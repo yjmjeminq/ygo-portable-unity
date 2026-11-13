@@ -209,31 +209,44 @@ namespace YGOPortable.Editor
             AssertTrue(missingPortraits == 0, $"{missingPortraits} character portraits failed to load");
             Debug.Log($"[VERIFY] DB verified: {DeckRepository.Characters.Count} chars (0 missing portraits), {DeckRepository.PresetDecks.Count} preset decks.");
 
-            // Run 5 full AI vs AI matches
+            // Run 6 full AI vs AI matches (5 going-first + 1 going-second HumanPlayerIndex=1)
+            // and verify effects, chains, Extra/GY/Banished zone indexing, combat, and prompts
             var metaDecks = DeckRepository.PresetDecks.Where(d => d.isMeta2026 && d.main != null && d.main.Length >= 40).ToList();
             var classicDecks = DeckRepository.PresetDecks.Where(d => !d.isMeta2026 && d.main != null && d.main.Length >= 40).ToList();
             AssertTrue(metaDecks.Count >= 18, $"Need >=18 playable meta decks, got {metaDecks.Count}");
             AssertTrue(classicDecks.Count >= 100, $"Need >=100 playable classic decks, got {classicDecks.Count}");
 
-            var pairings = new[]
+            var pairings = new (PresetDeckInfo d0, PresetDeckInfo d1, bool p0First)[]
             {
-                (metaDecks[0], metaDecks[Math.Min(1, metaDecks.Count - 1)]),
-                (metaDecks[Math.Min(2, metaDecks.Count - 1)], metaDecks[Math.Min(3, metaDecks.Count - 1)]),
-                (metaDecks[Math.Min(4, metaDecks.Count - 1)], metaDecks[Math.Min(5, metaDecks.Count - 1)]),
-                (metaDecks[0], classicDecks[0]),
-                (classicDecks[10], classicDecks[25]),
+                (metaDecks[0], metaDecks[Math.Min(1, metaDecks.Count - 1)], true),
+                (metaDecks[Math.Min(2, metaDecks.Count - 1)], metaDecks[Math.Min(3, metaDecks.Count - 1)], true),
+                (metaDecks[Math.Min(4, metaDecks.Count - 1)], metaDecks[Math.Min(5, metaDecks.Count - 1)], true),
+                (metaDecks[0], classicDecks[0], true),
+                (classicDecks[10], classicDecks[25], true),
+                (metaDecks[1], metaDecks[0], false),
             };
 
             int totalRetries = 0;
+            int totalChains = 0;
+            int totalSpSummons = 0;
+            int totalNormalSummons = 0;
+            int totalAttacks = 0;
+            int totalDamage = 0;
+            int extraZoneActionsVerified = 0;
+            int graveZoneActionsVerified = 0;
+            int removedZoneActionsVerified = 0;
+            int zoneSyncMismatches = 0;
+            var promptHistogram = new Dictionary<int, int>();
+
             for (int i = 0; i < pairings.Length; i++)
             {
-                var (d0, d1) = pairings[i];
+                var (d0, d1, p0First) = pairings[i];
                 var ai0 = new TacticalAI { Difficulty = AIDifficulty.Smart };
                 var ai1 = new TacticalAI { Difficulty = AIDifficulty.Smart };
                 using (var session = new DuelSession())
                 {
                     ulong[] seed = { (ulong)(1001 + i), (ulong)(2002 + i * 7), (ulong)(3003 + i * 13), (ulong)(4004 + i * 19) };
-                    bool started = session.StartNewDuel(d0.main, d0.extra, d1.main, d1.extra, true, 8000, seed);
+                    bool started = session.StartNewDuel(d0.main, d0.extra, d1.main, d1.extra, p0First, 8000, seed);
                     AssertTrue(started, $"Duel {i} failed StartNewDuel");
 
                     int steps = 0;
@@ -246,19 +259,79 @@ namespace YGOPortable.Editor
                             session.StepUntilPrompt();
                             continue;
                         }
-                        var curAi = session.ActivePrompt.playerId == 0 ? ai0 : ai1;
-                        byte[] resp = curAi.ComputeResponse(session, session.ActivePrompt);
+
+                        var pr = session.ActivePrompt;
+                        promptHistogram[pr.messageType] = promptHistogram.TryGetValue(pr.messageType, out int curCnt) ? curCnt + 1 : 1;
+
+                        // Verify Extra/GY/Banished zone items match RefreshZonesFromCore snapshots
+                        void CheckZoneItems(List<SelectableCardItem> items)
+                        {
+                            if (items == null) return;
+                            foreach (var it in items)
+                            {
+                                if (it.location != YgoConstants.LOCATION_EXTRA &&
+                                    it.location != YgoConstants.LOCATION_GRAVE &&
+                                    it.location != YgoConstants.LOCATION_REMOVED)
+                                    continue;
+
+                                var ps = session.Players[it.controller];
+                                var list = it.location == YgoConstants.LOCATION_EXTRA ? ps.extra
+                                         : it.location == YgoConstants.LOCATION_GRAVE ? ps.grave
+                                         : ps.banished;
+                                bool matched = list.Any(c => c != null && c.controller == it.controller && c.location == it.location && c.sequence == it.sequence && c.code == it.code);
+                                if (!matched)
+                                    zoneSyncMismatches++;
+                                else if (it.location == YgoConstants.LOCATION_EXTRA)
+                                    extraZoneActionsVerified++;
+                                else if (it.location == YgoConstants.LOCATION_GRAVE)
+                                    graveZoneActionsVerified++;
+                                else
+                                    removedZoneActionsVerified++;
+                            }
+                        }
+                        if (pr.messageType == YgoConstants.MSG_SELECT_IDLECMD || pr.messageType == YgoConstants.MSG_SELECT_BATTLECMD)
+                        {
+                            CheckZoneItems(pr.spSummonable);
+                            CheckZoneItems(pr.activatable);
+                        }
+
+                        var curAi = pr.playerId == 0 ? ai0 : ai1;
+                        byte[] resp = curAi.ComputeResponse(session, pr);
                         session.SubmitResponse(resp);
                     }
 
+                    int dChains = session.Logs.Count(l => l.StartsWith("체인 ") && l.Contains("발동"));
+                    int dSp = session.Logs.Count(l => l.StartsWith("특수 소환:"));
+                    int dNorm = session.Logs.Count(l => l.StartsWith("일반 소환:"));
+                    int dAtk = session.Logs.Count(l => l.Contains("공격 선언!"));
+                    int dDmg = session.Logs.Count(l => l.Contains("데미지 -"));
+                    totalChains += dChains;
+                    totalSpSummons += dSp;
+                    totalNormalSummons += dNorm;
+                    totalAttacks += dAtk;
+                    totalDamage += dDmg;
+
                     totalRetries += session.RetryCount;
-                    Debug.Log($"[VERIFY DUEL {i + 1}] '{d0.title}' vs '{d1.title}' => finished={session.IsFinished}, winner={session.Winner}, turns={session.TurnNumber}, steps={steps}, lp=({session.Players[0].lp},{session.Players[1].lp}), hands=({session.Players[0].hand.Count},{session.Players[1].hand.Count}), retries={session.RetryCount}");
+                    Debug.Log($"[VERIFY DUEL {i + 1}] '{d0.title}' vs '{d1.title}' (p0First={p0First}) => finished={session.IsFinished}, winner={session.Winner}, turns={session.TurnNumber}, steps={steps}, lp=({session.Players[0].lp},{session.Players[1].lp}), chains={dChains}, sp={dSp}, atk={dAtk}, dmg={dDmg}, retries={session.RetryCount}");
                     AssertTrue(steps >= 5 && session.TurnNumber >= 2, $"Duel {i + 1} ended prematurely (turns={session.TurnNumber}, steps={steps})");
                     AssertTrue(session.RetryCount <= 4, $"Duel {i + 1} had excessive retries ({session.RetryCount})");
                 }
             }
 
-            Debug.Log($"[VERIFY] Total retries across 5 duels: {totalRetries}, native errors: {luaErrors.Count}");
+            promptHistogram.TryGetValue(YgoConstants.MSG_SELECT_CARD, out int cardPrompts);
+            promptHistogram.TryGetValue(YgoConstants.MSG_SELECT_CHAIN, out int chainPrompts);
+            promptHistogram.TryGetValue(YgoConstants.MSG_SELECT_EFFECTYN, out int effYnPrompts);
+            promptHistogram.TryGetValue(YgoConstants.MSG_SELECT_PLACE, out int placePrompts);
+            promptHistogram.TryGetValue(YgoConstants.MSG_SELECT_POSITION, out int posPrompts);
+            Debug.Log($"[VERIFY EFFECTS] chains={totalChains}, spSummons={totalSpSummons}, normalSummons={totalNormalSummons}, attacks={totalAttacks}, damageEvents={totalDamage}, prompts(CARD={cardPrompts}, CHAIN={chainPrompts}, EFFECTYN={effYnPrompts}, PLACE={placePrompts}, POS={posPrompts}), zoneActionSync(EX={extraZoneActionsVerified}, GY={graveZoneActionsVerified}, BAN={removedZoneActionsVerified}, mismatches={zoneSyncMismatches})");
+            Debug.Log($"[VERIFY] Total retries across {pairings.Length} duels: {totalRetries}, native errors: {luaErrors.Count}");
+
+            AssertTrue(totalChains >= 3, $"Expected >= 3 effect/chain activations across test duels, got {totalChains}");
+            AssertTrue(totalSpSummons >= 2, $"Expected >= 2 Special Summons across test duels, got {totalSpSummons}");
+            AssertTrue(totalAttacks >= 3, $"Expected >= 3 attack declarations across test duels, got {totalAttacks}");
+            AssertTrue(totalDamage >= 2, $"Expected >= 2 LP damage events across test duels, got {totalDamage}");
+            AssertTrue(cardPrompts > 0 && chainPrompts > 0, $"Expected MSG_SELECT_CARD ({cardPrompts}) and MSG_SELECT_CHAIN ({chainPrompts}) prompts to fire");
+            AssertTrue(zoneSyncMismatches == 0, $"Detected {zoneSyncMismatches} Extra/GY/Banished zone sequence sync mismatches");
             AssertTrue(luaErrors.Count == 0, $"Native/Lua error logs detected: {string.Join(" | ", luaErrors.Take(3))}");
 
             CardArtLoader.Shutdown();

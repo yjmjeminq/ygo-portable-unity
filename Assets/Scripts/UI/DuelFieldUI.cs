@@ -70,8 +70,19 @@ namespace YGOPortable.UI
         private readonly FieldSlotView[] _emz = new FieldSlotView[2]; // [0]=Human seq5 (Opp seq6), [1]=Human seq6 (Opp seq5)
 
         // Stack counters (Deck / Extra / GY / Banished)
-        private Text _myDeckTxt, _myExtraTxt, _myGyTxt, _myBanTxt;
-        private Text _oppDeckTxt, _oppExtraTxt, _oppGyTxt, _oppBanTxt, _oppHandCountTxt;
+        private class StackTileView
+        {
+            public Text text;
+            public Outline border;
+        }
+
+        private StackTileView _myDeckTile, _myExtraTile, _myGyTile, _myBanTile;
+        private StackTileView _oppDeckTile, _oppExtraTile, _oppGyTile, _oppBanTile;
+        private Text _oppHandCountTxt;
+
+        // Multi-place selection accumulator (for MSG_SELECT_PLACE / MSG_SELECT_DISFIELD with min > 1)
+        private readonly List<(byte con, uint loc, uint seq)> _pendingPlaces = new List<(byte con, uint loc, uint seq)>();
+        private DuelPrompt _pendingPlacePrompt;
 
         // Hand rows
         private RectTransform _myHandBar;
@@ -94,6 +105,8 @@ namespace YGOPortable.UI
             _session = session;
             _oppChar = oppChar;
             _oppDeck = oppDeck;
+            _pendingPlaces.Clear();
+            _pendingPlacePrompt = null;
 
             Root.SetActive(true);
             _actionPopup.SetActive(false);
@@ -321,18 +334,26 @@ namespace YGOPortable.UI
             }
 
             // Column 0 (Left Edge): Opp Banished (0), Opp GY (1), Opp Deck (2) | My Extra (3), My Field (4)
-            _oppBanTxt = CreateStackTile(CellRect(0, 0), "LOTD/Field/exclude_red", "상대 제외\n0", () => _modals.ShowZoneViewer("상대 제외 존", _session?.Players[_session.AiPlayerIndex].banished, true));
-            _oppGyTxt = CreateStackTile(CellRect(0, 1), "LOTD/Field/graveyard_red", "상대 묘지\n0", () => _modals.ShowZoneViewer("상대 묘지", _session?.Players[_session.AiPlayerIndex].grave));
-            _oppDeckTxt = CreateStackTile(CellRect(0, 2), "LOTD/Field/monster_red", "상대 덱\n0", null);
-            _myExtraTxt = CreateStackTile(CellRect(0, 3), "LOTD/Field/extra_blue", "엑스트라\n0", () => _modals.ShowZoneViewer("내 엑스트라 덱", _session?.Players[_session.HumanPlayerIndex].extra));
+            _oppBanTile = CreateStackTile(CellRect(0, 0), "LOTD/Field/exclude_red", "상대 제외\n0",
+                () => OpenStackZone((byte)_session.AiPlayerIndex, YgoConstants.LOCATION_REMOVED, "상대 제외 존", true));
+            _oppGyTile = CreateStackTile(CellRect(0, 1), "LOTD/Field/graveyard_red", "상대 묘지\n0",
+                () => OpenStackZone((byte)_session.AiPlayerIndex, YgoConstants.LOCATION_GRAVE, "상대 묘지"));
+            _oppDeckTile = CreateStackTile(CellRect(0, 2), "LOTD/Field/monster_red", "상대 덱\n0",
+                () => OpenStackZone((byte)_session.AiPlayerIndex, YgoConstants.LOCATION_DECK, "상대 덱"));
+            _myExtraTile = CreateStackTile(CellRect(0, 3), "LOTD/Field/extra_blue", "엑스트라\n0",
+                () => OpenStackZone((byte)_session.HumanPlayerIndex, YgoConstants.LOCATION_EXTRA, "내 엑스트라 덱"));
             _mySZone[5] = CreateZoneSlot(CellRect(0, 4), "LOTD/Field/field_blue", true, (c, l, s) => OnSlotClicked(c, l, s));
 
             // Column 6 (Right Edge): Opp Field (0), Opp Extra (1) | My Deck (2), My GY (3), My Banished (4)
             _oppSZone[5] = CreateZoneSlot(CellRect(6, 0), "LOTD/Field/field_red", false, (c, l, s) => OnSlotClicked(c, l, s));
-            _oppExtraTxt = CreateStackTile(CellRect(6, 1), "LOTD/Field/extra_red", "상대 EX\n0", null);
-            _myDeckTxt = CreateStackTile(CellRect(6, 2), "LOTD/Field/monster_blue", "내 덱\n0", null);
-            _myGyTxt = CreateStackTile(CellRect(6, 3), "LOTD/Field/graveyard_blue", "내 묘지\n0", () => _modals.ShowZoneViewer("내 묘지", _session?.Players[_session.HumanPlayerIndex].grave));
-            _myBanTxt = CreateStackTile(CellRect(6, 4), "LOTD/Field/exclude_blue", "내 제외\n0", () => _modals.ShowZoneViewer("내 제외 존", _session?.Players[_session.HumanPlayerIndex].banished));
+            _oppExtraTile = CreateStackTile(CellRect(6, 1), "LOTD/Field/extra_red", "상대 EX\n0",
+                () => OpenStackZone((byte)_session.AiPlayerIndex, YgoConstants.LOCATION_EXTRA, "상대 엑스트라 덱"));
+            _myDeckTile = CreateStackTile(CellRect(6, 2), "LOTD/Field/monster_blue", "내 덱\n0",
+                () => OpenStackZone((byte)_session.HumanPlayerIndex, YgoConstants.LOCATION_DECK, "내 덱"));
+            _myGyTile = CreateStackTile(CellRect(6, 3), "LOTD/Field/graveyard_blue", "내 묘지\n0",
+                () => OpenStackZone((byte)_session.HumanPlayerIndex, YgoConstants.LOCATION_GRAVE, "내 묘지"));
+            _myBanTile = CreateStackTile(CellRect(6, 4), "LOTD/Field/exclude_blue", "내 제외\n0",
+                () => OpenStackZone((byte)_session.HumanPlayerIndex, YgoConstants.LOCATION_REMOVED, "내 제외 존"));
         }
 
         private FieldSlotView CreateZoneSlot(RectTransform cell, string frameSpritePath, bool isBlue, Action<byte, uint, uint> onClick)
@@ -378,20 +399,29 @@ namespace YGOPortable.UI
             return slot;
         }
 
-        private static Text CreateStackTile(RectTransform cell, string spritePath, string label, Action onClick)
+        private StackTileView CreateStackTile(RectTransform cell, string spritePath, string label, Action onClick)
         {
             var sp = LotdUiKit.LoadSprite(spritePath);
             var bg = LotdUiKit.AddImage(cell.gameObject, sp ?? LotdUiKit.WhiteSprite, sp != null ? Color.white : LotdUiKit.PanelNavy, false);
-            var pill = LotdUiKit.CreateRect("Pill", cell, new Vector2(0.06f, 0.20f), new Vector2(0.94f, 0.80f), Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(pill.gameObject, LotdUiKit.WhiteSprite, new Color(0.02f, 0.06f, 0.14f, 0.78f), false, false);
-            var txt = LotdUiKit.AddText(pill, "T", label, 12, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
+            var ol = cell.gameObject.AddComponent<Outline>();
+            ol.effectColor = new Color(0, 0, 0, 0);
+            ol.effectDistance = new Vector2(2f, -2f);
+
+            var pill = LotdUiKit.CreateRect("Pill", cell, new Vector2(0.06f, 0.18f), new Vector2(0.94f, 0.82f), Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(pill.gameObject, LotdUiKit.WhiteSprite, new Color(0.02f, 0.06f, 0.14f, 0.80f), false, false);
+            var txt = LotdUiKit.AddText(pill, "T", label, 11, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
             if (onClick != null)
             {
                 var btn = cell.gameObject.AddComponent<Button>();
                 btn.targetGraphic = bg;
-                btn.onClick.AddListener(() => { LotdAudio.PlayClick(); onClick(); });
+                btn.onClick.AddListener(() =>
+                {
+                    if (_session == null) return;
+                    LotdAudio.PlayClick();
+                    onClick();
+                });
             }
-            return txt;
+            return new StackTileView { text = txt, border = ol };
         }
 
         private void BuildBottomHudAndHands(Transform root)
@@ -453,6 +483,13 @@ namespace YGOPortable.UI
         {
             if (_session == null || Root == null || !Root.activeSelf) return;
 
+            var p = _session.ActivePrompt;
+            if (!ReferenceEquals(p, _pendingPlacePrompt))
+            {
+                _pendingPlacePrompt = p;
+                _pendingPlaces.Clear();
+            }
+
             int me = _session.HumanPlayerIndex;
             int opp = _session.AiPlayerIndex;
             var myP = _session.Players[me];
@@ -468,9 +505,15 @@ namespace YGOPortable.UI
             _turnBadgeText.text = $"TURN {_session.TurnNumber}";
             string turnOwner = _session.TurnPlayer == me ? "<color=#44DDFF>내 턴</color>" : "<color=#FF6666>상대 턴</color>";
             string phKr = YgoConstants.GetPhaseNameKR(_session.CurrentPhase);
-            bool waitingMyAction = _session.ActivePrompt != null && _session.ActivePrompt.playerId == me;
-            string extraCue = waitingMyAction && (_session.ActivePrompt.messageType == YgoConstants.MSG_SELECT_PLACE || _session.ActivePrompt.messageType == YgoConstants.MSG_SELECT_DISFIELD)
-                ? "  •  <color=#FFCC44>빈 존을 클릭하세요!</color>" : "";
+            bool waitingMyAction = p != null && p.playerId == me;
+            string extraCue = "";
+            if (waitingMyAction && (p.messageType == YgoConstants.MSG_SELECT_PLACE || p.messageType == YgoConstants.MSG_SELECT_DISFIELD))
+            {
+                int needPlaces = Mathf.Max(1, (int)p.min);
+                extraCue = needPlaces > 1
+                    ? $"  •  <color=#FFCC44>존 {needPlaces}곳 선택 ({_pendingPlaces.Count}/{needPlaces})</color>"
+                    : "  •  <color=#FFCC44>빈 존을 클릭하세요!</color>";
+            }
             _hintBannerText.text = $"{turnOwner} — {phKr}{extraCue}";
 
             // Phase bar colors
@@ -488,23 +531,22 @@ namespace YGOPortable.UI
             }
 
             // Phase quick buttons interactability
-            var p = _session.ActivePrompt;
             bool myIdle = waitingMyAction && p.messageType == YgoConstants.MSG_SELECT_IDLECMD;
             bool myBattle = waitingMyAction && p.messageType == YgoConstants.MSG_SELECT_BATTLECMD;
             _btnToBp.interactable = myIdle && p.canBp;
             _btnToMp2.interactable = myBattle && p.canM2;
             _btnToEp.interactable = (myIdle && p.canEp) || (myBattle && p.canEp);
 
-            // Stacks
-            _myDeckTxt.text = $"내 덱\n{myP.deckCount}";
-            _myExtraTxt.text = $"엑스트라\n{myP.extra.Count}";
-            _myGyTxt.text = $"내 묘지\n{myP.grave.Count}";
-            _myBanTxt.text = $"내 제외\n{myP.banished.Count}";
+            // Stacks (with playable EX / GY / Banished / Deck action highlight)
+            UpdateStackTile(_myDeckTile, "내 덱", myP.deckCount, (byte)me, YgoConstants.LOCATION_DECK, waitingMyAction);
+            UpdateStackTile(_myExtraTile, "엑스트라", myP.extra.Count, (byte)me, YgoConstants.LOCATION_EXTRA, waitingMyAction);
+            UpdateStackTile(_myGyTile, "내 묘지", myP.grave.Count, (byte)me, YgoConstants.LOCATION_GRAVE, waitingMyAction);
+            UpdateStackTile(_myBanTile, "내 제외", myP.banished.Count, (byte)me, YgoConstants.LOCATION_REMOVED, waitingMyAction);
 
-            _oppDeckTxt.text = $"상대 덱\n{opP.deckCount}";
-            _oppExtraTxt.text = $"상대 EX\n{opP.extra.Count}";
-            _oppGyTxt.text = $"상대 묘지\n{opP.grave.Count}";
-            _oppBanTxt.text = $"상대 제외\n{opP.banished.Count}";
+            UpdateStackTile(_oppDeckTile, "상대 덱", opP.deckCount, (byte)opp, YgoConstants.LOCATION_DECK, waitingMyAction);
+            UpdateStackTile(_oppExtraTile, "상대 EX", opP.extra.Count, (byte)opp, YgoConstants.LOCATION_EXTRA, waitingMyAction);
+            UpdateStackTile(_oppGyTile, "상대 묘지", opP.grave.Count, (byte)opp, YgoConstants.LOCATION_GRAVE, waitingMyAction);
+            UpdateStackTile(_oppBanTile, "상대 제외", opP.banished.Count, (byte)opp, YgoConstants.LOCATION_REMOVED, waitingMyAction);
             _oppHandCountTxt.text = $"상대 패: {opP.hand.Count}장";
 
             // Chain banner
@@ -529,10 +571,22 @@ namespace YGOPortable.UI
             RefreshLogFeed();
         }
 
+        private void UpdateStackTile(StackTileView tile, string baseLabel, int count, byte con, uint loc, bool waitingMyAction)
+        {
+            if (tile == null) return;
+            int actCount = waitingMyAction ? CountZoneActions(con, loc) : 0;
+            tile.text.text = actCount > 0
+                ? $"{baseLabel}\n{count} <color=#FFCC44>[가능 {actCount}]</color>"
+                : $"{baseLabel}\n{count}";
+            tile.border.effectColor = actCount > 0 ? LotdUiKit.GoldAccent : new Color(0, 0, 0, 0);
+        }
+
         private void BindEmz(FieldSlotView slot, byte myCon, uint mySeq, byte oppCon, uint oppSeq, LiveCardState myEmz, LiveCardState oppEmz)
         {
             if (oppEmz != null)
                 BindSlot(slot, oppCon, YgoConstants.LOCATION_MZONE, oppSeq, oppEmz, isOpponent: true);
+            else if (myEmz == null && !IsPlaceSelectable(myCon, YgoConstants.LOCATION_MZONE, mySeq) && IsPlaceSelectable(oppCon, YgoConstants.LOCATION_MZONE, oppSeq))
+                BindSlot(slot, oppCon, YgoConstants.LOCATION_MZONE, oppSeq, null, isOpponent: true);
             else
                 BindSlot(slot, myCon, YgoConstants.LOCATION_MZONE, mySeq, myEmz, isOpponent: false);
         }
@@ -547,7 +601,6 @@ namespace YGOPortable.UI
             if (live != null)
             {
                 slot.cardView.gameObject.SetActive(true);
-                bool faceDown = !live.IsFaceUp && !live.isPublic && (isOpponent || loc != YgoConstants.LOCATION_HAND);
                 bool showBack = !live.IsFaceUp;
                 slot.cardView.SetCard(showBack ? 0u : live.code, faceDown: showBack, live: live);
                 slot.cardView.transform.localRotation = (loc == YgoConstants.LOCATION_MZONE && live.IsDefense)
@@ -573,11 +626,13 @@ namespace YGOPortable.UI
                 slot.badgeText.text = "";
             }
 
-            // Highlight selectable places or playable field cards
-            bool placeValid = IsPlaceSelectable(con, loc, seq);
-            slot.placeGlow.SetActive(placeValid);
-            slot.border.effectColor = placeValid ? LotdUiKit.GoldAccent
-                : (live != null && HasFieldAction(con, loc, seq) ? LotdUiKit.CyanAccent : new Color(0, 0, 0, 0));
+            // Highlight selectable places, pending multi-place picks, or playable field cards
+            bool alreadyPicked = IsPlacePending(con, loc, seq);
+            bool placeValid = !alreadyPicked && IsPlaceSelectable(con, loc, seq);
+            slot.placeGlow.SetActive(placeValid || alreadyPicked);
+            slot.border.effectColor = alreadyPicked ? LotdUiKit.CyanAccent
+                : (placeValid ? LotdUiKit.GoldAccent
+                : (live != null && HasFieldAction(con, loc, seq) ? LotdUiKit.CyanAccent : new Color(0, 0, 0, 0)));
         }
 
         private void RefreshHands(PlayerFieldSnapshot myP, PlayerFieldSnapshot opP, DuelPrompt p, bool waitingMyAction)
@@ -636,6 +691,14 @@ namespace YGOPortable.UI
         }
 
         // ==================== PROMPT INTERACTIONS ====================
+        private bool IsPlacePending(byte con, uint loc, uint seq)
+        {
+            for (int i = 0; i < _pendingPlaces.Count; i++)
+                if (_pendingPlaces[i].con == con && _pendingPlaces[i].loc == loc && _pendingPlaces[i].seq == seq)
+                    return true;
+            return false;
+        }
+
         private bool IsPlaceSelectable(byte con, uint loc, uint seq)
         {
             var p = _session?.ActivePrompt;
@@ -644,7 +707,7 @@ namespace YGOPortable.UI
                 return false;
 
             uint avail = ~p.placeFlag;
-            int shift = con == 0 ? 0 : 16;
+            int shift = con == p.playerId ? 0 : 16;
             if (loc == YgoConstants.LOCATION_MZONE)
                 return seq < 7 && ((avail >> (shift + (int)seq)) & 1u) != 0;
             if (loc == YgoConstants.LOCATION_SZONE)
@@ -665,49 +728,105 @@ namespace YGOPortable.UI
             return CollectActions(con, loc, seq).Count > 0;
         }
 
-        private List<(string label, int responseVal, bool gold)> CollectActions(byte con, uint loc, uint seq)
+        private int CountZoneActions(byte con, uint loc)
         {
-            var res = new List<(string, int, bool)>();
+            return CollectZoneActions(con, loc).Count;
+        }
+
+        private void AppendMatchingActions(
+            Func<SelectableCardItem, bool> predicate,
+            List<(SelectableCardItem item, string label, int responseVal, bool gold)> dest)
+        {
             var p = _session?.ActivePrompt;
-            if (p == null || p.playerId != _session.HumanPlayerIndex) return res;
+            if (p == null || p.playerId != _session.HumanPlayerIndex) return;
 
             if (p.messageType == YgoConstants.MSG_SELECT_IDLECMD)
             {
                 for (int i = 0; i < p.summonable.Count; i++)
-                    if (Match(p.summonable[i], con, loc, seq)) res.Add(("일반 소환", (i << 16) | 0, true));
+                    if (predicate(p.summonable[i])) dest.Add((p.summonable[i], "일반 소환", (i << 16) | 0, true));
                 for (int i = 0; i < p.spSummonable.Count; i++)
-                    if (Match(p.spSummonable[i], con, loc, seq)) res.Add(("특수 소환", (i << 16) | 1, true));
+                    if (predicate(p.spSummonable[i])) dest.Add((p.spSummonable[i], "특수 소환", (i << 16) | 1, true));
                 for (int i = 0; i < p.repositionable.Count; i++)
-                    if (Match(p.repositionable[i], con, loc, seq)) res.Add(("표시 형식 변경", (i << 16) | 2, false));
+                    if (predicate(p.repositionable[i])) dest.Add((p.repositionable[i], "표시 형식 변경", (i << 16) | 2, false));
                 for (int i = 0; i < p.mSetable.Count; i++)
-                    if (Match(p.mSetable[i], con, loc, seq)) res.Add(("몬스터 뒷면 세트", (i << 16) | 3, false));
+                    if (predicate(p.mSetable[i])) dest.Add((p.mSetable[i], "몬스터 뒷면 세트", (i << 16) | 3, false));
                 for (int i = 0; i < p.sSetable.Count; i++)
-                    if (Match(p.sSetable[i], con, loc, seq)) res.Add(("마법/함정 세트", (i << 16) | 4, false));
+                    if (predicate(p.sSetable[i])) dest.Add((p.sSetable[i], "마법/함정 세트", (i << 16) | 4, false));
                 for (int i = 0; i < p.activatable.Count; i++)
                 {
-                    if (!Match(p.activatable[i], con, loc, seq)) continue;
+                    if (!predicate(p.activatable[i])) continue;
                     string desc = CardDatabase.ResolveDescription(p.activatable[i].description, p.activatable[i].code);
                     string lbl = string.IsNullOrEmpty(desc) ? "효과 발동" : $"발동: {desc}";
-                    res.Add((lbl, (i << 16) | 5, true));
+                    dest.Add((p.activatable[i], lbl, (i << 16) | 5, true));
                 }
             }
             else if (p.messageType == YgoConstants.MSG_SELECT_BATTLECMD)
             {
                 for (int i = 0; i < p.attackable.Count; i++)
-                    if (Match(p.attackable[i], con, loc, seq)) res.Add(("공격 선언!", (i << 16) | 1, true));
+                    if (predicate(p.attackable[i])) dest.Add((p.attackable[i], "공격 선언!", (i << 16) | 1, true));
                 for (int i = 0; i < p.activatable.Count; i++)
                 {
-                    if (!Match(p.activatable[i], con, loc, seq)) continue;
+                    if (!predicate(p.activatable[i])) continue;
                     string desc = CardDatabase.ResolveDescription(p.activatable[i].description, p.activatable[i].code);
-                    res.Add((string.IsNullOrEmpty(desc) ? "효과 발동" : $"발동: {desc}", (i << 16) | 0, true));
+                    string lbl = string.IsNullOrEmpty(desc) ? "효과 발동" : $"발동: {desc}";
+                    dest.Add((p.activatable[i], lbl, (i << 16) | 0, true));
                 }
             }
+        }
+
+        private List<(string label, int responseVal, bool gold)> CollectActions(byte con, uint loc, uint seq)
+        {
+            var matched = new List<(SelectableCardItem item, string label, int responseVal, bool gold)>();
+            AppendMatchingActions(it => it.controller == con && it.location == loc && it.sequence == seq, matched);
+            var res = new List<(string, int, bool)>(matched.Count);
+            for (int i = 0; i < matched.Count; i++)
+                res.Add((matched[i].label, matched[i].responseVal, matched[i].gold));
             return res;
         }
 
-        private static bool Match(SelectableCardItem item, byte con, uint loc, uint seq)
+        private List<(SelectableCardItem item, string label, int responseVal, bool gold)> CollectZoneActions(byte con, uint loc)
         {
-            return item.controller == con && item.location == loc && item.sequence == seq;
+            var res = new List<(SelectableCardItem item, string label, int responseVal, bool gold)>();
+            AppendMatchingActions(it => it.controller == con && it.location == loc, res);
+            return res;
+        }
+
+        private void ExecuteActionInt(int responseVal)
+        {
+            if (_session == null) return;
+            LotdAudio.PlayClick();
+            _actionPopup.SetActive(false);
+            _session.SubmitResponseInt(responseVal);
+            Refresh();
+        }
+
+        private void OpenStackZone(byte con, uint loc, string title, bool hideFaceDown = false)
+        {
+            if (_session == null) return;
+            var p = _session.ActivePrompt;
+            bool waitingMyAction = p != null && p.playerId == _session.HumanPlayerIndex;
+            var zoneActions = waitingMyAction ? CollectZoneActions(con, loc) : null;
+
+            // Keep Deck & Opponent Extra Deck hidden unless the player has legal actions there
+            if (loc == YgoConstants.LOCATION_DECK || (con == _session.AiPlayerIndex && loc == YgoConstants.LOCATION_EXTRA))
+            {
+                if (zoneActions != null && zoneActions.Count > 0)
+                    ShowZoneActionsPopup(title, zoneActions);
+                return;
+            }
+
+            var ps = _session.Players[con];
+            IReadOnlyList<LiveCardState> cards = loc == YgoConstants.LOCATION_EXTRA ? ps.extra
+                : loc == YgoConstants.LOCATION_GRAVE ? ps.grave
+                : ps.banished;
+
+            _modals.ShowZoneViewer(
+                title,
+                cards,
+                hideFaceDown,
+                waitingMyAction ? (Func<LiveCardState, List<(string label, int responseVal, bool gold)>>)(c => CollectActions(c.controller, c.location, c.sequence)) : null,
+                waitingMyAction ? (Action<int>)ExecuteActionInt : null,
+                waitingMyAction ? (Action<LiveCardState>)(c => ShowCardActionsPopup(c.controller, c.location, c.sequence, c.code, c.overlayCodes)) : null);
         }
 
         private void OnSlotClicked(byte con, uint loc, uint seq)
@@ -717,7 +836,36 @@ namespace YGOPortable.UI
             if (IsPlaceSelectable(con, loc, seq))
             {
                 LotdAudio.PlayClick();
-                byte[] resp = { con, (byte)loc, (byte)seq };
+                if (IsPlacePending(con, loc, seq))
+                {
+                    for (int i = 0; i < _pendingPlaces.Count; i++)
+                    {
+                        if (_pendingPlaces[i].con == con && _pendingPlaces[i].loc == loc && _pendingPlaces[i].seq == seq)
+                        {
+                            _pendingPlaces.RemoveAt(i);
+                            break;
+                        }
+                    }
+                    Refresh();
+                    return;
+                }
+
+                _pendingPlaces.Add((con, loc, seq));
+                int needed = Mathf.Max(1, (int)(_session.ActivePrompt?.min ?? 1));
+                if (_pendingPlaces.Count < needed)
+                {
+                    Refresh();
+                    return;
+                }
+
+                byte[] resp = new byte[_pendingPlaces.Count * 3];
+                for (int i = 0; i < _pendingPlaces.Count; i++)
+                {
+                    resp[i * 3] = _pendingPlaces[i].con;
+                    resp[i * 3 + 1] = (byte)_pendingPlaces[i].loc;
+                    resp[i * 3 + 2] = (byte)_pendingPlaces[i].seq;
+                }
+                _pendingPlaces.Clear();
                 _actionPopup.SetActive(false);
                 _session.SubmitResponse(resp);
                 Refresh();
@@ -745,8 +893,24 @@ namespace YGOPortable.UI
         private void ShowCardActionsPopup(byte con, uint loc, uint seq, uint code, List<uint> overlays)
         {
             var actions = CollectActions(con, loc, seq);
+            PopulateAndShowActionPopup(code != 0 ? CardDatabase.GetName(code) : "카드 행동", actions, overlays);
+        }
+
+        private void ShowZoneActionsPopup(string title, List<(SelectableCardItem item, string label, int responseVal, bool gold)> zoneActions)
+        {
+            var actions = new List<(string label, int responseVal, bool gold)>(zoneActions.Count);
+            foreach (var za in zoneActions)
+            {
+                string cname = CardDatabase.GetName(za.item.code);
+                actions.Add(($"{cname} — {za.label}", za.responseVal, za.gold));
+            }
+            PopulateAndShowActionPopup(title, actions, null);
+        }
+
+        private void PopulateAndShowActionPopup(string header, List<(string label, int responseVal, bool gold)> actions, List<uint> overlays)
+        {
             bool hasOverlays = overlays != null && overlays.Count > 0;
-            if (actions.Count == 0 && !hasOverlays)
+            if ((actions == null || actions.Count == 0) && !hasOverlays)
             {
                 _actionPopup.SetActive(false);
                 return;
@@ -755,20 +919,18 @@ namespace YGOPortable.UI
             for (int i = _actionList.childCount - 1; i >= 0; i--)
                 UnityEngine.Object.Destroy(_actionList.GetChild(i).gameObject);
 
-            _actionHeader.text = code != 0 ? CardDatabase.GetName(code) : "카드 행동";
+            _actionHeader.text = header;
 
-            foreach (var act in actions)
+            if (actions != null)
             {
-                int val = act.responseVal;
-                var row = new GameObject("ActBtn", typeof(RectTransform), typeof(LayoutElement));
-                row.transform.SetParent(_actionList, false);
-                row.GetComponent<LayoutElement>().preferredHeight = 46f;
-                LotdUiKit.CreateLotdButton(row.transform, "B", act.label, () =>
+                foreach (var act in actions)
                 {
-                    _actionPopup.SetActive(false);
-                    _session.SubmitResponseInt(val);
-                    Refresh();
-                }, 15, act.gold);
+                    int val = act.responseVal;
+                    var row = new GameObject("ActBtn", typeof(RectTransform), typeof(LayoutElement));
+                    row.transform.SetParent(_actionList, false);
+                    row.GetComponent<LayoutElement>().preferredHeight = 46f;
+                    LotdUiKit.CreateLotdButton(row.transform, "B", act.label, () => ExecuteActionInt(val), 15, act.gold);
+                }
             }
 
             if (hasOverlays)

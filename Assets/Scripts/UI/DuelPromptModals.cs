@@ -795,7 +795,13 @@ namespace YGOPortable.UI
             ZoneViewRoot.SetActive(false);
         }
 
-        public void ShowZoneViewer(string title, IReadOnlyList<LiveCardState> cards, bool hideFaceDown = false)
+        public void ShowZoneViewer(
+            string title,
+            IReadOnlyList<LiveCardState> cards,
+            bool hideFaceDown = false,
+            Func<LiveCardState, List<(string label, int responseVal, bool gold)>> getCardActions = null,
+            Action<int> onExecuteAction = null,
+            Action<LiveCardState> onOpenCardActions = null)
         {
             _zoneTitle.text = $"{title} ({cards?.Count ?? 0}장)";
             for (int i = _zoneGrid.childCount - 1; i >= 0; i--)
@@ -807,8 +813,9 @@ namespace YGOPortable.UI
                 {
                     var c = cards[i];
                     if (c == null) continue;
-                    bool fd = hideFaceDown && !c.IsFaceUp && !c.isPublic;
-                    AddZoneCardTile(fd ? 0u : c.code, fd, c);
+                    var actions = getCardActions?.Invoke(c);
+                    bool fd = hideFaceDown && !c.IsFaceUp && !c.isPublic && (actions == null || actions.Count == 0);
+                    AddZoneCardTile(fd ? 0u : c.code, fd, c, actions, onExecuteAction, onOpenCardActions);
                 }
             }
             ZoneViewRoot.SetActive(true);
@@ -828,12 +835,22 @@ namespace YGOPortable.UI
             ZoneViewRoot.SetActive(true);
         }
 
-        private void AddZoneCardTile(uint code, bool faceDown, LiveCardState live)
+        private void AddZoneCardTile(
+            uint code,
+            bool faceDown,
+            LiveCardState live,
+            List<(string label, int responseVal, bool gold)> actions = null,
+            Action<int> onExecuteAction = null,
+            Action<LiveCardState> onOpenCardActions = null)
         {
-            var tile = LotdUiKit.CreateBorderedPanel(_zoneGrid, $"Z_{code}", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            var cRt = LotdUiKit.CreateRect("C", tile, new Vector2(0.08f, 0.18f), new Vector2(0.92f, 0.96f), Vector2.zero, Vector2.zero);
+            bool hasActions = actions != null && actions.Count > 0;
+            var tile = LotdUiKit.CreateBorderedPanel(_zoneGrid, $"Z_{code}", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero,
+                LotdUiKit.PanelNavy, hasActions ? LotdUiKit.GoldAccent : LotdUiKit.CyanAccent);
+            var cRt = LotdUiKit.CreateRect("C", tile,
+                new Vector2(0.08f, hasActions ? 0.30f : 0.18f), new Vector2(0.92f, 0.96f), Vector2.zero, Vector2.zero);
             CompositeCardView.Create(cRt, "V", false).SetCard(code, faceDown, live);
-            LotdUiKit.AddText(LotdUiKit.CreateRect("L", tile, new Vector2(0.04f, 0.01f), new Vector2(0.96f, 0.17f), Vector2.zero, Vector2.zero),
+            LotdUiKit.AddText(LotdUiKit.CreateRect("L", tile,
+                new Vector2(0.04f, hasActions ? 0.17f : 0.01f), new Vector2(0.96f, hasActions ? 0.29f : 0.17f), Vector2.zero, Vector2.zero),
                 "T", faceDown ? "뒷면" : CardDatabase.GetName(code), 11, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary);
 
             if (!faceDown && code != 0)
@@ -841,6 +858,30 @@ namespace YGOPortable.UI
                 var btn = tile.gameObject.AddComponent<Button>();
                 btn.targetGraphic = tile.GetComponent<Image>();
                 btn.onClick.AddListener(() => _onInspectCard?.Invoke(code));
+            }
+
+            if (hasActions)
+            {
+                var actRt = LotdUiKit.CreateRect("Act", tile, new Vector2(0.06f, 0.02f), new Vector2(0.94f, 0.16f), Vector2.zero, Vector2.zero);
+                if (actions.Count == 1 && onExecuteAction != null)
+                {
+                    int val = actions[0].responseVal;
+                    string lbl = actions[0].label;
+                    if (lbl.Length > 7 && lbl.StartsWith("발동")) lbl = "효과 발동";
+                    LotdUiKit.CreateLotdButton(actRt, "B", lbl, () =>
+                    {
+                        ZoneViewRoot.SetActive(false);
+                        onExecuteAction(val);
+                    }, 11, actions[0].gold);
+                }
+                else if (live != null && onOpenCardActions != null)
+                {
+                    LotdUiKit.CreateLotdButton(actRt, "B", $"행동 ({actions.Count})", () =>
+                    {
+                        ZoneViewRoot.SetActive(false);
+                        onOpenCardActions(live);
+                    }, 11, true);
+                }
             }
         }
 
