@@ -351,13 +351,15 @@ namespace YGOPortable.UI
             LotdUiKit.CreateLotdButton(LotdUiKit.CreateRect("Save", top1, new Vector2(0.80f, 0), new Vector2(1f, 1), Vector2.zero, Vector2.zero),
                 "B", "저장", SaveCurrentDeck, 14, gold: true);
 
-            // Row 2: Deck Name Input + Sort + Toggle Extra/Side + Delete
+            // Row 2: Deck Name Input + Sort + Shuffle + Toggle Extra/Side + Delete
             var top2 = LotdUiKit.CreateRect("Top2", _deckColRect, new Vector2(0.02f, 0.855f), new Vector2(0.98f, 0.908f), Vector2.zero, Vector2.zero);
-            _deckNameInput = LotdUiKit.CreateInputField(LotdUiKit.CreateRect("DName", top2, new Vector2(0, 0), new Vector2(0.52f, 1), Vector2.zero, Vector2.zero),
+            _deckNameInput = LotdUiKit.CreateInputField(LotdUiKit.CreateRect("DName", top2, new Vector2(0, 0), new Vector2(0.42f, 1), Vector2.zero, Vector2.zero),
                 "DeckName", "덱 이름...", 14);
-            LotdUiKit.CreateLotdButton(LotdUiKit.CreateRect("SortD", top2, new Vector2(0.54f, 0), new Vector2(0.70f, 1), Vector2.zero, Vector2.zero),
-                "B", "정렬", SortWorkingDeck, 13);
-            LotdUiKit.CreateLotdButton(LotdUiKit.CreateRect("SwES", top2, new Vector2(0.72f, 0), new Vector2(0.88f, 1), Vector2.zero, Vector2.zero),
+            LotdUiKit.CreateLotdButton(LotdUiKit.CreateRect("SortD", top2, new Vector2(0.44f, 0), new Vector2(0.57f, 1), Vector2.zero, Vector2.zero),
+                "B", "정렬", SortWorkingDeck, 12);
+            LotdUiKit.CreateLotdButton(LotdUiKit.CreateRect("ShufD", top2, new Vector2(0.58f, 0), new Vector2(0.71f, 1), Vector2.zero, Vector2.zero),
+                "B", "셔플", ShuffleWorkingDeck, 12);
+            LotdUiKit.CreateLotdButton(LotdUiKit.CreateRect("SwES", top2, new Vector2(0.72f, 0), new Vector2(0.86f, 1), Vector2.zero, Vector2.zero),
                 "B", "Ex/사이드", () =>
                 {
                     _showingSide = !_showingSide;
@@ -365,7 +367,7 @@ namespace YGOPortable.UI
                     _sideGridHolder.SetActive(_showingSide);
                     RefreshDeckGrids();
                 }, 12);
-            LotdUiKit.CreateLotdButton(LotdUiKit.CreateRect("Del", top2, new Vector2(0.90f, 0), new Vector2(1f, 1), Vector2.zero, Vector2.zero),
+            LotdUiKit.CreateLotdButton(LotdUiKit.CreateRect("Del", top2, new Vector2(0.88f, 0), new Vector2(1f, 1), Vector2.zero, Vector2.zero),
                 "B", "삭제", DeleteCurrentDeck, 12);
 
             // Main Deck Header + 10x6 Grid (60 slots)
@@ -798,6 +800,24 @@ namespace YGOPortable.UI
             _workingDeck.side.Sort((a, b) => string.Compare(CardDatabase.GetName(a), CardDatabase.GetName(b), StringComparison.Ordinal));
             RefreshDeckGrids();
             ShowToast("덱 정렬 완료");
+        }
+
+        private void ShuffleWorkingDeck()
+        {
+            if (_workingDeck.main.Count <= 1) return;
+            using (var rng = System.Security.Cryptography.RandomNumberGenerator.Create())
+            {
+                byte[] rb = new byte[4];
+                for (int i = _workingDeck.main.Count - 1; i > 0; i--)
+                {
+                    rng.GetBytes(rb);
+                    int j = (int)(BitConverter.ToUInt32(rb, 0) % (uint)(i + 1));
+                    (_workingDeck.main[i], _workingDeck.main[j]) = (_workingDeck.main[j], _workingDeck.main[i]);
+                }
+            }
+            LotdAudio.PlayDraw();
+            RefreshDeckGrids();
+            ShowToast("메인 덱 순서를 무작위로 섞었습니다.");
         }
 
         private void DeleteCurrentDeck()

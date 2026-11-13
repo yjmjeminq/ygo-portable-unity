@@ -35,6 +35,20 @@ namespace YGOPortable.Core
         public bool IsAttack => (position & YgoConstants.POS_ATTACK) != 0;
     }
 
+    public class CardMoveEvent
+    {
+        public uint code;
+        public byte fromCon;
+        public uint fromLoc;
+        public uint fromSeq;
+        public uint fromPos;
+        public byte toCon;
+        public uint toLoc;
+        public uint toSeq;
+        public uint toPos;
+        public uint reason;
+    }
+
     public class ChainLinkInfo
     {
         public int chainNumber;
@@ -138,6 +152,12 @@ namespace YGOPortable.Core
 
         public event Action<string> OnLogAdded;
 
+        public int HumanPlayerIndex { get; private set; } = 0;
+        public int AiPlayerIndex => 1 - HumanPlayerIndex;
+
+        public event Action<CardMoveEvent> OnCardMoved;
+        public event Action<byte, uint, uint, byte, uint, uint> OnAttackDeclared;
+
         public bool StartNewDuel(
             IReadOnlyList<uint> p0Main, IReadOnlyList<uint> p0Extra,
             IReadOnlyList<uint> p1Main, IReadOnlyList<uint> p1Extra,
@@ -154,11 +174,18 @@ namespace YGOPortable.Core
             CurrentChain.Clear();
             Logs.Clear();
 
-            // When AI goes first, swap deck slots so logical Player 0 in core plays first, OR track humanPlayerId!
-            // Keep Team 0 = Human, Team 1 = AI; starting player swaps via NewCard team/duelist if needed:
-            // Standard ygopro-core always lets Player 0 take Turn 1! So if AI goes first, caller can handle swap OR
-            // wait: keeping Player 0 = first turn player means if !p0GoesFirst we map UI BottomPlayer = 1!
             HumanPlayerIndex = p0GoesFirst ? 0 : 1;
+
+            if (seed == null || seed.Length < 4)
+            {
+                seed = new ulong[4];
+                using (var rng = System.Security.Cryptography.RandomNumberGenerator.Create())
+                {
+                    byte[] bytes = new byte[32];
+                    rng.GetBytes(bytes);
+                    Buffer.BlockCopy(bytes, 0, seed, 0, 32);
+                }
+            }
 
             NativePtr = YgoNativeBridge.CreateDuel(
                 seed, YgoConstants.DUEL_MODE_MR5,
@@ -185,56 +212,25 @@ namespace YGOPortable.Core
             LoadDeckForPlayer(1, turn1Main, turn1Extra, seed);
 
             YgoNativeBridge.YGO_StartDuel(NativePtr);
-            AddLog($"듀얼 개시! ({(p0GoesFirst ? "플레이어 선공" : "AI 선공")})");
+            AddLog($"듀얼 개시! ({(p0GoesFirst ? "플레이어 선공" : "AI 선공")}) — 덱 무작위 셔플 완료");
             StepUntilPrompt();
             return true;
-        }
-
-        public int HumanPlayerIndex { get; private set; } = 0;
-        public int AiPlayerIndex => 1 - HumanPlayerIndex;
-
-        private static ulong ComputeDeckShuffleSeed(ulong[] seed, byte playerId)
-        {
-            ulong h = 0x9E3779B97F4A7C15UL ^ ((ulong)(playerId + 1) * 0xBF58476D1CE4E5B9UL);
-            if (seed != null && seed.Length > 0)
-            {
-                for (int i = 0; i < seed.Length; i++)
-                {
-                    h ^= seed[i] + 0x9E3779B97F4A7C15UL + (ulong)i;
-                    NextSplitMix64(ref h);
-                }
-            }
-            else
-            {
-                byte[] bytes = Guid.NewGuid().ToByteArray();
-                ulong lo = BitConverter.ToUInt64(bytes, 0);
-                ulong hi = BitConverter.ToUInt64(bytes, 8);
-                h ^= lo ^ (hi * 0x94D049BB133111EBUL);
-                NextSplitMix64(ref h);
-            }
-            return h != 0 ? h : 0xD1B54A32D192ED03UL;
-        }
-
-        private static ulong NextSplitMix64(ref ulong x)
-        {
-            x += 0x9E3779B97F4A7C15UL;
-            ulong z = x;
-            z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL;
-            z = (z ^ (z >> 27)) * 0x94D049BB133111EBUL;
-            return z ^ (z >> 31);
         }
 
         private void LoadDeckForPlayer(byte playerId, IReadOnlyList<uint> main, IReadOnlyList<uint> extra, ulong[] seed)
         {
             if (main != null && main.Count > 0)
             {
-                // ygopro-core OCG_StartDuel does not shuffle main decks on startup; shuffle here per official YGO rules.
                 var shuffled = new List<uint>(main);
-                ulong rng = ComputeDeckShuffleSeed(seed, playerId);
-                for (int i = shuffled.Count - 1; i > 0; i--)
+                using (var rng = System.Security.Cryptography.RandomNumberGenerator.Create())
                 {
-                    int j = (int)(NextSplitMix64(ref rng) % (ulong)(i + 1));
-                    (shuffled[i], shuffled[j]) = (shuffled[j], shuffled[i]);
+                    byte[] rb = new byte[4];
+                    for (int i = shuffled.Count - 1; i > 0; i--)
+                    {
+                        rng.GetBytes(rb);
+                        int j = (int)(BitConverter.ToUInt32(rb, 0) % (uint)(i + 1));
+                        (shuffled[i], shuffled[j]) = (shuffled[j], shuffled[i]);
+                    }
                 }
                 for (int i = shuffled.Count - 1; i >= 0; i--)
                 {
@@ -463,6 +459,30 @@ namespace YGOPortable.Core
                     break;
                 }
 
+                case YgoConstants.MSG_MOVE:
+                {
+                    uint code = br.ReadUInt32();
+                    byte fCon = br.ReadByte();
+                    byte fLoc = br.ReadByte();
+                    uint fSeq = br.ReadUInt32();
+                    uint fPos = br.ReadUInt32();
+                    byte tCon = br.ReadByte();
+                    byte tLoc = br.ReadByte();
+                    uint tSeq = br.ReadUInt32();
+                    uint tPos = br.ReadUInt32();
+                    uint reason = (br.BaseStream.Position < msgEnd) ? br.ReadUInt32() : 0;
+
+                    var ev = new CardMoveEvent
+                    {
+                        code = code,
+                        fromCon = fCon, fromLoc = fLoc, fromSeq = fSeq, fromPos = fPos,
+                        toCon = tCon, toLoc = tLoc, toSeq = tSeq, toPos = tPos,
+                        reason = reason,
+                    };
+                    OnCardMoved?.Invoke(ev);
+                    break;
+                }
+
                 case YgoConstants.MSG_CONFIRM_CARDS:
                 case YgoConstants.MSG_CONFIRM_DECKTOP:
                 {
@@ -535,6 +555,7 @@ namespace YGOPortable.Core
                     br.ReadUInt32();
                     HasActiveAttack = true;
                     AddLog(TargetLoc == 0 ? "직접 공격 선언!" : "몬스터 공격 선언!");
+                    OnAttackDeclared?.Invoke((byte)AttackerCon, AttackerLoc, AttackerSeq, (byte)TargetCon, TargetLoc, TargetSeq);
                     break;
                 }
 

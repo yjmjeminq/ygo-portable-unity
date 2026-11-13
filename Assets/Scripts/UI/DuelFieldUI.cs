@@ -108,7 +108,19 @@ namespace YGOPortable.UI
 
         public void BindSession(DuelSession session, OpponentCharacter oppChar, PresetDeckInfo oppDeck)
         {
+            if (_session != null)
+            {
+                _session.OnCardMoved -= HandleCardMovedEvent;
+                _session.OnAttackDeclared -= HandleAttackEvent;
+            }
+
             _session = session;
+            if (_session != null)
+            {
+                _session.OnCardMoved += HandleCardMovedEvent;
+                _session.OnAttackDeclared += HandleAttackEvent;
+            }
+
             _oppChar = oppChar;
             _oppDeck = oppDeck;
             _pendingPlaces.Clear();
@@ -874,6 +886,161 @@ namespace YGOPortable.UI
                     }
                 }
             }
+        }
+
+        private Vector2 GetLocationScreenPoint(byte con, uint loc, uint seq)
+        {
+            if (_session == null) return Vector2.zero;
+            int me = _session.HumanPlayerIndex;
+            bool isMe = con == me;
+
+            if (loc == YgoConstants.LOCATION_DECK)
+                return isMe ? (Vector2)_myDeckTile.root.position : (Vector2)_oppDeckTile.root.position;
+            if (loc == YgoConstants.LOCATION_EXTRA)
+                return isMe ? (Vector2)_myExtraTile.root.position : (Vector2)_oppExtraTile.root.position;
+            if (loc == YgoConstants.LOCATION_GRAVE)
+                return isMe ? (Vector2)_myGyTile.root.position : (Vector2)_oppGyTile.root.position;
+            if (loc == YgoConstants.LOCATION_REMOVED)
+                return isMe ? (Vector2)_myBanTile.root.position : (Vector2)_oppBanTile.root.position;
+
+            if (loc == YgoConstants.LOCATION_HAND)
+            {
+                if (isMe)
+                {
+                    if (_myHandBar != null && _myHandBar.childCount > 0)
+                    {
+                        int idx = Mathf.Clamp((int)seq, 0, _myHandBar.childCount - 1);
+                        return _myHandBar.GetChild(idx).position;
+                    }
+                    return _myHandBar != null ? (Vector2)_myHandBar.position : Vector2.zero;
+                }
+                else
+                {
+                    if (_oppHandBar != null && _oppHandBar.childCount > 0)
+                    {
+                        int idx = Mathf.Clamp((int)seq, 0, _oppHandBar.childCount - 1);
+                        return _oppHandBar.GetChild(idx).position;
+                    }
+                    return _oppHandBar != null ? (Vector2)_oppHandBar.position : Vector2.zero;
+                }
+            }
+
+            if (loc == YgoConstants.LOCATION_MZONE)
+            {
+                if (seq == 5) return _emz[0].root.position;
+                if (seq == 6) return _emz[1].root.position;
+                if (seq < 5) return isMe ? (Vector2)_myMZone[seq].root.position : (Vector2)_oppMZone[seq].root.position;
+            }
+
+            if (loc == YgoConstants.LOCATION_SZONE)
+            {
+                if (seq < 6) return isMe ? (Vector2)_mySZone[seq].root.position : (Vector2)_oppSZone[seq].root.position;
+            }
+
+            return Vector2.zero;
+        }
+
+        private FieldSlotView GetSlot(byte con, uint loc, uint seq)
+        {
+            if (_session == null) return null;
+            int me = _session.HumanPlayerIndex;
+            bool isMe = con == me;
+
+            if (loc == YgoConstants.LOCATION_MZONE)
+            {
+                if (seq == 5) return _emz[0];
+                if (seq == 6) return _emz[1];
+                if (seq < 5) return isMe ? _myMZone[seq] : _oppMZone[seq];
+            }
+            if (loc == YgoConstants.LOCATION_SZONE && seq < 6)
+            {
+                return isMe ? _mySZone[seq] : _oppSZone[seq];
+            }
+            return null;
+        }
+
+        private void PlaySlotImpact(byte con, uint loc, uint seq)
+        {
+            var slot = GetSlot(con, loc, seq);
+            if (slot != null && CardAnimationManager.Instance != null)
+            {
+                CardAnimationManager.Instance.PlayFlashGlow(slot.root.gameObject, LotdUiKit.CyanAccent, 0.25f);
+            }
+        }
+
+        private void HandleCardMovedEvent(CardMoveEvent e)
+        {
+            if (Root == null || !Root.activeSelf || _session == null) return;
+            if (_session.TurnNumber == 0 && e.fromLoc == YgoConstants.LOCATION_DECK && e.toLoc == YgoConstants.LOCATION_DECK)
+                return;
+
+            Vector2 startPos = GetLocationScreenPoint(e.fromCon, e.fromLoc, e.fromSeq);
+            Vector2 endPos = GetLocationScreenPoint(e.toCon, e.toLoc, e.toSeq);
+
+            if (startPos != Vector2.zero && endPos != Vector2.zero && Vector2.Distance(startPos, endPos) > 30f && CardAnimationManager.Instance != null)
+            {
+                bool faceDown = (e.toPos & YgoConstants.POS_FACEDOWN) != 0;
+                float duration = 0.30f;
+                float arc = 45f;
+
+                if (e.toLoc == YgoConstants.LOCATION_MZONE)
+                {
+                    LotdAudio.PlaySummon();
+                    duration = 0.32f;
+                    arc = 55f;
+                }
+                else if (e.toLoc == YgoConstants.LOCATION_SZONE)
+                {
+                    LotdAudio.PlayClick();
+                    duration = 0.28f;
+                    arc = 35f;
+                }
+                else if (e.toLoc == YgoConstants.LOCATION_HAND)
+                {
+                    LotdAudio.PlayDraw();
+                    duration = 0.26f;
+                    arc = 30f;
+                    if (e.toCon != _session.HumanPlayerIndex) faceDown = true;
+                }
+                else if (e.toLoc == YgoConstants.LOCATION_GRAVE)
+                {
+                    LotdAudio.PlayDamage();
+                    duration = 0.28f;
+                    arc = 25f;
+                }
+
+                CardAnimationManager.Instance.PlayCardFlight(e.code, startPos, endPos, duration, faceDown, arc, () =>
+                {
+                    Refresh();
+                    PlaySlotImpact(e.toCon, e.toLoc, e.toSeq);
+                });
+            }
+            else
+            {
+                Refresh();
+            }
+        }
+
+        private void HandleAttackEvent(byte aCon, uint aLoc, uint aSeq, byte tCon, uint tLoc, uint tSeq)
+        {
+            if (Root == null || !Root.activeSelf || _session == null || CardAnimationManager.Instance == null) return;
+
+            var atkSlot = GetSlot(aCon, aLoc, aSeq);
+            int me = _session.HumanPlayerIndex;
+            Vector2 targetPos = tLoc == 0
+                ? (tCon == me ? (Vector2)_myLpText.rectTransform.position : (Vector2)_oppLpText.rectTransform.position)
+                : GetLocationScreenPoint(tCon, tLoc, tSeq);
+
+            var tgtSlot = tLoc != 0 ? GetSlot(tCon, tLoc, tSeq) : null;
+
+            CardAnimationManager.Instance.PlayAttackLunge(atkSlot?.root, targetPos, 0.28f, onImpact: () =>
+            {
+                LotdAudio.PlayAttack();
+                if (tgtSlot != null)
+                {
+                    CardAnimationManager.Instance.PlayFlashGlow(tgtSlot.root.gameObject, LotdUiKit.RedAccent, 0.3f);
+                }
+            });
         }
 
         // ==================== PROMPT INTERACTIONS ====================
