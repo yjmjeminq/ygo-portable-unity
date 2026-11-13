@@ -336,6 +336,9 @@ namespace YGOPortable.Editor
             // Explicit test for User scenario: E-Emergency Call (213326) -> pick 3rd card (idx=2) from Deck
             VerifyDeckSearchEmergencyCall(classicDecks[0].main);
 
+            // Explicit test for older searchers finding newest 2025/2026 cards across Category/Type/Race/Stats/Level
+            VerifyOldSearchersFindNewestCards(classicDecks[0].main);
+
             AssertTrue(luaErrors.Count == 0, $"Native/Lua error logs detected: {string.Join(" | ", luaErrors.Take(3))}");
 
             CardArtLoader.Shutdown();
@@ -442,6 +445,190 @@ namespace YGOPortable.Editor
                 }
             }
             AssertTrue(false, "Could not draw E-Emergency Call across 60 seeds");
+        }
+
+        private readonly struct SearcherTestCase
+        {
+            public readonly uint SearcherCode;
+            public readonly uint[] NewestTargets;
+            public readonly bool NormalSummon;
+            public readonly bool SpecialSummonToField;
+
+            public SearcherTestCase(uint searcherCode, uint[] newestTargets, bool normalSummon = false, bool specialSummonToField = false)
+            {
+                SearcherCode = searcherCode;
+                NewestTargets = newestTargets;
+                NormalSummon = normalSummon;
+                SpecialSummonToField = specialSummonToField;
+            }
+        }
+
+        private static void VerifyOldSearchersFindNewestCards(uint[] oppDeckMain)
+        {
+            var cases = new[]
+            {
+                // Archetype setcode (0x3008 E-HERO -> 0x3008 Spellcaster without name string)
+                new SearcherTestCase(213326,   new uint[] { 30875635 }),
+                // Race + Level (Lv<=4 Warrior -> 2026 D-HERO & Warrior)
+                new SearcherTestCase(32807846, new uint[] { 98931282, 62542673, 76660178 }),
+                // Card Subtype (TYPE_FIELD 0x80002 -> 2026 Field Spells from cards.json fallback)
+                new SearcherTestCase(73628505, new uint[] { 39513225, 38391684, 2906939, 4663194 }),
+                // Race + Level (Lv<=6 Dinosaur -> newest 2025/2026 Dinos)
+                new SearcherTestCase(47325505, new uint[] { 29927283, 47647354 }),
+                // Race + Level -> Field SS (Lv<=3 Psychic -> newest X-Saber Bruno)
+                new SearcherTestCase(67723438, new uint[] { 45462306 }, specialSummonToField: true),
+                // Race + ATK/DEF stats (Dragon ATK>=3000, DEF<=2500 -> newest Dragons incl. k=23348)
+                new SearcherTestCase(48800175, new uint[] { 30397786, 54725177, 97818130 }),
+                // Archetype inheritance via Monster Trigger (0x8 HERO -> 0xc008 Destiny HERO & 0x3008 E-HERO)
+                new SearcherTestCase(40044918, new uint[] { 98931282, 62542673, 30875635 }, normalSummon: true),
+                // Archetype setcode Spell/Trap (SET_SEVENTH 0x177 & SET_BARIANS 0x1178 -> newest Field/Counter/Normal S/T)
+                new SearcherTestCase(23153227, new uint[] { 39513225, 38001022, 75518330 }),
+            };
+
+            foreach (var tc in cases)
+                VerifySingleOldSearcher(tc, oppDeckMain);
+        }
+
+        private static void VerifySingleOldSearcher(SearcherTestCase tc, uint[] oppDeckMain)
+        {
+            const uint NEUTRAL_FILLER = 83764718; // 죽은 자의 소생 (0x2 Normal Spell: never matched by Monster/Field/Seventh/Barian searchers)
+            var deckList = new List<uint>(40);
+            for (int r = 0; r < 3; r++) deckList.Add(tc.SearcherCode);
+            foreach (uint target in tc.NewestTargets)
+                for (int r = 0; r < 3; r++) deckList.Add(target);
+            while (deckList.Count < 40) deckList.Add(NEUTRAL_FILLER);
+            uint[] mainDeck = deckList.ToArray();
+
+            for (uint seedBase = 1; seedBase <= 120; seedBase++)
+            {
+                using (var session = new DuelSession())
+                {
+                    ulong[] seed = { seedBase * 17 + tc.SearcherCode, seedBase * 31, seedBase * 43, seedBase * 59 };
+                    AssertTrue(session.StartNewDuel(mainDeck, Array.Empty<uint>(), oppDeckMain, Array.Empty<uint>(), true, 8000, seed),
+                        $"VerifyOldSearcher({tc.SearcherCode}) failed StartNewDuel");
+
+                    int guard = 0;
+                    while (!session.IsFinished && guard++ < 64)
+                    {
+                        if (session.ActivePrompt == null) { session.StepUntilPrompt(); continue; }
+                        var p = session.ActivePrompt;
+                        if (p.messageType == YgoConstants.MSG_SELECT_CHAIN)
+                        {
+                            session.SubmitResponseInt(-1);
+                            continue;
+                        }
+                        if (p.messageType != YgoConstants.MSG_SELECT_IDLECMD || p.playerId != 0)
+                            break;
+
+                        int idleIdx = tc.NormalSummon
+                            ? p.summonable.FindIndex(c => c.code == tc.SearcherCode)
+                            : p.activatable.FindIndex(a => a.code == tc.SearcherCode);
+                        if (idleIdx < 0) break;
+
+                        // Require at least 1 of the 3 copies of every expected newest target still in Deck
+                        if (!tc.NewestTargets.All(t => session.Players[0].hand.Count(h => h.code == t) < 3))
+                            break;
+
+                        uint primaryTarget = tc.NewestTargets[0];
+                        int beforeZoneCount = tc.SpecialSummonToField
+                            ? session.Players[0].mzone.Count(c => c != null && c.code == primaryTarget)
+                            : session.Players[0].hand.Count(c => c.code == primaryTarget);
+
+                        int idleAction = tc.NormalSummon ? 0 : 5;
+                        session.SubmitResponseInt((idleIdx << 16) | idleAction);
+
+                        DuelPrompt searchPrompt = null;
+                        int stepGuard = 0;
+                        while (!session.IsFinished && stepGuard++ < 40)
+                        {
+                            if (session.ActivePrompt == null) { session.StepUntilPrompt(); continue; }
+                            var cp = session.ActivePrompt;
+                            if (cp.messageType == YgoConstants.MSG_SELECT_CARD && cp.playerId == 0
+                                && cp.candidates.Any(c => c.location == YgoConstants.LOCATION_DECK))
+                            {
+                                searchPrompt = cp;
+                                break;
+                            }
+                            if (cp.messageType == YgoConstants.MSG_SELECT_CARD && cp.playerId == 0)
+                            {
+                                // Discard/hand cost (e.g., Melody of Awakening Dragon): discard filler first
+                                int fillerIdx = cp.candidates.FindIndex(c => c.code == NEUTRAL_FILLER);
+                                byte[] costResp = new byte[12];
+                                Buffer.BlockCopy(BitConverter.GetBytes(0), 0, costResp, 0, 4);
+                                Buffer.BlockCopy(BitConverter.GetBytes(1), 0, costResp, 4, 4);
+                                Buffer.BlockCopy(BitConverter.GetBytes(fillerIdx >= 0 ? fillerIdx : 0), 0, costResp, 8, 4);
+                                session.SubmitResponse(costResp);
+                            }
+                            else if (cp.messageType == YgoConstants.MSG_SELECT_EFFECTYN || cp.messageType == YgoConstants.MSG_SELECT_YESNO)
+                            {
+                                session.SubmitResponseInt(1); // Accept trigger (e.g., Airman search)
+                            }
+                            else if (cp.messageType == YgoConstants.MSG_SELECT_OPTION)
+                            {
+                                session.SubmitResponseInt(0);
+                            }
+                            else if (cp.messageType == YgoConstants.MSG_SELECT_CHAIN)
+                            {
+                                session.SubmitResponseInt(-1);
+                            }
+                            else if (cp.messageType == YgoConstants.MSG_SELECT_PLACE || cp.messageType == YgoConstants.MSG_SELECT_POSITION)
+                            {
+                                session.SubmitResponse(new TacticalAI().ComputeResponse(session, cp));
+                            }
+                            else
+                            {
+                                AssertTrue(false, $"Searcher {tc.SearcherCode}: unexpected prompt {cp.messageType} waiting for Deck search");
+                            }
+                        }
+
+                        AssertTrue(searchPrompt != null, $"Searcher {tc.SearcherCode} ({CardDatabase.GetName(tc.SearcherCode)}) did not open Deck search");
+                        AssertTrue(searchPrompt.candidates.All(c => c.code != NEUTRAL_FILLER),
+                            $"Searcher {tc.SearcherCode} unexpectedly offered NEUTRAL_FILLER");
+
+                        foreach (uint expectedCode in tc.NewestTargets)
+                        {
+                            AssertTrue(searchPrompt.candidates.Any(c => c.code == expectedCode && c.location == YgoConstants.LOCATION_DECK),
+                                $"Old searcher [{CardDatabase.GetName(tc.SearcherCode)} ({tc.SearcherCode})] missed newest target [{CardDatabase.GetName(expectedCode)} ({expectedCode})] in Deck");
+                        }
+
+                        int pickIdx = searchPrompt.candidates.FindIndex(c => c.code == primaryTarget && c.location == YgoConstants.LOCATION_DECK);
+                        byte[] pickResp = new byte[12];
+                        Buffer.BlockCopy(BitConverter.GetBytes(0), 0, pickResp, 0, 4);
+                        Buffer.BlockCopy(BitConverter.GetBytes(1), 0, pickResp, 4, 4);
+                        Buffer.BlockCopy(BitConverter.GetBytes(pickIdx), 0, pickResp, 8, 4);
+                        session.SubmitResponse(pickResp);
+
+                        int postGuard = 0;
+                        while (!session.IsFinished && postGuard++ < 40)
+                        {
+                            if (session.ActivePrompt == null) { session.StepUntilPrompt(); continue; }
+                            var pp = session.ActivePrompt;
+                            if (pp.messageType == YgoConstants.MSG_SELECT_IDLECMD) break;
+                            if (pp.messageType == YgoConstants.MSG_SELECT_OPTION)
+                                session.SubmitResponseInt(0); // Seventh Ascension: choose Add to Hand over Deck top
+                            else if (pp.messageType == YgoConstants.MSG_SELECT_POSITION || pp.messageType == YgoConstants.MSG_SELECT_PLACE)
+                                session.SubmitResponse(new TacticalAI().ComputeResponse(session, pp));
+                            else if (pp.messageType == YgoConstants.MSG_SELECT_CHAIN || pp.messageType == YgoConstants.MSG_SELECT_EFFECTYN)
+                                session.SubmitResponseInt(pp.messageType == YgoConstants.MSG_SELECT_CHAIN ? -1 : 0);
+                            else
+                                break;
+                        }
+
+                        int afterZoneCount = tc.SpecialSummonToField
+                            ? session.Players[0].mzone.Count(c => c != null && c.code == primaryTarget)
+                            : session.Players[0].hand.Count(c => c.code == primaryTarget);
+
+                        AssertTrue(session.RetryCount == 0, $"Searcher {tc.SearcherCode} had RetryCount={session.RetryCount}");
+                        AssertTrue(afterZoneCount == beforeZoneCount + 1,
+                            $"Searcher {tc.SearcherCode} failed to move [{CardDatabase.GetName(primaryTarget)} ({primaryTarget})] ({beforeZoneCount}->{afterZoneCount})");
+
+                        string foundSummary = string.Join(", ", tc.NewestTargets.Select(t => $"{CardDatabase.GetName(t)}({t})"));
+                        Debug.Log($"[VERIFY OLD->NEW SEARCH] [{CardDatabase.GetName(tc.SearcherCode)}({tc.SearcherCode})] -> candidates={searchPrompt.candidates.Count}, verified={foundSummary}, retries={session.RetryCount}");
+                        return;
+                    }
+                }
+            }
+            AssertTrue(false, $"Could not set up hand+deck for old searcher {tc.SearcherCode} across 120 seeds");
         }
 
         private static void AssertTrue(bool cond, string msg)

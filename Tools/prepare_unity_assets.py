@@ -78,6 +78,77 @@ KIND_TO_TYPE = {
     "Trap": 0x4,
 }
 
+# Spell/Trap subtype bitmasks matched against YGO-Ex cards.json "icon" field
+ICON_TO_SUBTYPE = {
+    "Normal": 0,
+    "QuickPlay": 0x10000,   # TYPE_QUICKPLAY
+    "Continuous": 0x20000,  # TYPE_CONTINUOUS
+    "Equip": 0x40000,       # TYPE_EQUIP
+    "Field": 0x80000,       # TYPE_FIELD
+    "Ritual": 0x80,         # TYPE_RITUAL
+    "Counter": 0x100000,    # TYPE_COUNTER
+}
+
+# Official EDOPro/OpenDuel setcodes for cards present in cards.json but absent from OpenDuelEngine/cards.cdb.
+# Includes Konami archetype tags and "This card is always treated as ..." rule-clause setcodes.
+MISSING_CARD_SETCODES = {
+    # Destiny HERO (0xc008; matches HERO 0x8 and Destiny HERO 0xc008)
+    25158975: (0xC008,),  # 데스티니 히어로 데스도그마 가이
+    54641720: (0xC008,),  # 데스티니 히어로 드레드노트 가이
+    62542673: (0xC008,),  # 데스티니 히어로 데블로드 가이
+    98931282: (0xC008,),  # 데스티니 히어로 드레드노트 서번트
+    # Adamancipator (0x140)
+    24925387: (0x0140,),  # 아다마시아 컨덕터
+    30068809: (0x0140,),  # 아다마시아 메이트
+    41458361: (0x0140,),  # 아다마시아 루미나스
+    51420096: (0x0140,),  # 아다마시아 크리스타－티아마이트
+    89913287: (0x0140,),  # 아다마시아 라이즈－티아마이트
+    # Ashtra (0x1db)
+    1710647:  (0x01DB,),  # 역신의 아슈트라 요아
+    2906939:  (0x01DB,),  # 아슈트라셴 삼천세계
+    17020474: (0x01DB,),  # 아슈트라쟈 스사노오
+    37839434: (0x01DB,),  # 아슈트라의 신역
+    38114652: (0x01DB,),  # 봉신의 아슈트라 미쿠마리
+    38331244: (0x01DB,),  # 금신의 아슈트라 아카스나
+    43419178: (0x01DB,),  # 아슈트라야 미쿠마리노미코토
+    64455720: (0x01DB,),  # 아슈트라의 충독
+    65325949: (0x01DB,),  # 고신의 아슈트라 쿠즈하
+    91444835: (0x01DB,),  # 아슈트라의 주포
+    # Ars Magna (0x1dd) / Power Patron (0x1c6) / Theorealize (0x1d7) / Medius (0x1df)
+    36270527: (0x01DD,),                         # 무한과 유한의 아르스＝마그나
+    62368221: (0x01DD,),                         # 정화와 부패의 아르스＝마그나
+    90728287: (0x01DD,),                         # 아르스＝마그나－「필로소피룸」
+    99753860: (0x01DD,),                         # 결합과 괴리의 아르스＝마그나
+    37279096: (0x01DD, 0x01C7, 0x01CB, 0x01D0),  # 아르스＝마그나－「키트리니타스」 (룰상 아르토메기아/둠즈/엘펜노츠)
+    4063756:  (0x01C6,),                         # 환감옥신 메디쿠리우스
+    90875418: (0x01D7, 0x01DF, 0x01C6),          # 테오리얼라이즈 메디우스 (룰상 감옥신)
+    # Daedalus (0x1da)
+    41570943: (0x01DA,),  # 창해룡신－네오다이달로스 레이지
+    64233143: (0x01DA,),  # 다이달로스 메일스트롬
+    64603351: (0x01DA,),  # 아틀란티스의 룡신－다이달로스
+    78579058: (0x01DA,),  # 진해룡기－다이달로스
+    # Umbral Horror (0x87) / Number (0x48/0x1048) / Masquerade (0x1e0) / Chaos (0xcf) / CXyz (0x1073) / Barian (0x178/0x1178) / Seventh (0x177)
+    2932235:  (0x0087,),                         # 사우전드 엄브럴
+    3064783:  (0x0087,),                         # 샤이닝 엄브럴
+    39053882: (0x0087,),                         # V엄브럴
+    76548531: (0x0087,),                         # 고르고닉 엄브럴
+    16908882: (0x0048, 0x01E0),                  # No.104 마스커레이드 매지션 샤이닝V
+    42396591: (0x1048, 0x0087, 0x01E0, 0x00CF),  # CNo.104 마스커레이드 매지션 엄브럴 빅토리
+    79791695: (0x1073, 0x00CF, 0x0178),          # CX 기망황룡 카오스 바리언 드래곤
+    39513225: (0x0177, 0x1178),                  # 세븐스 바리언즈
+    38001022: (0x1178,),                         # 바리언즈 씰
+    75518330: (0x1178,),                         # 바리언즈 호프
+    # Red-Eyes / Archfiend / Invoked / Blitzclique / Sacred Beast / Warrior / Jinzo / Magician
+    17242022: (0x003B,),  # 붉은 눈의 초월흑룡
+    97818130: (0x0045,),  # 결속의 악마룡 블랙 데몬즈 드래곤
+    80635735: (0x00F4,),  # 소환수 데 아니마
+    30945251: (0x01D6,),  # 블리츠크리크－오버볼티지
+    3441553:  (0x1145,),  # 삼환마의 천괴
+    77482666: (0x2066,),  # 질풍의 표범전사 팬서 워리어
+    40275470: (0x00BC,),  # 인조인간 －사이코 에너지 쇼커－
+    40235813: (0x0098,),  # 시간의 흑마술사
+}
+
 JSON_TYPE_TO_RACE = {
     "Warrior": 0x1, "Spellcaster": 0x2, "Fairy": 0x4, "Fiend": 0x8,
     "Zombie": 0x10, "Machine": 0x20, "Aqua": 0x40, "Pyro": 0x80,
@@ -286,6 +357,8 @@ def build_cards():
             mc = mod_by_pass[code]
             kind = mc.get("kind", "Effect")
             ctype = KIND_TO_TYPE.get(kind, 0x21)
+            if ctype in (0x2, 0x4):
+                ctype |= ICON_TO_SUBTYPE.get(mc.get("icon") or "Normal", 0)
             atk = parse_stat(mc.get("atk"))
             df = parse_stat(mc.get("def"))
             lvl = parse_stat(mc.get("level"))
@@ -295,9 +368,14 @@ def build_cards():
                 df = 0
             race = JSON_TYPE_TO_RACE.get(mc.get("type", ""), 0)
             attr = JSON_ATTR_MAP.get(mc.get("attribute", ""), 0)
+            sn = mc.get("sameName")
+            alias = lotd_to_pass.get(int(sn["card"]), 0) if (isinstance(sn, dict) and sn.get("always") and sn.get("card")) else 0
+            scs = list(MISSING_CARD_SETCODES.get(code, ()))
+            while len(scs) < 8:
+                scs.append(0)
             d = {
                 "code": code,
-                "alias": 0,
+                "alias": alias,
                 "type": ctype,
                 "level": lvl,
                 "attribute": attr,
@@ -307,7 +385,7 @@ def build_cards():
                 "defense": df,
                 "lscale": sc,
                 "rscale": sc,
-                "setcodes": [0] * 8,
+                "setcodes": scs[:8],
             }
 
         packed_bytes += struct.pack(
