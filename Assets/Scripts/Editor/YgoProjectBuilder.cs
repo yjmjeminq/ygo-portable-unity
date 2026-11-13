@@ -332,10 +332,116 @@ namespace YGOPortable.Editor
             AssertTrue(totalDamage >= 2, $"Expected >= 2 LP damage events across test duels, got {totalDamage}");
             AssertTrue(cardPrompts > 0 && chainPrompts > 0, $"Expected MSG_SELECT_CARD ({cardPrompts}) and MSG_SELECT_CHAIN ({chainPrompts}) prompts to fire");
             AssertTrue(zoneSyncMismatches == 0, $"Detected {zoneSyncMismatches} Extra/GY/Banished zone sequence sync mismatches");
+
+            // Explicit test for User scenario: E-Emergency Call (213326) -> pick 3rd card (idx=2) from Deck
+            VerifyDeckSearchEmergencyCall(classicDecks[0].main);
+
             AssertTrue(luaErrors.Count == 0, $"Native/Lua error logs detected: {string.Join(" | ", luaErrors.Take(3))}");
 
             CardArtLoader.Shutdown();
             YgoNativeBridge.Shutdown();
+        }
+
+        private static void VerifyDeckSearchEmergencyCall(uint[] oppDeckMain)
+        {
+            const uint EMERG_CALL = 213326; // E－이머전시 콜
+            uint[] heroTargets = { 20721928, 21844576, 40044918, 50720316, 58932615, 45195443, 59392529 };
+            var deckList = new List<uint>(40);
+            for (int r = 0; r < 3; r++) deckList.Add(EMERG_CALL);
+            foreach (uint h in heroTargets)
+                for (int r = 0; r < 3; r++) deckList.Add(h);
+            while (deckList.Count < 40) deckList.Add(89631139); // 푸른 눈의 백룡 filler
+            uint[] heroMain = deckList.ToArray();
+
+            for (uint seedBase = 1; seedBase <= 60; seedBase++)
+            {
+                using (var session = new DuelSession())
+                {
+                    ulong[] seed = { seedBase * 11, seedBase * 23, seedBase * 37, seedBase * 53 };
+                    AssertTrue(session.StartNewDuel(heroMain, Array.Empty<uint>(), oppDeckMain, Array.Empty<uint>(), true, 8000, seed),
+                        "VerifyDeckSearch failed StartNewDuel");
+
+                    int guard = 0;
+                    while (!session.IsFinished && guard++ < 64)
+                    {
+                        if (session.ActivePrompt == null) { session.StepUntilPrompt(); continue; }
+                        var p = session.ActivePrompt;
+                        if (p.messageType == YgoConstants.MSG_SELECT_IDLECMD && p.playerId == 0)
+                        {
+                            int actIdx = p.activatable.FindIndex(a => a.code == EMERG_CALL);
+                            if (actIdx < 0) break; // try next seed to get 213326 in opening hand
+
+                            int deckBefore = session.Players[0].deckCount;
+                            session.SubmitResponseInt((actIdx << 16) | 5);
+
+                            DuelPrompt searchPrompt = null;
+                            int chainGuard = 0;
+                            while (!session.IsFinished && chainGuard++ < 32)
+                            {
+                                if (session.ActivePrompt == null) { session.StepUntilPrompt(); continue; }
+                                var cp = session.ActivePrompt;
+                                if (cp.messageType == YgoConstants.MSG_SELECT_CARD && cp.playerId == 0)
+                                {
+                                    searchPrompt = cp;
+                                    break;
+                                }
+                                if (cp.messageType == YgoConstants.MSG_SELECT_PLACE)
+                                    session.SubmitResponse(new TacticalAI().ComputeResponse(session, cp));
+                                else if (cp.messageType == YgoConstants.MSG_SELECT_CHAIN || cp.messageType == YgoConstants.MSG_SELECT_EFFECTYN)
+                                    session.SubmitResponseInt(cp.messageType == YgoConstants.MSG_SELECT_CHAIN ? -1 : 0);
+                                else
+                                    AssertTrue(false, $"Unexpected prompt {cp.messageType} while activating E-Emergency Call");
+                            }
+
+                            AssertTrue(searchPrompt != null, "E-Emergency Call did not open MSG_SELECT_CARD");
+                            AssertTrue(session.LastHintMsg == 506, $"Expected HINTMSG_ATOHAND (506), got {session.LastHintMsg}");
+                            string hintText = CardDatabase.ResolveDescription(session.LastHintMsg, 0);
+                            AssertTrue(hintText == "패에 넣을 카드를 선택하십시오.", $"Unexpected hint text: {hintText}");
+                            AssertTrue(searchPrompt.candidates.Count >= 3, $"Expected >=3 deck search candidates, got {searchPrompt.candidates.Count}");
+                            AssertTrue(searchPrompt.candidates[2].location == YgoConstants.LOCATION_DECK, "3rd candidate is not from LOCATION_DECK");
+
+                            uint thirdCode = searchPrompt.candidates[2].code;
+                            int handCopiesBefore = session.Players[0].hand.Count(c => c.code == thirdCode);
+
+                            // Send exact UI payload matching DuelPromptModals.OnConfirmMultiSelect() for 3rd card (index = 2)
+                            byte[] pickThirdResp = new byte[12];
+                            Buffer.BlockCopy(BitConverter.GetBytes(0), 0, pickThirdResp, 0, 4);
+                            Buffer.BlockCopy(BitConverter.GetBytes(1), 0, pickThirdResp, 4, 4);
+                            Buffer.BlockCopy(BitConverter.GetBytes(2), 0, pickThirdResp, 8, 4);
+                            session.SubmitResponse(pickThirdResp);
+
+                            int postGuard = 0;
+                            while (!session.IsFinished && postGuard++ < 32)
+                            {
+                                if (session.ActivePrompt == null) { session.StepUntilPrompt(); continue; }
+                                if (session.ActivePrompt.messageType == YgoConstants.MSG_SELECT_IDLECMD) break;
+                                if (session.ActivePrompt.messageType == YgoConstants.MSG_SELECT_CHAIN)
+                                    session.SubmitResponseInt(-1);
+                                else
+                                    break;
+                            }
+
+                            int handCopiesAfter = session.Players[0].hand.Count(c => c.code == thirdCode);
+                            int deckAfter = session.Players[0].deckCount;
+                            string pickedName = CardDatabase.GetName(thirdCode);
+
+                            AssertTrue(session.RetryCount == 0, $"E-Emergency Call search triggered RetryCount={session.RetryCount}");
+                            AssertTrue(handCopiesAfter == handCopiesBefore + 1, $"3rd card [{pickedName}] ({thirdCode}) not added to hand ({handCopiesBefore}->{handCopiesAfter})");
+                            AssertTrue(deckAfter == deckBefore - 1, $"Deck count did not decrease by 1 ({deckBefore}->{deckAfter})");
+                            AssertTrue(session.Players[0].grave.Any(c => c.code == EMERG_CALL), "E-Emergency Call did not resolve to Graveyard");
+                            AssertTrue(session.Logs.Any(l => l.Contains("카드 확인:") && l.Contains(pickedName)), $"Missing confirm log for [{pickedName}]");
+
+                            Debug.Log($"[VERIFY SEARCH] E-이머전시 콜(213326) -> candidates={searchPrompt.candidates.Count}, 3rd pick=[{pickedName} ({thirdCode})], handCopies {handCopiesBefore}->{handCopiesAfter}, deck {deckBefore}->{deckAfter}, hint='{hintText}', retries={session.RetryCount}");
+                            return;
+                        }
+                        if (p.messageType == YgoConstants.MSG_SELECT_CHAIN)
+                            session.SubmitResponseInt(-1);
+                        else
+                            break;
+                    }
+                }
+            }
+            AssertTrue(false, "Could not draw E-Emergency Call across 60 seeds");
         }
 
         private static void AssertTrue(bool cond, string msg)

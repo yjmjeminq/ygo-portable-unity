@@ -216,9 +216,15 @@ namespace YGOPortable.Core
         public void SubmitResponse(byte[] buffer)
         {
             if (NativePtr == IntPtr.Zero || IsFinished) return;
+            var prevPrompt = ActivePrompt;
+            int prevRetry = RetryCount;
             ActivePrompt = null;
             YgoNativeBridge.SetResponse(NativePtr, buffer);
             StepUntilPrompt();
+            if (!IsFinished && ActivePrompt == null && RetryCount > prevRetry && prevPrompt != null)
+            {
+                ActivePrompt = prevPrompt;
+            }
         }
 
         public void SubmitResponseInt(int val)
@@ -415,6 +421,28 @@ namespace YGOPortable.Core
                     byte con = br.ReadByte();
                     byte loc = br.ReadByte();
                     AddLog($"{(con == HumanPlayerIndex ? "플레이어" : "상대")} {(loc == YgoConstants.LOCATION_MZONE ? "몬스터" : "마법/함정")} 세트");
+                    break;
+                }
+
+                case YgoConstants.MSG_CONFIRM_CARDS:
+                {
+                    br.ReadByte(); // toPlayer
+                    uint cnt = br.ReadUInt32();
+                    var names = new List<string>((int)Math.Min(cnt, 5));
+                    for (uint i = 0; i < cnt; i++)
+                    {
+                        uint code = br.ReadUInt32();
+                        br.ReadByte(); // controller
+                        br.ReadByte(); // location
+                        br.ReadUInt32(); // sequence
+                        if (code != 0 && names.Count < 4)
+                            names.Add($"[{CardDatabase.GetName(code)}]");
+                    }
+                    if (names.Count > 0)
+                    {
+                        string suffix = cnt > 4 ? $" 외 {cnt - 4}장" : "";
+                        AddLog($"카드 확인: {string.Join(", ", names)}{suffix}");
+                    }
                     break;
                 }
 
