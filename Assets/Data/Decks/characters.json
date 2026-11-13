@@ -10,7 +10,8 @@
       "selectable": true,
       "unlocked": true,
       "sku": -1,
-      "arena": 0
+      "arena": 0,
+      "portrait": "atem_neutral.png"
     },
     {
       "id": 87,
@@ -22,7 +23,8 @@
       "selectable": true,
       "unlocked": true,
       "sku": -1,
-      "arena": 0
+      "arena": 0,
+      "portrait": "darkmagiciangirl_neutral.png"
     },
     {
       "id": 88,
@@ -34,7 +36,8 @@
       "selectable": true,
       "unlocked": true,
       "sku": -1,
-      "arena": 0
+      "arena": 0,
+      "portrait": "dukedevlin_neutral.png"
     },
     {
       "id": 204,
@@ -46,7 +49,8 @@
       "selectable": true,
       "unlocked": true,
       "sku": -1,
-      "arena": 0
+      "arena": 0,
+      "portrait": "namu_neutral.png"
     },
     {
       "id": 135,
@@ -58,7 +62,8 @@
       "selectable": true,
       "unlocked": true,
       "sku": -1,
-      "arena": 0
+      "arena": 0,
+      "portrait": "atticusrhodesunmasked_neutral.png"
     },
     {
       "id": 233,
@@ -70,7 +75,8 @@
       "selectable": true,
       "unlocked": true,
       "sku": -1,
-      "arena": 0
+      "arena": 0,
+      "portrait": "titan_dark_neutral.png"
     },
     {
       "id": 235,
@@ -82,7 +88,8 @@
       "selectable": true,
       "unlocked": true,
       "sku": -1,
-      "arena": 0
+      "arena": 0,
+      "portrait": "titan_neutral.png"
     },
     {
       "id": 236,
@@ -94,7 +101,8 @@
       "selectable": true,
       "unlocked": true,
       "sku": -1,
-      "arena": 0
+      "arena": 0,
+      "portrait": "shadowrider_neutral.png"
     },
     {
       "id": 8,
@@ -106,7 +114,8 @@
       "selectable": true,
       "unlocked": true,
       "sku": -1,
-      "arena": 0
+      "arena": 0,
+      "portrait": "bolttanner_neutral.png"
     },
     {
       "id": 22,
@@ -118,7 +127,8 @@
       "selectable": true,
       "unlocked": true,
       "sku": -1,
-      "arena": 0
+      "arena": 0,
+      "portrait": "devack_neutral.png"
     },
     {
       "id": 211,
@@ -130,7 +140,8 @@
       "selectable": true,
       "unlocked": true,
       "sku": -1,
-      "arena": 0
+      "arena": 0,
+      "portrait": "romangoodwin_neutral.png"
     },
     {
       "id": 212,
@@ -142,7 +153,8 @@
       "selectable": true,
       "unlocked": true,
       "sku": -1,
-      "arena": 0
+      "arena": 0,
+      "portrait": "rexgoodwin_dark_neutral.png"
     },
     {
       "id": 155,
@@ -154,7 +166,8 @@
       "selectable": true,
       "unlocked": true,
       "sku": -1,
-      "arena": 0
+      "arena": 0,
+      "portrait": "mrheartland_neutral.png"
     },
     {
       "id": 159,
@@ -166,7 +179,8 @@
       "selectable": true,
       "unlocked": true,
       "sku": -1,
-      "arena": 0
+      "arena": 0,
+      "portrait": "donthousand_neutral.png"
     },
     {
       "id": 164,
@@ -178,7 +192,8 @@
       "selectable": true,
       "unlocked": true,
       "sku": -1,
-      "arena": 0
+      "arena": 0,
+      "portrait": "alito_neutral.png"
     },
     {
       "id": 226,
@@ -190,7 +205,8 @@
       "selectable": true,
       "unlocked": true,
       "sku": -1,
-      "arena": 0
+      "arena": 0,
+      "portrait": "rayshadows_evil_neutral.png"
     },
     {
       "id": 227,
@@ -202,7 +218,8 @@
       "selectable": true,
       "unlocked": true,
       "sku": -1,
-      "arena": 0
+      "arena": 0,
+      "portrait": "GhostGal_neutral.png"
     },
     {
       "id": 237,
@@ -214,7 +231,8 @@
       "selectable": true,
       "unlocked": true,
       "sku": -1,
-      "arena": 0
+      "arena": 0,
+      "portrait": "AI_neutral.png"
     },
     {
       "id": 238,
@@ -226,7 +244,8 @@
       "selectable": true,
       "unlocked": true,
       "sku": -1,
-      "arena": 0
+      "arena": 0,
+      "portrait": "KnightofHanoi_neutral.png"
     },
     {
       "id": 239,
@@ -238,7 +257,8 @@
       "selectable": true,
       "unlocked": true,
       "sku": -1,
-      "arena": 0
+      "arena": 0,
+      "portrait": "KnightofHanoi_neutral.png"
     }
   ]
 }
