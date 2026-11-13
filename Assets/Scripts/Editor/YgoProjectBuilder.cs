@@ -339,6 +339,9 @@ namespace YGOPortable.Editor
             // Explicit test for older searchers finding newest 2025/2026 cards across Category/Type/Race/Stats/Level
             VerifyOldSearchersFindNewestCards(classicDecks[0].main);
 
+            // Explicit test for non-search effects & prompt handlers (announce, chain negate, destroy/banish, equip/counter/coin/dice/token, reborn/tribute, extra/ritual sum, RPS)
+            VerifyOtherCardEffects(classicDecks[0].main);
+
             AssertTrue(luaErrors.Count == 0, $"Native/Lua error logs detected: {string.Join(" | ", luaErrors.Take(3))}");
 
             CardArtLoader.Shutdown();
@@ -629,6 +632,585 @@ namespace YGOPortable.Editor
                 }
             }
             AssertTrue(false, $"Could not set up hand+deck for old searcher {tc.SearcherCode} across 120 seeds");
+        }
+
+        private static uint[] BuildDeck40(params (uint code, int count)[] entries)
+        {
+            var list = new List<uint>(40);
+            foreach (var (code, count) in entries)
+                for (int i = 0; i < count && list.Count < 40; i++) list.Add(code);
+            while (list.Count < 40) list.Add(89631139); // 푸른 눈의 백룡
+            return list.ToArray();
+        }
+
+        private static byte[] EncodeSelectIndices(params int[] indices)
+        {
+            byte[] resp = new byte[8 + indices.Length * 4];
+            Buffer.BlockCopy(BitConverter.GetBytes(0), 0, resp, 0, 4);
+            Buffer.BlockCopy(BitConverter.GetBytes(indices.Length), 0, resp, 4, 4);
+            for (int i = 0; i < indices.Length; i++)
+                Buffer.BlockCopy(BitConverter.GetBytes(indices[i]), 0, resp, 8 + i * 4, 4);
+            return resp;
+        }
+
+        private static void DriveUntilIdle(DuelSession session, TacticalAI ai, Func<DuelPrompt, byte[]> onPrompt = null, int maxSteps = 64)
+        {
+            int guard = 0;
+            while (!session.IsFinished && guard++ < maxSteps)
+            {
+                if (session.ActivePrompt == null) { session.StepUntilPrompt(); continue; }
+                var p = session.ActivePrompt;
+                if (onPrompt != null)
+                {
+                    byte[] custom = onPrompt(p);
+                    if (custom != null) { session.SubmitResponse(custom); continue; }
+                }
+                if (p.messageType == YgoConstants.MSG_SELECT_IDLECMD) break;
+                if (p.messageType == YgoConstants.MSG_SELECT_CHAIN) session.SubmitResponseInt(-1);
+                else if (p.messageType == YgoConstants.MSG_SELECT_EFFECTYN || p.messageType == YgoConstants.MSG_SELECT_YESNO || p.messageType == YgoConstants.MSG_SELECT_OPTION)
+                    session.SubmitResponseInt(0);
+                else if (p.messageType == YgoConstants.MSG_SELECT_PLACE || p.messageType == YgoConstants.MSG_SELECT_POSITION
+                    || p.messageType == YgoConstants.MSG_SELECT_COUNTER || p.messageType == YgoConstants.MSG_SELECT_UNSELECT_CARD)
+                    session.SubmitResponse(ai.ComputeResponse(session, p));
+                else
+                    break;
+            }
+        }
+
+        private static DuelSession StartSeedMatching(string label, uint[] main0, uint[] extra0, uint[] main1, uint[] extra1, bool humanFirst, Func<DuelSession, bool> setupAndCheck, int maxSeeds = 600)
+        {
+            for (uint seedBase = 1; seedBase <= maxSeeds; seedBase++)
+            {
+                var session = new DuelSession();
+                ulong[] seed = { seedBase * 29 + 101, seedBase * 47 + 7, seedBase * 71 + 13, seedBase * 97 + 3 };
+                AssertTrue(session.StartNewDuel(main0, extra0, main1, extra1, humanFirst, 8000, seed), $"{label}: StartNewDuel failed");
+                if (setupAndCheck(session)) return session;
+                session.Dispose();
+            }
+            AssertTrue(false, $"{label}: Could not find matching opening setup across {maxSeeds} seeds");
+            return null;
+        }
+
+        private static void VerifyOtherCardEffects(uint[] oppDeckMain)
+        {
+            var ai = new TacticalAI();
+
+            // 0. Bridge & UI validation assertions (MSG_ANNOUNCE_CARD full coverage + MSG_SELECT_SUM mustSelect/overflow)
+            uint[] allDeclarable = YgoNativeBridge.FilterDeclarableCards(Array.Empty<ulong>(), 20000);
+            AssertTrue(allDeclarable.Length >= 14000, $"Expected >=14000 declarable cards, got {allDeclarable.Length}");
+            foreach (uint staple in new uint[] { 14558127, 23434538, 10045474, 89631139 })
+                AssertTrue(Array.IndexOf(allDeclarable, staple) >= 0, $"FilterDeclarableCards missing staple {staple}");
+
+            var sumExactPrompt = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_SUM, min = 1, max = 1, acc = 8, sumExactCountZeroAny = false };
+            sumExactPrompt.mustSelect.Add(new SelectableCardItem { sumParam = 4 });
+            sumExactPrompt.candidates.Add(new SelectableCardItem { sumParam = 4 });
+            sumExactPrompt.candidates.Add(new SelectableCardItem { sumParam = 2 });
+            AssertTrue(!DuelPromptModals.CheckSumSelectionValid(sumExactPrompt, new HashSet<int>(), 8), "CheckSumSelectionValid: empty should be invalid");
+            AssertTrue(DuelPromptModals.CheckSumSelectionValid(sumExactPrompt, new HashSet<int> { 0 }, 8), "CheckSumSelectionValid: mustSelect+1 candidate (min=1,max=1) should be valid");
+            AssertTrue(!DuelPromptModals.CheckSumSelectionValid(sumExactPrompt, new HashSet<int> { 1 }, 8), "CheckSumSelectionValid: 4+2 != 8 should be invalid");
+            AssertTrue(!DuelPromptModals.CheckSumSelectionValid(sumExactPrompt, new HashSet<int> { 0, 1 }, 8), "CheckSumSelectionValid: count>max should be invalid");
+
+            var sumOverflowPrompt = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_SUM, min = 1, max = 1, acc = 8, sumExactCountZeroAny = true };
+            sumOverflowPrompt.candidates.Add(new SelectableCardItem { sumParam = 6 });
+            sumOverflowPrompt.candidates.Add(new SelectableCardItem { sumParam = 4 });
+            sumOverflowPrompt.candidates.Add(new SelectableCardItem { sumParam = 4 });
+            AssertTrue(!DuelPromptModals.CheckSumSelectionValid(sumOverflowPrompt, new HashSet<int> { 0 }, 8), "Overflow SUM: 6<8 must be invalid");
+            AssertTrue(DuelPromptModals.CheckSumSelectionValid(sumOverflowPrompt, new HashSet<int> { 0, 1 }, 8), "Overflow SUM: 6+4>=8 must be valid");
+            AssertTrue(!DuelPromptModals.CheckSumSelectionValid(sumOverflowPrompt, new HashSet<int> { 0, 1, 2 }, 8), "Overflow SUM: 6+4+4 overspend must be invalid");
+
+            // 1. Card Name Declaration: 0-opcode Prohibition (43711255) & filtered Crossout Designator (65681983 -> banish Ash Blossom 14558127)
+            uint[] annDeck = BuildDeck40((43711255, 3), (65681983, 3), (14558127, 3), (23434538, 3));
+            using (var s = StartSeedMatching("CardAnnounce", annDeck, Array.Empty<uint>(), oppDeckMain, Array.Empty<uint>(), true, sess =>
+            {
+                DriveUntilIdle(sess, ai);
+                var p = sess.ActivePrompt;
+                return p != null && p.messageType == YgoConstants.MSG_SELECT_IDLECMD && p.playerId == 0
+                    && p.activatable.Any(a => a.code == 43711255) && p.activatable.Any(a => a.code == 65681983)
+                    && sess.Players[0].hand.Count(h => h.code == 14558127) < 3;
+            }))
+            {
+                int act1 = s.ActivePrompt.activatable.FindIndex(a => a.code == 43711255);
+                s.SubmitResponseInt((act1 << 16) | 5);
+                DriveUntilIdle(s, ai, p =>
+                {
+                    if (p.messageType != YgoConstants.MSG_ANNOUNCE_CARD) return null;
+                    uint[] valid = YgoNativeBridge.FilterDeclarableCards(p.options.ToArray(), 20000);
+                    AssertTrue(Array.IndexOf(valid, 23434538u) >= 0, "Prohibition (0-opcode) failed to list Maxx C (23434538)");
+                    return BitConverter.GetBytes((int)23434538);
+                });
+                int act2 = s.ActivePrompt.activatable.FindIndex(a => a.code == 65681983);
+                AssertTrue(act2 >= 0, "Crossout Designator not activatable after Prohibition");
+                s.SubmitResponseInt((act2 << 16) | 5);
+                DriveUntilIdle(s, ai, p =>
+                {
+                    if (p.messageType == YgoConstants.MSG_ANNOUNCE_CARD)
+                    {
+                        uint[] valid = YgoNativeBridge.FilterDeclarableCards(p.options.ToArray(), 20000);
+                        AssertTrue(Array.IndexOf(valid, 14558127u) >= 0, "Crossout Designator failed to list Ash Blossom (14558127)");
+                        return BitConverter.GetBytes((int)14558127);
+                    }
+                    if (p.messageType == YgoConstants.MSG_SELECT_CARD)
+                        return EncodeSelectIndices(0);
+                    return null;
+                });
+                AssertTrue(s.RetryCount == 0 && s.Players[0].szone.Any(c => c != null && c.code == 43711255) && s.Players[0].banished.Any(c => c.code == 14558127),
+                    "CardNameAnnounce effects did not resolve properly");
+            }
+
+            // 2. Chain Negation (Hand Trap): ROTA (32807846) negated by P1 Ash Blossom (14558127)
+            uint[] chainDeck0 = BuildDeck40((32807846, 3), (40044918, 3));
+            uint[] chainDeck1 = BuildDeck40((14558127, 3));
+            using (var s = StartSeedMatching("ChainNegate", chainDeck0, Array.Empty<uint>(), chainDeck1, Array.Empty<uint>(), true, sess =>
+            {
+                DriveUntilIdle(sess, ai);
+                var p = sess.ActivePrompt;
+                if (p == null || p.messageType != YgoConstants.MSG_SELECT_IDLECMD || p.playerId != 0) return false;
+                if (!sess.Players[1].hand.Any(h => h.code == 14558127)) return false;
+                int act = p.activatable.FindIndex(a => a.code == 32807846);
+                if (act < 0) return false;
+                sess.SubmitResponseInt((act << 16) | 5);
+                for (int step = 0; step < 8 && !sess.IsFinished; step++)
+                {
+                    if (sess.ActivePrompt == null) { sess.StepUntilPrompt(); continue; }
+                    var cp = sess.ActivePrompt;
+                    if (cp.messageType == YgoConstants.MSG_SELECT_PLACE || cp.messageType == YgoConstants.MSG_SELECT_POSITION)
+                        sess.SubmitResponse(ai.ComputeResponse(sess, cp));
+                    else if (cp.messageType == YgoConstants.MSG_SELECT_CHAIN && cp.playerId == 1 && cp.candidates.Any(c => c.code == 14558127))
+                        return true;
+                    else
+                        return false;
+                }
+                return false;
+            }))
+            {
+                int handBefore = s.Players[0].hand.Count(c => c.code == 40044918);
+                int ashIdx = s.ActivePrompt.candidates.FindIndex(c => c.code == 14558127);
+                s.SubmitResponseInt(ashIdx);
+                DriveUntilIdle(s, ai);
+                AssertTrue(s.RetryCount == 0 && s.Players[0].hand.Count(c => c.code == 40044918) == handBefore,
+                    "Ash Blossom did not prevent ROTA search");
+                AssertTrue(s.Logs.Any(l => l.Contains("체인 2") && l.Contains("하루 우라라")) && s.Logs.Any(l => l.Contains("체인 1 무효화")),
+                    "Missing Chain 2 Ash Blossom / Chain 1 Negated logs");
+            }
+
+            // 3. Targeted Banish (Cosmic Cyclone 8267140) + Mass Non-Target Removal (Feather Duster 18144506, Raigeki 12580477)
+            uint[] oppFieldDeck = BuildDeck40((20721928, 3), (4148264, 3), (5464695, 3), (7359741, 3), (7459013, 3),
+                (5318639, 3), (55144522, 3), (24094653, 3), (40619825, 3), (81439173, 3), (83764718, 3), (37812118, 3));
+            uint[] removalDeck = BuildDeck40((8267140, 3), (18144506, 3), (12580477, 3));
+            using (var s = StartSeedMatching("DestroyBanish", removalDeck, Array.Empty<uint>(), oppFieldDeck, Array.Empty<uint>(), true, sess =>
+            {
+                // P0 passes Turn 1; P1 Turn 2 summons 1 monster & sets 2 S/T -> P0 Turn 3 resolves all 3 removals
+                DriveUntilIdle(sess, ai);
+                if (sess.ActivePrompt == null || sess.ActivePrompt.playerId != 0) return false;
+                sess.SubmitResponseInt(7); // End Turn 1
+                DriveUntilIdle(sess, ai);
+                if (sess.ActivePrompt == null || sess.ActivePrompt.playerId != 1 || sess.ActivePrompt.summonable.Count == 0 || sess.ActivePrompt.sSetable.Count == 0) return false;
+                sess.SubmitResponseInt(0); // Summon first monster
+                DriveUntilIdle(sess, ai);
+                for (int k = 0; k < 2; k++)
+                {
+                    if (sess.ActivePrompt == null || sess.ActivePrompt.playerId != 1 || sess.ActivePrompt.sSetable.Count == 0) return false;
+                    sess.SubmitResponseInt(4); // Set S/T
+                    DriveUntilIdle(sess, ai);
+                }
+                if (sess.ActivePrompt == null || sess.ActivePrompt.playerId != 1 || !sess.ActivePrompt.canEp) return false;
+                sess.SubmitResponseInt(7); // End Turn 2
+                DriveUntilIdle(sess, ai);
+                var p0 = sess.ActivePrompt;
+                return p0 != null && p0.messageType == YgoConstants.MSG_SELECT_IDLECMD && p0.playerId == 0
+                    && p0.activatable.Any(a => a.code == 8267140) && p0.activatable.Any(a => a.code == 18144506) && p0.activatable.Any(a => a.code == 12580477);
+            }))
+            {
+                s.SubmitResponseInt((s.ActivePrompt.activatable.FindIndex(a => a.code == 8267140) << 16) | 5);
+                DriveUntilIdle(s, ai, p => p.messageType == YgoConstants.MSG_SELECT_CARD ? EncodeSelectIndices(0) : null);
+                AssertTrue(s.Players[0].lp == 7000 && s.Players[1].banished.Count == 1, $"Cosmic Cyclone failed: LP={s.Players[0].lp}, oppBanished={s.Players[1].banished.Count}");
+
+                s.SubmitResponseInt((s.ActivePrompt.activatable.FindIndex(a => a.code == 18144506) << 16) | 5);
+                DriveUntilIdle(s, ai);
+                AssertTrue(s.Players[1].szone.All(c => c == null) && s.Players[1].grave.Count >= 1, "Harpie's Feather Duster failed to wipe opp S/T");
+
+                s.SubmitResponseInt((s.ActivePrompt.activatable.FindIndex(a => a.code == 12580477) << 16) | 5);
+                DriveUntilIdle(s, ai);
+                AssertTrue(s.RetryCount == 0 && s.Players[1].mzone.All(c => c == null), "Raigeki failed to wipe opp Monster");
+            }
+
+            // 4a. Equip (+1000 ATK + MSG_EQUIP), Draw (Pot of Greed), Counter (Royal Magical Library)
+            uint[] counterDeck = BuildDeck40((70791313, 3), (40619825, 3), (55144522, 3), (37812118, 3), (98645731, 3), (81439173, 3), (20721928, 3));
+            using (var s = StartSeedMatching("EquipCounter", counterDeck, Array.Empty<uint>(), oppDeckMain, Array.Empty<uint>(), true, sess =>
+            {
+                DriveUntilIdle(sess, ai);
+                var p = sess.ActivePrompt;
+                return p != null && p.messageType == YgoConstants.MSG_SELECT_IDLECMD && p.playerId == 0
+                    && p.summonable.Any(m => m.code == 70791313) && sess.Players[0].hand.Any(h => h.code == 40619825)
+                    && p.activatable.Any(a => a.code == 55144522) && p.activatable.Count >= 2;
+            }))
+            {
+                s.SubmitResponseInt((s.ActivePrompt.summonable.FindIndex(m => m.code == 70791313) << 16) | 0);
+                DriveUntilIdle(s, ai);
+                var lib = s.Players[0].mzone.FirstOrDefault(c => c != null && c.code == 70791313);
+                AssertTrue(lib != null && lib.attack == 0, "Royal Magical Library summon failed");
+
+                s.SubmitResponseInt((s.ActivePrompt.activatable.FindIndex(a => a.code == 55144522) << 16) | 5);
+                DriveUntilIdle(s, ai);
+                s.SubmitResponseInt((s.ActivePrompt.activatable.FindIndex(a => a.code == 40619825) << 16) | 5);
+                DriveUntilIdle(s, ai, p => p.messageType == YgoConstants.MSG_SELECT_CARD ? EncodeSelectIndices(0) : null);
+
+                // Activate 3rd Spell (Cup of Ace / Pot of Greed / Pot of Duality / Foolish Burial) for 3rd Spell Counter
+                uint[] thirdCandidates = { 37812118, 55144522, 98645731, 81439173 };
+                int act3 = s.ActivePrompt.activatable.FindIndex(a => Array.IndexOf(thirdCandidates, a.code) >= 0);
+                AssertTrue(act3 >= 0, "No 3rd activatable Spell found after Pot of Greed draw");
+                s.SubmitResponseInt((act3 << 16) | 5);
+                DriveUntilIdle(s, ai, p => p.messageType == YgoConstants.MSG_SELECT_CARD ? EncodeSelectIndices(0) : null);
+
+                lib = s.Players[0].mzone.FirstOrDefault(c => c != null && c.code == 70791313);
+                AssertTrue(lib != null && lib.attack == lib.baseAttack + 1000, $"Axe of Despair ATK boost failed: {lib?.attack}");
+                AssertTrue(s.Logs.Any(l => l.Contains("장착:")), "Missing MSG_EQUIP log");
+
+                int handBeforeLib = s.Players[0].hand.Count;
+                int libAct = s.ActivePrompt.activatable.FindIndex(a => a.code == 70791313 && a.location == YgoConstants.LOCATION_MZONE);
+                AssertTrue(libAct >= 0, "Royal Magical Library 3-counter draw effect not activatable");
+                s.SubmitResponseInt((libAct << 16) | 5);
+                DriveUntilIdle(s, ai);
+                AssertTrue(s.RetryCount == 0 && s.Players[0].hand.Count == handBeforeLib + 1, "Royal Magical Library failed to remove 3 counters & draw");
+            }
+
+            // 4b. Decktop Confirm (Pot of Duality 98645731) + Coin Toss (Cup of Ace 37812118) + Dice Toss (Dicephoon 3493058) + Tokens (Scapegoat 73915051)
+            uint[] ddtDeck = BuildDeck40((98645731, 3), (37812118, 3), (3493058, 3));
+            using (var s = StartSeedMatching("DeckTopCoinDice", ddtDeck, Array.Empty<uint>(), oppDeckMain, Array.Empty<uint>(), true, sess =>
+            {
+                DriveUntilIdle(sess, ai);
+                var p = sess.ActivePrompt;
+                return p != null && p.messageType == YgoConstants.MSG_SELECT_IDLECMD && p.playerId == 0
+                    && p.activatable.Any(a => a.code == 98645731) && p.activatable.Any(a => a.code == 37812118) && p.activatable.Any(a => a.code == 3493058);
+            }))
+            {
+                s.SubmitResponseInt((s.ActivePrompt.activatable.FindIndex(a => a.code == 98645731) << 16) | 5);
+                DriveUntilIdle(s, ai, p => p.messageType == YgoConstants.MSG_SELECT_CARD ? EncodeSelectIndices(0) : null);
+                s.SubmitResponseInt((s.ActivePrompt.activatable.FindIndex(a => a.code == 37812118) << 16) | 5);
+                DriveUntilIdle(s, ai);
+                s.SubmitResponseInt((s.ActivePrompt.activatable.FindIndex(a => a.code == 3493058) << 16) | 5);
+                DriveUntilIdle(s, ai, p => p.messageType == YgoConstants.MSG_SELECT_CARD ? EncodeSelectIndices(0) : null);
+                AssertTrue(s.RetryCount == 0 && s.Logs.Any(l => l.Contains("덱 위 확인:")) && s.Logs.Any(l => l.Contains("코인 토스:")) && s.Logs.Any(l => l.Contains("주사위:")),
+                    "Missing Decktop Confirm, Coin Toss, or Dice Toss log");
+            }
+
+            uint[] tokenDeck = BuildDeck40((73915051, 3));
+            using (var s = StartSeedMatching("ScapegoatTokens", tokenDeck, Array.Empty<uint>(), oppDeckMain, Array.Empty<uint>(), true, sess =>
+            {
+                DriveUntilIdle(sess, ai);
+                return sess.ActivePrompt?.activatable.Any(a => a.code == 73915051) == true;
+            }))
+            {
+                s.SubmitResponseInt((s.ActivePrompt.activatable.FindIndex(a => a.code == 73915051) << 16) | 5);
+                DriveUntilIdle(s, ai);
+                int tokCnt = s.Players[0].mzone.Count(c => c != null && c.code >= 73915052 && c.code <= 73915055);
+                AssertTrue(s.RetryCount == 0 && tokCnt == 4, $"Scapegoat expected 4 sheep tokens (73915052..73915055), got {tokCnt}");
+            }
+
+            // 5. Foolish Burial (81439173) -> Monster Reborn (83764718, POS) -> Tribute Summon Summoned Skull (70781052, MSG_SELECT_TRIBUTE)
+            uint[] rebDeck = BuildDeck40((81439173, 3), (83764718, 3), (70781052, 3), (20721928, 3));
+            using (var s = StartSeedMatching("RebornTribute", rebDeck, Array.Empty<uint>(), oppDeckMain, Array.Empty<uint>(), true, sess =>
+            {
+                DriveUntilIdle(sess, ai);
+                var p = sess.ActivePrompt;
+                return p != null && p.messageType == YgoConstants.MSG_SELECT_IDLECMD && p.playerId == 0
+                    && p.activatable.Any(a => a.code == 81439173) && sess.Players[0].hand.Any(h => h.code == 83764718)
+                    && sess.Players[0].hand.Any(h => h.code == 70781052) && sess.Players[0].hand.Count(h => h.code == 20721928) < 3;
+            }))
+            {
+                s.SubmitResponseInt((s.ActivePrompt.activatable.FindIndex(a => a.code == 81439173) << 16) | 5);
+                DriveUntilIdle(s, ai, p => p.messageType == YgoConstants.MSG_SELECT_CARD
+                    ? EncodeSelectIndices(Math.Max(0, p.candidates.FindIndex(c => c.code == 20721928))) : null);
+                AssertTrue(s.Players[0].grave.Any(c => c.code == 20721928), "Foolish Burial failed to send monster to GY");
+
+                s.SubmitResponseInt((s.ActivePrompt.activatable.FindIndex(a => a.code == 83764718) << 16) | 5);
+                bool sawPos = false;
+                DriveUntilIdle(s, ai, p =>
+                {
+                    if (p.messageType == YgoConstants.MSG_SELECT_CARD) return EncodeSelectIndices(Math.Max(0, p.candidates.FindIndex(c => c.code == 20721928)));
+                    if (p.messageType == YgoConstants.MSG_SELECT_POSITION) { sawPos = true; return BitConverter.GetBytes((int)YgoConstants.POS_FACEUP_ATTACK); }
+                    return null;
+                });
+                AssertTrue(sawPos && s.Players[0].mzone.Any(c => c != null && c.code == 20721928), "Monster Reborn failed to revive monster");
+
+                int tribSummon = s.ActivePrompt.summonable.FindIndex(m => m.code == 70781052);
+                AssertTrue(tribSummon >= 0, "Summoned Skull not Tribute Summonable");
+                bool sawTrib = false;
+                s.SubmitResponseInt((tribSummon << 16) | 0);
+                DriveUntilIdle(s, ai, p =>
+                {
+                    if (p.messageType == YgoConstants.MSG_SELECT_TRIBUTE) { sawTrib = true; return EncodeSelectIndices(0); }
+                    return null;
+                });
+                AssertTrue(sawTrib && s.RetryCount == 0 && s.Players[0].mzone.Any(c => c != null && c.code == 70781052),
+                    "Tribute Summon Summoned Skull failed");
+            }
+
+            // 6a. Ritual Overflow MSG_SELECT_SUM (Machine Angel Ritual 39996157 -> Cyber Angel Benten 77235086 using Lv8 Blue-Eyes)
+            uint[] ritDeck = BuildDeck40((39996157, 3), (77235086, 3));
+            using (var s = StartSeedMatching("RitualSum", ritDeck, Array.Empty<uint>(), oppDeckMain, Array.Empty<uint>(), true, sess =>
+            {
+                DriveUntilIdle(sess, ai);
+                var p = sess.ActivePrompt;
+                return p != null && p.activatable.Any(a => a.code == 39996157) && sess.Players[0].hand.Any(h => h.code == 77235086)
+                    && sess.Players[0].hand.Any(h => h.code == 89631139);
+            }))
+            {
+                s.SubmitResponseInt((s.ActivePrompt.activatable.FindIndex(a => a.code == 39996157) << 16) | 5);
+                bool sawRitualSum = false;
+                DriveUntilIdle(s, ai, p =>
+                {
+                    if (p.messageType == YgoConstants.MSG_SELECT_CARD) return EncodeSelectIndices(0);
+                    if (p.messageType == YgoConstants.MSG_SELECT_SUM)
+                    {
+                        sawRitualSum = true;
+                        AssertTrue(p.sumExactCountZeroAny, "Expected sumExactCountZeroAny=true for Machine Angel Ritual");
+                        AssertTrue(DuelPromptModals.CheckSumSelectionValid(p, new HashSet<int> { 0 }, (int)(p.acc & 0xFFFF)),
+                            "UI CheckSumSelectionValid disagreed with valid overflow Ritual tribute");
+                        return EncodeSelectIndices(0);
+                    }
+                    return null;
+                });
+                AssertTrue(sawRitualSum && s.RetryCount == 0 && s.Players[0].mzone.Any(c => c != null && c.code == 77235086),
+                    "Ritual Summon Cyber Angel Benten failed");
+            }
+
+            // 6b. Synchro Exact MSG_SELECT_SUM (Angel Trumpeter Lv4 Tuner 87979586 + Double Summon 43422537 + Lv4 -> Stardust Dragon 44508094)
+            uint[] syncDeck = BuildDeck40((87979586, 3), (43422537, 3), (4148264, 3), (5464695, 3), (7359741, 3), (7459013, 3), (20721928, 3));
+            uint[] syncExtra = { 44508094 };
+            using (var s = StartSeedMatching("SynchroSum", syncDeck, syncExtra, oppDeckMain, Array.Empty<uint>(), true, sess =>
+            {
+                DriveUntilIdle(sess, ai);
+                var p = sess.ActivePrompt;
+                return p != null && p.summonable.Any(m => m.code == 87979586) && p.activatable.Any(a => a.code == 43422537)
+                    && p.summonable.Any(m => m.code != 87979586 && m.code != 43422537);
+            }))
+            {
+                s.SubmitResponseInt((s.ActivePrompt.summonable.FindIndex(m => m.code == 87979586) << 16) | 0);
+                DriveUntilIdle(s, ai);
+                s.SubmitResponseInt((s.ActivePrompt.activatable.FindIndex(a => a.code == 43422537) << 16) | 5);
+                DriveUntilIdle(s, ai);
+                s.SubmitResponseInt((s.ActivePrompt.summonable.FindIndex(m => m.code != 87979586) << 16) | 0);
+                DriveUntilIdle(s, ai);
+
+                int spSyn = s.ActivePrompt.spSummonable.FindIndex(m => m.code == 44508094);
+                AssertTrue(spSyn >= 0, "Stardust Dragon not Synchro Summonable");
+                bool sawSyncMatPrompt = false;
+                s.SubmitResponseInt((spSyn << 16) | 1);
+                DriveUntilIdle(s, ai, p =>
+                {
+                    if (p.messageType == YgoConstants.MSG_SELECT_UNSELECT_CARD)
+                    {
+                        sawSyncMatPrompt = true;
+                        if (p.finishable && (p.unselectCandidates.Count > 0 || p.candidates.Count == 0))
+                            return BitConverter.GetBytes(-1);
+                        if (p.candidates.Count > 0)
+                        {
+                            byte[] resp = new byte[8];
+                            Buffer.BlockCopy(BitConverter.GetBytes(1), 0, resp, 0, 4);
+                            Buffer.BlockCopy(BitConverter.GetBytes(0), 0, resp, 4, 4);
+                            return resp;
+                        }
+                        return BitConverter.GetBytes(-1);
+                    }
+                    if (p.messageType == YgoConstants.MSG_SELECT_SUM)
+                    {
+                        sawSyncMatPrompt = true;
+                        var chosen = new HashSet<int>();
+                        for (int i = 0; i < p.candidates.Count && chosen.Count < Math.Max(1, (int)p.min); i++) chosen.Add(i);
+                        AssertTrue(DuelPromptModals.CheckSumSelectionValid(p, chosen, (int)(p.acc & 0xFFFF)),
+                            "UI CheckSumSelectionValid disagreed with valid Synchro Sum selection");
+                        return EncodeSelectIndices(chosen.ToArray());
+                    }
+                    return null;
+                });
+                AssertTrue(sawSyncMatPrompt && s.RetryCount == 0 && s.Players[0].mzone.Any(c => c != null && c.code == 44508094),
+                    $"Synchro Summon Stardust Dragon failed (sawMat={sawSyncMatPrompt}, retry={s.RetryCount}, synZone={s.Players[0].mzone.Any(c => c != null && c.code == 44508094)})");
+            }
+
+            // 6b-2. Exact MSG_SELECT_SUM (Tokusano Shinkyojin 50357013: exact sum Lv4+Lv6=10, sumExactCountZeroAny=false)
+            uint[] exactSumDeck = BuildDeck40((50357013, 3), (20721928, 3), (70781052, 3));
+            using (var s = StartSeedMatching("ExactSumSelect", exactSumDeck, Array.Empty<uint>(), oppDeckMain, Array.Empty<uint>(), true, sess =>
+            {
+                DriveUntilIdle(sess, ai);
+                var p = sess.ActivePrompt;
+                return p != null && p.activatable.Any(a => a.code == 50357013)
+                    && sess.Players[0].hand.Any(h => h.code == 20721928) && sess.Players[0].hand.Any(h => h.code == 70781052);
+            }))
+            {
+                int handBefore = s.Players[0].hand.Count;
+                s.SubmitResponseInt((s.ActivePrompt.activatable.FindIndex(a => a.code == 50357013) << 16) | 5);
+                bool sawExactSum = false;
+                DriveUntilIdle(s, ai, p =>
+                {
+                    if (p.messageType == YgoConstants.MSG_SELECT_SUM)
+                    {
+                        sawExactSum = true;
+                        AssertTrue(!p.sumExactCountZeroAny && (p.acc & 0xFFFF) == 10,
+                            $"Expected exact sum acc=10, got overflow={p.sumExactCountZeroAny}, acc={p.acc & 0xFFFF}");
+                        int idx4 = p.candidates.FindIndex(c => c.code == 20721928);
+                        int idx6 = p.candidates.FindIndex(c => c.code == 70781052);
+                        AssertTrue(idx4 >= 0 && idx6 >= 0, "Expected Lv4 and Lv6 candidates in MSG_SELECT_SUM");
+                        AssertTrue(!DuelPromptModals.CheckSumSelectionValid(p, new HashSet<int> { idx4 }, 10), "Lv4 alone should fail acc=10");
+                        AssertTrue(DuelPromptModals.CheckSumSelectionValid(p, new HashSet<int> { idx4, idx6 }, 10), "Lv4+Lv6 should pass acc=10");
+                        return EncodeSelectIndices(idx4, idx6);
+                    }
+                    return null;
+                });
+                // Cost sent 2 monsters + activated 1 spell (-3), resolved Draw 2 (+2) => net handBefore - 1; 2 monsters in GY
+                AssertTrue(sawExactSum && s.RetryCount == 0 && s.Players[0].hand.Count == handBefore - 1
+                    && s.Players[0].grave.Any(g => g.code == 20721928) && s.Players[0].grave.Any(g => g.code == 70781052),
+                    $"Tokusano Shinkyojin exact MSG_SELECT_SUM failed (saw={sawExactSum}, retry={s.RetryCount}, hand={handBefore}->{s.Players[0].hand.Count})");
+            }
+
+            // 6c. Xyz Summon + Overlay Detach (Gagaga Cowboy 12014404 Defense Mode burn -800 LP)
+            uint[] xyzDeck = BuildDeck40((43422537, 3), (4148264, 3), (5464695, 3), (7359741, 3), (7459013, 3), (20721928, 3));
+            uint[] xyzExtra = { 12014404 };
+            using (var s = StartSeedMatching("XyzDetach", xyzDeck, xyzExtra, oppDeckMain, Array.Empty<uint>(), true, sess =>
+            {
+                DriveUntilIdle(sess, ai);
+                var p = sess.ActivePrompt;
+                return p != null && p.activatable.Any(a => a.code == 43422537) && p.summonable.Count >= 2;
+            }))
+            {
+                s.SubmitResponseInt((0 << 16) | 0);
+                DriveUntilIdle(s, ai);
+                s.SubmitResponseInt((s.ActivePrompt.activatable.FindIndex(a => a.code == 43422537) << 16) | 5);
+                DriveUntilIdle(s, ai);
+                s.SubmitResponseInt((0 << 16) | 0);
+                DriveUntilIdle(s, ai);
+
+                int spXyz = s.ActivePrompt.spSummonable.FindIndex(m => m.code == 12014404);
+                AssertTrue(spXyz >= 0, "Gagaga Cowboy not Xyz Summonable");
+                s.SubmitResponseInt((spXyz << 16) | 1);
+                DriveUntilIdle(s, ai, p =>
+                {
+                    if (p.messageType == YgoConstants.MSG_SELECT_CARD) return EncodeSelectIndices(0, 1);
+                    if (p.messageType == YgoConstants.MSG_SELECT_POSITION) return BitConverter.GetBytes((int)YgoConstants.POS_FACEUP_DEFENSE);
+                    return null;
+                });
+
+                var xyz = s.Players[0].mzone.FirstOrDefault(c => c != null && c.code == 12014404);
+                AssertTrue(xyz != null && xyz.overlayCodes.Count == 2, $"Expected 2 overlay materials on Gagaga Cowboy, got {xyz?.overlayCodes.Count}");
+
+                int actXyz = s.ActivePrompt.activatable.FindIndex(a => a.code == 12014404);
+                AssertTrue(actXyz >= 0, "Gagaga Cowboy detach effect not activatable");
+                s.SubmitResponseInt((actXyz << 16) | 5);
+                DriveUntilIdle(s, ai, p => p.messageType == YgoConstants.MSG_SELECT_CARD ? EncodeSelectIndices(0) : null);
+
+                xyz = s.Players[0].mzone.FirstOrDefault(c => c != null && c.code == 12014404);
+                AssertTrue(s.RetryCount == 0 && xyz != null && xyz.overlayCodes.Count == 1 && s.Players[1].lp == 7200,
+                    $"Gagaga Cowboy detach failed: overlays={xyz?.overlayCodes.Count}, oppLP={s.Players[1].lp}");
+            }
+
+            // 6d. Fusion Summon (Polymerization 24094653 -> E-HERO Flame Wingman 35809262)
+            uint[] fusDeck = BuildDeck40((24094653, 3), (21844576, 3), (58932615, 3));
+            uint[] fusExtra = { 35809262 };
+            using (var s = StartSeedMatching("FusionSummon", fusDeck, fusExtra, oppDeckMain, Array.Empty<uint>(), true, sess =>
+            {
+                DriveUntilIdle(sess, ai);
+                var p = sess.ActivePrompt;
+                return p != null && p.activatable.Any(a => a.code == 24094653)
+                    && sess.Players[0].hand.Any(h => h.code == 21844576) && sess.Players[0].hand.Any(h => h.code == 58932615);
+            }))
+            {
+                s.SubmitResponseInt((s.ActivePrompt.activatable.FindIndex(a => a.code == 24094653) << 16) | 5);
+                DriveUntilIdle(s, ai, p =>
+                {
+                    if (p.messageType == YgoConstants.MSG_SELECT_CARD)
+                        return p.min <= 1 ? EncodeSelectIndices(0) : EncodeSelectIndices(0, 1);
+                    return null;
+                });
+                AssertTrue(s.RetryCount == 0 && s.Players[0].mzone.Any(c => c != null && c.code == 35809262), "Fusion Summon Flame Wingman failed");
+            }
+
+            // 7a. DNA Surgery (74701381) Race Announce -> RACE_ILLUSION (0x2000000) transforms Warrior into Illusion
+            uint[] dnaDeck = BuildDeck40((74701381, 3), (20721928, 3), (5265750, 3));
+            using (var s = StartSeedMatching("DnaIllusion", dnaDeck, Array.Empty<uint>(), oppDeckMain, Array.Empty<uint>(), true, sess =>
+            {
+                DriveUntilIdle(sess, ai);
+                var p = sess.ActivePrompt;
+                return p != null && p.sSetable.Any(a => a.code == 74701381) && p.summonable.Count >= 1;
+            }))
+            {
+                s.SubmitResponseInt((0 << 16) | 0); // Normal Summon Warrior
+                DriveUntilIdle(s, ai);
+                s.SubmitResponseInt((s.ActivePrompt.sSetable.FindIndex(a => a.code == 74701381) << 16) | 4);
+                DriveUntilIdle(s, ai);
+                s.SubmitResponseInt(7); // End Turn -> P1 Turn 2 Draw triggers DNA Surgery chain
+                bool sawRaceAnnounce = false;
+                DriveUntilIdle(s, ai, p =>
+                {
+                    if (p.messageType == YgoConstants.MSG_SELECT_CHAIN && p.playerId == 0 && p.candidates.Any(c => c.code == 74701381))
+                        return BitConverter.GetBytes(p.candidates.FindIndex(c => c.code == 74701381));
+                    if (p.messageType == YgoConstants.MSG_ANNOUNCE_RACE)
+                    {
+                        sawRaceAnnounce = true;
+                        AssertTrue((p.announceMask & YgoConstants.RACE_ILLUSION) != 0, "DNA Surgery announceMask missing RACE_ILLUSION");
+                        return BitConverter.GetBytes(YgoConstants.RACE_ILLUSION);
+                    }
+                    return null;
+                });
+                var transformed = s.Players[0].mzone.FirstOrDefault(c => c != null);
+                AssertTrue(sawRaceAnnounce && s.RetryCount == 0 && transformed != null && transformed.race == YgoConstants.RACE_ILLUSION,
+                    $"DNA Surgery failed to change monster race to RACE_ILLUSION (got {transformed?.race})");
+            }
+
+            // 7b. Rock-Paper-Scissors Trap: Transmission Gear (58297729) -> MSG_ROCK_PAPER_SCISSORS & MSG_HAND_RES
+            uint[] rpsDeck0 = BuildDeck40((58297729, 3), (4148264, 3), (5464695, 3), (7359741, 3), (7459013, 3));
+            uint[] rpsDeck1 = BuildDeck40((20721928, 3), (5265750, 3), (5053103, 3), (2311603, 3), (5388481, 3));
+            using (var s = StartSeedMatching("RockPaperScissors", rpsDeck0, Array.Empty<uint>(), rpsDeck1, Array.Empty<uint>(), true, sess =>
+            {
+                // P0 Turn 1 sets Transmission Gear & summons attacker; wait for P1 Turn 2 monster summon, then P0 Turn 3 attacks
+                DriveUntilIdle(sess, ai);
+                var p0 = sess.ActivePrompt;
+                return p0 != null && p0.messageType == YgoConstants.MSG_SELECT_IDLECMD && p0.playerId == 0
+                    && p0.sSetable.Any(a => a.code == 58297729) && p0.summonable.Any(m => m.code != 89631139);
+            }))
+            {
+                s.SubmitResponseInt((s.ActivePrompt.sSetable.FindIndex(a => a.code == 58297729) << 16) | 4);
+                DriveUntilIdle(s, ai);
+                s.SubmitResponseInt((s.ActivePrompt.summonable.FindIndex(m => m.code != 89631139) << 16) | 0);
+                DriveUntilIdle(s, ai);
+                s.SubmitResponseInt(7); // End Turn 1 -> P1 Turn 2
+                bool p1Summoned = false, p0Rps = false, p1Rps = false;
+                int turnGuard = 0;
+                while (!s.IsFinished && turnGuard++ < 80)
+                {
+                    if (s.ActivePrompt == null) { s.StepUntilPrompt(); continue; }
+                    var p = s.ActivePrompt;
+                    if (p.messageType == YgoConstants.MSG_ROCK_PAPER_SCISSORS)
+                    {
+                        if (p.playerId == 0) { p0Rps = true; s.SubmitResponseInt(2); } // 바위
+                        else { p1Rps = true; s.SubmitResponseInt(1); } // 가위
+                        if (p0Rps && p1Rps) { DriveUntilIdle(s, ai); break; }
+                    }
+                    else if (p.messageType == YgoConstants.MSG_SELECT_CHAIN && p.playerId == 0 && p.candidates.Any(c => c.code == 58297729))
+                        s.SubmitResponseInt(p.candidates.FindIndex(c => c.code == 58297729));
+                    else if (p.messageType == YgoConstants.MSG_SELECT_IDLECMD && p.playerId == 1 && !p1Summoned && p.summonable.Any(m => m.code != 89631139))
+                    {
+                        p1Summoned = true;
+                        s.SubmitResponseInt((p.summonable.FindIndex(m => m.code != 89631139) << 16) | 0);
+                    }
+                    else if (p.messageType == YgoConstants.MSG_SELECT_IDLECMD && p.playerId == 0 && p.canBp && p1Summoned)
+                        s.SubmitResponseInt(6); // Enter Battle Phase
+                    else if (p.messageType == YgoConstants.MSG_SELECT_IDLECMD)
+                        s.SubmitResponseInt(7); // End Turn
+                    else if (p.messageType == YgoConstants.MSG_SELECT_BATTLECMD && p.playerId == 0 && p.attackable.Count > 0)
+                        s.SubmitResponseInt(1); // Attack!
+                    else if (p.messageType == YgoConstants.MSG_SELECT_BATTLECMD)
+                        s.SubmitResponseInt(3); // End Battle
+                    else if (p.messageType == YgoConstants.MSG_SELECT_CHAIN)
+                        s.SubmitResponseInt(-1);
+                    else
+                        s.SubmitResponse(ai.ComputeResponse(s, p));
+                }
+                AssertTrue(p0Rps && p1Rps && s.RetryCount == 0 && s.Players[1].banished.Count >= 1,
+                    $"Transmission Gear RPS failed: p0={p0Rps}, p1={p1Rps}, oppBanished={s.Players[1].banished.Count}");
+                AssertTrue(s.Logs.Any(l => l.Contains("가위바위보 결과: P0(바위) vs P1(가위)")), "Missing MSG_HAND_RES log");
+            }
+
+            Debug.Log("[VERIFY OTHER EFFECTS] All 15 non-search effect & UI prompt suites passed (Bridge+SumUI, CardAnnounce, ChainNegate, DestroyBanish, Equip+Coin+Counter, DeckTop+Dice, ScapegoatTokens, Reborn+Tribute, RitualOverflowSUM, SynchroUnselect, ExactSumSelect, XyzDetach, Fusion, DNA-IllusionRace, RockPaperScissors) with 0 retries.");
         }
 
         private static void AssertTrue(bool cond, string msg)

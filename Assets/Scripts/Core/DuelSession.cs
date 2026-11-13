@@ -181,8 +181,8 @@ namespace YGOPortable.Core
             var turn1Main = p0GoesFirst ? p1Main : p0Main;
             var turn1Extra = p0GoesFirst ? p1Extra : p0Extra;
 
-            LoadDeckForPlayer(0, turn0Main, turn0Extra);
-            LoadDeckForPlayer(1, turn1Main, turn1Extra);
+            LoadDeckForPlayer(0, turn0Main, turn0Extra, seed);
+            LoadDeckForPlayer(1, turn1Main, turn1Extra, seed);
 
             YgoNativeBridge.YGO_StartDuel(NativePtr);
             AddLog($"듀얼 개시! ({(p0GoesFirst ? "플레이어 선공" : "AI 선공")})");
@@ -193,13 +193,52 @@ namespace YGOPortable.Core
         public int HumanPlayerIndex { get; private set; } = 0;
         public int AiPlayerIndex => 1 - HumanPlayerIndex;
 
-        private void LoadDeckForPlayer(byte playerId, IReadOnlyList<uint> main, IReadOnlyList<uint> extra)
+        private static ulong ComputeDeckShuffleSeed(ulong[] seed, byte playerId)
         {
-            if (main != null)
+            ulong h = 0x9E3779B97F4A7C15UL ^ ((ulong)(playerId + 1) * 0xBF58476D1CE4E5B9UL);
+            if (seed != null && seed.Length > 0)
             {
-                for (int i = main.Count - 1; i >= 0; i--)
+                for (int i = 0; i < seed.Length; i++)
                 {
-                    YgoNativeBridge.YGO_AddCard(NativePtr, playerId, 0, main[i],
+                    h ^= seed[i] + 0x9E3779B97F4A7C15UL + (ulong)i;
+                    NextSplitMix64(ref h);
+                }
+            }
+            else
+            {
+                byte[] bytes = Guid.NewGuid().ToByteArray();
+                ulong lo = BitConverter.ToUInt64(bytes, 0);
+                ulong hi = BitConverter.ToUInt64(bytes, 8);
+                h ^= lo ^ (hi * 0x94D049BB133111EBUL);
+                NextSplitMix64(ref h);
+            }
+            return h != 0 ? h : 0xD1B54A32D192ED03UL;
+        }
+
+        private static ulong NextSplitMix64(ref ulong x)
+        {
+            x += 0x9E3779B97F4A7C15UL;
+            ulong z = x;
+            z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL;
+            z = (z ^ (z >> 27)) * 0x94D049BB133111EBUL;
+            return z ^ (z >> 31);
+        }
+
+        private void LoadDeckForPlayer(byte playerId, IReadOnlyList<uint> main, IReadOnlyList<uint> extra, ulong[] seed)
+        {
+            if (main != null && main.Count > 0)
+            {
+                // ygopro-core OCG_StartDuel does not shuffle main decks on startup; shuffle here per official YGO rules.
+                var shuffled = new List<uint>(main);
+                ulong rng = ComputeDeckShuffleSeed(seed, playerId);
+                for (int i = shuffled.Count - 1; i > 0; i--)
+                {
+                    int j = (int)(NextSplitMix64(ref rng) % (ulong)(i + 1));
+                    (shuffled[i], shuffled[j]) = (shuffled[j], shuffled[i]);
+                }
+                for (int i = shuffled.Count - 1; i >= 0; i--)
+                {
+                    YgoNativeBridge.YGO_AddCard(NativePtr, playerId, 0, shuffled[i],
                         playerId, YgoConstants.LOCATION_DECK, 0, YgoConstants.POS_FACEDOWN_DEFENSE);
                 }
             }
@@ -425,8 +464,9 @@ namespace YGOPortable.Core
                 }
 
                 case YgoConstants.MSG_CONFIRM_CARDS:
+                case YgoConstants.MSG_CONFIRM_DECKTOP:
                 {
-                    br.ReadByte(); // toPlayer
+                    br.ReadByte(); // player
                     uint cnt = br.ReadUInt32();
                     var names = new List<string>((int)Math.Min(cnt, 5));
                     for (uint i = 0; i < cnt; i++)
@@ -440,8 +480,9 @@ namespace YGOPortable.Core
                     }
                     if (names.Count > 0)
                     {
+                        string prefix = msgType == YgoConstants.MSG_CONFIRM_DECKTOP ? "덱 위 확인" : "카드 확인";
                         string suffix = cnt > 4 ? $" 외 {cnt - 4}장" : "";
-                        AddLog($"카드 확인: {string.Join(", ", names)}{suffix}");
+                        AddLog($"{prefix}: {string.Join(", ", names)}{suffix}");
                     }
                     break;
                 }
@@ -825,6 +866,72 @@ namespace YGOPortable.Core
                     ActivePrompt = p;
                     break;
                 }
+
+                case YgoConstants.MSG_ROCK_PAPER_SCISSORS:
+                {
+                    ActivePrompt = new DuelPrompt
+                    {
+                        messageType = msgType,
+                        playerId = br.ReadByte(),
+                    };
+                    break;
+                }
+
+                case YgoConstants.MSG_HAND_RES:
+                {
+                    byte res = br.ReadByte();
+                    int h0 = res & 3;
+                    int h1 = (res >> 2) & 3;
+                    AddLog($"가위바위보 결과: P0({FormatRpsKR(h0)}) vs P1({FormatRpsKR(h1)})");
+                    break;
+                }
+
+                case YgoConstants.MSG_EQUIP:
+                {
+                    byte eCon = br.ReadByte();
+                    br.ReadByte(); // equip location
+                    uint eSeq = br.ReadUInt32();
+                    br.ReadUInt32(); // equip position
+                    byte tCon = br.ReadByte();
+                    br.ReadByte(); // target location
+                    uint tSeq = br.ReadUInt32();
+                    br.ReadUInt32(); // target position
+                    AddLog($"장착: {(eCon == HumanPlayerIndex ? "내" : "상대")} 마함[{eSeq + 1}] -> {(tCon == HumanPlayerIndex ? "내" : "상대")} 몬스터[{tSeq + 1}]");
+                    break;
+                }
+
+                case YgoConstants.MSG_TOSS_COIN:
+                {
+                    byte p = br.ReadByte();
+                    byte cnt = br.ReadByte();
+                    var coins = new List<string>(cnt);
+                    for (int i = 0; i < cnt; i++)
+                        coins.Add(br.ReadByte() == 1 ? "앞면" : "뒷면");
+                    AddLog($"{(p == HumanPlayerIndex ? "플레이어" : "상대")} 코인 토스: {string.Join(", ", coins)}");
+                    break;
+                }
+
+                case YgoConstants.MSG_TOSS_DICE:
+                {
+                    byte p = br.ReadByte();
+                    byte cnt = br.ReadByte();
+                    var dice = new List<string>(cnt);
+                    for (int i = 0; i < cnt; i++)
+                        dice.Add(br.ReadByte().ToString());
+                    AddLog($"{(p == HumanPlayerIndex ? "플레이어" : "상대")} 주사위: {string.Join(", ", dice)}");
+                    break;
+                }
+            }
+        }
+
+        private static string FormatRpsKR(int hand)
+        {
+            switch (hand)
+            {
+                case 1: return "가위";
+                case 2: return "바위";
+                case 3: return "보";
+                default: return "?";
             }
         }
 

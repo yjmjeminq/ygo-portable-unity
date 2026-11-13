@@ -153,6 +153,9 @@ namespace YGOPortable.UI
                 case YgoConstants.MSG_ANNOUNCE_CARD:
                     RenderAnnounceCard(prompt);
                     break;
+                case YgoConstants.MSG_ROCK_PAPER_SCISSORS:
+                    RenderRockPaperScissors();
+                    break;
                 default:
                     ModalRoot.SetActive(false);
                     break;
@@ -446,34 +449,52 @@ namespace YGOPortable.UI
             }
         }
 
-        private static bool CheckSumSelectionValid(DuelPrompt p, HashSet<int> chosen, int target)
+        public static bool CheckSumSelectionValid(DuelPrompt p, HashSet<int> chosen, int target)
         {
-            int totalCnt = p.mustSelect.Count + chosen.Count;
-            if (!p.sumExactCountZeroAny && (totalCnt < p.min || (p.max > 0 && totalCnt > p.max)))
-                return false;
+            if (p == null || chosen == null) return false;
 
             var items = new List<(int a, int b)>();
-            foreach (var m in p.mustSelect) items.Add(((int)(m.sumParam & 0xFFFF), (int)((m.sumParam >> 16) & 0xFFFF)));
+            foreach (var m in p.mustSelect)
+                items.Add(((int)(m.sumParam & 0xFFFF), (int)((m.sumParam >> 16) & 0xFFFF)));
             foreach (int i in chosen)
             {
+                if (i < 0 || i >= p.candidates.Count) return false;
                 var c = p.candidates[i];
                 items.Add(((int)(c.sumParam & 0xFFFF), (int)((c.sumParam >> 16) & 0xFFFF)));
             }
+            if (items.Count == 0) return false;
 
-            bool Dfs(int k, int acc, int minEach)
+            if (p.sumExactCountZeroAny)
             {
-                if (k == items.Count)
+                int sum = 0;
+                int mx = 0;
+                int mn = int.MaxValue;
+                foreach (var it in items)
                 {
-                    if (!p.sumExactCountZeroAny) return acc == target;
-                    return acc >= target && (acc - target) < minEach;
+                    int o1 = it.a;
+                    int o2 = it.b;
+                    int ms = (o2 > 0 && o2 < o1) ? o2 : o1;
+                    sum += ms;
+                    mx += Math.Max(o1, o2);
+                    if (ms < mn) mn = ms;
                 }
-                int a = items[k].a;
-                if (Dfs(k + 1, acc + a, Math.Min(minEach, a))) return true;
-                int b = items[k].b;
-                if (b > 0 && b != a && Dfs(k + 1, acc + b, Math.Min(minEach, b))) return true;
-                return false;
+                return mx >= target && (sum - mn) < target;
             }
-            return Dfs(0, 0, int.MaxValue);
+
+            // ygopro-core checks tot = return_cards.size() (excluding must_select_cards)
+            int cnt = chosen.Count;
+            if (cnt < p.min || (p.max > 0 && cnt > p.max))
+                return false;
+
+            bool Dfs(int k, int acc)
+            {
+                if (k == items.Count) return acc == target;
+                int a = items[k].a;
+                if (Dfs(k + 1, acc + a)) return true;
+                int b = items[k].b;
+                return b > 0 && b != a && Dfs(k + 1, acc + b);
+            }
+            return Dfs(0, 0);
         }
 
         private void RenderUnselectCard(DuelSession s, DuelPrompt p)
@@ -717,12 +738,36 @@ namespace YGOPortable.UI
             _confirmBtn.interactable = false;
         }
 
+        private void RenderRockPaperScissors()
+        {
+            _modalTitle.text = "가위바위보";
+            _modalSubtitle.text = "낼 패를 선택하세요.";
+
+            var choices = new (int val, string label, bool gold)[]
+            {
+                (1, "가위", false),
+                (2, "바위", true),
+                (3, "보", false),
+            };
+            float w = 1f / choices.Length;
+            for (int i = 0; i < choices.Length; i++)
+            {
+                var ch = choices[i];
+                var slot = LotdUiKit.CreateBorderedPanel(_modalBody, $"Rps_{ch.val}",
+                    new Vector2(i * w + 0.03f, 0.22f), new Vector2((i + 1) * w - 0.03f, 0.78f), Vector2.zero, Vector2.zero);
+                LotdUiKit.AddText(LotdUiKit.CreateRect("Lbl", slot, new Vector2(0.08f, 0.35f), new Vector2(0.92f, 0.85f), Vector2.zero, Vector2.zero),
+                    "T", ch.label, 28, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
+                var bRt = LotdUiKit.CreateRect("Btn", slot, new Vector2(0.12f, 0.10f), new Vector2(0.88f, 0.32f), Vector2.zero, Vector2.zero);
+                LotdUiKit.CreateLotdButton(bRt, "B", "선택", () => Submit(BitConverter.GetBytes(ch.val)), 16, gold: ch.gold);
+            }
+        }
+
         private void RenderAnnounceCard(DuelPrompt p)
         {
             _modalTitle.text = "카드명 선언";
             _modalSubtitle.text = "선언할 카드 이름을 검색하여 선택하세요.";
 
-            uint[] validCodes = YgoNativeBridge.FilterDeclarableCards(p.options.ToArray(), 256);
+            uint[] validCodes = YgoNativeBridge.FilterDeclarableCards(p.options.ToArray(), 20000);
             if (validCodes.Length == 0) validCodes = new[] { 89631139u };
             uint pickedCode = validCodes[0];
 

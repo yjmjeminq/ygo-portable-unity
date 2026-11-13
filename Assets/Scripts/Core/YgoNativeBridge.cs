@@ -172,11 +172,12 @@ namespace YGOPortable.Core
             return buf;
         }
 
-        public static uint[] FilterDeclarableCards(ulong[] opcodes, int maxOut = 256)
+        public static uint[] FilterDeclarableCards(ulong[] opcodes, int maxOut = 20000)
         {
-            if (opcodes == null || opcodes.Length == 0 || maxOut <= 0) return Array.Empty<uint>();
+            if (maxOut <= 0) return Array.Empty<uint>();
+            ulong[] effective = (opcodes != null && opcodes.Length > 0) ? opcodes : new ulong[] { 1UL };
             uint[] buf = new uint[maxOut];
-            int cnt = YGO_FilterDeclarableCards(opcodes, opcodes.Length, buf, maxOut);
+            int cnt = YGO_FilterDeclarableCards(effective, effective.Length, buf, maxOut);
             if (cnt <= 0) return Array.Empty<uint>();
             if (cnt == buf.Length) return buf;
             uint[] trimmed = new uint[cnt];

@@ -100,10 +100,13 @@ namespace YGOPortable.AI
 
                 case YgoConstants.MSG_ANNOUNCE_CARD:
                 {
-                    uint[] valid = YgoNativeBridge.FilterDeclarableCards(prompt.options.ToArray(), 16);
+                    uint[] valid = YgoNativeBridge.FilterDeclarableCards(prompt.options.ToArray(), 256);
                     uint pick = valid.Length > 0 ? valid[0] : 89631139u;
                     return BitConverter.GetBytes((int)pick);
                 }
+
+                case YgoConstants.MSG_ROCK_PAPER_SCISSORS:
+                    return BitConverter.GetBytes(1 + Math.Abs(session.TurnNumber + session.Logs.Count) % 3);
 
                 default:
                     return BitConverter.GetBytes(0);
@@ -398,7 +401,12 @@ namespace YGOPortable.AI
         private byte[] BuildSelectUnselect(DuelSession s, DuelPrompt p)
         {
             _unselectCount++;
-            if ((p.finishable || p.cancelable) && (_unselectCount >= p.candidates.Count + 4 || p.candidates.Count == 0))
+            if (p.finishable && (p.unselectCandidates.Count > 0 || p.candidates.Count == 0 || _unselectCount >= p.candidates.Count + 2))
+            {
+                _unselectCount = 0;
+                return BitConverter.GetBytes(-1);
+            }
+            if (p.cancelable && _unselectCount >= p.candidates.Count + 4)
             {
                 _unselectCount = 0;
                 return BitConverter.GetBytes(-1);
