@@ -92,6 +92,7 @@ namespace YGOPortable.UI
                 Debug.Log("[GameApp] 4. Ensuring EventSystem & Canvas...");
                 EnsureEventSystem();
                 var canvas = EnsureMainCanvas();
+                CardDragManager.Ensure(canvas);
 
                 Debug.Log("[GameApp] 5. Constructing TitleAndMenuUI...");
                 _titleAndMenu = new TitleAndMenuUI(this, canvas.transform);
