@@ -1,0 +1,97 @@
+i tk2d 1
+w 1890
+h 848
+~
+n arrow_1
+s 1812 444 73 60
+o 7 7 85 74
+~
+n arrow_2
+s 1609 765 85 74
+~
+n arrow_left1
+s 1812 508 58 71
+~
+n arrow_left2
+s 1812 583 58 71
+~
+n arrow_right1
+s 1698 765 58 71
+~
+n avatarbox
+s 1753 679 80 80
+~
+n avatarframe_small_blue
+s 1100 137 313 314
+o 2 2 318 318
+~
+n avatarframe_small_red
+s 1417 137 313 314
+o 2 2 318 318
+~
+n bookmark_wide
+s 1609 679 140 82
+~
+n challenge_icon_loss
+s 1368 782 27 26
+o 0 4 27 33
+~
+n challenge_icon_new
+s 1814 814 27 33
+~
+n challenge_icon_win
+s 1855 1 27 29
+o 0 3 27 33
+~
+n characterframe_large
+s 1100 455 264 354
+~
+n frame_reward_description_active
+s 1100 1 640 64
+~
+n frame_reward_description_inactive
+s 1100 69 640 64
+~
+n frame_reward_main_active
+s 1368 455 218 220
+~
+n frame_reward_main_inactive
+s 1590 455 218 220
+~
+n lock
+s 1760 763 50 56
+~
+n logo_triangle_menu_small
+s 1 1 1095 711
+~
+n menuheader
+s 1 716 962 131
+~
+n new_yellow
+s 1814 763 38 47
+~
+n optionbox
+s 1368 679 237 99
+~
+n related_cards_icon
+s 967 716 128 128
+~
+n reverseplay_active
+s 1782 334 107 106
+~
+n reverseplay_both
+s 1744 1 107 107
+~
+n reverseplay_inactive
+s 1782 112 107 107
+~
+n reverseplay_inactive_new
+s 1782 223 107 107
+~
+n statsbar_vertical
+s 1734 137 44 266
+o 0 0 44 280
+~
+n win_frame
+s 1734 407 36 41
+~

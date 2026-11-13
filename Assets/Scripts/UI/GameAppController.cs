@@ -1,0 +1,303 @@
+using System;
+using System.Collections;
+using System.IO;
+using System.Linq;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
+using YGOPortable.AI;
+using YGOPortable.Core;
+
+namespace YGOPortable.UI
+{
+    public enum AppScreen
+    {
+        Title,
+        MainMenu,
+        OpponentSelect,
+        DeckEditor,
+        Duel,
+    }
+
+    public class GameAppController : MonoBehaviour
+    {
+        public float AiStepDelay { get; set; } = 0.25f;
+        public AIDifficulty AiDifficulty { get; set; } = AIDifficulty.Smart;
+
+        private TitleAndMenuUI _titleAndMenu;
+        private OpponentSelectUI _oppSelect;
+        private DeckEditorUI _deckEditor;
+        private DuelPromptModals _modals;
+        private DuelFieldUI _duelField;
+
+        private DuelSession _session;
+        private readonly TacticalAI _ai = new TacticalAI();
+        private DuelPrompt _shownHumanPrompt;
+        private float _aiTimer;
+        private bool _resultShown;
+
+        private OpponentCharacter _activeOppChar;
+        private PresetDeckInfo _activeOppDeck;
+        private UserDeck _activeMyDeck;
+        private bool _activePlayerFirst;
+
+        private bool _initialized;
+
+        private void Start()
+        {
+            Application.runInBackground = true;
+            LotdAudio.EnsureInit(gameObject);
+
+            if (!YgoNativeBridge.IsInitialized)
+            {
+                int rc = YgoNativeBridge.Initialize(Application.streamingAssetsPath, OnNativeLog);
+                if (rc != 0) Debug.LogError($"[GameApp] YGO_Init failed rc={rc}");
+            }
+
+            if (!CardDatabase.IsLoaded)
+                CardDatabase.Load(Application.streamingAssetsPath);
+            CardArtLoader.Initialize(Application.streamingAssetsPath);
+            if (DeckRepository.PresetDecks.Count == 0)
+                DeckRepository.Load(Application.streamingAssetsPath, Application.persistentDataPath);
+
+            EnsureEventSystem();
+            var canvas = EnsureMainCanvas();
+
+            _titleAndMenu = new TitleAndMenuUI(this, canvas.transform);
+            _oppSelect = new OpponentSelectUI(this, canvas.transform);
+            _deckEditor = new DeckEditorUI(this, canvas.transform);
+            _modals = new DuelPromptModals(canvas.transform, code => _duelField?.InspectCard(code), OnHumanModalResponse);
+            _duelField = new DuelFieldUI(this, canvas.transform, _modals);
+
+            _initialized = true;
+            ShowScreen(AppScreen.Title);
+
+            ProcessCommandLineArgs();
+        }
+
+        private void OnNativeLog(int logType, string msg)
+        {
+            if (logType == 0) Debug.LogError($"[YGO-Core] {msg}");
+        }
+
+        private static void EnsureEventSystem()
+        {
+            if (FindFirstObjectByType<EventSystem>() != null) return;
+            var es = new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+            DontDestroyOnLoad(es);
+        }
+
+        private Canvas EnsureMainCanvas()
+        {
+            var canvas = FindFirstObjectByType<Canvas>();
+            if (canvas == null)
+            {
+                var go = new GameObject("LOTD_Canvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+                canvas = go.GetComponent<Canvas>();
+                canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            }
+            var scaler = canvas.GetComponent<CanvasScaler>() ?? canvas.gameObject.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1600, 900);
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+            scaler.matchWidthOrHeight = 0.5f;
+            return canvas;
+        }
+
+        public void ShowScreen(AppScreen screen)
+        {
+            if (!_initialized) return;
+
+            _modals.HideAll();
+            _modals.HideResult();
+            _titleAndMenu.SettingsRoot.SetActive(false);
+
+            _titleAndMenu.TitleRoot.SetActive(screen == AppScreen.Title);
+            _titleAndMenu.MenuRoot.SetActive(screen == AppScreen.MainMenu);
+            _oppSelect.Root.SetActive(screen == AppScreen.OpponentSelect);
+            _oppSelect.JankenRoot.SetActive(false);
+            _deckEditor.Root.SetActive(screen == AppScreen.DeckEditor);
+            _duelField.Root.SetActive(screen == AppScreen.Duel);
+
+            if (screen != AppScreen.Duel && _session != null)
+            {
+                _session.Dispose();
+                _session = null;
+                _shownHumanPrompt = null;
+            }
+
+            if (screen == AppScreen.OpponentSelect) _oppSelect.Open();
+            else if (screen == AppScreen.DeckEditor) _deckEditor.Open();
+        }
+
+        public void StartDuelMatch(OpponentCharacter oppChar, PresetDeckInfo oppDeck, UserDeck myDeck, bool playerGoesFirst)
+        {
+            _activeOppChar = oppChar;
+            _activeOppDeck = oppDeck;
+            _activeMyDeck = myDeck;
+            _activePlayerFirst = playerGoesFirst;
+
+            _session?.Dispose();
+            _session = new DuelSession();
+            _ai.Difficulty = AiDifficulty;
+            _shownHumanPrompt = null;
+            _aiTimer = 0f;
+            _resultShown = false;
+
+            ShowScreen(AppScreen.Duel);
+            _session.StartNewDuel(
+                myDeck.main, myDeck.extra,
+                oppDeck.main, oppDeck.extra,
+                p0GoesFirst: playerGoesFirst);
+
+            _duelField.BindSession(_session, oppChar, oppDeck);
+        }
+
+        private void Update()
+        {
+            if (_session == null) return;
+
+            if (_session.IsFinished)
+            {
+                if (!_resultShown)
+                {
+                    _resultShown = true;
+                    _modals.HideAll();
+                    _duelField.Refresh();
+                    bool won = _session.Winner == _session.HumanPlayerIndex;
+                    bool draw = _session.Winner == 2;
+                    _modals.ShowResult(
+                        won, draw, _activeOppChar, _session.TurnNumber,
+                        Mathf.Max(0, _session.Players[_session.HumanPlayerIndex].lp),
+                        Mathf.Max(0, _session.Players[_session.AiPlayerIndex].lp),
+                        () => StartDuelMatch(_activeOppChar, _activeOppDeck, _activeMyDeck, _activePlayerFirst),
+                        () => ShowScreen(AppScreen.OpponentSelect),
+                        () => ShowScreen(AppScreen.MainMenu));
+                }
+                return;
+            }
+
+            var prompt = _session.ActivePrompt;
+            if (prompt == null)
+            {
+                _session.StepUntilPrompt();
+                _duelField.Refresh();
+                return;
+            }
+
+            if (prompt.playerId == _session.AiPlayerIndex)
+            {
+                _aiTimer += Time.deltaTime;
+                if (_aiTimer >= AiStepDelay)
+                {
+                    _aiTimer = 0f;
+                    byte[] aiResp = _ai.ComputeResponse(_session, prompt);
+                    _session.SubmitResponse(aiResp);
+                    _duelField.Refresh();
+                }
+                return;
+            }
+
+            // Human prompt
+            if (_shownHumanPrompt != prompt)
+            {
+                _shownHumanPrompt = prompt;
+                _duelField.Refresh();
+
+                if (prompt.messageType != YgoConstants.MSG_SELECT_IDLECMD &&
+                    prompt.messageType != YgoConstants.MSG_SELECT_BATTLECMD &&
+                    prompt.messageType != YgoConstants.MSG_SELECT_PLACE &&
+                    prompt.messageType != YgoConstants.MSG_SELECT_DISFIELD)
+                {
+                    _modals.ShowPrompt(_session, prompt);
+                }
+                else
+                {
+                    _modals.HideAll();
+                }
+            }
+        }
+
+        private void OnHumanModalResponse(byte[] resp)
+        {
+            if (_session == null || _session.IsFinished) return;
+            _shownHumanPrompt = null;
+            _session.SubmitResponse(resp);
+            _duelField.Refresh();
+        }
+
+        private void ProcessCommandLineArgs()
+        {
+            var args = Environment.GetCommandLineArgs();
+            for (int i = 0; i < args.Length; i++)
+            {
+                if (args[i] == "-capture-tour" && i + 1 < args.Length)
+                {
+                    StartCoroutine(RunUiTourCapture(args[i + 1]));
+                    break;
+                }
+            }
+        }
+
+        private IEnumerator RunUiTourCapture(string outDir)
+        {
+            Directory.CreateDirectory(outDir);
+            yield return new WaitForSeconds(0.5f);
+            ScreenCapture.CaptureScreenshot(Path.Combine(outDir, "01_title.png"));
+            yield return new WaitForSeconds(0.3f);
+
+            ShowScreen(AppScreen.MainMenu);
+            yield return new WaitForSeconds(0.4f);
+            ScreenCapture.CaptureScreenshot(Path.Combine(outDir, "02_main_menu.png"));
+            yield return new WaitForSeconds(0.3f);
+
+            ShowScreen(AppScreen.OpponentSelect);
+            yield return new WaitForSeconds(0.4f);
+            ScreenCapture.CaptureScreenshot(Path.Combine(outDir, "03_opponents.png"));
+            yield return new WaitForSeconds(0.3f);
+
+            ShowScreen(AppScreen.DeckEditor);
+            yield return new WaitForSeconds(0.4f);
+            ScreenCapture.CaptureScreenshot(Path.Combine(outDir, "04_deck_editor.png"));
+            yield return new WaitForSeconds(0.3f);
+
+            var oppChar = DeckRepository.Characters.FirstOrDefault(c => c.isMeta2026) ?? DeckRepository.Characters.FirstOrDefault();
+            var oppDeck = oppChar != null ? DeckRepository.GetDecksForCharacter(oppChar.id).FirstOrDefault() : DeckRepository.PresetDecks.FirstOrDefault();
+            var myDeck = DeckRepository.UserDecks.FirstOrDefault();
+            if (oppChar != null && oppDeck != null && myDeck != null)
+            {
+                AiStepDelay = 0.04f;
+                StartDuelMatch(oppChar, oppDeck, myDeck, false);
+                float t = 0f;
+                while (t < 3.5f && _session != null && !_session.IsFinished &&
+                       (_session.TurnNumber < 2 || _session.ActivePrompt == null || _session.ActivePrompt.playerId != _session.HumanPlayerIndex))
+                {
+                    t += Time.deltaTime;
+                    yield return null;
+                }
+                var myHand = _session?.Players[_session.HumanPlayerIndex].hand;
+                if (myHand != null && myHand.Count > 0)
+                    _duelField?.InspectCard(myHand[0].code);
+                yield return new WaitForSeconds(0.25f);
+                ScreenCapture.CaptureScreenshot(Path.Combine(outDir, "05_duel_field.png"));
+                yield return new WaitForSeconds(0.35f);
+            }
+
+            Application.Quit();
+        }
+
+        private void OnDestroy()
+        {
+            _session?.Dispose();
+            _session = null;
+        }
+
+        private void OnApplicationQuit()
+        {
+            _session?.Dispose();
+            _session = null;
+            CardArtLoader.Shutdown();
+            YgoNativeBridge.Shutdown();
+        }
+    }
+}

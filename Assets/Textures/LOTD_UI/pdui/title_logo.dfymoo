@@ -1,0 +1,18 @@
+i tk2d 1
+w 1289
+h 1924
+~
+n btn_play_active
+s 1130 1 158 158
+~
+n btn_play_inactive
+s 1130 163 158 158
+~
+n logo_jp
+s 1 1 1125 973
+o 5 52 1920 1080
+~
+n logo_us
+s 1 978 1125 945
+o 5 80 1920 1080
+~

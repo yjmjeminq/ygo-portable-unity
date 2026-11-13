@@ -1,0 +1,80 @@
+i tk2d 1
+w 2530
+h 507
+~
+n ds_btn_active01
+s 2 2 630 99
+o 137 17 897 136
+~
+n ds_btn_active02
+s 2 103 630 99
+o 137 17 897 136
+~
+n ds_btn_active03
+s 2 204 630 99
+o 137 17 897 136
+~
+n ds_btn_active04
+s 2 305 630 99
+o 137 17 897 136
+~
+n ds_btn_active05
+s 2 406 630 99
+o 137 17 897 136
+~
+n ds_btn_active06
+s 634 2 630 99
+o 137 17 897 136
+~
+n ds_btn_active07
+s 634 103 630 99
+o 137 17 897 136
+~
+n ds_btn_active08
+s 634 204 630 99
+o 137 17 897 136
+~
+n ds_btn_active09
+s 634 305 630 99
+o 137 17 897 136
+~
+n ds_btn_active10
+s 634 406 630 99
+o 137 17 897 136
+~
+n ds_btn_active11
+s 1266 2 630 99
+o 137 17 897 136
+~
+n ds_btn_active12
+s 1898 2 630 99
+o 137 17 897 136
+~
+n ds_btn_active13
+s 1266 103 630 99
+o 137 17 897 136
+~
+n ds_btn_active14
+s 1898 103 630 99
+o 137 17 897 136
+~
+n ds_btn_active15
+s 1266 204 630 99
+o 137 17 897 136
+~
+n ds_btn_active16
+s 1898 204 630 99
+o 137 17 897 136
+~
+n ds_btn_active17
+s 1266 305 630 99
+o 137 17 897 136
+~
+n ds_btn_active18
+s 1898 305 630 99
+o 137 17 897 136
+~
+n ds_btn_active19
+s 1266 406 630 99
+o 137 17 897 136
+~

@@ -1,0 +1,31 @@
+i tk2d 1
+w 3649
+h 1809
+~
+n bg_arc-v
+s 2 2 1920 1080
+~
+n bg_arc-v_background_lines
+s 1924 2 1723 1080
+o 197 0 1920 1080
+~
+n bg_arc-v_foreground-1
+s 762 1084 16 349
+~
+n bg_arc-v_foreground-2
+s 2 1084 758 723
+~
+n bitmap 15
+s 762 1513 19 7
+~
+n bitmap 16
+s 762 1501 89 10
+o 4 0 112 10
+~
+n bitmap 2
+s 762 1489 273 10
+o 0 0 332 10
+~
+n bitmap 7
+s 762 1435 110 52
+~

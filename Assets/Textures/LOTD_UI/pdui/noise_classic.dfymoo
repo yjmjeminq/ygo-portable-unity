@@ -1,0 +1,288 @@
+i tk2d 1
+w 2618
+h 2043
+~
+n bg_classic_background
+s 2 2 1920 1080
+~
+n bitmap 1
+s 1595 1084 47 191
+o 3 8 57 209
+~
+n bitmap 10
+s 2512 613 16 33
+~
+n bitmap 100
+s 120 1979 29 22
+~
+n bitmap 101
+s 151 1979 29 22
+~
+n bitmap 102
+s 120 1979 29 22
+~
+n bitmap 103
+s 155 1955 27 22
+~
+n bitmap 104
+s 750 1365 26 22
+~
+n bitmap 105
+s 778 1365 26 22
+~
+n bitmap 106
+s 806 1365 26 22
+~
+n bitmap 107
+s 1302 1826 77 212
+~
+n bitmap 109
+s 521 1802 211 81
+~
+n bitmap 11
+s 102 1837 16 153
+~
+n bitmap 110
+s 1422 1084 171 251
+~
+n bitmap 111
+s 2388 745 228 208
+~
+n bitmap 112
+s 521 1909 206 100
+~
+n bitmap 113
+s 225 1802 234 201
+~
+n bitmap 14
+s 1644 1227 16 69
+~
+n bitmap 15
+s 729 1909 16 93
+~
+n bitmap 16
+s 1422 1338 16 105
+~
+n bitmap 17
+s 1284 1909 16 117
+~
+n bitmap 18
+s 2388 613 16 129
+~
+n bitmap 19
+s 1644 1084 16 141
+~
+n bitmap 2
+s 521 1885 218 22
+~
+n bitmap 20
+s 204 1837 16 153
+~
+n bitmap 21
+s 1440 1338 16 93
+~
+n bitmap 22
+s 2532 686 16 57
+~
+n bitmap 23
+s 2530 613 16 33
+~
+n bitmap 25
+s 1227 1358 16 81
+~
+n bitmap 29
+s 1906 1338 16 153
+~
+n bitmap 31
+s 1383 1358 34 60
+o 1 1 35 61
+~
+n bitmap 32
+s 2513 308 99 246
+o 1 1 100 247
+~
+n bitmap 33
+s 2406 649 124 94
+~
+n bitmap 34
+s 20 1802 203 33
+~
+n bitmap 35
+s 2442 1774 160 109
+~
+n bitmap 36
+s 2058 1794 297 138
+~
+n bitmap 37
+s 1381 1826 121 197
+~
+n bitmap 38
+s 738 1084 10 757
+~
+n bitmap 39
+s 2532 648 10 4
+~
+n bitmap 4
+s 2532 654 9 9
+~
+n bitmap 45
+s 2388 602 16 8
+~
+n bitmap 46
+s 2 1084 16 929
+~
+n bitmap 5
+s 2532 665 5 10
+~
+n bitmap 54
+s 1148 1084 272 272
+~
+n bitmap 55
+s 1668 1084 252 252
+~
+n bitmap 56
+s 2102 1520 272 272
+~
+n bitmap 57
+s 2310 1934 130 50
+~
+n bitmap 58
+s 1502 1337 160 43
+~
+n bitmap 59
+s 2548 613 49 71
+~
+n bitmap 6
+s 2 2015 747 22
+~
+n bitmap 60
+s 1458 1337 42 87
+~
+n bitmap 61
+s 2406 591 104 56
+~
+n bitmap 62
+s 1504 1985 129 54
+~
+n bitmap 63
+s 1016 1909 132 132
+~
+n bitmap 64
+s 1288 1446 378 378
+~
+n bitmap 65
+s 2513 2 102 151
+~
+n bitmap 66
+s 1173 1358 52 82
+~
+n bitmap 67
+s 1245 1358 136 70
+~
+n bitmap 68
+s 20 1084 716 716
+~
+n bitmap 69
+s 1016 1446 270 461
+~
+n bitmap 7
+s 1635 1985 258 53
+o 50 0 308 53
+~
+n bitmap 70
+s 2381 1446 188 326
+~
+n bitmap 71
+s 2102 1408 277 110
+~
+n bitmap 72
+s 1924 591 462 355
+o 0 0 463 356
+~
+n bitmap 73
+s 1895 1956 78 65
+~
+n bitmap 74
+s 2513 556 84 55
+~
+n bitmap 75
+s 1577 1382 77 59
+~
+n bitmap 76
+s 120 1837 82 61
+~
+n bitmap 77
+s 120 1900 79 53
+~
+n bitmap 78
+s 1502 1382 73 62
+~
+n bitmap 79
+s 751 1408 263 616
+~
+n bitmap 8
+s 2599 556 16 187
+~
+n bitmap 80
+s 2384 955 223 489
+~
+n bitmap 81
+s 750 1084 396 279
+~
+n bitmap 82
+s 1924 2 587 587
+~
+n bitmap 83
+s 1924 948 458 458
+~
+n bitmap 84
+s 1668 1338 236 236
+~
+n bitmap 85
+s 1150 1909 132 132
+~
+n bitmap 86
+s 1678 1576 378 378
+~
+n bitmap 87
+s 1975 1956 159 61
+~
+n bitmap 88
+s 461 1843 58 160
+~
+n bitmap 89
+s 1504 1826 172 157
+~
+n bitmap 9
+s 2388 591 16 9
+~
+n bitmap 90
+s 2513 155 102 151
+~
+n bitmap 91
+s 1016 1365 155 75
+~
+n bitmap 92
+s 2136 1934 172 57
+~
+n bitmap 93
+s 1924 1408 176 151
+~
+n bitmap 94
+s 20 1843 80 162
+~
+n bitmap 95
+s 2550 686 37 22
+~
+n bitmap 96
+s 461 1802 35 22
+~
+n bitmap 97
+s 2550 710 36 22
+~
+n bitmap 98
+s 120 1955 33 22
+~
+n bitmap 99
+s 120 1979 29 22
+~

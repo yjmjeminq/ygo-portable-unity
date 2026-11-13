@@ -1,0 +1,150 @@
+i tk2d 1
+w 3987
+h 1593
+~
+n bitmap 10
+s 542 1477 57 41
+~
+n bitmap 11
+s 728 1453 54 39
+~
+n bitmap 12
+s 743 1410 52 36
+~
+n bitmap 13
+s 799 1369 49 34
+~
+n bitmap 14
+s 784 1486 44 31
+~
+n bitmap 15
+s 728 1494 42 29
+~
+n bitmap 16
+s 772 1519 42 28
+~
+n bitmap 17
+s 1707 1567 34 23
+~
+n bitmap 18
+s 576 1369 84 52
+~
+n bitmap 19
+s 2 1369 404 176
+~
+n bitmap 2
+s 1780 1084 607 507
+o 2 2 613 514
+~
+n bitmap 20
+s 3916 973 44 152
+~
+n bitmap 21
+s 3846 973 68 170
+~
+n bitmap 22
+s 1548 1368 157 205
+~
+n bitmap 23
+s 3846 344 114 325
+~
+n bitmap 24
+s 2 1084 888 283
+~
+n bitmap 25
+s 892 1084 886 282
+~
+n bitmap 26
+s 2389 1084 539 358
+~
+n bitmap 27
+s 2930 1084 539 358
+~
+n bitmap 28
+s 1375 1368 171 76
+~
+n bitmap 29
+s 408 1369 166 66
+~
+n bitmap 30
+s 662 1369 79 82
+~
+n bitmap 31
+s 3846 2 139 340
+~
+n bitmap 32
+s 3846 671 123 300
+~
+n bitmap 33
+s 892 1368 481 212
+~
+n bitmap 36
+s 1375 1446 109 143
+~
+n bitmap 37
+s 1707 1368 71 143
+~
+n bitmap 38
+s 576 1423 84 52
+~
+n bitmap 39
+s 3471 1196 409 236
+o 0 0 409 238
+~
+n bitmap 40
+s 1743 1567 34 23
+~
+n bitmap 41
+s 3916 1127 64 67
+~
+n bitmap 42
+s 702 1525 42 28
+~
+n bitmap 43
+s 1486 1446 55 51
+~
+n bitmap 44
+s 658 1502 42 29
+~
+n bitmap 45
+s 799 1405 49 34
+~
+n bitmap 46
+s 784 1448 52 36
+~
+n bitmap 47
+s 743 1369 54 39
+~
+n bitmap 48
+s 476 1487 57 41
+~
+n bitmap 49
+s 408 1491 55 41
+~
+n bitmap 50
+s 1486 1499 60 44
+~
+n bitmap 51
+s 662 1453 64 47
+~
+n bitmap 52
+s 1707 1513 66 52
+~
+n bitmap 6
+s 408 1437 66 52
+~
+n bitmap 7
+s 476 1437 64 48
+~
+n bitmap 8
+s 1486 1545 60 44
+~
+n bitmap 9
+s 601 1477 55 41
+~
+n gx_background
+s 2 2 1920 1080
+~
+n gx_foreground2
+s 1924 2 1920 1080
+~

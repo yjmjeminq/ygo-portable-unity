@@ -1,0 +1,66 @@
+i tk2d 1
+w 3697
+h 507
+~
+n jnk_afterimage_blue
+s 909 225 280 246
+o 4 1 293 251
+~
+n jnk_afterimage_red
+s 2 246 280 246
+o 4 1 293 251
+~
+n jnk_select_indicator_blue
+s 284 246 259 259
+~
+n jnk_select_indicator_red
+s 545 246 259 259
+~
+n jnkn_opp_paper_active
+s 1204 2 288 288
+~
+n jnkn_opp_paper_inactive
+s 2944 2 249 249
+o 20 19 288 288
+~
+n jnkn_opp_scissor_active
+s 1494 2 288 288
+~
+n jnkn_opp_scissor_inactive
+s 3195 2 249 249
+o 20 19 288 288
+~
+n jnkn_opp_stone_active
+s 1784 2 288 288
+~
+n jnkn_opp_stone_inactive
+s 3446 2 249 249
+o 19 20 288 288
+~
+n jnkn_player_paper_active
+s 2074 2 288 288
+~
+n jnkn_player_paper_inactive
+s 2944 253 249 249
+o 20 19 288 288
+~
+n jnkn_player_scissor_active
+s 2364 2 288 288
+~
+n jnkn_player_scissor_inactive
+s 3195 253 249 249
+o 20 19 288 288
+~
+n jnkn_player_stone_active
+s 2654 2 288 288
+~
+n jnkn_player_stone_inactive
+s 3446 253 249 249
+o 19 20 288 288
+~
+n vs_background
+s 2 2 905 242
+~
+n vs_text
+s 909 2 293 221
+~

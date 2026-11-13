@@ -5,6 +5,10 @@
 /[Ll]ibrary/
 /[Ll]ocalCache/
 /[Ll]ogs/
+NativeEngine/build/
+verify*.log
+*.apk
+*.aab
 /[Mm]emoryCaptures/
 /[Oo]bj/
 /[Tt]emp/
