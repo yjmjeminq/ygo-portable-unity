@@ -75,6 +75,16 @@ namespace YGOPortable.Editor
                 return;
             }
 
+            // Patch boot.config to disable unstable gfx-jobs on Intel integrated GPUs
+            string bootConfigPath = Path.Combine(Path.GetDirectoryName(WinBuildPath), "YGOPortable_Data", "boot.config");
+            if (File.Exists(bootConfigPath))
+            {
+                string bootCfg = File.ReadAllText(bootConfigPath);
+                bootCfg = bootCfg.Replace("gfx-enable-gfx-jobs=1", "gfx-enable-gfx-jobs=0");
+                bootCfg = bootCfg.Replace("gfx-threading-mode=6", "gfx-threading-mode=0");
+                File.WriteAllText(bootConfigPath, bootCfg);
+            }
+
             Debug.Log($"[BUILD SUCCEEDED] {WinBuildPath} ({summary.totalSize / (1024f * 1024f):F1} MB, warnings={summary.totalWarnings})");
             if (Application.isBatchMode) EditorApplication.Exit(0);
         }

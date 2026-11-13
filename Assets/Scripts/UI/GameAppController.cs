@@ -43,36 +43,84 @@ namespace YGOPortable.UI
 
         private bool _initialized;
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void OnBeforeSceneLoad()
+        {
+            try
+            {
+                string logFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "game_runtime.log");
+                File.WriteAllText(logFile, $"[RuntimeInit] BeforeSceneLoad at {DateTime.Now:yyyy-MM-dd HH:mm:ss}\nCmd: {Environment.CommandLine}\n");
+                Application.logMessageReceived += (msg, stack, type) =>
+                {
+                    try { File.AppendAllText(logFile, $"[{type}] {msg}\n{(string.IsNullOrEmpty(stack) ? "" : stack + "\n")}"); } catch {}
+                };
+            }
+            catch {}
+        }
+
+        private void Awake()
+        {
+            Debug.Log("[GameApp] Awake called.");
+        }
+
         private void Start()
         {
-            Application.runInBackground = true;
-            LotdAudio.EnsureInit(gameObject);
-
-            if (!YgoNativeBridge.IsInitialized)
+            try
             {
-                int rc = YgoNativeBridge.Initialize(Application.streamingAssetsPath, OnNativeLog);
-                if (rc != 0) Debug.LogError($"[GameApp] YGO_Init failed rc={rc}");
+                Debug.Log($"[GameApp] Start() starting... StreamingAssets: {Application.streamingAssetsPath}");
+                Application.runInBackground = true;
+                LotdAudio.EnsureInit(gameObject);
+
+                if (!YgoNativeBridge.IsInitialized)
+                {
+                    int rc = YgoNativeBridge.Initialize(Application.streamingAssetsPath, OnNativeLog);
+                    if (rc != 0) Debug.LogError($"[GameApp] YGO_Init failed rc={rc}");
+                    else Debug.Log("[GameApp] YgoNativeBridge initialized.");
+                }
+
+                Debug.Log("[GameApp] 1. Loading CardDatabase...");
+                if (!CardDatabase.IsLoaded)
+                    CardDatabase.Load(Application.streamingAssetsPath);
+
+                Debug.Log("[GameApp] 2. Initializing CardArtLoader...");
+                CardArtLoader.Initialize(Application.streamingAssetsPath);
+
+                Debug.Log("[GameApp] 3. Loading DeckRepository...");
+                if (DeckRepository.PresetDecks.Count == 0)
+                    DeckRepository.Load(Application.streamingAssetsPath, Application.persistentDataPath);
+
+                Debug.Log("[GameApp] 4. Ensuring EventSystem & Canvas...");
+                EnsureEventSystem();
+                var canvas = EnsureMainCanvas();
+
+                Debug.Log("[GameApp] 5. Constructing TitleAndMenuUI...");
+                _titleAndMenu = new TitleAndMenuUI(this, canvas.transform);
+
+                Debug.Log("[GameApp] 6. Constructing OpponentSelectUI...");
+                _oppSelect = new OpponentSelectUI(this, canvas.transform);
+
+                Debug.Log("[GameApp] 7. Constructing DeckEditorUI...");
+                _deckEditor = new DeckEditorUI(this, canvas.transform);
+
+                Debug.Log("[GameApp] 8. Constructing DuelPromptModals...");
+                _modals = new DuelPromptModals(canvas.transform, code => _duelField?.InspectCard(code), OnHumanModalResponse);
+
+                Debug.Log("[GameApp] 9. Constructing DuelFieldUI...");
+                _duelField = new DuelFieldUI(this, canvas.transform, _modals);
+
+                _initialized = true;
+                Debug.Log("[GameApp] 10. Showing Title screen...");
+                ShowScreen(AppScreen.Title);
+
+                Debug.Log("[GameApp] 11. Processing Command Line Args...");
+                ProcessCommandLineArgs();
+
+                Debug.Log("[GameApp] 12. Start() completed successfully. Ready for input!");
             }
-
-            if (!CardDatabase.IsLoaded)
-                CardDatabase.Load(Application.streamingAssetsPath);
-            CardArtLoader.Initialize(Application.streamingAssetsPath);
-            if (DeckRepository.PresetDecks.Count == 0)
-                DeckRepository.Load(Application.streamingAssetsPath, Application.persistentDataPath);
-
-            EnsureEventSystem();
-            var canvas = EnsureMainCanvas();
-
-            _titleAndMenu = new TitleAndMenuUI(this, canvas.transform);
-            _oppSelect = new OpponentSelectUI(this, canvas.transform);
-            _deckEditor = new DeckEditorUI(this, canvas.transform);
-            _modals = new DuelPromptModals(canvas.transform, code => _duelField?.InspectCard(code), OnHumanModalResponse);
-            _duelField = new DuelFieldUI(this, canvas.transform, _modals);
-
-            _initialized = true;
-            ShowScreen(AppScreen.Title);
-
-            ProcessCommandLineArgs();
+            catch (Exception ex)
+            {
+                Debug.LogError($"[GameApp] Fatal Exception in Start(): {ex}");
+            }
         }
 
         private void OnNativeLog(int logType, string msg)
@@ -288,12 +336,14 @@ namespace YGOPortable.UI
 
         private void OnDestroy()
         {
+            Debug.Log($"[GameApp] OnDestroy called! Stack:\n{Environment.StackTrace}");
             _session?.Dispose();
             _session = null;
         }
 
         private void OnApplicationQuit()
         {
+            Debug.Log($"[GameApp] OnApplicationQuit called! Stack:\n{Environment.StackTrace}");
             _session?.Dispose();
             _session = null;
             CardArtLoader.Shutdown();
