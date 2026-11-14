@@ -159,24 +159,35 @@ namespace YGOPortable.UI
             LotdUiKit.AddText(hdr, "T", "환경 설정 (SETTINGS)", 22, TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
 
             // SFX Volume Row
-            var row1 = LotdUiKit.CreateRect("SfxRow", win, new Vector2(0.08f, 0.62f), new Vector2(0.92f, 0.76f), Vector2.zero, Vector2.zero);
-            var sfxLabel = LotdUiKit.AddText(row1, "L", "효과음 음량: 65%", 18, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary);
+            var row1 = LotdUiKit.CreateRect("SfxRow", win, new Vector2(0.08f, 0.67f), new Vector2(0.92f, 0.79f), Vector2.zero, Vector2.zero);
+            var sfxLabel = LotdUiKit.AddText(row1, "L", "효과음 음량: 65%", 17, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary);
             var toggleSfx = LotdUiKit.CreateRect("BtnMute", row1, new Vector2(0.60f, 0.1f), new Vector2(1f, 0.9f), Vector2.zero, Vector2.zero);
             LotdUiKit.CreateLotdButton(toggleSfx, "B", "음소거 전환", () =>
             {
                 LotdAudio.SfxVolume = LotdAudio.SfxVolume > 0.05f ? 0f : 0.65f;
                 sfxLabel.text = LotdAudio.SfxVolume > 0.05f ? "효과음 음량: 65%" : "효과음 음량: 음소거 (0%)";
-            }, 16);
+            }, 15);
+
+            // BGM Volume Row
+            var rowBgm = LotdUiKit.CreateRect("BgmRow", win, new Vector2(0.08f, 0.52f), new Vector2(0.92f, 0.64f), Vector2.zero, Vector2.zero);
+            var bgmLabel = LotdUiKit.AddText(rowBgm, "L", "배경음악 음량: 35%", 17, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary);
+            var toggleBgm = LotdUiKit.CreateRect("BtnBgm", rowBgm, new Vector2(0.60f, 0.1f), new Vector2(1f, 0.9f), Vector2.zero, Vector2.zero);
+            LotdUiKit.CreateLotdButton(toggleBgm, "B", "음악 전환", () =>
+            {
+                LotdAudio.BgmVolume = LotdAudio.BgmVolume > 0.05f ? 0f : 0.35f;
+                LotdAudio.UpdateBgmVolume();
+                bgmLabel.text = LotdAudio.BgmVolume > 0.05f ? "배경음악 음량: 35%" : "배경음악: 음소거 (0%)";
+            }, 15);
 
             // AI Speed / Level Row
-            var row2 = LotdUiKit.CreateRect("AiRow", win, new Vector2(0.08f, 0.42f), new Vector2(0.92f, 0.56f), Vector2.zero, Vector2.zero);
-            var aiLbl = LotdUiKit.AddText(row2, "L", $"AI 사고 속도: {_app.AiStepDelay:0.00}초", 18, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary);
+            var row2 = LotdUiKit.CreateRect("AiRow", win, new Vector2(0.08f, 0.37f), new Vector2(0.92f, 0.49f), Vector2.zero, Vector2.zero);
+            var aiLbl = LotdUiKit.AddText(row2, "L", $"AI 사고 속도: {_app.AiStepDelay:0.00}초", 17, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary);
             var spdBtn = LotdUiKit.CreateRect("BtnSpd", row2, new Vector2(0.60f, 0.1f), new Vector2(1f, 0.9f), Vector2.zero, Vector2.zero);
             LotdUiKit.CreateLotdButton(spdBtn, "B", "속도 전환 (빠름/보통)", () =>
             {
                 _app.AiStepDelay = _app.AiStepDelay > 0.30f ? 0.15f : 0.45f;
                 aiLbl.text = $"AI 사고 속도: {_app.AiStepDelay:0.00}초";
-            }, 16);
+            }, 15);
 
             // Rules Info
             var info = LotdUiKit.CreateRect("Info", win, new Vector2(0.08f, 0.22f), new Vector2(0.92f, 0.38f), Vector2.zero, Vector2.zero);

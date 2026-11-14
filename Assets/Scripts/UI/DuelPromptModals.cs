@@ -976,6 +976,15 @@ namespace YGOPortable.UI
             _resHeadline.text = isDraw ? "DRAW (무승부)" : (playerWon ? "DUEL VICTORY! (승리)" : "DEFEAT... (패배)");
             _resHeadline.color = isDraw ? LotdUiKit.CyanAccent : (playerWon ? LotdUiKit.GoldAccent : LotdUiKit.RedAccent);
 
+            if (playerWon)
+            {
+                LotdAudio.PlayWin();
+            }
+            else
+            {
+                LotdAudio.PlayDamage();
+            }
+
             Sprite bust = opp != null && !string.IsNullOrEmpty(opp.portrait)
                 ? LotdUiKit.LoadSprite($"LOTD/Busts/{opp.portrait}")
                 : LotdUiKit.LoadSprite("LOTD/Busts/kaiba_neutral");

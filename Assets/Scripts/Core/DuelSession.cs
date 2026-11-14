@@ -157,6 +157,8 @@ namespace YGOPortable.Core
 
         public event Action<CardMoveEvent> OnCardMoved;
         public event Action<byte, uint, uint, byte, uint, uint> OnAttackDeclared;
+        public event Action<byte, IReadOnlyList<bool>> OnCoinTossed;
+        public event Action<byte, IReadOnlyList<int>> OnDiceRolled;
 
         public bool StartNewDuel(
             IReadOnlyList<uint> p0Main, IReadOnlyList<uint> p0Extra,
@@ -926,9 +928,15 @@ namespace YGOPortable.Core
                     byte p = br.ReadByte();
                     byte cnt = br.ReadByte();
                     var coins = new List<string>(cnt);
+                    var coinBools = new List<bool>(cnt);
                     for (int i = 0; i < cnt; i++)
-                        coins.Add(br.ReadByte() == 1 ? "앞면" : "뒷면");
+                    {
+                        byte v = br.ReadByte();
+                        coins.Add(v == 1 ? "앞면" : "뒷면");
+                        coinBools.Add(v == 1);
+                    }
                     AddLog($"{(p == HumanPlayerIndex ? "플레이어" : "상대")} 코인 토스: {string.Join(", ", coins)}");
+                    OnCoinTossed?.Invoke(p, coinBools);
                     break;
                 }
 
@@ -937,9 +945,15 @@ namespace YGOPortable.Core
                     byte p = br.ReadByte();
                     byte cnt = br.ReadByte();
                     var dice = new List<string>(cnt);
+                    var diceInts = new List<int>(cnt);
                     for (int i = 0; i < cnt; i++)
-                        dice.Add(br.ReadByte().ToString());
+                    {
+                        byte v = br.ReadByte();
+                        dice.Add(v.ToString());
+                        diceInts.Add(v);
+                    }
                     AddLog($"{(p == HumanPlayerIndex ? "플레이어" : "상대")} 주사위: {string.Join(", ", dice)}");
+                    OnDiceRolled?.Invoke(p, diceInts);
                     break;
                 }
             }

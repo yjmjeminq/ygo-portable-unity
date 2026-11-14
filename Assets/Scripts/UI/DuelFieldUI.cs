@@ -87,11 +87,21 @@ namespace YGOPortable.UI
             public RectTransform root;
             public Text text;
             public Outline border;
+            public CompositeCardView cardView;
         }
 
         private StackTileView _myDeckTile, _myExtraTile, _myGyTile, _myBanTile;
         private StackTileView _oppDeckTile, _oppExtraTile, _oppGyTile, _oppBanTile;
         private Text _oppHandCountTxt;
+
+        // High-res Card Zoom Modal
+        private GameObject _cardZoomModal;
+        private CompositeCardView _zoomCardView;
+        private Text _zoomName;
+        private Text _zoomStats;
+        private Text _zoomPasscode;
+        private Text _zoomDesc;
+        private Image _zoomRaceIcon;
 
         // Multi-place selection accumulator (for MSG_SELECT_PLACE / MSG_SELECT_DISFIELD with min > 1)
         private readonly List<(byte con, uint loc, uint seq)> _pendingPlaces = new List<(byte con, uint loc, uint seq)>();
@@ -124,6 +134,8 @@ namespace YGOPortable.UI
             {
                 _session.OnCardMoved -= HandleCardMovedEvent;
                 _session.OnAttackDeclared -= HandleAttackEvent;
+                _session.OnCoinTossed -= HandleCoinTossedEvent;
+                _session.OnDiceRolled -= HandleDiceRolledEvent;
             }
 
             _session = session;
@@ -131,6 +143,8 @@ namespace YGOPortable.UI
             {
                 _session.OnCardMoved += HandleCardMovedEvent;
                 _session.OnAttackDeclared += HandleAttackEvent;
+                _session.OnCoinTossed += HandleCoinTossedEvent;
+                _session.OnDiceRolled += HandleDiceRolledEvent;
             }
 
             _oppChar = oppChar;
@@ -213,6 +227,7 @@ namespace YGOPortable.UI
             BuildCenterBoard(rt);
             BuildBottomHudAndHands(rt);
             BuildActionPopup(rt);
+            BuildCardZoomModal(rt);
 
             Root.SetActive(false);
         }
@@ -241,6 +256,19 @@ namespace YGOPortable.UI
             // CompositeCardView Inspector
             var cRt = LotdUiKit.CreateRect("CardView", left, new Vector2(0.05f, 0.44f), new Vector2(0.64f, 0.845f), Vector2.zero, Vector2.zero);
             _inspCard = CompositeCardView.Create(cRt, "Insp", true);
+
+            var zoomHit = LotdUiKit.FillRect("ZoomHit", cRt);
+            var zoomHitImg = LotdUiKit.AddImage(zoomHit.gameObject, LotdUiKit.WhiteSprite, Color.clear);
+            var zoomBtn = zoomHit.gameObject.AddComponent<Button>();
+            zoomBtn.targetGraphic = zoomHitImg;
+            zoomBtn.onClick.AddListener(() =>
+            {
+                if (_inspectedCode != 0)
+                {
+                    LotdAudio.PlayClick();
+                    ShowCardZoomModal(_inspectedCode);
+                }
+            });
 
             var rRt = LotdUiKit.CreateRect("RaceIc", left, new Vector2(0.67f, 0.72f), new Vector2(0.92f, 0.835f), Vector2.zero, Vector2.zero);
             _inspRaceIcon = LotdUiKit.AddImage(rRt.gameObject, null, Color.white, true);
@@ -455,9 +483,13 @@ namespace YGOPortable.UI
             ol.effectColor = new Color(0, 0, 0, 0);
             ol.effectDistance = new Vector2(2f, -2f);
 
-            var pill = LotdUiKit.CreateRect("Pill", cell, new Vector2(0.06f, 0.18f), new Vector2(0.94f, 0.82f), Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(pill.gameObject, LotdUiKit.WhiteSprite, new Color(0.02f, 0.06f, 0.14f, 0.80f), false, false);
-            var txt = LotdUiKit.AddText(pill, "T", label, 11, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
+            var cardRt = LotdUiKit.CreateRect("TopCard", cell, new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.92f), Vector2.zero, Vector2.zero);
+            var cv = CompositeCardView.Create(cardRt, "CardView", false);
+            cv.gameObject.SetActive(false);
+
+            var pill = LotdUiKit.CreateRect("Pill", cell, new Vector2(0.04f, 0.02f), new Vector2(0.96f, 0.38f), Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(pill.gameObject, LotdUiKit.WhiteSprite, new Color(0.02f, 0.06f, 0.14f, 0.88f), false, false);
+            var txt = LotdUiKit.AddText(pill, "T", label, 10, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
             if (onClick != null)
             {
                 var btn = cell.gameObject.AddComponent<Button>();
@@ -469,7 +501,7 @@ namespace YGOPortable.UI
                     onClick();
                 });
             }
-            return new StackTileView { root = cell, text = txt, border = ol };
+            return new StackTileView { root = cell, text = txt, border = ol, cardView = cv };
         }
 
         private void BuildBottomHudAndHands(Transform root)
@@ -633,15 +665,22 @@ namespace YGOPortable.UI
             _btnToEp.interactable = (myIdle && p.canEp) || (myBattle && p.canEp);
 
             // Stacks
-            UpdateStackTile(_myDeckTile, "내 덱", myP.deckCount, (byte)me, YgoConstants.LOCATION_DECK, waitingMyAction);
-            UpdateStackTile(_myExtraTile, "엑스트라", myP.extra.Count, (byte)me, YgoConstants.LOCATION_EXTRA, waitingMyAction);
-            UpdateStackTile(_myGyTile, "내 묘지", myP.grave.Count, (byte)me, YgoConstants.LOCATION_GRAVE, waitingMyAction);
-            UpdateStackTile(_myBanTile, "내 제외", myP.banished.Count, (byte)me, YgoConstants.LOCATION_REMOVED, waitingMyAction);
+            uint myGyTop = myP.grave.Count > 0 ? myP.grave.Last().code : 0;
+            uint oppGyTop = opP.grave.Count > 0 ? opP.grave.Last().code : 0;
+            uint myBanTop = myP.banished.Count > 0 ? myP.banished.Last().code : 0;
+            bool myBanDown = myP.banished.Count > 0 && !myP.banished.Last().IsFaceUp;
+            uint oppBanTop = opP.banished.Count > 0 ? opP.banished.Last().code : 0;
+            bool oppBanDown = opP.banished.Count > 0 && !opP.banished.Last().IsFaceUp;
 
-            UpdateStackTile(_oppDeckTile, "상대 덱", opP.deckCount, (byte)opp, YgoConstants.LOCATION_DECK, waitingMyAction);
-            UpdateStackTile(_oppExtraTile, "상대 EX", opP.extra.Count, (byte)opp, YgoConstants.LOCATION_EXTRA, waitingMyAction);
-            UpdateStackTile(_oppGyTile, "상대 묘지", opP.grave.Count, (byte)opp, YgoConstants.LOCATION_GRAVE, waitingMyAction);
-            UpdateStackTile(_oppBanTile, "상대 제외", opP.banished.Count, (byte)opp, YgoConstants.LOCATION_REMOVED, waitingMyAction);
+            UpdateStackTile(_myDeckTile, "내 덱", myP.deckCount, (byte)me, YgoConstants.LOCATION_DECK, waitingMyAction, 0, isFaceDown: true);
+            UpdateStackTile(_myExtraTile, "엑스트라", myP.extra.Count, (byte)me, YgoConstants.LOCATION_EXTRA, waitingMyAction, 0, isFaceDown: true);
+            UpdateStackTile(_myGyTile, "내 묘지", myP.grave.Count, (byte)me, YgoConstants.LOCATION_GRAVE, waitingMyAction, myGyTop, isFaceDown: false);
+            UpdateStackTile(_myBanTile, "내 제외", myP.banished.Count, (byte)me, YgoConstants.LOCATION_REMOVED, waitingMyAction, myBanTop, isFaceDown: myBanDown);
+
+            UpdateStackTile(_oppDeckTile, "상대 덱", opP.deckCount, (byte)opp, YgoConstants.LOCATION_DECK, waitingMyAction, 0, isFaceDown: true);
+            UpdateStackTile(_oppExtraTile, "상대 EX", opP.extra.Count, (byte)opp, YgoConstants.LOCATION_EXTRA, waitingMyAction, 0, isFaceDown: true);
+            UpdateStackTile(_oppGyTile, "상대 묘지", opP.grave.Count, (byte)opp, YgoConstants.LOCATION_GRAVE, waitingMyAction, oppGyTop, isFaceDown: false);
+            UpdateStackTile(_oppBanTile, "상대 제외", opP.banished.Count, (byte)opp, YgoConstants.LOCATION_REMOVED, waitingMyAction, oppBanTop, isFaceDown: oppBanDown);
             _oppHandCountTxt.text = $"상대 패: {opP.hand.Count}장";
 
             // Authentic LOTD Chain banner & sound
@@ -682,7 +721,7 @@ namespace YGOPortable.UI
             RefreshLogFeed();
         }
 
-        private void UpdateStackTile(StackTileView tile, string baseLabel, int count, byte con, uint loc, bool waitingMyAction)
+        private void UpdateStackTile(StackTileView tile, string baseLabel, int count, byte con, uint loc, bool waitingMyAction, uint topCode = 0, bool isFaceDown = false)
         {
             if (tile == null) return;
             int actCount = waitingMyAction ? CountZoneActions(con, loc) : 0;
@@ -690,6 +729,19 @@ namespace YGOPortable.UI
                 ? $"{baseLabel}\n{count} <color=#FFCC44>[가능 {actCount}]</color>"
                 : $"{baseLabel}\n{count}";
             tile.border.effectColor = actCount > 0 ? LotdUiKit.GoldAccent : new Color(0, 0, 0, 0);
+
+            if (tile.cardView != null)
+            {
+                if (count > 0 && (topCode != 0 || isFaceDown))
+                {
+                    tile.cardView.gameObject.SetActive(true);
+                    tile.cardView.SetCard(isFaceDown ? 0u : topCode, faceDown: isFaceDown);
+                }
+                else
+                {
+                    tile.cardView.gameObject.SetActive(false);
+                }
+            }
         }
 
         private void BindEmz(FieldSlotView slot, byte myCon, uint mySeq, byte oppCon, uint oppSeq, LiveCardState myEmz, LiveCardState oppEmz)
@@ -1192,6 +1244,11 @@ namespace YGOPortable.UI
             {
                 _oppLpText.color = Color.white;
             }
+
+            if (_cardZoomModal != null && _cardZoomModal.activeSelf && Input.GetKeyDown(KeyCode.Escape))
+            {
+                _cardZoomModal.SetActive(false);
+            }
         }
 
         private static string GetPhaseTitleEnglish(int phase)
@@ -1515,6 +1572,102 @@ namespace YGOPortable.UI
                 return;
             }
             _session.Surrender(_session.HumanPlayerIndex);
+        }
+
+        private void HandleCoinTossedEvent(byte player, IReadOnlyList<bool> coins)
+        {
+            CardAnimationManager.Instance?.PlayCoinTossSplash(coins, player != _session.HumanPlayerIndex);
+        }
+
+        private void HandleDiceRolledEvent(byte player, IReadOnlyList<int> dice)
+        {
+            CardAnimationManager.Instance?.PlayDiceRollSplash(dice, player != _session.HumanPlayerIndex);
+        }
+
+        private void BuildCardZoomModal(Transform root)
+        {
+            var dim = LotdUiKit.FillRect("Overlay_CardZoom", root);
+            _cardZoomModal = dim.gameObject;
+            LotdUiKit.AddImage(dim.gameObject, LotdUiKit.WhiteSprite, new Color(0.01f, 0.03f, 0.08f, 0.88f));
+            dim.gameObject.AddComponent<Button>().onClick.AddListener(() => _cardZoomModal.SetActive(false));
+
+            var win = LotdUiKit.CreateBorderedPanel(dim, "ZoomWin",
+                new Vector2(0.18f, 0.08f), new Vector2(0.82f, 0.92f), Vector2.zero, Vector2.zero,
+                LotdUiKit.PanelNavy, LotdUiKit.GoldAccent);
+
+            // Header bar
+            var hdr = LotdUiKit.CreateRect("Hdr", win, new Vector2(0f, 0.90f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(hdr.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelHeader);
+            LotdUiKit.AddText(hdr, "T", "카드 상세 정보 (CARD DETAILS)", 18, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold)
+                .rectTransform.offsetMin = new Vector2(20, 0);
+
+            var closeRt = LotdUiKit.CreateRect("Close", hdr, new Vector2(0.84f, 0.15f), new Vector2(0.98f, 0.85f), Vector2.zero, Vector2.zero);
+            LotdUiKit.CreateLotdButton(closeRt, "B", "닫기 (ESC)", () => _cardZoomModal.SetActive(false), 15);
+
+            // Left Side: Large Card View
+            var cardHolder = LotdUiKit.CreateRect("CardHolder", win, new Vector2(0.04f, 0.06f), new Vector2(0.42f, 0.88f), Vector2.zero, Vector2.zero);
+            _zoomCardView = CompositeCardView.Create(cardHolder, "ZoomCard", true);
+
+            // Right Side: Card Details
+            var infoRt = LotdUiKit.CreateRect("Info", win, new Vector2(0.45f, 0.05f), new Vector2(0.96f, 0.88f), Vector2.zero, Vector2.zero);
+
+            _zoomName = LotdUiKit.AddText(LotdUiKit.CreateRect("Name", infoRt, new Vector2(0f, 0.88f), new Vector2(0.82f, 1f), Vector2.zero, Vector2.zero),
+                "N", "", 22, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
+
+            var rRt = LotdUiKit.CreateRect("RaceIc", infoRt, new Vector2(0.84f, 0.88f), new Vector2(0.98f, 1f), Vector2.zero, Vector2.zero);
+            _zoomRaceIcon = LotdUiKit.AddImage(rRt.gameObject, null, Color.white, true);
+
+            _zoomStats = LotdUiKit.AddText(LotdUiKit.CreateRect("Stats", infoRt, new Vector2(0f, 0.74f), new Vector2(1f, 0.87f), Vector2.zero, Vector2.zero),
+                "S", "", 14, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
+
+            _zoomPasscode = LotdUiKit.AddText(LotdUiKit.CreateRect("Passcode", infoRt, new Vector2(0f, 0.68f), new Vector2(1f, 0.74f), Vector2.zero, Vector2.zero),
+                "P", "", 12, TextAnchor.MiddleLeft, LotdUiKit.CyanAccent);
+
+            var descBox = LotdUiKit.CreateBorderedPanel(infoRt, "DescBox", new Vector2(0f, 0f), new Vector2(1f, 0.66f), Vector2.zero, Vector2.zero,
+                new Color(0.02f, 0.05f, 0.12f, 0.95f));
+            var vp = LotdUiKit.FillRect("VP", descBox, 8f);
+            vp.gameObject.AddComponent<RectMask2D>();
+            var ct = LotdUiKit.CreateRect("C", vp, new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
+            ct.pivot = new Vector2(0.5f, 1f);
+            _zoomDesc = ct.gameObject.AddComponent<Text>();
+            _zoomDesc.font = LotdUiKit.FontKR;
+            _zoomDesc.fontSize = 15;
+            _zoomDesc.color = LotdUiKit.TextPrimary;
+            _zoomDesc.alignment = TextAnchor.UpperLeft;
+            _zoomDesc.lineSpacing = 1.15f;
+            ct.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            var sv = descBox.gameObject.AddComponent<ScrollRect>();
+            sv.horizontal = false; sv.vertical = true; sv.scrollSensitivity = 25f;
+            sv.viewport = vp; sv.content = ct;
+
+            _cardZoomModal.SetActive(false);
+        }
+
+        public void ShowCardZoomModal(uint code)
+        {
+            if (code == 0 || _zoomCardView == null) return;
+            var info = CardDatabase.Get(code);
+            _zoomCardView.SetCard(code, false);
+            if (info != null)
+            {
+                _zoomName.text = info.name;
+                _zoomStats.text = info.FormatStatsLineKR();
+                string attrStr = info.IsMonster && YgoConstants.AttributeNamesKR.TryGetValue(info.attr, out var an) ? $"[{an} 속성]  " : "";
+                _zoomPasscode.text = $"카드 No. {info.code:D8}  |  {attrStr}{YgoConstants.GetTypeTagKR(info.type)}";
+                _zoomDesc.text = info.desc;
+                var rSp = info.IsMonster ? LotdUiKit.GetRaceSprite(info.race) : LotdUiKit.LoadSprite($"LOTD/Icons/{YgoConstants.GetSpellTrapSubSpriteName(info.type)}");
+                _zoomRaceIcon.sprite = rSp;
+                _zoomRaceIcon.gameObject.SetActive(rSp != null);
+            }
+            else
+            {
+                _zoomName.text = $"카드 #{code}";
+                _zoomStats.text = "";
+                _zoomPasscode.text = $"카드 No. {code}";
+                _zoomDesc.text = "";
+                _zoomRaceIcon.gameObject.SetActive(false);
+            }
+            _cardZoomModal.SetActive(true);
         }
     }
 }

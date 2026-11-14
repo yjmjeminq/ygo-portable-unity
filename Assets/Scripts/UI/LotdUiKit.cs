@@ -378,14 +378,24 @@ namespace YGOPortable.UI
     public static class LotdAudio
     {
         private static AudioSource _sfxSource;
-        private static AudioClip _clipClick, _clipDraw, _clipSummon, _clipAttack, _clipDamage, _clipChain, _clipWin, _clipPhase, _clipDirectAttack, _clipTick;
+        private static AudioSource _bgmSource;
+        private static AudioClip _clipClick, _clipDraw, _clipSummon, _clipAttack, _clipDamage, _clipChain, _clipWin, _clipPhase, _clipDirectAttack, _clipTick, _clipCoin, _clipDice;
+        private static AudioClip _clipDuelBgm, _clipMenuBgm;
+
         public static float SfxVolume { get; set; } = 0.65f;
+        public static float BgmVolume { get; set; } = 0.35f;
 
         public static void EnsureInit(GameObject host)
         {
             if (_sfxSource != null) return;
             _sfxSource = host.GetComponent<AudioSource>() ?? host.AddComponent<AudioSource>();
             _sfxSource.playOnAwake = false;
+
+            _bgmSource = host.AddComponent<AudioSource>();
+            _bgmSource.playOnAwake = false;
+            _bgmSource.loop = true;
+
+            int sr = 22050;
             _clipClick = MakeTone(0.06f, 880f, 1180f, 0.25f);
             _clipDraw = MakeTone(0.09f, 520f, 760f, 0.25f);
             _clipSummon = MakeTone(0.24f, 240f, 540f, 0.35f);
@@ -396,6 +406,11 @@ namespace YGOPortable.UI
             _clipPhase = MakeTone(0.24f, 440f, 880f, 0.32f);
             _clipDirectAttack = MakeTone(0.32f, 280f, 60f, 0.50f);
             _clipTick = MakeTone(0.04f, 1320f, 1600f, 0.15f);
+            _clipCoin = MakeTone(0.22f, 980f, 1320f, 0.35f);
+            _clipDice = MakeTone(0.24f, 420f, 780f, 0.35f);
+
+            _clipDuelBgm = MakeDuelBgm(sr);
+            _clipMenuBgm = MakeMenuBgm(sr);
         }
 
         public static void PlayClick() => Play(_clipClick);
@@ -408,6 +423,43 @@ namespace YGOPortable.UI
         public static void PlayPhaseTransition() => Play(_clipPhase);
         public static void PlayDirectAttack() => Play(_clipDirectAttack);
         public static void PlayTick() => Play(_clipTick);
+        public static void PlayCoin() => Play(_clipCoin);
+        public static void PlayDice() => Play(_clipDice);
+
+        public static void PlayDuelBgm()
+        {
+            if (_bgmSource == null || _clipDuelBgm == null || BgmVolume < 0.01f) return;
+            if (_bgmSource.clip == _clipDuelBgm && _bgmSource.isPlaying) return;
+            _bgmSource.clip = _clipDuelBgm;
+            _bgmSource.loop = true;
+            _bgmSource.volume = BgmVolume;
+            _bgmSource.Play();
+        }
+
+        public static void PlayMenuBgm()
+        {
+            if (_bgmSource == null || _clipMenuBgm == null || BgmVolume < 0.01f) return;
+            if (_bgmSource.clip == _clipMenuBgm && _bgmSource.isPlaying) return;
+            _bgmSource.clip = _clipMenuBgm;
+            _bgmSource.loop = true;
+            _bgmSource.volume = BgmVolume;
+            _bgmSource.Play();
+        }
+
+        public static void StopBgm()
+        {
+            if (_bgmSource != null) _bgmSource.Stop();
+        }
+
+        public static void UpdateBgmVolume()
+        {
+            if (_bgmSource != null)
+            {
+                _bgmSource.volume = BgmVolume;
+                if (BgmVolume < 0.01f && _bgmSource.isPlaying) _bgmSource.Pause();
+                else if (BgmVolume >= 0.01f && !_bgmSource.isPlaying && _bgmSource.clip != null) _bgmSource.Play();
+            }
+        }
 
         private static void Play(AudioClip clip)
         {
@@ -430,6 +482,97 @@ namespace YGOPortable.UI
                 samples[i] = (float)Math.Sin(phase) * env * amp;
             }
             var clip = AudioClip.Create("sfx", n, 1, sr, false);
+            clip.SetData(samples, 0);
+            return clip;
+        }
+
+        private static AudioClip MakeDuelBgm(int sr)
+        {
+            float duration = 8.0f;
+            int n = (int)(sr * duration);
+            float[] samples = new float[n];
+            float[] roots = { 73.416f, 58.270f, 65.406f, 55.000f };
+            float[] fifths = { 110.00f, 87.307f, 97.999f, 82.407f };
+            float[] thirds = { 174.61f, 146.83f, 164.81f, 130.81f };
+
+            double pBass = 0.0, pArp = 0.0;
+            for (int i = 0; i < n; i++)
+            {
+                float t = (float)i / sr;
+                int bar = Mathf.Clamp((int)(t / 2.0f), 0, 3);
+                float barTime = t % 2.0f;
+                float beatTime = t % 0.5f;
+
+                float kick = 0f;
+                if (beatTime < 0.18f)
+                {
+                    float kt = beatTime / 0.18f;
+                    float kFreq = Mathf.Lerp(130f, 45f, kt * kt);
+                    kick = (float)Math.Sin(kFreq * 2.0 * Math.PI * beatTime) * Mathf.Exp(-kt * 5f) * 0.42f;
+                }
+
+                float hat = 0f;
+                float hatTime = (beatTime > 0.25f) ? (beatTime - 0.25f) : 1f;
+                if (hatTime < 0.08f)
+                {
+                    float ht = hatTime / 0.08f;
+                    float noise = ((i * 1103515245 + 12345) & 0x7FFFFFFF) / (float)0x7FFFFFFF * 2f - 1f;
+                    hat = noise * Mathf.Exp(-ht * 8f) * 0.12f;
+                }
+
+                float bassFreq = (barTime < 1.0f) ? roots[bar] : fifths[bar];
+                if ((int)(t * 8f) % 2 == 1) bassFreq *= 1.5f;
+                pBass += 2.0 * Math.PI * bassFreq / sr;
+                float bassEnv = Mathf.Repeat(t * 4f, 1f);
+                float bass = (float)(Math.Sin(pBass) + 0.35 * Math.Sin(pBass * 2.0)) * (1f - bassEnv * 0.6f) * 0.30f;
+
+                int arpStep = (int)(t * 8f) % 4;
+                float arpFreq = (arpStep == 0) ? roots[bar] * 4f : (arpStep == 1) ? thirds[bar] * 2f : (arpStep == 2) ? fifths[bar] * 4f : thirds[bar] * 4f;
+                pArp += 2.0 * Math.PI * arpFreq / sr;
+                float arpEnv = Mathf.Repeat(t * 8f, 1f);
+                float arp = (float)Math.Sin(pArp) * Mathf.Exp(-arpEnv * 4f) * 0.16f;
+
+                float loopFade = 1f;
+                if (i < 1000) loopFade = i / 1000f;
+                else if (i > n - 1000) loopFade = (n - i) / 1000f;
+
+                samples[i] = Mathf.Clamp((kick + hat + bass + arp) * loopFade, -1f, 1f);
+            }
+            var clip = AudioClip.Create("duel_bgm", n, 1, sr, false);
+            clip.SetData(samples, 0);
+            return clip;
+        }
+
+        private static AudioClip MakeMenuBgm(int sr)
+        {
+            float duration = 8.0f;
+            int n = (int)(sr * duration);
+            float[] samples = new float[n];
+            float[] chords = { 130.81f, 116.54f, 146.83f, 110.00f };
+
+            double pChord = 0.0, pPluck = 0.0;
+            for (int i = 0; i < n; i++)
+            {
+                float t = (float)i / sr;
+                int bar = Mathf.Clamp((int)(t / 2.0f), 0, 3);
+                float f = chords[bar];
+
+                pChord += 2.0 * Math.PI * f / sr;
+                float pad = (float)(Math.Sin(pChord) * 0.20 + Math.Sin(pChord * 1.5) * 0.12 + Math.Sin(pChord * 2.0) * 0.08);
+
+                int pStep = (int)(t * 2f) % 2;
+                float pf = f * (pStep == 0 ? 2f : 3f);
+                pPluck += 2.0 * Math.PI * pf / sr;
+                float pluckEnv = Mathf.Repeat(t * 2f, 1f);
+                float pluck = (float)Math.Sin(pPluck) * Mathf.Exp(-pluckEnv * 3.5f) * 0.12f;
+
+                float loopFade = 1f;
+                if (i < 1000) loopFade = i / 1000f;
+                else if (i > n - 1000) loopFade = (n - i) / 1000f;
+
+                samples[i] = Mathf.Clamp((pad + pluck) * loopFade, -1f, 1f);
+            }
+            var clip = AudioClip.Create("menu_bgm", n, 1, sr, false);
             clip.SetData(samples, 0);
             return clip;
         }

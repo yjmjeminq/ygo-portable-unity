@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 using YGOPortable.Core;
@@ -385,6 +386,124 @@ namespace YGOPortable.UI
             }
 
             if (go != null) UnityEngine.Object.Destroy(go);
+        }
+
+        public void PlayCoinTossSplash(IReadOnlyList<bool> coins, bool isOpponent, Action onComplete = null)
+        {
+            if (_animLayer == null || coins == null || coins.Count == 0) return;
+            StartCoroutine(CoinTossSplashRoutine(coins, isOpponent, onComplete));
+        }
+
+        private IEnumerator CoinTossSplashRoutine(IReadOnlyList<bool> coins, bool isOpponent, Action onComplete)
+        {
+            var banner = new GameObject("CoinSplashBanner", typeof(RectTransform));
+            banner.transform.SetParent(_animLayer, false);
+            var rt = (RectTransform)banner.transform;
+            rt.anchorMin = new Vector2(0.32f, 0.44f);
+            rt.anchorMax = new Vector2(0.92f, 0.63f);
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+
+            var cg = banner.AddComponent<CanvasGroup>();
+            cg.blocksRaycasts = false;
+
+            var bgImg = banner.AddComponent<Image>();
+            bgImg.sprite = LotdUiKit.LoadSprite("LOTD/Panel/panel_background") ?? LotdUiKit.WhiteSprite;
+            bgImg.color = new Color(0.04f, 0.08f, 0.18f, 0.94f);
+
+            var ol = banner.AddComponent<Outline>();
+            ol.effectColor = LotdUiKit.GoldAccent;
+            ol.effectDistance = new Vector2(3f, -3f);
+
+            var titleRt = LotdUiKit.CreateRect("T", rt, new Vector2(0.02f, 0.45f), new Vector2(0.98f, 0.95f), Vector2.zero, Vector2.zero);
+            LotdUiKit.AddText(titleRt, "T", "★ COIN TOSS (코인 토스) ★", 24, TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
+
+            string resultsText = string.Join("   ", coins.Select((c, idx) => c ? $"<color=#FFCC44>[앞면 / HEADS]</color>" : $"<color=#FF6666>[뒷면 / TAILS]</color>"));
+            var subRt = LotdUiKit.CreateRect("S", rt, new Vector2(0.02f, 0.05f), new Vector2(0.98f, 0.48f), Vector2.zero, Vector2.zero);
+            LotdUiKit.AddText(subRt, "S", resultsText, 18, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+
+            float totalDur = 1.15f;
+            float punchDur = 0.16f;
+            float fadeStart = 0.90f;
+            float timer = 0f;
+
+            LotdAudio.PlayCoin();
+
+            while (timer < totalDur && banner != null)
+            {
+                timer += Time.deltaTime;
+                float scale = timer < punchDur
+                    ? Mathf.Lerp(1.35f, 1.0f, timer / punchDur)
+                    : 1.0f;
+                rt.localScale = new Vector3(scale, scale, 1f);
+                if (timer > fadeStart)
+                {
+                    cg.alpha = Mathf.Clamp01(1f - (timer - fadeStart) / (totalDur - fadeStart));
+                }
+                yield return null;
+            }
+
+            if (banner != null) UnityEngine.Object.Destroy(banner);
+            onComplete?.Invoke();
+        }
+
+        public void PlayDiceRollSplash(IReadOnlyList<int> dice, bool isOpponent, Action onComplete = null)
+        {
+            if (_animLayer == null || dice == null || dice.Count == 0) return;
+            StartCoroutine(DiceRollSplashRoutine(dice, isOpponent, onComplete));
+        }
+
+        private IEnumerator DiceRollSplashRoutine(IReadOnlyList<int> dice, bool isOpponent, Action onComplete)
+        {
+            var banner = new GameObject("DiceSplashBanner", typeof(RectTransform));
+            banner.transform.SetParent(_animLayer, false);
+            var rt = (RectTransform)banner.transform;
+            rt.anchorMin = new Vector2(0.32f, 0.44f);
+            rt.anchorMax = new Vector2(0.92f, 0.63f);
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+
+            var cg = banner.AddComponent<CanvasGroup>();
+            cg.blocksRaycasts = false;
+
+            var bgImg = banner.AddComponent<Image>();
+            bgImg.sprite = LotdUiKit.LoadSprite("LOTD/Panel/panel_background") ?? LotdUiKit.WhiteSprite;
+            bgImg.color = new Color(0.04f, 0.08f, 0.18f, 0.94f);
+
+            var ol = banner.AddComponent<Outline>();
+            ol.effectColor = LotdUiKit.CyanAccent;
+            ol.effectDistance = new Vector2(3f, -3f);
+
+            var titleRt = LotdUiKit.CreateRect("T", rt, new Vector2(0.02f, 0.45f), new Vector2(0.98f, 0.95f), Vector2.zero, Vector2.zero);
+            LotdUiKit.AddText(titleRt, "T", "★ DICE ROLL (주사위 굴리기) ★", 24, TextAnchor.MiddleCenter, LotdUiKit.CyanAccent, FontStyle.Bold);
+
+            string resultsText = string.Join("    ", dice.Select(d => $"<color=#FFCC44>◆ [ {d} ] ◆</color>"));
+            var subRt = LotdUiKit.CreateRect("S", rt, new Vector2(0.02f, 0.05f), new Vector2(0.98f, 0.48f), Vector2.zero, Vector2.zero);
+            LotdUiKit.AddText(subRt, "S", resultsText, 20, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+
+            float totalDur = 1.15f;
+            float punchDur = 0.16f;
+            float fadeStart = 0.90f;
+            float timer = 0f;
+
+            LotdAudio.PlayDice();
+
+            while (timer < totalDur && banner != null)
+            {
+                timer += Time.deltaTime;
+                float scale = timer < punchDur
+                    ? Mathf.Lerp(1.35f, 1.0f, timer / punchDur)
+                    : 1.0f;
+                rt.localScale = new Vector3(scale, scale, 1f);
+                if (timer > fadeStart)
+                {
+                    cg.alpha = Mathf.Clamp01(1f - (timer - fadeStart) / (totalDur - fadeStart));
+                }
+                yield return null;
+            }
+
+            if (banner != null) UnityEngine.Object.Destroy(banner);
+            onComplete?.Invoke();
         }
     }
 }

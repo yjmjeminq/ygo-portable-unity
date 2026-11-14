@@ -169,11 +169,19 @@ namespace YGOPortable.UI
             _deckEditor.Root.SetActive(screen == AppScreen.DeckEditor);
             _duelField.Root.SetActive(screen == AppScreen.Duel);
 
-            if (screen != AppScreen.Duel && _session != null)
+            if (screen == AppScreen.Duel)
             {
-                _session.Dispose();
-                _session = null;
-                _shownHumanPrompt = null;
+                LotdAudio.PlayDuelBgm();
+            }
+            else
+            {
+                LotdAudio.PlayMenuBgm();
+                if (_session != null)
+                {
+                    _session.Dispose();
+                    _session = null;
+                    _shownHumanPrompt = null;
+                }
             }
 
             if (screen == AppScreen.OpponentSelect) _oppSelect.Open();
