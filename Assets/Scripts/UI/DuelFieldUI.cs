@@ -828,7 +828,13 @@ namespace YGOPortable.UI
                     }
                 };
                 slot.dragTrigger.OnLeftClick = () => OnSlotClicked(con, loc, seq);
-                slot.dragTrigger.OnRightClick = () => OnSlotClicked(con, loc, seq);
+                slot.dragTrigger.OnRightClick = () =>
+                {
+                    if (live != null && (live.IsFaceUp || live.controller == (byte)_session.HumanPlayerIndex))
+                    {
+                        InspectCard(live.code);
+                    }
+                };
             }
 
             bool alreadyPicked = IsPlacePending(con, loc, seq);
@@ -921,7 +927,6 @@ namespace YGOPortable.UI
                 trig.OnRightClick = () =>
                 {
                     InspectCard(cardCode);
-                    ShowCardActionsPopup((byte)_session.HumanPlayerIndex, YgoConstants.LOCATION_HAND, seq, cardCode, hc.overlayCodes);
                 };
             }
         }
@@ -986,6 +991,19 @@ namespace YGOPortable.UI
                     {
                         TryAttackOpponentSlot(mySeq, (uint)i, isDirect: false);
                         return;
+                    }
+                }
+
+                // Check Attack on Opponent EMZ Monster
+                for (int i = 0; i < 2; i++)
+                {
+                    if (_emz[i] != null && _emz[i].mappedCon == (byte)_session.AiPlayerIndex && _emz[i].liveCard != null)
+                    {
+                        if (CardDragManager.ContainsScreenPoint(_emz[i].root, ctx.DropPosition))
+                        {
+                            TryAttackOpponentSlot(mySeq, _emz[i].mappedSeq, isDirect: false);
+                            return;
+                        }
                     }
                 }
 
@@ -1115,8 +1133,8 @@ namespace YGOPortable.UI
 
             if (loc == YgoConstants.LOCATION_MZONE)
             {
-                if (seq == 5) return _emz[0].root.position;
-                if (seq == 6) return _emz[1].root.position;
+                if (seq == 5) return (isMe ? _emz[0] : _emz[1]).root.position;
+                if (seq == 6) return (isMe ? _emz[1] : _emz[0]).root.position;
                 if (seq < 5) return isMe ? (Vector2)_myMZone[seq].root.position : (Vector2)_oppMZone[seq].root.position;
             }
 
@@ -1136,8 +1154,8 @@ namespace YGOPortable.UI
 
             if (loc == YgoConstants.LOCATION_MZONE)
             {
-                if (seq == 5) return _emz[0];
-                if (seq == 6) return _emz[1];
+                if (seq == 5) return isMe ? _emz[0] : _emz[1];
+                if (seq == 6) return isMe ? _emz[1] : _emz[0];
                 if (seq < 5) return isMe ? _myMZone[seq] : _oppMZone[seq];
             }
             if (loc == YgoConstants.LOCATION_SZONE && seq < 6)
@@ -1318,6 +1336,23 @@ namespace YGOPortable.UI
                 else if (_modals != null && _modals.ModalRoot != null && _modals.ModalRoot.activeSelf)
                 {
                     _modals.TryCancelOrPass();
+                }
+                else if (Input.GetKeyDown(KeyCode.Escape) && _modals != null && _modals.ResultRoot != null && _modals.ResultRoot.activeSelf)
+                {
+                    _modals.TriggerMenu();
+                }
+            }
+
+            // Global Confirm via Enter / KeypadEnter
+            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+            {
+                if (_modals != null && _modals.ResultRoot != null && _modals.ResultRoot.activeSelf)
+                {
+                    _modals.TriggerRematch();
+                }
+                else if (_modals != null && _modals.ModalRoot != null && _modals.ModalRoot.activeSelf)
+                {
+                    _modals.TryConfirm();
                 }
             }
         }
@@ -1652,7 +1687,33 @@ namespace YGOPortable.UI
                 _app.ShowScreen(AppScreen.MainMenu);
                 return;
             }
-            _session.Surrender(_session.HumanPlayerIndex);
+
+            // Confirmation popup to prevent accidental clicks
+            for (int i = _actionList.childCount - 1; i >= 0; i--)
+                UnityEngine.Object.Destroy(_actionList.GetChild(i).gameObject);
+
+            _actionHeader.text = "듀얼을 항복하시겠습니까?";
+
+            var surRow = new GameObject("SurrenderRow", typeof(RectTransform), typeof(LayoutElement));
+            surRow.transform.SetParent(_actionList, false);
+            surRow.GetComponent<LayoutElement>().preferredHeight = 46f;
+            LotdUiKit.CreateLotdButton(surRow.transform, "B", "🏳️ 정말 항복합니다 (패배 처리)", () =>
+            {
+                LotdAudio.PlayClick();
+                _actionPopup.SetActive(false);
+                _session.Surrender(_session.HumanPlayerIndex);
+            }, 15, gold: false);
+
+            var cancelRow = new GameObject("CancelRow", typeof(RectTransform), typeof(LayoutElement));
+            cancelRow.transform.SetParent(_actionList, false);
+            cancelRow.GetComponent<LayoutElement>().preferredHeight = 44f;
+            LotdUiKit.CreateLotdButton(cancelRow.transform, "B", "✕ 취소 (듀얼 계속하기)", () =>
+            {
+                LotdAudio.PlayClick();
+                _actionPopup.SetActive(false);
+            }, 15, gold: true);
+
+            _actionPopup.SetActive(true);
         }
 
         private void HandleCoinTossedEvent(byte player, IReadOnlyList<bool> coins)

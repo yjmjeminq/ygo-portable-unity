@@ -138,6 +138,45 @@ namespace YGOPortable.UI
             return false;
         }
 
+        public bool TryConfirm()
+        {
+            if (ModalRoot == null || !ModalRoot.activeSelf || _curPrompt == null) return false;
+
+            if (_curPrompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN || _curPrompt.messageType == YgoConstants.MSG_SELECT_YESNO)
+            {
+                LotdAudio.PlayClick();
+                Submit(BitConverter.GetBytes(1)); // YES
+                return true;
+            }
+            if ((_curPrompt.messageType == YgoConstants.MSG_SELECT_CARD ||
+                 _curPrompt.messageType == YgoConstants.MSG_SELECT_TRIBUTE ||
+                 _curPrompt.messageType == YgoConstants.MSG_SELECT_SUM ||
+                 _curPrompt.messageType == YgoConstants.MSG_SELECT_UNSELECT_CARD) &&
+                _confirmBtn != null && _confirmBtn.interactable)
+            {
+                LotdAudio.PlayClick();
+                OnConfirmMultiSelect();
+                return true;
+            }
+            return false;
+        }
+
+        public void TriggerRematch()
+        {
+            if (ResultRoot == null || !ResultRoot.activeSelf) return;
+            LotdAudio.PlayClick();
+            HideResult();
+            _resRematch?.Invoke();
+        }
+
+        public void TriggerMenu()
+        {
+            if (ResultRoot == null || !ResultRoot.activeSelf) return;
+            LotdAudio.PlayClick();
+            HideResult();
+            _resMenu?.Invoke();
+        }
+
         private void OnModalCloseClicked()
         {
             TryCancelOrPass();
@@ -430,6 +469,12 @@ namespace YGOPortable.UI
                     if (item.code != 0) _onInspectCard?.Invoke(item.code);
                     if (_selectedIndices.Contains(idx))
                     {
+                        if (p.max == 1 && p.min == 1)
+                        {
+                            LotdAudio.PlayClick();
+                            OnConfirmMultiSelect();
+                            return;
+                        }
                         _selectedIndices.Remove(idx);
                         chkImg.gameObject.SetActive(false);
                         ol.effectColor = LotdUiKit.CyanAccent;
