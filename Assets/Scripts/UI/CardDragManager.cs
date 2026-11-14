@@ -162,7 +162,7 @@ namespace YGOPortable.UI
         }
     }
 
-    public class CardDragTrigger : MonoBehaviour, IPointerDownHandler, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler
+    public class CardDragTrigger : MonoBehaviour, IPointerDownHandler, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler, IPointerEnterHandler, IPointerExitHandler
     {
         public DragSourceType SourceType = DragSourceType.None;
         public Func<uint> CardCodeGetter;
@@ -170,8 +170,26 @@ namespace YGOPortable.UI
         public Func<object> DataGetter;
         public Action OnLeftClick;
         public Action OnRightClick;
+        public Action OnPointerEnterAction;
+        public Action OnPointerExitAction;
 
         private bool _isDraggingThis;
+
+        public void OnPointerEnter(PointerEventData eventData)
+        {
+            if (!_isDraggingThis)
+            {
+                OnPointerEnterAction?.Invoke();
+            }
+        }
+
+        public void OnPointerExit(PointerEventData eventData)
+        {
+            if (!_isDraggingThis)
+            {
+                OnPointerExitAction?.Invoke();
+            }
+        }
 
         public void OnPointerDown(PointerEventData eventData)
         {

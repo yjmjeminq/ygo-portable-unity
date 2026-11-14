@@ -509,11 +509,11 @@ namespace YGOPortable.UI
             var bot = LotdUiKit.CreateBorderedPanel(root, "BottomZone",
                 new Vector2(0.262f, 0.01f), new Vector2(0.995f, 0.20f), Vector2.zero, Vector2.zero);
 
-            // Human hand container on left 68% of bottom bar
-            _myHandBar = LotdUiKit.CreateRect("MyHand", bot, new Vector2(0.01f, 0.04f), new Vector2(0.69f, 0.96f), Vector2.zero, Vector2.zero);
+            // Human hand container takes 0.01f to 0.775f (width 76.5% of bottom zone, directly beneath field zones)
+            _myHandBar = LotdUiKit.CreateRect("MyHand", bot, new Vector2(0.01f, 0.02f), new Vector2(0.775f, 0.98f), Vector2.zero, Vector2.zero);
 
-            // Human LP + Quick Phase control buttons on right 30%
-            var myHud = LotdUiKit.CreateRect("MyHud", bot, new Vector2(0.70f, 0.44f), new Vector2(0.99f, 0.95f), Vector2.zero, Vector2.zero);
+            // Human LP + Quick Phase control buttons on right 22%
+            var myHud = LotdUiKit.CreateRect("MyHud", bot, new Vector2(0.785f, 0.46f), new Vector2(0.992f, 0.96f), Vector2.zero, Vector2.zero);
             LotdUiKit.AddImage(myHud.gameObject, LotdUiKit.LoadSprite("LOTD/HUD/lp_frame_blue") ?? LotdUiKit.WhiteSprite, new Color(0.55f, 0.82f, 1f, 0.92f));
             LotdUiKit.AddText(LotdUiKit.CreateRect("Lbl", myHud, new Vector2(0.05f, 0.42f), new Vector2(0.45f, 0.95f), Vector2.zero, Vector2.zero),
                 "L", "PLAYER LP", 13, TextAnchor.MiddleLeft, LotdUiKit.CyanAccent, FontStyle.Bold);
@@ -526,7 +526,7 @@ namespace YGOPortable.UI
             LotdUiKit.AddImage(_myLpFill.gameObject, LotdUiKit.LoadSprite("LOTD/HUD/LP_FILL"), LotdUiKit.CyanAccent);
 
             // Quick Phase transition buttons
-            var phBtns = LotdUiKit.CreateRect("QuickPhase", bot, new Vector2(0.70f, 0.05f), new Vector2(0.99f, 0.40f), Vector2.zero, Vector2.zero);
+            var phBtns = LotdUiKit.CreateRect("QuickPhase", bot, new Vector2(0.785f, 0.04f), new Vector2(0.992f, 0.42f), Vector2.zero, Vector2.zero);
             _btnToBp = LotdUiKit.CreateLotdButton(LotdUiKit.CreateRect("B1", phBtns, new Vector2(0f, 0f), new Vector2(0.32f, 1f), Vector2.zero, Vector2.zero),
                 "B", "배틀", () => OnPhaseShortcut(YgoConstants.PHASE_BATTLE), 13);
             _btnToMp2 = LotdUiKit.CreateLotdButton(LotdUiKit.CreateRect("B2", phBtns, new Vector2(0.34f, 0f), new Vector2(0.66f, 1f), Vector2.zero, Vector2.zero),
@@ -806,6 +806,13 @@ namespace YGOPortable.UI
                     slot.dragTrigger.IndexGetter = null;
                     slot.dragTrigger.DataGetter = null;
                 }
+                slot.dragTrigger.OnPointerEnterAction = () =>
+                {
+                    if (live != null && (live.IsFaceUp || live.controller == (byte)_session.HumanPlayerIndex))
+                    {
+                        InspectCard(live.code);
+                    }
+                };
                 slot.dragTrigger.OnLeftClick = () => OnSlotClicked(con, loc, seq);
                 slot.dragTrigger.OnRightClick = () => OnSlotClicked(con, loc, seq);
             }
@@ -823,35 +830,62 @@ namespace YGOPortable.UI
             for (int i = _myHandBar.childCount - 1; i >= 0; i--) UnityEngine.Object.Destroy(_myHandBar.GetChild(i).gameObject);
             for (int i = _oppHandBar.childCount - 1; i >= 0; i--) UnityEngine.Object.Destroy(_oppHandBar.GetChild(i).gameObject);
 
-            // Opponent hand face-down mini cards
+            // Opponent hand face-down mini cards (Centered in Opponent Hand Bar)
             int opCnt = Mathf.Min(10, opP.hand.Count);
-            float ow = opCnt > 0 ? Mathf.Min(0.11f, 0.98f / opCnt) : 0.1f;
-            for (int i = 0; i < opCnt; i++)
+            if (opCnt > 0)
             {
-                var rt = LotdUiKit.CreateRect($"OH_{i}", _oppHandBar, new Vector2(i * ow, 0.05f), new Vector2(i * ow + ow - 0.008f, 0.95f), Vector2.zero, Vector2.zero);
-                var c = opP.hand[i];
-                bool vis = c != null && (c.isPublic || c.code != 0 && c.IsFaceUp);
-                CompositeCardView.Create(rt, "V", false).SetCard(vis ? c.code : 0u, !vis, c);
+                float ow = Mathf.Min(0.13f, 0.94f / opCnt);
+                float totalW = opCnt * ow;
+                float opStartX = Mathf.Max(0.01f, (1f - totalW) * 0.5f);
+                for (int i = 0; i < opCnt; i++)
+                {
+                    float xMin = opStartX + i * ow;
+                    float xMax = xMin + ow - 0.006f;
+                    var rt = LotdUiKit.CreateRect($"OH_{i}", _oppHandBar, new Vector2(xMin, 0.05f), new Vector2(xMax, 0.95f), Vector2.zero, Vector2.zero);
+                    var c = opP.hand[i];
+                    bool vis = c != null && (c.isPublic || c.code != 0 && c.IsFaceUp);
+                    CompositeCardView.Create(rt, "V", false).SetCard(vis ? c.code : 0u, !vis, c);
+                }
             }
 
-            // Human hand cards
+            // Human hand cards (Authentic LOTD Centered Hand Layout)
             int cnt = myP.hand.Count;
             if (cnt == 0) return;
-            float cw = Mathf.Min(0.115f, 0.98f / cnt);
+
+            float cardW, stepX, startX;
+            if (cnt <= 6)
+            {
+                cardW = 0.128f;
+                float gap = 0.014f;
+                float totalW = cnt * cardW + (cnt - 1) * gap;
+                startX = Mathf.Max(0.01f, (1f - totalW) * 0.5f);
+                stepX = cardW + gap;
+            }
+            else
+            {
+                cardW = Mathf.Max(0.088f, 0.128f - (cnt - 6) * 0.006f);
+                startX = 0.015f;
+                stepX = (0.97f - cardW) / (cnt - 1);
+            }
+
             for (int i = 0; i < cnt; i++)
             {
                 var hc = myP.hand[i];
                 if (hc == null) continue;
                 uint seq = (uint)i;
-                float x = i * cw;
+                float xMin = startX + i * stepX;
+                float xMax = xMin + cardW;
                 bool actionable = waitingMyAction && HasHandAction((byte)_session.HumanPlayerIndex, seq);
 
+                // Actionable cards pop up higher in authentic LOTD style (0.09f vs 0.01f)
                 var slot = LotdUiKit.CreateRect($"MH_{i}", _myHandBar,
-                    new Vector2(x, actionable ? 0.06f : 0.01f), new Vector2(x + cw - 0.006f, actionable ? 0.99f : 0.92f),
+                    new Vector2(xMin, actionable ? 0.09f : 0.01f),
+                    new Vector2(xMax, actionable ? 0.99f : 0.91f),
                     Vector2.zero, Vector2.zero);
+
                 var ol = slot.gameObject.AddComponent<Outline>();
-                ol.effectColor = actionable ? LotdUiKit.CyanAccent : new Color(0, 0, 0, 0);
-                ol.effectDistance = new Vector2(2, -2);
+                ol.effectColor = actionable ? LotdUiKit.GoldAccent : new Color(0, 0, 0, 0);
+                ol.effectDistance = new Vector2(2.5f, -2.5f);
 
                 CompositeCardView.Create(slot, "V", false).SetCard(hc.code, false, hc);
                 var hit = LotdUiKit.AddImage(LotdUiKit.FillRect("Hit", slot).gameObject, LotdUiKit.WhiteSprite, Color.clear);
@@ -861,6 +895,10 @@ namespace YGOPortable.UI
                 uint cardCode = hc.code;
                 trig.CardCodeGetter = () => cardCode;
                 trig.IndexGetter = () => (int)seq;
+                trig.OnPointerEnterAction = () =>
+                {
+                    InspectCard(cardCode);
+                };
                 trig.OnLeftClick = () =>
                 {
                     InspectCard(cardCode);

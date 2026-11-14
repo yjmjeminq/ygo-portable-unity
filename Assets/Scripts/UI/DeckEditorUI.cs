@@ -507,6 +507,7 @@ namespace YGOPortable.UI
 
                     trig.CardCodeGetter = () => code;
                     trig.IndexGetter = () => cardIdx;
+                    trig.OnPointerEnterAction = () => InspectCard(code);
                     trig.OnLeftClick = () => InspectCard(code);
                     trig.OnRightClick = () => { InspectCard(code); TryAddCardToDeck(code, _showingSide); };
                 }
@@ -539,6 +540,7 @@ namespace YGOPortable.UI
                     trig.IndexGetter = null;
                     trig.OnLeftClick = null;
                     trig.OnRightClick = null;
+                    trig.OnPointerEnterAction = null;
                     continue;
                 }
                 cv.gameObject.SetActive(true);
@@ -548,6 +550,7 @@ namespace YGOPortable.UI
 
                 trig.CardCodeGetter = () => code;
                 trig.IndexGetter = () => capIdx;
+                trig.OnPointerEnterAction = () => InspectCard(code);
                 trig.OnLeftClick = () => InspectCard(code);
                 trig.OnRightClick = () =>
                 {
