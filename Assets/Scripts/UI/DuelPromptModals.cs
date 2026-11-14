@@ -22,6 +22,7 @@ namespace YGOPortable.UI
         private Text _modalSubtitle;
         private RectTransform _modalBody;
         private RectTransform _modalFooter;
+        private Button _modalCloseBtn;
 
         // Zone viewer refs
         private Text _zoneTitle;
@@ -101,7 +102,45 @@ namespace YGOPortable.UI
             _modalBody = LotdUiKit.CreateRect("Body", _modalBox, new Vector2(0.02f, 0.14f), new Vector2(0.98f, 0.85f), Vector2.zero, Vector2.zero);
             _modalFooter = LotdUiKit.CreateRect("Footer", _modalBox, new Vector2(0.02f, 0.02f), new Vector2(0.98f, 0.12f), Vector2.zero, Vector2.zero);
 
+            var closeRt = LotdUiKit.CreateRect("CloseBtn", hdr, new Vector2(0.82f, 0.16f), new Vector2(0.98f, 0.84f), Vector2.zero, Vector2.zero);
+            _modalCloseBtn = LotdUiKit.CreateLotdButton(closeRt, "B", "✕ 취소 (PASS)", OnModalCloseClicked, 13, gold: false);
+            dim.gameObject.AddComponent<Button>().onClick.AddListener(OnModalCloseClicked);
+
             ModalRoot.SetActive(false);
+        }
+
+        public bool TryCancelOrPass()
+        {
+            if (ModalRoot == null || !ModalRoot.activeSelf || _curPrompt == null) return false;
+
+            if (_curPrompt.messageType == YgoConstants.MSG_SELECT_CHAIN)
+            {
+                if (!_curPrompt.forced)
+                {
+                    LotdAudio.PlayClick();
+                    Submit(BitConverter.GetBytes(-1));
+                    return true;
+                }
+            }
+            else if (_curPrompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN || _curPrompt.messageType == YgoConstants.MSG_SELECT_YESNO)
+            {
+                LotdAudio.PlayClick();
+                Submit(BitConverter.GetBytes(0)); // NO
+                return true;
+            }
+            else if ((_curPrompt.messageType == YgoConstants.MSG_SELECT_CARD || _curPrompt.messageType == YgoConstants.MSG_SELECT_UNSELECT_CARD) && _curPrompt.cancelable)
+            {
+                LotdAudio.PlayClick();
+                Submit(BitConverter.GetBytes(-1));
+                return true;
+            }
+
+            return false;
+        }
+
+        private void OnModalCloseClicked()
+        {
+            TryCancelOrPass();
         }
 
         public void ShowPrompt(DuelSession session, DuelPrompt prompt)
@@ -110,6 +149,14 @@ namespace YGOPortable.UI
             _curPrompt = prompt;
             ClearBodyAndFooter();
             ModalRoot.SetActive(true);
+
+            bool canCancel = false;
+            if (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN) canCancel = !prompt.forced;
+            else if (prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN || prompt.messageType == YgoConstants.MSG_SELECT_YESNO) canCancel = true;
+            else if ((prompt.messageType == YgoConstants.MSG_SELECT_CARD || prompt.messageType == YgoConstants.MSG_SELECT_UNSELECT_CARD) && prompt.cancelable) canCancel = true;
+
+            if (_modalCloseBtn != null)
+                _modalCloseBtn.gameObject.SetActive(canCancel);
 
             switch (prompt.messageType)
             {
@@ -308,7 +355,7 @@ namespace YGOPortable.UI
 
             if (!p.forced)
             {
-                AddFooterButton(0.32f, 0.68f, "발동하지 않음 (PASS)", () => Submit(BitConverter.GetBytes(-1)), false);
+                AddFooterButton(0.24f, 0.76f, "❌ 효과 발동 취소 (발동하지 않고 패스 / PASS)", () => Submit(BitConverter.GetBytes(-1)), false);
             }
         }
 

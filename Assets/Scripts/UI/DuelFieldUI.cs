@@ -1297,9 +1297,28 @@ namespace YGOPortable.UI
                 _oppLpText.color = Color.white;
             }
 
-            if (_cardZoomModal != null && _cardZoomModal.activeSelf && Input.GetKeyDown(KeyCode.Escape))
+            // Global Cancel / Dismiss via ESC or Right Mouse Button
+            if (Input.GetKeyDown(KeyCode.Escape) || Input.GetMouseButtonDown(1))
             {
-                _cardZoomModal.SetActive(false);
+                if (_cardZoomModal != null && _cardZoomModal.activeSelf)
+                {
+                    LotdAudio.PlayClick();
+                    _cardZoomModal.SetActive(false);
+                }
+                else if (_actionPopup != null && _actionPopup.activeSelf)
+                {
+                    LotdAudio.PlayClick();
+                    _actionPopup.SetActive(false);
+                }
+                else if (_modals != null && _modals.ZoneViewRoot != null && _modals.ZoneViewRoot.activeSelf)
+                {
+                    LotdAudio.PlayClick();
+                    _modals.ZoneViewRoot.SetActive(false);
+                }
+                else if (_modals != null && _modals.ModalRoot != null && _modals.ModalRoot.activeSelf)
+                {
+                    _modals.TryCancelOrPass();
+                }
             }
         }
 
@@ -1574,6 +1593,16 @@ namespace YGOPortable.UI
                     _modals.ShowCodeListViewer("엑시즈 소재", overlays);
                 }, 14, false);
             }
+
+            // Always add an explicit cancel / close button to prevent accidental activation
+            var cancelRow = new GameObject("CancelBtn", typeof(RectTransform), typeof(LayoutElement));
+            cancelRow.transform.SetParent(_actionList, false);
+            cancelRow.GetComponent<LayoutElement>().preferredHeight = 40f;
+            LotdUiKit.CreateLotdButton(cancelRow.transform, "B", "✕ 닫기 / 행동 취소", () =>
+            {
+                LotdAudio.PlayClick();
+                _actionPopup.SetActive(false);
+            }, 14, false);
 
             _actionPopup.SetActive(true);
         }
