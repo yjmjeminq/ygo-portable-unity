@@ -302,6 +302,8 @@ namespace YGOPortable.UI
                 var insBtn = insRt.gameObject.AddComponent<Button>();
                 insBtn.targetGraphic = insImg;
                 insBtn.onClick.AddListener(() => _onInspectCard?.Invoke(c.code));
+                var insTrig = insRt.gameObject.AddComponent<CardDragTrigger>();
+                insTrig.OnPointerEnterAction = () => _onInspectCard?.Invoke(c.code);
             }
 
             if (!p.forced)
@@ -374,6 +376,8 @@ namespace YGOPortable.UI
                 var ol = tile.GetComponent<Outline>();
                 var btn = tile.gameObject.AddComponent<Button>();
                 btn.targetGraphic = tile.GetComponent<Image>();
+                var trig = tile.gameObject.AddComponent<CardDragTrigger>();
+                if (item.code != 0) trig.OnPointerEnterAction = () => _onInspectCard?.Invoke(item.code);
                 btn.onClick.AddListener(() =>
                 {
                     if (item.code != 0) _onInspectCard?.Invoke(item.code);
@@ -799,6 +803,8 @@ namespace YGOPortable.UI
 
                     var btn = tile.gameObject.AddComponent<Button>();
                     btn.targetGraphic = tile.GetComponent<Image>();
+                    var trig = tile.gameObject.AddComponent<CardDragTrigger>();
+                    trig.OnPointerEnterAction = () => _onInspectCard?.Invoke(code);
                     btn.onClick.AddListener(() =>
                     {
                         pickedCode = code;
@@ -903,6 +909,8 @@ namespace YGOPortable.UI
                 var btn = tile.gameObject.AddComponent<Button>();
                 btn.targetGraphic = tile.GetComponent<Image>();
                 btn.onClick.AddListener(() => _onInspectCard?.Invoke(code));
+                var trig = tile.gameObject.AddComponent<CardDragTrigger>();
+                trig.OnPointerEnterAction = () => _onInspectCard?.Invoke(code);
             }
 
             if (hasActions)
