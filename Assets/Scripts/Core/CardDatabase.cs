@@ -23,6 +23,7 @@ namespace YGOPortable.Core
         public uint lscale;
         public uint rscale;
         public uint link;
+        public ulong setcode;
         public string[] strs;
 
         public bool IsMonster => (type & YgoConstants.TYPE_MONSTER) != 0;
@@ -147,7 +148,137 @@ namespace YGOPortable.Core
                 if (c.code != 0) _byCode[c.code] = c;
                 if (c.lotdId > 0 && !_byLotdId.ContainsKey(c.lotdId)) _byLotdId[c.lotdId] = c;
             }
+
+            string propPath = Path.Combine(streamingAssetsPath, "cards_prop.bin");
+            if (File.Exists(propPath))
+            {
+                try
+                {
+                    byte[] bytes = File.ReadAllBytes(propPath);
+                    if (bytes.Length >= 12)
+                    {
+                        uint count = BitConverter.ToUInt32(bytes, 8);
+                        const int sz = 64;
+                        for (int i = 0; i < count && (12 + (i + 1) * sz) <= bytes.Length; i++)
+                        {
+                            int offset = 12 + i * sz;
+                            uint code = BitConverter.ToUInt32(bytes, offset);
+                            ulong sc = BitConverter.ToUInt64(bytes, offset + 48);
+                            if (code != 0 && _byCode.TryGetValue(code, out var ci))
+                            {
+                                ci.setcode = sc;
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[CardDatabase] Failed loading setcodes from prop: {ex.Message}");
+                }
+            }
+
+            _relatedCache.Clear();
             Debug.Log($"[CardDatabase] Loaded {_allCards.Count} KR cards.");
+        }
+
+        private static readonly Dictionary<uint, List<CardInfo>> _relatedCache = new Dictionary<uint, List<CardInfo>>();
+
+        public static HashSet<ushort> ExtractSetcodes(ulong setcode)
+        {
+            var res = new HashSet<ushort>();
+            if (setcode == 0) return res;
+            for (int shift = 0; shift < 64; shift += 16)
+            {
+                ushort v = (ushort)((setcode >> shift) & 0xFFFF);
+                if (v != 0)
+                {
+                    res.Add(v);
+                    ushort baseSc = (ushort)(v & 0x0FFF);
+                    if (baseSc != 0) res.Add(baseSc);
+                }
+            }
+            return res;
+        }
+
+        public static List<CardInfo> GetRelatedCards(uint code)
+        {
+            if (code == 0) return new List<CardInfo>();
+            if (_relatedCache.TryGetValue(code, out var cached)) return cached;
+
+            var results = new List<CardInfo>();
+            var target = Get(code);
+            if (target == null || _allCards == null) return results;
+
+            string tname = (target.name ?? "").Trim();
+            string tdesc = target.desc ?? "";
+            var targetSetcodes = ExtractSetcodes(target.setcode);
+
+            // Extract quoted archetype keywords: "..." or 「...」
+            var descKeywords = new List<string>();
+            var matches = System.Text.RegularExpressions.Regex.Matches(tdesc, "[\"「]([^\"」]+)[\"」]");
+            foreach (System.Text.RegularExpressions.Match m in matches)
+            {
+                if (m.Groups.Count > 1)
+                {
+                    string term = m.Groups[1].Value.Trim();
+                    if (term.Length >= 2 && !term.EndsWith("효과") && !term.EndsWith("턴") && !term.EndsWith("페이즈"))
+                    {
+                        descKeywords.Add(term);
+                    }
+                }
+            }
+
+            foreach (var c in _allCards)
+            {
+                if (c.code == code || (c.type & YgoConstants.TYPE_TOKEN) != 0) continue;
+
+                // 1. Same archetype / setcode match
+                if (targetSetcodes.Count > 0 && c.setcode != 0)
+                {
+                    var otherSc = ExtractSetcodes(c.setcode);
+                    if (targetSetcodes.Overlaps(otherSc))
+                    {
+                        results.Add(c);
+                        continue;
+                    }
+                }
+
+                string otherDesc = c.desc ?? "";
+                string otherName = c.name ?? "";
+
+                // 2. Other card mentions target card's exact name
+                if (tname.Length >= 2 && otherDesc.Contains(tname))
+                {
+                    results.Add(c);
+                    continue;
+                }
+
+                // 3. Target card mentions other card's exact name (if meaningful length)
+                if (otherName.Length >= 3 && tdesc.Contains(otherName))
+                {
+                    results.Add(c);
+                    continue;
+                }
+
+                // 4. Target's quoted archetype keyword appears in other card's name
+                bool kwMatch = false;
+                for (int k = 0; k < descKeywords.Count; k++)
+                {
+                    if (otherName.Contains(descKeywords[k]))
+                    {
+                        kwMatch = true;
+                        break;
+                    }
+                }
+                if (kwMatch)
+                {
+                    results.Add(c);
+                    continue;
+                }
+            }
+
+            _relatedCache[code] = results;
+            return results;
         }
 
         public static CardInfo Get(uint code)

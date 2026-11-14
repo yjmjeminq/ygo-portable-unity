@@ -60,6 +60,11 @@ namespace YGOPortable.UI
         private RectTransform _trunkViewport;
         private Text _trunkCountText;
         private Text _trunkScrollHint;
+        private uint _relatedFilterCode = 0;
+        private InputField _searchInp;
+        private RectTransform _searchInpRt;
+        private GameObject _relatedBanner;
+        private Text _relatedBannerText;
 
         private InputField _deckNameInput;
         private Text _deckHeaderText;
@@ -201,7 +206,7 @@ namespace YGOPortable.UI
 
             // Scrollable Card Effect Text
             var descBox = LotdUiKit.CreateBorderedPanel(col, "DescBox",
-                new Vector2(0.04f, 0.08f), new Vector2(0.96f, 0.27f), Vector2.zero, Vector2.zero,
+                new Vector2(0.04f, 0.125f), new Vector2(0.96f, 0.27f), Vector2.zero, Vector2.zero,
                 new Color(0.02f, 0.05f, 0.12f, 0.95f));
             var viewport = LotdUiKit.FillRect("VP", descBox, 6);
             viewport.gameObject.AddComponent<RectMask2D>();
@@ -222,10 +227,15 @@ namespace YGOPortable.UI
             scroll.vertical = true;
             scroll.scrollSensitivity = 25f;
 
-            // Add button at bottom
+            // Row 1: Search Related Cards button
+            var relBtnRt = LotdUiKit.CreateRect("RelCardBtn", col,
+                new Vector2(0.04f, 0.070f), new Vector2(0.96f, 0.118f), Vector2.zero, Vector2.zero);
+            LotdUiKit.CreateLotdButton(relBtnRt, "RelB", "🔍 연관 카드 찾기 (카드군 / 지원)", () => FilterRelatedCards(_inspectedCode), 13, gold: false);
+
+            // Row 2: Add button at bottom
             var addBtnRt = LotdUiKit.CreateRect("AddCardBtn", col,
-                new Vector2(0.04f, 0.015f), new Vector2(0.96f, 0.07f), Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(addBtnRt, "B", "+ 내 덱에 1장 추가 (드래그/우클릭)", () => TryAddCardToDeck(_inspectedCode, _showingSide), 14, gold: true);
+                new Vector2(0.04f, 0.015f), new Vector2(0.96f, 0.063f), Vector2.zero, Vector2.zero);
+            LotdUiKit.CreateLotdButton(addBtnRt, "AddB", "+ 내 덱에 1장 추가 (드래그/우클릭)", () => TryAddCardToDeck(_inspectedCode, _showingSide), 13, gold: true);
         }
 
         private void BuildCenterColumn(Transform rt)
@@ -235,13 +245,26 @@ namespace YGOPortable.UI
 
             // Row 1: Search bar + Result count
             var r1 = LotdUiKit.CreateRect("R1", col, new Vector2(0.02f, 0.925f), new Vector2(0.98f, 0.985f), Vector2.zero, Vector2.zero);
-            var inp = LotdUiKit.CreateInputField(LotdUiKit.CreateRect("Inp", r1, new Vector2(0, 0), new Vector2(0.68f, 1), Vector2.zero, Vector2.zero),
+            _searchInp = LotdUiKit.CreateInputField(LotdUiKit.CreateRect("Inp", r1, new Vector2(0, 0), new Vector2(0.68f, 1), Vector2.zero, Vector2.zero),
                 "Search", "카드 이름 / 효과 텍스트 검색...", 14);
-            inp.onValueChanged.AddListener(v =>
+            _searchInpRt = _searchInp.GetComponent<RectTransform>();
+            _searchInp.onValueChanged.AddListener(v =>
             {
                 _searchText = v ?? "";
                 RefreshTrunkFilter();
             });
+
+            // Related Cards Banner inside R1
+            _relatedBanner = LotdUiKit.CreateBorderedPanel(r1, "RelBanner",
+                new Vector2(0f, 0f), new Vector2(0.68f, 1f), Vector2.zero, Vector2.zero,
+                new Color(0.05f, 0.15f, 0.28f, 0.95f), LotdUiKit.GoldAccent).gameObject;
+            _relatedBannerText = LotdUiKit.AddText(LotdUiKit.CreateRect("T", _relatedBanner.transform,
+                new Vector2(0.02f, 0f), new Vector2(0.72f, 1f), Vector2.zero, Vector2.zero),
+                "T", "", 13, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
+            LotdUiKit.CreateLotdButton(LotdUiKit.CreateRect("ClrBtn", _relatedBanner.transform,
+                new Vector2(0.74f, 0.08f), new Vector2(0.98f, 0.92f), Vector2.zero, Vector2.zero),
+                "B", "전체 ✕", ClearRelatedFilter, 11, gold: true);
+            _relatedBanner.SetActive(false);
             _trunkCountText = LotdUiKit.AddText(LotdUiKit.CreateRect("Cnt", r1, new Vector2(0.70f, 0), new Vector2(1f, 1), Vector2.zero, Vector2.zero),
                 "C", "0장", 13, TextAnchor.MiddleRight, LotdUiKit.CyanAccent, FontStyle.Bold);
 
@@ -423,13 +446,53 @@ namespace YGOPortable.UI
             }
         }
 
+        private void FilterRelatedCards(uint code)
+        {
+            if (code == 0) return;
+            LotdAudio.PlayClick();
+            _relatedFilterCode = code;
+            _searchText = "";
+            if (_searchInp != null) _searchInp.text = "";
+            RefreshTrunkFilter();
+            ShowToast($"[{CardDatabase.GetName(code)}] 연관 카드 {_trunkResults.Count}장 검색됨");
+        }
+
+        private void ClearRelatedFilter()
+        {
+            LotdAudio.PlayClick();
+            _relatedFilterCode = 0;
+            _searchText = "";
+            if (_searchInp != null) _searchInp.text = "";
+            RefreshTrunkFilter();
+            ShowToast("전체 카드로 전환되었습니다.");
+        }
+
         private void RefreshTrunkFilter()
         {
             _trunkResults.Clear();
             string q = (_searchText ?? "").Trim().ToLowerInvariant();
             ulong raceMask = RaceOptions[_raceFilterIdx].mask;
 
-            foreach (var c in CardDatabase.AllCards)
+            IEnumerable<CardInfo> source = CardDatabase.AllCards;
+            if (_relatedFilterCode != 0)
+            {
+                var relList = CardDatabase.GetRelatedCards(_relatedFilterCode);
+                source = relList;
+                if (_relatedBanner != null) _relatedBanner.SetActive(true);
+                if (_relatedBannerText != null)
+                {
+                    string baseName = CardDatabase.GetName(_relatedFilterCode);
+                    _relatedBannerText.text = $"★ [{baseName}] 연관 ({relList.Count}장)";
+                }
+                if (_searchInpRt != null) _searchInpRt.gameObject.SetActive(false);
+            }
+            else
+            {
+                if (_relatedBanner != null) _relatedBanner.SetActive(false);
+                if (_searchInpRt != null) _searchInpRt.gameObject.SetActive(true);
+            }
+
+            foreach (var c in source)
             {
                 if ((c.type & YgoConstants.TYPE_TOKEN) != 0) continue;
                 if (_kindFilter == 1 && (!c.IsMonster || c.IsExtra)) continue;
@@ -453,7 +516,7 @@ namespace YGOPortable.UI
             float totalH = _totalRows * _rowHeight;
             _trunkContent.sizeDelta = new Vector2(_trunkViewport.rect.width, totalH);
 
-            _trunkCountText.text = $"검색 {_trunkResults.Count:N0}장";
+            _trunkCountText.text = (_relatedFilterCode != 0 ? "연관 " : "검색 ") + $"{_trunkResults.Count:N0}장";
             _trunkScroll.verticalNormalizedPosition = 1f;
             _lastFirstRow = -1;
             UpdateVirtualTrunkSlots(0, force: true);

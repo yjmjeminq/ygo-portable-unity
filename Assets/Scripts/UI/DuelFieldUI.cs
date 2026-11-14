@@ -213,6 +213,17 @@ namespace YGOPortable.UI
             _inspRaceIcon.gameObject.SetActive(rSp != null);
         }
 
+        private void OnInspectRelatedClicked()
+        {
+            if (_inspectedCode == 0 || _modals == null) return;
+            LotdAudio.PlayClick();
+            var rel = CardDatabase.GetRelatedCards(_inspectedCode);
+            var codes = new List<uint>(rel.Count);
+            for (int i = 0; i < rel.Count; i++) codes.Add(rel[i].code);
+            string baseName = CardDatabase.GetName(_inspectedCode);
+            _modals.ShowCodeListViewer($"[{baseName}] 연관 카드 ({rel.Count}장)", codes);
+        }
+
         private void BuildUI(Transform parent)
         {
             var rt = LotdUiKit.FillRect("Screen_DuelField", parent);
@@ -276,8 +287,11 @@ namespace YGOPortable.UI
             _inspStats = LotdUiKit.AddText(LotdUiKit.CreateRect("Stats", left, new Vector2(0.65f, 0.45f), new Vector2(0.97f, 0.71f), Vector2.zero, Vector2.zero),
                 "St", "", 12, TextAnchor.UpperCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
 
-            _inspName = LotdUiKit.AddText(LotdUiKit.CreateRect("CName", left, new Vector2(0.03f, 0.39f), new Vector2(0.97f, 0.44f), Vector2.zero, Vector2.zero),
+            _inspName = LotdUiKit.AddText(LotdUiKit.CreateRect("CName", left, new Vector2(0.03f, 0.39f), new Vector2(0.74f, 0.44f), Vector2.zero, Vector2.zero),
                 "N", "", 16, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
+
+            var relBtnRt = LotdUiKit.CreateRect("RelBtn", left, new Vector2(0.75f, 0.392f), new Vector2(0.97f, 0.438f), Vector2.zero, Vector2.zero);
+            LotdUiKit.CreateLotdButton(relBtnRt, "B", "🔍 연관", OnInspectRelatedClicked, 11, gold: false);
 
             // Scrollable description
             var descBox = LotdUiKit.CreateBorderedPanel(left, "DescBox", new Vector2(0.03f, 0.16f), new Vector2(0.97f, 0.385f), Vector2.zero, Vector2.zero,
