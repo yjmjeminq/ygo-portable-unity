@@ -53,7 +53,9 @@ namespace YGOPortable.Core
 
             string attrName = YgoConstants.AttributeNamesKR.TryGetValue(attr, out var an) ? an : "";
             string raceName = YgoConstants.RaceNamesKR.TryGetValue(race, out var rn) ? rn : "";
-            string lvStr = IsLink ? $"링크 {level}" : IsXyz ? $"랭크 {level}" : $"레벨 {level}";
+            int cleanLv = Mathf.Clamp((int)level, 0, 13);
+            string stars = (!IsLink && cleanLv > 0) ? new string('★', cleanLv) + " " : "";
+            string lvStr = IsLink ? $"링크 {level}" : IsXyz ? $"{stars}(랭크 {level})" : $"{stars}(레벨 {level})";
             string tag = YgoConstants.GetTypeTagKR(type);
             string atkDef = IsLink ? $"공격력 {AtkString} / LINK-{level}" : $"공격력 {AtkString} / 수비력 {DefString}";
             string pend = IsPendulum ? $" / 펜듈럼 스케일 {lscale}" : "";

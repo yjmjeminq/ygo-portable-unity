@@ -198,5 +198,193 @@ namespace YGOPortable.UI
                 ol.effectColor = origColor;
             }
         }
+
+        public void PlayPhaseBanner(string title, string subtitle, bool isOpponent, Action onComplete = null)
+        {
+            if (_animLayer == null) return;
+            StartCoroutine(PhaseBannerRoutine(title, subtitle, isOpponent, onComplete));
+        }
+
+        private IEnumerator PhaseBannerRoutine(string title, string subtitle, bool isOpponent, Action onComplete)
+        {
+            var banner = new GameObject("PhaseSplashBanner", typeof(RectTransform));
+            banner.transform.SetParent(_animLayer, false);
+            var rt = (RectTransform)banner.transform;
+            rt.anchorMin = new Vector2(0.32f, 0.47f);
+            rt.anchorMax = new Vector2(0.92f, 0.61f);
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+
+            var cg = banner.AddComponent<CanvasGroup>();
+            cg.blocksRaycasts = false;
+            cg.interactable = false;
+
+            var bgImg = banner.AddComponent<Image>();
+            bgImg.sprite = LotdUiKit.LoadSprite("LOTD/Panel/panel_background") ?? LotdUiKit.WhiteSprite;
+            bgImg.color = new Color(0.02f, 0.05f, 0.12f, 0.90f);
+
+            var ol = banner.AddComponent<Outline>();
+            ol.effectColor = isOpponent ? LotdUiKit.RedAccent : LotdUiKit.CyanAccent;
+            ol.effectDistance = new Vector2(2.5f, -2.5f);
+
+            var titleRt = LotdUiKit.CreateRect("T", rt, new Vector2(0.02f, 0.38f), new Vector2(0.98f, 0.95f), Vector2.zero, Vector2.zero);
+            var titleTxt = LotdUiKit.AddText(titleRt, "T", title, 26, TextAnchor.MiddleCenter,
+                isOpponent ? LotdUiKit.RedAccent : LotdUiKit.GoldAccent, FontStyle.Bold);
+            titleTxt.gameObject.AddComponent<Shadow>().effectColor = Color.black;
+
+            var subRt = LotdUiKit.CreateRect("S", rt, new Vector2(0.02f, 0.05f), new Vector2(0.98f, 0.42f), Vector2.zero, Vector2.zero);
+            var subTxt = LotdUiKit.AddText(subRt, "S", subtitle, 15, TextAnchor.MiddleCenter,
+                isOpponent ? new Color(1f, 0.65f, 0.65f, 1f) : LotdUiKit.CyanAccent, FontStyle.Bold);
+
+            float totalDur = 0.82f;
+            float punchDur = 0.15f;
+            float fadeStart = 0.62f;
+            float timer = 0f;
+
+            while (timer < totalDur && banner != null)
+            {
+                timer += Time.deltaTime;
+                float scale = timer < punchDur
+                    ? Mathf.Lerp(1.28f, 1.0f, timer / punchDur)
+                    : 1.0f;
+                rt.localScale = new Vector3(scale, scale, 1f);
+
+                if (timer > fadeStart)
+                {
+                    cg.alpha = Mathf.Clamp01(1f - (timer - fadeStart) / (totalDur - fadeStart));
+                }
+                yield return null;
+            }
+
+            if (banner != null) UnityEngine.Object.Destroy(banner);
+            onComplete?.Invoke();
+        }
+
+        public void PlayDirectAttackSplash(Action onComplete = null)
+        {
+            if (_animLayer == null) return;
+            StartCoroutine(DirectAttackSplashRoutine(onComplete));
+        }
+
+        private IEnumerator DirectAttackSplashRoutine(Action onComplete)
+        {
+            var banner = new GameObject("DirectAttackBanner", typeof(RectTransform));
+            banner.transform.SetParent(_animLayer, false);
+            var rt = (RectTransform)banner.transform;
+            rt.anchorMin = new Vector2(0.30f, 0.44f);
+            rt.anchorMax = new Vector2(0.94f, 0.63f);
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+
+            var cg = banner.AddComponent<CanvasGroup>();
+            cg.blocksRaycasts = false;
+
+            var bgImg = banner.AddComponent<Image>();
+            bgImg.sprite = LotdUiKit.LoadSprite("LOTD/Panel/panel_background") ?? LotdUiKit.WhiteSprite;
+            bgImg.color = new Color(0.18f, 0.02f, 0.02f, 0.94f);
+
+            var ol = banner.AddComponent<Outline>();
+            ol.effectColor = LotdUiKit.RedAccent;
+            ol.effectDistance = new Vector2(3.5f, -3.5f);
+
+            var titleRt = LotdUiKit.CreateRect("T", rt, new Vector2(0.02f, 0.40f), new Vector2(0.98f, 0.95f), Vector2.zero, Vector2.zero);
+            var titleTxt = LotdUiKit.AddText(titleRt, "T", "★ DIRECT ATTACK! ★", 30, TextAnchor.MiddleCenter,
+                LotdUiKit.GoldAccent, FontStyle.Bold);
+            titleTxt.gameObject.AddComponent<Shadow>().effectColor = Color.black;
+
+            var subRt = LotdUiKit.CreateRect("S", rt, new Vector2(0.02f, 0.05f), new Vector2(0.98f, 0.44f), Vector2.zero, Vector2.zero);
+            LotdUiKit.AddText(subRt, "S", "직접 공격 선언!!", 16, TextAnchor.MiddleCenter,
+                LotdUiKit.RedAccent, FontStyle.Bold);
+
+            float totalDur = 0.72f;
+            float punchDur = 0.14f;
+            float fadeStart = 0.50f;
+            float timer = 0f;
+
+            while (timer < totalDur && banner != null)
+            {
+                timer += Time.deltaTime;
+                float scale = timer < punchDur
+                    ? Mathf.Lerp(1.36f, 1.0f, timer / punchDur)
+                    : 1.0f;
+                rt.localScale = new Vector3(scale, scale, 1f);
+
+                if (timer > fadeStart)
+                {
+                    cg.alpha = Mathf.Clamp01(1f - (timer - fadeStart) / (totalDur - fadeStart));
+                }
+                yield return null;
+            }
+
+            if (banner != null) UnityEngine.Object.Destroy(banner);
+            onComplete?.Invoke();
+        }
+
+        public void PlayBoardShake(RectTransform target, float intensity = 12f, float duration = 0.22f)
+        {
+            if (target == null) return;
+            StartCoroutine(BoardShakeRoutine(target, intensity, duration));
+        }
+
+        private IEnumerator BoardShakeRoutine(RectTransform target, float intensity, float duration)
+        {
+            Vector2 orig = target.anchoredPosition;
+            float timer = 0f;
+            while (timer < duration && target != null)
+            {
+                timer += Time.deltaTime;
+                float decay = 1f - Mathf.Clamp01(timer / duration);
+                float ox = UnityEngine.Random.Range(-intensity, intensity) * decay;
+                float oy = UnityEngine.Random.Range(-intensity, intensity) * decay;
+                target.anchoredPosition = orig + new Vector2(ox, oy);
+                yield return null;
+            }
+            if (target != null) target.anchoredPosition = orig;
+        }
+
+        public void PlayDamagePopup(Vector2 screenPos, int delta)
+        {
+            if (_animLayer == null) return;
+            StartCoroutine(DamagePopupRoutine(screenPos, delta));
+        }
+
+        private IEnumerator DamagePopupRoutine(Vector2 screenPos, int delta)
+        {
+            var go = new GameObject("DamagePopup", typeof(RectTransform));
+            go.transform.SetParent(_animLayer, false);
+            var rt = (RectTransform)go.transform;
+            rt.sizeDelta = new Vector2(160f, 36f);
+            rt.position = (Vector3)screenPos;
+
+            var cg = go.AddComponent<CanvasGroup>();
+            cg.blocksRaycasts = false;
+
+            var txt = go.AddComponent<Text>();
+            txt.font = LotdUiKit.FontKR;
+            txt.fontSize = 24;
+            txt.fontStyle = FontStyle.Bold;
+            txt.alignment = TextAnchor.MiddleCenter;
+            txt.text = delta < 0 ? $"{delta}" : $"+{delta}";
+            txt.color = delta < 0 ? new Color(1f, 0.25f, 0.25f, 1f) : new Color(0.25f, 1f, 0.45f, 1f);
+
+            var ol = go.AddComponent<Outline>();
+            ol.effectColor = Color.black;
+            ol.effectDistance = new Vector2(2f, -2f);
+
+            float duration = 0.75f;
+            float timer = 0f;
+            Vector3 startPos = rt.position;
+
+            while (timer < duration && go != null)
+            {
+                timer += Time.deltaTime;
+                float t = Mathf.Clamp01(timer / duration);
+                rt.position = startPos + new Vector3(0f, 38f * t, 0f);
+                cg.alpha = Mathf.Clamp01(1f - t * t);
+                yield return null;
+            }
+
+            if (go != null) UnityEngine.Object.Destroy(go);
+        }
     }
 }

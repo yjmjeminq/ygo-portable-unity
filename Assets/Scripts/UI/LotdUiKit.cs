@@ -378,7 +378,7 @@ namespace YGOPortable.UI
     public static class LotdAudio
     {
         private static AudioSource _sfxSource;
-        private static AudioClip _clipClick, _clipDraw, _clipSummon, _clipAttack, _clipDamage, _clipChain, _clipWin;
+        private static AudioClip _clipClick, _clipDraw, _clipSummon, _clipAttack, _clipDamage, _clipChain, _clipWin, _clipPhase, _clipDirectAttack, _clipTick;
         public static float SfxVolume { get; set; } = 0.65f;
 
         public static void EnsureInit(GameObject host)
@@ -393,6 +393,9 @@ namespace YGOPortable.UI
             _clipDamage = MakeTone(0.25f, 180f, 65f, 0.48f);
             _clipChain = MakeTone(0.16f, 660f, 990f, 0.30f);
             _clipWin = MakeTone(0.45f, 523f, 1046f, 0.35f);
+            _clipPhase = MakeTone(0.24f, 440f, 880f, 0.32f);
+            _clipDirectAttack = MakeTone(0.32f, 280f, 60f, 0.50f);
+            _clipTick = MakeTone(0.04f, 1320f, 1600f, 0.15f);
         }
 
         public static void PlayClick() => Play(_clipClick);
@@ -402,6 +405,9 @@ namespace YGOPortable.UI
         public static void PlayDamage() => Play(_clipDamage);
         public static void PlayChain() => Play(_clipChain);
         public static void PlayWin() => Play(_clipWin);
+        public static void PlayPhaseTransition() => Play(_clipPhase);
+        public static void PlayDirectAttack() => Play(_clipDirectAttack);
+        public static void PlayTick() => Play(_clipTick);
 
         private static void Play(AudioClip clip)
         {

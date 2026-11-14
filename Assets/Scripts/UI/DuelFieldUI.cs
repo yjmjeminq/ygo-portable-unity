@@ -45,6 +45,18 @@ namespace YGOPortable.UI
         private Button _btnToMp2;
         private Button _btnToEp;
 
+        // Life Points Animated Rolling & Low LP State
+        private float _myDisplayLp = 8000f;
+        private float _oppDisplayLp = 8000f;
+        private int _myTargetLp = 8000;
+        private int _oppTargetLp = 8000;
+
+        // Phase & Turn Splash Announcements
+        private int _lastAnnouncedTurn = -1;
+        private int _lastAnnouncedTurnPlayer = -1;
+        private int _lastAnnouncedPhase = -1;
+        private int _lastChainCount = 0;
+
         // Zone slot widgets
         private class FieldSlotView
         {
@@ -125,6 +137,25 @@ namespace YGOPortable.UI
             _oppDeck = oppDeck;
             _pendingPlaces.Clear();
             _pendingPlacePrompt = null;
+
+            _lastAnnouncedTurn = -1;
+            _lastAnnouncedTurnPlayer = -1;
+            _lastAnnouncedPhase = -1;
+            _lastChainCount = 0;
+
+            if (_session != null)
+            {
+                int meIdx = _session.HumanPlayerIndex;
+                int oppIdx = _session.AiPlayerIndex;
+                _myDisplayLp = _myTargetLp = Mathf.Max(0, _session.Players[meIdx].lp);
+                _oppDisplayLp = _oppTargetLp = Mathf.Max(0, _session.Players[oppIdx].lp);
+                if (_myLpText != null) _myLpText.text = _myTargetLp.ToString();
+                if (_oppLpText != null) _oppLpText.text = _oppTargetLp.ToString();
+                if (_myLpFill != null) _myLpFill.anchorMax = new Vector2(Mathf.Clamp01(_myTargetLp / 8000f), 1f);
+                if (_oppLpFill != null) _oppLpFill.anchorMax = new Vector2(Mathf.Clamp01(_oppTargetLp / 8000f), 1f);
+                if (_myLpText != null) _myLpText.color = Color.white;
+                if (_oppLpText != null) _oppLpText.color = Color.white;
+            }
 
             Root.SetActive(true);
             _actionPopup.SetActive(false);
@@ -512,12 +543,58 @@ namespace YGOPortable.UI
             var myP = _session.Players[me];
             var opP = _session.Players[opp];
 
-            int myLpDisp = Mathf.Max(0, myP.lp);
-            int opLpDisp = Mathf.Max(0, opP.lp);
-            _myLpText.text = myLpDisp.ToString();
-            _myLpFill.anchorMax = new Vector2(Mathf.Clamp01(myLpDisp / 8000f), 1f);
-            _oppLpText.text = opLpDisp.ToString();
-            _oppLpFill.anchorMax = new Vector2(Mathf.Clamp01(opLpDisp / 8000f), 1f);
+            int myLp = Mathf.Max(0, myP.lp);
+            int opLp = Mathf.Max(0, opP.lp);
+
+            if (_myTargetLp != myLp)
+            {
+                int delta = myLp - _myTargetLp;
+                _myTargetLp = myLp;
+                CardAnimationManager.Instance?.PlayDamagePopup((Vector2)_myLpText.rectTransform.position + new Vector2(0f, 22f), delta);
+                if (delta < 0)
+                {
+                    CardAnimationManager.Instance?.PlayFlashGlow(_myLpText.transform.parent.gameObject, LotdUiKit.RedAccent, 0.35f);
+                    LotdAudio.PlayDamage();
+                }
+            }
+
+            if (_oppTargetLp != opLp)
+            {
+                int delta = opLp - _oppTargetLp;
+                _oppTargetLp = opLp;
+                CardAnimationManager.Instance?.PlayDamagePopup((Vector2)_oppLpText.rectTransform.position + new Vector2(0f, -22f), delta);
+                if (delta < 0)
+                {
+                    CardAnimationManager.Instance?.PlayFlashGlow(_oppLpText.transform.parent.gameObject, LotdUiKit.RedAccent, 0.35f);
+                    LotdAudio.PlayDamage();
+                }
+            }
+
+            // Phase and Turn splash announcements (Authentic LOTD splash)
+            int curTurn = _session.TurnNumber;
+            int curTurnPlayer = _session.TurnPlayer;
+            int curPhase = _session.CurrentPhase;
+
+            if (curTurn > 0 && (curTurn != _lastAnnouncedTurn || curTurnPlayer != _lastAnnouncedTurnPlayer))
+            {
+                _lastAnnouncedTurn = curTurn;
+                _lastAnnouncedTurnPlayer = curTurnPlayer;
+                _lastAnnouncedPhase = curPhase;
+                bool isMe = curTurnPlayer == me;
+                string title = $"TURN {curTurn}";
+                string sub = isMe ? "YOUR TURN (내 턴 개시)" : "OPPONENT'S TURN (상대 턴)";
+                CardAnimationManager.Instance?.PlayPhaseBanner(title, sub, !isMe);
+                LotdAudio.PlayPhaseTransition();
+            }
+            else if (curPhase != _lastAnnouncedPhase && curTurn > 0)
+            {
+                _lastAnnouncedPhase = curPhase;
+                string pTitle = GetPhaseTitleEnglish(curPhase);
+                string pSub = YgoConstants.GetPhaseNameKR(curPhase);
+                bool isOpp = curTurnPlayer != me;
+                CardAnimationManager.Instance?.PlayPhaseBanner(pTitle, pSub, isOpp);
+                LotdAudio.PlayPhaseTransition();
+            }
 
             _turnBadgeText.text = $"TURN {_session.TurnNumber}";
             string turnOwner = _session.TurnPlayer == me ? "<color=#44DDFF>내 턴 (YOUR TURN)</color>" : "<color=#FF6666>상대 턴 (OPPONENT TURN)</color>";
@@ -567,17 +644,24 @@ namespace YGOPortable.UI
             UpdateStackTile(_oppBanTile, "상대 제외", opP.banished.Count, (byte)opp, YgoConstants.LOCATION_REMOVED, waitingMyAction);
             _oppHandCountTxt.text = $"상대 패: {opP.hand.Count}장";
 
-            // Authentic LOTD Chain banner
-            if (_session.CurrentChain.Count > 0)
+            // Authentic LOTD Chain banner & sound
+            int curChain = _session.CurrentChain.Count;
+            if (curChain > 0)
             {
                 _chainIcon.gameObject.SetActive(true);
-                _chainBannerText.text = $"CHAIN LINK\n{_session.CurrentChain.Count}";
+                _chainBannerText.text = $"CHAIN LINK\n{curChain}";
+                if (curChain > _lastChainCount)
+                {
+                    CardAnimationManager.Instance?.PlayFlashGlow(_chainIcon.gameObject, LotdUiKit.GoldAccent, 0.35f);
+                    LotdAudio.PlayChain();
+                }
             }
             else
             {
                 _chainIcon.gameObject.SetActive(false);
                 _chainBannerText.text = "";
             }
+            _lastChainCount = curChain;
 
             // Board slots
             for (int i = 0; i < 5; i++)
@@ -1027,11 +1111,18 @@ namespace YGOPortable.UI
 
             var atkSlot = GetSlot(aCon, aLoc, aSeq);
             int me = _session.HumanPlayerIndex;
-            Vector2 targetPos = tLoc == 0
+            bool isDirect = (tLoc == 0);
+            Vector2 targetPos = isDirect
                 ? (tCon == me ? (Vector2)_myLpText.rectTransform.position : (Vector2)_oppLpText.rectTransform.position)
                 : GetLocationScreenPoint(tCon, tLoc, tSeq);
 
-            var tgtSlot = tLoc != 0 ? GetSlot(tCon, tLoc, tSeq) : null;
+            var tgtSlot = !isDirect ? GetSlot(tCon, tLoc, tSeq) : null;
+
+            if (isDirect)
+            {
+                CardAnimationManager.Instance.PlayDirectAttackSplash();
+                LotdAudio.PlayDirectAttack();
+            }
 
             CardAnimationManager.Instance.PlayAttackLunge(atkSlot?.root, targetPos, 0.28f, onImpact: () =>
             {
@@ -1040,7 +1131,85 @@ namespace YGOPortable.UI
                 {
                     CardAnimationManager.Instance.PlayFlashGlow(tgtSlot.root.gameObject, LotdUiKit.RedAccent, 0.3f);
                 }
+                else if (isDirect)
+                {
+                    var boardRt = Root.transform.Find("DuelBoard") as RectTransform;
+                    CardAnimationManager.Instance.PlayBoardShake(boardRt, 13f, 0.22f);
+                    var targetBox = (tCon == me ? _myLpText.transform.parent.gameObject : _oppLpText.transform.parent.gameObject);
+                    CardAnimationManager.Instance.PlayFlashGlow(targetBox, LotdUiKit.RedAccent, 0.38f);
+                }
             });
+        }
+
+        public void Update()
+        {
+            if (_session == null || Root == null || !Root.activeSelf) return;
+
+            // Smooth rolling LP odometer (authentic LOTD)
+            if (Mathf.Abs(_myDisplayLp - _myTargetLp) > 0.5f)
+            {
+                float step = Mathf.Max(1200f * Time.deltaTime, Mathf.Abs(_myDisplayLp - _myTargetLp) * 6.5f * Time.deltaTime);
+                int oldInt = (int)_myDisplayLp;
+                _myDisplayLp = Mathf.MoveTowards(_myDisplayLp, _myTargetLp, step);
+                int newInt = (int)_myDisplayLp;
+                if (oldInt != newInt)
+                {
+                    LotdAudio.PlayTick();
+                }
+                _myLpText.text = ((int)_myDisplayLp).ToString();
+                _myLpFill.anchorMax = new Vector2(Mathf.Clamp01(_myDisplayLp / 8000f), 1f);
+            }
+
+            if (Mathf.Abs(_oppDisplayLp - _oppTargetLp) > 0.5f)
+            {
+                float step = Mathf.Max(1200f * Time.deltaTime, Mathf.Abs(_oppDisplayLp - _oppTargetLp) * 6.5f * Time.deltaTime);
+                int oldInt = (int)_oppDisplayLp;
+                _oppDisplayLp = Mathf.MoveTowards(_oppDisplayLp, _oppTargetLp, step);
+                int newInt = (int)_oppDisplayLp;
+                if (oldInt != newInt)
+                {
+                    LotdAudio.PlayTick();
+                }
+                _oppLpText.text = ((int)_oppDisplayLp).ToString();
+                _oppLpFill.anchorMax = new Vector2(Mathf.Clamp01(_oppDisplayLp / 8000f), 1f);
+            }
+
+            // Critical low LP warning pulsation (<= 2000 LP)
+            if (_myDisplayLp <= 2000f && _myDisplayLp > 0f)
+            {
+                _myLpText.color = Color.Lerp(Color.white, new Color(1f, 0.22f, 0.22f, 1f), Mathf.PingPong(Time.time * 3.5f, 1f));
+            }
+            else
+            {
+                _myLpText.color = Color.white;
+            }
+
+            if (_oppDisplayLp <= 2000f && _oppDisplayLp > 0f)
+            {
+                _oppLpText.color = Color.Lerp(Color.white, new Color(1f, 0.22f, 0.22f, 1f), Mathf.PingPong(Time.time * 3.5f, 1f));
+            }
+            else
+            {
+                _oppLpText.color = Color.white;
+            }
+        }
+
+        private static string GetPhaseTitleEnglish(int phase)
+        {
+            switch (phase)
+            {
+                case YgoConstants.PHASE_DRAW: return "DRAW PHASE";
+                case YgoConstants.PHASE_STANDBY: return "STANDBY PHASE";
+                case YgoConstants.PHASE_MAIN1: return "MAIN PHASE 1";
+                case YgoConstants.PHASE_BATTLE_START:
+                case YgoConstants.PHASE_BATTLE_STEP:
+                case YgoConstants.PHASE_DAMAGE:
+                case YgoConstants.PHASE_DAMAGE_CAL:
+                case YgoConstants.PHASE_BATTLE: return "BATTLE PHASE";
+                case YgoConstants.PHASE_MAIN2: return "MAIN PHASE 2";
+                case YgoConstants.PHASE_END: return "END PHASE";
+                default: return "DUEL PHASE";
+            }
         }
 
         // ==================== PROMPT INTERACTIONS ====================

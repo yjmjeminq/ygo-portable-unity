@@ -206,6 +206,7 @@ namespace YGOPortable.UI
         private void Update()
         {
             if (_session == null) return;
+            _duelField?.Update();
 
             if (_session.IsFinished)
             {
