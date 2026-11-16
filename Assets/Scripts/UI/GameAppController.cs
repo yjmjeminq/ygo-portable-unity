@@ -231,11 +231,11 @@ namespace YGOPortable.UI
         {
             if (_session == null)
             {
-                _deckEditor?.UpdateLayout();
+                _deckEditor?.Update();
                 return;
             }
             _duelField?.Update();
-            if (_session == null) return;
+            if (_session == null || _duelField.IsReadingLog) return;
 
             if (_duelField.IsPresenting)
             {

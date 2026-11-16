@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using YGOPortable.Core;
 
@@ -18,11 +20,12 @@ namespace YGOPortable.UI
         private UserDeck _workingDeck;
         private uint _inspectedCode = 89631139;
 
-        // Filters & Search
-        private string _searchText = "";
-        private int _kindFilter = 0; // 0=All, 1=Monster, 2=Spell, 3=Trap, 4=Extra
-        private int _raceFilterIdx = 0; // index into RaceFilterOptions
-        private int _sortMode = 0; // 0=Default, 1=ATK Desc, 2=Level Desc, 3=Name Asc
+        private static readonly string[] CardKinds = { "종류: 전체", "메인 몬스터", "마법", "함정", "엑스트라" };
+        private static readonly string[] SortOptions = { "기본순", "공격력 높은 순", "레벨 높은 순", "이름순" };
+        private static readonly (ulong mask, string label)[] RaceOptions =
+            new[] { (mask: 0UL, label: "종족: 전체") }
+                .Concat(YgoConstants.RaceNamesKR.OrderBy(race => race.Value, StringComparer.Ordinal)
+                    .Select(race => (mask: race.Key, label: race.Value))).ToArray();
 
         // Virtualized Trunk Scroll Grid
         private const int TrunkCols = 5;
@@ -55,13 +58,15 @@ namespace YGOPortable.UI
         private ScrollRect _trunkScroll;
         private RectTransform _trunkContent;
         private RectTransform _trunkViewport;
+        private Text _trunkHeading;
         private Text _trunkCountText;
+        private Text _noTrunkResults;
         private uint _relatedFilterCode = 0;
         private ArchetypeInfo _activeArchetypeFilter = null;
         private InputField _searchInp;
-        private RectTransform _searchInpRt;
-        private GameObject _relatedBanner;
-        private Text _relatedBannerText;
+        private Dropdown _kindFilter;
+        private Dropdown _raceFilter;
+        private Dropdown _sortFilter;
 
         // Archetype Example Deck Browser Modal
         private GameObject _archModalRoot;
@@ -88,34 +93,17 @@ namespace YGOPortable.UI
         private Text _extraCountText;
         private Text _sideCountText;
         private Text _toastText;
-        private Text _kindFilterBtnText;
-        private Text _raceFilterBtnText;
-        private Text _sortBtnText;
+        private Text _saveButtonText;
+        private GameObject _deckDialog;
+        private Text _deckDialogTitle;
+        private Text _deckDialogMessage;
+        private Button _deckDialogPrimary;
+        private Button _deckDialogSecondary;
 
         private RectTransform _trunkPanel;
         private RectTransform _mainGridRect;
         private RectTransform _extraGridRect;
         private RectTransform _sideGridRect;
-
-        private static readonly (ulong mask, string label)[] RaceOptions =
-        {
-            (0UL, "전 종족"),
-            (YgoConstants.RACE_ILLUSION, "환상마족"),
-            (YgoConstants.RACE_DRAGON, "드래곤족"),
-            (YgoConstants.RACE_SPELLCASTER, "마법사족"),
-            (YgoConstants.RACE_WARRIOR, "전사족"),
-            (YgoConstants.RACE_FIEND, "악마족"),
-            (YgoConstants.RACE_MACHINE, "기계족"),
-            (YgoConstants.RACE_PYRO, "화염족"),
-            (YgoConstants.RACE_FAIRY, "천사족"),
-            (YgoConstants.RACE_CYBERSE, "사이버스족"),
-            (YgoConstants.RACE_ZOMBIE, "언데드족"),
-            (YgoConstants.RACE_THUNDER, "번개족"),
-            (YgoConstants.RACE_BEAST, "야수족"),
-            (YgoConstants.RACE_AQUA, "물족"),
-            (YgoConstants.RACE_WYRM, "환룡족"),
-            (YgoConstants.RACE_PSYCHIC, "사이킥족"),
-        };
 
         public DeckEditorUI(GameAppController app, Transform canvasParent)
         {
@@ -141,33 +129,51 @@ namespace YGOPortable.UI
             ShowToast("");
         }
 
-        public void UpdateLayout()
+        public void Update()
         {
-            if (Root.activeInHierarchy && _trunkViewport.rect.size != _trunkSize)
+            if (!Root.activeInHierarchy) return;
+            if (_trunkViewport.rect.size != _trunkSize)
                 ResizeTrunkGrid(false);
+
+            if (_deckDialog.activeSelf)
+            {
+                if (Input.GetKeyDown(KeyCode.Escape)) _deckDialog.SetActive(false);
+                return;
+            }
+
+            if (!Input.GetKey(KeyCode.LeftControl) && !Input.GetKey(KeyCode.RightControl)) return;
+            if (Input.GetKeyDown(KeyCode.F))
+            {
+                var input = _archModalRoot.activeSelf ? _archSearchInp : _searchInp;
+                EventSystem.current?.SetSelectedGameObject(input.gameObject);
+                input.ActivateInputField();
+            }
+            if (Input.GetKeyDown(KeyCode.S) && !_archModalRoot.activeSelf)
+                TrySaveCurrentDeck();
         }
 
         private void LoadWorkingDeckFromCurrent()
         {
             if (DeckRepository.UserDecks.Count == 0)
             {
-                _workingDeck = new UserDeck { id = $"custom_{DateTime.UtcNow:yyyyMMddHHmmss}", name = "새 커스텀 덱" };
-                DeckRepository.SaveUserDeck(_workingDeck);
+                DeckRepository.SaveUserDeck(new UserDeck { name = "새 커스텀 덱" });
             }
-            else
-            {
-                var src = DeckRepository.UserDecks[_userDeckIdx];
-                _workingDeck = new UserDeck
-                {
-                    id = src.id,
-                    name = src.name,
-                    main = new List<uint>(src.main),
-                    extra = new List<uint>(src.extra),
-                    side = new List<uint>(src.side),
-                };
-            }
-            _deckNameInput.text = _workingDeck.name;
+            _workingDeck = CopyDeck(DeckRepository.UserDecks[_userDeckIdx]);
+            _deckNameInput.SetTextWithoutNotify(_workingDeck.name);
             RefreshDeckGrids();
+            UpdateVirtualTrunkSlots(_lastFirstRow, force: true);
+        }
+
+        private static UserDeck CopyDeck(UserDeck deck)
+        {
+            return new UserDeck
+            {
+                id = deck.id,
+                name = deck.name,
+                main = new List<uint>(deck.main),
+                extra = new List<uint>(deck.extra),
+                side = new List<uint>(deck.side),
+            };
         }
 
         private void BuildUI(Transform parent)
@@ -185,7 +191,8 @@ namespace YGOPortable.UI
             LotdUiKit.CreateLotdButton(examples, "Button", "카드군 예시 덱", OpenArchetypeModal, 15);
             var back = LotdUiKit.CreateRect("Back", root, new Vector2(0.878f, 0.918f), new Vector2(0.985f, 0.976f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(back, "Button", "메인 메뉴", () => _app.ShowScreen(AppScreen.MainMenu), 15);
+            LotdUiKit.CreateLotdButton(back, "Button", "메인 메뉴",
+                () => BeforeReplacingEdits(() => _app.ShowScreen(AppScreen.MainMenu)), 15);
 
             BuildTrunkPanel(root);
             BuildCardDetails(root);
@@ -194,15 +201,16 @@ namespace YGOPortable.UI
             var footer = LotdUiKit.CreateRect("Controls", root, new Vector2(0.015f, 0.002f), new Vector2(0.985f, 0.041f),
                 Vector2.zero, Vector2.zero);
             LotdUiKit.AddImage(footer.gameObject, LotdUiKit.WhiteSprite, new Color(0.02f, 0.045f, 0.10f, 0.92f), false, false);
-            LotdUiKit.AddText(LotdUiKit.CreateRect("Help", footer, new Vector2(0.01f, 0f), new Vector2(0.52f, 1f),
-                Vector2.zero, Vector2.zero), "Text", "드래그  카드 이동      우클릭  추가 / 제거", 14,
+            LotdUiKit.AddText(LotdUiKit.CreateRect("Help", footer, new Vector2(0.01f, 0f), new Vector2(0.53f, 1f),
+                Vector2.zero, Vector2.zero), "Text", "드래그  이동    우클릭  추가 / 제거    Ctrl+F  검색    Ctrl+S  저장", 13,
                 TextAnchor.MiddleLeft, LotdUiKit.TextPrimary);
-            _toastText = LotdUiKit.AddText(LotdUiKit.CreateRect("Status", footer, new Vector2(0.52f, 0f), new Vector2(0.99f, 1f),
+            _toastText = LotdUiKit.AddText(LotdUiKit.CreateRect("Status", footer, new Vector2(0.54f, 0f), new Vector2(0.99f, 1f),
                 Vector2.zero, Vector2.zero), "Text", "", 14, TextAnchor.MiddleRight, LotdUiKit.GoldAccent, FontStyle.Bold);
             _toastText.resizeTextForBestFit = true;
             _toastText.resizeTextMinSize = 10;
             _toastText.resizeTextMaxSize = 14;
             BuildArchetypeModal(root);
+            BuildDeckDialog(root);
         }
 
         private void BuildCardDetails(Transform root)
@@ -270,60 +278,36 @@ namespace YGOPortable.UI
 
             var caption = LotdUiKit.CreateRect("TrunkHeading", col, new Vector2(0.034f, 0.929f), new Vector2(0.97f, 0.986f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddText(caption, "Label", "보관함", 19, TextAnchor.MiddleLeft, LotdUiKit.CyanAccent, FontStyle.Bold);
+            var heading = LotdUiKit.CreateRect("Title", caption, Vector2.zero, new Vector2(0.74f, 1f),
+                Vector2.zero, Vector2.zero);
+            _trunkHeading = LotdUiKit.AddText(heading, "Label", "보관함", 19, TextAnchor.MiddleLeft,
+                LotdUiKit.CyanAccent, FontStyle.Bold);
+            _trunkHeading.resizeTextForBestFit = true;
+            _trunkHeading.resizeTextMinSize = 12;
+            _trunkHeading.resizeTextMaxSize = 19;
             _trunkCountText = LotdUiKit.AddText(caption, "Count", "", 16, TextAnchor.MiddleRight, Color.white, FontStyle.Bold);
 
-            var r1 = LotdUiKit.CreateRect("SearchRow", col, new Vector2(0.034f, 0.874f), new Vector2(0.97f, 0.926f), Vector2.zero, Vector2.zero);
-            _searchInp = LotdUiKit.CreateInputField(r1, "Search", "카드명·효과 검색", 15);
-            _searchInpRt = _searchInp.GetComponent<RectTransform>();
-            _searchInp.onValueChanged.AddListener(v =>
+            var searchRow = LotdUiKit.CreateRect("SearchRow", col, new Vector2(0.034f, 0.874f),
+                new Vector2(0.97f, 0.926f), Vector2.zero, Vector2.zero);
+            var search = LotdUiKit.CreateRect("SearchBox", searchRow, Vector2.zero, new Vector2(0.79f, 1f),
+                Vector2.zero, Vector2.zero);
+            _searchInp = LotdUiKit.CreateInputField(search, "Search", "카드명·효과·카드 번호", 15);
+            _searchInp.onValueChanged.AddListener(_ => RefreshTrunkFilter());
+            var reset = LotdUiKit.CreateRect("ResetFilters", searchRow, new Vector2(0.81f, 0f), Vector2.one,
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.CreateLotdButton(reset, "Button", "초기화", () => SetTrunkSource(), 13);
+
+            var filters = LotdUiKit.CreateRect("Filters", col, new Vector2(0.034f, 0.816f), new Vector2(0.97f, 0.867f),
+                Vector2.zero, Vector2.zero);
+            Dropdown AddFilter(string name, float left, float right, IReadOnlyList<string> choices)
             {
-                _searchText = v ?? "";
-                RefreshTrunkFilter();
-            });
-
-            // Related Cards Banner inside R1
-            _relatedBanner = LotdUiKit.CreateBorderedPanel(r1, "RelBanner",
-                Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero,
-                new Color(0.05f, 0.15f, 0.28f, 0.95f), LotdUiKit.GoldAccent).gameObject;
-            _relatedBannerText = LotdUiKit.AddText(LotdUiKit.CreateRect("T", _relatedBanner.transform,
-                new Vector2(0.02f, 0f), new Vector2(0.72f, 1f), Vector2.zero, Vector2.zero),
-                "T", "", 13, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
-            LotdUiKit.CreateLotdButton(LotdUiKit.CreateRect("ClrBtn", _relatedBanner.transform,
-                new Vector2(0.74f, 0.08f), new Vector2(0.98f, 0.92f), Vector2.zero, Vector2.zero),
-                "B", "전체 ✕", ClearRelatedFilter, 11, gold: true);
-            _relatedBanner.SetActive(false);
-
-            // Row 2: Kind filter + Race filter + Sort
-            var r2 = LotdUiKit.CreateRect("Filters", col, new Vector2(0.034f, 0.816f), new Vector2(0.97f, 0.867f), Vector2.zero, Vector2.zero);
-            var bKind = LotdUiKit.CreateLotdButton(LotdUiKit.CreateRect("FK", r2, new Vector2(0f, 0), new Vector2(0.32f, 1), Vector2.zero, Vector2.zero),
-                "B", "종류: 전체", () =>
-                {
-                    _kindFilter = (_kindFilter + 1) % 5;
-                    string[] lbls = { "종류: 전체", "종류: 몬스터", "종류: 마법", "종류: 함정", "종류: 엑스트라" };
-                    _kindFilterBtnText.text = lbls[_kindFilter];
-                    RefreshTrunkFilter();
-                }, 13);
-            _kindFilterBtnText = bKind.GetComponentInChildren<Text>();
-
-            var bRace = LotdUiKit.CreateLotdButton(LotdUiKit.CreateRect("FR", r2, new Vector2(0.34f, 0), new Vector2(0.67f, 1), Vector2.zero, Vector2.zero),
-                "B", "종족: 전 종족", () =>
-                {
-                    _raceFilterIdx = (_raceFilterIdx + 1) % RaceOptions.Length;
-                    _raceFilterBtnText.text = $"종족: {RaceOptions[_raceFilterIdx].label}";
-                    RefreshTrunkFilter();
-                }, 13);
-            _raceFilterBtnText = bRace.GetComponentInChildren<Text>();
-
-            var bSort = LotdUiKit.CreateLotdButton(LotdUiKit.CreateRect("FS", r2, new Vector2(0.69f, 0), new Vector2(1f, 1), Vector2.zero, Vector2.zero),
-                "B", "정렬: 기본순", () =>
-                {
-                    _sortMode = (_sortMode + 1) % 4;
-                    string[] sLbls = { "정렬: 기본순", "정렬: ATK순", "정렬: 레벨순", "정렬: 이름순" };
-                    _sortBtnText.text = sLbls[_sortMode];
-                    RefreshTrunkFilter();
-                }, 13);
-            _sortBtnText = bSort.GetComponentInChildren<Text>();
+                var slot = LotdUiKit.CreateRect(name, filters, new Vector2(left, 0f), new Vector2(right, 1f),
+                    Vector2.zero, Vector2.zero);
+                return LotdUiKit.CreateLotdDropdown(slot, "Dropdown", choices, _ => RefreshTrunkFilter());
+            }
+            _kindFilter = AddFilter("Kind", 0f, 0.32f, CardKinds);
+            _raceFilter = AddFilter("Race", 0.34f, 0.67f, RaceOptions.Select(race => race.label).ToArray());
+            _sortFilter = AddFilter("Sort", 0.69f, 1f, SortOptions);
 
             var scrollHolder = LotdUiKit.CreateRect("TrunkScrollHolder", col,
                 new Vector2(0.034f, 0.035f), new Vector2(0.97f, 0.805f), Vector2.zero, Vector2.zero);
@@ -350,6 +334,8 @@ namespace YGOPortable.UI
                 scrollbar.SetValueWithoutNotify(position.y);
                 OnTrunkScrolled();
             });
+            _noTrunkResults = LotdUiKit.AddText(scrollHolder, "Empty", "조건에 맞는 카드가 없습니다.",
+                17, TextAnchor.MiddleCenter, LotdUiKit.TextMuted);
         }
 
         private void EnsureTrunkPool(int count)
@@ -392,13 +378,15 @@ namespace YGOPortable.UI
                 "Text", "", 15, TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
             Control(header, "Next", "▶", 0.24f, 0.081f, () => SwitchUserDeck(1));
             Control(header, "New", "새 덱", 0.34f, 0.18f, CreateNewUserDeck);
-            Control(header, "Save", "저장", 0.53f, 0.21f, SaveCurrentDeck, true);
+            _saveButtonText = Control(header, "Save", "저장", 0.53f, 0.21f,
+                () => TrySaveCurrentDeck(), true).GetComponentInChildren<Text>();
             Control(header, "Delete", "삭제", 0.76f, 0.24f, DeleteCurrentDeck);
 
             var edit = LotdUiKit.CreateRect("EditControls", panel,
                 new Vector2(0.025f, 0.867f), new Vector2(0.975f, 0.916f), Vector2.zero, Vector2.zero);
             _deckNameInput = LotdUiKit.CreateInputField(LotdUiKit.CreateRect("DeckName", edit, Vector2.zero,
                 new Vector2(0.579f, 1f), Vector2.zero, Vector2.zero), "Input", "덱 이름", 15);
+            _deckNameInput.onValueChanged.AddListener(_ => RefreshSaveLabel());
             Control(edit, "Sort", "정렬", 0.595f, 0.19f, SortWorkingDeck);
             Control(edit, "Shuffle", "셔플", 0.8f, 0.2f, ShuffleWorkingDeck);
 
@@ -447,85 +435,69 @@ namespace YGOPortable.UI
         private void FilterRelatedCards(uint code)
         {
             if (code == 0) return;
-            LotdAudio.PlayClick();
-            _activeArchetypeFilter = null;
-            _relatedFilterCode = code;
-            _searchText = "";
-            if (_searchInp != null) _searchInp.text = "";
-            RefreshTrunkFilter();
-            ShowToast($"[{CardDatabase.GetName(code)}] 연관 카드 {_trunkResults.Count}장 검색됨");
+            SetTrunkSource(relatedCode: code);
         }
 
-        private void ClearRelatedFilter()
+        private void SetTrunkSource(uint relatedCode = 0, ArchetypeInfo archetype = null)
         {
-            LotdAudio.PlayClick();
-            _activeArchetypeFilter = null;
-            _relatedFilterCode = 0;
-            _searchText = "";
-            if (_searchInp != null) _searchInp.text = "";
+            _relatedFilterCode = relatedCode;
+            _activeArchetypeFilter = archetype;
+            _searchInp.SetTextWithoutNotify("");
+            _kindFilter.SetValueWithoutNotify(0);
+            _raceFilter.SetValueWithoutNotify(0);
+            _sortFilter.SetValueWithoutNotify(0);
             RefreshTrunkFilter();
-            ShowToast("전체 카드로 전환되었습니다.");
         }
 
         private void RefreshTrunkFilter()
         {
             _trunkResults.Clear();
-            string q = (_searchText ?? "").Trim().ToLowerInvariant();
-            ulong raceMask = RaceOptions[_raceFilterIdx].mask;
+            string query = _searchInp.text.Trim();
+            uint.TryParse(query, out uint queryCode);
+            int kind = _kindFilter.value;
+            bool canFilterByRace = kind != 2 && kind != 3;
+            _raceFilter.interactable = canFilterByRace;
+            if (!canFilterByRace) _raceFilter.SetValueWithoutNotify(0);
+            ulong raceMask = RaceOptions[_raceFilter.value].mask;
 
             IEnumerable<CardInfo> source = CardDatabase.AllCards;
+            _trunkHeading.text = "보관함";
+            _trunkHeading.color = LotdUiKit.CyanAccent;
             if (_activeArchetypeFilter != null)
             {
-                var archPool = new List<CardInfo>(_activeArchetypeFilter.coreCards.Count + _activeArchetypeFilter.supportCards.Count);
-                archPool.AddRange(_activeArchetypeFilter.coreCards);
-                foreach (var sc in _activeArchetypeFilter.supportCards)
-                    if (!archPool.Contains(sc)) archPool.Add(sc);
-                source = archPool;
-                if (_relatedBanner != null) _relatedBanner.SetActive(true);
-                if (_relatedBannerText != null)
-                    _relatedBannerText.text = $"★ [순수 카드군: {_activeArchetypeFilter.name}] ({archPool.Count}장)";
-                if (_searchInpRt != null) _searchInpRt.gameObject.SetActive(false);
+                source = _activeArchetypeFilter.coreCards.Union(_activeArchetypeFilter.supportCards);
+                _trunkHeading.text = $"카드군 · {_activeArchetypeFilter.name}";
+                _trunkHeading.color = LotdUiKit.GoldAccent;
             }
             else if (_relatedFilterCode != 0)
             {
-                var relList = CardDatabase.GetRelatedCards(_relatedFilterCode);
-                source = relList;
-                if (_relatedBanner != null) _relatedBanner.SetActive(true);
-                if (_relatedBannerText != null)
-                {
-                    string baseName = CardDatabase.GetName(_relatedFilterCode);
-                    _relatedBannerText.text = $"★ [{baseName}] 연관 ({relList.Count}장)";
-                }
-                if (_searchInpRt != null) _searchInpRt.gameObject.SetActive(false);
-            }
-            else
-            {
-                if (_relatedBanner != null) _relatedBanner.SetActive(false);
-                if (_searchInpRt != null) _searchInpRt.gameObject.SetActive(true);
+                source = CardDatabase.GetRelatedCards(_relatedFilterCode);
+                _trunkHeading.text = $"관련 카드 · {CardDatabase.GetName(_relatedFilterCode)}";
+                _trunkHeading.color = LotdUiKit.GoldAccent;
             }
 
             foreach (var c in source)
             {
                 if ((c.type & YgoConstants.TYPE_TOKEN) != 0) continue;
-                if (_kindFilter == 1 && (!c.IsMonster || c.IsExtra)) continue;
-                if (_kindFilter == 2 && !c.IsSpell) continue;
-                if (_kindFilter == 3 && !c.IsTrap) continue;
-                if (_kindFilter == 4 && !c.IsExtra) continue;
+                if (kind == 1 && (!c.IsMonster || c.IsExtra)) continue;
+                if (kind == 2 && !c.IsSpell) continue;
+                if (kind == 3 && !c.IsTrap) continue;
+                if (kind == 4 && !c.IsExtra) continue;
                 if (raceMask != 0 && (c.race & raceMask) == 0) continue;
-                if (!string.IsNullOrEmpty(q))
-                {
-                    bool hit = (c.name ?? "").ToLowerInvariant().Contains(q) || (c.desc ?? "").ToLowerInvariant().Contains(q);
-                    if (!hit) continue;
-                }
+                if (query.Length != 0 && c.code != queryCode &&
+                    (c.name ?? "").IndexOf(query, StringComparison.OrdinalIgnoreCase) < 0 &&
+                    (c.desc ?? "").IndexOf(query, StringComparison.OrdinalIgnoreCase) < 0) continue;
                 _trunkResults.Add(c);
             }
 
-            if (_sortMode == 1) _trunkResults.Sort((a, b) => b.atk.CompareTo(a.atk));
-            else if (_sortMode == 2) _trunkResults.Sort((a, b) => b.level.CompareTo(a.level));
-            else if (_sortMode == 3) _trunkResults.Sort((a, b) => string.Compare(a.name, b.name, StringComparison.Ordinal));
+            int sort = _sortFilter.value;
+            if (sort == 1) _trunkResults.Sort((a, b) => b.atk.CompareTo(a.atk));
+            else if (sort == 2) _trunkResults.Sort((a, b) => b.level.CompareTo(a.level));
+            else if (sort == 3) _trunkResults.Sort((a, b) => string.Compare(a.name, b.name, StringComparison.Ordinal));
 
             Canvas.ForceUpdateCanvases();
             _trunkCountText.text = $"{_trunkResults.Count:N0}장";
+            _noTrunkResults.gameObject.SetActive(_trunkResults.Count == 0);
             ResizeTrunkGrid(true);
         }
 
@@ -609,6 +581,7 @@ namespace YGOPortable.UI
             SyncSlotList(_mainSlots, _workingDeck.main);
             SyncSlotList(_extraSlots, _workingDeck.extra);
             SyncSlotList(_sideSlots, _workingDeck.side);
+            RefreshSaveLabel();
         }
 
         private void SyncSlotList(List<(RectTransform rt, CompositeCardView card, CardDragTrigger trigger)> slots, List<uint> cards)
@@ -649,7 +622,7 @@ namespace YGOPortable.UI
 
         private void HandleCardDrop(DragContext context)
         {
-            if (!Root.activeInHierarchy || _workingDeck == null) return;
+            if (!Root.activeInHierarchy || _workingDeck == null || _deckDialog.activeSelf || _archModalRoot.activeSelf) return;
             var destination = FindDropZone(context.DropPosition);
             if (context.SourceType == DragSourceType.Trunk)
             {
@@ -803,30 +776,97 @@ namespace YGOPortable.UI
 
         private void SwitchUserDeck(int delta)
         {
-            if (DeckRepository.UserDecks.Count == 0) return;
-            _userDeckIdx = (_userDeckIdx + delta + DeckRepository.UserDecks.Count) % DeckRepository.UserDecks.Count;
-            LoadWorkingDeckFromCurrent();
-            UpdateVirtualTrunkSlots(_lastFirstRow, force: true);
+            int count = DeckRepository.UserDecks.Count;
+            if (count <= 1) return;
+            BeforeReplacingEdits(() =>
+            {
+                _userDeckIdx = (_userDeckIdx + delta + count) % count;
+                LoadWorkingDeckFromCurrent();
+            });
         }
 
         private void CreateNewUserDeck()
         {
-            var nd = new UserDeck
+            BeforeReplacingEdits(() =>
             {
-                id = $"custom_{DateTime.UtcNow:yyyyMMddHHmmssfff}",
-                name = $"새 커스텀 덱 {DeckRepository.UserDecks.Count + 1}",
-            };
-            DeckRepository.SaveUserDeck(nd);
-            _userDeckIdx = DeckRepository.UserDecks.Count - 1;
-            LoadWorkingDeckFromCurrent();
-            ShowToast("새 빈 덱을 생성했습니다.");
+                try
+                {
+                    DeckRepository.SaveUserDeck(new UserDeck { name = $"새 커스텀 덱 {DeckRepository.UserDecks.Count + 1}" });
+                    _userDeckIdx = DeckRepository.UserDecks.Count - 1;
+                    LoadWorkingDeckFromCurrent();
+                    ShowToast("새 빈 덱을 생성했습니다.");
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                {
+                    Debug.LogWarning($"[DeckEditor] Could not create a deck: {ex.Message}");
+                    ShowToast("덱을 만들 수 없습니다. 저장 폴더를 확인하세요.");
+                }
+            });
         }
 
-        private void SaveCurrentDeck()
+        private string DeckNameForSave => string.IsNullOrWhiteSpace(_deckNameInput.text)
+            ? "커스텀 덱" : _deckNameInput.text.Trim();
+
+        private bool HasUnsavedChanges()
         {
-            _workingDeck.name = string.IsNullOrWhiteSpace(_deckNameInput.text) ? "커스텀 덱" : _deckNameInput.text.Trim();
-            DeckRepository.SaveUserDeck(_workingDeck);
-            ShowToast($"'{_workingDeck.name}' 저장 완료!");
+            if (_workingDeck == null) return false;
+            var saved = DeckRepository.UserDecks.FirstOrDefault(deck => deck.id == _workingDeck.id);
+            return saved == null || DeckNameForSave != saved.name ||
+                !_workingDeck.main.SequenceEqual(saved.main) || !_workingDeck.extra.SequenceEqual(saved.extra) ||
+                !_workingDeck.side.SequenceEqual(saved.side);
+        }
+
+        private void RefreshSaveLabel()
+        {
+            _saveButtonText.text = HasUnsavedChanges() ? "저장 *" : "저장";
+        }
+
+        private bool TrySaveCurrentDeck()
+        {
+            if (_workingDeck == null) return false;
+            var snapshot = CopyDeck(_workingDeck);
+            snapshot.name = DeckNameForSave;
+            try
+            {
+                DeckRepository.SaveUserDeck(snapshot);
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                Debug.LogWarning($"[DeckEditor] Could not save the deck: {ex.Message}");
+                const string message = "덱을 저장할 수 없습니다. 저장 폴더를 확인하세요.";
+                if (_deckDialog.activeSelf)
+                    _deckDialogMessage.text = message;
+                else
+                    ShowToast(message);
+                return false;
+            }
+            _workingDeck.name = snapshot.name;
+            _deckNameInput.SetTextWithoutNotify(snapshot.name);
+            RefreshSaveLabel();
+            ShowToast($"'{snapshot.name}' 저장 완료");
+            return true;
+        }
+
+        private void BeforeReplacingEdits(Action next)
+        {
+            if (!HasUnsavedChanges())
+            {
+                next();
+                return;
+            }
+
+            ShowDeckDialog("덱 변경사항", $"'{DeckNameForSave}' 덱의 변경사항을 저장할까요?",
+                "저장 후 계속", () =>
+                {
+                    if (!TrySaveCurrentDeck()) return;
+                    _deckDialog.SetActive(false);
+                    next();
+                },
+                "저장 안 함", () =>
+                {
+                    _deckDialog.SetActive(false);
+                    next();
+                });
         }
 
         private void SortWorkingDeck()
@@ -876,15 +916,79 @@ namespace YGOPortable.UI
                 ShowToast("최소 1개의 덱은 유지해야 합니다.");
                 return;
             }
-            DeckRepository.DeleteUserDeck(_workingDeck.id);
-            _userDeckIdx = Mathf.Clamp(_userDeckIdx, 0, DeckRepository.UserDecks.Count - 1);
-            LoadWorkingDeckFromCurrent();
-            ShowToast("덱을 삭제했습니다.");
+            ShowDeckDialog("덱 삭제", $"'{DeckNameForSave}' 덱을 삭제할까요?", "삭제", () =>
+            {
+                try
+                {
+                    DeckRepository.DeleteUserDeck(_workingDeck.id);
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                {
+                    Debug.LogWarning($"[DeckEditor] Could not delete the deck: {ex.Message}");
+                    _deckDialogMessage.text = "덱을 삭제할 수 없습니다. 저장 폴더를 확인하세요.";
+                    return;
+                }
+                _deckDialog.SetActive(false);
+                _userDeckIdx = Mathf.Clamp(_userDeckIdx, 0, DeckRepository.UserDecks.Count - 1);
+                LoadWorkingDeckFromCurrent();
+                ShowToast("덱을 삭제했습니다.");
+            });
         }
 
         private void ShowToast(string msg)
         {
             if (_toastText != null) _toastText.text = msg ?? "";
+        }
+
+        private void BuildDeckDialog(Transform parent)
+        {
+            var dim = LotdUiKit.FillRect("Modal_DeckChanges", parent);
+            _deckDialog = dim.gameObject;
+            LotdUiKit.AddImage(_deckDialog, LotdUiKit.WhiteSprite, new Color(0f, 0.02f, 0.08f, 0.80f));
+            var window = LotdUiKit.CreateMenuPanel(dim, "Window", new Vector2(0.29f, 0.36f), new Vector2(0.71f, 0.64f));
+            var title = LotdUiKit.CreateRect("Title", window, new Vector2(0.05f, 0.72f), new Vector2(0.95f, 0.93f),
+                Vector2.zero, Vector2.zero);
+            _deckDialogTitle = LotdUiKit.AddText(title, "Text", "", 23, TextAnchor.MiddleCenter,
+                LotdUiKit.GoldAccent, FontStyle.Bold);
+            var message = LotdUiKit.CreateRect("Message", window, new Vector2(0.07f, 0.33f), new Vector2(0.93f, 0.71f),
+                Vector2.zero, Vector2.zero);
+            _deckDialogMessage = LotdUiKit.AddText(message, "Text", "", 17, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary);
+            _deckDialogMessage.supportRichText = false;
+
+            Button AddButton(string name, string label, float left, float right, Action action, bool gold = false)
+            {
+                var holder = LotdUiKit.CreateRect(name, window, new Vector2(left, 0.10f), new Vector2(right, 0.29f),
+                    Vector2.zero, Vector2.zero);
+                return LotdUiKit.CreateLotdButton(holder, "Button", label, action, 15, gold);
+            }
+            AddButton("Cancel", "취소", 0.05f, 0.33f, () => _deckDialog.SetActive(false));
+            _deckDialogSecondary = AddButton("Secondary", "", 0.36f, 0.64f, null);
+            _deckDialogPrimary = AddButton("Primary", "", 0.67f, 0.95f, null, true);
+            _deckDialog.SetActive(false);
+        }
+
+        private void ShowDeckDialog(string title, string message, string primaryLabel, Action primary,
+            string secondaryLabel = null, Action secondary = null)
+        {
+            void SetAction(Button button, string label, Action action)
+            {
+                button.gameObject.SetActive(action != null);
+                button.GetComponentInChildren<Text>(true).text = label ?? "";
+                button.onClick.RemoveAllListeners();
+                if (action == null) return;
+                button.onClick.AddListener(() =>
+                {
+                    LotdAudio.PlayClick();
+                    action();
+                });
+            }
+
+            _deckDialogTitle.text = title;
+            _deckDialogMessage.text = message;
+            SetAction(_deckDialogPrimary, primaryLabel, primary);
+            SetAction(_deckDialogSecondary, secondaryLabel, secondary);
+            _deckDialog.SetActive(true);
+            EventSystem.current?.SetSelectedGameObject(null);
         }
 
         // ==================== PURE ARCHETYPE EXAMPLE DECK BROWSER ====================
@@ -1112,30 +1216,21 @@ namespace YGOPortable.UI
         private void ApplyPureArchetypeExampleDeck(ArchetypeInfo arch)
         {
             if (arch == null) return;
-            var (main, extra) = CardDatabase.BuildPureArchetypeDeck(arch);
-            _workingDeck.name = $"[순수] {arch.name}";
-            _workingDeck.main = main;
-            _workingDeck.extra = extra;
-            _workingDeck.side.Clear();
-
-            if (_deckNameInput != null)
-                _deckNameInput.text = _workingDeck.name;
-
-            SortWorkingDeck();
-
-            _activeArchetypeFilter = arch;
-            _relatedFilterCode = 0;
-            _searchText = "";
-            if (_searchInp != null) _searchInp.text = "";
-            RefreshTrunkFilter();
-
-            if (arch.representativeCode != 0)
-                InspectCard(arch.representativeCode);
-
-            if (_archModalRoot != null)
+            BeforeReplacingEdits(() =>
+            {
+                var (main, extra) = CardDatabase.BuildPureArchetypeDeck(arch);
+                _workingDeck.name = $"[순수] {arch.name}";
+                _workingDeck.main = main;
+                _workingDeck.extra = extra;
+                _workingDeck.side.Clear();
+                _deckNameInput.SetTextWithoutNotify(_workingDeck.name);
+                SortWorkingDeck();
+                SetTrunkSource(archetype: arch);
+                if (arch.representativeCode != 0)
+                    InspectCard(arch.representativeCode);
                 _archModalRoot.SetActive(false);
-
-            ShowToast($"✨ '[순수] {arch.name}' 예시 덱 (메인 {main.Count}장 / EX {extra.Count}장) 구성 완료!");
+                ShowToast($"'{_workingDeck.name}' 불러옴 · 메인 {main.Count}장 / 엑스트라 {extra.Count}장");
+            });
         }
     }
 }

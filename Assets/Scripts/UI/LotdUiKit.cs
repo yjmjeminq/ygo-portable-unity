@@ -218,6 +218,72 @@ namespace YGOPortable.UI
             return btn;
         }
 
+        public static Dropdown CreateLotdDropdown(Transform parent, string name, IReadOnlyList<string> choices,
+            Action<int> onChanged)
+        {
+            const float rowHeight = 28f;
+            const int visibleRows = 7;
+            var root = FillRect(name, parent);
+            var background = AddImage(root.gameObject, LoadSprite("LOTD/Buttons/ds_btn_inactive01"), Color.white);
+            var caption = AddText(root, "Caption", "", 13, TextAnchor.MiddleLeft, TextPrimary, FontStyle.Bold);
+            caption.rectTransform.offsetMin = new Vector2(7f, 0f);
+            caption.rectTransform.offsetMax = new Vector2(-17f, 0f);
+            caption.resizeTextForBestFit = true;
+            caption.resizeTextMinSize = 10;
+            caption.resizeTextMaxSize = 13;
+            var arrow = AddText(root, "Arrow", "▼", 10, TextAnchor.MiddleRight, GoldAccent);
+            arrow.rectTransform.offsetMax = new Vector2(-5f, 0f);
+
+            float height = Mathf.Min(visibleRows, choices.Count) * rowHeight;
+            var template = CreateBorderedPanel(root, "Options", Vector2.zero, Vector2.right,
+                new Vector2(0f, -height - 4f), new Vector2(0f, -4f), PanelNavy, CyanAccent);
+            template.pivot = new Vector2(0.5f, 1f);
+            template.anchoredPosition = new Vector2(0f, -4f);
+            var scroll = template.gameObject.AddComponent<ScrollRect>();
+            scroll.horizontal = false;
+            scroll.scrollSensitivity = rowHeight;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            bool needsScrollbar = choices.Count > visibleRows;
+            var viewport = CreateRect("Viewport", template, Vector2.zero, Vector2.one,
+                Vector2.zero, new Vector2(needsScrollbar ? -15f : 0f, 0f));
+            viewport.gameObject.AddComponent<RectMask2D>();
+            var content = CreateRect("Content", viewport, Vector2.up, Vector2.one,
+                new Vector2(0f, -rowHeight), Vector2.zero);
+            content.pivot = new Vector2(0.5f, 1f);
+            content.anchoredPosition = Vector2.zero;
+            scroll.viewport = viewport;
+            scroll.content = content;
+            if (needsScrollbar) scroll.verticalScrollbar = AddVerticalScrollbar(template);
+
+            var item = FillRect("Item", content);
+            var itemBackground = AddImage(item.gameObject, WhiteSprite, new Color(0.08f, 0.20f, 0.39f));
+            var selected = FillRect("Selected", item, 1f);
+            var selectedImage = AddImage(selected.gameObject, WhiteSprite,
+                new Color(GoldAccent.r, GoldAccent.g, GoldAccent.b, 0.30f), false, false);
+            var label = AddText(item, "Label", "", 13, TextAnchor.MiddleLeft, TextPrimary);
+            label.rectTransform.offsetMin = new Vector2(7f, 0f);
+            label.rectTransform.offsetMax = new Vector2(-2f, 0f);
+            var toggle = item.gameObject.AddComponent<Toggle>();
+            toggle.targetGraphic = itemBackground;
+            toggle.graphic = selectedImage;
+
+            var dropdown = root.gameObject.AddComponent<Dropdown>();
+            dropdown.targetGraphic = background;
+            dropdown.template = template;
+            dropdown.captionText = caption;
+            dropdown.itemText = label;
+            foreach (string choice in choices)
+                dropdown.options.Add(new Dropdown.OptionData(choice));
+            dropdown.RefreshShownValue();
+            dropdown.onValueChanged.AddListener(value =>
+            {
+                LotdAudio.PlayClick();
+                onChanged(value);
+            });
+            template.gameObject.SetActive(false);
+            return dropdown;
+        }
+
         public static InputField CreateInputField(Transform parent, string name, string placeholderText, int fontSize = 16)
         {
             var rt = FillRect(name, parent);

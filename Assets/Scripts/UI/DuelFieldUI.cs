@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using YGOPortable.Core;
 
@@ -23,6 +24,9 @@ namespace YGOPortable.UI
         private Text _inspStats;
         private Text _inspDesc;
         private Text _logFeed;
+        private GameObject _logWindow;
+        private ScrollRect _logScroll;
+        private readonly List<Text> _logBlocks = new List<Text>();
         private ScrollRect _inspectScroll;
         private uint _inspectedCode;
 
@@ -132,7 +136,8 @@ namespace YGOPortable.UI
 
         public bool IsPresenting => CardAnimationManager.Instance != null && CardAnimationManager.Instance.IsPresenting;
         public bool IsPaused { get; private set; }
-        private bool CanAcceptPlayerAction => _session != null && !_session.IsFinished && !IsPresenting && !IsPaused &&
+        public bool IsReadingLog => _logWindow.activeSelf;
+        private bool CanAcceptPlayerAction => _session != null && !_session.IsFinished && !IsPresenting && !IsPaused && !IsReadingLog &&
             _session.ActivePrompt?.playerId == _session.HumanPlayerIndex;
 
         public DuelFieldUI(GameAppController app, Transform canvasParent, DuelPromptModals modals)
@@ -208,6 +213,7 @@ namespace YGOPortable.UI
             _preferredAttackTargetSeq = -1;
             _dragHighlightMZone = _dragHighlightSZone = _dragHighlightAttack = false;
             CloseActionPopup();
+            CloseDuelLog();
             _cardZoomModal.SetActive(false);
             CardAnimationManager.Instance?.Clear();
         }
@@ -264,6 +270,7 @@ namespace YGOPortable.UI
             BuildBottomHudAndHands(root);
             BuildActionPopup(root);
             BuildCardZoomModal(root);
+            BuildDuelLog(root);
             Root.SetActive(false);
         }
 
@@ -320,9 +327,13 @@ namespace YGOPortable.UI
             scroll.content = content;
             _inspectScroll = scroll;
 
-            var log = LotdUiKit.CreateRect("RecentActions", details, new Vector2(0.04f, 0.025f), new Vector2(0.96f, 0.22f),
+            var logButton = LotdUiKit.CreateRect("OpenLog", details, new Vector2(0.035f, 0.182f),
+                new Vector2(0.40f, 0.253f), Vector2.zero, Vector2.zero);
+            LotdUiKit.CreateLotdButton(logButton, "Button", "대전 기록", OpenDuelLog, 12);
+            var log = LotdUiKit.CreateRect("RecentActions", details, new Vector2(0.04f, 0.025f), new Vector2(0.96f, 0.174f),
                 Vector2.zero, Vector2.zero);
             _logFeed = LotdUiKit.AddText(log, "Log", "", 11, TextAnchor.LowerLeft, LotdUiKit.TextMuted);
+            _logFeed.supportRichText = false;
             var related = LotdUiKit.CreateRect("Related", left, new Vector2(0.68f, 0.52f), new Vector2(0.99f, 0.579f),
                 Vector2.zero, Vector2.zero);
             LotdUiKit.CreateLotdButton(related, "Button", "관련 카드", OnInspectRelatedClicked, 12);
@@ -870,8 +881,87 @@ namespace YGOPortable.UI
         private void RefreshLogFeed()
         {
             if (_session == null) return;
-            int start = Mathf.Max(0, _session.Logs.Count - 5);
+            int start = Mathf.Max(0, _session.Logs.Count - 3);
             _logFeed.text = string.Join("\n", _session.Logs.Skip(start));
+        }
+
+        private void BuildDuelLog(Transform root)
+        {
+            var dim = LotdUiKit.FillRect("Modal_DuelLog", root);
+            _logWindow = dim.gameObject;
+            LotdUiKit.AddImage(_logWindow, LotdUiKit.WhiteSprite, new Color(0f, 0.02f, 0.08f, 0.82f));
+            var panel = LotdUiKit.CreateMenuPanel(dim, "Window", new Vector2(0.20f, 0.15f), new Vector2(0.80f, 0.86f));
+            var header = LotdUiKit.CreateRect("Header", panel, new Vector2(0.03f, 0.87f), new Vector2(0.97f, 0.97f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddText(header, "Title", "대전 기록", 25, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
+            var close = LotdUiKit.CreateRect("Close", header, new Vector2(0.84f, 0.12f), new Vector2(1f, 0.88f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.CreateLotdButton(close, "Button", "닫기", CloseDuelLog, 15);
+
+            var body = LotdUiKit.CreateBorderedPanel(panel, "Log", new Vector2(0.026f, 0.035f), new Vector2(0.974f, 0.85f),
+                Vector2.zero, Vector2.zero);
+            var viewport = LotdUiKit.CreateRect("Viewport", body, Vector2.zero, Vector2.one,
+                new Vector2(8f, 5f), new Vector2(-20f, -5f));
+            viewport.gameObject.AddComponent<RectMask2D>();
+            var content = LotdUiKit.CreateRect("Content", viewport, Vector2.up, Vector2.one, Vector2.zero, Vector2.zero);
+            content.pivot = new Vector2(0.5f, 1f);
+            var layout = content.gameObject.AddComponent<VerticalLayoutGroup>();
+            layout.padding = new RectOffset(8, 8, 6, 6);
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandHeight = false;
+            content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            _logScroll = body.gameObject.AddComponent<ScrollRect>();
+            _logScroll.viewport = viewport;
+            _logScroll.content = content;
+            _logScroll.horizontal = false;
+            _logScroll.scrollSensitivity = 45f;
+            _logScroll.movementType = ScrollRect.MovementType.Clamped;
+            _logScroll.verticalScrollbar = LotdUiKit.AddVerticalScrollbar(body);
+            _logScroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
+            _logWindow.SetActive(false);
+        }
+
+        private void OpenDuelLog()
+        {
+            if (_session == null || IsPaused || _actionPopup.activeSelf || _cardZoomModal.activeSelf ||
+                _modals.IsPromptOpen || _modals.ZoneViewRoot.activeSelf || _modals.ResultRoot.activeSelf) return;
+            CardDragManager.Instance?.CancelDrag();
+            if (CardAnimationManager.Instance != null) CardAnimationManager.Instance.Paused = true;
+            _logWindow.transform.SetAsLastSibling();
+            _logWindow.SetActive(true);
+            EventSystem.current?.SetSelectedGameObject(null);
+
+            const int entriesPerBlock = 20;
+            var log = _session.Logs;
+            int blocks = Mathf.Max(1, (log.Count + entriesPerBlock - 1) / entriesPerBlock);
+            while (_logBlocks.Count < blocks)
+            {
+                var text = LotdUiKit.AddText(_logScroll.content, "Entries", "", 17, TextAnchor.UpperLeft, LotdUiKit.TextPrimary);
+                text.verticalOverflow = VerticalWrapMode.Overflow;
+                text.supportRichText = false;
+                text.lineSpacing = 1.16f;
+                _logBlocks.Add(text);
+            }
+            for (int i = 0; i < _logBlocks.Count; i++)
+            {
+                _logBlocks[i].gameObject.SetActive(i < blocks);
+                if (i >= blocks) continue;
+                _logBlocks[i].text = log.Count == 0 ? "대전 기록이 없습니다."
+                    : string.Join("\n", log.Skip(i * entriesPerBlock).Take(entriesPerBlock));
+            }
+            LayoutRebuilder.ForceRebuildLayoutImmediate(_logScroll.content);
+            Canvas.ForceUpdateCanvases();
+            _logScroll.StopMovement();
+            _logScroll.verticalNormalizedPosition = 0f;
+        }
+
+        private void CloseDuelLog()
+        {
+            if (!IsReadingLog) return;
+            _logWindow.SetActive(false);
+            if (CardAnimationManager.Instance != null) CardAnimationManager.Instance.Paused = IsPaused;
         }
 
         // ==================== DRAG & DROP LOGIC ====================
@@ -1413,6 +1503,11 @@ namespace YGOPortable.UI
         public void Update()
         {
             if (_session == null || Root == null || !Root.activeSelf) return;
+            if (IsReadingLog)
+            {
+                if (Input.GetKeyDown(KeyCode.Escape) || Input.GetMouseButtonDown(1)) CloseDuelLog();
+                return;
+            }
             byte me = (byte)_session.HumanPlayerIndex;
             byte opponent = (byte)_session.AiPlayerIndex;
             if (_myHandBar.rect.size != _myHandSize) RefreshHand(_session.Players[me].hand, me, false);

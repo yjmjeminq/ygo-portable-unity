@@ -131,7 +131,12 @@ namespace YGOPortable.Core
                 {
                     var d = JsonUtility.FromJson<UserDeck>(File.ReadAllText(f));
                     if (d != null && !string.IsNullOrEmpty(d.id))
+                    {
+                        d.main ??= new List<uint>();
+                        d.extra ??= new List<uint>();
+                        d.side ??= new List<uint>();
                         UserDecks.Add(d);
+                    }
                 }
                 catch (Exception e)
                 {
@@ -169,7 +174,17 @@ namespace YGOPortable.Core
                 deck.id = $"deck_{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid().ToString("N").Substring(0, 4)}";
             if (!Directory.Exists(_userDeckDir)) Directory.CreateDirectory(_userDeckDir);
             string path = Path.Combine(_userDeckDir, $"{deck.id}.json");
-            File.WriteAllText(path, JsonUtility.ToJson(deck, true), Encoding.UTF8);
+            string pending = Path.Combine(_userDeckDir, Path.GetRandomFileName() + ".tmp");
+            try
+            {
+                File.WriteAllText(pending, JsonUtility.ToJson(deck, true), Encoding.UTF8);
+                if (File.Exists(path)) File.Replace(pending, path, null);
+                else File.Move(pending, path);
+            }
+            finally
+            {
+                if (File.Exists(pending)) File.Delete(pending);
+            }
 
             int existing = UserDecks.FindIndex(d => d.id == deck.id);
             if (existing >= 0) UserDecks[existing] = deck;
@@ -178,9 +193,9 @@ namespace YGOPortable.Core
 
         public static void DeleteUserDeck(string deckId)
         {
-            UserDecks.RemoveAll(d => d.id == deckId);
             string path = Path.Combine(_userDeckDir, $"{deckId}.json");
-            if (File.Exists(path)) File.Delete(path);
+            File.Delete(path);
+            UserDecks.RemoveAll(d => d.id == deckId);
         }
 
         public static UserDeck ClonePresetToUserDeck(PresetDeckInfo preset, string customName = null)
