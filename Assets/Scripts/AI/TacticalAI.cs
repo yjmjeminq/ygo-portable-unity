@@ -349,8 +349,9 @@ namespace YGOPortable.AI
             if (p.forced) return 0;
             if (fallback || _actionsThisTurn > 48) return -1;
 
-            // Avoid chaining uselessly to our own effect if opponent hasn't added anything
-            if (s.CurrentChain.Count > 0 && s.CurrentChain[s.CurrentChain.Count - 1].triggerPlayer == p.playerId)
+            // Avoid chaining a fast/quick effect to our own card if opponent hasn't responded,
+            // UNLESS this is a simultaneous trigger chain (SEGOC: speCount == 0x7f, e.g. Tearlaments GY triggers).
+            if (!p.IsTriggerChain && s.CurrentChain.Count > 0 && s.CurrentChain[s.CurrentChain.Count - 1].triggerPlayer == p.playerId)
                 return -1;
 
             for (int i = 0; i < p.candidates.Count; i++)

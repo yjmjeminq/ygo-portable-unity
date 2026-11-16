@@ -104,6 +104,8 @@ namespace YGOPortable.Core
         public bool cancelable;
         public bool finishable;
         public bool forced;
+        public byte speCount;
+        public bool IsTriggerChain => speCount == 0x7f;
         public bool isChainSort;
         public bool sumExactCountZeroAny;
         public uint min;
@@ -147,6 +149,7 @@ namespace YGOPortable.Core
 
         public PlayerFieldSnapshot[] Players { get; } = { new PlayerFieldSnapshot(), new PlayerFieldSnapshot() };
         public List<ChainLinkInfo> CurrentChain { get; } = new List<ChainLinkInfo>();
+        public List<(int chainNumber, uint code)> SolvedChainLinks { get; } = new List<(int, uint)>();
         public List<string> Logs { get; } = new List<string>();
         public DuelPrompt ActivePrompt { get; private set; }
 
@@ -174,6 +177,7 @@ namespace YGOPortable.Core
             LastHintMsg = 0;
             ActivePrompt = null;
             CurrentChain.Clear();
+            SolvedChainLinks.Clear();
             Logs.Clear();
 
             HumanPlayerIndex = p0GoesFirst ? 0 : 1;
@@ -531,6 +535,18 @@ namespace YGOPortable.Core
                     break;
                 }
 
+                case YgoConstants.MSG_CHAIN_SOLVING:
+                {
+                    byte idx = br.ReadByte();
+                    if (idx > 0 && idx <= CurrentChain.Count)
+                    {
+                        var link = CurrentChain[idx - 1];
+                        SolvedChainLinks.Add((idx, link.code));
+                        AddLog($"체인 {idx} 처리: [{CardDatabase.GetName(link.code)}]");
+                    }
+                    break;
+                }
+
                 case YgoConstants.MSG_CHAIN_NEGATED:
                 case YgoConstants.MSG_CHAIN_DISABLED:
                 {
@@ -717,7 +733,7 @@ namespace YGOPortable.Core
                         messageType = msgType,
                         playerId = br.ReadByte(),
                     };
-                    br.ReadByte(); // spe_count
+                    p.speCount = br.ReadByte(); // 0x7f when SEGOC trigger chain (mandatory/optional triggers)
                     p.forced = br.ReadByte() != 0;
                     br.ReadUInt32(); // hint_timing self
                     br.ReadUInt32(); // hint_timing opp

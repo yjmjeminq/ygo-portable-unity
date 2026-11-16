@@ -53,6 +53,7 @@ namespace YGOPortable.Editor
             TestAdventurerTokenAndFatefulAdventure();
             TestTokenDisappearanceOnLeaveField();
             TestDestinyHeroDestroyerPhoenixEnforcer();
+            TestTearlamentsSegocAndMandatoryVsOptionalTriggers();
         }
 
         private static void TestTokenPresentationAndLocalization()
@@ -484,6 +485,206 @@ namespace YGOPortable.Editor
                 if (!passedDPEQuickEffect) throw new Exception("Failed to test DPE quick effect pass/cancel");
                 if (!triggeredDPEGraveEffect) throw new Exception("Failed to trigger DPE graveyard effect");
                 if (!revivedDPEInOppStandby) throw new Exception("Failed to revive DPE during opponent's Standby Phase");
+            }
+        }
+
+        private static void TestTearlamentsSegocAndMandatoryVsOptionalTriggers()
+        {
+            Debug.Log("[TOKEN & EFFECT TEST 5] Tearlaments GY Trigger Order (SEGOC) & Mandatory vs Optional Distinction...");
+
+            // 74191942 = Painful Choice (고통의 선택: sends 4 cards from Deck to GY simultaneously by card effect)
+            // 15341821 = Dandylion (댄디라이언: Mandatory GY trigger -> summons 2 Fluff Tokens 15341822)
+            // 79814787 = The White Stone of Legend (전설의 백석: Mandatory GY trigger -> adds Blue-Eyes 89631139 from Deck to Hand)
+            // 572850   = Tearlaments Scheiren (티아라멘츠 셰이렌: Optional GY trigger -> Fusion Summon from GY)
+            // 74078255 = Tearlaments Merrli (티아라멘츠 메이루: Optional GY trigger -> Fusion Summon from GY)
+            // 89631139 = Blue-Eyes White Dragon (푸른 눈의 백룡)
+            // 92731385 = Tearlaments Kitkallos (티아라멘츠 키토칼로스: Extra Deck Fusion Monster)
+            var p0Main = new List<uint>();
+            for (int i = 0; i < 34; i++) p0Main.Add(74191942);
+            p0Main.Add(15341821);
+            p0Main.Add(79814787);
+            p0Main.Add(572850);
+            p0Main.Add(74078255);
+            p0Main.Add(89631139);
+            p0Main.Add(89631139);
+            uint[] p0Extra = { 92731385 };
+
+            var p1Main = new List<uint>();
+            while (p1Main.Count < 40) p1Main.Add(20721928);
+
+            using (var s = new DuelSession())
+            {
+                bool ready = false;
+                for (int attempt = 0; attempt < 40; attempt++)
+                {
+                    if (!s.StartNewDuel(p0Main, p0Extra, p1Main, Array.Empty<uint>(), p0GoesFirst: true))
+                        throw new Exception("Failed to start duel for Tearlaments SEGOC test");
+                    if (s.Players[0].hand.All(c => c.code == 74191942))
+                    {
+                        ready = true;
+                        break;
+                    }
+                }
+                if (!ready) throw new Exception("Failed to roll opening hand of Painful Choice");
+
+                var ai = new TacticalAI { Difficulty = AIDifficulty.Smart };
+                bool activatedPainfulChoice = false;
+                bool pickedPainfulFive = false;
+                bool oppPickedBlueEyes = false;
+                bool verifiedForcedMandatorySegoc = false;
+                bool verifiedOptionalTearlamentsSegoc = false;
+                bool verifiedOptionalPassSecondTear = false;
+                bool verifiedKitkallosOptionalDecline = false;
+
+                int guard = 0;
+                while (!s.IsFinished && guard++ < 80)
+                {
+                    if (s.ActivePrompt == null) { s.StepUntilPrompt(); continue; }
+                    var p = s.ActivePrompt;
+
+                    // 1. Activate Painful Choice from hand
+                    if (p.playerId == 0 && p.messageType == YgoConstants.MSG_SELECT_IDLECMD)
+                    {
+                        if (!activatedPainfulChoice && p.activatable.Any(a => a.code == 74191942))
+                        {
+                            int idx = p.activatable.FindIndex(a => a.code == 74191942);
+                            activatedPainfulChoice = true;
+                            Debug.Log($"[SEGOC TEST] Activating Painful Choice (idx={idx})");
+                            s.SubmitResponseInt((idx << 16) | 5);
+                            continue;
+                        }
+                        if (verifiedKitkallosOptionalDecline)
+                        {
+                            break;
+                        }
+                    }
+
+                    // 2. Painful Choice: Player 0 picks 5 cards from Deck (Dandylion, White Stone, Scheiren, Merrli, Blue-Eyes)
+                    if (p.playerId == 0 && p.messageType == YgoConstants.MSG_SELECT_CARD && !pickedPainfulFive && p.min == 5 && p.max == 5)
+                    {
+                        int iDandy = p.candidates.FindIndex(c => c.code == 15341821);
+                        int iStone = p.candidates.FindIndex(c => c.code == 79814787);
+                        int iScheiren = p.candidates.FindIndex(c => c.code == 572850);
+                        int iMerrli = p.candidates.FindIndex(c => c.code == 74078255);
+                        int iBewd = p.candidates.FindIndex(c => c.code == 89631139);
+                        if (iDandy < 0 || iStone < 0 || iScheiren < 0 || iMerrli < 0 || iBewd < 0)
+                            throw new Exception("Missing expected cards in Deck for Painful Choice");
+                        pickedPainfulFive = true;
+                        Debug.Log("[SEGOC TEST] Selecting 5 cards for Painful Choice: Dandylion, White Stone, Scheiren, Merrli, Blue-Eyes");
+                        s.SubmitResponse(EncodeSelectIndices(iDandy, iStone, iScheiren, iMerrli, iBewd));
+                        continue;
+                    }
+
+                    // 3. Painful Choice: Opponent (Player 1) picks Blue-Eyes (89631139) to add to P0's hand, sending the 4 triggers to GY simultaneously!
+                    if (p.playerId == 1 && p.messageType == YgoConstants.MSG_SELECT_CARD && pickedPainfulFive && !oppPickedBlueEyes)
+                    {
+                        int iBewd = p.candidates.FindIndex(c => c.code == 89631139);
+                        if (iBewd < 0) throw new Exception("Opponent could not find Blue-Eyes among Painful Choice candidates");
+                        oppPickedBlueEyes = true;
+                        Debug.Log("[SEGOC TEST] Opponent picked Blue-Eyes -> Dandylion, White Stone, Scheiren, Merrli sent to GY simultaneously!");
+                        s.SubmitResponse(EncodeSelectIndices(iBewd));
+                        continue;
+                    }
+
+                    // 4. SEGOC Step A: Mandatory GY Triggers (Dandylion + White Stone) MUST be offered first with forced == true
+                    if (p.playerId == 0 && p.messageType == YgoConstants.MSG_SELECT_CHAIN && oppPickedBlueEyes && !verifiedForcedMandatorySegoc)
+                    {
+                        Debug.Log($"[SEGOC TEST] Mandatory Trigger Chain Prompt: forced={p.forced}, IsTriggerChain={p.IsTriggerChain}, candidates=[{string.Join(",", p.candidates.Select(c => c.code))}]");
+                        if (!p.forced)
+                            throw new Exception("Expected p.forced == true for simultaneous mandatory GY triggers (Dandylion + White Stone)!");
+                        if (!p.IsTriggerChain)
+                            throw new Exception("Expected p.IsTriggerChain (speCount == 0x7f) == true for SEGOC mandatory triggers!");
+                        if (p.candidates.Count != 2 || !p.candidates.Any(c => c.code == 15341821) || !p.candidates.Any(c => c.code == 79814787))
+                            throw new Exception("Expected exactly Dandylion (15341821) and White Stone (79814787) in mandatory trigger candidates!");
+                        if (p.candidates.Any(c => c.code == 572850 || c.code == 74078255))
+                            throw new Exception("Optional Tearlaments triggers must NOT be mixed into Mandatory trigger selection!");
+
+                        // Choose White Stone (79814787) as Chain Link 1 (so Dandylion automatically becomes Chain Link 2)
+                        int stoneIdx = p.candidates.FindIndex(c => c.code == 79814787);
+                        verifiedForcedMandatorySegoc = true;
+                        Debug.Log($"[SEGOC TEST] Choosing White Stone (idx={stoneIdx}) as Mandatory Chain Link 1 (Dandylion auto-assigned to Chain Link 2)");
+                        s.SubmitResponseInt(stoneIdx);
+                        continue;
+                    }
+
+                    // 5. SEGOC Step B: Optional GY Triggers (Tearlaments Scheiren + Merrli) offered AFTER mandatory triggers with forced == false
+                    if (p.playerId == 0 && p.messageType == YgoConstants.MSG_SELECT_CHAIN && verifiedForcedMandatorySegoc && !verifiedOptionalTearlamentsSegoc)
+                    {
+                        Debug.Log($"[SEGOC TEST] Optional Trigger Chain Prompt #1: forced={p.forced}, IsTriggerChain={p.IsTriggerChain}, currentChain={s.CurrentChain.Count}, candidates=[{string.Join(",", p.candidates.Select(c => c.code))}]");
+                        if (p.forced)
+                            throw new Exception("Expected p.forced == false for optional Tearlaments GY triggers!");
+                        if (!p.IsTriggerChain)
+                            throw new Exception("Expected p.IsTriggerChain (speCount == 0x7f) == true for SEGOC optional triggers!");
+                        if (s.CurrentChain.Count != 2 || s.CurrentChain[0].code != 79814787 || s.CurrentChain[1].code != 15341821)
+                            throw new Exception("Expected Chain Link 1 = White Stone (79814787) and Chain Link 2 = Dandylion (15341821) before optional triggers!");
+                        if (p.candidates.Count != 2 || !p.candidates.Any(c => c.code == 572850) || !p.candidates.Any(c => c.code == 74078255))
+                            throw new Exception("Expected both Tearlaments Scheiren (572850) and Merrli (74078255) in optional trigger candidates!");
+
+                        // Choose Merrli (74078255) as Chain Link 3
+                        int merrliIdx = p.candidates.FindIndex(c => c.code == 74078255);
+                        verifiedOptionalTearlamentsSegoc = true;
+                        Debug.Log($"[SEGOC TEST] Choosing Tearlaments Merrli (idx={merrliIdx}) as Optional Chain Link 3");
+                        s.SubmitResponseInt(merrliIdx);
+                        continue;
+                    }
+
+                    // 6. SEGOC Step C: Remaining Optional Trigger (Scheiren) offered for Chain Link 4 -> test declining/passing (-1)
+                    if (p.playerId == 0 && p.messageType == YgoConstants.MSG_SELECT_CHAIN && verifiedOptionalTearlamentsSegoc && !verifiedOptionalPassSecondTear)
+                    {
+                        Debug.Log($"[SEGOC TEST] Optional Trigger Chain Prompt #2: forced={p.forced}, IsTriggerChain={p.IsTriggerChain}, currentChain={s.CurrentChain.Count}, candidates=[{string.Join(",", p.candidates.Select(c => c.code))}]");
+                        if (p.forced)
+                            throw new Exception("Expected p.forced == false for remaining optional Tearlaments trigger!");
+                        if (s.CurrentChain.Count != 3 || s.CurrentChain[2].code != 74078255)
+                            throw new Exception("Expected Chain Link 3 = Tearlaments Merrli (74078255)!");
+                        if (!p.candidates.Any(c => c.code == 572850))
+                            throw new Exception("Expected remaining Tearlaments Scheiren (572850) as candidate for Chain Link 4!");
+
+                        verifiedOptionalPassSecondTear = true;
+                        Debug.Log("[SEGOC TEST] Submitting -1 (PASS) on Tearlaments Scheiren so only Merrli activates as CL3!");
+                        s.SubmitResponseInt(-1);
+                        continue;
+                    }
+
+                    // 7. Post-Chain Resolution: Kitkallos (92731385) was Fusion Summoned on CL3 -> triggers single optional effect via MSG_SELECT_EFFECTYN
+                    if (p.playerId == 0 && p.messageType == YgoConstants.MSG_SELECT_EFFECTYN && p.promptCardCode == 92731385)
+                    {
+                        verifiedKitkallosOptionalDecline = true;
+                        Debug.Log("[SEGOC TEST] Kitkallos on-summon optional trigger (MSG_SELECT_EFFECTYN) received -> Submitting 0 (NO / Decline)");
+                        s.SubmitResponseInt(0);
+                        continue;
+                    }
+
+                    s.SubmitResponse(ai.ComputeResponse(s, p));
+                }
+
+                if (!verifiedForcedMandatorySegoc) throw new Exception("Failed to verify mandatory GY trigger SEGOC");
+                if (!verifiedOptionalTearlamentsSegoc) throw new Exception("Failed to verify optional Tearlaments GY trigger SEGOC");
+                if (!verifiedOptionalPassSecondTear) throw new Exception("Failed to verify declining 2nd optional Tearlaments trigger");
+                if (!verifiedKitkallosOptionalDecline) throw new Exception("Failed to verify Kitkallos Fusion Summon and on-summon MSG_SELECT_EFFECTYN");
+
+                // Verify LIFO reverse chain resolution order: CL3 (Merrli 74078255) -> CL2 (Dandylion 15341821) -> CL1 (White Stone 79814787)
+                int cl3Idx = s.SolvedChainLinks.FindIndex(x => x.chainNumber == 3 && x.code == 74078255);
+                int cl2Idx = s.SolvedChainLinks.FindIndex(x => x.chainNumber == 2 && x.code == 15341821);
+                int cl1Idx = s.SolvedChainLinks.FindIndex(x => x.chainNumber == 1 && x.code == 79814787);
+                Debug.Log($"[SEGOC TEST] SolvedChainLinks LIFO check: CL3_pos={cl3Idx}, CL2_pos={cl2Idx}, CL1_pos={cl1Idx}");
+                if (cl3Idx < 0 || cl2Idx < 0 || cl1Idx < 0 || !(cl3Idx < cl2Idx && cl2Idx < cl1Idx))
+                    throw new Exception("Chain did not resolve in LIFO reverse order (CL3 Merrli -> CL2 Dandylion -> CL1 White Stone)!");
+
+                // Verify end board & hand state:
+                // - Kitkallos (92731385) on field
+                // - 2 Fluff Tokens (15341822) on field
+                // - Merrli (74078255) & Scheiren (572850) returned from GY to Deck as fusion materials!
+                bool hasKitkallos = s.Players[0].mzone.Any(c => c != null && c.code == 92731385);
+                int fluffTokens = s.Players[0].mzone.Count(c => c != null && c.code == 15341822);
+                bool merrliInGy = s.Players[0].grave.Any(c => c.code == 74078255);
+                bool scheirenInGy = s.Players[0].grave.Any(c => c.code == 572850);
+                int bewdInHand = s.Players[0].hand.Count(c => c.code == 89631139);
+                Debug.Log($"[SEGOC TEST] Post-Chain Board: Kitkallos={hasKitkallos}, FluffTokens={fluffTokens}, MerrliInGY={merrliInGy}, ScheirenInGY={scheirenInGy}, BlueEyesInHand={bewdInHand}");
+
+                if (!hasKitkallos) throw new Exception("Tearlaments Kitkallos should be Fusion Summoned on the field!");
+                if (fluffTokens != 2) throw new Exception($"Expected 2 Fluff Tokens from Dandylion, got {fluffTokens}");
+                if (merrliInGy || scheirenInGy) throw new Exception("Merrli and Scheiren should have been returned from GY to Deck as Fusion Materials!");
+                if (bewdInHand != 2) throw new Exception($"Expected 2 Blue-Eyes in hand (1 from Painful Choice + 1 from White Stone), got {bewdInHand}");
             }
         }
     }

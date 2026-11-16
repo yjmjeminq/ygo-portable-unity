@@ -261,8 +261,8 @@ namespace YGOPortable.UI
             string eff = CardDatabase.ResolveDescription(p.promptDesc, p.promptCardCode);
             if (string.IsNullOrEmpty(eff)) eff = "이 카드의 효과를 발동하시겠습니까?";
 
-            _modalTitle.text = "효과 발동 확인";
-            _modalSubtitle.text = $"{cardName} ({YgoConstants.GetLocationNameKR(p.promptLoc)})";
+            _modalTitle.text = "유발 효과 발동 확인 — [임의 효과 (선택 발동)]";
+            _modalSubtitle.text = $"{cardName}  [{YgoConstants.GetLocationNameKR(p.promptLoc)}] — 효과를 발동할지 선택하세요 (취소/패스 가능)";
 
             var cardRt = LotdUiKit.CreateRect("Card", _modalBody, new Vector2(0.06f, 0.10f), new Vector2(0.32f, 0.92f), Vector2.zero, Vector2.zero);
             var view = CompositeCardView.Create(cardRt, "Preview", false);
@@ -355,10 +355,29 @@ namespace YGOPortable.UI
 
         private void RenderSelectChain(DuelSession s, DuelPrompt p)
         {
-            _modalTitle.text = "체인 발동 확인";
-            _modalSubtitle.text = s.CurrentChain.Count > 0
-                ? $"현재 체인 블록 {s.CurrentChain.Count} — 체인해서 발동할 카드를 선택하세요."
-                : "발동 가능한 카드 효과가 있습니다.";
+            int nextLink = s.CurrentChain.Count + 1;
+            if (p.forced)
+            {
+                _modalTitle.text = $"⚡ 강제 유발 효과 체인 순서 선택 (체인 {nextLink} / 필수 발동)";
+                _modalSubtitle.text = $"강제 발동 효과입니다 (취소 불가) — 체인 블록 {nextLink} (Chain Link {nextLink})로 먼저 올릴 카드를 선택하세요.";
+            }
+            else if (p.IsTriggerChain)
+            {
+                _modalTitle.text = $"✨ 임의 유발 효과 발동 / 순서 선택 (체인 {nextLink} / 선택 발동)";
+                _modalSubtitle.text = $"체인 블록 {nextLink} (Chain Link {nextLink})로 발동할 효과를 순서대로 선택하거나, 발동하지 않으려면 아래 취소(PASS)를 누르세요.";
+            }
+            else
+            {
+                _modalTitle.text = $"체인 / 즉시 효과 발동 확인 (체인 {nextLink} / 선택 발동)";
+                _modalSubtitle.text = s.CurrentChain.Count > 0
+                    ? $"현재 체인 블록 {s.CurrentChain.Count} — 체인 {nextLink}(으)로 발동할 카드를 선택하거나 패스하세요."
+                    : "발동 가능한 카드 효과가 있습니다 (발동 여부 선택 가능).";
+            }
+
+            string badgeTag = p.forced
+                ? "<color=#FFAA33>[강제 효과 — 필수]</color>"
+                : (p.IsTriggerChain ? "<color=#66EEBB>[임의 유발 — 선택 가능]</color>" : "<color=#88CCFF>[임의 효과 — 선택 가능]</color>");
+            string btnLabel = p.forced ? $"체인 {nextLink} 등록" : $"체인 {nextLink} 발동";
 
             CreateVerticalScroll(_modalBody, out Transform content);
             for (int i = 0; i < p.candidates.Count; i++)
@@ -378,10 +397,10 @@ namespace YGOPortable.UI
                 cv.SetCard(c.code);
 
                 var txtRt = LotdUiKit.CreateRect("Txt", row, new Vector2(0.13f, 0.08f), new Vector2(0.75f, 0.92f), Vector2.zero, Vector2.zero);
-                LotdUiKit.AddText(txtRt, "T", $"{cname}  [{locTag}]\n<color=#88CCFF>{desc}</color>", 16, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
+                LotdUiKit.AddText(txtRt, "T", $"{cname}  [{locTag}]  {badgeTag}\n<color=#88CCFF>{desc}</color>", 16, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
 
                 var actRt = LotdUiKit.CreateRect("Act", row, new Vector2(0.77f, 0.18f), new Vector2(0.98f, 0.82f), Vector2.zero, Vector2.zero);
-                LotdUiKit.CreateLotdButton(actRt, "B", "체인 발동", () => Submit(BitConverter.GetBytes(pick)), 16, gold: true);
+                LotdUiKit.CreateLotdButton(actRt, "B", btnLabel, () => Submit(BitConverter.GetBytes(pick)), 16, gold: true);
 
                 var insRt = LotdUiKit.CreateRect("Ins", row, new Vector2(0.01f, 0.06f), new Vector2(0.11f, 0.94f), Vector2.zero, Vector2.zero);
                 var insImg = LotdUiKit.AddImage(insRt.gameObject, LotdUiKit.WhiteSprite, Color.clear);
@@ -394,7 +413,15 @@ namespace YGOPortable.UI
 
             if (!p.forced)
             {
-                AddFooterButton(0.24f, 0.76f, "❌ 효과 발동 취소 (발동하지 않고 패스 / PASS)", () => Submit(BitConverter.GetBytes(-1)), false);
+                string passLabel = p.IsTriggerChain
+                    ? "❌ 효과 발동 안 함 (남은 임의 효과 패스 / PASS)"
+                    : "❌ 효과 발동 취소 (발동하지 않고 패스 / PASS)";
+                AddFooterButton(0.24f, 0.76f, passLabel, () => Submit(BitConverter.GetBytes(-1)), false);
+            }
+            else
+            {
+                var infoRt = LotdUiKit.FillRect("ForcedInfo", _modalFooter);
+                LotdUiKit.AddText(infoRt, "T", "⚠️ 강제 유발 효과는 반드시 발동되며, 체인에 올릴 순서만 선택합니다.", 16, TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
             }
         }
 
@@ -1012,7 +1039,7 @@ namespace YGOPortable.UI
                 {
                     int val = actions[0].responseVal;
                     string lbl = actions[0].label;
-                    if (lbl.Length > 7 && lbl.StartsWith("발동")) lbl = "효과 발동";
+                    if (lbl.Length > 7 && lbl.Contains("발동")) lbl = "💥 효과 발동";
                     LotdUiKit.CreateLotdButton(actRt, "B", lbl, () =>
                     {
                         ZoneViewRoot.SetActive(false);

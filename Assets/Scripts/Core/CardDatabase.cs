@@ -183,7 +183,8 @@ namespace YGOPortable.Core
             { "Chewbone Jr. Token", "본체 Jr. 토큰" },
             { "Spool Token", "스풀 토큰" },
             { "Delta Token", "델타 토큰" },
-            { "Moult Token", "탈피 토큰" }
+            { "Moult Token", "탈피 토큰" },
+            { "Fluff Token", "플러프 토큰" }
         };
 
         public static string LocalizeTokenName(string name)
