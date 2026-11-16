@@ -353,6 +353,7 @@ namespace YGOPortable.Editor
             VerifyPossessedDestiny(classicDecks[0].main);
             VerifyMandatoryBattleAttack();
             VerifyAiFieldAndTributeChoices();
+            VerifyDddTurnPlanning();
             VerifyRainbowDarkDragonMatch();
 
             // Explicit test for Token generation, effect tokens (Swordsoul Tuner), dynamic/stat tokens, and token disappearance
@@ -1406,6 +1407,66 @@ namespace YGOPortable.Editor
             }
             AssertTrue(session.IsFinished && session.RetryCount == 0, "Rainbow Dark Dragon regression duel stalled or retried");
             Debug.Log($"[VERIFY RAINBOW DARK DRAGON] Completed {session.TurnNumber} turns in {elapsed.ElapsedMilliseconds} ms.");
+        }
+
+        private static void VerifyDddTurnPlanning()
+        {
+            const uint gilgamesh = 9024198, machinex = 46593546, siegfried = 44852429;
+            var deck = DeckRepository.PresetDecks.SingleOrDefault(candidate => candidate.id == 34043);
+            AssertTrue(deck != null && deck.charId == 43 && deck.main.Length == 40 && deck.extra.Length == 15 &&
+                deck.extra.Contains(gilgamesh) && deck.extra.Contains(machinex), "The planned D/D/D deck is not selectable.");
+
+            using var session = new DuelSession();
+            var own = session.Players[0];
+            var rival = session.Players[1];
+            own.deckCount = 28;
+            LiveCardState FaceUp(uint code) => new LiveCardState
+            {
+                code = code,
+                position = YgoConstants.POS_FACEUP_ATTACK,
+            };
+            own.mzone[0] = FaceUp(74583607);
+            own.mzone[1] = FaceUp(28406301);
+            own.hand.Add(FaceUp(19580308));
+            own.extra.AddRange(new[] { FaceUp(gilgamesh), FaceUp(machinex), FaceUp(siegfried) });
+
+            var prompt = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_IDLECMD, playerId = 0, canEp = true };
+            foreach (uint code in new[] { machinex, gilgamesh, siegfried })
+                prompt.spSummonable.Add(new SelectableCardItem { code = code, location = YgoConstants.LOCATION_EXTRA });
+
+            int Pick() => BitConverter.ToInt32(new TacticalAI().ComputeResponse(session, prompt), 0);
+            AssertTrue(Pick() == ((1 << 16) | 1), "D/D/D did not open the Pendulum route before overlaying.");
+
+            own.szone[6] = FaceUp(28406301);
+            own.szone[7] = FaceUp(11609969);
+            own.szone[1] = FaceUp(46372010);
+            rival.mzone[0] = FaceUp(89631139);
+            AssertTrue(Pick() == 1, "D/D/D did not choose Machinex against a public monster with interaction available.");
+            rival.szone[2] = new LiveCardState { position = YgoConstants.POS_FACEDOWN_DEFENSE };
+            AssertTrue(Pick() == ((2 << 16) | 1), "D/D/D did not adapt its boss choice to the opponent's backrow.");
+
+            own.szone[6] = own.szone[7] = null;
+            own.mzone[1] = null;
+            prompt.spSummonable.RemoveRange(1, 2);
+            own.hand.Add(FaceUp(45206713));
+            prompt.activatable.Add(new SelectableCardItem { code = 45206713, location = YgoConstants.LOCATION_HAND });
+            AssertTrue(Pick() == 5, "D/D/D did not use the available fusion route after losing its Link materials.");
+
+            session.CurrentChain.Add(new ChainLinkInfo { code = gilgamesh, description = (ulong)gilgamesh << 20 });
+            var scales = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_UNSELECT_CARD, min = 2, max = 2 };
+            SelectableCardItem Scale(uint code) => new SelectableCardItem { code = code, location = YgoConstants.LOCATION_DECK };
+            scales.unselectCandidates.Add(Scale(28406301));
+            scales.candidates.Add(Scale(46796664));
+            scales.candidates.Add(Scale(11609969));
+            AssertTrue(BitConverter.ToInt32(new TacticalAI().ComputeResponse(session, scales), 4) == 1,
+                "D/D/D chose two equal scales over a scale pair that can summon the current hand.");
+
+            own.szone[1] = null;
+            var kepler = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_OPTION };
+            kepler.options.AddRange(new[] { (11609969UL << 20) | 2UL, (11609969UL << 20) | 3UL });
+            AssertTrue(BitConverter.ToInt32(new TacticalAI().ComputeResponse(session, kepler), 0) == 1,
+                "D/D/D bounced a monster instead of searching for an unavailable Contract.");
+            Debug.Log("[VERIFY DDD TURN PLANNING] Board-based boss choice, fusion recovery, reachable Pendulum scales and Kepler search.");
         }
 
         private static void VerifyAiFieldAndTributeChoices()

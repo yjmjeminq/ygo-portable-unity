@@ -63,6 +63,8 @@ namespace YGOPortable.AI
                     return BitConverter.GetBytes(1);
 
                 case YgoConstants.MSG_SELECT_OPTION:
+                    return BitConverter.GetBytes(DddTurnPlan.ChooseOption(session, prompt) ?? 0);
+
                 case YgoConstants.MSG_ANNOUNCE_NUMBER:
                     return BitConverter.GetBytes(0);
 
@@ -123,6 +125,10 @@ namespace YGOPortable.AI
                 if (p.canBp && HasWorthwhileAttack(s, p.playerId)) return BitConverter.GetBytes(6);
                 if (p.canEp) return BitConverter.GetBytes(7);
             }
+            else if (DddTurnPlan.ChooseIdle(s, p, CanUseIdleAction) is int planned)
+            {
+                return EncodeIdleAction(p, planned & 0xffff, planned >> 16);
+            }
 
             // 1. High-ATK / Extra Deck Special Summons first
             if (p.spSummonable.Count > 0 && CountOwnMonsters(s, p.playerId) < 5)
@@ -132,8 +138,7 @@ namespace YGOPortable.AI
                 for (int i = 0; i < p.spSummonable.Count; i++)
                 {
                     var item = p.spSummonable[i];
-                    string key = $"sp:{item.code}";
-                    if (_effectCounts.TryGetValue(key, out int cnt) && cnt >= 2) continue;
+                    if (!CanUseIdleAction(1, item)) continue;
                     var ci = CardDatabase.Get(item.code);
                     int score = (ci != null ? ci.atk : 1500) + ((ci != null && ci.IsExtra) ? 1200 : 400);
                     if (score > bestScore)
@@ -142,11 +147,7 @@ namespace YGOPortable.AI
                         bestIdx = i;
                     }
                 }
-                if (bestIdx >= 0)
-                {
-                    BumpKey($"sp:{p.spSummonable[bestIdx].code}");
-                    return BitConverter.GetBytes((bestIdx << 16) | 1);
-                }
+                if (bestIdx >= 0) return EncodeIdleAction(p, 1, bestIdx);
             }
 
             // 2. Activate Spells / Monster Ignition Effects
@@ -157,8 +158,7 @@ namespace YGOPortable.AI
                 for (int i = 0; i < p.activatable.Count; i++)
                 {
                     var act = p.activatable[i];
-                    string key = $"act:{act.code}:{act.description}:{act.location}:{act.sequence}";
-                    if (_effectCounts.TryGetValue(key, out int cnt) && cnt >= 1) continue;
+                    if (!CanUseIdleAction(5, act)) continue;
                     var ci = CardDatabase.Get(act.code);
                     int score = 500;
                     if (ci != null)
@@ -174,12 +174,7 @@ namespace YGOPortable.AI
                         bestIdx = i;
                     }
                 }
-                if (bestIdx >= 0)
-                {
-                    var chosen = p.activatable[bestIdx];
-                    BumpKey($"act:{chosen.code}:{chosen.description}:{chosen.location}:{chosen.sequence}");
-                    return BitConverter.GetBytes((bestIdx << 16) | 5);
-                }
+                if (bestIdx >= 0) return EncodeIdleAction(p, 5, bestIdx);
             }
 
             // 3. Normal Summon strongest useful monster
@@ -255,6 +250,23 @@ namespace YGOPortable.AI
             if (p.canEp) return BitConverter.GetBytes(7);
             if (p.canBp) return BitConverter.GetBytes(6);
             return BitConverter.GetBytes(7);
+        }
+
+        private static string IdleActionKey(int command, SelectableCardItem item) => command == 1
+            ? $"sp:{item.code}" : $"act:{item.code}:{item.description}:{item.location}:{item.sequence}";
+
+        private bool CanUseIdleAction(int command, SelectableCardItem item) =>
+            (command != 1 && command != 5) ||
+            !_effectCounts.TryGetValue(IdleActionKey(command, item), out int count) || count < (command == 1 ? 2 : 1);
+
+        private byte[] EncodeIdleAction(DuelPrompt prompt, int command, int index)
+        {
+            if (command == 1 || command == 5)
+            {
+                var item = command == 1 ? prompt.spSummonable[index] : prompt.activatable[index];
+                BumpKey(IdleActionKey(command, item));
+            }
+            return BitConverter.GetBytes((index << 16) | command);
         }
 
         private byte[] BuildBattleCmd(DuelSession s, DuelPrompt p, bool fallback)
@@ -377,6 +389,9 @@ namespace YGOPortable.AI
 
         private byte[] BuildSelectCard(DuelSession s, DuelPrompt p)
         {
+            if (p.min == 1 && p.max == 1 && DddTurnPlan.ChooseCard(s, p) is int planned)
+                return PackIndexList(new[] { planned });
+
             bool removalHint = s.LastHintMsg == 500 || s.LastHintMsg == 501 || s.LastHintMsg == 502 || s.LastHintMsg == 504;
             int opp = 1 - p.playerId;
 
@@ -416,6 +431,9 @@ namespace YGOPortable.AI
             }
             if (p.candidates.Count > 0)
             {
+                if (DddTurnPlan.ChooseScale(s, p) is int scale)
+                    return PackTwoInts(1, scale);
+
                 int bestIdx = 0;
                 int bestScore = int.MinValue;
                 bool removal = s.LastHintMsg == 500 || s.LastHintMsg == 501 || s.LastHintMsg == 502 || s.LastHintMsg == 504;
