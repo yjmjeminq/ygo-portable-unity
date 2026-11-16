@@ -241,15 +241,14 @@ namespace YGOPortable.UI
             _inspRaceIcon.gameObject.SetActive(rSp != null);
         }
 
-        private void OnInspectRelatedClicked()
+        private void ShowZoomRelatedCards()
         {
-            if (_inspectedCode == 0 || _modals == null) return;
-            LotdAudio.PlayClick();
-            var rel = CardDatabase.GetRelatedCards(_inspectedCode);
-            var codes = new List<uint>(rel.Count);
-            for (int i = 0; i < rel.Count; i++) codes.Add(rel[i].code);
-            string baseName = CardDatabase.GetName(_inspectedCode);
-            _modals.ShowCodeListViewer($"[{baseName}] 연관 카드 ({rel.Count}장)", codes);
+            uint code = _zoomCardView.CurrentCode;
+            if (code == 0) return;
+            var related = CardDatabase.GetRelatedCards(code);
+            var codes = related.Select(card => card.code).ToArray();
+            _cardZoomModal.SetActive(false);
+            _modals.ShowCodeListViewer($"[{CardDatabase.GetName(code)}] 관련 카드", codes);
         }
 
 
@@ -308,7 +307,8 @@ namespace YGOPortable.UI
             var desc = LotdUiKit.CreateRect("Description", details,
                 new Vector2(0.035f, 0.265f), new Vector2(0.965f, 0.725f), Vector2.zero, Vector2.zero);
             LotdUiKit.AddImage(desc.gameObject, LotdUiKit.WhiteSprite, Color.clear);
-            var viewport = LotdUiKit.FillRect("Viewport", desc);
+            var viewport = LotdUiKit.CreateRect("Viewport", desc, Vector2.zero, Vector2.one,
+                Vector2.zero, new Vector2(-16f, 0f));
             viewport.gameObject.AddComponent<RectMask2D>();
             var content = LotdUiKit.CreateRect("Content", viewport, new Vector2(0f, 1f), new Vector2(1f, 1f),
                 Vector2.zero, Vector2.zero);
@@ -322,21 +322,21 @@ namespace YGOPortable.UI
             content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             var scroll = desc.gameObject.AddComponent<ScrollRect>();
             scroll.horizontal = false;
+            scroll.scrollSensitivity = 32f;
             scroll.movementType = ScrollRect.MovementType.Clamped;
             scroll.viewport = viewport;
             scroll.content = content;
+            scroll.verticalScrollbar = LotdUiKit.AddVerticalScrollbar(desc);
+            scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
             _inspectScroll = scroll;
 
             var logButton = LotdUiKit.CreateRect("OpenLog", details, new Vector2(0.035f, 0.182f),
                 new Vector2(0.40f, 0.253f), Vector2.zero, Vector2.zero);
             LotdUiKit.CreateLotdButton(logButton, "Button", "대전 기록", OpenDuelLog, 12);
-            var log = LotdUiKit.CreateRect("RecentActions", details, new Vector2(0.04f, 0.025f), new Vector2(0.96f, 0.174f),
+            var log = LotdUiKit.CreateRect("RecentActions", details, new Vector2(0.055f, 0.056f), new Vector2(0.94f, 0.174f),
                 Vector2.zero, Vector2.zero);
-            _logFeed = LotdUiKit.AddText(log, "Log", "", 11, TextAnchor.LowerLeft, LotdUiKit.TextMuted);
+            _logFeed = LotdUiKit.AddText(log, "Log", "", 11, TextAnchor.UpperLeft, LotdUiKit.TextMuted);
             _logFeed.supportRichText = false;
-            var related = LotdUiKit.CreateRect("Related", left, new Vector2(0.68f, 0.52f), new Vector2(0.99f, 0.579f),
-                Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(related, "Button", "관련 카드", OnInspectRelatedClicked, 12);
         }
 
         private void BuildTopHud(Transform root)
@@ -881,7 +881,7 @@ namespace YGOPortable.UI
         private void RefreshLogFeed()
         {
             if (_session == null) return;
-            int start = Mathf.Max(0, _session.Logs.Count - 3);
+            int start = Mathf.Max(0, _session.Logs.Count - 2);
             _logFeed.text = string.Join("\n", _session.Logs.Skip(start));
         }
 
@@ -2038,6 +2038,10 @@ namespace YGOPortable.UI
             LotdUiKit.AddImage(hdr.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelHeader);
             LotdUiKit.AddText(hdr, "T", "카드 상세 정보 (CARD DETAILS)", 18, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold)
                 .rectTransform.offsetMin = new Vector2(20, 0);
+
+            var relatedRt = LotdUiKit.CreateRect("Related", hdr, new Vector2(0.66f, 0.15f), new Vector2(0.82f, 0.85f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.CreateLotdButton(relatedRt, "B", "관련 카드", ShowZoomRelatedCards, 15);
 
             var closeRt = LotdUiKit.CreateRect("Close", hdr, new Vector2(0.84f, 0.15f), new Vector2(0.98f, 0.85f), Vector2.zero, Vector2.zero);
             LotdUiKit.CreateLotdButton(closeRt, "B", "닫기 (ESC)", () => _cardZoomModal.SetActive(false), 15);
