@@ -88,6 +88,8 @@ namespace YGOPortable.Core
 
     public static class CardDatabase
     {
+        private const int DescriptionIndexBits = 20;
+        private const ulong DescriptionIndexMask = (1UL << DescriptionIndexBits) - 1;
         private static Dictionary<uint, CardInfo> _byCode;
         private static Dictionary<int, CardInfo> _byLotdId;
         private static List<CardInfo> _allCards;
@@ -97,6 +99,9 @@ namespace YGOPortable.Core
 
         private static readonly Dictionary<uint, string> SystemHintsKR = new Dictionary<uint, string>
         {
+            { 70, "몬스터 카드" },
+            { 71, "마법 카드" },
+            { 72, "함정 카드" },
             { 500, "릴리스할 카드를 선택하십시오." },
             { 501, "버릴 카드를 선택하십시오." },
             { 502, "파괴할 카드를 선택하십시오." },
@@ -128,6 +133,7 @@ namespace YGOPortable.Core
             { 549, "공격 대상으로 삼을 몬스터를 선택하십시오." },
             { 550, "효과를 발동할 카드를 선택하십시오." },
             { 551, "대상을 선택하십시오." },
+            { 554, "카드의 종류를 선언하십시오." },
             { 555, "효과를 선택하십시오." },
             { 556, "적용할 효과를 선택하십시오." },
             { 560, "카드를 선택하십시오." },
@@ -139,7 +145,53 @@ namespace YGOPortable.Core
             { 568, "처리할 카드를 선택하십시오." },
             { 569, "존을 선택하십시오." },
             { 572, "카운터를 선택하십시오." },
+            { 573, "패에 넣는다" },
             { 575, "무효화할 카드를 선택하십시오." },
+            { 1056, "융합" },
+            { 1057, "의식" },
+            { 1063, "싱크로" },
+            { 1073, "엑시즈" },
+            { 1074, "펜듈럼" },
+            { 1152, "특수 소환" },
+            { 1153, "세트" },
+            { 1160, "펜듈럼 마법 카드로 발동" },
+            { 1213, "예" },
+            { 1214, "아니오" },
+        };
+
+        private static readonly Dictionary<string, string> EffectTextKR = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "Special Summon", "특수 소환한다" },
+            { "Special Summon this card", "이 카드를 특수 소환한다" },
+            { "Special Summon this card from your hand", "패에서 이 카드를 특수 소환한다" },
+            { "Special Summon this card from your hand in Defense Position", "패에서 이 카드를 수비 표시로 특수 소환한다" },
+            { "Special Summon 1 Fiend monster from your hand", "패에서 악마족 몬스터 1장을 특수 소환한다" },
+            { "Special Summon 1 Fiend monster, or Set 1 Spell/Trap, from your hand?",
+                "패에서 악마족 몬스터 1장을 특수 소환하거나 마법·함정 카드 1장을 세트하시겠습니까?" },
+            { "Set 1 Spell/Trap from your hand", "패에서 마법·함정 카드 1장을 세트한다" },
+            { "Set 1 Normal Trap with a different name from your Deck", "덱에서 이름이 다른 일반 함정 카드 1장을 세트한다" },
+            { "Special Summon then return to the hand", "특수 소환한 후 패로 되돌린다" },
+            { "Destroy", "파괴한다" },
+            { "Destroy 1 card your opponent controls", "상대 필드의 카드 1장을 파괴한다" },
+            { "Destroy 1 random card in your opponent's hand", "상대의 패를 무작위로 1장 파괴한다" },
+            { "Draw", "드로우한다" },
+            { "Draw 1 card", "카드를 1장 드로우한다" },
+            { "Draw 2 cards", "카드를 2장 드로우한다" },
+            { "Take control of 1 monster your opponent controls", "상대 필드의 몬스터 1장의 컨트롤을 얻는다" },
+            { "Look at your opponent's hand", "상대의 패를 확인한다" },
+            { "Draw 1 card for eatch Special Summoned card on opponent's Field", "상대가 몬스터를 특수 소환할 때마다 1장 드로우한다" },
+            { "Add to hand", "패에 넣는다" },
+            { "Return to hand", "패로 되돌린다" },
+            { "Return to the hand", "패로 되돌린다" },
+            { "Return to deck", "덱으로 되돌린다" },
+            { "Banish", "제외한다" },
+            { "Set", "세트한다" },
+            { "Equip", "장착한다" },
+            { "Send to Graveyard", "묘지로 보낸다" },
+            { "Negate that effect", "그 효과를 무효로 한다" },
+            { "Fusion Summon", "융합 소환한다" },
+            { "Spell Card", "마법 카드" },
+            { "Trap Card", "함정 카드" },
         };
 
         private static readonly Dictionary<string, string> TokenNameMapKR = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -841,29 +893,43 @@ namespace YGOPortable.Core
             return $"카드 #{code}";
         }
 
-        public static string ResolveDescription(ulong desc, uint cardCode = 0)
+        public static uint GetDescriptionCardCode(ulong desc)
         {
-            if (desc == 0) return "효과 발동";
-            if (desc <= 10000)
+            // aux.Stringid stores the card code above the low 20 bits of the description index.
+            ulong code = desc >> DescriptionIndexBits;
+            return code <= uint.MaxValue ? (uint)code : 0;
+        }
+
+        public static string ResolveDescription(ulong desc)
+        {
+            if (desc <= DescriptionIndexMask)
+                return SystemHintsKR.TryGetValue((uint)desc, out var hint) ? hint : null;
+
+            int index = (int)(desc & DescriptionIndexMask);
+            var card = Get(GetDescriptionCardCode(desc));
+            string text = ReadDescription(card, index);
+            if (text == null && card != null && card.alias != 0)
             {
-                if (SystemHintsKR.TryGetValue((uint)desc, out var sh)) return sh;
-                if (desc == 1) return "발동 / 선택";
-                return $"효과 / 안내 (#{desc})";
+                var original = Get(card.alias);
+                if (original != null && original.name == card.name)
+                    text = ReadDescription(original, index);
             }
-            uint code = (uint)(desc >> 4);
-            int idx = (int)(desc & 0xF);
-            var c = Get(code);
-            if (c != null && c.strs != null && idx < c.strs.Length && !string.IsNullOrEmpty(c.strs[idx]))
-            {
-                return c.strs[idx];
-            }
-            if (cardCode != 0 && cardCode != code)
-            {
-                c = Get(cardCode);
-                if (c != null && c.strs != null && idx < c.strs.Length && !string.IsNullOrEmpty(c.strs[idx]))
-                    return c.strs[idx];
-            }
-            return c != null ? $"{c.name} 효과 {idx + 1}" : $"효과 ({code}:{idx})";
+            return text != null && EffectTextKR.TryGetValue(text, out var localized) ? localized : text;
+        }
+
+        public static string ResolveEffectDescription(ulong desc, uint cardCode)
+        {
+            string text = ResolveDescription(desc);
+            if (text != null) return text;
+            var source = Get(GetDescriptionCardCode(desc)) ?? Get(cardCode);
+            return string.IsNullOrWhiteSpace(source?.desc) ? null : source.desc.Trim();
+        }
+
+        private static string ReadDescription(CardInfo card, int index)
+        {
+            var strings = card?.strs;
+            return strings != null && index < strings.Length && !string.IsNullOrWhiteSpace(strings[index])
+                ? strings[index].Trim() : null;
         }
     }
 }

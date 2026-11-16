@@ -191,6 +191,10 @@ namespace YGOPortable.Editor
 
             CardDatabase.Load(streaming);
             AssertTrue(CardDatabase.AllCards.Count >= 14000, "CardDatabase count too low");
+            AssertTrue(CardDatabase.ResolveDescription((81497285UL << 20) | 1) == "덱에서 이름이 다른 일반 함정 카드 1장을 세트한다",
+                "Could not resolve the Labrynth Lady's encoded effect description");
+            AssertTrue(CardDatabase.ResolveDescription(71) == "마법 카드" && CardDatabase.ResolveDescription(72) == "함정 카드",
+                "Spell and Trap declaration choices did not resolve");
 
             // Verify 환상마족 (Illusion) card (e.g. 14307929 하얀 숲의 요마 디아벨) + icon
             var paidra = CardDatabase.Get(39931513);
@@ -420,7 +424,7 @@ namespace YGOPortable.Editor
 
                             AssertTrue(searchPrompt != null, "E-Emergency Call did not open MSG_SELECT_CARD");
                             AssertTrue(session.LastHintMsg == 506, $"Expected HINTMSG_ATOHAND (506), got {session.LastHintMsg}");
-                            string hintText = CardDatabase.ResolveDescription(session.LastHintMsg, 0);
+                            string hintText = CardDatabase.ResolveDescription(session.LastHintMsg);
                             AssertTrue(hintText == "패에 넣을 카드를 선택하십시오.", $"Unexpected hint text: {hintText}");
                             AssertTrue(searchPrompt.candidates.Count >= 3, $"Expected >=3 deck search candidates, got {searchPrompt.candidates.Count}");
                             AssertTrue(searchPrompt.candidates[2].location == YgoConstants.LOCATION_DECK, "3rd candidate is not from LOCATION_DECK");

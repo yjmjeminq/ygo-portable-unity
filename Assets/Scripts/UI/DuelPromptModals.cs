@@ -263,8 +263,8 @@ namespace YGOPortable.UI
         {
             var info = CardDatabase.Get(p.promptCardCode);
             string cardName = info != null ? info.name : $"카드 #{p.promptCardCode}";
-            string eff = CardDatabase.ResolveDescription(p.promptDesc, p.promptCardCode);
-            if (string.IsNullOrEmpty(eff)) eff = "이 카드의 효과를 발동하시겠습니까?";
+            string effect = CardDatabase.ResolveEffectDescription(p.promptDesc, p.promptCardCode)
+                ?? "이 카드의 효과를 발동하시겠습니까?";
 
             _modalTitle.text = "유발 효과 발동 확인 — [임의 효과 (선택 발동)]";
             _modalSubtitle.text = $"{cardName}  [{YgoConstants.GetLocationNameKR(p.promptLoc)}] — 효과를 발동할지 선택하세요 (취소/패스 가능)";
@@ -275,10 +275,10 @@ namespace YGOPortable.UI
             _onInspectCard?.Invoke(p.promptCardCode);
 
             var descBox = LotdUiKit.CreateBorderedPanel(_modalBody, "Desc", new Vector2(0.36f, 0.14f), new Vector2(0.96f, 0.88f), Vector2.zero, Vector2.zero);
-            var descTxt = LotdUiKit.AddText(descBox, "T", $"{cardName}\n\n{eff}\n\n{(info != null ? info.desc : "")}",
-                16, TextAnchor.UpperLeft, LotdUiKit.TextPrimary);
-            descTxt.rectTransform.offsetMin = new Vector2(14, 14);
-            descTxt.rectTransform.offsetMax = new Vector2(-14, -14);
+            CreateVerticalScroll(descBox, out Transform description);
+            AddDescriptionText(description, "Effect", effect, 17);
+            if (!string.IsNullOrWhiteSpace(info?.desc) && effect != info.desc.Trim())
+                AddDescriptionText(description, "CardText", info.desc);
 
             AddFooterButton(0.18f, 0.48f, "발동한다 (YES)", () => Submit(BitConverter.GetBytes(1)), true);
             AddFooterButton(0.52f, 0.82f, "발동하지 않음 (NO)", () => Submit(BitConverter.GetBytes(0)), false);
@@ -286,15 +286,19 @@ namespace YGOPortable.UI
 
         private void RenderYesNo(DuelSession s, DuelPrompt p)
         {
-            string msg = CardDatabase.ResolveDescription(p.promptDesc, 0);
-            if (string.IsNullOrEmpty(msg)) msg = CardDatabase.ResolveDescription(s.LastHintMsg, 0);
-            if (string.IsNullOrEmpty(msg)) msg = "선택한 처리를 실행하시겠습니까?";
+            var card = CardDatabase.Get(CardDatabase.GetDescriptionCardCode(p.promptDesc));
+            string msg = CardDatabase.ResolveEffectDescription(p.promptDesc, 0)
+                ?? CardDatabase.ResolveDescription(s.LastHintMsg)
+                ?? "선택한 처리를 실행하시겠습니까?";
 
             _modalTitle.text = "확인 선택 (YES / NO)";
-            _modalSubtitle.text = "질문에 대한 예/아니오를 선택하세요.";
+            _modalSubtitle.text = card?.name ?? "질문에 대한 예/아니오를 선택하세요.";
 
-            var box = LotdUiKit.CreateBorderedPanel(_modalBody, "Msg", new Vector2(0.10f, 0.25f), new Vector2(0.90f, 0.78f), Vector2.zero, Vector2.zero);
-            LotdUiKit.AddText(box, "T", msg, 22, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
+            var box = LotdUiKit.CreateBorderedPanel(_modalBody, "Msg", new Vector2(0.10f, 0.12f), new Vector2(0.90f, 0.90f), Vector2.zero, Vector2.zero);
+            CreateVerticalScroll(box, out Transform description);
+            AddDescriptionText(description, "Question", msg, 18);
+            if (!string.IsNullOrWhiteSpace(card?.desc) && msg != card.desc.Trim())
+                AddDescriptionText(description, "CardText", card.desc);
 
             AddFooterButton(0.18f, 0.48f, "예 (YES)", () => Submit(BitConverter.GetBytes(1)), true);
             AddFooterButton(0.52f, 0.82f, "아니오 (NO)", () => Submit(BitConverter.GetBytes(0)), false);
@@ -343,18 +347,30 @@ namespace YGOPortable.UI
             _modalTitle.text = isNum ? "숫자 선언" : "효과 / 항목 선택";
             _modalSubtitle.text = "실행할 항목을 선택하세요.";
 
-            var scroll = CreateVerticalScroll(_modalBody, out Transform content);
+            CreateVerticalScroll(_modalBody, out Transform content);
+            var sources = new List<CardInfo>();
             for (int i = 0; i < p.options.Count; i++)
             {
                 int pick = i;
                 ulong opt = p.options[i];
-                string text = isNum ? $"선언 숫자: {opt}" : CardDatabase.ResolveDescription(opt, p.promptCardCode);
-                if (string.IsNullOrEmpty(text)) text = $"선택지 #{i + 1} ({opt})";
-
-                var row = new GameObject($"Opt_{i}", typeof(RectTransform), typeof(LayoutElement));
-                row.transform.SetParent(content, false);
-                row.GetComponent<LayoutElement>().preferredHeight = 56;
-                LotdUiKit.CreateLotdButton(row.transform, "B", text, () => Submit(BitConverter.GetBytes(pick)), 17, gold: i == 0);
+                var card = isNum ? null : CardDatabase.Get(CardDatabase.GetDescriptionCardCode(opt));
+                if (card != null && !sources.Contains(card))
+                    sources.Add(card);
+                string text = isNum ? $"선언 숫자: {opt}" : CardDatabase.ResolveDescription(opt);
+                if (text == null)
+                    text = card != null ? $"{i + 1}. {card.name}" : $"선택지 {i + 1}";
+                LotdUiKit.CreateWrappedButton(content, $"Opt_{i}", text, () => Submit(BitConverter.GetBytes(pick)),
+                    17, i == 0, 54f, sidePadding: 52);
+            }
+            if (sources.Count == 1)
+            {
+                _modalSubtitle.text = $"{sources[0].name}의 효과를 선택하세요.";
+                _onInspectCard?.Invoke(sources[0].code);
+            }
+            foreach (var card in sources)
+            {
+                if (!string.IsNullOrWhiteSpace(card.desc))
+                    AddDescriptionText(content, "CardText", $"{card.name}\n{card.desc}");
             }
         }
 
@@ -379,9 +395,6 @@ namespace YGOPortable.UI
                     : "발동 가능한 카드 효과가 있습니다 (발동 여부 선택 가능).";
             }
 
-            string badgeTag = p.forced
-                ? "<color=#FFAA33>[강제 효과 — 필수]</color>"
-                : (p.IsTriggerChain ? "<color=#66EEBB>[임의 유발 — 선택 가능]</color>" : "<color=#88CCFF>[임의 효과 — 선택 가능]</color>");
             string btnLabel = p.forced ? $"체인 {nextLink} 등록" : $"체인 {nextLink} 발동";
 
             CreateVerticalScroll(_modalBody, out Transform content);
@@ -390,24 +403,40 @@ namespace YGOPortable.UI
                 int pick = i;
                 var c = p.candidates[i];
                 string cname = CardDatabase.GetName(c.code);
-                string desc = CardDatabase.ResolveDescription(c.description, c.code);
-                if (string.IsNullOrEmpty(desc)) desc = "카드 효과 발동";
+                string desc = CardDatabase.ResolveEffectDescription(c.description, c.code);
                 string locTag = $"{(c.controller == s.HumanPlayerIndex ? "내" : "상대")} {YgoConstants.GetLocationNameKR(c.location)}";
 
                 var row = LotdUiKit.CreateBorderedPanel(content, $"Ch_{i}", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-                row.gameObject.AddComponent<LayoutElement>().preferredHeight = 96;
+                var layout = row.gameObject.AddComponent<HorizontalLayoutGroup>();
+                layout.padding = new RectOffset(12, 12, 8, 8);
+                layout.spacing = 12f;
+                layout.childAlignment = TextAnchor.MiddleLeft;
+                layout.childControlWidth = true;
+                layout.childControlHeight = true;
+                layout.childForceExpandWidth = false;
+                layout.childForceExpandHeight = false;
 
-                var thumbRt = LotdUiKit.CreateRect("Card", row, new Vector2(0.01f, 0.06f), new Vector2(0.11f, 0.94f), Vector2.zero, Vector2.zero);
+                var thumbRt = LotdUiKit.FillRect("Card", row);
+                var thumbSize = thumbRt.gameObject.AddComponent<LayoutElement>();
+                thumbSize.preferredWidth = 62f;
+                thumbSize.preferredHeight = 81f;
                 var cv = CompositeCardView.Create(thumbRt, "V", false);
                 cv.SetCard(c.code);
 
-                var txtRt = LotdUiKit.CreateRect("Txt", row, new Vector2(0.13f, 0.08f), new Vector2(0.75f, 0.92f), Vector2.zero, Vector2.zero);
-                LotdUiKit.AddText(txtRt, "T", $"{cname}  [{locTag}]  {badgeTag}\n<color=#88CCFF>{desc}</color>", 16, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
+                string details = desc == null ? $"{cname} · {locTag}" : $"{cname} · {locTag}\n{desc}";
+                var text = AddDescriptionText(row, "Effect", details, 16);
+                var textSize = text.gameObject.AddComponent<LayoutElement>();
+                textSize.minWidth = 0f;
+                textSize.preferredWidth = 0f;
+                textSize.flexibleWidth = 1f;
 
-                var actRt = LotdUiKit.CreateRect("Act", row, new Vector2(0.77f, 0.18f), new Vector2(0.98f, 0.82f), Vector2.zero, Vector2.zero);
+                var actRt = LotdUiKit.FillRect("Act", row);
+                var actSize = actRt.gameObject.AddComponent<LayoutElement>();
+                actSize.preferredWidth = 138f;
+                actSize.preferredHeight = 46f;
                 LotdUiKit.CreateLotdButton(actRt, "B", btnLabel, () => Submit(BitConverter.GetBytes(pick)), 16, gold: true);
 
-                var insRt = LotdUiKit.CreateRect("Ins", row, new Vector2(0.01f, 0.06f), new Vector2(0.11f, 0.94f), Vector2.zero, Vector2.zero);
+                var insRt = LotdUiKit.FillRect("Ins", thumbRt);
                 var insImg = LotdUiKit.AddImage(insRt.gameObject, LotdUiKit.WhiteSprite, Color.clear);
                 var insBtn = insRt.gameObject.AddComponent<Button>();
                 insBtn.targetGraphic = insImg;
@@ -432,7 +461,7 @@ namespace YGOPortable.UI
 
         private void RenderCardMultiSelect(DuelSession s, DuelPrompt p)
         {
-            string hint = CardDatabase.ResolveDescription(s.LastHintMsg, 0);
+            string hint = CardDatabase.ResolveDescription(s.LastHintMsg);
             if (p.messageType == YgoConstants.MSG_SELECT_TRIBUTE)
                 _modalTitle.text = !string.IsNullOrEmpty(hint) ? hint : "릴리스할 몬스터 선택";
             else if (p.messageType == YgoConstants.MSG_SELECT_SUM)
@@ -1042,6 +1071,23 @@ namespace YGOPortable.UI
             Action<LiveCardState> onOpenCardActions = null)
         {
             bool hasActions = actions != null && actions.Count > 0;
+            bool directAction = hasActions && actions.Count == 1 && onExecuteAction != null;
+            bool openActions = hasActions && live != null && onOpenCardActions != null &&
+                (!directAction || actions[0].label.Length > 12);
+            void SelectAction()
+            {
+                if (openActions)
+                {
+                    ZoneViewRoot.SetActive(false);
+                    onOpenCardActions(live);
+                }
+                else if (directAction)
+                {
+                    ZoneViewRoot.SetActive(false);
+                    onExecuteAction(actions[0].responseVal);
+                }
+            }
+
             var tile = LotdUiKit.CreateBorderedPanel(_zoneGrid, $"Z_{code}", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero,
                 LotdUiKit.PanelNavy, hasActions ? LotdUiKit.GoldAccent : LotdUiKit.CyanAccent);
             var cRt = LotdUiKit.CreateRect("C", tile,
@@ -1058,19 +1104,7 @@ namespace YGOPortable.UI
                 btn.onClick.AddListener(() =>
                 {
                     _onInspectCard?.Invoke(code);
-                    if (hasActions)
-                    {
-                        if (actions.Count == 1 && onExecuteAction != null)
-                        {
-                            ZoneViewRoot.SetActive(false);
-                            onExecuteAction(actions[0].responseVal);
-                        }
-                        else if (live != null && onOpenCardActions != null)
-                        {
-                            ZoneViewRoot.SetActive(false);
-                            onOpenCardActions(live);
-                        }
-                    }
+                    SelectAction();
                 });
                 var trig = tile.gameObject.AddComponent<CardDragTrigger>();
                 trig.OnPointerEnterAction = () => _onInspectCard?.Invoke(code);
@@ -1083,28 +1117,11 @@ namespace YGOPortable.UI
                 }
             }
 
-            if (hasActions)
+            if (openActions || directAction)
             {
                 var actRt = LotdUiKit.CreateRect("Act", tile, new Vector2(0.06f, 0.02f), new Vector2(0.94f, 0.16f), Vector2.zero, Vector2.zero);
-                if (actions.Count == 1 && onExecuteAction != null)
-                {
-                    int val = actions[0].responseVal;
-                    string lbl = actions[0].label;
-                    if (lbl.Length > 7 && lbl.Contains("발동")) lbl = "💥 효과 발동";
-                    LotdUiKit.CreateLotdButton(actRt, "B", lbl, () =>
-                    {
-                        ZoneViewRoot.SetActive(false);
-                        onExecuteAction(val);
-                    }, 11, actions[0].gold);
-                }
-                else if (live != null && onOpenCardActions != null)
-                {
-                    LotdUiKit.CreateLotdButton(actRt, "B", $"행동 ({actions.Count})", () =>
-                    {
-                        ZoneViewRoot.SetActive(false);
-                        onOpenCardActions(live);
-                    }, 11, true);
-                }
+                string label = openActions ? "행동 확인" : actions[0].label;
+                LotdUiKit.CreateLotdButton(actRt, "B", label, SelectAction, 11, openActions || actions[0].gold);
             }
         }
 
@@ -1184,17 +1201,27 @@ namespace YGOPortable.UI
             return LotdUiKit.CreateLotdButton(slot, "B", label, onClick, 17, gold);
         }
 
-        private static GameObject CreateVerticalScroll(Transform parent, out Transform content)
+        private static Text AddDescriptionText(Transform parent, string name, string value, int size = 15)
         {
-            var svRt = LotdUiKit.FillRect("Scroll", parent);
+            var text = LotdUiKit.AddText(parent, name, value, size, TextAnchor.UpperLeft, LotdUiKit.TextPrimary);
+            text.supportRichText = false;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+            return text;
+        }
+
+        private static void CreateVerticalScroll(Transform parent, out Transform content)
+        {
+            var svRt = LotdUiKit.CreateRect("Scroll", parent, Vector2.zero, Vector2.one,
+                new Vector2(20f, 4f), new Vector2(-20f, -4f));
+            LotdUiKit.AddImage(svRt.gameObject, LotdUiKit.WhiteSprite, Color.clear);
             var sr = svRt.gameObject.AddComponent<ScrollRect>();
             sr.horizontal = false;
             sr.vertical = true;
             sr.scrollSensitivity = 28f;
+            sr.movementType = ScrollRect.MovementType.Clamped;
 
-            var vp = LotdUiKit.FillRect("VP", svRt);
-            LotdUiKit.AddImage(vp.gameObject, LotdUiKit.WhiteSprite, new Color(0, 0, 0, 0.1f));
-            vp.gameObject.AddComponent<Mask>().showMaskGraphic = false;
+            var vp = LotdUiKit.CreateRect("VP", svRt, Vector2.zero, Vector2.one, new Vector2(2f, 2f), new Vector2(-17f, -2f));
+            vp.gameObject.AddComponent<RectMask2D>();
 
             var cRt = LotdUiKit.CreateRect("Content", vp, new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
             cRt.pivot = new Vector2(0.5f, 1f);
@@ -1203,14 +1230,15 @@ namespace YGOPortable.UI
             vlg.padding = new RectOffset(8, 8, 8, 8);
             vlg.childControlWidth = true;
             vlg.childForceExpandWidth = true;
-            vlg.childControlHeight = false;
+            vlg.childControlHeight = true;
             vlg.childForceExpandHeight = false;
             cRt.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
             sr.viewport = vp;
             sr.content = cRt;
+            sr.verticalScrollbar = LotdUiKit.AddVerticalScrollbar(svRt);
+            sr.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
             content = cRt;
-            return svRt.gameObject;
         }
 
         private static GameObject CreateHorizontalCardGrid(Transform parent, out Transform content, int cellW = 136, int cellH = 200)

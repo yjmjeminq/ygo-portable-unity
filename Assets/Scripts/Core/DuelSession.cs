@@ -419,7 +419,8 @@ namespace YGOPortable.Core
                     }
                     else if (htype == YgoConstants.HINT_MESSAGE)
                     {
-                        if (desc > 499) AddLog(CardDatabase.ResolveDescription(desc));
+                        string message = desc > 499 ? CardDatabase.ResolveDescription(desc) : null;
+                        if (message != null) AddLog(message);
                     }
                     break;
                 }

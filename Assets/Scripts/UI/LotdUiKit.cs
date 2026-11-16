@@ -236,6 +236,40 @@ namespace YGOPortable.UI
             return btn;
         }
 
+        public static Button CreateWrappedButton(Transform parent, string name, string label, Action onClick,
+            int fontSize, bool gold, float minHeight, Sprite icon = null, int sidePadding = 24)
+        {
+            var button = CreateLotdButton(parent, name, label, onClick, fontSize, gold);
+            button.gameObject.AddComponent<LayoutElement>().minHeight = minHeight;
+            var layout = button.gameObject.AddComponent<HorizontalLayoutGroup>();
+            layout.padding = new RectOffset(sidePadding, sidePadding, 8, 8);
+            layout.spacing = 9f;
+            layout.childAlignment = TextAnchor.MiddleLeft;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+
+            var caption = button.GetComponentInChildren<Text>();
+            caption.alignment = TextAnchor.MiddleLeft;
+            caption.verticalOverflow = VerticalWrapMode.Overflow;
+            caption.supportRichText = false;
+            var textLayout = caption.gameObject.AddComponent<LayoutElement>();
+            textLayout.minWidth = 0f;
+            textLayout.preferredWidth = 0f;
+            textLayout.flexibleWidth = 1f;
+            if (icon != null)
+            {
+                var holder = FillRect("CommandIcon", button.transform);
+                holder.SetAsFirstSibling();
+                var iconLayout = holder.gameObject.AddComponent<LayoutElement>();
+                iconLayout.preferredWidth = 27f;
+                iconLayout.preferredHeight = 27f;
+                AddImage(holder.gameObject, icon, Color.white, true, false);
+            }
+            return button;
+        }
+
         public static Dropdown CreateLotdDropdown(Transform parent, string name, IReadOnlyList<string> choices,
             Action<int> onChanged)
         {

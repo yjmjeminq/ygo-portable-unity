@@ -559,13 +559,17 @@ namespace YGOPortable.UI
             _actionHeader = LotdUiKit.AddFittedText(header, "CardName", "", 17, 10, TextAnchor.MiddleCenter,
                 LotdUiKit.GoldAccent, FontStyle.Bold);
 
-            var viewport = LotdUiKit.CreateRect("Viewport", _actionWindow, Vector2.zero, Vector2.one,
-                new Vector2(10f, 10f), new Vector2(-10f, -45f));
+            var scrollArea = LotdUiKit.CreateRect("ScrollArea", _actionWindow, Vector2.zero, Vector2.one,
+                new Vector2(25f, 18f), new Vector2(-25f, -45f));
+            var viewport = LotdUiKit.CreateRect("Viewport", scrollArea, Vector2.zero, Vector2.one,
+                Vector2.zero, new Vector2(-15f, 0f));
             viewport.gameObject.AddComponent<RectMask2D>();
             var scroll = _actionWindow.gameObject.AddComponent<ScrollRect>();
             scroll.viewport = viewport;
             scroll.horizontal = false;
             scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.verticalScrollbar = LotdUiKit.AddVerticalScrollbar(scrollArea);
+            scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
 
             _actionList = LotdUiKit.CreateRect("Actions", viewport, new Vector2(0f, 1f), Vector2.one,
                 Vector2.zero, Vector2.zero);
@@ -1673,10 +1677,8 @@ namespace YGOPortable.UI
                     if (predicate(p.sSetable[i])) dest.Add((p.sSetable[i], "마법·함정 세트", (i << 16) | 4, false));
                 for (int i = 0; i < p.activatable.Count; i++)
                 {
-                    if (!predicate(p.activatable[i])) continue;
-                    string desc = CardDatabase.ResolveDescription(p.activatable[i].description, p.activatable[i].code);
-                    string lbl = string.IsNullOrEmpty(desc) ? "효과 발동" : $"발동  {desc}";
-                    dest.Add((p.activatable[i], lbl, (i << 16) | 5, true));
+                    var item = p.activatable[i];
+                    if (predicate(item)) dest.Add((item, EffectActionLabel(item), (i << 16) | 5, true));
                 }
             }
             else if (p.messageType == YgoConstants.MSG_SELECT_BATTLECMD)
@@ -1685,12 +1687,16 @@ namespace YGOPortable.UI
                     if (predicate(p.attackable[i])) dest.Add((p.attackable[i], "공격", (i << 16) | 1, true));
                 for (int i = 0; i < p.activatable.Count; i++)
                 {
-                    if (!predicate(p.activatable[i])) continue;
-                    string desc = CardDatabase.ResolveDescription(p.activatable[i].description, p.activatable[i].code);
-                    string lbl = string.IsNullOrEmpty(desc) ? "효과 발동" : $"발동  {desc}";
-                    dest.Add((p.activatable[i], lbl, (i << 16) | 0, true));
+                    var item = p.activatable[i];
+                    if (predicate(item)) dest.Add((item, EffectActionLabel(item), (i << 16) | 0, true));
                 }
             }
+        }
+
+        private static string EffectActionLabel(SelectableCardItem item)
+        {
+            string desc = CardDatabase.ResolveEffectDescription(item.description, item.code);
+            return desc == null ? "카드 효과 발동" : $"발동 · {desc}";
         }
 
         private List<(string label, int responseVal, bool gold)> CollectActions(byte con, uint loc, uint seq)
@@ -1858,7 +1864,7 @@ namespace YGOPortable.UI
                 }, false, "LOOK");
             }
             AddActionRow("취소", CloseActionPopup, false);
-            PlaceActionWindow(actions.Count + (hasMaterials ? 2 : 1), anchor);
+            PlaceActionWindow(anchor);
         }
 
         private string CommandIcon(int response)
@@ -1879,22 +1885,8 @@ namespace YGOPortable.UI
 
         private void AddActionRow(string label, Action action, bool selected, string icon = null)
         {
-            var row = LotdUiKit.FillRect("Action", _actionList);
-            row.gameObject.AddComponent<LayoutElement>().preferredHeight = 42f;
-            var button = LotdUiKit.CreateLotdButton(row, "Button", label, action, 15, selected);
-            var caption = button.GetComponentInChildren<Text>();
-            caption.resizeTextForBestFit = true;
-            caption.resizeTextMinSize = 11;
-            caption.resizeTextMaxSize = 15;
-            if (icon == null) return;
-
-            var image = LotdUiKit.CreateRect("CommandIcon", button.transform, new Vector2(0.03f, 0.12f), new Vector2(0.16f, 0.88f),
-                Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(image.gameObject, LotdUiKit.LoadSprite($"LOTD/Icons/ICON_ID_CMDID_48_{icon}"),
-                Color.white, true, false);
-            caption.rectTransform.anchorMin = new Vector2(0.19f, 0f);
-            caption.rectTransform.anchorMax = new Vector2(0.96f, 1f);
-            caption.alignment = TextAnchor.MiddleLeft;
+            Sprite iconSprite = icon == null ? null : LotdUiKit.LoadSprite($"LOTD/Icons/ICON_ID_CMDID_48_{icon}");
+            LotdUiKit.CreateWrappedButton(_actionList, "Action", label, action, 15, selected, 42f, iconSprite);
         }
 
         private void ClearActionRows()
@@ -1908,11 +1900,16 @@ namespace YGOPortable.UI
             _actionList.anchoredPosition = Vector2.zero;
         }
 
-        private void PlaceActionWindow(int rows, RectTransform anchor = null)
+        private void PlaceActionWindow(RectTransform anchor = null)
         {
             var parent = (RectTransform)_actionPopup.transform;
-            float width = Mathf.Min(345f, parent.rect.width * 0.88f);
-            float height = Mathf.Min(51f + 46f * rows, parent.rect.height * 0.85f);
+            float width = Mathf.Min(410f, parent.rect.width * 0.88f);
+            float maxHeight = parent.rect.height * 0.85f;
+            _actionWindow.sizeDelta = new Vector2(width, maxHeight);
+            _actionPopup.transform.SetAsLastSibling();
+            _actionPopup.SetActive(true);
+            LayoutRebuilder.ForceRebuildLayoutImmediate(_actionList);
+            float height = Mathf.Min(63f + LayoutUtility.GetPreferredHeight(_actionList), maxHeight);
             _actionWindow.sizeDelta = new Vector2(width, height);
             Vector2 center = Vector2.zero;
             if (anchor != null)
@@ -1924,8 +1921,6 @@ namespace YGOPortable.UI
                 center.y = Mathf.Clamp(center.y, parent.rect.yMin + height * 0.5f + 6f, parent.rect.yMax - height * 0.5f - 6f);
             }
             _actionWindow.anchoredPosition = center;
-            _actionPopup.transform.SetAsLastSibling();
-            _actionPopup.SetActive(true);
         }
 
         private void CloseActionPopup()
@@ -1984,7 +1979,7 @@ namespace YGOPortable.UI
             _actionHeader.text = "일시 정지";
             AddActionRow("계속하기", CloseActionPopup, true);
             AddActionRow("항복", ConfirmSurrender, false, "SURRENDER");
-            PlaceActionWindow(2);
+            PlaceActionWindow();
         }
 
         private void ConfirmSurrender()
@@ -1999,7 +1994,7 @@ namespace YGOPortable.UI
                 _session.Surrender(_session.HumanPlayerIndex);
                 CloseActionPopup();
             }, false, "SURRENDER");
-            PlaceActionWindow(2);
+            PlaceActionWindow();
         }
 
         private void HandleCoinTossedEvent(byte player, IReadOnlyList<bool> coins)
