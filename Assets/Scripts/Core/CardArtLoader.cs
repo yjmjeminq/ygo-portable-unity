@@ -75,18 +75,35 @@ namespace YGOPortable.Core
             }
 
             uint lookupCode = code;
-            if (_index == null || !_index.TryGetValue(lookupCode, out var entry))
+            ArtEntry entry = default;
+            bool found = false;
+            if (_index != null && _index.TryGetValue(lookupCode, out entry))
+            {
+                found = true;
+            }
+            else
             {
                 var info = CardDatabase.Get(code);
                 if (info != null && info.alias != 0 && _index != null && _index.TryGetValue(info.alias, out var aliasEntry))
                 {
                     entry = aliasEntry;
+                    found = true;
                 }
-                else
+                else if (info != null && (info.type & YgoConstants.TYPE_TOKEN) != 0 && _index != null)
                 {
-                    return GetFallbackArt();
+                    for (uint sub = 1; sub <= 5; sub++)
+                    {
+                        if (code >= sub && _index.TryGetValue(code - sub, out var genEntry))
+                        {
+                            entry = genEntry;
+                            found = true;
+                            break;
+                        }
+                    }
                 }
             }
+
+            if (!found) return GetFallbackArt();
 
             try
             {
@@ -145,7 +162,7 @@ namespace YGOPortable.Core
             }
         }
 
-        private static Sprite GetFallbackArt()
+        public static Sprite GetFallbackArt()
         {
             if (_fallbackArt != null) return _fallbackArt;
             var tex = new Texture2D(64, 64, TextureFormat.RGBA32, false);

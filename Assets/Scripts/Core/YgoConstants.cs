@@ -355,7 +355,12 @@ namespace YGOPortable.Core
             if ((type & TYPE_SPIRIT) != 0) parts.Add("스피릿");
             if ((type & TYPE_GEMINI) != 0) parts.Add("듀얼");
             if ((type & TYPE_TOON) != 0) parts.Add("툰");
-            if ((type & TYPE_EFFECT) != 0) parts.Add("효과");
+            if ((type & TYPE_TOKEN) != 0)
+            {
+                if ((type & TYPE_EFFECT) != 0) parts.Add("효과");
+                parts.Add("토큰");
+            }
+            else if ((type & TYPE_EFFECT) != 0) parts.Add("효과");
             else if ((type & TYPE_NORMAL) != 0) parts.Add("일반");
             if (parts.Count == 0) parts.Add("몬스터");
             return string.Join(" / ", parts);

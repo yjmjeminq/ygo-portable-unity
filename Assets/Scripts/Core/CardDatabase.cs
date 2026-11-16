@@ -126,6 +126,78 @@ namespace YGOPortable.Core
             { 575, "무효화할 카드를 선택하십시오." },
         };
 
+        private static readonly Dictionary<string, string> TokenNameMapKR = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "Swordsoul Token", "상검 토큰" },
+            { "Primal Being Token", "원시생명체 토큰" },
+            { "Adventurer Token", "용사 토큰" },
+            { "Sheep Token", "양 토큰" },
+            { "Hippo Token", "하마 토큰" },
+            { "Mecha Phantom Beast Token", "환상수기 토큰" },
+            { "Photon Token", "포톤 토큰" },
+            { "Gadget Token", "가젯 토큰" },
+            { "Gadget Box Token", "가젯 박스 토큰" },
+            { "Phantom Token", "팬텀 토큰" },
+            { "Steam Token", "스팀 토큰" },
+            { "Koa'ki Meiru Token", "코아키메일 토큰" },
+            { "Phantasm Spiral Token", "환황룡 토큰" },
+            { "Familiar of the Evil Eye Token", "주안의 권속 토큰" },
+            { "Rose Token", "로즈 토큰" },
+            { "Rose Tendril Token", "로즈 텐드릴 토큰" },
+            { "Cyberse Token", "사이버스 토큰" },
+            { "Cyberse Gadget Token", "사이버스 가젯 토큰" },
+            { "Trickstar Token", "트릭스터 토큰" },
+            { "Sunvine Token", "생아발론 토큰" },
+            { "G-Golem Token", "G골렘 토큰" },
+            { "Kuriboh Token", "크리보 토큰" },
+            { "Dragonic Token", "드래고닉 토큰" },
+            { "Crystal Beast Token", "보옥수 토큰" },
+            { "Sin Token", "Sin 토큰" },
+            { "Doppel Token", "도플 토큰" },
+            { "Lamia Token", "라미아 토큰" },
+            { "Slime Token", "슬라임 토큰" },
+            { "Grinder Token", "토치 토큰" },
+            { "Ojama Token", "방해꾼 토큰" },
+            { "Emissary of Darkness Token", "명왕의 사자 토큰" },
+            { "Dark Sanctuary Token", "다크 생츄어리 토큰" },
+            { "Vague Shadow Token", "어스름의 그림자 토큰" },
+            { "Blackwing - Black Crest Token", "BF－흑염 토큰" },
+            { "Icebarrie Token", "빙결계 토큰" },
+            { "Generaider Token", "제너레이드 토큰" },
+            { "Plunder Patroll Token", "플런드롤 토큰" },
+            { "Tindangle Token", "틴당글 토큰" },
+            { "Gouki Token", "강귀 토큰" },
+            { "World Chalice Token", "성잔 토큰" },
+            { "Vylon Token", "바이론 토큰" },
+            { "Raidraptor - Eagle Token", "RR－이글 토큰" },
+            { "Jurrac Token", "쥬락 토큰" },
+            { "Naturia Token", "나츄르 토큰" },
+            { "Worm Token", "웜 토큰" },
+            { "Megalith Token", "메가리스 토큰" },
+            { "Alien Token", "에이리언 토큰" },
+            { "Fluffal Token", "퍼니멀 토큰" },
+            { "Kahyoki Token", "화빙천화 토큰" },
+            { "Double Dude Token", "더블 가이 토큰" },
+            { "Dark Soul Token", "다크 소울 토큰" },
+            { "Battle Eagle Token", "배틀 이글 토큰" },
+            { "Chewbone Jr. Token", "본체 Jr. 토큰" },
+            { "Spool Token", "스풀 토큰" },
+            { "Delta Token", "델타 토큰" },
+            { "Moult Token", "탈피 토큰" }
+        };
+
+        public static string LocalizeTokenName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return name;
+            if (TokenNameMapKR.TryGetValue(name, out var kr)) return kr;
+            if (name.EndsWith(" Token", StringComparison.OrdinalIgnoreCase))
+            {
+                string prefix = name.Substring(0, name.Length - 6);
+                return prefix + " 토큰";
+            }
+            return name;
+        }
+
         public static void Load(string streamingAssetsPath)
         {
             if (_allCards != null) return;
@@ -145,6 +217,10 @@ namespace YGOPortable.Core
             _byLotdId = new Dictionary<int, CardInfo>(_allCards.Count);
             foreach (var c in _allCards)
             {
+                if ((c.type & YgoConstants.TYPE_TOKEN) != 0 && !string.IsNullOrEmpty(c.name))
+                {
+                    c.name = LocalizeTokenName(c.name);
+                }
                 if (c.code != 0) _byCode[c.code] = c;
                 if (c.lotdId > 0 && !_byLotdId.ContainsKey(c.lotdId)) _byLotdId[c.lotdId] = c;
             }
@@ -296,7 +372,12 @@ namespace YGOPortable.Core
         public static string GetName(uint code)
         {
             var c = Get(code);
-            return (c != null && !string.IsNullOrEmpty(c.name)) ? c.name : $"카드 #{code}";
+            if (c != null && !string.IsNullOrEmpty(c.name))
+            {
+                if ((c.type & YgoConstants.TYPE_TOKEN) != 0) return LocalizeTokenName(c.name);
+                return c.name;
+            }
+            return $"카드 #{code}";
         }
 
         public static string ResolveDescription(ulong desc, uint cardCode = 0)

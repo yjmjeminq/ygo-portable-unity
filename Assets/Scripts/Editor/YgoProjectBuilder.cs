@@ -352,6 +352,9 @@ namespace YGOPortable.Editor
             // Explicit test for non-search effects & prompt handlers (announce, chain negate, destroy/banish, equip/counter/coin/dice/token, reborn/tribute, extra/ritual sum, RPS)
             VerifyOtherCardEffects(classicDecks[0].main);
 
+            // Explicit test for Token generation, effect tokens (Swordsoul Tuner), dynamic/stat tokens, and token disappearance
+            TestTokenAndComplexEffects.RunTokenSuiteHeadless();
+
             AssertTrue(luaErrors.Count == 0, $"Native/Lua error logs detected: {string.Join(" | ", luaErrors.Take(3))}");
 
             CardArtLoader.Shutdown();
