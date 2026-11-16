@@ -96,6 +96,7 @@ namespace YGOPortable.UI
         private Text _zoomStats;
         private Text _zoomPasscode;
         private Text _zoomDesc;
+        private ScrollRect _zoomScroll;
         private Image _zoomRaceIcon;
 
         // Multi-place selection accumulator (for MSG_SELECT_PLACE / MSG_SELECT_DISFIELD with min > 1)
@@ -235,7 +236,8 @@ namespace YGOPortable.UI
             _inspName.text = info.name;
             _inspStats.text = info.FormatStatsLineKR();
             _inspDesc.text = info.desc;
-            _inspectScroll.verticalNormalizedPosition = 1f;
+            _inspectScroll.StopMovement();
+            _inspectScroll.content.anchoredPosition = Vector2.zero;
             var rSp = info.IsMonster ? LotdUiKit.GetRaceSprite(info.race) : LotdUiKit.LoadSprite($"LOTD/Icons/{YgoConstants.GetSpellTrapSubSpriteName(info.type)}");
             _inspRaceIcon.sprite = rSp;
             _inspRaceIcon.gameObject.SetActive(rSp != null);
@@ -278,7 +280,7 @@ namespace YGOPortable.UI
             var left = LotdUiKit.CreateRect("LeftInspector", root, new Vector2(0.012f, 0.158f),
                 new Vector2(0.211f, 0.988f), Vector2.zero, Vector2.zero);
             var card = LotdUiKit.CreateRect("CardPreview", left,
-                new Vector2(0.105f, 0.535f), new Vector2(0.895f, 0.995f), Vector2.zero, Vector2.zero);
+                new Vector2(0.105f, 0.552f), new Vector2(0.895f, 0.995f), Vector2.zero, Vector2.zero);
             _inspCard = CompositeCardView.Create(card, "Card", true);
             var zoomHit = LotdUiKit.FillRect("ZoomHit", card);
             var zoom = zoomHit.gameObject.AddComponent<Button>();
@@ -286,26 +288,25 @@ namespace YGOPortable.UI
             zoom.onClick.AddListener(() => ShowCardZoomModal(_inspectedCode));
 
             var details = LotdUiKit.CreateMenuPanel(left, "CardDetails", Vector2.zero, new Vector2(1f, 0.54f));
-            var stats = LotdUiKit.CreateRect("Stats", details, new Vector2(0.025f, 0.85f), new Vector2(0.975f, 0.98f),
+            var inside = LotdUiKit.CreateRect("Content", details, Vector2.zero, Vector2.one,
+                new Vector2(31f, 27f), new Vector2(-31f, -17f));
+            var stats = LotdUiKit.CreateRect("Stats", inside, new Vector2(0f, 0.84f), Vector2.one,
                 Vector2.zero, Vector2.zero);
             LotdUiKit.AddImage(stats.gameObject, LotdUiKit.LoadSprite("LOTD/HUD/cardbar_texture"),
                 new Color(0.78f, 0.70f, 0.46f, 0.80f), false, false);
-            _inspStats = LotdUiKit.AddText(LotdUiKit.CreateRect("Info", stats,
-                new Vector2(0.025f, 0f), new Vector2(0.85f, 1f), Vector2.zero, Vector2.zero),
-                "Text", "", 13, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
-            var race = LotdUiKit.CreateRect("Race", stats, new Vector2(0.85f, 0.05f), new Vector2(0.98f, 0.95f),
+            _inspStats = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Info", stats,
+                new Vector2(0.025f, 0.07f), new Vector2(0.82f, 0.93f), Vector2.zero, Vector2.zero),
+                "Text", "", 13, 9, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
+            var race = LotdUiKit.CreateRect("Race", stats, new Vector2(0.85f, 0.12f), new Vector2(0.97f, 0.88f),
                 Vector2.zero, Vector2.zero);
             _inspRaceIcon = LotdUiKit.AddImage(race.gameObject, null, Color.white, true, false);
 
-            _inspName = LotdUiKit.AddText(LotdUiKit.CreateRect("Name", details,
-                new Vector2(0.035f, 0.735f), new Vector2(0.96f, 0.845f), Vector2.zero, Vector2.zero),
-                "Text", "", 19, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
-            _inspName.resizeTextForBestFit = true;
-            _inspName.resizeTextMinSize = 12;
-            _inspName.resizeTextMaxSize = 19;
+            _inspName = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Name", inside,
+                new Vector2(0f, 0.707f), new Vector2(1f, 0.822f), Vector2.zero, Vector2.zero),
+                "Text", "", 19, 11, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
 
-            var desc = LotdUiKit.CreateRect("Description", details,
-                new Vector2(0.035f, 0.265f), new Vector2(0.965f, 0.725f), Vector2.zero, Vector2.zero);
+            var desc = LotdUiKit.CreateRect("Description", inside,
+                new Vector2(0f, 0.252f), new Vector2(1f, 0.690f), Vector2.zero, Vector2.zero);
             LotdUiKit.AddImage(desc.gameObject, LotdUiKit.WhiteSprite, Color.clear);
             var viewport = LotdUiKit.CreateRect("Viewport", desc, Vector2.zero, Vector2.one,
                 Vector2.zero, new Vector2(-16f, 0f));
@@ -319,6 +320,7 @@ namespace YGOPortable.UI
             _inspDesc.color = LotdUiKit.TextPrimary;
             _inspDesc.raycastTarget = false;
             _inspDesc.alignment = TextAnchor.UpperLeft;
+            _inspDesc.supportRichText = false;
             content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             var scroll = desc.gameObject.AddComponent<ScrollRect>();
             scroll.horizontal = false;
@@ -330,13 +332,14 @@ namespace YGOPortable.UI
             scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
             _inspectScroll = scroll;
 
-            var logButton = LotdUiKit.CreateRect("OpenLog", details, new Vector2(0.035f, 0.182f),
-                new Vector2(0.40f, 0.253f), Vector2.zero, Vector2.zero);
+            var logButton = LotdUiKit.CreateRect("OpenLog", inside, new Vector2(0f, 0.155f),
+                new Vector2(0.46f, 0.235f), Vector2.zero, Vector2.zero);
             LotdUiKit.CreateLotdButton(logButton, "Button", "대전 기록", OpenDuelLog, 12);
-            var log = LotdUiKit.CreateRect("RecentActions", details, new Vector2(0.055f, 0.056f), new Vector2(0.94f, 0.174f),
+            var log = LotdUiKit.CreateRect("RecentActions", inside, new Vector2(0f, 0.015f), new Vector2(1f, 0.137f),
                 Vector2.zero, Vector2.zero);
             _logFeed = LotdUiKit.AddText(log, "Log", "", 11, TextAnchor.UpperLeft, LotdUiKit.TextMuted);
             _logFeed.supportRichText = false;
+            log.gameObject.AddComponent<RectMask2D>();
         }
 
         private void BuildTopHud(Transform root)
@@ -359,11 +362,10 @@ namespace YGOPortable.UI
                 new Vector2(0f, opponent ? 0.69f : 0.01f), new Vector2(1f, opponent ? 1f : 0.32f),
                 Vector2.zero, Vector2.zero);
             LotdUiKit.AddImage(namePlate.gameObject, LotdUiKit.LoadSprite($"LOTD/HUD/username_frame_{side}"), Color.white, false, false);
-            var name = LotdUiKit.AddText(LotdUiKit.FillRect("Name", namePlate, 7), "Text", "",
-                19, opponent ? TextAnchor.MiddleRight : TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
-            name.resizeTextForBestFit = true;
-            name.resizeTextMinSize = 12;
-            name.resizeTextMaxSize = 19;
+            var nameArea = LotdUiKit.CreateRect("Name", namePlate, Vector2.zero, Vector2.one,
+                new Vector2(13f, 4f), new Vector2(-13f, -4f));
+            var name = LotdUiKit.AddFittedText(nameArea, "Text", "", 19, 10,
+                opponent ? TextAnchor.MiddleRight : TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
 
             var lpPlate = LotdUiKit.CreateRect("LPPlate", root,
                 new Vector2(opponent ? 0f : 0.20f, 0.35f), new Vector2(opponent ? 0.79f : 1f, 0.66f),
@@ -372,15 +374,12 @@ namespace YGOPortable.UI
             var track = LotdUiKit.FillRect("LPTrack", lpPlate, 3f);
             var fill = LotdUiKit.FillRect("Fill", track);
             LotdUiKit.AddImage(fill.gameObject, LotdUiKit.LoadSprite("LOTD/HUD/LP_FILL"), Color.white, false, false);
-            LotdUiKit.AddText(LotdUiKit.CreateRect("Caption", lpPlate, new Vector2(0.04f, 0f), new Vector2(0.25f, 1f),
-                Vector2.zero, Vector2.zero), "Label", "LP", 20, TextAnchor.MiddleLeft,
+            LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Caption", lpPlate, new Vector2(0.05f, 0.10f), new Vector2(0.25f, 0.90f),
+                Vector2.zero, Vector2.zero), "Label", "LP", 20, 11, TextAnchor.MiddleLeft,
                 new Color(1f, 0.92f, 0.17f), FontStyle.Bold);
-            var lp = LotdUiKit.AddText(LotdUiKit.CreateRect("Value", lpPlate, new Vector2(0.26f, 0f), new Vector2(0.96f, 1f),
-                Vector2.zero, Vector2.zero), "Text", "8000", 30, TextAnchor.MiddleRight,
+            var lp = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Value", lpPlate, new Vector2(0.27f, 0.10f), new Vector2(0.95f, 0.90f),
+                Vector2.zero, Vector2.zero), "Text", "8000", 30, 12, TextAnchor.MiddleRight,
                 new Color(1f, 0.92f, 0.17f), FontStyle.Bold);
-            lp.resizeTextForBestFit = true;
-            lp.resizeTextMinSize = 14;
-            lp.resizeTextMaxSize = 30;
 
             var avatar = LotdUiKit.CreateRect("AvatarFrame", root,
                 new Vector2(opponent ? 0.80f : 0f, 0.31f), new Vector2(opponent ? 1f : 0.19f, 0.68f),
@@ -454,7 +453,8 @@ namespace YGOPortable.UI
                 Vector2.zero, Vector2.zero);
             LotdUiKit.AddImage(stats.gameObject, LotdUiKit.LoadSprite("LOTD/HUD/atk_def_frame"),
                 new Color(0.34f, 0.34f, 0.42f, 0.94f), false, false);
-            var values = LotdUiKit.AddText(stats, "Value", "", 14, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+            var values = LotdUiKit.AddFittedText(LotdUiKit.FillRect("Content", stats, 2f), "Value", "", 14, 8,
+                TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
             values.gameObject.AddComponent<Outline>().effectColor = new Color(0.025f, 0.025f, 0.06f);
             stats.gameObject.SetActive(false);
 
@@ -520,7 +520,8 @@ namespace YGOPortable.UI
             var turn = LotdUiKit.CreateRect("Turn", root, new Vector2(0.900f, 0.093f), new Vector2(0.983f, 0.181f),
                 Vector2.zero, Vector2.zero);
             LotdUiKit.AddImage(turn.gameObject, LotdUiKit.LoadSprite("LOTD/HUD/icon_turn"), Color.white, true, false);
-            _turnBadgeText = LotdUiKit.AddText(turn, "Value", "", 19, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+            _turnBadgeText = LotdUiKit.AddFittedText(LotdUiKit.FillRect("Content", turn, 7f), "Value", "", 19, 10,
+                TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
             _turnBadgeText.gameObject.AddComponent<Shadow>().effectColor = new Color(0f, 0f, 0f, 0.65f);
 
             var controls = LotdUiKit.CreateRect("PhaseControls", root, new Vector2(0.766f, 0.024f), new Vector2(0.984f, 0.086f),
@@ -554,12 +555,9 @@ namespace YGOPortable.UI
             var middle = new Vector2(0.5f, 0.5f);
             _actionWindow = LotdUiKit.CreateMenuPanel(overlay, "CommandWindow", middle, middle, true);
             var header = LotdUiKit.CreateRect("Caption", _actionWindow, new Vector2(0f, 1f), Vector2.one,
-                new Vector2(9f, -43f), new Vector2(-9f, -5f));
-            _actionHeader = LotdUiKit.AddText(header, "CardName", "", 17, TextAnchor.MiddleCenter,
+                new Vector2(27f, -43f), new Vector2(-27f, -7f));
+            _actionHeader = LotdUiKit.AddFittedText(header, "CardName", "", 17, 10, TextAnchor.MiddleCenter,
                 LotdUiKit.GoldAccent, FontStyle.Bold);
-            _actionHeader.resizeTextForBestFit = true;
-            _actionHeader.resizeTextMinSize = 11;
-            _actionHeader.resizeTextMaxSize = 17;
 
             var viewport = LotdUiKit.CreateRect("Viewport", _actionWindow, Vector2.zero, Vector2.one,
                 new Vector2(10f, 10f), new Vector2(-10f, -45f));
@@ -2036,8 +2034,10 @@ namespace YGOPortable.UI
             // Header bar
             var hdr = LotdUiKit.CreateRect("Hdr", win, new Vector2(0f, 0.90f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
             LotdUiKit.AddImage(hdr.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelHeader);
-            LotdUiKit.AddText(hdr, "T", "카드 상세 정보 (CARD DETAILS)", 18, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold)
-                .rectTransform.offsetMin = new Vector2(20, 0);
+            var title = LotdUiKit.CreateRect("Title", hdr, new Vector2(0.02f, 0.12f), new Vector2(0.63f, 0.88f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddFittedText(title, "T", "카드 상세 정보 (CARD DETAILS)", 18, 12,
+                TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
 
             var relatedRt = LotdUiKit.CreateRect("Related", hdr, new Vector2(0.66f, 0.15f), new Vector2(0.82f, 0.85f),
                 Vector2.zero, Vector2.zero);
@@ -2053,21 +2053,25 @@ namespace YGOPortable.UI
             // Right Side: Card Details
             var infoRt = LotdUiKit.CreateRect("Info", win, new Vector2(0.45f, 0.05f), new Vector2(0.96f, 0.88f), Vector2.zero, Vector2.zero);
 
-            _zoomName = LotdUiKit.AddText(LotdUiKit.CreateRect("Name", infoRt, new Vector2(0f, 0.88f), new Vector2(0.82f, 1f), Vector2.zero, Vector2.zero),
-                "N", "", 22, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
+            _zoomName = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Name", infoRt,
+                new Vector2(0f, 0.88f), new Vector2(0.82f, 1f), Vector2.zero, Vector2.zero),
+                "N", "", 22, 12, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
 
             var rRt = LotdUiKit.CreateRect("RaceIc", infoRt, new Vector2(0.84f, 0.88f), new Vector2(0.98f, 1f), Vector2.zero, Vector2.zero);
             _zoomRaceIcon = LotdUiKit.AddImage(rRt.gameObject, null, Color.white, true);
 
-            _zoomStats = LotdUiKit.AddText(LotdUiKit.CreateRect("Stats", infoRt, new Vector2(0f, 0.74f), new Vector2(1f, 0.87f), Vector2.zero, Vector2.zero),
-                "S", "", 14, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
+            _zoomStats = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Stats", infoRt,
+                new Vector2(0f, 0.74f), new Vector2(1f, 0.87f), Vector2.zero, Vector2.zero),
+                "S", "", 14, 10, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
 
-            _zoomPasscode = LotdUiKit.AddText(LotdUiKit.CreateRect("Passcode", infoRt, new Vector2(0f, 0.68f), new Vector2(1f, 0.74f), Vector2.zero, Vector2.zero),
-                "P", "", 12, TextAnchor.MiddleLeft, LotdUiKit.CyanAccent);
+            _zoomPasscode = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Passcode", infoRt,
+                new Vector2(0f, 0.68f), new Vector2(1f, 0.74f), Vector2.zero, Vector2.zero),
+                "P", "", 12, 9, TextAnchor.MiddleLeft, LotdUiKit.CyanAccent);
 
             var descBox = LotdUiKit.CreateBorderedPanel(infoRt, "DescBox", new Vector2(0f, 0f), new Vector2(1f, 0.66f), Vector2.zero, Vector2.zero,
                 new Color(0.02f, 0.05f, 0.12f, 0.95f));
-            var vp = LotdUiKit.FillRect("VP", descBox, 8f);
+            var vp = LotdUiKit.CreateRect("VP", descBox, Vector2.zero, Vector2.one,
+                new Vector2(10f, 8f), new Vector2(-19f, -8f));
             vp.gameObject.AddComponent<RectMask2D>();
             var ct = LotdUiKit.CreateRect("C", vp, new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
             ct.pivot = new Vector2(0.5f, 1f);
@@ -2077,10 +2081,17 @@ namespace YGOPortable.UI
             _zoomDesc.color = LotdUiKit.TextPrimary;
             _zoomDesc.alignment = TextAnchor.UpperLeft;
             _zoomDesc.lineSpacing = 1.15f;
+            _zoomDesc.supportRichText = false;
+            _zoomDesc.raycastTarget = false;
             ct.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            var sv = descBox.gameObject.AddComponent<ScrollRect>();
-            sv.horizontal = false; sv.vertical = true; sv.scrollSensitivity = 25f;
-            sv.viewport = vp; sv.content = ct;
+            _zoomScroll = descBox.gameObject.AddComponent<ScrollRect>();
+            _zoomScroll.horizontal = false;
+            _zoomScroll.scrollSensitivity = 32f;
+            _zoomScroll.movementType = ScrollRect.MovementType.Clamped;
+            _zoomScroll.viewport = vp;
+            _zoomScroll.content = ct;
+            _zoomScroll.verticalScrollbar = LotdUiKit.AddVerticalScrollbar(descBox);
+            _zoomScroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
 
             _cardZoomModal.SetActive(false);
         }
@@ -2110,6 +2121,8 @@ namespace YGOPortable.UI
                 _zoomRaceIcon.gameObject.SetActive(false);
             }
             _cardZoomModal.SetActive(true);
+            _zoomScroll.StopMovement();
+            _zoomScroll.content.anchoredPosition = Vector2.zero;
         }
     }
 }

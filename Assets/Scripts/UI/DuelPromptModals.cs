@@ -94,10 +94,13 @@ namespace YGOPortable.UI
 
             var hdr = LotdUiKit.CreateRect("Hdr", _modalBox, new Vector2(0f, 0.87f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
             LotdUiKit.AddImage(hdr.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelHeader);
-            _modalTitle = LotdUiKit.AddText(hdr, "Title", "", 21, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
-            _modalTitle.rectTransform.offsetMin = new Vector2(18, 20);
-            _modalSubtitle = LotdUiKit.AddText(hdr, "Sub", "", 14, TextAnchor.LowerLeft, LotdUiKit.TextPrimary);
-            _modalSubtitle.rectTransform.offsetMin = new Vector2(18, 4);
+            var titleBand = LotdUiKit.CreateRect("TitleBand", hdr, new Vector2(0.025f, 0.48f), new Vector2(0.80f, 0.92f),
+                Vector2.zero, Vector2.zero);
+            var subBand = LotdUiKit.CreateRect("SubtitleBand", hdr, new Vector2(0.025f, 0.12f), new Vector2(0.80f, 0.46f),
+                Vector2.zero, Vector2.zero);
+            _modalTitle = LotdUiKit.AddFittedText(titleBand, "Title", "", 21, 11, TextAnchor.MiddleLeft,
+                LotdUiKit.GoldAccent, FontStyle.Bold);
+            _modalSubtitle = LotdUiKit.AddFittedText(subBand, "Sub", "", 14, 10, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary);
 
             _modalBody = LotdUiKit.CreateRect("Body", _modalBox, new Vector2(0.02f, 0.14f), new Vector2(0.98f, 0.85f), Vector2.zero, Vector2.zero);
             _modalFooter = LotdUiKit.CreateRect("Footer", _modalBox, new Vector2(0.02f, 0.02f), new Vector2(0.98f, 0.12f), Vector2.zero, Vector2.zero);
@@ -956,8 +959,10 @@ namespace YGOPortable.UI
 
             var hdr = LotdUiKit.CreateRect("Hdr", win, new Vector2(0f, 0.88f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
             LotdUiKit.AddImage(hdr.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelHeader);
-            _zoneTitle = LotdUiKit.AddText(hdr, "T", "존 확인", 20, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
-            _zoneTitle.rectTransform.offsetMin = new Vector2(18, 0);
+            var titleBand = LotdUiKit.CreateRect("TitleBand", hdr, new Vector2(0.025f, 0.12f), new Vector2(0.80f, 0.88f),
+                Vector2.zero, Vector2.zero);
+            _zoneTitle = LotdUiKit.AddFittedText(titleBand, "T", "존 확인", 20, 11, TextAnchor.MiddleLeft,
+                LotdUiKit.GoldAccent, FontStyle.Bold);
 
             var closeRt = LotdUiKit.CreateRect("Close", hdr, new Vector2(0.82f, 0.15f), new Vector2(0.98f, 0.85f), Vector2.zero, Vector2.zero);
             LotdUiKit.CreateLotdButton(closeRt, "B", "✕ 닫기", () => ZoneViewRoot.SetActive(false), 16);
@@ -1042,9 +1047,9 @@ namespace YGOPortable.UI
             var cRt = LotdUiKit.CreateRect("C", tile,
                 new Vector2(0.08f, hasActions ? 0.30f : 0.18f), new Vector2(0.92f, 0.96f), Vector2.zero, Vector2.zero);
             CompositeCardView.Create(cRt, "V", false).SetCard(code, faceDown, live);
-            LotdUiKit.AddText(LotdUiKit.CreateRect("L", tile,
-                new Vector2(0.04f, hasActions ? 0.17f : 0.01f), new Vector2(0.96f, hasActions ? 0.29f : 0.17f), Vector2.zero, Vector2.zero),
-                "T", faceDown ? "뒷면" : CardDatabase.GetName(code), 11, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary);
+            LotdUiKit.AddFittedText(LotdUiKit.CreateRect("L", tile,
+                new Vector2(0.05f, hasActions ? 0.17f : 0.02f), new Vector2(0.95f, hasActions ? 0.29f : 0.17f), Vector2.zero, Vector2.zero),
+                "T", faceDown ? "뒷면" : CardDatabase.GetName(code), 11, 8, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary);
 
             if (!faceDown && code != 0)
             {

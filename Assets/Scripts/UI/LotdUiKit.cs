@@ -128,6 +128,24 @@ namespace YGOPortable.UI
             return txt;
         }
 
+        public static Text AddFittedText(Transform parent, string name, string content, int fontSize, int minSize,
+            TextAnchor align, Color color, FontStyle style = FontStyle.Normal)
+        {
+            var text = AddText(parent, name, content, fontSize, align, color, style);
+            text.rectTransform.anchorMin = new Vector2(0.018f, 0.035f);
+            text.rectTransform.anchorMax = new Vector2(0.982f, 0.965f);
+            text.rectTransform.offsetMin = Vector2.zero;
+            text.rectTransform.offsetMax = Vector2.zero;
+            text.resizeTextForBestFit = true;
+            text.resizeTextMinSize = minSize;
+            text.resizeTextMaxSize = fontSize;
+            text.alignByGeometry = true;
+            text.supportRichText = false;
+            if (!parent.TryGetComponent<RectMask2D>(out _))
+                parent.gameObject.AddComponent<RectMask2D>();
+            return text;
+        }
+
         public static RectTransform CreateBorderedPanel(Transform parent, string name,
             Vector2 aMin, Vector2 aMax, Vector2 oMin, Vector2 oMax, Color? fill = null, Color? border = null)
         {
@@ -316,9 +334,11 @@ namespace YGOPortable.UI
         private Image _limitImg;
         private Text _titleText;
         private Text _levelText;
-        private Text _scaleText;
+        private Text _leftScaleText;
+        private Text _rightScaleText;
         private Text _atkDefText;
         private Text _rulesText;
+        private RectTransform _rulesArea;
         private GameObject _backObj;
         private bool _detailed;
         private uint _retainedArtwork;
@@ -359,37 +379,41 @@ namespace YGOPortable.UI
             if (detailed)
             {
                 var titleRt = LotdUiKit.CreateRect("CardTitle", innerRt,
-                    new Vector2(0.08f, 0.88f), new Vector2(0.80f, 0.945f), Vector2.zero, Vector2.zero);
-                _titleText = LotdUiKit.AddText(titleRt, "T", "", 13, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
-                _titleText.resizeTextForBestFit = true;
-                _titleText.resizeTextMinSize = 8;
-                _titleText.resizeTextMaxSize = 14;
+                    new Vector2(0.09f, 0.89f), new Vector2(0.795f, 0.953f), Vector2.zero, Vector2.zero);
+                _titleText = LotdUiKit.AddFittedText(titleRt, "T", "", 14, 8, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
                 var ts = _titleText.gameObject.AddComponent<Shadow>();
                 ts.effectColor = new Color(0, 0, 0, 0.7f);
                 ts.effectDistance = new Vector2(1, -1);
 
                 var attrRt = LotdUiKit.CreateRect("AttrIcon", innerRt,
-                    new Vector2(0.815f, 0.885f), new Vector2(0.915f, 0.945f), Vector2.zero, Vector2.zero);
+                    new Vector2(0.822f, 0.89f), new Vector2(0.914f, 0.946f), Vector2.zero, Vector2.zero);
                 _attrImg = LotdUiKit.AddImage(attrRt.gameObject, null, Color.white, true, false);
 
                 var lvRt = LotdUiKit.CreateRect("LevelInfo", innerRt,
-                    new Vector2(0.09f, 0.825f), new Vector2(0.91f, 0.875f), Vector2.zero, Vector2.zero);
-                _levelText = LotdUiKit.AddText(lvRt, "Lv", "", 12, TextAnchor.MiddleRight, LotdUiKit.GoldAccent, FontStyle.Bold);
+                    new Vector2(0.095f, 0.825f), new Vector2(0.90f, 0.883f), Vector2.zero, Vector2.zero);
+                _levelText = LotdUiKit.AddFittedText(lvRt, "Lv", "", 12, 7, TextAnchor.MiddleRight, LotdUiKit.GoldAccent, FontStyle.Bold);
                 var ls = _levelText.gameObject.AddComponent<Shadow>();
                 ls.effectColor = Color.black;
 
-                var scRt = LotdUiKit.CreateRect("PendScale", innerRt,
-                    new Vector2(0.08f, 0.21f), new Vector2(0.92f, 0.27f), Vector2.zero, Vector2.zero);
-                _scaleText = LotdUiKit.AddText(scRt, "Sc", "", 12, TextAnchor.MiddleCenter, LotdUiKit.CyanAccent, FontStyle.Bold);
+                var leftScale = LotdUiKit.CreateRect("LeftScale", innerRt,
+                    new Vector2(0.077f, 0.263f), new Vector2(0.130f, 0.319f), Vector2.zero, Vector2.zero);
+                var rightScale = LotdUiKit.CreateRect("RightScale", innerRt,
+                    new Vector2(0.87f, 0.263f), new Vector2(0.923f, 0.319f), Vector2.zero, Vector2.zero);
+                _leftScaleText = LotdUiKit.AddFittedText(leftScale, "Value", "", 11, 7, TextAnchor.MiddleCenter,
+                    new Color(0.07f, 0.21f, 0.43f), FontStyle.Bold);
+                _rightScaleText = LotdUiKit.AddFittedText(rightScale, "Value", "", 11, 7, TextAnchor.MiddleCenter,
+                    new Color(0.44f, 0.08f, 0.07f), FontStyle.Bold);
 
-                var rules = LotdUiKit.CreateRect("Rules", innerRt,
-                    new Vector2(0.114f, 0.104f), new Vector2(0.891f, 0.286f), Vector2.zero, Vector2.zero);
-                _rulesText = LotdUiKit.AddText(rules, "Text", "", 9, TextAnchor.UpperLeft, new Color(0.09f, 0.07f, 0.05f));
+                _rulesArea = LotdUiKit.CreateRect("Rules", innerRt,
+                    new Vector2(0.09f, 0.120f), new Vector2(0.91f, 0.244f), Vector2.zero, Vector2.zero);
+                _rulesArea.gameObject.AddComponent<RectMask2D>();
+                _rulesText = LotdUiKit.AddText(_rulesArea, "Text", "", 9, TextAnchor.UpperLeft, new Color(0.09f, 0.07f, 0.05f));
                 _rulesText.supportRichText = false;
 
                 var statRt = LotdUiKit.CreateRect("AtkDef", innerRt,
-                    new Vector2(0.12f, 0.045f), new Vector2(0.90f, 0.095f), Vector2.zero, Vector2.zero);
-                _atkDefText = LotdUiKit.AddText(statRt, "Stat", "", 11, TextAnchor.MiddleRight, new Color(0.12f, 0.1f, 0.1f, 1f), FontStyle.Bold);
+                    new Vector2(0.090f, 0.064f), new Vector2(0.91f, 0.115f), Vector2.zero, Vector2.zero);
+                _atkDefText = LotdUiKit.AddFittedText(statRt, "Stat", "", 11, 7, TextAnchor.MiddleRight,
+                    new Color(0.12f, 0.1f, 0.1f, 1f), FontStyle.Bold);
             }
 
             var limRt = LotdUiKit.CreateRect("LimitBadge", innerRt,
@@ -435,7 +459,8 @@ namespace YGOPortable.UI
 
             if (_detailed)
             {
-                _rulesText.rectTransform.anchorMax = new Vector2(0.891f, isPend ? 0.209f : 0.286f);
+                bool monster = (type & YgoConstants.TYPE_MONSTER) != 0;
+                _rulesArea.anchorMin = new Vector2(0.09f, monster ? 0.120f : 0.074f);
                 _rulesText.text = info?.desc ?? "";
                 _titleText.text = info != null ? info.name : $"카드 #{code}";
                 bool darkFrame = (type & (YgoConstants.TYPE_XYZ | YgoConstants.TYPE_LINK | YgoConstants.TYPE_SPELL | YgoConstants.TYPE_TRAP | YgoConstants.TYPE_FUSION)) != 0;
@@ -452,7 +477,9 @@ namespace YGOPortable.UI
                 _attrImg.gameObject.SetActive(attrSp != null);
                 _attrImg.sprite = attrSp;
 
-                if ((type & YgoConstants.TYPE_MONSTER) != 0)
+                _leftScaleText.gameObject.SetActive(isPend && monster);
+                _rightScaleText.gameObject.SetActive(isPend && monster);
+                if (monster)
                 {
                     uint lv = live != null ? ((type & YgoConstants.TYPE_XYZ) != 0 ? live.rank : ((type & YgoConstants.TYPE_LINK) != 0 ? live.link : live.level)) : (info?.level ?? 0);
                     if ((type & YgoConstants.TYPE_LINK) != 0)
@@ -473,21 +500,23 @@ namespace YGOPortable.UI
 
                     uint ls = live != null ? live.lscale : (info?.lscale ?? 0);
                     uint rs = live != null ? live.rscale : (info?.rscale ?? 0);
-                    _scaleText.gameObject.SetActive(isPend);
-                    if (isPend) _scaleText.text = $"◀ {ls}          {rs} ▶";
+                    if (isPend)
+                    {
+                        _leftScaleText.text = ls.ToString();
+                        _rightScaleText.text = rs.ToString();
+                    }
 
                     int atk = live != null ? live.attack : (info?.atk ?? 0);
                     int def = live != null ? live.defense : (info?.def ?? 0);
                     string aStr = atk < 0 ? "?" : atk.ToString();
-                    string dStr = (type & YgoConstants.TYPE_LINK) != 0 ? $"LINK-{lv}" : (def < 0 ? "?" : def.ToString());
-                    _atkDefText.text = $"ATK/{aStr}  DEF/{dStr}";
-                    _atkDefText.color = (type & YgoConstants.TYPE_XYZ) != 0 ? Color.white : new Color(0.12f, 0.1f, 0.1f, 1f);
+                    string defense = (type & YgoConstants.TYPE_LINK) != 0
+                        ? $"LINK-{lv}" : $"DEF/{(def < 0 ? "?" : def.ToString())}";
+                    _atkDefText.text = $"ATK/{aStr}  {defense}";
                 }
                 else
                 {
                     _levelText.text = YgoConstants.GetTypeTagKR(type);
                     _levelText.color = Color.white;
-                    _scaleText.gameObject.SetActive(false);
                     _atkDefText.text = "";
                 }
             }
