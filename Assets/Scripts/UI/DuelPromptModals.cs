@@ -25,6 +25,23 @@ namespace YGOPortable.UI
         private RectTransform _modalFooter;
         private Button _modalCloseBtn;
         private CanvasGroup _promptInput;
+        private Image _promptShade;
+        private Button _promptBackdrop;
+        private RectTransform _zoneShortcuts;
+        private const float ChainCardWidth = 78f;
+        private const float ChainCardGap = 7f;
+        private RectTransform _chainBox;
+        private RectTransform _chainCards;
+        private ScrollRect _chainCardScroll;
+        private ScrollRect _chainEffectScroll;
+        private Text _chainTitle;
+        private Text _chainSummary;
+        private Text _chainName;
+        private Text _chainSource;
+        private Text _chainEffect;
+        private Button _chainActivate;
+        private Button _chainPass;
+        private int _chainSelection;
 
         // Zone viewer refs
         private Text _zoneTitle;
@@ -79,15 +96,30 @@ namespace YGOPortable.UI
 
         private void ClearBodyAndFooter()
         {
-            for (int i = _modalBody.childCount - 1; i >= 0; i--)
-                UnityEngine.Object.Destroy(_modalBody.GetChild(i).gameObject);
-            for (int i = _modalFooter.childCount - 1; i >= 0; i--)
-                UnityEngine.Object.Destroy(_modalFooter.GetChild(i).gameObject);
+            ClearChildren(_modalBody);
+            ClearChildren(_modalFooter);
+            ClearChildren(_chainCards);
             _selectedIndices.Clear();
+            _chainSelection = -1;
             _confirmBtn = null;
             _confirmBtnText = null;
             _counterAlloc = null;
             _sortOrder = null;
+        }
+
+        private static void ClearChildren(Transform parent)
+        {
+            for (int i = parent.childCount - 1; i >= 0; i--)
+            {
+                var child = parent.GetChild(i);
+                if (Application.isPlaying)
+                {
+                    child.gameObject.SetActive(false);
+                    child.SetParent(null, false);
+                    UnityEngine.Object.Destroy(child.gameObject);
+                }
+                else UnityEngine.Object.DestroyImmediate(child.gameObject);
+            }
         }
 
         private void BuildPromptModalShell(Transform parent)
@@ -95,7 +127,7 @@ namespace YGOPortable.UI
             var dim = LotdUiKit.FillRect("Modal_DuelPrompt", parent);
             ModalRoot = dim.gameObject;
             _promptInput = ModalRoot.AddComponent<CanvasGroup>();
-            LotdUiKit.AddImage(dim.gameObject, LotdUiKit.WhiteSprite, new Color(0f, 0.02f, 0.07f, 0.52f));
+            _promptShade = LotdUiKit.AddImage(dim.gameObject, LotdUiKit.WhiteSprite, Color.clear);
 
             _modalBox = DuelStyle.Panel(dim, "Win",
                 new Vector2(0.225f, 0.12f), new Vector2(0.978f, 0.88f));
@@ -116,12 +148,14 @@ namespace YGOPortable.UI
 
             var closeRt = LotdUiKit.CreateRect("CloseBtn", hdr, new Vector2(0.82f, 0.16f), new Vector2(0.98f, 0.84f), Vector2.zero, Vector2.zero);
             _modalCloseBtn = DuelStyle.Button(closeRt, "B", "✕ 취소", OnModalCloseClicked, 13);
-            dim.gameObject.AddComponent<Button>().onClick.AddListener(OnModalCloseClicked);
-            var shortcuts = LotdUiKit.CreateRect("ZoneShortcuts", dim, new Vector2(.595f, .038f),
+            _promptBackdrop = dim.gameObject.AddComponent<Button>();
+            _promptBackdrop.onClick.AddListener(OnModalCloseClicked);
+            BuildChainPicker(dim);
+            _zoneShortcuts = LotdUiKit.CreateRect("ZoneShortcuts", dim, new Vector2(.595f, .038f),
                 new Vector2(.978f, .106f), Vector2.zero, Vector2.zero);
-            AddZoneShortcut(shortcuts, "Grave", "내 묘지", YgoConstants.LOCATION_GRAVE, 0);
-            AddZoneShortcut(shortcuts, "Extra", "내 엑스트라 덱", YgoConstants.LOCATION_EXTRA, 1);
-            AddZoneShortcut(shortcuts, "Banished", "내 제외 존", YgoConstants.LOCATION_REMOVED, 2);
+            AddZoneShortcut(_zoneShortcuts, "Grave", "내 묘지", YgoConstants.LOCATION_GRAVE, 0);
+            AddZoneShortcut(_zoneShortcuts, "Extra", "내 엑스트라 덱", YgoConstants.LOCATION_EXTRA, 1);
+            AddZoneShortcut(_zoneShortcuts, "Banished", "내 제외 존", YgoConstants.LOCATION_REMOVED, 2);
 
             ModalRoot.SetActive(false);
         }
@@ -131,6 +165,86 @@ namespace YGOPortable.UI
             var tile = LotdUiKit.CreateRect(name, parent, new Vector2(column / 3f, 0f),
                 new Vector2((column + 1) / 3f, 1f), new Vector2(3f, 0f), new Vector2(-3f, 0f));
             DuelStyle.Button(tile, "B", label, () => _openOwnZone?.Invoke(location), 14);
+        }
+
+        private void BuildChainPicker(Transform parent)
+        {
+            _chainBox = DuelStyle.Panel(parent, "ChainWin", new Vector2(.235f, .214f), new Vector2(.845f, .480f),
+                fill: new Color(.022f, .038f, .054f, .98f), border: new Color(.45f, .65f, .75f, .58f));
+            if (DuelVisualAssets.ChainFrame != null)
+            {
+                var frame = LotdUiKit.FillRect("Frame", _chainBox, -17f);
+                var image = LotdUiKit.AddImage(frame.gameObject, DuelVisualAssets.ChainFrame, Color.white, false, false);
+                image.type = Image.Type.Sliced;
+                image.fillCenter = false;
+                image.pixelsPerUnitMultiplier = 2.4f;
+            }
+            var header = LotdUiKit.CreateRect("Hdr", _chainBox, new Vector2(0f, .82f), Vector2.one, Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(header.gameObject, LotdUiKit.WhiteSprite, DuelStyle.HeaderColor, false, false);
+            var title = LotdUiKit.CreateRect("Title", header, new Vector2(.024f, .05f), new Vector2(.62f, .95f),
+                Vector2.zero, Vector2.zero);
+            _chainTitle = LotdUiKit.AddFittedText(title, "Text", "", 19, 11, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
+            var summary = LotdUiKit.CreateRect("Summary", header, new Vector2(.67f, .07f), new Vector2(.972f, .93f),
+                Vector2.zero, Vector2.zero);
+            _chainSummary = LotdUiKit.AddFittedText(summary, "Text", "", 16, 10, TextAnchor.MiddleRight, DuelStyle.Gold, FontStyle.Bold);
+            if (DuelVisualAssets.ChainLinks != null)
+            {
+                var links = LotdUiKit.CreateRect("Links", header, new Vector2(.62f, .34f), new Vector2(.695f, .66f),
+                    Vector2.zero, Vector2.zero);
+                LotdUiKit.AddImage(links.gameObject, DuelVisualAssets.ChainLinks, DuelStyle.Gold, true, false);
+            }
+
+            var cards = LotdUiKit.CreateRect("Cards", _chainBox, new Vector2(.019f, .208f), new Vector2(.563f, .798f),
+                Vector2.zero, Vector2.zero);
+            _chainCardScroll = cards.gameObject.AddComponent<ScrollRect>();
+            _chainCardScroll.horizontal = true;
+            _chainCardScroll.vertical = false;
+            _chainCardScroll.movementType = ScrollRect.MovementType.Clamped;
+            _chainCardScroll.scrollSensitivity = 30f;
+            var viewport = LotdUiKit.CreateRect("Viewport", cards, new Vector2(0f, .085f), Vector2.one, Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(viewport.gameObject, LotdUiKit.WhiteSprite, Color.clear);
+            viewport.gameObject.AddComponent<RectMask2D>();
+            _chainCards = LotdUiKit.CreateRect("Content", viewport, Vector2.zero, Vector2.up, Vector2.zero, Vector2.zero);
+            _chainCards.pivot = new Vector2(0f, .5f);
+            var layout = _chainCards.gameObject.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = ChainCardGap;
+            layout.padding = new RectOffset(3, 3, 3, 3);
+            layout.childControlWidth = layout.childControlHeight = layout.childForceExpandHeight = true;
+            layout.childForceExpandWidth = false;
+            _chainCards.gameObject.AddComponent<ContentSizeFitter>().horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            _chainCardScroll.content = _chainCards;
+            _chainCardScroll.viewport = viewport;
+
+            var track = LotdUiKit.CreateRect("Scrollbar", cards, Vector2.zero, new Vector2(1f, .049f), Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(track.gameObject, LotdUiKit.WhiteSprite, new Color(.08f, .13f, .18f));
+            var slide = LotdUiKit.FillRect("SlidingArea", track);
+            var handle = LotdUiKit.FillRect("Handle", slide);
+            var scrollbar = track.gameObject.AddComponent<Scrollbar>();
+            scrollbar.direction = Scrollbar.Direction.LeftToRight;
+            scrollbar.targetGraphic = LotdUiKit.AddImage(handle.gameObject, LotdUiKit.WhiteSprite, DuelStyle.Player);
+            scrollbar.handleRect = handle;
+            _chainCardScroll.horizontalScrollbar = scrollbar;
+            _chainCardScroll.horizontalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
+
+            var details = DuelStyle.Panel(_chainBox, "Details", new Vector2(.583f, .218f), new Vector2(.977f, .798f));
+            var name = LotdUiKit.CreateRect("Name", details, new Vector2(.04f, .72f), new Vector2(.96f, .98f),
+                Vector2.zero, Vector2.zero);
+            _chainName = LotdUiKit.AddFittedText(name, "Text", "", 16, 10, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
+            var source = LotdUiKit.CreateRect("Source", details, new Vector2(.04f, .57f), new Vector2(.96f, .73f),
+                Vector2.zero, Vector2.zero);
+            _chainSource = LotdUiKit.AddFittedText(source, "Text", "", 12, 9, TextAnchor.MiddleLeft, DuelStyle.Gold);
+            var description = LotdUiKit.CreateRect("Description", details, new Vector2(.0f, .025f), new Vector2(1f, .565f),
+                Vector2.zero, Vector2.zero);
+            _chainEffectScroll = CreateVerticalScroll(description, out Transform content);
+            _chainEffect = AddDescriptionText(content, "Effect", "", 13);
+
+            var footer = LotdUiKit.CreateRect("Footer", _chainBox, new Vector2(.021f, .026f), new Vector2(.977f, .181f),
+                Vector2.zero, Vector2.zero);
+            var pass = LotdUiKit.CreateRect("Pass", footer, new Vector2(.655f, 0f), new Vector2(.817f, 1f), Vector2.zero, Vector2.zero);
+            _chainPass = DuelStyle.Button(pass, "B", "패스", OnModalCloseClicked, 14);
+            var activate = LotdUiKit.CreateRect("Activate", footer, new Vector2(.836f, 0f), Vector2.one, Vector2.zero, Vector2.zero);
+            _chainActivate = DuelStyle.Button(activate, "B", "발동", ConfirmChainChoice, 14, gold: true);
+            _chainBox.gameObject.SetActive(false);
         }
 
         public bool TryCancelOrPass()
@@ -211,17 +325,37 @@ namespace YGOPortable.UI
             _curSession = session;
             _curPrompt = prompt;
             ClearBodyAndFooter();
-            bool shortPrompt = prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN ||
-                prompt.messageType == YgoConstants.MSG_SELECT_YESNO || prompt.messageType == YgoConstants.MSG_SELECT_POSITION;
+            if (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN && !prompt.forced && prompt.candidates.Count == 0)
+            {
+                ModalRoot.SetActive(false);
+                _onSubmitResponse?.Invoke(BitConverter.GetBytes(-1));
+                return;
+            }
+
+            bool chain = prompt.messageType == YgoConstants.MSG_SELECT_CHAIN ||
+                prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN;
+            _chainBox.gameObject.SetActive(chain);
+            _modalBox.gameObject.SetActive(!chain);
+            _promptShade.color = new Color(0f, .02f, .07f, chain ? .10f : .52f);
+            _promptBackdrop.interactable = !chain;
+            _zoneShortcuts.anchorMin = chain ? new Vector2(.247f, .221f) : new Vector2(.595f, .038f);
+            _zoneShortcuts.anchorMax = chain ? new Vector2(.619f, .262f) : new Vector2(.978f, .106f);
+            bool shortPrompt = prompt.messageType == YgoConstants.MSG_SELECT_YESNO ||
+                prompt.messageType == YgoConstants.MSG_SELECT_POSITION;
             _modalBox.anchorMin = shortPrompt ? new Vector2(.294f, .26f) : new Vector2(.225f, .12f);
             _modalBox.anchorMax = shortPrompt ? new Vector2(.844f, .74f) : new Vector2(.978f, .88f);
             ModalRoot.transform.SetAsLastSibling();
             ModalRoot.SetActive(true);
             CardAnimationManager.Instance?.BringToFront();
 
+            if (chain)
+            {
+                RenderChainPicker(session, prompt);
+                return;
+            }
+
             bool canCancel = false;
-            if (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN) canCancel = !prompt.forced;
-            else if (prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN || prompt.messageType == YgoConstants.MSG_SELECT_YESNO) canCancel = true;
+            if (prompt.messageType == YgoConstants.MSG_SELECT_YESNO) canCancel = true;
             else if ((prompt.messageType == YgoConstants.MSG_SELECT_CARD || prompt.messageType == YgoConstants.MSG_SELECT_UNSELECT_CARD) && prompt.cancelable) canCancel = true;
 
             if (_modalCloseBtn != null)
@@ -229,9 +363,6 @@ namespace YGOPortable.UI
 
             switch (prompt.messageType)
             {
-                case YgoConstants.MSG_SELECT_EFFECTYN:
-                    RenderEffectYesNo(prompt);
-                    break;
                 case YgoConstants.MSG_SELECT_YESNO:
                     RenderYesNo(session, prompt);
                     break;
@@ -241,9 +372,6 @@ namespace YGOPortable.UI
                 case YgoConstants.MSG_SELECT_OPTION:
                 case YgoConstants.MSG_ANNOUNCE_NUMBER:
                     RenderOptionList(prompt);
-                    break;
-                case YgoConstants.MSG_SELECT_CHAIN:
-                    RenderSelectChain(session, prompt);
                     break;
                 case YgoConstants.MSG_SELECT_CARD:
                 case YgoConstants.MSG_SELECT_TRIBUTE:
@@ -283,31 +411,6 @@ namespace YGOPortable.UI
             if (!IsPromptOpen || IsZoneViewerOpen) return;
             ModalRoot.SetActive(false);
             _onSubmitResponse?.Invoke(bytes);
-        }
-
-        private void RenderEffectYesNo(DuelPrompt p)
-        {
-            var info = CardDatabase.Get(p.promptCardCode);
-            string cardName = info != null ? info.name : $"카드 #{p.promptCardCode}";
-            string effect = CardDatabase.ResolveEffectDescription(p.promptDesc, p.promptCardCode)
-                ?? "이 카드의 효과를 발동하시겠습니까?";
-
-            _modalTitle.text = "유발 효과 발동 확인 — [임의 효과 (선택 발동)]";
-            _modalSubtitle.text = $"{cardName}  [{YgoConstants.GetLocationNameKR(p.promptLoc)}] — 효과를 발동할지 선택하세요 (취소/패스 가능)";
-
-            var cardRt = LotdUiKit.CreateRect("Card", _modalBody, new Vector2(0.06f, 0.10f), new Vector2(0.32f, 0.92f), Vector2.zero, Vector2.zero);
-            var view = CompositeCardView.Create(cardRt, "Preview", false, duelArtwork: true);
-            view.SetCard(p.promptCardCode);
-            _onInspectCard?.Invoke(p.promptCardCode);
-
-            var descBox = DuelStyle.Panel(_modalBody, "Desc", new Vector2(0.36f, 0.14f), new Vector2(0.96f, 0.88f), Vector2.zero, Vector2.zero);
-            CreateVerticalScroll(descBox, out Transform description);
-            AddDescriptionText(description, "Effect", effect, 17);
-            if (!string.IsNullOrWhiteSpace(info?.desc) && effect != info.desc.Trim())
-                AddDescriptionText(description, "CardText", info.desc);
-
-            AddFooterButton(0.18f, 0.48f, "발동한다 (YES)", () => Submit(BitConverter.GetBytes(1)), true);
-            AddFooterButton(0.52f, 0.82f, "발동하지 않음 (NO)", () => Submit(BitConverter.GetBytes(0)), false);
         }
 
         private void RenderYesNo(DuelSession s, DuelPrompt p)
@@ -401,90 +504,96 @@ namespace YGOPortable.UI
             }
         }
 
-        private void RenderSelectChain(DuelSession s, DuelPrompt p)
+        private void RenderChainPicker(DuelSession session, DuelPrompt prompt)
         {
-            int nextLink = s.CurrentChain.Count + 1;
-            if (p.forced)
+            bool singleEffect = prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN;
+            IReadOnlyList<SelectableCardItem> choices = singleEffect
+                ? new[] { new SelectableCardItem
+                {
+                    code = prompt.promptCardCode,
+                    controller = prompt.promptCon,
+                    location = prompt.promptLoc,
+                    sequence = prompt.promptSeq,
+                    description = prompt.promptDesc,
+                } }
+                : prompt.candidates;
+            _chainTitle.text = prompt.forced ? "필수 효과 순서 선택" : "발동할 효과 선택";
+            _chainSummary.text = $"체인 {session.CurrentChain.Count + 1}  ·  {choices.Count}개";
+            _chainPass.transform.parent.gameObject.SetActive(!prompt.forced);
+            _chainActivate.interactable = choices.Count > 0;
+            _chainName.text = _chainSource.text = _chainEffect.text = "";
+
+            var frames = new Outline[choices.Count];
+            var sources = new (byte controller, uint location, uint sequence)[choices.Count];
+            for (int i = 0; i < choices.Count; i++)
+                sources[i] = (choices[i].controller, choices[i].location, choices[i].sequence);
+            var sourceCounts = sources.GroupBy(source => source).ToDictionary(group => group.Key, group => group.Count());
+            var sourceNumbers = new Dictionary<(byte, uint, uint), int>();
+
+            void Select(int index)
             {
-                _modalTitle.text = $"⚡ 강제 유발 효과 체인 순서 선택 (체인 {nextLink} / 필수 발동)";
-                _modalSubtitle.text = $"강제 발동 효과입니다 (취소 불가) — 체인 블록 {nextLink} (Chain Link {nextLink})로 먼저 올릴 카드를 선택하세요.";
-            }
-            else if (p.IsTriggerChain)
-            {
-                _modalTitle.text = $"✨ 임의 유발 효과 발동 / 순서 선택 (체인 {nextLink} / 선택 발동)";
-                _modalSubtitle.text = $"체인 블록 {nextLink} (Chain Link {nextLink})로 발동할 효과를 순서대로 선택하거나, 발동하지 않으려면 아래 취소(PASS)를 누르세요.";
-            }
-            else
-            {
-                _modalTitle.text = $"체인 / 즉시 효과 발동 확인 (체인 {nextLink} / 선택 발동)";
-                _modalSubtitle.text = s.CurrentChain.Count > 0
-                    ? $"현재 체인 블록 {s.CurrentChain.Count} — 체인 {nextLink}(으)로 발동할 카드를 선택하거나 패스하세요."
-                    : "발동 가능한 카드 효과가 있습니다 (발동 여부 선택 가능).";
-            }
-
-            string btnLabel = p.forced ? $"체인 {nextLink} 등록" : $"체인 {nextLink} 발동";
-
-            CreateVerticalScroll(_modalBody, out Transform content);
-            for (int i = 0; i < p.candidates.Count; i++)
-            {
-                int pick = i;
-                var c = p.candidates[i];
-                string cname = CardDatabase.GetName(c.code);
-                string desc = CardDatabase.ResolveEffectDescription(c.description, c.code);
-                string locTag = $"{(c.controller == s.HumanPlayerIndex ? "내" : "상대")} {YgoConstants.GetLocationNameKR(c.location)}";
-
-                var row = DuelStyle.Panel(content, $"Ch_{i}", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-                var layout = row.gameObject.AddComponent<HorizontalLayoutGroup>();
-                layout.padding = new RectOffset(12, 12, 8, 8);
-                layout.spacing = 12f;
-                layout.childAlignment = TextAnchor.MiddleLeft;
-                layout.childControlWidth = true;
-                layout.childControlHeight = true;
-                layout.childForceExpandWidth = false;
-                layout.childForceExpandHeight = false;
-
-                var thumbRt = LotdUiKit.FillRect("Card", row);
-                var thumbSize = thumbRt.gameObject.AddComponent<LayoutElement>();
-                thumbSize.preferredWidth = 62f;
-                thumbSize.preferredHeight = 81f;
-                var cv = CompositeCardView.Create(thumbRt, "V", false, duelArtwork: true);
-                cv.SetCard(c.code);
-
-                string details = desc == null ? $"{cname} · {locTag}" : $"{cname} · {locTag}\n{desc}";
-                var text = AddDescriptionText(row, "Effect", details, 16);
-                var textSize = text.gameObject.AddComponent<LayoutElement>();
-                textSize.minWidth = 0f;
-                textSize.preferredWidth = 0f;
-                textSize.flexibleWidth = 1f;
-
-                var actRt = LotdUiKit.FillRect("Act", row);
-                var actSize = actRt.gameObject.AddComponent<LayoutElement>();
-                actSize.preferredWidth = 138f;
-                actSize.preferredHeight = 46f;
-                DuelStyle.Button(actRt, "B", btnLabel, () => Submit(BitConverter.GetBytes(pick)), 16, gold: true);
-
-                var insRt = LotdUiKit.FillRect("Ins", thumbRt);
-                var insImg = LotdUiKit.AddImage(insRt.gameObject, LotdUiKit.WhiteSprite, Color.clear);
-                var insBtn = insRt.gameObject.AddComponent<Button>();
-                insBtn.targetGraphic = insImg;
-                insBtn.onClick.AddListener(() => _onInspectCard?.Invoke(c.code));
-                var insTrig = insRt.gameObject.AddComponent<CardDragTrigger>();
-                insTrig.OnPointerEnterAction = () => _onInspectCard?.Invoke(c.code);
+                if (!IsPromptOpen || IsZoneViewerOpen || !ReferenceEquals(_curPrompt, prompt)) return;
+                if (_chainSelection >= 0) frames[_chainSelection].effectColor = DuelStyle.BorderColor;
+                _chainSelection = index;
+                frames[index].effectColor = DuelStyle.Gold;
+                var item = choices[index];
+                _chainName.text = CardDatabase.GetName(item.code);
+                _chainSource.text = ChainSourceLabel(session, item);
+                _chainEffect.text = CardDatabase.ResolveEffectDescription(item.description, item.code)
+                    ?? CardDatabase.Get(item.code)?.desc ?? "이 카드의 효과를 발동할 수 있습니다.";
+                _chainEffectScroll.StopMovement();
+                _chainEffectScroll.content.anchoredPosition = Vector2.zero;
+                _onInspectCard?.Invoke(item.code);
             }
 
-            if (!p.forced)
+            for (int i = 0; i < choices.Count; i++)
             {
-                string passLabel = p.IsTriggerChain
-                    ? "❌ 효과 발동 안 함 (남은 임의 효과 패스 / PASS)"
-                    : "❌ 효과 발동 취소 (발동하지 않고 패스 / PASS)";
-                AddFooterButton(0.24f, 0.76f, passLabel, () => Submit(BitConverter.GetBytes(-1)), false);
+                int index = i;
+                var item = choices[index];
+                var tile = DuelStyle.Panel(_chainCards, $"Ch_{index}", Vector2.zero, Vector2.one);
+                var size = tile.gameObject.AddComponent<LayoutElement>();
+                size.preferredWidth = ChainCardWidth;
+                frames[index] = tile.GetComponent<Outline>();
+
+                var art = LotdUiKit.CreateRect("Card", tile, new Vector2(.08f, .17f), new Vector2(.92f, .97f),
+                    Vector2.zero, Vector2.zero);
+                CompositeCardView.Create(art, "V", duelArtwork: true).SetCard(item.code);
+
+                var source = sources[index];
+                string label = YgoConstants.GetLocationNameKR(source.location);
+                if (sourceCounts[source] > 1)
+                {
+                    sourceNumbers.TryGetValue(source, out int number);
+                    sourceNumbers[source] = ++number;
+                    label += $" · {number}";
+                }
+                var caption = LotdUiKit.CreateRect("Source", tile, new Vector2(.05f, .015f), new Vector2(.95f, .17f),
+                    Vector2.zero, Vector2.zero);
+                LotdUiKit.AddFittedText(caption, "Text", label, 11, 8, TextAnchor.MiddleCenter, DuelStyle.Muted);
+                var button = tile.gameObject.AddComponent<Button>();
+                button.targetGraphic = tile.GetComponent<Image>();
+                button.onClick.AddListener(() => Select(index));
             }
-            else
-            {
-                var infoRt = LotdUiKit.FillRect("ForcedInfo", _modalFooter);
-                LotdUiKit.AddText(infoRt, "T", "⚠️ 강제 유발 효과는 반드시 발동되며, 체인에 올릴 순서만 선택합니다.", 16, TextAnchor.MiddleCenter, DuelStyle.Gold, FontStyle.Bold);
-            }
+
+            _chainCardScroll.StopMovement();
+            _chainCards.anchoredPosition = Vector2.zero;
+            float stripWidth = 6f + choices.Count * ChainCardWidth + Mathf.Max(0, choices.Count - 1) * ChainCardGap;
+            _chainCardScroll.horizontalScrollbar.gameObject.SetActive(stripWidth > _chainCardScroll.viewport.rect.width);
+            if (choices.Count > 0) Select(0);
         }
+
+        private static string ChainSourceLabel(DuelSession session, SelectableCardItem card) =>
+            $"{(card.controller == session.HumanPlayerIndex ? "내" : "상대")} {YgoConstants.GetLocationNameKR(card.location)}";
+
+        private void ConfirmChainChoice()
+        {
+            if (_chainSelection < 0 || _curPrompt == null) return;
+            if (_curPrompt.messageType == YgoConstants.MSG_SELECT_CHAIN && _chainSelection < _curPrompt.candidates.Count)
+                Submit(BitConverter.GetBytes(_chainSelection));
+            else if (_curPrompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN)
+                Submit(BitConverter.GetBytes(1));
+        }
+
 
         private void RenderCardMultiSelect(DuelSession s, DuelPrompt p)
         {
@@ -1244,7 +1353,7 @@ namespace YGOPortable.UI
             return text;
         }
 
-        private static void CreateVerticalScroll(Transform parent, out Transform content)
+        private static ScrollRect CreateVerticalScroll(Transform parent, out Transform content)
         {
             var svRt = LotdUiKit.CreateRect("Scroll", parent, Vector2.zero, Vector2.one,
                 new Vector2(20f, 4f), new Vector2(-20f, -4f));
@@ -1274,6 +1383,7 @@ namespace YGOPortable.UI
             sr.verticalScrollbar = LotdUiKit.AddVerticalScrollbar(svRt);
             sr.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
             content = cRt;
+            return sr;
         }
 
         private static GameObject CreateHorizontalCardGrid(Transform parent, out Transform content, int cellW = 136, int cellH = 200)

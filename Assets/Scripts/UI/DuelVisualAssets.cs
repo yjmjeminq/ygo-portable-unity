@@ -19,6 +19,8 @@ namespace YGOPortable.UI
         internal static Sprite PauseIcon { get; } = LoadHudSprite("Pause");
         internal static Sprite LogIcon { get; } = LoadHudSprite("Log");
         internal static Sprite HandGlow { get; } = LoadHudSprite("HandGlow", Vector4.one * 20f);
+        internal static Sprite ChainLinks { get; } = LoadHudSprite("ChainLinks");
+        internal static Sprite ChainFrame { get; } = LoadHudSprite("ChainFrame", Vector4.one * 48f);
         private static readonly Sprite DrawPhase = LoadHudSprite("PhaseDraw");
         private static readonly Sprite StandbyPhase = LoadHudSprite("PhaseStandby");
         private static readonly Sprite MainOnePhase = LoadHudSprite("PhaseMain1");

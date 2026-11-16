@@ -359,6 +359,7 @@ namespace YGOPortable.Editor
             TestTokenAndComplexEffects.RunTokenSuiteHeadless();
             TestDuelZoneBrowser.Run();
             TestHandGlow.Run();
+            TestChainChooser.Run();
             TestDuelRematch.Run();
 
             AssertTrue(luaErrors.Count == 0, $"Native/Lua error logs detected: {string.Join(" | ", luaErrors.Take(3))}");

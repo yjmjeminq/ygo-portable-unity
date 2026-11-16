@@ -638,7 +638,7 @@ namespace YGOPortable.Editor
                         int stoneIdx = p.candidates.FindIndex(c => c.code == 79814787);
                         verifiedForcedMandatorySegoc = true;
                         Debug.Log($"[SEGOC TEST] Choosing White Stone (idx={stoneIdx}) as Mandatory Chain Link 1 (Dandylion auto-assigned to Chain Link 2)");
-                        s.SubmitResponseInt(stoneIdx);
+                        TestChainChooser.SubmitNativeChoice(s, stoneIdx);
                         continue;
                     }
 
@@ -659,7 +659,7 @@ namespace YGOPortable.Editor
                         int merrliIdx = p.candidates.FindIndex(c => c.code == 74078255);
                         verifiedOptionalTearlamentsSegoc = true;
                         Debug.Log($"[SEGOC TEST] Choosing Tearlaments Merrli (idx={merrliIdx}) as Optional Chain Link 3");
-                        s.SubmitResponseInt(merrliIdx);
+                        TestChainChooser.SubmitNativeChoice(s, merrliIdx);
                         continue;
                     }
 
@@ -676,7 +676,7 @@ namespace YGOPortable.Editor
 
                         verifiedOptionalPassSecondTear = true;
                         Debug.Log("[SEGOC TEST] Submitting -1 (PASS) on Tearlaments Scheiren so only Merrli activates as CL3!");
-                        s.SubmitResponseInt(-1);
+                        TestChainChooser.SubmitNativeChoice(s, -1);
                         continue;
                     }
 

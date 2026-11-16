@@ -43,6 +43,8 @@ HUD_SPRITES = {
     "Pause": "GUI_T_DuelButtonSubmenu01",
     "Log": "GUI_T_DuelButtonLog_Off_1",
     "HandGlow": "GUI_T_ComCardLight2",
+    "ChainLinks": "GUI_Duel_CardSelectionList_DialogChain",
+    "ChainFrame": "GUI_Global_WindowChain_Frame2",
 }
 EFFECTS = {
     "Strike": "fxt_hitm_flash01.png",
