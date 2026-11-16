@@ -52,6 +52,7 @@ namespace YGOPortable.Editor
             TestSwordsoulTunerTokenAndSynchro();
             TestAdventurerTokenAndFatefulAdventure();
             TestTokenDisappearanceOnLeaveField();
+            TestDestinyHeroDestroyerPhoenixEnforcer();
         }
 
         private static void TestTokenPresentationAndLocalization()
@@ -101,11 +102,11 @@ namespace YGOPortable.Editor
         {
             Debug.Log("[TOKEN TEST 1] Swordsoul Mo Ye -> Tuner Token -> Level 8 Synchro Chixiao...");
 
-            // Mo Ye (20001443) and Taia (57384901) guarantee opening hand has both
+            // Mo Ye (20001443) and Taia (56495147) guarantee opening hand has both
             var p0Main = new List<uint>();
             for (int i = 0; i < 20; i++) p0Main.Add(20001443);
-            for (int i = 0; i < 20; i++) p0Main.Add(57384901);
-            uint[] p0Extra = { 44508094 }; // Stardust Dragon (Lv 8 Synchro)
+            for (int i = 0; i < 20; i++) p0Main.Add(56495147);
+            uint[] p0Extra = { 69248256 }; // Chixiao (Lv 8 Synchro)
 
             var p1Main = new List<uint>();
             while (p1Main.Count < 40) p1Main.Add(20721928);
@@ -125,6 +126,7 @@ namespace YGOPortable.Editor
                 {
                     if (s.ActivePrompt == null) { s.StepUntilPrompt(); continue; }
                     var p = s.ActivePrompt;
+                    Debug.Log($"[DPE PROMPT] Player={p.playerId}, Msg={p.messageType}, ActCount={p.activatable.Count}, ActCodes=[{string.Join(",", p.activatable.Select(a => a.code))}], Candidates={p.candidates.Count}");
                     Debug.Log($"[TEST 3 PROMPT] Player={p.playerId}, Msg={p.messageType}, ActCount={p.activatable.Count}, ActCodes=[{string.Join(",", p.activatable.Select(a => a.code))}], Candidates={p.candidates.Count}");
                     Debug.Log($"[PROMPT] Player={p.playerId}, Msg={p.messageType}, CardCode={p.promptCardCode}, Desc={p.promptDesc}, Summonable={p.summonable.Count}, Activatable={p.activatable.Count}, Candidates={p.candidates.Count}");
 
@@ -140,13 +142,13 @@ namespace YGOPortable.Editor
                             {
                                 int idx = p.summonable.FindIndex(m => m.code == 20001443);
                                 summonedMoYe = true;
-                                Debug.Log($"[ACTION] Summoning Mo Ye (idx={idx})");
+                                Debug.Log($"[ACTION] Summoning Mo Ye (idx={idx}), Hand=[{string.Join(",", handCodes)}]");
                                 s.SubmitResponseInt((idx << 16) | 0);
                                 continue;
                             }
-                            if (tokenCreated && !synchroChixiao && p.spSummonable.Any(m => m.code == 46105261))
+                            if (tokenCreated && !synchroChixiao && p.spSummonable.Any(m => m.code == 69248256))
                             {
-                                int idx = p.spSummonable.FindIndex(m => m.code == 46105261);
+                                int idx = p.spSummonable.FindIndex(m => m.code == 69248256);
                                 synchroChixiao = true;
                                 Debug.Log($"[ACTION] Synchro Summoning Chixiao (idx={idx})");
                                 s.SubmitResponseInt((idx << 16) | 1);
@@ -353,6 +355,135 @@ namespace YGOPortable.Editor
 
                 if (!activatedScapegoat || !activatedDarkHole)
                     throw new Exception($"Failed steps: Scapegoat={activatedScapegoat}, DarkHole={activatedDarkHole}");
+            }
+        }
+
+        private static void TestDestinyHeroDestroyerPhoenixEnforcer()
+        {
+            Debug.Log("[TOKEN & EFFECT TEST 4] DPE (Destiny HERO - Destroyer Phoenix Enforcer) Optional Cancel & GY Standby Revive...");
+
+            var p0Main = new List<uint>();
+            for (int i = 0; i < 34; i++) p0Main.Add(52947044); // Fusion Destiny (52947044)
+            for (int i = 0; i < 4; i++) p0Main.Add(53129443); // Dark Hole
+            p0Main.Add(81866673); // Dasher (Lv 6 D-HERO)
+            p0Main.Add(16605586); // Denier (D-HERO)
+            uint[] p0Extra = { 60461804 }; // DPE
+
+            var p1Main = new List<uint>();
+            while (p1Main.Count < 40) p1Main.Add(20721928);
+
+            using (var s = new DuelSession())
+            {
+                bool started = s.StartNewDuel(p0Main, p0Extra, p1Main, Array.Empty<uint>(), p0GoesFirst: true);
+                if (!started) throw new Exception("Failed to start duel for DPE test");
+
+                var ai = new TacticalAI { Difficulty = AIDifficulty.Smart };
+                bool activatedFusionDestiny = false;
+                bool summonedDPE = false;
+                bool passedDPEQuickEffect = false;
+                bool activatedDarkHole = false;
+                bool triggeredDPEGraveEffect = false;
+                bool revivedDPEInOppStandby = false;
+
+                int guard = 0;
+                while (!s.IsFinished && guard++ < 80)
+                {
+                    if (s.ActivePrompt == null) { s.StepUntilPrompt(); continue; }
+                    var p = s.ActivePrompt;
+                    Debug.Log($"[DPE PROMPT] Player={p.playerId}, Msg={p.messageType}, ActCount={p.activatable.Count}, ActCodes=[{string.Join(",", p.activatable.Select(a => a.code))}], Candidates={p.candidates.Count}");
+
+                    bool dpeOnField = s.Players[0].mzone.Any(c => c != null && c.code == 60461804);
+                    if (dpeOnField && !summonedDPE)
+                    {
+                        summonedDPE = true;
+                        Debug.Log("[DPE TEST] DPE successfully summoned to field!");
+                    }
+
+                    if (p.playerId == 0)
+                    {
+                        // 1. Activate Fusion Destiny from hand in Main Phase 1
+                        if (p.messageType == YgoConstants.MSG_SELECT_IDLECMD)
+                        {
+                            var h = s.Players[0].hand.Select(c => c.code).ToList();
+                            Debug.Log($"[DPE TEST IDLECMD] Hand: [{string.Join(",", h)}], ActCount: {p.activatable.Count}");
+                            if (!activatedFusionDestiny && p.activatable.Any(a => a.code == 52947044))
+                            {
+                                int idx = p.activatable.FindIndex(a => a.code == 52947044);
+                                activatedFusionDestiny = true;
+                                Debug.Log($"[DPE TEST] Activating Fusion Destiny (idx={idx})");
+                                s.SubmitResponseInt((idx << 16) | 5);
+                                continue;
+                            }
+
+                            // 3. Once DPE is on field and optional quick effect was tested (passed), activate Dark Hole to destroy DPE
+                            if (summonedDPE && passedDPEQuickEffect && !activatedDarkHole && p.activatable.Any(a => a.code == 53129443))
+                            {
+                                int idx = p.activatable.FindIndex(a => a.code == 53129443);
+                                activatedDarkHole = true;
+                                Debug.Log($"[DPE TEST] Activating Dark Hole to destroy DPE (idx={idx})");
+                                s.SubmitResponseInt((idx << 16) | 5);
+                                continue;
+                            }
+
+                            // If DPE was destroyed and GY effect triggered, end turn so next Standby Phase arrives
+                            if (triggeredDPEGraveEffect)
+                            {
+                                Debug.Log("[DPE TEST] Ending Turn 1 to proceed to Turn 2 Standby Phase...");
+                                s.SubmitResponseInt(7); // End Phase
+                                continue;
+                            }
+                        }
+
+                        // 2. Test optional cancel: when MSG_SELECT_CHAIN asks if we want to activate DPE's quick effect, submit -1 (PASS)
+                        if (p.messageType == YgoConstants.MSG_SELECT_CHAIN)
+                        {
+                            int dpeChain = p.candidates.FindIndex(c => c.code == 60461804);
+                            if (summonedDPE && !passedDPEQuickEffect && dpeChain >= 0)
+                            {
+                                passedDPEQuickEffect = true;
+                                Debug.Log("[DPE TEST] MSG_SELECT_CHAIN: DPE optional quick effect offered -> Submitting -1 (PASS / Do not destroy)");
+                                s.SubmitResponseInt(-1); // PASS
+                                continue;
+                            }
+                        }
+
+                        // 4. When DPE is destroyed, ocgcore prompts MSG_SELECT_EFFECTYN for card in GRAVE (promptCardCode == 60461804)
+                        if (p.messageType == YgoConstants.MSG_SELECT_EFFECTYN && p.promptCardCode == 60461804)
+                        {
+                            triggeredDPEGraveEffect = true;
+                            Debug.Log($"[DPE TEST] MSG_SELECT_EFFECTYN for DPE in {YgoConstants.GetLocationNameKR(p.promptLoc)} -> Submitting 1 (YES, register delayed revive)");
+                            s.SubmitResponseInt(1);
+                            continue;
+                        }
+
+                        // 5. During Turn 2 (opponent's turn) Standby Phase: ocgcore prompts MSG_SELECT_CARD with playerId == 0
+                        if (p.messageType == YgoConstants.MSG_SELECT_CARD && triggeredDPEGraveEffect && s.TurnNumber >= 2)
+                        {
+                            int dpePick = p.candidates.FindIndex(c => c.code == 60461804);
+                            if (dpePick >= 0)
+                            {
+                                Debug.Log($"[DPE TEST] Standby Phase: Selecting DPE from Graveyard (idx={dpePick}, candidateCount={p.candidates.Count}, askedPlayer={p.playerId})");
+                                s.SubmitResponse(EncodeSelectIndices(dpePick));
+                                revivedDPEInOppStandby = true;
+                                continue;
+                            }
+                        }
+                    }
+
+                    s.SubmitResponse(ai.ComputeResponse(s, p));
+
+                    if (revivedDPEInOppStandby && s.Players[0].mzone.Any(c => c != null && c.code == 60461804))
+                    {
+                        Debug.Log("[DPE TEST] DPE successfully REVIVED from GY on opponent's Standby Phase!");
+                        break;
+                    }
+                }
+
+                if (!activatedFusionDestiny) throw new Exception("Failed to activate Fusion Destiny");
+                if (!summonedDPE) throw new Exception("Failed to summon DPE");
+                if (!passedDPEQuickEffect) throw new Exception("Failed to test DPE quick effect pass/cancel");
+                if (!triggeredDPEGraveEffect) throw new Exception("Failed to trigger DPE graveyard effect");
+                if (!revivedDPEInOppStandby) throw new Exception("Failed to revive DPE during opponent's Standby Phase");
             }
         }
     }
