@@ -54,6 +54,7 @@ namespace YGOPortable.Editor
             TestTokenDisappearanceOnLeaveField();
             TestDestinyHeroDestroyerPhoenixEnforcer();
             TestTearlamentsSegocAndMandatoryVsOptionalTriggers();
+            TestArchetypeCatalogAndPureDeckBuilder();
         }
 
         private static void TestTokenPresentationAndLocalization()
@@ -686,6 +687,38 @@ namespace YGOPortable.Editor
                 if (merrliInGy || scheirenInGy) throw new Exception("Merrli and Scheiren should have been returned from GY to Deck as Fusion Materials!");
                 if (bewdInHand != 2) throw new Exception($"Expected 2 Blue-Eyes in hand (1 from Painful Choice + 1 from White Stone), got {bewdInHand}");
             }
+        }
+
+        private static void TestArchetypeCatalogAndPureDeckBuilder()
+        {
+            Debug.Log("[TOKEN & EFFECT TEST 6] Pure Archetype Catalog & Example Deck Builder...");
+            var archetypes = CardDatabase.GetAllArchetypes();
+            Debug.Log($"[ARCHETYPE TEST] Total Pure Archetypes discovered: {archetypes.Count}");
+            if (archetypes.Count < 350)
+                throw new Exception($"Expected >= 350 archetypes, got {archetypes.Count}");
+
+            string[] requiredArchetypes = { "티아라멘츠", "크샤트리라", "라뷰린스", "푸른 눈", "블랙 매지션", "상검", "섬도희", "드래곤메이드", "엘리멘틀 히어로", "데스티니 히어로", "유벨", "천배룡" };
+            foreach (string req in requiredArchetypes)
+            {
+                var arch = archetypes.FirstOrDefault(a => a.name.Contains(req));
+                if (arch == null)
+                    throw new Exception($"Missing required archetype '{req}' in GetAllArchetypes()");
+                var (main, extra) = CardDatabase.BuildPureArchetypeDeck(arch);
+                if (main.Count != 40)
+                    throw new Exception($"Archetype '{arch.name}' example deck main count should be 40, got {main.Count}");
+                if (extra.Count > 15)
+                    throw new Exception($"Archetype '{arch.name}' example deck extra count should be <= 15, got {extra.Count}");
+            }
+
+            foreach (var arch in archetypes)
+            {
+                var (main, extra) = CardDatabase.BuildPureArchetypeDeck(arch);
+                if (main.Count != 40)
+                    throw new Exception($"Archetype '{arch.name}' built {main.Count} main deck cards instead of 40");
+                if (extra.Count > 15)
+                    throw new Exception($"Archetype '{arch.name}' built {extra.Count} extra deck cards (> 15)");
+            }
+            Debug.Log($"[ARCHETYPE TEST] Verified 40-card pure example deck generation across all {archetypes.Count} archetypes!");
         }
     }
 }

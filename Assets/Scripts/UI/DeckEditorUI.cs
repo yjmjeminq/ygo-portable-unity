@@ -61,10 +61,30 @@ namespace YGOPortable.UI
         private Text _trunkCountText;
         private Text _trunkScrollHint;
         private uint _relatedFilterCode = 0;
+        private ArchetypeInfo _activeArchetypeFilter = null;
         private InputField _searchInp;
         private RectTransform _searchInpRt;
         private GameObject _relatedBanner;
         private Text _relatedBannerText;
+
+        // Archetype Example Deck Browser Modal
+        private GameObject _archModalRoot;
+        private InputField _archSearchInp;
+        private Text _archSortBtnText;
+        private Text _archCountText;
+        private ScrollRect _archScroll;
+        private RectTransform _archViewport;
+        private RectTransform _archContent;
+        private string _archSearchText = "";
+        private int _archSortMode = 0; // 0=Card Count Desc, 1=Name Asc
+        private const int ArchCols = 3;
+        private const int ArchPoolRows = 6;
+        private float _archRowHeight = 112f;
+        private int _archTotalRows = 0;
+        private int _archLastFirstRow = -1;
+        private readonly List<ArchetypeInfo> _archResults = new List<ArchetypeInfo>();
+        private readonly List<(RectTransform rt, CompositeCardView card, Text titleTxt, Text subTxt, Button loadBtn, Button inspectBtn)> _archPool
+            = new List<(RectTransform, CompositeCardView, Text, Text, Button, Button)>();
 
         private InputField _deckNameInput;
         private Text _deckHeaderText;
@@ -163,19 +183,23 @@ namespace YGOPortable.UI
             var hdr = LotdUiKit.CreateBorderedPanel(rt, "Header",
                 new Vector2(0f, 0.92f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero,
                 LotdUiKit.PanelHeader, LotdUiKit.CyanAccent);
-            LotdUiKit.AddText(LotdUiKit.CreateRect("T", hdr, new Vector2(0.01f, 0), new Vector2(0.45f, 1), Vector2.zero, Vector2.zero),
-                "Title", "  덱 편집기 (DECK EDITOR) — 드래그 & 드롭 및 스크롤 지원", 20, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
+            LotdUiKit.AddText(LotdUiKit.CreateRect("T", hdr, new Vector2(0.01f, 0), new Vector2(0.36f, 1), Vector2.zero, Vector2.zero),
+                "Title", "  덱 편집기 (DECK EDITOR)", 20, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
 
-            _toastText = LotdUiKit.AddText(LotdUiKit.CreateRect("Toast", hdr, new Vector2(0.46f, 0), new Vector2(0.82f, 1), Vector2.zero, Vector2.zero),
-                "Msg", "", 14, TextAnchor.MiddleRight, LotdUiKit.GoldAccent, FontStyle.Bold);
+            _toastText = LotdUiKit.AddText(LotdUiKit.CreateRect("Toast", hdr, new Vector2(0.37f, 0), new Vector2(0.665f, 1), Vector2.zero, Vector2.zero),
+                "Msg", "", 13, TextAnchor.MiddleRight, LotdUiKit.GoldAccent, FontStyle.Bold);
 
-            var backBtn = LotdUiKit.CreateRect("Back", hdr, new Vector2(0.84f, 0.12f), new Vector2(0.985f, 0.88f), Vector2.zero, Vector2.zero);
+            var archModalBtn = LotdUiKit.CreateRect("ArchBtn", hdr, new Vector2(0.675f, 0.12f), new Vector2(0.855f, 0.88f), Vector2.zero, Vector2.zero);
+            LotdUiKit.CreateLotdButton(archModalBtn, "B", "📚 순수 카드군 예시 덱", OpenArchetypeModal, 14, gold: true);
+
+            var backBtn = LotdUiKit.CreateRect("Back", hdr, new Vector2(0.865f, 0.12f), new Vector2(0.988f, 0.88f), Vector2.zero, Vector2.zero);
             LotdUiKit.CreateLotdButton(backBtn, "B", "메인 메뉴", () => _app.ShowScreen(AppScreen.MainMenu), 15);
 
             // Columns
             BuildLeftColumn(rt);
             BuildCenterColumn(rt);
             BuildRightColumn(rt);
+            BuildArchetypeModal(rt);
         }
 
         private void BuildLeftColumn(Transform rt)
@@ -227,10 +251,14 @@ namespace YGOPortable.UI
             scroll.vertical = true;
             scroll.scrollSensitivity = 25f;
 
-            // Row 1: Search Related Cards button
+            // Row 1: Search Related Cards button + Build Pure Archetype Deck from inspected card
             var relBtnRt = LotdUiKit.CreateRect("RelCardBtn", col,
-                new Vector2(0.04f, 0.070f), new Vector2(0.96f, 0.118f), Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(relBtnRt, "RelB", "🔍 연관 카드 찾기 (카드군 / 지원)", () => FilterRelatedCards(_inspectedCode), 13, gold: false);
+                new Vector2(0.04f, 0.070f), new Vector2(0.49f, 0.118f), Vector2.zero, Vector2.zero);
+            LotdUiKit.CreateLotdButton(relBtnRt, "RelB", "🔍 연관 카드 찾기", () => FilterRelatedCards(_inspectedCode), 12, gold: false);
+
+            var pureQuickRt = LotdUiKit.CreateRect("PureQuickBtn", col,
+                new Vector2(0.51f, 0.070f), new Vector2(0.96f, 0.118f), Vector2.zero, Vector2.zero);
+            LotdUiKit.CreateLotdButton(pureQuickRt, "PureB", "⚡ 이 카드군 순수덱", BuildPureDeckFromInspectedCard, 12, gold: true);
 
             // Row 2: Add button at bottom
             var addBtnRt = LotdUiKit.CreateRect("AddCardBtn", col,
@@ -450,6 +478,7 @@ namespace YGOPortable.UI
         {
             if (code == 0) return;
             LotdAudio.PlayClick();
+            _activeArchetypeFilter = null;
             _relatedFilterCode = code;
             _searchText = "";
             if (_searchInp != null) _searchInp.text = "";
@@ -460,6 +489,7 @@ namespace YGOPortable.UI
         private void ClearRelatedFilter()
         {
             LotdAudio.PlayClick();
+            _activeArchetypeFilter = null;
             _relatedFilterCode = 0;
             _searchText = "";
             if (_searchInp != null) _searchInp.text = "";
@@ -474,7 +504,19 @@ namespace YGOPortable.UI
             ulong raceMask = RaceOptions[_raceFilterIdx].mask;
 
             IEnumerable<CardInfo> source = CardDatabase.AllCards;
-            if (_relatedFilterCode != 0)
+            if (_activeArchetypeFilter != null)
+            {
+                var archPool = new List<CardInfo>(_activeArchetypeFilter.coreCards.Count + _activeArchetypeFilter.supportCards.Count);
+                archPool.AddRange(_activeArchetypeFilter.coreCards);
+                foreach (var sc in _activeArchetypeFilter.supportCards)
+                    if (!archPool.Contains(sc)) archPool.Add(sc);
+                source = archPool;
+                if (_relatedBanner != null) _relatedBanner.SetActive(true);
+                if (_relatedBannerText != null)
+                    _relatedBannerText.text = $"★ [순수 카드군: {_activeArchetypeFilter.name}] ({archPool.Count}장)";
+                if (_searchInpRt != null) _searchInpRt.gameObject.SetActive(false);
+            }
+            else if (_relatedFilterCode != 0)
             {
                 var relList = CardDatabase.GetRelatedCards(_relatedFilterCode);
                 source = relList;
@@ -902,6 +944,253 @@ namespace YGOPortable.UI
         private void ShowToast(string msg)
         {
             if (_toastText != null) _toastText.text = msg ?? "";
+        }
+
+        // ==================== PURE ARCHETYPE EXAMPLE DECK BROWSER ====================
+        private void BuildArchetypeModal(Transform parent)
+        {
+            var dim = LotdUiKit.FillRect("Modal_ArchetypeBrowser", parent);
+            _archModalRoot = dim.gameObject;
+            LotdUiKit.AddImage(dim.gameObject, LotdUiKit.WhiteSprite, new Color(0f, 0.02f, 0.08f, 0.80f));
+            dim.gameObject.AddComponent<Button>().onClick.AddListener(() => _archModalRoot.SetActive(false));
+
+            var win = LotdUiKit.CreateBorderedPanel(dim, "Win",
+                new Vector2(0.262f, 0.04f), new Vector2(0.985f, 0.905f), Vector2.zero, Vector2.zero,
+                LotdUiKit.PanelNavy, LotdUiKit.GoldAccent);
+            win.gameObject.AddComponent<Button>(); // block click-through to dim
+
+            var hdr = LotdUiKit.CreateRect("Hdr", win, new Vector2(0f, 0.89f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(hdr.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelHeader);
+            var title = LotdUiKit.AddText(hdr, "T", "📚 순수 카드군 예시 덱 선택 (PURE ARCHETYPE DECKS)", 19, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
+            title.rectTransform.offsetMin = new Vector2(16, 18);
+            var sub = LotdUiKit.AddText(hdr, "Sub", "원하는 카드군을 선택하면 해당 순수 카드군 예시 덱(메인 40장 + 엑스트라 덱)이 자동 구성되며 보관함도 필터링됩니다.", 13, TextAnchor.LowerLeft, LotdUiKit.TextPrimary);
+            sub.rectTransform.offsetMin = new Vector2(16, 4);
+
+            var closeRt = LotdUiKit.CreateRect("Close", hdr, new Vector2(0.84f, 0.16f), new Vector2(0.985f, 0.84f), Vector2.zero, Vector2.zero);
+            LotdUiKit.CreateLotdButton(closeRt, "B", "✕ 닫기", () => _archModalRoot.SetActive(false), 14);
+
+            // Search & Sort row
+            var filterRow = LotdUiKit.CreateRect("FilterRow", win, new Vector2(0.02f, 0.81f), new Vector2(0.98f, 0.875f), Vector2.zero, Vector2.zero);
+            _archSearchInp = LotdUiKit.CreateInputField(
+                LotdUiKit.CreateRect("ArchSearch", filterRow, new Vector2(0f, 0f), new Vector2(0.58f, 1f), Vector2.zero, Vector2.zero),
+                "S", "카드군 이름 또는 대표 카드명 검색 (예: 티아라멘츠, 푸른 눈, 히어로, 상검, 섬도희...)", 14);
+            _archSearchInp.onValueChanged.AddListener(v =>
+            {
+                _archSearchText = v ?? "";
+                RefreshArchetypeModal();
+            });
+
+            var sortBtn = LotdUiKit.CreateLotdButton(
+                LotdUiKit.CreateRect("SortArch", filterRow, new Vector2(0.60f, 0f), new Vector2(0.80f, 1f), Vector2.zero, Vector2.zero),
+                "B", "정렬: 카드수/인기순", () =>
+                {
+                    _archSortMode = (_archSortMode + 1) % 2;
+                    _archSortBtnText.text = _archSortMode == 0 ? "정렬: 카드수/인기순" : "정렬: 가나다순";
+                    RefreshArchetypeModal();
+                }, 13);
+            _archSortBtnText = sortBtn.GetComponentInChildren<Text>();
+
+            _archCountText = LotdUiKit.AddText(
+                LotdUiKit.CreateRect("ArchCnt", filterRow, new Vector2(0.82f, 0f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero),
+                "C", "0개 카드군", 14, TextAnchor.MiddleRight, LotdUiKit.CyanAccent, FontStyle.Bold);
+
+            // Virtualized Scroll Grid (3 cols x 6 rows = 18 pooled tiles)
+            var scrollHolder = LotdUiKit.CreateRect("ArchScrollHolder", win, new Vector2(0.02f, 0.02f), new Vector2(0.98f, 0.795f), Vector2.zero, Vector2.zero);
+            _archScroll = scrollHolder.gameObject.AddComponent<ScrollRect>();
+            _archScroll.horizontal = false;
+            _archScroll.vertical = true;
+            _archScroll.scrollSensitivity = 36f;
+            _archScroll.movementType = ScrollRect.MovementType.Clamped;
+
+            _archViewport = LotdUiKit.FillRect("VP", scrollHolder);
+            _archViewport.gameObject.AddComponent<RectMask2D>();
+            _archScroll.viewport = _archViewport;
+
+            _archContent = LotdUiKit.CreateRect("Content", _archViewport, new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
+            _archContent.pivot = new Vector2(0.5f, 1f);
+            _archScroll.content = _archContent;
+
+            for (int r = 0; r < ArchPoolRows; r++)
+            {
+                for (int c = 0; c < ArchCols; c++)
+                {
+                    var tile = LotdUiKit.CreateBorderedPanel(_archContent, $"ArchTile_{r}_{c}",
+                        new Vector2(0, 1), new Vector2(0, 1), Vector2.zero, Vector2.zero,
+                        new Color(0.04f, 0.10f, 0.22f, 0.96f), LotdUiKit.CyanAccent);
+                    tile.pivot = new Vector2(0, 1);
+
+                    var thumbRt = LotdUiKit.CreateRect("Card", tile, new Vector2(0.03f, 0.06f), new Vector2(0.28f, 0.94f), Vector2.zero, Vector2.zero);
+                    var cv = CompositeCardView.Create(thumbRt, "V", false);
+                    var inspectImg = LotdUiKit.AddImage(thumbRt.gameObject, LotdUiKit.WhiteSprite, Color.clear);
+                    var inspectBtn = thumbRt.gameObject.AddComponent<Button>();
+                    inspectBtn.targetGraphic = inspectImg;
+
+                    var tTxt = LotdUiKit.AddText(
+                        LotdUiKit.CreateRect("Name", tile, new Vector2(0.31f, 0.62f), new Vector2(0.97f, 0.94f), Vector2.zero, Vector2.zero),
+                        "N", "", 15, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
+                    tTxt.resizeTextForBestFit = true;
+                    tTxt.resizeTextMinSize = 11;
+                    tTxt.resizeTextMaxSize = 16;
+
+                    var sTxt = LotdUiKit.AddText(
+                        LotdUiKit.CreateRect("Info", tile, new Vector2(0.31f, 0.38f), new Vector2(0.97f, 0.62f), Vector2.zero, Vector2.zero),
+                        "S", "", 11, TextAnchor.MiddleLeft, LotdUiKit.CyanAccent);
+
+                    var btnRt = LotdUiKit.CreateRect("LoadBtn", tile, new Vector2(0.31f, 0.07f), new Vector2(0.96f, 0.36f), Vector2.zero, Vector2.zero);
+                    var loadBtn = LotdUiKit.CreateLotdButton(btnRt, "B", "⚡ 순수 예시 덱 불러오기", null, 12, gold: true);
+
+                    _archPool.Add((tile, cv, tTxt, sTxt, loadBtn, inspectBtn));
+                }
+            }
+
+            _archScroll.onValueChanged.AddListener(_ => OnArchModalScrolled());
+            _archModalRoot.SetActive(false);
+        }
+
+        private void OpenArchetypeModal()
+        {
+            LotdAudio.PlayClick();
+            _archModalRoot.SetActive(true);
+            RefreshArchetypeModal();
+        }
+
+        private void RefreshArchetypeModal()
+        {
+            _archResults.Clear();
+            var all = CardDatabase.GetAllArchetypes();
+            string q = (_archSearchText ?? "").Trim().ToLowerInvariant();
+
+            foreach (var arch in all)
+            {
+                if (!string.IsNullOrEmpty(q))
+                {
+                    bool hit = arch.name.ToLowerInvariant().Contains(q) || arch.baseName.ToLowerInvariant().Contains(q);
+                    if (!hit)
+                    {
+                        for (int i = 0; i < arch.coreCards.Count; i++)
+                        {
+                            if ((arch.coreCards[i].name ?? "").ToLowerInvariant().Contains(q))
+                            {
+                                hit = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!hit) continue;
+                }
+                _archResults.Add(arch);
+            }
+
+            if (_archSortMode == 1)
+                _archResults.Sort((a, b) => string.Compare(a.name, b.name, StringComparison.Ordinal));
+            else
+                _archResults.Sort((a, b) =>
+                {
+                    int cmp = b.coreCards.Count.CompareTo(a.coreCards.Count);
+                    if (cmp != 0) return cmp;
+                    return b.TotalUniqueCount.CompareTo(a.TotalUniqueCount);
+                });
+
+            _archTotalRows = Mathf.Max(1, (_archResults.Count + ArchCols - 1) / ArchCols);
+            float vpW = _archViewport.rect.width > 10 ? _archViewport.rect.width : 960f;
+            _archContent.sizeDelta = new Vector2(vpW, _archTotalRows * _archRowHeight);
+            _archCountText.text = $"총 {_archResults.Count:N0}개 카드군";
+            _archScroll.verticalNormalizedPosition = 1f;
+            _archLastFirstRow = -1;
+            UpdateVirtualArchSlots(0, force: true);
+        }
+
+        private void OnArchModalScrolled()
+        {
+            if (_archTotalRows <= 0) return;
+            float scrollY = Mathf.Max(0f, _archContent.anchoredPosition.y);
+            int firstRow = Mathf.Clamp(Mathf.FloorToInt(scrollY / _archRowHeight), 0, Mathf.Max(0, _archTotalRows - ArchPoolRows + 1));
+            UpdateVirtualArchSlots(firstRow);
+        }
+
+        private void UpdateVirtualArchSlots(int firstRow, bool force = false)
+        {
+            if (firstRow == _archLastFirstRow && !force) return;
+            _archLastFirstRow = firstRow;
+
+            float vpWidth = _archViewport.rect.width > 10 ? _archViewport.rect.width : 960f;
+            float colW = vpWidth / ArchCols;
+
+            for (int r = 0; r < ArchPoolRows; r++)
+            {
+                int targetRow = firstRow + r;
+                float y = -targetRow * _archRowHeight;
+
+                for (int c = 0; c < ArchCols; c++)
+                {
+                    int poolIdx = r * ArchCols + c;
+                    var (rt, cv, titleTxt, subTxt, loadBtn, inspectBtn) = _archPool[poolIdx];
+
+                    float x = c * colW;
+                    rt.anchoredPosition = new Vector2(x + 4f, y - 4f);
+                    rt.sizeDelta = new Vector2(colW - 8f, _archRowHeight - 8f);
+
+                    int archIdx = targetRow * ArchCols + c;
+                    if (archIdx >= _archResults.Count)
+                    {
+                        rt.gameObject.SetActive(false);
+                        continue;
+                    }
+
+                    rt.gameObject.SetActive(true);
+                    var arch = _archResults[archIdx];
+                    cv.SetCard(arch.representativeCode);
+                    titleTxt.text = $"[{arch.name}]";
+                    subTxt.text = $"고유 카드 {arch.TotalUniqueCount}종 (메인 {arch.MainPoolCount} / EX {arch.ExtraPoolCount})";
+
+                    inspectBtn.onClick.RemoveAllListeners();
+                    inspectBtn.onClick.AddListener(() => InspectCard(arch.representativeCode));
+
+                    loadBtn.onClick.RemoveAllListeners();
+                    loadBtn.onClick.AddListener(() => ApplyPureArchetypeExampleDeck(arch));
+                }
+            }
+        }
+
+        private void BuildPureDeckFromInspectedCard()
+        {
+            if (_inspectedCode == 0) return;
+            var arch = CardDatabase.FindArchetypeForCard(_inspectedCode);
+            if (arch == null)
+            {
+                ShowToast("해당 카드의 순수 카드군 정보를 찾을 수 없습니다.");
+                return;
+            }
+            ApplyPureArchetypeExampleDeck(arch);
+        }
+
+        private void ApplyPureArchetypeExampleDeck(ArchetypeInfo arch)
+        {
+            if (arch == null) return;
+            var (main, extra) = CardDatabase.BuildPureArchetypeDeck(arch);
+            _workingDeck.name = $"[순수] {arch.name}";
+            _workingDeck.main = main;
+            _workingDeck.extra = extra;
+            _workingDeck.side.Clear();
+
+            if (_deckNameInput != null)
+                _deckNameInput.text = _workingDeck.name;
+
+            SortWorkingDeck();
+
+            _activeArchetypeFilter = arch;
+            _relatedFilterCode = 0;
+            _searchText = "";
+            if (_searchInp != null) _searchInp.text = "";
+            RefreshTrunkFilter();
+
+            if (arch.representativeCode != 0)
+                InspectCard(arch.representativeCode);
+
+            if (_archModalRoot != null)
+                _archModalRoot.SetActive(false);
+
+            ShowToast($"✨ '[순수] {arch.name}' 예시 덱 (메인 {main.Count}장 / EX {extra.Count}장) 구성 완료!");
         }
     }
 }

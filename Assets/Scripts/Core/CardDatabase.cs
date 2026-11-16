@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using UnityEngine;
 
 namespace YGOPortable.Core
@@ -68,6 +69,19 @@ namespace YGOPortable.Core
     internal class CardKrWrapper
     {
         public CardInfo[] cards;
+    }
+
+    public class ArchetypeInfo
+    {
+        public string name;
+        public string baseName;
+        public uint representativeCode;
+        public readonly HashSet<ushort> setcodes = new HashSet<ushort>();
+        public readonly List<CardInfo> coreCards = new List<CardInfo>();
+        public readonly List<CardInfo> supportCards = new List<CardInfo>();
+        public int MainPoolCount;
+        public int ExtraPoolCount;
+        public int TotalUniqueCount => coreCards.Count + supportCards.Count;
     }
 
     public static class CardDatabase
@@ -255,6 +269,7 @@ namespace YGOPortable.Core
             }
 
             _relatedCache.Clear();
+            _archetypes = null;
             Debug.Log($"[CardDatabase] Loaded {_allCards.Count} KR cards.");
         }
 
@@ -356,6 +371,445 @@ namespace YGOPortable.Core
 
             _relatedCache[code] = results;
             return results;
+        }
+
+        private static List<ArchetypeInfo> _archetypes;
+        private static readonly System.Text.RegularExpressions.Regex _archQuoteRegex =
+            new System.Text.RegularExpressions.Regex("\"([^\"]{1,24})\"\\s*(?:몬스터|카드|마법|함정|튜너|일반|효과|융합|싱크로|엑시즈|링크|의식|펜듈럼)",
+                System.Text.RegularExpressions.RegexOptions.Compiled);
+        private static readonly System.Text.RegularExpressions.Regex _anyQuoteRegex =
+            new System.Text.RegularExpressions.Regex("\"([^\"]{2,18})\"",
+                System.Text.RegularExpressions.RegexOptions.Compiled);
+        private static readonly System.Text.RegularExpressions.Regex _rubyStripRegex =
+            new System.Text.RegularExpressions.Regex("\\([^\\)]+\\)",
+                System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        private static string StripRuby(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            int idx = s.IndexOf('(');
+            if (idx < 0) return s.Trim();
+            return _rubyStripRegex.Replace(s, "").Trim();
+        }
+
+        private static bool IsPureAltArtDuplicate(CardInfo c)
+        {
+            if (c == null || c.alias == 0 || _byCode == null) return false;
+            if (_byCode.TryGetValue(c.alias, out var b) && b != null)
+            {
+                if (c.type == b.type && c.atk == b.atk && c.def == b.def && c.level == b.level)
+                    return true;
+            }
+            return false;
+        }
+
+        public static IReadOnlyList<ArchetypeInfo> GetAllArchetypes()
+        {
+            if (_archetypes != null) return _archetypes;
+            if (_allCards == null) return Array.Empty<ArchetypeInfo>();
+
+            var scMap = new Dictionary<ushort, List<CardInfo>>();
+            var quoteIndex = new Dictionary<string, List<CardInfo>>(StringComparer.Ordinal);
+
+            foreach (var c in _allCards)
+            {
+                if ((c.type & YgoConstants.TYPE_TOKEN) != 0 || IsPureAltArtDuplicate(c)) continue;
+
+                if (c.setcode != 0)
+                {
+                    var scs = ExtractSetcodes(c.setcode);
+                    foreach (ushort sc in scs)
+                    {
+                        if (!scMap.TryGetValue(sc, out var list))
+                        {
+                            list = new List<CardInfo>();
+                            scMap[sc] = list;
+                        }
+                        list.Add(c);
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(c.desc) && c.desc.IndexOf('"') >= 0)
+                {
+                    var seenInCard = new HashSet<string>(StringComparer.Ordinal);
+                    foreach (System.Text.RegularExpressions.Match m in _anyQuoteRegex.Matches(c.desc))
+                    {
+                        string kw = m.Groups[1].Value.Trim();
+                        string baseKw = StripRuby(kw);
+                        if (baseKw.Length >= 2 && seenInCard.Add(baseKw))
+                        {
+                            if (!quoteIndex.TryGetValue(baseKw, out var qList))
+                            {
+                                qList = new List<CardInfo>();
+                                quoteIndex[baseKw] = qList;
+                            }
+                            qList.Add(c);
+                        }
+                    }
+                }
+            }
+
+            var merged = new Dictionary<string, ArchetypeInfo>(StringComparer.Ordinal);
+
+            foreach (var kv in scMap)
+            {
+                ushort sc = kv.Key;
+                var cl = kv.Value;
+                if (cl.Count < 4) continue;
+
+                var scores = new Dictionary<string, int>(StringComparer.Ordinal);
+                foreach (var c in cl)
+                {
+                    if (string.IsNullOrEmpty(c.desc) || c.desc.IndexOf('"') < 0) continue;
+
+                    foreach (System.Text.RegularExpressions.Match m in _archQuoteRegex.Matches(c.desc))
+                    {
+                        string term = m.Groups[1].Value.Trim();
+                        if (term.EndsWith("토큰")) continue;
+                        string baseTerm = StripRuby(term);
+                        int inName = 0;
+                        for (int i = 0; i < cl.Count; i++)
+                        {
+                            string nm = cl[i].name ?? "";
+                            if (nm.Contains(term) || (baseTerm.Length >= 2 && nm.Contains(baseTerm))) inName++;
+                        }
+                        int bonus = term.IndexOf('(') >= 0 ? 10 : 0;
+                        scores.TryGetValue(term, out int cur);
+                        scores[term] = cur + 3 + inName * 8 + bonus;
+                    }
+
+                    foreach (System.Text.RegularExpressions.Match m in _anyQuoteRegex.Matches(c.desc))
+                    {
+                        string term = m.Groups[1].Value.Trim();
+                        if (term.EndsWith("토큰")) continue;
+                        string baseTerm = StripRuby(term);
+                        int inName = 0;
+                        bool exactSingleCard = false;
+                        for (int i = 0; i < cl.Count; i++)
+                        {
+                            string nm = cl[i].name ?? "";
+                            if (nm == term) exactSingleCard = true;
+                            if (nm.Contains(term) || (baseTerm.Length >= 2 && nm.Contains(baseTerm))) inName++;
+                        }
+                        if (inName >= 3 && (!exactSingleCard || term == "블랙 매지션" || term == "푸른 눈의 백룡" || term == "붉은 눈의 흑룡" || term == "유벨" || term == "사이버 드래곤"))
+                        {
+                            scores.TryGetValue(term, out int cur);
+                            scores[term] = cur + inName * 5;
+                        }
+                    }
+                }
+
+                if (scores.Count == 0) continue;
+
+                string bestName = null;
+                int bestScore = -1;
+                foreach (var skv in scores)
+                {
+                    if (skv.Value > bestScore)
+                    {
+                        bestScore = skv.Value;
+                        bestName = skv.Key;
+                    }
+                }
+                if (string.IsNullOrEmpty(bestName)) continue;
+
+                if (!merged.TryGetValue(bestName, out var info))
+                {
+                    info = new ArchetypeInfo
+                    {
+                        name = bestName,
+                        baseName = StripRuby(bestName),
+                    };
+                    merged[bestName] = info;
+                }
+                info.setcodes.Add(sc);
+                foreach (var c in cl)
+                {
+                    if (!info.coreCards.Contains(c))
+                        info.coreCards.Add(c);
+                }
+            }
+
+            // Enrich each archetype with direct support cards & secondary paired keywords (e.g. 섬도희->섬도, 천배룡->찬환, 황금향->엘드리치)
+            var resultList = new List<ArchetypeInfo>(merged.Values.Count);
+            foreach (var info in merged.Values)
+            {
+                var coreCodeSet = new HashSet<uint>();
+                foreach (var c in info.coreCards) coreCodeSet.Add(c.code);
+
+                string bName = info.baseName;
+                if (bName.Length >= 2)
+                {
+                    foreach (var c in _allCards)
+                    {
+                        if ((c.type & YgoConstants.TYPE_TOKEN) != 0 || IsPureAltArtDuplicate(c) || coreCodeSet.Contains(c.code)) continue;
+                        if ((c.name ?? "").Contains(bName))
+                        {
+                            info.coreCards.Add(c);
+                            coreCodeSet.Add(c.code);
+                        }
+                    }
+                }
+
+                var suppCodeSet = new HashSet<uint>();
+                if (bName.Length >= 2 && quoteIndex.TryGetValue(bName, out var directSupps))
+                {
+                    foreach (var sc in directSupps)
+                    {
+                        if (!coreCodeSet.Contains(sc.code) && suppCodeSet.Add(sc.code))
+                            info.supportCards.Add(sc);
+                    }
+                }
+
+                // Secondary archetype keywords mentioned across core + initial support cards
+                var secKwCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+                void ScanSecKeywords(List<CardInfo> list)
+                {
+                    foreach (var c in list)
+                    {
+                        if (string.IsNullOrEmpty(c.desc) || c.desc.IndexOf('"') < 0) continue;
+                        foreach (System.Text.RegularExpressions.Match m in _archQuoteRegex.Matches(c.desc))
+                        {
+                            string bm = StripRuby(m.Groups[1].Value.Trim());
+                            if (bm.Length >= 2 && bm != bName && !bm.EndsWith("토큰"))
+                            {
+                                secKwCounts.TryGetValue(bm, out int cnt);
+                                secKwCounts[bm] = cnt + 1;
+                            }
+                        }
+                    }
+                }
+                ScanSecKeywords(info.coreCards);
+                ScanSecKeywords(info.supportCards);
+
+                int secThreshold = info.coreCards.Count <= 6 ? 1 : 2;
+                foreach (var skv in secKwCounts)
+                {
+                    if (skv.Value < secThreshold) continue;
+                    string secKw = skv.Key;
+                    foreach (var c in _allCards)
+                    {
+                        if ((c.type & YgoConstants.TYPE_TOKEN) != 0 || IsPureAltArtDuplicate(c)) continue;
+                        if (coreCodeSet.Contains(c.code) || suppCodeSet.Contains(c.code)) continue;
+                        if ((c.name ?? "").Contains(secKw))
+                        {
+                            info.supportCards.Add(c);
+                            suppCodeSet.Add(c.code);
+                        }
+                    }
+                }
+
+                // Count Main & Extra pool sizes and choose representative Boss/Ace card
+                int mainCnt = 0, extraCnt = 0;
+                CardInfo bestRep = null;
+                int bestRepScore = int.MinValue;
+                foreach (var c in info.coreCards)
+                {
+                    if (c.IsExtra) extraCnt++; else mainCnt++;
+                    int repScore = (c.IsMonster ? c.atk : 0) + (c.IsExtra ? 800 : 0) + ((c.name ?? "").Contains(bName) ? 1000 : 0);
+                    if (repScore > bestRepScore)
+                    {
+                        bestRepScore = repScore;
+                        bestRep = c;
+                    }
+                }
+                foreach (var c in info.supportCards)
+                {
+                    if (c.IsExtra) extraCnt++; else mainCnt++;
+                }
+
+                info.MainPoolCount = mainCnt;
+                info.ExtraPoolCount = extraCnt;
+                info.representativeCode = bestRep != null ? bestRep.code : (info.coreCards.Count > 0 ? info.coreCards[0].code : 0);
+
+                if (info.TotalUniqueCount >= 5)
+                    resultList.Add(info);
+            }
+
+            resultList.Sort((a, b) =>
+            {
+                int cmp = b.coreCards.Count.CompareTo(a.coreCards.Count);
+                if (cmp != 0) return cmp;
+                return string.Compare(a.name, b.name, StringComparison.Ordinal);
+            });
+
+            _archetypes = resultList;
+            return _archetypes;
+        }
+
+        public static ArchetypeInfo FindArchetypeForCard(uint code)
+        {
+            var card = Get(code);
+            if (card == null) return null;
+            var all = GetAllArchetypes();
+            var cardScs = ExtractSetcodes(card.setcode);
+            foreach (var arch in all)
+            {
+                if (cardScs.Count > 0 && arch.setcodes.Overlaps(cardScs)) return arch;
+                if (arch.coreCards.Any(c => c.code == code)) return arch;
+            }
+            foreach (var arch in all)
+            {
+                if (arch.supportCards.Any(c => c.code == code)) return arch;
+            }
+            // Synthesize ad-hoc archetype from GetRelatedCards if not in named catalog
+            var rel = GetRelatedCards(code);
+            if (rel.Count > 0)
+            {
+                var adhoc = new ArchetypeInfo
+                {
+                    name = card.name,
+                    baseName = card.name,
+                    representativeCode = code,
+                };
+                adhoc.coreCards.Add(card);
+                foreach (var r in rel)
+                {
+                    if (!IsPureAltArtDuplicate(r))
+                        adhoc.coreCards.Add(r);
+                }
+                adhoc.MainPoolCount = adhoc.coreCards.Count(c => !c.IsExtra);
+                adhoc.ExtraPoolCount = adhoc.coreCards.Count(c => c.IsExtra);
+                return adhoc;
+            }
+            return null;
+        }
+
+        public static (List<uint> main, List<uint> extra) BuildPureArchetypeDeck(ArchetypeInfo arch)
+        {
+            var main = new List<uint>(40);
+            var extra = new List<uint>(15);
+            if (arch == null) return (main, extra);
+
+            var copyCounts = new Dictionary<uint, int>();
+            bool TryAddCard(List<uint> targetList, int maxListSize, CardInfo c, int maxCopies = 3)
+            {
+                if (c == null || (c.type & YgoConstants.TYPE_TOKEN) != 0 || targetList.Count >= maxListSize) return false;
+                uint key = c.alias != 0 ? c.alias : c.code;
+                copyCounts.TryGetValue(key, out int cur);
+                if (cur >= maxCopies || cur >= 3) return false;
+                targetList.Add(c.code);
+                copyCounts[key] = cur + 1;
+                return true;
+            }
+
+            int ScoreCardUtility(CardInfo c, bool isCore)
+            {
+                int s = isCore ? 1000 : 300;
+                string d = c.desc ?? "";
+                if (d.Contains("패에 넣") || d.Contains("서치")) s += 350;
+                if (d.Contains("특수 소환")) s += 300;
+                if (d.Contains("덱에서")) s += 250;
+                if (d.Contains("묘지")) s += 150;
+                if (d.Contains("무효")) s += 200;
+                if (c.IsMonster)
+                {
+                    if (!c.IsExtra && c.level >= 1 && c.level <= 4) s += 250;
+                    s += Mathf.Clamp(c.atk / 10, 0, 300);
+                }
+                else if (c.IsSpell)
+                {
+                    s += 220;
+                }
+                else if (c.IsTrap)
+                {
+                    s += 120;
+                }
+                return s;
+            }
+
+            // 1. Build Extra Deck (up to 15 cards) from Core + Support Extra Deck monsters
+            var extraPool = new List<CardInfo>();
+            foreach (var c in arch.coreCards) if (c.IsExtra) extraPool.Add(c);
+            foreach (var c in arch.supportCards) if (c.IsExtra && !extraPool.Contains(c)) extraPool.Add(c);
+            extraPool.Sort((a, b) => ScoreCardUtility(b, arch.coreCards.Contains(b)).CompareTo(ScoreCardUtility(a, arch.coreCards.Contains(a))));
+
+            if (extraPool.Count > 0)
+            {
+                int copiesPerExtra = extraPool.Count <= 4 ? 3 : (extraPool.Count <= 7 ? 2 : 1);
+                for (int pass = 0; pass < copiesPerExtra && extra.Count < 15; pass++)
+                {
+                    foreach (var ec in extraPool)
+                    {
+                        if (extra.Count >= 15) break;
+                        TryAddCard(extra, 15, ec, copiesPerExtra);
+                    }
+                }
+                // Top up to 15 if still room and we only added 1 copy
+                for (int pass = 0; pass < 2 && extra.Count < 15; pass++)
+                {
+                    foreach (var ec in extraPool)
+                    {
+                        if (extra.Count >= 15) break;
+                        TryAddCard(extra, 15, ec, 3);
+                    }
+                }
+            }
+
+            // 2. Build Main Deck (40 cards) prioritizing Pure Archetype Core first, then Direct Support
+            var coreLowMonsters = arch.coreCards.Where(c => !c.IsExtra && c.IsMonster && c.level <= 4)
+                .OrderByDescending(c => ScoreCardUtility(c, true)).ToList();
+            var coreSpellsTraps = arch.coreCards.Where(c => !c.IsExtra && (c.IsSpell || c.IsTrap))
+                .OrderByDescending(c => ScoreCardUtility(c, true)).ToList();
+            var coreHighMonsters = arch.coreCards.Where(c => !c.IsExtra && c.IsMonster && c.level >= 5)
+                .OrderByDescending(c => ScoreCardUtility(c, true)).ToList();
+            var suppMain = arch.supportCards.Where(c => !c.IsExtra)
+                .OrderByDescending(c => ScoreCardUtility(c, false)).ToList();
+
+            // Pass 1: Core Engine (3x Low-level Monsters, 3x Core Spells/Traps, 2x High-level Monsters)
+            foreach (var c in coreLowMonsters)
+                for (int k = 0; k < 3 && main.Count < 40; k++) TryAddCard(main, 40, c, 3);
+
+            foreach (var c in coreSpellsTraps)
+                for (int k = 0; k < 3 && main.Count < 40; k++) TryAddCard(main, 40, c, 3);
+
+            int highCopies = (coreLowMonsters.Count <= 3) ? 3 : 2;
+            foreach (var c in coreHighMonsters)
+                for (int k = 0; k < highCopies && main.Count < 40; k++) TryAddCard(main, 40, c, highCopies);
+
+            // Pass 2: Remaining copies of Core High Monsters up to 3
+            foreach (var c in coreHighMonsters)
+                for (int k = 0; k < 3 && main.Count < 40; k++) TryAddCard(main, 40, c, 3);
+
+            // Pass 3: Direct Archetype Support Cards (Spells/Traps/Monsters mentioning the archetype)
+            foreach (var c in suppMain)
+                for (int k = 0; k < 3 && main.Count < 40; k++) TryAddCard(main, 40, c, 3);
+
+            // Pass 4: If Extra Deck has Fusion Monsters and Main Deck lacks a Fusion effect, include Polymerization (24094653)
+            bool hasFusionExtra = extra.Any(code => { var ci = Get(code); return ci != null && (ci.type & YgoConstants.TYPE_FUSION) != 0; });
+            bool hasFusionSpell = main.Any(code => { var ci = Get(code); return ci != null && (ci.desc ?? "").Contains("융합 소환"); });
+            if (hasFusionExtra && !hasFusionSpell && main.Count < 40)
+            {
+                var poly = Get(24094653); // 융합
+                for (int k = 0; k < 2 && main.Count < 40; k++) TryAddCard(main, 40, poly, 2);
+            }
+
+            // Pass 5: If archetype + support pool had < 40 total card copies, fill remaining slots to 40 with staple cards
+            uint[] staples =
+            {
+                14558127, // 하루 우라라
+                23434538, // 증식의 G
+                10045474, // 무한포영
+                24224830, // 무덤의 지명자
+                35261759, // 욕망과 졸부의 항아리
+                81439173, // 어리석은 매장
+                83764718, // 죽은 자의 소생
+                18144506, // 해피의 깃털
+                14532163, // 라이트닝 스톰
+                25311006, // 삼전의 재
+            };
+            foreach (uint stCode in staples)
+            {
+                if (main.Count >= 40) break;
+                var stCard = Get(stCode);
+                if (stCard != null)
+                {
+                    for (int k = 0; k < 3 && main.Count < 40; k++)
+                        TryAddCard(main, 40, stCard, 3);
+                }
+            }
+
+            return (main, extra);
         }
 
         public static CardInfo Get(uint code)
