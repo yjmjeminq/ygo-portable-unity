@@ -186,6 +186,8 @@ namespace YGOPortable.Editor
             Debug.Log($"[VERIFY] Native loaded cards={cardCnt}, scripts={scriptCnt}");
             AssertTrue(cardCnt >= 14000, $"Expected >= 14000 cards, got {cardCnt}");
             AssertTrue(scriptCnt >= 13000, $"Expected >= 13000 scripts, got {scriptCnt}");
+            AssertTrue(YgoNativeBridge.YGO_HasScript("c88264978.lua") == 1,
+                "Missing Red-Eyes Darkness Metal Dragon effect script");
 
             CardDatabase.Load(streaming);
             AssertTrue(CardDatabase.AllCards.Count >= 14000, "CardDatabase count too low");
@@ -351,6 +353,8 @@ namespace YGOPortable.Editor
 
             // Explicit test for non-search effects & prompt handlers (announce, chain negate, destroy/banish, equip/counter/coin/dice/token, reborn/tribute, extra/ritual sum, RPS)
             VerifyOtherCardEffects(classicDecks[0].main);
+            VerifyPossessedDestiny(classicDecks[0].main);
+            VerifyMandatoryBattleAttack();
 
             // Explicit test for Token generation, effect tokens (Swordsoul Tuner), dynamic/stat tokens, and token disappearance
             TestTokenAndComplexEffects.RunTokenSuiteHeadless();
@@ -690,7 +694,7 @@ namespace YGOPortable.Editor
             }
         }
 
-        private static DuelSession StartSeedMatching(string label, uint[] main0, uint[] extra0, uint[] main1, uint[] extra1, bool humanFirst, Func<DuelSession, bool> setupAndCheck, int maxSeeds = 600)
+        internal static DuelSession StartSeedMatching(string label, uint[] main0, uint[] extra0, uint[] main1, uint[] extra1, bool humanFirst, Func<DuelSession, bool> setupAndCheck, int maxSeeds = 600)
         {
             for (uint seedBase = 1; seedBase <= maxSeeds; seedBase++)
             {
@@ -1224,6 +1228,63 @@ namespace YGOPortable.Editor
             }
 
             Debug.Log("[VERIFY OTHER EFFECTS] All 15 non-search effect & UI prompt suites passed (Bridge+SumUI, CardAnnounce, ChainNegate, DestroyBanish, Equip+Coin+Counter, DeckTop+Dice, ScapegoatTokens, Reborn+Tribute, RitualOverflowSUM, SynchroUnselect, ExactSumSelect, XyzDetach, Fusion, DNA-IllusionRace, RockPaperScissors) with 0 retries.");
+        }
+
+        private static void VerifyPossessedDestiny(uint[] opponentMain)
+        {
+            const uint destiny = 45508030;
+            const uint aussa = 31887905;
+            var main = BuildDeck40((destiny, 14), (aussa, 26));
+            var empty = Array.Empty<uint>();
+            var ai = new TacticalAI();
+            using var duel = StartSeedMatching("Possessed Destiny", main, empty, opponentMain, empty, true, session =>
+                session.ActivePrompt?.summonable.Any(c => c.code == aussa) == true &&
+                session.Players[0].hand.Any(c => c.code == destiny) &&
+                session.Players[0].hand.Count(c => c.code == aussa) >= 2);
+
+            int normal = duel.ActivePrompt.summonable.FindIndex(c => c.code == aussa);
+            duel.SubmitResponseInt(normal << 16);
+            DriveUntilIdle(duel, ai);
+            int activate = duel.ActivePrompt?.activatable.FindIndex(c => c.code == destiny) ?? -1;
+            AssertTrue(activate >= 0, "Possessed Destiny is unavailable with a matching-Attribute monster");
+            duel.SubmitResponseInt((activate << 16) | 5);
+            DriveUntilIdle(duel, ai, prompt =>
+            {
+                if (prompt.messageType == YgoConstants.MSG_SELECT_CARD)
+                {
+                    int target = prompt.candidates.FindIndex(c => c.code == aussa);
+                    AssertTrue(target >= 0, "Possessed Destiny did not offer the matching-Attribute monster");
+                    return EncodeSelectIndices(target);
+                }
+                if (prompt.messageType == YgoConstants.MSG_SELECT_POSITION)
+                {
+                    AssertTrue((prompt.allowedPositions & YgoConstants.POS_FACEUP_ATTACK) != 0 &&
+                               (prompt.allowedPositions & YgoConstants.POS_FACEDOWN_DEFENSE) != 0,
+                        "Possessed Destiny did not offer both legal Special Summon positions");
+                    return BitConverter.GetBytes(YgoConstants.POS_FACEUP_ATTACK);
+                }
+                return null;
+            });
+            AssertTrue(duel.RetryCount == 0 && duel.Players[0].mzone.Count(c => c != null && c.code == aussa) == 2,
+                "Possessed Destiny failed to Special Summon to the activating player's field");
+            Debug.Log("[VERIFY POSSESSED DESTINY] Matching-Attribute Special Summon completed without retries.");
+        }
+
+        private static void VerifyMandatoryBattleAttack()
+        {
+            using var duel = new DuelSession();
+            duel.Players[0].mzone[0] = new LiveCardState { attack = 1000, position = YgoConstants.POS_FACEUP_ATTACK };
+            duel.Players[1].mzone[0] = new LiveCardState { attack = 3000, position = YgoConstants.POS_FACEUP_ATTACK };
+            var prompt = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_BATTLECMD, playerId = 0 };
+            prompt.attackable.Add(new SelectableCardItem { sequence = 0 });
+            var ai = new TacticalAI();
+            for (int i = 0; i < 26; i++)
+                AssertTrue(BitConverter.ToInt32(ai.ComputeResponse(duel, prompt), 0) == 1,
+                    "AI attempted to leave the Battle Phase during a mandatory attack");
+            prompt.canEp = true;
+            AssertTrue(BitConverter.ToInt32(ai.ComputeResponse(duel, prompt), 0) == 3,
+                "AI did not end the Battle Phase when allowed");
+            Debug.Log("[VERIFY MANDATORY ATTACK] AI attacked when both phase transitions were unavailable.");
         }
 
         private static void AssertTrue(bool cond, string msg)

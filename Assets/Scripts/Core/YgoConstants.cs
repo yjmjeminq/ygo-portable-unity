@@ -35,6 +35,9 @@ namespace YGOPortable.Core
         public const uint POS_ATTACK = POS_FACEUP_ATTACK | POS_FACEDOWN_ATTACK;
         public const uint POS_DEFENSE = POS_FACEUP_DEFENSE | POS_FACEDOWN_DEFENSE;
 
+        public const uint REASON_DESTROY = 0x1;
+        public const uint REASON_SPSUMMON = 0x800;
+
         // Card Types
         public const uint TYPE_MONSTER = 0x1;
         public const uint TYPE_SPELL = 0x2;
@@ -181,6 +184,7 @@ namespace YGOPortable.Core
         public const byte MSG_SHUFFLE_SET_CARD = 36;
         public const byte MSG_DECK_TOP = 38;
         public const byte MSG_SHUFFLE_EXTRA = 39;
+        public const byte MSG_CONFIRM_EXTRATOP = 42;
         public const byte MSG_NEW_TURN = 40;
         public const byte MSG_NEW_PHASE = 41;
         public const byte MSG_MOVE = 50;

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using YGOPortable.Core;
 
@@ -26,13 +25,12 @@ namespace YGOPortable.UI
         private int _sortMode = 0; // 0=Default, 1=ATK Desc, 2=Level Desc, 3=Name Asc
 
         // Virtualized Trunk Scroll Grid
-        private const int TrunkCols = 6;
-        private const int PoolRows = 7;
-        private const int PoolSlotCount = TrunkCols * PoolRows;
+        private const int TrunkCols = 5;
         private float _rowHeight = 138f;
         private float _colWidth = 92f;
         private int _totalRows = 0;
         private int _lastFirstRow = -1;
+        private Vector2 _trunkSize;
 
         private readonly List<CardInfo> _trunkResults = new List<CardInfo>();
         private readonly List<(RectTransform rt, CompositeCardView card, Text sub, CardDragTrigger trigger)> _trunkPool
@@ -46,20 +44,18 @@ namespace YGOPortable.UI
         private readonly List<(RectTransform rt, CompositeCardView card, CardDragTrigger trigger)> _sideSlots
             = new List<(RectTransform, CompositeCardView, CardDragTrigger)>();
 
-        private bool _showingSide = false;
-
         // UI widgets
         private CompositeCardView _previewCard;
         private Image _previewRaceIcon;
         private Text _previewName;
         private Text _previewStats;
         private Text _previewDesc;
+        private ScrollRect _previewScroll;
 
         private ScrollRect _trunkScroll;
         private RectTransform _trunkContent;
         private RectTransform _trunkViewport;
         private Text _trunkCountText;
-        private Text _trunkScrollHint;
         private uint _relatedFilterCode = 0;
         private ArchetypeInfo _activeArchetypeFilter = null;
         private InputField _searchInp;
@@ -89,18 +85,17 @@ namespace YGOPortable.UI
         private InputField _deckNameInput;
         private Text _deckHeaderText;
         private Text _mainCountText;
-        private Text _extraOrSideTitle;
+        private Text _extraCountText;
+        private Text _sideCountText;
         private Text _toastText;
         private Text _kindFilterBtnText;
         private Text _raceFilterBtnText;
         private Text _sortBtnText;
 
-        private RectTransform _deckColRect;
+        private RectTransform _trunkPanel;
         private RectTransform _mainGridRect;
         private RectTransform _extraGridRect;
         private RectTransform _sideGridRect;
-        private GameObject _extraGridHolder;
-        private GameObject _sideGridHolder;
 
         private static readonly (ulong mask, string label)[] RaceOptions =
         {
@@ -146,6 +141,12 @@ namespace YGOPortable.UI
             ShowToast("");
         }
 
+        public void UpdateLayout()
+        {
+            if (Root.activeInHierarchy && _trunkViewport.rect.size != _trunkSize)
+                ResizeTrunkGrid(false);
+        }
+
         private void LoadWorkingDeckFromCurrent()
         {
             if (DeckRepository.UserDecks.Count == 0)
@@ -171,110 +172,109 @@ namespace YGOPortable.UI
 
         private void BuildUI(Transform parent)
         {
-            var rt = LotdUiKit.FillRect("Screen_DeckEditor", parent);
-            Root = rt.gameObject;
+            var root = LotdUiKit.FillRect("Screen_DeckEditor", parent);
+            Root = root.gameObject;
+            LotdUiKit.AddImage(LotdUiKit.FillRect("DeckBackground", root).gameObject,
+                LotdUiKit.LoadSprite("LOTD/Background/bg_vrains"), new Color(0.86f, 0.53f, 0.61f), false, false);
+            LotdUiKit.AddImage(LotdUiKit.FillRect("Backdrop", root).gameObject,
+                LotdUiKit.WhiteSprite, new Color(0.12f, 0.014f, 0.033f, 0.60f), false, false);
+            LotdUiKit.AddMenuHeader(root, "덱 편집");
 
-            LotdUiKit.AddImage(LotdUiKit.FillRect("Bg", rt).gameObject,
-                LotdUiKit.LoadSprite("LOTD/Background/noise_bgtec_small"), new Color(0.50f, 0.72f, 0.96f, 1f));
-            LotdUiKit.AddImage(LotdUiKit.FillRect("Dim", rt).gameObject,
-                LotdUiKit.WhiteSprite, new Color(0.02f, 0.05f, 0.12f, 0.75f));
+            var examples = LotdUiKit.CreateRect("Examples", root, new Vector2(0.765f, 0.918f), new Vector2(0.871f, 0.976f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.CreateLotdButton(examples, "Button", "카드군 예시 덱", OpenArchetypeModal, 15);
+            var back = LotdUiKit.CreateRect("Back", root, new Vector2(0.878f, 0.918f), new Vector2(0.985f, 0.976f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.CreateLotdButton(back, "Button", "메인 메뉴", () => _app.ShowScreen(AppScreen.MainMenu), 15);
 
-            // Header bar
-            var hdr = LotdUiKit.CreateBorderedPanel(rt, "Header",
-                new Vector2(0f, 0.92f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero,
-                LotdUiKit.PanelHeader, LotdUiKit.CyanAccent);
-            LotdUiKit.AddText(LotdUiKit.CreateRect("T", hdr, new Vector2(0.01f, 0), new Vector2(0.36f, 1), Vector2.zero, Vector2.zero),
-                "Title", "  덱 편집기 (DECK EDITOR)", 20, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
+            BuildTrunkPanel(root);
+            BuildCardDetails(root);
+            BuildDeckPanel(root);
 
-            _toastText = LotdUiKit.AddText(LotdUiKit.CreateRect("Toast", hdr, new Vector2(0.37f, 0), new Vector2(0.665f, 1), Vector2.zero, Vector2.zero),
-                "Msg", "", 13, TextAnchor.MiddleRight, LotdUiKit.GoldAccent, FontStyle.Bold);
-
-            var archModalBtn = LotdUiKit.CreateRect("ArchBtn", hdr, new Vector2(0.675f, 0.12f), new Vector2(0.855f, 0.88f), Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(archModalBtn, "B", "📚 순수 카드군 예시 덱", OpenArchetypeModal, 14, gold: true);
-
-            var backBtn = LotdUiKit.CreateRect("Back", hdr, new Vector2(0.865f, 0.12f), new Vector2(0.988f, 0.88f), Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(backBtn, "B", "메인 메뉴", () => _app.ShowScreen(AppScreen.MainMenu), 15);
-
-            // Columns
-            BuildLeftColumn(rt);
-            BuildCenterColumn(rt);
-            BuildRightColumn(rt);
-            BuildArchetypeModal(rt);
+            var footer = LotdUiKit.CreateRect("Controls", root, new Vector2(0.015f, 0.002f), new Vector2(0.985f, 0.041f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(footer.gameObject, LotdUiKit.WhiteSprite, new Color(0.02f, 0.045f, 0.10f, 0.92f), false, false);
+            LotdUiKit.AddText(LotdUiKit.CreateRect("Help", footer, new Vector2(0.01f, 0f), new Vector2(0.52f, 1f),
+                Vector2.zero, Vector2.zero), "Text", "드래그  카드 이동      우클릭  추가 / 제거", 14,
+                TextAnchor.MiddleLeft, LotdUiKit.TextPrimary);
+            _toastText = LotdUiKit.AddText(LotdUiKit.CreateRect("Status", footer, new Vector2(0.52f, 0f), new Vector2(0.99f, 1f),
+                Vector2.zero, Vector2.zero), "Text", "", 14, TextAnchor.MiddleRight, LotdUiKit.GoldAccent, FontStyle.Bold);
+            _toastText.resizeTextForBestFit = true;
+            _toastText.resizeTextMinSize = 10;
+            _toastText.resizeTextMaxSize = 14;
+            BuildArchetypeModal(root);
         }
 
-        private void BuildLeftColumn(Transform rt)
+        private void BuildCardDetails(Transform root)
         {
-            var col = LotdUiKit.CreateBorderedPanel(rt, "Col_CardPreview",
-                new Vector2(0.01f, 0.02f), new Vector2(0.255f, 0.905f), Vector2.zero, Vector2.zero);
+            var panel = LotdUiKit.CreateMenuPanel(root, "CardDetails",
+                new Vector2(0.301f, 0.053f), new Vector2(0.553f, 0.899f));
+            var card = LotdUiKit.CreateRect("LargeCard", panel,
+                new Vector2(0.085f, 0.578f), new Vector2(0.915f, 0.979f), Vector2.zero, Vector2.zero);
+            _previewCard = CompositeCardView.Create(card, "Preview", true);
 
-            var cardFrame = LotdUiKit.CreateRect("BigCard", col,
-                new Vector2(0.06f, 0.445f), new Vector2(0.94f, 0.98f), Vector2.zero, Vector2.zero);
-            _previewCard = CompositeCardView.Create(cardFrame, "PreviewCardView", detailedOverlay: true);
-
-            // Name & Race icon row
-            var nameRow = LotdUiKit.CreateRect("NameRow", col,
-                new Vector2(0.04f, 0.355f), new Vector2(0.96f, 0.43f), Vector2.zero, Vector2.zero);
-            _previewRaceIcon = LotdUiKit.AddImage(
-                LotdUiKit.CreateRect("RaceIcon", nameRow, new Vector2(0f, 0.10f), new Vector2(0.16f, 0.90f), Vector2.zero, Vector2.zero).gameObject,
-                null, Color.white, true);
-            _previewName = LotdUiKit.AddText(
-                LotdUiKit.CreateRect("CardName", nameRow, new Vector2(0.18f, 0f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero),
-                "N", "", 17, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
+            var stats = LotdUiKit.CreateRect("Stats", panel,
+                new Vector2(0.026f, 0.50f), new Vector2(0.974f, 0.577f), Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(stats.gameObject, LotdUiKit.LoadSprite("LOTD/HUD/cardbar_texture"),
+                new Color(0.86f, 0.68f, 0.38f, 0.86f), false, false);
+            var icon = LotdUiKit.CreateRect("TypeIcon", stats, new Vector2(0.83f, 0.06f), new Vector2(0.975f, 0.94f),
+                Vector2.zero, Vector2.zero);
+            _previewRaceIcon = LotdUiKit.AddImage(icon.gameObject, null, Color.white, true, false);
+            _previewStats = LotdUiKit.AddText(LotdUiKit.CreateRect("Info", stats,
+                new Vector2(0.03f, 0f), new Vector2(0.81f, 1f), Vector2.zero, Vector2.zero),
+                "Text", "", 14, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
+            _previewName = LotdUiKit.AddText(LotdUiKit.CreateRect("Name", panel,
+                new Vector2(0.04f, 0.435f), new Vector2(0.96f, 0.497f), Vector2.zero, Vector2.zero),
+                "Text", "", 20, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
             _previewName.resizeTextForBestFit = true;
-            _previewName.resizeTextMinSize = 11;
-            _previewName.resizeTextMaxSize = 18;
+            _previewName.resizeTextMinSize = 12;
+            _previewName.resizeTextMaxSize = 20;
 
-            _previewStats = LotdUiKit.AddText(
-                LotdUiKit.CreateRect("Stats", col, new Vector2(0.04f, 0.275f), new Vector2(0.96f, 0.355f), Vector2.zero, Vector2.zero),
-                "S", "", 12, TextAnchor.MiddleLeft, LotdUiKit.CyanAccent, FontStyle.Bold);
-
-            // Scrollable Card Effect Text
-            var descBox = LotdUiKit.CreateBorderedPanel(col, "DescBox",
-                new Vector2(0.04f, 0.125f), new Vector2(0.96f, 0.27f), Vector2.zero, Vector2.zero,
-                new Color(0.02f, 0.05f, 0.12f, 0.95f));
-            var viewport = LotdUiKit.FillRect("VP", descBox, 6);
+            var desc = LotdUiKit.CreateRect("Description", panel,
+                new Vector2(0.036f, 0.155f), new Vector2(0.964f, 0.434f), Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(desc.gameObject, LotdUiKit.WhiteSprite, Color.clear);
+            var viewport = LotdUiKit.CreateRect("Viewport", desc, Vector2.zero, Vector2.one,
+                Vector2.zero, new Vector2(-16f, 0f));
             viewport.gameObject.AddComponent<RectMask2D>();
-            var content = LotdUiKit.CreateRect("Content", viewport, new Vector2(0, 1), new Vector2(1, 1), Vector2.zero, Vector2.zero);
+            var content = LotdUiKit.CreateRect("Content", viewport, new Vector2(0f, 1f), Vector2.one,
+                Vector2.zero, Vector2.zero);
             content.pivot = new Vector2(0.5f, 1f);
             _previewDesc = content.gameObject.AddComponent<Text>();
             _previewDesc.font = LotdUiKit.FontKR;
-            _previewDesc.fontSize = 13;
+            _previewDesc.fontSize = 16;
             _previewDesc.color = LotdUiKit.TextPrimary;
-            _previewDesc.alignment = TextAnchor.UpperLeft;
-            var fitter = content.gameObject.AddComponent<ContentSizeFitter>();
-            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            _previewDesc.raycastTarget = false;
+            content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-            var scroll = descBox.gameObject.AddComponent<ScrollRect>();
-            scroll.viewport = viewport;
-            scroll.content = content;
-            scroll.horizontal = false;
-            scroll.vertical = true;
-            scroll.scrollSensitivity = 25f;
+            _previewScroll = desc.gameObject.AddComponent<ScrollRect>();
+            _previewScroll.viewport = viewport;
+            _previewScroll.content = content;
+            _previewScroll.horizontal = false;
+            _previewScroll.movementType = ScrollRect.MovementType.Clamped;
+            _previewScroll.verticalScrollbar = LotdUiKit.AddVerticalScrollbar(desc);
+            _previewScroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
 
-            // Row 1: Search Related Cards button + Build Pure Archetype Deck from inspected card
-            var relBtnRt = LotdUiKit.CreateRect("RelCardBtn", col,
-                new Vector2(0.04f, 0.070f), new Vector2(0.49f, 0.118f), Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(relBtnRt, "RelB", "🔍 연관 카드 찾기", () => FilterRelatedCards(_inspectedCode), 12, gold: false);
-
-            var pureQuickRt = LotdUiKit.CreateRect("PureQuickBtn", col,
-                new Vector2(0.51f, 0.070f), new Vector2(0.96f, 0.118f), Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(pureQuickRt, "PureB", "⚡ 이 카드군 순수덱", BuildPureDeckFromInspectedCard, 12, gold: true);
-
-            // Row 2: Add button at bottom
-            var addBtnRt = LotdUiKit.CreateRect("AddCardBtn", col,
-                new Vector2(0.04f, 0.015f), new Vector2(0.96f, 0.063f), Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(addBtnRt, "AddB", "+ 내 덱에 1장 추가 (드래그/우클릭)", () => TryAddCardToDeck(_inspectedCode, _showingSide), 13, gold: true);
+            var related = LotdUiKit.CreateRect("RelatedCards", panel,
+                new Vector2(0.035f, 0.087f), new Vector2(0.965f, 0.145f), Vector2.zero, Vector2.zero);
+            LotdUiKit.CreateLotdButton(related, "Button", "관련 카드", () => FilterRelatedCards(_inspectedCode), 14);
+            var add = LotdUiKit.CreateRect("AddCard", panel,
+                new Vector2(0.035f, 0.020f), new Vector2(0.965f, 0.080f), Vector2.zero, Vector2.zero);
+            LotdUiKit.CreateLotdButton(add, "Button", "덱에 추가", () => TryAddCardToDeck(_inspectedCode), 14, true);
         }
 
-        private void BuildCenterColumn(Transform rt)
+        private void BuildTrunkPanel(Transform rt)
         {
-            var col = LotdUiKit.CreateBorderedPanel(rt, "Col_Trunk",
-                new Vector2(0.262f, 0.02f), new Vector2(0.635f, 0.905f), Vector2.zero, Vector2.zero);
+            var col = LotdUiKit.CreateMenuPanel(rt, "Trunk",
+                new Vector2(0.015f, 0.053f), new Vector2(0.296f, 0.899f));
+            _trunkPanel = col;
 
-            // Row 1: Search bar + Result count
-            var r1 = LotdUiKit.CreateRect("R1", col, new Vector2(0.02f, 0.925f), new Vector2(0.98f, 0.985f), Vector2.zero, Vector2.zero);
-            _searchInp = LotdUiKit.CreateInputField(LotdUiKit.CreateRect("Inp", r1, new Vector2(0, 0), new Vector2(0.68f, 1), Vector2.zero, Vector2.zero),
-                "Search", "카드 이름 / 효과 텍스트 검색...", 14);
+            var caption = LotdUiKit.CreateRect("TrunkHeading", col, new Vector2(0.034f, 0.929f), new Vector2(0.97f, 0.986f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddText(caption, "Label", "보관함", 19, TextAnchor.MiddleLeft, LotdUiKit.CyanAccent, FontStyle.Bold);
+            _trunkCountText = LotdUiKit.AddText(caption, "Count", "", 16, TextAnchor.MiddleRight, Color.white, FontStyle.Bold);
+
+            var r1 = LotdUiKit.CreateRect("SearchRow", col, new Vector2(0.034f, 0.874f), new Vector2(0.97f, 0.926f), Vector2.zero, Vector2.zero);
+            _searchInp = LotdUiKit.CreateInputField(r1, "Search", "카드명·효과 검색", 15);
             _searchInpRt = _searchInp.GetComponent<RectTransform>();
             _searchInp.onValueChanged.AddListener(v =>
             {
@@ -284,7 +284,7 @@ namespace YGOPortable.UI
 
             // Related Cards Banner inside R1
             _relatedBanner = LotdUiKit.CreateBorderedPanel(r1, "RelBanner",
-                new Vector2(0f, 0f), new Vector2(0.68f, 1f), Vector2.zero, Vector2.zero,
+                Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero,
                 new Color(0.05f, 0.15f, 0.28f, 0.95f), LotdUiKit.GoldAccent).gameObject;
             _relatedBannerText = LotdUiKit.AddText(LotdUiKit.CreateRect("T", _relatedBanner.transform,
                 new Vector2(0.02f, 0f), new Vector2(0.72f, 1f), Vector2.zero, Vector2.zero),
@@ -293,11 +293,9 @@ namespace YGOPortable.UI
                 new Vector2(0.74f, 0.08f), new Vector2(0.98f, 0.92f), Vector2.zero, Vector2.zero),
                 "B", "전체 ✕", ClearRelatedFilter, 11, gold: true);
             _relatedBanner.SetActive(false);
-            _trunkCountText = LotdUiKit.AddText(LotdUiKit.CreateRect("Cnt", r1, new Vector2(0.70f, 0), new Vector2(1f, 1), Vector2.zero, Vector2.zero),
-                "C", "0장", 13, TextAnchor.MiddleRight, LotdUiKit.CyanAccent, FontStyle.Bold);
 
             // Row 2: Kind filter + Race filter + Sort
-            var r2 = LotdUiKit.CreateRect("R2", col, new Vector2(0.02f, 0.865f), new Vector2(0.98f, 0.918f), Vector2.zero, Vector2.zero);
+            var r2 = LotdUiKit.CreateRect("Filters", col, new Vector2(0.034f, 0.816f), new Vector2(0.97f, 0.867f), Vector2.zero, Vector2.zero);
             var bKind = LotdUiKit.CreateLotdButton(LotdUiKit.CreateRect("FK", r2, new Vector2(0f, 0), new Vector2(0.32f, 1), Vector2.zero, Vector2.zero),
                 "B", "종류: 전체", () =>
                 {
@@ -327,150 +325,122 @@ namespace YGOPortable.UI
                 }, 13);
             _sortBtnText = bSort.GetComponentInChildren<Text>();
 
-            // Virtualized Scrollable Grid Area (0.055 .. 0.855)
             var scrollHolder = LotdUiKit.CreateRect("TrunkScrollHolder", col,
-                new Vector2(0.015f, 0.055f), new Vector2(0.985f, 0.855f), Vector2.zero, Vector2.zero);
-
+                new Vector2(0.034f, 0.035f), new Vector2(0.97f, 0.805f), Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(scrollHolder.gameObject, LotdUiKit.WhiteSprite, Color.clear);
             _trunkScroll = scrollHolder.gameObject.AddComponent<ScrollRect>();
             _trunkScroll.horizontal = false;
-            _trunkScroll.vertical = true;
             _trunkScroll.scrollSensitivity = 40f;
             _trunkScroll.movementType = ScrollRect.MovementType.Clamped;
 
-            _trunkViewport = LotdUiKit.FillRect("Viewport", scrollHolder);
+            _trunkViewport = LotdUiKit.CreateRect("Viewport", scrollHolder, Vector2.zero, Vector2.one,
+                Vector2.zero, new Vector2(-17f, 0f));
             _trunkViewport.gameObject.AddComponent<RectMask2D>();
             _trunkScroll.viewport = _trunkViewport;
-
-            _trunkContent = LotdUiKit.CreateRect("Content", _trunkViewport, new Vector2(0, 1), new Vector2(1, 1), Vector2.zero, Vector2.zero);
+            _trunkContent = LotdUiKit.CreateRect("Content", _trunkViewport, new Vector2(0, 1), Vector2.one, Vector2.zero, Vector2.zero);
             _trunkContent.pivot = new Vector2(0f, 1f);
             _trunkScroll.content = _trunkContent;
 
-            // Instantiate Slot Pool (42 slots)
-            for (int r = 0; r < PoolRows; r++)
+            var scrollbar = LotdUiKit.AddVerticalScrollbar(scrollHolder);
+            scrollbar.size = 0.075f;
+            scrollbar.SetValueWithoutNotify(1f);
+            scrollbar.onValueChanged.AddListener(value => _trunkScroll.verticalNormalizedPosition = value);
+            _trunkScroll.onValueChanged.AddListener(position =>
             {
-                for (int c = 0; c < TrunkCols; c++)
-                {
-                    var slot = LotdUiKit.CreateRect($"Slot_{r}_{c}", _trunkContent, new Vector2(0, 1), new Vector2(0, 1), Vector2.zero, Vector2.zero);
-                    slot.pivot = new Vector2(0, 1);
-                    slot.sizeDelta = new Vector2(_colWidth, _rowHeight);
+                scrollbar.SetValueWithoutNotify(position.y);
+                OnTrunkScrolled();
+            });
+        }
 
-                    var card = CompositeCardView.Create(slot, "CV", false);
-                    var cntBg = LotdUiKit.CreateRect("CntBg", slot, new Vector2(0.52f, 0.02f), new Vector2(0.98f, 0.22f), Vector2.zero, Vector2.zero);
-                    LotdUiKit.AddImage(cntBg.gameObject, LotdUiKit.WhiteSprite, new Color(0, 0, 0, 0.80f), false, false);
-                    var cntTxt = LotdUiKit.AddText(cntBg, "T", "", 11, TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
+        private void EnsureTrunkPool(int count)
+        {
+            while (_trunkPool.Count < count)
+            {
+                var slot = LotdUiKit.CreateRect("TrunkCard", _trunkContent, new Vector2(0f, 1f), new Vector2(0f, 1f),
+                    Vector2.zero, Vector2.zero);
+                slot.pivot = new Vector2(0f, 1f);
+                var hit = LotdUiKit.AddImage(slot.gameObject, LotdUiKit.WhiteSprite, Color.clear);
+                var card = CompositeCardView.Create(LotdUiKit.FillRect("CardInset", slot, 1.8f), "Card");
+                var countBox = LotdUiKit.CreateRect("Copies", slot, new Vector2(0.30f, 0.018f), new Vector2(0.70f, 0.22f),
+                    Vector2.zero, Vector2.zero);
+                var label = LotdUiKit.AddText(countBox, "Count", "", 18, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+                label.gameObject.AddComponent<Outline>().effectColor = Color.black;
+                var trigger = slot.gameObject.AddComponent<CardDragTrigger>();
+                trigger.SourceType = DragSourceType.Trunk;
+                trigger.OnPointerExitAction = () => hit.color = Color.clear;
+                _trunkPool.Add((slot, card, label, trigger));
+            }
+        }
 
-                    var hit = slot.gameObject.AddComponent<Image>();
-                    hit.color = Color.clear;
+        private void BuildDeckPanel(Transform root)
+        {
+            var panel = LotdUiKit.CreateMenuPanel(root, "Deck",
+                new Vector2(0.558f, 0.053f), new Vector2(0.985f, 0.899f), true);
 
-                    var trigger = slot.gameObject.AddComponent<CardDragTrigger>();
-                    trigger.SourceType = DragSourceType.Trunk;
-
-                    _trunkPool.Add((slot, card, cntTxt, trigger));
-                }
+            var header = LotdUiKit.CreateRect("DeckControls", panel,
+                new Vector2(0.025f, 0.928f), new Vector2(0.975f, 0.985f), Vector2.zero, Vector2.zero);
+            Button Control(Transform row, string name, string label, float x, float width, Action action, bool gold = false)
+            {
+                var holder = LotdUiKit.CreateRect(name, row, new Vector2(x, 0f), new Vector2(x + width, 1f),
+                    Vector2.zero, Vector2.zero);
+                return LotdUiKit.CreateLotdButton(holder, "Button", label, action, 14, gold);
             }
 
-            _trunkScroll.onValueChanged.AddListener(OnTrunkScrolled);
+            Control(header, "Previous", "◀", 0f, 0.081f, () => SwitchUserDeck(-1));
+            _deckHeaderText = LotdUiKit.AddText(LotdUiKit.CreateRect("DeckNumber", header, new Vector2(0.083f, 0f),
+                new Vector2(0.235f, 1f), Vector2.zero, Vector2.zero),
+                "Text", "", 15, TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
+            Control(header, "Next", "▶", 0.24f, 0.081f, () => SwitchUserDeck(1));
+            Control(header, "New", "새 덱", 0.34f, 0.18f, CreateNewUserDeck);
+            Control(header, "Save", "저장", 0.53f, 0.21f, SaveCurrentDeck, true);
+            Control(header, "Delete", "삭제", 0.76f, 0.24f, DeleteCurrentDeck);
 
-            // Bottom bar: Scroll status hint & Jump to top button
-            var botBar = LotdUiKit.CreateRect("TrunkBotBar", col, new Vector2(0.02f, 0.01f), new Vector2(0.98f, 0.05f), Vector2.zero, Vector2.zero);
-            _trunkScrollHint = LotdUiKit.AddText(LotdUiKit.CreateRect("Hint", botBar, new Vector2(0f, 0), new Vector2(0.75f, 1), Vector2.zero, Vector2.zero),
-                "H", "💡 마우스 휠로 자유롭게 스크롤하여 카드를 탐색하고 드래그하여 덱에 넣으세요.", 11, TextAnchor.MiddleLeft, LotdUiKit.TextMuted);
+            var edit = LotdUiKit.CreateRect("EditControls", panel,
+                new Vector2(0.025f, 0.867f), new Vector2(0.975f, 0.916f), Vector2.zero, Vector2.zero);
+            _deckNameInput = LotdUiKit.CreateInputField(LotdUiKit.CreateRect("DeckName", edit, Vector2.zero,
+                new Vector2(0.579f, 1f), Vector2.zero, Vector2.zero), "Input", "덱 이름", 15);
+            Control(edit, "Sort", "정렬", 0.595f, 0.19f, SortWorkingDeck);
+            Control(edit, "Shuffle", "셔플", 0.8f, 0.2f, ShuffleWorkingDeck);
 
-            var topBtn = LotdUiKit.CreateRect("TopBtn", botBar, new Vector2(0.78f, 0), new Vector2(1f, 1), Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(topBtn, "B", "맨 위로 ▲", () =>
-            {
-                _trunkScroll.verticalNormalizedPosition = 1f;
-                UpdateVirtualTrunkSlots(0, force: true);
-            }, 12);
+            (_mainGridRect, _mainCountText) = BuildDeckSection(panel, "Main", "메인", 0.830f, 0.397f);
+            (_extraGridRect, _extraCountText) = BuildDeckSection(panel, "Extra", "엑스트라", 0.350f, 0.224f);
+            (_sideGridRect, _sideCountText) = BuildDeckSection(panel, "Side", "사이드", 0.176f, 0.047f);
+            BuildDeckSlots(_mainGridRect, _mainSlots, 13, 5, 60, DragSourceType.DeckMain);
+            BuildDeckSlots(_extraGridRect, _extraSlots, 15, 1, 15, DragSourceType.DeckExtra);
+            BuildDeckSlots(_sideGridRect, _sideSlots, 15, 1, 15, DragSourceType.DeckSide);
         }
 
-        private void BuildRightColumn(Transform rt)
+        private static (RectTransform grid, Text count) BuildDeckSection(Transform panel, string name, string title,
+            float top, float bottom)
         {
-            _deckColRect = LotdUiKit.CreateBorderedPanel(rt, "Col_Deck",
-                new Vector2(0.642f, 0.02f), new Vector2(0.99f, 0.905f), Vector2.zero, Vector2.zero);
-
-            // Top row: Prev Deck / Deck Selector / Next Deck / New / Save
-            var top1 = LotdUiKit.CreateRect("Top1", _deckColRect, new Vector2(0.02f, 0.915f), new Vector2(0.98f, 0.98f), Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(LotdUiKit.CreateRect("PD", top1, new Vector2(0, 0), new Vector2(0.11f, 1), Vector2.zero, Vector2.zero),
-                "B", "◀", () => SwitchUserDeck(-1), 14);
-            _deckHeaderText = LotdUiKit.AddText(LotdUiKit.CreateRect("DH", top1, new Vector2(0.12f, 0), new Vector2(0.46f, 1), Vector2.zero, Vector2.zero),
-                "L", "덱 1/1", 13, TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
-            LotdUiKit.CreateLotdButton(LotdUiKit.CreateRect("ND", top1, new Vector2(0.47f, 0), new Vector2(0.58f, 1), Vector2.zero, Vector2.zero),
-                "B", "▶", () => SwitchUserDeck(1), 14);
-            LotdUiKit.CreateLotdButton(LotdUiKit.CreateRect("New", top1, new Vector2(0.60f, 0), new Vector2(0.78f, 1), Vector2.zero, Vector2.zero),
-                "B", "새 덱", CreateNewUserDeck, 13);
-            LotdUiKit.CreateLotdButton(LotdUiKit.CreateRect("Save", top1, new Vector2(0.80f, 0), new Vector2(1f, 1), Vector2.zero, Vector2.zero),
-                "B", "저장", SaveCurrentDeck, 14, gold: true);
-
-            // Row 2: Deck Name Input + Sort + Shuffle + Toggle Extra/Side + Delete
-            var top2 = LotdUiKit.CreateRect("Top2", _deckColRect, new Vector2(0.02f, 0.855f), new Vector2(0.98f, 0.908f), Vector2.zero, Vector2.zero);
-            _deckNameInput = LotdUiKit.CreateInputField(LotdUiKit.CreateRect("DName", top2, new Vector2(0, 0), new Vector2(0.42f, 1), Vector2.zero, Vector2.zero),
-                "DeckName", "덱 이름...", 14);
-            LotdUiKit.CreateLotdButton(LotdUiKit.CreateRect("SortD", top2, new Vector2(0.44f, 0), new Vector2(0.57f, 1), Vector2.zero, Vector2.zero),
-                "B", "정렬", SortWorkingDeck, 12);
-            LotdUiKit.CreateLotdButton(LotdUiKit.CreateRect("ShufD", top2, new Vector2(0.58f, 0), new Vector2(0.71f, 1), Vector2.zero, Vector2.zero),
-                "B", "셔플", ShuffleWorkingDeck, 12);
-            LotdUiKit.CreateLotdButton(LotdUiKit.CreateRect("SwES", top2, new Vector2(0.72f, 0), new Vector2(0.86f, 1), Vector2.zero, Vector2.zero),
-                "B", "Ex/사이드", () =>
-                {
-                    _showingSide = !_showingSide;
-                    _extraGridHolder.SetActive(!_showingSide);
-                    _sideGridHolder.SetActive(_showingSide);
-                    RefreshDeckGrids();
-                }, 12);
-            LotdUiKit.CreateLotdButton(LotdUiKit.CreateRect("Del", top2, new Vector2(0.88f, 0), new Vector2(1f, 1), Vector2.zero, Vector2.zero),
-                "B", "삭제", DeleteCurrentDeck, 12);
-
-            // Main Deck Header + 10x6 Grid (60 slots)
-            _mainCountText = LotdUiKit.AddText(LotdUiKit.CreateRect("MainHdr", _deckColRect, new Vector2(0.02f, 0.815f), new Vector2(0.98f, 0.85f), Vector2.zero, Vector2.zero),
-                "L", "메인 덱 (0 / 40~60) — 카드 드래그 이동 / 정렬 지원", 13, TextAnchor.MiddleLeft, LotdUiKit.CyanAccent, FontStyle.Bold);
-
-            _mainGridRect = LotdUiKit.CreateBorderedPanel(_deckColRect, "MainGrid",
-                new Vector2(0.02f, 0.28f), new Vector2(0.98f, 0.812f), Vector2.zero, Vector2.zero,
-                new Color(0.02f, 0.06f, 0.14f, 0.90f));
-            BuildDeckSlots(_mainGridRect, _mainSlots, 10, 6, DragSourceType.DeckMain);
-
-            // Extra / Side Header + 8x2 Grid (15 slots)
-            _extraOrSideTitle = LotdUiKit.AddText(LotdUiKit.CreateRect("ExtraHdr", _deckColRect, new Vector2(0.02f, 0.235f), new Vector2(0.98f, 0.275f), Vector2.zero, Vector2.zero),
-                "L", "엑스트라 덱 (0 / 15)  — 드래그 또는 우클릭 제거", 13, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
-
-            _extraGridRect = LotdUiKit.CreateBorderedPanel(_deckColRect, "ExtraGrid",
-                new Vector2(0.02f, 0.02f), new Vector2(0.98f, 0.232f), Vector2.zero, Vector2.zero,
-                new Color(0.02f, 0.06f, 0.14f, 0.90f));
-            _extraGridHolder = _extraGridRect.gameObject;
-            BuildDeckSlots(_extraGridRect, _extraSlots, 8, 2, DragSourceType.DeckExtra);
-
-            _sideGridRect = LotdUiKit.CreateBorderedPanel(_deckColRect, "SideGrid",
-                new Vector2(0.02f, 0.02f), new Vector2(0.98f, 0.232f), Vector2.zero, Vector2.zero,
-                new Color(0.02f, 0.06f, 0.14f, 0.90f));
-            _sideGridHolder = _sideGridRect.gameObject;
-            BuildDeckSlots(_sideGridRect, _sideSlots, 8, 2, DragSourceType.DeckSide);
-            _sideGridHolder.SetActive(false);
+            var label = LotdUiKit.CreateRect(name + "Tab", panel, new Vector2(0.026f, top),
+                new Vector2(0.191f, top + 0.033f), Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(label.gameObject, LotdUiKit.LoadSprite("LOTD/Shared/tab-title-box"), Color.white, false, false);
+            LotdUiKit.AddText(label, "Label", title, 14, TextAnchor.MiddleCenter,
+                new Color(0.02f, 0.09f, 0.17f), FontStyle.Bold);
+            var count = LotdUiKit.AddText(LotdUiKit.CreateRect(name + "Count", panel,
+                new Vector2(0.6f, top), new Vector2(0.972f, top + 0.034f), Vector2.zero, Vector2.zero),
+                "Text", "", 16, TextAnchor.MiddleRight, Color.white, FontStyle.Bold);
+            var grid = LotdUiKit.CreateRect(name + "Grid", panel, new Vector2(0.026f, bottom),
+                new Vector2(0.974f, top), Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(grid.gameObject, LotdUiKit.WhiteSprite, new Color(0.08f, 0.35f, 0.47f, 0.68f));
+            return (grid, count);
         }
 
-        private void BuildDeckSlots(Transform parent, List<(RectTransform rt, CompositeCardView card, CardDragTrigger trigger)> target,
-            int cols, int rows, DragSourceType sourceType)
+        private static void BuildDeckSlots(Transform parent, List<(RectTransform rt, CompositeCardView card, CardDragTrigger trigger)> target,
+            int cols, int rows, int capacity, DragSourceType source)
         {
-            float cw = 1f / cols, rh = 1f / rows;
-            int idx = 0;
-            for (int r = 0; r < rows; r++)
+            for (int i = 0; i < capacity; i++)
             {
-                for (int c = 0; c < cols; c++)
-                {
-                    if (sourceType != DragSourceType.DeckMain && idx >= 15) return;
-                    var slot = LotdUiKit.CreateRect($"DS_{idx}", parent,
-                        new Vector2(c * cw + 0.003f, 1f - (r + 1) * rh + 0.006f),
-                        new Vector2((c + 1) * cw - 0.003f, 1f - r * rh - 0.006f),
-                        Vector2.zero, Vector2.zero);
-                    slot.gameObject.AddComponent<Image>().color = new Color(0.05f, 0.12f, 0.22f, 0.40f);
-                    var card = CompositeCardView.Create(slot, "CV", false);
-
-                    var trig = slot.gameObject.AddComponent<CardDragTrigger>();
-                    trig.SourceType = sourceType;
-
-                    target.Add((slot, card, trig));
-                    idx++;
-                }
+                int row = i / cols;
+                int col = i % cols;
+                var slot = LotdUiKit.CreateRect($"Card_{i}", parent, new Vector2(col / (float)cols, 1f - (row + 1f) / rows),
+                    new Vector2((col + 1f) / cols, 1f - row / (float)rows), new Vector2(1.2f, 1.2f), new Vector2(-1.2f, -1.2f));
+                LotdUiKit.AddImage(slot.gameObject, LotdUiKit.WhiteSprite, Color.clear);
+                var card = CompositeCardView.Create(LotdUiKit.FillRect("CardInset", slot, 1.8f), "Card");
+                var trigger = slot.gameObject.AddComponent<CardDragTrigger>();
+                trigger.SourceType = source;
+                target.Add((slot, card, trigger));
             }
         }
 
@@ -555,238 +525,197 @@ namespace YGOPortable.UI
             else if (_sortMode == 3) _trunkResults.Sort((a, b) => string.Compare(a.name, b.name, StringComparison.Ordinal));
 
             Canvas.ForceUpdateCanvases();
-            float vpWidth = _trunkViewport.rect.width > 10 ? _trunkViewport.rect.width : 690f;
-            _colWidth = vpWidth / TrunkCols;
-            _rowHeight = Mathf.Round(_colWidth * 1.42f);
-
-            _totalRows = Mathf.Max(1, (_trunkResults.Count + TrunkCols - 1) / TrunkCols);
-            float totalH = _totalRows * _rowHeight;
-            _trunkContent.sizeDelta = new Vector2(0f, totalH);
-
-            _trunkCountText.text = (_activeArchetypeFilter != null ? "카드군 " : (_relatedFilterCode != 0 ? "연관 " : "검색 ")) + $"{_trunkResults.Count:N0}장";
-            _trunkScroll.verticalNormalizedPosition = 1f;
-            _lastFirstRow = -1;
-            UpdateVirtualTrunkSlots(0, force: true);
+            _trunkCountText.text = $"{_trunkResults.Count:N0}장";
+            ResizeTrunkGrid(true);
         }
 
-        private void OnTrunkScrolled(Vector2 scrollPos)
+        private void ResizeTrunkGrid(bool startAtTop)
         {
-            if (_totalRows <= 0) return;
-            float scrollY = Mathf.Max(0f, _trunkContent.anchoredPosition.y);
-            int firstRow = Mathf.Clamp(Mathf.FloorToInt(scrollY / _rowHeight), 0, Mathf.Max(0, _totalRows - PoolRows + 1));
-            UpdateVirtualTrunkSlots(firstRow);
+            _trunkSize = _trunkViewport.rect.size;
+            float scroll = startAtTop ? 1f : _trunkScroll.verticalNormalizedPosition;
+            float vpWidth = _trunkViewport.rect.width > 10 ? _trunkViewport.rect.width : 405f;
+            _colWidth = vpWidth / TrunkCols;
+            _rowHeight = Mathf.Max(20f, Mathf.Round((_colWidth - 4f) / LotdUiKit.CardAspectRatio + 4f));
+
+            _totalRows = Mathf.Max(1, (_trunkResults.Count + TrunkCols - 1) / TrunkCols);
+            int rows = Mathf.CeilToInt(_trunkViewport.rect.height / _rowHeight) + 2;
+            EnsureTrunkPool(Mathf.Min(_totalRows, rows) * TrunkCols);
+            _trunkContent.sizeDelta = new Vector2(0f, _totalRows * _rowHeight);
+
+            _trunkScroll.StopMovement();
+            _trunkScroll.verticalNormalizedPosition = scroll;
+            _lastFirstRow = -1;
+            OnTrunkScrolled();
+        }
+
+        private void OnTrunkScrolled()
+        {
+            if (_totalRows == 0) return;
+            float distance = Mathf.Max(0f, _trunkContent.anchoredPosition.y);
+            int first = Mathf.Clamp(Mathf.FloorToInt(distance / _rowHeight), 0, _totalRows - 1);
+            UpdateVirtualTrunkSlots(first);
         }
 
         private void UpdateVirtualTrunkSlots(int firstRow, bool force = false)
         {
+            firstRow = Mathf.Max(0, firstRow);
             if (firstRow == _lastFirstRow && !force) return;
             _lastFirstRow = firstRow;
 
-            float vpWidth = _trunkViewport.rect.width > 10 ? _trunkViewport.rect.width : 690f;
-            _colWidth = vpWidth / TrunkCols;
-            _rowHeight = Mathf.Round(_colWidth * 1.42f);
-
-            for (int r = 0; r < PoolRows; r++)
+            for (int i = 0; i < _trunkPool.Count; i++)
             {
-                int targetRow = firstRow + r;
-                float y = -targetRow * _rowHeight;
-
-                for (int c = 0; c < TrunkCols; c++)
+                var (rect, view, count, trigger) = _trunkPool[i];
+                int row = firstRow + i / TrunkCols;
+                int col = i % TrunkCols;
+                int index = row * TrunkCols + col;
+                if (index >= _trunkResults.Count)
                 {
-                    int poolIdx = r * TrunkCols + c;
-                    var (rt, cv, sub, trig) = _trunkPool[poolIdx];
-
-                    float x = c * _colWidth;
-                    rt.anchoredPosition = new Vector2(x + 2f, y - 2f);
-                    rt.sizeDelta = new Vector2(_colWidth - 4f, _rowHeight - 4f);
-
-                    int cardIdx = targetRow * TrunkCols + c;
-                    if (cardIdx >= _trunkResults.Count)
-                    {
-                        rt.gameObject.SetActive(false);
-                        continue;
-                    }
-
-                    rt.gameObject.SetActive(true);
-                    var ci = _trunkResults[cardIdx];
-                    uint code = ci.code;
-                    cv.SetCard(code);
-
-                    int inDeck = CountInWorkingDeck(code);
-                    sub.transform.parent.gameObject.SetActive(inDeck > 0);
-                    sub.text = inDeck > 0 ? $"x{inDeck}" : "";
-
-                    trig.CardCodeGetter = () => code;
-                    trig.IndexGetter = () => cardIdx;
-                    trig.OnPointerEnterAction = () => InspectCard(code);
-                    trig.OnLeftClick = () => InspectCard(code);
-                    trig.OnRightClick = () => { InspectCard(code); TryAddCardToDeck(code, _showingSide); };
+                    rect.gameObject.SetActive(false);
+                    continue;
                 }
+
+                rect.anchoredPosition = new Vector2(col * _colWidth + 2f, -row * _rowHeight - 2f);
+                rect.sizeDelta = new Vector2(_colWidth - 4f, _rowHeight - 4f);
+                rect.gameObject.SetActive(true);
+                uint code = _trunkResults[index].code;
+                view.SetCard(code);
+
+                int copies = CountInWorkingDeck(code);
+                count.transform.parent.gameObject.SetActive(copies > 0);
+                count.text = copies.ToString();
+                var highlight = rect.GetComponent<Image>();
+                highlight.color = Color.clear;
+
+                trigger.CardCodeGetter = () => code;
+                trigger.IndexGetter = () => index;
+                trigger.OnPointerEnterAction = () =>
+                {
+                    highlight.color = LotdUiKit.GoldAccent;
+                    InspectCard(code);
+                };
+                trigger.OnLeftClick = () => InspectCard(code);
+                trigger.OnRightClick = () => TryAddCardToDeck(code);
             }
         }
 
         private void RefreshDeckGrids()
         {
-            _deckHeaderText.text = $"덱 {_userDeckIdx + 1}/{Mathf.Max(1, DeckRepository.UserDecks.Count)}";
-            _mainCountText.text = $"메인 덱 ({_workingDeck.main.Count} / 40~60) — 드래그 이동 / 정렬 지원";
-            _mainCountText.color = (_workingDeck.main.Count >= 40 && _workingDeck.main.Count <= 60) ? LotdUiKit.CyanAccent : LotdUiKit.RedAccent;
-            _extraOrSideTitle.text = _showingSide
-                ? $"사이드 덱 ({_workingDeck.side.Count} / 15)  — 드래그 이동 / 우클릭 제거"
-                : $"엑스트라 덱 ({_workingDeck.extra.Count} / 15)  — 드래그 이동 / 우클릭 제거";
-
-            SyncSlotList(_mainSlots, _workingDeck.main, DragSourceType.DeckMain);
-            SyncSlotList(_extraSlots, _workingDeck.extra, DragSourceType.DeckExtra);
-            SyncSlotList(_sideSlots, _workingDeck.side, DragSourceType.DeckSide);
+            _deckHeaderText.text = $"{_userDeckIdx + 1} / {Mathf.Max(1, DeckRepository.UserDecks.Count)}";
+            _mainCountText.text = $"{_workingDeck.main.Count}장";
+            _mainCountText.color = _workingDeck.main.Count >= 40 && _workingDeck.main.Count <= 60
+                ? Color.white : new Color(1f, 0.55f, 0.45f);
+            _extraCountText.text = $"{_workingDeck.extra.Count}장";
+            _sideCountText.text = $"{_workingDeck.side.Count}장";
+            SyncSlotList(_mainSlots, _workingDeck.main);
+            SyncSlotList(_extraSlots, _workingDeck.extra);
+            SyncSlotList(_sideSlots, _workingDeck.side);
         }
 
-        private void SyncSlotList(List<(RectTransform rt, CompositeCardView card, CardDragTrigger trigger)> slots, List<uint> list, DragSourceType st)
+        private void SyncSlotList(List<(RectTransform rt, CompositeCardView card, CardDragTrigger trigger)> slots, List<uint> cards)
         {
             for (int i = 0; i < slots.Count; i++)
             {
-                var (rt, cv, trig) = slots[i];
-                if (i >= list.Count)
-                {
-                    cv.gameObject.SetActive(false);
-                    trig.CardCodeGetter = null;
-                    trig.IndexGetter = null;
-                    trig.OnLeftClick = null;
-                    trig.OnRightClick = null;
-                    trig.OnPointerEnterAction = null;
-                    continue;
-                }
-                cv.gameObject.SetActive(true);
-                uint code = list[i];
-                int capIdx = i;
-                cv.SetCard(code);
+                var (rect, view, trigger) = slots[i];
+                var highlight = rect.GetComponent<Image>();
+                highlight.color = Color.clear;
+                bool filled = i < cards.Count;
+                view.gameObject.SetActive(filled);
+                trigger.CardCodeGetter = null;
+                trigger.IndexGetter = null;
+                trigger.OnLeftClick = null;
+                trigger.OnRightClick = null;
+                trigger.OnPointerEnterAction = null;
+                trigger.OnPointerExitAction = () => highlight.color = Color.clear;
+                if (!filled) continue;
 
-                trig.CardCodeGetter = () => code;
-                trig.IndexGetter = () => capIdx;
-                trig.OnPointerEnterAction = () => InspectCard(code);
-                trig.OnLeftClick = () => InspectCard(code);
-                trig.OnRightClick = () =>
+                uint code = cards[i];
+                int index = i;
+                view.SetCard(code);
+                trigger.CardCodeGetter = () => code;
+                trigger.IndexGetter = () => index;
+                trigger.OnLeftClick = () => InspectCard(code);
+                trigger.OnPointerEnterAction = () =>
                 {
-                    list.RemoveAt(capIdx);
-                    LotdAudio.PlayClick();
-                    RefreshDeckGrids();
-                    UpdateVirtualTrunkSlots(_lastFirstRow, force: true);
+                    highlight.color = LotdUiKit.GoldAccent;
+                    InspectCard(code);
+                };
+                trigger.OnRightClick = () =>
+                {
+                    cards.RemoveAt(index);
+                    FinishDeckEdit();
                 };
             }
         }
 
-        private void HandleCardDrop(DragContext ctx)
+        private void HandleCardDrop(DragContext context)
         {
-            if (Root == null || !Root.activeInHierarchy) return;
-
-            // 1. Dropped on Main Deck Grid
-            if (CardDragManager.ContainsScreenPoint(_mainGridRect, ctx.DropPosition))
+            if (!Root.activeInHierarchy || _workingDeck == null) return;
+            var destination = FindDropZone(context.DropPosition);
+            if (context.SourceType == DragSourceType.Trunk)
             {
-                if (ctx.SourceType == DragSourceType.Trunk)
+                if (destination != DragSourceType.None) TryAddCardToDeck(context.CardCode, destination);
+                return;
+            }
+
+            var source = GetDeckList(context.SourceType);
+            if (source == null || context.SourceIndex < 0 || context.SourceIndex >= source.Count ||
+                source[context.SourceIndex] != context.CardCode)
+                return;
+
+            if (destination == DragSourceType.None)
+            {
+                if (CardDragManager.ContainsScreenPoint(_trunkPanel, context.DropPosition))
                 {
-                    TryAddCardToDeck(ctx.CardCode, false);
-                }
-                else if (ctx.SourceType == DragSourceType.DeckSide)
-                {
-                    if (ctx.SourceIndex >= 0 && ctx.SourceIndex < _workingDeck.side.Count)
-                    {
-                        uint code = _workingDeck.side[ctx.SourceIndex];
-                        _workingDeck.side.RemoveAt(ctx.SourceIndex);
-                        _workingDeck.main.Add(code);
-                        LotdAudio.PlayClick();
-                        RefreshDeckGrids();
-                    }
-                }
-                else if (ctx.SourceType == DragSourceType.DeckMain)
-                {
-                    // Reorder within Main Deck
-                    int targetIdx = FindHoveredSlotIndex(_mainSlots, ctx.DropPosition);
-                    if (targetIdx >= 0 && targetIdx < _workingDeck.main.Count && targetIdx != ctx.SourceIndex)
-                    {
-                        uint code = _workingDeck.main[ctx.SourceIndex];
-                        _workingDeck.main.RemoveAt(ctx.SourceIndex);
-                        _workingDeck.main.Insert(targetIdx, code);
-                        LotdAudio.PlayClick();
-                        RefreshDeckGrids();
-                    }
+                    source.RemoveAt(context.SourceIndex);
+                    FinishDeckEdit();
                 }
                 return;
             }
 
-            // 2. Dropped on Extra Deck Grid
-            if (_extraGridHolder.activeSelf && CardDragManager.ContainsScreenPoint(_extraGridRect, ctx.DropPosition))
-            {
-                if (ctx.SourceType == DragSourceType.Trunk)
-                {
-                    TryAddCardToDeck(ctx.CardCode, false);
-                }
-                else if (ctx.SourceType == DragSourceType.DeckSide)
-                {
-                    if (ctx.SourceIndex >= 0 && ctx.SourceIndex < _workingDeck.side.Count)
-                    {
-                        uint code = _workingDeck.side[ctx.SourceIndex];
-                        _workingDeck.side.RemoveAt(ctx.SourceIndex);
-                        _workingDeck.extra.Add(code);
-                        LotdAudio.PlayClick();
-                        RefreshDeckGrids();
-                    }
-                }
-                return;
-            }
+            var target = GetDeckList(destination);
+            if (source != target && !CanPlaceCard(CardDatabase.Get(context.CardCode), destination, target)) return;
+            int index = FindHoveredSlotIndex(GetDeckSlots(destination), context.DropPosition);
+            if (source == target && index < 0) return;
+            if (source == target && index == context.SourceIndex) return;
+            source.RemoveAt(context.SourceIndex);
+            target.Insert(index < 0 ? target.Count : Mathf.Min(index, target.Count), context.CardCode);
+            FinishDeckEdit();
+        }
 
-            // 3. Dropped on Side Deck Grid
-            if (_sideGridHolder.activeSelf && CardDragManager.ContainsScreenPoint(_sideGridRect, ctx.DropPosition))
-            {
-                if (ctx.SourceType == DragSourceType.Trunk)
-                {
-                    TryAddCardToDeck(ctx.CardCode, true);
-                }
-                else if (ctx.SourceType == DragSourceType.DeckMain)
-                {
-                    if (ctx.SourceIndex >= 0 && ctx.SourceIndex < _workingDeck.main.Count)
-                    {
-                        uint code = _workingDeck.main[ctx.SourceIndex];
-                        _workingDeck.main.RemoveAt(ctx.SourceIndex);
-                        _workingDeck.side.Add(code);
-                        LotdAudio.PlayClick();
-                        RefreshDeckGrids();
-                    }
-                }
-                return;
-            }
+        private DragSourceType FindDropZone(Vector2 point)
+        {
+            if (CardDragManager.ContainsScreenPoint(_mainGridRect, point)) return DragSourceType.DeckMain;
+            if (CardDragManager.ContainsScreenPoint(_extraGridRect, point)) return DragSourceType.DeckExtra;
+            if (CardDragManager.ContainsScreenPoint(_sideGridRect, point)) return DragSourceType.DeckSide;
+            return DragSourceType.None;
+        }
 
-            // 4. Dragged out of Deck onto Trunk / background -> Remove card from deck
-            if (ctx.SourceType == DragSourceType.DeckMain && !CardDragManager.ContainsScreenPoint(_deckColRect, ctx.DropPosition))
+        private List<uint> GetDeckList(DragSourceType zone)
+        {
+            return zone switch
             {
-                if (ctx.SourceIndex >= 0 && ctx.SourceIndex < _workingDeck.main.Count)
-                {
-                    _workingDeck.main.RemoveAt(ctx.SourceIndex);
-                    LotdAudio.PlayClick();
-                    RefreshDeckGrids();
-                    UpdateVirtualTrunkSlots(_lastFirstRow, force: true);
-                    ShowToast("메인 덱에서 카드를 제거했습니다.");
-                }
-            }
-            else if (ctx.SourceType == DragSourceType.DeckExtra && !CardDragManager.ContainsScreenPoint(_deckColRect, ctx.DropPosition))
+                DragSourceType.DeckMain => _workingDeck.main,
+                DragSourceType.DeckExtra => _workingDeck.extra,
+                DragSourceType.DeckSide => _workingDeck.side,
+                _ => null,
+            };
+        }
+
+        private List<(RectTransform rt, CompositeCardView card, CardDragTrigger trigger)> GetDeckSlots(DragSourceType zone)
+        {
+            return zone switch
             {
-                if (ctx.SourceIndex >= 0 && ctx.SourceIndex < _workingDeck.extra.Count)
-                {
-                    _workingDeck.extra.RemoveAt(ctx.SourceIndex);
-                    LotdAudio.PlayClick();
-                    RefreshDeckGrids();
-                    UpdateVirtualTrunkSlots(_lastFirstRow, force: true);
-                    ShowToast("엑스트라 덱에서 카드를 제거했습니다.");
-                }
-            }
-            else if (ctx.SourceType == DragSourceType.DeckSide && !CardDragManager.ContainsScreenPoint(_deckColRect, ctx.DropPosition))
-            {
-                if (ctx.SourceIndex >= 0 && ctx.SourceIndex < _workingDeck.side.Count)
-                {
-                    _workingDeck.side.RemoveAt(ctx.SourceIndex);
-                    LotdAudio.PlayClick();
-                    RefreshDeckGrids();
-                    UpdateVirtualTrunkSlots(_lastFirstRow, force: true);
-                    ShowToast("사이드 덱에서 카드를 제거했습니다.");
-                }
-            }
+                DragSourceType.DeckMain => _mainSlots,
+                DragSourceType.DeckExtra => _extraSlots,
+                _ => _sideSlots,
+            };
+        }
+
+        private void FinishDeckEdit()
+        {
+            LotdAudio.PlayClick();
+            RefreshDeckGrids();
+            UpdateVirtualTrunkSlots(_lastFirstRow, force: true);
         }
 
         private static int FindHoveredSlotIndex(List<(RectTransform rt, CompositeCardView card, CardDragTrigger trigger)> slots, Vector2 screenPos)
@@ -819,38 +748,43 @@ namespace YGOPortable.UI
             return cnt;
         }
 
-        private void TryAddCardToDeck(uint code, bool addToSide)
+        private void TryAddCardToDeck(uint code, DragSourceType destination = DragSourceType.None)
         {
-            var ci = CardDatabase.Get(code);
-            if (ci == null) return;
+            var card = CardDatabase.Get(code);
+            if (card == null || _workingDeck == null) return;
             if (CountInWorkingDeck(code) >= 3)
             {
-                ShowToast("동명 카드는 최대 3장까지 넣을 수 있습니다.");
+                ShowToast("동명 카드는 세 덱을 합해 최대 3장입니다.");
                 return;
             }
-            if (addToSide)
+
+            if (destination == DragSourceType.None)
+                destination = card.IsExtra ? DragSourceType.DeckExtra : DragSourceType.DeckMain;
+            var target = GetDeckList(destination);
+            if (!CanPlaceCard(card, destination, target)) return;
+            target.Add(code);
+            FinishDeckEdit();
+        }
+
+        private bool CanPlaceCard(CardInfo card, DragSourceType destination, List<uint> target)
+        {
+            if (card == null || target == null || (card.type & YgoConstants.TYPE_TOKEN) != 0) return false;
+            if (destination != DragSourceType.DeckSide && card.IsExtra != (destination == DragSourceType.DeckExtra))
             {
-                if (_workingDeck.side.Count >= 15) { ShowToast("사이드 덱이 가득 찼습니다 (최대 15장)."); return; }
-                _workingDeck.side.Add(code);
+                ShowToast(card.IsExtra ? "엑스트라 또는 사이드 덱에 넣으세요." : "메인 또는 사이드 덱에 넣으세요.");
+                return false;
             }
-            else if (ci.IsExtra)
-            {
-                if (_workingDeck.extra.Count >= 15) { ShowToast("엑스트라 덱이 가득 찼습니다 (최대 15장)."); return; }
-                _workingDeck.extra.Add(code);
-            }
-            else
-            {
-                if (_workingDeck.main.Count >= 60) { ShowToast("메인 덱이 가득 찼습니다 (최대 60장)."); return; }
-                _workingDeck.main.Add(code);
-            }
-            LotdAudio.PlayClick();
-            RefreshDeckGrids();
-            UpdateVirtualTrunkSlots(_lastFirstRow, force: true);
+
+            int capacity = destination == DragSourceType.DeckMain ? 60 : 15;
+            if (target.Count < capacity) return true;
+            ShowToast($"이 덱은 {capacity}장까지 담을 수 있습니다.");
+            return false;
         }
 
         private void InspectCard(uint code)
         {
             _inspectedCode = code;
+            if (_previewCard.CurrentCode == code) return;
             var ci = CardDatabase.Get(code);
             _previewCard.SetCard(code);
             if (ci == null) return;
@@ -858,6 +792,7 @@ namespace YGOPortable.UI
             _previewName.text = ci.name;
             _previewStats.text = ci.FormatStatsLineKR();
             _previewDesc.text = ci.desc;
+            _previewScroll.verticalNormalizedPosition = 1f;
 
             Sprite raceSp = null;
             if (ci.IsMonster) raceSp = LotdUiKit.GetRaceSprite(ci.race);

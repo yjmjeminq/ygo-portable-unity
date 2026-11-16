@@ -1,588 +1,501 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 using YGOPortable.Core;
 
 namespace YGOPortable.UI
 {
+    internal readonly struct CardPose
+    {
+        public readonly Vector2 Position;
+        public readonly Vector2 Size;
+        public readonly float Angle;
+
+        public CardPose(Vector2 position, Vector2 size, float angle = 0f)
+        {
+            Position = position;
+            Size = size;
+            Angle = angle;
+        }
+
+        public bool IsValid => Size.x > 0f && Size.y > 0f;
+    }
+
+    internal readonly struct CardFlight
+    {
+        public readonly uint Code;
+        public readonly CardPose From;
+        public readonly CardPose To;
+        public readonly bool StartsFaceDown;
+        public readonly bool EndsFaceDown;
+
+        public CardFlight(uint code, CardPose from, CardPose to, bool startsFaceDown, bool endsFaceDown)
+        {
+            Code = code;
+            From = from;
+            To = to;
+            StartsFaceDown = startsFaceDown;
+            EndsFaceDown = endsFaceDown;
+        }
+    }
+
+    internal enum CardMotion
+    {
+        Transfer,
+        Summon,
+        ExtraDeckSummon,
+        Set,
+        ChangePosition,
+        Destroy,
+        Vanish,
+    }
+
     public class CardAnimationManager : MonoBehaviour
     {
         public static CardAnimationManager Instance { get; private set; }
 
-        private RectTransform _animLayer;
-        private readonly Queue<GameObject> _proxyPool = new Queue<GameObject>();
-        private float _nextFlightStartTime = 0f;
+        private readonly Queue<IEnumerator> _steps = new Queue<IEnumerator>();
+        private readonly Stack<CompositeCardView> _cards = new Stack<CompositeCardView>();
+        private RectTransform _layer;
+        private bool _playing;
+
+        public bool IsPresenting => _playing || _steps.Count > 0;
+        public bool Paused { get; set; }
 
         public static CardAnimationManager Ensure(Canvas canvas)
         {
-            if (Instance != null)
-            {
-                Instance.BringToFront();
-                return Instance;
-            }
-            var go = new GameObject("CardAnimationManager", typeof(RectTransform));
-            go.transform.SetParent(canvas.transform, false);
-            var rt = (RectTransform)go.transform;
-            rt.anchorMin = Vector2.zero;
-            rt.anchorMax = Vector2.one;
-            rt.offsetMin = Vector2.zero;
-            rt.offsetMax = Vector2.zero;
+            if (Instance != null) return Instance;
 
-            Instance = go.AddComponent<CardAnimationManager>();
-            Instance.Initialize(rt);
+            var layer = LotdUiKit.FillRect("DuelAnimations", canvas.transform);
+            var group = layer.gameObject.AddComponent<CanvasGroup>();
+            group.interactable = false;
+            group.blocksRaycasts = false;
+            Instance = layer.gameObject.AddComponent<CardAnimationManager>();
+            Instance._layer = layer;
             Instance.BringToFront();
             return Instance;
         }
 
         public void BringToFront()
         {
-            if (_animLayer != null) _animLayer.SetAsLastSibling();
-            if (CardDragManager.Instance != null) CardDragManager.Instance.transform.SetAsLastSibling();
+            _layer.SetAsLastSibling();
+            CardDragManager.Instance?.transform.SetAsLastSibling();
         }
 
-        private void Initialize(RectTransform layer)
+        public void Clear()
         {
-            _animLayer = layer;
-        }
-
-        private GameObject GetOrCreateProxy()
-        {
-            if (_proxyPool.Count > 0)
+            StopAllCoroutines();
+            _steps.Clear();
+            _cards.Clear();
+            _playing = false;
+            Paused = false;
+            for (int i = _layer.childCount - 1; i >= 0; i--)
             {
-                var item = _proxyPool.Dequeue();
-                if (item != null)
+                var child = _layer.GetChild(i).gameObject;
+                child.SetActive(false);
+                Destroy(child);
+            }
+        }
+
+        private void LateUpdate()
+        {
+            if (Paused || _playing || _steps.Count == 0) return;
+            _playing = true;
+            StartCoroutine(PlaySteps());
+        }
+
+        private IEnumerator PlaySteps()
+        {
+            BringToFront();
+            while (_steps.Count > 0) yield return _steps.Dequeue();
+            _playing = false;
+        }
+
+        internal Vector2 GetPoint(RectTransform rect, Vector2 normalizedPoint)
+        {
+            var local = rect.rect.min + Vector2.Scale(rect.rect.size, normalizedPoint);
+            return _layer.InverseTransformPoint(rect.TransformPoint(local));
+        }
+
+        internal CardPose GetPose(RectTransform rect, Vector2 normalizedCenter, Vector2 normalizedSize,
+            float angle = 0f, float scale = 1f)
+        {
+            Vector2 center = GetPoint(rect, normalizedCenter);
+            Vector2 size = Vector2.Scale(rect.rect.size, normalizedSize);
+            Vector2 width = _layer.InverseTransformVector(rect.TransformVector(Vector3.right * size.x));
+            Vector2 height = _layer.InverseTransformVector(rect.TransformVector(Vector3.up * size.y));
+            float cardHeight = Mathf.Min(height.magnitude, width.magnitude / LotdUiKit.CardAspectRatio) * scale;
+            return new CardPose(center, new Vector2(cardHeight * LotdUiKit.CardAspectRatio, cardHeight), angle);
+        }
+
+        internal void QueueDraw(IReadOnlyList<CardFlight> flights, Action<int> onArrive)
+        {
+            if (flights.Count > 0) _steps.Enqueue(DrawCards(flights, onArrive));
+        }
+
+        internal void QueueMove(CardFlight flight, CardMotion motion, Action onArrive)
+        {
+            _steps.Enqueue(MoveCard(flight, motion, onArrive));
+        }
+
+        internal void QueuePhase(string label, bool opponent, Vector2 boardCenter, Action onStart)
+        {
+            _steps.Enqueue(PhaseBanner(label, opponent, boardCenter, onStart));
+        }
+
+        internal void QueueChain(CardPose source, uint code, int chainNumber)
+        {
+            _steps.Enqueue(ChainActivation(source, code, chainNumber));
+        }
+
+        internal void QueueAttackArrow(Vector2 from, Vector2 to)
+        {
+            _steps.Enqueue(AttackArrow(from, to));
+        }
+
+        internal void QueueAttack(CardPose from, Vector2 to, uint code, bool direct, Action onFinish)
+        {
+            _steps.Enqueue(Attack(from, to, code, direct, onFinish));
+        }
+
+        internal void QueueLifeChange(Vector2 point, int delta, Action onStart)
+        {
+            _steps.Enqueue(LifeChange(point, delta, onStart));
+        }
+
+        private CompositeCardView TakeCard(uint code, bool faceDown, bool detailed = false)
+        {
+            CompositeCardView view;
+            if (detailed || !_cards.TryPop(out view))
+            {
+                view = CompositeCardView.Create(_layer, "MovingCard", detailed);
+                var rect = (RectTransform)view.transform;
+                rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+            }
+            view.SetCard(code, faceDown);
+            view.gameObject.SetActive(true);
+            view.transform.SetAsLastSibling();
+            return view;
+        }
+
+        private void RecycleCard(CompositeCardView view)
+        {
+            view.gameObject.SetActive(false);
+            _cards.Push(view);
+        }
+
+        private static void ApplyPose(CompositeCardView view, CardPose pose, float horizontalScale = 1f)
+        {
+            var rect = (RectTransform)view.transform;
+            rect.sizeDelta = pose.Size;
+            rect.anchoredPosition = pose.Position;
+            rect.localRotation = Quaternion.Euler(0f, 0f, pose.Angle);
+            rect.localScale = new Vector3(horizontalScale, 1f, 1f);
+        }
+
+        private static void ApplyFlight(CompositeCardView view, CardFlight flight, float t, float lift)
+        {
+            float eased = t * t * (3f - 2f * t);
+            float arc = Mathf.Sin(t * Mathf.PI);
+            Vector2 point = Vector2.Lerp(flight.From.Position, flight.To.Position, eased) + Vector2.up * (arc * lift);
+            Vector2 size = Vector2.Lerp(flight.From.Size, flight.To.Size, eased) * (1f + arc * 0.10f);
+            float angle = Mathf.LerpAngle(flight.From.Angle, flight.To.Angle, eased);
+            bool turnsOver = flight.StartsFaceDown != flight.EndsFaceDown;
+            bool showBack = t < 0.5f ? flight.StartsFaceDown : flight.EndsFaceDown;
+            uint visibleCode = showBack ? 0u : flight.Code;
+            if (view.CurrentCode != visibleCode) view.SetCard(visibleCode, showBack);
+            float flip = turnsOver ? Mathf.Max(0.035f, Mathf.Abs(Mathf.Cos(t * Mathf.PI))) : 1f;
+            ApplyPose(view, new CardPose(point, size, angle), flip);
+        }
+
+        private IEnumerator DrawCards(IReadOnlyList<CardFlight> flights, Action<int> onArrive)
+        {
+            const float travelTime = 0.26f;
+            const float stagger = 0.062f;
+            var views = new CompositeCardView[flights.Count];
+            int started = 0;
+            int arrived = 0;
+            float elapsed = 0f;
+
+            while (arrived < flights.Count)
+            {
+                while (started < flights.Count && elapsed >= started * stagger)
                 {
-                    item.SetActive(true);
-                    item.transform.SetAsLastSibling();
-                    return item;
+                    views[started] = TakeCard(0, true);
+                    LotdAudio.PlayDraw();
+                    started++;
                 }
-            }
-
-            var go = new GameObject("AnimCardProxy", typeof(RectTransform));
-            go.transform.SetParent(_animLayer, false);
-            var rt = (RectTransform)go.transform;
-            rt.sizeDelta = new Vector2(104f, 150f);
-            rt.pivot = new Vector2(0.5f, 0.5f);
-
-            var cg = go.AddComponent<CanvasGroup>();
-            cg.blocksRaycasts = false;
-            cg.interactable = false;
-
-            var ol = go.AddComponent<Outline>();
-            ol.effectColor = LotdUiKit.GoldAccent;
-            ol.effectDistance = new Vector2(2.5f, -2.5f);
-
-            CompositeCardView.Create(rt, "CV", false);
-            return go;
-        }
-
-        private void RecycleProxy(GameObject go)
-        {
-            if (go == null) return;
-            go.SetActive(false);
-            _proxyPool.Enqueue(go);
-        }
-
-        public float PlayCardFlight(uint code, Vector2 startScreenPos, Vector2 endScreenPos,
-            float duration = 0.34f, bool faceDown = false, float arcHeight = 52f,
-            Action onComplete = null)
-        {
-            if (startScreenPos == Vector2.zero || endScreenPos == Vector2.zero)
-            {
-                onComplete?.Invoke();
-                return 0f;
-            }
-
-            BringToFront();
-            float now = Time.unscaledTime;
-            float delay = 0f;
-            if (_nextFlightStartTime > now)
-            {
-                delay = Mathf.Min(0.45f, _nextFlightStartTime - now);
-            }
-            _nextFlightStartTime = Mathf.Max(now, _nextFlightStartTime) + 0.065f;
-
-            StartCoroutine(CardFlightRoutine(code, startScreenPos, endScreenPos, delay, duration, faceDown, arcHeight, onComplete));
-            return delay + duration;
-        }
-
-        private IEnumerator CardFlightRoutine(uint code, Vector2 startPos, Vector2 endPos,
-            float delay, float duration, bool faceDown, float arcHeight, Action onComplete)
-        {
-            if (delay > 0.001f)
-            {
-                yield return new WaitForSecondsRealtime(delay);
-            }
-
-            BringToFront();
-            var proxy = GetOrCreateProxy();
-            var rt = (RectTransform)proxy.transform;
-            var cv = proxy.GetComponentInChildren<CompositeCardView>();
-            if (cv != null) cv.SetCard(code, faceDown);
-
-            float timer = 0f;
-            duration = Mathf.Max(0.14f, duration);
-
-            while (timer < duration)
-            {
-                timer += Time.deltaTime;
-                float t = Mathf.Clamp01(timer / duration);
-                float ease = Mathf.SmoothStep(0f, 1f, t);
-
-                Vector2 linear = Vector2.Lerp(startPos, endPos, ease);
-                float arc = Mathf.Sin(t * Mathf.PI) * arcHeight;
-                rt.position = new Vector3(linear.x, linear.y + arc, 0f);
-
-                float scalePunch = 1.0f + Mathf.Sin(t * Mathf.PI) * 0.24f;
-                rt.localScale = new Vector3(scalePunch, scalePunch, 1f);
-
-                yield return null;
-            }
-
-            rt.position = endPos;
-            rt.localScale = Vector3.one;
-
-            RecycleProxy(proxy);
-            onComplete?.Invoke();
-        }
-
-        public void PlayAttackLunge(RectTransform attackerSlot, Vector2 targetScreenPos,
-            float duration = 0.28f, Action onImpact = null, Action onComplete = null)
-        {
-            if (attackerSlot == null)
-            {
-                onImpact?.Invoke();
-                onComplete?.Invoke();
-                return;
-            }
-
-            StartCoroutine(AttackLungeRoutine(attackerSlot, targetScreenPos, duration, onImpact, onComplete));
-        }
-
-        private IEnumerator AttackLungeRoutine(RectTransform slot, Vector2 targetPos,
-            float duration, Action onImpact, Action onComplete)
-        {
-            Vector3 origPos = slot.position;
-            Vector3 dir = ((Vector3)targetPos - origPos).normalized;
-            float maxLunge = Mathf.Min(60f, Vector3.Distance(origPos, targetPos) * 0.35f);
-
-            float halfDur = Mathf.Max(0.08f, duration * 0.45f);
-            float backDur = Mathf.Max(0.08f, duration * 0.55f);
-
-            // Forward lunge
-            float timer = 0f;
-            while (timer < halfDur)
-            {
-                timer += Time.deltaTime;
-                float t = Mathf.Clamp01(timer / halfDur);
-                float ease = Mathf.Sin(t * Mathf.PI * 0.5f);
-                slot.position = origPos + dir * (maxLunge * ease);
-                yield return null;
-            }
-
-            onImpact?.Invoke();
-
-            // Return recoil
-            timer = 0f;
-            Vector3 peakPos = slot.position;
-            while (timer < backDur)
-            {
-                timer += Time.deltaTime;
-                float t = Mathf.Clamp01(timer / backDur);
-                float ease = Mathf.SmoothStep(0f, 1f, t);
-                slot.position = Vector3.Lerp(peakPos, origPos, ease);
-                yield return null;
-            }
-
-            slot.position = origPos;
-            onComplete?.Invoke();
-        }
-
-        public void PlayFlashGlow(GameObject targetObj, Color flashColor, float duration = 0.25f)
-        {
-            if (targetObj == null) return;
-            StartCoroutine(FlashGlowRoutine(targetObj, flashColor, duration));
-        }
-
-        private IEnumerator FlashGlowRoutine(GameObject targetObj, Color color, float duration)
-        {
-            var ol = targetObj.GetComponent<Outline>() ?? targetObj.AddComponent<Outline>();
-            Color origColor = ol.effectColor;
-            ol.effectColor = color;
-
-            float timer = 0f;
-            while (timer < duration && targetObj != null)
-            {
-                timer += Time.deltaTime;
-                float t = Mathf.Clamp01(timer / duration);
-                ol.effectColor = Color.Lerp(color, origColor, t);
-                yield return null;
-            }
-
-            if (targetObj != null && ol != null)
-            {
-                ol.effectColor = origColor;
-            }
-        }
-
-        public void PlayPhaseBanner(string title, string subtitle, bool isOpponent, Action onComplete = null)
-        {
-            if (_animLayer == null) return;
-            BringToFront();
-            StartCoroutine(PhaseBannerRoutine(title, subtitle, isOpponent, onComplete));
-        }
-
-        private IEnumerator PhaseBannerRoutine(string title, string subtitle, bool isOpponent, Action onComplete)
-        {
-            var banner = new GameObject("PhaseSplashBanner", typeof(RectTransform));
-            banner.transform.SetParent(_animLayer, false);
-            var rt = (RectTransform)banner.transform;
-            rt.anchorMin = new Vector2(0.32f, 0.47f);
-            rt.anchorMax = new Vector2(0.92f, 0.61f);
-            rt.offsetMin = Vector2.zero;
-            rt.offsetMax = Vector2.zero;
-
-            var cg = banner.AddComponent<CanvasGroup>();
-            cg.blocksRaycasts = false;
-            cg.interactable = false;
-
-            var bgImg = banner.AddComponent<Image>();
-            bgImg.sprite = LotdUiKit.LoadSprite("LOTD/Panel/panel_background") ?? LotdUiKit.WhiteSprite;
-            bgImg.color = new Color(0.02f, 0.05f, 0.12f, 0.90f);
-
-            var ol = banner.AddComponent<Outline>();
-            ol.effectColor = isOpponent ? LotdUiKit.RedAccent : LotdUiKit.CyanAccent;
-            ol.effectDistance = new Vector2(2.5f, -2.5f);
-
-            var titleRt = LotdUiKit.CreateRect("T", rt, new Vector2(0.02f, 0.38f), new Vector2(0.98f, 0.95f), Vector2.zero, Vector2.zero);
-            var titleTxt = LotdUiKit.AddText(titleRt, "T", title, 26, TextAnchor.MiddleCenter,
-                isOpponent ? LotdUiKit.RedAccent : LotdUiKit.GoldAccent, FontStyle.Bold);
-            titleTxt.gameObject.AddComponent<Shadow>().effectColor = Color.black;
-
-            var subRt = LotdUiKit.CreateRect("S", rt, new Vector2(0.02f, 0.05f), new Vector2(0.98f, 0.42f), Vector2.zero, Vector2.zero);
-            var subTxt = LotdUiKit.AddText(subRt, "S", subtitle, 15, TextAnchor.MiddleCenter,
-                isOpponent ? new Color(1f, 0.65f, 0.65f, 1f) : LotdUiKit.CyanAccent, FontStyle.Bold);
-
-            float totalDur = 0.82f;
-            float punchDur = 0.15f;
-            float fadeStart = 0.62f;
-            float timer = 0f;
-
-            while (timer < totalDur && banner != null)
-            {
-                timer += Time.deltaTime;
-                float scale = timer < punchDur
-                    ? Mathf.Lerp(1.28f, 1.0f, timer / punchDur)
-                    : 1.0f;
-                rt.localScale = new Vector3(scale, scale, 1f);
-
-                if (timer > fadeStart)
+                for (int i = arrived; i < started; i++)
                 {
-                    cg.alpha = Mathf.Clamp01(1f - (timer - fadeStart) / (totalDur - fadeStart));
+                    float t = Mathf.Clamp01((elapsed - i * stagger) / travelTime);
+                    ApplyFlight(views[i], flights[i], t, 20f);
+                    if (t < 1f) continue;
+
+                    RecycleCard(views[i]);
+                    onArrive(i);
+                    arrived++;
                 }
                 yield return null;
+                if (!Paused) elapsed += Time.unscaledDeltaTime;
+            }
+        }
+
+        private IEnumerator MoveCard(CardFlight flight, CardMotion motion, Action onArrive)
+        {
+            if (!flight.From.IsValid || !flight.To.IsValid)
+            {
+                onArrive?.Invoke();
+                yield break;
             }
 
-            if (banner != null) UnityEngine.Object.Destroy(banner);
-            onComplete?.Invoke();
-        }
+            if (motion == CardMotion.Destroy)
+                yield return Pulse("LOTD/Effects/card_break_flare", flight.From.Position, flight.From.Size * 1.75f,
+                    new Color(0.72f, 0.91f, 1f), 0.20f);
 
-        public void PlayDirectAttackSplash(Action onComplete = null)
-        {
-            if (_animLayer == null) return;
-            BringToFront();
-            StartCoroutine(DirectAttackSplashRoutine(onComplete));
-        }
-
-        private IEnumerator DirectAttackSplashRoutine(Action onComplete)
-        {
-            var banner = new GameObject("DirectAttackBanner", typeof(RectTransform));
-            banner.transform.SetParent(_animLayer, false);
-            var rt = (RectTransform)banner.transform;
-            rt.anchorMin = new Vector2(0.30f, 0.44f);
-            rt.anchorMax = new Vector2(0.94f, 0.63f);
-            rt.offsetMin = Vector2.zero;
-            rt.offsetMax = Vector2.zero;
-
-            var cg = banner.AddComponent<CanvasGroup>();
-            cg.blocksRaycasts = false;
-
-            var bgImg = banner.AddComponent<Image>();
-            bgImg.sprite = LotdUiKit.LoadSprite("LOTD/Panel/panel_background") ?? LotdUiKit.WhiteSprite;
-            bgImg.color = new Color(0.18f, 0.02f, 0.02f, 0.94f);
-
-            var ol = banner.AddComponent<Outline>();
-            ol.effectColor = LotdUiKit.RedAccent;
-            ol.effectDistance = new Vector2(3.5f, -3.5f);
-
-            var titleRt = LotdUiKit.CreateRect("T", rt, new Vector2(0.02f, 0.40f), new Vector2(0.98f, 0.95f), Vector2.zero, Vector2.zero);
-            var titleTxt = LotdUiKit.AddText(titleRt, "T", "★ DIRECT ATTACK! ★", 30, TextAnchor.MiddleCenter,
-                LotdUiKit.GoldAccent, FontStyle.Bold);
-            titleTxt.gameObject.AddComponent<Shadow>().effectColor = Color.black;
-
-            var subRt = LotdUiKit.CreateRect("S", rt, new Vector2(0.02f, 0.05f), new Vector2(0.98f, 0.44f), Vector2.zero, Vector2.zero);
-            LotdUiKit.AddText(subRt, "S", "직접 공격 선언!!", 16, TextAnchor.MiddleCenter,
-                LotdUiKit.RedAccent, FontStyle.Bold);
-
-            float totalDur = 0.72f;
-            float punchDur = 0.14f;
-            float fadeStart = 0.50f;
-            float timer = 0f;
-
-            while (timer < totalDur && banner != null)
+            bool showDetails = motion == CardMotion.ExtraDeckSummon;
+            var proxy = TakeCard(flight.StartsFaceDown ? 0u : flight.Code, flight.StartsFaceDown, showDetails);
+            if (motion == CardMotion.Vanish)
             {
-                timer += Time.deltaTime;
-                float scale = timer < punchDur
-                    ? Mathf.Lerp(1.36f, 1.0f, timer / punchDur)
-                    : 1.0f;
-                rt.localScale = new Vector3(scale, scale, 1f);
-
-                if (timer > fadeStart)
+                var fade = proxy.GetComponent<CanvasGroup>() ?? proxy.gameObject.AddComponent<CanvasGroup>();
+                yield return Animate(0.21f, t =>
                 {
-                    cg.alpha = Mathf.Clamp01(1f - (timer - fadeStart) / (totalDur - fadeStart));
-                }
-                yield return null;
+                    ApplyFlight(proxy, flight, t, 8f);
+                    fade.alpha = 1f - t;
+                });
+                fade.alpha = 1f;
             }
-
-            if (banner != null) UnityEngine.Object.Destroy(banner);
-            onComplete?.Invoke();
-        }
-
-        public void PlayBoardShake(RectTransform target, float intensity = 12f, float duration = 0.22f)
-        {
-            if (target == null) return;
-            StartCoroutine(BoardShakeRoutine(target, intensity, duration));
-        }
-
-        private IEnumerator BoardShakeRoutine(RectTransform target, float intensity, float duration)
-        {
-            Vector2 orig = target.anchoredPosition;
-            float timer = 0f;
-            while (timer < duration && target != null)
+            else if (motion == CardMotion.ExtraDeckSummon)
             {
-                timer += Time.deltaTime;
-                float decay = 1f - Mathf.Clamp01(timer / duration);
-                float ox = UnityEngine.Random.Range(-intensity, intensity) * decay;
-                float oy = UnityEngine.Random.Range(-intensity, intensity) * decay;
-                target.anchoredPosition = orig + new Vector2(ox, oy);
-                yield return null;
-            }
-            if (target != null) target.anchoredPosition = orig;
-        }
+                Vector2 center = Vector2.Scale(_layer.rect.size, new Vector2(0.015f, 0.045f));
+                float height = Mathf.Min(316f, _layer.rect.height * 0.38f);
+                var reveal = new CardPose(center, new Vector2(height * LotdUiKit.CardAspectRatio, height));
+                var first = new CardFlight(flight.Code, flight.From, reveal, flight.StartsFaceDown, false);
+                yield return Animate(0.25f, t => ApplyFlight(proxy, first, t, 32f));
 
-        public void PlayDamagePopup(Vector2 screenPos, int delta)
-        {
-            if (_animLayer == null) return;
-            BringToFront();
-            StartCoroutine(DamagePopupRoutine(screenPos, delta));
-        }
-
-        private IEnumerator DamagePopupRoutine(Vector2 screenPos, int delta)
-        {
-            var go = new GameObject("DamagePopup", typeof(RectTransform));
-            go.transform.SetParent(_animLayer, false);
-            var rt = (RectTransform)go.transform;
-            rt.sizeDelta = new Vector2(160f, 36f);
-            rt.position = (Vector3)screenPos;
-
-            var cg = go.AddComponent<CanvasGroup>();
-            cg.blocksRaycasts = false;
-
-            var txt = go.AddComponent<Text>();
-            txt.font = LotdUiKit.FontKR;
-            txt.fontSize = 24;
-            txt.fontStyle = FontStyle.Bold;
-            txt.alignment = TextAnchor.MiddleCenter;
-            txt.text = delta < 0 ? $"{delta}" : $"+{delta}";
-            txt.color = delta < 0 ? new Color(1f, 0.25f, 0.25f, 1f) : new Color(0.25f, 1f, 0.45f, 1f);
-
-            var ol = go.AddComponent<Outline>();
-            ol.effectColor = Color.black;
-            ol.effectDistance = new Vector2(2f, -2f);
-
-            float duration = 0.75f;
-            float timer = 0f;
-            Vector3 startPos = rt.position;
-
-            while (timer < duration && go != null)
-            {
-                timer += Time.deltaTime;
-                float t = Mathf.Clamp01(timer / duration);
-                rt.position = startPos + new Vector3(0f, 38f * t, 0f);
-                cg.alpha = Mathf.Clamp01(1f - t * t);
-                yield return null;
-            }
-
-            if (go != null) UnityEngine.Object.Destroy(go);
-        }
-
-        public void PlayCoinTossSplash(IReadOnlyList<bool> coins, bool isOpponent, Action onComplete = null)
-        {
-            if (_animLayer == null || coins == null || coins.Count == 0) return;
-            BringToFront();
-            StartCoroutine(CoinTossSplashRoutine(coins, isOpponent, onComplete));
-        }
-
-        private IEnumerator CoinTossSplashRoutine(IReadOnlyList<bool> coins, bool isOpponent, Action onComplete)
-        {
-            var banner = new GameObject("CoinSplashBanner", typeof(RectTransform));
-            banner.transform.SetParent(_animLayer, false);
-            var rt = (RectTransform)banner.transform;
-            rt.anchorMin = new Vector2(0.32f, 0.44f);
-            rt.anchorMax = new Vector2(0.92f, 0.63f);
-            rt.offsetMin = Vector2.zero;
-            rt.offsetMax = Vector2.zero;
-
-            var cg = banner.AddComponent<CanvasGroup>();
-            cg.blocksRaycasts = false;
-
-            var bgImg = banner.AddComponent<Image>();
-            bgImg.sprite = LotdUiKit.LoadSprite("LOTD/Panel/panel_background") ?? LotdUiKit.WhiteSprite;
-            bgImg.color = new Color(0.04f, 0.08f, 0.18f, 0.94f);
-
-            var ol = banner.AddComponent<Outline>();
-            ol.effectColor = LotdUiKit.GoldAccent;
-            ol.effectDistance = new Vector2(3f, -3f);
-
-            var titleRt = LotdUiKit.CreateRect("T", rt, new Vector2(0.02f, 0.45f), new Vector2(0.98f, 0.95f), Vector2.zero, Vector2.zero);
-            LotdUiKit.AddText(titleRt, "T", "★ COIN TOSS (코인 토스) ★", 24, TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
-
-            string resultsText = string.Join("   ", coins.Select((c, idx) => c ? $"<color=#FFCC44>[앞면 / HEADS]</color>" : $"<color=#FF6666>[뒷면 / TAILS]</color>"));
-            var subRt = LotdUiKit.CreateRect("S", rt, new Vector2(0.02f, 0.05f), new Vector2(0.98f, 0.48f), Vector2.zero, Vector2.zero);
-            LotdUiKit.AddText(subRt, "S", resultsText, 18, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
-
-            float totalDur = 1.15f;
-            float punchDur = 0.16f;
-            float fadeStart = 0.90f;
-            float timer = 0f;
-
-            LotdAudio.PlayCoin();
-
-            while (timer < totalDur && banner != null)
-            {
-                timer += Time.deltaTime;
-                float scale = timer < punchDur
-                    ? Mathf.Lerp(1.35f, 1.0f, timer / punchDur)
-                    : 1.0f;
-                rt.localScale = new Vector3(scale, scale, 1f);
-                if (timer > fadeStart)
+                LotdAudio.PlaySummon();
+                var mark = CreateImage("SummonMark", SummonMark(flight.Code), center, new Vector2(height * 1.4f, height * 0.68f));
+                yield return Animate(0.26f, t =>
                 {
-                    cg.alpha = Mathf.Clamp01(1f - (timer - fadeStart) / (totalDur - fadeStart));
-                }
-                yield return null;
+                    mark.color = new Color(0.62f, 0.87f, 1f, Mathf.Sin(t * Mathf.PI) * 0.88f);
+                    mark.transform.localScale = Vector3.one * Mathf.Lerp(0.72f, 1.18f, t);
+                });
+                Destroy(mark.gameObject);
+
+                var last = new CardFlight(flight.Code, reveal, flight.To, false, flight.EndsFaceDown);
+                yield return Animate(0.25f, t => ApplyFlight(proxy, last, t, 22f));
+            }
+            else
+            {
+                if (motion == CardMotion.Destroy) LotdAudio.PlayDamage();
+                float lift = motion == CardMotion.ChangePosition ? 13f : 31f;
+                float time = motion == CardMotion.Transfer ? 0.24f : 0.29f;
+                yield return Animate(time, t => ApplyFlight(proxy, flight, t, lift));
             }
 
-            if (banner != null) UnityEngine.Object.Destroy(banner);
-            onComplete?.Invoke();
-        }
-
-        public void PlayDiceRollSplash(IReadOnlyList<int> dice, bool isOpponent, Action onComplete = null)
-        {
-            if (_animLayer == null || dice == null || dice.Count == 0) return;
-            BringToFront();
-            StartCoroutine(DiceRollSplashRoutine(dice, isOpponent, onComplete));
-        }
-
-        public void PlayChainActivationPulse(uint code, Vector2 screenPos, int chainNumber)
-        {
-            if (_animLayer == null || screenPos == Vector2.zero) return;
-            BringToFront();
-            StartCoroutine(ChainActivationPulseRoutine(code, screenPos, chainNumber));
-        }
-
-        private IEnumerator ChainActivationPulseRoutine(uint code, Vector2 screenPos, int chainNumber)
-        {
-            var go = new GameObject("ChainPulseCard", typeof(RectTransform));
-            go.transform.SetParent(_animLayer, false);
-            var rt = (RectTransform)go.transform;
-            rt.sizeDelta = new Vector2(96f, 138f);
-            rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.position = (Vector3)screenPos;
-
-            var cg = go.AddComponent<CanvasGroup>();
-            cg.blocksRaycasts = false;
-            cg.interactable = false;
-
-            var ol = go.AddComponent<Outline>();
-            ol.effectColor = LotdUiKit.GoldAccent;
-            ol.effectDistance = new Vector2(3.5f, -3.5f);
-
-            var cv = CompositeCardView.Create(rt, "CV", false);
-            cv.SetCard(code, code == 0);
-
-            var badgeRt = LotdUiKit.CreateRect("Badge", rt, new Vector2(0f, 0.72f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(badgeRt.gameObject, LotdUiKit.WhiteSprite, new Color(0.05f, 0.12f, 0.25f, 0.92f), false, false);
-            LotdUiKit.AddText(badgeRt, "T", $"CHAIN {chainNumber}", 13, TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
-
-            float dur = 0.42f;
-            float timer = 0f;
-            while (timer < dur && go != null)
+            if (showDetails)
             {
-                timer += Time.deltaTime;
-                float t = Mathf.Clamp01(timer / dur);
-                float scale = 1.0f + Mathf.Sin(t * Mathf.PI) * 0.35f;
-                rt.localScale = new Vector3(scale, scale, 1f);
-                cg.alpha = t < 0.65f ? 1f : Mathf.Clamp01(1f - (t - 0.65f) / 0.35f);
-                yield return null;
+                proxy.gameObject.SetActive(false);
+                Destroy(proxy.gameObject);
             }
+            else
+                RecycleCard(proxy);
+            onArrive?.Invoke();
 
-            if (go != null) UnityEngine.Object.Destroy(go);
+            if (motion == CardMotion.Summon || motion == CardMotion.ExtraDeckSummon)
+            {
+                if (motion == CardMotion.Summon) LotdAudio.PlaySummon();
+                var glow = CreateImage("SummonBeam", "LOTD/Effects/summon_beam",
+                    flight.To.Position + Vector2.up * (flight.To.Size.y * 0.55f),
+                    new Vector2(flight.To.Size.x * 1.05f, flight.To.Size.y * 2.35f));
+                glow.preserveAspect = false;
+                yield return Animate(0.22f, t => glow.color = new Color(0.54f, 0.86f, 1f, (1f - t) * 0.9f));
+                Destroy(glow.gameObject);
+            }
+            else if (motion == CardMotion.Set)
+            {
+                LotdAudio.PlayClick();
+                yield return Pulse("LOTD/Effects/set_cloud", flight.To.Position, flight.To.Size * 1.6f,
+                    new Color(0.76f, 0.89f, 1f), 0.18f);
+            }
         }
 
-        private IEnumerator DiceRollSplashRoutine(IReadOnlyList<int> dice, bool isOpponent, Action onComplete)
+        private static string SummonMark(uint code)
         {
-            var banner = new GameObject("DiceSplashBanner", typeof(RectTransform));
-            banner.transform.SetParent(_animLayer, false);
-            var rt = (RectTransform)banner.transform;
-            rt.anchorMin = new Vector2(0.32f, 0.44f);
-            rt.anchorMax = new Vector2(0.92f, 0.63f);
-            rt.offsetMin = Vector2.zero;
-            rt.offsetMax = Vector2.zero;
+            uint type = CardDatabase.Get(code)?.type ?? 0;
+            if ((type & YgoConstants.TYPE_LINK) != 0) return "LOTD/Effects/link_ring";
+            if ((type & YgoConstants.TYPE_SYNCHRO) != 0) return "LOTD/Effects/synchro_ring";
+            if ((type & YgoConstants.TYPE_XYZ) != 0) return "LOTD/Effects/xyz_mark";
+            return "LOTD/Effects/fusion_mark";
+        }
 
-            var cg = banner.AddComponent<CanvasGroup>();
-            cg.blocksRaycasts = false;
+        private IEnumerator AttackArrow(Vector2 from, Vector2 to)
+        {
+            var direction = to - from;
+            if (direction.sqrMagnitude < 1f) yield break;
+            float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
 
-            var bgImg = banner.AddComponent<Image>();
-            bgImg.sprite = LotdUiKit.LoadSprite("LOTD/Panel/panel_background") ?? LotdUiKit.WhiteSprite;
-            bgImg.color = new Color(0.04f, 0.08f, 0.18f, 0.94f);
-
-            var ol = banner.AddComponent<Outline>();
-            ol.effectColor = LotdUiKit.CyanAccent;
-            ol.effectDistance = new Vector2(3f, -3f);
-
-            var titleRt = LotdUiKit.CreateRect("T", rt, new Vector2(0.02f, 0.45f), new Vector2(0.98f, 0.95f), Vector2.zero, Vector2.zero);
-            LotdUiKit.AddText(titleRt, "T", "★ DICE ROLL (주사위 굴리기) ★", 24, TextAnchor.MiddleCenter, LotdUiKit.CyanAccent, FontStyle.Bold);
-
-            string resultsText = string.Join("    ", dice.Select(d => $"<color=#FFCC44>◆ [ {d} ] ◆</color>"));
-            var subRt = LotdUiKit.CreateRect("S", rt, new Vector2(0.02f, 0.05f), new Vector2(0.98f, 0.48f), Vector2.zero, Vector2.zero);
-            LotdUiKit.AddText(subRt, "S", resultsText, 20, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
-
-            float totalDur = 1.15f;
-            float punchDur = 0.16f;
-            float fadeStart = 0.90f;
-            float timer = 0f;
-
-            LotdAudio.PlayDice();
-
-            while (timer < totalDur && banner != null)
+            var arrows = new Image[3];
+            for (int i = 0; i < arrows.Length; i++)
             {
-                timer += Time.deltaTime;
-                float scale = timer < punchDur
-                    ? Mathf.Lerp(1.35f, 1.0f, timer / punchDur)
-                    : 1.0f;
-                rt.localScale = new Vector3(scale, scale, 1f);
-                if (timer > fadeStart)
+                arrows[i] = CreateImage("AttackArrow", "LOTD/Shared/bookmark_wide", from, new Vector2(54f, 34f));
+                arrows[i].rectTransform.localRotation = Quaternion.Euler(0f, 0f, angle);
+            }
+            LotdAudio.PlayClick();
+            yield return Animate(0.25f, t =>
+            {
+                for (int i = 0; i < arrows.Length; i++)
                 {
-                    cg.alpha = Mathf.Clamp01(1f - (timer - fadeStart) / (totalDur - fadeStart));
+                    float progress = Mathf.Clamp01(0.1f + t * 0.72f + i * 0.13f);
+                    arrows[i].rectTransform.anchoredPosition = Vector2.Lerp(from, to, progress);
+                    arrows[i].color = new Color(1f, 0.88f, 0.64f, Mathf.Sin(t * Mathf.PI));
                 }
-                yield return null;
+            });
+            foreach (var arrow in arrows) Destroy(arrow.gameObject);
+        }
+
+        private IEnumerator Attack(CardPose from, Vector2 to, uint code, bool direct, Action onFinish)
+        {
+            if (!from.IsValid || code == 0)
+            {
+                onFinish?.Invoke();
+                yield break;
             }
 
-            if (banner != null) UnityEngine.Object.Destroy(banner);
-            onComplete?.Invoke();
+            var proxy = TakeCard(code, false);
+            Vector2 hit = Vector2.Lerp(from.Position, to, direct ? 0.65f : 0.82f);
+            var lunge = new CardPose(hit, from.Size * 1.15f, from.Angle);
+            var outFlight = new CardFlight(code, from, lunge, false, false);
+            yield return Animate(0.19f, t => ApplyFlight(proxy, outFlight, t, 24f));
+
+            if (direct) LotdAudio.PlayDirectAttack();
+            else LotdAudio.PlayAttack();
+            var flare = CreateImage("Hit", "LOTD/Effects/summon_flare", to, Vector2.one * (direct ? 235f : 166f));
+            var returnFlight = new CardFlight(code, lunge, from, false, false);
+            yield return Animate(0.21f, t =>
+            {
+                ApplyFlight(proxy, returnFlight, t, 7f);
+                flare.rectTransform.localScale = Vector3.one * Mathf.Lerp(0.45f, 1.25f, t);
+                flare.color = new Color(1f, 0.72f, 0.37f, 1f - t);
+            });
+            Destroy(flare.gameObject);
+            RecycleCard(proxy);
+            onFinish?.Invoke();
+        }
+
+        private IEnumerator ChainActivation(CardPose source, uint code, int chainNumber)
+        {
+            if (!source.IsValid) yield break;
+            var card = TakeCard(code, code == 0);
+            var ring = CreateImage("Chain", "LOTD/HUD/chain", source.Position, source.Size * 1.5f);
+            var label = LotdUiKit.AddText(ring.transform, "Link", chainNumber.ToString(), 24,
+                TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+            AddShadow(label);
+            LotdAudio.PlayChain();
+            yield return Animate(0.34f, t =>
+            {
+                float pulse = Mathf.Sin(t * Mathf.PI);
+                ApplyPose(card, new CardPose(source.Position + Vector2.up * (22f * pulse),
+                    source.Size * (1f + 0.27f * pulse), source.Angle));
+                var color = Color.white;
+                color.a = pulse;
+                ring.color = color;
+                label.color = color;
+            });
+            Destroy(ring.gameObject);
+            RecycleCard(card);
+        }
+
+        private IEnumerator PhaseBanner(string label, bool opponent, Vector2 center, Action onStart)
+        {
+            onStart?.Invoke();
+            LotdAudio.PlayPhaseTransition();
+            var banner = CreateImage("Phase", "LOTD/HUD/phase_dialog_bg", center, new Vector2(455f, 53f));
+            banner.preserveAspect = false;
+            var text = LotdUiKit.AddText(banner.transform, "Label", label, 23, TextAnchor.MiddleCenter,
+                opponent ? new Color(1f, 0.74f, 0.73f) : new Color(0.78f, 0.96f, 1f), FontStyle.Bold);
+            AddShadow(text);
+            var group = banner.gameObject.AddComponent<CanvasGroup>();
+            yield return Animate(0.39f, t =>
+            {
+                group.alpha = Mathf.Clamp01(t * 8f) * Mathf.Clamp01((1f - t) * 7f);
+                banner.rectTransform.anchoredPosition = center + Vector2.right * Mathf.Lerp(-48f, 35f, t);
+            });
+            Destroy(banner.gameObject);
+        }
+
+        private IEnumerator LifeChange(Vector2 point, int delta, Action onStart)
+        {
+            onStart?.Invoke();
+            if (delta == 0) yield break;
+            if (delta < 0) LotdAudio.PlayDamage();
+
+            var holder = LotdUiKit.CreateRect("LPChange", _layer, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                Vector2.zero, Vector2.zero);
+            holder.sizeDelta = new Vector2(180f, 48f);
+            var text = LotdUiKit.AddText(holder, "Value", delta > 0 ? $"+{delta}" : delta.ToString(),
+                30, TextAnchor.MiddleCenter, delta > 0 ? LotdUiKit.GreenAccent : new Color(1f, 0.29f, 0.2f), FontStyle.Bold);
+            AddShadow(text);
+            Color tint = text.color;
+            yield return Animate(0.42f, t =>
+            {
+                holder.anchoredPosition = point + Vector2.up * (20f + 30f * t);
+                tint.a = Mathf.Clamp01((1f - t) * 3.8f);
+                text.color = tint;
+            });
+            Destroy(holder.gameObject);
+        }
+
+        internal void QueueRandomResult(string label, Vector2 boardCenter, bool opponent, Action playSound)
+        {
+            _steps.Enqueue(RandomResult(label, boardCenter, opponent, playSound));
+        }
+
+        private IEnumerator RandomResult(string label, Vector2 center, bool opponent, Action playSound)
+        {
+            playSound?.Invoke();
+            yield return PhaseBanner(label, opponent, center, null);
+        }
+
+        private IEnumerator Pulse(string path, Vector2 center, Vector2 size, Color color, float duration)
+        {
+            var image = CreateImage("Pulse", path, center, size);
+            yield return Animate(duration, t =>
+            {
+                image.rectTransform.localScale = Vector3.one * Mathf.Lerp(0.65f, 1.2f, t);
+                color.a = Mathf.Sin(t * Mathf.PI);
+                image.color = color;
+            });
+            Destroy(image.gameObject);
+        }
+
+        private Image CreateImage(string name, string spritePath, Vector2 point, Vector2 size)
+        {
+            var rect = LotdUiKit.CreateRect(name, _layer, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                Vector2.zero, Vector2.zero);
+            rect.anchoredPosition = point;
+            rect.sizeDelta = size;
+            return LotdUiKit.AddImage(rect.gameObject, LotdUiKit.LoadSprite(spritePath), Color.white, true, false);
+        }
+
+        private static void AddShadow(Text label)
+        {
+            var outline = label.gameObject.AddComponent<Outline>();
+            outline.effectColor = Color.black;
+            outline.effectDistance = new Vector2(1.25f, -1.25f);
+        }
+
+        private IEnumerator Animate(float duration, Action<float> apply)
+        {
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                apply(elapsed / duration);
+                yield return null;
+                if (!Paused) elapsed += Time.unscaledDeltaTime;
+            }
+            apply(1f);
         }
     }
 }

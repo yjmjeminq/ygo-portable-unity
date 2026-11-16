@@ -122,7 +122,7 @@ namespace YGOPortable.Core
             if (files.Length == 0)
             {
                 SeedDefaultUserDecks();
-                files = Directory.GetFiles(_userDeckDir, "*.json");
+                return;
             }
 
             foreach (var f in files.OrderBy(x => x))

@@ -77,6 +77,19 @@ KIND_TO_TYPE = {
     "Spell": 0x2,
     "Trap": 0x4,
 }
+TYPE_EXTRA = 0x40 | 0x2000 | 0x800000 | 0x4000000  # Fusion, Synchro, Xyz, Link
+
+# CARD_Pass.bin leaves these original Egyptian God card passwords at zero.
+LOTD_MISSING_PASSCODES = {
+    4998: 10000000,   # Obelisk the Tormentor
+    4999: 10000020,   # Slifer the Sky Dragon
+    5000: 10000010,   # The Winged Dragon of Ra
+    11927: 10000080,  # The Winged Dragon of Ra - Sphere Mode
+    12234: 10000090,  # The Winged Dragon of Ra - Immortal Phoenix
+}
+
+MERCURIUM_PRE_RELEASE = 101303084
+MERCURIUM = 22984000
 
 # Spell/Trap subtype bitmasks matched against YGO-Ex cards.json "icon" field
 ICON_TO_SUBTYPE = {
@@ -265,6 +278,7 @@ def build_cards():
         first, _second = struct.unpack_from("<II", card_prop, 8 * i)
         lotd_id = first & 0x3FFF
         passcode = struct.unpack_from("<I", card_pass, 4 * i)[0]
+        passcode = passcode or LOTD_MISSING_PASSCODES.get(lotd_id, 0)
         if lotd_id:
             lotd_to_pass[lotd_id] = passcode
         if passcode:
@@ -344,6 +358,30 @@ def build_cards():
         strs = strs[:last_nz + 1] if last_nz >= 0 else []
         cdb_texts[cid] = (row[1] or "", row[2] or "", strs)
 
+    # These effects create tokens missing from the installed card database.
+    generated_tokens = (
+        (41458361, 41458362, "기석 토큰", "아다마시아 루미나스", "Rock", "Light"),
+        (3129527, 3129528, "희생하는 양 토큰", "잠자는 양 희생양", "Beast", "Earth"),
+    )
+    for source, code, name, generator, race, attribute in generated_tokens:
+        if source not in cdb_datas and source not in mod_by_pass:
+            continue
+        cdb_datas.setdefault(code, {
+            "code": code,
+            "alias": 0,
+            "type": 0x4011,  # Monster | Normal | Token
+            "level": 1,
+            "attribute": JSON_ATTR_MAP[attribute],
+            "link_marker": 0,
+            "race": JSON_TYPE_TO_RACE[race],
+            "attack": 0,
+            "defense": 0,
+            "lscale": 0,
+            "rscale": 0,
+            "setcodes": [0] * 8,
+        })
+        stock_kr_by_pass.setdefault(code, (name, f'"{generator}"의 효과로 특수 소환되는 토큰.'))
+
     # Synthesize any cards in mod_by_pass missing from cards.cdb
     all_codes = sorted(set(cdb_datas.keys()) | set(mod_by_pass.keys()))
     packed_bytes = bytearray()
@@ -387,6 +425,9 @@ def build_cards():
                 "rscale": sc,
                 "setcodes": scs[:8],
             }
+
+        if code == MERCURIUM_PRE_RELEASE and MERCURIUM in cdb_datas:
+            d["alias"] = MERCURIUM
 
         packed_bytes += struct.pack(
             "<IIIIIIQiiII8H",
@@ -456,6 +497,38 @@ def build_script_pack(all_codes: set):
         stem = p.stem
         if stem.startswith("c") and stem[1:].isdigit() and int(stem[1:]) in all_codes:
             add_file(p)
+
+    # Match the LOTD prize-card IDs to the corresponding Project Ignis scripts.
+    fallback_scripts = {
+        662853: "unofficial/c501000085.lua",  # Sanctity of Dragon
+        662854: "unofficial/c501000086.lua",  # Noritoshi, in Darkest Rainment
+        662855: "unofficial/c501000087.lua",  # Amatsu, Okami of the Divine Peaks
+        662857: "unofficial/c501000084.lua",  # Iron Knight of Revolution
+        88264978: "pre-errata/c88264978.lua",  # Red-Eyes Darkness Metal Dragon (OCG errata)
+    }
+    for code, source in fallback_scripts.items():
+        name = f"c{code}.lua"
+        if code in all_codes and name not in scripts:
+            scripts[name] = (cs_root / source).read_bytes()
+
+    # Saved decks can still contain Mercurium's pre-release ID. Keep both
+    # IDs on the same once-per-turn counter and effect descriptions.
+    if MERCURIUM_PRE_RELEASE in all_codes:
+        name = f"c{MERCURIUM_PRE_RELEASE}.lua"
+        if name not in scripts:
+            script = scripts[f"c{MERCURIUM}.lua"]
+            scripts[name] = script.replace(b"local s,id=GetID()", f"local s=GetID()\nlocal id={MERCURIUM}".encode(), 1)
+
+    if 40975243 in all_codes:
+        scripts["c40975243.lua"] = (UNITY_ROOT / "Tools" / "ScriptOverrides" / "c40975243.lua").read_bytes()
+
+    # Possessed Destiny's summon check mistakenly uses Duel.SpecialSummon's
+    # argument order. Its destination player defaults to the summoning player.
+    if "c45508030.lua" in scripts:
+        scripts["c45508030.lua"] = scripts["c45508030.lua"].replace(
+            b"c:IsCanBeSpecialSummoned(e,0,tp,tp,false,false,",
+            b"c:IsCanBeSpecialSummoned(e,0,tp,false,false,",
+        )
 
     # Pack binary: YGOS + ver(1) + count + entries(16B each) + name_table + data_blob
     items = sorted(scripts.items(), key=lambda kv: kv[0])
@@ -544,7 +617,9 @@ def build_card_art(all_codes: set, lotd_to_pass: dict, mod_by_pass: dict):
     chunk_id = 0
     cur_chunk = bytearray()
     entries = []
-    for pw in sorted(pass_to_jpg.keys()):
+    # Append recovered artwork so existing chunks keep their byte offsets.
+    recovered = set(LOTD_MISSING_PASSCODES.values())
+    for pw in sorted(pass_to_jpg, key=lambda code: (code in recovered, code)):
         jpg = pass_to_jpg[pw]
         if len(cur_chunk) + len(jpg) > MAX_CHUNK and len(cur_chunk) > 0:
             (STREAMING / f"cardart_{chunk_id}.pack").write_bytes(cur_chunk)
@@ -580,7 +655,7 @@ def resolve_portrait_name(key: str, bust_map: dict) -> str:
     return "atem_neutral"
 
 
-def build_opponents_db(lotd_to_pass: dict, all_codes: set):
+def build_opponents_db(lotd_to_pass: dict, all_codes: set, extra_deck_codes: set):
     print("[4/5] Building opponents_db.json (20 [2026 Meta] + all LOTD Original) ...")
     bust_map = {}
     for p in sorted(BUSTS_SRC.glob("*.png")):
@@ -669,6 +744,10 @@ def build_opponents_db(lotd_to_pass: dict, all_codes: set):
             continue
         main_p = convert_ids(md["cards"]["main"])
         extra_p = convert_ids(md["cards"]["extra"])
+        wrong_main = sorted(set(main_p) & extra_deck_codes)
+        wrong_extra = sorted(set(extra_p) - extra_deck_codes)
+        if wrong_main or wrong_extra:
+            raise ValueError(f"{md['title']}: wrong Main Deck cards {wrong_main}, wrong Extra Deck cards {wrong_extra}")
         side_p = convert_ids(md["cards"]["side"])
         sig = lotd_to_pass.get(md.get("signatureCard", 0), main_p[0] if main_p else 89631139)
         all_decks.append({
@@ -894,10 +973,11 @@ def main():
         build_resources_lotd()
         print("Resources preparation COMPLETE!")
         return
-    all_codes, lotd_to_pass, mod_by_pass, _pk, _pl, _kr = build_cards()
+    all_codes, lotd_to_pass, mod_by_pass, _pk, _pl, kr_cards = build_cards()
     build_script_pack(all_codes)
     build_card_art(all_codes, lotd_to_pass, mod_by_pass)
-    build_opponents_db(lotd_to_pass, all_codes)
+    extra_deck_codes = {card["code"] for card in kr_cards if card["type"] & TYPE_EXTRA}
+    build_opponents_db(lotd_to_pass, all_codes, extra_deck_codes)
     build_resources_lotd()
     print("Asset preparation COMPLETE!")
 

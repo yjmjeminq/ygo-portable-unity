@@ -86,11 +86,10 @@ namespace YGOPortable.UI
         {
             var dim = LotdUiKit.FillRect("Modal_DuelPrompt", parent);
             ModalRoot = dim.gameObject;
-            LotdUiKit.AddImage(dim.gameObject, LotdUiKit.WhiteSprite, new Color(0f, 0.02f, 0.07f, 0.72f));
+            LotdUiKit.AddImage(dim.gameObject, LotdUiKit.WhiteSprite, new Color(0f, 0.02f, 0.07f, 0.52f));
 
-            _modalBox = LotdUiKit.CreateBorderedPanel(dim, "Win",
-                new Vector2(0.262f, 0.12f), new Vector2(0.985f, 0.88f), Vector2.zero, Vector2.zero,
-                LotdUiKit.PanelNavy, LotdUiKit.CyanAccent);
+            _modalBox = LotdUiKit.CreateMenuPanel(dim, "Win",
+                new Vector2(0.225f, 0.12f), new Vector2(0.978f, 0.88f));
             _modalBox.gameObject.AddComponent<Button>(); // block click-through to dim
 
             var hdr = LotdUiKit.CreateRect("Hdr", _modalBox, new Vector2(0f, 0.87f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
@@ -465,8 +464,8 @@ namespace YGOPortable.UI
             var tile = LotdUiKit.CreateBorderedPanel(grid, $"Tile_{idx}", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             var cardRt = LotdUiKit.CreateRect("Card", tile, new Vector2(0.08f, 0.22f), new Vector2(0.92f, 0.96f), Vector2.zero, Vector2.zero);
             var cv = CompositeCardView.Create(cardRt, "V", false);
-            bool hideOppFd = item.controller != s.HumanPlayerIndex && item.code == 0;
-            cv.SetCard(item.code, faceDown: hideOppFd);
+            uint code = s.GetVisibleSelectionCode(item);
+            cv.SetCard(code, faceDown: code == 0);
 
             string owner = item.controller == s.HumanPlayerIndex ? "내" : "상대";
             string sub = $"{owner} {YgoConstants.GetLocationNameKR(item.location)}";
@@ -480,7 +479,7 @@ namespace YGOPortable.UI
             }
 
             var lbl = LotdUiKit.AddText(LotdUiKit.CreateRect("Sub", tile, new Vector2(0.04f, 0.02f), new Vector2(0.96f, 0.21f), Vector2.zero, Vector2.zero),
-                "S", $"{(item.code != 0 ? CardDatabase.GetName(item.code) : "뒷면 카드")}\n<color=#88CCFF>{sub}</color>",
+                "S", $"{(code != 0 ? CardDatabase.GetName(code) : "뒷면 카드")}\n<color=#88CCFF>{sub}</color>",
                 11, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary);
 
             var checkRt = LotdUiKit.CreateRect("Chk", tile, new Vector2(0.62f, 0.72f), new Vector2(0.95f, 0.95f), Vector2.zero, Vector2.zero);
@@ -493,10 +492,10 @@ namespace YGOPortable.UI
                 var btn = tile.gameObject.AddComponent<Button>();
                 btn.targetGraphic = tile.GetComponent<Image>();
                 var trig = tile.gameObject.AddComponent<CardDragTrigger>();
-                if (item.code != 0) trig.OnPointerEnterAction = () => _onInspectCard?.Invoke(item.code);
+                if (code != 0) trig.OnPointerEnterAction = () => _onInspectCard?.Invoke(code);
                 btn.onClick.AddListener(() =>
                 {
-                    if (item.code != 0) _onInspectCard?.Invoke(item.code);
+                    if (code != 0) _onInspectCard?.Invoke(code);
                     if (_selectedIndices.Contains(idx))
                     {
                         if (p.max == 1 && p.min == 1)
@@ -632,20 +631,20 @@ namespace YGOPortable.UI
             for (int i = 0; i < p.candidates.Count; i++)
             {
                 int sendIdx = i;
-                var c = p.candidates[i];
-                AddImmediateClickTile(grid, c, "선택", false, () =>
+                uint code = s.GetVisibleSelectionCode(p.candidates[i]);
+                AddImmediateClickTile(grid, code, "선택", false, () =>
                 {
-                    if (c.code != 0) _onInspectCard?.Invoke(c.code);
+                    if (code != 0) _onInspectCard?.Invoke(code);
                     Submit(PackTwoInts(1, sendIdx));
                 });
             }
             for (int j = 0; j < p.unselectCandidates.Count; j++)
             {
                 int sendIdx = p.candidates.Count + j;
-                var u = p.unselectCandidates[j];
-                AddImmediateClickTile(grid, u, "선택됨 (클릭해제)", true, () =>
+                uint code = s.GetVisibleSelectionCode(p.unselectCandidates[j]);
+                AddImmediateClickTile(grid, code, "선택됨 (클릭해제)", true, () =>
                 {
-                    if (u.code != 0) _onInspectCard?.Invoke(u.code);
+                    if (code != 0) _onInspectCard?.Invoke(code);
                     Submit(PackTwoInts(1, sendIdx));
                 });
             }
@@ -656,14 +655,15 @@ namespace YGOPortable.UI
                 AddFooterButton(0.12f, 0.46f, "취소", () => Submit(BitConverter.GetBytes(-1)), false);
         }
 
-        private void AddImmediateClickTile(Transform grid, SelectableCardItem item, string tag, bool checkedState, Action onClick)
+        private void AddImmediateClickTile(Transform grid, uint code, string tag, bool checkedState, Action onClick)
         {
             var tile = LotdUiKit.CreateBorderedPanel(grid, "Imm", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero,
                 LotdUiKit.PanelNavy, checkedState ? LotdUiKit.GoldAccent : LotdUiKit.CyanAccent);
             var cRt = LotdUiKit.CreateRect("Card", tile, new Vector2(0.08f, 0.22f), new Vector2(0.92f, 0.96f), Vector2.zero, Vector2.zero);
-            CompositeCardView.Create(cRt, "V", false).SetCard(item.code);
+            CompositeCardView.Create(cRt, "V", false).SetCard(code, faceDown: code == 0);
             LotdUiKit.AddText(LotdUiKit.CreateRect("Sub", tile, new Vector2(0.04f, 0.02f), new Vector2(0.96f, 0.21f), Vector2.zero, Vector2.zero),
-                "S", $"{CardDatabase.GetName(item.code)}\n<color=#FFCC44>{tag}</color>", 11, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary);
+                "S", $"{(code != 0 ? CardDatabase.GetName(code) : "뒷면 카드")}\n<color=#FFCC44>{tag}</color>",
+                11, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary);
             var btn = tile.gameObject.AddComponent<Button>();
             btn.targetGraphic = tile.GetComponent<Image>();
             btn.onClick.AddListener(() => onClick?.Invoke());
@@ -730,7 +730,7 @@ namespace YGOPortable.UI
 
         private void RenderSortCards(DuelPrompt p)
         {
-            _modalTitle.text = p.isChainSort ? "동시 체인 발동 순서 지정" : "덱/카드 배치 순서 지정";
+            _modalTitle.text = p.isChainSort ? "효과 처리 순서 지정" : "덱/카드 배치 순서 지정";
             _modalSubtitle.text = "카드의 순서를 조정하거나 기본 순서로 확정하세요.";
             _sortOrder = Enumerable.Range(0, p.candidates.Count).ToArray();
 
@@ -768,7 +768,7 @@ namespace YGOPortable.UI
             AddFooterButton(0.15f, 0.48f, "현재 순서 확정", () =>
             {
                 byte[] res = new byte[_sortOrder.Length];
-                for (int i = 0; i < _sortOrder.Length; i++) res[i] = (byte)_sortOrder[i];
+                for (int i = 0; i < _sortOrder.Length; i++) res[_sortOrder[i]] = (byte)i;
                 Submit(res);
             }, true);
             AddFooterButton(0.52f, 0.85f, "기본 순서 (자동)", () => Submit(new byte[] { unchecked((byte)-1) }), false);
@@ -950,9 +950,8 @@ namespace YGOPortable.UI
             LotdUiKit.AddImage(dim.gameObject, LotdUiKit.WhiteSprite, new Color(0f, 0.02f, 0.08f, 0.72f));
             dim.gameObject.AddComponent<Button>().onClick.AddListener(() => ZoneViewRoot.SetActive(false));
 
-            var win = LotdUiKit.CreateBorderedPanel(dim, "Win",
-                new Vector2(0.262f, 0.12f), new Vector2(0.985f, 0.88f), Vector2.zero, Vector2.zero,
-                LotdUiKit.PanelNavy, LotdUiKit.CyanAccent);
+            var win = LotdUiKit.CreateMenuPanel(dim, "Win",
+                new Vector2(0.225f, 0.12f), new Vector2(0.978f, 0.88f));
             win.gameObject.AddComponent<Button>(); // block click-through to dim
 
             var hdr = LotdUiKit.CreateRect("Hdr", win, new Vector2(0f, 0.88f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
@@ -978,7 +977,7 @@ namespace YGOPortable.UI
             Action<int> onExecuteAction = null,
             Action<LiveCardState> onOpenCardActions = null)
         {
-            _zoneTitle.text = $"{title} ({cards?.Count ?? 0}장)  —  카드를 클릭하거나 드래그하여 소환/발동 또는 상세 확인";
+            _zoneTitle.text = $"{title}  {cards?.Count ?? 0}장";
             for (int i = _zoneGrid.childCount - 1; i >= 0; i--)
                 UnityEngine.Object.Destroy(_zoneGrid.GetChild(i).gameObject);
 
@@ -1161,7 +1160,7 @@ namespace YGOPortable.UI
 
             Sprite bust = opp != null && !string.IsNullOrEmpty(opp.portrait)
                 ? LotdUiKit.LoadSprite($"LOTD/Busts/{opp.portrait}")
-                : LotdUiKit.LoadSprite("LOTD/Busts/kaiba_neutral");
+                : LotdUiKit.LoadSprite("LOTD/Busts/setokaiba_neutral");
             _resOppBust.sprite = bust;
             _resOppBust.gameObject.SetActive(bust != null);
 

@@ -15,8 +15,6 @@ namespace YGOPortable.UI
         private readonly DuelPromptModals _modals;
 
         private DuelSession _session;
-        private OpponentCharacter _oppChar;
-        private PresetDeckInfo _oppDeck;
 
         // Left inspector & log
         private CompositeCardView _inspCard;
@@ -25,7 +23,8 @@ namespace YGOPortable.UI
         private Text _inspStats;
         private Text _inspDesc;
         private Text _logFeed;
-        private uint _inspectedCode = 89631139;
+        private ScrollRect _inspectScroll;
+        private uint _inspectedCode;
 
         // Opponent & Player HUD (Authentic LOTD Styling)
         private Image _oppBustImg;
@@ -40,7 +39,8 @@ namespace YGOPortable.UI
         private Image _chainIcon;
 
         // LOTD PhaseBar
-        private readonly Dictionary<int, Image> _phaseImages = new Dictionary<int, Image>();
+        private Image _phasePlate;
+        private Image _phaseLabel;
         private Button _btnToBp;
         private Button _btnToMp2;
         private Button _btnToEp;
@@ -50,12 +50,6 @@ namespace YGOPortable.UI
         private float _oppDisplayLp = 8000f;
         private int _myTargetLp = 8000;
         private int _oppTargetLp = 8000;
-
-        // Phase & Turn Splash Announcements
-        private int _lastAnnouncedTurn = -1;
-        private int _lastAnnouncedTurnPlayer = -1;
-        private int _lastAnnouncedPhase = -1;
-        private int _lastChainCount = 0;
 
         // Zone slot widgets
         private class FieldSlotView
@@ -67,10 +61,8 @@ namespace YGOPortable.UI
             public RectTransform atkPill;
             public Text atkText;
             public Text badgeText;
-            public GameObject placeGlow;
             public CardDragTrigger dragTrigger;
             public byte mappedCon;
-            public uint mappedLoc;
             public uint mappedSeq;
             public LiveCardState liveCard;
         }
@@ -92,7 +84,6 @@ namespace YGOPortable.UI
 
         private StackTileView _myDeckTile, _myExtraTile, _myGyTile, _myBanTile;
         private StackTileView _oppDeckTile, _oppExtraTile, _oppGyTile, _oppBanTile;
-        private Text _oppHandCountTxt;
 
         // High-res Card Zoom Modal
         private GameObject _cardZoomModal;
@@ -110,7 +101,7 @@ namespace YGOPortable.UI
         // Drag-to-zone & in-flight animation state
         private (byte con, uint loc, uint seq)? _preferredDropZone;
         private int _preferredAttackTargetSeq = -1;
-        private readonly Dictionary<(byte con, uint loc, uint seq), int> _inFlightSlotCounts = new Dictionary<(byte, uint, uint), int>();
+        private readonly Dictionary<(byte con, uint loc, uint seq), int> _arrivingCards = new Dictionary<(byte, uint, uint), int>();
         private bool _dragHighlightMZone;
         private bool _dragHighlightSZone;
         private bool _dragHighlightAttack;
@@ -119,11 +110,30 @@ namespace YGOPortable.UI
         // Hand rows
         private RectTransform _myHandBar;
         private RectTransform _oppHandBar;
+        private readonly int[] _handCounts = new int[2];
+        private readonly List<HandCardView> _myHandViews = new List<HandCardView>();
+        private readonly List<HandCardView> _oppHandViews = new List<HandCardView>();
+        private Vector2 _myHandSize;
+        private Vector2 _oppHandSize;
+
+        private sealed class HandCardView
+        {
+            public RectTransform Rect;
+            public CompositeCardView Card;
+            public Image Border;
+            public CardDragTrigger Trigger;
+        }
 
         // Context Action Popup Menu
         private GameObject _actionPopup;
         private RectTransform _actionList;
+        private RectTransform _actionWindow;
         private Text _actionHeader;
+
+        public bool IsPresenting => CardAnimationManager.Instance != null && CardAnimationManager.Instance.IsPresenting;
+        public bool IsPaused { get; private set; }
+        private bool CanAcceptPlayerAction => _session != null && !_session.IsFinished && !IsPresenting && !IsPaused &&
+            _session.ActivePrompt?.playerId == _session.HumanPlayerIndex;
 
         public DuelFieldUI(GameAppController app, Transform canvasParent, DuelPromptModals modals)
         {
@@ -139,81 +149,72 @@ namespace YGOPortable.UI
             }
         }
 
-        public void BindSession(DuelSession session, OpponentCharacter oppChar, PresetDeckInfo oppDeck)
+        public void BindSession(DuelSession session, OpponentCharacter opponent, PresetDeckInfo opponentDeck)
         {
-            if (_session != null)
-            {
-                _session.OnCardMoved -= HandleCardMovedEvent;
-                _session.OnChainActivated -= HandleChainActivatedEvent;
-                _session.OnAttackDeclared -= HandleAttackEvent;
-                _session.OnCoinTossed -= HandleCoinTossedEvent;
-                _session.OnDiceRolled -= HandleDiceRolledEvent;
-            }
-
+            UnbindSession();
             _session = session;
-            if (_session != null)
-            {
-                _session.OnCardMoved += HandleCardMovedEvent;
-                _session.OnChainActivated += HandleChainActivatedEvent;
-                _session.OnAttackDeclared += HandleAttackEvent;
-                _session.OnCoinTossed += HandleCoinTossedEvent;
-                _session.OnDiceRolled += HandleDiceRolledEvent;
-            }
-
-            _oppChar = oppChar;
-            _oppDeck = oppDeck;
-            _pendingPlaces.Clear();
-            _pendingPlacePrompt = null;
-            _preferredDropZone = null;
-            _preferredAttackTargetSeq = -1;
-            _inFlightSlotCounts.Clear();
-            _dragHighlightMZone = false;
-            _dragHighlightSZone = false;
-            _dragHighlightAttack = false;
-
-            _lastAnnouncedTurn = -1;
-            _lastAnnouncedTurnPlayer = -1;
-            _lastAnnouncedPhase = -1;
-            _lastChainCount = 0;
-
-            if (_session != null)
-            {
-                int meIdx = _session.HumanPlayerIndex;
-                int oppIdx = _session.AiPlayerIndex;
-                _myDisplayLp = _myTargetLp = Mathf.Max(0, _session.Players[meIdx].lp);
-                _oppDisplayLp = _oppTargetLp = Mathf.Max(0, _session.Players[oppIdx].lp);
-                if (_myLpText != null) _myLpText.text = _myTargetLp.ToString();
-                if (_oppLpText != null) _oppLpText.text = _oppTargetLp.ToString();
-                if (_myLpFill != null) _myLpFill.anchorMax = new Vector2(Mathf.Clamp01(_myTargetLp / 8000f), 1f);
-                if (_oppLpFill != null) _oppLpFill.anchorMax = new Vector2(Mathf.Clamp01(_oppTargetLp / 8000f), 1f);
-                if (_myLpText != null) _myLpText.color = Color.white;
-                if (_oppLpText != null) _oppLpText.color = Color.white;
-            }
+            session.OnCardMoved += HandleCardMovedEvent;
+            session.OnCardsDrawn += HandleCardsDrawn;
+            session.OnLifePointsChanged += HandleLifePointsChanged;
+            session.OnTurnStarted += HandleTurnStarted;
+            session.OnPhaseChanged += HandlePhaseChanged;
+            session.OnChainActivated += HandleChainActivatedEvent;
+            session.OnAttackDeclared += HandleAttackEvent;
+            session.OnBattleResolved += HandleBattleResolved;
+            session.OnCoinTossed += HandleCoinTossedEvent;
+            session.OnDiceRolled += HandleDiceRolledEvent;
 
             Root.SetActive(true);
-            _actionPopup.SetActive(false);
+            _oppNameText.text = opponent?.name ?? opponentDeck?.title ?? "AI 듀얼리스트";
+            _oppBustImg.sprite = opponent != null ? LotdUiKit.LoadSprite($"LOTD/Busts/{opponent.portrait}") : null;
+            _oppBustImg.enabled = _oppBustImg.sprite != null;
+            _turnBadgeText.text = "턴 1";
+            SetPhasePlate(YgoConstants.PHASE_DRAW, false);
+            _hintBannerText.text = "";
+            _chainIcon.gameObject.SetActive(false);
+            _chainBannerText.text = "";
+            _myTargetLp = _oppTargetLp = 8000;
+            _myDisplayLp = _oppDisplayLp = 8000f;
+            _myLpText.text = _oppLpText.text = "8000";
+            _myLpFill.anchorMax = _oppLpFill.anchorMax = Vector2.one;
             Canvas.ForceUpdateCanvases();
-
-            if (_oppChar != null)
-            {
-                _oppNameText.text = $"{_oppChar.name}\n<color=#88CCFF>{_oppDeck?.title ?? ""}</color>";
-                var bust = LotdUiKit.LoadSprite($"LOTD/Busts/{_oppChar.portrait}");
-                _oppBustImg.sprite = bust;
-                _oppBustImg.gameObject.SetActive(bust != null);
-            }
-            else
-            {
-                _oppNameText.text = "AI 듀얼리스트";
-                _oppBustImg.gameObject.SetActive(false);
-            }
-
+            _inspectedCode = 0;
             InspectCard(89631139);
             Refresh();
         }
 
+        public void UnbindSession()
+        {
+            if (_session != null)
+            {
+                _session.OnCardMoved -= HandleCardMovedEvent;
+                _session.OnCardsDrawn -= HandleCardsDrawn;
+                _session.OnLifePointsChanged -= HandleLifePointsChanged;
+                _session.OnTurnStarted -= HandleTurnStarted;
+                _session.OnPhaseChanged -= HandlePhaseChanged;
+                _session.OnChainActivated -= HandleChainActivatedEvent;
+                _session.OnAttackDeclared -= HandleAttackEvent;
+                _session.OnBattleResolved -= HandleBattleResolved;
+                _session.OnCoinTossed -= HandleCoinTossedEvent;
+                _session.OnDiceRolled -= HandleDiceRolledEvent;
+                _session = null;
+            }
+
+            _arrivingCards.Clear();
+            Array.Clear(_handCounts, 0, _handCounts.Length);
+            _pendingPlaces.Clear();
+            _pendingPlacePrompt = null;
+            _preferredDropZone = null;
+            _preferredAttackTargetSeq = -1;
+            _dragHighlightMZone = _dragHighlightSZone = _dragHighlightAttack = false;
+            CloseActionPopup();
+            _cardZoomModal.SetActive(false);
+            CardAnimationManager.Instance?.Clear();
+        }
+
         public void InspectCard(uint code)
         {
-            if (code == 0) return;
+            if (code == 0 || code == _inspectedCode) return;
             _inspectedCode = code;
             _inspCard.SetCard(code);
             var info = CardDatabase.Get(code);
@@ -228,6 +229,7 @@ namespace YGOPortable.UI
             _inspName.text = info.name;
             _inspStats.text = info.FormatStatsLineKR();
             _inspDesc.text = info.desc;
+            _inspectScroll.verticalNormalizedPosition = 1f;
             var rSp = info.IsMonster ? LotdUiKit.GetRaceSprite(info.race) : LotdUiKit.LoadSprite($"LOTD/Icons/{YgoConstants.GetSpellTrapSubSpriteName(info.type)}");
             _inspRaceIcon.sprite = rSp;
             _inspRaceIcon.gameObject.SetActive(rSp != null);
@@ -244,375 +246,336 @@ namespace YGOPortable.UI
             _modals.ShowCodeListViewer($"[{baseName}] 연관 카드 ({rel.Count}장)", codes);
         }
 
+
         private void BuildUI(Transform parent)
         {
-            var rt = LotdUiKit.FillRect("Screen_DuelField", parent);
-            Root = rt.gameObject;
+            var root = LotdUiKit.FillRect("Screen_DuelField", parent);
+            Root = root.gameObject;
 
-            var bg = LotdUiKit.FillRect("Bg", rt);
-            LotdUiKit.AddImage(bg.gameObject, LotdUiKit.LoadSprite("LOTD/Background/noise_bgtec_small"), new Color(0.45f, 0.72f, 1f, 1f));
-            LotdUiKit.AddImage(LotdUiKit.FillRect("Dim", rt).gameObject, LotdUiKit.WhiteSprite, new Color(0.015f, 0.045f, 0.11f, 0.78f));
+            LotdUiKit.AddImage(LotdUiKit.FillRect("DuelBackground", root).gameObject,
+                LotdUiKit.LoadSprite("LOTD/Background/bg_vrains"), Color.white, false, false);
+            var mat = LotdUiKit.CreateRect("DuelMat", root, new Vector2(0.08f, 0.095f), new Vector2(0.92f, 0.94f),
+                Vector2.zero, Vector2.zero);
+            mat.gameObject.AddComponent<DuelMat>().raycastTarget = false;
 
-            BuildLeftPanel(rt);
-            BuildTopHud(rt);
-            BuildCenterBoard(rt);
-            BuildBottomHudAndHands(rt);
-            BuildActionPopup(rt);
-            BuildCardZoomModal(rt);
-
+            BuildCenterBoard(root);
+            BuildLeftPanel(root);
+            BuildTopHud(root);
+            BuildBottomHudAndHands(root);
+            BuildActionPopup(root);
+            BuildCardZoomModal(root);
             Root.SetActive(false);
         }
 
         private void BuildLeftPanel(Transform root)
         {
-            var left = LotdUiKit.CreateBorderedPanel(root, "LeftInspector",
-                new Vector2(0.005f, 0.01f), new Vector2(0.255f, 0.99f), Vector2.zero, Vector2.zero);
+            var left = LotdUiKit.CreateRect("LeftInspector", root, new Vector2(0.012f, 0.158f),
+                new Vector2(0.211f, 0.988f), Vector2.zero, Vector2.zero);
+            var card = LotdUiKit.CreateRect("CardPreview", left,
+                new Vector2(0.105f, 0.535f), new Vector2(0.895f, 0.995f), Vector2.zero, Vector2.zero);
+            _inspCard = CompositeCardView.Create(card, "Card", true);
+            var zoomHit = LotdUiKit.FillRect("ZoomHit", card);
+            var zoom = zoomHit.gameObject.AddComponent<Button>();
+            zoom.targetGraphic = LotdUiKit.AddImage(zoomHit.gameObject, LotdUiKit.WhiteSprite, Color.clear);
+            zoom.onClick.AddListener(() => ShowCardZoomModal(_inspectedCode));
 
-            // Opponent mini HUD card at top of left column
-            var oppHud = LotdUiKit.CreateRect("OppHud", left, new Vector2(0.02f, 0.855f), new Vector2(0.98f, 0.985f), Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(oppHud.gameObject, LotdUiKit.LoadSprite("LOTD/HUD/lp_frame_red") ?? LotdUiKit.WhiteSprite,
-                new Color(0.95f, 0.35f, 0.35f, 0.92f));
-            _oppBustImg = LotdUiKit.AddImage(LotdUiKit.CreateRect("Bust", oppHud, new Vector2(0.02f, 0.06f), new Vector2(0.24f, 0.94f), Vector2.zero, Vector2.zero).gameObject,
-                null, Color.white, true);
-            _oppNameText = LotdUiKit.AddText(LotdUiKit.CreateRect("Name", oppHud, new Vector2(0.26f, 0.48f), new Vector2(0.70f, 0.95f), Vector2.zero, Vector2.zero),
-                "T", "", 13, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
-            _oppLpText = LotdUiKit.AddText(LotdUiKit.CreateRect("LP", oppHud, new Vector2(0.68f, 0.42f), new Vector2(0.97f, 0.94f), Vector2.zero, Vector2.zero),
-                "LP", "8000", 22, TextAnchor.MiddleRight, Color.white, FontStyle.Bold);
+            var details = LotdUiKit.CreateMenuPanel(left, "CardDetails", Vector2.zero, new Vector2(1f, 0.54f));
+            var stats = LotdUiKit.CreateRect("Stats", details, new Vector2(0.025f, 0.85f), new Vector2(0.975f, 0.98f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(stats.gameObject, LotdUiKit.LoadSprite("LOTD/HUD/cardbar_texture"),
+                new Color(0.78f, 0.70f, 0.46f, 0.80f), false, false);
+            _inspStats = LotdUiKit.AddText(LotdUiKit.CreateRect("Info", stats,
+                new Vector2(0.025f, 0f), new Vector2(0.85f, 1f), Vector2.zero, Vector2.zero),
+                "Text", "", 13, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
+            var race = LotdUiKit.CreateRect("Race", stats, new Vector2(0.85f, 0.05f), new Vector2(0.98f, 0.95f),
+                Vector2.zero, Vector2.zero);
+            _inspRaceIcon = LotdUiKit.AddImage(race.gameObject, null, Color.white, true, false);
 
-            var lpTrack = LotdUiKit.CreateRect("LpTrack", oppHud, new Vector2(0.26f, 0.14f), new Vector2(0.96f, 0.36f), Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(lpTrack.gameObject, LotdUiKit.WhiteSprite, new Color(0.15f, 0.05f, 0.05f, 0.9f));
-            _oppLpFill = LotdUiKit.FillRect("Fill", lpTrack, 1f);
-            LotdUiKit.AddImage(_oppLpFill.gameObject, LotdUiKit.LoadSprite("LOTD/HUD/LP_FILL"), new Color(0.98f, 0.22f, 0.22f, 1f));
+            _inspName = LotdUiKit.AddText(LotdUiKit.CreateRect("Name", details,
+                new Vector2(0.035f, 0.735f), new Vector2(0.96f, 0.845f), Vector2.zero, Vector2.zero),
+                "Text", "", 19, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
+            _inspName.resizeTextForBestFit = true;
+            _inspName.resizeTextMinSize = 12;
+            _inspName.resizeTextMaxSize = 19;
 
-            // CompositeCardView Inspector
-            var cRt = LotdUiKit.CreateRect("CardView", left, new Vector2(0.05f, 0.44f), new Vector2(0.64f, 0.845f), Vector2.zero, Vector2.zero);
-            _inspCard = CompositeCardView.Create(cRt, "Insp", true);
-
-            var zoomHit = LotdUiKit.FillRect("ZoomHit", cRt);
-            var zoomHitImg = LotdUiKit.AddImage(zoomHit.gameObject, LotdUiKit.WhiteSprite, Color.clear);
-            var zoomBtn = zoomHit.gameObject.AddComponent<Button>();
-            zoomBtn.targetGraphic = zoomHitImg;
-            zoomBtn.onClick.AddListener(() =>
-            {
-                if (_inspectedCode != 0)
-                {
-                    LotdAudio.PlayClick();
-                    ShowCardZoomModal(_inspectedCode);
-                }
-            });
-
-            var rRt = LotdUiKit.CreateRect("RaceIc", left, new Vector2(0.67f, 0.72f), new Vector2(0.92f, 0.835f), Vector2.zero, Vector2.zero);
-            _inspRaceIcon = LotdUiKit.AddImage(rRt.gameObject, null, Color.white, true);
-
-            _inspStats = LotdUiKit.AddText(LotdUiKit.CreateRect("Stats", left, new Vector2(0.65f, 0.51f), new Vector2(0.97f, 0.71f), Vector2.zero, Vector2.zero),
-                "St", "", 12, TextAnchor.UpperCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
-
-            var exBtnRt = LotdUiKit.CreateRect("ExBtn", left, new Vector2(0.65f, 0.445f), new Vector2(0.97f, 0.502f), Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(exBtnRt, "B", "📦 내 EX덱", () =>
-            {
-                if (_session == null) return;
-                LotdAudio.PlayClick();
-                OpenStackZone((byte)_session.HumanPlayerIndex, YgoConstants.LOCATION_EXTRA, "내 엑스트라 덱");
-            }, 11, gold: true);
-
-            _inspName = LotdUiKit.AddText(LotdUiKit.CreateRect("CName", left, new Vector2(0.03f, 0.39f), new Vector2(0.74f, 0.44f), Vector2.zero, Vector2.zero),
-                "N", "", 16, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
-
-            var relBtnRt = LotdUiKit.CreateRect("RelBtn", left, new Vector2(0.75f, 0.392f), new Vector2(0.97f, 0.438f), Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(relBtnRt, "B", "🔍 연관", OnInspectRelatedClicked, 11, gold: false);
-
-            // Scrollable description
-            var descBox = LotdUiKit.CreateBorderedPanel(left, "DescBox", new Vector2(0.03f, 0.16f), new Vector2(0.97f, 0.385f), Vector2.zero, Vector2.zero,
-                new Color(0.03f, 0.07f, 0.15f, 0.95f));
-            var vp = LotdUiKit.FillRect("VP", descBox, 6f);
-            vp.gameObject.AddComponent<RectMask2D>();
-            var ct = LotdUiKit.CreateRect("C", vp, new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
-            ct.pivot = new Vector2(0.5f, 1f);
-            _inspDesc = ct.gameObject.AddComponent<Text>();
+            var desc = LotdUiKit.CreateRect("Description", details,
+                new Vector2(0.035f, 0.265f), new Vector2(0.965f, 0.725f), Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(desc.gameObject, LotdUiKit.WhiteSprite, Color.clear);
+            var viewport = LotdUiKit.FillRect("Viewport", desc);
+            viewport.gameObject.AddComponent<RectMask2D>();
+            var content = LotdUiKit.CreateRect("Content", viewport, new Vector2(0f, 1f), new Vector2(1f, 1f),
+                Vector2.zero, Vector2.zero);
+            content.pivot = new Vector2(0.5f, 1f);
+            _inspDesc = content.gameObject.AddComponent<Text>();
             _inspDesc.font = LotdUiKit.FontKR;
-            _inspDesc.fontSize = 13;
+            _inspDesc.fontSize = 15;
             _inspDesc.color = LotdUiKit.TextPrimary;
+            _inspDesc.raycastTarget = false;
             _inspDesc.alignment = TextAnchor.UpperLeft;
-            ct.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            var sv = descBox.gameObject.AddComponent<ScrollRect>();
-            sv.horizontal = false; sv.vertical = true; sv.scrollSensitivity = 20f;
-            sv.viewport = vp; sv.content = ct;
+            content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            var scroll = desc.gameObject.AddComponent<ScrollRect>();
+            scroll.horizontal = false;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.viewport = viewport;
+            scroll.content = content;
+            _inspectScroll = scroll;
 
-            // Compact duel log feed at bottom-left
-            var logBox = LotdUiKit.CreateBorderedPanel(left, "LogBox", new Vector2(0.03f, 0.015f), new Vector2(0.97f, 0.15f), Vector2.zero, Vector2.zero,
-                new Color(0.02f, 0.05f, 0.12f, 0.95f));
-            _logFeed = LotdUiKit.AddText(logBox, "Log", "", 11, TextAnchor.LowerLeft, LotdUiKit.TextMuted);
-            _logFeed.rectTransform.offsetMin = new Vector2(6, 4);
-            _logFeed.rectTransform.offsetMax = new Vector2(-6, -4);
+            var log = LotdUiKit.CreateRect("RecentActions", details, new Vector2(0.04f, 0.025f), new Vector2(0.96f, 0.22f),
+                Vector2.zero, Vector2.zero);
+            _logFeed = LotdUiKit.AddText(log, "Log", "", 11, TextAnchor.LowerLeft, LotdUiKit.TextMuted);
+            var related = LotdUiKit.CreateRect("Related", left, new Vector2(0.68f, 0.52f), new Vector2(0.99f, 0.579f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.CreateLotdButton(related, "Button", "관련 카드", OnInspectRelatedClicked, 12);
         }
 
         private void BuildTopHud(Transform root)
         {
-            var top = LotdUiKit.CreateBorderedPanel(root, "TopBar",
-                new Vector2(0.262f, 0.90f), new Vector2(0.995f, 0.99f), Vector2.zero, Vector2.zero,
-                LotdUiKit.PanelHeader, LotdUiKit.CyanAccent);
+            _oppHandBar = LotdUiKit.CreateRect("OpponentHand", root, new Vector2(0.349f, 0.85f),
+                new Vector2(0.651f, 0.955f), Vector2.zero, Vector2.zero);
+            var opponent = LotdUiKit.CreateRect("OpponentHUD", root,
+                new Vector2(0.746f, 0.846f), new Vector2(0.985f, 0.986f), Vector2.zero, Vector2.zero);
+            (_oppNameText, _oppLpText, _oppLpFill, _oppBustImg) = BuildPlayerHud(opponent, true);
 
-            // Opponent hand strip + count on left of top bar
-            _oppHandBar = LotdUiKit.CreateRect("OppHand", top, new Vector2(0.01f, 0.29f), new Vector2(0.28f, 0.96f), Vector2.zero, Vector2.zero);
-            _oppHandCountTxt = LotdUiKit.AddText(LotdUiKit.CreateRect("OHCnt", top, new Vector2(0.01f, 0.02f), new Vector2(0.28f, 0.28f), Vector2.zero, Vector2.zero),
-                "HC", "상대 패: 5장", 12, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
+            var menu = LotdUiKit.CreateRect("PauseMenu", root, new Vector2(0.818f, 0.783f),
+                new Vector2(0.984f, 0.839f), Vector2.zero, Vector2.zero);
+            LotdUiKit.CreateLotdButton(menu, "Button", "일시 정지", OnPauseClicked, 15);
+        }
 
-            // Turn badge & Phase bar in center
-            var tRt = LotdUiKit.CreateRect("TurnBadge", top, new Vector2(0.29f, 0.10f), new Vector2(0.41f, 0.90f), Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(tRt.gameObject, LotdUiKit.LoadSprite("LOTD/HUD/icon_turn"), Color.white, true);
-            _turnBadgeText = LotdUiKit.AddText(tRt, "T", "TURN 1", 15, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+        private static (Text name, Text lp, RectTransform fill, Image portrait) BuildPlayerHud(RectTransform root, bool opponent)
+        {
+            string side = opponent ? "red" : "blue";
+            var namePlate = LotdUiKit.CreateRect("NamePlate", root,
+                new Vector2(0f, opponent ? 0.69f : 0.01f), new Vector2(1f, opponent ? 1f : 0.32f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(namePlate.gameObject, LotdUiKit.LoadSprite($"LOTD/HUD/username_frame_{side}"), Color.white, false, false);
+            var name = LotdUiKit.AddText(LotdUiKit.FillRect("Name", namePlate, 7), "Text", "",
+                19, opponent ? TextAnchor.MiddleRight : TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
+            name.resizeTextForBestFit = true;
+            name.resizeTextMinSize = 12;
+            name.resizeTextMaxSize = 19;
 
-            var phRow = LotdUiKit.CreateRect("PhaseBar", top, new Vector2(0.42f, 0.25f), new Vector2(0.84f, 0.92f), Vector2.zero, Vector2.zero);
-            (int phase, string key, string label)[] phases =
-            {
-                (YgoConstants.PHASE_DRAW, "dp", "DP"),
-                (YgoConstants.PHASE_STANDBY, "sp", "SP"),
-                (YgoConstants.PHASE_MAIN1, "mp1", "MP1"),
-                (YgoConstants.PHASE_BATTLE, "bp", "BP"),
-                (YgoConstants.PHASE_MAIN2, "mp2", "MP2"),
-                (YgoConstants.PHASE_END, "ep", "EP"),
-            };
-            for (int i = 0; i < phases.Length; i++)
-            {
-                var ph = phases[i];
-                var slot = LotdUiKit.CreateRect($"Ph_{ph.key}", phRow, new Vector2(i / 6f, 0f), new Vector2((i + 1) / 6f - 0.008f, 1f), Vector2.zero, Vector2.zero);
-                var img = LotdUiKit.AddImage(slot.gameObject, LotdUiKit.LoadSprite($"LOTD/PhaseBar/blue_{ph.key}"), Color.white, true);
-                _phaseImages[ph.phase] = img;
+            var lpPlate = LotdUiKit.CreateRect("LPPlate", root,
+                new Vector2(opponent ? 0f : 0.20f, 0.35f), new Vector2(opponent ? 0.79f : 1f, 0.66f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(lpPlate.gameObject, LotdUiKit.LoadSprite($"LOTD/HUD/lp_frame_{side}"), Color.white, false, false);
+            var track = LotdUiKit.FillRect("LPTrack", lpPlate, 3f);
+            var fill = LotdUiKit.FillRect("Fill", track);
+            LotdUiKit.AddImage(fill.gameObject, LotdUiKit.LoadSprite("LOTD/HUD/LP_FILL"), Color.white, false, false);
+            LotdUiKit.AddText(LotdUiKit.CreateRect("Caption", lpPlate, new Vector2(0.04f, 0f), new Vector2(0.25f, 1f),
+                Vector2.zero, Vector2.zero), "Label", "LP", 20, TextAnchor.MiddleLeft,
+                new Color(1f, 0.92f, 0.17f), FontStyle.Bold);
+            var lp = LotdUiKit.AddText(LotdUiKit.CreateRect("Value", lpPlate, new Vector2(0.26f, 0f), new Vector2(0.96f, 1f),
+                Vector2.zero, Vector2.zero), "Text", "8000", 30, TextAnchor.MiddleRight,
+                new Color(1f, 0.92f, 0.17f), FontStyle.Bold);
+            lp.resizeTextForBestFit = true;
+            lp.resizeTextMinSize = 14;
+            lp.resizeTextMaxSize = 30;
 
-                if (ph.phase == YgoConstants.PHASE_BATTLE || ph.phase == YgoConstants.PHASE_MAIN2 || ph.phase == YgoConstants.PHASE_END)
-                {
-                    var btn = slot.gameObject.AddComponent<Button>();
-                    btn.targetGraphic = img;
-                    int targetPh = ph.phase;
-                    btn.onClick.AddListener(() => OnPhaseShortcut(targetPh));
-                }
-            }
-
-            _hintBannerText = LotdUiKit.AddText(LotdUiKit.CreateRect("HintBanner", top, new Vector2(0.42f, 0.02f), new Vector2(0.84f, 0.25f), Vector2.zero, Vector2.zero),
-                "H", "내 턴 — 카드를 드래그하거나 클릭하여 소환/발동하세요", 12, TextAnchor.LowerCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
-
-            // Surrender / Back to Menu button on top-right
-            var surRt = LotdUiKit.CreateRect("Surrender", top, new Vector2(0.855f, 0.14f), new Vector2(0.99f, 0.86f), Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(surRt, "B", "항복 / 메뉴", OnSurrenderClicked, 14);
+            var avatar = LotdUiKit.CreateRect("AvatarFrame", root,
+                new Vector2(opponent ? 0.80f : 0f, 0.31f), new Vector2(opponent ? 1f : 0.19f, 0.68f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(avatar.gameObject, LotdUiKit.LoadSprite($"LOTD/Shared/avatarframe_small_{side}"), Color.white, true, false);
+            var portrait = LotdUiKit.AddImage(LotdUiKit.FillRect("Portrait", avatar, 4).gameObject, null, Color.white, true, false);
+            return (name, lp, fill, portrait);
         }
 
         private void BuildCenterBoard(Transform root)
         {
             var board = LotdUiKit.CreateRect("DuelBoard", root,
-                new Vector2(0.265f, 0.21f), new Vector2(0.992f, 0.892f), Vector2.zero, Vector2.zero);
+                new Vector2(0.144f, 0.232f), new Vector2(0.856f, 0.849f), Vector2.zero, Vector2.zero);
             _boardRect = board;
+            RectTransform Cell(int col, int row) => DuelZoneImage.CreateCell(board, col, row);
 
-            // 7 columns x 5 rows grid
-            // Rows (top to bottom): 0=Opp S/T, 1=Opp MZone, 2=Shared EMZ, 3=My MZone, 4=My S/T
-            float[] rowYMin = { 0.805f, 0.605f, 0.415f, 0.215f, 0.010f };
-            float[] rowYMax = { 0.995f, 0.795f, 0.595f, 0.405f, 0.200f };
-
-            float colW = 1f / 7f;
-            float padX = 0.004f;
-
-            RectTransform CellRect(int col, int row) =>
-                LotdUiKit.CreateRect($"C_{col}_{row}", board,
-                    new Vector2(col * colW + padX, rowYMin[row]),
-                    new Vector2((col + 1) * colW - padX, rowYMax[row]),
-                    Vector2.zero, Vector2.zero);
-
-            // Opponent S/T [4..0] across cols 1..5 in row 0
-            for (int col = 1; col <= 5; col++)
+            for (int i = 0; i < 5; i++)
             {
-                int seq = 5 - col;
-                _oppSZone[seq] = CreateZoneSlot(CellRect(col, 0), seq == 4 ? "LOTD/Field/pend_l_red" : seq == 0 ? "LOTD/Field/pend_r_red" : "LOTD/Field/monster_red",
-                    false, (c, l, s) => OnSlotClicked(c, l, s));
-            }
-            // Opponent Monster [4..0] across cols 1..5 in row 1
-            for (int col = 1; col <= 5; col++)
-            {
-                int seq = 5 - col;
-                _oppMZone[seq] = CreateZoneSlot(CellRect(col, 1), "LOTD/Field/monster_red", false, (c, l, s) => OnSlotClicked(c, l, s));
+                int col = 2 + i;
+                int oppSeq = 4 - i;
+                _myMZone[i] = CreateZoneSlot(Cell(col, 3), "monster_blue");
+                _oppMZone[oppSeq] = CreateZoneSlot(Cell(col, 1), "monster_red");
+                _mySZone[i] = CreateZoneSlot(Cell(col, 4), i == 0 ? "pend_l_blue" : i == 4 ? "pend_r_blue" : "monster_blue");
+                _oppSZone[oppSeq] = CreateZoneSlot(Cell(col, 0), i == 0 ? "pend_l_red" : i == 4 ? "pend_r_red" : "monster_red");
             }
 
-            // Shared EMZ: Left (col 2) & Right (col 4)
-            _emz[0] = CreateZoneSlot(CellRect(2, 2), "LOTD/Field/monster_neutral", true, (c, l, s) => OnSlotClicked(c, l, s));
-            _emz[1] = CreateZoneSlot(CellRect(4, 2), "LOTD/Field/monster_neutral", true, (c, l, s) => OnSlotClicked(c, l, s));
+            _emz[0] = CreateZoneSlot(Cell(3, 2), "monster_neutral");
+            _emz[1] = CreateZoneSlot(Cell(5, 2), "monster_neutral");
+            var phase = DuelZoneImage.CreateCell(board, 4, 2, drawZone: false);
+            var plate = LotdUiKit.CreateRect("PhasePlate", phase, new Vector2(0.025f, 0.24f), new Vector2(0.975f, 0.76f),
+                Vector2.zero, Vector2.zero);
+            _phasePlate = LotdUiKit.AddImage(plate.gameObject, LotdUiKit.LoadSprite("LOTD/PhaseBar/microbar_blue"),
+                Color.white, true, false);
+            _phaseLabel = LotdUiKit.AddImage(LotdUiKit.FillRect("PhaseLabel", plate, 7).gameObject,
+                LotdUiKit.LoadSprite("LOTD/PhaseBar/blue_dp"), Color.white, true, false);
+            var chain = LotdUiKit.CreateRect("Chain", board, new Vector2(0.474f, 0.65f), new Vector2(0.526f, 0.75f),
+                Vector2.zero, Vector2.zero);
+            _chainIcon = LotdUiKit.AddImage(chain.gameObject, LotdUiKit.LoadSprite("LOTD/HUD/chain"), Color.white, true, false);
+            _chainBannerText = LotdUiKit.AddText(chain, "Count", "", 21, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+            _chainBannerText.gameObject.AddComponent<Outline>().effectColor = Color.black;
 
-            // Center Chain Banner between EMZ slots (col 3, row 2)
-            var midBanner = LotdUiKit.CreateRect("MidBanner", board,
-                new Vector2(3 * colW + padX, rowYMin[2]), new Vector2(4 * colW - padX, rowYMax[2]), Vector2.zero, Vector2.zero);
-            _chainIcon = LotdUiKit.AddImage(midBanner.gameObject, LotdUiKit.LoadSprite("LOTD/HUD/chain"), Color.white, true);
-            _chainBannerText = LotdUiKit.AddText(midBanner, "Ch", "", 13, TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
-            _chainIcon.gameObject.SetActive(false);
+            _mySZone[5] = CreateZoneSlot(Cell(1, 3), "field_blue");
+            _oppSZone[5] = CreateZoneSlot(Cell(7, 1), "field_red");
+            _myExtraTile = CreateStackTile(Cell(1, 4), "extra_blue", false, YgoConstants.LOCATION_EXTRA, "엑스트라 덱");
+            _myDeckTile = CreateStackTile(Cell(7, 4), "monster_blue", false, YgoConstants.LOCATION_DECK, "덱");
+            _myGyTile = CreateStackTile(Cell(7, 3), "graveyard_blue", false, YgoConstants.LOCATION_GRAVE, "묘지");
+            _myBanTile = CreateStackTile(Cell(8, 3), "exclude_blue", false, YgoConstants.LOCATION_REMOVED, "제외");
 
-            // Player Monster [0..4] across cols 1..5 in row 3
-            for (int col = 1; col <= 5; col++)
-            {
-                int seq = col - 1;
-                _myMZone[seq] = CreateZoneSlot(CellRect(col, 3), "LOTD/Field/monster_blue", true, (c, l, s) => OnSlotClicked(c, l, s));
-            }
-            // Player S/T [0..4] across cols 1..5 in row 4
-            for (int col = 1; col <= 5; col++)
-            {
-                int seq = col - 1;
-                _mySZone[seq] = CreateZoneSlot(CellRect(col, 4), seq == 0 ? "LOTD/Field/pend_l_blue" : seq == 4 ? "LOTD/Field/pend_r_blue" : "LOTD/Field/monster_blue",
-                    true, (c, l, s) => OnSlotClicked(c, l, s));
-            }
-
-            // Column 0 (Left Edge): Opp Banished (0), Opp GY (1), Opp Deck (2) | My Extra (3), My Field (4)
-            _oppBanTile = CreateStackTile(CellRect(0, 0), "LOTD/Field/exclude_red", "상대 제외\n0",
-                () => OpenStackZone((byte)_session.AiPlayerIndex, YgoConstants.LOCATION_REMOVED, "상대 제외 존", true));
-            _oppGyTile = CreateStackTile(CellRect(0, 1), "LOTD/Field/graveyard_red", "상대 묘지\n0",
-                () => OpenStackZone((byte)_session.AiPlayerIndex, YgoConstants.LOCATION_GRAVE, "상대 묘지"));
-            _oppDeckTile = CreateStackTile(CellRect(0, 2), "LOTD/Field/monster_red", "상대 덱\n0",
-                () => OpenStackZone((byte)_session.AiPlayerIndex, YgoConstants.LOCATION_DECK, "상대 덱"));
-            _myExtraTile = CreateStackTile(CellRect(0, 3), "LOTD/Field/extra_blue", "엑스트라\n0",
-                () => OpenStackZone((byte)_session.HumanPlayerIndex, YgoConstants.LOCATION_EXTRA, "내 엑스트라 덱"));
-            _mySZone[5] = CreateZoneSlot(CellRect(0, 4), "LOTD/Field/field_blue", true, (c, l, s) => OnSlotClicked(c, l, s));
-
-            // Column 6 (Right Edge): Opp Field (0), Opp Extra (1) | My Deck (2), My GY (3), My Banished (4)
-            _oppSZone[5] = CreateZoneSlot(CellRect(6, 0), "LOTD/Field/field_red", false, (c, l, s) => OnSlotClicked(c, l, s));
-            _oppExtraTile = CreateStackTile(CellRect(6, 1), "LOTD/Field/extra_red", "상대 EX\n0",
-                () => OpenStackZone((byte)_session.AiPlayerIndex, YgoConstants.LOCATION_EXTRA, "상대 엑스트라 덱"));
-            _myDeckTile = CreateStackTile(CellRect(6, 2), "LOTD/Field/monster_blue", "내 덱\n0",
-                () => OpenStackZone((byte)_session.HumanPlayerIndex, YgoConstants.LOCATION_DECK, "내 덱"));
-            _myGyTile = CreateStackTile(CellRect(6, 3), "LOTD/Field/graveyard_blue", "내 묘지\n0",
-                () => OpenStackZone((byte)_session.HumanPlayerIndex, YgoConstants.LOCATION_GRAVE, "내 묘지"));
-            _myBanTile = CreateStackTile(CellRect(6, 4), "LOTD/Field/exclude_blue", "내 제외\n0",
-                () => OpenStackZone((byte)_session.HumanPlayerIndex, YgoConstants.LOCATION_REMOVED, "내 제외 존"));
+            _oppExtraTile = CreateStackTile(Cell(7, 0), "extra_red", true, YgoConstants.LOCATION_EXTRA, "엑스트라 덱");
+            _oppDeckTile = CreateStackTile(Cell(1, 0), "monster_red", true, YgoConstants.LOCATION_DECK, "덱");
+            _oppGyTile = CreateStackTile(Cell(1, 1), "graveyard_red", true, YgoConstants.LOCATION_GRAVE, "묘지");
+            _oppBanTile = CreateStackTile(Cell(0, 1), "exclude_red", true, YgoConstants.LOCATION_REMOVED, "제외");
         }
 
-        private FieldSlotView CreateZoneSlot(RectTransform cell, string frameSpritePath, bool isBlue, Action<byte, uint, uint> onClick)
+        private static readonly Color ZoneTint = new Color(0.76f, 0.93f, 1f, 0.63f);
+        private static readonly Vector2 SlotCardMin = new Vector2(0.10f, 0.07f);
+        private static readonly Vector2 SlotCardMax = new Vector2(0.90f, 0.98f);
+
+        private FieldSlotView CreateZoneSlot(RectTransform cell, string texture)
         {
-            var sp = LotdUiKit.LoadSprite(frameSpritePath);
-            var bg = LotdUiKit.AddImage(cell.gameObject, sp ?? LotdUiKit.WhiteSprite, sp != null ? Color.white : new Color(0.08f, 0.16f, 0.30f, 0.8f), false);
-            var ol = cell.gameObject.AddComponent<Outline>();
-            ol.effectColor = new Color(0, 0, 0, 0);
-            ol.effectDistance = new Vector2(2f, -2f);
+            var background = LotdUiKit.AddImage(cell.gameObject, LotdUiKit.LoadSprite($"LOTD/Field/{texture}"), ZoneTint);
+            var border = cell.gameObject.AddComponent<Outline>();
+            border.effectColor = Color.clear;
+            border.effectDistance = new Vector2(2f, -2f);
 
-            var glowRt = LotdUiKit.FillRect("PlaceGlow", cell);
-            LotdUiKit.AddImage(glowRt.gameObject, LotdUiKit.WhiteSprite, new Color(0.15f, 0.90f, 1f, 0.32f), false, false);
-            glowRt.gameObject.SetActive(false);
+            var card = LotdUiKit.CreateRect("Card", cell, SlotCardMin, SlotCardMax, Vector2.zero, Vector2.zero);
+            var view = CompositeCardView.Create(card, "CardView");
+            view.gameObject.SetActive(false);
 
-            var cardRt = LotdUiKit.CreateRect("Card", cell, new Vector2(0.14f, 0.06f), new Vector2(0.86f, 0.94f), Vector2.zero, Vector2.zero);
-            var cv = CompositeCardView.Create(cardRt, "CardView", false);
-            cv.gameObject.SetActive(false);
+            var stats = LotdUiKit.CreateRect("Stats", cell, new Vector2(0.125f, 0.01f), new Vector2(0.875f, 0.26f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(stats.gameObject, LotdUiKit.LoadSprite("LOTD/HUD/atk_def_frame"),
+                new Color(0.34f, 0.34f, 0.42f, 0.94f), false, false);
+            var values = LotdUiKit.AddText(stats, "Value", "", 14, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+            values.gameObject.AddComponent<Outline>().effectColor = new Color(0.025f, 0.025f, 0.06f);
+            stats.gameObject.SetActive(false);
 
-            var pillRt = LotdUiKit.CreateRect("AtkPill", cell, new Vector2(0.06f, 0.0f), new Vector2(0.94f, 0.24f), Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(pillRt.gameObject, LotdUiKit.LoadSprite("LOTD/HUD/atk_def_frame") ?? LotdUiKit.WhiteSprite, new Color(0.1f, 0.1f, 0.15f, 0.92f), false, false);
-            var atkTxt = LotdUiKit.AddText(pillRt, "Stat", "", 11, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
-            pillRt.gameObject.SetActive(false);
-
-            var badgeTxt = LotdUiKit.AddText(LotdUiKit.CreateRect("Badge", cell, new Vector2(0.65f, 0.72f), new Vector2(0.98f, 0.98f), Vector2.zero, Vector2.zero),
-                "B", "", 11, TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
-
-            var trig = cell.gameObject.AddComponent<CardDragTrigger>();
+            var badge = LotdUiKit.AddText(LotdUiKit.CreateRect("Materials", cell, new Vector2(0.69f, 0.63f),
+                new Vector2(1f, 0.98f), Vector2.zero, Vector2.zero), "Count", "", 12,
+                TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
 
             return new FieldSlotView
             {
                 root = cell,
-                bgImg = bg,
-                border = ol,
-                cardView = cv,
-                atkPill = pillRt,
-                atkText = atkTxt,
-                badgeText = badgeTxt,
-                placeGlow = glowRt.gameObject,
-                dragTrigger = trig,
+                bgImg = background,
+                border = border,
+                cardView = view,
+                atkPill = stats,
+                atkText = values,
+                badgeText = badge,
+                dragTrigger = cell.gameObject.AddComponent<CardDragTrigger>(),
             };
         }
 
-        private StackTileView CreateStackTile(RectTransform cell, string spritePath, string label, Action onClick)
+        private StackTileView CreateStackTile(RectTransform cell, string texture, bool opponent, uint location, string name)
         {
-            var sp = LotdUiKit.LoadSprite(spritePath);
-            var bg = LotdUiKit.AddImage(cell.gameObject, sp ?? LotdUiKit.WhiteSprite, sp != null ? Color.white : LotdUiKit.PanelNavy, false);
-            var ol = cell.gameObject.AddComponent<Outline>();
-            ol.effectColor = new Color(0, 0, 0, 0);
-            ol.effectDistance = new Vector2(2f, -2f);
+            var background = LotdUiKit.AddImage(cell.gameObject, LotdUiKit.LoadSprite($"LOTD/Field/{texture}"), ZoneTint);
+            var border = cell.gameObject.AddComponent<Outline>();
+            border.effectColor = Color.clear;
+            border.effectDistance = new Vector2(2f, -2f);
 
-            var cardRt = LotdUiKit.CreateRect("TopCard", cell, new Vector2(0.08f, 0.08f), new Vector2(0.92f, 0.92f), Vector2.zero, Vector2.zero);
-            var cv = CompositeCardView.Create(cardRt, "CardView", false);
-            cv.gameObject.SetActive(false);
+            var card = LotdUiKit.CreateRect("TopCard", cell, SlotCardMin, SlotCardMax, Vector2.zero, Vector2.zero);
+            var view = CompositeCardView.Create(card, "CardView");
+            view.gameObject.SetActive(false);
+            var count = LotdUiKit.AddText(cell, "Count", "", 27, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+            count.gameObject.AddComponent<Outline>().effectColor = Color.black;
 
-            var pill = LotdUiKit.CreateRect("Pill", cell, new Vector2(0.04f, 0.02f), new Vector2(0.96f, 0.38f), Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(pill.gameObject, LotdUiKit.WhiteSprite, new Color(0.02f, 0.06f, 0.14f, 0.88f), false, false);
-            var txt = LotdUiKit.AddText(pill, "T", label, 10, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
-            if (onClick != null)
+            void Open()
             {
-                var btn = cell.gameObject.AddComponent<Button>();
-                btn.targetGraphic = bg;
-                btn.onClick.AddListener(() =>
-                {
-                    if (_session == null) return;
-                    LotdAudio.PlayClick();
-                    onClick();
-                });
-                var trig = cell.gameObject.AddComponent<CardDragTrigger>();
-                trig.SourceType = DragSourceType.None;
-                trig.OnRightClick = () =>
-                {
-                    if (_session == null) return;
-                    LotdAudio.PlayClick();
-                    onClick();
-                };
+                if (_session == null || IsPresenting || IsPaused) return;
+                byte player = (byte)(opponent ? _session.AiPlayerIndex : _session.HumanPlayerIndex);
+                LotdAudio.PlayClick();
+                OpenStackZone(player, location, (opponent ? "상대 " : "내 ") + name, opponent && location == YgoConstants.LOCATION_REMOVED);
             }
-            return new StackTileView { root = cell, text = txt, border = ol, cardView = cv };
+
+            var button = cell.gameObject.AddComponent<Button>();
+            button.targetGraphic = background;
+            button.onClick.AddListener(Open);
+            var trigger = cell.gameObject.AddComponent<CardDragTrigger>();
+            trigger.OnRightClick = Open;
+            return new StackTileView { root = cell, text = count, border = border, cardView = view };
         }
 
         private void BuildBottomHudAndHands(Transform root)
         {
-            var bot = LotdUiKit.CreateBorderedPanel(root, "BottomZone",
-                new Vector2(0.262f, 0.01f), new Vector2(0.995f, 0.20f), Vector2.zero, Vector2.zero);
+            _myHandBar = LotdUiKit.CreateRect("PlayerHand", root, new Vector2(0.263f, 0.048f), new Vector2(0.737f, 0.231f),
+                Vector2.zero, Vector2.zero);
+            var player = LotdUiKit.CreateRect("PlayerHUD", root, new Vector2(0.016f, 0.018f), new Vector2(0.248f, 0.154f),
+                Vector2.zero, Vector2.zero);
+            var (name, lp, fill, portrait) = BuildPlayerHud(player, false);
+            name.text = "플레이어";
+            _myLpText = lp;
+            _myLpFill = fill;
+            portrait.sprite = LotdUiKit.LoadSprite("LOTD/Busts/yamiyugi_neutral") ?? LotdUiKit.LoadSprite("LOTD/Busts/atem_neutral");
+            portrait.enabled = portrait.sprite != null;
 
-            // Human hand container takes 0.01f to 0.775f (width 76.5% of bottom zone, directly beneath field zones)
-            _myHandBar = LotdUiKit.CreateRect("MyHand", bot, new Vector2(0.01f, 0.02f), new Vector2(0.775f, 0.98f), Vector2.zero, Vector2.zero);
+            var turn = LotdUiKit.CreateRect("Turn", root, new Vector2(0.900f, 0.093f), new Vector2(0.983f, 0.181f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(turn.gameObject, LotdUiKit.LoadSprite("LOTD/HUD/icon_turn"), Color.white, true, false);
+            _turnBadgeText = LotdUiKit.AddText(turn, "Value", "", 19, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+            _turnBadgeText.gameObject.AddComponent<Shadow>().effectColor = new Color(0f, 0f, 0f, 0.65f);
 
-            // Human LP + Quick Phase control buttons on right 22%
-            var myHud = LotdUiKit.CreateRect("MyHud", bot, new Vector2(0.785f, 0.46f), new Vector2(0.992f, 0.96f), Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(myHud.gameObject, LotdUiKit.LoadSprite("LOTD/HUD/lp_frame_blue") ?? LotdUiKit.WhiteSprite, new Color(0.55f, 0.82f, 1f, 0.92f));
-            LotdUiKit.AddText(LotdUiKit.CreateRect("Lbl", myHud, new Vector2(0.05f, 0.42f), new Vector2(0.45f, 0.95f), Vector2.zero, Vector2.zero),
-                "L", "PLAYER LP", 13, TextAnchor.MiddleLeft, LotdUiKit.CyanAccent, FontStyle.Bold);
-            _myLpText = LotdUiKit.AddText(LotdUiKit.CreateRect("LP", myHud, new Vector2(0.42f, 0.40f), new Vector2(0.96f, 0.95f), Vector2.zero, Vector2.zero),
-                "V", "8000", 24, TextAnchor.MiddleRight, Color.white, FontStyle.Bold);
+            var controls = LotdUiKit.CreateRect("PhaseControls", root, new Vector2(0.766f, 0.024f), new Vector2(0.984f, 0.086f),
+                Vector2.zero, Vector2.zero);
+            Button PhaseButton(string name, string label, int phase, float x, bool gold = false)
+            {
+                var slot = LotdUiKit.CreateRect(name, controls, new Vector2(x, 0f), new Vector2(x + 0.325f, 1f),
+                    Vector2.zero, Vector2.zero);
+                return LotdUiKit.CreateLotdButton(slot, "Button", label, () => OnPhaseShortcut(phase), 14, gold);
+            }
+            _btnToBp = PhaseButton("Battle", "배틀", YgoConstants.PHASE_BATTLE, 0f);
+            _btnToMp2 = PhaseButton("Main2", "메인 2", YgoConstants.PHASE_MAIN2, 0.337f);
+            _btnToEp = PhaseButton("End", "턴 종료", YgoConstants.PHASE_END, 0.675f, true);
 
-            var lpTrack = LotdUiKit.CreateRect("LpTrack", myHud, new Vector2(0.05f, 0.12f), new Vector2(0.95f, 0.36f), Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(lpTrack.gameObject, LotdUiKit.WhiteSprite, new Color(0.04f, 0.10f, 0.20f, 0.95f));
-            _myLpFill = LotdUiKit.FillRect("Fill", lpTrack, 1f);
-            LotdUiKit.AddImage(_myLpFill.gameObject, LotdUiKit.LoadSprite("LOTD/HUD/LP_FILL"), LotdUiKit.CyanAccent);
-
-            // Quick Phase transition buttons
-            var phBtns = LotdUiKit.CreateRect("QuickPhase", bot, new Vector2(0.785f, 0.04f), new Vector2(0.992f, 0.42f), Vector2.zero, Vector2.zero);
-            _btnToBp = LotdUiKit.CreateLotdButton(LotdUiKit.CreateRect("B1", phBtns, new Vector2(0f, 0f), new Vector2(0.32f, 1f), Vector2.zero, Vector2.zero),
-                "B", "배틀", () => OnPhaseShortcut(YgoConstants.PHASE_BATTLE), 13);
-            _btnToMp2 = LotdUiKit.CreateLotdButton(LotdUiKit.CreateRect("B2", phBtns, new Vector2(0.34f, 0f), new Vector2(0.66f, 1f), Vector2.zero, Vector2.zero),
-                "B", "메인 2", () => OnPhaseShortcut(YgoConstants.PHASE_MAIN2), 13);
-            _btnToEp = LotdUiKit.CreateLotdButton(LotdUiKit.CreateRect("B3", phBtns, new Vector2(0.68f, 0f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero),
-                "B", "턴 종료", () => OnPhaseShortcut(YgoConstants.PHASE_END), 13, gold: true);
+            var hint = LotdUiKit.CreateRect("ActionHint", root, new Vector2(0.262f, 0.003f), new Vector2(0.738f, 0.045f),
+                Vector2.zero, Vector2.zero);
+            _hintBannerText = LotdUiKit.AddText(hint, "Text", "", 15, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
+            _hintBannerText.gameObject.AddComponent<Outline>().effectColor = LotdUiKit.BgDeep;
         }
 
         private void BuildActionPopup(Transform root)
         {
-            var dim = LotdUiKit.FillRect("Overlay_CardActions", root);
-            _actionPopup = dim.gameObject;
-            LotdUiKit.AddImage(dim.gameObject, LotdUiKit.WhiteSprite, new Color(0, 0, 0, 0.38f));
-            dim.gameObject.AddComponent<Button>().onClick.AddListener(() => _actionPopup.SetActive(false));
+            var overlay = LotdUiKit.FillRect("CardCommands", root);
+            _actionPopup = overlay.gameObject;
+            var backdrop = LotdUiKit.AddImage(_actionPopup, LotdUiKit.WhiteSprite, new Color(0f, 0.015f, 0.045f, 0.23f));
+            var close = _actionPopup.AddComponent<Button>();
+            close.targetGraphic = backdrop;
+            close.transition = Selectable.Transition.None;
+            close.onClick.AddListener(CloseActionPopup);
 
-            var win = LotdUiKit.CreateBorderedPanel(dim, "Win",
-                new Vector2(0.48f, 0.22f), new Vector2(0.78f, 0.68f), Vector2.zero, Vector2.zero,
-                LotdUiKit.PanelNavy, LotdUiKit.GoldAccent);
-            _actionHeader = LotdUiKit.AddText(LotdUiKit.CreateRect("Hdr", win, new Vector2(0f, 0.85f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero),
-                "T", "행동 선택", 17, TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
+            var middle = new Vector2(0.5f, 0.5f);
+            _actionWindow = LotdUiKit.CreateMenuPanel(overlay, "CommandWindow", middle, middle, true);
+            var header = LotdUiKit.CreateRect("Caption", _actionWindow, new Vector2(0f, 1f), Vector2.one,
+                new Vector2(9f, -43f), new Vector2(-9f, -5f));
+            _actionHeader = LotdUiKit.AddText(header, "CardName", "", 17, TextAnchor.MiddleCenter,
+                LotdUiKit.GoldAccent, FontStyle.Bold);
+            _actionHeader.resizeTextForBestFit = true;
+            _actionHeader.resizeTextMinSize = 11;
+            _actionHeader.resizeTextMaxSize = 17;
 
-            _actionList = LotdUiKit.CreateRect("List", win, new Vector2(0.06f, 0.05f), new Vector2(0.94f, 0.83f), Vector2.zero, Vector2.zero);
-            var vlg = _actionList.gameObject.AddComponent<VerticalLayoutGroup>();
-            vlg.spacing = 8f;
-            vlg.childControlWidth = true;
-            vlg.childForceExpandWidth = true;
-            vlg.childControlHeight = false;
-            vlg.childForceExpandHeight = false;
+            var viewport = LotdUiKit.CreateRect("Viewport", _actionWindow, Vector2.zero, Vector2.one,
+                new Vector2(10f, 10f), new Vector2(-10f, -45f));
+            viewport.gameObject.AddComponent<RectMask2D>();
+            var scroll = _actionWindow.gameObject.AddComponent<ScrollRect>();
+            scroll.viewport = viewport;
+            scroll.horizontal = false;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+
+            _actionList = LotdUiKit.CreateRect("Actions", viewport, new Vector2(0f, 1f), Vector2.one,
+                Vector2.zero, Vector2.zero);
+            _actionList.pivot = new Vector2(0.5f, 1f);
+            scroll.content = _actionList;
+            var list = _actionList.gameObject.AddComponent<VerticalLayoutGroup>();
+            list.spacing = 4f;
+            list.childControlWidth = true;
+            list.childForceExpandWidth = true;
+            list.childControlHeight = true;
+            list.childForceExpandHeight = false;
+            _actionList.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             _actionPopup.SetActive(false);
         }
 
         // ==================== REFRESH & BINDING ====================
         public bool TryAutoFulfillPreferredPrompt()
         {
-            if (_session == null || _session.IsFinished) return false;
+            if (!CanAcceptPlayerAction || _actionPopup.activeSelf) return false;
             var p = _session.ActivePrompt;
             if (p == null || p.playerId != _session.HumanPlayerIndex) return false;
 
@@ -665,373 +628,243 @@ namespace YGOPortable.UI
 
         public void Refresh()
         {
-            if (_session == null || Root == null || !Root.activeSelf) return;
+            if (_session == null || !Root.activeInHierarchy) return;
 
-            if (TryAutoFulfillPreferredPrompt())
+            var prompt = _session.ActivePrompt;
+            if (!ReferenceEquals(prompt, _pendingPlacePrompt))
             {
-                // Auto-submitted preferred drop zone or attack target; continue refresh with updated state
-            }
-
-            var p = _session.ActivePrompt;
-            if (!ReferenceEquals(p, _pendingPlacePrompt))
-            {
-                _pendingPlacePrompt = p;
+                _pendingPlacePrompt = prompt;
                 _pendingPlaces.Clear();
             }
 
-            int me = _session.HumanPlayerIndex;
-            int opp = _session.AiPlayerIndex;
-            var myP = _session.Players[me];
-            var opP = _session.Players[opp];
-
-            int myLp = Mathf.Max(0, myP.lp);
-            int opLp = Mathf.Max(0, opP.lp);
-
-            if (_myTargetLp != myLp)
+            byte me = (byte)_session.HumanPlayerIndex;
+            byte opponent = (byte)_session.AiPlayerIndex;
+            var mine = _session.Players[me];
+            var theirs = _session.Players[opponent];
+            _handCounts[me] = mine.hand.Count;
+            _handCounts[opponent] = theirs.hand.Count;
+            if (!IsPresenting && _session.NativePtr != IntPtr.Zero)
             {
-                int delta = myLp - _myTargetLp;
-                _myTargetLp = myLp;
-                CardAnimationManager.Instance?.PlayDamagePopup((Vector2)_myLpText.rectTransform.position + new Vector2(0f, 22f), delta);
-                if (delta < 0)
-                {
-                    CardAnimationManager.Instance?.PlayFlashGlow(_myLpText.transform.parent.gameObject, LotdUiKit.RedAccent, 0.35f);
-                    LotdAudio.PlayDamage();
-                }
+                _myTargetLp = Mathf.Max(0, mine.lp);
+                _oppTargetLp = Mathf.Max(0, theirs.lp);
             }
 
-            if (_oppTargetLp != opLp)
+            bool waiting = CanAcceptPlayerAction;
+            string hint = "";
+            if (waiting && (prompt.messageType == YgoConstants.MSG_SELECT_PLACE ||
+                prompt.messageType == YgoConstants.MSG_SELECT_DISFIELD))
             {
-                int delta = opLp - _oppTargetLp;
-                _oppTargetLp = opLp;
-                CardAnimationManager.Instance?.PlayDamagePopup((Vector2)_oppLpText.rectTransform.position + new Vector2(0f, -22f), delta);
-                if (delta < 0)
-                {
-                    CardAnimationManager.Instance?.PlayFlashGlow(_oppLpText.transform.parent.gameObject, LotdUiKit.RedAccent, 0.35f);
-                    LotdAudio.PlayDamage();
-                }
+                int needed = Mathf.Max(1, (int)prompt.min);
+                hint = needed > 1 ? $"존 선택  {_pendingPlaces.Count} / {needed}" : "카드를 놓을 존을 선택하세요.";
             }
+            _hintBannerText.text = hint;
+            bool idle = waiting && prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD;
+            bool battle = waiting && prompt.messageType == YgoConstants.MSG_SELECT_BATTLECMD;
+            _btnToBp.interactable = idle && prompt.canBp;
+            _btnToMp2.interactable = battle && prompt.canM2;
+            _btnToEp.interactable = (idle || battle) && prompt.canEp;
 
-            // Phase and Turn splash announcements (Authentic LOTD splash)
-            int curTurn = _session.TurnNumber;
-            int curTurnPlayer = _session.TurnPlayer;
-            int curPhase = _session.CurrentPhase;
+            UpdateStackTile(_myDeckTile, mine.deckCount, me, YgoConstants.LOCATION_DECK);
+            UpdateStackTile(_myExtraTile, mine.extra.Count, me, YgoConstants.LOCATION_EXTRA);
+            UpdateStackTile(_myGyTile, mine.grave.Count, me, YgoConstants.LOCATION_GRAVE, mine.grave.LastOrDefault());
+            UpdateStackTile(_myBanTile, mine.banished.Count, me, YgoConstants.LOCATION_REMOVED, mine.banished.LastOrDefault());
+            UpdateStackTile(_oppDeckTile, theirs.deckCount, opponent, YgoConstants.LOCATION_DECK);
+            UpdateStackTile(_oppExtraTile, theirs.extra.Count, opponent, YgoConstants.LOCATION_EXTRA);
+            UpdateStackTile(_oppGyTile, theirs.grave.Count, opponent, YgoConstants.LOCATION_GRAVE, theirs.grave.LastOrDefault());
+            UpdateStackTile(_oppBanTile, theirs.banished.Count, opponent, YgoConstants.LOCATION_REMOVED, theirs.banished.LastOrDefault());
 
-            if (curTurn > 0 && (curTurn != _lastAnnouncedTurn || curTurnPlayer != _lastAnnouncedTurnPlayer))
-            {
-                _lastAnnouncedTurn = curTurn;
-                _lastAnnouncedTurnPlayer = curTurnPlayer;
-                _lastAnnouncedPhase = curPhase;
-                bool isMe = curTurnPlayer == me;
-                string title = $"TURN {curTurn}";
-                string sub = isMe ? "YOUR TURN (내 턴 개시)" : "OPPONENT'S TURN (상대 턴)";
-                CardAnimationManager.Instance?.PlayPhaseBanner(title, sub, !isMe);
-                LotdAudio.PlayPhaseTransition();
-            }
-            else if (curPhase != _lastAnnouncedPhase && curTurn > 0)
-            {
-                _lastAnnouncedPhase = curPhase;
-                string pTitle = GetPhaseTitleEnglish(curPhase);
-                string pSub = YgoConstants.GetPhaseNameKR(curPhase);
-                bool isOpp = curTurnPlayer != me;
-                CardAnimationManager.Instance?.PlayPhaseBanner(pTitle, pSub, isOpp);
-                LotdAudio.PlayPhaseTransition();
-            }
+            int chain = _session.CurrentChain.Count;
+            _chainIcon.gameObject.SetActive(chain > 0);
+            _chainBannerText.text = chain > 0 ? chain.ToString() : "";
 
-            _turnBadgeText.text = $"TURN {_session.TurnNumber}";
-            string turnOwner = _session.TurnPlayer == me ? "<color=#44DDFF>내 턴 (YOUR TURN)</color>" : "<color=#FF6666>상대 턴 (OPPONENT TURN)</color>";
-            string phKr = YgoConstants.GetPhaseNameKR(_session.CurrentPhase);
-            bool waitingMyAction = p != null && p.playerId == me;
-            string extraCue = "";
-            if (waitingMyAction && (p.messageType == YgoConstants.MSG_SELECT_PLACE || p.messageType == YgoConstants.MSG_SELECT_DISFIELD))
-            {
-                int needPlaces = Mathf.Max(1, (int)p.min);
-                extraCue = needPlaces > 1
-                    ? $"  •  <color=#FFCC44>존 {needPlaces}곳 선택 ({_pendingPlaces.Count}/{needPlaces})</color>"
-                    : "  •  <color=#FFCC44>빈 존을 클릭하거나 카드를 드래그하세요!</color>";
-            }
-            _hintBannerText.text = $"{turnOwner} — {phKr}{extraCue}";
-
-            // LOTD Phase Bar Colors & Active Glowing Sprite
-            foreach (var kv in _phaseImages)
-            {
-                bool active = (_session.CurrentPhase == kv.Key) ||
-                    (kv.Key == YgoConstants.PHASE_BATTLE && _session.CurrentPhase >= YgoConstants.PHASE_BATTLE_START && _session.CurrentPhase <= YgoConstants.PHASE_BATTLE);
-                string suffix = kv.Key == YgoConstants.PHASE_DRAW ? "dp" :
-                                kv.Key == YgoConstants.PHASE_STANDBY ? "sp" :
-                                kv.Key == YgoConstants.PHASE_MAIN1 ? "mp1" :
-                                kv.Key == YgoConstants.PHASE_BATTLE ? "bp" :
-                                kv.Key == YgoConstants.PHASE_MAIN2 ? "mp2" : "ep";
-                string prefix = active ? "hi" : (_session.TurnPlayer == me ? "blue" : "red");
-                kv.Value.sprite = LotdUiKit.LoadSprite($"LOTD/PhaseBar/{prefix}_{suffix}");
-                kv.Value.transform.localScale = active ? new Vector3(1.08f, 1.08f, 1f) : Vector3.one;
-            }
-
-            // Phase quick buttons interactability
-            bool myIdle = waitingMyAction && p.messageType == YgoConstants.MSG_SELECT_IDLECMD;
-            bool myBattle = waitingMyAction && p.messageType == YgoConstants.MSG_SELECT_BATTLECMD;
-            _btnToBp.interactable = myIdle && p.canBp;
-            _btnToMp2.interactable = myBattle && p.canM2;
-            _btnToEp.interactable = (myIdle && p.canEp) || (myBattle && p.canEp);
-
-            // Stacks
-            uint myGyTop = myP.grave.Count > 0 ? myP.grave.Last().code : 0;
-            uint oppGyTop = opP.grave.Count > 0 ? opP.grave.Last().code : 0;
-            uint myBanTop = myP.banished.Count > 0 ? myP.banished.Last().code : 0;
-            bool myBanDown = myP.banished.Count > 0 && !myP.banished.Last().IsFaceUp;
-            uint oppBanTop = opP.banished.Count > 0 ? opP.banished.Last().code : 0;
-            bool oppBanDown = opP.banished.Count > 0 && !opP.banished.Last().IsFaceUp;
-
-            UpdateStackTile(_myDeckTile, "내 덱", myP.deckCount, (byte)me, YgoConstants.LOCATION_DECK, waitingMyAction, 0, isFaceDown: true);
-            UpdateStackTile(_myExtraTile, "엑스트라", myP.extra.Count, (byte)me, YgoConstants.LOCATION_EXTRA, waitingMyAction, 0, isFaceDown: true);
-            UpdateStackTile(_myGyTile, "내 묘지", myP.grave.Count, (byte)me, YgoConstants.LOCATION_GRAVE, waitingMyAction, myGyTop, isFaceDown: false);
-            UpdateStackTile(_myBanTile, "내 제외", myP.banished.Count, (byte)me, YgoConstants.LOCATION_REMOVED, waitingMyAction, myBanTop, isFaceDown: myBanDown);
-
-            UpdateStackTile(_oppDeckTile, "상대 덱", opP.deckCount, (byte)opp, YgoConstants.LOCATION_DECK, waitingMyAction, 0, isFaceDown: true);
-            UpdateStackTile(_oppExtraTile, "상대 EX", opP.extra.Count, (byte)opp, YgoConstants.LOCATION_EXTRA, waitingMyAction, 0, isFaceDown: true);
-            UpdateStackTile(_oppGyTile, "상대 묘지", opP.grave.Count, (byte)opp, YgoConstants.LOCATION_GRAVE, waitingMyAction, oppGyTop, isFaceDown: false);
-            UpdateStackTile(_oppBanTile, "상대 제외", opP.banished.Count, (byte)opp, YgoConstants.LOCATION_REMOVED, waitingMyAction, oppBanTop, isFaceDown: oppBanDown);
-            _oppHandCountTxt.text = $"상대 패: {opP.hand.Count}장";
-
-            // Authentic LOTD Chain banner & sound
-            int curChain = _session.CurrentChain.Count;
-            if (curChain > 0)
-            {
-                _chainIcon.gameObject.SetActive(true);
-                _chainBannerText.text = $"CHAIN LINK\n{curChain}";
-                if (curChain > _lastChainCount)
-                {
-                    CardAnimationManager.Instance?.PlayFlashGlow(_chainIcon.gameObject, LotdUiKit.GoldAccent, 0.35f);
-                    LotdAudio.PlayChain();
-                }
-            }
-            else
-            {
-                _chainIcon.gameObject.SetActive(false);
-                _chainBannerText.text = "";
-            }
-            _lastChainCount = curChain;
-
-            // Board slots
             for (int i = 0; i < 5; i++)
             {
-                BindSlot(_myMZone[i], (byte)me, YgoConstants.LOCATION_MZONE, (uint)i, myP.mzone[i], isOpponent: false);
-                BindSlot(_mySZone[i], (byte)me, YgoConstants.LOCATION_SZONE, (uint)i, myP.szone[i], isOpponent: false);
-                BindSlot(_oppMZone[i], (byte)opp, YgoConstants.LOCATION_MZONE, (uint)i, opP.mzone[i], isOpponent: true);
-                BindSlot(_oppSZone[i], (byte)opp, YgoConstants.LOCATION_SZONE, (uint)i, opP.szone[i], isOpponent: true);
+                BindSlot(_myMZone[i], me, YgoConstants.LOCATION_MZONE, (uint)i, mine.mzone[i], false);
+                BindSlot(_mySZone[i], me, YgoConstants.LOCATION_SZONE, (uint)i, mine.szone[i], false);
+                BindSlot(_oppMZone[i], opponent, YgoConstants.LOCATION_MZONE, (uint)i, theirs.mzone[i], true);
+                BindSlot(_oppSZone[i], opponent, YgoConstants.LOCATION_SZONE, (uint)i, theirs.szone[i], true);
             }
-            BindSlot(_mySZone[5], (byte)me, YgoConstants.LOCATION_SZONE, 5, myP.szone[5], isOpponent: false);
-            BindSlot(_oppSZone[5], (byte)opp, YgoConstants.LOCATION_SZONE, 5, opP.szone[5], isOpponent: true);
+            BindSlot(_mySZone[5], me, YgoConstants.LOCATION_SZONE, 5, mine.szone[5], false);
+            BindSlot(_oppSZone[5], opponent, YgoConstants.LOCATION_SZONE, 5, theirs.szone[5], true);
+            BindEmz(_emz[0], me, 5, opponent, 6, mine.mzone[5], theirs.mzone[6]);
+            BindEmz(_emz[1], me, 6, opponent, 5, mine.mzone[6], theirs.mzone[5]);
 
-            // EMZ Left ([0]) = my mzone[5] OR opp mzone[6]; EMZ Right ([1]) = my mzone[6] OR opp mzone[5]
-            BindEmz(_emz[0], (byte)me, 5, (byte)opp, 6, myP.mzone[5], opP.mzone[6]);
-            BindEmz(_emz[1], (byte)me, 6, (byte)opp, 5, myP.mzone[6], opP.mzone[5]);
-
-            RefreshHands(myP, opP, p, waitingMyAction);
+            RefreshHand(mine.hand, me, false);
+            RefreshHand(theirs.hand, opponent, true);
             RefreshLogFeed();
         }
 
-        private void UpdateStackTile(StackTileView tile, string baseLabel, int count, byte con, uint loc, bool waitingMyAction, uint topCode = 0, bool isFaceDown = false)
+        private void SetPhasePlate(int phase, bool opponent)
         {
-            if (tile == null) return;
-            int actCount = waitingMyAction ? CountZoneActions(con, loc) : 0;
-            tile.text.text = actCount > 0
-                ? $"{baseLabel}\n{count} <color=#FFCC44>[가능 {actCount}]</color>"
-                : $"{baseLabel}\n{count}";
-            tile.border.effectColor = actCount > 0 ? LotdUiKit.GoldAccent : new Color(0, 0, 0, 0);
-
-            if (tile.cardView != null)
+            string phaseName = phase switch
             {
-                if (count > 0 && (topCode != 0 || isFaceDown))
-                {
-                    tile.cardView.gameObject.SetActive(true);
-                    tile.cardView.SetCard(isFaceDown ? 0u : topCode, faceDown: isFaceDown);
-                }
-                else
-                {
-                    tile.cardView.gameObject.SetActive(false);
-                }
-            }
+                YgoConstants.PHASE_DRAW => "dp",
+                YgoConstants.PHASE_STANDBY => "sp",
+                YgoConstants.PHASE_MAIN1 => "mp1",
+                YgoConstants.PHASE_MAIN2 => "mp2",
+                YgoConstants.PHASE_END => "ep",
+                _ => "bp",
+            };
+            string side = opponent ? "red" : "blue";
+            _phasePlate.sprite = LotdUiKit.LoadSprite($"LOTD/PhaseBar/microbar_{side}");
+            _phaseLabel.sprite = LotdUiKit.LoadSprite($"LOTD/PhaseBar/{side}_{phaseName}");
+        }
+
+        private void UpdateStackTile(StackTileView tile, int count, byte controller, uint location, LiveCardState top = null)
+        {
+            if (IsArriving(controller, location, 0)) return;
+
+            bool canAct = CanAcceptPlayerAction && CountZoneActions(controller, location) > 0;
+            tile.text.text = count > 0 ? count.ToString() : "";
+            tile.text.color = canAct ? LotdUiKit.GoldAccent : Color.white;
+            tile.border.effectColor = canAct ? LotdUiKit.GoldAccent : Color.clear;
+            tile.cardView.gameObject.SetActive(count > 0);
+            if (count <= 0) return;
+
+            bool showBack = top == null || location == YgoConstants.LOCATION_REMOVED && !top.IsFaceUp;
+            tile.cardView.SetCard(showBack ? 0u : top.code, showBack, top);
+            tile.cardView.transform.localRotation = Quaternion.Euler(0f, 0f,
+                controller == _session.HumanPlayerIndex ? 0f : 180f);
         }
 
         private void BindEmz(FieldSlotView slot, byte myCon, uint mySeq, byte oppCon, uint oppSeq, LiveCardState myEmz, LiveCardState oppEmz)
         {
             if (oppEmz != null)
-                BindSlot(slot, oppCon, YgoConstants.LOCATION_MZONE, oppSeq, oppEmz, isOpponent: true);
+                BindSlot(slot, oppCon, YgoConstants.LOCATION_MZONE, oppSeq, oppEmz, true);
             else if (myEmz == null && !IsPlaceSelectable(myCon, YgoConstants.LOCATION_MZONE, mySeq) && IsPlaceSelectable(oppCon, YgoConstants.LOCATION_MZONE, oppSeq))
-                BindSlot(slot, oppCon, YgoConstants.LOCATION_MZONE, oppSeq, null, isOpponent: true);
+                BindSlot(slot, oppCon, YgoConstants.LOCATION_MZONE, oppSeq, null, true);
             else
-                BindSlot(slot, myCon, YgoConstants.LOCATION_MZONE, mySeq, myEmz, isOpponent: false);
+                BindSlot(slot, myCon, YgoConstants.LOCATION_MZONE, mySeq, myEmz, false);
         }
 
-        private void BindSlot(FieldSlotView slot, byte con, uint loc, uint seq, LiveCardState live, bool isOpponent)
+        private void BindSlot(FieldSlotView slot, byte con, uint loc, uint seq, LiveCardState live, bool opponent)
         {
             slot.mappedCon = con;
-            slot.mappedLoc = loc;
             slot.mappedSeq = seq;
             slot.liveCard = live;
 
-            bool isFlyingHere = _inFlightSlotCounts.TryGetValue((con, loc, seq), out int fCnt) && fCnt > 0;
-
-            if (live != null && !isFlyingHere)
+            bool visible = live != null && !IsArriving(con, loc, seq);
+            slot.cardView.gameObject.SetActive(visible);
+            bool showStats = visible && loc == YgoConstants.LOCATION_MZONE && live.IsFaceUp;
+            slot.atkPill.gameObject.SetActive(showStats);
+            slot.badgeText.text = visible && live.overlayCodes.Count > 0 ? $"×{live.overlayCodes.Count}" : "";
+            if (visible)
             {
-                slot.cardView.gameObject.SetActive(true);
-                bool showBack = !live.IsFaceUp;
-                slot.cardView.SetCard(showBack ? 0u : live.code, faceDown: showBack, live: live);
-                slot.cardView.transform.localRotation = (loc == YgoConstants.LOCATION_MZONE && live.IsDefense)
-                    ? Quaternion.Euler(0, 0, isOpponent ? 90f : -90f)
-                    : Quaternion.identity;
-
-                if (loc == YgoConstants.LOCATION_MZONE && !showBack)
-                {
-                    slot.atkPill.gameObject.SetActive(true);
-                    string a = live.attack < 0 ? "?" : live.attack.ToString();
-                    string d = (live.type & YgoConstants.TYPE_LINK) != 0 ? $"L-{live.link}" : (live.defense < 0 ? "?" : live.defense.ToString());
-                    slot.atkText.text = live.IsDefense ? $"DEF/{d}" : $"ATK/{a}";
-                    slot.atkText.color = live.attack > live.baseAttack ? LotdUiKit.CyanAccent : (live.attack < live.baseAttack ? LotdUiKit.RedAccent : Color.white);
-                }
-                else slot.atkPill.gameObject.SetActive(false);
-
-                slot.badgeText.text = live.overlayCodes.Count > 0 ? $"★{live.overlayCodes.Count}" : "";
+                slot.cardView.SetCard(live.IsFaceUp ? live.code : 0u, !live.IsFaceUp, live);
+                slot.cardView.transform.localRotation = Quaternion.Euler(0f, 0f, CardAngle(loc, live.position, opponent));
+                slot.cardView.transform.localScale = Vector3.one * CardScale(loc, live.position);
             }
-            else
+            if (showStats)
             {
-                slot.cardView.gameObject.SetActive(false);
-                slot.atkPill.gameObject.SetActive(false);
-                slot.badgeText.text = "";
+                bool defense = live.IsDefense;
+                int stat = defense ? live.defense : live.attack;
+                int baseStat = defense ? live.baseDefense : live.baseAttack;
+                slot.atkText.text = $"{(defense ? "DEF" : "ATK")} {(stat < 0 ? "?" : stat.ToString())}";
+                slot.atkText.color = stat > baseStat ? LotdUiKit.CyanAccent : stat < baseStat ? LotdUiKit.RedAccent : Color.white;
             }
 
-            // Drag Trigger setup
-            if (slot.dragTrigger != null)
+            bool canDrag = visible && CanAcceptPlayerAction && !opponent && loc == YgoConstants.LOCATION_MZONE;
+            slot.dragTrigger.SourceType = canDrag ? DragSourceType.FieldMonster : DragSourceType.None;
+            slot.dragTrigger.CardCodeGetter = canDrag ? () => live.code : null;
+            slot.dragTrigger.IndexGetter = canDrag ? () => (int)seq : null;
+            slot.dragTrigger.DataGetter = canDrag ? () => (con, loc, seq) : null;
+            void Inspect()
             {
-                if (live != null && !isOpponent && loc == YgoConstants.LOCATION_MZONE)
-                {
-                    slot.dragTrigger.SourceType = DragSourceType.FieldMonster;
-                    slot.dragTrigger.CardCodeGetter = () => live.code;
-                    slot.dragTrigger.IndexGetter = () => (int)seq;
-                    slot.dragTrigger.DataGetter = () => (con, loc, seq);
-                }
-                else
-                {
-                    slot.dragTrigger.SourceType = DragSourceType.None;
-                    slot.dragTrigger.CardCodeGetter = null;
-                    slot.dragTrigger.IndexGetter = null;
-                    slot.dragTrigger.DataGetter = null;
-                }
-                slot.dragTrigger.OnPointerEnterAction = () =>
-                {
-                    if (live != null && (live.IsFaceUp || live.controller == (byte)_session.HumanPlayerIndex))
-                    {
-                        InspectCard(live.code);
-                    }
-                };
-                slot.dragTrigger.OnLeftClick = () => OnSlotClicked(con, loc, seq);
-                slot.dragTrigger.OnRightClick = () =>
-                {
-                    if (live != null && (live.IsFaceUp || live.controller == (byte)_session.HumanPlayerIndex))
-                    {
-                        InspectCard(live.code);
-                    }
-                };
+                if (visible && (live.IsFaceUp || live.isPublic || !opponent)) InspectCard(live.code);
             }
+            slot.dragTrigger.OnPointerEnterAction = Inspect;
+            slot.dragTrigger.OnRightClick = Inspect;
+            slot.dragTrigger.OnLeftClick = () => OnSlotClicked(con, loc, seq);
 
-            bool alreadyPicked = IsPlacePending(con, loc, seq);
-            bool placeValid = !alreadyPicked && IsPlaceSelectable(con, loc, seq);
-            bool dragHint = (!isOpponent && loc == YgoConstants.LOCATION_MZONE && _dragHighlightMZone && live == null) ||
-                            (!isOpponent && loc == YgoConstants.LOCATION_SZONE && _dragHighlightSZone && live == null) ||
-                            (isOpponent && loc == YgoConstants.LOCATION_MZONE && _dragHighlightAttack && live != null);
-
-            slot.placeGlow.SetActive(placeValid || alreadyPicked || dragHint);
-            slot.border.effectColor = alreadyPicked ? LotdUiKit.CyanAccent
-                : (placeValid ? LotdUiKit.GoldAccent
-                : (dragHint ? (_dragHighlightAttack ? LotdUiKit.RedAccent : LotdUiKit.GoldAccent)
-                : (live != null && HasFieldAction(con, loc, seq) ? LotdUiKit.CyanAccent : new Color(0, 0, 0, 0))));
+            bool selected = IsPlacePending(con, loc, seq);
+            bool place = IsPlaceSelectable(con, loc, seq);
+            bool drag = !opponent && live == null && (loc == YgoConstants.LOCATION_MZONE && _dragHighlightMZone ||
+                loc == YgoConstants.LOCATION_SZONE && _dragHighlightSZone);
+            bool attack = opponent && loc == YgoConstants.LOCATION_MZONE && _dragHighlightAttack && live != null;
+            bool action = visible && CanAcceptPlayerAction && HasFieldAction(con, loc, seq);
+            slot.bgImg.color = selected || place || drag || attack
+                ? new Color(0.89f, 0.98f, 1f, 0.96f) : ZoneTint;
+            slot.border.effectColor = attack ? LotdUiKit.RedAccent : selected || action ? LotdUiKit.CyanAccent :
+                place || drag ? LotdUiKit.GoldAccent : Color.clear;
         }
 
-        private void RefreshHands(PlayerFieldSnapshot myP, PlayerFieldSnapshot opP, DuelPrompt p, bool waitingMyAction)
+        private static float CardAngle(uint location, uint position, bool opponent)
         {
-            for (int i = _myHandBar.childCount - 1; i >= 0; i--) UnityEngine.Object.Destroy(_myHandBar.GetChild(i).gameObject);
-            for (int i = _oppHandBar.childCount - 1; i >= 0; i--) UnityEngine.Object.Destroy(_oppHandBar.GetChild(i).gameObject);
+            if (location == YgoConstants.LOCATION_MZONE && (position & YgoConstants.POS_DEFENSE) != 0)
+                return opponent ? 90f : -90f;
+            return opponent && location != YgoConstants.LOCATION_HAND ? 180f : 0f;
+        }
 
-            // Opponent hand face-down mini cards (Centered in Opponent Hand Bar)
-            int opCnt = Mathf.Min(10, opP.hand.Count);
-            if (opCnt > 0)
+        private static float CardScale(uint location, uint position)
+        {
+            return location == YgoConstants.LOCATION_MZONE && (position & YgoConstants.POS_DEFENSE) != 0 ? 0.87f : 1f;
+        }
+
+        private void RefreshHand(IReadOnlyList<LiveCardState> cards, byte controller, bool opponent)
+        {
+            var row = opponent ? _oppHandBar : _myHandBar;
+            var views = opponent ? _oppHandViews : _myHandViews;
+            if (opponent) _oppHandSize = row.rect.size;
+            else _myHandSize = row.rect.size;
+            while (views.Count < cards.Count) views.Add(CreateHandCard(row, opponent));
+
+            for (int i = 0; i < views.Count; i++)
             {
-                float ow = Mathf.Min(0.13f, 0.94f / opCnt);
-                float totalW = opCnt * ow;
-                float opStartX = Mathf.Max(0.01f, (1f - totalW) * 0.5f);
-                for (int i = 0; i < opCnt; i++)
+                var view = views[i];
+                bool visible = i < cards.Count && cards[i] != null && !IsArriving(controller, YgoConstants.LOCATION_HAND, (uint)i);
+                view.Rect.gameObject.SetActive(visible);
+                if (!visible) continue;
+
+                var bounds = HandCardBounds(row, cards.Count, i);
+                if (view.Rect.anchorMin != bounds.min || view.Rect.anchorMax != bounds.max)
                 {
-                    float xMin = opStartX + i * ow;
-                    float xMax = xMin + ow - 0.006f;
-                    var rt = LotdUiKit.CreateRect($"OH_{i}", _oppHandBar, new Vector2(xMin, 0.05f), new Vector2(xMax, 0.95f), Vector2.zero, Vector2.zero);
-                    var c = opP.hand[i];
-                    bool vis = c != null && (c.isPublic || c.code != 0 && c.IsFaceUp);
-                    CompositeCardView.Create(rt, "V", false).SetCard(vis ? c.code : 0u, !vis, c);
+                    view.Rect.anchorMin = bounds.min;
+                    view.Rect.anchorMax = bounds.max;
                 }
-            }
 
-            // Human hand cards (Authentic LOTD Centered Hand Layout)
-            int cnt = myP.hand.Count;
-            if (cnt == 0) return;
+                var card = cards[i];
+                uint sequence = (uint)i;
+                bool showFront = !opponent || card.isPublic || card.IsFaceUp;
+                view.Card.SetCard(showFront ? card.code : 0u, !showFront, card);
+                bool actionable = !opponent && CanAcceptPlayerAction && HasHandAction(controller, sequence);
+                view.Border.color = actionable ? new Color(1f, 0.73f, 0.13f, 0.85f) : Color.clear;
 
-            float cardW, stepX, startX;
-            if (cnt <= 6)
-            {
-                cardW = 0.128f;
-                float gap = 0.014f;
-                float totalW = cnt * cardW + (cnt - 1) * gap;
-                startX = Mathf.Max(0.01f, (1f - totalW) * 0.5f);
-                stepX = cardW + gap;
-            }
-            else
-            {
-                cardW = Mathf.Max(0.088f, 0.128f - (cnt - 6) * 0.006f);
-                startX = 0.015f;
-                stepX = (0.97f - cardW) / (cnt - 1);
-            }
-
-            for (int i = 0; i < cnt; i++)
-            {
-                var hc = myP.hand[i];
-                if (hc == null) continue;
-                uint seq = (uint)i;
-                float xMin = startX + i * stepX;
-                float xMax = xMin + cardW;
-                bool actionable = waitingMyAction && HasHandAction((byte)_session.HumanPlayerIndex, seq);
-
-                // Actionable cards pop up higher in authentic LOTD style (0.09f vs 0.01f)
-                var slot = LotdUiKit.CreateRect($"MH_{i}", _myHandBar,
-                    new Vector2(xMin, actionable ? 0.09f : 0.01f),
-                    new Vector2(xMax, actionable ? 0.99f : 0.91f),
-                    Vector2.zero, Vector2.zero);
-
-                var ol = slot.gameObject.AddComponent<Outline>();
-                ol.effectColor = actionable ? LotdUiKit.GoldAccent : new Color(0, 0, 0, 0);
-                ol.effectDistance = new Vector2(2.5f, -2.5f);
-
-                CompositeCardView.Create(slot, "V", false).SetCard(hc.code, false, hc);
-                var hit = LotdUiKit.AddImage(LotdUiKit.FillRect("Hit", slot).gameObject, LotdUiKit.WhiteSprite, Color.clear);
-
-                var trig = slot.gameObject.AddComponent<CardDragTrigger>();
-                trig.SourceType = DragSourceType.Hand;
-                trig.EnableHoverLift = true;
-                uint cardCode = hc.code;
-                trig.CardCodeGetter = () => cardCode;
-                trig.IndexGetter = () => (int)seq;
-                trig.OnPointerEnterAction = () =>
+                var trigger = view.Trigger;
+                if (trigger == null) continue;
+                trigger.SourceType = actionable ? DragSourceType.Hand : DragSourceType.None;
+                trigger.CardCodeGetter = actionable ? () => card.code : null;
+                trigger.IndexGetter = actionable ? () => (int)sequence : null;
+                trigger.OnPointerEnterAction = () => InspectCard(card.code);
+                trigger.OnRightClick = () => InspectCard(card.code);
+                trigger.OnLeftClick = () =>
                 {
-                    InspectCard(cardCode);
-                };
-                trig.OnLeftClick = () =>
-                {
-                    InspectCard(cardCode);
-                    ShowCardActionsPopup((byte)_session.HumanPlayerIndex, YgoConstants.LOCATION_HAND, seq, cardCode, hc.overlayCodes);
-                };
-                trig.OnRightClick = () =>
-                {
-                    InspectCard(cardCode);
+                    InspectCard(card.code);
+                    ShowCardActionsPopup(controller, YgoConstants.LOCATION_HAND, sequence, card.code, card.overlayCodes);
                 };
             }
+        }
+
+        private static HandCardView CreateHandCard(RectTransform row, bool opponent)
+        {
+            var rect = LotdUiKit.FillRect("HandCard", row);
+            var border = LotdUiKit.AddImage(rect.gameObject, LotdUiKit.WhiteSprite, Color.clear, false, !opponent);
+            var card = CompositeCardView.Create(rect, "CardView");
+            CardDragTrigger trigger = null;
+            if (!opponent)
+            {
+                trigger = rect.gameObject.AddComponent<CardDragTrigger>();
+                trigger.EnableHoverLift = true;
+            }
+            return new HandCardView { Rect = rect, Card = card, Border = border, Trigger = trigger };
+        }
+
+        private static (Vector2 min, Vector2 max) HandCardBounds(RectTransform row, int count, int index)
+        {
+            float width = Mathf.Clamp(row.rect.height * 0.965f * LotdUiKit.CardAspectRatio / Mathf.Max(1f, row.rect.width),
+                0.045f, 0.25f);
+            float spacing = Mathf.Min(width + 0.01f, (0.99f - width) / Mathf.Max(1, count - 1));
+            float x = (1f - width - spacing * (count - 1)) * 0.5f + spacing * index;
+            return (new Vector2(x, 0.015f), new Vector2(x + width, 0.98f));
         }
 
         private void RefreshLogFeed()
@@ -1044,7 +877,7 @@ namespace YGOPortable.UI
         // ==================== DRAG & DROP LOGIC ====================
         private void HandleDuelDragStarted(DragSourceType source, uint cardCode, int sourceIndex, object customData)
         {
-            if (Root == null || !Root.activeSelf || _session == null) return;
+            if (!Root.activeInHierarchy || !CanAcceptPlayerAction) return;
             InspectCard(cardCode);
 
             _dragHighlightMZone = false;
@@ -1100,7 +933,7 @@ namespace YGOPortable.UI
             _dragHighlightSZone = false;
             _dragHighlightAttack = false;
 
-            if (Root == null || !Root.activeSelf || _session == null) return;
+            if (!Root.activeInHierarchy || !CanAcceptPlayerAction) return;
             var p = _session.ActivePrompt;
             if (p == null || p.playerId != _session.HumanPlayerIndex)
             {
@@ -1145,8 +978,7 @@ namespace YGOPortable.UI
                 }
 
                 // Dropped anywhere on the Duel Board (above the hand bar)
-                if (!CardDragManager.ContainsScreenPoint(_myHandBar, ctx.DropPosition) &&
-                    (_boardRect == null || CardDragManager.ContainsScreenPoint(_boardRect, ctx.DropPosition) || ctx.DropPosition.y > Screen.height * 0.20f))
+                if (CardDragManager.ContainsScreenPoint(_boardRect, ctx.DropPosition))
                 {
                     HandleHandDropOnBoard(handSeq, ctx.CardCode);
                     return;
@@ -1347,64 +1179,44 @@ namespace YGOPortable.UI
             Refresh();
         }
 
-        private Vector2 GetLocationScreenPoint(byte con, uint loc, uint seq)
+        private StackTileView GetStack(byte controller, uint location)
         {
-            if (_session == null) return Vector2.zero;
-            int me = _session.HumanPlayerIndex;
-            bool isMe = con == me;
-
-            if (loc == YgoConstants.LOCATION_DECK)
-                return isMe ? (Vector2)_myDeckTile.root.position : (Vector2)_oppDeckTile.root.position;
-            if (loc == YgoConstants.LOCATION_EXTRA)
-                return isMe ? (Vector2)_myExtraTile.root.position : (Vector2)_oppExtraTile.root.position;
-            if (loc == YgoConstants.LOCATION_GRAVE)
-                return isMe ? (Vector2)_myGyTile.root.position : (Vector2)_oppGyTile.root.position;
-            if (loc == YgoConstants.LOCATION_REMOVED)
-                return isMe ? (Vector2)_myBanTile.root.position : (Vector2)_oppBanTile.root.position;
-
-            if (loc == YgoConstants.LOCATION_HAND)
+            bool opponent = controller != _session.HumanPlayerIndex;
+            return location switch
             {
-                if (isMe)
-                {
-                    if (_myHandBar != null && _myHandBar.childCount > 0)
-                    {
-                        int idx = Mathf.Clamp((int)seq, 0, _myHandBar.childCount - 1);
-                        return _myHandBar.GetChild(idx).position;
-                    }
-                    return _myHandBar != null ? (Vector2)_myHandBar.position : Vector2.zero;
-                }
-                else
-                {
-                    if (_oppHandBar != null && _oppHandBar.childCount > 0)
-                    {
-                        int idx = Mathf.Clamp((int)seq, 0, _oppHandBar.childCount - 1);
-                        return _oppHandBar.GetChild(idx).position;
-                    }
-                    return _oppHandBar != null ? (Vector2)_oppHandBar.position : Vector2.zero;
-                }
+                YgoConstants.LOCATION_DECK => opponent ? _oppDeckTile : _myDeckTile,
+                YgoConstants.LOCATION_EXTRA => opponent ? _oppExtraTile : _myExtraTile,
+                YgoConstants.LOCATION_GRAVE => opponent ? _oppGyTile : _myGyTile,
+                YgoConstants.LOCATION_REMOVED => opponent ? _oppBanTile : _myBanTile,
+                _ => null,
+            };
+        }
+
+        private CardPose GetCardPose(byte controller, uint location, uint sequence, uint position, int handCount = -1)
+        {
+            var animator = CardAnimationManager.Instance;
+            location &= ~YgoConstants.LOCATION_OVERLAY;
+            if (animator == null || controller >= _handCounts.Length) return default;
+
+            bool opponent = controller != _session.HumanPlayerIndex;
+            float angle = CardAngle(location, position, opponent);
+            if (location == YgoConstants.LOCATION_HAND)
+            {
+                var row = opponent ? _oppHandBar : _myHandBar;
+                int count = Mathf.Max(1, handCount >= 0 ? handCount : _handCounts[controller]);
+                var bounds = HandCardBounds(row, count, Mathf.Clamp((int)sequence, 0, count - 1));
+                return animator.GetPose(row, (bounds.min + bounds.max) * 0.5f, bounds.max - bounds.min);
             }
 
-            if (loc == YgoConstants.LOCATION_MZONE)
-            {
-                if (seq == 5) return (isMe ? _emz[0] : _emz[1]).root.position;
-                if (seq == 6) return (isMe ? _emz[1] : _emz[0]).root.position;
-                if (seq < 5) return isMe ? (Vector2)_myMZone[seq].root.position : (Vector2)_oppMZone[seq].root.position;
-            }
-
-            if (loc == YgoConstants.LOCATION_SZONE)
-            {
-                if (seq < 6) return isMe ? (Vector2)_mySZone[seq].root.position : (Vector2)_oppSZone[seq].root.position;
-            }
-
-            return Vector2.zero;
+            var rect = GetSlot(controller, location, sequence)?.root ?? GetStack(controller, location)?.root;
+            return rect == null ? default : animator.GetPose(rect, (SlotCardMin + SlotCardMax) * 0.5f,
+                SlotCardMax - SlotCardMin, angle, CardScale(location, position));
         }
 
         private FieldSlotView GetSlot(byte con, uint loc, uint seq)
         {
             if (_session == null) return null;
-            int me = _session.HumanPlayerIndex;
-            bool isMe = con == me;
-
+            bool isMe = con == _session.HumanPlayerIndex;
             if (loc == YgoConstants.LOCATION_MZONE)
             {
                 if (seq == 5) return isMe ? _emz[0] : _emz[1];
@@ -1412,144 +1224,202 @@ namespace YGOPortable.UI
                 if (seq < 5) return isMe ? _myMZone[seq] : _oppMZone[seq];
             }
             if (loc == YgoConstants.LOCATION_SZONE && seq < 6)
-            {
                 return isMe ? _mySZone[seq] : _oppSZone[seq];
-            }
             return null;
         }
 
-        private void PlaySlotImpact(byte con, uint loc, uint seq)
+        private static (byte, uint, uint) ArrivalKey(byte controller, uint location, uint sequence)
         {
-            var slot = GetSlot(con, loc, seq);
-            if (slot != null && CardAnimationManager.Instance != null)
-            {
-                CardAnimationManager.Instance.PlayFlashGlow(slot.root.gameObject, LotdUiKit.CyanAccent, 0.25f);
-            }
+            bool indexed = (location & (YgoConstants.LOCATION_HAND | YgoConstants.LOCATION_ONFIELD)) != 0;
+            return (controller, location, indexed ? sequence : 0);
         }
 
-        private void HandleChainActivatedEvent(ChainLinkInfo link)
+        private bool IsArriving(byte controller, uint location, uint sequence)
         {
-            if (Root == null || !Root.activeSelf || _session == null || CardAnimationManager.Instance == null) return;
-            Vector2 pos = GetLocationScreenPoint(link.triggerPlayer, link.triggerLoc, link.triggerSeq);
-            if (pos != Vector2.zero)
+            return _arrivingCards.ContainsKey(ArrivalKey(controller, location, sequence));
+        }
+
+        private void ShowArrival((byte, uint, uint) key)
+        {
+            if (_arrivingCards.TryGetValue(key, out int pending))
             {
-                CardAnimationManager.Instance.PlayChainActivationPulse(link.code, pos, link.chainNumber);
-                var slot = GetSlot(link.triggerPlayer, link.triggerLoc, link.triggerSeq);
-                if (slot != null)
-                {
-                    CardAnimationManager.Instance.PlayFlashGlow(slot.root.gameObject, LotdUiKit.GoldAccent, 0.38f);
-                }
+                if (pending == 1) _arrivingCards.Remove(key);
+                else _arrivingCards[key] = pending - 1;
             }
+            Refresh();
+        }
+
+        private (byte, uint, uint) HideUntilArrival(byte controller, uint location, uint sequence)
+        {
+            var key = ArrivalKey(controller, location, sequence);
+            _arrivingCards.TryGetValue(key, out int pending);
+            _arrivingCards[key] = pending + 1;
+            return key;
+        }
+
+        private bool IsFaceDown(byte controller, uint location, uint position)
+        {
+            if ((location & YgoConstants.LOCATION_OVERLAY) != 0) return false;
+            if (location == YgoConstants.LOCATION_HAND)
+                return controller != _session.HumanPlayerIndex && (position & YgoConstants.POS_FACEUP) == 0;
+            if (location == YgoConstants.LOCATION_DECK) return true;
+            if (location == YgoConstants.LOCATION_EXTRA) return (position & YgoConstants.POS_FACEUP) == 0;
+            return (position & YgoConstants.POS_FACEDOWN) != 0 && location != YgoConstants.LOCATION_GRAVE;
+        }
+
+        private void HandleCardsDrawn(byte controller, IReadOnlyList<uint> cards)
+        {
+            var animator = CardAnimationManager.Instance;
+            if (animator == null || controller >= _handCounts.Length || cards.Count == 0) return;
+            int first = _handCounts[controller];
+            _handCounts[controller] += cards.Count;
+            var from = GetCardPose(controller, YgoConstants.LOCATION_DECK, 0, 0);
+            var flights = new List<CardFlight>(cards.Count);
+            for (int i = 0; i < cards.Count; i++)
+            {
+                uint sequence = (uint)(first + i);
+                var to = GetCardPose(controller, YgoConstants.LOCATION_HAND, sequence, 0);
+                if (!from.IsValid || !to.IsValid) return;
+                flights.Add(new CardFlight(cards[i], from, to, true, cards[i] == 0));
+            }
+            var keys = new (byte, uint, uint)[flights.Count];
+            for (int i = 0; i < keys.Length; i++)
+                keys[i] = HideUntilArrival(controller, YgoConstants.LOCATION_HAND, (uint)(first + i));
+            animator.QueueDraw(flights, index => ShowArrival(keys[index]));
         }
 
         private void HandleCardMovedEvent(CardMoveEvent e)
         {
-            if (Root == null || !Root.activeSelf || _session == null) return;
-            if (_session.TurnNumber == 0 && e.fromLoc == YgoConstants.LOCATION_DECK && e.toLoc == YgoConstants.LOCATION_DECK)
+            var animator = CardAnimationManager.Instance;
+            if (animator == null || !Root.activeInHierarchy) return;
+            if (e.fromLoc == e.toLoc && e.fromCon == e.toCon && e.fromSeq == e.toSeq && e.fromPos == e.toPos) return;
+            if (e.fromLoc == YgoConstants.LOCATION_DECK && e.toLoc == YgoConstants.LOCATION_DECK) return;
+
+            var from = GetCardPose(e.fromCon, e.fromLoc, e.fromSeq, e.fromPos);
+            if (e.fromLoc == YgoConstants.LOCATION_HAND && e.fromCon < _handCounts.Length)
+                _handCounts[e.fromCon] = Mathf.Max(0, _handCounts[e.fromCon] - 1);
+            if (e.toLoc == YgoConstants.LOCATION_HAND && e.toCon < _handCounts.Length)
+                _handCounts[e.toCon]++;
+
+            var to = GetCardPose(e.toCon, e.toLoc, e.toSeq, e.toPos);
+            if (!from.IsValid && !to.IsValid) return;
+
+            bool disappearing = e.toLoc == 0;
+            if (!from.IsValid)
+                from = new CardPose(to.Position + Vector2.up * 52f, to.Size * 0.58f, to.Angle);
+            if (!to.IsValid)
+                to = new CardPose(from.Position + Vector2.up * 25f, from.Size * 0.72f, from.Angle);
+
+            bool fromBack = e.code == 0 || IsFaceDown(e.fromCon, e.fromLoc, e.fromPos);
+            bool toBack = disappearing ? fromBack : e.code == 0 || IsFaceDown(e.toCon, e.toLoc, e.toPos);
+            bool sameZone = e.fromCon == e.toCon && e.fromLoc == e.toLoc && e.fromSeq == e.toSeq;
+            CardMotion motion = CardMotion.Transfer;
+            if (disappearing) motion = CardMotion.Vanish;
+            else if ((e.reason & YgoConstants.REASON_DESTROY) != 0) motion = CardMotion.Destroy;
+            else if (sameZone) motion = CardMotion.ChangePosition;
+            else if ((e.toLoc & YgoConstants.LOCATION_ONFIELD) != 0 && toBack) motion = CardMotion.Set;
+            else if (e.toLoc == YgoConstants.LOCATION_MZONE && e.fromLoc != YgoConstants.LOCATION_MZONE)
+            {
+                motion = e.fromLoc == YgoConstants.LOCATION_EXTRA &&
+                    ((CardDatabase.Get(e.code)?.type ?? 0) & YgoConstants.TYPE_EXTRA) != 0 &&
+                    (e.reason & YgoConstants.REASON_SPSUMMON) != 0
+                    ? CardMotion.ExtraDeckSummon : CardMotion.Summon;
+            }
+
+            var flight = new CardFlight(e.code, from, to, fromBack, toBack);
+            if (disappearing || (e.toLoc & YgoConstants.LOCATION_OVERLAY) != 0)
+            {
+                animator.QueueMove(flight, motion, null);
                 return;
-
-            Vector2 startPos = GetLocationScreenPoint(e.fromCon, e.fromLoc, e.fromSeq);
-            Vector2 endPos = GetLocationScreenPoint(e.toCon, e.toLoc, e.toSeq);
-
-            if (startPos != Vector2.zero && endPos != Vector2.zero && Vector2.Distance(startPos, endPos) > 20f && CardAnimationManager.Instance != null)
-            {
-                bool faceDown = (e.toPos & YgoConstants.POS_FACEDOWN) != 0 || e.code == 0;
-                float duration = 0.32f;
-                float arc = 48f;
-
-                if (e.toLoc == YgoConstants.LOCATION_MZONE)
-                {
-                    LotdAudio.PlaySummon();
-                    duration = 0.35f;
-                    arc = 60f;
-                }
-                else if (e.toLoc == YgoConstants.LOCATION_SZONE)
-                {
-                    LotdAudio.PlayClick();
-                    duration = 0.30f;
-                    arc = 38f;
-                }
-                else if (e.toLoc == YgoConstants.LOCATION_HAND)
-                {
-                    LotdAudio.PlayDraw();
-                    duration = 0.28f;
-                    arc = 34f;
-                    if (e.toCon != _session.HumanPlayerIndex) faceDown = true;
-                }
-                else if (e.toLoc == YgoConstants.LOCATION_GRAVE || e.toLoc == YgoConstants.LOCATION_REMOVED)
-                {
-                    LotdAudio.PlayDamage();
-                    duration = 0.30f;
-                    arc = 28f;
-                }
-
-                bool trackSlot = e.toLoc == YgoConstants.LOCATION_MZONE || e.toLoc == YgoConstants.LOCATION_SZONE;
-                var slotKey = (e.toCon, e.toLoc, e.toSeq);
-                if (trackSlot)
-                {
-                    _inFlightSlotCounts.TryGetValue(slotKey, out int cur);
-                    _inFlightSlotCounts[slotKey] = cur + 1;
-                }
-
-                CardAnimationManager.Instance.PlayCardFlight(e.code, startPos, endPos, duration, faceDown, arc, () =>
-                {
-                    if (trackSlot && _inFlightSlotCounts.TryGetValue(slotKey, out int c))
-                    {
-                        if (c <= 1) _inFlightSlotCounts.Remove(slotKey);
-                        else _inFlightSlotCounts[slotKey] = c - 1;
-                    }
-                    Refresh();
-                    PlaySlotImpact(e.toCon, e.toLoc, e.toSeq);
-                });
             }
-            else
-            {
-                Refresh();
-            }
+            var key = HideUntilArrival(e.toCon, e.toLoc, e.toSeq);
+            animator.QueueMove(flight, motion, () => ShowArrival(key));
         }
 
-        private void HandleAttackEvent(byte aCon, uint aLoc, uint aSeq, byte tCon, uint tLoc, uint tSeq)
+        private void HandleChainActivatedEvent(ChainLinkInfo link)
         {
-            if (Root == null || !Root.activeSelf || _session == null || CardAnimationManager.Instance == null) return;
+            var animator = CardAnimationManager.Instance;
+            if (animator == null) return;
+            var pose = GetCardPose(link.triggerPlayer, link.triggerLoc, link.triggerSeq, YgoConstants.POS_FACEUP_ATTACK);
+            animator.QueueChain(pose, link.code, link.chainNumber);
+        }
 
-            var atkSlot = GetSlot(aCon, aLoc, aSeq);
-            int me = _session.HumanPlayerIndex;
-            bool isDirect = (tLoc == 0);
-            Vector2 targetPos = isDirect
-                ? (tCon == me ? (Vector2)_myLpText.rectTransform.position : (Vector2)_oppLpText.rectTransform.position)
-                : GetLocationScreenPoint(tCon, tLoc, tSeq);
-
-            var tgtSlot = !isDirect ? GetSlot(tCon, tLoc, tSeq) : null;
-
-            if (isDirect)
+        private Vector2 AttackTarget(CardAnimationManager animator, byte attacker, byte target, uint location, uint sequence)
+        {
+            if (location != 0)
             {
-                CardAnimationManager.Instance.PlayDirectAttackSplash();
-                LotdAudio.PlayDirectAttack();
+                var pose = GetCardPose(target, location, sequence, YgoConstants.POS_FACEUP_ATTACK);
+                if (pose.IsValid) return pose.Position;
             }
+            var lp = attacker == _session.HumanPlayerIndex ? _oppLpText : _myLpText;
+            return animator.GetPoint(lp.rectTransform, new Vector2(0.5f, 0.5f));
+        }
 
-            CardAnimationManager.Instance.PlayAttackLunge(atkSlot?.root, targetPos, 0.28f, onImpact: () =>
+        private void HandleAttackEvent(byte attacker, uint location, uint sequence, byte target, uint targetLoc, uint targetSeq)
+        {
+            var animator = CardAnimationManager.Instance;
+            if (animator == null) return;
+            var from = GetCardPose(attacker, location, sequence, YgoConstants.POS_FACEUP_ATTACK);
+            if (from.IsValid) animator.QueueAttackArrow(from.Position, AttackTarget(animator, attacker, target, targetLoc, targetSeq));
+        }
+
+        private void HandleBattleResolved(byte attacker, uint location, uint sequence, byte target, uint targetLoc, uint targetSeq)
+        {
+            var animator = CardAnimationManager.Instance;
+            var card = FindLiveCard(attacker, location, sequence);
+            if (animator == null || card == null) return;
+
+            var from = GetCardPose(attacker, location, sequence, card.position);
+            var hit = AttackTarget(animator, attacker, target, targetLoc, targetSeq);
+            var key = HideUntilArrival(attacker, location, sequence);
+            animator.QueueAttack(from, hit, card.code, targetLoc == 0, () => ShowArrival(key));
+        }
+
+        private void HandleLifePointsChanged(byte player, int delta, int lifePoints)
+        {
+            bool mine = player == _session.HumanPlayerIndex;
+            var animator = CardAnimationManager.Instance;
+            if (animator == null) return;
+            var point = animator.GetPoint((mine ? _myLpText : _oppLpText).rectTransform, new Vector2(0.64f, 0.5f));
+            animator.QueueLifeChange(point, delta, () =>
             {
-                LotdAudio.PlayAttack();
-                if (tgtSlot != null)
-                {
-                    CardAnimationManager.Instance.PlayFlashGlow(tgtSlot.root.gameObject, LotdUiKit.RedAccent, 0.3f);
-                }
-                else if (isDirect)
-                {
-                    var boardRt = Root.transform.Find("DuelBoard") as RectTransform;
-                    CardAnimationManager.Instance.PlayBoardShake(boardRt, 13f, 0.22f);
-                    var targetBox = (tCon == me ? _myLpText.transform.parent.gameObject : _oppLpText.transform.parent.gameObject);
-                    CardAnimationManager.Instance.PlayFlashGlow(targetBox, LotdUiKit.RedAccent, 0.38f);
-                }
+                if (mine) _myTargetLp = lifePoints;
+                else _oppTargetLp = lifePoints;
             });
+        }
+
+        private void HandleTurnStarted(int turn, int player)
+        {
+            bool opponent = player != _session.HumanPlayerIndex;
+            var animator = CardAnimationManager.Instance;
+            if (animator == null) return;
+            var center = animator.GetPoint(_boardRect, new Vector2(0.5f, 0.54f));
+            animator.QueuePhase(opponent ? "상대 턴" : "내 턴", opponent, center, () =>
+            {
+                _turnBadgeText.text = $"턴 {turn}";
+                SetPhasePlate(YgoConstants.PHASE_DRAW, opponent);
+            });
+        }
+
+        private void HandlePhaseChanged(int phase, int player)
+        {
+            bool opponent = player != _session.HumanPlayerIndex;
+            var animator = CardAnimationManager.Instance;
+            if (animator == null) return;
+            var center = animator.GetPoint(_boardRect, new Vector2(0.5f, 0.54f));
+            animator.QueuePhase(YgoConstants.GetPhaseNameKR(phase), opponent, center, () => SetPhasePlate(phase, opponent));
         }
 
         public void Update()
         {
             if (_session == null || Root == null || !Root.activeSelf) return;
+            byte me = (byte)_session.HumanPlayerIndex;
+            byte opponent = (byte)_session.AiPlayerIndex;
+            if (_myHandBar.rect.size != _myHandSize) RefreshHand(_session.Players[me].hand, me, false);
+            if (_oppHandBar.rect.size != _oppHandSize) RefreshHand(_session.Players[opponent].hand, opponent, true);
 
             // Smooth rolling LP odometer (authentic LOTD)
-            if (Mathf.Abs(_myDisplayLp - _myTargetLp) > 0.5f)
+            if (!IsPaused && Mathf.Abs(_myDisplayLp - _myTargetLp) > 0.5f)
             {
                 float step = Mathf.Max(1200f * Time.deltaTime, Mathf.Abs(_myDisplayLp - _myTargetLp) * 6.5f * Time.deltaTime);
                 int oldInt = (int)_myDisplayLp;
@@ -1563,7 +1433,7 @@ namespace YGOPortable.UI
                 _myLpFill.anchorMax = new Vector2(Mathf.Clamp01(_myDisplayLp / 8000f), 1f);
             }
 
-            if (Mathf.Abs(_oppDisplayLp - _oppTargetLp) > 0.5f)
+            if (!IsPaused && Mathf.Abs(_oppDisplayLp - _oppTargetLp) > 0.5f)
             {
                 float step = Mathf.Max(1200f * Time.deltaTime, Mathf.Abs(_oppDisplayLp - _oppTargetLp) * 6.5f * Time.deltaTime);
                 int oldInt = (int)_oppDisplayLp;
@@ -1584,7 +1454,7 @@ namespace YGOPortable.UI
             }
             else
             {
-                _myLpText.color = Color.white;
+                _myLpText.color = new Color(1f, 0.92f, 0.17f);
             }
 
             if (_oppDisplayLp <= 2000f && _oppDisplayLp > 0f)
@@ -1593,7 +1463,7 @@ namespace YGOPortable.UI
             }
             else
             {
-                _oppLpText.color = Color.white;
+                _oppLpText.color = new Color(1f, 0.92f, 0.17f);
             }
 
             // Global Cancel / Dismiss via ESC or Right Mouse Button
@@ -1607,7 +1477,7 @@ namespace YGOPortable.UI
                 else if (_actionPopup != null && _actionPopup.activeSelf)
                 {
                     LotdAudio.PlayClick();
-                    _actionPopup.SetActive(false);
+                    CloseActionPopup();
                 }
                 else if (_modals != null && _modals.ZoneViewRoot != null && _modals.ZoneViewRoot.activeSelf)
                 {
@@ -1622,11 +1492,16 @@ namespace YGOPortable.UI
                 {
                     _modals.TriggerMenu();
                 }
+                else if (Input.GetKeyDown(KeyCode.Escape))
+                {
+                    OnPauseClicked();
+                }
             }
 
             // Global Confirm via Enter / KeypadEnter
             if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
             {
+                if (IsPaused || IsPresenting) return;
                 if (_modals != null && _modals.ResultRoot != null && _modals.ResultRoot.activeSelf)
                 {
                     _modals.TriggerRematch();
@@ -1638,23 +1513,7 @@ namespace YGOPortable.UI
             }
         }
 
-        private static string GetPhaseTitleEnglish(int phase)
-        {
-            switch (phase)
-            {
-                case YgoConstants.PHASE_DRAW: return "DRAW PHASE";
-                case YgoConstants.PHASE_STANDBY: return "STANDBY PHASE";
-                case YgoConstants.PHASE_MAIN1: return "MAIN PHASE 1";
-                case YgoConstants.PHASE_BATTLE_START:
-                case YgoConstants.PHASE_BATTLE_STEP:
-                case YgoConstants.PHASE_DAMAGE:
-                case YgoConstants.PHASE_DAMAGE_CAL:
-                case YgoConstants.PHASE_BATTLE: return "BATTLE PHASE";
-                case YgoConstants.PHASE_MAIN2: return "MAIN PHASE 2";
-                case YgoConstants.PHASE_END: return "END PHASE";
-                default: return "DUEL PHASE";
-            }
-        }
+
 
         // ==================== PROMPT INTERACTIONS ====================
         private bool IsPlacePending(byte con, uint loc, uint seq)
@@ -1667,6 +1526,7 @@ namespace YGOPortable.UI
 
         private bool IsPlaceSelectable(byte con, uint loc, uint seq)
         {
+            if (!CanAcceptPlayerAction) return false;
             var p = _session?.ActivePrompt;
             if (p == null || p.playerId != _session.HumanPlayerIndex) return false;
             if (p.messageType != YgoConstants.MSG_SELECT_PLACE && p.messageType != YgoConstants.MSG_SELECT_DISFIELD)
@@ -1709,32 +1569,32 @@ namespace YGOPortable.UI
             if (p.messageType == YgoConstants.MSG_SELECT_IDLECMD)
             {
                 for (int i = 0; i < p.summonable.Count; i++)
-                    if (predicate(p.summonable[i])) dest.Add((p.summonable[i], "⚔️ 일반 소환", (i << 16) | 0, true));
+                    if (predicate(p.summonable[i])) dest.Add((p.summonable[i], "일반 소환", (i << 16) | 0, true));
                 for (int i = 0; i < p.spSummonable.Count; i++)
-                    if (predicate(p.spSummonable[i])) dest.Add((p.spSummonable[i], "⚡ 특수 소환", (i << 16) | 1, true));
+                    if (predicate(p.spSummonable[i])) dest.Add((p.spSummonable[i], "특수 소환", (i << 16) | 1, true));
                 for (int i = 0; i < p.repositionable.Count; i++)
-                    if (predicate(p.repositionable[i])) dest.Add((p.repositionable[i], "🔄 표시 형식 변경", (i << 16) | 2, false));
+                    if (predicate(p.repositionable[i])) dest.Add((p.repositionable[i], "표시 형식 변경", (i << 16) | 2, false));
                 for (int i = 0; i < p.mSetable.Count; i++)
-                    if (predicate(p.mSetable[i])) dest.Add((p.mSetable[i], "🛡️ 몬스터 세트", (i << 16) | 3, false));
+                    if (predicate(p.mSetable[i])) dest.Add((p.mSetable[i], "몬스터 세트", (i << 16) | 3, false));
                 for (int i = 0; i < p.sSetable.Count; i++)
-                    if (predicate(p.sSetable[i])) dest.Add((p.sSetable[i], "🔮 마법/함정 세트", (i << 16) | 4, false));
+                    if (predicate(p.sSetable[i])) dest.Add((p.sSetable[i], "마법·함정 세트", (i << 16) | 4, false));
                 for (int i = 0; i < p.activatable.Count; i++)
                 {
                     if (!predicate(p.activatable[i])) continue;
                     string desc = CardDatabase.ResolveDescription(p.activatable[i].description, p.activatable[i].code);
-                    string lbl = string.IsNullOrEmpty(desc) ? "💥 효과 발동" : $"💥 발동: {desc}";
+                    string lbl = string.IsNullOrEmpty(desc) ? "효과 발동" : $"발동  {desc}";
                     dest.Add((p.activatable[i], lbl, (i << 16) | 5, true));
                 }
             }
             else if (p.messageType == YgoConstants.MSG_SELECT_BATTLECMD)
             {
                 for (int i = 0; i < p.attackable.Count; i++)
-                    if (predicate(p.attackable[i])) dest.Add((p.attackable[i], "⚔️ 공격 선언!", (i << 16) | 1, true));
+                    if (predicate(p.attackable[i])) dest.Add((p.attackable[i], "공격", (i << 16) | 1, true));
                 for (int i = 0; i < p.activatable.Count; i++)
                 {
                     if (!predicate(p.activatable[i])) continue;
                     string desc = CardDatabase.ResolveDescription(p.activatable[i].description, p.activatable[i].code);
-                    string lbl = string.IsNullOrEmpty(desc) ? "💥 효과 발동" : $"💥 발동: {desc}";
+                    string lbl = string.IsNullOrEmpty(desc) ? "효과 발동" : $"발동  {desc}";
                     dest.Add((p.activatable[i], lbl, (i << 16) | 0, true));
                 }
             }
@@ -1759,18 +1619,18 @@ namespace YGOPortable.UI
 
         private void ExecuteActionInt(int responseVal)
         {
-            if (_session == null) return;
+            if (!CanAcceptPlayerAction) return;
             LotdAudio.PlayClick();
             _actionPopup.SetActive(false);
+            _modals.HideAll();
             _session.SubmitResponseInt(responseVal);
             Refresh();
         }
 
         private void OpenStackZone(byte con, uint loc, string title, bool hideFaceDown = false)
         {
-            if (_session == null) return;
-            var p = _session.ActivePrompt;
-            bool waitingMyAction = p != null && p.playerId == _session.HumanPlayerIndex;
+            if (_session == null || IsPresenting || IsPaused) return;
+            bool waitingMyAction = CanAcceptPlayerAction;
             var zoneActions = waitingMyAction ? CollectZoneActions(con, loc) : null;
 
             if (loc == YgoConstants.LOCATION_DECK)
@@ -1801,7 +1661,7 @@ namespace YGOPortable.UI
 
         private void OnSlotClicked(byte con, uint loc, uint seq)
         {
-            if (_session == null) return;
+            if (_session == null || IsPresenting || IsPaused) return;
 
             if (IsPlaceSelectable(con, loc, seq))
             {
@@ -1862,75 +1722,131 @@ namespace YGOPortable.UI
 
         private void ShowCardActionsPopup(byte con, uint loc, uint seq, uint code, List<uint> overlays)
         {
+            if (IsPresenting || IsPaused || _session == null) return;
             var actions = CollectActions(con, loc, seq);
-            PopulateAndShowActionPopup(code != 0 ? CardDatabase.GetName(code) : "카드 행동", actions, overlays);
+            var anchor = GetSlot(con, loc, seq)?.root ?? GetStack(con, loc)?.root;
+            if (loc == YgoConstants.LOCATION_HAND && con == _session.HumanPlayerIndex && seq < _myHandViews.Count)
+                anchor = _myHandViews[(int)seq].Rect;
+            PopulateAndShowActionPopup(code == 0 ? "카드 행동" : CardDatabase.GetName(code), actions, overlays, anchor);
         }
 
         private void ShowZoneActionsPopup(string title, List<(SelectableCardItem item, string label, int responseVal, bool gold)> zoneActions)
         {
-            var actions = new List<(string label, int responseVal, bool gold)>(zoneActions.Count);
-            foreach (var za in zoneActions)
-            {
-                string cname = CardDatabase.GetName(za.item.code);
-                actions.Add(($"{cname} — {za.label}", za.responseVal, za.gold));
-            }
-            PopulateAndShowActionPopup(title, actions, null);
+            var actions = zoneActions.Select(action => (
+                $"{CardDatabase.GetName(action.item.code)}  {action.label}", action.responseVal, action.gold)).ToList();
+            var first = zoneActions.FirstOrDefault().item;
+            var anchor = first != null ? GetStack(first.controller, first.location)?.root : null;
+            PopulateAndShowActionPopup(title, actions, null, anchor);
         }
 
-        private void PopulateAndShowActionPopup(string header, List<(string label, int responseVal, bool gold)> actions, List<uint> overlays)
+        private void PopulateAndShowActionPopup(string header, List<(string label, int responseVal, bool gold)> actions,
+            List<uint> overlays, RectTransform anchor = null)
         {
-            bool hasOverlays = overlays != null && overlays.Count > 0;
-            if ((actions == null || actions.Count == 0) && !hasOverlays)
+            bool hasMaterials = overlays != null && overlays.Count > 0;
+            if (actions.Count == 0 && !hasMaterials)
             {
-                _actionPopup.SetActive(false);
+                CloseActionPopup();
                 return;
             }
 
-            for (int i = _actionList.childCount - 1; i >= 0; i--)
-                UnityEngine.Object.Destroy(_actionList.GetChild(i).gameObject);
-
+            ClearActionRows();
             _actionHeader.text = header;
-
-            if (actions != null)
+            foreach (var action in actions)
             {
-                foreach (var act in actions)
-                {
-                    int val = act.responseVal;
-                    var row = new GameObject("ActBtn", typeof(RectTransform), typeof(LayoutElement));
-                    row.transform.SetParent(_actionList, false);
-                    row.GetComponent<LayoutElement>().preferredHeight = 46f;
-                    LotdUiKit.CreateLotdButton(row.transform, "B", act.label, () => ExecuteActionInt(val), 15, act.gold);
-                }
+                int command = action.responseVal;
+                AddActionRow(action.label, () => ExecuteActionInt(command), action.gold, CommandIcon(command));
             }
-
-            if (hasOverlays)
+            if (hasMaterials)
             {
-                var row = new GameObject("OvlBtn", typeof(RectTransform), typeof(LayoutElement));
-                row.transform.SetParent(_actionList, false);
-                row.GetComponent<LayoutElement>().preferredHeight = 42f;
-                LotdUiKit.CreateLotdButton(row.transform, "B", $"엑시즈 소재 확인 ({overlays.Count}장)", () =>
+                AddActionRow($"엑시즈 소재  {overlays.Count}장", () =>
                 {
-                    _actionPopup.SetActive(false);
+                    CloseActionPopup();
                     _modals.ShowCodeListViewer("엑시즈 소재", overlays);
-                }, 14, false);
+                }, false, "LOOK");
             }
+            AddActionRow("취소", CloseActionPopup, false);
+            PlaceActionWindow(actions.Count + (hasMaterials ? 2 : 1), anchor);
+        }
 
-            // Always add an explicit cancel / close button to prevent accidental activation
-            var cancelRow = new GameObject("CancelBtn", typeof(RectTransform), typeof(LayoutElement));
-            cancelRow.transform.SetParent(_actionList, false);
-            cancelRow.GetComponent<LayoutElement>().preferredHeight = 40f;
-            LotdUiKit.CreateLotdButton(cancelRow.transform, "B", "✕ 닫기 / 행동 취소", () =>
+        private string CommandIcon(int response)
+        {
+            int command = response & 0xFFFF;
+            if (_session.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_BATTLECMD)
+                return command == 1 ? "ATTACK" : "ACTION";
+            return command switch
             {
-                LotdAudio.PlayClick();
-                _actionPopup.SetActive(false);
-            }, 14, false);
+                0 => "SUMMON",
+                1 => "SUMMONSP",
+                2 => "TURN_DEF",
+                3 => "SETMONST",
+                4 => "SET",
+                _ => "ACTION",
+            };
+        }
 
+        private void AddActionRow(string label, Action action, bool selected, string icon = null)
+        {
+            var row = LotdUiKit.FillRect("Action", _actionList);
+            row.gameObject.AddComponent<LayoutElement>().preferredHeight = 42f;
+            var button = LotdUiKit.CreateLotdButton(row, "Button", label, action, 15, selected);
+            var caption = button.GetComponentInChildren<Text>();
+            caption.resizeTextForBestFit = true;
+            caption.resizeTextMinSize = 11;
+            caption.resizeTextMaxSize = 15;
+            if (icon == null) return;
+
+            var image = LotdUiKit.CreateRect("CommandIcon", button.transform, new Vector2(0.03f, 0.12f), new Vector2(0.16f, 0.88f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(image.gameObject, LotdUiKit.LoadSprite($"LOTD/Icons/ICON_ID_CMDID_48_{icon}"),
+                Color.white, true, false);
+            caption.rectTransform.anchorMin = new Vector2(0.19f, 0f);
+            caption.rectTransform.anchorMax = new Vector2(0.96f, 1f);
+            caption.alignment = TextAnchor.MiddleLeft;
+        }
+
+        private void ClearActionRows()
+        {
+            for (int i = _actionList.childCount - 1; i >= 0; i--)
+            {
+                var row = _actionList.GetChild(i).gameObject;
+                row.SetActive(false);
+                UnityEngine.Object.Destroy(row);
+            }
+            _actionList.anchoredPosition = Vector2.zero;
+        }
+
+        private void PlaceActionWindow(int rows, RectTransform anchor = null)
+        {
+            var parent = (RectTransform)_actionPopup.transform;
+            float width = Mathf.Min(345f, parent.rect.width * 0.88f);
+            float height = Mathf.Min(51f + 46f * rows, parent.rect.height * 0.85f);
+            _actionWindow.sizeDelta = new Vector2(width, height);
+            Vector2 center = Vector2.zero;
+            if (anchor != null)
+            {
+                center = parent.InverseTransformPoint(anchor.position);
+                float offset = width * 0.5f + 54f;
+                center.x += center.x > parent.rect.width * 0.18f ? -offset : offset;
+                center.x = Mathf.Clamp(center.x, parent.rect.xMin + width * 0.5f + 6f, parent.rect.xMax - width * 0.5f - 6f);
+                center.y = Mathf.Clamp(center.y, parent.rect.yMin + height * 0.5f + 6f, parent.rect.yMax - height * 0.5f - 6f);
+            }
+            _actionWindow.anchoredPosition = center;
+            _actionPopup.transform.SetAsLastSibling();
             _actionPopup.SetActive(true);
+        }
+
+        private void CloseActionPopup()
+        {
+            _actionPopup.SetActive(false);
+            if (!IsPaused) return;
+            IsPaused = false;
+            if (CardAnimationManager.Instance != null) CardAnimationManager.Instance.Paused = false;
+            Refresh();
         }
 
         private void OnPhaseShortcut(int targetPhase)
         {
-            if (_session == null || _session.ActivePrompt == null) return;
+            if (!CanAcceptPlayerAction) return;
             var p = _session.ActivePrompt;
             if (p.playerId != _session.HumanPlayerIndex) return;
 
@@ -1966,50 +1882,49 @@ namespace YGOPortable.UI
             }
         }
 
-        private void OnSurrenderClicked()
+        private void OnPauseClicked()
         {
-            if (_session == null || _session.IsFinished)
-            {
-                _app.ShowScreen(AppScreen.MainMenu);
-                return;
-            }
+            if (_session == null || _session.IsFinished) return;
+            IsPaused = true;
+            if (CardAnimationManager.Instance != null) CardAnimationManager.Instance.Paused = true;
+            ClearActionRows();
+            _actionHeader.text = "일시 정지";
+            AddActionRow("계속하기", CloseActionPopup, true);
+            AddActionRow("항복", ConfirmSurrender, false, "SURRENDER");
+            PlaceActionWindow(2);
+        }
 
-            // Confirmation popup to prevent accidental clicks
-            for (int i = _actionList.childCount - 1; i >= 0; i--)
-                UnityEngine.Object.Destroy(_actionList.GetChild(i).gameObject);
-
+        private void ConfirmSurrender()
+        {
+            ClearActionRows();
             _actionHeader.text = "듀얼을 항복하시겠습니까?";
-
-            var surRow = new GameObject("SurrenderRow", typeof(RectTransform), typeof(LayoutElement));
-            surRow.transform.SetParent(_actionList, false);
-            surRow.GetComponent<LayoutElement>().preferredHeight = 46f;
-            LotdUiKit.CreateLotdButton(surRow.transform, "B", "🏳️ 정말 항복합니다 (패배 처리)", () =>
+            AddActionRow("취소", OnPauseClicked, true);
+            AddActionRow("항복", () =>
             {
-                LotdAudio.PlayClick();
-                _actionPopup.SetActive(false);
+                CardAnimationManager.Instance?.Clear();
+                _arrivingCards.Clear();
                 _session.Surrender(_session.HumanPlayerIndex);
-            }, 15, gold: false);
-
-            var cancelRow = new GameObject("CancelRow", typeof(RectTransform), typeof(LayoutElement));
-            cancelRow.transform.SetParent(_actionList, false);
-            cancelRow.GetComponent<LayoutElement>().preferredHeight = 44f;
-            LotdUiKit.CreateLotdButton(cancelRow.transform, "B", "✕ 취소 (듀얼 계속하기)", () =>
-            {
-                LotdAudio.PlayClick();
-                _actionPopup.SetActive(false);
-            }, 15, gold: true);
-
-            _actionPopup.SetActive(true);
+                CloseActionPopup();
+            }, false, "SURRENDER");
+            PlaceActionWindow(2);
         }
 
         private void HandleCoinTossedEvent(byte player, IReadOnlyList<bool> coins)
         {
-            CardAnimationManager.Instance?.PlayCoinTossSplash(coins, player != _session.HumanPlayerIndex);
+            var animator = CardAnimationManager.Instance;
+            if (animator == null || coins.Count == 0) return;
+            var point = animator.GetPoint(_boardRect, new Vector2(0.5f, 0.54f));
+            animator.QueueRandomResult(string.Join("   /   ", coins.Select(coin => coin ? "앞면" : "뒷면")),
+                point, player != _session.HumanPlayerIndex, LotdAudio.PlayCoin);
         }
 
         private void HandleDiceRolledEvent(byte player, IReadOnlyList<int> dice)
         {
-            CardAnimationManager.Instance?.PlayDiceRollSplash(dice, player != _session.HumanPlayerIndex);
+            var animator = CardAnimationManager.Instance;
+            if (animator == null || dice.Count == 0) return;
+            var point = animator.GetPoint(_boardRect, new Vector2(0.5f, 0.54f));
+            animator.QueueRandomResult("주사위   " + string.Join("   /   ", dice),
+                point, player != _session.HumanPlayerIndex, LotdAudio.PlayDice);
         }
 
         private void BuildCardZoomModal(Transform root)

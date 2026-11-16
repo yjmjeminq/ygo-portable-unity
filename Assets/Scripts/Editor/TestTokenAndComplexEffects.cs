@@ -72,6 +72,11 @@ namespace YGOPortable.Editor
             if (advTokenName != "용사 토큰") throw new Exception($"Adventurer Token name mismatch: got '{advTokenName}'");
             if (sheepTokenName != "양 토큰") throw new Exception($"Sheep Token name mismatch: got '{sheepTokenName}'");
             if (nibiruTokenName != "원시생명체 토큰") throw new Exception($"Nibiru Token name mismatch: got '{nibiruTokenName}'");
+            var glimmer = CardDatabase.Get(41458362);
+            if (YgoNativeBridge.YGO_HasCard(41458362) != 1 || glimmer == null || glimmer.name != "기석 토큰" ||
+                (glimmer.type & (YgoConstants.TYPE_TOKEN | YgoConstants.TYPE_NORMAL)) != (YgoConstants.TYPE_TOKEN | YgoConstants.TYPE_NORMAL) ||
+                glimmer.race != YgoConstants.RACE_ROCK || glimmer.attr != YgoConstants.ATTRIBUTE_LIGHT)
+                throw new Exception("Glimmer Token is missing or has invalid metadata");
 
             // 2. Type Tags
             string swordsoulTag = YgoConstants.GetTypeTagKR(0x5011);
@@ -87,6 +92,7 @@ namespace YGOPortable.Editor
             var spAdv = CardArtLoader.GetArtSprite(3285552);
             var spSheep = CardArtLoader.GetArtSprite(73915052);
             var spNibiru = CardArtLoader.GetArtSprite(27204312);
+            var spGlimmer = CardArtLoader.GetArtSprite(41458362);
 
             if (spMoYe == null || spMoYe == CardArtLoader.GetFallbackArt())
                 throw new Exception("Swordsoul Token failed to load Mo Ye generator artwork!");
@@ -96,6 +102,8 @@ namespace YGOPortable.Editor
                 throw new Exception("Sheep Token failed to load Scapegoat generator artwork!");
             if (spNibiru == null || spNibiru == CardArtLoader.GetFallbackArt())
                 throw new Exception("Nibiru Token failed to load Nibiru generator artwork!");
+            if (spGlimmer == null || spGlimmer == CardArtLoader.GetFallbackArt())
+                throw new Exception("Glimmer Token failed to load Luminous generator artwork!");
 
             Debug.Log($"[TOKEN TEST 0] All token presentation checks passed: Art sizes=({spMoYe.rect.width}x{spMoYe.rect.height})");
         }
@@ -104,7 +112,6 @@ namespace YGOPortable.Editor
         {
             Debug.Log("[TOKEN TEST 1] Swordsoul Mo Ye -> Tuner Token -> Level 8 Synchro Chixiao...");
 
-            // Mo Ye (20001443) and Taia (56495147) guarantee opening hand has both
             var p0Main = new List<uint>();
             for (int i = 0; i < 20; i++) p0Main.Add(20001443);
             for (int i = 0; i < 20; i++) p0Main.Add(56495147);
@@ -113,11 +120,9 @@ namespace YGOPortable.Editor
             var p1Main = new List<uint>();
             while (p1Main.Count < 40) p1Main.Add(20721928);
 
-            using (var s = new DuelSession())
+            using (var s = YgoProjectBuilder.StartSeedMatching("Swordsoul", p0Main.ToArray(), p0Extra, p1Main.ToArray(), Array.Empty<uint>(), true,
+                session => session.Players[0].hand.Any(c => c.code == 20001443) && session.Players[0].hand.Any(c => c.code == 56495147)))
             {
-                bool started = s.StartNewDuel(p0Main, p0Extra, p1Main, Array.Empty<uint>(), p0GoesFirst: true);
-                if (!started) throw new Exception("Failed to start duel for Swordsoul test");
-
                 var ai = new TacticalAI { Difficulty = AIDifficulty.Smart };
                 bool summonedMoYe = false;
                 bool tokenCreated = false;
@@ -126,10 +131,21 @@ namespace YGOPortable.Editor
                 int guard = 0;
                 while (!s.IsFinished && guard++ < 80)
                 {
+                    if (s.Players[0].mzone.Any(c => c != null && c.code == 69248256))
+                    {
+                        synchroChixiao = true;
+                        break;
+                    }
+                    var token = s.Players[0].mzone.FirstOrDefault(c => c != null && c.code == 20001444);
+                    if (token != null && !tokenCreated)
+                    {
+                        const uint tokenFlags = YgoConstants.TYPE_TOKEN | YgoConstants.TYPE_TUNER;
+                        if ((token.type & tokenFlags) != tokenFlags || token.level != 4)
+                            throw new Exception("Mo Ye did not generate a level 4 Tuner Token");
+                        tokenCreated = true;
+                    }
                     if (s.ActivePrompt == null) { s.StepUntilPrompt(); continue; }
                     var p = s.ActivePrompt;
-                    Debug.Log($"[DPE PROMPT] Player={p.playerId}, Msg={p.messageType}, ActCount={p.activatable.Count}, ActCodes=[{string.Join(",", p.activatable.Select(a => a.code))}], Candidates={p.candidates.Count}");
-                    Debug.Log($"[TEST 3 PROMPT] Player={p.playerId}, Msg={p.messageType}, ActCount={p.activatable.Count}, ActCodes=[{string.Join(",", p.activatable.Select(a => a.code))}], Candidates={p.candidates.Count}");
                     Debug.Log($"[PROMPT] Player={p.playerId}, Msg={p.messageType}, CardCode={p.promptCardCode}, Desc={p.promptDesc}, Summonable={p.summonable.Count}, Activatable={p.activatable.Count}, Candidates={p.candidates.Count}");
 
                     if (p.playerId == 0)
@@ -151,7 +167,6 @@ namespace YGOPortable.Editor
                             if (tokenCreated && !synchroChixiao && p.spSummonable.Any(m => m.code == 69248256))
                             {
                                 int idx = p.spSummonable.FindIndex(m => m.code == 69248256);
-                                synchroChixiao = true;
                                 Debug.Log($"[ACTION] Synchro Summoning Chixiao (idx={idx})");
                                 s.SubmitResponseInt((idx << 16) | 1);
                                 continue;
@@ -190,20 +205,13 @@ namespace YGOPortable.Editor
                         }
                     }
 
-                    // Check if token is now on field
-                    var tok = s.Players[0].mzone.FirstOrDefault(c => c != null && (c.type & YgoConstants.TYPE_TOKEN) != 0);
-                    if (tok != null && !tokenCreated)
-                    {
-                        tokenCreated = true;
-                        Debug.Log($"[TOKEN TEST 1] Token detected: Code={tok.code}, Type=0x{tok.type:X}, Level={tok.level}, Race=0x{tok.race:X}, Atk={tok.attack}, Def={tok.defense}");
-                    }
-
                     s.SubmitResponse(ai.ComputeResponse(s, p));
                 }
 
                 Debug.Log($"Logs:\n{string.Join("\n", s.Logs.TakeLast(15))}");
                 if (!summonedMoYe) throw new Exception("Failed to summon Mo Ye");
                 if (!tokenCreated) throw new Exception("Failed to generate Swordsoul Token");
+                if (!synchroChixiao || s.RetryCount != 0) throw new Exception("Chixiao Synchro Summon did not resolve cleanly");
             }
         }
 
@@ -213,16 +221,15 @@ namespace YGOPortable.Editor
 
             var p0Main = new List<uint>();
             for (int i = 0; i < 20; i++) p0Main.Add(3285551);
-            for (int i = 0; i < 20; i++) p0Main.Add(20721928);
+            for (int i = 0; i < 19; i++) p0Main.Add(20721928);
+            p0Main.Add(39568067); // Fateful Adventure
 
             var p1Main = new List<uint>();
             while (p1Main.Count < 40) p1Main.Add(20721928);
 
-            using (var s = new DuelSession())
+            using (var s = YgoProjectBuilder.StartSeedMatching("Adventurer", p0Main.ToArray(), Array.Empty<uint>(), p1Main.ToArray(), Array.Empty<uint>(), true,
+                session => session.Players[0].hand.Any(c => c.code == 3285551) && session.Players[0].hand.All(c => c.code != 39568067)))
             {
-                bool started = s.StartNewDuel(p0Main, Array.Empty<uint>(), p1Main, Array.Empty<uint>(), p0GoesFirst: true);
-                if (!started) throw new Exception("Failed to start duel for Adventurer test");
-
                 var ai = new TacticalAI { Difficulty = AIDifficulty.Smart };
                 bool activatedRite = false;
                 bool tokenCreated = false;
@@ -254,7 +261,7 @@ namespace YGOPortable.Editor
                         }
                     }
 
-                    var tok = s.Players[0].mzone.FirstOrDefault(c => c != null && (c.type & YgoConstants.TYPE_TOKEN) != 0);
+                    var tok = s.Players[0].mzone.FirstOrDefault(c => c != null && c.code == 3285552);
                     if (tok != null && !tokenCreated)
                     {
                         tokenCreated = true;
@@ -263,14 +270,17 @@ namespace YGOPortable.Editor
                             throw new Exception($"Adventurer Token should have 2000/2000 ATK/DEF, got {tok.attack}/{tok.defense}");
                         if (tok.level != 4)
                             throw new Exception($"Adventurer Token should be Level 4, got {tok.level}");
-                        break;
                     }
+                    if (tokenCreated && s.Players[0].szone.Any(c => c != null && c.code == 39568067 && c.IsFaceUp))
+                        break;
 
                     s.SubmitResponse(ai.ComputeResponse(s, p));
                 }
 
                 if (!activatedRite) throw new Exception("Failed to activate Rite of Aramesir");
                 if (!tokenCreated) throw new Exception("Failed to generate Adventurer Token");
+                if (s.RetryCount != 0 || !s.Players[0].szone.Any(c => c != null && c.code == 39568067 && c.IsFaceUp))
+                    throw new Exception("Rite of Aramesir did not place Fateful Adventure from the Deck");
             }
         }
 
@@ -285,14 +295,13 @@ namespace YGOPortable.Editor
             var p1Main = new List<uint>();
             while (p1Main.Count < 40) p1Main.Add(20721928);
 
-            using (var s = new DuelSession())
+            using (var s = YgoProjectBuilder.StartSeedMatching("Scapegoat and Dark Hole", p0Main.ToArray(), Array.Empty<uint>(), p1Main.ToArray(), Array.Empty<uint>(), true,
+                session => session.Players[0].hand.Any(c => c.code == 73915051) && session.Players[0].hand.Any(c => c.code == 53129443)))
             {
-                bool started = s.StartNewDuel(p0Main, Array.Empty<uint>(), p1Main, Array.Empty<uint>(), p0GoesFirst: true);
-                if (!started) throw new Exception("Failed to start duel for Token Disappearance test");
-
                 var ai = new TacticalAI { Difficulty = AIDifficulty.Smart };
                 bool activatedScapegoat = false;
                 bool activatedDarkHole = false;
+                bool tokensVanished = false;
 
                 int guard = 0;
                 int maxTokensSeen = 0;
@@ -351,12 +360,14 @@ namespace YGOPortable.Editor
                         if (maxTokensSeen != 4) throw new Exception($"Expected 4 tokens spawned by Scapegoat, but saw max {maxTokensSeen}");
                         if (fieldTokens != 0) throw new Exception("Tokens should be destroyed from field");
                         if (gyTokens != 0) throw new Exception($"Tokens must vanish and NOT exist in Graveyard! Found {gyTokens} in GY");
+                        tokensVanished = true;
                         break;
                     }
                 }
 
                 if (!activatedScapegoat || !activatedDarkHole)
                     throw new Exception($"Failed steps: Scapegoat={activatedScapegoat}, DarkHole={activatedDarkHole}");
+                if (!tokensVanished || s.RetryCount != 0) throw new Exception("Scapegoat token removal did not resolve cleanly");
             }
         }
 
@@ -374,11 +385,9 @@ namespace YGOPortable.Editor
             var p1Main = new List<uint>();
             while (p1Main.Count < 40) p1Main.Add(20721928);
 
-            using (var s = new DuelSession())
+            using (var s = YgoProjectBuilder.StartSeedMatching("Phoenix Enforcer", p0Main.ToArray(), p0Extra, p1Main.ToArray(), Array.Empty<uint>(), true,
+                session => session.Players[0].hand.Any(c => c.code == 52947044) && session.Players[0].hand.Any(c => c.code == 53129443)))
             {
-                bool started = s.StartNewDuel(p0Main, p0Extra, p1Main, Array.Empty<uint>(), p0GoesFirst: true);
-                if (!started) throw new Exception("Failed to start duel for DPE test");
-
                 var ai = new TacticalAI { Difficulty = AIDifficulty.Smart };
                 bool activatedFusionDestiny = false;
                 bool summonedDPE = false;
@@ -485,7 +494,8 @@ namespace YGOPortable.Editor
                 if (!summonedDPE) throw new Exception("Failed to summon DPE");
                 if (!passedDPEQuickEffect) throw new Exception("Failed to test DPE quick effect pass/cancel");
                 if (!triggeredDPEGraveEffect) throw new Exception("Failed to trigger DPE graveyard effect");
-                if (!revivedDPEInOppStandby) throw new Exception("Failed to revive DPE during opponent's Standby Phase");
+                if (!revivedDPEInOppStandby || s.RetryCount != 0 || !s.Players[0].mzone.Any(c => c != null && c.code == 60461804))
+                    throw new Exception("Failed to complete DPE revival during opponent's Standby Phase");
             }
         }
 
@@ -494,7 +504,7 @@ namespace YGOPortable.Editor
             Debug.Log("[TOKEN & EFFECT TEST 5] Tearlaments GY Trigger Order (SEGOC) & Mandatory vs Optional Distinction...");
 
             // 74191942 = Painful Choice (고통의 선택: sends 4 cards from Deck to GY simultaneously by card effect)
-            // 15341821 = Dandylion (댄디라이언: Mandatory GY trigger -> summons 2 Fluff Tokens 15341822)
+            // 15341821 = Dandylion (댄디라이언: Mandatory GY trigger -> summons Fluff Tokens 15341822 and 15341823)
             // 79814787 = The White Stone of Legend (전설의 백석: Mandatory GY trigger -> adds Blue-Eyes 89631139 from Deck to Hand)
             // 572850   = Tearlaments Scheiren (티아라멘츠 셰이렌: Optional GY trigger -> Fusion Summon from GY)
             // 74078255 = Tearlaments Merrli (티아라멘츠 메이루: Optional GY trigger -> Fusion Summon from GY)
@@ -513,21 +523,9 @@ namespace YGOPortable.Editor
             var p1Main = new List<uint>();
             while (p1Main.Count < 40) p1Main.Add(20721928);
 
-            using (var s = new DuelSession())
+            using (var s = YgoProjectBuilder.StartSeedMatching("Tearlaments simultaneous triggers", p0Main.ToArray(), p0Extra, p1Main.ToArray(), Array.Empty<uint>(), true,
+                session => session.Players[0].hand.Count == 5 && session.Players[0].hand.All(c => c.code == 74191942)))
             {
-                bool ready = false;
-                for (int attempt = 0; attempt < 40; attempt++)
-                {
-                    if (!s.StartNewDuel(p0Main, p0Extra, p1Main, Array.Empty<uint>(), p0GoesFirst: true))
-                        throw new Exception("Failed to start duel for Tearlaments SEGOC test");
-                    if (s.Players[0].hand.All(c => c.code == 74191942))
-                    {
-                        ready = true;
-                        break;
-                    }
-                }
-                if (!ready) throw new Exception("Failed to roll opening hand of Painful Choice");
-
                 var ai = new TacticalAI { Difficulty = AIDifficulty.Smart };
                 bool activatedPainfulChoice = false;
                 bool pickedPainfulFive = false;
@@ -673,10 +671,12 @@ namespace YGOPortable.Editor
 
                 // Verify end board & hand state:
                 // - Kitkallos (92731385) on field
-                // - 2 Fluff Tokens (15341822) on field
+                // - 2 Fluff Tokens on field
                 // - Merrli (74078255) & Scheiren (572850) returned from GY to Deck as fusion materials!
                 bool hasKitkallos = s.Players[0].mzone.Any(c => c != null && c.code == 92731385);
-                int fluffTokens = s.Players[0].mzone.Count(c => c != null && c.code == 15341822);
+                int fluffTokens = s.Players[0].mzone.Count(c => c != null &&
+                    (c.type & YgoConstants.TYPE_TOKEN) != 0 &&
+                    (c.code == 15341822 || CardDatabase.Get(c.code)?.alias == 15341822));
                 bool merrliInGy = s.Players[0].grave.Any(c => c.code == 74078255);
                 bool scheirenInGy = s.Players[0].grave.Any(c => c.code == 572850);
                 int bewdInHand = s.Players[0].hand.Count(c => c.code == 89631139);

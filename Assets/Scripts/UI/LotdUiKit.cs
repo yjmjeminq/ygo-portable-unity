@@ -8,6 +8,7 @@ namespace YGOPortable.UI
 {
     public static class LotdUiKit
     {
+        public const float CardAspectRatio = 400f / 580f;
         public static readonly Color BgDeep = new Color(0.03f, 0.065f, 0.135f, 1f);
         public static readonly Color PanelNavy = new Color(0.045f, 0.095f, 0.195f, 0.94f);
         public static readonly Color PanelHeader = new Color(0.07f, 0.16f, 0.32f, 0.96f);
@@ -138,6 +139,48 @@ namespace YGOPortable.UI
             return rt;
         }
 
+        public static RectTransform CreateMenuPanel(Transform parent, string name,
+            Vector2 anchorMin, Vector2 anchorMax, bool highlighted = false)
+        {
+            var panel = CreateRect(name, parent, anchorMin, anchorMax, Vector2.zero, Vector2.zero);
+            AddImage(panel.gameObject, LoadSprite("LOTD/Shared/opponentframe_fill"), Color.white);
+            var frame = AddImage(FillRect("Frame", panel).gameObject, LoadSprite("LOTD/Shared/menuframe"),
+                Color.white, false, false);
+            if (frame.sprite.border.sqrMagnitude > 0f)
+                frame.type = Image.Type.Sliced;
+            if (highlighted)
+            {
+                var outline = panel.gameObject.AddComponent<Outline>();
+                outline.effectColor = GoldAccent;
+                outline.effectDistance = new Vector2(2f, -2f);
+            }
+            return panel;
+        }
+
+        public static void AddMenuHeader(Transform parent, string title)
+        {
+            var header = CreateRect("MenuHeader", parent, new Vector2(0.25f, 0.90f), new Vector2(0.75f, 0.995f),
+                Vector2.zero, Vector2.zero);
+            AddImage(header.gameObject, LoadSprite("LOTD/Shared/menuheader"), Color.white, false, false);
+            AddText(header, "Heading", title, 32, TextAnchor.MiddleCenter,
+                new Color(0.025f, 0.075f, 0.14f), FontStyle.Bold);
+        }
+
+        public static Scrollbar AddVerticalScrollbar(Transform parent)
+        {
+            var track = CreateRect("Scrollbar", parent, new Vector2(1f, 0f), Vector2.one,
+                new Vector2(-14f, 1f), new Vector2(-2f, -1f));
+            AddImage(track.gameObject, LoadSprite("LOTD/Shared/scrollbar_blue_track"), Color.white);
+            var slide = FillRect("SlidingArea", track, 1f);
+            var thumb = FillRect("Handle", slide);
+            var image = AddImage(thumb.gameObject, LoadSprite("LOTD/Shared/scrollbar_blue_thumb"), Color.white);
+            var scrollbar = track.gameObject.AddComponent<Scrollbar>();
+            scrollbar.direction = Scrollbar.Direction.BottomToTop;
+            scrollbar.handleRect = thumb;
+            scrollbar.targetGraphic = image;
+            return scrollbar;
+        }
+
         public static Button CreateLotdButton(Transform parent, string name, string label,
             Action onClick, int fontSize = 18, bool gold = false)
         {
@@ -209,8 +252,10 @@ namespace YGOPortable.UI
         private Text _levelText;
         private Text _scaleText;
         private Text _atkDefText;
+        private Text _rulesText;
         private GameObject _backObj;
         private bool _detailed;
+        private uint _retainedArtwork;
 
         public uint CurrentCode { get; private set; }
 
@@ -235,7 +280,7 @@ namespace YGOPortable.UI
             var innerRt = LotdUiKit.FillRect("AspectBox", transform);
             var arf = innerRt.gameObject.AddComponent<AspectRatioFitter>();
             arf.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
-            arf.aspectRatio = 400f / 580f;
+            arf.aspectRatio = LotdUiKit.CardAspectRatio;
 
             // Artwork box behind the cutout of card_*.png (LOTD 400x580 frame: art box ~ 12.2%..87.8% X, 29.6%..81.5% Y from bottom)
             var artRt = LotdUiKit.CreateRect("Artwork", innerRt,
@@ -271,6 +316,11 @@ namespace YGOPortable.UI
                     new Vector2(0.08f, 0.21f), new Vector2(0.92f, 0.27f), Vector2.zero, Vector2.zero);
                 _scaleText = LotdUiKit.AddText(scRt, "Sc", "", 12, TextAnchor.MiddleCenter, LotdUiKit.CyanAccent, FontStyle.Bold);
 
+                var rules = LotdUiKit.CreateRect("Rules", innerRt,
+                    new Vector2(0.114f, 0.104f), new Vector2(0.891f, 0.286f), Vector2.zero, Vector2.zero);
+                _rulesText = LotdUiKit.AddText(rules, "Text", "", 9, TextAnchor.UpperLeft, new Color(0.09f, 0.07f, 0.05f));
+                _rulesText.supportRichText = false;
+
                 var statRt = LotdUiKit.CreateRect("AtkDef", innerRt,
                     new Vector2(0.12f, 0.045f), new Vector2(0.90f, 0.095f), Vector2.zero, Vector2.zero);
                 _atkDefText = LotdUiKit.AddText(statRt, "Stat", "", 11, TextAnchor.MiddleRight, new Color(0.12f, 0.1f, 0.1f, 1f), FontStyle.Bold);
@@ -292,6 +342,7 @@ namespace YGOPortable.UI
             CurrentCode = code;
             if (faceDown || code == 0)
             {
+                ReleaseArtwork();
                 _backObj.SetActive(true);
                 return;
             }
@@ -313,11 +364,13 @@ namespace YGOPortable.UI
                 artRt.anchorMax = new Vector2(0.880f, 0.818f);
             }
 
-            _artImg.sprite = CardArtLoader.GetArtSprite(code);
+            BindArtwork(code);
             _frameImg.sprite = LotdUiKit.LoadSprite($"LOTD/Frames/{YgoConstants.GetCardFrameName(type)}");
 
             if (_detailed)
             {
+                _rulesText.rectTransform.anchorMax = new Vector2(0.891f, isPend ? 0.209f : 0.286f);
+                _rulesText.text = info?.desc ?? "";
                 _titleText.text = info != null ? info.name : $"카드 #{code}";
                 bool darkFrame = (type & (YgoConstants.TYPE_XYZ | YgoConstants.TYPE_LINK | YgoConstants.TYPE_SPELL | YgoConstants.TYPE_TRAP | YgoConstants.TYPE_FUSION)) != 0;
                 _titleText.color = darkFrame ? Color.white : new Color(0.10f, 0.08f, 0.06f, 1f);
@@ -372,6 +425,34 @@ namespace YGOPortable.UI
                     _atkDefText.text = "";
                 }
             }
+        }
+
+        private void OnEnable()
+        {
+            if (_backObj != null && !_backObj.activeSelf)
+                BindArtwork(CurrentCode);
+        }
+
+        private void OnDisable()
+        {
+            ReleaseArtwork();
+        }
+
+        private void BindArtwork(uint code)
+        {
+            if (code == _retainedArtwork && _artImg.sprite != null) return;
+            ReleaseArtwork();
+            if (code == 0 || !isActiveAndEnabled) return;
+            _artImg.sprite = CardArtLoader.RetainArtwork(code);
+            _retainedArtwork = code;
+        }
+
+        private void ReleaseArtwork()
+        {
+            if (_retainedArtwork == 0) return;
+            _artImg.sprite = null;
+            CardArtLoader.ReleaseArtwork(_retainedArtwork);
+            _retainedArtwork = 0;
         }
     }
 

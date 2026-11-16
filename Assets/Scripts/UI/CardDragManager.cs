@@ -168,6 +168,7 @@ namespace YGOPortable.UI
         public static bool ContainsScreenPoint(RectTransform rt, Vector2 screenPoint)
         {
             if (rt == null || !rt.gameObject.activeInHierarchy) return false;
+            if (rt.TryGetComponent<DuelZoneImage>(out var zone)) return zone.IsRaycastLocationValid(screenPoint, null);
             return RectTransformUtility.RectangleContainsScreenPoint(rt, screenPoint, null);
         }
     }

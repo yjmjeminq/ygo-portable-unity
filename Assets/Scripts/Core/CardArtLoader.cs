@@ -19,8 +19,10 @@ namespace YGOPortable.Core
         private static string _streamingDir;
 
         private const int MaxCacheCount = 500;
-        private static readonly Dictionary<uint, Sprite> _spriteCache = new Dictionary<uint, Sprite>(MaxCacheCount);
+        private static readonly Dictionary<uint, (Sprite sprite, LinkedListNode<uint> node)> _spriteCache =
+            new Dictionary<uint, (Sprite, LinkedListNode<uint>)>(MaxCacheCount);
         private static readonly LinkedList<uint> _lru = new LinkedList<uint>();
+        private static readonly Dictionary<uint, int> _visibleArtwork = new Dictionary<uint, int>();
         private static Sprite _fallbackArt;
         private static Sprite _cardBackSprite;
 
@@ -69,9 +71,15 @@ namespace YGOPortable.Core
         public static Sprite GetArtSprite(uint code)
         {
             if (code == 0) return GetCardBackSprite();
-            if (_spriteCache.TryGetValue(code, out var cached) && cached != null)
+            if (_spriteCache.TryGetValue(code, out var cached))
             {
-                return cached;
+                _lru.Remove(cached.node);
+                if (cached.sprite != null)
+                {
+                    _lru.AddLast(cached.node);
+                    return cached.sprite;
+                }
+                _spriteCache.Remove(code);
             }
 
             uint lookupCode = code;
@@ -135,9 +143,8 @@ namespace YGOPortable.Core
                 tex.filterMode = FilterMode.Bilinear;
                 var sp = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
 
-                EvictIfNeeded();
-                _spriteCache[code] = sp;
-                _lru.AddLast(code);
+                TrimArtwork(MaxCacheCount - 1);
+                _spriteCache[code] = (sp, _lru.AddLast(code));
                 return sp;
             }
             catch
@@ -146,20 +153,48 @@ namespace YGOPortable.Core
             }
         }
 
-        private static void EvictIfNeeded()
+        internal static Sprite RetainArtwork(uint code)
         {
-            while (_lru.Count >= MaxCacheCount && _lru.First != null)
+            var sprite = GetArtSprite(code);
+            if (_spriteCache.ContainsKey(code))
             {
-                uint old = _lru.First.Value;
-                _lru.RemoveFirst();
-                if (_spriteCache.TryGetValue(old, out var sp) && sp != null)
-                {
-                    var tex = sp.texture;
-                    UnityEngine.Object.Destroy(sp);
-                    if (tex != null) UnityEngine.Object.Destroy(tex);
-                }
-                _spriteCache.Remove(old);
+                _visibleArtwork.TryGetValue(code, out int views);
+                _visibleArtwork[code] = views + 1;
             }
+            return sprite;
+        }
+
+        internal static void ReleaseArtwork(uint code)
+        {
+            if (!_visibleArtwork.TryGetValue(code, out int views)) return;
+            if (views > 1) _visibleArtwork[code] = views - 1;
+            else _visibleArtwork.Remove(code);
+            TrimArtwork(MaxCacheCount);
+        }
+
+        private static void TrimArtwork(int capacity)
+        {
+            var node = _lru.First;
+            while (_spriteCache.Count > capacity && node != null)
+            {
+                var next = node.Next;
+                uint code = node.Value;
+                if (!_visibleArtwork.ContainsKey(code))
+                {
+                    DestroyArtwork(_spriteCache[code].sprite);
+                    _spriteCache.Remove(code);
+                    _lru.Remove(node);
+                }
+                node = next;
+            }
+        }
+
+        private static void DestroyArtwork(Sprite sprite)
+        {
+            if (sprite == null) return;
+            var texture = sprite.texture;
+            UnityEngine.Object.Destroy(sprite);
+            if (texture != null) UnityEngine.Object.Destroy(texture);
         }
 
         public static Sprite GetFallbackArt()
@@ -181,17 +216,11 @@ namespace YGOPortable.Core
                 foreach (var fs in _packStreams.Values) fs?.Dispose();
                 _packStreams.Clear();
             }
-            foreach (var sp in _spriteCache.Values)
-            {
-                if (sp != null)
-                {
-                    var tex = sp.texture;
-                    UnityEngine.Object.Destroy(sp);
-                    if (tex != null) UnityEngine.Object.Destroy(tex);
-                }
-            }
+            foreach (var entry in _spriteCache.Values)
+                DestroyArtwork(entry.sprite);
             _spriteCache.Clear();
             _lru.Clear();
+            _visibleArtwork.Clear();
             _index = null;
         }
     }

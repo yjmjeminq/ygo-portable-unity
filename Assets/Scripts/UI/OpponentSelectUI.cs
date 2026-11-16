@@ -64,6 +64,12 @@ namespace YGOPortable.UI
             ApplyFilter();
         }
 
+        public void ShowStatus(string message, bool isError = false)
+        {
+            _statusToast.color = isError ? LotdUiKit.RedAccent : LotdUiKit.GreenAccent;
+            _statusToast.text = message;
+        }
+
         private void EnsureValidMyDeckIndex()
         {
             if (DeckRepository.UserDecks.Count == 0) return;
@@ -77,21 +83,15 @@ namespace YGOPortable.UI
             Root = rt.gameObject;
 
             var bg = LotdUiKit.FillRect("Bg", rt);
-            LotdUiKit.AddImage(bg.gameObject, LotdUiKit.LoadSprite("LOTD/Background/noise_bgtec_small"), new Color(0.55f, 0.78f, 1f, 1f));
-            LotdUiKit.AddImage(LotdUiKit.FillRect("Dim", rt).gameObject, LotdUiKit.WhiteSprite, new Color(0.02f, 0.06f, 0.14f, 0.70f));
-
-            // Top Header
-            var hdr = LotdUiKit.CreateBorderedPanel(rt, "TopHdr",
-                new Vector2(0f, 0.91f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero,
-                LotdUiKit.PanelHeader, LotdUiKit.CyanAccent);
-            LotdUiKit.AddText(hdr, "Title", "  프리 듀얼 — 상대 및 덱 선택 (오프라인 AI)", 22, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
-
-            var backRt = LotdUiKit.CreateRect("Back", hdr, new Vector2(0.84f, 0.12f), new Vector2(0.98f, 0.88f), Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(bg.gameObject, LotdUiKit.LoadSprite("LOTD/Background/bg_vrains"), Color.white, false, false);
+            LotdUiKit.AddMenuHeader(rt, "프리 듀얼");
+            var backRt = LotdUiKit.CreateRect("Back", rt, new Vector2(0.858f, 0.922f), new Vector2(0.981f, 0.977f),
+                Vector2.zero, Vector2.zero);
             LotdUiKit.CreateLotdButton(backRt, "B", "메인 메뉴", () => _app.ShowScreen(AppScreen.MainMenu), 16);
 
             // Series Tabs row (LOTD series)
-            var tabBar = LotdUiKit.CreateBorderedPanel(rt, "SeriesTabs",
-                new Vector2(0.02f, 0.825f), new Vector2(0.62f, 0.895f), Vector2.zero, Vector2.zero);
+            var tabBar = LotdUiKit.CreateMenuPanel(rt, "SeriesTabs",
+                new Vector2(0.02f, 0.825f), new Vector2(0.62f, 0.895f));
             (int sid, string label)[] tabs =
             {
                 (6, "2026 메타"), (0, "DM"), (1, "GX"), (2, "5D's"),
@@ -125,8 +125,8 @@ namespace YGOPortable.UI
             });
 
             // Left 5x3 Character Portrait Grid
-            var leftGridPanel = LotdUiKit.CreateBorderedPanel(rt, "CharGridPanel",
-                new Vector2(0.02f, 0.03f), new Vector2(0.62f, 0.81f), Vector2.zero, Vector2.zero);
+            var leftGridPanel = LotdUiKit.CreateMenuPanel(rt, "CharGridPanel",
+                new Vector2(0.02f, 0.03f), new Vector2(0.62f, 0.81f));
 
             var gridArea = LotdUiKit.CreateRect("GridArea", leftGridPanel,
                 new Vector2(0.02f, 0.10f), new Vector2(0.98f, 0.98f), Vector2.zero, Vector2.zero);
@@ -148,8 +148,8 @@ namespace YGOPortable.UI
             }, 14);
 
             // Right Detail & Duel Setup Panel
-            var rightPanel = LotdUiKit.CreateBorderedPanel(rt, "OppDetailPanel",
-                new Vector2(0.635f, 0.03f), new Vector2(0.98f, 0.81f), Vector2.zero, Vector2.zero);
+            var rightPanel = LotdUiKit.CreateMenuPanel(rt, "OppDetailPanel",
+                new Vector2(0.635f, 0.03f), new Vector2(0.98f, 0.81f), true);
 
             // Top: Portrait + Name + Series/Bio
             var oppHeader = LotdUiKit.CreateRect("OppHdr", rightPanel,
@@ -193,7 +193,7 @@ namespace YGOPortable.UI
             var myDeckBox = LotdUiKit.CreateBorderedPanel(rightPanel, "MyDeckBox",
                 new Vector2(0.03f, 0.16f), new Vector2(0.97f, 0.34f), Vector2.zero, Vector2.zero);
             LotdUiKit.AddText(LotdUiKit.CreateRect("Lbl", myDeckBox, new Vector2(0.03f, 0.56f), new Vector2(0.97f, 0.94f), Vector2.zero, Vector2.zero),
-                "L", "내 사용 덱 (My Deck)", 13, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
+                "L", "내 덱", 14, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
 
             _myDeckLabel = LotdUiKit.AddText(LotdUiKit.CreateRect("Val", myDeckBox, new Vector2(0.18f, 0.08f), new Vector2(0.82f, 0.56f), Vector2.zero, Vector2.zero),
                 "V", "", 15, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
@@ -214,7 +214,7 @@ namespace YGOPortable.UI
             // Start Duel Button
             var startRt = LotdUiKit.CreateRect("StartDuelBtn", rightPanel,
                 new Vector2(0.04f, 0.02f), new Vector2(0.96f, 0.095f), Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(startRt, "B", "가위바위보 & 듀얼 시작!", OpenJanken, 20, gold: true);
+            LotdUiKit.CreateLotdButton(startRt, "B", "듀얼 시작", OpenJanken, 20, gold: true);
         }
 
         private void BuildGridSlots(Transform gridArea)
@@ -382,7 +382,7 @@ namespace YGOPortable.UI
             var cloned = DeckRepository.ClonePresetToUserDeck(d);
             _myDeckIdx = DeckRepository.UserDecks.IndexOf(cloned);
             UpdateMyDeckLabel();
-            _statusToast.text = "내 덱으로 복제 완료!";
+            ShowStatus("내 덱으로 복제 완료!");
         }
 
         private void OpenJanken()
@@ -391,8 +391,7 @@ namespace YGOPortable.UI
             var myDeck = DeckRepository.UserDecks[_myDeckIdx];
             if (!myDeck.IsPlayable)
             {
-                _statusToast.color = LotdUiKit.RedAccent;
-                _statusToast.text = $"내 덱은 메인 40~60장이어야 합니다 (현재 {myDeck.main.Count}장)";
+                ShowStatus($"내 덱은 메인 40~60장이어야 합니다 (현재 {myDeck.main.Count}장)", true);
                 return;
             }
             JankenRoot.SetActive(true);

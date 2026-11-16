@@ -1,7 +1,6 @@
 using System;
 using UnityEngine;
 using UnityEngine.UI;
-using YGOPortable.Core;
 
 namespace YGOPortable.UI
 {
@@ -23,124 +22,63 @@ namespace YGOPortable.UI
 
         private void BuildTitleScreen(Transform parent)
         {
-            var rt = LotdUiKit.FillRect("Screen_Title", parent);
-            TitleRoot = rt.gameObject;
+            var root = LotdUiKit.FillRect("Screen_Title", parent);
+            TitleRoot = root.gameObject;
+            AddTitleBackground(root);
 
-            // LOTD cyber tech background
-            var bg = LotdUiKit.FillRect("Bg", rt);
-            var bgSp = LotdUiKit.LoadSprite("LOTD/Background/noise_bgtec_small");
-            LotdUiKit.AddImage(bg.gameObject, bgSp, bgSp != null ? new Color(0.65f, 0.85f, 1f, 1f) : LotdUiKit.BgDeep);
-
-            // Subtle vignette & cyber frame
-            var dim = LotdUiKit.FillRect("Vignette", rt);
-            LotdUiKit.AddImage(dim.gameObject, LotdUiKit.WhiteSprite, new Color(0.01f, 0.04f, 0.11f, 0.55f));
-
-            // Center title logo
-            var logoRt = LotdUiKit.CreateRect("Logo", rt,
-                new Vector2(0.18f, 0.42f), new Vector2(0.82f, 0.86f), Vector2.zero, Vector2.zero);
-            var logoSp = LotdUiKit.LoadSprite("LOTD/Title/logo_us") ?? LotdUiKit.LoadSprite("LOTD/Title/logo_jp");
-            if (logoSp != null)
-            {
-                LotdUiKit.AddImage(logoRt.gameObject, logoSp, Color.white, true);
-            }
-            else
-            {
-                LotdUiKit.AddText(logoRt, "TitleFallback", "유희왕! 레거시 오브 더 듀얼리스트\nPORTABLE 2026", 46, TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
-            }
-
-            // Subtitle badge
-            var subRt = LotdUiKit.CreateBorderedPanel(rt, "SubBadge",
-                new Vector2(0.27f, 0.31f), new Vector2(0.73f, 0.39f), Vector2.zero, Vector2.zero,
-                new Color(0.03f, 0.10f, 0.24f, 0.90f), LotdUiKit.GoldAccent);
-            LotdUiKit.AddText(subRt, "SubTxt", "LINK EVOLUTION 오프라인 한글판  •  2026.11 메타 & 오리지널 완전판",
-                19, TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
-
-            // Play / Start button
-            var btnHolder = LotdUiKit.CreateRect("PlayBtn", rt,
-                new Vector2(0.35f, 0.13f), new Vector2(0.65f, 0.24f), Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(btnHolder, "Btn_Start", "게임 시작  (PRESS START)", () => _app.ShowScreen(AppScreen.MainMenu), 24, gold: true);
-
-            // Footer info
-            var ft = LotdUiKit.CreateRect("Footer", rt,
-                new Vector2(0.05f, 0.02f), new Vector2(0.95f, 0.08f), Vector2.zero, Vector2.zero);
-            int cardCnt = CardDatabase.IsLoaded ? CardDatabase.AllCards.Count : 0;
-            int deckCnt = DeckRepository.PresetDecks.Count;
-            LotdUiKit.AddText(ft, "FtTxt",
-                $"완전 오프라인 독립 엔진 (OpenDuel + YGOPro-Core)  |  수록 카드 {cardCnt:N0}장  |  대전 상대 덱 {deckCnt:N0}개",
-                15, TextAnchor.MiddleCenter, LotdUiKit.TextMuted);
+            var logo = LotdUiKit.CreateRect("Logo", root, new Vector2(0.069f, 0.46f), new Vector2(0.61f, 0.88f),
+                Vector2.zero, Vector2.zero);
+            AddLogo(logo);
+            var start = LotdUiKit.CreateRect("Start", root, new Vector2(0.166f, 0.26f),
+                new Vector2(0.496f, 0.355f), Vector2.zero, Vector2.zero);
+            LotdUiKit.CreateLotdButton(start, "Button", "게임 시작", () => _app.ShowScreen(AppScreen.MainMenu), 25, true);
         }
 
         private void BuildMainMenuScreen(Transform parent)
         {
-            var rt = LotdUiKit.FillRect("Screen_MainMenu", parent);
-            MenuRoot = rt.gameObject;
+            var root = LotdUiKit.FillRect("Screen_MainMenu", parent);
+            MenuRoot = root.gameObject;
+            AddTitleBackground(root);
 
-            var bg = LotdUiKit.FillRect("Bg", rt);
-            var bgSp = LotdUiKit.LoadSprite("LOTD/Background/noise_bgtec_small");
-            LotdUiKit.AddImage(bg.gameObject, bgSp, bgSp != null ? new Color(0.55f, 0.78f, 1f, 1f) : LotdUiKit.BgDeep);
-
-            var overlay = LotdUiKit.FillRect("Dim", rt);
-            LotdUiKit.AddImage(overlay.gameObject, LotdUiKit.WhiteSprite, new Color(0.02f, 0.06f, 0.15f, 0.60f));
-
-            // Top LOTD Header bar
-            var hdr = LotdUiKit.CreateBorderedPanel(rt, "TopBar",
-                new Vector2(0f, 0.90f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero,
-                LotdUiKit.PanelHeader, LotdUiKit.CyanAccent);
-            LotdUiKit.AddText(hdr, "HdrTitle", "  유희왕! LEGACY OF THE DUELIST — 오프라인 메인 메뉴", 24, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
-
-            // Left Showcase Character & Blue-Eyes/Dark Magician Art Panel
-            var showcase = LotdUiKit.CreateBorderedPanel(rt, "Showcase",
-                new Vector2(0.05f, 0.10f), new Vector2(0.47f, 0.85f), Vector2.zero, Vector2.zero);
-
-            var bustRt = LotdUiKit.CreateRect("HeroBust", showcase,
-                new Vector2(0.08f, 0.22f), new Vector2(0.92f, 0.94f), Vector2.zero, Vector2.zero);
-            var heroBust = LotdUiKit.LoadSprite("LOTD/Busts/yamiyugi_neutral") ?? LotdUiKit.LoadSprite("LOTD/Busts/atem_neutral");
-            LotdUiKit.AddImage(bustRt.gameObject, heroBust, Color.white, true);
-
-            var capRt = LotdUiKit.CreateRect("HeroCap", showcase,
-                new Vector2(0.05f, 0.04f), new Vector2(0.95f, 0.22f), Vector2.zero, Vector2.zero);
-            LotdUiKit.AddText(capRt, "Info",
-                "오프라인 AI 듀얼 & 덱 에디터 전용 에디션\n• 2026.11 최신 메타 덱 20종 + 원작 850개 덱 완비\n• 환상마족 포함 전 종족 & 14,884장 한글 데이터베이스",
-                16, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary);
-
-            // Right LOTD Menu Button Stack
-            var menuFrame = LotdUiKit.CreateBorderedPanel(rt, "MenuList",
-                new Vector2(0.51f, 0.10f), new Vector2(0.95f, 0.85f), Vector2.zero, Vector2.zero);
-
-            AddMenuCardButton(menuFrame, "FreeDuel", 0.72f, 0.92f,
-                "프리 듀얼  (오프라인 AI 대전)",
-                "2026 메타 20강 및 DM~VRAINS 전 시리즈 상대와 즉시 대전",
-                true, () => _app.ShowScreen(AppScreen.OpponentSelect));
-
-            AddMenuCardButton(menuFrame, "DeckEdit", 0.49f, 0.69f,
-                "덱 편집기  (트렁크 / 덱 수정)",
-                "14,884장 한글 카드 검색 • 종족/속성/효과 필터 • 커스텀 덱 제작 & 프리셋 복제",
-                false, () => _app.ShowScreen(AppScreen.DeckEditor));
-
-            AddMenuCardButton(menuFrame, "Settings", 0.26f, 0.46f,
-                "환경 설정  (AI / 사운드 / 규칙)",
-                "AI 사고 레벨 • 효과음 볼륨 • 룰(Master Rule 5) 확인",
-                false, () => SettingsRoot.SetActive(true));
-
-            AddMenuCardButton(menuFrame, "BackTitle", 0.06f, 0.21f,
-                "타이틀로 / 게임 종료",
-                "타이틀 화면으로 돌아가거나 게임을 안전하게 종료합니다",
-                false, () => _app.ShowScreen(AppScreen.Title));
+            var logo = LotdUiKit.CreateRect("Logo", root, new Vector2(0.049f, 0.61f), new Vector2(0.503f, 0.938f),
+                Vector2.zero, Vector2.zero);
+            AddLogo(logo);
+            var menu = LotdUiKit.CreateMenuPanel(root, "Menu", new Vector2(0.081f, 0.126f),
+                new Vector2(0.489f, 0.611f));
+            AddMenuEntry(menu, 0.745f, "프리 듀얼", () => _app.ShowScreen(AppScreen.OpponentSelect), true);
+            AddMenuEntry(menu, 0.54f, "덱 편집", () => _app.ShowScreen(AppScreen.DeckEditor));
+            AddMenuEntry(menu, 0.335f, "환경 설정", () => SettingsRoot.SetActive(true));
+            AddMenuEntry(menu, 0.13f, "타이틀로 돌아가기", () => _app.ShowScreen(AppScreen.Title));
         }
 
-        private void AddMenuCardButton(Transform parent, string name, float yMin, float yMax,
-            string title, string desc, bool gold, Action onClick)
+        private static void AddTitleBackground(Transform root)
         {
-            var slot = LotdUiKit.CreateRect(name, parent,
-                new Vector2(0.06f, yMin), new Vector2(0.94f, yMax), Vector2.zero, Vector2.zero);
-            var btn = LotdUiKit.CreateLotdButton(slot, "Btn", title, onClick, 22, gold: gold);
-            var lbl = btn.GetComponentInChildren<Text>();
-            if (lbl != null) lbl.rectTransform.offsetMin = new Vector2(0f, 14f);
+            LotdUiKit.AddImage(LotdUiKit.FillRect("Backdrop", root).gameObject,
+                LotdUiKit.LoadSprite("LOTD/Background/bg_vrains"), Color.white, false, false);
+            var glow = LotdUiKit.CreateRect("Light", root, new Vector2(0.36f, 0.09f), new Vector2(0.99f, 0.90f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(glow.gameObject, LotdUiKit.LoadSprite("LOTD/Effects/summon_flare"),
+                new Color(0.26f, 0.57f, 1f, 0.37f), true, false);
 
-            var sub = LotdUiKit.CreateRect("Sub", slot,
-                new Vector2(0.08f, 0.12f), new Vector2(0.92f, 0.34f), Vector2.zero, Vector2.zero);
-            var txt = LotdUiKit.AddText(sub, "Desc", desc, 13, TextAnchor.MiddleCenter, LotdUiKit.TextMuted);
-            txt.raycastTarget = false;
+            var hero = LotdUiKit.CreateRect("Character", root, new Vector2(0.48f, -0.025f), new Vector2(0.998f, 0.96f),
+                Vector2.zero, Vector2.zero);
+            var artwork = LotdUiKit.LoadSprite("LOTD/Title/magician_girl") ?? LotdUiKit.LoadSprite("LOTD/Busts/atem_neutral");
+            if (artwork != null) LotdUiKit.AddImage(hero.gameObject, artwork, Color.white, true, false);
+        }
+
+        private static void AddLogo(RectTransform holder)
+        {
+            var logo = LotdUiKit.LoadSprite("LOTD/Title/logo_us") ?? LotdUiKit.LoadSprite("LOTD/Title/logo_jp");
+            if (logo != null) LotdUiKit.AddImage(holder.gameObject, logo, Color.white, true, false);
+            else LotdUiKit.AddText(holder, "Title", "유희왕! 레거시 오브 더 듀얼리스트", 37,
+                TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
+        }
+
+        private static void AddMenuEntry(Transform parent, float y, string label, Action action, bool selected = false)
+        {
+            var row = LotdUiKit.CreateRect("MenuEntry", parent, new Vector2(0.097f, y), new Vector2(0.91f, y + 0.159f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.CreateLotdButton(row, "Button", label, action, 23, selected);
         }
 
         private void BuildSettingsOverlay(Transform parent)
@@ -149,14 +87,13 @@ namespace YGOPortable.UI
             SettingsRoot = bg.gameObject;
             LotdUiKit.AddImage(bg.gameObject, LotdUiKit.WhiteSprite, new Color(0f, 0f, 0f, 0.72f));
 
-            var win = LotdUiKit.CreateBorderedPanel(bg, "SettingsWin",
-                new Vector2(0.28f, 0.22f), new Vector2(0.72f, 0.78f), Vector2.zero, Vector2.zero,
-                LotdUiKit.PanelNavy, LotdUiKit.CyanAccent);
+            var win = LotdUiKit.CreateMenuPanel(bg, "SettingsWin",
+                new Vector2(0.28f, 0.22f), new Vector2(0.72f, 0.78f));
 
             var hdr = LotdUiKit.CreateRect("Hdr", win,
                 new Vector2(0f, 0.84f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
             LotdUiKit.AddImage(hdr.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelHeader);
-            LotdUiKit.AddText(hdr, "T", "환경 설정 (SETTINGS)", 22, TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
+            LotdUiKit.AddText(hdr, "T", "환경 설정", 22, TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
 
             // SFX Volume Row
             var row1 = LotdUiKit.CreateRect("SfxRow", win, new Vector2(0.08f, 0.67f), new Vector2(0.92f, 0.79f), Vector2.zero, Vector2.zero);

@@ -35,6 +35,7 @@ namespace YGOPortable.UI
         private DuelPrompt _shownHumanPrompt;
         private float _aiTimer;
         private bool _resultShown;
+        private bool _refreshAfterPresentation;
 
         private OpponentCharacter _activeOppChar;
         private PresetDeckInfo _activeOppDeck;
@@ -184,6 +185,8 @@ namespace YGOPortable.UI
                 LotdAudio.PlayMenuBgm();
                 if (_session != null)
                 {
+                    _duelField.UnbindSession();
+                    CardDragManager.Instance?.CancelDrag();
                     _session.Dispose();
                     _session = null;
                     _shownHumanPrompt = null;
@@ -207,21 +210,43 @@ namespace YGOPortable.UI
             _shownHumanPrompt = null;
             _aiTimer = 0f;
             _resultShown = false;
+            _refreshAfterPresentation = false;
 
             ShowScreen(AppScreen.Duel);
             _session.PreparePlayerIndices(playerGoesFirst);
             _duelField.BindSession(_session, oppChar, oppDeck);
-            _session.StartNewDuel(
+            if (!_session.StartNewDuel(
                 myDeck.main, myDeck.extra,
                 oppDeck.main, oppDeck.extra,
-                p0GoesFirst: playerGoesFirst);
+                p0GoesFirst: playerGoesFirst))
+            {
+                ShowScreen(AppScreen.OpponentSelect);
+                _oppSelect.ShowStatus("듀얼을 시작하지 못했습니다.", true);
+                return;
+            }
             _duelField.Refresh();
         }
 
         private void Update()
         {
-            if (_session == null) return;
+            if (_session == null)
+            {
+                _deckEditor?.UpdateLayout();
+                return;
+            }
             _duelField?.Update();
+            if (_session == null) return;
+
+            if (_duelField.IsPresenting)
+            {
+                _refreshAfterPresentation = true;
+                return;
+            }
+            if (_refreshAfterPresentation)
+            {
+                _refreshAfterPresentation = false;
+                _duelField.Refresh();
+            }
 
             if (_session.IsFinished)
             {
@@ -240,6 +265,13 @@ namespace YGOPortable.UI
                         () => ShowScreen(AppScreen.OpponentSelect),
                         () => ShowScreen(AppScreen.MainMenu));
                 }
+                return;
+            }
+
+            if (_duelField.IsPaused) return;
+            if (_duelField.TryAutoFulfillPreferredPrompt())
+            {
+                _duelField.Refresh();
                 return;
             }
 
@@ -288,6 +320,7 @@ namespace YGOPortable.UI
         {
             if (_session == null || _session.IsFinished) return;
             _shownHumanPrompt = null;
+            if (_duelField.IsPresenting || _duelField.IsPaused) return;
             _session.SubmitResponse(resp);
             _duelField.Refresh();
         }

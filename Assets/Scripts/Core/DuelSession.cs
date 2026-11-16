@@ -152,6 +152,8 @@ namespace YGOPortable.Core
         public List<(int chainNumber, uint code)> SolvedChainLinks { get; } = new List<(int, uint)>();
         public List<string> Logs { get; } = new List<string>();
         public DuelPrompt ActivePrompt { get; private set; }
+        private readonly HashSet<(byte Player, uint Location, uint Sequence, uint Code)> _confirmedCards =
+            new HashSet<(byte, uint, uint, uint)>();
 
         public event Action<string> OnLogAdded;
 
@@ -164,8 +166,13 @@ namespace YGOPortable.Core
         }
 
         public event Action<CardMoveEvent> OnCardMoved;
+        public event Action<byte, IReadOnlyList<uint>> OnCardsDrawn;
+        public event Action<byte, int, int> OnLifePointsChanged;
+        public event Action<int, int> OnTurnStarted;
+        public event Action<int, int> OnPhaseChanged;
         public event Action<ChainLinkInfo> OnChainActivated;
         public event Action<byte, uint, uint, byte, uint, uint> OnAttackDeclared;
+        public event Action<byte, uint, uint, byte, uint, uint> OnBattleResolved;
         public event Action<byte, IReadOnlyList<bool>> OnCoinTossed;
         public event Action<byte, IReadOnlyList<int>> OnDiceRolled;
 
@@ -185,6 +192,7 @@ namespace YGOPortable.Core
             CurrentChain.Clear();
             SolvedChainLinks.Clear();
             Logs.Clear();
+            _confirmedCards.Clear();
 
             HumanPlayerIndex = p0GoesFirst ? 0 : 1;
 
@@ -220,8 +228,16 @@ namespace YGOPortable.Core
             var turn1Main = p0GoesFirst ? p1Main : p0Main;
             var turn1Extra = p0GoesFirst ? p1Extra : p0Extra;
 
-            LoadDeckForPlayer(0, turn0Main, turn0Extra, seed);
-            LoadDeckForPlayer(1, turn1Main, turn1Extra, seed);
+            // Reuse the duel seed for deck order so a reported match can be replayed.
+            uint shuffleSeed = 2166136261;
+            for (int i = 0; i < 4; i++)
+            {
+                shuffleSeed = unchecked((shuffleSeed ^ (uint)seed[i]) * 16777619);
+                shuffleSeed = unchecked((shuffleSeed ^ (uint)(seed[i] >> 32)) * 16777619);
+            }
+            var shuffle = new System.Random(unchecked((int)shuffleSeed));
+            LoadDeckForPlayer(0, turn0Main, turn0Extra, shuffle);
+            LoadDeckForPlayer(1, turn1Main, turn1Extra, shuffle);
 
             YgoNativeBridge.YGO_StartDuel(NativePtr);
             AddLog($"듀얼 개시! ({(p0GoesFirst ? "플레이어 선공" : "AI 선공")}) — 덱 무작위 셔플 완료");
@@ -229,20 +245,15 @@ namespace YGOPortable.Core
             return true;
         }
 
-        private void LoadDeckForPlayer(byte playerId, IReadOnlyList<uint> main, IReadOnlyList<uint> extra, ulong[] seed)
+        private void LoadDeckForPlayer(byte playerId, IReadOnlyList<uint> main, IReadOnlyList<uint> extra, System.Random shuffle)
         {
             if (main != null && main.Count > 0)
             {
                 var shuffled = new List<uint>(main);
-                using (var rng = System.Security.Cryptography.RandomNumberGenerator.Create())
+                for (int i = shuffled.Count - 1; i > 0; i--)
                 {
-                    byte[] rb = new byte[4];
-                    for (int i = shuffled.Count - 1; i > 0; i--)
-                    {
-                        rng.GetBytes(rb);
-                        int j = (int)(BitConverter.ToUInt32(rb, 0) % (uint)(i + 1));
-                        (shuffled[i], shuffled[j]) = (shuffled[j], shuffled[i]);
-                    }
+                    int j = shuffle.Next(i + 1);
+                    (shuffled[i], shuffled[j]) = (shuffled[j], shuffled[i]);
                 }
                 for (int i = shuffled.Count - 1; i >= 0; i--)
                 {
@@ -346,6 +357,41 @@ namespace YGOPortable.Core
             };
         }
 
+        internal uint GetVisibleSelectionCode(SelectableCardItem item)
+        {
+            if (item.code == 0 || item.controller == HumanPlayerIndex || item.location == 0 ||
+                item.location == YgoConstants.LOCATION_GRAVE || (item.location & YgoConstants.LOCATION_OVERLAY) != 0 ||
+                _confirmedCards.Contains((item.controller, item.location, item.sequence, item.code)))
+                return item.code;
+
+            if (item.controller >= Players.Length) return 0;
+            var player = Players[item.controller];
+            IReadOnlyList<LiveCardState> cards = item.location switch
+            {
+                YgoConstants.LOCATION_HAND => player.hand,
+                YgoConstants.LOCATION_MZONE => player.mzone,
+                YgoConstants.LOCATION_SZONE => player.szone,
+                YgoConstants.LOCATION_EXTRA => player.extra,
+                YgoConstants.LOCATION_REMOVED => player.banished,
+                _ => null,
+            };
+            var card = cards != null && item.sequence < cards.Count ? cards[(int)item.sequence] : null;
+            if (card?.isPublic == true) return item.code;
+            if (item.location == YgoConstants.LOCATION_HAND) return 0;
+            uint position = item.position != 0 ? item.position : card?.position ?? 0;
+            return (position & YgoConstants.POS_FACEUP) != 0 ? item.code : 0;
+        }
+
+        private void NotifySwapMove(SelectableCardItem card, SelectableCardItem destination)
+        {
+            OnCardMoved?.Invoke(new CardMoveEvent
+            {
+                code = card.code,
+                fromCon = card.controller, fromLoc = card.location, fromSeq = card.sequence, fromPos = card.position,
+                toCon = destination.controller, toLoc = destination.location, toSeq = destination.sequence, toPos = card.position,
+            });
+        }
+
         private void HandleMessage(byte msgType, BinaryReader br, long msgEnd)
         {
             switch (msgType)
@@ -386,11 +432,13 @@ namespace YGOPortable.Core
 
                 case YgoConstants.MSG_NEW_TURN:
                 {
+                    _confirmedCards.Clear();
                     TurnPlayer = br.ReadByte();
                     TurnNumber++;
                     HasActiveAttack = false;
                     string who = TurnPlayer == HumanPlayerIndex ? "내 턴" : "상대 턴";
                     AddLog($"=== 턴 {TurnNumber}: {who} ===");
+                    OnTurnStarted?.Invoke(TurnNumber, TurnPlayer);
                     break;
                 }
 
@@ -399,15 +447,31 @@ namespace YGOPortable.Core
                     CurrentPhase = br.ReadUInt16();
                     HasActiveAttack = false;
                     AddLog($"[{YgoConstants.GetPhaseNameKR(CurrentPhase)}]");
+                    OnPhaseChanged?.Invoke(CurrentPhase, TurnPlayer);
                     break;
                 }
 
                 case YgoConstants.MSG_DRAW:
                 {
                     byte p = br.ReadByte();
+                    if (_confirmedCards.Count != 0)
+                        _confirmedCards.RemoveWhere(c => c.Player == p &&
+                            (c.Location == YgoConstants.LOCATION_HAND || c.Location == YgoConstants.LOCATION_DECK));
                     uint cnt = br.ReadUInt32();
                     string who = p == HumanPlayerIndex ? "플레이어" : "상대";
                     AddLog($"{who} 드로우 {cnt}장");
+                    if (OnCardsDrawn != null && cnt <= (msgEnd - br.BaseStream.Position) / 8)
+                    {
+                        var codes = new uint[cnt];
+                        for (int i = 0; i < codes.Length; i++)
+                        {
+                            uint code = br.ReadUInt32();
+                            uint position = br.ReadUInt32();
+                            if (p == HumanPlayerIndex || (position & YgoConstants.POS_FACEUP) != 0)
+                                codes[i] = code;
+                        }
+                        OnCardsDrawn.Invoke(p, codes);
+                    }
                     break;
                 }
 
@@ -417,6 +481,7 @@ namespace YGOPortable.Core
                     uint amt = br.ReadUInt32();
                     Players[p].lp = Math.Max(0, Players[p].lp - (int)amt);
                     AddLog($"{(p == HumanPlayerIndex ? "플레이어" : "상대")} 데미지 -{amt} LP (남은 LP: {Players[p].lp})");
+                    OnLifePointsChanged?.Invoke(p, -(int)amt, Players[p].lp);
                     break;
                 }
 
@@ -426,6 +491,7 @@ namespace YGOPortable.Core
                     uint amt = br.ReadUInt32();
                     Players[p].lp += (int)amt;
                     AddLog($"{(p == HumanPlayerIndex ? "플레이어" : "상대")} 회복 +{amt} LP (LP: {Players[p].lp})");
+                    OnLifePointsChanged?.Invoke(p, (int)amt, Players[p].lp);
                     break;
                 }
 
@@ -435,6 +501,7 @@ namespace YGOPortable.Core
                     uint amt = br.ReadUInt32();
                     Players[p].lp = Math.Max(0, Players[p].lp - (int)amt);
                     AddLog($"{(p == HumanPlayerIndex ? "플레이어" : "상대")} LP 코스트 -{amt} (LP: {Players[p].lp})");
+                    OnLifePointsChanged?.Invoke(p, -(int)amt, Players[p].lp);
                     break;
                 }
 
@@ -442,7 +509,10 @@ namespace YGOPortable.Core
                 {
                     byte p = br.ReadByte();
                     int nlp = br.ReadInt32();
+                    int previous = Players[p].lp;
                     Players[p].lp = Math.Max(0, nlp);
+                    if (Players[p].lp != previous)
+                        OnLifePointsChanged?.Invoke(p, Players[p].lp - previous, Players[p].lp);
                     break;
                 }
 
@@ -459,6 +529,26 @@ namespace YGOPortable.Core
                     uint code = br.ReadUInt32();
                     br.ReadBytes(10);
                     AddLog(code != 0 ? $"특수 소환: [{CardDatabase.GetName(code)}]" : "뒷면 표시 특수 소환");
+                    break;
+                }
+
+                case YgoConstants.MSG_FLIPSUMMONING:
+                {
+                    uint code = br.ReadUInt32();
+                    byte controller = br.ReadByte();
+                    byte location = br.ReadByte();
+                    uint sequence = br.ReadUInt32();
+                    uint position = br.ReadUInt32();
+                    uint previous = sequence < Players[controller].mzone.Length
+                        ? Players[controller].mzone[sequence]?.position ?? YgoConstants.POS_FACEDOWN_DEFENSE
+                        : YgoConstants.POS_FACEDOWN_DEFENSE;
+                    AddLog($"반전 소환: [{CardDatabase.GetName(code)}]");
+                    OnCardMoved?.Invoke(new CardMoveEvent
+                    {
+                        code = code,
+                        fromCon = controller, fromLoc = location, fromSeq = sequence, fromPos = previous,
+                        toCon = controller, toLoc = location, toSeq = sequence, toPos = position,
+                    });
                     break;
                 }
 
@@ -483,6 +573,7 @@ namespace YGOPortable.Core
                     uint tSeq = br.ReadUInt32();
                     uint tPos = br.ReadUInt32();
                     uint reason = (br.BaseStream.Position < msgEnd) ? br.ReadUInt32() : 0;
+                    _confirmedCards.Remove((fCon, fLoc, fSeq, code));
 
                     var ev = new CardMoveEvent
                     {
@@ -495,27 +586,87 @@ namespace YGOPortable.Core
                     break;
                 }
 
+                case YgoConstants.MSG_SWAP:
+                {
+                    var first = ReadLocIntoItem(br, br.ReadUInt32());
+                    var second = ReadLocIntoItem(br, br.ReadUInt32());
+                    _confirmedCards.Remove((first.controller, first.location, first.sequence, first.code));
+                    _confirmedCards.Remove((second.controller, second.location, second.sequence, second.code));
+                    NotifySwapMove(first, second);
+                    NotifySwapMove(second, first);
+                    break;
+                }
+
+                case YgoConstants.MSG_POS_CHANGE:
+                {
+                    uint code = br.ReadUInt32();
+                    byte controller = br.ReadByte();
+                    byte location = br.ReadByte();
+                    uint sequence = br.ReadByte();
+                    uint previous = br.ReadByte();
+                    uint position = br.ReadByte();
+                    OnCardMoved?.Invoke(new CardMoveEvent
+                    {
+                        code = code,
+                        fromCon = controller, fromLoc = location, fromSeq = sequence, fromPos = previous,
+                        toCon = controller, toLoc = location, toSeq = sequence, toPos = position,
+                    });
+                    break;
+                }
+
                 case YgoConstants.MSG_CONFIRM_CARDS:
                 case YgoConstants.MSG_CONFIRM_DECKTOP:
+                case YgoConstants.MSG_CONFIRM_EXTRATOP:
                 {
-                    br.ReadByte(); // player
+                    byte recipient = br.ReadByte();
+                    bool shownToHuman = msgType != YgoConstants.MSG_CONFIRM_CARDS || recipient == HumanPlayerIndex;
                     uint cnt = br.ReadUInt32();
-                    var names = new List<string>((int)Math.Min(cnt, 5));
+                    var names = new List<string>((int)Math.Min(cnt, 4));
+                    int visibleCount = 0;
                     for (uint i = 0; i < cnt; i++)
                     {
                         uint code = br.ReadUInt32();
-                        br.ReadByte(); // controller
-                        br.ReadByte(); // location
-                        br.ReadUInt32(); // sequence
-                        if (code != 0 && names.Count < 4)
+                        byte controller = br.ReadByte();
+                        uint location = br.ReadByte();
+                        uint sequence = br.ReadUInt32();
+                        if (code == 0 || (!shownToHuman && controller != HumanPlayerIndex)) continue;
+                        if (shownToHuman && controller != HumanPlayerIndex)
+                            _confirmedCards.Add((controller, location, sequence, code));
+                        visibleCount++;
+                        if (names.Count < 4)
                             names.Add($"[{CardDatabase.GetName(code)}]");
                     }
                     if (names.Count > 0)
                     {
-                        string prefix = msgType == YgoConstants.MSG_CONFIRM_DECKTOP ? "덱 위 확인" : "카드 확인";
-                        string suffix = cnt > 4 ? $" 외 {cnt - 4}장" : "";
+                        string prefix = msgType switch
+                        {
+                            YgoConstants.MSG_CONFIRM_DECKTOP => "덱 위 확인",
+                            YgoConstants.MSG_CONFIRM_EXTRATOP => "엑스트라 덱 확인",
+                            _ => "카드 확인",
+                        };
+                        string suffix = visibleCount > names.Count ? $" 외 {visibleCount - names.Count}장" : "";
                         AddLog($"{prefix}: {string.Join(", ", names)}{suffix}");
                     }
+                    break;
+                }
+
+                case YgoConstants.MSG_SHUFFLE_HAND:
+                case YgoConstants.MSG_SHUFFLE_DECK:
+                case YgoConstants.MSG_SHUFFLE_EXTRA:
+                {
+                    byte player = br.ReadByte();
+                    uint location = msgType == YgoConstants.MSG_SHUFFLE_HAND ? YgoConstants.LOCATION_HAND
+                        : msgType == YgoConstants.MSG_SHUFFLE_DECK ? YgoConstants.LOCATION_DECK : YgoConstants.LOCATION_EXTRA;
+                    if (_confirmedCards.Count != 0)
+                        _confirmedCards.RemoveWhere(c => c.Player == player && c.Location == location);
+                    break;
+                }
+
+                case YgoConstants.MSG_SHUFFLE_SET_CARD:
+                {
+                    uint location = br.ReadByte();
+                    if (_confirmedCards.Count != 0)
+                        _confirmedCards.RemoveWhere(c => c.Location == location);
                     break;
                 }
 
@@ -567,6 +718,7 @@ namespace YGOPortable.Core
 
                 case YgoConstants.MSG_CHAIN_END:
                     CurrentChain.Clear();
+                    _confirmedCards.Clear();
                     break;
 
                 case YgoConstants.MSG_ATTACK:
@@ -582,6 +734,20 @@ namespace YGOPortable.Core
                     HasActiveAttack = true;
                     AddLog(TargetLoc == 0 ? "직접 공격 선언!" : "몬스터 공격 선언!");
                     OnAttackDeclared?.Invoke((byte)AttackerCon, AttackerLoc, AttackerSeq, (byte)TargetCon, TargetLoc, TargetSeq);
+                    break;
+                }
+
+                case YgoConstants.MSG_BATTLE:
+                {
+                    if (OnBattleResolved == null) break;
+                    byte attacker = br.ReadByte();
+                    uint attackLocation = br.ReadByte();
+                    uint attackSequence = br.ReadUInt32();
+                    br.ReadBytes(13); // position, attack, defense, destroyed flag
+                    byte target = br.ReadByte();
+                    uint targetLocation = br.ReadByte();
+                    uint targetSequence = br.ReadUInt32();
+                    OnBattleResolved.Invoke(attacker, attackLocation, attackSequence, target, targetLocation, targetSequence);
                     break;
                 }
 

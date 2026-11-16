@@ -260,7 +260,8 @@ namespace YGOPortable.AI
         private byte[] BuildBattleCmd(DuelSession s, DuelPrompt p, bool fallback)
         {
             _battleActions++;
-            if (fallback || _battleActions > 25)
+            bool canLeaveBattle = p.canM2 || p.canEp;
+            if (canLeaveBattle && (fallback || _battleActions > 25))
                 return BitConverter.GetBytes(p.canM2 ? 2 : 3);
 
             if (p.activatable.Count > 0)
@@ -281,7 +282,8 @@ namespace YGOPortable.AI
                 var oppMonsters = s.Players[opp].mzone.Where(m => m != null).ToList();
 
                 // Pick attacker with guaranteed direct attack or favorable battle
-                int bestIdx = -1;
+                // A mandatory attacker still has to attack when no matchup is favorable.
+                int bestIdx = canLeaveBattle ? -1 : 0;
                 int bestGain = -1;
 
                 for (int i = 0; i < p.attackable.Count; i++)
