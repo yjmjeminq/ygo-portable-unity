@@ -401,10 +401,12 @@ namespace YGOPortable.UI
         private GameObject _backObj;
         private bool _detailed;
         private uint _retainedArtwork;
+        private int _retainedVariant;
 
         public uint CurrentCode { get; private set; }
+        internal bool UseDuelArtwork { get; set; }
 
-        public static CompositeCardView Create(Transform parent, string name, bool detailedOverlay = false)
+        public static CompositeCardView Create(Transform parent, string name, bool detailedOverlay = false, bool duelArtwork = false)
         {
             var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent, false);
@@ -414,6 +416,7 @@ namespace YGOPortable.UI
             rt.offsetMin = Vector2.zero;
             rt.offsetMax = Vector2.zero;
             var view = go.AddComponent<CompositeCardView>();
+            view.UseDuelArtwork = duelArtwork;
             view.BuildHierarchy(detailedOverlay);
             return view;
         }
@@ -594,18 +597,20 @@ namespace YGOPortable.UI
 
         private void BindArtwork(uint code)
         {
-            if (code == _retainedArtwork && _artImg.sprite != null) return;
-            ReleaseArtwork();
             if (code == 0 || !isActiveAndEnabled) return;
-            _artImg.sprite = CardArtLoader.RetainArtwork(code);
+            int variant = UseDuelArtwork ? CardArtLoader.GetDuelArtworkVariant(code) : -1;
+            if (code == _retainedArtwork && variant == _retainedVariant && _artImg.sprite != null) return;
+            ReleaseArtwork();
+            _artImg.sprite = CardArtLoader.RetainArtwork(code, variant);
             _retainedArtwork = code;
+            _retainedVariant = variant;
         }
 
         private void ReleaseArtwork()
         {
             if (_retainedArtwork == 0) return;
             _artImg.sprite = null;
-            CardArtLoader.ReleaseArtwork(_retainedArtwork);
+            CardArtLoader.ReleaseArtwork(_retainedArtwork, _retainedVariant);
             _retainedArtwork = 0;
         }
     }
@@ -632,19 +637,18 @@ namespace YGOPortable.UI
 
             int sr = 22050;
             _clipClick = MakeTone(0.06f, 880f, 1180f, 0.25f);
-            _clipDraw = MakeTone(0.09f, 520f, 760f, 0.25f);
-            _clipSummon = MakeTone(0.24f, 240f, 540f, 0.35f);
-            _clipAttack = MakeTone(0.18f, 440f, 110f, 0.45f);
-            _clipDamage = MakeTone(0.25f, 180f, 65f, 0.48f);
-            _clipChain = MakeTone(0.16f, 660f, 990f, 0.30f);
+            _clipDraw = DuelVisualAssets.LoadSound("Draw") ?? MakeTone(0.09f, 520f, 760f, 0.25f);
+            _clipSummon = DuelVisualAssets.LoadSound("Summon") ?? MakeTone(0.24f, 240f, 540f, 0.35f);
+            _clipAttack = DuelVisualAssets.LoadSound("Attack") ?? MakeTone(0.18f, 440f, 110f, 0.45f);
+            _clipDamage = DuelVisualAssets.LoadSound("Damage") ?? MakeTone(0.25f, 180f, 65f, 0.48f);
+            _clipChain = DuelVisualAssets.LoadSound("Chain") ?? MakeTone(0.16f, 660f, 990f, 0.30f);
             _clipWin = MakeTone(0.45f, 523f, 1046f, 0.35f);
             _clipPhase = MakeTone(0.24f, 440f, 880f, 0.32f);
-            _clipDirectAttack = MakeTone(0.32f, 280f, 60f, 0.50f);
+            _clipDirectAttack = DuelVisualAssets.LoadSound("DirectAttack") ?? MakeTone(0.32f, 280f, 60f, 0.50f);
             _clipTick = MakeTone(0.04f, 1320f, 1600f, 0.15f);
             _clipCoin = MakeTone(0.22f, 980f, 1320f, 0.35f);
             _clipDice = MakeTone(0.24f, 420f, 780f, 0.35f);
 
-            _clipDuelBgm = MakeDuelBgm(sr);
             _clipMenuBgm = MakeMenuBgm(sr);
         }
 
@@ -663,7 +667,8 @@ namespace YGOPortable.UI
 
         public static void PlayDuelBgm()
         {
-            if (_bgmSource == null || _clipDuelBgm == null || BgmVolume < 0.01f) return;
+            if (_bgmSource == null || BgmVolume < 0.01f) return;
+            _clipDuelBgm ??= DuelVisualAssets.LoadSound("DuelMusic") ?? MakeDuelBgm(22050);
             if (_bgmSource.clip == _clipDuelBgm && _bgmSource.isPlaying) return;
             _bgmSource.clip = _clipDuelBgm;
             _bgmSource.loop = true;

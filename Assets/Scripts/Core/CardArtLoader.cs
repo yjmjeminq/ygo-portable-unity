@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using UnityEngine;
 
 namespace YGOPortable.Core
@@ -20,13 +21,19 @@ namespace YGOPortable.Core
 
         private const int MaxCacheCount = 500;
         private const int TokenArtPackId = -1;
+        private const int DuelArtPackId = -2;
+        private const int BundledArtwork = -1;
         private const string TokenArtFileName = "tokenart.pack";
-        private static readonly Dictionary<uint, (Sprite sprite, LinkedListNode<uint> node)> _spriteCache =
-            new Dictionary<uint, (Sprite, LinkedListNode<uint>)>(MaxCacheCount);
-        private static readonly LinkedList<uint> _lru = new LinkedList<uint>();
-        private static readonly Dictionary<uint, int> _visibleArtwork = new Dictionary<uint, int>();
+        private const string DuelArtFileName = "cardart.pack";
+        private static readonly Dictionary<(uint code, int variant), ArtEntry> _duelArt = new();
+        private static readonly Dictionary<uint, List<int>> _duelVariants = new();
+        private static readonly Dictionary<(uint, int), (Sprite sprite, LinkedListNode<(uint, int)> node)> _spriteCache =
+            new(MaxCacheCount);
+        private static readonly LinkedList<(uint, int)> _lru = new();
+        private static readonly Dictionary<(uint, int), int> _visibleArtwork = new();
         private static Sprite _fallbackArt;
         private static Sprite _cardBackSprite;
+        internal static string LocalDuelVisualsPath => Path.Combine(Application.persistentDataPath, "DuelVisuals");
 
         public static void Initialize(string streamingAssetsPath)
         {
@@ -39,7 +46,76 @@ namespace YGOPortable.Core
             if (!ReadArtIndex(idxPath))
                 Debug.LogWarning($"[CardArtLoader] Missing or invalid {idxPath}");
             ReadArtIndex(Path.Combine(streamingAssetsPath, TokenArtFileName));
+            ReadDuelArtIndex();
             Debug.Log($"[CardArtLoader] Indexed {_index.Count} card artworks.");
+        }
+
+        private static void ReadDuelArtIndex()
+        {
+            string packPath = Path.Combine(LocalDuelVisualsPath, DuelArtFileName);
+            if (!File.Exists(packPath)) return;
+            FileStream stream = null;
+            try
+            {
+                stream = File.OpenRead(packPath);
+                using var reader = new BinaryReader(stream, Encoding.UTF8, leaveOpen: true);
+                if (stream.Length < 12 || reader.ReadUInt32() != 0x5241444D || reader.ReadUInt32() != 1) return;
+                uint count = reader.ReadUInt32();
+                long indexEnd = 12L + count * 16L;
+                if (indexEnd > stream.Length) return;
+                for (uint i = 0; i < count; i++)
+                {
+                    uint code = reader.ReadUInt32();
+                    int variant = reader.ReadInt32();
+                    uint offset = reader.ReadUInt32();
+                    uint length = reader.ReadUInt32();
+                    if (code == 0 || variant < 0 || offset < indexEnd || length == 0 ||
+                        (long)offset + length > stream.Length) continue;
+                    if (!_duelArt.TryAdd((code, variant), new ArtEntry
+                        { packId = DuelArtPackId, offset = offset, length = length })) continue;
+                    if (!_duelVariants.TryGetValue(code, out var variants))
+                        _duelVariants[code] = variants = new List<int>();
+                    variants.Add(variant);
+                }
+                foreach (var (code, variants) in _duelVariants)
+                {
+                    variants.Sort();
+                    if (variants[0] != 0 && TryGetArtEntry(code, out _)) variants.Insert(0, 0);
+                }
+                _packStreams[DuelArtPackId] = stream;
+                stream = null;
+                Debug.Log($"[CardArtLoader] Indexed {_duelArt.Count} local duel artworks for {_duelVariants.Count} cards.");
+            }
+            catch (Exception error) when (error is IOException || error is UnauthorizedAccessException)
+            {
+                _duelArt.Clear();
+                _duelVariants.Clear();
+                Debug.LogWarning($"[CardArtLoader] Cannot read local duel artwork index: {error.Message}");
+            }
+            finally
+            {
+                stream?.Dispose();
+            }
+        }
+
+        internal static IReadOnlyList<int> GetDuelArtworkChoices(uint code)
+        {
+            if (_duelVariants.TryGetValue(code, out var variants)) return variants;
+            return Array.Empty<int>();
+        }
+
+        internal static int GetDuelArtworkVariant(uint code)
+        {
+            if (!_duelVariants.TryGetValue(code, out var variants)) return BundledArtwork;
+            if (variants.Count == 1) return variants[0];
+            int variant = PlayerPrefs.GetInt($"DuelArtwork.{code}", variants[0]);
+            return variants.Contains(variant) ? variant : variants[0];
+        }
+
+        internal static void SetDuelArtworkVariant(uint code, int variant)
+        {
+            if (_duelVariants.TryGetValue(code, out var variants) && variants.Contains(variant))
+                PlayerPrefs.SetInt($"DuelArtwork.{code}", variant);
         }
 
         private static bool ReadArtIndex(string path)
@@ -91,10 +167,13 @@ namespace YGOPortable.Core
             return _cardBackSprite;
         }
 
-        public static Sprite GetArtSprite(uint code)
+        public static Sprite GetArtSprite(uint code) => GetArtSprite(code, BundledArtwork);
+
+        private static Sprite GetArtSprite(uint code, int variant)
         {
             if (code == 0) return GetCardBackSprite();
-            if (_spriteCache.TryGetValue(code, out var cached))
+            var key = (code, variant);
+            if (_spriteCache.TryGetValue(key, out var cached))
             {
                 _lru.Remove(cached.node);
                 if (cached.sprite != null)
@@ -102,18 +181,30 @@ namespace YGOPortable.Core
                     _lru.AddLast(cached.node);
                     return cached.sprite;
                 }
-                _spriteCache.Remove(code);
+                _spriteCache.Remove(key);
             }
 
-            if (!TryGetArtEntry(code, out var entry)) return GetFallbackArt();
+            Sprite sprite = null;
+            if (variant >= 0 && _duelArt.TryGetValue(key, out var local)) sprite = DecodeArtwork(local);
+            if (sprite == null && TryGetArtEntry(code, out var bundled)) sprite = DecodeArtwork(bundled);
+            if (sprite == null) return GetFallbackArt();
+            TrimArtwork(MaxCacheCount - 1);
+            _spriteCache[key] = (sprite, _lru.AddLast(key));
+            return sprite;
+        }
 
+        private static Sprite DecodeArtwork(ArtEntry entry)
+        {
             try
             {
                 if (!_packStreams.TryGetValue(entry.packId, out var fs))
                 {
-                    string packName = entry.packId == TokenArtPackId ? TokenArtFileName : $"cardart_{entry.packId}.pack";
-                    string packPath = Path.Combine(_streamingDir, packName);
-                    if (!File.Exists(packPath)) return GetFallbackArt();
+                    string packPath = entry.packId switch
+                    {
+                        TokenArtPackId => Path.Combine(_streamingDir, TokenArtFileName),
+                        _ => Path.Combine(_streamingDir, $"cardart_{entry.packId}.pack"),
+                    };
+                    if (!File.Exists(packPath)) return null;
                     fs = new FileStream(packPath, FileMode.Open, FileAccess.Read, FileShare.Read);
                     _packStreams[entry.packId] = fs;
                 }
@@ -124,7 +215,7 @@ namespace YGOPortable.Core
                 while (readTotal < jpg.Length)
                 {
                     int n = fs.Read(jpg, readTotal, jpg.Length - readTotal);
-                    if (n <= 0) break;
+                    if (n <= 0) return null;
                     readTotal += n;
                 }
 
@@ -132,38 +223,36 @@ namespace YGOPortable.Core
                 if (!tex.LoadImage(jpg))
                 {
                     UnityEngine.Object.Destroy(tex);
-                    return GetFallbackArt();
+                    return null;
                 }
                 tex.wrapMode = TextureWrapMode.Clamp;
                 tex.filterMode = FilterMode.Bilinear;
-                var sp = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
-
-                TrimArtwork(MaxCacheCount - 1);
-                _spriteCache[code] = (sp, _lru.AddLast(code));
-                return sp;
+                return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
             }
             catch
             {
-                return GetFallbackArt();
+                return null;
             }
         }
 
-        internal static Sprite RetainArtwork(uint code)
+        internal static Sprite RetainArtwork(uint code, int variant = BundledArtwork)
         {
-            var sprite = GetArtSprite(code);
-            if (_spriteCache.ContainsKey(code))
+            var sprite = GetArtSprite(code, variant);
+            var key = (code, variant);
+            if (_spriteCache.ContainsKey(key))
             {
-                _visibleArtwork.TryGetValue(code, out int views);
-                _visibleArtwork[code] = views + 1;
+                _visibleArtwork.TryGetValue(key, out int views);
+                _visibleArtwork[key] = views + 1;
             }
             return sprite;
         }
 
-        internal static void ReleaseArtwork(uint code)
+        internal static void ReleaseArtwork(uint code, int variant = BundledArtwork)
         {
-            if (!_visibleArtwork.TryGetValue(code, out int views)) return;
-            if (views > 1) _visibleArtwork[code] = views - 1;
-            else _visibleArtwork.Remove(code);
+            var key = (code, variant);
+            if (!_visibleArtwork.TryGetValue(key, out int views)) return;
+            if (views > 1) _visibleArtwork[key] = views - 1;
+            else _visibleArtwork.Remove(key);
             TrimArtwork(MaxCacheCount);
         }
 
@@ -173,11 +262,11 @@ namespace YGOPortable.Core
             while (_spriteCache.Count > capacity && node != null)
             {
                 var next = node.Next;
-                uint code = node.Value;
-                if (!_visibleArtwork.ContainsKey(code))
+                var key = node.Value;
+                if (!_visibleArtwork.ContainsKey(key))
                 {
-                    DestroyArtwork(_spriteCache[code].sprite);
-                    _spriteCache.Remove(code);
+                    DestroyArtwork(_spriteCache[key].sprite);
+                    _spriteCache.Remove(key);
                     _lru.Remove(node);
                 }
                 node = next;
@@ -216,6 +305,8 @@ namespace YGOPortable.Core
             _spriteCache.Clear();
             _lru.Clear();
             _visibleArtwork.Clear();
+            _duelArt.Clear();
+            _duelVariants.Clear();
             _index = null;
         }
     }

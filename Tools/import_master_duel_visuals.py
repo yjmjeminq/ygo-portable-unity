@@ -1,0 +1,358 @@
+"""Import locally installed Master Duel art, field textures and sound into DuelVisuals.
+
+Requires UnityPy and Pillow. The Steam installation is read-only. Generated
+files belong in the Unity game's local profile.
+"""
+
+import argparse
+import io
+import json
+import os
+import re
+import shutil
+import struct
+import tempfile
+import wave
+from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from urllib.request import urlopen
+
+import UnityPy
+import fmod_toolkit
+from PIL import Image, ImageChops
+from master_duel_portraits import render_setup_pose
+
+
+PROJECT = Path(__file__).resolve().parents[1]
+PROFILE = Path.home() / "AppData/LocalLow/YGOPortable/Yu-Gi-Oh LOTD Portable/DuelVisuals"
+YDK_IDS = "https://raw.githubusercontent.com/pixeltris/YgoMaster/master/YgoMaster/Data/YdkIds.txt"
+ART_VARIANTS = "https://raw.githubusercontent.com/daominah/yugioh_master_duel_card_art/main/alt_art_desc.md"
+TOKEN_IDS = {20001444: 16567, 3285552: 16760}
+EFFECTS = {
+    "Strike": "fxt_hitm_flash01.png",
+    "Break": "fxt_ef07445_tnd_001.png",
+    "Summon": "fxxt_hitm_fin_m04999_circle01.png",
+    "Token": "fxt_13631_bub_001.png",
+}
+SOUNDS = {
+    "Draw": "SE_DUEL_DRAW",
+    "Summon": "SE_CARD_TOKEN_SUMMON",
+    "Attack": "SE_ATTACK_A_LIGHT_DEFAULT_02",
+    "DirectAttack": "SE_DIRECT_ATTACK_PLAYER",
+    "Damage": "SE_COST_DAMAGE",
+    "Chain": "SE_DUELCHAIN_01",
+    "DuelMusic": "BGM_DUEL_NORMAL_03",
+}
+CUT_IN = re.compile(r"/monstercutin/(tcg|ocg)/p(\d+)/(highend_hd|sd)/")
+
+
+def scan_bundle(path):
+    with path.open("rb") as source:
+        if source.read(8) != b"UnityFS\0":
+            return []
+    return [
+        (str(path), obj.path_id, obj.type.name, name)
+        for name, obj in UnityPy.load(str(path)).container.items()
+        if (obj.type.name == "Texture2D"
+            and ("/card/images/illust/" in name or "/monstercutin/" in name or Path(name).name in EFFECTS.values()))
+        or (obj.type.name == "TextAsset" and "/monstercutin/" in name and name.endswith(("js.json", ".atlas.txt")))
+    ]
+
+
+def get_catalog(install, catalogs):
+    if catalogs:
+        return [row for catalog in catalogs for row in json.loads(catalog.read_text(encoding="utf-8"))]
+    bundles = (path for path in (install / "LocalData").rglob("*") if path.is_file())
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        return [row for entries in pool.map(scan_bundle, bundles) for row in entries]
+
+
+def read_asset(row):
+    file, path_id, kind, name = row
+    entry = UnityPy.load(file).container[name]
+    if entry.path_id != path_id or entry.type.name != kind:
+        raise ValueError(f"Asset identity changed for {name}")
+    return entry.deref_parse_as_object()
+
+
+def read_reference(path, url):
+    if path is not None:
+        return path.read_text(encoding="utf-8")
+    with urlopen(url, timeout=30) as source:
+        return source.read().decode("utf-8")
+
+
+def artwork_ids(args):
+    mapped = defaultdict(set)
+    for line in read_reference(args.id_map, YDK_IDS).splitlines():
+        fields = line.split()
+        if len(fields) == 2 and all(field.isdecimal() for field in fields):
+            code, cid = map(int, fields)
+            mapped[code].add(cid)
+
+    variants = defaultdict(set)
+    bases = {}
+    for line in read_reference(args.variant_map, ART_VARIANTS).splitlines():
+        fields = [field.strip() for field in line.strip().strip("|").split("|")]
+        if len(fields) > 5 and fields[1].isdecimal() and fields[3].isdecimal():
+            base, alternative = int(fields[1]), int(fields[3])
+            variants[base].add(alternative)
+            bases[alternative] = base
+    return mapped, variants, bases
+
+
+def card_images(rows):
+    images = {}
+    for row in rows:
+        _, _, kind, name = row
+        cid = Path(name).stem
+        if kind != "Texture2D" or "/card/images/illust/" not in name or not cid.isdecimal():
+            continue
+        art_id = int(cid)
+        if art_id not in images or "/common/" in name:
+            images[art_id] = row
+    return images
+
+
+def card_variants(args, images):
+    ids, variants, bases = artwork_ids(args)
+    cards = json.loads((PROJECT / "Assets/StreamingAssets/cards_kr.json").read_text(encoding="utf-8-sig"))["cards"]
+    for card in cards:
+        code = card["code"]
+        token = bool(card["type"] & 0x4000)
+        if token and code not in TOKEN_IDS:
+            continue
+        source_ids = ids.get(code, set())
+        normal_ids = {bases.get(cid, cid) for cid in source_ids}
+        preferred = card["konamiId"]
+        if token:
+            base = TOKEN_IDS[code]
+        elif preferred and (not normal_ids or preferred in normal_ids):
+            base = preferred
+        elif card["lotdId"] in normal_ids:
+            base = card["lotdId"]
+        elif len(normal_ids) == 1:
+            base = next(iter(normal_ids))
+        else:
+            continue
+        if card["alias"]:
+            # An explicit alternate YDK code keeps its own image when supplied.
+            exact = (source_ids & variants[base]) & images.keys()
+            if len(exact) == 1:
+                yield code, 0, next(iter(exact))
+            continue
+        if base in images:
+            yield code, 0, base
+        for variant in sorted(variants[base] & images.keys()):
+            yield code, variant, variant
+
+
+def export_card_art(output, entries, images):
+    imported = list(entries)
+    offsets, index = {}, []
+    with (output / "cardart.pack").open("wb") as pack:
+        pack.seek(12 + 16 * len(imported))
+        for code, variant, cid in imported:
+            if cid not in offsets:
+                art = read_asset(images[cid]).image.convert("RGB")
+                art.thumbnail((320, 320), Image.Resampling.LANCZOS)
+                buf = io.BytesIO()
+                art.save(buf, format="JPEG", quality=87)
+                offsets[cid] = pack.tell(), buf.tell()
+                pack.write(buf.getbuffer())
+            index.append(struct.pack("<IiII", code, variant, *offsets[cid]))
+        pack.seek(0)
+        pack.write(struct.pack("<4sII", b"MDAR", 1, len(index)))
+        pack.writelines(index)
+    print(f"{len(index)} artworks for {len({code for code, _, _ in imported})} cards; "
+          f"{sum(variant != 0 for _, variant, _ in imported)} alternate illustrations", flush=True)
+    return imported
+
+
+def export_cut_ins(output, rows, entries):
+    candidates = defaultdict(dict)
+    for row in rows:
+        _, _, kind, name = row
+        match = CUT_IN.search(name)
+        if kind not in {"Texture2D", "TextAsset"} or not match:
+            continue
+        region, cid, quality = match.groups()
+        candidates[int(cid)].setdefault((quality, region), {})[Path(name).name] = row
+
+    directory = output / "CutIns"
+    directory.mkdir()
+    jobs = defaultdict(list)
+    for code, variant, cid in entries:
+        if cid in candidates:
+            jobs[cid].append(directory / f"{code}-{variant}.png")
+
+    def bake(job):
+        cid, destinations = job
+        for quality in (("highend_hd", "tcg"), ("highend_hd", "ocg"), ("sd", "tcg"), ("sd", "ocg")):
+            files = candidates[cid].get(quality, {})
+            try:
+                image = cut_in_image(cid, files)
+            except (KeyError, ValueError, IndexError, StopIteration, OSError):
+                continue
+            if image is None:
+                continue
+            image.save(destinations[0], compress_level=2)
+            for destination in destinations[1:]:
+                shutil.copyfile(destinations[0], destination)
+            return len(destinations)
+        return 0
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        count = 0
+        for processed, written in enumerate(pool.map(bake, jobs.items()), 1):
+            count += written
+            if processed % 100 == 0:
+                print(f"Processed {processed} of {len(jobs)} cut-in sets", flush=True)
+    print(f"{count} assembled or standalone summon cut-ins", flush=True)
+
+
+def cut_in_image(cid, files):
+    name = f"p{cid}"
+    if name + "_monpng.png" in files:
+        image = read_asset(files[name + "_monpng.png"]).image.convert("RGBA")
+        alpha = image.getchannel("A")
+        bounds = alpha.getbbox()
+        if bounds is None or alpha.getextrema()[0] > 8:
+            return None
+        image = image.crop(bounds)
+        image.thumbnail((950, 780), Image.Resampling.LANCZOS)
+        return image
+    if name + "js.json" not in files or name + ".atlas.txt" not in files:
+        return None
+
+    def text(filename):
+        script = read_asset(files[filename]).m_Script
+        return script.decode("utf-8-sig") if isinstance(script, bytes) else script
+
+    return render_setup_pose(json.loads(text(name + "js.json")), text(name + ".atlas.txt"),
+                             lambda page: read_asset(files[page.lower()]).image.convert("RGBA"))
+
+
+def publish_cut_ins(source, profile):
+    target = profile / "CutIns"
+    if target.resolve().parent != profile.resolve():
+        raise ValueError("CutIns directory must be inside the game profile")
+    previous = source.parent / "previous-cut-ins"
+    if target.exists():
+        target.replace(previous)
+    try:
+        source.replace(target)
+    except OSError:
+        if previous.exists():
+            previous.replace(target)
+        raise
+
+
+def export_field(output, textures):
+    atlas = textures["Mat_002_01_BaseColor_near"].parse_as_object().image.convert("RGB")
+    ground_atlas = textures["Mat_002_02_BaseColor_near"].parse_as_object().image.convert("RGB")
+    side = ground_atlas.width
+    ground = ground_atlas.crop(tuple(int(side * value) for value in (.40, .33, .61, .54)))
+    ground.save(output / "Ground.png")
+
+    size = atlas.width
+    half = atlas.transform((1376, 460), Image.Transform.EXTENT,
+                           (-.106 * size, .147 * size, 1.106 * size, .499 * size),
+                           Image.Resampling.BICUBIC)
+    # The baked atlas has empty gutters beyond the stone slab.
+    backing = Image.new("RGB", half.size)
+    tile = ground.resize((344, 460), Image.Resampling.BICUBIC)
+    for i in range(4):
+        backing.paste(tile if i % 2 == 0 else tile.transpose(Image.Transpose.FLIP_LEFT_RIGHT), (i * 344, 0))
+    edge = Image.new("L", (half.width, 1))
+    edge.putdata([max(0, min(255, (min(x, half.width - x - 1) - 92) * 4)) for x in range(half.width)])
+    nonempty = half.convert("L").point(lambda value: max(0, min(255, (value - 16) * 8)))
+    half = Image.composite(half, backing, ImageChops.multiply(nonempty, edge.resize(half.size)))
+    field = Image.new("RGB", (half.width, half.height * 2))
+    field.paste(half, (0, 0))
+    field.paste(half.transpose(Image.Transpose.ROTATE_180), (0, half.height))
+    field.save(output / "Field.png")
+
+
+def export_effects(output, rows):
+    directory = output / "Effects"
+    directory.mkdir()
+    for kind, name in EFFECTS.items():
+        row = next((row for row in rows if row[2] == "Texture2D" and row[3].endswith("/" + name)), None)
+        if row is None:
+            continue
+        image = read_asset(row).image.convert("RGBA")
+        if kind in {"Summon", "Break"} or image.getchannel("A").getextrema()[0] == 255:
+            intensity = image.convert("L")
+            if kind == "Token":
+                image.putalpha(intensity)
+            else:
+                image = Image.new("RGBA", image.size, "white")
+                image.putalpha(intensity)
+        image.save(directory / f"{kind}.png")
+
+
+def export_audio(output, clips, data_dir):
+    directory = output / "Audio"
+    directory.mkdir()
+    for filename, name in SOUNDS.items():
+        if name not in clips:
+            continue
+        clip = clips[name].parse_as_object()
+        resource = clip.m_Resource
+        local_resource = data_dir / "resources.resource"
+        if resource is not None and resource.m_Source == "resources.resource" and local_resource.is_file():
+            with local_resource.open("rb") as file:
+                file.seek(resource.m_Offset)
+                data = file.read(resource.m_Size)
+            samples = fmod_toolkit.raw_to_wav(data, name, clip.m_Channels, clip.m_Frequency)
+        else:
+            samples = clip.samples
+        source = next(iter(samples.values()))
+        with wave.open(io.BytesIO(source), "rb") as original:
+            if original.getsampwidth() != 2 or original.getnchannels() not in (1, 2):
+                raise ValueError(f"Unsupported PCM format for {name}")
+            with wave.open(str(directory / f"{filename}.wav"), "wb") as destination:
+                destination.setparams(original.getparams())
+                destination.writeframes(original.readframes(original.getnframes()))
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("install", type=Path, help="Master Duel Steam installation directory")
+    parser.add_argument("--output", type=Path, default=PROFILE)
+    parser.add_argument("--bundle-catalog", type=Path, action="append", default=[])
+    parser.add_argument("--id-map", type=Path)
+    parser.add_argument("--variant-map", type=Path)
+    args = parser.parse_args()
+
+    data_dir = args.install / "masterduel_Data"
+    base = UnityPy.load(str(data_dir / "data.unity3d"))
+    textures = {obj.peek_name(): obj for obj in base.objects if obj.type.name == "Texture2D"}
+    clips = {obj.peek_name(): obj for obj in base.objects if obj.type.name == "AudioClip"}
+    rows = get_catalog(args.install, args.bundle_catalog)
+    images = card_images(rows)
+    if not images:
+        raise ValueError("No installed card artwork bundles were found")
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="ygo-duel-import-", dir=args.output.parent) as directory:
+        output = Path(directory)
+        export_field(output, textures)
+        export_effects(output, rows)
+        export_audio(output, clips, data_dir)
+        entries = export_card_art(output, card_variants(args, images), images)
+        export_cut_ins(output, rows, entries)
+        args.output.mkdir(exist_ok=True)
+        for file in sorted(output.rglob("*")):
+            relative = file.relative_to(output)
+            if file.is_file() and relative.parts[0] != "CutIns":
+                destination = args.output / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(file, destination)
+        publish_cut_ins(output / "CutIns", args.output)
+    print(f"Imported to {args.output}", flush=True)
+
+
+if __name__ == "__main__":
+    main()

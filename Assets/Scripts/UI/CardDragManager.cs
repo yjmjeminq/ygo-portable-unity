@@ -100,6 +100,8 @@ namespace YGOPortable.UI
             transform.SetAsLastSibling();
             _ghostRoot.gameObject.SetActive(true);
             _ghostRoot.SetAsLastSibling();
+            _ghostCardView.UseDuelArtwork = source == DragSourceType.Hand || source == DragSourceType.FieldMonster ||
+                source == DragSourceType.ExtraDeck;
             _ghostCardView.SetCard(cardCode);
             UpdateGhostPosition(Input.mousePosition);
 
@@ -186,6 +188,8 @@ namespace YGOPortable.UI
         public bool EnableHoverLift;
 
         private bool _isDraggingThis;
+        private bool _hovered;
+        private int _restingSibling;
         private CanvasGroup _cg;
         private ScrollRect _parentScroll;
 
@@ -195,14 +199,9 @@ namespace YGOPortable.UI
             {
                 if (EnableHoverLift)
                 {
-                    var rt = transform as RectTransform;
-                    if (rt != null)
-                    {
-                        rt.offsetMin = new Vector2(0f, 16f);
-                        rt.offsetMax = new Vector2(0f, 16f);
-                        rt.localScale = new Vector3(1.08f, 1.08f, 1f);
-                        rt.SetAsLastSibling();
-                    }
+                    if (!_hovered) _restingSibling = transform.GetSiblingIndex();
+                    _hovered = true;
+                    transform.SetAsLastSibling();
                 }
                 OnPointerEnterAction?.Invoke();
             }
@@ -212,15 +211,38 @@ namespace YGOPortable.UI
         {
             if (!_isDraggingThis)
             {
-                ResetVisualState();
+                EndHover();
                 OnPointerExitAction?.Invoke();
             }
+        }
+
+        private void Update()
+        {
+            if (!EnableHoverLift || _isDraggingThis || !(transform is RectTransform rect)) return;
+            float lift = _hovered ? 25f : 0f;
+            float smoothing = 1f - Mathf.Exp(-24f * Time.unscaledDeltaTime);
+            Vector2 offset = Vector2.Lerp(rect.offsetMin, Vector2.up * lift, smoothing);
+            if (Mathf.Abs(lift - offset.y) < .04f) offset = Vector2.up * lift;
+            if (rect.offsetMin != offset) rect.offsetMin = offset;
+            if (rect.offsetMax != offset) rect.offsetMax = offset;
+            Vector3 target = Vector3.one * (_hovered ? 1.105f : 1f);
+            var scale = Vector3.Lerp(rect.localScale, target, smoothing);
+            if ((target - scale).sqrMagnitude < .000001f) scale = target;
+            if (rect.localScale != scale) rect.localScale = scale;
+        }
+
+        private void EndHover()
+        {
+            if (!_hovered) return;
+            _hovered = false;
+            transform.SetSiblingIndex(_restingSibling);
         }
 
         private void ResetVisualState()
         {
             if (EnableHoverLift)
             {
+                EndHover();
                 var rt = transform as RectTransform;
                 if (rt != null)
                 {
@@ -289,7 +311,7 @@ namespace YGOPortable.UI
 
         private void OnDisable()
         {
-            if (_isDraggingThis)
+            if (_isDraggingThis || EnableHoverLift)
             {
                 _isDraggingThis = false;
                 ResetVisualState();

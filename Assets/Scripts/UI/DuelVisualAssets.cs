@@ -1,0 +1,95 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using UnityEngine;
+using YGOPortable.Core;
+
+namespace YGOPortable.UI
+{
+    internal static class DuelVisualAssets
+    {
+        private static readonly Dictionary<DuelEffectKind, Sprite> Effects = new();
+        internal static Texture2D Field { get; } = LoadTexture("Field.png", TextureWrapMode.Clamp);
+        internal static Texture2D Ground { get; } = LoadTexture("Ground.png", TextureWrapMode.Repeat);
+
+        internal static Sprite Effect(DuelEffectKind kind)
+        {
+            if (!Effects.TryGetValue(kind, out var sprite))
+            {
+                sprite = AsSprite(LoadTexture(Path.Combine("Effects", kind + ".png"), TextureWrapMode.Clamp));
+                Effects.Add(kind, sprite);
+            }
+            return sprite;
+        }
+
+        internal static Sprite SummonCutIn(uint code)
+        {
+            int variant = CardArtLoader.GetDuelArtworkVariant(code);
+            if (variant < 0) return null;
+            string path = Path.Combine("CutIns", $"{code}-{variant}.png");
+            return AsSprite(LoadTexture(path, TextureWrapMode.Clamp));
+        }
+
+        private static Sprite AsSprite(Texture2D texture) => texture == null ? null :
+            Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(.5f, .5f),
+                100f, 0, SpriteMeshType.FullRect);
+
+        private static Texture2D LoadTexture(string name, TextureWrapMode wrapMode)
+        {
+            string path = Path.Combine(CardArtLoader.LocalDuelVisualsPath, name);
+            if (!File.Exists(path)) return null;
+            try
+            {
+                var bytes = File.ReadAllBytes(path);
+                var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false)
+                {
+                    name = Path.GetFileNameWithoutExtension(name),
+                    wrapMode = wrapMode,
+                    filterMode = FilterMode.Bilinear,
+                };
+                if (texture.LoadImage(bytes, markNonReadable: true)) return texture;
+                UnityEngine.Object.Destroy(texture);
+            }
+            catch (Exception error) when (error is IOException || error is UnauthorizedAccessException)
+            {
+                Debug.LogWarning($"[DuelVisualAssets] Cannot read {name}: {error.Message}");
+            }
+            return null;
+        }
+
+        internal static AudioClip LoadSound(string name)
+        {
+            string path = Path.Combine(CardArtLoader.LocalDuelVisualsPath, "Audio", name + ".wav");
+            if (!File.Exists(path)) return null;
+            try
+            {
+                using var reader = new BinaryReader(File.OpenRead(path));
+                if (reader.BaseStream.Length < 44 || reader.ReadUInt32() != 0x46464952) return null; // RIFF
+                reader.ReadUInt32();
+                if (reader.ReadUInt32() != 0x45564157 || reader.ReadUInt32() != 0x20746D66 ||
+                    reader.ReadUInt32() != 16 || reader.ReadUInt16() != 1) return null; // WAVE, PCM
+                int channels = reader.ReadUInt16();
+                int rate = reader.ReadInt32();
+                reader.ReadUInt32();
+                int frameBytes = reader.ReadUInt16();
+                if (channels is < 1 or > 2 || rate is < 8000 or > 48000 || frameBytes != channels * 2 ||
+                    reader.ReadUInt16() != 16 || reader.ReadUInt32() != 0x61746164) return null; // data
+                int length = reader.ReadInt32();
+                if (length <= 0 || length > reader.BaseStream.Length - 44 || length % frameBytes != 0) return null;
+
+                var bytes = reader.ReadBytes(length);
+                var samples = new float[length / 2];
+                for (int i = 0; i < samples.Length; i++)
+                    samples[i] = (short)(bytes[i * 2] | bytes[i * 2 + 1] << 8) / 32768f;
+                var clip = AudioClip.Create(name, length / frameBytes, channels, rate, false);
+                clip.SetData(samples, 0);
+                return clip;
+            }
+            catch (Exception error) when (error is IOException || error is UnauthorizedAccessException)
+            {
+                Debug.LogWarning($"[DuelVisualAssets] Cannot read {name}: {error.Message}");
+                return null;
+            }
+        }
+    }
+}
