@@ -116,6 +116,7 @@ namespace YGOPortable.UI
         {
             Root.SetActive(true);
             _cardFilterDialog.SetActive(false);
+            StartPadNavigation();
             if (DeckRepository.UserDecks.Count == 0)
                 DeckRepository.Load(Application.streamingAssetsPath, Application.persistentDataPath);
 
@@ -126,11 +127,27 @@ namespace YGOPortable.UI
             ShowToast("");
         }
 
+        public void Close()
+        {
+            StopPadNavigation();
+            _cardFilterDialog.SetActive(false);
+            _deckDialog.SetActive(false);
+            _archModalRoot.SetActive(false);
+            Root.SetActive(false);
+        }
+
         public void Update()
         {
             if (!Root.activeInHierarchy) return;
             if (_trunkViewport.rect.size != _trunkSize)
                 ResizeTrunkGrid(false);
+            if (PollDeckPad()) return;
+            if (_padUi.HasPopup)
+            {
+                if (Input.GetKeyDown(KeyCode.Escape))
+                    _padUi.Handle(Root.transform, Vector2Int.zero, false, true, null);
+                return;
+            }
 
             if (_deckDialog.activeSelf)
             {
@@ -203,10 +220,10 @@ namespace YGOPortable.UI
             var footer = LotdUiKit.CreateRect("Controls", root, new Vector2(0.015f, 0.002f), new Vector2(0.985f, 0.041f),
                 Vector2.zero, Vector2.zero);
             LotdUiKit.AddImage(footer.gameObject, LotdUiKit.WhiteSprite, new Color(0.02f, 0.045f, 0.10f, 0.92f), false, false);
-            LotdUiKit.AddText(LotdUiKit.CreateRect("Help", footer, new Vector2(0.01f, 0f), new Vector2(0.53f, 1f),
-                Vector2.zero, Vector2.zero), "Text", "드래그  이동    우클릭  추가 / 제거    Ctrl+F  검색    Ctrl+S  저장", 13,
+            _deckHelpLabel = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Help", footer, new Vector2(0.01f, 0f),
+                new Vector2(0.58f, 1f), Vector2.zero, Vector2.zero), "Text", MouseHelp, 13, 9,
                 TextAnchor.MiddleLeft, LotdUiKit.TextPrimary);
-            _toastText = LotdUiKit.AddText(LotdUiKit.CreateRect("Status", footer, new Vector2(0.54f, 0f), new Vector2(0.99f, 1f),
+            _toastText = LotdUiKit.AddText(LotdUiKit.CreateRect("Status", footer, new Vector2(0.59f, 0f), new Vector2(0.99f, 1f),
                 Vector2.zero, Vector2.zero), "Text", "", 14, TextAnchor.MiddleRight, LotdUiKit.GoldAccent, FontStyle.Bold);
             _toastText.resizeTextForBestFit = true;
             _toastText.resizeTextMinSize = 10;
@@ -214,6 +231,7 @@ namespace YGOPortable.UI
             BuildArchetypeModal(root);
             BuildDeckDialog(root);
             BuildDetailedSearch(root);
+            BuildPadNavigation(root);
         }
 
         private void BuildCardDetails(Transform root)
@@ -501,6 +519,7 @@ namespace YGOPortable.UI
             Canvas.ForceUpdateCanvases();
             _trunkCountText.text = $"{_trunkResults.Count:N0}장";
             _noTrunkResults.gameObject.SetActive(_trunkResults.Count == 0);
+            _padIndices[(int)PadArea.Trunk] = 0;
             ResizeTrunkGrid(true);
         }
 

@@ -173,7 +173,7 @@ namespace YGOPortable.UI
             _titleAndMenu.MenuRoot.SetActive(screen == AppScreen.MainMenu);
             _oppSelect.Root.SetActive(screen == AppScreen.OpponentSelect);
             _oppSelect.JankenRoot.SetActive(false);
-            _deckEditor.Root.SetActive(screen == AppScreen.DeckEditor);
+            if (screen != AppScreen.DeckEditor) _deckEditor.Close();
             _duelField.Root.SetActive(screen == AppScreen.Duel);
 
             if (screen == AppScreen.Duel)
@@ -195,6 +195,12 @@ namespace YGOPortable.UI
 
             if (screen == AppScreen.OpponentSelect) _oppSelect.Open();
             else if (screen == AppScreen.DeckEditor) _deckEditor.Open();
+            else if (screen == AppScreen.Title || screen == AppScreen.MainMenu)
+            {
+                var page = screen == AppScreen.Title ? _titleAndMenu.TitleRoot : _titleAndMenu.MenuRoot;
+                var first = page.GetComponentInChildren<Button>();
+                EventSystem.current?.SetSelectedGameObject(first != null ? first.gameObject : null);
+            }
         }
 
         public void StartDuelMatch(OpponentCharacter oppChar, PresetDeckInfo oppDeck, UserDeck myDeck, bool playerGoesFirst)
