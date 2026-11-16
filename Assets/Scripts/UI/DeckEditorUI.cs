@@ -9,7 +9,7 @@ using YGOPortable.Core;
 
 namespace YGOPortable.UI
 {
-    public class DeckEditorUI
+    public partial class DeckEditorUI
     {
         public GameObject Root { get; private set; }
 
@@ -22,10 +22,6 @@ namespace YGOPortable.UI
 
         private static readonly string[] CardKinds = { "종류: 전체", "메인 몬스터", "마법", "함정", "엑스트라" };
         private static readonly string[] SortOptions = { "기본순", "공격력 높은 순", "레벨 높은 순", "이름순" };
-        private static readonly (ulong mask, string label)[] RaceOptions =
-            new[] { (mask: 0UL, label: "종족: 전체") }
-                .Concat(YgoConstants.RaceNamesKR.OrderBy(race => race.Value, StringComparer.Ordinal)
-                    .Select(race => (mask: race.Key, label: race.Value))).ToArray();
 
         // Virtualized Trunk Scroll Grid
         private const int TrunkCols = 5;
@@ -65,7 +61,6 @@ namespace YGOPortable.UI
         private ArchetypeInfo _activeArchetypeFilter = null;
         private InputField _searchInp;
         private Dropdown _kindFilter;
-        private Dropdown _raceFilter;
         private Dropdown _sortFilter;
 
         // Archetype Example Deck Browser Modal
@@ -119,6 +114,7 @@ namespace YGOPortable.UI
         public void Open()
         {
             Root.SetActive(true);
+            _cardFilterDialog.SetActive(false);
             if (DeckRepository.UserDecks.Count == 0)
                 DeckRepository.Load(Application.streamingAssetsPath, Application.persistentDataPath);
 
@@ -138,6 +134,11 @@ namespace YGOPortable.UI
             if (_deckDialog.activeSelf)
             {
                 if (Input.GetKeyDown(KeyCode.Escape)) _deckDialog.SetActive(false);
+                return;
+            }
+            if (_cardFilterDialog.activeSelf)
+            {
+                if (Input.GetKeyDown(KeyCode.Escape)) _cardFilterDialog.SetActive(false);
                 return;
             }
 
@@ -211,6 +212,7 @@ namespace YGOPortable.UI
             _toastText.resizeTextMaxSize = 14;
             BuildArchetypeModal(root);
             BuildDeckDialog(root);
+            BuildDetailedSearch(root);
         }
 
         private void BuildCardDetails(Transform root)
@@ -222,42 +224,42 @@ namespace YGOPortable.UI
             _previewCard = CompositeCardView.Create(card, "Preview", true);
 
             var stats = LotdUiKit.CreateRect("Stats", panel,
-                new Vector2(0.026f, 0.50f), new Vector2(0.974f, 0.577f), Vector2.zero, Vector2.zero);
+                new Vector2(0f, 0.493f), new Vector2(1f, 0.577f), new Vector2(17f, 0f), new Vector2(-17f, 0f));
             LotdUiKit.AddImage(stats.gameObject, LotdUiKit.LoadSprite("LOTD/HUD/cardbar_texture"),
                 new Color(0.86f, 0.68f, 0.38f, 0.86f), false, false);
             var icon = LotdUiKit.CreateRect("TypeIcon", stats, new Vector2(0.83f, 0.06f), new Vector2(0.975f, 0.94f),
                 Vector2.zero, Vector2.zero);
             _previewRaceIcon = LotdUiKit.AddImage(icon.gameObject, null, Color.white, true, false);
-            _previewStats = LotdUiKit.AddText(LotdUiKit.CreateRect("Info", stats,
+            _previewStats = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Info", stats,
                 new Vector2(0.03f, 0f), new Vector2(0.81f, 1f), Vector2.zero, Vector2.zero),
-                "Text", "", 14, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
-            _previewName = LotdUiKit.AddText(LotdUiKit.CreateRect("Name", panel,
-                new Vector2(0.04f, 0.435f), new Vector2(0.96f, 0.497f), Vector2.zero, Vector2.zero),
-                "Text", "", 20, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
-            _previewName.resizeTextForBestFit = true;
-            _previewName.resizeTextMinSize = 12;
-            _previewName.resizeTextMaxSize = 20;
+                "Text", "", 14, 9, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
+            _previewName = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Name", panel,
+                new Vector2(0f, 0.427f), new Vector2(1f, 0.492f), new Vector2(17f, 0f), new Vector2(-17f, 0f)),
+                "Text", "", 20, 10, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
 
             var desc = LotdUiKit.CreateRect("Description", panel,
-                new Vector2(0.036f, 0.155f), new Vector2(0.964f, 0.434f), Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(desc.gameObject, LotdUiKit.WhiteSprite, Color.clear);
+                new Vector2(0f, 0.155f), new Vector2(1f, 0.427f), new Vector2(17f, 0f), new Vector2(-17f, 0f));
+            LotdUiKit.AddImage(desc.gameObject, LotdUiKit.WhiteSprite, new Color(0.025f, 0.067f, 0.118f, 0.64f));
             var viewport = LotdUiKit.CreateRect("Viewport", desc, Vector2.zero, Vector2.one,
-                Vector2.zero, new Vector2(-16f, 0f));
+                new Vector2(8f, 5f), new Vector2(-21f, -5f));
             viewport.gameObject.AddComponent<RectMask2D>();
-            var content = LotdUiKit.CreateRect("Content", viewport, new Vector2(0f, 1f), Vector2.one,
-                Vector2.zero, Vector2.zero);
+            _previewDesc = LotdUiKit.AddText(viewport, "Content", "", 16, TextAnchor.UpperLeft, LotdUiKit.TextPrimary);
+            _previewDesc.supportRichText = false;
+            _previewDesc.verticalOverflow = VerticalWrapMode.Overflow;
+            _previewDesc.lineSpacing = 1.08f;
+            var content = _previewDesc.rectTransform;
+            content.anchorMin = new Vector2(0f, 1f);
+            content.anchorMax = Vector2.one;
             content.pivot = new Vector2(0.5f, 1f);
-            _previewDesc = content.gameObject.AddComponent<Text>();
-            _previewDesc.font = LotdUiKit.FontKR;
-            _previewDesc.fontSize = 16;
-            _previewDesc.color = LotdUiKit.TextPrimary;
-            _previewDesc.raycastTarget = false;
+            content.sizeDelta = Vector2.zero;
+            content.anchoredPosition = Vector2.zero;
             content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
             _previewScroll = desc.gameObject.AddComponent<ScrollRect>();
             _previewScroll.viewport = viewport;
             _previewScroll.content = content;
             _previewScroll.horizontal = false;
+            _previewScroll.scrollSensitivity = 32f;
             _previewScroll.movementType = ScrollRect.MovementType.Clamped;
             _previewScroll.verticalScrollbar = LotdUiKit.AddVerticalScrollbar(desc);
             _previewScroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
@@ -306,7 +308,10 @@ namespace YGOPortable.UI
                 return LotdUiKit.CreateLotdDropdown(slot, "Dropdown", choices, _ => RefreshTrunkFilter());
             }
             _kindFilter = AddFilter("Kind", 0f, 0.32f, CardKinds);
-            _raceFilter = AddFilter("Race", 0.34f, 0.67f, RaceOptions.Select(race => race.label).ToArray());
+            var advanced = LotdUiKit.CreateRect("DetailedSearch", filters, new Vector2(.337f, 0f),
+                new Vector2(.675f, 1f), Vector2.zero, Vector2.zero);
+            _detailButtonText = LotdUiKit.CreateLotdButton(advanced, "Button", "상세 검색", OpenDetailedSearch, 14, true)
+                .GetComponentInChildren<Text>();
             _sortFilter = AddFilter("Sort", 0.69f, 1f, SortOptions);
 
             var scrollHolder = LotdUiKit.CreateRect("TrunkScrollHolder", col,
@@ -444,21 +449,16 @@ namespace YGOPortable.UI
             _activeArchetypeFilter = archetype;
             _searchInp.SetTextWithoutNotify("");
             _kindFilter.SetValueWithoutNotify(0);
-            _raceFilter.SetValueWithoutNotify(0);
             _sortFilter.SetValueWithoutNotify(0);
+            ClearDetailedSearch();
             RefreshTrunkFilter();
         }
 
         private void RefreshTrunkFilter()
         {
             _trunkResults.Clear();
-            string query = _searchInp.text.Trim();
-            uint.TryParse(query, out uint queryCode);
-            int kind = _kindFilter.value;
-            bool canFilterByRace = kind != 2 && kind != 3;
-            _raceFilter.interactable = canFilterByRace;
-            if (!canFilterByRace) _raceFilter.SetValueWithoutNotify(0);
-            ulong raceMask = RaceOptions[_raceFilter.value].mask;
+            var filter = CreateTrunkFilter(_searchInp.text, (DeckCardKind)_kindFilter.value);
+            UpdateDetailedSearchButton();
 
             IEnumerable<CardInfo> source = CardDatabase.AllCards;
             _trunkHeading.text = "보관함";
@@ -476,19 +476,8 @@ namespace YGOPortable.UI
                 _trunkHeading.color = LotdUiKit.GoldAccent;
             }
 
-            foreach (var c in source)
-            {
-                if ((c.type & YgoConstants.TYPE_TOKEN) != 0) continue;
-                if (kind == 1 && (!c.IsMonster || c.IsExtra)) continue;
-                if (kind == 2 && !c.IsSpell) continue;
-                if (kind == 3 && !c.IsTrap) continue;
-                if (kind == 4 && !c.IsExtra) continue;
-                if (raceMask != 0 && (c.race & raceMask) == 0) continue;
-                if (query.Length != 0 && c.code != queryCode &&
-                    (c.name ?? "").IndexOf(query, StringComparison.OrdinalIgnoreCase) < 0 &&
-                    (c.desc ?? "").IndexOf(query, StringComparison.OrdinalIgnoreCase) < 0) continue;
-                _trunkResults.Add(c);
-            }
+            foreach (var card in source)
+                if (filter.Matches(card)) _trunkResults.Add(card);
 
             int sort = _sortFilter.value;
             if (sort == 1) _trunkResults.Sort((a, b) => b.atk.CompareTo(a.atk));
@@ -522,7 +511,11 @@ namespace YGOPortable.UI
 
         private void OnTrunkScrolled()
         {
-            if (_totalRows == 0) return;
+            if (_totalRows == 0)
+            {
+                UpdateVirtualTrunkSlots(0);
+                return;
+            }
             float distance = Mathf.Max(0f, _trunkContent.anchoredPosition.y);
             int first = Mathf.Clamp(Mathf.FloorToInt(distance / _rowHeight), 0, _totalRows - 1);
             UpdateVirtualTrunkSlots(first);
@@ -760,16 +753,16 @@ namespace YGOPortable.UI
             if (_previewCard.CurrentCode == code) return;
             var ci = CardDatabase.Get(code);
             _previewCard.SetCard(code);
-            if (ci == null) return;
 
-            _previewName.text = ci.name;
-            _previewStats.text = ci.FormatStatsLineKR();
-            _previewDesc.text = ci.desc;
-            _previewScroll.verticalNormalizedPosition = 1f;
+            _previewName.text = ci?.name ?? "";
+            _previewStats.text = ci?.FormatStatsLineKR() ?? "";
+            _previewDesc.text = ci?.desc ?? "";
+            _previewScroll.StopMovement();
+            _previewScroll.content.anchoredPosition = Vector2.zero;
 
             Sprite raceSp = null;
-            if (ci.IsMonster) raceSp = LotdUiKit.GetRaceSprite(ci.race);
-            else raceSp = LotdUiKit.LoadSprite($"LOTD/Icons/{YgoConstants.GetSpellTrapSubSpriteName(ci.type)}");
+            if (ci != null)
+                raceSp = ci.IsMonster ? LotdUiKit.GetRaceSprite(ci.race) : LotdUiKit.LoadSprite($"LOTD/Icons/{YgoConstants.GetSpellTrapSubSpriteName(ci.type)}");
             _previewRaceIcon.gameObject.SetActive(raceSp != null);
             _previewRaceIcon.sprite = raceSp;
         }

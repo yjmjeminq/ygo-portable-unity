@@ -8,6 +8,7 @@ Builds all Unity runtime & streaming assets for YGO Portable Unity:
   5. Assets/StreamingAssets/cardart.idx + cardart_*.pack (<40MB chunks of 224x224 JPEG artwork)
   6. Assets/Resources/LOTD/... + Fonts/NotoSansKR.ttf    (sliced LOTD UI sprites, frames, Busts, TypeIcons)
   7. Assets/StreamingAssets/tokenart.pack      (token artwork and its index)
+  8. Assets/StreamingAssets/deck_effect_categories.bin (deck editor effect filters)
 """
 
 import io
@@ -485,8 +486,55 @@ def build_cards():
     (STREAMING / "cards_prop.bin").write_bytes(packed_bytes)
     kr_json_text = json.dumps({"cards": kr_cards_list}, ensure_ascii=False, separators=(",", ":"))
     (STREAMING / "cards_kr.json").write_text(kr_json_text, encoding="utf-8")
+    build_deck_effect_categories(all_codes)
     print(f"  cards_prop.bin: {len(all_codes)} cards ({len(packed_bytes)/1024:.1f} KB), cards_kr.json: {len(kr_json_text)/1024/1024:.2f} MB")
     return set(all_codes), lotd_to_pass, mod_by_pass, pass_to_konami, pass_to_lotd, kr_cards_list
+
+
+def build_deck_effect_categories(all_codes):
+    # Output bits follow DeckCardFilter.EffectOptions. Input bit numbers differ
+    # between the original LOTD genre table and EDOPro's datas.category field.
+    lotd_bits = (
+        (10, 11), (14,), (37,), (15,), (2,), (5,), (3,), (30,), (4,),
+        (1,), (0,), (8,), (7,), (9,), (6,), (13,), (12,), (31,),
+        (29,), (16,), (17,), (18,),
+    )
+    edopro_bits = (
+        (0, 1), (7,), (4,), (5, 6), (8,), (9,), (20,), (22,), (16, 17),
+        (18,), (19,), (12,), (10,), (30,), (), (2,), (3,), (28,),
+        (23,), (13,), (14,), (15,),
+    )
+
+    def remap(value, source_bits):
+        return sum(1 << index for index, bits in enumerate(source_bits)
+                   if any(value & (1 << bit) for bit in bits))
+
+    toc = parse_toc(YGO_PC / "YGO_2020.toc")
+    with (YGO_PC / "YGO_2020.dat").open("rb") as archive:
+        def read(member):
+            offset, length = toc[member]
+            archive.seek(offset)
+            return archive.read(length)
+
+        passcodes = list(struct.iter_unpack("<I", read("bin/CARD_Pass.bin")))
+        genres = list(struct.iter_unpack("<Q", read("bin/CARD_Genre.bin")))
+    if len(passcodes) != len(genres):
+        raise ValueError("LOTD genre table does not match its passcode table.")
+    legacy = {code: remap(mask, lotd_bits) for (code,), (mask,) in zip(passcodes, genres) if code}
+
+    db_path = (OPENDUEL / "cards.cdb").resolve().as_uri()
+    with sqlite3.connect(f"{db_path}?mode=ro", uri=True) as db:
+        modern = {code: remap(category or 0, edopro_bits)
+                  for code, category in db.execute("SELECT id, category FROM datas")}
+
+    records = []
+    for code in sorted(all_codes):
+        mask = legacy.get(code, modern.get(code, 0))
+        if mask:
+            records.append(struct.pack("<II", code, mask))
+    path = STREAMING / "deck_effect_categories.bin"
+    path.write_bytes(struct.pack("<4sII", b"YGEC", 1, len(records)) + b"".join(records))
+    print(f"  deck_effect_categories.bin: {len(records)} cards with searchable effect tags")
 
 
 def build_script_pack(all_codes: set):

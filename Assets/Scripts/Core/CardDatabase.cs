@@ -26,6 +26,7 @@ namespace YGOPortable.Core
         public uint link;
         public ulong setcode;
         public string[] strs;
+        public uint DeckEffectCategories { get; internal set; }
 
         public bool IsMonster => (type & YgoConstants.TYPE_MONSTER) != 0;
         public bool IsSpell => (type & YgoConstants.TYPE_SPELL) != 0;
@@ -322,9 +323,38 @@ namespace YGOPortable.Core
                 }
             }
 
+            LoadDeckEffectCategories(streamingAssetsPath);
             _relatedCache.Clear();
             _archetypes = null;
             Debug.Log($"[CardDatabase] Loaded {_allCards.Count} KR cards.");
+        }
+
+        private static void LoadDeckEffectCategories(string streamingAssetsPath)
+        {
+            string path = Path.Combine(streamingAssetsPath, "deck_effect_categories.bin");
+            if (!File.Exists(path)) return;
+
+            try
+            {
+                using var stream = File.OpenRead(path);
+                using var reader = new BinaryReader(stream);
+                if (reader.ReadUInt32() != 0x43454759u || reader.ReadUInt32() != 1)
+                    throw new InvalidDataException("Unrecognized deck effect index format.");
+                uint count = reader.ReadUInt32();
+                if (stream.Length != 12L + count * 8L)
+                    throw new InvalidDataException("Unexpected deck effect index size.");
+
+                for (uint i = 0; i < count; i++)
+                {
+                    uint code = reader.ReadUInt32();
+                    uint flags = reader.ReadUInt32();
+                    if (_byCode.TryGetValue(code, out var card)) card.DeckEffectCategories = flags;
+                }
+            }
+            catch (Exception error) when (error is IOException || error is UnauthorizedAccessException)
+            {
+                Debug.LogWarning($"[CardDatabase] Failed loading deck effect categories: {error.Message}");
+            }
         }
 
         private static readonly Dictionary<uint, List<CardInfo>> _relatedCache = new Dictionary<uint, List<CardInfo>>();
