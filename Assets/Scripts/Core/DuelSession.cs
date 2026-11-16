@@ -171,6 +171,7 @@ namespace YGOPortable.Core
         public event Action<int, int> OnTurnStarted;
         public event Action<int, int> OnPhaseChanged;
         public event Action<ChainLinkInfo> OnChainActivated;
+        public event Action<ChainLinkInfo> OnChainResolving;
         public event Action<byte, uint, uint, byte, uint, uint> OnAttackDeclared;
         public event Action<byte, uint, uint, byte, uint, uint> OnBattleResolved;
         public event Action<byte, IReadOnlyList<bool>> OnCoinTossed;
@@ -710,6 +711,7 @@ namespace YGOPortable.Core
                         var link = CurrentChain[idx - 1];
                         SolvedChainLinks.Add((idx, link.code));
                         AddLog($"체인 {idx} 처리: [{CardDatabase.GetName(link.code)}]");
+                        OnChainResolving?.Invoke(link);
                     }
                     break;
                 }

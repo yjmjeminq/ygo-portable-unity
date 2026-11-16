@@ -63,6 +63,8 @@ namespace YGOPortable.UI
         private readonly Stack<CompositeCardView> _cards = new Stack<CompositeCardView>();
         private RectTransform _layer;
         private Sprite _summonArt;
+        private uint _previousChainCode;
+        private int _previousChainNumber;
         private bool _playing;
 
         public bool IsPresenting => _playing || _steps.Count > 0;
@@ -93,6 +95,8 @@ namespace YGOPortable.UI
             StopAllCoroutines();
             _steps.Clear();
             _cards.Clear();
+            _previousChainCode = 0;
+            _previousChainNumber = 0;
             _playing = false;
             Paused = false;
             for (int i = _layer.childCount - 1; i >= 0; i--)
@@ -172,6 +176,11 @@ namespace YGOPortable.UI
         internal void QueueChain(CardPose source, uint code, int chainNumber, bool opponent)
         {
             _steps.Enqueue(ChainActivation(source, code, chainNumber, opponent));
+        }
+
+        internal void QueueChainResolution(Vector2 center, uint code, int chainNumber)
+        {
+            _steps.Enqueue(ChainResolution(center, code, chainNumber));
         }
 
         internal void QueueAttackArrow(Vector2 from, Vector2 to, bool opponent)
@@ -290,7 +299,8 @@ namespace YGOPortable.UI
             else if (motion == CardMotion.TokenSummon || motion == CardMotion.Vanish)
             {
                 bool appearing = motion == CardMotion.TokenSummon;
-                var fade = proxy.GetComponent<CanvasGroup>() ?? proxy.gameObject.AddComponent<CanvasGroup>();
+                if (!proxy.TryGetComponent<CanvasGroup>(out var fade))
+                    fade = proxy.gameObject.AddComponent<CanvasGroup>();
                 var point = appearing ? flight.To.Position : flight.From.Position;
                 var effect = CreateEffect(appearing ? DuelEffectKind.Token : DuelEffectKind.Break, point,
                     flight.To.Size * 2.4f, DuelStyle.Player);
@@ -337,43 +347,37 @@ namespace YGOPortable.UI
         private IEnumerator RevealSummon(CompositeCardView proxy, CardFlight flight, CardMotion motion)
         {
             var (kind, accent, title) = SummonEffect(flight.Code, motion);
-            var center = new Vector2(_layer.rect.width * .016f, _layer.rect.height * .071f);
-            float height = Mathf.Min(352f, _layer.rect.height * .395f);
-            var cardCenter = _summonArt == null ? center : center + Vector2.left * (height * .78f);
-            var reveal = new CardPose(cardCenter, new Vector2(height * LotdUiKit.CardAspectRatio, height), -3f);
+            Vector2 view = _layer.rect.size;
+            var center = new Vector2(view.x * .035f, view.y * .045f);
+            float height = Mathf.Min(352f, view.y * .395f);
+            var reveal = new CardPose(center, new Vector2(height * LotdUiKit.CardAspectRatio, height), 0f);
             var first = new CardFlight(flight.Code, flight.From, reveal, flight.StartsFaceDown, false);
             var background = LotdUiKit.AddImage(LotdUiKit.FillRect("SummonShade", _layer).gameObject, LotdUiKit.WhiteSprite,
                 Color.clear, false, false);
-            var effect = CreateEffect(kind, center, new Vector2(height * 2.55f, height * 1.53f), accent);
+            var effect = CreateEffect(kind, center, new Vector2(view.x * .76f, view.y * .83f), accent);
             Image artwork = null;
+            var cardFade = proxy.gameObject.AddComponent<CanvasGroup>();
             if (_summonArt != null)
             {
-                var middle = new Vector2(.5f, .5f);
-                var holder = LotdUiKit.CreateRect("SummonArtwork", _layer, middle, middle, Vector2.zero, Vector2.zero);
-                holder.sizeDelta = new Vector2(height * 2.12f, height * 1.36f);
-                holder.anchoredPosition = center + new Vector2(height * .34f, height * .18f);
+                var holder = CenteredVisual("SummonArtwork", _layer, center, new Vector2(view.x * .79f, view.y * .89f));
                 artwork = LotdUiKit.AddImage(holder.gameObject, _summonArt, new Color(1f, 1f, 1f, 0f), true, false);
             }
-            var band = Banner("SummonName", center - Vector2.up * (height * .59f),
-                new Vector2(Mathf.Min(_layer.rect.width * .72f, 670f), 58f), accent);
-            var label = LotdUiKit.AddFittedText(LotdUiKit.FillRect("Content", band, 4f), "Name",
-                $"{title}  ·  {CardDatabase.GetName(flight.Code)}", 24, 12, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
-            DuelStyle.Shadow(label);
-            var layout = band.gameObject.AddComponent<CanvasGroup>();
-            layout.alpha = 0f;
             proxy.transform.SetAsLastSibling();
+            var layout = SummonPlate(flight, title, center - Vector2.up * view.y * (artwork == null ? .24f : .32f));
 
             LotdAudio.PlaySummon();
             yield return Animate(.28f, t =>
             {
                 ApplyFlight(proxy, first, t, 38f);
                 effect.Seek(t * .54f);
-                background.color = new Color(.009f, .013f, .02f, Mathf.SmoothStep(0f, .63f, t));
+                background.color = new Color(.009f, .013f, .02f, Mathf.SmoothStep(0f, .64f, t));
                 layout.alpha = Mathf.SmoothStep(0f, 1f, (t - .40f) / .60f);
                 if (artwork != null)
                 {
-                    artwork.color = new Color(1f, 1f, 1f, Mathf.SmoothStep(0f, 1f, (t - .26f) / .65f));
-                    artwork.rectTransform.localScale = Vector3.one * Mathf.Lerp(.84f, 1f, t);
+                    float crossfade = Mathf.SmoothStep(0f, 1f, (t - .39f) / .48f);
+                    artwork.color = new Color(1f, 1f, 1f, crossfade);
+                    artwork.rectTransform.localScale = Vector3.one * Mathf.Lerp(.82f, 1f, crossfade);
+                    cardFade.alpha = 1f - crossfade;
                 }
             });
             yield return Animate(artwork == null ? .18f : .37f, t => effect.Seek(.54f + t * .22f));
@@ -384,15 +388,68 @@ namespace YGOPortable.UI
                 ApplyFlight(proxy, last, t, 23f);
                 effect.Seek(.76f + t * .24f);
                 layout.alpha = 1f - t;
-                background.color = new Color(.009f, .013f, .02f, .63f * (1f - t));
+                background.color = new Color(.009f, .013f, .02f, .64f * (1f - t));
                 if (artwork != null)
+                {
+                    cardFade.alpha = Mathf.SmoothStep(0f, 1f, t * 3f);
                     artwork.color = new Color(1f, 1f, 1f, 1f - t);
+                }
             });
             Destroy(background.gameObject);
             Destroy(effect.gameObject);
-            Destroy(band.gameObject);
+            Destroy(layout.gameObject);
             if (artwork != null) Destroy(artwork.gameObject);
             ReleaseSummonArt();
+        }
+
+        private CanvasGroup SummonPlate(CardFlight flight, string summonType, Vector2 center)
+        {
+            float width = Mathf.Min(_layer.rect.width * .70f, 836f);
+            var holder = CenteredVisual("SummonName", _layer, center, new Vector2(width, 52f));
+            var group = holder.gameObject.AddComponent<CanvasGroup>();
+            group.alpha = 0f;
+            var info = CardDatabase.Get(flight.Code);
+            // Face-up monsters are rotated in opposite directions on the two sides of the board.
+            bool opponent = flight.To.Angle > 45f;
+            var plate = opponent ? DuelVisualAssets.SummonNameOpponent : DuelVisualAssets.SummonNamePlayer;
+            var accent = DuelStyle.Side(opponent);
+            AddBandBackground(holder, plate, accent);
+            var nameArea = LotdUiKit.FillRect("SummonNameText", holder);
+            var name = LotdUiKit.AddFittedText(nameArea, "Name", CardDatabase.GetName(flight.Code), 28, 14,
+                TextAnchor.MiddleCenter, Color.white, FontStyle.BoldAndItalic);
+            DuelStyle.Shadow(name);
+
+            var stats = CenteredVisual("SummonStats", holder, Vector2.down * 41f, new Vector2(width * .57f, 25f));
+            AddBandBackground(stats, opponent ? DuelVisualAssets.SummonStatsOpponent : DuelVisualAssets.SummonStatsPlayer, accent);
+            string value = info?.IsMonster == true
+                ? $"ATK {info.AtkString}  {(info.IsLink ? info.DefString : $"DEF {info.DefString}")}"
+                : summonType;
+            var statText = LotdUiKit.AddFittedText(stats, "Value", value, 18, 12,
+                TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+            DuelStyle.Shadow(statText);
+            if (info?.IsMonster == true && !info.IsLink && info.level > 0)
+            {
+                int count = (int)Math.Min(13u, info.level);
+                var icon = info.IsXyz ? DuelVisualAssets.SummonRank : DuelVisualAssets.SummonLevel;
+                var level = CenteredVisual("SummonLevel", holder, Vector2.up * 24f, new Vector2(width * .55f, 21f));
+                if (icon != null)
+                {
+                    float step = Mathf.Min(19f, level.rect.width / count);
+                    for (int i = 0; i < count; i++)
+                    {
+                        Vector2 point = Vector2.right * (i - (count - 1) * .5f) * step;
+                        var star = CenteredVisual("Star", level, point, Vector2.one * step * .94f);
+                        LotdUiKit.AddImage(star.gameObject, icon, Color.white, true, false);
+                    }
+                }
+                else
+                {
+                    string stars = new string(info.IsXyz ? '◆' : '★', count);
+                    var rank = LotdUiKit.AddText(level, "Value", stars, 16, TextAnchor.MiddleCenter, DuelStyle.Gold, FontStyle.Bold);
+                    DuelStyle.Shadow(rank);
+                }
+            }
+            return group;
         }
 
         internal static (DuelEffectKind kind, Color color, string label) SummonEffect(uint code, CardMotion motion)
@@ -464,38 +521,117 @@ namespace YGOPortable.UI
 
         private IEnumerator ChainActivation(CardPose source, uint code, int chainNumber, bool opponent)
         {
+            uint previous = chainNumber > 1 && _previousChainNumber == chainNumber - 1 ? _previousChainCode : 0;
+            _previousChainNumber = chainNumber;
+            _previousChainCode = code;
             if (!source.IsValid) yield break;
-            var center = new Vector2((opponent ? 1f : -1f) * _layer.rect.width * .074f, _layer.rect.height * .066f);
-            float height = Mathf.Min(295f, _layer.rect.height * .38f);
-            var reveal = new CardPose(center, new Vector2(height * LotdUiKit.CardAspectRatio, height), opponent ? 8f : -8f);
-            var crest = CreateEffect(DuelEffectKind.Chain, center, new Vector2(height * 1.45f, height * 1.15f), DuelStyle.Gold);
+
+            float side = opponent ? 1f : -1f;
+            Vector2 view = _layer.rect.size;
+            float height = Mathf.Min(350f, view.y * .45f, view.x * .31f);
+            var center = new Vector2(side * view.x * (previous == 0 ? .04f : .088f), view.y * .055f);
+            var reveal = new CardPose(center, new Vector2(height * LotdUiKit.CardAspectRatio, height), side * 8f);
+            var overlay = LotdUiKit.FillRect("ChainActivation", _layer);
+            LotdUiKit.AddImage(overlay.gameObject, LotdUiKit.WhiteSprite, new Color(.01f, .018f, .023f, .38f), false, false);
+            var opacity = overlay.gameObject.AddComponent<CanvasGroup>();
+            opacity.alpha = 0f;
+
+            if (previous != 0)
+            {
+                var point = new Vector2(-side * view.x * .135f, center.y + height * .26f);
+                AddChainConnector(overlay, center, point, height);
+                var prior = TakeCard(previous, false, true);
+                prior.transform.SetParent(overlay, false);
+                ApplyPose(prior, new CardPose(point, reveal.Size * .66f, -side * 10f));
+                ChainBadge(overlay, point + new Vector2(-side * height * .19f, -height * .27f), chainNumber - 1,
+                    height * .18f, active: false);
+            }
+
+            var crest = CreateEffect(DuelEffectKind.Chain, center, new Vector2(height * 1.40f, height * 1.25f), DuelStyle.Gold);
             var card = TakeCard(code, code == 0, true);
-            var label = Banner("ChainCount", center + Vector2.down * (height * .51f),
-                new Vector2(183f, 45f), DuelStyle.Player);
-            var labelText = LotdUiKit.AddText(label, "Link", $"CHAIN  {chainNumber}", 25, TextAnchor.MiddleCenter,
-                Color.white, FontStyle.Bold);
-            DuelStyle.Shadow(labelText);
-            var opacity = label.gameObject.AddComponent<CanvasGroup>();
+            var highlight = LotdUiKit.FillRect("ChainCardHighlight", card.transform, -height * .035f);
+            if (DuelVisualAssets.ChainCardHighlight != null)
+                LotdUiKit.AddImage(highlight.gameObject, DuelVisualAssets.ChainCardHighlight, DuelStyle.Gold, false, false);
+            var flash = highlight.gameObject.AddComponent<CanvasGroup>();
+            flash.alpha = 0f;
+            var badge = ChainBadge(_layer, center + new Vector2(side * reveal.Size.x * .47f, -height * .43f), chainNumber,
+                height * .32f, active: true);
+            var badgeOpacity = badge.gameObject.AddComponent<CanvasGroup>();
+            badgeOpacity.alpha = 0f;
             LotdAudio.PlayChain();
 
             var lift = new CardFlight(code, source, reveal, code == 0, code == 0);
             yield return Animate(.23f, t =>
             {
                 crest.Seek(t * .58f);
-                opacity.alpha = Mathf.Clamp01((t - .23f) * 2.3f);
+                opacity.alpha = Mathf.Clamp01(t * 2.5f);
+                flash.alpha = badgeOpacity.alpha = Mathf.SmoothStep(0f, 1f, (t - .28f) * 2.3f);
+                badge.localScale = Vector3.one * Mathf.Lerp(1.45f, 1f, badgeOpacity.alpha);
                 ApplyFlight(card, lift, t, 22f);
             });
             var back = new CardFlight(code, reveal, source, code == 0, code == 0);
             yield return Animate(.20f, t =>
             {
                 crest.Seek(.58f + t * .42f);
-                opacity.alpha = 1f - t;
-                ApplyFlight(card, back, t, 13f);
+                float returning = Mathf.Clamp01((t - .22f) / .78f);
+                flash.alpha = badgeOpacity.alpha = opacity.alpha = 1f - returning;
+                ApplyFlight(card, back, returning, 13f);
             });
             card.gameObject.SetActive(false);
             Destroy(card.gameObject);
             Destroy(crest.gameObject);
-            Destroy(label.gameObject);
+            Destroy(badge.gameObject);
+            Destroy(overlay.gameObject);
+        }
+
+        private IEnumerator ChainResolution(Vector2 center, uint code, int chainNumber)
+        {
+            float height = Mathf.Min(206f, _layer.rect.height * .29f);
+            var size = new Vector2(height * LotdUiKit.CardAspectRatio, height);
+            var overlay = LotdUiKit.FillRect("ChainResolution", _layer);
+            var card = TakeCard(code, code == 0, true);
+            card.transform.SetParent(overlay, false);
+            ApplyPose(card, new CardPose(center, size, -5f));
+            var badge = ChainBadge(overlay, center + new Vector2(size.x * .49f, -height * .32f),
+                chainNumber, height * .35f, active: true, resolving: true);
+            var fade = overlay.gameObject.AddComponent<CanvasGroup>();
+            fade.alpha = 0f;
+            yield return Animate(.34f, t =>
+            {
+                float appear = Mathf.SmoothStep(0f, 1f, t / .24f);
+                fade.alpha = appear * (1f - Mathf.SmoothStep(0f, 1f, (t - .73f) / .27f));
+                badge.localScale = Vector3.one * Mathf.Lerp(1.28f, 1f, appear);
+            });
+            overlay.gameObject.SetActive(false);
+            Destroy(overlay.gameObject);
+        }
+
+        private static void AddChainConnector(RectTransform overlay, Vector2 from, Vector2 to, float height)
+        {
+            Vector2 direction = to - from;
+            float width = height * .065f;
+            var connector = CenteredVisual("ChainConnector", overlay, (from + to) * .5f,
+                new Vector2(direction.magnitude, width));
+            connector.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg);
+            var ink = DuelVisualAssets.ChainLinks;
+            LotdUiKit.AddImage(connector.gameObject, ink, new Color(.77f, .88f, .94f, .94f), false, false);
+            if (ink == null) connector.sizeDelta = new Vector2(direction.magnitude, 2f);
+        }
+
+        private static RectTransform ChainBadge(RectTransform parent, Vector2 point, int number, float size,
+            bool active, bool resolving = false)
+        {
+            var holder = CenteredVisual("ChainCount", parent, point, Vector2.one * size);
+            var crest = resolving ? DuelVisualAssets.ChainResolving ?? DuelVisualAssets.ChainActive : DuelVisualAssets.ChainActive;
+            if (crest != null)
+                LotdUiKit.AddImage(holder.gameObject, crest, new Color(1f, 1f, 1f, active ? .79f : .54f), true, false);
+            var label = LotdUiKit.AddFittedText(holder, "Link", number.ToString(), Mathf.RoundToInt(size * .84f), 11,
+                TextAnchor.MiddleCenter, Color.white, FontStyle.BoldAndItalic);
+            var outline = label.gameObject.AddComponent<Outline>();
+            outline.effectColor = resolving ? new Color(.84f, .61f, .15f, .93f) :
+                active ? new Color(.13f, .87f, 1f, .93f) : new Color(.12f, .42f, .49f, .95f);
+            outline.effectDistance = Vector2.one * 2f;
+            return holder;
         }
 
         private IEnumerator PhaseBanner(string label, bool opponent, Vector2 center, Action onStart, bool intro = false)
@@ -503,18 +639,30 @@ namespace YGOPortable.UI
             onStart?.Invoke();
             LotdAudio.PlayPhaseTransition();
             Vector2 size = intro
-                ? new Vector2(Mathf.Min(920f, _layer.rect.width * .76f), 112f)
-                : new Vector2(Mathf.Min(530f, _layer.rect.width * .48f), 49f);
-            var band = Banner(intro ? "DuelStart" : "Phase", center, size, intro ? DuelStyle.Gold : DuelStyle.Side(opponent));
-            var text = LotdUiKit.AddFittedText(band, "Label", label, intro ? 75 : 25, intro ? 36 : 16,
-                TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
-            DuelStyle.Shadow(text);
+                ? new Vector2(Mathf.Min(1000f, _layer.rect.width * .78f), _layer.rect.height * .35f)
+                : new Vector2(Mathf.Min(580f, _layer.rect.width * .61f), 71f);
+            var band = CenteredVisual(intro ? "DuelStart" : "Phase", _layer, center, size);
+            var introArt = intro ? DuelVisualAssets.DuelStart : null;
+            if (introArt != null)
+                LotdUiKit.AddImage(band.gameObject, introArt, Color.white, true, false);
+            else
+            {
+                if (!intro)
+                    AddBandBackground(band, opponent ? DuelVisualAssets.PhaseBannerOpponent : DuelVisualAssets.PhaseBannerPlayer,
+                        DuelStyle.Side(opponent));
+                var text = LotdUiKit.AddFittedText(band, "Label", label, intro ? 102 : 33, intro ? 36 : 16,
+                    TextAnchor.MiddleCenter, Color.white, FontStyle.BoldAndItalic);
+                DuelStyle.Shadow(text, 2f);
+            }
             var group = band.gameObject.AddComponent<CanvasGroup>();
             yield return Animate(intro ? .65f : .31f, t =>
             {
-                group.alpha = Mathf.Min(1f, Mathf.Min(t * 7f, (1f - t) * 6f));
-                band.anchoredPosition = center + Vector2.right * (Mathf.Lerp(-75f, 48f, t) * (1f - group.alpha));
-                band.localScale = new Vector3(Mathf.Lerp(.85f, 1.065f, t), 1f, 1f);
+                group.alpha = Mathf.SmoothStep(0f, 1f, Mathf.Min(t * 7f, (1f - t) * 6f));
+                float direction = opponent ? -1f : 1f;
+                float offset = Mathf.Lerp(-size.x * .29f, size.x * .22f, t) * (1f - group.alpha);
+                band.anchoredPosition = intro ? center : center + Vector2.right * (offset * direction);
+                float scale = Mathf.Lerp(intro ? .80f : .94f, intro ? 1.14f : 1.04f, t);
+                band.localScale = intro ? Vector3.one * scale : new Vector3(scale, 1f, 1f);
             });
             Destroy(band.gameObject);
         }
@@ -565,10 +713,7 @@ namespace YGOPortable.UI
 
         private DuelEffectGraphic CreateEffect(DuelEffectKind kind, Vector2 center, Vector2 size, Color color)
         {
-            var midpoint = new Vector2(.5f, .5f);
-            var rect = LotdUiKit.CreateRect(kind.ToString(), _layer, midpoint, midpoint, Vector2.zero, Vector2.zero);
-            rect.anchoredPosition = center;
-            rect.sizeDelta = size;
+            var rect = CenteredVisual(kind.ToString(), _layer, center, size);
             var effect = rect.gameObject.AddComponent<DuelEffectGraphic>();
             effect.texture = Texture2D.whiteTexture;
             effect.Kind = kind;
@@ -578,17 +723,27 @@ namespace YGOPortable.UI
             return effect;
         }
 
-        private RectTransform Banner(string name, Vector2 center, Vector2 size, Color accent)
+        private static RectTransform CenteredVisual(string name, Transform parent, Vector2 center, Vector2 size)
         {
             var middle = new Vector2(.5f, .5f);
-            var band = DuelStyle.Panel(_layer, name, middle, middle, fill: new Color(.027f, .047f, .067f, .93f), border: accent);
-            band.anchoredPosition = center;
-            band.sizeDelta = size;
-            var line = LotdUiKit.CreateRect("Accent", band, new Vector2(0f, .965f), Vector2.one, Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(line.gameObject, LotdUiKit.WhiteSprite, accent, false, false);
-            return band;
+            var rect = LotdUiKit.CreateRect(name, parent, middle, middle, Vector2.zero, Vector2.zero);
+            rect.anchoredPosition = center;
+            rect.sizeDelta = size;
+            return rect;
         }
 
+        private static void AddBandBackground(RectTransform rect, Sprite sprite, Color accent)
+        {
+            if (sprite != null)
+            {
+                LotdUiKit.AddImage(rect.gameObject, sprite, Color.white, false, false);
+                return;
+            }
+            Color fill = Color.Lerp(new Color(.016f, .023f, .041f, .96f), accent, .18f);
+            LotdUiKit.AddImage(rect.gameObject, LotdUiKit.WhiteSprite, fill, false, false);
+            var line = LotdUiKit.CreateRect("Accent", rect, new Vector2(0f, .965f), Vector2.one, Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(line.gameObject, LotdUiKit.WhiteSprite, accent, false, false);
+        }
 
 
         private IEnumerator Animate(float duration, Action<float> apply)

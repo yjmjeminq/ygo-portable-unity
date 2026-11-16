@@ -45,6 +45,7 @@ namespace YGOPortable.UI
 
             float t = _progress;
             float glow = Mathf.SmoothStep(0f, 1f, Mathf.Min(t * 6f, (1f - t) * 4.2f));
+            if (glow <= 0f) return;
             float travel = 1f - (1f - t) * (1f - t);
             if (Kind == DuelEffectKind.AttackPath)
             {
@@ -55,12 +56,7 @@ namespace YGOPortable.UI
             switch (Kind)
             {
                 case DuelEffectKind.Strike:
-                    Glow(mesh, rect.center, radius * (.28f + .42f * t), .68f, Shade(Color.white, glow * .65f));
-                    Ring(mesh, rect.center, radius * (.26f + .68f * travel), .75f, 5.2f * (1f - t) + 1f,
-                        .18f + .12f * t, .80f, Shade(Tint, glow), 48);
-                    Ring(mesh, rect.center + new Vector2(radius * .09f, radius * .04f), radius * (.18f + .58f * t),
-                        .78f, 3.4f, .59f, .69f, Shade(Color.Lerp(Tint, Color.white, .6f), glow), 48);
-                    Sparks(mesh, rect.center, radius, travel, glow, 28, false);
+                    Strike(mesh, rect.center, radius, travel, glow);
                     break;
                 case DuelEffectKind.Break:
                     Glow(mesh, rect.center, radius * (.48f + .92f * t), .83f, Shade(Tint, glow * .55f));
@@ -101,18 +97,43 @@ namespace YGOPortable.UI
             var from = new Vector2(rect.xMin, y);
             var to = new Vector2(rect.xMax, y);
             float width = Mathf.Clamp(rect.height * .20f, 3f, 15f);
-            Line(mesh, from, Vector2.Lerp(from, to, Mathf.Clamp01(t * 3f)), width * 1.65f, Shade(Tint, glow * .16f));
-            Line(mesh, from, Vector2.Lerp(from, to, Mathf.Clamp01(t * 3f)), 2.8f, Shade(Tint, glow * .72f));
-            for (int i = 0; i < 4; i++)
+            float travel = Mathf.SmoothStep(0f, 1f, t * 1.65f);
+            Vector2 head = Vector2.Lerp(from, to, travel);
+            float length = Mathf.Min(width * 2.6f, rect.width * travel);
+            var neck = head - Vector2.right * (length * .66f);
+            var light = Color.Lerp(Tint, Color.white, .72f);
+            Line(mesh, from, neck, width * 1.5f, Shade(Tint, glow * .24f));
+            Line(mesh, from, neck, width * .55f, Shade(Tint, glow * .93f));
+            Line(mesh, from, neck, width * .15f, Shade(light, glow));
+            Triangle(mesh, head, neck + new Vector2(-length * .34f, width), neck, Shade(Tint, glow));
+            Triangle(mesh, head, neck, neck + new Vector2(-length * .34f, -width), Shade(Tint, glow));
+            Triangle(mesh, head, neck + Vector2.up * width * .37f, neck - Vector2.up * width * .37f, Shade(light, glow));
+            for (int i = 1; i <= 3; i++)
             {
-                float p = Mathf.Clamp01(t * .94f - i * .15f);
-                var tip = Vector2.Lerp(from, to, p);
-                Color color = Shade(Color.Lerp(Tint, Color.white, .32f), glow * Mathf.SmoothStep(.23f, 1f, p * 2f));
-                Triangle(mesh, tip, tip + new Vector2(-width * 1.7f, width * .65f),
-                    tip + new Vector2(-width * 1.24f, 0f), color);
-                Triangle(mesh, tip, tip + new Vector2(-width * 1.24f, 0f),
-                    tip + new Vector2(-width * 1.7f, -width * .65f), color);
+                float x = head.x - i * width * 2.5f;
+                if (x < from.x + width) break;
+                var point = new Vector2(x, y);
+                var color = Shade(light, glow * (.65f - i * .13f));
+                Line(mesh, point + new Vector2(-width * .65f, width * .48f), point, width * .17f, color);
+                Line(mesh, point, point + new Vector2(-width * .65f, -width * .48f), width * .17f, color);
             }
+        }
+
+        private void Strike(VertexHelper mesh, Vector2 center, float radius, float travel, float glow)
+        {
+            var white = Color.Lerp(Tint, Color.white, .84f);
+            Glow(mesh, center, radius * (.41f + .59f * travel), .65f, Shade(Tint, glow * .72f));
+            Glow(mesh, center, radius * (.29f + .47f * travel), .34f, Shade(white, glow * .89f));
+            float flash = glow * Mathf.Clamp01((1f - travel) * 1.8f);
+            Triangle(mesh, center - Vector2.right * radius, center + Vector2.right * radius,
+                center + Vector2.up * radius * .14f, Shade(white, flash));
+            Triangle(mesh, center + Vector2.right * radius, center - Vector2.right * radius,
+                center - Vector2.up * radius * .14f, Shade(white, flash));
+            Ring(mesh, center, radius * (.22f + .77f * travel), .73f, 5.2f * (1f - travel) + 1f,
+                .18f + .12f * travel, .80f, Shade(Tint, glow), 48);
+            Ring(mesh, center + new Vector2(radius * .09f, radius * .04f), radius * (.16f + .61f * travel),
+                .78f, 2.7f, .59f, .69f, Shade(white, glow), 48);
+            Sparks(mesh, center, radius, travel, glow, 24, false);
         }
 
         private void SummoningPattern(VertexHelper mesh, Vector2 center, float radius, float t, float glow)

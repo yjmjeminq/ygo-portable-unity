@@ -20,7 +20,7 @@ from urllib.request import urlopen
 
 import UnityPy
 import fmod_toolkit
-from PIL import Image, ImageChops
+from PIL import Image, ImageChops, ImageDraw
 from master_duel_portraits import render_setup_pose
 
 
@@ -38,6 +38,8 @@ HUD_SPRITES = {
     "PhaseBattle": "GUI_PhaseBP",
     "PhaseMain2": "GUI_PhaseMP2",
     "PhaseEnd": "GUI_PhaseEP",
+    "PhaseBannerPlayer": "img_Phase_near",
+    "PhaseBannerOpponent": "img_Phase_far",
     "LPPlayer": "GUI_LP_Blue",
     "LPOpponent": "GUI_LP_Red",
     "Pause": "GUI_T_DuelButtonSubmenu01",
@@ -45,6 +47,42 @@ HUD_SPRITES = {
     "HandGlow": "GUI_T_ComCardLight2",
     "ChainLinks": "GUI_Duel_CardSelectionList_DialogChain",
     "ChainFrame": "GUI_Global_WindowChain_Frame2",
+    "ChainActive": "chain_circle_s_base",
+    "ChainResolving": "chain_circle_s_baseR",
+    "ChainWinding": "ChainWinding01_01",
+    "CardStatsBase": "GUI_Duel_CardStats_Base_0",
+    "CardStatsBaseAlt": "GUI_Duel_CardStats_Base_1",
+    "WinnerCrown": "GUI_DuelEnd_WinnerIcon",
+    "DuelVictory": "img_text_DuelTextWin_01",
+    "SummonNamePlayer": "tex_NameBg_near",
+    "SummonNameOpponent": "tex_NameBg_far",
+    "SummonStatsPlayer": "tex_StatusBg_near",
+    "SummonStatsOpponent": "tex_StatusBg_far",
+    "SummonLevel": "tex_IconLv",
+    "SummonRank": "tex_IconRank",
+}
+# Solid letter layers and horizontal sprite centers of the original prefabs, in pixels.
+DUEL_TITLES = {
+    "DuelStart": (
+        ("img_text_DueltexStart_d01", -610.5),
+        ("img_text_DueltexStart_u01", -141),
+        ("img_text_DueltexStart_e01", 300),
+        ("img_text_DueltexStart_l01", 680),
+    ),
+    "DuelDefeat": (
+        ("img_text_DuelDirectAtk_d00", -375.5),
+        ("img_text_DuelDirectAtk_e00", -213.5),
+        ("img_text_DuelLose_f01", -65.5),
+        ("img_text_DuelDirectAtk_e00", 85.5),
+        ("img_text_DuelDirectAtk_a00", 232.5),
+        ("img_text_DuelDirectAtk_t00", 390.5),
+    ),
+    "DuelDraw": (
+        ("img_text_DuelDirectAtk_d00", -262.5),
+        ("img_text_DuelDirectAtk_r00", -93.5),
+        ("img_text_DuelDirectAtk_a00", 68.5),
+        ("img_text_DuelDraw_w01", 254.5),
+    ),
 }
 EFFECTS = {
     "Strike": "fxt_hitm_flash01.png",
@@ -296,9 +334,38 @@ def export_field(output, textures):
     field.save(output / "Field.png")
 
 
+def compose_duel_title(sprites, title):
+    if any(name not in sprites for name, _ in title):
+        return None
+    pieces = []
+    for name, center in title:
+        image = sprites[name].parse_as_object().image.convert("RGBA")
+        pieces.append((image, round(center - image.width / 2)))
+
+    left = min(x for _, x in pieces)
+    right = max(x + image.width for image, x in pieces)
+    height = max(image.height for image, _ in pieces)
+    result = Image.new("RGBA", (right - left, height))
+    for image, x in pieces:
+        result.alpha_composite(image, (x - left, (height - image.height) // 2))
+    return result
+
+
+def crop_stone_well(atlas, x, y, radius):
+    well = atlas.crop((x - radius, y - radius, x + radius, y + radius))
+    # The original rim is mapped to curved geometry. Mask out the neighboring atlas islands.
+    size = radius * 8
+    mask = Image.new("L", (size, size))
+    ImageDraw.Draw(mask).ellipse((4, 4, size - 5, size - 5), fill=255)
+    mask = mask.resize(well.size, Image.Resampling.LANCZOS)
+    well.putalpha(ImageChops.multiply(well.getchannel("A"), mask))
+    return well
+
+
 def export_hud(output, sprites, textures):
     sources = {filename: sprites.get(name) for filename, name in HUD_SPRITES.items()}
     sources["DeckBack"] = textures.get("ProtectorIcon1070001")
+    sources["ChainCardHighlight"] = textures.get("ChainCardHighlight001")
     directory = output / "Hud"
     directory.mkdir()
     imported = 0
@@ -308,6 +375,20 @@ def export_hud(output, sprites, textures):
         image = asset.parse_as_object().image.convert("RGBA")
         image.save(directory / f"{filename}.png")
         imported += 1
+
+    for filename, title in DUEL_TITLES.items():
+        image = compose_duel_title(sprites, title)
+        if image is not None:
+            image.save(directory / f"{filename}.png")
+            imported += 1
+
+    grave_texture = textures.get("Grave_002_BaseColor_near")
+    if grave_texture is not None:
+        atlas = grave_texture.parse_as_object().image.convert("RGBA")
+        if atlas.size == (512, 512):
+            crop_stone_well(atlas, 129, 128, 118).save(directory / "GraveWell.png")
+            crop_stone_well(atlas, 129, 381, 108).save(directory / "BanishedWell.png")
+            imported += 2
     return imported
 
 

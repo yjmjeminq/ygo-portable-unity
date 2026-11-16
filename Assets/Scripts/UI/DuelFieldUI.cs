@@ -67,9 +67,11 @@ namespace YGOPortable.UI
             public Image bgImg;
             public Outline border;
             public CompositeCardView cardView;
-            public RectTransform atkPill;
-            public Text atkText;
+            public RectTransform stats;
+            public Image statsEdge;
+            public Text statsText;
             public Text badgeText;
+            public RectTransform badge;
             public CardDragTrigger dragTrigger;
             public byte mappedCon;
             public uint mappedSeq;
@@ -89,6 +91,7 @@ namespace YGOPortable.UI
             public Text text;
             public Outline border;
             public CompositeCardView cardView;
+            public Image wellLight;
         }
 
         private StackTileView _myDeckTile, _myExtraTile, _myGyTile, _myBanTile;
@@ -177,6 +180,7 @@ namespace YGOPortable.UI
             session.OnTurnStarted += HandleTurnStarted;
             session.OnPhaseChanged += HandlePhaseChanged;
             session.OnChainActivated += HandleChainActivatedEvent;
+            session.OnChainResolving += HandleChainResolvingEvent;
             session.OnAttackDeclared += HandleAttackEvent;
             session.OnBattleResolved += HandleBattleResolved;
             session.OnCoinTossed += HandleCoinTossedEvent;
@@ -215,6 +219,7 @@ namespace YGOPortable.UI
                 _session.OnTurnStarted -= HandleTurnStarted;
                 _session.OnPhaseChanged -= HandlePhaseChanged;
                 _session.OnChainActivated -= HandleChainActivatedEvent;
+                _session.OnChainResolving -= HandleChainResolvingEvent;
                 _session.OnAttackDeclared -= HandleAttackEvent;
                 _session.OnBattleResolved -= HandleBattleResolved;
                 _session.OnCoinTossed -= HandleCoinTossedEvent;
@@ -462,7 +467,8 @@ namespace YGOPortable.UI
             _emz[1] = CreateZoneSlot(Cell(5, 2));
             var chain = LotdUiKit.CreateRect("Chain", board, new Vector2(0.472f, 0.486f), new Vector2(0.528f, 0.582f),
                 Vector2.zero, Vector2.zero);
-            _chainIcon = LotdUiKit.AddImage(chain.gameObject, LotdUiKit.LoadSprite("LOTD/HUD/chain"), Color.white, true, false);
+            _chainIcon = LotdUiKit.AddImage(chain.gameObject,
+                DuelVisualAssets.ChainActive ?? LotdUiKit.LoadSprite("LOTD/HUD/chain"), Color.white, true, false);
             _chainBannerText = LotdUiKit.AddText(chain, "Count", "", 21, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
             _chainBannerText.gameObject.AddComponent<Outline>().effectColor = Color.black;
 
@@ -494,18 +500,22 @@ namespace YGOPortable.UI
             var view = CompositeCardView.Create(card, "CardView", duelArtwork: true);
             view.gameObject.SetActive(false);
 
-            var stats = LotdUiKit.CreateRect("Stats", cell, new Vector2(0.125f, 0.01f), new Vector2(0.875f, 0.26f),
+            var stats = LotdUiKit.CreateRect("Stats", cell, new Vector2(0.03f, 0.02f), new Vector2(0.97f, 0.24f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(stats.gameObject, LotdUiKit.WhiteSprite, new Color(0.04f, 0.08f, 0.08f, 0.82f), false, false);
-            var values = LotdUiKit.AddFittedText(LotdUiKit.FillRect("Content", stats, 2f), "Value", "", 14, 8,
+            LotdUiKit.AddImage(stats.gameObject, LotdUiKit.WhiteSprite, new Color(0.025f, 0.045f, 0.058f, 0.83f), false, false);
+            var edge = LotdUiKit.CreateRect("Edge", stats, Vector2.zero, new Vector2(0f, 1f), Vector2.zero, new Vector2(8f, 0f));
+            var statsEdge = LotdUiKit.AddImage(edge.gameObject, DuelVisualAssets.CardStatsBase, Color.white, false, false);
+            var values = LotdUiKit.AddFittedText(LotdUiKit.FillRect("Content", stats, 2f), "Value", "", 15, 8,
                 TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
-            values.gameObject.AddComponent<Outline>().effectColor = new Color(0.025f, 0.025f, 0.06f);
+            values.supportRichText = true;
+            DuelStyle.Shadow(values);
             stats.gameObject.SetActive(false);
 
-            var badge = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Materials", cell, new Vector2(0.64f, 0.74f),
-                new Vector2(0.99f, 0.97f), Vector2.zero, Vector2.zero), "Count", "", 12, 8,
+            var badge = LotdUiKit.CreateRect("Materials", cell, new Vector2(0.54f, 0.74f),
+                new Vector2(0.99f, 0.97f), Vector2.zero, Vector2.zero);
+            var badgeText = LotdUiKit.AddFittedText(badge, "Count", "", 12, 8,
                 TextAnchor.MiddleCenter, DuelStyle.Gold, FontStyle.Bold);
-            DuelStyle.Shadow(badge, 1.5f);
+            DuelStyle.Shadow(badgeText, 1.5f);
 
             return new FieldSlotView
             {
@@ -513,9 +523,11 @@ namespace YGOPortable.UI
                 bgImg = background,
                 border = border,
                 cardView = view,
-                atkPill = stats,
-                atkText = values,
-                badgeText = badge,
+                stats = stats,
+                statsEdge = statsEdge,
+                statsText = values,
+                badge = badge,
+                badgeText = badgeText,
                 dragTrigger = cell.gameObject.AddComponent<CardDragTrigger>(),
             };
         }
@@ -527,21 +539,29 @@ namespace YGOPortable.UI
             border.effectColor = Color.clear;
             border.effectDistance = new Vector2(2f, -2f);
 
-            if (location == YgoConstants.LOCATION_GRAVE || location == YgoConstants.LOCATION_REMOVED)
+            bool grave = location == YgoConstants.LOCATION_GRAVE;
+            bool well = grave || location == YgoConstants.LOCATION_REMOVED;
+            Image wellLight = null;
+            if (well)
             {
-                var rim = LotdUiKit.FillRect("Well", cell, 10f);
-                LotdUiKit.AddImage(rim.gameObject, DuelStyle.Disc,
-                    location == YgoConstants.LOCATION_GRAVE ? new Color(.045f, .16f, .26f) : new Color(.18f, .07f, .25f),
-                    true, false);
-                if (DuelVisualAssets.PhaseRim != null)
+                var rim = LotdUiKit.FillRect("Well", cell, 4f);
+                Sprite wellSprite = grave ? DuelVisualAssets.GraveWell : DuelVisualAssets.BanishedWell;
+                LotdUiKit.AddImage(rim.gameObject, wellSprite ?? DuelStyle.Disc,
+                    wellSprite != null ? Color.white : new Color(.13f, .19f, .27f), true, false);
+                if (wellSprite == null && DuelVisualAssets.PhaseRim != null)
                     LotdUiKit.AddImage(LotdUiKit.FillRect("StoneRim", rim).gameObject, DuelVisualAssets.PhaseRim,
                         new Color(.82f, .80f, .66f), true, false);
+                var opening = LotdUiKit.CreateRect("WellLight", rim, Vector2.one * .16f, Vector2.one * .84f,
+                    Vector2.zero, Vector2.zero);
+                wellLight = LotdUiKit.AddImage(opening.gameObject, DuelStyle.Disc,
+                    grave ? new Color(.12f, .46f, .78f, .69f) : new Color(.47f, .15f, .74f, .72f), true, false);
+                wellLight.enabled = false;
             }
             var card = LotdUiKit.CreateRect("TopCard", cell, SlotCardMin, SlotCardMax, Vector2.zero, Vector2.zero);
             var view = CompositeCardView.Create(card, "CardView", duelArtwork: true);
             view.gameObject.SetActive(false);
-            var count = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Total", cell, new Vector2(0.27f, 0.06f),
-                new Vector2(0.73f, 0.32f), Vector2.zero, Vector2.zero), "Count", "", 23, 11,
+            var count = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Total", cell, new Vector2(0.19f, well ? 0.34f : 0.06f),
+                new Vector2(0.81f, well ? 0.66f : 0.32f), Vector2.zero, Vector2.zero), "Count", "", 23, 11,
                 TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
             DuelStyle.Shadow(count, 2f);
 
@@ -557,7 +577,7 @@ namespace YGOPortable.UI
             button.onClick.AddListener(Open);
             var trigger = cell.gameObject.AddComponent<CardDragTrigger>();
             trigger.OnRightClick = Open;
-            return new StackTileView { root = cell, text = count, border = border, cardView = view };
+            return new StackTileView { root = cell, text = count, border = border, cardView = view, wellLight = wellLight };
         }
 
         private void BuildBottomHudAndHands(Transform root)
@@ -769,12 +789,12 @@ namespace YGOPortable.UI
 
             UpdateStackTile(_myDeckTile, mine.deckCount, me, YgoConstants.LOCATION_DECK);
             UpdateStackTile(_myExtraTile, mine.extra.Count, me, YgoConstants.LOCATION_EXTRA);
-            UpdateStackTile(_myGyTile, mine.grave.Count, me, YgoConstants.LOCATION_GRAVE, mine.grave.LastOrDefault());
-            UpdateStackTile(_myBanTile, mine.banished.Count, me, YgoConstants.LOCATION_REMOVED, mine.banished.LastOrDefault());
+            UpdateStackTile(_myGyTile, mine.grave.Count, me, YgoConstants.LOCATION_GRAVE);
+            UpdateStackTile(_myBanTile, mine.banished.Count, me, YgoConstants.LOCATION_REMOVED);
             UpdateStackTile(_oppDeckTile, theirs.deckCount, opponent, YgoConstants.LOCATION_DECK);
             UpdateStackTile(_oppExtraTile, theirs.extra.Count, opponent, YgoConstants.LOCATION_EXTRA);
-            UpdateStackTile(_oppGyTile, theirs.grave.Count, opponent, YgoConstants.LOCATION_GRAVE, theirs.grave.LastOrDefault());
-            UpdateStackTile(_oppBanTile, theirs.banished.Count, opponent, YgoConstants.LOCATION_REMOVED, theirs.banished.LastOrDefault());
+            UpdateStackTile(_oppGyTile, theirs.grave.Count, opponent, YgoConstants.LOCATION_GRAVE);
+            UpdateStackTile(_oppBanTile, theirs.banished.Count, opponent, YgoConstants.LOCATION_REMOVED);
 
             int chain = _session.CurrentChain.Count;
             _chainIcon.gameObject.SetActive(chain > 0);
@@ -826,7 +846,7 @@ namespace YGOPortable.UI
             _mat.ShowTurn(opponent);
         }
 
-        private void UpdateStackTile(StackTileView tile, int count, byte controller, uint location, LiveCardState top = null)
+        private void UpdateStackTile(StackTileView tile, int count, byte controller, uint location)
         {
             if (IsArriving(controller, location, 0)) return;
 
@@ -834,11 +854,13 @@ namespace YGOPortable.UI
             tile.text.text = count > 0 ? count.ToString() : "";
             tile.text.color = canAct ? LotdUiKit.GoldAccent : Color.white;
             tile.border.effectColor = canAct ? LotdUiKit.GoldAccent : Color.clear;
-            tile.cardView.gameObject.SetActive(count > 0);
-            if (count <= 0) return;
+            bool hasCards = count > 0;
+            bool showPile = hasCards && tile.wellLight == null;
+            if (tile.wellLight != null) tile.wellLight.enabled = hasCards;
+            tile.cardView.gameObject.SetActive(showPile);
+            if (!showPile) return;
 
-            bool showBack = top == null || location == YgoConstants.LOCATION_REMOVED && !top.IsFaceUp;
-            tile.cardView.SetCard(showBack ? 0u : top.code, showBack, top);
+            tile.cardView.SetCard(0u, true);
             tile.cardView.transform.localRotation = Quaternion.Euler(0f, 0f,
                 CardAngle(location, YgoConstants.POS_FACEUP_ATTACK, controller != _session.HumanPlayerIndex));
         }
@@ -862,10 +884,12 @@ namespace YGOPortable.UI
             bool visible = live != null && !IsArriving(con, loc, seq);
             slot.cardView.gameObject.SetActive(visible);
             bool showStats = visible && loc == YgoConstants.LOCATION_MZONE && live.IsFaceUp;
-            slot.atkPill.gameObject.SetActive(showStats);
+            slot.stats.gameObject.SetActive(showStats);
             bool token = showStats && (live.type & YgoConstants.TYPE_TOKEN) != 0;
             slot.badgeText.text = token ? "토큰" : visible && live.overlayCodes.Count > 0 ? $"×{live.overlayCodes.Count}" : "";
             slot.badgeText.color = token ? DuelStyle.Player : DuelStyle.Gold;
+            slot.badge.anchorMin = new Vector2(0.54f, opponent ? 0.03f : 0.74f);
+            slot.badge.anchorMax = new Vector2(0.99f, opponent ? 0.26f : 0.97f);
             if (visible)
             {
                 slot.cardView.SetCard(live.IsFaceUp ? live.code : 0u, !live.IsFaceUp, live);
@@ -874,11 +898,18 @@ namespace YGOPortable.UI
             }
             if (showStats)
             {
-                bool defense = live.IsDefense;
-                int stat = defense ? live.defense : live.attack;
-                int baseStat = defense ? live.baseDefense : live.baseAttack;
-                slot.atkText.text = $"{(defense ? "DEF" : "ATK")} {(stat < 0 ? "?" : stat.ToString())}";
-                slot.atkText.color = stat > baseStat ? LotdUiKit.CyanAccent : stat < baseStat ? LotdUiKit.RedAccent : Color.white;
+                slot.stats.anchorMin = new Vector2(0.03f, opponent ? 0.76f : 0.02f);
+                slot.stats.anchorMax = new Vector2(0.97f, opponent ? 0.98f : 0.24f);
+                bool link = (live.type & YgoConstants.TYPE_LINK) != 0;
+                string attackValue = StatValue(live.attack, live.baseAttack, !live.IsDefense);
+                string secondValue = link ? $"<color=#80D7FF>L{live.link}</color>" :
+                    StatValue(live.defense, live.baseDefense, live.IsDefense);
+                string stats = $"{attackValue}<color=#B2BEC4>/</color>{secondValue}";
+                if (slot.statsText.text != stats) slot.statsText.text = stats;
+                bool modified = live.attack != live.baseAttack || !link && live.defense != live.baseDefense;
+                slot.statsEdge.sprite = modified ? DuelVisualAssets.CardStatsBaseAlt ?? DuelVisualAssets.CardStatsBase :
+                    DuelVisualAssets.CardStatsBase;
+                slot.statsEdge.enabled = slot.statsEdge.sprite != null;
             }
 
             bool canDrag = visible && CanAcceptPlayerAction && !opponent && loc == YgoConstants.LOCATION_MZONE;
@@ -905,6 +936,14 @@ namespace YGOPortable.UI
             slot.bgImg.color = highlight.a > 0f
                 ? new Color(highlight.r, highlight.g, highlight.b, selected || attack ? .64f : .32f) : ZoneTint;
             slot.border.effectColor = highlight;
+        }
+
+        private static string StatValue(int stat, int baseStat, bool current)
+        {
+            string color = stat >= 0 && baseStat >= 0 && stat != baseStat
+                ? stat > baseStat ? "#78E6FF" : "#FF9A82"
+                : current ? "#FFFFFF" : "#BAC6CF";
+            return $"<color={color}>{(stat < 0 ? "?" : stat.ToString())}</color>";
         }
 
         private static float CardAngle(uint location, uint position, bool opponent)
@@ -1597,6 +1636,14 @@ namespace YGOPortable.UI
             if (animator == null) return;
             var pose = GetCardPose(link.triggerPlayer, link.triggerLoc, link.triggerSeq, YgoConstants.POS_FACEUP_ATTACK);
             animator.QueueChain(pose, link.code, link.chainNumber, link.triggerPlayer != _session.HumanPlayerIndex);
+        }
+
+        private void HandleChainResolvingEvent(ChainLinkInfo link)
+        {
+            var animator = CardAnimationManager.Instance;
+            if (animator == null) return;
+            var center = animator.GetPoint(_boardRect, new Vector2(.50f, .56f));
+            animator.QueueChainResolution(center, link.code, link.chainNumber);
         }
 
         private Vector2 AttackTarget(CardAnimationManager animator, byte attacker, byte target, uint location, uint sequence)

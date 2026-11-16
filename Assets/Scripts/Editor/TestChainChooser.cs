@@ -19,7 +19,8 @@ namespace YGOPortable.Editor
             VerifySingleEffect(duel);
             VerifyScrollableChoices(duel);
             VerifyEmptyChain(duel);
-            Debug.Log("[VERIFY CHAIN CHOOSER] Compact layout, duplicate effects, zone overlay and empty chain checks passed.");
+            VerifyMaterialChoices(duel);
+            Debug.Log("[VERIFY CHAIN CHOOSER] Compact layout, duplicate effects, zone overlay, empty chain and material selection checks passed.");
         }
 
         internal static void SubmitNativeChoice(DuelSession duel, int index)
@@ -153,6 +154,53 @@ namespace YGOPortable.Editor
             view.SelectChoice(11, LadyLabrynth);
             view.ConfirmChoice();
             Require(view.Responses.SequenceEqual(new[] { 11 }), "Scrolling changed the displayed chain candidate indices.");
+        }
+
+        private static void VerifyMaterialChoices(DuelSession duel)
+        {
+            var canvas = new GameObject("Material Chooser Verification", typeof(Canvas));
+            try
+            {
+                ((RectTransform)canvas.transform).sizeDelta = new Vector2(1600, 900);
+                var responses = new List<byte[]>();
+                var modals = new DuelPromptModals(canvas.transform, null, responses.Add);
+                var prompt = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_SUM, acc = 8, min = 1, max = 1 };
+                var fixedMaterial = new SelectableCardItem { code = LadyLabrynth, sumParam = 4 };
+                prompt.mustSelect.Add(fixedMaterial);
+                for (int i = 0; i < 11; i++)
+                    prompt.candidates.Add(new SelectableCardItem { code = LadyLabrynth, sumParam = 2 });
+                prompt.candidates.Add(fixedMaterial);
+                modals.ShowPrompt(duel, prompt);
+                Canvas.ForceUpdateCanvases();
+
+                var panel = (RectTransform)modals.ModalRoot.transform.Find("Win");
+                var scroll = panel.Find("Body/Cards")?.GetComponent<ScrollRect>();
+                Require(panel.rect.height < 450f && panel.anchorMax.y < .5f && scroll != null && scroll.horizontal &&
+                        scroll.content.rect.width > scroll.viewport.rect.width, "Material choices did not fit a compact, scrollable panel.");
+                var confirm = panel.Find("Footer/Btn_선택 완료/B").GetComponent<Button>();
+                var first = scroll.content.Find("Tile_0").GetComponent<Button>();
+                first.onClick.Invoke();
+                Require(!confirm.interactable, "A material that failed the required sum enabled confirmation.");
+                confirm.onClick.Invoke();
+                Require(responses.Count == 0, "A disabled material confirmation submitted a response.");
+                first.onClick.Invoke();
+                Require(modals.IsPromptOpen && responses.Count == 0, "Clicking an invalid material twice submitted a response.");
+
+                first.onClick.Invoke();
+                scroll.horizontalNormalizedPosition = 1f;
+                scroll.content.Find("Tile_11").GetComponent<Button>().onClick.Invoke();
+                Require(scroll.content.Find("Tile_-1/Chk").gameObject.activeSelf &&
+                        !scroll.content.Find("Tile_0/Chk").gameObject.activeSelf && confirm.interactable,
+                    "Selecting the valid last material did not keep the fixed card and replace the previous choice.");
+                Require(modals.TryConfirm() && !modals.IsPromptOpen && responses.Count == 1 &&
+                        responses[0].Length == 12 && BitConverter.ToInt32(responses[0], 0) == 0 &&
+                        BitConverter.ToInt32(responses[0], 4) == 1 && BitConverter.ToInt32(responses[0], 8) == 11,
+                    "The valid material selection did not keep its native index after scrolling.");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(canvas);
+            }
         }
 
         private sealed class ChainView : IDisposable
