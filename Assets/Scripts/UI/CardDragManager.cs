@@ -16,6 +16,7 @@ namespace YGOPortable.UI
         DeckSide,
         Hand,
         FieldMonster,
+        ExtraDeck,
     }
 
     public class DragContext
@@ -35,8 +36,9 @@ namespace YGOPortable.UI
         public DragSourceType CurrentSource { get; private set; }
         public uint CurrentCode { get; private set; }
         public int CurrentIndex { get; private set; }
-        public object CurrentData { get; private set; }
+        public object CurrentData { get; set; }
 
+        public event Action<DragSourceType, uint, int, object> OnDragStarted;
         public event Action<DragContext> OnDragDropped;
         public event Action OnDragCancelled;
 
@@ -47,7 +49,11 @@ namespace YGOPortable.UI
 
         public static CardDragManager Ensure(Canvas canvas)
         {
-            if (Instance != null) return Instance;
+            if (Instance != null)
+            {
+                Instance.transform.SetAsLastSibling();
+                return Instance;
+            }
             var go = new GameObject("CardDragManager", typeof(RectTransform));
             go.transform.SetParent(canvas.transform, false);
             var rt = (RectTransform)go.transform;
@@ -57,6 +63,7 @@ namespace YGOPortable.UI
             rt.offsetMax = Vector2.zero;
             Instance = go.AddComponent<CardDragManager>();
             Instance.Initialize(rt);
+            Instance.transform.SetAsLastSibling();
             return Instance;
         }
 
@@ -65,13 +72,13 @@ namespace YGOPortable.UI
             var ghostGo = new GameObject("GhostCard", typeof(RectTransform));
             ghostGo.transform.SetParent(root, false);
             _ghostRoot = (RectTransform)ghostGo.transform;
-            _ghostRoot.sizeDelta = new Vector2(100f, 145f);
+            _ghostRoot.sizeDelta = new Vector2(112f, 162f);
             _ghostRoot.pivot = new Vector2(0.5f, 0.5f);
 
             _ghostCanvasGroup = ghostGo.AddComponent<CanvasGroup>();
             _ghostCanvasGroup.blocksRaycasts = false;
             _ghostCanvasGroup.interactable = false;
-            _ghostCanvasGroup.alpha = 0.90f;
+            _ghostCanvasGroup.alpha = 0.94f;
 
             _ghostOutline = ghostGo.AddComponent<Outline>();
             _ghostOutline.effectColor = LotdUiKit.CyanAccent;
@@ -90,13 +97,16 @@ namespace YGOPortable.UI
             CurrentIndex = index;
             CurrentData = customData;
 
+            transform.SetAsLastSibling();
             _ghostRoot.gameObject.SetActive(true);
             _ghostRoot.SetAsLastSibling();
             _ghostCardView.SetCard(cardCode);
             UpdateGhostPosition(Input.mousePosition);
 
-            _ghostOutline.effectColor = source == DragSourceType.FieldMonster ? LotdUiKit.RedAccent : LotdUiKit.CyanAccent;
+            _ghostOutline.effectColor = source == DragSourceType.FieldMonster ? LotdUiKit.RedAccent
+                : (source == DragSourceType.Hand || source == DragSourceType.ExtraDeck ? LotdUiKit.GoldAccent : LotdUiKit.CyanAccent);
             LotdAudio.PlayClick();
+            OnDragStarted?.Invoke(source, cardCode, index, customData);
         }
 
         public void UpdateGhostPosition(Vector2 screenPos)
@@ -172,13 +182,27 @@ namespace YGOPortable.UI
         public Action OnRightClick;
         public Action OnPointerEnterAction;
         public Action OnPointerExitAction;
+        public bool EnableHoverLift;
 
         private bool _isDraggingThis;
+        private CanvasGroup _cg;
+        private ScrollRect _parentScroll;
 
         public void OnPointerEnter(PointerEventData eventData)
         {
             if (!_isDraggingThis)
             {
+                if (EnableHoverLift)
+                {
+                    var rt = transform as RectTransform;
+                    if (rt != null)
+                    {
+                        rt.offsetMin = new Vector2(0f, 16f);
+                        rt.offsetMax = new Vector2(0f, 16f);
+                        rt.localScale = new Vector3(1.08f, 1.08f, 1f);
+                        rt.SetAsLastSibling();
+                    }
+                }
                 OnPointerEnterAction?.Invoke();
             }
         }
@@ -187,8 +211,24 @@ namespace YGOPortable.UI
         {
             if (!_isDraggingThis)
             {
+                ResetVisualState();
                 OnPointerExitAction?.Invoke();
             }
+        }
+
+        private void ResetVisualState()
+        {
+            if (EnableHoverLift)
+            {
+                var rt = transform as RectTransform;
+                if (rt != null)
+                {
+                    rt.offsetMin = Vector2.zero;
+                    rt.offsetMax = Vector2.zero;
+                    rt.localScale = Vector3.one;
+                }
+            }
+            if (_cg != null) _cg.alpha = 1f;
         }
 
         public void OnPointerDown(PointerEventData eventData)
@@ -198,19 +238,33 @@ namespace YGOPortable.UI
 
         public void OnBeginDrag(PointerEventData eventData)
         {
+            if (SourceType == DragSourceType.None || CardCodeGetter == null)
+            {
+                _parentScroll = GetComponentInParent<ScrollRect>();
+                _parentScroll?.OnBeginDrag(eventData);
+                return;
+            }
             if (eventData.button != PointerEventData.InputButton.Left) return;
-            uint code = CardCodeGetter != null ? CardCodeGetter() : 0;
+            uint code = CardCodeGetter();
             if (code == 0) return;
 
             int idx = IndexGetter != null ? IndexGetter() : -1;
             object data = DataGetter != null ? DataGetter() : null;
 
             _isDraggingThis = true;
+            _cg = GetComponent<CanvasGroup>() ?? gameObject.AddComponent<CanvasGroup>();
+            _cg.alpha = 0.35f;
+
             CardDragManager.Instance?.StartDrag(SourceType, code, idx, data);
         }
 
         public void OnDrag(PointerEventData eventData)
         {
+            if (SourceType == DragSourceType.None || CardCodeGetter == null)
+            {
+                _parentScroll?.OnDrag(eventData);
+                return;
+            }
             if (_isDraggingThis && CardDragManager.Instance != null)
             {
                 CardDragManager.Instance.UpdateGhostPosition(eventData.position);
@@ -219,10 +273,25 @@ namespace YGOPortable.UI
 
         public void OnEndDrag(PointerEventData eventData)
         {
+            if (SourceType == DragSourceType.None || CardCodeGetter == null)
+            {
+                _parentScroll?.OnEndDrag(eventData);
+                return;
+            }
             if (_isDraggingThis)
             {
                 _isDraggingThis = false;
+                ResetVisualState();
                 CardDragManager.Instance?.EndDrag(eventData.position);
+            }
+        }
+
+        private void OnDisable()
+        {
+            if (_isDraggingThis)
+            {
+                _isDraggingThis = false;
+                ResetVisualState();
             }
         }
 

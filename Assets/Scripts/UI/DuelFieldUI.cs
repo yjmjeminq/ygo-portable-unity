@@ -107,6 +107,15 @@ namespace YGOPortable.UI
         private readonly List<(byte con, uint loc, uint seq)> _pendingPlaces = new List<(byte con, uint loc, uint seq)>();
         private DuelPrompt _pendingPlacePrompt;
 
+        // Drag-to-zone & in-flight animation state
+        private (byte con, uint loc, uint seq)? _preferredDropZone;
+        private int _preferredAttackTargetSeq = -1;
+        private readonly Dictionary<(byte con, uint loc, uint seq), int> _inFlightSlotCounts = new Dictionary<(byte, uint, uint), int>();
+        private bool _dragHighlightMZone;
+        private bool _dragHighlightSZone;
+        private bool _dragHighlightAttack;
+        private RectTransform _boardRect;
+
         // Hand rows
         private RectTransform _myHandBar;
         private RectTransform _oppHandBar;
@@ -124,7 +133,9 @@ namespace YGOPortable.UI
 
             if (CardDragManager.Instance != null)
             {
+                CardDragManager.Instance.OnDragStarted += HandleDuelDragStarted;
                 CardDragManager.Instance.OnDragDropped += HandleDuelCardDrop;
+                CardDragManager.Instance.OnDragCancelled += HandleDuelDragCancelled;
             }
         }
 
@@ -133,6 +144,7 @@ namespace YGOPortable.UI
             if (_session != null)
             {
                 _session.OnCardMoved -= HandleCardMovedEvent;
+                _session.OnChainActivated -= HandleChainActivatedEvent;
                 _session.OnAttackDeclared -= HandleAttackEvent;
                 _session.OnCoinTossed -= HandleCoinTossedEvent;
                 _session.OnDiceRolled -= HandleDiceRolledEvent;
@@ -142,6 +154,7 @@ namespace YGOPortable.UI
             if (_session != null)
             {
                 _session.OnCardMoved += HandleCardMovedEvent;
+                _session.OnChainActivated += HandleChainActivatedEvent;
                 _session.OnAttackDeclared += HandleAttackEvent;
                 _session.OnCoinTossed += HandleCoinTossedEvent;
                 _session.OnDiceRolled += HandleDiceRolledEvent;
@@ -151,6 +164,12 @@ namespace YGOPortable.UI
             _oppDeck = oppDeck;
             _pendingPlaces.Clear();
             _pendingPlacePrompt = null;
+            _preferredDropZone = null;
+            _preferredAttackTargetSeq = -1;
+            _inFlightSlotCounts.Clear();
+            _dragHighlightMZone = false;
+            _dragHighlightSZone = false;
+            _dragHighlightAttack = false;
 
             _lastAnnouncedTurn = -1;
             _lastAnnouncedTurnPlayer = -1;
@@ -173,6 +192,7 @@ namespace YGOPortable.UI
 
             Root.SetActive(true);
             _actionPopup.SetActive(false);
+            Canvas.ForceUpdateCanvases();
 
             if (_oppChar != null)
             {
@@ -284,8 +304,16 @@ namespace YGOPortable.UI
             var rRt = LotdUiKit.CreateRect("RaceIc", left, new Vector2(0.67f, 0.72f), new Vector2(0.92f, 0.835f), Vector2.zero, Vector2.zero);
             _inspRaceIcon = LotdUiKit.AddImage(rRt.gameObject, null, Color.white, true);
 
-            _inspStats = LotdUiKit.AddText(LotdUiKit.CreateRect("Stats", left, new Vector2(0.65f, 0.45f), new Vector2(0.97f, 0.71f), Vector2.zero, Vector2.zero),
+            _inspStats = LotdUiKit.AddText(LotdUiKit.CreateRect("Stats", left, new Vector2(0.65f, 0.51f), new Vector2(0.97f, 0.71f), Vector2.zero, Vector2.zero),
                 "St", "", 12, TextAnchor.UpperCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
+
+            var exBtnRt = LotdUiKit.CreateRect("ExBtn", left, new Vector2(0.65f, 0.445f), new Vector2(0.97f, 0.502f), Vector2.zero, Vector2.zero);
+            LotdUiKit.CreateLotdButton(exBtnRt, "B", "📦 내 EX덱", () =>
+            {
+                if (_session == null) return;
+                LotdAudio.PlayClick();
+                OpenStackZone((byte)_session.HumanPlayerIndex, YgoConstants.LOCATION_EXTRA, "내 엑스트라 덱");
+            }, 11, gold: true);
 
             _inspName = LotdUiKit.AddText(LotdUiKit.CreateRect("CName", left, new Vector2(0.03f, 0.39f), new Vector2(0.74f, 0.44f), Vector2.zero, Vector2.zero),
                 "N", "", 16, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
@@ -372,6 +400,7 @@ namespace YGOPortable.UI
         {
             var board = LotdUiKit.CreateRect("DuelBoard", root,
                 new Vector2(0.265f, 0.21f), new Vector2(0.992f, 0.892f), Vector2.zero, Vector2.zero);
+            _boardRect = board;
 
             // 7 columns x 5 rows grid
             // Rows (top to bottom): 0=Opp S/T, 1=Opp MZone, 2=Shared EMZ, 3=My MZone, 4=My S/T
@@ -514,6 +543,14 @@ namespace YGOPortable.UI
                     LotdAudio.PlayClick();
                     onClick();
                 });
+                var trig = cell.gameObject.AddComponent<CardDragTrigger>();
+                trig.SourceType = DragSourceType.None;
+                trig.OnRightClick = () =>
+                {
+                    if (_session == null) return;
+                    LotdAudio.PlayClick();
+                    onClick();
+                };
             }
             return new StackTileView { root = cell, text = txt, border = ol, cardView = cv };
         }
@@ -573,9 +610,67 @@ namespace YGOPortable.UI
         }
 
         // ==================== REFRESH & BINDING ====================
+        public bool TryAutoFulfillPreferredPrompt()
+        {
+            if (_session == null || _session.IsFinished) return false;
+            var p = _session.ActivePrompt;
+            if (p == null || p.playerId != _session.HumanPlayerIndex) return false;
+
+            if (_preferredDropZone.HasValue &&
+                (p.messageType == YgoConstants.MSG_SELECT_PLACE || p.messageType == YgoConstants.MSG_SELECT_DISFIELD) &&
+                p.min <= 1)
+            {
+                var target = _preferredDropZone.Value;
+                _preferredDropZone = null;
+                if (IsPlaceSelectable(target.con, target.loc, target.seq))
+                {
+                    byte[] resp = { target.con, (byte)target.loc, (byte)target.seq };
+                    _pendingPlaces.Clear();
+                    _actionPopup.SetActive(false);
+                    _session.SubmitResponse(resp);
+                    return true;
+                }
+            }
+
+            if (_preferredAttackTargetSeq >= 0 &&
+                p.messageType == YgoConstants.MSG_SELECT_CARD &&
+                p.min == 1 && p.max == 1)
+            {
+                int targetSeq = _preferredAttackTargetSeq;
+                _preferredAttackTargetSeq = -1;
+                for (int i = 0; i < p.candidates.Count; i++)
+                {
+                    var c = p.candidates[i];
+                    if (c.controller == (byte)_session.AiPlayerIndex &&
+                        c.location == YgoConstants.LOCATION_MZONE &&
+                        c.sequence == (uint)targetSeq)
+                    {
+                        byte[] resp = new byte[12];
+                        Buffer.BlockCopy(BitConverter.GetBytes(0), 0, resp, 0, 4);
+                        Buffer.BlockCopy(BitConverter.GetBytes(1), 0, resp, 4, 4);
+                        Buffer.BlockCopy(BitConverter.GetBytes(i), 0, resp, 8, 4);
+                        _session.SubmitResponse(resp);
+                        return true;
+                    }
+                }
+            }
+
+            if (p.messageType == YgoConstants.MSG_SELECT_IDLECMD || p.messageType == YgoConstants.MSG_SELECT_BATTLECMD)
+            {
+                _preferredDropZone = null;
+                _preferredAttackTargetSeq = -1;
+            }
+            return false;
+        }
+
         public void Refresh()
         {
             if (_session == null || Root == null || !Root.activeSelf) return;
+
+            if (TryAutoFulfillPreferredPrompt())
+            {
+                // Auto-submitted preferred drop zone or attack target; continue refresh with updated state
+            }
 
             var p = _session.ActivePrompt;
             if (!ReferenceEquals(p, _pendingPlacePrompt))
@@ -775,7 +870,9 @@ namespace YGOPortable.UI
             slot.mappedSeq = seq;
             slot.liveCard = live;
 
-            if (live != null)
+            bool isFlyingHere = _inFlightSlotCounts.TryGetValue((con, loc, seq), out int fCnt) && fCnt > 0;
+
+            if (live != null && !isFlyingHere)
             {
                 slot.cardView.gameObject.SetActive(true);
                 bool showBack = !live.IsFaceUp;
@@ -839,10 +936,15 @@ namespace YGOPortable.UI
 
             bool alreadyPicked = IsPlacePending(con, loc, seq);
             bool placeValid = !alreadyPicked && IsPlaceSelectable(con, loc, seq);
-            slot.placeGlow.SetActive(placeValid || alreadyPicked);
+            bool dragHint = (!isOpponent && loc == YgoConstants.LOCATION_MZONE && _dragHighlightMZone && live == null) ||
+                            (!isOpponent && loc == YgoConstants.LOCATION_SZONE && _dragHighlightSZone && live == null) ||
+                            (isOpponent && loc == YgoConstants.LOCATION_MZONE && _dragHighlightAttack && live != null);
+
+            slot.placeGlow.SetActive(placeValid || alreadyPicked || dragHint);
             slot.border.effectColor = alreadyPicked ? LotdUiKit.CyanAccent
                 : (placeValid ? LotdUiKit.GoldAccent
-                : (live != null && HasFieldAction(con, loc, seq) ? LotdUiKit.CyanAccent : new Color(0, 0, 0, 0)));
+                : (dragHint ? (_dragHighlightAttack ? LotdUiKit.RedAccent : LotdUiKit.GoldAccent)
+                : (live != null && HasFieldAction(con, loc, seq) ? LotdUiKit.CyanAccent : new Color(0, 0, 0, 0))));
         }
 
         private void RefreshHands(PlayerFieldSnapshot myP, PlayerFieldSnapshot opP, DuelPrompt p, bool waitingMyAction)
@@ -912,6 +1014,7 @@ namespace YGOPortable.UI
 
                 var trig = slot.gameObject.AddComponent<CardDragTrigger>();
                 trig.SourceType = DragSourceType.Hand;
+                trig.EnableHoverLift = true;
                 uint cardCode = hc.code;
                 trig.CardCodeGetter = () => cardCode;
                 trig.IndexGetter = () => (int)seq;
@@ -939,11 +1042,73 @@ namespace YGOPortable.UI
         }
 
         // ==================== DRAG & DROP LOGIC ====================
-        private void HandleDuelCardDrop(DragContext ctx)
+        private void HandleDuelDragStarted(DragSourceType source, uint cardCode, int sourceIndex, object customData)
         {
             if (Root == null || !Root.activeSelf || _session == null) return;
+            InspectCard(cardCode);
+
+            _dragHighlightMZone = false;
+            _dragHighlightSZone = false;
+            _dragHighlightAttack = false;
+
             var p = _session.ActivePrompt;
             if (p == null || p.playerId != _session.HumanPlayerIndex) return;
+
+            byte me = (byte)_session.HumanPlayerIndex;
+            if (source == DragSourceType.Hand)
+            {
+                var actions = CollectActions(me, YgoConstants.LOCATION_HAND, (uint)sourceIndex);
+                foreach (var act in actions)
+                {
+                    if (act.label.Contains("소환") || act.label.Contains("몬스터 세트")) _dragHighlightMZone = true;
+                    if (act.label.Contains("발동") || act.label.Contains("마법/함정 세트")) _dragHighlightSZone = true;
+                }
+            }
+            else if (source == DragSourceType.ExtraDeck)
+            {
+                _dragHighlightMZone = true;
+                if (_modals != null && _modals.ZoneViewRoot != null && _modals.ZoneViewRoot.activeSelf)
+                {
+                    _modals.ZoneViewRoot.SetActive(false);
+                }
+            }
+            else if (source == DragSourceType.FieldMonster)
+            {
+                if (p.messageType == YgoConstants.MSG_SELECT_BATTLECMD)
+                {
+                    _dragHighlightAttack = p.attackable.Any(a => a.sequence == (uint)sourceIndex);
+                }
+            }
+
+            Refresh();
+        }
+
+        private void HandleDuelDragCancelled()
+        {
+            if (_dragHighlightMZone || _dragHighlightSZone || _dragHighlightAttack)
+            {
+                _dragHighlightMZone = false;
+                _dragHighlightSZone = false;
+                _dragHighlightAttack = false;
+                Refresh();
+            }
+        }
+
+        private void HandleDuelCardDrop(DragContext ctx)
+        {
+            _dragHighlightMZone = false;
+            _dragHighlightSZone = false;
+            _dragHighlightAttack = false;
+
+            if (Root == null || !Root.activeSelf || _session == null) return;
+            var p = _session.ActivePrompt;
+            if (p == null || p.playerId != _session.HumanPlayerIndex)
+            {
+                Refresh();
+                return;
+            }
+
+            byte me = (byte)_session.HumanPlayerIndex;
 
             // 1. Hand Card Dragged
             if (ctx.SourceType == DragSourceType.Hand)
@@ -955,7 +1120,7 @@ namespace YGOPortable.UI
                 {
                     if (CardDragManager.ContainsScreenPoint(_myMZone[i].root, ctx.DropPosition))
                     {
-                        HandleHandDropOnZone((byte)_session.HumanPlayerIndex, YgoConstants.LOCATION_MZONE, (uint)i, handSeq, ctx.CardCode);
+                        HandleHandDropOnZone(me, YgoConstants.LOCATION_MZONE, (uint)i, handSeq, ctx.CardCode);
                         return;
                     }
                 }
@@ -964,7 +1129,7 @@ namespace YGOPortable.UI
                     if (CardDragManager.ContainsScreenPoint(_emz[i].root, ctx.DropPosition))
                     {
                         uint emzSeq = (uint)(i == 0 ? 5 : 6);
-                        HandleHandDropOnZone((byte)_session.HumanPlayerIndex, YgoConstants.LOCATION_MZONE, emzSeq, handSeq, ctx.CardCode);
+                        HandleHandDropOnZone(me, YgoConstants.LOCATION_MZONE, emzSeq, handSeq, ctx.CardCode);
                         return;
                     }
                 }
@@ -974,12 +1139,56 @@ namespace YGOPortable.UI
                 {
                     if (CardDragManager.ContainsScreenPoint(_mySZone[i].root, ctx.DropPosition))
                     {
-                        HandleHandDropOnZone((byte)_session.HumanPlayerIndex, YgoConstants.LOCATION_SZONE, (uint)i, handSeq, ctx.CardCode);
+                        HandleHandDropOnZone(me, YgoConstants.LOCATION_SZONE, (uint)i, handSeq, ctx.CardCode);
                         return;
                     }
                 }
+
+                // Dropped anywhere on the Duel Board (above the hand bar)
+                if (!CardDragManager.ContainsScreenPoint(_myHandBar, ctx.DropPosition) &&
+                    (_boardRect == null || CardDragManager.ContainsScreenPoint(_boardRect, ctx.DropPosition) || ctx.DropPosition.y > Screen.height * 0.20f))
+                {
+                    HandleHandDropOnBoard(handSeq, ctx.CardCode);
+                    return;
+                }
+
+                Refresh();
             }
-            // 2. Field Monster Dragged (e.g. to Attack!)
+            // 2. Extra Deck Monster Dragged onto Board
+            else if (ctx.SourceType == DragSourceType.ExtraDeck)
+            {
+                uint exSeq = (uint)ctx.SourceIndex;
+                for (int i = 0; i < 5; i++)
+                {
+                    if (CardDragManager.ContainsScreenPoint(_myMZone[i].root, ctx.DropPosition))
+                    {
+                        _preferredDropZone = (me, YgoConstants.LOCATION_MZONE, (uint)i);
+                        break;
+                    }
+                }
+                for (int i = 0; i < 2; i++)
+                {
+                    if (CardDragManager.ContainsScreenPoint(_emz[i].root, ctx.DropPosition))
+                    {
+                        _preferredDropZone = (me, YgoConstants.LOCATION_MZONE, (uint)(i == 0 ? 5 : 6));
+                        break;
+                    }
+                }
+
+                var exActions = CollectActions(me, YgoConstants.LOCATION_EXTRA, exSeq);
+                if (exActions.Count == 1)
+                {
+                    ExecuteActionInt(exActions[0].responseVal);
+                    return;
+                }
+                else if (exActions.Count > 1)
+                {
+                    PopulateAndShowActionPopup(CardDatabase.GetName(ctx.CardCode), exActions, null);
+                    return;
+                }
+                Refresh();
+            }
+            // 3. Field Monster Dragged (e.g. to Attack or Activate/Reposition!)
             else if (ctx.SourceType == DragSourceType.FieldMonster)
             {
                 uint mySeq = (uint)ctx.SourceIndex;
@@ -1007,16 +1216,40 @@ namespace YGOPortable.UI
                     }
                 }
 
-                // Check Direct Attack on Opponent Bust / HUD
+                // Check Direct Attack on Opponent Bust / HUD / Opponent half of the screen
                 if (CardDragManager.ContainsScreenPoint(_oppBustImg.rectTransform, ctx.DropPosition) ||
-                    CardDragManager.ContainsScreenPoint(_oppLpText.rectTransform, ctx.DropPosition))
+                    CardDragManager.ContainsScreenPoint(_oppLpText.rectTransform, ctx.DropPosition) ||
+                    CardDragManager.ContainsScreenPoint(_oppHandBar, ctx.DropPosition) ||
+                    (p.messageType == YgoConstants.MSG_SELECT_BATTLECMD && ctx.DropPosition.y > Screen.height * 0.54f))
                 {
                     TryAttackOpponentSlot(mySeq, 0, isDirect: true);
                     return;
                 }
 
-                // Dropped on itself -> Show actions popup
-                ShowCardActionsPopup((byte)_session.HumanPlayerIndex, YgoConstants.LOCATION_MZONE, mySeq, ctx.CardCode, null);
+                // Dropped on itself or elsewhere -> Show actions popup
+                ShowCardActionsPopup(me, YgoConstants.LOCATION_MZONE, mySeq, ctx.CardCode, null);
+                Refresh();
+            }
+        }
+
+        private void HandleHandDropOnBoard(uint handSeq, uint cardCode)
+        {
+            var p = _session.ActivePrompt;
+            if (p == null) return;
+
+            byte me = (byte)_session.HumanPlayerIndex;
+            var actions = CollectActions(me, YgoConstants.LOCATION_HAND, handSeq);
+            if (actions.Count == 1)
+            {
+                ExecuteActionInt(actions[0].responseVal);
+            }
+            else if (actions.Count > 1)
+            {
+                PopulateAndShowActionPopup(CardDatabase.GetName(cardCode), actions, null);
+            }
+            else
+            {
+                Refresh();
             }
         }
 
@@ -1032,12 +1265,24 @@ namespace YGOPortable.UI
                 {
                     OnSlotClicked(con, loc, seq);
                 }
+                else
+                {
+                    Refresh();
+                }
                 return;
             }
 
-            // In Main Phase (MSG_SELECT_IDLECMD)
+            // Remember the target zone so if ygopro-core asks MSG_SELECT_PLACE next, we place it here automatically
+            _preferredDropZone = (con, loc, seq);
+
+            // In Main Phase (MSG_SELECT_IDLECMD) or Battle Phase (MSG_SELECT_BATTLECMD)
             var actions = CollectActions((byte)_session.HumanPlayerIndex, YgoConstants.LOCATION_HAND, handSeq);
-            if (actions.Count == 0) return;
+            if (actions.Count == 0)
+            {
+                _preferredDropZone = null;
+                Refresh();
+                return;
+            }
 
             if (loc == YgoConstants.LOCATION_MZONE)
             {
@@ -1070,6 +1315,12 @@ namespace YGOPortable.UI
                 }
             }
 
+            if (actions.Count == 1)
+            {
+                ExecuteActionInt(actions[0].responseVal);
+                return;
+            }
+
             // Fallback: show all available actions
             PopulateAndShowActionPopup(CardDatabase.GetName(cardCode), actions, null);
         }
@@ -1086,12 +1337,14 @@ namespace YGOPortable.UI
                     var atker = p.attackable[i];
                     if (atker.sequence == mySeq)
                     {
+                        _preferredAttackTargetSeq = isDirect ? -1 : (int)targetSeq;
                         LotdAudio.PlayAttack();
                         ExecuteActionInt((i << 16) | 1);
                         return;
                     }
                 }
             }
+            Refresh();
         }
 
         private Vector2 GetLocationScreenPoint(byte con, uint loc, uint seq)
@@ -1174,6 +1427,21 @@ namespace YGOPortable.UI
             }
         }
 
+        private void HandleChainActivatedEvent(ChainLinkInfo link)
+        {
+            if (Root == null || !Root.activeSelf || _session == null || CardAnimationManager.Instance == null) return;
+            Vector2 pos = GetLocationScreenPoint(link.triggerPlayer, link.triggerLoc, link.triggerSeq);
+            if (pos != Vector2.zero)
+            {
+                CardAnimationManager.Instance.PlayChainActivationPulse(link.code, pos, link.chainNumber);
+                var slot = GetSlot(link.triggerPlayer, link.triggerLoc, link.triggerSeq);
+                if (slot != null)
+                {
+                    CardAnimationManager.Instance.PlayFlashGlow(slot.root.gameObject, LotdUiKit.GoldAccent, 0.38f);
+                }
+            }
+        }
+
         private void HandleCardMovedEvent(CardMoveEvent e)
         {
             if (Root == null || !Root.activeSelf || _session == null) return;
@@ -1183,40 +1451,53 @@ namespace YGOPortable.UI
             Vector2 startPos = GetLocationScreenPoint(e.fromCon, e.fromLoc, e.fromSeq);
             Vector2 endPos = GetLocationScreenPoint(e.toCon, e.toLoc, e.toSeq);
 
-            if (startPos != Vector2.zero && endPos != Vector2.zero && Vector2.Distance(startPos, endPos) > 30f && CardAnimationManager.Instance != null)
+            if (startPos != Vector2.zero && endPos != Vector2.zero && Vector2.Distance(startPos, endPos) > 20f && CardAnimationManager.Instance != null)
             {
-                bool faceDown = (e.toPos & YgoConstants.POS_FACEDOWN) != 0;
-                float duration = 0.30f;
-                float arc = 45f;
+                bool faceDown = (e.toPos & YgoConstants.POS_FACEDOWN) != 0 || e.code == 0;
+                float duration = 0.32f;
+                float arc = 48f;
 
                 if (e.toLoc == YgoConstants.LOCATION_MZONE)
                 {
                     LotdAudio.PlaySummon();
-                    duration = 0.32f;
-                    arc = 55f;
+                    duration = 0.35f;
+                    arc = 60f;
                 }
                 else if (e.toLoc == YgoConstants.LOCATION_SZONE)
                 {
                     LotdAudio.PlayClick();
-                    duration = 0.28f;
-                    arc = 35f;
+                    duration = 0.30f;
+                    arc = 38f;
                 }
                 else if (e.toLoc == YgoConstants.LOCATION_HAND)
                 {
                     LotdAudio.PlayDraw();
-                    duration = 0.26f;
-                    arc = 30f;
+                    duration = 0.28f;
+                    arc = 34f;
                     if (e.toCon != _session.HumanPlayerIndex) faceDown = true;
                 }
-                else if (e.toLoc == YgoConstants.LOCATION_GRAVE)
+                else if (e.toLoc == YgoConstants.LOCATION_GRAVE || e.toLoc == YgoConstants.LOCATION_REMOVED)
                 {
                     LotdAudio.PlayDamage();
-                    duration = 0.28f;
-                    arc = 25f;
+                    duration = 0.30f;
+                    arc = 28f;
+                }
+
+                bool trackSlot = e.toLoc == YgoConstants.LOCATION_MZONE || e.toLoc == YgoConstants.LOCATION_SZONE;
+                var slotKey = (e.toCon, e.toLoc, e.toSeq);
+                if (trackSlot)
+                {
+                    _inFlightSlotCounts.TryGetValue(slotKey, out int cur);
+                    _inFlightSlotCounts[slotKey] = cur + 1;
                 }
 
                 CardAnimationManager.Instance.PlayCardFlight(e.code, startPos, endPos, duration, faceDown, arc, () =>
                 {
+                    if (trackSlot && _inFlightSlotCounts.TryGetValue(slotKey, out int c))
+                    {
+                        if (c <= 1) _inFlightSlotCounts.Remove(slotKey);
+                        else _inFlightSlotCounts[slotKey] = c - 1;
+                    }
                     Refresh();
                     PlaySlotImpact(e.toCon, e.toLoc, e.toSeq);
                 });
@@ -1492,11 +1773,16 @@ namespace YGOPortable.UI
             bool waitingMyAction = p != null && p.playerId == _session.HumanPlayerIndex;
             var zoneActions = waitingMyAction ? CollectZoneActions(con, loc) : null;
 
-            if (loc == YgoConstants.LOCATION_DECK || (con == _session.AiPlayerIndex && loc == YgoConstants.LOCATION_EXTRA))
+            if (loc == YgoConstants.LOCATION_DECK)
             {
                 if (zoneActions != null && zoneActions.Count > 0)
                     ShowZoneActionsPopup(title, zoneActions);
                 return;
+            }
+
+            if (con == _session.AiPlayerIndex && loc == YgoConstants.LOCATION_EXTRA)
+            {
+                hideFaceDown = true;
             }
 
             var ps = _session.Players[con];

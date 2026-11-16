@@ -158,7 +158,13 @@ namespace YGOPortable.Core
         public int HumanPlayerIndex { get; private set; } = 0;
         public int AiPlayerIndex => 1 - HumanPlayerIndex;
 
+        public void PreparePlayerIndices(bool p0GoesFirst)
+        {
+            HumanPlayerIndex = p0GoesFirst ? 0 : 1;
+        }
+
         public event Action<CardMoveEvent> OnCardMoved;
+        public event Action<ChainLinkInfo> OnChainActivated;
         public event Action<byte, uint, uint, byte, uint, uint> OnAttackDeclared;
         public event Action<byte, IReadOnlyList<bool>> OnCoinTossed;
         public event Action<byte, IReadOnlyList<int>> OnDiceRolled;
@@ -522,7 +528,7 @@ namespace YGOPortable.Core
                     uint tSeq = br.ReadUInt32();
                     ulong desc = br.ReadUInt64();
                     int chainNo = (int)br.ReadUInt32();
-                    CurrentChain.Add(new ChainLinkInfo
+                    var link = new ChainLinkInfo
                     {
                         chainNumber = chainNo,
                         code = code,
@@ -530,8 +536,10 @@ namespace YGOPortable.Core
                         triggerLoc = tLoc,
                         triggerSeq = tSeq,
                         description = desc,
-                    });
+                    };
+                    CurrentChain.Add(link);
                     AddLog($"체인 {chainNo}: [{CardDatabase.GetName(code)}] 발동");
+                    OnChainActivated?.Invoke(link);
                     break;
                 }
 

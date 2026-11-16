@@ -14,10 +14,15 @@ namespace YGOPortable.UI
 
         private RectTransform _animLayer;
         private readonly Queue<GameObject> _proxyPool = new Queue<GameObject>();
+        private float _nextFlightStartTime = 0f;
 
         public static CardAnimationManager Ensure(Canvas canvas)
         {
-            if (Instance != null) return Instance;
+            if (Instance != null)
+            {
+                Instance.BringToFront();
+                return Instance;
+            }
             var go = new GameObject("CardAnimationManager", typeof(RectTransform));
             go.transform.SetParent(canvas.transform, false);
             var rt = (RectTransform)go.transform;
@@ -28,7 +33,14 @@ namespace YGOPortable.UI
 
             Instance = go.AddComponent<CardAnimationManager>();
             Instance.Initialize(rt);
+            Instance.BringToFront();
             return Instance;
+        }
+
+        public void BringToFront()
+        {
+            if (_animLayer != null) _animLayer.SetAsLastSibling();
+            if (CardDragManager.Instance != null) CardDragManager.Instance.transform.SetAsLastSibling();
         }
 
         private void Initialize(RectTransform layer)
@@ -52,7 +64,7 @@ namespace YGOPortable.UI
             var go = new GameObject("AnimCardProxy", typeof(RectTransform));
             go.transform.SetParent(_animLayer, false);
             var rt = (RectTransform)go.transform;
-            rt.sizeDelta = new Vector2(90f, 130f);
+            rt.sizeDelta = new Vector2(104f, 150f);
             rt.pivot = new Vector2(0.5f, 0.5f);
 
             var cg = go.AddComponent<CanvasGroup>();
@@ -60,8 +72,8 @@ namespace YGOPortable.UI
             cg.interactable = false;
 
             var ol = go.AddComponent<Outline>();
-            ol.effectColor = LotdUiKit.CyanAccent;
-            ol.effectDistance = new Vector2(2f, -2f);
+            ol.effectColor = LotdUiKit.GoldAccent;
+            ol.effectDistance = new Vector2(2.5f, -2.5f);
 
             CompositeCardView.Create(rt, "CV", false);
             return go;
@@ -74,29 +86,45 @@ namespace YGOPortable.UI
             _proxyPool.Enqueue(go);
         }
 
-        public void PlayCardFlight(uint code, Vector2 startScreenPos, Vector2 endScreenPos,
-            float duration = 0.32f, bool faceDown = false, float arcHeight = 45f,
+        public float PlayCardFlight(uint code, Vector2 startScreenPos, Vector2 endScreenPos,
+            float duration = 0.34f, bool faceDown = false, float arcHeight = 52f,
             Action onComplete = null)
         {
             if (startScreenPos == Vector2.zero || endScreenPos == Vector2.zero)
             {
                 onComplete?.Invoke();
-                return;
+                return 0f;
             }
 
-            StartCoroutine(CardFlightRoutine(code, startScreenPos, endScreenPos, duration, faceDown, arcHeight, onComplete));
+            BringToFront();
+            float now = Time.unscaledTime;
+            float delay = 0f;
+            if (_nextFlightStartTime > now)
+            {
+                delay = Mathf.Min(0.45f, _nextFlightStartTime - now);
+            }
+            _nextFlightStartTime = Mathf.Max(now, _nextFlightStartTime) + 0.065f;
+
+            StartCoroutine(CardFlightRoutine(code, startScreenPos, endScreenPos, delay, duration, faceDown, arcHeight, onComplete));
+            return delay + duration;
         }
 
         private IEnumerator CardFlightRoutine(uint code, Vector2 startPos, Vector2 endPos,
-            float duration, bool faceDown, float arcHeight, Action onComplete)
+            float delay, float duration, bool faceDown, float arcHeight, Action onComplete)
         {
+            if (delay > 0.001f)
+            {
+                yield return new WaitForSecondsRealtime(delay);
+            }
+
+            BringToFront();
             var proxy = GetOrCreateProxy();
             var rt = (RectTransform)proxy.transform;
             var cv = proxy.GetComponentInChildren<CompositeCardView>();
             if (cv != null) cv.SetCard(code, faceDown);
 
             float timer = 0f;
-            duration = Mathf.Max(0.12f, duration);
+            duration = Mathf.Max(0.14f, duration);
 
             while (timer < duration)
             {
@@ -108,7 +136,7 @@ namespace YGOPortable.UI
                 float arc = Mathf.Sin(t * Mathf.PI) * arcHeight;
                 rt.position = new Vector3(linear.x, linear.y + arc, 0f);
 
-                float scalePunch = 1.0f + Mathf.Sin(t * Mathf.PI) * 0.16f;
+                float scalePunch = 1.0f + Mathf.Sin(t * Mathf.PI) * 0.24f;
                 rt.localScale = new Vector3(scalePunch, scalePunch, 1f);
 
                 yield return null;
@@ -203,6 +231,7 @@ namespace YGOPortable.UI
         public void PlayPhaseBanner(string title, string subtitle, bool isOpponent, Action onComplete = null)
         {
             if (_animLayer == null) return;
+            BringToFront();
             StartCoroutine(PhaseBannerRoutine(title, subtitle, isOpponent, onComplete));
         }
 
@@ -264,6 +293,7 @@ namespace YGOPortable.UI
         public void PlayDirectAttackSplash(Action onComplete = null)
         {
             if (_animLayer == null) return;
+            BringToFront();
             StartCoroutine(DirectAttackSplashRoutine(onComplete));
         }
 
@@ -346,6 +376,7 @@ namespace YGOPortable.UI
         public void PlayDamagePopup(Vector2 screenPos, int delta)
         {
             if (_animLayer == null) return;
+            BringToFront();
             StartCoroutine(DamagePopupRoutine(screenPos, delta));
         }
 
@@ -391,6 +422,7 @@ namespace YGOPortable.UI
         public void PlayCoinTossSplash(IReadOnlyList<bool> coins, bool isOpponent, Action onComplete = null)
         {
             if (_animLayer == null || coins == null || coins.Count == 0) return;
+            BringToFront();
             StartCoroutine(CoinTossSplashRoutine(coins, isOpponent, onComplete));
         }
 
@@ -450,7 +482,54 @@ namespace YGOPortable.UI
         public void PlayDiceRollSplash(IReadOnlyList<int> dice, bool isOpponent, Action onComplete = null)
         {
             if (_animLayer == null || dice == null || dice.Count == 0) return;
+            BringToFront();
             StartCoroutine(DiceRollSplashRoutine(dice, isOpponent, onComplete));
+        }
+
+        public void PlayChainActivationPulse(uint code, Vector2 screenPos, int chainNumber)
+        {
+            if (_animLayer == null || screenPos == Vector2.zero) return;
+            BringToFront();
+            StartCoroutine(ChainActivationPulseRoutine(code, screenPos, chainNumber));
+        }
+
+        private IEnumerator ChainActivationPulseRoutine(uint code, Vector2 screenPos, int chainNumber)
+        {
+            var go = new GameObject("ChainPulseCard", typeof(RectTransform));
+            go.transform.SetParent(_animLayer, false);
+            var rt = (RectTransform)go.transform;
+            rt.sizeDelta = new Vector2(96f, 138f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.position = (Vector3)screenPos;
+
+            var cg = go.AddComponent<CanvasGroup>();
+            cg.blocksRaycasts = false;
+            cg.interactable = false;
+
+            var ol = go.AddComponent<Outline>();
+            ol.effectColor = LotdUiKit.GoldAccent;
+            ol.effectDistance = new Vector2(3.5f, -3.5f);
+
+            var cv = CompositeCardView.Create(rt, "CV", false);
+            cv.SetCard(code, code == 0);
+
+            var badgeRt = LotdUiKit.CreateRect("Badge", rt, new Vector2(0f, 0.72f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(badgeRt.gameObject, LotdUiKit.WhiteSprite, new Color(0.05f, 0.12f, 0.25f, 0.92f), false, false);
+            LotdUiKit.AddText(badgeRt, "T", $"CHAIN {chainNumber}", 13, TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
+
+            float dur = 0.42f;
+            float timer = 0f;
+            while (timer < dur && go != null)
+            {
+                timer += Time.deltaTime;
+                float t = Mathf.Clamp01(timer / dur);
+                float scale = 1.0f + Mathf.Sin(t * Mathf.PI) * 0.35f;
+                rt.localScale = new Vector3(scale, scale, 1f);
+                cg.alpha = t < 0.65f ? 1f : Mathf.Clamp01(1f - (t - 0.65f) / 0.35f);
+                yield return null;
+            }
+
+            if (go != null) UnityEngine.Object.Destroy(go);
         }
 
         private IEnumerator DiceRollSplashRoutine(IReadOnlyList<int> dice, bool isOpponent, Action onComplete)

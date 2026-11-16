@@ -110,6 +110,12 @@ namespace YGOPortable.UI
                 Debug.Log("[GameApp] 9. Constructing DuelFieldUI...");
                 _duelField = new DuelFieldUI(this, canvas.transform, _modals);
 
+                // Ensure Modals, Animation Layer, and Drag Ghost Layer render ABOVE DuelFieldUI and DeckEditorUI
+                _modals.ModalRoot.transform.SetAsLastSibling();
+                _modals.ZoneViewRoot.transform.SetAsLastSibling();
+                _modals.ResultRoot.transform.SetAsLastSibling();
+                CardAnimationManager.Instance?.BringToFront();
+
                 _initialized = true;
                 Debug.Log("[GameApp] 10. Showing Title screen...");
                 ShowScreen(AppScreen.Title);
@@ -203,12 +209,13 @@ namespace YGOPortable.UI
             _resultShown = false;
 
             ShowScreen(AppScreen.Duel);
+            _session.PreparePlayerIndices(playerGoesFirst);
+            _duelField.BindSession(_session, oppChar, oppDeck);
             _session.StartNewDuel(
                 myDeck.main, myDeck.extra,
                 oppDeck.main, oppDeck.extra,
                 p0GoesFirst: playerGoesFirst);
-
-            _duelField.BindSession(_session, oppChar, oppDeck);
+            _duelField.Refresh();
         }
 
         private void Update()

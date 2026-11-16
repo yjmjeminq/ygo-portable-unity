@@ -89,8 +89,9 @@ namespace YGOPortable.UI
             LotdUiKit.AddImage(dim.gameObject, LotdUiKit.WhiteSprite, new Color(0f, 0.02f, 0.07f, 0.72f));
 
             _modalBox = LotdUiKit.CreateBorderedPanel(dim, "Win",
-                new Vector2(0.18f, 0.14f), new Vector2(0.86f, 0.86f), Vector2.zero, Vector2.zero,
+                new Vector2(0.262f, 0.12f), new Vector2(0.985f, 0.88f), Vector2.zero, Vector2.zero,
                 LotdUiKit.PanelNavy, LotdUiKit.CyanAccent);
+            _modalBox.gameObject.AddComponent<Button>(); // block click-through to dim
 
             var hdr = LotdUiKit.CreateRect("Hdr", _modalBox, new Vector2(0f, 0.87f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
             LotdUiKit.AddImage(hdr.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelHeader);
@@ -187,7 +188,9 @@ namespace YGOPortable.UI
             _curSession = session;
             _curPrompt = prompt;
             ClearBodyAndFooter();
+            ModalRoot.transform.SetAsLastSibling();
             ModalRoot.SetActive(true);
+            CardAnimationManager.Instance?.BringToFront();
 
             bool canCancel = false;
             if (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN) canCancel = !prompt.forced;
@@ -945,10 +948,12 @@ namespace YGOPortable.UI
             var dim = LotdUiKit.FillRect("Overlay_ZoneView", parent);
             ZoneViewRoot = dim.gameObject;
             LotdUiKit.AddImage(dim.gameObject, LotdUiKit.WhiteSprite, new Color(0f, 0.02f, 0.08f, 0.72f));
+            dim.gameObject.AddComponent<Button>().onClick.AddListener(() => ZoneViewRoot.SetActive(false));
 
             var win = LotdUiKit.CreateBorderedPanel(dim, "Win",
-                new Vector2(0.20f, 0.14f), new Vector2(0.84f, 0.86f), Vector2.zero, Vector2.zero,
+                new Vector2(0.262f, 0.12f), new Vector2(0.985f, 0.88f), Vector2.zero, Vector2.zero,
                 LotdUiKit.PanelNavy, LotdUiKit.CyanAccent);
+            win.gameObject.AddComponent<Button>(); // block click-through to dim
 
             var hdr = LotdUiKit.CreateRect("Hdr", win, new Vector2(0f, 0.88f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
             LotdUiKit.AddImage(hdr.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelHeader);
@@ -956,7 +961,7 @@ namespace YGOPortable.UI
             _zoneTitle.rectTransform.offsetMin = new Vector2(18, 0);
 
             var closeRt = LotdUiKit.CreateRect("Close", hdr, new Vector2(0.82f, 0.15f), new Vector2(0.98f, 0.85f), Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(closeRt, "B", "닫기", () => ZoneViewRoot.SetActive(false), 16);
+            LotdUiKit.CreateLotdButton(closeRt, "B", "✕ 닫기", () => ZoneViewRoot.SetActive(false), 16);
 
             var body = LotdUiKit.CreateRect("Body", win, new Vector2(0.02f, 0.03f), new Vector2(0.98f, 0.86f), Vector2.zero, Vector2.zero);
             CreateHorizontalCardGrid(body, out Transform g);
@@ -973,22 +978,39 @@ namespace YGOPortable.UI
             Action<int> onExecuteAction = null,
             Action<LiveCardState> onOpenCardActions = null)
         {
-            _zoneTitle.text = $"{title} ({cards?.Count ?? 0}장)";
+            _zoneTitle.text = $"{title} ({cards?.Count ?? 0}장)  —  카드를 클릭하거나 드래그하여 소환/발동 또는 상세 확인";
             for (int i = _zoneGrid.childCount - 1; i >= 0; i--)
                 UnityEngine.Object.Destroy(_zoneGrid.GetChild(i).gameObject);
 
             if (cards != null)
             {
-                for (int i = cards.Count - 1; i >= 0; i--)
+                bool forwardOrder = title != null && title.Contains("엑스트라");
+                if (forwardOrder)
                 {
-                    var c = cards[i];
-                    if (c == null) continue;
-                    var actions = getCardActions?.Invoke(c);
-                    bool fd = hideFaceDown && !c.IsFaceUp && !c.isPublic && (actions == null || actions.Count == 0);
-                    AddZoneCardTile(fd ? 0u : c.code, fd, c, actions, onExecuteAction, onOpenCardActions);
+                    for (int i = 0; i < cards.Count; i++)
+                    {
+                        var c = cards[i];
+                        if (c == null) continue;
+                        var actions = getCardActions?.Invoke(c);
+                        bool fd = hideFaceDown && !c.IsFaceUp && !c.isPublic && (actions == null || actions.Count == 0);
+                        AddZoneCardTile(fd ? 0u : c.code, fd, c, actions, onExecuteAction, onOpenCardActions);
+                    }
+                }
+                else
+                {
+                    for (int i = cards.Count - 1; i >= 0; i--)
+                    {
+                        var c = cards[i];
+                        if (c == null) continue;
+                        var actions = getCardActions?.Invoke(c);
+                        bool fd = hideFaceDown && !c.IsFaceUp && !c.isPublic && (actions == null || actions.Count == 0);
+                        AddZoneCardTile(fd ? 0u : c.code, fd, c, actions, onExecuteAction, onOpenCardActions);
+                    }
                 }
             }
+            ZoneViewRoot.transform.SetAsLastSibling();
             ZoneViewRoot.SetActive(true);
+            CardAnimationManager.Instance?.BringToFront();
         }
 
         public void ShowCodeListViewer(string title, IReadOnlyList<uint> codes)
@@ -1002,7 +1024,9 @@ namespace YGOPortable.UI
                 foreach (uint code in codes)
                     AddZoneCardTile(code, code == 0, null);
             }
+            ZoneViewRoot.transform.SetAsLastSibling();
             ZoneViewRoot.SetActive(true);
+            CardAnimationManager.Instance?.BringToFront();
         }
 
         private void AddZoneCardTile(
@@ -1027,9 +1051,32 @@ namespace YGOPortable.UI
             {
                 var btn = tile.gameObject.AddComponent<Button>();
                 btn.targetGraphic = tile.GetComponent<Image>();
-                btn.onClick.AddListener(() => _onInspectCard?.Invoke(code));
+                btn.onClick.AddListener(() =>
+                {
+                    _onInspectCard?.Invoke(code);
+                    if (hasActions)
+                    {
+                        if (actions.Count == 1 && onExecuteAction != null)
+                        {
+                            ZoneViewRoot.SetActive(false);
+                            onExecuteAction(actions[0].responseVal);
+                        }
+                        else if (live != null && onOpenCardActions != null)
+                        {
+                            ZoneViewRoot.SetActive(false);
+                            onOpenCardActions(live);
+                        }
+                    }
+                });
                 var trig = tile.gameObject.AddComponent<CardDragTrigger>();
                 trig.OnPointerEnterAction = () => _onInspectCard?.Invoke(code);
+                if (hasActions && live != null && live.location == YgoConstants.LOCATION_EXTRA)
+                {
+                    trig.SourceType = DragSourceType.ExtraDeck;
+                    trig.CardCodeGetter = () => code;
+                    trig.IndexGetter = () => (int)live.sequence;
+                    trig.DataGetter = () => live;
+                }
             }
 
             if (hasActions)
@@ -1120,7 +1167,9 @@ namespace YGOPortable.UI
 
             string oppName = opp != null ? opp.name : "AI 듀얼리스트";
             _resStats.text = $"대전 상대: {oppName}\n총 경과 턴: {turns}턴\n최종 라이프: 내 LP {myLp}  |  상대 LP {oppLp}";
+            ResultRoot.transform.SetAsLastSibling();
             ResultRoot.SetActive(true);
+            CardAnimationManager.Instance?.BringToFront();
             LotdAudio.PlayWin();
         }
 
