@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.UI;
 using YGOPortable.AI;
 using YGOPortable.Core;
 using YGOPortable.UI;
@@ -87,25 +88,60 @@ namespace YGOPortable.Editor
             if (!sheepTag.Contains("토큰") || sheepTag.Contains("일반"))
                 throw new Exception($"Sheep token tag should contain 토큰 and omit 일반: got '{sheepTag}'");
 
-            // 3. Generator Artwork Fallback
-            var spMoYe = CardArtLoader.GetArtSprite(20001444);
-            var spAdv = CardArtLoader.GetArtSprite(3285552);
-            var spSheep = CardArtLoader.GetArtSprite(73915052);
-            var spNibiru = CardArtLoader.GetArtSprite(27204312);
-            var spGlimmer = CardArtLoader.GetArtSprite(41458362);
+            // Compare the rendered pixels, since two different sprites can contain the same art.
+            uint[] expectedArt = { 20001444, 3285552, 41458362, 73915052, 73915053, 73915054, 73915055,
+                27204312, 91512836, 1799465, 85771020, 85771021 };
+            foreach (uint code in expectedArt)
+            {
+                var sprite = CardArtLoader.GetArtSprite(code);
+                if (sprite == null || sprite == CardArtLoader.GetFallbackArt())
+                    throw new Exception($"Missing artwork for {CardDatabase.GetName(code)} ({code})");
+            }
+            if (!HasSameArtwork(20001444, 20001443) || !HasSameArtwork(3285552, 3285551) || !HasSameArtwork(41458362, 41458361))
+                throw new Exception("Token artwork did not use its explicitly selected source");
+            if (HasSameArtwork(20001444, 91512836) || HasSameArtwork(20001444, 1799465))
+                throw new Exception("Swordsoul Token displays a different token's artwork");
+            if (HasSameArtwork(73915052, 73915053) || HasSameArtwork(73915052, 73915051) ||
+                HasSameArtwork(27204312, 27204311) || HasSameArtwork(85771020, 85771021))
+                throw new Exception("Dedicated token illustrations were replaced with shared source card art");
+            if (HasSameArtwork(35263181, 35263180) || HasSameArtwork(9995767, 9995766))
+                throw new Exception("An unmapped token displayed the image of a neighboring card or a non-token alias");
 
-            if (spMoYe == null || spMoYe == CardArtLoader.GetFallbackArt())
-                throw new Exception("Swordsoul Token failed to load Mo Ye generator artwork!");
-            if (spAdv == null || spAdv == CardArtLoader.GetFallbackArt())
-                throw new Exception("Adventurer Token failed to load Rite of Aramesir generator artwork!");
-            if (spSheep == null || spSheep == CardArtLoader.GetFallbackArt())
-                throw new Exception("Sheep Token failed to load Scapegoat generator artwork!");
-            if (spNibiru == null || spNibiru == CardArtLoader.GetFallbackArt())
-                throw new Exception("Nibiru Token failed to load Nibiru generator artwork!");
-            if (spGlimmer == null || spGlimmer == CardArtLoader.GetFallbackArt())
-                throw new Exception("Glimmer Token failed to load Luminous generator artwork!");
+            Debug.Log("[TOKEN TEST 0] Dedicated token pictures, explicit artwork and unmapped token fallbacks verified.");
+        }
 
-            Debug.Log($"[TOKEN TEST 0] All token presentation checks passed: Art sizes=({spMoYe.rect.width}x{spMoYe.rect.height})");
+        private static bool HasSameArtwork(uint leftCode, uint rightCode)
+        {
+            var left = CardArtLoader.GetArtSprite(leftCode)?.texture;
+            var right = CardArtLoader.GetArtSprite(rightCode)?.texture;
+            return left != null && right != null && left.width == right.width && left.height == right.height &&
+                left.GetPixels32().SequenceEqual(right.GetPixels32());
+        }
+
+        private static void VerifySwordsoulToken(LiveCardState token)
+        {
+            const uint tokenFlags = YgoConstants.TYPE_TOKEN | YgoConstants.TYPE_TUNER;
+            if ((token.type & tokenFlags) != tokenFlags || token.level != 4 ||
+                token.race != YgoConstants.RACE_WYRM || token.attribute != YgoConstants.ATTRIBUTE_WATER ||
+                token.attack != 0 || token.defense != 0 || CardDatabase.GetName(token.code) != "상검 토큰")
+                throw new Exception($"Wrong Swordsoul Token data: code={token.code}, race=0x{token.race:X}, attribute={token.attribute}, level={token.level}, ATK/DEF={token.attack}/{token.defense}");
+
+            var root = new GameObject("Swordsoul Token presentation test");
+            try
+            {
+                var view = CompositeCardView.Create(root.transform, "Token", detailedOverlay: true);
+                view.SetCard(token.code, live: token);
+                var box = view.transform.Find("AspectBox");
+                if (box.Find("Artwork").GetComponent<Image>().sprite != CardArtLoader.GetArtSprite(token.code) ||
+                    box.Find("Frame").GetComponent<Image>().sprite != LotdUiKit.LoadSprite("LOTD/Frames/card_token") ||
+                    box.Find("CardTitle/T").GetComponent<Text>().text != "상검 토큰")
+                    throw new Exception("The live Swordsoul Token had the wrong artwork, frame or name in the duel view");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+            Debug.Log($"[TOKEN TEST 1] Swordsoul Token {token.code}: Wyrm/Tuner/WATER, Level 4, ATK/DEF 0/0, duel card art verified.");
         }
 
         private static void TestSwordsoulTunerTokenAndSynchro()
@@ -139,9 +175,7 @@ namespace YGOPortable.Editor
                     var token = s.Players[0].mzone.FirstOrDefault(c => c != null && c.code == 20001444);
                     if (token != null && !tokenCreated)
                     {
-                        const uint tokenFlags = YgoConstants.TYPE_TOKEN | YgoConstants.TYPE_TUNER;
-                        if ((token.type & tokenFlags) != tokenFlags || token.level != 4)
-                            throw new Exception("Mo Ye did not generate a level 4 Tuner Token");
+                        VerifySwordsoulToken(token);
                         tokenCreated = true;
                     }
                     if (s.ActivePrompt == null) { s.StepUntilPrompt(); continue; }
@@ -212,6 +246,8 @@ namespace YGOPortable.Editor
                 if (!summonedMoYe) throw new Exception("Failed to summon Mo Ye");
                 if (!tokenCreated) throw new Exception("Failed to generate Swordsoul Token");
                 if (!synchroChixiao || s.RetryCount != 0) throw new Exception("Chixiao Synchro Summon did not resolve cleanly");
+                if (s.Players[0].mzone.Any(c => c?.code == 20001444) || s.Players[0].grave.Any(c => c.code == 20001444))
+                    throw new Exception("Swordsoul Token remained after it was used as Synchro material");
             }
         }
 

@@ -7,6 +7,7 @@ Builds all Unity runtime & streaming assets for YGO Portable Unity:
   4. Assets/StreamingAssets/opponents_db.json   (20 [2026 Meta] + all 850 original LOTD decks & characters)
   5. Assets/StreamingAssets/cardart.idx + cardart_*.pack (<40MB chunks of 224x224 JPEG artwork)
   6. Assets/Resources/LOTD/... + Fonts/NotoSansKR.ttf    (sliced LOTD UI sprites, frames, Busts, TypeIcons)
+  7. Assets/StreamingAssets/tokenart.pack      (token artwork and its index)
 """
 
 import io
@@ -80,6 +81,15 @@ KIND_TO_TYPE = {
     "Trap": 0x4,
 }
 TYPE_EXTRA = 0x40 | 0x2000 | 0x800000 | 0x4000000  # Fusion, Synchro, Xyz, Link
+TYPE_TOKEN = 0x4000
+
+# Use the appropriate source card art for these tokens that have no dedicated LOTD illustration.
+TOKEN_ART_FALLBACKS = {
+    20001444: 20001443,  # Swordsoul Token -> Swordsoul of Mo Ye
+    3285552: 3285551,   # Adventurer Token -> Rite of Aramesir
+    41458362: 41458361,  # 기석 토큰 -> 아다마시아 루미나스
+    3129528: 3129527,    # 희생하는 양 토큰 -> 잠자는 양 희생양
+}
 
 # CARD_Pass.bin leaves these original Egyptian God card passwords at zero.
 LOTD_MISSING_PASSCODES = {
@@ -557,6 +567,29 @@ def build_script_pack(all_codes: set):
     print(f"  cardscripts.pack: {count} scripts ({len(out)/1024/1024:.2f} MB)")
 
 
+def compress_card_art(raw_bytes: bytes) -> bytes:
+    im = Image.open(io.BytesIO(raw_bytes)).convert("RGB")
+    if im.size != (224, 224):
+        im = im.resize((224, 224), Image.Resampling.LANCZOS)
+    buf = io.BytesIO()
+    im.save(buf, format="JPEG", quality=76, optimize=True)
+    return buf.getvalue()
+
+
+def iter_lotd_art_locations(archive, toc):
+    for member in ("2020.full.illust_j.jpg.zib", "2020.full.illust_a.jpg.zib"):
+        base, _ = toc[member]
+        archive.seek(base)
+        first_offset, _, _ = struct.unpack(">II56s", archive.read(64))
+        count = ((first_offset & ~15) - 16) // 64
+        archive.seek(base)
+        header = archive.read(count * 64)
+        for offset, size, name in struct.iter_unpack(">II56s", header):
+            stem = name.rstrip(b"\x00").rsplit(b".", 1)[0]
+            if stem.isdigit():
+                yield int(stem), base + (offset & ~15), size
+
+
 def build_card_art(all_codes: set, lotd_to_pass: dict, mod_by_pass: dict):
     print("[3/5] Building chunked cardart_N.pack + cardart.idx (224x224 JPEG Q=76) ...")
     # Remove old chunks if re-running
@@ -569,14 +602,6 @@ def build_card_art(all_codes: set, lotd_to_pass: dict, mod_by_pass: dict):
     # Map passcode -> compressed 224x224 JPEG bytes
     pass_to_jpg = {}
 
-    def compress_jpg(raw_bytes: bytes) -> bytes:
-        im = Image.open(io.BytesIO(raw_bytes)).convert("RGB")
-        if im.size != (224, 224):
-            im = im.resize((224, 224), Image.Resampling.LANCZOS)
-        buf = io.BytesIO()
-        im.save(buf, format="JPEG", quality=76, optimize=True)
-        return buf.getvalue()
-
     # Priority 1: 2026 KR mod art (by konamiId -> password)
     for pw, mc in mod_by_pass.items():
         kid = int(mc.get("konamiId") or 0)
@@ -586,34 +611,18 @@ def build_card_art(all_codes: set, lotd_to_pass: dict, mod_by_pass: dict):
             if img_rel:
                 p = YGO_PC / "Mods" / "2026-11-KR-Cards" / "Yu-Gi-Oh-Ex" / img_rel
         if p.exists():
-            pass_to_jpg[pw] = compress_jpg(p.read_bytes())
+            pass_to_jpg[pw] = compress_card_art(p.read_bytes())
 
     # Priority 2: 2020.full.illust_j.jpg.zib then 2020.full.illust_a.jpg.zib
     with open(YGO_PC / "YGO_2020.dat", "rb") as f:
-        for zib_name in ["2020.full.illust_j.jpg.zib", "2020.full.illust_a.jpg.zib"]:
-            z_off, _z_sz = main_toc[zib_name]
-            f.seek(z_off)
-            first_off, _, _ = struct.unpack(">II56s", f.read(64))
-            z_first = first_off & ~15
-            z_count = (z_first - 16) // 64
-            f.seek(z_off)
-            hdr = f.read(z_count * 64)
-            for i in range(z_count):
-                eo, es, en = struct.unpack_from(">II56s", hdr, i * 64)
-                eo &= ~15
-                nm = en.rstrip(b"\x00").decode("ascii", errors="ignore")
-                stem = nm.rsplit(".", 1)[0]
-                if not stem.isdigit():
-                    continue
-                lid = int(stem)
-                pw = lotd_to_pass.get(lid, 0)
-                if pw and pw not in pass_to_jpg:
-                    f.seek(z_off + eo)
-                    raw = f.read(es)
-                    try:
-                        pass_to_jpg[pw] = compress_jpg(raw)
-                    except Exception:
-                        pass
+        for lid, offset, size in iter_lotd_art_locations(f, main_toc):
+            pw = lotd_to_pass.get(lid, 0)
+            if pw and pw not in pass_to_jpg:
+                f.seek(offset)
+                try:
+                    pass_to_jpg[pw] = compress_card_art(f.read(size))
+                except (OSError, ValueError):
+                    pass
 
     MAX_CHUNK = 40 * 1024 * 1024  # 40 MB (<50MB GitHub limit!)
     chunk_id = 0
@@ -640,6 +649,82 @@ def build_card_art(all_codes: set, lotd_to_pass: dict, mod_by_pass: dict):
     (STREAMING / "cardart.idx").write_bytes(idx_bytes)
     total_mb = sum(p.stat().st_size for p in STREAMING.glob("cardart*.pack")) / 1024 / 1024
     print(f"  cardart: {len(entries)} images in {chunk_id+1} chunks ({total_mb:.2f} MB total)")
+
+
+def build_token_art(cards):
+    token_codes = defaultdict(list)
+    for card in cards:
+        name = card["name"].strip().casefold()
+        if card["type"] & TYPE_TOKEN and name.endswith(" token"):
+            token_codes[name].append(card["code"])
+
+    toc = parse_toc(YGO_PC / "YGO_2020.toc")
+    token_art = {}
+    with (YGO_PC / "YGO_2020.dat").open("rb") as archive:
+        def read_entry(name):
+            offset, size = toc[f"bin/{name}.bin"]
+            archive.seek(offset)
+            return archive.read(size)
+
+        props = read_entry("CARD_Prop")
+        passwords = read_entry("CARD_Pass")
+        offsets = read_entry("CARD_Indx_E")
+        english_names = read_entry("CARD_Name_E")
+        lotd_ids_by_name = defaultdict(list)
+        for i in range(1, len(props) // 8):
+            if struct.unpack_from("<I", passwords, i * 4)[0] != 0:
+                continue
+            name_offset = struct.unpack_from("<I", offsets, i * 8)[0]
+            name = read_utf16(english_names, name_offset).strip().casefold()
+            if name in token_codes:
+                lotd_id = struct.unpack_from("<I", props, i * 8)[0] & 0x3FFF
+                lotd_ids_by_name[name].append(lotd_id)
+
+        wanted = {lid for ids in lotd_ids_by_name.values() for lid in ids}
+        art_by_lotd_id = {}
+        for lid, offset, size in iter_lotd_art_locations(archive, toc):
+            if lid in wanted:
+                archive.seek(offset)
+                art_by_lotd_id[lid] = compress_card_art(archive.read(size))
+                wanted.remove(lid)
+
+        for name, ids in lotd_ids_by_name.items():
+            illustrations = [art_by_lotd_id[lid] for lid in ids if lid in art_by_lotd_id]
+            codes = sorted(token_codes[name])
+            if not illustrations:
+                continue
+            # Keep separate variants where LOTD and the engine provide the same number of copies.
+            if len(illustrations) == len(codes):
+                token_art.update(zip(codes, illustrations))
+            else:
+                token_art.update(dict.fromkeys(codes, illustrations[0]))
+
+    original_count = len(token_art)
+    ordinary_art = {
+        code: (pack_id, offset, size)
+        for code, pack_id, offset, size in struct.iter_unpack("<IIII", (STREAMING / "cardart.idx").read_bytes()[12:])
+    }
+    valid_tokens = {card["code"] for card in cards if card["type"] & TYPE_TOKEN}
+    for code, source in TOKEN_ART_FALLBACKS.items():
+        if code in valid_tokens and code not in token_art and source in ordinary_art:
+            pack_id, offset, size = ordinary_art[source]
+            with (STREAMING / f"cardart_{pack_id}.pack").open("rb") as art:
+                art.seek(offset)
+                token_art[code] = art.read(size)
+
+    # The index shares the existing record layout. Pack ID -1 points to this file's embedded images.
+    count = len(token_art)
+    directory = bytearray(struct.pack("<4sII", b"YGOI", 1, count))
+    images = bytearray()
+    first_image = 12 + count * 16
+    positions = {}
+    for code, image in sorted(token_art.items()):
+        if image not in positions:
+            positions[image] = first_image + len(images)
+            images += image
+        directory += struct.pack("<IiII", code, -1, positions[image], len(image))
+    (STREAMING / "tokenart.pack").write_bytes(directory + images)
+    print(f"  tokenart: {original_count} token codes with LOTD artwork, {count-original_count} with source card artwork")
 
 
 def resolve_portrait_name(key: str, bust_map: dict) -> str:
@@ -1078,6 +1163,10 @@ def build_resources_lotd():
 
 
 def main():
+    if "--only-token-art" in sys.argv:
+        cards = json.loads((STREAMING / "cards_kr.json").read_text(encoding="utf-8"))["cards"]
+        build_token_art(cards)
+        return
     if "--only-opponents" in sys.argv:
         cards = json.loads((STREAMING / "cards_kr.json").read_text(encoding="utf-8"))["cards"]
         build_opponents_db(load_lotd_passcodes(), cards)
@@ -1089,6 +1178,7 @@ def main():
     all_codes, lotd_to_pass, mod_by_pass, _pk, _pl, kr_cards = build_cards()
     build_script_pack(all_codes)
     build_card_art(all_codes, lotd_to_pass, mod_by_pass)
+    build_token_art(kr_cards)
     build_opponents_db(lotd_to_pass, kr_cards)
     build_resources_lotd()
     print("Asset preparation COMPLETE!")

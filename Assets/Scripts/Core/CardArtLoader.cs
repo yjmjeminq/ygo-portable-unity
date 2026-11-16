@@ -19,6 +19,8 @@ namespace YGOPortable.Core
         private static string _streamingDir;
 
         private const int MaxCacheCount = 500;
+        private const int TokenArtPackId = -1;
+        private const string TokenArtFileName = "tokenart.pack";
         private static readonly Dictionary<uint, (Sprite sprite, LinkedListNode<uint> node)> _spriteCache =
             new Dictionary<uint, (Sprite, LinkedListNode<uint>)>(MaxCacheCount);
         private static readonly LinkedList<uint> _lru = new LinkedList<uint>();
@@ -34,25 +36,46 @@ namespace YGOPortable.Core
             _packStreams = new Dictionary<int, FileStream>();
 
             string idxPath = Path.Combine(streamingAssetsPath, "cardart.idx");
-            if (!File.Exists(idxPath))
-            {
-                Debug.LogWarning($"[CardArtLoader] Missing {idxPath}");
-                return;
-            }
-
-            byte[] data = File.ReadAllBytes(idxPath);
-            if (data.Length < 12) return;
-            uint count = BitConverter.ToUInt32(data, 8);
-            int pos = 12;
-            for (uint i = 0; i < count && pos + 16 <= data.Length; i++, pos += 16)
-            {
-                uint pw = BitConverter.ToUInt32(data, pos);
-                int pid = BitConverter.ToInt32(data, pos + 4);
-                uint off = BitConverter.ToUInt32(data, pos + 8);
-                uint len = BitConverter.ToUInt32(data, pos + 12);
-                _index[pw] = new ArtEntry { packId = pid, offset = off, length = len };
-            }
+            if (!ReadArtIndex(idxPath))
+                Debug.LogWarning($"[CardArtLoader] Missing or invalid {idxPath}");
+            ReadArtIndex(Path.Combine(streamingAssetsPath, TokenArtFileName));
             Debug.Log($"[CardArtLoader] Indexed {_index.Count} card artworks.");
+        }
+
+        private static bool ReadArtIndex(string path)
+        {
+            if (!File.Exists(path)) return false;
+            using var reader = new BinaryReader(File.OpenRead(path));
+            long length = reader.BaseStream.Length;
+            if (length < 12 || reader.ReadUInt32() != 0x494F4759 || reader.ReadUInt32() != 1)
+                return false;
+            uint count = reader.ReadUInt32();
+            if (count > (length - 12) / 16) return false;
+            for (uint i = 0; i < count; i++)
+            {
+                uint code = reader.ReadUInt32();
+                var entry = new ArtEntry { packId = reader.ReadInt32(), offset = reader.ReadUInt32(), length = reader.ReadUInt32() };
+                _index.TryAdd(code, entry);
+            }
+            return true;
+        }
+
+        private static bool TryGetArtEntry(uint code, out ArtEntry entry)
+        {
+            entry = default;
+            if (_index == null) return false;
+            if (_index.TryGetValue(code, out entry)) return true;
+
+            var info = CardDatabase.Get(code);
+            if (info == null || info.alias == 0) return false;
+            if ((info.type & YgoConstants.TYPE_TOKEN) != 0)
+            {
+                var sharedToken = CardDatabase.Get(info.alias);
+                if (sharedToken == null || (sharedToken.type & YgoConstants.TYPE_TOKEN) == 0 ||
+                    !string.Equals(info.name, sharedToken.name, StringComparison.OrdinalIgnoreCase))
+                    return false;
+            }
+            return _index.TryGetValue(info.alias, out entry);
         }
 
         public static Sprite GetCardBackSprite()
@@ -82,42 +105,14 @@ namespace YGOPortable.Core
                 _spriteCache.Remove(code);
             }
 
-            uint lookupCode = code;
-            ArtEntry entry = default;
-            bool found = false;
-            if (_index != null && _index.TryGetValue(lookupCode, out entry))
-            {
-                found = true;
-            }
-            else
-            {
-                var info = CardDatabase.Get(code);
-                if (info != null && info.alias != 0 && _index != null && _index.TryGetValue(info.alias, out var aliasEntry))
-                {
-                    entry = aliasEntry;
-                    found = true;
-                }
-                else if (info != null && (info.type & YgoConstants.TYPE_TOKEN) != 0 && _index != null)
-                {
-                    for (uint sub = 1; sub <= 5; sub++)
-                    {
-                        if (code >= sub && _index.TryGetValue(code - sub, out var genEntry))
-                        {
-                            entry = genEntry;
-                            found = true;
-                            break;
-                        }
-                    }
-                }
-            }
-
-            if (!found) return GetFallbackArt();
+            if (!TryGetArtEntry(code, out var entry)) return GetFallbackArt();
 
             try
             {
                 if (!_packStreams.TryGetValue(entry.packId, out var fs))
                 {
-                    string packPath = Path.Combine(_streamingDir, $"cardart_{entry.packId}.pack");
+                    string packName = entry.packId == TokenArtPackId ? TokenArtFileName : $"cardart_{entry.packId}.pack";
+                    string packPath = Path.Combine(_streamingDir, packName);
                     if (!File.Exists(packPath)) return GetFallbackArt();
                     fs = new FileStream(packPath, FileMode.Open, FileAccess.Read, FileShare.Read);
                     _packStreams[entry.packId] = fs;
