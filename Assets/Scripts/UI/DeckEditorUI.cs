@@ -78,8 +78,8 @@ namespace YGOPortable.UI
         private string _archSearchText = "";
         private int _archSortMode = 0; // 0=Card Count Desc, 1=Name Asc
         private const int ArchCols = 3;
-        private const int ArchPoolRows = 6;
-        private float _archRowHeight = 112f;
+        private const int ArchPoolRows = 7;
+        private float _archRowHeight = 124f;
         private int _archTotalRows = 0;
         private int _archLastFirstRow = -1;
         private readonly List<ArchetypeInfo> _archResults = new List<ArchetypeInfo>();
@@ -342,7 +342,7 @@ namespace YGOPortable.UI
             _trunkScroll.viewport = _trunkViewport;
 
             _trunkContent = LotdUiKit.CreateRect("Content", _trunkViewport, new Vector2(0, 1), new Vector2(1, 1), Vector2.zero, Vector2.zero);
-            _trunkContent.pivot = new Vector2(0.5f, 1f);
+            _trunkContent.pivot = new Vector2(0f, 1f);
             _trunkScroll.content = _trunkContent;
 
             // Instantiate Slot Pool (42 slots)
@@ -554,11 +554,16 @@ namespace YGOPortable.UI
             else if (_sortMode == 2) _trunkResults.Sort((a, b) => b.level.CompareTo(a.level));
             else if (_sortMode == 3) _trunkResults.Sort((a, b) => string.Compare(a.name, b.name, StringComparison.Ordinal));
 
+            Canvas.ForceUpdateCanvases();
+            float vpWidth = _trunkViewport.rect.width > 10 ? _trunkViewport.rect.width : 690f;
+            _colWidth = vpWidth / TrunkCols;
+            _rowHeight = Mathf.Round(_colWidth * 1.42f);
+
             _totalRows = Mathf.Max(1, (_trunkResults.Count + TrunkCols - 1) / TrunkCols);
             float totalH = _totalRows * _rowHeight;
-            _trunkContent.sizeDelta = new Vector2(_trunkViewport.rect.width, totalH);
+            _trunkContent.sizeDelta = new Vector2(0f, totalH);
 
-            _trunkCountText.text = (_relatedFilterCode != 0 ? "연관 " : "검색 ") + $"{_trunkResults.Count:N0}장";
+            _trunkCountText.text = (_activeArchetypeFilter != null ? "카드군 " : (_relatedFilterCode != 0 ? "연관 " : "검색 ")) + $"{_trunkResults.Count:N0}장";
             _trunkScroll.verticalNormalizedPosition = 1f;
             _lastFirstRow = -1;
             UpdateVirtualTrunkSlots(0, force: true);
@@ -577,8 +582,9 @@ namespace YGOPortable.UI
             if (firstRow == _lastFirstRow && !force) return;
             _lastFirstRow = firstRow;
 
-            float vpWidth = _trunkViewport.rect.width > 10 ? _trunkViewport.rect.width : 560f;
+            float vpWidth = _trunkViewport.rect.width > 10 ? _trunkViewport.rect.width : 690f;
             _colWidth = vpWidth / TrunkCols;
+            _rowHeight = Mathf.Round(_colWidth * 1.42f);
 
             for (int r = 0; r < PoolRows; r++)
             {
@@ -955,22 +961,22 @@ namespace YGOPortable.UI
             dim.gameObject.AddComponent<Button>().onClick.AddListener(() => _archModalRoot.SetActive(false));
 
             var win = LotdUiKit.CreateBorderedPanel(dim, "Win",
-                new Vector2(0.262f, 0.04f), new Vector2(0.985f, 0.905f), Vector2.zero, Vector2.zero,
+                new Vector2(0.262f, 0.02f), new Vector2(0.99f, 0.905f), Vector2.zero, Vector2.zero,
                 LotdUiKit.PanelNavy, LotdUiKit.GoldAccent);
             win.gameObject.AddComponent<Button>(); // block click-through to dim
 
-            var hdr = LotdUiKit.CreateRect("Hdr", win, new Vector2(0f, 0.89f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
+            var hdr = LotdUiKit.CreateRect("Hdr", win, new Vector2(0f, 0.90f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
             LotdUiKit.AddImage(hdr.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelHeader);
             var title = LotdUiKit.AddText(hdr, "T", "📚 순수 카드군 예시 덱 선택 (PURE ARCHETYPE DECKS)", 19, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
             title.rectTransform.offsetMin = new Vector2(16, 18);
             var sub = LotdUiKit.AddText(hdr, "Sub", "원하는 카드군을 선택하면 해당 순수 카드군 예시 덱(메인 40장 + 엑스트라 덱)이 자동 구성되며 보관함도 필터링됩니다.", 13, TextAnchor.LowerLeft, LotdUiKit.TextPrimary);
             sub.rectTransform.offsetMin = new Vector2(16, 4);
 
-            var closeRt = LotdUiKit.CreateRect("Close", hdr, new Vector2(0.84f, 0.16f), new Vector2(0.985f, 0.84f), Vector2.zero, Vector2.zero);
+            var closeRt = LotdUiKit.CreateRect("Close", hdr, new Vector2(0.85f, 0.16f), new Vector2(0.985f, 0.84f), Vector2.zero, Vector2.zero);
             LotdUiKit.CreateLotdButton(closeRt, "B", "✕ 닫기", () => _archModalRoot.SetActive(false), 14);
 
             // Search & Sort row
-            var filterRow = LotdUiKit.CreateRect("FilterRow", win, new Vector2(0.02f, 0.81f), new Vector2(0.98f, 0.875f), Vector2.zero, Vector2.zero);
+            var filterRow = LotdUiKit.CreateRect("FilterRow", win, new Vector2(0.015f, 0.825f), new Vector2(0.985f, 0.888f), Vector2.zero, Vector2.zero);
             _archSearchInp = LotdUiKit.CreateInputField(
                 LotdUiKit.CreateRect("ArchSearch", filterRow, new Vector2(0f, 0f), new Vector2(0.58f, 1f), Vector2.zero, Vector2.zero),
                 "S", "카드군 이름 또는 대표 카드명 검색 (예: 티아라멘츠, 푸른 눈, 히어로, 상검, 섬도희...)", 14);
@@ -994,8 +1000,8 @@ namespace YGOPortable.UI
                 LotdUiKit.CreateRect("ArchCnt", filterRow, new Vector2(0.82f, 0f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero),
                 "C", "0개 카드군", 14, TextAnchor.MiddleRight, LotdUiKit.CyanAccent, FontStyle.Bold);
 
-            // Virtualized Scroll Grid (3 cols x 6 rows = 18 pooled tiles)
-            var scrollHolder = LotdUiKit.CreateRect("ArchScrollHolder", win, new Vector2(0.02f, 0.02f), new Vector2(0.98f, 0.795f), Vector2.zero, Vector2.zero);
+            // Virtualized Scroll Grid (3 cols x 7 rows = 21 pooled tiles)
+            var scrollHolder = LotdUiKit.CreateRect("ArchScrollHolder", win, new Vector2(0.012f, 0.015f), new Vector2(0.988f, 0.812f), Vector2.zero, Vector2.zero);
             _archScroll = scrollHolder.gameObject.AddComponent<ScrollRect>();
             _archScroll.horizontal = false;
             _archScroll.vertical = true;
@@ -1007,7 +1013,7 @@ namespace YGOPortable.UI
             _archScroll.viewport = _archViewport;
 
             _archContent = LotdUiKit.CreateRect("Content", _archViewport, new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
-            _archContent.pivot = new Vector2(0.5f, 1f);
+            _archContent.pivot = new Vector2(0f, 1f);
             _archScroll.content = _archContent;
 
             for (int r = 0; r < ArchPoolRows; r++)
@@ -1091,9 +1097,12 @@ namespace YGOPortable.UI
                     return b.TotalUniqueCount.CompareTo(a.TotalUniqueCount);
                 });
 
+            Canvas.ForceUpdateCanvases();
             _archTotalRows = Mathf.Max(1, (_archResults.Count + ArchCols - 1) / ArchCols);
-            float vpW = _archViewport.rect.width > 10 ? _archViewport.rect.width : 960f;
-            _archContent.sizeDelta = new Vector2(vpW, _archTotalRows * _archRowHeight);
+            float vpW = _archViewport.rect.width > 10 ? _archViewport.rect.width : 1320f;
+            float colW = vpW / ArchCols;
+            _archRowHeight = Mathf.Clamp(Mathf.Round(colW * 0.30f), 116f, 140f);
+            _archContent.sizeDelta = new Vector2(0f, _archTotalRows * _archRowHeight);
             _archCountText.text = $"총 {_archResults.Count:N0}개 카드군";
             _archScroll.verticalNormalizedPosition = 1f;
             _archLastFirstRow = -1;
@@ -1113,8 +1122,9 @@ namespace YGOPortable.UI
             if (firstRow == _archLastFirstRow && !force) return;
             _archLastFirstRow = firstRow;
 
-            float vpWidth = _archViewport.rect.width > 10 ? _archViewport.rect.width : 960f;
+            float vpWidth = _archViewport.rect.width > 10 ? _archViewport.rect.width : 1320f;
             float colW = vpWidth / ArchCols;
+            _archRowHeight = Mathf.Clamp(Mathf.Round(colW * 0.30f), 116f, 140f);
 
             for (int r = 0; r < ArchPoolRows; r++)
             {
