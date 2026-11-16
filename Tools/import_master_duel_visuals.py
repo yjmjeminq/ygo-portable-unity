@@ -57,6 +57,7 @@ def scan_bundle(path):
         if (obj.type.name == "Texture2D"
             and ("/card/images/illust/" in name or "/monstercutin/" in name or Path(name).name in EFFECTS.values()))
         or (obj.type.name == "TextAsset" and "/monstercutin/" in name and name.endswith(("js.json", ".atlas.txt")))
+        or (obj.type.name == "Sprite" and "/monstercutin/" in name and name.endswith("_monpng.png"))
     ]
 
 
@@ -175,10 +176,13 @@ def export_cut_ins(output, rows, entries):
     for row in rows:
         _, _, kind, name = row
         match = CUT_IN.search(name)
-        if kind not in {"Texture2D", "TextAsset"} or not match:
+        if kind not in {"Texture2D", "TextAsset", "Sprite"} or not match:
             continue
         region, cid, quality = match.groups()
-        candidates[int(cid)].setdefault((quality, region), {})[Path(name).name] = row
+        files = candidates[int(cid)].setdefault((quality, region), {})
+        filename = Path(name).name
+        if filename not in files or kind == "Sprite":
+            files[filename] = row
 
     directory = output / "CutIns"
     directory.mkdir()
