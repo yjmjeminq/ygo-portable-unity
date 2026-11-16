@@ -30,6 +30,7 @@ YDK_IDS = "https://raw.githubusercontent.com/pixeltris/YgoMaster/master/YgoMaste
 ART_VARIANTS = "https://raw.githubusercontent.com/daominah/yugioh_master_duel_card_art/main/alt_art_desc.md"
 TOKEN_IDS = {20001444: 16567, 3285552: 16760}
 HUD_SPRITES = {
+    "MasterDuelLogo": "GUI_TitleLogo",
     "PhaseBase": "GUI_PhaseButtonBase2",
     "PhaseRim": "GUI_PhaseCircle",
     "PhaseDraw": "GUI_PhaseDP",

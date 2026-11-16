@@ -68,10 +68,10 @@ namespace YGOPortable.UI
 
         private static void AddLogo(RectTransform holder)
         {
-            var logo = LotdUiKit.LoadSprite("LOTD/Title/logo_us") ?? LotdUiKit.LoadSprite("LOTD/Title/logo_jp");
+            var logo = DuelVisualAssets.MasterDuelLogo;
             if (logo != null) LotdUiKit.AddImage(holder.gameObject, logo, Color.white, true, false);
-            else LotdUiKit.AddText(holder, "Title", "유희왕! 레거시 오브 더 듀얼리스트", 37,
-                TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
+            else LotdUiKit.AddFittedText(holder, "Title", "Yu-Gi-Oh!\nMASTER DUEL", 58, 21,
+                TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
         }
 
         private static void AddMenuEntry(Transform parent, float y, string label, Action action, bool selected = false)
