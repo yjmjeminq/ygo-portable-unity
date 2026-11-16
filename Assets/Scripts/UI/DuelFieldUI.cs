@@ -160,7 +160,10 @@ namespace YGOPortable.UI
             _app = app;
             _modals = modals;
             BuildUI(canvasParent);
-            _modals.SetOwnZoneShortcuts(OpenOwnStackZone);
+            _modals.SetBrowsablePiles(
+                _myGyTile.root.GetComponent<DuelZoneImage>(), _myExtraTile.root.GetComponent<DuelZoneImage>(),
+                _myBanTile.root.GetComponent<DuelZoneImage>(), _oppGyTile.root.GetComponent<DuelZoneImage>(),
+                _oppExtraTile.root.GetComponent<DuelZoneImage>(), _oppBanTile.root.GetComponent<DuelZoneImage>());
 
             if (CardDragManager.Instance != null)
             {
@@ -1803,7 +1806,9 @@ namespace YGOPortable.UI
                 }
                 else if (_modals != null && _modals.ModalRoot != null && _modals.ModalRoot.activeSelf)
                 {
-                    _modals.TryCancelOrPass();
+                    bool openingPile = !Input.GetKeyDown(KeyCode.Escape) && _modals.IsShowingField &&
+                        _modals.IsPointOverBrowsablePile(Input.mousePosition);
+                    if (!openingPile) _modals.TryCancelOrPass();
                 }
                 else if (Input.GetKeyDown(KeyCode.Escape) && _modals != null && _modals.ResultRoot != null && _modals.ResultRoot.activeSelf)
                 {
@@ -1950,9 +1955,11 @@ namespace YGOPortable.UI
         {
             var session = _session;
             if (session == null || session.IsFinished || IsPresenting || IsPaused || IsReadingLog ||
-                _cardZoomModal.activeSelf || _actionPopup.activeSelf || con >= session.Players.Length) return;
+                _cardZoomModal.activeSelf || _actionPopup.activeSelf || con >= session.Players.Length ||
+                _modals.IsPromptOpen && !_modals.IsShowingField) return;
             var prompt = session.ActivePrompt;
-            bool CanUseActions() => _session == session && ReferenceEquals(session.ActivePrompt, prompt) && CanAcceptPlayerAction;
+            bool CanUseActions() => !_modals.IsPromptOpen && _session == session &&
+                ReferenceEquals(session.ActivePrompt, prompt) && CanAcceptPlayerAction;
 
             if (loc == YgoConstants.LOCATION_DECK)
             {
@@ -1985,19 +1992,8 @@ namespace YGOPortable.UI
                 newestFirst: loc != YgoConstants.LOCATION_EXTRA,
                 hasCardActions: c => CanUseActions() && CollectActions(c.controller, c.location, c.sequence).Count > 0,
                 onOpenCardActions: c => ShowCardActionsPopup(c.controller, c.location, c.sequence, c.code, c.overlayCodes),
-                canUseCardActions: CanUseActions);
-        }
-
-        private void OpenOwnStackZone(uint location)
-        {
-            if (_session == null) return;
-            string title = location switch
-            {
-                YgoConstants.LOCATION_GRAVE => "내 묘지",
-                YgoConstants.LOCATION_EXTRA => "내 엑스트라 덱",
-                _ => "내 제외",
-            };
-            OpenStackZone((byte)_session.HumanPlayerIndex, location, title);
+                canUseCardActions: CanUseActions,
+                icon: DuelVisualAssets.ZoneIcon(loc, con != session.HumanPlayerIndex));
         }
 
         private void OnSlotClicked(byte con, uint loc, uint seq)

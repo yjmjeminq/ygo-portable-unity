@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.Rendering;
 using UnityEngine.UI;
 using YGOPortable.AI;
 using YGOPortable.Core;
@@ -25,7 +27,8 @@ namespace YGOPortable.Editor
             foreach (bool humanFirst in new[] { true, false })
                 opens += VerifyBanishAndGrave(humanFirst);
             opens += VerifyPromptAndExtraSummon();
-            Debug.Log($"[VERIFY ZONE BROWSER] {opens} successful opens. Graveyard, Extra Deck, and banished cards verified for both seating orders, including effect prompt and Synchro summon.");
+            string hitTest = SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null ? "raycast filters" : "GraphicRaycaster";
+            Debug.Log($"[VERIFY ZONE BROWSER] {opens} successful opens. Graveyard, Extra Deck, and banished cards verified for both seating orders, including effect prompt field view ({hitTest}) and a Synchro summon.");
         }
 
         private static int VerifyBanishAndGrave(bool humanFirst)
@@ -121,24 +124,7 @@ namespace YGOPortable.Editor
                                   prompt.messageType == YgoConstants.MSG_SELECT_CARD;
                 if (!inspectedDuringPrompt && prompt.playerId == 0 && cardPrompt)
                 {
-                    ui.Modals.ShowPrompt(duel, prompt);
-                    var shortcuts = ui.Modals.ModalRoot.transform.Find("ZoneShortcuts");
-                    Require(shortcuts != null, "There are no zone controls on the live effect prompt.");
-                    foreach (var (path, codes) in new[]
-                    {
-                        ("Grave", mine.grave.AsEnumerable().Reverse().Select(card => card.code)),
-                        ("Extra", mine.extra.Select(card => card.code)),
-                        ("Banished", mine.banished.AsEnumerable().Reverse().Select(card => card.code)),
-                    })
-                    {
-                        ui.Open(shortcuts.Find(path + "/B")?.GetComponent<Button>(), codes);
-                        Require(ui.Modals.IsPromptOpen && !ui.Modals.TryConfirm() && !ui.Modals.TryCancelOrPass(),
-                            "The prompt accepted input while the stack viewer covered it.");
-                        ui.Close();
-                        Require(ui.Modals.IsPromptOpen && ReferenceEquals(duel.ActivePrompt, prompt),
-                            "Closing the stack viewer lost the previous effect prompt.");
-                    }
-                    ui.Modals.HideAll();
+                    ui.VerifyPromptFieldView(prompt);
                     inspectedDuringPrompt = true;
                 }
 
@@ -187,6 +173,8 @@ namespace YGOPortable.Editor
             private readonly DuelSession _duel;
             private readonly RectTransform _grid;
             private readonly GameAppController _controller;
+            private readonly Camera _camera;
+            private readonly RenderTexture _frame;
 
             internal DuelFieldUI Field { get; }
             internal DuelPromptModals Modals { get; }
@@ -197,8 +185,25 @@ namespace YGOPortable.Editor
             internal Browser(DuelSession duel)
             {
                 _duel = duel;
-                _canvas = new GameObject("Zone Browser Verification", typeof(Canvas));
-                ((RectTransform)_canvas.transform).sizeDelta = new Vector2(1600, 900);
+                _canvas = new GameObject("Zone Browser Verification", typeof(Canvas), typeof(GraphicRaycaster));
+                var canvas = _canvas.GetComponent<Canvas>();
+                canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                canvas.sortingOrder = 10;
+                if (SystemInfo.graphicsDeviceType != GraphicsDeviceType.Null)
+                {
+                    _camera = new GameObject("Zone Browser Camera", typeof(Camera)).GetComponent<Camera>();
+                    _camera.enabled = false;
+                    _camera.orthographic = true;
+                    _camera.orthographicSize = 450f;
+                    _camera.aspect = 1600f / 900f;
+                    _camera.transform.position = Vector3.back * 10f;
+                    _frame = new RenderTexture(640, 360, 24);
+                    _camera.targetTexture = _frame;
+                    canvas.renderMode = RenderMode.WorldSpace;
+                    canvas.worldCamera = _camera;
+                    ((RectTransform)canvas.transform).sizeDelta = new Vector2(1600f, 900f);
+                    canvas.transform.position = Vector3.zero;
+                }
                 Modals = new DuelPromptModals(_canvas.transform, code => InspectedCode = code,
                     _ => throw new InvalidOperationException("Browsing submitted a modal response."));
                 _controller = _canvas.AddComponent<GameAppController>();
@@ -208,6 +213,100 @@ namespace YGOPortable.Editor
                 SetPrivate(_controller, "_modals", Modals);
                 Field.BindSession(_duel, null, null);
                 _grid = Private<RectTransform>(Modals, "_zoneGrid");
+            }
+
+            internal void VerifyPromptFieldView(DuelPrompt prompt)
+            {
+                var mine = _duel.Players[_duel.HumanPlayerIndex];
+                var theirs = _duel.Players[_duel.AiPlayerIndex];
+                Field.Refresh();
+                Modals.ShowPrompt(_duel, prompt);
+                var modal = Modals.ModalRoot.transform;
+                var panel = modal.Find("ChainWin").gameObject.activeSelf ? modal.Find("ChainWin") : modal.Find("Win");
+                var fieldView = modal.Find("FieldView/B") as RectTransform;
+                bool ShowingField() => Modals.IsPromptOpen && !modal.Find("Win").gameObject.activeSelf &&
+                    !modal.Find("ChainWin").gameObject.activeSelf;
+                Require(panel.gameObject.activeInHierarchy && fieldView != null,
+                    "The effect prompt did not start with its chooser visible.");
+                var selected = Private<HashSet<int>>(Modals, "_selectedIndices").ToArray();
+                int chainIndex = Private<int>(Modals, "_chainSelection");
+
+                var extra = StackRoot("_myExtraTile");
+                var blocked = Raycast(extra, out _);
+                Require(blocked != null && blocked.transform.IsChildOf(modal),
+                    "The active chooser let clicks reach the field underneath it.");
+                ClickAt(fieldView);
+                Require(ShowingField() && !Modals.TryConfirm(),
+                    "Field view did not hide and lock the current chooser.");
+
+                var deck = StackRoot("_myDeckTile");
+                var phase = Field.Root.transform.Find("Turn/Dial") as RectTransform;
+                foreach (var target in new[] { deck, phase })
+                {
+                    blocked = Raycast(target, out _);
+                    Require(blocked != null && blocked.transform.IsChildOf(modal),
+                        $"Field view returned an unexpected hit at {target.name}: {blocked?.name ?? "none"}.");
+                }
+
+                foreach (var (stack, codes) in new[]
+                {
+                    ("_myGyTile", mine.grave.AsEnumerable().Reverse().Select(card => card.code)),
+                    ("_myExtraTile", mine.extra.Select(card => card.code)),
+                    ("_myBanTile", mine.banished.AsEnumerable().Reverse().Select(card => card.code)),
+                    ("_oppExtraTile", theirs.extra.Select(card => card.IsFaceUp || card.isPublic ? card.code : 0u)),
+                })
+                {
+                    ClickAt(StackRoot(stack));
+                    VerifyOpened(prompt, codes);
+                    Require(Modals.IsPromptOpen && !Modals.TryConfirm() && !Modals.TryCancelOrPass(),
+                        "The prompt accepted input while the stack viewer covered it.");
+                    Close();
+                    Require(ShowingField() && ReferenceEquals(_duel.ActivePrompt, prompt),
+                        "Closing the stack viewer failed to return to the same field view.");
+                }
+
+                ClickAt(fieldView);
+                Require(panel.gameObject.activeInHierarchy && ReferenceEquals(_duel.ActivePrompt, prompt) &&
+                    Private<int>(Modals, "_chainSelection") == chainIndex &&
+                    Private<HashSet<int>>(Modals, "_selectedIndices").SetEquals(selected),
+                    "Opening the field changed the current prompt, choices or selection.");
+                ClickAt(fieldView);
+                Require(ShowingField() && Modals.TryCancelOrPass() && panel.gameObject.activeInHierarchy &&
+                    ReferenceEquals(_duel.ActivePrompt, prompt),
+                    "Cancel from field view sent an effect response or failed to restore its chooser.");
+                Modals.HideAll();
+            }
+
+            private GameObject Raycast(RectTransform target, out PointerEventData pointer)
+            {
+                Canvas.ForceUpdateCanvases();
+                Vector2 point = RectTransformUtility.WorldToScreenPoint(_camera, target.TransformPoint(target.rect.center));
+                pointer = new PointerEventData(EventSystem.current)
+                {
+                    position = point,
+                    button = PointerEventData.InputButton.Left,
+                };
+                if (_camera != null)
+                {
+                    _camera.Render();
+                    var hits = new List<RaycastResult>();
+                    _canvas.GetComponent<GraphicRaycaster>().Raycast(pointer, hits);
+                    return hits.Count > 0 ? hits[0].gameObject : null;
+                }
+
+                // The null graphics device assigns no CanvasRenderer depth.
+                return _canvas.GetComponentsInChildren<Graphic>().Reverse().FirstOrDefault(graphic =>
+                    graphic.raycastTarget && RectTransformUtility.RectangleContainsScreenPoint(graphic.rectTransform, point) &&
+                    graphic.Raycast(point, null))?.gameObject;
+            }
+
+            private void ClickAt(RectTransform target)
+            {
+                var hit = Raycast(target, out var pointer);
+                var handler = ExecuteEvents.GetEventHandler<IPointerClickHandler>(hit);
+                Require(handler == target.gameObject,
+                    $"A pointer click at {target.name} reached {handler?.name ?? hit?.name ?? "nothing"}.");
+                ExecuteEvents.Execute(handler, pointer, ExecuteEvents.pointerClickHandler);
             }
 
             internal void VerifyPhasePicker(DuelPrompt prompt)
@@ -257,16 +356,23 @@ namespace YGOPortable.Editor
             }
 
             internal void OpenStack(string stackField, IEnumerable<uint> expected)
+                => Open(StackRoot(stackField).GetComponent<Button>(), expected);
+
+            private RectTransform StackRoot(string stackField)
             {
                 var stack = Private<object>(Field, stackField);
-                var root = (RectTransform)stack.GetType().GetField("root")?.GetValue(stack);
-                Open(root?.GetComponent<Button>(), expected);
+                return (RectTransform)stack.GetType().GetField("root")?.GetValue(stack);
             }
 
             internal void Open(Button button, IEnumerable<uint> expected)
             {
                 var prompt = _duel.ActivePrompt;
                 Click(button);
+                VerifyOpened(prompt, expected);
+            }
+
+            private void VerifyOpened(DuelPrompt prompt, IEnumerable<uint> expected)
+            {
                 Require(Modals.ZoneViewRoot.activeSelf && Field.IsBrowsingZone, "The stack button did not open its zone browser.");
                 uint[] wanted = expected.ToArray();
                 Require(VisibleCards.Select(card => card.CurrentCode).SequenceEqual(wanted),
@@ -289,6 +395,8 @@ namespace YGOPortable.Editor
                 Field.UnbindSession();
                 SetPrivate(_controller, "_session", null);
                 UnityEngine.Object.DestroyImmediate(_canvas);
+                if (_camera != null) UnityEngine.Object.DestroyImmediate(_camera.gameObject);
+                if (_frame != null) UnityEngine.Object.DestroyImmediate(_frame);
             }
         }
 

@@ -25,8 +25,11 @@ namespace YGOPortable.UI
         private RectTransform _modalBody;
         private RectTransform _modalFooter;
         private CanvasGroup _promptInput;
-        private Image _promptShade;
-        private RectTransform _zoneShortcuts;
+        private DuelPromptBackdrop _promptShade;
+        private RectTransform _fieldViewTab;
+        private Image _fieldViewIcon;
+        private Text _fieldViewLabel;
+        private bool _chainPrompt;
         private const float ChainCardWidth = 78f;
         private const float ChainCardGap = 7f;
         private const float ChoiceCardWidth = 113f;
@@ -46,10 +49,10 @@ namespace YGOPortable.UI
 
         // Zone viewer refs
         private Text _zoneTitle;
+        private Image _zoneIcon;
         private RectTransform _zoneGrid;
         private ScrollRect _zoneScroll;
         private Text _zoneEmpty;
-        private Action<uint> _openOwnZone;
 
         // Result refs
         private Image _resCrown;
@@ -72,6 +75,8 @@ namespace YGOPortable.UI
 
         public bool IsPromptOpen => ModalRoot != null && ModalRoot.activeSelf;
         public bool IsZoneViewerOpen => ZoneViewRoot != null && ZoneViewRoot.activeSelf;
+        internal bool IsShowingField => IsPromptOpen && _promptShade.ShowingField;
+        private bool CanAnswerPrompt => IsPromptOpen && !IsZoneViewerOpen && !IsShowingField;
 
         public DuelPromptModals(Transform canvasParent, Action<uint> onInspectCard, Action<byte[]> onSubmitResponse)
         {
@@ -88,7 +93,14 @@ namespace YGOPortable.UI
             CloseZoneViewer();
         }
 
-        internal void SetOwnZoneShortcuts(Action<uint> openOwnZone) => _openOwnZone = openOwnZone;
+        internal void SetBrowsablePiles(params DuelZoneImage[] piles) => _promptShade.BrowsablePiles = piles;
+
+        internal bool IsPointOverBrowsablePile(Vector2 point)
+        {
+            var canvas = _promptShade.canvas;
+            var camera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+            return _promptShade.IsPointOverPile(point, camera);
+        }
 
         public void HideResult()
         {
@@ -127,7 +139,9 @@ namespace YGOPortable.UI
             var dim = LotdUiKit.FillRect("Modal_DuelPrompt", parent);
             ModalRoot = dim.gameObject;
             _promptInput = ModalRoot.AddComponent<CanvasGroup>();
-            _promptShade = LotdUiKit.AddImage(dim.gameObject, LotdUiKit.WhiteSprite, Color.clear);
+            var shade = LotdUiKit.FillRect("Shade", dim);
+            _promptShade = shade.gameObject.AddComponent<DuelPromptBackdrop>();
+            _promptShade.sprite = LotdUiKit.WhiteSprite;
 
             _modalBox = DuelStyle.Panel(dim, "Win", new Vector2(.235f, .17f), new Vector2(.845f, .474f),
                 fill: new Color(.022f, .038f, .054f, .98f), border: new Color(.45f, .65f, .75f, .58f));
@@ -146,20 +160,40 @@ namespace YGOPortable.UI
             _modalFooter = LotdUiKit.CreateRect("Footer", _modalBox, new Vector2(.62f, .028f), new Vector2(.98f, .183f), Vector2.zero, Vector2.zero);
 
             BuildChainPicker(dim);
-            _zoneShortcuts = LotdUiKit.CreateRect("ZoneShortcuts", dim, new Vector2(.595f, .038f),
-                new Vector2(.978f, .106f), Vector2.zero, Vector2.zero);
-            AddZoneShortcut(_zoneShortcuts, "Grave", "내 묘지", YgoConstants.LOCATION_GRAVE, 0);
-            AddZoneShortcut(_zoneShortcuts, "Extra", "내 엑스트라 덱", YgoConstants.LOCATION_EXTRA, 1);
-            AddZoneShortcut(_zoneShortcuts, "Banished", "내 제외 존", YgoConstants.LOCATION_REMOVED, 2);
-
+            _fieldViewTab = LotdUiKit.FillRect("FieldView", dim);
+            var button = DuelStyle.Button(_fieldViewTab, "B", "", ToggleFieldView, 14);
+            _fieldViewLabel = button.GetComponentInChildren<Text>();
+            _fieldViewLabel.rectTransform.anchorMin = new Vector2(.30f, 0f);
+            _fieldViewLabel.rectTransform.anchorMax = new Vector2(.97f, 1f);
+            _fieldViewLabel.rectTransform.offsetMin = _fieldViewLabel.rectTransform.offsetMax = Vector2.zero;
+            var icon = LotdUiKit.CreateRect("Icon", button.transform, new Vector2(.06f, .14f),
+                new Vector2(.28f, .86f), Vector2.zero, Vector2.zero);
+            _fieldViewIcon = LotdUiKit.AddImage(icon.gameObject, DuelVisualAssets.PromptFieldArrow, Color.white, true, false);
             ModalRoot.SetActive(false);
         }
 
-        private void AddZoneShortcut(Transform parent, string name, string label, uint location, int column)
+        private void ToggleFieldView()
         {
-            var tile = LotdUiKit.CreateRect(name, parent, new Vector2(column / 3f, 0f),
-                new Vector2((column + 1) / 3f, 1f), new Vector2(3f, 0f), new Vector2(-3f, 0f));
-            DuelStyle.Button(tile, "B", label, () => _openOwnZone?.Invoke(location), 14);
+            if (!IsPromptOpen || IsZoneViewerOpen) return;
+            LotdAudio.PlayClick();
+            EventSystem.current?.SetSelectedGameObject(null);
+            SetFieldView(!IsShowingField);
+        }
+
+        private void SetFieldView(bool showing)
+        {
+            _promptShade.ShowingField = showing;
+            _promptShade.color = showing ? Color.clear : new Color(0f, .02f, .07f, .11f);
+            _chainBox.gameObject.SetActive(_chainPrompt && !showing);
+            _modalBox.gameObject.SetActive(!_chainPrompt && !showing);
+            Vector2 corner = _chainPrompt ? _chainBox.anchorMax : _modalBox.anchorMax;
+            _fieldViewTab.anchorMin = showing ? new Vector2(.777f, .112f) : corner - new Vector2(.121f, 0f);
+            _fieldViewTab.anchorMax = showing ? new Vector2(.898f, .171f) : corner + new Vector2(0f, .059f);
+            _fieldViewLabel.text = showing ? "선택창 보기" : "필드 보기";
+            var glow = showing ? DuelVisualAssets.PromptFieldGlow : null;
+            _fieldViewIcon.sprite = glow ?? DuelVisualAssets.PromptFieldArrow;
+            _fieldViewIcon.enabled = _fieldViewIcon.sprite != null;
+            _fieldViewIcon.rectTransform.localRotation = Quaternion.Euler(0f, 0f, glow != null ? 0f : showing ? 90f : -90f);
         }
 
         private void BuildChainPicker(Transform parent)
@@ -201,15 +235,20 @@ namespace YGOPortable.UI
             var footer = LotdUiKit.CreateRect("Footer", _chainBox, new Vector2(.021f, .026f), new Vector2(.977f, .181f),
                 Vector2.zero, Vector2.zero);
             var pass = LotdUiKit.CreateRect("Pass", footer, new Vector2(.655f, 0f), new Vector2(.817f, 1f), Vector2.zero, Vector2.zero);
-            _chainPass = DuelStyle.Button(pass, "B", "패스", OnModalCloseClicked, 14);
+            _chainPass = DuelStyle.Button(pass, "B", "취소", OnModalCloseClicked, 14);
             var activate = LotdUiKit.CreateRect("Activate", footer, new Vector2(.836f, 0f), Vector2.one, Vector2.zero, Vector2.zero);
-            _chainActivate = DuelStyle.Button(activate, "B", "발동", ConfirmChainChoice, 14, gold: true);
+            _chainActivate = DuelStyle.Button(activate, "B", "효과 발동", ConfirmChainChoice, 14, gold: true);
             _chainBox.gameObject.SetActive(false);
         }
 
         public bool TryCancelOrPass()
         {
             if (!IsPromptOpen || IsZoneViewerOpen || _curPrompt == null) return false;
+            if (IsShowingField)
+            {
+                ToggleFieldView();
+                return true;
+            }
 
             if (_curPrompt.messageType == YgoConstants.MSG_SELECT_CHAIN)
             {
@@ -240,7 +279,7 @@ namespace YGOPortable.UI
 
         public bool TryConfirm()
         {
-            if (!IsPromptOpen || IsZoneViewerOpen || _curPrompt == null) return false;
+            if (!CanAnswerPrompt || _curPrompt == null) return false;
 
             if (_curPrompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN || _curPrompt.messageType == YgoConstants.MSG_SELECT_YESNO)
             {
@@ -293,23 +332,8 @@ namespace YGOPortable.UI
                 return;
             }
 
-            bool chain = prompt.messageType == YgoConstants.MSG_SELECT_CHAIN ||
+            _chainPrompt = prompt.messageType == YgoConstants.MSG_SELECT_CHAIN ||
                 prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN;
-            _chainBox.gameObject.SetActive(chain);
-            _modalBox.gameObject.SetActive(!chain);
-            _promptShade.color = new Color(0f, .02f, .07f, .11f);
-            _zoneShortcuts.anchorMin = chain ? new Vector2(.247f, .221f) : new Vector2(.247f, .179f);
-            _zoneShortcuts.anchorMax = chain ? new Vector2(.619f, .262f) : new Vector2(.599f, .225f);
-            ModalRoot.transform.SetAsLastSibling();
-            ModalRoot.SetActive(true);
-            CardAnimationManager.Instance?.BringToFront();
-
-            if (chain)
-            {
-                RenderChainPicker(session, prompt);
-                return;
-            }
-
             bool tall = prompt.messageType == YgoConstants.MSG_ANNOUNCE_CARD || prompt.messageType == YgoConstants.MSG_ANNOUNCE_RACE;
             _modalBox.anchorMax = new Vector2(.845f, tall ? .626f : .474f);
             _modalHeader.anchorMin = new Vector2(0f, tall ? .873f : .81f);
@@ -317,6 +341,16 @@ namespace YGOPortable.UI
             _modalBody.anchorMax = new Vector2(.98f, tall ? .855f : .785f);
             _modalFooter.anchorMin = new Vector2(.62f, tall ? .019f : .028f);
             _modalFooter.anchorMax = new Vector2(.98f, tall ? .122f : .183f);
+            SetFieldView(false);
+            ModalRoot.transform.SetAsLastSibling();
+            ModalRoot.SetActive(true);
+            CardAnimationManager.Instance?.BringToFront();
+
+            if (_chainPrompt)
+            {
+                RenderChainPicker(session, prompt);
+                return;
+            }
 
             switch (prompt.messageType)
             {
@@ -365,7 +399,7 @@ namespace YGOPortable.UI
 
         private void Submit(byte[] bytes)
         {
-            if (!IsPromptOpen || IsZoneViewerOpen) return;
+            if (!CanAnswerPrompt) return;
             ModalRoot.SetActive(false);
             _onSubmitResponse?.Invoke(bytes);
         }
@@ -492,7 +526,7 @@ namespace YGOPortable.UI
 
             void Select(int index)
             {
-                if (!IsPromptOpen || IsZoneViewerOpen || !ReferenceEquals(_curPrompt, prompt)) return;
+                if (!CanAnswerPrompt || !ReferenceEquals(_curPrompt, prompt)) return;
                 if (_chainSelection >= 0) frames[_chainSelection].effectColor = DuelStyle.BorderColor;
                 _chainSelection = index;
                 frames[index].effectColor = DuelStyle.Gold;
@@ -506,35 +540,75 @@ namespace YGOPortable.UI
                 _onInspectCard?.Invoke(item.code);
             }
 
-            for (int i = 0; i < choices.Count; i++)
+            const float groupPadding = 10f;
+            float stripWidth = 6f - ChainCardGap;
+            var groups = Enumerable.Range(0, sources.Length).GroupBy(i => (sources[i].controller, sources[i].location));
+            foreach (var group in groups)
             {
-                int index = i;
-                var item = choices[index];
-                var tile = CreateCardStripTile(_chainCards, $"Ch_{index}", ChainCardWidth);
-                frames[index] = tile.GetComponent<Outline>();
-
-                var art = LotdUiKit.CreateRect("Card", tile, new Vector2(.08f, .17f), new Vector2(.92f, .97f),
-                    Vector2.zero, Vector2.zero);
-                CompositeCardView.Create(art, "V", duelArtwork: true).SetCard(item.code);
-
-                var source = sources[index];
-                string label = YgoConstants.GetLocationNameKR(source.location);
-                if (sourceCounts[source] > 1)
+                var (controller, location) = group.Key;
+                int count = group.Count();
+                float width = count * ChainCardWidth + (count - 1) * ChainCardGap + groupPadding;
+                var row = CreateChainGroup(location, controller != session.HumanPlayerIndex, width);
+                stripWidth += width + ChainCardGap;
+                foreach (int index in group)
                 {
-                    sourceNumbers.TryGetValue(source, out int number);
-                    sourceNumbers[source] = ++number;
-                    label += $" · {number}";
+                    var tile = CreateCardStripTile(row, $"Ch_{index}", ChainCardWidth);
+                    frames[index] = tile.GetComponent<Outline>();
+                    var source = sources[index];
+                    bool duplicate = sourceCounts[source] > 1;
+                    var art = LotdUiKit.CreateRect("Card", tile, new Vector2(.055f, duplicate ? .16f : .035f),
+                        new Vector2(.945f, .975f), Vector2.zero, Vector2.zero);
+                    CompositeCardView.Create(art, "V", duelArtwork: true).SetCard(choices[index].code);
+
+                    if (duplicate)
+                    {
+                        sourceNumbers.TryGetValue(source, out int number);
+                        sourceNumbers[source] = ++number;
+                        var caption = LotdUiKit.CreateRect("EffectNumber", tile, new Vector2(.04f, .01f),
+                            new Vector2(.96f, .16f), Vector2.zero, Vector2.zero);
+                        LotdUiKit.AddFittedText(caption, "Text", $"효과 {number}", 11, 8, TextAnchor.MiddleCenter, DuelStyle.Muted);
+                    }
+                    var button = tile.gameObject.AddComponent<Button>();
+                    button.targetGraphic = tile.GetComponent<Image>();
+                    button.onClick.AddListener(() => Select(index));
                 }
-                var caption = LotdUiKit.CreateRect("Source", tile, new Vector2(.05f, .015f), new Vector2(.95f, .17f),
-                    Vector2.zero, Vector2.zero);
-                LotdUiKit.AddFittedText(caption, "Text", label, 11, 8, TextAnchor.MiddleCenter, DuelStyle.Muted);
-                var button = tile.gameObject.AddComponent<Button>();
-                button.targetGraphic = tile.GetComponent<Image>();
-                button.onClick.AddListener(() => Select(index));
             }
 
-            ResetCardStrip(_chainCardScroll, choices.Count, ChainCardWidth, ChainCardGap);
+            ResetCardStrip(_chainCardScroll, stripWidth);
             if (choices.Count > 0) Select(0);
+        }
+
+        private RectTransform CreateChainGroup(uint location, bool opponent, float width)
+        {
+            var group = LotdUiKit.FillRect("Source_" + location, _chainCards);
+            group.gameObject.AddComponent<LayoutElement>().preferredWidth = width;
+            var groupTone = opponent ? new Color(.69f, .21f, .24f) : new Color(.23f, .43f, .77f);
+            var edge = LotdUiKit.CreateRect("GroupFrame", group, Vector2.zero, Vector2.one,
+                Vector2.zero, new Vector2(0f, -21f));
+            var tint = new Color(groupTone.r, groupTone.g, groupTone.b, .57f);
+            LotdUiKit.AddImage(edge.gameObject, LotdUiKit.WhiteSprite, tint, false, false);
+            var row = LotdUiKit.FillRect("Cards", edge, 5f);
+            var layout = row.gameObject.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = ChainCardGap;
+            layout.childControlWidth = layout.childControlHeight = layout.childForceExpandHeight = true;
+            layout.childForceExpandWidth = false;
+
+            var icon = DuelVisualAssets.PromptZoneIcon(location, opponent);
+            var tab = LotdUiKit.CreateRect("LocationTab", group, Vector2.up, Vector2.up,
+                new Vector2(0f, -21f), new Vector2(icon != null ? 45f : 72f, 0f));
+            LotdUiKit.AddImage(tab.gameObject, DuelVisualAssets.PromptGroupLabel, groupTone, false, false);
+            if (icon != null)
+            {
+                var iconArea = LotdUiKit.CreateRect("Icon", tab, Vector2.zero, Vector2.up,
+                    new Vector2(5f, 0f), new Vector2(25f, 0f));
+                LotdUiKit.AddImage(iconArea.gameObject, icon, Color.white, true, false);
+            }
+            else
+            {
+                LotdUiKit.AddFittedText(tab, "Location", YgoConstants.GetLocationNameKR(location), 11, 8,
+                    TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
+            }
+            return row;
         }
 
         private static string CardSourceLabel(DuelSession session, SelectableCardItem card) =>
@@ -602,7 +676,7 @@ namespace YGOPortable.UI
             button.targetGraphic = tile.GetComponent<Image>();
             button.onClick.AddListener(() =>
             {
-                if (!IsPromptOpen || IsZoneViewerOpen || !ReferenceEquals(_curPrompt, p)) return;
+                if (!CanAnswerPrompt || !ReferenceEquals(_curPrompt, p)) return;
                 if (code != 0) _onInspectCard?.Invoke(code);
                 if (_selectedIndices.Contains(idx))
                 {
@@ -750,7 +824,7 @@ namespace YGOPortable.UI
             button.targetGraphic = tile.GetComponent<Image>();
             button.onClick.AddListener(() =>
             {
-                if (!IsPromptOpen || IsZoneViewerOpen || !ReferenceEquals(_curPrompt, prompt)) return;
+                if (!CanAnswerPrompt || !ReferenceEquals(_curPrompt, prompt)) return;
                 if (code != 0) _onInspectCard?.Invoke(code);
                 LotdAudio.PlayClick();
                 Submit(PackTwoInts(1, nativeIndex));
@@ -1043,6 +1117,9 @@ namespace YGOPortable.UI
             LotdUiKit.AddImage(accent.gameObject, LotdUiKit.WhiteSprite, DuelStyle.Player, false, false);
             var titleBand = LotdUiKit.CreateRect("TitleBand", hdr, new Vector2(0.025f, 0.12f), new Vector2(0.80f, 0.88f),
                 Vector2.zero, Vector2.zero);
+            var zoneIcon = LotdUiKit.CreateRect("LocationIcon", titleBand, Vector2.zero, Vector2.up,
+                Vector2.zero, new Vector2(31f, 0f));
+            _zoneIcon = LotdUiKit.AddImage(zoneIcon.gameObject, null, Color.white, true, false);
             _zoneTitle = LotdUiKit.AddFittedText(titleBand, "T", "존 확인", 20, 11, TextAnchor.MiddleLeft,
                 DuelStyle.Gold, FontStyle.Bold);
 
@@ -1098,7 +1175,8 @@ namespace YGOPortable.UI
             bool newestFirst = true,
             Func<LiveCardState, bool> hasCardActions = null,
             Action<LiveCardState> onOpenCardActions = null,
-            Func<bool> canUseCardActions = null)
+            Func<bool> canUseCardActions = null,
+            Sprite icon = null)
         {
             StartZoneViewer();
             int count = cards?.Count ?? 0;
@@ -1110,7 +1188,7 @@ namespace YGOPortable.UI
                 bool actionable = !hidden && onOpenCardActions != null && hasCardActions?.Invoke(card) == true;
                 AddZoneCardTile(hidden ? 0u : card.code, hidden, card, actionable, onOpenCardActions, canUseCardActions);
             }
-            FinishZoneViewer(title);
+            FinishZoneViewer(title, icon);
         }
 
         public void ShowCodeListViewer(string title, IReadOnlyList<uint> codes)
@@ -1132,10 +1210,13 @@ namespace YGOPortable.UI
             ZoneViewRoot.SetActive(true);
         }
 
-        private void FinishZoneViewer(string title)
+        private void FinishZoneViewer(string title, Sprite icon = null)
         {
             int count = _zoneGrid.childCount;
             _zoneTitle.text = $"{title}   ·   {count}장";
+            _zoneIcon.sprite = icon;
+            _zoneIcon.enabled = icon != null;
+            _zoneTitle.rectTransform.offsetMin = icon != null ? new Vector2(34f, 0f) : Vector2.zero;
             _zoneEmpty.gameObject.SetActive(count == 0);
             _zoneScroll.StopMovement();
             _zoneGrid.anchoredPosition = Vector2.zero;
@@ -1355,11 +1436,13 @@ namespace YGOPortable.UI
             return scroll;
         }
 
-        private static void ResetCardStrip(ScrollRect scroll, int count, float width, float gap)
+        private static void ResetCardStrip(ScrollRect scroll, int count, float width, float gap) =>
+            ResetCardStrip(scroll, 6f + count * width + Mathf.Max(0, count - 1) * gap);
+
+        private static void ResetCardStrip(ScrollRect scroll, float stripWidth)
         {
             scroll.StopMovement();
             scroll.content.anchoredPosition = Vector2.zero;
-            float stripWidth = 6f + count * width + Mathf.Max(0, count - 1) * gap;
             scroll.horizontalScrollbar.gameObject.SetActive(stripWidth > scroll.viewport.rect.width);
         }
 
@@ -1445,5 +1528,24 @@ namespace YGOPortable.UI
             while (v != 0) { v &= v - 1; c++; }
             return c;
         }
+    }
+
+    internal sealed class DuelPromptBackdrop : Image
+    {
+        internal DuelZoneImage[] BrowsablePiles { get; set; } = Array.Empty<DuelZoneImage>();
+        internal bool ShowingField { get; set; }
+
+        internal bool IsPointOverPile(Vector2 screenPoint, Camera eventCamera)
+        {
+            foreach (var pile in BrowsablePiles)
+            {
+                if (pile != null && pile.isActiveAndEnabled && pile.IsRaycastLocationValid(screenPoint, eventCamera))
+                    return true;
+            }
+            return false;
+        }
+
+        public override bool IsRaycastLocationValid(Vector2 screenPoint, Camera eventCamera) =>
+            !ShowingField || !IsPointOverPile(screenPoint, eventCamera);
     }
 }

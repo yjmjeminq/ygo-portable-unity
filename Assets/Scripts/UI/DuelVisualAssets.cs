@@ -21,6 +21,13 @@ namespace YGOPortable.UI
         internal static Sprite HandGlow { get; } = LoadHudSprite("HandGlow", Vector4.one * 20f);
         internal static Sprite ChainLinks { get; } = LoadHudSprite("ChainLinks");
         internal static Sprite ChainFrame { get; } = LoadHudSprite("ChainFrame", Vector4.one * 48f);
+        internal static Sprite PromptFieldGlow { get; } = LoadHudSprite("PromptFieldGlow");
+        internal static Sprite PromptFieldArrow { get; } = LoadHudSprite("PromptFieldArrow");
+        internal static Sprite PromptGroupLabel { get; } = LoadHudSprite("PromptGroupLabel");
+        private static readonly Sprite PromptGrave = LoadHudSprite("PromptGrave");
+        private static readonly Sprite PromptBanished = LoadHudSprite("PromptBanished");
+        private static readonly Sprite[] PlayerZoneIcons = LoadZoneIcons("Player");
+        private static readonly Sprite[] OpponentZoneIcons = LoadZoneIcons("Opponent");
         internal static Sprite PhaseBannerPlayer { get; } = LoadHudSprite("PhaseBannerPlayer");
         internal static Sprite PhaseBannerOpponent { get; } = LoadHudSprite("PhaseBannerOpponent");
         internal static Sprite ChainActive { get; } = LoadHudSprite("ChainActive");
@@ -58,6 +65,38 @@ namespace YGOPortable.UI
             YgoConstants.PHASE_BATTLE_START or YgoConstants.PHASE_BATTLE_STEP or YgoConstants.PHASE_BATTLE
                 or YgoConstants.PHASE_DAMAGE or YgoConstants.PHASE_DAMAGE_CAL => BattlePhase,
             _ => null,
+        };
+
+        internal static Sprite ZoneIcon(uint location, bool opponent)
+        {
+            var icons = opponent ? OpponentZoneIcons : PlayerZoneIcons;
+            return location switch
+            {
+                YgoConstants.LOCATION_HAND => icons[0],
+                YgoConstants.LOCATION_DECK => icons[1],
+                YgoConstants.LOCATION_GRAVE => icons[2],
+                YgoConstants.LOCATION_EXTRA => icons[3],
+                YgoConstants.LOCATION_REMOVED => icons[4],
+                YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE => icons[5],
+                _ => null,
+            };
+        }
+
+        internal static Sprite PromptZoneIcon(uint location, bool opponent)
+        {
+            var icon = location switch
+            {
+                YgoConstants.LOCATION_GRAVE => PromptGrave,
+                YgoConstants.LOCATION_REMOVED => PromptBanished,
+                _ => null,
+            };
+            return icon ?? ZoneIcon(location, opponent);
+        }
+
+        private static Sprite[] LoadZoneIcons(string side) => new[]
+        {
+            LoadHudSprite("ZoneHand" + side), LoadHudSprite("ZoneDeck" + side), LoadHudSprite("ZoneGrave" + side),
+            LoadHudSprite("ZoneExtra" + side), LoadHudSprite("ZoneBanished" + side), LoadHudSprite("ZoneField" + side),
         };
 
         private static Sprite LoadHudSprite(string name, Vector4 border = default) =>

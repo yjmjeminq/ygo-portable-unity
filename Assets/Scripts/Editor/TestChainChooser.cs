@@ -17,10 +17,11 @@ namespace YGOPortable.Editor
             using var duel = new DuelSession();
             VerifyDuplicateEffectsAndZoneViewer(duel);
             VerifySingleEffect(duel);
+            VerifyGroupedLocations(duel);
             VerifyScrollableChoices(duel);
             VerifyEmptyChain(duel);
             VerifyMaterialChoices(duel);
-            Debug.Log("[VERIFY CHAIN CHOOSER] Compact layout, duplicate effects, zone overlay, empty chain and material selection checks passed.");
+            Debug.Log("[VERIFY CHAIN CHOOSER] Grouped locations, native indices, duplicate effects, zone overlay, empty chain and material selection passed.");
         }
 
         internal static void SubmitNativeChoice(DuelSession duel, int index)
@@ -128,6 +129,31 @@ namespace YGOPortable.Editor
                 "An optional chain with no candidates opened an empty chooser.");
             Require(view.Responses.SequenceEqual(new[] { -1 }),
                 "An empty optional chain submitted an invalid response.");
+        }
+
+        private static void VerifyGroupedLocations(DuelSession duel)
+        {
+            using var view = new ChainView();
+            var prompt = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_CHAIN, playerId = 0 };
+            foreach (uint loc in new[] { YgoConstants.LOCATION_GRAVE, YgoConstants.LOCATION_HAND, YgoConstants.LOCATION_GRAVE })
+            {
+                prompt.candidates.Add(new SelectableCardItem
+                {
+                    code = LadyLabrynth,
+                    location = loc,
+                    sequence = (uint)prompt.candidates.Count,
+                    description = (ulong)LadyLabrynth << 20,
+                });
+            }
+            view.Show(duel, prompt);
+            var list = view.Modals.ModalRoot.transform.Find("ChainWin/Cards/Viewport/Content");
+            Require(list.childCount == 2 && list.GetChild(0).Find("GroupFrame/Cards/Ch_0") != null &&
+                list.GetChild(0).Find("GroupFrame/Cards/Ch_2") != null && list.GetChild(1).Find("GroupFrame/Cards/Ch_1") != null,
+                "Grouping by location did not retain the original candidate identities.");
+            view.SelectChoice(2, LadyLabrynth);
+            view.VerifyEffect(prompt.candidates[2]);
+            view.ConfirmChoice();
+            Require(view.Responses.SequenceEqual(new[] { 2 }), "A grouped chain option sent its visual index to the engine.");
         }
 
         private static void VerifyScrollableChoices(DuelSession duel)
