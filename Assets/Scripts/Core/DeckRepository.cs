@@ -16,6 +16,8 @@ namespace YGOPortable.Core
         public string name;
         public string bio;
         public string portrait;
+        public uint portraitCard;
+        public string[] aliases;
         public bool isMeta2026;
     }
 
@@ -29,6 +31,7 @@ namespace YGOPortable.Core
         public string subtitle;
         public uint sigCard;
         public bool isMeta2026;
+        public bool featured;
         public uint[] main;
         public uint[] extra;
         public uint[] side;
@@ -95,6 +98,8 @@ namespace YGOPortable.Core
                         }
                         list.Add(d);
                     }
+                    foreach (int charId in _decksByChar.Keys.ToArray())
+                        _decksByChar[charId] = _decksByChar[charId].OrderByDescending(d => d.featured).ToList();
                 }
             }
 

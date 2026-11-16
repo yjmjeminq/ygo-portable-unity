@@ -172,7 +172,7 @@ namespace YGOPortable.UI
 
             Root.SetActive(true);
             _oppNameText.text = opponent?.name ?? opponentDeck?.title ?? "AI 듀얼리스트";
-            _oppBustImg.sprite = opponent != null ? LotdUiKit.LoadSprite($"LOTD/Busts/{opponent.portrait}") : null;
+            _oppBustImg.sprite = LotdUiKit.LoadOpponentPortrait(opponent);
             _oppBustImg.enabled = _oppBustImg.sprite != null;
             _turnBadgeText.text = "턴 1";
             SetPhasePlate(YgoConstants.PHASE_DRAW, false);

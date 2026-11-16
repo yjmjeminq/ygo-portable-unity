@@ -21,6 +21,7 @@ namespace YGOPortable.UI
 
         private static Font _fontKR;
         private static readonly Dictionary<string, Sprite> _spriteCache = new Dictionary<string, Sprite>();
+        private static readonly Dictionary<uint, Sprite> _opponentCardPortraits = new Dictionary<uint, Sprite>();
         private static Sprite _whiteSprite;
 
         public static Font FontKR
@@ -63,6 +64,24 @@ namespace YGOPortable.UI
             }
             if (sp != null) _spriteCache[resourcesPath] = sp;
             return sp;
+        }
+
+        public static Sprite LoadOpponentPortrait(OpponentCharacter opponent)
+        {
+            if (opponent == null) return null;
+            if (!string.IsNullOrEmpty(opponent.portrait))
+            {
+                var bust = LoadSprite($"LOTD/Busts/{opponent.portrait}");
+                if (bust != null) return bust;
+            }
+            if (opponent.portraitCard != 0)
+            {
+                // These images also live on the duel HUD after the opponent screen closes.
+                if (!_opponentCardPortraits.TryGetValue(opponent.portraitCard, out var cardArt) || cardArt == null)
+                    _opponentCardPortraits[opponent.portraitCard] = cardArt = CardArtLoader.RetainArtwork(opponent.portraitCard);
+                if (cardArt != null) return cardArt;
+            }
+            return LoadSprite("LOTD/Busts/atem_neutral");
         }
 
         public static Sprite GetRaceSprite(ulong race)
@@ -271,7 +290,7 @@ namespace YGOPortable.UI
         }
 
         public static Dropdown CreateLotdDropdown(Transform parent, string name, IReadOnlyList<string> choices,
-            Action<int> onChanged)
+            Action<int> onChanged, bool dynamicChoices = false)
         {
             const float rowHeight = 28f;
             const int visibleRows = 7;
@@ -281,12 +300,13 @@ namespace YGOPortable.UI
             caption.rectTransform.offsetMin = new Vector2(7f, 0f);
             caption.rectTransform.offsetMax = new Vector2(-17f, 0f);
             caption.resizeTextForBestFit = true;
-            caption.resizeTextMinSize = 10;
+            caption.resizeTextMinSize = 9;
             caption.resizeTextMaxSize = 13;
+            caption.supportRichText = false;
             var arrow = AddText(root, "Arrow", "▼", 10, TextAnchor.MiddleRight, GoldAccent);
             arrow.rectTransform.offsetMax = new Vector2(-5f, 0f);
 
-            float height = Mathf.Min(visibleRows, choices.Count) * rowHeight;
+            float height = (dynamicChoices ? visibleRows : Mathf.Min(visibleRows, choices.Count)) * rowHeight;
             var template = CreateBorderedPanel(root, "Options", Vector2.zero, Vector2.right,
                 new Vector2(0f, -height - 4f), new Vector2(0f, -4f), PanelNavy, CyanAccent);
             template.pivot = new Vector2(0.5f, 1f);
@@ -295,7 +315,7 @@ namespace YGOPortable.UI
             scroll.horizontal = false;
             scroll.scrollSensitivity = rowHeight;
             scroll.movementType = ScrollRect.MovementType.Clamped;
-            bool needsScrollbar = choices.Count > visibleRows;
+            bool needsScrollbar = dynamicChoices || choices.Count > visibleRows;
             var viewport = CreateRect("Viewport", template, Vector2.zero, Vector2.one,
                 Vector2.zero, new Vector2(needsScrollbar ? -15f : 0f, 0f));
             viewport.gameObject.AddComponent<RectMask2D>();
@@ -306,6 +326,7 @@ namespace YGOPortable.UI
             scroll.viewport = viewport;
             scroll.content = content;
             if (needsScrollbar) scroll.verticalScrollbar = AddVerticalScrollbar(template);
+            if (dynamicChoices) scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHideAndExpandViewport;
 
             var item = FillRect("Item", content);
             var itemBackground = AddImage(item.gameObject, WhiteSprite, new Color(0.08f, 0.20f, 0.39f));
@@ -315,6 +336,10 @@ namespace YGOPortable.UI
             var label = AddText(item, "Label", "", 13, TextAnchor.MiddleLeft, TextPrimary);
             label.rectTransform.offsetMin = new Vector2(7f, 0f);
             label.rectTransform.offsetMax = new Vector2(-2f, 0f);
+            label.resizeTextForBestFit = true;
+            label.resizeTextMinSize = 9;
+            label.resizeTextMaxSize = 13;
+            label.supportRichText = false;
             var toggle = item.gameObject.AddComponent<Toggle>();
             toggle.targetGraphic = itemBackground;
             toggle.graphic = selectedImage;

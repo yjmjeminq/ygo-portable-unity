@@ -16,6 +16,7 @@ import shutil
 import sqlite3
 import struct
 import sys
+from collections import Counter, defaultdict
 from PIL import Image
 
 UNITY_ROOT = pathlib.Path(r"c:\jeminFolder\자체개발\ygo-portable-unity")
@@ -32,6 +33,7 @@ BUSTS_SRC = UNITY_ROOT / "Assets" / "Textures" / "Characters" / "Busts"
 ORIG_YDC_DIR = UNITY_ROOT / "Assets" / "Data" / "Decks" / "Original"
 META_DECKS_JSON = UNITY_ROOT / "Assets" / "Data" / "Decks" / "decks.json"
 META_CHARS_JSON = UNITY_ROOT / "Assets" / "Data" / "Decks" / "characters.json"
+OPPONENT_THEMES_JSON = pathlib.Path(__file__).with_name("opponent_themes.json")
 
 SERIES_NAMES = {
     0: "DM",
@@ -655,8 +657,125 @@ def resolve_portrait_name(key: str, bust_map: dict) -> str:
     return "atem_neutral"
 
 
-def build_opponents_db(lotd_to_pass: dict, all_codes: set, extra_deck_codes: set):
-    print("[4/5] Building opponents_db.json (20 [2026 Meta] + all LOTD Original) ...")
+def load_lotd_passcodes():
+    toc = parse_toc(YGO_PC / "YGO_2020.toc")
+    with (YGO_PC / "YGO_2020.dat").open("rb") as archive:
+        chunks = []
+        for entry in ("bin/CARD_Prop.bin", "bin/CARD_Pass.bin"):
+            offset, size = toc[entry]
+            archive.seek(offset)
+            chunks.append(archive.read(size))
+    props, codes = chunks
+    mapping = {}
+    for index in range(1, len(props) // 8):
+        lid = struct.unpack_from("<I", props, index * 8)[0] & 0x3FFF
+        if lid:
+            code = struct.unpack_from("<I", codes, index * 4)[0]
+            mapping[lid] = code or LOTD_MISSING_PASSCODES.get(lid, 0)
+    mod = YGO_PC / "Mods" / "2026-11-KR-Cards" / "Yu-Gi-Oh-Ex" / "cards.json"
+    for card in json.loads(mod.read_text(encoding="utf-8"))["cards"]:
+        lid = int(card.get("id") or 0)
+        code = int(card.get("password") or 0)
+        if lid and code:
+            mapping[lid] = code
+    return mapping
+
+
+def deck_signature(deck):
+    return tuple(tuple(sorted(deck[section])) for section in ("main", "extra"))
+
+
+def playable_deck(deck, extra_deck_codes):
+    return (40 <= len(deck["main"]) <= 60 and len(deck["extra"]) <= 15 and len(deck["side"]) <= 15
+            and not (set(deck["main"]) & extra_deck_codes) and set(deck["extra"]) <= extra_deck_codes)
+
+
+def apply_opponent_themes(characters, decks, cards, extra_deck_codes, bust_map):
+    catalog = json.loads(OPPONENT_THEMES_JSON.read_text(encoding="utf-8"))
+    char_by_id = {character["id"]: character for character in characters}
+    for raw_id, name in catalog["names"].items():
+        character = char_by_id[int(raw_id)]
+        if character["name"] != name:
+            character["aliases"] = [character["name"]]
+            character["name"] = name
+
+    for profile in catalog["characters"]:
+        cid = profile["id"]
+        if cid in char_by_id:
+            raise ValueError(f"Duplicate opponent character id {cid}")
+        series = profile["seriesIdx"]
+        portrait = profile.get("portrait", "")
+        portrait_card = profile.get("portraitCard", 0)
+        if series not in range(6) or (portrait and portrait.lower() not in bust_map):
+            raise ValueError(f"Bad series or portrait for {profile['name']}")
+        if not portrait and portrait_card not in cards:
+            raise ValueError(f"Missing portrait for {profile['name']}")
+        character = {**profile, "seriesName": SERIES_NAMES[series], "isMeta2026": False}
+        characters.append(character)
+        char_by_id[cid] = character
+
+    by_id = {deck["id"]: deck for deck in decks}
+    if len(by_id) != len(decks):
+        raise ValueError("Duplicate original opponent deck IDs")
+    for raw_id, label in catalog["deckLabels"].items():
+        deck = by_id[int(raw_id)]
+        deck.update(label)
+        if deck["sigCard"] not in deck["main"] + deck["extra"]:
+            raise ValueError(f"Missing ace for {deck['title']}")
+    signatures = defaultdict(set)
+    for deck in decks:
+        signatures[deck["charId"]].add(deck_signature(deck))
+
+    for recipe in catalog["decks"]:
+        cid = recipe["charId"]
+        character = char_by_id[cid]
+        did = recipe["id"]
+        if did in by_id:
+            raise ValueError(f"Duplicate opponent deck id {did}")
+        if "copy" in recipe:
+            original = by_id[recipe["copy"]]
+            main, extra, side = (original[section] for section in ("main", "extra", "side"))
+            signature = recipe.get("sigCard", original["sigCard"])
+        else:
+            main, extra, side = ([code for code, count in recipe.get(section, []) for _ in range(count)]
+                                 for section in ("main", "extra", "side"))
+            signature = recipe["sigCard"]
+        deck = {
+            "id": did, "charId": cid, "seriesIdx": character["seriesIdx"],
+            "title": recipe["title"], "subtitle": recipe.get("subtitle", "캐릭터 테마"),
+            "sigCard": signature, "isMeta2026": character["isMeta2026"], "featured": True,
+            "main": main, "extra": extra, "side": side,
+        }
+        in_deck = main + extra + side
+        if not set(in_deck) <= cards.keys() or signature not in main + extra or not playable_deck(deck, extra_deck_codes):
+            raise ValueError(f"Invalid opponent deck {did} ({deck['title']})")
+        if "copy" not in recipe:
+            copies = Counter(cards[code].get("alias") or code for code in in_deck)
+            if any(count > 3 for count in copies.values()):
+                raise ValueError(f"Too many copies of a card in {deck['title']}")
+        key = deck_signature(deck)
+        if key in signatures[cid]:
+            raise ValueError(f"Duplicate deck for {character['name']}: {deck['title']}")
+        signatures[cid].add(key)
+        decks.append(deck)
+        by_id[did] = deck
+
+    if any(profile["id"] not in signatures for profile in catalog["characters"]):
+        raise ValueError("An added opponent has no decks")
+    active = [c for c in characters if c["id"] in signatures]
+    incomplete = [(c["id"], c["name"]) for c in active if len(signatures[c["id"]]) < 2]
+    if incomplete:
+        raise ValueError(f"Opponents with fewer than two distinct decks: {incomplete}")
+    priority = catalog["featuredCharacters"] + [profile["id"] for profile in catalog["characters"]]
+    rank = {cid: index for index, cid in enumerate(priority)}
+    return sorted(active, key=lambda c: (c["seriesIdx"], rank.get(c["id"], len(rank))))
+
+
+def build_opponents_db(lotd_to_pass: dict, kr_cards):
+    print("[4/5] Building opponents_db.json ...")
+    cards = {card["code"]: card for card in kr_cards}
+    all_codes = cards.keys()
+    extra_deck_codes = {code for code, card in cards.items() if card["type"] & TYPE_EXTRA}
     bust_map = {}
     for p in sorted(BUSTS_SRC.glob("*.png")):
         bust_map[p.stem.lower()] = p.stem
@@ -766,16 +885,6 @@ def build_opponents_db(lotd_to_pass: dict, all_codes: set, extra_deck_codes: set
     # Append original LOTD characters
     all_chars.extend(char_list)
 
-    # Parse all 850 Original/*.ydc files
-    series_prefix_guess = {
-        "1classic": 0, "1dm": 0,
-        "2gx": 1,
-        "3_5ds": 2, "35ds": 2,
-        "4zexal": 3,
-        "5arcv": 4,
-        "6vrains": 5, "6dlc": 5,
-    }
-
     def read_ydc(path: pathlib.Path):
         data = path.read_bytes()
         off = 8
@@ -787,8 +896,7 @@ def build_opponents_db(lotd_to_pass: dict, all_codes: set, extra_deck_codes: set
         s = list(struct.unpack_from(f"<{n_s}H", data, off)); off += 2 * n_s
         return m, e, s
 
-    used_chars = set()
-    next_ydc_id = 1000
+    signatures = defaultdict(set)
     for idx, ydc in enumerate(sorted(ORIG_YDC_DIR.glob("*.ydc"))):
         stem = ydc.stem
         low = stem.lower()
@@ -796,34 +904,31 @@ def build_opponents_db(lotd_to_pass: dict, all_codes: set, extra_deck_codes: set
         main_p = convert_ids(m_l)
         extra_p = convert_ids(e_l)
         side_p = convert_ids(s_l)
-        if len(main_p) < 20:
-            continue
-
         meta = deck_meta_by_stem.get(low)
         if meta:
             did, series, sig_lid, char_id, title = meta
+            owner = char_by_id.get(char_id)
         else:
-            did = next_ydc_id; next_ydc_id += 1
-            series = 0
-            for pref, sidx in series_prefix_guess.items():
-                if low.startswith(pref):
-                    series = sidx
-                    break
+            parts = low.split("_")
+            owner = char_by_key.get(parts[-1])
+            if low.startswith("arcv_") and parts[-1] in ("a", "b") and len(parts) >= 4:
+                first, second = (char_by_key.get(key) for key in parts[-3:-1])
+                if first and second and first["seriesIdx"] == second["seriesIdx"] == 4:
+                    owner = first if parts[-1] == "a" else second
+            if owner is None:
+                continue
+            did = 10000 + idx
+            char_id = owner["id"]
             sig_lid = m_l[0] if m_l else 0
-            char_id = 1
-            parts = stem.split("_")
-            guess_key = parts[-1].lower()
-            for ck, co in char_by_key.items():
-                if guess_key and (ck == guess_key or ck.startswith(guess_key) or guess_key in ck):
-                    char_id = co["id"]
-                    break
             title = stem.replace("_", " ").title()
 
-        if char_id not in char_by_id:
-            char_id = 1
-        used_chars.add(char_id)
-        sig = lotd_to_pass.get(sig_lid, main_p[0])
-        all_decks.append({
+        if owner is None or not main_p:
+            continue
+        series = owner["seriesIdx"]
+        sig = lotd_to_pass.get(sig_lid, 0)
+        if sig not in main_p + extra_p:
+            sig = main_p[0]
+        deck = {
             "id": did,
             "charId": char_id,
             "seriesIdx": series,
@@ -834,16 +939,20 @@ def build_opponents_db(lotd_to_pass: dict, all_codes: set, extra_deck_codes: set
             "main": main_p,
             "extra": extra_p,
             "side": side_p,
-        })
+        }
+        key = deck_signature(deck)
+        if not playable_deck(deck, extra_deck_codes) or key in signatures[char_id]:
+            continue
+        signatures[char_id].add(key)
+        all_decks.append(deck)
 
-    # Keep all 20 meta chars + all original chars that have decks (or selectable portraits)
-    final_chars = [c for c in all_chars if c["isMeta2026"] or c["id"] in used_chars]
+    final_chars = apply_opponent_themes(all_chars, all_decks, cards, extra_deck_codes, bust_map)
     out_obj = {"characters": final_chars, "decks": all_decks}
     (STREAMING / "opponents_db.json").write_text(
         json.dumps(out_obj, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",
     )
-    print(f"  opponents_db.json: {len(final_chars)} characters, {len(all_decks)} decks (20 meta + {len(all_decks)-len(meta_decks)} original LOTD)")
+    print(f"  opponents_db.json: {len(final_chars)} characters, {len(all_decks)} selectable decks")
 
 
 def slice_dfymoo(dfymoo_path: pathlib.Path, png_path: pathlib.Path, out_dir: pathlib.Path, keep_prefix=None, apply_offset=False):
@@ -969,6 +1078,10 @@ def build_resources_lotd():
 
 
 def main():
+    if "--only-opponents" in sys.argv:
+        cards = json.loads((STREAMING / "cards_kr.json").read_text(encoding="utf-8"))["cards"]
+        build_opponents_db(load_lotd_passcodes(), cards)
+        return
     if "--only-resources" in sys.argv:
         build_resources_lotd()
         print("Resources preparation COMPLETE!")
@@ -976,8 +1089,7 @@ def main():
     all_codes, lotd_to_pass, mod_by_pass, _pk, _pl, kr_cards = build_cards()
     build_script_pack(all_codes)
     build_card_art(all_codes, lotd_to_pass, mod_by_pass)
-    extra_deck_codes = {card["code"] for card in kr_cards if card["type"] & TYPE_EXTRA}
-    build_opponents_db(lotd_to_pass, all_codes, extra_deck_codes)
+    build_opponents_db(lotd_to_pass, kr_cards)
     build_resources_lotd()
     print("Asset preparation COMPLETE!")
 

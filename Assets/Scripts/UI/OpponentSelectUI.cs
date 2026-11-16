@@ -15,7 +15,7 @@ namespace YGOPortable.UI
 
         private readonly GameAppController _app;
 
-        private int _seriesFilter = 6; // Default to [2026 메타] (-1 = All)
+        private int _seriesFilter;
         private string _searchQuery = "";
         private int _page = 0;
         private const int PageSize = 15; // 5x3 LOTD opponent frame grid
@@ -33,8 +33,11 @@ namespace YGOPortable.UI
         private Image _detailBust;
         private Text _detailName;
         private Text _detailBio;
-        private Text _oppDeckName;
+        private Dropdown _oppDeckDropdown;
         private Text _oppDeckStats;
+        private Text _oppDeckNote;
+        private Button _cloneOppButton;
+        private Button _startDuelButton;
         private CompositeCardView _sigCardPreview;
         private Text _myDeckLabel;
         private Text _pageLabel;
@@ -94,8 +97,8 @@ namespace YGOPortable.UI
                 new Vector2(0.02f, 0.825f), new Vector2(0.62f, 0.895f));
             (int sid, string label)[] tabs =
             {
-                (6, "2026 메타"), (0, "DM"), (1, "GX"), (2, "5D's"),
-                (3, "ZEXAL"), (4, "ARC-V"), (5, "VRAINS"), (-1, "전체")
+                (0, "DM"), (1, "GX"), (2, "5D's"), (3, "ZEXAL"),
+                (4, "ARC-V"), (5, "VRAINS"), (6, "2026 메타"), (-1, "전체")
             };
             float tw = 1f / tabs.Length;
             for (int i = 0; i < tabs.Length; i++)
@@ -161,8 +164,8 @@ namespace YGOPortable.UI
 
             var nameBox = LotdUiKit.CreateRect("NameBox", oppHeader,
                 new Vector2(0.43f, 0.04f), new Vector2(1f, 0.96f), Vector2.zero, Vector2.zero);
-            _detailName = LotdUiKit.AddText(LotdUiKit.CreateRect("N", nameBox, new Vector2(0, 0.62f), new Vector2(1, 1), Vector2.zero, Vector2.zero),
-                "N", "상대 선택", 21, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
+            _detailName = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("N", nameBox, new Vector2(0, 0.62f), new Vector2(1, 1), Vector2.zero, Vector2.zero),
+                "N", "상대 선택", 21, 13, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
             _detailBio = LotdUiKit.AddText(LotdUiKit.CreateRect("Bio", nameBox, new Vector2(0, 0.02f), new Vector2(1, 0.60f), Vector2.zero, Vector2.zero),
                 "B", "", 13, TextAnchor.UpperLeft, LotdUiKit.TextMuted);
 
@@ -177,17 +180,23 @@ namespace YGOPortable.UI
 
             var deckMeta = LotdUiKit.CreateRect("DeckMeta", oppDeckBox,
                 new Vector2(0.30f, 0.34f), new Vector2(0.98f, 0.95f), Vector2.zero, Vector2.zero);
-            _oppDeckName = LotdUiKit.AddText(LotdUiKit.CreateRect("DN", deckMeta, new Vector2(0, 0.45f), new Vector2(1, 1), Vector2.zero, Vector2.zero),
-                "DN", "상대 사용 덱", 17, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
-            _oppDeckStats = LotdUiKit.AddText(LotdUiKit.CreateRect("DS", deckMeta, new Vector2(0, 0), new Vector2(1, 0.45f), Vector2.zero, Vector2.zero),
-                "DS", "", 13, TextAnchor.MiddleLeft, LotdUiKit.CyanAccent);
+            var deckPicker = LotdUiKit.CreateRect("DeckPicker", deckMeta, new Vector2(0, 0.60f), Vector2.one, Vector2.zero, Vector2.zero);
+            _oppDeckDropdown = LotdUiKit.CreateLotdDropdown(deckPicker, "Dropdown", Array.Empty<string>(), index =>
+            {
+                _selectedCharDeckIdx = index;
+                RefreshSelectedOppDeck();
+            }, dynamicChoices: true);
+            _oppDeckStats = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("DS", deckMeta, new Vector2(0, 0.19f), new Vector2(1, 0.57f), Vector2.zero, Vector2.zero),
+                "DS", "", 13, 9, TextAnchor.MiddleLeft, LotdUiKit.CyanAccent);
+            _oppDeckNote = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("DeckNote", deckMeta, Vector2.zero, new Vector2(1, 0.19f), Vector2.zero, Vector2.zero),
+                "Label", "", 11, 9, TextAnchor.MiddleLeft, LotdUiKit.TextMuted);
 
             var prevDeckRt = LotdUiKit.CreateRect("PrevOppDeck", oppDeckBox, new Vector2(0.30f, 0.06f), new Vector2(0.48f, 0.30f), Vector2.zero, Vector2.zero);
             LotdUiKit.CreateLotdButton(prevDeckRt, "B", "◀ 덱", () => CycleOppDeck(-1), 13);
             var nextDeckRt = LotdUiKit.CreateRect("NextOppDeck", oppDeckBox, new Vector2(0.49f, 0.06f), new Vector2(0.67f, 0.30f), Vector2.zero, Vector2.zero);
             LotdUiKit.CreateLotdButton(nextDeckRt, "B", "덱 ▶", () => CycleOppDeck(1), 13);
             var cloneRt = LotdUiKit.CreateRect("CloneOppDeck", oppDeckBox, new Vector2(0.69f, 0.06f), new Vector2(0.98f, 0.30f), Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(cloneRt, "B", "내 덱으로 복제", CloneCurrentOppDeck, 12);
+            _cloneOppButton = LotdUiKit.CreateLotdButton(cloneRt, "B", "내 덱으로 복제", CloneCurrentOppDeck, 12);
 
             // My Deck Selector Box
             var myDeckBox = LotdUiKit.CreateBorderedPanel(rightPanel, "MyDeckBox",
@@ -214,7 +223,7 @@ namespace YGOPortable.UI
             // Start Duel Button
             var startRt = LotdUiKit.CreateRect("StartDuelBtn", rightPanel,
                 new Vector2(0.04f, 0.02f), new Vector2(0.96f, 0.095f), Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(startRt, "B", "듀얼 시작", OpenJanken, 20, gold: true);
+            _startDuelButton = LotdUiKit.CreateLotdButton(startRt, "B", "듀얼 시작", OpenJanken, 20, gold: true);
         }
 
         private void BuildGridSlots(Transform gridArea)
@@ -241,10 +250,7 @@ namespace YGOPortable.UI
                     var lblBg = LotdUiKit.CreateRect("NameBg", slot,
                         new Vector2(0.04f, 0.04f), new Vector2(0.96f, 0.24f), Vector2.zero, Vector2.zero);
                     LotdUiKit.AddImage(lblBg.gameObject, LotdUiKit.WhiteSprite, new Color(0.02f, 0.06f, 0.14f, 0.88f), false, false);
-                    var nm = LotdUiKit.AddText(lblBg, "Nm", "", 13, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
-                    nm.resizeTextForBestFit = true;
-                    nm.resizeTextMinSize = 9;
-                    nm.resizeTextMaxSize = 14;
+                    LotdUiKit.AddFittedText(lblBg, "Nm", "", 14, 9, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
 
                     var btn = slot.gameObject.AddComponent<Button>();
                     btn.targetGraphic = bgImg;
@@ -256,18 +262,21 @@ namespace YGOPortable.UI
         private void ApplyFilter()
         {
             _filteredChars.Clear();
-            string q = (_searchQuery ?? "").Trim().ToLowerInvariant();
+            string query = NormalizeSearch(_searchQuery);
+            OpponentCharacter deckMatch = null;
             foreach (var c in DeckRepository.Characters)
             {
                 if (_seriesFilter != -1 && c.seriesIdx != _seriesFilter) continue;
-                if (!string.IsNullOrEmpty(q))
+                var decks = DeckRepository.GetDecksForCharacter(c.id);
+                if (decks.Count == 0) continue;
+                if (query.Length != 0)
                 {
-                    bool nameHit = (c.name ?? "").ToLowerInvariant().Contains(q) || (c.bio ?? "").ToLowerInvariant().Contains(q);
-                    bool deckHit = DeckRepository.GetDecksForCharacter(c.id)
-                        .Any(d => (d.title ?? "").ToLowerInvariant().Contains(q));
+                    bool nameHit = MatchesSearch(c.name, query) || MatchesSearch(c.bio, query) ||
+                                   (c.aliases?.Any(alias => MatchesSearch(alias, query)) ?? false);
+                    bool deckHit = decks.Any(d => MatchesSearch(d.title, query));
                     if (!nameHit && !deckHit) continue;
+                    if (deckHit && deckMatch == null) deckMatch = c;
                 }
-                if (DeckRepository.GetDecksForCharacter(c.id).Count == 0) continue;
                 _filteredChars.Add(c);
             }
 
@@ -279,12 +288,20 @@ namespace YGOPortable.UI
                 ol.effectDistance = new Vector2(2, -2);
             }
 
-            RefreshGridPage();
-            if (_filteredChars.Count > 0 && (_selectedChar == null || !_filteredChars.Contains(_selectedChar)))
+            if (deckMatch != null)
             {
-                SelectCharacter(_filteredChars[0]);
+                SelectCharacter(deckMatch, query);
+                _page = _filteredChars.IndexOf(deckMatch) / PageSize;
             }
+            else if (!_filteredChars.Contains(_selectedChar))
+                SelectCharacter(_filteredChars.FirstOrDefault());
+            RefreshGridPage();
         }
+
+        private static string NormalizeSearch(string value) =>
+            string.Concat((value ?? "").Where(c => !char.IsWhiteSpace(c))).ToLowerInvariant();
+
+        private static bool MatchesSearch(string value, string query) => NormalizeSearch(value).Contains(query);
 
         private void RefreshGridPage()
         {
@@ -307,8 +324,7 @@ namespace YGOPortable.UI
                 bool isSel = _selectedChar != null && _selectedChar.id == c.id;
                 var frame = LotdUiKit.LoadSprite(isSel ? "LOTD/Shared/opponentframe_highlight" : "LOTD/Shared/opponentframe_normal");
                 slot.GetComponent<Image>().sprite = frame ?? LotdUiKit.WhiteSprite;
-                slot.transform.Find("Portrait").GetComponent<Image>().sprite =
-                    LotdUiKit.LoadSprite($"LOTD/Busts/{c.portrait}") ?? LotdUiKit.LoadSprite("LOTD/Busts/atem_neutral");
+                slot.transform.Find("Portrait").GetComponent<Image>().sprite = LotdUiKit.LoadOpponentPortrait(c);
                 slot.transform.Find("NameBg/Nm").GetComponent<Text>().text = c.name;
 
                 var btn = slot.GetComponent<Button>();
@@ -323,14 +339,21 @@ namespace YGOPortable.UI
             }
         }
 
-        private void SelectCharacter(OpponentCharacter c)
+        private void SelectCharacter(OpponentCharacter c, string deckQuery = "")
         {
             _selectedChar = c;
-            _charDecks = DeckRepository.GetDecksForCharacter(c.id);
-            _selectedCharDeckIdx = 0;
-            _detailBust.sprite = LotdUiKit.LoadSprite($"LOTD/Busts/{c.portrait}") ?? LotdUiKit.LoadSprite("LOTD/Busts/atem_neutral");
-            _detailName.text = c.name;
-            _detailBio.text = $"[{c.seriesName}] {c.bio}";
+            _charDecks = c == null ? new List<PresetDeckInfo>() : DeckRepository.GetDecksForCharacter(c.id);
+            _selectedCharDeckIdx = deckQuery.Length == 0
+                ? 0
+                : Mathf.Max(0, _charDecks.FindIndex(d => MatchesSearch(d.title, deckQuery)));
+            _detailBust.sprite = LotdUiKit.LoadOpponentPortrait(c);
+            _detailBust.enabled = c != null;
+            _detailName.text = c?.name ?? "검색 결과 없음";
+            _detailBio.text = c == null ? "" : $"[{c.seriesName}] {c.bio}";
+            _oppDeckDropdown.ClearOptions();
+            _oppDeckDropdown.AddOptions(_charDecks.Select((d, i) => $"{i + 1}. {d.title}").ToList());
+            _oppDeckDropdown.interactable = _charDecks.Count > 1;
+            _cloneOppButton.interactable = _startDuelButton.interactable = _charDecks.Count > 0;
             RefreshSelectedOppDeck();
         }
 
@@ -345,15 +368,17 @@ namespace YGOPortable.UI
         {
             if (_charDecks.Count == 0)
             {
-                _oppDeckName.text = "덱 없음";
                 _oppDeckStats.text = "";
+                _oppDeckNote.text = "";
+                _sigCardPreview.SetCard(0);
                 return;
             }
             var d = _charDecks[_selectedCharDeckIdx];
-            _oppDeckName.text = $"{d.title} ({_selectedCharDeckIdx + 1}/{_charDecks.Count})";
+            _oppDeckDropdown.SetValueWithoutNotify(_selectedCharDeckIdx);
             int mc = d.main != null ? d.main.Length : 0;
             int ec = d.extra != null ? d.extra.Length : 0;
-            _oppDeckStats.text = $"메인 {mc}장 / 엑스트라 {ec}장  •  에이스: {CardDatabase.GetName(d.sigCard)}";
+            _oppDeckStats.text = $"메인 {mc}장 / 엑스트라 {ec}장\n에이스 {CardDatabase.GetName(d.sigCard)}";
+            _oppDeckNote.text = d.subtitle ?? "";
             _sigCardPreview.SetCard(d.sigCard);
         }
 

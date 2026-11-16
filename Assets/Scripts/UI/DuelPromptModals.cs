@@ -1180,9 +1180,7 @@ namespace YGOPortable.UI
                 LotdAudio.PlayDamage();
             }
 
-            Sprite bust = opp != null && !string.IsNullOrEmpty(opp.portrait)
-                ? LotdUiKit.LoadSprite($"LOTD/Busts/{opp.portrait}")
-                : LotdUiKit.LoadSprite("LOTD/Busts/setokaiba_neutral");
+            Sprite bust = LotdUiKit.LoadOpponentPortrait(opp) ?? LotdUiKit.LoadSprite("LOTD/Busts/setokaiba_neutral");
             _resOppBust.sprite = bust;
             _resOppBust.gameObject.SetActive(bust != null);
 

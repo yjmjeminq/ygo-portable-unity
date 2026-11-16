@@ -212,18 +212,9 @@ namespace YGOPortable.Editor
             AssertTrue(CardArtLoader.GetArtSprite(89631139) != null, "Missing Blue-Eyes art sprite");
             AssertTrue(CardArtLoader.GetArtSprite(14307929) != null, "Missing Illusion art sprite");
 
-            // Verify Characters (236) & Decks (870 = 20 meta + 850 original) & Bust portraits
+            // Verify the roster and deck picker before dueling with the presets.
             DeckRepository.Load(streaming, tempSave);
-            AssertTrue(DeckRepository.Characters.Count >= 230, $"Expected >=230 chars, got {DeckRepository.Characters.Count}");
-            AssertTrue(DeckRepository.PresetDecks.Count >= 865, $"Expected >=865 decks, got {DeckRepository.PresetDecks.Count}");
-            int missingPortraits = 0;
-            foreach (var ch in DeckRepository.Characters)
-            {
-                if (string.IsNullOrEmpty(ch.portrait) || LotdUiKit.LoadSprite($"LOTD/Busts/{ch.portrait}") == null)
-                    missingPortraits++;
-            }
-            AssertTrue(missingPortraits == 0, $"{missingPortraits} character portraits failed to load");
-            Debug.Log($"[VERIFY] DB verified: {DeckRepository.Characters.Count} chars (0 missing portraits), {DeckRepository.PresetDecks.Count} preset decks.");
+            VerifyOpponentRoster();
 
             // Run 6 full AI vs AI matches (5 going-first + 1 going-second HumanPlayerIndex=1)
             // and verify effects, chains, Extra/GY/Banished zone indexing, combat, and prompts
@@ -369,6 +360,67 @@ namespace YGOPortable.Editor
 
             CardArtLoader.Shutdown();
             YgoNativeBridge.Shutdown();
+        }
+
+        private static void VerifyOpponentRoster()
+        {
+            AssertTrue(DeckRepository.Characters.Count >= 250, "Opponent roster is incomplete");
+            AssertTrue(DeckRepository.Characters.Select(c => c.id).Distinct().Count() == DeckRepository.Characters.Count,
+                "Duplicate opponent IDs");
+            AssertTrue(DeckRepository.PresetDecks.Select(d => d.id).Distinct().Count() == DeckRepository.PresetDecks.Count,
+                "Duplicate preset deck IDs");
+            foreach (var character in DeckRepository.Characters)
+            {
+                AssertTrue(LotdUiKit.LoadOpponentPortrait(character) != null, $"Missing portrait for {character.name}");
+                var decks = DeckRepository.GetDecksForCharacter(character.id);
+                var signatures = new HashSet<string>();
+                foreach (var deck in decks)
+                {
+                    AssertTrue(deck.seriesIdx == character.seriesIdx, $"Wrong series for deck {deck.id}");
+                    AssertTrue(deck.main.Length >= 40 && deck.main.Length <= 60 && deck.extra.Length <= 15 && deck.side.Length <= 15,
+                        $"Wrong deck size for {deck.id}");
+                    AssertTrue(deck.main.All(code => CardDatabase.Get(code) is CardInfo card && (card.type & YgoConstants.TYPE_EXTRA) == 0),
+                        $"Invalid main deck card in {deck.id}");
+                    AssertTrue(deck.extra.All(code => CardDatabase.Get(code) is CardInfo card && (card.type & YgoConstants.TYPE_EXTRA) != 0),
+                        $"Invalid extra deck card in {deck.id}");
+                    AssertTrue(deck.main.Contains(deck.sigCard) || deck.extra.Contains(deck.sigCard), $"Missing ace in deck {deck.id}");
+                    string signature = string.Join(",", deck.main.OrderBy(code => code)) + "|" + string.Join(",", deck.extra.OrderBy(code => code));
+                    AssertTrue(signatures.Add(signature), $"Duplicate playable deck for {character.name}");
+                }
+                AssertTrue(signatures.Count >= 2, $"{character.name} has fewer than two different decks");
+            }
+
+            var canvas = new GameObject("Opponent Roster Test", typeof(Canvas));
+            try
+            {
+                var ui = new OpponentSelectUI(null, canvas.transform);
+                ui.Open();
+                var dropdown = ui.Root.GetComponentInChildren<Dropdown>();
+                var preview = ui.Root.GetComponentInChildren<CompositeCardView>();
+                var search = ui.Root.GetComponentInChildren<InputField>();
+                var yugiDecks = DeckRepository.GetDecksForCharacter(104);
+                AssertTrue(yugiDecks.Take(3).Select(d => d.id).SequenceEqual(new[] { 30000, 30001, 30002 }),
+                    "Yugi's Gaia, Dark Magician and Chaos decks should lead the list");
+                AssertTrue(dropdown.options.Count == yugiDecks.Count && preview.CurrentCode == yugiDecks[0].sigCard,
+                    "The DM tab should open with Yami Yugi's Gaia deck");
+                dropdown.value = 2;
+                AssertTrue(preview.CurrentCode == yugiDecks[2].sigCard, "Changing the deck should update the ace card");
+                search.text = "마방기사가이아";
+                AssertTrue(dropdown.value == 0 && preview.CurrentCode == yugiDecks[0].sigCard, "Deck search should select the match");
+                search.text = "Yami Yugi";
+                AssertTrue(dropdown.options.Count == yugiDecks.Count, "Yugi's original name should be searchable");
+                search.text = "zz-no-opponent";
+                AssertTrue(dropdown.options.Count == 0 && !dropdown.interactable && preview.CurrentCode == 0,
+                    "An empty search should clear the previous selection");
+                search.text = "";
+                AssertTrue(dropdown.interactable && dropdown.options.Count == yugiDecks.Count,
+                    "Clearing the search should restore the opponent list");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(canvas);
+            }
+            Debug.Log($"[VERIFY ROSTER] {DeckRepository.Characters.Count} opponents, {DeckRepository.PresetDecks.Count} decks and opponent selection passed.");
         }
 
         private static void VerifyDeckSearchEmergencyCall(uint[] oppDeckMain)
