@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using YGOPortable.Core;
 
@@ -23,10 +24,14 @@ namespace YGOPortable.UI
         private RectTransform _modalBody;
         private RectTransform _modalFooter;
         private Button _modalCloseBtn;
+        private CanvasGroup _promptInput;
 
         // Zone viewer refs
         private Text _zoneTitle;
         private RectTransform _zoneGrid;
+        private ScrollRect _zoneScroll;
+        private Text _zoneEmpty;
+        private Action<uint> _openOwnZone;
 
         // Result refs
         private Image _resAccent;
@@ -48,6 +53,7 @@ namespace YGOPortable.UI
         private Text _confirmBtnText;
 
         public bool IsPromptOpen => ModalRoot != null && ModalRoot.activeSelf;
+        public bool IsZoneViewerOpen => ZoneViewRoot != null && ZoneViewRoot.activeSelf;
 
         public DuelPromptModals(Transform canvasParent, Action<uint> onInspectCard, Action<byte[]> onSubmitResponse)
         {
@@ -61,8 +67,10 @@ namespace YGOPortable.UI
         public void HideAll()
         {
             if (ModalRoot != null) ModalRoot.SetActive(false);
-            if (ZoneViewRoot != null) ZoneViewRoot.SetActive(false);
+            CloseZoneViewer();
         }
+
+        internal void SetOwnZoneShortcuts(Action<uint> openOwnZone) => _openOwnZone = openOwnZone;
 
         public void HideResult()
         {
@@ -86,6 +94,7 @@ namespace YGOPortable.UI
         {
             var dim = LotdUiKit.FillRect("Modal_DuelPrompt", parent);
             ModalRoot = dim.gameObject;
+            _promptInput = ModalRoot.AddComponent<CanvasGroup>();
             LotdUiKit.AddImage(dim.gameObject, LotdUiKit.WhiteSprite, new Color(0f, 0.02f, 0.07f, 0.52f));
 
             _modalBox = DuelStyle.Panel(dim, "Win",
@@ -108,13 +117,25 @@ namespace YGOPortable.UI
             var closeRt = LotdUiKit.CreateRect("CloseBtn", hdr, new Vector2(0.82f, 0.16f), new Vector2(0.98f, 0.84f), Vector2.zero, Vector2.zero);
             _modalCloseBtn = DuelStyle.Button(closeRt, "B", "✕ 취소", OnModalCloseClicked, 13);
             dim.gameObject.AddComponent<Button>().onClick.AddListener(OnModalCloseClicked);
+            var shortcuts = LotdUiKit.CreateRect("ZoneShortcuts", dim, new Vector2(.595f, .038f),
+                new Vector2(.978f, .106f), Vector2.zero, Vector2.zero);
+            AddZoneShortcut(shortcuts, "Grave", "내 묘지", YgoConstants.LOCATION_GRAVE, 0);
+            AddZoneShortcut(shortcuts, "Extra", "내 엑스트라 덱", YgoConstants.LOCATION_EXTRA, 1);
+            AddZoneShortcut(shortcuts, "Banished", "내 제외 존", YgoConstants.LOCATION_REMOVED, 2);
 
             ModalRoot.SetActive(false);
         }
 
+        private void AddZoneShortcut(Transform parent, string name, string label, uint location, int column)
+        {
+            var tile = LotdUiKit.CreateRect(name, parent, new Vector2(column / 3f, 0f),
+                new Vector2((column + 1) / 3f, 1f), new Vector2(3f, 0f), new Vector2(-3f, 0f));
+            DuelStyle.Button(tile, "B", label, () => _openOwnZone?.Invoke(location), 14);
+        }
+
         public bool TryCancelOrPass()
         {
-            if (ModalRoot == null || !ModalRoot.activeSelf || _curPrompt == null) return false;
+            if (!IsPromptOpen || IsZoneViewerOpen || _curPrompt == null) return false;
 
             if (_curPrompt.messageType == YgoConstants.MSG_SELECT_CHAIN)
             {
@@ -143,7 +164,7 @@ namespace YGOPortable.UI
 
         public bool TryConfirm()
         {
-            if (ModalRoot == null || !ModalRoot.activeSelf || _curPrompt == null) return false;
+            if (!IsPromptOpen || IsZoneViewerOpen || _curPrompt == null) return false;
 
             if (_curPrompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN || _curPrompt.messageType == YgoConstants.MSG_SELECT_YESNO)
             {
@@ -259,6 +280,7 @@ namespace YGOPortable.UI
 
         private void Submit(byte[] bytes)
         {
+            if (!IsPromptOpen || IsZoneViewerOpen) return;
             ModalRoot.SetActive(false);
             _onSubmitResponse?.Invoke(bytes);
         }
@@ -984,86 +1006,118 @@ namespace YGOPortable.UI
         {
             var dim = LotdUiKit.FillRect("Overlay_ZoneView", parent);
             ZoneViewRoot = dim.gameObject;
-            LotdUiKit.AddImage(dim.gameObject, LotdUiKit.WhiteSprite, new Color(0f, 0.02f, 0.08f, 0.72f));
-            dim.gameObject.AddComponent<Button>().onClick.AddListener(() => ZoneViewRoot.SetActive(false));
+            LotdUiKit.AddImage(dim.gameObject, LotdUiKit.WhiteSprite, new Color(0.015f, 0.022f, 0.038f, 0.40f));
+            dim.gameObject.AddComponent<Button>().onClick.AddListener(CloseZoneViewer);
 
             var win = DuelStyle.Panel(dim, "Win",
-                new Vector2(0.225f, 0.12f), new Vector2(0.978f, 0.88f));
-            win.gameObject.AddComponent<Button>(); // block click-through to dim
+                new Vector2(0.226f, 0.205f), new Vector2(0.972f, 0.615f),
+                fill: new Color(.039f, .071f, .093f, .97f));
+            win.gameObject.AddComponent<Button>();
 
-            var hdr = LotdUiKit.CreateRect("Hdr", win, new Vector2(0f, 0.88f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
+            var hdr = LotdUiKit.CreateRect("Hdr", win, new Vector2(0f, 1f), Vector2.one, new Vector2(0f, -53f), Vector2.zero);
             LotdUiKit.AddImage(hdr.gameObject, LotdUiKit.WhiteSprite, DuelStyle.HeaderColor);
+            var accent = LotdUiKit.CreateRect("Accent", hdr, new Vector2(0f, 1f), Vector2.one,
+                new Vector2(0f, -2f), Vector2.zero);
+            LotdUiKit.AddImage(accent.gameObject, LotdUiKit.WhiteSprite, DuelStyle.Player, false, false);
             var titleBand = LotdUiKit.CreateRect("TitleBand", hdr, new Vector2(0.025f, 0.12f), new Vector2(0.80f, 0.88f),
                 Vector2.zero, Vector2.zero);
             _zoneTitle = LotdUiKit.AddFittedText(titleBand, "T", "존 확인", 20, 11, TextAnchor.MiddleLeft,
                 DuelStyle.Gold, FontStyle.Bold);
 
             var closeRt = LotdUiKit.CreateRect("Close", hdr, new Vector2(0.82f, 0.15f), new Vector2(0.98f, 0.85f), Vector2.zero, Vector2.zero);
-            DuelStyle.Button(closeRt, "B", "✕ 닫기", () => ZoneViewRoot.SetActive(false), 16);
+            DuelStyle.Button(closeRt, "B", "✕ 닫기", CloseZoneViewer, 16);
 
-            var body = LotdUiKit.CreateRect("Body", win, new Vector2(0.02f, 0.03f), new Vector2(0.98f, 0.86f), Vector2.zero, Vector2.zero);
-            CreateHorizontalCardGrid(body, out Transform g);
+            var body = LotdUiKit.CreateRect("Body", win, Vector2.zero, Vector2.one,
+                new Vector2(10f, 8f), new Vector2(-10f, -62f));
+            _zoneScroll = CreateHorizontalCardGrid(body, out Transform g, cellW: 118, cellH: 174).GetComponent<ScrollRect>();
+            _zoneScroll.movementType = ScrollRect.MovementType.Clamped;
+            _zoneScroll.viewport.offsetMax = new Vector2(-14f, 0f);
+            _zoneScroll.verticalScrollbar = LotdUiKit.AddVerticalScrollbar(body);
+            _zoneScroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
+            _zoneScroll.verticalScrollbar.GetComponent<Image>().sprite = LotdUiKit.WhiteSprite;
+            _zoneScroll.verticalScrollbar.GetComponent<Image>().color = new Color(.095f, .16f, .20f);
+            var thumb = _zoneScroll.verticalScrollbar.targetGraphic as Image;
+            thumb.sprite = LotdUiKit.WhiteSprite;
+            thumb.color = DuelStyle.Player;
             _zoneGrid = (RectTransform)g;
+            _zoneEmpty = LotdUiKit.AddFittedText(body, "Empty", "이 존에 카드가 없습니다.", 20, 11,
+                TextAnchor.MiddleCenter, DuelStyle.Muted);
 
             ZoneViewRoot.SetActive(false);
+        }
+
+        public void CloseZoneViewer()
+        {
+            if (!IsZoneViewerOpen) return;
+            ZoneViewRoot.SetActive(false);
+            _promptInput.interactable = true;
+            for (int i = _zoneGrid.childCount - 1; i >= 0; i--)
+            {
+                var child = _zoneGrid.GetChild(i);
+                if (Application.isPlaying)
+                {
+                    child.gameObject.SetActive(false);
+                    child.SetParent(null, false);
+                    UnityEngine.Object.Destroy(child.gameObject);
+                }
+                else
+                {
+                    UnityEngine.Object.DestroyImmediate(child.gameObject);
+                }
+            }
+            _zoneScroll.StopMovement();
+            _zoneGrid.anchoredPosition = Vector2.zero;
         }
 
         public void ShowZoneViewer(
             string title,
             IReadOnlyList<LiveCardState> cards,
             bool hideFaceDown = false,
-            Func<LiveCardState, List<(string label, int responseVal, bool gold)>> getCardActions = null,
-            Action<int> onExecuteAction = null,
-            Action<LiveCardState> onOpenCardActions = null)
+            bool newestFirst = true,
+            Func<LiveCardState, bool> hasCardActions = null,
+            Action<LiveCardState> onOpenCardActions = null,
+            Func<bool> canUseCardActions = null)
         {
-            _zoneTitle.text = $"{title}  {cards?.Count ?? 0}장";
-            for (int i = _zoneGrid.childCount - 1; i >= 0; i--)
-                UnityEngine.Object.Destroy(_zoneGrid.GetChild(i).gameObject);
-
-            if (cards != null)
+            StartZoneViewer();
+            int count = cards?.Count ?? 0;
+            for (int i = 0; i < count; i++)
             {
-                bool forwardOrder = title != null && title.Contains("엑스트라");
-                if (forwardOrder)
-                {
-                    for (int i = 0; i < cards.Count; i++)
-                    {
-                        var c = cards[i];
-                        if (c == null) continue;
-                        var actions = getCardActions?.Invoke(c);
-                        bool fd = hideFaceDown && !c.IsFaceUp && !c.isPublic && (actions == null || actions.Count == 0);
-                        AddZoneCardTile(fd ? 0u : c.code, fd, c, actions, onExecuteAction, onOpenCardActions);
-                    }
-                }
-                else
-                {
-                    for (int i = cards.Count - 1; i >= 0; i--)
-                    {
-                        var c = cards[i];
-                        if (c == null) continue;
-                        var actions = getCardActions?.Invoke(c);
-                        bool fd = hideFaceDown && !c.IsFaceUp && !c.isPublic && (actions == null || actions.Count == 0);
-                        AddZoneCardTile(fd ? 0u : c.code, fd, c, actions, onExecuteAction, onOpenCardActions);
-                    }
-                }
+                var card = cards[newestFirst ? count - 1 - i : i];
+                if (card == null) continue;
+                bool hidden = card.code == 0 || hideFaceDown && !card.IsFaceUp && !card.isPublic;
+                bool actionable = !hidden && onOpenCardActions != null && hasCardActions?.Invoke(card) == true;
+                AddZoneCardTile(hidden ? 0u : card.code, hidden, card, actionable, onOpenCardActions, canUseCardActions);
             }
-            ZoneViewRoot.transform.SetAsLastSibling();
-            ZoneViewRoot.SetActive(true);
-            CardAnimationManager.Instance?.BringToFront();
+            FinishZoneViewer(title);
         }
 
         public void ShowCodeListViewer(string title, IReadOnlyList<uint> codes)
         {
-            _zoneTitle.text = $"{title} ({codes?.Count ?? 0}장)";
-            for (int i = _zoneGrid.childCount - 1; i >= 0; i--)
-                UnityEngine.Object.Destroy(_zoneGrid.GetChild(i).gameObject);
-
+            StartZoneViewer();
             if (codes != null)
             {
                 foreach (uint code in codes)
                     AddZoneCardTile(code, code == 0, null);
             }
-            ZoneViewRoot.transform.SetAsLastSibling();
+            FinishZoneViewer(title);
+        }
+
+        private void StartZoneViewer()
+        {
+            CloseZoneViewer();
+            EventSystem.current?.SetSelectedGameObject(null);
+            _promptInput.interactable = false;
             ZoneViewRoot.SetActive(true);
+        }
+
+        private void FinishZoneViewer(string title)
+        {
+            int count = _zoneGrid.childCount;
+            _zoneTitle.text = $"{title}   ·   {count}장";
+            _zoneEmpty.gameObject.SetActive(count == 0);
+            _zoneScroll.StopMovement();
+            _zoneGrid.anchoredPosition = Vector2.zero;
+            ZoneViewRoot.transform.SetAsLastSibling();
             CardAnimationManager.Instance?.BringToFront();
         }
 
@@ -1071,62 +1125,46 @@ namespace YGOPortable.UI
             uint code,
             bool faceDown,
             LiveCardState live,
-            List<(string label, int responseVal, bool gold)> actions = null,
-            Action<int> onExecuteAction = null,
-            Action<LiveCardState> onOpenCardActions = null)
+            bool hasActions = false,
+            Action<LiveCardState> onOpenCardActions = null,
+            Func<bool> canUseCardActions = null)
         {
-            bool hasActions = actions != null && actions.Count > 0;
-            bool directAction = hasActions && actions.Count == 1 && onExecuteAction != null;
-            bool openActions = hasActions && live != null && onOpenCardActions != null &&
-                (!directAction || actions[0].label.Length > 12);
-            void SelectAction()
-            {
-                if (openActions)
-                {
-                    ZoneViewRoot.SetActive(false);
-                    onOpenCardActions(live);
-                }
-                else if (directAction)
-                {
-                    ZoneViewRoot.SetActive(false);
-                    onExecuteAction(actions[0].responseVal);
-                }
-            }
-
             var tile = DuelStyle.Panel(_zoneGrid, $"Z_{code}", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero,
-                DuelStyle.PanelColor, hasActions ? DuelStyle.Gold : LotdUiKit.CyanAccent);
+                DuelStyle.PanelColor, hasActions ? DuelStyle.Gold : DuelStyle.BorderColor);
             var cRt = LotdUiKit.CreateRect("C", tile,
                 new Vector2(0.08f, hasActions ? 0.30f : 0.18f), new Vector2(0.92f, 0.96f), Vector2.zero, Vector2.zero);
-            CompositeCardView.Create(cRt, "V", false, duelArtwork: true).SetCard(code, faceDown, live);
+            CompositeCardView.Create(cRt, "V", false, duelArtwork: true).SetCard(code, faceDown, faceDown ? null : live);
+            string caption = faceDown ? "비공개 카드" : CardDatabase.GetName(code);
             LotdUiKit.AddFittedText(LotdUiKit.CreateRect("L", tile,
                 new Vector2(0.05f, hasActions ? 0.17f : 0.02f), new Vector2(0.95f, hasActions ? 0.29f : 0.17f), Vector2.zero, Vector2.zero),
-                "T", faceDown ? "뒷면" : CardDatabase.GetName(code), 11, 8, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary);
+                "T", caption, 12, 8, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary);
 
             if (!faceDown && code != 0)
             {
                 var btn = tile.gameObject.AddComponent<Button>();
                 btn.targetGraphic = tile.GetComponent<Image>();
-                btn.onClick.AddListener(() =>
-                {
-                    _onInspectCard?.Invoke(code);
-                    SelectAction();
-                });
+                btn.onClick.AddListener(() => _onInspectCard?.Invoke(code));
                 var trig = tile.gameObject.AddComponent<CardDragTrigger>();
                 trig.OnPointerEnterAction = () => _onInspectCard?.Invoke(code);
                 if (hasActions && live != null && live.location == YgoConstants.LOCATION_EXTRA)
                 {
                     trig.SourceType = DragSourceType.ExtraDeck;
-                    trig.CardCodeGetter = () => code;
+                    trig.CardCodeGetter = () => canUseCardActions?.Invoke() != false ? code : 0u;
                     trig.IndexGetter = () => (int)live.sequence;
                     trig.DataGetter = () => live;
                 }
             }
 
-            if (openActions || directAction)
+            if (hasActions)
             {
                 var actRt = LotdUiKit.CreateRect("Act", tile, new Vector2(0.06f, 0.02f), new Vector2(0.94f, 0.16f), Vector2.zero, Vector2.zero);
-                string label = openActions ? "행동 확인" : actions[0].label;
-                DuelStyle.Button(actRt, "B", label, SelectAction, 11, openActions || actions[0].gold);
+                DuelStyle.Button(actRt, "B", "행동 확인", () =>
+                {
+                    if (!IsZoneViewerOpen || canUseCardActions?.Invoke() == false) return;
+                    _onInspectCard?.Invoke(code);
+                    CloseZoneViewer();
+                    onOpenCardActions(live);
+                }, 11, true);
             }
         }
 

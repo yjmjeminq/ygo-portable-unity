@@ -277,8 +277,16 @@ namespace YGOPortable.Core
         {
             if (sprite == null) return;
             var texture = sprite.texture;
-            UnityEngine.Object.Destroy(sprite);
-            if (texture != null) UnityEngine.Object.Destroy(texture);
+            if (Application.isPlaying)
+            {
+                UnityEngine.Object.Destroy(sprite);
+                if (texture != null) UnityEngine.Object.Destroy(texture);
+            }
+            else
+            {
+                UnityEngine.Object.DestroyImmediate(sprite);
+                if (texture != null) UnityEngine.Object.DestroyImmediate(texture);
+            }
         }
 
         public static Sprite GetFallbackArt()

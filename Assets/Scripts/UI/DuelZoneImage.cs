@@ -105,8 +105,8 @@ namespace YGOPortable.UI
                     float u = (float)x / columns, v = (float)y / rows;
                     float patch = Mathf.PerlinNoise(u * 5.2f + 3f, v * 4.6f + 7f);
                     float edge = Mathf.SmoothStep(.2f, 1f, Mathf.Abs(u - .53f) * 1.85f + Mathf.Abs(v - .51f) * .68f);
-                    var vegetation = Color.Lerp(new Color(.13f, .18f, .11f), new Color(.43f, .50f, .25f), patch);
-                    vegetation *= Mathf.Lerp(1f, .45f, edge);
+                    var vegetation = Color.Lerp(new Color(.25f, .30f, .19f), new Color(.66f, .72f, .48f), patch);
+                    vegetation *= Mathf.Lerp(1f, .55f, edge);
                     vegetation.a = 1f;
                     mesh.AddVert(DuelMat.Point(rect, u, v), vegetation, new Vector2(u * 1.9f, v * 1.37f));
                 }
@@ -169,8 +169,8 @@ namespace YGOPortable.UI
                     Color.Lerp(close, far, low), Color.Lerp(close, far, high), new Vector2(0f, low), new Vector2(1f, high));
             }
 
-            var cutEdge = new Color(.39f, .40f, .31f);
-            var upperEdge = new Color(.84f, .82f, .66f);
+            var cutEdge = new Color(.34f, .38f, .25f);
+            var upperEdge = new Color(.60f, .62f, .47f);
             DrawEdge(mesh, nearLeft, farLeft, upperEdge, cutEdge);
             DrawEdge(mesh, farLeft, farRight, upperEdge, cutEdge);
             DrawEdge(mesh, farRight, nearRight, upperEdge, cutEdge);
@@ -178,7 +178,7 @@ namespace YGOPortable.UI
 
             var middleLeft = Vector2.Lerp(nearLeft, farLeft, .49f);
             var middleRight = Vector2.Lerp(nearRight, farRight, .49f);
-            Line(mesh, middleLeft, middleRight, 2f, new Color(.46f, .49f, .36f, .7f));
+            Line(mesh, middleLeft, middleRight, 1.5f, new Color(.43f, .46f, .32f, .62f));
             // Only the active side is illuminated.
             bool opposite = _side == DuelStyle.Opponent;
             var lineColor = new Color(_side.r, _side.g, _side.b, .77f);
@@ -190,7 +190,7 @@ namespace YGOPortable.UI
         private static void DrawEdge(VertexHelper mesh, Vector2 a, Vector2 b, Color light, Color dark)
         {
             Line(mesh, a, b, 9f, dark);
-            Line(mesh, a, b, 3.1f, light);
+            Line(mesh, a, b, 2f, light);
         }
 
         private static void Line(VertexHelper mesh, Vector2 a, Vector2 b, float width, Color color)

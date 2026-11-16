@@ -235,7 +235,7 @@ namespace YGOPortable.UI
                 return;
             }
             _duelField?.Update();
-            if (_session == null || _duelField.IsReadingLog) return;
+            if (_session == null || _duelField.IsReadingLog || _duelField.IsBrowsingZone) return;
 
             if (_duelField.IsPresenting)
             {
@@ -318,9 +318,9 @@ namespace YGOPortable.UI
 
         private void OnHumanModalResponse(byte[] resp)
         {
-            if (_session == null || _session.IsFinished) return;
+            if (_session == null || _session.IsFinished ||
+                _duelField.IsPresenting || _duelField.IsPaused || _duelField.IsBrowsingZone) return;
             _shownHumanPrompt = null;
-            if (_duelField.IsPresenting || _duelField.IsPaused) return;
             _session.SubmitResponse(resp);
             _duelField.Refresh();
         }

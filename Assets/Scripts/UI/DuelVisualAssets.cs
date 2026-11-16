@@ -11,6 +11,34 @@ namespace YGOPortable.UI
         private static readonly Dictionary<DuelEffectKind, Sprite> Effects = new();
         internal static Texture2D Field { get; } = LoadTexture("Field.png", TextureWrapMode.Clamp);
         internal static Texture2D Ground { get; } = LoadTexture("Ground.png", TextureWrapMode.Repeat);
+        internal static Sprite PhaseBase { get; } = LoadHudSprite("PhaseBase");
+        internal static Sprite PhaseRim { get; } = LoadHudSprite("PhaseRim");
+        internal static Sprite PlayerLp { get; } = LoadHudSprite("LPPlayer");
+        internal static Sprite OpponentLp { get; } = LoadHudSprite("LPOpponent");
+        internal static Sprite DeckBack { get; } = LoadHudSprite("DeckBack");
+        internal static Sprite PauseIcon { get; } = LoadHudSprite("Pause");
+        internal static Sprite LogIcon { get; } = LoadHudSprite("Log");
+        private static readonly Sprite DrawPhase = LoadHudSprite("PhaseDraw");
+        private static readonly Sprite StandbyPhase = LoadHudSprite("PhaseStandby");
+        private static readonly Sprite MainOnePhase = LoadHudSprite("PhaseMain1");
+        private static readonly Sprite BattlePhase = LoadHudSprite("PhaseBattle");
+        private static readonly Sprite MainTwoPhase = LoadHudSprite("PhaseMain2");
+        private static readonly Sprite EndPhase = LoadHudSprite("PhaseEnd");
+
+        internal static Sprite PhaseIcon(int phase) => phase switch
+        {
+            YgoConstants.PHASE_DRAW => DrawPhase,
+            YgoConstants.PHASE_STANDBY => StandbyPhase,
+            YgoConstants.PHASE_MAIN1 => MainOnePhase,
+            YgoConstants.PHASE_MAIN2 => MainTwoPhase,
+            YgoConstants.PHASE_END => EndPhase,
+            YgoConstants.PHASE_BATTLE_START or YgoConstants.PHASE_BATTLE_STEP or YgoConstants.PHASE_BATTLE
+                or YgoConstants.PHASE_DAMAGE or YgoConstants.PHASE_DAMAGE_CAL => BattlePhase,
+            _ => null,
+        };
+
+        private static Sprite LoadHudSprite(string name) =>
+            AsSprite(LoadTexture(Path.Combine("Hud", name + ".png"), TextureWrapMode.Clamp));
 
         internal static Sprite Effect(DuelEffectKind kind)
         {

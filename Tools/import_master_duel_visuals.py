@@ -1,4 +1,4 @@
-"""Import locally installed Master Duel art, field textures and sound into DuelVisuals.
+"""Import locally installed Master Duel art, field textures, HUD and sound into DuelVisuals.
 
 Requires UnityPy and Pillow. The Steam installation is read-only. Generated
 files belong in the Unity game's local profile.
@@ -29,6 +29,20 @@ PROFILE = Path.home() / "AppData/LocalLow/YGOPortable/Yu-Gi-Oh LOTD Portable/Due
 YDK_IDS = "https://raw.githubusercontent.com/pixeltris/YgoMaster/master/YgoMaster/Data/YdkIds.txt"
 ART_VARIANTS = "https://raw.githubusercontent.com/daominah/yugioh_master_duel_card_art/main/alt_art_desc.md"
 TOKEN_IDS = {20001444: 16567, 3285552: 16760}
+HUD_SPRITES = {
+    "PhaseBase": "GUI_PhaseButtonBase2",
+    "PhaseRim": "GUI_PhaseCircle",
+    "PhaseDraw": "GUI_PhaseDP",
+    "PhaseStandby": "GUI_PhaseSP",
+    "PhaseMain1": "GUI_PhaseMP1",
+    "PhaseBattle": "GUI_PhaseBP",
+    "PhaseMain2": "GUI_PhaseMP2",
+    "PhaseEnd": "GUI_PhaseEP",
+    "LPPlayer": "GUI_LP_Blue",
+    "LPOpponent": "GUI_LP_Red",
+    "Pause": "GUI_T_DuelButtonSubmenu01",
+    "Log": "GUI_T_DuelButtonLog_Off_1",
+}
 EFFECTS = {
     "Strike": "fxt_hitm_flash01.png",
     "Break": "fxt_ef07445_tnd_001.png",
@@ -279,6 +293,21 @@ def export_field(output, textures):
     field.save(output / "Field.png")
 
 
+def export_hud(output, sprites, textures):
+    sources = {filename: sprites.get(name) for filename, name in HUD_SPRITES.items()}
+    sources["DeckBack"] = textures.get("ProtectorIcon1070001")
+    directory = output / "Hud"
+    directory.mkdir()
+    imported = 0
+    for filename, asset in sources.items():
+        if asset is None:
+            continue
+        image = asset.parse_as_object().image.convert("RGBA")
+        image.save(directory / f"{filename}.png")
+        imported += 1
+    return imported
+
+
 def export_effects(output, rows):
     directory = output / "Effects"
     directory.mkdir()
@@ -326,6 +355,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("install", type=Path, help="Master Duel Steam installation directory")
     parser.add_argument("--output", type=Path, default=PROFILE)
+    parser.add_argument("--hud-only", action="store_true", help="Refresh HUD textures and the default card back only")
     parser.add_argument("--bundle-catalog", type=Path, action="append", default=[])
     parser.add_argument("--id-map", type=Path)
     parser.add_argument("--variant-map", type=Path)
@@ -334,19 +364,25 @@ def main():
     data_dir = args.install / "masterduel_Data"
     base = UnityPy.load(str(data_dir / "data.unity3d"))
     textures = {obj.peek_name(): obj for obj in base.objects if obj.type.name == "Texture2D"}
-    clips = {obj.peek_name(): obj for obj in base.objects if obj.type.name == "AudioClip"}
-    rows = get_catalog(args.install, args.bundle_catalog)
-    images = card_images(rows)
-    if not images:
-        raise ValueError("No installed card artwork bundles were found")
+    sprites = {obj.peek_name(): obj for obj in base.objects if obj.type.name == "Sprite"}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="ygo-duel-import-", dir=args.output.parent) as directory:
         output = Path(directory)
-        export_field(output, textures)
-        export_effects(output, rows)
-        export_audio(output, clips, data_dir)
-        entries = export_card_art(output, card_variants(args, images), images)
-        export_cut_ins(output, rows, entries)
+        hud_count = export_hud(output, sprites, textures)
+        if args.hud_only:
+            if hud_count == 0:
+                raise ValueError("No installed duel HUD textures were found")
+        else:
+            clips = {obj.peek_name(): obj for obj in base.objects if obj.type.name == "AudioClip"}
+            rows = get_catalog(args.install, args.bundle_catalog)
+            images = card_images(rows)
+            if not images:
+                raise ValueError("No installed card artwork bundles were found")
+            export_field(output, textures)
+            export_effects(output, rows)
+            export_audio(output, clips, data_dir)
+            entries = export_card_art(output, card_variants(args, images), images)
+            export_cut_ins(output, rows, entries)
         args.output.mkdir(exist_ok=True)
         for file in sorted(output.rglob("*")):
             relative = file.relative_to(output)
@@ -354,8 +390,9 @@ def main():
                 destination = args.output / relative
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 os.replace(file, destination)
-        publish_cut_ins(output / "CutIns", args.output)
-    print(f"Imported to {args.output}", flush=True)
+        if not args.hud_only:
+            publish_cut_ins(output / "CutIns", args.output)
+    print(f"Imported {hud_count} HUD textures to {args.output}", flush=True)
 
 
 if __name__ == "__main__":
