@@ -133,9 +133,11 @@ namespace YGOPortable.UI
         {
             public RectTransform Rect;
             public CompositeCardView Card;
-            public Image Border;
+            public Image PlayableGlow;
             public CardDragTrigger Trigger;
         }
+
+        private DuelPrompt _handGlowPrompt;
 
         // Context Action Popup Menu
         private GameObject _actionPopup;
@@ -233,6 +235,7 @@ namespace YGOPortable.UI
             _cardZoomModal.SetActive(false);
             _phasePicker.SetActive(false);
             CardAnimationManager.Instance?.Clear();
+            RefreshHandGlows(force: true);
         }
 
         public void InspectCard(uint code)
@@ -948,7 +951,6 @@ namespace YGOPortable.UI
                 bool showFront = !opponent || card.isPublic || card.IsFaceUp;
                 view.Card.SetCard(showFront ? card.code : 0u, !showFront, card);
                 bool actionable = !opponent && CanAcceptPlayerAction && HasHandAction(controller, sequence);
-                view.Border.color = actionable ? new Color(1f, 0.73f, 0.13f, 0.85f) : Color.clear;
 
                 var trigger = view.Trigger;
                 if (trigger == null) continue;
@@ -963,20 +965,72 @@ namespace YGOPortable.UI
                     ShowCardActionsPopup(controller, YgoConstants.LOCATION_HAND, sequence, card.code, card.overlayCodes);
                 };
             }
+            if (!opponent) RefreshHandGlows(force: true);
+        }
+
+        private void RefreshHandGlows(bool force = false)
+        {
+            DuelPrompt prompt = CanAcceptPlayerAction && !IsBrowsingZone && !_cardZoomModal.activeSelf && !_phasePicker.activeSelf
+                ? _session.ActivePrompt : null;
+            bool changed = force || !ReferenceEquals(prompt, _handGlowPrompt);
+            if (!changed && prompt == null) return;
+            _handGlowPrompt = prompt;
+            var hand = prompt == null ? null : _session.Players[_session.HumanPlayerIndex].hand;
+            float alpha = .84f + .16f * Mathf.Sin(Time.unscaledTime * 3.2f);
+            for (int i = 0; i < _myHandViews.Count; i++)
+            {
+                var view = _myHandViews[i];
+                var glow = view.PlayableGlow;
+                if (changed)
+                {
+                    var card = hand != null && i < hand.Count ? hand[i] : null;
+                    bool playable = view.Rect.gameObject.activeSelf && card != null &&
+                        IsPlayableHandCard(prompt, (byte)_session.HumanPlayerIndex, card.sequence);
+                    glow.gameObject.SetActive(playable);
+                }
+                if (glow.gameObject.activeSelf) glow.canvasRenderer.SetAlpha(alpha);
+            }
+        }
+
+        private bool IsPlayableHandCard(DuelPrompt prompt, byte controller, uint sequence)
+        {
+            switch (prompt.messageType)
+            {
+                case YgoConstants.MSG_SELECT_IDLECMD:
+                case YgoConstants.MSG_SELECT_BATTLECMD:
+                    return HasHandAction(controller, sequence);
+                case YgoConstants.MSG_SELECT_CHAIN:
+                    return prompt.candidates.Exists(item => item.controller == controller &&
+                        item.location == YgoConstants.LOCATION_HAND && item.sequence == sequence);
+                case YgoConstants.MSG_SELECT_EFFECTYN:
+                    return prompt.promptCon == controller && prompt.promptLoc == YgoConstants.LOCATION_HAND &&
+                        prompt.promptSeq == sequence;
+                default:
+                    return false;
+            }
         }
 
         private static HandCardView CreateHandCard(RectTransform row, bool opponent)
         {
             var rect = LotdUiKit.FillRect("HandCard", row);
-            var border = LotdUiKit.AddImage(rect.gameObject, LotdUiKit.WhiteSprite, Color.clear, false, !opponent);
             var card = CompositeCardView.Create(rect, "CardView", duelArtwork: true);
             CardDragTrigger trigger = null;
+            Image glow = null;
             if (!opponent)
             {
+                LotdUiKit.AddImage(rect.gameObject, LotdUiKit.WhiteSprite, Color.clear);
+                var original = DuelVisualAssets.HandGlow;
+                var outline = LotdUiKit.FillRect("PlayableGlow", card.transform.Find("AspectBox"), original != null ? -10f : -9f);
+                outline.SetAsFirstSibling();
+                glow = LotdUiKit.AddImage(outline.gameObject, original ?? DuelStyle.HandGlow, Color.white, false, false);
+                glow.type = Image.Type.Sliced;
+                glow.fillCenter = false;
+                glow.pixelsPerUnitMultiplier = original != null ? 1.7f : 1f;
+                outline.gameObject.SetActive(false);
                 trigger = rect.gameObject.AddComponent<CardDragTrigger>();
                 trigger.EnableHoverLift = true;
             }
-            return new HandCardView { Rect = rect, Card = card, Border = border, Trigger = trigger };
+            return new HandCardView { Rect = rect, Card = card, PlayableGlow = glow, Trigger = trigger };
         }
 
         private static (Vector2 min, Vector2 max, float angle) HandCardBounds(RectTransform row, int count, int index, bool opponent)
@@ -1617,6 +1671,7 @@ namespace YGOPortable.UI
         public void Update()
         {
             if (_session == null || Root == null || !Root.activeSelf) return;
+            RefreshHandGlows();
             if (_phasePicker.activeSelf && (!CanAcceptPlayerAction ||
                 Input.GetKeyDown(KeyCode.Escape) || Input.GetMouseButtonDown(1)))
             {

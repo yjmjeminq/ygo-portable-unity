@@ -42,6 +42,7 @@ HUD_SPRITES = {
     "LPOpponent": "GUI_LP_Red",
     "Pause": "GUI_T_DuelButtonSubmenu01",
     "Log": "GUI_T_DuelButtonLog_Off_1",
+    "HandGlow": "GUI_T_ComCardLight2",
 }
 EFFECTS = {
     "Strike": "fxt_hitm_flash01.png",

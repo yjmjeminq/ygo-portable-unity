@@ -16,6 +16,7 @@ namespace YGOPortable.UI
 
         private static Texture2D _stone;
         private static Sprite _disc;
+        private static Sprite _handGlow;
         internal static Texture2D Stone => _stone ??= Resources.Load<Texture2D>("Duel/StonePaving");
         internal static Color Side(bool opponent) => opponent ? Opponent : Player;
 
@@ -81,6 +82,44 @@ namespace YGOPortable.UI
                 tex.Apply(false, true);
                 _disc = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
                 return _disc;
+            }
+        }
+
+        internal static Sprite HandGlow
+        {
+            get
+            {
+                if (_handGlow != null) return _handGlow;
+                const int size = 48;
+                const float radius = 4f;
+                var pixels = new Color32[size * size];
+                for (int y = 0; y < size; y++)
+                {
+                    for (int x = 0; x < size; x++)
+                    {
+                        var p = new Vector2(Mathf.Abs(x + .5f - size * .5f), Mathf.Abs(y + .5f - size * .5f));
+                        var q = p - Vector2.one * (size * .5f - 9f - radius);
+                        float outside = new Vector2(Mathf.Max(q.x, 0f), Mathf.Max(q.y, 0f)).magnitude;
+                        float distance = Mathf.Abs(outside + Mathf.Min(Mathf.Max(q.x, q.y), 0f) - radius);
+                        float core = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.55f, 2.2f, distance));
+                        float halo = Mathf.Clamp01(1f - distance / 8.5f);
+                        var amber = Color.Lerp(new Color(1f, .64f, .10f), new Color(1f, .97f, .62f), core);
+                        amber.a = Mathf.Max(core, halo * halo * .81f);
+                        pixels[y * size + x] = amber;
+                    }
+                }
+
+                var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+                {
+                    name = "Playable hand card glow",
+                    wrapMode = TextureWrapMode.Clamp,
+                    filterMode = FilterMode.Bilinear,
+                };
+                texture.SetPixels32(pixels);
+                texture.Apply(false, true);
+                _handGlow = Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(.5f, .5f),
+                    100f, 0, SpriteMeshType.FullRect, new Vector4(18f, 18f, 18f, 18f));
+                return _handGlow;
             }
         }
 

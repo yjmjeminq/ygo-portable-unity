@@ -18,6 +18,7 @@ namespace YGOPortable.UI
         internal static Sprite DeckBack { get; } = LoadHudSprite("DeckBack");
         internal static Sprite PauseIcon { get; } = LoadHudSprite("Pause");
         internal static Sprite LogIcon { get; } = LoadHudSprite("Log");
+        internal static Sprite HandGlow { get; } = LoadHudSprite("HandGlow", Vector4.one * 20f);
         private static readonly Sprite DrawPhase = LoadHudSprite("PhaseDraw");
         private static readonly Sprite StandbyPhase = LoadHudSprite("PhaseStandby");
         private static readonly Sprite MainOnePhase = LoadHudSprite("PhaseMain1");
@@ -37,8 +38,8 @@ namespace YGOPortable.UI
             _ => null,
         };
 
-        private static Sprite LoadHudSprite(string name) =>
-            AsSprite(LoadTexture(Path.Combine("Hud", name + ".png"), TextureWrapMode.Clamp));
+        private static Sprite LoadHudSprite(string name, Vector4 border = default) =>
+            AsSprite(LoadTexture(Path.Combine("Hud", name + ".png"), TextureWrapMode.Clamp), border);
 
         internal static Sprite Effect(DuelEffectKind kind)
         {
@@ -58,9 +59,9 @@ namespace YGOPortable.UI
             return AsSprite(LoadTexture(path, TextureWrapMode.Clamp));
         }
 
-        private static Sprite AsSprite(Texture2D texture) => texture == null ? null :
+        private static Sprite AsSprite(Texture2D texture, Vector4 border = default) => texture == null ? null :
             Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(.5f, .5f),
-                100f, 0, SpriteMeshType.FullRect);
+                100f, 0, SpriteMeshType.FullRect, border);
 
         private static Texture2D LoadTexture(string name, TextureWrapMode wrapMode)
         {

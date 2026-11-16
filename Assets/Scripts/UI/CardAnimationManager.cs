@@ -56,7 +56,8 @@ namespace YGOPortable.UI
 
     public class CardAnimationManager : MonoBehaviour
     {
-        public static CardAnimationManager Instance { get; private set; }
+        private static CardAnimationManager _instance;
+        public static CardAnimationManager Instance => _instance != null ? _instance : null;
 
         private readonly Queue<IEnumerator> _steps = new Queue<IEnumerator>();
         private readonly Stack<CompositeCardView> _cards = new Stack<CompositeCardView>();
@@ -75,10 +76,10 @@ namespace YGOPortable.UI
             var group = layer.gameObject.AddComponent<CanvasGroup>();
             group.interactable = false;
             group.blocksRaycasts = false;
-            Instance = layer.gameObject.AddComponent<CardAnimationManager>();
-            Instance._layer = layer;
-            Instance.BringToFront();
-            return Instance;
+            _instance = layer.gameObject.AddComponent<CardAnimationManager>();
+            _instance._layer = layer;
+            _instance.BringToFront();
+            return _instance;
         }
 
         public void BringToFront()
@@ -105,6 +106,7 @@ namespace YGOPortable.UI
 
         private void OnDestroy()
         {
+            if (ReferenceEquals(_instance, this)) _instance = null;
             ReleaseSummonArt();
         }
 
