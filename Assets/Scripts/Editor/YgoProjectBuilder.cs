@@ -772,6 +772,56 @@ namespace YGOPortable.Editor
             return null;
         }
 
+        private static byte[] VerifyAnnounceCardSelection(DuelSession session, DuelPrompt prompt, uint code)
+        {
+            var canvas = new GameObject("Card Declaration Test", typeof(Canvas));
+            try
+            {
+                byte[] response = null;
+                var modals = new DuelPromptModals(canvas.transform, _ => { }, bytes => response = bytes);
+                modals.ShowPrompt(session, prompt);
+                var window = modals.ModalRoot.transform.Find("Win");
+                var input = window.Find("Body/Search/Inp").GetComponent<InputField>();
+                var confirm = window.Find("Footer/Btn_선언 확정/B").GetComponent<Button>();
+                var list = window.Find("Body/List");
+
+                Button FindChoice() => list.GetComponentsInChildren<Button>()
+                    .SingleOrDefault(button => button.name == $"Dec_{code}");
+
+                confirm.onClick.Invoke();
+                AssertTrue(!confirm.interactable && response == null && modals.IsPromptOpen,
+                    "Card declaration confirmed a hidden default before selecting a card.");
+
+                input.text = "증식의G";
+                var byName = FindChoice();
+                AssertTrue(byName != null, "Normalized Korean card name did not return Maxx C.");
+                byName.onClick.Invoke();
+                AssertTrue(confirm.interactable && response == null, "Selecting Maxx C did not enable explicit confirmation.");
+
+                input.text = "결과 없는 검색어 31415927";
+                confirm.onClick.Invoke();
+                AssertTrue(FindChoice() == null && !confirm.interactable && response == null &&
+                    modals.IsPromptOpen && ReferenceEquals(session.ActivePrompt, prompt),
+                    "An empty search retained a stale selection or consumed the declaration prompt.");
+
+                input.text = code.ToString();
+                var byPasscode = FindChoice();
+                AssertTrue(byPasscode != null && !confirm.interactable,
+                    "Exact passcode search did not find the card without selecting it.");
+                byPasscode.onClick.Invoke();
+                confirm.onClick.Invoke();
+                AssertTrue(response != null && response.Length == sizeof(uint) && BitConverter.ToUInt32(response, 0) == code &&
+                    !modals.IsPromptOpen && ReferenceEquals(session.ActivePrompt, prompt),
+                    "Explicit declaration confirmation did not send the native card passcode.");
+                Debug.Log("[VERIFY ANNOUNCE CARD UI] Normalized name and exact passcode search passed; empty queries cannot confirm hidden or stale choices.");
+                return response;
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(canvas);
+            }
+        }
+
         private static void VerifyOtherCardEffects(uint[] oppDeckMain)
         {
             var ai = new TacticalAI();
@@ -817,7 +867,7 @@ namespace YGOPortable.Editor
                     if (p.messageType != YgoConstants.MSG_ANNOUNCE_CARD) return null;
                     uint[] valid = YgoNativeBridge.FilterDeclarableCards(p.options.ToArray(), 20000);
                     AssertTrue(Array.IndexOf(valid, 23434538u) >= 0, "Prohibition (0-opcode) failed to list Maxx C (23434538)");
-                    return BitConverter.GetBytes((int)23434538);
+                    return VerifyAnnounceCardSelection(s, p, 23434538u);
                 });
                 int act2 = s.ActivePrompt.activatable.FindIndex(a => a.code == 65681983);
                 AssertTrue(act2 >= 0, "Crossout Designator not activatable after Prohibition");

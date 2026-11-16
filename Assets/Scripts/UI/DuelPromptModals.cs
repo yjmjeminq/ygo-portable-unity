@@ -176,7 +176,6 @@ namespace YGOPortable.UI
         {
             if (!IsPromptOpen || IsZoneViewerOpen) return;
             LotdAudio.PlayClick();
-            EventSystem.current?.SetSelectedGameObject(null);
             SetFieldView(!IsShowingField);
         }
 
@@ -1047,54 +1046,71 @@ namespace YGOPortable.UI
         private void RenderAnnounceCard(DuelPrompt p)
         {
             _modalTitle.text = "카드명 선언";
-            _modalSubtitle.text = "선언할 카드 이름을 검색하여 선택하세요.";
 
             uint[] validCodes = YgoNativeBridge.FilterDeclarableCards(p.options.ToArray(), 20000);
-            if (validCodes.Length == 0) validCodes = new[] { 89631139u };
-            uint pickedCode = validCodes[0];
+            uint pickedCode = 0;
+            Outline pickedOutline = null;
+            var confirm = AddFooterButton("선언 확정", () =>
+            {
+                if (pickedCode != 0) Submit(BitConverter.GetBytes(pickedCode));
+            }, true);
 
             var inpRt = LotdUiKit.CreateRect("Search", _modalBody, new Vector2(0.02f, 0.87f), new Vector2(0.98f, 0.99f), Vector2.zero, Vector2.zero);
-            var inp = LotdUiKit.CreateInputField(inpRt, "Inp", "선언할 카드명 입력 (한글)...", 16);
+            var inp = LotdUiKit.CreateInputField(inpRt, "Inp", "카드 이름 또는 카드 번호", 16);
 
             var gridHolder = LotdUiKit.CreateRect("List", _modalBody, new Vector2(0.0f, 0.0f), new Vector2(1f, 0.84f), Vector2.zero, Vector2.zero);
-            CreateHorizontalCardGrid(gridHolder, out Transform grid, 128, 178);
+            var scroll = CreateHorizontalCardGrid(gridHolder, out Transform grid, 128, 178).GetComponent<ScrollRect>();
+            var empty = LotdUiKit.AddFittedText(gridHolder, "Empty", "조건에 맞는 카드가 없습니다.", 18, 12,
+                TextAnchor.MiddleCenter, DuelStyle.Muted);
 
-            Action<string> refresh = q =>
+            void Refresh(string query)
             {
+                const int maxVisible = 40;
+                pickedCode = 0;
+                pickedOutline = null;
+                confirm.interactable = false;
                 ClearChildren(grid);
-
-                string qLow = (q ?? "").Trim().ToLowerInvariant();
-                int shown = 0;
+                scroll.StopMovement();
+                scroll.content.anchoredPosition = Vector2.zero;
+                var filter = new DeckCardFilter(query, "");
+                int matches = 0;
                 foreach (uint code in validCodes)
                 {
-                    var info = CardDatabase.Get(code);
-                    string cname = info != null ? info.name : $"카드 #{code}";
-                    if (!string.IsNullOrEmpty(qLow) && (cname == null || !cname.ToLowerInvariant().Contains(qLow)))
-                        continue;
+                    string name = CardDatabase.GetName(code);
+                    if (!filter.MatchesNameOrPasscode(code, name)) continue;
+                    if (++matches > maxVisible) continue;
 
                     var tile = DuelStyle.Panel(grid, $"Dec_{code}", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
                     var cRt = LotdUiKit.CreateRect("C", tile, new Vector2(0.10f, 0.22f), new Vector2(0.90f, 0.95f), Vector2.zero, Vector2.zero);
                     CompositeCardView.Create(cRt, "V", false, duelArtwork: true).SetCard(code);
-                    LotdUiKit.AddText(LotdUiKit.CreateRect("L", tile, new Vector2(0.04f, 0.02f), new Vector2(0.96f, 0.20f), Vector2.zero, Vector2.zero),
-                        "T", cname, 11, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary);
+                    LotdUiKit.AddFittedText(LotdUiKit.CreateRect("L", tile, new Vector2(0.04f, 0.02f),
+                        new Vector2(0.96f, 0.20f), Vector2.zero, Vector2.zero), "T", name, 12, 8,
+                        TextAnchor.MiddleCenter, LotdUiKit.TextPrimary);
 
+                    var outline = tile.GetComponent<Outline>();
                     var btn = tile.gameObject.AddComponent<Button>();
                     btn.targetGraphic = tile.GetComponent<Image>();
                     var trig = tile.gameObject.AddComponent<CardDragTrigger>();
                     trig.OnPointerEnterAction = () => _onInspectCard?.Invoke(code);
                     btn.onClick.AddListener(() =>
                     {
+                        if (!CanAnswerPrompt || !ReferenceEquals(_curPrompt, p) || !tile.gameObject.activeInHierarchy) return;
+                        if (pickedOutline != null) pickedOutline.effectColor = DuelStyle.BorderColor;
+                        pickedOutline = outline;
+                        pickedOutline.effectColor = DuelStyle.Gold;
                         pickedCode = code;
+                        confirm.interactable = true;
                         _onInspectCard?.Invoke(code);
-                        _modalSubtitle.text = $"선택된 선언 카드: {cname}";
+                        _modalSubtitle.text = $"선택한 카드 · {name}";
                     });
-                    if (++shown >= 40) break;
                 }
-            };
-            inp.onValueChanged.AddListener(v => refresh(v));
-            refresh("");
-
-            AddFooterButton("선언 확정", () => Submit(BitConverter.GetBytes(pickedCode)), true);
+                empty.gameObject.SetActive(matches == 0);
+                _modalSubtitle.text = matches > maxVisible
+                    ? $"후보 {matches:N0}장 · 처음 {maxVisible}장 표시 · 카드 이름이나 번호로 좁혀 보세요."
+                    : $"후보 {matches:N0}장";
+            }
+            inp.onValueChanged.AddListener(Refresh);
+            Refresh("");
         }
 
         // ==================== ZONE VIEWER ====================

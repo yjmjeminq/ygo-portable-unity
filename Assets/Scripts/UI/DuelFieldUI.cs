@@ -704,12 +704,12 @@ namespace YGOPortable.UI
             if (p == null || p.playerId != _session.HumanPlayerIndex) return false;
 
             if (_preferredDropZone.HasValue &&
-                (p.messageType == YgoConstants.MSG_SELECT_PLACE || p.messageType == YgoConstants.MSG_SELECT_DISFIELD) &&
-                p.min <= 1)
+                (p.messageType == YgoConstants.MSG_SELECT_PLACE || p.messageType == YgoConstants.MSG_SELECT_DISFIELD))
             {
                 var target = _preferredDropZone.Value;
                 _preferredDropZone = null;
-                if (IsPlaceSelectable(target.con, target.loc, target.seq))
+                if (p.messageType == YgoConstants.MSG_SELECT_PLACE && p.min == 1 &&
+                    IsPlaceSelectable(target.con, target.loc, target.seq))
                 {
                     byte[] resp = { target.con, (byte)target.loc, (byte)target.seq };
                     _pendingPlaces.Clear();
@@ -1188,11 +1188,13 @@ namespace YGOPortable.UI
             byte me = (byte)_session.HumanPlayerIndex;
             if (source == DragSourceType.Hand)
             {
+                var card = CardDatabase.Get(cardCode);
                 var actions = CollectActions(me, YgoConstants.LOCATION_HAND, (uint)sourceIndex);
                 foreach (var act in actions)
                 {
-                    if (act.label.Contains("소환") || act.label.Contains("몬스터 세트")) _dragHighlightMZone = true;
-                    if (act.label.Contains("발동") || act.label.Contains("마법/함정 세트")) _dragHighlightSZone = true;
+                    uint placement = HandActionPlacement(p.messageType, card, act.responseVal);
+                    _dragHighlightMZone |= placement == YgoConstants.LOCATION_MZONE;
+                    _dragHighlightSZone |= placement == YgoConstants.LOCATION_SZONE;
                 }
             }
             else if (source == DragSourceType.ExtraDeck)
@@ -1284,7 +1286,6 @@ namespace YGOPortable.UI
             // 2. Extra Deck Monster Dragged onto Board
             else if (ctx.SourceType == DragSourceType.ExtraDeck)
             {
-                _preferredDropZone = null;
                 if (p.messageType != YgoConstants.MSG_SELECT_IDLECMD ||
                     ctx.CustomData is not LiveCardState card || !_session.Players[me].extra.Contains(card))
                 {
@@ -1305,9 +1306,9 @@ namespace YGOPortable.UI
                         .Where(action => (action.responseVal & 0xffff) == 1).ToList();
                     if (summons.Count > 0)
                     {
-                        _preferredDropZone = (me, YgoConstants.LOCATION_MZONE, (uint)target);
-                        if (summons.Count == 1) ExecuteActionInt(summons[0].responseVal);
-                        else PopulateAndShowActionPopup(CardDatabase.GetName(card.code), summons, null);
+                        var placement = (me, YgoConstants.LOCATION_MZONE, (uint)target);
+                        if (summons.Count == 1) ExecuteActionInt(summons[0].responseVal, placement);
+                        else PopulateAndShowActionPopup(CardDatabase.GetName(card.code), summons, null, placement: placement);
                         return;
                     }
                 }
@@ -1397,57 +1398,31 @@ namespace YGOPortable.UI
                 return;
             }
 
-            // Remember the target zone so if ygopro-core asks MSG_SELECT_PLACE next, we place it here automatically
-            _preferredDropZone = (con, loc, seq);
-
-            // In Main Phase (MSG_SELECT_IDLECMD) or Battle Phase (MSG_SELECT_BATTLECMD)
-            var actions = CollectActions((byte)_session.HumanPlayerIndex, YgoConstants.LOCATION_HAND, handSeq);
-            if (actions.Count == 0)
-            {
-                _preferredDropZone = null;
-                Refresh();
-                return;
-            }
-
-            if (loc == YgoConstants.LOCATION_MZONE)
-            {
-                // Filter monster actions (Summon, SpSummon, Set)
-                var mActions = actions.Where(a => a.label.Contains("소환") || a.label.Contains("세트")).ToList();
-                if (mActions.Count == 1)
-                {
-                    ExecuteActionInt(mActions[0].responseVal);
-                    return;
-                }
-                else if (mActions.Count > 1)
-                {
-                    PopulateAndShowActionPopup(CardDatabase.GetName(cardCode), mActions, null);
-                    return;
-                }
-            }
-            else if (loc == YgoConstants.LOCATION_SZONE)
-            {
-                // Filter spell/trap actions (Activate, Set)
-                var sActions = actions.Where(a => a.label.Contains("발동") || a.label.Contains("세트")).ToList();
-                if (sActions.Count == 1)
-                {
-                    ExecuteActionInt(sActions[0].responseVal);
-                    return;
-                }
-                else if (sActions.Count > 1)
-                {
-                    PopulateAndShowActionPopup(CardDatabase.GetName(cardCode), sActions, null);
-                    return;
-                }
-            }
-
+            var card = CardDatabase.Get(cardCode);
+            var actions = CollectActions(con, YgoConstants.LOCATION_HAND, handSeq);
+            actions.RemoveAll(action => HandActionPlacement(p.messageType, card, action.responseVal) != loc);
+            var placement = (con, loc, seq);
             if (actions.Count == 1)
+                ExecuteActionInt(actions[0].responseVal, placement);
+            else if (actions.Count > 1)
+                PopulateAndShowActionPopup(CardDatabase.GetName(cardCode), actions, null, placement: placement);
+            else
+                Refresh();
+        }
+
+        private static uint HandActionPlacement(byte messageType, CardInfo card, int response)
+        {
+            int command = response & 0xffff;
+            if (messageType == YgoConstants.MSG_SELECT_IDLECMD)
             {
-                ExecuteActionInt(actions[0].responseVal);
-                return;
+                if (command is 0 or 1 or 3) return YgoConstants.LOCATION_MZONE;
+                if (command == 4) return YgoConstants.LOCATION_SZONE;
             }
 
-            // Fallback: show all available actions
-            PopulateAndShowActionPopup(CardDatabase.GetName(cardCode), actions, null);
+            bool activation = messageType == YgoConstants.MSG_SELECT_IDLECMD && command == 5 ||
+                messageType == YgoConstants.MSG_SELECT_BATTLECMD && command == 0;
+            return activation && card != null && (card.IsSpell || card.IsTrap || card.IsPendulum)
+                ? YgoConstants.LOCATION_SZONE : 0;
         }
 
         private void TryAttackOpponentSlot(uint mySeq, uint targetSeq, bool isDirect)
@@ -1820,23 +1795,30 @@ namespace YGOPortable.UI
                 }
             }
 
-            // Global Confirm via Enter / KeypadEnter
             if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
-            {
-                if (IsPaused || IsPresenting || IsBrowsingZone) return;
-                if (_modals != null && _modals.ResultRoot != null && _modals.ResultRoot.activeSelf)
-                {
-                    _modals.TriggerRematch();
-                }
-                else if (_modals != null && _modals.ModalRoot != null && _modals.ModalRoot.activeSelf)
-                {
-                    _modals.TryConfirm();
-                }
-            }
+                HandleKeyboardConfirm();
         }
 
+        private void HandleKeyboardConfirm()
+        {
+            if (IsPaused || IsPresenting || IsBrowsingZone || _cardZoomModal.activeSelf ||
+                _actionPopup.activeSelf || _phasePicker.activeSelf) return;
 
+            bool result = _modals.ResultRoot.activeInHierarchy;
+            var panel = result ? _modals.ResultRoot : _modals.ModalRoot;
+            if (!panel.activeInHierarchy) return;
 
+            var events = EventSystem.current;
+            if (events != null && events.sendNavigationEvents && FocusHandlesSubmit(events.currentSelectedGameObject, panel))
+                return;
+
+            if (result) _modals.TriggerRematch();
+            else _modals.TryConfirm();
+        }
+
+        private static bool FocusHandlesSubmit(GameObject control, GameObject panel) =>
+            control != null && control.transform.IsChildOf(panel.transform) &&
+            ExecuteEvents.CanHandleEvent<ISubmitHandler>(control);
         // ==================== PROMPT INTERACTIONS ====================
         private bool IsPlacePending(byte con, uint loc, uint seq)
         {
@@ -1941,9 +1923,10 @@ namespace YGOPortable.UI
             return res;
         }
 
-        private void ExecuteActionInt(int responseVal)
+        private void ExecuteActionInt(int responseVal, (byte con, uint loc, uint seq)? placement = null)
         {
             if (!CanAcceptPlayerAction || IsBrowsingZone) return;
+            _preferredDropZone = placement;
             LotdAudio.PlayClick();
             _actionPopup.SetActive(false);
             _modals.HideAll();
@@ -2077,7 +2060,7 @@ namespace YGOPortable.UI
         }
 
         private void PopulateAndShowActionPopup(string header, List<(string label, int responseVal, bool gold)> actions,
-            List<uint> overlays, RectTransform anchor = null)
+            List<uint> overlays, RectTransform anchor = null, (byte con, uint loc, uint seq)? placement = null)
         {
             bool hasMaterials = overlays != null && overlays.Count > 0;
             if (actions.Count == 0 && !hasMaterials)
@@ -2096,7 +2079,7 @@ namespace YGOPortable.UI
                 AddActionRow(action.label, () =>
                 {
                     if (_session == session && ReferenceEquals(session.ActivePrompt, prompt))
-                        ExecuteActionInt(command);
+                        ExecuteActionInt(command, placement);
                 }, action.gold, CommandIcon(command));
             }
             if (hasMaterials)

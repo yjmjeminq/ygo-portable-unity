@@ -75,6 +75,12 @@ namespace YGOPortable.UI
             (0x001, "↙ 왼쪽 아래"), (0x002, "↓ 아래"), (0x004, "↘ 오른쪽 아래"),
         };
 
+        private static readonly Facet[] MonsterFacets =
+        {
+            Facet.MonsterType, Facet.Race, Facet.Attribute, Facet.Level, Facet.Rank,
+            Facet.LinkRating, Facet.PendulumScale, Facet.LinkMarker,
+        };
+
         private readonly Dropdown[] _facetControls = new Dropdown[(int)Facet.Count];
         private readonly int[] _savedFacets = new int[(int)Facet.Count];
         private readonly InputField[] _statInputs = new InputField[4];
@@ -172,9 +178,91 @@ namespace YGOPortable.UI
 
         private void OnDetailedChoiceChanged(Facet facet, int index)
         {
+            if (facet == Facet.Kind)
+            {
+                SyncDetailedKind();
+                return;
+            }
+            if (index != 0 && (facet == Facet.Frame || facet == Facet.SpellTrap))
+            {
+                uint mask = facet == Facet.Frame ? FrameOptions[index].mask : SpellTrapTypes[index].required;
+                var kind = (DeckCardKind)_facetControls[(int)Facet.Kind].value;
+                var implied = KindForMask(mask);
+                if (facet == Facet.Frame && (mask & TYPE_MONSTER) != 0)
+                    _facetControls[(int)Facet.SpellTrap].SetValueWithoutNotify(0);
+                if (!KindAllowsMask(kind, mask) || kind == DeckCardKind.Any && implied != DeckCardKind.Any)
+                {
+                    _facetControls[(int)Facet.Kind].SetValueWithoutNotify((int)implied);
+                    SyncDetailedKind();
+                }
+            }
             if (index == 0 || (facet != Facet.Level && facet != Facet.Rank && facet != Facet.LinkRating)) return;
             foreach (var metric in new[] { Facet.Level, Facet.Rank, Facet.LinkRating })
                 if (metric != facet) _facetControls[(int)metric].SetValueWithoutNotify(0);
+        }
+
+        private static DeckCardKind KindForMask(uint mask)
+        {
+            if ((mask & TYPE_SPELL) != 0) return DeckCardKind.Spell;
+            if ((mask & TYPE_TRAP) != 0) return DeckCardKind.Trap;
+            if ((mask & TYPE_EXTRA) != 0) return DeckCardKind.ExtraDeck;
+            if ((mask & TYPE_RITUAL) != 0) return DeckCardKind.MainMonster;
+            return DeckCardKind.Any;
+        }
+
+        private static bool KindAllowsMask(DeckCardKind kind, uint mask)
+        {
+            if (mask == 0 || kind == DeckCardKind.Any) return true;
+            if (kind == DeckCardKind.Spell) return (mask & TYPE_SPELL) != 0;
+            if (kind == DeckCardKind.Trap) return (mask & TYPE_TRAP) != 0;
+            return (mask & TYPE_MONSTER) != 0 &&
+                (kind == DeckCardKind.MainMonster ? (mask & TYPE_EXTRA) == 0 : (mask & TYPE_RITUAL) == 0);
+        }
+
+        private static void ClearIncompatibleFacets(DeckCardKind kind, Func<Facet, int> get, Action<Facet> clear)
+        {
+            if (!KindAllowsMask(kind, FrameOptions[get(Facet.Frame)].mask)) clear(Facet.Frame);
+            if (!KindAllowsMask(kind, SpellTrapTypes[get(Facet.SpellTrap)].required)) clear(Facet.SpellTrap);
+            if (kind == DeckCardKind.Spell || kind == DeckCardKind.Trap)
+            {
+                foreach (var facet in MonsterFacets) clear(facet);
+            }
+            else if (kind == DeckCardKind.MainMonster)
+            {
+                clear(Facet.Rank);
+                clear(Facet.LinkRating);
+                clear(Facet.LinkMarker);
+            }
+        }
+
+        private void ChangeTrunkKind(int choice)
+        {
+            var kind = (DeckCardKind)choice;
+            ClearIncompatibleFacets(kind, facet => _savedFacets[(int)facet], facet => _savedFacets[(int)facet] = 0);
+            if (kind == DeckCardKind.Spell || kind == DeckCardKind.Trap)
+                Array.Clear(_savedStats, 0, _savedStats.Length);
+            RefreshTrunkFilter();
+        }
+
+        private void SyncDetailedKind()
+        {
+            var kind = (DeckCardKind)_facetControls[(int)Facet.Kind].value;
+            ClearIncompatibleFacets(kind, facet => _facetControls[(int)facet].value,
+                facet => _facetControls[(int)facet].SetValueWithoutNotify(0));
+            bool nonMonster = kind == DeckCardKind.Spell || kind == DeckCardKind.Trap;
+            foreach (var facet in MonsterFacets)
+                _facetControls[(int)facet].interactable = !nonMonster;
+            if (kind == DeckCardKind.MainMonster)
+            {
+                _facetControls[(int)Facet.Rank].interactable = false;
+                _facetControls[(int)Facet.LinkRating].interactable = false;
+                _facetControls[(int)Facet.LinkMarker].interactable = false;
+            }
+            foreach (var input in _statInputs)
+            {
+                input.interactable = !nonMonster;
+                if (nonMonster) input.SetTextWithoutNotify("");
+            }
         }
 
         private void OpenDetailedSearch()
@@ -185,6 +273,7 @@ namespace YGOPortable.UI
             for (int i = 0; i < _statInputs.Length; i++)
                 _statInputs[i].SetTextWithoutNotify(_savedStats[i]?.ToString() ?? "");
             _effectTextInput.SetTextWithoutNotify(_savedEffectText);
+            SyncDetailedKind();
             _filterError.text = "";
             EventSystem.current?.SetSelectedGameObject(null);
             _cardFilterDialog.transform.SetAsLastSibling();
@@ -196,6 +285,7 @@ namespace YGOPortable.UI
             foreach (var choice in _facetControls) choice.SetValueWithoutNotify(0);
             foreach (var input in _statInputs) input.SetTextWithoutNotify("");
             _effectTextInput.SetTextWithoutNotify("");
+            SyncDetailedKind();
             _filterError.text = "";
         }
 

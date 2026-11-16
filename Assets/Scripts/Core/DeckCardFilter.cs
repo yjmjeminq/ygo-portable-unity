@@ -114,9 +114,11 @@ namespace YGOPortable.Core
                 _effectText.Length != 0 && !Contains(card.desc, _effectText))
                 return false;
 
-            return _query.Length == 0 || _passcode != 0 && card.code == _passcode ||
-                Contains(card.name, _query) || Contains(card.desc, _query) || ContainsCompactName(card.name);
+            return _query.Length == 0 || Contains(card.desc, _query) || MatchesNameOrPasscode(card.code, card.name);
         }
+
+        internal bool MatchesNameOrPasscode(uint code, string name) => _query.Length == 0 ||
+            _passcode != 0 && code == _passcode || Contains(name, _query) || ContainsCompactName(name);
 
         private bool MatchesKind(CardInfo card) => _kind switch
         {

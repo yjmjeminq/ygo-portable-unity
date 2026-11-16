@@ -56,6 +56,7 @@ namespace YGOPortable.UI
         private RectTransform _trunkViewport;
         private Text _trunkHeading;
         private Text _trunkCountText;
+        private Button _showAllCards;
         private Text _noTrunkResults;
         private uint _relatedFilterCode = 0;
         private ArchetypeInfo _activeArchetypeFilter = null;
@@ -280,14 +281,19 @@ namespace YGOPortable.UI
 
             var caption = LotdUiKit.CreateRect("TrunkHeading", col, new Vector2(0.034f, 0.929f), new Vector2(0.97f, 0.986f),
                 Vector2.zero, Vector2.zero);
-            var heading = LotdUiKit.CreateRect("Title", caption, Vector2.zero, new Vector2(0.74f, 1f),
+            var heading = LotdUiKit.CreateRect("Title", caption, Vector2.zero, new Vector2(0.56f, 1f),
                 Vector2.zero, Vector2.zero);
             _trunkHeading = LotdUiKit.AddText(heading, "Label", "보관함", 19, TextAnchor.MiddleLeft,
                 LotdUiKit.CyanAccent, FontStyle.Bold);
             _trunkHeading.resizeTextForBestFit = true;
             _trunkHeading.resizeTextMinSize = 12;
             _trunkHeading.resizeTextMaxSize = 19;
-            _trunkCountText = LotdUiKit.AddText(caption, "Count", "", 16, TextAnchor.MiddleRight, Color.white, FontStyle.Bold);
+            var showAll = LotdUiKit.CreateRect("ShowAll", caption, new Vector2(.57f, .095f), new Vector2(.82f, .905f),
+                Vector2.zero, Vector2.zero);
+            _showAllCards = LotdUiKit.CreateLotdButton(showAll, "Button", "전체 카드", ExitTrunkScope, 12);
+            var count = LotdUiKit.CreateRect("Total", caption, new Vector2(.835f, 0f), Vector2.one,
+                Vector2.zero, Vector2.zero);
+            _trunkCountText = LotdUiKit.AddFittedText(count, "Count", "", 16, 9, TextAnchor.MiddleRight, Color.white, FontStyle.Bold);
 
             var searchRow = LotdUiKit.CreateRect("SearchRow", col, new Vector2(0.034f, 0.874f),
                 new Vector2(0.97f, 0.926f), Vector2.zero, Vector2.zero);
@@ -301,18 +307,18 @@ namespace YGOPortable.UI
 
             var filters = LotdUiKit.CreateRect("Filters", col, new Vector2(0.034f, 0.816f), new Vector2(0.97f, 0.867f),
                 Vector2.zero, Vector2.zero);
-            Dropdown AddFilter(string name, float left, float right, IReadOnlyList<string> choices)
+            Dropdown AddFilter(string name, float left, float right, IReadOnlyList<string> choices, Action<int> changed)
             {
                 var slot = LotdUiKit.CreateRect(name, filters, new Vector2(left, 0f), new Vector2(right, 1f),
                     Vector2.zero, Vector2.zero);
-                return LotdUiKit.CreateLotdDropdown(slot, "Dropdown", choices, _ => RefreshTrunkFilter());
+                return LotdUiKit.CreateLotdDropdown(slot, "Dropdown", choices, changed);
             }
-            _kindFilter = AddFilter("Kind", 0f, 0.32f, CardKinds);
+            _kindFilter = AddFilter("Kind", 0f, 0.32f, CardKinds, ChangeTrunkKind);
             var advanced = LotdUiKit.CreateRect("DetailedSearch", filters, new Vector2(.337f, 0f),
                 new Vector2(.675f, 1f), Vector2.zero, Vector2.zero);
             _detailButtonText = LotdUiKit.CreateLotdButton(advanced, "Button", "상세 검색", OpenDetailedSearch, 14, true)
                 .GetComponentInChildren<Text>();
-            _sortFilter = AddFilter("Sort", 0.69f, 1f, SortOptions);
+            _sortFilter = AddFilter("Sort", 0.69f, 1f, SortOptions, _ => RefreshTrunkFilter());
 
             var scrollHolder = LotdUiKit.CreateRect("TrunkScrollHolder", col,
                 new Vector2(0.034f, 0.035f), new Vector2(0.97f, 0.805f), Vector2.zero, Vector2.zero);
@@ -454,6 +460,13 @@ namespace YGOPortable.UI
             RefreshTrunkFilter();
         }
 
+        private void ExitTrunkScope()
+        {
+            _relatedFilterCode = 0;
+            _activeArchetypeFilter = null;
+            RefreshTrunkFilter();
+        }
+
         private void RefreshTrunkFilter()
         {
             _trunkResults.Clear();
@@ -461,6 +474,7 @@ namespace YGOPortable.UI
             UpdateDetailedSearchButton();
 
             IEnumerable<CardInfo> source = CardDatabase.AllCards;
+            _showAllCards.transform.parent.gameObject.SetActive(_activeArchetypeFilter != null || _relatedFilterCode != 0);
             _trunkHeading.text = "보관함";
             _trunkHeading.color = LotdUiKit.CyanAccent;
             if (_activeArchetypeFilter != null)
