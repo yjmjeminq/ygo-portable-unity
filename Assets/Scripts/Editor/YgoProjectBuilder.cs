@@ -273,6 +273,8 @@ namespace YGOPortable.Editor
                         }
 
                         var pr = session.ActivePrompt;
+                        if (pr.messageType == YgoConstants.MSG_SELECT_CHAIN)
+                            AssertTrue(pr.candidates.Count > 0, $"Duel {i + 1} exposed a chain prompt without any choices");
                         promptHistogram[pr.messageType] = promptHistogram.TryGetValue(pr.messageType, out int curCnt) ? curCnt + 1 : 1;
 
                         // Verify Extra/GY/Banished zone items match RefreshZonesFromCore snapshots

@@ -321,7 +321,14 @@ namespace YGOPortable.Core
                 }
                 if (status == YgoConstants.OCG_DUEL_STATUS_AWAITING)
                 {
-                    break;
+                    var prompt = ActivePrompt;
+                    if (prompt == null || prompt.messageType != YgoConstants.MSG_SELECT_CHAIN ||
+                        prompt.forced || prompt.candidates.Count != 0)
+                        break;
+
+                    // The core requests a pass even when no optional chain effects are available.
+                    ActivePrompt = null;
+                    YgoNativeBridge.SetResponseInt(NativePtr, -1);
                 }
             }
 
