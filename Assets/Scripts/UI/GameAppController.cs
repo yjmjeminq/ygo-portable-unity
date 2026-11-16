@@ -31,7 +31,7 @@ namespace YGOPortable.UI
         private DuelFieldUI _duelField;
 
         private DuelSession _session;
-        private readonly TacticalAI _ai = new TacticalAI();
+        private TacticalAI _ai;
         private DuelPrompt _shownHumanPrompt;
         private float _aiTimer;
         private bool _resultShown;
@@ -206,7 +206,7 @@ namespace YGOPortable.UI
 
             _session?.Dispose();
             _session = new DuelSession();
-            _ai.Difficulty = AiDifficulty;
+            _ai = new TacticalAI { Difficulty = AiDifficulty };
             _shownHumanPrompt = null;
             _aiTimer = 0f;
             _resultShown = false;

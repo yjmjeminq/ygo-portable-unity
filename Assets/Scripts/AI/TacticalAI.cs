@@ -561,9 +561,9 @@ namespace YGOPortable.AI
             var resp = new List<byte>(needed * 3);
 
             int[] mOrder = { 5, 6, 2, 1, 3, 0, 4 };
-            int[] sOrder = { 2, 1, 3, 0, 4 };
+            int[] sOrder = { 2, 1, 3, 0, 4, 5, 6, 7 };
 
-            void Scan(byte con, uint loc, int shift, int[] order, int seqOffset = 0)
+            void Scan(byte con, uint loc, int shift, int[] order)
             {
                 foreach (int idx in order)
                 {
@@ -572,17 +572,15 @@ namespace YGOPortable.AI
                     {
                         resp.Add(con);
                         resp.Add((byte)loc);
-                        resp.Add((byte)(seqOffset + idx));
+                        resp.Add((byte)idx);
                     }
                 }
             }
 
             Scan(me, YgoConstants.LOCATION_MZONE, 0, mOrder);
             Scan(me, YgoConstants.LOCATION_SZONE, 8, sOrder);
-            Scan(me, YgoConstants.LOCATION_SZONE, 14, new[] { 0, 1 }, 6);
             Scan(opp, YgoConstants.LOCATION_MZONE, 16, mOrder);
             Scan(opp, YgoConstants.LOCATION_SZONE, 24, sOrder);
-            Scan(opp, YgoConstants.LOCATION_SZONE, 30, new[] { 0, 1 }, 6);
 
             while (resp.Count < needed * 3)
             {

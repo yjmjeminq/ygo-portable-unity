@@ -352,10 +352,13 @@ namespace YGOPortable.Editor
             VerifyOtherCardEffects(classicDecks[0].main);
             VerifyPossessedDestiny(classicDecks[0].main);
             VerifyMandatoryBattleAttack();
+            VerifyAiFieldAndTributeChoices();
+            VerifyRainbowDarkDragonMatch();
 
             // Explicit test for Token generation, effect tokens (Swordsoul Tuner), dynamic/stat tokens, and token disappearance
             TestTokenAndComplexEffects.RunTokenSuiteHeadless();
             TestDuelZoneBrowser.Run();
+            TestDuelRematch.Run();
 
             AssertTrue(luaErrors.Count == 0, $"Native/Lua error logs detected: {string.Join(" | ", luaErrors.Take(3))}");
 
@@ -1327,6 +1330,64 @@ namespace YGOPortable.Editor
             AssertTrue(duel.RetryCount == 0 && duel.Players[0].mzone.Count(c => c != null && c.code == aussa) == 2,
                 "Possessed Destiny failed to Special Summon to the activating player's field");
             Debug.Log("[VERIFY POSSESSED DESTINY] Matching-Attribute Special Summon completed without retries.");
+        }
+
+        private static void VerifyRainbowDarkDragonMatch()
+        {
+            var rainbow = DeckRepository.PresetDecks.Single(deck => deck.id == 340);
+            var earthbound = DeckRepository.PresetDecks.Single(deck => deck.id == 36);
+            ulong[] seed = { 31157, 114085, 128029, 241025 };
+            using var session = new DuelSession();
+            var players = new[] { new TacticalAI(), new TacticalAI() };
+            var elapsed = System.Diagnostics.Stopwatch.StartNew();
+            AssertTrue(session.StartNewDuel(rainbow.main, rainbow.extra, earthbound.main, earthbound.extra, true, 8000, seed),
+                "Could not start the Rainbow Dark Dragon regression duel");
+            for (int step = 0; !session.IsFinished && step < 650; step++)
+            {
+                var prompt = session.ActivePrompt;
+                if (prompt == null)
+                    session.StepUntilPrompt();
+                else
+                    session.SubmitResponse(players[prompt.playerId].ComputeResponse(session, prompt));
+                AssertTrue(elapsed.Elapsed.TotalSeconds < 12,
+                    $"Rainbow Dark Dragon match spent {elapsed.Elapsed.TotalSeconds:F1}s by turn {session.TurnNumber}");
+            }
+            AssertTrue(session.IsFinished && session.RetryCount == 0, "Rainbow Dark Dragon regression duel stalled or retried");
+            Debug.Log($"[VERIFY RAINBOW DARK DRAGON] Completed {session.TurnNumber} turns in {elapsed.ElapsedMilliseconds} ms.");
+        }
+
+        private static void VerifyAiFieldAndTributeChoices()
+        {
+            using var duel = new DuelSession();
+            var ai = new TacticalAI();
+            foreach (byte current in new byte[] { 0, 1 })
+            {
+                var place = new DuelPrompt
+                {
+                    messageType = YgoConstants.MSG_SELECT_PLACE,
+                    playerId = current,
+                    min = 1,
+                    placeFlag = ~(1u << 13),
+                };
+                AssertTrue(ai.ComputeResponse(duel, place).SequenceEqual(new byte[] { current, (byte)YgoConstants.LOCATION_SZONE, 5 }),
+                    "AI could not select its own Field Zone");
+                place.placeFlag = ~(1u << 29);
+                AssertTrue(ai.ComputeResponse(duel, place).SequenceEqual(new byte[] { (byte)(1 - current), (byte)YgoConstants.LOCATION_SZONE, 5 }),
+                    "AI could not select the opponent's Field Zone");
+            }
+
+            var tribute = new DuelPrompt
+            {
+                messageType = YgoConstants.MSG_SELECT_TRIBUTE,
+                min = 2,
+                max = 2,
+            };
+            tribute.candidates.Add(new SelectableCardItem { code = 17444133, releaseParam = 2 });
+            tribute.candidates.Add(new SelectableCardItem { code = 46986414, releaseParam = 1 });
+            var response = ai.ComputeResponse(duel, tribute);
+            AssertTrue(response.Length == 12 && BitConverter.ToInt32(response, 4) == 1 && BitConverter.ToInt32(response, 8) == 0,
+                "AI did not count the double tribute as two tributes");
+            Debug.Log("[VERIFY AI CHOICES] Field Zones for both players and weighted tributes passed.");
         }
 
         private static void VerifyMandatoryBattleAttack()

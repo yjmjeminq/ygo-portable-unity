@@ -542,6 +542,16 @@ def build_script_pack(all_codes: set):
             b"c:IsCanBeSpecialSummoned(e,0,tp,false,false,",
         )
 
+    # Rainbow Dark Dragon cannot summon without seven names and room after banishing.
+    # Check both requirements before searching for a valid group of materials.
+    rainbow = scripts.get("c79407975.lua")
+    if rainbow is not None:
+        search = b"\treturn aux.SelectUnselectGroup(rg,e,tp,7,7,s.rescon,0)"
+        guard = b"\tif rg:GetClassCount(Card.GetCode)<7 or Duel.GetMZoneCount(tp,rg)<1 then return false end"
+        if guard not in rainbow:
+            newline = b"\r\n" if b"\r\n" in rainbow else b"\n"
+            scripts["c79407975.lua"] = rainbow.replace(search, guard + newline + search, 1)
+
     # Pack binary: YGOS + ver(1) + count + entries(16B each) + name_table + data_blob
     items = sorted(scripts.items(), key=lambda kv: kv[0])
     count = len(items)
