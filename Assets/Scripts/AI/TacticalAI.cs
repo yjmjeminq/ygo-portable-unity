@@ -125,7 +125,7 @@ namespace YGOPortable.AI
                 if (p.canBp && HasWorthwhileAttack(s, p.playerId)) return BitConverter.GetBytes(6);
                 if (p.canEp) return BitConverter.GetBytes(7);
             }
-            else if (DddTurnPlan.ChooseIdle(s, p, CanUseIdleAction) is int planned)
+            else if (ChoosePlannedIdle(s, p) is int planned)
             {
                 return EncodeIdleAction(p, planned & 0xffff, planned >> 16);
             }
@@ -133,12 +133,13 @@ namespace YGOPortable.AI
             // 1. High-ATK / Extra Deck Special Summons first
             if (p.spSummonable.Count > 0 && CountOwnMonsters(s, p.playerId) < 5)
             {
+                bool preserveBoard = FusionXyzTurnPlan.PreserveOpeningBoard(s, p.playerId);
                 int bestIdx = -1;
                 int bestScore = int.MinValue;
                 for (int i = 0; i < p.spSummonable.Count; i++)
                 {
                     var item = p.spSummonable[i];
-                    if (!CanUseIdleAction(1, item)) continue;
+                    if (!CanUseIdleAction(1, item) || (preserveBoard && item.location == YgoConstants.LOCATION_EXTRA)) continue;
                     var ci = CardDatabase.Get(item.code);
                     int score = (ci != null ? ci.atk : 1500) + ((ci != null && ci.IsExtra) ? 1200 : 400);
                     if (score > bestScore)
@@ -158,7 +159,7 @@ namespace YGOPortable.AI
                 for (int i = 0; i < p.activatable.Count; i++)
                 {
                     var act = p.activatable[i];
-                    if (!CanUseIdleAction(5, act)) continue;
+                    if (!CanUseIdleAction(5, act) || !SynchroTurnPlan.CanActivate(s, p, act)) continue;
                     var ci = CardDatabase.Get(act.code);
                     int score = 500;
                     if (ci != null)
@@ -252,6 +253,16 @@ namespace YGOPortable.AI
             return BitConverter.GetBytes(7);
         }
 
+        private int? ChoosePlannedIdle(DuelSession session, DuelPrompt prompt)
+        {
+            Func<int, SelectableCardItem, bool> canUse = CanUseIdleAction;
+            return DddTurnPlan.ChooseIdle(session, prompt, canUse)
+                ?? LinkTurnPlan.ChooseIdle(session, prompt, canUse)
+                ?? SynchroTurnPlan.ChooseIdle(session, prompt, canUse)
+                ?? FusionXyzTurnPlan.ChooseIdle(session, prompt, canUse)
+                ?? PendulumTurnPlan.ChooseIdle(session, prompt, canUse);
+        }
+
         private static string IdleActionKey(int command, SelectableCardItem item) => command == 1
             ? $"sp:{item.code}" : $"act:{item.code}:{item.description}:{item.location}:{item.sequence}";
 
@@ -281,6 +292,7 @@ namespace YGOPortable.AI
                 for (int i = 0; i < p.activatable.Count; i++)
                 {
                     var act = p.activatable[i];
+                    if (!SynchroTurnPlan.CanActivate(s, p, act)) continue;
                     string key = $"bpact:{act.code}:{act.description}:{act.sequence}";
                     if (_effectCounts.ContainsKey(key)) continue;
                     BumpKey(key);
@@ -371,6 +383,7 @@ namespace YGOPortable.AI
             for (int i = 0; i < p.candidates.Count; i++)
             {
                 var c = p.candidates[i];
+                if (!SynchroTurnPlan.CanActivate(s, p, c)) continue;
                 string key = $"ch:{s.TurnNumber}:{c.code}:{c.description}:{s.CurrentChain.Count}";
                 if (_effectCounts.ContainsKey(key)) continue;
                 BumpKey(key);
@@ -389,10 +402,23 @@ namespace YGOPortable.AI
 
         private byte[] BuildSelectCard(DuelSession s, DuelPrompt p)
         {
-            if (p.min == 1 && p.max == 1 && DddTurnPlan.ChooseCard(s, p) is int planned)
+            if (p.min == 1 && p.max == 1 &&
+                (DddTurnPlan.ChooseCard(s, p) ?? LinkTurnPlan.ChooseCard(s, p) ??
+                SynchroTurnPlan.ChooseCard(s, p) ?? FusionXyzTurnPlan.ChooseCard(s, p)) is int planned)
                 return PackIndexList(new[] { planned });
 
-            bool removalHint = s.LastHintMsg == 500 || s.LastHintMsg == 501 || s.LastHintMsg == 502 || s.LastHintMsg == 504;
+            const ulong negateTarget = 575;
+            if (s.LastHintMsg == negateTarget && p.min == 1 && p.max == 1 &&
+                s.CurrentChain.LastOrDefault() is ChainLinkInfo opposingEffect && opposingEffect.triggerPlayer != p.playerId &&
+                opposingEffect.triggerLoc == YgoConstants.LOCATION_MZONE)
+            {
+                int target = p.candidates.FindIndex(card => card.controller == opposingEffect.triggerPlayer &&
+                    card.location == opposingEffect.triggerLoc && card.sequence == opposingEffect.triggerSeq &&
+                    card.code == opposingEffect.code);
+                if (target >= 0) return PackIndexList(new[] { target });
+            }
+
+            bool removalHint = s.LastHintMsg is 500 or 501 or 502 or 504 or negateTarget;
             int opp = 1 - p.playerId;
 
             var ranked = p.candidates
@@ -431,8 +457,9 @@ namespace YGOPortable.AI
             }
             if (p.candidates.Count > 0)
             {
-                if (DddTurnPlan.ChooseScale(s, p) is int scale)
-                    return PackTwoInts(1, scale);
+                if ((DddTurnPlan.ChooseScale(s, p) ?? LinkTurnPlan.ChooseLinkMaterial(s, p) ??
+                    FusionXyzTurnPlan.ChooseLinkMaterial(s, p)) is int material)
+                    return PackTwoInts(1, material);
 
                 int bestIdx = 0;
                 int bestScore = int.MinValue;

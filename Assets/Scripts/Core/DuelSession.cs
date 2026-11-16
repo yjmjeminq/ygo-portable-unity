@@ -149,9 +149,11 @@ namespace YGOPortable.Core
 
         public PlayerFieldSnapshot[] Players { get; } = { new PlayerFieldSnapshot(), new PlayerFieldSnapshot() };
         public List<ChainLinkInfo> CurrentChain { get; } = new List<ChainLinkInfo>();
+        internal ChainLinkInfo SelectionChainLink => _resolvingChainLink ?? (CurrentChain.Count == 1 ? CurrentChain[0] : null);
         public List<(int chainNumber, uint code)> SolvedChainLinks { get; } = new List<(int, uint)>();
         public List<string> Logs { get; } = new List<string>();
         public DuelPrompt ActivePrompt { get; private set; }
+        private ChainLinkInfo _resolvingChainLink;
         private readonly HashSet<(byte Player, uint Location, uint Sequence, uint Code)> _confirmedCards =
             new HashSet<(byte, uint, uint, uint)>();
 
@@ -191,6 +193,7 @@ namespace YGOPortable.Core
             LastHintMsg = 0;
             ActivePrompt = null;
             CurrentChain.Clear();
+            _resolvingChainLink = null;
             SolvedChainLinks.Clear();
             Logs.Clear();
             _confirmedCards.Clear();
@@ -706,15 +709,21 @@ namespace YGOPortable.Core
                 case YgoConstants.MSG_CHAIN_SOLVING:
                 {
                     byte idx = br.ReadByte();
+                    _resolvingChainLink = null;
                     if (idx > 0 && idx <= CurrentChain.Count)
                     {
                         var link = CurrentChain[idx - 1];
+                        _resolvingChainLink = link;
                         SolvedChainLinks.Add((idx, link.code));
                         AddLog($"체인 {idx} 처리: [{CardDatabase.GetName(link.code)}]");
                         OnChainResolving?.Invoke(link);
                     }
                     break;
                 }
+
+                case YgoConstants.MSG_CHAIN_SOLVED:
+                    _resolvingChainLink = null;
+                    break;
 
                 case YgoConstants.MSG_CHAIN_NEGATED:
                 case YgoConstants.MSG_CHAIN_DISABLED:
@@ -728,6 +737,7 @@ namespace YGOPortable.Core
 
                 case YgoConstants.MSG_CHAIN_END:
                     CurrentChain.Clear();
+                    _resolvingChainLink = null;
                     _confirmedCards.Clear();
                     break;
 

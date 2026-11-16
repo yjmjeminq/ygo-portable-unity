@@ -354,6 +354,7 @@ namespace YGOPortable.Editor
             VerifyMandatoryBattleAttack();
             VerifyAiFieldAndTributeChoices();
             VerifyDddTurnPlanning();
+            TestOtherDeckTurnPlans.Run();
             VerifyRainbowDarkDragonMatch();
 
             // Explicit test for Token generation, effect tokens (Swordsoul Tuner), dynamic/stat tokens, and token disappearance

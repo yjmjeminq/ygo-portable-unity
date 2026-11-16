@@ -323,9 +323,8 @@ namespace YGOPortable.AI
         // Keep the generic chooser whenever the engine has not identified a unique source.
         private static ChainLinkInfo OwnChainSource(DuelSession session, byte player)
         {
-            if (session.CurrentChain.Count != 1) return null;
-            var link = session.CurrentChain[0];
-            return link.triggerPlayer == player && !link.negated ? link : null;
+            var link = session.SelectionChainLink;
+            return link != null && link.triggerPlayer == player && !link.negated ? link : null;
         }
 
         private static bool IsDescription(ulong description, uint code, int index) =>
