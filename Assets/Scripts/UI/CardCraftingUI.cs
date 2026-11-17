@@ -94,9 +94,8 @@ namespace YGOPortable.UI
             AddButton(main, "Back", "팩 상점으로", .825f, .917f, .968f, .975f, Back);
 
             var catalog = PackShopStyle.Panel(main, "Catalog", new Vector2(.025f, .083f), new Vector2(.425f, .882f));
-            _finder = LotdUiKit.CreateInputField(Slot(catalog, "Search", .08f, .849f, .92f, .925f),
+            _finder = PackShopStyle.Search(Slot(catalog, "Search", .08f, .849f, .92f, .925f),
                 "Input", "카드 이름·카드 번호 검색", 18);
-            _finder.GetComponent<Outline>().effectColor = PackShopStyle.TextMuted;
             for (int i = 0; i < _filterLabels.Length; i++)
             {
                 int filter = i;
@@ -133,22 +132,22 @@ namespace YGOPortable.UI
             {
                 var tier = Rarities[i];
                 var slot = Slot(details, $"Balance_{tier}", .075f + i * .215f, .867f, .284f + i * .215f, .933f);
-                LotdUiKit.AddImage(slot.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelNavy, false, false);
+                LotdUiKit.AddImage(slot.gameObject, LotdUiKit.WhiteSprite, PackShopStyle.SurfaceInset, false, false);
                 _balances[i] = LotdUiKit.AddFittedText(slot, "Text", "", 19, 12,
                     TextAnchor.MiddleCenter, CardRarityStyle.GetColor(tier), FontStyle.Bold);
             }
             var heading = Slot(details, "Name", .075f, .768f, .926f, .851f);
             _title = LotdUiKit.AddFittedText(heading, "Text", "", 26, 16,
-                TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
+                TextAnchor.MiddleCenter, PackShopStyle.TextPrimary, FontStyle.Bold);
             _art = CompositeCardView.Create(Slot(details, "Art", .075f, .204f, .371f, .745f), "SelectedCard", true);
             _rarity = ShopRarityBadge.Create(details, new Vector2(.409f, .679f), new Vector2(.49f, .738f), 17);
             _cardInfo = Label(details, "Ownership", "", .501f, .669f, .925f, .749f, 17,
                 TextAnchor.MiddleLeft, PackShopStyle.Accent);
-            _cardStats = Label(details, "Stats", "", .409f, .591f, .925f, .668f, 16, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary);
+            _cardStats = Label(details, "Stats", "", .409f, .591f, .925f, .668f, 16, TextAnchor.MiddleLeft, PackShopStyle.TextPrimary);
             (_descriptionScroll, _description) = CreateDescription(details);
             _craft = AddButton(details, "Craft", "제작", .407f, .204f, .661f, .281f, () => OpenConfirmation(true), true);
             _disassemble = AddButton(details, "Disassemble", "분해", .673f, .204f, .926f, .281f, () => OpenConfirmation(false));
-            _status = Label(details, "Status", "", .077f, .126f, .928f, .195f, 17, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary);
+            _status = Label(details, "Status", "", .077f, .126f, .928f, .195f, 17, TextAnchor.MiddleCenter, PackShopStyle.TextPrimary);
             Label(details, "Rules", "같은 등급 CP로 제작할 수 있으며 저장한 덱의 카드는 분해에서 보호됩니다.",
                 .077f, .069f, .928f, .121f, 16, TextAnchor.MiddleCenter, PackShopStyle.TextMuted);
 
@@ -158,12 +157,12 @@ namespace YGOPortable.UI
 
             var modal = LotdUiKit.FillRect("Confirmation", root);
             _confirmation = modal.gameObject;
-            LotdUiKit.AddImage(modal.gameObject, LotdUiKit.WhiteSprite, new Color(.015f, .024f, .053f, .83f));
+            LotdUiKit.AddImage(modal.gameObject, LotdUiKit.WhiteSprite, PackShopStyle.Scrim);
             var window = PackShopStyle.Panel(modal, "Window", new Vector2(.29f, .282f), new Vector2(.71f, .718f));
             _confirmTitle = Label(window, "Title", "", .09f, .78f, .91f, .92f, 27, TextAnchor.MiddleCenter, PackShopStyle.Accent);
-            _confirmBody = Label(window, "Details", "", .085f, .483f, .915f, .751f, 22, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary);
+            _confirmBody = Label(window, "Details", "", .085f, .483f, .915f, .751f, 22, TextAnchor.MiddleCenter, PackShopStyle.TextPrimary);
             _minus = AddButton(window, "Minus", "−", .26f, .29f, .39f, .437f, () => ChangeQuantity(-1));
-            _quantityLabel = Label(window, "Quantity", "", .406f, .29f, .594f, .437f, 22, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary);
+            _quantityLabel = Label(window, "Quantity", "", .406f, .29f, .594f, .437f, 22, TextAnchor.MiddleCenter, PackShopStyle.TextPrimary);
             _plus = AddButton(window, "Plus", "+", .61f, .29f, .74f, .437f, () => ChangeQuantity(1));
             _cancel = AddButton(window, "Cancel", "취소", .092f, .095f, .465f, .24f, CloseConfirmation);
             _confirm = AddButton(window, "Confirm", "", .535f, .095f, .908f, .24f, ApplyConfirmed, true);
@@ -243,7 +242,7 @@ namespace YGOPortable.UI
             if (_entries == null) return;
             for (int i = 0; i < _filterLabels.Length; i++)
                 SetButtonLabelColor(_filterLabels[i], i == _filter ? PackShopStyle.Accent :
-                    i == 0 ? LotdUiKit.TextPrimary : CardRarityStyle.GetColor(Rarities[i - 1]));
+                    i == 0 ? PackShopStyle.TextPrimary : CardRarityStyle.GetColor(Rarities[i - 1]));
 
             string query = _finder.text.Trim();
             string normalized = Normalize(query);
@@ -339,7 +338,7 @@ namespace YGOPortable.UI
 
             int first = _page * PageSize;
             for (int i = 0; i < _rows.Length && first + i < _matches.Count; i++)
-                SetButtonLabelColor(_rowNames[i], _matches[first + i] == entry ? PackShopStyle.Accent : LotdUiKit.TextPrimary);
+                SetButtonLabelColor(_rowNames[i], _matches[first + i] == entry ? PackShopStyle.Accent : PackShopStyle.TextPrimary);
         }
 
         private int DisassembleLimit(uint code) =>
@@ -371,11 +370,13 @@ namespace YGOPortable.UI
                 int usable = CollectionProgress.GetCraftPoints(_selected.Rarity) / CollectionProgress.CraftPointCost;
                 if (room == 0)
                 {
+                    _status.color = PackShopStyle.Danger;
                     _status.text = "이 카드는 보유 한도에 도달했습니다.";
                     return;
                 }
                 if (usable == 0)
                 {
+                    _status.color = PackShopStyle.Danger;
                     _status.text = $"{rarity} 제작 포인트가 부족합니다.";
                     return;
                 }
@@ -386,6 +387,7 @@ namespace YGOPortable.UI
                 _maxQuantity = DisassembleLimit(code);
                 if (_maxQuantity == 0)
                 {
+                    _status.color = PackShopStyle.Danger;
                     _status.text = CollectionProgress.GetOwnedCount(code) == 0 ?
                         "이 카드를 보유하고 있지 않습니다." : "저장한 덱에 필요한 카드입니다.";
                     return;
@@ -423,8 +425,6 @@ namespace YGOPortable.UI
             _plus.transform.parent.gameObject.SetActive(_maxQuantity > 1);
             _minus.interactable = _quantity > 1;
             _plus.interactable = _quantity < _maxQuantity;
-            _minus.GetComponentInChildren<Text>().color = _minus.interactable ? LotdUiKit.TextPrimary : PackShopStyle.TextMuted;
-            _plus.GetComponentInChildren<Text>().color = _plus.interactable ? LotdUiKit.TextPrimary : PackShopStyle.TextMuted;
             SetButtonText(_confirm, $"{action}하기");
         }
 
@@ -444,16 +444,17 @@ namespace YGOPortable.UI
                 CollectionProgress.TryDisassembleCards(new Dictionary<uint, int> { [code] = _quantity }, out error);
             CloseConfirmation();
             RefreshPointsAndOwnership();
+            _status.color = saved ? PackShopStyle.TextPrimary : PackShopStyle.Danger;
             _status.text = saved ? $"{name} {_quantity}장 {(_crafting ? "제작" : "분해")}했습니다." : error;
         }
 
         private static (ScrollRect, Text) CreateDescription(Transform parent)
         {
             var holder = Slot(parent, "Description", .407f, .305f, .925f, .585f);
-            LotdUiKit.AddImage(holder.gameObject, LotdUiKit.WhiteSprite, new Color(.06f, .07f, .135f));
+            LotdUiKit.AddImage(holder.gameObject, LotdUiKit.WhiteSprite, PackShopStyle.SurfaceInset);
             var viewport = LotdUiKit.CreateRect("Viewport", holder, Vector2.zero, Vector2.one, new Vector2(8f, 5f), new Vector2(-20f, -5f));
             viewport.gameObject.AddComponent<RectMask2D>();
-            var text = LotdUiKit.AddText(viewport, "Text", "", 17, TextAnchor.UpperLeft, LotdUiKit.TextPrimary);
+            var text = LotdUiKit.AddText(viewport, "Text", "", 17, TextAnchor.UpperLeft, PackShopStyle.TextPrimary);
             text.supportRichText = false;
             text.verticalOverflow = VerticalWrapMode.Overflow;
             text.rectTransform.anchorMin = Vector2.up;
@@ -467,13 +468,7 @@ namespace YGOPortable.UI
             scroll.content = text.rectTransform;
             scroll.horizontal = false;
             scroll.movementType = ScrollRect.MovementType.Clamped;
-            scroll.verticalScrollbar = LotdUiKit.AddVerticalScrollbar(holder);
-            var track = scroll.verticalScrollbar.GetComponent<Image>();
-            track.sprite = LotdUiKit.WhiteSprite;
-            track.color = new Color(.12f, .15f, .25f);
-            var thumb = (Image)scroll.verticalScrollbar.targetGraphic;
-            thumb.sprite = LotdUiKit.WhiteSprite;
-            thumb.color = PackShopStyle.Accent;
+            scroll.verticalScrollbar = PackShopStyle.AddVerticalScrollbar(holder);
             scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
             scroll.scrollSensitivity = 25f;
             return (scroll, text);

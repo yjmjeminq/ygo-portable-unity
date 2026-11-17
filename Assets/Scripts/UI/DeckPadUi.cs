@@ -10,6 +10,8 @@ namespace YGOPortable.UI
         private const int VisibleChoices = 7;
         private readonly Transform _root;
         private readonly DeckPadKeyboard _keyboard;
+        private readonly Func<bool> _useShopPalette;
+        private DeckPadKeyboard _shopKeyboard;
         private readonly Button[] _choiceButtons = new Button[VisibleChoices];
         private readonly Text[] _choiceLabels = new Text[VisibleChoices];
         private readonly RectTransform _choicePanel;
@@ -22,12 +24,16 @@ namespace YGOPortable.UI
         private int _choiceIndex;
         private int _firstChoice;
 
-        internal bool IsTyping => _keyboard.IsOpen;
+        private DeckPadKeyboard ActiveKeyboard => _shopKeyboard?.IsOpen == true ? _shopKeyboard : _keyboard;
+        internal bool IsTyping => ActiveKeyboard.IsOpen;
         internal bool HasPopup => IsTyping || _choicePanel.gameObject.activeSelf;
 
-        internal DeckPadUi(Transform root)
+        internal DeckPadUi(Transform root) : this(root, null) { }
+
+        internal DeckPadUi(Transform root, Func<bool> useShopPalette)
         {
             _root = root;
+            _useShopPalette = useShopPalette;
             var overlay = LotdUiKit.FillRect("PadChoices", root);
             _choicePanel = overlay;
             LotdUiKit.AddImage(overlay.gameObject, LotdUiKit.WhiteSprite, new Color(.01f, .025f, .07f, .80f));
@@ -65,7 +71,10 @@ namespace YGOPortable.UI
             CloseChoice();
             _returnFocus = target;
             target.DeactivateInputField();
-            _keyboard.Open(target);
+            var keyboard = _useShopPalette?.Invoke() == true
+                ? _shopKeyboard ??= new DeckPadKeyboard(_root, shopColors: true)
+                : _keyboard;
+            keyboard.Open(target);
             _scope = null;
             SetFocus(null);
         }
@@ -152,7 +161,7 @@ namespace YGOPortable.UI
                 _choicePanel.gameObject.SetActive(false);
                 _dropdown = null;
             }
-            _keyboard.Close();
+            ActiveKeyboard.Close();
             _returnFocus = null;
             _scope = null;
             SetFocus(null, preserveSelection);
@@ -163,7 +172,8 @@ namespace YGOPortable.UI
         {
             if (IsTyping)
             {
-                HandleScope(_keyboard.Scope, move, submit, cancel, _keyboard.Close, _keyboard.DefaultFocus);
+                var keyboard = ActiveKeyboard;
+                HandleScope(keyboard.Scope, move, submit, cancel, keyboard.Close, keyboard.DefaultFocus);
                 return true;
             }
             if (_choicePanel.gameObject.activeSelf)
@@ -287,6 +297,13 @@ namespace YGOPortable.UI
                 if (viewport != null && target.IsChildOf(viewport))
                     host = viewport;
             }
+            if (_useShopPalette?.Invoke() == true)
+            {
+                var track = PackShopStyle.Accent;
+                track.a = .68f;
+                _frame.SetColors(track, PackShopStyle.Accent);
+            }
+            else _frame.SetColors();
             _frame.Show(target, host != null ? host : (RectTransform)_root);
         }
 

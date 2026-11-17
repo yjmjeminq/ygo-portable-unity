@@ -122,7 +122,7 @@ namespace YGOPortable.UI
 
                 Debug.Log("[GameApp] 9. Constructing DuelFieldUI...");
                 _duelField = new DuelFieldUI(this, canvas.transform, _modals);
-                _menuPad = new DeckPadUi(LotdUiKit.FillRect("MenuPad", canvas.transform));
+                _menuPad = new DeckPadUi(LotdUiKit.FillRect("MenuPad", canvas.transform), () => _screen == AppScreen.CardShop);
 
                 // Ensure Modals, Animation Layer, and Drag Ghost Layer render ABOVE DuelFieldUI and DeckEditorUI
                 _modals.ModalRoot.transform.SetAsLastSibling();

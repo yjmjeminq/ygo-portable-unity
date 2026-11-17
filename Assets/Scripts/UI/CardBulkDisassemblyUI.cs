@@ -83,9 +83,8 @@ namespace YGOPortable.UI
             _catalogRoot = root.gameObject;
             var catalog = Panel(root, "Catalog", .025f, .083f, .555f, .882f);
             Heading(catalog, "Heading", "분해할 카드 선택", .08f, .858f, .92f, .93f);
-            _search = LotdUiKit.CreateInputField(Slot(catalog, "Search", .08f, .768f, .663f, .845f),
+            _search = PackShopStyle.Search(Slot(catalog, "Search", .08f, .768f, .663f, .845f),
                 "Input", "카드명·카드 번호 검색", 17);
-            _search.GetComponent<Outline>().effectColor = PackShopStyle.TextMuted;
             _search.onValueChanged.AddListener(_ => Filter());
             var filter = AddButton(catalog, "RarityFilter", "", .675f, .768f, .92f, .845f, CycleRarity);
             _filterLabel = filter.GetComponentInChildren<Text>();
@@ -293,7 +292,7 @@ namespace YGOPortable.UI
             {
                 var card = _matches[first + i];
                 var row = _rows[i];
-                row.Name.color = card == _inspected ? PackShopStyle.Accent : LotdUiKit.TextPrimary;
+                row.Name.color = card == _inspected ? PackShopStyle.Accent : PackShopStyle.TextPrimary;
                 int selected = Quantity(card.Code);
                 row.Quantity.text = $"선택 {selected:N0} / {card.Limit:N0}";
                 row.Quantity.color = selected > 0 ? PackShopStyle.Accent : PackShopStyle.TextMuted;
@@ -344,6 +343,7 @@ namespace YGOPortable.UI
                 int quantity = Math.Min(card.Limit, card.Owned - 1);
                 if (quantity > 0) _selected.Add(card.Code, quantity);
             }
+            _status.color = PackShopStyle.TextPrimary;
             _status.text = _selected.Count == 0 ? "분해할 여분 카드가 없습니다." : "모든 카드에서 분해할 여분을 선택했습니다.";
             RefreshSelection();
         }
@@ -395,6 +395,7 @@ namespace YGOPortable.UI
             ReloadCards();
             _reviewRoot.SetActive(false);
             _catalogRoot.SetActive(true);
+            _status.color = success ? PackShopStyle.TextPrimary : PackShopStyle.Danger;
             _status.text = success ? "제작 포인트를 받았습니다." : error;
             Filter();
             FocusFirstRow();
@@ -429,7 +430,7 @@ namespace YGOPortable.UI
             }
             else
             {
-                LotdUiKit.AddImage(holder.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelNavy, false, false);
+                LotdUiKit.AddImage(holder.gameObject, LotdUiKit.WhiteSprite, PackShopStyle.SurfaceInset, false, false);
             }
             row.Name = Label(content, "Name", "", .06f, 0f, .633f, 1f, 18, TextAnchor.MiddleLeft);
             row.Quantity = Label(content, "Quantity", "", .635f, 0f, .814f, 1f, 16);
@@ -445,7 +446,7 @@ namespace YGOPortable.UI
                 var rarity = (CardRarity)i;
                 float left = .08f + .213f * i;
                 var slot = Slot(parent, CardRarityCatalog.GetLabel(rarity), left, bottom, left + .201f, top);
-                LotdUiKit.AddImage(slot.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelNavy, false, false);
+                LotdUiKit.AddImage(slot.gameObject, LotdUiKit.WhiteSprite, PackShopStyle.SurfaceInset, false, false);
                 labels[i] = LotdUiKit.AddFittedText(slot, "Points", "", 18, 11, TextAnchor.MiddleCenter,
                     CardRarityStyle.GetColor(rarity), FontStyle.Bold);
             }
@@ -481,13 +482,13 @@ namespace YGOPortable.UI
         {
             var slot = Slot(parent, name, left, bottom, right, top);
             return LotdUiKit.AddFittedText(slot, "Text", value, 23, 14, TextAnchor.MiddleCenter,
-                LotdUiKit.TextPrimary, FontStyle.Bold);
+                PackShopStyle.TextPrimary, FontStyle.Bold);
         }
 
         private static Text Label(Transform parent, string name, string text, float left, float bottom, float right, float top,
             int size, TextAnchor align = TextAnchor.MiddleCenter) =>
             LotdUiKit.AddFittedText(Slot(parent, name, left, bottom, right, top),
-                "Text", text, size, Mathf.Max(11, size - 6), align, LotdUiKit.TextPrimary);
+                "Text", text, size, Mathf.Max(11, size - 6), align, PackShopStyle.TextPrimary);
 
         private static Button AddButton(Transform parent, string name, string title, float left, float bottom, float right,
             float top, Action action, bool primary = false) => PackShopStyle.Button(

@@ -15,6 +15,9 @@ namespace YGOPortable.UI
         private static Sprite _bloomSprite;
         private RectTransform _stage;
         private RectTransform _wrapper;
+        private Image _reflection;
+        private Image _burstBackdrop;
+        private Image _highlight;
         private PackWrapperSlice _body;
         private PackWrapperSlice _seal;
         private Image _glow;
@@ -35,10 +38,24 @@ namespace YGOPortable.UI
             _rarity = highestRarity;
             _accent = highestRarity switch
             {
-                CardRarity.UltraRare => new Color(.74f, .40f, 1f),
-                CardRarity.SuperRare => new Color(1f, .73f, .32f),
-                _ => new Color(.32f, .81f, 1f),
+                CardRarity.UltraRare => new Color32(166, 224, 255, 255),
+                CardRarity.SuperRare => new Color32(255, 194, 77, 255),
+                _ => new Color32(131, 201, 251, 255),
             };
+            _reflection.sprite = _cover;
+            _highlight.sprite = LotdUiKit.LoadSprite("PackShop/PackHighlightFlare" + (highestRarity switch
+            {
+                CardRarity.UltraRare => "UR",
+                CardRarity.SuperRare => "SR",
+                _ => "N",
+            }));
+            _burstBackdrop.sprite = highestRarity switch
+            {
+                CardRarity.UltraRare => LotdUiKit.LoadSprite("PackShop/PackOpenBGBottom_ur"),
+                CardRarity.SuperRare => LotdUiKit.LoadSprite("PackShop/PackOpenBGBottom_sr"),
+                _ => null,
+            };
+            _burstBackdrop.enabled = _burstBackdrop.sprite != null;
             _body.SetFace(_cover, false);
             _seal.SetFace(_cover, true);
             _elapsed = 0f;
@@ -62,6 +79,7 @@ namespace YGOPortable.UI
             _onFinished = null;
             _cover = null;
             if (_stage == null) return;
+            _reflection.sprite = null;
             _body.SetFace(null, false);
             _seal.SetFace(null, true);
             _stage.gameObject.SetActive(false);
@@ -86,23 +104,32 @@ namespace YGOPortable.UI
             float lift = EaseOut(open);
             float fade = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.28f, 1f, open));
             float hover = Mathf.Sin(elapsed * Mathf.PI * 2f) * 6f;
-            float tilt = Mathf.Lerp(-13f, -5f, enter) + Mathf.Sin(elapsed * 4f) * 2f;
-            float height = Mathf.Max(1f, _stage.rect.height * .60f);
+            float tilt = Mathf.Lerp(-8f, 0f, enter) + Mathf.Sin(elapsed * 4f) * 1.2f;
+            float height = Mathf.Max(1f, _stage.rect.height * .48f);
             float aspect = Mathf.Clamp(_cover.rect.width / _cover.rect.height, .34f, 1.4f);
             height = Mathf.Min(height, _stage.rect.width * .36f / aspect);
             Vector2 size = new Vector2(height * aspect, height);
-            Vector2 point = Vector2.up * (Mathf.Lerp(-48f, 0f, enter) + hover);
+            Vector2 point = Vector2.up * (_stage.rect.height * .055f + Mathf.Lerp(-48f, 0f, enter) + hover);
             float scale = Mathf.Lerp(.79f, 1f, enter) + lift * .045f;
 
             _wrapper.sizeDelta = size;
             _wrapper.anchoredPosition = point;
             _wrapper.localRotation = Quaternion.Euler(0f, 0f, tilt);
             _wrapper.localScale = Vector3.one * scale;
+            var mirrored = _reflection.rectTransform;
+            mirrored.anchoredPosition = point - Vector2.up * height * scale * .745f;
+            mirrored.sizeDelta = new Vector2(size.x, size.y * .49f) * scale;
+            mirrored.localRotation = Quaternion.Euler(0f, 0f, -tilt * .45f);
+            _reflection.color = new Color(.62f, .60f, .68f, .40f * (1f - lift));
             SetPiece(_body, new Vector2(-45f, -72f) * lift, -14f * lift, fade);
             SetPiece(_seal, new Vector2(126f, 153f) * lift, -45f * lift, fade * (1f - .27f * open));
 
             float incomingLight = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.22f, TearAt, elapsed));
             float burst = Mathf.Max(0f, 1f - Mathf.Abs(elapsed - (TearAt + .07f)) / .16f);
+            _burstBackdrop.color = WithAlpha(Color.white, burst * .78f);
+            _highlight.rectTransform.sizeDelta = new Vector2(height * 1.54f, height * .51f);
+            _highlight.rectTransform.anchoredPosition = point + Vector2.up * height * .62f;
+            _highlight.color = WithAlpha(Color.white, burst * .95f);
             SetGlow(_glow, point, height * (1.82f + .45f * lift),
                 WithAlpha(_accent, fade * (.31f + incomingLight * .31f + burst * .17f)));
             SetGlow(_flash, point + Vector2.up * height * .31f, height * (1.30f + lift * .34f),
@@ -115,12 +142,19 @@ namespace YGOPortable.UI
 
         private void Build()
         {
-            _stage = LotdUiKit.CreateRect("PackOpeningStage", transform, new Vector2(.07f, .06f),
-                new Vector2(.93f, .94f), Vector2.zero, Vector2.zero);
+            _stage = LotdUiKit.FillRect("PackOpeningStage", transform);
             _glow = MakeGlow("Aura", _stage);
+            _reflection = LotdUiKit.AddImage(Centered("PackReflection", _stage).gameObject,
+                null, Color.clear, false, false);
+            _reflection.rectTransform.localScale = new Vector3(1f, -1f, 1f);
+            PackOpeningStage.FloorFade(_stage, .058f, .234f);
+            _burstBackdrop = LotdUiKit.AddImage(LotdUiKit.FillRect("BurstBackdrop", _stage).gameObject,
+                null, Color.clear, false, false);
             _wrapper = Centered("Wrapper", _stage);
             _body = LotdUiKit.FillRect("Body", _wrapper).gameObject.AddComponent<PackWrapperSlice>();
             _seal = LotdUiKit.FillRect("Seal", _wrapper).gameObject.AddComponent<PackWrapperSlice>();
+            _highlight = LotdUiKit.AddImage(Centered("Highlight", _stage).gameObject,
+                null, Color.clear, false, false);
             _sparks = LotdUiKit.FillRect("LightTrails", _stage).gameObject.AddComponent<PackOpeningSparks>();
             _sparks.raycastTarget = false;
             _flash = MakeGlow("Burst", _stage);
@@ -184,6 +218,48 @@ namespace YGOPortable.UI
             float cos = Mathf.Cos(radians);
             float sin = Mathf.Sin(radians);
             return new Vector2(point.x * cos - point.y * sin, point.x * sin + point.y * cos);
+        }
+    }
+
+    internal static class PackOpeningStage
+    {
+        private static Sprite _floorFade;
+
+        internal static void Backdrop(RectTransform root) => LotdUiKit.AddImage(
+            LotdUiKit.FillRect("OpeningBackdrop", root).gameObject,
+            LotdUiKit.LoadSprite("PackShop/ShopBGBase03"), Color.white);
+
+        internal static void FloorFade(Transform parent, float bottom, float top) => LotdUiKit.AddImage(
+            LotdUiKit.CreateRect("ReflectionFade", parent, new Vector2(0f, bottom), new Vector2(1f, top),
+                Vector2.zero, Vector2.zero).gameObject,
+            _floorFade ??= CreateFloorFade(), Color.white, false, false);
+
+        private static Sprite Bake(string name, int width, int height, Color32[] pixels)
+        {
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            {
+                name = name,
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            texture.SetPixels32(pixels);
+            texture.Apply(false, true);
+            return Sprite.Create(texture, new Rect(0, 0, width, height), new Vector2(.5f, .5f), 100f);
+        }
+
+        private static Sprite CreateFloorFade()
+        {
+            const int height = 64;
+            var pixels = new Color32[height];
+            for (int row = 0; row < height; row++)
+            {
+                float position = row / (float)(height - 1);
+                var tint = new Color32(20, 12, 30, 255);
+                tint.a = (byte)Mathf.RoundToInt(232 * Mathf.SmoothStep(0f, 1f, 1f - position));
+                pixels[row] = tint;
+            }
+            return Bake("Pack Stage Reflection Fade", 1, height, pixels);
         }
     }
 
@@ -309,7 +385,8 @@ namespace YGOPortable.UI
                 float reach = _height * (.20f + .79f * Mathf.Repeat(i * .37812f, 1f));
                 var head = origin + direction * (reach * opening) + Vector2.down * (_height * .13f * opening * opening);
                 float length = (.011f + .085f * seed) * (_height * fade);
-                var tint = Color.Lerp(_accent, Color.white, i % 4 == 0 ? .89f : .20f);
+                var light = _rarity == CardRarity.UltraRare ? Color.HSVToRGB(seed, .83f, 1f) : _accent;
+                var tint = Color.Lerp(light, Color.white, i % 4 == 0 ? .89f : .20f);
                 Line(vertices, head - direction * length, head, i % 4 == 0 ? 2.6f : 1.6f,
                     PackOpeningMotion.WithAlpha(tint, fade));
             }

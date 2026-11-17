@@ -46,8 +46,7 @@ namespace YGOPortable.UI
             var catalog = PackShopStyle.Panel(root, "Catalog", new Vector2(.025f, .083f), new Vector2(.445f, .882f));
             _packName = Heading(catalog, "PackName", .08f, .862f, .92f, .93f);
             var search = Slot(catalog, "Search", .08f, .769f, .92f, .848f);
-            SearchInput = LotdUiKit.CreateInputField(search, "Input", "이 팩에서 카드명·카드 번호 검색", 17);
-            SearchInput.GetComponent<Outline>().effectColor = PackShopStyle.TextMuted;
+            SearchInput = PackShopStyle.Search(search, "Input", "이 팩에서 카드명·카드 번호 검색", 17);
             _count = Label(catalog, "Count", .087f, .721f, .914f, .76f, 16, TextAnchor.MiddleLeft, PackShopStyle.TextMuted);
 
             for (int i = 0; i < PageSize; i++)
@@ -79,7 +78,7 @@ namespace YGOPortable.UI
             _art = CompositeCardView.Create(Slot(details, "Art", .073f, .14f, .459f, .834f), "Card", true);
             _owner = Label(details, "Owner", .489f, .748f, .822f, .828f, 19, TextAnchor.MiddleLeft, PackShopStyle.Accent);
             _rarity = ShopRarityBadge.Create(details, new Vector2(.835f, .759f), new Vector2(.919f, .816f), 17);
-            _stats = Label(details, "Stats", .489f, .625f, .919f, .739f, 18, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary);
+            _stats = Label(details, "Stats", .489f, .625f, .919f, .739f, 18, TextAnchor.MiddleLeft, PackShopStyle.TextPrimary);
             (_descriptionScroll, _description) = CreateDescription(details);
             if (onFindPacks != null)
             {
@@ -219,7 +218,7 @@ namespace YGOPortable.UI
             int first = _page * PageSize;
             for (int i = 0; i < _labels.Length && first + i < _matches.Count; i++)
             {
-                Color color = _matches[first + i].Code == code ? PackShopStyle.Accent : LotdUiKit.TextPrimary;
+                Color color = _matches[first + i].Code == code ? PackShopStyle.Accent : PackShopStyle.TextPrimary;
                 _rows[i].GetComponent<PackShopButtonLabel>().Normal = color;
                 _labels[i].color = color;
             }
@@ -228,11 +227,11 @@ namespace YGOPortable.UI
         private static (ScrollRect, Text) CreateDescription(Transform parent)
         {
             var holder = Slot(parent, "Description", .487f, .232f, .921f, .614f);
-            LotdUiKit.AddImage(holder.gameObject, LotdUiKit.WhiteSprite, new Color(.06f, .07f, .135f));
+            LotdUiKit.AddImage(holder.gameObject, LotdUiKit.WhiteSprite, PackShopStyle.SurfaceInset);
             var viewport = LotdUiKit.CreateRect("Viewport", holder, Vector2.zero, Vector2.one,
                 new Vector2(8f, 5f), new Vector2(-20f, -5f));
             viewport.gameObject.AddComponent<RectMask2D>();
-            var content = LotdUiKit.AddText(viewport, "Text", "", 18, TextAnchor.UpperLeft, LotdUiKit.TextPrimary);
+            var content = LotdUiKit.AddText(viewport, "Text", "", 18, TextAnchor.UpperLeft, PackShopStyle.TextPrimary);
             content.supportRichText = false;
             content.verticalOverflow = VerticalWrapMode.Overflow;
             content.rectTransform.anchorMin = Vector2.up;
@@ -247,13 +246,7 @@ namespace YGOPortable.UI
             scroll.content = content.rectTransform;
             scroll.horizontal = false;
             scroll.movementType = ScrollRect.MovementType.Clamped;
-            scroll.verticalScrollbar = LotdUiKit.AddVerticalScrollbar(holder);
-            var track = scroll.verticalScrollbar.GetComponent<Image>();
-            track.sprite = LotdUiKit.WhiteSprite;
-            track.color = new Color(.12f, .15f, .25f);
-            var thumb = (Image)scroll.verticalScrollbar.targetGraphic;
-            thumb.sprite = LotdUiKit.WhiteSprite;
-            thumb.color = PackShopStyle.Accent;
+            scroll.verticalScrollbar = PackShopStyle.AddVerticalScrollbar(holder);
             scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
             scroll.scrollSensitivity = 25f;
             return (scroll, content);
@@ -268,7 +261,7 @@ namespace YGOPortable.UI
         {
             var slot = Slot(parent, name, left, bottom, right, top);
             return LotdUiKit.AddFittedText(slot, "Text", "", 24, 15, TextAnchor.MiddleCenter,
-                LotdUiKit.TextPrimary, FontStyle.Bold);
+                PackShopStyle.TextPrimary, FontStyle.Bold);
         }
 
         private static Text Label(Transform parent, string name, float left, float bottom, float right, float top,

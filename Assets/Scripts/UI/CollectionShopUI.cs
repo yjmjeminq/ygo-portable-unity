@@ -41,7 +41,6 @@ namespace YGOPortable.UI
             internal readonly Button[] Rows = new Button[PageSize];
             internal readonly Text[] Labels = new Text[PageSize];
             internal Image[] PackTiles;
-            internal Outline[] PackSelectionFrames;
             internal CatalogItem[] Items = Array.Empty<CatalogItem>();
             internal readonly List<CatalogItem> Matches = new();
             internal CatalogItem Selected;
@@ -58,7 +57,7 @@ namespace YGOPortable.UI
         private PackOpeningView _openingView;
         private Text _balance;
         private Text _filterCount;
-        private Text[] _filterLabels;
+        private Button[] _filterButtons;
         private PackFilter _packFilter;
         private GameObject _shopDialog;
         private Text _dialogHeading;
@@ -310,36 +309,39 @@ namespace YGOPortable.UI
             catalog.Root = root.gameObject;
             PackShopStyle.Backdrop(root);
             PackShopStyle.Header(root, "상점");
-            _balance = Label(root, "Wallet", "", .722f, .918f, .835f, .969f, 21,
-                TextAnchor.MiddleRight, PackShopStyle.Accent);
+            var wallet = Slot("Wallet", root, .716f, .918f, .835f, .969f);
+            LotdUiKit.AddImage(wallet.gameObject, LotdUiKit.WhiteSprite, new Color32(82, 83, 86, 214), false, false);
+            _balance = LotdUiKit.AddFittedText(wallet, "Balance", "", 21, 14, TextAnchor.MiddleCenter,
+                PackShopStyle.TextPrimary, FontStyle.Bold);
             ShopButton(root, "Back", "메인 메뉴", .853f, .918f, .965f, .971f, _onBack);
 
-            ShopButton(root, "Packs", "팩", .035f, .819f, .151f, .885f, () => SetPackFilter(PackFilter.All), true);
-            _cardLookupButton = ShopButton(root, "CardLookup", "카드로 팩 찾기", .160f, .819f, .296f, .885f, OpenLookup);
-            _craftingButton = ShopButton(root, "Crafting", "제작·분해", .305f, .819f, .437f, .885f, OpenCrafting);
+            PackShopStyle.SetSelected(ShopButton(root, "Packs", "팩", .035f, .819f, .151f, .885f,
+                () => SetPackFilter(PackFilter.All), kind: PackShopStyle.ButtonKind.Category), true);
+            _cardLookupButton = ShopButton(root, "CardLookup", "카드로 팩 찾기", .160f, .819f, .296f, .885f,
+                OpenLookup, kind: PackShopStyle.ButtonKind.Category);
+            _craftingButton = ShopButton(root, "Crafting", "제작·분해", .305f, .819f, .437f, .885f,
+                OpenCrafting, kind: PackShopStyle.ButtonKind.Category);
 
-            var rail = PackShopStyle.Panel(root, "Categories", new Vector2(.035f, .109f), new Vector2(.151f, .800f));
+            var rail = PackShopStyle.Panel(root, "Categories", new Vector2(.035f, .109f), new Vector2(.151f, .800f), .36f);
             string[] filterNames = { "전체 팩", "카드군 팩", "공용 팩" };
-            _filterLabels = new Text[filterNames.Length];
+            _filterButtons = new Button[filterNames.Length];
             for (int i = 0; i < filterNames.Length; i++)
             {
                 PackFilter filter = (PackFilter)i;
                 float top = .95f - i * .123f;
-                var button = ShopButton(rail, $"Filter_{i}", filterNames[i], .088f, top - .097f, .912f, top,
-                    () => SetPackFilter(filter));
-                _filterLabels[i] = button.GetComponentInChildren<Text>();
+                _filterButtons[i] = ShopButton(rail, $"Filter_{i}", filterNames[i], .088f, top - .097f, .912f, top,
+                    () => SetPackFilter(filter), kind: PackShopStyle.ButtonKind.Filter);
             }
             _filterCount = Label(rail, "Count", "", .088f, .050f, .912f, .131f, 16,
                 TextAnchor.MiddleCenter, PackShopStyle.TextMuted);
 
-            var grid = PackShopStyle.Panel(root, "Catalog", new Vector2(.16f, .109f), new Vector2(.698f, .800f));
-            catalog.Search = LotdUiKit.CreateInputField(Slot("Search", grid, .027f, .870f, .973f, .974f),
+            var grid = PackShopStyle.Panel(root, "Catalog", new Vector2(.16f, .109f), new Vector2(.698f, .800f), .34f);
+            catalog.Search = PackShopStyle.Search(Slot("Search", grid, .027f, .870f, .973f, .974f),
                 "Input", "팩 이름·카드명·카드 번호", 18);
             catalog.Search.onValueChanged.AddListener(_ => FilterCatalog(catalog));
             catalog.CountLabel = Label(grid, "Count", "", .042f, .796f, .960f, .856f, 17,
                 TextAnchor.MiddleLeft, PackShopStyle.TextMuted);
             catalog.PackTiles = new Image[PageSize];
-            catalog.PackSelectionFrames = new Outline[PageSize];
             for (int i = 0; i < PageSize; i++)
             {
                 int row = i;
@@ -352,7 +354,7 @@ namespace YGOPortable.UI
                     if (index >= catalog.Matches.Count) return;
                     Select(catalog, catalog.Matches[index]);
                     EventSystem.current?.SetSelectedGameObject(_viewContentsButton.gameObject);
-                });
+                }, kind: PackShopStyle.ButtonKind.Tile);
                 button.gameObject.AddComponent<StarterRowFocus>().ShowPreview = () =>
                 {
                     int index = catalog.Page * PageSize + row;
@@ -360,7 +362,6 @@ namespace YGOPortable.UI
                         Select(catalog, catalog.Matches[index]);
                 };
                 catalog.Rows[i] = button;
-                catalog.PackSelectionFrames[i] = button.GetComponent<Outline>();
                 var title = button.GetComponentInChildren<Text>();
                 title.rectTransform.anchorMin = new Vector2(.045f, .015f);
                 title.rectTransform.anchorMax = new Vector2(.955f, .232f);
@@ -376,17 +377,17 @@ namespace YGOPortable.UI
             catalog.PageLabel = Label(grid, "Page", "", .33f, .026f, .67f, .103f, 17, TextAnchor.MiddleCenter, PackShopStyle.TextMuted);
 
             var detail = PackShopStyle.Panel(root, "Details", new Vector2(.71f, .109f), new Vector2(.965f, .800f));
-            catalog.Heading = Label(detail, "Heading", "", .067f, .870f, .933f, .972f, 26, TextAnchor.MiddleCenter, Color.white);
+            catalog.Heading = Label(detail, "Heading", "", .067f, .870f, .933f, .972f, 26, TextAnchor.MiddleCenter, PackShopStyle.TextPrimary);
             var preview = Slot("Cover", detail, .113f, .395f, .887f, .866f);
             catalog.PackCover = LotdUiKit.AddImage(preview.gameObject, null, Color.white, true, false);
             catalog.Details = Label(detail, "Info", "", .073f, .330f, .927f, .387f, 18, TextAnchor.MiddleCenter, PackShopStyle.TextMuted);
             _viewContentsButton = ShopButton(detail, "ViewContents", "수록 카드", .065f, .237f, .490f, .315f, ViewSelectedPack);
             _oddsButton = ShopButton(detail, "Odds", "제공 비율", .510f, .237f, .935f, .315f, ShowPackOdds);
             catalog.Action = ShopButton(detail, "Buy", $"1팩    {CollectionProgress.PackCost:N0} DP",
-                .065f, .136f, .490f, .219f, () => PromptPurchase(1), true);
+                .065f, .136f, .490f, .219f, () => PromptPurchase(1), kind: PackShopStyle.ButtonKind.SinglePurchase);
             int bundle = CollectionProgress.PackBundleSize;
             _buyBundleButton = ShopButton(detail, "BuyBundle", $"{bundle}팩    {bundle * CollectionProgress.PackCost:N0} DP",
-                .510f, .136f, .935f, .219f, () => PromptPurchase(bundle), true);
+                .510f, .136f, .935f, .219f, () => PromptPurchase(bundle), kind: PackShopStyle.ButtonKind.BundlePurchase);
             catalog.Status = Label(detail, "Status", "", .060f, .031f, .940f, .119f, 16, TextAnchor.MiddleCenter, PackShopStyle.TextMuted);
             Label(root, "Controls", "방향키 이동   A 선택   Y 검색   LB/RB 페이지   B 뒤로",
                 .033f, .024f, .967f, .077f, 16, TextAnchor.MiddleCenter, PackShopStyle.TextMuted);
@@ -464,9 +465,9 @@ namespace YGOPortable.UI
         {
             var modal = LotdUiKit.FillRect("ShopDialog", parent);
             _shopDialog = modal.gameObject;
-            LotdUiKit.AddImage(modal.gameObject, LotdUiKit.WhiteSprite, new Color(.012f, .017f, .042f, .85f));
+            LotdUiKit.AddImage(modal.gameObject, LotdUiKit.WhiteSprite, PackShopStyle.Scrim);
             var box = PackShopStyle.Panel(modal, "Window", new Vector2(.295f, .276f), new Vector2(.705f, .724f));
-            _dialogHeading = Label(box, "Heading", "", .07f, .770f, .93f, .931f, 27, TextAnchor.MiddleCenter, Color.white);
+            _dialogHeading = Label(box, "Heading", "", .07f, .770f, .93f, .931f, 27, TextAnchor.MiddleCenter, PackShopStyle.TextPrimary);
             _dialogText = Label(box, "Details", "", .077f, .310f, .923f, .746f, 22, TextAnchor.MiddleCenter, PackShopStyle.TextMuted);
             _dialogCancel = ShopButton(box, "Cancel", "닫기", .090f, .090f, .475f, .239f, CloseShopDialog);
             _dialogConfirm = ShopButton(box, "Confirm", "", .525f, .090f, .910f, .239f, BuySelectedPack, true);
@@ -558,12 +559,8 @@ namespace YGOPortable.UI
         private void SetPackFilter(PackFilter filter, bool refresh = true)
         {
             _packFilter = filter;
-            for (int i = 0; i < _filterLabels.Length; i++)
-            {
-                var label = _filterLabels[i];
-                label.GetComponentInParent<PackShopButtonLabel>().Normal = i == (int)filter ? PackShopStyle.Accent : Color.white;
-                label.color = i == (int)filter ? PackShopStyle.Accent : Color.white;
-            }
+            for (int i = 0; i < _filterButtons.Length; i++)
+                PackShopStyle.SetSelected(_filterButtons[i], i == (int)filter);
             if (refresh) FilterCatalog(_shop);
         }
 
@@ -655,14 +652,7 @@ namespace YGOPortable.UI
             {
                 bool selected = catalog.Matches[first + i] == item;
                 if (starter) catalog.Labels[i].color = selected ? LotdUiKit.GoldAccent : LotdUiKit.TextPrimary;
-                else
-                {
-                    Color color = selected ? PackShopStyle.Accent : Color.white;
-                    catalog.Labels[i].color = color;
-                    catalog.Labels[i].GetComponentInParent<PackShopButtonLabel>().Normal = color;
-                    catalog.PackSelectionFrames[i].effectColor = selected ? PackShopStyle.Accent : new Color(.50f, .55f, .76f, .45f);
-                    catalog.PackSelectionFrames[i].effectDistance = Vector2.one * (selected ? 2f : 1f);
-                }
+                else PackShopStyle.SetSelected(catalog.Rows[i], selected);
             }
         }
 
@@ -677,10 +667,12 @@ namespace YGOPortable.UI
 
         private static Sprite GetPackCover(CatalogItem item) => PackCoverArt.Get(item.Id, item.FeaturedCode, item.CardPool);
 
-        private static void SetStatus(Catalog catalog, string message, bool error)
+        private void SetStatus(Catalog catalog, string message, bool error)
         {
             catalog.Status.text = message;
-            catalog.Status.color = error ? LotdUiKit.RedAccent : LotdUiKit.TextMuted;
+            if (catalog == _starter)
+                catalog.Status.color = error ? LotdUiKit.RedAccent : LotdUiKit.TextMuted;
+            else catalog.Status.color = error ? PackShopStyle.Danger : PackShopStyle.TextMuted;
         }
 
         private static void FocusFirstRow(Catalog catalog) =>
@@ -702,8 +694,9 @@ namespace YGOPortable.UI
             LotdUiKit.CreateLotdButton(Slot(name, parent, left, bottom, right, top), "Button", caption, click, 18, gold);
 
         private static Button ShopButton(Transform parent, string name, string caption, float left, float bottom,
-            float right, float top, Action click, bool primary = false) =>
-            PackShopStyle.Button(Slot(name, parent, left, bottom, right, top), "Button", caption, click, 18, primary);
+            float right, float top, Action click, bool primary = false,
+            PackShopStyle.ButtonKind kind = PackShopStyle.ButtonKind.Standard) =>
+            PackShopStyle.Button(Slot(name, parent, left, bottom, right, top), "Button", caption, click, 18, primary, kind);
     }
 
     internal static class ShopRarityBadge
@@ -711,9 +704,13 @@ namespace YGOPortable.UI
         internal static Text Create(Transform parent, Vector2 anchorMin, Vector2 anchorMax, int fontSize)
         {
             var holder = LotdUiKit.CreateRect("Rarity", parent, anchorMin, anchorMax, Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(holder.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelNavy, raycast: false);
-            return LotdUiKit.AddFittedText(holder, "Text", "", fontSize, Mathf.Min(10, fontSize),
-                TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
+            LotdUiKit.AddImage(holder.gameObject, LotdUiKit.WhiteSprite, PackShopStyle.SurfaceInset, raycast: false);
+            var text = LotdUiKit.AddFittedText(holder, "Text", "", fontSize, Mathf.Min(10, fontSize),
+                TextAnchor.MiddleCenter, PackShopStyle.TextPrimary, FontStyle.Bold);
+            var shadow = text.gameObject.AddComponent<Shadow>();
+            shadow.effectColor = PackShopStyle.Ink;
+            shadow.effectDistance = new Vector2(.8f, -.8f);
+            return text;
         }
 
         internal static void Update(Text label, uint code)
@@ -722,7 +719,7 @@ namespace YGOPortable.UI
             if (code == 0) return;
             var rarity = CardRarityCatalog.GetRarity(code);
             label.text = CardRarityCatalog.GetLabel(rarity);
-            label.color = CardRarityStyle.GetColor(rarity);
+            label.transform.parent.GetComponent<Image>().color = PackShopStyle.RarityColor(rarity);
         }
     }
 

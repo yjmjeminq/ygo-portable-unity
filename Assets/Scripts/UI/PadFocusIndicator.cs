@@ -33,6 +33,8 @@ namespace YGOPortable.UI
         private RectTransform _target;
         private CanvasGroup _track;
         private CanvasGroup _tips;
+        private Color _trackTint = TrackColor;
+        private Color _tipTint = CornerColor;
         private FocusPose _displayed;
         private FocusPose _from;
         private float _arrivalTime;
@@ -92,6 +94,19 @@ namespace YGOPortable.UI
             _target = null;
             _host = null;
             _sliding = false;
+        }
+
+        internal void SetColors(Color? track = null, Color? corners = null)
+        {
+            SetStrokeColor(_track.transform, ref _trackTint, track ?? TrackColor);
+            SetStrokeColor(_tips.transform, ref _tipTint, corners ?? CornerColor);
+        }
+
+        private static void SetStrokeColor(Transform layer, ref Color current, Color color)
+        {
+            if (current == color) return;
+            current = color;
+            foreach (Transform stroke in layer) stroke.GetComponent<Image>().color = color;
         }
 
         private void LateUpdate()

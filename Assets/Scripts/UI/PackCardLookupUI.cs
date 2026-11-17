@@ -72,8 +72,7 @@ namespace YGOPortable.UI
             var detail = PackShopStyle.Panel(root, "Details",
                 new Vector2(.439f, .083f), new Vector2(.975f, .882f));
             var searchSlot = Slot("Search", catalog, .08f, .851f, .92f, .924f);
-            Search = LotdUiKit.CreateInputField(searchSlot, "Input", "카드 이름·카드 번호 검색", 18);
-            Search.GetComponent<Outline>().effectColor = PackShopStyle.TextMuted;
+            Search = PackShopStyle.Search(searchSlot, "Input", "카드 이름·카드 번호 검색", 18);
             Search.onValueChanged.AddListener(_ => FilterCards());
             _cardCount = Label(catalog, "Count", .087f, .796f, .914f, .841f, 16,
                 TextAnchor.MiddleLeft, PackShopStyle.TextMuted);
@@ -98,16 +97,16 @@ namespace YGOPortable.UI
 
             var heading = Slot("Heading", detail, .073f, .853f, .927f, .929f);
             _cardHeading = LotdUiKit.AddFittedText(heading, "Title", "", 27, 16,
-                TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
+                TextAnchor.MiddleCenter, PackShopStyle.TextPrimary, FontStyle.Bold);
             var art = Slot("Art", detail, .073f, .339f, .385f, .822f);
             _preview = CompositeCardView.Create(art, "SelectedCard", true);
             _cardRarity = ShopRarityBadge.Create(detail, new Vector2(.172f, .271f), new Vector2(.286f, .324f), 17);
             _cardInfo = Label(detail, "CardInfo", .081f, .146f, .378f, .257f, 17,
-                TextAnchor.UpperCenter, LotdUiKit.TextPrimary);
+                TextAnchor.UpperCenter, PackShopStyle.TextPrimary);
 
             _packPane = Slot("Packs", detail, .408f, .091f, .927f, .827f);
             _packHeading = Label(_packPane, "Count", 0f, .906f, 1f, .997f, 20,
-                TextAnchor.MiddleLeft, LotdUiKit.TextPrimary);
+                TextAnchor.MiddleLeft, PackShopStyle.TextPrimary);
             for (int i = 0; i < PacksPerPage; i++)
             {
                 int row = i;
@@ -265,7 +264,7 @@ namespace YGOPortable.UI
             int first = _cardPage * CardsPerPage;
             for (int row = 0; row < CardsPerPage && first + row < _matches.Count; row++)
             {
-                Color color = _matches[first + row] == entry ? PackShopStyle.Accent : LotdUiKit.TextPrimary;
+                Color color = _matches[first + row] == entry ? PackShopStyle.Accent : PackShopStyle.TextPrimary;
                 _cardRows[row].GetComponent<PackShopButtonLabel>().Normal = color;
                 _cardLabels[row].color = color;
             }

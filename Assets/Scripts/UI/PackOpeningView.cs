@@ -20,6 +20,7 @@ namespace YGOPortable.UI
             internal CanvasGroup Group;
             internal RectTransform Face;
             internal CompositeCardView Card;
+            internal CompositeCardView Reflection;
             internal Button Button;
             internal Text Name;
             internal Text RarityLabel;
@@ -44,6 +45,7 @@ namespace YGOPortable.UI
         private readonly Button _skipBatch;
         private readonly Button _all;
         private readonly Button _exit;
+        private readonly Button _skipResult;
         private readonly Button _previous;
         private readonly Text _allLabel;
         private readonly Text _exitLabel;
@@ -73,32 +75,35 @@ namespace YGOPortable.UI
             _root = root.gameObject;
             var opening = LotdUiKit.FillRect("Opening", root);
             _opening = opening.gameObject;
-            PackShopStyle.Backdrop(opening);
+            PackOpeningStage.Backdrop(opening);
             _motion = LotdUiKit.FillRect("Motion", opening).gameObject.AddComponent<PackOpeningMotion>();
-            _openingTitle = Label(opening, "Title", "", .18f, .88f, .82f, .965f, 31, LotdUiKit.TextPrimary);
-            _openingPage = Label(opening, "Page", "", .25f, .837f, .75f, .883f, 20, PackShopStyle.TextMuted);
+            _openingTitle = Label(opening, "Title", "", .18f, .88f, .82f, .965f, 31, PackShopStyle.TextPrimary);
+            _openingPage = Label(opening, "Page", "", .02f, .89f, .16f, .967f, 28, PackShopStyle.TextPrimary);
             _skip = ButtonAt(opening, "Skip", "건너뛰기", .84f, .04f, .967f, .099f, Back);
             _skipBatch = ButtonAt(opening, "SkipBatch", "전체 빠른 공개", .655f, .04f, .826f, .099f, SkipBatch);
 
             var results = LotdUiKit.FillRect("Results", root);
             _results = results.gameObject;
-            PackShopStyle.Backdrop(results);
-            _resultTitle = Label(results, "Title", "", .19f, .875f, .81f, .957f, 32, LotdUiKit.TextPrimary);
-            _resultPage = Label(results, "Page", "", .26f, .821f, .74f, .865f, 20, PackShopStyle.TextMuted);
-            _previous = ButtonAt(results, "Previous", "이전 팩", .034f, .896f, .165f, .954f, () => ChangePage(-1));
-            _exit = ButtonAt(results, "Exit", "", .835f, .896f, .966f, .954f, Back);
+            PackOpeningStage.Backdrop(results);
+            _resultTitle = Label(results, "Title", "", .19f, .875f, .81f, .957f, 32, PackShopStyle.TextPrimary);
+            _resultPage = Label(results, "Page", "", .02f, .89f, .16f, .967f, 28, PackShopStyle.TextPrimary);
+            _previous = ButtonAt(results, "Previous", "이전 팩", .034f, .048f, .165f, .112f, () => ChangePage(-1));
+            _exit = ButtonAt(results, "Exit", "", .405f, .086f, .595f, .152f, Back, light: true);
+            _skipResult = ButtonAt(results, "Skip", "건너뛰기", .84f, .04f, .967f, .099f, Back);
             _exitLabel = _exit.GetComponentInChildren<Text>();
 
-            var spread = Slot(results, "Cards", .036f, .31f, .964f, .788f);
-            var light = Slot(results, "Light", .037f, .309f, .962f, .311f);
-            LotdUiKit.AddImage(light.gameObject, LotdUiKit.WhiteSprite, new Color(.17f, .57f, .87f, .42f), false, false);
+            var spread = Slot(results, "Cards", .048f, .37f, .952f, .686f);
             for (int i = 0; i < _pulls.Length; i++)
                 _pulls[i] = BuildPull(spread, i);
-            _summary = Label(results, "Summary", "", .20f, .24f, .80f, .308f, 22, LotdUiKit.CyanAccent);
-            _selected = Label(results, "Selected", "", .16f, .165f, .84f, .232f, 24, LotdUiKit.TextPrimary);
-            _all = ButtonAt(results, "RevealAll", "모두 공개", .405f, .089f, .595f, .151f, RevealAll, true);
+            PackOpeningStage.FloorFade(results, .09f, .375f);
+            _exit.transform.parent.SetAsLastSibling();
+            _previous.transform.parent.SetAsLastSibling();
+            _skipResult.transform.parent.SetAsLastSibling();
+            _summary = Label(results, "Summary", "", .20f, .206f, .80f, .253f, 19, PackShopStyle.TextMuted);
+            _selected = Label(results, "Selected", "", .16f, .149f, .84f, .204f, 22, PackShopStyle.TextPrimary);
+            _all = ButtonAt(results, "RevealAll", "모두 공개", .405f, .086f, .595f, .152f, RevealAll, light: true);
             _allLabel = _all.GetComponentInChildren<Text>();
-            _controls = Label(results, "Controls", "", .20f, .019f, .8f, .064f, 17, LotdUiKit.TextMuted);
+            _controls = Label(results, "Controls", "", .20f, .017f, .8f, .066f, 16, PackShopStyle.TextMuted);
             _playback = results.gameObject.AddComponent<PackOpeningPlayback>();
             _playback.Step = AdvanceResults;
 
@@ -139,7 +144,7 @@ namespace YGOPortable.UI
                 pull.Rarity = CardRarityCatalog.GetRarity(pull.Code);
                 if (pull.Rarity > highest) highest = pull.Rarity;
             }
-            string page = _packs.Count > 1 ? $"팩 {_packIndex + 1} / {_packs.Count}" : "";
+            string page = $"{_packIndex + 1} / {_packs.Count}";
             _openingPage.text = _resultPage.text = page;
             if (_quickBatch || _opened[_packIndex])
             {
@@ -162,7 +167,7 @@ namespace YGOPortable.UI
             _root.SetActive(false);
             _opening.SetActive(false);
             _results.SetActive(false);
-            foreach (var pull in _pulls) pull.Card.SetCard(0, faceDown: true);
+            foreach (var pull in _pulls) SetFace(pull, 0, true);
             _packs = null;
             _opened = null;
             _cover = null;
@@ -195,7 +200,7 @@ namespace YGOPortable.UI
             float stride = 1f / _pulls.Length;
             var slot = Slot(parent, $"Card_{index}", index * stride + .006f, 0f, (index + 1) * stride - .006f, 1f);
             var group = slot.gameObject.AddComponent<CanvasGroup>();
-            var buttonBounds = Slot(slot, "Select", 0f, .213f, 1f, .985f);
+            var buttonBounds = Slot(slot, "Select", 0f, .015f, 1f, .94f);
             var clickArea = LotdUiKit.AddImage(buttonBounds.gameObject, LotdUiKit.WhiteSprite, Color.clear);
             var button = buttonBounds.gameObject.AddComponent<Button>();
             button.targetGraphic = clickArea;
@@ -209,6 +214,10 @@ namespace YGOPortable.UI
             shineRect.anchorMax = new Vector2(.97f, .982f);
             var shine = LotdUiKit.AddImage(shineRect.gameObject, LotdUiKit.WhiteSprite, Color.clear, false, false);
             var card = CompositeCardView.Create(face, "View", detailedOverlay: true);
+            var mirror = Slot(card.transform.Find("AspectBox"), "Reflection", 0f, -1f, 1f, 0f);
+            mirror.localScale = new Vector3(1f, -1f, 1f);
+            mirror.gameObject.AddComponent<CanvasGroup>().alpha = .35f;
+            var reflection = CompositeCardView.Create(mirror, "View");
             // The tint overlays the card front briefly at the midpoint of the flip.
             shineRect.SetAsLastSibling();
 
@@ -218,9 +227,10 @@ namespace YGOPortable.UI
                 Group = group,
                 Face = face,
                 Card = card,
+                Reflection = reflection,
                 Button = button,
-                Name = Label(slot, "Name", "", 0f, .005f, 1f, .14f, 16, LotdUiKit.TextPrimary),
-                RarityLabel = ShopRarityBadge.Create(slot, new Vector2(.31f, .145f), new Vector2(.69f, .216f), 15),
+                Name = Label(slot, "Name", "", 0f, -.23f, 1f, -.105f, 15, PackShopStyle.TextPrimary),
+                RarityLabel = ShopRarityBadge.Create(slot, new Vector2(.74f, .927f), new Vector2(.987f, 1.013f), 15),
                 Shine = shine,
             };
         }
@@ -238,7 +248,7 @@ namespace YGOPortable.UI
                 pull.FlipAge = 0f;
                 pull.Face.localScale = Vector3.one;
                 pull.Shine.color = Color.clear;
-                pull.Card.SetCard(pull.Code, faceDown: true);
+                SetFace(pull, pull.Code, true);
                 pull.RarityLabel.transform.parent.gameObject.SetActive(false);
                 pull.Name.text = "";
             }
@@ -325,7 +335,7 @@ namespace YGOPortable.UI
             pull.Face.localScale = new Vector3(width, 1f + .055f * Mathf.Sin(t * Mathf.PI), 1f);
             if (t >= .5f) RevealCard(pull, playSound: true);
 
-            Color foil = CardRarityStyle.GetColor(pull.Rarity);
+            Color foil = pull.Rarity == CardRarity.UltraRare ? Color.HSVToRGB(t, .68f, 1f) : CardRarityStyle.GetColor(pull.Rarity);
             foil.a = Mathf.Sin(t * Mathf.PI) * (pull.Rarity >= CardRarity.SuperRare ? .68f : .25f);
             pull.Shine.color = foil;
             if (t >= 1f)
@@ -341,7 +351,7 @@ namespace YGOPortable.UI
             if (pull.FaceUp) return;
             pull.FaceUp = true;
             _revealed++;
-            pull.Card.SetCard(pull.Code);
+            SetFace(pull, pull.Code, false);
             ShopRarityBadge.Update(pull.RarityLabel, pull.Code);
             pull.Name.text = CardDatabase.GetName(pull.Code);
             if (playSound && Application.isPlaying)
@@ -353,6 +363,12 @@ namespace YGOPortable.UI
             RefreshStatus();
         }
 
+        private static void SetFace(Pull pull, uint code, bool faceDown)
+        {
+            pull.Card.SetCard(code, faceDown);
+            pull.Reflection.SetCard(code, faceDown);
+        }
+
         private void RefreshStatus()
         {
             bool finished = _revealed == _count;
@@ -360,13 +376,16 @@ namespace YGOPortable.UI
             _previous.gameObject.SetActive(_packIndex > 0);
             _previous.interactable = finished;
             _summary.text = finished ? $"카드 {_count}장 공개 완료" : $"공개 {_revealed} / {_count}";
-            _exitLabel.text = !finished ? "건너뛰기" : _packIndex + 1 < _packs.Count ? "다음 팩" : "상점으로";
+            _exitLabel.text = _packIndex + 1 < _packs.Count ? "다음 팩" : "상점으로";
             _controls.text = finished
                 ? _packs.Count > 1 ? "방향키 카드 선택   LB/RB 팩 이동" : "방향키 카드 선택   B 상점으로"
                 : "방향키 카드 선택   A 공개   B 건너뛰기";
             _all.gameObject.SetActive(!finished);
+            _exit.gameObject.SetActive(finished);
+            _skipResult.gameObject.SetActive(!finished);
             _allLabel.text = _allQueued ? "즉시 공개" : "모두 공개";
-            if (finished && EventSystem.current?.currentSelectedGameObject == _all.gameObject)
+            var focus = EventSystem.current?.currentSelectedGameObject;
+            if (finished && (focus == _all.gameObject || focus == _skipResult.gameObject))
                 Focus(_exit);
             Inspect(_inspected);
         }
@@ -392,8 +411,9 @@ namespace YGOPortable.UI
                 Mathf.Max(11, size - 8), TextAnchor.MiddleCenter, color, FontStyle.Bold);
 
         private static Button ButtonAt(Transform parent, string name, string text, float left, float bottom, float right, float top,
-            Action click, bool gold = false) =>
-            PackShopStyle.Button(Slot(parent, name, left, bottom, right, top), "Button", text, click, 19, gold);
+            Action click, bool light = false) =>
+            PackShopStyle.Button(Slot(parent, name, left, bottom, right, top), "Button", text, click, 19,
+                kind: light ? PackShopStyle.ButtonKind.OpeningAction : PackShopStyle.ButtonKind.OpeningSkip);
     }
 
     internal sealed class PackOpeningPlayback : MonoBehaviour
