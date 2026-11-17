@@ -100,6 +100,11 @@ namespace YGOPortable.UI
         private void HandleDeckPad(DeckPadFrame frame)
         {
             if (_workingDeck == null) return;
+            if (_cardCrafting?.IsOpen == true)
+            {
+                HandleCardCraftingPad(frame);
+                return;
+            }
             bool cardActionsOpen = _deckCardActions.activeSelf;
             bool mainSortOpen = _mainSortMenu.activeSelf;
             var overlay = cardActionsOpen ? _deckCardActionPanel.gameObject :
@@ -309,6 +314,31 @@ namespace YGOPortable.UI
                 _padIndices[trunk] = Mathf.Max(0, _trunkResults.FindIndex(card => card.code == code));
         }
 
+        private void HandleCardCraftingPad(DeckPadFrame frame)
+        {
+            if (frame.HasInput)
+            {
+                _padMode = true;
+                _padMousePoint = Input.mousePosition;
+            }
+
+            var scope = _cardCrafting.ActiveRoot.transform;
+            if (_padUi.HasPopup)
+                _padUi.Handle(scope, frame.Direction, frame.Submit, frame.Cancel, null);
+            else if (frame.Cancel)
+                _cardCrafting.Back();
+            else if (frame.Search)
+                _padUi.OpenText(_cardCrafting.Search);
+            else if (frame.PreviousArea || frame.NextArea)
+                _cardCrafting.ChangePage(frame.PreviousArea ? -1 : 1);
+            else
+            {
+                _cardCrafting.ScrollDescription(frame.DescriptionScroll);
+                if (frame.HasInput) _padUi.AdoptPointerFocus(scope);
+                _padUi.Handle(scope, frame.Direction, frame.Submit, false, null);
+            }
+        }
+
         private void HandleDeckCardActionsPad(DeckPadFrame frame)
         {
             _padCardFocus.Hide();
@@ -316,7 +346,7 @@ namespace YGOPortable.UI
             if (frame.HasInput) _padUi.AdoptPointerFocus(_deckCardActionPanel);
             _padUi.Handle(_deckCardActionPanel, frame.Direction, frame.Submit, frame.Cancel,
                 CloseDeckCardActions, _deckCardActionDefault);
-            if (_deckCardActions.activeSelf) return;
+            if (_deckCardActions.activeSelf || _cardCrafting?.IsOpen == true) return;
 
             if (_padArea != PadArea.Controls) DrawPadCardFocus();
         }

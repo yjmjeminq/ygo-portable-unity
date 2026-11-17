@@ -33,6 +33,7 @@ namespace YGOPortable.UI
 
         private readonly Action _close;
         private readonly Action _changed;
+        private UserDeck _editingDeck;
         private readonly GameObject _catalogRoot;
         private readonly GameObject _reviewRoot;
         private readonly InputField _search;
@@ -136,8 +137,9 @@ namespace YGOPortable.UI
             _reviewRoot.SetActive(false);
         }
 
-        internal void Show()
+        internal void Show(UserDeck editingDeck)
         {
+            _editingDeck = editingDeck;
             _reviewRoot.SetActive(false);
             _filter = null;
             _selected.Clear();
@@ -152,6 +154,7 @@ namespace YGOPortable.UI
 
         internal void Hide()
         {
+            _editingDeck = null;
             _catalogRoot.SetActive(false);
             _reviewRoot.SetActive(false);
             _selected.Clear();
@@ -188,7 +191,7 @@ namespace YGOPortable.UI
         private void ReloadCards()
         {
             _cards.Clear();
-            var limits = CollectionProgress.GetDisassembleLimits();
+            var limits = CollectionProgress.GetDisassembleLimits(_editingDeck);
             foreach (var entry in limits)
             {
                 string name = CardDatabase.GetName(entry.Key);
@@ -390,7 +393,7 @@ namespace YGOPortable.UI
         private void ConfirmDisassembly()
         {
             if (!_reviewRoot.activeInHierarchy) return;
-            bool success = CollectionProgress.TryDisassembleCards(_selected, out string error);
+            bool success = CollectionProgress.TryDisassembleCards(_selected, out string error, _editingDeck);
             if (success) _selected.Clear();
             ReloadCards();
             _reviewRoot.SetActive(false);

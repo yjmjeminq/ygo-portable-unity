@@ -9,13 +9,14 @@ namespace YGOPortable.UI
     public partial class DeckEditorUI
     {
         private const float CardActionWidth = 300f;
-        private const float CardActionHeight = 244f;
+        private const float CardActionHeight = 292f;
         private GameObject _deckCardActions;
         private RectTransform _deckCardActionPanel;
         private Text _deckCardActionTitle;
         private Button _deckCardActionMain;
         private Button _deckCardActionAlternate;
         private Button _deckCardActionRelated;
+        private Button _deckCardActionCrafting;
         private Button _deckCardActionCancel;
         private Button _deckCardActionDefault;
 
@@ -33,7 +34,7 @@ namespace YGOPortable.UI
             _deckCardActionPanel = LotdUiKit.CreateMenuPanel(overlay, "Window", overlay.pivot, overlay.pivot);
             _deckCardActionPanel.pivot = new Vector2(0f, 1f);
             _deckCardActionPanel.sizeDelta = new Vector2(CardActionWidth, CardActionHeight);
-            var title = LotdUiKit.CreateRect("Title", _deckCardActionPanel, new Vector2(.10f, .765f), new Vector2(.90f, .88f),
+            var title = LotdUiKit.CreateRect("Title", _deckCardActionPanel, new Vector2(.10f, .81f), new Vector2(.90f, .906f),
                 Vector2.zero, Vector2.zero);
             LotdUiKit.AddImage(title.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelNavy, false, false);
             _deckCardActionTitle = LotdUiKit.AddFittedText(title, "Text", "", 18, 12,
@@ -41,15 +42,16 @@ namespace YGOPortable.UI
 
             Button AddRow(string name, string label, float top, Action action = null)
             {
-                var row = LotdUiKit.CreateRect(name, _deckCardActionPanel, new Vector2(.10f, top - .135f), new Vector2(.90f, top),
+                var row = LotdUiKit.CreateRect(name, _deckCardActionPanel, new Vector2(.10f, top - .112f), new Vector2(.90f, top),
                     Vector2.zero, Vector2.zero);
                 return LotdUiKit.CreateLotdButton(row, "Button", label, action, 17);
             }
 
-            _deckCardActionMain = AddRow("MainAction", "", .743f);
-            _deckCardActionAlternate = AddRow("AlternateAction", "", .587f);
-            _deckCardActionRelated = AddRow("Related", "", .431f);
-            _deckCardActionCancel = AddRow("Cancel", "취소", .275f, CloseDeckCardActions);
+            _deckCardActionMain = AddRow("MainAction", "", .785f);
+            _deckCardActionAlternate = AddRow("AlternateAction", "", .647f);
+            _deckCardActionRelated = AddRow("Related", "", .509f);
+            _deckCardActionCrafting = AddRow("Crafting", "", .371f);
+            _deckCardActionCancel = AddRow("Cancel", "취소", .233f, CloseDeckCardActions);
             overlay.gameObject.SetActive(false);
         }
 
@@ -97,6 +99,8 @@ namespace YGOPortable.UI
                 FilterRelatedCards(code);
                 SwitchPadArea(PadArea.Trunk);
             });
+            SetDeckCardAction(_deckCardActionCrafting, "제작·분해",
+                CollectionProgress.HasStarter && CollectionProgress.IsCraftableCard(card), () => OpenCardCrafting(code));
             SetDeckCardActionNavigation();
             _deckCardActionTitle.text = card.name;
             InspectCard(code);
@@ -112,7 +116,8 @@ namespace YGOPortable.UI
         {
             _deckCardActionDefault = null;
             Button previous = null;
-            foreach (var button in new[] { _deckCardActionMain, _deckCardActionAlternate, _deckCardActionRelated, _deckCardActionCancel })
+            foreach (var button in new[] { _deckCardActionMain, _deckCardActionAlternate, _deckCardActionRelated,
+                _deckCardActionCrafting, _deckCardActionCancel })
             {
                 if (!button.interactable) continue;
                 if (_deckCardActionDefault == null) _deckCardActionDefault = button;

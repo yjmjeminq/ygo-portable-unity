@@ -69,6 +69,7 @@ namespace YGOPortable.UI
         private readonly List<Entry> _matches = new();
         private Entry[] _entries;
         private IReadOnlyDictionary<uint, int> _disassembleLimits;
+        private UserDeck _editingDeck;
         private Entry _selected;
         private Entry _confirmedCard;
         private int _page;
@@ -95,7 +96,7 @@ namespace YGOPortable.UI
             PackShopStyle.Backdrop(main);
             PackShopStyle.Header(main, "카드 제작·분해");
             _bulkButton = AddButton(main, "Bulk", "일괄 분해", .655f, .917f, .812f, .975f, OpenBulk);
-            AddButton(main, "Back", "팩 상점으로", .825f, .917f, .968f, .975f, Back);
+            AddButton(main, "Back", "덱 편집으로", .825f, .917f, .968f, .975f, Back);
 
             var catalog = PackShopStyle.Panel(main, "Catalog", new Vector2(.025f, .083f), new Vector2(.425f, .882f));
             _finder = PackShopStyle.Search(Slot(catalog, "Search", .08f, .849f, .92f, .925f),
@@ -152,7 +153,7 @@ namespace YGOPortable.UI
             _craft = AddButton(details, "Craft", "제작", .407f, .204f, .661f, .281f, () => OpenConfirmation(true), true);
             _disassemble = AddButton(details, "Disassemble", "분해", .673f, .204f, .926f, .281f, () => OpenConfirmation(false));
             _status = Label(details, "Status", "", .077f, .126f, .928f, .195f, 17, TextAnchor.MiddleCenter, PackShopStyle.TextPrimary);
-            Label(details, "Rules", "같은 등급 CP로 제작할 수 있으며 저장한 덱의 카드는 분해에서 보호됩니다.",
+            Label(details, "Rules", "같은 등급 CP로 제작할 수 있으며 덱에 사용 중인 카드는 분해에서 보호됩니다.",
                 .077f, .069f, .928f, .121f, 16, TextAnchor.MiddleCenter, PackShopStyle.TextMuted);
 
             var footer = PackShopStyle.Panel(main, "Footer", new Vector2(.035f, .017f), new Vector2(.965f, .059f));
@@ -178,16 +179,19 @@ namespace YGOPortable.UI
             Root.SetActive(false);
         }
 
-        internal void Show()
+        internal void Show(UserDeck editingDeck, uint selectedCard)
         {
+            _editingDeck = editingDeck;
             _entries ??= CardDatabase.AllCards.Where(CollectionProgress.IsCraftableCard).Select(card => new Entry(card))
                 .OrderBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase).ThenBy(entry => entry.Card.code).ToArray();
             Root.SetActive(true);
             _main.SetActive(true);
-            _status.text = "";
+            _filter = 0;
+            _finder.SetTextWithoutNotify("");
             RefreshPoints();
-            Filter();
-            Focus(_finder);
+            int selectedIndex = Filter(selectedCard);
+            if (selectedIndex >= 0) Focus(_rows[selectedIndex % PageSize]);
+            else Focus(_finder);
         }
 
         internal void Hide()
@@ -197,6 +201,7 @@ namespace YGOPortable.UI
             _finder.DeactivateInputField();
             _art.SetCard(0);
             _selected = null;
+            _editingDeck = null;
             Root.SetActive(false);
         }
 
@@ -242,9 +247,9 @@ namespace YGOPortable.UI
             Filter();
         }
 
-        private void Filter()
+        private int Filter(uint selectedCard = 0)
         {
-            if (_entries == null) return;
+            if (_entries == null) return -1;
             for (int i = 0; i < _filterLabels.Length; i++)
                 SetButtonLabelColor(_filterLabels[i], i == _filter ? PackShopStyle.Accent :
                     i == 0 ? PackShopStyle.TextPrimary : CardRarityStyle.GetColor(Rarities[i - 1]));
@@ -261,9 +266,12 @@ namespace YGOPortable.UI
                     normalized.Length > 0 && entry.SearchName.IndexOf(normalized, StringComparison.OrdinalIgnoreCase) >= 0))
                     _matches.Add(entry);
             }
-            _page = 0;
+            int selectedIndex = _matches.FindIndex(entry => entry.Card.code == selectedCard);
+            _page = selectedIndex < 0 ? 0 : selectedIndex / PageSize;
             _status.text = "";
             RefreshPage();
+            if (selectedIndex >= 0) SelectRow(selectedIndex % PageSize);
+            return selectedIndex;
         }
 
         private void RefreshPointsAndOwnership()
@@ -274,7 +282,7 @@ namespace YGOPortable.UI
 
         private void RefreshPoints()
         {
-            _disassembleLimits = CollectionProgress.GetDisassembleLimits();
+            _disassembleLimits = CollectionProgress.GetDisassembleLimits(_editingDeck);
             for (int i = 0; i < Rarities.Length; i++)
             {
                 var rarity = Rarities[i];
@@ -352,7 +360,7 @@ namespace YGOPortable.UI
         {
             _finder.DeactivateInputField();
             _main.SetActive(false);
-            _bulk.Show();
+            _bulk.Show(_editingDeck);
         }
 
         private void ReturnFromBulk()
@@ -457,7 +465,7 @@ namespace YGOPortable.UI
             string name = _confirmedCard.Name;
             string error;
             bool saved = _crafting ? CollectionProgress.TryCraftCard(code, _quantity, out error) :
-                CollectionProgress.TryDisassembleCards(new Dictionary<uint, int> { [code] = _quantity }, out error);
+                CollectionProgress.TryDisassembleCards(new Dictionary<uint, int> { [code] = _quantity }, out error, _editingDeck);
             CloseConfirmation();
             RefreshPointsAndOwnership();
             _status.color = saved ? PackShopStyle.TextPrimary : PackShopStyle.Danger;

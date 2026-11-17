@@ -53,7 +53,6 @@ namespace YGOPortable.UI
         private readonly Catalog _starter;
         private readonly PackContentsUI _packContents;
         private readonly PackCardLookupUI _cardLookup;
-        private CardCraftingUI _crafting;
         private PackOpeningView _openingView;
         private Text _balance;
         private Text _filterCount;
@@ -74,16 +73,14 @@ namespace YGOPortable.UI
         private Button _viewContentsButton;
         private Button _oddsButton;
         private Button _buyBundleButton;
-        private Button _craftingButton;
         private bool _lookupFromContents;
 
         public GameObject Root => _shop.Root;
         public GameObject StarterRoot => _starter.Root;
-        private bool CraftingIsOpen => _crafting?.IsOpen == true;
         private bool OpeningIsOpen => _openingView?.IsOpen == true;
         private bool ShopDialogIsOpen => _shopDialog.activeSelf;
         internal GameObject ActiveShopRoot => OpeningIsOpen ? _openingView.ActiveRoot :
-            ShopDialogIsOpen ? _shopDialog : CraftingIsOpen ? _crafting.ActiveRoot :
+            ShopDialogIsOpen ? _shopDialog :
             _cardLookup.Root.activeSelf ? _cardLookup.Root :
             _packContents.Root.activeSelf ? _packContents.Root : Root;
 
@@ -122,7 +119,6 @@ namespace YGOPortable.UI
         {
             _openingView?.Hide();
             HideShopDialog();
-            _crafting?.Hide();
             _cardLookup.Root.SetActive(false);
             _packContents.Close();
             Root.SetActive(false);
@@ -152,7 +148,6 @@ namespace YGOPortable.UI
 
         internal InputField CatalogSearch(bool starter) => starter ? _starter.Search :
             OpeningIsOpen || ShopDialogIsOpen ? null :
-            CraftingIsOpen ? _crafting.Search :
             _cardLookup.Root.activeSelf ? _cardLookup.Search :
             _packContents.Root.activeSelf ? _packContents.SearchInput : _shop.Search;
 
@@ -164,11 +159,7 @@ namespace YGOPortable.UI
                 return;
             }
             if (!starter && ShopDialogIsOpen) return;
-            if (!starter && CraftingIsOpen)
-            {
-                _crafting.ChangePage(delta);
-                return;
-            }
+
             if (!starter && _cardLookup.Root.activeSelf)
             {
                 _cardLookup.ChangePage(delta);
@@ -185,8 +176,7 @@ namespace YGOPortable.UI
 
         internal void ScrollShopDescription(float direction)
         {
-            if (CraftingIsOpen) _crafting.ScrollDescription(direction);
-            else if (_packContents.Root.activeSelf) _packContents.ScrollDescription(direction);
+            if (_packContents.Root.activeSelf) _packContents.ScrollDescription(direction);
         }
 
         internal bool HandleShopBack()
@@ -201,11 +191,7 @@ namespace YGOPortable.UI
                 CloseShopDialog();
                 return true;
             }
-            if (CraftingIsOpen)
-            {
-                _crafting.Back();
-                return true;
-            }
+
             if (_cardLookup.Root.activeSelf)
             {
                 ReturnFromLookup();
@@ -219,19 +205,6 @@ namespace YGOPortable.UI
             return false;
         }
 
-        private void OpenCrafting()
-        {
-            _crafting ??= new CardCraftingUI(Root.transform.parent, ReturnFromCrafting);
-            Root.SetActive(false);
-            _crafting.Show();
-        }
-
-        private void ReturnFromCrafting()
-        {
-            _crafting.Hide();
-            Root.SetActive(true);
-            EventSystem.current?.SetSelectedGameObject(_craftingButton.gameObject);
-        }
 
         private void ViewSelectedPack()
         {
@@ -323,8 +296,7 @@ namespace YGOPortable.UI
                 () => SetPackFilter(PackFilter.All), kind: PackShopStyle.ButtonKind.Category), true);
             _cardLookupButton = ShopButton(root, "CardLookup", "카드로 팩 찾기", .160f, .819f, .296f, .885f,
                 OpenLookup, kind: PackShopStyle.ButtonKind.Category);
-            _craftingButton = ShopButton(root, "Crafting", "제작·분해", .305f, .819f, .437f, .885f,
-                OpenCrafting, kind: PackShopStyle.ButtonKind.Category);
+
 
             var rail = PackShopStyle.Panel(root, "Categories", new Vector2(.035f, .109f), new Vector2(.151f, .800f), .36f);
             string[] filterNames = { "전체 팩", "카드군 팩", "공용 팩" };

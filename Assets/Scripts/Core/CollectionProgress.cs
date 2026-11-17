@@ -206,12 +206,12 @@ namespace YGOPortable.Core
             return GetDisassembleLimit(code, reserved);
         }
 
-        public static IReadOnlyDictionary<uint, int> GetDisassembleLimits()
+        public static IReadOnlyDictionary<uint, int> GetDisassembleLimits(UserDeck editingDeck = null)
         {
             var available = new Dictionary<uint, int>();
             if (!HasStarter) return available;
 
-            var reserved = GetReservedDeckCopies();
+            var reserved = GetReservedDeckCopies(editingDeck);
             foreach (uint code in _owned.Keys)
             {
                 int quantity = GetDisassembleLimit(code, reserved);
@@ -249,7 +249,8 @@ namespace YGOPortable.Core
             return Write(next, owned, out error);
         }
 
-        public static bool TryDisassembleCards(IReadOnlyDictionary<uint, int> quantities, out string error)
+        public static bool TryDisassembleCards(IReadOnlyDictionary<uint, int> quantities, out string error,
+            UserDeck editingDeck = null)
         {
             if (!CanTradeCards(out error)) return false;
             if (quantities == null || quantities.Count == 0)
@@ -258,7 +259,7 @@ namespace YGOPortable.Core
                 return false;
             }
 
-            var reserved = GetReservedDeckCopies();
+            var reserved = GetReservedDeckCopies(editingDeck);
             var owned = new Dictionary<uint, int>(_owned);
             var next = WithBalance(Balance);
             next.craftPoints = (int[])_profile.craftPoints.Clone();
@@ -305,7 +306,7 @@ namespace YGOPortable.Core
         private static int GetDisassembleLimit(uint code, Dictionary<uint, int> reserved) =>
             Math.Max(0, GetOwnedCount(code) - reserved.GetValueOrDefault(code));
 
-        private static Dictionary<uint, int> GetReservedDeckCopies()
+        private static Dictionary<uint, int> GetReservedDeckCopies(UserDeck editingDeck = null)
         {
             var reserved = new Dictionary<uint, int>();
             void Reserve(UserDeck deck)
@@ -316,6 +317,7 @@ namespace YGOPortable.Core
 
             Reserve(_profile.starterDeck);
             foreach (var deck in DeckRepository.UserDecks) Reserve(deck);
+            if (editingDeck != null) Reserve(editingDeck);
             return reserved;
         }
 

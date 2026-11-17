@@ -41,7 +41,13 @@ namespace YGOPortable.Editor
                 shop.OpenShop();
                 Canvas.ForceUpdateCanvases();
                 VerifyPack(shop, events);
-                VerifyDisassembly(shop);
+                Require(shop.Root.transform.Find("Crafting") == null, "The pack shop still exposes card crafting.");
+                Call(shop, "CloseShop");
+
+                var editor = new DeckEditorUI(canvasObject.AddComponent<GameAppController>(), canvasObject.transform);
+                editor.Open();
+                try { VerifyDeckDisassembly(editor, events); }
+                finally { editor.Close(); }
             }
             finally
             {
@@ -93,19 +99,48 @@ namespace YGOPortable.Editor
             Require(Scope(shop) == shop.Root && buy.IsInteractable(), "Leaving the results did not restore shop controls.");
         }
 
-        private static void VerifyDisassembly(CollectionShopUI shop)
+        private static void VerifyDeckDisassembly(DeckEditorUI editor, EventSystem events)
         {
             uint code = CollectionProgress.GetDisassembleLimits().Keys.First();
             int owned = CollectionProgress.GetOwnedCount(code);
             var rarity = CardRarityCatalog.GetRarity(code);
             var alternative = CardDatabase.AllCards.First(card => card.code != code && CollectionProgress.IsCraftableCard(card));
-            ButtonAt(shop.Root, "Crafting/Button").onClick.Invoke();
-            var catalog = Scope(shop);
-            var search = catalog.transform.Find("Catalog/Search/Input").GetComponent<InputField>();
-            search.text = code.ToString();
+            var working = (UserDeck)Field(editor, "_workingDeck");
+            int originalSize = working.main.Count;
+            working.main.AddRange(Enumerable.Repeat(code, owned));
+            Call(editor, "InspectCard", code);
+            var craftingButton = ButtonAt(editor.Root, "Editor/CardDetails/Crafting/Button");
+            events.SetSelectedGameObject(craftingButton.gameObject);
+            craftingButton.onClick.Invoke();
+
+            var crafting = Field(editor, "_cardCrafting");
+            var catalog = CraftingScope(crafting);
+            var art = (CompositeCardView)Field(crafting, "_art");
+            Require(editor.Root.activeSelf && !craftingButton.gameObject.activeInHierarchy && art.CurrentCode == code,
+                "Crafting did not open from the selected card without exposing the deck editor controls.");
             var disassemble = ButtonAt(catalog, "Details/Disassemble/Button");
             disassemble.onClick.Invoke();
-            var dialog = Scope(shop);
+            Require(CraftingScope(crafting) == catalog &&
+                !CollectionProgress.GetDisassembleLimits(working).ContainsKey(code),
+                "A card reserved by unsaved deck edits was offered for disassembly.");
+
+            ButtonAt(catalog, "Bulk/Button").onClick.Invoke();
+            var bulk = Field(crafting, "_bulk");
+            ((InputField)Field(bulk, "_search")).text = code.ToString();
+            Require(((Text)Field(bulk, "_count")).text == "분해 가능 0종",
+                "Bulk disassembly included a card reserved by the edited deck.");
+            Call(crafting, "Back");
+            ButtonAt(catalog, "Back/Button").onClick.Invoke();
+            Require(craftingButton.gameObject.activeInHierarchy && events.currentSelectedGameObject == craftingButton.gameObject &&
+                ReferenceEquals(Field(editor, "_workingDeck"), working) && working.main.Count == originalSize + owned,
+                "Returning from crafting did not restore the original working deck and focus.");
+
+            working.main.RemoveRange(originalSize, owned);
+            craftingButton.onClick.Invoke();
+            catalog = CraftingScope(crafting);
+            var search = catalog.transform.Find("Catalog/Search/Input").GetComponent<InputField>();
+            disassemble.onClick.Invoke();
+            var dialog = CraftingScope(crafting);
             var cancel = ButtonAt(dialog, "Window/Cancel/Button");
             var confirm = ButtonAt(dialog, "Window/Confirm/Button");
             Require(!search.IsInteractable() && !disassemble.IsInteractable() && confirm.IsInteractable(),
@@ -120,7 +155,11 @@ namespace YGOPortable.Editor
             confirm.onClick.Invoke();
             Require(CollectionProgress.GetOwnedCount(code) == owned - 1 &&
                 CollectionProgress.GetCraftPoints(rarity) == CollectionProgress.DisassemblePointValue &&
-                search.IsInteractable() && Scope(shop) == catalog, "Disassembly failed to apply its displayed card exactly once.");
+                search.IsInteractable() && CraftingScope(crafting) == catalog,
+                "Disassembly failed to apply its displayed card exactly once.");
+            ButtonAt(catalog, "Back/Button").onClick.Invoke();
+            Require(((Text)Field(editor, "_previewOwnership")).text.Contains($"보유 {owned - 1}장"),
+                "The editor did not refresh the card's ownership after disassembly.");
         }
 
         private static void VerifyNeighbors(Button control, GameObject dialog)
@@ -133,6 +172,9 @@ namespace YGOPortable.Editor
 
         private static GameObject Scope(CollectionShopUI shop) =>
             (GameObject)shop.GetType().GetProperty("ActiveShopRoot", Instance).GetValue(shop);
+
+        private static GameObject CraftingScope(object crafting) =>
+            (GameObject)crafting.GetType().GetProperty("ActiveRoot", Instance).GetValue(crafting);
 
         private static Button ButtonAt(GameObject root, string path) => root.transform.Find(path).GetComponent<Button>();
         private static object Field(object target, string name) => target.GetType().GetField(name, Instance).GetValue(target);

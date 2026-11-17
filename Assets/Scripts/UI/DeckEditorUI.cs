@@ -100,6 +100,9 @@ namespace YGOPortable.UI
         private Text _sideCountText;
         private Text _toastText;
         private Text _saveButtonText;
+        private GameObject _editorContent;
+        private Button _cardCraftingButton;
+        private CardCraftingUI _cardCrafting;
         private GameObject _deckDialog;
         private Text _deckDialogTitle;
         private Text _deckDialogMessage;
@@ -159,12 +162,24 @@ namespace YGOPortable.UI
             CloseDeckDialog(restoreFocus: false);
             CloseArchetypeModal(restoreFocus: false);
             CloseMainDeckSort(restoreFocus: false);
+            _cardCrafting?.Hide();
             Root.SetActive(false);
+            _editorContent.SetActive(true);
         }
 
         public void Update()
         {
             if (!Root.activeInHierarchy) return;
+            if (_cardCrafting?.IsOpen == true)
+            {
+                if (!PollDeckPad() && Input.GetKeyDown(KeyCode.Escape))
+                {
+                    if (_padUi.HasPopup)
+                        _padUi.Handle(_cardCrafting.ActiveRoot.transform, Vector2Int.zero, false, true, null);
+                    else _cardCrafting.Back();
+                }
+                return;
+            }
             UpdateDeckTransfer(Time.unscaledDeltaTime);
             if (_trunkViewport.rect.size != _trunkSize)
                 ResizeTrunkGrid(false);
@@ -249,8 +264,10 @@ namespace YGOPortable.UI
 
         private void BuildUI(Transform parent)
         {
-            var root = LotdUiKit.FillRect("Screen_DeckEditor", parent);
-            Root = root.gameObject;
+            var screen = LotdUiKit.FillRect("Screen_DeckEditor", parent);
+            Root = screen.gameObject;
+            var root = LotdUiKit.FillRect("Editor", screen);
+            _editorContent = root.gameObject;
             LotdUiKit.AddImage(LotdUiKit.FillRect("DeckBackground", root).gameObject,
                 LotdUiKit.LoadSprite("LOTD/Background/bg_vrains"), new Color(0.86f, 0.53f, 0.61f), false, false);
             LotdUiKit.AddImage(LotdUiKit.FillRect("Backdrop", root).gameObject,
@@ -284,7 +301,7 @@ namespace YGOPortable.UI
             BuildArchetypeModal(root);
             BuildDeckDialog(root);
             BuildDetailedSearch(root);
-            BuildPadNavigation(root);
+            BuildPadNavigation(screen);
             BuildDeckCardActions(root);
             BuildMainSortMenu(root);
         }
@@ -354,11 +371,47 @@ namespace YGOPortable.UI
             _previewScroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
 
             var related = LotdUiKit.CreateRect("RelatedCards", panel,
-                new Vector2(0f, 0.094f), new Vector2(1f, 0.145f), new Vector2(28f, 0f), new Vector2(-28f, 0f));
+                new Vector2(0f, 0.094f), new Vector2(0.5f, 0.145f), new Vector2(28f, 0f), new Vector2(-4f, 0f));
             LotdUiKit.CreateLotdButton(related, "Button", "관련 카드", () => FilterRelatedCards(_inspectedCode), 14);
+            var crafting = LotdUiKit.CreateRect("Crafting", panel,
+                new Vector2(0.5f, 0.094f), new Vector2(1f, 0.145f), new Vector2(4f, 0f), new Vector2(-28f, 0f));
+            _cardCraftingButton = LotdUiKit.CreateLotdButton(crafting, "Button", "제작·분해",
+                () => OpenCardCrafting(_inspectedCode), 14);
             var add = LotdUiKit.CreateRect("AddCard", panel,
                 new Vector2(0f, 0.034f), new Vector2(1f, 0.085f), new Vector2(28f, 0f), new Vector2(-28f, 0f));
             LotdUiKit.CreateLotdButton(add, "Button", "덱에 추가", () => TryAddCardToDeck(_inspectedCode), 14, true);
+        }
+
+        private void OpenCardCrafting(uint code)
+        {
+            if (!CollectionProgress.HasStarter)
+            {
+                ShowToast("스타터 덱을 선택하면 카드를 제작하거나 분해할 수 있습니다.");
+                return;
+            }
+
+            CancelDeckDrag();
+            EndDeckTransfer();
+            _padUi.Clear();
+            _padCardFocus.Hide();
+            ClearCardVisual(ref _hoveredSlot);
+            ClearCardVisual(ref _padVisualSlot);
+            _pointerSlot = _inspectedSource = null;
+            _cardCrafting ??= new CardCraftingUI(Root.transform, ReturnFromCardCrafting);
+            _cardCrafting.Root.transform.SetAsLastSibling();
+            _editorContent.SetActive(false);
+            _cardCrafting.Show(_workingDeck, code);
+        }
+
+        private void ReturnFromCardCrafting()
+        {
+            _padUi.Clear();
+            _cardCrafting.Hide();
+            _editorContent.SetActive(true);
+            RefreshTrunkFilter();
+            RefreshPreviewOwnership();
+            if (_padMode && _padArea != PadArea.Controls) DrawPadCardFocus();
+            else EventSystem.current?.SetSelectedGameObject(_cardCraftingButton.gameObject);
         }
 
         private void BuildTrunkPanel(Transform rt)
@@ -845,7 +898,7 @@ namespace YGOPortable.UI
 
         private void HandleCardDrop(DragContext context)
         {
-            if (!Root.activeInHierarchy || _workingDeck == null || _deckDialog.activeSelf ||
+            if (!_editorContent.activeInHierarchy || _workingDeck == null || _deckDialog.activeSelf ||
                 _deckCardActions.activeSelf || _archModalRoot.activeSelf || _cardFilterDialog.activeSelf ||
                 _mainSortMenu.activeSelf) return;
             var destination = FindDropZone(context.DropPosition);
