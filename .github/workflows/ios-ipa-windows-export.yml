@@ -1,0 +1,66 @@
+name: Build unsigned IPA from Windows Unity
+
+on:
+  workflow_dispatch:
+    inputs:
+      xcode_asset_id:
+        description: Draft release asset ID for the Xcode tar.gz. Leave empty to build the native library first.
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  native-library:
+    if: inputs.xcode_asset_id == ''
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Compile the native duel engine
+        run: bash NativeEngine/build-ios.sh
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: YGO-iOS-native-library
+          path: Assets/Plugins/iOS/libygo_native.a
+          if-no-files-found: error
+          retention-days: 7
+
+  package:
+    if: inputs.xcode_asset_id != ''
+    runs-on: macos-15
+    timeout-minutes: 60
+    permissions:
+      contents: write # GitHub requires push access for draft release assets.
+    env:
+      IOS_SIGNING: unsigned
+      IOS_BUNDLE_IDENTIFIER: com.ygoportable.lotd
+      IOS_XCODE_PATH: Builds/iOS/Xcode
+      IOS_IPA_PATH: Builds/iOS/IPA
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Download Xcode project
+        env:
+          GH_TOKEN: ${{ github.token }}
+          XCODE_ASSET_ID: ${{ inputs.xcode_asset_id }}
+        run: |
+          [[ "$XCODE_ASSET_ID" =~ ^[0-9]+$ ]] || { echo 'Expected a numeric asset ID.' >&2; exit 1; }
+          asset="repos/$GITHUB_REPOSITORY/releases/assets/$XCODE_ASSET_ID"
+          archive="$RUNNER_TEMP/xcode-project.tar.gz"
+          gh api "$asset" -H 'Accept: application/octet-stream' > "$archive"
+          mkdir -p "$IOS_XCODE_PATH"
+          tar -xzf "$archive" -C "$IOS_XCODE_PATH"
+          rm -- "$archive"
+      - name: Package IPA using Xcode
+        run: bash Tools/build-ios-ipa.sh package
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: YGO-Portable-iOS-unsigned-${{ github.run_number }}
+          path: Builds/iOS/IPA/*.ipa
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
