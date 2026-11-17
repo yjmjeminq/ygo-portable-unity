@@ -2,6 +2,7 @@ using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using YGOPortable.Core;
 
 namespace YGOPortable.UI
 {
@@ -13,6 +14,9 @@ namespace YGOPortable.UI
 
         private readonly GameAppController _app;
         private CanvasGroup _menuControls;
+        private Button _freeDuelButton;
+        private Button _shopButton;
+        private Text _shopBalance;
         private Button _settingsOpenButton;
         private Button _settingsCloseButton;
 
@@ -36,6 +40,13 @@ namespace YGOPortable.UI
             SettingsRoot.SetActive(false);
             _menuControls.interactable = true;
             if (restoreFocus) EventSystem.current?.SetSelectedGameObject(_settingsOpenButton.gameObject);
+        }
+
+        internal void FocusMainMenu(bool returningFromShop)
+        {
+            _shopBalance.text = $"보유 {CollectionProgress.Balance:N0} DP";
+            var selected = returningFromShop ? _shopButton : _freeDuelButton;
+            EventSystem.current?.SetSelectedGameObject(selected.gameObject);
         }
 
         private void BuildTitleScreen(Transform parent)
@@ -62,13 +73,58 @@ namespace YGOPortable.UI
             var logo = LotdUiKit.CreateRect("Logo", root, new Vector2(0.31f, 0.674f), new Vector2(0.69f, 0.938f),
                 Vector2.zero, Vector2.zero);
             AddLogo(logo);
-            var menu = LotdUiKit.CreateMenuPanel(root, "Menu", new Vector2(0.30f, 0.132f),
-                new Vector2(0.70f, 0.643f));
-            AddMenuEntry(menu, "FreeDuel", .754f, "프리 듀얼", () => _app.ShowScreen(AppScreen.OpponentSelect));
-            AddMenuEntry(menu, "DeckEditor", .589f, "덱 편집", () => _app.ShowScreen(AppScreen.DeckEditor));
-            AddMenuEntry(menu, "Shop", .424f, "카드 상점", () => _app.ShowScreen(AppScreen.CardShop));
-            _settingsOpenButton = AddMenuEntry(menu, "Settings", .259f, "환경 설정", OpenSettings);
-            AddMenuEntry(menu, "ReturnToTitle", .094f, "타이틀로 돌아가기", () => _app.ShowScreen(AppScreen.Title));
+            var menu = LotdUiKit.CreateMenuPanel(root, "Menu", new Vector2(.205f, .132f),
+                new Vector2(.538f, .643f));
+            _freeDuelButton = AddMenuEntry(menu, "FreeDuel", .745f, "프리 듀얼", () => _app.ShowScreen(AppScreen.OpponentSelect));
+            AddMenuEntry(menu, "DeckEditor", .54f, "덱 편집", () => _app.ShowScreen(AppScreen.DeckEditor));
+            _settingsOpenButton = AddMenuEntry(menu, "Settings", .335f, "환경 설정", OpenSettings);
+            AddMenuEntry(menu, "ReturnToTitle", .13f, "타이틀로 돌아가기", () => _app.ShowScreen(AppScreen.Title));
+            BuildShopTile(root);
+        }
+
+        private void BuildShopTile(Transform root)
+        {
+            var tile = LotdUiKit.CreateMenuPanel(root, "ShopTile", new Vector2(.555f, .132f), new Vector2(.795f, .643f));
+            var hitbox = LotdUiKit.FillRect("Button", tile, 7f);
+            var target = LotdUiKit.AddImage(hitbox.gameObject, LotdUiKit.WhiteSprite, Color.clear);
+            _shopButton = hitbox.gameObject.AddComponent<Button>();
+            _shopButton.targetGraphic = target;
+            _shopButton.transition = Selectable.Transition.None;
+            _shopButton.onClick.AddListener(() =>
+            {
+                LotdAudio.PlayClick();
+                _app.ShowScreen(AppScreen.CardShop);
+            });
+
+            var cardBack = CardArtLoader.GetCardBackSprite();
+            var cards = LotdUiKit.CreateRect("Cards", tile, new Vector2(.12f, .385f), new Vector2(.88f, .885f),
+                Vector2.zero, Vector2.zero);
+            void AddCard(float left, float right, float angle, Color tint)
+            {
+                var card = LotdUiKit.CreateRect("Card", cards, new Vector2(left, .02f), new Vector2(right, .98f),
+                    Vector2.zero, Vector2.zero);
+                card.localRotation = Quaternion.Euler(0f, 0f, angle);
+                LotdUiKit.AddImage(card.gameObject, cardBack, tint, true, false);
+            }
+            if (cardBack != null)
+            {
+                var sideTint = new Color(.75f, .81f, .94f);
+                AddCard(.09f, .525f, 13f, sideTint);
+                AddCard(.475f, .91f, -13f, sideTint);
+                AddCard(.2825f, .7175f, 0f, Color.white);
+            }
+
+            var wallet = LotdUiKit.CreateRect("Wallet", tile, new Vector2(.12f, .277f), new Vector2(.88f, .365f),
+                Vector2.zero, Vector2.zero);
+            _shopBalance = LotdUiKit.AddFittedText(wallet, "Text", "", 23, 14, TextAnchor.MiddleCenter,
+                LotdUiKit.GoldAccent, FontStyle.Bold);
+
+            var action = LotdUiKit.CreateRect("Action", tile, new Vector2(.11f, .10f), new Vector2(.89f, .24f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(action.gameObject, LotdUiKit.LoadSprite("LOTD/Buttons_Yellow/ds_btn_inactive01"),
+                Color.white, false, false);
+            LotdUiKit.AddFittedText(action, "Label", "카드 상점", 26, 17, TextAnchor.MiddleCenter,
+                LotdUiKit.TextPrimary, FontStyle.Bold);
         }
 
         private static void AddTitleBackground(Transform root)

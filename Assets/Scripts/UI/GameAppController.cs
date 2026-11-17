@@ -192,6 +192,7 @@ namespace YGOPortable.UI
             if (CollectionProgress.Initialized && !CollectionProgress.HasStarter && screen != AppScreen.Title)
                 screen = AppScreen.StarterSelection;
 
+            var previousScreen = _screen;
             _screen = screen;
             _menuPad?.Clear();
             _menuPadInput.Reset();
@@ -237,10 +238,14 @@ namespace YGOPortable.UI
                 _collectionShop.OpenShop();
                 SyncFrontMenuFocus();
             }
-            else if (screen == AppScreen.Title || screen == AppScreen.MainMenu)
+            else if (screen == AppScreen.MainMenu)
             {
-                var page = screen == AppScreen.Title ? _titleAndMenu.TitleRoot : _titleAndMenu.MenuRoot;
-                var first = page.GetComponentInChildren<Button>();
+                _titleAndMenu.FocusMainMenu(previousScreen == AppScreen.CardShop);
+                SyncFrontMenuFocus();
+            }
+            else if (screen == AppScreen.Title)
+            {
+                var first = _titleAndMenu.TitleRoot.GetComponentInChildren<Button>();
                 EventSystem.current?.SetSelectedGameObject(first != null ? first.gameObject : null);
                 SyncFrontMenuFocus();
             }
