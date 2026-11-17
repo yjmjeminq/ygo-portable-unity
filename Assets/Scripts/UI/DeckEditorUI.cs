@@ -151,6 +151,7 @@ namespace YGOPortable.UI
             CloseDetailedSearch();
             CloseDeckDialog(restoreFocus: false);
             CloseArchetypeModal(restoreFocus: false);
+            CloseMainDeckSort(restoreFocus: false);
             Root.SetActive(false);
         }
 
@@ -176,6 +177,11 @@ namespace YGOPortable.UI
             if (_deckDialog.activeSelf)
             {
                 if (Input.GetKeyDown(KeyCode.Escape)) CloseDeckDialog();
+                return;
+            }
+            if (_mainSortMenu.activeSelf)
+            {
+                if (Input.GetKeyDown(KeyCode.Escape)) CloseMainDeckSort();
                 return;
             }
             if (_cardFilterDialog.activeSelf && Input.GetKeyDown(KeyCode.Escape))
@@ -271,6 +277,7 @@ namespace YGOPortable.UI
             BuildDetailedSearch(root);
             BuildPadNavigation(root);
             BuildDeckCardActions(root);
+            BuildMainSortMenu(root);
         }
 
         private void BuildCardDetails(Transform root)
@@ -496,10 +503,11 @@ namespace YGOPortable.UI
             _deckNameInput = LotdUiKit.CreateInputField(LotdUiKit.CreateRect("DeckName", edit, Vector2.zero,
                 new Vector2(0.579f, 1f), Vector2.zero, Vector2.zero), "Input", "덱 이름", 15);
             _deckNameInput.onValueChanged.AddListener(_ => RefreshSaveLabel());
-            Control(edit, "Sort", "정렬", 0.595f, 0.19f, SortWorkingDeck);
+            Control(edit, "Sort", "전체 정렬", 0.595f, 0.19f, SortWorkingDeck);
             Control(edit, "Shuffle", "셔플", 0.8f, 0.2f, ShuffleWorkingDeck);
 
             (_mainGridRect, _mainCountText) = BuildDeckSection(panel, "Main", "메인", 0.789f, 0.397f);
+            _mainSortButton = AddMainSortButton(panel, OpenMainDeckSort);
             (_extraGridRect, _extraCountText) = BuildDeckSection(panel, "Extra", "엑스트라", 0.350f, 0.224f);
             (_sideGridRect, _sideCountText) = BuildDeckSection(panel, "Side", "사이드", 0.176f, 0.047f);
             BuildDeckSlots(_mainGridRect, _mainSlots, 13, 5, 60, DragSourceType.DeckMain);
@@ -776,7 +784,8 @@ namespace YGOPortable.UI
         private void HandleCardDrop(DragContext context)
         {
             if (!Root.activeInHierarchy || _workingDeck == null || _deckDialog.activeSelf ||
-                _deckCardActions.activeSelf || _archModalRoot.activeSelf || _cardFilterDialog.activeSelf) return;
+                _deckCardActions.activeSelf || _archModalRoot.activeSelf || _cardFilterDialog.activeSelf ||
+                _mainSortMenu.activeSelf) return;
             var destination = FindDropZone(context.DropPosition);
             if (context.SourceType == DragSourceType.Trunk)
             {

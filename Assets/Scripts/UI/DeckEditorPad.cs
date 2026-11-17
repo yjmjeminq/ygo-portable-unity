@@ -99,11 +99,14 @@ namespace YGOPortable.UI
         {
             if (_workingDeck == null) return;
             bool cardActionsOpen = _deckCardActions.activeSelf;
+            bool mainSortOpen = _mainSortMenu.activeSelf;
             var overlay = cardActionsOpen ? _deckCardActionPanel.gameObject :
                 _deckDialog.activeSelf ? _deckDialog : _cardFilterDialog.activeSelf ? _cardFilterDialog :
+                mainSortOpen ? _mainSortMenu :
                 _archModalRoot.activeSelf ? _archModalRoot : null;
             var scope = overlay != null ? overlay.transform : Root.transform;
-            bool resetFilters = frame.ResetFilters && !cardActionsOpen && !_deckDialog.activeSelf && !_archModalRoot.activeSelf;
+            bool resetFilters = frame.ResetFilters && !cardActionsOpen && !mainSortOpen &&
+                !_deckDialog.activeSelf && !_archModalRoot.activeSelf;
             if (!resetFilters && !_padUi.HasPopup &&
                 _padUi.HandleOpenedDropdown(scope, frame.Direction, frame.Submit, frame.Cancel, findAny: frame.HasInput))
             {
@@ -167,6 +170,14 @@ namespace YGOPortable.UI
                     () => CloseDeckDialog(), _deckDialogCancel);
                 return;
             }
+            if (mainSortOpen)
+            {
+                _padCardFocus.Hide();
+                if (frame.HasInput) _padUi.AdoptPointerFocus(_mainSortMenu.transform);
+                _padUi.Handle(_mainSortMenu.transform, frame.Direction, frame.Submit, frame.Cancel,
+                    () => CloseMainDeckSort(), _mainSortOptions[_lastMainSort]);
+                return;
+            }
             if (_cardFilterDialog.activeSelf)
             {
                 HandleDetailedSearchPad(frame);
@@ -218,6 +229,11 @@ namespace YGOPortable.UI
 
             if (frame.Alternate && !frame.Cancel)
             {
+                if (_padArea == PadArea.Main)
+                {
+                    OpenMainDeckSort();
+                    return;
+                }
                 CyclePadTrunkSort();
                 if (_padArea != PadArea.Controls) DrawPadCardFocus();
                 return;
@@ -398,7 +414,8 @@ namespace YGOPortable.UI
             var reorder = CurrentPadDeck != DragSourceType.None ? "   R스틱 클릭 순서" : "";
             string menu = area == PadArea.Trunk ? "Menu/+ 조회" : "Menu/+ 저장";
             string related = area == PadArea.Controls ? "" : relatedList ? "   R2/ZR/RT 전체 카드" : "   R2/ZR/RT 관련 카드";
-            _deckHelpLabel.text = $"{actions}{reorder}   X 정렬   Y 검색{related}   LB/RB 영역   {menu}   {PadFilterResetHelp}   {back}";
+            string sortHelp = area == PadArea.Main ? "X 메인 정렬" : "X 보관함 정렬";
+            _deckHelpLabel.text = $"{actions}{reorder}   {sortHelp}   Y 검색{related}   LB/RB 영역   {menu}   {PadFilterResetHelp}   {back}";
         }
 
         private DragSourceType CurrentPadDeck => _padArea switch

@@ -36,6 +36,7 @@ namespace YGOPortable.Editor
                 VerifyConfirmation(editor, events);
                 VerifyArchetypeBrowser(editor, events);
                 VerifyGroupingAndTrunk(editor, streamingPath, Path.Combine(save, "trunk"));
+                VerifyMainSorting(editor, events);
             }
             finally
             {
@@ -48,7 +49,7 @@ namespace YGOPortable.Editor
                     UnityEngine.Object.DestroyImmediate(events.gameObject);
                 }
             }
-            Debug.Log("[VERIFY DECK EDITING] Transfer continuity, illegal moves, oversized deck navigation, modal focus, grouped copies and live trunk counts passed.");
+            Debug.Log("[VERIFY DECK EDITING] Transfer continuity, illegal moves, oversized deck navigation, modal focus, grouped copies, live trunk counts and main sort controls passed.");
         }
 
         private static void VerifyTransfer(DeckEditorUI editor)
@@ -171,6 +172,93 @@ namespace YGOPortable.Editor
         private static string TrunkCount(DeckEditorUI editor, uint code) =>
             Field<List<(RectTransform rt, CompositeCardView card, Text count, CardDragTrigger trigger)>>(editor, "_trunkPool")
                 .Single(slot => slot.rt.gameObject.activeInHierarchy && slot.card.CurrentCode == code).count.text;
+
+        private static void VerifyMainSorting(DeckEditorUI editor, EventSystem events)
+        {
+            const uint blueEyes = 89631139;
+            const uint mysticalElf = 15025844;
+            const uint goblinAttackForce = 78658564;
+            const uint reborn = 83764718;
+            const uint mirrorForce = 44095762;
+            uint unknownAttack = CardDatabase.AllCards.First(card => card.IsMonster && !card.IsExtra &&
+                (card.type & YgoConstants.TYPE_EFFECT) != 0 && card.atk < 0 && card.def < 0).code;
+            var deck = Field<UserDeck>(editor, "_workingDeck");
+            deck.main = new List<uint> { mirrorForce, blueEyes, reborn, goblinAttackForce, unknownAttack, mysticalElf, blueEyes };
+            deck.extra = CardDatabase.AllCards.Where(card => card.IsExtra).Take(2).Select(card => card.code).ToList();
+            deck.side = new List<uint> { mirrorForce, reborn };
+            var untouchedExtra = deck.extra.ToArray();
+            var untouchedSide = deck.side.ToArray();
+            Call(editor, "RefreshDeckGrids");
+
+            var opener = Field<Button>(editor, "_mainSortButton");
+            var overlay = Field<GameObject>(editor, "_mainSortMenu");
+            var options = Field<Button[]>(editor, "_mainSortOptions");
+            void Select(DeckMainSortMode mode)
+            {
+                events.SetSelectedGameObject(opener.gameObject);
+                opener.onClick.Invoke();
+                Require(overlay.activeSelf &&
+                    EventSystem.current.currentSelectedGameObject.transform.IsChildOf(overlay.transform) &&
+                    options.All(option => option.navigation.mode == Navigation.Mode.Explicit),
+                    "The main sort picker did not take keyboard focus.");
+                options[(int)mode].onClick.Invoke();
+                Require(!overlay.activeSelf && events.currentSelectedGameObject == opener.gameObject,
+                    "Choosing a main sort did not restore the opener focus.");
+                Require(deck.extra.SequenceEqual(untouchedExtra) && deck.side.SequenceEqual(untouchedSide),
+                    "Main sorting moved cards in Extra or Side.");
+                Require(deck.main.LastIndexOf(blueEyes) == deck.main.IndexOf(blueEyes) + 1,
+                    "Main sorting split identical copies.");
+            }
+
+            Select(DeckMainSortMode.Frame);
+            Require(deck.main.IndexOf(blueEyes) < deck.main.IndexOf(goblinAttackForce) &&
+                deck.main.IndexOf(goblinAttackForce) < deck.main.IndexOf(reborn) && deck.main.IndexOf(reborn) < deck.main.IndexOf(mirrorForce),
+                "Frame sorting failed to separate normal, effect, spell and trap frames.");
+            Select(DeckMainSortMode.Name);
+            Require(deck.main.Select(CardDatabase.GetName).SequenceEqual(
+                deck.main.Select(CardDatabase.GetName).OrderBy(name => name, StringComparer.Ordinal)), "Name sorting is not ascending.");
+            Select(DeckMainSortMode.Attack);
+            Require(deck.main.Take(4).SequenceEqual(new[] { blueEyes, blueEyes, goblinAttackForce, mysticalElf }),
+                "Attack sorting did not rank known numbers ahead of unknown values.");
+            var highestAttack = deck.main.ToArray();
+            deck.main.Reverse();
+            Call(editor, "RefreshDeckGrids");
+            Select(DeckMainSortMode.Attack);
+            Require(deck.main.SequenceEqual(highestAttack), "The same sort could not be applied again after changing the order.");
+            Select(DeckMainSortMode.Defense);
+            Require(deck.main.Take(3).SequenceEqual(new[] { blueEyes, blueEyes, mysticalElf }),
+                "Defense sorting used the wrong stat.");
+            Select(DeckMainSortMode.Level);
+            Require(deck.main.Where(code => CardDatabase.Get(code).IsMonster).Select(code => CardDatabase.Get(code).level)
+                .SequenceEqual(deck.main.Where(code => CardDatabase.Get(code).IsMonster).Select(code => CardDatabase.Get(code).level)
+                    .OrderByDescending(level => level)), "Level sorting did not prioritize higher levels.");
+
+            var editorType = editor.GetType();
+            var padArea = editorType.GetField("_padArea", Instance);
+            padArea.SetValue(editor, Enum.Parse(padArea.FieldType, "Main"));
+            editorType.GetField("_padMode", Instance).SetValue(editor, true);
+            int[] indices = Field<int[]>(editor, "_padIndices");
+            int mainArea = (int)padArea.GetValue(editor);
+            indices[mainArea] = deck.main.IndexOf(mysticalElf);
+            var assembly = editorType.Assembly;
+            var frame = assembly.GetType("YGOPortable.UI.DeckPadFrame", true);
+            var buttons = assembly.GetType("YGOPortable.UI.DeckPadButtons", true);
+            void Pad(string button) => Call(editor, "HandleDeckPad",
+                Activator.CreateInstance(frame, Instance, null, new object[] { Vector2Int.zero, Enum.Parse(buttons, button), 0f }, null));
+            Pad("Alternate");
+            Require(overlay.activeSelf, "X did not open the main-deck sort picker.");
+            events.SetSelectedGameObject(options[(int)DeckMainSortMode.Attack].gameObject);
+            Pad("Submit");
+            Require(!overlay.activeSelf && deck.main.SequenceEqual(highestAttack) &&
+                deck.main[indices[mainArea]] == mysticalElf,
+                "Controller sorting did not preserve the selected card or apply the highlighted mode.");
+            padArea.SetValue(editor, Enum.Parse(padArea.FieldType, "Trunk"));
+            var trunkSort = Field<Dropdown>(editor, "_sortFilter");
+            int before = trunkSort.value;
+            Pad("Alternate");
+            Require(!overlay.activeSelf && trunkSort.value == (before + 1) % trunkSort.options.Count &&
+                deck.main.SequenceEqual(highestAttack), "X changed the main deck while the trunk was selected.");
+        }
 
         private static T Field<T>(object target, string name) => (T)target.GetType().GetField(name, Instance).GetValue(target);
 
