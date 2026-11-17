@@ -4,7 +4,9 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using UnityEngine;
+using UnityEngine.UI;
 using YGOPortable.Core;
+using YGOPortable.UI;
 
 namespace YGOPortable.Editor
 {
@@ -38,6 +40,7 @@ namespace YGOPortable.Editor
             var materials = LoadLegacyProfile(save, profile);
             VerifyCrafting(materials, starter, profile);
             VerifyPurchasesAndRewards(save, profile);
+            VerifyMyDeckPicker(starter);
             VerifyDeckCopyLimitAndFullDisassembly(starter);
             Debug.Log($"[VERIFY COLLECTION] {starters.Count} starter deck sizes, legacy saves, uncapped inventory, isolated CP, " +
                 "deck copy limits, full disassembly, pack ownership, rollback and opponent progression passed.");
@@ -193,6 +196,72 @@ namespace YGOPortable.Editor
                     out string error) && CollectionProgress.GetOwnedCount(GracefulCharity) == 0 &&
                 !CollectionProgress.CanUseDeck(deck, out reason) && reason.Contains("보유 0장"),
                 $"Full disassembly did not update deck eligibility: {error}");
+        }
+
+        private static void VerifyMyDeckPicker(UserDeck starter)
+        {
+            UserDeck Copy(string id, string name) => new UserDeck
+            {
+                id = id,
+                name = name,
+                main = starter.main.ToList(),
+                extra = starter.extra.ToList(),
+                side = starter.side.ToList(),
+            };
+
+            var first = Copy("picker-first", "First playable");
+            var second = Copy("picker-second", "Second playable");
+            var incomplete = new UserDeck { id = "picker-short", name = "Incomplete deck" };
+            var missingCard = Copy("picker-unowned", "Unowned card deck");
+            var presentKeys = new HashSet<uint>(starter.main.Concat(starter.extra).Concat(starter.side)
+                .Select(CollectionProgress.GetDeckCopyKey));
+            missingCard.main[0] = CardDatabase.AllCards.First(card => CollectionProgress.IsCraftableCard(card) &&
+                !card.IsExtra && CollectionProgress.GetOwnedCount(card.code) == 0 &&
+                !presentKeys.Contains(CollectionProgress.GetDeckCopyKey(card.code))).code;
+            Require(!CollectionProgress.CanUseDeck(missingCard, out string reason) && reason.Contains("보유 0장"),
+                "The ownership fixture must fail solely for a missing card.");
+
+            var savedDecks = DeckRepository.UserDecks.ToArray();
+            var canvas = new GameObject("Playable Deck Picker", typeof(Canvas));
+            canvas.GetComponent<Canvas>().renderMode = RenderMode.WorldSpace;
+            ((RectTransform)canvas.transform).sizeDelta = new Vector2(1600f, 900f);
+            try
+            {
+                DeckRepository.UserDecks.Clear();
+                DeckRepository.UserDecks.AddRange(new[] { incomplete, first, missingCard, second });
+                var ui = new OpponentSelectUI(null, canvas.transform);
+                ui.Open();
+                var picker = ui.Root.transform.Find("OppDetailPanel/MyDeckBox/MyDeckPicker/Dropdown").GetComponent<Dropdown>();
+                var start = ui.Root.transform.Find("OppDetailPanel/StartDuelBtn/B").GetComponent<Button>();
+                Require(picker.interactable && picker.options.Count == 2 && picker.options[0].text.StartsWith(first.name) &&
+                    picker.options[1].text.StartsWith(second.name) && start.interactable,
+                    "The list included an unplayable deck or omitted a playable deck.");
+
+                picker.value = 1;
+                var updated = Copy(second.id, "Renamed playable deck");
+                DeckRepository.UserDecks.Remove(second);
+                DeckRepository.UserDecks.Insert(0, updated);
+                ui.Open();
+                Require(picker.value == 0 && picker.captionText.text.StartsWith(updated.name),
+                    "Reopening the screen did not retain the selected deck after a reorder or edit.");
+
+                updated.main.Clear();
+                ui.Open();
+                Require(picker.options.Count == 1 && picker.captionText.text.StartsWith(first.name) && start.interactable,
+                    "The picker did not fall back to an eligible deck after the selection became unusable.");
+                DeckRepository.UserDecks.Remove(first);
+                ui.Open();
+                Require(picker.options.Count == 0 && !picker.interactable && !start.interactable &&
+                    picker.captionText.text.Contains("사용 가능한 덱 없음"),
+                    "The empty state did not disable Duel Start and explain that no deck can be used.");
+                Debug.Log("[VERIFY MY DECK PICKER] Playable-only options, retained selection and empty state passed.");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(canvas);
+                DeckRepository.UserDecks.Clear();
+                DeckRepository.UserDecks.AddRange(savedDecks);
+            }
         }
 
         private static bool ValidPack(IReadOnlyList<uint> pulls, CollectionPack pack) =>

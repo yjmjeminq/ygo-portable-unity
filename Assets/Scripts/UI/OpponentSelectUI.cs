@@ -30,7 +30,8 @@ namespace YGOPortable.UI
         private readonly List<int> _charDeckLevels = new List<int>();
         private int _totalDeckLevels;
         private int _selectedCharDeckIdx = 0;
-        private int _myDeckIdx = 0;
+        private readonly List<UserDeck> _playableMyDecks = new List<UserDeck>();
+        private UserDeck _selectedMyDeck;
 
         // Detail UI refs
         private Image _detailBust;
@@ -46,12 +47,11 @@ namespace YGOPortable.UI
         private Button _startDuelButton;
         private Button _previousPageButton;
         private Button _nextPageButton;
-        private Button _previousMyDeckButton;
-        private Button _nextMyDeckButton;
+        private Dropdown _myDeckDropdown;
+        private Text _myDeckCount;
         private InputField _searchInput;
         private CanvasGroup _opponentControls;
         private CompositeCardView _sigCardPreview;
-        private Text _myDeckLabel;
         private Text _pageLabel;
         private Text _unlockProgress;
         private Text _diffLabel;
@@ -82,7 +82,7 @@ namespace YGOPortable.UI
             JankenRoot.SetActive(false);
             _opponentControls.interactable = true;
             if (_statusToast != null) _statusToast.text = "";
-            EnsureValidMyDeckIndex();
+            RefreshMyDecks();
             ApplyFilter();
             FocusCurrentCharacter();
         }
@@ -106,11 +106,6 @@ namespace YGOPortable.UI
             _statusToast.text = message;
         }
 
-        private void EnsureValidMyDeckIndex()
-        {
-            _myDeckIdx = Mathf.Clamp(_myDeckIdx, 0, Mathf.Max(0, DeckRepository.UserDecks.Count - 1));
-            UpdateMyDeckLabel();
-        }
 
         private void BuildOpponentScreen(Transform parent)
         {
@@ -241,16 +236,17 @@ namespace YGOPortable.UI
             // My Deck Selector Box
             var myDeckBox = LotdUiKit.CreateBorderedPanel(rightPanel, "MyDeckBox",
                 new Vector2(0.03f, 0.16f), new Vector2(0.97f, 0.34f), Vector2.zero, Vector2.zero);
-            LotdUiKit.AddText(LotdUiKit.CreateRect("Lbl", myDeckBox, new Vector2(0.03f, 0.56f), new Vector2(0.97f, 0.94f), Vector2.zero, Vector2.zero),
+            LotdUiKit.AddText(LotdUiKit.CreateRect("Lbl", myDeckBox, new Vector2(0.03f, 0.58f),
+                new Vector2(0.45f, 0.94f), Vector2.zero, Vector2.zero),
                 "L", "내 덱", 14, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
+            _myDeckCount = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Count", myDeckBox, new Vector2(0.46f, 0.58f),
+                new Vector2(0.97f, 0.94f), Vector2.zero, Vector2.zero),
+                "Text", "", 13, 10, TextAnchor.MiddleRight, LotdUiKit.TextMuted);
 
-            _myDeckLabel = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Val", myDeckBox, new Vector2(0.18f, 0.08f), new Vector2(0.82f, 0.56f), Vector2.zero, Vector2.zero),
-                "V", "", 15, 10, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
-
-            var myPrev = LotdUiKit.CreateRect("P", myDeckBox, new Vector2(0.03f, 0.10f), new Vector2(0.16f, 0.52f), Vector2.zero, Vector2.zero);
-            _previousMyDeckButton = LotdUiKit.CreateLotdButton(myPrev, "B", "◀", () => CycleMyDeck(-1), 14);
-            var myNext = LotdUiKit.CreateRect("N", myDeckBox, new Vector2(0.84f, 0.10f), new Vector2(0.97f, 0.52f), Vector2.zero, Vector2.zero);
-            _nextMyDeckButton = LotdUiKit.CreateLotdButton(myNext, "B", "▶", () => CycleMyDeck(1), 14);
+            var myDeckPicker = LotdUiKit.CreateRect("MyDeckPicker", myDeckBox, new Vector2(0.03f, 0.12f),
+                new Vector2(0.97f, 0.57f), Vector2.zero, Vector2.zero);
+            _myDeckDropdown = LotdUiKit.CreateLotdDropdown(myDeckPicker, "Dropdown", Array.Empty<string>(),
+                SelectMyDeck, dynamicChoices: true);
 
             // Difficulty & Toast
             var diffRt = LotdUiKit.CreateRect("DiffRow", rightPanel,
@@ -489,7 +485,7 @@ namespace YGOPortable.UI
             Color deckArrowColor = canSwitchDeck ? Color.white : new Color(.52f, .61f, .72f, .76f);
             _previousOppDeckButton.targetGraphic.color = _nextOppDeckButton.targetGraphic.color = deckArrowColor;
             _cloneOppButton.interactable = _charDecks.Count > 0;
-            _startDuelButton.interactable = _charDecks.Count > 0 && DeckRepository.UserDecks.Count > 0;
+            UpdateStartDuelAvailability();
             RefreshSelectedOppDeck();
         }
 
@@ -535,45 +531,51 @@ namespace YGOPortable.UI
             }
         }
 
-        private void CycleMyDeck(int delta)
+        private void RefreshMyDecks(UserDeck preferredDeck = null)
         {
-            if (DeckRepository.UserDecks.Count == 0) return;
-            _myDeckIdx = (_myDeckIdx + delta + DeckRepository.UserDecks.Count) % DeckRepository.UserDecks.Count;
-            UpdateMyDeckLabel();
-            UiEntranceMotion.Play(_myDeckLabel.gameObject);
+            var previous = preferredDeck ?? _selectedMyDeck;
+            _playableMyDecks.Clear();
+            _playableMyDecks.AddRange(DeckRepository.UserDecks.Where(deck => GameAppController.CanStartWithDeck(deck, out _)));
+            int index = _playableMyDecks.FindIndex(deck => deck == previous ||
+                (!string.IsNullOrEmpty(previous?.id) && deck.id == previous.id));
+
+            _myDeckDropdown.ClearOptions();
+            _myDeckDropdown.AddOptions(_playableMyDecks.Select(deck =>
+                $"{deck.name}  ·  메인 {deck.main.Count} / 엑스트라 {deck.extra.Count} / 사이드 {deck.side.Count}").ToList());
+            _myDeckCount.text = $"사용 가능 {_playableMyDecks.Count:N0}개";
+            _myDeckDropdown.interactable = _playableMyDecks.Count > 0;
+            if (_playableMyDecks.Count > 0) _myDeckDropdown.SetValueWithoutNotify(Mathf.Max(0, index));
+            SelectMyDeck(Mathf.Max(0, index));
+
+            if (_selectedMyDeck == null)
+                _myDeckDropdown.captionText.text = DeckRepository.UserDecks.Count == 0
+                    ? "저장된 덱 없음" : "사용 가능한 덱 없음 · 덱 편집에서 확인";
         }
 
-        private void UpdateMyDeckLabel()
+        private void SelectMyDeck(int index)
         {
-            _previousMyDeckButton.interactable = _nextMyDeckButton.interactable = DeckRepository.UserDecks.Count > 1;
-            _startDuelButton.interactable = _charDecks.Count > 0 && DeckRepository.UserDecks.Count > 0;
-            if (DeckRepository.UserDecks.Count == 0)
-            {
-                _myDeckLabel.text = "저장된 내 덱 없음";
-                return;
-            }
-            var md = DeckRepository.UserDecks[_myDeckIdx];
-            _myDeckLabel.text = $"{md.name} (메인 {md.main.Count} / 엑스트라 {md.extra.Count})";
-            if (CollectionProgress.Initialized && !GameAppController.CanStartWithDeck(md, out _))
-                _myDeckLabel.text += "\n듀얼에 사용할 수 없는 덱";
+            _selectedMyDeck = index >= 0 && index < _playableMyDecks.Count ? _playableMyDecks[index] : null;
+            UpdateStartDuelAvailability();
         }
+
+        private void UpdateStartDuelAvailability() =>
+            _startDuelButton.interactable = _charDecks.Count > 0 && _selectedMyDeck != null;
 
         private void CloneCurrentOppDeck()
         {
             if (!TryGetSelectedOpponentDeck(out var d)) return;
             var cloned = DeckRepository.ClonePresetToUserDeck(d);
-            _myDeckIdx = DeckRepository.UserDecks.IndexOf(cloned);
-            UpdateMyDeckLabel();
             bool playable = GameAppController.CanStartWithDeck(cloned, out _);
+            RefreshMyDecks(playable ? cloned : null);
             ShowStatus(playable ? "덱 목록을 복제했습니다." : "덱 목록 복제 완료. 덱 편집에서 사용 조건을 확인하세요.");
         }
 
         private void OpenJanken()
         {
-            if (!TryGetSelectedOpponentDeck(out _) || DeckRepository.UserDecks.Count == 0) return;
-            var myDeck = DeckRepository.UserDecks[_myDeckIdx];
-            if (!GameAppController.CanStartWithDeck(myDeck, out string reason))
+            if (!TryGetSelectedOpponentDeck(out _) || _selectedMyDeck == null) return;
+            if (!GameAppController.CanStartWithDeck(_selectedMyDeck, out string reason))
             {
+                RefreshMyDecks();
                 ShowStatus(reason, true);
                 return;
             }
@@ -669,14 +671,13 @@ namespace YGOPortable.UI
 
         private void LaunchMatch(bool playerGoesFirst)
         {
-            if (!TryGetSelectedOpponentDeck(out var oppDeck) || _myDeckIdx < 0 || _myDeckIdx >= DeckRepository.UserDecks.Count)
+            if (!TryGetSelectedOpponentDeck(out var oppDeck) || _selectedMyDeck == null)
             {
                 CloseJanken();
                 return;
             }
             JankenRoot.SetActive(false);
-            var myDeck = DeckRepository.UserDecks[_myDeckIdx];
-            _app.StartDuelMatch(_selectedChar, oppDeck, myDeck, playerGoesFirst);
+            _app.StartDuelMatch(_selectedChar, oppDeck, _selectedMyDeck, playerGoesFirst);
         }
 
         private bool TryGetSelectedOpponentDeck(out PresetDeckInfo deck)
