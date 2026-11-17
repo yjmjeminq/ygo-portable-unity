@@ -372,6 +372,7 @@ namespace YGOPortable.Editor
 
         private static void VerifyOpponentRoster()
         {
+            var singleCopyCards = new HashSet<uint> { 55144522, 79571449, 12580477, 18144506 };
             AssertTrue(DeckRepository.Characters.Count >= 250, "Opponent roster is incomplete");
             AssertTrue(DeckRepository.Characters.Select(c => c.id).Distinct().Count() == DeckRepository.Characters.Count,
                 "Duplicate opponent IDs");
@@ -392,6 +393,10 @@ namespace YGOPortable.Editor
                     AssertTrue(deck.extra.All(code => CardDatabase.Get(code) is CardInfo card && (card.type & YgoConstants.TYPE_EXTRA) != 0),
                         $"Invalid extra deck card in {deck.id}");
                     AssertTrue(deck.main.Contains(deck.sigCard) || deck.extra.Contains(deck.sigCard), $"Missing ace in deck {deck.id}");
+                    var copies = deck.main.Concat(deck.extra).Concat(deck.side).GroupBy(code =>
+                        CardDatabase.Get(code)?.alias is uint alias && alias != 0 ? alias : code);
+                    AssertTrue(copies.All(group => group.Count() <= (singleCopyCards.Contains(group.Key) ? 1 : 3)),
+                        $"Too many copies of a card in opponent deck {deck.id}");
                     string signature = string.Join(",", deck.main.OrderBy(code => code)) + "|" + string.Join(",", deck.extra.OrderBy(code => code));
                     AssertTrue(signatures.Add(signature), $"Duplicate playable deck for {character.name}");
                 }

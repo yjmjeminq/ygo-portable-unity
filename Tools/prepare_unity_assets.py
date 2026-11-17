@@ -4,7 +4,7 @@ Builds all Unity runtime & streaming assets for YGO Portable Unity:
   1. Assets/StreamingAssets/cards_prop.bin      (sorted 64B PackedCard structs for ygoengine.dll)
   2. Assets/StreamingAssets/cardscripts.pack    (all CardScripts Lua packed into 1 fast binary)
   3. Assets/StreamingAssets/cards_kr.json       (unified Korean card DB + hint strings + ID maps)
-  4. Assets/StreamingAssets/opponents_db.json   (20 [2026 Meta] + all 850 original LOTD decks & characters)
+  4. Assets/StreamingAssets/opponents_db.json   (modern Free Duel decks for LOTD and additional characters)
   5. Assets/StreamingAssets/cardart.idx + cardart_*.pack (<40MB chunks of 224x224 JPEG artwork)
   6. Assets/Resources/LOTD/... + Fonts/NotoSansKR.ttf    (sliced LOTD UI sprites, frames, Busts, TypeIcons)
   7. Assets/StreamingAssets/tokenart.pack      (token artwork and its index)
@@ -20,6 +20,7 @@ import struct
 import sys
 from collections import Counter, defaultdict
 from PIL import Image
+from modernize_opponents import modernize_opponents
 
 UNITY_ROOT = pathlib.Path(r"c:\jeminFolder\자체개발\ygo-portable-unity")
 YGO_PC = pathlib.Path(r"c:\jeminFolder\자체개발\YGO-PC-Full")
@@ -1090,12 +1091,13 @@ def build_opponents_db(lotd_to_pass: dict, kr_cards):
         all_decks.append(deck)
 
     final_chars = apply_opponent_themes(all_chars, all_decks, cards, extra_deck_codes, bust_map)
-    out_obj = {"characters": final_chars, "decks": all_decks}
+    final_decks = modernize_opponents(final_chars, all_decks, cards, STREAMING / "cards_prop.bin")
+    out_obj = {"characters": final_chars, "decks": final_decks}
     (STREAMING / "opponents_db.json").write_text(
         json.dumps(out_obj, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",
     )
-    print(f"  opponents_db.json: {len(final_chars)} characters, {len(all_decks)} selectable decks")
+    print(f"  opponents_db.json: {len(final_chars)} characters, {len(final_decks)} selectable decks")
 
 
 def slice_dfymoo(dfymoo_path: pathlib.Path, png_path: pathlib.Path, out_dir: pathlib.Path, keep_prefix=None, apply_offset=False):
