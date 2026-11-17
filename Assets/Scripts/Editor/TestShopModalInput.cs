@@ -164,7 +164,7 @@ namespace YGOPortable.Editor
                 search.IsInteractable() && CraftingScope(crafting) == catalog,
                 "Disassembly failed to apply its displayed card exactly once.");
             ButtonAt(catalog, "Back/Button").onClick.Invoke();
-            Require(((Text)Field(editor, "_previewOwnership")).text.Contains("보유 0장"),
+            Require(((Text)Field(editor, "_previewOwnership")).text.Contains("미보유"),
                 "The editor did not refresh the card's ownership after disassembly.");
         }
 

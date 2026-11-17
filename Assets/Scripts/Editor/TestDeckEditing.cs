@@ -201,6 +201,40 @@ namespace YGOPortable.Editor
                 Field<Text>(editor, "_previewOwnership").text.Contains("보관함 1장"),
                 "Removing a card did not update the trunk and preview immediately.");
             Require(CollectionProgress.GetOwnedCount(repeated) == 3, "Editing the deck changed card ownership.");
+            VerifyUnownedBadges(editor, deck, repeated);
+        }
+
+        private static void VerifyUnownedBadges(DeckEditorUI editor, UserDeck deck, uint code)
+        {
+            deck.side.Add(code);
+            Call(editor, "RefreshDeckGrids");
+            var archetype = new ArchetypeInfo { name = "Ownership fixture" };
+            archetype.coreCards.Add(CardDatabase.Get(code));
+            Call(editor, "SetTrunkSource", 0u, archetype);
+
+            var mainGrid = Field<RectTransform>(editor, "_mainDeckSlotGrid");
+            var sideGrid = Field<RectTransform>(editor, "_sideGridRect");
+            var mainBadge = mainGrid.Find($"Card_{deck.main.IndexOf(code)}/CardInset/Card/AspectBox/Unowned");
+            var sideBadge = sideGrid.Find("Card_0/CardInset/Card/AspectBox/Unowned");
+            var preview = Field<Text>(editor, "_previewOwnership");
+            Call(editor, "InspectCard", code);
+            Require(!mainBadge.gameObject.activeInHierarchy && !sideBadge.gameObject.activeInHierarchy &&
+                TrunkCount(editor, code) == "×0", "Spending all available copies in the deck marked the card as unowned.");
+
+            Call(editor, "OpenCardCrafting", code);
+            Require(CollectionProgress.TryDisassembleCards(new Dictionary<uint, int> { [code] = 3 }, out string error), error);
+            Call(editor, "ReturnFromCardCrafting");
+            Require(mainBadge.gameObject.activeInHierarchy && sideBadge.gameObject.activeInHierarchy &&
+                TrunkCount(editor, code) == "미보유" && preview.text.Contains("미보유"),
+                "Disassembling the last copy did not refresh the deck, card list and preview.");
+
+            Call(editor, "OpenCardCrafting", code);
+            Require(CollectionProgress.TryCraftCard(code, 1, out error), error);
+            Call(editor, "ReturnFromCardCrafting");
+            Require(!mainBadge.gameObject.activeInHierarchy && !sideBadge.gameObject.activeInHierarchy &&
+                TrunkCount(editor, code) == "×0" && preview.text.Contains("보유 1장"),
+                "Crafting a copy did not remove the unowned markers.");
+            Call(editor, "SetTrunkSource", 0u, null);
         }
 
         private static string TrunkCount(DeckEditorUI editor, uint code) =>

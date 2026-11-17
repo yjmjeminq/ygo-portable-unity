@@ -40,6 +40,9 @@ namespace YGOPortable.UI
         private const int MainDeckCapacity = 60;
         private const int MainDeckSlotRows = (MainDeckCapacity + DeckColumns - 1) / DeckColumns;
         private const int MainDeckVisibleRows = 4;
+        private const string UnownedLabel = "미보유";
+        private static readonly Color UnownedBadgeColor = new Color(.39f, .075f, .11f, .96f);
+        private static readonly Color TrunkCountBadgeColor = new Color(.02f, .07f, .14f, .93f);
 
         // Deck Slot Lists
         private readonly List<(RectTransform rt, CompositeCardView card, CardDragTrigger trigger)> _mainSlots
@@ -409,8 +412,8 @@ namespace YGOPortable.UI
             _padUi.Clear();
             _cardCrafting.Hide();
             _editorContent.SetActive(true);
+            RefreshDeckGrids();
             RefreshTrunkFilter();
-            RefreshPreviewOwnership();
             if (_padMode && _padArea != PadArea.Controls) DrawPadCardFocus();
             else EventSystem.current?.SetSelectedGameObject(_cardCraftingButton.gameObject);
         }
@@ -525,8 +528,8 @@ namespace YGOPortable.UI
                 DeckCardVisualMotion.Bind(card, hit);
                 var countBox = LotdUiKit.CreateRect("Copies", slot, new Vector2(0.24f, 0.032f), new Vector2(0.76f, 0.215f),
                     Vector2.zero, Vector2.zero);
-                LotdUiKit.AddImage(countBox.gameObject, LotdUiKit.WhiteSprite, new Color(.02f, .07f, .14f, .93f), false, false);
-                var label = LotdUiKit.AddFittedText(countBox, "Count", "", 17, 10, TextAnchor.MiddleCenter, Color.white,
+                LotdUiKit.AddImage(countBox.gameObject, LotdUiKit.WhiteSprite, TrunkCountBadgeColor, false, false);
+                var label = LotdUiKit.AddFittedText(countBox, "Count", "", 17, 8, TextAnchor.MiddleCenter, Color.white,
                     FontStyle.Bold);
                 label.gameObject.AddComponent<Outline>().effectColor = Color.black;
                 var trigger = slot.gameObject.AddComponent<CardDragTrigger>();
@@ -661,6 +664,11 @@ namespace YGOPortable.UI
                 DeckCardVisualMotion.Bind(card, hit);
                 var trigger = slot.gameObject.AddComponent<CardDragTrigger>();
                 trigger.SourceType = source;
+                var badge = LotdUiKit.CreateRect("Unowned", card.transform.Find("AspectBox"),
+                    new Vector2(.03f, .04f), new Vector2(.97f, .25f), Vector2.zero, Vector2.zero);
+                LotdUiKit.AddImage(badge.gameObject, LotdUiKit.WhiteSprite, UnownedBadgeColor, false, false);
+                LotdUiKit.AddFittedText(badge, "Label", UnownedLabel, 14, 7, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+                badge.gameObject.SetActive(false);
                 target.Add((slot, card, trigger));
             }
         }
@@ -817,19 +825,23 @@ namespace YGOPortable.UI
                 if (view.CurrentCode != code) ResetCardBinding(rect, view);
                 view.SetCard(code);
 
+                var countBox = count.transform.parent;
+                var countBackground = countBox.GetComponent<Image>();
+                countBackground.color = TrunkCountBadgeColor;
                 bool showOwnership = CollectionProgress.Initialized;
                 if (showOwnership)
                 {
                     int remaining = GetRemainingTrunkCopies(code, out int owned, out int inDeck);
-                    count.transform.parent.gameObject.SetActive(true);
-                    count.text = $"×{remaining}";
-                    count.color = inDeck > owned ? LotdUiKit.RedAccent :
+                    countBox.gameObject.SetActive(true);
+                    count.text = owned == 0 ? UnownedLabel : $"×{remaining}";
+                    if (owned == 0) countBackground.color = UnownedBadgeColor;
+                    count.color = owned == 0 ? Color.white : inDeck > owned ? LotdUiKit.RedAccent :
                         remaining == 0 ? LotdUiKit.TextMuted : Color.white;
                 }
                 else
                 {
                     int copies = CountInWorkingDeck(code);
-                    count.transform.parent.gameObject.SetActive(copies > 0);
+                    countBox.gameObject.SetActive(copies > 0);
                     count.text = copies.ToString();
                     count.color = Color.white;
                 }
@@ -886,6 +898,8 @@ namespace YGOPortable.UI
                 uint code = cards[i];
                 int index = i;
                 view.SetCard(code);
+                view.transform.Find("AspectBox/Unowned").gameObject.SetActive(CollectionProgress.Initialized &&
+                    CollectionProgress.GetOwnedCount(code) == 0);
                 trigger.CardCodeGetter = () => code;
                 trigger.IndexGetter = () => index;
                 trigger.OnLeftClick = () =>
@@ -1212,7 +1226,8 @@ namespace YGOPortable.UI
             if (!visible) return;
 
             int remaining = GetRemainingTrunkCopies(_inspectedCode, out int owned, out int inDeck);
-            _previewOwnership.text = $"보관함 {remaining}장 · 덱에 {inDeck}장 · 보유 {owned}장";
+            _previewOwnership.text = owned == 0 ? $"{UnownedLabel} · 덱에 {inDeck}장" :
+                $"보관함 {remaining}장 · 덱에 {inDeck}장 · 보유 {owned}장";
             _previewOwnership.color = inDeck > owned || owned == 0 ? LotdUiKit.RedAccent : LotdUiKit.TextPrimary;
             var rarity = CardRarityCatalog.GetRarity(_inspectedCode);
             _previewRarity.text = CardRarityCatalog.GetLabel(rarity);
