@@ -24,7 +24,7 @@ namespace YGOPortable.Editor
         {
             VerifyMainPhaseAndStaleState();
             VerifyOpponentTurnActivation();
-            Debug.Log("[VERIFY HAND GLOW] Native summons and effects, distinct hand copies, blocked prompts, animation, off-turn activation and monster ratings passed.");
+            Debug.Log("[VERIFY HAND GLOW] Native summons and effects, distinct hand copies, blocked prompts, animation, off-turn activation and field-only monster ratings passed.");
         }
 
         private static void VerifyMainPhaseAndStaleState()
@@ -203,13 +203,10 @@ namespace YGOPortable.Editor
             {
                 var mine = duel.Players[duel.HumanPlayerIndex];
                 var theirs = duel.Players[duel.AiPlayerIndex];
-                var hand = Field.Root.transform.Find("PlayerHand");
-                Text HandRating(uint code) => hand.GetChild((int)mine.hand.First(card => card.code == code).sequence)
-                    .Find("CardView/AspectBox/MonsterRating/Value").GetComponent<Text>();
-                Require(HandRating(BlueEyes).text == "Lv 8" && HandRating(BlueEyes).gameObject.activeInHierarchy &&
-                    !HandRating(PotOfDesires).gameObject.activeInHierarchy &&
-                    Field.Root.transform.Find("OpponentHand").GetComponentsInChildren<Text>().Length == 0,
-                    "Hand ratings missed a monster or appeared on a spell or private card.");
+                foreach (string hand in new[] { "PlayerHand", "OpponentHand" })
+                    Require(!Field.Root.transform.Find(hand).GetComponentsInChildren<Text>(true)
+                        .Any(label => label.transform.parent.name == "MonsterRating"),
+                        "A hand card rendered a field monster rating.");
 
                 Transform Slot(string fieldName, int index)
                 {

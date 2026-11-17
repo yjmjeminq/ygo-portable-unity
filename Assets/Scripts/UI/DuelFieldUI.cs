@@ -156,7 +156,6 @@ namespace YGOPortable.UI
             public CompositeCardView Card;
             public RectTransform FocusArt;
             public Image PlayableGlow;
-            public Text RatingText;
             public CardDragTrigger Trigger;
             public (Vector2 min, Vector2 max, float angle) Layout;
             public bool HasLayout;
@@ -1221,7 +1220,6 @@ namespace YGOPortable.UI
                 uint sequence = (uint)i;
                 bool showFront = !opponent || card.isPublic || card.IsFaceUp;
                 view.Card.SetCard(showFront ? card.code : 0u, !showFront, card);
-                BindMonsterRating(view.RatingText, showFront ? card : null);
                 bool actionable = !opponent && CanAcceptPlayerAction && !IsStagingPlacement && HasHandAction(controller, sequence);
 
                 var trigger = view.Trigger;
@@ -1357,16 +1355,12 @@ namespace YGOPortable.UI
                 outline.gameObject.SetActive(false);
                 trigger = rect.gameObject.AddComponent<CardDragTrigger>();
             }
-            var rating = CreateMonsterRating(art, opponent ? new Vector2(.37f, .03f) : new Vector2(.035f, .78f),
-                opponent ? new Vector2(.965f, .22f) : new Vector2(.63f, .97f));
-            if (opponent) rating.transform.parent.localRotation = Quaternion.Euler(0f, 0f, 180f);
             return new HandCardView
             {
                 Rect = rect,
                 Card = card,
                 FocusArt = art,
                 PlayableGlow = glow,
-                RatingText = rating,
                 Trigger = trigger,
             };
         }
