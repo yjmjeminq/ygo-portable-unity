@@ -82,16 +82,49 @@ namespace YGOPortable.Editor
         private static void VerifyLegacyDeck(DeckEditorUI editor)
         {
             var saved = Field<UserDeck>(editor, "_workingDeck");
-            saved.main.AddRange(Enumerable.Repeat(46986414u, 60));
+            saved.main.AddRange(Enumerable.Repeat(46986414u, 39));
             Call(editor, "RefreshDeckGrids");
+            Canvas.ForceUpdateCanvases();
+            var scroll = Field<ScrollRect>(editor, "_mainDeckScroll");
+            var mainSlots = Field<RectTransform>(editor, "_mainDeckSlotGrid");
+            var sideSlots = Field<RectTransform>(editor, "_sideGridRect");
+            VerifyTenColumns(mainSlots, "Main");
+            VerifyTenColumns(sideSlots, "Side");
+            float slotHeight = ((RectTransform)mainSlots.Find("Card_0")).rect.height;
+            Require(Mathf.Abs(scroll.content.rect.height - scroll.viewport.rect.height) < .1f,
+                "A 40-card deck required scrolling to reach its fourth row.");
+
+            saved.main.AddRange(Enumerable.Repeat(46986414u, 21));
+            Call(editor, "RefreshDeckGrids");
+            Canvas.ForceUpdateCanvases();
+            Require(Mathf.Abs(((RectTransform)mainSlots.Find("Card_0")).rect.height - slotHeight) < .1f,
+                "The main deck cards shrank when a fifth or sixth row was added.");
             var area = editor.GetType().GetField("_padArea", Instance);
             var main = Enum.Parse(area.FieldType, "Main");
             area.SetValue(editor, main);
             var indices = Field<int[]>(editor, "_padIndices");
+            indices[(int)main] = 0;
+            Call(editor, "NavigatePadCards", Vector2Int.down, false);
+            Require(indices[(int)main] == 10, "Controller movement did not follow the main deck columns.");
             indices[(int)main] = 60;
             Call(editor, "DrawPadCardFocus");
+            var lastSlot = (RectTransform)mainSlots.Find("Card_59");
+            float lastSlotBottom = scroll.viewport.InverseTransformPoint(lastSlot.TransformPoint(lastSlot.rect.min)).y;
+            Require(scroll.content.anchoredPosition.y > 0f && lastSlotBottom >= scroll.viewport.rect.yMin - .1f,
+                "Controller focus did not scroll the sixth row into view.");
             Require(indices[(int)main] == 59 && saved.main.Count == 61,
                 "An oversized legacy deck broke focus or dropped its unrendered card.");
+        }
+
+        private static void VerifyTenColumns(Transform grid, string section)
+        {
+            var first = (RectTransform)grid.Find("Card_0");
+            var tenth = (RectTransform)grid.Find("Card_9");
+            var eleventh = (RectTransform)grid.Find("Card_10");
+            Require(Mathf.Approximately(first.anchorMin.y, tenth.anchorMin.y) &&
+                Mathf.Approximately(first.anchorMin.x, eleventh.anchorMin.x) &&
+                eleventh.anchorMax.y < first.anchorMax.y,
+                $"{section} did not wrap after ten cards.");
         }
 
         private static void VerifyConfirmation(DeckEditorUI editor, EventSystem events)
