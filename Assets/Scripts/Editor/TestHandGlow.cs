@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using UnityEngine;
+using UnityEngine.UI;
 using YGOPortable.AI;
 using YGOPortable.Core;
 using YGOPortable.UI;
@@ -23,7 +24,7 @@ namespace YGOPortable.Editor
         {
             VerifyMainPhaseAndStaleState();
             VerifyOpponentTurnActivation();
-            Debug.Log("[VERIFY HAND GLOW] Native summons and effects, distinct hand copies, blocked prompts, animation, and off-turn activation passed.");
+            Debug.Log("[VERIFY HAND GLOW] Native summons and effects, distinct hand copies, blocked prompts, animation, off-turn activation and monster ratings passed.");
         }
 
         private static void VerifyMainPhaseAndStaleState()
@@ -49,6 +50,7 @@ namespace YGOPortable.Editor
                 "The native fixture did not offer both a summon and an activation.");
             ui.Expect(cards.Where(card => card.code != BlueEyes).Select(card => card.sequence));
             var handRow = ui.Field.Root.transform.Find("PlayerHand");
+            ui.VerifyMonsterRatings(duel);
             var actionBar = ui.Field.Root.transform.Find("CardActions");
             handRow.GetChild((int)cards.First(card => card.code == PotOfDesires).sequence)
                 .GetComponent<CardDragTrigger>().OnPointerEnterAction.Invoke();
@@ -195,6 +197,51 @@ namespace YGOPortable.Editor
                 uint[] actual = ActiveGlows("_myHandViews", requireElement: true);
                 Require(actual.SequenceEqual(positions), $"Expected hand glows [{string.Join(",", positions)}], got [{string.Join(",", actual)}].");
                 Require(ActiveGlows("_oppHandViews", requireElement: false).Length == 0, "A hidden opponent card displayed a hand action.");
+            }
+
+            internal void VerifyMonsterRatings(DuelSession duel)
+            {
+                var mine = duel.Players[duel.HumanPlayerIndex];
+                var theirs = duel.Players[duel.AiPlayerIndex];
+                var hand = Field.Root.transform.Find("PlayerHand");
+                Text HandRating(uint code) => hand.GetChild((int)mine.hand.First(card => card.code == code).sequence)
+                    .Find("CardView/AspectBox/MonsterRating/Value").GetComponent<Text>();
+                Require(HandRating(BlueEyes).text == "Lv 8" && HandRating(BlueEyes).gameObject.activeInHierarchy &&
+                    !HandRating(PotOfDesires).gameObject.activeInHierarchy &&
+                    Field.Root.transform.Find("OpponentHand").GetComponentsInChildren<Text>().Length == 0,
+                    "Hand ratings missed a monster or appeared on a spell or private card.");
+
+                Transform Slot(string fieldName, int index)
+                {
+                    var slots = (Array)typeof(DuelFieldUI).GetField(fieldName, PrivateInstance).GetValue(Field);
+                    var slot = slots.GetValue(index);
+                    return (Transform)slot.GetType().GetField("root").GetValue(slot);
+                }
+                Text Rating(Transform slot) => slot.Find("MonsterRating/Value").GetComponent<Text>();
+                const uint monster = YgoConstants.TYPE_MONSTER;
+                mine.mzone[0] = new LiveCardState { code = BlueEyes, type = monster, level = 5,
+                    position = YgoConstants.POS_FACEUP_DEFENSE };
+                mine.mzone[1] = new LiveCardState { code = 84013237, type = monster | YgoConstants.TYPE_XYZ, rank = 4,
+                    position = YgoConstants.POS_FACEUP_ATTACK };
+                theirs.mzone[6] = new LiveCardState { code = 1861629, type = monster | YgoConstants.TYPE_LINK, link = 3,
+                    position = YgoConstants.POS_FACEUP_ATTACK, attack = 2300, baseAttack = 2300 };
+                var normal = Rating(Slot("_myMZone", 0));
+                var xyz = Rating(Slot("_myMZone", 1));
+                var emz = Slot("_emz", 0);
+                var link = Rating(emz);
+                Field.Refresh();
+                Require(new[] { normal, xyz, link }.All(label => label.gameObject.activeInHierarchy && !label.raycastTarget) &&
+                    normal.text == "Lv 5" && xyz.text == "랭크 4" && link.text == "링크 3" &&
+                    emz.Find("Stats/Content/Value").GetComponent<Text>().text == "<color=#FFFFFF>2300</color>",
+                    "Field ratings did not use the current level, rank and link rating in either seat.");
+                mine.mzone[0].level = 0;
+                theirs.mzone[6].position = YgoConstants.POS_FACEDOWN_DEFENSE;
+                Field.Refresh();
+                Require(!normal.gameObject.activeInHierarchy && !link.gameObject.activeInHierarchy,
+                    "A removed level or facedown monster displayed a rating.");
+                mine.mzone[0] = mine.mzone[1] = theirs.mzone[6] = null;
+                Field.Refresh();
+                Require(!xyz.gameObject.activeInHierarchy, "A vacated zone retained a rating.");
             }
 
             private uint[] ActiveGlows(string fieldName, bool requireElement)

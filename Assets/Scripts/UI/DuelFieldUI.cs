@@ -78,6 +78,7 @@ namespace YGOPortable.UI
             public RectTransform stats;
             public Image statsEdge;
             public Text statsText;
+            public Text ratingText;
             public Text badgeText;
             public RectTransform badge;
             public CardDragTrigger dragTrigger;
@@ -155,6 +156,7 @@ namespace YGOPortable.UI
             public CompositeCardView Card;
             public RectTransform FocusArt;
             public Image PlayableGlow;
+            public Text RatingText;
             public CardDragTrigger Trigger;
             public (Vector2 min, Vector2 max, float angle) Layout;
             public bool HasLayout;
@@ -563,6 +565,7 @@ namespace YGOPortable.UI
             var badgeText = LotdUiKit.AddFittedText(badge, "Count", "", 12, 8,
                 TextAnchor.MiddleCenter, DuelStyle.Gold, FontStyle.Bold);
             DuelStyle.Shadow(badgeText, 1.5f);
+            var rating = CreateMonsterRating(cell, new Vector2(.03f, .74f), new Vector2(.53f, .97f));
 
             var slot = new FieldSlotView
             {
@@ -574,6 +577,7 @@ namespace YGOPortable.UI
                 stats = stats,
                 statsEdge = statsEdge,
                 statsText = values,
+                ratingText = rating,
                 badge = badge,
                 badgeText = badgeText,
                 dragTrigger = cell.gameObject.AddComponent<CardDragTrigger>(),
@@ -1084,6 +1088,7 @@ namespace YGOPortable.UI
             slot.cardView.gameObject.SetActive(visible);
             bool showStats = visible && loc == YgoConstants.LOCATION_MZONE && live.IsFaceUp;
             slot.stats.gameObject.SetActive(showStats);
+            BindMonsterRating(slot.ratingText, showStats ? live : null);
             bool token = showStats && (live.type & YgoConstants.TYPE_TOKEN) != 0;
             slot.badgeText.text = token ? "토큰" : visible && live.overlayCodes.Count > 0 ? $"×{live.overlayCodes.Count}" : "";
             slot.badgeText.color = token ? DuelStyle.Player : DuelStyle.Gold;
@@ -1099,11 +1104,13 @@ namespace YGOPortable.UI
             {
                 slot.stats.anchorMin = new Vector2(0.03f, opponent ? 0.76f : 0.02f);
                 slot.stats.anchorMax = new Vector2(0.97f, opponent ? 0.98f : 0.24f);
+                var rating = (RectTransform)slot.ratingText.transform.parent;
+                rating.anchorMin = new Vector2(.03f, opponent ? .03f : .74f);
+                rating.anchorMax = new Vector2(.53f, opponent ? .26f : .97f);
                 bool link = (live.type & YgoConstants.TYPE_LINK) != 0;
                 string attackValue = StatValue(live.attack, live.baseAttack, !live.IsDefense);
-                string secondValue = link ? $"<color=#80D7FF>L{live.link}</color>" :
-                    StatValue(live.defense, live.baseDefense, live.IsDefense);
-                string stats = $"{attackValue}<color=#B2BEC4>/</color>{secondValue}";
+                string stats = link ? attackValue :
+                    $"{attackValue}<color=#B2BEC4>/</color>{StatValue(live.defense, live.baseDefense, live.IsDefense)}";
                 if (slot.statsText.text != stats) slot.statsText.text = stats;
                 bool modified = live.attack != live.baseAttack || !link && live.defense != live.baseDefense;
                 slot.statsEdge.sprite = modified ? DuelVisualAssets.CardStatsBaseAlt ?? DuelVisualAssets.CardStatsBase :
@@ -1214,6 +1221,7 @@ namespace YGOPortable.UI
                 uint sequence = (uint)i;
                 bool showFront = !opponent || card.isPublic || card.IsFaceUp;
                 view.Card.SetCard(showFront ? card.code : 0u, !showFront, card);
+                BindMonsterRating(view.RatingText, showFront ? card : null);
                 bool actionable = !opponent && CanAcceptPlayerAction && !IsStagingPlacement && HasHandAction(controller, sequence);
 
                 var trigger = view.Trigger;
@@ -1333,13 +1341,14 @@ namespace YGOPortable.UI
         {
             var rect = LotdUiKit.FillRect("HandCard", row);
             var card = CompositeCardView.Create(rect, "CardView", duelArtwork: true);
+            var art = (RectTransform)card.transform.Find("AspectBox");
             CardDragTrigger trigger = null;
             Image glow = null;
             if (!opponent)
             {
                 LotdUiKit.AddImage(rect.gameObject, LotdUiKit.WhiteSprite, Color.clear);
                 var original = DuelVisualAssets.HandGlow;
-                var outline = LotdUiKit.FillRect("PlayableGlow", card.transform.Find("AspectBox"), original != null ? -10f : -9f);
+                var outline = LotdUiKit.FillRect("PlayableGlow", art, original != null ? -10f : -9f);
                 outline.SetAsFirstSibling();
                 glow = LotdUiKit.AddImage(outline.gameObject, original ?? DuelStyle.HandGlow, Color.white, false, false);
                 glow.type = Image.Type.Sliced;
@@ -1348,14 +1357,40 @@ namespace YGOPortable.UI
                 outline.gameObject.SetActive(false);
                 trigger = rect.gameObject.AddComponent<CardDragTrigger>();
             }
+            var rating = CreateMonsterRating(art, opponent ? new Vector2(.37f, .03f) : new Vector2(.035f, .78f),
+                opponent ? new Vector2(.965f, .22f) : new Vector2(.63f, .97f));
+            if (opponent) rating.transform.parent.localRotation = Quaternion.Euler(0f, 0f, 180f);
             return new HandCardView
             {
                 Rect = rect,
                 Card = card,
-                FocusArt = (RectTransform)card.transform.Find("AspectBox"),
+                FocusArt = art,
                 PlayableGlow = glow,
+                RatingText = rating,
                 Trigger = trigger,
             };
+        }
+
+        private static Text CreateMonsterRating(Transform parent, Vector2 min, Vector2 max)
+        {
+            var chip = LotdUiKit.CreateRect("MonsterRating", parent, min, max, Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(chip.gameObject, LotdUiKit.WhiteSprite, new Color(.025f, .045f, .058f, .91f), false, false);
+            var text = LotdUiKit.AddFittedText(chip, "Value", "", 15, 8, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+            chip.gameObject.SetActive(false);
+            return text;
+        }
+
+        private static void BindMonsterRating(Text text, LiveCardState card)
+        {
+            uint type = card != null && card.code != 0 ? card.type : 0;
+            bool link = (type & YgoConstants.TYPE_LINK) != 0;
+            bool xyz = (type & YgoConstants.TYPE_XYZ) != 0;
+            uint value = (type & YgoConstants.TYPE_MONSTER) == 0 ? 0 : link ? card.link : xyz ? card.rank : card.level;
+            text.transform.parent.gameObject.SetActive(value != 0);
+            if (value == 0) return;
+
+            text.text = $"{(link ? "링크" : xyz ? "랭크" : "Lv")} {value}";
+            text.color = link ? DuelStyle.Player : xyz ? Color.white : DuelStyle.Gold;
         }
 
         private static (Vector2 min, Vector2 max, float angle) HandCardBounds(RectTransform row, int count, int index, bool opponent)
