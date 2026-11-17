@@ -19,6 +19,7 @@ namespace YGOPortable.Editor
             using var duel = new DuelSession();
             VerifyDuplicateEffectsAndZoneViewer(duel);
             VerifySingleEffect(duel);
+            VerifyKoreanEffect(duel);
             VerifyGroupedLocations(duel);
             VerifyScrollableChoices(duel);
             VerifyNavigation(duel);
@@ -26,6 +27,37 @@ namespace YGOPortable.Editor
             VerifyEmptyChain(duel);
             VerifyMaterialChoices(duel);
             Debug.Log("[VERIFY CHAIN CHOOSER] Grouped locations, native indices, duplicate effects, zone overlay, input focus, empty chain and material selection passed.");
+        }
+
+        private static void VerifyKoreanEffect(DuelSession duel)
+        {
+            const uint kaleidoHeart = 28226490;
+            const uint legendaryBlackLusterSoldier = 70551291;
+            const uint cyberseCodeMagician = 64866;
+            ulong untranslatedOption = (ulong)legendaryBlackLusterSoldier << 20;
+            string rulesText = CardDatabase.Get(legendaryBlackLusterSoldier).desc.Trim();
+            Require(CardDatabase.ResolveDescription(untranslatedOption) == null &&
+                    CardDatabase.ResolveEffectDescription(untranslatedOption, legendaryBlackLusterSoldier) == rulesText,
+                "An untranslated effect label did not fall back to the Korean card text.");
+            Require(CardDatabase.ResolveDescription(untranslatedOption | 1) == "덱으로 되돌린다" &&
+                    CardDatabase.ResolveEffectDescription((ulong)cyberseCodeMagician << 20, cyberseCodeMagician) == null,
+                "The shared translation or the fallback for cards without Korean text failed.");
+
+            using var view = new ChainView();
+            var prompt = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_CHAIN, playerId = 0 };
+            prompt.candidates.Add(new SelectableCardItem
+            {
+                code = kaleidoHeart,
+                controller = 0,
+                location = YgoConstants.LOCATION_MZONE,
+                description = (ulong)kaleidoHeart << 20,
+            });
+            view.Show(duel, prompt);
+            view.SelectChoice(0, kaleidoHeart);
+            var effect = view.Modals.ModalRoot.GetComponentsInChildren<Text>()
+                .Single(label => label.gameObject.name == "Effect");
+            Require(effect.text == "상대 필드의 카드 1장을 주인의 덱으로 되돌린다.",
+                "Kaleido-Heart's chain preview did not show its Korean effect text.");
         }
 
         internal static void SubmitNativeChoice(DuelSession duel, int index)

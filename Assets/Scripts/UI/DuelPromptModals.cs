@@ -557,7 +557,8 @@ namespace YGOPortable.UI
 
         private void RenderYesNo(DuelSession s, DuelPrompt p)
         {
-            var card = CardDatabase.Get(CardDatabase.GetDescriptionCardCode(p.promptDesc));
+            uint cardCode = CardDatabase.GetDescriptionCardCode(p.promptDesc);
+            var card = CardDatabase.Get(cardCode);
             string msg = CardDatabase.ResolveEffectDescription(p.promptDesc, 0)
                 ?? CardDatabase.ResolveDescription(s.LastHintMsg)
                 ?? "선택한 처리를 실행하시겠습니까?";
@@ -567,8 +568,9 @@ namespace YGOPortable.UI
 
             CreateVerticalScroll(_modalBody, out Transform description);
             AddDescriptionText(description, "Question", msg, 18);
-            if (!string.IsNullOrWhiteSpace(card?.desc) && msg != card.desc.Trim())
-                AddDescriptionText(description, "CardText", card.desc);
+            string cardText = CardDatabase.GetKoreanCardDescription(cardCode);
+            if (cardText != null && msg != cardText)
+                AddDescriptionText(description, "CardText", cardText);
 
             AddFooterButton("예", () => Submit(BitConverter.GetBytes(1)), true);
             AddFooterButton("아니오", () => Submit(BitConverter.GetBytes(0)), false);
@@ -645,8 +647,9 @@ namespace YGOPortable.UI
             }
             foreach (var card in sources)
             {
-                if (!string.IsNullOrWhiteSpace(card.desc))
-                    AddDescriptionText(content, "CardText", $"{card.name}\n{card.desc}");
+                string cardText = CardDatabase.GetKoreanCardDescription(card.code);
+                if (cardText != null)
+                    AddDescriptionText(content, "CardText", $"{card.name}\n{cardText}");
             }
         }
 
@@ -694,7 +697,7 @@ namespace YGOPortable.UI
                 _chainName.text = CardDatabase.GetName(item.code);
                 _chainSource.text = CardSourceLabel(session, item);
                 _chainEffect.text = CardDatabase.ResolveEffectDescription(item.description, item.code)
-                    ?? CardDatabase.Get(item.code)?.desc ?? "이 카드의 효과를 발동할 수 있습니다.";
+                    ?? "이 카드의 효과를 발동할 수 있습니다.";
                 _chainEffectScroll.StopMovement();
                 _chainEffectScroll.content.anchoredPosition = Vector2.zero;
                 _onInspectCard?.Invoke(item.code);

@@ -202,12 +202,148 @@ namespace YGOPortable.Core
             { "Negate that effect", "그 효과를 무효로 한다" },
             { "Negate the activation of that effect", "그 효과의 발동을 무효로 한다" },
             { "Fusion Summon", "융합 소환한다" },
+            { "Search", "덱에서 카드를 패에 넣는다" },
+            { "Add card", "카드를 패에 넣는다" },
+            { "Add this card to your hand", "이 카드를 패에 넣는다" },
+            { "Return this card to the hand", "이 카드를 패로 되돌린다" },
+            { "Return to the Deck", "덱으로 되돌린다" },
+            { "Shuffle to Deck", "덱으로 되돌린다" },
+            { "Shuffle to the Deck", "덱으로 되돌린다" },
+            { "Shuffle into the Deck", "덱으로 되돌린다" },
+            { "Return to the Extra Deck", "엑스트라 덱으로 되돌린다" },
+            { "Send to the GY", "묘지로 보낸다" },
+            { "Send to the Graveyard", "묘지로 보낸다" },
+            { "Send the top 2 cards of your Deck to the GY", "자신의 덱 위에서 카드 2장을 묘지로 보낸다" },
+            { "Send the top 3 cards of your Deck to the GY", "자신의 덱 위에서 카드 3장을 묘지로 보낸다" },
+            { "Send the top 3 cards of either Deck to the GY", "자신 또는 상대 덱 위에서 카드 3장을 묘지로 보낸다" },
+            { "Send the top 3 cards of your Deck…", "자신의 덱 위에서 카드 3장을 묘지로 보낸다" },
+            { "Mill the top 5 cards", "덱 위에서 카드 5장을 묘지로 보낸다" },
+            { "Face-down and send to GY", "뒷면 수비 표시로 하고 덱에서 카드를 묘지로 보낸다" },
+            { "Draw card", "카드를 드로우한다" },
+            { "Draw 1 card?", "카드를 1장 드로우하시겠습니까?" },
+            { "Draw 3 cards", "카드를 3장 드로우한다" },
+            { "Special Summon it", "그 몬스터를 특수 소환한다" },
+            { "Special Summon from hand", "패에서 특수 소환한다" },
+            { "Special Summon from the Deck", "덱에서 특수 소환한다" },
+            { "Special Summon from the GY", "묘지에서 특수 소환한다" },
+            { "Special Summon this card from your GY", "자신의 묘지에서 이 카드를 특수 소환한다" },
+            { "Special Summon this card and banish", "이 카드를 특수 소환하고 카드를 제외한다" },
+            { "Banish and Special Summon", "카드를 제외하고 특수 소환한다" },
+            { "Banish an opponent's card face-down", "상대의 카드를 뒷면으로 제외한다" },
+            { "Banish 1 monster", "몬스터 1장을 제외한다" },
+            { "Select the card to add to your hand or Special Summon", "패에 넣거나 특수 소환할 카드를 선택하세요." },
+            { "Normal Summon without Tribute", "릴리스 없이 일반 소환한다" },
+            { "Ritual Summon", "의식 소환한다" },
+            { "Synchro Summon", "싱크로 소환한다" },
+            { "Xyz Summon", "엑시즈 소환한다" },
+            { "Pendulum Summon", "펜듈럼 소환한다" },
+            { "Link Summon", "링크 소환한다" },
+            { "Destroy 1 card on the field", "필드의 카드 1장을 파괴한다" },
+            { "Destroy 1 monster your opponent controls", "상대 필드의 몬스터 1장을 파괴한다" },
+            { "Inflict damage", "데미지를 준다" },
+            { "Damage", "데미지를 준다" },
+            { "Inflict damage to your opponent", "상대에게 데미지를 준다" },
+            { "Gain LP", "LP를 회복한다" },
+            { "Negate", "무효로 한다" },
+            { "Negate effect", "효과를 무효로 한다" },
+            { "Negate attack", "공격을 무효로 한다" },
+            { "Negate activation", "발동을 무효로 한다" },
+            { "Negate the activation", "발동을 무효로 한다" },
+            { "Gain attack", "공격력을 올린다" },
+            { "Gain ATK", "공격력을 올린다" },
+            { "Increase ATK", "공격력을 올린다" },
+            { "Change ATK", "공격력을 변경한다" },
+            { "Change Level", "레벨을 변경한다" },
+            { "Increase Level", "레벨을 올린다" },
+            { "Change position", "표시 형식을 변경한다" },
+            { "Change battle position", "표시 형식을 변경한다" },
+            { "Change to Defense Position", "수비 표시로 변경한다" },
+            { "Change to face-down Defense Position", "뒷면 수비 표시로 변경한다" },
+            { "Take control", "컨트롤을 얻는다" },
+            { "Activate", "발동한다" },
+            { "Place counter", "카운터를 놓는다" },
+            { "Set this card", "이 카드를 세트한다" },
+            { "Set 1 Trap from your GY?", "자신의 묘지에서 함정 카드 1장을 세트하시겠습니까?" },
+            { "Place this card in your Pendulum Zone", "이 카드를 자신의 펜듈럼 존에 놓는다" },
+            { "Excavate", "덱 위에서 카드를 넘긴다" },
+            { "Attach", "엑시즈 소재로 한다" },
+            { "Coin toss", "코인을 던진다" },
+            { "Roll dice", "주사위를 굴린다" },
+            { "Search 1 \"Polymerization\"", "덱에서 융합 1장을 패에 넣는다" },
+            { "Activate using \"Infinite Impermanence\"", "무한포영을 발동한다" },
+            { "Normal Summon", "일반 소환한다" },
+            { "Normal Summon without Tributing", "릴리스 없이 일반 소환한다" },
+            { "Special Summon?", "특수 소환하시겠습니까?" },
+            { "Special Summon itself", "이 카드를 특수 소환한다" },
+            { "Special Summon this card?", "이 카드를 특수 소환하시겠습니까?" },
+            { "Special Summon this card from your hand or GY", "패 또는 묘지에서 이 카드를 특수 소환한다" },
+            { "Special Summon this card in Defense Position", "이 카드를 수비 표시로 특수 소환한다" },
+            { "Special Summon this card as an Effect Monster", "이 카드를 효과 몬스터로 특수 소환한다" },
+            { "Special Summon 1 monster from your hand", "패에서 몬스터 1장을 특수 소환한다" },
+            { "Special Summon 1 monster from your GY", "자신의 묘지에서 몬스터 1장을 특수 소환한다" },
+            { "Special Summon Token", "토큰을 특수 소환한다" },
+            { "Special Summon it to your field", "자신 필드에 그 몬스터를 특수 소환한다" },
+            { "Special Summon it to your opponent's field", "상대 필드에 그 몬스터를 특수 소환한다" },
+            { "Fusion Summon 1 Fusion Monster from your Extra Deck", "엑스트라 덱에서 융합 몬스터 1장을 융합 소환한다" },
+            { "Destroy this card", "이 카드를 파괴한다" },
+            { "Destroy 1 card on the field?", "필드의 카드 1장을 파괴하시겠습니까?" },
+            { "Destroy 1 monster on the field", "필드의 몬스터 1장을 파괴한다" },
+            { "Destroy 1 Spell/Trap on the field", "필드의 마법·함정 카드 1장을 파괴한다" },
+            { "Destroy all monsters your opponent controls", "상대 필드의 몬스터를 전부 파괴한다" },
+            { "Destroy all cards your opponent controls", "상대 필드의 카드를 전부 파괴한다" },
+            { "Destroy all cards on the field", "필드의 카드를 전부 파괴한다" },
+            { "Destroy and inflict damage", "파괴하고 데미지를 준다" },
+            { "Destroy and Special Summon", "파괴하고 특수 소환한다" },
+            { "Target 1 card to destroy", "파괴할 카드 1장을 대상으로 한다" },
+            { "Negate effects", "효과를 무효로 한다" },
+            { "Negate and destroy", "무효로 하고 파괴한다" },
+            { "Negate the activation and destroy that card", "발동을 무효로 하고 그 카드를 파괴한다" },
+            { "Negate the activation, and if you do, destroy that card", "발동을 무효로 하고 그 카드를 파괴한다" },
+            { "Select effect", "적용할 효과를 선택하세요." },
+            { "Apply 1 of these effects", "다음 효과 중 1개를 적용한다" },
+            { "Apply these effects in sequence", "이 효과들을 순서대로 적용한다" },
+            { "Search card", "덱에서 카드를 패에 넣는다" },
+            { "Search or Special Summon", "덱에서 카드를 패에 넣거나 특수 소환한다" },
+            { "Select the card to add to your hand or send to the GY", "패에 넣거나 묘지로 보낼 카드를 선택하세요." },
+            { "Back to hand", "패로 되돌린다" },
+            { "Shuffle it into the Deck", "그 카드를 덱으로 되돌린다" },
+            { "Return this card to the Extra Deck", "이 카드를 엑스트라 덱으로 되돌린다" },
+            { "Send this card to the GY", "이 카드를 묘지로 보낸다" },
+            { "Banish 1 card on the field", "필드의 카드 1장을 제외한다" },
+            { "Banish 1 card your opponent controls", "상대 필드의 카드 1장을 제외한다" },
+            { "Discard", "패에서 카드를 버린다" },
+            { "Discard 1 random card from your opponent's hand", "상대의 패를 무작위로 1장 버린다" },
+            { "Reduce ATK", "공격력을 내린다" },
+            { "Decrease ATK", "공격력을 내린다" },
+            { "Lower attack", "공격력을 내린다" },
+            { "Halve ATK", "공격력을 절반으로 한다" },
+            { "Double ATK", "공격력을 2배로 한다" },
+            { "Increase ATK and DEF", "공격력과 수비력을 올린다" },
+            { "Reduce damage to 0", "데미지를 0으로 한다" },
+            { "Reduce Level", "레벨을 내린다" },
+            { "Increase Level by 1", "레벨을 1개 올린다" },
+            { "Increase its Level by 1", "그 몬스터의 레벨을 1개 올린다" },
+            { "Decrease its Level by 1", "그 몬스터의 레벨을 1개 내린다" },
+            { "Flip into face-down Defense Position", "뒷면 수비 표시로 한다" },
+            { "Place in Pendulum Zone", "펜듈럼 존에 놓는다" },
+            { "Equip this card", "이 카드를 장착한다" },
+            { "Place spell counter", "마력 카운터를 놓는다" },
+            { "Copy effect", "효과를 복사한다" },
+            { "Attack again", "한 번 더 공격한다" },
+            { "Direct attack", "직접 공격한다" },
+            { "Heads", "앞면" },
+            { "Tails", "뒷면" },
+            { "Token", "토큰" },
             { "Spell Card", "마법 카드" },
             { "Trap Card", "함정 카드" },
         };
 
         private static readonly Dictionary<ulong, string> CardEffectTextKR = new Dictionary<ulong, string>
         {
+            { 28226490UL << DescriptionIndexBits, "상대 필드의 카드 1장을 주인의 덱으로 되돌린다." },
+            { (28226490UL << DescriptionIndexBits) | 1, "이 카드를 특수 소환하고, 덱에서 티아라멘츠 카드 1장을 묘지로 보낸다." },
+            { (32731036UL << DescriptionIndexBits) | 1, "덱에서 낙인 지속 마법·함정 카드 1장을 자신 필드에 앞면으로 놓는다." },
+            { (33854624UL << DescriptionIndexBits) | 1, "이 턴의 엔드 페이즈에 덱 또는 묘지에서 다른 드래곤족 몬스터 1장을 패에 넣는다." },
             { 9024198UL << DescriptionIndexBits, "덱에서 이름이 다른 DD 펜듈럼 몬스터 2장을 펜듈럼 존에 놓고 1000 데미지를 받는다. 턴 종료까지 DD 몬스터만 특수 소환할 수 있다." },
             { 11609969UL << DescriptionIndexBits, "이 카드의 펜듈럼 스케일을 2 내린다(최소 1). 새 스케일 이상의 레벨을 가진 자신의 DD 이외 몬스터를 파괴한다." },
             { (11609969UL << DescriptionIndexBits) | 1, "자신 필드의 다른 DD 카드 1장을 패로 되돌리거나, 덱에서 계약서 카드 1장을 패에 넣는다." },
@@ -956,29 +1092,47 @@ namespace YGOPortable.Core
 
             int index = (int)(desc & DescriptionIndexMask);
             var card = Get(GetDescriptionCardCode(desc));
-            string text = ReadDescription(card, index);
+            string text = ReadLocalizedDescription(card, index);
             if (text == null && card != null && card.alias != 0)
             {
                 var original = Get(card.alias);
                 if (original != null && original.name == card.name)
-                    text = ReadDescription(original, index);
+                    text = ReadLocalizedDescription(original, index);
             }
-            return text != null && EffectTextKR.TryGetValue(text, out var localized) ? localized : text;
+            return text;
         }
 
         public static string ResolveEffectDescription(ulong desc, uint cardCode)
         {
             string text = ResolveDescription(desc);
             if (text != null) return text;
-            var source = Get(GetDescriptionCardCode(desc)) ?? Get(cardCode);
-            return string.IsNullOrWhiteSpace(source?.desc) ? null : source.desc.Trim();
+            return GetKoreanCardDescription(GetDescriptionCardCode(desc)) ?? GetKoreanCardDescription(cardCode);
         }
 
-        private static string ReadDescription(CardInfo card, int index)
+        internal static string GetKoreanCardDescription(uint code)
+        {
+            string text = Get(code)?.desc;
+            return HasKoreanText(text) ? text.Trim() : null;
+        }
+
+        private static string ReadLocalizedDescription(CardInfo card, int index)
         {
             var strings = card?.strs;
-            return strings != null && index < strings.Length && !string.IsNullOrWhiteSpace(strings[index])
-                ? strings[index].Trim() : null;
+            if (strings == null || index >= strings.Length || string.IsNullOrWhiteSpace(strings[index]))
+                return null;
+            string text = strings[index].Trim();
+            if (HasKoreanText(text)) return text;
+
+            string key = text.Replace('’', '\'').TrimEnd('.');
+            return EffectTextKR.TryGetValue(key, out var localized) ? localized : null;
+        }
+
+        private static bool HasKoreanText(string text)
+        {
+            if (text == null) return false;
+            foreach (char character in text)
+                if (character >= '가' && character <= '힣') return true;
+            return false;
         }
     }
 }
