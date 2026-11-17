@@ -85,6 +85,7 @@ namespace YGOPortable.UI
             Heading(catalog, "Heading", "분해할 카드 선택", .08f, .858f, .92f, .93f);
             _search = LotdUiKit.CreateInputField(Slot(catalog, "Search", .08f, .768f, .663f, .845f),
                 "Input", "카드명·카드 번호 검색", 17);
+            _search.GetComponent<Outline>().effectColor = PackShopStyle.TextMuted;
             _search.onValueChanged.AddListener(_ => Filter());
             var filter = AddButton(catalog, "RarityFilter", "", .675f, .768f, .92f, .845f, CycleRarity);
             _filterLabel = filter.GetComponentInChildren<Text>();
@@ -292,10 +293,10 @@ namespace YGOPortable.UI
             {
                 var card = _matches[first + i];
                 var row = _rows[i];
-                row.Name.color = card == _inspected ? LotdUiKit.GoldAccent : LotdUiKit.TextPrimary;
+                row.Name.color = card == _inspected ? PackShopStyle.Accent : LotdUiKit.TextPrimary;
                 int selected = Quantity(card.Code);
                 row.Quantity.text = $"선택 {selected:N0} / {card.Limit:N0}";
-                row.Quantity.color = selected > 0 ? LotdUiKit.GoldAccent : LotdUiKit.TextMuted;
+                row.Quantity.color = selected > 0 ? PackShopStyle.Accent : PackShopStyle.TextMuted;
             }
             RefreshTotals(_summary, _points);
         }
@@ -421,7 +422,7 @@ namespace YGOPortable.UI
             Transform content = holder;
             if (selectable)
             {
-                row.Button = LotdUiKit.CreateLotdButton(holder, "Button", "", select, 18);
+                row.Button = PackShopStyle.Button(holder, "Button", "", select);
                 row.Button.gameObject.AddComponent<StarterRowFocus>().ShowPreview = select;
                 row.Button.GetComponentInChildren<Text>().gameObject.SetActive(false);
                 content = row.Button.transform;
@@ -454,18 +455,16 @@ namespace YGOPortable.UI
         private static RectTransform BuildScreen(Transform parent, string name, string title, string back, Action close)
         {
             var root = LotdUiKit.FillRect(name, parent);
-            LotdUiKit.AddImage(LotdUiKit.FillRect("Backdrop", root).gameObject,
-                LotdUiKit.LoadSprite("LOTD/Background/bg_vrains"), new Color(.52f, .63f, .79f), false, false);
-            LotdUiKit.AddMenuHeader(root, title);
+            PackShopStyle.Backdrop(root);
+            PackShopStyle.Header(root, title);
             AddButton(root, "Back", back, .825f, .917f, .968f, .975f, close);
             return root;
         }
 
         private static void Footer(Transform root, string controls)
         {
-            var panel = LotdUiKit.CreateBorderedPanel(root, "Footer", new Vector2(.035f, .017f), new Vector2(.965f, .059f),
-                Vector2.zero, Vector2.zero);
-            LotdUiKit.AddFittedText(panel, "Controls", controls, 16, 11, TextAnchor.MiddleCenter, LotdUiKit.TextMuted);
+            var panel = PackShopStyle.Panel(root, "Footer", new Vector2(.035f, .017f), new Vector2(.965f, .059f));
+            LotdUiKit.AddFittedText(panel, "Controls", controls, 16, 11, TextAnchor.MiddleCenter, PackShopStyle.TextMuted);
         }
 
         private static string Normalize(string text) => new string(text.Where(char.IsLetterOrDigit).ToArray());
@@ -473,7 +472,7 @@ namespace YGOPortable.UI
         private static int PageCount(int count) => Mathf.Max(1, (count + PageSize - 1) / PageSize);
 
         private static RectTransform Panel(Transform parent, string name, float left, float bottom, float right, float top) =>
-            LotdUiKit.CreateMenuPanel(parent, name, new Vector2(left, bottom), new Vector2(right, top));
+            PackShopStyle.Panel(parent, name, new Vector2(left, bottom), new Vector2(right, top));
 
         private static RectTransform Slot(Transform parent, string name, float left, float bottom, float right, float top) =>
             LotdUiKit.CreateRect(name, parent, new Vector2(left, bottom), new Vector2(right, top), Vector2.zero, Vector2.zero);
@@ -481,9 +480,8 @@ namespace YGOPortable.UI
         private static Text Heading(Transform parent, string name, string value, float left, float bottom, float right, float top)
         {
             var slot = Slot(parent, name, left, bottom, right, top);
-            LotdUiKit.AddImage(slot.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelHeader, false, false);
             return LotdUiKit.AddFittedText(slot, "Text", value, 23, 14, TextAnchor.MiddleCenter,
-                LotdUiKit.GoldAccent, FontStyle.Bold);
+                LotdUiKit.TextPrimary, FontStyle.Bold);
         }
 
         private static Text Label(Transform parent, string name, string text, float left, float bottom, float right, float top,
@@ -492,7 +490,7 @@ namespace YGOPortable.UI
                 "Text", text, size, Mathf.Max(11, size - 6), align, LotdUiKit.TextPrimary);
 
         private static Button AddButton(Transform parent, string name, string title, float left, float bottom, float right,
-            float top, Action action, bool gold = false) => LotdUiKit.CreateLotdButton(
-            Slot(parent, name, left, bottom, right, top), "Button", title, action, 18, gold);
+            float top, Action action, bool primary = false) => PackShopStyle.Button(
+            Slot(parent, name, left, bottom, right, top), "Button", title, action, 18, primary);
     }
 }

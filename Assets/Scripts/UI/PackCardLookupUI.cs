@@ -34,6 +34,7 @@ namespace YGOPortable.UI
         private readonly Text[] _cardRarities = new Text[CardsPerPage];
         private readonly Button[] _packRows = new Button[PacksPerPage];
         private readonly Text[] _packLabels = new Text[PacksPerPage];
+        private readonly Image[] _packCovers = new Image[PacksPerPage];
         private readonly List<Entry> _matches = new();
         private readonly Text _cardCount;
         private readonly Text _cardPageLabel;
@@ -62,20 +63,20 @@ namespace YGOPortable.UI
             _onPackChosen = onPackChosen;
             var root = LotdUiKit.FillRect("Screen_PackCardLookup", parent);
             Root = root.gameObject;
-            LotdUiKit.AddImage(LotdUiKit.FillRect("Backdrop", root).gameObject,
-                LotdUiKit.LoadSprite("LOTD/Background/bg_vrains"), new Color(.52f, .63f, .79f), false, false);
-            LotdUiKit.AddMenuHeader(root, "카드로 팩 찾기");
+            PackShopStyle.Backdrop(root);
+            PackShopStyle.Header(root, "카드로 팩 찾기");
             AddButton(root, "Back", "뒤로", .825f, .917f, .968f, .975f, onBack);
 
-            var catalog = LotdUiKit.CreateMenuPanel(root, "Catalog",
+            var catalog = PackShopStyle.Panel(root, "Catalog",
                 new Vector2(.025f, .083f), new Vector2(.425f, .882f));
-            var detail = LotdUiKit.CreateMenuPanel(root, "Details",
+            var detail = PackShopStyle.Panel(root, "Details",
                 new Vector2(.439f, .083f), new Vector2(.975f, .882f));
             var searchSlot = Slot("Search", catalog, .08f, .851f, .92f, .924f);
             Search = LotdUiKit.CreateInputField(searchSlot, "Input", "카드 이름·카드 번호 검색", 18);
+            Search.GetComponent<Outline>().effectColor = PackShopStyle.TextMuted;
             Search.onValueChanged.AddListener(_ => FilterCards());
             _cardCount = Label(catalog, "Count", .087f, .796f, .914f, .841f, 16,
-                TextAnchor.MiddleLeft, LotdUiKit.TextMuted);
+                TextAnchor.MiddleLeft, PackShopStyle.TextMuted);
 
             for (int i = 0; i < CardsPerPage; i++)
             {
@@ -93,12 +94,11 @@ namespace YGOPortable.UI
             }
             _previousCard = AddButton(catalog, "Previous", "이전", .08f, .074f, .28f, .14f, () => ChangeCardPage(-1));
             _nextCard = AddButton(catalog, "Next", "다음", .72f, .074f, .92f, .14f, () => ChangeCardPage(1));
-            _cardPageLabel = Label(catalog, "Page", .31f, .074f, .69f, .14f, 18, TextAnchor.MiddleCenter, LotdUiKit.TextMuted);
+            _cardPageLabel = Label(catalog, "Page", .31f, .074f, .69f, .14f, 18, TextAnchor.MiddleCenter, PackShopStyle.TextMuted);
 
             var heading = Slot("Heading", detail, .073f, .853f, .927f, .929f);
-            LotdUiKit.AddImage(heading.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelHeader, false, false);
             _cardHeading = LotdUiKit.AddFittedText(heading, "Title", "", 27, 16,
-                TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
+                TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
             var art = Slot("Art", detail, .073f, .339f, .385f, .822f);
             _preview = CompositeCardView.Create(art, "SelectedCard", true);
             _cardRarity = ShopRarityBadge.Create(detail, new Vector2(.172f, .271f), new Vector2(.286f, .324f), 17);
@@ -116,15 +116,21 @@ namespace YGOPortable.UI
                     () => ChoosePack(row));
                 _packRows[i] = button;
                 _packLabels[i] = FitButtonLabel(button);
+                _packLabels[i].alignment = TextAnchor.MiddleLeft;
+                _packLabels[i].rectTransform.anchorMin = new Vector2(.205f, 0f);
+                _packLabels[i].rectTransform.anchorMax = new Vector2(.94f, 1f);
+                var cover = LotdUiKit.AddImage(Slot("Cover", button.transform, .028f, .075f, .179f, .925f).gameObject,
+                    LotdUiKit.WhiteSprite, Color.white, false, false);
+                cover.preserveAspect = true;
+                _packCovers[i] = cover;
             }
             _previousPack = AddButton(_packPane, "Previous", "이전", 0f, .1f, .276f, .19f, () => ChangePackPage(-1));
             _nextPack = AddButton(_packPane, "Next", "다음", .724f, .1f, 1f, .19f, () => ChangePackPage(1));
-            _packPageLabel = Label(_packPane, "Page", .31f, .1f, .69f, .19f, 18, TextAnchor.MiddleCenter, LotdUiKit.TextMuted);
+            _packPageLabel = Label(_packPane, "Page", .31f, .1f, .69f, .19f, 18, TextAnchor.MiddleCenter, PackShopStyle.TextMuted);
 
-            var footer = LotdUiKit.CreateBorderedPanel(root, "Footer", new Vector2(.035f, .017f),
-                new Vector2(.965f, .059f), Vector2.zero, Vector2.zero);
+            var footer = PackShopStyle.Panel(root, "Footer", new Vector2(.035f, .017f), new Vector2(.965f, .059f));
             LotdUiKit.AddFittedText(footer, "Controls", "방향키 이동   A 선택   Y 검색   LB/RB 페이지   B 뒤로",
-                16, 11, TextAnchor.MiddleCenter, LotdUiKit.TextMuted);
+                16, 11, TextAnchor.MiddleCenter, PackShopStyle.TextMuted);
             Root.SetActive(false);
         }
 
@@ -258,7 +264,11 @@ namespace YGOPortable.UI
             ShopRarityBadge.Update(_cardRarity, entry?.Code ?? 0);
             int first = _cardPage * CardsPerPage;
             for (int row = 0; row < CardsPerPage && first + row < _matches.Count; row++)
-                _cardLabels[row].color = _matches[first + row] == entry ? LotdUiKit.GoldAccent : LotdUiKit.TextPrimary;
+            {
+                Color color = _matches[first + row] == entry ? PackShopStyle.Accent : LotdUiKit.TextPrimary;
+                _cardRows[row].GetComponent<PackShopButtonLabel>().Normal = color;
+                _cardLabels[row].color = color;
+            }
             ShowPackPage();
         }
 
@@ -280,7 +290,11 @@ namespace YGOPortable.UI
                 int index = first + row;
                 bool visible = index < count;
                 _packRows[row].transform.parent.gameObject.SetActive(visible);
-                if (visible) _packLabels[row].text = _selected.Packs[index].Name;
+                if (!visible) continue;
+                var pack = _selected.Packs[index];
+                _packLabels[row].text = pack.Name;
+                _packCovers[row].sprite = PackCoverArt.Get(pack.Id, pack.FeaturedCode, pack.CardPool);
+                _packCovers[row].enabled = _packCovers[row].sprite != null;
             }
             int pages = PageCount(count, PacksPerPage);
             _packHeading.text = count == 0 ? "수록 팩" : $"수록 팩 {count:N0}개";
@@ -321,6 +335,6 @@ namespace YGOPortable.UI
 
         private static Button AddButton(Transform parent, string name, string label, float left, float bottom,
             float right, float top, Action action) =>
-            LotdUiKit.CreateLotdButton(Slot(name, parent, left, bottom, right, top), "Button", label, action, 18);
+            PackShopStyle.Button(Slot(name, parent, left, bottom, right, top), "Button", label, action, 18);
     }
 }

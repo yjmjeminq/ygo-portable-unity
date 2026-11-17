@@ -53,6 +53,7 @@ namespace YGOPortable.Core
     public static class CollectionProgress
     {
         public const int PackCost = 100;
+        public const int PackBundleSize = 10;
         public const int CardsPerPack = 8;
         public const int WinReward = 120;
         public const int LossReward = 60;
@@ -419,13 +420,27 @@ namespace YGOPortable.Core
         public static bool TryBuyPack(string id, out IReadOnlyList<uint> pulls, out string error)
         {
             pulls = Array.Empty<uint>();
+            if (!TryBuyPacks(id, 1, out var packs, out error)) return false;
+            pulls = packs[0];
+            return true;
+        }
+
+        public static bool TryBuyPacks(string id, int packCount, out IReadOnlyList<IReadOnlyList<uint>> pulls, out string error)
+        {
+            pulls = Array.Empty<IReadOnlyList<uint>>();
             if (!CanTransact(out error)) return false;
             if (!HasStarter)
             {
                 error = "먼저 스타터 덱을 선택하세요.";
                 return false;
             }
-            if (Balance < PackCost)
+            if (packCount != 1 && packCount != PackBundleSize)
+            {
+                error = $"팩은 1개 또는 {PackBundleSize}개씩 구매할 수 있습니다.";
+                return false;
+            }
+            int cost = PackCost * packCount;
+            if (Balance < cost)
             {
                 error = "DP가 부족합니다.";
                 return false;
@@ -458,24 +473,29 @@ namespace YGOPortable.Core
             }
 
             var owned = new Dictionary<uint, int>(_owned);
-            var opened = new uint[CardsPerPack];
-            for (int i = 0; i < opened.Length; i++)
+            var openedPacks = new IReadOnlyList<uint>[packCount];
+            for (int packIndex = 0; packIndex < openedPacks.Length; packIndex++)
             {
-                var available = RollPackRarity(availableGroups, PackRandom);
-                var group = available ?? RollPackRarity(packGroups, PackRandom);
-                int index = PackRandom.Next(group.Count);
-                uint code = group[index];
-                opened[i] = code;
-                if (available == null) continue;
+                var opened = new uint[CardsPerPack];
+                for (int cardIndex = 0; cardIndex < opened.Length; cardIndex++)
+                {
+                    var available = RollPackRarity(availableGroups, PackRandom);
+                    var group = available ?? RollPackRarity(packGroups, PackRandom);
+                    int index = PackRandom.Next(group.Count);
+                    uint code = group[index];
+                    opened[cardIndex] = code;
+                    if (available == null) continue;
 
-                owned.TryGetValue(code, out int count);
-                owned[code] = ++count;
-                if (count >= GetDeckCopyLimit(code))
-                    available.RemoveAt(index);
+                    owned.TryGetValue(code, out int count);
+                    owned[code] = ++count;
+                    if (count >= GetDeckCopyLimit(code))
+                        available.RemoveAt(index);
+                }
+                openedPacks[packIndex] = Array.AsReadOnly(opened);
             }
 
-            if (!Write(WithBalance(Balance - PackCost), owned, out error)) return false;
-            pulls = Array.AsReadOnly(opened);
+            if (!Write(WithBalance(Balance - cost), owned, out error)) return false;
+            pulls = Array.AsReadOnly(openedPacks);
             return true;
         }
 
