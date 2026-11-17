@@ -48,6 +48,15 @@ namespace YGOPortable.Editor
                 original.activatable.Any(card => card.code == PotOfDesires),
                 "The native fixture did not offer both a summon and an activation.");
             ui.Expect(cards.Where(card => card.code != BlueEyes).Select(card => card.sequence));
+            var handRow = ui.Field.Root.transform.Find("PlayerHand");
+            var actionBar = ui.Field.Root.transform.Find("HandActions");
+            handRow.GetChild((int)cards.First(card => card.code == PotOfDesires).sequence)
+                .GetComponent<CardDragTrigger>().OnPointerEnterAction.Invoke();
+            Require(actionBar.gameObject.activeSelf && actionBar.Find("ACTION/Button/Icon") != null &&
+                actionBar.Find("SET/Button/Icon") != null, "A playable spell did not show activation and set icons.");
+            handRow.GetChild((int)cards.First(card => card.code == BlueEyes).sequence)
+                .GetComponent<CardDragTrigger>().OnPointerEnterAction.Invoke();
+            Require(!actionBar.gameObject.activeSelf, "The action row showed commands for an unplayable card.");
 
             // Inject a command snapshot to distinguish two physical copies with the same code.
             uint availableCopy = duplicateSlots[1];

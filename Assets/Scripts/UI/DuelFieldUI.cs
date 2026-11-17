@@ -254,6 +254,8 @@ namespace YGOPortable.UI
             _preferredAttackTargetSeq = -1;
             _dragHighlightMZone = _dragHighlightSZone = _dragHighlightAttack = false;
             ResetDuelPad();
+            _pointerHandActionCard = null;
+            HideHandActions();
             CloseActionPopup();
             CloseDuelLog();
             _modals.CloseZoneViewer();
@@ -329,6 +331,7 @@ namespace YGOPortable.UI
             BuildLeftPanel(root);
             BuildTopHud(root);
             BuildBottomHudAndHands(root);
+            BuildHandActions(root);
             BuildActionPopup(root);
             BuildCardZoomModal(root);
             BuildDuelLog(root);
@@ -872,6 +875,7 @@ namespace YGOPortable.UI
             RefreshHand(theirs.hand, opponent, true);
             RefreshLogFeed();
             RefreshDuelPadCursor(layoutChanged: true);
+            RefreshHandActions();
         }
 
         private void OpenPhasePicker()
@@ -1036,7 +1040,11 @@ namespace YGOPortable.UI
             {
                 var view = views[i];
                 bool visible = i < cards.Count && cards[i] != null && view.PendingArrival == null;
-                if (!visible) ClearPointerCard((RectTransform)view.Card.transform);
+                if (!visible)
+                {
+                    ClearPointerCard((RectTransform)view.Card.transform);
+                    if (view == _pointerHandActionCard) _pointerHandActionCard = null;
+                }
                 bool wasVisible = view.Rect.gameObject.activeSelf;
                 view.Rect.gameObject.SetActive(visible);
                 if (!visible)
@@ -1063,13 +1071,21 @@ namespace YGOPortable.UI
                 trigger.IndexGetter = actionable ? () => (int)sequence : null;
                 var art = (RectTransform)view.Card.transform;
                 RefreshPointerCard(art, card.code);
-                trigger.OnPointerEnterAction = () => TrackPointerCard(art, card.code);
-                trigger.OnPointerExitAction = () => ClearPointerCard(art);
+                trigger.OnPointerEnterAction = () =>
+                {
+                    TrackPointerCard(art, card.code);
+                    PointAtHandActions(view);
+                };
+                trigger.OnPointerExitAction = () =>
+                {
+                    ClearPointerCard(art);
+                    LeaveHandActions(view);
+                };
                 trigger.OnRightClick = () => InspectCard(card.code);
                 trigger.OnLeftClick = () =>
                 {
                     InspectCard(card.code);
-                    ShowCardActionsPopup(controller, YgoConstants.LOCATION_HAND, sequence, card.code, card.overlayCodes);
+                    PointAtHandActions(view);
                 };
             }
             UpdateHandDepth(views, opponent ? null : _raisedCard);
@@ -1957,6 +1973,7 @@ namespace YGOPortable.UI
             UpdateDuelPad();
             if (_session != session || !Root.activeSelf) return;
             RefreshHandGlows();
+            RefreshHandActions();
             if (_phasePicker.activeSelf && (!CanAcceptPlayerAction ||
                 Input.GetKeyDown(KeyCode.Escape) || Input.GetMouseButtonDown(1)))
             {

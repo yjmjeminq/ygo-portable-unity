@@ -76,6 +76,11 @@ namespace YGOPortable.Editor
                 var pointer = new PointerEventData(events);
                 Vector2 hitPosition = mouseCard.anchoredPosition;
                 ExecuteEvents.Execute(mouseCard.gameObject, pointer, ExecuteEvents.pointerEnterHandler);
+                var handActions = (RectTransform)field.Root.transform.Find("HandActions");
+                Require(handActions.gameObject.activeSelf && handActions.Find("SUMMON/Button/Icon").GetComponent<Image>().sprite != null &&
+                    handActions.Find("SETMONST/Button/Icon").GetComponent<Image>().sprite != null &&
+                    handActions.TransformPoint(Vector3.zero).y > mouseCard.TransformPoint(Vector3.up * mouseCard.rect.yMax).y &&
+                    ReferenceEquals(idle, session.ActivePrompt), "Hovering a monster did not show its legal hand actions above the card.");
                 Invoke(field, "AdvanceDuelPadCardMotions", .06f);
                 Require(mouseCard.anchoredPosition == hitPosition && mouseCard.localScale == Vector3.one &&
                     mouseArt.anchoredPosition.y > 0f,
@@ -90,6 +95,8 @@ namespace YGOPortable.Editor
                 mine.hand[0].code = originalHoveredCode;
                 field.Refresh();
                 ExecuteEvents.Execute(mouseCard.gameObject, pointer, ExecuteEvents.pointerExitHandler);
+                typeof(DuelFieldUI).GetField("_pointerHandActionLeftAt", Private).SetValue(field, float.NegativeInfinity);
+                Invoke(field, "RefreshHandActions");
                 Invoke(field, "AdvanceDuelPadCardMotions", .5f);
                 Require(mouseArt.anchoredPosition == Vector2.zero && mouseArt.localScale == Vector3.one,
                     "Leaving a hovered card did not settle the artwork.");
@@ -151,15 +158,26 @@ namespace YGOPortable.Editor
                 Pad(field, LeftShoulder);
                 var commandCard = Get<RectTransform>(field, "_duelPadFocus");
                 var commandCardArt = (RectTransform)commandCard.GetComponentInChildren<CompositeCardView>().transform;
+                Require(handActions.gameObject.activeSelf && !Get<GameObject>(field, "_actionPopup").activeSelf,
+                    "Focusing a hand card with the controller did not show the action icons.");
+                var summonIcon = handActions.Find("SUMMON/Button").gameObject;
+                var setIcon = handActions.Find("SETMONST/Button").gameObject;
                 Pad(field, A);
-                Require(Get<GameObject>(field, "_actionPopup").activeSelf && ReferenceEquals(idle, session.ActivePrompt),
-                    "Opening command choices should not submit an action.");
+                Require(events.currentSelectedGameObject == summonIcon && ReferenceEquals(idle, session.ActivePrompt),
+                    "Opening hand action choices submitted a command or selected the wrong icon.");
+                Pad(field, direction: Vector2Int.right);
+                Require(events.currentSelectedGameObject == setIcon, "The controller did not move to the Set icon.");
+                Pad(field, B);
+                Require(events.currentSelectedGameObject == commandCard.gameObject && ReferenceEquals(idle, session.ActivePrompt),
+                    "Cancel did not return from the icon row to its card.");
+                Pad(field, A);
                 Invoke(field, "AdvanceDuelPadCardMotions", .12f);
-                Require(commandCardArt.anchoredPosition.y > 0f &&
-                    events.currentSelectedGameObject.transform.IsChildOf(field.Root.transform.Find("CardCommands")),
-                    "Opening the commands detached the active card from its new input focus.");
-                Pad(field, A);
-                Require(session.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_PLACE,
+                Require(commandCardArt.anchoredPosition.y > 0f && events.currentSelectedGameObject == summonIcon,
+                    "Focusing a hand action did not keep the card raised.");
+                if (playerFirst) Pad(field, A);
+                else ExecuteEvents.Execute(summonIcon,
+                    new PointerEventData(events) { button = PointerEventData.InputButton.Left }, ExecuteEvents.pointerClickHandler);
+                Require(session.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_PLACE && !handActions.gameObject.activeSelf,
                     "Confirming the first hand command did not reach legal placement.");
                 Pad(field, direction: Vector2Int.right);
                 var placement = Get<RectTransform>(field, "_duelPadFocus");
