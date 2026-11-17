@@ -17,6 +17,7 @@ namespace YGOPortable.UI
         private readonly Dictionary<RectTransform, StackTileView> _stackTilesByRect = new();
         private readonly Vector3[] _cardActionCorners = new Vector3[4];
         private RectTransform _cardActionsBar;
+        private RectTransform _cardActionsHoverArea;
         private RectTransform _pointerActionAnchor;
         private float _pointerActionLeftAt;
         private RectTransform _cardActionAnchor;
@@ -30,6 +31,8 @@ namespace YGOPortable.UI
             _cardActionsBar = LotdUiKit.CreateRect("CardActions", root, new Vector2(.5f, .5f),
                 new Vector2(.5f, .5f), Vector2.zero, Vector2.zero);
             _cardActionsBar.pivot = new Vector2(.5f, 0f);
+            _cardActionsHoverArea = LotdUiKit.FillRect("HoverArea", _cardActionsBar);
+            LotdUiKit.AddImage(_cardActionsHoverArea.gameObject, LotdUiKit.WhiteSprite, Color.clear);
             _cardActionsBar.gameObject.SetActive(false);
         }
 
@@ -57,7 +60,7 @@ namespace YGOPortable.UI
             if (!_cardActionsBar.gameObject.activeSelf) return false;
             var canvas = _cardActionsBar.GetComponentInParent<Canvas>();
             var camera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
-            return RectTransformUtility.RectangleContainsScreenPoint(_cardActionsBar, Input.mousePosition, camera);
+            return RectTransformUtility.RectangleContainsScreenPoint(_cardActionsHoverArea, Input.mousePosition, camera);
         }
 
         private (LiveCardState card, RectTransform art) FindCardActionSource(RectTransform anchor)
@@ -170,7 +173,7 @@ namespace YGOPortable.UI
 
         private void ClearCardActionButtons(int count)
         {
-            for (int i = _cardActionsBar.childCount - 1; i >= 0; i--)
+            for (int i = _cardActionsBar.childCount - 1; i > 0; i--)
             {
                 var old = _cardActionsBar.GetChild(i);
                 old.gameObject.SetActive(false);
@@ -274,6 +277,10 @@ namespace YGOPortable.UI
             float inset = _cardActionsBar.sizeDelta.x * .5f + 8f;
             float y = Mathf.Min(root.rect.yMax - CardActionHeight - 8f, top + (inHand ? 20f : 6f));
             _cardActionsBar.anchoredPosition = new Vector2(Mathf.Clamp(x, root.rect.xMin + inset, root.rect.xMax - inset), y);
+
+            // Keep pointer travel from the card to the controls above cards behind the toolbar.
+            float topEdge = root.InverseTransformPoint(anchor.TransformPoint(new Vector2(anchor.rect.center.x, anchor.rect.yMax))).y;
+            _cardActionsHoverArea.offsetMin = new Vector2(0f, Mathf.Min(0f, topEdge - y));
         }
 
         private void HideCardActions()

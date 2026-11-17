@@ -66,7 +66,10 @@ namespace YGOPortable.Editor
 
                 int activate = prompt.activatable.FindIndex(card => card.code == PotOfDesires);
                 Require(activate >= 0, "The deterministic Pot of Desires fixture is missing its activation.");
-                duel.SubmitResponseInt((activate << 16) | 5);
+                if (player == duel.HumanPlayerIndex)
+                    ui.ActivateHandCardOverBoard(prompt.activatable[activate]);
+                else
+                    duel.SubmitResponseInt((activate << 16) | 5);
                 prompt = ReachMainPhase(duel, player);
                 var resolved = duel.Players[player];
                 Require(resolved.grave.Any(card => card.code == PotOfDesires) &&
@@ -339,6 +342,41 @@ namespace YGOPortable.Editor
                 return (RectTransform)slot.GetType().GetField("root").GetValue(slot);
             }
 
+            internal void ActivateHandCardOverBoard(SelectableCardItem card)
+            {
+                Field.Refresh();
+                var hand = Field.Root.transform.Find("PlayerHand");
+                var source = hand.GetComponentsInChildren<CardDragTrigger>()
+                    .Single(trigger => trigger.IndexGetter?.Invoke() == (int)card.sequence);
+                var pointer = new PointerEventData(EventSystem.current);
+                ExecuteEvents.Execute(source.gameObject, pointer, ExecuteEvents.pointerEnterHandler);
+
+                var bar = (RectTransform)Field.Root.transform.Find("CardActions");
+                var hoverArea = (RectTransform)bar.Find("HoverArea");
+                var activate = (RectTransform)bar.Find("ACTION/Circle/Button");
+                Require(bar.gameObject.activeInHierarchy && activate != null, "The hovered hand card had no activation icon.");
+                var behind = LotdUiKit.FillRect("CardBehindActions", bar.parent);
+                behind.SetSiblingIndex(bar.GetSiblingIndex());
+                LotdUiKit.AddImage(behind.gameObject, LotdUiKit.WhiteSprite, Color.white);
+                try
+                {
+                    Canvas.ForceUpdateCanvases();
+                    float inGap = hoverArea.offsetMin.y * .5f;
+                    Require(inGap < -1f, "The activation icon is too close to the hand card for this fixture.");
+                    Vector2 gapPoint = RectTransformUtility.WorldToScreenPoint(_camera, bar.TransformPoint(new Vector2(0f, inGap)));
+                    Vector2 betweenActions = RectTransformUtility.WorldToScreenPoint(_camera, bar.TransformPoint(new Vector2(0f, 44f)));
+                    Require(Raycast(gapPoint, out _) == hoverArea.gameObject &&
+                        Raycast(betweenActions, out _) == hoverArea.gameObject,
+                        "A card behind the action toolbar intercepted the pointer.");
+                    ClickAt(activate);
+                }
+                finally
+                {
+                    UnityEngine.Object.DestroyImmediate(behind.gameObject);
+                }
+            }
+
+
             internal void SummonFromPileShortcut(DuelPrompt prompt)
             {
                 var extra = StackRoot("_myExtraTile");
@@ -465,6 +503,11 @@ namespace YGOPortable.Editor
             {
                 Canvas.ForceUpdateCanvases();
                 Vector2 point = RectTransformUtility.WorldToScreenPoint(_camera, target.TransformPoint(target.rect.center));
+                return Raycast(point, out pointer);
+            }
+
+            private GameObject Raycast(Vector2 point, out PointerEventData pointer)
+            {
                 pointer = new PointerEventData(EventSystem.current)
                 {
                     position = point,
