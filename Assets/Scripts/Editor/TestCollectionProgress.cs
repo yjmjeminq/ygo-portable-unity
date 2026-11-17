@@ -33,8 +33,8 @@ namespace YGOPortable.Editor
                 "A starter pack was missing, duplicated, or had an illegal deck size.");
             var selection = starters.First(option => option.Name.Contains("상검"));
             Require(CollectionProgress.TryChooseStarter(selection.Id, out var starter, out string error), error);
-            Require(CollectionProgress.Balance == CollectionProgress.StartingBalance &&
-                CollectionProgress.CanUseDeck(starter, out _) && !CollectionProgress.TryChooseStarter(selection.Id, out _, out _),
+            Require(!CollectionProgress.TryChooseStarter(selection.Id, out _, out _) &&
+                CollectionProgress.CanUseDeck(starter, out _) && CollectionProgress.Balance == 20_000,
                 "Starter selection did not grant the deck and starting DP exactly once.");
 
             VerifySaveSync(save, starter);
@@ -107,13 +107,14 @@ namespace YGOPortable.Editor
 
             string json = File.ReadAllText(profile);
             json = Regex.Replace(json, "\"version\"\\s*:\\s*\\d+", "\"version\": 3");
+            json = Regex.Replace(json, "\"balance\"\\s*:\\s*\\d+", "\"balance\": 3000");
             json = Regex.Replace(json, "\"craftDust\"\\s*:\\s*\"[^\"]*\",\\s*", "");
             for (int i = 0; i < materials.Length; i++)
                 json = WithOwnership(json, materials[i], i == (int)CardRarity.UltraRare ? 15 : 3);
             foreach (uint code in DrawSpells) json = WithOwnership(json, code, 4);
             File.WriteAllText(profile, json);
             CollectionProgress.Load(save);
-            Require(CollectionProgress.HasStarter && CollectionProgress.Balance == CollectionProgress.StartingBalance &&
+            Require(CollectionProgress.HasStarter && CollectionProgress.Balance == 3000 &&
                 CollectionProgress.CraftDust == 0 &&
                 CollectionProgress.GetOwnedCount(materials[(int)CardRarity.UltraRare]) == 15 &&
                 DrawSpells.All(code => CollectionProgress.GetOwnedCount(code) == 4),
@@ -137,6 +138,7 @@ namespace YGOPortable.Editor
 
         private static void VerifyCrafting(uint[] materials, UserDeck starter, string profile)
         {
+            int balanceBeforeCrafting = CollectionProgress.Balance;
             uint normal = materials[(int)CardRarity.Normal];
             uint rare = materials[(int)CardRarity.Rare];
             uint super = materials[(int)CardRarity.SuperRare];
@@ -179,7 +181,7 @@ namespace YGOPortable.Editor
             Require(CollectionProgress.TryCraftCard(normal, 5, out error) &&
                 CollectionProgress.GetOwnedCount(normal) == 5 && CollectionProgress.CraftDust == 0, error);
             Require(!CollectionProgress.TryCraftCard(AshBlossom, 1, out _) &&
-                CollectionProgress.Balance == CollectionProgress.StartingBalance &&
+                CollectionProgress.Balance == balanceBeforeCrafting &&
                 !File.ReadAllText(profile).Contains("\"craftPoints\""),
                 "Crafting changed DP, accepted an overspend, or saved the old rarity balances.");
         }

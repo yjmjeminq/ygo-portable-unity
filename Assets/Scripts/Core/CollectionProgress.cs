@@ -58,7 +58,7 @@ namespace YGOPortable.Core
         public const int CardsPerPack = 8;
         public const int WinReward = 120;
         public const int LossReward = 60;
-        public const int StartingBalance = 3000;
+        public const int StartingBalance = 20_000;
         public const int DisassemblyDustPerCard = 10;
         public const int DeckCopyLimit = 3;
 
