@@ -36,6 +36,6 @@ cmake -S "$engine_dir" -B "$build_dir" -G 'Unix Makefiles' \
 cmake --build "$build_dir" --target ygoengine --parallel "$(sysctl -n hw.logicalcpu)"
 
 archive="$build_dir/libygo_native.a"
-xcrun lipo -verify_arch arm64 "$archive"
+xcrun lipo "$archive" -verify_arch arm64
 mkdir -p "$plugin_dir"
 install -m 644 "$archive" "$plugin_dir/libygo_native.a"
