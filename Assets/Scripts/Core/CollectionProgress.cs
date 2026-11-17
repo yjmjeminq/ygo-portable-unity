@@ -57,9 +57,11 @@ namespace YGOPortable.Core
         public const int LossReward = 60;
         public const int StartingBalance = 300;
 
-        private const int ProfileVersion = 1;
+        private const int ProfileVersion = 2;
         private const int GenericPackSize = 160;
         private const string ProfileFileName = "collection-profile.json";
+        private const int FirstOpponentId = 99;
+        private const int SecondOpponentId = 81;
 
         [Serializable]
         private struct CardCopies
@@ -76,6 +78,8 @@ namespace YGOPortable.Core
             public string starterId;
             public UserDeck starterDeck;
             public List<CardCopies> cards;
+            public List<int> unlockedOpponentIds;
+            public List<int> clearedOpponentIds;
         }
 
         private static readonly (string id, string name, int preset)[] StarterPresets =
@@ -105,6 +109,7 @@ namespace YGOPortable.Core
         private static Dictionary<uint, int> _owned = new Dictionary<uint, int>();
         private static IReadOnlyList<CollectionStarter> _starters;
         private static IReadOnlyList<CollectionPack> _packs;
+        private static IReadOnlyList<OpponentCharacter> _opponents;
 
         public static bool Initialized => _profilePath != null;
         public static bool HasStarter => _profile?.starterDeck != null;
@@ -112,12 +117,20 @@ namespace YGOPortable.Core
         public static string LoadError { get; private set; } = "";
         public static IReadOnlyList<CollectionStarter> Starters => _starters ??= BuildStarters();
         public static IReadOnlyList<CollectionPack> Packs => _packs ??= BuildPacks();
+        public static int OpponentCount => OpponentOrder.Count;
+        public static int UnlockedOpponentCount => OpponentOrder.Count(opponent => IsOpponentUnlocked(opponent.id));
+        internal static IReadOnlyList<OpponentCharacter> UnlockedOpponents =>
+            OpponentOrder.Where(opponent => IsOpponentUnlocked(opponent.id)).ToArray();
+
+        private static IReadOnlyList<OpponentCharacter> OpponentOrder =>
+            Initialized ? _opponents ??= BuildOpponentOrder() : BuildOpponentOrder();
 
         public static void Load(string persistentDataPath)
         {
             _profilePath = Path.Combine(persistentDataPath, ProfileFileName);
             _starters = null;
             _packs = null;
+            _opponents = null;
             _profile = null;
             _savedJson = null;
             _owned = new Dictionary<uint, int>();
@@ -128,7 +141,8 @@ namespace YGOPortable.Core
                 string json = ReadProfileJson();
                 if (json == null) return;
                 var saved = JsonUtility.FromJson<SavedProfile>(json);
-                if (saved == null || saved.version != ProfileVersion || saved.balance < 0 || saved.cards == null ||
+                if (saved == null || saved.version < 1 || saved.version > ProfileVersion || saved.balance < 0 ||
+                    saved.cards == null ||
                     !IsStarterId(saved.starterId) || saved.starterDeck == null ||
                     saved.starterDeck.id != "collection_" + saved.starterId ||
                     saved.starterDeck.main == null || saved.starterDeck.extra == null || saved.starterDeck.side == null)
@@ -141,6 +155,7 @@ namespace YGOPortable.Core
                         throw new InvalidDataException("Invalid card ownership entry.");
                     owned.Add(entry.code, entry.count);
                 }
+                InitializeOpponentProgress(saved);
                 _profile = saved;
                 _owned = owned;
                 _savedJson = json;
@@ -157,6 +172,16 @@ namespace YGOPortable.Core
         }
 
         public static int GetOwnedCount(uint code) => _owned.TryGetValue(code, out int copies) ? copies : 0;
+
+        public static bool IsOpponentUnlocked(int id)
+        {
+            if (!Initialized) return true;
+            if (_profile != null) return _profile.unlockedOpponentIds.Contains(id);
+            var first = OpponentOrder.FirstOrDefault();
+            return first != null && first.id == id;
+        }
+
+        public static bool IsOpponentCleared(int id) => _profile?.clearedOpponentIds.Contains(id) == true;
 
         public static uint GetDeckCopyKey(uint code)
         {
@@ -215,6 +240,7 @@ namespace YGOPortable.Core
                 starterDeck = selected,
                 balance = StartingBalance,
             };
+            InitializeOpponentProgress(next);
             if (!Write(next, owned, out error)) return false;
             deck = CopyDeck(selected);
             return true;
@@ -271,19 +297,43 @@ namespace YGOPortable.Core
             return true;
         }
 
-        public static bool TryAwardDuel(bool won, out int amount, out string error)
+        public static bool TryAwardDuel(bool won, out int amount, out string error) =>
+            TryAwardDuel(won, -1, out amount, out _, out error);
+
+        public static bool TryAwardDuel(bool won, int opponentId, out int amount, out OpponentCharacter unlockedOpponent,
+            out string error)
         {
             amount = 0;
+            unlockedOpponent = null;
             if (!CanTransact(out error)) return false;
             if (!HasStarter)
             {
                 error = "먼저 스타터 덱을 선택하세요.";
                 return false;
             }
+            if (opponentId >= 0 && !IsOpponentUnlocked(opponentId))
+            {
+                error = "아직 해금하지 않은 상대입니다.";
+                return false;
+            }
+
             int reward = Math.Min(int.MaxValue - Balance, won ? WinReward : LossReward);
-            if (reward == 0) return true;
-            if (!Write(WithBalance(Balance + reward), _owned, out error)) return false;
+            bool firstWin = won && opponentId >= 0 && !IsOpponentCleared(opponentId);
+            if (reward == 0 && !firstWin) return true;
+
+            var next = WithBalance(Balance + reward);
+            OpponentCharacter newlyUnlocked = null;
+            if (firstWin)
+            {
+                next.clearedOpponentIds = new List<int>(_profile.clearedOpponentIds) { opponentId };
+                newlyUnlocked = OpponentOrder.FirstOrDefault(opponent => !IsOpponentUnlocked(opponent.id));
+                if (newlyUnlocked != null)
+                    next.unlockedOpponentIds = new List<int>(_profile.unlockedOpponentIds) { newlyUnlocked.id };
+            }
+
+            if (!Write(next, _owned, out error)) return false;
             amount = reward;
+            unlockedOpponent = newlyUnlocked;
             return true;
         }
 
@@ -311,7 +361,31 @@ namespace YGOPortable.Core
             starterId = _profile.starterId,
             starterDeck = _profile.starterDeck,
             balance = balance,
+            unlockedOpponentIds = _profile.unlockedOpponentIds,
+            clearedOpponentIds = _profile.clearedOpponentIds,
         };
+
+        private static IReadOnlyList<OpponentCharacter> BuildOpponentOrder() => DeckRepository.Characters
+            .Where(opponent => DeckRepository.GetDecksForCharacter(opponent.id).Any(deck =>
+                deck.main?.Length >= 40 && deck.main.Length <= 60 &&
+                (deck.extra?.Length ?? 0) <= 15 && (deck.side?.Length ?? 0) <= 15))
+            .OrderBy(opponent => opponent.id == FirstOpponentId ? 0 : opponent.id == SecondOpponentId ? 1 : 2)
+            .ThenBy(opponent => opponent.seriesIdx)
+            .ToArray();
+
+        private static void InitializeOpponentProgress(SavedProfile profile)
+        {
+            profile.clearedOpponentIds ??= new List<int>();
+            profile.unlockedOpponentIds ??= new List<int>();
+            if (OpponentOrder.Any(opponent => profile.unlockedOpponentIds.Contains(opponent.id) &&
+                                             !profile.clearedOpponentIds.Contains(opponent.id)))
+                return;
+
+            // A fresh profile has no opponent history. This also keeps progression
+            // available if the roster is extended or the last active opponent is removed.
+            var next = OpponentOrder.FirstOrDefault(opponent => !profile.unlockedOpponentIds.Contains(opponent.id));
+            if (next != null) profile.unlockedOpponentIds.Add(next.id);
+        }
 
         private static bool Write(SavedProfile next, Dictionary<uint, int> owned, out string error)
         {

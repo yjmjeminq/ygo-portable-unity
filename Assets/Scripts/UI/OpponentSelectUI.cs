@@ -48,6 +48,7 @@ namespace YGOPortable.UI
         private CompositeCardView _sigCardPreview;
         private Text _myDeckLabel;
         private Text _pageLabel;
+        private Text _unlockProgress;
         private Text _diffLabel;
         private Text _statusToast;
 
@@ -64,6 +65,7 @@ namespace YGOPortable.UI
         public OpponentSelectUI(GameAppController app, Transform canvasParent)
         {
             _app = app;
+            _seriesFilter = CollectionProgress.Initialized ? -1 : 0;
             BuildOpponentScreen(canvasParent);
             BuildJankenOverlay(canvasParent);
         }
@@ -102,6 +104,11 @@ namespace YGOPortable.UI
             var bg = LotdUiKit.FillRect("Bg", rt);
             LotdUiKit.AddImage(bg.gameObject, LotdUiKit.LoadSprite("LOTD/Background/bg_vrains"), Color.white, false, false);
             LotdUiKit.AddMenuHeader(rt, "프리 듀얼");
+            var progress = LotdUiKit.CreateBorderedPanel(rt, "UnlockProgress",
+                new Vector2(0.02f, 0.918f), new Vector2(0.232f, 0.980f), Vector2.zero, Vector2.zero);
+            _unlockProgress = LotdUiKit.AddFittedText(progress, "Value", "", 16, 12,
+                TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
+            progress.gameObject.SetActive(false);
             var backRt = LotdUiKit.CreateRect("Back", rt, new Vector2(0.858f, 0.922f), new Vector2(0.981f, 0.977f),
                 Vector2.zero, Vector2.zero);
             LotdUiKit.CreateLotdButton(backRt, "B", "메인 메뉴", () => _app.ShowScreen(AppScreen.MainMenu), 16);
@@ -265,6 +272,14 @@ namespace YGOPortable.UI
                     LotdUiKit.AddImage(lblBg.gameObject, LotdUiKit.WhiteSprite, new Color(0.02f, 0.06f, 0.14f, 0.88f), false, false);
                     LotdUiKit.AddFittedText(lblBg, "Nm", "", 14, 9, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
 
+                    var cleared = LotdUiKit.CreateBorderedPanel(slot, "Cleared",
+                        new Vector2(0.66f, 0.79f), new Vector2(0.95f, 0.94f), Vector2.zero, Vector2.zero,
+                        new Color(0.02f, 0.07f, 0.10f, 0.92f), LotdUiKit.GoldAccent);
+                    cleared.GetComponent<Image>().raycastTarget = false;
+                    LotdUiKit.AddFittedText(cleared, "Label", "승리", 13, 9,
+                        TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
+                    cleared.gameObject.SetActive(false);
+
                     var btn = slot.gameObject.AddComponent<Button>();
                     btn.targetGraphic = bgImg;
                     _gridSlots.Add(slot.gameObject);
@@ -275,9 +290,25 @@ namespace YGOPortable.UI
         private void ApplyFilter()
         {
             _filteredChars.Clear();
+            bool trackUnlocks = CollectionProgress.Initialized;
+            IEnumerable<OpponentCharacter> opponents = trackUnlocks
+                ? CollectionProgress.UnlockedOpponents : DeckRepository.Characters;
+            var openSeries = trackUnlocks ? new HashSet<int>(opponents.Select(c => c.seriesIdx)) : null;
+            if (trackUnlocks && _seriesFilter != -1 && !openSeries.Contains(_seriesFilter))
+                _seriesFilter = -1;
+
+            _unlockProgress.transform.parent.gameObject.SetActive(trackUnlocks);
+            if (trackUnlocks)
+            {
+                int unlocked = CollectionProgress.UnlockedOpponentCount;
+                int total = CollectionProgress.OpponentCount;
+                _unlockProgress.text = $"해금한 상대 {unlocked:N0} / {total:N0}명";
+                if (unlocked < total) _unlockProgress.text += "\n새 상대에게 처음 이기면 한 명 해금";
+            }
+
             string query = NormalizeSearch(_searchQuery);
             OpponentCharacter deckMatch = null;
-            foreach (var c in DeckRepository.Characters)
+            foreach (var c in opponents)
             {
                 if (_seriesFilter != -1 && c.seriesIdx != _seriesFilter) continue;
                 var decks = DeckRepository.GetDecksForCharacter(c.id);
@@ -295,6 +326,10 @@ namespace YGOPortable.UI
 
             foreach (var kv in _tabButtons)
             {
+                bool available = !trackUnlocks || kv.Key == -1 || openSeries.Contains(kv.Key);
+                kv.Value.interactable = available;
+                kv.Value.GetComponentInChildren<Text>().color = available ? LotdUiKit.TextPrimary : LotdUiKit.TextMuted;
+                if (trackUnlocks) kv.Value.targetGraphic.color = available ? Color.white : new Color(.52f, .61f, .72f, .76f);
                 var ol = kv.Value.GetComponent<Outline>();
                 if (ol == null) ol = kv.Value.gameObject.AddComponent<Outline>();
                 ol.effectColor = kv.Key == _seriesFilter ? LotdUiKit.GoldAccent : new Color(0, 0, 0, 0);
@@ -343,6 +378,8 @@ namespace YGOPortable.UI
                 slot.GetComponent<Image>().sprite = frame ?? LotdUiKit.WhiteSprite;
                 slot.transform.Find("Portrait").GetComponent<Image>().sprite = LotdUiKit.LoadOpponentPortrait(c);
                 slot.transform.Find("NameBg/Nm").GetComponent<Text>().text = c.name;
+                slot.transform.Find("Cleared").gameObject.SetActive(CollectionProgress.Initialized &&
+                    CollectionProgress.IsOpponentCleared(c.id));
 
                 var btn = slot.GetComponent<Button>();
                 btn.onClick.RemoveAllListeners();
@@ -457,6 +494,7 @@ namespace YGOPortable.UI
         private void OpenJanken()
         {
             if (_selectedChar == null || _charDecks.Count == 0 || DeckRepository.UserDecks.Count == 0) return;
+            if (CollectionProgress.Initialized && !CollectionProgress.IsOpponentUnlocked(_selectedChar.id)) return;
             var myDeck = DeckRepository.UserDecks[_myDeckIdx];
             if (!GameAppController.CanStartWithDeck(myDeck, out string reason))
             {

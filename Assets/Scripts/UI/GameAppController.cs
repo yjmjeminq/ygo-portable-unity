@@ -282,6 +282,13 @@ namespace YGOPortable.UI
 
         public void StartDuelMatch(OpponentCharacter oppChar, PresetDeckInfo oppDeck, UserDeck myDeck, bool playerGoesFirst)
         {
+            if (oppChar == null || oppDeck == null || oppDeck.charId != oppChar.id ||
+                !CollectionProgress.IsOpponentUnlocked(oppChar.id))
+            {
+                ShowScreen(AppScreen.OpponentSelect);
+                _oppSelect.ShowStatus("해금된 상대와 덱을 선택하세요.", true);
+                return;
+            }
             if (!CanStartWithDeck(myDeck, out string reason))
             {
                 ShowScreen(AppScreen.OpponentSelect);
@@ -354,10 +361,12 @@ namespace YGOPortable.UI
                     _duelField.Refresh();
                     bool won = _session.Winner == _session.HumanPlayerIndex;
                     bool draw = _session.Winner == 2;
+                    OpponentCharacter unlockedOpponent = null;
                     string rewardText = "";
                     if (_session.Winner >= 0 && CollectionProgress.HasStarter)
                     {
-                        rewardText = CollectionProgress.TryAwardDuel(won, out int reward, out string error)
+                        rewardText = CollectionProgress.TryAwardDuel(won, _activeOppChar.id, out int reward,
+                            out unlockedOpponent, out string error)
                             ? $"듀얼 보상 +{reward:N0} DP  ·  보유 {CollectionProgress.Balance:N0} DP"
                             : error;
                     }
@@ -367,7 +376,7 @@ namespace YGOPortable.UI
                         Mathf.Max(0, _session.Players[_session.AiPlayerIndex].lp),
                         () => StartDuelMatch(_activeOppChar, _activeOppDeck, _activeMyDeck, _activePlayerFirst),
                         () => ShowScreen(AppScreen.OpponentSelect),
-                        () => ShowScreen(AppScreen.MainMenu), rewardText);
+                        () => ShowScreen(AppScreen.MainMenu), rewardText, unlockedOpponent);
                 }
                 return;
             }
@@ -583,7 +592,8 @@ namespace YGOPortable.UI
             ScreenCapture.CaptureScreenshot(Path.Combine(outDir, "04_deck_editor.png"));
             yield return new WaitForSeconds(0.3f);
 
-            var oppChar = DeckRepository.Characters.FirstOrDefault(c => c.isMeta2026) ?? DeckRepository.Characters.FirstOrDefault();
+            var opponents = DeckRepository.Characters.Where(character => CollectionProgress.IsOpponentUnlocked(character.id));
+            var oppChar = opponents.FirstOrDefault(character => character.isMeta2026) ?? opponents.FirstOrDefault();
             var oppDeck = oppChar != null ? DeckRepository.GetDecksForCharacter(oppChar.id).FirstOrDefault() : DeckRepository.PresetDecks.FirstOrDefault();
             var myDeck = DeckRepository.UserDecks.FirstOrDefault();
             if (oppChar != null && oppDeck != null && myDeck != null)
