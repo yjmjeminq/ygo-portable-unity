@@ -13,6 +13,7 @@ namespace YGOPortable.Editor
     {
         private const string MainScene = "Assets/Scenes/Main.unity";
         private const string NativePlugin = "Assets/Plugins/iOS/libygo_native.a";
+        private const string KeychainPlugin = "Assets/Plugins/SaveSyncKeychain.mm";
 
         [MenuItem("YGO Portable/Export iOS Xcode Project")]
         public static void Export()
@@ -38,7 +39,8 @@ namespace YGOPortable.Editor
                     throw new BuildFailedException("Specify the Apple team ID, provisioning profile UUID, and signing identity together.");
             }
 
-            ConfigureNativePlugin(projectRoot);
+            ConfigureNativePlugin(projectRoot, NativePlugin);
+            ConfigureNativePlugin(projectRoot, KeychainPlugin);
             PlayerSettings.iOS.sdkVersion = iOSSdkVersion.DeviceSDK;
             if (bundleId != null)
                 PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.iOS, bundleId);
@@ -52,19 +54,23 @@ namespace YGOPortable.Editor
             if (report.summary.result != BuildResult.Succeeded)
                 throw new BuildFailedException($"iOS Xcode export {report.summary.result} ({report.summary.totalErrors} errors).");
 
-            if (teamId != null)
-                ConfigureSigning(output, teamId, profileId, identity);
+            string projectPath = PBXProject.GetPBXProjectPath(output);
+            var project = new PBXProject();
+            project.ReadFromFile(projectPath);
+            project.AddFrameworkToProject(project.GetUnityFrameworkTargetGuid(), "Security.framework", false);
+            if (teamId != null) ConfigureSigning(project, teamId, profileId, identity);
+            project.WriteToFile(projectPath);
             Debug.Log($"[iOS] Exported Xcode project to {output}");
         }
 
-        private static void ConfigureNativePlugin(string projectRoot)
+        private static void ConfigureNativePlugin(string projectRoot, string asset)
         {
-            if (!File.Exists(Path.Combine(projectRoot, NativePlugin)))
-                throw new BuildFailedException("The iOS duel engine is missing. Run bash NativeEngine/build-ios.sh before export.");
+            if (!File.Exists(Path.Combine(projectRoot, asset)))
+                throw new BuildFailedException($"Missing iOS plugin at {asset}.");
 
-            AssetDatabase.ImportAsset(NativePlugin, ImportAssetOptions.ForceSynchronousImport);
-            if (!(AssetImporter.GetAtPath(NativePlugin) is PluginImporter importer))
-                throw new BuildFailedException($"Unity could not import the iOS duel engine at {NativePlugin}.");
+            AssetDatabase.ImportAsset(asset, ImportAssetOptions.ForceSynchronousImport);
+            if (!(AssetImporter.GetAtPath(asset) is PluginImporter importer))
+                throw new BuildFailedException($"Unity could not import the iOS plugin at {asset}.");
             if (!importer.GetCompatibleWithAnyPlatform() && !importer.GetCompatibleWithEditor()
                 && importer.GetCompatibleWithPlatform(BuildTarget.iOS))
                 return;
@@ -75,12 +81,8 @@ namespace YGOPortable.Editor
             importer.SaveAndReimport();
         }
 
-        private static void ConfigureSigning(string output, string teamId, string profileId, string identity)
+        private static void ConfigureSigning(PBXProject project, string teamId, string profileId, string identity)
         {
-            string projectPath = PBXProject.GetPBXProjectPath(output);
-            var project = new PBXProject();
-            project.ReadFromFile(projectPath);
-
             string appTarget = project.GetUnityMainTargetGuid();
             project.SetBuildProperty(appTarget, "DEVELOPMENT_TEAM", teamId);
             project.SetBuildProperty(appTarget, "CODE_SIGN_STYLE", "Manual");
@@ -94,7 +96,6 @@ namespace YGOPortable.Editor
             project.SetBuildProperty(frameworkTarget, "CODE_SIGNING_ALLOWED", "NO");
             project.SetBuildProperty(frameworkTarget, "PROVISIONING_PROFILE", "");
             project.SetBuildProperty(frameworkTarget, "PROVISIONING_PROFILE_SPECIFIER", "");
-            project.WriteToFile(projectPath);
         }
 
         private static string GetOption(string[] arguments, string name)

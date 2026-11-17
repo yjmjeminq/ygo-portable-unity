@@ -14,6 +14,8 @@ namespace YGOPortable.UI
 
         private readonly GameAppController _app;
         private CanvasGroup _menuControls;
+        private CanvasGroup _titleControls;
+        private CanvasGroup _settingsControls;
         private Button _freeDuelButton;
         private Button _deckEditorButton;
         private Button _shopButton;
@@ -45,9 +47,18 @@ namespace YGOPortable.UI
             if (restoreFocus) EventSystem.current?.SetSelectedGameObject(_settingsOpenButton.gameObject);
         }
 
+        internal void SetSaveSyncOpen(bool open)
+        {
+            _titleControls.interactable = !open;
+            _settingsControls.interactable = !open;
+            _menuControls.interactable = !open && !SettingsRoot.activeSelf;
+        }
+
+        internal void RefreshWallet() => _shopBalance.text = $"보유 {CollectionProgress.Balance:N0} DP";
+
         internal void FocusMainMenu(AppScreen previousScreen)
         {
-            _shopBalance.text = $"보유 {CollectionProgress.Balance:N0} DP";
+            RefreshWallet();
             var selected = previousScreen switch
             {
                 AppScreen.CardShop => _shopButton,
@@ -61,6 +72,7 @@ namespace YGOPortable.UI
         {
             var root = LotdUiKit.FillRect("Screen_Title", parent);
             TitleRoot = root.gameObject;
+            _titleControls = TitleRoot.AddComponent<CanvasGroup>();
             AddTitleBackground(root);
 
             var logo = LotdUiKit.CreateRect("Logo", root, new Vector2(0.22f, 0.40f), new Vector2(0.78f, 0.83f),
@@ -70,6 +82,9 @@ namespace YGOPortable.UI
                 new Vector2(0.625f, 0.292f), Vector2.zero, Vector2.zero);
             MenuButtonMotion.Attach(LotdUiKit.CreateLotdButton(start, "Button", "게임 시작",
                 () => _app.ShowScreen(AppScreen.MainMenu), 25, true));
+            var cloud = LotdUiKit.CreateRect("CloudSave", root, new Vector2(.72f, .078f),
+                new Vector2(.91f, .148f), Vector2.zero, Vector2.zero);
+            LotdUiKit.CreateLotdButton(cloud, "Button", "클라우드 저장", _app.OpenSaveSync, 19);
         }
 
         private void BuildMainMenuScreen(Transform parent)
@@ -162,6 +177,7 @@ namespace YGOPortable.UI
         {
             var bg = LotdUiKit.FillRect("Overlay_Settings", parent);
             SettingsRoot = bg.gameObject;
+            _settingsControls = SettingsRoot.AddComponent<CanvasGroup>();
             LotdUiKit.AddImage(bg.gameObject, LotdUiKit.WhiteSprite, new Color(0f, 0f, 0f, 0.72f));
 
             var win = LotdUiKit.CreateMenuPanel(bg, "SettingsWin",
@@ -204,10 +220,12 @@ namespace YGOPortable.UI
                 aiLbl.text = $"AI 사고 속도: {_app.AiStepDelay:0.00}초";
             }, 15);
 
-            // Rules Info
-            var info = LotdUiKit.CreateRect("Info", win, new Vector2(0.08f, 0.22f), new Vector2(0.92f, 0.38f), Vector2.zero, Vector2.zero);
-            LotdUiKit.AddText(info, "I", "적용 룰: 신 마스터 룰 2020 (Master Rule 5)\n네트워크/멀티플레이: 완전히 비활성화됨 (100% 오프라인)",
-                15, TextAnchor.MiddleCenter, LotdUiKit.TextMuted);
+            var info = LotdUiKit.CreateRect("Rule", win, new Vector2(.08f, .22f), new Vector2(.51f, .34f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddFittedText(info, "Text", "신 마스터 룰 2020", 17, 12, TextAnchor.MiddleLeft, LotdUiKit.TextMuted);
+            var cloud = LotdUiKit.CreateRect("CloudSave", win, new Vector2(.56f, .22f), new Vector2(.92f, .34f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.CreateLotdButton(cloud, "Button", "클라우드 저장", _app.OpenSaveSync, 16);
 
             // Close & Quit
             var closeRt = LotdUiKit.CreateRect("Close", win, new Vector2(0.55f, 0.05f), new Vector2(0.92f, 0.17f), Vector2.zero, Vector2.zero);

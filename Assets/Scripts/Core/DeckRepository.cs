@@ -61,6 +61,7 @@ namespace YGOPortable.Core
         public static List<OpponentCharacter> Characters { get; private set; } = new List<OpponentCharacter>();
         public static List<PresetDeckInfo> PresetDecks { get; private set; } = new List<PresetDeckInfo>();
         public static List<UserDeck> UserDecks { get; private set; } = new List<UserDeck>();
+        internal static event Action SaveChanged;
 
         private static Dictionary<int, OpponentCharacter> _charById = new Dictionary<int, OpponentCharacter>();
         private static Dictionary<int, List<PresetDeckInfo>> _decksByChar = new Dictionary<int, List<PresetDeckInfo>>();
@@ -150,6 +151,8 @@ namespace YGOPortable.Core
             }
         }
 
+        internal static void ReloadUserDecks() => LoadUserDecks(seedDefaultDecks: false);
+
         private static void SeedDefaultUserDecks()
         {
             // Seed with representative 2026 meta & classic decks so player can duel right away
@@ -177,6 +180,7 @@ namespace YGOPortable.Core
             if (deck == null) return;
             if (string.IsNullOrEmpty(deck.id))
                 deck.id = $"deck_{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid().ToString("N").Substring(0, 4)}";
+            using var profileLock = LockUserSave();
             if (!Directory.Exists(_userDeckDir)) Directory.CreateDirectory(_userDeckDir);
             string path = Path.Combine(_userDeckDir, $"{deck.id}.json");
             string pending = Path.Combine(_userDeckDir, Path.GetRandomFileName() + ".tmp");
@@ -194,14 +198,20 @@ namespace YGOPortable.Core
             int existing = UserDecks.FindIndex(d => d.id == deck.id);
             if (existing >= 0) UserDecks[existing] = deck;
             else UserDecks.Add(deck);
+            SaveChanged?.Invoke();
         }
 
         public static void DeleteUserDeck(string deckId)
         {
+            using var profileLock = LockUserSave();
             string path = Path.Combine(_userDeckDir, $"{deckId}.json");
             File.Delete(path);
             UserDecks.RemoveAll(d => d.id == deckId);
+            SaveChanged?.Invoke();
         }
+
+        private static FileStream LockUserSave() => SaveSyncFiles.LockProfile(
+            Path.Combine(Path.GetDirectoryName(_userDeckDir), CollectionProgress.ProfileFileName));
 
         public static UserDeck ClonePresetToUserDeck(PresetDeckInfo preset, string customName = null)
         {

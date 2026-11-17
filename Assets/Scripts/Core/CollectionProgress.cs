@@ -64,7 +64,7 @@ namespace YGOPortable.Core
 
         private const int ProfileVersion = 5;
         private const int GenericPackSize = 160;
-        private const string ProfileFileName = "collection-profile.json";
+        internal const string ProfileFileName = "collection-profile.json";
         private const int FirstOpponentId = 99;
         private const int SecondOpponentId = 81;
 
@@ -126,6 +126,7 @@ namespace YGOPortable.Core
         private static IReadOnlyList<OpponentCharacter> _opponents;
 
         public static bool Initialized => _profilePath != null;
+        internal static event Action SaveChanged;
         public static bool HasStarter => _profile?.starterDeck != null;
         public static int Balance => _profile?.balance ?? 0;
         public static string LoadError { get; private set; } = "";
@@ -154,25 +155,7 @@ namespace YGOPortable.Core
                 // Reading directly distinguishes an absent profile from an inaccessible one.
                 string json = ReadProfileJson();
                 if (json == null) return;
-                var saved = JsonUtility.FromJson<SavedProfile>(json);
-                if (saved == null || saved.version < 1 || saved.version > ProfileVersion || saved.balance < 0 ||
-                    saved.cards == null ||
-                    !IsStarterId(saved.starterId) || saved.starterDeck == null ||
-                    saved.starterDeck.id != "collection_" + saved.starterId ||
-                    saved.starterDeck.main == null || saved.starterDeck.extra == null || saved.starterDeck.side == null)
-                    throw new InvalidDataException("Invalid collection profile.");
-
-                saved.craftPoints ??= new long[CardRarityCatalog.TierCount];
-                if (saved.craftPoints.Length != CardRarityCatalog.TierCount || saved.craftPoints.Any(points => points < 0))
-                    throw new InvalidDataException("Invalid craft point balances.");
-
-                var owned = new Dictionary<uint, int>(saved.cards.Count);
-                foreach (var entry in saved.cards)
-                {
-                    if (entry.code == 0 || entry.count < 1 || owned.ContainsKey(entry.code))
-                        throw new InvalidDataException("Invalid card ownership entry.");
-                    owned.Add(entry.code, entry.count);
-                }
+                var saved = ParseProfile(json, out var owned);
                 InitializeOpponentProgress(saved);
                 _profile = saved;
                 _owned = owned;
@@ -187,6 +170,30 @@ namespace YGOPortable.Core
                 LoadError = "카드 보유 정보를 불러올 수 없습니다. 기존 수집 데이터는 보존했습니다.";
                 Debug.LogWarning($"[CollectionProgress] Could not load profile: {ex.Message}");
             }
+        }
+
+        internal static void ValidateSaveProfile(string json) => ParseProfile(json, out _);
+
+        private static SavedProfile ParseProfile(string json, out Dictionary<uint, int> owned)
+        {
+            var saved = JsonUtility.FromJson<SavedProfile>(json);
+            if (saved == null || saved.version < 1 || saved.version > ProfileVersion || saved.balance < 0 ||
+                saved.cards == null || !IsStarterId(saved.starterId) || saved.starterDeck == null ||
+                saved.starterDeck.id != "collection_" + saved.starterId ||
+                saved.starterDeck.main == null || saved.starterDeck.extra == null || saved.starterDeck.side == null)
+                throw new InvalidDataException("Invalid collection profile.");
+
+            saved.craftPoints ??= new long[CardRarityCatalog.TierCount];
+            if (saved.craftPoints.Length != CardRarityCatalog.TierCount || saved.craftPoints.Any(points => points < 0))
+                throw new InvalidDataException("Invalid craft point balances.");
+
+            owned = new Dictionary<uint, int>(saved.cards.Count);
+            foreach (var entry in saved.cards)
+            {
+                if (entry.code == 0 || entry.count < 1 || !owned.TryAdd(entry.code, entry.count))
+                    throw new InvalidDataException("Invalid card ownership entry.");
+            }
+            return saved;
         }
 
         public static int GetOwnedCount(uint code) => _owned.TryGetValue(code, out int copies) ? copies : 0;
@@ -631,8 +638,7 @@ namespace YGOPortable.Core
             {
                 string directory = Path.GetDirectoryName(_profilePath);
                 Directory.CreateDirectory(directory);
-                using var profileLock = new FileStream(_profilePath + ".lock",
-                    FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+                using var profileLock = SaveSyncFiles.LockProfile(_profilePath);
                 if (!string.Equals(ReadProfileJson(), _savedJson, StringComparison.Ordinal))
                 {
                     error = "다른 게임 창에서 수집 데이터를 변경했습니다. 게임을 다시 시작해 주세요.";
@@ -665,6 +671,7 @@ namespace YGOPortable.Core
             }
             _profile = next;
             _owned = owned;
+            SaveChanged?.Invoke();
             return true;
         }
 

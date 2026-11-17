@@ -233,7 +233,8 @@ namespace YGOPortable.UI
                     OpenChoice(dropdown);
                     break;
                 case InputField field:
-                    OpenText(field);
+                    if (field.contentType == InputField.ContentType.Password) field.ActivateInputField();
+                    else OpenText(field);
                     break;
                 case Button button:
                     button.onClick.Invoke();

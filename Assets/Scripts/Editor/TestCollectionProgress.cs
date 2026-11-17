@@ -37,6 +37,7 @@ namespace YGOPortable.Editor
                 CollectionProgress.CanUseDeck(starter, out _) && !CollectionProgress.TryChooseStarter(selection.Id, out _, out _),
                 "Starter selection did not grant the deck and starting DP exactly once.");
 
+            VerifySaveSync(save, starter);
             var materials = LoadLegacyProfile(save, profile);
             VerifyCrafting(materials, starter, profile);
             VerifyPurchasesAndRewards(save, profile);
@@ -45,6 +46,57 @@ namespace YGOPortable.Editor
             Debug.Log($"[VERIFY COLLECTION] {starters.Count} starter deck sizes, legacy saves, uncapped inventory, isolated CP, " +
                 "deck copy limits, full disassembly, pack ownership, rollback and opponent progression passed.");
         }
+
+        private static void VerifySaveSync(string save, UserDeck starter)
+        {
+            string secondDevice = Path.Combine(save, "second-device");
+            Directory.CreateDirectory(secondDevice);
+            var source = new SaveSyncFiles(save);
+            var destination = new SaveSyncFiles(secondDevice);
+            var start = source.Capture();
+            start.decks.Add(new SaveSyncSnapshot.Deck { id = starter.id, json = JsonUtility.ToJson(starter) });
+            var empty = destination.Capture();
+            Require(SaveSyncSnapshot.Decide(start, start.Hash, null, null) == SaveSyncAction.Upload &&
+                SaveSyncSnapshot.Decide(empty, empty.Hash, start.Hash, null) == SaveSyncAction.Download,
+                "A first connection could not seed the cloud or restore a fresh device.");
+            Require(destination.Restore(start, empty.Hash) && destination.Capture().Hash == start.Hash,
+                "The destination did not get the profile and all decks.");
+            destination.SetBaseline(start.Hash);
+            Require(destination.Baseline == start.Hash, "The last synced version did not persist.");
+
+            var changed = SaveSyncSnapshot.Parse(start.Serialize());
+            changed.decks.Clear();
+            Require(SaveSyncSnapshot.Decide(changed, changed.Hash, start.Hash, start.Hash) == SaveSyncAction.Upload &&
+                SaveSyncSnapshot.Decide(start, start.Hash, changed.Hash, start.Hash) == SaveSyncAction.Download &&
+                SaveSyncSnapshot.Decide(changed, changed.Hash, start.Hash, null) == SaveSyncAction.Conflict &&
+                SaveSyncSnapshot.Decide(changed, changed.Hash, start.Hash, empty.Hash) == SaveSyncAction.Conflict,
+                "The sync rules did not distinguish one-sided changes from conflicts.");
+            Require(!destination.Restore(changed, empty.Hash) && destination.Capture().Hash == start.Hash,
+                "A stale download replaced a locally changed save.");
+            Require(destination.Restore(changed, start.Hash) && destination.Capture().Hash == changed.Hash &&
+                SaveSyncSnapshot.Parse(File.ReadAllText(Path.Combine(secondDevice, "cloud-save-previous-local.json"))).Hash == start.Hash,
+                "Cloud deck deletion or local backup did not work.");
+
+            SaveSyncFiles.WriteAtomic(Path.Combine(secondDevice, "cloud-save-restore.pending"), start.Serialize());
+            destination.Recover();
+            Require(destination.Capture().Hash == start.Hash && !File.Exists(Path.Combine(secondDevice, "cloud-save-restore.pending")),
+                "Recovery left an interrupted cloud restore unfinished.");
+            Require(!SaveSyncSnapshot.ValidDeckId("../outside") && !SaveSyncSnapshot.ValidDeckId("C:outside"),
+                "A remote deck could escape the game's deck folder.");
+
+            if (SaveSyncCredential.Supported)
+            {
+                const string placeholder = "fixture-credential-never-sent";
+                SaveSyncCredential.Write(secondDevice, placeholder);
+                var stored = File.ReadAllText(Path.Combine(secondDevice, "cloud-save-token.dpapi"));
+                Require(!stored.Contains(placeholder) && SaveSyncCredential.Read(secondDevice) == placeholder,
+                    "The Windows credential could not be read from encrypted storage.");
+                SaveSyncCredential.Write(secondDevice, null);
+                Require(SaveSyncCredential.Read(secondDevice) == null, "Disconnect did not remove the local credential.");
+            }
+            Debug.Log("[VERIFY SAVE SYNC] First launch, handoff, conflict, stale writes, restore recovery and credential storage passed.");
+        }
+
 
         private static uint[] LoadLegacyProfile(string save, string profile)
         {

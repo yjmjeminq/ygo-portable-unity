@@ -33,6 +33,10 @@ namespace YGOPortable.UI
         private DuelPromptModals _modals;
         private DuelFieldUI _duelField;
         private CollectionShopUI _collectionShop;
+        private GitHubSaveSync _saveSync;
+        private SaveSyncMenu _saveSyncMenu;
+        private GameObject _focusBeforeSaveSync;
+        private bool _saveConflictShown;
         private readonly DeckPadInput _menuPadInput = new DeckPadInput();
         private DeckPadUi _menuPad;
         private AppScreen _screen;
@@ -93,6 +97,8 @@ namespace YGOPortable.UI
                 Debug.Log("[GameApp] 2. Initializing CardArtLoader...");
                 CardArtLoader.Initialize(Application.streamingAssetsPath);
 
+                var saveFiles = new SaveSyncFiles(Application.persistentDataPath);
+                saveFiles.Recover();
                 Debug.Log("[GameApp] 3. Loading DeckRepository...");
                 if (DeckRepository.PresetDecks.Count == 0)
                     DeckRepository.Load(Application.streamingAssetsPath, Application.persistentDataPath, seedDefaultDecks: false);
@@ -107,6 +113,9 @@ namespace YGOPortable.UI
 
                 Debug.Log("[GameApp] 5. Constructing TitleAndMenuUI...");
                 _titleAndMenu = new TitleAndMenuUI(this, canvas.transform);
+                _saveSync = new GitHubSaveSync(this, Application.persistentDataPath, saveFiles,
+                    CanApplyCloudSave, ReloadCloudSave);
+                _saveSyncMenu = new SaveSyncMenu(canvas.transform, _saveSync, () => CloseSaveSync());
                 _collectionShop = new CollectionShopUI(canvas.transform,
                     () => ShowScreen(_screen == AppScreen.StarterSelection ? AppScreen.Title : AppScreen.MainMenu),
                     CompleteStarterSelection);
@@ -204,7 +213,9 @@ namespace YGOPortable.UI
             _menuPadInput.Reset();
             _modals.HideAll();
             _modals.HideResult();
+            CloseSaveSync(restoreFocus: false);
             _titleAndMenu.CloseSettings(restoreFocus: false);
+            if (CanApplyCloudSave()) _saveSync?.RequestSync();
 
             _titleAndMenu.TitleRoot.SetActive(screen == AppScreen.Title);
             _titleAndMenu.MenuRoot.SetActive(screen == AppScreen.MainMenu);
@@ -344,8 +355,50 @@ namespace YGOPortable.UI
             _duelField.Refresh();
         }
 
+        private bool CanApplyCloudSave() => _screen is AppScreen.Title or AppScreen.MainMenu;
+
+        private void ReloadCloudSave()
+        {
+            DeckRepository.ReloadUserDecks();
+            CollectionProgress.Load(Application.persistentDataPath);
+            RegisterStarterDeck(CollectionProgress.CreateStarterDeck());
+            _titleAndMenu.RefreshWallet();
+        }
+
+        internal void OpenSaveSync()
+        {
+            if (_saveSyncMenu == null || _saveSyncMenu.Root.activeSelf || !CanApplyCloudSave()) return;
+            _focusBeforeSaveSync = EventSystem.current?.currentSelectedGameObject;
+            _menuPad?.Clear();
+            _titleAndMenu.SetSaveSyncOpen(true);
+            _saveSyncMenu.Open();
+        }
+
+        private void CloseSaveSync(bool restoreFocus = true)
+        {
+            if (_saveSyncMenu == null || !_saveSyncMenu.Root.activeSelf) return;
+            _saveSyncMenu.Close();
+            _titleAndMenu.SetSaveSyncOpen(false);
+            _menuPad?.Clear();
+            if (restoreFocus && _focusBeforeSaveSync != null && _focusBeforeSaveSync.activeInHierarchy)
+                EventSystem.current?.SetSelectedGameObject(_focusBeforeSaveSync);
+            _focusBeforeSaveSync = null;
+        }
+
         private void Update()
         {
+            _saveSync?.Tick();
+            if (_saveSync?.HasConflict == true)
+            {
+                if (!_saveConflictShown && CanApplyCloudSave())
+                {
+                    _saveConflictShown = true;
+                    OpenSaveSync();
+                }
+            }
+            else _saveConflictShown = false;
+            _saveSyncMenu?.Refresh();
+
             if (_session == null)
             {
                 if (_screen == AppScreen.DeckEditor) _deckEditor?.Update();
@@ -489,7 +542,7 @@ namespace YGOPortable.UI
         private void SyncFrontMenuFocus()
         {
             if (_menuPad == null || _menuPad.HasPopup) return;
-            var page = _screen switch
+            var page = _saveSyncMenu?.Root.activeSelf == true ? _saveSyncMenu.Root : _screen switch
             {
                 AppScreen.Title => _titleAndMenu.TitleRoot,
                 AppScreen.MainMenu => _titleAndMenu.SettingsRoot.activeInHierarchy
@@ -505,14 +558,15 @@ namespace YGOPortable.UI
 
         private void HandleMenuInput(DeckPadFrame frame, bool escape)
         {
+            bool cloudSave = _saveSyncMenu?.Root.activeSelf == true;
             bool settings = _titleAndMenu.SettingsRoot.activeInHierarchy;
             bool janken = _oppSelect.JankenRoot.activeInHierarchy;
             bool selectingStarter = _screen == AppScreen.StarterSelection;
             bool collectionPage = selectingStarter || _screen == AppScreen.CardShop;
-            bool cancel = frame.Cancel || (escape && (settings || janken || _menuPad.HasPopup || collectionPage));
+            bool cancel = frame.Cancel || (escape && (cloudSave || settings || janken || _menuPad.HasPopup || collectionPage));
             if (!frame.HasInput && !cancel) return;
 
-            GameObject scope = _screen switch
+            GameObject scope = cloudSave ? _saveSyncMenu.Root : _screen switch
             {
                 AppScreen.Title => _titleAndMenu.TitleRoot,
                 AppScreen.MainMenu => settings ? _titleAndMenu.SettingsRoot : _titleAndMenu.MenuRoot,
@@ -558,7 +612,8 @@ namespace YGOPortable.UI
 
             void Back()
             {
-                if (settings) _titleAndMenu.CloseSettings();
+                if (cloudSave) CloseSaveSync();
+                else if (settings) _titleAndMenu.CloseSettings();
                 else if (janken) _oppSelect.CloseJanken();
                 else if (selectingStarter) ShowScreen(AppScreen.Title);
                 else if (_screen == AppScreen.CardShop)
@@ -649,8 +704,19 @@ namespace YGOPortable.UI
             Application.Quit();
         }
 
+        private void OnApplicationFocus(bool focused)
+        {
+            if (focused) _saveSync?.RequestSync();
+        }
+
+        private void OnApplicationPause(bool paused)
+        {
+            if (!paused) _saveSync?.RequestSync();
+        }
+
         private void OnDestroy()
         {
+            _saveSync?.Dispose();
             Debug.Log($"[GameApp] OnDestroy called! Stack:\n{Environment.StackTrace}");
             _session?.Dispose();
             _session = null;
