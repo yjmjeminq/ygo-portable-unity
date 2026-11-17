@@ -26,6 +26,7 @@ namespace YGOPortable.UI
         private RectTransform _cardActionArt;
         private DuelPrompt _cardActionsPrompt;
         private (byte controller, uint location, uint sequence, uint code, int materials) _cardActionKey;
+        private bool _infoActionShown;
         private bool _navigatingCardActions;
 
         private void BuildCardActions(Transform root)
@@ -44,6 +45,15 @@ namespace YGOPortable.UI
             CardDragManager.Instance?.IsDragging != true &&
             _session.ActivePrompt.messageType is YgoConstants.MSG_SELECT_IDLECMD or YgoConstants.MSG_SELECT_BATTLECMD;
 
+        private bool CanOpenTouchCardDetails =>
+            _session != null && !_session.IsFinished && !IsPresenting && !IsPaused && !IsReadingLog &&
+            !IsStagingPlacement && !_modals.IsPromptOpen && !IsBrowsingZone && !_modals.ResultRoot.activeSelf &&
+            !_actionPopup.activeSelf && !_phasePicker.activeSelf && !_cardZoomModal.activeSelf &&
+            CardDragManager.Instance?.IsDragging != true;
+
+        private bool CanInspectCardActionSource(LiveCardState card) => card != null && card.code != 0 &&
+            (card.controller == _session.HumanPlayerIndex || card.IsFaceUp || card.isPublic);
+
         private void PointAtCardActions(RectTransform anchor)
         {
             _pointerActionAnchor = anchor;
@@ -59,6 +69,17 @@ namespace YGOPortable.UI
 
         private void SelectTouchCardActions(RectTransform anchor)
         {
+            if (_session == null || anchor == null) return;
+            var (card, _) = FindCardActionSource(anchor);
+            if (CanOpenTouchCardDetails && CanInspectCardActionSource(card) &&
+                (!CanShowCardActions || (card.overlayCodes.Count == 0 &&
+                    CollectActions(card.controller, card.location, card.sequence).Count == 0)))
+            {
+                HideCardActions();
+                ShowCardZoomModal(card.code);
+                return;
+            }
+
             _touchActionAnchor = anchor;
             _touchActionPrompt = _session.ActivePrompt;
             _pointerActionAnchor = null;
@@ -147,7 +168,9 @@ namespace YGOPortable.UI
 
             var prompt = _session.ActivePrompt;
             var key = CardActionKey(card);
-            if (anchor != _cardActionAnchor || !ReferenceEquals(prompt, _cardActionsPrompt) || _cardActionKey != key)
+            bool showInfo = anchor == _touchActionAnchor && CanInspectCardActionSource(card);
+            if (anchor != _cardActionAnchor || !ReferenceEquals(prompt, _cardActionsPrompt) ||
+                _cardActionKey != key || _infoActionShown != showInfo)
             {
                 var actions = CollectActions(card.controller, card.location, card.sequence);
                 if (actions.Count == 0 && card.overlayCodes.Count == 0)
@@ -160,7 +183,8 @@ namespace YGOPortable.UI
                 _cardActionArt = art;
                 _cardActionsPrompt = prompt;
                 _cardActionKey = key;
-                RebuildCardActions(anchor, card, prompt, actions);
+                _infoActionShown = showInfo;
+                RebuildCardActions(anchor, card, prompt, actions, showInfo);
             }
 
             PositionCardActions(anchor, card.location == YgoConstants.LOCATION_HAND);
@@ -224,11 +248,12 @@ namespace YGOPortable.UI
         }
 
         private void RebuildCardActions(RectTransform anchor, LiveCardState card, DuelPrompt prompt,
-            List<(string label, int responseVal, bool gold)> actions)
+            List<(string label, int responseVal, bool gold)> actions, bool showInfo)
         {
             var groups = actions.GroupBy(action => action.responseVal & 0xffff).ToArray();
             bool hasMaterials = card.overlayCodes.Count > 0;
-            ClearCardActionButtons(groups.Length + (hasMaterials ? 1 : 0));
+            int infoIndex = groups.Length + (hasMaterials ? 1 : 0);
+            ClearCardActionButtons(infoIndex + (showInfo ? 1 : 0));
             var session = _session;
             var key = CardActionKey(card);
             LiveCardState GetLiveSource()
@@ -282,12 +307,22 @@ namespace YGOPortable.UI
                     HideCardActions();
                 });
             }
+            if (showInfo)
+            {
+                AddCardAction(infoIndex, "LOOK", "상세 정보", () =>
+                {
+                    var source = GetLiveSource();
+                    if (!CanInspectCardActionSource(source)) return;
+                    HideCardActions();
+                    ShowCardZoomModal(source.code);
+                }, "Details");
+            }
         }
 
-        private void AddCardAction(int index, string iconName, string label, Action action)
+        private void AddCardAction(int index, string iconName, string label, Action action, string name = null)
         {
             float left = index * (CardActionWidth + CardActionGap);
-            var slot = LotdUiKit.CreateRect(iconName, _cardActionsBar, Vector2.zero, Vector2.zero,
+            var slot = LotdUiKit.CreateRect(name ?? iconName, _cardActionsBar, Vector2.zero, Vector2.zero,
                 new Vector2(left, 0f), new Vector2(left + CardActionWidth, CardActionHeight));
             bool highlighted = iconName is "ACTION" or "ATTACK" or "SUMMON" or "SUMMONSP";
             var face = LotdUiKit.CreateRect("Circle", slot, new Vector2(.09f, .25f), new Vector2(.91f, 1f),

@@ -409,7 +409,7 @@ namespace YGOPortable.UI
                 return;
             }
             _duelField?.Update();
-            if (_session == null || _duelField.IsReadingLog || _duelField.IsBrowsingZone) return;
+            if (_session == null || _duelField.IsReadingLog || _duelField.IsBrowsingZone || _duelField.IsReadingCardDetails) return;
 
             if (_duelField.IsPresenting)
             {
@@ -473,7 +473,7 @@ namespace YGOPortable.UI
 
             if (prompt.playerId == _session.AiPlayerIndex)
             {
-                _aiTimer += Time.deltaTime;
+                _aiTimer += Time.deltaTime * DuelFieldUI.PlaybackRate;
                 if (_aiTimer >= AiStepDelay)
                 {
                     _aiTimer = 0f;

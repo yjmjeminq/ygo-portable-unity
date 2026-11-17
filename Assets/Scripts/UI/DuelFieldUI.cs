@@ -176,6 +176,8 @@ namespace YGOPortable.UI
         public bool IsPaused { get; private set; }
         public bool IsReadingLog => _logWindow.activeSelf;
         public bool IsBrowsingZone => _modals.IsZoneViewerOpen;
+        internal bool IsReadingCardDetails => _cardZoomModal.activeSelf;
+        internal static float PlaybackRate => Application.platform == RuntimePlatform.IPhonePlayer ? .75f : 1f;
         private bool CanAcceptPlayerAction => _session != null && !_session.IsFinished && !IsPresenting && !IsPaused && !IsReadingLog &&
             _session.ActivePrompt?.playerId == _session.HumanPlayerIndex;
 
@@ -2162,7 +2164,7 @@ namespace YGOPortable.UI
         {
             if (_session == null || Root == null || !Root.activeSelf) return;
             var session = _session;
-            AdvanceHandLayout(Time.unscaledDeltaTime);
+            AdvanceHandLayout(Time.unscaledDeltaTime * PlaybackRate);
             AdvanceActionWindow();
             UpdateDuelPad();
             if (_session != session || !Root.activeSelf) return;
@@ -2187,9 +2189,10 @@ namespace YGOPortable.UI
             if (_oppHandBar.rect.size != _oppHandSize) RefreshHand(_session.Players[opponent].hand, opponent, true);
 
             // Keep the current HP readable while the damage animation is playing.
+            float playbackDelta = Time.deltaTime * PlaybackRate;
             if (!IsPaused && Mathf.Abs(_myDisplayLp - _myTargetLp) > 0.5f)
             {
-                float step = Mathf.Max(1200f * Time.deltaTime, Mathf.Abs(_myDisplayLp - _myTargetLp) * 6.5f * Time.deltaTime);
+                float step = Mathf.Max(1200f, Mathf.Abs(_myDisplayLp - _myTargetLp) * 6.5f) * playbackDelta;
                 int oldInt = (int)_myDisplayLp;
                 _myDisplayLp = Mathf.MoveTowards(_myDisplayLp, _myTargetLp, step);
                 int newInt = (int)_myDisplayLp;
@@ -2203,7 +2206,7 @@ namespace YGOPortable.UI
 
             if (!IsPaused && Mathf.Abs(_oppDisplayLp - _oppTargetLp) > 0.5f)
             {
-                float step = Mathf.Max(1200f * Time.deltaTime, Mathf.Abs(_oppDisplayLp - _oppTargetLp) * 6.5f * Time.deltaTime);
+                float step = Mathf.Max(1200f, Mathf.Abs(_oppDisplayLp - _oppTargetLp) * 6.5f) * playbackDelta;
                 int oldInt = (int)_oppDisplayLp;
                 _oppDisplayLp = Mathf.MoveTowards(_oppDisplayLp, _oppTargetLp, step);
                 int newInt = (int)_oppDisplayLp;
@@ -2644,7 +2647,7 @@ namespace YGOPortable.UI
             bool canInspect = live.IsFaceUp || live.isPublic || con == _session.HumanPlayerIndex;
             if (canInspect) InspectCard(live.code);
 
-            if (CanShowCardActions)
+            if (CanShowCardActions || (touch && canInspect && CanOpenTouchCardDetails))
             {
                 var anchor = GetSlot(con, loc, seq)?.root;
                 if (touch) SelectTouchCardActions(anchor);
@@ -2908,19 +2911,22 @@ namespace YGOPortable.UI
 
         private void BuildCardZoomModal(Transform root)
         {
+            bool onIPhone = Application.platform == RuntimePlatform.IPhonePlayer;
             var dim = LotdUiKit.FillRect("Overlay_CardZoom", root);
             _cardZoomModal = dim.gameObject;
             LotdUiKit.AddImage(dim.gameObject, LotdUiKit.WhiteSprite, new Color(0.01f, 0.03f, 0.08f, 0.88f));
             dim.gameObject.AddComponent<Button>().onClick.AddListener(() => _cardZoomModal.SetActive(false));
 
-            var win = DuelStyle.Panel(dim, "ZoomWin", new Vector2(0.18f, 0.08f), new Vector2(0.82f, 0.92f));
+            var content = onIPhone ? MobileSafeArea.Create(dim) : dim;
+            var win = DuelStyle.Panel(content, "ZoomWin", onIPhone ? new Vector2(.045f, .035f) : new Vector2(.18f, .08f),
+                onIPhone ? new Vector2(.955f, .965f) : new Vector2(.82f, .92f));
 
             // Header bar
             var hdr = LotdUiKit.CreateRect("Hdr", win, new Vector2(0f, 0.90f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
             LotdUiKit.AddImage(hdr.gameObject, LotdUiKit.WhiteSprite, DuelStyle.HeaderColor);
             var title = LotdUiKit.CreateRect("Title", hdr, new Vector2(0.02f, 0.12f), new Vector2(0.63f, 0.88f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddFittedText(title, "T", "카드 상세 정보 (CARD DETAILS)", 18, 12,
+            LotdUiKit.AddFittedText(title, "T", onIPhone ? "카드 상세 정보" : "카드 상세 정보 (CARD DETAILS)", 18, 12,
                 TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
 
             var relatedRt = LotdUiKit.CreateRect("Related", hdr, new Vector2(0.66f, 0.15f), new Vector2(0.82f, 0.85f),
@@ -2928,12 +2934,13 @@ namespace YGOPortable.UI
             DuelStyle.Button(relatedRt, "B", "관련 카드", ShowZoomRelatedCards, 15);
 
             var closeRt = LotdUiKit.CreateRect("Close", hdr, new Vector2(0.84f, 0.15f), new Vector2(0.98f, 0.85f), Vector2.zero, Vector2.zero);
-            DuelStyle.Button(closeRt, "B", "닫기 (ESC)", () => _cardZoomModal.SetActive(false), 15);
+            DuelStyle.Button(closeRt, "B", onIPhone ? "닫기" : "닫기 (ESC)", () => _cardZoomModal.SetActive(false), 15);
 
             // Left Side: Large Card View
-            var cardHolder = LotdUiKit.CreateRect("CardHolder", win, new Vector2(0.04f, 0.12f), new Vector2(0.42f, 0.88f), Vector2.zero, Vector2.zero);
+            float cardRight = onIPhone ? .33f : .42f;
+            var cardHolder = LotdUiKit.CreateRect("CardHolder", win, new Vector2(0.04f, 0.12f), new Vector2(cardRight, 0.88f), Vector2.zero, Vector2.zero);
             _zoomCardView = CompositeCardView.Create(cardHolder, "ZoomCard", true, duelArtwork: true);
-            var artwork = LotdUiKit.CreateRect("ArtworkOptions", win, new Vector2(.04f, .035f), new Vector2(.42f, .098f),
+            var artwork = LotdUiKit.CreateRect("ArtworkOptions", win, new Vector2(.04f, .035f), new Vector2(cardRight, .098f),
                 Vector2.zero, Vector2.zero);
             _zoomArtworkControls = artwork.gameObject;
             var previous = LotdUiKit.CreateRect("Previous", artwork, Vector2.zero, new Vector2(.19f, 1f),
@@ -2947,7 +2954,7 @@ namespace YGOPortable.UI
             _zoomArtworkLabel = LotdUiKit.AddFittedText(counter, "Label", "", 15, 9, TextAnchor.MiddleCenter, Color.white);
 
             // Right Side: Card Details
-            var infoRt = LotdUiKit.CreateRect("Info", win, new Vector2(0.45f, 0.05f), new Vector2(0.96f, 0.88f), Vector2.zero, Vector2.zero);
+            var infoRt = LotdUiKit.CreateRect("Info", win, new Vector2(cardRight + .03f, .05f), new Vector2(.96f, .88f), Vector2.zero, Vector2.zero);
 
             _zoomName = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Name", infoRt,
                 new Vector2(0f, 0.88f), new Vector2(0.82f, 1f), Vector2.zero, Vector2.zero),
@@ -2973,7 +2980,7 @@ namespace YGOPortable.UI
             ct.pivot = new Vector2(0.5f, 1f);
             _zoomDesc = ct.gameObject.AddComponent<Text>();
             _zoomDesc.font = LotdUiKit.FontKR;
-            _zoomDesc.fontSize = 15;
+            _zoomDesc.fontSize = onIPhone ? 22 : 15;
             _zoomDesc.color = LotdUiKit.TextPrimary;
             _zoomDesc.alignment = TextAnchor.UpperLeft;
             _zoomDesc.lineSpacing = 1.15f;

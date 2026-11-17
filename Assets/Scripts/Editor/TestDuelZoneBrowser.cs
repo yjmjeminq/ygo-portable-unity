@@ -23,12 +23,40 @@ namespace YGOPortable.Editor
 
         internal static void Run()
         {
+            VerifyCardDetailsSafeArea();
             int opens = 0;
             foreach (bool humanFirst in new[] { true, false })
                 opens += VerifyBanishAndGrave(humanFirst);
             opens += VerifyPromptAndExtraSummon();
             string hitTest = SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null ? "raycast filters" : "GraphicRaycaster";
             Debug.Log($"[VERIFY ZONE BROWSER] {opens} successful opens. Graveyard, Extra Deck, and banished cards verified for both seating orders, including effect prompt field view ({hitTest}), a Synchro summon, and an attack response.");
+        }
+
+        private static void VerifyCardDetailsSafeArea()
+        {
+            var overlay = new GameObject("Card details safe area fixture", typeof(RectTransform));
+            try
+            {
+                var parent = (RectTransform)overlay.transform;
+                var originalMin = parent.anchorMin;
+                var originalMax = parent.anchorMax;
+                var safeArea = typeof(DuelFieldUI).Assembly.GetType("YGOPortable.UI.MobileSafeArea", true);
+                const BindingFlags Static = BindingFlags.Static | BindingFlags.NonPublic;
+                var content = (RectTransform)safeArea.GetMethod("Create", Static).Invoke(null, new object[] { parent });
+                var apply = safeArea.GetMethod("Apply", Static);
+                var display = new Vector2Int(2400, 1080);
+                apply.Invoke(null, new object[] { content, new Rect(144, 36, 2256, 1044), display });
+                Require(Mathf.Approximately(content.anchorMin.x, .06f) && content.anchorMax == Vector2.one &&
+                    content.anchorMin.y > 0 && parent.anchorMin == originalMin && parent.anchorMax == originalMax,
+                    "The card details did not clear a left-side cutout, or moved their full-screen overlay.");
+                apply.Invoke(null, new object[] { content, new Rect(0, 36, 2256, 1044), display });
+                Require(content.anchorMin.x == 0 && Mathf.Approximately(content.anchorMax.x, .94f),
+                    "The card details retained the old inset after a landscape rotation.");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(overlay);
+            }
         }
 
         internal static byte[] SelectFieldTarget(DuelSession duel, DuelPrompt prompt)
@@ -62,7 +90,10 @@ namespace YGOPortable.Editor
                 if (player == duel.HumanPlayerIndex)
                     ui.VerifyPhasePicker(prompt);
                 else
+                {
                     ui.VerifyAiWaitsWhileBrowsing(mine);
+                    ui.VerifyAiWaitsWhileReadingCard(mine.hand.First());
+                }
 
                 int activate = prompt.activatable.FindIndex(card => card.code == PotOfDesires);
                 Require(activate >= 0, "The deterministic Pot of Desires fixture is missing its activation.");
@@ -368,6 +399,10 @@ namespace YGOPortable.Editor
                         new object[] { new Vector2(-1000f, -1000f) });
                     Require(!bar.gameObject.activeSelf, "Tapping elsewhere did not dismiss the hand actions.");
                     ExecuteEvents.Execute(source.gameObject, pointer, ExecuteEvents.pointerClickHandler);
+                    var prompt = _duel.ActivePrompt;
+                    Click(bar.Find("Details/Circle/Button")?.GetComponent<Button>());
+                    VerifyCardDetails(card.code, prompt);
+                    ExecuteEvents.Execute(source.gameObject, pointer, ExecuteEvents.pointerClickHandler);
                 }
                 var hoverArea = (RectTransform)bar.Find("HoverArea");
                 var activate = (RectTransform)bar.Find("ACTION/Circle/Button");
@@ -381,7 +416,9 @@ namespace YGOPortable.Editor
                     float inGap = hoverArea.offsetMin.y * .5f;
                     Require(inGap < -1f, "The activation icon is too close to the hand card for this fixture.");
                     Vector2 gapPoint = RectTransformUtility.WorldToScreenPoint(_camera, bar.TransformPoint(new Vector2(0f, inGap)));
-                    Vector2 betweenActions = RectTransformUtility.WorldToScreenPoint(_camera, bar.TransformPoint(new Vector2(0f, 44f)));
+                    float buttonGap = bar.rect.xMin + ((RectTransform)bar.GetChild(1)).rect.width + 2.5f;
+                    Vector2 betweenActions = RectTransformUtility.WorldToScreenPoint(_camera,
+                        bar.TransformPoint(new Vector2(buttonGap, 44f)));
                     Require(Raycast(gapPoint, out _) == hoverArea.gameObject &&
                         Raycast(betweenActions, out _) == hoverArea.gameObject,
                         "A card behind the action toolbar intercepted the pointer.");
@@ -594,6 +631,32 @@ namespace YGOPortable.Editor
                 Require(ReferenceEquals(_duel.ActivePrompt, prompt) && Modals.ZoneViewRoot.activeSelf,
                     "The AI advanced its action while the zone browser was open.");
                 Close();
+            }
+
+            internal void VerifyAiWaitsWhileReadingCard(LiveCardState card)
+            {
+                var prompt = _duel.ActivePrompt;
+                var art = Field.Root.transform.Find("PlayerHand").GetComponentsInChildren<CompositeCardView>()
+                    .First(view => view.CurrentCode == card.code);
+                var source = art.transform.parent.GetComponent<CardDragTrigger>();
+                var pointer = new PointerEventData(EventSystem.current) { pointerId = 0 };
+                ExecuteEvents.Execute(source.gameObject, pointer, ExecuteEvents.pointerClickHandler);
+                SetPrivate(_controller, "_aiTimer", _controller.AiStepDelay + 1f);
+                typeof(GameAppController).GetMethod("Update", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(_controller, null);
+                VerifyCardDetails(card.code, prompt);
+                SetPrivate(_controller, "_aiTimer", 0f);
+            }
+
+            private void VerifyCardDetails(uint code, DuelPrompt prompt)
+            {
+                var zoom = Field.Root.transform.Find("Overlay_CardZoom");
+                var desc = Private<Text>(Field, "_zoomDesc");
+                Require(zoom.gameObject.activeInHierarchy && desc.text == CardDatabase.Get(code).desc &&
+                    ReferenceEquals(_duel.ActivePrompt, prompt), "Touch did not open the correct card details without advancing the duel.");
+                Click(zoom.GetComponent<Button>());
+                Require(!zoom.gameObject.activeSelf && ReferenceEquals(_duel.ActivePrompt, prompt),
+                    "Closing card details changed the active prompt.");
             }
 
             internal void VerifyOwnZones(PlayerFieldSnapshot player)

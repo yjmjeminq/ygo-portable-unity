@@ -307,7 +307,7 @@ namespace YGOPortable.UI
                     arrived++;
                 }
                 yield return null;
-                if (!Paused) elapsed += Time.unscaledDeltaTime;
+                if (!Paused) elapsed += Time.unscaledDeltaTime * DuelFieldUI.PlaybackRate;
             }
         }
 
@@ -789,7 +789,7 @@ namespace YGOPortable.UI
             {
                 apply(elapsed / duration);
                 yield return null;
-                if (!Paused) elapsed += Time.unscaledDeltaTime;
+                if (!Paused) elapsed += Time.unscaledDeltaTime * DuelFieldUI.PlaybackRate;
             }
             apply(1f);
         }
