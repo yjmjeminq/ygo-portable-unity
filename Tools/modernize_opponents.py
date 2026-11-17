@@ -11,6 +11,7 @@ SECTIONS = ("main", "extra", "side")
 EXTRA_TYPES = 0x40 | 0x2000 | 0x800000 | 0x4000000
 ONE_COPY = {55144522, 79571449, 12580477, 18144506}  # Pot, Charity, Raigeki, Feather Duster
 GENERIC_SUMMON_TAGS = {0x17, 0x46}  # Synchro and Fusion spell/effect families shared by many decks
+DEDICATED_SUPPORT_TAGS = {7394770: 0x1047}  # Brilliant Fusion specifically summons Gem-Knights
 KEEP_DECKS = {36, 340, 34043}  # Themed Earthbound, Rainbow Dark Dragon and D/D/D presets
 RECIPE_FILES = ("modern_opponent_recipes_dm_gx.json", "modern_opponent_recipes_later_series.json")
 MATCHING_META_DECKS = {20670, 20683}  # Mahad's Dark Magician and Era's Numeron
@@ -39,7 +40,7 @@ def read_card_sets(path):
     if header[0:2] != (b"YGOP", 1):
         raise ValueError("Unknown packed card format")
     cards = {
-        record[0]: frozenset(tag & 0xfff for tag in record[-8:] if tag)
+        record[0]: frozenset(tag for tag in record[-8:] if tag)
         for record in struct.iter_unpack("<IIIIIIQiiII8H", entries[12:])
     }
     if len(cards) != header[2]:
@@ -67,7 +68,15 @@ def signature(deck):
 class OpponentDeckCatalog:
     def __init__(self, cards, props_path):
         self.cards = cards
-        self.tags = read_card_sets(props_path)
+        raw_tags = read_card_sets(props_path)
+        for code, tag in DEDICATED_SUPPORT_TAGS.items():
+            raw_tags[code] |= {tag}
+        self.tags = {code: {tag & 0xfff for tag in tags} for code, tags in raw_tags.items()}
+        self.limit_tags = {
+            code: {tag if (tag & 0xfff) in GENERIC_SUMMON_TAGS else tag & 0xfff
+                   for tag in tags if tag not in GENERIC_SUMMON_TAGS}
+            for code, tags in raw_tags.items()
+        }
         scripts = available_scripts(props_path.with_name("cardscripts.pack"))
         snapshot = read_json(DATA / "opponent_card_versions.json")
         self.years = {code: int(year) for year, codes in snapshot["firstReleaseYears"].items() for code in codes}
@@ -87,15 +96,19 @@ class OpponentDeckCatalog:
     def recent(self, code):
         return self.years.get(self.key(code), self.years.get(code, 0))
 
-    def deck_themes(self, deck):
+    def deck_themes(self, deck, *, for_limits=False):
+        memberships = self.limit_tags if for_limits else self.tags
         counts = Counter()
         names = defaultdict(set)
         for code in deck["main"] + deck["extra"]:
-            for tag in self.tags[code]:
+            for tag in memberships[code]:
                 if code not in ONE_COPY:
                     counts[tag] += 1 if self.cards[code]["type"] & EXTRA_TYPES else 2
                     names[tag].add(self.key(code))
-        ace_tags = self.tags[deck["sigCard"]]
+        ace_tags = memberships[deck["sigCard"]]
+        if for_limits:
+            return {tag for tag, weight in counts.items() if (len(names[tag]) >= 3 and weight >= 10) or
+                    (tag in ace_tags and len(names[tag]) >= 2)}
         ranked = sorted(counts, key=lambda tag: (-counts[tag], tag not in ace_tags, tag))
         return set(tag for tag in ranked[:4] if (len(names[tag]) >= 3 and counts[tag] >= 10) or
                    (tag in ace_tags and len(names[tag]) >= 2 and counts[tag] >= 5))
@@ -104,7 +117,7 @@ class OpponentDeckCatalog:
         key = self.key(code)
         if key in ONE_COPY:
             return 1
-        if code == ace or self.tags[code] & (themes - GENERIC_SUMMON_TAGS):
+        if key == self.key(ace) or (self.limit_tags[code] | self.limit_tags.get(key, set())) & themes:
             return 3
         return self.limits.get(key, 3)
 
@@ -120,6 +133,7 @@ class OpponentDeckCatalog:
 
         ace = deck["sigCard"]
         themes = self.deck_themes(deck)
+        limit_themes = self.deck_themes(deck, for_limits=True)
         original = {section: Counter(deck[section]) for section in SECTIONS}
         for section in SECTIONS:
             deck[section] = []
@@ -132,7 +146,7 @@ class OpponentDeckCatalog:
                 return
             key = self.key(code)
             space = (40 if section == "main" else 15) - len(deck[section])
-            copies = min(count, space, self.cap(code, themes, ace) - counts[key])
+            copies = min(count, space, self.cap(code, limit_themes, ace) - counts[key])
             if copies > 0:
                 deck[section].extend([code] * copies)
                 counts[key] += copies
@@ -173,7 +187,7 @@ class OpponentDeckCatalog:
                 '"' + self.cards[code]["name"] + '"' in ace_text
             }
             for code in ranked_original("extra"):
-                if code != ace and self.tags[code] & themes:
+                if code != ace and (self.tags[code] & themes or self.limit_tags[code] & limit_themes):
                     add("extra", code, original["extra"][code])
             for code in ranked_original("main"):
                 if code != ace and (code in important_materials or (self.recent(code) and self.tags[code] & themes)):

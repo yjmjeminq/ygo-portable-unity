@@ -403,6 +403,14 @@ namespace YGOPortable.Editor
                 AssertTrue(signatures.Count >= 2, $"{character.name} has fewer than two different decks");
             }
 
+            PresetDeckInfo Preset(int id) => DeckRepository.PresetDecks.Single(deck => deck.id == id);
+            AssertTrue(Preset(107).main.Count(code => code == 7394770) == 3,
+                "Brilliant Fusion should retain three copies as dedicated Gem-Knight support.");
+            AssertTrue(Preset(527).extra.Contains(22593417u) && !Preset(486).extra.Contains(22593417u),
+                "Gumblar should be allowed in the Topologic preset and subject to the normal ban elsewhere.");
+            AssertTrue(Preset(19).main.Count(code => code == 99243014) == 1,
+                "The generic Synchro tag should not waive the limit on Synchro Overtake.");
+
             var canvas = new GameObject("Opponent Roster Test", typeof(Canvas));
             try
             {
