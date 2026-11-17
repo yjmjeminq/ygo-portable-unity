@@ -57,8 +57,10 @@ namespace YGOPortable.Core
         public const int WinReward = 120;
         public const int LossReward = 60;
         public const int StartingBalance = 3000;
+        public const int CraftPointCost = 30;
+        public const int DisassemblePointValue = 10;
 
-        private const int ProfileVersion = 3;
+        private const int ProfileVersion = 4;
         private const int GenericPackSize = 160;
         private const string ProfileFileName = "collection-profile.json";
         private const int FirstOpponentId = 99;
@@ -84,6 +86,7 @@ namespace YGOPortable.Core
         {
             public int version;
             public int balance;
+            public int[] craftPoints;
             public string starterId;
             public UserDeck starterDeck;
             public List<CardCopies> cards;
@@ -158,6 +161,10 @@ namespace YGOPortable.Core
                     saved.starterDeck.main == null || saved.starterDeck.extra == null || saved.starterDeck.side == null)
                     throw new InvalidDataException("Invalid collection profile.");
 
+                saved.craftPoints ??= new int[CardRarityCatalog.TierCount];
+                if (saved.craftPoints.Length != CardRarityCatalog.TierCount || saved.craftPoints.Any(points => points < 0))
+                    throw new InvalidDataException("Invalid craft point balances.");
+
                 var owned = new Dictionary<uint, int>(saved.cards.Count);
                 foreach (var entry in saved.cards)
                 {
@@ -182,6 +189,134 @@ namespace YGOPortable.Core
         }
 
         public static int GetOwnedCount(uint code) => _owned.TryGetValue(code, out int copies) ? copies : 0;
+
+        public static int GetCraftPoints(CardRarity rarity) =>
+            (uint)rarity < CardRarityCatalog.TierCount ? _profile?.craftPoints[(int)rarity] ?? 0 : 0;
+
+        public static bool IsCraftableCard(CardInfo card) => IsDeckCard(card);
+
+        public static int GetCraftLimit(uint code) => HasStarter && IsCraftableCard(CardDatabase.Get(code))
+            ? Math.Max(0, GetDeckCopyLimit(code) - GetOwnedCount(code)) : 0;
+
+        public static int GetDisassembleLimit(uint code)
+        {
+            if (!HasStarter || !IsCraftableCard(CardDatabase.Get(code)) || GetOwnedCount(code) == 0) return 0;
+            var reserved = GetReservedDeckCopies();
+            return GetDisassembleLimit(code, reserved);
+        }
+
+        public static IReadOnlyDictionary<uint, int> GetDisassembleLimits()
+        {
+            var available = new Dictionary<uint, int>();
+            if (!HasStarter) return available;
+
+            var reserved = GetReservedDeckCopies();
+            foreach (uint code in _owned.Keys)
+            {
+                int quantity = GetDisassembleLimit(code, reserved);
+                if (quantity > 0 && IsCraftableCard(CardDatabase.Get(code))) available.Add(code, quantity);
+            }
+            return available;
+        }
+
+        public static bool TryCraftCard(uint code, int quantity, out string error)
+        {
+            if (!CanTradeCards(out error)) return false;
+            if (quantity <= 0 || !IsCraftableCard(CardDatabase.Get(code)))
+            {
+                error = "제작할 카드와 수량을 확인하세요.";
+                return false;
+            }
+            if (quantity > GetCraftLimit(code))
+            {
+                error = $"{CardDatabase.GetName(code)} 보유 한도는 {GetDeckCopyLimit(code)}장입니다.";
+                return false;
+            }
+
+            var rarity = CardRarityCatalog.GetRarity(code);
+            int cost = quantity * CraftPointCost;
+            if (GetCraftPoints(rarity) < cost)
+            {
+                error = $"{CardRarityCatalog.GetLabel(rarity)} 제작 포인트가 {cost:N0} 필요합니다.";
+                return false;
+            }
+
+            var owned = new Dictionary<uint, int>(_owned) { [code] = GetOwnedCount(code) + quantity };
+            var next = WithBalance(Balance);
+            next.craftPoints = (int[])_profile.craftPoints.Clone();
+            next.craftPoints[(int)rarity] -= cost;
+            return Write(next, owned, out error);
+        }
+
+        public static bool TryDisassembleCards(IReadOnlyDictionary<uint, int> quantities, out string error)
+        {
+            if (!CanTradeCards(out error)) return false;
+            if (quantities == null || quantities.Count == 0)
+            {
+                error = "분해할 카드를 선택하세요.";
+                return false;
+            }
+
+            var reserved = GetReservedDeckCopies();
+            var owned = new Dictionary<uint, int>(_owned);
+            var next = WithBalance(Balance);
+            next.craftPoints = (int[])_profile.craftPoints.Clone();
+            foreach (var entry in quantities)
+            {
+                uint code = entry.Key;
+                int quantity = entry.Value;
+                if (quantity <= 0 || !IsCraftableCard(CardDatabase.Get(code)))
+                {
+                    error = "분해할 카드와 수량을 확인하세요.";
+                    return false;
+                }
+                int copies = owned.GetValueOrDefault(code);
+                int available = Math.Max(0, copies - reserved.GetValueOrDefault(code));
+                if (quantity > available)
+                {
+                    error = $"{CardDatabase.GetName(code)} 분해 가능 수량은 {available}장입니다.";
+                    return false;
+                }
+
+                int tier = (int)CardRarityCatalog.GetRarity(code);
+                int gain = quantity * DisassemblePointValue;
+                if (next.craftPoints[tier] > int.MaxValue - gain)
+                {
+                    error = "제작 포인트 보유 한도를 초과합니다.";
+                    return false;
+                }
+                next.craftPoints[tier] += gain;
+                int remaining = copies - quantity;
+                if (remaining == 0) owned.Remove(code);
+                else owned[code] = remaining;
+            }
+            return Write(next, owned, out error);
+        }
+
+        private static bool CanTradeCards(out string error)
+        {
+            if (!CanTransact(out error)) return false;
+            if (HasStarter) return true;
+            error = "먼저 스타터 덱을 선택하세요.";
+            return false;
+        }
+
+        private static int GetDisassembleLimit(uint code, Dictionary<uint, int> reserved) =>
+            Math.Max(0, GetOwnedCount(code) - reserved.GetValueOrDefault(code));
+
+        private static Dictionary<uint, int> GetReservedDeckCopies()
+        {
+            var reserved = new Dictionary<uint, int>();
+            void Reserve(UserDeck deck)
+            {
+                foreach (var group in GetDeckCards(deck).GroupBy(code => code))
+                    reserved[group.Key] = Math.Max(reserved.GetValueOrDefault(group.Key), group.Count());
+            }
+
+            Reserve(_profile.starterDeck);
+            foreach (var deck in DeckRepository.UserDecks) Reserve(deck);
+            return reserved;
+        }
 
         public static bool IsOpponentUnlocked(int id)
         {
@@ -273,6 +408,7 @@ namespace YGOPortable.Core
                 starterId = starter.Id,
                 starterDeck = selected,
                 balance = StartingBalance,
+                craftPoints = new int[CardRarityCatalog.TierCount],
             };
             InitializeOpponentProgress(next);
             if (!Write(next, owned, out error)) return false;
@@ -441,6 +577,7 @@ namespace YGOPortable.Core
             starterId = _profile.starterId,
             starterDeck = _profile.starterDeck,
             balance = balance,
+            craftPoints = _profile.craftPoints,
             unlockedOpponentIds = _profile.unlockedOpponentIds,
             clearedOpponentIds = _profile.clearedOpponentIds,
             opponentDeckProgress = _profile.opponentDeckProgress,

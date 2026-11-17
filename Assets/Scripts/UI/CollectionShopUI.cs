@@ -51,6 +51,7 @@ namespace YGOPortable.UI
         private readonly Catalog _starter;
         private readonly PackContentsUI _packContents;
         private readonly PackCardLookupUI _cardLookup;
+        private CardCraftingUI _crafting;
         private readonly List<CompositeCardView> _pullViews = new();
         private readonly List<Text> _pullLabels = new();
         private readonly List<Text> _pullRarities = new();
@@ -60,11 +61,14 @@ namespace YGOPortable.UI
         private ShopCardRevealMotion _revealMotion;
         private Button _cardLookupButton;
         private Button _viewContentsButton;
+        private Button _craftingButton;
         private bool _lookupFromContents;
 
         public GameObject Root => _shop.Root;
         public GameObject StarterRoot => _starter.Root;
-        internal GameObject ActiveShopRoot => _cardLookup.Root.activeSelf ? _cardLookup.Root :
+        private bool CraftingIsOpen => _crafting?.IsOpen == true;
+        internal GameObject ActiveShopRoot => CraftingIsOpen ? _crafting.ActiveRoot :
+            _cardLookup.Root.activeSelf ? _cardLookup.Root :
             _packContents.Root.activeSelf ? _packContents.Root : Root;
 
         public CollectionShopUI(Transform parent, Action onBack, Action<UserDeck> onStarterClaimed)
@@ -100,6 +104,7 @@ namespace YGOPortable.UI
 
         internal void CloseShop()
         {
+            _crafting?.Hide();
             _cardLookup.Root.SetActive(false);
             _packContents.Close();
             Root.SetActive(false);
@@ -137,11 +142,17 @@ namespace YGOPortable.UI
         }
 
         internal InputField CatalogSearch(bool starter) => starter ? _starter.Search :
+            CraftingIsOpen ? _crafting.Search :
             _cardLookup.Root.activeSelf ? _cardLookup.Search :
             _packContents.Root.activeSelf ? _packContents.SearchInput : _shop.Search;
 
         internal void ChangeCatalogPage(bool starter, int delta)
         {
+            if (!starter && CraftingIsOpen)
+            {
+                _crafting.ChangePage(delta);
+                return;
+            }
             if (!starter && _cardLookup.Root.activeSelf)
             {
                 _cardLookup.ChangePage(delta);
@@ -158,11 +169,17 @@ namespace YGOPortable.UI
 
         internal void ScrollShopDescription(float direction)
         {
-            if (_packContents.Root.activeSelf) _packContents.ScrollDescription(direction);
+            if (CraftingIsOpen) _crafting.ScrollDescription(direction);
+            else if (_packContents.Root.activeSelf) _packContents.ScrollDescription(direction);
         }
 
         internal bool HandleShopBack()
         {
+            if (CraftingIsOpen)
+            {
+                _crafting.Back();
+                return true;
+            }
             if (_cardLookup.Root.activeSelf)
             {
                 ReturnFromLookup();
@@ -174,6 +191,21 @@ namespace YGOPortable.UI
                 return true;
             }
             return DismissReveal();
+        }
+
+        private void OpenCrafting()
+        {
+            _crafting ??= new CardCraftingUI(Root.transform.parent, ReturnFromCrafting);
+            DismissReveal();
+            Root.SetActive(false);
+            _crafting.Show();
+        }
+
+        private void ReturnFromCrafting()
+        {
+            _crafting.Hide();
+            Root.SetActive(true);
+            EventSystem.current?.SetSelectedGameObject(_craftingButton.gameObject);
         }
 
         private void ViewSelectedPack()
@@ -254,8 +286,9 @@ namespace YGOPortable.UI
                     new Vector2(.222f, .976f), Vector2.zero, Vector2.zero);
                 _balance = LotdUiKit.AddFittedText(wallet, "Balance", "", 22, 14, TextAnchor.MiddleCenter,
                     LotdUiKit.GoldAccent, FontStyle.Bold);
+                _craftingButton = AddButton(root, "Crafting", "제작·분해", .759f, .917f, .865f, .975f, OpenCrafting);
             }
-            AddButton(root, "Back", starter ? "타이틀" : "메인 메뉴", .825f, .917f, .968f, .975f, _onBack);
+            AddButton(root, "Back", starter ? "타이틀" : "메인 메뉴", starter ? .825f : .872f, .917f, .968f, .975f, _onBack);
 
             var list = LotdUiKit.CreateMenuPanel(root, "Catalog", new Vector2(.025f, .083f), new Vector2(.405f, .882f));
             var details = LotdUiKit.CreateMenuPanel(root, "Details", new Vector2(.419f, .083f), new Vector2(.975f, .882f));

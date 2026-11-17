@@ -1,0 +1,509 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
+using YGOPortable.Core;
+
+namespace YGOPortable.UI
+{
+    internal sealed class CardCraftingUI
+    {
+        private const int PageSize = 7;
+        private static readonly CardRarity[] Rarities =
+        {
+            CardRarity.Normal, CardRarity.Rare, CardRarity.SuperRare, CardRarity.UltraRare,
+        };
+
+        private sealed class Entry
+        {
+            internal readonly CardInfo Card;
+            internal readonly string Name;
+            internal readonly string SearchName;
+            internal readonly CardRarity Rarity;
+
+            internal Entry(CardInfo card)
+            {
+                Card = card;
+                Name = CardDatabase.GetName(card.code);
+                SearchName = Normalize(Name);
+                Rarity = CardRarityCatalog.GetRarity(card.code);
+            }
+        }
+
+        private readonly Action _onClose;
+        private readonly GameObject _main;
+        private readonly InputField _finder;
+        private readonly Button _bulkButton;
+        private readonly CardBulkDisassemblyUI _bulk;
+        private readonly Button[] _rows = new Button[PageSize];
+        private readonly Text[] _rowNames = new Text[PageSize];
+        private readonly Text[] _rowRarities = new Text[PageSize];
+        private readonly Text[] _filterLabels = new Text[Rarities.Length + 1];
+        private readonly Text[] _balances = new Text[Rarities.Length];
+        private readonly Text _count;
+        private readonly Text _pageLabel;
+        private readonly Button _previous;
+        private readonly Button _next;
+        private readonly Text _title;
+        private readonly Text _cardInfo;
+        private readonly Text _cardStats;
+        private readonly Text _rarity;
+        private readonly CompositeCardView _art;
+        private readonly ScrollRect _descriptionScroll;
+        private readonly Text _description;
+        private readonly Button _craft;
+        private readonly Button _disassemble;
+        private readonly Text _status;
+        private readonly GameObject _confirmation;
+        private readonly Text _confirmTitle;
+        private readonly Text _confirmBody;
+        private readonly Text _quantityLabel;
+        private readonly Button _minus;
+        private readonly Button _plus;
+        private readonly Button _cancel;
+        private readonly Button _confirm;
+        private readonly List<Entry> _matches = new();
+        private Entry[] _entries;
+        private IReadOnlyDictionary<uint, int> _disassembleLimits;
+        private Entry _selected;
+        private int _page;
+        private int _filter;
+        private int _quantity;
+        private int _maxQuantity;
+        private bool _crafting;
+
+        internal GameObject Root { get; }
+        internal bool IsOpen => Root.activeSelf;
+        internal GameObject ActiveRoot => _bulk.IsOpen ? _bulk.ActiveRoot :
+            _confirmation.activeSelf ? _confirmation : _main;
+        internal InputField Search => _bulk.IsOpen ? _bulk.Search :
+            _confirmation.activeSelf ? null : _finder;
+
+        internal CardCraftingUI(Transform parent, Action close)
+        {
+            _onClose = close;
+            var root = LotdUiKit.FillRect("Screen_CardCrafting", parent);
+            Root = root.gameObject;
+            var main = LotdUiKit.FillRect("Main", root);
+            _main = main.gameObject;
+            LotdUiKit.AddImage(LotdUiKit.FillRect("Backdrop", main).gameObject,
+                LotdUiKit.LoadSprite("LOTD/Background/bg_vrains"), new Color(.52f, .63f, .79f), false, false);
+            LotdUiKit.AddMenuHeader(main, "카드 제작·분해");
+            _bulkButton = AddButton(main, "Bulk", "일괄 분해", .035f, .917f, .208f, .975f, OpenBulk);
+            AddButton(main, "Back", "팩 상점으로", .825f, .917f, .968f, .975f, Back);
+
+            var catalog = LotdUiKit.CreateMenuPanel(main, "Catalog", new Vector2(.025f, .083f), new Vector2(.425f, .882f));
+            _finder = LotdUiKit.CreateInputField(Slot(catalog, "Search", .08f, .849f, .92f, .925f),
+                "Input", "카드 이름·카드 번호 검색", 18);
+            for (int i = 0; i < _filterLabels.Length; i++)
+            {
+                int filter = i;
+                float left = .08f + i * .17f;
+                string label = i == 0 ? "전체" : CardRarityCatalog.GetLabel(Rarities[i - 1]);
+                var button = AddButton(catalog, $"Filter_{i}", label, left, .769f, left + .16f, .831f,
+                    () => ChangeFilter(filter));
+                _filterLabels[i] = button.GetComponentInChildren<Text>();
+            }
+            _count = Label(catalog, "Count", "", .087f, .710f, .915f, .761f, 16, TextAnchor.MiddleLeft, LotdUiKit.TextMuted);
+
+            for (int i = 0; i < PageSize; i++)
+            {
+                int row = i;
+                float top = .703f - i * .078f;
+                var button = AddButton(catalog, $"Card_{i}", "", .08f, top - .067f, .92f, top, () => SelectRow(row));
+                button.gameObject.AddComponent<StarterRowFocus>().ShowPreview = () => SelectRow(row);
+                _rows[i] = button;
+                _rowNames[i] = button.GetComponentInChildren<Text>();
+                _rowNames[i].resizeTextForBestFit = true;
+                _rowNames[i].resizeTextMinSize = 11;
+                _rowNames[i].resizeTextMaxSize = 18;
+                _rowNames[i].supportRichText = false;
+                _rowNames[i].rectTransform.anchorMin = new Vector2(.055f, 0f);
+                _rowNames[i].rectTransform.anchorMax = new Vector2(.806f, 1f);
+                _rowRarities[i] = ShopRarityBadge.Create(button.transform, new Vector2(.83f, .19f), new Vector2(.945f, .81f), 16);
+            }
+            _previous = AddButton(catalog, "Previous", "이전", .08f, .074f, .28f, .14f, () => ChangePage(-1));
+            _pageLabel = Label(catalog, "Page", "", .31f, .074f, .69f, .14f, 18, TextAnchor.MiddleCenter, LotdUiKit.TextMuted);
+            _next = AddButton(catalog, "Next", "다음", .72f, .074f, .92f, .14f, () => ChangePage(1));
+
+            var details = LotdUiKit.CreateMenuPanel(main, "Details", new Vector2(.439f, .083f), new Vector2(.975f, .882f));
+            for (int i = 0; i < Rarities.Length; i++)
+            {
+                var tier = Rarities[i];
+                var slot = Slot(details, $"Balance_{tier}", .075f + i * .215f, .867f, .284f + i * .215f, .933f);
+                LotdUiKit.AddImage(slot.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelNavy, false, false);
+                _balances[i] = LotdUiKit.AddFittedText(slot, "Text", "", 19, 12,
+                    TextAnchor.MiddleCenter, CardRarityStyle.GetColor(tier), FontStyle.Bold);
+            }
+            var heading = Slot(details, "Name", .075f, .768f, .926f, .851f);
+            LotdUiKit.AddImage(heading.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelHeader, false, false);
+            _title = LotdUiKit.AddFittedText(heading, "Text", "", 26, 16,
+                TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
+            _art = CompositeCardView.Create(Slot(details, "Art", .075f, .204f, .371f, .745f), "SelectedCard", true);
+            _rarity = ShopRarityBadge.Create(details, new Vector2(.409f, .679f), new Vector2(.49f, .738f), 17);
+            _cardInfo = Label(details, "Ownership", "", .501f, .669f, .925f, .749f, 17,
+                TextAnchor.MiddleLeft, LotdUiKit.GoldAccent);
+            _cardStats = Label(details, "Stats", "", .409f, .591f, .925f, .668f, 16, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary);
+            (_descriptionScroll, _description) = CreateDescription(details);
+            _craft = AddButton(details, "Craft", "제작", .407f, .204f, .661f, .281f, () => OpenConfirmation(true), true);
+            _disassemble = AddButton(details, "Disassemble", "분해", .673f, .204f, .926f, .281f, () => OpenConfirmation(false));
+            _status = Label(details, "Status", "", .077f, .126f, .928f, .195f, 17, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary);
+            Label(details, "Rules", "같은 등급 CP로 제작할 수 있으며 저장한 덱의 카드는 분해에서 보호됩니다.",
+                .077f, .069f, .928f, .121f, 16, TextAnchor.MiddleCenter, LotdUiKit.TextMuted);
+
+            var footer = LotdUiKit.CreateBorderedPanel(main, "Footer", new Vector2(.035f, .017f),
+                new Vector2(.965f, .059f), Vector2.zero, Vector2.zero);
+            LotdUiKit.AddFittedText(footer, "Controls", "방향키 이동   A 선택   Y 검색   LB/RB 페이지   오른쪽 스틱 설명   B 뒤로",
+                16, 11, TextAnchor.MiddleCenter, LotdUiKit.TextMuted);
+
+            var modal = LotdUiKit.FillRect("Confirmation", root);
+            _confirmation = modal.gameObject;
+            LotdUiKit.AddImage(modal.gameObject, LotdUiKit.WhiteSprite, new Color(.015f, .024f, .053f, .83f));
+            var window = LotdUiKit.CreateMenuPanel(modal, "Window", new Vector2(.29f, .282f), new Vector2(.71f, .718f));
+            _confirmTitle = Label(window, "Title", "", .09f, .78f, .91f, .92f, 27, TextAnchor.MiddleCenter, LotdUiKit.GoldAccent);
+            _confirmBody = Label(window, "Details", "", .085f, .483f, .915f, .751f, 22, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary);
+            _minus = AddButton(window, "Minus", "−", .26f, .29f, .39f, .437f, () => ChangeQuantity(-1));
+            _quantityLabel = Label(window, "Quantity", "", .406f, .29f, .594f, .437f, 22, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary);
+            _plus = AddButton(window, "Plus", "+", .61f, .29f, .74f, .437f, () => ChangeQuantity(1));
+            _cancel = AddButton(window, "Cancel", "취소", .092f, .095f, .465f, .24f, CloseConfirmation);
+            _confirm = AddButton(window, "Confirm", "", .535f, .095f, .908f, .24f, ApplyConfirmed, true);
+            _confirmation.SetActive(false);
+
+            _bulk = new CardBulkDisassemblyUI(root, ReturnFromBulk, RefreshPointsAndOwnership);
+            _finder.onValueChanged.AddListener(_ => Filter());
+            Root.SetActive(false);
+        }
+
+        internal void Show()
+        {
+            _entries ??= CardDatabase.AllCards.Where(CollectionProgress.IsCraftableCard).Select(card => new Entry(card))
+                .OrderBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase).ThenBy(entry => entry.Card.code).ToArray();
+            Root.SetActive(true);
+            _main.SetActive(true);
+            _status.text = "";
+            RefreshPoints();
+            Filter();
+            Focus(_finder);
+        }
+
+        internal void Hide()
+        {
+            _bulk.Hide();
+            _confirmation.SetActive(false);
+            _finder.DeactivateInputField();
+            _art.SetCard(0);
+            _selected = null;
+            Root.SetActive(false);
+        }
+
+        internal void Back()
+        {
+            if (_bulk.IsOpen) _bulk.Back();
+            else if (_confirmation.activeSelf) CloseConfirmation();
+            else _onClose?.Invoke();
+        }
+
+        internal void ChangePage(int delta)
+        {
+            if (_bulk.IsOpen)
+            {
+                _bulk.ChangePage(delta);
+                return;
+            }
+            if (_confirmation.activeSelf) return;
+
+            int target = Mathf.Clamp(_page + delta, 0, PageCount - 1);
+            if (target == _page) return;
+            _page = target;
+            RefreshPage();
+            Focus(_rows[0]);
+        }
+
+        internal void ScrollDescription(float direction)
+        {
+            if (direction == 0 || !_main.activeInHierarchy || _confirmation.activeSelf) return;
+            float range = _descriptionScroll.content.rect.height - _descriptionScroll.viewport.rect.height;
+            if (range <= 0) return;
+            _descriptionScroll.StopMovement();
+            _descriptionScroll.verticalNormalizedPosition = Mathf.Clamp01(
+                _descriptionScroll.verticalNormalizedPosition + direction * 300f * Time.unscaledDeltaTime / range);
+        }
+
+        private int PageCount => Mathf.Max(1, (_matches.Count + PageSize - 1) / PageSize);
+
+        private void ChangeFilter(int filter)
+        {
+            if (_filter == filter) return;
+            _filter = filter;
+            Filter();
+        }
+
+        private void Filter()
+        {
+            if (_entries == null) return;
+            for (int i = 0; i < _filterLabels.Length; i++)
+                _filterLabels[i].color = i == _filter ? LotdUiKit.GoldAccent :
+                    i == 0 ? LotdUiKit.TextPrimary : CardRarityStyle.GetColor(Rarities[i - 1]);
+
+            string query = _finder.text.Trim();
+            string normalized = Normalize(query);
+            bool isCode = uint.TryParse(query, out uint code);
+            _matches.Clear();
+            foreach (var entry in _entries)
+            {
+                if (_filter != 0 && entry.Rarity != Rarities[_filter - 1]) continue;
+                if (query.Length == 0 || (isCode ? entry.Card.code == code :
+                    entry.Name.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    normalized.Length > 0 && entry.SearchName.IndexOf(normalized, StringComparison.OrdinalIgnoreCase) >= 0))
+                    _matches.Add(entry);
+            }
+            _page = 0;
+            _status.text = "";
+            RefreshPage();
+        }
+
+        private void RefreshPointsAndOwnership()
+        {
+            RefreshPoints();
+            RefreshPage();
+        }
+
+        private void RefreshPoints()
+        {
+            _disassembleLimits = CollectionProgress.GetDisassembleLimits();
+            for (int i = 0; i < Rarities.Length; i++)
+            {
+                var rarity = Rarities[i];
+                _balances[i].text = $"{CardRarityCatalog.GetLabel(rarity)} CP {CollectionProgress.GetCraftPoints(rarity):N0}";
+            }
+        }
+
+        private void RefreshPage()
+        {
+            int first = _page * PageSize;
+            for (int row = 0; row < _rows.Length; row++)
+            {
+                int index = first + row;
+                bool visible = index < _matches.Count;
+                _rows[row].transform.parent.gameObject.SetActive(visible);
+                if (!visible) continue;
+                var entry = _matches[index];
+                uint code = entry.Card.code;
+                _rowNames[row].text = $"{entry.Name} · {CollectionProgress.GetOwnedCount(code)}장";
+                ShopRarityBadge.Update(_rowRarities[row], code);
+            }
+            _count.text = _matches.Count == 0 ? "검색 결과 없음" : $"카드 {_matches.Count:N0}종";
+            _pageLabel.text = $"{_page + 1} / {PageCount}";
+            _previous.interactable = _page > 0;
+            _next.interactable = _page + 1 < PageCount;
+
+            int indexOfSelection = _matches.IndexOf(_selected);
+            if (indexOfSelection < first || indexOfSelection >= first + PageSize) indexOfSelection = first;
+            SetCard(indexOfSelection < _matches.Count ? _matches[indexOfSelection] : null);
+        }
+
+        private void SelectRow(int row)
+        {
+            int index = _page * PageSize + row;
+            if (index >= _matches.Count) return;
+            SetCard(_matches[index]);
+        }
+
+        private void SetCard(Entry entry)
+        {
+            uint code = entry?.Card.code ?? 0;
+            if (entry != _selected)
+            {
+                _status.text = "";
+                _description.text = entry?.Card.desc ?? "";
+                _descriptionScroll.StopMovement();
+                _descriptionScroll.content.anchoredPosition = Vector2.zero;
+            }
+            _selected = entry;
+            _title.text = entry?.Name ?? "선택 카드 없음";
+            _cardStats.text = entry?.Card.FormatStatsLineKR() ?? "";
+            if (_art.CurrentCode != code) _art.SetCard(code);
+            _art.gameObject.SetActive(code != 0);
+            ShopRarityBadge.Update(_rarity, code);
+            _craft.interactable = _disassemble.interactable = code != 0;
+
+            if (entry == null) _cardInfo.text = "";
+            else
+            {
+                int owned = CollectionProgress.GetOwnedCount(code);
+                _cardInfo.text = $"보유 {owned}장 · 분해 가능 {DisassembleLimit(code)}장";
+            }
+            string tier = entry == null ? "" : CardRarityCatalog.GetLabel(entry.Rarity);
+            SetButtonText(_craft, entry == null ? "제작" : $"제작 · {tier} {CollectionProgress.CraftPointCost} CP");
+            SetButtonText(_disassemble, entry == null ? "분해" : $"분해 · {tier} {CollectionProgress.DisassemblePointValue} CP");
+
+            int first = _page * PageSize;
+            for (int i = 0; i < _rows.Length && first + i < _matches.Count; i++)
+                _rowNames[i].color = _matches[first + i] == entry ? LotdUiKit.GoldAccent : LotdUiKit.TextPrimary;
+        }
+
+        private int DisassembleLimit(uint code) =>
+            _disassembleLimits != null && _disassembleLimits.TryGetValue(code, out int count) ? count : 0;
+
+        private void OpenBulk()
+        {
+            _finder.DeactivateInputField();
+            _main.SetActive(false);
+            _bulk.Show();
+        }
+
+        private void ReturnFromBulk()
+        {
+            _main.SetActive(true);
+            _status.text = "";
+            RefreshPointsAndOwnership();
+            Focus(_bulkButton);
+        }
+
+        private void OpenConfirmation(bool crafting)
+        {
+            if (_selected == null) return;
+            uint code = _selected.Card.code;
+            string rarity = CardRarityCatalog.GetLabel(_selected.Rarity);
+            if (crafting)
+            {
+                int room = CollectionProgress.GetCraftLimit(code);
+                int usable = CollectionProgress.GetCraftPoints(_selected.Rarity) / CollectionProgress.CraftPointCost;
+                if (room == 0)
+                {
+                    _status.text = "이 카드는 보유 한도에 도달했습니다.";
+                    return;
+                }
+                if (usable == 0)
+                {
+                    _status.text = $"{rarity} 제작 포인트가 부족합니다.";
+                    return;
+                }
+                _maxQuantity = Mathf.Min(room, usable);
+            }
+            else
+            {
+                _maxQuantity = DisassembleLimit(code);
+                if (_maxQuantity == 0)
+                {
+                    _status.text = CollectionProgress.GetOwnedCount(code) == 0 ?
+                        "이 카드를 보유하고 있지 않습니다." : "저장한 덱에 필요한 카드입니다.";
+                    return;
+                }
+            }
+            _status.text = "";
+            _finder.DeactivateInputField();
+            _quantity = 1;
+            _crafting = crafting;
+            _confirmation.SetActive(true);
+            RefreshConfirmation();
+            Focus(_cancel);
+        }
+
+        private void ChangeQuantity(int delta)
+        {
+            _quantity = Mathf.Clamp(_quantity + delta, 1, _maxQuantity);
+            RefreshConfirmation();
+            if (delta > 0 && !_plus.interactable) Focus(_minus);
+            else if (delta < 0 && !_minus.interactable) Focus(_plus);
+        }
+
+        private void RefreshConfirmation()
+        {
+            string action = _crafting ? "제작" : "분해";
+            int points = _quantity * (_crafting ? CollectionProgress.CraftPointCost : CollectionProgress.DisassemblePointValue);
+            int current = CollectionProgress.GetCraftPoints(_selected.Rarity);
+            long result = _crafting ? (long)current - points : (long)current + points;
+            string rarity = CardRarityCatalog.GetLabel(_selected.Rarity);
+            _confirmTitle.text = $"카드 {action}";
+            string change = _crafting ? "사용" : "획득";
+            _confirmBody.text = $"{_selected.Name}\n{rarity} CP {points:N0} {change}\n{rarity} CP {current:N0} → {result:N0}";
+            _quantityLabel.text = $"{_quantity}장";
+            _minus.transform.parent.gameObject.SetActive(_maxQuantity > 1);
+            _plus.transform.parent.gameObject.SetActive(_maxQuantity > 1);
+            _minus.interactable = _quantity > 1;
+            _plus.interactable = _quantity < _maxQuantity;
+            _minus.GetComponentInChildren<Text>().color = _minus.interactable ? LotdUiKit.TextPrimary : LotdUiKit.TextMuted;
+            _plus.GetComponentInChildren<Text>().color = _plus.interactable ? LotdUiKit.TextPrimary : LotdUiKit.TextMuted;
+            SetButtonText(_confirm, $"{action}하기");
+        }
+
+        private void CloseConfirmation()
+        {
+            _confirmation.SetActive(false);
+            Focus(_crafting ? _craft : _disassemble);
+        }
+
+        private void ApplyConfirmed()
+        {
+            if (!_confirmation.activeSelf || _selected == null) return;
+            uint code = _selected.Card.code;
+            string name = _selected.Name;
+            string error;
+            bool saved = _crafting ? CollectionProgress.TryCraftCard(code, _quantity, out error) :
+                CollectionProgress.TryDisassembleCards(new Dictionary<uint, int> { [code] = _quantity }, out error);
+            CloseConfirmation();
+            RefreshPointsAndOwnership();
+            _status.text = saved ? $"{name} {_quantity}장 {(_crafting ? "제작" : "분해")}했습니다." : error;
+        }
+
+        private static (ScrollRect, Text) CreateDescription(Transform parent)
+        {
+            var holder = Slot(parent, "Description", .407f, .305f, .925f, .585f);
+            LotdUiKit.AddImage(holder.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelNavy);
+            var viewport = LotdUiKit.CreateRect("Viewport", holder, Vector2.zero, Vector2.one, new Vector2(8f, 5f), new Vector2(-20f, -5f));
+            viewport.gameObject.AddComponent<RectMask2D>();
+            var text = LotdUiKit.AddText(viewport, "Text", "", 17, TextAnchor.UpperLeft, LotdUiKit.TextPrimary);
+            text.supportRichText = false;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+            text.rectTransform.anchorMin = Vector2.up;
+            text.rectTransform.anchorMax = Vector2.one;
+            text.rectTransform.pivot = new Vector2(.5f, 1f);
+            text.rectTransform.sizeDelta = Vector2.zero;
+            text.rectTransform.anchoredPosition = Vector2.zero;
+            text.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            var scroll = holder.gameObject.AddComponent<ScrollRect>();
+            scroll.viewport = viewport;
+            scroll.content = text.rectTransform;
+            scroll.horizontal = false;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.verticalScrollbar = LotdUiKit.AddVerticalScrollbar(holder);
+            scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
+            scroll.scrollSensitivity = 25f;
+            return (scroll, text);
+        }
+
+        private static string Normalize(string value) => new string(value.Where(char.IsLetterOrDigit).ToArray());
+
+        private static void Focus(Selectable button)
+        {
+            var events = EventSystem.current;
+            if (events != null && !events.alreadySelecting) events.SetSelectedGameObject(button.gameObject);
+        }
+
+        private static void SetButtonText(Button button, string label) => button.GetComponentInChildren<Text>().text = label;
+
+        private static RectTransform Slot(Transform parent, string name, float left, float bottom, float right, float top) =>
+            LotdUiKit.CreateRect(name, parent, new Vector2(left, bottom), new Vector2(right, top), Vector2.zero, Vector2.zero);
+
+        private static Text Label(Transform parent, string name, string text, float left, float bottom, float right, float top,
+            int size, TextAnchor alignment, Color color) => LotdUiKit.AddFittedText(Slot(parent, name, left, bottom, right, top),
+            "Text", text, size, Mathf.Max(11, size - 8), alignment, color);
+
+        private static Button AddButton(Transform parent, string name, string text, float left, float bottom, float right, float top,
+            Action action, bool gold = false)
+        {
+            var button = LotdUiKit.CreateLotdButton(Slot(parent, name, left, bottom, right, top), "Button", text, action, 18, gold);
+            var caption = button.GetComponentInChildren<Text>();
+            caption.resizeTextForBestFit = true;
+            caption.resizeTextMinSize = 11;
+            caption.resizeTextMaxSize = 18;
+            caption.supportRichText = false;
+            caption.rectTransform.anchorMin = new Vector2(.06f, .06f);
+            caption.rectTransform.anchorMax = new Vector2(.94f, .94f);
+            return button;
+        }
+    }
+}
