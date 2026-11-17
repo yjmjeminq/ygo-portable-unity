@@ -104,6 +104,8 @@ LOTD_MISSING_PASSCODES = {
 
 MERCURIUM_PRE_RELEASE = 101303084
 MERCURIUM = 22984000
+CARD_OF_SANCTITY = 42664989
+CARD_OF_SANCTITY_ANIME = 511001126
 
 # Spell/Trap subtype bitmasks matched against YGO-Ex cards.json "icon" field
 ICON_TO_SUBTYPE = {
@@ -372,6 +374,11 @@ def build_cards():
         strs = strs[:last_nz + 1] if last_nz >= 0 else []
         cdb_texts[cid] = (row[1] or "", row[2] or "", strs)
 
+    # Give the anime spell its own identity while reusing the printed spell's base stats.
+    anime_effect = "양쪽 플레이어는 각각 자신의 패가 6장이 되도록 덱에서 드로우한다."
+    cdb_datas[CARD_OF_SANCTITY_ANIME] = dict(cdb_datas[CARD_OF_SANCTITY], code=CARD_OF_SANCTITY_ANIME, alias=0)
+    cdb_texts[CARD_OF_SANCTITY_ANIME] = ("하늘의 선물 (원작판)", f"①: {anime_effect}", [anime_effect])
+
     # These effects create tokens missing from the installed card database.
     generated_tokens = (
         (41458361, 41458362, "기석 토큰", "아다마시아 루미나스", "Rock", "Light"),
@@ -527,6 +534,7 @@ def build_deck_effect_categories(all_codes):
     with sqlite3.connect(f"{db_path}?mode=ro", uri=True) as db:
         modern = {code: remap(category or 0, edopro_bits)
                   for code, category in db.execute("SELECT id, category FROM datas")}
+    modern[CARD_OF_SANCTITY_ANIME] = 1 << 4  # Draw
 
     records = []
     for code in sorted(all_codes):
@@ -580,8 +588,10 @@ def build_script_pack(all_codes: set):
             script = scripts[f"c{MERCURIUM}.lua"]
             scripts[name] = script.replace(b"local s,id=GetID()", f"local s=GetID()\nlocal id={MERCURIUM}".encode(), 1)
 
-    if 40975243 in all_codes:
-        scripts["c40975243.lua"] = (UNITY_ROOT / "Tools" / "ScriptOverrides" / "c40975243.lua").read_bytes()
+    for code in (40975243, CARD_OF_SANCTITY_ANIME):
+        if code in all_codes:
+            name = f"c{code}.lua"
+            scripts[name] = (UNITY_ROOT / "Tools" / "ScriptOverrides" / name).read_bytes()
 
     # Master Duel automatically makes blind random selections. These effects reveal and
     # shuffle the candidates before choosing one, and their card text explicitly says random.
@@ -735,13 +745,19 @@ def build_card_art(all_codes: set, lotd_to_pass: dict, mod_by_pass: dict):
     if len(cur_chunk) > 0:
         (STREAMING / f"cardart_{chunk_id}.pack").write_bytes(cur_chunk)
 
-    # Index file: YGOI + ver(1) + count + [passcode(u32), packId(u32), offset(u32), length(u32)]
-    idx_bytes = bytearray(struct.pack("<4sII", b"YGOI", 1, len(entries)))
-    for pw, pid, off, ln in entries:
-        idx_bytes += struct.pack("<IIII", pw, pid, off, ln)
-    (STREAMING / "cardart.idx").write_bytes(idx_bytes)
+    write_card_art_index(entries)
     total_mb = sum(p.stat().st_size for p in STREAMING.glob("cardart*.pack")) / 1024 / 1024
     print(f"  cardart: {len(entries)} images in {chunk_id+1} chunks ({total_mb:.2f} MB total)")
+
+
+def write_card_art_index(entries):
+    # Both editions use the same bundled artwork bytes.
+    by_code = {code: (pack, offset, size) for code, pack, offset, size in entries}
+    by_code[CARD_OF_SANCTITY_ANIME] = by_code[CARD_OF_SANCTITY]
+    idx_bytes = bytearray(struct.pack("<4sII", b"YGOI", 1, len(by_code)))
+    for code, art in by_code.items():
+        idx_bytes += struct.pack("<IIII", code, *art)
+    (STREAMING / "cardart.idx").write_bytes(idx_bytes)
 
 
 def build_token_art(cards):

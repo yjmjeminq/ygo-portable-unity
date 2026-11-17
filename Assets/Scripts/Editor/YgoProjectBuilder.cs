@@ -346,6 +346,7 @@ namespace YGOPortable.Editor
             // Explicit test for User scenario: E-Emergency Call (213326) -> pick 3rd card (idx=2) from Deck
             VerifyDeckSearchEmergencyCall(classicDecks[0].main);
             VerifyBingoMachineAutoPick();
+            VerifyAnimeCardOfSanctity();
 
             // Explicit test for older searchers finding newest 2025/2026 cards across Category/Type/Race/Stats/Level
             VerifyOldSearchersFindNewestCards(classicDecks[0].main);
@@ -622,6 +623,70 @@ namespace YGOPortable.Editor
                 player.hand.Count(card => offeredCodes.Contains(card.code)) == offeredInHandBefore + 1 &&
                 session.RetryCount == 0, "Bingo Machine should put one revealed card in hand without an opponent prompt.");
             Debug.Log("[VERIFY BINGO] One revealed card was automatically added to hand without an opponent prompt.");
+        }
+
+        private static void VerifyAnimeCardOfSanctity()
+        {
+            const uint sanctity = 511001126;
+            const uint printedSanctity = 42664989;
+            const uint oneDayOfPeace = 33782437;
+            const uint potOfGreed = 55144522;
+            const uint filler = 46986414;
+            var anime = CardDatabase.Get(sanctity);
+            var search = new DeckCardFilter("하늘의 선물", "", DeckCardKind.Spell, effectCategories: 1UL << 4);
+            AssertTrue(anime != null && anime.alias == 0 && search.Matches(anime) && search.Matches(CardDatabase.Get(printedSanctity)),
+                "Both versions of Card of Sanctity should appear in the deck editor's draw-spell search.");
+            AssertTrue(CardArtLoader.GetArtSprite(sanctity) != CardArtLoader.GetFallbackArt(),
+                "Anime Card of Sanctity could not load its bundled artwork.");
+
+            uint[] empty = Array.Empty<uint>();
+            uint[] deck = Enumerable.Repeat(sanctity, 3)
+                .Concat(Enumerable.Repeat(oneDayOfPeace, 9))
+                .Concat(Enumerable.Repeat(potOfGreed, 8))
+                .Concat(Enumerable.Repeat(filler, 20)).ToArray();
+            uint[] opponentDeck = Enumerable.Repeat(filler, 40).ToArray();
+            var ai = new TacticalAI();
+
+            foreach (var (peaceActivations, potActivations) in new[] { (0, 0), (2, 0), (2, 1), (0, 2) })
+            {
+                using var session = StartSeedMatching("Anime Card of Sanctity", deck, empty, opponentDeck, empty, true,
+                    duel => duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD &&
+                        duel.ActivePrompt.activatable.Any(card => card.code == sanctity) &&
+                        duel.Players[0].hand.Count(card => card.code == oneDayOfPeace) >= peaceActivations &&
+                        duel.Players[0].hand.Count(card => card.code == potOfGreed) >= potActivations);
+
+                void Activate(uint code)
+                {
+                    int index = session.ActivePrompt.activatable.FindIndex(card => card.code == code);
+                    AssertTrue(index >= 0, $"Expected to activate {CardDatabase.GetName(code)}.");
+                    session.SubmitResponseInt((index << 16) | 5);
+                    DriveUntilIdle(session, ai);
+                    AssertTrue(session.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD,
+                        $"Expected to return to the main phase after activating {CardDatabase.GetName(code)}.");
+                }
+
+                for (int i = 0; i < peaceActivations; i++) Activate(oneDayOfPeace);
+                for (int i = 0; i < potActivations; i++) Activate(potOfGreed);
+
+                var player = session.Players[0];
+                var opponent = session.Players[1];
+                int playerHandBefore = 5 + potActivations;
+                int opponentHandBefore = 5 + peaceActivations;
+                AssertTrue(player.hand.Count == playerHandBefore && opponent.hand.Count == opponentHandBefore,
+                    $"Anime Card of Sanctity: expected hands of {playerHandBefore} and {opponentHandBefore} before activation.");
+                int playerDeckBefore = player.deckCount;
+                int opponentDeckBefore = opponent.deckCount;
+                Activate(sanctity);
+
+                int playerHandAtResolution = playerHandBefore - 1;
+                AssertTrue(player.grave.Any(card => card.code == sanctity) && session.RetryCount == 0,
+                    "Anime Card of Sanctity did not resolve cleanly.");
+                AssertTrue(player.hand.Count == 6 && player.deckCount == playerDeckBefore - (6 - playerHandAtResolution) &&
+                    opponent.hand.Count == Math.Max(6, opponentHandBefore) &&
+                    opponent.deckCount == opponentDeckBefore - Math.Max(0, 6 - opponentHandBefore),
+                    $"Anime Card of Sanctity drew the wrong number of cards for hands of {playerHandAtResolution} and {opponentHandBefore}.");
+                Debug.Log($"[VERIFY SANCTITY] Hands of {playerHandAtResolution} and {opponentHandBefore} resolved to {player.hand.Count} and {opponent.hand.Count}.");
+            }
         }
 
         private static void VerifyDeckSearchEmergencyCall(uint[] oppDeckMain)
