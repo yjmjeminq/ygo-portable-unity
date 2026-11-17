@@ -43,7 +43,7 @@ namespace YGOPortable.Editor
             VerifyPurchasesAndRewards(save, profile);
             VerifyMyDeckPicker(starter);
             VerifyDeckCopyLimitAndFullDisassembly(starter);
-            Debug.Log($"[VERIFY COLLECTION] {starters.Count} starter deck sizes, legacy saves, uncapped inventory, isolated CP, " +
+            Debug.Log($"[VERIFY COLLECTION] {starters.Count} starter deck sizes, legacy saves, uncapped inventory, shared crafting dust, " +
                 "deck copy limits, full disassembly, pack ownership, rollback and opponent progression passed.");
         }
 
@@ -107,17 +107,29 @@ namespace YGOPortable.Editor
 
             string json = File.ReadAllText(profile);
             json = Regex.Replace(json, "\"version\"\\s*:\\s*\\d+", "\"version\": 3");
-            json = Regex.Replace(json, "\"craftPoints\"\\s*:\\s*\\[[^\\]]*\\],\\s*", "");
+            json = Regex.Replace(json, "\"craftDust\"\\s*:\\s*\"[^\"]*\",\\s*", "");
             for (int i = 0; i < materials.Length; i++)
                 json = WithOwnership(json, materials[i], i == (int)CardRarity.UltraRare ? 15 : 3);
             foreach (uint code in DrawSpells) json = WithOwnership(json, code, 4);
             File.WriteAllText(profile, json);
             CollectionProgress.Load(save);
             Require(CollectionProgress.HasStarter && CollectionProgress.Balance == CollectionProgress.StartingBalance &&
-                Rarities.All(rarity => CollectionProgress.GetCraftPoints(rarity) == 0) &&
+                CollectionProgress.CraftDust == 0 &&
                 CollectionProgress.GetOwnedCount(materials[(int)CardRarity.UltraRare]) == 15 &&
                 DrawSpells.All(code => CollectionProgress.GetOwnedCount(code) == 4),
-                "The legacy profile did not preserve DP and cards or initialize CP to zero.");
+                "A legacy profile without crafting balances did not load correctly.");
+            string legacy = Regex.Replace(json, "\"version\"\\s*:\\s*\\d+",
+                "\"version\": 5,\n    \"craftPoints\": [5, 7, 12, 16]");
+            string maxBalances = legacy.Replace("[5, 7, 12, 16]",
+                $"[{long.MaxValue}, {long.MaxValue}, {long.MaxValue}, {long.MaxValue}]");
+            File.WriteAllText(profile, maxBalances);
+            CollectionProgress.Load(save);
+            Require(CollectionProgress.CraftDust == 4m * long.MaxValue,
+                "Adding the old rarity balances overflowed.");
+            File.WriteAllText(profile, legacy);
+            Require(new SaveSyncFiles(save).Capture().profile == legacy, "Cloud sync rejected an old crafting save.");
+            CollectionProgress.Load(save);
+            Require(CollectionProgress.CraftDust == 40, "The old rarity balances did not migrate to a single pool.");
             Require(CardRarityCatalog.GetRarity(AshBlossom, out bool sourced) == CardRarity.UltraRare && sourced,
                 "The bundled rarity catalog did not yield the expected UR test card.");
             return materials;
@@ -155,26 +167,27 @@ namespace YGOPortable.Editor
                 [super] = 2,
                 [ultra] = 15,
             }, out string error), error);
-            int value = CollectionProgress.DisassemblePointValue;
-            Require(CollectionProgress.GetCraftPoints(CardRarity.Normal) == 3 * value &&
-                CollectionProgress.GetCraftPoints(CardRarity.Rare) == 3 * value &&
-                CollectionProgress.GetCraftPoints(CardRarity.SuperRare) == 2 * value &&
-                CollectionProgress.GetCraftPoints(CardRarity.UltraRare) == 15 * value,
-                "Bulk disassembly mixed rarity balances.");
+            Require(CollectionProgress.CraftDust == 40 + 23 * CollectionProgress.DisassemblyDustPerCard &&
+                Rarities.Select(CollectionProgress.GetCraftDustCost).SequenceEqual(new[] { 30, 60, 90, 120 }),
+                "Bulk disassembly did not award shared dust or crafting costs did not increase by rarity.");
             Require(!CollectionProgress.TryCraftCard(AshBlossom, 0, out _), "A zero craft quantity was accepted.");
-            Require(CollectionProgress.TryCraftCard(AshBlossom, 4, out error) &&
-                CollectionProgress.TryCraftCard(AshBlossom, 1, out error) &&
-                CollectionProgress.GetOwnedCount(AshBlossom) == 5 &&
-                CollectionProgress.GetCraftPoints(CardRarity.UltraRare) == 0, error);
+            Require(CollectionProgress.TryCraftCard(AshBlossom, 1, out error) &&
+                CollectionProgress.GetOwnedCount(AshBlossom) == 1 &&
+                CollectionProgress.CraftDust == 150, error);
+            Require(!CollectionProgress.TryCraftCard(rare, 3, out _) && CollectionProgress.CraftDust == 150 &&
+                CollectionProgress.GetOwnedCount(rare) == 0, "Crafting used more dust than the shared balance.");
+            Require(CollectionProgress.TryCraftCard(normal, 5, out error) &&
+                CollectionProgress.GetOwnedCount(normal) == 5 && CollectionProgress.CraftDust == 0, error);
             Require(!CollectionProgress.TryCraftCard(AshBlossom, 1, out _) &&
-                CollectionProgress.GetCraftPoints(CardRarity.Rare) == 3 * value &&
-                CollectionProgress.Balance == CollectionProgress.StartingBalance,
-                "Crafting fell back to a different currency or changed DP.");
+                CollectionProgress.Balance == CollectionProgress.StartingBalance &&
+                !File.ReadAllText(profile).Contains("\"craftPoints\""),
+                "Crafting changed DP, accepted an overspend, or saved the old rarity balances.");
         }
 
         private static void VerifyPurchasesAndRewards(string save, string profile)
         {
             int expectedDp = CollectionProgress.Balance;
+            decimal expectedDust = CollectionProgress.CraftDust;
             var pack = CollectionProgress.Packs.Single(item => item.Id == SupportPack);
             string stockedProfile = File.ReadAllText(profile);
             foreach (uint code in pack.CardPool)
@@ -213,12 +226,12 @@ namespace YGOPortable.Editor
                 File.ReadAllText(profile) == changedExternally, "A stale profile overwrote a newer save.");
             CollectionProgress.Load(save);
             Require(CollectionProgress.Balance == expectedDp &&
-                CollectionProgress.GetCraftPoints(CardRarity.Rare) == 3 * CollectionProgress.DisassemblePointValue &&
+                CollectionProgress.CraftDust == expectedDust &&
                 CollectionProgress.GetOwnedCount(AshBlossom) > 0 &&
                 CollectionProgress.IsOpponentDeckCleared(first.id, levels[0].id) &&
                 CollectionProgress.IsOpponentDeckUnlocked(first.id, levels[1].id) &&
                 CollectionProgress.IsOpponentUnlocked(opponent.id),
-                "Reload lost minted ownership, CP, DP, or opponent progression.");
+                "Reload lost crafted ownership, dust, DP, or opponent progression.");
         }
 
         private static string WithOwnership(string json, uint code, int count)

@@ -42,7 +42,7 @@ namespace YGOPortable.UI
         private readonly Text[] _rowNames = new Text[PageSize];
         private readonly Text[] _rowRarities = new Text[PageSize];
         private readonly Text[] _filterLabels = new Text[Rarities.Length + 1];
-        private readonly Text[] _balances = new Text[Rarities.Length];
+        private readonly Text _balance;
         private readonly Text _count;
         private readonly Text _pageLabel;
         private readonly Button _previous;
@@ -132,14 +132,10 @@ namespace YGOPortable.UI
             _next = AddButton(catalog, "Next", "다음", .72f, .074f, .92f, .14f, () => ChangePage(1));
 
             var details = PackShopStyle.Panel(main, "Details", new Vector2(.439f, .083f), new Vector2(.975f, .882f));
-            for (int i = 0; i < Rarities.Length; i++)
-            {
-                var tier = Rarities[i];
-                var slot = Slot(details, $"Balance_{tier}", .075f + i * .215f, .867f, .284f + i * .215f, .933f);
-                LotdUiKit.AddImage(slot.gameObject, LotdUiKit.WhiteSprite, PackShopStyle.SurfaceInset, false, false);
-                _balances[i] = LotdUiKit.AddFittedText(slot, "Text", "", 19, 12,
-                    TextAnchor.MiddleCenter, CardRarityStyle.GetColor(tier), FontStyle.Bold);
-            }
+            var balance = Slot(details, "Balance", .075f, .867f, .926f, .933f);
+            LotdUiKit.AddImage(balance.gameObject, LotdUiKit.WhiteSprite, PackShopStyle.SurfaceInset, false, false);
+            _balance = LotdUiKit.AddFittedText(balance, "Text", "", 20, 12,
+                TextAnchor.MiddleCenter, PackShopStyle.Accent, FontStyle.Bold);
             var heading = Slot(details, "Name", .075f, .768f, .926f, .851f);
             _title = LotdUiKit.AddFittedText(heading, "Text", "", 26, 16,
                 TextAnchor.MiddleCenter, PackShopStyle.TextPrimary, FontStyle.Bold);
@@ -152,7 +148,9 @@ namespace YGOPortable.UI
             _craft = AddButton(details, "Craft", "제작", .407f, .204f, .661f, .281f, () => OpenConfirmation(true), true);
             _disassemble = AddButton(details, "Disassemble", "분해", .673f, .204f, .926f, .281f, () => OpenConfirmation(false));
             _status = Label(details, "Status", "", .077f, .126f, .928f, .195f, 17, TextAnchor.MiddleCenter, PackShopStyle.TextPrimary);
-            Label(details, "Rules", "같은 등급의 CP를 사용해 카드를 제작할 수 있습니다.",
+            string prices = string.Join(" · ", Rarities.Select(rarity =>
+                $"{CardRarityCatalog.GetLabel(rarity)} {CollectionProgress.GetCraftDustCost(rarity)}"));
+            Label(details, "Rules", $"제작에 드는 가루   {prices}",
                 .077f, .069f, .928f, .121f, 16, TextAnchor.MiddleCenter, PackShopStyle.TextMuted);
 
             var footer = PackShopStyle.Panel(main, "Footer", new Vector2(.035f, .017f), new Vector2(.965f, .059f));
@@ -187,7 +185,7 @@ namespace YGOPortable.UI
             _main.SetActive(true);
             _filter = 0;
             _finder.SetTextWithoutNotify("");
-            RefreshPoints();
+            RefreshDust();
             int selectedIndex = Filter(selectedCard);
             if (selectedIndex >= 0) Focus(_rows[selectedIndex % PageSize]);
             else Focus(_finder);
@@ -274,18 +272,11 @@ namespace YGOPortable.UI
 
         private void RefreshPointsAndOwnership()
         {
-            RefreshPoints();
+            RefreshDust();
             RefreshPage();
         }
 
-        private void RefreshPoints()
-        {
-            for (int i = 0; i < Rarities.Length; i++)
-            {
-                var rarity = Rarities[i];
-                _balances[i].text = $"{CardRarityCatalog.GetLabel(rarity)} CP {CollectionProgress.GetCraftPoints(rarity):N0}";
-            }
-        }
+        private void RefreshDust() => _balance.text = $"보유 가루 {CollectionProgress.CraftDust:N0}";
 
         private void RefreshPage()
         {
@@ -341,9 +332,8 @@ namespace YGOPortable.UI
                 int owned = CollectionProgress.GetOwnedCount(code);
                 _cardInfo.text = $"보유 {owned:N0}장";
             }
-            string tier = entry == null ? "" : CardRarityCatalog.GetLabel(entry.Rarity);
-            SetButtonText(_craft, entry == null ? "제작" : $"제작 · {tier} {CollectionProgress.CraftPointCost} CP");
-            SetButtonText(_disassemble, entry == null ? "분해" : $"분해 · {tier} {CollectionProgress.DisassemblePointValue} CP");
+            SetButtonText(_craft, entry == null ? "제작" : $"제작 · 가루 {CollectionProgress.GetCraftDustCost(entry.Rarity)}");
+            SetButtonText(_disassemble, entry == null ? "분해" : $"분해 · 가루 +{CollectionProgress.DisassemblyDustPerCard}");
 
             int first = _page * PageSize;
             for (int i = 0; i < _rows.Length && first + i < _matches.Count; i++)
@@ -371,11 +361,11 @@ namespace YGOPortable.UI
             if (_selected == null || _confirmation.activeSelf) return;
             var card = _selected;
             uint code = card.Card.code;
-            string rarity = CardRarityCatalog.GetLabel(card.Rarity);
             if (crafting)
             {
                 int room = CollectionProgress.GetCraftLimit(code);
-                long usable = CollectionProgress.GetCraftPoints(card.Rarity) / CollectionProgress.CraftPointCost;
+                int cost = CollectionProgress.GetCraftDustCost(card.Rarity);
+                decimal usable = decimal.Floor(CollectionProgress.CraftDust / cost);
                 if (room == 0)
                 {
                     _status.color = PackShopStyle.Danger;
@@ -385,7 +375,7 @@ namespace YGOPortable.UI
                 if (usable == 0)
                 {
                     _status.color = PackShopStyle.Danger;
-                    _status.text = $"{rarity} 제작 포인트가 부족합니다.";
+                    _status.text = $"제작에 가루 {cost:N0}개가 필요합니다.";
                     return;
                 }
                 _maxQuantity = (int)Math.Min(room, usable);
@@ -432,13 +422,15 @@ namespace YGOPortable.UI
         private void RefreshConfirmation()
         {
             string action = _crafting ? "제작" : "분해";
-            long points = (long)_quantity * (_crafting ? CollectionProgress.CraftPointCost : CollectionProgress.DisassemblePointValue);
-            long current = CollectionProgress.GetCraftPoints(_confirmedCard.Rarity);
-            long result = _crafting ? current - points : current + Math.Min(points, long.MaxValue - current);
-            string rarity = CardRarityCatalog.GetLabel(_confirmedCard.Rarity);
+            int perCard = _crafting
+                ? CollectionProgress.GetCraftDustCost(_confirmedCard.Rarity)
+                : CollectionProgress.DisassemblyDustPerCard;
+            long dust = (long)_quantity * perCard;
+            decimal current = CollectionProgress.CraftDust;
+            decimal result = _crafting ? current - dust : current + Math.Min(dust, decimal.MaxValue - current);
             _confirmTitle.text = $"카드 {action}";
             string change = _crafting ? "사용" : "획득";
-            _confirmBody.text = $"{_confirmedCard.Name}\n{rarity} CP {points:N0} {change}\n{rarity} CP {current:N0} → {result:N0}";
+            _confirmBody.text = $"{_confirmedCard.Name}\n가루 {dust:N0} {change}\n보유 가루 {current:N0} → {result:N0}";
             if (!_crafting) _confirmBody.text += "\n보유 카드가 부족해진 덱은 수정 후 사용할 수 있습니다.";
             _quantityLabel.text = $"{_quantity:N0}장";
             _minus.transform.parent.gameObject.SetActive(_maxQuantity > 1);

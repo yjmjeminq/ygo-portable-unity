@@ -118,6 +118,9 @@ namespace YGOPortable.Editor
             var art = (CompositeCardView)Field(crafting, "_art");
             Require(editor.Root.activeSelf && !craftingButton.gameObject.activeInHierarchy && art.CurrentCode == code,
                 "Crafting did not open from the selected card without exposing the deck editor controls.");
+            var craft = ButtonAt(catalog, "Details/Craft/Button");
+            Require(craft.GetComponentInChildren<Text>().text == $"제작 · 가루 {CollectionProgress.GetCraftDustCost(rarity)}",
+                "The crafting button did not show the cost for the selected rarity.");
             var disassemble = ButtonAt(catalog, "Details/Disassemble/Button");
             disassemble.onClick.Invoke();
             var usedCardDialog = CraftingScope(crafting);
@@ -134,6 +137,14 @@ namespace YGOPortable.Editor
             Require(selected.Count == available.Count && selected[code] == owned &&
                 available.All(pair => selected.TryGetValue(pair.Key, out int quantity) && quantity == pair.Value),
                 "Select all missed eligible owned copies.");
+            string reward = $"가루 +{available.Values.Sum(quantity => (long)quantity * CollectionProgress.DisassemblyDustPerCard):N0}";
+            Require(bulkCatalog.transform.Find("Details/Dust/Text").GetComponent<Text>().text == reward,
+                "The bulk catalog did not total the shared dust reward.");
+            ButtonAt(bulkCatalog, "Details/Review/Button").onClick.Invoke();
+            var bulkReview = CraftingScope(crafting);
+            Require(bulkReview != bulkCatalog && bulkReview.transform.Find("Details/Dust/Text").GetComponent<Text>().text == reward,
+                "The bulk confirmation did not show the same shared dust reward.");
+            Call(crafting, "Back");
             Call(crafting, "Back");
             ButtonAt(catalog, "Back/Button").onClick.Invoke();
             Require(craftingButton.gameObject.activeInHierarchy && events.currentSelectedGameObject == craftingButton.gameObject &&
@@ -160,7 +171,9 @@ namespace YGOPortable.Editor
             search.text = alternative.code.ToString();
             confirm.onClick.Invoke();
             Require(CollectionProgress.GetOwnedCount(code) == 0 &&
-                CollectionProgress.GetCraftPoints(rarity) == owned * CollectionProgress.DisassemblePointValue &&
+                CollectionProgress.CraftDust == owned * CollectionProgress.DisassemblyDustPerCard &&
+                catalog.transform.Find("Details/Balance/Text").GetComponent<Text>().text ==
+                    $"보유 가루 {CollectionProgress.CraftDust:N0}" &&
                 search.IsInteractable() && CraftingScope(crafting) == catalog,
                 "Disassembly failed to apply its displayed card exactly once.");
             ButtonAt(catalog, "Back/Button").onClick.Invoke();

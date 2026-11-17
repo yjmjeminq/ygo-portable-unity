@@ -228,6 +228,16 @@ namespace YGOPortable.Editor
                 TrunkCount(editor, code) == "미보유" && preview.text.Contains("미보유"),
                 "Disassembling the last copy did not refresh the deck, card list and preview.");
 
+            int cost = CollectionProgress.GetCraftDustCost(CardRarityCatalog.GetRarity(code));
+            int extraCopies = (int)Math.Ceiling((cost - CollectionProgress.CraftDust) / CollectionProgress.DisassemblyDustPerCard);
+            if (extraCopies > 0)
+            {
+                var materials = CollectionProgress.GetDisassembleLimits()
+                    .Where(entry => entry.Key != code && !deck.main.Contains(entry.Key))
+                    .SelectMany(entry => Enumerable.Repeat(entry.Key, entry.Value)).Take(extraCopies)
+                    .GroupBy(material => material).ToDictionary(group => group.Key, group => group.Count());
+                Require(CollectionProgress.TryDisassembleCards(materials, out error), error);
+            }
             Call(editor, "OpenCardCrafting", code);
             Require(CollectionProgress.TryCraftCard(code, 1, out error), error);
             Call(editor, "ReturnFromCardCrafting");

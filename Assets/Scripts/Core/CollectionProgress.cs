@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using UnityEngine;
@@ -58,11 +59,11 @@ namespace YGOPortable.Core
         public const int WinReward = 120;
         public const int LossReward = 60;
         public const int StartingBalance = 3000;
-        public const int CraftPointCost = 30;
-        public const int DisassemblePointValue = 10;
+        public const int DisassemblyDustPerCard = 10;
         public const int DeckCopyLimit = 3;
 
-        private const int ProfileVersion = 5;
+        private const int SharedDustVersion = 6;
+        private const int ProfileVersion = SharedDustVersion;
         private const int GenericPackSize = 160;
         internal const string ProfileFileName = "collection-profile.json";
         private const int FirstOpponentId = 99;
@@ -88,13 +89,21 @@ namespace YGOPortable.Core
         {
             public int version;
             public int balance;
-            public long[] craftPoints;
+            // Store exact integers even when the four legacy balances sum to more than Int64.MaxValue.
+            public string craftDust;
+            [NonSerialized] internal decimal dust;
             public string starterId;
             public UserDeck starterDeck;
             public List<CardCopies> cards;
             public List<int> unlockedOpponentIds;
             public List<int> clearedOpponentIds;
             public List<OpponentDeckProgress> opponentDeckProgress;
+        }
+
+        [Serializable]
+        private sealed class LegacyCraftBalances
+        {
+            public long[] craftPoints;
         }
 
         private static readonly (ushort setcode, int presetId)[] StarterPresets =
@@ -183,9 +192,20 @@ namespace YGOPortable.Core
                 saved.starterDeck.main == null || saved.starterDeck.extra == null || saved.starterDeck.side == null)
                 throw new InvalidDataException("Invalid collection profile.");
 
-            saved.craftPoints ??= new long[CardRarityCatalog.TierCount];
-            if (saved.craftPoints.Length != CardRarityCatalog.TierCount || saved.craftPoints.Any(points => points < 0))
-                throw new InvalidDataException("Invalid craft point balances.");
+            if (saved.version < SharedDustVersion)
+            {
+                var legacy = JsonUtility.FromJson<LegacyCraftBalances>(json)?.craftPoints;
+                if (legacy != null)
+                {
+                    if (legacy.Length != CardRarityCatalog.TierCount || legacy.Any(points => points < 0))
+                        throw new InvalidDataException("Invalid craft point balances.");
+                    saved.dust = legacy.Sum(points => (decimal)points);
+                }
+            }
+            else if (!decimal.TryParse(saved.craftDust, NumberStyles.None, CultureInfo.InvariantCulture, out saved.dust))
+            {
+                throw new InvalidDataException("Invalid craft dust balance.");
+            }
 
             owned = new Dictionary<uint, int>(saved.cards.Count);
             foreach (var entry in saved.cards)
@@ -198,8 +218,15 @@ namespace YGOPortable.Core
 
         public static int GetOwnedCount(uint code) => _owned.TryGetValue(code, out int copies) ? copies : 0;
 
-        public static long GetCraftPoints(CardRarity rarity) =>
-            (uint)rarity < CardRarityCatalog.TierCount ? _profile?.craftPoints[(int)rarity] ?? 0 : 0;
+        public static decimal CraftDust => _profile?.dust ?? 0;
+
+        public static int GetCraftDustCost(CardRarity rarity) => rarity switch
+        {
+            CardRarity.Rare => 60,
+            CardRarity.SuperRare => 90,
+            CardRarity.UltraRare => 120,
+            _ => 30,
+        };
 
         public static bool IsCraftableCard(CardInfo card) => IsDeckCard(card);
 
@@ -229,17 +256,16 @@ namespace YGOPortable.Core
             }
 
             var rarity = CardRarityCatalog.GetRarity(code);
-            long cost = (long)quantity * CraftPointCost;
-            if (GetCraftPoints(rarity) < cost)
+            long cost = (long)quantity * GetCraftDustCost(rarity);
+            if (CraftDust < cost)
             {
-                error = $"{CardRarityCatalog.GetLabel(rarity)} 제작 포인트가 {cost:N0} 필요합니다.";
+                error = $"제작에 가루 {cost:N0}개가 필요합니다.";
                 return false;
             }
 
             var owned = new Dictionary<uint, int>(_owned) { [code] = GetOwnedCount(code) + quantity };
             var next = WithBalance(Balance);
-            next.craftPoints = (long[])_profile.craftPoints.Clone();
-            next.craftPoints[(int)rarity] -= cost;
+            next.dust -= cost;
             return Write(next, owned, out error);
         }
 
@@ -254,7 +280,6 @@ namespace YGOPortable.Core
 
             var owned = new Dictionary<uint, int>(_owned);
             var next = WithBalance(Balance);
-            next.craftPoints = (long[])_profile.craftPoints.Clone();
             foreach (var entry in quantities)
             {
                 uint code = entry.Key;
@@ -271,14 +296,13 @@ namespace YGOPortable.Core
                     return false;
                 }
 
-                int tier = (int)CardRarityCatalog.GetRarity(code);
-                long gain = (long)quantity * DisassemblePointValue;
-                if (next.craftPoints[tier] > long.MaxValue - gain)
+                long gain = (long)quantity * DisassemblyDustPerCard;
+                if (next.dust > decimal.MaxValue - gain)
                 {
-                    error = "제작 포인트 보유 한도를 초과합니다.";
+                    error = "가루 보유 한도를 초과합니다.";
                     return false;
                 }
-                next.craftPoints[tier] += gain;
+                next.dust += gain;
                 int remaining = copies - quantity;
                 if (remaining == 0) owned.Remove(code);
                 else owned[code] = remaining;
@@ -382,7 +406,6 @@ namespace YGOPortable.Core
                 starterId = starter.Id,
                 starterDeck = selected,
                 balance = StartingBalance,
-                craftPoints = new long[CardRarityCatalog.TierCount],
             };
             InitializeOpponentProgress(next);
             if (!Write(next, owned, out error)) return false;
@@ -556,7 +579,7 @@ namespace YGOPortable.Core
             starterId = _profile.starterId,
             starterDeck = _profile.starterDeck,
             balance = balance,
-            craftPoints = _profile.craftPoints,
+            dust = _profile.dust,
             unlockedOpponentIds = _profile.unlockedOpponentIds,
             clearedOpponentIds = _profile.clearedOpponentIds,
             opponentDeckProgress = _profile.opponentDeckProgress,
@@ -648,6 +671,7 @@ namespace YGOPortable.Core
                 pending = Path.Combine(directory, Path.GetRandomFileName() + ".tmp");
                 next.cards = owned.OrderBy(pair => pair.Key)
                     .Select(pair => new CardCopies { code = pair.Key, count = pair.Value }).ToList();
+                next.craftDust = next.dust.ToString(CultureInfo.InvariantCulture);
                 string json = JsonUtility.ToJson(next, true);
                 File.WriteAllText(pending, json);
                 if (File.Exists(_profilePath)) File.Replace(pending, _profilePath, null);

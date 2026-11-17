@@ -41,8 +41,8 @@ namespace YGOPortable.UI
         private readonly Dictionary<uint, int> _selected = new();
         private readonly CardRow[] _rows = new CardRow[PageSize];
         private readonly CardRow[] _reviewRows = new CardRow[PageSize];
-        private readonly Text[] _points;
-        private readonly Text[] _reviewPoints;
+        private readonly Text _dust;
+        private readonly Text _reviewDust;
         private readonly CompositeCardView _art;
         private readonly Text _cardName;
         private readonly Text _cardInfo;
@@ -110,7 +110,7 @@ namespace YGOPortable.UI
             _selectAll = AddButton(details, "SelectAll", "전체 보유 선택", .402f, .375f, .67f, .45f, SelectAll);
             _clear = AddButton(details, "Clear", "선택 초기화", .682f, .375f, .92f, .45f, ClearSelection);
             _summary = Label(details, "Summary", "", .085f, .298f, .915f, .365f, 18, TextAnchor.MiddleLeft);
-            _points = BuildPointLabels(details, .217f, .292f);
+            _dust = BuildDustLabel(details, .217f, .292f);
             _review = AddButton(details, "Review", "분해 내역 확인", .08f, .124f, .92f, .205f, OpenReview, true);
             _status = Label(details, "Status", "", .08f, .052f, .92f, .119f, 16);
             Footer(root, "방향키 이동   A 선택   Y 검색   LB/RB 페이지   B 뒤로");
@@ -125,9 +125,9 @@ namespace YGOPortable.UI
             _reviewPageLabel = Label(list, "Page", "", .30f, .06f, .70f, .13f, 18);
             _reviewNext = AddButton(list, "Next", "다음", .72f, .06f, .92f, .13f, () => ChangePage(1));
             var totals = Panel(review, "Details", .57f, .083f, .975f, .882f);
-            Heading(totals, "Heading", "받을 제작 포인트", .08f, .858f, .92f, .93f);
+            Heading(totals, "Heading", "받을 가루", .08f, .858f, .92f, .93f);
             _reviewSummary = Label(totals, "Summary", "", .08f, .732f, .92f, .815f, 22);
-            _reviewPoints = BuildPointLabels(totals, .60f, .71f);
+            _reviewDust = BuildDustLabel(totals, .60f, .71f);
             Label(totals, "Explanation", "덱에 넣은 카드도 분해됩니다.\n보유 카드가 부족해진 덱은 수정 후 사용할 수 있습니다.",
                 .10f, .397f, .90f, .556f, 19);
             _reviewCancel = AddButton(totals, "Cancel", "취소", .08f, .138f, .43f, .229f, CancelReview);
@@ -297,22 +297,15 @@ namespace YGOPortable.UI
                 row.Quantity.text = $"선택 {selected:N0} / {card.Owned:N0}";
                 row.Quantity.color = selected > 0 ? PackShopStyle.Accent : PackShopStyle.TextMuted;
             }
-            RefreshTotals(_summary, _points);
+            RefreshTotals(_summary, _dust);
         }
 
-        private void RefreshTotals(Text summary, Text[] points)
+        private void RefreshTotals(Text summary, Text dust)
         {
-            var earned = new long[CardRarityCatalog.TierCount];
-            long count = 0;
-            foreach (var selection in _selected)
-            {
-                count += selection.Value;
-                var rarity = CardRarityCatalog.GetRarity(selection.Key);
-                earned[(int)rarity] += (long)selection.Value * CollectionProgress.DisassemblePointValue;
-            }
+            long count = _selected.Values.Sum(quantity => (long)quantity);
+            decimal earned = (decimal)count * CollectionProgress.DisassemblyDustPerCard;
             summary.text = $"선택 {_selected.Count:N0}종 · {count:N0}장";
-            for (int i = 0; i < earned.Length; i++)
-                points[i].text = $"{CardRarityCatalog.GetLabel((CardRarity)i)}  +{earned[i]:N0}";
+            dust.text = $"가루 +{earned:N0}";
         }
 
         private int Quantity(uint code) => _selected.TryGetValue(code, out int count) ? count : 0;
@@ -382,7 +375,7 @@ namespace YGOPortable.UI
             _reviewPageLabel.text = $"{_reviewPage + 1} / {PageCount(_reviewCards.Count)}";
             _reviewPrevious.interactable = _reviewPage > 0;
             _reviewNext.interactable = _reviewPage + 1 < PageCount(_reviewCards.Count);
-            RefreshTotals(_reviewSummary, _reviewPoints);
+            RefreshTotals(_reviewSummary, _reviewDust);
         }
 
         private void CancelReview()
@@ -401,7 +394,7 @@ namespace YGOPortable.UI
             _reviewRoot.SetActive(false);
             _catalogRoot.SetActive(true);
             _status.color = success ? PackShopStyle.TextPrimary : PackShopStyle.Danger;
-            _status.text = success ? "제작 포인트를 받았습니다." : error;
+            _status.text = success ? "가루를 받았습니다." : error;
             Filter();
             FocusFirstRow();
             if (success) _changed?.Invoke();
@@ -443,19 +436,12 @@ namespace YGOPortable.UI
             return row;
         }
 
-        private static Text[] BuildPointLabels(Transform parent, float bottom, float top)
+        private static Text BuildDustLabel(Transform parent, float bottom, float top)
         {
-            var labels = new Text[CardRarityCatalog.TierCount];
-            for (int i = 0; i < labels.Length; i++)
-            {
-                var rarity = (CardRarity)i;
-                float left = .08f + .213f * i;
-                var slot = Slot(parent, CardRarityCatalog.GetLabel(rarity), left, bottom, left + .201f, top);
-                LotdUiKit.AddImage(slot.gameObject, LotdUiKit.WhiteSprite, PackShopStyle.SurfaceInset, false, false);
-                labels[i] = LotdUiKit.AddFittedText(slot, "Points", "", 18, 11, TextAnchor.MiddleCenter,
-                    CardRarityStyle.GetColor(rarity), FontStyle.Bold);
-            }
-            return labels;
+            var slot = Slot(parent, "Dust", .08f, bottom, .92f, top);
+            LotdUiKit.AddImage(slot.gameObject, LotdUiKit.WhiteSprite, PackShopStyle.SurfaceInset, false, false);
+            return LotdUiKit.AddFittedText(slot, "Text", "", 21, 12, TextAnchor.MiddleCenter,
+                PackShopStyle.Accent, FontStyle.Bold);
         }
 
         private static RectTransform BuildScreen(Transform parent, string name, string title, string back, Action close)
