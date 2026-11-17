@@ -177,6 +177,8 @@ namespace YGOPortable.UI
             }
             if (Input.GetKeyDown(KeyCode.S) && !_archModalRoot.activeSelf)
                 TrySaveCurrentDeck();
+            if (Input.GetKeyDown(KeyCode.R) && !_archModalRoot.activeSelf)
+                ResetTrunkFilters();
         }
 
         private void LoadWorkingDeckFromCurrent()
@@ -325,13 +327,13 @@ namespace YGOPortable.UI
 
             var searchRow = LotdUiKit.CreateRect("SearchRow", col, new Vector2(0f, .827f),
                 new Vector2(1f, .878f), insideLeft, insideRight);
-            var search = LotdUiKit.CreateRect("SearchBox", searchRow, Vector2.zero, new Vector2(0.79f, 1f),
+            var search = LotdUiKit.CreateRect("SearchBox", searchRow, Vector2.zero, new Vector2(0.74f, 1f),
                 Vector2.zero, Vector2.zero);
             _searchInp = LotdUiKit.CreateInputField(search, "Search", "카드명·효과·카드 번호", 15);
             _searchInp.onValueChanged.AddListener(_ => RefreshTrunkFilter());
-            var reset = LotdUiKit.CreateRect("ResetFilters", searchRow, new Vector2(0.81f, 0f), Vector2.one,
+            var reset = LotdUiKit.CreateRect("ResetFilters", searchRow, new Vector2(0.76f, 0f), Vector2.one,
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(reset, "Button", "초기화", () => SetTrunkSource(), 14);
+            LotdUiKit.CreateLotdButton(reset, "Button", "필터 초기화", ResetTrunkFilters, 14);
 
             var filters = LotdUiKit.CreateRect("Filters", col, new Vector2(0f, .764f), new Vector2(1f, .816f),
                 insideLeft, insideRight);
@@ -505,10 +507,29 @@ namespace YGOPortable.UI
             CloseDetailedSearch();
             _relatedFilterCode = relatedCode;
             _activeArchetypeFilter = archetype;
+            _sortFilter.SetValueWithoutNotify(0);
+            ClearTrunkFilterValues();
+        }
+
+        private void ResetTrunkFilters()
+        {
+            _relatedFilterCode = 0;
+            _activeArchetypeFilter = null;
+            ClearTrunkFilterValues();
+        }
+
+        private void ClearTrunkFilterValues()
+        {
+            _queryBeforeFilters = "";
+            ClearDetailedSearch();
+            if (_cardFilterDialog.activeSelf)
+            {
+                ResetDetailedDraft();
+                return;
+            }
+
             _searchInp.SetTextWithoutNotify("");
             _kindFilter.SetValueWithoutNotify(0);
-            _sortFilter.SetValueWithoutNotify(0);
-            ClearDetailedSearch();
             RefreshTrunkFilter();
         }
 

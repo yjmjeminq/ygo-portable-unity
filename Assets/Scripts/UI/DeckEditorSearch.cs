@@ -184,7 +184,7 @@ namespace YGOPortable.UI
                     Vector2.zero, Vector2.zero);
                 LotdUiKit.CreateLotdButton(slot, "Button", label, action, 15, gold);
             }
-            ActionButton("Reset", "초기화", 0f, .31f, ResetDetailedDraft);
+            ActionButton("Reset", "초기화", 0f, .31f, ResetTrunkFilters);
             ActionButton("Cancel", "취소", .345f, .655f, CloseDetailedSearch);
             ActionButton("Apply", "적용", .69f, 1f, ApplyDetailedSearch, true);
             _cardFilterDialog.SetActive(false);

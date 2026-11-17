@@ -10,7 +10,8 @@ namespace YGOPortable.UI
     {
         private enum PadArea { Trunk, Main, Extra, Side, Controls, Count }
 
-        private const string MouseHelp = "드래그  이동    우클릭  추가 / 제거    Ctrl+F  검색    Ctrl+S  저장";
+        private const string MouseHelp = "드래그  이동    우클릭  추가 / 제거    Ctrl+F  검색    Ctrl+R  필터 초기화    Ctrl+S  저장";
+        private const string PadFilterResetHelp = "−/View 필터 초기화";
         private readonly DeckPadInput _padInput = new DeckPadInput();
         private readonly int[] _padIndices = new int[(int)PadArea.Count];
         private DeckPadUi _padUi;
@@ -107,7 +108,9 @@ namespace YGOPortable.UI
             var overlay = _deckDialog.activeSelf ? _deckDialog : _cardFilterDialog.activeSelf ? _cardFilterDialog :
                 _archModalRoot.activeSelf ? _archModalRoot : null;
             var scope = overlay != null ? overlay.transform : Root.transform;
-            if (!_padUi.HasPopup && _padUi.HandleOpenedDropdown(scope, frame.Direction, frame.Submit, frame.Cancel, findAny: frame.HasInput))
+            bool resetFilters = frame.ResetFilters && !_deckDialog.activeSelf && !_archModalRoot.activeSelf;
+            if (!resetFilters && !_padUi.HasPopup &&
+                _padUi.HandleOpenedDropdown(scope, frame.Direction, frame.Submit, frame.Cancel, findAny: frame.HasInput))
             {
                 _padMode = true;
                 _padMousePoint = Input.mousePosition;
@@ -130,6 +133,20 @@ namespace YGOPortable.UI
                 }
                 else EventSystem.current?.SetSelectedGameObject(null);
                 SwitchPadArea(_padArea);
+            }
+
+            if (resetFilters)
+            {
+                if (_padUi.HasPopup)
+                    _padUi.Clear();
+                else
+                    _padUi.HandleOpenedDropdown(scope, Vector2Int.zero, false, true);
+                ResetTrunkFilters();
+                if (_cardFilterDialog.activeSelf)
+                    HandleDetailedSearchPad(default);
+                else if (_padArea != PadArea.Controls)
+                    DrawPadCardFocus();
+                return;
             }
 
             if (_padUi.HasPopup)
@@ -217,7 +234,7 @@ namespace YGOPortable.UI
         private void HandleDetailedSearchPad(DeckPadFrame frame)
         {
             _padCardFocus.gameObject.SetActive(false);
-            _deckHelpLabel.text = "조회 조건   방향키 이동   A 선택   Y 검색   B 취소";
+            _deckHelpLabel.text = $"조회 조건   방향키 이동   A 선택   Y 검색   {PadFilterResetHelp}   B 취소";
             if (frame.Search && !frame.Cancel)
             {
                 _padUi.OpenText(_detailedQueryInput);
@@ -299,7 +316,7 @@ namespace YGOPortable.UI
             string back = area == PadArea.Controls ? "B 카드 목록" : "우스틱 설명   B 뒤로";
             var reorder = CurrentPadDeck != DragSourceType.None ? "   R스틱 클릭 순서" : "";
             string menu = area == PadArea.Trunk ? "Menu/+ 조회" : "Menu/+ 저장";
-            _deckHelpLabel.text = $"{actions}{reorder}   Y 검색   LB/RB 영역   {menu}   {back}";
+            _deckHelpLabel.text = $"{actions}{reorder}   Y 검색   LB/RB 영역   {menu}   {PadFilterResetHelp}   {back}";
         }
 
         private DragSourceType CurrentPadDeck => _padArea switch

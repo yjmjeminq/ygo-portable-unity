@@ -13,6 +13,7 @@ namespace YGOPortable.UI
         Left = 0x0004,
         Right = 0x0008,
         Save = 0x0010,
+        ResetFilters = 0x0020,
         Reorder = 0x0080,
         PreviousArea = 0x0100,
         NextArea = 0x0200,
@@ -25,7 +26,8 @@ namespace YGOPortable.UI
     internal readonly struct DeckPadFrame
     {
         private const DeckPadButtons Actions = DeckPadButtons.Submit | DeckPadButtons.Cancel | DeckPadButtons.Alternate |
-            DeckPadButtons.Search | DeckPadButtons.PreviousArea | DeckPadButtons.NextArea | DeckPadButtons.Save | DeckPadButtons.Reorder;
+            DeckPadButtons.Search | DeckPadButtons.PreviousArea | DeckPadButtons.NextArea | DeckPadButtons.Save |
+            DeckPadButtons.ResetFilters | DeckPadButtons.Reorder;
         private readonly DeckPadButtons _pressed;
 
         internal DeckPadFrame(Vector2Int direction, DeckPadButtons pressed, float descriptionScroll = 0f)
@@ -45,6 +47,7 @@ namespace YGOPortable.UI
         internal bool PreviousArea => (_pressed & DeckPadButtons.PreviousArea) != 0;
         internal bool NextArea => (_pressed & DeckPadButtons.NextArea) != 0;
         internal bool Save => (_pressed & DeckPadButtons.Save) != 0;
+        internal bool ResetFilters => (_pressed & DeckPadButtons.ResetFilters) != 0;
         internal bool Reorder => (_pressed & DeckPadButtons.Reorder) != 0;
     }
 
@@ -96,6 +99,7 @@ namespace YGOPortable.UI
                 LegacyButton(KeyCode.JoystickButton3, DeckPadButtons.Search) |
                 LegacyButton(KeyCode.JoystickButton4, DeckPadButtons.PreviousArea) |
                 LegacyButton(KeyCode.JoystickButton5, DeckPadButtons.NextArea) |
+                LegacyButton(KeyCode.JoystickButton6, DeckPadButtons.ResetFilters) |
                 LegacyButton(KeyCode.JoystickButton7, DeckPadButtons.Save) |
                 LegacyButton(KeyCode.JoystickButton9, DeckPadButtons.Reorder) |
                 LegacyDirection("DeckPadDpadHorizontal", DeckPadButtons.Left, DeckPadButtons.Right) |
