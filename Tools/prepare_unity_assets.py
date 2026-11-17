@@ -377,7 +377,7 @@ def build_cards():
     # Give the anime spell its own identity while reusing the printed spell's base stats.
     anime_effect = "양쪽 플레이어는 각각 자신의 패가 6장이 되도록 덱에서 드로우한다."
     cdb_datas[CARD_OF_SANCTITY_ANIME] = dict(cdb_datas[CARD_OF_SANCTITY], code=CARD_OF_SANCTITY_ANIME, alias=0)
-    cdb_texts[CARD_OF_SANCTITY_ANIME] = ("하늘의 선물 (원작판)", f"①: {anime_effect}", [anime_effect])
+    cdb_texts[CARD_OF_SANCTITY_ANIME] = ("하늘의 선물 org", f"①: {anime_effect}", [anime_effect])
 
     # These effects create tokens missing from the installed card database.
     generated_tokens = (
