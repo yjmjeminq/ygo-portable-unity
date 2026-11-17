@@ -1355,13 +1355,13 @@ namespace YGOPortable.Editor
                     "Missing Chain 2 Ash Blossom / Chain 1 Negated logs");
             }
 
-            // 3. Targeted Banish (Cosmic Cyclone 8267140) + Mass Non-Target Removal (Feather Duster 18144506, Raigeki 12580477)
+            // 3. Field targeting (Mystical Space Typhoon), targeted banish (Cosmic Cyclone) and mass removal
             uint[] oppFieldDeck = BuildDeck40((20721928, 3), (4148264, 3), (5464695, 3), (7359741, 3), (7459013, 3),
                 (5318639, 3), (55144522, 3), (24094653, 3), (40619825, 3), (81439173, 3), (83764718, 3), (37812118, 3));
-            uint[] removalDeck = BuildDeck40((8267140, 3), (18144506, 3), (12580477, 3));
+            uint[] removalDeck = BuildDeck40((5318639, 3), (8267140, 3), (18144506, 3), (12580477, 3));
             using (var s = StartSeedMatching("DestroyBanish", removalDeck, Array.Empty<uint>(), oppFieldDeck, Array.Empty<uint>(), true, sess =>
             {
-                // P0 passes Turn 1; P1 Turn 2 summons 1 monster & sets 2 S/T -> P0 Turn 3 resolves all 3 removals
+                // P0 passes Turn 1; P1 Turn 2 summons 1 monster & sets 3 S/T -> P0 Turn 3 resolves all 4 removals
                 DriveUntilIdle(sess, ai);
                 if (sess.ActivePrompt == null || sess.ActivePrompt.playerId != 0) return false;
                 sess.SubmitResponseInt(7); // End Turn 1
@@ -1369,7 +1369,7 @@ namespace YGOPortable.Editor
                 if (sess.ActivePrompt == null || sess.ActivePrompt.playerId != 1 || sess.ActivePrompt.summonable.Count == 0 || sess.ActivePrompt.sSetable.Count == 0) return false;
                 sess.SubmitResponseInt(0); // Summon first monster
                 DriveUntilIdle(sess, ai);
-                for (int k = 0; k < 2; k++)
+                for (int k = 0; k < 3; k++)
                 {
                     if (sess.ActivePrompt == null || sess.ActivePrompt.playerId != 1 || sess.ActivePrompt.sSetable.Count == 0) return false;
                     sess.SubmitResponseInt(4); // Set S/T
@@ -1380,9 +1380,24 @@ namespace YGOPortable.Editor
                 DriveUntilIdle(sess, ai);
                 var p0 = sess.ActivePrompt;
                 return p0 != null && p0.messageType == YgoConstants.MSG_SELECT_IDLECMD && p0.playerId == 0
-                    && p0.activatable.Any(a => a.code == 8267140) && p0.activatable.Any(a => a.code == 18144506) && p0.activatable.Any(a => a.code == 12580477);
+                    && p0.activatable.Any(a => a.code == 5318639) && p0.activatable.Any(a => a.code == 8267140)
+                    && p0.activatable.Any(a => a.code == 18144506) && p0.activatable.Any(a => a.code == 12580477);
             }))
             {
+                int destroyedSequence = -1;
+                s.SubmitResponseInt((s.ActivePrompt.activatable.FindIndex(a => a.code == 5318639) << 16) | 5);
+                DriveUntilIdle(s, ai, p =>
+                {
+                    if (p.messageType != YgoConstants.MSG_SELECT_CARD) return null;
+                    AssertTrue(s.LastHintMsg == 502, "Mystical Space Typhoon did not issue a destroy target prompt");
+                    byte[] response = TestDuelZoneBrowser.SelectFieldTarget(s, p);
+                    destroyedSequence = (int)p.candidates[1].sequence;
+                    return response;
+                });
+                AssertTrue(destroyedSequence >= 0 && s.Players[1].szone[destroyedSequence] == null &&
+                    s.Players[1].szone.Count(card => card != null) == 2 && s.RetryCount == 0,
+                    "Confirming the field target did not destroy the chosen card");
+
                 s.SubmitResponseInt((s.ActivePrompt.activatable.FindIndex(a => a.code == 8267140) << 16) | 5);
                 DriveUntilIdle(s, ai, p => p.messageType == YgoConstants.MSG_SELECT_CARD ? EncodeSelectIndices(0) : null);
                 AssertTrue(s.Players[0].lp == 7000 && s.Players[1].banished.Count == 1, $"Cosmic Cyclone failed: LP={s.Players[0].lp}, oppBanished={s.Players[1].banished.Count}");

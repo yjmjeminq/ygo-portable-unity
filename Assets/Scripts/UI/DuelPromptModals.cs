@@ -78,6 +78,7 @@ namespace YGOPortable.UI
 
         // State for interactive multi-select modals
         private readonly HashSet<int> _selectedIndices = new HashSet<int>();
+        private readonly Dictionary<(byte controller, uint location, uint sequence), int> _fieldCardIndices = new();
         private int[] _counterAlloc;
         private int[] _sortOrder;
         private Button _confirmBtn;
@@ -87,6 +88,32 @@ namespace YGOPortable.UI
         internal bool IsChainPromptOpen => IsPromptOpen && _chainPrompt;
         internal bool IsShowingField => IsPromptOpen && _promptShade.ShowingField;
         internal Selectable FieldViewControl => _fieldViewButton;
+        internal bool IsFieldCardSelection => IsPromptOpen && _fieldCardIndices.Count > 0;
+        internal Button FieldCardConfirmButton => IsFieldCardSelection ? _confirmBtn : null;
+
+        internal void SetFieldCardHitTest(Func<Vector2, Camera, bool> hitTest) => _promptShade.FieldCardHitTest = hitTest;
+
+        internal bool FindFieldCard(DuelPrompt prompt, byte controller, uint location, uint sequence, out int index)
+        {
+            index = -1;
+            return IsFieldCardSelection && CanAnswerPrompt && ReferenceEquals(prompt, _curPrompt) &&
+                _fieldCardIndices.TryGetValue((controller, location, sequence), out index);
+        }
+
+        internal bool IsFieldCardSelected(int index) => _selectedIndices.Contains(index);
+
+        internal void ToggleFieldCard(int index)
+        {
+            if (!_selectedIndices.Remove(index))
+            {
+                if (_curPrompt.max == 1) _selectedIndices.Clear();
+                if (_selectedIndices.Count >= _curPrompt.max) return;
+                _selectedIndices.Add(index);
+            }
+
+            LotdAudio.PlayClick();
+            UpdateMultiSelectState();
+        }
         private bool CanAnswerPrompt => IsPromptOpen && !IsZoneViewerOpen && !IsShowingField;
 
         public DuelPromptModals(Transform canvasParent, Action<uint> onInspectCard, Action<byte[]> onSubmitResponse)
@@ -120,7 +147,7 @@ namespace YGOPortable.UI
             host = (_padKeyboard.IsOpen ? _padKeyboard.Scope :
                 IsZoneViewerOpen ? ZoneViewRoot.transform :
                 ResultRoot.activeSelf ? ResultRoot.transform :
-                IsPromptOpen && !IsShowingField ? ModalRoot.transform : null) as RectTransform;
+                IsPromptOpen && !IsShowingField && !IsFieldCardSelection ? ModalRoot.transform : null) as RectTransform;
             target = EventSystem.current?.currentSelectedGameObject?.transform as RectTransform;
             return host != null && target != null && target.IsChildOf(host) && target.gameObject.activeInHierarchy;
         }
@@ -128,14 +155,14 @@ namespace YGOPortable.UI
         internal bool HandlePad(DeckPadFrame frame)
         {
             if (!frame.HasInput)
-                return _padKeyboard.IsOpen || IsZoneViewerOpen || ResultRoot.activeSelf || IsPromptOpen && !IsShowingField;
+                return _padKeyboard.IsOpen || IsZoneViewerOpen || ResultRoot.activeSelf || IsPromptOpen && !IsShowingField && !IsFieldCardSelection;
             if (_padKeyboard.IsOpen)
                 HandlePadScope(_padKeyboard.Scope, frame, _padKeyboard.DefaultFocus, _padKeyboard.Close);
             else if (IsZoneViewerOpen)
                 HandlePadScope(ZoneViewRoot.transform, frame, FirstFocus(_zoneGrid) ?? _zoneClose, CloseZoneViewer, _zoneScroll);
             else if (ResultRoot.activeSelf)
                 HandlePadScope(ResultRoot.transform, frame, _rematchButton, TriggerMenu);
-            else if (IsPromptOpen && !IsShowingField)
+            else if (IsPromptOpen && !IsShowingField && !IsFieldCardSelection)
                 HandlePadScope(ModalRoot.transform, frame, PreferredPromptControl(), OnModalCloseClicked,
                     _chainPrompt ? _chainEffectScroll : _modalBody.GetComponentInChildren<ScrollRect>());
             else return false;
@@ -246,6 +273,7 @@ namespace YGOPortable.UI
             ClearChildren(_modalFooter);
             ClearChildren(_chainCards);
             _selectedIndices.Clear();
+            _fieldCardIndices.Clear();
             _chainSelection = -1;
             _confirmBtn = null;
             _counterAlloc = null;
@@ -308,7 +336,7 @@ namespace YGOPortable.UI
 
         private void ToggleFieldView()
         {
-            if (!IsPromptOpen || IsZoneViewerOpen) return;
+            if (!IsPromptOpen || IsZoneViewerOpen || IsFieldCardSelection) return;
             LotdAudio.PlayClick();
             SetFieldView(!IsShowingField);
             if (IsShowingField) SetFocus(_fieldViewButton.gameObject);
@@ -323,7 +351,9 @@ namespace YGOPortable.UI
         {
             _promptShade.ShowingField = showing;
             _promptShade.ChainConfirmationAvailable = _chainPrompt;
-            _promptShade.color = showing ? Color.clear : new Color(0f, .02f, .07f, .11f);
+            _promptShade.SelectingFieldCards = _fieldCardIndices.Count > 0;
+            _promptShade.color = showing || _promptShade.SelectingFieldCards ? Color.clear : new Color(0f, .02f, .07f, .11f);
+            _fieldViewTab.gameObject.SetActive(!_promptShade.SelectingFieldCards);
             _chainBox.gameObject.SetActive(_chainPrompt && !showing);
             _modalBox.gameObject.SetActive(!_chainPrompt && !showing);
             Vector2 corner = _chainPrompt ? _chainBox.anchorMax : _modalBox.anchorMax;
@@ -484,6 +514,18 @@ namespace YGOPortable.UI
             _modalBody.anchorMax = new Vector2(.98f, tall ? .855f : .785f);
             _modalFooter.anchorMin = new Vector2(.62f, tall ? .019f : .028f);
             _modalFooter.anchorMax = new Vector2(.98f, tall ? .122f : .183f);
+            _modalBox.anchorMin = new Vector2(.235f, .17f);
+            _modalHeader.anchorMax = Vector2.one;
+            BindFieldCardChoices(session, prompt);
+            if (_fieldCardIndices.Count > 0)
+            {
+                _modalBox.anchorMin = new Vector2(.305f, .151f);
+                _modalBox.anchorMax = new Vector2(.762f, .214f);
+                _modalHeader.anchorMin = Vector2.zero;
+                _modalHeader.anchorMax = new Vector2(.56f, 1f);
+                _modalFooter.anchorMin = new Vector2(.56f, .08f);
+                _modalFooter.anchorMax = new Vector2(.98f, .92f);
+            }
             SetFieldView(false);
             ModalRoot.transform.SetAsLastSibling();
             ModalRoot.SetActive(true);
@@ -789,6 +831,29 @@ namespace YGOPortable.UI
         }
 
 
+        private void BindFieldCardChoices(DuelSession session, DuelPrompt prompt)
+        {
+            if (_promptShade.FieldCardHitTest == null || prompt.messageType != YgoConstants.MSG_SELECT_CARD ||
+                prompt.playerId != session.HumanPlayerIndex) return;
+
+            for (int i = 0; i < prompt.candidates.Count; i++)
+            {
+                var card = prompt.candidates[i];
+                var player = card.controller < session.Players.Length ? session.Players[card.controller] : null;
+                bool onBoard = card.location switch
+                {
+                    YgoConstants.LOCATION_MZONE => card.sequence < 7 && player?.mzone[card.sequence] != null,
+                    YgoConstants.LOCATION_SZONE => card.sequence < 6 && player?.szone[card.sequence] != null,
+                    _ => false,
+                };
+                if (!onBoard || !_fieldCardIndices.TryAdd((card.controller, card.location, card.sequence), i))
+                {
+                    _fieldCardIndices.Clear();
+                    return;
+                }
+            }
+        }
+
         private void RenderCardMultiSelect(DuelSession s, DuelPrompt p)
         {
             string hint = CardDatabase.ResolveDescription(s.LastHintMsg);
@@ -799,18 +864,19 @@ namespace YGOPortable.UI
             else
                 _modalTitle.text = !string.IsNullOrEmpty(hint) ? hint : "대상 카드 선택";
 
-            RectTransform grid = BuildChoiceCardStrip(p.mustSelect.Count + p.candidates.Count);
-
-            // Show locked must-select cards for SELECT_SUM
-            for (int m = 0; m < p.mustSelect.Count; m++)
+            if (!IsFieldCardSelection)
             {
-                var item = p.mustSelect[m];
-                AddMultiSelectCardTile(grid, item, -1 - m, lockedMust: true, p, s);
+                RectTransform grid = BuildChoiceCardStrip(p.mustSelect.Count + p.candidates.Count);
+                // Show locked must-select cards for SELECT_SUM
+                for (int m = 0; m < p.mustSelect.Count; m++)
+                    AddMultiSelectCardTile(grid, p.mustSelect[m], -1 - m, lockedMust: true, p, s);
+
+                for (int i = 0; i < p.candidates.Count; i++)
+                    AddMultiSelectCardTile(grid, p.candidates[i], i, lockedMust: false, p, s);
             }
-
-            for (int i = 0; i < p.candidates.Count; i++)
+            else if (string.IsNullOrEmpty(hint))
             {
-                AddMultiSelectCardTile(grid, p.candidates[i], i, lockedMust: false, p, s);
+                _modalTitle.text = "필드에서 카드를 선택하세요.";
             }
 
             _confirmBtn = AddFooterButton("선택 완료", OnConfirmMultiSelect, true);
@@ -2027,6 +2093,8 @@ namespace YGOPortable.UI
     {
         internal DuelZoneImage[] BrowsablePiles { get; set; } = Array.Empty<DuelZoneImage>();
         internal bool ShowingField { get; set; }
+        internal bool SelectingFieldCards { get; set; }
+        internal Func<Vector2, Camera, bool> FieldCardHitTest { get; set; }
         internal Button ChainConfirmationControl { get; set; }
         internal bool ChainConfirmationAvailable { get; set; }
 
@@ -2046,6 +2114,7 @@ namespace YGOPortable.UI
             if (ChainConfirmationAvailable && control != null && control.isActiveAndEnabled && control.IsInteractable() &&
                 RectTransformUtility.RectangleContainsScreenPoint((RectTransform)control.transform, screenPoint, eventCamera))
                 return false;
+            if (SelectingFieldCards) return !FieldCardHitTest(screenPoint, eventCamera);
             return !ShowingField || !IsPointOverPile(screenPoint, eventCamera);
         }
     }

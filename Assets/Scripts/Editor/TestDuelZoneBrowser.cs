@@ -31,6 +31,17 @@ namespace YGOPortable.Editor
             Debug.Log($"[VERIFY ZONE BROWSER] {opens} successful opens. Graveyard, Extra Deck, and banished cards verified for both seating orders, including effect prompt field view ({hitTest}) and a Synchro summon.");
         }
 
+        internal static byte[] SelectFieldTarget(DuelSession duel, DuelPrompt prompt)
+        {
+            byte[] response = null;
+            using var ui = new Browser(duel, bytes => response = bytes);
+            ui.VerifyFieldTarget(prompt);
+            Require(response != null && response.Length == 12 && BitConverter.ToInt32(response, 0) == 0 &&
+                BitConverter.ToInt32(response, 4) == 1 && BitConverter.ToInt32(response, 8) == 1,
+                "The field picker did not submit the original native index of the second target.");
+            return response;
+        }
+
         private static int VerifyBanishAndGrave(bool humanFirst)
         {
             var main = Enumerable.Repeat(PotOfDesires, 20).Concat(Enumerable.Repeat(89631139u, 20)).ToArray();
@@ -182,7 +193,7 @@ namespace YGOPortable.Editor
             internal int Opens { get; private set; }
             internal CompositeCardView[] VisibleCards => _grid.GetComponentsInChildren<CompositeCardView>();
 
-            internal Browser(DuelSession duel)
+            internal Browser(DuelSession duel, Action<byte[]> onSubmit = null)
             {
                 _duel = duel;
                 _canvas = new GameObject("Zone Browser Verification", typeof(Canvas), typeof(GraphicRaycaster));
@@ -205,7 +216,7 @@ namespace YGOPortable.Editor
                     canvas.transform.position = Vector3.zero;
                 }
                 Modals = new DuelPromptModals(_canvas.transform, code => InspectedCode = code,
-                    _ => throw new InvalidOperationException("Browsing submitted a modal response."));
+                    onSubmit ?? (_ => throw new InvalidOperationException("Browsing submitted a modal response.")));
                 _controller = _canvas.AddComponent<GameAppController>();
                 Field = new DuelFieldUI(_controller, _canvas.transform, Modals);
                 SetPrivate(_controller, "_session", _duel);
@@ -275,6 +286,42 @@ namespace YGOPortable.Editor
                     ReferenceEquals(_duel.ActivePrompt, prompt),
                     "Cancel from field view sent an effect response or failed to restore its chooser.");
                 Modals.HideAll();
+            }
+
+            internal void VerifyFieldTarget(DuelPrompt prompt)
+            {
+                Modals.ShowPrompt(_duel, prompt);
+                Field.Refresh();
+                var modal = Modals.ModalRoot.transform;
+                Require(Modals.IsPromptOpen && !modal.Find("FieldView").gameObject.activeSelf &&
+                    !modal.Find("Win/Body/Cards") && !Modals.TryConfirm(),
+                    "The field-only prompt opened a card list or accepted an empty selection.");
+
+                RectTransform CardSlot(SelectableCardItem card)
+                {
+                    var slot = typeof(DuelFieldUI).GetMethod("GetSlot", BindingFlags.Instance | BindingFlags.NonPublic)
+                        .Invoke(Field, new object[] { card.controller, card.location, card.sequence });
+                    return (RectTransform)slot.GetType().GetField("root").GetValue(slot);
+                }
+
+                Require(prompt.candidates.Count >= 2, "The field fixture needs at least two candidates.");
+                var first = CardSlot(prompt.candidates[0]);
+                var second = CardSlot(prompt.candidates[1]);
+                var blocked = Raycast(StackRoot("_oppGyTile"), out _);
+                Require(first.GetComponent<Outline>().effectColor.a > 0f &&
+                    second.GetComponent<Outline>().effectColor.a > 0f &&
+                    blocked != null && blocked.transform.IsChildOf(modal),
+                    "The picker did not highlight targets or block unrelated board actions.");
+
+                ClickAt(first);
+                var selected = Private<HashSet<int>>(Modals, "_selectedIndices");
+                Require(selected.SetEquals(new[] { 0 }), "Clicking a field card did not select it.");
+                ClickAt(first);
+                Require(selected.Count == 0 && !Modals.TryConfirm(), "Clicking the selected card did not clear it.");
+                ClickAt(first);
+                ClickAt(second);
+                Require(selected.SetEquals(new[] { 1 }) && Modals.TryConfirm() && !Modals.IsPromptOpen,
+                    "Changing the target or confirming the field selection failed.");
             }
 
             private GameObject Raycast(RectTransform target, out PointerEventData pointer)

@@ -174,6 +174,7 @@ namespace YGOPortable.UI
             _app = app;
             _modals = modals;
             BuildUI(canvasParent);
+            _modals.SetFieldCardHitTest(IsPointOverFieldCardChoice);
             _modals.SetBrowsablePiles(
                 _myGyTile.root.GetComponent<DuelZoneImage>(), _myExtraTile.root.GetComponent<DuelZoneImage>(),
                 _myBanTile.root.GetComponent<DuelZoneImage>(), _oppGyTile.root.GetComponent<DuelZoneImage>(),
@@ -969,7 +970,8 @@ namespace YGOPortable.UI
                 slot.statsEdge.enabled = slot.statsEdge.sprite != null;
             }
 
-            bool canDrag = visible && CanAcceptPlayerAction && !opponent && loc == YgoConstants.LOCATION_MZONE;
+            bool canDrag = visible && CanAcceptPlayerAction && !_modals.IsFieldCardSelection &&
+                !opponent && loc == YgoConstants.LOCATION_MZONE;
             slot.dragTrigger.SourceType = canDrag ? DragSourceType.FieldMonster : DragSourceType.None;
             slot.dragTrigger.CardCodeGetter = canDrag ? () => live.code : null;
             slot.dragTrigger.IndexGetter = canDrag ? () => (int)seq : null;
@@ -988,10 +990,13 @@ namespace YGOPortable.UI
                 loc == YgoConstants.LOCATION_SZONE && _dragHighlightSZone);
             bool attack = opponent && loc == YgoConstants.LOCATION_MZONE && _dragHighlightAttack && live != null;
             bool action = visible && CanAcceptPlayerAction && HasFieldAction(con, loc, seq);
-            Color highlight = attack ? DuelStyle.Opponent : selected || action ? DuelStyle.Player :
-                place || drag ? DuelStyle.Gold : Color.clear;
+            int choiceIndex = -1;
+            bool cardChoice = visible && FindFieldCardChoice(con, loc, seq, out choiceIndex);
+            bool cardSelected = cardChoice && _modals.IsFieldCardSelected(choiceIndex);
+            Color highlight = cardSelected ? DuelStyle.Gold : attack ? DuelStyle.Opponent :
+                cardChoice || selected || action ? DuelStyle.Player : place || drag ? DuelStyle.Gold : Color.clear;
             slot.bgImg.color = highlight.a > 0f
-                ? new Color(highlight.r, highlight.g, highlight.b, selected || attack ? .64f : .32f) : ZoneTint;
+                ? new Color(highlight.r, highlight.g, highlight.b, selected || cardSelected || attack ? .64f : .32f) : ZoneTint;
             slot.border.effectColor = highlight;
         }
 
@@ -2038,7 +2043,8 @@ namespace YGOPortable.UI
                 {
                     bool openingPile = !Input.GetKeyDown(KeyCode.Escape) && _modals.IsShowingField &&
                         _modals.IsPointOverBrowsablePile(Input.mousePosition);
-                    if (!openingPile) _modals.TryCancelOrPass();
+                    if (!openingPile && (!_modals.IsFieldCardSelection || Input.GetKeyDown(KeyCode.Escape)))
+                        _modals.TryCancelOrPass();
                 }
                 else if (Input.GetKeyDown(KeyCode.Escape) && _modals != null && _modals.ResultRoot != null && _modals.ResultRoot.activeSelf)
                 {
@@ -2234,9 +2240,42 @@ namespace YGOPortable.UI
                 icon: DuelVisualAssets.ZoneIcon(loc, con != session.HumanPlayerIndex));
         }
 
+        private bool FindFieldCardChoice(byte con, uint loc, uint seq, out int index)
+        {
+            index = -1;
+            return CanAcceptPlayerAction && !_cardZoomModal.activeSelf && !IsArriving(con, loc, seq) &&
+                _modals.FindFieldCard(_session.ActivePrompt, con, loc, seq, out index);
+        }
+
+        private bool IsPointOverFieldCardChoice(Vector2 point, Camera camera)
+        {
+            var prompt = _session?.ActivePrompt;
+            if (prompt == null) return false;
+            foreach (var card in prompt.candidates)
+            {
+                if (!FindFieldCardChoice(card.controller, card.location, card.sequence, out _)) continue;
+                var slot = GetSlot(card.controller, card.location, card.sequence);
+                if (slot != null && slot.cardView.gameObject.activeInHierarchy &&
+                    RectTransformUtility.RectangleContainsScreenPoint(slot.root, point, camera))
+                    return true;
+            }
+            return false;
+        }
+
         private void OnSlotClicked(byte con, uint loc, uint seq)
         {
             if (_session == null || IsPresenting || IsPaused || IsBrowsingZone) return;
+
+            if (_modals.IsFieldCardSelection)
+            {
+                if (FindFieldCardChoice(con, loc, seq, out int index))
+                {
+                    InspectCard(_session.GetVisibleSelectionCode(_session.ActivePrompt.candidates[index]));
+                    _modals.ToggleFieldCard(index);
+                    Refresh();
+                }
+                return;
+            }
 
             if (IsPlaceSelectable(con, loc, seq))
             {
