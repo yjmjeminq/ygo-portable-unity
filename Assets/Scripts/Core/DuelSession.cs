@@ -207,6 +207,7 @@ namespace YGOPortable.Core
             CurrentPhase = YgoConstants.PHASE_DRAW;
             RetryCount = 0;
             LastHintMsg = 0;
+            HasActiveAttack = false;
             ActivePrompt = null;
             CurrentChain.Clear();
             _resolvingChainLink = null;
@@ -804,6 +805,7 @@ namespace YGOPortable.Core
 
                 case YgoConstants.MSG_BATTLE:
                 {
+                    HasActiveAttack = false;
                     if (OnBattleResolved == null) break;
                     byte attacker = br.ReadByte();
                     uint attackLocation = br.ReadByte();
@@ -827,6 +829,7 @@ namespace YGOPortable.Core
 
                 case YgoConstants.MSG_SELECT_BATTLECMD:
                 {
+                    HasActiveAttack = false;
                     var p = new DuelPrompt { messageType = msgType, playerId = br.ReadByte() };
                     uint actCnt = br.ReadUInt32();
                     for (uint i = 0; i < actCnt; i++)

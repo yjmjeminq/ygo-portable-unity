@@ -248,7 +248,7 @@ namespace YGOPortable.UI
             if (scope == PadScope.Place) AddDuelPadButton(_placementCancel);
             if (scope != PadScope.Board) return;
 
-            AddDuelPadPiles();
+            AddDuelPadPiles(useActions: true);
             AddDuelPadButton(_phaseButton);
             AddDuelPadButton(_duelPadInspectButton);
             AddDuelPadButton(_chainConfirmationButton);
@@ -256,14 +256,25 @@ namespace YGOPortable.UI
             AddDuelPadButton(_duelPadPauseButton);
         }
 
-        private void AddDuelPadPiles()
+        private void AddDuelPadPiles(bool useActions = false)
         {
-            AddDuelPadButton(_myGyTile.button);
-            AddDuelPadButton(_myExtraTile.button);
-            AddDuelPadButton(_myBanTile.button);
-            AddDuelPadButton(_oppGyTile.button);
-            AddDuelPadButton(_oppExtraTile.button);
-            AddDuelPadButton(_oppBanTile.button);
+            void Add(StackTileView tile, bool player)
+            {
+                var button = tile.button;
+                if (!button.isActiveAndEnabled || !button.IsInteractable()) return;
+                _duelPadTargets.Add(new PadTarget(tile.root, () =>
+                {
+                    if (!useActions || !player || !EnterCardActions())
+                        button.onClick.Invoke();
+                }));
+            }
+
+            Add(_myGyTile, true);
+            Add(_myExtraTile, true);
+            Add(_myBanTile, true);
+            Add(_oppGyTile, false);
+            Add(_oppExtraTile, false);
+            Add(_oppBanTile, false);
         }
 
         private void AddDuelPadSlots(FieldSlotView[] slots, PadScope scope)

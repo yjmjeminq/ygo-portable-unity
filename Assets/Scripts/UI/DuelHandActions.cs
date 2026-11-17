@@ -14,6 +14,7 @@ namespace YGOPortable.UI
         private const float CardActionGap = 5f;
 
         private readonly Dictionary<RectTransform, FieldSlotView> _fieldSlotsByRect = new();
+        private readonly Dictionary<RectTransform, StackTileView> _stackTilesByRect = new();
         private readonly Vector3[] _cardActionCorners = new Vector3[4];
         private RectTransform _cardActionsBar;
         private RectTransform _pointerActionAnchor;
@@ -91,6 +92,12 @@ namespace YGOPortable.UI
                 anchor = _pointerActionAnchor ?? (overActions ? _cardActionAnchor : null);
             }
 
+            if (anchor != null && _stackTilesByRect.TryGetValue(anchor, out var pile))
+            {
+                RefreshPileActions(pile);
+                return;
+            }
+
             var (card, art) = FindCardActionSource(anchor);
             if (card == null)
             {
@@ -120,8 +127,48 @@ namespace YGOPortable.UI
             _cardActionsBar.gameObject.SetActive(true);
         }
 
-        private void RebuildCardActions(RectTransform anchor, LiveCardState card, DuelPrompt prompt,
-            List<(string label, int responseVal, bool gold)> actions)
+        private void RefreshPileActions(StackTileView pile)
+        {
+            var session = _session;
+            if (pile.controller != session.HumanPlayerIndex ||
+                pile.location is not (YgoConstants.LOCATION_GRAVE or YgoConstants.LOCATION_EXTRA or YgoConstants.LOCATION_REMOVED))
+            {
+                HideCardActions();
+                return;
+            }
+
+            var prompt = session.ActivePrompt;
+            if (_cardActionAnchor != pile.root || !ReferenceEquals(_cardActionsPrompt, prompt))
+            {
+                var actions = CollectZoneActions(pile.controller, pile.location);
+                if (actions.Count == 0)
+                {
+                    HideCardActions();
+                    return;
+                }
+
+                _cardActionAnchor = pile.root;
+                _cardActionArt = null;
+                _cardActionsPrompt = prompt;
+                ClearCardActionButtons(1);
+                bool summons = pile.location == YgoConstants.LOCATION_EXTRA && actions.Any(action => CommandIcon(action.responseVal) == "SUMMONSP");
+                bool activations = actions.Any(action => CommandIcon(action.responseVal) == "ACTION");
+                string icon = summons ? "SUMMONSP" : "ACTION";
+                string label = summons && !activations ? "특수 소환" : !summons && activations ? "효과 발동" : "행동 선택";
+                AddCardAction(0, icon, label, () =>
+                {
+                    if (!CanShowCardActions || _session != session || !ReferenceEquals(session.ActivePrompt, prompt) ||
+                        _cardActionAnchor != pile.root) return;
+                    OpenStackZone(pile.controller, pile.location, $"내 {pile.name}", actionsOnly: true);
+                    HideCardActions();
+                });
+            }
+
+            PositionCardActions(pile.root, false);
+            _cardActionsBar.gameObject.SetActive(true);
+        }
+
+        private void ClearCardActionButtons(int count)
         {
             for (int i = _cardActionsBar.childCount - 1; i >= 0; i--)
             {
@@ -132,11 +179,16 @@ namespace YGOPortable.UI
                 else UnityEngine.Object.DestroyImmediate(old.gameObject);
             }
 
-            var groups = actions.GroupBy(action => action.responseVal & 0xffff).ToArray();
-            bool hasMaterials = card.overlayCodes.Count > 0;
-            int count = groups.Length + (hasMaterials ? 1 : 0);
             _cardActionsBar.sizeDelta = new Vector2(count * (CardActionWidth + CardActionGap) - CardActionGap,
                 CardActionHeight);
+        }
+
+        private void RebuildCardActions(RectTransform anchor, LiveCardState card, DuelPrompt prompt,
+            List<(string label, int responseVal, bool gold)> actions)
+        {
+            var groups = actions.GroupBy(action => action.responseVal & 0xffff).ToArray();
+            bool hasMaterials = card.overlayCodes.Count > 0;
+            ClearCardActionButtons(groups.Length + (hasMaterials ? 1 : 0));
             var session = _session;
             var key = CardActionKey(card);
             LiveCardState GetLiveSource()

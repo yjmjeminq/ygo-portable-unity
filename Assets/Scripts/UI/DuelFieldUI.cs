@@ -41,6 +41,7 @@ namespace YGOPortable.UI
         private Text _turnBadgeText;
         private Text _hintBannerText;
         private Text _chainBannerText;
+        private DuelEffectGraphic _responseAttackArrow;
         private Image _chainIcon;
         private Button _chainConfirmationButton;
         private Text _chainConfirmationLabel;
@@ -103,6 +104,8 @@ namespace YGOPortable.UI
             public Image wellLight;
             public string name;
             public Button button;
+            public byte controller;
+            public uint location;
         }
 
         private StackTileView _myDeckTile, _myExtraTile, _myGyTile, _myBanTile;
@@ -269,6 +272,7 @@ namespace YGOPortable.UI
             _modals.CloseZoneViewer();
             _cardZoomModal.SetActive(false);
             _phasePicker.SetActive(false);
+            _responseAttackArrow.gameObject.SetActive(false);
             _placementBanner.SetActive(false);
             _placementCancel.transform.parent.gameObject.SetActive(false);
             CardAnimationManager.Instance?.Clear();
@@ -338,6 +342,15 @@ namespace YGOPortable.UI
             ground.raycastTarget = false;
 
             BuildCenterBoard(root);
+            var arrow = LotdUiKit.CreateRect("ResponseAttackArrow", root, Vector2.one * .5f, Vector2.one * .5f,
+                Vector2.zero, Vector2.zero);
+            _responseAttackArrow = arrow.gameObject.AddComponent<DuelEffectGraphic>();
+            _responseAttackArrow.texture = Texture2D.whiteTexture;
+            _responseAttackArrow.Kind = DuelEffectKind.AttackPath;
+            _responseAttackArrow.Tint = DuelStyle.Player;
+            _responseAttackArrow.raycastTarget = false;
+            _responseAttackArrow.Seek(.66f);
+            arrow.gameObject.SetActive(false);
             BuildLeftPanel(root);
             BuildTopHud(root);
             BuildBottomHudAndHands(root);
@@ -619,11 +632,18 @@ namespace YGOPortable.UI
             button.onClick.AddListener(Open);
             var trigger = cell.gameObject.AddComponent<CardDragTrigger>();
             trigger.OnRightClick = Open;
-            return new StackTileView
+            if (location is YgoConstants.LOCATION_GRAVE or YgoConstants.LOCATION_EXTRA or YgoConstants.LOCATION_REMOVED)
+            {
+                trigger.OnPointerEnterAction = () => PointAtCardActions(cell);
+                trigger.OnPointerExitAction = () => LeaveCardActions(cell);
+            }
+            var tile = new StackTileView
             {
                 root = cell, text = count, border = border, cardView = view, wellImage = wellImage,
-                wellLight = wellLight, button = button, name = name,
+                wellLight = wellLight, button = button, name = name, location = location,
             };
+            _stackTilesByRect.Add(cell, tile);
+            return tile;
         }
 
         private void BuildBottomHudAndHands(Transform root)
@@ -973,6 +993,8 @@ namespace YGOPortable.UI
             RefreshHand(mine.hand, me, false);
             RefreshHand(theirs.hand, opponent, true);
             RefreshLogFeed();
+            RefreshAttackResponseArrow();
+            RefreshMaterialConfirm();
             RefreshDuelPadCursor(layoutChanged: true);
             RefreshCardActions();
         }
@@ -1017,6 +1039,7 @@ namespace YGOPortable.UI
 
         private void UpdateStackTile(StackTileView tile, int count, byte controller, uint location)
         {
+            tile.controller = controller;
             if (IsArriving(controller, location, 0)) return;
 
             bool canAct = CanAcceptPlayerAction && CountZoneActions(controller, location) > 0;
@@ -2028,6 +2051,35 @@ namespace YGOPortable.UI
             return animator.GetPoint(lp.rectTransform, new Vector2(0.5f, 0.5f));
         }
 
+        private void RefreshAttackResponseArrow()
+        {
+            bool responding = _modals.IsChainPromptOpen && _session.HasActiveAttack &&
+                _session.AttackerCon != _session.HumanPlayerIndex && !_modals.IsZoneViewerOpen;
+            var source = responding ? GetSlot((byte)_session.AttackerCon, _session.AttackerLoc, _session.AttackerSeq) : null;
+            if (source == null || source.liveCard == null)
+            {
+                _responseAttackArrow.gameObject.SetActive(false);
+                return;
+            }
+
+            var target = _session.TargetLoc == 0 ? _myLpText.rectTransform :
+                GetSlot((byte)_session.TargetCon, _session.TargetLoc, _session.TargetSeq)?.root;
+            if (target == null)
+            {
+                _responseAttackArrow.gameObject.SetActive(false);
+                return;
+            }
+            var host = (RectTransform)Root.transform;
+            var arrow = _responseAttackArrow.rectTransform;
+            Vector2 from = host.InverseTransformPoint(source.root.TransformPoint(source.root.rect.center));
+            Vector2 to = host.InverseTransformPoint(target.TransformPoint(target.rect.center));
+            Vector2 delta = to - from;
+            arrow.anchoredPosition = (from + to) * .5f;
+            arrow.sizeDelta = new Vector2(delta.magnitude, 54f);
+            arrow.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg);
+            arrow.gameObject.SetActive(delta.sqrMagnitude > 1f);
+        }
+
         private void HandleAttackEvent(byte attacker, uint location, uint sequence, byte target, uint targetLoc, uint targetSeq)
         {
             var animator = CardAnimationManager.Instance;
@@ -2109,6 +2161,7 @@ namespace YGOPortable.UI
             UpdateDuelPad();
             if (_session != session || !Root.activeSelf) return;
             RefreshHandGlows();
+            RefreshAttackResponseArrow();
             RefreshCardActions();
             if (_phasePicker.activeSelf && (!CanAcceptPlayerAction ||
                 Input.GetKeyDown(KeyCode.Escape) || Input.GetMouseButtonDown(1)))
@@ -2428,7 +2481,7 @@ namespace YGOPortable.UI
             Refresh();
         }
 
-        private void OpenStackZone(byte con, uint loc, string title, bool hideFaceDown = false)
+        private void OpenStackZone(byte con, uint loc, string title, bool hideFaceDown = false, bool actionsOnly = false)
         {
             var session = _session;
             if (session == null || session.IsFinished || IsStagingPlacement || IsPresenting || IsPaused || IsReadingLog ||
@@ -2457,7 +2510,7 @@ namespace YGOPortable.UI
                 YgoConstants.LOCATION_REMOVED => player.banished,
                 _ => null,
             };
-            if (cards == null) return;
+            if (cards == null || actionsOnly && !CanUseActions()) return;
             hideFaceDown |= con != session.HumanPlayerIndex &&
                 (loc == YgoConstants.LOCATION_EXTRA || loc == YgoConstants.LOCATION_REMOVED);
 
@@ -2468,9 +2521,18 @@ namespace YGOPortable.UI
                 hideFaceDown,
                 newestFirst: loc != YgoConstants.LOCATION_EXTRA,
                 hasCardActions: c => CanUseActions() && CollectActions(c.controller, c.location, c.sequence).Count > 0,
-                onOpenCardActions: c => ShowCardActionsPopup(c.controller, c.location, c.sequence, c.code, c.overlayCodes),
+                onOpenCardActions: c =>
+                {
+                    if (!CanUseActions()) return;
+                    var actions = CollectActions(c.controller, c.location, c.sequence);
+                    if (actionsOnly && actions.Count == 1)
+                        ExecuteActionInt(actions[0].responseVal);
+                    else
+                        ShowCardActionsPopup(c.controller, c.location, c.sequence, c.code, c.overlayCodes, actions: actions);
+                },
                 canUseCardActions: CanUseActions,
-                icon: DuelVisualAssets.ZoneIcon(loc, con != session.HumanPlayerIndex));
+                icon: DuelVisualAssets.ZoneIcon(loc, con != session.HumanPlayerIndex),
+                actionsOnly: actionsOnly, sidePanel: true);
         }
 
         private bool FindFieldCardChoice(byte con, uint loc, uint seq, out int index)
@@ -2480,18 +2542,19 @@ namespace YGOPortable.UI
                 _modals.FindFieldCard(_session.ActivePrompt, con, loc, seq, out index);
         }
 
+        private void RefreshMaterialConfirm()
+        {
+            _modals.RefreshFieldMaterialConfirm((controller, location, sequence) =>
+                GetSlot(controller, location, sequence)?.root);
+        }
+
         private bool IsPointOverFieldCardChoice(Vector2 point, Camera camera)
         {
-            var prompt = _session?.ActivePrompt;
-            if (prompt == null) return false;
-            foreach (var card in prompt.candidates)
-            {
-                if (!FindFieldCardChoice(card.controller, card.location, card.sequence, out _)) continue;
-                var slot = GetSlot(card.controller, card.location, card.sequence);
-                if (slot != null && slot.cardView.gameObject.activeInHierarchy &&
+            foreach (var slot in _fieldSlotsByRect.Values)
+                if (slot.cardView.gameObject.activeInHierarchy &&
+                    FindFieldCardChoice(slot.mappedCon, slot.mappedLoc, slot.mappedSeq, out _) &&
                     RectTransformUtility.RectangleContainsScreenPoint(slot.root, point, camera))
                     return true;
-            }
             return false;
         }
 
@@ -2503,8 +2566,13 @@ namespace YGOPortable.UI
             {
                 if (FindFieldCardChoice(con, loc, seq, out int index))
                 {
-                    InspectCard(_session.GetVisibleSelectionCode(_session.ActivePrompt.candidates[index]));
-                    _modals.ToggleFieldCard(index);
+                    var prompt = _session.ActivePrompt;
+                    var card = index < 0 ? prompt.mustSelect[-1 - index] :
+                        index < prompt.candidates.Count ? prompt.candidates[index] :
+                        prompt.unselectCandidates[index - prompt.candidates.Count];
+                    uint code = _session.GetVisibleSelectionCode(card);
+                    if (code != 0) InspectCard(code);
+                    _modals.ToggleFieldCard(index, con, loc, seq);
                     Refresh();
                 }
                 return;

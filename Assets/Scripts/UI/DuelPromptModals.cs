@@ -52,6 +52,7 @@ namespace YGOPortable.UI
         private int[] _chainCandidateIndices;
 
         // Zone viewer refs
+        private RectTransform _zoneWindow;
         private Text _zoneTitle;
         private Image _zoneIcon;
         private RectTransform _zoneGrid;
@@ -83,6 +84,10 @@ namespace YGOPortable.UI
         private int[] _counterAlloc;
         private int[] _sortOrder;
         private Button _confirmBtn;
+        private RectTransform _materialConfirmRoot;
+        private Button _materialConfirm;
+        private bool _fieldMaterialPick;
+        private (byte controller, uint location, uint sequence)? _lastMaterial;
 
         public bool IsPromptOpen => ModalRoot != null && ModalRoot.activeSelf;
         public bool IsZoneViewerOpen => ZoneViewRoot != null && ZoneViewRoot.activeSelf;
@@ -90,7 +95,8 @@ namespace YGOPortable.UI
         internal bool IsShowingField => IsPromptOpen && _promptShade.ShowingField;
         internal Selectable FieldViewControl => _fieldViewButton;
         internal bool IsFieldCardSelection => IsPromptOpen && _fieldCardIndices.Count > 0;
-        internal Button FieldCardConfirmButton => IsFieldCardSelection ? _confirmBtn : null;
+        internal Button FieldCardConfirmButton => !IsFieldCardSelection ? null :
+            _materialConfirmRoot.gameObject.activeSelf ? _materialConfirm : _confirmBtn;
 
         internal void SetFieldCardHitTest(Func<Vector2, Camera, bool> hitTest) => _promptShade.FieldCardHitTest = hitTest;
 
@@ -101,19 +107,58 @@ namespace YGOPortable.UI
                 _fieldCardIndices.TryGetValue((controller, location, sequence), out index);
         }
 
-        internal bool IsFieldCardSelected(int index) => _selectedIndices.Contains(index);
+        internal bool IsFieldCardSelected(int index) => index < 0 || _selectedIndices.Contains(index) ||
+            (_curPrompt.messageType == YgoConstants.MSG_SELECT_UNSELECT_CARD && index >= _curPrompt.candidates.Count);
 
-        internal void ToggleFieldCard(int index)
+        internal void ToggleFieldCard(int index, byte controller, uint location, uint sequence)
         {
+            if (!CanAnswerPrompt || index < 0) return;
+            _lastMaterial = (controller, location, sequence);
+            if (_curPrompt.messageType == YgoConstants.MSG_SELECT_UNSELECT_CARD)
+            {
+                LotdAudio.PlayClick();
+                Submit(PackTwoInts(1, index));
+                return;
+            }
+
+            bool capped = _curPrompt.messageType != YgoConstants.MSG_SELECT_SUM ||
+                !_curPrompt.sumExactCountZeroAny && _curPrompt.max > 0;
             if (!_selectedIndices.Remove(index))
             {
-                if (_curPrompt.max == 1) _selectedIndices.Clear();
-                if (_selectedIndices.Count >= _curPrompt.max) return;
+                if (capped && _curPrompt.max == 1) _selectedIndices.Clear();
+                if (capped && _selectedIndices.Count >= _curPrompt.max) return;
                 _selectedIndices.Add(index);
             }
 
             LotdAudio.PlayClick();
             UpdateMultiSelectState();
+        }
+
+        internal void RefreshFieldMaterialConfirm(Func<byte, uint, uint, RectTransform> findSlot)
+        {
+            if (!IsFieldCardSelection || !_fieldMaterialPick || !CanAnswerPrompt || _confirmBtn?.interactable != true)
+            {
+                _materialConfirmRoot.gameObject.SetActive(false);
+                if (_confirmBtn != null && _fieldMaterialPick) _confirmBtn.transform.parent.gameObject.SetActive(true);
+                return;
+            }
+
+            RectTransform anchor = null;
+            if (_lastMaterial is { } last && _fieldCardIndices.TryGetValue(last, out int index) && IsFieldCardSelected(index))
+                anchor = findSlot(last.controller, last.location, last.sequence);
+            if (anchor == null)
+                foreach (var (key, choice) in _fieldCardIndices)
+                    if (IsFieldCardSelected(choice))
+                        anchor = findSlot(key.controller, key.location, key.sequence) ?? anchor;
+
+            _materialConfirmRoot.gameObject.SetActive(anchor != null);
+            _confirmBtn.transform.parent.gameObject.SetActive(anchor == null);
+            if (anchor == null) return;
+
+            var host = (RectTransform)ModalRoot.transform;
+            var point = anchor.TransformPoint(new Vector2(anchor.rect.center.x, anchor.rect.yMax));
+            Vector2 local = host.InverseTransformPoint(point);
+            _materialConfirmRoot.anchoredPosition = new Vector2(local.x, Mathf.Min(local.y + 32f, host.rect.yMax - 32f));
         }
         private bool CanAnswerPrompt => IsPromptOpen && !IsZoneViewerOpen && !IsShowingField;
 
@@ -188,13 +233,35 @@ namespace YGOPortable.UI
             }
             if (frame.Direction != Vector2Int.zero)
             {
-                SetFocus(PadNeighbor(scope, control, frame.Direction).gameObject);
+                var next = PadNeighbor(scope, control, frame.Direction);
+                SetFocus(next.gameObject);
+                if (IsZoneViewerOpen && next.transform.IsChildOf(_zoneGrid))
+                {
+                    var tile = next.transform;
+                    while (tile.parent != _zoneGrid) tile = tile.parent;
+                    KeepZoneCardVisible((RectTransform)tile);
+                }
                 return;
             }
             if (!frame.Submit) return;
             if (control is Button button) button.onClick.Invoke();
             else if (control is InputField field) OpenPadKeyboard(field);
         }
+
+        private void KeepZoneCardVisible(RectTransform tile)
+        {
+            var viewport = _zoneScroll.viewport;
+            float overflow = _zoneGrid.rect.height - viewport.rect.height;
+            if (overflow <= 0f) return;
+
+            var upper = viewport.InverseTransformPoint(tile.TransformPoint(new Vector2(0f, tile.rect.yMax))).y;
+            var lower = viewport.InverseTransformPoint(tile.TransformPoint(new Vector2(0f, tile.rect.yMin))).y;
+            float offset = upper > viewport.rect.yMax ? upper - viewport.rect.yMax :
+                Mathf.Min(0f, lower - viewport.rect.yMin);
+            _zoneScroll.StopMovement();
+            _zoneScroll.verticalNormalizedPosition = Mathf.Clamp01(_zoneScroll.verticalNormalizedPosition + offset / overflow);
+        }
+
 
         private static void ScrollFromPad(ScrollRect scroll, float amount)
         {
@@ -275,6 +342,8 @@ namespace YGOPortable.UI
             ClearChildren(_chainCards);
             _selectedIndices.Clear();
             _fieldCardIndices.Clear();
+            _fieldMaterialPick = false;
+            _materialConfirmRoot.gameObject.SetActive(false);
             _chainSelection = -1;
             _confirmBtn = null;
             _counterAlloc = null;
@@ -322,6 +391,12 @@ namespace YGOPortable.UI
             _modalFooter = LotdUiKit.CreateRect("Footer", _modalBox, new Vector2(.62f, .028f), new Vector2(.98f, .183f), Vector2.zero, Vector2.zero);
 
             BuildChainPicker(dim);
+            _materialConfirmRoot = LotdUiKit.CreateRect("MaterialConfirm", dim, Vector2.one * .5f, Vector2.one * .5f,
+                new Vector2(-30f, -30f), new Vector2(30f, 30f));
+            _materialConfirm = DuelStyle.RoundButton(_materialConfirmRoot, "Button", DuelStyle.Gold, () => TryConfirm());
+            var confirmIcon = LotdUiKit.FillRect("Check", _materialConfirm.transform, 13f);
+            LotdUiKit.AddFittedText(confirmIcon, "Mark", "✓", 26, 17, TextAnchor.MiddleCenter, DuelStyle.Player, FontStyle.Bold);
+            _materialConfirmRoot.gameObject.SetActive(false);
             _fieldViewTab = LotdUiKit.FillRect("FieldView", dim);
             _fieldViewButton = DuelStyle.Button(_fieldViewTab, "B", "", ToggleFieldView, 14);
             PrepareFocusControls(_fieldViewTab, OnModalCloseClicked);
@@ -496,6 +571,9 @@ namespace YGOPortable.UI
             if (!IsPromptOpen) _focusBeforePrompt = EventSystem.current?.currentSelectedGameObject;
             _focusBeforeKeyboard = null;
             _padKeyboard.Close();
+            if (session != _curSession || _curPrompt?.messageType != YgoConstants.MSG_SELECT_UNSELECT_CARD ||
+                prompt.messageType != YgoConstants.MSG_SELECT_UNSELECT_CARD)
+                _lastMaterial = null;
             _curSession = session;
             _curPrompt = prompt;
             ClearBodyAndFooter();
@@ -520,8 +598,8 @@ namespace YGOPortable.UI
             BindFieldCardChoices(session, prompt);
             if (_fieldCardIndices.Count > 0)
             {
-                _modalBox.anchorMin = new Vector2(.305f, .151f);
-                _modalBox.anchorMax = new Vector2(.762f, .214f);
+                _modalBox.anchorMin = _fieldMaterialPick ? new Vector2(.286f, .835f) : new Vector2(.305f, .151f);
+                _modalBox.anchorMax = _fieldMaterialPick ? new Vector2(.800f, .898f) : new Vector2(.762f, .214f);
                 _modalHeader.anchorMin = Vector2.zero;
                 _modalHeader.anchorMax = new Vector2(.56f, 1f);
                 _modalFooter.anchorMin = new Vector2(.56f, .08f);
@@ -724,8 +802,11 @@ namespace YGOPortable.UI
             cardStrip.anchorMax = new Vector2(compact ? .262f : .563f, .798f);
             _chainDetails.anchorMin = new Vector2(compact ? .278f : .583f, .218f);
             SetFieldView(false);
+            bool respondingToAttack = session.HasActiveAttack && session.AttackerCon != session.HumanPlayerIndex;
             _chainTitle.text = prompt.forced ? "필수 효과 순서 선택" :
-                compact ? "효과를 발동하시겠습니까?" : "발동할 효과 선택";
+                respondingToAttack && session.CurrentChain.Count == 0
+                    ? (session.TargetLoc == 0 ? "상대의 직접 공격에 대응하시겠습니까?" : "상대의 공격 선언에 대응하시겠습니까?")
+                    : compact ? "효과를 발동하시겠습니까?" : "발동할 효과 선택";
             _chainSummary.text = $"체인 {session.CurrentChain.Count + 1}  ·  {choices.Count}개";
             _chainPass.transform.parent.gameObject.SetActive(!prompt.forced);
             _chainActivate.interactable = choices.Count > 0;
@@ -841,12 +922,12 @@ namespace YGOPortable.UI
 
         private void BindFieldCardChoices(DuelSession session, DuelPrompt prompt)
         {
-            if (_promptShade.FieldCardHitTest == null || prompt.messageType != YgoConstants.MSG_SELECT_CARD ||
-                prompt.playerId != session.HumanPlayerIndex) return;
+            if (_promptShade.FieldCardHitTest == null || prompt.playerId != session.HumanPlayerIndex ||
+                prompt.messageType is not (YgoConstants.MSG_SELECT_CARD or YgoConstants.MSG_SELECT_SUM or
+                    YgoConstants.MSG_SELECT_TRIBUTE or YgoConstants.MSG_SELECT_UNSELECT_CARD)) return;
 
-            for (int i = 0; i < prompt.candidates.Count; i++)
+            bool Add(SelectableCardItem card, int index)
             {
-                var card = prompt.candidates[i];
                 var player = card.controller < session.Players.Length ? session.Players[card.controller] : null;
                 bool onBoard = card.location switch
                 {
@@ -854,12 +935,25 @@ namespace YGOPortable.UI
                     YgoConstants.LOCATION_SZONE => card.sequence < 6 && player?.szone[card.sequence] != null,
                     _ => false,
                 };
-                if (!onBoard || !_fieldCardIndices.TryAdd((card.controller, card.location, card.sequence), i))
-                {
-                    _fieldCardIndices.Clear();
-                    return;
-                }
+                return onBoard && _fieldCardIndices.TryAdd((card.controller, card.location, card.sequence), index);
             }
+
+            bool AddAll(List<SelectableCardItem> cards, int start, int direction = 1)
+            {
+                for (int i = 0; i < cards.Count; i++)
+                    if (!Add(cards[i], start + direction * i)) return false;
+                return true;
+            }
+
+            if (!AddAll(prompt.candidates, 0) || !AddAll(prompt.mustSelect, -1, -1) ||
+                !AddAll(prompt.unselectCandidates, prompt.candidates.Count))
+            {
+                _fieldCardIndices.Clear();
+                return;
+            }
+
+            _fieldMaterialPick = prompt.messageType != YgoConstants.MSG_SELECT_CARD ||
+                session.LastHintMsg is 511 or 512 or 513 or 531 or 533;
         }
 
         private void RenderCardMultiSelect(DuelSession s, DuelPrompt p)
@@ -882,7 +976,7 @@ namespace YGOPortable.UI
                 for (int i = 0; i < p.candidates.Count; i++)
                     AddMultiSelectCardTile(grid, p.candidates[i], i, lockedMust: false, p, s);
             }
-            else if (string.IsNullOrEmpty(hint))
+            else if (p.messageType == YgoConstants.MSG_SELECT_CARD && string.IsNullOrEmpty(hint))
             {
                 _modalTitle.text = "필드에서 카드를 선택하세요.";
             }
@@ -1038,12 +1132,14 @@ namespace YGOPortable.UI
         {
             _modalTitle.text = CardDatabase.ResolveDescription(s.LastHintMsg) ?? "소재 / 대상 선택";
             _modalSubtitle.text = $"선택됨 {p.unselectCandidates.Count}장 · 추가 선택 가능 {p.candidates.Count}장";
-            RectTransform grid = BuildChoiceCardStrip(p.candidates.Count + p.unselectCandidates.Count);
-
-            for (int j = 0; j < p.unselectCandidates.Count; j++)
-                AddImmediateClickTile(grid, s, p, p.unselectCandidates[j], p.candidates.Count + j, true);
-            for (int i = 0; i < p.candidates.Count; i++)
-                AddImmediateClickTile(grid, s, p, p.candidates[i], i, false);
+            if (!IsFieldCardSelection)
+            {
+                RectTransform grid = BuildChoiceCardStrip(p.candidates.Count + p.unselectCandidates.Count);
+                for (int j = 0; j < p.unselectCandidates.Count; j++)
+                    AddImmediateClickTile(grid, s, p, p.unselectCandidates[j], p.candidates.Count + j, true);
+                for (int i = 0; i < p.candidates.Count; i++)
+                    AddImmediateClickTile(grid, s, p, p.candidates[i], i, false);
+            }
 
             _confirmBtn = AddFooterButton("선택 완료", () =>
             {
@@ -1444,7 +1540,7 @@ namespace YGOPortable.UI
             dismiss.navigation = new Navigation { mode = Navigation.Mode.None };
             dismiss.onClick.AddListener(CloseZoneViewer);
 
-            var win = DuelStyle.Panel(dim, "Win",
+            var win = _zoneWindow = DuelStyle.Panel(dim, "Win",
                 new Vector2(0.226f, 0.205f), new Vector2(0.972f, 0.615f),
                 fill: new Color(.039f, .071f, .093f, .97f));
             win.gameObject.AddComponent<Button>().navigation = new Navigation { mode = Navigation.Mode.None };
@@ -1505,9 +1601,11 @@ namespace YGOPortable.UI
             Func<LiveCardState, bool> hasCardActions = null,
             Action<LiveCardState> onOpenCardActions = null,
             Func<bool> canUseCardActions = null,
-            Sprite icon = null)
+            Sprite icon = null,
+            bool actionsOnly = false,
+            bool sidePanel = false)
         {
-            StartZoneViewer();
+            StartZoneViewer(sidePanel);
             int count = cards?.Count ?? 0;
             for (int i = 0; i < count; i++)
             {
@@ -1515,7 +1613,8 @@ namespace YGOPortable.UI
                 if (card == null) continue;
                 bool hidden = card.code == 0 || hideFaceDown && !card.IsFaceUp && !card.isPublic;
                 bool actionable = !hidden && onOpenCardActions != null && hasCardActions?.Invoke(card) == true;
-                AddZoneCardTile(hidden ? 0u : card.code, hidden, card, actionable, onOpenCardActions, canUseCardActions);
+                if (actionsOnly && !actionable) continue;
+                AddZoneCardTile(hidden ? 0u : card.code, hidden, card, actionable, onOpenCardActions, canUseCardActions, actionsOnly);
             }
             FinishZoneViewer(title, icon);
         }
@@ -1531,12 +1630,27 @@ namespace YGOPortable.UI
             FinishZoneViewer(title);
         }
 
-        private void StartZoneViewer()
+        private void StartZoneViewer(bool sidePanel = false)
         {
             CloseZoneViewer();
             _focusBeforeZone = EventSystem.current?.currentSelectedGameObject;
             _promptInput.interactable = false;
             ZoneViewRoot.SetActive(true);
+            _zoneWindow.anchorMin = sidePanel ? new Vector2(.865f, .171f) : new Vector2(.226f, .205f);
+            _zoneWindow.anchorMax = sidePanel ? new Vector2(.986f, .871f) : new Vector2(.972f, .615f);
+            ZoneViewRoot.GetComponent<Image>().color = new Color(.015f, .022f, .038f, sidePanel ? .14f : .40f);
+
+            var close = (RectTransform)_zoneClose.transform.parent;
+            close.anchorMin = new Vector2(sidePanel ? .77f : .82f, .15f);
+            _zoneClose.GetComponentInChildren<Text>().text = sidePanel ? "✕" : "✕ 닫기";
+            var grid = _zoneGrid.GetComponent<GridLayoutGroup>();
+            grid.constraint = sidePanel ? GridLayoutGroup.Constraint.FixedColumnCount : GridLayoutGroup.Constraint.Flexible;
+            grid.constraintCount = 1;
+            grid.childAlignment = sidePanel ? TextAnchor.UpperCenter : TextAnchor.UpperLeft;
+            grid.padding = sidePanel ? new RectOffset(4, 4, 6, 6) : new RectOffset(10, 10, 10, 10);
+            grid.cellSize = sidePanel
+                ? new Vector2(Mathf.Clamp(_zoneScroll.viewport.rect.width - 10f, 52f, 116f), 160f)
+                : new Vector2(118f, 174f);
         }
 
         private void FinishZoneViewer(string title, Sprite icon = null)
@@ -1563,7 +1677,8 @@ namespace YGOPortable.UI
             LiveCardState live,
             bool hasActions = false,
             Action<LiveCardState> onOpenCardActions = null,
-            Func<bool> canUseCardActions = null)
+            Func<bool> canUseCardActions = null,
+            bool actionSelection = false)
         {
             var tile = DuelStyle.Panel(_zoneGrid, $"Z_{code}", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero,
                 DuelStyle.PanelColor, hasActions ? DuelStyle.Gold : DuelStyle.BorderColor);
@@ -1595,7 +1710,10 @@ namespace YGOPortable.UI
             if (hasActions)
             {
                 var actRt = LotdUiKit.CreateRect("Act", tile, new Vector2(0.06f, 0.02f), new Vector2(0.94f, 0.16f), Vector2.zero, Vector2.zero);
-                var action = DuelStyle.Button(actRt, "B", "행동 확인", () =>
+                string actionText = actionSelection
+                    ? live.location == YgoConstants.LOCATION_EXTRA ? "선택" : "효과 발동"
+                    : "행동 확인";
+                var action = DuelStyle.Button(actRt, "B", actionText, () =>
                 {
                     if (!IsZoneViewerOpen || canUseCardActions?.Invoke() == false) return;
                     _onInspectCard?.Invoke(code);

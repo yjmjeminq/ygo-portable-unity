@@ -456,7 +456,7 @@ namespace YGOPortable.UI
                     prompt.messageType != YgoConstants.MSG_SELECT_DISFIELD)
                 {
                     _modals.ShowPrompt(_session, prompt, ChainConfirmation);
-                    if (_modals.IsFieldCardSelection) _duelField.Refresh();
+                    if (_modals.IsFieldCardSelection || _modals.IsChainPromptOpen) _duelField.Refresh();
                 }
                 else
                 {

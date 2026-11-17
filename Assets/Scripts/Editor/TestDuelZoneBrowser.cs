@@ -28,7 +28,7 @@ namespace YGOPortable.Editor
                 opens += VerifyBanishAndGrave(humanFirst);
             opens += VerifyPromptAndExtraSummon();
             string hitTest = SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null ? "raycast filters" : "GraphicRaycaster";
-            Debug.Log($"[VERIFY ZONE BROWSER] {opens} successful opens. Graveyard, Extra Deck, and banished cards verified for both seating orders, including effect prompt field view ({hitTest}) and a Synchro summon.");
+            Debug.Log($"[VERIFY ZONE BROWSER] {opens} successful opens. Graveyard, Extra Deck, and banished cards verified for both seating orders, including effect prompt field view ({hitTest}), a Synchro summon, and an attack response.");
         }
 
         internal static byte[] SelectFieldTarget(DuelSession duel, DuelPrompt prompt)
@@ -90,7 +90,8 @@ namespace YGOPortable.Editor
             using var duel = YgoProjectBuilder.StartSeedMatching("Zone browser Synchro", main, ExtraDeck, otherMain, ExtraDeck, true,
                 session => session.Players[0].hand.Any(card => card.code == MoYe) &&
                            session.Players[0].hand.Any(card => card.code == Longyuan));
-            using var ui = new Browser(duel);
+            Action<byte[]> submit = duel.SubmitResponse;
+            using var ui = new Browser(duel, bytes => submit(bytes));
             var mine = duel.Players[0];
             var mainPrompt = ReachMainPhase(duel, 0);
             int normalSummon = mainPrompt.summonable.FindIndex(card => card.code == MoYe);
@@ -99,6 +100,7 @@ namespace YGOPortable.Editor
 
             bool inspectedDuringPrompt = false;
             bool choseSummon = false;
+            bool choseMaterials = false;
             for (int step = 0; step < 40 && !mine.mzone.Any(card => card?.code == Chixiao); step++)
             {
                 var prompt = duel.ActivePrompt;
@@ -122,11 +124,17 @@ namespace YGOPortable.Editor
                         "Opening the Extra Deck command already submitted a summon.");
                     var popup = Private<GameObject>(ui.Field, "_actionPopup");
                     Require(popup.activeSelf, "The explicit Extra Deck command did not open the action popup.");
-                    var summonButton = popup.GetComponentsInChildren<Button>().Single(button =>
-                        button.gameObject != popup &&
-                        button.GetComponentsInChildren<Text>().Any(label => label.text == "특수 소환"));
-                    Click(summonButton);
+                    Click(popup.GetComponent<Button>());
+                    ui.SummonFromPileShortcut(prompt);
                     choseSummon = true;
+                    continue;
+                }
+
+                if (choseSummon && prompt.playerId == 0 && (prompt.messageType == YgoConstants.MSG_SELECT_SUM ||
+                    prompt.messageType == YgoConstants.MSG_SELECT_UNSELECT_CARD))
+                {
+                    ui.SelectSynchroMaterials(prompt);
+                    choseMaterials = true;
                     continue;
                 }
 
@@ -154,12 +162,19 @@ namespace YGOPortable.Editor
                 }
             }
 
-            Require(inspectedDuringPrompt && choseSummon && mine.mzone.Any(card => card?.code == Chixiao) && duel.RetryCount == 0,
+            Require(inspectedDuringPrompt && choseSummon && choseMaterials && mine.mzone.Any(card => card?.code == Chixiao) && duel.RetryCount == 0,
                 "The Synchro summon or modal inspection could not finish.");
             ui.Field.Refresh();
             ui.VerifyOwnZones(mine);
             Require(mine.extra.All(card => card.code != Chixiao) && mine.grave.Any(card => card.code == MoYe),
                 "The three stacks no longer match the native duel after the summon.");
+            var summoned = mine.mzone.Single(card => card?.code == Chixiao);
+            byte[] confirmation = null;
+            submit = bytes => confirmation = bytes;
+            ui.ConfirmFieldMaterials(summoned);
+            Require(confirmation is { Length: 4 } && BitConverter.ToInt32(confirmation, 0) == -1,
+                "The field confirmation did not submit the native finish response.");
+            ui.VerifyAttackResponse(summoned);
             return ui.Opens;
         }
 
@@ -297,13 +312,6 @@ namespace YGOPortable.Editor
                     !modal.Find("Win/Body/Cards") && !Modals.TryConfirm(),
                     "The field-only prompt opened a card list or accepted an empty selection.");
 
-                RectTransform CardSlot(SelectableCardItem card)
-                {
-                    var slot = typeof(DuelFieldUI).GetMethod("GetSlot", BindingFlags.Instance | BindingFlags.NonPublic)
-                        .Invoke(Field, new object[] { card.controller, card.location, card.sequence });
-                    return (RectTransform)slot.GetType().GetField("root").GetValue(slot);
-                }
-
                 Require(prompt.candidates.Count >= 2, "The field fixture needs at least two candidates.");
                 var first = CardSlot(prompt.candidates[0]);
                 var second = CardSlot(prompt.candidates[1]);
@@ -323,6 +331,135 @@ namespace YGOPortable.Editor
                 Require(selected.SetEquals(new[] { 1 }) && Modals.TryConfirm() && !Modals.IsPromptOpen,
                     "Changing the target or confirming the field selection failed.");
             }
+
+            private RectTransform CardSlot(SelectableCardItem card)
+            {
+                var slot = typeof(DuelFieldUI).GetMethod("GetSlot", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(Field, new object[] { card.controller, card.location, card.sequence });
+                return (RectTransform)slot.GetType().GetField("root").GetValue(slot);
+            }
+
+            internal void SummonFromPileShortcut(DuelPrompt prompt)
+            {
+                var extra = StackRoot("_myExtraTile");
+                extra.GetComponent<CardDragTrigger>().OnPointerEnterAction.Invoke();
+                var icon = Field.Root.transform.Find("CardActions/SUMMONSP/Circle/Button") as RectTransform;
+                Require(icon != null && icon.gameObject.activeInHierarchy, "The Extra Deck shortcut was missing.");
+                ClickAt(icon);
+
+                var layout = _grid.GetComponent<GridLayoutGroup>();
+                var window = Private<RectTransform>(Modals, "_zoneWindow");
+                Require(ReferenceEquals(_duel.ActivePrompt, prompt) && Modals.ZoneViewRoot.activeSelf &&
+                    layout.constraint == GridLayoutGroup.Constraint.FixedColumnCount && layout.constraintCount == 1 &&
+                    window.anchorMin.x > .8f, "The shortcut did not open a vertical action list on the right.");
+                var cards = VisibleCards;
+                Require(cards.Length > 0 && cards.All(card => card.transform.parent.parent.Find("Act/B")),
+                    "The action list included a card without a legal command.");
+                var tile = cards.Single(card => card.CurrentCode == Chixiao).transform.parent.parent;
+                Click(tile.Find("Act/B").GetComponent<Button>());
+                Require(!Modals.ZoneViewRoot.activeSelf && !ReferenceEquals(_duel.ActivePrompt, prompt),
+                    "Selecting a legal summon in the shortcut did not advance the duel.");
+                Opens++;
+            }
+
+            internal void SelectSynchroMaterials(DuelPrompt prompt)
+            {
+                Modals.ShowPrompt(_duel, prompt);
+                Field.Refresh();
+                var modal = Modals.ModalRoot.transform;
+                Require(Modals.IsPromptOpen && !modal.Find("FieldView").gameObject.activeSelf && !modal.Find("Win/Body/Cards"),
+                    "The Synchro materials were not selectable on the field.");
+
+                byte[] response = Ai.ComputeResponse(_duel, prompt);
+                if (prompt.messageType == YgoConstants.MSG_SELECT_SUM)
+                {
+                    for (int i = 0; i < BitConverter.ToInt32(response, 4); i++)
+                        ClickAt(CardSlot(prompt.candidates[BitConverter.ToInt32(response, 8 + i * 4)]));
+                }
+                else if (response.Length == 8)
+                {
+                    ClickAt(CardSlot(prompt.candidates[BitConverter.ToInt32(response, 4)]));
+                    Require(!ReferenceEquals(_duel.ActivePrompt, prompt), "Clicking a material did not update the native selection.");
+                    return;
+                }
+
+                ClickMaterialConfirm();
+                Require(!ReferenceEquals(_duel.ActivePrompt, prompt), "The field confirmation did not complete the selection.");
+            }
+
+            internal void ConfirmFieldMaterials(LiveCardState material)
+            {
+                var prompt = new DuelPrompt
+                {
+                    messageType = YgoConstants.MSG_SELECT_UNSELECT_CARD, playerId = material.controller,
+                    finishable = true, cancelable = true, min = 1, max = 2,
+                };
+                prompt.unselectCandidates.Add(new SelectableCardItem
+                {
+                    code = material.code, controller = material.controller,
+                    location = material.location, sequence = material.sequence,
+                });
+                var activePrompt = typeof(DuelSession).GetProperty(nameof(DuelSession.ActivePrompt));
+                var previous = _duel.ActivePrompt;
+                activePrompt.SetValue(_duel, prompt);
+                try
+                {
+                    Modals.ShowPrompt(_duel, prompt);
+                    Field.Refresh();
+                    ClickMaterialConfirm();
+                }
+                finally
+                {
+                    activePrompt.SetValue(_duel, previous);
+                }
+            }
+
+            private void ClickMaterialConfirm()
+            {
+                var confirm = Modals.ModalRoot.transform.Find("MaterialConfirm/Button") as RectTransform;
+                Require(confirm != null && confirm.gameObject.activeInHierarchy, "The material confirmation was missing from the field.");
+                ClickAt(confirm);
+            }
+
+            internal void VerifyAttackResponse(LiveCardState defender)
+            {
+                byte opponent = (byte)_duel.AiPlayerIndex;
+                _duel.Players[opponent].mzone[0] = new LiveCardState
+                {
+                    controller = opponent, location = YgoConstants.LOCATION_MZONE, code = 20721928,
+                    position = YgoConstants.POS_FACEUP_ATTACK,
+                };
+                _duel.AttackerCon = opponent;
+                _duel.AttackerLoc = YgoConstants.LOCATION_MZONE;
+                _duel.AttackerSeq = 0;
+                _duel.TargetCon = defender.controller;
+                _duel.TargetLoc = defender.location;
+                _duel.TargetSeq = defender.sequence;
+                typeof(DuelSession).GetProperty(nameof(DuelSession.HasActiveAttack)).SetValue(_duel, true);
+                var response = new DuelPrompt
+                {
+                    messageType = YgoConstants.MSG_SELECT_EFFECTYN, playerId = defender.controller,
+                    promptCardCode = defender.code, promptCon = defender.controller,
+                    promptLoc = defender.location, promptSeq = defender.sequence,
+                };
+                var title = Private<Text>(Modals, "_chainTitle");
+                var arrow = Field.Root.transform.Find("ResponseAttackArrow");
+
+                Modals.ShowPrompt(_duel, response);
+                Field.Refresh();
+                Require(arrow.gameObject.activeInHierarchy && title.text.Contains("공격 선언"),
+                    "An attack response did not show the declaration and arrow.");
+
+                _duel.TargetLoc = 0;
+                Modals.ShowPrompt(_duel, response);
+                Field.Refresh();
+                Require(arrow.gameObject.activeInHierarchy && title.text.Contains("직접 공격"),
+                    "A direct attack response did not show its own declaration and arrow.");
+                Modals.HideAll();
+                Field.Refresh();
+                Require(!arrow.gameObject.activeSelf, "The attack response arrow remained after closing the prompt.");
+            }
+
 
             private GameObject Raycast(RectTransform target, out PointerEventData pointer)
             {
