@@ -12,6 +12,8 @@ namespace YGOPortable.Editor
     {
         private const string SupportPack = "support-staples";
         private const uint AshBlossom = 14558127;
+        private const uint GracefulCharity = 79571449;
+        private static readonly uint[] DrawSpells = { 42664989, 511001126, GracefulCharity };
         private static readonly CardRarity[] Rarities = (CardRarity[])Enum.GetValues(typeof(CardRarity));
 
         internal static void Run(string streamingPath)
@@ -36,27 +38,30 @@ namespace YGOPortable.Editor
             var materials = LoadLegacyProfile(save, profile);
             VerifyCrafting(materials, starter, profile);
             VerifyPurchasesAndRewards(save, profile);
-            Debug.Log($"[VERIFY COLLECTION] {starters.Count} starter deck sizes, legacy saves, isolated CP, reserved cards, " +
-                "single and bundle purchases, stale-save rollback and opponent progression passed.");
+            VerifyDeckCopyLimitAndFullDisassembly(starter);
+            Debug.Log($"[VERIFY COLLECTION] {starters.Count} starter deck sizes, legacy saves, uncapped inventory, isolated CP, " +
+                "deck copy limits, full disassembly, pack ownership, rollback and opponent progression passed.");
         }
 
         private static uint[] LoadLegacyProfile(string save, string profile)
         {
             var materials = Rarities.Select(rarity => CardDatabase.AllCards.First(card =>
                 card.code != AshBlossom && card.alias == 0 && card.IsMonster && CollectionProgress.IsCraftableCard(card) &&
-                CollectionProgress.GetDeckCopyLimit(card.code) == 3 && CollectionProgress.GetOwnedCount(card.code) == 0 &&
+                CollectionProgress.GetOwnedCount(card.code) == 0 &&
                 CardRarityCatalog.GetRarity(card.code) == rarity).code).ToArray();
 
             string json = File.ReadAllText(profile);
             json = Regex.Replace(json, "\"version\"\\s*:\\s*\\d+", "\"version\": 3");
             json = Regex.Replace(json, "\"craftPoints\"\\s*:\\s*\\[[^\\]]*\\],\\s*", "");
-            string cards = string.Join(",", materials.Select(code => $"{{\"code\":{code},\"count\":3}}"));
-            json = Regex.Replace(json, "\"cards\"\\s*:\\s*\\[", "\"cards\":[" + cards + ",");
+            for (int i = 0; i < materials.Length; i++)
+                json = WithOwnership(json, materials[i], i == (int)CardRarity.UltraRare ? 15 : 3);
+            foreach (uint code in DrawSpells) json = WithOwnership(json, code, 4);
             File.WriteAllText(profile, json);
             CollectionProgress.Load(save);
             Require(CollectionProgress.HasStarter && CollectionProgress.Balance == CollectionProgress.StartingBalance &&
                 Rarities.All(rarity => CollectionProgress.GetCraftPoints(rarity) == 0) &&
-                materials.All(code => CollectionProgress.GetOwnedCount(code) == 3),
+                CollectionProgress.GetOwnedCount(materials[(int)CardRarity.UltraRare]) == 15 &&
+                DrawSpells.All(code => CollectionProgress.GetOwnedCount(code) == 4),
                 "The legacy profile did not preserve DP and cards or initialize CP to zero.");
             Require(CardRarityCatalog.GetRarity(AshBlossom, out bool sourced) == CardRarity.UltraRare && sourced,
                 "The bundled rarity catalog did not yield the expected UR test card.");
@@ -80,31 +85,31 @@ namespace YGOPortable.Editor
                 name = "Collection second reserve fixture",
                 main = new List<uint> { normal },
             });
-            Require(CollectionProgress.GetDisassembleLimit(normal) == 1 &&
-                CollectionProgress.GetDisassembleLimit(starter.main[0]) == 0,
-                "Card protection did not reserve the maximum used in one deck and the starter.");
+            Require(CollectionProgress.GetDisassembleLimit(normal) == 3 &&
+                CollectionProgress.GetDisassembleLimit(starter.main[0]) == CollectionProgress.GetOwnedCount(starter.main[0]),
+                "Cards placed in a deck were excluded from disassembly.");
 
             string before = File.ReadAllText(profile);
-            Require(!CollectionProgress.TryDisassembleCards(new Dictionary<uint, int> { [rare] = 1, [normal] = 2 }, out _) &&
+            Require(!CollectionProgress.TryDisassembleCards(new Dictionary<uint, int> { [rare] = 1, [normal] = 4 }, out _) &&
                 File.ReadAllText(profile) == before && CollectionProgress.GetOwnedCount(rare) == 3,
-                "A batch that included a protected card partially spent ownership.");
+                "A batch that exceeded ownership partially disassembled cards.");
             Require(CollectionProgress.TryDisassembleCards(new Dictionary<uint, int>
             {
-                [normal] = 1,
+                [normal] = 3,
                 [rare] = 3,
                 [super] = 2,
-                [ultra] = 3,
+                [ultra] = 15,
             }, out string error), error);
             int value = CollectionProgress.DisassemblePointValue;
-            Require(CollectionProgress.GetCraftPoints(CardRarity.Normal) == value &&
+            Require(CollectionProgress.GetCraftPoints(CardRarity.Normal) == 3 * value &&
                 CollectionProgress.GetCraftPoints(CardRarity.Rare) == 3 * value &&
                 CollectionProgress.GetCraftPoints(CardRarity.SuperRare) == 2 * value &&
-                CollectionProgress.GetCraftPoints(CardRarity.UltraRare) == 3 * value,
+                CollectionProgress.GetCraftPoints(CardRarity.UltraRare) == 15 * value,
                 "Bulk disassembly mixed rarity balances.");
-            Require(!CollectionProgress.TryCraftCard(AshBlossom, 4, out _) &&
-                !CollectionProgress.TryCraftCard(AshBlossom, 0, out _), "Invalid craft quantities were accepted.");
-            Require(CollectionProgress.TryCraftCard(AshBlossom, 1, out error) &&
-                CollectionProgress.GetOwnedCount(AshBlossom) == 1 &&
+            Require(!CollectionProgress.TryCraftCard(AshBlossom, 0, out _), "A zero craft quantity was accepted.");
+            Require(CollectionProgress.TryCraftCard(AshBlossom, 4, out error) &&
+                CollectionProgress.TryCraftCard(AshBlossom, 1, out error) &&
+                CollectionProgress.GetOwnedCount(AshBlossom) == 5 &&
                 CollectionProgress.GetCraftPoints(CardRarity.UltraRare) == 0, error);
             Require(!CollectionProgress.TryCraftCard(AshBlossom, 1, out _) &&
                 CollectionProgress.GetCraftPoints(CardRarity.Rare) == 3 * value &&
@@ -116,6 +121,12 @@ namespace YGOPortable.Editor
         {
             int expectedDp = CollectionProgress.Balance;
             var pack = CollectionProgress.Packs.Single(item => item.Id == SupportPack);
+            string stockedProfile = File.ReadAllText(profile);
+            foreach (uint code in pack.CardPool)
+                stockedProfile = WithOwnership(stockedProfile, code, Math.Max(3, CollectionProgress.GetOwnedCount(code)));
+            File.WriteAllText(profile, stockedProfile);
+            CollectionProgress.Load(save);
+            var beforePurchase = pack.CardPool.ToDictionary(code => code, CollectionProgress.GetOwnedCount);
             Require(CollectionProgress.TryBuyPack(SupportPack, out var single, out string error), error);
             expectedDp -= CollectionProgress.PackCost;
             Require(ValidPack(single, pack) && CollectionProgress.Balance == expectedDp,
@@ -123,9 +134,10 @@ namespace YGOPortable.Editor
             Require(CollectionProgress.TryBuyPacks(SupportPack, CollectionProgress.PackBundleSize, out var bundle, out error), error);
             expectedDp -= CollectionProgress.PackBundleSize * CollectionProgress.PackCost;
             Require(bundle.Count == CollectionProgress.PackBundleSize && bundle.All(pulls => ValidPack(pulls, pack)) &&
-                CollectionProgress.Balance == expectedDp && pack.CardPool.All(code =>
-                    CollectionProgress.GetOwnedCount(code) <= CollectionProgress.GetDeckCopyLimit(code)),
-                "A bundle did not respect its count, price, or collection caps.");
+                CollectionProgress.Balance == expectedDp &&
+                single.Concat(bundle.SelectMany(pulls => pulls)).GroupBy(code => code).All(group =>
+                    CollectionProgress.GetOwnedCount(group.Key) == beforePurchase[group.Key] + group.Count()),
+                "A bundle did not retain every pull above the former three-copy inventory cap.");
 
             var first = DeckRepository.Characters.Single(character => CollectionProgress.IsOpponentUnlocked(character.id));
             var levels = OpponentDeckLevels.GetDecks(first.id);
@@ -152,6 +164,35 @@ namespace YGOPortable.Editor
                 CollectionProgress.IsOpponentDeckUnlocked(first.id, levels[1].id) &&
                 CollectionProgress.IsOpponentUnlocked(opponent.id),
                 "Reload lost minted ownership, CP, DP, or opponent progression.");
+        }
+
+        private static string WithOwnership(string json, uint code, int count)
+        {
+            var existing = new Regex("\\{\\s*\"code\"\\s*:\\s*" + code + "\\s*,\\s*\"count\"\\s*:\\s*\\d+\\s*\\}");
+            string entry = $"{{\"code\":{code},\"count\":{count}}}";
+            return existing.IsMatch(json) ? existing.Replace(json, entry) :
+                new Regex("\"cards\"\\s*:\\s*\\[").Replace(json, "\"cards\":[" + entry + ",", 1);
+        }
+
+        private static void VerifyDeckCopyLimitAndFullDisassembly(UserDeck starter)
+        {
+            var deck = new UserDeck
+            {
+                main = starter.main.Where(code => !DrawSpells.Contains(code)).Take(31)
+                    .Concat(DrawSpells.SelectMany(code => Enumerable.Repeat(code, 3))).ToList(),
+            };
+            Require(CollectionProgress.CanUseDeck(deck, out string reason),
+                $"Three copies of the draw spells were rejected: {reason}");
+            deck.side.Add(GracefulCharity);
+            Require(!CollectionProgress.CanUseDeck(deck, out reason) && reason.Contains("3장"),
+                "A fourth copy in Side bypassed the total deck copy limit.");
+            deck.side.Clear();
+
+            int copies = CollectionProgress.GetOwnedCount(GracefulCharity);
+            Require(CollectionProgress.TryDisassembleCards(new Dictionary<uint, int> { [GracefulCharity] = copies },
+                    out string error) && CollectionProgress.GetOwnedCount(GracefulCharity) == 0 &&
+                !CollectionProgress.CanUseDeck(deck, out reason) && reason.Contains("보유 0장"),
+                $"Full disassembly did not update deck eligibility: {error}");
         }
 
         private static bool ValidPack(IReadOnlyList<uint> pulls, CollectionPack pack) =>

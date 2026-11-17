@@ -101,7 +101,8 @@ namespace YGOPortable.Core
         private static CardRarity AssignLocalRarity(CardInfo card)
         {
             if (card == null || (card.type & TYPE_TOKEN) != 0) return CardRarity.Normal;
-            if (CollectionProgress.GetDeckCopyLimit(card.code) == 1) return CardRarity.UltraRare;
+            if (CollectionProgress.GetDeckCopyKey(card.code) is 55144522 or 79571449 or 12580477 or 18144506)
+                return CardRarity.UltraRare;
 
             int score = card.IsExtra ? 2 : 0;
             if (card.IsMonster && card.atk >= 2600) score++;

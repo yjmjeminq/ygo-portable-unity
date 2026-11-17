@@ -19,7 +19,6 @@ namespace YGOPortable.UI
             internal string SearchName;
             internal CardRarity Rarity;
             internal int Owned;
-            internal int Limit;
         }
 
         private sealed class CardRow
@@ -33,7 +32,6 @@ namespace YGOPortable.UI
 
         private readonly Action _close;
         private readonly Action _changed;
-        private UserDeck _editingDeck;
         private readonly GameObject _catalogRoot;
         private readonly GameObject _reviewRoot;
         private readonly InputField _search;
@@ -64,6 +62,7 @@ namespace YGOPortable.UI
         private readonly Button _increment;
         private readonly Button _maximum;
         private readonly Button _autoSelect;
+        private readonly Button _selectAll;
         private readonly Button _clear;
         private readonly Button _review;
         private readonly Button _reviewCancel;
@@ -107,8 +106,9 @@ namespace YGOPortable.UI
             _decrement = AddButton(details, "Decrease", "−", .408f, .563f, .538f, .638f, () => AdjustQuantity(-1));
             _increment = AddButton(details, "Increase", "+", .55f, .563f, .68f, .638f, () => AdjustQuantity(1));
             _maximum = AddButton(details, "Maximum", "최대", .696f, .563f, .92f, .638f, SelectMaximum);
-            _autoSelect = AddButton(details, "SelectSpare", "카드별 1장 남기기", .08f, .375f, .60f, .45f, SelectSpare);
-            _clear = AddButton(details, "Clear", "선택 초기화", .615f, .375f, .92f, .45f, ClearSelection);
+            _autoSelect = AddButton(details, "SelectSpare", "카드별 1장 남기기", .08f, .375f, .39f, .45f, SelectSpare);
+            _selectAll = AddButton(details, "SelectAll", "전체 보유 선택", .402f, .375f, .67f, .45f, SelectAll);
+            _clear = AddButton(details, "Clear", "선택 초기화", .682f, .375f, .92f, .45f, ClearSelection);
             _summary = Label(details, "Summary", "", .085f, .298f, .915f, .365f, 18, TextAnchor.MiddleLeft);
             _points = BuildPointLabels(details, .217f, .292f);
             _review = AddButton(details, "Review", "분해 내역 확인", .08f, .124f, .92f, .205f, OpenReview, true);
@@ -128,7 +128,7 @@ namespace YGOPortable.UI
             Heading(totals, "Heading", "받을 제작 포인트", .08f, .858f, .92f, .93f);
             _reviewSummary = Label(totals, "Summary", "", .08f, .732f, .92f, .815f, 22);
             _reviewPoints = BuildPointLabels(totals, .60f, .71f);
-            Label(totals, "Explanation", "선택한 카드의 보유 수량이 줄어들고\n등급별 제작 포인트가 지급됩니다.",
+            Label(totals, "Explanation", "덱에 넣은 카드도 분해됩니다.\n보유 카드가 부족해진 덱은 수정 후 사용할 수 있습니다.",
                 .10f, .397f, .90f, .556f, 19);
             _reviewCancel = AddButton(totals, "Cancel", "취소", .08f, .138f, .43f, .229f, CancelReview);
             AddButton(totals, "Confirm", "카드 분해", .47f, .138f, .92f, .229f, ConfirmDisassembly, true);
@@ -137,9 +137,8 @@ namespace YGOPortable.UI
             _reviewRoot.SetActive(false);
         }
 
-        internal void Show(UserDeck editingDeck)
+        internal void Show()
         {
-            _editingDeck = editingDeck;
             _reviewRoot.SetActive(false);
             _filter = null;
             _selected.Clear();
@@ -154,7 +153,6 @@ namespace YGOPortable.UI
 
         internal void Hide()
         {
-            _editingDeck = null;
             _catalogRoot.SetActive(false);
             _reviewRoot.SetActive(false);
             _selected.Clear();
@@ -191,7 +189,7 @@ namespace YGOPortable.UI
         private void ReloadCards()
         {
             _cards.Clear();
-            var limits = CollectionProgress.GetDisassembleLimits(_editingDeck);
+            var limits = CollectionProgress.GetDisassembleLimits();
             foreach (var entry in limits)
             {
                 string name = CardDatabase.GetName(entry.Key);
@@ -201,8 +199,7 @@ namespace YGOPortable.UI
                     Name = name,
                     SearchName = Normalize(name),
                     Rarity = CardRarityCatalog.GetRarity(entry.Key),
-                    Owned = CollectionProgress.GetOwnedCount(entry.Key),
-                    Limit = entry.Value,
+                    Owned = entry.Value,
                 });
             }
             _cards.Sort((left, right) =>
@@ -218,6 +215,7 @@ namespace YGOPortable.UI
                     _selected.Remove(code);
             }
             _autoSelect.interactable = _cards.Any(card => card.Owned > 1);
+            _selectAll.interactable = _cards.Count > 0;
         }
 
         private void CycleRarity()
@@ -280,10 +278,10 @@ namespace YGOPortable.UI
         private void RefreshSelection()
         {
             int quantity = _inspected == null ? 0 : Quantity(_inspected.Code);
-            int limit = _inspected?.Limit ?? 0;
+            int limit = _inspected?.Owned ?? 0;
             _cardInfo.text = _inspected == null
                 ? ""
-                : $"보유 {_inspected.Owned:N0}장 · 분해 가능 {limit:N0}장\n선택 {quantity:N0}장";
+                : $"보유 {limit:N0}장\n선택 {quantity:N0}장";
             _decrement.interactable = quantity > 0;
             _increment.interactable = quantity < limit;
             _maximum.interactable = quantity < limit;
@@ -296,7 +294,7 @@ namespace YGOPortable.UI
                 var row = _rows[i];
                 row.Name.color = card == _inspected ? PackShopStyle.Accent : PackShopStyle.TextPrimary;
                 int selected = Quantity(card.Code);
-                row.Quantity.text = $"선택 {selected:N0} / {card.Limit:N0}";
+                row.Quantity.text = $"선택 {selected:N0} / {card.Owned:N0}";
                 row.Quantity.color = selected > 0 ? PackShopStyle.Accent : PackShopStyle.TextMuted;
             }
             RefreshTotals(_summary, _points);
@@ -322,7 +320,7 @@ namespace YGOPortable.UI
         private void AdjustQuantity(int delta)
         {
             if (_inspected == null) return;
-            int quantity = Mathf.Clamp(Quantity(_inspected.Code) + delta, 0, _inspected.Limit);
+            int quantity = (int)Math.Clamp((long)Quantity(_inspected.Code) + delta, 0, _inspected.Owned);
             if (quantity == 0) _selected.Remove(_inspected.Code);
             else _selected[_inspected.Code] = quantity;
             _status.text = "";
@@ -332,21 +330,25 @@ namespace YGOPortable.UI
         private void SelectMaximum()
         {
             if (_inspected == null) return;
-            _selected[_inspected.Code] = _inspected.Limit;
+            _selected[_inspected.Code] = _inspected.Owned;
             _status.text = "";
             RefreshSelection();
         }
 
-        private void SelectSpare()
+        private void SelectSpare() => SelectFromCollection(keepOne: true);
+
+        private void SelectAll() => SelectFromCollection(keepOne: false);
+
+        private void SelectFromCollection(bool keepOne)
         {
             _selected.Clear();
             foreach (var card in _cards)
             {
-                int quantity = Math.Min(card.Limit, card.Owned - 1);
+                int quantity = card.Owned - (keepOne ? 1 : 0);
                 if (quantity > 0) _selected.Add(card.Code, quantity);
             }
             _status.color = PackShopStyle.TextPrimary;
-            _status.text = _selected.Count == 0 ? "분해할 여분 카드가 없습니다." : "모든 카드에서 분해할 여분을 선택했습니다.";
+            _status.text = keepOne ? "카드별로 1장씩 남겼습니다." : "보유한 카드를 전부 선택했습니다.";
             RefreshSelection();
         }
 
@@ -393,7 +395,7 @@ namespace YGOPortable.UI
         private void ConfirmDisassembly()
         {
             if (!_reviewRoot.activeInHierarchy) return;
-            bool success = CollectionProgress.TryDisassembleCards(_selected, out string error, _editingDeck);
+            bool success = CollectionProgress.TryDisassembleCards(_selected, out string error);
             if (success) _selected.Clear();
             ReloadCards();
             _reviewRoot.SetActive(false);

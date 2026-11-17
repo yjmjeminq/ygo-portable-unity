@@ -120,15 +120,20 @@ namespace YGOPortable.Editor
                 "Crafting did not open from the selected card without exposing the deck editor controls.");
             var disassemble = ButtonAt(catalog, "Details/Disassemble/Button");
             disassemble.onClick.Invoke();
-            Require(CraftingScope(crafting) == catalog &&
-                !CollectionProgress.GetDisassembleLimits(working).ContainsKey(code),
-                "A card reserved by unsaved deck edits was offered for disassembly.");
+            var usedCardDialog = CraftingScope(crafting);
+            Require(usedCardDialog != catalog && (int)Field(crafting, "_maxQuantity") == owned,
+                "Single-card disassembly did not offer every copy used by the edited deck.");
+            Call(crafting, "Back");
 
             ButtonAt(catalog, "Bulk/Button").onClick.Invoke();
             var bulk = Field(crafting, "_bulk");
-            ((InputField)Field(bulk, "_search")).text = code.ToString();
-            Require(((Text)Field(bulk, "_count")).text == "분해 가능 0종",
-                "Bulk disassembly included a card reserved by the edited deck.");
+            var bulkCatalog = CraftingScope(crafting);
+            ButtonAt(bulkCatalog, "Details/SelectAll/Button").onClick.Invoke();
+            var selected = (System.Collections.Generic.Dictionary<uint, int>)Field(bulk, "_selected");
+            var available = CollectionProgress.GetDisassembleLimits();
+            Require(selected.Count == available.Count && selected[code] == owned &&
+                available.All(pair => selected.TryGetValue(pair.Key, out int quantity) && quantity == pair.Value),
+                "Select all missed eligible owned copies.");
             Call(crafting, "Back");
             ButtonAt(catalog, "Back/Button").onClick.Invoke();
             Require(craftingButton.gameObject.activeInHierarchy && events.currentSelectedGameObject == craftingButton.gameObject &&
@@ -151,14 +156,15 @@ namespace YGOPortable.Editor
                 "Disassembly cancellation changed the card or left catalog controls locked.");
 
             disassemble.onClick.Invoke();
+            if (owned > 1) ButtonAt(CraftingScope(crafting), "Window/Maximum/Button").onClick.Invoke();
             search.text = alternative.code.ToString();
             confirm.onClick.Invoke();
-            Require(CollectionProgress.GetOwnedCount(code) == owned - 1 &&
-                CollectionProgress.GetCraftPoints(rarity) == CollectionProgress.DisassemblePointValue &&
+            Require(CollectionProgress.GetOwnedCount(code) == 0 &&
+                CollectionProgress.GetCraftPoints(rarity) == owned * CollectionProgress.DisassemblePointValue &&
                 search.IsInteractable() && CraftingScope(crafting) == catalog,
                 "Disassembly failed to apply its displayed card exactly once.");
             ButtonAt(catalog, "Back/Button").onClick.Invoke();
-            Require(((Text)Field(editor, "_previewOwnership")).text.Contains($"보유 {owned - 1}장"),
+            Require(((Text)Field(editor, "_previewOwnership")).text.Contains("보유 0장"),
                 "The editor did not refresh the card's ownership after disassembly.");
         }
 

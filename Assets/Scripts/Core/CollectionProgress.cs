@@ -60,8 +60,9 @@ namespace YGOPortable.Core
         public const int StartingBalance = 3000;
         public const int CraftPointCost = 30;
         public const int DisassemblePointValue = 10;
+        public const int DeckCopyLimit = 3;
 
-        private const int ProfileVersion = 4;
+        private const int ProfileVersion = 5;
         private const int GenericPackSize = 160;
         private const string ProfileFileName = "collection-profile.json";
         private const int FirstOpponentId = 99;
@@ -87,7 +88,7 @@ namespace YGOPortable.Core
         {
             public int version;
             public int balance;
-            public int[] craftPoints;
+            public long[] craftPoints;
             public string starterId;
             public UserDeck starterDeck;
             public List<CardCopies> cards;
@@ -116,7 +117,6 @@ namespace YGOPortable.Core
         };
 
         private static readonly System.Random PackRandom = new System.Random();
-        private static readonly HashSet<uint> SingleCopyCards = new HashSet<uint> { 55144522, 79571449, 12580477, 18144506 };
         private static string _profilePath;
         private static string _savedJson;
         private static SavedProfile _profile;
@@ -162,14 +162,14 @@ namespace YGOPortable.Core
                     saved.starterDeck.main == null || saved.starterDeck.extra == null || saved.starterDeck.side == null)
                     throw new InvalidDataException("Invalid collection profile.");
 
-                saved.craftPoints ??= new int[CardRarityCatalog.TierCount];
+                saved.craftPoints ??= new long[CardRarityCatalog.TierCount];
                 if (saved.craftPoints.Length != CardRarityCatalog.TierCount || saved.craftPoints.Any(points => points < 0))
                     throw new InvalidDataException("Invalid craft point balances.");
 
                 var owned = new Dictionary<uint, int>(saved.cards.Count);
                 foreach (var entry in saved.cards)
                 {
-                    if (entry.code == 0 || entry.count < 1 || entry.count > 3 || owned.ContainsKey(entry.code))
+                    if (entry.code == 0 || entry.count < 1 || owned.ContainsKey(entry.code))
                         throw new InvalidDataException("Invalid card ownership entry.");
                     owned.Add(entry.code, entry.count);
                 }
@@ -191,34 +191,21 @@ namespace YGOPortable.Core
 
         public static int GetOwnedCount(uint code) => _owned.TryGetValue(code, out int copies) ? copies : 0;
 
-        public static int GetCraftPoints(CardRarity rarity) =>
+        public static long GetCraftPoints(CardRarity rarity) =>
             (uint)rarity < CardRarityCatalog.TierCount ? _profile?.craftPoints[(int)rarity] ?? 0 : 0;
 
         public static bool IsCraftableCard(CardInfo card) => IsDeckCard(card);
 
         public static int GetCraftLimit(uint code) => HasStarter && IsCraftableCard(CardDatabase.Get(code))
-            ? Math.Max(0, GetDeckCopyLimit(code) - GetOwnedCount(code)) : 0;
+            ? int.MaxValue - GetOwnedCount(code) : 0;
 
-        public static int GetDisassembleLimit(uint code)
-        {
-            if (!HasStarter || !IsCraftableCard(CardDatabase.Get(code)) || GetOwnedCount(code) == 0) return 0;
-            var reserved = GetReservedDeckCopies();
-            return GetDisassembleLimit(code, reserved);
-        }
+        public static int GetDisassembleLimit(uint code) => HasStarter && IsCraftableCard(CardDatabase.Get(code))
+            ? GetOwnedCount(code) : 0;
 
-        public static IReadOnlyDictionary<uint, int> GetDisassembleLimits(UserDeck editingDeck = null)
-        {
-            var available = new Dictionary<uint, int>();
-            if (!HasStarter) return available;
-
-            var reserved = GetReservedDeckCopies(editingDeck);
-            foreach (uint code in _owned.Keys)
-            {
-                int quantity = GetDisassembleLimit(code, reserved);
-                if (quantity > 0 && IsCraftableCard(CardDatabase.Get(code))) available.Add(code, quantity);
-            }
-            return available;
-        }
+        public static IReadOnlyDictionary<uint, int> GetDisassembleLimits() => HasStarter
+            ? _owned.Where(entry => IsCraftableCard(CardDatabase.Get(entry.Key)))
+                .ToDictionary(entry => entry.Key, entry => entry.Value)
+            : new Dictionary<uint, int>();
 
         public static bool TryCraftCard(uint code, int quantity, out string error)
         {
@@ -230,12 +217,12 @@ namespace YGOPortable.Core
             }
             if (quantity > GetCraftLimit(code))
             {
-                error = $"{CardDatabase.GetName(code)} 보유 한도는 {GetDeckCopyLimit(code)}장입니다.";
+                error = "카드 보유 수량을 저장할 수 있는 범위를 초과합니다.";
                 return false;
             }
 
             var rarity = CardRarityCatalog.GetRarity(code);
-            int cost = quantity * CraftPointCost;
+            long cost = (long)quantity * CraftPointCost;
             if (GetCraftPoints(rarity) < cost)
             {
                 error = $"{CardRarityCatalog.GetLabel(rarity)} 제작 포인트가 {cost:N0} 필요합니다.";
@@ -244,13 +231,12 @@ namespace YGOPortable.Core
 
             var owned = new Dictionary<uint, int>(_owned) { [code] = GetOwnedCount(code) + quantity };
             var next = WithBalance(Balance);
-            next.craftPoints = (int[])_profile.craftPoints.Clone();
+            next.craftPoints = (long[])_profile.craftPoints.Clone();
             next.craftPoints[(int)rarity] -= cost;
             return Write(next, owned, out error);
         }
 
-        public static bool TryDisassembleCards(IReadOnlyDictionary<uint, int> quantities, out string error,
-            UserDeck editingDeck = null)
+        public static bool TryDisassembleCards(IReadOnlyDictionary<uint, int> quantities, out string error)
         {
             if (!CanTradeCards(out error)) return false;
             if (quantities == null || quantities.Count == 0)
@@ -259,10 +245,9 @@ namespace YGOPortable.Core
                 return false;
             }
 
-            var reserved = GetReservedDeckCopies(editingDeck);
             var owned = new Dictionary<uint, int>(_owned);
             var next = WithBalance(Balance);
-            next.craftPoints = (int[])_profile.craftPoints.Clone();
+            next.craftPoints = (long[])_profile.craftPoints.Clone();
             foreach (var entry in quantities)
             {
                 uint code = entry.Key;
@@ -273,16 +258,15 @@ namespace YGOPortable.Core
                     return false;
                 }
                 int copies = owned.GetValueOrDefault(code);
-                int available = Math.Max(0, copies - reserved.GetValueOrDefault(code));
-                if (quantity > available)
+                if (quantity > copies)
                 {
-                    error = $"{CardDatabase.GetName(code)} 분해 가능 수량은 {available}장입니다.";
+                    error = $"{CardDatabase.GetName(code)} 분해 가능 수량은 {copies}장입니다.";
                     return false;
                 }
 
                 int tier = (int)CardRarityCatalog.GetRarity(code);
-                int gain = quantity * DisassemblePointValue;
-                if (next.craftPoints[tier] > int.MaxValue - gain)
+                long gain = (long)quantity * DisassemblePointValue;
+                if (next.craftPoints[tier] > long.MaxValue - gain)
                 {
                     error = "제작 포인트 보유 한도를 초과합니다.";
                     return false;
@@ -301,24 +285,6 @@ namespace YGOPortable.Core
             if (HasStarter) return true;
             error = "먼저 스타터 덱을 선택하세요.";
             return false;
-        }
-
-        private static int GetDisassembleLimit(uint code, Dictionary<uint, int> reserved) =>
-            Math.Max(0, GetOwnedCount(code) - reserved.GetValueOrDefault(code));
-
-        private static Dictionary<uint, int> GetReservedDeckCopies(UserDeck editingDeck = null)
-        {
-            var reserved = new Dictionary<uint, int>();
-            void Reserve(UserDeck deck)
-            {
-                foreach (var group in GetDeckCards(deck).GroupBy(code => code))
-                    reserved[group.Key] = Math.Max(reserved.GetValueOrDefault(group.Key), group.Count());
-            }
-
-            Reserve(_profile.starterDeck);
-            foreach (var deck in DeckRepository.UserDecks) Reserve(deck);
-            if (editingDeck != null) Reserve(editingDeck);
-            return reserved;
         }
 
         public static bool IsOpponentUnlocked(int id)
@@ -359,8 +325,6 @@ namespace YGOPortable.Core
             var card = CardDatabase.Get(code);
             return card != null && card.alias != 0 ? card.alias : code;
         }
-
-        public static int GetDeckCopyLimit(uint code) => SingleCopyCards.Contains(GetDeckCopyKey(code)) ? 1 : 3;
 
         public static UserDeck CreateStarterDeck() => HasStarter ? CopyDeck(_profile.starterDeck) : null;
 
@@ -411,7 +375,7 @@ namespace YGOPortable.Core
                 starterId = starter.Id,
                 starterDeck = selected,
                 balance = StartingBalance,
-                craftPoints = new int[CardRarityCatalog.TierCount],
+                craftPoints = new long[CardRarityCatalog.TierCount],
             };
             InitializeOpponentProgress(next);
             if (!Write(next, owned, out error)) return false;
@@ -455,24 +419,10 @@ namespace YGOPortable.Core
             }
 
             var packGroups = new List<uint>[CardRarityCatalog.TierCount];
-            var availableGroups = new List<uint>[CardRarityCatalog.TierCount];
             for (int tier = 0; tier < packGroups.Length; tier++)
-            {
                 packGroups[tier] = new List<uint>();
-                availableGroups[tier] = new List<uint>();
-            }
             foreach (uint code in pack.CardPool)
-            {
-                int tier = (int)CardRarityCatalog.GetRarity(code);
-                packGroups[tier].Add(code);
-                if (GetOwnedCount(code) < GetDeckCopyLimit(code))
-                    availableGroups[tier].Add(code);
-            }
-            if (availableGroups.All(group => group.Count == 0))
-            {
-                error = "이 팩의 카드를 모두 최대 수량까지 보유하고 있습니다.";
-                return false;
-            }
+                packGroups[(int)CardRarityCatalog.GetRarity(code)].Add(code);
 
             var owned = new Dictionary<uint, int>(_owned);
             var openedPacks = new IReadOnlyList<uint>[packCount];
@@ -481,17 +431,17 @@ namespace YGOPortable.Core
                 var opened = new uint[CardsPerPack];
                 for (int cardIndex = 0; cardIndex < opened.Length; cardIndex++)
                 {
-                    var available = RollPackRarity(availableGroups, PackRandom);
-                    var group = available ?? RollPackRarity(packGroups, PackRandom);
-                    int index = PackRandom.Next(group.Count);
-                    uint code = group[index];
-                    opened[cardIndex] = code;
-                    if (available == null) continue;
+                    var group = RollPackRarity(packGroups, PackRandom);
+                    uint code = group[PackRandom.Next(group.Count)];
+                    int count = owned.GetValueOrDefault(code);
+                    if (count == int.MaxValue)
+                    {
+                        error = "카드 보유 수량을 저장할 수 있는 범위를 초과합니다.";
+                        return false;
+                    }
 
-                    owned.TryGetValue(code, out int count);
-                    owned[code] = ++count;
-                    if (count >= GetDeckCopyLimit(code))
-                        available.RemoveAt(index);
+                    opened[cardIndex] = code;
+                    owned[code] = count + 1;
                 }
                 openedPacks[packIndex] = Array.AsReadOnly(opened);
             }
@@ -767,7 +717,7 @@ namespace YGOPortable.Core
                 if (pile.Count >= size || !IsDeckCard(card) || card.IsExtra != extraPile) return false;
                 uint key = GetDeckCopyKey(code);
                 counts.TryGetValue(key, out int count);
-                if (count >= GetDeckCopyLimit(code)) return false;
+                if (count >= DeckCopyLimit) return false;
                 counts[key] = count + 1;
                 pile.Add(code);
                 return true;
@@ -897,9 +847,8 @@ namespace YGOPortable.Core
             }
             foreach (var group in GetDeckCards(deck).GroupBy(GetDeckCopyKey))
             {
-                int limit = GetDeckCopyLimit(group.Key);
-                if (group.Count() <= limit) continue;
-                reason = $"{CardDatabase.GetName(group.Key)}은(는) 덱에 {limit}장까지 넣을 수 있습니다.";
+                if (group.Count() <= DeckCopyLimit) continue;
+                reason = $"{CardDatabase.GetName(group.Key)}은(는) 덱에 {DeckCopyLimit}장까지 넣을 수 있습니다.";
                 return false;
             }
             reason = "";

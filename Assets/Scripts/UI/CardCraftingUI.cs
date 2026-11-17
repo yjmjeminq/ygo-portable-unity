@@ -64,12 +64,11 @@ namespace YGOPortable.UI
         private readonly Text _quantityLabel;
         private readonly Button _minus;
         private readonly Button _plus;
+        private readonly Button _maximum;
         private readonly Button _cancel;
         private readonly Button _confirm;
         private readonly List<Entry> _matches = new();
         private Entry[] _entries;
-        private IReadOnlyDictionary<uint, int> _disassembleLimits;
-        private UserDeck _editingDeck;
         private Entry _selected;
         private Entry _confirmedCard;
         private int _page;
@@ -153,7 +152,7 @@ namespace YGOPortable.UI
             _craft = AddButton(details, "Craft", "제작", .407f, .204f, .661f, .281f, () => OpenConfirmation(true), true);
             _disassemble = AddButton(details, "Disassemble", "분해", .673f, .204f, .926f, .281f, () => OpenConfirmation(false));
             _status = Label(details, "Status", "", .077f, .126f, .928f, .195f, 17, TextAnchor.MiddleCenter, PackShopStyle.TextPrimary);
-            Label(details, "Rules", "같은 등급 CP로 제작할 수 있으며 덱에 사용 중인 카드는 분해에서 보호됩니다.",
+            Label(details, "Rules", "같은 등급의 CP를 사용해 카드를 제작할 수 있습니다.",
                 .077f, .069f, .928f, .121f, 16, TextAnchor.MiddleCenter, PackShopStyle.TextMuted);
 
             var footer = PackShopStyle.Panel(main, "Footer", new Vector2(.035f, .017f), new Vector2(.965f, .059f));
@@ -167,9 +166,10 @@ namespace YGOPortable.UI
             _confirmationWindow = window.gameObject;
             _confirmTitle = Label(window, "Title", "", .09f, .78f, .91f, .92f, 27, TextAnchor.MiddleCenter, PackShopStyle.Accent);
             _confirmBody = Label(window, "Details", "", .085f, .483f, .915f, .751f, 22, TextAnchor.MiddleCenter, PackShopStyle.TextPrimary);
-            _minus = AddButton(window, "Minus", "−", .26f, .29f, .39f, .437f, () => ChangeQuantity(-1));
-            _quantityLabel = Label(window, "Quantity", "", .406f, .29f, .594f, .437f, 22, TextAnchor.MiddleCenter, PackShopStyle.TextPrimary);
-            _plus = AddButton(window, "Plus", "+", .61f, .29f, .74f, .437f, () => ChangeQuantity(1));
+            _minus = AddButton(window, "Minus", "−", .12f, .29f, .25f, .437f, () => ChangeQuantity(-1));
+            _quantityLabel = Label(window, "Quantity", "", .27f, .29f, .53f, .437f, 22, TextAnchor.MiddleCenter, PackShopStyle.TextPrimary);
+            _plus = AddButton(window, "Plus", "+", .55f, .29f, .68f, .437f, () => ChangeQuantity(1));
+            _maximum = AddButton(window, "Maximum", "최대", .71f, .29f, .88f, .437f, SelectMaximum);
             _cancel = AddButton(window, "Cancel", "취소", .092f, .095f, .465f, .24f, CloseConfirmation);
             _confirm = AddButton(window, "Confirm", "", .535f, .095f, .908f, .24f, ApplyConfirmed, true);
             _confirmation.SetActive(false);
@@ -179,9 +179,8 @@ namespace YGOPortable.UI
             Root.SetActive(false);
         }
 
-        internal void Show(UserDeck editingDeck, uint selectedCard)
+        internal void Show(uint selectedCard)
         {
-            _editingDeck = editingDeck;
             _entries ??= CardDatabase.AllCards.Where(CollectionProgress.IsCraftableCard).Select(card => new Entry(card))
                 .OrderBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase).ThenBy(entry => entry.Card.code).ToArray();
             Root.SetActive(true);
@@ -201,7 +200,6 @@ namespace YGOPortable.UI
             _finder.DeactivateInputField();
             _art.SetCard(0);
             _selected = null;
-            _editingDeck = null;
             Root.SetActive(false);
         }
 
@@ -282,7 +280,6 @@ namespace YGOPortable.UI
 
         private void RefreshPoints()
         {
-            _disassembleLimits = CollectionProgress.GetDisassembleLimits(_editingDeck);
             for (int i = 0; i < Rarities.Length; i++)
             {
                 var rarity = Rarities[i];
@@ -342,7 +339,7 @@ namespace YGOPortable.UI
             else
             {
                 int owned = CollectionProgress.GetOwnedCount(code);
-                _cardInfo.text = $"보유 {owned}장 · 분해 가능 {DisassembleLimit(code)}장";
+                _cardInfo.text = $"보유 {owned:N0}장";
             }
             string tier = entry == null ? "" : CardRarityCatalog.GetLabel(entry.Rarity);
             SetButtonText(_craft, entry == null ? "제작" : $"제작 · {tier} {CollectionProgress.CraftPointCost} CP");
@@ -353,14 +350,12 @@ namespace YGOPortable.UI
                 SetButtonLabelColor(_rowNames[i], _matches[first + i] == entry ? PackShopStyle.Accent : PackShopStyle.TextPrimary);
         }
 
-        private int DisassembleLimit(uint code) =>
-            _disassembleLimits != null && _disassembleLimits.TryGetValue(code, out int count) ? count : 0;
 
         private void OpenBulk()
         {
             _finder.DeactivateInputField();
             _main.SetActive(false);
-            _bulk.Show(_editingDeck);
+            _bulk.Show();
         }
 
         private void ReturnFromBulk()
@@ -380,7 +375,7 @@ namespace YGOPortable.UI
             if (crafting)
             {
                 int room = CollectionProgress.GetCraftLimit(code);
-                int usable = CollectionProgress.GetCraftPoints(card.Rarity) / CollectionProgress.CraftPointCost;
+                long usable = CollectionProgress.GetCraftPoints(card.Rarity) / CollectionProgress.CraftPointCost;
                 if (room == 0)
                 {
                     _status.color = PackShopStyle.Danger;
@@ -393,16 +388,15 @@ namespace YGOPortable.UI
                     _status.text = $"{rarity} 제작 포인트가 부족합니다.";
                     return;
                 }
-                _maxQuantity = Mathf.Min(room, usable);
+                _maxQuantity = (int)Math.Min(room, usable);
             }
             else
             {
-                _maxQuantity = DisassembleLimit(code);
+                _maxQuantity = CollectionProgress.GetDisassembleLimit(code);
                 if (_maxQuantity == 0)
                 {
                     _status.color = PackShopStyle.Danger;
-                    _status.text = CollectionProgress.GetOwnedCount(code) == 0 ?
-                        "이 카드를 보유하고 있지 않습니다." : "저장한 덱에 필요한 카드입니다.";
+                    _status.text = "이 카드를 보유하고 있지 않습니다.";
                     return;
                 }
             }
@@ -421,27 +415,37 @@ namespace YGOPortable.UI
         private void ChangeQuantity(int delta)
         {
             if (!_confirmation.activeInHierarchy) return;
-            _quantity = Mathf.Clamp(_quantity + delta, 1, _maxQuantity);
+            _quantity = (int)Math.Clamp((long)_quantity + delta, 1, _maxQuantity);
             RefreshConfirmation();
             if (delta > 0 && !_plus.interactable) Focus(_minus);
             else if (delta < 0 && !_minus.interactable) Focus(_plus);
         }
 
+        private void SelectMaximum()
+        {
+            if (!_confirmation.activeInHierarchy) return;
+            _quantity = _maxQuantity;
+            RefreshConfirmation();
+            Focus(_minus);
+        }
+
         private void RefreshConfirmation()
         {
             string action = _crafting ? "제작" : "분해";
-            int points = _quantity * (_crafting ? CollectionProgress.CraftPointCost : CollectionProgress.DisassemblePointValue);
-            int current = CollectionProgress.GetCraftPoints(_confirmedCard.Rarity);
-            long result = _crafting ? (long)current - points : (long)current + points;
+            long points = (long)_quantity * (_crafting ? CollectionProgress.CraftPointCost : CollectionProgress.DisassemblePointValue);
+            long current = CollectionProgress.GetCraftPoints(_confirmedCard.Rarity);
+            long result = _crafting ? current - points : current + Math.Min(points, long.MaxValue - current);
             string rarity = CardRarityCatalog.GetLabel(_confirmedCard.Rarity);
             _confirmTitle.text = $"카드 {action}";
             string change = _crafting ? "사용" : "획득";
             _confirmBody.text = $"{_confirmedCard.Name}\n{rarity} CP {points:N0} {change}\n{rarity} CP {current:N0} → {result:N0}";
-            _quantityLabel.text = $"{_quantity}장";
+            if (!_crafting) _confirmBody.text += "\n보유 카드가 부족해진 덱은 수정 후 사용할 수 있습니다.";
+            _quantityLabel.text = $"{_quantity:N0}장";
             _minus.transform.parent.gameObject.SetActive(_maxQuantity > 1);
             _plus.transform.parent.gameObject.SetActive(_maxQuantity > 1);
+            _maximum.transform.parent.gameObject.SetActive(_maxQuantity > 1);
             _minus.interactable = _quantity > 1;
-            _plus.interactable = _quantity < _maxQuantity;
+            _plus.interactable = _maximum.interactable = _quantity < _maxQuantity;
             SetButtonText(_confirm, $"{action}하기");
         }
 
@@ -465,7 +469,7 @@ namespace YGOPortable.UI
             string name = _confirmedCard.Name;
             string error;
             bool saved = _crafting ? CollectionProgress.TryCraftCard(code, _quantity, out error) :
-                CollectionProgress.TryDisassembleCards(new Dictionary<uint, int> { [code] = _quantity }, out error, _editingDeck);
+                CollectionProgress.TryDisassembleCards(new Dictionary<uint, int> { [code] = _quantity }, out error);
             CloseConfirmation();
             RefreshPointsAndOwnership();
             _status.color = saved ? PackShopStyle.TextPrimary : PackShopStyle.Danger;
