@@ -21,7 +21,7 @@ namespace YGOPortable.UI
         private uint _inspectedCode = 89631139;
 
         private static readonly string[] CardKinds = { "종류: 전체", "메인 몬스터", "마법", "함정", "엑스트라" };
-        private static readonly string[] SortOptions = { "기본순", "공격력 높은 순", "레벨 높은 순", "이름순" };
+        private static readonly string[] SortOptions = { "기본순", "공격력 높은 순", "레벨 높은 순", "이름순", "카드 프레임별" };
 
         // Virtualized Trunk Scroll Grid
         private const int TrunkCols = 5;
@@ -565,7 +565,7 @@ namespace YGOPortable.UI
             _deckNameInput = LotdUiKit.CreateInputField(LotdUiKit.CreateRect("DeckName", edit, Vector2.zero,
                 new Vector2(0.579f, 1f), Vector2.zero, Vector2.zero), "Input", "덱 이름", 15);
             _deckNameInput.onValueChanged.AddListener(_ => RefreshSaveLabel());
-            Control(edit, "Sort", "전체 정렬", 0.595f, 0.19f, SortWorkingDeck);
+            _wholeSortButton = Control(edit, "Sort", "전체 정렬 ▼", 0.595f, 0.19f, OpenWholeDeckSort);
             Control(edit, "Shuffle", "셔플", 0.8f, 0.2f, ShuffleWorkingDeck);
 
             (_mainGridRect, _mainCountText) = BuildDeckSection(panel, "Main", "메인", 0.789f, 0.397f);
@@ -741,6 +741,11 @@ namespace YGOPortable.UI
             if (sort == 1) _trunkResults.Sort((a, b) => b.atk.CompareTo(a.atk));
             else if (sort == 2) _trunkResults.Sort((a, b) => b.level.CompareTo(a.level));
             else if (sort == 3) _trunkResults.Sort((a, b) => string.Compare(a.name, b.name, StringComparison.Ordinal));
+            else if (sort == 4) _trunkResults.Sort((a, b) =>
+            {
+                int frame = DeckMainSorter.FrameOrder(a).CompareTo(DeckMainSorter.FrameOrder(b));
+                return frame != 0 ? frame : string.Compare(a.name, b.name, StringComparison.Ordinal);
+            });
 
             Canvas.ForceUpdateCanvases();
             _trunkCountText.text = CollectionProgress.Initialized ? $"{_trunkResults.Count:N0}종" : $"{_trunkResults.Count:N0}장";
@@ -1333,7 +1338,7 @@ namespace YGOPortable.UI
                 });
         }
 
-        private void SortWorkingDeck()
+        private void SortWorkingDeck(bool byFrame = false)
         {
             var main = _workingDeck.main.ToArray();
             var extra = _workingDeck.extra.ToArray();
@@ -1343,30 +1348,44 @@ namespace YGOPortable.UI
             var sidePositions = CaptureDeckPositions(DragSourceType.DeckSide, side.Length);
             CancelDeckDrag();
             EndDeckTransfer();
-            int RankCard(uint code)
+            if (byFrame)
             {
-                var c = CardDatabase.Get(code);
-                if (c == null) return 9;
-                if (c.IsMonster) return 0;
-                if (c.IsSpell) return 1;
-                return 2;
+                foreach (var section in new[] { _workingDeck.main, _workingDeck.extra, _workingDeck.side })
+                {
+                    var ordered = OrderDeckGroups(section, DeckMainSortMode.Frame);
+                    section.Clear();
+                    section.AddRange(ordered);
+                }
             }
-            _workingDeck.main.Sort((a, b) =>
+            else
             {
-                int ra = RankCard(a).CompareTo(RankCard(b));
-                if (ra != 0) return ra;
-                return string.Compare(CardDatabase.GetName(a), CardDatabase.GetName(b), StringComparison.Ordinal);
-            });
-            _workingDeck.extra.Sort((a, b) => string.Compare(CardDatabase.GetName(a), CardDatabase.GetName(b), StringComparison.Ordinal));
-            _workingDeck.side.Sort((a, b) => string.Compare(CardDatabase.GetName(a), CardDatabase.GetName(b), StringComparison.Ordinal));
-            GroupDeckCopies(_workingDeck.main);
-            GroupDeckCopies(_workingDeck.extra);
-            GroupDeckCopies(_workingDeck.side);
+                static int RankCard(uint code)
+                {
+                    var card = CardDatabase.Get(code);
+                    if (card == null) return 9;
+                    if (card.IsMonster) return 0;
+                    return card.IsSpell ? 1 : 2;
+                }
+
+                static int CompareNames(uint a, uint b) =>
+                    string.Compare(CardDatabase.GetName(a), CardDatabase.GetName(b), StringComparison.Ordinal);
+
+                _workingDeck.main.Sort((a, b) =>
+                {
+                    int rank = RankCard(a).CompareTo(RankCard(b));
+                    return rank != 0 ? rank : CompareNames(a, b);
+                });
+                _workingDeck.extra.Sort(CompareNames);
+                _workingDeck.side.Sort(CompareNames);
+                GroupDeckCopies(_workingDeck.main);
+                GroupDeckCopies(_workingDeck.extra);
+                GroupDeckCopies(_workingDeck.side);
+            }
             RefreshDeckGrids();
             AnimateOrderedDeck(DragSourceType.DeckMain, _workingDeck.main, main, mainPositions);
             AnimateOrderedDeck(DragSourceType.DeckExtra, _workingDeck.extra, extra, extraPositions);
             AnimateOrderedDeck(DragSourceType.DeckSide, _workingDeck.side, side, sidePositions);
-            ShowToast("덱 정렬 완료");
+            ShowToast(byFrame ? "전체 덱 정렬 · 카드 프레임별" : "덱 정렬 완료");
         }
 
         private void ShuffleWorkingDeck()

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -21,8 +22,16 @@ namespace YGOPortable.UI
         private GameObject _mainSortMenu;
         private GameObject _mainSortReturnFocus;
         private Button _mainSortButton;
+        private Button _wholeSortButton;
+        private Text _deckSortTitle;
         private readonly Button[] _mainSortOptions = new Button[MainSortOptions.Length];
+        private readonly Button[] _wholeSortOptions = new Button[2];
         private int _lastMainSort;
+        private int _lastWholeSort;
+        private bool _sortingWholeDeck;
+
+        private Button ActiveDeckSortOption =>
+            _sortingWholeDeck ? _wholeSortOptions[_lastWholeSort] : _mainSortOptions[_lastMainSort];
 
         private static Button AddMainSortButton(Transform panel, Action open)
         {
@@ -48,7 +57,7 @@ namespace YGOPortable.UI
 
             var menu = LotdUiKit.CreateMenuPanel(overlay, "Window", new Vector2(.635f, .274f), new Vector2(.96f, .723f));
             var title = SortMenuRow(menu, "Title", .833f, .956f);
-            LotdUiKit.AddFittedText(title, "Text", "메인 덱 정렬", 23, 15, TextAnchor.MiddleCenter,
+            _deckSortTitle = LotdUiKit.AddFittedText(title, "Text", "메인 덱 정렬", 23, 15, TextAnchor.MiddleCenter,
                 LotdUiKit.GoldAccent, FontStyle.Bold);
             for (int index = 0; index < MainSortOptions.Length; index++)
             {
@@ -58,6 +67,10 @@ namespace YGOPortable.UI
                 _mainSortOptions[index] = LotdUiKit.CreateLotdButton(row, "Button", MainSortOptions[index].Label,
                     () => ChooseMainSort(choice), 17);
             }
+            _wholeSortOptions[0] = LotdUiKit.CreateLotdButton(SortMenuRow(menu, "WholeDefault", .640f, .767f),
+                "Button", "기본 정렬", () => ChooseWholeSort(byFrame: false), 17);
+            _wholeSortOptions[1] = LotdUiKit.CreateLotdButton(SortMenuRow(menu, "WholeFrame", .465f, .592f),
+                "Button", "카드 프레임별", () => ChooseWholeSort(byFrame: true), 17);
             var cancel = SortMenuRow(menu, "Cancel", .075f, .182f);
             LotdUiKit.CreateLotdButton(cancel, "Button", "취소", () => CloseMainDeckSort(), 16);
             _mainSortMenu.SetActive(false);
@@ -67,9 +80,17 @@ namespace YGOPortable.UI
             LotdUiKit.CreateRect(name, parent, new Vector2(.092f, bottom), new Vector2(.908f, top),
                 Vector2.zero, Vector2.zero);
 
-        private void OpenMainDeckSort()
+        private void OpenMainDeckSort() => OpenDeckSort(wholeDeck: false);
+
+        private void OpenWholeDeckSort() => OpenDeckSort(wholeDeck: true);
+
+        private void OpenDeckSort(bool wholeDeck)
         {
             if (_mainSortMenu.activeSelf || _workingDeck == null) return;
+            _sortingWholeDeck = wholeDeck;
+            _deckSortTitle.text = wholeDeck ? "전체 덱 정렬" : "메인 덱 정렬";
+            foreach (var option in _mainSortOptions) option.transform.parent.gameObject.SetActive(!wholeDeck);
+            foreach (var option in _wholeSortOptions) option.transform.parent.gameObject.SetActive(wholeDeck);
             var events = EventSystem.current;
             _mainSortReturnFocus = _padMode && _padArea == PadArea.Main ? null : events?.currentSelectedGameObject;
             _padUi.Clear();
@@ -78,7 +99,7 @@ namespace YGOPortable.UI
             _mainSortMenu.SetActive(true);
             DeckPadUi.LimitKeyboardNavigation(_mainSortMenu.transform);
             UiEntranceMotion.Play(_mainSortMenu.transform.Find("Window").gameObject);
-            events?.SetSelectedGameObject(_mainSortOptions[_lastMainSort].gameObject);
+            events?.SetSelectedGameObject(ActiveDeckSortOption.gameObject);
         }
 
         private void CloseMainDeckSort(bool restoreFocus = true)
@@ -98,7 +119,7 @@ namespace YGOPortable.UI
             {
                 var control = previous != null ? previous.GetComponent<Selectable>() : null;
                 EventSystem.current?.SetSelectedGameObject(control != null && control.isActiveAndEnabled && control.IsInteractable()
-                    ? previous : _mainSortButton.gameObject);
+                    ? previous : (_sortingWholeDeck ? _wholeSortButton : _mainSortButton).gameObject);
             }
         }
 
@@ -112,11 +133,24 @@ namespace YGOPortable.UI
             ShowToast($"메인 덱 정렬 · {label}");
         }
 
+        private void ChooseWholeSort(bool byFrame)
+        {
+            if (!_mainSortMenu.activeSelf) return;
+            _lastWholeSort = byFrame ? 1 : 0;
+            SortWorkingDeck(byFrame);
+            CloseMainDeckSort();
+        }
+
+        private static uint[] OrderDeckGroups(IEnumerable<uint> cards, DeckMainSortMode mode)
+        {
+            var groups = cards.GroupBy(DeckGroupKey).ToDictionary(group => group.Key);
+            return DeckMainSorter.Order(groups.Keys, mode).SelectMany(key => groups[key]).ToArray();
+        }
+
         private void SortMainDeck(DeckMainSortMode mode)
         {
             var main = _workingDeck.main;
-            var groups = main.GroupBy(DeckGroupKey).ToDictionary(group => group.Key);
-            var sorted = DeckMainSorter.Order(groups.Keys, mode).SelectMany(key => groups[key]).ToArray();
+            var sorted = OrderDeckGroups(main, mode);
             if (main.SequenceEqual(sorted)) return;
 
             var before = main.ToArray();

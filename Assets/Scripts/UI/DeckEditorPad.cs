@@ -182,7 +182,7 @@ namespace YGOPortable.UI
                 _padCardFocus.Hide();
                 if (frame.HasInput) _padUi.AdoptPointerFocus(_mainSortMenu.transform);
                 _padUi.Handle(_mainSortMenu.transform, frame.Direction, frame.Submit, frame.Cancel,
-                    () => CloseMainDeckSort(), _mainSortOptions[_lastMainSort]);
+                    () => CloseMainDeckSort(), ActiveDeckSortOption);
                 return;
             }
             if (_cardFilterDialog.activeSelf)

@@ -41,7 +41,7 @@ namespace YGOPortable.Core
 
         private static uint? Level(CardInfo card) => card?.IsMonster == true ? card.level : null;
 
-        private static int FrameOrder(CardInfo card) => card?.FrameSpriteName switch
+        internal static int FrameOrder(CardInfo card) => card?.FrameSpriteName switch
         {
             "card_nomal" => 0,
             "card_kouka" => 1,

@@ -292,6 +292,43 @@ namespace YGOPortable.Editor
             Pad("Alternate");
             Require(!overlay.activeSelf && trunkSort.value == (before + 1) % trunkSort.options.Count &&
                 deck.main.SequenceEqual(highestAttack), "X changed the main deck while the trunk was selected.");
+
+            Field<InputField>(editor, "_searchInp").text = "";
+            var trunk = Field<List<CardInfo>>(editor, "_trunkResults");
+            int frameOption = trunkSort.options.FindIndex(option => option.text == "카드 프레임별");
+            Require(frameOption >= 0 && trunk.Select(card => card.FrameSpriteName).Distinct().Count() > 1,
+                "The trunk did not expose frame sorting on a mixed collection.");
+            var expectedTrunk = DeckMainSorter.Order(trunk.Select(card => card.code), DeckMainSortMode.Frame);
+            trunkSort.value = frameOption;
+            Require(trunk.Select(card => card.code).SequenceEqual(expectedTrunk) && deck.main.SequenceEqual(highestAttack),
+                "Sorting the trunk by frame changed its contents or modified the main deck.");
+
+            uint fusion = CardDatabase.AllCards.First(card => card.FrameSpriteName == "card_yugo").code;
+            uint link = CardDatabase.AllCards.First(card => card.FrameSpriteName == "card_link").code;
+            deck.extra = new List<uint> { link, fusion };
+            deck.side = new List<uint> { mirrorForce, reborn, blueEyes };
+            var expectedMain = DeckMainSorter.Order(deck.main, DeckMainSortMode.Frame);
+            Call(editor, "RefreshDeckGrids");
+            padArea.SetValue(editor, Enum.Parse(padArea.FieldType, "Controls"));
+            var allSort = Field<Button>(editor, "_wholeSortButton");
+            var allOptions = Field<Button[]>(editor, "_wholeSortOptions");
+            events.SetSelectedGameObject(allSort.gameObject);
+            allSort.onClick.Invoke();
+            Require(overlay.activeSelf && allOptions.All(button => button.gameObject.activeInHierarchy) &&
+                options.All(button => !button.gameObject.activeInHierarchy),
+                "Whole-deck sort showed incorrect choices.");
+            events.SetSelectedGameObject(allOptions[1].gameObject);
+            Pad("Submit");
+            Require(!overlay.activeSelf && events.currentSelectedGameObject == allSort.gameObject &&
+                deck.main.SequenceEqual(expectedMain) && deck.extra.SequenceEqual(new[] { fusion, link }) &&
+                deck.side.SequenceEqual(new[] { blueEyes, reborn, mirrorForce }),
+                "Whole-deck frame sorting did not sort all three sections independently or restore focus.");
+
+            allSort.onClick.Invoke();
+            allOptions[0].onClick.Invoke();
+            Require(!overlay.activeSelf && deck.side.Select(CardDatabase.GetName).SequenceEqual(
+                deck.side.Select(CardDatabase.GetName).OrderBy(name => name, StringComparer.Ordinal)),
+                "The original whole-deck sort did not remain available.");
         }
 
         private static void VerifyTouchPad(Transform canvas, EventSystem events)
