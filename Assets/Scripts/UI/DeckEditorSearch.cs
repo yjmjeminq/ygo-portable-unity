@@ -96,12 +96,13 @@ namespace YGOPortable.UI
             var overlay = LotdUiKit.FillRect("Overlay_TrunkSearch", parent);
             _cardFilterDialog = overlay.gameObject;
             LotdUiKit.AddImage(overlay.gameObject, LotdUiKit.WhiteSprite, new Color(.011f, .024f, .066f, .79f));
-            var panel = LotdUiKit.CreateMenuPanel(overlay, "SearchWindow", new Vector2(.151f, .095f), new Vector2(.849f, .884f));
+            var panel = LotdUiKit.CreateMenuPanel(overlay, "SearchWindow", new Vector2(.151f, .105f), new Vector2(.849f, .895f));
 
-            var header = LotdUiKit.CreateRect("Heading", panel, new Vector2(.044f, .88f), new Vector2(.956f, .973f),
+            var header = LotdUiKit.CreateRect("Heading", panel, new Vector2(.044f, .88f), new Vector2(.956f, .952f),
                 Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(header.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelHeader, false, false);
             LotdUiKit.AddFittedText(header, "Title", "보관함 상세 검색", 27, 18,
-                TextAnchor.MiddleLeft, LotdUiKit.CyanAccent, FontStyle.Bold);
+                TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
 
             RectTransform Field(string name, string title, string icon, int row, int column, int columns = 1)
             {
@@ -127,8 +128,14 @@ namespace YGOPortable.UI
             void Choice(Facet facet, string label, string icon, int row, int col, IReadOnlyList<string> values)
             {
                 var holder = Field(facet.ToString(), label, icon, row, col);
-                _facetControls[(int)facet] = LotdUiKit.CreateLotdDropdown(holder, "Dropdown", values,
+                var dropdown = LotdUiKit.CreateLotdDropdown(holder, "Dropdown", values,
                     index => OnDetailedChoiceChanged(facet, index));
+                var caption = dropdown.captionText;
+                caption.alignment = TextAnchor.MiddleCenter;
+                caption.resizeTextMaxSize = 16;
+                caption.rectTransform.offsetMin = new Vector2(20f, 0f);
+                caption.rectTransform.offsetMax = new Vector2(-20f, 0f);
+                _facetControls[(int)facet] = dropdown;
             }
 
             Choice(Facet.Kind, "카드 종류", "FRAME", 0, 0, new[] { "전체", "메인 몬스터", "마법", "함정", "엑스트라 몬스터" });

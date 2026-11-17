@@ -52,6 +52,7 @@ namespace YGOPortable.UI
         private ScrollRect _previewScroll;
 
         private ScrollRect _trunkScroll;
+        private Scrollbar _trunkScrollbar;
         private RectTransform _trunkContent;
         private RectTransform _trunkViewport;
         private Text _trunkHeading;
@@ -244,11 +245,11 @@ namespace YGOPortable.UI
             var panel = LotdUiKit.CreateMenuPanel(root, "CardDetails",
                 new Vector2(0.301f, 0.053f), new Vector2(0.553f, 0.899f));
             var card = LotdUiKit.CreateRect("LargeCard", panel,
-                new Vector2(0.085f, 0.578f), new Vector2(0.915f, 0.979f), Vector2.zero, Vector2.zero);
+                new Vector2(0.085f, 0.578f), new Vector2(0.915f, 0.956f), Vector2.zero, Vector2.zero);
             _previewCard = CompositeCardView.Create(card, "Preview", true);
 
             var stats = LotdUiKit.CreateRect("Stats", panel,
-                new Vector2(0f, 0.493f), new Vector2(1f, 0.577f), new Vector2(17f, 0f), new Vector2(-17f, 0f));
+                new Vector2(0f, 0.493f), new Vector2(1f, 0.577f), new Vector2(28f, 0f), new Vector2(-28f, 0f));
             LotdUiKit.AddImage(stats.gameObject, LotdUiKit.LoadSprite("LOTD/HUD/cardbar_texture"),
                 new Color(0.86f, 0.68f, 0.38f, 0.86f), false, false);
             var icon = LotdUiKit.CreateRect("TypeIcon", stats, new Vector2(0.83f, 0.06f), new Vector2(0.975f, 0.94f),
@@ -257,15 +258,17 @@ namespace YGOPortable.UI
             _previewStats = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Info", stats,
                 new Vector2(0.03f, 0f), new Vector2(0.81f, 1f), Vector2.zero, Vector2.zero),
                 "Text", "", 14, 9, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
-            _previewName = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Name", panel,
-                new Vector2(0f, 0.427f), new Vector2(1f, 0.492f), new Vector2(17f, 0f), new Vector2(-17f, 0f)),
-                "Text", "", 20, 10, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
+            var name = LotdUiKit.CreateRect("Name", panel,
+                new Vector2(0f, 0.424f), new Vector2(1f, 0.486f), new Vector2(28f, 0f), new Vector2(-28f, 0f));
+            LotdUiKit.AddImage(name.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelNavy, false, false);
+            _previewName = LotdUiKit.AddFittedText(name, "Text", "", 20, 11,
+                TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
 
             var desc = LotdUiKit.CreateRect("Description", panel,
-                new Vector2(0f, 0.155f), new Vector2(1f, 0.427f), new Vector2(17f, 0f), new Vector2(-17f, 0f));
+                new Vector2(0f, 0.155f), new Vector2(1f, 0.418f), new Vector2(28f, 0f), new Vector2(-28f, 0f));
             LotdUiKit.AddImage(desc.gameObject, LotdUiKit.WhiteSprite, new Color(0.025f, 0.067f, 0.118f, 0.64f));
             var viewport = LotdUiKit.CreateRect("Viewport", desc, Vector2.zero, Vector2.one,
-                new Vector2(8f, 5f), new Vector2(-21f, -5f));
+                new Vector2(8f, 16f), new Vector2(-21f, -5f));
             viewport.gameObject.AddComponent<RectMask2D>();
             _previewDesc = LotdUiKit.AddText(viewport, "Content", "", 16, TextAnchor.UpperLeft, LotdUiKit.TextPrimary);
             _previewDesc.supportRichText = false;
@@ -285,14 +288,14 @@ namespace YGOPortable.UI
             _previewScroll.horizontal = false;
             _previewScroll.scrollSensitivity = 32f;
             _previewScroll.movementType = ScrollRect.MovementType.Clamped;
-            _previewScroll.verticalScrollbar = LotdUiKit.AddVerticalScrollbar(desc);
+            _previewScroll.verticalScrollbar = AddDeckScrollbar(desc);
             _previewScroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
 
             var related = LotdUiKit.CreateRect("RelatedCards", panel,
-                new Vector2(0.035f, 0.087f), new Vector2(0.965f, 0.145f), Vector2.zero, Vector2.zero);
+                new Vector2(0f, 0.094f), new Vector2(1f, 0.145f), new Vector2(28f, 0f), new Vector2(-28f, 0f));
             LotdUiKit.CreateLotdButton(related, "Button", "관련 카드", () => FilterRelatedCards(_inspectedCode), 14);
             var add = LotdUiKit.CreateRect("AddCard", panel,
-                new Vector2(0.035f, 0.020f), new Vector2(0.965f, 0.080f), Vector2.zero, Vector2.zero);
+                new Vector2(0f, 0.034f), new Vector2(1f, 0.085f), new Vector2(28f, 0f), new Vector2(-28f, 0f));
             LotdUiKit.CreateLotdButton(add, "Button", "덱에 추가", () => TryAddCardToDeck(_inspectedCode), 14, true);
         }
 
@@ -302,39 +305,41 @@ namespace YGOPortable.UI
                 new Vector2(0.015f, 0.053f), new Vector2(0.296f, 0.899f));
             _trunkPanel = col;
 
-            var caption = LotdUiKit.CreateRect("TrunkHeading", col, new Vector2(0.034f, 0.929f), new Vector2(0.97f, 0.986f),
+            var insideLeft = new Vector2(28f, 0f);
+            var insideRight = new Vector2(-28f, 0f);
+            var caption = LotdUiKit.CreateBorderedPanel(col, "TrunkHeading",
+                new Vector2(0f, .889f), new Vector2(1f, .944f), insideLeft, insideRight,
+                LotdUiKit.PanelNavy, new Color(.27f, .63f, .82f, .74f));
+            var heading = LotdUiKit.CreateRect("Title", caption, new Vector2(.225f, 0f), new Vector2(.775f, 1f),
                 Vector2.zero, Vector2.zero);
-            var heading = LotdUiKit.CreateRect("Title", caption, Vector2.zero, new Vector2(0.56f, 1f),
+            _trunkHeading = LotdUiKit.AddFittedText(heading, "Label", "보관함", 21, 12,
+                TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+            var showAll = LotdUiKit.CreateRect("ShowAll", caption, new Vector2(.012f, .10f), new Vector2(.221f, .90f),
                 Vector2.zero, Vector2.zero);
-            _trunkHeading = LotdUiKit.AddText(heading, "Label", "보관함", 19, TextAnchor.MiddleLeft,
-                LotdUiKit.CyanAccent, FontStyle.Bold);
-            _trunkHeading.resizeTextForBestFit = true;
-            _trunkHeading.resizeTextMinSize = 12;
-            _trunkHeading.resizeTextMaxSize = 19;
-            var showAll = LotdUiKit.CreateRect("ShowAll", caption, new Vector2(.57f, .095f), new Vector2(.82f, .905f),
+            _showAllCards = LotdUiKit.CreateLotdButton(showAll, "Button", "전체 카드", ExitTrunkScope, 13);
+            var count = LotdUiKit.CreateRect("Total", caption, new Vector2(.785f, 0f), new Vector2(.978f, 1f),
                 Vector2.zero, Vector2.zero);
-            _showAllCards = LotdUiKit.CreateLotdButton(showAll, "Button", "전체 카드", ExitTrunkScope, 12);
-            var count = LotdUiKit.CreateRect("Total", caption, new Vector2(.835f, 0f), Vector2.one,
-                Vector2.zero, Vector2.zero);
-            _trunkCountText = LotdUiKit.AddFittedText(count, "Count", "", 16, 9, TextAnchor.MiddleRight, Color.white, FontStyle.Bold);
+            _trunkCountText = LotdUiKit.AddFittedText(count, "Count", "", 17, 12, TextAnchor.MiddleRight, Color.white, FontStyle.Bold);
 
-            var searchRow = LotdUiKit.CreateRect("SearchRow", col, new Vector2(0.034f, 0.874f),
-                new Vector2(0.97f, 0.926f), Vector2.zero, Vector2.zero);
+            var searchRow = LotdUiKit.CreateRect("SearchRow", col, new Vector2(0f, .827f),
+                new Vector2(1f, .878f), insideLeft, insideRight);
             var search = LotdUiKit.CreateRect("SearchBox", searchRow, Vector2.zero, new Vector2(0.79f, 1f),
                 Vector2.zero, Vector2.zero);
             _searchInp = LotdUiKit.CreateInputField(search, "Search", "카드명·효과·카드 번호", 15);
             _searchInp.onValueChanged.AddListener(_ => RefreshTrunkFilter());
             var reset = LotdUiKit.CreateRect("ResetFilters", searchRow, new Vector2(0.81f, 0f), Vector2.one,
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(reset, "Button", "초기화", () => SetTrunkSource(), 13);
+            LotdUiKit.CreateLotdButton(reset, "Button", "초기화", () => SetTrunkSource(), 14);
 
-            var filters = LotdUiKit.CreateRect("Filters", col, new Vector2(0.034f, 0.816f), new Vector2(0.97f, 0.867f),
-                Vector2.zero, Vector2.zero);
+            var filters = LotdUiKit.CreateRect("Filters", col, new Vector2(0f, .764f), new Vector2(1f, .816f),
+                insideLeft, insideRight);
             Dropdown AddFilter(string name, float left, float right, IReadOnlyList<string> choices, Action<int> changed)
             {
                 var slot = LotdUiKit.CreateRect(name, filters, new Vector2(left, 0f), new Vector2(right, 1f),
                     Vector2.zero, Vector2.zero);
-                return LotdUiKit.CreateLotdDropdown(slot, "Dropdown", choices, changed);
+                var dropdown = LotdUiKit.CreateLotdDropdown(slot, "Dropdown", choices, changed);
+                dropdown.captionText.alignment = TextAnchor.MiddleCenter;
+                return dropdown;
             }
             _kindFilter = AddFilter("Kind", 0f, 0.32f, CardKinds, ChangeTrunkKind);
             var advanced = LotdUiKit.CreateRect("DetailedSearch", filters, new Vector2(.337f, 0f),
@@ -344,7 +349,7 @@ namespace YGOPortable.UI
             _sortFilter = AddFilter("Sort", 0.69f, 1f, SortOptions, _ => RefreshTrunkFilter());
 
             var scrollHolder = LotdUiKit.CreateRect("TrunkScrollHolder", col,
-                new Vector2(0.034f, 0.035f), new Vector2(0.97f, 0.805f), Vector2.zero, Vector2.zero);
+                new Vector2(0f, .047f), new Vector2(1f, .752f), insideLeft, insideRight);
             LotdUiKit.AddImage(scrollHolder.gameObject, LotdUiKit.WhiteSprite, Color.clear);
             _trunkScroll = scrollHolder.gameObject.AddComponent<ScrollRect>();
             _trunkScroll.horizontal = false;
@@ -359,17 +364,36 @@ namespace YGOPortable.UI
             _trunkContent.pivot = new Vector2(0f, 1f);
             _trunkScroll.content = _trunkContent;
 
-            var scrollbar = LotdUiKit.AddVerticalScrollbar(scrollHolder);
-            scrollbar.size = 0.075f;
-            scrollbar.SetValueWithoutNotify(1f);
-            scrollbar.onValueChanged.AddListener(value => _trunkScroll.verticalNormalizedPosition = value);
+            _trunkScrollbar = AddDeckScrollbar(scrollHolder);
+            _trunkScrollbar.size = 0.075f;
+            _trunkScrollbar.SetValueWithoutNotify(1f);
+            _trunkScrollbar.onValueChanged.AddListener(value => _trunkScroll.verticalNormalizedPosition = value);
             _trunkScroll.onValueChanged.AddListener(position =>
             {
-                scrollbar.SetValueWithoutNotify(position.y);
+                _trunkScrollbar.SetValueWithoutNotify(position.y);
                 OnTrunkScrolled();
             });
             _noTrunkResults = LotdUiKit.AddText(scrollHolder, "Empty", "조건에 맞는 카드가 없습니다.",
                 17, TextAnchor.MiddleCenter, LotdUiKit.TextMuted);
+        }
+
+        private static Scrollbar AddDeckScrollbar(Transform parent)
+        {
+            var scrollbar = LotdUiKit.AddVerticalScrollbar(parent);
+            var thumb = (Image)scrollbar.targetGraphic;
+            thumb.sprite = LotdUiKit.WhiteSprite;
+            thumb.color = new Color(.35f, .78f, .96f);
+            return scrollbar;
+        }
+
+        private static void UpdateDeckScrollbar(ScrollRect scroll)
+        {
+            float viewportHeight = scroll.viewport.rect.height;
+            float contentHeight = scroll.content.rect.height;
+            bool hasOverflow = contentHeight > viewportHeight;
+            scroll.verticalScrollbar.gameObject.SetActive(hasOverflow);
+            scroll.verticalScrollbar.size = hasOverflow ? viewportHeight / contentHeight : 1f;
+            scroll.verticalScrollbar.SetValueWithoutNotify(scroll.verticalNormalizedPosition);
         }
 
         private void EnsureTrunkPool(int count)
@@ -398,7 +422,7 @@ namespace YGOPortable.UI
                 new Vector2(0.558f, 0.053f), new Vector2(0.985f, 0.899f), true);
 
             var header = LotdUiKit.CreateRect("DeckControls", panel,
-                new Vector2(0.025f, 0.928f), new Vector2(0.975f, 0.985f), Vector2.zero, Vector2.zero);
+                new Vector2(0f, .889f), new Vector2(1f, .944f), new Vector2(28f, 0f), new Vector2(-28f, 0f));
             Button Control(Transform row, string name, string label, float x, float width, Action action, bool gold = false)
             {
                 var holder = LotdUiKit.CreateRect(name, row, new Vector2(x, 0f), new Vector2(x + width, 1f),
@@ -407,9 +431,9 @@ namespace YGOPortable.UI
             }
 
             Control(header, "Previous", "◀", 0f, 0.081f, () => SwitchUserDeck(-1));
-            _deckHeaderText = LotdUiKit.AddText(LotdUiKit.CreateRect("DeckNumber", header, new Vector2(0.083f, 0f),
+            _deckHeaderText = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("DeckNumber", header, new Vector2(0.083f, 0f),
                 new Vector2(0.235f, 1f), Vector2.zero, Vector2.zero),
-                "Text", "", 15, TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
+                "Text", "", 16, 11, TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
             Control(header, "Next", "▶", 0.24f, 0.081f, () => SwitchUserDeck(1));
             Control(header, "New", "새 덱", 0.34f, 0.18f, CreateNewUserDeck);
             _saveButtonText = Control(header, "Save", "저장", 0.53f, 0.21f,
@@ -417,14 +441,14 @@ namespace YGOPortable.UI
             Control(header, "Delete", "삭제", 0.76f, 0.24f, DeleteCurrentDeck);
 
             var edit = LotdUiKit.CreateRect("EditControls", panel,
-                new Vector2(0.025f, 0.867f), new Vector2(0.975f, 0.916f), Vector2.zero, Vector2.zero);
+                new Vector2(0f, .827f), new Vector2(1f, .878f), new Vector2(28f, 0f), new Vector2(-28f, 0f));
             _deckNameInput = LotdUiKit.CreateInputField(LotdUiKit.CreateRect("DeckName", edit, Vector2.zero,
                 new Vector2(0.579f, 1f), Vector2.zero, Vector2.zero), "Input", "덱 이름", 15);
             _deckNameInput.onValueChanged.AddListener(_ => RefreshSaveLabel());
             Control(edit, "Sort", "정렬", 0.595f, 0.19f, SortWorkingDeck);
             Control(edit, "Shuffle", "셔플", 0.8f, 0.2f, ShuffleWorkingDeck);
 
-            (_mainGridRect, _mainCountText) = BuildDeckSection(panel, "Main", "메인", 0.830f, 0.397f);
+            (_mainGridRect, _mainCountText) = BuildDeckSection(panel, "Main", "메인", 0.789f, 0.397f);
             (_extraGridRect, _extraCountText) = BuildDeckSection(panel, "Extra", "엑스트라", 0.350f, 0.224f);
             (_sideGridRect, _sideCountText) = BuildDeckSection(panel, "Side", "사이드", 0.176f, 0.047f);
             BuildDeckSlots(_mainGridRect, _mainSlots, 13, 5, 60, DragSourceType.DeckMain);
@@ -435,16 +459,16 @@ namespace YGOPortable.UI
         private static (RectTransform grid, Text count) BuildDeckSection(Transform panel, string name, string title,
             float top, float bottom)
         {
-            var label = LotdUiKit.CreateRect(name + "Tab", panel, new Vector2(0.026f, top),
-                new Vector2(0.191f, top + 0.033f), Vector2.zero, Vector2.zero);
+            var label = LotdUiKit.CreateRect(name + "Tab", panel, new Vector2(0f, top),
+                new Vector2(0.194f, top + 0.033f), new Vector2(28f, 0f), Vector2.zero);
             LotdUiKit.AddImage(label.gameObject, LotdUiKit.LoadSprite("LOTD/Shared/tab-title-box"), Color.white, false, false);
             LotdUiKit.AddText(label, "Label", title, 14, TextAnchor.MiddleCenter,
                 new Color(0.02f, 0.09f, 0.17f), FontStyle.Bold);
-            var count = LotdUiKit.AddText(LotdUiKit.CreateRect(name + "Count", panel,
-                new Vector2(0.6f, top), new Vector2(0.972f, top + 0.034f), Vector2.zero, Vector2.zero),
-                "Text", "", 16, TextAnchor.MiddleRight, Color.white, FontStyle.Bold);
-            var grid = LotdUiKit.CreateRect(name + "Grid", panel, new Vector2(0.026f, bottom),
-                new Vector2(0.974f, top), Vector2.zero, Vector2.zero);
+            var count = LotdUiKit.AddFittedText(LotdUiKit.CreateRect(name + "Count", panel,
+                new Vector2(0.6f, top), new Vector2(1f, top + 0.034f), Vector2.zero, new Vector2(-28f, 0f)),
+                "Text", "", 16, 11, TextAnchor.MiddleRight, Color.white, FontStyle.Bold);
+            var grid = LotdUiKit.CreateRect(name + "Grid", panel, new Vector2(0f, bottom),
+                new Vector2(1f, top), new Vector2(28f, 0f), new Vector2(-28f, 0f));
             LotdUiKit.AddImage(grid.gameObject, LotdUiKit.WhiteSprite, new Color(0.08f, 0.35f, 0.47f, 0.68f));
             return (grid, count);
         }
@@ -499,7 +523,7 @@ namespace YGOPortable.UI
             IEnumerable<CardInfo> source = CardDatabase.AllCards;
             _showAllCards.transform.parent.gameObject.SetActive(_activeArchetypeFilter != null || _relatedFilterCode != 0);
             _trunkHeading.text = "보관함";
-            _trunkHeading.color = LotdUiKit.CyanAccent;
+            _trunkHeading.color = Color.white;
             if (_activeArchetypeFilter != null)
             {
                 source = _activeArchetypeFilter.coreCards.Union(_activeArchetypeFilter.supportCards);
@@ -540,9 +564,11 @@ namespace YGOPortable.UI
             int rows = Mathf.CeilToInt(_trunkViewport.rect.height / _rowHeight) + 2;
             EnsureTrunkPool(Mathf.Min(_totalRows, rows) * TrunkCols);
             _trunkContent.sizeDelta = new Vector2(0f, _totalRows * _rowHeight);
+            _trunkScrollbar.gameObject.SetActive(_trunkContent.rect.height > _trunkViewport.rect.height);
 
             _trunkScroll.StopMovement();
             _trunkScroll.verticalNormalizedPosition = scroll;
+            _trunkScrollbar.SetValueWithoutNotify(scroll);
             _lastFirstRow = -1;
             OnTrunkScrolled();
         }
@@ -817,6 +843,8 @@ namespace YGOPortable.UI
             _previewDesc.text = ci?.desc ?? "";
             _previewScroll.StopMovement();
             _previewScroll.content.anchoredPosition = Vector2.zero;
+            LayoutRebuilder.ForceRebuildLayoutImmediate(_previewScroll.content);
+            UpdateDeckScrollbar(_previewScroll);
 
             Sprite raceSp = null;
             if (ci != null)
@@ -1050,26 +1078,31 @@ namespace YGOPortable.UI
             LotdUiKit.AddImage(dim.gameObject, LotdUiKit.WhiteSprite, new Color(0f, 0.02f, 0.08f, 0.80f));
             dim.gameObject.AddComponent<Button>().onClick.AddListener(() => _archModalRoot.SetActive(false));
 
-            var win = LotdUiKit.CreateBorderedPanel(dim, "Win",
-                new Vector2(0.262f, 0.02f), new Vector2(0.99f, 0.905f), Vector2.zero, Vector2.zero,
-                LotdUiKit.PanelNavy, LotdUiKit.GoldAccent);
+            var win = LotdUiKit.CreateMenuPanel(dim, "Win",
+                new Vector2(.105f, .075f), new Vector2(.895f, .925f));
             win.gameObject.AddComponent<Button>().interactable = false; // Catch clicks on the panel background without taking focus.
 
-            var hdr = LotdUiKit.CreateRect("Hdr", win, new Vector2(0f, 0.90f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(hdr.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelHeader);
-            var title = LotdUiKit.AddText(hdr, "T", "📚 순수 카드군 예시 덱 선택 (PURE ARCHETYPE DECKS)", 19, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
-            title.rectTransform.offsetMin = new Vector2(16, 18);
-            var sub = LotdUiKit.AddText(hdr, "Sub", "원하는 카드군을 선택하면 해당 순수 카드군 예시 덱(메인 40장 + 엑스트라 덱)이 자동 구성되며 보관함도 필터링됩니다.", 13, TextAnchor.LowerLeft, LotdUiKit.TextPrimary);
-            sub.rectTransform.offsetMin = new Vector2(16, 4);
+            var hdr = LotdUiKit.CreateRect("Hdr", win, new Vector2(.034f, .854f), new Vector2(.966f, .956f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(hdr.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelHeader, false, false);
+            var title = LotdUiKit.CreateRect("Title", hdr, new Vector2(.17f, .43f), new Vector2(.83f, .97f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddFittedText(title, "T", "카드군 예시 덱", 26, 20, TextAnchor.MiddleCenter,
+                LotdUiKit.TextPrimary, FontStyle.Bold);
+            var subtitle = LotdUiKit.CreateRect("Subtitle", hdr, new Vector2(.17f, .08f), new Vector2(.83f, .46f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddFittedText(subtitle, "Sub", "메인·엑스트라 덱을 교체하고 사이드 덱을 비웁니다.", 15, 12,
+                TextAnchor.MiddleCenter, LotdUiKit.TextPrimary);
 
-            var closeRt = LotdUiKit.CreateRect("Close", hdr, new Vector2(0.85f, 0.16f), new Vector2(0.985f, 0.84f), Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(closeRt, "B", "✕ 닫기", () => _archModalRoot.SetActive(false), 14);
+            var closeRt = LotdUiKit.CreateRect("Close", hdr, new Vector2(.855f, .20f), new Vector2(.985f, .80f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.CreateLotdButton(closeRt, "B", "닫기", () => _archModalRoot.SetActive(false), 16);
 
-            // Search & Sort row
-            var filterRow = LotdUiKit.CreateRect("FilterRow", win, new Vector2(0.015f, 0.825f), new Vector2(0.985f, 0.888f), Vector2.zero, Vector2.zero);
+            var filterRow = LotdUiKit.CreateRect("FilterRow", win, new Vector2(.034f, .777f), new Vector2(.966f, .839f),
+                Vector2.zero, Vector2.zero);
             _archSearchInp = LotdUiKit.CreateInputField(
-                LotdUiKit.CreateRect("ArchSearch", filterRow, new Vector2(0f, 0f), new Vector2(0.58f, 1f), Vector2.zero, Vector2.zero),
-                "S", "카드군 이름 또는 대표 카드명 검색 (예: 티아라멘츠, 푸른 눈, 히어로, 상검, 섬도희...)", 14);
+                LotdUiKit.CreateRect("ArchSearch", filterRow, Vector2.zero, new Vector2(.58f, 1f), Vector2.zero, Vector2.zero),
+                "S", "카드군 또는 대표 카드명 검색", 17);
             _archSearchInp.onValueChanged.AddListener(v =>
             {
                 _archSearchText = v ?? "";
@@ -1077,34 +1110,40 @@ namespace YGOPortable.UI
             });
 
             var sortBtn = LotdUiKit.CreateLotdButton(
-                LotdUiKit.CreateRect("SortArch", filterRow, new Vector2(0.60f, 0f), new Vector2(0.80f, 1f), Vector2.zero, Vector2.zero),
-                "B", "정렬: 카드수/인기순", () =>
+                LotdUiKit.CreateRect("SortArch", filterRow, new Vector2(.60f, 0f), new Vector2(.80f, 1f), Vector2.zero, Vector2.zero),
+                "B", "정렬 · 카드 수", () =>
                 {
                     _archSortMode = (_archSortMode + 1) % 2;
-                    _archSortBtnText.text = _archSortMode == 0 ? "정렬: 카드수/인기순" : "정렬: 가나다순";
+                    _archSortBtnText.text = _archSortMode == 0 ? "정렬 · 카드 수" : "정렬 · 가나다순";
                     RefreshArchetypeModal();
-                }, 13);
+                }, 16);
             _archSortBtnText = sortBtn.GetComponentInChildren<Text>();
 
-            _archCountText = LotdUiKit.AddText(
-                LotdUiKit.CreateRect("ArchCnt", filterRow, new Vector2(0.82f, 0f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero),
-                "C", "0개 카드군", 14, TextAnchor.MiddleRight, LotdUiKit.CyanAccent, FontStyle.Bold);
+            var count = LotdUiKit.CreateRect("ArchCnt", filterRow, new Vector2(.82f, .08f), new Vector2(1f, .92f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(count.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelNavy, false, false);
+            _archCountText = LotdUiKit.AddFittedText(count, "C", "0개 카드군", 17, 13, TextAnchor.MiddleCenter,
+                LotdUiKit.TextPrimary, FontStyle.Bold);
 
             // Virtualized Scroll Grid (3 cols x 7 rows = 21 pooled tiles)
-            var scrollHolder = LotdUiKit.CreateRect("ArchScrollHolder", win, new Vector2(0.012f, 0.015f), new Vector2(0.988f, 0.812f), Vector2.zero, Vector2.zero);
+            var scrollHolder = LotdUiKit.CreateRect("ArchScrollHolder", win, new Vector2(.034f, .042f), new Vector2(.966f, .761f),
+                Vector2.zero, Vector2.zero);
             _archScroll = scrollHolder.gameObject.AddComponent<ScrollRect>();
             _archScroll.horizontal = false;
             _archScroll.vertical = true;
             _archScroll.scrollSensitivity = 36f;
             _archScroll.movementType = ScrollRect.MovementType.Clamped;
 
-            _archViewport = LotdUiKit.FillRect("VP", scrollHolder);
+            _archViewport = LotdUiKit.CreateRect("VP", scrollHolder, Vector2.zero, Vector2.one,
+                Vector2.zero, new Vector2(-18f, 0f));
             _archViewport.gameObject.AddComponent<RectMask2D>();
             _archScroll.viewport = _archViewport;
 
             _archContent = LotdUiKit.CreateRect("Content", _archViewport, new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
             _archContent.pivot = new Vector2(0f, 1f);
             _archScroll.content = _archContent;
+            _archScroll.verticalScrollbar = AddDeckScrollbar(scrollHolder);
+            _archScroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
 
             for (int r = 0; r < ArchPoolRows; r++)
             {
@@ -1121,19 +1160,17 @@ namespace YGOPortable.UI
                     var inspectBtn = thumbRt.gameObject.AddComponent<Button>();
                     inspectBtn.targetGraphic = inspectImg;
 
-                    var tTxt = LotdUiKit.AddText(
-                        LotdUiKit.CreateRect("Name", tile, new Vector2(0.31f, 0.62f), new Vector2(0.97f, 0.94f), Vector2.zero, Vector2.zero),
-                        "N", "", 15, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
-                    tTxt.resizeTextForBestFit = true;
-                    tTxt.resizeTextMinSize = 11;
-                    tTxt.resizeTextMaxSize = 16;
+                    var tTxt = LotdUiKit.AddFittedText(
+                        LotdUiKit.CreateRect("Name", tile, new Vector2(.31f, .62f), new Vector2(.97f, .94f), Vector2.zero, Vector2.zero),
+                        "N", "", 19, 13, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
 
-                    var sTxt = LotdUiKit.AddText(
-                        LotdUiKit.CreateRect("Info", tile, new Vector2(0.31f, 0.38f), new Vector2(0.97f, 0.62f), Vector2.zero, Vector2.zero),
-                        "S", "", 11, TextAnchor.MiddleLeft, LotdUiKit.CyanAccent);
+                    var sTxt = LotdUiKit.AddFittedText(
+                        LotdUiKit.CreateRect("Info", tile, new Vector2(.31f, .38f), new Vector2(.97f, .62f), Vector2.zero, Vector2.zero),
+                        "S", "", 14, 11, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary);
 
-                    var btnRt = LotdUiKit.CreateRect("LoadBtn", tile, new Vector2(0.31f, 0.07f), new Vector2(0.96f, 0.36f), Vector2.zero, Vector2.zero);
-                    var loadBtn = LotdUiKit.CreateLotdButton(btnRt, "B", "⚡ 순수 예시 덱 불러오기", null, 12, gold: true);
+                    var btnRt = LotdUiKit.CreateRect("LoadBtn", tile, new Vector2(.31f, .07f), new Vector2(.96f, .36f),
+                        Vector2.zero, Vector2.zero);
+                    var loadBtn = LotdUiKit.CreateLotdButton(btnRt, "B", "불러오기", null, 15, gold: true);
 
                     _archPool.Add((tile, cv, tTxt, sTxt, loadBtn, inspectBtn));
                 }
@@ -1189,12 +1226,11 @@ namespace YGOPortable.UI
 
             Canvas.ForceUpdateCanvases();
             _archTotalRows = Mathf.Max(1, (_archResults.Count + ArchCols - 1) / ArchCols);
-            float vpW = _archViewport.rect.width > 10 ? _archViewport.rect.width : 1320f;
-            float colW = vpW / ArchCols;
-            _archRowHeight = Mathf.Clamp(Mathf.Round(colW * 0.30f), 116f, 140f);
+            _archRowHeight = Mathf.Max(88f, Mathf.Floor(_archViewport.rect.height / 5f));
             _archContent.sizeDelta = new Vector2(0f, _archTotalRows * _archRowHeight);
             _archCountText.text = $"총 {_archResults.Count:N0}개 카드군";
             _archScroll.verticalNormalizedPosition = 1f;
+            UpdateDeckScrollbar(_archScroll);
             _archLastFirstRow = -1;
             UpdateVirtualArchSlots(0, force: true);
         }
@@ -1216,7 +1252,6 @@ namespace YGOPortable.UI
 
             float vpWidth = _archViewport.rect.width > 10 ? _archViewport.rect.width : 1320f;
             float colW = vpWidth / ArchCols;
-            _archRowHeight = Mathf.Clamp(Mathf.Round(colW * 0.30f), 116f, 140f);
 
             for (int r = 0; r < ArchPoolRows; r++)
             {
@@ -1243,8 +1278,8 @@ namespace YGOPortable.UI
                     rt.gameObject.SetActive(true);
                     var arch = _archResults[archIdx];
                     cv.SetCard(arch.representativeCode);
-                    titleTxt.text = $"[{arch.name}]";
-                    subTxt.text = $"고유 카드 {arch.TotalUniqueCount}종 (메인 {arch.MainPoolCount} / EX {arch.ExtraPoolCount})";
+                    titleTxt.text = arch.name;
+                    subTxt.text = $"{arch.TotalUniqueCount}종 · 메인 {arch.MainPoolCount} / 엑스트라 {arch.ExtraPoolCount}";
 
                     inspectBtn.onClick.RemoveAllListeners();
                     inspectBtn.onClick.AddListener(() => InspectCard(arch.representativeCode));
