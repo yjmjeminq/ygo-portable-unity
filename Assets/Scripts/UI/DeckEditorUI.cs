@@ -853,6 +853,11 @@ namespace YGOPortable.UI
                     RememberMouseCard(PadArea.Trunk, index);
                     SetMouseCardVisual(rect, code);
                 };
+                trigger.OnTouchClick = () =>
+                {
+                    trigger.OnLeftClick();
+                    ShowDeckCardActions(rect, DragSourceType.Trunk, index, code);
+                };
                 trigger.OnRightClick = () =>
                 {
                     RememberMouseCard(PadArea.Trunk, index);
@@ -890,6 +895,7 @@ namespace YGOPortable.UI
                 trigger.CardCodeGetter = null;
                 trigger.IndexGetter = null;
                 trigger.OnLeftClick = null;
+                trigger.OnTouchClick = null;
                 trigger.OnRightClick = null;
                 trigger.OnPointerEnterAction = null;
                 trigger.OnPointerExitAction = () => ClearMouseCardVisual(rect);
@@ -908,6 +914,11 @@ namespace YGOPortable.UI
                     SetMouseCardVisual(rect, code);
                 };
                 trigger.OnPointerEnterAction = () => SetMouseCardVisual(rect, code);
+                trigger.OnTouchClick = () =>
+                {
+                    trigger.OnLeftClick();
+                    ShowDeckCardActions(rect, trigger.SourceType, index, code);
+                };
                 trigger.OnRightClick = () =>
                 {
                     RememberMouseCard(area, index);

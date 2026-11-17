@@ -67,7 +67,7 @@ namespace YGOPortable.Editor
                 int activate = prompt.activatable.FindIndex(card => card.code == PotOfDesires);
                 Require(activate >= 0, "The deterministic Pot of Desires fixture is missing its activation.");
                 if (player == duel.HumanPlayerIndex)
-                    ui.ActivateHandCardOverBoard(prompt.activatable[activate]);
+                    ui.ActivateHandCardOverBoard(prompt.activatable[activate], touch: humanFirst);
                 else
                     duel.SubmitResponseInt((activate << 16) | 5);
                 prompt = ReachMainPhase(duel, player);
@@ -324,7 +324,7 @@ namespace YGOPortable.Editor
                     blocked != null && blocked.transform.IsChildOf(modal),
                     "The picker did not highlight targets or block unrelated board actions.");
 
-                ClickAt(first);
+                ClickAt(first, pointerId: 0);
                 var selected = Private<HashSet<int>>(Modals, "_selectedIndices");
                 Require(selected.SetEquals(new[] { 0 }), "Clicking a field card did not select it.");
                 ClickAt(first);
@@ -342,16 +342,33 @@ namespace YGOPortable.Editor
                 return (RectTransform)slot.GetType().GetField("root").GetValue(slot);
             }
 
-            internal void ActivateHandCardOverBoard(SelectableCardItem card)
+            internal void ActivateHandCardOverBoard(SelectableCardItem card, bool touch)
             {
                 Field.Refresh();
                 var hand = Field.Root.transform.Find("PlayerHand");
                 var source = hand.GetComponentsInChildren<CardDragTrigger>()
                     .Single(trigger => trigger.IndexGetter?.Invoke() == (int)card.sequence);
-                var pointer = new PointerEventData(EventSystem.current);
-                ExecuteEvents.Execute(source.gameObject, pointer, ExecuteEvents.pointerEnterHandler);
-
+                var pointer = new PointerEventData(EventSystem.current)
+                {
+                    pointerId = touch ? 0 : -1,
+                    button = PointerEventData.InputButton.Left,
+                };
                 var bar = (RectTransform)Field.Root.transform.Find("CardActions");
+                ExecuteEvents.Execute(source.gameObject, pointer, ExecuteEvents.pointerEnterHandler);
+                if (touch)
+                {
+                    Require(!bar.gameObject.activeSelf, "Touch opened card actions before the tap was released.");
+                    ExecuteEvents.Execute(source.gameObject, pointer, ExecuteEvents.pointerClickHandler);
+                    ExecuteEvents.Execute(source.gameObject, pointer, ExecuteEvents.pointerExitHandler);
+                    const BindingFlags PrivateInstance = BindingFlags.Instance | BindingFlags.NonPublic;
+                    typeof(DuelFieldUI).GetField("_pointerActionLeftAt", PrivateInstance).SetValue(Field, float.NegativeInfinity);
+                    typeof(DuelFieldUI).GetMethod("RefreshCardActions", PrivateInstance).Invoke(Field, null);
+                    Require(bar.gameObject.activeInHierarchy, "The hand actions disappeared after lifting the finger.");
+                    typeof(DuelFieldUI).GetMethod("DismissTouchCardActionsAt", PrivateInstance).Invoke(Field,
+                        new object[] { new Vector2(-1000f, -1000f) });
+                    Require(!bar.gameObject.activeSelf, "Tapping elsewhere did not dismiss the hand actions.");
+                    ExecuteEvents.Execute(source.gameObject, pointer, ExecuteEvents.pointerClickHandler);
+                }
                 var hoverArea = (RectTransform)bar.Find("HoverArea");
                 var activate = (RectTransform)bar.Find("ACTION/Circle/Button");
                 Require(bar.gameObject.activeInHierarchy && activate != null, "The hovered hand card had no activation icon.");
@@ -527,9 +544,10 @@ namespace YGOPortable.Editor
                     graphic.Raycast(point, null))?.gameObject;
             }
 
-            private void ClickAt(RectTransform target)
+            private void ClickAt(RectTransform target, int pointerId = -1)
             {
                 var hit = Raycast(target, out var pointer);
+                pointer.pointerId = pointerId;
                 var handler = ExecuteEvents.GetEventHandler<IPointerClickHandler>(hit);
                 Require(handler == target.gameObject,
                     $"A pointer click at {target.name} reached {handler?.name ?? hit?.name ?? "nothing"}.");

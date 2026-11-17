@@ -1134,6 +1134,7 @@ namespace YGOPortable.UI
             };
             slot.dragTrigger.OnRightClick = () => InspectCard(previewCode);
             slot.dragTrigger.OnLeftClick = () => OnSlotClicked(con, loc, seq);
+            slot.dragTrigger.OnTouchClick = () => OnSlotClicked(con, loc, seq, touch: true);
 
             bool selected = IsPlacePending(con, loc, seq);
             bool place = IsPlaceSelectable(con, loc, seq);
@@ -1235,6 +1236,11 @@ namespace YGOPortable.UI
                 {
                     InspectCard(card.code);
                     PointAtCardActions(view.Rect);
+                };
+                trigger.OnTouchClick = () =>
+                {
+                    InspectCard(card.code);
+                    SelectTouchCardActions(view.Rect);
                 };
             }
             UpdateHandDepth(views, opponent ? null : _raisedCard);
@@ -2162,6 +2168,7 @@ namespace YGOPortable.UI
             if (_session != session || !Root.activeSelf) return;
             RefreshHandGlows();
             RefreshAttackResponseArrow();
+            UpdateTouchCardActions();
             RefreshCardActions();
             if (_phasePicker.activeSelf && (!CanAcceptPlayerAction ||
                 Input.GetKeyDown(KeyCode.Escape) || Input.GetMouseButtonDown(1)))
@@ -2558,7 +2565,7 @@ namespace YGOPortable.UI
             return false;
         }
 
-        private void OnSlotClicked(byte con, uint loc, uint seq)
+        private void OnSlotClicked(byte con, uint loc, uint seq, bool touch = false)
         {
             if (_session == null || IsPresenting || IsPaused || IsBrowsingZone) return;
 
@@ -2639,7 +2646,9 @@ namespace YGOPortable.UI
 
             if (CanShowCardActions)
             {
-                PointAtCardActions(GetSlot(con, loc, seq)?.root);
+                var anchor = GetSlot(con, loc, seq)?.root;
+                if (touch) SelectTouchCardActions(anchor);
+                else PointAtCardActions(anchor);
                 return;
             }
 

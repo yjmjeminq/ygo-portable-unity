@@ -198,6 +198,7 @@ namespace YGOPortable.UI
         public Func<int> IndexGetter;
         public Func<object> DataGetter;
         public Action OnLeftClick;
+        public Action OnTouchClick;
         public Action OnRightClick;
         public Action OnPointerEnterAction;
         public Action OnPointerExitAction;
@@ -209,9 +210,11 @@ namespace YGOPortable.UI
         private CanvasGroup _cg;
         private ScrollRect _parentScroll;
 
+        private bool HandlesTouchTap(PointerEventData data) => data.pointerId >= 0 && OnTouchClick != null;
+
         public void OnPointerEnter(PointerEventData eventData)
         {
-            if (!_isDraggingThis)
+            if (!_isDraggingThis && !HandlesTouchTap(eventData))
             {
                 if (EnableHoverLift)
                 {
@@ -225,7 +228,7 @@ namespace YGOPortable.UI
 
         public void OnPointerExit(PointerEventData eventData)
         {
-            if (!_isDraggingThis)
+            if (!_isDraggingThis && !HandlesTouchTap(eventData))
             {
                 EndHover();
                 OnPointerExitAction?.Invoke();
@@ -277,11 +280,17 @@ namespace YGOPortable.UI
 
         public void OnBeginDrag(PointerEventData eventData)
         {
-            if (SourceType == DragSourceType.None || CardCodeGetter == null)
+            _parentScroll = null;
+            bool canDragCard = SourceType != DragSourceType.None && CardCodeGetter != null;
+            if (!canDragCard || eventData.pointerId >= 0)
             {
-                _parentScroll = GetComponentInParent<ScrollRect>();
-                _parentScroll?.OnBeginDrag(eventData);
-                return;
+                var scroll = GetComponentInParent<ScrollRect>();
+                if (!canDragCard || ShouldScrollOnTouch(scroll, eventData.position - eventData.pressPosition))
+                {
+                    _parentScroll = scroll;
+                    _parentScroll?.OnBeginDrag(eventData);
+                    return;
+                }
             }
             if (eventData.button != PointerEventData.InputButton.Left || CardDragManager.Instance?.IsDragging == true) return;
             uint code = CardCodeGetter();
@@ -299,9 +308,9 @@ namespace YGOPortable.UI
 
         public void OnDrag(PointerEventData eventData)
         {
-            if (SourceType == DragSourceType.None || CardCodeGetter == null)
+            if (_parentScroll != null)
             {
-                _parentScroll?.OnDrag(eventData);
+                _parentScroll.OnDrag(eventData);
                 return;
             }
             if (_isDraggingThis && CardDragManager.Instance != null)
@@ -312,9 +321,10 @@ namespace YGOPortable.UI
 
         public void OnEndDrag(PointerEventData eventData)
         {
-            if (SourceType == DragSourceType.None || CardCodeGetter == null)
+            if (_parentScroll != null)
             {
-                _parentScroll?.OnEndDrag(eventData);
+                _parentScroll.OnEndDrag(eventData);
+                _parentScroll = null;
                 return;
             }
             if (_isDraggingThis)
@@ -326,8 +336,18 @@ namespace YGOPortable.UI
             }
         }
 
+        private static bool ShouldScrollOnTouch(ScrollRect scroll, Vector2 movement)
+        {
+            if (scroll == null || !scroll.isActiveAndEnabled || scroll.content == null) return false;
+            var viewport = scroll.viewport != null ? scroll.viewport : (RectTransform)scroll.transform;
+            return Mathf.Abs(movement.y) >= Mathf.Abs(movement.x)
+                ? scroll.vertical && scroll.content.rect.height > viewport.rect.height
+                : scroll.horizontal && scroll.content.rect.width > viewport.rect.width;
+        }
+
         private void OnDisable()
         {
+            _parentScroll = null;
             if (_isDraggingThis || EnableHoverLift)
             {
                 _isDraggingThis = false;
@@ -337,14 +357,14 @@ namespace YGOPortable.UI
 
         public void OnPointerClick(PointerEventData eventData)
         {
-            if (_isDraggingThis) return;
+            if (_isDraggingThis || _parentScroll != null) return;
             if (eventData.button == PointerEventData.InputButton.Right)
             {
                 OnRightClick?.Invoke();
             }
             else if (eventData.button == PointerEventData.InputButton.Left)
             {
-                OnLeftClick?.Invoke();
+                (HandlesTouchTap(eventData) ? OnTouchClick : OnLeftClick)?.Invoke();
             }
         }
     }

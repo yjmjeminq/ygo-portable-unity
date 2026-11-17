@@ -139,10 +139,7 @@ namespace YGOPortable.UI
                 _modals.ResultRoot.transform.SetAsLastSibling();
                 CardAnimationManager.Instance?.BringToFront();
                 if (Application.platform == RuntimePlatform.IPhonePlayer)
-                {
                     Input.simulateMouseWithTouches = false;
-                    TouchGamepad.Create(canvas.transform);
-                }
 
                 _initialized = true;
                 Debug.Log("[GameApp] 10. Showing Title screen...");
@@ -208,7 +205,6 @@ namespace YGOPortable.UI
 
             var previousScreen = _screen;
             _screen = screen;
-            TouchGamepad.ReleaseAll();
             _menuPad?.Clear();
             _menuPadInput.Reset();
             _modals.HideAll();

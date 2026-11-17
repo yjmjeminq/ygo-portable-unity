@@ -9,9 +9,9 @@ namespace YGOPortable.UI
 {
     public partial class DuelFieldUI
     {
-        private const float CardActionWidth = 77f;
-        private const float CardActionHeight = 73f;
         private const float CardActionGap = 5f;
+        private static float CardActionWidth => Application.platform == RuntimePlatform.IPhonePlayer ? 110f : 77f;
+        private static float CardActionHeight => Application.platform == RuntimePlatform.IPhonePlayer ? 100f : 73f;
 
         private readonly Dictionary<RectTransform, FieldSlotView> _fieldSlotsByRect = new();
         private readonly Dictionary<RectTransform, StackTileView> _stackTilesByRect = new();
@@ -20,6 +20,8 @@ namespace YGOPortable.UI
         private RectTransform _cardActionsHoverArea;
         private RectTransform _pointerActionAnchor;
         private float _pointerActionLeftAt;
+        private RectTransform _touchActionAnchor;
+        private DuelPrompt _touchActionPrompt;
         private RectTransform _cardActionAnchor;
         private RectTransform _cardActionArt;
         private DuelPrompt _cardActionsPrompt;
@@ -55,12 +57,44 @@ namespace YGOPortable.UI
                 _pointerActionLeftAt = Time.unscaledTime;
         }
 
+        private void SelectTouchCardActions(RectTransform anchor)
+        {
+            _touchActionAnchor = anchor;
+            _touchActionPrompt = _session.ActivePrompt;
+            _pointerActionAnchor = null;
+            RefreshCardActions();
+        }
+
+        private void UpdateTouchCardActions()
+        {
+            if (_touchActionAnchor == null) return;
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                var touch = Input.GetTouch(i);
+                if (touch.phase == TouchPhase.Began) DismissTouchCardActionsAt(touch.position);
+            }
+        }
+
+        private void DismissTouchCardActionsAt(Vector2 point)
+        {
+            if (_touchActionAnchor == null) return;
+            var camera = CardActionsCamera();
+            if (RectTransformUtility.RectangleContainsScreenPoint(_touchActionAnchor, point, camera) ||
+                RectTransformUtility.RectangleContainsScreenPoint(_cardActionsHoverArea, point, camera)) return;
+            HideCardActions();
+        }
+
+        private Camera CardActionsCamera()
+        {
+            var canvas = _cardActionsBar.GetComponentInParent<Canvas>();
+            return canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+        }
+
+
         private bool IsPointerOverCardActions()
         {
             if (!_cardActionsBar.gameObject.activeSelf) return false;
-            var canvas = _cardActionsBar.GetComponentInParent<Canvas>();
-            var camera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
-            return RectTransformUtility.RectangleContainsScreenPoint(_cardActionsHoverArea, Input.mousePosition, camera);
+            return RectTransformUtility.RectangleContainsScreenPoint(_cardActionsHoverArea, Input.mousePosition, CardActionsCamera());
         }
 
         private (LiveCardState card, RectTransform art) FindCardActionSource(RectTransform anchor)
@@ -86,13 +120,16 @@ namespace YGOPortable.UI
                 return;
             }
 
+            if (_usingDuelPad || !ReferenceEquals(_touchActionPrompt, _session.ActivePrompt))
+                _touchActionAnchor = null;
+
             RectTransform anchor = _duelPadBoardFocus;
             if (!_usingDuelPad)
             {
                 bool overActions = IsPointerOverCardActions();
                 if (Time.unscaledTime > _pointerActionLeftAt + .22f && !overActions)
                     _pointerActionAnchor = null;
-                anchor = _pointerActionAnchor ?? (overActions ? _cardActionAnchor : null);
+                anchor = _touchActionAnchor ?? _pointerActionAnchor ?? (overActions ? _cardActionAnchor : null);
             }
 
             if (anchor != null && _stackTilesByRect.TryGetValue(anchor, out var pile))
@@ -286,7 +323,8 @@ namespace YGOPortable.UI
         private void HideCardActions()
         {
             _cardActionsBar.gameObject.SetActive(false);
-            _cardActionAnchor = _cardActionArt = null;
+            _cardActionAnchor = _cardActionArt = _touchActionAnchor = null;
+            _touchActionPrompt = null;
             _cardActionsPrompt = null;
             _navigatingCardActions = false;
         }
