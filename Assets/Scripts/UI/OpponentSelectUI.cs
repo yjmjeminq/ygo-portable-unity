@@ -26,7 +26,9 @@ namespace YGOPortable.UI
         private readonly Dictionary<int, Button> _tabButtons = new Dictionary<int, Button>();
 
         private OpponentCharacter _selectedChar;
-        private List<PresetDeckInfo> _charDecks = new List<PresetDeckInfo>();
+        private readonly List<PresetDeckInfo> _charDecks = new List<PresetDeckInfo>();
+        private readonly List<int> _charDeckLevels = new List<int>();
+        private int _totalDeckLevels;
         private int _selectedCharDeckIdx = 0;
         private int _myDeckIdx = 0;
 
@@ -36,8 +38,11 @@ namespace YGOPortable.UI
         private Text _detailBio;
         private Dropdown _oppDeckDropdown;
         private Text _oppDeckStats;
+        private Text _oppDeckProgress;
         private Text _oppDeckNote;
         private Button _cloneOppButton;
+        private Button _previousOppDeckButton;
+        private Button _nextOppDeckButton;
         private Button _startDuelButton;
         private Button _previousPageButton;
         private Button _nextPageButton;
@@ -82,6 +87,17 @@ namespace YGOPortable.UI
         }
 
         internal InputField SearchInput => _searchInput;
+
+        internal void FocusUnlockedDeck(PresetDeckInfo deck)
+        {
+            if (deck == null || _selectedChar?.id != deck.charId) return;
+            int index = _charDecks.FindIndex(candidate => candidate.id == deck.id);
+            if (index < 0) return;
+            _selectedCharDeckIdx = index;
+            RefreshSelectedOppDeck();
+            if (_oppDeckDropdown.IsInteractable())
+                EventSystem.current?.SetSelectedGameObject(_oppDeckDropdown.gameObject);
+        }
 
         public void ShowStatus(string message, bool isError = false)
         {
@@ -197,21 +213,27 @@ namespace YGOPortable.UI
 
             var deckMeta = LotdUiKit.CreateRect("DeckMeta", oppDeckBox,
                 new Vector2(0.30f, 0.34f), new Vector2(0.98f, 0.95f), Vector2.zero, Vector2.zero);
-            var deckPicker = LotdUiKit.CreateRect("DeckPicker", deckMeta, new Vector2(0, 0.60f), Vector2.one, Vector2.zero, Vector2.zero);
+            var deckPicker = LotdUiKit.CreateRect("DeckPicker", deckMeta, new Vector2(0, 0.67f), Vector2.one, Vector2.zero, Vector2.zero);
             _oppDeckDropdown = LotdUiKit.CreateLotdDropdown(deckPicker, "Dropdown", Array.Empty<string>(), index =>
             {
                 _selectedCharDeckIdx = index;
                 RefreshSelectedOppDeck();
             }, dynamicChoices: true);
-            _oppDeckStats = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("DS", deckMeta, new Vector2(0, 0.19f), new Vector2(1, 0.57f), Vector2.zero, Vector2.zero),
+            _oppDeckStats = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("DS", deckMeta, new Vector2(0, 0.32f), new Vector2(1, 0.64f), Vector2.zero, Vector2.zero),
                 "DS", "", 13, 9, TextAnchor.MiddleLeft, LotdUiKit.CyanAccent);
-            _oppDeckNote = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("DeckNote", deckMeta, Vector2.zero, new Vector2(1, 0.19f), Vector2.zero, Vector2.zero),
-                "Label", "", 11, 9, TextAnchor.MiddleLeft, LotdUiKit.TextMuted);
+            _oppDeckProgress = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("DeckProgress", deckMeta,
+                new Vector2(0, 0.16f), new Vector2(1, 0.31f), Vector2.zero, Vector2.zero),
+                "Label", "", 13, 9, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
+            _oppDeckNote = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("DeckNote", deckMeta, Vector2.zero,
+                new Vector2(1, 0.15f), Vector2.zero, Vector2.zero), "Label", "", 12, 9,
+                TextAnchor.MiddleLeft, LotdUiKit.TextMuted);
 
             var prevDeckRt = LotdUiKit.CreateRect("PrevOppDeck", oppDeckBox, new Vector2(0.30f, 0.06f), new Vector2(0.48f, 0.30f), Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(prevDeckRt, "B", "◀ 덱", () => CycleOppDeck(-1), 13);
+            _previousOppDeckButton = LotdUiKit.CreateLotdButton(prevDeckRt, "B",
+                CollectionProgress.Initialized ? "◀ 레벨" : "◀ 덱", () => CycleOppDeck(-1), 13);
             var nextDeckRt = LotdUiKit.CreateRect("NextOppDeck", oppDeckBox, new Vector2(0.49f, 0.06f), new Vector2(0.67f, 0.30f), Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(nextDeckRt, "B", "덱 ▶", () => CycleOppDeck(1), 13);
+            _nextOppDeckButton = LotdUiKit.CreateLotdButton(nextDeckRt, "B",
+                CollectionProgress.Initialized ? "레벨 ▶" : "덱 ▶", () => CycleOppDeck(1), 13);
             var cloneRt = LotdUiKit.CreateRect("CloneOppDeck", oppDeckBox, new Vector2(0.69f, 0.06f), new Vector2(0.98f, 0.30f), Vector2.zero, Vector2.zero);
             _cloneOppButton = LotdUiKit.CreateLotdButton(cloneRt, "B", "덱 목록 복제", CloneCurrentOppDeck, 12);
 
@@ -317,7 +339,8 @@ namespace YGOPortable.UI
                 {
                     bool nameHit = MatchesSearch(c.name, query) || MatchesSearch(c.bio, query) ||
                                    (c.aliases?.Any(alias => MatchesSearch(alias, query)) ?? false);
-                    bool deckHit = decks.Any(d => MatchesSearch(d.title, query));
+                    bool deckHit = (trackUnlocks ? OpponentDeckLevels.GetDecks(c.id) : decks)
+                        .Any(d => IsSelectableDeck(c.id, d) && MatchesSearch(d.title, query));
                     if (!nameHit && !deckHit) continue;
                     if (deckHit && deckMatch == null) deckMatch = c;
                 }
@@ -344,7 +367,10 @@ namespace YGOPortable.UI
             else if (!_filteredChars.Contains(_selectedChar))
                 SelectCharacter(_filteredChars.FirstOrDefault());
             else
+            {
+                SelectCharacter(_selectedChar);
                 _page = _filteredChars.IndexOf(_selectedChar) / PageSize;
+            }
             RefreshGridPage();
         }
 
@@ -352,6 +378,9 @@ namespace YGOPortable.UI
             string.Concat((value ?? "").Where(c => !char.IsWhiteSpace(c))).ToLowerInvariant();
 
         private static bool MatchesSearch(string value, string query) => NormalizeSearch(value).Contains(query);
+
+        private static bool IsSelectableDeck(int charId, PresetDeckInfo deck) =>
+            !CollectionProgress.Initialized || CollectionProgress.IsOpponentDeckUnlocked(charId, deck.id);
 
         private void RefreshGridPage()
         {
@@ -414,20 +443,38 @@ namespace YGOPortable.UI
 
         private void SelectCharacter(OpponentCharacter c, string deckQuery = "")
         {
+            int? previousDeckId = _selectedChar != null && c?.id == _selectedChar.id &&
+                _selectedCharDeckIdx >= 0 && _selectedCharDeckIdx < _charDecks.Count
+                ? _charDecks[_selectedCharDeckIdx].id : null;
             _selectedChar = c;
-            _charDecks = c == null ? new List<PresetDeckInfo>() : DeckRepository.GetDecksForCharacter(c.id);
+            IReadOnlyList<PresetDeckInfo> allDecks = c == null ? Array.Empty<PresetDeckInfo>() :
+                CollectionProgress.Initialized ? OpponentDeckLevels.GetDecks(c.id) : DeckRepository.GetDecksForCharacter(c.id);
+            _totalDeckLevels = allDecks.Count;
+            _charDecks.Clear();
+            _charDeckLevels.Clear();
+            for (int i = 0; i < allDecks.Count; i++)
+            {
+                if (!IsSelectableDeck(c.id, allDecks[i])) continue;
+                _charDecks.Add(allDecks[i]);
+                _charDeckLevels.Add(i + 1);
+            }
             _selectedCharDeckIdx = deckQuery.Length == 0
-                ? 0
+                ? Mathf.Max(0, _charDecks.FindIndex(d => d.id == previousDeckId))
                 : Mathf.Max(0, _charDecks.FindIndex(d => MatchesSearch(d.title, deckQuery)));
             _detailBust.sprite = LotdUiKit.LoadOpponentPortrait(c);
             _detailBust.enabled = c != null;
             _detailName.text = c?.name ?? "검색 결과 없음";
             _detailBio.text = c == null ? "" : string.IsNullOrWhiteSpace(c.bio)
-                ? $"[{c.seriesName}] 상대 덱 {_charDecks.Count}개"
+                ? $"[{c.seriesName}] 상대 덱 {_totalDeckLevels}개"
                 : $"[{c.seriesName}]\n{c.bio}";
             _oppDeckDropdown.ClearOptions();
-            _oppDeckDropdown.AddOptions(_charDecks.Select((d, i) => $"{i + 1}. {d.title}").ToList());
-            _oppDeckDropdown.interactable = _charDecks.Count > 1;
+            _oppDeckDropdown.AddOptions(_charDecks.Select((d, i) => CollectionProgress.Initialized
+                ? $"Lv. {_charDeckLevels[i]}  {d.title}" : $"{i + 1}. {d.title}").ToList());
+            bool canSwitchDeck = _charDecks.Count > 1;
+            _oppDeckDropdown.interactable = canSwitchDeck;
+            _previousOppDeckButton.interactable = _nextOppDeckButton.interactable = canSwitchDeck;
+            Color deckArrowColor = canSwitchDeck ? Color.white : new Color(.52f, .61f, .72f, .76f);
+            _previousOppDeckButton.targetGraphic.color = _nextOppDeckButton.targetGraphic.color = deckArrowColor;
             _cloneOppButton.interactable = _charDecks.Count > 0;
             _startDuelButton.interactable = _charDecks.Count > 0 && DeckRepository.UserDecks.Count > 0;
             RefreshSelectedOppDeck();
@@ -435,7 +482,7 @@ namespace YGOPortable.UI
 
         private void CycleOppDeck(int delta)
         {
-            if (_charDecks.Count == 0) return;
+            if (_charDecks.Count < 2) return;
             _selectedCharDeckIdx = (_selectedCharDeckIdx + delta + _charDecks.Count) % _charDecks.Count;
             RefreshSelectedOppDeck();
         }
@@ -445,6 +492,7 @@ namespace YGOPortable.UI
             if (_charDecks.Count == 0)
             {
                 _oppDeckStats.text = "";
+                _oppDeckProgress.text = "";
                 _oppDeckNote.text = "";
                 _sigCardPreview.SetCard(0);
                 return;
@@ -454,7 +502,19 @@ namespace YGOPortable.UI
             int mc = d.main != null ? d.main.Length : 0;
             int ec = d.extra != null ? d.extra.Length : 0;
             _oppDeckStats.text = $"메인 {mc}장 / 엑스트라 {ec}장\n에이스 {CardDatabase.GetName(d.sigCard)}";
-            _oppDeckNote.text = d.subtitle ?? "";
+            if (CollectionProgress.Initialized)
+            {
+                bool cleared = CollectionProgress.IsOpponentDeckCleared(_selectedChar.id, d.id);
+                _oppDeckProgress.color = cleared ? LotdUiKit.GoldAccent : LotdUiKit.TextPrimary;
+                _oppDeckProgress.text = $"덱 해금 {_charDecks.Count}/{_totalDeckLevels}  ·  {(cleared ? "승리 완료" : "도전 가능")}";
+                _oppDeckNote.text = _charDecks.Count < _totalDeckLevels
+                    ? $"Lv. {_charDeckLevels[_charDeckLevels.Count - 1]} 첫 승리 시 다음 덱 해금" : d.subtitle ?? "";
+            }
+            else
+            {
+                _oppDeckProgress.text = "";
+                _oppDeckNote.text = d.subtitle ?? "";
+            }
             _sigCardPreview.SetCard(d.sigCard);
         }
 
@@ -482,8 +542,7 @@ namespace YGOPortable.UI
 
         private void CloneCurrentOppDeck()
         {
-            if (_charDecks.Count == 0) return;
-            var d = _charDecks[_selectedCharDeckIdx];
+            if (!TryGetSelectedOpponentDeck(out var d)) return;
             var cloned = DeckRepository.ClonePresetToUserDeck(d);
             _myDeckIdx = DeckRepository.UserDecks.IndexOf(cloned);
             UpdateMyDeckLabel();
@@ -493,8 +552,7 @@ namespace YGOPortable.UI
 
         private void OpenJanken()
         {
-            if (_selectedChar == null || _charDecks.Count == 0 || DeckRepository.UserDecks.Count == 0) return;
-            if (CollectionProgress.Initialized && !CollectionProgress.IsOpponentUnlocked(_selectedChar.id)) return;
+            if (!TryGetSelectedOpponentDeck(out _) || DeckRepository.UserDecks.Count == 0) return;
             var myDeck = DeckRepository.UserDecks[_myDeckIdx];
             if (!GameAppController.CanStartWithDeck(myDeck, out string reason))
             {
@@ -588,10 +646,24 @@ namespace YGOPortable.UI
 
         private void LaunchMatch(bool playerGoesFirst)
         {
+            if (!TryGetSelectedOpponentDeck(out var oppDeck) || _myDeckIdx < 0 || _myDeckIdx >= DeckRepository.UserDecks.Count)
+            {
+                CloseJanken();
+                return;
+            }
             JankenRoot.SetActive(false);
             var myDeck = DeckRepository.UserDecks[_myDeckIdx];
-            var oppDeck = _charDecks[_selectedCharDeckIdx];
             _app.StartDuelMatch(_selectedChar, oppDeck, myDeck, playerGoesFirst);
+        }
+
+        private bool TryGetSelectedOpponentDeck(out PresetDeckInfo deck)
+        {
+            deck = null;
+            if (_selectedChar == null || _selectedCharDeckIdx < 0 || _selectedCharDeckIdx >= _charDecks.Count) return false;
+            var selected = _charDecks[_selectedCharDeckIdx];
+            if (!IsSelectableDeck(_selectedChar.id, selected)) return false;
+            deck = selected;
+            return true;
         }
     }
 }
