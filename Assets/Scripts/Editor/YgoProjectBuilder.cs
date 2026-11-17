@@ -515,7 +515,7 @@ namespace YGOPortable.Editor
                 var app = canvas.AddComponent<GameAppController>();
                 var menu = new TitleAndMenuUI(app, canvas.transform);
                 menu.TitleRoot.SetActive(false);
-                var settings = menu.MenuRoot.GetComponentsInChildren<Button>()[2];
+                var settings = ButtonAt(menu.MenuRoot, "Menu/Settings/Button");
                 Submit(settings);
                 var close = ButtonAt(menu.SettingsRoot, "SettingsWin/Close/BtnClose");
                 AssertTrue(menu.SettingsRoot.activeSelf && !settings.IsInteractable() && events.currentSelectedGameObject == close.gameObject,

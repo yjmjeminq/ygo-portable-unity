@@ -49,6 +49,7 @@ namespace YGOPortable.UI
         private Text _previewName;
         private Text _previewStats;
         private Text _previewDesc;
+        private Text _previewOwnership;
         private ScrollRect _previewScroll;
 
         private ScrollRect _trunkScroll;
@@ -121,11 +122,15 @@ namespace YGOPortable.UI
             CloseDetailedSearch();
             StartPadNavigation();
             if (DeckRepository.UserDecks.Count == 0)
-                DeckRepository.Load(Application.streamingAssetsPath, Application.persistentDataPath);
+                DeckRepository.Load(Application.streamingAssetsPath, Application.persistentDataPath,
+                    seedDefaultDecks: !CollectionProgress.Initialized);
 
             _userDeckIdx = Mathf.Clamp(_userDeckIdx, 0, Mathf.Max(0, DeckRepository.UserDecks.Count - 1));
             LoadWorkingDeckFromCurrent();
             RefreshTrunkFilter();
+            if (CollectionProgress.Initialized && CollectionProgress.GetOwnedCount(_inspectedCode) == 0 &&
+                _trunkResults.Count > 0)
+                _inspectedCode = _trunkResults[0].code;
             InspectCard(_inspectedCode);
             ShowToast("");
         }
@@ -279,6 +284,12 @@ namespace YGOPortable.UI
             var desc = LotdUiKit.CreateRect("Description", panel,
                 new Vector2(0f, 0.155f), new Vector2(1f, 0.418f), new Vector2(28f, 0f), new Vector2(-28f, 0f));
             LotdUiKit.AddImage(desc.gameObject, LotdUiKit.WhiteSprite, new Color(0.025f, 0.067f, 0.118f, 0.64f));
+            var ownership = LotdUiKit.CreateRect("Ownership", desc, Vector2.up, Vector2.one,
+                new Vector2(8f, -29f), new Vector2(-10f, -4f));
+            LotdUiKit.AddImage(ownership.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelNavy, false, false);
+            _previewOwnership = LotdUiKit.AddFittedText(ownership, "Count", "", 15, 11,
+                TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
+            ownership.gameObject.SetActive(false);
             var viewport = LotdUiKit.CreateRect("Viewport", desc, Vector2.zero, Vector2.one,
                 new Vector2(8f, 16f), new Vector2(-21f, -5f));
             viewport.gameObject.AddComponent<RectMask2D>();
@@ -418,9 +429,11 @@ namespace YGOPortable.UI
                 slot.pivot = new Vector2(0f, 1f);
                 var hit = LotdUiKit.AddImage(slot.gameObject, LotdUiKit.WhiteSprite, Color.clear);
                 var card = CompositeCardView.Create(LotdUiKit.FillRect("CardInset", slot, 1.8f), "Card");
-                var countBox = LotdUiKit.CreateRect("Copies", slot, new Vector2(0.30f, 0.018f), new Vector2(0.70f, 0.22f),
+                var countBox = LotdUiKit.CreateRect("Copies", slot, new Vector2(0.24f, 0.032f), new Vector2(0.76f, 0.215f),
                     Vector2.zero, Vector2.zero);
-                var label = LotdUiKit.AddText(countBox, "Count", "", 18, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+                LotdUiKit.AddImage(countBox.gameObject, LotdUiKit.WhiteSprite, new Color(.02f, .07f, .14f, .93f), false, false);
+                var label = LotdUiKit.AddFittedText(countBox, "Count", "", 17, 10, TextAnchor.MiddleCenter, Color.white,
+                    FontStyle.Bold);
                 label.gameObject.AddComponent<Outline>().effectColor = Color.black;
                 var trigger = slot.gameObject.AddComponent<CardDragTrigger>();
                 trigger.SourceType = DragSourceType.Trunk;
@@ -571,8 +584,11 @@ namespace YGOPortable.UI
                 _trunkHeading.color = LotdUiKit.GoldAccent;
             }
 
+            bool previewUnowned = _activeArchetypeFilter != null || _relatedFilterCode != 0;
             foreach (var card in source)
-                if (filter.Matches(card)) _trunkResults.Add(card);
+                if ((!CollectionProgress.Initialized || previewUnowned || CollectionProgress.GetOwnedCount(card.code) > 0) &&
+                    filter.Matches(card))
+                    _trunkResults.Add(card);
 
             int sort = _sortFilter.value;
             if (sort == 1) _trunkResults.Sort((a, b) => b.atk.CompareTo(a.atk));
@@ -580,7 +596,9 @@ namespace YGOPortable.UI
             else if (sort == 3) _trunkResults.Sort((a, b) => string.Compare(a.name, b.name, StringComparison.Ordinal));
 
             Canvas.ForceUpdateCanvases();
-            _trunkCountText.text = $"{_trunkResults.Count:N0}장";
+            _trunkCountText.text = CollectionProgress.Initialized ? $"{_trunkResults.Count:N0}종" : $"{_trunkResults.Count:N0}장";
+            _noTrunkResults.text = CollectionProgress.Initialized && !previewUnowned
+                ? "조건에 맞는 보유 카드가 없습니다." : "조건에 맞는 카드가 없습니다.";
             _noTrunkResults.gameObject.SetActive(_trunkResults.Count == 0);
             _padIndices[(int)PadArea.Trunk] = 0;
             ResizeTrunkGrid(true);
@@ -643,9 +661,12 @@ namespace YGOPortable.UI
                 uint code = _trunkResults[index].code;
                 view.SetCard(code);
 
-                int copies = CountInWorkingDeck(code);
-                count.transform.parent.gameObject.SetActive(copies > 0);
-                count.text = copies.ToString();
+                bool showOwnership = CollectionProgress.Initialized;
+                int copies = CountInWorkingDeck(code, combineAlternateArts: !showOwnership);
+                int owned = showOwnership ? CollectionProgress.GetOwnedCount(code) : 0;
+                count.transform.parent.gameObject.SetActive(showOwnership || copies > 0);
+                count.text = showOwnership ? $"{copies}/{owned}" : copies.ToString();
+                count.color = showOwnership && copies > owned ? LotdUiKit.RedAccent : Color.white;
                 var highlight = rect.GetComponent<Image>();
                 highlight.color = Color.clear;
 
@@ -680,6 +701,7 @@ namespace YGOPortable.UI
             SyncSlotList(_mainSlots, _workingDeck.main, PadArea.Main);
             SyncSlotList(_extraSlots, _workingDeck.extra, PadArea.Extra);
             SyncSlotList(_sideSlots, _workingDeck.side, PadArea.Side);
+            RefreshPreviewOwnership();
             RefreshSaveLabel();
         }
 
@@ -813,17 +835,15 @@ namespace YGOPortable.UI
             return -1;
         }
 
-        private int CountInWorkingDeck(uint code)
+        private int CountInWorkingDeck(uint code, bool combineAlternateArts = true)
         {
-            var ci = CardDatabase.Get(code);
-            uint targetKey = ci != null && ci.alias != 0 ? ci.alias : code;
+            uint targetKey = combineAlternateArts ? CollectionProgress.GetDeckCopyKey(code) : code;
             int cnt = 0;
             void CountList(List<uint> l)
             {
                 foreach (var c in l)
                 {
-                    var cc = CardDatabase.Get(c);
-                    uint k = cc != null && cc.alias != 0 ? cc.alias : c;
+                    uint k = combineAlternateArts ? CollectionProgress.GetDeckCopyKey(c) : c;
                     if (k == targetKey) cnt++;
                 }
             }
@@ -833,15 +853,29 @@ namespace YGOPortable.UI
             return cnt;
         }
 
+        private bool CanAddCardCopy(uint code, bool showReason = true)
+        {
+            if (CollectionProgress.Initialized)
+            {
+                int owned = CollectionProgress.GetOwnedCount(code);
+                if (CountInWorkingDeck(code, combineAlternateArts: false) >= owned)
+                {
+                    if (showReason) ShowToast(owned == 0 ? "보유하지 않은 카드입니다." : $"보유 카드 {owned}장을 모두 사용 중입니다.");
+                    return false;
+                }
+            }
+
+            int limit = CollectionProgress.GetDeckCopyLimit(code);
+            if (CountInWorkingDeck(code) < limit) return true;
+            if (showReason) ShowToast($"동명 카드는 세 덱을 합해 최대 {limit}장입니다.");
+            return false;
+        }
+
         private void TryAddCardToDeck(uint code, DragSourceType destination = DragSourceType.None)
         {
             var card = CardDatabase.Get(code);
             if (card == null || _workingDeck == null) return;
-            if (CountInWorkingDeck(code) >= 3)
-            {
-                ShowToast("동명 카드는 세 덱을 합해 최대 3장입니다.");
-                return;
-            }
+            if (!CanAddCardCopy(code)) return;
 
             if (destination == DragSourceType.None)
                 destination = card.IsExtra ? DragSourceType.DeckExtra : DragSourceType.DeckMain;
@@ -866,12 +900,26 @@ namespace YGOPortable.UI
             return false;
         }
 
+        private void RefreshPreviewOwnership()
+        {
+            bool visible = CollectionProgress.Initialized && _workingDeck != null && CardDatabase.Get(_inspectedCode) != null;
+            _previewOwnership.transform.parent.gameObject.SetActive(visible);
+            _previewScroll.viewport.offsetMax = new Vector2(-21f, visible ? -33f : -5f);
+            if (!visible) return;
+
+            int owned = CollectionProgress.GetOwnedCount(_inspectedCode);
+            int copies = CountInWorkingDeck(_inspectedCode, combineAlternateArts: false);
+            _previewOwnership.text = $"보유 {owned}장 · 덱에 {copies}장";
+            _previewOwnership.color = copies > owned || owned == 0 ? LotdUiKit.RedAccent : LotdUiKit.TextPrimary;
+        }
+
         private void InspectCard(uint code)
         {
             _inspectedCode = code;
             if (_previewCard.CurrentCode == code) return;
             var ci = CardDatabase.Get(code);
             _previewCard.SetCard(code);
+            RefreshPreviewOwnership();
 
             _previewName.text = ci?.name ?? "";
             _previewStats.text = ci?.FormatStatsLineKR() ?? "";
@@ -1205,7 +1253,8 @@ namespace YGOPortable.UI
 
                     var btnRt = LotdUiKit.CreateRect("LoadBtn", tile, new Vector2(.31f, .07f), new Vector2(.96f, .36f),
                         Vector2.zero, Vector2.zero);
-                    var loadBtn = LotdUiKit.CreateLotdButton(btnRt, "B", "불러오기", null, 15, gold: true);
+                    var loadBtn = LotdUiKit.CreateLotdButton(btnRt, "B", CollectionProgress.Initialized ? "보유분 불러오기" : "불러오기",
+                        null, 15, gold: true);
 
                     _archPool.Add((tile, cv, tTxt, sTxt, loadBtn, inspectBtn));
                 }
@@ -1341,9 +1390,36 @@ namespace YGOPortable.UI
         private void ApplyPureArchetypeExampleDeck(ArchetypeInfo arch)
         {
             if (arch == null) return;
+            var (main, extra) = CardDatabase.BuildPureArchetypeDeck(arch);
+            bool ownedOnly = CollectionProgress.Initialized;
+            if (ownedOnly)
+            {
+                var used = new Dictionary<uint, int>();
+                var usedByName = new Dictionary<uint, int>();
+                bool TakeOwnedCopy(uint code)
+                {
+                    uint key = CollectionProgress.GetDeckCopyKey(code);
+                    used.TryGetValue(code, out int copies);
+                    usedByName.TryGetValue(key, out int sameName);
+                    if (copies >= CollectionProgress.GetOwnedCount(code) || sameName >= CollectionProgress.GetDeckCopyLimit(code))
+                        return false;
+                    used[code] = copies + 1;
+                    usedByName[key] = sameName + 1;
+                    return true;
+                }
+
+                main = main.Where(TakeOwnedCopy).ToList();
+                extra = extra.Where(TakeOwnedCopy).ToList();
+                if (main.Count + extra.Count == 0)
+                {
+                    _archModalRoot.SetActive(false);
+                    ShowToast("이 예시 덱에 넣을 보유 카드가 없습니다.");
+                    return;
+                }
+            }
+
             BeforeReplacingEdits(() =>
             {
-                var (main, extra) = CardDatabase.BuildPureArchetypeDeck(arch);
                 _workingDeck.name = $"[순수] {arch.name}";
                 _workingDeck.main = main;
                 _workingDeck.extra = extra;
@@ -1354,7 +1430,8 @@ namespace YGOPortable.UI
                 if (arch.representativeCode != 0)
                     InspectCard(arch.representativeCode);
                 _archModalRoot.SetActive(false);
-                ShowToast($"'{_workingDeck.name}' 불러옴 · 메인 {main.Count}장 / 엑스트라 {extra.Count}장");
+                string action = ownedOnly ? "보유 카드로 구성" : "불러옴";
+                ShowToast($"'{_workingDeck.name}' {action} · 메인 {main.Count}장 / 엑스트라 {extra.Count}장");
             });
         }
     }

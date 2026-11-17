@@ -17,6 +17,8 @@ namespace YGOPortable.UI
         OpponentSelect,
         DeckEditor,
         Duel,
+        StarterSelection,
+        CardShop,
     }
 
     public class GameAppController : MonoBehaviour
@@ -30,6 +32,7 @@ namespace YGOPortable.UI
         private DeckEditorUI _deckEditor;
         private DuelPromptModals _modals;
         private DuelFieldUI _duelField;
+        private CollectionShopUI _collectionShop;
         private readonly DeckPadInput _menuPadInput = new DeckPadInput();
         private DeckPadUi _menuPad;
         private AppScreen _screen;
@@ -92,7 +95,9 @@ namespace YGOPortable.UI
 
                 Debug.Log("[GameApp] 3. Loading DeckRepository...");
                 if (DeckRepository.PresetDecks.Count == 0)
-                    DeckRepository.Load(Application.streamingAssetsPath, Application.persistentDataPath);
+                    DeckRepository.Load(Application.streamingAssetsPath, Application.persistentDataPath, seedDefaultDecks: false);
+                CollectionProgress.Load(Application.persistentDataPath);
+                RegisterStarterDeck(CollectionProgress.CreateStarterDeck());
 
                 Debug.Log("[GameApp] 4. Ensuring EventSystem & Canvas...");
                 EnsureEventSystem();
@@ -102,6 +107,9 @@ namespace YGOPortable.UI
 
                 Debug.Log("[GameApp] 5. Constructing TitleAndMenuUI...");
                 _titleAndMenu = new TitleAndMenuUI(this, canvas.transform);
+                _collectionShop = new CollectionShopUI(canvas.transform,
+                    () => ShowScreen(_screen == AppScreen.StarterSelection ? AppScreen.Title : AppScreen.MainMenu),
+                    CompleteStarterSelection);
 
                 Debug.Log("[GameApp] 6. Constructing OpponentSelectUI...");
                 _oppSelect = new OpponentSelectUI(this, canvas.transform);
@@ -181,6 +189,8 @@ namespace YGOPortable.UI
         public void ShowScreen(AppScreen screen)
         {
             if (!_initialized) return;
+            if (CollectionProgress.Initialized && !CollectionProgress.HasStarter && screen != AppScreen.Title)
+                screen = AppScreen.StarterSelection;
 
             _screen = screen;
             _menuPad?.Clear();
@@ -191,6 +201,8 @@ namespace YGOPortable.UI
 
             _titleAndMenu.TitleRoot.SetActive(screen == AppScreen.Title);
             _titleAndMenu.MenuRoot.SetActive(screen == AppScreen.MainMenu);
+            _collectionShop?.StarterRoot.SetActive(false);
+            _collectionShop?.Root.SetActive(false);
             _oppSelect.Root.SetActive(screen == AppScreen.OpponentSelect);
             _oppSelect.JankenRoot.SetActive(false);
             if (screen != AppScreen.DeckEditor) _deckEditor.Close();
@@ -215,6 +227,16 @@ namespace YGOPortable.UI
 
             if (screen == AppScreen.OpponentSelect) _oppSelect.Open();
             else if (screen == AppScreen.DeckEditor) _deckEditor.Open();
+            else if (screen == AppScreen.StarterSelection)
+            {
+                _collectionShop.OpenStarter();
+                SyncFrontMenuFocus();
+            }
+            else if (screen == AppScreen.CardShop)
+            {
+                _collectionShop.OpenShop();
+                SyncFrontMenuFocus();
+            }
             else if (screen == AppScreen.Title || screen == AppScreen.MainMenu)
             {
                 var page = screen == AppScreen.Title ? _titleAndMenu.TitleRoot : _titleAndMenu.MenuRoot;
@@ -224,8 +246,48 @@ namespace YGOPortable.UI
             }
         }
 
+        private void CompleteStarterSelection(UserDeck deck)
+        {
+            RegisterStarterDeck(deck);
+            ShowScreen(AppScreen.MainMenu);
+        }
+
+        private static void RegisterStarterDeck(UserDeck starter)
+        {
+            if (starter == null) return;
+            var existing = DeckRepository.UserDecks.Find(deck => deck.id == starter.id);
+            if (existing == null)
+            {
+                try { DeckRepository.SaveUserDeck(starter); }
+                catch (Exception error) when (error is IOException || error is UnauthorizedAccessException)
+                {
+                    Debug.LogWarning($"[GameApp] 스타터 덱 저장 실패. 다음 실행 시 수집 프로필에서 다시 불러옵니다. {error.Message}");
+                }
+                existing = starter;
+            }
+
+            DeckRepository.UserDecks.Remove(existing);
+            DeckRepository.UserDecks.Insert(0, existing);
+        }
+
+        internal static bool CanStartWithDeck(UserDeck deck, out string reason)
+        {
+            if (CollectionProgress.Initialized) return CollectionProgress.CanUseDeck(deck, out reason);
+            reason = deck == null ? "사용할 덱을 선택하세요." :
+                deck.main.Count < 40 || deck.main.Count > 60 ? "메인 덱은 40~60장이어야 합니다." :
+                deck.extra.Count > 15 ? "엑스트라 덱은 최대 15장입니다." :
+                deck.side.Count > 15 ? "사이드 덱은 최대 15장입니다." : "";
+            return reason.Length == 0;
+        }
+
         public void StartDuelMatch(OpponentCharacter oppChar, PresetDeckInfo oppDeck, UserDeck myDeck, bool playerGoesFirst)
         {
+            if (!CanStartWithDeck(myDeck, out string reason))
+            {
+                ShowScreen(AppScreen.OpponentSelect);
+                _oppSelect.ShowStatus(reason, true);
+                return;
+            }
             _activeOppChar = oppChar;
             _activeOppDeck = oppDeck;
             _activeMyDeck = myDeck;
@@ -292,13 +354,20 @@ namespace YGOPortable.UI
                     _duelField.Refresh();
                     bool won = _session.Winner == _session.HumanPlayerIndex;
                     bool draw = _session.Winner == 2;
+                    string rewardText = "";
+                    if (_session.Winner >= 0 && CollectionProgress.HasStarter)
+                    {
+                        rewardText = CollectionProgress.TryAwardDuel(won, out int reward, out string error)
+                            ? $"듀얼 보상 +{reward:N0} DP  ·  보유 {CollectionProgress.Balance:N0} DP"
+                            : error;
+                    }
                     _modals.ShowResult(
                         won, draw, _activeOppChar, _session.TurnNumber,
                         Mathf.Max(0, _session.Players[_session.HumanPlayerIndex].lp),
                         Mathf.Max(0, _session.Players[_session.AiPlayerIndex].lp),
                         () => StartDuelMatch(_activeOppChar, _activeOppDeck, _activeMyDeck, _activePlayerFirst),
                         () => ShowScreen(AppScreen.OpponentSelect),
-                        () => ShowScreen(AppScreen.MainMenu));
+                        () => ShowScreen(AppScreen.MainMenu), rewardText);
                 }
                 return;
             }
@@ -389,6 +458,8 @@ namespace YGOPortable.UI
                 AppScreen.Title => _titleAndMenu.TitleRoot,
                 AppScreen.MainMenu => _titleAndMenu.SettingsRoot.activeInHierarchy
                     ? _titleAndMenu.SettingsRoot : _titleAndMenu.MenuRoot,
+                AppScreen.StarterSelection => _collectionShop?.StarterRoot,
+                AppScreen.CardShop => _collectionShop?.Root,
                 _ => null,
             };
             if (page != null && page.activeInHierarchy)
@@ -399,7 +470,9 @@ namespace YGOPortable.UI
         {
             bool settings = _titleAndMenu.SettingsRoot.activeInHierarchy;
             bool janken = _oppSelect.JankenRoot.activeInHierarchy;
-            bool cancel = frame.Cancel || (escape && (settings || janken || _menuPad.HasPopup));
+            bool selectingStarter = _screen == AppScreen.StarterSelection;
+            bool collectionPage = selectingStarter || _screen == AppScreen.CardShop;
+            bool cancel = frame.Cancel || (escape && (settings || janken || _menuPad.HasPopup || collectionPage));
             if (!frame.HasInput && !cancel) return;
 
             GameObject scope = _screen switch
@@ -407,6 +480,8 @@ namespace YGOPortable.UI
                 AppScreen.Title => _titleAndMenu.TitleRoot,
                 AppScreen.MainMenu => settings ? _titleAndMenu.SettingsRoot : _titleAndMenu.MenuRoot,
                 AppScreen.OpponentSelect => janken ? _oppSelect.JankenRoot : _oppSelect.Root,
+                AppScreen.StarterSelection => _collectionShop?.StarterRoot,
+                AppScreen.CardShop => _collectionShop?.Root,
                 _ => null,
             };
             if (scope == null || !scope.activeInHierarchy) return;
@@ -414,6 +489,20 @@ namespace YGOPortable.UI
             {
                 if (_menuPad.HandleOpenedDropdown(scope.transform, frame.Direction, frame.Submit, cancel)) return;
                 _menuPad.AdoptPointerFocus(scope.transform);
+                if (collectionPage && !cancel)
+                {
+                    if (frame.Search)
+                    {
+                        _menuPad.OpenText(_collectionShop.CatalogSearch(selectingStarter));
+                        return;
+                    }
+                    if (frame.PreviousArea || frame.NextArea)
+                    {
+                        _collectionShop.ChangeCatalogPage(selectingStarter, frame.PreviousArea ? -1 : 1);
+                        _menuPad.AdoptPointerFocus(scope.transform);
+                        return;
+                    }
+                }
                 if (_screen == AppScreen.OpponentSelect && !janken && !cancel)
                 {
                     if (frame.Search)
@@ -434,6 +523,11 @@ namespace YGOPortable.UI
             {
                 if (settings) _titleAndMenu.CloseSettings();
                 else if (janken) _oppSelect.CloseJanken();
+                else if (selectingStarter) ShowScreen(AppScreen.Title);
+                else if (_screen == AppScreen.CardShop)
+                {
+                    if (!_collectionShop.DismissReveal()) ShowScreen(AppScreen.MainMenu);
+                }
                 else if (_screen == AppScreen.OpponentSelect) ShowScreen(AppScreen.MainMenu);
                 else if (_screen == AppScreen.MainMenu) ShowScreen(AppScreen.Title);
             }
@@ -471,6 +565,11 @@ namespace YGOPortable.UI
 
             ShowScreen(AppScreen.MainMenu);
             yield return new WaitForSeconds(0.4f);
+            if (_screen == AppScreen.StarterSelection)
+            {
+                ScreenCapture.CaptureScreenshot(Path.Combine(outDir, "02_starter.png"));
+                yield break;
+            }
             ScreenCapture.CaptureScreenshot(Path.Combine(outDir, "02_main_menu.png"));
             yield return new WaitForSeconds(0.3f);
 

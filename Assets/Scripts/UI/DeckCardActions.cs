@@ -60,7 +60,7 @@ namespace YGOPortable.UI
             string homeName = card.IsExtra ? "엑스트라 덱" : "메인 덱";
             if (source == DragSourceType.Trunk)
             {
-                bool canAdd = CountInWorkingDeck(code) < 3;
+                bool canAdd = CanAddCardCopy(code, showReason: false);
                 SetDeckCardAction(_deckCardActionMain, $"{homeName}에 추가",
                     canAdd && CanPlaceCard(card, home, GetDeckList(home), showReason: false),
                     () => TryAddCardToDeck(code, home));

@@ -206,7 +206,7 @@ namespace YGOPortable.UI
             var nextDeckRt = LotdUiKit.CreateRect("NextOppDeck", oppDeckBox, new Vector2(0.49f, 0.06f), new Vector2(0.67f, 0.30f), Vector2.zero, Vector2.zero);
             LotdUiKit.CreateLotdButton(nextDeckRt, "B", "덱 ▶", () => CycleOppDeck(1), 13);
             var cloneRt = LotdUiKit.CreateRect("CloneOppDeck", oppDeckBox, new Vector2(0.69f, 0.06f), new Vector2(0.98f, 0.30f), Vector2.zero, Vector2.zero);
-            _cloneOppButton = LotdUiKit.CreateLotdButton(cloneRt, "B", "내 덱으로 복제", CloneCurrentOppDeck, 12);
+            _cloneOppButton = LotdUiKit.CreateLotdButton(cloneRt, "B", "덱 목록 복제", CloneCurrentOppDeck, 12);
 
             // My Deck Selector Box
             var myDeckBox = LotdUiKit.CreateBorderedPanel(rightPanel, "MyDeckBox",
@@ -229,6 +229,9 @@ namespace YGOPortable.UI
                 "L", "AI: 스마트 (전술 최적화)", 13, TextAnchor.MiddleLeft, LotdUiKit.CyanAccent);
             _statusToast = LotdUiKit.AddText(LotdUiKit.CreateRect("Toast", diffRt, new Vector2(0.55f, 0), new Vector2(1, 1), Vector2.zero, Vector2.zero),
                 "T", "", 13, TextAnchor.MiddleRight, LotdUiKit.GreenAccent);
+            _statusToast.resizeTextForBestFit = true;
+            _statusToast.resizeTextMinSize = 9;
+            _statusToast.resizeTextMaxSize = 13;
 
             // Start Duel Button
             var startRt = LotdUiKit.CreateRect("StartDuelBtn", rightPanel,
@@ -436,6 +439,8 @@ namespace YGOPortable.UI
             }
             var md = DeckRepository.UserDecks[_myDeckIdx];
             _myDeckLabel.text = $"{md.name} (메인 {md.main.Count} / 엑스트라 {md.extra.Count})";
+            if (CollectionProgress.Initialized && !GameAppController.CanStartWithDeck(md, out _))
+                _myDeckLabel.text += "\n듀얼에 사용할 수 없는 덱";
         }
 
         private void CloneCurrentOppDeck()
@@ -445,17 +450,16 @@ namespace YGOPortable.UI
             var cloned = DeckRepository.ClonePresetToUserDeck(d);
             _myDeckIdx = DeckRepository.UserDecks.IndexOf(cloned);
             UpdateMyDeckLabel();
-            ShowStatus("내 덱으로 복제 완료!");
+            bool playable = GameAppController.CanStartWithDeck(cloned, out _);
+            ShowStatus(playable ? "덱 목록을 복제했습니다." : "덱 목록 복제 완료. 덱 편집에서 사용 조건을 확인하세요.");
         }
 
         private void OpenJanken()
         {
             if (_selectedChar == null || _charDecks.Count == 0 || DeckRepository.UserDecks.Count == 0) return;
             var myDeck = DeckRepository.UserDecks[_myDeckIdx];
-            if (!myDeck.IsPlayable)
+            if (!GameAppController.CanStartWithDeck(myDeck, out string reason))
             {
-                string reason = myDeck.main.Count < 40 || myDeck.main.Count > 60 ? "메인 덱은 40~60장이어야 합니다." :
-                    myDeck.extra.Count > 15 ? "엑스트라 덱은 최대 15장입니다." : "사이드 덱은 최대 15장입니다.";
                 ShowStatus(reason, true);
                 return;
             }

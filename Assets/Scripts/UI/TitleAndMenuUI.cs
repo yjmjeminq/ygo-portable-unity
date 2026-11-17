@@ -64,10 +64,11 @@ namespace YGOPortable.UI
             AddLogo(logo);
             var menu = LotdUiKit.CreateMenuPanel(root, "Menu", new Vector2(0.30f, 0.132f),
                 new Vector2(0.70f, 0.643f));
-            AddMenuEntry(menu, 0.745f, "프리 듀얼", () => _app.ShowScreen(AppScreen.OpponentSelect));
-            AddMenuEntry(menu, 0.54f, "덱 편집", () => _app.ShowScreen(AppScreen.DeckEditor));
-            _settingsOpenButton = AddMenuEntry(menu, 0.335f, "환경 설정", OpenSettings);
-            AddMenuEntry(menu, 0.13f, "타이틀로 돌아가기", () => _app.ShowScreen(AppScreen.Title));
+            AddMenuEntry(menu, "FreeDuel", .754f, "프리 듀얼", () => _app.ShowScreen(AppScreen.OpponentSelect));
+            AddMenuEntry(menu, "DeckEditor", .589f, "덱 편집", () => _app.ShowScreen(AppScreen.DeckEditor));
+            AddMenuEntry(menu, "Shop", .424f, "카드 상점", () => _app.ShowScreen(AppScreen.CardShop));
+            _settingsOpenButton = AddMenuEntry(menu, "Settings", .259f, "환경 설정", OpenSettings);
+            AddMenuEntry(menu, "ReturnToTitle", .094f, "타이틀로 돌아가기", () => _app.ShowScreen(AppScreen.Title));
         }
 
         private static void AddTitleBackground(Transform root)
@@ -84,9 +85,9 @@ namespace YGOPortable.UI
                 TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
         }
 
-        private static Button AddMenuEntry(Transform parent, float y, string label, Action action)
+        private static Button AddMenuEntry(Transform parent, string name, float y, string label, Action action)
         {
-            var row = LotdUiKit.CreateRect("MenuEntry", parent, new Vector2(0.097f, y), new Vector2(0.91f, y + 0.159f),
+            var row = LotdUiKit.CreateRect(name, parent, new Vector2(0.097f, y), new Vector2(0.91f, y + .137f),
                 Vector2.zero, Vector2.zero);
             return LotdUiKit.CreateLotdButton(row, "Button", label, action, 23);
         }

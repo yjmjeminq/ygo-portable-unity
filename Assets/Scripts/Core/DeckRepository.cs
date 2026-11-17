@@ -66,7 +66,7 @@ namespace YGOPortable.Core
         private static Dictionary<int, List<PresetDeckInfo>> _decksByChar = new Dictionary<int, List<PresetDeckInfo>>();
         private static string _userDeckDir;
 
-        public static void Load(string streamingAssetsPath, string persistentDataPath)
+        public static void Load(string streamingAssetsPath, string persistentDataPath, bool seedDefaultDecks = true)
         {
             Characters.Clear();
             PresetDecks.Clear();
@@ -104,7 +104,7 @@ namespace YGOPortable.Core
             }
 
             _userDeckDir = Path.Combine(persistentDataPath, "Decks");
-            LoadUserDecks();
+            LoadUserDecks(seedDefaultDecks);
             Debug.Log($"[DeckRepository] Loaded {Characters.Count} chars, {PresetDecks.Count} preset decks, {UserDecks.Count} user decks.");
         }
 
@@ -118,7 +118,7 @@ namespace YGOPortable.Core
             return _decksByChar.TryGetValue(charId, out var list) ? list : new List<PresetDeckInfo>();
         }
 
-        private static void LoadUserDecks()
+        private static void LoadUserDecks(bool seedDefaultDecks)
         {
             UserDecks.Clear();
             if (!Directory.Exists(_userDeckDir)) Directory.CreateDirectory(_userDeckDir);
@@ -126,7 +126,7 @@ namespace YGOPortable.Core
             var files = Directory.GetFiles(_userDeckDir, "*.json");
             if (files.Length == 0)
             {
-                SeedDefaultUserDecks();
+                if (seedDefaultDecks) SeedDefaultUserDecks();
                 return;
             }
 

@@ -1501,7 +1501,7 @@ namespace YGOPortable.UI
         }
 
         public void ShowResult(bool playerWon, bool isDraw, OpponentCharacter opp, int turns, int myLp, int oppLp,
-            Action onRematch, Action onOppSelect, Action onMenu)
+            Action onRematch, Action onOppSelect, Action onMenu, string rewardText = "")
         {
             _resRematch = onRematch;
             _resOppSel = onOppSelect;
@@ -1523,6 +1523,7 @@ namespace YGOPortable.UI
             string oppName = opp != null ? opp.name : "AI 듀얼리스트";
             string result = _resTitleArt.enabled ? $"{headline}  ·  " : "";
             _resStats.text = $"{result}{oppName}  ·  {turns}턴\n내 LP {myLp}  /  상대 LP {oppLp}";
+            if (!string.IsNullOrEmpty(rewardText)) _resStats.text += $"\n{rewardText}";
             ResultRoot.transform.SetAsLastSibling();
             ResultRoot.SetActive(true);
             CardAnimationManager.Instance?.BringToFront();
