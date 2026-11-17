@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -8,200 +9,233 @@ namespace YGOPortable.UI
 {
     public partial class DuelFieldUI
     {
-        private const float HandActionWidth = 92f;
-        private const float HandActionHeight = 62f;
-        private const float HandActionGap = 5f;
-        private const float HandActionPointerGrace = .22f;
+        private const float CardActionWidth = 86f;
+        private const float CardActionHeight = 58f;
+        private const float CardActionGap = 5f;
 
-        private RectTransform _handActionsBar;
-        private HandCardView _pointerHandActionCard;
-        private float _pointerHandActionLeftAt;
-        private HandCardView _handActionCard;
-        private DuelPrompt _handActionsPrompt;
-        private uint _handActionsCode;
-        private uint _handActionsSequence;
-        private bool _navigatingHandActions;
-        private readonly Vector3[] _handActionCorners = new Vector3[4];
+        private readonly Dictionary<RectTransform, FieldSlotView> _fieldSlotsByRect = new();
+        private readonly Vector3[] _cardActionCorners = new Vector3[4];
+        private RectTransform _cardActionsBar;
+        private RectTransform _pointerActionAnchor;
+        private float _pointerActionLeftAt;
+        private RectTransform _cardActionAnchor;
+        private RectTransform _cardActionArt;
+        private DuelPrompt _cardActionsPrompt;
+        private (byte controller, uint location, uint sequence, uint code, int materials) _cardActionKey;
+        private bool _navigatingCardActions;
 
-        private void BuildHandActions(Transform root)
+        private void BuildCardActions(Transform root)
         {
-            _handActionsBar = LotdUiKit.CreateRect("HandActions", root, new Vector2(.5f, .5f),
+            _cardActionsBar = LotdUiKit.CreateRect("CardActions", root, new Vector2(.5f, .5f),
                 new Vector2(.5f, .5f), Vector2.zero, Vector2.zero);
-            _handActionsBar.pivot = new Vector2(.5f, 0f);
-            _handActionsBar.gameObject.SetActive(false);
+            _cardActionsBar.pivot = new Vector2(.5f, 0f);
+            _cardActionsBar.gameObject.SetActive(false);
         }
 
-        private bool CanShowHandActions =>
+        private bool CanShowCardActions =>
             CanAcceptPlayerAction && !_modals.IsPromptOpen && !IsBrowsingZone && !_modals.ResultRoot.activeSelf &&
             !_actionPopup.activeSelf && !_phasePicker.activeSelf && !_cardZoomModal.activeSelf &&
             CardDragManager.Instance?.IsDragging != true &&
             _session.ActivePrompt.messageType is YgoConstants.MSG_SELECT_IDLECMD or YgoConstants.MSG_SELECT_BATTLECMD;
 
-        private void PointAtHandActions(HandCardView view)
+        private void PointAtCardActions(RectTransform anchor)
         {
-            _pointerHandActionCard = view;
-            _pointerHandActionLeftAt = float.PositiveInfinity;
-            RefreshHandActions();
+            _pointerActionAnchor = anchor;
+            _pointerActionLeftAt = float.PositiveInfinity;
+            RefreshCardActions();
         }
 
-        private void LeaveHandActions(HandCardView view)
+        private void LeaveCardActions(RectTransform anchor)
         {
-            if (_pointerHandActionCard == view)
-                _pointerHandActionLeftAt = Time.unscaledTime;
+            if (_pointerActionAnchor == anchor)
+                _pointerActionLeftAt = Time.unscaledTime;
         }
 
-        private bool IsPointerOverHandActions()
+        private bool IsPointerOverCardActions()
         {
-            if (!_handActionsBar.gameObject.activeSelf) return false;
-            var canvas = _handActionsBar.GetComponentInParent<Canvas>();
+            if (!_cardActionsBar.gameObject.activeSelf) return false;
+            var canvas = _cardActionsBar.GetComponentInParent<Canvas>();
             var camera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
-            return RectTransformUtility.RectangleContainsScreenPoint(_handActionsBar, Input.mousePosition, camera);
+            return RectTransformUtility.RectangleContainsScreenPoint(_cardActionsBar, Input.mousePosition, camera);
         }
 
-        private void RefreshHandActions()
+        private (LiveCardState card, RectTransform art) FindCardActionSource(RectTransform anchor)
         {
-            if (!CanShowHandActions)
-            {
-                HideHandActions();
-                return;
-            }
-
-            HandCardView view;
-            if (_usingDuelPad)
-            {
-                view = _myHandViews.Find(card => card.Rect == _duelPadBoardFocus);
-            }
-            else
-            {
-                if (Time.unscaledTime > _pointerHandActionLeftAt + HandActionPointerGrace && !IsPointerOverHandActions())
-                    _pointerHandActionCard = null;
-                view = _pointerHandActionCard ?? (IsPointerOverHandActions() ? _handActionCard : null);
-            }
+            if (anchor == null || !anchor.gameObject.activeInHierarchy) return default;
+            if (_fieldSlotsByRect.TryGetValue(anchor, out var slot))
+                return slot.cardView.gameObject.activeInHierarchy ? (slot.liveCard, slot.focusArt) : default;
 
             var hand = _session.Players[_session.HumanPlayerIndex].hand;
-            int index = view == null ? -1 : _myHandViews.IndexOf(view);
-            if (index < 0 || index >= hand.Count || hand[index] == null || !view.Rect.gameObject.activeInHierarchy)
+            int index = _myHandViews.FindIndex(view => view.Rect == anchor);
+            if (index < 0 || index >= hand.Count) return default;
+            return (hand[index], (RectTransform)_myHandViews[index].Card.transform);
+        }
+
+        private static (byte, uint, uint, uint, int) CardActionKey(LiveCardState card) =>
+            (card.controller, card.location, card.sequence, card.code, card.overlayCodes.Count);
+
+        private void RefreshCardActions()
+        {
+            if (!CanShowCardActions)
             {
-                HideHandActions();
+                HideCardActions();
                 return;
             }
 
-            var card = hand[index];
-            var prompt = _session.ActivePrompt;
-            if (view != _handActionCard || !ReferenceEquals(prompt, _handActionsPrompt) ||
-                _handActionsCode != card.code || _handActionsSequence != card.sequence)
+            RectTransform anchor = _duelPadBoardFocus;
+            if (!_usingDuelPad)
             {
-                var actions = CollectActions((byte)_session.HumanPlayerIndex, YgoConstants.LOCATION_HAND, card.sequence);
-                if (actions.Count == 0)
+                bool overActions = IsPointerOverCardActions();
+                if (Time.unscaledTime > _pointerActionLeftAt + .22f && !overActions)
+                    _pointerActionAnchor = null;
+                anchor = _pointerActionAnchor ?? (overActions ? _cardActionAnchor : null);
+            }
+
+            var (card, art) = FindCardActionSource(anchor);
+            if (card == null)
+            {
+                HideCardActions();
+                return;
+            }
+
+            var prompt = _session.ActivePrompt;
+            var key = CardActionKey(card);
+            if (anchor != _cardActionAnchor || !ReferenceEquals(prompt, _cardActionsPrompt) || _cardActionKey != key)
+            {
+                var actions = CollectActions(card.controller, card.location, card.sequence);
+                if (actions.Count == 0 && card.overlayCodes.Count == 0)
                 {
-                    HideHandActions();
+                    HideCardActions();
                     return;
                 }
 
-                _handActionCard = view;
-                _handActionsPrompt = prompt;
-                _handActionsCode = card.code;
-                _handActionsSequence = card.sequence;
-                RebuildHandActions(view, card, prompt, actions);
+                _cardActionAnchor = anchor;
+                _cardActionArt = art;
+                _cardActionsPrompt = prompt;
+                _cardActionKey = key;
+                RebuildCardActions(anchor, card, prompt, actions);
             }
 
-            PositionHandActions(view);
-            _handActionsBar.gameObject.SetActive(true);
+            PositionCardActions(anchor, card.location == YgoConstants.LOCATION_HAND);
+            _cardActionsBar.gameObject.SetActive(true);
         }
 
-        private void RebuildHandActions(HandCardView view, LiveCardState card, DuelPrompt prompt,
+        private void RebuildCardActions(RectTransform anchor, LiveCardState card, DuelPrompt prompt,
             List<(string label, int responseVal, bool gold)> actions)
         {
-            for (int i = _handActionsBar.childCount - 1; i >= 0; i--)
+            for (int i = _cardActionsBar.childCount - 1; i >= 0; i--)
             {
-                var old = _handActionsBar.GetChild(i);
+                var old = _cardActionsBar.GetChild(i);
                 old.gameObject.SetActive(false);
                 old.SetParent(null, false);
-                if (Application.isPlaying) Object.Destroy(old.gameObject);
-                else Object.DestroyImmediate(old.gameObject);
+                if (Application.isPlaying) UnityEngine.Object.Destroy(old.gameObject);
+                else UnityEngine.Object.DestroyImmediate(old.gameObject);
             }
 
             var groups = actions.GroupBy(action => action.responseVal & 0xffff).ToArray();
-            _handActionsBar.sizeDelta = new Vector2(groups.Length * (HandActionWidth + HandActionGap) - HandActionGap,
-                HandActionHeight);
+            bool hasMaterials = card.overlayCodes.Count > 0;
+            int count = groups.Length + (hasMaterials ? 1 : 0);
+            _cardActionsBar.sizeDelta = new Vector2(count * (CardActionWidth + CardActionGap) - CardActionGap,
+                CardActionHeight);
             var session = _session;
-            byte controller = (byte)session.HumanPlayerIndex;
-            uint sequence = card.sequence;
-            uint code = card.code;
+            var key = CardActionKey(card);
+            LiveCardState GetLiveSource()
+            {
+                if (!ReferenceEquals(_session, session) || !CanShowCardActions || !ReferenceEquals(session.ActivePrompt, prompt) ||
+                    anchor != _cardActionAnchor) return null;
+                var current = FindCardActionSource(anchor).card;
+                return current != null && CardActionKey(current) == key ? current : null;
+            }
+
             for (int i = 0; i < groups.Length; i++)
             {
                 var choices = groups[i].ToList();
                 var first = choices[0];
-                string iconName = CommandIcon(first.responseVal);
-                                string label = iconName switch
+                string icon = CommandIcon(first.responseVal);
+                string label = icon switch
                 {
                     "ACTION" => "효과 발동",
+                    "TURN_DEF" => "표시 변경",
                     "SETMONST" or "SET" => "세트",
                     _ => first.label,
                 };
-                float left = i * (HandActionWidth + HandActionGap);
-                var slot = LotdUiKit.CreateRect(iconName, _handActionsBar, Vector2.zero, Vector2.zero,
-                    new Vector2(left, 0f), new Vector2(left + HandActionWidth, HandActionHeight));
-                var button = DuelStyle.Button(slot, "Button", label, () =>
+                AddCardAction(i, icon, label, () =>
                 {
-                    var hand = session.Players[controller].hand;
-                    int index = _myHandViews.IndexOf(view);
-                    if (!CanShowHandActions || !ReferenceEquals(_session, session) ||
-                        !ReferenceEquals(session.ActivePrompt, prompt) || view != _handActionCard ||
-                        index < 0 || index >= hand.Count || hand[index]?.code != code || hand[index].sequence != sequence)
-                        return;
-
-                    InspectCard(code);
+                    var source = GetLiveSource();
+                    if (source == null) return;
+                    bool canInspect = source.controller == session.HumanPlayerIndex || source.IsFaceUp || source.isPublic;
+                    if (canInspect) InspectCard(source.code);
                     if (choices.Count == 1)
                     {
-                        _navigatingHandActions = false;
+                        _navigatingCardActions = false;
                         ExecuteActionInt(first.responseVal);
                     }
                     else
                     {
-                        ShowCardActionsPopup(controller, YgoConstants.LOCATION_HAND, sequence, code, null, actions: choices);
-                        HideHandActions();
+                        ShowCardActionsPopup(source.controller, source.location, source.sequence,
+                            canInspect ? source.code : 0, null, actions: choices);
+                        HideCardActions();
                     }
-                }, 13, gold: iconName == "ACTION");
-                button.navigation = new Navigation { mode = Navigation.Mode.None };
-                var caption = button.GetComponentInChildren<Text>().rectTransform;
-                caption.anchorMin = new Vector2(.04f, .03f);
-                caption.anchorMax = new Vector2(.96f, .32f);
-                caption.offsetMin = caption.offsetMax = Vector2.zero;
-                var icon = LotdUiKit.CreateRect("Icon", button.transform, new Vector2(.28f, .34f),
-                    new Vector2(.72f, .94f), Vector2.zero, Vector2.zero);
-                LotdUiKit.AddImage(icon.gameObject, LotdUiKit.LoadSprite($"LOTD/Icons/ICON_ID_CMDID_48_{iconName}"),
-                    Color.white, true, false);
+                });
+            }
+
+            if (hasMaterials)
+            {
+                AddCardAction(groups.Length, "LOOK", $"소재 {card.overlayCodes.Count}", () =>
+                {
+                    var source = GetLiveSource();
+                    if (source == null) return;
+                    _modals.ShowCodeListViewer("엑시즈 소재", source.overlayCodes);
+                    HideCardActions();
+                });
             }
         }
 
-        private void PositionHandActions(HandCardView view)
+        private void AddCardAction(int index, string iconName, string label, Action action)
+        {
+            float left = index * (CardActionWidth + CardActionGap);
+            var slot = LotdUiKit.CreateRect(iconName, _cardActionsBar, Vector2.zero, Vector2.zero,
+                new Vector2(left, 0f), new Vector2(left + CardActionWidth, CardActionHeight));
+            bool highlighted = iconName is "ACTION" or "ATTACK";
+            var button = DuelStyle.Button(slot, "Button", label, action, 13, gold: highlighted);
+            button.navigation = new Navigation { mode = Navigation.Mode.None };
+            var caption = button.GetComponentInChildren<Text>().rectTransform;
+            caption.anchorMin = new Vector2(.04f, .03f);
+            caption.anchorMax = new Vector2(.96f, .32f);
+            caption.offsetMin = caption.offsetMax = Vector2.zero;
+            var icon = LotdUiKit.CreateRect("Icon", button.transform, new Vector2(.28f, .34f),
+                new Vector2(.72f, .94f), Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(icon.gameObject, LotdUiKit.LoadSprite($"LOTD/Icons/ICON_ID_CMDID_48_{iconName}"),
+                Color.white, true, false);
+        }
+
+        private void PositionCardActions(RectTransform anchor, bool inHand)
         {
             var root = (RectTransform)Root.transform;
-            var bounds = view.Rect.rect;
-            view.Rect.GetWorldCorners(_handActionCorners);
+            anchor.GetWorldCorners(_cardActionCorners);
             float top = float.NegativeInfinity;
-            foreach (var corner in _handActionCorners)
+            foreach (var corner in _cardActionCorners)
                 top = Mathf.Max(top, root.InverseTransformPoint(corner).y);
-            float x = root.InverseTransformPoint(view.Rect.TransformPoint(bounds.center)).x;
-            float inset = _handActionsBar.sizeDelta.x * .5f + 8f;
-            _handActionsBar.anchoredPosition = new Vector2(Mathf.Clamp(x, root.rect.xMin + inset, root.rect.xMax - inset),
-                top + 20f);
+            float x = root.InverseTransformPoint(anchor.TransformPoint(anchor.rect.center)).x;
+            float inset = _cardActionsBar.sizeDelta.x * .5f + 8f;
+            float y = Mathf.Min(root.rect.yMax - CardActionHeight - 8f, top + (inHand ? 20f : 6f));
+            _cardActionsBar.anchoredPosition = new Vector2(Mathf.Clamp(x, root.rect.xMin + inset, root.rect.xMax - inset), y);
         }
 
-        private void HideHandActions()
+        private void HideCardActions()
         {
-            _handActionsBar.gameObject.SetActive(false);
-            _handActionCard = null;
-            _handActionsPrompt = null;
-            _navigatingHandActions = false;
+            _cardActionsBar.gameObject.SetActive(false);
+            _cardActionAnchor = _cardActionArt = null;
+            _cardActionsPrompt = null;
+            _navigatingCardActions = false;
         }
 
-        private void EnterHandActions()
+        private bool EnterCardActions()
         {
-            RefreshHandActions();
-            if (!_handActionsBar.gameObject.activeSelf) return;
-            _navigatingHandActions = true;
+            RefreshCardActions();
+            if (!_cardActionsBar.gameObject.activeSelf) return false;
+            _navigatingCardActions = true;
+            return true;
         }
     }
 }

@@ -38,6 +38,7 @@ namespace YGOPortable.UI
         private const float ChoiceCardGap = 8f;
         private RectTransform _chainBox;
         private RectTransform _chainCards;
+        private RectTransform _chainDetails;
         private ScrollRect _chainCardScroll;
         private ScrollRect _chainEffectScroll;
         private Text _chainTitle;
@@ -384,7 +385,7 @@ namespace YGOPortable.UI
                 Vector2.zero, Vector2.zero);
             _chainCardScroll = CreateCardStrip(cards, out _chainCards, ChainCardGap);
 
-            var details = DuelStyle.Panel(_chainBox, "Details", new Vector2(.583f, .218f), new Vector2(.977f, .798f));
+            var details = _chainDetails = DuelStyle.Panel(_chainBox, "Details", new Vector2(.583f, .218f), new Vector2(.977f, .798f));
             var name = LotdUiKit.CreateRect("Name", details, new Vector2(.04f, .72f), new Vector2(.96f, .98f),
                 Vector2.zero, Vector2.zero);
             _chainName = LotdUiKit.AddFittedText(name, "Text", "", 16, 10, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
@@ -716,7 +717,15 @@ namespace YGOPortable.UI
                     .Where(index => session.IsChainCandidateVisible(prompt, prompt.candidates[index], chainConfirmation)).ToArray();
                 choices = _chainCandidateIndices.Select(index => prompt.candidates[index]).ToArray();
             }
-            _chainTitle.text = prompt.forced ? "필수 효과 순서 선택" : "발동할 효과 선택";
+            bool compact = choices.Count == 1;
+            _chainBox.anchorMin = compact ? new Vector2(.324f, .218f) : new Vector2(.235f, .214f);
+            _chainBox.anchorMax = compact ? new Vector2(.776f, .448f) : new Vector2(.845f, .480f);
+            var cardStrip = (RectTransform)_chainCardScroll.transform;
+            cardStrip.anchorMax = new Vector2(compact ? .262f : .563f, .798f);
+            _chainDetails.anchorMin = new Vector2(compact ? .278f : .583f, .218f);
+            SetFieldView(false);
+            _chainTitle.text = prompt.forced ? "필수 효과 순서 선택" :
+                compact ? "효과를 발동하시겠습니까?" : "발동할 효과 선택";
             _chainSummary.text = $"체인 {session.CurrentChain.Count + 1}  ·  {choices.Count}개";
             _chainPass.transform.parent.gameObject.SetActive(!prompt.forced);
             _chainActivate.interactable = choices.Count > 0;
@@ -799,21 +808,20 @@ namespace YGOPortable.UI
             layout.childControlWidth = layout.childControlHeight = layout.childForceExpandHeight = true;
             layout.childForceExpandWidth = false;
 
-            var icon = DuelVisualAssets.PromptZoneIcon(location, opponent);
             var tab = LotdUiKit.CreateRect("LocationTab", group, Vector2.up, Vector2.up,
-                new Vector2(0f, -21f), new Vector2(icon != null ? 45f : 72f, 0f));
+                new Vector2(0f, -21f), new Vector2(Mathf.Min(width, 112f), 0f));
             LotdUiKit.AddImage(tab.gameObject, DuelVisualAssets.PromptGroupLabel, groupTone, false, false);
-            if (icon != null)
+            bool hasIcon = DuelPromptLocationIcon.Supports(location);
+            if (hasIcon)
             {
-                var iconArea = LotdUiKit.CreateRect("Icon", tab, Vector2.zero, Vector2.up,
-                    new Vector2(5f, 0f), new Vector2(25f, 0f));
-                LotdUiKit.AddImage(iconArea.gameObject, icon, Color.white, true, false);
+                var icon = LotdUiKit.CreateRect("Icon", tab, Vector2.zero, Vector2.up,
+                    new Vector2(4f, 1f), new Vector2(22f, -1f));
+                DuelPromptLocationIcon.Add(icon, location, opponent);
             }
-            else
-            {
-                LotdUiKit.AddFittedText(tab, "Location", YgoConstants.GetLocationNameKR(location), 11, 8,
-                    TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
-            }
+            var caption = LotdUiKit.CreateRect("Caption", tab, Vector2.zero, Vector2.one,
+                new Vector2(hasIcon ? 25f : 4f, 0f), new Vector2(-3f, 0f));
+            LotdUiKit.AddFittedText(caption, "Location", YgoConstants.GetLocationNameKR(location), 11, 8,
+                TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
             return row;
         }
 

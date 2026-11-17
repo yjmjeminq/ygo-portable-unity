@@ -49,7 +49,7 @@ namespace YGOPortable.Editor
                 "The native fixture did not offer both a summon and an activation.");
             ui.Expect(cards.Where(card => card.code != BlueEyes).Select(card => card.sequence));
             var handRow = ui.Field.Root.transform.Find("PlayerHand");
-            var actionBar = ui.Field.Root.transform.Find("HandActions");
+            var actionBar = ui.Field.Root.transform.Find("CardActions");
             handRow.GetChild((int)cards.First(card => card.code == PotOfDesires).sequence)
                 .GetComponent<CardDragTrigger>().OnPointerEnterAction.Invoke();
             Require(actionBar.gameObject.activeSelf && actionBar.Find("ACTION/Button/Icon") != null &&

@@ -584,8 +584,9 @@ namespace YGOPortable.Editor
                     Canvas.ForceUpdateCanvases();
                     var panel = (RectTransform)Modals.ModalRoot.transform.Find("ChainWin");
                     Require(panel != null && panel.gameObject.activeInHierarchy, "The compact chain panel did not open.");
+                    bool single = prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN || prompt.candidates.Count == 1;
                     Require(panel.rect.height > 0 && panel.rect.height < size.y * .5f &&
-                            panel.rect.width > 0 && panel.rect.width < size.x * .8f,
+                            panel.rect.width > 0 && panel.rect.width < size.x * (single ? .5f : .8f),
                         $"Chain chooser is not compact at {size.x}×{size.y}.");
                 }
             }

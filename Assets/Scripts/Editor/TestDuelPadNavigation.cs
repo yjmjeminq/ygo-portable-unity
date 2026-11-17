@@ -70,13 +70,24 @@ namespace YGOPortable.Editor
                 var mine = session.Players[session.HumanPlayerIndex];
                 var enemyField = session.Players[session.AiPlayerIndex];
                 var idle = session.ActivePrompt;
+                Require(Get<Text>(field, "_turnBadgeText").text.StartsWith("내 턴") &&
+                    Get<Text>(field, "_phaseControlHint").enabled,
+                    "The current player's turn and the phase-change control were not visible.");
+                foreach (string zone in new[] { "_myGyTile", "_oppGyTile", "_myBanTile", "_oppBanTile" })
+                {
+                    var tile = Get<object>(field, zone);
+                    string label = ((Text)tile.GetType().GetField("text").GetValue(tile)).text;
+                    string expected = zone.EndsWith("GyTile") ? "묘지" : "제외";
+                    Require(label.StartsWith(expected + " ") && int.TryParse(label.Split(' ')[1], out _),
+                        "A graveyard or banished pile was missing its location or count.");
+                }
 
                 var mouseCard = field.Root.transform.Find("PlayerHand").GetChild(0) as RectTransform;
                 var mouseArt = (RectTransform)mouseCard.GetComponentInChildren<CompositeCardView>().transform;
                 var pointer = new PointerEventData(events);
                 Vector2 hitPosition = mouseCard.anchoredPosition;
                 ExecuteEvents.Execute(mouseCard.gameObject, pointer, ExecuteEvents.pointerEnterHandler);
-                var handActions = (RectTransform)field.Root.transform.Find("HandActions");
+                var handActions = (RectTransform)field.Root.transform.Find("CardActions");
                 Require(handActions.gameObject.activeSelf && handActions.Find("SUMMON/Button/Icon").GetComponent<Image>().sprite != null &&
                     handActions.Find("SETMONST/Button/Icon").GetComponent<Image>().sprite != null &&
                     handActions.TransformPoint(Vector3.zero).y > mouseCard.TransformPoint(Vector3.up * mouseCard.rect.yMax).y &&
@@ -95,8 +106,8 @@ namespace YGOPortable.Editor
                 mine.hand[0].code = originalHoveredCode;
                 field.Refresh();
                 ExecuteEvents.Execute(mouseCard.gameObject, pointer, ExecuteEvents.pointerExitHandler);
-                typeof(DuelFieldUI).GetField("_pointerHandActionLeftAt", Private).SetValue(field, float.NegativeInfinity);
-                Invoke(field, "RefreshHandActions");
+                typeof(DuelFieldUI).GetField("_pointerActionLeftAt", Private).SetValue(field, float.NegativeInfinity);
+                Invoke(field, "RefreshCardActions");
                 Invoke(field, "AdvanceDuelPadCardMotions", .5f);
                 Require(mouseArt.anchoredPosition == Vector2.zero && mouseArt.localScale == Vector3.one,
                     "Leaving a hovered card did not settle the artwork.");
@@ -201,8 +212,14 @@ namespace YGOPortable.Editor
                 Advance(session, prompt => prompt.playerId == session.HumanPlayerIndex && prompt.messageType == YgoConstants.MSG_SELECT_BATTLECMD);
                 field.Refresh();
                 Require(Get<RectTransform>(field, "_duelPadFocus") == placement, "The monster selection did not survive closing the phase picker.");
+                var attackIcon = handActions.Find("ATTACK/Button");
+                Require(handActions.gameObject.activeSelf && attackIcon != null &&
+                    !Get<GameObject>(field, "_actionPopup").activeSelf,
+                    "Focusing a field monster in the Battle Phase did not show the attack icon.");
                 Pad(field, A);
-                Require(Get<GameObject>(field, "_actionPopup").activeSelf, "The live battle command could not be opened.");
+                Require(events.currentSelectedGameObject == attackIcon.gameObject &&
+                    session.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_BATTLECMD,
+                    "Moving from the monster to its attack icon submitted the command.");
                 Pad(field, A);
                 Advance(session, prompt => prompt.playerId == session.HumanPlayerIndex && prompt.messageType == YgoConstants.MSG_SELECT_BATTLECMD);
                 Require(enemyField.lp < 8000 && session.RetryCount == 0, "Confirming the attack caused no battle damage.");

@@ -10,7 +10,7 @@ namespace YGOPortable.UI
 {
     public partial class DuelFieldUI
     {
-        private enum PadScope { None, Board, Place, FieldCards, Piles, HandActions, Commands, Phase, Log, Zoom }
+        private enum PadScope { None, Board, Place, FieldCards, Piles, CardActions, Commands, Phase, Log, Zoom }
 
         private readonly struct PadTarget
         {
@@ -117,8 +117,8 @@ namespace YGOPortable.UI
             {
                 switch (scope)
                 {
-                    case PadScope.HandActions:
-                        _navigatingHandActions = false;
+                    case PadScope.CardActions:
+                        _navigatingCardActions = false;
                         _duelPadFocus = _duelPadBoardFocus;
                         break;
                     case PadScope.Commands: CloseActionPopup(); break;
@@ -196,8 +196,8 @@ namespace YGOPortable.UI
                 if (prompt.messageType is not (YgoConstants.MSG_SELECT_IDLECMD or YgoConstants.MSG_SELECT_BATTLECMD))
                     return PadScope.None;
             }
-            return _navigatingHandActions && _handActionsBar.gameObject.activeSelf &&
-                ReferenceEquals(_handActionsPrompt, prompt) && CanShowHandActions ? PadScope.HandActions : PadScope.Board;
+            return _navigatingCardActions && _cardActionsBar.gameObject.activeSelf &&
+                ReferenceEquals(_cardActionsPrompt, prompt) && CanShowCardActions ? PadScope.CardActions : PadScope.Board;
         }
 
         private void BuildDuelPadTargets(PadScope scope)
@@ -207,9 +207,9 @@ namespace YGOPortable.UI
             {
                 case PadScope.None:
                     return;
-                case PadScope.HandActions:
-                    foreach (var button in _handActionsBar.GetComponentsInChildren<Button>())
-                        AddDuelPadButton(button, (RectTransform)_handActionCard.Card.transform);
+                case PadScope.CardActions:
+                    foreach (var button in _cardActionsBar.GetComponentsInChildren<Button>())
+                        AddDuelPadButton(button, _cardActionArt);
                     return;
                 case PadScope.Commands:
                     AddDuelPadButtons(_actionList);
@@ -239,7 +239,7 @@ namespace YGOPortable.UI
                 {
                     var view = _myHandViews[i];
                     if (view.Rect.gameObject.activeInHierarchy && view.Trigger?.OnLeftClick != null)
-                        _duelPadTargets.Add(new PadTarget(view.Rect, EnterHandActions, hand[i].code,
+                        _duelPadTargets.Add(new PadTarget(view.Rect, () => EnterCardActions(), hand[i].code,
                             view.FocusArt, (RectTransform)view.Card.transform));
                 }
             }
@@ -284,8 +284,11 @@ namespace YGOPortable.UI
                 if (scope == PadScope.FieldCards &&
                     !FindFieldCardChoice(slot.mappedCon, slot.mappedLoc, slot.mappedSeq, out _)) continue;
                 bool publicCard = card.IsFaceUp || card.isPublic || slot.mappedCon == _session.HumanPlayerIndex;
-                _duelPadTargets.Add(new PadTarget(slot.root, slot.dragTrigger.OnLeftClick,
-                    publicCard ? card.code : 0, slot.focusArt));
+                _duelPadTargets.Add(new PadTarget(slot.root, () =>
+                {
+                    if (scope != PadScope.Board || !EnterCardActions())
+                        slot.dragTrigger.OnLeftClick();
+                }, publicCard ? card.code : 0, slot.focusArt));
             }
         }
 
@@ -357,7 +360,7 @@ namespace YGOPortable.UI
             if (scope == PadScope.Board)
             {
                 _duelPadBoardFocus = target.Rect;
-                RefreshHandActions();
+                RefreshCardActions();
             }
             if (target.PreviewCode != 0) InspectCard(target.PreviewCode);
             var events = EventSystem.current;
@@ -389,7 +392,7 @@ namespace YGOPortable.UI
             }
             _hintBannerText.text = _duelPadBoardHint.Length > 0 ? _duelPadBoardHint :
                 scope == PadScope.Board ? "A 선택  X 상세  Y 페이즈  RB 체인  B 정지" :
-                scope == PadScope.HandActions ? "A 실행  B 카드로 돌아가기" : "";
+                scope == PadScope.CardActions ? "A 실행  B 카드로 돌아가기" : "";
             if (scope == PadScope.Board && _duelPadPlacementFocus != null)
             {
                 BuildDuelPadTargets(scope);
@@ -444,7 +447,7 @@ namespace YGOPortable.UI
             else if (!_usingDuelPad && !_actionPopup.activeSelf && !_phasePicker.activeSelf && !IsReadingLog &&
                 !_cardZoomModal.activeSelf && !_modals.IsPromptOpen && !_modals.IsZoneViewerOpen &&
                 !_modals.ResultRoot.activeSelf && CardDragManager.Instance?.IsDragging != true)
-                raised = _duelPointerRaisedCard ?? (_handActionCard != null ? (RectTransform)_handActionCard.Card.transform : null);
+                raised = _duelPointerRaisedCard ?? _cardActionArt;
 
             if (raised != _raisedCard)
             {
