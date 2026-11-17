@@ -85,6 +85,19 @@ namespace YGOPortable.UI
             return true;
         }
 
+        internal void SyncSelectedFocus(Transform scope)
+        {
+            var selected = EventSystem.current?.currentSelectedGameObject?.GetComponent<Selectable>();
+            if (!CanFocus(selected, scope))
+            {
+                SetFocus(null, preserveSelection: true);
+                return;
+            }
+
+            if (_scope != scope || _focus != selected || _frame == null || !_frame.gameObject.activeSelf)
+                FocusInScope(scope, selected);
+        }
+
         internal bool HandleOpenedDropdown(Transform scope, Vector2Int move, bool submit, bool cancel, bool findAny = true)
         {
             var events = EventSystem.current;

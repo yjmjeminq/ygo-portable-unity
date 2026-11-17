@@ -44,11 +44,11 @@ namespace YGOPortable.UI
             TitleRoot = root.gameObject;
             AddTitleBackground(root);
 
-            var logo = LotdUiKit.CreateRect("Logo", root, new Vector2(0.069f, 0.46f), new Vector2(0.61f, 0.88f),
+            var logo = LotdUiKit.CreateRect("Logo", root, new Vector2(0.22f, 0.40f), new Vector2(0.78f, 0.83f),
                 Vector2.zero, Vector2.zero);
             AddLogo(logo);
-            var start = LotdUiKit.CreateRect("Start", root, new Vector2(0.166f, 0.26f),
-                new Vector2(0.496f, 0.355f), Vector2.zero, Vector2.zero);
+            var start = LotdUiKit.CreateRect("Start", root, new Vector2(0.375f, 0.205f),
+                new Vector2(0.625f, 0.292f), Vector2.zero, Vector2.zero);
             LotdUiKit.CreateLotdButton(start, "Button", "게임 시작", () => _app.ShowScreen(AppScreen.MainMenu), 25, true);
         }
 
@@ -59,12 +59,12 @@ namespace YGOPortable.UI
             _menuControls = MenuRoot.AddComponent<CanvasGroup>();
             AddTitleBackground(root);
 
-            var logo = LotdUiKit.CreateRect("Logo", root, new Vector2(0.049f, 0.61f), new Vector2(0.503f, 0.938f),
+            var logo = LotdUiKit.CreateRect("Logo", root, new Vector2(0.31f, 0.674f), new Vector2(0.69f, 0.938f),
                 Vector2.zero, Vector2.zero);
             AddLogo(logo);
-            var menu = LotdUiKit.CreateMenuPanel(root, "Menu", new Vector2(0.081f, 0.126f),
-                new Vector2(0.489f, 0.611f));
-            AddMenuEntry(menu, 0.745f, "프리 듀얼", () => _app.ShowScreen(AppScreen.OpponentSelect), true);
+            var menu = LotdUiKit.CreateMenuPanel(root, "Menu", new Vector2(0.30f, 0.132f),
+                new Vector2(0.70f, 0.643f));
+            AddMenuEntry(menu, 0.745f, "프리 듀얼", () => _app.ShowScreen(AppScreen.OpponentSelect));
             AddMenuEntry(menu, 0.54f, "덱 편집", () => _app.ShowScreen(AppScreen.DeckEditor));
             _settingsOpenButton = AddMenuEntry(menu, 0.335f, "환경 설정", OpenSettings);
             AddMenuEntry(menu, 0.13f, "타이틀로 돌아가기", () => _app.ShowScreen(AppScreen.Title));
@@ -73,16 +73,7 @@ namespace YGOPortable.UI
         private static void AddTitleBackground(Transform root)
         {
             LotdUiKit.AddImage(LotdUiKit.FillRect("Backdrop", root).gameObject,
-                LotdUiKit.LoadSprite("LOTD/Background/bg_vrains"), Color.white, false, false);
-            var glow = LotdUiKit.CreateRect("Light", root, new Vector2(0.36f, 0.09f), new Vector2(0.99f, 0.90f),
-                Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(glow.gameObject, LotdUiKit.LoadSprite("LOTD/Effects/summon_flare"),
-                new Color(0.26f, 0.57f, 1f, 0.37f), true, false);
-
-            var hero = LotdUiKit.CreateRect("Character", root, new Vector2(0.48f, -0.025f), new Vector2(0.998f, 0.96f),
-                Vector2.zero, Vector2.zero);
-            var artwork = LotdUiKit.LoadSprite("LOTD/Title/magician_girl") ?? LotdUiKit.LoadSprite("LOTD/Busts/atem_neutral");
-            if (artwork != null) LotdUiKit.AddImage(hero.gameObject, artwork, Color.white, true, false);
+                LotdUiKit.LoadSprite("LOTD/Background/bg_vrains"), new Color(0.53f, 0.64f, 0.80f), false, false);
         }
 
         private static void AddLogo(RectTransform holder)
@@ -93,11 +84,11 @@ namespace YGOPortable.UI
                 TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
         }
 
-        private static Button AddMenuEntry(Transform parent, float y, string label, Action action, bool selected = false)
+        private static Button AddMenuEntry(Transform parent, float y, string label, Action action)
         {
             var row = LotdUiKit.CreateRect("MenuEntry", parent, new Vector2(0.097f, y), new Vector2(0.91f, y + 0.159f),
                 Vector2.zero, Vector2.zero);
-            return LotdUiKit.CreateLotdButton(row, "Button", label, action, 23, selected);
+            return LotdUiKit.CreateLotdButton(row, "Button", label, action, 23);
         }
 
         private void BuildSettingsOverlay(Transform parent)

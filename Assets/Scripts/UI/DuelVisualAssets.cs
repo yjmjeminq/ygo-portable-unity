@@ -11,7 +11,8 @@ namespace YGOPortable.UI
         private static readonly Dictionary<DuelEffectKind, Sprite> Effects = new();
         internal static Texture2D Field { get; } = LoadTexture("Field.png", TextureWrapMode.Clamp);
         internal static Texture2D Ground { get; } = LoadTexture("Ground.png", TextureWrapMode.Repeat);
-        internal static Sprite MasterDuelLogo { get; } = LoadHudSprite("MasterDuelLogo");
+        internal static Sprite MasterDuelLogo { get; } = Resources.Load<Sprite>("Title/MasterDuelLogo") ??
+            LoadHudSprite("MasterDuelLogo");
         internal static Sprite PhaseBase { get; } = LoadHudSprite("PhaseBase");
         internal static Sprite PhaseRim { get; } = LoadHudSprite("PhaseRim");
         internal static Sprite PlayerLp { get; } = LoadHudSprite("LPPlayer");

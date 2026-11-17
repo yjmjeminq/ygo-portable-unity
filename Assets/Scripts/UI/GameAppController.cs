@@ -220,6 +220,7 @@ namespace YGOPortable.UI
                 var page = screen == AppScreen.Title ? _titleAndMenu.TitleRoot : _titleAndMenu.MenuRoot;
                 var first = page.GetComponentInChildren<Button>();
                 EventSystem.current?.SetSelectedGameObject(first != null ? first.gameObject : null);
+                SyncFrontMenuFocus();
             }
         }
 
@@ -264,6 +265,7 @@ namespace YGOPortable.UI
                     if (!_menuPad.HasPopup && (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1)))
                         _menuPad.Clear(preserveSelection: true);
                     HandleMenuInput(_menuPadInput.Read(Time.unscaledTime), Input.GetKeyDown(KeyCode.Escape));
+                    SyncFrontMenuFocus();
                 }
                 return;
             }
@@ -377,6 +379,20 @@ namespace YGOPortable.UI
                 _shownHumanPrompt = null;
             ChainConfirmation = nextMode;
             _duelField.RefreshChainConfirmation(ChainConfirmation);
+        }
+
+        private void SyncFrontMenuFocus()
+        {
+            if (_menuPad == null || _menuPad.HasPopup) return;
+            var page = _screen switch
+            {
+                AppScreen.Title => _titleAndMenu.TitleRoot,
+                AppScreen.MainMenu => _titleAndMenu.SettingsRoot.activeInHierarchy
+                    ? _titleAndMenu.SettingsRoot : _titleAndMenu.MenuRoot,
+                _ => null,
+            };
+            if (page != null && page.activeInHierarchy)
+                _menuPad.SyncSelectedFocus(page.transform);
         }
 
         private void HandleMenuInput(DeckPadFrame frame, bool escape)
