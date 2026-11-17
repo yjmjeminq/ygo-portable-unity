@@ -58,6 +58,36 @@ namespace YGOPortable.UI
             stroke.effectDistance = new Vector2(1f, -1f);
         }
 
+        internal static Button RoundButton(RectTransform parent, string name, Color accent, Action action)
+        {
+            var rect = LotdUiKit.FillRect(name, parent);
+            var circle = rect.gameObject.AddComponent<AspectRatioFitter>();
+            circle.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+            circle.aspectRatio = 1f;
+            var rim = LotdUiKit.AddImage(rect.gameObject, Disc, accent, true);
+            var face = LotdUiKit.FillRect("Face", rect, 2.5f);
+            LotdUiKit.AddImage(face.gameObject, Disc, new Color(.074f, .145f, .214f), true, false);
+            var button = rect.gameObject.AddComponent<Button>();
+            button.targetGraphic = rim;
+            button.navigation = new Navigation { mode = Navigation.Mode.None };
+            button.colors = new ColorBlock
+            {
+                normalColor = Color.white,
+                highlightedColor = new Color(.81f, .96f, 1f),
+                selectedColor = new Color(.81f, .96f, 1f),
+                pressedColor = new Color(.43f, .68f, .83f),
+                disabledColor = Color.white,
+                colorMultiplier = 1f,
+                fadeDuration = .08f,
+            };
+            button.onClick.AddListener(() =>
+            {
+                LotdAudio.PlayClick();
+                action?.Invoke();
+            });
+            return button;
+        }
+
         internal static Sprite Disc
         {
             get

@@ -362,11 +362,25 @@ namespace YGOPortable.Editor
                 Click(Field.Root.transform.Find("Turn/Dial")?.GetComponent<Button>());
                 var picker = Field.Root.transform.Find("PhasePicker");
                 Require(picker != null && picker.gameObject.activeInHierarchy, "The phase dial did not open its picker.");
-                foreach (var (name, enabled) in new[] { ("Battle", prompt.canBp), ("Main2", false), ("End", prompt.canEp) })
+                float previousX = float.NegativeInfinity;
+                float? rowY = null;
+                foreach (var (name, enabled) in new[]
+                {
+                    ("Draw", false), ("Standby", false), ("Main1", false),
+                    ("Battle", prompt.canBp), ("Main2", false), ("End", prompt.canEp),
+                })
                 {
                     var choice = picker.Find($"PhaseControls/{name}/Button")?.GetComponent<Button>();
                     Require(choice != null && choice.IsInteractable() == enabled, $"The phase picker mishandled the {name} command.");
+                    var position = ((RectTransform)choice.transform.parent).anchorMin;
+                    Require(position.x > previousX && (rowY == null || Mathf.Approximately(position.y, rowY.Value)),
+                        "Phase buttons were not shown in order on the same row.");
+                    previousX = position.x;
+                    rowY = position.y;
                 }
+                var current = picker.Find("PhaseControls/Main1/Button").GetComponent<Image>();
+                Require(current.color.r > .9f && current.color.b < .5f,
+                    "The current Main Phase was not visually distinct from available phases.");
                 Click(picker.GetComponent<Button>());
                 Require(!picker.gameObject.activeSelf && ReferenceEquals(_duel.ActivePrompt, prompt),
                     "Dismissing the phase picker submitted an action.");

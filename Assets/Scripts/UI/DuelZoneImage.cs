@@ -14,6 +14,14 @@ namespace YGOPortable.UI
         };
 
         private Vector4 _edges = new Vector4(0f, 1f, 0f, 1f);
+        private bool _placementHighlighted;
+
+        internal void SetPlacementHighlight(bool highlighted)
+        {
+            if (_placementHighlighted == highlighted) return;
+            _placementHighlighted = highlighted;
+            SetVerticesDirty();
+        }
 
         internal static RectTransform CreateCell(Transform board, int column, int row)
         {
@@ -65,6 +73,16 @@ namespace YGOPortable.UI
                 mesh.AddVert(Corner(rect, i, .92f), tone, Vector2.zero);
             for (int i = 0; i < Corners.Length; i++)
                 mesh.AddTriangle(center, center + 1 + i, center + 1 + (i + 1) % Corners.Length);
+
+            if (_placementHighlighted)
+            {
+                var edgeColor = new Color(.99f, .90f, .32f, .96f);
+                for (int i = 0; i < Corners.Length; i++)
+                    DuelMat.AddQuad(mesh, Corner(rect, i, .99f), Corner(rect, i, .90f),
+                        Corner(rect, i + 1, .90f), Corner(rect, i + 1, .99f),
+                        edgeColor, edgeColor, Vector2.zero, Vector2.zero);
+                return;
+            }
 
             if (paintedZone) return;
             var shadow = new Color(.07f, .08f, .065f, Mathf.Max(.30f, tone.a * .75f));

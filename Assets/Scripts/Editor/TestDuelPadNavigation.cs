@@ -88,8 +88,8 @@ namespace YGOPortable.Editor
                 Vector2 hitPosition = mouseCard.anchoredPosition;
                 ExecuteEvents.Execute(mouseCard.gameObject, pointer, ExecuteEvents.pointerEnterHandler);
                 var handActions = (RectTransform)field.Root.transform.Find("CardActions");
-                Require(handActions.gameObject.activeSelf && handActions.Find("SUMMON/Button/Icon").GetComponent<Image>().sprite != null &&
-                    handActions.Find("SETMONST/Button/Icon").GetComponent<Image>().sprite != null &&
+                Require(handActions.gameObject.activeSelf && handActions.Find("SUMMON/Circle/Button/Icon").GetComponent<Image>().sprite != null &&
+                    handActions.Find("SETMONST/Circle/Button/Icon").GetComponent<Image>().sprite != null &&
                     handActions.TransformPoint(Vector3.zero).y > mouseCard.TransformPoint(Vector3.up * mouseCard.rect.yMax).y &&
                     ReferenceEquals(idle, session.ActivePrompt), "Hovering a monster did not show its legal hand actions above the card.");
                 Invoke(field, "AdvanceDuelPadCardMotions", .06f);
@@ -171,8 +171,8 @@ namespace YGOPortable.Editor
                 var commandCardArt = (RectTransform)commandCard.GetComponentInChildren<CompositeCardView>().transform;
                 Require(handActions.gameObject.activeSelf && !Get<GameObject>(field, "_actionPopup").activeSelf,
                     "Focusing a hand card with the controller did not show the action icons.");
-                var summonIcon = handActions.Find("SUMMON/Button").gameObject;
-                var setIcon = handActions.Find("SETMONST/Button").gameObject;
+                var summonIcon = handActions.Find("SUMMON/Circle/Button").gameObject;
+                var setIcon = handActions.Find("SETMONST/Circle/Button").gameObject;
                 Pad(field, A);
                 Require(events.currentSelectedGameObject == summonIcon && ReferenceEquals(idle, session.ActivePrompt),
                     "Opening hand action choices submitted a command or selected the wrong icon.");
@@ -185,14 +185,36 @@ namespace YGOPortable.Editor
                 Invoke(field, "AdvanceDuelPadCardMotions", .12f);
                 Require(commandCardArt.anchoredPosition.y > 0f && events.currentSelectedGameObject == summonIcon,
                     "Focusing a hand action did not keep the card raised.");
-                if (playerFirst) Pad(field, A);
-                else ExecuteEvents.Execute(summonIcon,
+                void ChooseSummon()
+                {
+                    if (playerFirst) Pad(field, A);
+                    else ExecuteEvents.Execute(summonIcon,
+                        new PointerEventData(events) { button = PointerEventData.InputButton.Left }, ExecuteEvents.pointerClickHandler);
+                }
+
+                ChooseSummon();
+                var banner = field.Root.transform.Find("PlacementHint");
+                var cancelPlacement = field.Root.transform.Find("PlacementCancel/Button").GetComponent<Button>();
+                Require(ReferenceEquals(session.ActivePrompt, idle) && banner.gameObject.activeInHierarchy &&
+                    banner.GetComponentInChildren<Text>().text.Contains(CardDatabase.GetName(mine.hand[0].code)) &&
+                    cancelPlacement.gameObject.activeInHierarchy && !handActions.gameObject.activeSelf,
+                    "The position prompt did not name the card or allow cancellation before committing the summon.");
+                if (playerFirst) Pad(field, B);
+                else ExecuteEvents.Execute(cancelPlacement.gameObject,
                     new PointerEventData(events) { button = PointerEventData.InputButton.Left }, ExecuteEvents.pointerClickHandler);
-                Require(session.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_PLACE && !handActions.gameObject.activeSelf,
-                    "Confirming the first hand command did not reach legal placement.");
+                Require(ReferenceEquals(session.ActivePrompt, idle) && mine.mzone.All(card => card == null) &&
+                    !banner.gameObject.activeSelf && !cancelPlacement.gameObject.activeInHierarchy && session.RetryCount == 0,
+                    "Canceling placement consumed the summon or left its controls visible.");
+
+                Pad(field, A);
+                summonIcon = handActions.Find("SUMMON/Circle/Button").gameObject;
+                ChooseSummon();
                 Pad(field, direction: Vector2Int.right);
                 var placement = Get<RectTransform>(field, "_duelPadFocus");
-                Require(placement.IsChildOf(field.Root.transform.Find("DuelBoard")), "A placement prompt did not focus a field zone.");
+                Require(placement.IsChildOf(field.Root.transform.Find("DuelBoard")) &&
+                    placement.GetComponent<Image>().color.g > .8f &&
+                    placement.GetComponent<Image>().color.b < .4f,
+                    "A placement prompt did not focus and highlight a legal field zone.");
                 Pad(field, A);
                 Require(mine.mzone.Count(card => card != null) == 1 && session.RetryCount == 0,
                     "Controller placement failed to complete the summon.");
@@ -212,7 +234,7 @@ namespace YGOPortable.Editor
                 Advance(session, prompt => prompt.playerId == session.HumanPlayerIndex && prompt.messageType == YgoConstants.MSG_SELECT_BATTLECMD);
                 field.Refresh();
                 Require(Get<RectTransform>(field, "_duelPadFocus") == placement, "The monster selection did not survive closing the phase picker.");
-                var attackIcon = handActions.Find("ATTACK/Button");
+                var attackIcon = handActions.Find("ATTACK/Circle/Button");
                 Require(handActions.gameObject.activeSelf && attackIcon != null &&
                     !Get<GameObject>(field, "_actionPopup").activeSelf,
                     "Focusing a field monster in the Battle Phase did not show the attack icon.");

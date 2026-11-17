@@ -52,7 +52,6 @@ namespace YGOPortable.UI
             new List<(RectTransform, bool)>(4);
         private PadScope _duelPadScope;
         private bool _usingDuelPad;
-        private string _duelPadBoardHint = "";
 
         private void ResetDuelPad()
         {
@@ -81,7 +80,7 @@ namespace YGOPortable.UI
                 _duelPadPlacementFocus = null;
                 HideDuelPadFrame();
                 InspectCard(_duelPointerCode);
-                _hintBannerText.text = _duelPadBoardHint;
+                _hintBannerText.text = "";
             }
             var frame = _duelPadInput.Read(Time.unscaledTime);
             if (frame.HasInput) HandleDuelPad(frame);
@@ -127,10 +126,7 @@ namespace YGOPortable.UI
                     case PadScope.Zoom: _cardZoomModal.SetActive(false); break;
                     case PadScope.FieldCards:
                     case PadScope.Piles: _modals.TryCancelOrPass(); break;
-                    case PadScope.Place when _pendingPlaces.Count > 0:
-                        _pendingPlaces.RemoveAt(_pendingPlaces.Count - 1);
-                        Refresh();
-                        break;
+                    case PadScope.Place: TryCancelPlacement(); break;
                     default: OnPauseClicked(); break;
                 }
                 RefreshDuelPadCursor();
@@ -191,7 +187,7 @@ namespace YGOPortable.UI
             if (_session == null || _session.IsFinished) return PadScope.None;
             if (prompt != null && prompt.playerId == _session.HumanPlayerIndex)
             {
-                if (prompt.messageType is YgoConstants.MSG_SELECT_PLACE or YgoConstants.MSG_SELECT_DISFIELD)
+                if (IsStagingPlacement || IsNativePlacement(prompt))
                     return IsPresenting ? PadScope.None : PadScope.Place;
                 if (prompt.messageType is not (YgoConstants.MSG_SELECT_IDLECMD or YgoConstants.MSG_SELECT_BATTLECMD))
                     return PadScope.None;
@@ -215,9 +211,9 @@ namespace YGOPortable.UI
                     AddDuelPadButtons(_actionList);
                     return;
                 case PadScope.Phase:
-                    AddDuelPadButton(_btnToBp);
-                    AddDuelPadButton(_btnToMp2);
-                    AddDuelPadButton(_btnToEp);
+                    foreach (var choice in _phaseChoices)
+                        AddDuelPadButton(choice.button);
+                    AddDuelPadButton(_phaseCancel);
                     return;
                 case PadScope.Log:
                     AddDuelPadButtons(_logWindow.transform);
@@ -249,6 +245,7 @@ namespace YGOPortable.UI
             AddDuelPadSlots(_oppMZone, scope);
             AddDuelPadSlots(_oppSZone, scope);
             if (scope == PadScope.FieldCards) AddDuelPadButton(_modals.FieldCardConfirmButton);
+            if (scope == PadScope.Place) AddDuelPadButton(_placementCancel);
             if (scope != PadScope.Board) return;
 
             AddDuelPadPiles();
@@ -390,9 +387,13 @@ namespace YGOPortable.UI
                     HideDuelPadFrame();
                 return;
             }
-            _hintBannerText.text = _duelPadBoardHint.Length > 0 ? _duelPadBoardHint :
-                scope == PadScope.Board ? "A 선택  X 상세  Y 페이즈  RB 체인  B 정지" :
-                scope == PadScope.CardActions ? "A 실행  B 카드로 돌아가기" : "";
+            _hintBannerText.text = scope switch
+            {
+                PadScope.Board => "A 선택  X 상세  Y 페이즈  RB 체인  B 정지",
+                PadScope.CardActions => "A 실행  B 카드로 돌아가기",
+                PadScope.Place => _placementCancel.gameObject.activeInHierarchy ? "A 위치 선택  B 취소" : "A 위치 선택",
+                _ => "",
+            };
             if (scope == PadScope.Board && _duelPadPlacementFocus != null)
             {
                 BuildDuelPadTargets(scope);
@@ -443,7 +444,8 @@ namespace YGOPortable.UI
         private void AdvanceDuelPadCardMotions(float dt)
         {
             var raised = _duelPadRaisedCard;
-            if (_actionPopup.activeSelf && _duelCommandRaisedCard != null) raised = _duelCommandRaisedCard;
+            if (IsStagingPlacement) raised = _stagedPlacement.Value.art;
+            else if (_actionPopup.activeSelf && _duelCommandRaisedCard != null) raised = _duelCommandRaisedCard;
             else if (!_usingDuelPad && !_actionPopup.activeSelf && !_phasePicker.activeSelf && !IsReadingLog &&
                 !_cardZoomModal.activeSelf && !_modals.IsPromptOpen && !_modals.IsZoneViewerOpen &&
                 !_modals.ResultRoot.activeSelf && CardDragManager.Instance?.IsDragging != true)

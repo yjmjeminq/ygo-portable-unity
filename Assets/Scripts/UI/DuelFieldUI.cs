@@ -54,9 +54,11 @@ namespace YGOPortable.UI
         private GameObject _phasePicker;
         private Text _phaseLabel;
         private Text _phaseControlHint;
-        private Button _btnToBp;
-        private Button _btnToMp2;
-        private Button _btnToEp;
+        private readonly List<(int phase, Button button, Text label, Image icon)> _phaseChoices = new();
+        private Button _phaseCancel;
+        private GameObject _placementBanner;
+        private Text _placementHint;
+        private Button _placementCancel;
 
         // Life Points Animated Rolling & Low LP State
         private float _myDisplayLp = 8000f;
@@ -68,7 +70,7 @@ namespace YGOPortable.UI
         private class FieldSlotView
         {
             public RectTransform root;
-            public Image bgImg;
+            public DuelZoneImage bgImg;
             public Outline border;
             public CompositeCardView cardView;
             public RectTransform focusArt;
@@ -121,6 +123,7 @@ namespace YGOPortable.UI
         // Multi-place selection accumulator (for MSG_SELECT_PLACE / MSG_SELECT_DISFIELD with min > 1)
         private readonly List<(byte con, uint loc, uint seq)> _pendingPlaces = new List<(byte con, uint loc, uint seq)>();
         private DuelPrompt _pendingPlacePrompt;
+        private (DuelPrompt prompt, int command, uint code, uint location, uint availableZones, RectTransform art)? _stagedPlacement;
 
         // Drag-to-zone & in-flight animation state
         private (byte con, uint loc, uint seq)? _preferredDropZone;
@@ -254,6 +257,7 @@ namespace YGOPortable.UI
             Array.Clear(_handCounts, 0, _handCounts.Length);
             _pendingPlaces.Clear();
             _pendingPlacePrompt = null;
+            _stagedPlacement = null;
             _preferredDropZone = null;
             _preferredAttackTargetSeq = -1;
             _dragHighlightMZone = _dragHighlightSZone = _dragHighlightAttack = false;
@@ -265,6 +269,8 @@ namespace YGOPortable.UI
             _modals.CloseZoneViewer();
             _cardZoomModal.SetActive(false);
             _phasePicker.SetActive(false);
+            _placementBanner.SetActive(false);
+            _placementCancel.transform.parent.gameObject.SetActive(false);
             CardAnimationManager.Instance?.Clear();
             RefreshHandGlows(force: true);
         }
@@ -546,7 +552,7 @@ namespace YGOPortable.UI
             var slot = new FieldSlotView
             {
                 root = cell,
-                bgImg = background,
+                bgImg = (DuelZoneImage)background,
                 border = border,
                 cardView = view,
                 focusArt = (RectTransform)view.transform.Find("AspectBox"),
@@ -667,29 +673,8 @@ namespace YGOPortable.UI
             DuelStyle.Shadow(_turnBadgeText);
             DuelStyle.Shadow(_phaseLabel);
 
-            var overlay = LotdUiKit.FillRect("PhasePicker", root);
-            _phasePicker = overlay.gameObject;
-            var dismiss = overlay.gameObject.AddComponent<Button>();
-            dismiss.targetGraphic = LotdUiKit.AddImage(overlay.gameObject, LotdUiKit.WhiteSprite, Color.clear);
-            dismiss.transition = Selectable.Transition.None;
-            dismiss.onClick.AddListener(() => _phasePicker.SetActive(false));
-            var controls = DuelStyle.Panel(overlay, "PhaseControls", new Vector2(.780f, .442f), new Vector2(.900f, .626f),
-                border: DuelStyle.Gold);
-            Button PhaseButton(string name, string label, int phase, int row, bool gold = false)
-            {
-                float bottom = (2 - row) / 3f;
-                var slot = LotdUiKit.CreateRect(name, controls, new Vector2(0f, bottom), new Vector2(1f, bottom + 1f / 3f),
-                    new Vector2(5f, 3f), new Vector2(-5f, -3f));
-                return DuelStyle.Button(slot, "Button", label, () =>
-                {
-                    _phasePicker.SetActive(false);
-                    OnPhaseShortcut(phase);
-                }, 14, gold);
-            }
-            _btnToBp = PhaseButton("Battle", "배틀 페이즈", YgoConstants.PHASE_BATTLE, 0);
-            _btnToMp2 = PhaseButton("Main2", "메인 페이즈 2", YgoConstants.PHASE_MAIN2, 1);
-            _btnToEp = PhaseButton("End", "턴 종료", YgoConstants.PHASE_END, 2, true);
-            _phasePicker.SetActive(false);
+            BuildPhasePicker(root);
+            BuildPlacementControls(root);
             var log = LotdUiKit.CreateRect("OpenLog", root, new Vector2(0.910f, 0.035f), new Vector2(0.984f, 0.092f),
                 Vector2.zero, Vector2.zero);
             _duelPadLogButton = BuildHudControl(log, DuelVisualAssets.LogIcon, "대전 기록", OpenDuelLog);
@@ -710,10 +695,114 @@ namespace YGOPortable.UI
             _hintBannerText.gameObject.AddComponent<Outline>().effectColor = LotdUiKit.BgDeep;
         }
 
+        private void BuildPhasePicker(Transform root)
+        {
+            var overlay = LotdUiKit.FillRect("PhasePicker", root);
+            _phasePicker = overlay.gameObject;
+            var dismiss = overlay.gameObject.AddComponent<Button>();
+            dismiss.targetGraphic = LotdUiKit.AddImage(overlay.gameObject, LotdUiKit.WhiteSprite, new Color(.018f, .03f, .07f, .38f));
+            dismiss.transition = Selectable.Transition.None;
+            dismiss.onClick.AddListener(() => _phasePicker.SetActive(false));
+
+            var controls = DuelStyle.Panel(overlay, "PhaseControls", new Vector2(.235f, .218f), new Vector2(.845f, .465f),
+                fill: new Color(.035f, .096f, .146f, .98f), border: new Color(.56f, .73f, .80f, .76f));
+            var header = LotdUiKit.CreateRect("Header", controls, new Vector2(0f, .79f), Vector2.one, Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(header.gameObject, LotdUiKit.WhiteSprite, DuelStyle.PanelColor, false, false);
+            LotdUiKit.AddFittedText(header, "Title", "이동할 페이즈를 선택하세요", 20, 12, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+
+            var line = LotdUiKit.CreateRect("Track", controls, new Vector2(.099f, .485f), new Vector2(.901f, .485f),
+                Vector2.zero, new Vector2(0f, 2f));
+            LotdUiKit.AddImage(line.gameObject, LotdUiKit.WhiteSprite, new Color(.43f, .65f, .75f, .46f), false, false);
+            var phases = new[]
+            {
+                ("Draw", "드로우", YgoConstants.PHASE_DRAW, "dp"),
+                ("Standby", "스탠바이", YgoConstants.PHASE_STANDBY, "sp"),
+                ("Main1", "메인 1", YgoConstants.PHASE_MAIN1, "mp1"),
+                ("Battle", "배틀", YgoConstants.PHASE_BATTLE, "bp"),
+                ("Main2", "메인 2", YgoConstants.PHASE_MAIN2, "mp2"),
+                ("End", "엔드", YgoConstants.PHASE_END, "ep"),
+            };
+            for (int i = 0; i < phases.Length; i++)
+            {
+                var (name, label, phase, asset) = phases[i];
+                float left = .028f + .158f * i;
+                var slot = LotdUiKit.CreateRect(name, controls, new Vector2(left, .244f), new Vector2(left + .150f, .735f),
+                    Vector2.zero, Vector2.zero);
+                var button = DuelStyle.RoundButton(slot, "Button", DuelStyle.Player, () =>
+                {
+                    _phasePicker.SetActive(false);
+                    OnPhaseShortcut(phase);
+                });
+                var iconBox = LotdUiKit.CreateRect("Icon", button.transform, new Vector2(.20f, .46f), new Vector2(.80f, .75f),
+                    Vector2.zero, Vector2.zero);
+                Sprite sprite = DuelVisualAssets.PhaseIcon(phase) ?? LotdUiKit.LoadSprite("LOTD/PhaseBar/blue_" + asset);
+                var icon = LotdUiKit.AddImage(iconBox.gameObject, sprite, Color.white, true, false);
+                icon.enabled = sprite != null;
+                var labelBox = LotdUiKit.CreateRect("Caption", button.transform, new Vector2(.06f, .18f), new Vector2(.94f, .43f),
+                    Vector2.zero, Vector2.zero);
+                var caption = LotdUiKit.AddFittedText(labelBox, "Label", label, 15, 8, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+                _phaseChoices.Add((phase, button, caption, icon));
+            }
+
+            var cancel = LotdUiKit.CreateRect("Cancel", controls, new Vector2(.405f, .038f), new Vector2(.595f, .195f),
+                Vector2.zero, Vector2.zero);
+            _phaseCancel = DuelStyle.Button(cancel, "Button", "취소", () => _phasePicker.SetActive(false), 15);
+            _phaseCancel.navigation = new Navigation { mode = Navigation.Mode.None };
+            _phasePicker.SetActive(false);
+        }
+
+        private void RefreshPhaseChoices(DuelPrompt prompt)
+        {
+            bool waiting = CanAcceptPlayerAction && !IsStagingPlacement;
+            bool idle = waiting && prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD;
+            bool battle = waiting && prompt.messageType == YgoConstants.MSG_SELECT_BATTLECMD;
+            int current = _session.CurrentPhase;
+            if (current is YgoConstants.PHASE_BATTLE_START or YgoConstants.PHASE_BATTLE_STEP or
+                YgoConstants.PHASE_DAMAGE or YgoConstants.PHASE_DAMAGE_CAL)
+                current = YgoConstants.PHASE_BATTLE;
+
+            bool any = false;
+            foreach (var (phase, button, label, icon) in _phaseChoices)
+            {
+                bool enabled = phase switch
+                {
+                    YgoConstants.PHASE_BATTLE => idle && prompt.canBp,
+                    YgoConstants.PHASE_MAIN2 => battle && prompt.canM2,
+                    YgoConstants.PHASE_END => (idle || battle) && prompt.canEp,
+                    _ => false,
+                };
+                bool active = phase == current;
+                button.interactable = enabled;
+                button.image.color = active ? DuelStyle.Gold : enabled ? DuelStyle.Player : new Color(.29f, .35f, .38f);
+                label.color = active ? DuelStyle.Gold : enabled ? Color.white : new Color(.61f, .67f, .70f);
+                icon.color = active || enabled ? Color.white : new Color(.64f, .68f, .71f, .64f);
+                any |= enabled;
+            }
+            _phaseButton.interactable = any;
+            _phaseControlHint.enabled = any;
+            if (!any) _phasePicker.SetActive(false);
+        }
+
+        private void BuildPlacementControls(Transform root)
+        {
+            var panel = DuelStyle.Panel(root, "PlacementHint", new Vector2(.286f, .842f), new Vector2(.771f, .895f),
+                fill: new Color(.033f, .083f, .135f, .94f), border: new Color(.72f, .82f, .86f, .57f));
+            panel.GetComponent<Image>().raycastTarget = false;
+            _placementBanner = panel.gameObject;
+            _placementHint = LotdUiKit.AddFittedText(panel, "Text", "", 22, 11, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+            _placementBanner.SetActive(false);
+
+            var cancel = LotdUiKit.CreateRect("PlacementCancel", root, new Vector2(.904f, .368f), new Vector2(.984f, .450f),
+                Vector2.zero, Vector2.zero);
+            _placementCancel = DuelStyle.RoundButton(cancel, "Button", DuelStyle.Player, () => TryCancelPlacement());
+            LotdUiKit.AddFittedText(_placementCancel.transform, "Label", "취소", 17, 10, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+            cancel.gameObject.SetActive(false);
+        }
+
         private bool CanToggleChainConfirmation =>
             _session != null && !_session.IsFinished && !IsPaused && !IsReadingLog && !IsBrowsingZone &&
             !_cardZoomModal.activeSelf && !_actionPopup.activeSelf && !_phasePicker.activeSelf &&
-            !_modals.ResultRoot.activeSelf && (!_modals.IsPromptOpen || _modals.IsChainPromptOpen);
+            !_modals.ResultRoot.activeSelf && !IsStagingPlacement && (!_modals.IsPromptOpen || _modals.IsChainPromptOpen);
 
         private void CycleChainConfirmation()
         {
@@ -838,6 +927,7 @@ namespace YGOPortable.UI
             {
                 _pendingPlacePrompt = prompt;
                 _pendingPlaces.Clear();
+                if (!ReferenceEquals(_stagedPlacement?.prompt, prompt)) _stagedPlacement = null;
             }
 
             byte me = (byte)_session.HumanPlayerIndex;
@@ -852,24 +942,8 @@ namespace YGOPortable.UI
                 _oppTargetLp = Mathf.Max(0, theirs.lp);
             }
 
-            bool waiting = CanAcceptPlayerAction;
-            string hint = "";
-            if (waiting && (prompt.messageType == YgoConstants.MSG_SELECT_PLACE ||
-                prompt.messageType == YgoConstants.MSG_SELECT_DISFIELD))
-            {
-                int needed = Mathf.Max(1, (int)prompt.min);
-                hint = needed > 1 ? $"존 선택  {_pendingPlaces.Count} / {needed}" : "카드를 놓을 존을 선택하세요.";
-            }
-            _hintBannerText.text = hint;
-            _duelPadBoardHint = hint;
-            bool idle = waiting && prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD;
-            bool battle = waiting && prompt.messageType == YgoConstants.MSG_SELECT_BATTLECMD;
-            _btnToBp.interactable = idle && prompt.canBp;
-            _btnToMp2.interactable = battle && prompt.canM2;
-            _btnToEp.interactable = (idle || battle) && prompt.canEp;
-            _phaseButton.interactable = _btnToBp.interactable || _btnToMp2.interactable || _btnToEp.interactable;
-            _phaseControlHint.enabled = _phaseButton.interactable;
-            if (!_phaseButton.interactable) _phasePicker.SetActive(false);
+            RefreshPlacementControls(prompt);
+            RefreshPhaseChoices(prompt);
 
             UpdateStackTile(_myDeckTile, mine.deckCount, me, YgoConstants.LOCATION_DECK);
             UpdateStackTile(_myExtraTile, mine.extra.Count, me, YgoConstants.LOCATION_EXTRA);
@@ -1012,7 +1086,7 @@ namespace YGOPortable.UI
                 slot.statsEdge.enabled = slot.statsEdge.sprite != null;
             }
 
-            bool canDrag = visible && CanAcceptPlayerAction && !_modals.IsFieldCardSelection &&
+            bool canDrag = visible && CanAcceptPlayerAction && !IsStagingPlacement && !_modals.IsFieldCardSelection &&
                 !opponent && loc == YgoConstants.LOCATION_MZONE;
             slot.dragTrigger.SourceType = canDrag ? DragSourceType.FieldMonster : DragSourceType.None;
             slot.dragTrigger.CardCodeGetter = canDrag ? () => live.code : null;
@@ -1048,10 +1122,12 @@ namespace YGOPortable.UI
             bool cardChoice = visible && FindFieldCardChoice(con, loc, seq, out choiceIndex);
             bool cardSelected = cardChoice && _modals.IsFieldCardSelected(choiceIndex);
             Color highlight = cardSelected ? DuelStyle.Gold : attack ? DuelStyle.Opponent :
-                cardChoice || selected || action ? DuelStyle.Player : place || drag ? DuelStyle.Gold : Color.clear;
+                cardChoice || selected || action ? DuelStyle.Player :
+                place ? new Color(.98f, .89f, .29f) : drag ? DuelStyle.Gold : Color.clear;
             slot.bgImg.color = highlight.a > 0f
-                ? new Color(highlight.r, highlight.g, highlight.b, selected || cardSelected || attack ? .64f : .32f) : ZoneTint;
-            slot.border.effectColor = highlight;
+                ? new Color(highlight.r, highlight.g, highlight.b, selected || cardSelected || attack ? .64f : place ? .09f : .32f) : ZoneTint;
+            slot.border.effectColor = place ? Color.clear : highlight;
+            slot.bgImg.SetPlacementHighlight(place);
         }
 
         private static string StatValue(int stat, int baseStat, bool current)
@@ -1112,7 +1188,7 @@ namespace YGOPortable.UI
                 uint sequence = (uint)i;
                 bool showFront = !opponent || card.isPublic || card.IsFaceUp;
                 view.Card.SetCard(showFront ? card.code : 0u, !showFront, card);
-                bool actionable = !opponent && CanAcceptPlayerAction && HasHandAction(controller, sequence);
+                bool actionable = !opponent && CanAcceptPlayerAction && !IsStagingPlacement && HasHandAction(controller, sequence);
 
                 var trigger = view.Trigger;
                 if (trigger == null) continue;
@@ -1180,7 +1256,7 @@ namespace YGOPortable.UI
         }
         private void RefreshHandGlows(bool force = false)
         {
-            DuelPrompt prompt = CanAcceptPlayerAction && !IsBrowsingZone && !_cardZoomModal.activeSelf && !_phasePicker.activeSelf
+            DuelPrompt prompt = CanAcceptPlayerAction && !IsStagingPlacement && !IsBrowsingZone && !_cardZoomModal.activeSelf && !_phasePicker.activeSelf
                 ? _session.ActivePrompt : null;
             bool changed = force || !ReferenceEquals(prompt, _handGlowPrompt);
             if (!changed && prompt == null) return;
@@ -1351,7 +1427,7 @@ namespace YGOPortable.UI
         // ==================== DRAG & DROP LOGIC ====================
         private void HandleDuelDragStarted(DragSourceType source, uint cardCode, int sourceIndex, object customData)
         {
-            if (!Root.activeInHierarchy || !CanAcceptPlayerAction) return;
+            if (!Root.activeInHierarchy || !CanAcceptPlayerAction || IsStagingPlacement) return;
             InspectCard(cardCode);
 
             _dragHighlightMZone = false;
@@ -1406,7 +1482,7 @@ namespace YGOPortable.UI
             _dragHighlightSZone = false;
             _dragHighlightAttack = false;
 
-            if (!Root.activeInHierarchy || !CanAcceptPlayerAction) return;
+            if (!Root.activeInHierarchy || !CanAcceptPlayerAction || IsStagingPlacement) return;
             var p = _session.ActivePrompt;
             if (p == null || p.playerId != _session.HumanPlayerIndex)
             {
@@ -2123,6 +2199,10 @@ namespace YGOPortable.UI
                     if (!openingPile && (!_modals.IsFieldCardSelection || Input.GetKeyDown(KeyCode.Escape)))
                         _modals.TryCancelOrPass();
                 }
+                else if (TryCancelPlacement())
+                {
+                    LotdAudio.PlayClick();
+                }
                 else if (Input.GetKeyDown(KeyCode.Escape) && _modals != null && _modals.ResultRoot != null && _modals.ResultRoot.activeSelf)
                 {
                     _modals.TriggerMenu();
@@ -2158,6 +2238,77 @@ namespace YGOPortable.UI
             control != null && control.transform.IsChildOf(panel.transform) &&
             ExecuteEvents.CanHandleEvent<ISubmitHandler>(control);
         // ==================== PROMPT INTERACTIONS ====================
+        private bool IsStagingPlacement => _stagedPlacement.HasValue &&
+            ReferenceEquals(_stagedPlacement.Value.prompt, _session?.ActivePrompt);
+
+        private static bool IsNativePlacement(DuelPrompt prompt) =>
+            prompt?.messageType is YgoConstants.MSG_SELECT_PLACE or YgoConstants.MSG_SELECT_DISFIELD;
+
+        private bool TryStageCardPlacement(LiveCardState source, int response)
+        {
+            if (_session.ActivePrompt.messageType != YgoConstants.MSG_SELECT_IDLECMD ||
+                source.location != YgoConstants.LOCATION_HAND || source.controller != _session.HumanPlayerIndex)
+                return false;
+
+            var card = CardDatabase.Get(source.code);
+            if (card == null) return false;
+            int action = response & 0xffff;
+            uint location;
+            if (action is 0 or 3 && card.IsMonster && card.level is > 0 and <= 4)
+                location = YgoConstants.LOCATION_MZONE;
+            else if (action == 4 && (card.IsSpell || card.IsTrap))
+                location = YgoConstants.LOCATION_SZONE;
+            else return false;
+
+            var player = _session.Players[source.controller];
+            var zones = location == YgoConstants.LOCATION_MZONE ? player.mzone : player.szone;
+            uint disabled = _session.FieldDisabledMask >> (16 * source.controller + (location == YgoConstants.LOCATION_SZONE ? 8 : 0));
+            bool fieldSpell = (card.type & YgoConstants.TYPE_FIELD) != 0;
+            uint available = 0;
+            for (int i = fieldSpell ? 5 : 0; i < (fieldSpell ? 6 : 5); i++)
+                if (zones[i] == null && (disabled & (1u << i)) == 0)
+                    available |= 1u << i;
+            if (available == 0) return false;
+
+            _stagedPlacement = (_session.ActivePrompt, response, source.code, location, available, _cardActionArt);
+            HideCardActions();
+            Refresh();
+            return true;
+        }
+
+        private void RefreshPlacementControls(DuelPrompt prompt)
+        {
+            bool staged = IsStagingPlacement;
+            bool visible = CanAcceptPlayerAction && (staged || IsNativePlacement(prompt));
+            _placementBanner.SetActive(visible);
+            _placementCancel.transform.parent.gameObject.SetActive(visible && (staged || _pendingPlaces.Count > 0));
+            _hintBannerText.text = "";
+            if (!visible) return;
+
+            if (staged)
+            {
+                _placementHint.text = $"「{CardDatabase.GetName(_stagedPlacement.Value.code)}」  ·  놓을 위치를 선택하세요.";
+                return;
+            }
+
+            string instruction = prompt.messageType == YgoConstants.MSG_SELECT_DISFIELD
+                ? "사용할 수 없게 할 존을 선택하세요." : "카드를 놓을 위치를 선택하세요.";
+            _placementHint.text = prompt.min > 1 ? $"{instruction}  {_pendingPlaces.Count}/{prompt.min}" : instruction;
+        }
+
+        private bool TryCancelPlacement()
+        {
+            if (!CanAcceptPlayerAction) return false;
+            if (IsStagingPlacement)
+                _stagedPlacement = null;
+            else if (IsNativePlacement(_session.ActivePrompt) && _pendingPlaces.Count > 0)
+                _pendingPlaces.RemoveAt(_pendingPlaces.Count - 1);
+            else return false;
+
+            Refresh();
+            return true;
+        }
+
         private bool IsPlacePending(byte con, uint loc, uint seq)
         {
             for (int i = 0; i < _pendingPlaces.Count; i++)
@@ -2169,10 +2320,15 @@ namespace YGOPortable.UI
         private bool IsPlaceSelectable(byte con, uint loc, uint seq)
         {
             if (!CanAcceptPlayerAction) return false;
-            var p = _session?.ActivePrompt;
-            if (p == null || p.playerId != _session.HumanPlayerIndex) return false;
-            if (p.messageType != YgoConstants.MSG_SELECT_PLACE && p.messageType != YgoConstants.MSG_SELECT_DISFIELD)
-                return false;
+            if (IsStagingPlacement)
+            {
+                var placement = _stagedPlacement.Value;
+                return con == _session.HumanPlayerIndex && loc == placement.location &&
+                    seq < 6 && (placement.availableZones & (1u << (int)seq)) != 0;
+            }
+
+            var p = _session.ActivePrompt;
+            if (!IsNativePlacement(p)) return false;
 
             uint avail = ~p.placeFlag;
             int shift = con == p.playerId ? 0 : 16;
@@ -2263,7 +2419,7 @@ namespace YGOPortable.UI
 
         private void ExecuteActionInt(int responseVal, (byte con, uint loc, uint seq)? placement = null)
         {
-            if (!CanAcceptPlayerAction || IsBrowsingZone) return;
+            if (!CanAcceptPlayerAction || IsStagingPlacement || IsBrowsingZone) return;
             _preferredDropZone = placement;
             LotdAudio.PlayClick();
             _actionPopup.SetActive(false);
@@ -2275,7 +2431,7 @@ namespace YGOPortable.UI
         private void OpenStackZone(byte con, uint loc, string title, bool hideFaceDown = false)
         {
             var session = _session;
-            if (session == null || session.IsFinished || IsPresenting || IsPaused || IsReadingLog ||
+            if (session == null || session.IsFinished || IsStagingPlacement || IsPresenting || IsPaused || IsReadingLog ||
                 _cardZoomModal.activeSelf || _actionPopup.activeSelf || con >= session.Players.Length ||
                 _modals.IsPromptOpen && !_modals.IsShowingField) return;
             var prompt = session.ActivePrompt;
@@ -2356,6 +2512,18 @@ namespace YGOPortable.UI
 
             if (IsPlaceSelectable(con, loc, seq))
             {
+                if (IsStagingPlacement)
+                {
+                    int response = _stagedPlacement.Value.command;
+                    _stagedPlacement = null;
+                    if (_usingDuelPad)
+                        _duelPadPlacementFocus = GetSlot(con, loc, seq)?.root;
+                    // The staged destination is validated against the engine's placement prompt before use.
+                    ExecuteActionInt(response, (con, loc, seq));
+                    if (TryAutoFulfillPreferredPrompt()) Refresh();
+                    return;
+                }
+
                 LotdAudio.PlayClick();
                 if (IsPlacePending(con, loc, seq))
                 {
@@ -2395,6 +2563,7 @@ namespace YGOPortable.UI
                 return;
             }
 
+            if (IsStagingPlacement) return;
             var live = FindLiveCard(con, loc, seq);
             if (live == null) return;
             bool canInspect = live.IsFaceUp || live.isPublic || con == _session.HumanPlayerIndex;

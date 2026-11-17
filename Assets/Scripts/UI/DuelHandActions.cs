@@ -9,8 +9,8 @@ namespace YGOPortable.UI
 {
     public partial class DuelFieldUI
     {
-        private const float CardActionWidth = 86f;
-        private const float CardActionHeight = 58f;
+        private const float CardActionWidth = 77f;
+        private const float CardActionHeight = 73f;
         private const float CardActionGap = 5f;
 
         private readonly Dictionary<RectTransform, FieldSlotView> _fieldSlotsByRect = new();
@@ -33,7 +33,7 @@ namespace YGOPortable.UI
         }
 
         private bool CanShowCardActions =>
-            CanAcceptPlayerAction && !_modals.IsPromptOpen && !IsBrowsingZone && !_modals.ResultRoot.activeSelf &&
+            CanAcceptPlayerAction && !IsStagingPlacement && !_modals.IsPromptOpen && !IsBrowsingZone && !_modals.ResultRoot.activeSelf &&
             !_actionPopup.activeSelf && !_phasePicker.activeSelf && !_cardZoomModal.activeSelf &&
             CardDragManager.Instance?.IsDragging != true &&
             _session.ActivePrompt.messageType is YgoConstants.MSG_SELECT_IDLECMD or YgoConstants.MSG_SELECT_BATTLECMD;
@@ -168,7 +168,8 @@ namespace YGOPortable.UI
                     if (choices.Count == 1)
                     {
                         _navigatingCardActions = false;
-                        ExecuteActionInt(first.responseVal);
+                        if (!TryStageCardPlacement(source, first.responseVal))
+                            ExecuteActionInt(first.responseVal);
                     }
                     else
                     {
@@ -196,15 +197,16 @@ namespace YGOPortable.UI
             float left = index * (CardActionWidth + CardActionGap);
             var slot = LotdUiKit.CreateRect(iconName, _cardActionsBar, Vector2.zero, Vector2.zero,
                 new Vector2(left, 0f), new Vector2(left + CardActionWidth, CardActionHeight));
-            bool highlighted = iconName is "ACTION" or "ATTACK";
-            var button = DuelStyle.Button(slot, "Button", label, action, 13, gold: highlighted);
-            button.navigation = new Navigation { mode = Navigation.Mode.None };
-            var caption = button.GetComponentInChildren<Text>().rectTransform;
-            caption.anchorMin = new Vector2(.04f, .03f);
-            caption.anchorMax = new Vector2(.96f, .32f);
-            caption.offsetMin = caption.offsetMax = Vector2.zero;
-            var icon = LotdUiKit.CreateRect("Icon", button.transform, new Vector2(.28f, .34f),
-                new Vector2(.72f, .94f), Vector2.zero, Vector2.zero);
+            bool highlighted = iconName is "ACTION" or "ATTACK" or "SUMMON" or "SUMMONSP";
+            var face = LotdUiKit.CreateRect("Circle", slot, new Vector2(.09f, .25f), new Vector2(.91f, 1f),
+                Vector2.zero, Vector2.zero);
+            var button = DuelStyle.RoundButton(face, "Button", highlighted ? DuelStyle.Gold : DuelStyle.Player, action);
+            var caption = LotdUiKit.CreateRect("Caption", slot, Vector2.zero, new Vector2(1f, .27f),
+                Vector2.zero, Vector2.zero);
+            DuelStyle.Shadow(LotdUiKit.AddFittedText(caption, "Label", label, 14, 9, TextAnchor.MiddleCenter,
+                Color.white, FontStyle.Bold), 1.5f);
+            var icon = LotdUiKit.CreateRect("Icon", button.transform, new Vector2(.24f, .24f),
+                new Vector2(.76f, .76f), Vector2.zero, Vector2.zero);
             LotdUiKit.AddImage(icon.gameObject, LotdUiKit.LoadSprite($"LOTD/Icons/ICON_ID_CMDID_48_{iconName}"),
                 Color.white, true, false);
         }

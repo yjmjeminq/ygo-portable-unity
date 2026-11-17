@@ -52,8 +52,8 @@ namespace YGOPortable.Editor
             var actionBar = ui.Field.Root.transform.Find("CardActions");
             handRow.GetChild((int)cards.First(card => card.code == PotOfDesires).sequence)
                 .GetComponent<CardDragTrigger>().OnPointerEnterAction.Invoke();
-            Require(actionBar.gameObject.activeSelf && actionBar.Find("ACTION/Button/Icon") != null &&
-                actionBar.Find("SET/Button/Icon") != null, "A playable spell did not show activation and set icons.");
+            Require(actionBar.gameObject.activeSelf && actionBar.Find("ACTION/Circle/Button/Icon") != null &&
+                actionBar.Find("SET/Circle/Button/Icon") != null, "A playable spell did not show activation and set icons.");
             handRow.GetChild((int)cards.First(card => card.code == BlueEyes).sequence)
                 .GetComponent<CardDragTrigger>().OnPointerEnterAction.Invoke();
             Require(!actionBar.gameObject.activeSelf, "The action row showed commands for an unplayable card.");
