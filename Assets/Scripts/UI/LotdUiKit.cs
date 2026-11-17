@@ -629,12 +629,17 @@ namespace YGOPortable.UI
         public static void EnsureInit(GameObject host)
         {
             if (_sfxSource != null) return;
-            _sfxSource = host.GetComponent<AudioSource>() ?? host.AddComponent<AudioSource>();
+            _sfxSource = host.GetComponent<AudioSource>();
+            if (_sfxSource == null) _sfxSource = host.AddComponent<AudioSource>();
+            if (_sfxSource == null) return;
             _sfxSource.playOnAwake = false;
 
             _bgmSource = host.AddComponent<AudioSource>();
-            _bgmSource.playOnAwake = false;
-            _bgmSource.loop = true;
+            if (_bgmSource != null)
+            {
+                _bgmSource.playOnAwake = false;
+                _bgmSource.loop = true;
+            }
 
             int sr = 22050;
             _clipClick = MakeTone(0.06f, 880f, 1180f, 0.25f);

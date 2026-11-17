@@ -68,6 +68,9 @@ namespace YGOPortable.Core
         private static extern IntPtr YGO_GetMessage(IntPtr duel, out uint outLen);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern ulong YGO_GetSingleTriggerDescription(IntPtr duel, byte player, uint code, ulong hint);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         private static extern void YGO_SetResponse(IntPtr duel, byte[] buf, uint len);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]

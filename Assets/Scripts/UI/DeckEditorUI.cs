@@ -159,6 +159,11 @@ namespace YGOPortable.UI
                 if (Input.GetKeyDown(KeyCode.Escape)) _cardFilterDialog.SetActive(false);
                 return;
             }
+            if (_archModalRoot.activeSelf && Input.GetKeyDown(KeyCode.Escape))
+            {
+                _archModalRoot.SetActive(false);
+                return;
+            }
 
             if (!Input.GetKey(KeyCode.LeftControl) && !Input.GetKey(KeyCode.RightControl)) return;
             if (Input.GetKeyDown(KeyCode.F))
@@ -1028,7 +1033,7 @@ namespace YGOPortable.UI
             var win = LotdUiKit.CreateBorderedPanel(dim, "Win",
                 new Vector2(0.262f, 0.02f), new Vector2(0.99f, 0.905f), Vector2.zero, Vector2.zero,
                 LotdUiKit.PanelNavy, LotdUiKit.GoldAccent);
-            win.gameObject.AddComponent<Button>(); // block click-through to dim
+            win.gameObject.AddComponent<Button>().interactable = false; // Catch clicks on the panel background without taking focus.
 
             var hdr = LotdUiKit.CreateRect("Hdr", win, new Vector2(0f, 0.90f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
             LotdUiKit.AddImage(hdr.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelHeader);
@@ -1182,6 +1187,8 @@ namespace YGOPortable.UI
             UpdateVirtualArchSlots(firstRow);
         }
 
+        private static int ArchetypePoolSlot(int row, int col) => (row % ArchPoolRows) * ArchCols + col;
+
         private void UpdateVirtualArchSlots(int firstRow, bool force = false)
         {
             if (firstRow == _archLastFirstRow && !force) return;
@@ -1198,7 +1205,8 @@ namespace YGOPortable.UI
 
                 for (int c = 0; c < ArchCols; c++)
                 {
-                    int poolIdx = r * ArchCols + c;
+                    // Rows that remain visible keep the same buttons and controller focus.
+                    int poolIdx = ArchetypePoolSlot(targetRow, c);
                     var (rt, cv, titleTxt, subTxt, loadBtn, inspectBtn) = _archPool[poolIdx];
 
                     float x = c * colW;

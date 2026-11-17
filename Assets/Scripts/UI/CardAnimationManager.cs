@@ -50,6 +50,7 @@ namespace YGOPortable.UI
         TokenSummon,
         Set,
         ChangePosition,
+        Material,
         Destroy,
         Vanish,
     }
@@ -60,6 +61,7 @@ namespace YGOPortable.UI
         public static CardAnimationManager Instance => _instance != null ? _instance : null;
 
         private readonly Queue<IEnumerator> _steps = new Queue<IEnumerator>();
+        private List<(CardFlight flight, Action onArrive)> _openPileTransfers;
         private readonly Stack<CompositeCardView> _cards = new Stack<CompositeCardView>();
         private RectTransform _layer;
         private Sprite _summonArt;
@@ -94,6 +96,7 @@ namespace YGOPortable.UI
         {
             StopAllCoroutines();
             _steps.Clear();
+            _openPileTransfers = null;
             _cards.Clear();
             _previousChainCode = 0;
             _previousChainNumber = 0;
@@ -155,47 +158,64 @@ namespace YGOPortable.UI
 
         internal void QueueDraw(IReadOnlyList<CardFlight> flights, Action<int> onArrive)
         {
-            if (flights.Count > 0) _steps.Enqueue(DrawCards(flights, onArrive));
+            if (flights.Count > 0) QueueStep(FlyCards(flights, onArrive, draw: true));
         }
 
         internal void QueueMove(CardFlight flight, CardMotion motion, Action onArrive)
         {
-            _steps.Enqueue(MoveCard(flight, motion, onArrive));
+            QueueStep(MoveCard(flight, motion, onArrive));
+        }
+
+        internal void QueuePileTransfer(CardFlight flight, Action onArrive)
+        {
+            // Moves emitted together by one effect overlap. Other animation steps still play in engine order.
+            if (_openPileTransfers == null)
+            {
+                _openPileTransfers = new List<(CardFlight, Action)>();
+                _steps.Enqueue(PlayPileTransfers(_openPileTransfers));
+            }
+            _openPileTransfers.Add((flight, onArrive));
+        }
+
+        private void QueueStep(IEnumerator step)
+        {
+            _openPileTransfers = null;
+            _steps.Enqueue(step);
         }
 
         internal void QueuePhase(string label, bool opponent, Vector2 boardCenter, Action onStart)
         {
-            _steps.Enqueue(PhaseBanner(label, opponent, boardCenter, onStart));
+            QueueStep(PhaseBanner(label, opponent, boardCenter, onStart));
         }
 
         internal void QueueDuelStart(Vector2 boardCenter)
         {
-            _steps.Enqueue(PhaseBanner("DUEL", false, boardCenter, null, intro: true));
+            QueueStep(PhaseBanner("DUEL", false, boardCenter, null, intro: true));
         }
 
         internal void QueueChain(CardPose source, uint code, int chainNumber, bool opponent)
         {
-            _steps.Enqueue(ChainActivation(source, code, chainNumber, opponent));
+            QueueStep(ChainActivation(source, code, chainNumber, opponent));
         }
 
         internal void QueueChainResolution(Vector2 center, uint code, int chainNumber)
         {
-            _steps.Enqueue(ChainResolution(center, code, chainNumber));
+            QueueStep(ChainResolution(center, code, chainNumber));
         }
 
         internal void QueueAttackArrow(Vector2 from, Vector2 to, bool opponent)
         {
-            _steps.Enqueue(AttackArrow(from, to, opponent));
+            QueueStep(AttackArrow(from, to, opponent));
         }
 
         internal void QueueAttack(CardPose from, Vector2 to, uint code, bool direct, bool opponent, Action onFinish)
         {
-            _steps.Enqueue(Attack(from, to, code, direct, opponent, onFinish));
+            QueueStep(Attack(from, to, code, direct, opponent, onFinish));
         }
 
         internal void QueueLifeChange(Vector2 point, int delta, Action onStart)
         {
-            _steps.Enqueue(LifeChange(point, delta, onStart));
+            QueueStep(LifeChange(point, delta, onStart));
         }
 
         private CompositeCardView TakeCard(uint code, bool faceDown, bool detailed = false)
@@ -243,10 +263,18 @@ namespace YGOPortable.UI
             ApplyPose(view, new CardPose(point, size, angle), flip);
         }
 
-        private IEnumerator DrawCards(IReadOnlyList<CardFlight> flights, Action<int> onArrive)
+        private IEnumerator PlayPileTransfers(List<(CardFlight flight, Action onArrive)> transfers)
         {
-            const float travelTime = 0.26f;
-            const float stagger = 0.062f;
+            if (ReferenceEquals(_openPileTransfers, transfers)) _openPileTransfers = null;
+            var flights = new CardFlight[transfers.Count];
+            for (int i = 0; i < flights.Length; i++) flights[i] = transfers[i].flight;
+            yield return FlyCards(flights, i => transfers[i].onArrive?.Invoke(), draw: false);
+        }
+
+        private IEnumerator FlyCards(IReadOnlyList<CardFlight> flights, Action<int> onArrive, bool draw)
+        {
+            float travelTime = draw ? .26f : .23f;
+            float stagger = draw ? .062f : .034f;
             var views = new CompositeCardView[flights.Count];
             int started = 0;
             int arrived = 0;
@@ -256,8 +284,9 @@ namespace YGOPortable.UI
             {
                 while (started < flights.Count && elapsed >= started * stagger)
                 {
-                    views[started] = TakeCard(0, true);
-                    LotdAudio.PlayDraw();
+                    var flight = flights[started];
+                    views[started] = TakeCard(flight.StartsFaceDown ? 0u : flight.Code, flight.StartsFaceDown);
+                    if (draw) LotdAudio.PlayDraw();
                     started++;
                 }
                 for (int i = arrived; i < started; i++)
@@ -317,8 +346,8 @@ namespace YGOPortable.UI
             }
             else
             {
-                float lift = motion == CardMotion.ChangePosition ? 13f : 31f;
-                float time = motion == CardMotion.Transfer ? .23f : .27f;
+                float lift = motion == CardMotion.ChangePosition || motion == CardMotion.Material ? 13f : 31f;
+                float time = motion == CardMotion.Material ? .20f : motion == CardMotion.Transfer ? .23f : .27f;
                 yield return Animate(time, t => ApplyFlight(proxy, flight, t, lift));
             }
 
@@ -695,7 +724,7 @@ namespace YGOPortable.UI
 
         internal void QueueRandomResult(string label, Vector2 boardCenter, bool opponent, Action playSound)
         {
-            _steps.Enqueue(RandomResult(label, boardCenter, opponent, playSound));
+            QueueStep(RandomResult(label, boardCenter, opponent, playSound));
         }
 
         private IEnumerator RandomResult(string label, Vector2 center, bool opponent, Action playSound)

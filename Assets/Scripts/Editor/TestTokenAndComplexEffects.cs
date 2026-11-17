@@ -683,6 +683,9 @@ namespace YGOPortable.Editor
                     // 7. Post-Chain Resolution: Kitkallos (92731385) was Fusion Summoned on CL3 -> triggers single optional effect via MSG_SELECT_EFFECTYN
                     if (p.playerId == 0 && p.messageType == YgoConstants.MSG_SELECT_EFFECTYN && p.promptCardCode == 92731385)
                     {
+                        if (p.promptEffectDesc != (92731385UL << 20) ||
+                            CardDatabase.ResolveDescription(p.promptEffectDesc) != "덱에서 카드를 패에 넣거나 묘지로 보낸다")
+                            throw new Exception("The lone native Kitkallos trigger did not resolve to its on-summon effect text.");
                         verifiedKitkallosOptionalDecline = true;
                         Debug.Log("[SEGOC TEST] Kitkallos on-summon optional trigger (MSG_SELECT_EFFECTYN) received -> Submitting 0 (NO / Decline)");
                         s.SubmitResponseInt(0);

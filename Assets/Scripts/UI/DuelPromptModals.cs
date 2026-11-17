@@ -27,6 +27,7 @@ namespace YGOPortable.UI
         private CanvasGroup _promptInput;
         private DuelPromptBackdrop _promptShade;
         private RectTransform _fieldViewTab;
+        private Button _fieldViewButton;
         private Image _fieldViewIcon;
         private Text _fieldViewLabel;
         private bool _chainPrompt;
@@ -53,6 +54,9 @@ namespace YGOPortable.UI
         private RectTransform _zoneGrid;
         private ScrollRect _zoneScroll;
         private Text _zoneEmpty;
+        private Button _zoneClose;
+        private GameObject _focusBeforePrompt;
+        private GameObject _focusBeforeZone;
 
         // Result refs
         private Image _resCrown;
@@ -60,6 +64,7 @@ namespace YGOPortable.UI
         private Image _resTitleRule;
         private Text _resHeadline;
         private Text _resStats;
+        private Button _rematchButton;
         private Action _resRematch;
         private Action _resOppSel;
         private Action _resMenu;
@@ -89,8 +94,8 @@ namespace YGOPortable.UI
 
         public void HideAll()
         {
-            if (ModalRoot != null) ModalRoot.SetActive(false);
             CloseZoneViewer();
+            HidePrompt();
         }
 
         internal void SetBrowsablePiles(params DuelZoneImage[] piles) => _promptShade.BrowsablePiles = piles;
@@ -104,7 +109,19 @@ namespace YGOPortable.UI
 
         public void HideResult()
         {
-            if (ResultRoot != null) ResultRoot.SetActive(false);
+            if (ResultRoot == null) return;
+            bool restoreFocus = FocusIsInside(ResultRoot);
+            ResultRoot.SetActive(false);
+            if (restoreFocus) SetFocus(null);
+        }
+
+        private void HidePrompt()
+        {
+            if (!IsPromptOpen) return;
+            bool restoreFocus = FocusIsInside(ModalRoot);
+            ModalRoot.SetActive(false);
+            if (restoreFocus) SetFocus(_focusBeforePrompt);
+            _focusBeforePrompt = null;
         }
 
         private void ClearBodyAndFooter()
@@ -161,12 +178,13 @@ namespace YGOPortable.UI
 
             BuildChainPicker(dim);
             _fieldViewTab = LotdUiKit.FillRect("FieldView", dim);
-            var button = DuelStyle.Button(_fieldViewTab, "B", "", ToggleFieldView, 14);
-            _fieldViewLabel = button.GetComponentInChildren<Text>();
+            _fieldViewButton = DuelStyle.Button(_fieldViewTab, "B", "", ToggleFieldView, 14);
+            PrepareFocusControls(_fieldViewTab, OnModalCloseClicked);
+            _fieldViewLabel = _fieldViewButton.GetComponentInChildren<Text>();
             _fieldViewLabel.rectTransform.anchorMin = new Vector2(.30f, 0f);
             _fieldViewLabel.rectTransform.anchorMax = new Vector2(.97f, 1f);
             _fieldViewLabel.rectTransform.offsetMin = _fieldViewLabel.rectTransform.offsetMax = Vector2.zero;
-            var icon = LotdUiKit.CreateRect("Icon", button.transform, new Vector2(.06f, .14f),
+            var icon = LotdUiKit.CreateRect("Icon", _fieldViewButton.transform, new Vector2(.06f, .14f),
                 new Vector2(.28f, .86f), Vector2.zero, Vector2.zero);
             _fieldViewIcon = LotdUiKit.AddImage(icon.gameObject, DuelVisualAssets.PromptFieldArrow, Color.white, true, false);
             ModalRoot.SetActive(false);
@@ -177,6 +195,8 @@ namespace YGOPortable.UI
             if (!IsPromptOpen || IsZoneViewerOpen) return;
             LotdAudio.PlayClick();
             SetFieldView(!IsShowingField);
+            if (IsShowingField) SetFocus(_fieldViewButton.gameObject);
+            else FocusPrompt();
         }
 
         private void SetFieldView(bool showing)
@@ -208,12 +228,6 @@ namespace YGOPortable.UI
             var summary = LotdUiKit.CreateRect("Summary", header, new Vector2(.67f, .07f), new Vector2(.972f, .93f),
                 Vector2.zero, Vector2.zero);
             _chainSummary = LotdUiKit.AddFittedText(summary, "Text", "", 16, 10, TextAnchor.MiddleRight, DuelStyle.Gold, FontStyle.Bold);
-            if (DuelVisualAssets.ChainLinks != null)
-            {
-                var links = LotdUiKit.CreateRect("Links", header, new Vector2(.62f, .34f), new Vector2(.695f, .66f),
-                    Vector2.zero, Vector2.zero);
-                LotdUiKit.AddImage(links.gameObject, DuelVisualAssets.ChainLinks, DuelStyle.Gold, true, false);
-            }
 
             var cards = LotdUiKit.CreateRect("Cards", _chainBox, new Vector2(.019f, .208f), new Vector2(.563f, .798f),
                 Vector2.zero, Vector2.zero);
@@ -321,12 +335,13 @@ namespace YGOPortable.UI
 
         public void ShowPrompt(DuelSession session, DuelPrompt prompt)
         {
+            if (!IsPromptOpen) _focusBeforePrompt = EventSystem.current?.currentSelectedGameObject;
             _curSession = session;
             _curPrompt = prompt;
             ClearBodyAndFooter();
             if (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN && !prompt.forced && prompt.candidates.Count == 0)
             {
-                ModalRoot.SetActive(false);
+                HidePrompt();
                 _onSubmitResponse?.Invoke(BitConverter.GetBytes(-1));
                 return;
             }
@@ -348,6 +363,8 @@ namespace YGOPortable.UI
             if (_chainPrompt)
             {
                 RenderChainPicker(session, prompt);
+                PrepareFocusControls(_chainBox, OnModalCloseClicked);
+                FocusPrompt();
                 return;
             }
 
@@ -391,15 +408,20 @@ namespace YGOPortable.UI
                     RenderRockPaperScissors();
                     break;
                 default:
-                    ModalRoot.SetActive(false);
+                    HidePrompt();
                     break;
+            }
+            if (IsPromptOpen)
+            {
+                PrepareFocusControls(_modalBox, OnModalCloseClicked);
+                FocusPrompt();
             }
         }
 
         private void Submit(byte[] bytes)
         {
             if (!CanAnswerPrompt) return;
-            ModalRoot.SetActive(false);
+            HidePrompt();
             _onSubmitResponse?.Invoke(bytes);
         }
 
@@ -507,7 +529,7 @@ namespace YGOPortable.UI
                     controller = prompt.promptCon,
                     location = prompt.promptLoc,
                     sequence = prompt.promptSeq,
-                    description = prompt.promptDesc,
+                    description = prompt.promptEffectDesc != 0 ? prompt.promptEffectDesc : prompt.promptDesc,
                 } }
                 : prompt.candidates;
             _chainTitle.text = prompt.forced ? "필수 효과 순서 선택" : "발동할 효과 선택";
@@ -570,6 +592,7 @@ namespace YGOPortable.UI
                     var button = tile.gameObject.AddComponent<Button>();
                     button.targetGraphic = tile.GetComponent<Image>();
                     button.onClick.AddListener(() => Select(index));
+                    tile.gameObject.AddComponent<DuelPromptSelection>().OnSelected = () => Select(index);
                 }
             }
 
@@ -1140,7 +1163,7 @@ namespace YGOPortable.UI
                 DuelStyle.Gold, FontStyle.Bold);
 
             var closeRt = LotdUiKit.CreateRect("Close", hdr, new Vector2(0.82f, 0.15f), new Vector2(0.98f, 0.85f), Vector2.zero, Vector2.zero);
-            DuelStyle.Button(closeRt, "B", "✕ 닫기", CloseZoneViewer, 16);
+            _zoneClose = DuelStyle.Button(closeRt, "B", "✕ 닫기", CloseZoneViewer, 16);
 
             var body = LotdUiKit.CreateRect("Body", win, Vector2.zero, Vector2.one,
                 new Vector2(10f, 8f), new Vector2(-10f, -62f));
@@ -1164,22 +1187,12 @@ namespace YGOPortable.UI
         public void CloseZoneViewer()
         {
             if (!IsZoneViewerOpen) return;
+            bool restoreFocus = FocusIsInside(ZoneViewRoot);
             ZoneViewRoot.SetActive(false);
             _promptInput.interactable = true;
-            for (int i = _zoneGrid.childCount - 1; i >= 0; i--)
-            {
-                var child = _zoneGrid.GetChild(i);
-                if (Application.isPlaying)
-                {
-                    child.gameObject.SetActive(false);
-                    child.SetParent(null, false);
-                    UnityEngine.Object.Destroy(child.gameObject);
-                }
-                else
-                {
-                    UnityEngine.Object.DestroyImmediate(child.gameObject);
-                }
-            }
+            if (restoreFocus) SetFocus(IsShowingField ? _fieldViewButton.gameObject : _focusBeforeZone);
+            _focusBeforeZone = null;
+            ClearChildren(_zoneGrid);
             _zoneScroll.StopMovement();
             _zoneGrid.anchoredPosition = Vector2.zero;
         }
@@ -1221,7 +1234,7 @@ namespace YGOPortable.UI
         private void StartZoneViewer()
         {
             CloseZoneViewer();
-            EventSystem.current?.SetSelectedGameObject(null);
+            _focusBeforeZone = EventSystem.current?.currentSelectedGameObject;
             _promptInput.interactable = false;
             ZoneViewRoot.SetActive(true);
         }
@@ -1238,6 +1251,8 @@ namespace YGOPortable.UI
             _zoneGrid.anchoredPosition = Vector2.zero;
             ZoneViewRoot.transform.SetAsLastSibling();
             CardAnimationManager.Instance?.BringToFront();
+            PrepareFocusControls(ZoneViewRoot.transform, CloseZoneViewer);
+            SetFocus(FirstFocus(_zoneGrid)?.gameObject ?? _zoneClose.gameObject);
         }
 
         private void AddZoneCardTile(
@@ -1312,7 +1327,7 @@ namespace YGOPortable.UI
             DuelStyle.Shadow(_resStats);
 
             var r1 = LotdUiKit.CreateRect("Rematch", dim, new Vector2(.22f, .169f), new Vector2(.397f, .234f), Vector2.zero, Vector2.zero);
-            DuelStyle.Button(r1, "B", "재대결", () => { HideResult(); _resRematch?.Invoke(); }, 18, gold: true);
+            _rematchButton = DuelStyle.Button(r1, "B", "재대결", () => { HideResult(); _resRematch?.Invoke(); }, 18, gold: true);
 
             var r2 = LotdUiKit.CreateRect("OpponentSelect", dim, new Vector2(.411f, .169f), new Vector2(.589f, .234f), Vector2.zero, Vector2.zero);
             DuelStyle.Button(r2, "B", "상대 선택", () => { HideResult(); _resOppSel?.Invoke(); }, 18);
@@ -1349,9 +1364,57 @@ namespace YGOPortable.UI
             ResultRoot.transform.SetAsLastSibling();
             ResultRoot.SetActive(true);
             CardAnimationManager.Instance?.BringToFront();
+            PrepareFocusControls(ResultRoot.transform, TriggerMenu);
+            SetFocus(_rematchButton.gameObject);
         }
 
         // ==================== UI HELPERS ====================
+        private void FocusPrompt()
+        {
+            if (EventSystem.current == null) return;
+            Canvas.ForceUpdateCanvases();
+            if (_chainPrompt)
+            {
+                var choice = _chainCards.GetComponentsInChildren<Button>().FirstOrDefault(b => b.name == $"Ch_{_chainSelection}");
+                SetFocus(choice != null ? choice.gameObject : _fieldViewButton.gameObject);
+                return;
+            }
+            SetFocus((FirstFocus(_modalBody) ?? FirstFocus(_modalFooter) ?? _fieldViewButton).gameObject);
+        }
+
+        private static Selectable FirstFocus(Transform parent) =>
+            parent.GetComponentsInChildren<Selectable>().FirstOrDefault(control =>
+                control is not Scrollbar && control.IsInteractable() && control.navigation.mode != Navigation.Mode.None);
+
+        private static void PrepareFocusControls(Transform parent, Action onCancel)
+        {
+            foreach (var control in parent.GetComponentsInChildren<Selectable>())
+            {
+                var palette = control.colors;
+                palette.selectedColor = palette.highlightedColor;
+                control.colors = palette;
+                var handler = control.GetComponent<DuelPromptSelection>() ??
+                    control.gameObject.AddComponent<DuelPromptSelection>();
+                handler.OnCancelled = onCancel;
+            }
+        }
+
+        private static bool FocusIsInside(GameObject overlay)
+        {
+            var current = EventSystem.current?.currentSelectedGameObject;
+            return current != null && current.transform.IsChildOf(overlay.transform);
+        }
+
+        private static void SetFocus(GameObject target)
+        {
+            var events = EventSystem.current;
+            if (events == null) return;
+            if (target != null && (!target.TryGetComponent<Selectable>(out var control) ||
+                !control.isActiveAndEnabled || !control.IsInteractable()))
+                target = null;
+            events.SetSelectedGameObject(target);
+        }
+
         private Button AddFooterButton(string label, Action onClick, bool gold)
         {
             var slot = LotdUiKit.CreateRect($"Btn_{label}", _modalFooter,
@@ -1543,6 +1606,44 @@ namespace YGOPortable.UI
             int c = 0;
             while (v != 0) { v &= v - 1; c++; }
             return c;
+        }
+    }
+
+    internal sealed class DuelPromptSelection : MonoBehaviour, ISelectHandler, ICancelHandler
+    {
+        internal Action OnSelected { get; set; }
+        internal Action OnCancelled { get; set; }
+
+        public void OnSelect(BaseEventData eventData)
+        {
+            var scroll = GetComponentInParent<ScrollRect>();
+            if (scroll != null && scroll.content != null && scroll.viewport != null && transform.IsChildOf(scroll.content))
+            {
+                var view = scroll.viewport;
+                var visible = view.rect;
+                var choice = RectTransformUtility.CalculateRelativeRectTransformBounds(view, transform);
+                var shift = Vector3.zero;
+                if (scroll.horizontal)
+                    shift.x = choice.min.x < visible.xMin ? visible.xMin - choice.min.x :
+                        Mathf.Min(0f, visible.xMax - choice.max.x);
+                if (scroll.vertical)
+                    shift.y = choice.max.y > visible.yMax ? visible.yMax - choice.max.y :
+                        Mathf.Max(0f, visible.yMin - choice.min.y);
+                if (shift != Vector3.zero)
+                {
+                    scroll.StopMovement();
+                    scroll.content.anchoredPosition += (Vector2)scroll.content.parent.InverseTransformVector(view.TransformVector(shift));
+                }
+            }
+            OnSelected?.Invoke();
+        }
+
+        public void OnCancel(BaseEventData eventData)
+        {
+            // Escape is handled by the field's global shortcut.
+            if (Input.GetKeyDown(KeyCode.Escape) || OnCancelled == null) return;
+            OnCancelled();
+            eventData.Use();
         }
     }
 

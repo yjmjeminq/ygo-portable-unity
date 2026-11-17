@@ -96,6 +96,7 @@ namespace YGOPortable.Core
         public uint promptLoc;
         public uint promptSeq;
         public ulong promptDesc;
+        public ulong promptEffectDesc;
 
         // SelectOption / AnnounceNumber / AnnounceCard
         public List<ulong> options = new List<ulong>();
@@ -855,6 +856,8 @@ namespace YGOPortable.Core
                     };
                     br.ReadUInt32(); // pos
                     p.promptDesc = br.ReadUInt64();
+                    if (p.promptDesc is 0 or 221)
+                        p.promptEffectDesc = YgoNativeBridge.YGO_GetSingleTriggerDescription(NativePtr, p.playerId, p.promptCardCode, p.promptDesc);
                     ActivePrompt = p;
                     break;
                 }

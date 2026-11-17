@@ -167,7 +167,7 @@ namespace YGOPortable.UI
 
             _modals.HideAll();
             _modals.HideResult();
-            _titleAndMenu.SettingsRoot.SetActive(false);
+            _titleAndMenu.CloseSettings(restoreFocus: false);
 
             _titleAndMenu.TitleRoot.SetActive(screen == AppScreen.Title);
             _titleAndMenu.MenuRoot.SetActive(screen == AppScreen.MainMenu);
@@ -237,6 +237,8 @@ namespace YGOPortable.UI
         {
             if (_session == null)
             {
+                _titleAndMenu?.Update();
+                _oppSelect?.Update();
                 _deckEditor?.Update();
                 return;
             }

@@ -117,6 +117,8 @@ namespace YGOPortable.UI
         private (byte con, uint loc, uint seq)? _preferredDropZone;
         private int _preferredAttackTargetSeq = -1;
         private readonly Dictionary<(byte con, uint loc, uint seq), int> _arrivingCards = new Dictionary<(byte, uint, uint), int>();
+        private readonly Dictionary<(byte controller, uint sequence), List<(uint code, CardPose from, bool faceDown, uint index)>>
+            _pendingXyzMaterials = new Dictionary<(byte, uint), List<(uint, CardPose, bool, uint)>>();
         private bool _dragHighlightMZone;
         private bool _dragHighlightSZone;
         private bool _dragHighlightAttack;
@@ -231,6 +233,7 @@ namespace YGOPortable.UI
             }
 
             _arrivingCards.Clear();
+            _pendingXyzMaterials.Clear();
             Array.Clear(_handCounts, 0, _handCounts.Length);
             _pendingPlaces.Clear();
             _pendingPlacePrompt = null;
@@ -1463,11 +1466,13 @@ namespace YGOPortable.UI
         private CardPose GetCardPose(byte controller, uint location, uint sequence, uint position, int handCount = -1)
         {
             var animator = CardAnimationManager.Instance;
+            bool material = (location & YgoConstants.LOCATION_OVERLAY) != 0;
             location &= ~YgoConstants.LOCATION_OVERLAY;
             if (animator == null || controller >= _handCounts.Length) return default;
 
             bool opponent = controller != _session.HumanPlayerIndex;
-            float angle = CardAngle(location, position, opponent);
+            uint cardPosition = material ? YgoConstants.POS_FACEUP_ATTACK : position;
+            float angle = CardAngle(location, cardPosition, opponent);
             if (location == YgoConstants.LOCATION_HAND)
             {
                 var row = opponent ? _oppHandBar : _myHandBar;
@@ -1477,8 +1482,16 @@ namespace YGOPortable.UI
             }
 
             var rect = GetSlot(controller, location, sequence)?.root ?? GetStack(controller, location)?.root;
-            return rect == null ? default : animator.GetPose(rect, (SlotCardMin + SlotCardMax) * 0.5f,
-                SlotCardMax - SlotCardMin, angle, CardScale(location, position));
+            if (rect == null) return default;
+            var center = (SlotCardMin + SlotCardMax) * 0.5f;
+            float scale = CardScale(location, cardPosition);
+            if (material)
+            {
+                // The engine stores the material index in the position field for overlay locations.
+                center += new Vector2(.035f * Math.Min(position, 3u), opponent ? .13f : -.13f);
+                scale *= .60f;
+            }
+            return animator.GetPose(rect, center, SlotCardMax - SlotCardMin, angle, scale);
         }
 
         private FieldSlotView GetSlot(byte con, uint loc, uint seq)
@@ -1548,8 +1561,8 @@ namespace YGOPortable.UI
                 uint sequence = (uint)(first + i);
                 var to = GetCardPose(controller, YgoConstants.LOCATION_HAND, sequence, 0);
                 if (!from.IsValid || !to.IsValid) return;
-                bool privateDraw = controller != _session.HumanPlayerIndex || cards[i] == 0;
-                flights.Add(new CardFlight(privateDraw ? 0u : cards[i], from, to, true, privateDraw));
+                // The session masks hidden draws for the other duelist with code zero.
+                flights.Add(new CardFlight(cards[i], from, to, true, cards[i] == 0));
             }
             var keys = new (byte, uint, uint)[flights.Count];
             for (int i = 0; i < keys.Length; i++)
@@ -1581,10 +1594,38 @@ namespace YGOPortable.UI
 
             bool fromBack = e.code == 0 || IsFaceDown(e.fromCon, e.fromLoc, e.fromPos);
             bool toBack = disappearing ? fromBack : e.code == 0 || IsFaceDown(e.toCon, e.toLoc, e.toPos);
+            if (e.toLoc == (YgoConstants.LOCATION_EXTRA | YgoConstants.LOCATION_OVERLAY))
+            {
+                // The materials arrive first, while the Xyz host is still indexed in the Extra Deck.
+                // Wait for its move so their destination is the selected monster zone.
+                var host = (e.toCon, e.toSeq);
+                if (!_pendingXyzMaterials.TryGetValue(host, out var materials))
+                {
+                    materials = new List<(uint, CardPose, bool, uint)>();
+                    _pendingXyzMaterials.Add(host, materials);
+                }
+                materials.Add((e.code, from, fromBack, e.toPos));
+                return;
+            }
+            if (e.fromLoc == YgoConstants.LOCATION_EXTRA && _pendingXyzMaterials.Remove((e.fromCon, e.fromSeq), out var pending))
+            {
+                uint hostLocation = e.toLoc == YgoConstants.LOCATION_MZONE ? e.toLoc : e.fromLoc;
+                byte hostController = hostLocation == e.toLoc ? e.toCon : e.fromCon;
+                uint hostSequence = hostLocation == e.toLoc ? e.toSeq : e.fromSeq;
+                foreach (var material in pending)
+                {
+                    var arrival = GetCardPose(hostController, hostLocation | YgoConstants.LOCATION_OVERLAY, hostSequence, material.index);
+                    var materialFlight = new CardFlight(material.code, material.from, arrival, material.faceDown, material.code == 0);
+                    animator.QueueMove(materialFlight, CardMotion.Material, null);
+                }
+            }
+
+            bool materialMove = ((e.fromLoc | e.toLoc) & YgoConstants.LOCATION_OVERLAY) != 0;
             bool sameZone = e.fromCon == e.toCon && e.fromLoc == e.toLoc && e.fromSeq == e.toSeq;
             CardMotion motion = CardMotion.Transfer;
             if (disappearing) motion = CardMotion.Vanish;
             else if ((e.reason & YgoConstants.REASON_DESTROY) != 0) motion = CardMotion.Destroy;
+            else if (materialMove) motion = CardMotion.Material;
             else if (sameZone) motion = CardMotion.ChangePosition;
             else if ((e.toLoc & YgoConstants.LOCATION_ONFIELD) != 0 && toBack) motion = CardMotion.Set;
             else if (e.toLoc == YgoConstants.LOCATION_MZONE && e.fromLoc != YgoConstants.LOCATION_MZONE)
@@ -1605,7 +1646,11 @@ namespace YGOPortable.UI
                 return;
             }
             var key = HideUntilArrival(e.toCon, e.toLoc, e.toSeq);
-            animator.QueueMove(flight, motion, () => ShowArrival(key));
+            if (motion == CardMotion.Transfer &&
+                e.fromLoc is YgoConstants.LOCATION_DECK or YgoConstants.LOCATION_EXTRA &&
+                e.toLoc is YgoConstants.LOCATION_GRAVE or YgoConstants.LOCATION_REMOVED)
+                animator.QueuePileTransfer(flight, () => ShowArrival(key));
+            else animator.QueueMove(flight, motion, () => ShowArrival(key));
         }
 
         private void HandleChainActivatedEvent(ChainLinkInfo link)
@@ -1673,6 +1718,7 @@ namespace YGOPortable.UI
 
         private void HandleTurnStarted(int turn, int player)
         {
+            _pendingXyzMaterials.Clear();
             bool opponent = player != _session.HumanPlayerIndex;
             var animator = CardAnimationManager.Instance;
             if (animator == null) return;

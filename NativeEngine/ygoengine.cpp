@@ -19,6 +19,10 @@
 
 #include "ocgapi.h"
 #include "ocgapi_constants.h"
+#include "card.h"
+#include "duel.h"
+#include "effect.h"
+#include "field.h"
 
 namespace {
 
@@ -312,6 +316,24 @@ YGO_API const void* YGO_GetMessage(void* duel, uint32_t* outLen) {
         return nullptr;
     }
     return OCG_DuelGetMessage(static_cast<OCG_Duel>(duel), outLen);
+}
+
+YGO_API uint64_t YGO_GetSingleTriggerDescription(void* handle, uint8_t player, uint32_t code, uint64_t hint) {
+    if (!handle || (hint != 0 && hint != 221)) return 0;
+    auto& core = static_cast<duel*>(handle)->game_field->core;
+    if (core.units.size() < 2 || core.select_chains.size() != 1) return 0;
+
+    auto unit = core.units.begin();
+    const auto* prompt = Processors::get_opt_variant<Processors::SelectEffectYesNo>(*unit++);
+    if (!prompt || prompt->step != 1 || prompt->playerid != player || prompt->description != hint ||
+        !prompt->pcard || prompt->pcard->data.code != code) return 0;
+
+    // The stock messages for a lone optional phase or event trigger contain only a generic prompt.
+    if (hint == 0 && !Processors::get_opt_variant<Processors::PhaseEvent>(*unit)) return 0;
+    if (hint == 221 && !Processors::get_opt_variant<Processors::PointEvent>(*unit)) return 0;
+
+    const auto* effect = core.select_chains.front().triggering_effect;
+    return effect && effect->get_handler() == prompt->pcard ? effect->description : 0;
 }
 
 YGO_API void YGO_SetResponse(void* duel, const void* buf, uint32_t len) {

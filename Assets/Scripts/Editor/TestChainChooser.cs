@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using YGOPortable.Core;
 using YGOPortable.UI;
@@ -19,9 +21,10 @@ namespace YGOPortable.Editor
             VerifySingleEffect(duel);
             VerifyGroupedLocations(duel);
             VerifyScrollableChoices(duel);
+            VerifyNavigation(duel);
             VerifyEmptyChain(duel);
             VerifyMaterialChoices(duel);
-            Debug.Log("[VERIFY CHAIN CHOOSER] Grouped locations, native indices, duplicate effects, zone overlay, empty chain and material selection passed.");
+            Debug.Log("[VERIFY CHAIN CHOOSER] Grouped locations, native indices, duplicate effects, zone overlay, input focus, empty chain and material selection passed.");
         }
 
         internal static void SubmitNativeChoice(DuelSession duel, int index)
@@ -182,6 +185,76 @@ namespace YGOPortable.Editor
             Require(view.Responses.SequenceEqual(new[] { 11 }), "Scrolling changed the displayed chain candidate indices.");
         }
 
+        private static void VerifyNavigation(DuelSession duel)
+        {
+            var previous = EventSystem.current;
+            var host = new GameObject("Duel Choice Navigation Verification", typeof(EventSystem));
+            var events = host.GetComponent<EventSystem>();
+            const BindingFlags lifecycle = BindingFlags.Instance | BindingFlags.NonPublic;
+            bool registeredManually = !Application.isPlaying;
+            try
+            {
+                if (registeredManually)
+                    typeof(EventSystem).GetMethod("OnEnable", lifecycle).Invoke(events, null);
+                EventSystem.current = events;
+                using var view = new ChainView();
+                var prompt = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_CHAIN, playerId = 0 };
+                for (uint i = 0; i < 12; i++)
+                {
+                    prompt.candidates.Add(new SelectableCardItem
+                    {
+                        code = LadyLabrynth,
+                        location = YgoConstants.LOCATION_GRAVE,
+                        sequence = i,
+                        description = ((ulong)LadyLabrynth << 20) | (i % 2),
+                    });
+                }
+
+                view.Show(duel, prompt);
+                Require(events.currentSelectedGameObject == view.Choice(0).gameObject, "New chain prompt did not receive input focus.");
+                ExecuteEvents.Execute(events.currentSelectedGameObject,
+                    new AxisEventData(events) { moveDir = MoveDirection.Right, moveVector = Vector2.right }, ExecuteEvents.moveHandler);
+                Require(events.currentSelectedGameObject == view.Choice(1).gameObject, "Right navigation did not focus the next effect.");
+                view.VerifyEffect(prompt.candidates[1]);
+                var last = view.Choice(11).gameObject;
+                events.SetSelectedGameObject(last);
+                var scroll = last.GetComponentInParent<ScrollRect>();
+                var bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(scroll.viewport, last.transform);
+                Require(bounds.max.x <= scroll.viewport.rect.xMax + 0.5f, "A focused effect scrolled beyond the visible strip.");
+                ExecuteEvents.Execute(last, new BaseEventData(events), ExecuteEvents.submitHandler);
+                Require(view.Responses.Count == 0, "Submitting on a focused effect skipped its review step.");
+
+                view.Modals.ShowCodeListViewer("내 묘지", new[] { LadyLabrynth });
+                Require(events.currentSelectedGameObject.transform.IsChildOf(view.Modals.ZoneViewRoot.transform),
+                    "The zone viewer failed to take input focus.");
+                ExecuteEvents.Execute(events.currentSelectedGameObject, new BaseEventData(events), ExecuteEvents.cancelHandler);
+                Require(!view.Modals.IsZoneViewerOpen && events.currentSelectedGameObject == last && view.Responses.Count == 0,
+                    "Leaving a zone viewer did not restore the pending chain choice and its focus.");
+
+                var fieldView = view.Modals.ModalRoot.transform.Find("FieldView/B").GetComponent<Button>();
+                fieldView.onClick.Invoke();
+                view.Modals.ShowCodeListViewer("내 묘지", Array.Empty<uint>());
+                Require(events.currentSelectedGameObject.transform.parent.name == "Close",
+                    "An empty zone did not focus its close button.");
+                ExecuteEvents.Execute(events.currentSelectedGameObject, new BaseEventData(events), ExecuteEvents.cancelHandler);
+                Require(events.currentSelectedGameObject == fieldView.gameObject, "The empty zone did not return focus to field view.");
+                ExecuteEvents.Execute(events.currentSelectedGameObject, new BaseEventData(events), ExecuteEvents.cancelHandler);
+                Require(events.currentSelectedGameObject == last && view.Responses.Count == 0,
+                    "Returning from field view changed or activated the pending chain choice.");
+
+                events.SetSelectedGameObject(view.ConfirmButton.gameObject);
+                ExecuteEvents.Execute(events.currentSelectedGameObject, new BaseEventData(events), ExecuteEvents.submitHandler);
+                Require(view.Responses.SequenceEqual(new[] { 11 }), "Submitting the focused confirm sent the wrong chain candidate.");
+            }
+            finally
+            {
+                if (registeredManually)
+                    typeof(EventSystem).GetMethod("OnDisable", lifecycle).Invoke(events, null);
+                UnityEngine.Object.DestroyImmediate(host);
+                if (previous != null) EventSystem.current = previous;
+            }
+        }
+
         private static void VerifyMaterialChoices(DuelSession duel)
         {
             var canvas = new GameObject("Material Chooser Verification", typeof(Canvas));
@@ -278,7 +351,7 @@ namespace YGOPortable.Editor
                 Require(canPass == optional, "The pass button did not match the engine's optional/forced flag.");
             }
 
-            private Transform Choice(int index) =>
+            internal Transform Choice(int index) =>
                 Modals.ModalRoot.GetComponentsInChildren<Transform>().Single(child => child.name == $"Ch_{index}");
 
             internal void SelectChoice(int index, uint source)

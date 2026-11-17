@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
 using UnityEditor.SceneManagement;
@@ -436,12 +437,100 @@ namespace YGOPortable.Editor
                 search.text = "";
                 AssertTrue(dropdown.interactable && dropdown.options.Count == yugiDecks.Count,
                     "Clearing the search should restore the opponent list");
+                VerifyOpponentNavigation(ui, canvas);
             }
             finally
             {
                 UnityEngine.Object.DestroyImmediate(canvas);
             }
             Debug.Log($"[VERIFY ROSTER] {DeckRepository.Characters.Count} opponents, {DeckRepository.PresetDecks.Count} decks and opponent selection passed.");
+        }
+
+        private static void VerifyOpponentNavigation(OpponentSelectUI ui, GameObject canvas)
+        {
+            var events = EventSystem.current;
+            GameObject localEvents = null;
+            if (events == null)
+            {
+                localEvents = new GameObject("Navigation Verification", typeof(EventSystem));
+                events = localEvents.GetComponent<EventSystem>();
+                if (EventSystem.current == null)
+                    typeof(EventSystem).GetMethod("OnEnable", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(events, null);
+            }
+            var selectedBefore = events.currentSelectedGameObject;
+            var sample = DeckRepository.PresetDecks[0];
+            var ownDeck = new UserDeck { name = sample.title, main = sample.main.ToList(), extra = sample.extra.ToList() };
+            DeckRepository.UserDecks.Insert(0, ownDeck);
+            try
+            {
+                Button ButtonAt(GameObject page, string path) => page.transform.Find(path).GetComponent<Button>();
+                void Submit(Button button)
+                {
+                    events.SetSelectedGameObject(button.gameObject);
+                    ExecuteEvents.Execute(button.gameObject, new BaseEventData(events), ExecuteEvents.submitHandler);
+                }
+
+                ui.Open();
+                string firstCell = "CharGridPanel/GridArea/CharSlot_0_0";
+                AssertTrue(events.currentSelectedGameObject == ui.Root.transform.Find(firstCell).gameObject,
+                    "The opponent controller focus should start on the selected character.");
+                var next = ButtonAt(ui.Root, "CharGridPanel/PageBar/Next/B");
+                Submit(next);
+                var pageOpponent = DeckRepository.Characters.Where(character => character.seriesIdx == 0).ElementAt(15);
+                var preview = ui.Root.GetComponentInChildren<CompositeCardView>();
+                AssertTrue(preview.CurrentCode == DeckRepository.GetDecksForCharacter(pageOpponent.id)[0].sigCard,
+                    "The selected opponent stayed on the previous page.");
+
+                var start = ButtonAt(ui.Root, "OppDetailPanel/StartDuelBtn/B");
+                Submit(start);
+                var rock = ButtonAt(ui.JankenRoot, "JnkWin/Hands/H1/B");
+                var first = ButtonAt(ui.JankenRoot, "JnkWin/Order/First/B");
+                var second = ButtonAt(ui.JankenRoot, "JnkWin/Order/Second/B");
+                AssertTrue(ui.JankenRoot.activeSelf && !start.IsInteractable() &&
+                    events.currentSelectedGameObject == ui.JankenRoot.transform.Find("JnkWin/Hands/H0/B").gameObject,
+                    "Opening rock-paper-scissors did not move focus out of the opponent screen.");
+                var resolve = typeof(OpponentSelectUI).GetMethod("ResolveJanken", BindingFlags.Instance | BindingFlags.NonPublic);
+                events.SetSelectedGameObject(rock.gameObject);
+                resolve.Invoke(ui, new object[] { 1, 1 });
+                AssertTrue(rock.gameObject.activeInHierarchy && events.currentSelectedGameObject == rock.gameObject,
+                    "A drawn rock-paper-scissors round should keep the hand controls available.");
+                resolve.Invoke(ui, new object[] { 1, 2 });
+                AssertTrue(ui.JankenRoot.activeSelf && !first.gameObject.activeInHierarchy &&
+                    events.currentSelectedGameObject == second.gameObject,
+                    "The player should see the losing result and confirm going second before the duel starts.");
+                Submit(ButtonAt(ui.JankenRoot, "JnkWin/Cancel/B"));
+                AssertTrue(!ui.JankenRoot.activeSelf && start.IsInteractable() && events.currentSelectedGameObject == start.gameObject,
+                    "Canceling rock-paper-scissors should return focus to Duel Start.");
+                Submit(start);
+                resolve.Invoke(ui, new object[] { 1, 0 });
+                AssertTrue(first.gameObject.activeInHierarchy && events.currentSelectedGameObject == first.gameObject,
+                    "Winning rock-paper-scissors should focus the turn order controls.");
+                Submit(ButtonAt(ui.JankenRoot, "JnkWin/Cancel/B"));
+
+                ui.Root.SetActive(false);
+                var menu = new TitleAndMenuUI(canvas.AddComponent<GameAppController>(), canvas.transform);
+                menu.TitleRoot.SetActive(false);
+                var settings = menu.MenuRoot.GetComponentsInChildren<Button>()[2];
+                Submit(settings);
+                var close = ButtonAt(menu.SettingsRoot, "SettingsWin/Close/BtnClose");
+                AssertTrue(menu.SettingsRoot.activeSelf && !settings.IsInteractable() && events.currentSelectedGameObject == close.gameObject,
+                    "Settings did not take focus or prevent navigation to the main menu.");
+                Submit(close);
+                AssertTrue(!menu.SettingsRoot.activeSelf && settings.IsInteractable() && events.currentSelectedGameObject == settings.gameObject,
+                    "Closing settings should restore main menu focus.");
+                Debug.Log("[VERIFY OPPONENT NAVIGATION] Page and ace stayed in sync, rock-paper-scissors retained focus through all results, and settings restored focus.");
+            }
+            finally
+            {
+                DeckRepository.UserDecks.Remove(ownDeck);
+                events.SetSelectedGameObject(selectedBefore);
+                if (localEvents != null)
+                {
+                    if (EventSystem.current == events)
+                        typeof(EventSystem).GetMethod("OnDisable", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(events, null);
+                    UnityEngine.Object.DestroyImmediate(localEvents);
+                }
+            }
         }
 
         private static void VerifyDeckSearchEmergencyCall(uint[] oppDeckMain)
@@ -1478,6 +1567,9 @@ namespace YGOPortable.Editor
             own.szone[1] = null;
             var kepler = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_OPTION };
             kepler.options.AddRange(new[] { (11609969UL << 20) | 2UL, (11609969UL << 20) | 3UL });
+            AssertTrue(CardDatabase.ResolveDescription((11609969UL << 20) | 1).Contains("계약서") &&
+                CardDatabase.ResolveDescription(kepler.options[1]) == "덱에서 계약서 카드 1장을 패에 넣는다",
+                "Kepler should preview its two alternatives and describe the actual search option in Korean.");
             AssertTrue(BitConverter.ToInt32(new TacticalAI().ComputeResponse(session, kepler), 0) == 1,
                 "D/D/D bounced a monster instead of searching for an unavailable Contract.");
             Debug.Log("[VERIFY DDD TURN PLANNING] Board-based boss choice, fusion recovery, reachable Pendulum scales and Kepler search.");

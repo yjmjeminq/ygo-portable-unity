@@ -133,17 +133,9 @@ namespace YGOPortable.UI
             {
                 _padCardFocus.gameObject.SetActive(false);
                 if (frame.Search) _padUi.OpenText(_archSearchInp);
-                else
-                {
-                    if (frame.PreviousArea || frame.NextArea)
-                    {
-                        float pages = Mathf.Max(1f, _archContent.rect.height / Mathf.Max(1f, _archViewport.rect.height));
-                        _archScroll.verticalNormalizedPosition += (frame.PreviousArea ? 1f : -1f) / pages;
-                        OnArchModalScrolled();
-                    }
-                    _padUi.Handle(_archModalRoot.transform, frame.Direction, frame.Submit, frame.Cancel,
-                        () => _archModalRoot.SetActive(false));
-                }
+                else if (frame.PreviousArea || frame.NextArea) PagePadArchetypes(frame.PreviousArea);
+                else _padUi.Handle(_archModalRoot.transform, frame.Direction, frame.Submit, frame.Cancel,
+                    () => _archModalRoot.SetActive(false), _archSearchInp);
                 return;
             }
 
@@ -184,6 +176,22 @@ namespace YGOPortable.UI
             if (frame.Submit || frame.Alternate) ExecutePadCard(frame.Alternate);
             DrawPadCardFocus();
             ScrollPadDescription(frame.DescriptionScroll);
+        }
+
+        private void PagePadArchetypes(bool previous)
+        {
+            float viewport = _archViewport.rect.height;
+            float overflow = _archContent.rect.height - viewport;
+            if (overflow <= 0f || viewport <= 0f || _archResults.Count == 0) return;
+
+            _archScroll.StopMovement();
+            _archScroll.verticalNormalizedPosition = Mathf.Clamp01(_archScroll.verticalNormalizedPosition +
+                (previous ? viewport : -viewport) / overflow);
+            OnArchModalScrolled();
+            int firstWholeRow = Mathf.Clamp(Mathf.CeilToInt((_archContent.anchoredPosition.y - .01f) / _archRowHeight),
+                0, _archTotalRows - 1);
+            var button = _archPool[ArchetypePoolSlot(firstWholeRow, 0)].loadBtn;
+            _padUi.FocusInScope(_archModalRoot.transform, button);
         }
 
         private void SwitchPadArea(PadArea area)

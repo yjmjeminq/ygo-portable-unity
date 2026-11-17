@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using YGOPortable.AI;
 using YGOPortable.Core;
@@ -38,6 +39,12 @@ namespace YGOPortable.UI
         private Text _oppDeckNote;
         private Button _cloneOppButton;
         private Button _startDuelButton;
+        private Button _previousPageButton;
+        private Button _nextPageButton;
+        private Button _previousMyDeckButton;
+        private Button _nextMyDeckButton;
+        private InputField _searchInput;
+        private CanvasGroup _opponentControls;
         private CompositeCardView _sigCardPreview;
         private Text _myDeckLabel;
         private Text _pageLabel;
@@ -50,6 +57,9 @@ namespace YGOPortable.UI
         private Image _jnkOppImg;
         private GameObject _jnkHandsRow;
         private GameObject _jnkOrderRow;
+        private Button _jnkFirstHand;
+        private Button _jnkChooseFirst;
+        private Button _jnkChooseSecond;
 
         public OpponentSelectUI(GameAppController app, Transform canvasParent)
         {
@@ -62,9 +72,17 @@ namespace YGOPortable.UI
         {
             Root.SetActive(true);
             JankenRoot.SetActive(false);
+            _opponentControls.interactable = true;
             if (_statusToast != null) _statusToast.text = "";
             EnsureValidMyDeckIndex();
             ApplyFilter();
+            FocusCurrentCharacter();
+        }
+
+        internal void Update()
+        {
+            if (!JankenRoot.activeInHierarchy || !Input.GetButtonDown("Cancel")) return;
+            CloseJanken();
         }
 
         public void ShowStatus(string message, bool isError = false)
@@ -75,8 +93,7 @@ namespace YGOPortable.UI
 
         private void EnsureValidMyDeckIndex()
         {
-            if (DeckRepository.UserDecks.Count == 0) return;
-            _myDeckIdx = Mathf.Clamp(_myDeckIdx, 0, DeckRepository.UserDecks.Count - 1);
+            _myDeckIdx = Mathf.Clamp(_myDeckIdx, 0, Mathf.Max(0, DeckRepository.UserDecks.Count - 1));
             UpdateMyDeckLabel();
         }
 
@@ -84,6 +101,7 @@ namespace YGOPortable.UI
         {
             var rt = LotdUiKit.FillRect("Screen_OpponentSelect", parent);
             Root = rt.gameObject;
+            _opponentControls = Root.AddComponent<CanvasGroup>();
 
             var bg = LotdUiKit.FillRect("Bg", rt);
             LotdUiKit.AddImage(bg.gameObject, LotdUiKit.LoadSprite("LOTD/Background/bg_vrains"), Color.white, false, false);
@@ -119,8 +137,8 @@ namespace YGOPortable.UI
             // Search input right of tabs
             var searchPanel = LotdUiKit.CreateRect("SearchBox", rt,
                 new Vector2(0.63f, 0.825f), new Vector2(0.98f, 0.895f), Vector2.zero, Vector2.zero);
-            var inp = LotdUiKit.CreateInputField(searchPanel, "SearchInput", "상대 이름 또는 덱 검색...", 15);
-            inp.onValueChanged.AddListener(v =>
+            _searchInput = LotdUiKit.CreateInputField(searchPanel, "SearchInput", "상대 이름 또는 덱 검색...", 15);
+            _searchInput.onValueChanged.AddListener(v =>
             {
                 _searchQuery = v ?? "";
                 _page = 0;
@@ -138,17 +156,13 @@ namespace YGOPortable.UI
             var pageBar = LotdUiKit.CreateRect("PageBar", leftGridPanel,
                 new Vector2(0.02f, 0.015f), new Vector2(0.98f, 0.085f), Vector2.zero, Vector2.zero);
             var prevRt = LotdUiKit.CreateRect("Prev", pageBar, new Vector2(0.02f, 0.08f), new Vector2(0.24f, 0.92f), Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(prevRt, "B", "◀ 이전 페이지", () => { if (_page > 0) { _page--; RefreshGridPage(); } }, 14);
+            _previousPageButton = LotdUiKit.CreateLotdButton(prevRt, "B", "◀ 이전 페이지", () => ChangePage(-1), 14);
 
             var pageTxtRt = LotdUiKit.CreateRect("PageTxt", pageBar, new Vector2(0.25f, 0.08f), new Vector2(0.75f, 0.92f), Vector2.zero, Vector2.zero);
             _pageLabel = LotdUiKit.AddText(pageTxtRt, "L", "1 / 1", 16, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
 
             var nextRt = LotdUiKit.CreateRect("Next", pageBar, new Vector2(0.76f, 0.08f), new Vector2(0.98f, 0.92f), Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(nextRt, "B", "다음 페이지 ▶", () =>
-            {
-                int maxP = Mathf.Max(0, (_filteredChars.Count - 1) / PageSize);
-                if (_page < maxP) { _page++; RefreshGridPage(); }
-            }, 14);
+            _nextPageButton = LotdUiKit.CreateLotdButton(nextRt, "B", "다음 페이지 ▶", () => ChangePage(1), 14);
 
             // Right Detail & Duel Setup Panel
             var rightPanel = LotdUiKit.CreateMenuPanel(rt, "OppDetailPanel",
@@ -166,8 +180,8 @@ namespace YGOPortable.UI
                 new Vector2(0.43f, 0.04f), new Vector2(1f, 0.96f), Vector2.zero, Vector2.zero);
             _detailName = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("N", nameBox, new Vector2(0, 0.62f), new Vector2(1, 1), Vector2.zero, Vector2.zero),
                 "N", "상대 선택", 21, 13, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
-            _detailBio = LotdUiKit.AddText(LotdUiKit.CreateRect("Bio", nameBox, new Vector2(0, 0.02f), new Vector2(1, 0.60f), Vector2.zero, Vector2.zero),
-                "B", "", 13, TextAnchor.UpperLeft, LotdUiKit.TextMuted);
+            _detailBio = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Bio", nameBox, new Vector2(0, 0.02f), new Vector2(1, 0.60f), Vector2.zero, Vector2.zero),
+                "B", "", 13, 10, TextAnchor.UpperLeft, LotdUiKit.TextMuted);
 
             // Middle: Opponent Signature Deck Switcher + Ace Card Preview
             var oppDeckBox = LotdUiKit.CreateBorderedPanel(rightPanel, "OppDeckBox",
@@ -204,13 +218,13 @@ namespace YGOPortable.UI
             LotdUiKit.AddText(LotdUiKit.CreateRect("Lbl", myDeckBox, new Vector2(0.03f, 0.56f), new Vector2(0.97f, 0.94f), Vector2.zero, Vector2.zero),
                 "L", "내 덱", 14, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
 
-            _myDeckLabel = LotdUiKit.AddText(LotdUiKit.CreateRect("Val", myDeckBox, new Vector2(0.18f, 0.08f), new Vector2(0.82f, 0.56f), Vector2.zero, Vector2.zero),
-                "V", "", 15, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
+            _myDeckLabel = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Val", myDeckBox, new Vector2(0.18f, 0.08f), new Vector2(0.82f, 0.56f), Vector2.zero, Vector2.zero),
+                "V", "", 15, 10, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
 
             var myPrev = LotdUiKit.CreateRect("P", myDeckBox, new Vector2(0.03f, 0.10f), new Vector2(0.16f, 0.52f), Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(myPrev, "B", "◀", () => CycleMyDeck(-1), 14);
+            _previousMyDeckButton = LotdUiKit.CreateLotdButton(myPrev, "B", "◀", () => CycleMyDeck(-1), 14);
             var myNext = LotdUiKit.CreateRect("N", myDeckBox, new Vector2(0.84f, 0.10f), new Vector2(0.97f, 0.52f), Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(myNext, "B", "▶", () => CycleMyDeck(1), 14);
+            _nextMyDeckButton = LotdUiKit.CreateLotdButton(myNext, "B", "▶", () => CycleMyDeck(1), 14);
 
             // Difficulty & Toast
             var diffRt = LotdUiKit.CreateRect("DiffRow", rightPanel,
@@ -295,6 +309,8 @@ namespace YGOPortable.UI
             }
             else if (!_filteredChars.Contains(_selectedChar))
                 SelectCharacter(_filteredChars.FirstOrDefault());
+            else
+                _page = _filteredChars.IndexOf(_selectedChar) / PageSize;
             RefreshGridPage();
         }
 
@@ -308,6 +324,8 @@ namespace YGOPortable.UI
             int totalPages = Mathf.Max(1, (_filteredChars.Count + PageSize - 1) / PageSize);
             _page = Mathf.Clamp(_page, 0, totalPages - 1);
             _pageLabel.text = $"{_page + 1} / {totalPages}  (상대 {_filteredChars.Count}명)";
+            _previousPageButton.interactable = _page > 0;
+            _nextPageButton.interactable = _page < totalPages - 1;
 
             int start = _page * PageSize;
             for (int i = 0; i < _gridSlots.Count; i++)
@@ -339,6 +357,25 @@ namespace YGOPortable.UI
             }
         }
 
+        private void ChangePage(int delta)
+        {
+            int start = (_page + delta) * PageSize;
+            if (start < 0 || start >= _filteredChars.Count) return;
+            var source = delta < 0 ? _previousPageButton : _nextPageButton;
+            _page += delta;
+            SelectCharacter(_filteredChars[start]);
+            RefreshGridPage();
+            if (!source.interactable && EventSystem.current?.currentSelectedGameObject == source.gameObject)
+                FocusCurrentCharacter();
+        }
+
+        private void FocusCurrentCharacter()
+        {
+            int position = _filteredChars.IndexOf(_selectedChar) - _page * PageSize;
+            var target = position >= 0 && position < PageSize ? _gridSlots[position] : _searchInput.gameObject;
+            EventSystem.current?.SetSelectedGameObject(target);
+        }
+
         private void SelectCharacter(OpponentCharacter c, string deckQuery = "")
         {
             _selectedChar = c;
@@ -349,11 +386,14 @@ namespace YGOPortable.UI
             _detailBust.sprite = LotdUiKit.LoadOpponentPortrait(c);
             _detailBust.enabled = c != null;
             _detailName.text = c?.name ?? "검색 결과 없음";
-            _detailBio.text = c == null ? "" : $"[{c.seriesName}] {c.bio}";
+            _detailBio.text = c == null ? "" : string.IsNullOrWhiteSpace(c.bio)
+                ? $"[{c.seriesName}] 상대 덱 {_charDecks.Count}개"
+                : $"[{c.seriesName}]\n{c.bio}";
             _oppDeckDropdown.ClearOptions();
             _oppDeckDropdown.AddOptions(_charDecks.Select((d, i) => $"{i + 1}. {d.title}").ToList());
             _oppDeckDropdown.interactable = _charDecks.Count > 1;
-            _cloneOppButton.interactable = _startDuelButton.interactable = _charDecks.Count > 0;
+            _cloneOppButton.interactable = _charDecks.Count > 0;
+            _startDuelButton.interactable = _charDecks.Count > 0 && DeckRepository.UserDecks.Count > 0;
             RefreshSelectedOppDeck();
         }
 
@@ -391,6 +431,8 @@ namespace YGOPortable.UI
 
         private void UpdateMyDeckLabel()
         {
+            _previousMyDeckButton.interactable = _nextMyDeckButton.interactable = DeckRepository.UserDecks.Count > 1;
+            _startDuelButton.interactable = _charDecks.Count > 0 && DeckRepository.UserDecks.Count > 0;
             if (DeckRepository.UserDecks.Count == 0)
             {
                 _myDeckLabel.text = "저장된 내 덱 없음";
@@ -416,15 +458,26 @@ namespace YGOPortable.UI
             var myDeck = DeckRepository.UserDecks[_myDeckIdx];
             if (!myDeck.IsPlayable)
             {
-                ShowStatus($"내 덱은 메인 40~60장이어야 합니다 (현재 {myDeck.main.Count}장)", true);
+                string reason = myDeck.main.Count < 40 || myDeck.main.Count > 60 ? "메인 덱은 40~60장이어야 합니다." :
+                    myDeck.extra.Count > 15 ? "엑스트라 덱은 최대 15장입니다." : "사이드 덱은 최대 15장입니다.";
+                ShowStatus(reason, true);
                 return;
             }
+            _opponentControls.interactable = false;
             JankenRoot.SetActive(true);
             _jnkHandsRow.SetActive(true);
             _jnkOrderRow.SetActive(false);
             _jnkStatusText.text = "선/후공 결정을 위해 가위·바위·보를 선택하세요!";
             _jnkPlayerImg.sprite = LotdUiKit.LoadSprite("LOTD/Janken/jnkn_player_stone_inactive");
             _jnkOppImg.sprite = LotdUiKit.LoadSprite("LOTD/Janken/jnkn_opp_stone_inactive");
+            EventSystem.current?.SetSelectedGameObject(_jnkFirstHand.gameObject);
+        }
+
+        private void CloseJanken()
+        {
+            JankenRoot.SetActive(false);
+            _opponentControls.interactable = true;
+            EventSystem.current?.SetSelectedGameObject(_startDuelButton.gameObject);
         }
 
         private void BuildJankenOverlay(Transform parent)
@@ -457,25 +510,25 @@ namespace YGOPortable.UI
                 int pick = i;
                 var slot = LotdUiKit.CreateRect($"H{i}", _jnkHandsRow.transform,
                     new Vector2(i * 0.34f, 0f), new Vector2(i * 0.34f + 0.31f, 1f), Vector2.zero, Vector2.zero);
-                LotdUiKit.CreateLotdButton(slot, "B", names[i], () => ResolveJanken(pick), 18);
+                var button = LotdUiKit.CreateLotdButton(slot, "B", names[i], () => ResolveJanken(pick, UnityEngine.Random.Range(0, 3)), 18);
+                if (i == 0) _jnkFirstHand = button;
             }
 
             _jnkOrderRow = LotdUiKit.CreateRect("Order", win, new Vector2(0.12f, 0.10f), new Vector2(0.88f, 0.30f), Vector2.zero, Vector2.zero).gameObject;
             var b1 = LotdUiKit.CreateRect("First", _jnkOrderRow.transform, new Vector2(0f, 0f), new Vector2(0.47f, 1f), Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(b1, "B", "선공 선택 (Going 1st)", () => LaunchMatch(true), 20, gold: true);
+            _jnkChooseFirst = LotdUiKit.CreateLotdButton(b1, "B", "선공 선택", () => LaunchMatch(true), 20, gold: true);
             var b2 = LotdUiKit.CreateRect("Second", _jnkOrderRow.transform, new Vector2(0.53f, 0f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(b2, "B", "후공 선택 (Going 2nd)", () => LaunchMatch(false), 20);
+            _jnkChooseSecond = LotdUiKit.CreateLotdButton(b2, "B", "후공으로 시작", () => LaunchMatch(false), 20);
 
             var cancelRt = LotdUiKit.CreateRect("Cancel", win, new Vector2(0.82f, 0.02f), new Vector2(0.97f, 0.09f), Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(cancelRt, "B", "취소", () => JankenRoot.SetActive(false), 14);
+            LotdUiKit.CreateLotdButton(cancelRt, "B", "취소", CloseJanken, 14);
             JankenRoot.SetActive(false);
         }
 
-        private void ResolveJanken(int playerHand) // 0=scissor, 1=rock, 2=paper
+        private void ResolveJanken(int playerHand, int oppHand) // 0=scissors, 1=rock, 2=paper
         {
             string[] pSprites = { "jnkn_player_scissor_active", "jnkn_player_stone_active", "jnkn_player_paper_active" };
             string[] oSprites = { "jnkn_opp_scissor_active", "jnkn_opp_stone_active", "jnkn_opp_paper_active" };
-            int oppHand = UnityEngine.Random.Range(0, 3);
             _jnkPlayerImg.sprite = LotdUiKit.LoadSprite($"LOTD/Janken/{pSprites[playerHand]}");
             _jnkOppImg.sprite = LotdUiKit.LoadSprite($"LOTD/Janken/{oSprites[oppHand]}");
 
@@ -485,19 +538,14 @@ namespace YGOPortable.UI
                 return;
             }
             bool playerWon = (playerHand == 0 && oppHand == 2) || (playerHand == 1 && oppHand == 0) || (playerHand == 2 && oppHand == 1);
-            if (playerWon)
-            {
-                _jnkStatusText.text = "승리했습니다! 선공 또는 후공을 선택하세요!";
-                _jnkHandsRow.SetActive(false);
-                _jnkOrderRow.SetActive(true);
-            }
-            else
-            {
-                _jnkHandsRow.SetActive(false);
-                _jnkOrderRow.SetActive(false);
-                _jnkStatusText.text = "상대가 가위바위보에서 승리하여 선공을 선택했습니다! (시작 중...)";
-                LaunchMatch(false);
-            }
+            _jnkStatusText.text = playerWon ? "승리했습니다. 선공 또는 후공을 선택하세요." : "상대가 선공을 선택했습니다.";
+            _jnkHandsRow.SetActive(false);
+            _jnkChooseFirst.gameObject.SetActive(playerWon);
+            var secondSlot = (RectTransform)_jnkChooseSecond.transform.parent;
+            secondSlot.anchorMin = new Vector2(playerWon ? 0.53f : 0.265f, 0f);
+            secondSlot.anchorMax = new Vector2(playerWon ? 1f : 0.735f, 1f);
+            _jnkOrderRow.SetActive(true);
+            EventSystem.current?.SetSelectedGameObject((playerWon ? _jnkChooseFirst : _jnkChooseSecond).gameObject);
         }
 
         private void LaunchMatch(bool playerGoesFirst)

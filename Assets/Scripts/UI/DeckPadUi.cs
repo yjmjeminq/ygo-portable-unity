@@ -66,7 +66,14 @@ namespace YGOPortable.UI
             SetFocus(null);
         }
 
-        internal void Focus(Selectable control)
+        internal void FocusInScope(Transform scope, Selectable control)
+        {
+            _scope = scope;
+            _returnFocus = null;
+            Focus(control);
+        }
+
+        private void Focus(Selectable control)
         {
             SetFocus(control);
             ScrollTo(control);

@@ -163,6 +163,7 @@ namespace YGOPortable.Core
         private static readonly Dictionary<string, string> EffectTextKR = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             { "Special Summon", "특수 소환한다" },
+            { "Activate 1 of these effects", "발동한 뒤 적용할 효과를 선택한다" },
             { "Special Summon this card", "이 카드를 특수 소환한다" },
             { "Special Summon this card from your hand", "패에서 이 카드를 특수 소환한다" },
             { "Special Summon this card from your hand in Defense Position", "패에서 이 카드를 수비 표시로 특수 소환한다" },
@@ -171,6 +172,12 @@ namespace YGOPortable.Core
                 "패에서 악마족 몬스터 1장을 특수 소환하거나 마법·함정 카드 1장을 세트하시겠습니까?" },
             { "Set 1 Spell/Trap from your hand", "패에서 마법·함정 카드 1장을 세트한다" },
             { "Set 1 Normal Trap with a different name from your Deck", "덱에서 이름이 다른 일반 함정 카드 1장을 세트한다" },
+            { "Special Summon 1 \"D/D\" from Extra Deck or GY in Defense Position", "엑스트라 덱이나 묘지에서 DD 몬스터 1장을 수비 표시로 특수 소환한다" },
+            { "Change the Pendulum Scale of up to 2 cards to 0", "펜듈럼 존의 카드 최대 2장의 스케일을 0으로 한다" },
+            { "Make this card's Level become 4", "이 카드의 레벨을 4로 한다" },
+            { "Return 1 \"D/D\" Pendulum Monster Card you control to the hand", "자신 필드의 DD 펜듈럼 몬스터 카드 1장을 패로 되돌린다" },
+            { "Return 1 other \"D/D\" card you control to the hand", "자신 필드의 다른 DD 카드 1장을 패로 되돌린다" },
+            { "Search 1 \"Dark Contract\" card", "덱에서 계약서 카드 1장을 패에 넣는다" },
             { "Special Summon then return to the hand", "특수 소환한 후 패로 되돌린다" },
             { "Destroy", "파괴한다" },
             { "Destroy 1 card your opponent controls", "상대 필드의 카드 1장을 파괴한다" },
@@ -189,10 +196,21 @@ namespace YGOPortable.Core
             { "Set", "세트한다" },
             { "Equip", "장착한다" },
             { "Send to Graveyard", "묘지로 보낸다" },
+            { "Send to GY", "묘지로 보낸다" },
+            { "Search or send to GY", "덱에서 카드를 패에 넣거나 묘지로 보낸다" },
+            { "Mill", "덱 위에서 카드를 묘지로 보낸다" },
             { "Negate that effect", "그 효과를 무효로 한다" },
+            { "Negate the activation of that effect", "그 효과의 발동을 무효로 한다" },
             { "Fusion Summon", "융합 소환한다" },
             { "Spell Card", "마법 카드" },
             { "Trap Card", "함정 카드" },
+        };
+
+        private static readonly Dictionary<ulong, string> CardEffectTextKR = new Dictionary<ulong, string>
+        {
+            { 9024198UL << DescriptionIndexBits, "덱에서 이름이 다른 DD 펜듈럼 몬스터 2장을 펜듈럼 존에 놓고 1000 데미지를 받는다. 턴 종료까지 DD 몬스터만 특수 소환할 수 있다." },
+            { 11609969UL << DescriptionIndexBits, "이 카드의 펜듈럼 스케일을 2 내린다(최소 1). 새 스케일 이상의 레벨을 가진 자신의 DD 이외 몬스터를 파괴한다." },
+            { (11609969UL << DescriptionIndexBits) | 1, "자신 필드의 다른 DD 카드 1장을 패로 되돌리거나, 덱에서 계약서 카드 1장을 패에 넣는다." },
         };
 
         private static readonly Dictionary<string, string> TokenNameMapKR = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -934,6 +952,7 @@ namespace YGOPortable.Core
         {
             if (desc <= DescriptionIndexMask)
                 return SystemHintsKR.TryGetValue((uint)desc, out var hint) ? hint : null;
+            if (CardEffectTextKR.TryGetValue(desc, out var specificText)) return specificText;
 
             int index = (int)(desc & DescriptionIndexMask);
             var card = Get(GetDescriptionCardCode(desc));

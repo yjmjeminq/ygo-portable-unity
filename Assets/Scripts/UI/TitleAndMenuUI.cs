@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace YGOPortable.UI
@@ -11,6 +12,9 @@ namespace YGOPortable.UI
         public GameObject SettingsRoot { get; private set; }
 
         private readonly GameAppController _app;
+        private CanvasGroup _menuControls;
+        private Button _settingsOpenButton;
+        private Button _settingsCloseButton;
 
         public TitleAndMenuUI(GameAppController app, Transform canvasParent)
         {
@@ -18,6 +22,25 @@ namespace YGOPortable.UI
             BuildTitleScreen(canvasParent);
             BuildMainMenuScreen(canvasParent);
             BuildSettingsOverlay(canvasParent);
+        }
+
+        internal void Update()
+        {
+            if (SettingsRoot.activeInHierarchy && Input.GetButtonDown("Cancel")) CloseSettings();
+        }
+
+        private void OpenSettings()
+        {
+            _menuControls.interactable = false;
+            SettingsRoot.SetActive(true);
+            EventSystem.current?.SetSelectedGameObject(_settingsCloseButton.gameObject);
+        }
+
+        internal void CloseSettings(bool restoreFocus = true)
+        {
+            SettingsRoot.SetActive(false);
+            _menuControls.interactable = true;
+            if (restoreFocus) EventSystem.current?.SetSelectedGameObject(_settingsOpenButton.gameObject);
         }
 
         private void BuildTitleScreen(Transform parent)
@@ -38,6 +61,7 @@ namespace YGOPortable.UI
         {
             var root = LotdUiKit.FillRect("Screen_MainMenu", parent);
             MenuRoot = root.gameObject;
+            _menuControls = MenuRoot.AddComponent<CanvasGroup>();
             AddTitleBackground(root);
 
             var logo = LotdUiKit.CreateRect("Logo", root, new Vector2(0.049f, 0.61f), new Vector2(0.503f, 0.938f),
@@ -47,7 +71,7 @@ namespace YGOPortable.UI
                 new Vector2(0.489f, 0.611f));
             AddMenuEntry(menu, 0.745f, "프리 듀얼", () => _app.ShowScreen(AppScreen.OpponentSelect), true);
             AddMenuEntry(menu, 0.54f, "덱 편집", () => _app.ShowScreen(AppScreen.DeckEditor));
-            AddMenuEntry(menu, 0.335f, "환경 설정", () => SettingsRoot.SetActive(true));
+            _settingsOpenButton = AddMenuEntry(menu, 0.335f, "환경 설정", OpenSettings);
             AddMenuEntry(menu, 0.13f, "타이틀로 돌아가기", () => _app.ShowScreen(AppScreen.Title));
         }
 
@@ -74,11 +98,11 @@ namespace YGOPortable.UI
                 TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
         }
 
-        private static void AddMenuEntry(Transform parent, float y, string label, Action action, bool selected = false)
+        private static Button AddMenuEntry(Transform parent, float y, string label, Action action, bool selected = false)
         {
             var row = LotdUiKit.CreateRect("MenuEntry", parent, new Vector2(0.097f, y), new Vector2(0.91f, y + 0.159f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(row, "Button", label, action, 23, selected);
+            return LotdUiKit.CreateLotdButton(row, "Button", label, action, 23, selected);
         }
 
         private void BuildSettingsOverlay(Transform parent)
@@ -133,7 +157,7 @@ namespace YGOPortable.UI
 
             // Close & Quit
             var closeRt = LotdUiKit.CreateRect("Close", win, new Vector2(0.55f, 0.05f), new Vector2(0.92f, 0.17f), Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(closeRt, "BtnClose", "닫기", () => SettingsRoot.SetActive(false), 18, gold: true);
+            _settingsCloseButton = LotdUiKit.CreateLotdButton(closeRt, "BtnClose", "닫기", () => CloseSettings(), 18, gold: true);
 
             var quitRt = LotdUiKit.CreateRect("Quit", win, new Vector2(0.08f, 0.05f), new Vector2(0.45f, 0.17f), Vector2.zero, Vector2.zero);
             LotdUiKit.CreateLotdButton(quitRt, "BtnQuit", "게임 종료", () => Application.Quit(), 18);

@@ -842,6 +842,8 @@ def apply_opponent_themes(characters, decks, cards, extra_deck_codes, bust_map):
         if character["name"] != name:
             character["aliases"] = [character["name"]]
             character["name"] = name
+    for raw_id, bio in catalog.get("bios", {}).items():
+        char_by_id[int(raw_id)]["bio"] = bio
 
     for profile in catalog["characters"]:
         cid = profile["id"]
@@ -942,14 +944,13 @@ def build_opponents_db(lotd_to_pass: dict, kr_cards):
         cid, series, _bust_id, selectable = rec[0], rec[1], rec[2], rec[3]
         key = read_ascii(cd, rec[8]).strip()
         name = read_utf16(cd, rec[9]).strip() or key
-        bio = read_utf16(cd, rec[10]).strip()
         portrait = resolve_portrait_name(key, bust_map)
         cobj = {
             "id": cid,
             "seriesIdx": series,
             "seriesName": SERIES_NAMES.get(series, "DM"),
             "name": name,
-            "bio": bio,
+            "bio": "",
             "portrait": portrait,
             "isMeta2026": False,
         }
@@ -993,7 +994,7 @@ def build_opponents_db(lotd_to_pass: dict, kr_cards):
             "seriesIdx": 6,
             "seriesName": "2026 메타",
             "name": f"[2026] {mc['name']}",
-            "bio": mc.get("bio", ""),
+            "bio": "",
             "portrait": portrait,
             "isMeta2026": True,
         }
