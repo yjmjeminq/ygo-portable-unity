@@ -69,6 +69,7 @@ namespace YGOPortable.UI
             public Image bgImg;
             public Outline border;
             public CompositeCardView cardView;
+            public RectTransform focusArt;
             public RectTransform stats;
             public Image statsEdge;
             public Text statsText;
@@ -142,6 +143,7 @@ namespace YGOPortable.UI
         {
             public RectTransform Rect;
             public CompositeCardView Card;
+            public RectTransform FocusArt;
             public Image PlayableGlow;
             public CardDragTrigger Trigger;
         }
@@ -533,6 +535,7 @@ namespace YGOPortable.UI
                 bgImg = background,
                 border = border,
                 cardView = view,
+                focusArt = (RectTransform)view.transform.Find("AspectBox"),
                 stats = stats,
                 statsEdge = statsEdge,
                 statsText = values,
@@ -1119,7 +1122,14 @@ namespace YGOPortable.UI
                 trigger = rect.gameObject.AddComponent<CardDragTrigger>();
                 trigger.EnableHoverLift = true;
             }
-            return new HandCardView { Rect = rect, Card = card, PlayableGlow = glow, Trigger = trigger };
+            return new HandCardView
+            {
+                Rect = rect,
+                Card = card,
+                FocusArt = (RectTransform)card.transform.Find("AspectBox"),
+                PlayableGlow = glow,
+                Trigger = trigger,
+            };
         }
 
         private static (Vector2 min, Vector2 max, float angle) HandCardBounds(RectTransform row, int count, int index, bool opponent)

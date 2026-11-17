@@ -17,7 +17,7 @@ namespace YGOPortable.UI
         private Transform _scope;
         private Selectable _focus;
         private Selectable _returnFocus;
-        private RectTransform _frame;
+        private PadFocusIndicator _frame;
         private Dropdown _dropdown;
         private int _choiceIndex;
         private int _firstChoice;
@@ -128,8 +128,8 @@ namespace YGOPortable.UI
 
         private void Focus(Selectable control)
         {
-            SetFocus(control);
             ScrollTo(control);
+            SetFocus(control);
         }
 
         internal void Clear(bool preserveSelection = false)
@@ -256,41 +256,25 @@ namespace YGOPortable.UI
             {
                 if (!preserveSelection && events != null && _focus != null && events.currentSelectedGameObject == _focus.gameObject)
                     events.SetSelectedGameObject(null);
-                if (_frame != null)
-                {
-                    _frame.gameObject.SetActive(false);
-                    _frame.SetParent(_root, false);
-                }
+                _frame?.Hide();
                 _focus = null;
                 return;
             }
             _focus = control;
             if (events != null && events.currentSelectedGameObject != control.gameObject && !events.alreadySelecting)
                 events.SetSelectedGameObject(control.gameObject);
-            if (_frame == null) _frame = CreateFrame(control.transform);
-            else if (_frame.parent != control.transform) _frame.SetParent(control.transform, false);
-            _frame.anchorMin = Vector2.zero;
-            _frame.anchorMax = Vector2.one;
-            _frame.offsetMin = Vector2.zero;
-            _frame.offsetMax = Vector2.zero;
-            _frame.SetAsLastSibling();
-            _frame.gameObject.SetActive(true);
-        }
-
-        private static RectTransform CreateFrame(Transform target)
-        {
-            var frame = LotdUiKit.FillRect("PadFocus", target);
-            frame.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
-            void Edge(Vector2 min, Vector2 max, Vector2 offsetMin, Vector2 offsetMax)
+            if (_frame == null) _frame = PadFocusIndicator.Create(_root, "PadFocus");
+            var target = (RectTransform)control.transform;
+            var host = _scope as RectTransform;
+            if (_choicePanel.gameObject.activeSelf && target.IsChildOf(_choicePanel))
+                host = _choicePanel;
+            else
             {
-                var edge = LotdUiKit.CreateRect("FocusEdge", frame, min, max, offsetMin, offsetMax);
-                LotdUiKit.AddImage(edge.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.GoldAccent, false, false);
+                var viewport = target.GetComponentInParent<ScrollRect>()?.viewport;
+                if (viewport != null && target.IsChildOf(viewport))
+                    host = viewport;
             }
-            Edge(Vector2.zero, Vector2.right, Vector2.zero, Vector2.up * 2f);
-            Edge(Vector2.up, Vector2.one, Vector2.down * 2f, Vector2.zero);
-            Edge(Vector2.zero, Vector2.up, Vector2.zero, Vector2.right * 2f);
-            Edge(Vector2.right, Vector2.one, Vector2.left * 2f, Vector2.zero);
-            return frame;
+            _frame.Show(target, host != null ? host : (RectTransform)_root);
         }
 
         private static void ScrollTo(Selectable control)

@@ -15,10 +15,12 @@ namespace YGOPortable.UI
         private readonly DeckPadInput _padInput = new DeckPadInput();
         private readonly int[] _padIndices = new int[(int)PadArea.Count];
         private DeckPadUi _padUi;
-        private RectTransform _padCardFocus;
+        private PadFocusIndicator _padCardFocus;
         private Text _deckHelpLabel;
         private bool _padMode;
         private PadArea _padArea;
+        private PadArea _padFocusArea;
+        private float _padFocusTrunkOffset;
         private int _padReorderOrigin = -1;
         private Vector3 _padMousePoint;
         private StandaloneInputModule _deckInputModule;
@@ -27,20 +29,7 @@ namespace YGOPortable.UI
         private void BuildPadNavigation(Transform root)
         {
             _padUi = new DeckPadUi(root);
-            _padCardFocus = LotdUiKit.FillRect("PadCardFocus", root);
-            Color gold = new Color(1f, .84f, .18f, 1f);
-            void Line(string name, Vector2 a, Vector2 b, Vector2 min, Vector2 max)
-            {
-                var rect = LotdUiKit.CreateRect(name, _padCardFocus, a, b, min, max);
-                LotdUiKit.AddImage(rect.gameObject, LotdUiKit.WhiteSprite, gold, false, false);
-            }
-
-            const float thickness = 3f;
-            Line("Top", Vector2.up, Vector2.one, Vector2.down * thickness, Vector2.zero);
-            Line("Bottom", Vector2.zero, Vector2.right, Vector2.zero, Vector2.up * thickness);
-            Line("Left", Vector2.zero, Vector2.up, Vector2.zero, Vector2.right * thickness);
-            Line("Right", Vector2.right, Vector2.one, Vector2.left * thickness, Vector2.zero);
-            _padCardFocus.gameObject.SetActive(false);
+            _padCardFocus = PadFocusIndicator.Create(root, "PadCardFocus");
         }
 
         private void StartPadNavigation()
@@ -80,7 +69,7 @@ namespace YGOPortable.UI
             _padReorderOrigin = -1;
             _padInput.Reset();
             _padUi.Clear(preserveSelection: true);
-            _padCardFocus.gameObject.SetActive(false);
+            _padCardFocus.Hide();
             _deckHelpLabel.text = MouseHelp;
             _padMousePoint = Input.mousePosition;
         }
@@ -120,7 +109,7 @@ namespace YGOPortable.UI
                     _padReorderOrigin = -1;
                     SwitchPadArea(_padArea);
                 }
-                _padCardFocus.gameObject.SetActive(false);
+                _padCardFocus.Hide();
                 return;
             }
             if (!_padMode)
@@ -151,13 +140,13 @@ namespace YGOPortable.UI
 
             if (_padUi.HasPopup)
             {
-                _padCardFocus.gameObject.SetActive(false);
+                _padCardFocus.Hide();
                 _padUi.Handle(Root.transform, frame.Direction, frame.Submit, frame.Cancel, null);
                 return;
             }
             if (_deckDialog.activeSelf)
             {
-                _padCardFocus.gameObject.SetActive(false);
+                _padCardFocus.Hide();
                 _padUi.Handle(_deckDialog.transform, frame.Direction, frame.Submit, frame.Cancel,
                     () => _deckDialog.SetActive(false), _deckDialog.transform.Find("Window/Cancel/Button")?.GetComponent<Button>());
                 return;
@@ -169,7 +158,7 @@ namespace YGOPortable.UI
             }
             if (_archModalRoot.activeSelf)
             {
-                _padCardFocus.gameObject.SetActive(false);
+                _padCardFocus.Hide();
                 if (frame.Search) _padUi.OpenText(_archSearchInp);
                 else if (frame.PreviousArea || frame.NextArea) PagePadArchetypes(frame.PreviousArea);
                 else _padUi.Handle(_archModalRoot.transform, frame.Direction, frame.Submit, frame.Cancel,
@@ -187,7 +176,7 @@ namespace YGOPortable.UI
             if (frame.Search)
             {
                 SwitchPadArea(PadArea.Trunk);
-                _padCardFocus.gameObject.SetActive(false);
+                _padCardFocus.Hide();
                 _padUi.OpenText(_searchInp);
                 return;
             }
@@ -213,7 +202,7 @@ namespace YGOPortable.UI
 
             if (_padArea == PadArea.Controls)
             {
-                _padCardFocus.gameObject.SetActive(false);
+                _padCardFocus.Hide();
                 _padUi.Handle(Root.transform, frame.Direction, frame.Submit, frame.Cancel,
                     () => SwitchPadArea(PadArea.Trunk), _detailButtonText.GetComponentInParent<Button>());
                 return;
@@ -221,7 +210,7 @@ namespace YGOPortable.UI
             if (frame.Cancel)
             {
                 BeforeReplacingEdits(() => _app.ShowScreen(AppScreen.MainMenu));
-                if (_deckDialog.activeSelf) _padCardFocus.gameObject.SetActive(false);
+                if (_deckDialog.activeSelf) _padCardFocus.Hide();
                 return;
             }
 
@@ -233,7 +222,7 @@ namespace YGOPortable.UI
 
         private void HandleDetailedSearchPad(DeckPadFrame frame)
         {
-            _padCardFocus.gameObject.SetActive(false);
+            _padCardFocus.Hide();
             _deckHelpLabel.text = $"조회 조건   방향키 이동   A 선택   Y 검색   {PadFilterResetHelp}   B 취소";
             if (frame.Search && !frame.Cancel)
             {
@@ -425,7 +414,7 @@ namespace YGOPortable.UI
             {
                 if (_trunkResults.Count == 0)
                 {
-                    _padCardFocus.gameObject.SetActive(false);
+                    _padCardFocus.Hide();
                     return;
                 }
                 int index = _padIndices[area] = ClampPadIndex(_padIndices[area], _trunkResults.Count);
@@ -433,6 +422,8 @@ namespace YGOPortable.UI
                 int slot = index - _lastFirstRow * TrunkCols;
                 if (slot >= 0 && slot < _trunkPool.Count)
                     ShowPadCardFocus(_trunkPool[slot].rt, _trunkResults[index].code);
+                else
+                    _padCardFocus.Hide();
                 return;
             }
 
@@ -459,15 +450,16 @@ namespace YGOPortable.UI
 
         private void ShowPadCardFocus(RectTransform target, uint code)
         {
-            if (_padCardFocus.parent != target)
+            bool inTrunk = _padArea == PadArea.Trunk;
+            bool animate = _padArea == _padFocusArea;
+            if (inTrunk)
             {
-                _padCardFocus.SetParent(target, false);
-                _padCardFocus.anchorMin = Vector2.zero;
-                _padCardFocus.anchorMax = Vector2.one;
-                _padCardFocus.offsetMin = _padCardFocus.offsetMax = Vector2.zero;
-                _padCardFocus.SetAsLastSibling();
+                float scrollOffset = _trunkContent.anchoredPosition.y;
+                animate &= Mathf.Abs(scrollOffset - _padFocusTrunkOffset) < 0.5f;
+                _padFocusTrunkOffset = scrollOffset;
             }
-            _padCardFocus.gameObject.SetActive(true);
+            _padFocusArea = _padArea;
+            _padCardFocus.Show(target, inTrunk ? _trunkViewport : _deckPanel, animate);
             if (code != 0) InspectCard(code);
         }
 

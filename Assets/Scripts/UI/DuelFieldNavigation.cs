@@ -17,12 +17,17 @@ namespace YGOPortable.UI
             internal readonly RectTransform Rect;
             internal readonly Action Submit;
             internal readonly uint PreviewCode;
+            internal readonly RectTransform Art;
+            internal readonly RectTransform HandVisual;
 
-            internal PadTarget(RectTransform rect, Action submit, uint previewCode = 0)
+            internal PadTarget(RectTransform rect, Action submit, uint previewCode = 0, RectTransform art = null,
+                RectTransform handVisual = null)
             {
                 Rect = rect;
                 Submit = submit;
                 PreviewCode = previewCode;
+                Art = art;
+                HandVisual = handVisual;
             }
         }
 
@@ -31,9 +36,13 @@ namespace YGOPortable.UI
         private Button _duelPadInspectButton;
         private Button _duelPadPauseButton;
         private Button _duelPadLogButton;
-        private RectTransform _duelPadFrame;
+        private PadFocusIndicator _duelPadFrame;
+        private RectTransform _duelPadFrameTarget;
         private RectTransform _duelPadFocus;
         private RectTransform _duelPadBoardFocus;
+        private RectTransform _duelPadRaisedCard;
+        private readonly List<(RectTransform Rect, bool InHand)> _duelPadCardMotions =
+            new List<(RectTransform, bool)>(4);
         private PadScope _duelPadScope;
         private bool _usingDuelPad;
         private string _duelPadBoardHint = "";
@@ -46,6 +55,7 @@ namespace YGOPortable.UI
             _duelPadFocus = _duelPadBoardFocus = null;
             _usingDuelPad = false;
             HideDuelPadFrame();
+            ResetDuelPadCardMotions();
         }
 
         private void UpdateDuelPad()
@@ -59,6 +69,7 @@ namespace YGOPortable.UI
             var frame = _duelPadInput.Read(Time.unscaledTime);
             if (frame.HasInput) HandleDuelPad(frame);
             RefreshDuelPadCursor();
+            AdvanceDuelPadCardMotions(Time.unscaledDeltaTime);
         }
 
         internal void HandleDuelPad(DeckPadFrame frame)
@@ -79,7 +90,7 @@ namespace YGOPortable.UI
             {
                 _duelPadScope = PadScope.None;
                 _duelPadFocus = null;
-                HideDuelPadFrame();
+                RefreshDuelPadCursor();
                 return;
             }
 
@@ -199,7 +210,8 @@ namespace YGOPortable.UI
                 {
                     var view = _myHandViews[i];
                     if (view.Rect.gameObject.activeInHierarchy && view.Trigger?.OnLeftClick != null)
-                        _duelPadTargets.Add(new PadTarget(view.Rect, view.Trigger.OnLeftClick, hand[i].code));
+                        _duelPadTargets.Add(new PadTarget(view.Rect, view.Trigger.OnLeftClick, hand[i].code,
+                            view.FocusArt, (RectTransform)view.Card.transform));
                 }
             }
             AddDuelPadSlots(_myMZone, placing);
@@ -240,7 +252,8 @@ namespace YGOPortable.UI
                 var card = slot.liveCard;
                 if (card == null || !slot.cardView.gameObject.activeInHierarchy) continue;
                 bool publicCard = card.IsFaceUp || card.isPublic || slot.mappedCon == _session.HumanPlayerIndex;
-                _duelPadTargets.Add(new PadTarget(slot.root, slot.dragTrigger.OnLeftClick, publicCard ? card.code : 0));
+                _duelPadTargets.Add(new PadTarget(slot.root, slot.dragTrigger.OnLeftClick,
+                    publicCard ? card.code : 0, slot.focusArt));
             }
         }
 
@@ -300,6 +313,7 @@ namespace YGOPortable.UI
 
         private void SetDuelPadFocus(PadTarget target, PadScope scope)
         {
+            bool sameScope = _duelPadScope == scope;
             _duelPadScope = scope;
             _duelPadFocus = target.Rect;
             if (scope == PadScope.Board) _duelPadBoardFocus = target.Rect;
@@ -307,8 +321,18 @@ namespace YGOPortable.UI
             var events = EventSystem.current;
             if (events != null && !events.alreadySelecting && events.currentSelectedGameObject != target.Rect.gameObject)
                 events.SetSelectedGameObject(target.Rect.gameObject);
-            ShowDuelPadFrame(target.Rect);
             RevealDuelPadTarget(target.Rect);
+            var raisedCard = target.HandVisual != null ? target.HandVisual : target.Art;
+            if (_duelPadRaisedCard != raisedCard)
+            {
+                _duelPadRaisedCard = raisedCard;
+                if (raisedCard != null && !_duelPadCardMotions.Exists(motion => motion.Rect == raisedCard))
+                    _duelPadCardMotions.Add((raisedCard, target.HandVisual != null));
+            }
+
+            var host = target.Rect.IsChildOf(_modals.ModalRoot.transform)
+                ? (RectTransform)_modals.ModalRoot.transform : (RectTransform)Root.transform;
+            ShowDuelPadFrame(target.Art != null ? target.Art : target.Rect, host, sameScope);
         }
 
         private void RefreshDuelPadCursor(bool layoutChanged = false)
@@ -319,7 +343,11 @@ namespace YGOPortable.UI
             {
                 _duelPadScope = scope;
                 _duelPadFocus = null;
-                HideDuelPadFrame();
+                _duelPadRaisedCard = null;
+                if (_modals.TryGetPadFocus(out var target, out var host))
+                    ShowDuelPadFrame(target, host);
+                else
+                    HideDuelPadFrame();
                 return;
             }
             _hintBannerText.text = _duelPadBoardHint.Length > 0 ? _duelPadBoardHint :
@@ -337,36 +365,65 @@ namespace YGOPortable.UI
 
         private void HideDuelPadFrame()
         {
-            if (_duelPadFrame == null) return;
-            _duelPadFrame.gameObject.SetActive(false);
-            if (_duelPadFrame.parent != Root.transform) _duelPadFrame.SetParent(Root.transform, false);
+            _duelPadRaisedCard = null;
+            _duelPadFrameTarget = null;
+            _duelPadFrame?.Hide();
         }
 
-        private void ShowDuelPadFrame(RectTransform target)
+        private void ShowDuelPadFrame(RectTransform target, RectTransform host, bool animate = true)
         {
+            if (_duelPadFrame != null && _duelPadFrame.gameObject.activeSelf && _duelPadFrameTarget == target) return;
+            var scroll = target.GetComponentInParent<ScrollRect>();
+            if (scroll != null && scroll.viewport != null && scroll.content != null && target.IsChildOf(scroll.content))
+                host = scroll.viewport;
             if (_duelPadFrame == null)
+                _duelPadFrame = PadFocusIndicator.Create((RectTransform)Root.transform, "DuelPadFocus");
+            _duelPadFrameTarget = target;
+            _duelPadFrame.Show(target, host, animate);
+        }
+
+        private void AdvanceDuelPadCardMotions(float dt)
+        {
+            float step = 1f - Mathf.Exp(-22f * dt);
+            for (int i = _duelPadCardMotions.Count - 1; i >= 0; i--)
             {
-                _duelPadFrame = LotdUiKit.FillRect("DuelPadFocus", target);
-                _duelPadFrame.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
-                void Edge(Vector2 a, Vector2 b, Vector2 min, Vector2 max)
+                var motion = _duelPadCardMotions[i];
+                var rect = motion.Rect;
+                if (rect == null)
                 {
-                    var line = LotdUiKit.CreateRect("Edge", _duelPadFrame, a, b, min, max);
-                    LotdUiKit.AddImage(line.gameObject, LotdUiKit.WhiteSprite, DuelStyle.Gold, false, false);
+                    _duelPadCardMotions.RemoveAt(i);
+                    continue;
                 }
-                Edge(Vector2.zero, Vector2.right, Vector2.zero, Vector2.up * 3f);
-                Edge(Vector2.up, Vector2.one, Vector2.down * 3f, Vector2.zero);
-                Edge(Vector2.zero, Vector2.up, Vector2.zero, Vector2.right * 3f);
-                Edge(Vector2.right, Vector2.one, Vector2.left * 3f, Vector2.zero);
+
+                bool focused = rect == _duelPadRaisedCard && rect.gameObject.activeInHierarchy;
+                float focusScale = motion.InHand ? 1.075f : 1.05f;
+                Vector3 scale = Vector3.one * (focused ? focusScale : 1f);
+                Vector3 nextScale = Vector3.Lerp(rect.localScale, scale, step);
+                bool settled = (scale - nextScale).sqrMagnitude < .000001f;
+                nextScale = settled ? scale : nextScale;
+                if (rect.localScale != nextScale) rect.localScale = nextScale;
+                if (motion.InHand)
+                {
+                    var position = focused ? Vector2.up * Mathf.Min(18f, rect.rect.height * .12f) : Vector2.zero;
+                    var nextPosition = Vector2.Lerp(rect.anchoredPosition, position, step);
+                    bool positionSettled = (position - nextPosition).sqrMagnitude < .0025f;
+                    nextPosition = positionSettled ? position : nextPosition;
+                    if (rect.anchoredPosition != nextPosition) rect.anchoredPosition = nextPosition;
+                    settled &= positionSettled;
+                }
+                if (!focused && settled) _duelPadCardMotions.RemoveAt(i);
             }
-            else if (_duelPadFrame.parent != target)
+        }
+
+        private void ResetDuelPadCardMotions()
+        {
+            foreach (var motion in _duelPadCardMotions)
             {
-                _duelPadFrame.SetParent(target, false);
-                _duelPadFrame.anchorMin = Vector2.zero;
-                _duelPadFrame.anchorMax = Vector2.one;
-                _duelPadFrame.offsetMin = _duelPadFrame.offsetMax = Vector2.zero;
+                if (motion.Rect == null) continue;
+                motion.Rect.localScale = Vector3.one;
+                if (motion.InHand) motion.Rect.anchoredPosition = Vector2.zero;
             }
-            _duelPadFrame.SetAsLastSibling();
-            _duelPadFrame.gameObject.SetActive(true);
+            _duelPadCardMotions.Clear();
         }
 
         private static void RevealDuelPadTarget(RectTransform target)

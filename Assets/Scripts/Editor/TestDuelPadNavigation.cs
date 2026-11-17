@@ -72,10 +72,19 @@ namespace YGOPortable.Editor
 
                 Pad(field, LeftShoulder);
                 var initial = Get<RectTransform>(field, "_duelPadFocus");
+                var initialArt = (RectTransform)initial.GetComponentInChildren<CompositeCardView>().transform;
+                Invoke(field, "AdvanceDuelPadCardMotions", .12f);
                 Pad(field, direction: Vector2Int.right);
                 var chosen = Get<RectTransform>(field, "_duelPadFocus");
                 Require(chosen != initial && chosen.IsChildOf(field.Root.transform.Find("PlayerHand")),
                     "Moving right from the first card did not reach another card in the hand.");
+                var chosenArt = (RectTransform)chosen.GetComponentInChildren<CompositeCardView>().transform;
+                Invoke(field, "AdvanceDuelPadCardMotions", .06f);
+                Require(chosenArt.anchoredPosition.y > 0f && chosenArt.localScale.x > 1f,
+                    "The focused hand card did not rise and grow during the transition.");
+                Invoke(field, "AdvanceDuelPadCardMotions", .5f);
+                Require(initialArt.anchoredPosition == Vector2.zero && initialArt.localScale == Vector3.one,
+                    "The previously focused hand card did not return to its original position and size.");
                 Pad(field, X);
                 Require(Get<GameObject>(field, "_cardZoomModal").activeSelf, "The focused card could not be inspected.");
                 Pad(field, B);

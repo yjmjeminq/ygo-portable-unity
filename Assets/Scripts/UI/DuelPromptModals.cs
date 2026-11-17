@@ -114,6 +114,16 @@ namespace YGOPortable.UI
             return _promptShade.IsPointOverPile(point, camera);
         }
 
+        internal bool TryGetPadFocus(out RectTransform target, out RectTransform host)
+        {
+            host = (_padKeyboard.IsOpen ? _padKeyboard.Scope :
+                IsZoneViewerOpen ? ZoneViewRoot.transform :
+                ResultRoot.activeSelf ? ResultRoot.transform :
+                IsPromptOpen && !IsShowingField ? ModalRoot.transform : null) as RectTransform;
+            target = EventSystem.current?.currentSelectedGameObject?.transform as RectTransform;
+            return host != null && target != null && target.IsChildOf(host) && target.gameObject.activeInHierarchy;
+        }
+
         internal bool HandlePad(DeckPadFrame frame)
         {
             if (!frame.HasInput)
