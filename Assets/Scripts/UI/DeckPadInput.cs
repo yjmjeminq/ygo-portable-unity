@@ -93,7 +93,8 @@ namespace YGOPortable.UI
             {
                 var stick = new Vector2(pad.LeftThumbX / 32768f, pad.LeftThumbY / 32768f);
                 float rightTrigger = includeRightTrigger ? pad.RightTrigger / 255f : 0f;
-                return Advance(stick, (DeckPadButtons)pad.Buttons, now, pad.RightThumbY / 32768f, rightTrigger);
+                return AdvanceWithTouch(stick, (DeckPadButtons)pad.Buttons, now, pad.RightThumbY / 32768f,
+                    rightTrigger, includeRightTrigger);
             }
 #endif
 
@@ -109,7 +110,29 @@ namespace YGOPortable.UI
                 LegacyButton(KeyCode.JoystickButton9, DeckPadButtons.Reorder) |
                 LegacyDirection("DeckPadDpadHorizontal", DeckPadButtons.Left, DeckPadButtons.Right) |
                 LegacyDirection("DeckPadDpadVertical", DeckPadButtons.Down, DeckPadButtons.Up);
-            return Advance(legacyStick, buttons, now, Input.GetAxisRaw("DeckPadLookVertical"));
+            return AdvanceWithTouch(legacyStick, buttons, now, Input.GetAxisRaw("DeckPadLookVertical"),
+                0f, includeRightTrigger);
+        }
+
+        internal DeckPadFrame AdvanceWithTouch(Vector2 stick, DeckPadButtons buttons, float now,
+            float descriptionStick, float rightTrigger, bool includeRightTrigger)
+        {
+            var touchButtons = TouchGamepad.HeldButtons;
+            if (!includeRightTrigger) touchButtons &= ~DeckPadButtons.RelatedCards;
+            float touchScroll = TouchGamepad.DescriptionScroll;
+            return Advance(stick, buttons | touchButtons, now,
+                touchScroll != 0f ? touchScroll : descriptionStick, rightTrigger);
+        }
+
+        internal static bool DirectTouchBegan()
+        {
+            if (Application.platform != RuntimePlatform.IPhonePlayer) return false;
+            for (int i = 0; i < Input.touchCount; i++)
+            {
+                var touch = Input.GetTouch(i);
+                if (touch.phase == TouchPhase.Began && !TouchGamepad.IsControlAt(touch.position)) return true;
+            }
+            return false;
         }
 
         internal DeckPadFrame Advance(Vector2 stick, DeckPadButtons held, float now, float descriptionStick = 0f,

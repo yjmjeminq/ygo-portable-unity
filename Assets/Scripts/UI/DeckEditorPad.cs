@@ -73,7 +73,9 @@ namespace YGOPortable.UI
             _padCardFocus.Hide();
             ClearCardVisual(ref _padVisualSlot);
             _trunkPadScrollTarget = null;
-            _deckHelpLabel.text = MouseHelp;
+            _deckHelpLabel.text = Application.platform == RuntimePlatform.IPhonePlayer
+                ? "카드 탭  정보 보기    드래그  이동    X  정렬    Y  검색    +  저장"
+                : MouseHelp;
             _padMousePoint = Input.mousePosition;
         }
 
@@ -81,7 +83,7 @@ namespace YGOPortable.UI
         {
             if (_padMode && !_padUi.HasPopup &&
                 (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.mouseScrollDelta.y != 0 ||
-                 (Input.mousePosition - _padMousePoint).sqrMagnitude > 36f))
+                 (Input.mousePosition - _padMousePoint).sqrMagnitude > 36f || DeckPadInput.DirectTouchBegan()))
             {
                 ResetPadMode();
                 RestoreMouseCardVisual();

@@ -1,0 +1,147 @@
+name: Build iOS IPA
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: Build on a GitHub-hosted Mac or your own Mac runner
+        type: choice
+        default: hosted
+        options:
+          - hosted
+          - self-hosted
+      signing:
+        description: Unsigned for personal signing, or choose an Xcode export method
+        type: choice
+        default: unsigned
+        options:
+          - unsigned
+          - debugging
+          - release-testing
+          - app-store-connect
+      bundle_identifier:
+        description: iOS bundle identifier matching your provisioning profile
+        type: string
+        default: com.ygoportable.lotd
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-ipa-${{ inputs.runner }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Export and package iOS
+    runs-on: ${{ fromJSON(inputs.runner == 'self-hosted' && '["self-hosted","macOS"]' || '["macos-15"]') }}
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    env:
+      IOS_SIGNING: ${{ inputs.signing }}
+      IOS_BUNDLE_IDENTIFIER: ${{ inputs.bundle_identifier }}
+      IOS_XCODE_PATH: Builds/iOS/Xcode
+      IOS_IPA_PATH: Builds/iOS/IPA
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Read build settings
+        id: settings
+        env:
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ inputs.signing != 'unsigned' && secrets.IOS_PROVISIONING_PROFILE_BASE64 || '' }}
+        run: |
+          read -r editor_version editor_revision < <(
+            sed -En 's/^m_EditorVersionWithRevision: ([^ ]+) \(([[:xdigit:]]+)\)$/\1 \2/p' ProjectSettings/ProjectVersion.txt
+          )
+          editor_directory="${UNITY_EDITOR_ROOT:-/Applications/Unity/Hub/Editor}/$editor_version"
+          {
+            printf 'editor_version=%s\n' "$editor_version"
+            printf 'editor_revision=%s\n' "$editor_revision"
+            printf 'editor_directory=%s\n' "$editor_directory"
+          } >> "$GITHUB_OUTPUT"
+          bash Tools/build-ios-ipa.sh signing-settings >> "$GITHUB_OUTPUT"
+
+      - name: Install Unity and the iOS build module
+        if: inputs.runner == 'hosted'
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_CLI_TELEMETRY: '0'
+          EDITOR_VERSION: ${{ steps.settings.outputs.editor_version }}
+          EDITOR_REVISION: ${{ steps.settings.outputs.editor_revision }}
+          EDITOR_DIRECTORY: ${{ steps.settings.outputs.editor_directory }}
+        run: |
+          if [[ -z "$UNITY_LICENSE" || -z "$UNITY_EMAIL" || -z "$UNITY_PASSWORD" ]]; then
+            echo '::error::Add the GameCI Unity secrets or choose a Mac runner with an activated Unity installation.'
+            exit 1
+          fi
+          unset UNITY_LICENSE UNITY_EMAIL UNITY_PASSWORD
+          # GameCI's Hub CLI installer predates Unity Hub 4. Install with the current Unity CLI.
+          brew install --cask unity-cli
+          unity install-path --set "$(dirname "$EDITOR_DIRECTORY")"
+          unity install "$EDITOR_VERSION" --changeset "$EDITOR_REVISION" --module ios
+
+      - name: Verify Unity and Xcode
+        env:
+          EDITOR_DIRECTORY: ${{ steps.settings.outputs.editor_directory }}
+        run: |
+          if [[ ! -x "$EDITOR_DIRECTORY/Unity.app/Contents/MacOS/Unity" ]] ||
+             [[ ! -d "$EDITOR_DIRECTORY/PlaybackEngines/iOSSupport" &&
+                ! -d "$EDITOR_DIRECTORY/Unity.app/Contents/PlaybackEngines/iOSSupport" ]]; then
+            echo '::error::Install the Unity version in ProjectVersion.txt with iOS Build Support on this Mac.'
+            exit 1
+          fi
+          xcrun --sdk iphoneos --show-sdk-version
+
+      - name: Compile the native duel engine
+        run: bash NativeEngine/build-ios.sh
+
+      - name: Export Xcode project on GitHub
+        if: inputs.runner == 'hosted'
+        uses: game-ci/unity-builder@4423ee75828dff56037d1d1cfdac6b68e3a6ba00 # v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: iOS
+          buildMethod: YGOPortable.Editor.YgoIosBuilder.Export
+          buildsPath: Builds
+          versioning: None
+          customParameters: >-
+            -ygoIosOutput ${{ env.IOS_XCODE_PATH }}
+            -ygoIosBundleId ${{ env.IOS_BUNDLE_IDENTIFIER }}
+            ${{ steps.settings.outputs.signing_args }}
+
+      - name: Export Xcode project on your Mac
+        if: inputs.runner == 'self-hosted'
+        env:
+          EDITOR_DIRECTORY: ${{ steps.settings.outputs.editor_directory }}
+          SIGNING_ARGS: ${{ steps.settings.outputs.signing_args }}
+        run: |
+          read -r -a signing_args <<< "$SIGNING_ARGS"
+          "$EDITOR_DIRECTORY/Unity.app/Contents/MacOS/Unity" \
+            -batchmode -nographics -quit -logFile - -projectPath "$GITHUB_WORKSPACE" \
+            -buildTarget iOS -executeMethod YGOPortable.Editor.YgoIosBuilder.Export \
+            -ygoIosOutput "$IOS_XCODE_PATH" -ygoIosBundleId "$IOS_BUNDLE_IDENTIFIER" \
+            ${signing_args[@]+"${signing_args[@]}"}
+
+      - name: Package IPA using Xcode
+        env:
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ inputs.signing != 'unsigned' && secrets.IOS_PROVISIONING_PROFILE_BASE64 || '' }}
+          IOS_CERTIFICATE_BASE64: ${{ inputs.signing != 'unsigned' && secrets.IOS_CERTIFICATE_BASE64 || '' }}
+          IOS_CERTIFICATE_PASSWORD: ${{ inputs.signing != 'unsigned' && secrets.IOS_CERTIFICATE_PASSWORD || '' }}
+        run: bash Tools/build-ios-ipa.sh package
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: YGO-Portable-iOS-${{ inputs.signing }}-${{ github.run_number }}
+          path: Builds/iOS/IPA/*.ipa
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7

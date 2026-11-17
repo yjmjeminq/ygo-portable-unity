@@ -37,7 +37,13 @@ file(GLOB LUA_SRC "${YGOPRO_CORE_DIR}/lua/src/*.c")
 list(FILTER LUA_SRC EXCLUDE REGEX ".*(lbitlib|lcorolib|ldblib|linit|loadlib|loslib|ltests|lua|luac|lutf8lib|onelua)\\.c$")
 set_source_files_properties(${LUA_SRC} PROPERTIES LANGUAGE CXX)
 
-add_library(ygoengine SHARED
+if(IOS)
+    set(YGOENGINE_LIBRARY_TYPE STATIC)
+else()
+    set(YGOENGINE_LIBRARY_TYPE SHARED)
+endif()
+
+add_library(ygoengine ${YGOENGINE_LIBRARY_TYPE}
     ygoengine.cpp
     ${CORE_CPP}
     ${LUA_SRC}
@@ -68,19 +74,23 @@ else()
     target_compile_options(ygoengine PRIVATE -O2 -fno-rtti -include "${YGOPRO_CORE_DIR}/lua/luaconf-customize.h")
 endif()
 
-set_target_properties(ygoengine PROPERTIES
-    PREFIX ""
-    OUTPUT_NAME "ygoengine"
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../Assets/Plugins/x86_64"
-    RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_SOURCE_DIR}/../Assets/Plugins/x86_64"
-    RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_CURRENT_SOURCE_DIR}/../Assets/Plugins/x86_64"
-    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../Assets/Plugins/x86_64"
-)
+if(IOS)
+    set_target_properties(ygoengine PROPERTIES OUTPUT_NAME "ygo_native")
+else()
+    set_target_properties(ygoengine PROPERTIES
+        PREFIX ""
+        OUTPUT_NAME "ygoengine"
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../Assets/Plugins/x86_64"
+        RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_SOURCE_DIR}/../Assets/Plugins/x86_64"
+        RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_CURRENT_SOURCE_DIR}/../Assets/Plugins/x86_64"
+        ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../Assets/Plugins/x86_64"
+    )
 
-add_executable(ygo_smoke smoke_test.cpp)
-target_link_libraries(ygo_smoke PRIVATE ygoengine)
-set_target_properties(ygo_smoke PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin"
-    RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_BINARY_DIR}/bin"
-)
+    add_executable(ygo_smoke smoke_test.cpp)
+    target_link_libraries(ygo_smoke PRIVATE ygoengine)
+    set_target_properties(ygo_smoke PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin"
+        RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_BINARY_DIR}/bin"
+    )
+endif()

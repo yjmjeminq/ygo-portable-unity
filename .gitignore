@@ -6,6 +6,8 @@
 /[Ll]ocalCache/
 /[Ll]ogs/
 NativeEngine/build/
+/Assets/Plugins/iOS/
+/Assets/Plugins/iOS.meta
 verify*.log
 *.apk
 *.aab

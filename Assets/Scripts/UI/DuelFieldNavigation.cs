@@ -74,7 +74,8 @@ namespace YGOPortable.UI
             bool pointerMoved = _hasDuelPointerSample && (pointer - _lastDuelPointer).sqrMagnitude > 9f;
             if (!_hasDuelPointerSample || pointerMoved) _lastDuelPointer = pointer;
             _hasDuelPointerSample = true;
-            if (_usingDuelPad && (pointerMoved || Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1)))
+            if (_usingDuelPad && (pointerMoved || Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) ||
+                DeckPadInput.DirectTouchBegan()))
             {
                 _usingDuelPad = false;
                 _duelPadPlacementFocus = null;

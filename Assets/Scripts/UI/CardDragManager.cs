@@ -46,6 +46,7 @@ namespace YGOPortable.UI
         private CanvasGroup _ghostCanvasGroup;
         private CompositeCardView _ghostCardView;
         private Outline _ghostOutline;
+        private int _dragPointerId;
 
         public static CardDragManager Ensure(Canvas canvas)
         {
@@ -88,9 +89,11 @@ namespace YGOPortable.UI
             ghostGo.SetActive(false);
         }
 
-        public void StartDrag(DragSourceType source, uint cardCode, int index = -1, object customData = null)
+        public void StartDrag(DragSourceType source, uint cardCode, int index = -1, object customData = null,
+            int pointerId = -1, Vector2? screenPosition = null)
         {
             if (cardCode == 0) return;
+            _dragPointerId = pointerId;
             IsDragging = true;
             CurrentSource = source;
             CurrentCode = cardCode;
@@ -103,7 +106,7 @@ namespace YGOPortable.UI
             _ghostCardView.UseDuelArtwork = source == DragSourceType.Hand || source == DragSourceType.FieldMonster ||
                 source == DragSourceType.ExtraDeck;
             _ghostCardView.SetCard(cardCode);
-            UpdateGhostPosition(Input.mousePosition);
+            UpdateGhostPosition(screenPosition ?? (Vector2)Input.mousePosition);
 
             _ghostOutline.effectColor = source == DragSourceType.FieldMonster ? LotdUiKit.RedAccent
                 : (source == DragSourceType.Hand || source == DragSourceType.ExtraDeck ? LotdUiKit.GoldAccent : LotdUiKit.CyanAccent);
@@ -154,6 +157,19 @@ namespace YGOPortable.UI
         private void Update()
         {
             if (!IsDragging) return;
+            if (_dragPointerId >= 0)
+            {
+                for (int i = 0; i < Input.touchCount; i++)
+                {
+                    var touch = Input.GetTouch(i);
+                    if (touch.fingerId != _dragPointerId) continue;
+                    if (touch.phase == TouchPhase.Canceled) CancelDrag();
+                    else if (touch.phase == TouchPhase.Ended) EndDrag(touch.position);
+                    return;
+                }
+                CancelDrag();
+                return;
+            }
 
             UpdateGhostPosition(Input.mousePosition);
 
@@ -267,7 +283,7 @@ namespace YGOPortable.UI
                 _parentScroll?.OnBeginDrag(eventData);
                 return;
             }
-            if (eventData.button != PointerEventData.InputButton.Left) return;
+            if (eventData.button != PointerEventData.InputButton.Left || CardDragManager.Instance?.IsDragging == true) return;
             uint code = CardCodeGetter();
             if (code == 0) return;
 
@@ -278,7 +294,7 @@ namespace YGOPortable.UI
             _cg = GetComponent<CanvasGroup>() ?? gameObject.AddComponent<CanvasGroup>();
             _cg.alpha = 0.35f;
 
-            CardDragManager.Instance?.StartDrag(SourceType, code, idx, data);
+            CardDragManager.Instance?.StartDrag(SourceType, code, idx, data, eventData.pointerId, eventData.position);
         }
 
         public void OnDrag(PointerEventData eventData)
@@ -305,7 +321,8 @@ namespace YGOPortable.UI
             {
                 _isDraggingThis = false;
                 ResetVisualState();
-                CardDragManager.Instance?.EndDrag(eventData.position);
+                // The drag manager checks the owning touch for cancellation and release.
+                if (eventData.pointerId < 0) CardDragManager.Instance?.EndDrag(eventData.position);
             }
         }
 

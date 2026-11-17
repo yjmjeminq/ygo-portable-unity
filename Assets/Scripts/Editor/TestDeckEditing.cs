@@ -37,6 +37,7 @@ namespace YGOPortable.Editor
                 VerifyArchetypeBrowser(editor, events);
                 VerifyGroupingAndTrunk(editor, streamingPath, Path.Combine(save, "trunk"));
                 VerifyMainSorting(editor, events);
+                VerifyTouchPad(canvas.transform, events);
             }
             finally
             {
@@ -49,7 +50,7 @@ namespace YGOPortable.Editor
                     UnityEngine.Object.DestroyImmediate(events.gameObject);
                 }
             }
-            Debug.Log("[VERIFY DECK EDITING] Transfer continuity, illegal moves, oversized deck navigation, modal focus, grouped copies, live trunk counts and main sort controls passed.");
+            Debug.Log("[VERIFY DECK EDITING] Transfer continuity, illegal moves, oversized deck navigation, modal focus, grouped copies, live trunk counts, main sort controls and touch pad passed.");
         }
 
         private static void VerifyTransfer(DeckEditorUI editor)
@@ -258,6 +259,63 @@ namespace YGOPortable.Editor
             Pad("Alternate");
             Require(!overlay.activeSelf && trunkSort.value == (before + 1) % trunkSort.options.Count &&
                 deck.main.SequenceEqual(highestAttack), "X changed the main deck while the trunk was selected.");
+        }
+
+        private static void VerifyTouchPad(Transform canvas, EventSystem events)
+        {
+            const BindingFlags Static = BindingFlags.Static | BindingFlags.NonPublic;
+            var assembly = typeof(GameAppController).Assembly;
+            var touchPad = assembly.GetType("YGOPortable.UI.TouchGamepad", true);
+            var padInput = assembly.GetType("YGOPortable.UI.DeckPadInput", true);
+            var buttons = assembly.GetType("YGOPortable.UI.DeckPadButtons", true);
+            var pad = (Component)touchPad.GetMethod("Create", Static).Invoke(null, new object[] { canvas });
+            try
+            {
+                var controls = pad.transform.Find("SafeArea/Controls");
+                var toggle = pad.transform.Find("SafeArea/Toggle").gameObject;
+                var firstFinger = new PointerEventData(events) { pointerId = 0 };
+                var secondFinger = new PointerEventData(events) { pointerId = 1 };
+                var input = Activator.CreateInstance(padInput, nonPublic: true);
+                var read = padInput.GetMethod("AdvanceWithTouch", Instance);
+                object Sample(float time, string physical = "None", bool related = true) => read.Invoke(input,
+                    new object[] { Vector2.zero, Enum.Parse(buttons, physical), time, 0f, 0f, related });
+                T Read<T>(object frame, string name) => (T)frame.GetType().GetProperty(name, Instance).GetValue(frame);
+                void Down(string key, PointerEventData finger) =>
+                    ExecuteEvents.Execute(controls.Find(key).gameObject, finger, ExecuteEvents.pointerDownHandler);
+                void Up(string key, PointerEventData finger) =>
+                    ExecuteEvents.Execute(controls.Find(key).gameObject, finger, ExecuteEvents.pointerUpHandler);
+
+                Sample(0f);
+                Down("Left", firstFinger);
+                Down("A", secondFinger);
+                var combined = Sample(.1f, "Search");
+                Require(Read<bool>(combined, "Submit") && Read<bool>(combined, "Search") &&
+                    Read<Vector2Int>(combined, "Direction") == Vector2Int.left,
+                    "Touch directions and action did not combine with physical button input.");
+                Up("A", secondFinger);
+                var repeated = Sample(.5f);
+                Require(!Read<bool>(repeated, "Submit") && Read<Vector2Int>(repeated, "Direction") == Vector2Int.left,
+                    "Releasing one touch disturbed the other touch's direction repeat.");
+                Up("Left", firstFinger);
+                Down("X", firstFinger);
+                Require(Read<bool>(Sample(.6f), "Alternate"), "The top face button did not use the deck sorting input.");
+                Up("X", firstFinger);
+                Down("ZR", firstFinger);
+                Require(!Read<bool>(Sample(.7f, related: false), "RelatedCards") &&
+                    Read<bool>(Sample(.8f), "RelatedCards"), "The related card shortcut was not scoped to the deck editor.");
+                Down("ScrollUp", secondFinger);
+                Require(Read<float>(Sample(.9f), "DescriptionScroll") > 0f, "The touch pad did not scroll card details.");
+                ExecuteEvents.Execute(toggle, firstFinger, ExecuteEvents.pointerClickHandler);
+                Require(!controls.gameObject.activeSelf && !Read<bool>(Sample(1f), "HasInput"),
+                    "Hiding the touch pad left a virtual control held.");
+                ExecuteEvents.Execute(toggle, firstFinger, ExecuteEvents.pointerClickHandler);
+                Require(controls.gameObject.activeSelf && !Read<bool>(Sample(1.1f), "HasInput"),
+                    "Showing the touch pad restored an earlier touch.");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(pad.gameObject);
+            }
         }
 
         private static T Field<T>(object target, string name) => (T)target.GetType().GetField(name, Instance).GetValue(target);

@@ -129,6 +129,11 @@ namespace YGOPortable.UI
                 _modals.ZoneViewRoot.transform.SetAsLastSibling();
                 _modals.ResultRoot.transform.SetAsLastSibling();
                 CardAnimationManager.Instance?.BringToFront();
+                if (Application.platform == RuntimePlatform.IPhonePlayer)
+                {
+                    Input.simulateMouseWithTouches = false;
+                    TouchGamepad.Create(canvas.transform);
+                }
 
                 _initialized = true;
                 Debug.Log("[GameApp] 10. Showing Title screen...");
@@ -194,6 +199,7 @@ namespace YGOPortable.UI
 
             var previousScreen = _screen;
             _screen = screen;
+            TouchGamepad.ReleaseAll();
             _menuPad?.Clear();
             _menuPadInput.Reset();
             _modals.HideAll();
@@ -345,7 +351,8 @@ namespace YGOPortable.UI
                 if (_screen == AppScreen.DeckEditor) _deckEditor?.Update();
                 else if (_menuPad != null)
                 {
-                    if (!_menuPad.HasPopup && (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1)))
+                    if (!_menuPad.HasPopup && (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) ||
+                        DeckPadInput.DirectTouchBegan()))
                         _menuPad.Clear(preserveSelection: true);
                     HandleMenuInput(_menuPadInput.Read(Time.unscaledTime), Input.GetKeyDown(KeyCode.Escape));
                     SyncFrontMenuFocus();
