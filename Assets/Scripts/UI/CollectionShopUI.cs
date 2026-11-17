@@ -20,6 +20,7 @@ namespace YGOPortable.UI
             internal string Details;
             internal string SearchText;
             internal IReadOnlyList<uint> CardPool;
+            internal CollectionStarter Starter;
         }
 
         private sealed class Catalog
@@ -96,7 +97,12 @@ namespace YGOPortable.UI
                     Id = starter.Id,
                     Name = starter.Name,
                     FeaturedCode = starter.FeaturedCode,
-                    Details = $"메인 덱 {starter.MainCount}장\n엑스트라 덱 {starter.ExtraCount}장",
+                    SearchText = string.Join("\n", starter.ThemeCards.Select(CardDatabase.GetName)
+                        .Prepend(CardDatabase.GetName(starter.FeaturedCode))
+                        .Prepend(starter.Name)
+                        .Select(NormalizeStarterSearch)),
+                    CardPool = starter.ThemeCards,
+                    Starter = starter,
                 }).ToArray();
             }
             OpenCatalog(_starter);
@@ -140,7 +146,7 @@ namespace YGOPortable.UI
             var list = LotdUiKit.CreateMenuPanel(root, "Catalog", new Vector2(.025f, .083f), new Vector2(.405f, .882f));
             var details = LotdUiKit.CreateMenuPanel(root, "Details", new Vector2(.419f, .083f), new Vector2(.975f, .882f));
             var search = Slot("Search", list, .08f, .851f, .92f, .924f);
-            catalog.Search = LotdUiKit.CreateInputField(search, "Input", starter ? "카드군 이름 검색" : "팩 이름·카드명·카드 번호 검색", 17);
+            catalog.Search = LotdUiKit.CreateInputField(search, "Input", starter ? "카드군·카드명·카드 번호 검색" : "팩 이름·카드명·카드 번호 검색", 17);
             catalog.Search.onValueChanged.AddListener(_ => FilterCatalog(catalog));
             catalog.CountLabel = Label(list, "Count", "", .087f, .796f, .914f, .838f, 16,
                 TextAnchor.MiddleLeft, LotdUiKit.TextMuted);
@@ -157,6 +163,15 @@ namespace YGOPortable.UI
                         EventSystem.current?.SetSelectedGameObject(catalog.Action.gameObject);
                 });
                 catalog.Rows[i] = button;
+                if (starter)
+                {
+                    button.gameObject.AddComponent<StarterRowFocus>().ShowPreview = () =>
+                    {
+                        int index = catalog.Page * PageSize + row;
+                        if (index < catalog.Matches.Count && catalog.Matches[index] != catalog.Selected)
+                            Select(catalog, catalog.Matches[index]);
+                    };
+                }
                 var label = button.GetComponentInChildren<Text>();
                 label.resizeTextForBestFit = true;
                 label.resizeTextMinSize = 12;
@@ -183,7 +198,7 @@ namespace YGOPortable.UI
                 TextAnchor.MiddleLeft, LotdUiKit.TextMuted);
 
             if (starter)
-                Label(details, "StarterInfo", $"카드군은 처음 한 번만 선택합니다.\n스타터 덱과 시작 보상 {CollectionProgress.StartingBalance:N0} DP를 받습니다.",
+                Label(details, "StarterInfo", $"전체 카드군 중 하나를 처음 한 번만 고릅니다.\n고른 카드군의 스타터 덱과 {CollectionProgress.StartingBalance:N0} DP를 받습니다.",
                     .48f, .204f, .923f, .362f, 18, TextAnchor.UpperLeft, LotdUiKit.TextMuted);
             else
                 BuildReveal(details);
@@ -263,18 +278,22 @@ namespace YGOPortable.UI
         private void FilterCatalog(Catalog catalog)
         {
             string query = catalog.Search.text.Trim();
+            string searchText = catalog == _starter ? NormalizeStarterSearch(query) : query;
             bool codeQuery = uint.TryParse(query, out uint code);
             catalog.Matches.Clear();
             foreach (var item in catalog.Items)
             {
                 if (query.Length == 0 || item.Name.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    (codeQuery ? item.CardPool?.Contains(code) == true :
-                        item.SearchText?.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0))
+                    (codeQuery ? item.FeaturedCode == code || item.CardPool?.Contains(code) == true :
+                        searchText.Length > 0 && item.SearchText?.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0))
                     catalog.Matches.Add(item);
             }
             catalog.Page = 0;
             RefreshPage(catalog);
         }
+
+        private static string NormalizeStarterSearch(string value) =>
+            new string(value.Where(char.IsLetterOrDigit).ToArray());
 
         private bool ChangePage(Catalog catalog, int delta)
         {
@@ -296,7 +315,8 @@ namespace YGOPortable.UI
                 if (visible) catalog.Labels[i].text = catalog.Matches[index].Name;
             }
             catalog.PageLabel.text = $"{catalog.Page + 1} / {PageCount(catalog)}";
-            catalog.CountLabel.text = catalog.Matches.Count == 0 ? "검색 결과 없음" : $"{catalog.Matches.Count:N0}개";
+            catalog.CountLabel.text = catalog.Matches.Count == 0 ? "검색 결과 없음" :
+                catalog == _starter ? $"카드군 {catalog.Matches.Count:N0} / {catalog.Items.Length:N0}종" : $"{catalog.Matches.Count:N0}개";
             catalog.Previous.interactable = catalog.Page > 0;
             catalog.Next.interactable = catalog.Page + 1 < PageCount(catalog);
             Select(catalog, first < catalog.Matches.Count ? catalog.Matches[first] : null);
@@ -307,7 +327,9 @@ namespace YGOPortable.UI
             bool starter = catalog == _starter;
             catalog.Selected = item;
             catalog.Heading.text = item?.Name ?? "선택 항목 없음";
-            catalog.Details.text = item?.Details ?? "";
+            catalog.Details.text = item?.Starter is CollectionStarter choice
+                ? $"메인 덱 {choice.MainCount}장\n엑스트라 덱 {choice.ExtraCount}장"
+                : item?.Details ?? "";
             catalog.Cover.gameObject.SetActive(item != null && item.FeaturedCode != 0);
             catalog.Cover.SetCard(item?.FeaturedCode ?? 0);
             catalog.ActionLabel.text = starter ? "이 카드군으로 시작" : $"팩 열기   {CollectionProgress.PackCost:N0} DP";
@@ -345,6 +367,13 @@ namespace YGOPortable.UI
         private static Button AddButton(Transform parent, string name, string caption, float left, float bottom,
             float right, float top, Action click, bool gold = false) =>
             LotdUiKit.CreateLotdButton(Slot(name, parent, left, bottom, right, top), "Button", caption, click, 18, gold);
+    }
+
+    internal sealed class StarterRowFocus : MonoBehaviour, ISelectHandler
+    {
+        internal Action ShowPreview { get; set; }
+
+        public void OnSelect(BaseEventData eventData) => ShowPreview?.Invoke();
     }
 
     internal sealed class ShopCardRevealMotion : MonoBehaviour

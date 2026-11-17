@@ -11,26 +11,27 @@ namespace YGOPortable.Core
         public string Id { get; }
         public string Name { get; }
         public uint FeaturedCode { get; }
-        public int MainCount => _deck.main.Count;
-        public int ExtraCount => _deck.extra.Count;
-        private readonly UserDeck _deck;
+        public IReadOnlyList<uint> ThemeCards { get; }
+        public int MainCount => Deck.main.Count;
+        public int ExtraCount => Deck.extra.Count;
 
-        internal CollectionStarter(string id, string name, PresetDeckInfo preset)
+        private readonly ArchetypeInfo _archetype;
+        private readonly PresetDeckInfo _preset;
+        private UserDeck _deck;
+
+        private UserDeck Deck => _deck ??= CollectionProgress.BuildStarterDeck(Id, _archetype, _preset);
+
+        internal CollectionStarter(ArchetypeInfo archetype, PresetDeckInfo preset)
         {
-            Id = id;
-            Name = name;
-            FeaturedCode = preset.sigCard;
-            _deck = new UserDeck
-            {
-                id = "collection_" + id,
-                name = name + " 스타터",
-                main = new List<uint>(preset.main ?? Array.Empty<uint>()),
-                extra = new List<uint>(preset.extra ?? Array.Empty<uint>()),
-                side = new List<uint>(preset.side ?? Array.Empty<uint>()),
-            };
+            Id = $"archetype-{archetype.setcodes.Min():x4}";
+            Name = archetype.name;
+            FeaturedCode = preset != null && preset.sigCard != 0 ? preset.sigCard : archetype.representativeCode;
+            ThemeCards = Array.AsReadOnly(archetype.coreCards.Select(card => card.code).Distinct().ToArray());
+            _archetype = archetype;
+            _preset = preset;
         }
 
-        internal UserDeck CreateDeck() => CollectionProgress.CopyDeck(_deck);
+        internal UserDeck CreateDeck() => CollectionProgress.CopyDeck(Deck);
     }
 
     public sealed class CollectionPack
@@ -82,16 +83,16 @@ namespace YGOPortable.Core
             public List<int> clearedOpponentIds;
         }
 
-        private static readonly (string id, string name, int preset)[] StarterPresets =
+        private static readonly (ushort setcode, int presetId)[] StarterPresets =
         {
-            ("dark-magician", "블랙 매지션", 30001),
-            ("blue-eyes", "푸른 눈", 258),
-            ("red-eyes", "붉은 눈", 279),
-            ("elemental-hero", "엘리멘틀 히어로", 289),
-            ("cyber-dragon", "사이버 드래곤", 312),
-            ("ddd", "DDD", 34043),
-            ("labrynth", "라뷰린스", 20672),
-            ("sky-striker", "섬도희", 20687),
+            (0x10a2, 30001), // 블랙 매지션
+            (0x00dd, 258), // 푸른 눈
+            (0x003b, 279), // 붉은 눈
+            (0x3008, 289), // 엘리멘틀 히어로
+            (0x1093, 312), // 사이버 드래곤
+            (0x10af, 34043), // DD(디디)
+            (0x017f, 20672), // 라뷰린스
+            (0x1115, 20687), // 섬도희
         };
 
         private static readonly uint[] SupportCodes =
@@ -232,6 +233,7 @@ namespace YGOPortable.Core
             }
 
             var selected = starter.CreateDeck();
+            if (!ValidateDeck(selected, out error)) return false;
             var owned = GetDeckCards(selected).GroupBy(code => code).ToDictionary(group => group.Key, group => group.Count());
             var next = new SavedProfile
             {
@@ -449,16 +451,94 @@ namespace YGOPortable.Core
         private static IReadOnlyList<CollectionStarter> BuildStarters()
         {
             var starters = new List<CollectionStarter>();
-            foreach (var (id, name, presetId) in StarterPresets)
+            foreach (var archetype in StarterArchetypeCatalog.GetAll().OrderBy(archetype => archetype.name, StringComparer.Ordinal))
             {
-                var preset = DeckRepository.PresetDecks.FirstOrDefault(item => item.id == presetId);
-                if (preset == null) continue;
-                var starter = new CollectionStarter(id, name, preset);
-                if (ValidateDeck(starter.CreateDeck(), out _))
-                    starters.Add(starter);
+                var (_, presetId) = StarterPresets.FirstOrDefault(entry => archetype.setcodes.Contains(entry.setcode));
+                var preset = presetId != 0 ? DeckRepository.PresetDecks.Find(item => item.id == presetId) : null;
+                starters.Add(new CollectionStarter(archetype, preset));
             }
             return starters.AsReadOnly();
         }
+
+        internal static UserDeck BuildStarterDeck(string id, ArchetypeInfo archetype, PresetDeckInfo preset)
+        {
+            const int mainSize = 40;
+            const int extraSize = 15;
+            var deck = new UserDeck { id = "collection_" + id, name = archetype.name + " 스타터" };
+            if (preset != null)
+            {
+                deck.main.AddRange(preset.main ?? Array.Empty<uint>());
+                deck.extra.AddRange(preset.extra ?? Array.Empty<uint>());
+                deck.side.AddRange(preset.side ?? Array.Empty<uint>());
+                if (ValidateDeck(deck, out _)) return deck;
+                deck.main.Clear();
+                deck.extra.Clear();
+                deck.side.Clear();
+            }
+
+            var counts = new Dictionary<uint, int>();
+            bool AddCard(List<uint> pile, int size, uint code, bool extraPile)
+            {
+                var card = CardDatabase.Get(code);
+                if (pile.Count >= size || !IsDeckCard(card) || card.IsExtra != extraPile) return false;
+                uint key = GetDeckCopyKey(code);
+                counts.TryGetValue(key, out int count);
+                if (count >= GetDeckCopyLimit(code)) return false;
+                counts[key] = count + 1;
+                pile.Add(code);
+                return true;
+            }
+
+            var (main, extra) = CardDatabase.BuildPureArchetypeDeck(archetype);
+            var ace = CardDatabase.Get(archetype.representativeCode);
+            if (IsDeckCard(ace))
+            {
+                var generated = ace.IsExtra ? extra : main;
+                if (!generated.Contains(ace.code))
+                    AddCard(ace.IsExtra ? deck.extra : deck.main, ace.IsExtra ? extraSize : mainSize, ace.code, ace.IsExtra);
+            }
+
+            foreach (uint code in extra) AddCard(deck.extra, extraSize, code, extraPile: true);
+
+            var theme = new HashSet<uint>(archetype.coreCards.Concat(archetype.supportCards).Select(card => card.code))
+            {
+                24094653, // 융합, added by the existing generator when needed
+            };
+            foreach (uint code in main)
+                if (theme.Contains(code)) AddCard(deck.main, mainSize, code, extraPile: false);
+
+            // Sparse themes can otherwise get a deck with many spells and too few monsters they can Normal Summon.
+            int normalSummons = deck.main.Count(code => IsStarterNormalSummon(CardDatabase.Get(code)));
+            if (normalSummons < 9 && deck.main.Count < mainSize)
+            {
+                var monsters = CardDatabase.AllCards.Where(card => IsStarterNormalSummon(card) && card.alias == 0 &&
+                    (card.type & YgoConstants.TYPE_NORMAL) != 0 && card.atk >= 1600)
+                    .OrderByDescending(card => card.race == ace?.race)
+                    .ThenByDescending(card => card.attr == ace?.attr)
+                    .ThenByDescending(card => card.atk)
+                    .ThenBy(card => card.code);
+                foreach (var card in monsters)
+                {
+                    while (normalSummons < 9 && AddCard(deck.main, mainSize, card.code, extraPile: false)) normalSummons++;
+                    if (normalSummons >= 9 || deck.main.Count == mainSize) break;
+                }
+            }
+
+            foreach (uint code in main)
+                if (!theme.Contains(code)) AddCard(deck.main, mainSize, code, extraPile: false);
+
+            foreach (uint code in SupportCodes)
+            {
+                if (deck.main.Count == mainSize) break;
+                while (AddCard(deck.main, mainSize, code, extraPile: false)) { }
+            }
+
+            return deck;
+        }
+
+        private static bool IsStarterNormalSummon(CardInfo card) => IsDeckCard(card) && card.IsMonster &&
+            !card.IsExtra && card.level is >= 1 and <= 4 &&
+            (card.type & (YgoConstants.TYPE_RITUAL | YgoConstants.TYPE_SPSUMMON)) == 0;
 
         private static IReadOnlyList<CollectionPack> BuildPacks()
         {
