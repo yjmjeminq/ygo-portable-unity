@@ -5,7 +5,7 @@ using UnityEngine;
 namespace YGOPortable.UI
 {
     [Flags]
-    internal enum DeckPadButtons : ushort
+    internal enum DeckPadButtons : uint
     {
         None = 0,
         Up = 0x0001,
@@ -21,13 +21,14 @@ namespace YGOPortable.UI
         Cancel = 0x2000,
         Alternate = 0x4000,
         Search = 0x8000,
+        RelatedCards = 0x10000, // The analog trigger is outside XInput's 16-bit button field.
     }
 
     internal readonly struct DeckPadFrame
     {
         private const DeckPadButtons Actions = DeckPadButtons.Submit | DeckPadButtons.Cancel | DeckPadButtons.Alternate |
             DeckPadButtons.Search | DeckPadButtons.PreviousArea | DeckPadButtons.NextArea | DeckPadButtons.Save |
-            DeckPadButtons.ResetFilters | DeckPadButtons.Reorder;
+            DeckPadButtons.ResetFilters | DeckPadButtons.Reorder | DeckPadButtons.RelatedCards;
         private readonly DeckPadButtons _pressed;
 
         internal DeckPadFrame(Vector2Int direction, DeckPadButtons pressed, float descriptionScroll = 0f)
@@ -49,12 +50,15 @@ namespace YGOPortable.UI
         internal bool Save => (_pressed & DeckPadButtons.Save) != 0;
         internal bool ResetFilters => (_pressed & DeckPadButtons.ResetFilters) != 0;
         internal bool Reorder => (_pressed & DeckPadButtons.Reorder) != 0;
+        internal bool RelatedCards => (_pressed & DeckPadButtons.RelatedCards) != 0;
     }
 
     internal sealed class DeckPadInput
     {
         private const float StickPress = .57f;
         private const float StickRelease = .39f;
+        private const float TriggerPress = .55f;
+        private const float TriggerRelease = .35f;
         private const float InitialRepeatDelay = .34f;
         private const float NextRepeatDelay = .10f;
 
@@ -76,7 +80,7 @@ namespace YGOPortable.UI
             _nextDirection = 0f;
         }
 
-        internal DeckPadFrame Read(float now)
+        internal DeckPadFrame Read(float now, bool includeRightTrigger = false)
         {
             if (!Application.isFocused)
             {
@@ -88,7 +92,8 @@ namespace YGOPortable.UI
             if (TryReadXInput(now, out var pad))
             {
                 var stick = new Vector2(pad.LeftThumbX / 32768f, pad.LeftThumbY / 32768f);
-                return Advance(stick, pad.Buttons, now, pad.RightThumbY / 32768f);
+                float rightTrigger = includeRightTrigger ? pad.RightTrigger / 255f : 0f;
+                return Advance(stick, (DeckPadButtons)pad.Buttons, now, pad.RightThumbY / 32768f, rightTrigger);
             }
 #endif
 
@@ -107,8 +112,12 @@ namespace YGOPortable.UI
             return Advance(legacyStick, buttons, now, Input.GetAxisRaw("DeckPadLookVertical"));
         }
 
-        internal DeckPadFrame Advance(Vector2 stick, DeckPadButtons held, float now, float descriptionStick = 0f)
+        internal DeckPadFrame Advance(Vector2 stick, DeckPadButtons held, float now, float descriptionStick = 0f,
+            float rightTrigger = 0f)
         {
+            float triggerThreshold = (_heldButtons & DeckPadButtons.RelatedCards) != 0 ? TriggerRelease : TriggerPress;
+            if (rightTrigger >= triggerThreshold) held |= DeckPadButtons.RelatedCards;
+
             // A button already held while entering the editor belongs to the previous screen.
             var pressed = _sampledButtons ? held & ~_heldButtons : DeckPadButtons.None;
             _heldButtons = held;
@@ -161,7 +170,7 @@ namespace YGOPortable.UI
         private struct XInputState
         {
             public uint PacketNumber;
-            public DeckPadButtons Buttons;
+            public ushort Buttons;
             public byte LeftTrigger;
             public byte RightTrigger;
             public short LeftThumbX;

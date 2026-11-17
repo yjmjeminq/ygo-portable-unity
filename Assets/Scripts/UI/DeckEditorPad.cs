@@ -84,7 +84,7 @@ namespace YGOPortable.UI
                 return false;
             }
 
-            var frame = _padInput.Read(Time.unscaledTime);
+            var frame = _padInput.Read(Time.unscaledTime, includeRightTrigger: true);
             if (CardDragManager.Instance?.IsDragging == true) return false;
             if (!_padMode && !frame.HasInput) return false;
             HandleDeckPad(frame);
@@ -134,7 +134,10 @@ namespace YGOPortable.UI
                 if (_cardFilterDialog.activeSelf)
                     HandleDetailedSearchPad(default);
                 else if (_padArea != PadArea.Controls)
+                {
+                    if (_padArea == PadArea.Trunk) SwitchPadArea(PadArea.Trunk);
                     DrawPadCardFocus();
+                }
                 return;
             }
 
@@ -207,6 +210,13 @@ namespace YGOPortable.UI
                     () => SwitchPadArea(PadArea.Trunk), _detailButtonText.GetComponentInParent<Button>());
                 return;
             }
+            if (_padArea == PadArea.Trunk && _relatedFilterCode != 0 && (frame.Cancel || frame.RelatedCards))
+            {
+                ExitTrunkScope();
+                SwitchPadArea(PadArea.Trunk);
+                DrawPadCardFocus();
+                return;
+            }
             if (frame.Cancel)
             {
                 BeforeReplacingEdits(() => _app.ShowScreen(AppScreen.MainMenu));
@@ -215,9 +225,30 @@ namespace YGOPortable.UI
             }
 
             NavigatePadCards(frame.Direction);
-            if (frame.Submit || frame.Alternate) ExecutePadCard(frame.Alternate);
+            if (frame.RelatedCards) OpenRelatedCardsForPadSelection();
+            else if (frame.Submit || frame.Alternate) ExecutePadCard(frame.Alternate);
             DrawPadCardFocus();
             ScrollPadDescription(frame.DescriptionScroll);
+        }
+
+        private void OpenRelatedCardsForPadSelection()
+        {
+            int index = _padIndices[(int)_padArea];
+            uint code;
+            if (_padArea == PadArea.Trunk)
+            {
+                if (_trunkResults.Count == 0) return;
+                code = _trunkResults[ClampPadIndex(index, _trunkResults.Count)].code;
+            }
+            else
+            {
+                var cards = GetDeckList(CurrentPadDeck);
+                if (cards.Count == 0) return;
+                code = cards[ClampPadIndex(index, cards.Count)];
+            }
+
+            FilterRelatedCards(code);
+            SwitchPadArea(PadArea.Trunk);
         }
 
         private void HandleDetailedSearchPad(DeckPadFrame frame)
@@ -302,10 +333,13 @@ namespace YGOPortable.UI
                 PadArea.Extra => "엑스트라   A 사이드 이동   X 제거",
                 _ => "메인   A 사이드 이동   X 제거",
             };
-            string back = area == PadArea.Controls ? "B 카드 목록" : "우스틱 설명   B 뒤로";
+            bool relatedList = area == PadArea.Trunk && _relatedFilterCode != 0;
+            string back = area == PadArea.Controls ? "B 카드 목록" :
+                relatedList ? "우스틱 설명   B 전체 카드" : "우스틱 설명   B 뒤로";
             var reorder = CurrentPadDeck != DragSourceType.None ? "   R스틱 클릭 순서" : "";
             string menu = area == PadArea.Trunk ? "Menu/+ 조회" : "Menu/+ 저장";
-            _deckHelpLabel.text = $"{actions}{reorder}   Y 검색   LB/RB 영역   {menu}   {PadFilterResetHelp}   {back}";
+            string related = area == PadArea.Controls ? "" : relatedList ? "   R2/ZR/RT 전체 카드" : "   R2/ZR/RT 관련 카드";
+            _deckHelpLabel.text = $"{actions}{reorder}   Y 검색{related}   LB/RB 영역   {menu}   {PadFilterResetHelp}   {back}";
         }
 
         private DragSourceType CurrentPadDeck => _padArea switch
