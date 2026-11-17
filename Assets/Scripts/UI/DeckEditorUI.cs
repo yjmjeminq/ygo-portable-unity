@@ -117,6 +117,7 @@ namespace YGOPortable.UI
         public void Open()
         {
             Root.SetActive(true);
+            CloseDeckCardActions();
             CloseDetailedSearch();
             StartPadNavigation();
             if (DeckRepository.UserDecks.Count == 0)
@@ -132,6 +133,7 @@ namespace YGOPortable.UI
         public void Close()
         {
             StopPadNavigation();
+            CloseDeckCardActions();
             CloseDetailedSearch();
             _deckDialog.SetActive(false);
             _archModalRoot.SetActive(false);
@@ -144,6 +146,11 @@ namespace YGOPortable.UI
             if (_trunkViewport.rect.size != _trunkSize)
                 ResizeTrunkGrid(false);
             if (PollDeckPad()) return;
+            if (_deckCardActions.activeSelf)
+            {
+                if (Input.GetKeyDown(KeyCode.Escape)) CloseDeckCardActions();
+                return;
+            }
             if (_padUi.HasPopup)
             {
                 if (Input.GetKeyDown(KeyCode.Escape))
@@ -242,6 +249,7 @@ namespace YGOPortable.UI
             BuildDeckDialog(root);
             BuildDetailedSearch(root);
             BuildPadNavigation(root);
+            BuildDeckCardActions(root);
         }
 
         private void BuildCardDetails(Transform root)
@@ -719,7 +727,8 @@ namespace YGOPortable.UI
 
         private void HandleCardDrop(DragContext context)
         {
-            if (!Root.activeInHierarchy || _workingDeck == null || _deckDialog.activeSelf || _archModalRoot.activeSelf) return;
+            if (!Root.activeInHierarchy || _workingDeck == null || _deckDialog.activeSelf ||
+                _deckCardActions.activeSelf || _archModalRoot.activeSelf) return;
             var destination = FindDropZone(context.DropPosition);
             if (context.SourceType == DragSourceType.Trunk)
             {
@@ -842,18 +851,18 @@ namespace YGOPortable.UI
             FinishDeckEdit();
         }
 
-        private bool CanPlaceCard(CardInfo card, DragSourceType destination, List<uint> target)
+        private bool CanPlaceCard(CardInfo card, DragSourceType destination, List<uint> target, bool showReason = true)
         {
             if (card == null || target == null || (card.type & YgoConstants.TYPE_TOKEN) != 0) return false;
             if (destination != DragSourceType.DeckSide && card.IsExtra != (destination == DragSourceType.DeckExtra))
             {
-                ShowToast(card.IsExtra ? "엑스트라 또는 사이드 덱에 넣으세요." : "메인 또는 사이드 덱에 넣으세요.");
+                if (showReason) ShowToast(card.IsExtra ? "엑스트라 또는 사이드 덱에 넣으세요." : "메인 또는 사이드 덱에 넣으세요.");
                 return false;
             }
 
             int capacity = destination == DragSourceType.DeckMain ? 60 : 15;
             if (target.Count < capacity) return true;
-            ShowToast($"이 덱은 {capacity}장까지 담을 수 있습니다.");
+            if (showReason) ShowToast($"이 덱은 {capacity}장까지 담을 수 있습니다.");
             return false;
         }
 

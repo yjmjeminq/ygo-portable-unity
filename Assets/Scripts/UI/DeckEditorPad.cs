@@ -94,10 +94,12 @@ namespace YGOPortable.UI
         private void HandleDeckPad(DeckPadFrame frame)
         {
             if (_workingDeck == null) return;
-            var overlay = _deckDialog.activeSelf ? _deckDialog : _cardFilterDialog.activeSelf ? _cardFilterDialog :
+            bool cardActionsOpen = _deckCardActions.activeSelf;
+            var overlay = cardActionsOpen ? _deckCardActionPanel.gameObject :
+                _deckDialog.activeSelf ? _deckDialog : _cardFilterDialog.activeSelf ? _cardFilterDialog :
                 _archModalRoot.activeSelf ? _archModalRoot : null;
             var scope = overlay != null ? overlay.transform : Root.transform;
-            bool resetFilters = frame.ResetFilters && !_deckDialog.activeSelf && !_archModalRoot.activeSelf;
+            bool resetFilters = frame.ResetFilters && !cardActionsOpen && !_deckDialog.activeSelf && !_archModalRoot.activeSelf;
             if (!resetFilters && !_padUi.HasPopup &&
                 _padUi.HandleOpenedDropdown(scope, frame.Direction, frame.Submit, frame.Cancel, findAny: frame.HasInput))
             {
@@ -122,6 +124,12 @@ namespace YGOPortable.UI
                 }
                 else EventSystem.current?.SetSelectedGameObject(null);
                 SwitchPadArea(_padArea);
+            }
+
+            if (cardActionsOpen)
+            {
+                HandleDeckCardActionsPad(frame);
+                return;
             }
 
             if (resetFilters)
@@ -203,6 +211,13 @@ namespace YGOPortable.UI
                 SwitchPadArea((PadArea)(((int)_padArea + (frame.NextArea ? 1 : count - 1)) % count));
             }
 
+            if (frame.Alternate && !frame.Cancel)
+            {
+                CyclePadTrunkSort();
+                if (_padArea != PadArea.Controls) DrawPadCardFocus();
+                return;
+            }
+
             if (_padArea == PadArea.Controls)
             {
                 _padCardFocus.Hide();
@@ -226,35 +241,70 @@ namespace YGOPortable.UI
 
             NavigatePadCards(frame.Direction);
             if (frame.RelatedCards) OpenRelatedCardsForPadSelection();
-            else if (frame.Submit || frame.Alternate) ExecutePadCard(frame.Alternate);
+            else if (frame.Submit)
+            {
+                OpenCardActionsForPadSelection();
+                if (_deckCardActions.activeSelf)
+                {
+                    HandleDeckCardActionsPad(default);
+                    return;
+                }
+            }
             DrawPadCardFocus();
             ScrollPadDescription(frame.DescriptionScroll);
         }
 
-        private void OpenRelatedCardsForPadSelection()
+        private uint GetPadSelectedCard(out int index)
         {
-            int index = _padIndices[(int)_padArea];
-            uint code;
             if (_padArea == PadArea.Trunk)
             {
-                if (_trunkResults.Count == 0) return;
-                code = _trunkResults[ClampPadIndex(index, _trunkResults.Count)].code;
-            }
-            else
-            {
-                var cards = GetDeckList(CurrentPadDeck);
-                if (cards.Count == 0) return;
-                code = cards[ClampPadIndex(index, cards.Count)];
+                index = ClampPadIndex(_padIndices[(int)_padArea], _trunkResults.Count);
+                return _trunkResults.Count == 0 ? 0 : _trunkResults[index].code;
             }
 
+            var cards = GetDeckList(CurrentPadDeck);
+            index = ClampPadIndex(_padIndices[(int)_padArea], cards.Count);
+            return cards.Count == 0 ? 0 : cards[index];
+        }
+
+        private void OpenRelatedCardsForPadSelection()
+        {
+            uint code = GetPadSelectedCard(out _);
+            if (code == 0) return;
             FilterRelatedCards(code);
             SwitchPadArea(PadArea.Trunk);
+        }
+
+        private void CyclePadTrunkSort()
+        {
+            int trunk = (int)PadArea.Trunk;
+            int index = ClampPadIndex(_padIndices[trunk], _trunkResults.Count);
+            uint code = _trunkResults.Count == 0 ? 0 : _trunkResults[index].code;
+            _sortFilter.value = (_sortFilter.value + 1) % _sortFilter.options.Count;
+            if (code != 0)
+                _padIndices[trunk] = Mathf.Max(0, _trunkResults.FindIndex(card => card.code == code));
+        }
+
+        private void HandleDeckCardActionsPad(DeckPadFrame frame)
+        {
+            _padCardFocus.Hide();
+            _deckHelpLabel.text = "카드 메뉴   방향키 이동   A 선택   B 취소";
+            _padUi.Handle(_deckCardActionPanel, frame.Direction, frame.Submit, frame.Cancel,
+                CloseDeckCardActions, _deckCardActionDefault);
+            if (_deckCardActions.activeSelf) return;
+
+            if (_padArea != PadArea.Controls) DrawPadCardFocus();
         }
 
         private void HandleDetailedSearchPad(DeckPadFrame frame)
         {
             _padCardFocus.Hide();
-            _deckHelpLabel.text = $"조회 조건   방향키 이동   A 선택   Y 검색   {PadFilterResetHelp}   B 취소";
+            _deckHelpLabel.text = $"조회 조건   방향키 이동   A 선택   X 정렬   Y 검색   {PadFilterResetHelp}   B 취소";
+            if (frame.Alternate && !frame.Cancel)
+            {
+                CyclePadTrunkSort();
+                return;
+            }
             if (frame.Search && !frame.Cancel)
             {
                 _padUi.OpenText(_detailedQueryInput);
@@ -327,11 +377,11 @@ namespace YGOPortable.UI
             _padArea = area;
             var actions = area switch
             {
-                PadArea.Trunk => "보관함   A 담기   X 사이드",
+                PadArea.Trunk => "보관함   A 카드 메뉴",
                 PadArea.Controls => "메뉴   A 선택",
-                PadArea.Side => "사이드   A 덱으로 이동   X 제거",
-                PadArea.Extra => "엑스트라   A 사이드 이동   X 제거",
-                _ => "메인   A 사이드 이동   X 제거",
+                PadArea.Side => "사이드   A 카드 메뉴",
+                PadArea.Extra => "엑스트라   A 카드 메뉴",
+                _ => "메인   A 카드 메뉴",
             };
             bool relatedList = area == PadArea.Trunk && _relatedFilterCode != 0;
             string back = area == PadArea.Controls ? "B 카드 목록" :
@@ -339,7 +389,7 @@ namespace YGOPortable.UI
             var reorder = CurrentPadDeck != DragSourceType.None ? "   R스틱 클릭 순서" : "";
             string menu = area == PadArea.Trunk ? "Menu/+ 조회" : "Menu/+ 저장";
             string related = area == PadArea.Controls ? "" : relatedList ? "   R2/ZR/RT 전체 카드" : "   R2/ZR/RT 관련 카드";
-            _deckHelpLabel.text = $"{actions}{reorder}   Y 검색{related}   LB/RB 영역   {menu}   {PadFilterResetHelp}   {back}";
+            _deckHelpLabel.text = $"{actions}{reorder}   X 정렬   Y 검색{related}   LB/RB 영역   {menu}   {PadFilterResetHelp}   {back}";
         }
 
         private DragSourceType CurrentPadDeck => _padArea switch
@@ -410,35 +460,21 @@ namespace YGOPortable.UI
             SwitchPadArea(_padArea);
         }
 
-        private void ExecutePadCard(bool alternate)
+        private void OpenCardActionsForPadSelection()
         {
-            int area = (int)_padArea;
+            uint code = GetPadSelectedCard(out int index);
+            if (code == 0) return;
+
             if (_padArea == PadArea.Trunk)
             {
-                if (_trunkResults.Count == 0) return;
-                int index = ClampPadIndex(_padIndices[area], _trunkResults.Count);
-                TryAddCardToDeck(_trunkResults[index].code, alternate ? DragSourceType.DeckSide : DragSourceType.None);
+                EnsureTrunkPadVisible(index);
+                int slot = index - _lastFirstRow * TrunkCols;
+                if (slot >= 0 && slot < _trunkPool.Count)
+                    ShowDeckCardActions(_trunkPool[slot].rt, DragSourceType.Trunk, index, code);
                 return;
             }
 
-            var source = GetDeckList(CurrentPadDeck);
-            if (source.Count == 0) return;
-            int slot = ClampPadIndex(_padIndices[area], source.Count);
-            uint code = source[slot];
-            if (alternate)
-            {
-                source.RemoveAt(slot);
-                FinishDeckEdit();
-                return;
-            }
-
-            var card = CardDatabase.Get(code);
-            var destination = CurrentPadDeck == DragSourceType.DeckSide
-                ? card?.IsExtra == true ? DragSourceType.DeckExtra : DragSourceType.DeckMain
-                : DragSourceType.DeckSide;
-            var target = GetDeckList(destination);
-            if (!CanPlaceCard(card, destination, target)) return;
-            MoveDeckCard(source, slot, target, target.Count);
+            ShowDeckCardActions(GetDeckSlots(CurrentPadDeck)[index].rt, CurrentPadDeck, index, code);
         }
 
         private void DrawPadCardFocus()

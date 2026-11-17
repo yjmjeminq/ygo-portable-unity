@@ -1,0 +1,165 @@
+using System;
+using UnityEngine;
+using UnityEngine.UI;
+using YGOPortable.Core;
+
+namespace YGOPortable.UI
+{
+    public partial class DeckEditorUI
+    {
+        private const float CardActionWidth = 300f;
+        private const float CardActionHeight = 244f;
+        private GameObject _deckCardActions;
+        private RectTransform _deckCardActionPanel;
+        private Text _deckCardActionTitle;
+        private Button _deckCardActionMain;
+        private Button _deckCardActionAlternate;
+        private Button _deckCardActionRelated;
+        private Button _deckCardActionCancel;
+        private Button _deckCardActionDefault;
+
+        private void BuildDeckCardActions(Transform root)
+        {
+            var overlay = LotdUiKit.FillRect("DeckCardActions", root);
+            _deckCardActions = overlay.gameObject;
+            var backdrop = LotdUiKit.FillRect("Dismiss", overlay);
+            LotdUiKit.AddImage(backdrop.gameObject, LotdUiKit.WhiteSprite, Color.clear);
+            var dismiss = backdrop.gameObject.AddComponent<Button>();
+            dismiss.transition = Selectable.Transition.None;
+            dismiss.navigation = new Navigation { mode = Navigation.Mode.None };
+            dismiss.onClick.AddListener(CloseDeckCardActions);
+
+            _deckCardActionPanel = LotdUiKit.CreateMenuPanel(overlay, "Window", overlay.pivot, overlay.pivot);
+            _deckCardActionPanel.pivot = new Vector2(0f, 1f);
+            _deckCardActionPanel.sizeDelta = new Vector2(CardActionWidth, CardActionHeight);
+            var title = LotdUiKit.CreateRect("Title", _deckCardActionPanel, new Vector2(.10f, .765f), new Vector2(.90f, .88f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(title.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelNavy, false, false);
+            _deckCardActionTitle = LotdUiKit.AddFittedText(title, "Text", "", 18, 12,
+                TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
+
+            Button AddRow(string name, string label, float top, Action action = null)
+            {
+                var row = LotdUiKit.CreateRect(name, _deckCardActionPanel, new Vector2(.10f, top - .135f), new Vector2(.90f, top),
+                    Vector2.zero, Vector2.zero);
+                return LotdUiKit.CreateLotdButton(row, "Button", label, action, 17);
+            }
+
+            _deckCardActionMain = AddRow("MainAction", "", .743f);
+            _deckCardActionAlternate = AddRow("AlternateAction", "", .587f);
+            _deckCardActionRelated = AddRow("Related", "", .431f);
+            _deckCardActionCancel = AddRow("Cancel", "취소", .275f, CloseDeckCardActions);
+            overlay.gameObject.SetActive(false);
+        }
+
+        private void ShowDeckCardActions(RectTransform anchor, DragSourceType source, int index, uint code)
+        {
+            var card = CardDatabase.Get(code);
+            if (card == null) return;
+            var home = card.IsExtra ? DragSourceType.DeckExtra : DragSourceType.DeckMain;
+            string homeName = card.IsExtra ? "엑스트라 덱" : "메인 덱";
+            if (source == DragSourceType.Trunk)
+            {
+                bool canAdd = CountInWorkingDeck(code) < 3;
+                SetDeckCardAction(_deckCardActionMain, $"{homeName}에 추가",
+                    canAdd && CanPlaceCard(card, home, GetDeckList(home), showReason: false),
+                    () => TryAddCardToDeck(code, home));
+                SetDeckCardAction(_deckCardActionAlternate, "사이드 덱에 추가",
+                    canAdd && CanPlaceCard(card, DragSourceType.DeckSide, _workingDeck.side, showReason: false),
+                    () => TryAddCardToDeck(code, DragSourceType.DeckSide));
+            }
+            else
+            {
+                var sourceCards = GetDeckList(source);
+                if (sourceCards == null || index < 0 || index >= sourceCards.Count || sourceCards[index] != code) return;
+                var destination = source == DragSourceType.DeckSide ? home : DragSourceType.DeckSide;
+                var target = GetDeckList(destination);
+                string destinationName = destination == DragSourceType.DeckSide ? "사이드 덱" : homeName;
+                bool StillSelected() => sourceCards == GetDeckList(source) && index < sourceCards.Count && sourceCards[index] == code;
+
+                SetDeckCardAction(_deckCardActionMain, $"{destinationName}으로 이동",
+                    CanPlaceCard(card, destination, target, showReason: false), () =>
+                    {
+                        if (StillSelected() && CanPlaceCard(card, destination, target))
+                            MoveDeckCard(sourceCards, index, target, target.Count);
+                    });
+                SetDeckCardAction(_deckCardActionAlternate, "덱에서 제거", true, () =>
+                {
+                    if (!StillSelected()) return;
+                    sourceCards.RemoveAt(index);
+                    FinishDeckEdit();
+                });
+            }
+
+            SetDeckCardAction(_deckCardActionRelated, "관련 카드", true, () =>
+            {
+                FilterRelatedCards(code);
+                SwitchPadArea(PadArea.Trunk);
+            });
+            SetDeckCardActionNavigation();
+            _deckCardActionTitle.text = card.name;
+            InspectCard(code);
+            var overlay = (RectTransform)_deckCardActions.transform;
+            PositionDeckCardActions(anchor, overlay);
+            overlay.SetAsLastSibling();
+            _deckCardActions.SetActive(true);
+        }
+
+        private void SetDeckCardActionNavigation()
+        {
+            _deckCardActionDefault = null;
+            Button previous = null;
+            foreach (var button in new[] { _deckCardActionMain, _deckCardActionAlternate, _deckCardActionRelated, _deckCardActionCancel })
+            {
+                if (!button.interactable) continue;
+                if (_deckCardActionDefault == null) _deckCardActionDefault = button;
+                button.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnUp = previous };
+                if (previous != null)
+                {
+                    var navigation = previous.navigation;
+                    navigation.selectOnDown = button;
+                    previous.navigation = navigation;
+                }
+                previous = button;
+            }
+        }
+
+        private void SetDeckCardAction(Button button, string label, bool available, Action action)
+        {
+            var caption = button.GetComponentInChildren<Text>();
+            caption.text = label;
+            caption.color = available ? LotdUiKit.TextPrimary : LotdUiKit.TextMuted;
+            button.interactable = available;
+            button.onClick.RemoveAllListeners();
+            button.onClick.AddListener(() =>
+            {
+                if (!button.interactable) return;
+                LotdAudio.PlayClick();
+                CloseDeckCardActions();
+                action();
+            });
+        }
+
+        private void PositionDeckCardActions(RectTransform anchor, RectTransform overlay)
+        {
+            const float gap = 10f;
+            var bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(overlay, anchor);
+            var screen = overlay.rect;
+            float maxLeft = screen.xMax - CardActionWidth - gap;
+            float left = bounds.max.x + gap;
+            if (left > maxLeft) left = bounds.min.x - CardActionWidth - gap;
+            float bodyBottom = Mathf.Lerp(screen.yMin, screen.yMax, _deckPanel.anchorMin.y);
+            float bodyTop = Mathf.Lerp(screen.yMin, screen.yMax, _deckPanel.anchorMax.y);
+            float top = Mathf.Clamp(bounds.max.y, bodyBottom + CardActionHeight, bodyTop);
+            _deckCardActionPanel.anchoredPosition = new Vector2(Mathf.Clamp(left, screen.xMin + gap, maxLeft), top);
+        }
+
+        private void CloseDeckCardActions()
+        {
+            if (!_deckCardActions.activeSelf) return;
+            _padUi.Clear();
+            _deckCardActions.SetActive(false);
+            if (_padMode) SwitchPadArea(_padArea);
+        }
+    }
+}
