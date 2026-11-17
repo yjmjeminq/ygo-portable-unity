@@ -10,6 +10,7 @@ DATA = Path(__file__).parent
 SECTIONS = ("main", "extra", "side")
 EXTRA_TYPES = 0x40 | 0x2000 | 0x800000 | 0x4000000
 ONE_COPY = {55144522, 79571449, 12580477, 18144506}  # Pot, Charity, Raigeki, Feather Duster
+GENERIC_SUMMON_TAGS = {0x17, 0x46}  # Synchro and Fusion spell/effect families shared by many decks
 KEEP_DECKS = {36, 340, 34043}  # Themed Earthbound, Rainbow Dark Dragon and D/D/D presets
 RECIPE_FILES = ("modern_opponent_recipes_dm_gx.json", "modern_opponent_recipes_later_series.json")
 MATCHING_META_DECKS = {20670, 20683}  # Mahad's Dark Magician and Era's Numeron
@@ -103,7 +104,7 @@ class OpponentDeckCatalog:
         key = self.key(code)
         if key in ONE_COPY:
             return 1
-        if code == ace or self.tags[code] & themes:
+        if code == ace or self.tags[code] & (themes - GENERIC_SUMMON_TAGS):
             return 3
         return self.limits.get(key, 3)
 
