@@ -301,8 +301,21 @@ namespace YGOPortable.Core
                 return false;
             }
 
-            var available = pack.CardPool.Where(code => GetOwnedCount(code) < GetDeckCopyLimit(code)).ToList();
-            if (available.Count == 0)
+            var packGroups = new List<uint>[CardRarityCatalog.TierCount];
+            var availableGroups = new List<uint>[CardRarityCatalog.TierCount];
+            for (int tier = 0; tier < packGroups.Length; tier++)
+            {
+                packGroups[tier] = new List<uint>();
+                availableGroups[tier] = new List<uint>();
+            }
+            foreach (uint code in pack.CardPool)
+            {
+                int tier = (int)CardRarityCatalog.GetRarity(code);
+                packGroups[tier].Add(code);
+                if (GetOwnedCount(code) < GetDeckCopyLimit(code))
+                    availableGroups[tier].Add(code);
+            }
+            if (availableGroups.All(group => group.Count == 0))
             {
                 error = "이 팩의 카드를 모두 최대 수량까지 보유하고 있습니다.";
                 return false;
@@ -312,16 +325,15 @@ namespace YGOPortable.Core
             var opened = new uint[CardsPerPack];
             for (int i = 0; i < opened.Length; i++)
             {
-                if (available.Count == 0)
-                {
-                    opened[i] = pack.CardPool[PackRandom.Next(pack.CardPool.Count)];
-                    continue;
-                }
-                int index = PackRandom.Next(available.Count);
-                uint code = available[index];
+                var available = RollPackRarity(availableGroups, PackRandom);
+                var group = available ?? RollPackRarity(packGroups, PackRandom);
+                int index = PackRandom.Next(group.Count);
+                uint code = group[index];
+                opened[i] = code;
+                if (available == null) continue;
+
                 owned.TryGetValue(code, out int count);
                 owned[code] = ++count;
-                opened[i] = code;
                 if (count >= GetDeckCopyLimit(code))
                     available.RemoveAt(index);
             }
@@ -329,6 +341,23 @@ namespace YGOPortable.Core
             if (!Write(WithBalance(Balance - PackCost), owned, out error)) return false;
             pulls = Array.AsReadOnly(opened);
             return true;
+        }
+
+        private static List<uint> RollPackRarity(List<uint>[] groups, System.Random random)
+        {
+            int weight = 0;
+            for (int tier = 0; tier < groups.Length; tier++)
+                if (groups[tier].Count > 0) weight += CardRarityCatalog.GetBaseWeight((CardRarity)tier);
+            if (weight == 0) return null;
+
+            int roll = random.Next(weight);
+            for (int tier = 0; tier < groups.Length; tier++)
+            {
+                if (groups[tier].Count == 0) continue;
+                roll -= CardRarityCatalog.GetBaseWeight((CardRarity)tier);
+                if (roll < 0) return groups[tier];
+            }
+            throw new InvalidOperationException("Invalid pack rarity weights.");
         }
 
         public static bool TryAwardDuel(bool won, out int amount, out string error) =>

@@ -50,6 +50,7 @@ namespace YGOPortable.UI
         private Text _previewStats;
         private Text _previewDesc;
         private Text _previewOwnership;
+        private Text _previewRarity;
         private ScrollRect _previewScroll;
 
         private ScrollRect _trunkScroll;
@@ -289,6 +290,12 @@ namespace YGOPortable.UI
             LotdUiKit.AddImage(ownership.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelNavy, false, false);
             _previewOwnership = LotdUiKit.AddFittedText(ownership, "Count", "", 15, 11,
                 TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
+            _previewOwnership.rectTransform.anchorMax = new Vector2(.79f, .965f);
+            var rarity = LotdUiKit.CreateRect("Rarity", ownership, new Vector2(.815f, .08f),
+                new Vector2(.984f, .92f), Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(rarity.gameObject, LotdUiKit.WhiteSprite, new Color(.09f, .15f, .26f), false, false);
+            _previewRarity = LotdUiKit.AddFittedText(rarity, "Value", "", 17, 12,
+                TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
             ownership.gameObject.SetActive(false);
             var viewport = LotdUiKit.CreateRect("Viewport", desc, Vector2.zero, Vector2.one,
                 new Vector2(8f, 16f), new Vector2(-21f, -5f));
@@ -911,6 +918,9 @@ namespace YGOPortable.UI
             int copies = CountInWorkingDeck(_inspectedCode, combineAlternateArts: false);
             _previewOwnership.text = $"보유 {owned}장 · 덱에 {copies}장";
             _previewOwnership.color = copies > owned || owned == 0 ? LotdUiKit.RedAccent : LotdUiKit.TextPrimary;
+            var rarity = CardRarityCatalog.GetRarity(_inspectedCode);
+            _previewRarity.text = CardRarityCatalog.GetLabel(rarity);
+            _previewRarity.color = CardRarityStyle.GetColor(rarity);
         }
 
         private void InspectCard(uint code)

@@ -13,6 +13,7 @@ namespace YGOPortable.UI
         private const int PageSize = 8;
         private readonly Button[] _rows = new Button[PageSize];
         private readonly Text[] _labels = new Text[PageSize];
+        private readonly Text[] _rarities = new Text[PageSize];
         private readonly List<(uint Code, string Name, string SearchName)> _cards = new();
         private readonly List<(uint Code, string Name)> _matches = new();
         private readonly Text _packName;
@@ -20,6 +21,7 @@ namespace YGOPortable.UI
         private readonly Text _pageLabel;
         private readonly Text _cardName;
         private readonly Text _owner;
+        private readonly Text _rarity;
         private readonly Text _stats;
         private readonly Text _description;
         private readonly ScrollRect _descriptionScroll;
@@ -61,7 +63,11 @@ namespace YGOPortable.UI
                 label.resizeTextMinSize = 12;
                 label.resizeTextMaxSize = 18;
                 label.supportRichText = false;
+                label.rectTransform.anchorMin = new Vector2(.05f, 0f);
+                label.rectTransform.anchorMax = new Vector2(.81f, 1f);
                 _labels[i] = label;
+                _rarities[i] = ShopRarityBadge.Create(button.transform, new Vector2(.83f, .19f),
+                    new Vector2(.945f, .81f), 16);
             }
 
             _previous = AddButton(catalog, "Previous", "이전", .08f, .063f, .28f, .127f, () => ChangePage(-1));
@@ -71,7 +77,8 @@ namespace YGOPortable.UI
             var details = LotdUiKit.CreateMenuPanel(root, "Details", new Vector2(.459f, .083f), new Vector2(.975f, .882f));
             _cardName = Heading(details, "Name", .075f, .862f, .925f, .93f);
             _art = CompositeCardView.Create(Slot(details, "Art", .073f, .14f, .459f, .834f), "Card", true);
-            _owner = Label(details, "Owner", .489f, .748f, .919f, .828f, 21, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent);
+            _owner = Label(details, "Owner", .489f, .748f, .822f, .828f, 19, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent);
+            _rarity = ShopRarityBadge.Create(details, new Vector2(.835f, .759f), new Vector2(.919f, .816f), 17);
             _stats = Label(details, "Stats", .489f, .625f, .919f, .739f, 18, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary);
             (_descriptionScroll, _description) = CreateDescription(details);
             if (onFindPacks != null)
@@ -167,7 +174,11 @@ namespace YGOPortable.UI
             {
                 int index = first + i;
                 _rows[i].transform.parent.gameObject.SetActive(index < _matches.Count);
-                if (index < _matches.Count) _labels[i].text = _matches[index].Name;
+                if (index < _matches.Count)
+                {
+                    _labels[i].text = _matches[index].Name;
+                    ShopRarityBadge.Update(_rarities[i], _matches[index].Code);
+                }
             }
 
             _count.text = SearchInput.text.Trim().Length == 0
@@ -193,6 +204,7 @@ namespace YGOPortable.UI
             var info = CardDatabase.Get(code);
             _cardName.text = code == 0 ? "검색 결과 없음" : CardDatabase.GetName(code);
             _owner.text = code == 0 ? "" : $"보유 {CollectionProgress.GetOwnedCount(code):N0}장  ·  카드 번호 {code:D8}";
+            ShopRarityBadge.Update(_rarity, code);
             _stats.text = info?.FormatStatsLineKR() ?? "";
             if (_selectedCode != code)
             {

@@ -31,6 +31,7 @@ namespace YGOPortable.UI
         private readonly Action<string> _onPackChosen;
         private readonly Button[] _cardRows = new Button[CardsPerPage];
         private readonly Text[] _cardLabels = new Text[CardsPerPage];
+        private readonly Text[] _cardRarities = new Text[CardsPerPage];
         private readonly Button[] _packRows = new Button[PacksPerPage];
         private readonly Text[] _packLabels = new Text[PacksPerPage];
         private readonly List<Entry> _matches = new();
@@ -40,6 +41,7 @@ namespace YGOPortable.UI
         private readonly Text _packHeading;
         private readonly Text _cardHeading;
         private readonly Text _cardInfo;
+        private readonly Text _cardRarity;
         private readonly Button _previousCard;
         private readonly Button _nextCard;
         private readonly Button _previousPack;
@@ -84,6 +86,10 @@ namespace YGOPortable.UI
                 button.gameObject.AddComponent<StarterRowFocus>().ShowPreview = () => PreviewCard(row);
                 _cardRows[i] = button;
                 _cardLabels[i] = FitButtonLabel(button);
+                _cardLabels[i].rectTransform.anchorMin = new Vector2(.05f, 0f);
+                _cardLabels[i].rectTransform.anchorMax = new Vector2(.81f, 1f);
+                _cardRarities[i] = ShopRarityBadge.Create(button.transform, new Vector2(.83f, .19f),
+                    new Vector2(.945f, .81f), 16);
             }
             _previousCard = AddButton(catalog, "Previous", "이전", .08f, .074f, .28f, .14f, () => ChangeCardPage(-1));
             _nextCard = AddButton(catalog, "Next", "다음", .72f, .074f, .92f, .14f, () => ChangeCardPage(1));
@@ -95,7 +101,8 @@ namespace YGOPortable.UI
                 TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
             var art = Slot("Art", detail, .073f, .339f, .385f, .822f);
             _preview = CompositeCardView.Create(art, "SelectedCard", true);
-            _cardInfo = Label(detail, "CardInfo", .081f, .146f, .378f, .322f, 17,
+            _cardRarity = ShopRarityBadge.Create(detail, new Vector2(.172f, .271f), new Vector2(.286f, .324f), 17);
+            _cardInfo = Label(detail, "CardInfo", .081f, .146f, .378f, .257f, 17,
                 TextAnchor.UpperCenter, LotdUiKit.TextPrimary);
 
             _packPane = Slot("Packs", detail, .408f, .091f, .927f, .827f);
@@ -212,6 +219,7 @@ namespace YGOPortable.UI
                 {
                     var entry = _matches[index];
                     _cardLabels[row].text = $"{entry.Name}  ·  {entry.Code}";
+                    ShopRarityBadge.Update(_cardRarities[row], entry.Code);
                 }
             }
             int pages = PageCount(_matches.Count, CardsPerPage);
@@ -247,6 +255,7 @@ namespace YGOPortable.UI
             _preview.gameObject.SetActive(entry != null);
             _preview.SetCard(entry?.Code ?? 0);
             _cardInfo.text = entry == null ? "" : $"카드 번호 {entry.Code}\n보유 {CollectionProgress.GetOwnedCount(entry.Code)}장";
+            ShopRarityBadge.Update(_cardRarity, entry?.Code ?? 0);
             int first = _cardPage * CardsPerPage;
             for (int row = 0; row < CardsPerPage && first + row < _matches.Count; row++)
                 _cardLabels[row].color = _matches[first + row] == entry ? LotdUiKit.GoldAccent : LotdUiKit.TextPrimary;

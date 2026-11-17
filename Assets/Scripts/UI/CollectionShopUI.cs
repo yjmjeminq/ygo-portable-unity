@@ -53,6 +53,7 @@ namespace YGOPortable.UI
         private readonly PackCardLookupUI _cardLookup;
         private readonly List<CompositeCardView> _pullViews = new();
         private readonly List<Text> _pullLabels = new();
+        private readonly List<Text> _pullRarities = new();
         private Text _balance;
         private GameObject _reveal;
         private Text _revealHeading;
@@ -305,7 +306,7 @@ namespace YGOPortable.UI
                 LotdUiKit.GoldAccent, FontStyle.Bold);
             var cover = Slot("Cover", details, .08f, starter ? .194f : .411f, starter ? .42f : .38f, .835f);
             catalog.Cover = CompositeCardView.Create(cover, "FeaturedCard", true);
-            catalog.Details = Label(details, "Info", "", starter ? .48f : .429f, .563f, .914f, .817f, 22,
+            catalog.Details = Label(details, "Info", "", starter ? .48f : .429f, starter ? .563f : .704f, .914f, .817f, 22,
                 TextAnchor.MiddleLeft, LotdUiKit.TextPrimary);
             if (!starter)
                 _viewContentsButton = AddButton(details, "ViewContents", "수록 카드", .429f, .466f, .659f, .547f, ViewSelectedPack);
@@ -319,7 +320,13 @@ namespace YGOPortable.UI
                 Label(details, "StarterInfo", $"전체 카드군 중 하나를 처음 한 번만 고릅니다.\n고른 카드군의 스타터 덱과 {CollectionProgress.StartingBalance:N0} DP를 받습니다.",
                     .48f, .204f, .923f, .362f, 18, TextAnchor.UpperLeft, LotdUiKit.TextMuted);
             else
+            {
+                string odds = string.Join("  ·  ", Enum.GetValues(typeof(CardRarity)).Cast<CardRarity>()
+                    .Select(rarity => $"{CardRarityCatalog.GetLabel(rarity)} {CardRarityCatalog.GetBaseWeight(rarity) / 10f:0.#}%"));
+                Label(details, "RarityOdds", $"카드 1장당 기본 확률\n{odds}\n팩에 남은 등급에 따라 확률이 조정됩니다.",
+                    .429f, .558f, .923f, .702f, 17, TextAnchor.MiddleLeft, LotdUiKit.TextMuted);
                 BuildReveal(details);
+            }
 
             var footer = LotdUiKit.CreateBorderedPanel(root, "Footer", new Vector2(.035f, .017f), new Vector2(.965f, .059f),
                 Vector2.zero, Vector2.zero);
@@ -343,8 +350,9 @@ namespace YGOPortable.UI
                 float left = .022f + stride * i;
                 var item = Slot($"Card_{i}", area, left, .077f, left + stride - .005f, .748f);
                 cardGroups[i] = item.gameObject.AddComponent<CanvasGroup>();
-                _pullViews.Add(CompositeCardView.Create(Slot("Art", item, .015f, .275f, .985f, 1f), "Card", true));
-                _pullLabels.Add(Label(item, "Name", "", 0f, 0f, 1f, .264f, 14, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary));
+                _pullViews.Add(CompositeCardView.Create(Slot("Art", item, .015f, .365f, .985f, 1f), "Card", true));
+                _pullRarities.Add(ShopRarityBadge.Create(item, new Vector2(.25f, .241f), new Vector2(.75f, .365f), 14));
+                _pullLabels.Add(Label(item, "Name", "", 0f, 0f, 1f, .235f, 13, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary));
             }
             _revealMotion = _reveal.AddComponent<ShopCardRevealMotion>();
             _revealMotion.SetCards(cardGroups);
@@ -379,6 +387,7 @@ namespace YGOPortable.UI
                 uint code = i < cards.Count ? cards[i] : 0;
                 _pullViews[i].transform.parent.parent.gameObject.SetActive(code != 0);
                 _pullViews[i].SetCard(code);
+                ShopRarityBadge.Update(_pullRarities[i], code);
                 _pullLabels[i].text = code == 0 ? "" : $"{CardDatabase.GetName(code)}\n보유 {CollectionProgress.GetOwnedCount(code)}장";
             }
             _revealMotion.Play();
@@ -486,6 +495,26 @@ namespace YGOPortable.UI
         private static Button AddButton(Transform parent, string name, string caption, float left, float bottom,
             float right, float top, Action click, bool gold = false) =>
             LotdUiKit.CreateLotdButton(Slot(name, parent, left, bottom, right, top), "Button", caption, click, 18, gold);
+    }
+
+    internal static class ShopRarityBadge
+    {
+        internal static Text Create(Transform parent, Vector2 anchorMin, Vector2 anchorMax, int fontSize)
+        {
+            var holder = LotdUiKit.CreateRect("Rarity", parent, anchorMin, anchorMax, Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(holder.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelNavy, raycast: false);
+            return LotdUiKit.AddFittedText(holder, "Text", "", fontSize, Mathf.Min(10, fontSize),
+                TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
+        }
+
+        internal static void Update(Text label, uint code)
+        {
+            label.transform.parent.gameObject.SetActive(code != 0);
+            if (code == 0) return;
+            var rarity = CardRarityCatalog.GetRarity(code);
+            label.text = CardRarityCatalog.GetLabel(rarity);
+            label.color = CardRarityStyle.GetColor(rarity);
+        }
     }
 
     internal sealed class StarterRowFocus : MonoBehaviour, ISelectHandler
