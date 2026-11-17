@@ -31,6 +31,7 @@ namespace YGOPortable.UI
             var overlay = LotdUiKit.FillRect("PadChoices", root);
             _choicePanel = overlay;
             LotdUiKit.AddImage(overlay.gameObject, LotdUiKit.WhiteSprite, new Color(.01f, .025f, .07f, .80f));
+            overlay.gameObject.AddComponent<DeckChoiceWheel>().MoveChoice = MoveChoice;
             var panel = LotdUiKit.CreateMenuPanel(overlay, "Window", new Vector2(.265f, .147f), new Vector2(.735f, .853f));
             var header = LotdUiKit.CreateRect("Header", panel, new Vector2(.09f, .843f), new Vector2(.91f, .955f),
                 Vector2.zero, Vector2.zero);
@@ -48,9 +49,12 @@ namespace YGOPortable.UI
                 _choiceLabels[i].resizeTextMinSize = 11;
                 _choiceLabels[i].resizeTextMaxSize = 17;
             }
-            var hint = LotdUiKit.CreateRect("Hint", panel, new Vector2(.08f, .063f), new Vector2(.92f, .124f),
+            var hint = LotdUiKit.CreateRect("Hint", panel, new Vector2(.08f, .063f), new Vector2(.65f, .124f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddFittedText(hint, "Text", "↑↓ 이동   A 선택   B 취소", 15, 10, TextAnchor.MiddleCenter, LotdUiKit.TextMuted);
+            LotdUiKit.AddFittedText(hint, "Text", "휠/↑↓ 이동   클릭/A 선택", 15, 10, TextAnchor.MiddleCenter, LotdUiKit.TextMuted);
+            var cancel = LotdUiKit.CreateRect("Cancel", panel, new Vector2(.69f, .054f), new Vector2(.89f, .132f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.CreateLotdButton(cancel, "Button", "취소 (B)", CloseChoice, 14);
             overlay.gameObject.SetActive(false);
             _keyboard = new DeckPadKeyboard(root);
         }
@@ -73,19 +77,72 @@ namespace YGOPortable.UI
             Focus(control);
         }
 
+        internal bool AdoptPointerFocus(Transform scope)
+        {
+            var selected = EventSystem.current?.currentSelectedGameObject?.GetComponent<Selectable>();
+            if (!CanFocus(selected, scope)) return false;
+            FocusInScope(scope, selected);
+            return true;
+        }
+
+        internal bool HandleOpenedDropdown(Transform scope, Vector2Int move, bool submit, bool cancel, bool findAny = true)
+        {
+            var events = EventSystem.current;
+            if (scope == null || events == null) return false;
+            if (_returnFocus is Dropdown known && CanFocus(known, scope) && HandleDropdown(known)) return true;
+            if (!findAny) return false;
+            foreach (var dropdown in scope.GetComponentsInChildren<Dropdown>())
+                if (HandleDropdown(dropdown)) return true;
+            return false;
+
+            bool HandleDropdown(Dropdown dropdown)
+            {
+                var list = dropdown.transform.Find("Dropdown List");
+                if (list == null || !list.gameObject.activeInHierarchy) return false;
+                if (move == Vector2Int.zero && !submit && !cancel) return true;
+                _returnFocus = dropdown;
+                SetFocus(null);
+                if (cancel)
+                {
+                    dropdown.Hide();
+                    if (list != null) list.gameObject.SetActive(false);
+                    return true;
+                }
+
+                var options = list.GetComponentsInChildren<Toggle>();
+                if (options.Length == 0) return true;
+                int index = Array.FindIndex(options, item => item.gameObject == events.currentSelectedGameObject);
+                if (index < 0) index = Mathf.Clamp(dropdown.value, 0, options.Length - 1);
+                if (move.y != 0) index = Mathf.Clamp(index - move.y, 0, options.Length - 1);
+                var item = options[index];
+                events.SetSelectedGameObject(item.gameObject);
+                ScrollTo(item);
+                if (submit)
+                {
+                    ExecuteEvents.Execute(item.gameObject, new BaseEventData(events), ExecuteEvents.submitHandler);
+                    if (list != null) list.gameObject.SetActive(false);
+                }
+                return true;
+            }
+        }
+
         private void Focus(Selectable control)
         {
             SetFocus(control);
             ScrollTo(control);
         }
 
-        internal void Clear()
+        internal void Clear(bool preserveSelection = false)
         {
-            CloseChoice();
+            if (_choicePanel.gameObject.activeSelf)
+            {
+                _choicePanel.gameObject.SetActive(false);
+                _dropdown = null;
+            }
             _keyboard.Close();
             _returnFocus = null;
             _scope = null;
-            SetFocus(null);
+            SetFocus(null, preserveSelection);
         }
 
         internal bool Handle(Transform scope, Vector2Int move, bool submit, bool cancel, Action onCancel,
@@ -102,14 +159,11 @@ namespace YGOPortable.UI
                     CloseChoice();
                 else if (submit)
                     AcceptChoice(_choiceIndex);
-                else if (move.y != 0)
-                {
-                    _choiceIndex = Mathf.Clamp(_choiceIndex - move.y, 0, _dropdown.options.Count - 1);
-                    RefreshChoices();
-                }
+                else if (move.y != 0) MoveChoice(-move.y);
                 return true;
             }
             if (scope == null || !scope.gameObject.activeInHierarchy) return false;
+            if (HandleOpenedDropdown(scope, move, submit, cancel, findAny: move != Vector2Int.zero || submit || cancel)) return true;
             if (CanFocus(_returnFocus, scope))
             {
                 _scope = scope;
@@ -195,12 +249,12 @@ namespace YGOPortable.UI
             return next;
         }
 
-        private void SetFocus(Selectable control)
+        private void SetFocus(Selectable control, bool preserveSelection = false)
         {
             var events = EventSystem.current;
             if (control == null)
             {
-                if (events != null && _focus != null && events.currentSelectedGameObject == _focus.gameObject)
+                if (!preserveSelection && events != null && _focus != null && events.currentSelectedGameObject == _focus.gameObject)
                     events.SetSelectedGameObject(null);
                 if (_frame != null)
                 {
@@ -285,6 +339,13 @@ namespace YGOPortable.UI
             SetFocus(_choiceButtons[_choiceIndex - _firstChoice]);
         }
 
+        private void MoveChoice(int delta)
+        {
+            if (_dropdown == null || _dropdown.options.Count == 0) return;
+            _choiceIndex = Mathf.Clamp(_choiceIndex + delta, 0, _dropdown.options.Count - 1);
+            RefreshChoices();
+        }
+
         private void AcceptChoice(int index)
         {
             if (_dropdown == null || index < 0 || index >= _dropdown.options.Count) return;
@@ -299,6 +360,18 @@ namespace YGOPortable.UI
             SetFocus(null);
             _choicePanel.gameObject.SetActive(false);
             _dropdown = null;
+        }
+    }
+
+    internal sealed class DeckChoiceWheel : MonoBehaviour, IScrollHandler
+    {
+        internal Action<int> MoveChoice { get; set; }
+
+        public void OnScroll(PointerEventData eventData)
+        {
+            if (Mathf.Approximately(eventData.scrollDelta.y, 0f)) return;
+            MoveChoice?.Invoke(eventData.scrollDelta.y > 0f ? -1 : 1);
+            eventData.Use();
         }
     }
 }

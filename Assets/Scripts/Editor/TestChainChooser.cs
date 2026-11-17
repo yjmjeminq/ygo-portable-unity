@@ -245,6 +245,7 @@ namespace YGOPortable.Editor
                 events.SetSelectedGameObject(view.ConfirmButton.gameObject);
                 ExecuteEvents.Execute(events.currentSelectedGameObject, new BaseEventData(events), ExecuteEvents.submitHandler);
                 Require(view.Responses.SequenceEqual(new[] { 11 }), "Submitting the focused confirm sent the wrong chain candidate.");
+                VerifyPadDialogs(duel, events);
             }
             finally
             {
@@ -253,6 +254,106 @@ namespace YGOPortable.Editor
                 UnityEngine.Object.DestroyImmediate(host);
                 if (previous != null) EventSystem.current = previous;
             }
+        }
+
+        private static void VerifyPadDialogs(DuelSession duel, EventSystem events)
+        {
+            var canvas = new GameObject("Duel Pad Dialog Verification", typeof(Canvas));
+            try
+            {
+                ((RectTransform)canvas.transform).sizeDelta = new Vector2(1600, 900);
+                var responses = new List<byte[]>();
+                var modals = new DuelPromptModals(canvas.transform, null, responses.Add);
+                const uint dragon = 89631139;
+                var page = modals.ModalRoot.transform.Find("Win");
+
+                // Only the explicit action command should dispatch a move from the Extra Deck viewer.
+                var extraCard = new LiveCardState { code = dragon, location = YgoConstants.LOCATION_EXTRA };
+                LiveCardState openedCard = null;
+                modals.ShowZoneViewer("엑스트라 덱", new[] { extraCard }, hasCardActions: _ => true,
+                    onOpenCardActions: card => openedCard = card);
+                Canvas.ForceUpdateCanvases();
+                var preview = events.currentSelectedGameObject;
+                Pad(modals, button: "Submit");
+                Require(modals.IsZoneViewerOpen && openedCard == null && events.currentSelectedGameObject == preview,
+                    "Pad submit on an Extra Deck preview did not preserve the separate action step.");
+                Pad(modals, Vector2Int.down);
+                Require(events.currentSelectedGameObject.transform.parent.name == "Act", "Pad navigation could not reach the selected card's action.");
+                Pad(modals, button: "Submit");
+                Require(openedCard == extraCard && !modals.IsZoneViewerOpen, "The focused Extra Deck action did not use the original card.");
+
+                var sort = new DuelPrompt { messageType = YgoConstants.MSG_SORT_CHAIN, isChainSort = true };
+                sort.candidates.Add(new SelectableCardItem { code = LadyLabrynth });
+                sort.candidates.Add(new SelectableCardItem { code = dragon });
+                modals.ShowPrompt(duel, sort);
+                Pad(modals, button: "Submit");
+                Require(events.currentSelectedGameObject.transform.parent.parent.name == "Sort_1",
+                    "Reordering cards did not move pad focus with the moved card.");
+                events.SetSelectedGameObject(page.Find("Footer/Btn_순서 확정/B").gameObject);
+                Pad(modals, button: "Submit");
+                Require(responses.Count == 1 && responses[0].SequenceEqual(new byte[] { 1, 0 }), "The reordered cards did not keep their native indices.");
+                responses.Clear();
+
+                var declare = new DuelPrompt { messageType = YgoConstants.MSG_ANNOUNCE_CARD };
+                modals.ShowPrompt(duel, declare);
+                var input = page.Find("Body/Search/Inp").GetComponent<InputField>();
+                var keyboard = modals.ModalRoot.transform.Find("PadKeyboard");
+                Require(events.currentSelectedGameObject == input.gameObject, "Declaration search did not receive focus.");
+                Pad(modals, button: "Submit");
+                Require(keyboard.gameObject.activeSelf && events.currentSelectedGameObject.transform.IsChildOf(keyboard),
+                    "Pad submit on declaration search did not open the onscreen keyboard.");
+                Pad(modals, button: "Cancel");
+                Require(!keyboard.gameObject.activeSelf && modals.IsPromptOpen && events.currentSelectedGameObject == input.gameObject && responses.Count == 0,
+                    "Canceling onscreen input submitted or left the declaration prompt.");
+
+                Pad(modals, button: "Submit");
+                void PressKey(string path)
+                {
+                    events.SetSelectedGameObject(keyboard.Find(path).gameObject);
+                    Pad(modals, button: "Submit");
+                }
+                PressKey("Window/Page/Button");
+                PressKey("Window/Page/Button");
+                foreach (char digit in "89631139")
+                    PressKey($"Window/Key{"1234567890".IndexOf(digit)}/Button");
+                PressKey("Window/Apply/Button");
+                Require(input.text == "89631139" && events.currentSelectedGameObject == input.gameObject && !keyboard.gameObject.activeSelf,
+                    "Entering a passcode did not filter the declaration in place or restore input focus.");
+                Pad(modals, Vector2Int.down);
+                Require(events.currentSelectedGameObject.name == "Dec_89631139", "Pad navigation could not reach the refreshed declaration result.");
+                Pad(modals, button: "Submit");
+                Require(responses.Count == 0 && modals.IsPromptOpen, "Selecting a declaration result skipped explicit confirmation.");
+                Pad(modals, Vector2Int.down);
+                var declarationConfirm = page.Find("Footer/Btn_선언 확정/B").GetComponent<Button>();
+                Require(events.currentSelectedGameObject == declarationConfirm.gameObject,
+                    $"Pad down from the sole declaration card reached {events.currentSelectedGameObject.name} ({events.currentSelectedGameObject.transform.parent.name}) rather than confirm, available={declarationConfirm.interactable}.");
+                Pad(modals, button: "Submit");
+                Require(responses.Count == 1 && BitConverter.ToUInt32(responses[0], 0) == dragon && !modals.IsPromptOpen,
+                    "Declaring a filtered card by pad did not submit its exact code.");
+
+                int rematches = 0, opponentSelections = 0;
+                modals.ShowResult(true, false, null, 2, 8000, 0, () => rematches++, () => opponentSelections++, null);
+                Canvas.ForceUpdateCanvases();
+                Pad(modals, Vector2Int.right);
+                Pad(modals, button: "Submit");
+                Require(opponentSelections == 1 && rematches == 0 && !modals.ResultRoot.activeSelf,
+                    "The result screen replayed the duel instead of opening the focused opponent selection.");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(canvas);
+            }
+        }
+
+        private static void Pad(DuelPromptModals modals, Vector2Int direction = default, string button = "None")
+        {
+            var ui = typeof(DuelPromptModals).Assembly;
+            var buttons = ui.GetType("YGOPortable.UI.DeckPadButtons", true);
+            var frameType = ui.GetType("YGOPortable.UI.DeckPadFrame", true);
+            const BindingFlags instance = BindingFlags.Instance | BindingFlags.NonPublic;
+            var frame = Activator.CreateInstance(frameType, instance, null, new object[] { direction, Enum.Parse(buttons, button), 0f }, null);
+            bool handled = (bool)typeof(DuelPromptModals).GetMethod("HandlePad", instance).Invoke(modals, new[] { frame });
+            Require(handled, "An open duel overlay did not claim its controller input.");
         }
 
         private static void VerifyMaterialChoices(DuelSession duel)

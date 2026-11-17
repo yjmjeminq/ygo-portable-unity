@@ -13,6 +13,7 @@ namespace YGOPortable.UI
         Left = 0x0004,
         Right = 0x0008,
         Save = 0x0010,
+        Reorder = 0x0080,
         PreviousArea = 0x0100,
         NextArea = 0x0200,
         Submit = 0x1000,
@@ -24,7 +25,7 @@ namespace YGOPortable.UI
     internal readonly struct DeckPadFrame
     {
         private const DeckPadButtons Actions = DeckPadButtons.Submit | DeckPadButtons.Cancel | DeckPadButtons.Alternate |
-            DeckPadButtons.Search | DeckPadButtons.PreviousArea | DeckPadButtons.NextArea | DeckPadButtons.Save;
+            DeckPadButtons.Search | DeckPadButtons.PreviousArea | DeckPadButtons.NextArea | DeckPadButtons.Save | DeckPadButtons.Reorder;
         private readonly DeckPadButtons _pressed;
 
         internal DeckPadFrame(Vector2Int direction, DeckPadButtons pressed, float descriptionScroll = 0f)
@@ -44,6 +45,7 @@ namespace YGOPortable.UI
         internal bool PreviousArea => (_pressed & DeckPadButtons.PreviousArea) != 0;
         internal bool NextArea => (_pressed & DeckPadButtons.NextArea) != 0;
         internal bool Save => (_pressed & DeckPadButtons.Save) != 0;
+        internal bool Reorder => (_pressed & DeckPadButtons.Reorder) != 0;
     }
 
     internal sealed class DeckPadInput
@@ -94,8 +96,11 @@ namespace YGOPortable.UI
                 LegacyButton(KeyCode.JoystickButton3, DeckPadButtons.Search) |
                 LegacyButton(KeyCode.JoystickButton4, DeckPadButtons.PreviousArea) |
                 LegacyButton(KeyCode.JoystickButton5, DeckPadButtons.NextArea) |
-                LegacyButton(KeyCode.JoystickButton7, DeckPadButtons.Save);
-            return Advance(legacyStick, buttons, now);
+                LegacyButton(KeyCode.JoystickButton7, DeckPadButtons.Save) |
+                LegacyButton(KeyCode.JoystickButton9, DeckPadButtons.Reorder) |
+                LegacyDirection("DeckPadDpadHorizontal", DeckPadButtons.Left, DeckPadButtons.Right) |
+                LegacyDirection("DeckPadDpadVertical", DeckPadButtons.Down, DeckPadButtons.Up);
+            return Advance(legacyStick, buttons, now, Input.GetAxisRaw("DeckPadLookVertical"));
         }
 
         internal DeckPadFrame Advance(Vector2 stick, DeckPadButtons held, float now, float descriptionStick = 0f)
@@ -140,6 +145,12 @@ namespace YGOPortable.UI
 
         private static DeckPadButtons LegacyButton(KeyCode key, DeckPadButtons action) =>
             Input.GetKey(key) ? action : DeckPadButtons.None;
+
+        private static DeckPadButtons LegacyDirection(string axis, DeckPadButtons negative, DeckPadButtons positive)
+        {
+            float value = Input.GetAxisRaw(axis);
+            return value < -.6f ? negative : value > .6f ? positive : DeckPadButtons.None;
+        }
 
 #if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
         [StructLayout(LayoutKind.Sequential)]

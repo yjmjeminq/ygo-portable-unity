@@ -24,11 +24,6 @@ namespace YGOPortable.UI
             BuildSettingsOverlay(canvasParent);
         }
 
-        internal void Update()
-        {
-            if (SettingsRoot.activeInHierarchy && Input.GetButtonDown("Cancel")) CloseSettings();
-        }
-
         private void OpenSettings()
         {
             _menuControls.interactable = false;

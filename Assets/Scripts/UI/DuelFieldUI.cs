@@ -8,7 +8,7 @@ using YGOPortable.Core;
 
 namespace YGOPortable.UI
 {
-    public class DuelFieldUI
+    public partial class DuelFieldUI
     {
         public GameObject Root { get; private set; }
 
@@ -74,6 +74,7 @@ namespace YGOPortable.UI
             public RectTransform badge;
             public CardDragTrigger dragTrigger;
             public byte mappedCon;
+            public uint mappedLoc;
             public uint mappedSeq;
             public LiveCardState liveCard;
         }
@@ -92,6 +93,7 @@ namespace YGOPortable.UI
             public Outline border;
             public CompositeCardView cardView;
             public Image wellLight;
+            public Button button;
         }
 
         private StackTileView _myDeckTile, _myExtraTile, _myGyTile, _myBanTile;
@@ -240,6 +242,7 @@ namespace YGOPortable.UI
             _preferredDropZone = null;
             _preferredAttackTargetSeq = -1;
             _dragHighlightMZone = _dragHighlightSZone = _dragHighlightAttack = false;
+            ResetDuelPad();
             CloseActionPopup();
             CloseDuelLog();
             _modals.CloseZoneViewer();
@@ -332,6 +335,7 @@ namespace YGOPortable.UI
             var zoom = zoomHit.gameObject.AddComponent<Button>();
             zoom.targetGraphic = LotdUiKit.AddImage(zoomHit.gameObject, LotdUiKit.WhiteSprite, Color.clear);
             zoom.onClick.AddListener(() => ShowCardZoomModal(_inspectedCode));
+            _duelPadInspectButton = zoom;
 
             var inside = LotdUiKit.FillRect("CardDetails", left, 7f);
             var stats = LotdUiKit.CreateRect("Stats", inside, new Vector2(0.56f, 0.575f), new Vector2(0.98f, 0.874f),
@@ -392,16 +396,13 @@ namespace YGOPortable.UI
 
             var menu = LotdUiKit.CreateRect("PauseMenu", root, new Vector2(0.016f, 0.936f),
                 new Vector2(0.103f, 0.982f), Vector2.zero, Vector2.zero);
-            BuildHudControl(menu, DuelVisualAssets.PauseIcon, "일시 정지", OnPauseClicked);
+            _duelPadPauseButton = BuildHudControl(menu, DuelVisualAssets.PauseIcon, "일시 정지", OnPauseClicked);
         }
 
-        private static void BuildHudControl(RectTransform holder, Sprite sprite, string label, Action action)
+        private static Button BuildHudControl(RectTransform holder, Sprite sprite, string label, Action action)
         {
             if (sprite == null)
-            {
-                DuelStyle.Button(holder, "Button", label, action, 13);
-                return;
-            }
+                return DuelStyle.Button(holder, "Button", label, action, 13);
 
             var icon = LotdUiKit.CreateRect(label, holder, Vector2.zero, new Vector2(.45f, 1f), Vector2.zero, Vector2.zero);
             var image = LotdUiKit.AddImage(icon.gameObject, sprite, Color.white, true, false);
@@ -412,6 +413,7 @@ namespace YGOPortable.UI
             var text = LotdUiKit.CreateRect("Label", holder, new Vector2(.43f, .10f), new Vector2(1f, .90f), Vector2.zero, Vector2.zero);
             var caption = LotdUiKit.AddFittedText(text, "Text", label, 12, 8, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
             DuelStyle.Shadow(caption, 1.75f);
+            return button;
         }
 
         private static (Text name, Text lp, RectTransform fill, Image portrait) BuildPlayerHud(RectTransform root, bool opponent)
@@ -583,7 +585,10 @@ namespace YGOPortable.UI
             button.onClick.AddListener(Open);
             var trigger = cell.gameObject.AddComponent<CardDragTrigger>();
             trigger.OnRightClick = Open;
-            return new StackTileView { root = cell, text = count, border = border, cardView = view, wellLight = wellLight };
+            return new StackTileView
+            {
+                root = cell, text = count, border = border, cardView = view, wellLight = wellLight, button = button,
+            };
         }
 
         private void BuildBottomHudAndHands(Transform root)
@@ -648,7 +653,7 @@ namespace YGOPortable.UI
             _phasePicker.SetActive(false);
             var log = LotdUiKit.CreateRect("OpenLog", root, new Vector2(0.910f, 0.035f), new Vector2(0.984f, 0.092f),
                 Vector2.zero, Vector2.zero);
-            BuildHudControl(log, DuelVisualAssets.LogIcon, "대전 기록", OpenDuelLog);
+            _duelPadLogButton = BuildHudControl(log, DuelVisualAssets.LogIcon, "대전 기록", OpenDuelLog);
 
             var hint = LotdUiKit.CreateRect("ActionHint", root, new Vector2(0.294f, 0.187f), new Vector2(0.752f, 0.225f),
                 Vector2.zero, Vector2.zero);
@@ -785,6 +790,7 @@ namespace YGOPortable.UI
                 hint = needed > 1 ? $"존 선택  {_pendingPlaces.Count} / {needed}" : "카드를 놓을 존을 선택하세요.";
             }
             _hintBannerText.text = hint;
+            _duelPadBoardHint = hint;
             bool idle = waiting && prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD;
             bool battle = waiting && prompt.messageType == YgoConstants.MSG_SELECT_BATTLECMD;
             _btnToBp.interactable = idle && prompt.canBp;
@@ -821,6 +827,7 @@ namespace YGOPortable.UI
             RefreshHand(mine.hand, me, false);
             RefreshHand(theirs.hand, opponent, true);
             RefreshLogFeed();
+            RefreshDuelPadCursor(layoutChanged: true);
         }
 
         private void OpenPhasePicker()
@@ -884,6 +891,7 @@ namespace YGOPortable.UI
         private void BindSlot(FieldSlotView slot, byte con, uint loc, uint seq, LiveCardState live, bool opponent)
         {
             slot.mappedCon = con;
+            slot.mappedLoc = loc;
             slot.mappedSeq = seq;
             slot.liveCard = live;
 
@@ -1742,6 +1750,9 @@ namespace YGOPortable.UI
         public void Update()
         {
             if (_session == null || Root == null || !Root.activeSelf) return;
+            var session = _session;
+            UpdateDuelPad();
+            if (_session != session || !Root.activeSelf) return;
             RefreshHandGlows();
             if (_phasePicker.activeSelf && (!CanAcceptPlayerAction ||
                 Input.GetKeyDown(KeyCode.Escape) || Input.GetMouseButtonDown(1)))
@@ -2165,11 +2176,16 @@ namespace YGOPortable.UI
 
         private void ClearActionRows()
         {
+            HideDuelPadFrame();
             for (int i = _actionList.childCount - 1; i >= 0; i--)
             {
                 var row = _actionList.GetChild(i).gameObject;
-                row.SetActive(false);
-                UnityEngine.Object.Destroy(row);
+                if (Application.isPlaying)
+                {
+                    row.SetActive(false);
+                    UnityEngine.Object.Destroy(row);
+                }
+                else UnityEngine.Object.DestroyImmediate(row);
             }
             _actionList.anchoredPosition = Vector2.zero;
         }

@@ -29,6 +29,9 @@ namespace YGOPortable.UI
         private DeckEditorUI _deckEditor;
         private DuelPromptModals _modals;
         private DuelFieldUI _duelField;
+        private readonly DeckPadInput _menuPadInput = new DeckPadInput();
+        private DeckPadUi _menuPad;
+        private AppScreen _screen;
 
         private DuelSession _session;
         private TacticalAI _ai;
@@ -110,6 +113,7 @@ namespace YGOPortable.UI
 
                 Debug.Log("[GameApp] 9. Constructing DuelFieldUI...");
                 _duelField = new DuelFieldUI(this, canvas.transform, _modals);
+                _menuPad = new DeckPadUi(LotdUiKit.FillRect("MenuPad", canvas.transform));
 
                 // Ensure Modals, Animation Layer, and Drag Ghost Layer render ABOVE DuelFieldUI and DeckEditorUI
                 _modals.ModalRoot.transform.SetAsLastSibling();
@@ -139,9 +143,21 @@ namespace YGOPortable.UI
 
         private static void EnsureEventSystem()
         {
-            if (FindFirstObjectByType<EventSystem>() != null) return;
-            var es = new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
-            DontDestroyOnLoad(es);
+            var events = FindFirstObjectByType<EventSystem>();
+            if (events == null)
+            {
+                var go = new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+                events = go.GetComponent<EventSystem>();
+                DontDestroyOnLoad(go);
+            }
+            if (events.TryGetComponent<StandaloneInputModule>(out var input))
+            {
+                // Custom pad navigation owns controller edges; keep Unity's mouse and keyboard paths.
+                input.horizontalAxis = "DeckUiHorizontal";
+                input.verticalAxis = "DeckUiVertical";
+                input.submitButton = "DeckUiSubmit";
+                input.cancelButton = "DeckUiCancel";
+            }
         }
 
         private Canvas EnsureMainCanvas()
@@ -165,6 +181,9 @@ namespace YGOPortable.UI
         {
             if (!_initialized) return;
 
+            _screen = screen;
+            _menuPad?.Clear();
+            _menuPadInput.Reset();
             _modals.HideAll();
             _modals.HideResult();
             _titleAndMenu.CloseSettings(restoreFocus: false);
@@ -237,9 +256,13 @@ namespace YGOPortable.UI
         {
             if (_session == null)
             {
-                _titleAndMenu?.Update();
-                _oppSelect?.Update();
-                _deckEditor?.Update();
+                if (_screen == AppScreen.DeckEditor) _deckEditor?.Update();
+                else if (_menuPad != null)
+                {
+                    if (!_menuPad.HasPopup && (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1)))
+                        _menuPad.Clear(preserveSelection: true);
+                    HandleMenuInput(_menuPadInput.Read(Time.unscaledTime), Input.GetKeyDown(KeyCode.Escape));
+                }
                 return;
             }
             _duelField?.Update();
@@ -322,6 +345,51 @@ namespace YGOPortable.UI
                     _modals.HideAll();
                 }
             }
+        }
+
+        private void HandleMenuInput(DeckPadFrame frame, bool escape)
+        {
+            bool settings = _titleAndMenu.SettingsRoot.activeInHierarchy;
+            bool janken = _oppSelect.JankenRoot.activeInHierarchy;
+            bool cancel = frame.Cancel || (escape && (settings || janken || _menuPad.HasPopup));
+            if (!frame.HasInput && !cancel) return;
+
+            GameObject scope = _screen switch
+            {
+                AppScreen.Title => _titleAndMenu.TitleRoot,
+                AppScreen.MainMenu => settings ? _titleAndMenu.SettingsRoot : _titleAndMenu.MenuRoot,
+                AppScreen.OpponentSelect => janken ? _oppSelect.JankenRoot : _oppSelect.Root,
+                _ => null,
+            };
+            if (scope == null || !scope.activeInHierarchy) return;
+            if (!_menuPad.HasPopup)
+            {
+                if (_menuPad.HandleOpenedDropdown(scope.transform, frame.Direction, frame.Submit, cancel)) return;
+                _menuPad.AdoptPointerFocus(scope.transform);
+                if (_screen == AppScreen.OpponentSelect && !janken && !cancel)
+                {
+                    if (frame.Search)
+                    {
+                        _menuPad.OpenText(_oppSelect.SearchInput);
+                        return;
+                    }
+                    if (frame.PreviousArea || frame.NextArea)
+                    {
+                        _oppSelect.ChangePage(frame.PreviousArea ? -1 : 1, focusCharacter: true);
+                        _menuPad.AdoptPointerFocus(scope.transform);
+                        return;
+                    }
+                }
+            }
+
+            void Back()
+            {
+                if (settings) _titleAndMenu.CloseSettings();
+                else if (janken) _oppSelect.CloseJanken();
+                else if (_screen == AppScreen.OpponentSelect) ShowScreen(AppScreen.MainMenu);
+                else if (_screen == AppScreen.MainMenu) ShowScreen(AppScreen.Title);
+            }
+            _menuPad.Handle(scope.transform, frame.Direction, frame.Submit, cancel, Back);
         }
 
         private void OnHumanModalResponse(byte[] resp)

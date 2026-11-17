@@ -363,6 +363,7 @@ namespace YGOPortable.Editor
             TestDuelZoneBrowser.Run();
             TestHandGlow.Run();
             TestChainChooser.Run();
+            TestDuelPadNavigation.Run();
             TestDuelRematch.Run();
 
             AssertTrue(luaErrors.Count == 0, $"Native/Lua error logs detected: {string.Join(" | ", luaErrors.Take(3))}");
@@ -508,7 +509,8 @@ namespace YGOPortable.Editor
                 Submit(ButtonAt(ui.JankenRoot, "JnkWin/Cancel/B"));
 
                 ui.Root.SetActive(false);
-                var menu = new TitleAndMenuUI(canvas.AddComponent<GameAppController>(), canvas.transform);
+                var app = canvas.AddComponent<GameAppController>();
+                var menu = new TitleAndMenuUI(app, canvas.transform);
                 menu.TitleRoot.SetActive(false);
                 var settings = menu.MenuRoot.GetComponentsInChildren<Button>()[2];
                 Submit(settings);
@@ -518,6 +520,7 @@ namespace YGOPortable.Editor
                 Submit(close);
                 AssertTrue(!menu.SettingsRoot.activeSelf && settings.IsInteractable() && events.currentSelectedGameObject == settings.gameObject,
                     "Closing settings should restore main menu focus.");
+                VerifyMenuPadInput(app, menu, ui, events, settings, canvas.transform);
                 Debug.Log("[VERIFY OPPONENT NAVIGATION] Page and ace stayed in sync, rock-paper-scissors retained focus through all results, and settings restored focus.");
             }
             finally
@@ -531,6 +534,52 @@ namespace YGOPortable.Editor
                     UnityEngine.Object.DestroyImmediate(localEvents);
                 }
             }
+        }
+
+        private static void VerifyMenuPadInput(GameAppController app, TitleAndMenuUI menu, OpponentSelectUI opponents,
+            EventSystem events, Button settings, Transform canvas)
+        {
+            const BindingFlags privateInstance = BindingFlags.Instance | BindingFlags.NonPublic;
+            var appType = typeof(GameAppController);
+            var padFrame = appType.Assembly.GetType("YGOPortable.UI.DeckPadFrame");
+            var padButtons = appType.Assembly.GetType("YGOPortable.UI.DeckPadButtons");
+            var handle = appType.GetMethod("HandleMenuInput", privateInstance);
+            var layer = LotdUiKit.FillRect("MenuPadTest", canvas);
+            var padField = appType.GetField("_menuPad", privateInstance);
+            padField.SetValue(app, Activator.CreateInstance(padField.FieldType, privateInstance, null, new object[] { layer }, null));
+            appType.GetField("_titleAndMenu", privateInstance).SetValue(app, menu);
+            appType.GetField("_oppSelect", privateInstance).SetValue(app, opponents);
+            var screen = appType.GetField("_screen", privateInstance);
+
+            void Pad(string button)
+            {
+                var frame = Activator.CreateInstance(padFrame, privateInstance, null,
+                    new object[] { Vector2Int.zero, Enum.Parse(padButtons, button), 0f }, null);
+                handle.Invoke(app, new[] { frame, (object)false });
+            }
+
+            screen.SetValue(app, AppScreen.MainMenu);
+            events.SetSelectedGameObject(settings.gameObject);
+            Pad("Submit");
+            AssertTrue(menu.SettingsRoot.activeSelf, "Gamepad confirmation did not adopt the pointer-selected Settings button.");
+            Pad("Cancel");
+            AssertTrue(!menu.SettingsRoot.activeSelf && events.currentSelectedGameObject == settings.gameObject,
+                "Gamepad cancel did not return from Settings to its previous focus.");
+
+            menu.MenuRoot.SetActive(false);
+            screen.SetValue(app, AppScreen.OpponentSelect);
+            opponents.Open();
+            Pad("NextArea");
+            AssertTrue(events.currentSelectedGameObject?.name == "CharSlot_0_0",
+                "Turning an opponent page with the controller should focus its first visible character.");
+            Pad("Search");
+            var keyboard = layer.Find("PadKeyboard");
+            AssertTrue(keyboard.gameObject.activeSelf, "The opponent search needs a controller keyboard.");
+            Pad("Submit");
+            Pad("Cancel");
+            AssertTrue(!keyboard.gameObject.activeSelf && opponents.Root.activeSelf,
+                "Canceling the opponent search keyboard should stay on opponent selection.");
+            Debug.Log("[VERIFY MENU PAD] Pointer-to-controller handoff, Settings, opponent paging and search keyboard passed.");
         }
 
         private static void VerifyDeckSearchEmergencyCall(uint[] oppDeckMain)

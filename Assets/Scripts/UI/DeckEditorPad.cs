@@ -18,6 +18,7 @@ namespace YGOPortable.UI
         private Text _deckHelpLabel;
         private bool _padMode;
         private PadArea _padArea;
+        private int _padReorderOrigin = -1;
         private Vector3 _padMousePoint;
         private StandaloneInputModule _deckInputModule;
         private (string horizontal, string vertical, string submit, string cancel) _previousAxes;
@@ -75,8 +76,9 @@ namespace YGOPortable.UI
         private void ResetPadMode()
         {
             _padMode = false;
+            _padReorderOrigin = -1;
             _padInput.Reset();
-            _padUi.Clear();
+            _padUi.Clear(preserveSelection: true);
             _padCardFocus.gameObject.SetActive(false);
             _deckHelpLabel.text = MouseHelp;
             _padMousePoint = Input.mousePosition;
@@ -93,6 +95,7 @@ namespace YGOPortable.UI
             }
 
             var frame = _padInput.Read(Time.unscaledTime);
+            if (CardDragManager.Instance?.IsDragging == true) return false;
             if (!_padMode && !frame.HasInput) return false;
             HandleDeckPad(frame);
             return frame.HasInput;
@@ -101,11 +104,31 @@ namespace YGOPortable.UI
         private void HandleDeckPad(DeckPadFrame frame)
         {
             if (_workingDeck == null) return;
+            var overlay = _deckDialog.activeSelf ? _deckDialog : _cardFilterDialog.activeSelf ? _cardFilterDialog :
+                _archModalRoot.activeSelf ? _archModalRoot : null;
+            var scope = overlay != null ? overlay.transform : Root.transform;
+            if (!_padUi.HasPopup && _padUi.HandleOpenedDropdown(scope, frame.Direction, frame.Submit, frame.Cancel, findAny: frame.HasInput))
+            {
+                _padMode = true;
+                _padMousePoint = Input.mousePosition;
+                if (overlay == null)
+                {
+                    _padArea = PadArea.Controls;
+                    _padReorderOrigin = -1;
+                    SwitchPadArea(_padArea);
+                }
+                _padCardFocus.gameObject.SetActive(false);
+                return;
+            }
             if (!_padMode)
             {
                 _padMode = true;
                 _padMousePoint = Input.mousePosition;
-                EventSystem.current?.SetSelectedGameObject(null);
+                if (_padUi.AdoptPointerFocus(scope))
+                {
+                    if (overlay == null) _padArea = PadArea.Controls;
+                }
+                else EventSystem.current?.SetSelectedGameObject(null);
                 SwitchPadArea(_padArea);
             }
 
@@ -136,6 +159,13 @@ namespace YGOPortable.UI
                 else if (frame.PreviousArea || frame.NextArea) PagePadArchetypes(frame.PreviousArea);
                 else _padUi.Handle(_archModalRoot.transform, frame.Direction, frame.Submit, frame.Cancel,
                     () => _archModalRoot.SetActive(false), _archSearchInp);
+                return;
+            }
+
+            if (_padReorderOrigin >= 0 || (frame.Reorder && CurrentPadDeck != DragSourceType.None))
+            {
+                HandlePadReorder(frame);
+                DrawPadCardFocus();
                 return;
             }
 
@@ -196,7 +226,11 @@ namespace YGOPortable.UI
 
         private void SwitchPadArea(PadArea area)
         {
-            if (_padArea != area) _padUi.Clear();
+            if (_padArea != area)
+            {
+                _padReorderOrigin = -1;
+                _padUi.Clear();
+            }
             _padArea = area;
             var actions = area switch
             {
@@ -207,7 +241,8 @@ namespace YGOPortable.UI
                 _ => "메인   A 사이드 이동   X 제거",
             };
             string back = area == PadArea.Controls ? "B 카드 목록" : "우스틱 설명   B 뒤로";
-            _deckHelpLabel.text = $"{actions}   Y 검색   LB/RB 영역   Menu 저장   {back}";
+            var reorder = CurrentPadDeck != DragSourceType.None ? "   R스틱 클릭 순서" : "";
+            _deckHelpLabel.text = $"{actions}{reorder}   Y 검색   LB/RB 영역   Menu 저장   {back}";
         }
 
         private DragSourceType CurrentPadDeck => _padArea switch
@@ -220,7 +255,16 @@ namespace YGOPortable.UI
 
         private static int ClampPadIndex(int index, int count) => Mathf.Clamp(index, 0, Mathf.Max(0, count - 1));
 
-        private void NavigatePadCards(Vector2Int move)
+        private void RememberMouseCard(PadArea area, int index)
+        {
+            _padReorderOrigin = -1;
+            _padArea = area;
+            _padIndices[(int)area] = index;
+            var events = EventSystem.current;
+            if (events != null && !events.alreadySelecting) events.SetSelectedGameObject(null);
+        }
+
+        private void NavigatePadCards(Vector2Int move, bool stayInArea = false)
         {
             if (move == Vector2Int.zero) return;
             int count = _padArea == PadArea.Trunk ? _trunkResults.Count : GetDeckList(CurrentPadDeck).Count;
@@ -231,17 +275,42 @@ namespace YGOPortable.UI
             int col = index % cols;
             int next = index + move.x - move.y * cols;
 
-            if (move.x > 0 && _padArea == PadArea.Trunk && (col == cols - 1 || next >= count))
+            if (!stayInArea && move.x > 0 && _padArea == PadArea.Trunk && (col == cols - 1 || next >= count))
                 SwitchPadArea(PadArea.Main);
-            else if (move.x < 0 && col == 0 && _padArea != PadArea.Trunk)
+            else if (!stayInArea && move.x < 0 && col == 0 && _padArea != PadArea.Trunk)
                 SwitchPadArea(PadArea.Trunk);
-            else if (move.y < 0 && (row + 1) * cols >= count && (_padArea == PadArea.Main || _padArea == PadArea.Extra))
+            else if (!stayInArea && move.y < 0 && (row + 1) * cols >= count && (_padArea == PadArea.Main || _padArea == PadArea.Extra))
                 SwitchPadArea(_padArea == PadArea.Main ? PadArea.Extra : PadArea.Side);
-            else if (move.y > 0 && row == 0 && (_padArea == PadArea.Side || _padArea == PadArea.Extra))
+            else if (!stayInArea && move.y > 0 && row == 0 && (_padArea == PadArea.Side || _padArea == PadArea.Extra))
                 SwitchPadArea(_padArea == PadArea.Side ? PadArea.Extra : PadArea.Main);
             else if (move.x == 0 && next >= 0 && (row - move.y) * cols < count ||
                 move.x != 0 && next >= 0 && (next / cols) == row && next < count)
                 _padIndices[area] = ClampPadIndex(next, count);
+        }
+
+        private void HandlePadReorder(DeckPadFrame frame)
+        {
+            var cards = GetDeckList(CurrentPadDeck);
+            int area = (int)_padArea;
+            if (_padReorderOrigin < 0)
+            {
+                if (cards.Count < 2) return;
+                _padReorderOrigin = ClampPadIndex(_padIndices[area], cards.Count);
+                _deckHelpLabel.text = "순서 이동   방향키로 위치 선택   A 놓기   B 취소";
+                return;
+            }
+            if (frame.Cancel)
+            {
+                _padIndices[area] = _padReorderOrigin;
+                _padReorderOrigin = -1;
+                SwitchPadArea(_padArea);
+                return;
+            }
+            NavigatePadCards(frame.Direction, stayInArea: true);
+            if (!frame.Submit && !frame.Reorder) return;
+            MoveDeckCard(cards, _padReorderOrigin, cards, _padIndices[area]);
+            _padReorderOrigin = -1;
+            SwitchPadArea(_padArea);
         }
 
         private void ExecutePadCard(bool alternate)
@@ -272,9 +341,7 @@ namespace YGOPortable.UI
                 : DragSourceType.DeckSide;
             var target = GetDeckList(destination);
             if (!CanPlaceCard(card, destination, target)) return;
-            source.RemoveAt(slot);
-            target.Add(code);
-            FinishDeckEdit();
+            MoveDeckCard(source, slot, target, target.Count);
         }
 
         private void DrawPadCardFocus()

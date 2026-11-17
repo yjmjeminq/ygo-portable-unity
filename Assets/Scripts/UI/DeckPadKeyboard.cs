@@ -24,6 +24,7 @@ namespace YGOPortable.UI
         private readonly Text _pageLabel;
         private readonly Button _shiftButton;
         private readonly Button _spaceButton;
+        private readonly Action _onClosed;
         private readonly List<char> _hangul = new List<char>();
         private InputField _target;
         private KeyboardPage _page;
@@ -36,8 +37,9 @@ namespace YGOPortable.UI
         internal Selectable DefaultFocus => _keys[0];
         internal bool IsOpen => _overlay.gameObject.activeSelf;
 
-        internal DeckPadKeyboard(Transform parent)
+        internal DeckPadKeyboard(Transform parent, Action onClosed = null)
         {
+            _onClosed = onClosed;
             _overlay = LotdUiKit.FillRect("PadKeyboard", parent);
             LotdUiKit.AddImage(_overlay.gameObject, LotdUiKit.WhiteSprite, new Color(.012f, .021f, .05f, .88f));
             var panel = LotdUiKit.CreateMenuPanel(_overlay, "Window", new Vector2(.15f, .21f), new Vector2(.85f, .79f));
@@ -98,8 +100,10 @@ namespace YGOPortable.UI
 
         internal void Close()
         {
+            bool wasOpen = IsOpen;
             _target = null;
             _overlay.gameObject.SetActive(false);
+            if (wasOpen) _onClosed?.Invoke();
         }
 
         private string Value => _committed + ComposeHangul(_hangul);

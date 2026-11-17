@@ -596,8 +596,16 @@ namespace YGOPortable.UI
                     highlight.color = LotdUiKit.GoldAccent;
                     InspectCard(code);
                 };
-                trigger.OnLeftClick = () => InspectCard(code);
-                trigger.OnRightClick = () => TryAddCardToDeck(code);
+                trigger.OnLeftClick = () =>
+                {
+                    RememberMouseCard(PadArea.Trunk, index);
+                    InspectCard(code);
+                };
+                trigger.OnRightClick = () =>
+                {
+                    RememberMouseCard(PadArea.Trunk, index);
+                    TryAddCardToDeck(code);
+                };
             }
         }
 
@@ -609,13 +617,14 @@ namespace YGOPortable.UI
                 ? Color.white : new Color(1f, 0.55f, 0.45f);
             _extraCountText.text = $"{_workingDeck.extra.Count}장";
             _sideCountText.text = $"{_workingDeck.side.Count}장";
-            SyncSlotList(_mainSlots, _workingDeck.main);
-            SyncSlotList(_extraSlots, _workingDeck.extra);
-            SyncSlotList(_sideSlots, _workingDeck.side);
+            SyncSlotList(_mainSlots, _workingDeck.main, PadArea.Main);
+            SyncSlotList(_extraSlots, _workingDeck.extra, PadArea.Extra);
+            SyncSlotList(_sideSlots, _workingDeck.side, PadArea.Side);
             RefreshSaveLabel();
         }
 
-        private void SyncSlotList(List<(RectTransform rt, CompositeCardView card, CardDragTrigger trigger)> slots, List<uint> cards)
+        private void SyncSlotList(List<(RectTransform rt, CompositeCardView card, CardDragTrigger trigger)> slots,
+            List<uint> cards, PadArea area)
         {
             for (int i = 0; i < slots.Count; i++)
             {
@@ -637,7 +646,11 @@ namespace YGOPortable.UI
                 view.SetCard(code);
                 trigger.CardCodeGetter = () => code;
                 trigger.IndexGetter = () => index;
-                trigger.OnLeftClick = () => InspectCard(code);
+                trigger.OnLeftClick = () =>
+                {
+                    RememberMouseCard(area, index);
+                    InspectCard(code);
+                };
                 trigger.OnPointerEnterAction = () =>
                 {
                     highlight.color = LotdUiKit.GoldAccent;
@@ -645,6 +658,7 @@ namespace YGOPortable.UI
                 };
                 trigger.OnRightClick = () =>
                 {
+                    RememberMouseCard(area, index);
                     cards.RemoveAt(index);
                     FinishDeckEdit();
                 };
@@ -679,10 +693,16 @@ namespace YGOPortable.UI
             var target = GetDeckList(destination);
             if (source != target && !CanPlaceCard(CardDatabase.Get(context.CardCode), destination, target)) return;
             int index = FindHoveredSlotIndex(GetDeckSlots(destination), context.DropPosition);
-            if (source == target && index < 0) return;
-            if (source == target && index == context.SourceIndex) return;
-            source.RemoveAt(context.SourceIndex);
-            target.Insert(index < 0 ? target.Count : Mathf.Min(index, target.Count), context.CardCode);
+            MoveDeckCard(source, context.SourceIndex, target, index);
+        }
+
+        private void MoveDeckCard(List<uint> source, int sourceIndex, List<uint> target, int targetIndex)
+        {
+            if (sourceIndex < 0 || sourceIndex >= source.Count ||
+                (source == target && (targetIndex < 0 || targetIndex == sourceIndex))) return;
+            uint code = source[sourceIndex];
+            source.RemoveAt(sourceIndex);
+            target.Insert(targetIndex < 0 ? target.Count : Mathf.Min(targetIndex, target.Count), code);
             FinishDeckEdit();
         }
 

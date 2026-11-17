@@ -79,11 +79,7 @@ namespace YGOPortable.UI
             FocusCurrentCharacter();
         }
 
-        internal void Update()
-        {
-            if (!JankenRoot.activeInHierarchy || !Input.GetButtonDown("Cancel")) return;
-            CloseJanken();
-        }
+        internal InputField SearchInput => _searchInput;
 
         public void ShowStatus(string message, bool isError = false)
         {
@@ -357,7 +353,7 @@ namespace YGOPortable.UI
             }
         }
 
-        private void ChangePage(int delta)
+        internal void ChangePage(int delta, bool focusCharacter = false)
         {
             int start = (_page + delta) * PageSize;
             if (start < 0 || start >= _filteredChars.Count) return;
@@ -365,7 +361,7 @@ namespace YGOPortable.UI
             _page += delta;
             SelectCharacter(_filteredChars[start]);
             RefreshGridPage();
-            if (!source.interactable && EventSystem.current?.currentSelectedGameObject == source.gameObject)
+            if (focusCharacter || (!source.interactable && EventSystem.current?.currentSelectedGameObject == source.gameObject))
                 FocusCurrentCharacter();
         }
 
@@ -473,7 +469,7 @@ namespace YGOPortable.UI
             EventSystem.current?.SetSelectedGameObject(_jnkFirstHand.gameObject);
         }
 
-        private void CloseJanken()
+        internal void CloseJanken()
         {
             JankenRoot.SetActive(false);
             _opponentControls.interactable = true;
