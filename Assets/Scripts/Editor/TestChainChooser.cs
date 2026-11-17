@@ -331,6 +331,7 @@ namespace YGOPortable.Editor
                 Pad(modals, button: "Submit");
                 Require(responses.Count == 1 && responses[0].SequenceEqual(new byte[] { 1, 0 }), "The reordered cards did not keep their native indices.");
                 responses.Clear();
+                VerifyChoiceLocations(duel, modals, page, responses);
 
                 var declare = new DuelPrompt { messageType = YgoConstants.MSG_ANNOUNCE_CARD };
                 modals.ShowPrompt(duel, declare);
@@ -381,6 +382,64 @@ namespace YGOPortable.Editor
             {
                 UnityEngine.Object.DestroyImmediate(canvas);
             }
+        }
+
+        private static void VerifyChoiceLocations(DuelSession duel, DuelPromptModals modals, Transform page,
+            List<byte[]> responses)
+        {
+            const uint dragon = 89631139;
+            var material = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_UNSELECT_CARD, finishable = true };
+            var regions = new[] { YgoConstants.LOCATION_HAND, YgoConstants.LOCATION_MZONE, YgoConstants.LOCATION_DECK };
+            foreach (uint region in regions)
+                material.candidates.Add(new SelectableCardItem { code = dragon, controller = (byte)duel.HumanPlayerIndex, location = region });
+            material.candidates.Add(new SelectableCardItem { code = 0, controller = (byte)duel.AiPlayerIndex, location = YgoConstants.LOCATION_HAND });
+            material.unselectCandidates.Add(new SelectableCardItem
+                { code = dragon, controller = (byte)duel.HumanPlayerIndex, location = YgoConstants.LOCATION_GRAVE });
+            modals.ShowPrompt(duel, material);
+            Canvas.ForceUpdateCanvases();
+
+            var tiles = page.Find("Body/Cards/Viewport/Content");
+            for (int i = 0; i <= material.candidates.Count; i++)
+            {
+                var badge = tiles.Find($"Imm_{i}/Source");
+                var icon = badge.Find("LocationIcon").GetComponent<Graphic>();
+                var tone = badge.GetComponent<Image>().color;
+                bool isOpponent = i == material.candidates.Count - 1;
+                Require(icon != null && !icon.raycastTarget && badge.GetComponentInChildren<Text>() == null &&
+                    (isOpponent ? tone.r > tone.b : tone.b > tone.r),
+                    "A material card did not show a location icon with the matching player's color.");
+                if (icon is Image image)
+                    Require(image.sprite != null, "A loaded location emblem did not have a sprite.");
+                else
+                {
+                    using var mesh = new VertexHelper();
+                    icon.GetType().GetMethod("OnPopulateMesh", BindingFlags.Instance | BindingFlags.NonPublic,
+                        null, new[] { typeof(VertexHelper) }, null).Invoke(icon, new object[] { mesh });
+                    Require(mesh.currentVertCount > 0, "The bundled location glyph did not render.");
+                }
+            }
+
+            var hidden = tiles.Find("Imm_3/Name/Text").GetComponent<Text>();
+            var checkedCard = tiles.Find($"Imm_{material.candidates.Count}");
+            Require(hidden.text == "뒷면 카드" && checkedCard.Find("Chk").gameObject.activeSelf,
+                "Adding location icons changed hidden information or the selected-material marker.");
+            checkedCard.GetComponent<Button>().onClick.Invoke();
+            Require(responses.Count == 1 && BitConverter.ToInt32(responses[0], 0) == 1 &&
+                BitConverter.ToInt32(responses[0], 4) == material.candidates.Count,
+                "Clicking a selected material no longer sends its original index.");
+            responses.Clear();
+
+            var sum = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_SUM, min = 1, max = 1, acc = 7 };
+            sum.mustSelect.Add(new SelectableCardItem
+                { code = dragon, controller = (byte)duel.HumanPlayerIndex, location = YgoConstants.LOCATION_MZONE, sumParam = 4 });
+            sum.candidates.Add(new SelectableCardItem
+                { code = dragon, controller = (byte)duel.HumanPlayerIndex, location = YgoConstants.LOCATION_GRAVE, sumParam = 3 });
+            modals.ShowPrompt(duel, sum);
+            var mandatory = page.Find("Body/Cards/Viewport/Content/Tile_-1/Source");
+            Require(mandatory.Find("LocationIcon") != null &&
+                mandatory.Find("Detail/Text").GetComponent<Text>().text == "필수 · 4",
+                "The material icon removed required selection details.");
+            Debug.Log("[VERIFY PROMPT LOCATION ICONS] Material location, ownership color, hidden cards, and selection indices passed.");
         }
 
         private static void Pad(DuelPromptModals modals, Vector2Int direction = default, string button = "None")

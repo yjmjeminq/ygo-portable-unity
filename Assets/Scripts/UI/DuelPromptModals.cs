@@ -820,16 +820,16 @@ namespace YGOPortable.UI
         private void AddMultiSelectCardTile(Transform grid, SelectableCardItem item, int idx, bool lockedMust, DuelPrompt p, DuelSession s)
         {
             uint code = s.GetVisibleSelectionCode(item);
-            string sub = CardSourceLabel(s, item);
-            if (p.messageType == YgoConstants.MSG_SELECT_TRIBUTE && item.releaseParam > 1) sub += $" · {item.releaseParam}장분";
+            string detail = null;
+            if (p.messageType == YgoConstants.MSG_SELECT_TRIBUTE && item.releaseParam > 1) detail = $"{item.releaseParam}장분";
             if (p.messageType == YgoConstants.MSG_SELECT_SUM)
             {
                 uint v1 = item.sumParam & 0xFFFF;
                 uint v2 = (item.sumParam >> 16) & 0xFFFF;
-                sub = $"{(lockedMust ? "필수 · " : "")}{sub} · {(v2 > 0 ? $"{v1}/{v2}" : $"{v1}")}";
+                detail = $"{(lockedMust ? "필수 · " : "")}{(v2 > 0 ? $"{v1}/{v2}" : $"{v1}")}";
             }
 
-            var tile = CreateChoiceCardTile(grid, $"Tile_{idx}", code, sub);
+            var tile = CreateChoiceCardTile(grid, $"Tile_{idx}", code, item.location, item.controller != s.HumanPlayerIndex, detail);
             var mark = AddSelectionMark(tile, lockedMust);
             if (lockedMust) return;
 
@@ -981,7 +981,7 @@ namespace YGOPortable.UI
             int nativeIndex, bool selected)
         {
             uint code = session.GetVisibleSelectionCode(item);
-            var tile = CreateChoiceCardTile(grid, $"Imm_{nativeIndex}", code, CardSourceLabel(session, item));
+            var tile = CreateChoiceCardTile(grid, $"Imm_{nativeIndex}", code, item.location, item.controller != session.HumanPlayerIndex);
             if (selected) AddSelectionMark(tile, true);
             var button = tile.gameObject.AddComponent<Button>();
             button.targetGraphic = tile.GetComponent<Image>();
@@ -1639,23 +1639,46 @@ namespace YGOPortable.UI
             return cards;
         }
 
-        private RectTransform CreateChoiceCardTile(Transform parent, string name, uint code, string source)
+        private RectTransform CreateChoiceCardTile(Transform parent, string name, uint code, uint location,
+            bool opponent, string detail = null)
         {
             var tile = CreateCardStripTile(parent, name, ChoiceCardWidth);
-            var art = LotdUiKit.CreateRect("Card", tile, new Vector2(.05f, .246f), new Vector2(.95f, .975f),
+            var art = LotdUiKit.CreateRect("Card", tile, new Vector2(.05f, .292f), new Vector2(.95f, .975f),
                 Vector2.zero, Vector2.zero);
             CompositeCardView.Create(art, "V", duelArtwork: true).SetCard(code, faceDown: code == 0);
 
-            var title = LotdUiKit.CreateRect("Name", tile, new Vector2(.04f, .123f), new Vector2(.96f, .242f),
-                Vector2.zero, Vector2.zero);
-            var caption = LotdUiKit.CreateRect("Source", tile, new Vector2(.04f, .012f), new Vector2(.96f, .12f),
+            var title = LotdUiKit.CreateRect("Name", tile, new Vector2(.04f, .174f), new Vector2(.96f, .29f),
                 Vector2.zero, Vector2.zero);
             LotdUiKit.AddFittedText(title, "Text", code != 0 ? CardDatabase.GetName(code) : "뒷면 카드", 12, 8,
                 TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
-            LotdUiKit.AddFittedText(caption, "Text", source, 11, 8, TextAnchor.MiddleCenter, DuelStyle.Muted);
+            AddChoiceCardSource(tile, location, opponent, detail);
             if (code != 0)
                 tile.gameObject.AddComponent<CardDragTrigger>().OnPointerEnterAction = () => _onInspectCard?.Invoke(code);
             return tile;
+        }
+
+        private static void AddChoiceCardSource(Transform tile, uint location, bool opponent, string detail)
+        {
+            bool hasIcon = DuelPromptLocationIcon.Supports(location);
+            bool hasDetail = !string.IsNullOrEmpty(detail);
+            if (!hasIcon && !hasDetail) return;
+
+            var badge = LotdUiKit.CreateRect("Source", tile, new Vector2(hasDetail ? .065f : .32f, .02f),
+                new Vector2(hasDetail ? .935f : .68f, .166f), Vector2.zero, Vector2.zero);
+            var tone = DuelStyle.Side(opponent);
+            LotdUiKit.AddImage(badge.gameObject, LotdUiKit.WhiteSprite, new Color(tone.r, tone.g, tone.b, .17f), false, false);
+            if (hasIcon)
+            {
+                var icon = LotdUiKit.CreateRect("LocationIcon", badge, Vector2.zero,
+                    hasDetail ? new Vector2(.32f, 1f) : Vector2.one, new Vector2(2f, 1f), new Vector2(-2f, -1f));
+                DuelPromptLocationIcon.Add(icon, location, opponent);
+            }
+            if (hasDetail)
+            {
+                var caption = LotdUiKit.CreateRect("Detail", badge, new Vector2(hasIcon ? .32f : 0f, 0f), Vector2.one,
+                    Vector2.zero, new Vector2(-2f, 0f));
+                LotdUiKit.AddFittedText(caption, "Text", detail, 11, 8, TextAnchor.MiddleCenter, DuelStyle.Muted);
+            }
         }
 
         private static RectTransform CreateCardStripTile(Transform parent, string name, float width)
@@ -1805,6 +1828,99 @@ namespace YGOPortable.UI
             int c = 0;
             while (v != 0) { v &= v - 1; c++; }
             return c;
+        }
+    }
+
+    [RequireComponent(typeof(CanvasRenderer))]
+    internal sealed class DuelPromptLocationIcon : MaskableGraphic
+    {
+        private uint _location;
+
+        internal static bool Supports(uint location) => (location & YgoConstants.LOCATION_OVERLAY) != 0 ||
+            location is YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_DECK or YgoConstants.LOCATION_EXTRA
+                or YgoConstants.LOCATION_GRAVE or YgoConstants.LOCATION_REMOVED or YgoConstants.LOCATION_ONFIELD
+                or YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE or YgoConstants.LOCATION_FZONE or YgoConstants.LOCATION_PZONE;
+
+        internal static void Add(RectTransform holder, uint location, bool opponent)
+        {
+            var sprite = DuelVisualAssets.PromptZoneIcon(location, opponent);
+            if (sprite != null)
+            {
+                LotdUiKit.AddImage(holder.gameObject, sprite, Color.white, true, false);
+                return;
+            }
+
+            var glyph = holder.gameObject.AddComponent<DuelPromptLocationIcon>();
+            glyph._location = (location & YgoConstants.LOCATION_OVERLAY) != 0 ? YgoConstants.LOCATION_OVERLAY : location;
+            glyph.color = DuelStyle.Side(opponent);
+            glyph.raycastTarget = false;
+        }
+
+        protected override void OnPopulateMesh(VertexHelper mesh)
+        {
+            mesh.Clear();
+            var rect = GetPixelAdjustedRect();
+            float scale = Mathf.Min(rect.width, rect.height) / 24f;
+            if (scale <= 0f) return;
+
+            void Line(float x1, float y1, float x2, float y2)
+            {
+                Vector2 a = rect.center + new Vector2(x1 - 12f, y1 - 12f) * scale;
+                Vector2 b = rect.center + new Vector2(x2 - 12f, y2 - 12f) * scale;
+                var delta = (b - a).normalized;
+                var normal = new Vector2(-delta.y, delta.x) * (.85f * scale);
+                var cap = delta * (.65f * scale);
+                DuelMat.AddQuad(mesh, a - cap - normal, a - cap + normal, b + cap + normal, b + cap - normal,
+                    color, color, Vector2.zero, Vector2.zero);
+            }
+
+            void Path(params (float x, float y)[] points)
+            {
+                for (int i = 1; i < points.Length; i++)
+                    Line(points[i - 1].x, points[i - 1].y, points[i].x, points[i].y);
+            }
+
+            void Box(float left, float bottom, float right, float top) =>
+                Path((left, bottom), (left, top), (right, top), (right, bottom), (left, bottom));
+
+            switch (_location)
+            {
+                case YgoConstants.LOCATION_HAND:
+                    Path((4, 5), (2, 15), (7, 18));
+                    Path((20, 5), (22, 15), (17, 18));
+                    Box(8, 4, 16, 20);
+                    break;
+                case YgoConstants.LOCATION_DECK:
+                    Box(4, 10, 20, 19);
+                    Line(4, 7, 20, 7);
+                    Line(4, 4, 20, 4);
+                    break;
+                case YgoConstants.LOCATION_EXTRA:
+                    Box(5, 4, 16, 18);
+                    Path((8, 21), (20, 21), (20, 8));
+                    Path((10.5f, 8), (13, 11), (10.5f, 14), (8, 11), (10.5f, 8));
+                    break;
+                case YgoConstants.LOCATION_GRAVE:
+                    Path((6, 5), (6, 15), (8, 19), (12, 21), (16, 19), (18, 15), (18, 5));
+                    Line(3, 5, 21, 5);
+                    Line(12, 8, 12, 16);
+                    Line(9, 13, 15, 13);
+                    break;
+                case YgoConstants.LOCATION_REMOVED:
+                    Path((8, 21), (16, 21), (21, 16), (21, 8), (16, 3), (8, 3), (3, 8), (3, 16), (8, 21));
+                    Line(5, 5, 19, 19);
+                    break;
+                case YgoConstants.LOCATION_OVERLAY:
+                    Path((3, 15), (12, 21), (21, 15), (12, 9), (3, 15));
+                    Path((3, 9), (12, 3), (21, 9));
+                    break;
+                default:
+                    Box(2, 6, 22, 18);
+                    Line(2, 12, 22, 12);
+                    Line(9, 6, 9, 18);
+                    Line(15, 6, 15, 18);
+                    break;
+            }
         }
     }
 
