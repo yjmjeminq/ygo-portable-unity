@@ -49,15 +49,22 @@ namespace YGOPortable.UI
         private readonly Action<UserDeck> _onStarterClaimed;
         private readonly Catalog _shop;
         private readonly Catalog _starter;
+        private readonly PackContentsUI _packContents;
+        private readonly PackCardLookupUI _cardLookup;
         private readonly List<CompositeCardView> _pullViews = new();
         private readonly List<Text> _pullLabels = new();
         private Text _balance;
         private GameObject _reveal;
         private Text _revealHeading;
         private ShopCardRevealMotion _revealMotion;
+        private Button _cardLookupButton;
+        private Button _viewContentsButton;
+        private bool _lookupFromContents;
 
         public GameObject Root => _shop.Root;
         public GameObject StarterRoot => _starter.Root;
+        internal GameObject ActiveShopRoot => _cardLookup.Root.activeSelf ? _cardLookup.Root :
+            _packContents.Root.activeSelf ? _packContents.Root : Root;
 
         public CollectionShopUI(Transform parent, Action onBack, Action<UserDeck> onStarterClaimed)
         {
@@ -65,10 +72,13 @@ namespace YGOPortable.UI
             _onStarterClaimed = onStarterClaimed;
             _shop = BuildCatalog(parent, starter: false, BuySelectedPack);
             _starter = BuildCatalog(parent, starter: true, ChooseSelectedStarter);
+            _packContents = new PackContentsUI(parent, ReturnFromContents, OpenLookupForCard);
+            _cardLookup = new PackCardLookupUI(parent, ReturnFromLookup, ShowPackFromLookup);
         }
 
         public void OpenShop()
         {
+            CloseShop();
             Root.SetActive(true);
             DismissReveal();
             if (_shop.Items.Length == 0)
@@ -85,6 +95,14 @@ namespace YGOPortable.UI
             }
             RefreshBalance();
             OpenCatalog(_shop);
+        }
+
+        internal void CloseShop()
+        {
+            _cardLookup.Root.SetActive(false);
+            _packContents.Close();
+            Root.SetActive(false);
+            _lookupFromContents = false;
         }
 
         public void OpenStarter()
@@ -117,12 +135,107 @@ namespace YGOPortable.UI
             return true;
         }
 
-        internal InputField CatalogSearch(bool starter) => (starter ? _starter : _shop).Search;
+        internal InputField CatalogSearch(bool starter) => starter ? _starter.Search :
+            _cardLookup.Root.activeSelf ? _cardLookup.Search :
+            _packContents.Root.activeSelf ? _packContents.SearchInput : _shop.Search;
 
         internal void ChangeCatalogPage(bool starter, int delta)
         {
+            if (!starter && _cardLookup.Root.activeSelf)
+            {
+                _cardLookup.ChangePage(delta);
+                return;
+            }
+            if (!starter && _packContents.Root.activeSelf)
+            {
+                _packContents.ChangePage(delta);
+                return;
+            }
             var catalog = starter ? _starter : _shop;
             if (ChangePage(catalog, delta)) FocusFirstRow(catalog);
+        }
+
+        internal void ScrollShopDescription(float direction)
+        {
+            if (_packContents.Root.activeSelf) _packContents.ScrollDescription(direction);
+        }
+
+        internal bool HandleShopBack()
+        {
+            if (_cardLookup.Root.activeSelf)
+            {
+                ReturnFromLookup();
+                return true;
+            }
+            if (_packContents.Root.activeSelf)
+            {
+                ReturnFromContents();
+                return true;
+            }
+            return DismissReveal();
+        }
+
+        private void ViewSelectedPack()
+        {
+            var pack = CollectionProgress.Packs.FirstOrDefault(item => item.Id == _shop.Selected?.Id);
+            if (pack == null) return;
+            Root.SetActive(false);
+            _packContents.Open(pack);
+        }
+
+        private void ReturnFromContents()
+        {
+            _packContents.Close();
+            Root.SetActive(true);
+            EventSystem.current?.SetSelectedGameObject(_viewContentsButton.gameObject);
+        }
+
+        private void OpenLookup()
+        {
+            _lookupFromContents = false;
+            Root.SetActive(false);
+            _cardLookup.Open();
+        }
+
+        private void OpenLookupForCard(uint code)
+        {
+            _lookupFromContents = true;
+            _packContents.Root.SetActive(false);
+            _cardLookup.Open();
+            _cardLookup.SetSearch(code.ToString());
+        }
+
+        private void ReturnFromLookup()
+        {
+            _cardLookup.Root.SetActive(false);
+            if (_lookupFromContents)
+            {
+                _lookupFromContents = false;
+                _packContents.Resume();
+                return;
+            }
+            Root.SetActive(true);
+            EventSystem.current?.SetSelectedGameObject(_cardLookupButton.gameObject);
+        }
+
+        private void ShowPackFromLookup(string packId)
+        {
+            var item = _shop.Items.FirstOrDefault(candidate => candidate.Id == packId);
+            if (item == null) return;
+            CloseShop();
+            Root.SetActive(true);
+            DismissReveal();
+            int index = _shop.Matches.IndexOf(item);
+            if (index < 0)
+            {
+                _shop.Search.SetTextWithoutNotify("");
+                FilterCatalog(_shop);
+                index = _shop.Matches.IndexOf(item);
+            }
+            _shop.Page = index / PageSize;
+            RefreshPage(_shop);
+            Select(_shop, item);
+            EventSystem.current?.SetSelectedGameObject(_viewContentsButton.gameObject);
         }
 
         private Catalog BuildCatalog(Transform parent, bool starter, Action onAction)
@@ -145,9 +258,11 @@ namespace YGOPortable.UI
 
             var list = LotdUiKit.CreateMenuPanel(root, "Catalog", new Vector2(.025f, .083f), new Vector2(.405f, .882f));
             var details = LotdUiKit.CreateMenuPanel(root, "Details", new Vector2(.419f, .083f), new Vector2(.975f, .882f));
-            var search = Slot("Search", list, .08f, .851f, .92f, .924f);
+            var search = Slot("Search", list, .08f, .851f, starter ? .92f : .632f, .924f);
             catalog.Search = LotdUiKit.CreateInputField(search, "Input", starter ? "카드군·카드명·카드 번호 검색" : "팩 이름·카드명·카드 번호 검색", 17);
             catalog.Search.onValueChanged.AddListener(_ => FilterCatalog(catalog));
+            if (!starter)
+                _cardLookupButton = AddButton(list, "CardLookup", "카드로 팩 찾기", .651f, .851f, .92f, .924f, OpenLookup);
             catalog.CountLabel = Label(list, "Count", "", .087f, .796f, .914f, .838f, 16,
                 TextAnchor.MiddleLeft, LotdUiKit.TextMuted);
             for (int i = 0; i < PageSize; i++)
@@ -159,8 +274,9 @@ namespace YGOPortable.UI
                     int index = catalog.Page * PageSize + row;
                     if (index >= catalog.Matches.Count) return;
                     Select(catalog, catalog.Matches[index]);
-                    if (catalog.Action.IsInteractable())
-                        EventSystem.current?.SetSelectedGameObject(catalog.Action.gameObject);
+                    var next = starter ? catalog.Action : _viewContentsButton;
+                    if (next.IsInteractable())
+                        EventSystem.current?.SetSelectedGameObject(next.gameObject);
                 });
                 catalog.Rows[i] = button;
                 if (starter)
@@ -191,7 +307,9 @@ namespace YGOPortable.UI
             catalog.Cover = CompositeCardView.Create(cover, "FeaturedCard", true);
             catalog.Details = Label(details, "Info", "", starter ? .48f : .429f, .563f, .914f, .817f, 22,
                 TextAnchor.MiddleLeft, LotdUiKit.TextPrimary);
-            catalog.Action = AddButton(details, starter ? "Choose" : "Buy", "", starter ? .48f : .429f, .466f,
+            if (!starter)
+                _viewContentsButton = AddButton(details, "ViewContents", "수록 카드", .429f, .466f, .659f, .547f, ViewSelectedPack);
+            catalog.Action = AddButton(details, starter ? "Choose" : "Buy", "", starter ? .48f : .674f, .466f,
                 .923f, .547f, onAction, true);
             catalog.ActionLabel = catalog.Action.GetComponentInChildren<Text>();
             catalog.Status = Label(details, "Status", "", starter ? .48f : .429f, .395f, .923f, .454f, 17,
@@ -335,6 +453,7 @@ namespace YGOPortable.UI
             catalog.ActionLabel.text = starter ? "이 카드군으로 시작" : $"팩 열기   {CollectionProgress.PackCost:N0} DP";
             string loadError = CollectionProgress.LoadError;
             catalog.Action.interactable = item != null && string.IsNullOrEmpty(loadError);
+            if (!starter) _viewContentsButton.interactable = item != null;
             SetStatus(catalog, loadError, !string.IsNullOrEmpty(loadError));
             int first = catalog.Page * PageSize;
             for (int i = 0; i < PageSize && first + i < catalog.Matches.Count; i++)

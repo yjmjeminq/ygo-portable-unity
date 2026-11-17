@@ -202,7 +202,7 @@ namespace YGOPortable.UI
             _titleAndMenu.TitleRoot.SetActive(screen == AppScreen.Title);
             _titleAndMenu.MenuRoot.SetActive(screen == AppScreen.MainMenu);
             _collectionShop?.StarterRoot.SetActive(false);
-            _collectionShop?.Root.SetActive(false);
+            _collectionShop?.CloseShop();
             _oppSelect.Root.SetActive(screen == AppScreen.OpponentSelect);
             _oppSelect.JankenRoot.SetActive(false);
             if (screen != AppScreen.DeckEditor) _deckEditor.Close();
@@ -468,7 +468,7 @@ namespace YGOPortable.UI
                 AppScreen.MainMenu => _titleAndMenu.SettingsRoot.activeInHierarchy
                     ? _titleAndMenu.SettingsRoot : _titleAndMenu.MenuRoot,
                 AppScreen.StarterSelection => _collectionShop?.StarterRoot,
-                AppScreen.CardShop => _collectionShop?.Root,
+                AppScreen.CardShop => _collectionShop?.ActiveShopRoot,
                 _ => null,
             };
             if (page != null && page.activeInHierarchy)
@@ -490,7 +490,7 @@ namespace YGOPortable.UI
                 AppScreen.MainMenu => settings ? _titleAndMenu.SettingsRoot : _titleAndMenu.MenuRoot,
                 AppScreen.OpponentSelect => janken ? _oppSelect.JankenRoot : _oppSelect.Root,
                 AppScreen.StarterSelection => _collectionShop?.StarterRoot,
-                AppScreen.CardShop => _collectionShop?.Root,
+                AppScreen.CardShop => _collectionShop?.ActiveShopRoot,
                 _ => null,
             };
             if (scope == null || !scope.activeInHierarchy) return;
@@ -535,12 +535,14 @@ namespace YGOPortable.UI
                 else if (selectingStarter) ShowScreen(AppScreen.Title);
                 else if (_screen == AppScreen.CardShop)
                 {
-                    if (!_collectionShop.DismissReveal()) ShowScreen(AppScreen.MainMenu);
+                    if (!_collectionShop.HandleShopBack()) ShowScreen(AppScreen.MainMenu);
                 }
                 else if (_screen == AppScreen.OpponentSelect) ShowScreen(AppScreen.MainMenu);
                 else if (_screen == AppScreen.MainMenu) ShowScreen(AppScreen.Title);
             }
             _menuPad.Handle(scope.transform, frame.Direction, frame.Submit, cancel, Back);
+            if (_screen == AppScreen.CardShop)
+                _collectionShop.ScrollShopDescription(frame.DescriptionScroll);
         }
 
         private void OnHumanModalResponse(byte[] resp)
