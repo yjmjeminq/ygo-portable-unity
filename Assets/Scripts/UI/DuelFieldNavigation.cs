@@ -478,6 +478,16 @@ namespace YGOPortable.UI
             if (!_usingDuelPad) InspectCard(previewCode);
         }
 
+        private void RefreshPointerCard(RectTransform card, uint previewCode)
+        {
+            if (_duelPointerRaisedCard != card || _duelPointerCode == previewCode) return;
+            _duelPointerCode = previewCode;
+            if (!_usingDuelPad && !_actionPopup.activeSelf && !_phasePicker.activeSelf && !IsReadingLog &&
+                !_cardZoomModal.activeSelf && !_modals.IsPromptOpen && !_modals.IsZoneViewerOpen &&
+                !_modals.ResultRoot.activeSelf && CardDragManager.Instance?.IsDragging != true)
+                InspectCard(previewCode);
+        }
+
         private void ResetDuelPadCardMotions()
         {
             foreach (var motion in _duelPadCardMotions)

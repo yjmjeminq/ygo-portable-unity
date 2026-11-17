@@ -84,6 +84,7 @@ namespace YGOPortable.UI
                  (Input.mousePosition - _padMousePoint).sqrMagnitude > 36f))
             {
                 ResetPadMode();
+                RestoreMouseCardVisual();
                 return false;
             }
 
@@ -161,8 +162,9 @@ namespace YGOPortable.UI
             if (_deckDialog.activeSelf)
             {
                 _padCardFocus.Hide();
+                if (frame.HasInput) _padUi.AdoptPointerFocus(_deckDialog.transform);
                 _padUi.Handle(_deckDialog.transform, frame.Direction, frame.Submit, frame.Cancel,
-                    () => _deckDialog.SetActive(false), _deckDialog.transform.Find("Window/Cancel/Button")?.GetComponent<Button>());
+                    () => CloseDeckDialog(), _deckDialogCancel);
                 return;
             }
             if (_cardFilterDialog.activeSelf)
@@ -176,7 +178,7 @@ namespace YGOPortable.UI
                 if (frame.Search) _padUi.OpenText(_archSearchInp);
                 else if (frame.PreviousArea || frame.NextArea) PagePadArchetypes(frame.PreviousArea);
                 else _padUi.Handle(_archModalRoot.transform, frame.Direction, frame.Submit, frame.Cancel,
-                    () => _archModalRoot.SetActive(false), _archSearchInp);
+                    () => CloseArchetypeModal(), _archSearchInp);
                 return;
             }
 
@@ -266,8 +268,9 @@ namespace YGOPortable.UI
             }
 
             var cards = GetDeckList(CurrentPadDeck);
-            index = ClampPadIndex(_padIndices[(int)_padArea], cards.Count);
-            return cards.Count == 0 ? 0 : cards[index];
+            int count = VisiblePadDeckCount;
+            index = ClampPadIndex(_padIndices[(int)_padArea], count);
+            return count == 0 ? 0 : cards[index];
         }
 
         private void OpenRelatedCardsForPadSelection()
@@ -292,6 +295,7 @@ namespace YGOPortable.UI
         {
             _padCardFocus.Hide();
             _deckHelpLabel.text = "카드 메뉴   방향키 이동   A 선택   B 취소";
+            if (frame.HasInput) _padUi.AdoptPointerFocus(_deckCardActionPanel);
             _padUi.Handle(_deckCardActionPanel, frame.Direction, frame.Submit, frame.Cancel,
                 CloseDeckCardActions, _deckCardActionDefault);
             if (_deckCardActions.activeSelf) return;
@@ -405,6 +409,9 @@ namespace YGOPortable.UI
             _ => DragSourceType.None,
         };
 
+        private int VisiblePadDeckCount =>
+            Mathf.Min(GetDeckList(CurrentPadDeck)?.Count ?? 0, GetDeckSlots(CurrentPadDeck).Count);
+
         private static int ClampPadIndex(int index, int count) => Mathf.Clamp(index, 0, Mathf.Max(0, count - 1));
 
         private void RememberMouseCard(PadArea area, int index)
@@ -420,7 +427,7 @@ namespace YGOPortable.UI
         private void NavigatePadCards(Vector2Int move, bool stayInArea = false)
         {
             if (move == Vector2Int.zero) return;
-            int count = _padArea == PadArea.Trunk ? _trunkResults.Count : GetDeckList(CurrentPadDeck).Count;
+            int count = _padArea == PadArea.Trunk ? _trunkResults.Count : VisiblePadDeckCount;
             int cols = _padArea == PadArea.Trunk ? TrunkCols : _padArea == PadArea.Main ? 13 : 15;
             int area = (int)_padArea;
             int index = ClampPadIndex(_padIndices[area], count);
@@ -443,12 +450,12 @@ namespace YGOPortable.UI
 
         private void HandlePadReorder(DeckPadFrame frame)
         {
-            var cards = GetDeckList(CurrentPadDeck);
             int area = (int)_padArea;
             if (_padReorderOrigin < 0)
             {
-                if (cards.Count < 2) return;
-                _padReorderOrigin = ClampPadIndex(_padIndices[area], cards.Count);
+                int count = VisiblePadDeckCount;
+                if (count < 2) return;
+                _padReorderOrigin = ClampPadIndex(_padIndices[area], count);
                 _deckHelpLabel.text = "순서 이동   방향키로 위치 선택   A 놓기   B 취소";
                 return;
             }
@@ -510,8 +517,9 @@ namespace YGOPortable.UI
             }
 
             var cards = GetDeckList(CurrentPadDeck);
-            int deckIndex = _padIndices[area] = ClampPadIndex(_padIndices[area], cards.Count);
-            ShowPadCardFocus(GetDeckSlots(CurrentPadDeck)[deckIndex].rt, cards.Count > 0 ? cards[deckIndex] : 0);
+            int count = VisiblePadDeckCount;
+            int deckIndex = _padIndices[area] = ClampPadIndex(_padIndices[area], count);
+            ShowPadCardFocus(GetDeckSlots(CurrentPadDeck)[deckIndex].rt, count > 0 ? cards[deckIndex] : 0);
         }
 
         private void EnsureTrunkPadVisible(int index, bool snap = false)

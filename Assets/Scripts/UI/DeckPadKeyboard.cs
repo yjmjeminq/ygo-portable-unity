@@ -161,6 +161,12 @@ namespace YGOPortable.UI
             _pageButton.transform.parent.gameObject.SetActive(!_numericOnly);
             _shiftButton.transform.parent.gameObject.SetActive(_page == KeyboardPage.Latin);
             _spaceButton.transform.parent.gameObject.SetActive(!_numericOnly);
+            DeckPadUi.LimitKeyboardNavigation(_overlay);
+            var events = UnityEngine.EventSystems.EventSystem.current;
+            if (events != null && events.currentSelectedGameObject != null &&
+                events.currentSelectedGameObject.transform.IsChildOf(_overlay) &&
+                !events.currentSelectedGameObject.activeInHierarchy)
+                events.SetSelectedGameObject(DefaultFocus.gameObject);
         }
 
         private void PressLetter(int index)

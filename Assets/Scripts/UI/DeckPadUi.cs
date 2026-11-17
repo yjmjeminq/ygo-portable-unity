@@ -62,7 +62,7 @@ namespace YGOPortable.UI
                 Vector2.zero, Vector2.zero);
             LotdUiKit.CreateLotdButton(cancel, "Button", "취소 (B)", CloseChoice, 14);
             overlay.gameObject.SetActive(false);
-            _keyboard = new DeckPadKeyboard(root);
+            _keyboard = new DeckPadKeyboard(root, RestorePopupFocus);
         }
 
         internal void OpenText(InputField target)
@@ -72,11 +72,11 @@ namespace YGOPortable.UI
             _returnFocus = target;
             target.DeactivateInputField();
             var keyboard = _useShopPalette?.Invoke() == true
-                ? _shopKeyboard ??= new DeckPadKeyboard(_root, shopColors: true)
+                ? _shopKeyboard ??= new DeckPadKeyboard(_root, RestorePopupFocus, shopColors: true)
                 : _keyboard;
             keyboard.Open(target);
-            _scope = null;
-            SetFocus(null);
+            _scope = keyboard.Scope;
+            Focus(keyboard.DefaultFocus);
         }
 
         internal void FocusInScope(Transform scope, Selectable control)
@@ -156,13 +156,13 @@ namespace YGOPortable.UI
 
         internal void Clear(bool preserveSelection = false)
         {
+            _returnFocus = null;
             if (_choicePanel.gameObject.activeSelf)
             {
                 _choicePanel.gameObject.SetActive(false);
                 _dropdown = null;
             }
             ActiveKeyboard.Close();
-            _returnFocus = null;
             _scope = null;
             SetFocus(null, preserveSelection);
         }
@@ -173,11 +173,21 @@ namespace YGOPortable.UI
             if (IsTyping)
             {
                 var keyboard = ActiveKeyboard;
+                var selected = EventSystem.current?.currentSelectedGameObject?.GetComponent<Selectable>();
+                if (selected != _focus && CanFocus(selected, keyboard.Scope))
+                {
+                    _scope = keyboard.Scope;
+                    Focus(selected);
+                }
                 HandleScope(keyboard.Scope, move, submit, cancel, keyboard.Close, keyboard.DefaultFocus);
                 return true;
             }
             if (_choicePanel.gameObject.activeSelf)
             {
+                var selected = EventSystem.current?.currentSelectedGameObject?.GetComponent<Button>();
+                int row = Array.IndexOf(_choiceButtons, selected);
+                if (row >= 0 && CanFocus(selected, _choicePanel))
+                    _choiceIndex = _firstChoice + row;
                 if (cancel || _dropdown == null || !_dropdown.isActiveAndEnabled)
                     CloseChoice();
                 else if (submit)
@@ -261,15 +271,57 @@ namespace YGOPortable.UI
             {
                 if (!CanFocus(candidate, scope) || candidate == current) continue;
                 var delta = center(candidate) - origin;
-                float forward = Vector2.Dot(direction, delta);
-                if (forward <= 1f) continue;
-                float across = Mathf.Abs(Vector2.Dot(new Vector2(-direction.y, direction.x), delta));
-                float score = forward + 3.5f * across;
+                float score = DirectionScore(direction, delta);
                 if (score >= bestScore) continue;
                 bestScore = score;
                 next = candidate;
             }
             return next;
+        }
+
+        internal static void LimitKeyboardNavigation(Transform scope)
+        {
+            var controls = Array.FindAll(scope.GetComponentsInChildren<Selectable>(), item => CanFocus(item, scope));
+            var positions = new Vector2[controls.Length];
+            for (int i = 0; i < controls.Length; i++)
+            {
+                var rect = (RectTransform)controls[i].transform;
+                positions[i] = scope.InverseTransformPoint(rect.TransformPoint(rect.rect.center));
+            }
+
+            for (int i = 0; i < controls.Length; i++)
+            {
+                controls[i].navigation = new Navigation
+                {
+                    mode = Navigation.Mode.Explicit,
+                    selectOnUp = Neighbor(i, Vector2.up),
+                    selectOnDown = Neighbor(i, Vector2.down),
+                    selectOnLeft = Neighbor(i, Vector2.left),
+                    selectOnRight = Neighbor(i, Vector2.right),
+                };
+            }
+
+            Selectable Neighbor(int from, Vector2 direction)
+            {
+                float best = float.PositiveInfinity;
+                Selectable result = null;
+                for (int i = 0; i < positions.Length; i++)
+                {
+                    float score = DirectionScore(direction, positions[i] - positions[from]);
+                    if (score >= best) continue;
+                    best = score;
+                    result = controls[i];
+                }
+                return result;
+            }
+        }
+
+        private static float DirectionScore(Vector2 direction, Vector2 delta)
+        {
+            float forward = Vector2.Dot(direction, delta);
+            if (forward <= 1f) return float.PositiveInfinity;
+            float across = Mathf.Abs(direction.x * delta.y - direction.y * delta.x);
+            return forward + 3.5f * across;
         }
 
         private void SetFocus(Selectable control, bool preserveSelection = false)
@@ -335,6 +387,7 @@ namespace YGOPortable.UI
             _firstChoice = Mathf.Clamp(_choiceIndex - VisibleChoices / 2, 0, Mathf.Max(0, dropdown.options.Count - VisibleChoices));
             _choicePanel.SetAsLastSibling();
             _choicePanel.gameObject.SetActive(true);
+            _scope = _choicePanel;
             RefreshChoices();
         }
 
@@ -350,6 +403,7 @@ namespace YGOPortable.UI
                 button.transform.parent.gameObject.SetActive(option < _dropdown.options.Count);
                 if (option < _dropdown.options.Count) _choiceLabels[i].text = _dropdown.options[option].text;
             }
+            LimitKeyboardNavigation(_choicePanel);
             SetFocus(_choiceButtons[_choiceIndex - _firstChoice]);
         }
 
@@ -374,6 +428,19 @@ namespace YGOPortable.UI
             SetFocus(null);
             _choicePanel.gameObject.SetActive(false);
             _dropdown = null;
+            RestorePopupFocus();
+        }
+
+        private void RestorePopupFocus()
+        {
+            var target = _returnFocus;
+            if (target == null) return;
+            _returnFocus = null;
+            _scope = null;
+            SetFocus(null);
+            var events = EventSystem.current;
+            if (events != null && !events.alreadySelecting && target.isActiveAndEnabled && target.IsInteractable())
+                events.SetSelectedGameObject(target.gameObject);
         }
     }
 

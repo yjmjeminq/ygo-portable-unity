@@ -59,6 +59,7 @@ namespace YGOPortable.UI
         private Text _filterCount;
         private Button[] _filterButtons;
         private PackFilter _packFilter;
+        private CanvasGroup _shopControls;
         private GameObject _shopDialog;
         private GameObject _dialogWindow;
         private Text _dialogHeading;
@@ -120,9 +121,7 @@ namespace YGOPortable.UI
         internal void CloseShop()
         {
             _openingView?.Hide();
-            _shopDialog.SetActive(false);
-            _purchaseItem = null;
-            _purchaseCount = 0;
+            HideShopDialog();
             _crafting?.Hide();
             _cardLookup.Root.SetActive(false);
             _packContents.Close();
@@ -311,6 +310,7 @@ namespace YGOPortable.UI
             var catalog = new Catalog();
             var root = LotdUiKit.FillRect("Screen_CollectionShop", parent);
             catalog.Root = root.gameObject;
+            _shopControls = root.gameObject.AddComponent<CanvasGroup>();
             PackShopStyle.Backdrop(root);
             PackShopStyle.Header(root, "상점");
             var wallet = Slot("Wallet", root, .716f, .918f, .835f, .969f);
@@ -470,6 +470,8 @@ namespace YGOPortable.UI
         {
             var modal = LotdUiKit.FillRect("ShopDialog", parent);
             _shopDialog = modal.gameObject;
+            // Keep the confirmation navigable while keyboard navigation behind it is blocked.
+            _shopDialog.AddComponent<CanvasGroup>().ignoreParentGroups = true;
             LotdUiKit.AddImage(modal.gameObject, LotdUiKit.WhiteSprite, PackShopStyle.Scrim);
             var box = PackShopStyle.Panel(modal, "Window", new Vector2(.295f, .276f), new Vector2(.705f, .724f));
             _dialogWindow = box.gameObject;
@@ -504,9 +506,7 @@ namespace YGOPortable.UI
                 SetStatus(_shop, error, true);
                 return;
             }
-            _shopDialog.SetActive(false);
-            _purchaseItem = null;
-            _purchaseCount = 0;
+            HideShopDialog();
             RefreshBalance();
             SetStatus(_shop, $"{count}팩 구매 완료   ·   −{count * CollectionProgress.PackCost:N0} DP", false);
             Root.SetActive(false);
@@ -545,6 +545,7 @@ namespace YGOPortable.UI
         private void ShowShopDialog()
         {
             _shop.Search.DeactivateInputField();
+            _shopControls.interactable = false;
             _shopDialog.SetActive(true);
             UiEntranceMotion.Play(_dialogWindow, .75f, .13f);
             EventSystem.current?.SetSelectedGameObject(_dialogCancel.gameObject);
@@ -552,10 +553,16 @@ namespace YGOPortable.UI
 
         private void CloseShopDialog()
         {
+            HideShopDialog();
+            EventSystem.current?.SetSelectedGameObject(_dialogReturn.gameObject);
+        }
+
+        private void HideShopDialog()
+        {
             _shopDialog.SetActive(false);
+            _shopControls.interactable = true;
             _purchaseItem = null;
             _purchaseCount = 0;
-            EventSystem.current?.SetSelectedGameObject(_dialogReturn.gameObject);
         }
 
         private void ReturnFromOpening()

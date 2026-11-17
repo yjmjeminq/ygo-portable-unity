@@ -12,6 +12,7 @@ namespace YGOPortable.UI
         private CompositeCardView _transferCard;
         private CanvasGroup _transferGroup;
         private DeckCardVisualMotion _arrivalMotion;
+        private RectTransform _pointerSlot;
         private RectTransform _hoveredSlot;
         private RectTransform _padVisualSlot;
         private RectTransform _inspectedSource;
@@ -51,7 +52,8 @@ namespace YGOPortable.UI
                 return null;
             Vector2 center = _deckMotionLayer.InverseTransformPoint(rect.TransformPoint(rect.rect.center));
             Vector2 size = _deckMotionLayer.InverseTransformVector(rect.TransformVector(rect.rect.size));
-            return new VisualPose(center, new Vector2(Mathf.Abs(size.x), Mathf.Abs(size.y)));
+            float height = Mathf.Min(Mathf.Abs(size.y), Mathf.Abs(size.x) / LotdUiKit.CardAspectRatio);
+            return new VisualPose(center, new Vector2(height * LotdUiKit.CardAspectRatio, height));
         }
 
         private VisualPose? DropPose(Vector2 screenPoint)
@@ -70,7 +72,13 @@ namespace YGOPortable.UI
         {
             var slots = GetDeckSlots(zone);
             var positions = new VisualPose?[Mathf.Min(count, slots.Count)];
-            for (int i = 0; i < positions.Length; i++) positions[i] = CardPose((RectTransform)slots[i].card.transform);
+            for (int i = 0; i < positions.Length; i++)
+            {
+                var art = (RectTransform)slots[i].card.transform;
+                // A rapid move should continue from the moving artwork that the player can see.
+                positions[i] = CardPose(_transferActive && _arrivalMotion != null && _arrivalMotion.transform == art
+                    ? _transferRect : art);
+            }
             return positions;
         }
 
@@ -81,14 +89,16 @@ namespace YGOPortable.UI
             for (int index = start; index < Mathf.Min(end, slots.Count); index++)
             {
                 int origin = oldIndex(index);
-                if (origin == index || origin < 0 || origin >= oldPositions.Length ||
+                if (origin < 0 || origin >= oldPositions.Length ||
                     !oldPositions[origin].HasValue) continue;
                 var view = slots[index].card;
                 var visual = (RectTransform)view.transform;
                 var position = oldPositions[origin].Value;
                 var current = CardPose(visual);
                 if (!current.HasValue) continue;
-                Vector3 shift = _deckMotionLayer.TransformVector(position.Center - current.Value.Center);
+                Vector2 distance = position.Center - current.Value.Center;
+                if (distance.sqrMagnitude < .04f) continue;
+                Vector3 shift = _deckMotionLayer.TransformVector(distance);
                 var motion = view.GetComponent<DeckCardVisualMotion>();
                 motion.SlideFrom(visual.anchoredPosition + (Vector2)visual.parent.InverseTransformVector(shift));
             }
@@ -172,7 +182,10 @@ namespace YGOPortable.UI
 
         private void SetMouseCardVisual(RectTransform slot, uint code)
         {
+            _pointerSlot = slot;
             if (_padMode) return;
+            if (_deckCardActions.activeSelf || _deckDialog.activeSelf || _cardFilterDialog.activeSelf || _archModalRoot.activeSelf)
+                return;
             if (_hoveredSlot != slot)
             {
                 ClearCardVisual(ref _hoveredSlot);
@@ -185,7 +198,16 @@ namespace YGOPortable.UI
 
         private void ClearMouseCardVisual(RectTransform slot)
         {
+            if (slot == _pointerSlot) _pointerSlot = null;
             if (slot == _hoveredSlot) ClearCardVisual(ref _hoveredSlot);
+        }
+
+        private void RestoreMouseCardVisual()
+        {
+            if (!CardDragManager.ContainsScreenPoint(_pointerSlot, Input.mousePosition)) return;
+            var card = CardVisual(_pointerSlot)?.GetComponent<CompositeCardView>();
+            if (card != null && card.gameObject.activeInHierarchy && card.CurrentCode != 0)
+                SetMouseCardVisual(_pointerSlot, card.CurrentCode);
         }
 
         private void SetPadCardVisual(RectTransform slot, uint code)

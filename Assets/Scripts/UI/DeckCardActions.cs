@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using YGOPortable.Core;
 
@@ -60,6 +61,7 @@ namespace YGOPortable.UI
             string homeName = card.IsExtra ? "엑스트라 덱" : "메인 덱";
             if (source == DragSourceType.Trunk)
             {
+                _trunkScroll.StopMovement();
                 bool canAdd = CanAddCardCopy(code, showReason: false);
                 SetDeckCardAction(_deckCardActionMain, $"{homeName}에 추가",
                     canAdd && CanPlaceCard(card, home, GetDeckList(home), showReason: false),
@@ -80,7 +82,7 @@ namespace YGOPortable.UI
                 SetDeckCardAction(_deckCardActionMain, $"{destinationName}으로 이동",
                     CanPlaceCard(card, destination, target, showReason: false), () =>
                     {
-                        if (StillSelected() && CanPlaceCard(card, destination, target))
+                        if (StillSelected())
                             MoveDeckCard(source, index, destination, target.Count);
                     });
                 SetDeckCardAction(_deckCardActionAlternate, "덱에서 제거", true, () =>
@@ -103,6 +105,7 @@ namespace YGOPortable.UI
             overlay.SetAsLastSibling();
             _deckCardActions.SetActive(true);
             UiEntranceMotion.Play(_deckCardActionPanel.gameObject);
+            EventSystem.current?.SetSelectedGameObject(_deckCardActionDefault.gameObject);
         }
 
         private void SetDeckCardActionNavigation()
@@ -133,7 +136,7 @@ namespace YGOPortable.UI
             button.onClick.RemoveAllListeners();
             button.onClick.AddListener(() =>
             {
-                if (!button.interactable) return;
+                if (!button.isActiveAndEnabled || !button.IsInteractable()) return;
                 LotdAudio.PlayClick();
                 CloseDeckCardActions();
                 action();

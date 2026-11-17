@@ -263,7 +263,6 @@ namespace YGOPortable.UI
                 pull.FaceUp = pull.Flipping = false;
                 pull.FlipAge = 0f;
                 pull.Lift = 0f;
-                pull.Highlighted = false;
                 pull.Face.localScale = Vector3.one;
                 pull.Shine.color = Color.clear;
                 SetFace(pull, pull.Code, true);
@@ -336,7 +335,9 @@ namespace YGOPortable.UI
                 float t = Mathf.Clamp01((_dealAge - i * DealGap) / DealTime);
                 float ease = 1f - (1f - t) * (1f - t);
                 pull.Group.alpha = ease;
-                pull.Button.interactable = t >= 1f;
+                bool arrived = t >= 1f;
+                if (arrived && !pull.Button.interactable && pull.Highlighted) Inspect(i);
+                pull.Button.interactable = arrived;
                 float lift = pull.Highlighted && pull.Button.interactable ? 1f : 0f;
                 pull.Lift = Mathf.MoveTowards(pull.Lift, lift, delta / .13f);
                 pull.Slot.anchoredPosition = Vector2.up *

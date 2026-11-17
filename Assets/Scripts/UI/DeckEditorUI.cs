@@ -69,6 +69,8 @@ namespace YGOPortable.UI
 
         // Archetype Example Deck Browser Modal
         private GameObject _archModalRoot;
+        private GameObject _archReturnFocus;
+        private Button _archCloseButton;
         private InputField _archSearchInp;
         private Text _archSortBtnText;
         private Text _archCountText;
@@ -98,6 +100,8 @@ namespace YGOPortable.UI
         private Text _deckDialogMessage;
         private Button _deckDialogPrimary;
         private Button _deckDialogSecondary;
+        private Button _deckDialogCancel;
+        private GameObject _deckDialogReturnFocus;
 
         private RectTransform _trunkPanel;
         private RectTransform _deckPanel;
@@ -138,14 +142,15 @@ namespace YGOPortable.UI
 
         public void Close()
         {
+            CancelDeckDrag();
             StopPadNavigation();
             EndDeckTransfer();
             ClearCardVisual(ref _hoveredSlot);
-            _inspectedSource = null;
+            _pointerSlot = _inspectedSource = null;
             CloseDeckCardActions();
             CloseDetailedSearch();
-            _deckDialog.SetActive(false);
-            _archModalRoot.SetActive(false);
+            CloseDeckDialog(restoreFocus: false);
+            CloseArchetypeModal(restoreFocus: false);
             Root.SetActive(false);
         }
 
@@ -170,7 +175,7 @@ namespace YGOPortable.UI
 
             if (_deckDialog.activeSelf)
             {
-                if (Input.GetKeyDown(KeyCode.Escape)) _deckDialog.SetActive(false);
+                if (Input.GetKeyDown(KeyCode.Escape)) CloseDeckDialog();
                 return;
             }
             if (_cardFilterDialog.activeSelf && Input.GetKeyDown(KeyCode.Escape))
@@ -180,7 +185,7 @@ namespace YGOPortable.UI
             }
             if (_archModalRoot.activeSelf && Input.GetKeyDown(KeyCode.Escape))
             {
-                _archModalRoot.SetActive(false);
+                CloseArchetypeModal();
                 return;
             }
 
@@ -200,6 +205,7 @@ namespace YGOPortable.UI
 
         private void LoadWorkingDeckFromCurrent()
         {
+            CancelDeckDrag();
             EndDeckTransfer();
             if (DeckRepository.UserDecks.Count == 0)
             {
@@ -757,7 +763,7 @@ namespace YGOPortable.UI
         private void HandleCardDrop(DragContext context)
         {
             if (!Root.activeInHierarchy || _workingDeck == null || _deckDialog.activeSelf ||
-                _deckCardActions.activeSelf || _archModalRoot.activeSelf) return;
+                _deckCardActions.activeSelf || _archModalRoot.activeSelf || _cardFilterDialog.activeSelf) return;
             var destination = FindDropZone(context.DropPosition);
             if (context.SourceType == DragSourceType.Trunk)
             {
@@ -778,8 +784,6 @@ namespace YGOPortable.UI
                 return;
             }
 
-            var target = GetDeckList(destination);
-            if (source != target && !CanPlaceCard(CardDatabase.Get(context.CardCode), destination, target)) return;
             int index = FindHoveredSlotIndex(GetDeckSlots(destination), context.DropPosition);
             MoveDeckCard(context.SourceType, context.SourceIndex, destination, index, context.DropPosition);
         }
@@ -789,20 +793,22 @@ namespace YGOPortable.UI
         {
             var source = GetDeckList(sourceZone);
             var target = GetDeckList(targetZone);
-            if (sourceIndex < 0 || sourceIndex >= source.Count ||
-                (source == target && (targetIndex < 0 || targetIndex == sourceIndex))) return;
+            if (source == null || target == null || sourceIndex < 0 || sourceIndex >= source.Count) return;
+            bool sameZone = source == target;
+            int landing = targetIndex < 0 ? target.Count : Mathf.Min(targetIndex, target.Count - (sameZone ? 1 : 0));
+            if (sameZone && (targetIndex < 0 || landing == sourceIndex)) return;
             uint code = source[sourceIndex];
+            if (!sameZone && !CanPlaceCard(CardDatabase.Get(code), targetZone, target)) return;
             var sourcePositions = CaptureDeckPositions(sourceZone, source.Count);
-            var targetPositions = source == target ? sourcePositions : CaptureDeckPositions(targetZone, target.Count);
+            var targetPositions = sameZone ? sourcePositions : CaptureDeckPositions(targetZone, target.Count);
             var origin = dropPosition.HasValue ? DropPose(dropPosition.Value) :
                 sourceIndex < sourcePositions.Length ? sourcePositions[sourceIndex] : null;
             source.RemoveAt(sourceIndex);
-            int landing = targetIndex < 0 ? target.Count : Mathf.Min(targetIndex, target.Count);
             target.Insert(landing, code);
             FinishDeckEdit();
             if (dropPosition.HasValue && !_padMode) RememberMouseCard(DeckPadArea(targetZone), landing);
 
-            if (source == target)
+            if (sameZone)
             {
                 bool movedForward = sourceIndex < landing;
                 int start = Mathf.Min(sourceIndex, landing);
@@ -828,6 +834,7 @@ namespace YGOPortable.UI
         private void RemoveDeckCard(DragSourceType zone, int index, Vector2? dropPosition = null)
         {
             var cards = GetDeckList(zone);
+            if (cards == null || index < 0 || index >= cards.Count) return;
             uint code = cards[index];
             var positions = CaptureDeckPositions(zone, cards.Count);
             var origin = dropPosition.HasValue ? DropPose(dropPosition.Value) :
@@ -873,10 +880,18 @@ namespace YGOPortable.UI
 
         private void FinishDeckEdit()
         {
+            CancelDeckDrag();
             EndDeckTransfer();
             LotdAudio.PlayClick();
             RefreshDeckGrids();
             UpdateVirtualTrunkSlots(_lastFirstRow, force: true);
+        }
+
+        private static void CancelDeckDrag()
+        {
+            var drag = CardDragManager.Instance;
+            if (drag?.CurrentSource is DragSourceType.Trunk or DragSourceType.DeckMain or DragSourceType.DeckExtra or DragSourceType.DeckSide)
+                drag.CancelDrag();
         }
 
         private static int FindHoveredSlotIndex(List<(RectTransform rt, CompositeCardView card, CardDragTrigger trigger)> slots, Vector2 screenPos)
@@ -936,6 +951,7 @@ namespace YGOPortable.UI
                 destination = card.IsExtra ? DragSourceType.DeckExtra : DragSourceType.DeckMain;
             var target = GetDeckList(destination);
             if (!CanPlaceCard(card, destination, target)) return;
+            if (origin != null && origin.GetComponent<CompositeCardView>()?.CurrentCode != code) origin = null;
             if (origin == null && CardVisual(_inspectedSource) is RectTransform inspected &&
                 inspected.GetComponent<CompositeCardView>().CurrentCode == code)
                 origin = inspected;
@@ -1086,25 +1102,26 @@ namespace YGOPortable.UI
                 "저장 후 계속", () =>
                 {
                     if (!TrySaveCurrentDeck()) return;
-                    _deckDialog.SetActive(false);
+                    CloseDeckDialog();
                     next();
                 },
                 "저장 안 함", () =>
                 {
-                    _deckDialog.SetActive(false);
+                    CloseDeckDialog();
                     next();
                 });
         }
 
         private void SortWorkingDeck()
         {
-            EndDeckTransfer();
             var main = _workingDeck.main.ToArray();
             var extra = _workingDeck.extra.ToArray();
             var side = _workingDeck.side.ToArray();
             var mainPositions = CaptureDeckPositions(DragSourceType.DeckMain, main.Length);
             var extraPositions = CaptureDeckPositions(DragSourceType.DeckExtra, extra.Length);
             var sidePositions = CaptureDeckPositions(DragSourceType.DeckSide, side.Length);
+            CancelDeckDrag();
+            EndDeckTransfer();
             int RankCard(uint code)
             {
                 var c = CardDatabase.Get(code);
@@ -1131,9 +1148,10 @@ namespace YGOPortable.UI
         private void ShuffleWorkingDeck()
         {
             if (_workingDeck.main.Count <= 1) return;
-            EndDeckTransfer();
             var main = _workingDeck.main.ToArray();
             var positions = CaptureDeckPositions(DragSourceType.DeckMain, main.Length);
+            CancelDeckDrag();
+            EndDeckTransfer();
             using (var rng = System.Security.Cryptography.RandomNumberGenerator.Create())
             {
                 byte[] rb = new byte[4];
@@ -1169,7 +1187,7 @@ namespace YGOPortable.UI
                     _deckDialogMessage.text = "덱을 삭제할 수 없습니다. 저장 폴더를 확인하세요.";
                     return;
                 }
-                _deckDialog.SetActive(false);
+                CloseDeckDialog();
                 _userDeckIdx = Mathf.Clamp(_userDeckIdx, 0, DeckRepository.UserDecks.Count - 1);
                 LoadWorkingDeckFromCurrent();
                 ShowToast("덱을 삭제했습니다.");
@@ -1204,7 +1222,7 @@ namespace YGOPortable.UI
                     Vector2.zero, Vector2.zero);
                 return LotdUiKit.CreateLotdButton(holder, "Button", label, action, 15, gold);
             }
-            AddButton("Cancel", "취소", 0.05f, 0.33f, () => _deckDialog.SetActive(false));
+            _deckDialogCancel = AddButton("Cancel", "취소", 0.05f, 0.33f, () => CloseDeckDialog());
             _deckDialogSecondary = AddButton("Secondary", "", 0.36f, 0.64f, null);
             _deckDialogPrimary = AddButton("Primary", "", 0.67f, 0.95f, null, true);
             _deckDialog.SetActive(false);
@@ -1221,6 +1239,7 @@ namespace YGOPortable.UI
                 if (action == null) return;
                 button.onClick.AddListener(() =>
                 {
+                    if (!button.IsInteractable() || !button.isActiveAndEnabled) return;
                     LotdAudio.PlayClick();
                     action();
                 });
@@ -1230,9 +1249,40 @@ namespace YGOPortable.UI
             _deckDialogMessage.text = message;
             SetAction(_deckDialogPrimary, primaryLabel, primary);
             SetAction(_deckDialogSecondary, secondaryLabel, secondary);
+            var events = EventSystem.current;
+            if (!_deckDialog.activeSelf) _deckDialogReturnFocus = events?.currentSelectedGameObject;
             _deckDialog.SetActive(true);
             UiEntranceMotion.Play(_deckDialog);
-            EventSystem.current?.SetSelectedGameObject(null);
+            Button previous = null;
+            foreach (var choice in new[] { _deckDialogCancel, _deckDialogSecondary, _deckDialogPrimary })
+            {
+                if (!choice.gameObject.activeSelf) continue;
+                choice.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnLeft = previous };
+                if (previous != null)
+                {
+                    var navigation = previous.navigation;
+                    navigation.selectOnRight = choice;
+                    previous.navigation = navigation;
+                }
+                previous = choice;
+            }
+            events?.SetSelectedGameObject(_deckDialogCancel.gameObject);
+        }
+
+        private void CloseDeckDialog(bool restoreFocus = true)
+        {
+            if (!_deckDialog.activeSelf) return;
+            var returnFocus = _deckDialogReturnFocus;
+            _deckDialogReturnFocus = null;
+            _deckDialog.SetActive(false);
+            var events = EventSystem.current;
+            if (events == null) return;
+            var selected = events.currentSelectedGameObject;
+            if (restoreFocus && returnFocus != null && returnFocus.TryGetComponent<Selectable>(out var control) &&
+                control.isActiveAndEnabled && control.IsInteractable())
+                events.SetSelectedGameObject(returnFocus);
+            else if (selected != null && selected.transform.IsChildOf(_deckDialog.transform))
+                events.SetSelectedGameObject(null);
         }
 
         // ==================== PURE ARCHETYPE EXAMPLE DECK BROWSER ====================
@@ -1241,7 +1291,9 @@ namespace YGOPortable.UI
             var dim = LotdUiKit.FillRect("Modal_ArchetypeBrowser", parent);
             _archModalRoot = dim.gameObject;
             LotdUiKit.AddImage(dim.gameObject, LotdUiKit.WhiteSprite, new Color(0f, 0.02f, 0.08f, 0.80f));
-            dim.gameObject.AddComponent<Button>().onClick.AddListener(() => _archModalRoot.SetActive(false));
+            var backdrop = dim.gameObject.AddComponent<Button>();
+            backdrop.navigation = new Navigation { mode = Navigation.Mode.None };
+            backdrop.onClick.AddListener(() => CloseArchetypeModal());
 
             var win = LotdUiKit.CreateMenuPanel(dim, "Win",
                 new Vector2(.105f, .075f), new Vector2(.895f, .925f));
@@ -1261,7 +1313,7 @@ namespace YGOPortable.UI
 
             var closeRt = LotdUiKit.CreateRect("Close", hdr, new Vector2(.855f, .20f), new Vector2(.985f, .80f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(closeRt, "B", "닫기", () => _archModalRoot.SetActive(false), 16);
+            _archCloseButton = LotdUiKit.CreateLotdButton(closeRt, "B", "닫기", () => CloseArchetypeModal(), 16);
 
             var filterRow = LotdUiKit.CreateRect("FilterRow", win, new Vector2(.034f, .777f), new Vector2(.966f, .839f),
                 Vector2.zero, Vector2.zero);
@@ -1308,6 +1360,7 @@ namespace YGOPortable.UI
             _archContent.pivot = new Vector2(0f, 1f);
             _archScroll.content = _archContent;
             _archScroll.verticalScrollbar = AddDeckScrollbar(scrollHolder);
+            _archScroll.verticalScrollbar.navigation = new Navigation { mode = Navigation.Mode.None };
             _archScroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
 
             for (int r = 0; r < ArchPoolRows; r++)
@@ -1348,11 +1401,30 @@ namespace YGOPortable.UI
 
         private void OpenArchetypeModal()
         {
+            if (_archModalRoot.activeSelf) return;
             CloseDetailedSearch();
             LotdAudio.PlayClick();
+            var events = EventSystem.current;
+            _archReturnFocus = events?.currentSelectedGameObject;
             _archModalRoot.SetActive(true);
             UiEntranceMotion.Play(_archModalRoot);
             RefreshArchetypeModal();
+            events?.SetSelectedGameObject(_archCloseButton.gameObject);
+        }
+
+        private void CloseArchetypeModal(bool restoreFocus = true)
+        {
+            if (!_archModalRoot.activeSelf) return;
+            _archModalRoot.SetActive(false);
+            var returnFocus = _archReturnFocus;
+            _archReturnFocus = null;
+            var events = EventSystem.current;
+            if (events == null) return;
+            if (restoreFocus && returnFocus != null && returnFocus.TryGetComponent<Selectable>(out var control) &&
+                control.isActiveAndEnabled && control.IsInteractable())
+                events.SetSelectedGameObject(returnFocus);
+            else if (events.currentSelectedGameObject?.transform.IsChildOf(_archModalRoot.transform) == true)
+                events.SetSelectedGameObject(null);
         }
 
         private void RefreshArchetypeModal()
@@ -1456,6 +1528,7 @@ namespace YGOPortable.UI
                     loadBtn.onClick.AddListener(() => ApplyPureArchetypeExampleDeck(arch));
                 }
             }
+            DeckPadUi.LimitKeyboardNavigation(_archModalRoot.transform);
         }
 
         private void BuildPureDeckFromInspectedCard()
@@ -1495,7 +1568,7 @@ namespace YGOPortable.UI
                 extra = extra.Where(TakeOwnedCopy).ToList();
                 if (main.Count + extra.Count == 0)
                 {
-                    _archModalRoot.SetActive(false);
+                    CloseArchetypeModal();
                     ShowToast("이 예시 덱에 넣을 보유 카드가 없습니다.");
                     return;
                 }
@@ -1512,7 +1585,7 @@ namespace YGOPortable.UI
                 SetTrunkSource(archetype: arch);
                 if (arch.representativeCode != 0)
                     InspectCard(arch.representativeCode);
-                _archModalRoot.SetActive(false);
+                CloseArchetypeModal();
                 string action = ownedOnly ? "보유 카드로 구성" : "불러옴";
                 ShowToast($"'{_workingDeck.name}' {action} · 메인 {main.Count}장 / 엑스트라 {extra.Count}장");
             });

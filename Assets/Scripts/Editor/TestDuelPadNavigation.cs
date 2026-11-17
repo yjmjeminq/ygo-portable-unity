@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Linq;
 using System.Reflection;
 using UnityEngine;
@@ -28,7 +29,7 @@ namespace YGOPortable.Editor
         {
             foreach (bool playerFirst in new[] { true, false })
                 VerifyDuel(playerFirst);
-            Debug.Log("[VERIFY DUEL PAD] Both seats passed hand focus/detail, summon and placement, piles during a chain, phase changes, attack, mouse log and pad pause.");
+            Debug.Log("[VERIFY DUEL PAD] Both seats passed hand focus/detail/reflow, summon and placement, piles during a chain, phase changes, attack, mouse log and pad pause.");
         }
 
         private static void VerifyDuel(bool playerFirst)
@@ -79,6 +80,15 @@ namespace YGOPortable.Editor
                 Require(mouseCard.anchoredPosition == hitPosition && mouseCard.localScale == Vector3.one &&
                     mouseArt.anchoredPosition.y > 0f,
                     "Pointer hover moved the card hitbox or did not lift the artwork.");
+                uint originalHoveredCode = mine.hand[0].code;
+                uint reboundCode = originalHoveredCode == Sparkman ? BurstLady : Sparkman;
+                mine.hand[0].code = reboundCode;
+                field.Refresh();
+                Require(Get<uint>(field, "_inspectedCode") == reboundCode &&
+                    Get<uint>(field, "_duelPointerCode") == reboundCode,
+                    "Rebinding the card under a stationary mouse left the old card in the preview.");
+                mine.hand[0].code = originalHoveredCode;
+                field.Refresh();
                 ExecuteEvents.Execute(mouseCard.gameObject, pointer, ExecuteEvents.pointerExitHandler);
                 Invoke(field, "AdvanceDuelPadCardMotions", .5f);
                 Require(mouseArt.anchoredPosition == Vector2.zero && mouseArt.localScale == Vector3.one,
@@ -190,6 +200,8 @@ namespace YGOPortable.Editor
                 Require(field.IsPaused, "The controller did not open pause.");
                 Pad(field, A);
                 Require(!field.IsPaused, "The controller did not resume from pause.");
+
+                VerifyHandArrivalFollowsCard(field, mine, (byte)session.HumanPlayerIndex);
             }
             finally
             {
@@ -202,6 +214,28 @@ namespace YGOPortable.Editor
                 else previousEvents.SetSelectedGameObject(previousFocus);
                 UnityEngine.Object.DestroyImmediate(canvasObject);
             }
+        }
+
+        private static void VerifyHandArrivalFollowsCard(DuelFieldUI field, PlayerFieldSnapshot player, byte controller)
+        {
+            var views = Get<IList>(field, "_myHandViews");
+            RectTransform HandRect(int index)
+            {
+                var view = views[index];
+                return (RectTransform)view.GetType().GetField("Rect").GetValue(view);
+            }
+
+            var arriving = HandRect(1);
+            var neighbor = HandRect(2);
+            var complete = (Action)Invoke(field, "HideUntilArrival", controller, YgoConstants.LOCATION_HAND, 1u);
+            player.hand.RemoveAt(0);
+            Invoke(field, "RemoveHandView", controller, 0u);
+            field.Refresh();
+            Require(HandRect(0) == arriving && !arriving.gameObject.activeSelf && neighbor.gameObject.activeSelf,
+                "When an earlier hand card left, the incoming card's animation hid the wrong card.");
+            complete();
+            Require(arriving.gameObject.activeSelf && neighbor.gameObject.activeSelf,
+                "Completing a shifted hand arrival did not reveal the correct card.");
         }
 
         private static void Advance(DuelSession session, Func<DuelPrompt, bool> stop)
@@ -227,7 +261,7 @@ namespace YGOPortable.Editor
         }
 
         private static T Get<T>(object owner, string name) => (T)owner.GetType().GetField(name, Private).GetValue(owner);
-        private static void Invoke(object owner, string name, params object[] args) => owner.GetType().GetMethod(name, Private).Invoke(owner, args);
+        private static object Invoke(object owner, string name, params object[] args) => owner.GetType().GetMethod(name, Private).Invoke(owner, args);
         private static void Require(bool condition, string message)
         {
             if (!condition) throw new InvalidOperationException("[DUEL PAD] " + message);

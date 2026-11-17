@@ -98,13 +98,11 @@ namespace YGOPortable.Editor
             ui.Field.Refresh();
             ui.Expect(new[] { availableCopy });
 
-            var arrivals = (Dictionary<(byte, uint, uint), int>)typeof(DuelFieldUI)
-                .GetField("_arrivingCards", PrivateInstance).GetValue(ui.Field);
-            arrivals[(player, YgoConstants.LOCATION_HAND, availableCopy)] = 1;
+            var completeArrival = (Action)typeof(DuelFieldUI).GetMethod("HideUntilArrival", PrivateInstance)
+                .Invoke(ui.Field, new object[] { player, YgoConstants.LOCATION_HAND, availableCopy });
             ui.Field.Refresh();
             ui.Expect(Array.Empty<uint>());
-            arrivals.Clear();
-            ui.Field.Refresh();
+            completeArrival();
             ui.Expect(new[] { availableCopy });
 
             SetPrompt(duel, original);

@@ -148,6 +148,7 @@ namespace YGOPortable.UI
             public CardDragTrigger Trigger;
             public (Vector2 min, Vector2 max, float angle) Layout;
             public bool HasLayout;
+            public object PendingArrival;
         }
 
         private DuelPrompt _handGlowPrompt;
@@ -243,7 +244,7 @@ namespace YGOPortable.UI
                 _session = null;
             }
 
-            _arrivingCards.Clear();
+            ClearArrivals();
             _pendingXyzMaterials.Clear();
             Array.Clear(_handCounts, 0, _handCounts.Length);
             _pendingPlaces.Clear();
@@ -252,8 +253,6 @@ namespace YGOPortable.UI
             _preferredAttackTargetSeq = -1;
             _dragHighlightMZone = _dragHighlightSZone = _dragHighlightAttack = false;
             ResetDuelPad();
-            foreach (var view in _myHandViews) view.HasLayout = false;
-            foreach (var view in _oppHandViews) view.HasLayout = false;
             CloseActionPopup();
             CloseDuelLog();
             _modals.CloseZoneViewer();
@@ -977,6 +976,7 @@ namespace YGOPortable.UI
             slot.dragTrigger.DataGetter = canDrag ? () => (con, loc, seq) : null;
             if (!visible) ClearPointerCard(slot.focusArt);
             uint previewCode = visible && (live.IsFaceUp || live.isPublic || !opponent) ? live.code : 0;
+            if (visible) RefreshPointerCard(slot.focusArt, previewCode);
             slot.dragTrigger.OnPointerEnterAction = () => TrackPointerCard(visible ? slot.focusArt : null, previewCode);
             slot.dragTrigger.OnPointerExitAction = () => ClearPointerCard(slot.focusArt);
             slot.dragTrigger.OnRightClick = () => InspectCard(previewCode);
@@ -1030,7 +1030,7 @@ namespace YGOPortable.UI
             for (int i = 0; i < views.Count; i++)
             {
                 var view = views[i];
-                bool visible = i < cards.Count && cards[i] != null && !IsArriving(controller, YgoConstants.LOCATION_HAND, (uint)i);
+                bool visible = i < cards.Count && cards[i] != null && view.PendingArrival == null;
                 if (!visible) ClearPointerCard((RectTransform)view.Card.transform);
                 bool wasVisible = view.Rect.gameObject.activeSelf;
                 view.Rect.gameObject.SetActive(visible);
@@ -1057,6 +1057,7 @@ namespace YGOPortable.UI
                 trigger.CardCodeGetter = actionable ? () => card.code : null;
                 trigger.IndexGetter = actionable ? () => (int)sequence : null;
                 var art = (RectTransform)view.Card.transform;
+                RefreshPointerCard(art, card.code);
                 trigger.OnPointerEnterAction = () => TrackPointerCard(art, card.code);
                 trigger.OnPointerExitAction = () => ClearPointerCard(art);
                 trigger.OnRightClick = () => InspectCard(card.code);
@@ -1625,6 +1626,31 @@ namespace YGOPortable.UI
         private List<HandCardView> GetHandViews(byte controller) =>
             controller == _session.HumanPlayerIndex ? _myHandViews : _oppHandViews;
 
+        private static void ResetHandViews(List<HandCardView> views)
+        {
+            foreach (var view in views)
+            {
+                view.HasLayout = false;
+                view.PendingArrival = null;
+            }
+        }
+
+        private void ClearArrivals()
+        {
+            _arrivingCards.Clear();
+            ResetHandViews(_myHandViews);
+            ResetHandViews(_oppHandViews);
+        }
+
+        private HandCardView EnsureHandView(byte controller, int index)
+        {
+            var views = GetHandViews(controller);
+            bool opponent = controller != _session.HumanPlayerIndex;
+            var row = opponent ? _oppHandBar : _myHandBar;
+            while (views.Count <= index) views.Add(CreateHandCard(row, opponent));
+            return views[index];
+        }
+
         private void RemoveHandView(byte controller, uint sequence)
         {
             var views = GetHandViews(controller);
@@ -1636,6 +1662,7 @@ namespace YGOPortable.UI
             ClearPointerCard(art);
             if (_duelCommandRaisedCard == art) _duelCommandRaisedCard = null;
             view.HasLayout = false;
+            view.PendingArrival = null;
             view.Rect.gameObject.SetActive(false);
         }
 
@@ -1643,9 +1670,7 @@ namespace YGOPortable.UI
         {
             if (sequence >= occupied) return;
             var views = GetHandViews(controller);
-            bool opponent = controller != _session.HumanPlayerIndex;
-            while (views.Count <= occupied) views.Add(CreateHandCard(opponent ? _oppHandBar : _myHandBar, opponent));
-            var view = views[occupied];
+            var view = EnsureHandView(controller, occupied);
             views.RemoveAt(occupied);
             views.Insert((int)sequence, view);
         }
@@ -1667,7 +1692,7 @@ namespace YGOPortable.UI
 
         private static (byte, uint, uint) ArrivalKey(byte controller, uint location, uint sequence)
         {
-            bool indexed = (location & (YgoConstants.LOCATION_HAND | YgoConstants.LOCATION_ONFIELD)) != 0;
+            bool indexed = (location & YgoConstants.LOCATION_ONFIELD) != 0;
             return (controller, location, indexed ? sequence : 0);
         }
 
@@ -1686,12 +1711,25 @@ namespace YGOPortable.UI
             Refresh();
         }
 
-        private (byte, uint, uint) HideUntilArrival(byte controller, uint location, uint sequence)
+        private Action HideUntilArrival(byte controller, uint location, uint sequence)
         {
+            if (location == YgoConstants.LOCATION_HAND)
+            {
+                var view = EnsureHandView(controller, (int)sequence);
+                // The view follows the card when hand indices shift. An old animation must not reveal a reused view.
+                var arrival = new object();
+                view.PendingArrival = arrival;
+                return () =>
+                {
+                    if (view.PendingArrival != arrival) return;
+                    view.PendingArrival = null;
+                    Refresh();
+                };
+            }
             var key = ArrivalKey(controller, location, sequence);
             _arrivingCards.TryGetValue(key, out int pending);
             _arrivingCards[key] = pending + 1;
-            return key;
+            return () => ShowArrival(key);
         }
 
         private bool IsFaceDown(byte controller, uint location, uint position)
@@ -1720,10 +1758,10 @@ namespace YGOPortable.UI
                 // The session masks hidden draws for the other duelist with code zero.
                 flights.Add(new CardFlight(cards[i], from, to, true, cards[i] == 0));
             }
-            var keys = new (byte, uint, uint)[flights.Count];
-            for (int i = 0; i < keys.Length; i++)
-                keys[i] = HideUntilArrival(controller, YgoConstants.LOCATION_HAND, (uint)(first + i));
-            animator.QueueDraw(flights, index => ShowArrival(keys[index]));
+            var arrivals = new Action[flights.Count];
+            for (int i = 0; i < arrivals.Length; i++)
+                arrivals[i] = HideUntilArrival(controller, YgoConstants.LOCATION_HAND, (uint)(first + i));
+            animator.QueueDraw(flights, index => arrivals[index]());
         }
 
         private void HandleCardMovedEvent(CardMoveEvent e)
@@ -1808,12 +1846,12 @@ namespace YGOPortable.UI
                 animator.QueueMove(flight, motion, null);
                 return;
             }
-            var key = HideUntilArrival(e.toCon, e.toLoc, e.toSeq);
+            var onArrival = HideUntilArrival(e.toCon, e.toLoc, e.toSeq);
             if (motion == CardMotion.Transfer &&
                 e.fromLoc is YgoConstants.LOCATION_DECK or YgoConstants.LOCATION_EXTRA &&
                 e.toLoc is YgoConstants.LOCATION_GRAVE or YgoConstants.LOCATION_REMOVED)
-                animator.QueuePileTransfer(flight, () => ShowArrival(key));
-            else animator.QueueMove(flight, motion, () => ShowArrival(key));
+                animator.QueuePileTransfer(flight, onArrival);
+            else animator.QueueMove(flight, motion, onArrival);
         }
 
         private void HandleChainActivatedEvent(ChainLinkInfo link)
@@ -1864,9 +1902,9 @@ namespace YGOPortable.UI
             var from = GetDisplayedCardPose(attacker, location, sequence, card.code);
             if (!from.IsValid) from = resting;
             var hit = AttackTarget(animator, attacker, target, targetLoc, targetSeq);
-            var key = HideUntilArrival(attacker, location, sequence);
+            var arrival = HideUntilArrival(attacker, location, sequence);
             animator.QueueAttack(from, hit, card.code, targetLoc == 0, attacker != _session.HumanPlayerIndex,
-                () => ShowArrival(key), resting);
+                arrival, resting);
         }
 
         private void HandleLifePointsChanged(byte player, int delta, int lifePoints)
@@ -2475,7 +2513,7 @@ namespace YGOPortable.UI
             AddActionRow("항복", () =>
             {
                 CardAnimationManager.Instance?.Clear();
-                _arrivingCards.Clear();
+                ClearArrivals();
                 _session.Surrender(_session.HumanPlayerIndex);
                 CloseActionPopup();
             }, false, "SURRENDER");

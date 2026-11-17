@@ -368,6 +368,9 @@ namespace YGOPortable.Editor
             TestChainChooser.Run();
             TestDuelPadNavigation.Run();
             TestDuelRematch.Run();
+            TestDeckEditing.Run(streaming);
+            TestCollectionProgress.Run(streaming);
+            TestShopModalInput.Run();
 
             AssertTrue(luaErrors.Count == 0, $"Native/Lua error logs detected: {string.Join(" | ", luaErrors.Take(3))}");
 
@@ -478,6 +481,12 @@ namespace YGOPortable.Editor
                 string firstCell = "CharGridPanel/GridArea/CharSlot_0_0";
                 AssertTrue(events.currentSelectedGameObject == ui.Root.transform.Find(firstCell).gameObject,
                     "The opponent controller focus should start on the selected character.");
+                var secondCell = ui.Root.transform.Find("CharGridPanel/GridArea/CharSlot_0_1");
+                var nextOpponent = DeckRepository.Characters.Where(character => character.seriesIdx == 0).ElementAt(1);
+                events.SetSelectedGameObject(secondCell.gameObject);
+                AssertTrue(ui.Root.GetComponentInChildren<CompositeCardView>().CurrentCode ==
+                    DeckRepository.GetDecksForCharacter(nextOpponent.id)[0].sigCard,
+                    "Moving focus to an opponent should update the ace preview before confirmation.");
                 var next = ButtonAt(ui.Root, "CharGridPanel/PageBar/Next/B");
                 Submit(next);
                 var pageOpponent = DeckRepository.Characters.Where(character => character.seriesIdx == 0).ElementAt(15);
@@ -577,11 +586,22 @@ namespace YGOPortable.Editor
                 "Turning an opponent page with the controller should focus its first visible character.");
             Pad("Search");
             var keyboard = layer.Find("PadKeyboard");
-            AssertTrue(keyboard.gameObject.activeSelf, "The opponent search needs a controller keyboard.");
+            var keyboardFocus = events.currentSelectedGameObject?.GetComponent<Selectable>();
+            AssertTrue(keyboard.gameObject.activeSelf && keyboardFocus != null &&
+                keyboardFocus.transform.IsChildOf(keyboard) && keyboardFocus.navigation.mode == Navigation.Mode.Explicit,
+                "Opening the opponent keyboard should move focus into a scoped keyboard immediately.");
+            var keyboardControls = keyboard.GetComponentsInChildren<Selectable>();
+            AssertTrue(keyboardControls.All(control =>
+            {
+                var navigation = control.navigation;
+                return new[] { navigation.selectOnUp, navigation.selectOnDown, navigation.selectOnLeft, navigation.selectOnRight }
+                    .All(neighbor => neighbor == null || neighbor.transform.IsChildOf(keyboard));
+            }), "Native keyboard navigation can escape the opponent search popup.");
             Pad("Submit");
             Pad("Cancel");
-            AssertTrue(!keyboard.gameObject.activeSelf && opponents.Root.activeSelf,
-                "Canceling the opponent search keyboard should stay on opponent selection.");
+            AssertTrue(!keyboard.gameObject.activeSelf && opponents.Root.activeSelf &&
+                events.currentSelectedGameObject == opponents.Root.transform.Find("SearchBox/SearchInput").gameObject,
+                "Canceling the opponent keyboard should immediately restore focus to the search field.");
             Debug.Log("[VERIFY MENU PAD] Pointer-to-controller handoff, Settings, opponent paging and search keyboard passed.");
         }
 

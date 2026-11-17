@@ -389,6 +389,7 @@ namespace YGOPortable.UI
 
         private void ConfirmDisassembly()
         {
+            if (!_reviewRoot.activeInHierarchy) return;
             bool success = CollectionProgress.TryDisassembleCards(_selected, out string error);
             if (success) _selected.Clear();
             ReloadCards();
