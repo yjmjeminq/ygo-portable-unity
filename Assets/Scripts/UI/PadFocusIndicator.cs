@@ -5,8 +5,7 @@ namespace YGOPortable.UI
 {
     internal sealed class PadFocusIndicator : MonoBehaviour
     {
-        private const float SlideDuration = .12f;
-        private const float MaxSlideDistance = 320f;
+        private const float MaxSlideDistance = 475f;
         private static readonly Color TrackColor = new Color(.28f, .79f, .93f, .65f);
         private static readonly Color CornerColor = new Color(1f, .89f, .58f);
 
@@ -38,7 +37,9 @@ namespace YGOPortable.UI
         private FocusPose _displayed;
         private FocusPose _from;
         private float _arrivalTime;
+        private float _slideDuration = .12f;
         private bool _sliding;
+        private bool _fadingOnArrival;
         private float _cornerLength;
 
         internal static PadFocusIndicator Create(Transform parent, string name)
@@ -73,16 +74,17 @@ namespace YGOPortable.UI
                 gameObject.SetActive(true);
             }
             _target = target;
-            if (changed) _arrivalTime = now;
-
             var destination = GetTargetPose();
-            if (!animate || !sameHost)
-                _sliding = false;
-            else if (changed)
+            if (changed)
             {
+                _arrivalTime = now;
                 _from = _displayed;
-                _sliding = (_from.Center - destination.Center).sqrMagnitude <= MaxSlideDistance * MaxSlideDistance;
+                float distance = Vector2.Distance(_from.Center, destination.Center);
+                _slideDuration = Mathf.Lerp(.09f, .165f, Mathf.Clamp01(distance / MaxSlideDistance));
+                _sliding = animate && sameHost && distance <= MaxSlideDistance;
+                _fadingOnArrival = Application.isPlaying && animate && !_sliding;
             }
+            else if (!animate) _sliding = _fadingOnArrival = false;
             Draw(now, destination);
         }
 
@@ -93,7 +95,7 @@ namespace YGOPortable.UI
             if (_home != null) _frame.SetParent(_home, false);
             _target = null;
             _host = null;
-            _sliding = false;
+            _sliding = _fadingOnArrival = false;
         }
 
         internal void SetColors(Color? track = null, Color? corners = null)
@@ -131,7 +133,8 @@ namespace YGOPortable.UI
 
         private void Draw(float now, FocusPose destination)
         {
-            float t = Mathf.Clamp01((now - _arrivalTime) / SlideDuration);
+            float age = Mathf.Max(0f, now - _arrivalTime);
+            float t = Mathf.Clamp01(age / _slideDuration);
             _sliding &= t < 1f;
             if (_sliding)
             {
@@ -149,13 +152,16 @@ namespace YGOPortable.UI
             _frame.anchoredPosition = _displayed.Center;
             _frame.sizeDelta = _displayed.Size;
             _frame.localRotation = Quaternion.Euler(0f, 0f, _displayed.Angle);
-            float pulse = .5f + .5f * Mathf.Sin(now * 5f);
-            float landing = 1f - Mathf.Clamp01((now - _arrivalTime) / .20f);
-            var padding = Vector2.one * (2f + .85f * pulse + 2.4f * landing);
+            float pulse = .5f + .5f * Mathf.Sin(now * 4.2f);
+            float arrival = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(age / .14f));
+            float visibility = _fadingOnArrival ? Mathf.Lerp(.32f, 1f, arrival) : 1f;
+            _fadingOnArrival &= arrival < 1f;
+            float landing = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(age / .22f));
+            var padding = Vector2.one * (2f + .70f * pulse + 1.85f * landing);
             _outline.offsetMin = -padding;
             _outline.offsetMax = padding;
-            _track.alpha = .66f + .30f * pulse;
-            _tips.alpha = .84f + .12f * pulse + .04f * landing;
+            _track.alpha = (.68f + .24f * pulse) * visibility;
+            _tips.alpha = (.85f + .11f * pulse + .04f * landing) * visibility;
 
             float length = Mathf.Clamp(Mathf.Min(_displayed.Size.x, _displayed.Size.y) * .32f, 4f, 15f);
             if (Mathf.Approximately(length, _cornerLength)) return;

@@ -146,6 +146,8 @@ namespace YGOPortable.UI
             public RectTransform FocusArt;
             public Image PlayableGlow;
             public CardDragTrigger Trigger;
+            public (Vector2 min, Vector2 max, float angle) Layout;
+            public bool HasLayout;
         }
 
         private DuelPrompt _handGlowPrompt;
@@ -155,6 +157,9 @@ namespace YGOPortable.UI
         private RectTransform _actionList;
         private RectTransform _actionWindow;
         private Text _actionHeader;
+        private Vector2 _actionWindowTarget;
+        private Vector2 _actionWindowOffset;
+        private float _actionWindowStart = -1f;
 
         public bool IsPresenting => CardAnimationManager.Instance != null && CardAnimationManager.Instance.IsPresenting;
         public bool IsPaused { get; private set; }
@@ -247,6 +252,8 @@ namespace YGOPortable.UI
             _preferredAttackTargetSeq = -1;
             _dragHighlightMZone = _dragHighlightSZone = _dragHighlightAttack = false;
             ResetDuelPad();
+            foreach (var view in _myHandViews) view.HasLayout = false;
+            foreach (var view in _oppHandViews) view.HasLayout = false;
             CloseActionPopup();
             CloseDuelLog();
             _modals.CloseZoneViewer();
@@ -968,12 +975,11 @@ namespace YGOPortable.UI
             slot.dragTrigger.CardCodeGetter = canDrag ? () => live.code : null;
             slot.dragTrigger.IndexGetter = canDrag ? () => (int)seq : null;
             slot.dragTrigger.DataGetter = canDrag ? () => (con, loc, seq) : null;
-            void Inspect()
-            {
-                if (visible && (live.IsFaceUp || live.isPublic || !opponent)) InspectCard(live.code);
-            }
-            slot.dragTrigger.OnPointerEnterAction = Inspect;
-            slot.dragTrigger.OnRightClick = Inspect;
+            if (!visible) ClearPointerCard(slot.focusArt);
+            uint previewCode = visible && (live.IsFaceUp || live.isPublic || !opponent) ? live.code : 0;
+            slot.dragTrigger.OnPointerEnterAction = () => TrackPointerCard(visible ? slot.focusArt : null, previewCode);
+            slot.dragTrigger.OnPointerExitAction = () => ClearPointerCard(slot.focusArt);
+            slot.dragTrigger.OnRightClick = () => InspectCard(previewCode);
             slot.dragTrigger.OnLeftClick = () => OnSlotClicked(con, loc, seq);
 
             bool selected = IsPlacePending(con, loc, seq);
@@ -1025,16 +1031,19 @@ namespace YGOPortable.UI
             {
                 var view = views[i];
                 bool visible = i < cards.Count && cards[i] != null && !IsArriving(controller, YgoConstants.LOCATION_HAND, (uint)i);
+                if (!visible) ClearPointerCard((RectTransform)view.Card.transform);
+                bool wasVisible = view.Rect.gameObject.activeSelf;
                 view.Rect.gameObject.SetActive(visible);
-                if (!visible) continue;
-
-                var bounds = HandCardBounds(row, cards.Count, i, opponent);
-                if (view.Rect.anchorMin != bounds.min || view.Rect.anchorMax != bounds.max)
+                if (!visible)
                 {
-                    view.Rect.anchorMin = bounds.min;
-                    view.Rect.anchorMax = bounds.max;
+                    view.HasLayout = false;
+                    continue;
                 }
-                view.Rect.localRotation = Quaternion.Euler(0f, 0f, bounds.angle);
+
+                view.Layout = HandCardBounds(row, cards.Count, i, opponent);
+                if (!view.HasLayout || !wasVisible || !Application.isPlaying)
+                    ApplyHandLayout(view, 1f);
+                view.HasLayout = true;
 
                 var card = cards[i];
                 uint sequence = (uint)i;
@@ -1047,7 +1056,9 @@ namespace YGOPortable.UI
                 trigger.SourceType = actionable ? DragSourceType.Hand : DragSourceType.None;
                 trigger.CardCodeGetter = actionable ? () => card.code : null;
                 trigger.IndexGetter = actionable ? () => (int)sequence : null;
-                trigger.OnPointerEnterAction = () => InspectCard(card.code);
+                var art = (RectTransform)view.Card.transform;
+                trigger.OnPointerEnterAction = () => TrackPointerCard(art, card.code);
+                trigger.OnPointerExitAction = () => ClearPointerCard(art);
                 trigger.OnRightClick = () => InspectCard(card.code);
                 trigger.OnLeftClick = () =>
                 {
@@ -1055,9 +1066,46 @@ namespace YGOPortable.UI
                     ShowCardActionsPopup(controller, YgoConstants.LOCATION_HAND, sequence, card.code, card.overlayCodes);
                 };
             }
+            UpdateHandDepth(views, opponent ? null : _raisedCard);
             if (!opponent) RefreshHandGlows(force: true);
         }
 
+        private static void UpdateHandDepth(List<HandCardView> views, RectTransform raised)
+        {
+            RectTransform front = null;
+            for (int i = 0; i < views.Count; i++)
+            {
+                var view = views[i];
+                view.Rect.SetSiblingIndex(i);
+                if (view.Card.transform == raised) front = view.Rect;
+            }
+            front?.SetAsLastSibling();
+        }
+
+        private static void ApplyHandLayout(HandCardView view, float step)
+        {
+            var target = view.Layout;
+            var rect = view.Rect;
+            Vector2 min = Vector2.Lerp(rect.anchorMin, target.min, step);
+            Vector2 max = Vector2.Lerp(rect.anchorMax, target.max, step);
+            float angle = Mathf.LerpAngle(rect.localEulerAngles.z, target.angle, step);
+            min = (min - target.min).sqrMagnitude < .00000001f ? target.min : min;
+            max = (max - target.max).sqrMagnitude < .00000001f ? target.max : max;
+            if (rect.anchorMin != min) rect.anchorMin = min;
+            if (rect.anchorMax != max) rect.anchorMax = max;
+            if (Mathf.Abs(Mathf.DeltaAngle(angle, target.angle)) < .02f) angle = target.angle;
+            if (Mathf.Abs(Mathf.DeltaAngle(rect.localEulerAngles.z, angle)) > .001f)
+                rect.localRotation = Quaternion.Euler(0f, 0f, angle);
+        }
+
+        private void AdvanceHandLayout(float dt)
+        {
+            float step = 1f - Mathf.Exp(-20f * dt);
+            foreach (var view in _myHandViews)
+                if (view.HasLayout) ApplyHandLayout(view, step);
+            foreach (var view in _oppHandViews)
+                if (view.HasLayout) ApplyHandLayout(view, step);
+        }
         private void RefreshHandGlows(bool force = false)
         {
             DuelPrompt prompt = CanAcceptPlayerAction && !IsBrowsingZone && !_cardZoomModal.activeSelf && !_phasePicker.activeSelf
@@ -1120,7 +1168,6 @@ namespace YGOPortable.UI
                 glow.pixelsPerUnitMultiplier = original != null ? 1.7f : 1f;
                 outline.gameObject.SetActive(false);
                 trigger = rect.gameObject.AddComponent<CardDragTrigger>();
-                trigger.EnableHoverLift = true;
             }
             return new HandCardView
             {
@@ -1428,7 +1475,7 @@ namespace YGOPortable.UI
             }
             else if (actions.Count > 1)
             {
-                PopulateAndShowActionPopup(CardDatabase.GetName(cardCode), actions, null);
+                ShowCardActionsPopup(me, YgoConstants.LOCATION_HAND, handSeq, cardCode, null, actions: actions);
             }
             else
             {
@@ -1462,7 +1509,7 @@ namespace YGOPortable.UI
             if (actions.Count == 1)
                 ExecuteActionInt(actions[0].responseVal, placement);
             else if (actions.Count > 1)
-                PopulateAndShowActionPopup(CardDatabase.GetName(cardCode), actions, null, placement: placement);
+                ShowCardActionsPopup(con, YgoConstants.LOCATION_HAND, handSeq, cardCode, null, placement, actions);
             else
                 Refresh();
         }
@@ -1548,6 +1595,61 @@ namespace YGOPortable.UI
             return animator.GetPose(rect, center, SlotCardMax - SlotCardMin, angle, scale);
         }
 
+        private CardPose GetDisplayedCardPose(byte controller, uint location, uint sequence, uint code)
+        {
+            CompositeCardView view;
+            RectTransform art;
+            if (location == YgoConstants.LOCATION_HAND)
+            {
+                var views = GetHandViews(controller);
+                if (sequence >= views.Count) return default;
+                var hand = views[(int)sequence];
+                if (!hand.HasLayout) return default;
+                view = hand.Card;
+                art = hand.FocusArt;
+            }
+            else
+            {
+                var slot = GetSlot(controller, location, sequence);
+                if (slot == null || slot.mappedCon != controller || slot.mappedLoc != location || slot.mappedSeq != sequence)
+                    return default;
+                view = slot.cardView;
+                art = slot.focusArt;
+            }
+
+            if (!view.gameObject.activeInHierarchy || code != 0 && view.CurrentCode != 0 && view.CurrentCode != code)
+                return default;
+            return CardAnimationManager.Instance.GetVisualPose(art);
+        }
+
+        private List<HandCardView> GetHandViews(byte controller) =>
+            controller == _session.HumanPlayerIndex ? _myHandViews : _oppHandViews;
+
+        private void RemoveHandView(byte controller, uint sequence)
+        {
+            var views = GetHandViews(controller);
+            if (sequence >= views.Count) return;
+            var view = views[(int)sequence];
+            views.RemoveAt((int)sequence);
+            views.Add(view);
+            var art = (RectTransform)view.Card.transform;
+            ClearPointerCard(art);
+            if (_duelCommandRaisedCard == art) _duelCommandRaisedCard = null;
+            view.HasLayout = false;
+            view.Rect.gameObject.SetActive(false);
+        }
+
+        private void InsertHandView(byte controller, uint sequence, int occupied)
+        {
+            if (sequence >= occupied) return;
+            var views = GetHandViews(controller);
+            bool opponent = controller != _session.HumanPlayerIndex;
+            while (views.Count <= occupied) views.Add(CreateHandCard(opponent ? _oppHandBar : _myHandBar, opponent));
+            var view = views[occupied];
+            views.RemoveAt(occupied);
+            views.Insert((int)sequence, view);
+        }
+
         private FieldSlotView GetSlot(byte con, uint loc, uint seq)
         {
             if (_session == null) return null;
@@ -1631,11 +1733,18 @@ namespace YGOPortable.UI
             if (e.fromLoc == e.toLoc && e.fromCon == e.toCon && e.fromSeq == e.toSeq && e.fromPos == e.toPos) return;
             if (e.fromLoc == YgoConstants.LOCATION_DECK && e.toLoc == YgoConstants.LOCATION_DECK) return;
 
-            var from = GetCardPose(e.fromCon, e.fromLoc, e.fromSeq, e.fromPos);
+            var from = GetDisplayedCardPose(e.fromCon, e.fromLoc, e.fromSeq, e.code);
+            if (!from.IsValid) from = GetCardPose(e.fromCon, e.fromLoc, e.fromSeq, e.fromPos);
             if (e.fromLoc == YgoConstants.LOCATION_HAND && e.fromCon < _handCounts.Length)
+            {
+                if (e.fromSeq < _handCounts[e.fromCon]) RemoveHandView(e.fromCon, e.fromSeq);
                 _handCounts[e.fromCon] = Mathf.Max(0, _handCounts[e.fromCon] - 1);
+            }
             if (e.toLoc == YgoConstants.LOCATION_HAND && e.toCon < _handCounts.Length)
+            {
+                InsertHandView(e.toCon, e.toSeq, _handCounts[e.toCon]);
                 _handCounts[e.toCon]++;
+            }
 
             var to = GetCardPose(e.toCon, e.toLoc, e.toSeq, e.toPos);
             if (!from.IsValid && !to.IsValid) return;
@@ -1738,7 +1847,8 @@ namespace YGOPortable.UI
         {
             var animator = CardAnimationManager.Instance;
             if (animator == null) return;
-            var from = GetCardPose(attacker, location, sequence, YgoConstants.POS_FACEUP_ATTACK);
+            var from = GetDisplayedCardPose(attacker, location, sequence, 0);
+            if (!from.IsValid) from = GetCardPose(attacker, location, sequence, YgoConstants.POS_FACEUP_ATTACK);
             if (from.IsValid)
                 animator.QueueAttackArrow(from.Position, AttackTarget(animator, attacker, target, targetLoc, targetSeq),
                     attacker != _session.HumanPlayerIndex);
@@ -1750,11 +1860,13 @@ namespace YGOPortable.UI
             var card = FindLiveCard(attacker, location, sequence);
             if (animator == null || card == null) return;
 
-            var from = GetCardPose(attacker, location, sequence, card.position);
+            var resting = GetCardPose(attacker, location, sequence, card.position);
+            var from = GetDisplayedCardPose(attacker, location, sequence, card.code);
+            if (!from.IsValid) from = resting;
             var hit = AttackTarget(animator, attacker, target, targetLoc, targetSeq);
             var key = HideUntilArrival(attacker, location, sequence);
             animator.QueueAttack(from, hit, card.code, targetLoc == 0, attacker != _session.HumanPlayerIndex,
-                () => ShowArrival(key));
+                () => ShowArrival(key), resting);
         }
 
         private void HandleLifePointsChanged(byte player, int delta, int lifePoints)
@@ -1797,6 +1909,8 @@ namespace YGOPortable.UI
         {
             if (_session == null || Root == null || !Root.activeSelf) return;
             var session = _session;
+            AdvanceHandLayout(Time.unscaledDeltaTime);
+            AdvanceActionWindow();
             UpdateDuelPad();
             if (_session != session || !Root.activeSelf) return;
             RefreshHandGlows();
@@ -2119,6 +2233,8 @@ namespace YGOPortable.UI
                     resp[i * 3 + 2] = (byte)_pendingPlaces[i].seq;
                 }
                 _pendingPlaces.Clear();
+                if (_usingDuelPad)
+                    _duelPadPlacementFocus = GetSlot(con, loc, seq)?.root;
                 _actionPopup.SetActive(false);
                 _session.SubmitResponse(resp);
                 Refresh();
@@ -2143,14 +2259,22 @@ namespace YGOPortable.UI
             return null;
         }
 
-        private void ShowCardActionsPopup(byte con, uint loc, uint seq, uint code, List<uint> overlays)
+        private void ShowCardActionsPopup(byte con, uint loc, uint seq, uint code, List<uint> overlays,
+            (byte con, uint loc, uint seq)? placement = null,
+            List<(string label, int responseVal, bool gold)> actions = null)
         {
             if (IsPresenting || IsPaused || _session == null) return;
-            var actions = CollectActions(con, loc, seq);
-            var anchor = GetSlot(con, loc, seq)?.root ?? GetStack(con, loc)?.root;
+            actions ??= CollectActions(con, loc, seq);
+            var slot = GetSlot(con, loc, seq);
+            var anchor = slot?.root ?? GetStack(con, loc)?.root;
+            var art = slot?.focusArt;
             if (loc == YgoConstants.LOCATION_HAND && con == _session.HumanPlayerIndex && seq < _myHandViews.Count)
-                anchor = _myHandViews[(int)seq].Rect;
-            PopulateAndShowActionPopup(code == 0 ? "카드 행동" : CardDatabase.GetName(code), actions, overlays, anchor);
+            {
+                var view = _myHandViews[(int)seq];
+                anchor = view.Rect;
+                art = (RectTransform)view.Card.transform;
+            }
+            PopulateAndShowActionPopup(code == 0 ? "카드 행동" : CardDatabase.GetName(code), actions, overlays, anchor, placement, art);
         }
 
         private void ShowZoneActionsPopup(string title, List<(SelectableCardItem item, string label, int responseVal, bool gold)> zoneActions)
@@ -2163,7 +2287,8 @@ namespace YGOPortable.UI
         }
 
         private void PopulateAndShowActionPopup(string header, List<(string label, int responseVal, bool gold)> actions,
-            List<uint> overlays, RectTransform anchor = null, (byte con, uint loc, uint seq)? placement = null)
+            List<uint> overlays, RectTransform anchor = null, (byte con, uint loc, uint seq)? placement = null,
+            RectTransform sourceCard = null)
         {
             bool hasMaterials = overlays != null && overlays.Count > 0;
             if (actions.Count == 0 && !hasMaterials)
@@ -2173,6 +2298,7 @@ namespace YGOPortable.UI
             }
 
             ClearActionRows();
+            _duelCommandRaisedCard = sourceCard;
             _actionHeader.text = header;
             var session = _session;
             var prompt = session.ActivePrompt;
@@ -2223,6 +2349,7 @@ namespace YGOPortable.UI
         private void ClearActionRows()
         {
             HideDuelPadFrame();
+            _duelCommandRaisedCard = null;
             for (int i = _actionList.childCount - 1; i >= 0; i--)
             {
                 var row = _actionList.GetChild(i).gameObject;
@@ -2256,12 +2383,34 @@ namespace YGOPortable.UI
                 center.x = Mathf.Clamp(center.x, parent.rect.xMin + width * 0.5f + 6f, parent.rect.xMax - width * 0.5f - 6f);
                 center.y = Mathf.Clamp(center.y, parent.rect.yMin + height * 0.5f + 6f, parent.rect.yMax - height * 0.5f - 6f);
             }
-            _actionWindow.anchoredPosition = center;
+            _actionWindowTarget = center;
+            _actionWindowOffset = anchor != null
+                ? Vector2.ClampMagnitude((Vector2)parent.InverseTransformPoint(anchor.position) - center, 16f)
+                : Vector2.down * 10f;
+            _actionWindowStart = Application.isPlaying ? Time.unscaledTime : -1f;
+            SetActionWindowProgress(Application.isPlaying ? 0f : 1f);
+            UiEntranceMotion.Play(_actionWindow.gameObject, .62f, .14f);
+        }
+
+        private void AdvanceActionWindow()
+        {
+            if (!_actionPopup.activeSelf || _actionWindowStart < 0f) return;
+            float progress = Mathf.Clamp01((Time.unscaledTime - _actionWindowStart) / .14f);
+            SetActionWindowProgress(progress);
+            if (progress >= 1f) _actionWindowStart = -1f;
+        }
+
+        private void SetActionWindowProgress(float progress)
+        {
+            float eased = 1f - Mathf.Pow(1f - progress, 3f);
+            _actionWindow.anchoredPosition = _actionWindowTarget + _actionWindowOffset * (1f - eased);
+            _actionWindow.localScale = Vector3.one * Mathf.Lerp(.96f, 1f, eased);
         }
 
         private void CloseActionPopup()
         {
             _actionPopup.SetActive(false);
+            _duelCommandRaisedCard = null;
             if (!IsPaused) return;
             IsPaused = false;
             if (CardAnimationManager.Instance != null) CardAnimationManager.Instance.Paused = false;

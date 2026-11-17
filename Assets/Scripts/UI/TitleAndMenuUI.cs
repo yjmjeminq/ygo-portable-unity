@@ -15,10 +15,12 @@ namespace YGOPortable.UI
         private readonly GameAppController _app;
         private CanvasGroup _menuControls;
         private Button _freeDuelButton;
+        private Button _deckEditorButton;
         private Button _shopButton;
         private Text _shopBalance;
         private Button _settingsOpenButton;
         private Button _settingsCloseButton;
+        private GameObject _settingsPanel;
 
         public TitleAndMenuUI(GameAppController app, Transform canvasParent)
         {
@@ -32,6 +34,7 @@ namespace YGOPortable.UI
         {
             _menuControls.interactable = false;
             SettingsRoot.SetActive(true);
+            UiEntranceMotion.Play(_settingsPanel, .57f);
             EventSystem.current?.SetSelectedGameObject(_settingsCloseButton.gameObject);
         }
 
@@ -42,10 +45,15 @@ namespace YGOPortable.UI
             if (restoreFocus) EventSystem.current?.SetSelectedGameObject(_settingsOpenButton.gameObject);
         }
 
-        internal void FocusMainMenu(bool returningFromShop)
+        internal void FocusMainMenu(AppScreen previousScreen)
         {
             _shopBalance.text = $"보유 {CollectionProgress.Balance:N0} DP";
-            var selected = returningFromShop ? _shopButton : _freeDuelButton;
+            var selected = previousScreen switch
+            {
+                AppScreen.CardShop => _shopButton,
+                AppScreen.DeckEditor => _deckEditorButton,
+                _ => _freeDuelButton,
+            };
             EventSystem.current?.SetSelectedGameObject(selected.gameObject);
         }
 
@@ -60,7 +68,8 @@ namespace YGOPortable.UI
             AddLogo(logo);
             var start = LotdUiKit.CreateRect("Start", root, new Vector2(0.375f, 0.205f),
                 new Vector2(0.625f, 0.292f), Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(start, "Button", "게임 시작", () => _app.ShowScreen(AppScreen.MainMenu), 25, true);
+            MenuButtonMotion.Attach(LotdUiKit.CreateLotdButton(start, "Button", "게임 시작",
+                () => _app.ShowScreen(AppScreen.MainMenu), 25, true));
         }
 
         private void BuildMainMenuScreen(Transform parent)
@@ -76,7 +85,7 @@ namespace YGOPortable.UI
             var menu = LotdUiKit.CreateMenuPanel(root, "Menu", new Vector2(.205f, .132f),
                 new Vector2(.538f, .643f));
             _freeDuelButton = AddMenuEntry(menu, "FreeDuel", .745f, "프리 듀얼", () => _app.ShowScreen(AppScreen.OpponentSelect));
-            AddMenuEntry(menu, "DeckEditor", .54f, "덱 편집", () => _app.ShowScreen(AppScreen.DeckEditor));
+            _deckEditorButton = AddMenuEntry(menu, "DeckEditor", .54f, "덱 편집", () => _app.ShowScreen(AppScreen.DeckEditor));
             _settingsOpenButton = AddMenuEntry(menu, "Settings", .335f, "환경 설정", OpenSettings);
             AddMenuEntry(menu, "ReturnToTitle", .13f, "타이틀로 돌아가기", () => _app.ShowScreen(AppScreen.Title));
             BuildShopTile(root);
@@ -95,6 +104,7 @@ namespace YGOPortable.UI
                 LotdAudio.PlayClick();
                 _app.ShowScreen(AppScreen.CardShop);
             });
+            MenuButtonMotion.Attach(_shopButton);
 
             var cardBack = CardArtLoader.GetCardBackSprite();
             var cards = LotdUiKit.CreateRect("Cards", tile, new Vector2(.12f, .385f), new Vector2(.88f, .885f),
@@ -145,7 +155,7 @@ namespace YGOPortable.UI
         {
             var row = LotdUiKit.CreateRect(name, parent, new Vector2(0.097f, y), new Vector2(0.91f, y + .137f),
                 Vector2.zero, Vector2.zero);
-            return LotdUiKit.CreateLotdButton(row, "Button", label, action, 23);
+            return MenuButtonMotion.Attach(LotdUiKit.CreateLotdButton(row, "Button", label, action, 23));
         }
 
         private void BuildSettingsOverlay(Transform parent)
@@ -156,6 +166,7 @@ namespace YGOPortable.UI
 
             var win = LotdUiKit.CreateMenuPanel(bg, "SettingsWin",
                 new Vector2(0.28f, 0.22f), new Vector2(0.72f, 0.78f));
+            _settingsPanel = win.gameObject;
 
             var hdr = LotdUiKit.CreateRect("Hdr", win,
                 new Vector2(0f, 0.84f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);

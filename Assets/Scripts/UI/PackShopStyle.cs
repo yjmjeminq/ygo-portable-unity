@@ -103,6 +103,14 @@ namespace YGOPortable.UI
             if (button is PackShopButtonLabel themed) themed.SetSelected(selected);
         }
 
+        internal static void ShowCardPreview(CompositeCardView visual, uint code)
+        {
+            bool changed = visual.CurrentCode != code;
+            if (changed) visual.SetCard(code);
+            visual.gameObject.SetActive(code != 0);
+            if (changed && code != 0) UiEntranceMotion.Play(visual.gameObject, .72f, .14f);
+        }
+
         internal static Color RarityColor(Core.CardRarity rarity) => rarity switch
         {
             Core.CardRarity.Rare => new Color32(18, 147, 235, 255),
@@ -264,6 +272,7 @@ namespace YGOPortable.UI
         private PackShopStyle.ButtonKind _kind;
         private bool _primary;
         private bool _selected;
+        private PackTileArtMotion _artMotion;
 
         internal Color Normal
         {
@@ -288,6 +297,12 @@ namespace YGOPortable.UI
             ApplyStyle(currentSelectionState);
         }
 
+        internal void SetMovingArtwork(RectTransform artwork)
+        {
+            _artMotion = artwork.gameObject.AddComponent<PackTileArtMotion>();
+            ApplyStyle(currentSelectionState);
+        }
+
         protected override void DoStateTransition(SelectionState state, bool instant)
         {
             base.DoStateTransition(state, instant);
@@ -305,8 +320,41 @@ namespace YGOPortable.UI
             image.sprite = PackShopStyle.ButtonSprite(_kind, _primary, _selected, focused);
             image.color = !enabled ? new Color(.49f, .49f, .52f, .65f)
                 : state == SelectionState.Pressed ? new Color(.82f, .82f, .82f) : Color.white;
+            if (_artMotion != null) _artMotion.Raised = enabled && (_selected || focused);
             Label.color = !enabled ? PackShopStyle.TextMuted : darkLabel ? PackShopStyle.Ink :
                 _kind is PackShopStyle.ButtonKind.OpeningAction or PackShopStyle.ButtonKind.OpeningSkip ? PackShopStyle.TextMuted : _normal;
+        }
+    }
+
+    internal sealed class PackTileArtMotion : MonoBehaviour
+    {
+        internal bool Raised { get; set; }
+        private RectTransform _art;
+        private Vector2 _position;
+        private float _amount;
+
+        private void Awake()
+        {
+            _art = (RectTransform)transform;
+            _position = _art.anchoredPosition;
+        }
+
+        private void Update()
+        {
+            float target = Raised ? 1f : 0f;
+            if (_amount == target) return;
+            _amount = Mathf.MoveTowards(_amount, target, Time.unscaledDeltaTime / .13f);
+            float lift = Mathf.SmoothStep(0f, 1f, _amount);
+            _art.anchoredPosition = _position + Vector2.up * (3.5f * lift);
+            _art.localScale = Vector3.one * (1f + .038f * lift);
+        }
+
+        private void OnDisable()
+        {
+            if (_art == null) return;
+            _amount = 0f;
+            _art.anchoredPosition = _position;
+            _art.localScale = Vector3.one;
         }
     }
 }

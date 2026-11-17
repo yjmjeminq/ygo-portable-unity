@@ -257,8 +257,7 @@ namespace YGOPortable.UI
             if (_selected != entry) _packPage = 0;
             _selected = entry;
             _cardHeading.text = entry?.Name ?? "선택 카드 없음";
-            _preview.gameObject.SetActive(entry != null);
-            _preview.SetCard(entry?.Code ?? 0);
+            PackShopStyle.ShowCardPreview(_preview, entry?.Code ?? 0);
             _cardInfo.text = entry == null ? "" : $"카드 번호 {entry.Code}\n보유 {CollectionProgress.GetOwnedCount(entry.Code)}장";
             ShopRarityBadge.Update(_cardRarity, entry?.Code ?? 0);
             int first = _cardPage * CardsPerPage;
@@ -277,6 +276,7 @@ namespace YGOPortable.UI
             if (page == _packPage) return;
             _packPage = page;
             ShowPackPage();
+            UiEntranceMotion.Play(_packPane.gameObject, .76f, .13f);
             EventSystem.current?.SetSelectedGameObject(_packRows[0].gameObject);
         }
 

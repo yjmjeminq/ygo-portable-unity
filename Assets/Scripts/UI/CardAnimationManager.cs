@@ -156,6 +156,13 @@ namespace YGOPortable.UI
             return new CardPose(center, new Vector2(cardHeight * LotdUiKit.CardAspectRatio, cardHeight), angle);
         }
 
+        internal CardPose GetVisualPose(RectTransform art)
+        {
+            var right = _layer.InverseTransformVector(art.TransformVector(Vector3.right));
+            float angle = Mathf.Atan2(right.y, right.x) * Mathf.Rad2Deg;
+            return GetPose(art, Vector2.one * .5f, Vector2.one, angle);
+        }
+
         internal void QueueDraw(IReadOnlyList<CardFlight> flights, Action<int> onArrive)
         {
             if (flights.Count > 0) QueueStep(FlyCards(flights, onArrive, draw: true));
@@ -208,9 +215,9 @@ namespace YGOPortable.UI
             QueueStep(AttackArrow(from, to, opponent));
         }
 
-        internal void QueueAttack(CardPose from, Vector2 to, uint code, bool direct, bool opponent, Action onFinish)
+        internal void QueueAttack(CardPose from, Vector2 to, uint code, bool direct, bool opponent, Action onFinish, CardPose resting)
         {
-            QueueStep(Attack(from, to, code, direct, opponent, onFinish));
+            QueueStep(Attack(from, to, code, direct, opponent, onFinish, resting));
         }
 
         internal void QueueLifeChange(Vector2 point, int delta, Action onStart)
@@ -513,7 +520,7 @@ namespace YGOPortable.UI
             Destroy(arrow.gameObject);
         }
 
-        private IEnumerator Attack(CardPose from, Vector2 to, uint code, bool direct, bool opponent, Action onFinish)
+        private IEnumerator Attack(CardPose from, Vector2 to, uint code, bool direct, bool opponent, Action onFinish, CardPose resting)
         {
             if (!from.IsValid || code == 0)
             {
@@ -537,7 +544,7 @@ namespace YGOPortable.UI
             Color accent = opponent ? DuelStyle.Opponent : new Color(.38f, 1f, .70f);
             var impact = CreateEffect(DuelEffectKind.Strike, to, Vector2.one * (direct ? 335f : 248f), accent);
             impact.rectTransform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg);
-            var returnFlight = new CardFlight(code, lunge, from, false, false);
+            var returnFlight = new CardFlight(code, lunge, resting.IsValid ? resting : from, false, false);
             yield return Animate(.27f, t =>
             {
                 ApplyFlight(proxy, returnFlight, t, 10f);

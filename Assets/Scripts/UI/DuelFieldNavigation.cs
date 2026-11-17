@@ -40,7 +40,14 @@ namespace YGOPortable.UI
         private RectTransform _duelPadFrameTarget;
         private RectTransform _duelPadFocus;
         private RectTransform _duelPadBoardFocus;
+        private RectTransform _duelPadPlacementFocus;
         private RectTransform _duelPadRaisedCard;
+        private RectTransform _duelPointerRaisedCard;
+        private uint _duelPointerCode;
+        private RectTransform _duelCommandRaisedCard;
+        private RectTransform _raisedCard;
+        private Vector2 _lastDuelPointer;
+        private bool _hasDuelPointerSample;
         private readonly List<(RectTransform Rect, bool InHand)> _duelPadCardMotions =
             new List<(RectTransform, bool)>(4);
         private PadScope _duelPadScope;
@@ -52,7 +59,10 @@ namespace YGOPortable.UI
             _duelPadInput.Reset();
             _duelPadTargets.Clear();
             _duelPadScope = PadScope.None;
-            _duelPadFocus = _duelPadBoardFocus = null;
+            _duelPadFocus = _duelPadBoardFocus = _duelPadPlacementFocus = null;
+            _duelPointerRaisedCard = _duelCommandRaisedCard = _raisedCard = null;
+            _duelPointerCode = 0;
+            _hasDuelPointerSample = false;
             _usingDuelPad = false;
             HideDuelPadFrame();
             ResetDuelPadCardMotions();
@@ -60,10 +70,16 @@ namespace YGOPortable.UI
 
         private void UpdateDuelPad()
         {
-            if (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1))
+            Vector2 pointer = Input.mousePosition;
+            bool pointerMoved = _hasDuelPointerSample && (pointer - _lastDuelPointer).sqrMagnitude > 9f;
+            if (!_hasDuelPointerSample || pointerMoved) _lastDuelPointer = pointer;
+            _hasDuelPointerSample = true;
+            if (_usingDuelPad && (pointerMoved || Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1)))
             {
                 _usingDuelPad = false;
+                _duelPadPlacementFocus = null;
                 HideDuelPadFrame();
+                InspectCard(_duelPointerCode);
                 _hintBannerText.text = _duelPadBoardHint;
             }
             var frame = _duelPadInput.Read(Time.unscaledTime);
@@ -275,6 +291,12 @@ namespace YGOPortable.UI
             if (current >= 0) return current;
             if (scope == PadScope.Board)
             {
+                int placement = FindDuelPadTarget(_duelPadPlacementFocus);
+                if (placement >= 0)
+                {
+                    _duelPadPlacementFocus = null;
+                    return placement;
+                }
                 int saved = FindDuelPadTarget(_duelPadBoardFocus);
                 if (saved >= 0) return saved;
             }
@@ -323,12 +345,7 @@ namespace YGOPortable.UI
                 events.SetSelectedGameObject(target.Rect.gameObject);
             RevealDuelPadTarget(target.Rect);
             var raisedCard = target.HandVisual != null ? target.HandVisual : target.Art;
-            if (_duelPadRaisedCard != raisedCard)
-            {
-                _duelPadRaisedCard = raisedCard;
-                if (raisedCard != null && !_duelPadCardMotions.Exists(motion => motion.Rect == raisedCard))
-                    _duelPadCardMotions.Add((raisedCard, target.HandVisual != null));
-            }
+            _duelPadRaisedCard = raisedCard;
 
             var host = target.Rect.IsChildOf(_modals.ModalRoot.transform)
                 ? (RectTransform)_modals.ModalRoot.transform : (RectTransform)Root.transform;
@@ -352,6 +369,23 @@ namespace YGOPortable.UI
             }
             _hintBannerText.text = _duelPadBoardHint.Length > 0 ? _duelPadBoardHint :
                 scope == PadScope.Board ? "A 선택  X 상세  Y 페이즈  RB 체인  B 정지" : "";
+            if (scope == PadScope.Board && _duelPadPlacementFocus != null)
+            {
+                BuildDuelPadTargets(scope);
+                int placement = FindDuelPadTarget(_duelPadPlacementFocus);
+                if (placement >= 0)
+                {
+                    _duelPadPlacementFocus = null;
+                    SetDuelPadFocus(_duelPadTargets[placement], scope);
+                    return;
+                }
+                if (IsPresenting)
+                {
+                    HideDuelPadFrame();
+                    return;
+                }
+                _duelPadPlacementFocus = null;
+            }
             if (!layoutChanged && _duelPadScope == scope && _duelPadFocus != null &&
                 _duelPadFocus.gameObject.activeInHierarchy) return;
             BuildDuelPadTargets(scope);
@@ -384,7 +418,22 @@ namespace YGOPortable.UI
 
         private void AdvanceDuelPadCardMotions(float dt)
         {
-            float step = 1f - Mathf.Exp(-22f * dt);
+            var raised = _duelPadRaisedCard;
+            if (_actionPopup.activeSelf && _duelCommandRaisedCard != null) raised = _duelCommandRaisedCard;
+            else if (!_usingDuelPad && !_actionPopup.activeSelf && !_phasePicker.activeSelf && !IsReadingLog &&
+                !_cardZoomModal.activeSelf && !_modals.IsPromptOpen && !_modals.IsZoneViewerOpen &&
+                !_modals.ResultRoot.activeSelf && CardDragManager.Instance?.IsDragging != true)
+                raised = _duelPointerRaisedCard;
+
+            if (raised != _raisedCard)
+            {
+                _raisedCard = raised;
+                if (raised != null && !_duelPadCardMotions.Exists(motion => motion.Rect == raised))
+                    _duelPadCardMotions.Add((raised, raised.parent != null && raised.parent.parent == _myHandBar));
+                UpdateHandDepth(_myHandViews, _raisedCard);
+            }
+
+            float step = 1f - Mathf.Exp(-24f * dt);
             for (int i = _duelPadCardMotions.Count - 1; i >= 0; i--)
             {
                 var motion = _duelPadCardMotions[i];
@@ -395,7 +444,7 @@ namespace YGOPortable.UI
                     continue;
                 }
 
-                bool focused = rect == _duelPadRaisedCard && rect.gameObject.activeInHierarchy;
+                bool focused = rect == _raisedCard && rect.gameObject.activeInHierarchy;
                 float focusScale = motion.InHand ? 1.075f : 1.05f;
                 Vector3 scale = Vector3.one * (focused ? focusScale : 1f);
                 Vector3 nextScale = Vector3.Lerp(rect.localScale, scale, step);
@@ -413,6 +462,20 @@ namespace YGOPortable.UI
                 }
                 if (!focused && settled) _duelPadCardMotions.RemoveAt(i);
             }
+        }
+
+        private void ClearPointerCard(RectTransform card)
+        {
+            if (_duelPointerRaisedCard != card) return;
+            _duelPointerRaisedCard = null;
+            _duelPointerCode = 0;
+        }
+
+        private void TrackPointerCard(RectTransform card, uint previewCode)
+        {
+            _duelPointerRaisedCard = card;
+            _duelPointerCode = previewCode;
+            if (!_usingDuelPad) InspectCard(previewCode);
         }
 
         private void ResetDuelPadCardMotions()

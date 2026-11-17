@@ -229,26 +229,33 @@ namespace YGOPortable.UI
             if (screen == AppScreen.OpponentSelect) _oppSelect.Open();
             else if (screen == AppScreen.DeckEditor) _deckEditor.Open();
             else if (screen == AppScreen.StarterSelection)
-            {
                 _collectionShop.OpenStarter();
-                SyncFrontMenuFocus();
-            }
             else if (screen == AppScreen.CardShop)
-            {
                 _collectionShop.OpenShop();
-                SyncFrontMenuFocus();
-            }
             else if (screen == AppScreen.MainMenu)
-            {
-                _titleAndMenu.FocusMainMenu(previousScreen == AppScreen.CardShop);
-                SyncFrontMenuFocus();
-            }
+                _titleAndMenu.FocusMainMenu(previousScreen);
             else if (screen == AppScreen.Title)
             {
                 var first = _titleAndMenu.TitleRoot.GetComponentInChildren<Button>();
                 EventSystem.current?.SetSelectedGameObject(first != null ? first.gameObject : null);
-                SyncFrontMenuFocus();
             }
+
+            if (previousScreen != screen || screen == AppScreen.Title)
+            {
+                var root = screen switch
+                {
+                    AppScreen.Title => _titleAndMenu.TitleRoot,
+                    AppScreen.MainMenu => _titleAndMenu.MenuRoot,
+                    AppScreen.OpponentSelect => _oppSelect.Root,
+                    AppScreen.DeckEditor => _deckEditor.Root,
+                    AppScreen.Duel => _duelField.Root,
+                    AppScreen.StarterSelection => _collectionShop.StarterRoot,
+                    AppScreen.CardShop => _collectionShop.Root,
+                    _ => null,
+                };
+                if (root != null) UiEntranceMotion.Play(root, .67f, .19f);
+            }
+            SyncFrontMenuFocus();
         }
 
         private void CompleteStarterSelection(UserDeck deck)
@@ -479,6 +486,7 @@ namespace YGOPortable.UI
                 AppScreen.Title => _titleAndMenu.TitleRoot,
                 AppScreen.MainMenu => _titleAndMenu.SettingsRoot.activeInHierarchy
                     ? _titleAndMenu.SettingsRoot : _titleAndMenu.MenuRoot,
+                AppScreen.OpponentSelect => _oppSelect.JankenRoot.activeInHierarchy ? _oppSelect.JankenRoot : _oppSelect.Root,
                 AppScreen.StarterSelection => _collectionShop?.StarterRoot,
                 AppScreen.CardShop => _collectionShop?.ActiveShopRoot,
                 _ => null,

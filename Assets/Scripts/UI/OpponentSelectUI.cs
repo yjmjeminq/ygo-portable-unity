@@ -61,6 +61,7 @@ namespace YGOPortable.UI
         private Text _jnkStatusText;
         private Image _jnkPlayerImg;
         private Image _jnkOppImg;
+        private GameObject _jnkPanel;
         private GameObject _jnkHandsRow;
         private GameObject _jnkOrderRow;
         private Button _jnkFirstHand;
@@ -265,7 +266,8 @@ namespace YGOPortable.UI
             // Start Duel Button
             var startRt = LotdUiKit.CreateRect("StartDuelBtn", rightPanel,
                 new Vector2(0.04f, 0.02f), new Vector2(0.96f, 0.095f), Vector2.zero, Vector2.zero);
-            _startDuelButton = LotdUiKit.CreateLotdButton(startRt, "B", "듀얼 시작", OpenJanken, 20, gold: true);
+            _startDuelButton = MenuButtonMotion.Attach(
+                LotdUiKit.CreateLotdButton(startRt, "B", "듀얼 시작", OpenJanken, 20, gold: true));
         }
 
         private void BuildGridSlots(Transform gridArea)
@@ -304,6 +306,14 @@ namespace YGOPortable.UI
 
                     var btn = slot.gameObject.AddComponent<Button>();
                     btn.targetGraphic = bgImg;
+                    int slotIndex = _gridSlots.Count;
+                    btn.onClick.AddListener(() =>
+                    {
+                        LotdAudio.PlayClick();
+                        PreviewCharacter(slotIndex);
+                    });
+                    btn.gameObject.AddComponent<StarterRowFocus>().ShowPreview = () => PreviewCharacter(slotIndex);
+                    MenuButtonMotion.Attach(btn);
                     _gridSlots.Add(slot.gameObject);
                 }
             }
@@ -410,16 +420,17 @@ namespace YGOPortable.UI
                 slot.transform.Find("Cleared").gameObject.SetActive(CollectionProgress.Initialized &&
                     CollectionProgress.IsOpponentCleared(c.id));
 
-                var btn = slot.GetComponent<Button>();
-                btn.onClick.RemoveAllListeners();
-                var captured = c;
-                btn.onClick.AddListener(() =>
-                {
-                    LotdAudio.PlayClick();
-                    SelectCharacter(captured);
-                    RefreshGridPage();
-                });
             }
+        }
+
+        private void PreviewCharacter(int slotIndex)
+        {
+            int index = _page * PageSize + slotIndex;
+            if (!_opponentControls.interactable || index >= _filteredChars.Count) return;
+            var character = _filteredChars[index];
+            if (character.id == _selectedChar?.id) return;
+            SelectCharacter(character);
+            RefreshGridPage();
         }
 
         internal void ChangePage(int delta, bool focusCharacter = false)
@@ -443,6 +454,7 @@ namespace YGOPortable.UI
 
         private void SelectCharacter(OpponentCharacter c, string deckQuery = "")
         {
+            bool changed = c?.id != _selectedChar?.id;
             int? previousDeckId = _selectedChar != null && c?.id == _selectedChar.id &&
                 _selectedCharDeckIdx >= 0 && _selectedCharDeckIdx < _charDecks.Count
                 ? _charDecks[_selectedCharDeckIdx].id : null;
@@ -463,6 +475,7 @@ namespace YGOPortable.UI
                 : Mathf.Max(0, _charDecks.FindIndex(d => MatchesSearch(d.title, deckQuery)));
             _detailBust.sprite = LotdUiKit.LoadOpponentPortrait(c);
             _detailBust.enabled = c != null;
+            if (changed && c != null) UiEntranceMotion.Play(_detailBust.gameObject, .5f, .18f);
             _detailName.text = c?.name ?? "검색 결과 없음";
             _detailBio.text = c == null ? "" : string.IsNullOrWhiteSpace(c.bio)
                 ? $"[{c.seriesName}] 상대 덱 {_totalDeckLevels}개"
@@ -515,7 +528,11 @@ namespace YGOPortable.UI
                 _oppDeckProgress.text = "";
                 _oppDeckNote.text = d.subtitle ?? "";
             }
-            _sigCardPreview.SetCard(d.sigCard);
+            if (_sigCardPreview.CurrentCode != d.sigCard)
+            {
+                _sigCardPreview.SetCard(d.sigCard);
+                UiEntranceMotion.Play(_sigCardPreview.gameObject, .53f, .16f);
+            }
         }
 
         private void CycleMyDeck(int delta)
@@ -523,6 +540,7 @@ namespace YGOPortable.UI
             if (DeckRepository.UserDecks.Count == 0) return;
             _myDeckIdx = (_myDeckIdx + delta + DeckRepository.UserDecks.Count) % DeckRepository.UserDecks.Count;
             UpdateMyDeckLabel();
+            UiEntranceMotion.Play(_myDeckLabel.gameObject);
         }
 
         private void UpdateMyDeckLabel()
@@ -566,6 +584,7 @@ namespace YGOPortable.UI
             _jnkStatusText.text = "선/후공 결정을 위해 가위·바위·보를 선택하세요!";
             _jnkPlayerImg.sprite = LotdUiKit.LoadSprite("LOTD/Janken/jnkn_player_stone_inactive");
             _jnkOppImg.sprite = LotdUiKit.LoadSprite("LOTD/Janken/jnkn_opp_stone_inactive");
+            UiEntranceMotion.Play(_jnkPanel, .56f);
             EventSystem.current?.SetSelectedGameObject(_jnkFirstHand.gameObject);
         }
 
@@ -585,6 +604,7 @@ namespace YGOPortable.UI
             var win = LotdUiKit.CreateBorderedPanel(bg, "JnkWin",
                 new Vector2(0.18f, 0.16f), new Vector2(0.82f, 0.84f), Vector2.zero, Vector2.zero,
                 LotdUiKit.PanelNavy, LotdUiKit.GoldAccent);
+            _jnkPanel = win.gameObject;
 
             var vsBg = LotdUiKit.CreateRect("VsBg", win, new Vector2(0.05f, 0.35f), new Vector2(0.95f, 0.85f), Vector2.zero, Vector2.zero);
             LotdUiKit.AddImage(vsBg.gameObject, LotdUiKit.LoadSprite("LOTD/Janken/vs_background"), new Color(0.8f, 0.9f, 1f, 0.9f), true);
@@ -627,6 +647,8 @@ namespace YGOPortable.UI
             string[] oSprites = { "jnkn_opp_scissor_active", "jnkn_opp_stone_active", "jnkn_opp_paper_active" };
             _jnkPlayerImg.sprite = LotdUiKit.LoadSprite($"LOTD/Janken/{pSprites[playerHand]}");
             _jnkOppImg.sprite = LotdUiKit.LoadSprite($"LOTD/Janken/{oSprites[oppHand]}");
+            UiEntranceMotion.Play(_jnkPlayerImg.gameObject, .44f);
+            UiEntranceMotion.Play(_jnkOppImg.gameObject, .44f);
 
             if (playerHand == oppHand)
             {
@@ -641,6 +663,7 @@ namespace YGOPortable.UI
             secondSlot.anchorMin = new Vector2(playerWon ? 0.53f : 0.265f, 0f);
             secondSlot.anchorMax = new Vector2(playerWon ? 1f : 0.735f, 1f);
             _jnkOrderRow.SetActive(true);
+            UiEntranceMotion.Play(_jnkOrderRow, .58f);
             EventSystem.current?.SetSelectedGameObject((playerWon ? _jnkChooseFirst : _jnkChooseSecond).gameObject);
         }
 

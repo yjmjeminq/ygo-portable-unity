@@ -57,6 +57,7 @@ namespace YGOPortable.UI
         private readonly Button _disassemble;
         private readonly Text _status;
         private readonly GameObject _confirmation;
+        private readonly GameObject _confirmationWindow;
         private readonly Text _confirmTitle;
         private readonly Text _confirmBody;
         private readonly Text _quantityLabel;
@@ -159,6 +160,7 @@ namespace YGOPortable.UI
             _confirmation = modal.gameObject;
             LotdUiKit.AddImage(modal.gameObject, LotdUiKit.WhiteSprite, PackShopStyle.Scrim);
             var window = PackShopStyle.Panel(modal, "Window", new Vector2(.29f, .282f), new Vector2(.71f, .718f));
+            _confirmationWindow = window.gameObject;
             _confirmTitle = Label(window, "Title", "", .09f, .78f, .91f, .92f, 27, TextAnchor.MiddleCenter, PackShopStyle.Accent);
             _confirmBody = Label(window, "Details", "", .085f, .483f, .915f, .751f, 22, TextAnchor.MiddleCenter, PackShopStyle.TextPrimary);
             _minus = AddButton(window, "Minus", "−", .26f, .29f, .39f, .437f, () => ChangeQuantity(-1));
@@ -321,8 +323,7 @@ namespace YGOPortable.UI
             _selected = entry;
             _title.text = entry?.Name ?? "선택 카드 없음";
             _cardStats.text = entry?.Card.FormatStatsLineKR() ?? "";
-            if (_art.CurrentCode != code) _art.SetCard(code);
-            _art.gameObject.SetActive(code != 0);
+            PackShopStyle.ShowCardPreview(_art, code);
             ShopRarityBadge.Update(_rarity, code);
             _craft.interactable = _disassemble.interactable = code != 0;
 
@@ -399,6 +400,7 @@ namespace YGOPortable.UI
             _crafting = crafting;
             _confirmation.SetActive(true);
             RefreshConfirmation();
+            UiEntranceMotion.Play(_confirmationWindow, .75f, .13f);
             Focus(_cancel);
         }
 

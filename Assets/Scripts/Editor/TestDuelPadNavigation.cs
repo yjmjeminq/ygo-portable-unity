@@ -70,6 +70,20 @@ namespace YGOPortable.Editor
                 var enemyField = session.Players[session.AiPlayerIndex];
                 var idle = session.ActivePrompt;
 
+                var mouseCard = field.Root.transform.Find("PlayerHand").GetChild(0) as RectTransform;
+                var mouseArt = (RectTransform)mouseCard.GetComponentInChildren<CompositeCardView>().transform;
+                var pointer = new PointerEventData(events);
+                Vector2 hitPosition = mouseCard.anchoredPosition;
+                ExecuteEvents.Execute(mouseCard.gameObject, pointer, ExecuteEvents.pointerEnterHandler);
+                Invoke(field, "AdvanceDuelPadCardMotions", .06f);
+                Require(mouseCard.anchoredPosition == hitPosition && mouseCard.localScale == Vector3.one &&
+                    mouseArt.anchoredPosition.y > 0f,
+                    "Pointer hover moved the card hitbox or did not lift the artwork.");
+                ExecuteEvents.Execute(mouseCard.gameObject, pointer, ExecuteEvents.pointerExitHandler);
+                Invoke(field, "AdvanceDuelPadCardMotions", .5f);
+                Require(mouseArt.anchoredPosition == Vector2.zero && mouseArt.localScale == Vector3.one,
+                    "Leaving a hovered card did not settle the artwork.");
+
                 Pad(field, LeftShoulder);
                 var initial = Get<RectTransform>(field, "_duelPadFocus");
                 var initialArt = (RectTransform)initial.GetComponentInChildren<CompositeCardView>().transform;
@@ -125,9 +139,15 @@ namespace YGOPortable.Editor
                 modals.HideAll();
 
                 Pad(field, LeftShoulder);
+                var commandCard = Get<RectTransform>(field, "_duelPadFocus");
+                var commandCardArt = (RectTransform)commandCard.GetComponentInChildren<CompositeCardView>().transform;
                 Pad(field, A);
                 Require(Get<GameObject>(field, "_actionPopup").activeSelf && ReferenceEquals(idle, session.ActivePrompt),
                     "Opening command choices should not submit an action.");
+                Invoke(field, "AdvanceDuelPadCardMotions", .12f);
+                Require(commandCardArt.anchoredPosition.y > 0f &&
+                    events.currentSelectedGameObject.transform.IsChildOf(field.Root.transform.Find("CardCommands")),
+                    "Opening the commands detached the active card from its new input focus.");
                 Pad(field, A);
                 Require(session.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_PLACE,
                     "Confirming the first hand command did not reach legal placement.");

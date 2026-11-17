@@ -211,8 +211,7 @@ namespace YGOPortable.UI
                 _descriptionScroll.content.anchoredPosition = Vector2.zero;
             }
             _selectedCode = code;
-            if (_art.CurrentCode != code) _art.SetCard(code);
-            _art.gameObject.SetActive(code != 0);
+            PackShopStyle.ShowCardPreview(_art, code);
             if (_findPacks != null) _findPacks.interactable = code != 0;
 
             int first = _page * PageSize;

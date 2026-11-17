@@ -21,6 +21,7 @@ namespace YGOPortable.UI
         private PadArea _padArea;
         private PadArea _padFocusArea;
         private float _padFocusTrunkOffset;
+        private float? _trunkPadScrollTarget;
         private int _padReorderOrigin = -1;
         private Vector3 _padMousePoint;
         private StandaloneInputModule _deckInputModule;
@@ -70,6 +71,8 @@ namespace YGOPortable.UI
             _padInput.Reset();
             _padUi.Clear(preserveSelection: true);
             _padCardFocus.Hide();
+            ClearCardVisual(ref _padVisualSlot);
+            _trunkPadScrollTarget = null;
             _deckHelpLabel.text = MouseHelp;
             _padMousePoint = Input.mousePosition;
         }
@@ -372,6 +375,8 @@ namespace YGOPortable.UI
             if (_padArea != area)
             {
                 _padReorderOrigin = -1;
+                _trunkPadScrollTarget = null;
+                ClearCardVisual(ref _padVisualSlot);
                 _padUi.Clear();
             }
             _padArea = area;
@@ -404,6 +409,7 @@ namespace YGOPortable.UI
 
         private void RememberMouseCard(PadArea area, int index)
         {
+            if (_padMode) ResetPadMode();
             _padReorderOrigin = -1;
             _padArea = area;
             _padIndices[(int)area] = index;
@@ -455,7 +461,7 @@ namespace YGOPortable.UI
             }
             NavigatePadCards(frame.Direction, stayInArea: true);
             if (!frame.Submit && !frame.Reorder) return;
-            MoveDeckCard(cards, _padReorderOrigin, cards, _padIndices[area]);
+            MoveDeckCard(CurrentPadDeck, _padReorderOrigin, CurrentPadDeck, _padIndices[area]);
             _padReorderOrigin = -1;
             SwitchPadArea(_padArea);
         }
@@ -467,7 +473,7 @@ namespace YGOPortable.UI
 
             if (_padArea == PadArea.Trunk)
             {
-                EnsureTrunkPadVisible(index);
+                EnsureTrunkPadVisible(index, snap: true);
                 int slot = index - _lastFirstRow * TrunkCols;
                 if (slot >= 0 && slot < _trunkPool.Count)
                     ShowDeckCardActions(_trunkPool[slot].rt, DragSourceType.Trunk, index, code);
@@ -485,15 +491,21 @@ namespace YGOPortable.UI
                 if (_trunkResults.Count == 0)
                 {
                     _padCardFocus.Hide();
+                    ClearCardVisual(ref _padVisualSlot);
                     return;
                 }
                 int index = _padIndices[area] = ClampPadIndex(_padIndices[area], _trunkResults.Count);
                 EnsureTrunkPadVisible(index);
+                UpdateTrunkPadScroll(Time.unscaledDeltaTime);
                 int slot = index - _lastFirstRow * TrunkCols;
                 if (slot >= 0 && slot < _trunkPool.Count)
                     ShowPadCardFocus(_trunkPool[slot].rt, _trunkResults[index].code);
                 else
+                {
                     _padCardFocus.Hide();
+                    ClearCardVisual(ref _padVisualSlot);
+                    InspectCard(_trunkResults[index].code);
+                }
                 return;
             }
 
@@ -502,7 +514,7 @@ namespace YGOPortable.UI
             ShowPadCardFocus(GetDeckSlots(CurrentPadDeck)[deckIndex].rt, cards.Count > 0 ? cards[deckIndex] : 0);
         }
 
-        private void EnsureTrunkPadVisible(int index)
+        private void EnsureTrunkPadVisible(int index, bool snap = false)
         {
             float height = _trunkViewport.rect.height;
             if (height <= 0f) return;
@@ -511,10 +523,35 @@ namespace YGOPortable.UI
             float destination = offset;
             if (top < offset) destination = top;
             else if (top + _rowHeight > offset + height) destination = top + _rowHeight - height;
-            if (Mathf.Approximately(offset, destination)) return;
+            _trunkPadScrollTarget = Mathf.Abs(destination - offset) > .05f ? destination : null;
+            if (snap && _trunkPadScrollTarget.HasValue)
+            {
+                SetTrunkPadOffset(destination);
+                _trunkPadScrollTarget = null;
+            }
+        }
+
+        private void UpdateTrunkPadScroll(float dt)
+        {
+            if (!_trunkPadScrollTarget.HasValue) return;
+            float offset = _trunkContent.anchoredPosition.y;
+            float target = _trunkPadScrollTarget.Value;
+            float next = Mathf.Lerp(offset, target, 1f - Mathf.Exp(-26f * dt));
+            if (Mathf.Abs(next - target) < .15f)
+            {
+                next = target;
+                _trunkPadScrollTarget = null;
+            }
+            SetTrunkPadOffset(next);
+        }
+
+        private void SetTrunkPadOffset(float destination)
+        {
+            float height = _trunkViewport.rect.height;
             float max = Mathf.Max(0f, _trunkContent.rect.height - height);
             _trunkScroll.StopMovement();
             _trunkScroll.verticalNormalizedPosition = max > 0f ? 1f - Mathf.Clamp01(destination / max) : 1f;
+            _trunkScrollbar.SetValueWithoutNotify(_trunkScroll.verticalNormalizedPosition);
             OnTrunkScrolled();
         }
 
@@ -530,6 +567,7 @@ namespace YGOPortable.UI
             }
             _padFocusArea = _padArea;
             _padCardFocus.Show(target, inTrunk ? _trunkViewport : _deckPanel, animate);
+            SetPadCardVisual(target, code);
             if (code != 0) InspectCard(code);
         }
 

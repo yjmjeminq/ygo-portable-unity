@@ -60,12 +60,14 @@ namespace YGOPortable.UI
         private Button[] _filterButtons;
         private PackFilter _packFilter;
         private GameObject _shopDialog;
+        private GameObject _dialogWindow;
         private Text _dialogHeading;
         private Text _dialogText;
         private Text _dialogConfirmLabel;
         private Button _dialogCancel;
         private Button _dialogConfirm;
         private Button _dialogReturn;
+        private CatalogItem _purchaseItem;
         private int _purchaseCount;
         private Button _cardLookupButton;
         private Button _viewContentsButton;
@@ -119,6 +121,8 @@ namespace YGOPortable.UI
         {
             _openingView?.Hide();
             _shopDialog.SetActive(false);
+            _purchaseItem = null;
+            _purchaseCount = 0;
             _crafting?.Hide();
             _cardLookup.Root.SetActive(false);
             _packContents.Close();
@@ -358,7 +362,7 @@ namespace YGOPortable.UI
                 button.gameObject.AddComponent<StarterRowFocus>().ShowPreview = () =>
                 {
                     int index = catalog.Page * PageSize + row;
-                    if (index < catalog.Matches.Count && catalog.Selected != catalog.Matches[index])
+                    if (!ShopDialogIsOpen && index < catalog.Matches.Count && catalog.Selected != catalog.Matches[index])
                         Select(catalog, catalog.Matches[index]);
                 };
                 catalog.Rows[i] = button;
@@ -371,6 +375,7 @@ namespace YGOPortable.UI
                 catalog.Labels[i] = title;
                 var art = Slot("PackCover", button.transform, .06f, .238f, .94f, .957f);
                 catalog.PackTiles[i] = LotdUiKit.AddImage(art.gameObject, null, Color.white, true, false);
+                ((PackShopButtonLabel)button).SetMovingArtwork(art);
             }
             catalog.Previous = ShopButton(grid, "Previous", "‹ 이전", .027f, .025f, .235f, .104f, () => ChangePage(catalog, -1));
             catalog.Next = ShopButton(grid, "Next", "다음 ›", .765f, .025f, .973f, .104f, () => ChangePage(catalog, 1));
@@ -467,6 +472,7 @@ namespace YGOPortable.UI
             _shopDialog = modal.gameObject;
             LotdUiKit.AddImage(modal.gameObject, LotdUiKit.WhiteSprite, PackShopStyle.Scrim);
             var box = PackShopStyle.Panel(modal, "Window", new Vector2(.295f, .276f), new Vector2(.705f, .724f));
+            _dialogWindow = box.gameObject;
             _dialogHeading = Label(box, "Heading", "", .07f, .770f, .93f, .931f, 27, TextAnchor.MiddleCenter, PackShopStyle.TextPrimary);
             _dialogText = Label(box, "Details", "", .077f, .310f, .923f, .746f, 22, TextAnchor.MiddleCenter, PackShopStyle.TextMuted);
             _dialogCancel = ShopButton(box, "Cancel", "닫기", .090f, .090f, .475f, .239f, CloseShopDialog);
@@ -488,8 +494,8 @@ namespace YGOPortable.UI
 
         private void BuySelectedPack()
         {
-            if (_shop.Selected == null || OpeningIsOpen || !ShopDialogIsOpen || _purchaseCount == 0) return;
-            var item = _shop.Selected;
+            if (_purchaseItem == null || OpeningIsOpen || !ShopDialogIsOpen || _purchaseCount == 0) return;
+            var item = _purchaseItem;
             int count = _purchaseCount;
             _openingView ??= new PackOpeningView(Root.transform.parent, ReturnFromOpening);
             if (!CollectionProgress.TryBuyPacks(item.Id, count, out var cards, out string error))
@@ -499,21 +505,23 @@ namespace YGOPortable.UI
                 return;
             }
             _shopDialog.SetActive(false);
+            _purchaseItem = null;
             _purchaseCount = 0;
             RefreshBalance();
             SetStatus(_shop, $"{count}팩 구매 완료   ·   −{count * CollectionProgress.PackCost:N0} DP", false);
             Root.SetActive(false);
-            _openingView.Show(_shop.PackCover.sprite, item.Name, cards);
+            _openingView.Show(GetPackCover(item), item.Name, cards);
         }
 
         private void PromptPurchase(int count)
         {
             if (_shop.Selected == null || OpeningIsOpen || ShopDialogIsOpen) return;
+            _purchaseItem = _shop.Selected;
             _purchaseCount = count;
             _dialogReturn = count == 1 ? _shop.Action : _buyBundleButton;
             int cost = count * CollectionProgress.PackCost;
             _dialogHeading.text = "팩 구매 확인";
-            _dialogText.text = $"{_shop.Selected.Name}   ×{count}\n카드 {count * CollectionProgress.CardsPerPack}장\n\n보유 DP   {CollectionProgress.Balance:N0} → {CollectionProgress.Balance - cost:N0}";
+            _dialogText.text = $"{_purchaseItem.Name}   ×{count}\n카드 {count * CollectionProgress.CardsPerPack}장\n\n보유 DP   {CollectionProgress.Balance:N0} → {CollectionProgress.Balance - cost:N0}";
             _dialogConfirmLabel.text = $"구매   {cost:N0} DP";
             _dialogCancel.GetComponentInChildren<Text>().text = "취소";
             _dialogConfirm.gameObject.SetActive(true);
@@ -522,6 +530,7 @@ namespace YGOPortable.UI
 
         private void ShowPackOdds()
         {
+            _purchaseItem = null;
             _purchaseCount = 0;
             _dialogReturn = _oddsButton;
             _dialogHeading.text = "카드 제공 비율";
@@ -537,12 +546,14 @@ namespace YGOPortable.UI
         {
             _shop.Search.DeactivateInputField();
             _shopDialog.SetActive(true);
+            UiEntranceMotion.Play(_dialogWindow, .75f, .13f);
             EventSystem.current?.SetSelectedGameObject(_dialogCancel.gameObject);
         }
 
         private void CloseShopDialog()
         {
             _shopDialog.SetActive(false);
+            _purchaseItem = null;
             _purchaseCount = 0;
             EventSystem.current?.SetSelectedGameObject(_dialogReturn.gameObject);
         }
@@ -628,6 +639,7 @@ namespace YGOPortable.UI
         private void Select(Catalog catalog, CatalogItem item)
         {
             bool starter = catalog == _starter;
+            bool changed = catalog.Selected != item;
             catalog.Selected = item;
             catalog.Heading.text = item?.Name ?? "선택 항목 없음";
             catalog.Details.text = item?.Starter is CollectionStarter choice
@@ -642,6 +654,7 @@ namespace YGOPortable.UI
             {
                 catalog.PackCover.gameObject.SetActive(item != null);
                 catalog.PackCover.sprite = item != null ? GetPackCover(item) : null;
+                if (changed && item != null) UiEntranceMotion.Play(catalog.PackCover.gameObject, .70f, .14f);
             }
             string loadError = CollectionProgress.LoadError;
             if (starter) catalog.Action.interactable = item != null && string.IsNullOrEmpty(loadError);
@@ -723,11 +736,45 @@ namespace YGOPortable.UI
         }
     }
 
-    internal sealed class StarterRowFocus : MonoBehaviour, ISelectHandler
+    internal sealed class StarterRowFocus : MonoBehaviour, ISelectHandler, IDeselectHandler, IPointerEnterHandler, IPointerExitHandler
     {
         internal Action ShowPreview { get; set; }
+        internal Action<bool> ShowHighlight { get; set; }
+        internal bool PreviewOnHover { get; set; }
+        private bool _selected;
+        private bool _hovered;
 
-        public void OnSelect(BaseEventData eventData) => ShowPreview?.Invoke();
+        public void OnSelect(BaseEventData eventData)
+        {
+            _selected = true;
+            ShowPreview?.Invoke();
+            ShowHighlight?.Invoke(true);
+        }
+
+        public void OnDeselect(BaseEventData eventData)
+        {
+            _selected = false;
+            ShowHighlight?.Invoke(_hovered);
+        }
+
+        public void OnPointerEnter(PointerEventData eventData)
+        {
+            _hovered = true;
+            if (PreviewOnHover) ShowPreview?.Invoke();
+            ShowHighlight?.Invoke(true);
+        }
+
+        public void OnPointerExit(PointerEventData eventData)
+        {
+            _hovered = false;
+            ShowHighlight?.Invoke(_selected);
+        }
+
+        private void OnDisable()
+        {
+            _hovered = _selected = false;
+            ShowHighlight?.Invoke(false);
+        }
     }
 
 }

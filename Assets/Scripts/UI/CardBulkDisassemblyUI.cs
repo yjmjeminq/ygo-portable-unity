@@ -269,8 +269,7 @@ namespace YGOPortable.UI
             _inspected = card;
             _cardName.text = card?.Name ?? "분해할 카드가 없습니다";
             uint code = card?.Code ?? 0;
-            if (_art.CurrentCode != code) _art.SetCard(code);
-            _art.gameObject.SetActive(code != 0);
+            PackShopStyle.ShowCardPreview(_art, code);
             ShopRarityBadge.Update(_cardRarity, code);
             RefreshSelection();
         }

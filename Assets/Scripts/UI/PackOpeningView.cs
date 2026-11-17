@@ -28,8 +28,10 @@ namespace YGOPortable.UI
             internal uint Code;
             internal CardRarity Rarity;
             internal float FlipAge;
+            internal float Lift;
             internal bool Flipping;
             internal bool FaceUp;
+            internal bool Highlighted;
         }
 
         private readonly GameObject _root;
@@ -175,6 +177,7 @@ namespace YGOPortable.UI
 
         internal void Back()
         {
+            if (!IsOpen) return;
             if (_opening.activeSelf) _motion.Skip();
             else if (_revealed < _count) FinishResults();
             else if (_packIndex + 1 < _packs.Count) ChangePage(1);
@@ -183,13 +186,14 @@ namespace YGOPortable.UI
 
         internal void ChangePage(int delta)
         {
-            if (_opening.activeSelf || _revealed < _count) return;
+            if (!IsOpen || _opening.activeSelf || _revealed < _count) return;
             int next = Mathf.Clamp(_packIndex + delta, 0, _packs.Count - 1);
             if (next != _packIndex) StartPack(next);
         }
 
         private void SkipBatch()
         {
+            if (!_opening.activeInHierarchy || !_motion.IsPlaying) return;
             _quickBatch = true;
             _motion.Skip();
             FinishResults();
@@ -206,7 +210,6 @@ namespace YGOPortable.UI
             button.targetGraphic = clickArea;
             button.transition = Selectable.Transition.None;
             button.onClick.AddListener(() => SelectCard(index));
-            button.gameObject.AddComponent<StarterRowFocus>().ShowPreview = () => Inspect(index);
 
             var face = LotdUiKit.FillRect("Face", buttonBounds);
             var shineRect = LotdUiKit.FillRect("Shine", face);
@@ -221,7 +224,7 @@ namespace YGOPortable.UI
             // The tint overlays the card front briefly at the midpoint of the flip.
             shineRect.SetAsLastSibling();
 
-            return new Pull
+            var pull = new Pull
             {
                 Slot = slot,
                 Group = group,
@@ -233,6 +236,19 @@ namespace YGOPortable.UI
                 RarityLabel = ShopRarityBadge.Create(slot, new Vector2(.74f, .927f), new Vector2(.987f, 1.013f), 15),
                 Shine = shine,
             };
+            var focus = button.gameObject.AddComponent<StarterRowFocus>();
+            focus.PreviewOnHover = true;
+            focus.ShowPreview = () =>
+            {
+                if (pull.Button.IsInteractable()) Inspect(index);
+            };
+            focus.ShowHighlight = highlighted =>
+            {
+                if (highlighted == pull.Highlighted) return;
+                pull.Highlighted = highlighted;
+                if (_results.activeInHierarchy) _playback.enabled = true;
+            };
+            return pull;
         }
 
         private void ShowResults()
@@ -246,6 +262,8 @@ namespace YGOPortable.UI
                 if (i >= _count) continue;
                 pull.FaceUp = pull.Flipping = false;
                 pull.FlipAge = 0f;
+                pull.Lift = 0f;
+                pull.Highlighted = false;
                 pull.Face.localScale = Vector3.one;
                 pull.Shine.color = Color.clear;
                 SetFace(pull, pull.Code, true);
@@ -260,9 +278,10 @@ namespace YGOPortable.UI
 
         private void SelectCard(int index)
         {
-            Inspect(index);
             var pull = _pulls[index];
-            if (pull.Flipping || pull.FaceUp) return;
+            if (!_results.activeInHierarchy || !pull.Button.IsInteractable()) return;
+            Inspect(index);
+            if (pull.FaceUp || (pull.Flipping && pull.FlipAge >= 0f)) return;
             pull.Flipping = true;
             pull.FlipAge = 0f;
             _playback.enabled = true;
@@ -270,6 +289,7 @@ namespace YGOPortable.UI
 
         private void RevealAll()
         {
+            if (!_results.activeInHierarchy || _revealed >= _count) return;
             if (_allQueued)
             {
                 FinishResults();
@@ -281,6 +301,7 @@ namespace YGOPortable.UI
             {
                 var pull = _pulls[i];
                 if (pull.FaceUp || pull.Flipping) continue;
+                delay = Mathf.Max(delay, DealTime + i * DealGap - _dealAge);
                 pull.Flipping = true;
                 pull.FlipAge = -delay;
                 delay += FlipGap;
@@ -314,9 +335,13 @@ namespace YGOPortable.UI
                 var pull = _pulls[i];
                 float t = Mathf.Clamp01((_dealAge - i * DealGap) / DealTime);
                 float ease = 1f - (1f - t) * (1f - t);
-                pull.Slot.anchoredPosition = Vector2.down * (36f * (1f - ease));
                 pull.Group.alpha = ease;
                 pull.Button.interactable = t >= 1f;
+                float lift = pull.Highlighted && pull.Button.interactable ? 1f : 0f;
+                pull.Lift = Mathf.MoveTowards(pull.Lift, lift, delta / .13f);
+                pull.Slot.anchoredPosition = Vector2.up *
+                    (6f * Mathf.SmoothStep(0f, 1f, pull.Lift) - 36f * (1f - ease));
+                motionActive |= pull.Lift != lift;
                 if (pull.Flipping)
                 {
                     UpdateFlip(pull, delta);

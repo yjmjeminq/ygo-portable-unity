@@ -438,6 +438,7 @@ namespace YGOPortable.UI
             _kindFilter.interactable = false;
             _deckPanel.gameObject.SetActive(false);
             _cardFilterDialog.SetActive(true);
+            UiEntranceMotion.Play(_cardFilterDialog);
             ShowDetailedFacet(Facet.Kind);
             RefreshDetailedDraft();
         }

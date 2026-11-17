@@ -63,10 +63,10 @@ namespace YGOPortable.UI
                 bool canAdd = CanAddCardCopy(code, showReason: false);
                 SetDeckCardAction(_deckCardActionMain, $"{homeName}에 추가",
                     canAdd && CanPlaceCard(card, home, GetDeckList(home), showReason: false),
-                    () => TryAddCardToDeck(code, home));
+                    () => TryAddCardToDeck(code, home, CardVisual(anchor)));
                 SetDeckCardAction(_deckCardActionAlternate, "사이드 덱에 추가",
                     canAdd && CanPlaceCard(card, DragSourceType.DeckSide, _workingDeck.side, showReason: false),
-                    () => TryAddCardToDeck(code, DragSourceType.DeckSide));
+                    () => TryAddCardToDeck(code, DragSourceType.DeckSide, CardVisual(anchor)));
             }
             else
             {
@@ -81,13 +81,12 @@ namespace YGOPortable.UI
                     CanPlaceCard(card, destination, target, showReason: false), () =>
                     {
                         if (StillSelected() && CanPlaceCard(card, destination, target))
-                            MoveDeckCard(sourceCards, index, target, target.Count);
+                            MoveDeckCard(source, index, destination, target.Count);
                     });
                 SetDeckCardAction(_deckCardActionAlternate, "덱에서 제거", true, () =>
                 {
                     if (!StillSelected()) return;
-                    sourceCards.RemoveAt(index);
-                    FinishDeckEdit();
+                    RemoveDeckCard(source, index);
                 });
             }
 
@@ -103,6 +102,7 @@ namespace YGOPortable.UI
             PositionDeckCardActions(anchor, overlay);
             overlay.SetAsLastSibling();
             _deckCardActions.SetActive(true);
+            UiEntranceMotion.Play(_deckCardActionPanel.gameObject);
         }
 
         private void SetDeckCardActionNavigation()

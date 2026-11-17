@@ -312,7 +312,11 @@ namespace YGOPortable.UI
             LotdAudio.PlayClick();
             SetFieldView(!IsShowingField);
             if (IsShowingField) SetFocus(_fieldViewButton.gameObject);
-            else FocusPrompt();
+            else
+            {
+                UiEntranceMotion.Play((_chainPrompt ? _chainBox : _modalBox).gameObject);
+                FocusPrompt();
+            }
         }
 
         private void SetFieldView(bool showing)
@@ -483,6 +487,7 @@ namespace YGOPortable.UI
             SetFieldView(false);
             ModalRoot.transform.SetAsLastSibling();
             ModalRoot.SetActive(true);
+            UiEntranceMotion.Play((_chainPrompt ? _chainBox : _modalBox).gameObject);
             CardAnimationManager.Instance?.BringToFront();
 
             if (_chainPrompt)
@@ -1414,6 +1419,7 @@ namespace YGOPortable.UI
             PrepareFocusControls(ZoneViewRoot.transform, CloseZoneViewer);
             Canvas.ForceUpdateCanvases();
             SetFocus(FirstFocus(_zoneGrid)?.gameObject ?? _zoneClose.gameObject);
+            UiEntranceMotion.Play(ZoneViewRoot, duration: .13f);
         }
 
         private void AddZoneCardTile(
@@ -1545,6 +1551,7 @@ namespace YGOPortable.UI
             CardAnimationManager.Instance?.BringToFront();
             PrepareFocusControls(ResultRoot.transform, TriggerMenu);
             SetFocus(_rematchButton.gameObject);
+            UiEntranceMotion.Play(ResultRoot, duration: .22f);
         }
 
         // ==================== UI HELPERS ====================
