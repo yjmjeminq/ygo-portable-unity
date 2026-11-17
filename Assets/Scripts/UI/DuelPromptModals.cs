@@ -523,7 +523,7 @@ namespace YGOPortable.UI
                     break;
                 case YgoConstants.MSG_SORT_CARD:
                 case YgoConstants.MSG_SORT_CHAIN:
-                    RenderSortCards(prompt);
+                    RenderSortCards(session, prompt);
                     break;
                 case YgoConstants.MSG_ANNOUNCE_RACE:
                     RenderAnnounceRace(prompt);
@@ -1055,41 +1055,84 @@ namespace YGOPortable.UI
             _confirmBtn.interactable = sum == _curPrompt.min;
         }
 
-        private void RenderSortCards(DuelPrompt p)
+        private void RenderSortCards(DuelSession session, DuelPrompt p)
         {
-            _modalTitle.text = p.isChainSort ? "효과 처리 순서 지정" : "덱/카드 배치 순서 지정";
-            _modalSubtitle.text = "카드의 순서를 조정하거나 기본 순서로 확정하세요.";
+            // The core sends top cards in descending sequence and bottom cards in ascending sequence.
+            bool deckOrder = !p.isChainSort && p.candidates.Count > 1 &&
+                p.candidates.All(card => card.location == YgoConstants.LOCATION_DECK &&
+                    card.controller == p.candidates[0].controller) &&
+                p.candidates[0].sequence != p.candidates[p.candidates.Count - 1].sequence;
+            string deckEdge = deckOrder && p.candidates[0].sequence < p.candidates[p.candidates.Count - 1].sequence
+                ? "아래" : "위";
+            string deckName = deckOrder && p.candidates[0].controller != session.HumanPlayerIndex ? "상대 덱" : "덱";
+            _modalTitle.text = p.isChainSort ? "체인에 올릴 순서" :
+                deckOrder ? $"{deckName} {deckEdge}쪽 카드 순서" : "카드 순서 지정";
+            _modalSubtitle.text = p.isChainSort ? "왼쪽부터 발동 · 오른쪽부터 처리" :
+                deckOrder ? $"왼쪽이 덱 맨 {deckEdge} · 화살표로 카드 이동" : "왼쪽부터 1번 · 화살표로 카드 이동";
             _sortOrder = Enumerable.Range(0, p.candidates.Count).ToArray();
 
             RectTransform grid = BuildChoiceCardStrip(p.candidates.Count);
-            void RebuildTiles(int focusPosition = -1)
+            var scroll = grid.GetComponentInParent<ScrollRect>();
+            void RebuildTiles(int focusPosition = -1, int focusDirection = 0)
             {
                 ClearChildren(grid);
                 Button restore = null;
 
                 for (int pos = 0; pos < _sortOrder.Length; pos++)
                 {
-                    int curPos = pos;
-                    int origIdx = _sortOrder[pos];
-                    var c = p.candidates[origIdx];
+                    int position = pos;
+                    uint code = p.candidates[_sortOrder[pos]].code;
                     var tile = CreateCardStripTile(grid, $"Sort_{pos}", ChoiceCardWidth);
-                    var cRt = LotdUiKit.CreateRect("Card", tile, new Vector2(0.10f, 0.25f), new Vector2(0.90f, 0.94f), Vector2.zero, Vector2.zero);
-                    CompositeCardView.Create(cRt, "V", false, duelArtwork: true).SetCard(c.code);
-                    LotdUiKit.AddText(LotdUiKit.CreateRect("Ord", tile, new Vector2(0.05f, 0.14f), new Vector2(0.95f, 0.25f), Vector2.zero, Vector2.zero),
-                        "O", $"순서 #{pos + 1}", 14, TextAnchor.MiddleCenter, DuelStyle.Gold, FontStyle.Bold);
+                    string rank = p.isChainSort ? $"발동 {pos + 1} · 처리 {_sortOrder.Length - pos}" :
+                        deckOrder && pos == 0 ? $"1번 · 맨 {deckEdge}" : $"{pos + 1}번";
+                    var order = LotdUiKit.CreateRect("Order", tile, new Vector2(.042f, .805f),
+                        new Vector2(.958f, .966f), Vector2.zero, Vector2.zero);
+                    LotdUiKit.AddImage(order.gameObject, LotdUiKit.WhiteSprite, DuelStyle.HeaderColor, false, false);
+                    LotdUiKit.AddFittedText(order, "Text", rank, 16, 9, TextAnchor.MiddleCenter,
+                        pos == 0 && !p.isChainSort ? DuelStyle.Gold : LotdUiKit.TextPrimary, FontStyle.Bold);
 
-                    var swapRt = LotdUiKit.CreateRect("Swap", tile, new Vector2(0.10f, 0.03f), new Vector2(0.90f, 0.13f), Vector2.zero, Vector2.zero);
-                    var swap = DuelStyle.Button(swapRt, "B", curPos > 0 ? "◀ 앞으로" : "▶ 뒤로", () =>
+                    var art = LotdUiKit.CreateRect("Card", tile, new Vector2(.08f, .219f),
+                        new Vector2(.92f, .79f), Vector2.zero, Vector2.zero);
+                    CompositeCardView.Create(art, "V", false, duelArtwork: true).SetCard(code, faceDown: code == 0);
+
+                    Button MoveButton(int direction)
                     {
-                        int other = curPos > 0 ? curPos - 1 : Mathf.Min(curPos + 1, _sortOrder.Length - 1);
-                        int tmp = _sortOrder[curPos];
-                        _sortOrder[curPos] = _sortOrder[other];
-                        _sortOrder[other] = tmp;
-                        RebuildTiles(other);
-                    }, 12);
-                    swap.interactable = _sortOrder.Length > 1;
-                    PreviewOnFocus(swap, c.code);
-                    if (pos == focusPosition) restore = swap;
+                        bool left = direction < 0;
+                        int other = position + direction;
+                        var holder = LotdUiKit.CreateRect(left ? "Earlier" : "Later", tile,
+                            new Vector2(left ? .07f : .53f, .031f), new Vector2(left ? .47f : .93f, .196f),
+                            Vector2.zero, Vector2.zero);
+                        var sprite = LotdUiKit.LoadSprite(left ? "LOTD/Shared/arrow_left1" : "LOTD/Shared/arrow_right1");
+                        var button = DuelStyle.Button(holder, "B", sprite != null ? "" : left ? "◀" : "▶", () =>
+                        {
+                            if (!CanAnswerPrompt || !ReferenceEquals(_curPrompt, p) ||
+                                other < 0 || other >= _sortOrder.Length) return;
+                            (_sortOrder[position], _sortOrder[other]) = (_sortOrder[other], _sortOrder[position]);
+                            RebuildTiles(other, direction);
+                        }, 15);
+                        button.interactable = other >= 0 && other < _sortOrder.Length;
+                        if (sprite != null)
+                        {
+                            var icon = LotdUiKit.CreateRect("Arrow", button.transform, new Vector2(.23f, .12f),
+                                new Vector2(.77f, .88f), Vector2.zero, Vector2.zero);
+                            LotdUiKit.AddImage(icon.gameObject, sprite,
+                                button.interactable ? Color.white : new Color(1f, 1f, 1f, .26f), true, false);
+                        }
+                        SelectionHandler(button).OnSelected = () =>
+                        {
+                            RevealSortCard(scroll, tile);
+                            if (code != 0) _onInspectCard?.Invoke(code);
+                        };
+                        return button;
+                    }
+
+                    var earlier = MoveButton(-1);
+                    var later = MoveButton(1);
+                    if (pos == focusPosition)
+                    {
+                        var preferred = focusDirection < 0 ? earlier : later;
+                        restore = preferred.interactable ? preferred : focusDirection < 0 ? later : earlier;
+                    }
                 }
                 PrepareFocusControls(grid, OnModalCloseClicked);
                 if (restore != null)
@@ -1106,7 +1149,22 @@ namespace YGOPortable.UI
                 for (int i = 0; i < _sortOrder.Length; i++) res[_sortOrder[i]] = (byte)i;
                 Submit(res);
             }, true);
-            AddFooterButton("기본 순서", () => Submit(new byte[] { unchecked((byte)-1) }), false);
+            AddFooterButton("원래 순서로 확정", () => Submit(new byte[] { unchecked((byte)-1) }), false);
+        }
+
+        private static void RevealSortCard(ScrollRect scroll, RectTransform tile)
+        {
+            var viewport = scroll.viewport;
+            float width = viewport.rect.width;
+            if (width <= 0f || scroll.content.rect.width <= width) return;
+
+            float left = viewport.InverseTransformPoint(tile.TransformPoint(tile.rect.min)).x;
+            float right = viewport.InverseTransformPoint(tile.TransformPoint(tile.rect.max)).x;
+            float shift = left < viewport.rect.xMin ? viewport.rect.xMin - left :
+                right > viewport.rect.xMax ? viewport.rect.xMax - right : 0f;
+            if (Mathf.Abs(shift) < .1f) return;
+            scroll.StopMovement();
+            scroll.horizontalNormalizedPosition -= shift / (scroll.content.rect.width - width);
         }
 
         private void RenderAnnounceRace(DuelPrompt p)

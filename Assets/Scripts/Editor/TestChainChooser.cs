@@ -324,12 +324,28 @@ namespace YGOPortable.Editor
                 sort.candidates.Add(new SelectableCardItem { code = LadyLabrynth });
                 sort.candidates.Add(new SelectableCardItem { code = dragon });
                 modals.ShowPrompt(duel, sort);
+                var firstRank = page.Find("Body/Cards/Viewport/Content/Sort_0/Order/Text").GetComponent<Text>();
+                Require(firstRank.text == "발동 1 · 처리 2", "Chain order did not distinguish activation from resolution.");
                 Pad(modals, button: "Submit");
                 Require(events.currentSelectedGameObject.transform.parent.parent.name == "Sort_1",
                     "Reordering cards did not move pad focus with the moved card.");
                 events.SetSelectedGameObject(page.Find("Footer/Btn_순서 확정/B").gameObject);
                 Pad(modals, button: "Submit");
                 Require(responses.Count == 1 && responses[0].SequenceEqual(new byte[] { 1, 0 }), "The reordered cards did not keep their native indices.");
+                responses.Clear();
+
+                var bottom = new DuelPrompt { messageType = YgoConstants.MSG_SORT_CARD };
+                bottom.candidates.Add(new SelectableCardItem
+                    { code = LadyLabrynth, controller = (byte)duel.AiPlayerIndex, location = YgoConstants.LOCATION_DECK, sequence = 0 });
+                bottom.candidates.Add(new SelectableCardItem
+                    { code = dragon, controller = (byte)duel.AiPlayerIndex, location = YgoConstants.LOCATION_DECK, sequence = 1 });
+                modals.ShowPrompt(duel, bottom);
+                Require(page.Find("Hdr/TitleBand/Title").GetComponent<Text>().text == "상대 덱 아래쪽 카드 순서" &&
+                    page.Find("Body/Cards/Viewport/Content/Sort_0/Order/Text").GetComponent<Text>().text == "1번 · 맨 아래",
+                    "A bottom-of-deck sort used the top-of-deck direction or hid the target player.");
+                page.Find("Footer/Btn_원래 순서로 확정/B").GetComponent<Button>().onClick.Invoke();
+                Require(responses.Count == 1 && responses[0].SequenceEqual(new byte[] { 255 }),
+                    "Keeping the original arrangement no longer uses the original-order response.");
                 responses.Clear();
                 VerifyChoiceLocations(duel, modals, page, responses);
 

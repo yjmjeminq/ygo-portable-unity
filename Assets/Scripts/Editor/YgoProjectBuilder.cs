@@ -354,6 +354,7 @@ namespace YGOPortable.Editor
 
             // Explicit test for non-search effects & prompt handlers (announce, chain negate, destroy/banish, equip/counter/coin/dice/token, reborn/tribute, extra/ritual sum, RPS)
             VerifyOtherCardEffects(classicDecks[0].main);
+            VerifyDeckSortDrawOrder(classicDecks[0].main);
             VerifyPossessedDestiny(classicDecks[0].main);
             VerifyMandatoryBattleAttack();
             VerifyAiFieldAndTributeChoices();
@@ -1185,6 +1186,66 @@ namespace YGOPortable.Editor
                     "Explicit declaration confirmation did not send the native card passcode.");
                 Debug.Log("[VERIFY ANNOUNCE CARD UI] Normalized name and exact passcode search passed; empty queries cannot confirm hidden or stale choices.");
                 return response;
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(canvas);
+            }
+        }
+
+        private static void VerifyDeckSortDrawOrder(uint[] opponentMain)
+        {
+            const uint organization = 96677818;
+            const uint potOfGreed = 55144522;
+            var ai = new TacticalAI();
+            uint[] main = BuildDeck40((organization, 3), (potOfGreed, 3), (46986414, 12), (15025844, 10));
+            using var duel = StartSeedMatching("Deck sort draw order", main, Array.Empty<uint>(), opponentMain,
+                Array.Empty<uint>(), true, session =>
+                {
+                    DriveUntilIdle(session, ai);
+                    var idle = session.ActivePrompt;
+                    int sortSpell = idle?.activatable.FindIndex(card => card.code == organization) ?? -1;
+                    if (sortSpell < 0 || !idle.activatable.Any(card => card.code == potOfGreed)) return false;
+                    session.SubmitResponseInt((sortSpell << 16) | 5);
+                    DriveUntilIdle(session, ai);
+                    var sort = session.ActivePrompt;
+                    return sort?.messageType == YgoConstants.MSG_SORT_CARD && sort.candidates.Count == 3 &&
+                        sort.candidates[0].code != sort.candidates[2].code;
+                });
+
+            var prompt = duel.ActivePrompt;
+            var expected = new[] { prompt.candidates[2].code, prompt.candidates[0].code };
+            var canvas = new GameObject("Deck Sort Draw Test", typeof(Canvas));
+            try
+            {
+                byte[] response = null;
+                var modals = new DuelPromptModals(canvas.transform, null, bytes => response = bytes);
+                modals.ShowPrompt(duel, prompt);
+                var window = modals.ModalRoot.transform.Find("Win");
+                var tiles = window.Find("Body/Cards/Viewport/Content");
+                Button Earlier(int index) => tiles.Find($"Sort_{index}/Earlier/B").GetComponent<Button>();
+                Button Later(int index) => tiles.Find($"Sort_{index}/Later/B").GetComponent<Button>();
+                AssertTrue(tiles.Find("Sort_0/Order/Text").GetComponent<Text>().text == "1번 · 맨 위" &&
+                    !Earlier(0).interactable && Later(0).interactable &&
+                    Earlier(2).transform.Find("Arrow").GetComponent<Image>().sprite != null && !Later(2).interactable,
+                    "Deck sort did not identify the first draw or show the available movement controls.");
+                Earlier(2).onClick.Invoke();
+                Earlier(1).onClick.Invoke();
+                window.Find("Footer/Btn_순서 확정/B").GetComponent<Button>().onClick.Invoke();
+                AssertTrue(response != null && response.SequenceEqual(new byte[] { 1, 2, 0 }),
+                    "Deck sort sent the displayed positions in the wrong native order.");
+
+                duel.SubmitResponse(response);
+                DriveUntilIdle(duel, ai);
+                int drawSpell = duel.ActivePrompt?.activatable.FindIndex(card => card.code == potOfGreed) ?? -1;
+                AssertTrue(drawSpell >= 0, "The draw spell was unavailable after rearranging the deck.");
+                IReadOnlyList<uint> drawn = null;
+                duel.OnCardsDrawn += (player, codes) => { if (player == duel.HumanPlayerIndex) drawn = codes; };
+                duel.SubmitResponseInt((drawSpell << 16) | 5);
+                DriveUntilIdle(duel, ai);
+                AssertTrue(drawn != null && drawn.SequenceEqual(expected) && duel.RetryCount == 0,
+                    "The first two drawn cards did not match the leftmost two cards shown by the sort prompt.");
+                Debug.Log("[VERIFY DECK SORT ORDER] Reordered the top cards with arrows and drew them from left to right.");
             }
             finally
             {
