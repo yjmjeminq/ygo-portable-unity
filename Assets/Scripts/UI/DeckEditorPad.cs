@@ -147,9 +147,7 @@ namespace YGOPortable.UI
             }
             if (_cardFilterDialog.activeSelf)
             {
-                _padCardFocus.gameObject.SetActive(false);
-                _padUi.Handle(_cardFilterDialog.transform, frame.Direction, frame.Submit, frame.Cancel,
-                    () => _cardFilterDialog.SetActive(false));
+                HandleDetailedSearchPad(frame);
                 return;
             }
             if (_archModalRoot.activeSelf)
@@ -178,7 +176,15 @@ namespace YGOPortable.UI
             }
             if (frame.Save)
             {
-                TrySaveCurrentDeck();
+                if (_padArea == PadArea.Trunk)
+                {
+                    OpenDetailedSearch();
+                    HandleDetailedSearchPad(default);
+                }
+                else
+                {
+                    TrySaveCurrentDeck();
+                }
                 return;
             }
 
@@ -192,7 +198,7 @@ namespace YGOPortable.UI
             {
                 _padCardFocus.gameObject.SetActive(false);
                 _padUi.Handle(Root.transform, frame.Direction, frame.Submit, frame.Cancel,
-                    () => SwitchPadArea(PadArea.Trunk), Root.transform.Find("Trunk/Filters/DetailedSearch/Button")?.GetComponent<Button>());
+                    () => SwitchPadArea(PadArea.Trunk), _detailButtonText.GetComponentInParent<Button>());
                 return;
             }
             if (frame.Cancel)
@@ -206,6 +212,56 @@ namespace YGOPortable.UI
             if (frame.Submit || frame.Alternate) ExecutePadCard(frame.Alternate);
             DrawPadCardFocus();
             ScrollPadDescription(frame.DescriptionScroll);
+        }
+
+        private void HandleDetailedSearchPad(DeckPadFrame frame)
+        {
+            _padCardFocus.gameObject.SetActive(false);
+            _deckHelpLabel.text = "조회 조건   방향키 이동   A 선택   Y 검색   B 취소";
+            if (frame.Search && !frame.Cancel)
+            {
+                _padUi.OpenText(_detailedQueryInput);
+                return;
+            }
+            if (!frame.Cancel && frame.Direction.x != 0 && MoveBetweenFilterColumns(frame.Direction.x)) return;
+            _padUi.Handle(_cardFilterDialog.transform, frame.Direction, frame.Submit, frame.Cancel,
+                CloseDetailedSearch, _detailedQueryInput);
+            if (_cardFilterDialog.activeSelf) return;
+
+            _padUi.Clear();
+            SwitchPadArea(_padArea);
+            if (_padArea == PadArea.Controls)
+                _padUi.FocusInScope(Root.transform, _detailButtonText.GetComponentInParent<Button>());
+            else
+                DrawPadCardFocus();
+        }
+
+        private bool MoveBetweenFilterColumns(int direction)
+        {
+            var selected = EventSystem.current?.currentSelectedGameObject;
+            if (selected == null) return false;
+
+            var scope = _cardFilterDialog.transform;
+            if (direction < 0 && selected.transform.IsChildOf(_optionScroll.transform.parent))
+            {
+                _padUi.FocusInScope(scope, _facetButtons[(int)_activeFacet]);
+                return true;
+            }
+
+            if (direction < 0) return false;
+            int index = Array.FindIndex(_facetButtons, button => button.gameObject == selected);
+            if (index < 0) return false;
+            var facet = (Facet)index;
+            ShowDetailedFacet(facet);
+            Selectable value = facet switch
+            {
+                Facet.Attack => _statInputs[0],
+                Facet.Defense => _statInputs[2],
+                Facet.EffectText => _effectTextInput,
+                _ => _optionButtons[_draftFacets[index]],
+            };
+            _padUi.FocusInScope(scope, value);
+            return true;
         }
 
         private void PagePadArchetypes(bool previous)
@@ -242,7 +298,8 @@ namespace YGOPortable.UI
             };
             string back = area == PadArea.Controls ? "B 카드 목록" : "우스틱 설명   B 뒤로";
             var reorder = CurrentPadDeck != DragSourceType.None ? "   R스틱 클릭 순서" : "";
-            _deckHelpLabel.text = $"{actions}{reorder}   Y 검색   LB/RB 영역   Menu 저장   {back}";
+            string menu = area == PadArea.Trunk ? "Menu/+ 조회" : "Menu/+ 저장";
+            _deckHelpLabel.text = $"{actions}{reorder}   Y 검색   LB/RB 영역   {menu}   {back}";
         }
 
         private DragSourceType CurrentPadDeck => _padArea switch

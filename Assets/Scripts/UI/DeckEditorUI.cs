@@ -98,6 +98,7 @@ namespace YGOPortable.UI
         private Button _deckDialogSecondary;
 
         private RectTransform _trunkPanel;
+        private RectTransform _deckPanel;
         private RectTransform _mainGridRect;
         private RectTransform _extraGridRect;
         private RectTransform _sideGridRect;
@@ -116,7 +117,7 @@ namespace YGOPortable.UI
         public void Open()
         {
             Root.SetActive(true);
-            _cardFilterDialog.SetActive(false);
+            CloseDetailedSearch();
             StartPadNavigation();
             if (DeckRepository.UserDecks.Count == 0)
                 DeckRepository.Load(Application.streamingAssetsPath, Application.persistentDataPath);
@@ -131,7 +132,7 @@ namespace YGOPortable.UI
         public void Close()
         {
             StopPadNavigation();
-            _cardFilterDialog.SetActive(false);
+            CloseDetailedSearch();
             _deckDialog.SetActive(false);
             _archModalRoot.SetActive(false);
             Root.SetActive(false);
@@ -155,9 +156,9 @@ namespace YGOPortable.UI
                 if (Input.GetKeyDown(KeyCode.Escape)) _deckDialog.SetActive(false);
                 return;
             }
-            if (_cardFilterDialog.activeSelf)
+            if (_cardFilterDialog.activeSelf && Input.GetKeyDown(KeyCode.Escape))
             {
-                if (Input.GetKeyDown(KeyCode.Escape)) _cardFilterDialog.SetActive(false);
+                CloseDetailedSearch();
                 return;
             }
             if (_archModalRoot.activeSelf && Input.GetKeyDown(KeyCode.Escape))
@@ -169,7 +170,8 @@ namespace YGOPortable.UI
             if (!Input.GetKey(KeyCode.LeftControl) && !Input.GetKey(KeyCode.RightControl)) return;
             if (Input.GetKeyDown(KeyCode.F))
             {
-                var input = _archModalRoot.activeSelf ? _archSearchInp : _searchInp;
+                var input = _archModalRoot.activeSelf ? _archSearchInp :
+                    _cardFilterDialog.activeSelf ? _detailedQueryInput : _searchInp;
                 EventSystem.current?.SetSelectedGameObject(input.gameObject);
                 input.ActivateInputField();
             }
@@ -341,15 +343,16 @@ namespace YGOPortable.UI
                 dropdown.captionText.alignment = TextAnchor.MiddleCenter;
                 return dropdown;
             }
-            _kindFilter = AddFilter("Kind", 0f, 0.32f, CardKinds, ChangeTrunkKind);
-            var advanced = LotdUiKit.CreateRect("DetailedSearch", filters, new Vector2(.337f, 0f),
-                new Vector2(.675f, 1f), Vector2.zero, Vector2.zero);
-            _detailButtonText = LotdUiKit.CreateLotdButton(advanced, "Button", "상세 검색", OpenDetailedSearch, 14, true)
+            _kindFilter = AddFilter("Kind", 0f, .49f, CardKinds, ChangeTrunkKind);
+            _sortFilter = AddFilter("Sort", .51f, 1f, SortOptions, _ => RefreshTrunkFilter());
+
+            var advanced = LotdUiKit.CreateRect("DetailedSearch", col, new Vector2(0f, .038f),
+                new Vector2(1f, .093f), insideLeft, insideRight);
+            _detailButtonText = LotdUiKit.CreateLotdButton(advanced, "Button", "필터", ToggleDetailedSearch, 15, true)
                 .GetComponentInChildren<Text>();
-            _sortFilter = AddFilter("Sort", 0.69f, 1f, SortOptions, _ => RefreshTrunkFilter());
 
             var scrollHolder = LotdUiKit.CreateRect("TrunkScrollHolder", col,
-                new Vector2(0f, .047f), new Vector2(1f, .752f), insideLeft, insideRight);
+                new Vector2(0f, .101f), new Vector2(1f, .752f), insideLeft, insideRight);
             LotdUiKit.AddImage(scrollHolder.gameObject, LotdUiKit.WhiteSprite, Color.clear);
             _trunkScroll = scrollHolder.gameObject.AddComponent<ScrollRect>();
             _trunkScroll.horizontal = false;
@@ -420,6 +423,7 @@ namespace YGOPortable.UI
         {
             var panel = LotdUiKit.CreateMenuPanel(root, "Deck",
                 new Vector2(0.558f, 0.053f), new Vector2(0.985f, 0.899f), true);
+            _deckPanel = panel;
 
             var header = LotdUiKit.CreateRect("DeckControls", panel,
                 new Vector2(0f, .889f), new Vector2(1f, .944f), new Vector2(28f, 0f), new Vector2(-28f, 0f));
@@ -498,6 +502,7 @@ namespace YGOPortable.UI
 
         private void SetTrunkSource(uint relatedCode = 0, ArchetypeInfo archetype = null)
         {
+            CloseDetailedSearch();
             _relatedFilterCode = relatedCode;
             _activeArchetypeFilter = archetype;
             _searchInp.SetTextWithoutNotify("");
@@ -1182,6 +1187,7 @@ namespace YGOPortable.UI
 
         private void OpenArchetypeModal()
         {
+            CloseDetailedSearch();
             LotdAudio.PlayClick();
             _archModalRoot.SetActive(true);
             RefreshArchetypeModal();

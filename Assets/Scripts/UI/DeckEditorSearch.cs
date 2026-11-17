@@ -14,7 +14,7 @@ namespace YGOPortable.UI
         private enum Facet
         {
             Kind, Frame, MonsterType, SpellTrap, Race, Attribute, Effect, LinkMarker,
-            Level, Rank, LinkRating, PendulumScale, Count,
+            Level, Rank, LinkRating, PendulumScale, Attack, Defense, EffectText, Count,
         }
 
         private static readonly (uint mask, string label)[] FrameOptions =
@@ -81,103 +81,176 @@ namespace YGOPortable.UI
             Facet.LinkRating, Facet.PendulumScale, Facet.LinkMarker,
         };
 
-        private readonly Dropdown[] _facetControls = new Dropdown[(int)Facet.Count];
+        private readonly Button[] _facetButtons = new Button[(int)Facet.Count];
+        private readonly Text[] _facetLabels = new Text[(int)Facet.Count];
+        private readonly Text[] _facetValues = new Text[(int)Facet.Count];
+        private readonly IReadOnlyList<string>[] _facetOptions = new IReadOnlyList<string>[(int)Facet.Count];
+        private readonly int[] _draftFacets = new int[(int)Facet.Count];
         private readonly int[] _savedFacets = new int[(int)Facet.Count];
         private readonly InputField[] _statInputs = new InputField[4];
+        private readonly int?[] _draftStats = new int?[4];
         private readonly int?[] _savedStats = new int?[4];
+        private readonly List<Button> _optionButtons = new List<Button>();
         private string _savedEffectText = "";
+        private string _queryBeforeFilters = "";
         private GameObject _cardFilterDialog;
+        private InputField _detailedQueryInput;
         private InputField _effectTextInput;
         private Text _filterError;
         private Text _detailButtonText;
+        private Text _optionHeading;
+        private RectTransform _optionRows;
+        private ScrollRect _optionScroll;
+        private RectTransform _attackEditor;
+        private RectTransform _defenseEditor;
+        private RectTransform _effectTextEditor;
+        private Facet _activeFacet;
 
         private void BuildDetailedSearch(Transform parent)
         {
-            var overlay = LotdUiKit.FillRect("Overlay_TrunkSearch", parent);
-            _cardFilterDialog = overlay.gameObject;
-            LotdUiKit.AddImage(overlay.gameObject, LotdUiKit.WhiteSprite, new Color(.011f, .024f, .066f, .79f));
-            var panel = LotdUiKit.CreateMenuPanel(overlay, "SearchWindow", new Vector2(.151f, .105f), new Vector2(.849f, .895f));
-
-            var header = LotdUiKit.CreateRect("Heading", panel, new Vector2(.044f, .88f), new Vector2(.956f, .952f),
+            var panel = LotdUiKit.CreateRect("TrunkFilterPanel", parent, _deckPanel.anchorMin, _deckPanel.anchorMax,
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(header.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelHeader, false, false);
-            LotdUiKit.AddFittedText(header, "Title", "보관함 상세 검색", 27, 18,
-                TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
+            _cardFilterDialog = panel.gameObject;
+            var conditions = LotdUiKit.CreateMenuPanel(panel, "Conditions", Vector2.zero, new Vector2(.526f, 1f));
+            var options = LotdUiKit.CreateMenuPanel(panel, "Options", new Vector2(.536f, 0f), Vector2.one);
+            AddFilterHeading(conditions, "보관함 필터");
+            _optionHeading = AddFilterHeading(options, "");
 
-            RectTransform Field(string name, string title, string icon, int row, int column, int columns = 1)
+            var queryRow = LotdUiKit.CreateRect("TextSearch", conditions, new Vector2(.087f, .803f),
+                new Vector2(.913f, .868f), Vector2.zero, Vector2.zero);
+            _detailedQueryInput = LotdUiKit.CreateInputField(queryRow, "Query", "카드명·효과·카드 번호", 16);
+            _detailedQueryInput.onValueChanged.AddListener(_ => RefreshDetailedDraft());
+
+            var conditionRows = BuildFilterRows(conditions, "ConditionsList", .105f, .783f, out _);
+            _optionRows = BuildFilterRows(options, "OptionList", .105f, .868f, out _optionScroll);
+
+            void AddFacet(Facet facet, string label, string icon, IReadOnlyList<string> values = null)
             {
-                float left = .045f + column * .230f;
-                float top = .862f - row * .138f;
-                var field = LotdUiKit.CreateRect(name, panel, new Vector2(left, top - .114f),
-                    new Vector2(left + .230f * columns - .015f, top), Vector2.zero, Vector2.zero);
-                var caption = LotdUiKit.CreateRect("Label", field, new Vector2(0f, .56f), Vector2.one,
-                    Vector2.zero, Vector2.zero);
+                int index = (int)facet;
+                _facetOptions[index] = values;
+                var row = AddFilterRow(conditionRows, facet.ToString());
+                var button = LotdUiKit.CreateLotdButton(row, "Button", label, () => ShowDetailedFacet(facet), 15);
+                _facetButtons[index] = button;
+                var caption = button.GetComponentInChildren<Text>();
+                _facetLabels[index] = caption;
+                caption.alignment = TextAnchor.MiddleLeft;
+                caption.rectTransform.anchorMin = new Vector2(.137f, .06f);
+                caption.rectTransform.anchorMax = new Vector2(.58f, .94f);
+                caption.rectTransform.offsetMin = caption.rectTransform.offsetMax = Vector2.zero;
                 var sprite = LotdUiKit.LoadSprite("LOTD/Icons/ICON_ID_FILTER_CARD_" + icon);
                 if (sprite != null)
                 {
-                    var image = LotdUiKit.CreateRect("Icon", caption, Vector2.zero, Vector2.up,
-                        Vector2.zero, new Vector2(23f, 0f));
+                    var image = LotdUiKit.CreateRect("Icon", button.transform, new Vector2(.039f, .10f),
+                        new Vector2(.121f, .90f), Vector2.zero, Vector2.zero);
                     LotdUiKit.AddImage(image.gameObject, sprite, Color.white, true, false);
                 }
-                var label = LotdUiKit.AddFittedText(caption, "Text", title, 17, 11,
-                    TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
-                if (sprite != null) label.rectTransform.offsetMin = new Vector2(27f, 0f);
-                return LotdUiKit.CreateRect("Value", field, Vector2.zero, new Vector2(1f, .55f), Vector2.zero, Vector2.zero);
+                var value = LotdUiKit.CreateRect("Value", button.transform, new Vector2(.595f, .06f),
+                    new Vector2(.96f, .94f), Vector2.zero, Vector2.zero);
+                _facetValues[index] = LotdUiKit.AddFittedText(value, "Text", "", 14, 10, TextAnchor.MiddleRight,
+                    LotdUiKit.TextPrimary);
             }
 
-            void Choice(Facet facet, string label, string icon, int row, int col, IReadOnlyList<string> values)
-            {
-                var holder = Field(facet.ToString(), label, icon, row, col);
-                var dropdown = LotdUiKit.CreateLotdDropdown(holder, "Dropdown", values,
-                    index => OnDetailedChoiceChanged(facet, index));
-                var caption = dropdown.captionText;
-                caption.alignment = TextAnchor.MiddleCenter;
-                caption.resizeTextMaxSize = 16;
-                caption.rectTransform.offsetMin = new Vector2(20f, 0f);
-                caption.rectTransform.offsetMax = new Vector2(-20f, 0f);
-                _facetControls[(int)facet] = dropdown;
-            }
+            AddFacet(Facet.Kind, "카드 종류", "FRAME", new[] { "전체", "메인 몬스터", "마법", "함정", "엑스트라 몬스터" });
+            AddFacet(Facet.Frame, "카드 프레임", "FRAME", FrameOptions.Select(item => item.label).ToArray());
+            AddFacet(Facet.MonsterType, "몬스터 특성", "TYPE", MonsterTypes.Select(item => item.label).ToArray());
+            AddFacet(Facet.SpellTrap, "마법·함정 종류", "ICON", SpellTrapTypes.Select(item => item.label).ToArray());
+            AddFacet(Facet.Race, "종족", "TYPE", RaceOptions.Select(item => item.label).ToArray());
+            AddFacet(Facet.Attribute, "속성", "ATTR", AttributeOptions.Select(item => item.label).ToArray());
+            AddFacet(Facet.Level, "레벨", "LEVEL", NumberChoices(1, 13));
+            AddFacet(Facet.Rank, "랭크", "RANK", NumberChoices(0, 13));
+            AddFacet(Facet.LinkRating, "링크", "LINKNUM", NumberChoices(1, 8));
+            AddFacet(Facet.LinkMarker, "링크 마커", "LINKDIR", LinkMarkerOptions.Select(item => item.label).ToArray());
+            AddFacet(Facet.PendulumScale, "펜듈럼 스케일", "PEND", NumberChoices(0, 13));
+            AddFacet(Facet.Effect, "효과 분류", "GENRE", DeckCardFilter.EffectOptions.Select(item => item.label).ToArray());
+            AddFacet(Facet.Attack, "공격력", "ATK");
+            AddFacet(Facet.Defense, "수비력", "DEF");
+            AddFacet(Facet.EffectText, "효과 문구", "GENRE");
 
-            Choice(Facet.Kind, "카드 종류", "FRAME", 0, 0, new[] { "전체", "메인 몬스터", "마법", "함정", "엑스트라 몬스터" });
-            Choice(Facet.Frame, "카드 프레임", "FRAME", 0, 1, FrameOptions.Select(item => item.label).ToArray());
-            Choice(Facet.MonsterType, "몬스터 특성", "TYPE", 0, 2, MonsterTypes.Select(item => item.label).ToArray());
-            Choice(Facet.SpellTrap, "마법·함정 종류", "ICON", 0, 3, SpellTrapTypes.Select(item => item.label).ToArray());
-            Choice(Facet.Race, "종족", "TYPE", 1, 0, RaceOptions.Select(item => item.label).ToArray());
-            Choice(Facet.Attribute, "속성", "ATTR", 1, 1, AttributeOptions.Select(item => item.label).ToArray());
-            Choice(Facet.Effect, "효과 분류", "GENRE", 1, 2, DeckCardFilter.EffectOptions.Select(item => item.label).ToArray());
-            Choice(Facet.LinkMarker, "링크 마커", "LINKDIR", 1, 3, LinkMarkerOptions.Select(item => item.label).ToArray());
-            Choice(Facet.Level, "레벨", "LEVEL", 2, 0, NumberChoices(1, 13));
-            Choice(Facet.Rank, "랭크", "RANK", 2, 1, NumberChoices(0, 13));
-            Choice(Facet.LinkRating, "링크", "LINKNUM", 2, 2, NumberChoices(1, 8));
-            Choice(Facet.PendulumScale, "펜듈럼 스케일", "PEND", 2, 3, NumberChoices(0, 13));
-
-            string[] statLabels = { "최소 공격력", "최대 공격력", "최소 수비력", "최대 수비력" };
-            for (int i = 0; i < statLabels.Length; i++)
-            {
-                var holder = Field("Stat" + i, statLabels[i], i < 2 ? "ATK" : "DEF", 3, i);
-                _statInputs[i] = LotdUiKit.CreateInputField(holder, "Number", "전체", 16);
-                _statInputs[i].contentType = InputField.ContentType.IntegerNumber;
-                _statInputs[i].characterLimit = 6;
-            }
-
-            var effect = Field("EffectText", "효과 문구", "GENRE", 4, 0, 4);
-            _effectTextInput = LotdUiKit.CreateInputField(effect, "Query", "예: 특수 소환, 패에 넣는다", 17);
-            var status = LotdUiKit.CreateRect("Status", panel, new Vector2(.044f, .122f), new Vector2(.956f, .172f),
+            _attackEditor = BuildStatInputs(options, "Attack", 0);
+            _defenseEditor = BuildStatInputs(options, "Defense", 2);
+            _effectTextEditor = LotdUiKit.CreateRect("EffectText", options, new Vector2(.087f, .803f),
+                new Vector2(.913f, .868f), Vector2.zero, Vector2.zero);
+            _effectTextInput = LotdUiKit.CreateInputField(_effectTextEditor, "Query", "예: 특수 소환", 16);
+            _effectTextInput.onValueChanged.AddListener(_ => RefreshDetailedDraft());
+            var status = LotdUiKit.CreateRect("Status", options, new Vector2(.087f, .033f), new Vector2(.913f, .099f),
                 Vector2.zero, Vector2.zero);
-            _filterError = LotdUiKit.AddFittedText(status, "Text", "", 15, 10, TextAnchor.MiddleLeft, LotdUiKit.RedAccent);
+            _filterError = LotdUiKit.AddFittedText(status, "Text", "", 15, 11, TextAnchor.MiddleCenter, LotdUiKit.RedAccent);
 
-            var footer = LotdUiKit.CreateRect("Actions", panel, new Vector2(.044f, .04f), new Vector2(.956f, .11f),
+            var footer = LotdUiKit.CreateRect("Actions", conditions, new Vector2(.084f, .039f), new Vector2(.916f, .094f),
                 Vector2.zero, Vector2.zero);
-            Button ActionButton(string name, string label, float left, float right, Action action, bool gold = false)
+            void ActionButton(string name, string label, float left, float right, Action action, bool gold = false)
             {
                 var slot = LotdUiKit.CreateRect(name, footer, new Vector2(left, 0f), new Vector2(right, 1f),
                     Vector2.zero, Vector2.zero);
-                return LotdUiKit.CreateLotdButton(slot, "Button", label, action, 17, gold);
+                LotdUiKit.CreateLotdButton(slot, "Button", label, action, 15, gold);
             }
-            ActionButton("Reset", "초기화", 0f, .19f, ResetDetailedDraft);
-            ActionButton("Cancel", "취소", .59f, .785f, () => _cardFilterDialog.SetActive(false));
-            ActionButton("Apply", "검색 적용", .805f, 1f, ApplyDetailedSearch, true);
+            ActionButton("Reset", "초기화", 0f, .31f, ResetDetailedDraft);
+            ActionButton("Cancel", "취소", .345f, .655f, CloseDetailedSearch);
+            ActionButton("Apply", "적용", .69f, 1f, ApplyDetailedSearch, true);
             _cardFilterDialog.SetActive(false);
+        }
+
+        private static Text AddFilterHeading(RectTransform panel, string title)
+        {
+            var header = LotdUiKit.CreateRect("Heading", panel, new Vector2(.087f, .884f), new Vector2(.913f, .946f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(header.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelHeader, false, false);
+            return LotdUiKit.AddFittedText(header, "Title", title, 21, 14, TextAnchor.MiddleCenter,
+                Color.white, FontStyle.Bold);
+        }
+
+        private static RectTransform BuildFilterRows(RectTransform panel, string name, float bottom, float top, out ScrollRect scroll)
+        {
+            var holder = LotdUiKit.CreateRect(name, panel, new Vector2(.087f, bottom), new Vector2(.913f, top),
+                Vector2.zero, Vector2.zero);
+            var viewport = LotdUiKit.CreateRect("Viewport", holder, Vector2.zero, Vector2.one,
+                Vector2.zero, new Vector2(-15f, 0f));
+            LotdUiKit.AddImage(viewport.gameObject, LotdUiKit.WhiteSprite, Color.clear);
+            viewport.gameObject.AddComponent<RectMask2D>();
+            var rows = LotdUiKit.CreateRect("Rows", viewport, new Vector2(0f, 1f), Vector2.one,
+                Vector2.zero, Vector2.zero);
+            rows.pivot = new Vector2(.5f, 1f);
+            var layout = rows.gameObject.AddComponent<VerticalLayoutGroup>();
+            layout.spacing = 3f;
+            layout.childControlWidth = layout.childForceExpandWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandHeight = false;
+            rows.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            scroll = holder.gameObject.AddComponent<ScrollRect>();
+            scroll.viewport = viewport;
+            scroll.content = rows;
+            scroll.horizontal = false;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = 32f;
+            scroll.verticalScrollbar = AddDeckScrollbar(holder);
+            scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
+            return rows;
+        }
+
+        private static RectTransform AddFilterRow(RectTransform rows, string name)
+        {
+            var row = LotdUiKit.FillRect(name, rows);
+            row.gameObject.AddComponent<LayoutElement>().preferredHeight = 31f;
+            return row;
+        }
+
+        private RectTransform BuildStatInputs(RectTransform parent, string name, int start)
+        {
+            var group = LotdUiKit.CreateRect(name, parent, new Vector2(.087f, .66f), new Vector2(.913f, .868f),
+                Vector2.zero, Vector2.zero);
+            for (int i = 0; i < 2; i++)
+            {
+                string label = i == 0 ? "최소" : "최대";
+                var row = LotdUiKit.CreateRect(label, group, new Vector2(0f, i == 0 ? .54f : .04f),
+                    new Vector2(1f, i == 0 ? 1f : .5f), Vector2.zero, Vector2.zero);
+                var input = LotdUiKit.CreateInputField(row, "Number", label, 16);
+                input.contentType = InputField.ContentType.IntegerNumber;
+                input.characterLimit = 6;
+                input.onValueChanged.AddListener(_ => RefreshDetailedDraft());
+                _statInputs[start + i] = input;
+            }
+            return group;
         }
 
         private static string[] NumberChoices(int first, int last) =>
@@ -185,6 +258,7 @@ namespace YGOPortable.UI
 
         private void OnDetailedChoiceChanged(Facet facet, int index)
         {
+            _draftFacets[(int)facet] = index;
             if (facet == Facet.Kind)
             {
                 SyncDetailedKind();
@@ -193,19 +267,19 @@ namespace YGOPortable.UI
             if (index != 0 && (facet == Facet.Frame || facet == Facet.SpellTrap))
             {
                 uint mask = facet == Facet.Frame ? FrameOptions[index].mask : SpellTrapTypes[index].required;
-                var kind = (DeckCardKind)_facetControls[(int)Facet.Kind].value;
+                var kind = (DeckCardKind)_draftFacets[(int)Facet.Kind];
                 var implied = KindForMask(mask);
                 if (facet == Facet.Frame && (mask & TYPE_MONSTER) != 0)
-                    _facetControls[(int)Facet.SpellTrap].SetValueWithoutNotify(0);
+                    _draftFacets[(int)Facet.SpellTrap] = 0;
                 if (!KindAllowsMask(kind, mask) || kind == DeckCardKind.Any && implied != DeckCardKind.Any)
                 {
-                    _facetControls[(int)Facet.Kind].SetValueWithoutNotify((int)implied);
+                    _draftFacets[(int)Facet.Kind] = (int)implied;
                     SyncDetailedKind();
                 }
             }
             if (index == 0 || (facet != Facet.Level && facet != Facet.Rank && facet != Facet.LinkRating)) return;
             foreach (var metric in new[] { Facet.Level, Facet.Rank, Facet.LinkRating })
-                if (metric != facet) _facetControls[(int)metric].SetValueWithoutNotify(0);
+                if (metric != facet) _draftFacets[(int)metric] = 0;
         }
 
         private static DeckCardKind KindForMask(uint mask)
@@ -253,50 +327,147 @@ namespace YGOPortable.UI
 
         private void SyncDetailedKind()
         {
-            var kind = (DeckCardKind)_facetControls[(int)Facet.Kind].value;
-            ClearIncompatibleFacets(kind, facet => _facetControls[(int)facet].value,
-                facet => _facetControls[(int)facet].SetValueWithoutNotify(0));
+            var kind = (DeckCardKind)_draftFacets[(int)Facet.Kind];
+            ClearIncompatibleFacets(kind, facet => _draftFacets[(int)facet], facet => _draftFacets[(int)facet] = 0);
             bool nonMonster = kind == DeckCardKind.Spell || kind == DeckCardKind.Trap;
             foreach (var facet in MonsterFacets)
-                _facetControls[(int)facet].interactable = !nonMonster;
+                _facetButtons[(int)facet].interactable = !nonMonster;
             if (kind == DeckCardKind.MainMonster)
             {
-                _facetControls[(int)Facet.Rank].interactable = false;
-                _facetControls[(int)Facet.LinkRating].interactable = false;
-                _facetControls[(int)Facet.LinkMarker].interactable = false;
+                _facetButtons[(int)Facet.Rank].interactable = false;
+                _facetButtons[(int)Facet.LinkRating].interactable = false;
+                _facetButtons[(int)Facet.LinkMarker].interactable = false;
             }
-            foreach (var input in _statInputs)
+            _facetButtons[(int)Facet.Attack].interactable = !nonMonster;
+            _facetButtons[(int)Facet.Defense].interactable = !nonMonster;
+            if (nonMonster)
             {
-                input.interactable = !nonMonster;
-                if (nonMonster) input.SetTextWithoutNotify("");
+                foreach (var input in _statInputs) input.SetTextWithoutNotify("");
             }
+        }
+
+        private void ShowDetailedFacet(Facet facet)
+        {
+            _activeFacet = facet;
+            _optionHeading.text = _facetLabels[(int)facet].text;
+            var choices = _facetOptions[(int)facet];
+            _attackEditor.gameObject.SetActive(facet == Facet.Attack);
+            _defenseEditor.gameObject.SetActive(facet == Facet.Defense);
+            _effectTextEditor.gameObject.SetActive(facet == Facet.EffectText);
+            _optionScroll.gameObject.SetActive(choices != null);
+
+            if (choices != null)
+            {
+                while (_optionButtons.Count < choices.Count)
+                {
+                    int choice = _optionButtons.Count;
+                    var row = AddFilterRow(_optionRows, $"Option_{choice}");
+                    _optionButtons.Add(LotdUiKit.CreateLotdButton(row, "Button", "", () =>
+                    {
+                        OnDetailedChoiceChanged(_activeFacet, choice);
+                        RefreshDetailedDraft();
+                    }, 15));
+                }
+                for (int i = 0; i < _optionButtons.Count; i++)
+                    _optionButtons[i].transform.parent.gameObject.SetActive(i < choices.Count);
+                LayoutRebuilder.ForceRebuildLayoutImmediate(_optionRows);
+                _optionScroll.verticalNormalizedPosition = 1f;
+                UpdateDeckScrollbar(_optionScroll);
+            }
+
+            UpdateDetailedSelectionLabels();
+        }
+
+        private void UpdateDetailedSelectionLabels()
+        {
+            for (int i = 0; i < _facetValues.Length; i++)
+            {
+                string value = (Facet)i switch
+                {
+                    Facet.Attack => FormatStatRange(_draftStats[0], _draftStats[1]),
+                    Facet.Defense => FormatStatRange(_draftStats[2], _draftStats[3]),
+                    Facet.EffectText => _effectTextInput.text.Trim(),
+                    _ => _facetOptions[i][_draftFacets[i]],
+                };
+                bool enabled = _facetButtons[i].interactable;
+                bool selected = (Facet)i == _activeFacet;
+                _facetLabels[i].color = !enabled ? LotdUiKit.TextMuted : selected ? LotdUiKit.GoldAccent : Color.white;
+                _facetValues[i].text = value.Length > 0 ? value : "전체";
+                _facetValues[i].color = enabled && _facetValues[i].text != "전체"
+                    ? LotdUiKit.GoldAccent : LotdUiKit.TextMuted;
+            }
+
+            var choices = _facetOptions[(int)_activeFacet];
+            if (choices == null) return;
+            for (int i = 0; i < choices.Count; i++)
+            {
+                var label = _optionButtons[i].GetComponentInChildren<Text>();
+                bool selected = i == _draftFacets[(int)_activeFacet];
+                label.text = selected ? $"●  {choices[i]}" : choices[i];
+                label.color = selected ? LotdUiKit.GoldAccent : Color.white;
+            }
+        }
+
+        private static string FormatStatRange(int? min, int? max)
+        {
+            if (min.HasValue && max.HasValue) return $"{min}–{max}";
+            if (min.HasValue) return $"{min} 이상";
+            return max.HasValue ? $"{max} 이하" : "전체";
+        }
+
+        private void ToggleDetailedSearch()
+        {
+            if (_cardFilterDialog.activeSelf) CloseDetailedSearch();
+            else OpenDetailedSearch();
         }
 
         private void OpenDetailedSearch()
         {
-            for (int i = 0; i < _facetControls.Length; i++)
-                _facetControls[i].SetValueWithoutNotify(_savedFacets[i]);
-            _facetControls[(int)Facet.Kind].SetValueWithoutNotify(_kindFilter.value);
+            if (_cardFilterDialog.activeSelf) return;
+            _queryBeforeFilters = _searchInp.text;
+            _savedFacets[(int)Facet.Kind] = _kindFilter.value;
+            Array.Copy(_savedFacets, _draftFacets, _savedFacets.Length);
+            Array.Copy(_savedStats, _draftStats, _savedStats.Length);
+            _detailedQueryInput.SetTextWithoutNotify(_queryBeforeFilters);
             for (int i = 0; i < _statInputs.Length; i++)
                 _statInputs[i].SetTextWithoutNotify(_savedStats[i]?.ToString() ?? "");
             _effectTextInput.SetTextWithoutNotify(_savedEffectText);
             SyncDetailedKind();
-            _filterError.text = "";
             EventSystem.current?.SetSelectedGameObject(null);
-            _cardFilterDialog.transform.SetAsLastSibling();
+            _searchInp.interactable = false;
+            _kindFilter.interactable = false;
+            _deckPanel.gameObject.SetActive(false);
             _cardFilterDialog.SetActive(true);
+            ShowDetailedFacet(Facet.Kind);
+            RefreshDetailedDraft();
+        }
+
+        private void CloseDetailedSearch()
+        {
+            if (!_cardFilterDialog.activeSelf) return;
+            var selected = EventSystem.current?.currentSelectedGameObject;
+            if (selected != null && selected.transform.IsChildOf(_cardFilterDialog.transform))
+                EventSystem.current.SetSelectedGameObject(null);
+            _cardFilterDialog.SetActive(false);
+            _deckPanel.gameObject.SetActive(true);
+            _searchInp.SetTextWithoutNotify(_queryBeforeFilters);
+            _kindFilter.SetValueWithoutNotify(_savedFacets[(int)Facet.Kind]);
+            _searchInp.interactable = true;
+            _kindFilter.interactable = true;
+            RefreshTrunkFilter();
         }
 
         private void ResetDetailedDraft()
         {
-            foreach (var choice in _facetControls) choice.SetValueWithoutNotify(0);
+            Array.Clear(_draftFacets, 0, _draftFacets.Length);
             foreach (var input in _statInputs) input.SetTextWithoutNotify("");
+            _detailedQueryInput.SetTextWithoutNotify("");
             _effectTextInput.SetTextWithoutNotify("");
             SyncDetailedKind();
-            _filterError.text = "";
+            RefreshDetailedDraft();
         }
 
-        private void ApplyDetailedSearch()
+        private bool ReadDetailedStats()
         {
             var bounds = new int?[_statInputs.Length];
             for (int i = 0; i < bounds.Length; i++)
@@ -305,24 +476,40 @@ namespace YGOPortable.UI
                 if (raw.Length == 0) continue;
                 if (!int.TryParse(raw, out int stat) || stat < 0)
                 {
-                    _filterError.text = "공격력과 수비력은 0 이상의 정수로 입력하세요.";
-                    return;
+                    _filterError.text = "공격력과 수비력은\n0 이상의 정수로 입력하세요.";
+                    return false;
                 }
                 bounds[i] = stat;
             }
             if (bounds[0] > bounds[1] || bounds[2] > bounds[3])
             {
-                _filterError.text = "최솟값은 최댓값보다 클 수 없습니다.";
-                return;
+                _filterError.text = "최솟값은 최댓값보다\n클 수 없습니다.";
+                return false;
             }
 
-            for (int i = 0; i < _facetControls.Length; i++)
-                _savedFacets[i] = _facetControls[i].value;
-            Array.Copy(bounds, _savedStats, bounds.Length);
-            _savedEffectText = _effectTextInput.text.Trim();
-            _kindFilter.SetValueWithoutNotify(_savedFacets[(int)Facet.Kind]);
-            _cardFilterDialog.SetActive(false);
+            Array.Copy(bounds, _draftStats, bounds.Length);
+            _filterError.text = "";
+            return true;
+        }
+
+        private void RefreshDetailedDraft()
+        {
+            if (!_cardFilterDialog.activeSelf) return;
+            ReadDetailedStats();
+            UpdateDetailedSelectionLabels();
+            _searchInp.SetTextWithoutNotify(_detailedQueryInput.text);
+            _kindFilter.SetValueWithoutNotify(_draftFacets[(int)Facet.Kind]);
             RefreshTrunkFilter();
+        }
+
+        private void ApplyDetailedSearch()
+        {
+            if (!ReadDetailedStats()) return;
+            Array.Copy(_draftFacets, _savedFacets, _draftFacets.Length);
+            Array.Copy(_draftStats, _savedStats, _draftStats.Length);
+            _savedEffectText = _effectTextInput.text.Trim();
+            _queryBeforeFilters = _detailedQueryInput.text.Trim();
+            CloseDetailedSearch();
         }
 
         private void ClearDetailedSearch()
@@ -334,25 +521,37 @@ namespace YGOPortable.UI
 
         private void UpdateDetailedSearchButton()
         {
-            int active = _savedFacets.Skip(1).Count(index => index != 0) + _savedStats.Count(value => value.HasValue);
+            if (_cardFilterDialog.activeSelf)
+            {
+                _detailButtonText.text = "필터 닫기";
+                return;
+            }
+            int active = _savedFacets.Skip(1).Count(index => index != 0);
+            if (_kindFilter.value != 0) active++;
+            if (_searchInp.text.Trim().Length > 0) active++;
+            if (_savedStats[0].HasValue || _savedStats[1].HasValue) active++;
+            if (_savedStats[2].HasValue || _savedStats[3].HasValue) active++;
             if (_savedEffectText.Length > 0) active++;
-            _detailButtonText.text = active == 0 ? "상세 검색" : $"상세 검색 ({active})";
+            _detailButtonText.text = active == 0 ? "필터" : $"필터 ({active})";
         }
 
         private DeckCardFilter CreateTrunkFilter(string query, DeckCardKind kind)
         {
-            int Selected(Facet facet) => _savedFacets[(int)facet];
+            bool editing = _cardFilterDialog.activeSelf;
+            var facets = editing ? _draftFacets : _savedFacets;
+            var stats = editing ? _draftStats : _savedStats;
+            int Selected(Facet facet) => facets[(int)facet];
             int? Rating(Facet facet, int first) => Selected(facet) == 0 ? null : Selected(facet) + first - 1;
             var frame = FrameOptions[Selected(Facet.Frame)];
             var monster = MonsterTypes[Selected(Facet.MonsterType)];
             var spellTrap = SpellTrapTypes[Selected(Facet.SpellTrap)];
-            return new DeckCardFilter(query, _savedEffectText, kind,
+            return new DeckCardFilter(query, editing ? _effectTextInput.text.Trim() : _savedEffectText, kind,
                 requiredTypes: frame.mask | monster.required | spellTrap.required,
                 excludedTypes: spellTrap.excluded,
                 race: RaceOptions[Selected(Facet.Race)].mask, attribute: AttributeOptions[Selected(Facet.Attribute)].mask,
                 level: Rating(Facet.Level, 1), rank: Rating(Facet.Rank, 0), linkRating: Rating(Facet.LinkRating, 1),
                 effectCategories: DeckCardFilter.EffectOptions[Selected(Facet.Effect)].mask,
-                minAttack: _savedStats[0], maxAttack: _savedStats[1], minDefense: _savedStats[2], maxDefense: _savedStats[3],
+                minAttack: stats[0], maxAttack: stats[1], minDefense: stats[2], maxDefense: stats[3],
                 pendulumScale: Rating(Facet.PendulumScale, 0), linkMarker: LinkMarkerOptions[Selected(Facet.LinkMarker)].mask);
         }
     }
