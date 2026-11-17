@@ -35,9 +35,10 @@ namespace YGOPortable.UI
         private readonly List<(RectTransform rt, CompositeCardView card, Text sub, CardDragTrigger trigger)> _trunkPool
             = new List<(RectTransform, CompositeCardView, Text, CardDragTrigger)>();
 
-        private const int DeckColumns = 10;
+        private const int DeckColumns = 8;
         private const int OtherDeckCapacity = 15;
         private const int MainDeckCapacity = 60;
+        private const int MainDeckSlotRows = (MainDeckCapacity + DeckColumns - 1) / DeckColumns;
         private const int MainDeckVisibleRows = 4;
 
         // Deck Slot Lists
@@ -605,7 +606,7 @@ namespace YGOPortable.UI
             var content = _mainDeckScroll.content;
             content.anchorMin = new Vector2(0f, 1f - rows / (float)MainDeckVisibleRows);
             // Keep slot height constant as the scrollable content gains or loses rows.
-            _mainDeckSlotGrid.anchorMin = new Vector2(0f, 1f - MainDeckCapacity / (float)(DeckColumns * rows));
+            _mainDeckSlotGrid.anchorMin = new Vector2(0f, 1f - MainDeckSlotRows / (float)rows);
 
             float maxOffset = Mathf.Max(0f, content.rect.height - _mainDeckScroll.viewport.rect.height);
             if (content.anchoredPosition.y > maxOffset)
