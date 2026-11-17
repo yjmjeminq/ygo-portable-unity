@@ -629,6 +629,8 @@ namespace YGOPortable.Editor
                             throw new Exception("Expected p.forced == true for simultaneous mandatory GY triggers (Dandylion + White Stone)!");
                         if (!p.IsTriggerChain)
                             throw new Exception("Expected p.IsTriggerChain (speCount == 0x7f) == true for SEGOC mandatory triggers!");
+                        if (s.ShouldPassChainPrompt(p, ChainConfirmationMode.Off))
+                            throw new Exception("OFF passed a mandatory trigger choice.");
                         if (p.candidates.Count != 2 || !p.candidates.Any(c => c.code == 15341821) || !p.candidates.Any(c => c.code == 79814787))
                             throw new Exception("Expected exactly Dandylion (15341821) and White Stone (79814787) in mandatory trigger candidates!");
                         if (p.candidates.Any(c => c.code == 572850 || c.code == 74078255))
@@ -650,6 +652,8 @@ namespace YGOPortable.Editor
                             throw new Exception("Expected p.forced == false for optional Tearlaments GY triggers!");
                         if (!p.IsTriggerChain)
                             throw new Exception("Expected p.IsTriggerChain (speCount == 0x7f) == true for SEGOC optional triggers!");
+                        if (s.ShouldPassChainPrompt(p, ChainConfirmationMode.Off))
+                            throw new Exception("OFF passed an optional public trigger choice.");
                         if (s.CurrentChain.Count != 2 || s.CurrentChain[0].code != 79814787 || s.CurrentChain[1].code != 15341821)
                             throw new Exception("Expected Chain Link 1 = White Stone (79814787) and Chain Link 2 = Dandylion (15341821) before optional triggers!");
                         if (p.candidates.Count != 2 || !p.candidates.Any(c => c.code == 572850) || !p.candidates.Any(c => c.code == 74078255))
@@ -686,6 +690,8 @@ namespace YGOPortable.Editor
                         if (p.promptEffectDesc != (92731385UL << 20) ||
                             CardDatabase.ResolveDescription(p.promptEffectDesc) != "덱에서 카드를 패에 넣거나 묘지로 보낸다")
                             throw new Exception("The lone native Kitkallos trigger did not resolve to its on-summon effect text.");
+                        if (s.ShouldPassChainPrompt(p, ChainConfirmationMode.Off))
+                            throw new Exception("OFF passed a standalone Trigger Effect confirmation.");
                         verifiedKitkallosOptionalDecline = true;
                         Debug.Log("[SEGOC TEST] Kitkallos on-summon optional trigger (MSG_SELECT_EFFECTYN) received -> Submitting 0 (NO / Decline)");
                         s.SubmitResponseInt(0);

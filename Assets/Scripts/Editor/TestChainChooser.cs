@@ -22,6 +22,7 @@ namespace YGOPortable.Editor
             VerifyGroupedLocations(duel);
             VerifyScrollableChoices(duel);
             VerifyNavigation(duel);
+            VerifyFilteredChainCandidates(duel);
             VerifyEmptyChain(duel);
             VerifyMaterialChoices(duel);
             Debug.Log("[VERIFY CHAIN CHOOSER] Grouped locations, native indices, duplicate effects, zone overlay, input focus, empty chain and material selection passed.");
@@ -121,6 +122,43 @@ namespace YGOPortable.Editor
             declined.Show(duel, prompt);
             declined.Pass();
             Require(declined.Responses.SequenceEqual(new[] { 0 }), "A single-effect pass did not submit NO.");
+        }
+
+        private static void VerifyFilteredChainCandidates(DuelSession duel)
+        {
+            using var view = new ChainView();
+            var prompt = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_CHAIN, playerId = 0 };
+            prompt.candidates.Add(new SelectableCardItem { code = 14087893, location = YgoConstants.LOCATION_HAND });
+            prompt.candidates.Add(new SelectableCardItem
+            {
+                code = 94656263,
+                location = YgoConstants.LOCATION_HAND,
+                isTriggeredEffect = true,
+            });
+            prompt.candidates.Add(new SelectableCardItem
+            {
+                code = 14558127,
+                location = YgoConstants.LOCATION_HAND,
+                isEventSpecificEffect = true,
+            });
+
+            view.Modals.ShowPrompt(duel, prompt, ChainConfirmationMode.Off);
+            Require(view.Modals.IsPromptOpen &&
+                    view.Choice(0).GetComponentInChildren<CompositeCardView>().CurrentCode == 94656263 &&
+                    !view.Modals.ModalRoot.GetComponentsInChildren<Transform>().Any(child => child.name == "Ch_1"),
+                "The filtered chooser showed an unrelated fast effect.");
+            view.SelectChoice(0, 94656263);
+            view.ConfirmChoice();
+            Require(view.Responses.SequenceEqual(new[] { 1 }), "The filtered chooser changed the native response index.");
+
+            using var automatic = new ChainView();
+            automatic.Modals.ShowPrompt(duel, prompt, ChainConfirmationMode.Auto);
+            Require(automatic.Choice(0).GetComponentInChildren<CompositeCardView>().CurrentCode == 94656263,
+                "AUTO hid a triggered effect in a quiet window.");
+            automatic.SelectChoice(1, 14558127);
+            automatic.ConfirmChoice();
+            Require(automatic.Responses.SequenceEqual(new[] { 2 }),
+                "AUTO hid a response specific to the current event or submitted the wrong native index.");
         }
 
         private static void VerifyEmptyChain(DuelSession duel)

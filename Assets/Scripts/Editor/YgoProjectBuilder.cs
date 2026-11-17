@@ -347,6 +347,7 @@ namespace YGOPortable.Editor
             VerifyDeckSearchEmergencyCall(classicDecks[0].main);
             VerifyBingoMachineAutoPick();
             VerifyAnimeCardOfSanctity();
+            VerifyFastChainConfirmationModes();
 
             // Explicit test for older searchers finding newest 2025/2026 cards across Category/Type/Race/Stats/Level
             VerifyOldSearchersFindNewestCards(classicDecks[0].main);
@@ -687,6 +688,95 @@ namespace YGOPortable.Editor
                     $"Anime Card of Sanctity drew the wrong number of cards for hands of {playerHandAtResolution} and {opponentHandBefore}.");
                 Debug.Log($"[VERIFY SANCTITY] Hands of {playerHandAtResolution} and {opponentHandBefore} resolved to {player.hand.Count} and {opponent.hand.Count}.");
             }
+        }
+
+        private static void VerifyFastChainConfirmationModes()
+        {
+            const uint book = 14087893;
+            const uint upstart = 70368879;
+            const uint sparkman = 20721928;
+            uint[] main = BuildDeck40((book, 9), (upstart, 9), (sparkman, 9));
+            uint[] opponent = BuildDeck40();
+            uint[] empty = Array.Empty<uint>();
+            var ai = new TacticalAI();
+            using var session = StartSeedMatching("Chain confirmation", main, empty, opponent, empty, true, duel =>
+                duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD &&
+                duel.ActivePrompt.summonable.Any(card => card.code == sparkman) &&
+                duel.ActivePrompt.sSetable.Any(card => card.code == upstart) &&
+                duel.Players[0].hand.Any(card => card.code == book));
+
+            bool OffersBook(DuelPrompt prompt) => prompt?.messageType == YgoConstants.MSG_SELECT_CHAIN &&
+                prompt.playerId == session.HumanPlayerIndex && prompt.candidates.Any(card => card.code == book);
+
+            void VerifyBookPolicy(DuelPrompt prompt, string timing, bool autoOffers)
+            {
+                AssertTrue(OffersBook(prompt), $"Expected a native Book of Moon response window {timing}.");
+                AssertTrue(!session.ShouldPassChainPrompt(prompt, ChainConfirmationMode.Auto) == autoOffers &&
+                    session.ShouldPassChainPrompt(prompt, ChainConfirmationMode.Off) &&
+                    !session.ShouldPassChainPrompt(prompt, ChainConfirmationMode.On),
+                    $"Unexpected AUTO/OFF/ON policy {timing}.");
+            }
+
+            void VerifyBookWindow(string timing, bool autoOffers)
+            {
+                var prompt = session.ActivePrompt;
+                if (prompt?.messageType == YgoConstants.MSG_SELECT_PLACE)
+                    session.SubmitResponse(ai.ComputeResponse(session, prompt));
+                VerifyBookPolicy(session.ActivePrompt, timing, autoOffers);
+                session.SubmitResponseInt(-1);
+                DriveUntilIdle(session, ai);
+                AssertTrue(session.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD && session.RetryCount == 0,
+                    $"Passing on Book of Moon {timing} did not return to the Main Phase.");
+            }
+
+            int summon = session.ActivePrompt.summonable.FindIndex(card => card.code == sparkman);
+            session.SubmitResponseInt(summon << 16);
+            VerifyBookWindow("after a Normal Summon", true);
+
+            int set = session.ActivePrompt.sSetable.FindIndex(card => card.code == upstart);
+            session.SubmitResponseInt((set << 16) | 4);
+            VerifyBookWindow("after setting a Spell", false);
+
+            int activate = session.ActivePrompt.activatable.FindIndex(card => card.code == upstart);
+            AssertTrue(activate >= 0, "Expected to activate the set Normal Spell.");
+            session.SubmitResponseInt((activate << 16) | 5);
+            VerifyBookWindow("in response to a Spell effect", true);
+
+            int setBook = session.ActivePrompt.sSetable.FindIndex(card => card.code == book);
+            AssertTrue(setBook >= 0, "Book of Moon was unavailable to set for the opponent's turn.");
+            session.SubmitResponseInt((setBook << 16) | 4);
+            DriveUntilIdle(session, ai);
+            session.SubmitResponseInt(7);
+            bool sawStandby = false;
+            bool sawEnd = false;
+            for (int step = 0; step < 20 && !sawEnd && !session.IsFinished; step++)
+            {
+                var prompt = session.ActivePrompt;
+                if (prompt == null) session.StepUntilPrompt();
+                else if (prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD && prompt.playerId == session.AiPlayerIndex && prompt.canEp)
+                    session.SubmitResponseInt(7);
+                else if (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN)
+                {
+                    if (session.TurnPlayer == session.AiPlayerIndex && OffersBook(prompt))
+                    {
+                        if (session.CurrentPhase == YgoConstants.PHASE_STANDBY)
+                        {
+                            AssertTrue(prompt.speCount > 0, "The prior hint heuristic would not offer Book of Moon in this Standby Phase.");
+                            VerifyBookPolicy(prompt, "in the opponent's Standby Phase", false);
+                            sawStandby = true;
+                        }
+                        else if (session.CurrentPhase == YgoConstants.PHASE_END)
+                        {
+                            VerifyBookPolicy(prompt, "in the opponent's End Phase", true);
+                            sawEnd = true;
+                        }
+                    }
+                    session.SubmitResponseInt(-1);
+                }
+                else throw new InvalidOperationException($"Unexpected prompt testing opponent response windows: {prompt.messageType}.");
+            }
+            AssertTrue(sawStandby && sawEnd && session.RetryCount == 0, "Did not reach both opponent phase response windows.");
+            Debug.Log("[VERIFY CHAIN CONFIRMATION] AUTO, OFF and ON passed native Summon, Set, Spell and opponent phase windows.");
         }
 
         private static void VerifyDeckSearchEmergencyCall(uint[] oppDeckMain)

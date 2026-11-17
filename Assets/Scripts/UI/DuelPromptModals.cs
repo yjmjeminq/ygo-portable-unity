@@ -48,6 +48,7 @@ namespace YGOPortable.UI
         private Button _chainActivate;
         private Button _chainPass;
         private int _chainSelection;
+        private int[] _chainCandidateIndices;
 
         // Zone viewer refs
         private Text _zoneTitle;
@@ -82,6 +83,7 @@ namespace YGOPortable.UI
 
         public bool IsPromptOpen => ModalRoot != null && ModalRoot.activeSelf;
         public bool IsZoneViewerOpen => ZoneViewRoot != null && ZoneViewRoot.activeSelf;
+        internal bool IsChainPromptOpen => IsPromptOpen && _chainPrompt;
         internal bool IsShowingField => IsPromptOpen && _promptShade.ShowingField;
         internal Selectable FieldViewControl => _fieldViewButton;
         private bool CanAnswerPrompt => IsPromptOpen && !IsZoneViewerOpen && !IsShowingField;
@@ -103,6 +105,7 @@ namespace YGOPortable.UI
         }
 
         internal void SetBrowsablePiles(params DuelZoneImage[] piles) => _promptShade.BrowsablePiles = piles;
+        internal void SetChainConfirmationControl(Button button) => _promptShade.ChainConfirmationControl = button;
 
         internal bool IsPointOverBrowsablePile(Vector2 point)
         {
@@ -304,6 +307,7 @@ namespace YGOPortable.UI
         private void SetFieldView(bool showing)
         {
             _promptShade.ShowingField = showing;
+            _promptShade.ChainConfirmationAvailable = _chainPrompt;
             _promptShade.color = showing ? Color.clear : new Color(0f, .02f, .07f, .11f);
             _chainBox.gameObject.SetActive(_chainPrompt && !showing);
             _modalBox.gameObject.SetActive(!_chainPrompt && !showing);
@@ -440,7 +444,8 @@ namespace YGOPortable.UI
             TryCancelOrPass();
         }
 
-        public void ShowPrompt(DuelSession session, DuelPrompt prompt)
+        public void ShowPrompt(DuelSession session, DuelPrompt prompt,
+            ChainConfirmationMode chainConfirmation = ChainConfirmationMode.On)
         {
             if (!IsPromptOpen) _focusBeforePrompt = EventSystem.current?.currentSelectedGameObject;
             _focusBeforeKeyboard = null;
@@ -471,7 +476,7 @@ namespace YGOPortable.UI
 
             if (_chainPrompt)
             {
-                RenderChainPicker(session, prompt);
+                RenderChainPicker(session, prompt, chainConfirmation);
                 PrepareFocusControls(_chainBox, OnModalCloseClicked);
                 FocusPrompt();
                 return;
@@ -629,7 +634,7 @@ namespace YGOPortable.UI
             }
         }
 
-        private void RenderChainPicker(DuelSession session, DuelPrompt prompt)
+        private void RenderChainPicker(DuelSession session, DuelPrompt prompt, ChainConfirmationMode chainConfirmation)
         {
             bool singleEffect = prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN;
             IReadOnlyList<SelectableCardItem> choices = singleEffect
@@ -642,6 +647,14 @@ namespace YGOPortable.UI
                     description = prompt.promptEffectDesc != 0 ? prompt.promptEffectDesc : prompt.promptDesc,
                 } }
                 : prompt.candidates;
+            _chainCandidateIndices = null;
+            if (chainConfirmation != ChainConfirmationMode.On && !singleEffect)
+            {
+                // Hide fast responses without changing the indices sent back to the engine.
+                _chainCandidateIndices = Enumerable.Range(0, prompt.candidates.Count)
+                    .Where(index => session.IsChainCandidateVisible(prompt, prompt.candidates[index], chainConfirmation)).ToArray();
+                choices = _chainCandidateIndices.Select(index => prompt.candidates[index]).ToArray();
+            }
             _chainTitle.text = prompt.forced ? "필수 효과 순서 선택" : "발동할 효과 선택";
             _chainSummary.text = $"체인 {session.CurrentChain.Count + 1}  ·  {choices.Count}개";
             _chainPass.transform.parent.gameObject.SetActive(!prompt.forced);
@@ -749,8 +762,9 @@ namespace YGOPortable.UI
         private void ConfirmChainChoice()
         {
             if (_chainSelection < 0 || _curPrompt == null) return;
-            if (_curPrompt.messageType == YgoConstants.MSG_SELECT_CHAIN && _chainSelection < _curPrompt.candidates.Count)
-                Submit(BitConverter.GetBytes(_chainSelection));
+            if (_curPrompt.messageType == YgoConstants.MSG_SELECT_CHAIN &&
+                _chainSelection < (_chainCandidateIndices?.Length ?? _curPrompt.candidates.Count))
+                Submit(BitConverter.GetBytes(_chainCandidateIndices?[_chainSelection] ?? _chainSelection));
             else if (_curPrompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN)
                 Submit(BitConverter.GetBytes(1));
         }
@@ -1802,6 +1816,8 @@ namespace YGOPortable.UI
     {
         internal DuelZoneImage[] BrowsablePiles { get; set; } = Array.Empty<DuelZoneImage>();
         internal bool ShowingField { get; set; }
+        internal Button ChainConfirmationControl { get; set; }
+        internal bool ChainConfirmationAvailable { get; set; }
 
         internal bool IsPointOverPile(Vector2 screenPoint, Camera eventCamera)
         {
@@ -1813,7 +1829,13 @@ namespace YGOPortable.UI
             return false;
         }
 
-        public override bool IsRaycastLocationValid(Vector2 screenPoint, Camera eventCamera) =>
-            !ShowingField || !IsPointOverPile(screenPoint, eventCamera);
+        public override bool IsRaycastLocationValid(Vector2 screenPoint, Camera eventCamera)
+        {
+            var control = ChainConfirmationControl;
+            if (ChainConfirmationAvailable && control != null && control.isActiveAndEnabled && control.IsInteractable() &&
+                RectTransformUtility.RectangleContainsScreenPoint((RectTransform)control.transform, screenPoint, eventCamera))
+                return false;
+            return !ShowingField || !IsPointOverPile(screenPoint, eventCamera);
+        }
     }
 }

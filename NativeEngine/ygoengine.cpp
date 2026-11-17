@@ -336,6 +336,28 @@ YGO_API uint64_t YGO_GetSingleTriggerDescription(void* handle, uint8_t player, u
     return effect && effect->get_handler() == prompt->pcard ? effect->description : 0;
 }
 
+YGO_API int32_t YGO_GetChainTriggerFlags(void* handle, uint8_t player, uint8_t* flags, uint32_t count) {
+    if (!handle || !flags) return 0;
+    auto& core = static_cast<duel*>(handle)->game_field->core;
+    if (core.units.empty() || core.select_chains.size() != count) return 0;
+    const auto* prompt = Processors::get_opt_variant<Processors::SelectChain>(core.units.front());
+    if (!prompt || prompt->step != 1 || prompt->playerid != player) return 0;
+
+    // SelectChain sorts this list before sending the candidates, so these flags
+    // use the same indices as both the wire message and the submitted response.
+    constexpr uint16_t trigger_types = EFFECT_TYPE_TRIGGER_O | EFFECT_TYPE_TRIGGER_F | EFFECT_TYPE_CONTINUOUS;
+    constexpr uint8_t triggered_effect = 1 << 0;
+    constexpr uint8_t event_specific_effect = 1 << 1;
+    for (const auto& option : core.select_chains) {
+        const auto* effect = option.triggering_effect;
+        uint8_t kind = 0;
+        if ((option.flag & CHAIN_HAND_TRIGGER) || (effect->type & trigger_types)) kind |= triggered_effect;
+        if (effect->code != EVENT_FREE_CHAIN) kind |= event_specific_effect;
+        *flags++ = kind;
+    }
+    return 1;
+}
+
 YGO_API void YGO_SetResponse(void* duel, const void* buf, uint32_t len) {
     if (duel) OCG_DuelSetResponse(static_cast<OCG_Duel>(duel), buf, len);
 }

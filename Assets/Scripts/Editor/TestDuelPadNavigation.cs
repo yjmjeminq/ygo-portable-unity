@@ -59,7 +59,10 @@ namespace YGOPortable.Editor
             try
             {
                 var modals = new DuelPromptModals(canvas.transform, code => field.InspectCard(code), bytes => session.SubmitResponse(bytes));
-                field = new DuelFieldUI(canvasObject.AddComponent<GameAppController>(), canvas.transform, modals);
+                var app = canvasObject.AddComponent<GameAppController>();
+                field = new DuelFieldUI(app, canvas.transform, modals);
+                typeof(GameAppController).GetField("_session", Private).SetValue(app, session);
+                typeof(GameAppController).GetField("_duelField", Private).SetValue(app, field);
                 Advance(session, prompt => prompt.playerId == session.HumanPlayerIndex && prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD);
                 field.BindSession(session, null, null);
                 Canvas.ForceUpdateCanvases();
@@ -79,16 +82,30 @@ namespace YGOPortable.Editor
                 Require(Get<RectTransform>(field, "_duelPadFocus") == chosen && ReferenceEquals(idle, session.ActivePrompt),
                     "Closing the card detail changed the selected card or advanced the duel.");
 
+                var chainButton = field.Root.transform.Find("ChainConfirmation/Button").GetComponent<Button>();
+                var chainLabel = chainButton.GetComponentInChildren<Text>();
+                Require(chainLabel.text == "AUTO", "Chain confirmation did not default to AUTO.");
                 Pad(field, RightShoulder);
-                Pad(field, A);
-                Require(modals.IsZoneViewerOpen && ReferenceEquals(idle, session.ActivePrompt), "The graveyard was not browsable.");
-                Pad(field, B);
-                Require(!modals.IsZoneViewerOpen, "The controller did not close the pile viewer.");
+                Require(chainLabel.text == "OFF", "Controller RB did not switch chain confirmation to OFF.");
+                ExecuteEvents.Execute(chainButton.gameObject,
+                    new PointerEventData(events) { button = PointerEventData.InputButton.Left }, ExecuteEvents.pointerClickHandler);
+                Require(chainLabel.text == "ON", "The mouse did not switch chain confirmation to ON.");
+                Pad(field, RightShoulder);
+                Require(chainLabel.text == "AUTO" && ReferenceEquals(idle, session.ActivePrompt),
+                    "Cycling chain confirmation changed a pending Main Phase command.");
 
                 var fake = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_EFFECTYN, playerId = (byte)session.HumanPlayerIndex,
                     promptCon = (byte)session.HumanPlayerIndex, promptLoc = YgoConstants.LOCATION_HAND, promptCardCode = Sparkman };
                 modals.ShowPrompt(session, fake);
+                Pad(field, RightShoulder);
+                Require(chainLabel.text == "OFF" && modals.IsPromptOpen && ReferenceEquals(idle, session.ActivePrompt),
+                    "Controller RB could not switch chain confirmation during an effect prompt.");
                 modals.ModalRoot.transform.Find("FieldView/B").GetComponent<Button>().onClick.Invoke();
+                Pad(field, RightShoulder);
+                Pad(field, A);
+                Require(modals.IsZoneViewerOpen && ReferenceEquals(idle, session.ActivePrompt), "The graveyard was not browsable.");
+                Pad(field, B);
+                Require(!modals.IsZoneViewerOpen, "The controller did not close the graveyard.");
                 Pad(field, LeftShoulder);
                 Pad(field, A);
                 Require(modals.IsZoneViewerOpen && ReferenceEquals(idle, session.ActivePrompt), "Field view could not open the Extra Deck with the controller.");

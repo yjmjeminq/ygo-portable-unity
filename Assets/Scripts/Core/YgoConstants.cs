@@ -143,6 +143,13 @@ namespace YGOPortable.Core
         public const int PHASE_MAIN2 = 0x100;
         public const int PHASE_END = 0x200;
 
+        // ygopro-core field.h hint flags in MSG_SELECT_CHAIN.
+        public const uint TIMING_END_PHASE = 0x20;
+        public const uint TIMING_SUMMON = 0x40;
+        public const uint TIMING_SPSUMMON = 0x80;
+        public const uint TIMING_FLIPSUMMON = 0x100;
+        public const uint TIMING_ATTACK = 0x1000;
+
         // Hints
         public const int HINT_EVENT = 1;
         public const int HINT_MESSAGE = 2;

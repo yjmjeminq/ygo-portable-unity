@@ -65,6 +65,11 @@ namespace YGOPortable.UI
         {
             if (_session == null || !Root.activeInHierarchy || !frame.HasInput ||
                 CardDragManager.Instance?.IsDragging == true) return;
+            if (frame.NextArea && CanToggleChainConfirmation && !_modals.IsShowingField)
+            {
+                _chainConfirmationButton.onClick.Invoke();
+                return;
+            }
             if (!_usingDuelPad)
             {
                 _duelPadFocus = EventSystem.current?.currentSelectedGameObject?.transform as RectTransform;
@@ -207,6 +212,7 @@ namespace YGOPortable.UI
             AddDuelPadPiles();
             AddDuelPadButton(_phaseButton);
             AddDuelPadButton(_duelPadInspectButton);
+            AddDuelPadButton(_chainConfirmationButton);
             AddDuelPadButton(_duelPadLogButton);
             AddDuelPadButton(_duelPadPauseButton);
         }
@@ -317,7 +323,7 @@ namespace YGOPortable.UI
                 return;
             }
             _hintBannerText.text = _duelPadBoardHint.Length > 0 ? _duelPadBoardHint :
-                scope == PadScope.Board ? "A 선택  X 카드 상세  Y 턴 진행  B 일시 정지" : "";
+                scope == PadScope.Board ? "A 선택  X 상세  Y 페이즈  RB 체인  B 정지" : "";
             if (!layoutChanged && _duelPadScope == scope && _duelPadFocus != null &&
                 _duelPadFocus.gameObject.activeInHierarchy) return;
             BuildDuelPadTargets(scope);

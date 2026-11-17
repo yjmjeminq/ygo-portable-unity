@@ -23,6 +23,7 @@ namespace YGOPortable.UI
     {
         public float AiStepDelay { get; set; } = 0.25f;
         public AIDifficulty AiDifficulty { get; set; } = AIDifficulty.Smart;
+        internal ChainConfirmationMode ChainConfirmation { get; private set; } = ChainConfirmationMode.Auto;
 
         private TitleAndMenuUI _titleAndMenu;
         private OpponentSelectUI _oppSelect;
@@ -240,6 +241,7 @@ namespace YGOPortable.UI
             ShowScreen(AppScreen.Duel);
             _session.PreparePlayerIndices(playerGoesFirst);
             _duelField.BindSession(_session, oppChar, oppDeck);
+            _duelField.RefreshChainConfirmation(ChainConfirmation);
             if (!_session.StartNewDuel(
                 myDeck.main, myDeck.extra,
                 oppDeck.main, oppDeck.extra,
@@ -327,6 +329,15 @@ namespace YGOPortable.UI
                 return;
             }
 
+            if (_session.ShouldPassChainPrompt(prompt, ChainConfirmation))
+            {
+                _shownHumanPrompt = null;
+                _modals.HideAll();
+                _session.SubmitResponseInt(-1);
+                _duelField.Refresh();
+                return;
+            }
+
             // Human prompt
             if (_shownHumanPrompt != prompt)
             {
@@ -338,13 +349,34 @@ namespace YGOPortable.UI
                     prompt.messageType != YgoConstants.MSG_SELECT_PLACE &&
                     prompt.messageType != YgoConstants.MSG_SELECT_DISFIELD)
                 {
-                    _modals.ShowPrompt(_session, prompt);
+                    _modals.ShowPrompt(_session, prompt, ChainConfirmation);
                 }
                 else
                 {
                     _modals.HideAll();
                 }
             }
+        }
+
+        internal void CycleChainConfirmation()
+        {
+            if (_session == null || _session.IsFinished || _duelField.IsPaused ||
+                _duelField.IsReadingLog || _duelField.IsBrowsingZone) return;
+
+            var nextMode = ChainConfirmation switch
+            {
+                ChainConfirmationMode.Auto => ChainConfirmationMode.Off,
+                ChainConfirmationMode.Off => ChainConfirmationMode.On,
+                _ => ChainConfirmationMode.Auto,
+            };
+            var prompt = _shownHumanPrompt;
+            if (prompt?.messageType == YgoConstants.MSG_SELECT_CHAIN &&
+                prompt.candidates.Exists(candidate =>
+                    _session.IsChainCandidateVisible(prompt, candidate, ChainConfirmation) !=
+                    _session.IsChainCandidateVisible(prompt, candidate, nextMode)))
+                _shownHumanPrompt = null;
+            ChainConfirmation = nextMode;
+            _duelField.RefreshChainConfirmation(ChainConfirmation);
         }
 
         private void HandleMenuInput(DeckPadFrame frame, bool escape)

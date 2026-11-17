@@ -42,6 +42,8 @@ namespace YGOPortable.UI
         private Text _hintBannerText;
         private Text _chainBannerText;
         private Image _chainIcon;
+        private Button _chainConfirmationButton;
+        private Text _chainConfirmationLabel;
 
         // Phase indicator and shortcuts
         private Image _phasePlate;
@@ -654,11 +656,43 @@ namespace YGOPortable.UI
             var log = LotdUiKit.CreateRect("OpenLog", root, new Vector2(0.910f, 0.035f), new Vector2(0.984f, 0.092f),
                 Vector2.zero, Vector2.zero);
             _duelPadLogButton = BuildHudControl(log, DuelVisualAssets.LogIcon, "대전 기록", OpenDuelLog);
+            var chainConfirmation = LotdUiKit.CreateRect("ChainConfirmation", root,
+                new Vector2(.825f, .035f), new Vector2(.901f, .092f), Vector2.zero, Vector2.zero);
+            _chainConfirmationButton = DuelStyle.Button(chainConfirmation, "Button", "AUTO", CycleChainConfirmation, 15);
+            _chainConfirmationButton.navigation = new Navigation { mode = Navigation.Mode.None };
+            _chainConfirmationLabel = _chainConfirmationButton.GetComponentInChildren<Text>();
+            _chainConfirmationLabel.rectTransform.anchorMax = new Vector2(1f, .66f);
+            var chainCaption = LotdUiKit.CreateRect("Caption", _chainConfirmationButton.transform,
+                new Vector2(.04f, .58f), new Vector2(.96f, .99f), Vector2.zero, Vector2.zero);
+            LotdUiKit.AddFittedText(chainCaption, "Label", "체인 확인", 11, 8, TextAnchor.MiddleCenter, DuelStyle.Muted);
+            _modals.SetChainConfirmationControl(_chainConfirmationButton);
 
             var hint = LotdUiKit.CreateRect("ActionHint", root, new Vector2(0.294f, 0.187f), new Vector2(0.752f, 0.225f),
                 Vector2.zero, Vector2.zero);
             _hintBannerText = LotdUiKit.AddText(hint, "Text", "", 15, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
             _hintBannerText.gameObject.AddComponent<Outline>().effectColor = LotdUiKit.BgDeep;
+        }
+
+        private bool CanToggleChainConfirmation =>
+            _session != null && !_session.IsFinished && !IsPaused && !IsReadingLog && !IsBrowsingZone &&
+            !_cardZoomModal.activeSelf && !_actionPopup.activeSelf && !_phasePicker.activeSelf &&
+            !_modals.ResultRoot.activeSelf && (!_modals.IsPromptOpen || _modals.IsChainPromptOpen);
+
+        private void CycleChainConfirmation()
+        {
+            if (CanToggleChainConfirmation) _app?.CycleChainConfirmation();
+        }
+
+        internal void RefreshChainConfirmation(ChainConfirmationMode mode)
+        {
+            _chainConfirmationLabel.text = mode.ToString().ToUpperInvariant();
+            _chainConfirmationLabel.color = mode switch
+            {
+                ChainConfirmationMode.On => DuelStyle.Player,
+                ChainConfirmationMode.Off => DuelStyle.Muted,
+                _ => Color.white
+            };
+            RefreshHandGlows(force: true);
         }
 
         private void BuildActionPopup(Transform root)
@@ -1053,8 +1087,10 @@ namespace YGOPortable.UI
                 case YgoConstants.MSG_SELECT_BATTLECMD:
                     return HasHandAction(controller, sequence);
                 case YgoConstants.MSG_SELECT_CHAIN:
+                    var mode = _app?.ChainConfirmation ?? ChainConfirmationMode.Auto;
                     return prompt.candidates.Exists(item => item.controller == controller &&
-                        item.location == YgoConstants.LOCATION_HAND && item.sequence == sequence);
+                        item.location == YgoConstants.LOCATION_HAND && item.sequence == sequence &&
+                        _session.IsChainCandidateVisible(prompt, item, mode));
                 case YgoConstants.MSG_SELECT_EFFECTYN:
                     return prompt.promptCon == controller && prompt.promptLoc == YgoConstants.LOCATION_HAND &&
                         prompt.promptSeq == sequence;

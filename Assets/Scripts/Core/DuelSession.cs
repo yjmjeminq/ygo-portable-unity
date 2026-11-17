@@ -69,10 +69,19 @@ namespace YGOPortable.Core
         public uint position;
         public ulong description;
         public byte mode;
+        public bool isTriggeredEffect;
+        public bool isEventSpecificEffect;
         public bool directAttackable;
         public byte releaseParam;
         public uint sumParam;
         public uint currentCounter;
+    }
+
+    public enum ChainConfirmationMode
+    {
+        Auto,
+        Off,
+        On,
     }
 
     public class DuelPrompt
@@ -107,6 +116,9 @@ namespace YGOPortable.Core
         public bool forced;
         public byte speCount;
         public bool IsTriggerChain => speCount == 0x7f;
+        public uint hintTimingSelf;
+        public uint hintTimingOther;
+        internal bool chainTriggerInfoMissing;
         public bool isChainSort;
         public bool sumExactCountZeroAny;
         public uint min;
@@ -135,6 +147,9 @@ namespace YGOPortable.Core
 
     public class DuelSession : IDisposable
     {
+        private const byte TriggeredEffectFlag = 1 << 0;
+        private const byte EventSpecificEffectFlag = 1 << 1;
+
         public IntPtr NativePtr { get; private set; }
         public int TurnNumber { get; private set; }
         public int TurnPlayer { get; private set; }
@@ -303,6 +318,35 @@ namespace YGOPortable.Core
             ActivePrompt = null;
             AddLog(losingPlayer == HumanPlayerIndex ? "플레이어가 항복했습니다." : "상대가 항복했습니다.");
         }
+
+        public bool ShouldPassChainPrompt(DuelPrompt prompt, ChainConfirmationMode mode)
+        {
+            if (!IsHumanOptionalChainPrompt(prompt)) return false;
+            foreach (var candidate in prompt.candidates)
+                if (IsChainCandidateVisible(prompt, candidate, mode)) return false;
+            return true;
+        }
+
+        public bool IsChainCandidateVisible(DuelPrompt prompt, SelectableCardItem candidate, ChainConfirmationMode mode) =>
+            ShouldOfferFastChainEffects(prompt, mode) || candidate.isTriggeredEffect ||
+            (mode == ChainConfirmationMode.Auto && candidate.isEventSpecificEffect);
+
+        public bool ShouldOfferFastChainEffects(DuelPrompt prompt, ChainConfirmationMode mode)
+        {
+            if (!IsHumanOptionalChainPrompt(prompt) || prompt.chainTriggerInfoMissing ||
+                mode == ChainConfirmationMode.On) return true;
+            if (mode == ChainConfirmationMode.Off) return false;
+
+            const uint summonOrAttack = YgoConstants.TIMING_SUMMON | YgoConstants.TIMING_SPSUMMON |
+                YgoConstants.TIMING_FLIPSUMMON | YgoConstants.TIMING_ATTACK;
+            return CurrentChain.Count > 0 ||
+                ((prompt.hintTimingSelf | prompt.hintTimingOther) & summonOrAttack) != 0 ||
+                (TurnPlayer != HumanPlayerIndex && (prompt.hintTimingOther & YgoConstants.TIMING_END_PHASE) != 0);
+        }
+
+        private bool IsHumanOptionalChainPrompt(DuelPrompt prompt) =>
+            prompt?.messageType == YgoConstants.MSG_SELECT_CHAIN && prompt.playerId == HumanPlayerIndex &&
+            !prompt.forced && !prompt.IsTriggerChain;
 
         public void StepUntilPrompt()
         {
@@ -932,8 +976,8 @@ namespace YGOPortable.Core
                     };
                     p.speCount = br.ReadByte(); // 0x7f when SEGOC trigger chain (mandatory/optional triggers)
                     p.forced = br.ReadByte() != 0;
-                    br.ReadUInt32(); // hint_timing self
-                    br.ReadUInt32(); // hint_timing opp
+                    p.hintTimingSelf = br.ReadUInt32();
+                    p.hintTimingOther = br.ReadUInt32();
                     uint cnt = br.ReadUInt32();
                     for (uint i = 0; i < cnt; i++)
                     {
@@ -941,6 +985,17 @@ namespace YGOPortable.Core
                         item.description = br.ReadUInt64();
                         item.mode = br.ReadByte();
                         p.candidates.Add(item);
+                    }
+                    if (cnt != 0 && IsHumanOptionalChainPrompt(p))
+                    {
+                        var triggerFlags = new byte[p.candidates.Count];
+                        p.chainTriggerInfoMissing = YgoNativeBridge.YGO_GetChainTriggerFlags(
+                            NativePtr, p.playerId, triggerFlags, cnt) == 0;
+                        for (int i = 0; i < triggerFlags.Length; i++)
+                        {
+                            p.candidates[i].isTriggeredEffect = (triggerFlags[i] & TriggeredEffectFlag) != 0;
+                            p.candidates[i].isEventSpecificEffect = (triggerFlags[i] & EventSpecificEffectFlag) != 0;
+                        }
                     }
                     ActivePrompt = p;
                     break;
