@@ -1,0 +1,54 @@
+--- a/processor.cpp
++++ b/processor.cpp
+@@ -15,6 +15,10 @@
+ #include "field.h"
+ #include "group.h"
+ #include "interpreter.h"
++
++namespace {
++constexpr std::size_t master_duel_chain_limit = 16;
++}
+
+ bool field::process(Processors::ExecuteCost& arg) {
+ 	auto step = arg.step;
+@@ -610,6 +614,11 @@
+ 	}
+ 	case 2: {
+ 		//forced trigger
++		if(core.current_chain.size() >= master_duel_chain_limit) {
++			// Resolve this chain and leave unselected triggers for the next PointEvent.
++			arg.step = 9;
++			return FALSE;
++		}
+ 		core.select_chains.clear();
+ 		for (auto clit = core.new_fchain_s.begin(); clit != core.new_fchain_s.end(); ) {
+ 			effect* peffect = clit->triggering_effect;
+@@ -683,6 +692,10 @@
+ 	}
+ 	case 4: {
+ 		//optional trigger
++		if(core.current_chain.size() >= master_duel_chain_limit) {
++			arg.step = 9;
++			return FALSE;
++		}
+ 		core.select_chains.clear();
+ 		for (auto clit = core.new_ochain_s.begin(); clit != core.new_ochain_s.end(); ) {
+ 			effect* peffect = clit->triggering_effect;
+@@ -941,6 +954,17 @@
+ 	return TRUE;
+ }
+ bool field::process(Processors::QuickEffect& arg) {
++	if(core.current_chain.size() + core.new_chains.size() >= master_duel_chain_limit) {
++		// Forced fast effects can already be queued, but their remaining candidates
++		// cannot respond to this chain once its last slot was filled.
++		core.quick_f_chain.clear();
++		core.select_chains.clear();
++		if(!core.new_chains.empty())
++			emplace_process<Processors::AddChain>();
++		core.hint_timing[0] &= TIMING_DAMAGE_STEP | TIMING_DAMAGE_CAL;
++		core.hint_timing[1] &= TIMING_DAMAGE_STEP | TIMING_DAMAGE_CAL;
++		return TRUE;
++	}
+ 	auto skip_freechain = arg.skip_freechain;
+ 	auto priority = arg.priority_player;
+ 	switch(arg.step) {

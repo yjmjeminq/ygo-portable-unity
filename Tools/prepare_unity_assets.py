@@ -583,6 +583,40 @@ def build_script_pack(all_codes: set):
     if 40975243 in all_codes:
         scripts["c40975243.lua"] = (UNITY_ROOT / "Tools" / "ScriptOverrides" / "c40975243.lua").read_bytes()
 
+    # Master Duel automatically makes blind random selections. These effects reveal and
+    # shuffle the candidates before choosing one, and their card text explicitly says random.
+    random_opponent_groups = {
+        14733538: "sg1",   # Draco Face-Off
+        21888494: "sg1",   # Chosen One
+        23270035: "g",     # Monster Assortment
+        23898021: "sg",    # Lilith, Lady of Lament
+        32360466: "sg",    # Beginning of Heaven and Earth
+        40230018: "revg",  # Spellbook Library of the Crescent
+        50756327: "sg1",   # Crowley, the First Propheseer
+        58753372: "cg",    # Super Quantal Fairy Alphan
+        64280356: "sg",    # Kozmo Tincan
+        70508653: "g",     # Tool Box
+        72813401: "sg",    # Hi-Speedroid Rubber Band Shooter
+        93437091: "sg",    # Bingo Machine, Go!!!
+    }
+    for code, group in random_opponent_groups.items():
+        if code not in all_codes:
+            continue
+        name = f"c{code}.lua"
+        select = f"{group}:Select(1-tp,1,1,nil)".encode("ascii")
+        random_select = f"{group}:RandomSelect(1-tp,1)".encode("ascii")
+        script = scripts[name]
+        if script.count(select) != 1:
+            if random_select in script and select not in script:
+                continue
+            raise ValueError(f"Review the random selection override for {name}: expected one matching call")
+        lines = script.splitlines(keepends=True)
+        index = next(i for i, line in enumerate(lines) if select in line)
+        lines[index] = lines[index].replace(select, random_select)
+        if index > 0 and lines[index - 1].lstrip().startswith(b"Duel.Hint(HINT_SELECTMSG,"):
+            del lines[index - 1]
+        scripts[name] = b"".join(lines)
+
     # Possessed Destiny's summon check mistakenly uses Duel.SpecialSummon's
     # argument order. Its destination player defaults to the summoning player.
     if "c45508030.lua" in scripts:

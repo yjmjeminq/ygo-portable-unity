@@ -8,6 +8,31 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 set(YGOPRO_CORE_DIR "C:/Users/y/AppData/Local/YGO-PC-Full/OpenDuelEngine/ygopro-core" CACHE PATH "Path to ygopro-core source")
 
 file(GLOB CORE_CPP "${YGOPRO_CORE_DIR}/*.cpp" "${YGOPRO_CORE_DIR}/RNG/*.cpp")
+
+# Apply the project's chain rule without changing the shared OpenDuelEngine source.
+find_package(Git REQUIRED)
+set(CORE_PROCESSOR "${YGOPRO_CORE_DIR}/processor.cpp")
+set(CHAIN_PATCH "${CMAKE_CURRENT_SOURCE_DIR}/master_duel_chain_limit.patch")
+set(CORE_PATCH_STAGE "${CMAKE_CURRENT_BINARY_DIR}/core-patch-stage")
+set(CORE_PROCESSOR_PATCHED "${CMAKE_CURRENT_BINARY_DIR}/processor.cpp")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CORE_PROCESSOR}" "${CHAIN_PATCH}")
+file(MAKE_DIRECTORY "${CORE_PATCH_STAGE}")
+file(READ "${CORE_PROCESSOR}" CORE_PROCESSOR_SOURCE)
+file(WRITE "${CORE_PATCH_STAGE}/processor.cpp" "${CORE_PROCESSOR_SOURCE}")
+execute_process(
+    COMMAND "${CMAKE_COMMAND}" -E env "GIT_CEILING_DIRECTORIES=${CMAKE_CURRENT_BINARY_DIR}"
+        "${GIT_EXECUTABLE}" apply --no-index --ignore-space-change "${CHAIN_PATCH}"
+    WORKING_DIRECTORY "${CORE_PATCH_STAGE}"
+    RESULT_VARIABLE CHAIN_PATCH_RESULT
+    ERROR_VARIABLE CHAIN_PATCH_ERROR
+)
+if(NOT CHAIN_PATCH_RESULT EQUAL 0)
+    message(FATAL_ERROR "Could not apply the chain limit to ygopro-core's processor.cpp:\n${CHAIN_PATCH_ERROR}")
+endif()
+configure_file("${CORE_PATCH_STAGE}/processor.cpp" "${CORE_PROCESSOR_PATCHED}" COPYONLY)
+list(REMOVE_ITEM CORE_CPP "${CORE_PROCESSOR}")
+list(APPEND CORE_CPP "${CORE_PROCESSOR_PATCHED}")
+
 file(GLOB LUA_SRC "${YGOPRO_CORE_DIR}/lua/src/*.c")
 list(FILTER LUA_SRC EXCLUDE REGEX ".*(lbitlib|lcorolib|ldblib|linit|loadlib|loslib|ltests|lua|luac|lutf8lib|onelua)\\.c$")
 set_source_files_properties(${LUA_SRC} PROPERTIES LANGUAGE CXX)

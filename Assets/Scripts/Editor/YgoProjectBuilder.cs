@@ -345,6 +345,7 @@ namespace YGOPortable.Editor
 
             // Explicit test for User scenario: E-Emergency Call (213326) -> pick 3rd card (idx=2) from Deck
             VerifyDeckSearchEmergencyCall(classicDecks[0].main);
+            VerifyBingoMachineAutoPick();
 
             // Explicit test for older searchers finding newest 2025/2026 cards across Category/Type/Race/Stats/Level
             VerifyOldSearchersFindNewestCards(classicDecks[0].main);
@@ -580,6 +581,47 @@ namespace YGOPortable.Editor
             AssertTrue(!keyboard.gameObject.activeSelf && opponents.Root.activeSelf,
                 "Canceling the opponent search keyboard should stay on opponent selection.");
             Debug.Log("[VERIFY MENU PAD] Pointer-to-controller handoff, Settings, opponent paging and search keyboard passed.");
+        }
+
+        private static void VerifyBingoMachineAutoPick()
+        {
+            const uint bingo = 93437091;
+            const uint filler = 46986414;
+            uint[] offeredCodes = { 89631139, 38517737, 30576089 };
+            uint[] deck = offeredCodes.Concat(new[] { bingo })
+                .SelectMany(code => Enumerable.Repeat(code, 3))
+                .Concat(Enumerable.Repeat(filler, 28)).ToArray();
+            using var session = StartSeedMatching("Bingo Machine", deck, Array.Empty<uint>(),
+                Enumerable.Repeat(filler, 40).ToArray(), Array.Empty<uint>(), true,
+                duel => duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD &&
+                    duel.ActivePrompt.activatable.Any(card => card.code == bingo));
+
+            var ai = new TacticalAI();
+            var player = session.Players[0];
+            int deckBefore = player.deckCount;
+            int offeredInHandBefore = player.hand.Count(card => offeredCodes.Contains(card.code));
+            int activation = session.ActivePrompt.activatable.FindIndex(card => card.code == bingo);
+            session.SubmitResponseInt((activation << 16) | 5);
+
+            bool revealedCards = false;
+            DriveUntilIdle(session, ai, prompt =>
+            {
+                if (prompt.messageType != YgoConstants.MSG_SELECT_CARD) return null;
+                AssertTrue(!revealedCards && prompt.playerId == 0 && prompt.min == 3 && prompt.max == 3,
+                    "Bingo Machine should only ask the activating player to choose three cards to reveal.");
+                int[] picks = offeredCodes.Select(code => prompt.candidates.FindIndex(card => card.code == code)).ToArray();
+                AssertTrue(picks.All(index => index >= 0), "Bingo Machine did not offer all three Blue-Eyes cards.");
+                revealedCards = true;
+                byte[] response = new byte[20];
+                Buffer.BlockCopy(new[] { 0, picks.Length, picks[0], picks[1], picks[2] }, 0, response, 0, response.Length);
+                return response;
+            });
+
+            AssertTrue(revealedCards && session.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD &&
+                player.deckCount == deckBefore - 1 && player.grave.Any(card => card.code == bingo) &&
+                player.hand.Count(card => offeredCodes.Contains(card.code)) == offeredInHandBefore + 1 &&
+                session.RetryCount == 0, "Bingo Machine should put one revealed card in hand without an opponent prompt.");
+            Debug.Log("[VERIFY BINGO] One revealed card was automatically added to hand without an opponent prompt.");
         }
 
         private static void VerifyDeckSearchEmergencyCall(uint[] oppDeckMain)
