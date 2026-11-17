@@ -212,6 +212,9 @@ namespace YGOPortable.UI
                 DeckRepository.SaveUserDeck(new UserDeck { name = "새 커스텀 덱" });
             }
             _workingDeck = CopyDeck(DeckRepository.UserDecks[_userDeckIdx]);
+            GroupDeckCopies(_workingDeck.main);
+            GroupDeckCopies(_workingDeck.extra);
+            GroupDeckCopies(_workingDeck.side);
             _deckNameInput.SetTextWithoutNotify(_workingDeck.name);
             RefreshDeckGrids();
             UpdateVirtualTrunkSlots(_lastFirstRow, force: true);
@@ -687,11 +690,21 @@ namespace YGOPortable.UI
                 view.SetCard(code);
 
                 bool showOwnership = CollectionProgress.Initialized;
-                int copies = CountInWorkingDeck(code, combineAlternateArts: !showOwnership);
-                int owned = showOwnership ? CollectionProgress.GetOwnedCount(code) : 0;
-                count.transform.parent.gameObject.SetActive(showOwnership || copies > 0);
-                count.text = showOwnership ? $"{copies}/{owned}" : copies.ToString();
-                count.color = showOwnership && copies > owned ? LotdUiKit.RedAccent : Color.white;
+                if (showOwnership)
+                {
+                    int remaining = GetRemainingTrunkCopies(code, out int owned, out int inDeck);
+                    count.transform.parent.gameObject.SetActive(true);
+                    count.text = $"×{remaining}";
+                    count.color = inDeck > owned ? LotdUiKit.RedAccent :
+                        remaining == 0 ? LotdUiKit.TextMuted : Color.white;
+                }
+                else
+                {
+                    int copies = CountInWorkingDeck(code);
+                    count.transform.parent.gameObject.SetActive(copies > 0);
+                    count.text = copies.ToString();
+                    count.color = Color.white;
+                }
                 trigger.CardCodeGetter = () => code;
                 trigger.IndexGetter = () => index;
                 trigger.OnPointerEnterAction = () => SetMouseCardVisual(rect, code);
@@ -794,13 +807,17 @@ namespace YGOPortable.UI
             var source = GetDeckList(sourceZone);
             var target = GetDeckList(targetZone);
             if (source == null || target == null || sourceIndex < 0 || sourceIndex >= source.Count) return;
-            bool sameZone = source == target;
-            int landing = targetIndex < 0 ? target.Count : Mathf.Min(targetIndex, target.Count - (sameZone ? 1 : 0));
-            if (sameZone && (targetIndex < 0 || landing == sourceIndex)) return;
+            if (source == target)
+            {
+                ReorderDeckGroup(sourceZone, source, sourceIndex, targetIndex, dropPosition);
+                return;
+            }
+
             uint code = source[sourceIndex];
-            if (!sameZone && !CanPlaceCard(CardDatabase.Get(code), targetZone, target)) return;
+            if (!CanPlaceCard(CardDatabase.Get(code), targetZone, target)) return;
+            int landing = FindDeckInsertionIndex(target, code, targetIndex);
             var sourcePositions = CaptureDeckPositions(sourceZone, source.Count);
-            var targetPositions = sameZone ? sourcePositions : CaptureDeckPositions(targetZone, target.Count);
+            var targetPositions = CaptureDeckPositions(targetZone, target.Count);
             var origin = dropPosition.HasValue ? DropPose(dropPosition.Value) :
                 sourceIndex < sourcePositions.Length ? sourcePositions[sourceIndex] : null;
             source.RemoveAt(sourceIndex);
@@ -808,27 +825,94 @@ namespace YGOPortable.UI
             FinishDeckEdit();
             if (dropPosition.HasValue && !_padMode) RememberMouseCard(DeckPadArea(targetZone), landing);
 
-            if (sameZone)
+            AnimateDeckSlots(sourceZone, sourceIndex, source.Count, sourcePositions, i => i + 1);
+            AnimateDeckSlots(targetZone, landing + 1, target.Count, targetPositions, i => i - 1);
+            if (_padMode && CurrentPadDeck == sourceZone)
             {
-                bool movedForward = sourceIndex < landing;
-                int start = Mathf.Min(sourceIndex, landing);
-                int end = Mathf.Max(sourceIndex, landing);
-                AnimateDeckSlots(sourceZone, start, end + 1, sourcePositions,
-                    i => i == landing ? -1 : i + (movedForward ? 1 : -1));
-            }
-            else
-            {
-                AnimateDeckSlots(sourceZone, sourceIndex, source.Count, sourcePositions, i => i + 1);
-                AnimateDeckSlots(targetZone, landing + 1, target.Count, targetPositions, i => i - 1);
-                if (_padMode && CurrentPadDeck == sourceZone)
-                {
-                    var destination = DeckPadArea(targetZone);
-                    _padIndices[(int)destination] = landing;
-                    SwitchPadArea(destination);
-                }
+                var destination = DeckPadArea(targetZone);
+                _padIndices[(int)destination] = landing;
+                SwitchPadArea(destination);
             }
             var targetSlots = GetDeckSlots(targetZone);
             if (landing < targetSlots.Count) AnimateTransfer(code, origin, (RectTransform)targetSlots[landing].card.transform);
+        }
+
+        private void ReorderDeckGroup(DragSourceType zone, List<uint> cards, int sourceIndex, int targetIndex,
+            Vector2? dropPosition)
+        {
+            if (targetIndex < 0) return;
+            targetIndex = Mathf.Min(targetIndex, cards.Count - 1);
+            int start = DeckGroupStart(cards, sourceIndex);
+            int end = DeckGroupEnd(cards, sourceIndex);
+            if (targetIndex >= start && targetIndex < end) return;
+
+            bool forward = targetIndex >= end;
+            int length = end - start;
+            int startAfterMove = forward ? DeckGroupEnd(cards, targetIndex) - length : DeckGroupStart(cards, targetIndex);
+            int landing = startAfterMove + sourceIndex - start;
+            var oldPositions = CaptureDeckPositions(zone, cards.Count);
+            var origin = dropPosition.HasValue ? DropPose(dropPosition.Value) :
+                sourceIndex < oldPositions.Length ? oldPositions[sourceIndex] : null;
+            uint code = cards[sourceIndex];
+            var group = cards.GetRange(start, length);
+            cards.RemoveRange(start, length);
+            cards.InsertRange(startAfterMove, group);
+            FinishDeckEdit();
+            var area = DeckPadArea(zone);
+            if (_padMode && CurrentPadDeck == zone) _padIndices[(int)area] = landing;
+            else if (dropPosition.HasValue && !_padMode) RememberMouseCard(area, landing);
+
+            int firstChanged = Mathf.Min(start, startAfterMove);
+            int lastChanged = Mathf.Max(start, startAfterMove) + length;
+            AnimateDeckSlots(zone, firstChanged, lastChanged, oldPositions, index =>
+            {
+                if (index == landing) return -1;
+                if (index >= startAfterMove && index < startAfterMove + length) return start + index - startAfterMove;
+                return index + (forward ? length : -length);
+            });
+            var slots = GetDeckSlots(zone);
+            if (landing < slots.Count) AnimateTransfer(code, origin, (RectTransform)slots[landing].card.transform);
+        }
+
+        private static uint DeckGroupKey(uint code)
+        {
+            uint key = CollectionProgress.GetDeckCopyKey(code);
+            return key != code && CardDatabase.Get(key) is CardInfo original && !string.IsNullOrEmpty(original.name) &&
+                CardDatabase.Get(code)?.name == original.name ? key : code;
+        }
+
+        private static IEnumerable<uint> GroupedDeckOrder(List<uint> cards) =>
+            cards.GroupBy(DeckGroupKey).SelectMany(group => group);
+
+        private static void GroupDeckCopies(List<uint> cards)
+        {
+            var grouped = GroupedDeckOrder(cards).ToArray();
+            cards.Clear();
+            cards.AddRange(grouped);
+        }
+
+        private static int DeckGroupStart(List<uint> cards, int index)
+        {
+            uint key = DeckGroupKey(cards[index]);
+            while (index > 0 && DeckGroupKey(cards[index - 1]) == key) index--;
+            return index;
+        }
+
+        private static int DeckGroupEnd(List<uint> cards, int index)
+        {
+            uint key = DeckGroupKey(cards[index]);
+            int end = index + 1;
+            while (end < cards.Count && DeckGroupKey(cards[end]) == key) end++;
+            return end;
+        }
+
+        private static int FindDeckInsertionIndex(List<uint> cards, uint code, int requestedIndex)
+        {
+            uint key = DeckGroupKey(code);
+            int match = cards.FindLastIndex(candidate => DeckGroupKey(candidate) == key);
+            if (match >= 0) return match + 1;
+            return requestedIndex >= 0 && requestedIndex < cards.Count
+                ? DeckGroupStart(cards, requestedIndex) : cards.Count;
         }
 
         private void RemoveDeckCard(DragSourceType zone, int index, Vector2? dropPosition = null)
@@ -957,9 +1041,12 @@ namespace YGOPortable.UI
                 origin = inspected;
             if (origin == null && _previewCard.CurrentCode == code) origin = (RectTransform)_previewCard.transform;
             var from = dropPosition.HasValue ? DropPose(dropPosition.Value) : CardPose(origin);
-            target.Add(code);
+            int landing = FindDeckInsertionIndex(target, code, -1);
+            var targetPositions = CaptureDeckPositions(destination, target.Count);
+            target.Insert(landing, code);
             FinishDeckEdit();
-            AnimateTransfer(code, from, (RectTransform)GetDeckSlots(destination)[target.Count - 1].card.transform);
+            AnimateDeckSlots(destination, landing + 1, target.Count, targetPositions, index => index - 1);
+            AnimateTransfer(code, from, (RectTransform)GetDeckSlots(destination)[landing].card.transform);
         }
 
         private bool CanPlaceCard(CardInfo card, DragSourceType destination, List<uint> target, bool showReason = true)
@@ -977,6 +1064,13 @@ namespace YGOPortable.UI
             return false;
         }
 
+        private int GetRemainingTrunkCopies(uint code, out int owned, out int inDeck)
+        {
+            owned = CollectionProgress.GetOwnedCount(code);
+            inDeck = CountInWorkingDeck(code, combineAlternateArts: false);
+            return Mathf.Max(0, owned - inDeck);
+        }
+
         private void RefreshPreviewOwnership()
         {
             bool visible = CollectionProgress.Initialized && _workingDeck != null && CardDatabase.Get(_inspectedCode) != null;
@@ -984,10 +1078,9 @@ namespace YGOPortable.UI
             _previewScroll.viewport.offsetMax = new Vector2(-21f, visible ? -33f : -5f);
             if (!visible) return;
 
-            int owned = CollectionProgress.GetOwnedCount(_inspectedCode);
-            int copies = CountInWorkingDeck(_inspectedCode, combineAlternateArts: false);
-            _previewOwnership.text = $"보유 {owned}장 · 덱에 {copies}장";
-            _previewOwnership.color = copies > owned || owned == 0 ? LotdUiKit.RedAccent : LotdUiKit.TextPrimary;
+            int remaining = GetRemainingTrunkCopies(_inspectedCode, out int owned, out int inDeck);
+            _previewOwnership.text = $"보관함 {remaining}장 · 덱에 {inDeck}장 · 보유 {owned}장";
+            _previewOwnership.color = inDeck > owned || owned == 0 ? LotdUiKit.RedAccent : LotdUiKit.TextPrimary;
             var rarity = CardRarityCatalog.GetRarity(_inspectedCode);
             _previewRarity.text = CardRarityCatalog.GetLabel(rarity);
             _previewRarity.color = CardRarityStyle.GetColor(rarity);
@@ -1055,8 +1148,9 @@ namespace YGOPortable.UI
             if (_workingDeck == null) return false;
             var saved = DeckRepository.UserDecks.FirstOrDefault(deck => deck.id == _workingDeck.id);
             return saved == null || DeckNameForSave != saved.name ||
-                !_workingDeck.main.SequenceEqual(saved.main) || !_workingDeck.extra.SequenceEqual(saved.extra) ||
-                !_workingDeck.side.SequenceEqual(saved.side);
+                !_workingDeck.main.SequenceEqual(GroupedDeckOrder(saved.main)) ||
+                !_workingDeck.extra.SequenceEqual(GroupedDeckOrder(saved.extra)) ||
+                !_workingDeck.side.SequenceEqual(GroupedDeckOrder(saved.side));
         }
 
         private void RefreshSaveLabel()
@@ -1138,6 +1232,9 @@ namespace YGOPortable.UI
             });
             _workingDeck.extra.Sort((a, b) => string.Compare(CardDatabase.GetName(a), CardDatabase.GetName(b), StringComparison.Ordinal));
             _workingDeck.side.Sort((a, b) => string.Compare(CardDatabase.GetName(a), CardDatabase.GetName(b), StringComparison.Ordinal));
+            GroupDeckCopies(_workingDeck.main);
+            GroupDeckCopies(_workingDeck.extra);
+            GroupDeckCopies(_workingDeck.side);
             RefreshDeckGrids();
             AnimateOrderedDeck(DragSourceType.DeckMain, _workingDeck.main, main, mainPositions);
             AnimateOrderedDeck(DragSourceType.DeckExtra, _workingDeck.extra, extra, extraPositions);
@@ -1149,23 +1246,27 @@ namespace YGOPortable.UI
         {
             if (_workingDeck.main.Count <= 1) return;
             var main = _workingDeck.main.ToArray();
+            var groups = main.GroupBy(DeckGroupKey).ToArray();
+            if (groups.Length <= 1) return;
             var positions = CaptureDeckPositions(DragSourceType.DeckMain, main.Length);
             CancelDeckDrag();
             EndDeckTransfer();
             using (var rng = System.Security.Cryptography.RandomNumberGenerator.Create())
             {
                 byte[] rb = new byte[4];
-                for (int i = _workingDeck.main.Count - 1; i > 0; i--)
+                for (int i = groups.Length - 1; i > 0; i--)
                 {
                     rng.GetBytes(rb);
                     int j = (int)(BitConverter.ToUInt32(rb, 0) % (uint)(i + 1));
-                    (_workingDeck.main[i], _workingDeck.main[j]) = (_workingDeck.main[j], _workingDeck.main[i]);
+                    (groups[i], groups[j]) = (groups[j], groups[i]);
                 }
             }
+            _workingDeck.main.Clear();
+            _workingDeck.main.AddRange(groups.SelectMany(group => group));
             LotdAudio.PlayDraw();
             RefreshDeckGrids();
             AnimateOrderedDeck(DragSourceType.DeckMain, _workingDeck.main, main, positions);
-            ShowToast("메인 덱 순서를 무작위로 섞었습니다.");
+            ShowToast("메인 덱에서 카드 그룹의 순서를 섞었습니다.");
         }
 
         private void DeleteCurrentDeck()

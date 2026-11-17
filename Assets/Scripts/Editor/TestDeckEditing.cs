@@ -35,6 +35,7 @@ namespace YGOPortable.Editor
                 VerifyLegacyDeck(editor);
                 VerifyConfirmation(editor, events);
                 VerifyArchetypeBrowser(editor, events);
+                VerifyGroupingAndTrunk(editor, streamingPath, Path.Combine(save, "trunk"));
             }
             finally
             {
@@ -47,7 +48,7 @@ namespace YGOPortable.Editor
                     UnityEngine.Object.DestroyImmediate(events.gameObject);
                 }
             }
-            Debug.Log("[VERIFY DECK EDITING] Interrupted transfer continuity, illegal move rollback, oversized deck navigation and confirmation focus passed.");
+            Debug.Log("[VERIFY DECK EDITING] Transfer continuity, illegal moves, oversized deck navigation, modal focus, grouped copies and live trunk counts passed.");
         }
 
         private static void VerifyTransfer(DeckEditorUI editor)
@@ -126,9 +127,56 @@ namespace YGOPortable.Editor
                 "Closing the archetype browser did not restore the original control.");
         }
 
+        private static void VerifyGroupingAndTrunk(DeckEditorUI editor, string streamingPath, string save)
+        {
+            editor.Close();
+            DeckRepository.Load(streamingPath, save, seedDefaultDecks: false);
+            CollectionProgress.Load(save);
+            var selection = CollectionProgress.Starters.First(option => option.Name.Contains("상검"));
+            Require(CollectionProgress.TryChooseStarter(selection.Id, out var starter, out string error), error);
+            uint repeated = starter.main.GroupBy(code => code).First(group => group.Count() == 3).Key;
+            uint other = starter.main.First(code => CollectionProgress.GetDeckCopyKey(code) != CollectionProgress.GetDeckCopyKey(repeated));
+            var saved = new UserDeck { name = "Split copies fixture", main = new List<uint> { repeated, other, repeated } };
+            DeckRepository.SaveUserDeck(saved);
+            editor.Open();
+
+            var deck = Field<UserDeck>(editor, "_workingDeck");
+            Require(deck.main.SequenceEqual(new[] { repeated, repeated, other }) &&
+                saved.main.SequenceEqual(new[] { repeated, other, repeated }),
+                "Loading separated copies did not group them without rewriting the saved deck.");
+            Require(!(bool)CallResult(editor, "HasUnsavedChanges"), "Loading a deck marked it dirty just for grouping copies.");
+
+            Field<InputField>(editor, "_searchInp").text = repeated.ToString();
+            Call(editor, "InspectCard", repeated);
+            Require(TrunkCount(editor, repeated) == "×1", "Two copies assigned to Main did not leave one in the trunk.");
+            Call(editor, "MoveDeckCard", DragSourceType.DeckMain, 1, DragSourceType.DeckMain, 2, null);
+            Require(deck.main.SequenceEqual(new[] { other, repeated, repeated }),
+                "Reordering within Main split the group instead of moving it together.");
+            Call(editor, "TryAddCardToDeck", repeated, DragSourceType.DeckMain, null, null);
+            Require(deck.main.SequenceEqual(new[] { other, repeated, repeated, repeated }) &&
+                TrunkCount(editor, repeated) == "×0", "An added copy did not join its group and consume the last trunk copy.");
+            Call(editor, "TryAddCardToDeck", repeated, DragSourceType.DeckMain, null, null);
+            Require(deck.main.Count == 4, "The zero trunk balance allowed another copy into the deck.");
+
+            Call(editor, "MoveDeckCard", DragSourceType.DeckMain, 2, DragSourceType.DeckSide, -1, null);
+            Require(deck.main.SequenceEqual(new[] { other, repeated, repeated }) && deck.side.SequenceEqual(new[] { repeated }) &&
+                TrunkCount(editor, repeated) == "×0", "Moving one copy to Side changed the total available in the trunk.");
+            Call(editor, "RemoveDeckCard", DragSourceType.DeckSide, 0, null);
+            Require(TrunkCount(editor, repeated) == "×1" &&
+                Field<Text>(editor, "_previewOwnership").text.Contains("보관함 1장"),
+                "Removing a card did not update the trunk and preview immediately.");
+            Require(CollectionProgress.GetOwnedCount(repeated) == 3, "Editing the deck changed card ownership.");
+        }
+
+        private static string TrunkCount(DeckEditorUI editor, uint code) =>
+            Field<List<(RectTransform rt, CompositeCardView card, Text count, CardDragTrigger trigger)>>(editor, "_trunkPool")
+                .Single(slot => slot.rt.gameObject.activeInHierarchy && slot.card.CurrentCode == code).count.text;
+
         private static T Field<T>(object target, string name) => (T)target.GetType().GetField(name, Instance).GetValue(target);
 
-        private static void Call(object target, string method, params object[] args) =>
+        private static void Call(object target, string method, params object[] args) => CallResult(target, method, args);
+
+        private static object CallResult(object target, string method, params object[] args) =>
             target.GetType().GetMethod(method, Instance).Invoke(target, args);
 
         private static void Require(bool passed, string message)
