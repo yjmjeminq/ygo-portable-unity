@@ -27,6 +27,8 @@ namespace YGOPortable.Editor
             VerifyNativeCombatReadout();
             VerifyInspectedCardMoves(swapInPlace: true);
             VerifyInspectedCardMoves(swapInPlace: false);
+            VerifyNativeSummonReadout(turnFaceDown: false);
+            VerifyNativeSummonReadout(turnFaceDown: true);
             Debug.Log("[VERIFY HAND GLOW] Native summons and effects, distinct hand copies, blocked prompts, animation, off-turn activation and field-only monster ratings passed.");
         }
 
@@ -343,6 +345,87 @@ namespace YGOPortable.Editor
                 typeof(DuelFieldUI).GetField("_zoomFieldCard", PrivateInstance).GetValue(ui.Field) == null,
                 "A face-down transfer kept the captured live stats in its details.");
             Debug.Log($"[VERIFY DUEL CARD FOLLOW] {(swapInPlace ? "Paired swap" : "Zone transfer")} kept the equipped copy's stats and controller focus, then released its hidden state.");
+        }
+
+        private static void VerifyNativeSummonReadout(bool turnFaceDown)
+        {
+            const uint ocean = 295517, instantFusion = 1845204, theseus = 96334243, bookOfMoon = 14087893;
+            uint[] main = Enumerable.Repeat(KaiserSeaHorse, 22).Concat(Enumerable.Repeat(ocean, 6))
+                .Concat(Enumerable.Repeat(instantFusion, 6)).Concat(Enumerable.Repeat(bookOfMoon, 6)).ToArray();
+            uint[] enemy = Enumerable.Repeat(BlueEyes, 40).ToArray();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Native summon readout", main, new[] { theseus },
+                enemy, Array.Empty<uint>(), true, session =>
+                {
+                    var hand = session.Players[session.HumanPlayerIndex].hand;
+                    return new[] { ocean, instantFusion, bookOfMoon }.All(code => hand.Any(card => card.code == code));
+                });
+            var ai = new TacticalAI();
+
+            void Activate(uint code)
+            {
+                int index = duel.ActivePrompt.activatable.FindIndex(card => card.code == code);
+                Require(index >= 0, $"The summon fixture could not activate {CardDatabase.GetName(code)}.");
+                duel.SubmitResponseInt((index << 16) | 5);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt => prompt.messageType == YgoConstants.MSG_SELECT_CARD &&
+                    prompt.candidates.Count == 1 ? DuelSession.PackCardSelection(0) : null);
+                Require(duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD && duel.RetryCount == 0,
+                    "The summon fixture could not resolve the preceding effect.");
+            }
+
+            Activate(ocean);
+            using var ui = new HandUI(duel);
+            var animation = CardAnimationManager.Ensure(ui.Canvas);
+            Activate(instantFusion);
+            var pendingField = typeof(DuelFieldUI).GetField("_pendingSummonReadouts", PrivateInstance);
+            var pending = (Dictionary<(byte, uint), SummonReadoutSnapshot>)pendingField.GetValue(ui.Field);
+            Require(pending.Count == 1 && pending.Values.Single().Code == theseus,
+                "The native Fusion Summon did not queue a readout for its own card.");
+            var captured = pending.Single();
+
+            if (turnFaceDown)
+            {
+                Activate(bookOfMoon);
+                ui.Field.Refresh();
+                Require(duel.Players[captured.Key.Item1].mzone[captured.Key.Item2].position == YgoConstants.POS_FACEDOWN_DEFENSE &&
+                        pending.Count == 0 && captured.Value.Card == null,
+                    "A summon preview read the live stats of a card that was already hidden when the field refreshed.");
+                Debug.Log("[VERIFY DUEL SUMMON STATS] A pending reveal discarded a card's live stats when the card became hidden.");
+                return;
+            }
+
+            ui.Field.Refresh();
+            var stats = captured.Value.Card;
+            Require(pending.Count == 0 && stats?.attack == 2400 && stats.defense == 2000 && stats.level == 4,
+                "The summon readout missed a continuous effect applied before presentation.");
+            var pose = new CardPose(Vector2.zero, new Vector2(160, 230));
+            var flight = new CardFlight(theseus, pose, pose, true, false);
+            var plate = animation.SummonPlate(flight, "융합 소환", Vector2.zero, stats);
+            Require(plate.transform.Find("Caption/Value").GetComponent<Text>().text == "융합 소환 · 레벨 4" &&
+                    plate.transform.Find("SummonStats/Attack/Digits/Value").GetComponent<Text>().text == "2400" &&
+                    plate.transform.Find("SummonStats/Defense/Digits/Value").GetComponent<Text>().text == "2000",
+                "The Fusion Summon banner and the queued live readout disagreed.");
+            var proxy = CompositeCardView.Create(ui.Canvas.transform, "Summoned Card", detailedOverlay: true);
+            proxy.SetCard(0, faceDown: true);
+            CardAnimationManager.ApplySummonEntrance(proxy, flight, DuelEffectKind.Fusion, .25f, stats);
+            Require(proxy.CurrentCode == 0 && proxy.transform.Find("AspectBox/CardBack").gameObject.activeSelf,
+                "The moving card exposed its face before the reveal.");
+            CardAnimationManager.ApplySummonEntrance(proxy, flight, DuelEffectKind.Fusion, .75f, stats);
+            Require(proxy.transform.Find("AspectBox/AtkDef/Stat").GetComponent<Text>().text == "ATK/2400  DEF/2000" &&
+                    proxy.transform.Find("AspectBox/LevelInfo/Lv").GetComponent<Text>().text == "★★★★",
+                "The revealed card face did not keep the same numbers as the summon banner.");
+
+            var (controller, sequence) = captured.Key;
+            var location = (controller, YgoConstants.LOCATION_MZONE, sequence);
+            typeof(DuelFieldUI).GetMethod("ShowArrival", PrivateInstance).Invoke(ui.Field, new object[] { location });
+            var fieldSlot = typeof(DuelFieldUI).GetMethod("GetSlot", PrivateInstance).Invoke(ui.Field,
+                new object[] { controller, YgoConstants.LOCATION_MZONE, sequence });
+            var slot = (Transform)fieldSlot.GetType().GetField("root").GetValue(fieldSlot);
+            Require(slot.Find("CardReadout/Combat/Attack/Digits/Value").GetComponent<Text>().text == "2400" &&
+                    slot.Find("CardReadout/Combat/Defense/Digits/Value").GetComponent<Text>().text == "2000" &&
+                    slot.Find("CardReadout/Labels/Rating/Value").GetComponent<Text>().text == "레벨 4",
+                "The field did not show the same readout after the summon animation.");
+            UnityEngine.Object.DestroyImmediate(plate.gameObject);
+            Debug.Log("[VERIFY DUEL SUMMON STATS] Native Fusion Summon displayed 2400 ATK, 2000 DEF and Level 4 on the banner, card face and field.");
         }
 
         private static bool IsAshBlossomPrompt(DuelSession duel, DuelPrompt prompt)

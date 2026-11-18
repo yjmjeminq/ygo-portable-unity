@@ -116,9 +116,7 @@ namespace YGOPortable.Editor
         {
             const uint accesscode = 86066372;
             var pose = new CardPose(Vector2.zero, new Vector2(160, 230));
-            var create = typeof(CardAnimationManager).GetMethod("SummonPlate", BindingFlags.Instance | BindingFlags.NonPublic);
-            var plate = (CanvasGroup)create.Invoke(animator, new object[]
-                { new CardFlight(accesscode, pose, pose, false, false), "링크 소환", Vector2.zero });
+            var plate = animator.SummonPlate(new CardFlight(accesscode, pose, pose, false, false), "링크 소환", Vector2.zero);
             try
             {
                 var root = plate.transform;

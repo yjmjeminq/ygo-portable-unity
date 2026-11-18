@@ -137,6 +137,7 @@ namespace YGOPortable.UI
         private (byte con, uint loc, uint seq)? _preferredDropZone;
         private int _preferredAttackTargetSeq = -1;
         private readonly Dictionary<(byte con, uint loc, uint seq), int> _arrivingCards = new Dictionary<(byte, uint, uint), int>();
+        private readonly Dictionary<(byte Controller, uint Sequence), SummonReadoutSnapshot> _pendingSummonReadouts = new();
         private readonly Dictionary<(byte controller, uint sequence), List<(uint code, CardPose from, bool faceDown, uint index)>>
             _pendingXyzMaterials = new Dictionary<(byte, uint), List<(uint, CardPose, bool, uint)>>();
         private bool _dragHighlightMZone;
@@ -219,7 +220,7 @@ namespace YGOPortable.UI
             UnbindSession();
             _session = session;
             session.OnCardMoved += HandleCardMovedEvent;
-            session.OnCardLocationsChanged += FollowInspectedCards;
+            session.OnCardLocationsChanged += HandleCardLocationsChanged;
             session.OnCardsDrawn += HandleCardsDrawn;
             session.OnLifePointsChanged += HandleLifePointsChanged;
             session.OnTurnStarted += HandleTurnStarted;
@@ -257,7 +258,7 @@ namespace YGOPortable.UI
             if (_session != null)
             {
                 _session.OnCardMoved -= HandleCardMovedEvent;
-                _session.OnCardLocationsChanged -= FollowInspectedCards;
+                _session.OnCardLocationsChanged -= HandleCardLocationsChanged;
                 _session.OnCardsDrawn -= HandleCardsDrawn;
                 _session.OnLifePointsChanged -= HandleLifePointsChanged;
                 _session.OnTurnStarted -= HandleTurnStarted;
@@ -363,8 +364,13 @@ namespace YGOPortable.UI
         private LiveCardState ReadVisibleFieldCard(uint code, (byte controller, uint location, uint sequence)? location) =>
             location is { } slot ? _session?.GetVisibleFieldCard(code, slot.controller, slot.location, slot.sequence) : null;
 
-        private void FollowInspectedCards(CardMoveEvent move, CardMoveEvent swapPartner)
+        private void HandleCardLocationsChanged(CardMoveEvent move, CardMoveEvent swapPartner)
         {
+            if (move.fromLoc == YgoConstants.LOCATION_MZONE)
+                _pendingSummonReadouts.Remove((move.fromCon, move.fromSeq));
+            if (swapPartner?.fromLoc == YgoConstants.LOCATION_MZONE)
+                _pendingSummonReadouts.Remove((swapPartner.fromCon, swapPartner.fromSeq));
+
             var before = _inspectedFieldCard;
             _inspectedFieldCard = FollowFieldCard(before, _inspectedCode, move, swapPartner);
             if (_zoomFieldCard.HasValue)
@@ -1044,6 +1050,7 @@ namespace YGOPortable.UI
         {
             if (_session == null || !Root.activeInHierarchy) return;
 
+            CaptureSummonReadouts();
             var prompt = _session.ActivePrompt;
             if (!ReferenceEquals(prompt, _pendingPlacePrompt))
             {
@@ -1903,6 +1910,7 @@ namespace YGOPortable.UI
         private void ClearArrivals()
         {
             _arrivingCards.Clear();
+            _pendingSummonReadouts.Clear();
             ResetHandViews(_myHandViews);
             ResetHandViews(_oppHandViews);
         }
@@ -1995,6 +2003,14 @@ namespace YGOPortable.UI
             _arrivingCards.TryGetValue(key, out int pending);
             _arrivingCards[key] = pending + 1;
             return () => ShowArrival(key);
+        }
+
+        private void CaptureSummonReadouts()
+        {
+            // Read the field refreshed for this response before playing its queued animations.
+            foreach (var (slot, summon) in _pendingSummonReadouts)
+                summon.Card = _session.GetVisibleFieldCard(summon.Code, slot.Controller, YgoConstants.LOCATION_MZONE, slot.Sequence);
+            _pendingSummonReadouts.Clear();
         }
 
         private bool IsFaceDown(byte controller, uint location, uint position)
@@ -2108,7 +2124,16 @@ namespace YGOPortable.UI
                 e.fromLoc is YgoConstants.LOCATION_DECK or YgoConstants.LOCATION_EXTRA &&
                 e.toLoc is YgoConstants.LOCATION_GRAVE or YgoConstants.LOCATION_REMOVED)
                 animator.QueuePileTransfer(flight, onArrival);
-            else animator.QueueMove(flight, motion, onArrival);
+            else
+            {
+                SummonReadoutSnapshot summon = null;
+                if (!toBack && CardAnimationManager.IsSummonMotion(motion))
+                {
+                    summon = new SummonReadoutSnapshot(e.code);
+                    _pendingSummonReadouts[(e.toCon, e.toSeq)] = summon;
+                }
+                animator.QueueMove(flight, motion, onArrival, summon);
+            }
         }
 
         internal static CardMotion MonsterArrivalMotion(CardMoveEvent move)

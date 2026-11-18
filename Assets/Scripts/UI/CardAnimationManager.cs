@@ -56,6 +56,14 @@ namespace YGOPortable.UI
         Vanish,
     }
 
+    internal sealed class SummonReadoutSnapshot
+    {
+        internal readonly uint Code;
+        internal LiveCardState Card;
+
+        internal SummonReadoutSnapshot(uint code) => Code = code;
+    }
+
     public class CardAnimationManager : MonoBehaviour
     {
         private static CardAnimationManager _instance;
@@ -171,9 +179,9 @@ namespace YGOPortable.UI
             if (flights.Count > 0) QueueStep(FlyCards(flights, onArrive, draw: true));
         }
 
-        internal void QueueMove(CardFlight flight, CardMotion motion, Action onArrive)
+        internal void QueueMove(CardFlight flight, CardMotion motion, Action onArrive, SummonReadoutSnapshot summonReadout = null)
         {
-            QueueStep(MoveCard(flight, motion, onArrive));
+            QueueStep(MoveCard(flight, motion, onArrive, summonReadout));
         }
 
         internal void QueuePileTransfer(CardFlight flight, Action onArrive)
@@ -258,7 +266,7 @@ namespace YGOPortable.UI
             rect.localScale = new Vector3(horizontalScale, 1f, 1f);
         }
 
-        private static void ApplyFlight(CompositeCardView view, CardFlight flight, float t, float lift)
+        private static void ApplyFlight(CompositeCardView view, CardFlight flight, float t, float lift, LiveCardState live = null)
         {
             float eased = t * t * (3f - 2f * t);
             float arc = Mathf.Sin(t * Mathf.PI);
@@ -268,7 +276,7 @@ namespace YGOPortable.UI
             bool turnsOver = flight.StartsFaceDown != flight.EndsFaceDown;
             bool showBack = t < 0.5f ? flight.StartsFaceDown : flight.EndsFaceDown;
             uint visibleCode = showBack ? 0u : flight.Code;
-            if (view.CurrentCode != visibleCode) view.SetCard(visibleCode, showBack);
+            if (view.CurrentCode != visibleCode) view.SetCard(visibleCode, showBack, live);
             float flip = turnsOver ? Mathf.Max(0.035f, Mathf.Abs(Mathf.Cos(t * Mathf.PI))) : 1f;
             ApplyPose(view, new CardPose(point, size, angle), flip);
         }
@@ -314,7 +322,7 @@ namespace YGOPortable.UI
             }
         }
 
-        private IEnumerator MoveCard(CardFlight flight, CardMotion motion, Action onArrive)
+        private IEnumerator MoveCard(CardFlight flight, CardMotion motion, Action onArrive, SummonReadoutSnapshot summonReadout)
         {
             if (!flight.From.IsValid || !flight.To.IsValid)
             {
@@ -330,13 +338,13 @@ namespace YGOPortable.UI
             }
 
             bool extraSummon = motion is CardMotion.ExtraDeckSummon or CardMotion.PendulumSummon;
-            bool summons = extraSummon || motion is CardMotion.Summon or CardMotion.SpecialSummon;
+            bool summons = IsSummonMotion(motion);
             bool featured = summons && TakeFeaturedSummon(flight);
             if (summons && !featured && !flight.EndsFaceDown) _summonArt = DuelVisualAssets.SummonCutIn(flight.Code);
             bool reveal = !flight.EndsFaceDown && (extraSummon || featured || _summonArt != null);
             var proxy = TakeCard(flight.StartsFaceDown ? 0u : flight.Code, flight.StartsFaceDown, reveal);
             if (reveal)
-                yield return RevealSummon(proxy, flight, motion, featured);
+                yield return RevealSummon(proxy, flight, motion, featured, summonReadout?.Card);
             else if (motion == CardMotion.TokenSummon || motion == CardMotion.Vanish)
             {
                 bool appearing = motion == CardMotion.TokenSummon;
@@ -385,6 +393,9 @@ namespace YGOPortable.UI
             }
         }
 
+        internal static bool IsSummonMotion(CardMotion motion) =>
+            motion is CardMotion.Summon or CardMotion.SpecialSummon or CardMotion.ExtraDeckSummon or CardMotion.PendulumSummon;
+
         internal bool TakeFeaturedSummon(CardFlight flight)
         {
             if (flight.EndsFaceDown || flight.Code == 0) return false;
@@ -396,8 +407,9 @@ namespace YGOPortable.UI
             return (signature || rareBoss) && _featuredSummons.Add((flight.To.Angle > 45f, key));
         }
 
-        private IEnumerator RevealSummon(CompositeCardView proxy, CardFlight flight, CardMotion motion, bool featured)
+        private IEnumerator RevealSummon(CompositeCardView proxy, CardFlight flight, CardMotion motion, bool featured, LiveCardState live)
         {
+            if (!flight.StartsFaceDown && live != null) proxy.SetCard(flight.Code, live: live);
             var (kind, accent, title) = SummonEffect(flight.Code, motion);
             Vector2 view = _layer.rect.size;
             var center = new Vector2(view.x * .035f, view.y * .045f);
@@ -422,12 +434,12 @@ namespace YGOPortable.UI
             }
             proxy.transform.SetAsLastSibling();
             var layout = SummonPlate(flight, title,
-                center - Vector2.up * view.y * (featured ? .29f : artwork == null ? .24f : .32f));
+                center - Vector2.up * view.y * (featured ? .29f : artwork == null ? .24f : .32f), live);
 
             LotdAudio.PlaySummon();
             yield return Animate(.28f, t =>
             {
-                ApplySummonEntrance(proxy, first, kind, t);
+                ApplySummonEntrance(proxy, first, kind, t, live);
                 effect.Seek(t * .54f);
                 background.color = new Color(.009f, .013f, .02f, Mathf.SmoothStep(0f, .64f, t));
                 layout.alpha = Mathf.SmoothStep(0f, 1f, (t - .40f) / .60f);
@@ -458,7 +470,7 @@ namespace YGOPortable.UI
             var last = new CardFlight(flight.Code, reveal, flight.To, false, flight.EndsFaceDown);
             yield return Animate(.22f, t =>
             {
-                ApplyFlight(proxy, last, t, 23f);
+                ApplyFlight(proxy, last, t, 23f, live);
                 proxy.SetRarityHighlight(.25f * (1f - t));
                 effect.Seek(.76f + t * .24f);
                 layout.alpha = 1f - t;
@@ -494,7 +506,8 @@ namespace YGOPortable.UI
             return group;
         }
 
-        internal static void ApplySummonEntrance(CompositeCardView proxy, CardFlight flight, DuelEffectKind kind, float progress)
+        internal static void ApplySummonEntrance(CompositeCardView proxy, CardFlight flight, DuelEffectKind kind, float progress,
+            LiveCardState live = null)
         {
             var (lift, shift, roll) = kind switch
             {
@@ -506,7 +519,7 @@ namespace YGOPortable.UI
                 DuelEffectKind.Pendulum => (51f, 32f, -10f),
                 _ => (38f, 0f, 0f),
             };
-            ApplyFlight(proxy, flight, progress, lift);
+            ApplyFlight(proxy, flight, progress, lift, live);
             float swing = Mathf.Sin(progress * Mathf.PI);
             var rect = (RectTransform)proxy.transform;
             rect.anchoredPosition += Vector2.right * (shift * swing);
@@ -514,13 +527,13 @@ namespace YGOPortable.UI
             proxy.SetRarityHighlight(Mathf.SmoothStep(0f, .85f, progress));
         }
 
-        private CanvasGroup SummonPlate(CardFlight flight, string summonType, Vector2 center)
+        internal CanvasGroup SummonPlate(CardFlight flight, string summonType, Vector2 center, LiveCardState live = null)
         {
             float width = Mathf.Min(_layer.rect.width * .64f, 678f);
             var holder = CenteredVisual("SummonName", _layer, center, new Vector2(width, 65f));
             var group = holder.gameObject.AddComponent<CanvasGroup>();
             group.alpha = 0f;
-            var card = new DuelCardReadout(CardDatabase.Get(flight.Code));
+            var card = new DuelCardReadout(CardDatabase.Get(flight.Code), live);
             var accent = DuelStyle.Side(flight.To.Angle > 45f);
             DuelReadoutPlate.Add(holder, new Color(.045f, .068f, .085f, .98f));
             var rail = LotdUiKit.CreateRect("Accent", holder, new Vector2(.008f, .16f), new Vector2(.008f, .88f),
