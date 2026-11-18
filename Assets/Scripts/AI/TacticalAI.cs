@@ -17,14 +17,16 @@ namespace YGOPortable.AI
     {
         public AIDifficulty Difficulty { get; set; } = AIDifficulty.Smart;
 
-        private const int FieldZone = 5;
         private const uint TrickstarLightStage = 35371948;
         private const uint PrimevalPlanetPerlereino = 77103950;
         private const uint TheHiddenCity = 5697558;
+        private const uint UnionHangar = 66399653;
+        private const uint AromaGarden = 5050644;
         private const uint VisasStarfrost = 56099748;
         private const ushort TrickstarSet = 0xfb;
         private const ushort TearlamentsSet = 0x182;
         private const ushort SubterrorSet = 0xed;
+        private const ushort AromaSet = 0xc9;
 
         private int _lastTurn = -1;
         private int _actionsThisTurn;
@@ -128,7 +130,7 @@ namespace YGOPortable.AI
         {
             _unselectCount = 0;
             _actionsThisTurn++;
-            bool CanUse(int command, SelectableCardItem item) => CanUseIdleAction(command, item) &&
+            bool CanUse(int command, SelectableCardItem item) => CanUseIdleAction(s, command, item) &&
                 (command != 5 || (SynchroTurnPlan.CanActivate(s, p, item) && CanPlayFieldSpell(s, p, item)));
 
             if (fallback || _actionsThisTurn > 42)
@@ -138,7 +140,7 @@ namespace YGOPortable.AI
             }
             else if (ChoosePlannedIdle(s, p, CanUse) is int planned)
             {
-                return EncodeIdleAction(p, planned & 0xffff, planned >> 16);
+                return EncodeIdleAction(s, p, planned & 0xffff, planned >> 16);
             }
 
             // 1. High-ATK / Extra Deck Special Summons first
@@ -159,7 +161,7 @@ namespace YGOPortable.AI
                         bestIdx = i;
                     }
                 }
-                if (bestIdx >= 0) return EncodeIdleAction(p, 1, bestIdx);
+                if (bestIdx >= 0) return EncodeIdleAction(s, p, 1, bestIdx);
             }
 
             // 2. Activate Spells / Monster Ignition Effects
@@ -186,7 +188,7 @@ namespace YGOPortable.AI
                         bestIdx = i;
                     }
                 }
-                if (bestIdx >= 0) return EncodeIdleAction(p, 5, bestIdx);
+                if (bestIdx >= 0) return EncodeIdleAction(s, p, 5, bestIdx);
             }
 
             // 3. Normal Summon strongest useful monster
@@ -279,52 +281,82 @@ namespace YGOPortable.AI
                 CardDatabase.Get(item.code) is not CardInfo incoming || (incoming.type & YgoConstants.TYPE_FIELD) == 0)
                 return true;
 
-            var current = session.Players[prompt.playerId].szone[FieldZone];
+            var current = session.Players[prompt.playerId].szone[YgoConstants.FIELD_ZONE_SEQUENCE];
             if (current == null || current.effectsDisabled) return true;
 
             // Flip a set field or use an available effect of the existing field before replacing it.
             if (prompt.activatable.Any(effect => effect.controller == prompt.playerId &&
-                effect.location == YgoConstants.LOCATION_SZONE && effect.sequence == FieldZone &&
-                CanUseIdleAction(5, effect))) return false;
+                YgoConstants.IsFieldZone(effect.location, effect.sequence) &&
+                CanUseIdleAction(session, 5, effect))) return false;
 
             if (!current.IsFaceUp) return true;
             var existing = CardDatabase.Get(current.code);
             uint code = CardDatabase.GetArchetypeCollectionKey(incoming);
             uint currentCode = existing == null ? current.code : CardDatabase.GetArchetypeCollectionKey(existing);
-            return code != currentCode || CanGainFromFieldReactivation(session, prompt.playerId, code);
+            return code != currentCode || CanGainFromFieldReactivation(session, prompt, code);
         }
 
-        private static bool CanGainFromFieldReactivation(DuelSession session, byte player, uint code)
+        private static bool CanGainFromFieldReactivation(DuelSession session, DuelPrompt prompt, uint code)
         {
-            // These fields can supply another search when activated and a target remains in the deck.
-            // Keep Light Stage in play when it can be holding an opponent's set back row inactive.
+            byte player = prompt.playerId;
             return code switch
             {
-                TrickstarLightStage => !session.Players[1 - player].szone.Take(FieldZone).Any(card => card is { IsFaceUp: false }) &&
+                // Keep Light Stage in play when it can be holding a set card inactive.
+                TrickstarLightStage => !session.Players[1 - player].szone.Take(YgoConstants.FIELD_ZONE_SEQUENCE)
+                    .Any(card => card is { IsFaceUp: false }) &&
                     session.HasCardInDeck(player, card => IsMonsterInSet(card, TrickstarSet)),
                 PrimevalPlanetPerlereino => session.HasCardInDeck(player,
                     card => card.code == VisasStarfrost || IsMonsterInSet(card, TearlamentsSet)),
                 TheHiddenCity => session.HasCardInDeck(player, card => IsMonsterInSet(card, SubterrorSet)),
+                UnionHangar => session.HasCardInDeck(player, card => (card.type & YgoConstants.TYPE_UNION) != 0 &&
+                    card.race == YgoConstants.RACE_MACHINE && card.attr == YgoConstants.ATTRIBUTE_LIGHT),
+                AromaGarden => CanFinishWithAromaGarden(session, prompt),
                 _ => false,
             };
+        }
+
+        private static bool CanFinishWithAromaGarden(DuelSession session, DuelPrompt prompt)
+        {
+            var own = session.Players[prompt.playerId];
+            var rival = session.Players[1 - prompt.playerId];
+            if (!prompt.canBp || rival.mzone.Any(card => card != null)) return false;
+
+            var faceUp = own.mzone.Where(card => card?.IsFaceUp == true).ToArray();
+            if (!faceUp.Any(card => CardDatabase.Get(card.code) is CardInfo info && IsMonsterInSet(info, AromaSet)))
+                return false;
+
+            var attackers = faceUp.Where(card => card.IsAttack).ToArray();
+            int damage = attackers.Sum(card => Math.Max(0, card.attack));
+            return damage < rival.lp && damage + 500 * attackers.Length >= rival.lp;
         }
 
         private static bool IsMonsterInSet(CardInfo card, ushort setcode) =>
             card.IsMonster && CardDatabase.ExtractSetcodes(card.setcode).Any(code => (code & 0xfff) == setcode);
 
-        private static string IdleActionKey(int command, SelectableCardItem item) => command == 1
-            ? $"sp:{item.code}" : $"act:{item.code}:{item.description}:{item.location}:{item.sequence}";
+        private static string IdleActionKey(DuelSession session, int command, SelectableCardItem item)
+        {
+            if (command == 1) return $"sp:{item.code}";
+            if (YgoConstants.IsFieldZone(item.location, item.sequence) ||
+                (item.location == YgoConstants.LOCATION_HAND && CardDatabase.Get(item.code) is CardInfo card &&
+                    (card.type & YgoConstants.TYPE_FIELD) != 0))
+            {
+                // A replacement can have its own effect, and a second hand copy can move into the first copy's slot.
+                int version = session.Players[item.controller].FieldZoneVersion;
+                return $"field:{item.controller}:{version}:{item.code}:{item.description}:{item.location}:{item.sequence}";
+            }
+            return $"act:{item.code}:{item.description}:{item.location}:{item.sequence}";
+        }
 
-        private bool CanUseIdleAction(int command, SelectableCardItem item) =>
+        private bool CanUseIdleAction(DuelSession session, int command, SelectableCardItem item) =>
             (command != 1 && command != 5) ||
-            !_effectCounts.TryGetValue(IdleActionKey(command, item), out int count) || count < (command == 1 ? 2 : 1);
+            !_effectCounts.TryGetValue(IdleActionKey(session, command, item), out int count) || count < (command == 1 ? 2 : 1);
 
-        private byte[] EncodeIdleAction(DuelPrompt prompt, int command, int index)
+        private byte[] EncodeIdleAction(DuelSession session, DuelPrompt prompt, int command, int index)
         {
             if (command == 1 || command == 5)
             {
                 var item = command == 1 ? prompt.spSummonable[index] : prompt.activatable[index];
-                BumpKey(IdleActionKey(command, item));
+                BumpKey(IdleActionKey(session, command, item));
             }
             return BitConverter.GetBytes((index << 16) | command);
         }

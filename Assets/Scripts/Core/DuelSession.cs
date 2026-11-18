@@ -148,6 +148,7 @@ namespace YGOPortable.Core
         public List<LiveCardState> banished = new List<LiveCardState>();
         public List<LiveCardState> extra = new List<LiveCardState>();
         public int deckCount;
+        internal int FieldZoneVersion { get; set; }
     }
 
     public class DuelSession : IDisposable
@@ -248,8 +249,11 @@ namespace YGOPortable.Core
                 return false;
             }
 
-            Players[0].lp = startingLp;
-            Players[1].lp = startingLp;
+            foreach (var player in Players)
+            {
+                player.lp = startingLp;
+                player.FieldZoneVersion = 0;
+            }
 
             var turn0Main = p0GoesFirst ? p0Main : p1Main;
             var turn0Extra = p0GoesFirst ? p0Extra : p1Extra;
@@ -462,9 +466,18 @@ namespace YGOPortable.Core
             return (position & YgoConstants.POS_FACEUP) != 0 ? item.code : 0;
         }
 
+        private void NotifyCardMoved(CardMoveEvent move)
+        {
+            if (YgoConstants.IsFieldZone(move.toLoc, move.toSeq) &&
+                (move.fromCon != move.toCon || move.fromLoc != move.toLoc || move.fromSeq != move.toSeq))
+                Players[move.toCon].FieldZoneVersion++;
+
+            OnCardMoved?.Invoke(move);
+        }
+
         private void NotifySwapMove(SelectableCardItem card, SelectableCardItem destination)
         {
-            OnCardMoved?.Invoke(new CardMoveEvent
+            NotifyCardMoved(new CardMoveEvent
             {
                 code = card.code,
                 fromCon = card.controller, fromLoc = card.location, fromSeq = card.sequence, fromPos = card.position,
@@ -625,7 +638,7 @@ namespace YGOPortable.Core
                         ? Players[controller].mzone[sequence]?.position ?? YgoConstants.POS_FACEDOWN_DEFENSE
                         : YgoConstants.POS_FACEDOWN_DEFENSE;
                     AddLog($"반전 소환: [{CardDatabase.GetName(code)}]");
-                    OnCardMoved?.Invoke(new CardMoveEvent
+                    NotifyCardMoved(new CardMoveEvent
                     {
                         code = code,
                         fromCon = controller, fromLoc = location, fromSeq = sequence, fromPos = previous,
@@ -664,7 +677,7 @@ namespace YGOPortable.Core
                         toCon = tCon, toLoc = tLoc, toSeq = tSeq, toPos = tPos,
                         reason = reason,
                     };
-                    OnCardMoved?.Invoke(ev);
+                    NotifyCardMoved(ev);
                     break;
                 }
 
@@ -687,7 +700,7 @@ namespace YGOPortable.Core
                     uint sequence = br.ReadByte();
                     uint previous = br.ReadByte();
                     uint position = br.ReadByte();
-                    OnCardMoved?.Invoke(new CardMoveEvent
+                    NotifyCardMoved(new CardMoveEvent
                     {
                         code = code,
                         fromCon = controller, fromLoc = location, fromSeq = sequence, fromPos = previous,

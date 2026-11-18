@@ -24,6 +24,10 @@ namespace YGOPortable.Core
         public const uint LOCATION_ONFIELD = LOCATION_MZONE | LOCATION_SZONE;
         public const uint LOCATION_FZONE = 0x100;
         public const uint LOCATION_PZONE = 0x200;
+        internal const int FIELD_ZONE_SEQUENCE = 5;
+
+        internal static bool IsFieldZone(uint location, uint sequence) =>
+            location == LOCATION_SZONE && sequence == FIELD_ZONE_SEQUENCE;
 
         // Positions
         public const uint POS_FACEUP_ATTACK = 0x1;

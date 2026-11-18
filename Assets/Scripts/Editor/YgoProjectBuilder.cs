@@ -369,6 +369,7 @@ namespace YGOPortable.Editor
             VerifyAiFieldAndTributeChoices();
             VerifyAiKeepsActiveFieldSpell();
             VerifyAiFieldReplacementChoices();
+            VerifyAiAromaGardenReplacement();
             VerifyDddTurnPlanning();
             TestOtherDeckTurnPlans.Run();
             VerifyRainbowDarkDragonMatch();
@@ -2169,6 +2170,71 @@ namespace YGOPortable.Editor
             AssertTrue((last & 0xffff) != 5 && searchDuel.RetryCount == 0,
                 "The AI used a third Light Stage after its search targets ran out.");
             Debug.Log("[VERIFY AI FIELD SPELL] Used the existing field effect first and replaced Light Stage only for another search.");
+        }
+
+        private static void VerifyAiAromaGardenReplacement()
+        {
+            const uint garden = 5050644, cananga = 22174866;
+            var aiDeck = Enumerable.Repeat(garden, 20).Concat(Enumerable.Repeat(cananga, 20)).ToArray();
+            var otherDeck = Enumerable.Repeat(89631139u, 40).ToArray();
+            var empty = Array.Empty<uint>();
+            foreach (int lp in new[] { 2200, 3100 })
+            {
+                using var duel = new DuelSession();
+                var ai = new TacticalAI();
+                AssertTrue(duel.StartNewDuel(otherDeck, empty, aiDeck, empty, true, lp, new ulong[] { 7, 19, 31, 41 }),
+                    "Could not start the Aroma Garden duel.");
+                DriveUntilIdle(duel, ai);
+                duel.SubmitResponseInt(7);
+                DriveUntilIdle(duel, ai);
+                var opening = duel.ActivePrompt;
+                int summon = opening.summonable.FindIndex(card => card.code == cananga);
+                AssertTrue(opening.playerId == duel.AiPlayerIndex && opening.canBp && summon >= 0 &&
+                    opening.activatable.Count(card => card.code == garden) >= 2,
+                    "The Aroma Garden fixture needs a monster, two Fields and the Battle Phase.");
+                duel.SubmitResponseInt(summon << 16);
+                DriveUntilIdle(duel, ai);
+
+                void ActivateGarden(uint location)
+                {
+                    var prompt = duel.ActivePrompt;
+                    int response = BitConverter.ToInt32(ai.ComputeResponse(duel, prompt), 0);
+                    AssertTrue((response & 0xffff) == 5 && prompt.activatable[response >> 16].code == garden &&
+                        prompt.activatable[response >> 16].location == location,
+                        $"The AI did not use Aroma Garden at {location} with the opponent at {lp} LP.");
+                    duel.SubmitResponseInt(response);
+                    DriveUntilIdle(duel, ai);
+                }
+
+                var own = duel.Players[duel.AiPlayerIndex];
+                ActivateGarden(YgoConstants.LOCATION_HAND);
+                ActivateGarden(YgoConstants.LOCATION_SZONE);
+                AssertTrue(own.mzone.Any(card => card?.attack == 1900), "The first boost did not resolve.");
+
+                if (lp == 2200)
+                {
+                    ActivateGarden(YgoConstants.LOCATION_HAND);
+                    ActivateGarden(YgoConstants.LOCATION_SZONE);
+                    AssertTrue(own.mzone.Any(card => card?.attack == 2400) && own.grave.Count(card => card.code == garden) == 1,
+                        "The replacement copy did not supply the extra 500 ATK.");
+                    for (int step = 0; step < 12 && !duel.IsFinished; step++)
+                    {
+                        var prompt = duel.ActivePrompt;
+                        if (prompt == null) duel.StepUntilPrompt();
+                        else duel.SubmitResponse(ai.ComputeResponse(duel, prompt));
+                    }
+                    AssertTrue(duel.IsFinished && duel.Winner == duel.AiPlayerIndex && own.grave.Count(card => card.code == garden) == 1,
+                        "The AI did not finish the duel after the second boost.");
+                }
+                else
+                {
+                    int response = BitConverter.ToInt32(ai.ComputeResponse(duel, duel.ActivePrompt), 0);
+                    AssertTrue(response == 6 && !own.grave.Any(card => card.code == garden),
+                        "The AI replaced Aroma Garden when another boost would still not finish the duel.");
+                }
+                AssertTrue(duel.RetryCount == 0, "The Aroma Garden decisions should all be legal.");
+            }
+            Debug.Log("[VERIFY AI FIELD SPELL] Reused Aroma Garden for enough attack to win and held the extra copy otherwise.");
         }
 
         private static void VerifyMandatoryBattleAttack()
