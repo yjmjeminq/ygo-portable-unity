@@ -164,6 +164,11 @@ namespace YGOPortable.Editor
                     Option(30453613, 2) == "자신의 필드 존에 놓는다" && Option(30453613, 3) == "상대의 필드 존에 놓는다",
                 "The options did not retain the original quantity or player in Korean.");
 
+            const uint rulkallos = 84330567;
+            Require(Option(rulkallos, 0).Contains("패 또는 필드의 앞면 표시 카드 중 티아라멘츠 카드 1장을 묘지로 보낸다") &&
+                    Option(rulkallos, 1) == "융합 소환했던 이 카드를 묘지에서 특수 소환한다",
+                "Rulkallos' two effect descriptions did not identify their different actions.");
+
             Require(CardDatabase.ResolveOptionDescription(94) == "이 카드의 추가 효과를 적용하시겠습니까?" &&
                     CardDatabase.ResolveOptionDescription(210) == "카드를 1장 더 선택하시겠습니까?",
                 "A bundled system-level yes/no prompt lost its description.");
@@ -203,6 +208,30 @@ namespace YGOPortable.Editor
             }
             Debug.Log($"[VERIFY KOREAN DUEL EFFECTS] {labels} bundled labels checked. {withDescriptions} Korean labels, " +
                 $"{labels - withDescriptions} Korean card-text fallbacks.");
+        }
+
+        internal static byte[] ChooseKitkallosDestination(DuelSession duel, bool toGrave)
+        {
+            var prompt = duel.ActivePrompt;
+            Require(prompt?.messageType == YgoConstants.MSG_SELECT_OPTION &&
+                prompt.options.SequenceEqual(new[] { 573UL, 574UL }) && duel.SelectionChainLink?.code == 92731385,
+                "The expected native hand and graveyard options were not offered by Kitkallos.");
+
+            using var view = new ChainView();
+            view.Modals.ShowPrompt(duel, prompt);
+            Button Option(int index) => view.Modals.ModalRoot.GetComponentsInChildren<Button>()
+                .Single(button => button.name == $"Opt_{index}");
+            string hand = Option(0).GetComponentInChildren<Text>().text;
+            string grave = Option(1).GetComponentInChildren<Text>().text;
+            Require(hand == "패에 넣는다" && grave == "묘지로 보낸다",
+                $"Kitkallos showed the wrong destination labels: [{hand}] and [{grave}].");
+            Require(view.Modals.ModalRoot.transform.Find("Win/Hdr/SubtitleBand/Sub").GetComponent<Text>().text ==
+                CardDatabase.GetName(92731385), "The destination prompt omitted the resolving card's name.");
+
+            int chosen = toGrave ? 1 : 0;
+            Option(chosen).onClick.Invoke();
+            Require(view.Responses.SequenceEqual(new[] { chosen }), "The chosen destination submitted an incorrect native index.");
+            return BitConverter.GetBytes(view.Responses[0]);
         }
 
         internal static void SubmitNativeChoice(DuelSession duel, int index)

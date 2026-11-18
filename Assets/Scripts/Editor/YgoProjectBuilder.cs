@@ -362,6 +362,7 @@ namespace YGOPortable.Editor
             // Explicit test for non-search effects & prompt handlers (announce, chain negate, destroy/banish, equip/counter/coin/dice/token, reborn/tribute, extra/ritual sum, RPS)
             VerifyOtherCardEffects(classicDecks[0].main);
             VerifyTearlamentsKashtiraDeckChoice();
+            VerifyKitkallosDestinationChoice();
             VerifyArcanaReadingCoinChoice();
             VerifyDeckSortDrawOrder(classicDecks[0].main);
             VerifyPossessedDestiny(classicDecks[0].main);
@@ -1226,6 +1227,48 @@ namespace YGOPortable.Editor
                     "Tearlaments Kashtira did not send three cards from the selected deck.");
             }
             Debug.Log("[VERIFY TEARLAMENTS KASHTIRA] Both deck selections sent three cards from the selected deck without retries.");
+        }
+
+        private static void VerifyKitkallosDestinationChoice()
+        {
+            const uint instantFusion = 1845204, kitkallos = 92731385, cryme = 1329620;
+            uint[] main = Enumerable.Repeat(instantFusion, 20).Concat(Enumerable.Repeat(cryme, 20)).ToArray();
+            uint[] opponent = Enumerable.Repeat(89631139u, 40).ToArray();
+            var ai = new TacticalAI();
+            foreach (bool toGrave in new[] { false, true })
+            {
+                using var duel = StartSeedMatching("Kitkallos destination", main, new[] { kitkallos }, opponent,
+                    Array.Empty<uint>(), true, session => session.ActivePrompt?.activatable.Any(card => card.code == instantFusion) == true);
+                var own = duel.Players[duel.HumanPlayerIndex];
+                int handBefore = own.hand.Count(card => card.code == cryme);
+                bool submitted = false;
+                int activate = duel.ActivePrompt.activatable.FindIndex(card => card.code == instantFusion);
+                duel.SubmitResponseInt((activate << 16) | 5);
+                DriveUntilIdle(duel, ai, prompt =>
+                {
+                    switch (prompt.messageType)
+                    {
+                        case YgoConstants.MSG_SELECT_CHAIN:
+                            return BitConverter.GetBytes(prompt.candidates.FindIndex(card => card.code == kitkallos));
+                        case YgoConstants.MSG_SELECT_EFFECTYN when prompt.promptCardCode == kitkallos:
+                            return BitConverter.GetBytes(1);
+                        case YgoConstants.MSG_SELECT_CARD:
+                            int index = prompt.candidates.FindIndex(card => card.code is kitkallos or cryme);
+                            return index >= 0 ? EncodeSelectIndices(index) : null;
+                        case YgoConstants.MSG_SELECT_OPTION:
+                            AssertTrue(!submitted, "Kitkallos opened an unexpected second destination choice.");
+                            submitted = true;
+                            return TestChainChooser.ChooseKitkallosDestination(duel, toGrave);
+                        default:
+                            return null;
+                    }
+                });
+                AssertTrue(submitted && duel.RetryCount == 0 && own.mzone.Any(card => card?.code == kitkallos) &&
+                    own.hand.Count(card => card.code == cryme) == handBefore + (toGrave ? 0 : 1) &&
+                    own.grave.Count(card => card.code == cryme) == (toGrave ? 1 : 0),
+                    "Kitkallos did not send the chosen card to the destination shown on the selected button.");
+            }
+            Debug.Log("[VERIFY KITKALLOS CHOICE] Both native options displayed the source and sent the selected card to the shown destination.");
         }
 
         private static void VerifyArcanaReadingCoinChoice()

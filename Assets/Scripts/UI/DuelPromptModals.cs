@@ -825,6 +825,8 @@ namespace YGOPortable.UI
                 _modalSubtitle.text = sources[0].name;
                 _onInspectCard?.Invoke(sources[0].code);
             }
+            else if (!isNum && sources.Length == 0 && session.SelectionChainLink is { } link)
+                _modalSubtitle.text = CardDatabase.GetName(link.code);
             foreach (uint code in rulesNeeded)
             {
                 string rules = CardDatabase.GetKoreanCardDescription(code);
