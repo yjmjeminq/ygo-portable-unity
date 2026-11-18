@@ -18,6 +18,8 @@ namespace YGOPortable.AI
         public AIDifficulty Difficulty { get; set; } = AIDifficulty.Smart;
         internal bool UsesTrainedPolicy => Difficulty == AIDifficulty.Smart && _policy != null;
         internal bool HasLinkPolicy => Difficulty == AIDifficulty.Smart && _linkPolicy != null;
+        internal int SimulatedComboBranches => _comboSearch?.SimulatedBranches ?? 0;
+        internal int ChangedComboLines => _comboSearch?.ChangedLines ?? 0;
         private bool UsesTacticalRules => Difficulty == AIDifficulty.Smart && _tacticalRules;
 
         private const uint TrickstarLightStage = 35371948;
@@ -42,14 +44,18 @@ namespace YGOPortable.AI
         private readonly HashSet<uint> _repositionedSeqs = new HashSet<uint>();
         private readonly DuelAiPolicy _policy;
         private readonly LinkComboPolicy _linkPolicy;
+        private readonly ComboSearch _comboSearch;
+        private DuelPrompt _preparingCombo;
+        private IEnumerator<bool> _comboPreparation;
         private readonly bool _tacticalRules;
 
         public TacticalAI() { }
 
-        internal TacticalAI(DuelAiPolicy policy, LinkComboPolicy linkPolicy = null)
+        internal TacticalAI(DuelAiPolicy policy, LinkComboPolicy linkPolicy = null, bool searchCombos = false)
         {
             _policy = policy;
             _linkPolicy = linkPolicy;
+            if (searchCombos) _comboSearch = new ComboSearch();
             _tacticalRules = true;
         }
 
@@ -68,7 +74,9 @@ namespace YGOPortable.AI
             }
         }
 
-        public byte[] ComputeResponse(DuelSession session, DuelPrompt prompt)
+        public byte[] ComputeResponse(DuelSession session, DuelPrompt prompt) => ComputeComboResponse(session, prompt, null);
+
+        internal byte[] ComputeComboResponse(DuelSession session, DuelPrompt prompt, int? plannedMainAction)
         {
             if (prompt == null) return Array.Empty<byte>();
             ResetTurnState(session.TurnNumber);
@@ -79,7 +87,7 @@ namespace YGOPortable.AI
             switch (prompt.messageType)
             {
                 case YgoConstants.MSG_SELECT_IDLECMD:
-                    return BuildIdleCmd(session, prompt, emergencyFallback);
+                    return BuildIdleCmd(session, prompt, emergencyFallback, plannedMainAction);
 
                 case YgoConstants.MSG_SELECT_BATTLECMD:
                     return BuildBattleCmd(session, prompt, emergencyFallback);
@@ -146,21 +154,104 @@ namespace YGOPortable.AI
             }
         }
 
-        private byte[] BuildIdleCmd(DuelSession s, DuelPrompt p, bool fallback)
+        internal TacticalAI ForkForComboSearch()
         {
+            var copy = new TacticalAI(_policy, _linkPolicy)
+            {
+                Difficulty = Difficulty,
+                _lastTurn = _lastTurn,
+                _actionsThisTurn = _actionsThisTurn,
+                _linkDeck = _linkDeck,
+            };
+            foreach (var pair in _effectCounts) copy._effectCounts.Add(pair.Key, pair.Value);
+            copy._repositionedSeqs.UnionWith(_repositionedSeqs);
+            return copy;
+        }
+
+        internal int[] ComboMainOptions(DuelSession session, DuelPrompt prompt)
+        {
+            bool planLinks = PlanLinks(session, prompt);
+            var choices = new List<(int action, int priority)>();
+            var distinct = new HashSet<(int command, uint code, uint location, ulong description)>();
+
+            void Add(List<SelectableCardItem> items, int command)
+            {
+                for (int i = 0; i < items.Count; i++)
+                {
+                    var item = items[i];
+                    if (item.controller != prompt.playerId || !CanUseMainAction(session, prompt, planLinks, command, item) ||
+                        !distinct.Add((command, item.code, item.location, item.description))) continue;
+                    var card = CardDatabase.Get(item.code);
+                    uint tags = card?.DeckEffectCategories ?? 0;
+                    bool develops = (tags & ((1u << 5) | (1u << 6) | (1u << 7))) != 0;
+                    int priority = command switch
+                    {
+                        1 => 550 + (card?.IsExtra == true ? 140 * (card.IsLink ? (int)card.level : 2) : 50),
+                        5 => 400 + (item.location == YgoConstants.LOCATION_GRAVE ? 120 : 0),
+                        _ => 500,
+                    };
+                    choices.Add(((i << 16) | command, priority + (develops ? 280 : 0)));
+                }
+            }
+
+            Add(prompt.spSummonable, 1);
+            Add(prompt.activatable, 5);
+            Add(prompt.summonable, 0);
+            if (prompt.canBp && HasWorthwhileAttack(session, prompt.playerId)) choices.Add((6, 850));
+            if (prompt.canEp && CountOwnMonsters(session, prompt.playerId) > 0 && prompt.sSetable.Count == 0)
+                choices.Add((7, 900));
+            return choices.OrderByDescending(choice => choice.priority).Take(10).Select(choice => choice.action).ToArray();
+        }
+
+        private bool PlanLinks(DuelSession session, DuelPrompt prompt) =>
+            HasLinkPolicy && (_linkDeck ??= LinkComboPolicy.FitsDeck(session.Players[prompt.playerId]));
+
+        private bool CanUseMainAction(DuelSession session, DuelPrompt prompt, bool planLinks, int command, SelectableCardItem item) =>
+            CanUseIdleAction(session, command, item) &&
+            (command != 1 || !planLinks || LinkComboPolicy.CanUseSummon(session.Players[prompt.playerId], item)) &&
+            (command != 5 || (CanActivate(session, prompt, item) && CanPlayFieldSpell(session, prompt, item)));
+
+        internal bool AdvanceComboPlanning(DuelSession session, DuelPrompt prompt)
+        {
+            if (!ReferenceEquals(_preparingCombo, prompt))
+            {
+                _comboPreparation?.Dispose();
+                _comboPreparation = null;
+                _preparingCombo = prompt;
+                ResetTurnState(session.TurnNumber);
+                if (prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD && CanSearchCombo(session, prompt, PlanLinks(session, prompt)))
+                    _comboPreparation = _comboSearch.Prepare(session, prompt, this).GetEnumerator();
+            }
+            if (_comboPreparation == null) return true;
+            if (_comboPreparation.MoveNext()) return false;
+            _comboPreparation.Dispose();
+            _comboPreparation = null;
+            return true;
+        }
+
+        private bool CanSearchCombo(DuelSession session, DuelPrompt prompt, bool planLinks) =>
+            _comboSearch != null && Difficulty == AIDifficulty.Smart && session.RetryCount == 0 && _actionsThisTurn < 36 &&
+            ReferenceEquals(session.ActivePrompt, prompt) && (planLinks || DddTurnPlan.IsDddDeck(session.Players[prompt.playerId]));
+
+        private byte[] BuildIdleCmd(DuelSession s, DuelPrompt p, bool fallback, int? plannedMainAction)
+        {
+            bool planLinks = PlanLinks(s, p);
+            if (plannedMainAction == null && CanSearchCombo(s, p, planLinks))
+                plannedMainAction = _comboSearch.Choose(s, p, this);
+
             _unselectCount = 0;
             _actionsThisTurn++;
             _linkSummon = 0;
-            var own = s.Players[p.playerId];
-            bool planLinks = HasLinkPolicy && (_linkDeck ??= LinkComboPolicy.FitsDeck(own));
-            bool CanUse(int command, SelectableCardItem item) => CanUseIdleAction(s, command, item) &&
-                (command != 1 || !planLinks || LinkComboPolicy.CanUseSummon(own, item)) &&
-                (command != 5 || (CanActivate(s, p, item) && CanPlayFieldSpell(s, p, item)));
+            bool CanUse(int command, SelectableCardItem item) => CanUseMainAction(s, p, planLinks, command, item);
 
             if (fallback || _actionsThisTurn > 42)
             {
                 if (p.canBp && HasWorthwhileAttack(s, p.playerId)) return BitConverter.GetBytes(6);
                 if (p.canEp) return BitConverter.GetBytes(7);
+            }
+            else if (plannedMainAction is int action && UsePlannedMainAction(s, p, action, CanUse) is byte[] response)
+            {
+                return response;
             }
             else if (((planLinks ? _linkPolicy.Choose(s, p, CanUse) : null) ?? ChoosePlannedIdle(s, p, CanUse)) is int planned)
             {
@@ -176,10 +267,10 @@ namespace YGOPortable.AI
                 if (garden >= 0) return EncodeIdleAction(s, p, 5, garden);
             }
 
-            int? action = usePolicy
+            int? genericAction = usePolicy
                 ? _policy.ChooseMainAction(s, p, canBattle, preserveBoard, CanUse)
                 : ChooseRuleMainAction(s, p, preserveBoard, CanUse);
-            if (action is int selected) return EncodeIdleAction(s, p, selected & 0xffff, selected >> 16);
+            if (genericAction is int selected) return EncodeIdleAction(s, p, selected & 0xffff, selected >> 16);
 
             // Reposition weak attack monsters or prepare defenders for battle.
             if (p.repositionable.Count > 0 && s.CurrentPhase == YgoConstants.PHASE_MAIN1)
@@ -239,6 +330,26 @@ namespace YGOPortable.AI
             if (p.canEp) return BitConverter.GetBytes(7);
             if (p.canBp) return BitConverter.GetBytes(6);
             return BitConverter.GetBytes(7);
+        }
+
+        private byte[] UsePlannedMainAction(DuelSession session, DuelPrompt prompt, int action, Func<int, SelectableCardItem, bool> canUse)
+        {
+            int command = action & 0xffff;
+            int index = action >> 16;
+            if (action == 6 && prompt.canBp || action == 7 && prompt.canEp) return BitConverter.GetBytes(action);
+            var options = command switch
+            {
+                0 => prompt.summonable,
+                1 => prompt.spSummonable,
+                2 => prompt.repositionable,
+                3 => prompt.mSetable,
+                4 => prompt.sSetable,
+                5 => prompt.activatable,
+                _ => null,
+            };
+            if (options == null || index < 0 || index >= options.Count || !canUse(command, options[index])) return null;
+            if (command == 2) _repositionedSeqs.Add(options[index].sequence);
+            return EncodeIdleAction(session, prompt, command, index);
         }
 
         private static int? ChooseRuleMainAction(DuelSession session, DuelPrompt prompt, bool preserveBoard,

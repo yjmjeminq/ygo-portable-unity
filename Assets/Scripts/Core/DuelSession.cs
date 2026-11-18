@@ -155,6 +155,26 @@ namespace YGOPortable.Core
     {
         private const byte TriggeredEffectFlag = 1 << 0;
         private const byte EventSpecificEffectFlag = 1 << 1;
+        private const int MaxReplayResponses = 256;
+
+        private readonly bool _recordPlanningReplay;
+        private PlanningReplay _planningReplay;
+        private bool _loadingPlanningReplay;
+        private int _speculatingPlayer = -1;
+        private readonly List<uint> _selectedFromDeck = new List<uint>();
+        internal bool SpeculationUncertain { get; private set; }
+
+        private sealed class PlanningReplay
+        {
+            internal uint[] firstDeck, firstExtra, secondDeck, secondExtra;
+            internal ulong[] seed;
+            internal bool first;
+            internal int startingLp;
+            internal readonly List<(byte message, byte player, byte[] bytes)> responses = new();
+        }
+
+        public DuelSession() { }
+        internal DuelSession(bool recordPlanningReplay) => _recordPlanningReplay = recordPlanningReplay;
 
         public IntPtr NativePtr { get; private set; }
         public int TurnNumber { get; private set; }
@@ -272,9 +292,68 @@ namespace YGOPortable.Core
             LoadDeckForPlayer(1, turn1Main, turn1Extra, shuffle);
 
             YgoNativeBridge.YGO_StartDuel(NativePtr);
+            if (_recordPlanningReplay)
+            {
+                _planningReplay = new PlanningReplay
+                {
+                    first = p0GoesFirst,
+                    startingLp = startingLp,
+                    seed = (ulong[])seed.Clone(),
+                    firstDeck = CopyDeck(p0Main), firstExtra = CopyDeck(p0Extra),
+                    secondDeck = CopyDeck(p1Main), secondExtra = CopyDeck(p1Extra),
+                };
+            }
             AddLog($"듀얼 개시! ({(p0GoesFirst ? "플레이어 선공" : "AI 선공")}) — 덱 무작위 셔플 완료");
             StepUntilPrompt();
             return true;
+        }
+
+        private static uint[] CopyDeck(IReadOnlyList<uint> cards)
+        {
+            if (cards == null || cards.Count == 0) return Array.Empty<uint>();
+            var copy = new uint[cards.Count];
+            for (int i = 0; i < copy.Length; i++) copy[i] = cards[i];
+            return copy;
+        }
+
+        internal DuelSession ReplayForPlanning(Func<bool> expired)
+        {
+            var replay = _planningReplay;
+            if (replay == null || RetryCount != 0 || expired()) return null;
+            var copy = new DuelSession { _loadingPlanningReplay = true };
+            bool ready = false;
+            try
+            {
+                if (!copy.StartNewDuel(replay.firstDeck, replay.firstExtra, replay.secondDeck, replay.secondExtra,
+                    replay.first, replay.startingLp, replay.seed)) return null;
+                foreach (var response in replay.responses)
+                {
+                    if (expired() || copy.IsFinished) return null;
+                    if (copy.ActivePrompt == null) copy.StepUntilPrompt();
+                    var prompt = copy.ActivePrompt;
+                    if (prompt == null || prompt.messageType != response.message || prompt.playerId != response.player) return null;
+                    copy.SubmitResponse(response.bytes);
+                    if (copy.RetryCount != 0) return null;
+                }
+                if (copy.ActivePrompt == null) copy.StepUntilPrompt();
+                copy._loadingPlanningReplay = false;
+                if (copy.IsFinished || copy.ActivePrompt == null || copy.TurnNumber != TurnNumber || copy.CurrentPhase != CurrentPhase)
+                    return null;
+                copy.RefreshZonesFromCore();
+                ready = true;
+                return copy;
+            }
+            finally
+            {
+                if (!ready) copy.Dispose();
+            }
+        }
+
+        internal void BeginSpeculation(int player)
+        {
+            _speculatingPlayer = player;
+            SpeculationUncertain = false;
+            _selectedFromDeck.Clear();
         }
 
         private void LoadDeckForPlayer(byte playerId, IReadOnlyList<uint> main, IReadOnlyList<uint> extra, System.Random shuffle)
@@ -308,12 +387,48 @@ namespace YGOPortable.Core
             if (NativePtr == IntPtr.Zero || IsFinished) return;
             var prevPrompt = ActivePrompt;
             int prevRetry = RetryCount;
+            if (_planningReplay != null)
+            {
+                if (prevPrompt == null || buffer == null || buffer.Length == 0 || _planningReplay.responses.Count >= MaxReplayResponses)
+                    _planningReplay = null;
+                else _planningReplay.responses.Add((prevPrompt.messageType, prevPrompt.playerId, (byte[])buffer.Clone()));
+            }
+            if (_speculatingPlayer >= 0) TrackSpeculativeSelection(prevPrompt, buffer);
             ActivePrompt = null;
             YgoNativeBridge.SetResponse(NativePtr, buffer);
             StepUntilPrompt();
             if (!IsFinished && ActivePrompt == null && RetryCount > prevRetry && prevPrompt != null)
             {
                 ActivePrompt = prevPrompt;
+            }
+        }
+
+        private void TrackSpeculativeSelection(DuelPrompt prompt, byte[] buffer)
+        {
+            _selectedFromDeck.Clear();
+            if (prompt == null || prompt.playerId != _speculatingPlayer || buffer == null || buffer.Length < 4) return;
+            int action = BitConverter.ToInt32(buffer, 0);
+            if (prompt.messageType == YgoConstants.MSG_SELECT_CARD && action == 0 && buffer.Length >= 8)
+            {
+                int count = Math.Min(BitConverter.ToInt32(buffer, 4), (buffer.Length - 8) / 4);
+                for (int i = 0; i < count; i++) Add(BitConverter.ToInt32(buffer, 8 + i * 4));
+            }
+            else if (prompt.messageType == YgoConstants.MSG_SELECT_UNSELECT_CARD)
+            {
+                foreach (var card in prompt.unselectCandidates) Remember(card);
+                if (action == 1 && buffer.Length >= 8) Add(BitConverter.ToInt32(buffer, 4));
+            }
+
+            void Add(int index)
+            {
+                if (index < 0 || index >= prompt.candidates.Count) return;
+                Remember(prompt.candidates[index]);
+            }
+
+            void Remember(SelectableCardItem card)
+            {
+                if (card.controller == _speculatingPlayer && card.location == YgoConstants.LOCATION_DECK)
+                    _selectedFromDeck.Add(card.code);
             }
         }
 
@@ -403,7 +518,7 @@ namespace YGOPortable.Core
                 }
             }
 
-            RefreshZonesFromCore();
+            if (!_loadingPlanningReplay) RefreshZonesFromCore();
         }
 
         private void ParseMessages(byte[] buf)
@@ -487,6 +602,10 @@ namespace YGOPortable.Core
 
         private void HandleMessage(byte msgType, BinaryReader br, long msgEnd)
         {
+            if (_speculatingPlayer >= 0 && msgType is YgoConstants.MSG_DRAW or YgoConstants.MSG_CONFIRM_DECKTOP or
+                YgoConstants.MSG_DECK_TOP or YgoConstants.MSG_CONFIRM_EXTRATOP or YgoConstants.MSG_RANDOM_SELECTED or
+                YgoConstants.MSG_TOSS_COIN or YgoConstants.MSG_TOSS_DICE)
+                SpeculationUncertain = true;
             switch (msgType)
             {
                 case YgoConstants.MSG_RETRY:
@@ -668,6 +787,8 @@ namespace YGOPortable.Core
                     uint tSeq = br.ReadUInt32();
                     uint tPos = br.ReadUInt32();
                     uint reason = (br.BaseStream.Position < msgEnd) ? br.ReadUInt32() : 0;
+                    if (_speculatingPlayer >= 0 && fLoc == YgoConstants.LOCATION_DECK && tLoc != YgoConstants.LOCATION_DECK &&
+                        (fCon != _speculatingPlayer || !_selectedFromDeck.Remove(code))) SpeculationUncertain = true;
                     _confirmedCards.Remove((fCon, fLoc, fSeq, code));
 
                     var ev = new CardMoveEvent
@@ -724,6 +845,9 @@ namespace YGOPortable.Core
                         byte controller = br.ReadByte();
                         uint location = br.ReadByte();
                         uint sequence = br.ReadUInt32();
+                        if (_speculatingPlayer >= 0 && recipient == _speculatingPlayer && controller != _speculatingPlayer &&
+                            location is YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_DECK or YgoConstants.LOCATION_EXTRA)
+                            SpeculationUncertain = true;
                         if (code == 0 || (!shownToHuman && controller != HumanPlayerIndex)) continue;
                         if (shownToHuman && controller != HumanPlayerIndex)
                             _confirmedCards.Add((controller, location, sequence, code));
@@ -774,6 +898,7 @@ namespace YGOPortable.Core
                     uint tSeq = br.ReadUInt32();
                     ulong desc = br.ReadUInt64();
                     int chainNo = (int)br.ReadUInt32();
+                    if (_speculatingPlayer >= 0 && tCon != _speculatingPlayer) SpeculationUncertain = true;
                     var link = new ChainLinkInfo
                     {
                         chainNumber = chainNo,
@@ -1417,6 +1542,8 @@ namespace YGOPortable.Core
 
         public void Dispose()
         {
+            _planningReplay = null;
+            _speculatingPlayer = -1;
             if (NativePtr != IntPtr.Zero)
             {
                 YgoNativeBridge.YGO_DestroyDuel(NativePtr);

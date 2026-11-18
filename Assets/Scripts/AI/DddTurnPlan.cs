@@ -298,7 +298,7 @@ namespace YGOPortable.AI
         private static bool IsLevelMonster(uint code) =>
             CardDatabase.Get(code) is CardInfo info && info.IsMonster && !info.IsXyz && !info.IsLink && info.level != 0 && IsSet(code, DdSet);
 
-        private static bool IsDarkContract(uint code) => IsSet(code, DarkContractSet);
+        internal static bool IsDarkContract(uint code) => IsSet(code, DarkContractSet);
 
         private static bool IsSet(uint code, uint target)
         {
@@ -314,7 +314,7 @@ namespace YGOPortable.AI
             return false;
         }
 
-        private static bool IsDddDeck(PlayerFieldSnapshot own) =>
+        internal static bool IsDddDeck(PlayerFieldSnapshot own) =>
             own.extra.Count(card => IsSet(card.code, DddSet)) >= 2 &&
             (own.extra.Any(card => card.code is Gilgamesh or Machinex) ||
              own.mzone.Any(card => card != null && card.IsFaceUp && (card.code is Gilgamesh or Machinex)));

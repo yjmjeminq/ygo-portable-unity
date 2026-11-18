@@ -336,8 +336,8 @@ namespace YGOPortable.UI
             _activePlayerFirst = playerGoesFirst;
 
             _session?.Dispose();
-            _session = new DuelSession();
-            _ai = new TacticalAI(DuelAiPolicy.LoadIncluded(), LinkComboPolicy.LoadIncluded()) { Difficulty = AiDifficulty };
+            _session = new DuelSession(recordPlanningReplay: AiDifficulty == AIDifficulty.Smart);
+            _ai = new TacticalAI(DuelAiPolicy.LoadIncluded(), LinkComboPolicy.LoadIncluded(), searchCombos: true) { Difficulty = AiDifficulty };
             _shownHumanPrompt = null;
             _aiTimer = 0f;
             _resultShown = false;
@@ -482,7 +482,7 @@ namespace YGOPortable.UI
             if (prompt.playerId == _session.AiPlayerIndex)
             {
                 _aiTimer += Time.deltaTime * DuelFieldUI.PlaybackRate;
-                if (_aiTimer >= AiStepDelay)
+                if (_ai.AdvanceComboPlanning(_session, prompt) && _aiTimer >= AiStepDelay)
                 {
                     _aiTimer = 0f;
                     byte[] aiResp = _ai.ComputeResponse(_session, prompt);
