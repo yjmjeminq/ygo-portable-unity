@@ -2466,7 +2466,7 @@ namespace YGOPortable.UI
             Vector2 statSize = slot == null ? Vector2.zero : animator.GetAreaSize(slot.readout?.Rect ?? slot.root);
             var source = QueueBattleCard(attacker, card);
             var target = QueueBattleCard(defender, defendingCard);
-            (CardPose pose, Vector2 size, RectTransform defenderStats) Start()
+            (CardPose pose, Vector2 size, CardPose defenderPose, RectTransform defenderStats) Start()
             {
                 var pose = GetDisplayedCardPose(attacker.Controller, attacker.Location, attacker.Sequence, card.code);
                 Vector2 size = slot == null ? Vector2.zero : animator.GetAreaSize(slot.readout?.Rect ?? slot.root);
@@ -2487,7 +2487,10 @@ namespace YGOPortable.UI
                     }
                 }
                 Refresh();
-                return (pose, size, defenderStats);
+                var targetPose = GetDisplayedCardPose(defender.Controller, defender.Location, defender.Sequence, defendingCard?.code ?? 0);
+                if (!targetPose.IsValid)
+                    targetPose = GetCardPose(defender.Controller, defender.Location, defender.Sequence, defender.Position);
+                return (pose, size, targetPose, defenderStats);
             }
             void Finish()
             {

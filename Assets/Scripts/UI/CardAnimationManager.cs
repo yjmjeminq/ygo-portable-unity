@@ -229,7 +229,7 @@ namespace YGOPortable.UI
 
         internal void QueueAttack(CardFlight flight, Vector2 hit, bool direct, bool opponent,
             CanvasGroup readout, DuelCardReadout attacker, Vector2 statSize, Action onFinish,
-            Func<(CardPose Pose, Vector2 ReadoutSize, RectTransform DefenderReadout)> onStart = null)
+            Func<(CardPose Pose, Vector2 ReadoutSize, CardPose Defender, RectTransform DefenderReadout)> onStart = null)
         {
             QueueStep(Attack(flight, hit, direct, opponent, readout, attacker, statSize, onFinish, onStart));
         }
@@ -651,7 +651,7 @@ namespace YGOPortable.UI
 
         private IEnumerator Attack(CardFlight flight, Vector2 to, bool direct, bool opponent,
             CanvasGroup readout, DuelCardReadout attacker, Vector2 statSize, Action onFinish,
-            Func<(CardPose Pose, Vector2 ReadoutSize, RectTransform DefenderReadout)> onStart)
+            Func<(CardPose Pose, Vector2 ReadoutSize, CardPose Defender, RectTransform DefenderReadout)> onStart)
         {
             var from = flight.From;
             uint code = flight.Code;
@@ -663,12 +663,15 @@ namespace YGOPortable.UI
             }
 
             RectTransform defenderStats = null;
+            CardPose defender = default;
             if (onStart != null)
             {
-                var (pose, size, defending) = onStart();
+                var (pose, size, target, defending) = onStart();
                 if (pose.IsValid) from = pose;
                 if (size.x > 0f && size.y > 0f) statSize = size;
                 defenderStats = defending;
+                defender = target;
+                if (defender.IsValid && !direct) to = defender.Position;
             }
             var proxy = TakeCard(code, false);
             var art = (RectTransform)proxy.transform;
@@ -678,30 +681,64 @@ namespace YGOPortable.UI
                 proxy.SetCard(code, live: attacker.Live);
                 stats = CreateBattleCardReadout("AttackingCardReadout", attacker, opponent, from.Position, statSize);
             }
+            var statContent = (RectTransform)stats?.Find("CardReadout");
             if (defenderStats != null) defenderStats.SetAsLastSibling();
             if (readout != null) readout.transform.SetAsLastSibling();
 
-            void MoveWithStats(CardFlight path, float time, float lift)
+            const float fullLungeScale = 1.14f, gap = 5f;
+            Vector2 delta = to - from.Position;
+            Vector2 direction = delta.normalized;
+            Vector2 lungePoint = Vector2.Lerp(from.Position, to, direct ? .78f : .89f);
+            Vector2 approachAxis = Vector2.zero, extentAxis = Vector2.zero;
+            float lungeScale = fullLungeScale, stopEdge = 0f;
+            if (!direct && defender.IsValid && delta.sqrMagnitude > 1f)
             {
-                ApplyFlight(proxy, path, time, lift);
-                if (stats == null) return;
-                stats.anchoredPosition = art.anchoredPosition;
-                stats.sizeDelta = statSize * (art.sizeDelta.y / from.Size.y);
+                Vector2 attackerHalf = BattleHalfSize(from.Size, from.Angle, stats != null ? statSize : Vector2.zero);
+                Vector2 defenderHalf = BattleHalfSize(defender.Size, defender.Angle, defenderStats?.sizeDelta ?? Vector2.zero);
+                Vector2 reserve = attackerHalf * fullLungeScale + defenderHalf + Vector2.one * gap;
+                // Use the first axis on which both rectangles clear along the attack line.
+                bool horizontal = reserve.x / Mathf.Abs(delta.x) < reserve.y / Mathf.Abs(delta.y);
+                extentAxis = horizontal ? Vector2.right : Vector2.up;
+                approachAxis = extentAxis * Mathf.Sign(Vector2.Dot(extentAxis, delta));
+                float half = Vector2.Dot(extentAxis, attackerHalf);
+                stopEdge = Vector2.Dot(approachAxis, to) - Vector2.Dot(extentAxis, defenderHalf) - gap;
+                float available = stopEdge - Vector2.Dot(approachAxis, from.Position);
+                lungeScale = Mathf.Clamp((available - 8f) / half, 1f, fullLungeScale);
+                float reach = Mathf.Clamp01((available - half * lungeScale) / Vector2.Dot(approachAxis, delta));
+                lungePoint = Vector2.Lerp(from.Position, to, Mathf.Min(.89f, reach));
             }
 
-            var direction = (to - from.Position).normalized;
-            var windup = new CardPose(from.Position - direction * 26f, from.Size * 1.10f, from.Angle);
+            void MoveWithStats(CardFlight path, float time, float lift, float clearance = 1f)
+            {
+                ApplyFlight(proxy, path, time, lift);
+                Vector2 scaledStats = stats == null ? Vector2.zero : statSize * (art.sizeDelta.y / from.Size.y);
+                if (approachAxis != Vector2.zero && clearance > 0f)
+                {
+                    float extent = Vector2.Dot(extentAxis, BattleHalfSize(art.sizeDelta, art.localEulerAngles.z, scaledStats));
+                    float edge = Vector2.Dot(approachAxis, art.anchoredPosition) + extent;
+                    art.anchoredPosition -= approachAxis * (Mathf.Max(0f, edge - stopEdge) * clearance);
+                }
+                if (stats == null) return;
+                stats.anchoredPosition = art.anchoredPosition;
+                stats.sizeDelta = scaledStats;
+                if (approachAxis == Vector2.zero) return;
+                // A focused card can start closer to its target than its full stat plate allows.
+                float statEdge = Vector2.Dot(approachAxis, art.anchoredPosition) + Vector2.Dot(extentAxis, scaledStats) * .5f;
+                float frameEdge = stopEdge + (gap - 1f) * (1f - clearance);
+                statContent.anchoredPosition = -approachAxis * Mathf.Max(0f, statEdge - frameEdge);
+            }
+
+            var windup = new CardPose(from.Position - direction * 26f, from.Size * Mathf.Lerp(1f, lungeScale, .714f), from.Angle);
             var first = new CardFlight(code, from, windup, false, false);
             yield return Animate(.085f, t =>
             {
-                MoveWithStats(first, t, 5f);
+                MoveWithStats(first, t, 5f, Mathf.SmoothStep(0f, 1f, t));
                 if (readout != null) readout.alpha = Mathf.SmoothStep(0f, 1f, t);
             });
 
-            Vector2 hit = Vector2.Lerp(from.Position, to, direct ? .78f : .89f);
-            var lunge = new CardPose(hit, from.Size * 1.14f, from.Angle);
+            var lunge = new CardPose(lungePoint, from.Size * lungeScale, from.Angle);
             var outFlight = new CardFlight(code, windup, lunge, false, false);
-            yield return Animate(.13f, t => MoveWithStats(outFlight, t, 27f));
+            yield return Animate(.13f, t => MoveWithStats(outFlight, t, direct ? 27f : 16f));
 
             if (direct) LotdAudio.PlayDirectAttack();
             else LotdAudio.PlayAttack();
@@ -713,7 +750,8 @@ namespace YGOPortable.UI
             var returnFlight = new CardFlight(code, lunge, flight.To.IsValid ? flight.To : from, false, false);
             yield return Animate(.27f, t =>
             {
-                MoveWithStats(returnFlight, t, 10f);
+                float clearance = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.8f, 1f, t));
+                MoveWithStats(returnFlight, t, 10f, clearance);
                 impact.Seek(t);
                 if (readout != null) readout.alpha = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.57f, 1f, t));
             });
@@ -723,6 +761,14 @@ namespace YGOPortable.UI
             RemoveTransient(impact.gameObject);
             RecycleCard(proxy);
             onFinish?.Invoke();
+        }
+
+        private static Vector2 BattleHalfSize(Vector2 cardSize, float angle, Vector2 readoutSize)
+        {
+            float radians = angle * Mathf.Deg2Rad;
+            float cos = Mathf.Abs(Mathf.Cos(radians)), sin = Mathf.Abs(Mathf.Sin(radians));
+            var cardBounds = new Vector2(cardSize.x * cos + cardSize.y * sin, cardSize.x * sin + cardSize.y * cos);
+            return Vector2.Max(cardBounds, readoutSize) * .5f;
         }
 
         internal RectTransform CreateBattleCardReadout(string name, DuelCardReadout card, bool opponent,

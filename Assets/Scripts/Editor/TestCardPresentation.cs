@@ -30,6 +30,7 @@ namespace YGOPortable.Editor
                 VerifySummonReadout(animator);
                 VerifyBattleVisibility(animator);
                 VerifyLinkDirectAttack(animator);
+                VerifyAttackSpacing(animator);
             }
             finally
             {
@@ -173,6 +174,65 @@ namespace YGOPortable.Editor
             Require(arrivals == 1, "The direct attack did not finish once.");
         }
 
+        private static void VerifyAttackSpacing(CardAnimationManager animator)
+        {
+            const uint wagon = 34496660, mysticalElf = 15025844;
+            foreach (var (start, end, opponent) in new[]
+            {
+                (new Vector2(48f, -70f), new Vector2(48f, 32f), false),
+                (new Vector2(-182f, 62f), new Vector2(20f, -61f), true),
+            })
+            {
+                animator.Clear();
+                var resting = new CardPose(opponent ? start : start - Vector2.up * 7f, new Vector2(70f, 102f), opponent ? 90f : 0f);
+                var from = new CardPose(start, resting.Size * (opponent ? 1f : 1.05f), resting.Angle);
+                var defender = new CardPose(end, new Vector2(70f, 102f), -90f);
+                var targetArt = LotdUiKit.CreateRect("Target Card", animator.transform, Vector2.one * .5f,
+                    Vector2.one * .5f, Vector2.zero, Vector2.zero);
+                targetArt.anchoredPosition = end;
+                targetArt.sizeDelta = defender.Size;
+                targetArt.localRotation = Quaternion.Euler(0f, 0f, defender.Angle);
+
+                var sourceCard = CardDatabase.Get(opponent ? wagon : BlueEyes);
+                byte player = opponent ? (byte)1 : (byte)0;
+                var attack = new BattleCardStats(player, YgoConstants.LOCATION_MZONE, 1,
+                    opponent ? YgoConstants.POS_FACEUP_DEFENSE : YgoConstants.POS_FACEUP_ATTACK, sourceCard.atk, sourceCard.def);
+                var defense = new BattleCardStats((byte)(1 - player), YgoConstants.LOCATION_MZONE, 1,
+                    YgoConstants.POS_FACEUP_DEFENSE, 800, 2000);
+                var target = new DuelCardReadout(CardDatabase.Get(mysticalElf), battleStats: defense);
+                var comparison = animator.CreateBattleReadout(DuelFieldUI.BattleStatsArea, attack, defense, 0, false, false);
+                var queued = new CardPose(start - Vector2.one * 14f, from.Size, from.Angle);
+                var flight = new CardFlight(sourceCard.code, queued, resting, false, false);
+                var size = new Vector2(118f, opponent ? 108f : 113f);
+                int arrivals = 0;
+                animator.QueueAttack(flight, end + Vector2.one * 24f, false, opponent, comparison,
+                    new DuelCardReadout(sourceCard, battleStats: attack), size, () => arrivals++,
+                    () => (from, size, defender,
+                        animator.CreateBattleCardReadout("DefendingCardReadout", target, !opponent, end, new Vector2(110f, 100f))));
+
+                bool firstFrame = true;
+                VerifyAttackFlight(animator, sourceCard.atk.ToString(), sourceCard.def.ToString(),
+                    sourceCard.level.ToString(), () =>
+                    {
+                        var art = (RectTransform)animator.transform.Find("MovingCard");
+                        if (firstFrame)
+                        {
+                            Require(art.anchoredPosition == from.Position, "The attack skipped the current displayed pose.");
+                            var labels = (RectTransform)animator.transform.Find("AttackingCardReadout/CardReadout");
+                            Require(opponent || labels.anchoredPosition.y < 0f,
+                                "The raised card's readout did not keep its clearance on the first frame.");
+                            firstFrame = false;
+                        }
+                        Require(!Bounds(art).Overlaps(Bounds(targetArt)), "The raised attack covered the target card.");
+                        var impact = (RectTransform)animator.transform.Find("Strike");
+                        Require(impact == null || impact.anchoredPosition == end,
+                            "The impact used the old queued point instead of the defender's current position.");
+                    });
+                Require(arrivals == 1, "The spaced attack did not finish once.");
+            }
+            Debug.Log("[VERIFY DUEL ATTACK SPACING] A focused adjacent attack and a diagonal defense-position attack kept both cards and stat plates separate through windup, contact and return.");
+        }
+
         internal static void VerifyAttackFlight(CardAnimationManager animator, string attack, string defense, string rating,
             Action inspectFrame = null)
         {
@@ -184,7 +244,8 @@ namespace YGOPortable.Editor
             for (int stage = 0; stage < 3; stage++)
             {
                 Require(step.MoveNext() && step.Current is IEnumerator, "The attack omitted an animation stage.");
-                Require(((IEnumerator)step.Current).MoveNext(), "The attack did not render its first frame.");
+                var frames = (IEnumerator)step.Current;
+                Require(frames.MoveNext(), "The attack did not render its first frame.");
                 var art = (RectTransform)animator.transform.Find("MovingCard");
                 var stats = (RectTransform)animator.transform.Find("AttackingCardReadout");
                 var strip = stats.Find("CardReadout/Combat");
@@ -200,12 +261,32 @@ namespace YGOPortable.Editor
                     stats.Find("CardReadout/Labels/Rating/Value").GetComponent<Text>().text == rating &&
                     stats.GetComponentsInChildren<Graphic>().All(graphic => !graphic.raycastTarget),
                     "The flying card omitted its current stats, rank, link or level, or blocked input.");
-                inspectFrame?.Invoke();
                 previous = stats.anchoredPosition;
+                var sample = (Action<float>)frames.GetType().GetField("apply", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                    ?.GetValue(frames);
+                Require(sample != null, "The attack renderer did not expose its interpolated frames.");
+                var defender = (RectTransform)animator.transform.Find("DefendingCardReadout");
+                var content = (RectTransform)stats.Find("CardReadout");
+                for (int frame = 0; frame <= 16; frame++)
+                {
+                    sample(frame / 16f);
+                    Require(stats.anchoredPosition == art.anchoredPosition &&
+                        (defender == null || !Bounds(content).Overlaps(Bounds(defender))),
+                        "The battle readouts separated from their card or overlapped each other during the attack.");
+                    inspectFrame?.Invoke();
+                }
             }
             Require(!step.MoveNext() && animator.transform.Find("AttackingCardReadout") == null &&
                 animator.transform.Find("BattleReadout") == null && !animator.transform.Find("MovingCard").gameObject.activeSelf,
                 "The attack left a transient card or stats on screen.");
+        }
+
+        private static Rect Bounds(RectTransform rect)
+        {
+            var corners = new Vector3[4];
+            rect.GetWorldCorners(corners);
+            return Rect.MinMaxRect(corners.Min(point => point.x), corners.Min(point => point.y),
+                corners.Max(point => point.x), corners.Max(point => point.y));
         }
 
         private static void Require(bool condition, string message)
