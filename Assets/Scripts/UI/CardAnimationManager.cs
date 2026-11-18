@@ -302,9 +302,9 @@ namespace YGOPortable.UI
             QueueStep(ChainResolution(center, code, chainNumber, maxHeight));
         }
 
-        internal void QueueChainReadoutUpdate(Action apply) => QueueStep(ApplyChainReadoutUpdate(apply));
+        internal void QueueFieldReadoutUpdate(Action apply) => QueueStep(ApplyFieldReadoutUpdate(apply));
 
-        private static IEnumerator ApplyChainReadoutUpdate(Action apply)
+        private static IEnumerator ApplyFieldReadoutUpdate(Action apply)
         {
             apply();
             yield break;

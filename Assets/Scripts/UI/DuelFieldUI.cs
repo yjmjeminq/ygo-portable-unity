@@ -166,7 +166,7 @@ namespace YGOPortable.UI
         private readonly Dictionary<(byte Controller, uint Sequence), CardMoveReadoutSnapshot> _pendingCardReadouts = new();
         private const uint FieldMaterials = YgoConstants.LOCATION_MZONE | YgoConstants.LOCATION_OVERLAY;
         private readonly Dictionary<(byte Controller, uint Sequence), MaterialReadout> _materialReadouts = new();
-        private readonly Dictionary<(byte Controller, uint Location, uint Sequence), ChainCardReadout> _chainCardReadouts = new();
+        private readonly Dictionary<(byte Controller, uint Location, uint Sequence), PresentedFieldReadout> _presentedFieldReadouts = new();
 
         private sealed class MaterialReadout
         {
@@ -203,7 +203,7 @@ namespace YGOPortable.UI
             public object PendingArrival;
         }
 
-        private sealed class ChainCardReadout
+        private sealed class PresentedFieldReadout
         {
             internal LiveCardState Shown;
         }
@@ -272,7 +272,7 @@ namespace YGOPortable.UI
             session.OnPhaseChanged += HandlePhaseChanged;
             session.OnChainActivated += HandleChainActivatedEvent;
             session.OnChainResolving += HandleChainResolvingEvent;
-            session.OnChainReadoutChanged += QueueChainReadouts;
+            session.OnFieldReadoutsChanged += QueueFieldReadouts;
             session.OnAttackDeclared += HandleAttackEvent;
             session.OnBattleResolved += HandleBattleResolved;
             session.OnCoinTossed += HandleCoinTossedEvent;
@@ -313,7 +313,7 @@ namespace YGOPortable.UI
                 _session.OnPhaseChanged -= HandlePhaseChanged;
                 _session.OnChainActivated -= HandleChainActivatedEvent;
                 _session.OnChainResolving -= HandleChainResolvingEvent;
-                _session.OnChainReadoutChanged -= QueueChainReadouts;
+                _session.OnFieldReadoutsChanged -= QueueFieldReadouts;
                 _session.OnAttackDeclared -= HandleAttackEvent;
                 _session.OnBattleResolved -= HandleBattleResolved;
                 _session.OnCoinTossed -= HandleCoinTossedEvent;
@@ -1274,7 +1274,7 @@ namespace YGOPortable.UI
         {
             if (_session == null || !Root.activeInHierarchy) return;
 
-            if (!IsPresenting) _chainCardReadouts.Clear();
+            if (!IsPresenting) _presentedFieldReadouts.Clear();
             CaptureCardReadouts();
             var prompt = _session.ActivePrompt;
             if (!ReferenceEquals(prompt, _pendingPlacePrompt))
@@ -2152,7 +2152,7 @@ namespace YGOPortable.UI
         {
             _arrivingCards.Clear();
             _materialReadouts.Clear();
-            _chainCardReadouts.Clear();
+            _presentedFieldReadouts.Clear();
             _battleCardDisplays.Clear();
             _pendingCardReadouts.Clear();
             ResetHandViews(_myHandViews);
@@ -2265,9 +2265,9 @@ namespace YGOPortable.UI
         private DuelCardReadout ReadFieldStats(uint code, LiveCardState live)
         {
             if (live?.IsFaceUp == true &&
-                _chainCardReadouts.TryGetValue((live.controller, live.location, live.sequence), out var chain) &&
-                chain.Shown.code == code)
-                live = chain.Shown;
+                _presentedFieldReadouts.TryGetValue((live.controller, live.location, live.sequence), out var presented) &&
+                presented.Shown.code == code)
+                live = presented.Shown;
             if (live != null && live.location == YgoConstants.LOCATION_MZONE &&
                 _materialReadouts.TryGetValue((live.controller, live.sequence), out var held) && held.Source.code == code)
                 return new DuelCardReadout(CardDatabase.Get(code), live,
@@ -2283,29 +2283,29 @@ namespace YGOPortable.UI
 
             void Clear(byte controller, uint location, uint sequence)
             {
-                _chainCardReadouts.Remove((controller, location & ~YgoConstants.LOCATION_OVERLAY, sequence));
+                _presentedFieldReadouts.Remove((controller, location & ~YgoConstants.LOCATION_OVERLAY, sequence));
                 if (location == YgoConstants.LOCATION_MZONE) _materialReadouts.Remove((controller, sequence));
             }
         }
 
-        private void QueueChainReadouts(IReadOnlyList<(LiveCardState Before, LiveCardState After)> changes)
+        private void QueueFieldReadouts(IReadOnlyList<(LiveCardState Before, LiveCardState After)> changes)
         {
             var animator = CardAnimationManager.Instance;
             if (animator == null || !Root.activeInHierarchy) return;
 
-            var updates = new (ChainCardReadout Readout, LiveCardState After)[changes.Count];
+            var updates = new (PresentedFieldReadout Readout, LiveCardState After)[changes.Count];
             for (int i = 0; i < changes.Count; i++)
             {
                 var (before, after) = changes[i];
                 var key = (before.controller, before.location, before.sequence);
-                if (!_chainCardReadouts.TryGetValue(key, out var readout))
+                if (!_presentedFieldReadouts.TryGetValue(key, out var readout))
                 {
-                    readout = new ChainCardReadout { Shown = before };
-                    _chainCardReadouts.Add(key, readout);
+                    readout = new PresentedFieldReadout { Shown = before };
+                    _presentedFieldReadouts.Add(key, readout);
                 }
                 updates[i] = (readout, after);
             }
-            animator.QueueChainReadoutUpdate(() =>
+            animator.QueueFieldReadoutUpdate(() =>
             {
                 foreach (var (readout, after) in updates)
                     readout.Shown = after;
@@ -2343,7 +2343,8 @@ namespace YGOPortable.UI
             {
                 // Field modifiers may not apply during the placement of the other cards in this summon.
                 if (animator?.IsSummonReserved(slot.Controller, slot.Sequence) == true) continue;
-                readout.DestinationCard = _session.GetVisibleFieldCard(readout.Code, slot.Controller, YgoConstants.LOCATION_MZONE, slot.Sequence);
+                var live = _session.GetVisibleFieldCard(readout.Code, slot.Controller, YgoConstants.LOCATION_MZONE, slot.Sequence);
+                readout.DestinationCard = ReadFieldStats(readout.Code, live).Live;
                 _pendingCardReadouts.Remove(slot);
             }
         }

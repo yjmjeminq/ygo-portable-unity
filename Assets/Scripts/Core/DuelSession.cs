@@ -260,7 +260,8 @@ namespace YGOPortable.Core
         public DuelPrompt ActivePrompt { get; private set; }
         private ChainLinkInfo _resolvingChainLink;
         private (byte player, ulong hint)? _pendingSelectionHint;
-        private Dictionary<(byte Controller, uint Location, uint Sequence), LiveCardState> _chainReadoutBaseline;
+        private Dictionary<(byte Controller, uint Location, uint Sequence), LiveCardState> _fieldReadoutBaseline;
+        private bool _awaitingSpecialSummonCompletion;
         private readonly HashSet<(byte Player, uint Location, uint Sequence, uint Code)> _confirmedCards =
             new HashSet<(byte, uint, uint, uint)>();
 
@@ -284,7 +285,7 @@ namespace YGOPortable.Core
         public event Action<int, int> OnPhaseChanged;
         public event Action<ChainLinkInfo> OnChainActivated;
         public event Action<ChainLinkInfo> OnChainResolving;
-        internal event Action<IReadOnlyList<(LiveCardState Before, LiveCardState After)>> OnChainReadoutChanged;
+        internal event Action<IReadOnlyList<(LiveCardState Before, LiveCardState After)>> OnFieldReadoutsChanged;
         public event Action<byte, uint, uint, byte, uint, uint> OnAttackDeclared;
         internal event Action<BattleCardStats, BattleCardStats> OnBattleResolved;
         public event Action<byte, IReadOnlyList<bool>> OnCoinTossed;
@@ -303,7 +304,6 @@ namespace YGOPortable.Core
             RetryCount = 0;
             LastHintMsg = 0;
             _pendingSelectionHint = null;
-            _chainReadoutBaseline = null;
             ClearAttack();
             ActivePrompt = null;
             CurrentChain.Clear();
@@ -564,6 +564,8 @@ namespace YGOPortable.Core
         public void StepUntilPrompt()
         {
             if (NativePtr == IntPtr.Zero || IsFinished) return;
+            if (OnFieldReadoutsChanged == null) _fieldReadoutBaseline = null;
+            else _fieldReadoutBaseline ??= CaptureFieldReadouts(fromNative: false);
 
             int guard = 0;
             while (!IsFinished && guard < 256)
@@ -600,9 +602,10 @@ namespace YGOPortable.Core
             if (IsFinished || ActivePrompt != null &&
                 ActivePrompt.messageType is not (YgoConstants.MSG_SELECT_PLACE or YgoConstants.MSG_SELECT_POSITION))
             {
-                OnSpecialSummonBoundary?.Invoke();
-                if (_chainReadoutBaseline != null) SampleChainReadouts(keepTracking: !IsFinished);
+                CompleteSpecialSummonPresentation();
+                if (!_loadingPlanningReplay) SampleFieldReadouts(fromNative: false);
             }
+            if (IsFinished) _fieldReadoutBaseline = null;
         }
 
         private void ParseMessages(byte[] buf)
@@ -612,6 +615,7 @@ namespace YGOPortable.Core
             {
                 // Native processing emits the comparison and battle together, with optional hints in between.
                 (BattleComparisonValue? Attacker, BattleComparisonValue? Defender) comparison = default;
+                bool sampleReadouts = false;
                 while (ms.Position + 4 <= ms.Length)
                 {
                     uint sz = br.ReadUInt32();
@@ -620,6 +624,9 @@ namespace YGOPortable.Core
                     byte msgType = br.ReadByte();
                     var previousPrompt = ActivePrompt;
                     HandleMessage(msgType, br, msgEnd, ref comparison);
+                    sampleReadouts |= msgType is YgoConstants.MSG_MOVE or YgoConstants.MSG_SWAP or YgoConstants.MSG_POS_CHANGE
+                        or YgoConstants.MSG_SET or YgoConstants.MSG_SUMMONED or YgoConstants.MSG_FLIPSUMMONED
+                        or YgoConstants.MSG_SPSUMMONED or YgoConstants.MSG_DRAW or YgoConstants.MSG_NEW_TURN or YgoConstants.MSG_NEW_PHASE;
                     if (ActivePrompt != null && ActivePrompt != previousPrompt && _pendingSelectionHint is { } selection)
                     {
                         if (ActivePrompt.playerId == selection.player) ActivePrompt.SelectionHint = selection.hint;
@@ -627,7 +634,16 @@ namespace YGOPortable.Core
                     }
                     ms.Position = msgEnd;
                 }
+                // The native state reflects the whole returned batch. Queue the new values after its animations.
+                if (sampleReadouts && CurrentChain.Count == 0 && !_awaitingSpecialSummonCompletion)
+                    SampleFieldReadouts();
             }
+        }
+
+        private void CompleteSpecialSummonPresentation()
+        {
+            _awaitingSpecialSummonCompletion = false;
+            OnSpecialSummonBoundary?.Invoke();
         }
 
         private static SelectableCardItem ReadLocIntoItem(BinaryReader br, uint code)
@@ -697,8 +713,9 @@ namespace YGOPortable.Core
 
         private void NotifyCardMoved(CardMoveEvent move, CardMoveEvent swapPartner = null)
         {
-            InvalidateChainReadouts(move);
-            if (swapPartner != null) InvalidateChainReadouts(swapPartner);
+            InvalidateFieldReadouts(move);
+            if (swapPartner != null) InvalidateFieldReadouts(swapPartner);
+            if (move.summonType.HasValue) _awaitingSpecialSummonCompletion = true;
             if (_chosenAttacker is { } source)
             {
                 var slot = (source.controller, source.location, source.sequence);
@@ -879,7 +896,7 @@ namespace YGOPortable.Core
                 }
 
                 case YgoConstants.MSG_SPSUMMONED:
-                    OnSpecialSummonBoundary?.Invoke();
+                    CompleteSpecialSummonPresentation();
                     break;
 
                 case YgoConstants.MSG_FLIPSUMMONING:
@@ -1062,14 +1079,14 @@ namespace YGOPortable.Core
                         _resolvingChainLink = link;
                         SolvedChainLinks.Add((idx, link.code));
                         AddLog($"체인 {idx} 처리: [{CardDatabase.GetName(link.code)}]");
-                        SampleChainReadouts(keepTracking: true);
+                        SampleFieldReadouts();
                         OnChainResolving?.Invoke(link);
                     }
                     break;
                 }
 
                 case YgoConstants.MSG_CHAIN_SOLVED:
-                    if (_chainReadoutBaseline != null) SampleChainReadouts(keepTracking: true);
+                    SampleFieldReadouts();
                     _resolvingChainLink = null;
                     break;
 
@@ -1084,7 +1101,7 @@ namespace YGOPortable.Core
                 }
 
                 case YgoConstants.MSG_CHAIN_END:
-                    if (_chainReadoutBaseline != null) SampleChainReadouts(keepTracking: false);
+                    SampleFieldReadouts();
                     CurrentChain.Clear();
                     _resolvingChainLink = null;
                     _confirmedCards.Clear();
@@ -1548,41 +1565,43 @@ namespace YGOPortable.Core
             }
         }
 
-        private void InvalidateChainReadouts(CardMoveEvent move)
+        private void InvalidateFieldReadouts(CardMoveEvent move)
         {
-            if (_chainReadoutBaseline == null) return;
+            if (_fieldReadoutBaseline == null) return;
             // A move can replace a copy with the same passcode. Materials have their own timing.
-            _chainReadoutBaseline.Remove((move.fromCon, move.fromLoc & ~YgoConstants.LOCATION_OVERLAY, move.fromSeq));
-            _chainReadoutBaseline.Remove((move.toCon, move.toLoc & ~YgoConstants.LOCATION_OVERLAY, move.toSeq));
+            _fieldReadoutBaseline.Remove((move.fromCon, move.fromLoc & ~YgoConstants.LOCATION_OVERLAY, move.fromSeq));
+            _fieldReadoutBaseline.Remove((move.toCon, move.toLoc & ~YgoConstants.LOCATION_OVERLAY, move.toSeq));
         }
 
-        private void SampleChainReadouts(bool keepTracking)
+        private Dictionary<(byte Controller, uint Location, uint Sequence), LiveCardState> CaptureFieldReadouts(bool fromNative)
         {
-            var listener = OnChainReadoutChanged;
-            if (listener == null || NativePtr == IntPtr.Zero)
-            {
-                _chainReadoutBaseline = null;
-                return;
-            }
-
-            // The native process yields at each message boundary. Query a separate snapshot
-            // here so effects on successive links retain their own presentation values.
             var field = new Dictionary<(byte Controller, uint Location, uint Sequence), LiveCardState>();
             for (byte player = 0; player < Players.Length; player++)
             {
-                AddVisible(QueryLocationCards(player, YgoConstants.LOCATION_MZONE));
-                AddVisible(QueryLocationCards(player, YgoConstants.LOCATION_SZONE));
+                AddVisible(fromNative ? QueryLocationCards(player, YgoConstants.LOCATION_MZONE) : Players[player].mzone);
+                AddVisible(fromNative ? QueryLocationCards(player, YgoConstants.LOCATION_SZONE) : Players[player].szone);
             }
-            void AddVisible(List<LiveCardState> cards)
+            return field;
+
+            void AddVisible(IReadOnlyList<LiveCardState> cards)
             {
-                foreach (var card in cards)
+                for (int index = 0; index < cards.Count; index++)
+                {
+                    var card = cards[index];
                     if (card?.IsFaceUp == true && card.code != 0)
                         field.Add((card.controller, card.location, card.sequence), card);
+                }
             }
+        }
 
-            var before = _chainReadoutBaseline;
-            _chainReadoutBaseline = keepTracking ? field : null;
-            if (before == null) return;
+        private void SampleFieldReadouts(bool fromNative = true)
+        {
+            var before = _fieldReadoutBaseline;
+            var listener = OnFieldReadoutsChanged;
+            if (before == null || listener == null) return;
+
+            var field = CaptureFieldReadouts(fromNative);
+            _fieldReadoutBaseline = field;
             List<(LiveCardState Before, LiveCardState After)> changes = null;
             foreach (var (slot, previous) in before)
             {
@@ -1754,6 +1773,8 @@ namespace YGOPortable.Core
         {
             _planningReplay = null;
             _speculatingPlayer = -1;
+            _fieldReadoutBaseline = null;
+            _awaitingSpecialSummonCompletion = false;
             if (NativePtr != IntPtr.Zero)
             {
                 YgoNativeBridge.YGO_DestroyDuel(NativePtr);

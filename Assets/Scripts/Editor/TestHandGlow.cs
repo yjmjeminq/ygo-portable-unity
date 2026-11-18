@@ -28,6 +28,8 @@ namespace YGOPortable.Editor
             VerifyNativeCombatReadout(useHonest: true);
             VerifyNativeCombatReadout(useHonest: false);
             VerifyNativeChainReadouts();
+            VerifyFieldReplacementReadouts();
+            VerifyTurnAndDrawReadouts();
             VerifyDefensePositionBattleReadout(34496660, BattleStatSource.Defense, 1800);
             VerifyDefensePositionBattleReadout(75372290, BattleStatSource.Attack, 1550);
             VerifyEffectModifiedBattleReadout();
@@ -320,7 +322,7 @@ namespace YGOPortable.Editor
                 "The waiting attacker or battle-destroyed defender was removed before the attack began.");
             // The frame sampler skips the preceding animations. Apply their queued card readouts before sampling the strike.
             foreach (var step in steps.TakeWhile(step => !step.GetType().Name.StartsWith("<Attack>", StringComparison.Ordinal)))
-                if (step.GetType().Name.StartsWith("<ApplyChainReadoutUpdate>", StringComparison.Ordinal))
+                if (step.GetType().Name.StartsWith("<ApplyFieldReadoutUpdate>", StringComparison.Ordinal))
                     Require(!step.MoveNext(), "The damage-step effect did not release its card readout.");
             Require(attack.text == expectedAttack, "The chain's attack value did not reach the field before combat began.");
             TestCardPresentation.VerifyAttackFlight(animation, expectedAttack, "1650", "4", () =>
@@ -428,12 +430,12 @@ namespace YGOPortable.Editor
 
             var steps = AnimationSteps(animator).Where(step =>
                 step.GetType().Name.StartsWith("<ChainResolution>", StringComparison.Ordinal) ||
-                step.GetType().Name.StartsWith("<ApplyChainReadoutUpdate>", StringComparison.Ordinal)).ToArray();
+                step.GetType().Name.StartsWith("<ApplyFieldReadoutUpdate>", StringComparison.Ordinal)).ToArray();
             Require(steps.Length == 4, "Each resolved link must publish its own card values.");
             for (int index = 0; index < steps.Length; index += 2)
             {
                 Require(steps[index].GetType().Name.StartsWith("<ChainResolution>", StringComparison.Ordinal) &&
-                        steps[index + 1].GetType().Name.StartsWith("<ApplyChainReadoutUpdate>", StringComparison.Ordinal),
+                        steps[index + 1].GetType().Name.StartsWith("<ApplyFieldReadoutUpdate>", StringComparison.Ordinal),
                     "The chain queued its new values before showing the resolving card.");
                 Require(steps[index].MoveNext() && steps[index].Current is IEnumerator, "A link did not have its own resolution animation.");
                 var sample = TestCardPresentation.SampleAnimation((IEnumerator)steps[index].Current);
@@ -445,6 +447,156 @@ namespace YGOPortable.Editor
             }
             Verify("2750", "2050", "1200", "3");
             Debug.Log("[VERIFY DUEL CHAIN READOUT] Rush changed only one copy to 2550 at link 2. Ocean changed both copies' ATK/DEF and Level at link 1.");
+        }
+
+        private static void VerifyFieldReplacementReadouts()
+        {
+            const uint gagagigo = 49003308, magePower = 83746708, umi = 22702055;
+            var main = Enumerable.Repeat(gagagigo, 10).Concat(Enumerable.Repeat(magePower, 8))
+                .Concat(Enumerable.Repeat(umi, 22)).ToArray();
+            var ai = new TacticalAI();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Field replacement combat values", main, Array.Empty<uint>(),
+                Enumerable.Repeat(gagagigo, 40).ToArray(), Array.Empty<uint>(), true, session =>
+                {
+                    var hand = session.Players[session.HumanPlayerIndex].hand;
+                    return hand.Any(card => card.code == gagagigo) && hand.Any(card => card.code == magePower) &&
+                        hand.Count(card => card.code == umi) >= 2;
+                });
+            int summon = duel.ActivePrompt.summonable.FindIndex(card => card.code == gagagigo);
+            Require(summon >= 0, "Gagagigo was not available for the field replacement fixture.");
+            duel.SubmitResponseInt(summon << 16);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            ActivateFromMainPhase(duel, magePower);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
+                prompt.messageType == YgoConstants.MSG_SELECT_CARD ? DuelSession.PackCardSelection(0) : null);
+
+            void SetFieldSpell()
+            {
+                int option = duel.ActivePrompt.sSetable.FindIndex(card => card.code == umi);
+                Require(option >= 0, "Umi was not available to set in the Field Zone.");
+                duel.SubmitResponseInt((option << 16) | 4);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+                Require(duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD && duel.RetryCount == 0,
+                    "Setting the Field Spell did not return to the main phase.");
+            }
+
+            SetFieldSpell();
+            var own = duel.Players[duel.HumanPlayerIndex];
+            var monster = own.mzone.Single(card => card?.code == gagagigo);
+            Require(monster.attack == 2850 && monster.defense == 2000 && own.szone[5]?.code == umi,
+                "Mage Power did not count the first Field Spell.");
+            using var ui = new HandUI(duel);
+            var animator = CardAnimationManager.Ensure(ui.Canvas);
+            Canvas.ForceUpdateCanvases();
+            var tile = FieldSlot(ui.Field, monster);
+            tile.GetComponent<CardDragTrigger>().OnRightClick();
+            var inspector = ui.Field.Root.transform.Find("LeftInspector/CardDetails/CombatStats");
+
+            void Verify(string attack, string defense)
+            {
+                Require(tile.Find("CardReadout/Combat/Attack/Digits/Value").GetComponent<Text>().text == attack &&
+                        tile.Find("CardReadout/Combat/Defense/Digits/Value").GetComponent<Text>().text == defense &&
+                        inspector.Find("Attack/Digits/Value").GetComponent<Text>().text == attack &&
+                        inspector.Find("Defense/Digits/Value").GetComponent<Text>().text == defense,
+                    $"The field and inspector did not both show ATK {attack} and DEF {defense} during the replacement.");
+            }
+
+            SetFieldSpell();
+            Require(own.grave.Count(card => card.code == umi) == 1 && own.szone[5]?.code == umi &&
+                    own.mzone[monster.sequence].attack == 2850 && own.mzone[monster.sequence].defense == 2000,
+                "The native set did not replace the first Field Spell and restore Mage Power's full increase.");
+            ui.Field.Refresh();
+            Verify("2850", "2000");
+
+            const BindingFlags fields = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            bool IsReadoutUpdate(IEnumerator step) => step.GetType().Name.StartsWith("<ApplyFieldReadoutUpdate>", StringComparison.Ordinal);
+            var steps = AnimationSteps(animator).Where(step => IsReadoutUpdate(step) ||
+                step.GetType().GetField("flight", fields)?.GetValue(step) is CardFlight flight && flight.Code == umi).ToArray();
+            Require(steps.Length == 4 && IsReadoutUpdate(steps[1]) && IsReadoutUpdate(steps[3]),
+                "Replacing a Field Spell did not queue a stat update after each native move.");
+            for (int index = 0; index < steps.Length; index += 2)
+            {
+                var move = steps[index];
+                Require(move.MoveNext() && move.Current is IEnumerator, "The Field Spell did not enter its move animation.");
+                var sample = TestCardPresentation.SampleAnimation((IEnumerator)move.Current);
+                sample(.68f);
+                if (index == 0) Verify("2850", "2000");
+                else Verify("2350", "1500");
+                sample(1f);
+                while (move.MoveNext()) { }
+                Require(!steps[index + 1].MoveNext(), "The stat update added a separate delay after the move.");
+            }
+            Verify("2850", "2000");
+            Debug.Log("[VERIFY DUEL FIELD REPLACEMENT] Mage Power displayed 2850/2000, then 2350/1500 as the old Field Spell left, and restored 2850/2000 on the replacement.");
+        }
+
+        private static void VerifyTurnAndDrawReadouts()
+        {
+            const uint muka = 46657337, rush = 70046172;
+            var main = Enumerable.Repeat(muka, 20).Concat(Enumerable.Repeat(rush, 20)).ToArray();
+            var ai = new TacticalAI();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Draw and temporary attack values", main, Array.Empty<uint>(),
+                Enumerable.Repeat(BlueEyes, 40).ToArray(), Array.Empty<uint>(), true, session =>
+                {
+                    var hand = session.Players[session.HumanPlayerIndex].hand;
+                    return hand.Any(card => card.code == muka) && hand.Any(card => card.code == rush);
+                });
+            int normal = duel.ActivePrompt.summonable.FindIndex(card => card.code == muka);
+            Require(normal >= 0, "Muka Muka could not be summoned.");
+            duel.SubmitResponseInt(normal << 16);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            ActivateFromMainPhase(duel, rush);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
+                prompt.messageType == YgoConstants.MSG_SELECT_CARD ? DuelSession.PackCardSelection(0) : null);
+            var own = duel.Players[duel.HumanPlayerIndex];
+            var original = own.mzone.Single(card => card?.code == muka);
+            Require(original.attack == 2200 && original.defense == 1200, "Muka Muka did not receive the initial boosts.");
+
+            using var ui = new HandUI(duel);
+            var animator = CardAnimationManager.Ensure(ui.Canvas);
+            Canvas.ForceUpdateCanvases();
+            var tile = FieldSlot(ui.Field, original);
+            tile.GetComponent<CardDragTrigger>().OnRightClick();
+            var combat = tile.Find("CardReadout/Combat");
+            var attack = combat.Find("Attack/Digits/Value").GetComponent<Text>();
+            var defense = combat.Find("Defense/Digits/Value").GetComponent<Text>();
+            void Verify(string atk, string def)
+            {
+                Require(attack.text == atk && defense.text == def,
+                    $"The duel displayed {attack.text}/{defense.text} instead of Muka Muka's {atk}/{def}.");
+            }
+
+            for (int turn = 0; turn < 2; turn++)
+            {
+                duel.SubmitResponseInt(7);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            }
+            Require(duel.TurnPlayer == duel.HumanPlayerIndex && duel.RetryCount == 0 &&
+                    own.mzone[original.sequence].attack == 1800 && own.mzone[original.sequence].defense == 1500,
+                "The native turn transition and draw did not produce the expected combat stats.");
+            ui.Field.Refresh();
+            Verify("2200", "1200");
+
+            const BindingFlags fields = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
+            var steps = AnimationSteps(animator).ToArray();
+            var updates = steps.Where(step => step.GetType().Name.StartsWith("<ApplyFieldReadoutUpdate>", StringComparison.Ordinal)).ToArray();
+            int ownDraw = Array.FindIndex(steps, step => step.GetType().GetField("flights", fields)?.GetValue(step) is
+                IReadOnlyList<CardFlight> flights && flights.Any(flight => flight.Code != 0));
+            Require(updates.Length == 2 && ownDraw >= 0 && ownDraw + 1 < steps.Length &&
+                    Array.IndexOf(steps, updates[0]) < ownDraw && steps[ownDraw + 1] == updates[1],
+                "The temporary boost and the draw did not each have a stat update at their own presentation boundary.");
+            Require(!updates[0].MoveNext(), "Finishing the turn added a delay before expiring the boost.");
+            Verify("1500", "1200");
+
+            var draw = steps[ownDraw];
+            Require(draw.MoveNext(), "The draw had no flying card.");
+            Verify("1500", "1200");
+            draw.GetType().GetFields(fields).Single(field => field.Name.StartsWith("<elapsed>", StringComparison.Ordinal))
+                .SetValue(draw, 1f);
+            Require(draw.MoveNext() && !draw.MoveNext(), "The drawn card did not reach the hand.");
+            Require(!updates[1].MoveNext(), "Drawing added a delay before updating combat stats.");
+            Verify("1800", "1500");
+            Debug.Log("[VERIFY DUEL DRAW READOUT] Rush Recklessly expired at turn change. Muka Muka gained 300 ATK/DEF after the next draw.");
         }
 
         private static void VerifyDefensePositionBattleReadout(uint attacker, BattleStatSource source, int damage)
