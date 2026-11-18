@@ -283,6 +283,7 @@ namespace YGOPortable.Editor
                 theirs.mzone[6] = new LiveCardState
                 {
                     code = 1861629, type = monster | YgoConstants.TYPE_LINK, link = 3,
+                    linkMarker = 0x040 | 0x002 | 0x020,
                     position = YgoConstants.POS_FACEUP_ATTACK, attack = 2300, baseAttack = 2300,
                 };
                 mine.szone[0] = new LiveCardState
@@ -309,6 +310,11 @@ namespace YGOPortable.Editor
                     Label(link, attack).text == "2300" && !link.Find("Combat/Defense").gameObject.activeSelf &&
                     ((RectTransform)link.Find("Combat")).anchorMin.y > ((RectTransform)normal.Find("Combat")).anchorMin.y,
                     "The field readouts lost a stat change, the active position, or the correct board-side placement.");
+                var compass = link.Find("Combat/LinkDirections/Compass");
+                Require(compass.Find("BottomRight").gameObject.activeSelf && compass.Find("Top").gameObject.activeSelf &&
+                    compass.Find("Left").gameObject.activeSelf && !compass.Find("TopLeft").gameObject.activeSelf &&
+                    !compass.Find("Bottom").gameObject.activeSelf && !compass.Find("Right").gameObject.activeSelf,
+                    "The opponent's live Link markers were not turned to match the board.");
 
                 normalSlot.GetComponent<CardDragTrigger>().OnRightClick();
                 var inspector = Field.Root.transform.Find("LeftInspector/CardDetails/CombatStats");
@@ -357,7 +363,7 @@ namespace YGOPortable.Editor
                 Require(!xyz.gameObject.activeInHierarchy && !scale.gameObject.activeInHierarchy,
                     "A vacated zone retained a rating or pendulum scale.");
                 typeof(DuelFieldUI).GetMethod("ResetCardInspector", PrivateInstance).Invoke(Field, null);
-                Debug.Log("[VERIFY DUEL CARD READOUT] Verified live combat stats, changing copies, ratings, scales, face-down cards and three viewport sizes.");
+                Debug.Log("[VERIFY DUEL CARD READOUT] Verified live combat stats, changing copies, ratings, scales, Link markers, face-down cards and three viewport sizes.");
             }
 
             private uint[] ActiveGlows(string fieldName, bool requireElement)

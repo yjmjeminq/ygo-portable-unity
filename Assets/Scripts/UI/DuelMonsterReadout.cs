@@ -25,8 +25,13 @@ namespace YGOPortable.UI
         internal int Defense => Live?.defense ?? Printed?.def ?? -1;
         internal uint LeftScale => Live?.lscale ?? Printed?.lscale ?? 0;
         internal uint RightScale => Live?.rscale ?? Printed?.rscale ?? 0;
+        internal uint LinkMarkers => IsLink ? Live?.linkMarker ?? Printed?.link ?? 0 : 0;
         internal int Materials => Live?.overlayCodes.Count ?? 0;
         internal bool Disabled => Live?.effectsDisabled == true;
+
+        internal uint? ScaleIn(uint location, uint sequence) =>
+            location == YgoConstants.LOCATION_SZONE && IsScale && sequence is 0 or 4
+                ? sequence == 0 ? LeftScale : RightScale : null;
 
         internal string Rating
         {
@@ -64,6 +69,7 @@ namespace YGOPortable.UI
         private readonly StatCell _attack;
         private readonly StatCell _defense;
         private readonly bool _compact;
+        private DuelLinkCompass _compass;
 
         internal DuelStatStrip(RectTransform root, bool compact)
         {
@@ -76,13 +82,17 @@ namespace YGOPortable.UI
 
         internal void Hide() => _root.gameObject.SetActive(false);
 
-        internal void Bind(DuelCardReadout card)
+        internal void Bind(DuelCardReadout card, bool opponent = false)
         {
             _root.gameObject.SetActive(card.IsMonster);
             if (!card.IsMonster) return;
 
-            _attack.Rect.anchorMin = card.IsLink && _compact ? new Vector2(.21f, 0f) : Vector2.zero;
-            _attack.Rect.anchorMax = new Vector2(card.IsLink ? (_compact ? .79f : 1f) : .493f, 1f);
+            bool hasDirections = card.LinkMarkers != 0;
+            if (hasDirections) (_compass ??= new DuelLinkCompass(_root)).Bind(card.LinkMarkers, opponent);
+            else _compass?.Hide();
+            _attack.Rect.anchorMin = card.IsLink && _compact && !hasDirections ? new Vector2(.21f, 0f) : Vector2.zero;
+            float attackWidth = !card.IsLink ? .493f : hasDirections ? .62f : _compact ? .79f : 1f;
+            _attack.Rect.anchorMax = new Vector2(attackWidth, 1f);
             _defense.Rect.anchorMin = new Vector2(.507f, 0f);
             _defense.Rect.anchorMax = Vector2.one;
             _defense.Rect.gameObject.SetActive(!card.IsLink);
@@ -136,6 +146,75 @@ namespace YGOPortable.UI
         }
     }
 
+    internal sealed class DuelLinkCompass
+    {
+        private static readonly (uint mask, string name, Vector2 direction)[] Marks =
+        {
+            (0x040, "TopLeft", new Vector2(-1, 1)), (0x080, "Top", Vector2.up),
+            (0x100, "TopRight", new Vector2(1, 1)), (0x008, "Left", Vector2.left),
+            (0x020, "Right", Vector2.right), (0x001, "BottomLeft", new Vector2(-1, -1)),
+            (0x002, "Bottom", Vector2.down), (0x004, "BottomRight", new Vector2(1, -1)),
+        };
+        private static Sprite _arrow;
+        private readonly RectTransform _root;
+        private readonly GameObject[] _marks = new GameObject[Marks.Length];
+
+        internal DuelLinkCompass(Transform parent)
+        {
+            _root = LotdUiKit.CreateRect("LinkDirections", parent, new Vector2(.635f, 0f), Vector2.one,
+                Vector2.zero, Vector2.zero);
+            DuelReadoutPlate.Add(_root, new Color(.043f, .090f, .105f, .98f));
+            var map = LotdUiKit.FillRect("Compass", _root, 2.5f);
+            var aspect = map.gameObject.AddComponent<AspectRatioFitter>();
+            aspect.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+            aspect.aspectRatio = 1f;
+            var center = LotdUiKit.CreateRect("Center", map, Vector2.one * .415f, Vector2.one * .585f, Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(center.gameObject, DuelStyle.Disc, new Color(.60f, .91f, .89f), true, false);
+            if (_arrow == null) _arrow = BuildArrow();
+            for (int i = 0; i < Marks.Length; i++)
+            {
+                var item = Marks[i];
+                var at = Vector2.one * .5f + item.direction * .328f;
+                var marker = LotdUiKit.CreateRect(item.name, map, at - Vector2.one * .137f, at + Vector2.one * .137f,
+                    Vector2.zero, Vector2.zero);
+                marker.localRotation = Quaternion.Euler(0f, 0f, Vector2.SignedAngle(Vector2.up, item.direction));
+                LotdUiKit.AddImage(marker.gameObject, _arrow, new Color(.65f, 1f, .91f), true, false);
+                _marks[i] = marker.gameObject;
+            }
+        }
+
+        internal void Bind(uint markers, bool opponent)
+        {
+            _root.gameObject.SetActive(true);
+            for (int i = 0; i < Marks.Length; i++)
+                _marks[i].SetActive((markers & Marks[opponent ? Marks.Length - 1 - i : i].mask) != 0);
+        }
+
+        internal void Hide() => _root.gameObject.SetActive(false);
+
+        private static Sprite BuildArrow()
+        {
+            const int size = 24;
+            var pixels = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float halfWidth = 11f - y * .49f;
+                float opacity = Mathf.Clamp01(halfWidth - Mathf.Abs(x + .5f - size * .5f));
+                pixels[y * size + x] = new Color32(255, 255, 255, (byte)(opacity * 255f));
+            }
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                name = "Link Direction Marker",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+            };
+            texture.SetPixels32(pixels);
+            texture.Apply(false, true);
+            return Sprite.Create(texture, new Rect(0, 0, size, size), Vector2.one * .5f);
+        }
+    }
+
     internal sealed class DuelFieldReadout
     {
         private static readonly Color Backing = new Color(.045f, .068f, .085f, .96f);
@@ -146,15 +225,29 @@ namespace YGOPortable.UI
         private readonly DuelStatStrip _stats;
         private readonly Text _rating;
         private readonly Text _status;
+        private readonly bool _inPreview;
 
-        internal DuelFieldReadout(Transform slot)
+        internal DuelFieldReadout(Transform slot, bool inPreview = false)
         {
+            _inPreview = inPreview;
             _root = LotdUiKit.FillRect("CardReadout", slot);
             _combat = LotdUiKit.FillRect("Combat", _root);
             _stats = new DuelStatStrip(_combat, compact: true);
             _labels = LotdUiKit.FillRect("Labels", _root);
-            _rating = CreateLabel("Rating", .035f, .485f, 15);
-            _status = CreateLabel("Status", .50f, .965f, 13);
+            // Leave room for the selection check on choice cards.
+            _rating = CreateLabel("Rating", .035f, inPreview ? .365f : .485f, 15);
+            _status = CreateLabel("Status", inPreview ? .38f : .50f, inPreview ? .79f : .965f, 13);
+            if (inPreview)
+            {
+                _combat.anchorMin = new Vector2(.03f, 0f);
+                _combat.anchorMax = new Vector2(.97f, 0f);
+                _combat.offsetMin = new Vector2(0f, 3f);
+                _combat.offsetMax = new Vector2(0f, 35f);
+                _labels.anchorMin = Vector2.up;
+                _labels.anchorMax = Vector2.one;
+                _labels.offsetMin = new Vector2(0f, -24f);
+                _labels.offsetMax = new Vector2(0f, -4f);
+            }
         }
 
         private Text CreateLabel(string name, float left, float right, int size)
@@ -170,11 +263,14 @@ namespace YGOPortable.UI
         internal void Bind(DuelCardReadout card, bool opponent, uint? scale)
         {
             _root.gameObject.SetActive(true);
-            _combat.anchorMin = new Vector2(.03f, opponent ? .715f : .015f);
-            _combat.anchorMax = new Vector2(.97f, opponent ? .985f : .285f);
-            _labels.anchorMin = new Vector2(0f, opponent ? .025f : .765f);
-            _labels.anchorMax = new Vector2(1f, opponent ? .235f : .975f);
-            _stats.Bind(card);
+            if (!_inPreview)
+            {
+                _combat.anchorMin = new Vector2(.03f, opponent ? .715f : .015f);
+                _combat.anchorMax = new Vector2(.97f, opponent ? .985f : .285f);
+                _labels.anchorMin = new Vector2(0f, opponent ? .025f : .765f);
+                _labels.anchorMax = new Vector2(1f, opponent ? .235f : .975f);
+            }
+            _stats.Bind(card, opponent);
             SetLabel(_rating, scale.HasValue ? $"스케일 {scale.Value}" : card.Rating,
                 card.IsXyz ? RankColor : card.IsLink || scale.HasValue ? DuelStyle.Player : DuelStyle.Gold);
             SetLabel(_status, card.Status,
@@ -195,7 +291,8 @@ namespace YGOPortable.UI
 
         internal static Image Add(RectTransform root, Color tint)
         {
-            var plate = LotdUiKit.AddImage(root.gameObject, _corners ??= BuildCorners(), tint, false, false);
+            if (_corners == null) _corners = BuildCorners();
+            var plate = LotdUiKit.AddImage(root.gameObject, _corners, tint, false, false);
             plate.type = Image.Type.Sliced;
             return plate;
         }

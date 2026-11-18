@@ -581,6 +581,20 @@ namespace YGOPortable.Core
             return (position & YgoConstants.POS_FACEUP) != 0 ? item.code : 0;
         }
 
+        internal LiveCardState GetVisibleFieldCard(uint code, byte controller, uint location, uint sequence)
+        {
+            if (code == 0 || controller >= Players.Length) return null;
+            var player = Players[controller];
+            var zone = location switch
+            {
+                YgoConstants.LOCATION_MZONE => player.mzone,
+                YgoConstants.LOCATION_SZONE => player.szone,
+                _ => null,
+            };
+            var live = zone != null && sequence < zone.Length ? zone[sequence] : null;
+            return live?.IsFaceUp == true && live.code == code ? live : null;
+        }
+
         private void NotifyCardMoved(CardMoveEvent move)
         {
             if (YgoConstants.IsFieldZone(move.toLoc, move.toSeq) &&

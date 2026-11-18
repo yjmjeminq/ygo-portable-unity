@@ -198,6 +198,7 @@ namespace YGOPortable.UI
             BuildUI(canvasParent, mobileDetails);
             _modals.SetFieldCardHitTest(IsPointOverFieldCardChoice);
             _modals.SetInspectorArtworkControl(_duelPadInspectButton);
+            _modals.SetCandidateInspector(InspectCandidate);
             _modals.SetBrowsablePiles(
                 _myGyTile.root.GetComponent<DuelZoneImage>(), _myExtraTile.root.GetComponent<DuelZoneImage>(),
                 _myBanTile.root.GetComponent<DuelZoneImage>(), _oppGyTile.root.GetComponent<DuelZoneImage>(),
@@ -294,13 +295,17 @@ namespace YGOPortable.UI
             RefreshHandGlows(force: true);
         }
 
-        public void InspectCard(uint code) => InspectCard(code, null);
+        public void InspectCard(uint code) => InspectCardAt(code, null);
 
-        private void InspectCard(uint code, FieldSlotView slot)
+        private void InspectCard(uint code, FieldSlotView slot) => InspectCardAt(code, InspectionLocation(slot));
+
+        private void InspectCandidate(SelectableCardItem item, uint code) =>
+            InspectCardAt(code, (item.controller, item.location, item.sequence));
+
+        private void InspectCardAt(uint code, (byte controller, uint location, uint sequence)? fieldCard)
         {
             if (code == 0) return;
             bool changed = code != _inspectedCode;
-            var fieldCard = InspectionLocation(slot);
             if (!changed && _inspectedFieldCard == fieldCard) return;
             _inspectedCode = code;
             _inspectedFieldCard = fieldCard;
@@ -352,12 +357,8 @@ namespace YGOPortable.UI
         private static (byte controller, uint location, uint sequence)? InspectionLocation(FieldSlotView slot) =>
             slot == null ? null : (slot.mappedCon, slot.mappedLoc, slot.mappedSeq);
 
-        private LiveCardState ReadVisibleFieldCard(uint code, (byte controller, uint location, uint sequence)? location)
-        {
-            if (location is not { } slot) return null;
-            var live = FindLiveCard(slot.controller, slot.location, slot.sequence);
-            return live?.IsFaceUp == true && live.code == code ? live : null;
-        }
+        private LiveCardState ReadVisibleFieldCard(uint code, (byte controller, uint location, uint sequence)? location) =>
+            location is { } slot ? _session?.GetVisibleFieldCard(code, slot.controller, slot.location, slot.sequence) : null;
 
         private void RefreshInspectorReadout()
         {
@@ -366,7 +367,7 @@ namespace YGOPortable.UI
             if (live == null) _inspectedFieldCard = null;
             var card = new DuelCardReadout(CardDatabase.Get(_inspectedCode), live);
             _inspStats.text = FormatInspectorStats(card);
-            _inspCombat.Bind(card);
+            _inspCombat.Bind(card, live != null && _inspectedFieldCard.Value.controller != _session.HumanPlayerIndex);
         }
 
         private static string FormatInspectorStats(DuelCardReadout card)
@@ -1157,8 +1158,7 @@ namespace YGOPortable.UI
             if (visible && live.IsFaceUp && live.code != 0)
             {
                 var readout = new DuelCardReadout(CardDatabase.Get(live.code), live);
-                uint? scale = loc == YgoConstants.LOCATION_SZONE && seq is 0 or 4 && readout.IsScale
-                    ? seq == 0 ? readout.LeftScale : readout.RightScale : null;
+                uint? scale = readout.ScaleIn(loc, seq);
                 if (loc == YgoConstants.LOCATION_MZONE && readout.IsMonster || scale.HasValue)
                     (slot.readout ??= new DuelFieldReadout(slot.root)).Bind(readout, opponent, scale);
                 else slot.readout?.Hide();
@@ -3200,7 +3200,7 @@ namespace YGOPortable.UI
             var card = new DuelCardReadout(CardDatabase.Get(code), live);
             _zoomCardView.SetCard(code, false, live);
             _zoomStats.text = FormatInspectorStats(card);
-            _zoomCombat.Bind(card);
+            _zoomCombat.Bind(card, live != null && _zoomFieldCard.Value.controller != _session.HumanPlayerIndex);
         }
 
         private void CloseCardZoomModal(bool restoreFocus = true)

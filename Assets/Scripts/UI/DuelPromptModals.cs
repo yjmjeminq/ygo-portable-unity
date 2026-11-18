@@ -15,6 +15,7 @@ namespace YGOPortable.UI
         public GameObject ResultRoot { get; private set; }
 
         private readonly Action<uint> _onInspectCard;
+        private Action<SelectableCardItem, uint> _onInspectCandidate;
         private readonly Action<byte[]> _onSubmitResponse;
         private readonly DeckPadKeyboard _padKeyboard;
 
@@ -217,6 +218,8 @@ namespace YGOPortable.UI
             _promptShade.InspectorArtworkControl = button;
             _zoneShade.InspectorArtworkControl = button;
         }
+
+        internal void SetCandidateInspector(Action<SelectableCardItem, uint> inspect) => _onInspectCandidate = inspect;
 
         internal void SetCardDetailsOpen(bool open) => _promptInput.interactable = !open && !IsZoneViewerOpen;
 
@@ -695,7 +698,7 @@ namespace YGOPortable.UI
                     RenderUnselectCard(session, prompt);
                     break;
                 case YgoConstants.MSG_SELECT_COUNTER:
-                    RenderSelectCounter(prompt);
+                    RenderSelectCounter(session, prompt);
                     break;
                 case YgoConstants.MSG_SORT_CARD:
                 case YgoConstants.MSG_SORT_CHAIN:
@@ -898,7 +901,7 @@ namespace YGOPortable.UI
                     ?? "이 카드의 효과를 발동할 수 있습니다.";
                 _chainEffectScroll.StopMovement();
                 _chainEffectScroll.content.anchoredPosition = Vector2.zero;
-                _onInspectCard?.Invoke(item.code);
+                InspectChoice(item.code, item);
             }
 
             float stripWidth = 6f - ChainCardGap;
@@ -918,7 +921,7 @@ namespace YGOPortable.UI
                     bool duplicate = sourceCounts[source] > 1;
                     var art = LotdUiKit.CreateRect("Card", tile, new Vector2(.055f, duplicate ? .16f : .035f),
                         new Vector2(.945f, .975f), Vector2.zero, Vector2.zero);
-                    CompositeCardView.Create(art, "V", duelArtwork: true).SetCard(choices[index].code);
+                    BuildCandidateCard(art, session, choices[index], choices[index].code);
 
                     if (duplicate)
                     {
@@ -1082,18 +1085,18 @@ namespace YGOPortable.UI
                 detail = $"{(lockedMust ? "필수 · " : "")}{(v2 > 0 ? $"{v1}/{v2}" : $"{v1}")}";
             }
 
-            var tile = CreateChoiceCardTile(grid, $"Tile_{idx}", code, item.location, item.controller != s.HumanPlayerIndex, detail);
+            var tile = CreateChoiceCardTile(grid, $"Tile_{idx}", s, item, code, detail);
             var mark = AddSelectionMark(tile, lockedMust);
             if (lockedMust) return;
 
             bool capped = p.messageType != YgoConstants.MSG_SELECT_SUM || !p.sumExactCountZeroAny && p.max > 0;
             var button = tile.gameObject.AddComponent<Button>();
             button.targetGraphic = tile.GetComponent<Image>();
-            PreviewOnFocus(button, code);
+            PreviewOnFocus(button, code, item);
             button.onClick.AddListener(() =>
             {
                 if (!CanAnswerPrompt || !ReferenceEquals(_curPrompt, p)) return;
-                if (code != 0) _onInspectCard?.Invoke(code);
+                InspectChoice(code, item);
                 if (p.IsAttackTargetSelection)
                 {
                     SubmitAttackTarget(idx);
@@ -1239,21 +1242,21 @@ namespace YGOPortable.UI
             int nativeIndex, bool selected)
         {
             uint code = session.GetVisibleSelectionCode(item);
-            var tile = CreateChoiceCardTile(grid, $"Imm_{nativeIndex}", code, item.location, item.controller != session.HumanPlayerIndex);
+            var tile = CreateChoiceCardTile(grid, $"Imm_{nativeIndex}", session, item, code);
             if (selected) AddSelectionMark(tile, true);
             var button = tile.gameObject.AddComponent<Button>();
             button.targetGraphic = tile.GetComponent<Image>();
-            PreviewOnFocus(button, code);
+            PreviewOnFocus(button, code, item);
             button.onClick.AddListener(() =>
             {
                 if (!CanAnswerPrompt || !ReferenceEquals(_curPrompt, prompt)) return;
-                if (code != 0) _onInspectCard?.Invoke(code);
+                InspectChoice(code, item);
                 LotdAudio.PlayClick();
                 Submit(PackTwoInts(1, nativeIndex));
             });
         }
 
-        private void RenderSelectCounter(DuelPrompt p)
+        private void RenderSelectCounter(DuelSession session, DuelPrompt p)
         {
             _modalTitle.text = "카운터 제거 선택";
             _counterAlloc = new int[p.candidates.Count];
@@ -1265,9 +1268,10 @@ namespace YGOPortable.UI
             {
                 int idx = i;
                 var c = p.candidates[i];
+                uint code = session.GetVisibleSelectionCode(c);
                 var tile = CreateCardStripTile(grid, $"Cnt_{i}", ChoiceCardWidth);
                 var cRt = LotdUiKit.CreateRect("Card", tile, new Vector2(0.10f, 0.30f), new Vector2(0.90f, 0.95f), Vector2.zero, Vector2.zero);
-                CompositeCardView.Create(cRt, "V", false, duelArtwork: true).SetCard(c.code);
+                BuildCandidateCard(cRt, session, c, code);
 
                 countLabels[i] = LotdUiKit.AddText(LotdUiKit.CreateRect("Lbl", tile, new Vector2(0.05f, 0.16f), new Vector2(0.95f, 0.30f), Vector2.zero, Vector2.zero),
                     "L", $"0 / {c.currentCounter}개", 14, TextAnchor.MiddleCenter, DuelStyle.Gold, FontStyle.Bold);
@@ -1287,8 +1291,8 @@ namespace YGOPortable.UI
                     countLabels[idx].text = $"{_counterAlloc[idx]} / {c.currentCounter}개";
                     UpdateCounterConfirm();
                 }, 16);
-                PreviewOnFocus(decrease, c.code);
-                PreviewOnFocus(increase, c.code);
+                PreviewOnFocus(decrease, code, c);
+                PreviewOnFocus(increase, code, c);
             }
 
             _confirmBtn = AddFooterButton("확정", () =>
@@ -1338,7 +1342,8 @@ namespace YGOPortable.UI
                 for (int pos = 0; pos < _sortOrder.Length; pos++)
                 {
                     int position = pos;
-                    uint code = p.candidates[_sortOrder[pos]].code;
+                    var item = p.candidates[_sortOrder[pos]];
+                    uint code = item.code;
                     var tile = CreateCardStripTile(grid, $"Sort_{pos}", ChoiceCardWidth);
                     string rank = p.isChainSort ? $"발동 {pos + 1} · 처리 {_sortOrder.Length - pos}" :
                         deckOrder && pos == 0 ? $"1번 · 맨 {deckEdge}" : $"{pos + 1}번";
@@ -1350,7 +1355,7 @@ namespace YGOPortable.UI
 
                     var art = LotdUiKit.CreateRect("Card", tile, new Vector2(.08f, .219f),
                         new Vector2(.92f, .79f), Vector2.zero, Vector2.zero);
-                    CompositeCardView.Create(art, "V", false, duelArtwork: true).SetCard(code, faceDown: code == 0);
+                    BuildCandidateCard(art, session, item, code);
 
                     Button MoveButton(int direction)
                     {
@@ -1375,7 +1380,7 @@ namespace YGOPortable.UI
                             LotdUiKit.AddImage(icon.gameObject, sprite,
                                 button.interactable ? Color.white : new Color(1f, 1f, 1f, .26f), true, false);
                         }
-                        PreviewOnFocus(button, code);
+                        PreviewOnFocus(button, code, item);
                         return button;
                     }
 
@@ -2049,9 +2054,16 @@ namespace YGOPortable.UI
         private static Selectable FirstFocus(Transform parent) =>
             parent.GetComponentsInChildren<Selectable>().FirstOrDefault(control => CanNavigate(control, parent));
 
-        private void PreviewOnFocus(Selectable control, uint code)
+        private void InspectChoice(uint code, SelectableCardItem item)
         {
-            if (code != 0) SelectionHandler(control).OnSelected = () => _onInspectCard?.Invoke(code);
+            if (code == 0) return;
+            if (item != null && _onInspectCandidate != null) _onInspectCandidate(item, code);
+            else _onInspectCard?.Invoke(code);
+        }
+
+        private void PreviewOnFocus(Selectable control, uint code, SelectableCardItem item = null)
+        {
+            if (code != 0) SelectionHandler(control).OnSelected = () => InspectChoice(code, item);
         }
 
         private static DuelPromptSelection SelectionHandler(Selectable control) =>
@@ -2110,22 +2122,36 @@ namespace YGOPortable.UI
             return cards;
         }
 
-        private RectTransform CreateChoiceCardTile(Transform parent, string name, uint code, uint location,
-            bool opponent, string detail = null)
+        private RectTransform CreateChoiceCardTile(Transform parent, string name, DuelSession session,
+            SelectableCardItem item, uint code, string detail = null)
         {
             var tile = CreateCardStripTile(parent, name, ChoiceCardWidth);
             var art = LotdUiKit.CreateRect("Card", tile, new Vector2(.045f, .246f), new Vector2(.955f, .976f),
                 Vector2.zero, Vector2.zero);
-            CompositeCardView.Create(art, "V", duelArtwork: true).SetCard(code, faceDown: code == 0);
+            BuildCandidateCard(art, session, item, code);
 
             var title = LotdUiKit.CreateRect("Name", tile, new Vector2(.04f, .137f), new Vector2(.96f, .244f),
                 Vector2.zero, Vector2.zero);
             LotdUiKit.AddFittedText(title, "Text", code != 0 ? CardDatabase.GetName(code) : "뒷면 카드", 12, 8,
                 TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
-            AddChoiceCardSource(tile, location, opponent, detail);
+            AddChoiceCardSource(tile, item.location, item.controller != session.HumanPlayerIndex, detail);
             if (code != 0)
-                tile.gameObject.AddComponent<CardDragTrigger>().OnPointerEnterAction = () => _onInspectCard?.Invoke(code);
+                tile.gameObject.AddComponent<CardDragTrigger>().OnPointerEnterAction = () => InspectChoice(code, item);
             return tile;
+        }
+
+        private static void BuildCandidateCard(Transform art, DuelSession session, SelectableCardItem item, uint code)
+        {
+            var live = session.GetVisibleFieldCard(code, item.controller, item.location, item.sequence);
+            var view = CompositeCardView.Create(art, "V", duelArtwork: true);
+            view.SetCard(code, faceDown: code == 0, live: live);
+            if (live == null) return;
+
+            var readout = new DuelCardReadout(CardDatabase.Get(code), live);
+            uint? scale = readout.ScaleIn(item.location, item.sequence);
+            if (item.location == YgoConstants.LOCATION_MZONE && readout.IsMonster || scale.HasValue)
+                new DuelFieldReadout(view.transform.Find("AspectBox"), inPreview: true)
+                    .Bind(readout, item.controller != session.HumanPlayerIndex, scale);
         }
 
         private static void AddChoiceCardSource(Transform tile, uint location, bool opponent, string detail)
