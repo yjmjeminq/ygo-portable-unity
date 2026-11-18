@@ -415,8 +415,13 @@ namespace YGOPortable.UI
             if (swapPartner?.fromLoc == YgoConstants.LOCATION_MZONE)
                 _pendingCardReadouts.Remove((swapPartner.fromCon, swapPartner.fromSeq));
 
-            var held = HandleCardMovedEvent(move, readout, paired: swapPartner != null);
-            var partnerHeld = swapPartner == null ? null : HandleCardMovedEvent(swapPartner, partnerReadout, paired: true);
+            BattleCardDisplay held = null;
+            BattleCardDisplay partnerHeld = null;
+            if (swapPartner == null || !TryQueueFieldSwap(move, swapPartner, readout, partnerReadout))
+            {
+                held = HandleCardMovedEvent(move, readout, paired: swapPartner != null);
+                if (swapPartner != null) partnerHeld = HandleCardMovedEvent(swapPartner, partnerReadout, paired: true);
+            }
             var before = _inspectedFieldCard;
             _inspectedFieldCard = FollowFieldCard(before, _inspectedCode, move, swapPartner, held, partnerHeld);
             if (_zoomFieldCard.HasValue)
@@ -459,10 +464,14 @@ namespace YGOPortable.UI
 
         private DuelCardReadout ReadInspectedStats(uint code, (byte controller, uint location, uint sequence)? location)
         {
-            if (location is { } slot &&
-                GetBattleCardDisplay(slot.controller, slot.sequence, slot.location) is { Readout: not null } held &&
-                held.Readout.Shown.code == code)
-                return new DuelCardReadout(CardDatabase.Get(code), held.Hidden ? null : held.Readout.Shown);
+            if (location is { } slot)
+            {
+                if (_swapInspections.TryGetValue(slot, out var swap) && swap.Move.Code == code)
+                    return new DuelCardReadout(CardDatabase.Get(code), swap.Shown);
+                if (GetBattleCardDisplay(slot.controller, slot.sequence, slot.location) is { Readout: not null } held &&
+                    held.Readout.Shown.code == code)
+                    return new DuelCardReadout(CardDatabase.Get(code), held.Hidden ? null : held.Readout.Shown);
+            }
             return ReadFieldStats(code, ReadVisibleFieldCard(code, location));
         }
 
@@ -474,7 +483,7 @@ namespace YGOPortable.UI
             _inspStats.text = FormatInspectorStats(card, compact: true);
             BindIdentityIcons(card, _inspRaceIcon, _inspAttributeIcon);
             _inspCounters.Bind(card.CounterCount, showChanges);
-            _inspCombat.Bind(card, card.Live != null && _inspectedFieldCard.Value.controller != _session.HumanPlayerIndex,
+            _inspCombat.Bind(card, card.Live != null && card.Live.controller != _session.HumanPlayerIndex,
                 showChanges && card.Live != null);
             SizeInspectorDescription(card.IsMonster);
         }
@@ -2177,6 +2186,7 @@ namespace YGOPortable.UI
             _materialReadouts.Clear();
             _presentedFieldReadouts.Clear();
             _battleCardDisplays.Clear();
+            _swapInspections.Clear();
             _pendingCardReadouts.Clear();
             ResetHandViews(_myHandViews);
             ResetHandViews(_oppHandViews);
@@ -2308,6 +2318,7 @@ namespace YGOPortable.UI
             void Clear(byte controller, uint location, uint sequence)
             {
                 _presentedFieldReadouts.Remove((controller, location & ~YgoConstants.LOCATION_OVERLAY, sequence));
+                _swapInspections.Remove((controller, location, sequence));
                 if (location == YgoConstants.LOCATION_MZONE) _materialReadouts.Remove((controller, sequence));
             }
         }
@@ -3746,7 +3757,7 @@ namespace YGOPortable.UI
             _zoomStats.text = FormatInspectorStats(card);
             BindIdentityIcons(card, _zoomRaceIcon, _zoomAttributeIcon);
             _zoomCounters.Bind(card.CounterCount, showChanges);
-            _zoomCombat.Bind(card, card.Live != null && _zoomFieldCard.Value.controller != _session.HumanPlayerIndex,
+            _zoomCombat.Bind(card, card.Live != null && card.Live.controller != _session.HumanPlayerIndex,
                 showChanges && card.Live != null);
         }
 

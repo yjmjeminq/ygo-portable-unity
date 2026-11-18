@@ -20,6 +20,94 @@ namespace YGOPortable.UI
 
         // The engine can resolve a whole battle before its queued animations have played.
         private readonly Dictionary<(byte Controller, uint Location, uint Sequence), Queue<BattleCardDisplay>> _battleCardDisplays = new();
+        private readonly Dictionary<(byte Controller, uint Location, uint Sequence), SwapInspection> _swapInspections = new();
+
+        private sealed class SwapInspection
+        {
+            internal CardMoveReadoutSnapshot Move;
+            internal PresentedFieldReadout Waiting;
+            internal bool AtDestination;
+
+            internal LiveCardState Shown => AtDestination
+                ? Move.DestinationCard ?? Move.SourceCard
+                : Waiting?.Shown ?? Move.SourceCard;
+        }
+
+        private bool TryQueueFieldSwap(CardMoveEvent first, CardMoveEvent second, PresentedFieldReadout firstReadout,
+            PresentedFieldReadout secondReadout)
+        {
+            var animator = CardAnimationManager.Instance;
+            if (animator == null || !Root.activeInHierarchy ||
+                !TryGetSwapFlight(first, out var firstFlight) || !TryGetSwapFlight(second, out var secondFlight))
+                return false;
+
+            var firstHeld = HoldFieldCard(first, firstReadout, keepFaceDown: true);
+            var secondHeld = HoldFieldCard(second, secondReadout, keepFaceDown: true);
+            var firstMove = PrepareMoveReadout(animator, first, firstFlight.StartsFaceDown, firstFlight.EndsFaceDown);
+            var secondMove = PrepareMoveReadout(animator, second, secondFlight.StartsFaceDown, secondFlight.EndsFaceDown);
+            var firstInspection = TrackSwapInspection(first, firstMove, firstHeld?.Readout);
+            var secondInspection = TrackSwapInspection(second, secondMove, secondHeld?.Readout);
+            var releaseFirst = ReserveCardArrival(first.toCon, first.toLoc, first.toSeq);
+            var releaseSecond = ReserveCardArrival(second.toCon, second.toLoc, second.toSeq);
+
+            animator.QueueFieldSwap((firstFlight, firstMove), (secondFlight, secondMove), () =>
+            {
+                if (firstHeld != null) firstHeld.Hidden = true;
+                if (secondHeld != null) secondHeld.Hidden = true;
+                if (firstInspection != null) firstInspection.Waiting = null;
+                if (secondInspection != null) secondInspection.Waiting = null;
+                Refresh();
+            }, () =>
+            {
+                if (firstInspection != null) firstInspection.AtDestination = true;
+                if (secondInspection != null) secondInspection.AtDestination = true;
+                RefreshInspectorReadout();
+                if (_cardZoomModal.activeSelf) RefreshZoomReadout(_zoomCardView.CurrentCode);
+            }, () =>
+            {
+                ReleaseBattleCardDisplay(firstHeld);
+                ReleaseBattleCardDisplay(secondHeld);
+                releaseFirst();
+                releaseSecond();
+                ReleaseSwapInspection(first, firstInspection);
+                ReleaseSwapInspection(second, secondInspection);
+                Refresh();
+            });
+            return true;
+        }
+
+        private bool TryGetSwapFlight(CardMoveEvent move, out CardFlight flight)
+        {
+            flight = default;
+            if (move.fromLoc is not (YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE) ||
+                move.toLoc is not (YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE))
+                return false;
+            var from = GetDisplayedCardPose(move.fromCon, move.fromLoc, move.fromSeq, move.code);
+            if (!from.IsValid) from = GetCardPose(move.fromCon, move.fromLoc, move.fromSeq, move.fromPos);
+            var to = GetCardPose(move.toCon, move.toLoc, move.toSeq, move.toPos);
+            if (!from.IsValid || !to.IsValid) return false;
+            flight = new CardFlight(move.code, from, to,
+                move.code == 0 || IsFaceDown(move.fromCon, move.fromLoc, move.fromPos),
+                move.code == 0 || IsFaceDown(move.toCon, move.toLoc, move.toPos));
+            return true;
+        }
+
+        private SwapInspection TrackSwapInspection(CardMoveEvent move, CardMoveReadoutSnapshot readout,
+            PresentedFieldReadout waiting)
+        {
+            if (readout?.SourceCard == null || move.toLoc != YgoConstants.LOCATION_MZONE ||
+                (move.toPos & YgoConstants.POS_FACEUP) == 0) return null;
+            var inspection = new SwapInspection { Move = readout, Waiting = waiting };
+            _swapInspections[(move.toCon, move.toLoc, move.toSeq)] = inspection;
+            return inspection;
+        }
+
+        private void ReleaseSwapInspection(CardMoveEvent move, SwapInspection inspection)
+        {
+            var slot = (move.toCon, move.toLoc, move.toSeq);
+            if (_swapInspections.TryGetValue(slot, out var shown) && ReferenceEquals(shown, inspection))
+                _swapInspections.Remove(slot);
+        }
 
         private BattleCardDisplay GetBattleCardDisplay(byte controller, uint sequence, uint location = YgoConstants.LOCATION_MZONE) =>
             _battleCardDisplays.TryGetValue((controller, location, sequence), out var cards) ? cards.Peek() : null;
@@ -78,9 +166,14 @@ namespace YGOPortable.UI
         {
             var battle = HoldBattleMove(move, motion);
             if (battle != null) return battle;
-            if (paired || IsArriving(move.fromCon, move.fromLoc, move.fromSeq)) return null;
+            return paired ? null : HoldFieldCard(move, readout, keepFaceDown: move.DestructionGroup != null);
+        }
+
+        private BattleCardDisplay HoldFieldCard(CardMoveEvent move, PresentedFieldReadout readout, bool keepFaceDown)
+        {
+            if (IsArriving(move.fromCon, move.fromLoc, move.fromSeq)) return null;
             var source = move.SourceReadout;
-            if (source == null && move.DestructionGroup != null &&
+            if (source == null && keepFaceDown &&
                 (move.fromLoc is YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE) &&
                 (move.fromPos & YgoConstants.POS_FACEDOWN) != 0)
                 source = new LiveCardState { position = move.fromPos };

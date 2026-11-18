@@ -40,6 +40,7 @@ namespace YGOPortable.Editor
             VerifyNativeIdentityReadout();
             VerifyInspectedCardMoves(swapInPlace: true);
             VerifyInspectedCardMoves(swapInPlace: false);
+            VerifyInspectedCardMoves(swapInPlace: false, opponentSets: true);
             VerifyNativeSummonReadout(turnFaceDown: false);
             VerifyNativeSummonReadout(turnFaceDown: true);
             VerifyNativeLinkedZone();
@@ -1146,7 +1147,7 @@ namespace YGOPortable.Editor
             Debug.Log("[VERIFY DUEL IDENTITY] An inspected monster's race and attribute icons followed Zombie World and Lair of Darkness, then returned to normal. Multiple attributes and face-down visibility passed.");
         }
 
-        private static void VerifyInspectedCardMoves(bool swapInPlace)
+        private static void VerifyInspectedCardMoves(bool swapInPlace, bool opponentSets = false)
         {
             const uint axe = 40619825, creatureSwap = 31036355, bookOfMoon = 14087893, burden = 44947065;
             uint[] main = Enumerable.Repeat(KaiserSeaHorse, 16).Concat(Enumerable.Repeat(burden, 6)).Concat(Enumerable.Repeat(axe, 6))
@@ -1186,7 +1187,7 @@ namespace YGOPortable.Editor
             ReachIdle();
             duel.SubmitResponseInt(7);
             ReachIdle();
-            duel.SubmitResponseInt(0);
+            duel.SubmitResponseInt(opponentSets ? 3 : 0);
             ReachIdle();
             duel.SubmitResponseInt(7);
             ReachIdle();
@@ -1201,6 +1202,7 @@ namespace YGOPortable.Editor
             var inspector = ui.Field.Root.transform.Find($"LeftInspector/CardDetails/CombatStats/{statPath}").GetComponent<Text>();
             var zoom = ui.Field.Root.transform.Find($"Overlay_CardZoom/ZoomWin/Info/CombatStats/{statPath}").GetComponent<Text>();
             var source = ui.Field.Root.transform.Find($"DuelBoard/Zone_{origin + 2}_3");
+            var otherSource = ui.Field.Root.transform.Find($"DuelBoard/Zone_{6 - other}_1");
             source.GetComponent<CardDragTrigger>().OnRightClick();
             var focus = typeof(DuelFieldUI).GetField("_duelPadFocus", PrivateInstance);
             typeof(DuelFieldUI).GetField("_usingDuelPad", PrivateInstance).SetValue(ui.Field, true);
@@ -1221,25 +1223,48 @@ namespace YGOPortable.Editor
             });
             var pending = PendingMoveReadouts(ui.Field);
             var snapshot = pending[((byte)duel.AiPlayerIndex, destination)];
-            var reciprocal = pending[((byte)duel.HumanPlayerIndex, origin)];
+            pending.TryGetValue(((byte)duel.HumanPlayerIndex, origin), out var reciprocal);
             ui.Field.Refresh();
-            Require(paired == swapInPlace && mine.mzone[origin]?.attack == 1700 && theirs.mzone[destination]?.attack == 2300 &&
-                inspector.text == "2300" && zoom.text == "2300",
-                "The inspector or details missed the new controller's modifier or switched to the wrong copy.");
-            var move = OpenMove(animator, KaiserSeaHorse, snapshot);
-            RequireTravelStats(move.Readout, "2700", "1650", "4", defense: false);
-            move.Sample(.72f);
-            RequireTravelStats(move.Readout, "2300", "1650", "4", defense: false);
-            move.Sample(1f);
-            Require(!move.Step.MoveNext() && move.Readout == null,
-                "A control change left the moving stat panel behind.");
-            var returning = OpenMove(animator, KaiserSeaHorse, reciprocal);
-            RequireTravelStats(returning.Readout, "1300", "1650", "4", defense: false);
-            returning.Sample(.72f);
-            RequireTravelStats(returning.Readout, "1700", "1650", "4", defense: false);
-            returning.Sample(1f);
-            Require(!returning.Step.MoveNext() && returning.Readout == null,
-                "The other copy did not finish with its own controller's stats.");
+            Require(paired && snapshot.SourceCard.attack == 2700 && snapshot.DestinationCard.attack == 2300 &&
+                (opponentSets ? reciprocal == null && mine.mzone[origin]?.position == YgoConstants.POS_FACEDOWN_DEFENSE :
+                    reciprocal?.SourceCard.attack == 1300 && reciprocal.DestinationCard.attack == 1700) &&
+                inspector.text == "2700" && zoom.text == "2700",
+                "The exchange lost a card's original stats or exposed the new controller's modifier before departure.");
+            Require(source.GetComponentInChildren<CompositeCardView>() != null &&
+                otherSource.GetComponentInChildren<CompositeCardView>() != null,
+                "The cards should remain in their original slots until the shared departure.");
+
+            var step = AnimationSteps(animator).Single(move => move.GetType().Name.StartsWith("<PlayFieldSwap>", StringComparison.Ordinal));
+            Require(step.MoveNext() && step.Current is IEnumerator, "The two native control changes did not enter one animation.");
+            var sample = TestCardPresentation.SampleAnimation((IEnumerator)step.Current);
+            sample(.5f);
+            var readouts = animator.transform.Cast<RectTransform>().Where(rect => rect.name == "MovingCardReadout").ToArray();
+            var proxies = animator.GetComponentsInChildren<CompositeCardView>().Where(card => card.name == "MovingCard").ToArray();
+            Require(proxies.Length == 2 && readouts.Length == (opponentSets ? 1 : 2) &&
+                proxies.Count(proxy => proxy.CurrentCode == 0) == (opponentSets ? 1 : 0) &&
+                source.GetComponentInChildren<CompositeCardView>() == null && otherSource.GetComponentInChildren<CompositeCardView>() == null,
+                "The field exchange showed a duplicate card, lost a moving card, or revealed the face-down card.");
+            Require(readouts.All(readout => proxies.Count(proxy =>
+                ((RectTransform)proxy.transform).anchoredPosition == readout.anchoredPosition) == 1),
+                "The stat displays did not stay on their moving cards.");
+            var outgoing = readouts.Single(readout => ReadAttack(readout) == "2700");
+            var incoming = readouts.SingleOrDefault(readout => readout != outgoing);
+            RequireTravelStats(outgoing, "2700", "1650", "4", defense: false);
+            if (incoming != null)
+            {
+                RequireTravelStats(incoming, "1300", "1650", "4", defense: false);
+                Require(!Bounds(outgoing).Overlaps(Bounds(incoming)), "The moving stat plates covered each other.");
+            }
+            Require(inspector.text == "2700" && zoom.text == "2700",
+                "The selected copy's stats changed at the crossing.");
+            sample(.92f);
+            RequireTravelStats(outgoing, "2300", "1650", "4", defense: false);
+            if (incoming != null) RequireTravelStats(incoming, "1700", "1650", "4", defense: false);
+            Require(inspector.text == "2300" && zoom.text == "2300",
+                "The inspector and detail view missed the selected card's new stats.");
+            sample(1f);
+            Require(!step.MoveNext() && animator.transform.Find("MovingCardReadout") == null,
+                "The swap left a moving stat plate behind.");
             ui.Field.HandleDuelPad(new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Cancel));
             var expected = ui.Field.Root.transform.Find($"DuelBoard/Zone_{6 - destination}_1");
             Require(!ui.Field.IsReadingCardDetails && expected != null && (Transform)focus.GetValue(ui.Field) == expected &&
@@ -1255,7 +1280,13 @@ namespace YGOPortable.Editor
                 inspector.text == "1700" && zoom.text == "1700" &&
                 typeof(DuelFieldUI).GetField("_zoomFieldCard", PrivateInstance).GetValue(ui.Field) == null,
                 "A face-down transfer kept the captured live stats in its details.");
-            Debug.Log($"[VERIFY DUEL CARD FOLLOW] {(swapInPlace ? "Paired swap" : "Zone transfer")} kept controller focus and displayed 2700 before and 2300 after the transfer.");
+            Debug.Log($"[VERIFY DUEL CARD FOLLOW] Simultaneous swap in {(swapInPlace ? "the original" : "different")} zones. " +
+                $"Face-down opponent: {opponentSets}. Controller focus and the 2700-to-2300 readout followed the selected card.");
+
+            static string ReadAttack(RectTransform view) =>
+                view.Find("CardReadout/Combat/Attack/Digits/Value").GetComponent<Text>().text;
+
+            static Rect Bounds(RectTransform view) => new Rect(view.anchoredPosition - view.sizeDelta * .5f, view.sizeDelta);
         }
 
         private static void VerifyNativeSummonReadout(bool turnFaceDown)

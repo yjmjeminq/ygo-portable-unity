@@ -93,6 +93,7 @@ namespace YGOPortable.UI
         private bool _playing;
 
         private const float LifeFeedbackDuration = .46f;
+        private const float FieldSwapHandoff = .80f;
         private static readonly Color LifeDamageTint = new Color(1f, .61f, .52f);
         private static readonly Color DestructionTint = new Color(.55f, .84f, 1f);
 
@@ -244,6 +245,12 @@ namespace YGOPortable.UI
             _openDestructions.Moves.Add((flight, motion, readout, depart, release));
         }
 
+        internal void QueueFieldSwap((CardFlight Flight, CardMoveReadoutSnapshot Readout) first,
+            (CardFlight Flight, CardMoveReadoutSnapshot Readout) second, Action depart, Action handoff, Action arrive)
+        {
+            QueueStep(PlayFieldSwap(first, second, depart, handoff, arrive));
+        }
+
         internal void StageSpecialSummon(CardFlight flight, CardMotion motion, byte controller, uint sequence,
             CardMoveReadoutSnapshot readout, Action depart, Action release, Action refresh)
         {
@@ -390,11 +397,12 @@ namespace YGOPortable.UI
             rect.localScale = new Vector3(horizontalScale, 1f, 1f);
         }
 
-        private static void ApplyFlight(CompositeCardView view, CardFlight flight, float t, float lift, LiveCardState live = null)
+        private static void ApplyFlight(CompositeCardView view, CardFlight flight, float t, float lift,
+            LiveCardState live = null, Vector2 lateral = default)
         {
             float eased = t * t * (3f - 2f * t);
             float arc = Mathf.Sin(t * Mathf.PI);
-            Vector2 point = Vector2.Lerp(flight.From.Position, flight.To.Position, eased) + Vector2.up * (arc * lift);
+            Vector2 point = Vector2.Lerp(flight.From.Position, flight.To.Position, eased) + arc * (Vector2.up * lift + lateral);
             Vector2 size = Vector2.Lerp(flight.From.Size, flight.To.Size, eased) * (1f + arc * 0.10f);
             float angle = Mathf.LerpAngle(flight.From.Angle, flight.To.Angle, eased);
             bool turnsOver = flight.StartsFaceDown != flight.EndsFaceDown;
@@ -580,6 +588,53 @@ namespace YGOPortable.UI
             Land();
         }
 
+        private IEnumerator PlayFieldSwap((CardFlight Flight, CardMoveReadoutSnapshot Readout) first,
+            (CardFlight Flight, CardMoveReadoutSnapshot Readout) second, Action depart, Action handoff, Action arrive)
+        {
+            depart();
+            var firstCard = TakeCard(first.Flight.StartsFaceDown ? 0 : first.Flight.Code, first.Flight.StartsFaceDown);
+            var secondCard = TakeCard(second.Flight.StartsFaceDown ? 0 : second.Flight.Code, second.Flight.StartsFaceDown);
+            var firstStats = CreateMovingReadout(first.Flight, CardMotion.Transfer, first.Readout, handoff: FieldSwapHandoff);
+            var secondStats = CreateMovingReadout(second.Flight, CardMotion.Transfer, second.Readout, handoff: FieldSwapHandoff);
+
+            Vector2 firstTravel = first.Flight.To.Position - first.Flight.From.Position;
+            Vector2 secondTravel = second.Flight.To.Position - second.Flight.From.Position;
+            Vector2 relativeTravel = firstTravel - secondTravel;
+            Vector2 side = new Vector2(-relativeTravel.y, relativeTravel.x).normalized;
+            if (side == Vector2.zero) side = Vector2.right;
+            Vector2 midpointGap = (first.Flight.From.Position + first.Flight.To.Position -
+                second.Flight.From.Position - second.Flight.To.Position) * .5f;
+            if (Vector2.Dot(side, midpointGap) < 0f) side = -side;
+
+            // Use the widest card or stat plate along the crossing direction.
+            Vector2 space = Vector2.Max(SwapSize(first.Flight, first.Readout), SwapSize(second.Flight, second.Readout));
+            Vector2 curve = side * (.55f * Vector2.Dot(new Vector2(Mathf.Abs(side.x), Mathf.Abs(side.y)), space) + 6f);
+            bool updated = false;
+            yield return Animate(.37f, time =>
+            {
+                ApplyFlight(firstCard, first.Flight, time, 0f, lateral: curve);
+                ApplyFlight(secondCard, second.Flight, time, 0f, lateral: -curve);
+                firstStats?.Follow(firstCard, time);
+                secondStats?.Follow(secondCard, time);
+                if (updated || time < FieldSwapHandoff) return;
+                updated = true;
+                handoff();
+            });
+            RecycleCard(firstCard);
+            RecycleCard(secondCard);
+            if (firstStats != null) RemoveTransient(firstStats.Root.gameObject);
+            if (secondStats != null) RemoveTransient(secondStats.Root.gameObject);
+            arrive();
+        }
+
+        private static Vector2 SwapSize(CardFlight flight, CardMoveReadoutSnapshot readout)
+        {
+            Vector2 size = Vector2.Max(flight.From.Size, flight.To.Size) * 1.10f;
+            if (readout != null)
+                size = Vector2.Max(size, Vector2.Max(readout.Movement.StartSize, readout.Movement.EndSize));
+            return size;
+        }
+
         private IEnumerator GatherXyzMaterials(IReadOnlyList<CardFlight> flights, Vector2 center, Vector2 size)
         {
             var effect = CreateEffect(DuelEffectKind.Xyz, center, size * 2.15f, new Color(.71f, .51f, 1f));
@@ -615,13 +670,13 @@ namespace YGOPortable.UI
         }
 
         private DuelMovingReadout CreateMovingReadout(CardFlight flight, CardMotion motion, CardMoveReadoutSnapshot readout,
-            bool sharedPile = false)
+            bool sharedPile = false, float? handoff = null)
         {
             if (readout?.SourceCard == null && readout?.DestinationCard == null) return null;
             var holder = CenteredVisual("MovingCardReadout", _layer, flight.From.Position, readout.Movement.StartSize);
-            float handoff = motion == CardMotion.TokenSummon ? .27f
-                : !flight.EndsFaceDown && readout.DestinationCard == null && !sharedPile ? .82f : .5f;
-            return new DuelMovingReadout(holder, readout, handoff);
+            float transition = handoff ?? (motion == CardMotion.TokenSummon ? .27f
+                : !flight.EndsFaceDown && readout.DestinationCard == null && !sharedPile ? .82f : .5f);
+            return new DuelMovingReadout(holder, readout, transition);
         }
 
         private IEnumerator MoveCard(CardFlight flight, CardMotion motion, Action onArrive, CardMoveReadoutSnapshot readout,
