@@ -717,6 +717,14 @@ namespace YGOPortable.Editor
                     normal.Find("Labels/Rating/ChangePulse").gameObject.activeInHierarchy && Label(normal, rating).text == "레벨 6",
                     "The updated attack, defense or level did not animate with its current value.");
 
+                var attackIcon = normal.Find("Combat/Attack/Symbol").GetComponent<Image>();
+                var defenseIcon = normal.Find("Combat/Defense/Symbol").GetComponent<Image>();
+                Require(attackIcon.sprite != null && defenseIcon.sprite != null && attackIcon.sprite != defenseIcon.sprite &&
+                    !attackIcon.raycastTarget && !defenseIcon.raycastTarget,
+                    "The compact readout did not have separate non-interactive attack and defense symbols.");
+                mine.mzone[1].attack = mine.mzone[1].defense = int.MaxValue;
+                Field.Refresh();
+
                 var viewport = (RectTransform)Canvas.transform;
                 var originalSize = viewport.sizeDelta;
                 foreach (var size in new[] { new Vector2(1600, 900), new Vector2(1024, 768), new Vector2(1740, 805) })
@@ -724,7 +732,7 @@ namespace YGOPortable.Editor
                     viewport.sizeDelta = size;
                     Canvas.ForceUpdateCanvases();
                     foreach (var readout in new[] { normal, xyz, link })
-                    foreach (var path in new[] { attack, defense, rating, "Combat/Attack/Caption/Label", "Combat/Defense/Caption/Label" })
+                    foreach (var path in new[] { attack, defense, rating })
                     {
                         var label = Label(readout, path);
                         if (!label.gameObject.activeInHierarchy) continue;
@@ -733,6 +741,9 @@ namespace YGOPortable.Editor
                             bounds.max.y <= readout.rect.yMax + .01f && label.rectTransform.rect.height > 9f,
                             $"A field stat overflowed when the canvas resized to {size}.");
                     }
+                    VerifyStatGlyphs(Label(normal, attack), "3200");
+                    VerifyStatGlyphs(Label(xyz, attack), int.MaxValue.ToString());
+                    VerifyStatGlyphs(Label(xyz, defense), int.MaxValue.ToString());
                 }
                 viewport.sizeDelta = originalSize;
 
@@ -759,6 +770,29 @@ namespace YGOPortable.Editor
                     "A vacated zone retained a rating or pendulum scale.");
                 typeof(DuelFieldUI).GetMethod("ResetCardInspector", PrivateInstance).Invoke(Field, null);
                 Debug.Log("[VERIFY DUEL CARD READOUT] Verified live combat stats, changing copies, ratings, scales, Link markers, face-down cards and three viewport sizes.");
+                Debug.Log("[VERIFY DUEL STAT FIT] Attack and defense icons left room for larger digits. All ten digits stayed on one line across three viewports.");
+            }
+
+            private static void VerifyStatGlyphs(Text text, string expected)
+            {
+                Require(text.text == expected && text.horizontalOverflow == HorizontalWrapMode.Overflow,
+                    "A stat field truncated or wrapped the full number.");
+                using var mesh = new VertexHelper();
+                var populate = typeof(Text).GetMethod("OnPopulateMesh", PrivateInstance, null, new[] { typeof(VertexHelper) }, null);
+                populate.Invoke(text, new object[] { mesh });
+                text.GetComponent<DuelStatDigitFit>().ModifyMesh(mesh);
+                Require(mesh.currentVertCount == expected.Length * 4, "The stat field omitted rendered digits.");
+                Rect rect = text.GetPixelAdjustedRect();
+                var vertex = default(UIVertex);
+                for (int i = 0; i < mesh.currentVertCount; i++)
+                {
+                    mesh.PopulateUIVertex(ref vertex, i);
+                    Require(vertex.position.x >= rect.xMin - .1f && vertex.position.x <= rect.xMax + .1f &&
+                        vertex.position.y >= rect.yMin - .1f && vertex.position.y <= rect.yMax + .1f,
+                        "A stat digit rendered outside its allotted space.");
+                }
+                var cell = (RectTransform)text.transform.parent.parent;
+                Require(rect.height / cell.rect.height > .78f, "The compact stat did not give its number most of the available height.");
             }
 
             private uint[] ActiveGlows(string fieldName, bool requireElement)

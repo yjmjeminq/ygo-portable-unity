@@ -75,8 +75,8 @@ namespace YGOPortable.UI
         {
             _root = root;
             _compact = compact;
-            _attack = new StatCell(root, "Attack", compact ? "ATK" : "공격력", AttackColor, compact);
-            _defense = new StatCell(root, "Defense", compact ? "DEF" : "수비력", DefenseColor, compact);
+            _attack = new StatCell(root, "Attack", "공격력", AttackColor, compact);
+            _defense = new StatCell(root, "Defense", "수비력", DefenseColor, compact);
             Hide();
         }
 
@@ -124,6 +124,7 @@ namespace YGOPortable.UI
             private readonly Image _rail;
             private readonly Text _value;
             private readonly Text _change;
+            private readonly RectTransform _symbol;
             private readonly Color _accent;
             private int _lastValue = -1;
 
@@ -135,19 +136,30 @@ namespace YGOPortable.UI
                 var rail = LotdUiKit.CreateRect("Rail", Rect, new Vector2(.07f, 0f), new Vector2(.93f, 0f),
                     Vector2.zero, new Vector2(0f, 1.8f));
                 _rail = LotdUiKit.AddImage(rail.gameObject, LotdUiKit.WhiteSprite, accent, false, false);
-                var heading = LotdUiKit.CreateRect("Caption", Rect, new Vector2(.09f, .60f), new Vector2(.76f, .99f),
-                    Vector2.zero, Vector2.zero);
-                var title = LotdUiKit.AddFittedText(heading, "Label", label, compact ? 11 : 14, 8,
-                    TextAnchor.MiddleLeft, accent, FontStyle.Bold);
-                title.verticalOverflow = VerticalWrapMode.Overflow;
-                var badge = LotdUiKit.CreateRect("Change", Rect, new Vector2(.76f, .60f), new Vector2(.94f, .99f),
-                    Vector2.zero, Vector2.zero);
-                _change = LotdUiKit.AddFittedText(badge, "Arrow", "", 12, 8, TextAnchor.MiddleCenter, accent, FontStyle.Bold);
+                if (compact)
+                {
+                    _symbol = LotdUiKit.CreateRect("Symbol", Rect, new Vector2(.055f, .17f), new Vector2(.245f, .91f),
+                        Vector2.zero, Vector2.zero);
+                    LotdUiKit.AddImage(_symbol.gameObject, DuelStatSymbols.Get(key == "Defense"), accent, true, false);
+                }
+                else
+                {
+                    var heading = LotdUiKit.CreateRect("Caption", Rect, new Vector2(.09f, .60f), new Vector2(.76f, .99f),
+                        Vector2.zero, Vector2.zero);
+                    var title = LotdUiKit.AddFittedText(heading, "Label", label, 14, 8, TextAnchor.MiddleLeft, accent, FontStyle.Bold);
+                    title.verticalOverflow = VerticalWrapMode.Overflow;
+                }
+                var badge = LotdUiKit.CreateRect("Change", Rect, compact ? new Vector2(.055f, .04f) : new Vector2(.76f, .60f),
+                    compact ? new Vector2(.245f, .43f) : new Vector2(.94f, .99f), Vector2.zero, Vector2.zero);
+                _change = LotdUiKit.AddFittedText(badge, "Arrow", "", compact ? 10 : 12, compact ? 6 : 8,
+                    TextAnchor.MiddleCenter, accent, FontStyle.Bold);
                 _change.verticalOverflow = VerticalWrapMode.Overflow;
-                var digits = LotdUiKit.CreateRect("Digits", Rect, new Vector2(.055f, .035f), new Vector2(.945f, .68f),
-                    Vector2.zero, Vector2.zero);
-                _value = LotdUiKit.AddFittedText(digits, "Value", "", compact ? 22 : 28, 9,
+                var digits = LotdUiKit.CreateRect("Digits", Rect, compact ? new Vector2(.265f, .085f) : new Vector2(.055f, .035f),
+                    compact ? new Vector2(.96f, .96f) : new Vector2(.945f, .68f), Vector2.zero, Vector2.zero);
+                _value = LotdUiKit.AddFittedText(digits, "Value", "", compact ? 23 : 28, compact ? 7 : 9,
                     TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+                _value.horizontalOverflow = HorizontalWrapMode.Overflow;
+                _value.gameObject.AddComponent<DuelStatDigitFit>();
             }
 
             internal void Bind(int value, int original, bool active, bool showChanges = false)
@@ -165,9 +177,90 @@ namespace YGOPortable.UI
                 _value.color = change > 0 ? Increased : change < 0 ? Decreased : active ? Color.white : DuelStyle.Muted;
                 _change.text = change > 0 ? "▲" : change < 0 ? "▼" : "";
                 _change.color = _value.color;
+                if (_symbol != null) _symbol.anchorMin = new Vector2(.055f, change == 0 ? .17f : .44f);
                 _plate.color = active ? Color.Lerp(Backing, _accent, .15f) : Backing;
                 _rail.color = new Color(_accent.r, _accent.g, _accent.b, active ? .95f : .28f);
             }
+        }
+    }
+
+    internal sealed class DuelStatDigitFit : BaseMeshEffect
+    {
+        public override void ModifyMesh(VertexHelper mesh)
+        {
+            if (!IsActive() || mesh.currentVertCount == 0) return;
+            Rect rect = graphic.GetPixelAdjustedRect();
+            if (rect.width <= 0f) return;
+            float min = float.PositiveInfinity, max = float.NegativeInfinity;
+            var vertex = default(UIVertex);
+            for (int i = 0; i < mesh.currentVertCount; i++)
+            {
+                mesh.PopulateUIVertex(ref vertex, i);
+                min = Mathf.Min(min, vertex.position.x);
+                max = Mathf.Max(max, vertex.position.x);
+            }
+            float width = max - min;
+            if (width <= 0f || min >= rect.xMin && max <= rect.xMax) return;
+            float center = (min + max) * .5f;
+            float scale = Mathf.Min(1f, rect.width / width);
+            for (int i = 0; i < mesh.currentVertCount; i++)
+            {
+                mesh.PopulateUIVertex(ref vertex, i);
+                vertex.position.x = rect.center.x + (vertex.position.x - center) * scale;
+                mesh.SetUIVertex(vertex, i);
+            }
+        }
+    }
+
+    internal static class DuelStatSymbols
+    {
+        private static Sprite _blade;
+        private static Sprite _shield;
+
+        internal static Sprite Get(bool defense)
+        {
+            if (defense) return _shield != null ? _shield : (_shield = Build(defense: true));
+            return _blade != null ? _blade : (_blade = Build(defense: false));
+        }
+
+        private static Sprite Build(bool defense)
+        {
+            const int size = 24, samples = 3;
+            var pixels = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                int covered = 0;
+                for (int row = 0; row < samples; row++)
+                for (int col = 0; col < samples; col++)
+                {
+                    float u = (x + (col + .5f) / samples) / size - .5f;
+                    float v = (y + (row + .5f) / samples) / size - .5f;
+                    if (defense ? InsideShield(u, v) : InsideBlade(u, v)) covered++;
+                }
+                pixels[y * size + x] = new Color32(255, 255, 255, (byte)(255 * covered / (samples * samples)));
+            }
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                name = defense ? "Duel Defense Symbol" : "Duel Attack Symbol",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+            };
+            texture.SetPixels32(pixels);
+            texture.Apply(false, true);
+            return Sprite.Create(texture, new Rect(0, 0, size, size), Vector2.one * .5f);
+        }
+
+        private static bool InsideShield(float x, float y) =>
+            y >= -.40f && y <= .37f && Mathf.Abs(x) < .34f * Mathf.InverseLerp(-.40f, -.14f, y);
+
+        private static bool InsideBlade(float x, float y)
+        {
+            float along = (x + y) * .7071f;
+            float across = Mathf.Abs((y - x) * .7071f);
+            return along >= -.51f && along <= -.19f && across < .066f ||
+                along >= -.24f && along <= -.12f && across < .24f ||
+                along >= -.13f && along < .52f && across < .127f * Mathf.Clamp01((.52f - along) / .20f);
         }
     }
 
