@@ -59,10 +59,17 @@ namespace YGOPortable.UI
     internal sealed class CardMoveReadoutSnapshot
     {
         internal readonly uint Code;
-        internal LiveCardState Card;
-        internal (Vector2 StartSize, Vector2 EndSize, uint StartPosition, bool StartOpponent, bool EndOpponent)? Movement;
+        internal readonly LiveCardState SourceCard;
+        internal readonly (Vector2 StartSize, Vector2 EndSize, bool StartOpponent, bool EndOpponent) Movement;
+        internal LiveCardState DestinationCard;
 
-        internal CardMoveReadoutSnapshot(uint code) => Code = code;
+        internal CardMoveReadoutSnapshot(uint code, LiveCardState sourceCard,
+            (Vector2 StartSize, Vector2 EndSize, bool StartOpponent, bool EndOpponent) movement)
+        {
+            Code = code;
+            SourceCard = sourceCard;
+            Movement = movement;
+        }
     }
 
     public class CardAnimationManager : MonoBehaviour
@@ -371,8 +378,14 @@ namespace YGOPortable.UI
             if (summons && !featured && !flight.EndsFaceDown) _summonArt = DuelVisualAssets.SummonCutIn(flight.Code);
             bool reveal = !flight.EndsFaceDown && (extraSummon || featured || _summonArt != null);
             var proxy = TakeCard(flight.StartsFaceDown ? 0u : flight.Code, flight.StartsFaceDown, reveal);
+            DuelMovingReadout moving = null;
+            if (!reveal && (readout?.SourceCard != null || readout?.DestinationCard != null))
+            {
+                var holder = CenteredVisual("MovingCardReadout", _layer, flight.From.Position, readout.Movement.StartSize);
+                moving = new DuelMovingReadout(holder, readout, motion == CardMotion.TokenSummon ? .27f : .5f);
+            }
             if (reveal)
-                yield return RevealSummon(proxy, flight, motion, featured, readout?.Card);
+                yield return RevealSummon(proxy, flight, motion, featured, readout?.DestinationCard);
             else if (motion == CardMotion.TokenSummon || motion == CardMotion.Vanish)
             {
                 bool appearing = motion == CardMotion.TokenSummon;
@@ -382,10 +395,13 @@ namespace YGOPortable.UI
                 var effect = CreateEffect(appearing ? DuelEffectKind.Token : DuelEffectKind.Break, point,
                     flight.To.Size * 2.4f, DuelStyle.Player);
                 proxy.transform.SetAsLastSibling();
+                moving?.Root.SetAsLastSibling();
+                fade.alpha = appearing ? 0f : 1f;
                 if (appearing) LotdAudio.PlaySummon();
                 yield return Animate(appearing ? .35f : .22f, t =>
                 {
                     ApplyFlight(proxy, flight, t, appearing ? 10f : 6f);
+                    moving?.Follow(proxy, t);
                     fade.alpha = appearing ? Mathf.SmoothStep(0f, 1f, t) : 1f - t;
                     effect.Seek(t);
                 });
@@ -396,28 +412,14 @@ namespace YGOPortable.UI
             {
                 float lift = motion == CardMotion.ChangePosition || motion == CardMotion.Material ? 13f : 31f;
                 float time = motion == CardMotion.Material ? .20f : motion == CardMotion.Transfer ? .23f : .27f;
-                DuelMovingReadout moving = null;
-                if (!flight.StartsFaceDown && !flight.EndsFaceDown && readout?.Movement is { } movement && readout.Card?.IsFaceUp == true)
-                {
-                    var stats = new DuelCardReadout(CardDatabase.Get(flight.Code), readout.Card);
-                    if (stats.IsMonster)
-                    {
-                        var holder = CenteredVisual("MovingCardReadout", _layer, flight.From.Position, movement.StartSize);
-                        moving = new DuelMovingReadout(holder, readout, stats);
-                        proxy.SetCard(flight.Code, live: readout.Card);
-                    }
-                }
                 yield return Animate(time, t =>
                 {
                     ApplyFlight(proxy, flight, t, lift);
-                    moving?.Follow((RectTransform)proxy.transform, t);
+                    moving?.Follow(proxy, t);
                 });
-                if (moving != null)
-                {
-                    RemoveTransient(moving.Root.gameObject);
-                }
             }
 
+            if (moving != null) RemoveTransient(moving.Root.gameObject);
             if (reveal)
             {
                 proxy.gameObject.SetActive(false);

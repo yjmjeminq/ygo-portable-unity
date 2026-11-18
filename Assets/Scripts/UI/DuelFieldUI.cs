@@ -2208,7 +2208,7 @@ namespace YGOPortable.UI
         {
             // Read the field refreshed for this response before playing its queued animations.
             foreach (var (slot, readout) in _pendingCardReadouts)
-                readout.Card = _session.GetVisibleFieldCard(readout.Code, slot.Controller, YgoConstants.LOCATION_MZONE, slot.Sequence);
+                readout.DestinationCard = _session.GetVisibleFieldCard(readout.Code, slot.Controller, YgoConstants.LOCATION_MZONE, slot.Sequence);
             _pendingCardReadouts.Clear();
         }
 
@@ -2335,34 +2335,35 @@ namespace YGOPortable.UI
                 animator.QueuePileTransfer(flight, onArrival);
             else
             {
-                CardMoveReadoutSnapshot readout = null;
-                if (!toBack && CardAnimationManager.IsSummonMotion(motion))
-                {
-                    readout = new CardMoveReadoutSnapshot(e.code);
-                }
-                else if (!fromBack && !toBack && (e.fromPos & YgoConstants.POS_FACEUP) != 0 &&
-                    (motion is CardMotion.ChangePosition or CardMotion.Transfer) &&
-                    e.fromLoc == YgoConstants.LOCATION_MZONE && e.toLoc == YgoConstants.LOCATION_MZONE)
-                {
-                    var source = GetSlot(e.fromCon, e.fromLoc, e.fromSeq);
-                    var destination = GetSlot(e.toCon, e.toLoc, e.toSeq);
-                    if (source != null && destination != null)
-                    {
-                        int viewer = _session.HumanPlayerIndex;
-                        readout = new CardMoveReadoutSnapshot(e.code)
-                        {
-                            Movement = (animator.GetAreaSize(source.readout?.Rect ?? source.root), animator.GetAreaSize(destination.root),
-                                e.fromPos, e.fromCon != viewer, e.toCon != viewer),
-                        };
-                    }
-                }
-                if (readout != null) _pendingCardReadouts[(e.toCon, e.toSeq)] = readout;
+                var readout = PrepareMoveReadout(animator, e, fromBack, toBack);
                 animator.QueueMove(flight, motion, held == null ? onArrival : () =>
                 {
                     ReleaseBattleCardDisplay(held);
                     onArrival();
                 }, readout, depart);
             }
+        }
+
+        private CardMoveReadoutSnapshot PrepareMoveReadout(CardAnimationManager animator, CardMoveEvent move,
+            bool fromBack, bool toBack)
+        {
+            if (move.toLoc != YgoConstants.LOCATION_MZONE || move.code == 0) return null;
+            var destination = GetSlot(move.toCon, move.toLoc, move.toSeq);
+            if (destination == null) return null;
+
+            var source = move.fromLoc == YgoConstants.LOCATION_MZONE ? GetSlot(move.fromCon, move.fromLoc, move.fromSeq) : null;
+            var sourceCard = !fromBack && source != null
+                ? _session.GetVisibleFieldCard(move.code, move.fromCon, move.fromLoc, move.fromSeq) : null;
+            if (sourceCard?.position != move.fromPos) sourceCard = null;
+            if (toBack && sourceCard == null) return null;
+
+            var endSize = animator.GetAreaSize(destination.root);
+            var startSize = sourceCard == null ? endSize : animator.GetAreaSize(source.readout?.Rect ?? source.root);
+            int viewer = _session.HumanPlayerIndex;
+            var readout = new CardMoveReadoutSnapshot(move.code, sourceCard,
+                (startSize, endSize, move.fromCon != viewer, move.toCon != viewer));
+            if (!toBack) _pendingCardReadouts[(move.toCon, move.toSeq)] = readout;
+            return readout;
         }
 
         internal static CardMotion MonsterArrivalMotion(CardMoveEvent move)

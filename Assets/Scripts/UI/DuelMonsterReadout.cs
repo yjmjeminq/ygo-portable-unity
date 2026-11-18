@@ -733,38 +733,46 @@ namespace YGOPortable.UI
     {
         internal RectTransform Root { get; }
         private readonly DuelFieldReadout _readout;
-        private readonly DuelCardReadout _card;
-        private readonly (Vector2 StartSize, Vector2 EndSize, uint StartPosition, bool StartOpponent, bool EndOpponent) _movement;
+        private readonly CardMoveReadoutSnapshot _snapshot;
         private readonly CanvasGroup _opacity;
-        private bool _atDestination;
+        private readonly float _handoff;
+        private bool? _atDestination;
 
-        internal DuelMovingReadout(RectTransform root, CardMoveReadoutSnapshot snapshot, DuelCardReadout card)
+        internal DuelMovingReadout(RectTransform root, CardMoveReadoutSnapshot snapshot, float handoff)
         {
             Root = root;
-            _movement = snapshot.Movement.Value;
-            _card = card;
+            _snapshot = snapshot;
+            _handoff = handoff;
             _readout = new DuelFieldReadout(root);
-            _readout.Bind(card, _movement.StartOpponent, null, _movement.StartPosition);
-            if (_movement.StartOpponent != _movement.EndOpponent)
-            {
-                _opacity = root.gameObject.AddComponent<CanvasGroup>();
-                _opacity.blocksRaycasts = _opacity.interactable = false;
-            }
+            _readout.Hide();
+            _opacity = root.gameObject.AddComponent<CanvasGroup>();
+            _opacity.alpha = 0f;
+            _opacity.blocksRaycasts = _opacity.interactable = false;
         }
 
-        internal void Follow(RectTransform card, float progress)
+        internal void Follow(CompositeCardView view, float progress)
         {
-            Root.anchoredPosition = card.anchoredPosition;
-            Root.sizeDelta = Vector2.Lerp(_movement.StartSize, _movement.EndSize, Mathf.SmoothStep(0f, 1f, progress));
-            bool destination = progress >= .5f;
+            var movement = _snapshot.Movement;
+            Root.anchoredPosition = ((RectTransform)view.transform).anchoredPosition;
+            Root.sizeDelta = Vector2.Lerp(movement.StartSize, movement.EndSize, Mathf.SmoothStep(0f, 1f, progress));
+            bool destination = progress >= _handoff;
             if (destination != _atDestination)
             {
                 _atDestination = destination;
-                _readout.Bind(_card, destination ? _movement.EndOpponent : _movement.StartOpponent,
-                    null, destination ? null : _movement.StartPosition);
+                var live = destination ? _snapshot.DestinationCard : _snapshot.SourceCard;
+                if (live?.IsFaceUp == true && live.code != 0 && view.CurrentCode == live.code &&
+                    (live.type & YgoConstants.TYPE_MONSTER) != 0)
+                {
+                    view.SetCard(live.code, live: live);
+                    _readout.Bind(new DuelCardReadout(CardDatabase.Get(live.code), live),
+                        destination ? movement.EndOpponent : movement.StartOpponent, null);
+                }
+                else _readout.Hide();
             }
-            if (_opacity != null)
-                _opacity.alpha = Mathf.Lerp(.60f, 1f, Mathf.Abs(progress - .5f) * 5f);
+            _opacity.alpha = _snapshot.SourceCard == null ? Mathf.SmoothStep(0f, 1f, (progress - _handoff) / .24f)
+                : _snapshot.DestinationCard == null ? Mathf.SmoothStep(0f, 1f, (_handoff - progress) / .24f)
+                : movement.StartOpponent != movement.EndOpponent ? Mathf.Lerp(.60f, 1f, Mathf.Abs(progress - _handoff) * 5f)
+                : 1f;
         }
     }
 

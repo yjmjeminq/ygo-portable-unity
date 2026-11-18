@@ -361,8 +361,7 @@ namespace YGOPortable.Editor
             for (int stage = 0; stage < 3; stage++)
             {
                 Require(step.MoveNext() && step.Current is IEnumerator, "The attack omitted an animation stage.");
-                var frames = (IEnumerator)step.Current;
-                Require(frames.MoveNext(), "The attack did not render its first frame.");
+                var sample = SampleAnimation((IEnumerator)step.Current);
                 var art = (RectTransform)animator.transform.Find("MovingCard");
                 var stats = (RectTransform)animator.transform.Find("AttackingCardReadout");
                 var strip = stats.Find("CardReadout/Combat");
@@ -379,9 +378,6 @@ namespace YGOPortable.Editor
                     stats.GetComponentsInChildren<Graphic>().All(graphic => !graphic.raycastTarget),
                     "The flying card omitted its current stats, rank, link or level, or blocked input.");
                 previous = stats.anchoredPosition;
-                var sample = (Action<float>)frames.GetType().GetField("apply", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
-                    ?.GetValue(frames);
-                Require(sample != null, "The attack renderer did not expose its interpolated frames.");
                 var defender = (RectTransform)animator.transform.Find("DefendingCardReadout");
                 var content = (RectTransform)stats.Find("CardReadout");
                 for (int frame = 0; frame <= 16; frame++)
@@ -396,6 +392,15 @@ namespace YGOPortable.Editor
             Require(!step.MoveNext() && animator.transform.Find("AttackingCardReadout") == null &&
                 animator.transform.Find("BattleReadout") == null && !animator.transform.Find("MovingCard").gameObject.activeSelf,
                 "The attack left a transient card or stats on screen.");
+        }
+
+        internal static Action<float> SampleAnimation(IEnumerator frames)
+        {
+            Require(frames.MoveNext(), "The animation did not render its first frame.");
+            var sample = (Action<float>)frames.GetType().GetField("apply",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)?.GetValue(frames);
+            Require(sample != null, "The renderer did not expose its interpolated frames.");
+            return sample;
         }
 
         private static Rect Bounds(RectTransform rect)
