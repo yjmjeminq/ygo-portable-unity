@@ -300,9 +300,16 @@ namespace YGOPortable.AI
             int? genericAction = usePolicy
                 ? _policy.ChooseMainAction(s, p, canBattle, preserveBoard, CanUse)
                 : ChooseRuleMainAction(s, p, preserveBoard, CanUse);
-            if (genericAction is int selected) return EncodeIdleAction(s, p, selected & 0xffff, selected >> 16);
+            if (genericAction is int selected)
+            {
+                int command = selected & 0xffff;
+                int index = selected >> 16;
+                if (UsesTacticalRules && command == 0 && DuelTactics.ChooseDefensiveSet(s, p, p.summonable[index]) is int setIndex)
+                    return EncodeIdleAction(s, p, 3, setIndex);
+                return EncodeIdleAction(s, p, command, index);
+            }
 
-            // Reposition weak attack monsters or prepare defenders for battle.
+            // Prepare defenders for battle. Smart AI considers defensive changes when it ends its turn.
             if (p.repositionable.Count > 0 && s.CurrentPhase == YgoConstants.PHASE_MAIN1)
             {
                 for (int i = 0; i < p.repositionable.Count; i++)
@@ -313,15 +320,9 @@ namespace YGOPortable.AI
                     if (live == null) continue;
                     int oppMax = MaxOpponentAtk(s, p.playerId);
                     if (live.IsDefense && live.attack >= oppMax && live.attack >= 1400 && p.canBp)
-                    {
-                        _repositionedSeqs.Add(rep.sequence);
-                        return BitConverter.GetBytes((i << 16) | 2);
-                    }
-                    if (!live.IsDefense && live.attack < oppMax && live.defense > live.attack + 400)
-                    {
-                        _repositionedSeqs.Add(rep.sequence);
-                        return BitConverter.GetBytes((i << 16) | 2);
-                    }
+                        return EncodeIdleAction(s, p, 2, i);
+                    if (!UsesTacticalRules && !live.IsDefense && live.attack < oppMax && live.defense > live.attack + 400)
+                        return EncodeIdleAction(s, p, 2, i);
                 }
             }
 
@@ -357,16 +358,26 @@ namespace YGOPortable.AI
                 }
             }
 
-            if (p.canEp) return BitConverter.GetBytes(7);
+            if (p.canEp) return EndMainPhase(s, p);
             if (p.canBp) return BitConverter.GetBytes(6);
+            return BitConverter.GetBytes(7);
+        }
+
+        private byte[] EndMainPhase(DuelSession session, DuelPrompt prompt)
+        {
+            // Apply end-of-turn positioning after the live AI has committed to ending the Main Phase.
+            if (UsesTacticalRules && !_comboProjection &&
+                DuelTactics.ChooseDefensiveReposition(session, prompt, _repositionedSeqs) is int index)
+                return EncodeIdleAction(session, prompt, 2, index);
             return BitConverter.GetBytes(7);
         }
 
         private byte[] UsePlannedMainAction(DuelSession session, DuelPrompt prompt, int action, Func<int, SelectableCardItem, bool> canUse)
         {
+            if (action == 6 && prompt.canBp) return BitConverter.GetBytes(action);
+            if (action == 7 && prompt.canEp) return EndMainPhase(session, prompt);
             int command = action & 0xffff;
             int index = action >> 16;
-            if (action == 6 && prompt.canBp || action == 7 && prompt.canEp) return BitConverter.GetBytes(action);
             var options = command switch
             {
                 0 => prompt.summonable,
@@ -378,7 +389,6 @@ namespace YGOPortable.AI
                 _ => null,
             };
             if (options == null || index < 0 || index >= options.Count || !canUse(command, options[index])) return null;
-            if (command == 2) _repositionedSeqs.Add(options[index].sequence);
             return EncodeIdleAction(session, prompt, command, index);
         }
 
@@ -506,6 +516,7 @@ namespace YGOPortable.AI
 
         private byte[] EncodeIdleAction(DuelSession session, DuelPrompt prompt, int command, int index)
         {
+            if (command == 2) _repositionedSeqs.Add(prompt.repositionable[index].sequence);
             if (command == 1 || command == 5)
             {
                 var item = command == 1 ? prompt.spSummonable[index] : prompt.activatable[index];

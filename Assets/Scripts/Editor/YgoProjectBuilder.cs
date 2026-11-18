@@ -367,6 +367,7 @@ namespace YGOPortable.Editor
             VerifyPossessedDestiny(classicDecks[0].main);
             VerifyMandatoryBattleAttack();
             VerifyAiTacticalChoices();
+            VerifyAiDefense();
             VerifyAiFieldAndTributeChoices();
             VerifyAiKeepsActiveFieldSpell();
             VerifyAiFieldReplacementChoices();
@@ -2302,6 +2303,137 @@ namespace YGOPortable.Editor
             AssertTrue(BitConverter.ToInt32(ai.ComputeResponse(duel, main), 0) == 5,
                 "The AI did not consider Dark Hole when it could remove an opposing monster.");
             Debug.Log("[VERIFY AI TACTICS] Legal battle targets, banishing, material choice and avoiding an own-only board wipe passed.");
+        }
+
+        private static void VerifyAiDefense()
+        {
+            var policy = DuelAiPolicy.LoadIncluded();
+            var linkPolicy = LinkComboPolicy.LoadIncluded();
+            TacticalAI CreateAi() => new TacticalAI(policy, linkPolicy, searchCombos: true);
+            VerifyAiSummonDefense(CreateAi(), boosted: true);
+            VerifyAiSummonDefense(CreateAi(), boosted: false);
+            VerifyAiDefensiveReposition(CreateAi(), main2: false);
+            VerifyAiDefensiveReposition(CreateAi(), main2: true);
+            Debug.Log("[VERIFY AI DEFENSE] Native summon positions, defensive sets and position changes in both Main Phases passed.");
+        }
+
+        private static void VerifyAiSummonDefense(TacticalAI ai, bool boosted)
+        {
+            const uint warwolf = 69247929, axeOfDespair = 40619825, cyberDragon = 70095154, jerryBeansMan = 23635815;
+            uint[] empty = Array.Empty<uint>();
+            uint[] human = Enumerable.Repeat(warwolf, 32).Concat(Enumerable.Repeat(axeOfDespair, 8)).ToArray();
+            uint[] computer = new[] { cyberDragon }.Concat(Enumerable.Repeat(jerryBeansMan, 39)).ToArray();
+            using var duel = StartSeedMatching("AI summon defense", human, empty, computer, empty, true, session =>
+                session.ActivePrompt?.summonable.Any(card => card.code == warwolf) == true &&
+                session.Players[0].hand.Any(card => card.code == axeOfDespair) &&
+                session.Players[1].hand.Any(card => card.code == cyberDragon));
+
+            duel.SubmitResponseInt(duel.ActivePrompt.summonable.FindIndex(card => card.code == warwolf) << 16);
+            DriveUntilIdle(duel, ai);
+            if (boosted)
+            {
+                int equip = duel.ActivePrompt.activatable.FindIndex(card => card.code == axeOfDespair);
+                AssertTrue(equip >= 0, "The native defense fixture did not offer Axe of Despair.");
+                duel.SubmitResponseInt((equip << 16) | 5);
+                DriveUntilIdle(duel, ai, prompt => prompt.messageType == YgoConstants.MSG_SELECT_CARD ? EncodeSelectIndices(0) : null);
+            }
+
+            AssertTrue(duel.Players[0].mzone.Any(card => card?.attack == (boosted ? 3000 : 2000)),
+                "The native defense fixture did not establish the expected opposing ATK.");
+            if (boosted)
+            {
+                var position = new DuelPrompt
+                {
+                    messageType = YgoConstants.MSG_SELECT_POSITION,
+                    playerId = (byte)duel.AiPlayerIndex,
+                    promptCardCode = cyberDragon,
+                    allowedPositions = (byte)(YgoConstants.POS_FACEUP_ATTACK | YgoConstants.POS_FACEUP_DEFENSE),
+                };
+                AssertTrue(BitConverter.ToUInt32(ai.ComputeResponse(duel, position), 0) == YgoConstants.POS_FACEUP_DEFENSE,
+                    "An off-turn summon must consider a stronger opposing attacker.");
+                position.allowedPositions = (byte)YgoConstants.POS_FACEUP_ATTACK;
+                AssertTrue(BitConverter.ToUInt32(ai.ComputeResponse(duel, position), 0) == YgoConstants.POS_FACEUP_ATTACK,
+                    "The AI must honor an Attack Position-only summon.");
+            }
+            duel.SubmitResponseInt(7);
+            DriveUntilIdle(duel, ai);
+            int summon = duel.ActivePrompt.spSummonable.FindIndex(card => card.code == cyberDragon);
+            AssertTrue(duel.ActivePrompt.playerId == duel.AiPlayerIndex && summon >= 0,
+                "The AI does not have a legal Cyber Dragon Special Summon.");
+            duel.SubmitResponseInt((summon << 16) | 1);
+            uint expectedPosition = boosted ? YgoConstants.POS_FACEUP_DEFENSE : YgoConstants.POS_FACEUP_ATTACK;
+            DriveUntilIdle(duel, ai);
+            var own = duel.Players[duel.AiPlayerIndex];
+            AssertTrue(own.mzone.Any(card => card?.code == cyberDragon && card.position == expectedPosition),
+                $"Cyber Dragon chose the wrong position against {(boosted ? 3000 : 2000)} ATK.");
+
+            if (boosted)
+            {
+                var prompt = duel.ActivePrompt;
+                int action = BitConverter.ToInt32(ai.ComputeResponse(duel, prompt), 0);
+                AssertTrue((action & 0xffff) == 3 && prompt.mSetable[action >> 16].code == jerryBeansMan,
+                    "The AI exposed a weaker Normal Monster when a defensive Set was legal.");
+                duel.SubmitResponseInt(action);
+                DriveUntilIdle(duel, ai);
+                AssertTrue(own.mzone.Any(card => card?.code == jerryBeansMan && card.position == YgoConstants.POS_FACEDOWN_DEFENSE),
+                    "The engine did not apply the AI's defensive Set.");
+            }
+            AssertTrue(duel.RetryCount == 0, "The AI's summon positions must remain legal.");
+        }
+
+        private static void VerifyAiDefensiveReposition(TacticalAI ai, bool main2)
+        {
+            const uint warwolf = 69247929, jerryBeansMan = 23635815, blueEyes = 89631139;
+            uint[] empty = Array.Empty<uint>();
+            uint[] computer = new[] { jerryBeansMan }.Concat(Enumerable.Repeat(blueEyes, 39)).ToArray();
+            using var duel = StartSeedMatching("AI defensive reposition", Enumerable.Repeat(warwolf, 40).ToArray(), empty,
+                computer, empty, true,
+                session => session.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD &&
+                    session.Players[1].hand.Any(card => card.code == jerryBeansMan));
+
+            // The AI summons first, and Warwolf enters on the following turn.
+            duel.SubmitResponseInt(7);
+            DriveUntilIdle(duel, ai);
+            duel.SubmitResponseInt(0);
+            DriveUntilIdle(duel, ai);
+            duel.SubmitResponseInt(7);
+            DriveUntilIdle(duel, ai);
+            duel.SubmitResponseInt(0);
+            DriveUntilIdle(duel, ai);
+            duel.SubmitResponseInt(7);
+            DriveUntilIdle(duel, ai);
+            if (main2)
+            {
+                duel.SubmitResponseInt(6);
+                AssertTrue(duel.ActivePrompt?.canM2 == true, "The native defense fixture cannot enter Main Phase 2.");
+                duel.SubmitResponseInt(2);
+                DriveUntilIdle(duel, ai);
+            }
+
+            var prompt = duel.ActivePrompt;
+            AssertTrue(prompt?.playerId == duel.AiPlayerIndex &&
+                duel.CurrentPhase == (main2 ? YgoConstants.PHASE_MAIN2 : YgoConstants.PHASE_MAIN1),
+                "The native defense fixture reached the wrong Main Phase.");
+            int index = prompt.repositionable.FindIndex(card => card.code == jerryBeansMan);
+            AssertTrue(index >= 0, "The weaker Attack Position monster must be eligible for a position change.");
+            // Main Phase 2 also exercises the path where a combo plan already picked End Phase.
+            byte[] response = main2 ? ai.ComputeComboResponse(duel, prompt, 7) : ai.ComputeResponse(duel, prompt);
+            int action = BitConverter.ToInt32(response, 0);
+            AssertTrue(action == ((index << 16) | 2), "The AI ended its turn with a weaker monster exposed to battle damage.");
+            duel.SubmitResponseInt(action);
+            DriveUntilIdle(duel, ai);
+            var own = duel.Players[duel.AiPlayerIndex];
+            AssertTrue(own.mzone.Any(card => card?.code == jerryBeansMan && card.position == YgoConstants.POS_FACEUP_DEFENSE),
+                "The engine did not put the weaker monster in Defense Position.");
+
+            duel.SubmitResponseInt(7);
+            DriveUntilIdle(duel, ai);
+            duel.SubmitResponseInt(6);
+            AssertTrue(duel.ActivePrompt?.attackable.Count == 1, "The native defense fixture cannot declare an attack.");
+            duel.SubmitResponseInt(1);
+            DriveUntilIdle(duel, ai, pick => pick.IsAttackTargetSelection ? EncodeSelectIndices(0) : null);
+            AssertTrue(duel.RetryCount == 0 && own.mzone.All(card => card == null) && own.lp == 8000,
+                $"Defense Position should prevent the LP loss on destruction. LP: {own.lp}, retries: {duel.RetryCount}, prompt: {duel.ActivePrompt?.messageType}.");
         }
 
         private static void AssertTrue(bool cond, string msg)

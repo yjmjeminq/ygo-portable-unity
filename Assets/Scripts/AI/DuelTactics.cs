@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using YGOPortable.Core;
 
@@ -53,16 +54,61 @@ namespace YGOPortable.AI
         internal static int? ChoosePosition(DuelSession duel, DuelPrompt prompt)
         {
             const uint both = YgoConstants.POS_FACEUP_ATTACK | YgoConstants.POS_FACEUP_DEFENSE;
-            if ((prompt.allowedPositions & both) != both || duel.TurnNumber <= 1 || duel.TurnPlayer != prompt.playerId)
-                return null;
+            if ((prompt.allowedPositions & both) != both) return null;
             var card = CardDatabase.Get(prompt.promptCardCode);
-            var rivals = duel.Players[1 - prompt.playerId].mzone;
-            if (card == null || card.atk <= 0 || duel.CurrentPhase is not (YgoConstants.PHASE_MAIN1 or YgoConstants.PHASE_BATTLE))
-                return null;
+            if (card == null) return null;
 
-            bool canInflictDamage = !rivals.Any(rival => rival != null) || rivals.Any(rival => rival?.IsFaceUp == true &&
-                rival.IsAttack && card.atk > rival.attack);
-            return canInflictDamage ? (int)YgoConstants.POS_FACEUP_ATTACK : null;
+            var rival = duel.Players[1 - prompt.playerId];
+            bool canAttack = duel.TurnNumber > 1 && duel.TurnPlayer == prompt.playerId &&
+                duel.CurrentPhase is YgoConstants.PHASE_MAIN1 or YgoConstants.PHASE_BATTLE;
+            if (canAttack && CanWinBattle(rival, card.atk)) return (int)YgoConstants.POS_FACEUP_ATTACK;
+            return StrongestAttacker(rival) > Math.Max(0, card.atk) ? (int)YgoConstants.POS_FACEUP_DEFENSE : null;
+        }
+
+        internal static int? ChooseDefensiveSet(DuelSession duel, DuelPrompt prompt, SelectableCardItem summon)
+        {
+            var card = CardDatabase.Get(summon.code);
+            // Keep Normal Summon triggers and face-up tuners available for development.
+            if (card == null || card.level > 4 || summon.location != YgoConstants.LOCATION_HAND ||
+                (card.type & (YgoConstants.TYPE_NORMAL | YgoConstants.TYPE_FLIP)) == 0 ||
+                (card.type & YgoConstants.TYPE_TUNER) != 0) return null;
+
+            var rival = duel.Players[1 - prompt.playerId];
+            if (StrongestAttacker(rival) <= Math.Max(0, card.atk) || (prompt.canBp && CanWinBattle(rival, card.atk))) return null;
+
+            int index = prompt.mSetable.FindIndex(item => item.controller == prompt.playerId &&
+                item.location == summon.location && item.sequence == summon.sequence);
+            return index >= 0 ? index : null;
+        }
+
+        internal static int? ChooseDefensiveReposition(DuelSession duel, DuelPrompt prompt, ISet<uint> repositioned)
+        {
+            int threat = StrongestAttacker(duel.Players[1 - prompt.playerId]);
+            if (threat <= 0) return null;
+            var own = duel.Players[prompt.playerId].mzone;
+            for (int i = 0; i < prompt.repositionable.Count; i++)
+            {
+                var option = prompt.repositionable[i];
+                if (option.controller != prompt.playerId || option.sequence >= own.Length || repositioned.Contains(option.sequence))
+                    continue;
+                var card = own[option.sequence];
+                // Defense Position can protect LP even when the monster will still be destroyed.
+                if (card?.IsFaceUp == true && card.IsAttack && (card.type & YgoConstants.TYPE_LINK) == 0 && card.attack < threat)
+                    return i;
+            }
+            return null;
+        }
+
+        private static bool CanWinBattle(PlayerFieldSnapshot rival, int attack) => attack > 0 &&
+            (rival.mzone.All(card => card == null) || rival.mzone.Any(card =>
+                card?.IsFaceUp == true && attack > (card.IsDefense ? card.defense : card.attack)));
+
+        private static int StrongestAttacker(PlayerFieldSnapshot rival)
+        {
+            int attack = 0;
+            foreach (var card in rival.mzone)
+                if (card?.IsFaceUp == true && card.IsAttack) attack = Math.Max(attack, card.attack);
+            return attack;
         }
     }
 }
