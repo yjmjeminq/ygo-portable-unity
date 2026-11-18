@@ -14,6 +14,7 @@ namespace YGOPortable.UI
 
         private readonly GameAppController _app;
         private readonly DuelPromptModals _modals;
+        private readonly bool _mobileLayout;
 
         private DuelSession _session;
 
@@ -196,11 +197,12 @@ namespace YGOPortable.UI
         {
         }
 
-        internal DuelFieldUI(GameAppController app, Transform canvasParent, DuelPromptModals modals, bool mobileDetails)
+        internal DuelFieldUI(GameAppController app, Transform canvasParent, DuelPromptModals modals, bool mobileLayout)
         {
             _app = app;
             _modals = modals;
-            BuildUI(canvasParent, mobileDetails);
+            _mobileLayout = mobileLayout;
+            BuildUI(canvasParent);
             _modals.SetFieldCardHitTest(IsPointOverFieldCardChoice);
             _modals.SetInspectorArtworkControl(_duelPadInspectButton);
             _modals.SetCandidateInspector(InspectCandidate);
@@ -486,7 +488,7 @@ namespace YGOPortable.UI
         }
 
 
-        private void BuildUI(Transform parent, bool mobileDetails)
+        private void BuildUI(Transform parent)
         {
             var root = LotdUiKit.FillRect("Screen_DuelField", parent);
             Root = root.gameObject;
@@ -496,8 +498,9 @@ namespace YGOPortable.UI
             ground.texture = DuelVisualAssets.Ground ?? DuelStyle.Stone;
             ground.raycastTarget = false;
 
-            BuildCenterBoard(root);
-            var arrow = LotdUiKit.CreateRect("ResponseAttackArrow", root, Vector2.one * .5f, Vector2.one * .5f,
+            var playArea = _mobileLayout ? MobileSafeArea.Create(root) : root;
+            BuildCenterBoard(playArea);
+            var arrow = LotdUiKit.CreateRect("ResponseAttackArrow", playArea, Vector2.one * .5f, Vector2.one * .5f,
                 Vector2.zero, Vector2.zero);
             _responseAttackArrow = arrow.gameObject.AddComponent<DuelEffectGraphic>();
             _responseAttackArrow.texture = Texture2D.whiteTexture;
@@ -506,13 +509,13 @@ namespace YGOPortable.UI
             _responseAttackArrow.raycastTarget = false;
             _responseAttackArrow.Seek(.66f);
             arrow.gameObject.SetActive(false);
-            BuildLeftPanel(root);
-            BuildTopHud(root);
-            BuildBottomHudAndHands(root);
-            BuildCardActions(root);
-            BuildActionPopup(root);
-            BuildCardZoomModal(root, mobileDetails);
-            BuildDuelLog(root);
+            BuildLeftPanel(playArea);
+            BuildTopHud(playArea);
+            BuildBottomHudAndHands(playArea);
+            BuildCardActions(playArea);
+            BuildActionPopup(playArea);
+            BuildCardZoomModal(root, _mobileLayout);
+            BuildDuelLog(playArea);
             Root.SetActive(false);
         }
 
@@ -2247,8 +2250,8 @@ namespace YGOPortable.UI
                 _responseAttackArrow.gameObject.SetActive(false);
                 return;
             }
-            var host = (RectTransform)Root.transform;
             var arrow = _responseAttackArrow.rectTransform;
+            var host = (RectTransform)arrow.parent;
             Vector2 from = host.InverseTransformPoint(source.root.TransformPoint(source.root.rect.center));
             Vector2 to = host.InverseTransformPoint(target.TransformPoint(target.rect.center));
             Vector2 delta = to - from;
@@ -2286,7 +2289,8 @@ namespace YGOPortable.UI
             bool defenderIsLink = defendingCard != null &&
                 new DuelCardReadout(CardDatabase.Get(defendingCard.code), defendingCard).IsLink;
             int viewer = _session.HumanPlayerIndex;
-            var readout = animator.CreateBattleReadout(BattleStatsArea, attacker, defender, viewer, attackerIsLink, defenderIsLink);
+            var readout = animator.CreateBattleReadout(BattleStatsArea, attacker, defender, viewer, attackerIsLink, defenderIsLink,
+                _mobileLayout);
             var flight = new CardFlight(card.code, from, resting, false, false);
             animator.QueueAttack(flight, hit, defender.Location == 0, attacker.Controller != viewer, readout, arrival);
         }

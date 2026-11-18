@@ -589,13 +589,13 @@ namespace YGOPortable.UI
         }
 
         internal CanvasGroup CreateBattleReadout(Rect area, BattleCardStats attacker, BattleCardStats defender,
-            int viewer, bool attackerIsLink, bool defenderIsLink)
+            int viewer, bool attackerIsLink, bool defenderIsLink, bool mobileLayout = false)
         {
             if (!attacker.IsFaceUp && !defender.IsFaceUp) return null;
             bool pair = attacker.IsFaceUp && defender.IsFaceUp;
-            float right = pair ? area.xMax : Mathf.Lerp(area.xMin, area.xMax, .62f);
-            var root = LotdUiKit.CreateRect("BattleReadout", _layer, area.min, new Vector2(right, area.yMax),
-                Vector2.zero, Vector2.zero);
+            if (!pair) area.xMax = Mathf.Lerp(area.xMin, area.xMax, .62f);
+            var root = LotdUiKit.CreateRect("BattleReadout", _layer, area.min, area.max, Vector2.zero, Vector2.zero);
+            if (mobileLayout) MobileSafeArea.Attach(root, area);
             var fade = root.gameObject.AddComponent<CanvasGroup>();
             fade.alpha = 0f;
             fade.blocksRaycasts = fade.interactable = false;

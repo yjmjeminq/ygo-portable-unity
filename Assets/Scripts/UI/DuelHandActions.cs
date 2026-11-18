@@ -340,7 +340,7 @@ namespace YGOPortable.UI
 
         private void PositionCardActions(RectTransform anchor, bool inHand)
         {
-            var root = (RectTransform)Root.transform;
+            var root = (RectTransform)_cardActionsBar.parent;
             anchor.GetWorldCorners(_cardActionCorners);
             float top = float.NegativeInfinity;
             foreach (var corner in _cardActionCorners)

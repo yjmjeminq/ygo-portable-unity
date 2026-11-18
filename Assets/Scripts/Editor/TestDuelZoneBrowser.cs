@@ -23,7 +23,7 @@ namespace YGOPortable.Editor
 
         internal static void Run()
         {
-            VerifyCardDetailsSafeArea();
+            VerifyMobileDuelSafeArea();
             int opens = 0;
             foreach (bool humanFirst in new[] { true, false })
             {
@@ -35,30 +35,107 @@ namespace YGOPortable.Editor
             Debug.Log($"[VERIFY ZONE BROWSER] {opens} successful opens. Pile tabs, inspector details, grave effect and Extra Deck summon shortcuts, privacy and effect prompt field view ({hitTest}) verified.");
         }
 
-        private static void VerifyCardDetailsSafeArea()
+        private static void VerifyMobileDuelSafeArea()
         {
-            var overlay = new GameObject("Card details safe area fixture", typeof(RectTransform));
+            const uint dragon = 89631139, attacker = 17444133;
+            var display = new Vector2Int(2400, 1080);
+            var canvas = new GameObject("Mobile Duel Safe Area", typeof(Canvas)).GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            var screen = (RectTransform)canvas.transform;
+            screen.sizeDelta = (Vector2)display;
+            using var duel = new DuelSession();
+            duel.Players[0].mzone[2] = new LiveCardState
+            {
+                code = dragon, type = YgoConstants.TYPE_MONSTER, position = YgoConstants.POS_FACEUP_ATTACK,
+                sequence = 2, location = YgoConstants.LOCATION_MZONE, level = 7, attack = 3400, defense = 2500,
+            };
+            duel.Players[1].mzone[1] = new LiveCardState
+            {
+                code = attacker, type = YgoConstants.TYPE_MONSTER, position = YgoConstants.POS_FACEUP_ATTACK,
+                controller = 1, sequence = 1, location = YgoConstants.LOCATION_MZONE, level = 4, attack = 1700, defense = 1650,
+            };
+            var modals = new DuelPromptModals(screen, null, null);
+            var field = new DuelFieldUI(null, screen, modals, mobileLayout: true);
+            CanvasGroup battle = null;
             try
             {
-                var parent = (RectTransform)overlay.transform;
-                var originalMin = parent.anchorMin;
-                var originalMax = parent.anchorMax;
-                var safeArea = typeof(DuelFieldUI).Assembly.GetType("YGOPortable.UI.MobileSafeArea", true);
-                const BindingFlags Static = BindingFlags.Static | BindingFlags.NonPublic;
-                var content = (RectTransform)safeArea.GetMethod("Create", Static).Invoke(null, new object[] { parent });
-                var apply = safeArea.GetMethod("Apply", Static);
-                var display = new Vector2Int(2400, 1080);
-                apply.Invoke(null, new object[] { content, new Rect(144, 36, 2256, 1044), display });
-                Require(Mathf.Approximately(content.anchorMin.x, .06f) && content.anchorMax == Vector2.one &&
-                    content.anchorMin.y > 0 && parent.anchorMin == originalMin && parent.anchorMax == originalMax,
-                    "The card details did not clear a left-side cutout, or moved their full-screen overlay.");
-                apply.Invoke(null, new object[] { content, new Rect(0, 36, 2256, 1044), display });
-                Require(content.anchorMin.x == 0 && Mathf.Approximately(content.anchorMax.x, .94f),
-                    "The card details retained the old inset after a landscape rotation.");
+                field.BindSession(duel, null, null);
+                var viewport = field.Root.transform.Find("MobileSafeArea");
+                var left = viewport.Find("LeftInspector");
+                var slot = (RectTransform)viewport.Find("DuelBoard/Zone_4_3");
+                var actions = (RectTransform)viewport.Find("CardActions");
+                actions.sizeDelta = new Vector2(100f, 40f);
+                slot.GetComponent<CardDragTrigger>().OnRightClick();
+                left.Find("CardPreview/Card/AspectBox/ZoomHit").GetComponent<Button>().onClick.Invoke();
+                var overlay = field.Root.transform.Find("Overlay_CardZoom");
+                var details = overlay.Find("MobileSafeArea");
+                var animator = CardAnimationManager.Ensure(canvas);
+                battle = animator.CreateBattleReadout(DuelFieldUI.BattleStatsArea,
+                    new BattleCardStats(1, YgoConstants.LOCATION_MZONE, 1, YgoConstants.POS_FACEUP_ATTACK, 1700, 1650),
+                    new BattleCardStats(0, YgoConstants.LOCATION_MZONE, 2, YgoConstants.POS_FACEUP_ATTACK, 3400, 2500),
+                    0, false, false, mobileLayout: true);
+
+                Rect Bounds(Transform node)
+                {
+                    var rect = (RectTransform)node;
+                    Vector2 min = (Vector2)screen.InverseTransformPoint(rect.TransformPoint(rect.rect.min)) - screen.rect.min;
+                    Vector2 max = (Vector2)screen.InverseTransformPoint(rect.TransformPoint(rect.rect.max)) - screen.rect.min;
+                    return Rect.MinMaxRect(min.x, min.y, max.x, max.y);
+                }
+
+                var placeActions = typeof(DuelFieldUI).GetMethod("PositionCardActions", BindingFlags.Instance | BindingFlags.NonPublic);
+                foreach (var safe in new[] { new Rect(144, 36, 2256, 1044), new Rect(0, 36, 2256, 1044) })
+                {
+                    viewport.GetComponent<MobileSafeArea>().Reflow(safe, display);
+                    details.GetComponent<MobileSafeArea>().Reflow(safe, display);
+                    battle.GetComponent<MobileSafeArea>().Reflow(safe, display);
+                    Canvas.ForceUpdateCanvases();
+                    placeActions.Invoke(field, new object[] { slot, false });
+
+                    foreach (var element in new[] { left, left.Find("CardDetails/CombatStats"), left.Find("CardDetails/Description/Viewport"),
+                        slot.Find("CardReadout"), viewport.Find("DuelBoard"), viewport.Find("PlayerHUD"), viewport.Find("OpponentHUD"),
+                        details.Find("ZoomWin"), battle.transform })
+                    {
+                        Rect bounds = Bounds(element);
+                        Require(bounds.xMin >= safe.xMin - .1f && bounds.xMax <= safe.xMax + .1f &&
+                            bounds.yMin >= safe.yMin - .1f && bounds.yMax <= safe.yMax + .1f && bounds.width > 0f,
+                            $"{element.name} intersected the device cutout or home indicator.");
+                    }
+
+                    var preview = Bounds(left);
+                    var comparison = Bounds(battle.transform);
+                    Require(Mathf.Abs(preview.xMin - comparison.xMin) < .1f && Mathf.Abs(preview.xMax - comparison.xMax) < .1f &&
+                        comparison.yMax < preview.yMin && comparison.yMin > Bounds(viewport.Find("PlayerHUD")).yMax,
+                        "The live combat comparison left its place between the inspector and player HUD.");
+                    Require(Mathf.Abs(Bounds(actions).center.x - Bounds(slot).center.x) < .1f,
+                        "The card actions lost alignment with the selected card after a layout change.");
+                    Require(Bounds(overlay).size == (Vector2)display && Bounds(field.Root.transform.Find("ArenaGround")).size == (Vector2)display,
+                        "The full-screen background or card details backdrop moved into the safe area.");
+                }
+
+                Require(left.Find("CardDetails/CombatStats/Attack/Digits/Value").GetComponent<Text>().text == "3400" &&
+                    details.Find("ZoomWin/Info/CombatStats/Attack/Digits/Value").GetComponent<Text>().text == "3400",
+                    "The mobile layout lost the selected monster's live stats.");
+                details.Find("ZoomWin/Hdr/Close/B").GetComponent<Button>().onClick.Invoke();
+                duel.AttackerCon = 1;
+                duel.AttackerLoc = duel.TargetLoc = YgoConstants.LOCATION_MZONE;
+                duel.AttackerSeq = 1;
+                duel.TargetSeq = 2;
+                typeof(DuelSession).GetProperty(nameof(DuelSession.HasActiveAttack)).SetValue(duel, true);
+                modals.ShowPrompt(duel, new DuelPrompt { messageType = YgoConstants.MSG_SELECT_EFFECTYN,
+                    promptCardCode = dragon, promptLoc = YgoConstants.LOCATION_MZONE, promptSeq = 2 });
+                field.Refresh();
+                var arrow = viewport.Find("ResponseAttackArrow");
+                Vector2 midpoint = (Bounds(viewport.Find("DuelBoard/Zone_5_1")).center + Bounds(slot).center) * .5f;
+                Require(arrow.gameObject.activeInHierarchy && Vector2.Distance(Bounds(arrow).center, midpoint) < .2f,
+                    "The response arrow ended up offset from the two cards after rotation.");
+                Debug.Log("[VERIFY DUEL SAFE AREA] Both landscape insets kept the field, live stats and card details visible and aligned.");
             }
             finally
             {
-                UnityEngine.Object.DestroyImmediate(overlay);
+                if (battle != null) UnityEngine.Object.DestroyImmediate(battle.gameObject);
+                field.UnbindSession();
+                UnityEngine.Object.DestroyImmediate(canvas.gameObject);
             }
         }
 
