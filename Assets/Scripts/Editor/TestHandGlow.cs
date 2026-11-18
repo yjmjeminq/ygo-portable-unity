@@ -402,7 +402,7 @@ namespace YGOPortable.Editor
         {
             const uint breaker = 71413901;
             const uint powerStone = 34029630;
-            const string countPath = "CardReadout/Counters/Number/Value";
+            const string countPath = "CardReadout/Labels/Counters/Number/Value";
             var empty = Array.Empty<uint>();
             var main = Enumerable.Repeat(breaker, 20).Concat(Enumerable.Repeat(powerStone, 20)).ToArray();
             var opponent = Enumerable.Repeat(BlueEyes, 40).ToArray();
@@ -460,7 +460,7 @@ namespace YGOPortable.Editor
             var trapCount = trapSlot.Find(countPath)?.GetComponent<Text>();
             var monsterCount = monsterSlot.Find(countPath)?.GetComponent<Text>();
             Require(mine.szone[trap.sequence].counterCount == 3 && monster.counterCount == 1 && monster.attack == 1900 &&
-                trapCount?.text == "◆ 3" && monsterCount?.text == "◆ 1" &&
+                trapCount?.text == "3" && monsterCount?.text == "1" &&
                 !trapSlot.Find("CardReadout/Combat").gameObject.activeSelf,
                 $"The native trap and monster counters did not match their readouts ({mine.szone[trap.sequence].counterCount}, {monster.counterCount}).");
 
@@ -968,6 +968,7 @@ namespace YGOPortable.Editor
                 }
                 const string attack = "Combat/Attack/Digits/Value", defense = "Combat/Defense/Digits/Value";
                 const string rating = "Labels/Rating/Value", status = "Labels/Status/Value";
+                const string materials = "Labels/Materials/Value", counters = "Labels/Counters/Number/Value";
                 Text Label(Transform root, string path) => root.Find(path).GetComponent<Text>();
                 const uint monster = YgoConstants.TYPE_MONSTER;
                 mine.mzone[0] = new LiveCardState
@@ -1000,13 +1001,14 @@ namespace YGOPortable.Editor
                 Field.Refresh();
                 var normalSlot = Slot("_myMZone", 0);
                 var normal = (RectTransform)normalSlot.Find("CardReadout");
-                var xyz = (RectTransform)Slot("_myMZone", 1).Find("CardReadout");
+                var xyzSlot = (RectTransform)Slot("_myMZone", 1);
+                var xyz = (RectTransform)xyzSlot.Find("CardReadout");
                 var link = (RectTransform)Slot("_emz", 0).Find("CardReadout");
                 var scale = Slot("_mySZone", 0).Find("CardReadout");
                 Require(new[] { normal, xyz, link }.All(readout => readout.gameObject.activeInHierarchy &&
                     !readout.GetComponentsInChildren<Graphic>().Any(graphic => graphic.raycastTarget)) &&
                     Label(normal, rating).text == "5" && Label(xyz, rating).text == "0" &&
-                    Label(link, rating).text == "3" && Label(xyz, status).text == "소재 2 · 무효" &&
+                    Label(link, rating).text == "3" && Label(xyz, materials).text == "2" && Label(xyz, status).text == "무효" &&
                     Label(scale, rating).text == "8" && !scale.Find("Combat").gameObject.activeSelf,
                     "The field readouts did not show the current rating, materials, effects and scale.");
                 var ratingSymbols = new[] { normal, xyz, link, scale }.Select(readout => readout.Find("Labels/Rating/Symbol").GetComponent<Image>()).ToArray();
@@ -1086,10 +1088,15 @@ namespace YGOPortable.Editor
                     "The compact readout did not have separate non-interactive attack and defense symbols.");
                 mine.mzone[1].attack = mine.mzone[1].defense = int.MaxValue;
                 mine.mzone[1].rank = 12;
+                mine.mzone[1].counterCount = 12;
+                mine.mzone[1].overlayCodes.AddRange(Enumerable.Repeat(BlueEyes, 8));
                 Field.Refresh();
 
                 var viewport = (RectTransform)Canvas.transform;
                 var originalSize = viewport.sizeDelta;
+                var applyFocus = typeof(DuelFieldUI).GetMethod("ApplyFieldCardFocus", BindingFlags.NonPublic | BindingFlags.Static);
+                var fieldSlots = (Array)typeof(DuelFieldUI).GetField("_myMZone", PrivateInstance).GetValue(Field);
+                var xyzView = fieldSlots.GetValue(1);
                 foreach (var size in new[] { new Vector2(1600, 900), new Vector2(1024, 768), new Vector2(1740, 805) })
                 {
                     viewport.sizeDelta = size;
@@ -1108,10 +1115,24 @@ namespace YGOPortable.Editor
                     VerifyStatGlyphs(Label(xyz, attack), int.MaxValue.ToString());
                     VerifyStatGlyphs(Label(xyz, defense), int.MaxValue.ToString());
                     VerifyStatGlyphs(Label(xyz, rating), "12");
-                    VerifyStatGlyphs(Label(xyz, status), "소재 2 · 무효");
-                    var rank = RectTransformUtility.CalculateRelativeRectTransformBounds(xyz, xyz.Find("Labels/Rating"));
-                    var material = RectTransformUtility.CalculateRelativeRectTransformBounds(xyz, xyz.Find("Labels/Status"));
-                    Require(rank.max.x < material.min.x, "The two-digit rank covered the material or effect status.");
+                    VerifyStatGlyphs(Label(xyz, materials), "10");
+                    VerifyStatGlyphs(Label(xyz, counters), "12");
+                    VerifyStatGlyphs(Label(xyz, status), "무효");
+
+                    applyFocus.Invoke(null, new[] { xyzView, (object)1f, 1.05f });
+                    Canvas.ForceUpdateCanvases();
+                    Bounds Chip(Transform root, string name) => RectTransformUtility.CalculateRelativeRectTransformBounds(
+                        xyzSlot, root.Find("Labels/" + name));
+                    Bounds rank = Chip(xyz, "Rating"), material = Chip(xyz, "Materials");
+                    Bounds counter = Chip(xyz, "Counters"), statusBadge = Chip(xyz, "Status");
+                    Require(xyz.Find("Labels/Counters/Symbol").GetComponent<Image>().sprite == DuelStatSymbols.Counter &&
+                        xyz.Find("Labels/Materials/Symbol").GetComponent<DuelPromptLocationIcon>() != null &&
+                        rank.max.x < material.min.x && counter.max.x < statusBadge.min.x &&
+                        Mathf.Max(counter.max.y, statusBadge.max.y) < Mathf.Min(rank.min.y, material.min.y) &&
+                        Mathf.Max(rank.max.y, material.max.y) < Chip(link, "Rating").min.y &&
+                        rank.max.y < xyzSlot.rect.yMax,
+                        "The focused readout covered another badge or the neighboring Extra Monster Zone.");
+                    applyFocus.Invoke(null, new[] { xyzView, (object)0f, 1f });
                 }
                 viewport.sizeDelta = originalSize;
 
@@ -1128,10 +1149,12 @@ namespace YGOPortable.Editor
                 mine.mzone[0].level = 0;
                 theirs.mzone[6].position = YgoConstants.POS_FACEDOWN_DEFENSE;
                 mine.mzone[1].overlayCodes.Clear();
+                mine.mzone[1].counterCount = 0;
                 Field.Refresh();
                 ExpectLinkedZones();
                 Require(!Label(normal, rating).gameObject.activeInHierarchy && !link.gameObject.activeInHierarchy &&
-                    Label(xyz, status).text == "소재 0 · 무효", "A field readout kept stale state when a card changed.");
+                    Label(xyz, materials).text == "0" && Label(xyz, status).text == "무효" &&
+                    !xyz.Find("Labels/Counters").gameObject.activeSelf, "A field readout kept stale state when a card changed.");
                 mine.mzone[0] = mine.mzone[1] = mine.mzone[2] = mine.mzone[4] = theirs.mzone[6] = mine.szone[0] = null;
                 Field.Refresh();
                 Require(!xyz.gameObject.activeInHierarchy && !scale.gameObject.activeInHierarchy,
@@ -1139,7 +1162,7 @@ namespace YGOPortable.Editor
                 typeof(DuelFieldUI).GetMethod("ResetCardInspector", PrivateInstance).Invoke(Field, null);
                 Debug.Log("[VERIFY DUEL CARD READOUT] Verified live combat stats, changing copies, ratings, scales, Link markers, face-down cards and three viewport sizes.");
                 Debug.Log("[VERIFY DUEL STAT FIT] Attack and defense icons left room for larger digits. All ten digits stayed on one line across three viewports.");
-                Debug.Log("[VERIFY DUEL RATING BADGES] Level, rank, Link and scale used distinct symbols. A live two-digit rank and status fit across three viewports.");
+                Debug.Log("[VERIFY DUEL RATING BADGES] Distinct rating, material, counter and negation badges stayed separate from the neighboring zone at full focus across three viewports.");
             }
 
             private static void VerifyStatGlyphs(Text text, string expected)
@@ -1155,14 +1178,20 @@ namespace YGOPortable.Editor
                     $"The readout omitted or wrapped a glyph in '{expected}'.");
                 Rect rect = text.GetPixelAdjustedRect();
                 var vertex = default(UIVertex);
+                float bottom = float.PositiveInfinity, top = float.NegativeInfinity;
                 for (int i = 0; i < mesh.currentVertCount; i++)
                 {
                     mesh.PopulateUIVertex(ref vertex, i);
                     Require(vertex.position.x >= rect.xMin - .1f && vertex.position.x <= rect.xMax + .1f &&
                         vertex.position.y >= rect.yMin - .1f && vertex.position.y <= rect.yMax + .1f,
                         "A readout glyph rendered outside its allotted space.");
+                    bottom = Mathf.Min(bottom, vertex.position.y);
+                    top = Mathf.Max(top, vertex.position.y);
                 }
-                var cell = (RectTransform)text.transform.parent.parent;
+                if (!text.resizeTextForBestFit)
+                    Require(top - bottom >= rect.height * .68f, "The field label left too much space unused by its glyphs.");
+                var cell = (RectTransform)text.transform.parent;
+                if (cell.name is "Digits" or "Number") cell = (RectTransform)cell.parent;
                 Require(rect.height / cell.rect.height > .78f, "The compact readout did not give its text most of the available height.");
             }
 

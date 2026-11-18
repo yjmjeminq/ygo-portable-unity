@@ -1126,8 +1126,9 @@ namespace YGOPortable.Editor
                 Require(hidden.Find("CardBack").gameObject.activeSelf && hidden.Find("CardReadout") == null &&
                         material.Find($"{card}/CardReadout") == null,
                     "A hidden card or Xyz material exposed the live stats of a field monster.");
-                Require(second.Find($"{card}/{counters}/Number/Value").GetComponent<Text>().text == "◆ 2" &&
-                        trap.Find($"{counters}/Number/Value").GetComponent<Text>().text == "◆ 3" &&
+                Require(second.Find($"{card}/{counters}/Number/Value").GetComponent<Text>().text == "2" &&
+                        trap.Find($"{counters}/Number/Value").GetComponent<Text>().text == "3" &&
+                        trap.Find($"{counters}/Symbol").GetComponent<Image>().sprite == DuelStatSymbols.Counter &&
                         !trap.Find("CardReadout/Combat").gameObject.activeSelf,
                     "The selection list lost the monster or trap counter count.");
 

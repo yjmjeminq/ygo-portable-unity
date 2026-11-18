@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using YGOPortable.Core;
@@ -37,6 +38,8 @@ namespace YGOPortable.UI
         internal int Materials => Live?.overlayCodes.Count ?? 0;
         internal uint CounterCount => Live?.counterCount ?? 0;
         internal bool Disabled => Live?.effectsDisabled == true;
+        internal bool HasMaterials => Live != null && (IsXyz || Materials > 0);
+        internal bool IsToken => (Type & YgoConstants.TYPE_TOKEN) != 0;
 
         internal uint? ScaleIn(uint location, uint sequence) =>
             location == YgoConstants.LOCATION_SZONE && IsScale && sequence is 0 or 4
@@ -74,8 +77,7 @@ namespace YGOPortable.UI
         {
             get
             {
-                string badge = Live != null && (IsXyz || Materials > 0) ? $"소재 {Materials}" :
-                    (Type & YgoConstants.TYPE_TOKEN) != 0 ? "토큰" : "";
+                string badge = HasMaterials ? $"소재 {Materials}" : IsToken ? "토큰" : "";
                 if (!Disabled) return badge;
                 return badge.Length == 0 ? "효과 무효" : $"{badge} · 무효";
             }
@@ -237,23 +239,28 @@ namespace YGOPortable.UI
         {
             if (!IsActive() || mesh.currentVertCount == 0) return;
             Rect rect = graphic.GetPixelAdjustedRect();
-            if (rect.width <= 0f) return;
-            float min = float.PositiveInfinity, max = float.NegativeInfinity;
+            if (rect.width <= 0f || rect.height <= 0f) return;
+            var min = Vector2.positiveInfinity;
+            var max = Vector2.negativeInfinity;
             var vertex = default(UIVertex);
             for (int i = 0; i < mesh.currentVertCount; i++)
             {
                 mesh.PopulateUIVertex(ref vertex, i);
-                min = Mathf.Min(min, vertex.position.x);
-                max = Mathf.Max(max, vertex.position.x);
+                min = Vector2.Min(min, vertex.position);
+                max = Vector2.Max(max, vertex.position);
             }
-            float width = max - min;
-            if (width <= 0f || min >= rect.xMin && max <= rect.xMax) return;
-            float center = (min + max) * .5f;
-            float scale = Mathf.Min(1f, rect.width / width);
+            Vector2 size = max - min;
+            bool fitWidth = size.x > 0f && (min.x < rect.xMin || max.x > rect.xMax);
+            bool fitHeight = size.y > 0f && (min.y < rect.yMin || max.y > rect.yMax);
+            if (!fitWidth && !fitHeight) return;
+            Vector2 center = (min + max) * .5f;
+            float scaleX = fitWidth ? Mathf.Min(1f, rect.width / size.x) : 1f;
+            float scaleY = fitHeight ? Mathf.Min(1f, rect.height / size.y) : 1f;
             for (int i = 0; i < mesh.currentVertCount; i++)
             {
                 mesh.PopulateUIVertex(ref vertex, i);
-                vertex.position.x = rect.center.x + (vertex.position.x - center) * scale;
+                if (fitWidth) vertex.position.x = rect.center.x + (vertex.position.x - center.x) * scaleX;
+                if (fitHeight) vertex.position.y = rect.center.y + (vertex.position.y - center.y) * scaleY;
                 mesh.SetUIVertex(vertex, i);
             }
         }
@@ -263,7 +270,10 @@ namespace YGOPortable.UI
     {
         private static Sprite _blade;
         private static Sprite _shield;
+        private static Sprite _counter;
         private static readonly Sprite[] RatingSprites = new Sprite[(int)DuelRatingKind.Scale + 1];
+
+        internal static Sprite Counter => _counter != null ? _counter : (_counter = Build("Duel Counter Symbol", InsideCounter));
 
         internal static Sprite Get(bool defense)
         {
@@ -359,6 +369,10 @@ namespace YGOPortable.UI
             float height = Mathf.Abs(y);
             return height <= .41f && Mathf.Abs(x) <= .065f + height * .83f;
         }
+
+        private static bool InsideCounter(float x, float y) =>
+            x * x + (y - .21f) * (y - .21f) <= .027f ||
+            (Mathf.Abs(x) - .20f) * (Mathf.Abs(x) - .20f) + (y + .17f) * (y + .17f) <= .027f;
     }
 
     internal sealed class DuelLinkCompass
@@ -443,11 +457,22 @@ namespace YGOPortable.UI
             Root = root;
             _compact = compact;
             DuelReadoutPlate.Add(root, Backing);
-            var digits = LotdUiKit.CreateRect("Number", root, new Vector2(.06f, 0f), new Vector2(.94f, 1f),
+            if (compact)
+            {
+                var icon = LotdUiKit.CreateRect("Symbol", root, new Vector2(.04f, .08f), new Vector2(.41f, .92f),
+                    Vector2.zero, Vector2.zero);
+                LotdUiKit.AddImage(icon.gameObject, DuelStatSymbols.Counter, Ink, true, false);
+            }
+            var digits = LotdUiKit.CreateRect("Number", root, new Vector2(compact ? .42f : .06f, 0f), new Vector2(.95f, 1f),
                 Vector2.zero, Vector2.zero);
-            _value = LotdUiKit.AddFittedText(digits, "Value", "", compact ? 14 : 16, 8,
+            _value = LotdUiKit.AddFittedText(digits, "Value", "", compact ? 19 : 16, 8,
                 TextAnchor.MiddleCenter, Ink, FontStyle.Bold);
             _value.horizontalOverflow = HorizontalWrapMode.Overflow;
+            if (compact)
+            {
+                _value.resizeTextForBestFit = false;
+                _value.verticalOverflow = VerticalWrapMode.Overflow;
+            }
             _value.gameObject.AddComponent<DuelStatDigitFit>();
             Bind(0);
         }
@@ -455,7 +480,7 @@ namespace YGOPortable.UI
         internal void Bind(uint count, bool showChanges = false)
         {
             bool visible = count != 0;
-            string next = !visible ? "" : _compact ? $"◆ {count}" : $"카운터 {count}개";
+            string next = !visible ? "" : _compact ? count.ToString() : $"카운터 {count}개";
             Root.gameObject.SetActive(visible);
             if (!showChanges || !visible) DuelReadoutPulse.Cancel(Root);
             else if (_value.text != next) DuelReadoutPulse.Play(Root, Ink);
@@ -468,6 +493,8 @@ namespace YGOPortable.UI
         private static readonly Color Backing = new Color(.045f, .068f, .085f, .96f);
         private static readonly Color RankColor = new Color(.91f, .75f, 1f);
         private static readonly Color ScaleColor = new Color(.60f, 1f, .83f);
+        private static readonly Color MaterialColor = new Color(.80f, .89f, 1f);
+        private static readonly Color DisabledColor = new Color(1f, .65f, .58f);
         private readonly RectTransform _root;
         private readonly RectTransform _combat;
         private readonly RectTransform _labels;
@@ -476,6 +503,8 @@ namespace YGOPortable.UI
         private readonly Image _ratingIcon;
         private readonly Text _status;
         private readonly bool _inPreview;
+        private readonly List<(RectTransform Rect, float Width)> _fieldLabels;
+        private Text _materials;
         private DuelCounterBadge _counters;
         private (uint Code, bool Opponent) _lastCard;
 
@@ -484,18 +513,16 @@ namespace YGOPortable.UI
         internal DuelFieldReadout(Transform slot, bool inPreview = false)
         {
             _inPreview = inPreview;
+            _fieldLabels = inPreview ? null : new(4);
             _root = LotdUiKit.FillRect("CardReadout", slot);
             _combat = LotdUiKit.FillRect("Combat", _root);
             _stats = new DuelStatStrip(_combat, compact: true);
             _labels = LotdUiKit.FillRect("Labels", _root);
             // Leave room for the selection check on choice cards.
             _rating = CreateLabel("Rating", .035f, .355f, 19);
-            _rating.rectTransform.anchorMin = new Vector2(.435f, .04f);
-            _rating.rectTransform.anchorMax = new Vector2(.96f, .96f);
-            var icon = LotdUiKit.CreateRect("Symbol", _rating.transform.parent, new Vector2(.055f, .10f),
-                new Vector2(.435f, .90f), Vector2.zero, Vector2.zero);
+            var icon = CreateLabelSymbol(_rating);
             _ratingIcon = LotdUiKit.AddImage(icon.gameObject, null, Color.white, true, false);
-            _status = CreateLabel("Status", .372f, inPreview ? .79f : .965f, 13);
+            _status = CreateLabel("Status", .372f, inPreview ? .79f : .965f, inPreview ? 13 : 16);
             if (inPreview)
             {
                 _combat.anchorMin = new Vector2(.03f, 0f);
@@ -516,8 +543,22 @@ namespace YGOPortable.UI
             DuelReadoutPlate.Add(chip, Backing);
             var value = LotdUiKit.AddFittedText(chip, "Value", "", size, 8, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
             value.horizontalOverflow = HorizontalWrapMode.Overflow;
+            if (!_inPreview)
+            {
+                // Fit the painted glyphs so line spacing does not shrink short field labels.
+                value.resizeTextForBestFit = false;
+                value.verticalOverflow = VerticalWrapMode.Overflow;
+            }
             value.gameObject.AddComponent<DuelStatDigitFit>();
             return value;
+        }
+
+        private static RectTransform CreateLabelSymbol(Text label)
+        {
+            label.rectTransform.anchorMin = new Vector2(.435f, .04f);
+            label.rectTransform.anchorMax = new Vector2(.96f, .96f);
+            return LotdUiKit.CreateRect("Symbol", label.transform.parent, new Vector2(.055f, .10f),
+                new Vector2(.435f, .90f), Vector2.zero, Vector2.zero);
         }
 
         internal void Hide() => _root.gameObject.SetActive(false);
@@ -527,6 +568,22 @@ namespace YGOPortable.UI
             if (_root.anchoredPosition != lift) _root.anchoredPosition = lift;
             var size = Vector3.one * scale;
             if (_root.localScale != size) _root.localScale = size;
+
+            if (_inPreview) return;
+            KeepLaneInSlot(_combat);
+            KeepLaneInSlot(_labels);
+
+            void KeepLaneInSlot(RectTransform lane)
+            {
+                // Follow the raised card up to the slot edge so an adjacent card's badges stay visible.
+                float height = _root.rect.height;
+                float edge = height * .492f;
+                float bottom = (lane.anchorMin.y - .5f) * height * scale + lift.y;
+                float top = (lane.anchorMax.y - .5f) * height * scale + lift.y;
+                var offset = Vector2.up * (Mathf.Clamp(0f, -edge - bottom, edge - top) / scale);
+                if (lane.offsetMin != offset) lane.offsetMin = offset;
+                if (lane.offsetMax != offset) lane.offsetMax = offset;
+            }
         }
 
         internal void Bind(DuelCardReadout card, bool opponent, uint? scale, uint? position = null)
@@ -539,14 +596,29 @@ namespace YGOPortable.UI
             {
                 _combat.anchorMin = new Vector2(.03f, opponent ? .715f : .015f);
                 _combat.anchorMax = new Vector2(.97f, opponent ? .985f : .285f);
-                _labels.anchorMin = new Vector2(0f, opponent ? .025f : .765f);
-                _labels.anchorMax = new Vector2(1f, opponent ? .235f : .975f);
             }
             _stats.Bind(card, opponent, showChanges, position);
-            BindRating(scale.HasValue ? (DuelRatingKind.Scale, scale.Value) : card.RatingNumber, showChanges);
-            SetLabel(_status, card.Status,
-                card.Disabled ? new Color(1f, .65f, .58f) : DuelStyle.Muted, showChanges);
-            BindCounters(card.CounterCount, opponent, showChanges);
+            var rating = scale.HasValue ? (DuelRatingKind.Scale, scale.Value) : card.RatingNumber;
+            BindRating(rating, showChanges);
+            BindCounters(card.CounterCount, showChanges);
+            if (_inPreview)
+            {
+                SetLabel(_status, card.Status, card.Disabled ? DisabledColor : DuelStyle.Muted, showChanges);
+                return;
+            }
+
+            if (card.HasMaterials && _materials == null)
+            {
+                _materials = CreateLabel("Materials", 0f, 1f, 19);
+                var symbol = CreateLabelSymbol(_materials);
+                DuelPromptLocationIcon.Add(symbol, YgoConstants.LOCATION_OVERLAY, false, glyphOnly: true).color = MaterialColor;
+            }
+            if (_materials != null)
+                SetLabel(_materials, card.HasMaterials ? card.Materials.ToString() : "", MaterialColor, showChanges);
+            string status = card.IsToken ? "토큰" : "";
+            if (card.Disabled) status = card.IsToken ? "토큰 · 무효" : "무효";
+            SetLabel(_status, status, card.Disabled ? DisabledColor : DuelStyle.Muted, showChanges);
+            LayoutFieldLabels(rating.Value, card.Materials, card.CounterCount, status.Length > 2, opponent);
         }
 
         private void BindRating((DuelRatingKind Kind, uint Value) rating, bool showChanges)
@@ -559,31 +631,70 @@ namespace YGOPortable.UI
                 DuelRatingKind.Scale => ScaleColor,
                 _ => DuelStyle.Gold,
             };
-            float right = (_inPreview ? .315f : .355f) + (rating.Value >= 10 ? .065f : 0f);
-            var badge = (RectTransform)_rating.transform.parent;
-            badge.anchorMax = new Vector2(right, 1f);
-            ((RectTransform)_status.transform.parent).anchorMin = new Vector2(visible ? right + .017f : .035f, 0f);
+            if (_inPreview)
+            {
+                float right = .315f + (rating.Value >= 10 ? .065f : 0f);
+                ((RectTransform)_rating.transform.parent).anchorMax = new Vector2(right, 1f);
+                ((RectTransform)_status.transform.parent).anchorMin = new Vector2(visible ? right + .017f : .035f, 0f);
+            }
             _ratingIcon.sprite = DuelStatSymbols.Rating(rating.Kind);
             _ratingIcon.color = color;
             SetLabel(_rating, visible ? rating.Value.ToString() : "", color, showChanges);
         }
 
-        private void BindCounters(uint count, bool opponent, bool showChanges)
+        private void BindCounters(uint count, bool showChanges)
         {
-            if (_counters == null)
+            if (_counters == null && count != 0)
             {
-                if (count == 0) return;
-                var chip = LotdUiKit.CreateRect("Counters", _root,
-                    new Vector2(_inPreview ? .38f : .50f, 1f), new Vector2(_inPreview ? .79f : .965f, 1f),
-                    new Vector2(0f, _inPreview ? -44f : 0f), new Vector2(0f, _inPreview ? -25f : 0f));
+                var chip = _inPreview
+                    ? LotdUiKit.CreateRect("Counters", _root, new Vector2(.38f, 1f), new Vector2(.79f, 1f),
+                        new Vector2(0f, -44f), new Vector2(0f, -25f))
+                    : LotdUiKit.FillRect("Counters", _labels);
                 _counters = new DuelCounterBadge(chip, compact: true);
             }
-            if (!_inPreview)
+            _counters?.Bind(count, showChanges);
+        }
+
+        private void LayoutFieldLabels(uint rating, int materials, uint counters, bool longStatus, bool opponent)
+        {
+            _fieldLabels.Clear();
+            Add((RectTransform)_rating.transform.parent, rating >= 10 ? .38f : .295f);
+            Add(_materials?.transform.parent as RectTransform, materials >= 10 ? .37f : .28f);
+            Add(_counters?.Root, counters >= 10 ? .37f : .28f);
+            Add((RectTransform)_status.transform.parent, longStatus ? .50f : .31f);
+
+            bool twoRows = _fieldLabels.Count == 4;
+            _labels.anchorMin = new Vector2(0f, opponent ? .025f : twoRows ? .548f : .765f);
+            _labels.anchorMax = new Vector2(1f, opponent ? twoRows ? .452f : .235f : .975f);
+            if (twoRows)
             {
-                _counters.Root.anchorMin = new Vector2(.50f, opponent ? .245f : .545f);
-                _counters.Root.anchorMax = new Vector2(.965f, opponent ? .455f : .755f);
+                PlaceRow(0, 2, opponent ? 0f : .515f, opponent ? .485f : 1f);
+                PlaceRow(2, 2, opponent ? .515f : 0f, opponent ? 1f : .485f);
             }
-            _counters.Bind(count, showChanges);
+            else PlaceRow(0, _fieldLabels.Count, 0f, 1f);
+
+            void Add(RectTransform chip, float width)
+            {
+                if (chip != null && chip.gameObject.activeSelf) _fieldLabels.Add((chip, width));
+            }
+
+            void PlaceRow(int first, int count, float bottom, float top)
+            {
+                const float edge = .035f, gap = .017f;
+                if (count == 0) return;
+                float width = 0f;
+                for (int i = first; i < first + count; i++) width += _fieldLabels[i].Width;
+                float fit = Mathf.Min(1f, (1f - 2f * edge - gap * (count - 1)) / width);
+                float x = edge;
+                for (int i = first; i < first + count; i++)
+                {
+                    var badge = _fieldLabels[i];
+                    badge.Rect.anchorMin = new Vector2(x, bottom);
+                    x += badge.Width * fit;
+                    badge.Rect.anchorMax = new Vector2(x, top);
+                    x += gap;
+                }
+            }
         }
 
         private static void SetLabel(Text label, string content, Color color, bool showChanges)
