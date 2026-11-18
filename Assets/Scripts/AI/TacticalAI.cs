@@ -17,6 +17,7 @@ namespace YGOPortable.AI
     {
         public AIDifficulty Difficulty { get; set; } = AIDifficulty.Smart;
         internal bool UsesTrainedPolicy => Difficulty == AIDifficulty.Smart && _policy != null;
+        internal bool HasLinkPolicy => Difficulty == AIDifficulty.Smart && _linkPolicy != null;
         private bool UsesTacticalRules => Difficulty == AIDifficulty.Smart && _tacticalRules;
 
         private const uint TrickstarLightStage = 35371948;
@@ -35,16 +36,20 @@ namespace YGOPortable.AI
         private int _battleActions;
         private int _unselectCount;
         private uint _attackerSequence = uint.MaxValue;
+        private uint _linkSummon;
+        private bool? _linkDeck;
         private readonly Dictionary<string, int> _effectCounts = new Dictionary<string, int>();
         private readonly HashSet<uint> _repositionedSeqs = new HashSet<uint>();
         private readonly DuelAiPolicy _policy;
+        private readonly LinkComboPolicy _linkPolicy;
         private readonly bool _tacticalRules;
 
         public TacticalAI() { }
 
-        internal TacticalAI(DuelAiPolicy policy)
+        internal TacticalAI(DuelAiPolicy policy, LinkComboPolicy linkPolicy = null)
         {
             _policy = policy;
+            _linkPolicy = linkPolicy;
             _tacticalRules = true;
         }
 
@@ -57,6 +62,7 @@ namespace YGOPortable.AI
                 _battleActions = 0;
                 _unselectCount = 0;
                 _attackerSequence = uint.MaxValue;
+                _linkSummon = 0;
                 _effectCounts.Clear();
                 _repositionedSeqs.Clear();
             }
@@ -104,7 +110,7 @@ namespace YGOPortable.AI
 
                 case YgoConstants.MSG_SELECT_PLACE:
                 case YgoConstants.MSG_SELECT_DISFIELD:
-                    return BuildSelectPlace(prompt);
+                    return BuildSelectPlace(session, prompt);
 
                 case YgoConstants.MSG_SELECT_POSITION:
                     return BitConverter.GetBytes((UsesTacticalRules ? DuelTactics.ChoosePosition(session, prompt) : null) ?? PickPosition(prompt));
@@ -144,7 +150,11 @@ namespace YGOPortable.AI
         {
             _unselectCount = 0;
             _actionsThisTurn++;
+            _linkSummon = 0;
+            var own = s.Players[p.playerId];
+            bool planLinks = HasLinkPolicy && (_linkDeck ??= LinkComboPolicy.FitsDeck(own));
             bool CanUse(int command, SelectableCardItem item) => CanUseIdleAction(s, command, item) &&
+                (command != 1 || !planLinks || LinkComboPolicy.CanUseSummon(own, item)) &&
                 (command != 5 || (CanActivate(s, p, item) && CanPlayFieldSpell(s, p, item)));
 
             if (fallback || _actionsThisTurn > 42)
@@ -152,7 +162,7 @@ namespace YGOPortable.AI
                 if (p.canBp && HasWorthwhileAttack(s, p.playerId)) return BitConverter.GetBytes(6);
                 if (p.canEp) return BitConverter.GetBytes(7);
             }
-            else if (ChoosePlannedIdle(s, p, CanUse) is int planned)
+            else if (((planLinks ? _linkPolicy.Choose(s, p, CanUse) : null) ?? ChoosePlannedIdle(s, p, CanUse)) is int planned)
             {
                 return EncodeIdleAction(s, p, planned & 0xffff, planned >> 16);
             }
@@ -358,6 +368,8 @@ namespace YGOPortable.AI
             if (command == 1 || command == 5)
             {
                 var item = command == 1 ? prompt.spSummonable[index] : prompt.activatable[index];
+                if (_linkDeck == true && command == 1 && item.location == YgoConstants.LOCATION_EXTRA && LinkComboPolicy.Rank(item.code) > 0)
+                    _linkSummon = item.code;
                 BumpKey(IdleActionKey(session, command, item));
             }
             return BitConverter.GetBytes((index << 16) | command);
@@ -514,7 +526,8 @@ namespace YGOPortable.AI
             }
 
             if (p.min == 1 && p.max == 1 &&
-                (DddTurnPlan.ChooseCard(s, p) ?? LinkTurnPlan.ChooseCard(s, p) ??
+                ((_linkDeck == true ? LinkComboPolicy.ChooseSupport(s, p) ?? LinkComboPolicy.ChooseMaterial(s, p, _linkSummon) : null) ??
+                DddTurnPlan.ChooseCard(s, p) ?? LinkTurnPlan.ChooseCard(s, p) ??
                 SynchroTurnPlan.ChooseCard(s, p) ?? FusionXyzTurnPlan.ChooseCard(s, p)) is int planned)
                 return PackIndexList(new[] { planned });
 
@@ -569,7 +582,8 @@ namespace YGOPortable.AI
             }
             if (p.candidates.Count > 0)
             {
-                if ((DddTurnPlan.ChooseScale(s, p) ?? LinkTurnPlan.ChooseLinkMaterial(s, p) ??
+                if (((_linkDeck == true ? LinkComboPolicy.ChooseMaterial(s, p, _linkSummon) : null) ??
+                    DddTurnPlan.ChooseScale(s, p) ?? LinkTurnPlan.ChooseLinkMaterial(s, p) ??
                     FusionXyzTurnPlan.ChooseLinkMaterial(s, p)) is int material)
                     return PackTwoInts(1, material);
 
@@ -711,12 +725,15 @@ namespace YGOPortable.AI
             return Dfs(0, mSumMin, mSumMax, mSmallest);
         }
 
-        private byte[] BuildSelectPlace(DuelPrompt p)
+        private byte[] BuildSelectPlace(DuelSession session, DuelPrompt p)
         {
             int needed = Math.Max(1, (int)p.min);
             uint avail = ~p.placeFlag;
             byte me = p.playerId;
             byte opp = (byte)(1 - me);
+            if (_linkDeck == true && session.TurnPlayer == me && needed == 1 && p.messageType == YgoConstants.MSG_SELECT_PLACE &&
+                LinkComboPolicy.ChooseMonsterZone(session.Players[me], avail & 0x7f, _linkSummon) is int zone)
+                return new[] { me, (byte)YgoConstants.LOCATION_MZONE, (byte)zone };
             var resp = new List<byte>(needed * 3);
 
             int[] mOrder = { 5, 6, 2, 1, 3, 0, 4 };

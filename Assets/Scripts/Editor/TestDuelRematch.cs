@@ -36,7 +36,7 @@ namespace YGOPortable.Editor
                 Require(firstDuel.NativePtr != IntPtr.Zero && !firstDuel.IsFinished && firstDuel.HumanPlayerIndex == 1,
                     "The first duel did not start with the AI going first.");
                 firstAi.Difficulty = AIDifficulty.Smart;
-                Require(firstAi.UsesTrainedPolicy, "The gameplay opponent could not use the included policy.");
+                Require(firstAi.UsesTrainedPolicy && firstAi.HasLinkPolicy, "The gameplay opponent could not load the included duel policies.");
                 firstAi.Difficulty = AIDifficulty.Normal;
 
                 // Exhaust this optional effect's per-turn allowance without submitting a synthetic prompt to the core.
