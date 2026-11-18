@@ -192,6 +192,13 @@ namespace YGOPortable.Editor
 
             CardDatabase.Load(streaming);
             AssertTrue(CardDatabase.AllCards.Count >= 14000, "CardDatabase count too low");
+            var withoutKorean = CardDatabase.AllCards.FirstOrDefault(card => CardDatabase.GetKoreanCardDescription(card.code) == null);
+            AssertTrue(withoutKorean == null, $"Missing Korean rules text for card {withoutKorean?.code}");
+            var gearfried = CardDatabase.Get(423705);
+            var alternateGearfried = CardDatabase.Get(423706);
+            AssertTrue(gearfried != null && alternateGearfried != null &&
+                alternateGearfried.name == gearfried.name && alternateGearfried.desc == gearfried.desc,
+                "A Gearfried illustration did not inherit the Korean text of the identical card.");
             AssertTrue(CardDatabase.ResolveDescription((81497285UL << 20) | 1) == "덱에서 이름이 다른 일반 함정 카드 1장을 세트한다",
                 "Could not resolve the Labrynth Lady's encoded effect description");
             AssertTrue(CardDatabase.ResolveDescription(71) == "마법 카드" && CardDatabase.ResolveDescription(72) == "함정 카드",

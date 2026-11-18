@@ -1,0 +1,841 @@
+{
+  "names": {
+    "@Ignister Token": "＠이그니스터 토큰",
+    "Absolute King - Megaplunder": "절대왕 메가플런더",
+    "Adventurer Token": "용사 토큰",
+    "Alien Token": "에이리언 토큰",
+    "Alligator Token": "앨리게이터 토큰",
+    "Ancient Gear Token": "앤틱 기어 토큰",
+    "Ancient Warriors Token": "전황 토큰",
+    "Angelechy Bastion": "엔젤레키 바스티온",
+    "Angelechy Destrier": "엔젤레키 데스트리어",
+    "Angelechy Disturbance": "엔젤레키 디스터번스",
+    "Angelechy Enlisted": "엔젤레키 엔리스티드",
+    "Angelechy Opening to e4": "엔젤레키 오프닝 e4",
+    "Angelechy Problem": "엔젤레키 프로블럼",
+    "Angelechy Shatranga": "엔젤레키 샤트랑가",
+    "Anotherverse Gluttonia": "어나더버스 글러토니아",
+    "Anotherverse Solaria": "어나더버스 솔라리아",
+    "Arc Token": "아크 토큰",
+    "Archfiend's Origin": "데몬의 기원",
+    "ARG☆S－GiantKilling": "ARG☆S－자이언트 킬링",
+    "ARG☆S－HomeStadium": "ARG☆S－홈 스타디움",
+    "Armament Reincarnation Token": "무장전생 토큰",
+    "Army Ant Token": "군대개미 토큰",
+    "Asmo Token": "아스모 토큰",
+    "Baby Mantis Token": "새끼 사마귀 토큰",
+    "Batteryman Token": "전지맨 토큰",
+    "Battle Eagle Token": "배틀 이글 토큰",
+    "Beetrooper Token": "비틀트루퍼 토큰",
+    "Bellcat Token": "벨캣 토큰",
+    "Big Inflate Dragon": "빅 인플레이트 드래곤",
+    "BIG Win!?": "빅 윈!?",
+    "Black Jack the Shadow-Armored Knight": "그림자 갑옷 기사 블랙 잭",
+    "Black Rose Dragon/Assault Mode": "블랙 로즈 드래곤 / 버스터",
+    "Black Sheep Token": "검은 양 토큰",
+    "Blackwing - Black Crest Token": "BF－흑염 토큰",
+    "Block Token": "블록 토큰",
+    "Bomb Token": "폭탄 토큰",
+    "Capsule Monster Chess": "캡슐 몬스터 체스",
+    "Centur-Ion Token": "센츄리온 토큰",
+    "Ceremonial Token": "의례 토큰",
+    "Cerynemesia, Mystical Beast of the Forest": "숲의 성수 케리네메시아",
+    "Chewbone Jr. Token": "본체 Jr. 토큰",
+    "Clock Token": "클록 토큰",
+    "Clone Token": "클론 토큰",
+    "Cloudian Token": "운마물 토큰",
+    "Clown Crew Cappello": "클라운 크루 카펠로",
+    "Compass Token": "컴퍼스 토큰",
+    "Congester Token": "콘제스터 토큰",
+    "Crystal Beast Token": "보옥수 토큰",
+    "Crystron Token": "크리스트론 토큰",
+    "Cyberse Gadget Token": "사이버스 가젯 토큰",
+    "Cyberse Token": "사이버스 토큰",
+    "Cynet Token": "사이넷 토큰",
+    "D3": "D3(디큐빅)",
+    "Dark Beast Token": "어둠의 야수 토큰",
+    "Dark Creator Token": "다크 크리에이터 토큰",
+    "Dark Sanctuary Token": "다크 생츄어리 토큰",
+    "Dark Soul Token": "다크 소울 토큰",
+    "Darklord Token": "타락천사 토큰",
+    "Data Acorn Token": "데이터 도토리 토큰",
+    "Data Token": "데이터 토큰",
+    "Decoy": "디코이",
+    "Delta Token": "델타 토큰",
+    "Destined Duel": "운명의 듀얼",
+    "Deus Token": "데우스 토큰",
+    "Diagram Token": "다이어그램 토큰",
+    "Dinomorphia Token": "다이놀피어 토큰",
+    "Distrust Paranoia": "불신의 편집증",
+    "Divine Dragon Token": "신룡 토큰",
+    "DOG Fighter Token": "DOG 파이터 토큰",
+    "Doomsday Token": "종언의 토큰",
+    "Doppel Token": "도플 토큰",
+    "Doppelganger Token": "도플갱어 토큰",
+    "Double Dude Token": "더블 가이 토큰",
+    "Dragon Lord Token": "드래곤로드 토큰",
+    "Dragon Token": "드래곤 토큰",
+    "Dragonic Token": "드래고닉 토큰",
+    "Dragonoid Token": "드래고노이드 토큰",
+    "Dual Avatar Spirit Token": "쌍천혼 토큰",
+    "Duel Dragon Token": "듀얼 드래곤 토큰",
+    "Early Palm Gets the Win": "선수를 치면 승리",
+    "Ebisu Shinsen Matsuri": "에비스 신선 축제",
+    "Ebisu Token": "에비스 토큰",
+    "Einherjar Token": "에인헤랴르 토큰",
+    "Elfnote Seraphim Token": "엘프노트 세라핌 토큰",
+    "Emissary of Darkness Token": "명왕의 사자 토큰",
+    "Engine Token": "엔진 토큰",
+    "Epigonos Token": "에피고노스 토큰",
+    "Escapegoat Token": "이스케이프고트 토큰",
+    "Eva Token": "이바 토큰",
+    "Evil Lord - Zorc": "사신 조크",
+    "Evil Token": "이블 토큰",
+    "Fallin' Cheatah": "폴린 치타",
+    "Familiar of the Evil Eye Token": "주안의 권속 토큰",
+    "Fiendsmith Token": "데먼스미스 토큰",
+    "Fire Token": "화염 토큰",
+    "Fireball Token": "파이어볼 토큰",
+    "Five-Headed Dragon": "파이브 갓 드래곤",
+    "Fluff Token": "플러프 토큰",
+    "Fluffal Token": "퍼니멀 토큰",
+    "Fox Token": "여우 토큰",
+    "Frost Tiger": "프로스트 타이거",
+    "Full Moon Mirror": "보름달 거울",
+    "G Golem Token": "G골렘 토큰",
+    "G-Golem Token": "G골렘 토큰",
+    "Gadget Box Token": "가젯 박스 토큰",
+    "Gadget Token": "가젯 토큰",
+    "Generaider Token": "제너레이드 토큰",
+    "Ghost Token": "유령 토큰",
+    "Gift Fiend Token": "기프트 데몬 토큰",
+    "GMX－ALLOS": "GMX－알로스",
+    "GMX－COMPREX": "GMX－컴프렉스",
+    "GMX－VELOX": "GMX－벨록스",
+    "Gold Pride Token": "골드 프라이드 토큰",
+    "Gouki Token": "강귀 토큰",
+    "Grinder Token": "토치 토큰",
+    "Guivre": "기브르",
+    "Haunted Token": "망령 토큰",
+    "Hippo Token": "하마 토큰",
+    "Homunculus Token": "호문쿨루스 토큰",
+    "Horseytail Token": "호스테일 토큰",
+    "Hundred Apples Token": "백사과 토큰",
+    "Ice Barrier Token": "빙결계 토큰",
+    "Ice Coffin Token": "빙관 토큰",
+    "Ice Pillar Token": "얼음기둥 토큰",
+    "Icebarrie Token": "빙결계 토큰",
+    "Iceblade Token": "빙검 토큰",
+    "Icejade Token": "빙수 토큰",
+    "Ilios the Black Sun Dragon": "흑태양룡 일리오스",
+    "Imposter Shift": "임포스터 시프트",
+    "Imposter Token": "임포스터 토큰",
+    "Infernoid Token": "인페르노이드 토큰",
+    "Insect Monster Token": "곤충 몬스터 토큰",
+    "Iron Rubble Token": "철 부스러기 토큰",
+    "Ivy Token": "아이비 토큰",
+    "Jurrac Token": "쥬락 토큰",
+    "Jurraegg Token": "쥬락 에그 토큰",
+    "K9－EX “Ripper / M”": "K9－EX “리퍼 / M”",
+    "K9－EX “Werewolf”": "K9－EX “웨어울프”",
+    "Kagemusha Raccoon Token": "분신 너구리 토큰",
+    "Kahyoki Token": "화빙천화 토큰",
+    "Koa'ki Meiru Token": "코아키메일 토큰",
+    "Kuriboh Token": "크리보 토큰",
+    "Lamb Token": "새끼 양 토큰",
+    "Lamia Token": "라미아 토큰",
+    "Lamp Token": "램프 토큰",
+    "Laval Token": "라바르 토큰",
+    "Legendary Dueling Field": "전설의 듀얼 필드",
+    "Lekunga Token": "레쿤가 토큰",
+    "Light Beast Token": "빛의 야수 토큰",
+    "Link Token": "링크 토큰",
+    "Long-Tailed Black Horse": "긴 꼬리의 검은 말",
+    "Lunalight Scarlet Tiger": "문라이트 스칼렛 타이거",
+    "Lunalight Token": "문라이트 토큰",
+    "Machine Token": "기계 토큰",
+    "Maize Token": "옥수수 토큰",
+    "Makourai, the Lightning Strike": "뇌격의 마코라이",
+    "Maliss in Underground": "M∀LICE(맬리스) 인 언더그라운드",
+    "Malus Token": "말루스 토큰",
+    "Manipulator Token": "매니퓰레이터 토큰",
+    "Mask Token": "가면 토큰",
+    "Mech Beast Token": "기계수 토큰",
+    "Mecha Phantom Beast Token": "환상수기 토큰",
+    "Megalith Token": "메가리스 토큰",
+    "Mercurium the Living Quicksilver": "생명의 수은 머큐리움",
+    "Metabo Token": "메타보 토큰",
+    "Metal Fiend Token": "메탈 데몬 토큰",
+    "Mini Mare Mare Token": "미니 요마간드 토큰",
+    "Mirage Token": "미라지 토큰",
+    "Mixousia the Confounder": "혼란의 믹수시아",
+    "Moon Token": "달 토큰",
+    "Mortilux Heruvur": "모틸룩스 헤루부르",
+    "Moult Token": "탈피 토큰",
+    "Ms.JUDGE": "Ms.JUDGE(미즈 저지)",
+    "Multi Token": "멀티 토큰",
+    "M∀LICE IN THE MIRROR": "M∀LICE(맬리스) 인 더 미러",
+    "M∀LICE IN UNDERGROUND": "M∀LICE(맬리스) 인 언더그라운드",
+    "M∀LICE<C>GWC－06": "M∀LICE(맬리스)〈C〉GWC－06",
+    "M∀LICE<C>MTP－07": "M∀LICE(맬리스)〈C〉MTP－07",
+    "M∀LICE<C>TB－11": "M∀LICE(맬리스)〈C〉TB－11",
+    "M∀LICE<P>Cheshire Cat": "M∀LICE〈P〉체셔 캣",
+    "M∀LICE<P>Dormouse": "M∀LICE〈P〉도마우스",
+    "M∀LICE<P>March Hare": "M∀LICE〈P〉마치 헤어",
+    "M∀LICE<P>White Rabbit": "M∀LICE〈P〉화이트 래빗",
+    "M∀LICE<Q>HEARTS OF CRYPTER": "M∀LICE〈Q〉하츠 오브 크립터",
+    "M∀LICE<Q>RED RANSOM": "M∀LICE〈Q〉레드 랜섬",
+    "M∀LICE<Q>WHITE BINDER": "M∀LICE〈Q〉화이트 바인더",
+    "Naturia Token": "나츄르 토큰",
+    "Needle Token": "니들 토큰",
+    "Nightmare Archfiend Token": "나이트메어 데몬 토큰",
+    "Noble Knight Token": "성기사 토큰",
+    "Nordic Beast Token": "극성수 토큰",
+    "Nouvelles Token": "누밸즈 토큰",
+    "NT8000－SIRIUS": "NT8000－시리우스",
+    "Nytro Token": "니트로 토큰",
+    "Odd-Eyes Override Dragon": "오드아이즈 오버라이드 드래곤",
+    "Ogdoadic Token": "명세계 토큰",
+    "Oh F!sh!": "오! 피시!",
+    "Ojama Token": "방해꾼 토큰",
+    "Option Token": "옵션 토큰",
+    "Otoshidamashi Token": "오토시다마시 토큰",
+    "Overflow Token": "오버플로 토큰",
+    "Oyster Token": "굴 토큰",
+    "P.U.N.K.JAM FEVER!": "P.U.N.K.JAM(펑크잼) FEVER(피버)!",
+    "Pair Bear Scare!!": "페어 베어 스케어!!",
+    "Paralyzing Token": "마비 토큰",
+    "Parasomnia Token": "파라솜니아 토큰",
+    "Phantasm Spiral Token": "환황룡 토큰",
+    "Phantasm Token": "환마 토큰",
+    "Phantasmal Martyr Token": "환마의 순교자 토큰",
+    "Phantom Glimmer Token": "팬텀 글리머 토큰",
+    "Phantom Token": "팬텀 토큰",
+    "Photon Token": "포톤 토큰",
+    "Plant Token": "식물 토큰",
+    "Plunder Patroll Token": "플런드롤 토큰",
+    "Poisonous Snake Token": "독사 토큰",
+    "Possessed Destiny - Wynn": "빙의운명의 윈",
+    "Prank-Kids Token": "프랭키즈 토큰",
+    "Predaplant Daredevil": "프레데터 플랜츠 데어데블",
+    "Primal Being Token": "원시생명체 토큰",
+    "Prince of Fairies": "요정 왕자 토큰",
+    "Pyrite Token": "황철석 토큰",
+    "Radian Token": "라디안 토큰",
+    "Raidraptor - Eagle Token": "RR－이글 토큰",
+    "RAI－JIN": "RAI－JIN(라이진)",
+    "RAI－MEI": "RAI－MEI(라이메이)",
+    "Re:EX": "Re:EX(렉스)",
+    "Regenerating Rose Token": "재생의 장미 토큰",
+    "Reptilianne Token": "레프티레스 토큰",
+    "Re－BUSTER": "리 버스터",
+    "Rockstone Token": "암석 토큰",
+    "Rose Tendril Token": "로즈 텐드릴 토큰",
+    "Rose Token": "로즈 토큰",
+    "Runick Token": "루닉 토큰",
+    "Sacrificial Offering Token": "제물 토큰",
+    "Security Token": "시큐리티 토큰",
+    "Seed Token": "씨앗 토큰",
+    "Shamanite Shamanknight": "샤머니트 샤먼나이트",
+    "Sheep Token": "양 토큰",
+    "Shinobird Token": "에스프릿 토큰",
+    "Shinsen Token": "신선 토큰",
+    "Shiranui Token": "시라누이 토큰",
+    "Sin Token": "Sin 토큰",
+    "Sinister Seed Token": "사악한 씨앗 토큰",
+    "Siphon Token": "사이폰 토큰",
+    "Sky Striker Ace Token": "섬도희 토큰",
+    "Skyblaster Token": "스카이블래스터 토큰",
+    "Slime Token": "슬라임 토큰",
+    "Snack Token": "간식 토큰",
+    "Soul Token": "영혼 토큰",
+    "Speedroid Darumaknocker": "SR(스피드로이드) 다루마노커",
+    "Speedroid Token": "스피드로이드 토큰",
+    "Spider Token": "스파이더 토큰",
+    "Spinos Token": "스피노스 토큰",
+    "Spool Token": "스풀 토큰",
+    "SPYRAL RESORT": "SPYRAL(스파이랄) 리조트",
+    "Squid Ink Token": "오징어 먹물 토큰",
+    "Stag Token": "사슴 토큰",
+    "Stage of Destiny": "운명의 무대",
+    "Stardust Token": "스타더스트 토큰",
+    "Start for VS!": "스타트 포 VS(뱅키시 소울)!",
+    "Steam Knight - BULLauncher": "스팀 나이트－불런처",
+    "Steam Knight - Hamburk": "스팀 나이트－함부르크",
+    "Steam Token": "스팀 토큰",
+    "Sunvine Token": "생아발론 토큰",
+    "Support Token": "서포트 토큰",
+    "Surprise Token": "서프라이즈 토큰",
+    "Swordsoul Token": "상검 토큰",
+    "Synchron Token": "싱크론 토큰",
+    "Synthetic Seraphim Token": "합성천사 토큰",
+    "T.G. Token": "테크지너스 토큰",
+    "TBR - Imperial Custom": "TBR－임페리얼 커스텀",
+    "Tellus Wing Token": "텔루스 윙 토큰",
+    "Tenyi Spirit Token": "천위룡 토큰",
+    "The big SATURN": "더 빅 새턴",
+    "The blazing MARS": "더 블레이징 마스",
+    "The despair URANUS": "더 디스페어 우라누스",
+    "The Fallen & The Virtuous": "낙윤과 성녀",
+    "The grand JUPITER": "더 그랜드 주피터",
+    "The Legend of Tickets": "티켓의 전설",
+    "The Magical King of Dimension Zeta": "차원의 마도왕 제타",
+    "The splendid VENUS": "더 스플렌디드 비너스",
+    "The suppression PLUTO": "더 서프레션 플루토",
+    "The supremacy SUN": "더 수프리머시 선",
+    "The tripping MERCURY": "더 트리핑 머큐리",
+    "The tyrant NEPTUNE": "더 타이런트 넵튠",
+    "Thunder Option Token": "썬더 옵션 토큰",
+    "Thundercrash Snarecrow": "썬더크래시 스네어크로우",
+    "Time Dimension Hole": "시공의 함정",
+    "Tindangle Token": "틴당글 토큰",
+    "Torment Token": "토먼트 토큰",
+    "Trap of the Poisonous Scorpion": "맹독 전갈의 함정",
+    "Trick or Treat!": "트릭 오어 트리트!",
+    "Trickstar Token": "트릭스터 토큰",
+    "Tricky Token": "트릭키 토큰",
+    "Tyler the Great Warrior": "위대한 전사 타일러",
+    "Ultimate Baseball Homerun King": "궁극 야구 홈런왕",
+    "Umbral Horror Mirage Token": "엄브럴 미라지 토큰",
+    "Unknown": "미확인 토큰",
+    "Utchatzimime Token": "우차치미메 토큰",
+    "V-LAN Token": "V－LAN 토큰",
+    "Vague Shadow Token": "어스름의 그림자 토큰",
+    "Vassal Token": "가신 토큰",
+    "Vendread Token": "벤데드 토큰",
+    "Vilepawn Salmon Token": "트래팬 새먼 토큰",
+    "Vylon Token": "바이론 토큰",
+    "Waltz Token": "왈츠 토큰",
+    "White Fluff Token": "하얀 솜털 토큰",
+    "Wicked Plant Token": "사악한 식물 토큰",
+    "Wicked Token": "사악한 토큰",
+    "Wild Fire Token": "와일드 파이어 토큰",
+    "WINDS OF VICTORY": "승리의 바람",
+    "Witchcrafter Seed": "위치크래프트 시드",
+    "Witness of the Ancient": "태고의 목격자",
+    "World Chalice Token": "성잔 토큰",
+    "World Legacy Token": "성유물 토큰",
+    "Worm Token": "웜 토큰",
+    "Wyvern Token": "와이번 토큰",
+    "Yomagna the Fire Phantom": "화염의 환영 요마그나",
+    "ZERO－MAX": "ZERO－MAX(제로 맥스)",
+    "Z－ONE": "Z－ONE(존)",
+    "“Case of K9”": "“케이스 오브 K9”"
+  },
+  "names_as_printed": {
+    "3868277": "TGX3－DX2",
+    "5257687": "X·E·N·O",
+    "9622164": "D·D·R",
+    "10669138": "L·G·D",
+    "11264180": "TGX1－HL",
+    "40253382": "TG－SX1",
+    "54423935": "R·R·R",
+    "58258899": "TGX300",
+    "66002986": "SR / CWW",
+    "67048711": "7",
+    "67441879": "B·F·W",
+    "74414885": "NEXT",
+    "76641981": "TG1－EM1",
+    "81913510": "NEX",
+    "82112775": "D·D·M",
+    "99267150": "F·G·D"
+  },
+  "descriptions": {
+    "212652": {
+      "source": "When an opponent's monster declares an attack: Destroy it, then inflict 300 damage to your opponent.",
+      "text": "①: 상대 몬스터의 공격 선언시에 발동할 수 있다. 그 몬스터를 파괴하고, 그 후 상대에게 300 데미지를 준다."
+    },
+    "904186": {
+      "source": "Special Summoned with the effect of \"Mecha Phantom Beast\" monsters and related cards.",
+      "text": "\"환상수기\" 몬스터 및 관련 카드의 효과로 특수 소환된다."
+    },
+    "1799465": {
+      "source": "Special Summoned with the effect of \"Transcicada\". While this Token is on the field, the player that Special Summoned it cannot Special Summon monsters from the Extra Deck, except Insect-Type monsters.",
+      "text": "\"트랜시케이다\"의 효과로 특수 소환된다. 이 토큰이 필드에 존재하는 한, 이 토큰을 특수 소환한 플레이어는 곤충족 몬스터밖에 엑스트라 덱에서 특수 소환할 수 없다."
+    },
+    "2625940": {
+      "source": "Special Summoned with the effect of \"Spool Code\". This Token cannot be used as a Tribute for a Tribute Summon.",
+      "text": "\"스풀 코드\"의 효과로 특수 소환된다. 이 토큰은 어드밴스 소환을 위해 릴리스할 수 없다."
+    },
+    "3739500": {
+      "source": "You can Ritual Summon this card with an \"End of the World\" card. This card's name becomes \"Demise, King of Armageddon\" while in the hand or on the field. You can only use each of the following effects of \"Ruler of the End of the World\" once per turn. You can reveal this card in your hand, pay 2000 LP, then banish 1 Ritual Spell from your Deck; apply that card's activation effect that Ritual Summons a monster. You can pay 2000 LP; destroy all other cards on the field, then this card gains 2900 ATK.",
+      "text": "\"엔드 오브 더 월드\" 카드에 의해 의식 소환. 이 카드의 카드명은 패 / 필드에 존재하는 한 \"종언의 왕 데미스\"로 취급한다. 이 카드명의 ①②의 효과는 각각 1턴에 1번밖에 사용할 수 없다.\n①: 패의 이 카드를 보여주고 2000 LP를 지불한 후, 덱에서 의식 마법 카드 1장을 제외하여 발동할 수 있다. 그 카드 발동시의 몬스터를 의식 소환하는 효과를 적용한다.\n②: 2000 LP를 지불하고 발동할 수 있다. 필드의 다른 카드를 전부 파괴하고, 그 후 이 카드의 공격력을 2900 올린다."
+    },
+    "9929399": {
+      "source": "Special Summoned with the effect of \"Blackwing - Gofu the Vague Shadow\". This Token cannot be Tributed or be used as Synchro Material.",
+      "text": "\"BF－농그림자의 고우후우\"의 효과로 특수 소환된다. 이 토큰은 릴리스하거나 싱크로 소재로 할 수 없다."
+    },
+    "9995767": {
+      "source": "Old, now unused entry. To be removed.",
+      "text": "이전 데이터에 있던 항목으로, 현재는 사용되지 않는다."
+    },
+    "10000100": {
+      "source": "The strongest warrior, it has the same capabilities as Blue-Eyes White Dragon.",
+      "text": "푸른 눈의 백룡에 필적하는 힘을 지닌 최강의 전사."
+    },
+    "10000110": {
+      "source": "",
+      "text": "별도의 효과 설명이 없는 토큰."
+    },
+    "10000120": {
+      "source": "",
+      "text": "별도의 효과 설명이 없는 토큰."
+    },
+    "10389143": {
+      "source": "Special Summoned with the effect of \"Number 42: Galaxy Tomahawk\". Destroy this Token during the End Phase of the turn it is Special Summoned.",
+      "text": "\"No.42 스타쉽 갤럭시 토마호크\"의 효과로 특수 소환된다. 이 토큰은 특수 소환된 턴의 엔드 페이즈에 파괴된다."
+    },
+    "11050416": {
+      "source": "Special Summoned with the effect of \"Hippo Carnival\". This Token cannot be Tributed. You cannot Special Summon monsters from the Extra Deck while a \"Hippo Token\" is in a Monster Zone.",
+      "text": "\"히포 카니발\"의 효과로 특수 소환된다. 이 토큰은 릴리스할 수 없다. \"하마 토큰\"이 몬스터 존에 존재하는 한, 자신은 엑스트라 덱에서 특수 소환할 수 없다."
+    },
+    "11876803": {
+      "source": "If you activate a \"Lunalight\" monster's effect (except during the Damage Step): You can Special Summon this card from your hand, then if you activated this effect during the turn your opponent activated a card or effect, you can add 1 \"Polymerization\" from your Deck or GY to your hand. If this card is sent to the GY by card effect: You can Special Summon 1 \"Lunalight\" monster from your face-up Extra Deck or GY, except a Level 5 monster, but it cannot activate its effects. You can only use each effect of \"Lunalight Scarlet Tiger\" once per turn.",
+      "text": "이 카드명의 ①②의 효과는 각각 1턴에 1번밖에 사용할 수 없다.\n①: 자신이 \"문라이트\" 몬스터의 효과를 발동했을 경우, 데미지 스텝 이외에 발동할 수 있다. 이 카드를 패에서 특수 소환한다. 그 후, 상대가 카드 또는 효과를 발동한 턴에 이 효과를 발동했다면, 덱 / 묘지에서 \"융합\" 1장을 패에 넣을 수 있다.\n②: 이 카드가 효과로 묘지에 보내졌을 경우에 발동할 수 있다. 자신의 엑스트라 덱의 앞면 표시 몬스터 또는 묘지에서 레벨 5 이외의 \"문라이트\" 몬스터 1장을 특수 소환한다. 그 몬스터는 효과를 발동할 수 없다."
+    },
+    "14089429": {
+      "source": "Special Summoned with the effect of \"Blue Thunder T-45\". This Token cannot be used as a Tribute for a Tribute Summon.",
+      "text": "\"블루 썬더 T45\"의 효과로 특수 소환된다. 이 토큰은 어드밴스 소환을 위해 릴리스할 수 없다."
+    },
+    "14470846": {
+      "source": "Special Summoned with the effect of \"Ojama Duo\". This Token cannot be used as a Tribute for a Tribute Summon. When it is destroyed, the controller takes 300 damage.",
+      "text": "\"방해꾼 듀오\"의 효과로 특수 소환된다. 이 토큰은 어드밴스 소환을 위해 릴리스할 수 없다. 이 토큰이 파괴됐을 때, 그 컨트롤러는 300 데미지를 받는다."
+    },
+    "15341822": {
+      "source": "Special Summoned with the effect of \"Dandylion\". This Token cannot be Tributed for a Tribute Summon during the turn it is Special Summoned.",
+      "text": "\"댄디라이언\"의 효과로 특수 소환된다. 이 토큰은 특수 소환된 턴에 어드밴스 소환을 위해 릴리스할 수 없다."
+    },
+    "15415552": {
+      "source": "2+ Level 8 monsters\nIf a monster(s) is sent to your opponent's GY (except during the Damage Step): You can target 1 of them; attach it to this card. You can only use this effect of \"Mortilux Heruvur\" once per turn. This card gains effects based on the number of materials attached to it.\n● 2+: Cannot be destroyed by battle or card effects.\n● 3+: Your opponent cannot target cards in the GYs with card effects.\n● 4+: You can detach 3 materials from this card; send 1 monster on the field to the GY.",
+      "text": "레벨 8 몬스터 × 2장 이상\n①: 몬스터가 상대 묘지로 보내졌을 경우, 데미지 스텝 이외에 그중 1장을 대상으로 발동할 수 있다. 그 몬스터를 이 카드의 엑시즈 소재로 한다. 이 카드명의 이 효과는 1턴에 1번밖에 사용할 수 없다.\n②: 이 카드의 엑시즈 소재 수에 따라 이하의 효과를 얻는다.\n● 2개 이상: 이 카드는 전투 / 효과로는 파괴되지 않는다.\n● 3개 이상: 상대는 묘지의 카드를 효과의 대상으로 할 수 없다.\n● 4개 이상: 이 카드의 엑시즈 소재를 3개 제거하고 발동할 수 있다. 필드의 몬스터 1장을 묘지로 보낸다."
+    },
+    "15629802": {
+      "source": "Special Summoned with the effect of \"Battle Waltz\". Neither player takes battle damage from battles involving this Token.",
+      "text": "\"배틀 왈츠\"의 효과로 특수 소환된다. 이 토큰의 전투로는 양쪽 플레이어 모두 전투 데미지를 받지 않는다."
+    },
+    "15725501": {
+      "source": "(This card is always treated as an \"Archfiend\" card.)\nTarget 1 \"Archfiend\" monster you control; it gains 600 ATK, then you can destroy all monsters your opponent controls with lower original ATK than that monster's ATK. During your Main Phase: You can banish this card from your GY, then target 1 Level 6 Fiend monster with 2500 ATK in your GY; add it to your hand. You can only use each effect of \"Makourai, the Lightning Strike\" once per turn.",
+      "text": "이 카드는 룰상 \"데몬\" 카드로도 취급한다. 이 카드명의 ①②의 효과는 각각 1턴에 1번밖에 사용할 수 없다.\n①: 자신 필드의 \"데몬\" 몬스터 1장을 대상으로 발동할 수 있다. 그 몬스터의 공격력을 600 올린다. 그 후, 원래 공격력이 그 몬스터의 공격력보다 낮은 상대 필드의 몬스터를 전부 파괴할 수 있다.\n②: 자신 메인 페이즈에 묘지의 이 카드를 제외하고, 자신의 묘지의 공격력 2500인 레벨 6 악마족 몬스터 1장을 대상으로 발동할 수 있다. 그 몬스터를 패에 넣는다."
+    },
+    "16237004": {
+      "source": "2+ Level 3 monsters\nIf this card is Xyz Summoned, or if a Trap you own is banished: You can target 1 of your banished Traps; attach it to this card. You can detach any number of materials from this card, then target 1 DARK monster in your GY or banishment with a Level equal to the number detached; Special Summon it. You can only use each effect of \"Shamanite Shamanknight\" once per turn.",
+      "text": "레벨 3 몬스터 × 2장 이상\n이 카드명의 ①②의 효과는 각각 1턴에 1번밖에 사용할 수 없다.\n①: 이 카드를 엑시즈 소환했을 경우, 또는 자신이 주인인 함정 카드가 제외됐을 경우, 제외 상태인 자신의 함정 카드 1장을 대상으로 발동할 수 있다. 그 카드를 이 카드의 엑시즈 소재로 한다.\n②: 이 카드의 엑시즈 소재를 임의의 수만큼 제거하고, 묘지 또는 제외 상태인 자신의 어둠 속성 몬스터 중 제거한 수와 같은 레벨의 몬스터 1장을 대상으로 발동할 수 있다. 그 몬스터를 특수 소환한다."
+    },
+    "17350692": {
+      "source": "Cannot be Normal Summoned/Set. Must first be Special Summoned (from your hand) by shuffling 3 cards of the same type (Monster, Spell, or Trap) from your GY into the Deck/Extra Deck. If this card is Special Summoned: You can declare 1 Monster Type; this card becomes that Type until the end of this turn. During your Main Phase: You can Fusion Summon 1 Fusion Monster from your Extra Deck using monsters on either field, including this card. You can only use each effect of \"Yomagna the Fire Phantom\" once per turn.",
+      "text": "이 카드는 일반 소환 / 세트할 수 없다. 자신 묘지에서 같은 종류(몬스터 / 마법 / 함정)의 카드 3장을 덱 / 엑스트라 덱으로 되돌렸을 경우에만 패에서 처음으로 특수 소환할 수 있다. 이 카드명의 ①②의 효과는 각각 1턴에 1번밖에 사용할 수 없다.\n①: 이 카드가 특수 소환됐을 경우, 종족을 1개 선언하여 발동할 수 있다. 이 카드는 턴 종료시까지 선언한 종족이 된다.\n②: 자신 메인 페이즈에 발동할 수 있다. 이 카드를 포함한 자신 또는 상대 필드의 몬스터를 소재로 하여, 엑스트라 덱에서 융합 몬스터 1장을 융합 소환한다."
+    },
+    "17418745": {
+      "source": "Special Summoned with the effect of \"Photon Sanctuary\". This Token cannot attack or be used as a Synchro Material Monster.",
+      "text": "\"포톤의 성역\"의 효과로 특수 소환된다. 이 토큰은 공격하거나 싱크로 소재로 할 수 없다."
+    },
+    "17782288": {
+      "source": "Once per turn: You can discard 1 Spell/Trap; Special Summon 1 Level 2 \"Angelechy\" monster from your Extra Deck, and if you do, place 1 \"Angelechy\" monster from your Extra Deck to your Spell & Trap Zone as a face-up Continuous Spell. If a face-up \"Angelechy\" Monster Card(s) you control is destroyed by battle or card effect: You can return 1 \"Angelechy\" Monster Card you own from your Spell & Trap Zone to the Extra Deck, then you can Special Summon it.",
+      "text": "①: 1턴에 1번, 마법 / 함정 카드 1장을 버리고 발동할 수 있다. 엑스트라 덱에서 레벨 2의 \"엔젤레키\" 몬스터 1장을 특수 소환하고, 엑스트라 덱에서 \"엔젤레키\" 몬스터 1장을 지속 마법 카드로 취급하여 자신의 마법 & 함정 존에 앞면 표시로 놓는다.\n②: 자신 필드의 앞면 표시 \"엔젤레키\" 몬스터 카드가 전투 또는 효과로 파괴됐을 경우에 발동할 수 있다. 자신의 마법 & 함정 존에서 자신이 주인인 \"엔젤레키\" 몬스터 카드 1장을 엑스트라 덱으로 되돌린다. 그 후, 그 몬스터를 특수 소환할 수 있다."
+    },
+    "18905769": {
+      "source": "Gains 400 ATK for each Dragon monster you control. When this card destroys a monster by battle: You can Special Summon 1 \"Wyvern Token\" (Dragon/LIGHT/Level 1/ATK 400/DEF 400). During the Battle Phase or Main Phase 2, you can (Quick Effect): Immediately after this effect resolves, Tribute Summon 1 Dragon monster face-up. You can only use this effect of \"Guivre\" once per turn.",
+      "text": "①: 이 카드의 공격력은 자신 필드의 드래곤족 몬스터의 수 × 400 올린다.\n②: 이 카드가 전투로 몬스터를 파괴했을 경우에 발동할 수 있다. 자신 필드에 \"와이번 토큰\"(드래곤족 / 빛 / 레벨 1 / 공격력 400 / 수비력 400) 1장을 특수 소환한다.\n③: 배틀 페이즈 또는 메인 페이즈 2에 발동할 수 있다(퀵 이펙트). 이 효과의 처리 직후, 드래곤족 몬스터 1장을 앞면 표시로 어드밴스 소환한다. 이 카드명의 이 효과는 1턴에 1번밖에 사용할 수 없다."
+    },
+    "19438484": {
+      "source": "You can reveal 3 Dragon monsters in your Extra Deck with 3000 or more ATK and different names; Special Summon this card from your hand. If this card is sent to the GY: You can target 1 Dragon Fusion, Synchro, Xyz, or Link Monster you control; your opponent cannot target it with card effects this turn. Neither player can activate cards or effects in response to this effect's activation. You can only use each effect of \"Ilios the Black Sun Dragon\" once per turn.",
+      "text": "이 카드명의 ①②의 효과는 각각 1턴에 1번밖에 사용할 수 없다.\n①: 엑스트라 덱에서 공격력이 3000 이상인 카드명이 다른 드래곤족 몬스터 3장을 보여주고 발동할 수 있다. 이 카드를 패에서 특수 소환한다.\n②: 이 카드가 묘지로 보내졌을 경우, 자신 필드의 드래곤족 융합 / 싱크로 / 엑시즈 / 링크 몬스터 1장을 대상으로 발동할 수 있다. 이 턴에 상대는 그 몬스터를 효과의 대상으로 할 수 없다. 양쪽 플레이어는 이 효과의 발동에 체인하여 카드의 효과를 발동할 수 없다."
+    },
+    "19491080": {
+      "source": "[ Pendulum Effect ]\nDuring your Main Phase: You can send 1 non-Pendulum \"Clown Crew\" card from your Deck to the GY, and if you do, Special Summon this card, also until the end of the next turn after this effect resolves, you cannot activate the effect of monsters Special Summoned from the Deck or Extra Deck. You can only use this effect of \"Clown Crew Cappello\" once per turn.\n----------------------------------------\n[ Monster Effect ]\nMonsters your opponent controls lose 1500 DEF while you control a Tribute Summoned monster. If this card is Tributed: You can activate 1 of these effects (but you can only use each effect of \"Clown Crew Cappello\" once per turn);\n● Shuffle all Pendulum Monsters from the face-up Extra Decks and the field into the Deck.\n● Special Summon 1 non-Pendulum \"Clown Crew\" monster from your Deck or Extra Deck, ignoring its Summoning conditions.",
+      "text": "[펜듈럼 효과]\n이 카드명의 펜듈럼 효과는 1턴에 1번밖에 사용할 수 없다.\n①: 자신 메인 페이즈에 발동할 수 있다. 덱에서 펜듈럼 이외의 \"클라운 크루\" 카드 1장을 묘지로 보내고, 이 카드를 특수 소환한다. 이 효과의 처리 후 다음 턴 종료시까지, 자신은 덱 / 엑스트라 덱에서 특수 소환된 몬스터의 효과를 발동할 수 없다.\n[몬스터 효과]\n①: 자신 필드에 어드밴스 소환한 몬스터가 존재하는 한, 상대 필드의 몬스터의 수비력은 1500 내린다.\n②: 이 카드가 릴리스됐을 경우, 이하의 효과에서 1개를 선택하여 발동할 수 있다. 이 카드명의 각 효과는 1턴에 1번밖에 사용할 수 없다.\n● 양쪽 엑스트라 덱의 앞면 표시 펜듈럼 몬스터와 필드의 펜듈럼 몬스터를 전부 덱으로 되돌린다.\n● 자신의 덱 / 엑스트라 덱에서 펜듈럼 이외의 \"클라운 크루\" 몬스터 1장을 소환 조건을 무시하고 특수 소환한다."
+    },
+    "20240828": {
+      "source": "An angel of happiness that descends on the sacred mound. It's said that he lands along with his partner in order to perform a special ritual known as the Ceremonial First Pitch. After charming everyone with its elegant coat of fur and its cute appearance, he finishes the ritual with a high five.\n\nThe SHOTIME along with his partner will go on...",
+      "text": "신성한 마운드에 내려오는 행복의 천사. 파트너와 함께 내려와 시구라는 특별한 의식을 치른다고 한다. 우아한 털과 귀여운 모습으로 모두를 매료시키고 나면 하이파이브로 의식을 마친다. 파트너와 함께하는 쇼타임은 계속된다…"
+    },
+    "21501961": {
+      "source": "Your opponent can reveal 1 \"Pair Bear Scare!!\" in their hand or Deck, and if they do, each player gains 2000 LP. Otherwise, you destroy 1 monster your opponent controls. If this card is sent from the field to the GY: Add this card to your opponent's hand. You can only use this effect of \"Pair Bear Scare!!\" once per Duel. You can only activate 1 \"Pair Bear Scare!!\" per turn.",
+      "text": "이 카드명의 카드는 1턴에 1장밖에 발동할 수 없다.\n①: 상대는 자신의 패 / 덱에서 \"페어 베어 스케어!!\" 1장을 보여줄 수 있다. 보여줬을 경우, 양쪽 플레이어는 각각 2000 LP를 회복한다. 보여주지 않았을 경우, 상대 필드의 몬스터 1장을 파괴한다.\n②: 이 카드가 필드에서 묘지로 보내졌을 경우, 이 카드를 상대의 패에 넣는다. 이 카드명의 이 효과는 듀얼 중에 1번밖에 사용할 수 없다."
+    },
+    "22493812": {
+      "source": "Special Summoned with the effect of \"Multiplication of Ants\". This Token cannot be used as a Tribute for a Tribute Summon.",
+      "text": "\"개미 증식\"의 효과로 특수 소환된다. 이 토큰은 어드밴스 소환을 위해 릴리스할 수 없다."
+    },
+    "22984000": {
+      "source": "2+ Level 10 monsters\nIf this card is Xyz Summoned: You can attach 1 monster from your Deck to this card as material. You can only use this effect of \"Mercurium the Living Quicksilver\" once per turn. While this card has material, your opponent cannot activate the effects of monsters in their GY with the same Attribute as a monster in your GY. Once per turn, during the End Phase: Detach 1 material from this card or take 3000 damage.",
+      "text": "레벨 10 몬스터 × 2장 이상\n①: 이 카드를 엑시즈 소환했을 경우에 발동할 수 있다. 덱에서 몬스터 1장을 이 카드의 엑시즈 소재로 한다. 이 카드명의 이 효과는 1턴에 1번밖에 사용할 수 없다.\n②: 이 카드가 엑시즈 소재를 가지고 있는 한, 상대는 자신의 묘지에 있는 몬스터 중 내 묘지의 몬스터와 같은 속성인 몬스터의 효과를 발동할 수 없다.\n③: 1턴에 1번, 엔드 페이즈에 이 카드의 엑시즈 소재를 1개 제거하거나, 자신이 3000 데미지를 받는다."
+    },
+    "23923758": {
+      "source": "''One of the knights, he is equipped with \"BFS Armor\", which is made of a dense steel carefully refined at the factory, and \"Foil-Packer\", a special mechanism that can be converted into various weapons depending on the state of combat, thanks to it being linked with the highly analytical \"Coc-OS\". Although \"Hamburk\" is equipped with the usual suite of equipment, he is incredibly popular thanks to his combat style being extremely high calorie. His power is further enhanced by the blessings of the goddess \"Madera\".''",
+      "text": "한 명의 기사. 공장에서 정성 들여 제련한 고밀도 강철로 만든 \"BFS 아머\"를 입고 있다. 분석 능력이 뛰어난 \"코크 OS\"와 연동되는 특수 장치 \"포일 패커\"는 전황에 따라 여러 무기로 바뀐다. 함부르크의 장비는 표준형이지만, 열량이 아주 높은 전투 스타일로 인기가 많다. 여신 \"마데라\"의 축복을 받아 그 힘은 더욱 강해진다."
+    },
+    "23923759": {
+      "source": "One of the knights, he is equipped with \"BFS Armor\", which is made of a dense steel carefully refined at the factory, and \"Foil-Packer\", a special mechanism that can be converted into various weapons depending on the state of combat, thanks to it being linked with the highly analytical \"Coc-OS\". Although \"Hamburk\" is equipped with the usual suite of equipment, he is incredibly popular thanks to his combat style being extremely high calorie. His power is further enhanced by the blessings of the goddess \"Madera\".",
+      "text": "한 명의 기사. 공장에서 정성 들여 제련한 고밀도 강철로 만든 \"BFS 아머\"를 입고 있다. 분석 능력이 뛰어난 \"코크 OS\"와 연동되는 특수 장치 \"포일 패커\"는 전황에 따라 여러 무기로 바뀐다. 함부르크의 장비는 표준형이지만, 열량이 아주 높은 전투 스타일로 인기가 많다. 여신 \"마데라\"의 축복을 받아 그 힘은 더욱 강해진다."
+    },
+    "24056179": {
+      "source": "During the Main Phase: The turn player can target 1 monster in their GY; they place it face-up in their Spell & Trap Zone as a Continuous Spell. During the End Phase: The turn player can send 1 face-up Monster Card they control to the GY; they Special Summon 1 monster from their Deck with the same original Type and Attribute, but 1, 2, or 3 original Levels higher. You can only use each effect of \"Capsule Monster Chess\" once per turn.",
+      "text": "이 카드명의 ①②의 효과는 각각 1턴에 1번밖에 사용할 수 없다.\n①: 메인 페이즈에 턴 플레이어는 자신의 묘지의 몬스터 1장을 대상으로 발동할 수 있다. 그 몬스터를 지속 마법 카드로 취급하여 자신의 마법 & 함정 존에 앞면 표시로 놓는다.\n②: 엔드 페이즈에 턴 플레이어는 자신 필드의 앞면 표시 몬스터 카드 1장을 묘지로 보내고 발동할 수 있다. 그 몬스터와 원래의 종족 및 속성이 같고 원래의 레벨이 1, 2 또는 3 높은 몬스터 1장을 자신의 덱에서 특수 소환한다."
+    },
+    "24874631": {
+      "source": "Special Summoned with the effect of \"Fiend's Sanctuary\". This Token cannot attack. Your opponent takes any battle damage you would have taken from battles involving this Token. During each of your Standby Phases, pay 1000 Life Points or destroy this Token.",
+      "text": "\"데블의 성역\"의 효과로 특수 소환된다. 이 토큰은 공격할 수 없다. 이 토큰의 전투로 자신이 받을 전투 데미지는 대신 상대가 받는다. 자신 스탠바이 페이즈마다 1000 LP를 지불하거나 이 토큰을 파괴한다."
+    },
+    "25415053": {
+      "source": "Special Summoned with the effect of \"Shinobaroness Peacock\" or \"Shinobaron Peacock\".",
+      "text": "\"에스프릿 로드－희공작\" 또는 \"에스프릿 로드－언공작\"의 효과로 특수 소환된다."
+    },
+    "27204312": {
+      "source": "Special Summoned with the effect of \"Nibiru, the Primal Being\". When Summoned, this Token's ATK/DEF become the combined original ATK/DEF of the Tributed monsters.",
+      "text": "\"원시생명체 니비루\"의 효과로 특수 소환된다. 이 토큰이 소환됐을 때, 이 토큰의 공격력과 수비력은 각각 릴리스한 몬스터의 원래 공격력 합계와 원래 수비력 합계가 된다."
+    },
+    "27553701": {
+      "source": "''The king of dinosaurs that rules over the Earth. Its mighty roar makes its foes tremble in fear!''",
+      "text": "대지를 지배하는 공룡의 왕. 우렁찬 포효만으로 적을 공포에 떨게 한다!"
+    },
+    "28736826": {
+      "source": "When this card destroys an opponent's monster by battle: You can make this card gain 1000 ATK.",
+      "text": "①: 이 카드가 전투로 상대 몬스터를 파괴했을 경우에 발동할 수 있다. 이 카드의 공격력을 1000 올린다."
+    },
+    "28904860": {
+      "source": "1 Tuner + 1+ non-Tuners\nYou can target 1 other card in this card's column; banish it. If this card is placed in the Spell & Trap Zone as a Continuous Spell: You can place 1 \"Angelechy Shatranga\" from your Extra Deck in your Spell & Trap Zone as a face-up Continuous Spell. You can only use each of the preceding effects of \"Angelechy Bastion\" once per turn. While this card is treated as a Continuous Spell, other \"Angelechy\" cards on the field cannot be destroyed by your opponent's card effects.",
+      "text": "튜너 ＋ 튜너 이외의 몬스터 1장 이상\n이 카드명의 ①②의 효과는 각각 1턴에 1번밖에 사용할 수 없다.\n①: 이 카드와 같은 세로열의 다른 카드 1장을 대상으로 발동할 수 있다. 그 카드를 제외한다.\n②: 이 카드가 지속 마법 카드로 취급되어 마법 & 함정 존에 놓였을 경우에 발동할 수 있다. 엑스트라 덱에서 \"엔젤레키 샤트랑가\" 1장을 지속 마법 카드로 취급하여 자신의 마법 & 함정 존에 앞면 표시로 놓는다.\n③: 이 카드가 지속 마법 카드로 취급되는 한, 필드의 다른 \"엔젤레키\" 카드는 상대 효과로 파괴되지 않는다."
+    },
+    "30069399": {
+      "source": "Special Summoned with the effect of \"Wall of Ivy\". When it is destroyed, the controller takes 300 damage.",
+      "text": "\"아이비 월\"의 효과로 특수 소환된다. 이 토큰이 파괴됐을 때, 그 컨트롤러는 300 데미지를 받는다."
+    },
+    "30138615": {
+      "source": "2 monsters with different Types (Fiend, Illusion, or Spellcaster)\nGains ATK equal to the combined ATK of the monsters equipped to this card by its effect. If this card battles a monster, neither can be destroyed by that battle. Your opponent's monsters cannot attack any monsters, except this one. If this card is Special Summoned, or at the end of the Battle Phase, if this card battled: You can equip 1 monster your opponent controls to this card as an Equip Spell. You can only use this effect of \"Nightmare-Eyes Restrict\" once per turn.",
+      "text": "서로 종족이 다른 몬스터 2장(악마족 / 환상마족 / 마법사족)\n①: 이 카드의 공격력은 이 카드의 효과로 장착한 몬스터의 공격력의 합계만큼 올린다.\n②: 이 카드가 몬스터와 전투를 실행할 경우, 두 몬스터는 그 전투로 파괴되지 않는다.\n③: 상대 몬스터는 이 카드 이외의 몬스터를 공격할 수 없다.\n④: 이 카드가 특수 소환됐을 경우, 또는 이 카드가 전투를 실행한 배틀 페이즈 종료시에 발동할 수 있다. 상대 필드의 몬스터 1장을 장착 마법 카드로 취급하여 이 카드에 장착한다. 이 카드명의 이 효과는 1턴에 1번밖에 사용할 수 없다."
+    },
+    "30650148": {
+      "source": "Special Summoned with the effect of \"Vendread Reorigin\". While this Token is on the field, the player that Special Summoned it cannot Normal or Special Summon monsters, except \"Vendread\" monsters.",
+      "text": "\"벤데드 리본\"의 효과로 특수 소환된다. 이 토큰이 필드에 존재하는 한, 이 토큰을 특수 소환한 플레이어는 \"벤데드\" 몬스터밖에 일반 소환 / 특수 소환할 수 없다."
+    },
+    "32446631": {
+      "source": "Special Summoned with the effect of \"Number C43: High Manipulator of Chaos\". When Summoned, this Token's ATK and DEF each become equal to half the opponent's current Life Points.",
+      "text": "\"CNo.43 혼백괴뢰귀신 카오스 마리오네터\"의 효과로 특수 소환된다. 이 토큰이 소환됐을 때, 이 토큰의 공격력과 수비력은 각각 상대의 현재 LP의 절반이 된다."
+    },
+    "37301660": {
+      "source": "The equipped monster gains 300 ATK, also it becomes WIND.",
+      "text": "①: 장착 몬스터의 공격력은 300 올리고, 속성은 바람 속성이 된다."
+    },
+    "38030233": {
+      "source": "Special Summoned with the effect of \"Tenyi Spirit - Sahasrara\". When Summoned, this Token's ATK becomes equal to the original ATK of the targeted monster.",
+      "text": "\"천위룡－사하스라라\"의 효과로 특수 소환된다. 이 토큰이 소환됐을 때, 이 토큰의 공격력은 대상 몬스터의 원래 공격력과 같아진다."
+    },
+    "38041941": {
+      "source": "Special Summoned with the effect of \"Seed of Flame\". This Token cannot be used as a Tribute for a Tribute Summon.",
+      "text": "\"시드 오브 프레임\"의 효과로 특수 소환된다. 이 토큰은 어드밴스 소환을 위해 릴리스할 수 없다."
+    },
+    "38053382": {
+      "source": "Special Summoned with the effect of \"Generaider Boss Stage\". Destroy this Token during the End Phase.",
+      "text": "\"제너레이드 스테이지\"의 효과로 특수 소환된다. 이 토큰은 엔드 페이즈에 파괴된다."
+    },
+    "39016067": {
+      "source": "While this Pendulum Summoned card is in your Monster Zone, your opponent cannot target it with card effects, also it cannot be destroyed by your opponent's card effects. (Quick Effect): You can target 1 Pendulum Monster Card you control and 1 card your opponent controls; return them to the hand. You can only use this effect of \"Wind Unicorn Parallel, the Dracoslayer\" once per turn.\n[Pendulum Effect]\nIf you have a card in your other Pendulum Zone: You can activate 1 of these effects;\n● Special Summon this card.\n● Destroy this card, and if you do, Special Summon 1 Level 5 or lower Pendulum Monster Card from your Pendulum Zone.\nYou can only use this effect of \"Wind Unicorn Parallel, the Dracoslayer\" once per turn.",
+      "text": "[몬스터 효과]\n①: 펜듈럼 소환한 이 카드가 자신 몬스터 존에 존재하는 한, 상대는 이 카드를 효과의 대상으로 할 수 없으며, 이 카드는 상대 효과로 파괴되지 않는다.\n②: 자신 필드의 펜듈럼 몬스터 카드 1장과 상대 필드의 카드 1장을 대상으로 발동할 수 있다(퀵 이펙트). 그 카드들을 패로 되돌린다. 이 카드명의 이 효과는 1턴에 1번밖에 사용할 수 없다.\n[펜듈럼 효과]\n자신의 다른 쪽 펜듈럼 존에 카드가 존재할 경우, 이하의 효과에서 1개를 선택하여 발동할 수 있다. 이 카드명의 이 효과는 1턴에 1번밖에 사용할 수 없다.\n● 이 카드를 특수 소환한다.\n● 이 카드를 파괴하고, 파괴했을 경우 자신의 펜듈럼 존의 레벨 5 이하 펜듈럼 몬스터 카드 1장을 특수 소환한다."
+    },
+    "39972130": {
+      "source": "Special Summoned with the effect of \"Number 64: Ronin Raccoon Sandayu\". When Summoned, this Token's ATK becomes equal to the current ATK of the monster on the field that has the highest ATK (your choice, if tied).",
+      "text": "\"No.64 늙은 너구리 삼태부\"의 효과로 특수 소환된다. 이 토큰이 소환됐을 때, 이 토큰의 공격력은 필드에서 공격력이 가장 높은 몬스터의 현재 공격력과 같아진다. 가장 높은 공격력의 몬스터가 여러 장이면 자신이 고른다."
+    },
+    "40551411": {
+      "source": "This card can be used as a Nouvelles Token\".\n\n* If used for another Token, apply that Token's Type/Attribute/Level/ATK/DEF.",
+      "text": "이 카드는 \"누밸즈 토큰\"으로 사용할 수 있다.\n\n※ 다른 토큰으로 사용할 경우, 그 토큰의 종족 / 속성 / 레벨 / 공격력 / 수비력을 적용한다."
+    },
+    "40703223": {
+      "source": "Special Summoned with the effect of \"Multiply\". This Token cannot be used as a Tribute for a Tribute Summon.",
+      "text": "\"증식\"의 효과로 특수 소환된다. 이 토큰은 어드밴스 소환을 위해 릴리스할 수 없다."
+    },
+    "42026772": {
+      "source": "The observer of the void. Through every rift and distortion in spacetime, it contemplates all things in existence. Take heed. Whenever you peek through a door, Zeta peeks into your world in return.",
+      "text": "공허의 관측자. 시공의 모든 틈과 왜곡을 통해 존재하는 모든 것을 지켜본다. 문틈 너머를 들여다볼 때는 조심하라. 제타도 그 문을 통해 네 세계를 들여다보고 있으니."
+    },
+    "42232157": {
+      "source": "You can activate this card the turn it was Set, by revealing 1 Normal Monster in your hand. Special Summon up to 5 Normal Monsters from your hand and/or GY in Attack Position, also you cannot Special Summon from the Extra Deck for the rest of this turn after this card resolves. You can only activate 1 \"Stage of Destiny\" per turn.",
+      "text": "이 카드명의 카드는 1턴에 1장밖에 발동할 수 없다. 이 카드는 패의 일반 몬스터 1장을 보여주고 세트한 턴에도 발동할 수 있다.\n①: 자신의 패 / 묘지에서 일반 몬스터를 5장까지 골라 공격 표시로 특수 소환한다. 이 효과의 처리 후 턴 종료시까지, 자신은 엑스트라 덱에서 특수 소환할 수 없다."
+    },
+    "42410161": {
+      "source": "1 Tuner + 1+ non-Tuners\nYou can target 1 monster your opponent controls; banish it. If this card is placed in the Spell & Trap Zone as a Continuous Spell: You can add 1 \"Angelechy\" Trap from your Deck or GY to your hand. You can only use each of the preceding effects of \"Angelechy Shatranga\" once per turn. While this card is treated as a Continuous Spell, your opponent can only attempt to activate up to 5 monster effects per turn.",
+      "text": "튜너 ＋ 튜너 이외의 몬스터 1장 이상\n이 카드명의 ①②의 효과는 각각 1턴에 1번밖에 사용할 수 없다.\n①: 상대 필드의 몬스터 1장을 대상으로 발동할 수 있다. 그 몬스터를 제외한다.\n②: 이 카드가 지속 마법 카드로 취급되어 마법 & 함정 존에 놓였을 경우에 발동할 수 있다. 덱 / 묘지에서 \"엔젤레키\" 함정 카드 1장을 패에 넣는다.\n③: 이 카드가 지속 마법 카드로 취급되는 한, 상대는 1턴에 몬스터 효과의 발동을 5번까지만 시도할 수 있다."
+    },
+    "42671152": {
+      "source": "Special Summoned with the effect of \"The Golden Apples\". The ATK and DEF of this Token are each equal to the amount of Life Points gained by the effect of \"The Golden Apples\".",
+      "text": "\"프릿그의 사과\"의 효과로 특수 소환된다. 이 토큰의 공격력과 수비력은 각각 \"프릿그의 사과\"의 효과로 회복한 LP와 같다."
+    },
+    "42956964": {
+      "source": "Special Summoned with the effect of \"Nightmare Archfiends\". When it is destroyed, the controller will take 800 damage.",
+      "text": "\"나이트메어 데몬즈\"의 효과로 특수 소환된다. 이 토큰이 파괴됐을 때, 그 컨트롤러는 800 데미지를 받는다."
+    },
+    "43632709": {
+      "source": "If this card is Normal or Special Summoned: You can banish (face-up) 1 Beast monster from your hand or face-up field until the End Phase; Special Summon 1 EARTH Beast monster from your Deck or GY, with an equal or lower Level than that monster's original Level, then your opponent can Special Summon 1 monster from their hand. You can only use this effect of \"Cerynemesia, Mystical Beast of the Forest\" once per turn. Your opponent's monsters that can attack must attack the monster you control with the highest ATK (their choice, if tied).",
+      "text": "①: 이 카드가 일반 소환 또는 특수 소환됐을 경우, 자신의 패 또는 필드의 앞면 표시 야수족 몬스터 1장을 엔드 페이즈까지 앞면으로 제외하고 발동할 수 있다. 제외한 몬스터의 원래 레벨 이하인 땅 속성 야수족 몬스터 1장을 자신의 덱 / 묘지에서 특수 소환한다. 그 후, 상대는 자신의 패에서 몬스터 1장을 특수 소환할 수 있다. 이 카드명의 이 효과는 1턴에 1번밖에 사용할 수 없다.\n②: 공격 가능한 상대 몬스터는 자신 필드에서 공격력이 가장 높은 몬스터를 공격해야 한다. 가장 높은 공격력의 몬스터가 여러 장이면 상대가 그중에서 고른다."
+    },
+    "43664495": {
+      "source": "Special Summoned with the effect of \"Prank-Kids Pranks\". This Token cannot be Tributed.",
+      "text": "\"프랭키즈 프랭크\"의 효과로 특수 소환된다. 이 토큰은 릴리스할 수 없다."
+    },
+    "44330099": {
+      "source": "Special Summoned with the effect of \"Gorz the Emissary of Darkness\". The ATK and DEF of this Token are each equal to the amount of battle damage a player took when \"Gorz the Emissary of Darkness\" is Special Summoned.",
+      "text": "\"저승사자 고즈\"의 효과로 특수 소환된다. 이 토큰의 공격력과 수비력은 각각 \"저승사자 고즈\"를 특수 소환했을 때 플레이어가 받은 전투 데미지와 같다."
+    },
+    "44857722": {
+      "source": "Each time a monster(s) is destroyed by battle or card effect, place 1 Full Moon Counter on this card for each. You can remove Full Moon Counters from this card, then activate 1 of these effects;\n● 1: Special Summon 1 Level 6 or lower monster (Fiend or Fairy) from your hand or GY.\n● 3: Add 1 Level 10 DARK monster from your Deck to your hand.\n● 5: Special Summon 1 Level 10 monster from your hand or GY.\nYou can only use this effect of \"Full Moon Mirror\" once per turn.",
+      "text": "①: 몬스터가 전투 또는 효과로 파괴될 때마다, 파괴된 몬스터의 수만큼 이 카드에 만월 카운터를 놓는다.\n②: 이 카드의 만월 카운터를 제거하고, 제거한 수에 해당하는 이하의 효과를 발동할 수 있다. 이 카드명의 이 효과는 1턴에 1번밖에 사용할 수 없다.\n● 1개: 자신의 패 / 묘지에서 레벨 6 이하의 악마족 또는 천사족 몬스터 1장을 특수 소환한다.\n● 3개: 덱에서 레벨 10 어둠 속성 몬스터 1장을 패에 넣는다.\n● 5개: 자신의 패 / 묘지에서 레벨 10 몬스터 1장을 특수 소환한다."
+    },
+    "46173680": {
+      "source": "Special Summoned with the effect of \"Fires of Doomsday\". This Token cannot be used as a Tribute for a Tribute Summon, unless it is for a DARK monster.",
+      "text": "\"종언의 화염\"의 효과로 특수 소환된다. 어둠 속성 몬스터의 어드밴스 소환 이외에는 이 토큰을 어드밴스 소환을 위해 릴리스할 수 없다."
+    },
+    "46647145": {
+      "source": "Special Summoned with the effect of \"World Legacy - \"World Lance\"\".",
+      "text": "\"성유물－『성창』\"의 효과로 특수 소환된다."
+    },
+    "46985799": {
+      "source": "Cannot be Normal Summoned/Set. Must be Special Summoned with \"Assault Mode Activate\". If this card is destroyed: You can Special Summon 1 \"Black Rose Dragon\" from your GY. You can only use each of the following effects of \"Black Rose Dragon/Assault Mode\" once per turn. You can reveal this card in your hand; shuffle it into the Deck, and if you do, change the ATK of 1 face-up monster on the field to 0. If this card is Special Summoned, or a monster(s) is Special Summoned to your opponent's field: You can destroy all cards on the field.",
+      "text": "이 카드는 일반 소환 / 세트할 수 없으며, \"버스터 모드\"의 효과로 특수 소환해야 한다. 이 카드명의 ②③의 효과는 각각 1턴에 1번밖에 사용할 수 없다.\n①: 이 카드가 파괴됐을 경우에 발동할 수 있다. 자신의 묘지에서 \"블랙 로즈 드래곤\" 1장을 특수 소환한다.\n②: 패의 이 카드를 보여주고 발동할 수 있다. 이 카드를 덱으로 되돌리고, 되돌렸을 경우 필드의 앞면 표시 몬스터 1장의 공격력을 0으로 한다.\n③: 이 카드가 특수 소환됐을 경우, 또는 상대 필드에 몬스터가 특수 소환됐을 경우에 발동할 수 있다. 필드의 카드를 전부 파괴한다."
+    },
+    "48115278": {
+      "source": "Special Summoned with the effect of \"Blockman\". This Token cannot declare an attack.",
+      "text": "\"블록맨\"의 효과로 특수 소환된다. 이 토큰은 공격 선언을 할 수 없다."
+    },
+    "48128081": {
+      "source": "When this card is activated: Each player can Special Summon 1 monster from their hand in Attack Position, then if there are any other face-up monsters on the field, change all of them to face-down Defense Position. For the rest of this turn after this card resolves, you cannot Normal or Special Summon. Once per turn, when your monster declares an attack: You can negate the attack, and if you do, destroy 1 face-down card your opponent controls. Once per turn, during your opponent's End Phase: Return this card to the hand.",
+      "text": "①: 이 카드의 발동시에 양쪽 플레이어는 각각 자신의 패에서 몬스터 1장을 공격 표시로 특수 소환할 수 있다. 그 후, 필드에 그 몬스터들 이외의 앞면 표시 몬스터가 존재하면, 그 몬스터를 전부 뒷면 수비 표시로 한다. 이 효과의 처리 후 턴 종료시까지, 자신은 일반 소환 / 특수 소환할 수 없다.\n②: 1턴에 1번, 자신의 몬스터가 공격을 선언했을 경우에 발동할 수 있다. 그 공격을 무효로 하고, 무효로 했을 경우 상대 필드의 뒷면 표시 카드 1장을 파괴한다.\n③: 1턴에 1번, 상대 엔드 페이즈에 이 카드를 패로 되돌린다."
+    },
+    "48411997": {
+      "source": "Special Summoned with the effect of \"Jurrac Stauriko\". This Token cannot be Tributed for a Tribute Summon, unless it is for a \"Jurrac\" monster.",
+      "text": "\"쥬락 스타우리코\"의 효과로 특수 소환된다. \"쥬락\" 몬스터의 어드밴스 소환 이외에는 이 토큰을 어드밴스 소환을 위해 릴리스할 수 없다."
+    },
+    "49808197": {
+      "source": "Special Summoned with the effect of \"Metabo Globster\". This Token cannot be used as a Tribute for a Tribute Summon.",
+      "text": "\"메타보 서커\"의 효과로 특수 소환된다. 이 토큰은 어드밴스 소환을 위해 릴리스할 수 없다."
+    },
+    "49858495": {
+      "source": "''The three Power Pro girls are best friends! And their passion for baseball soars like a home run!\nAoi Hayakawa was the first female player in the league. Her signature pitch is a submariner she calls The Marine Ball!\nMizuki Tachibana is more of a tomboy than her senpai, best known for her Crescent Moon Pitch and her love for the pudding sold down at Pawado!\nHijiri Rokudo is a catcher with a rare gift for baseball! She's been best friends with Mizuki since junior high and her favorite at Pawado is the Kintsuba!''",
+      "text": "파워프로 소녀 세 사람은 서로 가장 친한 친구! 야구에 대한 열정은 홈런처럼 하늘을 가른다. 하야카와 아오이는 리그 최초의 여성 선수로, 마린 볼이라는 언더핸드 투구가 특기다. 타치바나 미즈키는 선배보다 활달하고, 크레센트 문 피치와 파와도의 푸딩 사랑으로 유명하다. 로쿠도 히지리는 드문 야구 재능을 지닌 포수다. 중학교 때부터 미즈키의 단짝이고 파와도의 킨츠바를 가장 좋아한다!"
+    },
+    "51083544": {
+      "source": "If this card is Normal or Special Summoned: You can add 1 Level 5 or higher WATER Spellcaster monster or 1 \"Twin Pillars of Ice\" from your Deck to your hand. You can only use this effect of \"Frost Tiger\" once per turn.",
+      "text": "이 카드명의 효과는 1턴에 1번밖에 사용할 수 없다.\n①: 이 카드가 일반 소환 또는 특수 소환됐을 경우에 발동할 수 있다. 덱에서 레벨 5 이상의 물 속성 마법사족 몬스터 1장 또는 \"얼음의 쌍기둥\" 1장을 패에 넣는다."
+    },
+    "51987572": {
+      "source": "Special Summoned with the effect of \"Rockstone Warrior\". This Token cannot be used as a Tribute for a Tribute Summon.",
+      "text": "\"락스톤 워리어\"의 효과로 특수 소환된다. 이 토큰은 어드밴스 소환을 위해 릴리스할 수 없다."
+    },
+    "52340445": {
+      "source": "Special Summoned with the effect of \"Sky Striker Mecha - Hornet Drones\". This Token cannot be Tributed.",
+      "text": "\"섬도기－호넷비트\"의 효과로 특수 소환된다. 이 토큰은 릴리스할 수 없다."
+    },
+    "53754391": {
+      "source": "Each time a non-Thunder monster(s) is Special Summoned face-up, while this card is in the Monster Zone: That monster(s) cannot attack this turn, also destroy it during the End Phase. If this card is in your GY: You can target 1 face-up card you control; destroy it, and if you do, add this card to your hand. You can only use this effect of \"Thundercrash Snarecrow' once per turn.",
+      "text": "①: 이 카드가 몬스터 존에 존재하는 한, 번개족 이외의 몬스터가 앞면 표시로 특수 소환될 때마다, 그 몬스터는 이 턴에 공격할 수 없으며 엔드 페이즈에 파괴된다.\n②: 이 카드가 묘지에 존재할 경우, 자신 필드의 앞면 표시 카드 1장을 대상으로 발동할 수 있다. 그 카드를 파괴하고, 파괴했을 경우 이 카드를 패에 넣는다. 이 카드명의 이 효과는 1턴에 1번밖에 사용할 수 없다."
+    },
+    "54120521": {
+      "source": "Target 1 card in your GY; place it on top of the Deck during the End Phase of this turn, also draw 2 cards instead of 1 for your normal draw during your next Draw Phase. You can only activate 1 \"The Legend of Tickets\" per turn.",
+      "text": "이 카드명의 카드는 1턴에 1장밖에 발동할 수 없다.\n①: 자신 묘지의 카드 1장을 대상으로 발동할 수 있다. 이 턴의 엔드 페이즈에 그 카드를 덱 맨 위에 놓는다. 다음 자신 드로우 페이즈의 일반 드로우는 1장 대신 2장 드로우한다."
+    },
+    "54171327": {
+      "source": "Give control of 1 \"Angelechy\" monster you control to your opponent (until the End Phase), then if your opponent controls a face-up card(s) in its adjacent Monster Zones and/or Spell & Trap Zones, their effects are negated. You can banish this card from your GY; add 1 \"Angelechy\" Spell/Trap from your Deck to your hand, except \"Angelechy Disturbance\". You can only use each effect of \"Angelechy Disturbance\" once per turn.",
+      "text": "이 카드명의 ①②의 효과는 각각 1턴에 1번밖에 사용할 수 없다.\n①: 자신 필드의 \"엔젤레키\" 몬스터 1장의 컨트롤을 엔드 페이즈까지 상대에게 넘긴다. 그 후, 상대의 인접한 몬스터 존 및 / 또는 마법 & 함정 존에 앞면 표시 카드가 존재하면, 그 카드들의 효과를 무효로 한다.\n②: 묘지의 이 카드를 제외하고 발동할 수 있다. 덱에서 \"엔젤레키 디스터번스\" 이외의 \"엔젤레키\" 마법 / 함정 카드 1장을 패에 넣는다."
+    },
+    "54577949": {
+      "source": "If you have a Synchro Monster in your field or GY: You can Special Summon this card from your hand. If this card is Special Summoned: You can place up to 3 Synchro Monsters with different names from your Extra Deck and/or GY in your Spell & Trap Zone as face-up Continuous Spells, and Special Summon 1 \"Arc Token\" (Machine/LIGHT/ATK 0/DEF 0) with a Level equal to the number placed, also for the rest of this turn, you cannot Special Summon from the Extra Deck, except Synchro Monsters. You can only use each effect of \"Witness of the Ancient\" once per turn.",
+      "text": "이 카드명의 ①②의 효과는 각각 1턴에 1번밖에 사용할 수 없다.\n①: 자신 필드 또는 묘지에 싱크로 몬스터가 존재할 경우에 발동할 수 있다. 이 카드를 패에서 특수 소환한다.\n②: 이 카드가 특수 소환됐을 경우에 발동할 수 있다. 자신의 엑스트라 덱 / 묘지에서 카드명이 다른 싱크로 몬스터를 3장까지 골라 지속 마법 카드로 취급하여 자신의 마법 & 함정 존에 앞면 표시로 놓고, 놓은 수와 같은 레벨의 \"아크 토큰\"(기계족 / 빛 / 공격력 0 / 수비력 0) 1장을 특수 소환한다. 이 턴의 남은 동안 자신은 싱크로 몬스터밖에 엑스트라 덱에서 특수 소환할 수 없다."
+    },
+    "55326323": {
+      "source": "Special Summoned with the effect of \"Crystron Rosenix\". This Token cannot be Tributed.",
+      "text": "\"크리스트론－로즈닉스\"의 효과로 특수 소환된다. 이 토큰은 릴리스할 수 없다."
+    },
+    "55343172": {
+      "source": "''A field of battle for those who believe in the Decks they've built, those who never turn their backs on any foes, those brave enough to fight to the very end and wage rites deciding winners and losers. It is said that when they unite their hearts with the hearts of their cards through bonds and take a step forward by swearing on their pride and souls, they can carve open a road continuing on to the as-of-yet unfinished future.''",
+      "text": "자신이 만든 덱을 믿는 자, 어떤 상대에게도 등을 돌리지 않는 자, 끝까지 싸우며 승패를 가를 의식에 임할 용기를 지닌 자들을 위한 전장. 유대로 카드와 마음을 하나로 잇고 긍지와 영혼을 걸어 한 걸음 내디디면, 아직 완성되지 않은 미래로 이어지는 길을 열 수 있다고 한다."
+    },
+    "55393975": {
+      "source": "1 Tuner + 1+ non-Tuners\nYou can target 1 monster in another column; banish it. If this card is placed in the Spell & Trap Zone as a Continuous Spell: You can add 1 \"Angelechy\" Spell from your Deck to your hand. You can only use each of the preceding effects of \"Angelechy Destrier\" once per turn. While this card is treated as a Continuous Spell, each time your opponent activates a card or effect, inflict 500 damage to your opponent when it resolves.",
+      "text": "튜너 ＋ 튜너 이외의 몬스터 1장 이상\n이 카드명의 ①②의 효과는 각각 1턴에 1번밖에 사용할 수 없다.\n①: 이 카드와 다른 세로열의 몬스터 1장을 대상으로 발동할 수 있다. 그 몬스터를 제외한다.\n②: 이 카드가 지속 마법 카드로 취급되어 마법 & 함정 존에 놓였을 경우에 발동할 수 있다. 덱에서 \"엔젤레키\" 마법 카드 1장을 패에 넣는다.\n③: 이 카드가 지속 마법 카드로 취급되는 한, 상대가 카드 또는 효과를 발동할 때마다, 그 효과의 처리시에 상대에게 500 데미지를 준다."
+    },
+    "56597273": {
+      "source": "Special Summoned with the effect of \"Cloudian - Sheep Cloud\". This Token cannot be Tributed for a Tribute Summon, unless it is for a \"Cloudian\" monster.",
+      "text": "\"운마물－양 구름\"의 효과로 특수 소환된다. \"운마물\" 몬스터의 어드밴스 소환 이외에는 이 토큰을 어드밴스 소환을 위해 릴리스할 수 없다."
+    },
+    "58083496": {
+      "source": "2+ monsters, including a Pendulum Monster\nYou can target 1 other card you control; destroy it, and if you do, draw 1 card. During your turn, when your opponent activates a card or effect (Quick Effect): You can discard 1 card; negate that effect. You can only use each of the preceding effects of \"Odd-Eyes Override Dragon\" once per turn. If you destroyed a Pendulum Monster Card by this card's first effect, during your Main Phase this turn, you can conduct 1 Pendulum Summon of a \"Performapal\" monster(s), \"Magician\" Pendulum Monster(s), and/or \"Odd-Eyes\" monster(s), in addition to your Pendulum Summon (you can only gain this effect once per turn).",
+      "text": "펜듈럼 몬스터를 포함하는 몬스터 2장 이상\n이 카드명의 ①②의 효과는 각각 1턴에 1번밖에 사용할 수 없다.\n①: 자신 필드의 다른 카드 1장을 대상으로 발동할 수 있다. 그 카드를 파괴하고, 파괴했을 경우 자신은 1장 드로우한다.\n②: 자신 턴에 상대가 카드 또는 효과를 발동했을 때, 패를 1장 버리고 발동할 수 있다(퀵 이펙트). 그 효과를 무효로 한다.\n③: 이 카드의 ①의 효과로 펜듈럼 몬스터 카드를 파괴했을 경우, 이 턴의 자신 메인 페이즈에 통상의 펜듈럼 소환 외에도 \"EM\" 몬스터, \"마술사\" 펜듈럼 몬스터 및 / 또는 \"오드아이즈\" 몬스터를 1번 펜듈럼 소환할 수 있다. 이 효과는 1턴에 1번밖에 얻을 수 없다."
+    },
+    "58995660": {
+      "source": "Once per turn, when an attack is declared involving your monster: You can roll a six-sided die and apply this effect to that monster you control based on the result until the end of this turn. If you activated this effect when an attack was declared involving 2 monsters in the same column, you choose the effect instead.\n● 1 or 4: The first time it would be destroyed by battle or card effect, it is not destroyed.\n● 2 or 5: It loses 500 ATK, also it is unaffected by activated Spell/Trap effects, except \"Early Palm Gets the Win\".\n● 3 or 6: It gains 1000 ATK, also it can make up to 2 attacks on monsters during each Battle Phase.",
+      "text": "①: 1턴에 1번, 자신의 몬스터가 관련된 공격이 선언됐을 때 발동할 수 있다. 6면 주사위를 1번 굴리고, 나온 눈에 따라 턴 종료시까지 그 자신 몬스터에 이하의 효과를 적용한다. 같은 세로열의 몬스터끼리 전투하는 경우에는 주사위를 굴리지 않고 이하에서 1개를 고른다.\n● 1·4: 처음으로 전투 또는 효과로 파괴될 경우, 파괴되지 않는다.\n● 2·5: 공격력이 500 내리고, \"선수를 치면 승리\" 이외의 발동한 마법 / 함정 효과를 받지 않는다.\n● 3·6: 공격력이 1000 오르고, 1번의 배틀 페이즈 중에 몬스터에 2회까지 공격할 수 있다."
+    },
+    "59011257": {
+      "source": "This face-up card in the Monster Zone cannot be Tributed, nor used as material for a Fusion, Synchro, Xyz, or Link Summon. If a monster(s) is Special Summoned to your opponent's field, while this card is in the Monster Zone: Target 1 of them; give control of this card to that monster's controller, also that monster cannot be Tributed nor used as material for a Fusion, Synchro, Xyz or Link Summon while this monster is face-up on the field.",
+      "text": "①: 몬스터 존의 앞면 표시인 이 카드는 릴리스할 수 없으며, 융합 / 싱크로 / 엑시즈 / 링크 소환의 소재로 할 수 없다.\n②: 이 카드가 몬스터 존에 존재하는 상태에서 상대 필드에 몬스터가 특수 소환됐을 경우, 그중 1장을 대상으로 발동한다. 이 카드의 컨트롤을 그 몬스터의 컨트롤러에게 넘긴다. 이 카드가 필드에 앞면 표시로 존재하는 한, 그 몬스터는 릴리스할 수 없으며 융합 / 싱크로 / 엑시즈 / 링크 소환의 소재로 할 수 없다."
+    },
+    "59106048": {
+      "source": "If this card is Normal or Special Summoned and you control a \"Witchcrafter\" monster other than \"Witchcrafter Seed\", or \"Regulus, the Prince of Endymion\": You can target 1 face-up card on the field; return it to the hand. You can banish this card from your GY; reveal any number of cards in your hand, including a Spell, and shuffle them into the Deck, then draw that many cards. You can only use each effect of \"Witchcrafter Seed\" once per turn.",
+      "text": "이 카드명의 ①②의 효과는 각각 1턴에 1번밖에 사용할 수 없다.\n①: 이 카드가 일반 소환 / 특수 소환됐고, 자신 필드에 \"위치크래프트 시드\" 이외의 \"위치크래프트\" 몬스터 또는 \"엔디미온의 왕자 레굴루스\"가 존재할 경우, 필드의 앞면 표시 카드 1장을 대상으로 발동할 수 있다. 그 카드를 패로 되돌린다.\n②: 묘지의 이 카드를 제외하고 발동할 수 있다. 자신의 패에서 마법 카드를 포함한 임의의 수의 카드를 보여주고 덱으로 되돌린다. 그 후, 되돌린 수만큼 드로우한다."
+    },
+    "60516416": {
+      "source": "1 Spellcaster monster + 1 WIND monster\n(This card is always treated as a \"Familiar-Possessed\" card.)\nIf this card is Fusion Summoned: You can place 1 WIND monster from your GY on the bottom of the Deck, then target 1 monster your opponent controls; take control of that monster. During your opponent's turn (Quick Effect): You can target 2 cards on the field, including a WIND monster you control; place them on the bottom of the Deck in any order. You can only use 1 \"Possessed Destiny - Wynn\" effect per turn, and only once that turn.",
+      "text": "마법사족 몬스터 ＋ 바람 속성 몬스터\n이 카드는 룰상 \"빙의장착\" 카드로도 취급한다. 이 카드명의 ①②의 효과는 1턴에 1번, 어느 쪽이든 1개밖에 사용할 수 없다.\n①: 이 카드를 융합 소환했을 경우, 자신 묘지의 바람 속성 몬스터 1장을 덱 맨 아래로 되돌린 후 상대 필드의 몬스터 1장을 대상으로 발동할 수 있다. 그 몬스터의 컨트롤을 얻는다.\n②: 상대 턴에 자신 필드의 바람 속성 몬스터를 포함한 필드의 카드 2장을 대상으로 발동할 수 있다(퀵 이펙트). 그 카드들을 원하는 순서로 덱 맨 아래로 되돌린다."
+    },
+    "63028558": {
+      "source": "''The stellar god of another world, harboring its twilight sun. His frozen flames leave a scorched trail across the dimensions, forever seeking new strength.''",
+      "text": "황혼의 태양을 품은 이세계의 별의 신. 얼어붙은 불꽃으로 차원 너머에 그을린 흔적을 남기며, 끝없이 새로운 힘을 찾아다닌다."
+    },
+    "63442605": {
+      "source": "Special Summoned with the effect of \"Physical Double\". Destroy this Token during the End Phase.",
+      "text": "\"물리분신\"의 효과로 특수 소환된다. 이 토큰은 엔드 페이즈에 파괴된다."
+    },
+    "65400671": {
+      "source": "2+ monsters, including a Tuner\nIf this card is Link Summoned: You can Special Summon 1 Tuner from your Extra Deck in Defense Position, with a Level less than or equal to the total original Levels of the monsters used as material. During your opponent's Main or Battle Phase (Quick Effect): You can banish this card you control; Special Summon 3 \"Crystron Tokens\" (Machine/WATER/Level 1/ATK 0/DEF 0), but they cannot be Tributed. You can only use each effect of \"Crystron Halqifibrax Prism\" once per turn.",
+      "text": "튜너를 포함하는 몬스터 2장 이상\n이 카드명의 ①②의 효과는 각각 1턴에 1번밖에 사용할 수 없다.\n①: 이 카드를 링크 소환했을 경우에 발동할 수 있다. 이 카드의 소재로 한 몬스터들의 원래 레벨 합계 이하의 레벨을 가진 튜너 1장을 자신의 엑스트라 덱에서 수비 표시로 특수 소환한다.\n②: 상대 메인 페이즈 또는 배틀 페이즈에 이 카드를 제외하고 발동할 수 있다(퀵 이펙트). 자신 필드에 \"크리스트론 토큰\"(기계족 / 물 / 레벨 1 / 공격력 0 / 수비력 0) 3장을 특수 소환한다. 이 토큰은 릴리스할 수 없다."
+    },
+    "65500516": {
+      "source": "Special Summoned with the effect of \"Squirt Squid\". When Summoned, this Token's ATK becomes equal to the current ATK of the attacking monster.",
+      "text": "\"먹물오징어\"의 효과로 특수 소환된다. 이 토큰이 소환됐을 때, 이 토큰의 공격력은 공격 몬스터의 현재 공격력과 같아진다."
+    },
+    "66122213": {
+      "source": "1 Tuner + 1+ non-Tuners\nDuring Main Phase 2 (Quick Effect): You can destroy as many face-up monsters on the field as possible, and if you do, inflict damage to your opponent equal to the total original Levels of those destroyed monsters x 200. If this card is destroyed by battle or card effect: You can target 1 Level 5 or lower Machine monster in your GY; Special Summon it in Defense Position. You can only use each effect of \"Infernal Strike Fighter\" once per turn.",
+      "text": "튜너 ＋ 튜너 이외의 몬스터 1장 이상\n이 카드명의 ①②의 효과는 각각 1턴에 1번밖에 사용할 수 없다.\n①: 메인 페이즈 2에 발동할 수 있다(퀵 이펙트). 필드의 앞면 표시 몬스터를 가능한 한 많이 파괴하고, 파괴했을 경우 그 몬스터들의 원래 레벨 합계 × 200 데미지를 상대에게 준다.\n②: 이 카드가 전투 또는 효과로 파괴됐을 경우, 자신 묘지의 레벨 5 이하 기계족 몬스터 1장을 대상으로 발동할 수 있다. 그 몬스터를 수비 표시로 특수 소환한다."
+    },
+    "66661679": {
+      "source": "Special Summoned with the effect of \"Royal Knight of the Ice Barrier\". This Token cannot be used as a Tribute for a Tribute Summon.",
+      "text": "\"빙결계의 로얄 나이트\"의 효과로 특수 소환된다. 이 토큰은 어드밴스 소환을 위해 릴리스할 수 없다."
+    },
+    "67949764": {
+      "source": "Special Summoned with the effect of \"Corrupted Keys\". When Summoned, this Token's ATK becomes equal to the current ATK of the Xyz Monster targeted by \"Corrupted Keys\". This Token cannot attack your opponent directly or be Tributed, except for a Tribute Summon. When that face-up Xyz Monster leaves the field, destroy this Token.",
+      "text": "\"죄건의 법－신 키 로우\"의 효과로 특수 소환된다. 이 토큰이 소환됐을 때, 이 토큰의 공격력은 \"죄건의 법－신 키 로우\"가 대상으로 한 엑시즈 몬스터의 현재 공격력과 같아진다. 이 토큰은 직접 공격할 수 없으며, 어드밴스 소환 이외에는 릴리스할 수 없다. 그 앞면 표시 엑시즈 몬스터가 필드에서 벗어나면 이 토큰을 파괴한다."
+    },
+    "68075840": {
+      "source": "''The stadium is now open, and our all-star ladies are ready to take you out to the ball game! It's the beginning of a new baseball legend!\nPresenting: The three navigators of the Power Pro world! That's Paa-chan on the left, bright, energetic, and (usually) dependable. On the right we've got Waa-chan, calm, earnest, and level-headed (usually...). And Namiki is in charge up front with little Chikuwa in her tote bag, helping us cheer everyone on!''",
+      "text": "경기장이 열렸다! 올스타 소녀들과 함께 야구를 즐길 시간이다. 새로운 야구 전설의 시작! 파워프로 세계의 안내자 세 사람을 소개한다. 왼쪽은 밝고 활기차며 대체로 믿음직한 파짱, 오른쪽은 차분하고 성실하며 대체로 침착한 와짱. 앞쪽의 나미키는 가방 속 작은 치쿠와와 함께 모두를 응원한다!"
+    },
+    "68811206": {
+      "source": "This monster cannot be Special Summoned. When this card destroys a monster as a result of battle and sends it to the Graveyard, inflict damage to your opponent's Life Points equal to the ATK of the destroyed monster.",
+      "text": "이 카드는 특수 소환할 수 없다. 이 카드가 전투로 몬스터를 파괴하여 묘지로 보냈을 때, 파괴한 몬스터의 공격력만큼 상대에게 데미지를 준다."
+    },
+    "69890968": {
+      "source": "Special Summoned with the effect of \"Raviel, Lord of Phantasms\". This Token cannot declare an attack.",
+      "text": "\"환마황제 라비엘\"의 효과로 특수 소환된다. 이 토큰은 공격 선언을 할 수 없다."
+    },
+    "71771005": {
+      "source": "Special Summoned with the effect of \"Readying of Rites\". While you control that Token, you cannot Special Summon from the Extra Deck.",
+      "text": "\"공물의 손질\"의 효과로 특수 소환된다. 자신 필드에 이 토큰이 존재하는 한, 자신은 엑스트라 덱에서 특수 소환할 수 없다."
+    },
+    "73320394": {
+      "source": "You can discard 2 cards, including this card; add 1 Level 8 Fiend monster from your Deck to your hand. When your Fiend monster is destroyed by battle: You can Special Summon this card from your GY. During your Main Phase: You can roll a six-sided die and apply this effect based on the result.\n● 1, 2, 3, or 4: Take control of, or destroy, 1 monster your opponent controls.\n● 5 or 6: Destroy 1 card you control.\nYou can only use each effect of \"Evil Lord - Zorc\" once per turn.",
+      "text": "이 카드명의 ①②③의 효과는 각각 1턴에 1번밖에 사용할 수 없다.\n①: 이 카드를 포함한 패 2장을 버리고 발동할 수 있다. 덱에서 레벨 8 악마족 몬스터 1장을 패에 넣는다.\n②: 자신의 악마족 몬스터가 전투로 파괴됐을 때 발동할 수 있다. 묘지의 이 카드를 특수 소환한다.\n③: 자신 메인 페이즈에 발동할 수 있다. 6면 주사위를 1번 굴리고, 나온 눈에 따라 이하를 적용한다.\n● 1·2·3·4: 상대 필드의 몬스터 1장의 컨트롤을 얻거나 그 몬스터를 파괴한다.\n● 5·6: 자신 필드의 카드 1장을 파괴한다."
+    },
+    "73915052": {
+      "source": "Special Summoned with the effect of \"Scapegoat\". This Token cannot be used as a Tribute for a Tribute Summon.",
+      "text": "\"희생양\"의 효과로 특수 소환된다. 이 토큰은 어드밴스 소환을 위해 릴리스할 수 없다."
+    },
+    "75622825": {
+      "source": "Special Summoned with the effect of \"Tricky Spell 4\". This Token cannot declare an attack.",
+      "text": "\"트릭키 매직4\"의 효과로 특수 소환된다. 이 토큰은 공격 선언을 할 수 없다."
+    },
+    "77435269": {
+      "source": "Special Summoned with the effect of \"Checkker\". Cannot be used as material for a Fusion, Synchro, or Link Summon.",
+      "text": "\"체츠커\"의 효과로 특수 소환된다. 이 토큰은 융합 / 싱크로 / 링크 소환의 소재로 할 수 없다."
+    },
+    "79621896": {
+      "source": "If this card is in your hand: You can Tribute 1 other \"Archfiend\" monster from your hand or field; Special Summon this card. If this card is Normal or Special Summoned: You can Special Summon 1 Level 6 Fiend monster with 2500 ATK from your hand, Deck, or GY. When your opponent activates a monster effect and you control \"Summoned Skull\" (Quick Effect): You can negate the activation, and if you do, destroy that card. You can only use each effect of \"Archfiend's Origin\" once per turn.",
+      "text": "이 카드명의 ①②③의 효과는 각각 1턴에 1번밖에 사용할 수 없다.\n①: 이 카드가 패에 존재할 경우, 자신의 패 / 필드에서 이 카드 이외의 \"데몬\" 몬스터 1장을 릴리스하고 발동할 수 있다. 이 카드를 특수 소환한다.\n②: 이 카드가 일반 소환 또는 특수 소환됐을 경우에 발동할 수 있다. 자신의 패 / 덱 / 묘지에서 공격력 2500인 레벨 6 악마족 몬스터 1장을 특수 소환한다.\n③: 자신 필드에 \"데몬 소환\"이 존재하고 상대가 몬스터 효과를 발동했을 때 발동할 수 있다(퀵 이펙트). 그 발동을 무효로 하고, 무효로 했을 경우 그 카드를 파괴한다."
+    },
+    "80565021": {
+      "source": "If your opponent goes first, you can also activate this card from your hand during the Standby Phase of their first turn. Place 1 \"Angelechy\" Field Spell from your hand, Deck, or GY, face-up on your field, and if you do, Special Summon 1 Level 2 or 7 \"Angelechy\" monster from your Extra Deck to the Extra Monster Zone, and if you do that, place 1 \"Angelechy\" monster from your Extra Deck in your Spell & Trap Zone as a face-up Continuous Spell. Until the end of your next turn after this card resolves, you cannot Special Summon from the Extra Deck, except Synchro Monsters.",
+      "text": "상대가 선공이라면, 상대의 첫 턴 스탠바이 페이즈에 이 카드를 패에서 발동할 수도 있다.\n①: 자신의 패 / 덱 / 묘지에서 \"엔젤레키\" 필드 마법 카드 1장을 필드 존에 앞면 표시로 놓는다. 놓았을 경우, 엑스트라 덱에서 레벨 2 또는 7의 \"엔젤레키\" 몬스터 1장을 엑스트라 몬스터 존에 특수 소환한다. 그 특수 소환에 성공했을 경우, 엑스트라 덱에서 \"엔젤레키\" 몬스터 1장을 지속 마법 카드로 취급하여 자신의 마법 & 함정 존에 앞면 표시로 놓는다. 이 카드의 처리 후 다음 자신 턴 종료시까지, 자신은 싱크로 몬스터밖에 엑스트라 덱에서 특수 소환할 수 없다."
+    },
+    "80843006": {
+      "source": "1 Spellcaster monster + 1 non-Spellcaster monster\nYou can target 1 face-up monster on the field and declare 1 Attribute; it becomes that Attribute. During your opponent's Main Phase (Quick Effect): You can Fusion Summon 1 Fusion Monster from your Extra Deck, by banishing this card you control and monsters from your field or GY as material. If this card is in your GY: You can declare 1 Attribute; this card in the GY becomes that Attribute until the end of this turn. You can only use each effect of \"Mixousia the Confounder\" once per turn.",
+      "text": "마법사족 몬스터 ＋ 마법사족 이외의 몬스터\n이 카드명의 ①②③의 효과는 각각 1턴에 1번밖에 사용할 수 없다.\n①: 필드의 앞면 표시 몬스터 1장을 대상으로 하고 속성을 1개 선언하여 발동할 수 있다. 그 몬스터는 선언한 속성이 된다.\n②: 상대 메인 페이즈에 발동할 수 있다(퀵 이펙트). 자신 필드의 이 카드 및 자신 필드 / 묘지의 몬스터를 융합 소재로서 제외하고, 엑스트라 덱에서 융합 몬스터 1장을 융합 소환한다.\n③: 이 카드가 묘지에 존재할 경우, 속성을 1개 선언하여 발동할 수 있다. 묘지의 이 카드는 턴 종료시까지 선언한 속성이 된다."
+    },
+    "81797573": {
+      "source": "1 Tuner + 1 non-Tuner\nYou can target 1 opponent's monster in this card's adjacent column; banish it, then change control of this card by moving it to one of your opponent's Main Monster Zones in this card's adjacent columns. If the control of this face-up card changes: Return this card to the Extra Deck, then the owner of this card Special Summons 1 \"Angelechy\" monster from their Extra Deck. You can only use each effect of \"Angelechy Enlisted\" once per turn.",
+      "text": "튜너 ＋ 튜너 이외의 몬스터 1장\n이 카드명의 ①②의 효과는 각각 1턴에 1번밖에 사용할 수 없다.\n①: 이 카드와 인접한 세로열의 상대 몬스터 1장을 대상으로 발동할 수 있다. 그 몬스터를 제외한 후, 이 카드를 인접한 세로열의 상대 메인 몬스터 존 중 1곳으로 옮겨 컨트롤을 상대에게 넘긴다.\n②: 앞면 표시인 이 카드의 컨트롤이 변경됐을 경우에 발동한다. 이 카드를 엑스트라 덱으로 되돌린 후, 이 카드의 주인은 자신의 엑스트라 덱에서 \"엔젤레키\" 몬스터 1장을 특수 소환한다."
+    },
+    "81965543": {
+      "source": "Take control of all your opponent's monsters in this card's column. If this Set card in its owner's control has left the field by an opponent's effect, and is now in the GY or banished: You can Special Summon this card as an Effect Monster (Fiend/DARK/Level 10/ATK 4000/DEF 4000) with the following effect (this card is NOT treated as a Trap).\n● Unaffected by your opponent's card effects activated in the same column.\nYou can only activate 1 \"Distrust Paranoia\" per turn.",
+      "text": "이 카드명의 카드는 1턴에 1장밖에 발동할 수 없다.\n①: 이 카드와 같은 세로열의 상대 몬스터의 컨트롤을 전부 얻는다.\n②: 원래 주인의 필드에 세트돼 있던 이 카드가 상대 효과로 필드에서 벗어나 묘지 또는 제외 상태에 있을 경우에 발동할 수 있다. 이 카드를 이하의 효과를 가진 효과 몬스터(악마족 / 어둠 / 레벨 10 / 공격력 4000 / 수비력 4000)로서 특수 소환한다. 이 카드는 함정 카드로 취급하지 않는다.\n● 이 카드는 자신과 같은 세로열에서 발동한 상대 카드의 효과를 받지 않는다."
+    },
+    "82324106": {
+      "source": "Special Summoned with the effect of \"Limit Impulse\". This Token cannot be Tributed, except for a Tribute Summon.",
+      "text": "\"극한으로의 충동\"의 효과로 특수 소환된다. 이 토큰은 어드밴스 소환 이외에는 릴리스할 수 없다."
+    },
+    "82340057": {
+      "source": "Special Summoned with the effect of \"Offering to the Immortals\". This Token cannot be Tributed, except for a Tribute Summon of an \"Earthbound Immortal\" monster, and cannot be used as Synchro Material monsters.",
+      "text": "\"영예의 제물\"의 효과로 특수 소환된다. 이 토큰은 \"지박신\" 몬스터의 어드밴스 소환 이외에는 릴리스할 수 없으며, 싱크로 소재로 할 수 없다."
+    },
+    "82370493": {
+      "source": "1 \"Predaplant\" monster + 1 Level 1 monster\nMust first be either Fusion Summoned, or Special Summoned (from your Extra Deck) by Tributing 1 monster on either field with a Predator Counter and 1 \"Predaplant\" monster you control. During the Main Phase, if this card was Special Summoned this turn (Quick Effect): You can target Spells/Traps on the field, up to the number of monsters with a Predator Counter; destroy them. You can only use this effect of \"Predaplant Daredevil\" once per turn.",
+      "text": "\"프레데터 플랜츠\" 몬스터 ＋ 레벨 1 몬스터\n엑스트라 덱의 이 카드는 융합 소환하거나, 포식 카운터가 놓인 자신 또는 상대 필드의 몬스터 1장과 자신 필드의 \"프레데터 플랜츠\" 몬스터 1장을 릴리스했을 경우에만 처음으로 특수 소환할 수 있다.\n①: 이 카드가 특수 소환된 턴의 메인 페이즈에, 포식 카운터가 놓인 몬스터의 수까지 필드의 마법 / 함정 카드를 대상으로 발동할 수 있다(퀵 이펙트). 그 카드들을 파괴한다. 이 카드명의 이 효과는 1턴에 1번밖에 사용할 수 없다."
+    },
+    "82994510": {
+      "source": "Special Summoned with the effect of \"Horseytail\". When this Token is destroyed by battle with a Plant-Type monster, its controller sends 1 card from their hand to the Graveyard.",
+      "text": "\"쇠뜨기\"의 효과로 특수 소환된다. 이 토큰이 식물족 몬스터와의 전투로 파괴됐을 때, 그 컨트롤러는 자신의 패에서 카드 1장을 묘지로 보낸다."
+    },
+    "85482105": {
+      "source": "If this card is in your hand: You can send 1 \"Speedroid\" card from your Deck to the GY, except \"Speedroid Darumaknocker\"; Special Summon this card, also you cannot Special Summon for the rest of this turn, except WIND monsters. If this card is sent from the field to the GY: You can add 1 \"Speedroid\" Spell/Trap from your Deck to your hand, then if you control a \"Clear Wing\" monster, you can destroy 1 monster on the field. You can only use each effect of \"Speedroid Darumaknocker\" once per turn.",
+      "text": "이 카드명의 ①②의 효과는 각각 1턴에 1번밖에 사용할 수 없다.\n①: 이 카드가 패에 존재할 경우, 덱에서 \"SR(스피드로이드) 다루마노커\" 이외의 \"SR\" 카드 1장을 묘지로 보내고 발동할 수 있다. 이 카드를 특수 소환한다. 이 턴의 남은 동안 자신은 바람 속성 몬스터밖에 특수 소환할 수 없다.\n②: 이 카드가 필드에서 묘지에 보내졌을 경우에 발동할 수 있다. 덱에서 \"SR\" 마법 / 함정 카드 1장을 패에 넣는다. 그 후, 자신 필드에 \"클리어윙\" 몬스터가 존재할 경우 필드의 몬스터 1장을 파괴할 수 있다."
+    },
+    "85771020": {
+      "source": "Special Summoned with the effect of \"Darklord Asmodeus\". This Token cannot be destroyed by a card effect.",
+      "text": "\"타락천사 아스모디우스\"의 효과로 특수 소환된다. 이 토큰은 효과로 파괴되지 않는다."
+    },
+    "85771021": {
+      "source": "Special Summoned with the effect of \"Darklord Asmodeus\". This Token cannot be destroyed by battle.",
+      "text": "\"타락천사 아스모디우스\"의 효과로 특수 소환된다. 이 토큰은 전투로 파괴되지 않는다."
+    },
+    "86801872": {
+      "source": "Special Summoned with the effect of \"Cobra Jar\". When this Token is destroyed as a result of battle, inflict 500 points of damage to your opponent's Life Points.",
+      "text": "\"스네이크 포트\"의 효과로 특수 소환된다. 이 토큰이 전투로 파괴됐을 때, 상대에게 500 데미지를 준다."
+    },
+    "86871615": {
+      "source": "Special Summoned with the effect of \"Cloning\". If the monster is destroyed and sent to the Graveyard, destroy this Token.",
+      "text": "\"클론 복제\"의 효과로 특수 소환된다. 복제한 몬스터가 파괴되어 묘지로 보내지면 이 토큰을 파괴한다."
+    },
+    "86893702": {
+      "source": "''A massive, malevolent monstrosity, devourer of diverse dimensions, who molds multiple domains where only the mightiest dare dwell.''",
+      "text": "여러 차원을 삼키는 거대하고 사악한 괴물. 가장 강한 자만이 감히 살아갈 수 있는 여러 영역을 빚어낸다."
+    },
+    "89027418": {
+      "source": "When a monster effect that was activated on your opponent's field by targeting a card(s) on the field resolves, if any of those targets are in a different column than that opponent's monster, they can banish 1 card from their GY. If they did not, negate the activated effect. You can banish 1 monster from your GY; Special Summon 1 \"Imposter Token\" (Psychic/EARTH/ATK 800/DEF 800) with the same Level as that monster. You can only use this effect of \"Imposter Shift\" once per turn.",
+      "text": "①: 필드의 카드를 대상으로 상대 필드에서 발동한 몬스터 효과의 처리시에, 그 대상 중에 그 상대 몬스터와 다른 세로열의 카드가 있으면 상대는 자신의 묘지에서 카드 1장을 제외할 수 있다. 제외하지 않았을 경우, 그 발동한 효과를 무효로 한다.\n②: 자신 묘지의 몬스터 1장을 제외하고 발동할 수 있다. 제외한 몬스터와 같은 레벨의 \"임포스터 토큰\"(사이킥족 / 땅 / 공격력 800 / 수비력 800) 1장을 특수 소환한다. 이 카드명의 이 효과는 1턴에 1번밖에 사용할 수 없다."
+    },
+    "90615639": {
+      "source": "Shuffle your Deck, then excavate the top card of your Deck, and if it is a monster that can be Normal Summoned/Set, Special Summon it. If it wasn't, or couldn't be Special Summoned, place it on the top or bottom of the Deck. You can only activate 1 \"Time Dimension Hole\" per turn.",
+      "text": "이 카드명의 카드는 1턴에 1장밖에 발동할 수 없다.\n①: 자신의 덱을 셔플하고 그 덱의 맨 위 카드를 넘긴다. 그 카드가 일반 소환 / 세트 가능한 몬스터라면 특수 소환한다. 해당 몬스터가 아니거나 특수 소환할 수 없을 경우, 그 카드를 덱 맨 위 또는 맨 아래에 놓는다."
+    },
+    "91337277": {
+      "source": "If this card is Normal Summoned: You can banish the top 50 cards of your Deck, face-down; this card's ATK becomes 10,000 until the end of this turn.",
+      "text": "①: 이 카드가 일반 소환됐을 경우, 덱 맨 위에서 카드 50장을 뒷면으로 제외하고 발동할 수 있다. 이 카드의 공격력은 턴 종료시까지 10000이 된다."
+    },
+    "92447211": {
+      "source": "If this card is Normal or Special Summoned: You can reveal 1 Zombie monster in your hand and send 1 EARTH Zombie monster from your Deck to the GY; send the revealed monster to the GY, and if you do, this card gains 500 ATK until the end of this turn. You can only use this effect of \"Long-Tailed Black Horse\" once per turn.",
+      "text": "이 카드명의 효과는 1턴에 1번밖에 사용할 수 없다.\n①: 이 카드가 일반 소환 또는 특수 소환됐을 경우, 패의 언데드족 몬스터 1장을 보여주고 덱에서 땅 속성 언데드족 몬스터 1장을 묘지로 보내 발동할 수 있다. 보여준 몬스터를 묘지로 보내고, 묘지로 보냈을 경우 이 카드의 공격력은 턴 종료시까지 500 올린다."
+    },
+    "92517928": {
+      "source": "2 Level 9 monsters\nOnce per turn, you can also Xyz Summon \"Galaxy-Eyes Antimatter Dragon\" by using 1 Xyz Monster you control with 3 or more materials (transfer its materials). Any battle damage this card inflicts to your opponent while it has material is halved. You can detach 1 material from this card; it can make up to 2 attacks on monsters during each Battle Phase this turn, then if the detached material was a monster, you can send 1 monster with the same Type as that monster from your Deck to the GY.",
+      "text": "레벨 9 몬스터 × 2장\n\"갤럭시아이즈 안티매터 드래곤\"은 1턴에 1번, 엑시즈 소재를 3개 이상 가진 자신 필드의 엑시즈 몬스터 1장 위에 겹쳐 엑시즈 소환할 수도 있다. 그 몬스터가 가진 소재도 이 카드의 소재로 한다.\n①: 이 카드가 엑시즈 소재를 가지고 있는 한, 이 카드가 상대에게 주는 전투 데미지는 절반이 된다.\n②: 이 카드의 엑시즈 소재를 1개 제거하고 발동할 수 있다. 이 턴에 이 카드는 1번의 배틀 페이즈 중 몬스터에 2회까지 공격할 수 있다. 그 후, 제거한 소재가 몬스터였다면 덱에서 그 몬스터와 같은 종족의 몬스터 1장을 묘지로 보낼 수 있다."
+    },
+    "93130022": {
+      "source": "Special Summoned with the effect of \"Victory Viper XX03\" or \"Power Capsule\". This Token always has the same Type, Attribute, Level, ATK, and DEF as \"Victory Viper XX03\".",
+      "text": "\"빅토리 바이퍼 XX03\" 또는 \"파워 캡슐\"의 효과로 특수 소환된다. 이 토큰의 종족 / 속성 / 레벨 / 공격력 / 수비력은 항상 \"빅토리 바이퍼 XX03\"과 같다."
+    },
+    "94384774": {
+      "source": "Once per Chain, if an Effect Monster(s) is Special Summoned (except during the Damage Step): You can target 1 of them; Special Summon 1 \"Shinsen Token\" (Aqua/WATER/Level 3/ATK 0/DEF 0) to its controller's opponent's field in Defense Position. Once per Battle Phase, at the start of the Battle Phase: You can destroy both this card and as many Tokens on the field as possible, and if you do, Special Summon 1 \"Ebisu Token\" (Fairy/WATER/Level 7/ATK ?/DEF ?). This Token's ATK/DEF become the number of Tokens destroyed by this effect x 700.",
+      "text": "①: 같은 체인에 1번, 효과 몬스터가 특수 소환됐을 경우, 데미지 스텝 이외에 그중 1장을 대상으로 발동할 수 있다. 그 몬스터의 컨트롤러의 상대 필드에 \"신선 토큰\"(물족 / 물 / 레벨 3 / 공격력 0 / 수비력 0) 1장을 수비 표시로 특수 소환한다.\n②: 배틀 페이즈마다 1번, 그 배틀 페이즈 개시시에 발동할 수 있다. 이 카드와 필드의 토큰을 가능한 한 많이 파괴하고, 파괴했을 경우 \"에비스 토큰\"(천사족 / 물 / 레벨 7 / 공격력 ? / 수비력 ?) 1장을 특수 소환한다. 그 토큰의 공격력 / 수비력은 이 효과로 파괴한 토큰의 수 × 700이 된다."
+    },
+    "94384776": {
+      "source": "Special Summoned with the effect of \"Ebisu Shinsen Matsuri\". This Token's ATK/DEF become the number of Tokens destroyed by this effect x 700.",
+      "text": "\"에비스 신선 축제\"의 효과로 특수 소환된다. 이 토큰의 공격력과 수비력은 각각 그 효과로 파괴한 토큰의 수 × 700이 된다."
+    },
+    "95506252": {
+      "source": "1 Tuner + 1+ non-Tuners\nCannot be destroyed by battle. Each time a card(s) is placed in your opponent's Spell & Trap Zone: Excavate cards from the top of your Deck until you excavate a monster, equip it to this card as an Equip Spell, also place the rest on the bottom of the Deck in any order. Gains ATK/DEF equal to the total Levels of the monsters equipped to this card x 300. If the total Levels of the monsters equipped to this card is greater than 21, destroy this card.",
+      "text": "튜너 ＋ 튜너 이외의 몬스터 1장 이상\n①: 이 카드는 전투로는 파괴되지 않는다.\n②: 상대의 마법 & 함정 존에 카드가 놓일 때마다, 몬스터가 나올 때까지 자신 덱의 맨 위부터 카드를 넘긴다. 넘긴 몬스터는 장착 마법 카드로 취급하여 이 카드에 장착하고, 나머지 카드는 원하는 순서로 덱 맨 아래에 놓는다.\n③: 이 카드의 공격력 / 수비력은 이 카드에 장착한 몬스터들의 레벨 합계 × 300 올린다. 그 레벨 합계가 21을 넘으면 이 카드를 파괴한다."
+    },
+    "98588427": {
+      "source": "''\"BULLauncher\" is a support machine specializing in bombardment and daytime combat that not only has the constantly refined \"Coc-OS\" and \"BFS Armor\", but it also has 3 \"Foil-Packers\" installed within it under orders of \"Madera\" after repeated trial and error. By installing a \"Beef-Rifle\" or other armaments, it can be used as medium- and long-range support for the \"Steam Knights\" and their operations. Also, \"BULLauncher\" can be combined with \"WINGear\", which specializes in high-speed aerial combat, and \"BOARms\", which specializes in melee and assault combat, to cause the high-calorie \"Steam Jushin - BW\" to descend upon this world.''",
+      "text": "\"불런처\"는 포격과 주간 전투에 특화한 지원 기체다. 끊임없이 개선되는 \"코크 OS\"와 \"BFS 아머\"를 갖췄으며, 반복된 시행착오 끝에 여신 \"마데라\"의 명령으로 \"포일 패커\" 3기를 탑재했다. \"비프 라이플\" 등의 무장을 장착하여 \"스팀 나이트\"의 작전을 중장거리에서 지원한다. 고속 공중전에 특화한 \"윙기어\", 근접전과 돌격에 특화한 \"보어암스\"와 합체하면 열량 높은 \"스팀 주신－BW\"가 이 세계에 강림한다."
+    }
+  }
+}

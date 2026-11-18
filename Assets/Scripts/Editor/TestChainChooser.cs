@@ -42,9 +42,11 @@ namespace YGOPortable.Editor
             Require(CardDatabase.ResolveDescription(untranslatedOption) == null &&
                     CardDatabase.ResolveEffectDescription(untranslatedOption, legendaryBlackLusterSoldier) == rulesText,
                 "An untranslated effect label did not fall back to the Korean card text.");
+            string cyberseRules = CardDatabase.GetKoreanCardDescription(cyberseCodeMagician);
             Require(CardDatabase.ResolveDescription(untranslatedOption | 1) == "덱으로 되돌린다" &&
-                    CardDatabase.ResolveEffectDescription((ulong)cyberseCodeMagician << 20, cyberseCodeMagician) == null,
-                "The shared translation or the fallback for cards without Korean text failed.");
+                    !string.IsNullOrWhiteSpace(cyberseRules) &&
+                    CardDatabase.ResolveEffectDescription((ulong)cyberseCodeMagician << 20, cyberseCodeMagician) == cyberseRules,
+                "The option translation or the recovered Korean card text did not resolve.");
 
             using var view = new ChainView();
             var prompt = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_CHAIN, playerId = 0 };

@@ -20,6 +20,7 @@ import struct
 import sys
 from collections import Counter, defaultdict
 from PIL import Image
+from localize_card_text import load_supplemental, localize_card_text, prefer_korean
 from modernize_opponents import modernize_opponents
 
 UNITY_ROOT = pathlib.Path(r"c:\jeminFolder\자체개발\ygo-portable-unity")
@@ -300,13 +301,10 @@ def build_cards():
         if passcode:
             pass_to_lotd.setdefault(passcode, lotd_id)
             n_off, d_off = struct.unpack_from("<II", kr_indx, 8 * i)
-            nm = read_utf16(kr_name, n_off).strip()
-            ds = read_utf16(kr_desc, d_off).strip()
-            if not nm:
-                no2, do2 = struct.unpack_from("<II", en_indx, 8 * i)
-                nm = read_utf16(en_name, no2).strip()
-                ds = read_utf16(en_desc, do2).strip()
-            if nm:
+            no2, do2 = struct.unpack_from("<II", en_indx, 8 * i)
+            nm = prefer_korean(read_utf16(kr_name, n_off).strip(), read_utf16(en_name, no2).strip())
+            ds = prefer_korean(read_utf16(kr_desc, d_off).strip(), read_utf16(en_desc, do2).strip())
+            if nm or ds:
                 stock_kr_by_pass[passcode] = (nm, ds)
 
     # Read Modern 2026 KR cards.json
@@ -456,19 +454,11 @@ def build_cards():
             d["race"], d["attack"], d["defense"], d["lscale"], d["rscale"], *d["setcodes"]
         )
 
-        # Build KR text entry: priority mod_by_pass -> stock_kr_by_pass -> cdb_texts
-        nm, ds = "", ""
-        if code in mod_by_pass:
-            nm = mod_by_pass[code].get("name", "") or ""
-            ds = mod_by_pass[code].get("description", "") or ""
-        if not nm and code in stock_kr_by_pass:
-            nm, ds = stock_kr_by_pass[code]
-        cdb_t = cdb_texts.get(code)
-        if not nm and cdb_t:
-            nm, ds = cdb_t[0], cdb_t[1]
-        elif not ds and cdb_t:
-            ds = cdb_t[1]
-        strs = cdb_t[2] if cdb_t else []
+        mod = mod_by_pass.get(code, {})
+        stock_name, stock_desc = stock_kr_by_pass.get(code, ("", ""))
+        cdb_name, cdb_desc, strs = cdb_texts.get(code, ("", "", []))
+        nm = prefer_korean(mod.get("name"), stock_name, cdb_name)
+        ds = prefer_korean(mod.get("description"), stock_desc, cdb_desc)
 
         entry = {
             "code": d["code"],
@@ -491,6 +481,7 @@ def build_cards():
             entry["strs"] = strs
         kr_cards_list.append(entry)
 
+    localize_card_text(kr_cards_list, cdb_texts, load_supplemental())
     (STREAMING / "cards_prop.bin").write_bytes(packed_bytes)
     kr_json_text = json.dumps({"cards": kr_cards_list}, ensure_ascii=False, separators=(",", ":"))
     (STREAMING / "cards_kr.json").write_text(kr_json_text, encoding="utf-8")
