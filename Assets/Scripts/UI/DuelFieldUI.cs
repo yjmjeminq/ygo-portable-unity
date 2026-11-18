@@ -2488,7 +2488,7 @@ namespace YGOPortable.UI
 
         private static string EffectActionLabel(SelectableCardItem item)
         {
-            string desc = CardDatabase.ResolveEffectDescription(item.description, item.code);
+            string desc = CardDatabase.ResolveOptionDescription(item.description);
             return desc == null ? "카드 효과 발동" : $"발동 · {desc}";
         }
 

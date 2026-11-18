@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -46,7 +47,11 @@ namespace YGOPortable.Editor
 
                 var editor = new DeckEditorUI(canvasObject.AddComponent<GameAppController>(), canvasObject.transform);
                 editor.Open();
-                try { VerifyDeckDisassembly(editor, events); }
+                try
+                {
+                    VerifyDeckDisassembly(editor, events);
+                    VerifyExcessDisassembly(editor, events);
+                }
                 finally { editor.Close(); }
             }
             finally
@@ -59,7 +64,7 @@ namespace YGOPortable.Editor
                     UnityEngine.Object.DestroyImmediate(localEvents);
                 }
             }
-            Debug.Log("[VERIFY SHOP INPUT] Pack/crafting confirmation scopes, cancellation, repeat confirmation, pack hover/reveal and displayed card disassembly passed.");
+            Debug.Log("[VERIFY SHOP INPUT] Pack/crafting confirmation scopes, cancellation, repeat confirmation, pack hover/reveal and excess-copy disassembly passed.");
         }
 
         private static void VerifyPack(CollectionShopUI shop, EventSystem events)
@@ -122,6 +127,9 @@ namespace YGOPortable.Editor
             Require(craft.GetComponentInChildren<Text>().text == $"제작 · 가루 {CollectionProgress.GetCraftDustCost(rarity)}",
                 "The crafting button did not show the cost for the selected rarity.");
             var disassemble = ButtonAt(catalog, "Details/Disassemble/Button");
+            int dustPerCard = CollectionProgress.GetDisassemblyDustPerCard(code);
+            Require(disassemble.GetComponentInChildren<Text>().text == $"분해 · 가루 +{dustPerCard}",
+                "The disassembly button did not show the reward for the selected rarity.");
             disassemble.onClick.Invoke();
             var usedCardDialog = CraftingScope(crafting);
             Require(usedCardDialog != catalog && (int)Field(crafting, "_maxQuantity") == owned,
@@ -132,12 +140,12 @@ namespace YGOPortable.Editor
             var bulk = Field(crafting, "_bulk");
             var bulkCatalog = CraftingScope(crafting);
             ButtonAt(bulkCatalog, "Details/SelectAll/Button").onClick.Invoke();
-            var selected = (System.Collections.Generic.Dictionary<uint, int>)Field(bulk, "_selected");
+            var selected = (Dictionary<uint, int>)Field(bulk, "_selected");
             var available = CollectionProgress.GetDisassembleLimits();
             Require(selected.Count == available.Count && selected[code] == owned &&
                 available.All(pair => selected.TryGetValue(pair.Key, out int quantity) && quantity == pair.Value),
                 "Select all missed eligible owned copies.");
-            string reward = $"가루 +{available.Values.Sum(quantity => (long)quantity * CollectionProgress.DisassemblyDustPerCard):N0}";
+            string reward = $"가루 +{available.Sum(entry => (long)entry.Value * CollectionProgress.GetDisassemblyDustPerCard(entry.Key)):N0}";
             Require(bulkCatalog.transform.Find("Details/Dust/Text").GetComponent<Text>().text == reward,
                 "The bulk catalog did not total the shared dust reward.");
             ButtonAt(bulkCatalog, "Details/Review/Button").onClick.Invoke();
@@ -171,7 +179,7 @@ namespace YGOPortable.Editor
             search.text = alternative.code.ToString();
             confirm.onClick.Invoke();
             Require(CollectionProgress.GetOwnedCount(code) == 0 &&
-                CollectionProgress.CraftDust == owned * CollectionProgress.DisassemblyDustPerCard &&
+                CollectionProgress.CraftDust == (long)owned * dustPerCard &&
                 catalog.transform.Find("Details/Balance/Text").GetComponent<Text>().text ==
                     $"보유 가루 {CollectionProgress.CraftDust:N0}" &&
                 search.IsInteractable() && CraftingScope(crafting) == catalog,
@@ -179,6 +187,61 @@ namespace YGOPortable.Editor
             ButtonAt(catalog, "Back/Button").onClick.Invoke();
             Require(((Text)Field(editor, "_previewOwnership")).text.Contains("미보유"),
                 "The editor did not refresh the card's ownership after disassembly.");
+        }
+
+        private static void VerifyExcessDisassembly(DeckEditorUI editor, EventSystem events)
+        {
+            var owned = CollectionProgress.GetDisassembleLimits();
+            uint reserved = owned.First(entry => entry.Value == 3).Key;
+            uint FindUnownedCard(CardRarity rarity) => CardDatabase.AllCards.First(card => card.alias == 0 &&
+                card.IsMonster && !owned.ContainsKey(card.code) && CollectionProgress.IsCraftableCard(card) &&
+                CardRarityCatalog.GetRarity(card.code) == rarity).code;
+            uint normal = FindUnownedCard(CardRarity.Normal);
+            uint rare = FindUnownedCard(CardRarity.Rare);
+            var materials = owned.Where(entry => entry.Key != reserved).ToDictionary(entry => entry.Key, entry => entry.Value);
+            Require(CollectionProgress.TryDisassembleCards(materials, out string error), error);
+            Require(CollectionProgress.TryCraftCard(normal, 4, out error), error);
+            Require(CollectionProgress.TryCraftCard(rare, 5, out error), error);
+
+            Call(editor, "InspectCard", reserved);
+            ButtonAt(editor.Root, "Editor/CardDetails/Crafting/Button").onClick.Invoke();
+            var crafting = Field(editor, "_cardCrafting");
+            var catalog = CraftingScope(crafting);
+            ButtonAt(catalog, "Bulk/Button").onClick.Invoke();
+            var bulkCatalog = CraftingScope(crafting);
+            var excess = ButtonAt(bulkCatalog, "Details/SelectExcess/Button");
+            var search = bulkCatalog.transform.Find("Catalog/Search/Input").GetComponent<InputField>();
+            search.text = reserved.ToString();
+            ButtonAt(bulkCatalog, "Details/SelectAll/Button").onClick.Invoke();
+
+            decimal before = CollectionProgress.CraftDust;
+            int total = CollectionProgress.GetDisassemblyDustPerCard(normal) + 2 * CollectionProgress.GetDisassemblyDustPerCard(rare);
+            Require(excess.IsInteractable(), "A card search disabled the collection-wide excess action.");
+            ExecuteEvents.Execute(excess.gameObject, new PointerEventData(events) { button = PointerEventData.InputButton.Left },
+                ExecuteEvents.pointerClickHandler);
+            var review = CraftingScope(crafting);
+            var bulk = Field(crafting, "_bulk");
+            var selection = (Dictionary<uint, int>)Field(bulk, "_selected");
+            Require(review != bulkCatalog && selection.Count == 2 && selection[normal] == 1 && selection[rare] == 2 &&
+                review.transform.Find("Details/Dust/Text").GetComponent<Text>().text == $"가루 +{total:N0}" &&
+                events.currentSelectedGameObject == ButtonAt(review, "Details/Cancel/Button").gameObject,
+                "The excess action did not review only copies beyond the third or displayed an incorrect reward.");
+            Call(editor, "HandleDeckPad", new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Cancel));
+            Require(CraftingScope(crafting) == bulkCatalog && CollectionProgress.CraftDust == before &&
+                CollectionProgress.GetOwnedCount(normal) == 4 && CollectionProgress.GetOwnedCount(rare) == 5,
+                "Cancelling the excess review changed the collection.");
+
+            events.SetSelectedGameObject(excess.gameObject);
+            Call(editor, "HandleDeckPad", new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Submit));
+            Require(CraftingScope(crafting) == review, "Controller submit did not open the excess review.");
+            var confirm = ButtonAt(review, "Details/Confirm/Button");
+            confirm.onClick.Invoke();
+            confirm.onClick.Invoke();
+            Require(CraftingScope(crafting) == bulkCatalog && !excess.IsInteractable() &&
+                CollectionProgress.CraftDust == before + total && new[] { normal, rare, reserved }.All(code =>
+                    CollectionProgress.GetOwnedCount(code) == 3), "Excess confirmation did not preserve three copies or applied twice.");
+            Call(crafting, "Back");
+            Call(crafting, "Back");
         }
 
         private static void VerifyNeighbors(Button control, GameObject dialog)

@@ -20,13 +20,14 @@ namespace YGOPortable.Editor
             VerifyDuplicateEffectsAndZoneViewer(duel);
             VerifySingleEffect(duel);
             VerifyKoreanEffect(duel);
+            VerifyEffectOptions(duel);
             VerifyGroupedLocations(duel);
             VerifyScrollableChoices(duel);
             VerifyNavigation(duel);
             VerifyFilteredChainCandidates(duel);
             VerifyEmptyChain(duel);
             VerifyMaterialChoices(duel);
-            Debug.Log("[VERIFY CHAIN CHOOSER] Grouped locations, native indices, duplicate effects, zone overlay, input focus, empty chain and material selection passed.");
+            Debug.Log("[VERIFY CHAIN CHOOSER] Grouped locations, native indices, compact effect options, zone overlay, input focus, empty chain and material selection passed.");
         }
 
         private static void VerifyKoreanEffect(DuelSession duel)
@@ -58,6 +59,47 @@ namespace YGOPortable.Editor
                 .Single(label => label.gameObject.name == "Effect");
             Require(effect.text == "상대 필드의 카드 1장을 주인의 덱으로 되돌린다.",
                 "Kaleido-Heart's chain preview did not show its Korean effect text.");
+
+            var unknownPrompt = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_EFFECTYN, playerId = 0,
+                promptCardCode = legendaryBlackLusterSoldier, promptDesc = untranslatedOption };
+            view.Modals.ShowPrompt(duel, unknownPrompt);
+            effect = view.Modals.ModalRoot.GetComponentsInChildren<Text>()
+                .Single(label => label.gameObject.name == "Effect");
+            Require(effect.text == "Give up your draw to search 1 Ritual Spell" && effect.text != rulesText,
+                "An untranslated chain preview should describe just the available effect.");
+        }
+
+        private static void VerifyEffectOptions(DuelSession duel)
+        {
+            const ulong kashtiraDescription = 4928565UL << 20;
+            using var view = new ChainView();
+            var prompt = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_OPTION, playerId = 0 };
+            prompt.options.Add(kashtiraDescription | 3);
+            prompt.options.Add(kashtiraDescription | 4);
+            view.Modals.ShowPrompt(duel, prompt);
+            Button Option(int index) => view.Modals.ModalRoot.GetComponentsInChildren<Button>()
+                .Single(button => button.name == $"Opt_{index}");
+
+            Require(Option(0).GetComponentInChildren<Text>().text == "내 덱 위에서 카드 3장을 묘지로 보낸다" &&
+                    Option(1).GetComponentInChildren<Text>().text == "상대 덱 위에서 카드 3장을 묘지로 보낸다" &&
+                    !view.Modals.ModalRoot.GetComponentsInChildren<Text>().Any(label => label.name == "CardText"),
+                "Kashtira's effect options must identify their respective decks without repeating card rules.");
+            Option(1).onClick.Invoke();
+
+            prompt.options.RemoveAt(0);
+            view.Modals.ShowPrompt(duel, prompt);
+            Require(Option(0).GetComponentInChildren<Text>().text == "상대 덱 위에서 카드 3장을 묘지로 보낸다",
+                "The label for the remaining option depended on its position.");
+            Option(0).onClick.Invoke();
+            Require(view.Responses.SequenceEqual(new[] { 1, 0 }),
+                "The option buttons did not send the indices of the options offered by the engine.");
+
+            view.Modals.ShowPrompt(duel, new DuelPrompt { messageType = YgoConstants.MSG_SELECT_YESNO,
+                playerId = 0, promptDesc = kashtiraDescription | 1 });
+            var labels = view.Modals.ModalRoot.GetComponentsInChildren<Text>();
+            Require(labels.Single(label => label.name == "Question").text == "자신 또는 상대 덱 위에서 카드 3장을 묘지로 보낸다" &&
+                    !labels.Any(label => label.name == "CardText"),
+                "An effect confirmation included unrelated card rules.");
         }
 
         internal static void SubmitNativeChoice(DuelSession duel, int index)
@@ -612,7 +654,8 @@ namespace YGOPortable.Editor
 
             internal void VerifyEffect(SelectableCardItem source)
             {
-                string text = CardDatabase.ResolveEffectDescription(source.description, source.code);
+                string text = CardDatabase.ResolveOptionDescription(source.description)
+                    ?? "이 카드의 효과를 발동할 수 있습니다.";
                 string location = YgoConstants.GetLocationNameKR(source.location);
                 var visibleText = Modals.ModalRoot.GetComponentsInChildren<Text>();
                 var labels = visibleText.Select(label => label.text).ToArray();

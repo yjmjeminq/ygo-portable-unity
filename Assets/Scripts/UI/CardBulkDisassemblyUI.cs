@@ -61,6 +61,7 @@ namespace YGOPortable.UI
         private readonly Button _decrement;
         private readonly Button _increment;
         private readonly Button _maximum;
+        private readonly Button _selectExcess;
         private readonly Button _autoSelect;
         private readonly Button _selectAll;
         private readonly Button _clear;
@@ -100,15 +101,16 @@ namespace YGOPortable.UI
 
             var details = Panel(root, "Details", .57f, .083f, .975f, .882f);
             _cardName = Heading(details, "Name", "", .08f, .858f, .92f, .93f);
-            _art = CompositeCardView.Create(Slot(details, "Art", .085f, .47f, .375f, .839f), "Card", true);
+            _art = CompositeCardView.Create(Slot(details, "Art", .085f, .544f, .375f, .839f), "Card", true);
             _cardRarity = ShopRarityBadge.Create(details, new Vector2(.408f, .766f), new Vector2(.506f, .827f), 17);
             _cardInfo = Label(details, "CardInfo", "", .41f, .652f, .92f, .759f, 18, TextAnchor.MiddleLeft);
             _decrement = AddButton(details, "Decrease", "−", .408f, .563f, .538f, .638f, () => AdjustQuantity(-1));
             _increment = AddButton(details, "Increase", "+", .55f, .563f, .68f, .638f, () => AdjustQuantity(1));
             _maximum = AddButton(details, "Maximum", "최대", .696f, .563f, .92f, .638f, SelectMaximum);
-            _autoSelect = AddButton(details, "SelectSpare", "카드별 1장 남기기", .08f, .375f, .39f, .45f, SelectSpare);
-            _selectAll = AddButton(details, "SelectAll", "전체 보유 선택", .402f, .375f, .67f, .45f, SelectAll);
-            _clear = AddButton(details, "Clear", "선택 초기화", .682f, .375f, .92f, .45f, ClearSelection);
+            _selectExcess = AddButton(details, "SelectExcess", "3장 남기고 분해", .08f, .462f, .492f, .537f, SelectExcess);
+            _autoSelect = AddButton(details, "SelectSpare", "카드별 1장 남기기", .508f, .462f, .92f, .537f, SelectSpare);
+            _selectAll = AddButton(details, "SelectAll", "전체 보유 선택", .08f, .375f, .492f, .45f, SelectAll);
+            _clear = AddButton(details, "Clear", "선택 초기화", .508f, .375f, .92f, .45f, ClearSelection);
             _summary = Label(details, "Summary", "", .085f, .298f, .915f, .365f, 18, TextAnchor.MiddleLeft);
             _dust = BuildDustLabel(details, .217f, .292f);
             _review = AddButton(details, "Review", "분해 내역 확인", .08f, .124f, .92f, .205f, OpenReview, true);
@@ -214,6 +216,7 @@ namespace YGOPortable.UI
                 else
                     _selected.Remove(code);
             }
+            _selectExcess.interactable = _cards.Any(card => card.Owned > CollectionProgress.DeckCopyLimit);
             _autoSelect.interactable = _cards.Any(card => card.Owned > 1);
             _selectAll.interactable = _cards.Count > 0;
         }
@@ -303,7 +306,7 @@ namespace YGOPortable.UI
         private void RefreshTotals(Text summary, Text dust)
         {
             long count = _selected.Values.Sum(quantity => (long)quantity);
-            decimal earned = (decimal)count * CollectionProgress.DisassemblyDustPerCard;
+            decimal earned = _selected.Sum(entry => (decimal)entry.Value * CollectionProgress.GetDisassemblyDustPerCard(entry.Key));
             summary.text = $"선택 {_selected.Count:N0}종 · {count:N0}장";
             dust.text = $"가루 +{earned:N0}";
         }
@@ -328,20 +331,27 @@ namespace YGOPortable.UI
             RefreshSelection();
         }
 
-        private void SelectSpare() => SelectFromCollection(keepOne: true);
+        private void SelectExcess()
+        {
+            if (!_selectExcess.IsInteractable()) return;
+            SelectFromCollection(CollectionProgress.DeckCopyLimit, "카드별로 3장을 초과한 수량만 선택했습니다.");
+            OpenReview();
+        }
 
-        private void SelectAll() => SelectFromCollection(keepOne: false);
+        private void SelectSpare() => SelectFromCollection(1, "카드별로 1장씩 남겼습니다.");
 
-        private void SelectFromCollection(bool keepOne)
+        private void SelectAll() => SelectFromCollection(0, "보유한 카드를 전부 선택했습니다.");
+
+        private void SelectFromCollection(int keepCopies, string status)
         {
             _selected.Clear();
             foreach (var card in _cards)
             {
-                int quantity = card.Owned - (keepOne ? 1 : 0);
+                int quantity = card.Owned - keepCopies;
                 if (quantity > 0) _selected.Add(card.Code, quantity);
             }
             _status.color = PackShopStyle.TextPrimary;
-            _status.text = keepOne ? "카드별로 1장씩 남겼습니다." : "보유한 카드를 전부 선택했습니다.";
+            _status.text = status;
             RefreshSelection();
         }
 

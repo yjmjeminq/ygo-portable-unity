@@ -56,10 +56,9 @@ namespace YGOPortable.Core
         public const int PackCost = 100;
         public const int PackBundleSize = 10;
         public const int CardsPerPack = 8;
-        public const int WinReward = 120;
-        public const int LossReward = 60;
+        public const int WinReward = 300;
+        public const int LossReward = 150;
         public const int StartingBalance = 20_000;
-        public const int DisassemblyDustPerCard = 10;
         public const int DeckCopyLimit = 3;
 
         private const int SharedDustVersion = 6;
@@ -228,6 +227,8 @@ namespace YGOPortable.Core
             _ => 30,
         };
 
+        public static int GetDisassemblyDustPerCard(uint code) => GetCraftDustCost(CardRarityCatalog.GetRarity(code)) / 3;
+
         public static bool IsCraftableCard(CardInfo card) => IsDeckCard(card);
 
         public static int GetCraftLimit(uint code) => HasStarter && IsCraftableCard(CardDatabase.Get(code))
@@ -296,7 +297,7 @@ namespace YGOPortable.Core
                     return false;
                 }
 
-                long gain = (long)quantity * DisassemblyDustPerCard;
+                long gain = (long)quantity * GetDisassemblyDustPerCard(code);
                 if (next.dust > decimal.MaxValue - gain)
                 {
                     error = "가루 보유 한도를 초과합니다.";

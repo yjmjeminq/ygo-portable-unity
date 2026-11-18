@@ -213,10 +213,20 @@ namespace YGOPortable.Core
             { "Return to the Extra Deck", "엑스트라 덱으로 되돌린다" },
             { "Send to the GY", "묘지로 보낸다" },
             { "Send to the Graveyard", "묘지로 보낸다" },
+            { "Send it to the GY", "그 카드를 묘지로 보낸다" },
             { "Send the top 2 cards of your Deck to the GY", "자신의 덱 위에서 카드 2장을 묘지로 보낸다" },
             { "Send the top 3 cards of your Deck to the GY", "자신의 덱 위에서 카드 3장을 묘지로 보낸다" },
             { "Send the top 3 cards of either Deck to the GY", "자신 또는 상대 덱 위에서 카드 3장을 묘지로 보낸다" },
+            { "Send the top 3 cards of your Deck", "내 덱 위에서 카드 3장을 묘지로 보낸다" },
+            { "Send the top 3 cards of your opponent's Deck", "상대 덱 위에서 카드 3장을 묘지로 보낸다" },
             { "Send the top 3 cards of your Deck…", "자신의 덱 위에서 카드 3장을 묘지로 보낸다" },
+            { "Top of the Deck", "덱 맨 위" },
+            { "Bottom of Deck", "덱 맨 아래" },
+            { "Bottom of the Deck", "덱 맨 아래" },
+            { "Place it on the top of the Deck", "덱 맨 위에 놓는다" },
+            { "Place it on the bottom of the Deck", "덱 맨 아래에 놓는다" },
+            { "Place on bottom", "덱 맨 아래에 놓는다" },
+            { "Apply both effects, in sequence", "두 효과를 순서대로 적용한다" },
             { "Mill the top 5 cards", "덱 위에서 카드 5장을 묘지로 보낸다" },
             { "Face-down and send to GY", "뒷면 수비 표시로 하고 덱에서 카드를 묘지로 보낸다" },
             { "Draw card", "카드를 드로우한다" },
@@ -322,8 +332,11 @@ namespace YGOPortable.Core
             { "Reduce damage to 0", "데미지를 0으로 한다" },
             { "Reduce Level", "레벨을 내린다" },
             { "Increase Level by 1", "레벨을 1개 올린다" },
+            { "Increase Level by 2", "레벨을 2 올린다" },
+            { "Decrease Level by 1", "레벨을 1 내린다" },
             { "Increase its Level by 1", "그 몬스터의 레벨을 1개 올린다" },
             { "Decrease its Level by 1", "그 몬스터의 레벨을 1개 내린다" },
+            { "Reduce its Level by 1", "그 몬스터의 레벨을 1 내린다" },
             { "Flip into face-down Defense Position", "뒷면 수비 표시로 한다" },
             { "Place in Pendulum Zone", "펜듈럼 존에 놓는다" },
             { "Equip this card", "이 카드를 장착한다" },
@@ -340,6 +353,7 @@ namespace YGOPortable.Core
 
         private static readonly Dictionary<ulong, string> CardEffectTextKR = new Dictionary<ulong, string>
         {
+            { 4928565UL << DescriptionIndexBits, "패에서 이 카드를 특수 소환한 뒤, 자신의 패·묘지에서 크샤트리라 또는 티아라멘츠 카드 1장을 제외한다." },
             { 28226490UL << DescriptionIndexBits, "상대 필드의 카드 1장을 주인의 덱으로 되돌린다." },
             { (28226490UL << DescriptionIndexBits) | 1, "이 카드를 특수 소환하고, 덱에서 티아라멘츠 카드 1장을 묘지로 보낸다." },
             { (32731036UL << DescriptionIndexBits) | 1, "덱에서 낙인 지속 마법·함정 카드 1장을 자신 필드에 앞면으로 놓는다." },
@@ -1092,14 +1106,7 @@ namespace YGOPortable.Core
 
             int index = (int)(desc & DescriptionIndexMask);
             var card = Get(GetDescriptionCardCode(desc));
-            string text = ReadLocalizedDescription(card, index);
-            if (text == null && card != null && card.alias != 0)
-            {
-                var original = Get(card.alias);
-                if (original != null && original.name == card.name)
-                    text = ReadLocalizedDescription(original, index);
-            }
-            return text;
+            return ReadLocalizedDescription(card, index) ?? ReadLocalizedDescription(GetSameNameOriginal(card), index);
         }
 
         public static string ResolveEffectDescription(ulong desc, uint cardCode)
@@ -1107,6 +1114,16 @@ namespace YGOPortable.Core
             string text = ResolveDescription(desc);
             if (text != null) return text;
             return GetKoreanCardDescription(GetDescriptionCardCode(desc)) ?? GetKoreanCardDescription(cardCode);
+        }
+
+        internal static string ResolveOptionDescription(ulong desc)
+        {
+            string localized = ResolveDescription(desc);
+            if (localized != null || desc <= DescriptionIndexMask) return localized;
+
+            var card = Get(GetDescriptionCardCode(desc));
+            int index = (int)(desc & DescriptionIndexMask);
+            return ReadDescriptionString(card, index) ?? ReadDescriptionString(GetSameNameOriginal(card), index);
         }
 
         internal static string GetKoreanCardDescription(uint code)
@@ -1117,14 +1134,27 @@ namespace YGOPortable.Core
 
         private static string ReadLocalizedDescription(CardInfo card, int index)
         {
-            var strings = card?.strs;
-            if (strings == null || index >= strings.Length || string.IsNullOrWhiteSpace(strings[index]))
-                return null;
-            string text = strings[index].Trim();
+            string text = ReadDescriptionString(card, index);
+            if (text == null) return null;
             if (HasKoreanText(text)) return text;
 
             string key = text.Replace('’', '\'').TrimEnd('.');
             return EffectTextKR.TryGetValue(key, out var localized) ? localized : null;
+        }
+
+        private static string ReadDescriptionString(CardInfo card, int index)
+        {
+            var strings = card?.strs;
+            if (strings == null || index >= strings.Length || string.IsNullOrWhiteSpace(strings[index]))
+                return null;
+            return strings[index].Trim();
+        }
+
+        private static CardInfo GetSameNameOriginal(CardInfo card)
+        {
+            if (card == null || card.alias == 0) return null;
+            var original = Get(card.alias);
+            return original?.name == card.name ? original : null;
         }
 
         private static bool HasKoreanText(string text)

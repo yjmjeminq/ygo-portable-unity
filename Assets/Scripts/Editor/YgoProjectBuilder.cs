@@ -354,6 +354,7 @@ namespace YGOPortable.Editor
 
             // Explicit test for non-search effects & prompt handlers (announce, chain negate, destroy/banish, equip/counter/coin/dice/token, reborn/tribute, extra/ritual sum, RPS)
             VerifyOtherCardEffects(classicDecks[0].main);
+            VerifyTearlamentsKashtiraDeckChoice();
             VerifyDeckSortDrawOrder(classicDecks[0].main);
             VerifyPossessedDestiny(classicDecks[0].main);
             VerifyMandatoryBattleAttack();
@@ -1141,6 +1142,52 @@ namespace YGOPortable.Editor
             }
             AssertTrue(false, $"{label}: Could not find matching opening setup across {maxSeeds} seeds");
             return null;
+        }
+
+        private static void VerifyTearlamentsKashtiraDeckChoice()
+        {
+            const uint kashtira = 4928565;
+            ulong ownDeck = ((ulong)kashtira << 20) | 3;
+            ulong opponentDeck = ((ulong)kashtira << 20) | 4;
+            uint[] main = Enumerable.Repeat(kashtira, 40).ToArray();
+            uint[] opponent = Enumerable.Repeat(89631139u, 40).ToArray();
+            var empty = Array.Empty<uint>();
+            var ai = new TacticalAI();
+
+            foreach (ulong option in new[] { ownDeck, opponentDeck })
+            {
+                using var duel = StartSeedMatching("Tearlaments Kashtira deck choice", main, empty, opponent, empty,
+                    true, session =>
+                    {
+                        DriveUntilIdle(session, ai);
+                        return session.ActivePrompt?.activatable.Any(card => card.code == kashtira) == true;
+                    });
+                int activate = duel.ActivePrompt.activatable.FindIndex(card => card.code == kashtira);
+                duel.SubmitResponseInt((activate << 16) | 5);
+                for (int step = 0; step < 16 && duel.ActivePrompt?.messageType != YgoConstants.MSG_SELECT_OPTION; step++)
+                {
+                    var prompt = duel.ActivePrompt;
+                    if (prompt == null) duel.StepUntilPrompt();
+                    else if (prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN)
+                        duel.SubmitResponseInt(prompt.promptCardCode == kashtira ? 1 : 0);
+                    else if (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN)
+                        duel.SubmitResponseInt(prompt.candidates.FindIndex(card => card.code == kashtira));
+                    else if (prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD) break;
+                    else duel.SubmitResponse(ai.ComputeResponse(duel, prompt));
+                }
+
+                var choices = duel.ActivePrompt;
+                AssertTrue(choices?.messageType == YgoConstants.MSG_SELECT_OPTION && choices.options.Count == 2 &&
+                    choices.options.Contains(ownDeck) && choices.options.Contains(opponentDeck),
+                    "Tearlaments Kashtira did not offer the two expected deck choices.");
+                int[] before = duel.Players.Select(player => player.grave.Count).ToArray();
+                duel.SubmitResponseInt(choices.options.IndexOf(option));
+                int target = option == ownDeck ? duel.HumanPlayerIndex : duel.AiPlayerIndex;
+                AssertTrue(duel.Players[target].grave.Count == before[target] + 3 &&
+                    duel.Players[1 - target].grave.Count == before[1 - target] && duel.RetryCount == 0,
+                    "Tearlaments Kashtira did not send three cards from the selected deck.");
+            }
+            Debug.Log("[VERIFY TEARLAMENTS KASHTIRA] Both deck selections sent three cards from the selected deck without retries.");
         }
 
         private static byte[] VerifyAnnounceCardSelection(DuelSession session, DuelPrompt prompt, uint code)

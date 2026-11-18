@@ -622,7 +622,7 @@ namespace YGOPortable.UI
             switch (prompt.messageType)
             {
                 case YgoConstants.MSG_SELECT_YESNO:
-                    RenderYesNo(session, prompt);
+                    RenderYesNo(prompt);
                     break;
                 case YgoConstants.MSG_SELECT_POSITION:
                     RenderSelectPosition(prompt);
@@ -676,22 +676,19 @@ namespace YGOPortable.UI
             _onSubmitResponse?.Invoke(bytes);
         }
 
-        private void RenderYesNo(DuelSession s, DuelPrompt p)
+        private void RenderYesNo(DuelPrompt p)
         {
             uint cardCode = CardDatabase.GetDescriptionCardCode(p.promptDesc);
             var card = CardDatabase.Get(cardCode);
-            string msg = CardDatabase.ResolveEffectDescription(p.promptDesc, 0)
-                ?? CardDatabase.ResolveDescription(s.LastHintMsg)
+            string msg = CardDatabase.ResolveOptionDescription(p.promptDesc)
                 ?? "선택한 처리를 실행하시겠습니까?";
 
             _modalTitle.text = "선택 확인";
             _modalSubtitle.text = card?.name ?? "";
+            if (card != null) _onInspectCard?.Invoke(card.code);
 
             CreateVerticalScroll(_modalBody, out Transform description);
             AddDescriptionText(description, "Question", msg, 18);
-            string cardText = CardDatabase.GetKoreanCardDescription(cardCode);
-            if (cardText != null && msg != cardText)
-                AddDescriptionText(description, "CardText", cardText);
 
             AddFooterButton("예", () => Submit(BitConverter.GetBytes(1)), true);
             AddFooterButton("아니오", () => Submit(BitConverter.GetBytes(0)), false);
@@ -741,36 +738,30 @@ namespace YGOPortable.UI
         private void RenderOptionList(DuelPrompt p)
         {
             bool isNum = p.messageType == YgoConstants.MSG_ANNOUNCE_NUMBER;
-            _modalTitle.text = isNum ? "숫자 선언" : "효과 / 항목 선택";
-            _modalSubtitle.text = "실행할 항목을 선택하세요.";
+            _modalTitle.text = isNum ? "숫자 선언" : "선택할 항목";
+            _modalSubtitle.text = "";
 
             CreateVerticalScroll(_modalBody, out Transform content);
-            var sources = new List<CardInfo>();
+            var cards = isNum ? Array.Empty<CardInfo>() : p.options
+                .Select(opt => CardDatabase.Get(CardDatabase.GetDescriptionCardCode(opt))).ToArray();
+            var sources = cards.Where(card => card != null).Distinct().ToArray();
             for (int i = 0; i < p.options.Count; i++)
             {
                 int pick = i;
                 ulong opt = p.options[i];
-                var card = isNum ? null : CardDatabase.Get(CardDatabase.GetDescriptionCardCode(opt));
-                if (card != null && !sources.Contains(card))
-                    sources.Add(card);
-                string text = isNum ? $"선언 숫자: {opt}" : CardDatabase.ResolveDescription(opt);
-                if (text == null)
-                    text = card != null ? $"{i + 1}. {card.name}" : $"선택지 {i + 1}";
+                var card = isNum ? null : cards[i];
+                string text = isNum ? opt.ToString() : CardDatabase.ResolveOptionDescription(opt) ?? $"선택지 {i + 1}";
+                if (sources.Length > 1 && card != null)
+                    text = $"{card.name}\n{text}";
                 var option = LotdUiKit.CreateWrappedButton(content, $"Opt_{i}", text, () => Submit(BitConverter.GetBytes(pick)),
                     17, i == 0, 54f, sidePadding: 22);
                 DuelStyle.ApplyButton(option, i == 0);
                 PreviewOnFocus(option, card?.code ?? 0);
             }
-            if (sources.Count == 1)
+            if (sources.Length == 1)
             {
-                _modalSubtitle.text = $"{sources[0].name}의 효과를 선택하세요.";
+                _modalSubtitle.text = sources[0].name;
                 _onInspectCard?.Invoke(sources[0].code);
-            }
-            foreach (var card in sources)
-            {
-                string cardText = CardDatabase.GetKoreanCardDescription(card.code);
-                if (cardText != null)
-                    AddDescriptionText(content, "CardText", $"{card.name}\n{cardText}");
             }
         }
 
@@ -828,7 +819,7 @@ namespace YGOPortable.UI
                 var item = choices[index];
                 _chainName.text = CardDatabase.GetName(item.code);
                 _chainSource.text = CardSourceLabel(session, item);
-                _chainEffect.text = CardDatabase.ResolveEffectDescription(item.description, item.code)
+                _chainEffect.text = CardDatabase.ResolveOptionDescription(item.description)
                     ?? "이 카드의 효과를 발동할 수 있습니다.";
                 _chainEffectScroll.StopMovement();
                 _chainEffectScroll.content.anchoredPosition = Vector2.zero;

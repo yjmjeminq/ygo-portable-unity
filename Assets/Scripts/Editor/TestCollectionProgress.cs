@@ -169,17 +169,18 @@ namespace YGOPortable.Editor
                 [super] = 2,
                 [ultra] = 15,
             }, out string error), error);
-            Require(CollectionProgress.CraftDust == 40 + 23 * CollectionProgress.DisassemblyDustPerCard &&
+            Require(CollectionProgress.CraftDust == 790 &&
+                materials.Select(CollectionProgress.GetDisassemblyDustPerCard).SequenceEqual(new[] { 10, 20, 30, 40 }) &&
                 Rarities.Select(CollectionProgress.GetCraftDustCost).SequenceEqual(new[] { 30, 60, 90, 120 }),
                 "Bulk disassembly did not award shared dust or crafting costs did not increase by rarity.");
             Require(!CollectionProgress.TryCraftCard(AshBlossom, 0, out _), "A zero craft quantity was accepted.");
             Require(CollectionProgress.TryCraftCard(AshBlossom, 1, out error) &&
                 CollectionProgress.GetOwnedCount(AshBlossom) == 1 &&
-                CollectionProgress.CraftDust == 150, error);
-            Require(!CollectionProgress.TryCraftCard(rare, 3, out _) && CollectionProgress.CraftDust == 150 &&
+                CollectionProgress.CraftDust == 670, error);
+            Require(!CollectionProgress.TryCraftCard(rare, 12, out _) && CollectionProgress.CraftDust == 670 &&
                 CollectionProgress.GetOwnedCount(rare) == 0, "Crafting used more dust than the shared balance.");
-            Require(CollectionProgress.TryCraftCard(normal, 5, out error) &&
-                CollectionProgress.GetOwnedCount(normal) == 5 && CollectionProgress.CraftDust == 0, error);
+            Require(CollectionProgress.TryCraftCard(normal, 22, out error) &&
+                CollectionProgress.GetOwnedCount(normal) == 22 && CollectionProgress.CraftDust == 10, error);
             Require(!CollectionProgress.TryCraftCard(AshBlossom, 1, out _) &&
                 CollectionProgress.Balance == balanceBeforeCrafting &&
                 !File.ReadAllText(profile).Contains("\"craftPoints\""),
@@ -217,9 +218,9 @@ namespace YGOPortable.Editor
             Require(!CollectionProgress.TryAwardDuel(true, first.id, levels[1].id, out _, out _, out _, out _),
                 "An unplayed locked deck accepted a reward.");
             Require(CollectionProgress.TryAwardDuel(false, first.id, levels[0].id, out int loss, out _, out _, out error) &&
-                loss == CollectionProgress.LossReward && !CollectionProgress.IsOpponentDeckUnlocked(first.id, levels[1].id), error);
+                loss == 150 && !CollectionProgress.IsOpponentDeckUnlocked(first.id, levels[1].id), error);
             Require(CollectionProgress.TryAwardDuel(true, first.id, levels[0].id, out int win, out var opponent, out var advanced, out error) &&
-                win == CollectionProgress.WinReward && opponent != null && advanced?.id == levels[1].id, error);
+                win == 300 && opponent != null && advanced?.id == levels[1].id, error);
             expectedDp += loss + win;
 
             File.AppendAllText(profile, "\n");

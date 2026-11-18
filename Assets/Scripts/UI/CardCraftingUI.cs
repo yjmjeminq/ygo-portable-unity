@@ -333,7 +333,7 @@ namespace YGOPortable.UI
                 _cardInfo.text = $"보유 {owned:N0}장";
             }
             SetButtonText(_craft, entry == null ? "제작" : $"제작 · 가루 {CollectionProgress.GetCraftDustCost(entry.Rarity)}");
-            SetButtonText(_disassemble, entry == null ? "분해" : $"분해 · 가루 +{CollectionProgress.DisassemblyDustPerCard}");
+            SetButtonText(_disassemble, entry == null ? "분해" : $"분해 · 가루 +{CollectionProgress.GetDisassemblyDustPerCard(code)}");
 
             int first = _page * PageSize;
             for (int i = 0; i < _rows.Length && first + i < _matches.Count; i++)
@@ -424,7 +424,7 @@ namespace YGOPortable.UI
             string action = _crafting ? "제작" : "분해";
             int perCard = _crafting
                 ? CollectionProgress.GetCraftDustCost(_confirmedCard.Rarity)
-                : CollectionProgress.DisassemblyDustPerCard;
+                : CollectionProgress.GetDisassemblyDustPerCard(_confirmedCard.Card.code);
             long dust = (long)_quantity * perCard;
             decimal current = CollectionProgress.CraftDust;
             decimal result = _crafting ? current - dust : current + Math.Min(dust, decimal.MaxValue - current);
