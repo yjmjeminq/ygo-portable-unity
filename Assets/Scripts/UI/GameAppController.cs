@@ -19,6 +19,7 @@ namespace YGOPortable.UI
         Duel,
         StarterSelection,
         CardShop,
+        ArchetypeCodex,
     }
 
     public class GameAppController : MonoBehaviour
@@ -33,6 +34,7 @@ namespace YGOPortable.UI
         private DuelPromptModals _modals;
         private DuelFieldUI _duelField;
         private CollectionShopUI _collectionShop;
+        private ArchetypeCodexUI _archetypeCodex;
         private GitHubSaveSync _saveSync;
         private SaveSyncMenu _saveSyncMenu;
         private GameObject _focusBeforeSaveSync;
@@ -119,6 +121,7 @@ namespace YGOPortable.UI
                 _collectionShop = new CollectionShopUI(canvas.transform,
                     () => ShowScreen(_screen == AppScreen.StarterSelection ? AppScreen.Title : AppScreen.MainMenu),
                     CompleteStarterSelection);
+                _archetypeCodex = new ArchetypeCodexUI(canvas.transform, () => ShowScreen(AppScreen.MainMenu));
 
                 Debug.Log("[GameApp] 6. Constructing OpponentSelectUI...");
                 _oppSelect = new OpponentSelectUI(this, canvas.transform);
@@ -131,7 +134,8 @@ namespace YGOPortable.UI
 
                 Debug.Log("[GameApp] 9. Constructing DuelFieldUI...");
                 _duelField = new DuelFieldUI(this, canvas.transform, _modals);
-                _menuPad = new DeckPadUi(LotdUiKit.FillRect("MenuPad", canvas.transform), () => _screen == AppScreen.CardShop);
+                _menuPad = new DeckPadUi(LotdUiKit.FillRect("MenuPad", canvas.transform),
+                    () => _screen is AppScreen.CardShop or AppScreen.ArchetypeCodex);
 
                 // Ensure Modals, Animation Layer, and Drag Ghost Layer render ABOVE DuelFieldUI and DeckEditorUI
                 _modals.ModalRoot.transform.SetAsLastSibling();
@@ -217,6 +221,7 @@ namespace YGOPortable.UI
             _titleAndMenu.MenuRoot.SetActive(screen == AppScreen.MainMenu);
             _collectionShop?.StarterRoot.SetActive(false);
             _collectionShop?.CloseShop();
+            _archetypeCodex.Close();
             _oppSelect.Root.SetActive(screen == AppScreen.OpponentSelect);
             _oppSelect.JankenRoot.SetActive(false);
             if (screen != AppScreen.DeckEditor) _deckEditor.Close();
@@ -245,6 +250,8 @@ namespace YGOPortable.UI
                 _collectionShop.OpenStarter();
             else if (screen == AppScreen.CardShop)
                 _collectionShop.OpenShop();
+            else if (screen == AppScreen.ArchetypeCodex)
+                _archetypeCodex.Open();
             else if (screen == AppScreen.MainMenu)
                 _titleAndMenu.FocusMainMenu(previousScreen);
             else if (screen == AppScreen.Title)
@@ -264,6 +271,7 @@ namespace YGOPortable.UI
                     AppScreen.Duel => _duelField.Root,
                     AppScreen.StarterSelection => _collectionShop.StarterRoot,
                     AppScreen.CardShop => _collectionShop.Root,
+                    AppScreen.ArchetypeCodex => _archetypeCodex.Root,
                     _ => null,
                 };
                 if (root != null) UiEntranceMotion.Play(root, .67f, .19f);
@@ -546,6 +554,7 @@ namespace YGOPortable.UI
                 AppScreen.OpponentSelect => _oppSelect.JankenRoot.activeInHierarchy ? _oppSelect.JankenRoot : _oppSelect.Root,
                 AppScreen.StarterSelection => _collectionShop?.StarterRoot,
                 AppScreen.CardShop => _collectionShop?.ActiveShopRoot,
+                AppScreen.ArchetypeCodex => _archetypeCodex.Root,
                 _ => null,
             };
             if (page != null && page.activeInHierarchy)
@@ -558,7 +567,8 @@ namespace YGOPortable.UI
             bool settings = _titleAndMenu.SettingsRoot.activeInHierarchy;
             bool janken = _oppSelect.JankenRoot.activeInHierarchy;
             bool selectingStarter = _screen == AppScreen.StarterSelection;
-            bool collectionPage = selectingStarter || _screen == AppScreen.CardShop;
+            bool codex = _screen == AppScreen.ArchetypeCodex;
+            bool collectionPage = selectingStarter || _screen == AppScreen.CardShop || codex;
             bool cancel = frame.Cancel || (escape && (cloudSave || settings || janken || _menuPad.HasPopup || collectionPage));
             if (!frame.HasInput && !cancel) return;
 
@@ -569,6 +579,7 @@ namespace YGOPortable.UI
                 AppScreen.OpponentSelect => janken ? _oppSelect.JankenRoot : _oppSelect.Root,
                 AppScreen.StarterSelection => _collectionShop?.StarterRoot,
                 AppScreen.CardShop => _collectionShop?.ActiveShopRoot,
+                AppScreen.ArchetypeCodex => _archetypeCodex.Root,
                 _ => null,
             };
             if (scope == null || !scope.activeInHierarchy) return;
@@ -580,12 +591,14 @@ namespace YGOPortable.UI
                 {
                     if (frame.Search)
                     {
-                        _menuPad.OpenText(_collectionShop.CatalogSearch(selectingStarter));
+                        _menuPad.OpenText(codex ? _archetypeCodex.SearchInput : _collectionShop.CatalogSearch(selectingStarter));
                         return;
                     }
                     if (frame.PreviousArea || frame.NextArea)
                     {
-                        _collectionShop.ChangeCatalogPage(selectingStarter, frame.PreviousArea ? -1 : 1);
+                        int delta = frame.PreviousArea ? -1 : 1;
+                        if (codex) _archetypeCodex.ChangePage(delta);
+                        else _collectionShop.ChangeCatalogPage(selectingStarter, delta);
                         _menuPad.AdoptPointerFocus(scope.transform);
                         return;
                     }
@@ -616,7 +629,7 @@ namespace YGOPortable.UI
                 {
                     if (!_collectionShop.HandleShopBack()) ShowScreen(AppScreen.MainMenu);
                 }
-                else if (_screen == AppScreen.OpponentSelect) ShowScreen(AppScreen.MainMenu);
+                else if (_screen is AppScreen.OpponentSelect or AppScreen.ArchetypeCodex) ShowScreen(AppScreen.MainMenu);
                 else if (_screen == AppScreen.MainMenu) ShowScreen(AppScreen.Title);
             }
             _menuPad.Handle(scope.transform, frame.Direction, frame.Submit, cancel, Back);

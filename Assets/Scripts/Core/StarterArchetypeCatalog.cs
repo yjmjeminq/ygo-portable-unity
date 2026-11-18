@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace YGOPortable.Core
@@ -9,9 +10,13 @@ namespace YGOPortable.Core
     {
         private static readonly Regex NamedGroup = new Regex(
             @"""([^""\r\n]{2,30})""\s*(?:카드|몬스터|마법|함정)", RegexOptions.Compiled);
+        private static readonly Dictionary<ArchetypeInfo, string> SearchNames = new();
+        private static IReadOnlyList<ArchetypeInfo> _catalog;
 
         internal static IReadOnlyList<ArchetypeInfo> GetAll()
         {
+            if (_catalog != null) return _catalog;
+            if (!CardDatabase.IsLoaded) return Array.Empty<ArchetypeInfo>();
             var catalog = CardDatabase.GetAllArchetypes().ToList();
             var registered = new HashSet<ushort>(catalog.SelectMany(group => group.setcodes));
             var names = new HashSet<string>(catalog.Select(group => group.name), StringComparer.Ordinal);
@@ -62,8 +67,29 @@ namespace YGOPortable.Core
                 catalog.Add(group);
             }
 
-            return catalog;
+            return _catalog = catalog;
         }
+
+        internal static IEnumerable<ArchetypeInfo> Search(string query, bool includeSmallGroups)
+        {
+            var groups = includeSmallGroups ? GetAll() : CardDatabase.GetAllArchetypes();
+            string key = Normalize(query);
+            return key.Length == 0 ? groups : groups.Where(group => GetSearchNames(group).Contains(key));
+        }
+
+        private static string GetSearchNames(ArchetypeInfo group)
+        {
+            if (!SearchNames.TryGetValue(group, out string names))
+            {
+                names = string.Join("\n", group.coreCards.Select(card => card.name)
+                    .Prepend(group.baseName).Prepend(group.name).Select(Normalize));
+                SearchNames.Add(group, names);
+            }
+            return names;
+        }
+
+        private static string Normalize(string text) => new string((text ?? "").Normalize(NormalizationForm.FormKC)
+            .Where(char.IsLetterOrDigit).Select(char.ToUpperInvariant).ToArray());
 
         private static string InferName(IReadOnlyList<CardInfo> cards)
         {

@@ -117,9 +117,12 @@ namespace YGOPortable.UI
             _optionHeading = AddFilterHeading(options, "");
 
             var queryRow = LotdUiKit.CreateRect("TextSearch", conditions, new Vector2(.087f, .803f),
-                new Vector2(.913f, .868f), Vector2.zero, Vector2.zero);
+                new Vector2(.638f, .868f), Vector2.zero, Vector2.zero);
             _detailedQueryInput = LotdUiKit.CreateInputField(queryRow, "Query", "카드명·효과·카드 번호", 16);
             _detailedQueryInput.onValueChanged.AddListener(_ => RefreshDetailedDraft());
+            var archetype = LotdUiKit.CreateRect("ArchetypeSearch", conditions, new Vector2(.656f, .803f),
+                new Vector2(.913f, .868f), Vector2.zero, Vector2.zero);
+            LotdUiKit.CreateLotdButton(archetype, "Button", "카드군 검색", OpenArchetypeSearch, 14);
 
             var conditionRows = BuildFilterRows(conditions, "ConditionsList", .105f, .783f, out _);
             _optionRows = BuildFilterRows(options, "OptionList", .105f, .868f, out _optionScroll);

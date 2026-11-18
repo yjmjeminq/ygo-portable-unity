@@ -36,6 +36,8 @@ namespace YGOPortable.Editor
                 VerifyConfirmation(editor, events);
                 VerifyArchetypeBrowser(editor, events);
                 VerifyGroupingAndTrunk(editor, streamingPath, Path.Combine(save, "trunk"));
+                VerifyArchetypeSearch(editor);
+                VerifyArchetypeCodex(canvas.transform, events);
                 VerifyMainSorting(editor, events);
                 VerifyTouchDeckMenu(editor, events);
             }
@@ -186,6 +188,83 @@ namespace YGOPortable.Editor
             close.onClick.Invoke();
             Require(!popup.activeSelf && events.currentSelectedGameObject == before,
                 "Closing the archetype browser did not restore the original control.");
+        }
+
+        private static void VerifyArchetypeSearch(DeckEditorUI editor)
+        {
+            var deck = Field<UserDeck>(editor, "_workingDeck");
+            var before = CollectionProgress.CopyDeck(deck);
+            editor.Root.transform.Find("Editor/Trunk/SearchOptions/ArchetypeSearch/Button").GetComponent<Button>().onClick.Invoke();
+            var popup = Field<GameObject>(editor, "_archModalRoot");
+            var query = Field<InputField>(editor, "_archSearchInp");
+            var matches = Field<List<ArchetypeInfo>>(editor, "_archResults");
+            query.text = "상 검";
+            Require(popup.activeSelf && matches.Any(group => group.baseName == "상검"),
+                "The trunk archetype search missed Swordsoul with spacing in the query.");
+            query.text = "D/D/D";
+            int index = matches.FindIndex(group => group.setcodes.Contains(0x10af));
+            Require(index >= 0 && matches[index].supportCards.Count > 0,
+                "The trunk archetype search missed D/D/D or its support cards when entered with slashes.");
+            var group = matches[index];
+            var apply = popup.transform.Find($"Win/ArchScrollHolder/VP/Content/ArchTile_{index / 3}_{index % 3}/LoadBtn/B")
+                .GetComponent<Button>();
+            Require(apply.GetComponentInChildren<Text>().text == "카드 보기", "Trunk search exposed a deck import action.");
+            apply.onClick.Invoke();
+            var result = Field<List<CardInfo>>(editor, "_trunkResults");
+            var expected = group.coreCards.Union(group.supportCards).ToHashSet();
+            Require(!popup.activeSelf && Field<ArchetypeInfo>(editor, "_activeArchetypeFilter") == group &&
+                result.ToHashSet().SetEquals(expected),
+                $"Applying the archetype returned {result.Count} results for {group.name}, expected {expected.Count}.");
+            Require(result.Any(card => CollectionProgress.GetOwnedCount(card.code) == 0),
+                "The D/D/D scope omitted unowned cards from the Swordsoul player's search.");
+            Require(deck.name == before.name && deck.main.SequenceEqual(before.main) && deck.extra.SequenceEqual(before.extra) &&
+                deck.side.SequenceEqual(before.side), "Searching for an archetype changed the current deck.");
+            Field<Button>(editor, "_showAllCards").onClick.Invoke();
+            Require(Field<ArchetypeInfo>(editor, "_activeArchetypeFilter") == null &&
+                result.All(card => CollectionProgress.GetOwnedCount(card.code) > 0), "The full trunk retained the archetype scope.");
+        }
+
+        private static void VerifyArchetypeCodex(Transform canvas, EventSystem events)
+        {
+            var group = StarterArchetypeCatalog.Search("상검", includeSmallGroups: true).First(item => item.baseName == "상검");
+            var memberKeys = group.coreCards.Select(CardDatabase.GetArchetypeCollectionKey).ToHashSet();
+            var ownedKeys = CardDatabase.AllCards.Where(card => CollectionProgress.GetOwnedCount(card.code) > 0)
+                .Select(CardDatabase.GetArchetypeCollectionKey).ToHashSet();
+            int owned = memberKeys.Count(ownedKeys.Contains);
+            Require(CardDatabase.GetArchetypeCollectionKey(CardDatabase.Get(89631134)) == 89631139 &&
+                CardDatabase.GetArchetypeCollectionKey(CardDatabase.Get(295517)) == 295517,
+                "The codex must group alternate artwork and keep distinct cards that share a rules name separate.");
+
+            var before = events.currentSelectedGameObject;
+            var codex = new ArchetypeCodexUI(canvas, () => { });
+            try
+            {
+                codex.Open();
+                codex.SearchInput.text = "상검";
+                var directory = codex.Root.transform.Find("Directory");
+                var row = directory.GetComponentsInChildren<PackShopButtonLabel>().Single(button => button.Label.text == group.name);
+                events.SetSelectedGameObject(row.gameObject);
+                var progress = Field<Text>(codex, "_progress");
+                Require(owned > 0 && progress.text == $"소속 카드 수집 {owned} / {memberKeys.Count}종",
+                    "The codex did not compute collection progress from owned member cards.");
+
+                Field<Button>(codex, "_support").onClick.Invoke();
+                var related = Field<uint[]>(codex, "_cards");
+                Require(related.Length > 0 && !related.Any(memberKeys.Contains) &&
+                    progress.text == $"소속 카드 수집 {owned} / {memberKeys.Count}종" &&
+                    Field<CompositeCardView>(codex, "_preview").CurrentCode != 0,
+                    "The support tab showed no preview or contributed to the member count.");
+
+                codex.SearchInput.text = "__없는카드군42__";
+                Require(!Field<GameObject>(codex, "_detail").activeSelf, "Empty search results left stale card details visible.");
+            }
+            finally
+            {
+                codex.Close();
+                events.SetSelectedGameObject(before);
+                UnityEngine.Object.DestroyImmediate(codex.Root);
+            }
+            Debug.Log("[VERIFY ARCHETYPE CODEX] Name search, trunk scope, member ownership, support tabs and alternate art passed.");
         }
 
         private static void VerifyGroupingAndTrunk(DeckEditorUI editor, string streamingPath, string save)

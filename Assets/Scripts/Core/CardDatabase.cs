@@ -739,6 +739,12 @@ namespace YGOPortable.Core
             return false;
         }
 
+        internal static uint GetArchetypeCollectionKey(CardInfo card)
+        {
+            var original = GetSameNameOriginal(card);
+            return original != null && IsPureAltArtDuplicate(card) ? original.code : card.code;
+        }
+
         public static IReadOnlyList<ArchetypeInfo> GetAllArchetypes()
         {
             if (_archetypes != null) return _archetypes;

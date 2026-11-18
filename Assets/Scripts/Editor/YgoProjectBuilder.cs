@@ -612,7 +612,27 @@ namespace YGOPortable.Editor
             AssertTrue(!keyboard.gameObject.activeSelf && opponents.Root.activeSelf &&
                 events.currentSelectedGameObject == opponents.Root.transform.Find("SearchBox/SearchInput").gameObject,
                 "Canceling the opponent keyboard should immediately restore focus to the search field.");
-            Debug.Log("[VERIFY MENU PAD] Pointer-to-controller handoff, Settings, opponent paging and search keyboard passed.");
+
+            opponents.Root.SetActive(false);
+            var codex = new ArchetypeCodexUI(canvas, () => { });
+            appType.GetField("_archetypeCodex", privateInstance).SetValue(app, codex);
+            screen.SetValue(app, AppScreen.ArchetypeCodex);
+            codex.Open();
+            Pad("NextArea");
+            AssertTrue(codex.Root.transform.Find("Directory/Page/Text").GetComponent<Text>().text.StartsWith("2 / ") &&
+                events.currentSelectedGameObject.transform.parent.name == "Group_0",
+                "The codex should page through archetypes and focus the first visible row.");
+            Pad("Search");
+            AssertTrue(keyboard.gameObject.activeSelf, "The codex controller shortcut did not open search.");
+            Pad("Cancel");
+            AssertTrue(!keyboard.gameObject.activeSelf && events.currentSelectedGameObject == codex.SearchInput.gameObject,
+                "Canceling the codex keyboard did not restore search focus.");
+            codex.Close();
+            menu.MenuRoot.SetActive(true);
+            menu.FocusMainMenu(AppScreen.ArchetypeCodex);
+            AssertTrue(events.currentSelectedGameObject == menu.MenuRoot.transform.Find("Menu/ArchetypeCodex/Button").gameObject,
+                "Returning from the codex should focus its main menu entry.");
+            Debug.Log("[VERIFY MENU PAD] Pointer-to-controller handoff, Settings, opponent and codex paging and search keyboard passed.");
         }
 
         private static void VerifyBingoMachineAutoPick()

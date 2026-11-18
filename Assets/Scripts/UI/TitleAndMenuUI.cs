@@ -19,6 +19,7 @@ namespace YGOPortable.UI
         private Button _freeDuelButton;
         private Button _deckEditorButton;
         private Button _shopButton;
+        private Button _codexButton;
         private Text _shopBalance;
         private Button _settingsOpenButton;
         private Button _settingsCloseButton;
@@ -63,6 +64,7 @@ namespace YGOPortable.UI
             {
                 AppScreen.CardShop => _shopButton,
                 AppScreen.DeckEditor => _deckEditorButton,
+                AppScreen.ArchetypeCodex => _codexButton,
                 _ => _freeDuelButton,
             };
             EventSystem.current?.SetSelectedGameObject(selected.gameObject);
@@ -99,10 +101,11 @@ namespace YGOPortable.UI
             AddLogo(logo);
             var menu = LotdUiKit.CreateMenuPanel(root, "Menu", new Vector2(.205f, .132f),
                 new Vector2(.538f, .643f));
-            _freeDuelButton = AddMenuEntry(menu, "FreeDuel", .745f, "프리 듀얼", () => _app.ShowScreen(AppScreen.OpponentSelect));
-            _deckEditorButton = AddMenuEntry(menu, "DeckEditor", .54f, "덱 편집", () => _app.ShowScreen(AppScreen.DeckEditor));
-            _settingsOpenButton = AddMenuEntry(menu, "Settings", .335f, "환경 설정", OpenSettings);
-            AddMenuEntry(menu, "ReturnToTitle", .13f, "타이틀로 돌아가기", () => _app.ShowScreen(AppScreen.Title));
+            _freeDuelButton = AddMenuEntry(menu, "FreeDuel", .77f, "프리 듀얼", () => _app.ShowScreen(AppScreen.OpponentSelect));
+            _deckEditorButton = AddMenuEntry(menu, "DeckEditor", .60f, "덱 편집", () => _app.ShowScreen(AppScreen.DeckEditor));
+            _codexButton = AddMenuEntry(menu, "ArchetypeCodex", .43f, "카드군 도감", () => _app.ShowScreen(AppScreen.ArchetypeCodex));
+            _settingsOpenButton = AddMenuEntry(menu, "Settings", .26f, "환경 설정", OpenSettings);
+            AddMenuEntry(menu, "ReturnToTitle", .09f, "타이틀로 돌아가기", () => _app.ShowScreen(AppScreen.Title));
             BuildShopTile(root);
         }
 

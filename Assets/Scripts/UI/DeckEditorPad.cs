@@ -253,7 +253,9 @@ namespace YGOPortable.UI
                     () => SwitchPadArea(PadArea.Trunk), _detailButtonText.GetComponentInParent<Button>());
                 return;
             }
-            if (_padArea == PadArea.Trunk && _relatedFilterCode != 0 && (frame.Cancel || frame.RelatedCards))
+            if (_padArea == PadArea.Trunk &&
+                (frame.Cancel && (_relatedFilterCode != 0 || _activeArchetypeFilter != null) ||
+                 frame.RelatedCards && _relatedFilterCode != 0))
             {
                 ExitTrunkScope();
                 SwitchPadArea(PadArea.Trunk);
@@ -441,8 +443,9 @@ namespace YGOPortable.UI
                 _ => "메인   A 카드 메뉴",
             };
             bool relatedList = area == PadArea.Trunk && _relatedFilterCode != 0;
+            bool scopedTrunk = relatedList || area == PadArea.Trunk && _activeArchetypeFilter != null;
             string back = area == PadArea.Controls ? "B 카드 목록" :
-                relatedList ? "우스틱 설명   B 전체 카드" : "우스틱 설명   B 뒤로";
+                scopedTrunk ? "우스틱 설명   B 전체 카드" : "우스틱 설명   B 뒤로";
             var reorder = CurrentPadDeck != DragSourceType.None ? "   R스틱 클릭 순서" : "";
             string menu = area == PadArea.Trunk ? "Menu/+ 조회" : "Menu/+ 저장";
             string related = area == PadArea.Controls ? "" : relatedList ? "   R2/ZR/RT 전체 카드" : "   R2/ZR/RT 관련 카드";
