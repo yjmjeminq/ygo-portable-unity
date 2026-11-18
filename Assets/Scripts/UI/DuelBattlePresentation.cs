@@ -17,6 +17,7 @@ namespace YGOPortable.UI
             internal bool Hidden;
             internal bool HideReadout;
             internal bool InspectWhileHidden;
+            internal bool PositionChanging;
         }
 
         // The engine can resolve a whole battle before its queued animations have played.
@@ -167,12 +168,42 @@ namespace YGOPortable.UI
         {
             var battle = HoldBattleMove(move, motion);
             if (battle != null) return battle;
-            return paired ? null : HoldFieldCard(move, readout, keepFaceDown: move.SendGroup != null);
+            return paired ? null : HoldFieldCard(move, readout, keepFaceDown: move.PresentationGroup != null || move.ChangesPositionInPlace);
+        }
+
+        private void QueuePositionChange(CardAnimationManager animator, CardMoveEvent move, CardFlight flight,
+            CardMoveReadoutSnapshot readout, BattleCardDisplay held)
+        {
+            if (held != null)
+            {
+                held.PositionChanging = true;
+                if (move.SourceReadout != null)
+                {
+                    held.Readout ??= new PresentedFieldReadout { Shown = move.SourceReadout };
+                    held.InspectWhileHidden = true;
+                }
+            }
+            var release = ReserveCardArrival(move.toCon, move.toLoc, move.toSeq);
+            animator.QueuePositionChange(move.PresentationGroup, flight, readout, () =>
+            {
+                if (held != null) held.Hidden = true;
+            }, () =>
+            {
+                if (held == null) return;
+                var live = flight.EndsFaceDown ? null : readout?.DestinationCard ?? move.DestinationReadout;
+                held.InspectWhileHidden = live != null;
+                if (live != null) held.Readout = new PresentedFieldReadout { Shown = live };
+            }, () =>
+            {
+                ReleaseBattleCardDisplay(held);
+                release();
+            }, Refresh);
         }
 
         private BattleCardDisplay HoldFieldCard(CardMoveEvent move, PresentedFieldReadout readout, bool keepFaceDown)
         {
-            if (IsArriving(move.fromCon, move.fromLoc, move.fromSeq)) return null;
+            bool arriving = IsArriving(move.fromCon, move.fromLoc, move.fromSeq);
+            if (arriving && !move.ChangesPositionInPlace) return null;
             var source = move.SourceReadout;
             if (source == null && keepFaceDown &&
                 (move.fromLoc is YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE) &&
@@ -181,6 +212,7 @@ namespace YGOPortable.UI
             if (source == null) return null;
 
             var display = QueueBattleCardDisplay(move.fromCon, move.fromLoc, move.fromSeq, source, move.fromPos);
+            display.Hidden = arriving;
             if (source.IsFaceUp) display.Readout = readout ?? new PresentedFieldReadout { Shown = source };
             return display;
         }

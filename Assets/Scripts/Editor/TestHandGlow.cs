@@ -46,6 +46,7 @@ namespace YGOPortable.Editor
             VerifyNativeLinkedZone();
             VerifyNativeCoLinkedZone();
             VerifyNativeMovingReadout();
+            VerifyNativePositionGroup();
             VerifyNativeTokenArrivalReadout();
             VerifyNativePendulumArrivalReadout();
             VerifyNativeFieldMaterials(xyz: true);
@@ -537,8 +538,8 @@ namespace YGOPortable.Editor
             Require(chained && duel.RetryCount == 0 && duel.SolvedChainLinks.SequenceEqual(new[] { (2, rush), (1, darkHole) }) &&
                     duel.Players[duel.HumanPlayerIndex].grave.Count(card => card.code == gagagigo) == 1 &&
                     enemy.grave.Count(card => card.code == gagagigo) == 2 && destroyed.Count == 3 &&
-                    destroyed[0].SendGroup != null &&
-                    destroyed.All(move => ReferenceEquals(move.SendGroup, destroyed[0].SendGroup)),
+                    destroyed[0].PresentationGroup != null &&
+                    destroyed.All(move => ReferenceEquals(move.PresentationGroup, destroyed[0].PresentationGroup)),
                 "The native chain did not destroy all three cards with one operation after applying the buff.");
             ui.Field.Refresh();
             VerifyWaiting(ownTile, "1850");
@@ -1281,9 +1282,14 @@ namespace YGOPortable.Editor
                     card.controller == duel.AiPlayerIndex && card.sequence == destination)) : null);
             ui.Field.Refresh();
             Require(theirs.mzone[destination]?.position == YgoConstants.POS_FACEDOWN_DEFENSE &&
-                inspector.text == "1700" && zoom.text == "1700" &&
-                typeof(DuelFieldUI).GetField("_zoomFieldCard", PrivateInstance).GetValue(ui.Field) == null,
-                "A face-down transfer kept the captured live stats in its details.");
+                inspector.text == "2300" && zoom.text == "2300",
+                "The selected copy lost its live numbers before turning face-down.");
+            var conceal = OpenMove(animator, KaiserSeaHorse);
+            conceal.Sample(.5f);
+            Require(inspector.text == "1700" && zoom.text == "1700" && conceal.Proxy.CurrentCode == 0,
+                "A face-down transfer kept the captured live stats after the turn.");
+            conceal.Sample(1f);
+            Require(!conceal.Step.MoveNext(), "The selected book target did not complete its position change.");
             Debug.Log($"[VERIFY DUEL CARD FOLLOW] Simultaneous swap in {(swapInPlace ? "the original" : "different")} zones. " +
                 $"Face-down opponent: {opponentSets}. Controller focus and the 2700-to-2300 readout followed the selected card.");
 
@@ -1637,6 +1643,164 @@ namespace YGOPortable.Editor
             Debug.Log("[VERIFY DUEL MOVING STATS] Native regular summon, pointer focus, rotation and both flip directions preserved public ATK, DEF and Level.");
         }
 
+        private static void VerifyNativePositionGroup()
+        {
+            const uint doubleSummon = 43422537, earthquake = 82828051, eclipse = 35480699, spark = 81777047, sparkman = 20721928;
+            var main = Enumerable.Repeat(KaiserSeaHorse, 16).Concat(Enumerable.Repeat(doubleSummon, 6))
+                .Concat(Enumerable.Repeat(earthquake, 6)).Concat(Enumerable.Repeat(eclipse, 6)).Concat(Enumerable.Repeat(spark, 6)).ToArray();
+            var enemy = Enumerable.Repeat(KaiserSeaHorse, 20).Concat(Enumerable.Repeat(sparkman, 12))
+                .Concat(Enumerable.Repeat(doubleSummon, 8)).ToArray();
+            var empty = Array.Empty<uint>();
+            var ai = new TacticalAI();
+
+            void PutPair(DuelSession session, uint first, uint second)
+            {
+                ActivateFromMainPhase(session, doubleSummon);
+                YgoProjectBuilder.DriveUntilIdle(session, ai);
+                foreach (uint code in new[] { first, second })
+                {
+                    int index = session.ActivePrompt.summonable.FindIndex(card => card.code == code);
+                    Require(index >= 0, "The position fixture could not Normal Summon its monster.");
+                    session.SubmitResponseInt(index << 16);
+                    YgoProjectBuilder.DriveUntilIdle(session, ai);
+                }
+                session.SubmitResponseInt(7);
+                YgoProjectBuilder.DriveUntilIdle(session, ai);
+            }
+
+            using var duel = YgoProjectBuilder.StartSeedMatching("Group position changes", main, empty, enemy, empty, true, session =>
+            {
+                var mine = session.Players[session.HumanPlayerIndex].hand;
+                var theirs = session.Players[session.AiPlayerIndex].hand;
+                if (mine.Count(card => card.code == KaiserSeaHorse) < 2 || !mine.Exists(card => card.code == doubleSummon) ||
+                    !new[] { KaiserSeaHorse, sparkman, doubleSummon }.All(code => theirs.Exists(card => card.code == code)))
+                    return false;
+                PutPair(session, KaiserSeaHorse, KaiserSeaHorse);
+                PutPair(session, KaiserSeaHorse, sparkman);
+                return session.ActivePrompt?.playerId == session.HumanPlayerIndex &&
+                    new[] { earthquake, eclipse, spark }.All(code =>
+                        session.Players[session.HumanPlayerIndex].hand.Exists(card => card.code == code));
+            });
+            ActivateFromMainPhase(duel, spark);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            var sources = duel.Players.SelectMany(player => player.mzone).Where(card => card != null).ToArray();
+            Require(sources.Length == 4 && sources.All(card => card.position == YgoConstants.POS_FACEUP_ATTACK),
+                "The position fixture did not set up four public attacking monsters.");
+            var focused = sources.Single(card => card.code == sparkman);
+            Require(focused.attack == 2100 && focused.defense == 1000, "Luminous Spark did not alter the inspected monster's live values.");
+            using var ui = new HandUI(duel);
+            var animator = CardAnimationManager.Ensure(ui.Canvas);
+            Canvas.ForceUpdateCanvases();
+            FieldSlot(ui.Field, focused).GetComponent<CardDragTrigger>().OnRightClick();
+            ui.Field.Root.transform.Find("LeftInspector/CardDetails/ArtworkControls/Details/B").GetComponent<Button>().onClick.Invoke();
+            Require(ui.Field.IsReadingCardDetails, "The grouped position fixture did not open the inspected card.");
+            var moves = new List<CardMoveEvent>();
+            duel.OnCardMoved += move => { if (move.ChangesPositionInPlace) moves.Add(move); };
+            var steps = AnimationSteps(animator);
+
+            void CheckInspector(string attack, string defense, bool defending)
+            {
+                var root = ui.Field.Root.transform;
+                foreach (string path in new[] { "LeftInspector/CardDetails/CombatStats", "Overlay_CardZoom/ZoomWin/Info/CombatStats" })
+                {
+                    var stats = root.Find(path);
+                    Require(stats.Find("Attack/Digits/Value").GetComponent<Text>().text == attack &&
+                        stats.Find("Defense/Digits/Value").GetComponent<Text>().text == defense &&
+                        Defending(stats) == defending, "The selected card's details did not follow the visible face and stance.");
+                }
+            }
+
+            (IEnumerator Step, Action<float> Sample, CompositeCardView[] Cards, RectTransform[] Plates)
+                BeginGroup(int count, uint from, uint to)
+            {
+                Require(moves.Count == count && moves[0].PresentationGroup != null &&
+                    moves.All(move => ReferenceEquals(move.PresentationGroup, moves[0].PresentationGroup) &&
+                        move.fromPos == from && move.toPos == to), "The engine did not identify one simultaneous position change.");
+                ui.Field.Refresh();
+                foreach (var move in moves)
+                {
+                    var slot = FieldSlot(ui.Field, sources.Single(card => card.controller == move.fromCon && card.sequence == move.fromSeq));
+                    var card = slot.Find("Card/CardView").GetComponent<CompositeCardView>();
+                    Require(card.gameObject.activeInHierarchy && card.CurrentCode == ((from & YgoConstants.POS_FACEUP) != 0 ? move.code : 0),
+                        "A position change was visible on the field before the shared animation started.");
+                }
+                var step = steps.Single(cue => cue.GetType().Name.StartsWith("<PlayPositionChanges>", StringComparison.Ordinal));
+                Require(step.MoveNext() && step.Current is IEnumerator, "The shared position motion did not start.");
+                var sample = TestCardPresentation.SampleAnimation((IEnumerator)step.Current);
+                var cards = animator.GetComponentsInChildren<CompositeCardView>().Where(card => card.name == "MovingCard").ToArray();
+                var plates = animator.transform.Cast<RectTransform>().Where(panel => panel.name == "MovingCardReadout").ToArray();
+                Require(cards.Length == count && plates.Length == count &&
+                    plates.All(panel => cards.Count(card => ((RectTransform)card.transform).anchoredPosition == panel.anchoredPosition) == 1),
+                    "A monster or its readout was missing or attached to the wrong motion.");
+                return (step, sample, cards, plates);
+            }
+
+            void Complete((IEnumerator Step, Action<float> Sample, CompositeCardView[] Cards, RectTransform[] Plates) change)
+            {
+                change.Sample(1f);
+                Require(!change.Step.MoveNext() && change.Cards.All(card => !card.gameObject.activeInHierarchy) &&
+                    change.Plates.All(plate => plate == null), "The shared position motion left a duplicate card or readout.");
+                steps.Clear();
+                moves.Clear();
+            }
+
+            static bool Defending(Transform stats) =>
+                stats.Find("Defense/Rail").GetComponent<Image>().color.a > stats.Find("Attack/Rail").GetComponent<Image>().color.a;
+
+            ActivateFromMainPhase(duel, earthquake);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            var turn = BeginGroup(4, YgoConstants.POS_FACEUP_ATTACK, YgoConstants.POS_FACEUP_DEFENSE);
+            CheckInspector("2100", "1000", false);
+            turn.Sample(.46f);
+            Require(turn.Plates.All(plate => !Defending(plate.Find("CardReadout/Combat"))), "The stance highlight switched before the shared rotation.");
+            turn.Sample(.62f);
+            CheckInspector("2100", "1000", true);
+            Require(turn.Plates.All(plate => Defending(plate.Find("CardReadout/Combat"))), "The stance highlight missed the shared rotation.");
+            Complete(turn);
+
+            ActivateFromMainPhase(duel, eclipse);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            var cover = BeginGroup(4, YgoConstants.POS_FACEUP_DEFENSE, YgoConstants.POS_FACEDOWN_DEFENSE);
+            cover.Sample(.43f);
+            CheckInspector("2100", "1000", true);
+            cover.Sample(.5f);
+            Require(cover.Cards.All(card => card.CurrentCode == 0) &&
+                cover.Plates.All(plate => !plate.Find("CardReadout").gameObject.activeInHierarchy),
+                "A concealed monster or one of its stats was still public during the group flip.");
+            CheckInspector("1600", "1400", false);
+            Complete(cover);
+
+            var draws = new List<int>();
+            duel.OnCardsDrawn += (controller, cards) => { if (controller == duel.AiPlayerIndex) draws.Add(cards.Count); };
+            duel.SubmitResponseInt(7);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            var reveal = BeginGroup(2, YgoConstants.POS_FACEDOWN_DEFENSE, YgoConstants.POS_FACEUP_DEFENSE);
+            reveal.Sample(.49f);
+            CheckInspector("1600", "1400", false);
+            Require(reveal.Cards.All(card => card.CurrentCode == 0) &&
+                reveal.Plates.All(plate => !plate.Find("CardReadout").gameObject.activeInHierarchy),
+                "A set opponent monster's live information appeared before it was revealed.");
+            reveal.Sample(.78f);
+            CheckInspector("2100", "1000", true);
+            foreach (var move in moves)
+            {
+                Require(move.SourceReadout == null && move.DestinationReadout?.code == move.code &&
+                    move.DestinationReadout.position == YgoConstants.POS_FACEUP_DEFENSE, "A reveal did not carry its frozen new public values.");
+                var card = reveal.Cards.Single(view => view.CurrentCode == move.code);
+                var readout = reveal.Plates.Single(panel => panel.anchoredPosition == ((RectTransform)card.transform).anchoredPosition);
+                var before = sources.Single(source => source.code == move.code && source.controller == duel.AiPlayerIndex);
+                RequireTravelStats(readout, before.attack.ToString(), before.defense.ToString(), "4", defense: true);
+            }
+            var queued = steps.ToArray();
+            Require(draws.Contains(2) && Array.FindIndex(queued, cue =>
+                    cue.GetType().Name.StartsWith("<FlyCards>", StringComparison.Ordinal)) > Array.IndexOf(queued, reveal.Step),
+                "Book of Eclipse drew before both monsters were revealed.");
+            Complete(reveal);
+            Require(duel.RetryCount == 0 && duel.Players[duel.HumanPlayerIndex].mzone.Count(card => card != null && !card.IsFaceUp) == 2,
+                "The end-phase reveal modified the wrong duelist's set monsters.");
+            Debug.Log("[VERIFY DUEL POSITION GROUP] Earthquake rotated four public monsters, Eclipse concealed all four together, then revealed two with live values before the draw.");
+        }
+
         private static void VerifyNativeTokenArrivalReadout()
         {
             const uint scapegoat = 73915051, sheepToken = 73915052, gaiaPower = 56594520;
@@ -1943,8 +2107,8 @@ namespace YGOPortable.Editor
 
         private static void VerifyNativeSendGroup(IReadOnlyList<CardMoveEvent> moves, uint method)
         {
-            Require(moves.Count == 2 && moves[0].SendGroup != null &&
-                moves.All(move => move.MaterialMethod == method && ReferenceEquals(move.SendGroup, moves[0].SendGroup)),
+            Require(moves.Count == 2 && moves[0].PresentationGroup != null &&
+                moves.All(move => move.MaterialMethod == method && ReferenceEquals(move.PresentationGroup, moves[0].PresentationGroup)),
                 "The two real material moves did not share an authoritative engine group.");
         }
 

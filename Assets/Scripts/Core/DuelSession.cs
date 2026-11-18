@@ -51,7 +51,11 @@ namespace YGOPortable.Core
         public uint reason;
         internal uint? summonType;
         internal LiveCardState SourceReadout;
-        internal object SendGroup;
+        internal LiveCardState DestinationReadout;
+        internal object PresentationGroup;
+        internal bool ChangesPositionInPlace =>
+            fromCon == toCon && fromLoc == toLoc && fromSeq == toSeq && fromPos != toPos &&
+            (fromLoc is YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE);
         internal uint MaterialMethod => (reason & YgoConstants.REASON_MATERIAL) == 0
             ? 0 : reason & YgoConstants.MATERIAL_METHOD_MASK;
     }
@@ -268,8 +272,9 @@ namespace YGOPortable.Core
         private bool _awaitingSpecialSummonCompletion;
         private const uint DestructionGroupTag = 0x31444759; // YGD1
         private const uint MaterialGroupTag = 0x314D4759; // YGM1
+        private const uint PositionGroupTag = 0x31504759; // YGP1
         private const uint SwapMoveTag = 0x31534759; // YGS1
-        private readonly Stack<(uint Tag, object Key)> _sendGroups = new();
+        private readonly Stack<(uint Tag, object Key)> _movementGroups = new();
         private readonly HashSet<(byte Player, uint Location, uint Sequence, uint Code)> _confirmedCards =
             new HashSet<(byte, uint, uint, uint)>();
 
@@ -624,6 +629,7 @@ namespace YGOPortable.Core
                 // Native processing emits the comparison and battle together, with optional hints in between.
                 (BattleComparisonValue? Attacker, BattleComparisonValue? Defender) comparison = default;
                 CardMoveEvent firstSwapMove = null;
+                Dictionary<(byte Controller, uint Location, uint Sequence), LiveCardState> positionReadouts = null;
                 bool sampleReadouts = false;
                 while (ms.Position + 4 <= ms.Length)
                 {
@@ -637,7 +643,7 @@ namespace YGOPortable.Core
                         firstSwapMove = null;
                     }
                     var previousPrompt = ActivePrompt;
-                    HandleMessage(msgType, br, msgEnd, ref comparison, ref firstSwapMove);
+                    HandleMessage(msgType, br, msgEnd, ref comparison, ref firstSwapMove, ref positionReadouts);
                     sampleReadouts |= msgType is YgoConstants.MSG_MOVE or YgoConstants.MSG_SWAP or YgoConstants.MSG_POS_CHANGE
                         or YgoConstants.MSG_SET or YgoConstants.MSG_SUMMONED or YgoConstants.MSG_FLIPSUMMONED
                         or YgoConstants.MSG_SPSUMMONED or YgoConstants.MSG_DRAW or YgoConstants.MSG_NEW_TURN or YgoConstants.MSG_NEW_PHASE;
@@ -650,7 +656,7 @@ namespace YGOPortable.Core
                 }
                 if (firstSwapMove != null) NotifyCardMoved(firstSwapMove);
                 // The native state reflects the whole returned batch. Queue the new values after its animations.
-                if (sampleReadouts && _sendGroups.Count == 0 && CurrentChain.Count == 0 && !_awaitingSpecialSummonCompletion)
+                if (sampleReadouts && _movementGroups.Count == 0 && CurrentChain.Count == 0 && !_awaitingSpecialSummonCompletion)
                     SampleFieldReadouts();
             }
         }
@@ -732,6 +738,8 @@ namespace YGOPortable.Core
             if (swapPartner != null) CaptureMoveSource(swapPartner, true);
             InvalidateFieldReadouts(move);
             if (swapPartner != null) InvalidateFieldReadouts(swapPartner);
+            if (move.DestinationReadout is { } destination && _fieldReadoutBaseline != null)
+                _fieldReadoutBaseline[(move.toCon, move.toLoc, move.toSeq)] = destination;
             if (move.summonType.HasValue) _awaitingSpecialSummonCompletion = true;
             if (_chosenAttacker is { } source)
             {
@@ -753,7 +761,8 @@ namespace YGOPortable.Core
         private void CaptureMoveSource(CardMoveEvent move, bool paired)
         {
             if ((move.fromLoc == YgoConstants.LOCATION_MZONE ||
-                (paired || move.SendGroup != null || move.MaterialMethod != 0) && move.fromLoc == YgoConstants.LOCATION_SZONE) &&
+                (paired || move.PresentationGroup != null || move.MaterialMethod != 0 || move.ChangesPositionInPlace) &&
+                move.fromLoc == YgoConstants.LOCATION_SZONE) &&
                 _fieldReadoutBaseline?.TryGetValue((move.fromCon, move.fromLoc, move.fromSeq), out var source) == true &&
                 source.code == move.code && source.position == move.fromPos)
                 move.SourceReadout = source;
@@ -777,7 +786,8 @@ namespace YGOPortable.Core
             };
 
         private void HandleMessage(byte msgType, BinaryReader br, long msgEnd,
-            ref (BattleComparisonValue? Attacker, BattleComparisonValue? Defender) comparison, ref CardMoveEvent firstSwapMove)
+            ref (BattleComparisonValue? Attacker, BattleComparisonValue? Defender) comparison, ref CardMoveEvent firstSwapMove,
+            ref Dictionary<(byte Controller, uint Location, uint Sequence), LiveCardState> positionReadouts)
         {
             if (_speculatingPlayer >= 0 && msgType is YgoConstants.MSG_DRAW or YgoConstants.MSG_CONFIRM_DECKTOP or
                 YgoConstants.MSG_DECK_TOP or YgoConstants.MSG_CONFIRM_EXTRATOP or YgoConstants.MSG_RANDOM_SELECTED or
@@ -941,12 +951,12 @@ namespace YGOPortable.Core
                         ? Players[controller].mzone[sequence]?.position ?? YgoConstants.POS_FACEDOWN_DEFENSE
                         : YgoConstants.POS_FACEDOWN_DEFENSE;
                     AddLog($"반전 소환: [{CardDatabase.GetName(code)}]");
-                    NotifyCardMoved(new CardMoveEvent
+                    NotifyPositionChanged(new CardMoveEvent
                     {
                         code = code,
                         fromCon = controller, fromLoc = location, fromSeq = sequence, fromPos = previous,
                         toCon = controller, toLoc = location, toSeq = sequence, toPos = position,
-                    });
+                    }, ref positionReadouts);
                     break;
                 }
 
@@ -974,7 +984,8 @@ namespace YGOPortable.Core
                     long extraLength = msgEnd - br.BaseStream.Position;
                     uint? presentation = extraLength == sizeof(uint) ? br.ReadUInt32() : null;
                     uint swapPart = extraLength == 2 * sizeof(uint) && br.ReadUInt32() == SwapMoveTag ? br.ReadUInt32() : 0;
-                    uint? summonType = tLoc == YgoConstants.LOCATION_MZONE && presentation is not (DestructionGroupTag or MaterialGroupTag)
+                    uint? summonType = tLoc == YgoConstants.LOCATION_MZONE &&
+                        presentation is not (DestructionGroupTag or MaterialGroupTag or PositionGroupTag)
                         ? presentation : null;
                     if (_speculatingPlayer >= 0 && fLoc == YgoConstants.LOCATION_DECK && tLoc != YgoConstants.LOCATION_DECK &&
                         (fCon != _speculatingPlayer || !_selectedFromDeck.Remove(code))) SpeculationUncertain = true;
@@ -987,7 +998,7 @@ namespace YGOPortable.Core
                         toCon = tCon, toLoc = tLoc, toSeq = tSeq, toPos = tPos,
                         reason = reason,
                         summonType = summonType,
-                        SendGroup = _sendGroups.TryPeek(out var group) && presentation == group.Tag ? group.Key : null,
+                        PresentationGroup = _movementGroups.TryPeek(out var group) && presentation == group.Tag ? group.Key : null,
                     };
                     if (firstSwapMove != null)
                     {
@@ -1023,12 +1034,15 @@ namespace YGOPortable.Core
                     uint sequence = br.ReadByte();
                     uint previous = br.ReadByte();
                     uint position = br.ReadByte();
-                    NotifyCardMoved(new CardMoveEvent
+                    var positionGroup = msgEnd - br.BaseStream.Position == sizeof(uint) && br.ReadUInt32() == PositionGroupTag &&
+                        _movementGroups.TryPeek(out var group) && group.Tag == PositionGroupTag ? group.Key : null;
+                    NotifyPositionChanged(new CardMoveEvent
                     {
                         code = code,
                         fromCon = controller, fromLoc = location, fromSeq = sequence, fromPos = previous,
                         toCon = controller, toLoc = location, toSeq = sequence, toPos = position,
-                    });
+                        PresentationGroup = positionGroup,
+                    }, ref positionReadouts);
                     break;
                 }
 
@@ -1187,13 +1201,13 @@ namespace YGOPortable.Core
                     if (msgEnd - br.BaseStream.Position == sizeof(uint) + sizeof(byte))
                     {
                         uint tag = br.ReadUInt32();
-                        if (tag is DestructionGroupTag or MaterialGroupTag)
+                        if (tag is DestructionGroupTag or MaterialGroupTag or PositionGroupTag)
                         {
-                            if (br.ReadByte() != 0) _sendGroups.Push((tag, new object()));
-                            else if (_sendGroups.TryPeek(out var group) && group.Tag == tag)
+                            if (br.ReadByte() != 0) _movementGroups.Push((tag, new object()));
+                            else if (_movementGroups.TryPeek(out var group) && group.Tag == tag)
                             {
-                                _sendGroups.Pop();
-                                if (_sendGroups.Count == 0 && CurrentChain.Count == 0 && !_awaitingSpecialSummonCompletion)
+                                _movementGroups.Pop();
+                                if (_movementGroups.Count == 0 && CurrentChain.Count == 0 && !_awaitingSpecialSummonCompletion)
                                     SampleFieldReadouts();
                             }
                             break;
@@ -1636,6 +1650,21 @@ namespace YGOPortable.Core
             _fieldReadoutBaseline.Remove((move.toCon, move.toLoc & ~YgoConstants.LOCATION_OVERLAY, move.toSeq));
         }
 
+        private void NotifyPositionChanged(CardMoveEvent move,
+            ref Dictionary<(byte Controller, uint Location, uint Sequence), LiveCardState> positionReadouts)
+        {
+            if (_fieldReadoutBaseline != null && NativePtr != IntPtr.Zero && move.ChangesPositionInPlace &&
+                (move.toPos & YgoConstants.POS_FACEUP) != 0)
+            {
+                // This packet contains the resolved position change, before any later chain effect.
+                positionReadouts ??= CaptureFieldReadouts(fromNative: true);
+                if (positionReadouts.TryGetValue((move.toCon, move.toLoc, move.toSeq), out var live) &&
+                    live.code == move.code && live.position == move.toPos)
+                    move.DestinationReadout = live;
+            }
+            NotifyCardMoved(move);
+        }
+
         private Dictionary<(byte Controller, uint Location, uint Sequence), LiveCardState> CaptureFieldReadouts(bool fromNative)
         {
             var field = new Dictionary<(byte Controller, uint Location, uint Sequence), LiveCardState>();
@@ -1838,7 +1867,7 @@ namespace YGOPortable.Core
             _speculatingPlayer = -1;
             _fieldReadoutBaseline = null;
             _awaitingSpecialSummonCompletion = false;
-            _sendGroups.Clear();
+            _movementGroups.Clear();
             if (NativePtr != IntPtr.Zero)
             {
                 YgoNativeBridge.YGO_DestroyDuel(NativePtr);

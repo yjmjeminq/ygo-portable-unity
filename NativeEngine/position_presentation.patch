@@ -1,0 +1,36 @@
+--- a/operations.cpp
++++ b/operations.cpp
+@@ -5294,6 +5294,15 @@
+ 		card_vector cv(targets->container.begin(), targets->container.end());
+ 		if(cv.size() > 1)
+ 			std::sort(cv.begin(), cv.end(), card::card_operation_sort);
++		constexpr uint32_t position_group_tag = 0x31504759; // YGP1
++		const bool grouped = cv.size() > 1;
++		const auto emit_position_boundary = [&](bool begin) {
++			auto message = pduel->new_message(MSG_CUSTOM_MSG);
++			message->write<uint32_t>(position_group_tag);
++			message->write<uint8_t>(begin);
++		};
++		if(grouped)
++			emit_position_boundary(true);
+ 		for(auto& pcard : cv) {
+ 			uint8_t npos = pcard->position_param & 0xff;
+ 			uint8_t opos = pcard->current.position;
+@@ -5312,6 +5321,8 @@
+ 			message->write<uint8_t>(pcard->current.sequence);
+ 			message->write<uint8_t>(pcard->previous.position);
+ 			message->write<uint8_t>(pcard->current.position);
++			if(grouped)
++				message->write<uint32_t>(position_group_tag);
+ 			core.hint_timing[pcard->current.controler] |= TIMING_POS_CHANGE;
+ 			if((opos & POS_FACEDOWN) && (npos & POS_FACEUP)) {
+ 				pcard->fieldid = infos.field_id++;
+@@ -5367,6 +5378,8 @@
+ 			}
+ 		}
+ 		adjust_instant();
++		if(grouped)
++			emit_position_boundary(false);
+ 		process_single_event();
+ 		if(flips.size())
+ 			raise_event(std::move(flips), EVENT_FLIP, reason_effect, 0, reason_player, 0, 0);

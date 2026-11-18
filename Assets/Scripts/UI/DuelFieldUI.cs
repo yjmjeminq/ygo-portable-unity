@@ -458,7 +458,8 @@ namespace YGOPortable.UI
             }
             if (move.code != code) return null;
             if (move.toLoc is YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE)
-                return (move.toPos & YgoConstants.POS_FACEUP) != 0 ? (move.toCon, move.toLoc, move.toSeq) : null;
+                return (move.toPos & YgoConstants.POS_FACEUP) != 0 || move.ChangesPositionInPlace
+                    ? (move.toCon, move.toLoc, move.toSeq) : null;
             return held?.Readout != null ? source : null;
         }
 
@@ -468,18 +469,25 @@ namespace YGOPortable.UI
             {
                 if (_swapInspections.TryGetValue(slot, out var swap) && swap.Move.Code == code)
                     return new DuelCardReadout(CardDatabase.Get(code), swap.Shown);
-                if (GetBattleCardDisplay(slot.controller, slot.sequence, slot.location) is { Readout: not null } held &&
-                    held.Readout.Shown.code == code)
-                    return new DuelCardReadout(CardDatabase.Get(code), held.Hidden && !held.InspectWhileHidden ? null : held.Readout.Shown);
+                if (GetBattleCardDisplay(slot.controller, slot.sequence, slot.location) is { } held)
+                {
+                    if (held.Readout?.Shown is { } shown && shown.code == code)
+                        return new DuelCardReadout(CardDatabase.Get(code), held.Hidden && !held.InspectWhileHidden ? null : shown);
+                    if (held.PositionChanging) return new DuelCardReadout(CardDatabase.Get(code));
+                }
             }
             return ReadFieldStats(code, ReadVisibleFieldCard(code, location));
         }
+
+        private bool IsInspectedCardStillOnField(uint code, (byte controller, uint location, uint sequence)? location) =>
+            location is { } slot && (slot.location is YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE) &&
+            FindLiveCard(slot.controller, slot.location, slot.sequence)?.code == code;
 
         private void RefreshInspectorReadout(bool showChanges = true)
         {
             if (_inspectedCode == 0) return;
             var card = ReadInspectedStats(_inspectedCode, _inspectedFieldCard);
-            if (card.Live == null) _inspectedFieldCard = null;
+            if (card.Live == null && !IsInspectedCardStillOnField(_inspectedCode, _inspectedFieldCard)) _inspectedFieldCard = null;
             _inspStats.text = FormatInspectorStats(card, compact: true);
             BindIdentityIcons(card, _inspRaceIcon, _inspAttributeIcon);
             _inspCounters.Bind(card.CounterCount, showChanges);
@@ -2323,7 +2331,8 @@ namespace YGOPortable.UI
         private void ClearMovedReadouts(CardMoveEvent move)
         {
             bool changesSlot = (move.fromCon, move.fromLoc, move.fromSeq) != (move.toCon, move.toLoc, move.toSeq);
-            if (changesSlot || (move.toPos & YgoConstants.POS_FACEUP) == 0) Clear(move.fromCon, move.fromLoc, move.fromSeq);
+            if (changesSlot || move.ChangesPositionInPlace || (move.toPos & YgoConstants.POS_FACEUP) == 0)
+                Clear(move.fromCon, move.fromLoc, move.fromSeq);
             if (changesSlot) Clear(move.toCon, move.toLoc, move.toSeq);
 
             void Clear(byte controller, uint location, uint sequence)
@@ -2389,8 +2398,11 @@ namespace YGOPortable.UI
             {
                 // Field modifiers may not apply during the placement of the other cards in this summon.
                 if (animator?.IsSummonReserved(slot.Controller, slot.Sequence) == true) continue;
-                var live = _session.GetVisibleFieldCard(readout.Code, slot.Controller, YgoConstants.LOCATION_MZONE, slot.Sequence);
-                readout.DestinationCard = ReadFieldStats(readout.Code, live).Live;
+                if (readout.DestinationCard == null)
+                {
+                    var live = _session.GetVisibleFieldCard(readout.Code, slot.Controller, YgoConstants.LOCATION_MZONE, slot.Sequence);
+                    readout.DestinationCard = ReadFieldStats(readout.Code, live).Live;
+                }
                 _pendingCardReadouts.Remove(slot);
             }
         }
@@ -2492,12 +2504,17 @@ namespace YGOPortable.UI
 
             var held = HoldMovingFieldCard(e, motion, previousReadout, paired);
             var readout = PrepareMoveReadout(animator, e, fromBack, toBack);
-            if (e.SendGroup != null && (e.reason & YgoConstants.REASON_DESTROY) != 0 &&
+            if (motion == CardMotion.ChangePosition && e.ChangesPositionInPlace)
+            {
+                QueuePositionChange(animator, e, flight, readout, held);
+                return held;
+            }
+            if (e.PresentationGroup != null && (e.reason & YgoConstants.REASON_DESTROY) != 0 &&
                 (e.fromLoc is YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE) &&
                 (e.toLoc & (YgoConstants.LOCATION_ONFIELD | YgoConstants.LOCATION_OVERLAY)) == 0)
             {
                 var release = disappearing ? null : ReserveCardArrival(e.toCon, e.toLoc, e.toSeq);
-                animator.QueueFieldDestruction(e.SendGroup, flight, motion, readout,
+                animator.QueueFieldDestruction(e.PresentationGroup, flight, motion, readout,
                     held == null ? null : () => held.Hidden = true, () =>
                     {
                         ReleaseBattleCardDisplay(held);
@@ -2580,7 +2597,7 @@ namespace YGOPortable.UI
                     _pendingXyzMaterials.Add(host, materials = new());
                 materials.Add((material, move.toPos));
             }
-            else animator.QueueMaterialDeparture(move.SendGroup, material, move.MaterialMethod, Refresh);
+            else animator.QueueMaterialDeparture(move.PresentationGroup, material, move.MaterialMethod, Refresh);
             return held;
         }
 
@@ -2599,7 +2616,10 @@ namespace YGOPortable.UI
             var endSize = destination == null ? startSize : animator.GetAreaSize(destination.root);
             int viewer = _session.HumanPlayerIndex;
             var readout = new CardMoveReadoutSnapshot(move.code, sourceCard,
-                (startSize, endSize, move.fromCon != viewer, move.toCon != viewer));
+                (startSize, endSize, move.fromCon != viewer, move.toCon != viewer))
+            {
+                DestinationCard = destination == null ? null : move.DestinationReadout,
+            };
             if (destination != null) _pendingCardReadouts[(move.toCon, move.toSeq)] = readout;
             return readout;
         }
@@ -3789,7 +3809,7 @@ namespace YGOPortable.UI
         private void RefreshZoomReadout(uint code, bool showChanges = true)
         {
             var card = ReadInspectedStats(code, _zoomFieldCard);
-            if (card.Live == null) _zoomFieldCard = null;
+            if (card.Live == null && !IsInspectedCardStillOnField(code, _zoomFieldCard)) _zoomFieldCard = null;
             _zoomCardView.SetCard(code, false, card.Live, (card.Attack, card.Defense));
             _zoomStats.text = FormatInspectorStats(card);
             BindIdentityIcons(card, _zoomRaceIcon, _zoomAttributeIcon);
