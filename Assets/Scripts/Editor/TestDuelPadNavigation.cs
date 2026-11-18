@@ -91,9 +91,10 @@ namespace YGOPortable.Editor
                 foreach (string zone in new[] { "_myGyTile", "_oppGyTile", "_myBanTile", "_oppBanTile" })
                 {
                     var tile = Get<object>(field, zone);
-                    string label = ((Text)tile.GetType().GetField("text").GetValue(tile)).text;
+                    string label = ((Text)tile.GetType().GetField("label").GetValue(tile)).text;
+                    string count = ((Text)tile.GetType().GetField("count").GetValue(tile)).text;
                     string expected = zone.EndsWith("GyTile") ? "묘지" : "제외";
-                    Require(label.StartsWith(expected + " ") && int.TryParse(label.Split(' ')[1], out _),
+                    Require(label == expected && int.TryParse(count, out _),
                         "A graveyard or banished pile was missing its location or count.");
                 }
 

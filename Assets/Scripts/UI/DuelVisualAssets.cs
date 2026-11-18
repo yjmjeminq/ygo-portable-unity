@@ -13,7 +13,6 @@ namespace YGOPortable.UI
         internal static Texture2D ArenaBackdrop { get; } = Resources.Load<Texture2D>("Duel/ObservatoryBackdrop");
         internal static Sprite MasterDuelLogo { get; } = Resources.Load<Sprite>("Title/MasterDuelLogo") ??
             LoadHudSprite("MasterDuelLogo");
-        internal static Sprite PhaseRim { get; } = LoadHudSprite("PhaseRim");
         internal static Sprite DeckBack { get; } = LoadHudSprite("DeckBack");
         internal static Sprite PauseIcon { get; } = LoadHudSprite("Pause");
         internal static Sprite LogIcon { get; } = LoadHudSprite("Log");
@@ -35,8 +34,6 @@ namespace YGOPortable.UI
         internal static Sprite DuelVictory { get; } = LoadHudSprite("DuelVictory");
         internal static Sprite DuelDefeat { get; } = LoadHudSprite("DuelDefeat");
         internal static Sprite DuelDraw { get; } = LoadHudSprite("DuelDraw");
-        internal static Sprite GraveWell { get; } = LoadHudSprite("GraveWell");
-        internal static Sprite BanishedWell { get; } = LoadHudSprite("BanishedWell");
         private static readonly Sprite DrawPhase = LoadHudSprite("PhaseDraw");
         private static readonly Sprite StandbyPhase = LoadHudSprite("PhaseStandby");
         private static readonly Sprite MainOnePhase = LoadHudSprite("PhaseMain1");

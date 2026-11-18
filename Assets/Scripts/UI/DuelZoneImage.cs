@@ -15,6 +15,7 @@ namespace YGOPortable.UI
 
         private Vector4 _edges = new Vector4(0f, 1f, 0f, 1f);
         private bool _placementHighlighted;
+        private bool _pileActionHighlighted;
         private DuelLinkZoneRim _linkRim;
         internal bool LinkHighlighted { get; private set; }
 
@@ -23,6 +24,13 @@ namespace YGOPortable.UI
             if (_placementHighlighted == highlighted) return;
             _placementHighlighted = highlighted;
             if (_linkRim != null) _linkRim.gameObject.SetActive(LinkHighlighted && !highlighted);
+            SetVerticesDirty();
+        }
+
+        internal void SetPileActionHighlight(bool highlighted)
+        {
+            if (_pileActionHighlighted == highlighted) return;
+            _pileActionHighlighted = highlighted;
             SetVerticesDirty();
         }
 
@@ -110,15 +118,18 @@ namespace YGOPortable.UI
                 DuelMat.AddQuad(mesh, Corner(rect, i, 1.022f), a, b, Corner(rect, i + 1, 1.022f), fade, rim);
                 DuelMat.AddQuad(mesh, a, Corner(rect, i, .944f), Corner(rect, i + 1, .944f), b, rim, fade);
             }
+
+            if (_pileActionHighlighted)
+                DrawSelectionRim(mesh, rect, new Color(.91f, .74f, .41f, .82f), .09f, .96f);
         }
 
-        internal void DrawSelectionRim(VertexHelper mesh, Rect rect, Color color, float gap)
+        internal void DrawSelectionRim(VertexHelper mesh, Rect rect, Color color, float gap, float innerSize = .90f)
         {
             for (int i = 0; i < Corners.Length; i++)
             {
                 var outerA = Corner(rect, i, .99f);
-                var innerA = Corner(rect, i, .90f);
-                var innerB = Corner(rect, i + 1, .90f);
+                var innerA = Corner(rect, i, innerSize);
+                var innerB = Corner(rect, i + 1, innerSize);
                 var outerB = Corner(rect, i + 1, .99f);
                 DuelMat.AddQuad(mesh, Vector2.Lerp(outerA, outerB, gap), Vector2.Lerp(innerA, innerB, gap),
                     Vector2.Lerp(innerB, innerA, gap), Vector2.Lerp(outerB, outerA, gap),

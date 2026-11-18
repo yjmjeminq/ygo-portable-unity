@@ -223,7 +223,7 @@ namespace YGOPortable.UI
                 {
                     if (!CanShowCardActions || _session != session || !ReferenceEquals(session.ActivePrompt, prompt) ||
                         _cardActionAnchor != pile.root) return;
-                    OpenStackZone(pile.controller, pile.location, $"내 {pile.name}", actionsOnly: true);
+                    OpenStackZone(pile.controller, pile.location, $"내 {pile.label.text}", actionsOnly: true);
                     HideCardActions();
                 });
             }

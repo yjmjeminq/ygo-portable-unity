@@ -32,7 +32,7 @@ namespace YGOPortable.Editor
             }
             opens += VerifyPromptAndExtraSummon();
             string hitTest = SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null ? "raycast filters" : "GraphicRaycaster";
-            Debug.Log($"[VERIFY ZONE BROWSER] {opens} successful opens. Pile tabs, inspector details, grave effect and Extra Deck summon shortcuts, privacy and effect prompt field view ({hitTest}) verified.");
+            Debug.Log($"[VERIFY ZONE BROWSER] {opens} successful opens. Pile counts and visible tops, tabs, card details, filtered action shortcuts, privacy and effect prompt field view ({hitTest}) verified.");
         }
 
         private static void VerifyMobileDuelSafeArea()
@@ -54,6 +54,13 @@ namespace YGOPortable.Editor
                 code = attacker, type = YgoConstants.TYPE_MONSTER, position = YgoConstants.POS_FACEUP_ATTACK,
                 controller = 1, sequence = 1, location = YgoConstants.LOCATION_MZONE, level = 4, attack = 1700, defense = 1650,
             };
+            const uint pendulum = 11609969;
+            var publicExtra = new LiveCardState
+            {
+                code = pendulum, controller = 1, location = YgoConstants.LOCATION_EXTRA, position = YgoConstants.POS_FACEUP_ATTACK,
+            };
+            duel.Players[0].deckCount = 36;
+            duel.Players[1].extra.Add(publicExtra);
             var modals = new DuelPromptModals(screen, null, null);
             var field = new DuelFieldUI(null, screen, modals, mobileLayout: true);
             CanvasGroup battle = null;
@@ -76,6 +83,10 @@ namespace YGOPortable.Editor
                 var overlay = field.Root.transform.Find("Overlay_CardZoom");
                 var details = overlay.Find("MobileSafeArea");
                 var animator = CardAnimationManager.Ensure(canvas);
+                var myDeck = viewport.Find("DuelBoard/Zone_7_4");
+                var opponentExtra = viewport.Find("DuelBoard/Zone_7_0");
+                VerifyPileReadout(myDeck, 36, 0);
+                VerifyPileReadout(opponentExtra, 1, pendulum);
                 battle = animator.CreateBattleReadout(DuelFieldUI.BattleStatsArea,
                     new BattleCardStats(1, YgoConstants.LOCATION_MZONE, 1, YgoConstants.POS_FACEUP_ATTACK, 1700, 1650),
                     new BattleCardStats(0, YgoConstants.LOCATION_MZONE, 2, YgoConstants.POS_FACEUP_ATTACK, 3400, 2500),
@@ -90,6 +101,7 @@ namespace YGOPortable.Editor
                 }
 
                 var placeActions = typeof(DuelFieldUI).GetMethod("PositionCardActions", BindingFlags.Instance | BindingFlags.NonPublic);
+                var cardPose = typeof(DuelFieldUI).GetMethod("GetCardPose", BindingFlags.Instance | BindingFlags.NonPublic);
                 foreach (var safe in new[] { new Rect(144, 36, 2256, 1044), new Rect(0, 36, 2256, 1044) })
                 {
                     viewport.GetComponent<MobileSafeArea>().Reflow(safe, display);
@@ -118,6 +130,23 @@ namespace YGOPortable.Editor
                             $"{hudName} let its portrait overlap the name or LP.");
                     }
 
+                    foreach (var (pile, controller, location) in new[]
+                    {
+                        (myDeck, (byte)0, YgoConstants.LOCATION_DECK), (opponentExtra, (byte)1, YgoConstants.LOCATION_EXTRA),
+                    })
+                    {
+                        var caption = Bounds(pile.Find("Total/Caption"));
+                        var count = Bounds(pile.Find("Total/Amount"));
+                        Require(!caption.Overlaps(count) && count.width > 0f, "The pile count overlapped its label.");
+                        var art = (RectTransform)pile.Find("TopCard/CardView/AspectBox");
+                        var face = animator.GetVisualPose(art);
+                        var flight = (CardPose)cardPose.Invoke(field,
+                            new object[] { controller, location, 0u, YgoConstants.POS_FACEUP_ATTACK, -1 });
+                        Require(flight.IsValid && Vector2.Distance(face.Position, flight.Position) < .15f &&
+                            Vector2.Distance(face.Size, flight.Size) < .15f && Mathf.Abs(Mathf.DeltaAngle(face.Angle, flight.Angle)) < .1f,
+                            "The card flight did not line up with its pile.");
+                    }
+
                     var preview = Bounds(left);
                     var comparison = Bounds(battle.transform);
                     Require(Mathf.Abs(preview.xMin - comparison.xMin) < .1f && Mathf.Abs(preview.xMax - comparison.xMax) < .1f &&
@@ -129,6 +158,12 @@ namespace YGOPortable.Editor
                         "The full-screen background or card details backdrop moved into the safe area.");
                 }
 
+                publicExtra.position = YgoConstants.POS_FACEDOWN_DEFENSE;
+                field.Refresh();
+                VerifyPileReadout(opponentExtra, 1, 0);
+                duel.Players[1].extra.Clear();
+                field.Refresh();
+                VerifyPileReadout(opponentExtra, 0, 0);
                 Require(left.Find("CardDetails/CombatStats/Attack/Digits/Value").GetComponent<Text>().text == "3400" &&
                     details.Find("ZoomWin/Info/CombatStats/Attack/Digits/Value").GetComponent<Text>().text == "3400",
                     "The mobile layout lost the selected monster's live stats.");
@@ -145,7 +180,7 @@ namespace YGOPortable.Editor
                 Vector2 midpoint = (Bounds(viewport.Find("DuelBoard/Zone_5_1")).center + Bounds(slot).center) * .5f;
                 Require(arrow.gameObject.activeInHierarchy && Vector2.Distance(Bounds(arrow).center, midpoint) < .2f,
                     "The response arrow ended up offset from the two cards after rotation.");
-                Debug.Log("[VERIFY DUEL SAFE AREA] Both landscape insets kept the field, live stats and card details visible and aligned.");
+                Debug.Log("[VERIFY DUEL SAFE AREA] Both landscape insets kept the field, live stats, pile counts, pile flight endpoints and card details aligned.");
             }
             finally
             {
@@ -189,6 +224,8 @@ namespace YGOPortable.Editor
             using var ui = new Browser(duel);
             var mine = duel.Players[duel.HumanPlayerIndex];
             var opponent = duel.Players[duel.AiPlayerIndex];
+            ui.VerifyPileReadout("_myGyTile", 0, 0);
+            ui.VerifyPileReadout("_oppGyTile", 0, 0);
             ui.VerifyOwnZones(mine);
             ui.OpenStack("_oppExtraTile", opponent.extra.Select(_ => 0u));
             ui.Close();
@@ -218,6 +255,10 @@ namespace YGOPortable.Editor
                         resolved.banished.Count == 10 && resolved.banished.All(card => !card.IsFaceUp && card.code != 0),
                     "Pot of Desires did not reach the expected face-down banish state.");
                 ui.Field.Refresh();
+                string side = player == duel.HumanPlayerIndex ? "_my" : "_opp";
+                ui.VerifyPileReadout(side + "GyTile", resolved.grave.Count, PotOfDesires);
+                ui.VerifyPileReadout(side + "BanTile", resolved.banished.Count, 0);
+                ui.VerifyPileReadout(side + "DeckTile", resolved.deckCount, 0);
                 ui.VerifyOwnZones(mine);
                 ui.OpenStack("_oppBanTile", opponent.banished.Select(_ => 0u));
                 ui.Close();
@@ -365,6 +406,18 @@ namespace YGOPortable.Editor
                     duel.SubmitResponse(choose?.Invoke(prompt) ?? Ai.ComputeResponse(duel, prompt));
             }
             throw new InvalidOperationException($"Could not reach main phase for player {player}.");
+        }
+
+        private static void VerifyPileReadout(Transform pile, int count, uint visibleCode)
+        {
+            var amount = pile.Find("Total/Amount/Count").GetComponent<Text>();
+            var top = pile.Find("TopCard/CardView").GetComponent<CompositeCardView>();
+            Require(amount.text == count.ToString() && top.gameObject.activeSelf == (count > 0),
+                "The board pile did not track the native count.");
+            if (count == 0) return;
+            bool back = top.transform.Find("AspectBox/CardBack").gameObject.activeSelf;
+            Require(top.CurrentCode == visibleCode && back == (visibleCode == 0),
+                "The board pile lost a public top card or exposed a hidden one.");
         }
 
         private sealed class Browser : IDisposable
@@ -1061,6 +1114,9 @@ namespace YGOPortable.Editor
                 VerifyRepeated("_myExtraTile", player.extra);
                 VerifyRepeated("_myBanTile", player.banished.AsEnumerable().Reverse());
             }
+
+            internal void VerifyPileReadout(string pile, int count, uint visibleCode) =>
+                TestDuelZoneBrowser.VerifyPileReadout(StackRoot(pile), count, visibleCode);
 
             internal void VerifyPileTabsAndDetails(PlayerFieldSnapshot mine, PlayerFieldSnapshot opponent)
             {

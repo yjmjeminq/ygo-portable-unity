@@ -2447,15 +2447,12 @@ namespace YGOPortable.UI
         private static bool IsField(uint location) => location is YgoConstants.LOCATION_ONFIELD or YgoConstants.LOCATION_MZONE
             or YgoConstants.LOCATION_SZONE or YgoConstants.LOCATION_FZONE or YgoConstants.LOCATION_PZONE;
 
-        internal static void Add(RectTransform holder, uint location, bool opponent)
+        internal static Graphic Add(RectTransform holder, uint location, bool opponent, bool glyphOnly = false)
         {
-            bool useGlyph = location is YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_GRAVE || IsField(location);
+            bool useGlyph = glyphOnly || location is YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_GRAVE || IsField(location);
             var sprite = useGlyph ? null : DuelVisualAssets.PromptZoneIcon(location, opponent);
             if (sprite != null)
-            {
-                LotdUiKit.AddImage(holder.gameObject, sprite, Color.white, true, false);
-                return;
-            }
+                return LotdUiKit.AddImage(holder.gameObject, sprite, Color.white, true, false);
 
             var glyph = holder.gameObject.AddComponent<DuelPromptLocationIcon>();
             glyph._location = (location & YgoConstants.LOCATION_OVERLAY) != 0 ? YgoConstants.LOCATION_OVERLAY : location;
@@ -2466,6 +2463,7 @@ namespace YGOPortable.UI
                 _ => IsField(location) ? DuelStyle.Gold : DuelStyle.Side(opponent),
             };
             glyph.raycastTarget = false;
+            return glyph;
         }
 
         protected override void OnPopulateMesh(VertexHelper mesh)

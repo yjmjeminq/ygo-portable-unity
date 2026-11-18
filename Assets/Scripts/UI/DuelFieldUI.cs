@@ -113,12 +113,14 @@ namespace YGOPortable.UI
         private class StackTileView
         {
             public RectTransform root;
-            public Text text;
-            public Outline border;
+            public RectTransform cardArea;
+            public Text label;
+            public Text count;
+            public DuelZoneImage background;
             public CompositeCardView cardView;
-            public Image wellImage;
-            public Image wellLight;
-            public string name;
+            public DuelPileWell well;
+            public Graphic wellGlyph;
+            public DuelPileDepth depth;
             public Button button;
             public byte controller;
             public uint location;
@@ -821,13 +823,12 @@ namespace YGOPortable.UI
 
         private static Button BuildPileActionButton(StackTileView tile, string name, string label, Action action)
         {
-            var indicator = LotdUiKit.CreateRect(name, tile.root, new Vector2(.14f, .70f),
-                new Vector2(.86f, .93f), Vector2.zero, Vector2.zero);
-            var button = DuelStyle.Button(indicator, "Button", label, action, 15, gold: true);
-            var text = button.GetComponentInChildren<Text>();
-            text.resizeTextForBestFit = true;
-            text.resizeTextMinSize = 10;
-            text.resizeTextMaxSize = 15;
+            var indicator = LotdUiKit.CreateRect(name, tile.root, new Vector2(.11f, .714f),
+                new Vector2(.89f, .949f), Vector2.zero, Vector2.zero);
+            var rect = LotdUiKit.FillRect("Button", indicator);
+            var rim = AddHudSurface(rect, DuelStyle.Gold, new Color(.23f, .175f, .087f, .99f));
+            var button = AddHudButton(rim, action);
+            LotdUiKit.AddFittedText(rect, "Label", label, 15, 9, TextAnchor.MiddleCenter, DuelStyle.Gold, FontStyle.Bold);
             button.gameObject.SetActive(false);
             return button;
         }
@@ -862,43 +863,50 @@ namespace YGOPortable.UI
 
         private StackTileView CreateStackTile(RectTransform cell, bool opponent, uint location, string name)
         {
-            var background = LotdUiKit.AddImage(cell.gameObject, LotdUiKit.WhiteSprite, ZoneTint);
-            var border = cell.gameObject.AddComponent<Outline>();
-            border.effectColor = Color.clear;
-            border.effectDistance = new Vector2(2f, -2f);
+            var background = (DuelZoneImage)LotdUiKit.AddImage(cell.gameObject, LotdUiKit.WhiteSprite, ZoneTint);
 
             bool grave = location == YgoConstants.LOCATION_GRAVE;
-            bool well = grave || location == YgoConstants.LOCATION_REMOVED;
-            Image wellImage = null;
-            Image wellLight = null;
-            if (well)
+            bool usesWell = grave || location == YgoConstants.LOCATION_REMOVED;
+            DuelPileWell well = null;
+            Graphic wellGlyph = null;
+            if (usesWell)
             {
-                var rim = LotdUiKit.CreateRect("Well", cell, new Vector2(.12f, .20f), new Vector2(.88f, .98f),
+                var basin = LotdUiKit.CreateRect("Well", cell, new Vector2(.12f, .229f), new Vector2(.88f, .985f),
                     Vector2.zero, Vector2.zero);
-                Sprite wellSprite = grave ? DuelVisualAssets.GraveWell : DuelVisualAssets.BanishedWell;
-                wellImage = LotdUiKit.AddImage(rim.gameObject, wellSprite ?? DuelStyle.Disc, Color.white, true, false);
-                if (wellSprite == null && DuelVisualAssets.PhaseRim != null)
-                    LotdUiKit.AddImage(LotdUiKit.FillRect("StoneRim", rim).gameObject, DuelVisualAssets.PhaseRim,
-                        new Color(.82f, .80f, .66f), true, false);
-                var opening = LotdUiKit.CreateRect("WellLight", rim, Vector2.one * .16f, Vector2.one * .84f,
+                well = basin.gameObject.AddComponent<DuelPileWell>();
+                well.texture = Texture2D.whiteTexture;
+                well.raycastTarget = false;
+                well.Accent = grave ? new Color(.38f, .68f, .73f) : new Color(.67f, .55f, .81f);
+                var glyph = LotdUiKit.CreateRect("Location", basin, new Vector2(.31f, .31f), new Vector2(.69f, .69f),
                     Vector2.zero, Vector2.zero);
-                wellLight = LotdUiKit.AddImage(opening.gameObject, DuelStyle.Disc,
-                    grave ? new Color(.12f, .46f, .78f, .69f) : new Color(.47f, .15f, .74f, .72f), true, false);
-                wellLight.enabled = false;
-                var glyph = LotdUiKit.CreateRect("Location", rim, new Vector2(.28f, .25f), new Vector2(.72f, .72f),
-                    Vector2.zero, Vector2.zero);
-                DuelPromptLocationIcon.Add(glyph, location, opponent);
+                wellGlyph = DuelPromptLocationIcon.Add(glyph, location, opponent, glyphOnly: true);
+                wellGlyph.color = Color.Lerp(DuelStyle.Muted, well.Accent, .52f);
             }
-            var card = LotdUiKit.CreateRect("TopCard", cell, SlotCardMin, SlotCardMax, Vector2.zero, Vector2.zero);
+            var card = LotdUiKit.CreateRect("TopCard", cell, usesWell ? new Vector2(.19f, .322f) : new Vector2(.15f, .312f),
+                usesWell ? new Vector2(.81f, .889f) : new Vector2(.85f, .949f), Vector2.zero, Vector2.zero);
             var view = CompositeCardView.Create(card, "CardView", duelArtwork: true);
+            view.transform.localRotation = Quaternion.Euler(0f, 0f, opponent ? 180f : 0f);
+            DuelPileDepth depth = null;
+            if (!usesWell)
+            {
+                var layer = LotdUiKit.FillRect("StackDepth", view.transform.Find("AspectBox"));
+                layer.SetAsFirstSibling();
+                depth = layer.gameObject.AddComponent<DuelPileDepth>();
+                depth.texture = Texture2D.whiteTexture;
+                depth.Opponent = opponent;
+                depth.raycastTarget = false;
+            }
             view.gameObject.SetActive(false);
-            var counter = LotdUiKit.CreateRect("Total", cell, new Vector2(.10f, .075f), new Vector2(.90f, .31f),
+            var counter = LotdUiKit.CreateRect("Total", cell, new Vector2(.075f, .063f), new Vector2(.925f, .255f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(counter.gameObject, LotdUiKit.WhiteSprite, new Color(.04f, .08f, .12f, .93f), false, false);
-            var edge = LotdUiKit.CreateRect("Accent", counter, new Vector2(0f, .14f), new Vector2(.034f, .86f),
+            Color side = DuelStyle.Side(opponent);
+            AddHudSurface(counter, Color.Lerp(HudEdge, side, .24f), HudSurface);
+            var nameRect = LotdUiKit.CreateRect("Caption", counter, new Vector2(.046f, .04f), new Vector2(.745f, .958f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(edge.gameObject, LotdUiKit.WhiteSprite, DuelStyle.Side(opponent), false, false);
-            var count = LotdUiKit.AddFittedText(counter, "Count", "", 15, 9, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+            var label = LotdUiKit.AddFittedText(nameRect, "Label", name, 14, 8, TextAnchor.MiddleLeft, DuelStyle.Muted, FontStyle.Bold);
+            var amountRect = LotdUiKit.CreateRect("Amount", counter, new Vector2(.748f, .04f), new Vector2(.953f, .958f),
+                Vector2.zero, Vector2.zero);
+            var count = LotdUiKit.AddFittedText(amountRect, "Count", "", 17, 8, TextAnchor.MiddleRight, HudText, FontStyle.Bold);
 
             void Open()
             {
@@ -919,8 +927,8 @@ namespace YGOPortable.UI
             }
             var tile = new StackTileView
             {
-                root = cell, text = count, border = border, cardView = view, wellImage = wellImage,
-                wellLight = wellLight, button = button, name = name, location = location,
+                root = cell, cardArea = card, label = label, count = count, background = background, cardView = view,
+                well = well, wellGlyph = wellGlyph, depth = depth, button = button, location = location,
             };
             _stackTilesByRect.Add(cell, tile);
             return tile;
@@ -1244,14 +1252,14 @@ namespace YGOPortable.UI
             RefreshPlacementControls(prompt);
             RefreshPhaseChoices(prompt);
 
-            UpdateStackTile(_myDeckTile, mine.deckCount, me, YgoConstants.LOCATION_DECK);
-            UpdateStackTile(_myExtraTile, mine.extra.Count, me, YgoConstants.LOCATION_EXTRA);
-            UpdateStackTile(_myGyTile, mine.grave.Count, me, YgoConstants.LOCATION_GRAVE);
-            UpdateStackTile(_myBanTile, mine.banished.Count, me, YgoConstants.LOCATION_REMOVED);
-            UpdateStackTile(_oppDeckTile, theirs.deckCount, opponent, YgoConstants.LOCATION_DECK);
-            UpdateStackTile(_oppExtraTile, theirs.extra.Count, opponent, YgoConstants.LOCATION_EXTRA);
-            UpdateStackTile(_oppGyTile, theirs.grave.Count, opponent, YgoConstants.LOCATION_GRAVE);
-            UpdateStackTile(_oppBanTile, theirs.banished.Count, opponent, YgoConstants.LOCATION_REMOVED);
+            UpdateStackTile(_myDeckTile, mine.deckCount, me);
+            UpdateStackTile(_myExtraTile, mine.extra.Count, me, mine.extra.LastOrDefault());
+            UpdateStackTile(_myGyTile, mine.grave.Count, me, mine.grave.LastOrDefault());
+            UpdateStackTile(_myBanTile, mine.banished.Count, me, mine.banished.LastOrDefault());
+            UpdateStackTile(_oppDeckTile, theirs.deckCount, opponent);
+            UpdateStackTile(_oppExtraTile, theirs.extra.Count, opponent, theirs.extra.LastOrDefault());
+            UpdateStackTile(_oppGyTile, theirs.grave.Count, opponent, theirs.grave.LastOrDefault());
+            UpdateStackTile(_oppBanTile, theirs.banished.Count, opponent, theirs.banished.LastOrDefault());
 
             int chain = _session.CurrentChain.Count;
             _chainIcon.gameObject.SetActive(chain > 0);
@@ -1317,28 +1325,30 @@ namespace YGOPortable.UI
             _mat.ShowTurn(opponent);
         }
 
-        private void UpdateStackTile(StackTileView tile, int count, byte controller, uint location)
+        private void UpdateStackTile(StackTileView tile, int count, byte controller, LiveCardState top = null)
         {
             tile.controller = controller;
-            if (IsArriving(controller, location, 0)) return;
+            if (IsArriving(controller, tile.location, 0)) return;
 
-            bool canAct = CanAcceptPlayerAction && CountZoneActions(controller, location) > 0;
+            bool canAct = CanAcceptPlayerAction && CountZoneActions(controller, tile.location) > 0;
             bool hasCards = count > 0;
-            tile.text.text = $"{tile.name} {count}";
-            tile.text.color = canAct ? LotdUiKit.GoldAccent : hasCards ? Color.white : DuelStyle.Muted;
-            tile.border.effectColor = canAct ? LotdUiKit.GoldAccent : Color.clear;
-            bool showPile = hasCards && tile.wellLight == null;
-            if (tile.wellLight != null)
+            tile.count.text = count.ToString();
+            tile.count.color = canAct ? DuelStyle.Gold : hasCards ? HudText : DuelStyle.Muted;
+            tile.label.color = canAct ? DuelStyle.Gold : DuelStyle.Muted;
+            tile.background.SetPileActionHighlight(canAct);
+            tile.depth?.SetCount(count);
+            if (tile.well != null)
             {
-                tile.wellImage.color = new Color(.23f, .31f, .40f, hasCards ? .96f : .66f);
-                tile.wellLight.enabled = hasCards;
+                tile.well.SetOccupied(hasCards);
+                tile.wellGlyph.enabled = !hasCards;
             }
-            tile.cardView.gameObject.SetActive(showPile);
-            if (!showPile) return;
+            tile.cardView.gameObject.SetActive(hasCards);
+            if (!hasCards) return;
 
-            tile.cardView.SetCard(0u, true);
-            tile.cardView.transform.localRotation = Quaternion.Euler(0f, 0f,
-                CardAngle(location, YgoConstants.POS_FACEUP_ATTACK, controller != _session.HumanPlayerIndex));
+            bool showFace = top != null && top.code != 0 &&
+                (tile.location == YgoConstants.LOCATION_GRAVE || top.IsFaceUp || top.isPublic);
+            if (showFace) tile.cardView.SetCard(top.code, live: top);
+            else tile.cardView.SetCard(0u, true);
         }
 
         private void BindEmz(FieldSlotView slot, byte myCon, uint mySeq, byte oppCon, uint oppSeq, LiveCardState myEmz, LiveCardState oppEmz)
@@ -1425,10 +1435,6 @@ namespace YGOPortable.UI
         {
             if (location == YgoConstants.LOCATION_MZONE && (position & YgoConstants.POS_DEFENSE) != 0)
                 return opponent ? 90f : -90f;
-            if (location == YgoConstants.LOCATION_DECK)
-                return opponent ? 166f : -14f;
-            if (location == YgoConstants.LOCATION_EXTRA)
-                return opponent ? 193f : 13f;
             return opponent && location != YgoConstants.LOCATION_HAND ? 180f : 0f;
         }
 
@@ -2023,9 +2029,11 @@ namespace YGOPortable.UI
                 return animator.GetPose(row, (bounds.min + bounds.max) * 0.5f, bounds.max - bounds.min, bounds.angle);
             }
 
-            var rect = GetSlot(controller, location, sequence)?.root ?? GetStack(controller, location)?.root;
+            var slot = GetSlot(controller, location, sequence);
+            var rect = slot?.root ?? GetStack(controller, location)?.cardArea;
             if (rect == null) return default;
-            var center = (SlotCardMin + SlotCardMax) * 0.5f;
+            var center = Vector2.one * .5f;
+            var size = slot != null ? SlotCardMax - SlotCardMin : Vector2.one;
             float scale = CardScale(rect, location, cardPosition);
             if (material)
             {
@@ -2033,7 +2041,7 @@ namespace YGOPortable.UI
                 center += new Vector2(.035f * Math.Min(position, 3u), opponent ? .13f : -.13f);
                 scale *= .60f;
             }
-            return animator.GetPose(rect, center, SlotCardMax - SlotCardMin, angle, scale);
+            return animator.GetPose(rect, center, size, angle, scale);
         }
 
         private CardPose GetDisplayedCardPose(byte controller, uint location, uint sequence, uint code)
@@ -2833,7 +2841,6 @@ namespace YGOPortable.UI
             bool CanSummon() => _session == session && ReferenceEquals(session.ActivePrompt, prompt) && CanUseCardActions;
 
             HideCardActions();
-            LotdAudio.PlayClick();
             _modals.ShowZoneViewer(
                 "엑스트라 소환 가능",
                 session.Players[session.HumanPlayerIndex].extra,
