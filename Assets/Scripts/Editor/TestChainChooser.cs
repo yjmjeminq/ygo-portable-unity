@@ -25,6 +25,7 @@ namespace YGOPortable.Editor
             VerifyEffectOptions(duel);
             VerifyKoreanPendulumReadouts(duel);
             VerifyLightningStormOptions();
+            VerifyCyberRaiderOptions();
             VerifyBundledOptionDescriptions();
             VerifyKoreanEffectCatalogue();
             VerifyGroupedLocations(duel);
@@ -189,6 +190,16 @@ namespace YGOPortable.Editor
                     CardDatabase.ResolveOptionDescription(80) == "배틀 페이즈로 이동한다" &&
                     CardDatabase.ResolveOptionDescription(81) == "엔드 페이즈로 이동한다",
                 "Native procedure, attack, phase or cost prompts lost their distinct descriptions.");
+
+            const uint thrust = 35269904, machinex = 46593546, blackCat = 24140059;
+            Require(Option(thrust, 1) == "덱에서 세트하거나 패에 넣을 일반 마법·함정 카드를 선택하십시오." &&
+                    Option(thrust, 2) == "세트하는 대신 선택한 카드를 패에 넣으시겠습니까?" &&
+                    Option(machinex, 4) == "이 카드의 엑시즈 소재를 2개 제거한다" &&
+                    Option(machinex, 5) == "자신 필드의 계약서 카드 1장을 파괴한다",
+                "Thrust and Machinex must distinguish their native destinations and costs.");
+            Require(Option(blackCat, 0) == "패에 넣는다" &&
+                    CardDatabase.ResolveDescription(578) == "엑시즈 소재로 할 카드를 선택하십시오.",
+                "A common confirmation or attach-material instruction lost its Korean wording.");
         }
 
         private static void VerifyKoreanPendulumReadouts(DuelSession duel)
@@ -288,15 +299,89 @@ namespace YGOPortable.Editor
             Debug.Log("[VERIFY KOREAN NATIVE OPTIONS] Lightning Storm offered both Korean choices and resolved the chosen effect twice.");
         }
 
+        private static void VerifyCyberRaiderOptions()
+        {
+            const uint raider = 39978267, sparkman = 20721928, equip = 56747793;
+            ulong description = (ulong)raider << 20;
+            var main = Enumerable.Repeat(raider, 13).Concat(Enumerable.Repeat(sparkman, 14))
+                .Concat(Enumerable.Repeat(equip, 13)).ToArray();
+            var opponent = Enumerable.Repeat(sparkman, 40).ToArray();
+            var empty = Array.Empty<uint>();
+            var ai = new TacticalAI();
+            string[] labels = { "필드의 장착 카드 1장을 파괴한다", "필드의 장착 카드 1장을 이 카드에 장착한다" };
+
+            for (int choice = 0; choice < labels.Length; choice++)
+            {
+                using var duel = YgoProjectBuilder.StartSeedMatching("Cyber Raider options", main, empty, opponent, empty,
+                    true, session =>
+                    {
+                        var hand = session.Players[session.HumanPlayerIndex].hand;
+                        return hand.Any(card => card.code == raider) && hand.Any(card => card.code == sparkman) &&
+                            hand.Any(card => card.code == equip);
+                    });
+                void Summon(uint code)
+                {
+                    int index = duel.ActivePrompt.summonable.FindIndex(card => card.code == code);
+                    Require(index >= 0, $"Cyber Raider fixture could not summon {code}.");
+                    duel.SubmitResponseInt(index << 16);
+                }
+
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+                Summon(sparkman);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+                int activate = duel.ActivePrompt.activatable.FindIndex(card => card.code == equip);
+                Require(activate >= 0, "Cyber Raider fixture could not activate its Equip Spell.");
+                duel.SubmitResponseInt((activate << 16) | 5);
+                byte[] SelectCard(DuelPrompt prompt) =>
+                    prompt.messageType == YgoConstants.MSG_SELECT_CARD ? ai.ComputeResponse(duel, prompt) : null;
+                YgoProjectBuilder.DriveUntilIdle(duel, ai, SelectCard);
+                var player = duel.Players[duel.HumanPlayerIndex];
+                Require(player.mzone.Any(card => card?.code == sparkman && card.attack == 2400),
+                    "The Equip Spell did not boost the original monster.");
+
+                for (int turn = 0; turn < 2; turn++)
+                {
+                    duel.SubmitResponseInt(7);
+                    YgoProjectBuilder.DriveUntilIdle(duel, ai);
+                }
+                Summon(raider);
+                using var view = new ChainView();
+                YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
+                {
+                    if (prompt.messageType != YgoConstants.MSG_SELECT_OPTION) return SelectCard(prompt);
+                    Require(prompt.options.SequenceEqual(new[] { description | 1, description | 2 }),
+                        "Cyber Raider did not offer both native equipment actions.");
+                    view.Modals.ShowPrompt(duel, prompt);
+                    var buttons = view.Modals.ModalRoot.GetComponentsInChildren<Button>();
+                    for (int i = 0; i < labels.Length; i++)
+                    {
+                        var option = buttons.Single(button => button.name == $"Opt_{i}");
+                        Require(option.GetComponentInChildren<Text>().text == labels[i], "An equipment action lost its Korean label.");
+                    }
+                    buttons.Single(button => button.name == $"Opt_{choice}").onClick.Invoke();
+                    Require(view.Responses.SequenceEqual(new[] { choice }), "The localized option changed the native response index.");
+                    return BitConverter.GetBytes(view.Responses[0]);
+                });
+                int raiderAttack = CardDatabase.Get(raider).atk;
+                Require(view.Responses.Count == 1 && duel.RetryCount == 0 &&
+                    player.mzone.Any(card => card?.code == sparkman && card.attack == 1600) &&
+                    player.mzone.Any(card => card?.code == raider && card.attack == raiderAttack + (choice == 0 ? 0 : 1600)) &&
+                    player.grave.Any(card => card.code == equip) == (choice == 0),
+                    "The translated choice did not destroy or move the Equip Spell as labeled.");
+            }
+            Debug.Log("[VERIFY KOREAN NATIVE OPTIONS] Cyber Raider destroyed and moved the Equip Spell using its respective Korean choices.");
+        }
+
         private static void VerifyKoreanEffectCatalogue()
         {
             int labels = 0, withDescriptions = 0;
             foreach (var card in CardDatabase.AllCards)
             {
                 string rules = card.desc ?? "";
-                Require(!rules.Contains("[Pendulum Effect]", StringComparison.OrdinalIgnoreCase) &&
+                Require(rules.Any(letter => letter is >= '가' and <= '힣') &&
+                    !rules.Contains("[Pendulum Effect]", StringComparison.OrdinalIgnoreCase) &&
                     !rules.Contains("[Monster Effect]", StringComparison.OrdinalIgnoreCase),
-                    $"An English heading remained in the loaded card text for {card.code}.");
+                    $"Korean card rules or headings were missing for {card.code}.");
                 for (int i = 0; i < (card.strs?.Length ?? 0); i++)
                 {
                     if (string.IsNullOrWhiteSpace(card.strs[i])) continue;
