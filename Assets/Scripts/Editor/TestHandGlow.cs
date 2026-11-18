@@ -48,7 +48,11 @@ namespace YGOPortable.Editor
             VerifyNativeMovingReadout();
             VerifyNativeTokenArrivalReadout();
             VerifyNativePendulumArrivalReadout();
-            VerifyNativeXyzMaterialGather();
+            VerifyNativeFieldMaterials(xyz: true);
+            VerifyNativeFieldMaterials(xyz: false);
+            VerifyNativeSynchroMaterials();
+            VerifyNativeMixedMaterials(ritual: false);
+            VerifyNativeMixedMaterials(ritual: true);
             VerifyNativeXyzMaterialReadout();
             Debug.Log("[VERIFY HAND GLOW] Native summons and effects, distinct hand copies, blocked prompts, animation, off-turn activation and field-only monster ratings passed.");
         }
@@ -533,8 +537,8 @@ namespace YGOPortable.Editor
             Require(chained && duel.RetryCount == 0 && duel.SolvedChainLinks.SequenceEqual(new[] { (2, rush), (1, darkHole) }) &&
                     duel.Players[duel.HumanPlayerIndex].grave.Count(card => card.code == gagagigo) == 1 &&
                     enemy.grave.Count(card => card.code == gagagigo) == 2 && destroyed.Count == 3 &&
-                    destroyed[0].DestructionGroup != null &&
-                    destroyed.All(move => ReferenceEquals(move.DestructionGroup, destroyed[0].DestructionGroup)),
+                    destroyed[0].SendGroup != null &&
+                    destroyed.All(move => ReferenceEquals(move.SendGroup, destroyed[0].SendGroup)),
                 "The native chain did not destroy all three cards with one operation after applying the buff.");
             ui.Field.Refresh();
             VerifyWaiting(ownTile, "1850");
@@ -1788,68 +1792,244 @@ namespace YGOPortable.Editor
                 "The group did not land together or left its moving readouts on screen.");
         }
 
-        private static void VerifyNativeXyzMaterialGather()
+        private static void VerifyNativeFieldMaterials(bool xyz)
         {
-            const uint sparkman = 20721928, doubleSummon = 43422537, cowboy = 12014404;
-            var main = Enumerable.Repeat(sparkman, 30).Concat(Enumerable.Repeat(doubleSummon, 10)).ToArray();
+            const uint sparkman = 20721928, doubleSummon = 43422537, rush = 70046172, cowboy = 12014404, proxy = 22862454;
+            uint result = xyz ? cowboy : proxy;
+            var main = Enumerable.Repeat(sparkman, 24).Concat(Enumerable.Repeat(doubleSummon, 8)).Concat(Enumerable.Repeat(rush, 8)).ToArray();
             var enemy = Enumerable.Repeat(BlueEyes, 40).ToArray();
             var ai = new TacticalAI();
-            using var duel = YgoProjectBuilder.StartSeedMatching("Xyz material flights", main, new[] { cowboy }, enemy,
+            using var duel = YgoProjectBuilder.StartSeedMatching("Field material flights", main, new[] { result }, enemy,
                 Array.Empty<uint>(), true, session =>
                 {
                     var hand = session.Players[session.HumanPlayerIndex].hand;
-                    return hand.Count(card => card.code == sparkman) >= 2 && hand.Any(card => card.code == doubleSummon);
+                    return hand.Count(card => card.code == sparkman) >= 2 &&
+                        hand.Any(card => card.code == doubleSummon) && hand.Any(card => card.code == rush);
                 });
             ActivateFromMainPhase(duel, doubleSummon);
             YgoProjectBuilder.DriveUntilIdle(duel, ai);
             for (int i = 0; i < 2; i++)
             {
-                Require(duel.ActivePrompt.summonable.Count != 0, "The Xyz fixture ran out of normal summons.");
+                Require(duel.ActivePrompt.summonable.Count != 0, "The material fixture ran out of normal summons.");
                 duel.SubmitResponseInt(0);
                 YgoProjectBuilder.DriveUntilIdle(duel, ai);
             }
-            int summon = duel.ActivePrompt.spSummonable.FindIndex(card => card.code == cowboy);
-            Require(summon >= 0, "The two monsters did not offer an Xyz Summon.");
+            ActivateFromMainPhase(duel, rush);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt => prompt.messageType == YgoConstants.MSG_SELECT_CARD
+                ? SelectCard(prompt, sparkman) : null);
+            var player = duel.Players[duel.HumanPlayerIndex];
+            var sources = player.mzone.Where(card => card?.code == sparkman).ToArray();
+            Require(sources.Select(card => card.attack).OrderBy(value => value).SequenceEqual(new[] { 1600, 2300 }),
+                "The two identical materials did not start with distinct live stats.");
+            int summon = duel.ActivePrompt.spSummonable.FindIndex(card => card.code == result);
+            Require(summon >= 0, "The two monsters did not offer the expected summon.");
             using var ui = new HandUI(duel);
             var animator = CardAnimationManager.Ensure(ui.Canvas);
             Canvas.ForceUpdateCanvases();
+            var focused = sources.Single(card => card.attack == 2300);
+            FieldSlot(ui.Field, focused).GetComponent<CardDragTrigger>().OnRightClick();
+            ui.Field.Root.transform.Find("LeftInspector/CardDetails/ArtworkControls/Details/B").GetComponent<Button>().onClick.Invoke();
+            Require(ui.Field.IsReadingCardDetails, "The moving material fixture did not open the selected card's details.");
+            var send = new List<CardMoveEvent>();
+            duel.OnCardMoved += move => { if (move.MaterialMethod != 0) send.Add(move); };
             duel.SubmitResponseInt((summon << 16) | 1);
             YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt => prompt.messageType switch
             {
-                YgoConstants.MSG_SELECT_CARD => DuelSession.PackCardSelection(0, 1),
+                YgoConstants.MSG_SELECT_CARD => prompt.min == 2 ? DuelSession.PackCardSelection(0, 1) : DuelSession.PackCardSelection(0),
                 YgoConstants.MSG_SELECT_POSITION => BitConverter.GetBytes((int)YgoConstants.POS_FACEUP_DEFENSE),
                 _ => null,
             });
-            var host = duel.Players[duel.HumanPlayerIndex].mzone.Single(card => card?.code == cowboy);
-            Require(host.overlayCodes.Count == 2 && duel.RetryCount == 0, "The Xyz fixture did not give Cowboy two materials.");
-            ui.Field.Refresh();
+            var host = player.mzone.Single(card => card?.code == result);
+            Require(duel.RetryCount == 0 && (xyz ? host.overlayCodes.Count == 2 : host.link == 2),
+                "The material fixture did not complete the intended summon.");
+            if (!xyz) VerifyNativeSendGroup(send, YgoConstants.REASON_LINK);
+            var slot = VerifyMaterialTimeline(ui.Field, animator, host, sources, count: 2, merging: xyz, inspected: focused);
+            if (xyz)
+                Require(slot.Find("CardReadout/Labels/Materials/Value").GetComponent<Text>().text == "2",
+                    "The Xyz monster did not land with both assembled materials.");
+            else
+                Require(player.grave.Count(card => card.code == sparkman) == 2,
+                    "The Link materials did not reach the Graveyard as shown.");
+            Debug.Log($"[VERIFY DUEL SUMMON MATERIAL] {(xyz ? "Xyz" : "Link")} kept the 1600 and 2300 copies distinct until departure and displayed the result.");
+        }
 
+        private static void VerifyNativeSynchroMaterials()
+        {
+            const uint moYe = 20001443, token = 20001444, wyrm = 56495147, chixiao = 69248256;
+            var main = Enumerable.Repeat(moYe, 20).Concat(Enumerable.Repeat(wyrm, 20)).ToArray();
+            var ai = new TacticalAI();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Swordsoul material flights", main, new[] { chixiao },
+                Enumerable.Repeat(BlueEyes, 40).ToArray(), Array.Empty<uint>(), true,
+                session => session.ActivePrompt?.summonable.Exists(card => card.code == moYe) == true &&
+                    session.Players[session.HumanPlayerIndex].hand.Exists(card => card.code == wyrm));
+            duel.SubmitResponseInt(duel.ActivePrompt.summonable.FindIndex(card => card.code == moYe) << 16);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt => prompt.messageType switch
+            {
+                YgoConstants.MSG_SELECT_EFFECTYN when prompt.promptCardCode == moYe => BitConverter.GetBytes(1),
+                YgoConstants.MSG_SELECT_CHAIN => BitConverter.GetBytes(prompt.candidates.FindIndex(card => card.code == moYe)),
+                YgoConstants.MSG_SELECT_CARD => SelectCard(prompt, wyrm),
+                _ => null,
+            });
+            var player = duel.Players[duel.HumanPlayerIndex];
+            var sources = player.mzone.Where(card => card != null).ToArray();
+            Require(sources.Length == 2 && sources.Any(card => card.code == token && card.level == 4 && card.IsFaceUp),
+                "The Synchro fixture did not create its Tuner Token.");
+            int summon = duel.ActivePrompt.spSummonable.FindIndex(card => card.code == chixiao);
+            Require(summon >= 0, "The Tuner Token did not offer the Synchro Summon.");
+            using var ui = new HandUI(duel);
+            var animator = CardAnimationManager.Ensure(ui.Canvas);
+            Canvas.ForceUpdateCanvases();
+
+            var send = new List<CardMoveEvent>();
+            duel.OnCardMoved += move => { if (move.MaterialMethod != 0) send.Add(move); };
+            duel.SubmitResponseInt((summon << 16) | 1);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt => prompt.messageType is YgoConstants.MSG_SELECT_SUM or YgoConstants.MSG_SELECT_CARD
+                ? ai.ComputeResponse(duel, prompt) : null);
+            VerifyNativeSendGroup(send, YgoConstants.REASON_SYNCHRO);
+            var host = player.mzone.Single(card => card?.code == chixiao);
+            Require(duel.RetryCount == 0 && host.level == 8 && send.Any(move => move.code == token && move.toLoc == 0) &&
+                    player.grave.Any(card => card.code == moYe) && player.grave.All(card => card.code != token),
+                "The Synchro send did not remove the Tuner Token and send Mo Ye to the Graveyard.");
+            VerifyMaterialTimeline(ui.Field, animator, host, sources, count: 2, vanishes: token);
+            Debug.Log("[VERIFY DUEL SUMMON MATERIAL] Synchro kept both Level 4 readouts, faded the Tuner Token and sent Mo Ye to the Graveyard.");
+        }
+
+        private static void VerifyNativeMixedMaterials(bool ritual)
+        {
+            const uint sparkman = 20721928, avian = 21844576, burstinatrix = 58932615;
+            const uint polymerization = 24094653, flameWingman = 35809262, ritualSpell = 55761792, blackLuster = 5405694;
+            uint material = ritual ? sparkman : avian;
+            uint spell = ritual ? ritualSpell : polymerization;
+            uint result = ritual ? blackLuster : flameWingman;
+            var main = ritual
+                ? Enumerable.Repeat(spell, 14).Concat(Enumerable.Repeat(result, 10)).Concat(Enumerable.Repeat(material, 16)).ToArray()
+                : Enumerable.Repeat(spell, 14).Concat(Enumerable.Repeat(material, 10)).Concat(Enumerable.Repeat(burstinatrix, 16)).ToArray();
+            var ai = new TacticalAI();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Mixed material flights", main, ritual ? Array.Empty<uint>() : new[] { result },
+                Enumerable.Repeat(BlueEyes, 40).ToArray(), Array.Empty<uint>(), true, session =>
+                {
+                    var hand = session.Players[session.HumanPlayerIndex].hand;
+                    return hand.Any(card => card.code == spell) && hand.Count(card => card.code == material) == (ritual ? 2 : 1) &&
+                        (ritual ? hand.Count(card => card.code == result) == 1 : hand.Any(card => card.code == burstinatrix));
+                });
+
+            var prompt = duel.ActivePrompt;
+            var choices = ritual ? prompt.summonable : prompt.mSetable;
+            int place = choices.FindIndex(card => card.code == material);
+            Require(place >= 0, "The mixed fixture could not place the field material.");
+            duel.SubmitResponseInt((place << 16) | (ritual ? 0 : 3));
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            var player = duel.Players[duel.HumanPlayerIndex];
+            var source = player.mzone.Single(card => card != null);
+            Require(source.IsFaceUp == ritual, "The mixed fixture did not set the expected visibility.");
+            using var ui = new HandUI(duel);
+            var animator = CardAnimationManager.Ensure(ui.Canvas);
+            Canvas.ForceUpdateCanvases();
+
+            var send = new List<CardMoveEvent>();
+            duel.OnCardMoved += move => { if (move.MaterialMethod != 0) send.Add(move); };
+            ActivateFromMainPhase(duel, spell);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, request => request.messageType is YgoConstants.MSG_SELECT_SUM or YgoConstants.MSG_SELECT_CARD
+                ? ai.ComputeResponse(duel, request) : null);
+            VerifyNativeSendGroup(send, ritual ? YgoConstants.REASON_RITUAL : YgoConstants.REASON_FUSION);
+            var host = player.mzone.Single(card => card?.code == result);
+            Require(duel.RetryCount == 0 &&
+                    send.Any(move => move.fromLoc == YgoConstants.LOCATION_HAND && move.toLoc == YgoConstants.LOCATION_GRAVE) &&
+                    send.Any(move => move.fromLoc == YgoConstants.LOCATION_MZONE && move.toLoc == YgoConstants.LOCATION_GRAVE),
+                "The effect did not use one hand card and one field card.");
+            VerifyMaterialTimeline(ui.Field, animator, host, new[] { source }, count: 2, faceDown: ritual ? 0 : 1);
+            Debug.Log($"[VERIFY DUEL SUMMON MATERIAL] {(ritual ? "Ritual" : "Fusion")} kept the hand and field origins and respected the set card's visibility.");
+        }
+
+        private static void VerifyNativeSendGroup(IReadOnlyList<CardMoveEvent> moves, uint method)
+        {
+            Require(moves.Count == 2 && moves[0].SendGroup != null &&
+                moves.All(move => move.MaterialMethod == method && ReferenceEquals(move.SendGroup, moves[0].SendGroup)),
+                "The two real material moves did not share an authoritative engine group.");
+        }
+
+        private static Transform VerifyMaterialTimeline(DuelFieldUI field, CardAnimationManager animator, LiveCardState host,
+            IReadOnlyList<LiveCardState> sources, int count, bool merging = false, int faceDown = 0, uint vanishes = 0,
+            LiveCardState inspected = null)
+        {
+            void CheckInspectedAttack(int attack)
+            {
+                const string value = "CombatStats/Attack/Digits/Value";
+                var root = field.Root.transform;
+                Require(root.Find($"LeftInspector/CardDetails/{value}").GetComponent<Text>().text == attack.ToString() &&
+                    root.Find($"Overlay_CardZoom/ZoomWin/Info/{value}").GetComponent<Text>().text == attack.ToString(),
+                    $"The inspector and detailed view did not show the material's {attack} ATK at the right time.");
+            }
+
+            field.Refresh();
+            var slots = sources.Select(card => FieldSlot(field, card)).ToArray();
             var queued = AnimationSteps(animator).ToArray();
-            int gather = Array.FindIndex(queued, step => step.GetType().Name.StartsWith("<GatherXyzMaterials>", StringComparison.Ordinal));
-            var arrival = queued.Single(step => FlightCode(step) == cowboy);
-            Require(gather >= 0 && gather < Array.IndexOf(queued, arrival) &&
-                    queued.Count(step => FlightCode(step) == sparkman) == 0,
-                "The engine's two Xyz materials did not converge before the host's arrival.");
-            var step = queued[gather];
-            Require(step.MoveNext() && step.Current is IEnumerator, "The Xyz materials did not share one moving frame.");
+            var step = queued.Single(cue => cue.GetType().Name.StartsWith("<PlaySummonMaterials>", StringComparison.Ordinal));
+            var arrival = queued.Single(cue => FlightCode(cue) == host.code);
+            Require(Array.IndexOf(queued, step) < Array.IndexOf(queued, arrival),
+                "The material group was sequenced after the new monster.");
+            Require(step.MoveNext() && step.Current is IEnumerator, "The shared material cue did not start.");
+            var cueFrame = TestCardPresentation.SampleAnimation((IEnumerator)step.Current);
+            cueFrame(.8f);
+            Require(animator.GetComponentsInChildren<DuelEffectGraphic>().Count(effect => effect.Kind == DuelEffectKind.SummonMaterial) == count,
+                "A material missed the shared summon cue.");
+            for (int index = 0; index < sources.Count; index++)
+            {
+                var card = sources[index];
+                var art = slots[index].GetComponentInChildren<CompositeCardView>();
+                Require(art != null && art.CurrentCode == (card.IsFaceUp ? card.code : 0),
+                    "A material left its slot or revealed a hidden card during the cue.");
+                if (card.IsFaceUp)
+                    Require(slots[index].Find("CardReadout/Combat/Attack/Digits/Value").GetComponent<Text>().text == card.attack.ToString(),
+                        "A material lost its live stats at the start of the cue.");
+            }
+            if (inspected != null) CheckInspectedAttack(inspected.attack);
+
+            cueFrame(1f);
+            Require(step.MoveNext() && step.Current is IEnumerator, "The materials did not move together.");
             var sample = TestCardPresentation.SampleAnimation((IEnumerator)step.Current);
             var cards = animator.GetComponentsInChildren<CompositeCardView>().Where(view => view.name == "MovingCard")
                 .Select(view => (RectTransform)view.transform).ToArray();
-            Require(cards.Length == 2, "The shared Xyz animation omitted a material.");
-            Vector2[] start = cards.Select(card => card.anchoredPosition).ToArray();
-            float distance = Vector2.Distance(start[0], start[1]);
-            sample(.82f);
-            Require(distance > 10f && Vector2.Distance(cards[0].anchoredPosition, cards[1].anchoredPosition) < distance * .5f &&
-                    cards.Select((card, i) => Vector2.Distance(card.anchoredPosition, start[i])).All(moved => moved > 8f),
-                "The Xyz materials did not travel together towards the destination.");
+            var plates = animator.transform.Cast<RectTransform>().Where(rect => rect.name == "MovingCardReadout").ToArray();
+            sample(.2f);
+            if (inspected != null) CheckInspectedAttack(inspected.attack);
+            Require(cards.Length == count && cards.Count(card => card.GetComponent<CompositeCardView>().CurrentCode == 0) == faceDown &&
+                    plates.Length == sources.Count(card => card.IsFaceUp) &&
+                    slots.All(slot => slot.GetComponentInChildren<CompositeCardView>() == null),
+                "The shared flight omitted a material, duplicated its field view, or revealed private stats.");
+            foreach (var source in sources.Where(card => card.IsFaceUp))
+            {
+                var readout = plates.Single(plate => plate.Find("CardReadout/Combat/Attack/Digits/Value").GetComponent<Text>().text ==
+                    source.attack.ToString());
+                RequireTravelStats(readout, source.attack.ToString(), source.defense.ToString(), source.level.ToString(), source.IsDefense);
+                Require(cards.Count(card => card.anchoredPosition == readout.anchoredPosition) == 1,
+                    "A material's live values did not follow its artwork.");
+            }
+            if (merging)
+            {
+                float separation = Vector2.Distance(cards[0].anchoredPosition, cards[1].anchoredPosition);
+                sample(.91f);
+                Require(separation > 10f && Vector2.Distance(cards[0].anchoredPosition, cards[1].anchoredPosition) < separation * .5f,
+                    "The Xyz materials did not converge on the chosen slot.");
+            }
+            if (vanishes != 0)
+            {
+                sample(.91f);
+                var token = cards.Single(card => card.GetComponent<CompositeCardView>().CurrentCode == vanishes);
+                var other = cards.Single(card => card != token);
+                Require(token.GetComponent<CanvasGroup>().alpha < .3f && other.GetComponent<CanvasGroup>().alpha == 1f,
+                    "The consumed token did not fade separately from the material sent to the Graveyard.");
+            }
             sample(1f);
+            var hostSlot = FieldSlot(field, host);
             Require(!step.MoveNext() && cards.All(card => !card.gameObject.activeInHierarchy) &&
-                    !FieldSlot(ui.Field, host).Find("Card/CardView").gameObject.activeInHierarchy,
-                "The Xyz materials lingered or the host arrived before they merged.");
+                    !hostSlot.Find("Card/CardView").gameObject.activeInHierarchy,
+                "The materials lingered or the new monster arrived during their departure.");
+            if (inspected != null) CheckInspectedAttack(CardDatabase.Get(inspected.code).atk);
             Require(arrival.MoveNext() && !arrival.MoveNext() &&
-                    FieldSlot(ui.Field, host).Find("CardReadout/Labels/Materials/Value").GetComponent<Text>().text == "2",
-                "The host did not land with the two assembled materials.");
-            Debug.Log("[VERIFY DUEL XYZ MATERIAL] Two native materials converged together before Cowboy appeared with material count 2.");
+                    hostSlot.GetComponentInChildren<CompositeCardView>()?.CurrentCode == host.code,
+                "The summoned monster did not land once the materials cleared.");
+            return hostSlot;
         }
 
         private static void VerifyNativeXyzMaterialReadout()

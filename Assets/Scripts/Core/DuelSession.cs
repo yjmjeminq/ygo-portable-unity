@@ -51,7 +51,9 @@ namespace YGOPortable.Core
         public uint reason;
         internal uint? summonType;
         internal LiveCardState SourceReadout;
-        internal object DestructionGroup;
+        internal object SendGroup;
+        internal uint MaterialMethod => (reason & YgoConstants.REASON_MATERIAL) == 0
+            ? 0 : reason & YgoConstants.MATERIAL_METHOD_MASK;
     }
 
     internal enum BattleStatSource : byte { Attack = 1, Defense, Effect }
@@ -265,8 +267,9 @@ namespace YGOPortable.Core
         private Dictionary<(byte Controller, uint Location, uint Sequence), LiveCardState> _fieldReadoutBaseline;
         private bool _awaitingSpecialSummonCompletion;
         private const uint DestructionGroupTag = 0x31444759; // YGD1
+        private const uint MaterialGroupTag = 0x314D4759; // YGM1
         private const uint SwapMoveTag = 0x31534759; // YGS1
-        private readonly Stack<object> _destructionGroups = new();
+        private readonly Stack<(uint Tag, object Key)> _sendGroups = new();
         private readonly HashSet<(byte Player, uint Location, uint Sequence, uint Code)> _confirmedCards =
             new HashSet<(byte, uint, uint, uint)>();
 
@@ -647,7 +650,7 @@ namespace YGOPortable.Core
                 }
                 if (firstSwapMove != null) NotifyCardMoved(firstSwapMove);
                 // The native state reflects the whole returned batch. Queue the new values after its animations.
-                if (sampleReadouts && _destructionGroups.Count == 0 && CurrentChain.Count == 0 && !_awaitingSpecialSummonCompletion)
+                if (sampleReadouts && _sendGroups.Count == 0 && CurrentChain.Count == 0 && !_awaitingSpecialSummonCompletion)
                     SampleFieldReadouts();
             }
         }
@@ -750,7 +753,7 @@ namespace YGOPortable.Core
         private void CaptureMoveSource(CardMoveEvent move, bool paired)
         {
             if ((move.fromLoc == YgoConstants.LOCATION_MZONE ||
-                (paired || move.DestructionGroup != null) && move.fromLoc == YgoConstants.LOCATION_SZONE) &&
+                (paired || move.SendGroup != null || move.MaterialMethod != 0) && move.fromLoc == YgoConstants.LOCATION_SZONE) &&
                 _fieldReadoutBaseline?.TryGetValue((move.fromCon, move.fromLoc, move.fromSeq), out var source) == true &&
                 source.code == move.code && source.position == move.fromPos)
                 move.SourceReadout = source;
@@ -971,7 +974,8 @@ namespace YGOPortable.Core
                     long extraLength = msgEnd - br.BaseStream.Position;
                     uint? presentation = extraLength == sizeof(uint) ? br.ReadUInt32() : null;
                     uint swapPart = extraLength == 2 * sizeof(uint) && br.ReadUInt32() == SwapMoveTag ? br.ReadUInt32() : 0;
-                    uint? summonType = tLoc == YgoConstants.LOCATION_MZONE && presentation != DestructionGroupTag ? presentation : null;
+                    uint? summonType = tLoc == YgoConstants.LOCATION_MZONE && presentation is not (DestructionGroupTag or MaterialGroupTag)
+                        ? presentation : null;
                     if (_speculatingPlayer >= 0 && fLoc == YgoConstants.LOCATION_DECK && tLoc != YgoConstants.LOCATION_DECK &&
                         (fCon != _speculatingPlayer || !_selectedFromDeck.Remove(code))) SpeculationUncertain = true;
                     _confirmedCards.Remove((fCon, fLoc, fSeq, code));
@@ -983,8 +987,7 @@ namespace YGOPortable.Core
                         toCon = tCon, toLoc = tLoc, toSeq = tSeq, toPos = tPos,
                         reason = reason,
                         summonType = summonType,
-                        DestructionGroup = presentation == DestructionGroupTag && _destructionGroups.TryPeek(out var group)
-                            ? group : null,
+                        SendGroup = _sendGroups.TryPeek(out var group) && presentation == group.Tag ? group.Key : null,
                     };
                     if (firstSwapMove != null)
                     {
@@ -1181,13 +1184,21 @@ namespace YGOPortable.Core
 
                 case YgoConstants.MSG_CUSTOM_MSG:
                 {
-                    if (msgEnd - br.BaseStream.Position == sizeof(uint) + sizeof(byte) && br.ReadUInt32() == DestructionGroupTag)
+                    if (msgEnd - br.BaseStream.Position == sizeof(uint) + sizeof(byte))
                     {
-                        if (br.ReadByte() != 0) _destructionGroups.Push(new object());
-                        else if (_destructionGroups.TryPop(out _) && _destructionGroups.Count == 0 &&
-                            CurrentChain.Count == 0 && !_awaitingSpecialSummonCompletion)
-                            SampleFieldReadouts();
-                        break;
+                        uint tag = br.ReadUInt32();
+                        if (tag is DestructionGroupTag or MaterialGroupTag)
+                        {
+                            if (br.ReadByte() != 0) _sendGroups.Push((tag, new object()));
+                            else if (_sendGroups.TryPeek(out var group) && group.Tag == tag)
+                            {
+                                _sendGroups.Pop();
+                                if (_sendGroups.Count == 0 && CurrentChain.Count == 0 && !_awaitingSpecialSummonCompletion)
+                                    SampleFieldReadouts();
+                            }
+                            break;
+                        }
+                        br.BaseStream.Position -= sizeof(uint);
                     }
                     var values = BattleComparisonValue.ReadMessage(br, msgEnd);
                     if (values.Attacker.HasValue) comparison = values;
@@ -1827,7 +1838,7 @@ namespace YGOPortable.Core
             _speculatingPlayer = -1;
             _fieldReadoutBaseline = null;
             _awaitingSpecialSummonCompletion = false;
-            _destructionGroups.Clear();
+            _sendGroups.Clear();
             if (NativePtr != IntPtr.Zero)
             {
                 YgoNativeBridge.YGO_DestroyDuel(NativePtr);

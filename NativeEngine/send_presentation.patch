@@ -1,52 +1,56 @@
 --- a/operations.cpp
 +++ b/operations.cpp
-@@ -4248,6 +4248,17 @@
+@@ -4248,6 +4248,21 @@
  	auto targets = arg.targets;
  	auto reason_effect = arg.reason_effect;
  	auto reason = arg.reason;
 +	constexpr uint32_t destruction_group_tag = 0x31444759; // YGD1
-+	const auto grouped_destruction = [&arg, reason]() {
-+		return (reason & REASON_DESTROY) && arg.extra_args->cv.size() > 1;
++	constexpr uint32_t material_group_tag = 0x314d4759; // YGM1
++	const bool is_summon_material = (reason & REASON_MATERIAL)
++		&& (reason & (REASON_FUSION | REASON_SYNCHRO | REASON_RITUAL | REASON_XYZ | REASON_LINK));
++	const uint32_t group_tag = is_summon_material ? material_group_tag : (reason & REASON_DESTROY) ? destruction_group_tag : 0;
++	const auto grouped_send = [&arg, group_tag]() {
++		return group_tag && arg.extra_args->cv.size() > 1;
 +	};
-+	const auto emit_destruction_boundary = [&](bool begin) {
-+		if(!grouped_destruction())
++	const auto emit_group_boundary = [&](bool begin) {
++		if(!grouped_send())
 +			return;
 +		auto message = pduel->new_message(MSG_CUSTOM_MSG);
-+		message->write<uint32_t>(destruction_group_tag);
++		message->write<uint32_t>(group_tag);
 +		message->write<uint8_t>(begin);
 +	};
  	auto reason_player = arg.reason_player;
  	switch(arg.step) {
  	case 0: {
-@@ -4427,11 +4438,13 @@
+@@ -4427,11 +4442,13 @@
  			}
  		}
  		param->cvit = param->cv.begin();
-+		emit_destruction_boundary(true);
++		emit_group_boundary(true);
  		return FALSE;
  	}
  	case 5: {
  		auto& param = arg.extra_args;
  		if(param->cvit == param->cv.end()) {
-+			emit_destruction_boundary(false);
++			emit_group_boundary(false);
  			arg.step = 8;
  			return FALSE;
  		}
-@@ -4447,6 +4460,8 @@
+@@ -4447,6 +4464,8 @@
  			message->write(pcard->get_info_location());
  			message->write(loc_info{});
  			message->write<uint32_t>(pcard->current.reason);
-+			if(grouped_destruction())
-+				message->write<uint32_t>(destruction_group_tag);
++			if(grouped_send())
++				message->write<uint32_t>(group_tag);
  			if(core.current_chain.size() > 0)
  				core.just_sent_cards.insert(pcard);
  			pcard->previous.controler = pcard->current.controler;
-@@ -4506,6 +4521,8 @@
+@@ -4506,6 +4525,8 @@
  			pcard->current.position = pcard->sendto_param.position;
  			message->write(pcard->get_info_location());
  			message->write<uint32_t>(pcard->current.reason);
-+			if(grouped_destruction())
-+				message->write<uint32_t>(destruction_group_tag);
++			if(grouped_send())
++				message->write<uint32_t>(group_tag);
  		}
  		if(pcard->current.location == LOCATION_DECK && (core.deck_reversed || (pcard->current.position == POS_FACEUP_DEFENSE)))
  			param->check_decktop_visibility[control_player] = true;

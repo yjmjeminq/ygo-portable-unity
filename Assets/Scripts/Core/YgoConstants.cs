@@ -40,9 +40,16 @@ namespace YGOPortable.Core
         public const uint POS_DEFENSE = POS_FACEUP_DEFENSE | POS_FACEDOWN_DEFENSE;
 
         public const uint REASON_DESTROY = 0x1;
+        internal const uint REASON_MATERIAL = 0x8;
         internal const uint REASON_BATTLE = 0x20;
         internal const uint REASON_EFFECT = 0x40;
         public const uint REASON_SPSUMMON = 0x800;
+        internal const uint REASON_FUSION = 0x40000;
+        internal const uint REASON_SYNCHRO = 0x80000;
+        internal const uint REASON_RITUAL = 0x100000;
+        internal const uint REASON_XYZ = 0x200000;
+        internal const uint REASON_LINK = 0x10000000;
+        internal const uint MATERIAL_METHOD_MASK = REASON_FUSION | REASON_SYNCHRO | REASON_RITUAL | REASON_XYZ | REASON_LINK;
         internal const uint SUMMON_METHOD_MASK = 0xff000000;
         internal const uint SUMMON_TYPE_FUSION = 0x43000000;
         internal const uint SUMMON_TYPE_RITUAL = 0x45000000;
@@ -50,7 +57,6 @@ namespace YGOPortable.Core
         internal const uint SUMMON_TYPE_XYZ = 0x49000000;
         internal const uint SUMMON_TYPE_PENDULUM = 0x4a000000;
         internal const uint SUMMON_TYPE_LINK = 0x4c000000;
-        internal const uint REASON_LINK = 0x10000000;
 
         // Card Types
         public const uint TYPE_MONSTER = 0x1;

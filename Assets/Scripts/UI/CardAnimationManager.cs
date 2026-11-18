@@ -73,6 +73,27 @@ namespace YGOPortable.UI
         }
     }
 
+    internal readonly struct SummonMaterialFlight
+    {
+        internal readonly CardFlight Flight;
+        internal readonly CardMoveReadoutSnapshot Readout;
+        internal readonly Action Depart;
+        internal readonly Action Release;
+        internal readonly bool Vanishes;
+
+        internal SummonMaterialFlight(CardFlight flight, CardMoveReadoutSnapshot readout, Action depart, Action release, bool vanishes = false)
+        {
+            Flight = flight;
+            Readout = readout;
+            Depart = depart;
+            Release = release;
+            Vanishes = vanishes;
+        }
+
+        internal SummonMaterialFlight AimAt(CardPose to) =>
+            new(new CardFlight(Flight.Code, Flight.From, to, Flight.StartsFaceDown, Flight.EndsFaceDown), Readout, Depart, Release, Vanishes);
+    }
+
     public class CardAnimationManager : MonoBehaviour
     {
         private static CardAnimationManager _instance;
@@ -82,6 +103,7 @@ namespace YGOPortable.UI
         private List<(CardFlight flight, Action onArrive)> _openPileTransfers;
         private List<LifeChangeCue> _openBattleLifeChanges;
         private DestructionGroup _openDestructions;
+        private MaterialDepartureGroup _openMaterials;
         private List<SpecialSummonArrival> _pendingSpecialSummons;
         private Action _refreshAfterSpecialSummons;
         private readonly Stack<CompositeCardView> _cards = new Stack<CompositeCardView>();
@@ -124,6 +146,12 @@ namespace YGOPortable.UI
                 Action Depart, Action Release)> Moves = new();
         }
 
+        private sealed class MaterialDepartureGroup
+        {
+            internal object Key;
+            internal readonly List<SummonMaterialFlight> Moves = new();
+        }
+
         public bool IsPresenting => _playing || _steps.Count > 0;
         public bool Paused { get; set; }
 
@@ -154,6 +182,7 @@ namespace YGOPortable.UI
             _openPileTransfers = null;
             _openBattleLifeChanges = null;
             _openDestructions = null;
+            _openMaterials = null;
             _pendingSpecialSummons = null;
             _refreshAfterSpecialSummons = null;
             _cards.Clear();
@@ -251,10 +280,22 @@ namespace YGOPortable.UI
             QueueStep(PlayFieldSwap(first, second, depart, handoff, arrive));
         }
 
+        internal void QueueMaterialDeparture(object group, SummonMaterialFlight move, uint method, Action refresh)
+        {
+            if (group == null || _openMaterials?.Key != group)
+            {
+                var next = new MaterialDepartureGroup { Key = group };
+                QueueStep(PlaySummonMaterials(next.Moves, method, refresh, merging: false));
+                _openMaterials = next;
+            }
+            _openMaterials.Moves.Add(move);
+        }
+
         internal void StageSpecialSummon(CardFlight flight, CardMotion motion, byte controller, uint sequence,
             CardMoveReadoutSnapshot readout, Action depart, Action release, Action refresh)
         {
             _openDestructions = null;
+            _openMaterials = null;
             _openPileTransfers = null;
             _openBattleLifeChanges = null;
             _pendingSpecialSummons ??= new List<SpecialSummonArrival>();
@@ -287,9 +328,9 @@ namespace YGOPortable.UI
                 : PlaySpecialSummonGroup(moves, Land));
         }
 
-        internal void QueueXyzMaterials(IReadOnlyList<CardFlight> flights, Vector2 center, Vector2 size)
+        internal void QueueXyzMaterials(IReadOnlyList<SummonMaterialFlight> moves, Action refresh)
         {
-            if (flights.Count != 0) QueueStep(GatherXyzMaterials(flights, center, size));
+            if (moves.Count != 0) QueueStep(PlaySummonMaterials(moves, YgoConstants.REASON_XYZ, refresh, merging: true));
         }
 
         internal void QueuePileTransfer(CardFlight flight, Action onArrive)
@@ -297,6 +338,7 @@ namespace YGOPortable.UI
             // Moves emitted together by one effect overlap. Other animation steps still play in engine order.
             CompleteSpecialSummons();
             _openDestructions = null;
+            _openMaterials = null;
             _openBattleLifeChanges = null;
             if (_openPileTransfers == null)
             {
@@ -310,6 +352,7 @@ namespace YGOPortable.UI
         {
             CompleteSpecialSummons();
             _openDestructions = null;
+            _openMaterials = null;
             _openPileTransfers = null;
             _openBattleLifeChanges = null;
             _steps.Enqueue(step);
@@ -635,15 +678,37 @@ namespace YGOPortable.UI
             return size;
         }
 
-        private IEnumerator GatherXyzMaterials(IReadOnlyList<CardFlight> flights, Vector2 center, Vector2 size)
+        private IEnumerator PlaySummonMaterials(IReadOnlyList<SummonMaterialFlight> moves, uint method, Action refresh, bool merging)
         {
-            var effect = CreateEffect(DuelEffectKind.Xyz, center, size * 2.15f, new Color(.71f, .51f, 1f));
-            effect.Seek(0f);
-            var cards = new CompositeCardView[flights.Count];
-            var fades = new CanvasGroup[flights.Count];
-            for (int i = 0; i < flights.Count; i++)
+            if (ReferenceEquals(_openMaterials?.Moves, moves)) _openMaterials = null;
+            Color accent = method switch
             {
-                var flight = flights[i];
+                YgoConstants.REASON_FUSION => new Color(.82f, .47f, 1f),
+                YgoConstants.REASON_SYNCHRO => new Color(.42f, .95f, .65f),
+                YgoConstants.REASON_RITUAL => new Color(.38f, .62f, 1f),
+                YgoConstants.REASON_LINK => new Color(.26f, .80f, 1f),
+                _ => new Color(.71f, .51f, 1f),
+            };
+            var cues = new DuelEffectGraphic[moves.Count];
+            for (int i = 0; i < moves.Count; i++)
+            {
+                var origin = moves[i].Flight.From;
+                cues[i] = CreateEffect(DuelEffectKind.SummonMaterial, origin.Position, origin.Size * 1.58f, accent);
+            }
+            yield return Animate(.105f, time =>
+            {
+                foreach (var cue in cues) cue.Seek(time * .56f);
+            });
+
+            foreach (var move in moves) move.Depart?.Invoke();
+            refresh();
+            var cards = new CompositeCardView[moves.Count];
+            var fades = new CanvasGroup[moves.Count];
+            var stats = new DuelMovingReadout[moves.Count];
+            var spread = new Vector2[moves.Count];
+            for (int i = 0; i < moves.Count; i++)
+            {
+                var flight = moves[i].Flight;
                 var view = TakeCard(flight.StartsFaceDown ? 0u : flight.Code, flight.StartsFaceDown);
                 if (!view.TryGetComponent<CanvasGroup>(out var fade))
                     fade = view.gameObject.AddComponent<CanvasGroup>();
@@ -651,22 +716,57 @@ namespace YGOPortable.UI
                 cards[i] = view;
                 fades[i] = fade;
             }
-
-            yield return Animate(.32f, progress =>
+            for (int i = 0; i < moves.Count; i++)
             {
-                effect.Seek(progress);
-                for (int i = 0; i < cards.Length; i++)
+                var move = moves[i];
+                stats[i] = CreateMovingReadout(move.Flight, CardMotion.Transfer, move.Readout,
+                    handoff: moves.Count > 1 || move.Flight.EndsFaceDown ? .61f : .75f);
+                if (stats[i] != null) spread[i] = MaterialSpread(moves, i, merging);
+            }
+
+            yield return Animate(.30f, time =>
+            {
+                for (int i = 0; i < moves.Count; i++)
                 {
-                    ApplyFlight(cards[i], flights[i], progress, 18f);
-                    fades[i].alpha = 1f - Mathf.SmoothStep(0f, 1f, (progress - .77f) / .23f);
+                    var move = moves[i];
+                    var flight = move.Flight;
+                    cues[i].Seek(.56f + .44f * Mathf.Clamp01(time * 2.4f));
+                    ApplyFlight(cards[i], flight, time, move.Vanishes ? 6f : 18f, lateral: spread[i]);
+                    stats[i]?.Follow(cards[i], time);
+                    if (merging || move.Vanishes)
+                    {
+                        float fadeStart = move.Vanishes ? .48f : .75f;
+                        fades[i].alpha = 1f - Mathf.SmoothStep(0f, 1f, (time - fadeStart) / (1f - fadeStart));
+                    }
                 }
             });
             for (int i = 0; i < cards.Length; i++)
             {
                 fades[i].alpha = 1f;
                 RecycleCard(cards[i]);
+                if (stats[i] != null) RemoveTransient(stats[i].Root.gameObject);
+                RemoveTransient(cues[i].gameObject);
+                moves[i].Release?.Invoke();
             }
-            RemoveTransient(effect.gameObject);
+            refresh();
+        }
+
+        private static Vector2 MaterialSpread(IReadOnlyList<SummonMaterialFlight> moves, int index, bool merging)
+        {
+            var move = moves[index];
+            Vector2 center = move.Flight.From.Position;
+            int nearby = 1;
+            for (int i = 0; i < moves.Count; i++)
+            {
+                var other = moves[i];
+                if (i == index || other.Readout?.SourceCard == null ||
+                    !merging && other.Flight.To.Position != move.Flight.To.Position) continue;
+                center += other.Flight.From.Position;
+                nearby++;
+            }
+            // Keep the original slots' spacing as the readouts start converging on a shared destination.
+            Vector2 direction = move.Flight.From.Position - center / nearby;
+            return direction.normalized * (move.Readout.Movement.StartSize.x * .38f);
         }
 
         private DuelMovingReadout CreateMovingReadout(CardFlight flight, CardMotion motion, CardMoveReadoutSnapshot readout,

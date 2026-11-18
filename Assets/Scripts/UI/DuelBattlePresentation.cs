@@ -16,6 +16,7 @@ namespace YGOPortable.UI
             internal bool UseBattleStats;
             internal bool Hidden;
             internal bool HideReadout;
+            internal bool InspectWhileHidden;
         }
 
         // The engine can resolve a whole battle before its queued animations have played.
@@ -166,7 +167,7 @@ namespace YGOPortable.UI
         {
             var battle = HoldBattleMove(move, motion);
             if (battle != null) return battle;
-            return paired ? null : HoldFieldCard(move, readout, keepFaceDown: move.DestructionGroup != null);
+            return paired ? null : HoldFieldCard(move, readout, keepFaceDown: move.SendGroup != null);
         }
 
         private BattleCardDisplay HoldFieldCard(CardMoveEvent move, PresentedFieldReadout readout, bool keepFaceDown)

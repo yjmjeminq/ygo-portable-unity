@@ -174,8 +174,8 @@ namespace YGOPortable.UI
             internal int Count;
             internal int Pending;
         }
-        private readonly Dictionary<(byte controller, uint sequence), List<(uint code, CardPose from, bool faceDown, uint index)>>
-            _pendingXyzMaterials = new Dictionary<(byte, uint), List<(uint, CardPose, bool, uint)>>();
+        private readonly Dictionary<(byte Controller, uint Sequence), List<(SummonMaterialFlight Move, uint Index)>>
+            _pendingXyzMaterials = new();
         private bool _dragHighlightMZone;
         private bool _dragHighlightSZone;
         private bool _dragHighlightAttack;
@@ -470,7 +470,7 @@ namespace YGOPortable.UI
                     return new DuelCardReadout(CardDatabase.Get(code), swap.Shown);
                 if (GetBattleCardDisplay(slot.controller, slot.sequence, slot.location) is { Readout: not null } held &&
                     held.Readout.Shown.code == code)
-                    return new DuelCardReadout(CardDatabase.Get(code), held.Hidden ? null : held.Readout.Shown);
+                    return new DuelCardReadout(CardDatabase.Get(code), held.Hidden && !held.InspectWhileHidden ? null : held.Readout.Shown);
             }
             return ReadFieldStats(code, ReadVisibleFieldCard(code, location));
         }
@@ -2294,7 +2294,18 @@ namespace YGOPortable.UI
             return key;
         }
 
-        private static void CompleteSpecialSummons() => CardAnimationManager.Instance?.CompleteSpecialSummons();
+        private void CompleteSpecialSummons()
+        {
+            var animator = CardAnimationManager.Instance;
+            foreach (var pending in _pendingXyzMaterials.Values)
+            {
+                // Some effects attach to a monster in the Extra Deck without summoning it.
+                if (animator != null) animator.QueueXyzMaterials(pending.Select(material => material.Move).ToArray(), Refresh);
+                else foreach (var material in pending) material.Move.Release?.Invoke();
+            }
+            _pendingXyzMaterials.Clear();
+            animator?.CompleteSpecialSummons();
+        }
 
         private DuelCardReadout ReadFieldStats(uint code, LiveCardState live)
         {
@@ -2447,33 +2458,25 @@ namespace YGOPortable.UI
 
             bool fromBack = e.code == 0 || IsFaceDown(e.fromCon, e.fromLoc, e.fromPos);
             bool toBack = disappearing ? fromBack : e.code == 0 || IsFaceDown(e.toCon, e.toLoc, e.toPos);
+            var flight = new CardFlight(e.code, from, to, fromBack, toBack);
             if (e.toLoc == (YgoConstants.LOCATION_EXTRA | YgoConstants.LOCATION_OVERLAY))
-            {
-                // The materials arrive first, while the Xyz host is still indexed in the Extra Deck.
-                // Wait for its move so their destination is the selected monster zone.
-                var host = (e.toCon, e.toSeq);
-                if (!_pendingXyzMaterials.TryGetValue(host, out var materials))
-                {
-                    materials = new List<(uint, CardPose, bool, uint)>();
-                    _pendingXyzMaterials.Add(host, materials);
-                }
-                materials.Add((e.code, from, fromBack, e.toPos));
-                return null;
-            }
+                return QueueSummonMaterial(animator, e, flight, previousReadout, awaitingXyzHost: true);
             if (e.fromLoc == YgoConstants.LOCATION_EXTRA && _pendingXyzMaterials.Remove((e.fromCon, e.fromSeq), out var pending))
             {
                 uint hostLocation = e.toLoc == YgoConstants.LOCATION_MZONE ? e.toLoc : e.fromLoc;
                 byte hostController = hostLocation == e.toLoc ? e.toCon : e.fromCon;
                 uint hostSequence = hostLocation == e.toLoc ? e.toSeq : e.fromSeq;
-                var materialFlights = new List<CardFlight>(pending.Count);
+                var materialFlights = new List<SummonMaterialFlight>(pending.Count);
                 foreach (var material in pending)
                 {
-                    var arrival = GetCardPose(hostController, hostLocation | YgoConstants.LOCATION_OVERLAY, hostSequence, material.index);
-                    if (material.from.IsValid && arrival.IsValid)
-                        materialFlights.Add(new CardFlight(material.code, material.from, arrival, material.faceDown, material.code == 0));
+                    var arrival = GetCardPose(hostController, hostLocation | YgoConstants.LOCATION_OVERLAY, hostSequence, material.Index);
+                    materialFlights.Add(arrival.IsValid ? material.Move.AimAt(arrival) : material.Move);
                 }
-                animator.QueueXyzMaterials(materialFlights, to.Position, to.Size);
+                animator.QueueXyzMaterials(materialFlights, Refresh);
             }
+
+            if (e.MaterialMethod != 0 && (e.toLoc & (YgoConstants.LOCATION_ONFIELD | YgoConstants.LOCATION_OVERLAY)) == 0)
+                return QueueSummonMaterial(animator, e, flight, previousReadout);
 
             bool attaches = (e.toLoc & YgoConstants.LOCATION_OVERLAY) != 0;
             bool detaches = (e.fromLoc & YgoConstants.LOCATION_OVERLAY) != 0;
@@ -2487,15 +2490,14 @@ namespace YGOPortable.UI
             else if (e.toLoc == YgoConstants.LOCATION_MZONE && e.fromLoc != YgoConstants.LOCATION_MZONE)
                 motion = MonsterArrivalMotion(e);
 
-            var flight = new CardFlight(e.code, from, to, fromBack, toBack);
             var held = HoldMovingFieldCard(e, motion, previousReadout, paired);
             var readout = PrepareMoveReadout(animator, e, fromBack, toBack);
-            if (e.DestructionGroup != null && (e.reason & YgoConstants.REASON_DESTROY) != 0 &&
+            if (e.SendGroup != null && (e.reason & YgoConstants.REASON_DESTROY) != 0 &&
                 (e.fromLoc is YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE) &&
                 (e.toLoc & (YgoConstants.LOCATION_ONFIELD | YgoConstants.LOCATION_OVERLAY)) == 0)
             {
                 var release = disappearing ? null : ReserveCardArrival(e.toCon, e.toLoc, e.toSeq);
-                animator.QueueFieldDestruction(e.DestructionGroup, flight, motion, readout,
+                animator.QueueFieldDestruction(e.SendGroup, flight, motion, readout,
                     held == null ? null : () => held.Hidden = true, () =>
                     {
                         ReleaseBattleCardDisplay(held);
@@ -2544,6 +2546,41 @@ namespace YGOPortable.UI
                     onArrival();
                 }, readout, depart);
             }
+            return held;
+        }
+
+        private BattleCardDisplay QueueSummonMaterial(CardAnimationManager animator, CardMoveEvent move, CardFlight flight,
+            PresentedFieldReadout previous, bool awaitingXyzHost = false)
+        {
+            var held = HoldFieldCard(move, previous, keepFaceDown: true);
+            if (held?.Readout != null) held.InspectWhileHidden = true;
+            var readout = PrepareMoveReadout(animator, move, flight.StartsFaceDown, flight.EndsFaceDown);
+            var detach = HoldMaterialReadout(move.fromCon, move.fromLoc, move.fromSeq, -1);
+            bool vanishes = move.toLoc == 0;
+            var release = awaitingXyzHost || vanishes ? null : ReserveCardArrival(move.toCon, move.toLoc, move.toSeq);
+            var material = new SummonMaterialFlight(flight, readout, () =>
+            {
+                if (held != null) held.Hidden = true;
+                detach?.Invoke();
+            }, () =>
+            {
+                if (held?.InspectWhileHidden == true)
+                {
+                    if (_inspectedFieldCard == held.Slot && _inspectedCode == move.code) _inspectedFieldCard = null;
+                    if (_zoomFieldCard == held.Slot && _zoomCardView.CurrentCode == move.code) _zoomFieldCard = null;
+                }
+                ReleaseBattleCardDisplay(held);
+                release?.Invoke();
+            }, vanishes);
+            if (awaitingXyzHost)
+            {
+                // Overlay moves precede the host's placement. Keep the origins until the final zone is known.
+                var host = (move.toCon, move.toSeq);
+                if (!_pendingXyzMaterials.TryGetValue(host, out var materials))
+                    _pendingXyzMaterials.Add(host, materials = new());
+                materials.Add((material, move.toPos));
+            }
+            else animator.QueueMaterialDeparture(move.SendGroup, material, move.MaterialMethod, Refresh);
             return held;
         }
 
@@ -2748,7 +2785,7 @@ namespace YGOPortable.UI
 
         private void HandleTurnStarted(int turn, int player)
         {
-            _pendingXyzMaterials.Clear();
+            if (_pendingXyzMaterials.Count != 0) CompleteSpecialSummons();
             bool opponent = player != _session.HumanPlayerIndex;
             void ApplyTurn()
             {

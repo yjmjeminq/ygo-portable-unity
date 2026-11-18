@@ -5,7 +5,7 @@ namespace YGOPortable.UI
 {
     internal enum DuelEffectKind
     {
-        AttackPath, Strike, Break, Token, Summon, Chain, Fusion, Synchro, Xyz, Link, Ritual, Pendulum, XyzMaterial
+        AttackPath, Strike, Break, Token, Summon, Chain, Fusion, Synchro, Xyz, Link, Ritual, Pendulum, XyzMaterial, SummonMaterial
     }
 
     // Canvas particles and tracks use one mesh, with white fill and vertex tints.
@@ -91,6 +91,12 @@ namespace YGOPortable.UI
                         Shade(Tint, glow * .67f), 36);
                     Ring(mesh, rect.center, radius * (.62f + .24f * travel), .46f, 1.3f, .50f + t * .69f, .42f,
                         Shade(new Color(.85f, .76f, 1f), glow * .68f), 36);
+                    break;
+                case DuelEffectKind.SummonMaterial:
+                    Glow(mesh, rect.center, radius * .77f, .68f, Shade(Tint, glow * .31f));
+                    for (int i = 0; i < 4; i++)
+                        Ring(mesh, rect.center, radius * (.82f + .12f * travel), .73f, 2.6f,
+                            .125f + i * .25f + t * .09f, .14f, Shade(Tint, glow * .88f), 40);
                     break;
                 default:
                     SummoningPattern(mesh, rect.center, radius, t, glow);
