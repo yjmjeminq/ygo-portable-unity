@@ -17,6 +17,15 @@ namespace YGOPortable.AI
     {
         public AIDifficulty Difficulty { get; set; } = AIDifficulty.Smart;
 
+        private const int FieldZone = 5;
+        private const uint TrickstarLightStage = 35371948;
+        private const uint PrimevalPlanetPerlereino = 77103950;
+        private const uint TheHiddenCity = 5697558;
+        private const uint VisasStarfrost = 56099748;
+        private const ushort TrickstarSet = 0xfb;
+        private const ushort TearlamentsSet = 0x182;
+        private const ushort SubterrorSet = 0xed;
+
         private int _lastTurn = -1;
         private int _actionsThisTurn;
         private int _battleActions;
@@ -119,13 +128,15 @@ namespace YGOPortable.AI
         {
             _unselectCount = 0;
             _actionsThisTurn++;
+            bool CanUse(int command, SelectableCardItem item) => CanUseIdleAction(command, item) &&
+                (command != 5 || (SynchroTurnPlan.CanActivate(s, p, item) && CanPlayFieldSpell(s, p, item)));
 
             if (fallback || _actionsThisTurn > 42)
             {
                 if (p.canBp && HasWorthwhileAttack(s, p.playerId)) return BitConverter.GetBytes(6);
                 if (p.canEp) return BitConverter.GetBytes(7);
             }
-            else if (ChoosePlannedIdle(s, p) is int planned)
+            else if (ChoosePlannedIdle(s, p, CanUse) is int planned)
             {
                 return EncodeIdleAction(p, planned & 0xffff, planned >> 16);
             }
@@ -139,7 +150,7 @@ namespace YGOPortable.AI
                 for (int i = 0; i < p.spSummonable.Count; i++)
                 {
                     var item = p.spSummonable[i];
-                    if (!CanUseIdleAction(1, item) || (preserveBoard && item.location == YgoConstants.LOCATION_EXTRA)) continue;
+                    if (!CanUse(1, item) || (preserveBoard && item.location == YgoConstants.LOCATION_EXTRA)) continue;
                     var ci = CardDatabase.Get(item.code);
                     int score = (ci != null ? ci.atk : 1500) + ((ci != null && ci.IsExtra) ? 1200 : 400);
                     if (score > bestScore)
@@ -159,7 +170,7 @@ namespace YGOPortable.AI
                 for (int i = 0; i < p.activatable.Count; i++)
                 {
                     var act = p.activatable[i];
-                    if (!CanUseIdleAction(5, act) || !SynchroTurnPlan.CanActivate(s, p, act)) continue;
+                    if (!CanUse(5, act)) continue;
                     var ci = CardDatabase.Get(act.code);
                     int score = 500;
                     if (ci != null)
@@ -253,15 +264,53 @@ namespace YGOPortable.AI
             return BitConverter.GetBytes(7);
         }
 
-        private int? ChoosePlannedIdle(DuelSession session, DuelPrompt prompt)
+        private static int? ChoosePlannedIdle(DuelSession session, DuelPrompt prompt, Func<int, SelectableCardItem, bool> canUse)
         {
-            Func<int, SelectableCardItem, bool> canUse = CanUseIdleAction;
             return DddTurnPlan.ChooseIdle(session, prompt, canUse)
                 ?? LinkTurnPlan.ChooseIdle(session, prompt, canUse)
                 ?? SynchroTurnPlan.ChooseIdle(session, prompt, canUse)
                 ?? FusionXyzTurnPlan.ChooseIdle(session, prompt, canUse)
                 ?? PendulumTurnPlan.ChooseIdle(session, prompt, canUse);
         }
+
+        private bool CanPlayFieldSpell(DuelSession session, DuelPrompt prompt, SelectableCardItem item)
+        {
+            if (item.location != YgoConstants.LOCATION_HAND || item.controller != prompt.playerId ||
+                CardDatabase.Get(item.code) is not CardInfo incoming || (incoming.type & YgoConstants.TYPE_FIELD) == 0)
+                return true;
+
+            var current = session.Players[prompt.playerId].szone[FieldZone];
+            if (current == null || current.effectsDisabled) return true;
+
+            // Flip a set field or use an available effect of the existing field before replacing it.
+            if (prompt.activatable.Any(effect => effect.controller == prompt.playerId &&
+                effect.location == YgoConstants.LOCATION_SZONE && effect.sequence == FieldZone &&
+                CanUseIdleAction(5, effect))) return false;
+
+            if (!current.IsFaceUp) return true;
+            var existing = CardDatabase.Get(current.code);
+            uint code = CardDatabase.GetArchetypeCollectionKey(incoming);
+            uint currentCode = existing == null ? current.code : CardDatabase.GetArchetypeCollectionKey(existing);
+            return code != currentCode || CanGainFromFieldReactivation(session, prompt.playerId, code);
+        }
+
+        private static bool CanGainFromFieldReactivation(DuelSession session, byte player, uint code)
+        {
+            // These fields can supply another search when activated and a target remains in the deck.
+            // Keep Light Stage in play when it can be holding an opponent's set back row inactive.
+            return code switch
+            {
+                TrickstarLightStage => !session.Players[1 - player].szone.Take(FieldZone).Any(card => card is { IsFaceUp: false }) &&
+                    session.HasCardInDeck(player, card => IsMonsterInSet(card, TrickstarSet)),
+                PrimevalPlanetPerlereino => session.HasCardInDeck(player,
+                    card => card.code == VisasStarfrost || IsMonsterInSet(card, TearlamentsSet)),
+                TheHiddenCity => session.HasCardInDeck(player, card => IsMonsterInSet(card, SubterrorSet)),
+                _ => false,
+            };
+        }
+
+        private static bool IsMonsterInSet(CardInfo card, ushort setcode) =>
+            card.IsMonster && CardDatabase.ExtractSetcodes(card.setcode).Any(code => (code & 0xfff) == setcode);
 
         private static string IdleActionKey(int command, SelectableCardItem item) => command == 1
             ? $"sp:{item.code}" : $"act:{item.code}:{item.description}:{item.location}:{item.sequence}";

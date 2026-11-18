@@ -28,6 +28,7 @@ namespace YGOPortable.Core
         public uint linkMarker;
         public byte owner;
         public bool isPublic;
+        public bool effectsDisabled;
         public List<uint> overlayCodes = new List<uint>();
 
         public bool IsFaceUp => (position & YgoConstants.POS_FACEUP) != 0;
@@ -1307,10 +1308,17 @@ namespace YGOPortable.Core
             }
         }
 
-        private List<LiveCardState> QueryLocationCards(byte playerId, uint loc, bool keepNulls = true)
+        internal bool HasCardInDeck(byte playerId, Predicate<CardInfo> matches)
+        {
+            if (NativePtr == IntPtr.Zero) return false;
+            var cards = QueryLocationCards(playerId, YgoConstants.LOCATION_DECK, keepNulls: false, flags: YgoConstants.QUERY_CODE);
+            return cards.Exists(card => CardDatabase.Get(card.code) is CardInfo info && matches(info));
+        }
+
+        private List<LiveCardState> QueryLocationCards(byte playerId, uint loc, bool keepNulls = true, uint flags = YgoConstants.QUERY_DEFAULT)
         {
             var result = new List<LiveCardState>();
-            byte[] raw = YgoNativeBridge.QueryLocationBytes(NativePtr, YgoConstants.QUERY_DEFAULT, playerId, loc);
+            byte[] raw = YgoNativeBridge.QueryLocationBytes(NativePtr, flags, playerId, loc);
             if (raw.Length < 4) return result;
 
             int pos = 4; // uint32 total payload bytes
@@ -1363,6 +1371,10 @@ namespace YGOPortable.Core
                         case YgoConstants.QUERY_BASE_DEFENSE: card.baseDefense = BitConverter.ToInt32(raw, valPos); break;
                         case YgoConstants.QUERY_OWNER: card.owner = raw[valPos]; break;
                         case YgoConstants.QUERY_IS_PUBLIC: card.isPublic = raw[valPos] != 0; break;
+                        case YgoConstants.QUERY_STATUS:
+                            card.effectsDisabled = (BitConverter.ToUInt32(raw, valPos) &
+                                (YgoConstants.STATUS_DISABLED | YgoConstants.STATUS_FORBIDDEN)) != 0;
+                            break;
                         case YgoConstants.QUERY_LSCALE: card.lscale = BitConverter.ToUInt32(raw, valPos); break;
                         case YgoConstants.QUERY_RSCALE: card.rscale = BitConverter.ToUInt32(raw, valPos); break;
                         case YgoConstants.QUERY_LINK:

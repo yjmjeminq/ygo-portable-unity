@@ -126,10 +126,12 @@ namespace YGOPortable.Core
         public const uint QUERY_RSCALE = 0x400000;
         public const uint QUERY_LINK = 0x800000;
         public const uint QUERY_END = 0x80000000;
+        internal const uint STATUS_DISABLED = 0x1;
+        internal const uint STATUS_FORBIDDEN = 0x4000000;
         public const uint QUERY_DEFAULT = QUERY_CODE | QUERY_POSITION | QUERY_ALIAS | QUERY_TYPE |
             QUERY_LEVEL | QUERY_RANK | QUERY_ATTRIBUTE | QUERY_RACE | QUERY_ATTACK | QUERY_DEFENSE |
             QUERY_BASE_ATTACK | QUERY_BASE_DEFENSE | QUERY_OVERLAY_CARD | QUERY_COUNTERS |
-            QUERY_OWNER | QUERY_IS_PUBLIC | QUERY_LSCALE | QUERY_RSCALE | QUERY_LINK;
+            QUERY_OWNER | QUERY_STATUS | QUERY_IS_PUBLIC | QUERY_LSCALE | QUERY_RSCALE | QUERY_LINK;
 
         // Phases
         public const int PHASE_DRAW = 0x01;

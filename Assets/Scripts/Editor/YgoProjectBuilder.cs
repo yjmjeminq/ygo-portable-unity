@@ -367,6 +367,8 @@ namespace YGOPortable.Editor
             VerifyPossessedDestiny(classicDecks[0].main);
             VerifyMandatoryBattleAttack();
             VerifyAiFieldAndTributeChoices();
+            VerifyAiKeepsActiveFieldSpell();
+            VerifyAiFieldReplacementChoices();
             VerifyDddTurnPlanning();
             TestOtherDeckTurnPlans.Run();
             VerifyRainbowDarkDragonMatch();
@@ -2071,6 +2073,102 @@ namespace YGOPortable.Editor
             AssertTrue(response.Length == 12 && BitConverter.ToInt32(response, 4) == 1 && BitConverter.ToInt32(response, 8) == 0,
                 "AI did not count the double tribute as two tributes");
             Debug.Log("[VERIFY AI CHOICES] Field Zones for both players and weighted tributes passed.");
+        }
+
+        private static void VerifyAiKeepsActiveFieldSpell()
+        {
+            const uint yami = 59197169;
+            var fieldDeck = Enumerable.Repeat(yami, 40).ToArray();
+            var empty = Array.Empty<uint>();
+            foreach (bool humanFirst in new[] { true, false })
+            {
+                using var duel = new DuelSession();
+                var ai = new TacticalAI();
+                AssertTrue(duel.StartNewDuel(fieldDeck, empty, fieldDeck, empty, humanFirst, 8000, new ulong[] { 7, 19, 31, 41 }),
+                    "Could not start the duplicate Field Spell duel.");
+                DriveUntilIdle(duel, ai);
+                if (humanFirst)
+                {
+                    var opening = duel.ActivePrompt;
+                    int activate = opening.activatable.FindIndex(card => card.code == yami);
+                    AssertTrue(activate >= 0, "The first player could not activate Yami.");
+                    duel.SubmitResponseInt((activate << 16) | 5);
+                    DriveUntilIdle(duel, ai);
+                    duel.SubmitResponseInt(7);
+                    DriveUntilIdle(duel, ai);
+                }
+
+                var prompt = duel.ActivePrompt;
+                AssertTrue(prompt?.playerId == duel.AiPlayerIndex, "Expected the AI's Main Phase.");
+                int response = BitConverter.ToInt32(ai.ComputeResponse(duel, prompt), 0);
+                AssertTrue((response & 0xffff) == 5 && prompt.activatable[response >> 16].code == yami,
+                    "The AI did not activate Yami into its empty Field Zone.");
+                duel.SubmitResponseInt(response);
+                DriveUntilIdle(duel, ai);
+
+                prompt = duel.ActivePrompt;
+                var own = duel.Players[duel.AiPlayerIndex];
+                AssertTrue(own.szone[5]?.IsFaceUp == true && own.szone[5].code == yami &&
+                    prompt.canEp && prompt.activatable.Any(card => card.code == yami && card.location == YgoConstants.LOCATION_HAND),
+                    "The engine did not offer the expected duplicate of the active Field Spell.");
+                response = BitConverter.ToInt32(ai.ComputeResponse(duel, prompt), 0);
+                AssertTrue(response == 7 && duel.RetryCount == 0,
+                    "The AI replaced its active Yami with an identical copy instead of keeping it in hand.");
+            }
+            Debug.Log("[VERIFY AI FIELD SPELL] Both seats kept Yami in play and held the redundant copy.");
+        }
+
+        private static void VerifyAiFieldReplacementChoices()
+        {
+            const uint ravine = 62265044, bootSector = 36668118;
+            using (var duel = new DuelSession())
+            {
+                var ai = new TacticalAI();
+                var prompt = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_IDLECMD, canEp = true };
+                duel.Players[0].szone[5] = new LiveCardState { code = ravine, position = YgoConstants.POS_FACEUP_ATTACK };
+                prompt.activatable.Add(new SelectableCardItem { code = bootSector, location = YgoConstants.LOCATION_HAND });
+                prompt.activatable.Add(new SelectableCardItem { code = ravine, location = YgoConstants.LOCATION_SZONE, sequence = 5 });
+                AssertTrue(BitConverter.ToInt32(ai.ComputeResponse(duel, prompt), 0) == ((1 << 16) | 5),
+                    "The AI replaced Dragon Ravine before using its available effect.");
+                AssertTrue(BitConverter.ToInt32(ai.ComputeResponse(duel, prompt), 0) == 5,
+                    "The AI could not change to a different Field Spell after using Dragon Ravine.");
+            }
+
+            const uint lightStage = 35371948, candina = 61283655;
+            var aiDeck = Enumerable.Repeat(lightStage, 9).Concat(Enumerable.Repeat(candina, 2))
+                .Concat(Enumerable.Repeat(89631139u, 29)).ToArray();
+            var otherDeck = Enumerable.Repeat(89631139u, 40).ToArray();
+            var empty = Array.Empty<uint>();
+            var stageAi = new TacticalAI();
+            using var searchDuel = StartSeedMatching("Light Stage duplicate search", otherDeck, empty, aiDeck, empty, false,
+                session =>
+                {
+                    DriveUntilIdle(session, stageAi);
+                    var hand = session.Players[session.AiPlayerIndex].hand;
+                    return hand.Count(card => card.code == lightStage) >= 3 && hand.All(card => card.code != candina);
+                });
+            var own = searchDuel.Players[searchDuel.AiPlayerIndex];
+            for (int expected = 1; expected <= 2; expected++)
+            {
+                var prompt = searchDuel.ActivePrompt;
+                int response = BitConverter.ToInt32(stageAi.ComputeResponse(searchDuel, prompt), 0);
+                AssertTrue((response & 0xffff) == 5 && prompt.activatable[response >> 16].code == lightStage,
+                    "The AI skipped a Light Stage activation with a valid search target.");
+                searchDuel.SubmitResponseInt(response);
+                DriveUntilIdle(searchDuel, stageAi, next => next.messageType is YgoConstants.MSG_SELECT_CARD or YgoConstants.MSG_SELECT_YESNO
+                    ? stageAi.ComputeResponse(searchDuel, next) : null);
+                AssertTrue(own.hand.Count(card => card.code == candina) == expected,
+                    "Light Stage did not add the expected Trickstar monster.");
+            }
+
+            var ending = searchDuel.ActivePrompt;
+            AssertTrue(ending.activatable.Any(card => card.code == lightStage && card.location == YgoConstants.LOCATION_HAND),
+                "The exhausted Light Stage copy was not offered by the engine.");
+            // Check the empty search pool independently of per-turn action limits.
+            int last = BitConverter.ToInt32(new TacticalAI().ComputeResponse(searchDuel, ending), 0);
+            AssertTrue((last & 0xffff) != 5 && searchDuel.RetryCount == 0,
+                "The AI used a third Light Stage after its search targets ran out.");
+            Debug.Log("[VERIFY AI FIELD SPELL] Used the existing field effect first and replaced Light Stage only for another search.");
         }
 
         private static void VerifyMandatoryBattleAttack()
