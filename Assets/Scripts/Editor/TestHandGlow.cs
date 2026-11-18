@@ -25,7 +25,8 @@ namespace YGOPortable.Editor
         {
             VerifyMainPhaseAndStaleState();
             VerifyOpponentTurnActivation();
-            VerifyNativeCombatReadout();
+            VerifyNativeCombatReadout(useHonest: true);
+            VerifyNativeCombatReadout(useHonest: false);
             VerifyNativeCounterReadout();
             VerifyNativeIdentityReadout();
             VerifyInspectedCardMoves(swapInPlace: true);
@@ -170,18 +171,18 @@ namespace YGOPortable.Editor
             Require(duel.RetryCount == 0, "Passing the native hand effect caused a retry.");
         }
 
-        private static void VerifyNativeCombatReadout()
+        private static void VerifyNativeCombatReadout(bool useHonest)
         {
             const uint axeOfDespair = 40619825;
             const uint honest = 37742478;
             const uint mysticalElf = 15025844;
             uint[] main = Enumerable.Repeat(KaiserSeaHorse, 24).Concat(Enumerable.Repeat(axeOfDespair, 8))
-                .Concat(Enumerable.Repeat(honest, 8)).ToArray();
+                .Concat(Enumerable.Repeat(useHonest ? honest : KaiserSeaHorse, 8)).ToArray();
             uint[] opponent = Enumerable.Repeat(mysticalElf, 40).ToArray();
             using var duel = YgoProjectBuilder.StartSeedMatching("Live combat readout", main, Array.Empty<uint>(),
                 opponent, Array.Empty<uint>(), true, session => session.ActivePrompt?.summonable.Any(card => card.code == KaiserSeaHorse) == true &&
                     session.Players[session.HumanPlayerIndex].hand.Any(card => card.code == axeOfDespair) &&
-                    session.Players[session.HumanPlayerIndex].hand.Any(card => card.code == honest));
+                    (!useHonest || session.Players[session.HumanPlayerIndex].hand.Any(card => card.code == honest)));
             using var ui = new HandUI(duel);
             var ai = new TacticalAI();
             var own = duel.Players[duel.HumanPlayerIndex];
@@ -262,27 +263,71 @@ namespace YGOPortable.Editor
                     picking.Find("AttackTarget/Heading/Name").GetComponent<Text>().text == "대상 · 뒷면 카드" &&
                     !picking.Find("AttackTarget/Combat").gameObject.activeSelf,
                 "The attack picker lost the equipped attack or revealed the face-down target's values.");
+            var target = duel.ActivePrompt.candidates.Single();
+            var defender = ui.Field.Root.transform.Find($"DuelBoard/Zone_{6 - (int)target.sequence}_1");
             ui.Modals.HideAll();
             duel.SubmitResponse(DuelSession.PackCardSelection(0));
+            ui.Field.Refresh();
+            var attackerFace = slot.Find("Card/CardView");
+            var defenderFace = defender.Find("Card/CardView").GetComponent<CompositeCardView>();
+            Require(attackerFace.gameObject.activeInHierarchy && defenderFace.gameObject.activeInHierarchy &&
+                defenderFace.CurrentCode == 0 && (defender.Find("CardReadout") == null ||
+                    !defender.Find("CardReadout").gameObject.activeInHierarchy),
+                "The attack declaration hid a participant or revealed the defense before its flip.");
+
+            var steps = (Queue<IEnumerator>)typeof(CardAnimationManager).GetField("_steps", PrivateInstance).GetValue(animation);
+            var flip = steps.First(step => step.GetType().Name.StartsWith("<MoveCard>", StringComparison.Ordinal));
+            Require(flip.MoveNext() && !defenderFace.gameObject.activeInHierarchy &&
+                flip.Current is IEnumerator flipFrames && flipFrames.MoveNext() &&
+                animation.transform.Find("MovingCard").GetComponent<CompositeCardView>().CurrentCode == 0,
+                "The battle flip did not start from the hidden face.");
+            Require(!flip.MoveNext(), "The defender's flip did not finish.");
+            Require(defenderFace.gameObject.activeInHierarchy && defenderFace.CurrentCode == mysticalElf &&
+                defender.Find("CardReadout/Combat/Defense/Digits/Value").GetComponent<Text>().text == "2000",
+                "The revealed defender disappeared between its flip and the attack.");
+
             bool usedHonest = false;
             for (int turn = 0; turn < 12 && duel.ActivePrompt is { messageType: YgoConstants.MSG_SELECT_CHAIN } chain; turn++)
             {
-                int index = usedHonest || chain.playerId != duel.HumanPlayerIndex
+                int index = !useHonest || usedHonest || chain.playerId != duel.HumanPlayerIndex
                     ? -1 : chain.candidates.FindIndex(card => card.code == honest && card.location == YgoConstants.LOCATION_HAND);
                 usedHonest |= index >= 0;
                 duel.SubmitResponseInt(index);
             }
             var readout = animation.transform.Find("BattleReadout");
-            Require(usedHonest && readout != null && duel.RetryCount == 0 &&
-                attack.text == "2700" && readout.Find("Attacker/Values/Attack/Digits/Value").GetComponent<Text>().text == "3500" &&
+            string expectedAttack = useHonest ? "3500" : "2700";
+            Require(usedHonest == useHonest && readout != null && duel.RetryCount == 0 &&
+                attack.text == "2700" && readout.Find("Attacker/Values/Attack/Digits/Value").GetComponent<Text>().text == expectedAttack &&
                 readout.Find("Defender/Values/Defense/Digits/Value").GetComponent<Text>().text == "2000",
                 "The attack presentation lost the native damage-step increase or the revealed defense.");
             ui.Field.Refresh();
-            Require(!slot.Find("CardReadout").gameObject.activeInHierarchy, "The static readout remained under the attacking card.");
-            TestCardPresentation.VerifyAttackFlight(animation, "3500", "1650", "4");
-            Require(slot.Find("CardReadout").gameObject.activeInHierarchy && attack.text == "3500",
+            Require(attackerFace.gameObject.activeInHierarchy && slot.Find("CardReadout").gameObject.activeInHierarchy &&
+                duel.Players[duel.AiPlayerIndex].mzone[target.sequence] == null && defenderFace.gameObject.activeInHierarchy,
+                "The waiting attacker or battle-destroyed defender was removed before the attack began.");
+            TestCardPresentation.VerifyAttackFlight(animation, expectedAttack, "1650", "4", () =>
+            {
+                var overlay = animation.transform.Find("DefendingCardReadout");
+                var impact = animation.transform.Find("Strike");
+                Require(!attackerFace.gameObject.activeInHierarchy && defenderFace.gameObject.activeInHierarchy &&
+                    !defender.Find("CardReadout").gameObject.activeInHierarchy && overlay != null &&
+                    overlay.Find("CardReadout/Combat/Defense/Digits/Value").GetComponent<Text>().text == "2000" &&
+                    (impact == null || overlay.GetSiblingIndex() > impact.GetSiblingIndex()),
+                    "The attack duplicated its stat readouts or hid the defender's values under the impact.");
+            });
+            Require(slot.Find("CardReadout").gameObject.activeInHierarchy && attack.text == expectedAttack &&
+                defender.Find("CardReadout").gameObject.activeInHierarchy && animation.transform.Find("DefendingCardReadout") == null,
                 "The card and its current stats did not return to the field.");
-            Debug.Log("[VERIFY DUEL BATTLE STATS] Target selection hid the defender. The attack showed the native damage-step 3500 ATK and revealed 2000 DEF.");
+            var destroy = steps.Last(step => step.GetType().Name.StartsWith("<MoveCard>", StringComparison.Ordinal));
+            Require(destroy.MoveNext() && defenderFace.gameObject.activeInHierarchy,
+                "The destroyed defender vanished before its break effect.");
+            Require(destroy.MoveNext() && !defenderFace.gameObject.activeInHierarchy &&
+                destroy.Current is IEnumerator depart && depart.MoveNext() &&
+                animation.transform.Find("MovingCard").GetComponent<CompositeCardView>().CurrentCode == mysticalElf,
+                "The defeated defender did not pass from its zone to its destruction animation.");
+            Require(!destroy.MoveNext() && !defenderFace.gameObject.activeInHierarchy &&
+                ((IDictionary)typeof(DuelFieldUI).GetField("_battleCardDisplays", PrivateInstance).GetValue(ui.Field)).Count == 0,
+                "A destroyed defender or queued battle display remained on the field.");
+            Debug.Log($"[VERIFY DUEL BATTLE STATS] A set defender stayed hidden until its flip, showed 2000 DEF through the {expectedAttack} ATK strike, and left at destruction.");
         }
 
         private static void VerifyNativeCounterReadout()

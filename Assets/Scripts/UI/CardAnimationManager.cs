@@ -179,9 +179,10 @@ namespace YGOPortable.UI
             if (flights.Count > 0) QueueStep(FlyCards(flights, onArrive, draw: true));
         }
 
-        internal void QueueMove(CardFlight flight, CardMotion motion, Action onArrive, CardMoveReadoutSnapshot readout = null)
+        internal void QueueMove(CardFlight flight, CardMotion motion, Action onArrive, CardMoveReadoutSnapshot readout = null,
+            Action onDepart = null)
         {
-            QueueStep(MoveCard(flight, motion, onArrive, readout));
+            QueueStep(MoveCard(flight, motion, onArrive, readout, onDepart));
         }
 
         internal void QueuePileTransfer(CardFlight flight, Action onArrive)
@@ -227,9 +228,10 @@ namespace YGOPortable.UI
         }
 
         internal void QueueAttack(CardFlight flight, Vector2 hit, bool direct, bool opponent,
-            CanvasGroup readout, DuelCardReadout attacker, Vector2 statSize, Action onFinish)
+            CanvasGroup readout, DuelCardReadout attacker, Vector2 statSize, Action onFinish,
+            Func<(CardPose Pose, Vector2 ReadoutSize, RectTransform DefenderReadout)> onStart = null)
         {
-            QueueStep(Attack(flight, hit, direct, opponent, readout, attacker, statSize, onFinish));
+            QueueStep(Attack(flight, hit, direct, opponent, readout, attacker, statSize, onFinish, onStart));
         }
 
         internal void QueueLifeChange(Vector2 point, int delta, Action onStart)
@@ -323,7 +325,8 @@ namespace YGOPortable.UI
             }
         }
 
-        private IEnumerator MoveCard(CardFlight flight, CardMotion motion, Action onArrive, CardMoveReadoutSnapshot readout)
+        private IEnumerator MoveCard(CardFlight flight, CardMotion motion, Action onArrive, CardMoveReadoutSnapshot readout,
+            Action onDepart)
         {
             if (!flight.From.IsValid || !flight.To.IsValid)
             {
@@ -338,6 +341,7 @@ namespace YGOPortable.UI
                     new Color(.55f, .84f, 1f), .18f);
             }
 
+            onDepart?.Invoke();
             bool extraSummon = motion is CardMotion.ExtraDeckSummon or CardMotion.PendulumSummon;
             bool summons = IsSummonMotion(motion);
             bool featured = summons && TakeFeaturedSummon(flight);
@@ -643,7 +647,8 @@ namespace YGOPortable.UI
         }
 
         private IEnumerator Attack(CardFlight flight, Vector2 to, bool direct, bool opponent,
-            CanvasGroup readout, DuelCardReadout attacker, Vector2 statSize, Action onFinish)
+            CanvasGroup readout, DuelCardReadout attacker, Vector2 statSize, Action onFinish,
+            Func<(CardPose Pose, Vector2 ReadoutSize, RectTransform DefenderReadout)> onStart)
         {
             var from = flight.From;
             uint code = flight.Code;
@@ -654,15 +659,23 @@ namespace YGOPortable.UI
                 yield break;
             }
 
+            RectTransform defenderStats = null;
+            if (onStart != null)
+            {
+                var (pose, size, defending) = onStart();
+                if (pose.IsValid) from = pose;
+                if (size.x > 0f && size.y > 0f) statSize = size;
+                defenderStats = defending;
+            }
             var proxy = TakeCard(code, false);
             var art = (RectTransform)proxy.transform;
             RectTransform stats = null;
             if (attacker.IsMonster && statSize.x > 0f && statSize.y > 0f)
             {
                 proxy.SetCard(code, live: attacker.Live);
-                stats = CenteredVisual("AttackingCardReadout", _layer, from.Position, statSize);
-                new DuelFieldReadout(stats).Bind(attacker, opponent, null);
+                stats = CreateBattleCardReadout("AttackingCardReadout", attacker, opponent, from.Position, statSize);
             }
+            if (defenderStats != null) defenderStats.SetAsLastSibling();
             if (readout != null) readout.transform.SetAsLastSibling();
 
             void MoveWithStats(CardFlight path, float time, float lift)
@@ -693,6 +706,7 @@ namespace YGOPortable.UI
             var impact = CreateEffect(DuelEffectKind.Strike, to, Vector2.one * (direct ? 335f : 248f), accent);
             impact.rectTransform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg);
             if (stats != null) stats.SetAsLastSibling();
+            if (defenderStats != null) defenderStats.SetAsLastSibling();
             var returnFlight = new CardFlight(code, lunge, flight.To.IsValid ? flight.To : from, false, false);
             yield return Animate(.27f, t =>
             {
@@ -702,9 +716,18 @@ namespace YGOPortable.UI
             });
             if (readout != null) RemoveTransient(readout.gameObject);
             if (stats != null) RemoveTransient(stats.gameObject);
+            if (defenderStats != null) RemoveTransient(defenderStats.gameObject);
             RemoveTransient(impact.gameObject);
             RecycleCard(proxy);
             onFinish?.Invoke();
+        }
+
+        internal RectTransform CreateBattleCardReadout(string name, DuelCardReadout card, bool opponent,
+            Vector2 position, Vector2 size)
+        {
+            var holder = CenteredVisual(name, _layer, position, size);
+            new DuelFieldReadout(holder).Bind(card, opponent, null);
+            return holder;
         }
 
         private static void RemoveTransient(GameObject visual)

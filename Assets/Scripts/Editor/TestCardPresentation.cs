@@ -173,7 +173,8 @@ namespace YGOPortable.Editor
             Require(arrivals == 1, "The direct attack did not finish once.");
         }
 
-        internal static void VerifyAttackFlight(CardAnimationManager animator, string attack, string defense, string rating)
+        internal static void VerifyAttackFlight(CardAnimationManager animator, string attack, string defense, string rating,
+            Action inspectFrame = null)
         {
             var steps = (Queue<IEnumerator>)typeof(CardAnimationManager)
                 .GetField("_steps", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(animator);
@@ -199,6 +200,7 @@ namespace YGOPortable.Editor
                     stats.Find("CardReadout/Labels/Rating/Value").GetComponent<Text>().text == rating &&
                     stats.GetComponentsInChildren<Graphic>().All(graphic => !graphic.raycastTarget),
                     "The flying card omitted its current stats, rank, link or level, or blocked input.");
+                inspectFrame?.Invoke();
                 previous = stats.anchoredPosition;
             }
             Require(!step.MoveNext() && animator.transform.Find("AttackingCardReadout") == null &&

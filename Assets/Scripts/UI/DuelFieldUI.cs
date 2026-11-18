@@ -1356,9 +1356,11 @@ namespace YGOPortable.UI
 
         private void BindEmz(FieldSlotView slot, byte myCon, uint mySeq, byte oppCon, uint oppSeq, LiveCardState myEmz, LiveCardState oppEmz)
         {
-            if (oppEmz != null)
+            bool heldMine = GetBattleCardDisplay(myCon, mySeq) != null;
+            bool heldOpponent = GetBattleCardDisplay(oppCon, oppSeq) != null;
+            if (heldOpponent || !heldMine && oppEmz != null)
                 BindSlot(slot, oppCon, YgoConstants.LOCATION_MZONE, oppSeq, oppEmz, true);
-            else if (myEmz == null && !IsPlaceSelectable(myCon, YgoConstants.LOCATION_MZONE, mySeq) && IsPlaceSelectable(oppCon, YgoConstants.LOCATION_MZONE, oppSeq))
+            else if (!heldMine && myEmz == null && !IsPlaceSelectable(myCon, YgoConstants.LOCATION_MZONE, mySeq) && IsPlaceSelectable(oppCon, YgoConstants.LOCATION_MZONE, oppSeq))
                 BindSlot(slot, oppCon, YgoConstants.LOCATION_MZONE, oppSeq, null, true);
             else
                 BindSlot(slot, myCon, YgoConstants.LOCATION_MZONE, mySeq, myEmz, false);
@@ -1369,45 +1371,52 @@ namespace YGOPortable.UI
             slot.mappedCon = con;
             slot.mappedLoc = loc;
             slot.mappedSeq = seq;
-            slot.liveCard = live;
+            var battle = loc == YgoConstants.LOCATION_MZONE ? GetBattleCardDisplay(con, seq) : null;
+            slot.liveCard = battle == null ? live : null;
 
-            bool visible = live != null && !IsArriving(con, loc, seq);
+            var shown = battle?.Card ?? live;
+            uint position = battle?.Position ?? shown?.position ?? 0;
+            bool faceUp = (position & YgoConstants.POS_FACEUP) != 0;
+            bool visible = battle != null ? !battle.Hidden : live != null && !IsArriving(con, loc, seq);
             slot.cardView.gameObject.SetActive(visible);
             if (visible)
             {
-                slot.cardView.SetCard(live.IsFaceUp ? live.code : 0u, !live.IsFaceUp, live);
-                slot.cardView.transform.localRotation = Quaternion.Euler(0f, 0f, CardAngle(loc, live.position, opponent));
-                slot.cardView.transform.localScale = Vector3.one * CardScale(slot.root, loc, live.position);
+                slot.cardView.SetCard(faceUp ? shown.code : 0u, !faceUp, shown);
+                slot.cardView.transform.localRotation = Quaternion.Euler(0f, 0f, CardAngle(loc, position, opponent));
+                slot.cardView.transform.localScale = Vector3.one * CardScale(slot.root, loc, position);
             }
-            if (visible && live.IsFaceUp && live.code != 0)
+            if (visible && faceUp && shown.code != 0 && battle?.HideReadout != true)
             {
-                var readout = new DuelCardReadout(CardDatabase.Get(live.code), live);
+                var readout = new DuelCardReadout(CardDatabase.Get(shown.code), shown,
+                    battle?.UseBattleStats == true ? battle.Stats : null);
                 uint? scale = readout.ScaleIn(loc, seq);
                 if (loc == YgoConstants.LOCATION_MZONE && readout.IsMonster || scale.HasValue || readout.CounterCount != 0)
                 {
                     slot.readout ??= new DuelFieldReadout(slot.root);
-                    slot.readout.Bind(readout, opponent, scale);
+                    slot.readout.Bind(readout, opponent, scale, position);
                     slot.readout.FollowFocus(slot.cardArea.anchoredPosition, slot.focusArt.localScale.x);
                 }
                 else slot.readout?.Hide();
             }
             else slot.readout?.Hide();
 
-            bool canDrag = visible && CanAcceptPlayerAction && !IsStagingPlacement && !_modals.IsFieldCardSelection &&
+            bool interactive = battle == null && visible;
+            bool canDrag = interactive && CanAcceptPlayerAction && !IsStagingPlacement && !_modals.IsFieldCardSelection &&
                 !opponent && loc == YgoConstants.LOCATION_MZONE;
             slot.dragTrigger.SourceType = canDrag ? DragSourceType.FieldMonster : DragSourceType.None;
             slot.dragTrigger.CardCodeGetter = canDrag ? () => live.code : null;
             slot.dragTrigger.IndexGetter = canDrag ? () => (int)seq : null;
             slot.dragTrigger.DataGetter = canDrag ? () => (con, loc, seq) : null;
             if (!visible)
-            {
                 ResetFieldCardFocus(slot);
+            if (!interactive)
+            {
                 ClearPointerCard(slot.focusArt);
                 if (_pointerActionAnchor == slot.root) _pointerActionAnchor = null;
             }
-            uint previewCode = visible && (live.IsFaceUp || live.isPublic || !opponent) ? live.code : 0;
-            if (visible) RefreshPointerCard(slot.focusArt, previewCode);
-            slot.dragTrigger.OnPointerEnterAction = () =>
+            uint previewCode = interactive && (live.IsFaceUp || live.isPublic || !opponent) ? live.code : 0;
+            if (interactive) RefreshPointerCard(slot.focusArt, previewCode);
+            slot.dragTrigger.OnPointerEnterAction = battle != null ? null : () =>
             {
                 TrackPointerCard(visible ? slot.focusArt : null, previewCode, visible ? slot : null);
                 PointAtCardActions(visible ? slot.root : null);
@@ -1417,7 +1426,7 @@ namespace YGOPortable.UI
                 ClearPointerCard(slot.focusArt);
                 LeaveCardActions(slot.root);
             };
-            slot.dragTrigger.OnRightClick = () => InspectCard(previewCode, slot);
+            slot.dragTrigger.OnRightClick = battle != null ? null : () => InspectCard(previewCode, slot);
             slot.dragTrigger.OnLeftClick = () => OnSlotClicked(con, loc, seq);
             slot.dragTrigger.OnTouchClick = () => OnSlotClicked(con, loc, seq, touch: true);
 
@@ -1425,10 +1434,10 @@ namespace YGOPortable.UI
             bool place = IsPlaceSelectable(con, loc, seq);
             bool drag = !opponent && live == null && (loc == YgoConstants.LOCATION_MZONE && _dragHighlightMZone ||
                 loc == YgoConstants.LOCATION_SZONE && _dragHighlightSZone);
-            bool attack = opponent && loc == YgoConstants.LOCATION_MZONE && _dragHighlightAttack && live != null;
-            bool action = visible && CanAcceptPlayerAction && HasFieldAction(con, loc, seq);
+            bool attack = opponent && loc == YgoConstants.LOCATION_MZONE && _dragHighlightAttack && interactive;
+            bool action = interactive && CanAcceptPlayerAction && HasFieldAction(con, loc, seq);
             int choiceIndex = -1;
-            bool cardChoice = visible && FindFieldCardChoice(con, loc, seq, out choiceIndex);
+            bool cardChoice = interactive && FindFieldCardChoice(con, loc, seq, out choiceIndex);
             bool cardSelected = cardChoice && _modals.IsFieldCardSelected(choiceIndex);
             Color highlight = cardSelected ? DuelStyle.Gold : attack ? DuelStyle.Opponent :
                 cardChoice || selected || action ? DuelStyle.Player :
@@ -2094,6 +2103,7 @@ namespace YGOPortable.UI
         private void ClearArrivals()
         {
             _arrivingCards.Clear();
+            _battleCardDisplays.Clear();
             _pendingCardReadouts.Clear();
             ResetHandViews(_myHandViews);
             ResetHandViews(_oppHandViews);
@@ -2298,9 +2308,19 @@ namespace YGOPortable.UI
                 motion = MonsterArrivalMotion(e);
 
             var flight = new CardFlight(e.code, from, to, fromBack, toBack);
+            var held = HoldBattleMove(e, motion);
+            Action depart = held == null ? null : () =>
+            {
+                held.Hidden = true;
+                Refresh();
+            };
             if (disappearing || (e.toLoc & YgoConstants.LOCATION_OVERLAY) != 0)
             {
-                animator.QueueMove(flight, motion, null);
+                animator.QueueMove(flight, motion, held == null ? null : () =>
+                {
+                    ReleaseBattleCardDisplay(held);
+                    Refresh();
+                }, onDepart: depart);
                 return;
             }
             var onArrival = HideUntilArrival(e.toCon, e.toLoc, e.toSeq);
@@ -2332,7 +2352,11 @@ namespace YGOPortable.UI
                     }
                 }
                 if (readout != null) _pendingCardReadouts[(e.toCon, e.toSeq)] = readout;
-                animator.QueueMove(flight, motion, onArrival, readout);
+                animator.QueueMove(flight, motion, held == null ? onArrival : () =>
+                {
+                    ReleaseBattleCardDisplay(held);
+                    onArrival();
+                }, readout, depart);
             }
         }
 
@@ -2427,18 +2451,50 @@ namespace YGOPortable.UI
             var from = GetDisplayedCardPose(attacker.Controller, attacker.Location, attacker.Sequence, card.code);
             if (!from.IsValid) from = resting;
             var hit = AttackTarget(animator, attacker.Controller, defender.Controller, defender.Location, defender.Sequence);
-            var arrival = HideUntilArrival(attacker.Controller, attacker.Location, attacker.Sequence);
-            var defendingCard = defender.IsFaceUp ? FindLiveCard(defender.Controller, defender.Location, defender.Sequence) : null;
+            var defendingCard = defender.Location == YgoConstants.LOCATION_MZONE
+                ? FindLiveCard(defender.Controller, defender.Location, defender.Sequence) : null;
             var combat = new DuelCardReadout(CardDatabase.Get(card.code), card, attacker);
-            bool defenderIsLink = defendingCard != null &&
-                new DuelCardReadout(CardDatabase.Get(defendingCard.code), defendingCard).IsLink;
+            var defense = defender.IsFaceUp && defendingCard?.code > 0
+                ? new DuelCardReadout(CardDatabase.Get(defendingCard.code), defendingCard, defender) : default;
             int viewer = _session.HumanPlayerIndex;
-            var readout = animator.CreateBattleReadout(BattleStatsArea, attacker, defender, viewer, combat.IsLink, defenderIsLink,
+            var readout = animator.CreateBattleReadout(BattleStatsArea, attacker, defender, viewer, combat.IsLink, defense.IsLink,
                 _mobileLayout);
             var flight = new CardFlight(card.code, from, resting, false, false);
             var slot = GetSlot(attacker.Controller, attacker.Location, attacker.Sequence);
             Vector2 statSize = slot == null ? Vector2.zero : animator.GetAreaSize(slot.readout?.Rect ?? slot.root);
-            animator.QueueAttack(flight, hit, defender.Location == 0, attacker.Controller != viewer, readout, combat, statSize, arrival);
+            var source = QueueBattleCard(attacker, card);
+            var target = QueueBattleCard(defender, defendingCard);
+            (CardPose pose, Vector2 size, RectTransform defenderStats) Start()
+            {
+                var pose = GetDisplayedCardPose(attacker.Controller, attacker.Location, attacker.Sequence, card.code);
+                Vector2 size = slot == null ? Vector2.zero : animator.GetAreaSize(slot.readout?.Rect ?? slot.root);
+                RectTransform defenderStats = null;
+                if (source != null) source.Hidden = true;
+                if (target != null)
+                {
+                    target.Position = defender.Position;
+                    target.UseBattleStats = true;
+                    var targetSlot = GetSlot(defender.Controller, defender.Location, defender.Sequence);
+                    if (defense.IsMonster && targetSlot != null)
+                    {
+                        ResetFieldCardFocus(targetSlot);
+                        var area = targetSlot.readout?.Rect ?? targetSlot.root;
+                        defenderStats = animator.CreateBattleCardReadout("DefendingCardReadout", defense,
+                            defender.Controller != viewer, animator.GetPoint(area, Vector2.one * .5f), animator.GetAreaSize(area));
+                        target.HideReadout = true;
+                    }
+                }
+                Refresh();
+                return (pose, size, defenderStats);
+            }
+            void Finish()
+            {
+                ReleaseBattleCardDisplay(source);
+                ReleaseBattleCardDisplay(target);
+                Refresh();
+            }
+            animator.QueueAttack(flight, hit, defender.Location == 0, attacker.Controller != viewer, readout, combat, statSize,
+                Finish, Start);
         }
 
         private void HandleLifePointsChanged(byte player, int delta, int lifePoints)
