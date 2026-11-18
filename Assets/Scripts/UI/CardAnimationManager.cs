@@ -516,51 +516,28 @@ namespace YGOPortable.UI
 
         private CanvasGroup SummonPlate(CardFlight flight, string summonType, Vector2 center)
         {
-            float width = Mathf.Min(_layer.rect.width * .70f, 836f);
-            var holder = CenteredVisual("SummonName", _layer, center, new Vector2(width, 52f));
+            float width = Mathf.Min(_layer.rect.width * .64f, 678f);
+            var holder = CenteredVisual("SummonName", _layer, center, new Vector2(width, 65f));
             var group = holder.gameObject.AddComponent<CanvasGroup>();
             group.alpha = 0f;
-            var info = CardDatabase.Get(flight.Code);
-            // Face-up monsters are rotated in opposite directions on the two sides of the board.
-            bool opponent = flight.To.Angle > 45f;
-            var plate = opponent ? DuelVisualAssets.SummonNameOpponent : DuelVisualAssets.SummonNamePlayer;
-            var accent = DuelStyle.Side(opponent);
-            AddBandBackground(holder, plate, accent);
-            var nameArea = LotdUiKit.FillRect("SummonNameText", holder);
-            var name = LotdUiKit.AddFittedText(nameArea, "Name", CardDatabase.GetName(flight.Code), 28, 14,
-                TextAnchor.MiddleCenter, Color.white, FontStyle.BoldAndItalic);
-            DuelStyle.Shadow(name);
+            var card = new DuelCardReadout(CardDatabase.Get(flight.Code));
+            var accent = DuelStyle.Side(flight.To.Angle > 45f);
+            DuelReadoutPlate.Add(holder, new Color(.045f, .068f, .085f, .98f));
+            var rail = LotdUiKit.CreateRect("Accent", holder, new Vector2(.008f, .16f), new Vector2(.008f, .88f),
+                Vector2.zero, new Vector2(3f, 0f));
+            LotdUiKit.AddImage(rail.gameObject, LotdUiKit.WhiteSprite, accent, false, false);
+            var caption = LotdUiKit.CreateRect("Caption", holder, new Vector2(.04f, .60f), new Vector2(.96f, .96f),
+                Vector2.zero, Vector2.zero);
+            string rating = card.Rating;
+            LotdUiKit.AddFittedText(caption, "Value", rating.Length > 0 ? $"{summonType} · {rating}" : summonType,
+                16, 11, TextAnchor.MiddleLeft, accent, FontStyle.Bold);
+            var nameArea = LotdUiKit.CreateRect("SummonNameText", holder, new Vector2(.04f, .05f), new Vector2(.96f, .61f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddFittedText(nameArea, "Name", CardDatabase.GetName(flight.Code), 27, 13,
+                TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
 
-            var stats = CenteredVisual("SummonStats", holder, Vector2.down * 41f, new Vector2(width * .57f, 25f));
-            AddBandBackground(stats, opponent ? DuelVisualAssets.SummonStatsOpponent : DuelVisualAssets.SummonStatsPlayer, accent);
-            string value = info?.IsMonster == true
-                ? $"{summonType}  ·  ATK {info.AtkString}  {(info.IsLink ? info.DefString : $"DEF {info.DefString}")}"
-                : summonType;
-            var statText = LotdUiKit.AddFittedText(stats, "Value", value, 18, 12,
-                TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
-            DuelStyle.Shadow(statText);
-            if (info?.IsMonster == true && !info.IsLink && info.level > 0)
-            {
-                int count = (int)Math.Min(13u, info.level);
-                var icon = info.IsXyz ? DuelVisualAssets.SummonRank : DuelVisualAssets.SummonLevel;
-                var level = CenteredVisual("SummonLevel", holder, Vector2.up * 24f, new Vector2(width * .55f, 21f));
-                if (icon != null)
-                {
-                    float step = Mathf.Min(19f, level.rect.width / count);
-                    for (int i = 0; i < count; i++)
-                    {
-                        Vector2 point = Vector2.right * (i - (count - 1) * .5f) * step;
-                        var star = CenteredVisual("Star", level, point, Vector2.one * step * .94f);
-                        LotdUiKit.AddImage(star.gameObject, icon, Color.white, true, false);
-                    }
-                }
-                else
-                {
-                    string stars = new string(info.IsXyz ? '◆' : '★', count);
-                    var rank = LotdUiKit.AddText(level, "Value", stars, 16, TextAnchor.MiddleCenter, DuelStyle.Gold, FontStyle.Bold);
-                    DuelStyle.Shadow(rank);
-                }
-            }
+            var stats = CenteredVisual("SummonStats", holder, new Vector2(width * .20f, -55f), new Vector2(width * .60f, 40f));
+            new DuelStatStrip(stats, compact: false).Bind(card);
             return group;
         }
 

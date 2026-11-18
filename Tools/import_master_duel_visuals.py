@@ -68,16 +68,8 @@ HUD_SPRITES = {
     "ZoneBanishedOpponent": "GUI_alpha_Icon_Cardlist6",
     "ZoneFieldPlayer": "GUI_Log_Field_Near",
     "ZoneFieldOpponent": "GUI_Log_Field_Far",
-    "CardStatsBase": "GUI_Duel_CardStats_Base_0",
-    "CardStatsBaseAlt": "GUI_Duel_CardStats_Base_1",
     "WinnerCrown": "GUI_DuelEnd_WinnerIcon",
     "DuelVictory": "img_text_DuelTextWin_01",
-    "SummonNamePlayer": "tex_NameBg_near",
-    "SummonNameOpponent": "tex_NameBg_far",
-    "SummonStatsPlayer": "tex_StatusBg_near",
-    "SummonStatsOpponent": "tex_StatusBg_far",
-    "SummonLevel": "tex_IconLv",
-    "SummonRank": "tex_IconRank",
 }
 # Solid letter layers and horizontal sprite centers of the original prefabs, in pixels.
 DUEL_TITLES = {

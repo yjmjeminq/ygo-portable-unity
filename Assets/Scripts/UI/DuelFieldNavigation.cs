@@ -43,6 +43,7 @@ namespace YGOPortable.UI
         private RectTransform _duelPadPlacementFocus;
         private RectTransform _duelPadRaisedCard;
         private RectTransform _duelPointerRaisedCard;
+        private FieldSlotView _duelPointerSlot;
         private uint _duelPointerCode;
         private RectTransform _duelCommandRaisedCard;
         private RectTransform _raisedCard;
@@ -60,6 +61,7 @@ namespace YGOPortable.UI
             _duelPadScope = PadScope.None;
             _duelPadFocus = _duelPadBoardFocus = _duelPadPlacementFocus = null;
             _duelPointerRaisedCard = _duelCommandRaisedCard = _raisedCard = null;
+            _duelPointerSlot = null;
             _duelPointerCode = 0;
             _hasDuelPointerSample = false;
             _usingDuelPad = false;
@@ -79,7 +81,7 @@ namespace YGOPortable.UI
                 _usingDuelPad = false;
                 _duelPadPlacementFocus = null;
                 HideDuelPadFrame();
-                InspectCard(_duelPointerCode);
+                InspectCard(_duelPointerCode, _duelPointerSlot);
                 _hintBannerText.text = "";
             }
             var frame = _duelPadInput.Read(Time.unscaledTime);
@@ -168,7 +170,8 @@ namespace YGOPortable.UI
             var target = _duelPadTargets[index];
             SetDuelPadFocus(target, scope);
             if (frame.Submit) target.Submit?.Invoke();
-            else if (frame.Alternate && scope != PadScope.FieldCards && target.PreviewCode != 0) ShowCardZoomModal(target.PreviewCode);
+            else if (frame.Alternate && scope != PadScope.FieldCards && target.PreviewCode != 0)
+                ShowCardZoomModal(target.PreviewCode, _inspectedFieldCard);
             RefreshDuelPadCursor();
         }
 
@@ -372,7 +375,11 @@ namespace YGOPortable.UI
                 _duelPadBoardFocus = target.Rect;
                 RefreshCardActions();
             }
-            if (target.PreviewCode != 0) InspectCard(target.PreviewCode);
+            if (target.PreviewCode != 0)
+            {
+                _fieldSlotsByRect.TryGetValue(target.Rect, out var slot);
+                InspectCard(target.PreviewCode, slot);
+            }
             var events = EventSystem.current;
             if (events != null && !events.alreadySelecting && events.currentSelectedGameObject != target.Rect.gameObject)
                 events.SetSelectedGameObject(target.Rect.gameObject);
@@ -512,14 +519,16 @@ namespace YGOPortable.UI
         {
             if (_duelPointerRaisedCard != card) return;
             _duelPointerRaisedCard = null;
+            _duelPointerSlot = null;
             _duelPointerCode = 0;
         }
 
-        private void TrackPointerCard(RectTransform card, uint previewCode)
+        private void TrackPointerCard(RectTransform card, uint previewCode, FieldSlotView slot = null)
         {
             _duelPointerRaisedCard = card;
+            _duelPointerSlot = slot;
             _duelPointerCode = previewCode;
-            if (!_usingDuelPad) InspectCard(previewCode);
+            if (!_usingDuelPad) InspectCard(previewCode, slot);
         }
 
         private void RefreshPointerCard(RectTransform card, uint previewCode)
@@ -529,7 +538,7 @@ namespace YGOPortable.UI
             if (!_usingDuelPad && !_actionPopup.activeSelf && !_phasePicker.activeSelf && !IsReadingLog &&
                 !_cardZoomModal.activeSelf && !_modals.IsPromptOpen && !_modals.IsZoneViewerOpen &&
                 !_modals.ResultRoot.activeSelf && CardDragManager.Instance?.IsDragging != true)
-                InspectCard(previewCode);
+                InspectCard(previewCode, _duelPointerSlot);
         }
 
         private void ResetDuelPadCardMotions()

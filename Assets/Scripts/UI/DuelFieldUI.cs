@@ -23,6 +23,7 @@ namespace YGOPortable.UI
         private Text _inspName;
         private Image _inspTitle;
         private Text _inspStats;
+        private DuelStatStrip _inspCombat;
         private Text _inspDesc;
         private Text _logFeed;
         private GameObject _logWindow;
@@ -30,6 +31,7 @@ namespace YGOPortable.UI
         private readonly List<Text> _logBlocks = new List<Text>();
         private ScrollRect _inspectScroll;
         private uint _inspectedCode;
+        private (byte controller, uint location, uint sequence)? _inspectedFieldCard;
 
         // Opponent and player HUD
         private Image _oppBustImg;
@@ -75,12 +77,7 @@ namespace YGOPortable.UI
             public Outline border;
             public CompositeCardView cardView;
             public RectTransform focusArt;
-            public RectTransform stats;
-            public Image statsEdge;
-            public Text statsText;
-            public Text ratingText;
-            public Text badgeText;
-            public RectTransform badge;
+            public DuelFieldReadout readout;
             public CardDragTrigger dragTrigger;
             public byte mappedCon;
             public uint mappedLoc;
@@ -124,6 +121,8 @@ namespace YGOPortable.UI
         private Text _zoomArtworkLabel;
         private Text _zoomName;
         private Text _zoomStats;
+        private DuelStatStrip _zoomCombat;
+        private (byte controller, uint location, uint sequence)? _zoomFieldCard;
         private Text _zoomPasscode;
         private Text _zoomDesc;
         private ScrollRect _zoomScroll;
@@ -188,10 +187,15 @@ namespace YGOPortable.UI
             _session.ActivePrompt?.playerId == _session.HumanPlayerIndex;
 
         public DuelFieldUI(GameAppController app, Transform canvasParent, DuelPromptModals modals)
+            : this(app, canvasParent, modals, Application.platform == RuntimePlatform.IPhonePlayer)
+        {
+        }
+
+        internal DuelFieldUI(GameAppController app, Transform canvasParent, DuelPromptModals modals, bool mobileDetails)
         {
             _app = app;
             _modals = modals;
-            BuildUI(canvasParent);
+            BuildUI(canvasParent, mobileDetails);
             _modals.SetFieldCardHitTest(IsPointOverFieldCardChoice);
             _modals.SetInspectorArtworkControl(_duelPadInspectButton);
             _modals.SetBrowsablePiles(
@@ -290,10 +294,19 @@ namespace YGOPortable.UI
             RefreshHandGlows(force: true);
         }
 
-        public void InspectCard(uint code)
+        public void InspectCard(uint code) => InspectCard(code, null);
+
+        private void InspectCard(uint code, FieldSlotView slot)
         {
-            if (code == 0 || code == _inspectedCode) return;
+            if (code == 0) return;
+            bool changed = code != _inspectedCode;
+            var fieldCard = InspectionLocation(slot);
+            if (!changed && _inspectedFieldCard == fieldCard) return;
             _inspectedCode = code;
+            _inspectedFieldCard = fieldCard;
+            RefreshInspectorReadout();
+            if (!changed) return;
+
             _duelPadInspectButton.interactable = true;
             _inspCard.gameObject.SetActive(true);
             _inspCard.SetCard(code);
@@ -306,13 +319,11 @@ namespace YGOPortable.UI
             if (info == null)
             {
                 _inspName.text = $"카드 #{code}";
-                _inspStats.text = "";
                 _inspDesc.text = "";
                 _inspRaceIcon.gameObject.SetActive(false);
                 return;
             }
             _inspName.text = info.name;
-            _inspStats.text = FormatInspectorStats(info);
             _inspDesc.text = info.desc;
             _inspectScroll.StopMovement();
             _inspectScroll.content.anchoredPosition = Vector2.zero;
@@ -324,28 +335,55 @@ namespace YGOPortable.UI
         private void ResetCardInspector()
         {
             _inspectedCode = 0;
+            _inspectedFieldCard = null;
             _inspCard.SetCard(0);
             _inspCard.gameObject.SetActive(false);
             _duelPadInspectButton.interactable = false;
             _inspTitle.color = DuelStyle.HeaderColor;
             _inspName.text = "카드 정보";
             _inspStats.text = "";
+            _inspCombat.Hide();
             _inspDesc.text = "카드를 선택하면 효과를 확인할 수 있습니다.";
             _inspRaceIcon.gameObject.SetActive(false);
             _inspectScroll.StopMovement();
             _inspectScroll.content.anchoredPosition = Vector2.zero;
         }
 
-        private static string FormatInspectorStats(CardInfo info)
+        private static (byte controller, uint location, uint sequence)? InspectionLocation(FieldSlotView slot) =>
+            slot == null ? null : (slot.mappedCon, slot.mappedLoc, slot.mappedSeq);
+
+        private LiveCardState ReadVisibleFieldCard(uint code, (byte controller, uint location, uint sequence)? location)
         {
-            string type = YgoConstants.GetTypeTagKR(info.type).Replace(" / ", " · ");
-            if (!info.IsMonster) return type;
-            YgoConstants.RaceNamesKR.TryGetValue(info.race, out string race);
-            YgoConstants.AttributeNamesKR.TryGetValue(info.attr, out string attribute);
-            string rating = info.IsLink ? info.DefString : $"{(info.IsXyz ? "랭크" : "레벨")} {info.level}";
-            string scale = info.IsPendulum ? $" · 스케일 {info.lscale}/{info.rscale}" : "";
-            string defense = info.IsLink ? "" : $" · 수비력 {info.DefString}";
-            return $"{race} · {attribute} · {rating}\n{type}{scale}\n공격력 {info.AtkString}{defense}";
+            if (location is not { } slot) return null;
+            var live = FindLiveCard(slot.controller, slot.location, slot.sequence);
+            return live?.IsFaceUp == true && live.code == code ? live : null;
+        }
+
+        private void RefreshInspectorReadout()
+        {
+            if (_inspectedCode == 0) return;
+            var live = ReadVisibleFieldCard(_inspectedCode, _inspectedFieldCard);
+            if (live == null) _inspectedFieldCard = null;
+            var card = new DuelCardReadout(CardDatabase.Get(_inspectedCode), live);
+            _inspStats.text = FormatInspectorStats(card);
+            _inspCombat.Bind(card);
+        }
+
+        private static string FormatInspectorStats(DuelCardReadout card)
+        {
+            if (card.Type == 0) return "";
+            string type = card.IsScale ? "펜듈럼 마법" : YgoConstants.GetTypeTagKR(card.Type).Replace(" / ", " · ");
+            if (card.IsPendulum) type += $" · 스케일 {card.LeftScale}/{card.RightScale}";
+            if (!card.IsMonster) return type;
+
+            YgoConstants.RaceNamesKR.TryGetValue(card.Live?.race ?? card.Printed?.race ?? 0, out string race);
+            YgoConstants.AttributeNamesKR.TryGetValue(card.Live?.attribute ?? card.Printed?.attr ?? 0, out string attribute);
+            string identity = string.Join(" · ", new[] { race, attribute, card.Rating }.Where(part => !string.IsNullOrEmpty(part)));
+            if (card.Live == null) return $"{identity}\n{type}";
+
+            string position = card.Live.IsDefense ? "수비 표시" : "공격 표시";
+            string status = card.Status;
+            return $"{identity}\n{type}\n{position}{(status.Length > 0 ? " · " + status : "")}";
         }
 
         private void ShowZoomRelatedCards()
@@ -359,7 +397,7 @@ namespace YGOPortable.UI
         }
 
 
-        private void BuildUI(Transform parent)
+        private void BuildUI(Transform parent, bool mobileDetails)
         {
             var root = LotdUiKit.FillRect("Screen_DuelField", parent);
             Root = root.gameObject;
@@ -384,7 +422,7 @@ namespace YGOPortable.UI
             BuildBottomHudAndHands(root);
             BuildCardActions(root);
             BuildActionPopup(root);
-            BuildCardZoomModal(root);
+            BuildCardZoomModal(root, mobileDetails);
             BuildDuelLog(root);
             Root.SetActive(false);
         }
@@ -394,7 +432,7 @@ namespace YGOPortable.UI
             var left = DuelStyle.Panel(root, "LeftInspector", new Vector2(0.015f, 0.195f),
                 new Vector2(0.186f, 0.922f));
             var card = LotdUiKit.CreateRect("CardPreview", left,
-                new Vector2(.07f, .425f), new Vector2(.93f, .9f), Vector2.zero, Vector2.zero);
+                new Vector2(.07f, .462f), new Vector2(.93f, .9f), Vector2.zero, Vector2.zero);
             _inspCard = CompositeCardView.Create(card, "Card", duelArtwork: true);
             var zoomHit = LotdUiKit.FillRect("ZoomHit", _inspCard.transform.Find("AspectBox"));
             LotdUiKit.AddImage(zoomHit.gameObject, LotdUiKit.WhiteSprite, Color.clear);
@@ -406,17 +444,20 @@ namespace YGOPortable.UI
             zoom.onClick.AddListener(() =>
             {
                 LotdAudio.PlayClick();
-                ShowCardZoomModal(_inspectedCode);
+                ShowCardZoomModal(_inspectedCode, _inspectedFieldCard);
             });
             _duelPadInspectButton = zoom;
 
             var inside = LotdUiKit.FillRect("CardDetails", left, 7f);
-            var stats = LotdUiKit.CreateRect("Stats", inside, new Vector2(.018f, .325f), new Vector2(.825f, .42f),
+            var stats = LotdUiKit.CreateRect("Stats", inside, new Vector2(.018f, .378f), new Vector2(.825f, .454f),
                 Vector2.zero, Vector2.zero);
             _inspStats = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Info", stats,
                 Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero),
                 "Text", "", 13, 9, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
-            var race = LotdUiKit.CreateRect("Race", inside, new Vector2(.842f, .341f), new Vector2(.987f, .404f),
+            var combat = LotdUiKit.CreateRect("CombatStats", inside, new Vector2(.025f, .323f), new Vector2(.975f, .375f),
+                Vector2.zero, Vector2.zero);
+            _inspCombat = new DuelStatStrip(combat, compact: false);
+            var race = LotdUiKit.CreateRect("Race", inside, new Vector2(.842f, .388f), new Vector2(.987f, .445f),
                 Vector2.zero, Vector2.zero);
             _inspRaceIcon = LotdUiKit.AddImage(race.gameObject, null, Color.white, true, false);
 
@@ -597,24 +638,6 @@ namespace YGOPortable.UI
             var view = CompositeCardView.Create(card, "CardView", duelArtwork: true);
             view.gameObject.SetActive(false);
 
-            var stats = LotdUiKit.CreateRect("Stats", cell, new Vector2(0.03f, 0.02f), new Vector2(0.97f, 0.24f),
-                Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(stats.gameObject, LotdUiKit.WhiteSprite, new Color(0.025f, 0.045f, 0.058f, 0.83f), false, false);
-            var edge = LotdUiKit.CreateRect("Edge", stats, Vector2.zero, new Vector2(0f, 1f), Vector2.zero, new Vector2(8f, 0f));
-            var statsEdge = LotdUiKit.AddImage(edge.gameObject, DuelVisualAssets.CardStatsBase, Color.white, false, false);
-            var values = LotdUiKit.AddFittedText(LotdUiKit.FillRect("Content", stats, 2f), "Value", "", 15, 8,
-                TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
-            values.supportRichText = true;
-            DuelStyle.Shadow(values);
-            stats.gameObject.SetActive(false);
-
-            var badge = LotdUiKit.CreateRect("Materials", cell, new Vector2(0.54f, 0.74f),
-                new Vector2(0.99f, 0.97f), Vector2.zero, Vector2.zero);
-            var badgeText = LotdUiKit.AddFittedText(badge, "Count", "", 12, 8,
-                TextAnchor.MiddleCenter, DuelStyle.Gold, FontStyle.Bold);
-            DuelStyle.Shadow(badgeText, 1.5f);
-            var rating = CreateMonsterRating(cell, new Vector2(.03f, .74f), new Vector2(.53f, .97f));
-
             var slot = new FieldSlotView
             {
                 root = cell,
@@ -622,12 +645,6 @@ namespace YGOPortable.UI
                 border = border,
                 cardView = view,
                 focusArt = (RectTransform)view.transform.Find("AspectBox"),
-                stats = stats,
-                statsEdge = statsEdge,
-                statsText = values,
-                ratingText = rating,
-                badge = badge,
-                badgeText = badgeText,
                 dragTrigger = cell.gameObject.AddComponent<CardDragTrigger>(),
             };
             _fieldSlotsByRect.Add(cell, slot);
@@ -1038,6 +1055,8 @@ namespace YGOPortable.UI
             BindEmz(_emz[0], me, 5, opponent, 6, mine.mzone[5], theirs.mzone[6]);
             BindEmz(_emz[1], me, 6, opponent, 5, mine.mzone[6], theirs.mzone[5]);
 
+            RefreshInspectorReadout();
+            if (_cardZoomModal.activeSelf && _zoomFieldCard.HasValue) RefreshZoomReadout(_zoomCardView.CurrentCode);
             RefreshHand(mine.hand, me, false);
             RefreshHand(theirs.hand, opponent, true);
             RefreshLogFeed();
@@ -1129,37 +1148,22 @@ namespace YGOPortable.UI
 
             bool visible = live != null && !IsArriving(con, loc, seq);
             slot.cardView.gameObject.SetActive(visible);
-            bool showStats = visible && loc == YgoConstants.LOCATION_MZONE && live.IsFaceUp;
-            slot.stats.gameObject.SetActive(showStats);
-            BindMonsterRating(slot.ratingText, showStats ? live : null);
-            bool token = showStats && (live.type & YgoConstants.TYPE_TOKEN) != 0;
-            slot.badgeText.text = token ? "토큰" : visible && live.overlayCodes.Count > 0 ? $"×{live.overlayCodes.Count}" : "";
-            slot.badgeText.color = token ? DuelStyle.Player : DuelStyle.Gold;
-            slot.badge.anchorMin = new Vector2(0.54f, opponent ? 0.03f : 0.74f);
-            slot.badge.anchorMax = new Vector2(0.99f, opponent ? 0.26f : 0.97f);
             if (visible)
             {
                 slot.cardView.SetCard(live.IsFaceUp ? live.code : 0u, !live.IsFaceUp, live);
                 slot.cardView.transform.localRotation = Quaternion.Euler(0f, 0f, CardAngle(loc, live.position, opponent));
                 slot.cardView.transform.localScale = Vector3.one * CardScale(slot.root, loc, live.position);
             }
-            if (showStats)
+            if (visible && live.IsFaceUp && live.code != 0)
             {
-                slot.stats.anchorMin = new Vector2(0.03f, opponent ? 0.76f : 0.02f);
-                slot.stats.anchorMax = new Vector2(0.97f, opponent ? 0.98f : 0.24f);
-                var rating = (RectTransform)slot.ratingText.transform.parent;
-                rating.anchorMin = new Vector2(.03f, opponent ? .03f : .74f);
-                rating.anchorMax = new Vector2(.53f, opponent ? .26f : .97f);
-                bool link = (live.type & YgoConstants.TYPE_LINK) != 0;
-                string attackValue = StatValue(live.attack, live.baseAttack, !live.IsDefense);
-                string stats = link ? attackValue :
-                    $"{attackValue}<color=#B2BEC4>/</color>{StatValue(live.defense, live.baseDefense, live.IsDefense)}";
-                if (slot.statsText.text != stats) slot.statsText.text = stats;
-                bool modified = live.attack != live.baseAttack || !link && live.defense != live.baseDefense;
-                slot.statsEdge.sprite = modified ? DuelVisualAssets.CardStatsBaseAlt ?? DuelVisualAssets.CardStatsBase :
-                    DuelVisualAssets.CardStatsBase;
-                slot.statsEdge.enabled = slot.statsEdge.sprite != null;
+                var readout = new DuelCardReadout(CardDatabase.Get(live.code), live);
+                uint? scale = loc == YgoConstants.LOCATION_SZONE && seq is 0 or 4 && readout.IsScale
+                    ? seq == 0 ? readout.LeftScale : readout.RightScale : null;
+                if (loc == YgoConstants.LOCATION_MZONE && readout.IsMonster || scale.HasValue)
+                    (slot.readout ??= new DuelFieldReadout(slot.root)).Bind(readout, opponent, scale);
+                else slot.readout?.Hide();
             }
+            else slot.readout?.Hide();
 
             bool canDrag = visible && CanAcceptPlayerAction && !IsStagingPlacement && !_modals.IsFieldCardSelection &&
                 !opponent && loc == YgoConstants.LOCATION_MZONE;
@@ -1176,7 +1180,7 @@ namespace YGOPortable.UI
             if (visible) RefreshPointerCard(slot.focusArt, previewCode);
             slot.dragTrigger.OnPointerEnterAction = () =>
             {
-                TrackPointerCard(visible ? slot.focusArt : null, previewCode);
+                TrackPointerCard(visible ? slot.focusArt : null, previewCode, visible ? slot : null);
                 PointAtCardActions(visible ? slot.root : null);
             };
             slot.dragTrigger.OnPointerExitAction = () =>
@@ -1184,7 +1188,7 @@ namespace YGOPortable.UI
                 ClearPointerCard(slot.focusArt);
                 LeaveCardActions(slot.root);
             };
-            slot.dragTrigger.OnRightClick = () => InspectCard(previewCode);
+            slot.dragTrigger.OnRightClick = () => InspectCard(previewCode, slot);
             slot.dragTrigger.OnLeftClick = () => OnSlotClicked(con, loc, seq);
             slot.dragTrigger.OnTouchClick = () => OnSlotClicked(con, loc, seq, touch: true);
 
@@ -1204,14 +1208,6 @@ namespace YGOPortable.UI
                 ? new Color(highlight.r, highlight.g, highlight.b, selected || cardSelected || attack ? .64f : place ? .09f : .32f) : ZoneTint;
             slot.border.effectColor = place ? Color.clear : highlight;
             slot.bgImg.SetPlacementHighlight(place);
-        }
-
-        private static string StatValue(int stat, int baseStat, bool current)
-        {
-            string color = stat >= 0 && baseStat >= 0 && stat != baseStat
-                ? stat > baseStat ? "#78E6FF" : "#FF9A82"
-                : current ? "#FFFFFF" : "#BAC6CF";
-            return $"<color={color}>{(stat < 0 ? "?" : stat.ToString())}</color>";
         }
 
         private static float CardAngle(uint location, uint position, bool opponent)
@@ -1411,28 +1407,6 @@ namespace YGOPortable.UI
                 PlayableGlow = glow,
                 Trigger = trigger,
             };
-        }
-
-        private static Text CreateMonsterRating(Transform parent, Vector2 min, Vector2 max)
-        {
-            var chip = LotdUiKit.CreateRect("MonsterRating", parent, min, max, Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(chip.gameObject, LotdUiKit.WhiteSprite, new Color(.025f, .045f, .058f, .91f), false, false);
-            var text = LotdUiKit.AddFittedText(chip, "Value", "", 15, 8, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
-            chip.gameObject.SetActive(false);
-            return text;
-        }
-
-        private static void BindMonsterRating(Text text, LiveCardState card)
-        {
-            uint type = card != null && card.code != 0 ? card.type : 0;
-            bool link = (type & YgoConstants.TYPE_LINK) != 0;
-            bool xyz = (type & YgoConstants.TYPE_XYZ) != 0;
-            uint value = (type & YgoConstants.TYPE_MONSTER) == 0 ? 0 : link ? card.link : xyz ? card.rank : card.level;
-            text.transform.parent.gameObject.SetActive(value != 0);
-            if (value == 0) return;
-
-            text.text = $"{(link ? "링크" : xyz ? "랭크" : "Lv")} {value}";
-            text.color = link ? DuelStyle.Player : xyz ? Color.white : DuelStyle.Gold;
         }
 
         private static (Vector2 min, Vector2 max, float angle) HandCardBounds(RectTransform row, int count, int index, bool opponent)
@@ -2748,7 +2722,7 @@ namespace YGOPortable.UI
                         index < prompt.candidates.Count ? prompt.candidates[index] :
                         prompt.unselectCandidates[index - prompt.candidates.Count];
                     uint code = _session.GetVisibleSelectionCode(card);
-                    if (code != 0) InspectCard(code);
+                    if (code != 0) InspectCard(code, GetSlot(con, loc, seq));
                     _modals.ToggleFieldCard(index, con, loc, seq);
                     Refresh();
                 }
@@ -2812,7 +2786,7 @@ namespace YGOPortable.UI
             var live = FindLiveCard(con, loc, seq);
             if (live == null) return;
             bool canInspect = live.IsFaceUp || live.isPublic || con == _session.HumanPlayerIndex;
-            if (canInspect) InspectCard(live.code);
+            if (canInspect) InspectCard(live.code, GetSlot(con, loc, seq));
 
             if (CanShowCardActions || (touch && canInspect && CanOpenTouchCardDetails))
             {
@@ -3076,9 +3050,8 @@ namespace YGOPortable.UI
                 point, player != _session.HumanPlayerIndex, LotdAudio.PlayDice);
         }
 
-        private void BuildCardZoomModal(Transform root)
+        private void BuildCardZoomModal(Transform root, bool onIPhone)
         {
-            bool onIPhone = Application.platform == RuntimePlatform.IPhonePlayer;
             var dim = LotdUiKit.FillRect("Overlay_CardZoom", root);
             _cardZoomModal = dim.gameObject;
             LotdUiKit.AddImage(dim.gameObject, LotdUiKit.WhiteSprite, new Color(0.01f, 0.03f, 0.08f, 0.88f));
@@ -3134,14 +3107,17 @@ namespace YGOPortable.UI
             _zoomRaceIcon = LotdUiKit.AddImage(rRt.gameObject, null, Color.white, true);
 
             _zoomStats = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Stats", infoRt,
-                new Vector2(0f, 0.74f), new Vector2(1f, 0.87f), Vector2.zero, Vector2.zero),
-                "S", "", 14, 10, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
+                new Vector2(0f, .735f), new Vector2(1f, .875f), Vector2.zero, Vector2.zero),
+                "S", "", 16, 10, TextAnchor.MiddleLeft, DuelStyle.Muted, FontStyle.Bold);
+            var combat = LotdUiKit.CreateRect("CombatStats", infoRt,
+                new Vector2(0f, .635f), new Vector2(1f, .721f), Vector2.zero, Vector2.zero);
+            _zoomCombat = new DuelStatStrip(combat, compact: false);
 
             _zoomPasscode = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Passcode", infoRt,
-                new Vector2(0f, 0.68f), new Vector2(1f, 0.74f), Vector2.zero, Vector2.zero),
+                new Vector2(0f, .571f), new Vector2(1f, .626f), Vector2.zero, Vector2.zero),
                 "P", "", 12, 9, TextAnchor.MiddleLeft, LotdUiKit.CyanAccent);
 
-            var descBox = LotdUiKit.CreateBorderedPanel(infoRt, "DescBox", new Vector2(0f, 0f), new Vector2(1f, 0.66f), Vector2.zero, Vector2.zero,
+            var descBox = LotdUiKit.CreateBorderedPanel(infoRt, "DescBox", new Vector2(0f, 0f), new Vector2(1f, .561f), Vector2.zero, Vector2.zero,
                 new Color(0.02f, 0.05f, 0.12f, 0.95f));
             var vp = LotdUiKit.CreateRect("VP", descBox, Vector2.zero, Vector2.one,
                 new Vector2(10f, 8f), new Vector2(-19f, -8f));
@@ -3169,7 +3145,12 @@ namespace YGOPortable.UI
             _cardZoomModal.SetActive(false);
         }
 
-        public void ShowCardZoomModal(uint code)
+        public void ShowCardZoomModal(uint code) => ShowCardZoomModal(code, null);
+
+        private void ShowCardZoomModal(LiveCardState card) =>
+            ShowCardZoomModal(card.code, InspectionLocation(GetSlot(card.controller, card.location, card.sequence)));
+
+        private void ShowCardZoomModal(uint code, (byte controller, uint location, uint sequence)? fieldCard)
         {
             if (code == 0 || !Root.activeInHierarchy) return;
             bool opening = !_cardZoomModal.activeSelf;
@@ -3183,13 +3164,12 @@ namespace YGOPortable.UI
                 _cardZoomModal.SetActive(true);
             }
             var info = CardDatabase.Get(code);
-            _zoomCardView.SetCard(code, false);
+            _zoomFieldCard = fieldCard;
+            RefreshZoomReadout(code);
             if (info != null)
             {
                 _zoomName.text = info.name;
-                _zoomStats.text = info.FormatStatsLineKR();
-                string attrStr = info.IsMonster && YgoConstants.AttributeNamesKR.TryGetValue(info.attr, out var an) ? $"[{an} 속성]  " : "";
-                _zoomPasscode.text = $"카드 No. {info.code:D8}  |  {attrStr}{YgoConstants.GetTypeTagKR(info.type)}";
+                _zoomPasscode.text = $"카드 번호 {info.code:D8}";
                 _zoomDesc.text = info.desc;
                 var rSp = info.IsMonster ? LotdUiKit.GetRaceSprite(info.race) : LotdUiKit.LoadSprite($"LOTD/Icons/{YgoConstants.GetSpellTrapSubSpriteName(info.type)}");
                 _zoomRaceIcon.sprite = rSp;
@@ -3198,8 +3178,7 @@ namespace YGOPortable.UI
             else
             {
                 _zoomName.text = $"카드 #{code}";
-                _zoomStats.text = "";
-                _zoomPasscode.text = $"카드 No. {code}";
+                _zoomPasscode.text = $"카드 번호 {code}";
                 _zoomDesc.text = "";
                 _zoomRaceIcon.gameObject.SetActive(false);
             }
@@ -3214,9 +3193,20 @@ namespace YGOPortable.UI
             }
         }
 
+        private void RefreshZoomReadout(uint code)
+        {
+            var live = ReadVisibleFieldCard(code, _zoomFieldCard);
+            if (live == null) _zoomFieldCard = null;
+            var card = new DuelCardReadout(CardDatabase.Get(code), live);
+            _zoomCardView.SetCard(code, false, live);
+            _zoomStats.text = FormatInspectorStats(card);
+            _zoomCombat.Bind(card);
+        }
+
         private void CloseCardZoomModal(bool restoreFocus = true)
         {
             if (!_cardZoomModal.activeSelf) return;
+            _zoomFieldCard = null;
             _cardZoomModal.SetActive(false);
             if (_cardZoomModal.transform.parent != Root.transform) _cardZoomModal.transform.SetParent(Root.transform, false);
             _modals.SetCardDetailsOpen(false);
@@ -3236,7 +3226,7 @@ namespace YGOPortable.UI
         {
             uint code = _zoomCardView.CurrentCode;
             UpdateArtworkOptions(code, direction);
-            _zoomCardView.SetCard(code);
+            RefreshZoomReadout(code);
             if (_inspectedCode == code) _inspCard.SetCard(code);
             Refresh();
         }

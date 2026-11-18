@@ -33,8 +33,6 @@ namespace YGOPortable.UI
         internal static Sprite ChainActive { get; } = LoadHudSprite("ChainActive");
         internal static Sprite ChainResolving { get; } = LoadHudSprite("ChainResolving");
         internal static Sprite ChainCardHighlight { get; } = LoadHudSprite("ChainCardHighlight");
-        internal static Sprite CardStatsBase { get; } = LoadHudSprite("CardStatsBase");
-        internal static Sprite CardStatsBaseAlt { get; } = LoadHudSprite("CardStatsBaseAlt");
         internal static Sprite WinnerCrown { get; } = LoadHudSprite("WinnerCrown");
         internal static Sprite DuelStart { get; } = LoadHudSprite("DuelStart");
         internal static Sprite DuelVictory { get; } = LoadHudSprite("DuelVictory");
@@ -42,12 +40,6 @@ namespace YGOPortable.UI
         internal static Sprite DuelDraw { get; } = LoadHudSprite("DuelDraw");
         internal static Sprite GraveWell { get; } = LoadHudSprite("GraveWell");
         internal static Sprite BanishedWell { get; } = LoadHudSprite("BanishedWell");
-        internal static Sprite SummonNamePlayer { get; } = LoadHudSprite("SummonNamePlayer");
-        internal static Sprite SummonNameOpponent { get; } = LoadHudSprite("SummonNameOpponent");
-        internal static Sprite SummonStatsPlayer { get; } = LoadHudSprite("SummonStatsPlayer");
-        internal static Sprite SummonStatsOpponent { get; } = LoadHudSprite("SummonStatsOpponent");
-        internal static Sprite SummonLevel { get; } = LoadHudSprite("SummonLevel");
-        internal static Sprite SummonRank { get; } = LoadHudSprite("SummonRank");
         private static readonly Sprite DrawPhase = LoadHudSprite("PhaseDraw");
         private static readonly Sprite StandbyPhase = LoadHudSprite("PhaseStandby");
         private static readonly Sprite MainOnePhase = LoadHudSprite("PhaseMain1");

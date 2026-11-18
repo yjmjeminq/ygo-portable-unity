@@ -78,7 +78,7 @@ namespace YGOPortable.UI
                     CollectActions(card.controller, card.location, card.sequence).Count == 0)))
             {
                 HideCardActions();
-                ShowCardZoomModal(card.code);
+                ShowCardZoomModal(card);
                 return;
             }
 
@@ -281,7 +281,7 @@ namespace YGOPortable.UI
                     var source = GetLiveSource();
                     if (source == null) return;
                     bool canInspect = source.controller == session.HumanPlayerIndex || source.IsFaceUp || source.isPublic;
-                    if (canInspect) InspectCard(source.code);
+                    if (canInspect) InspectCard(source.code, GetSlot(source.controller, source.location, source.sequence));
                     if (choices.Count == 1)
                     {
                         _navigatingCardActions = false;
@@ -314,7 +314,7 @@ namespace YGOPortable.UI
                     var source = GetLiveSource();
                     if (!CanInspectCardActionSource(source)) return;
                     HideCardActions();
-                    ShowCardZoomModal(source.code);
+                    ShowCardZoomModal(source);
                 }, "Details");
             }
         }

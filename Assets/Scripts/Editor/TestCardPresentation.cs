@@ -22,7 +22,9 @@ namespace YGOPortable.Editor
                 var card = CompositeCardView.Create(canvas.transform, "Card", true);
                 VerifyFoil(card);
                 VerifySummonMotion(card);
-                VerifyFeaturedCards(CardAnimationManager.Ensure(canvas));
+                var animator = CardAnimationManager.Ensure(canvas);
+                VerifyFeaturedCards(animator);
+                VerifySummonReadout(animator);
             }
             finally
             {
@@ -107,6 +109,27 @@ namespace YGOPortable.Editor
             animator.Clear();
             Require(animator.TakeFeaturedSummon(new CardFlight(BlueEyes, mine, mine, false, false)),
                 "Starting a fresh duel did not clear the featured summons.");
+        }
+
+        private static void VerifySummonReadout(CardAnimationManager animator)
+        {
+            const uint accesscode = 86066372;
+            var pose = new CardPose(Vector2.zero, new Vector2(160, 230));
+            var create = typeof(CardAnimationManager).GetMethod("SummonPlate", BindingFlags.Instance | BindingFlags.NonPublic);
+            var plate = (CanvasGroup)create.Invoke(animator, new object[]
+                { new CardFlight(accesscode, pose, pose, false, false), "링크 소환", Vector2.zero });
+            try
+            {
+                var root = plate.transform;
+                Require(root.Find("Caption/Value").GetComponent<Text>().text == "링크 소환 · 링크 4" &&
+                    root.Find("SummonStats/Attack/Digits/Value").GetComponent<Text>().text == "2300" &&
+                    !root.Find("SummonStats/Defense").gameObject.activeSelf,
+                    "A Link summon omitted its rating or added a defense value.");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(plate.gameObject);
+            }
         }
 
         private static void Require(bool condition, string message)
