@@ -1842,14 +1842,14 @@ namespace YGOPortable.UI
 
         internal void ShowPileViewer(bool opponent, uint location, PlayerFieldSnapshot piles,
             Func<LiveCardState, bool> hasCardActions, Action<LiveCardState> onOpenCardActions,
-            Func<bool> canUseCardActions, bool actionsOnly)
+            Func<bool> canUseCardActions, bool actionsOnly, IReadOnlyList<LiveCardState> banished = null)
         {
             int index = Array.FindIndex(PileTabs, tab => tab.Location == location);
             if (index < 0) return;
             IReadOnlyList<LiveCardState> cards = location switch
             {
                 YgoConstants.LOCATION_GRAVE => piles.grave,
-                YgoConstants.LOCATION_REMOVED => piles.banished,
+                YgoConstants.LOCATION_REMOVED => banished ?? piles.banished,
                 _ => piles.extra,
             };
             bool browsePiles = !actionsOnly && _onBrowsePile != null;

@@ -16,7 +16,7 @@ set(CORE_PATCHES
     "${CMAKE_CURRENT_SOURCE_DIR}/master_duel_chain_limit.patch"
     "${CMAKE_CURRENT_SOURCE_DIR}/battle_comparison.patch"
     "${CMAKE_CURRENT_SOURCE_DIR}/life_point_damage_reason.patch"
-    "${CMAKE_CURRENT_SOURCE_DIR}/special_summon_presentation.patch"
+    "${CMAKE_CURRENT_SOURCE_DIR}/field_arrival_presentation.patch"
     "${CMAKE_CURRENT_SOURCE_DIR}/send_presentation.patch"
     "${CMAKE_CURRENT_SOURCE_DIR}/position_presentation.patch"
     "${CMAKE_CURRENT_SOURCE_DIR}/swap_presentation.patch"

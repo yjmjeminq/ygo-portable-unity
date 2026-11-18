@@ -1,11 +1,16 @@
 --- a/operations.cpp
 +++ b/operations.cpp
-@@ -5084,6 +5084,8 @@
+@@ -5084,6 +5084,13 @@
  		target->set_status(STATUS_LEAVE_CONFIRMED, FALSE);
  		message->write(target->get_info_location());
  		message->write<uint32_t>(target->current.reason);
 +		if(reason == LOCATION_REASON::SPSUMMON && location == LOCATION_MZONE)
 +			message->write<uint32_t>(target->summon.type); // Presentation metadata after the standard move payload.
++		else if(reason == LOCATION_REASON::RETURN_TOFIELD) {
++			message->write<uint32_t>(0x31524759); // YGR1
++			message->write<uint32_t>(core.reason_effect ? core.reason_effect->id : 0);
++			message->write<uint32_t>(target->cardid);
++		}
  		if((target->current.location != LOCATION_MZONE)) {
  			if(target->equiping_cards.size()) {
  				destroy(target->equiping_cards, nullptr, REASON_LOST_TARGET + REASON_RULE, PLAYER_NONE);

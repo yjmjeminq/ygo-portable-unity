@@ -264,7 +264,7 @@ namespace YGOPortable.UI
             UnbindSession();
             _session = session;
             session.OnCardLocationsChanged += HandleCardLocationsChanged;
-            session.OnSpecialSummonBoundary += CompleteSpecialSummons;
+            session.OnFieldArrivalBoundary += CompleteFieldArrivals;
             session.OnCardsDrawn += HandleCardsDrawn;
             session.OnLifePointChange += HandleLifePointsChanged;
             session.OnTurnStarted += HandleTurnStarted;
@@ -304,7 +304,7 @@ namespace YGOPortable.UI
             if (_session != null)
             {
                 _session.OnCardLocationsChanged -= HandleCardLocationsChanged;
-                _session.OnSpecialSummonBoundary -= CompleteSpecialSummons;
+                _session.OnFieldArrivalBoundary -= CompleteFieldArrivals;
                 _session.OnCardsDrawn -= HandleCardsDrawn;
                 _session.OnLifePointChange -= HandleLifePointsChanged;
                 _session.OnTurnStarted -= HandleTurnStarted;
@@ -356,6 +356,7 @@ namespace YGOPortable.UI
         private void InspectCardAt(uint code, (byte controller, uint location, uint sequence)? fieldCard)
         {
             if (code == 0) return;
+            _inspectedBanishedCard = null;
             bool changed = code != _inspectedCode;
             if (!changed && _inspectedFieldCard == fieldCard) return;
             _inspectedCode = code;
@@ -380,6 +381,7 @@ namespace YGOPortable.UI
         {
             _inspectedCode = 0;
             _inspectedFieldCard = null;
+            _inspectedBanishedCard = null;
             _inspCard.SetCard(0);
             _inspCard.gameObject.SetActive(false);
             _duelPadInspectButton.interactable = false;
@@ -423,7 +425,8 @@ namespace YGOPortable.UI
                 if (swapPartner != null) partnerHeld = HandleCardMovedEvent(swapPartner, partnerReadout, paired: true);
             }
             var before = _inspectedFieldCard;
-            _inspectedFieldCard = FollowFieldCard(before, _inspectedCode, move, swapPartner, held, partnerHeld);
+            FollowTemporaryBanishment(move);
+            _inspectedFieldCard = FollowFieldCard(_inspectedFieldCard, _inspectedCode, move, swapPartner, held, partnerHeld);
             if (_zoomFieldCard.HasValue)
                 _zoomFieldCard = FollowFieldCard(_zoomFieldCard, _zoomCardView.CurrentCode, move, swapPartner, held, partnerHeld);
 
@@ -467,8 +470,8 @@ namespace YGOPortable.UI
         {
             if (location is { } slot)
             {
-                if (_swapInspections.TryGetValue(slot, out var swap) && swap.Move.Code == code)
-                    return new DuelCardReadout(CardDatabase.Get(code), swap.Shown);
+                if (_movingInspections.TryGetValue(slot, out var moving) && moving.Move.Code == code)
+                    return new DuelCardReadout(CardDatabase.Get(code), moving.Shown);
                 if (GetBattleCardDisplay(slot.controller, slot.sequence, slot.location) is { } held)
                 {
                     if (held.Readout?.Shown is { } shown && shown.code == code)
@@ -743,7 +746,11 @@ namespace YGOPortable.UI
             log.gameObject.AddComponent<RectMask2D>();
         }
 
-        private void OpenInspectedCardDetails() => ShowCardZoomModal(_inspectedCode, _inspectedFieldCard);
+        private void OpenInspectedCardDetails()
+        {
+            ShowCardZoomModal(_inspectedCode, _inspectedFieldCard);
+            if (_cardZoomModal.activeSelf) _zoomBanishedCard = _inspectedBanishedCard;
+        }
 
         private static void AddInspectorArtworkFrame(Transform aspect)
         {
@@ -1339,11 +1346,13 @@ namespace YGOPortable.UI
             UpdateStackTile(_myDeckTile, mine.deckCount, me);
             UpdateStackTile(_myExtraTile, mine.extra.Count, me, mine.extra.LastOrDefault());
             UpdateStackTile(_myGyTile, mine.grave.Count, me, mine.grave.LastOrDefault());
-            UpdateStackTile(_myBanTile, mine.banished.Count, me, mine.banished.LastOrDefault());
+            var myBanished = DisplayedBanishedCards(me);
+            UpdateStackTile(_myBanTile, myBanished.Count, me, myBanished.LastOrDefault());
             UpdateStackTile(_oppDeckTile, theirs.deckCount, opponent);
             UpdateStackTile(_oppExtraTile, theirs.extra.Count, opponent, theirs.extra.LastOrDefault());
             UpdateStackTile(_oppGyTile, theirs.grave.Count, opponent, theirs.grave.LastOrDefault());
-            UpdateStackTile(_oppBanTile, theirs.banished.Count, opponent, theirs.banished.LastOrDefault());
+            var theirBanished = DisplayedBanishedCards(opponent);
+            UpdateStackTile(_oppBanTile, theirBanished.Count, opponent, theirBanished.LastOrDefault());
 
             int chain = _session.CurrentChain.Count;
             _chainIcon.gameObject.SetActive(chain > 0);
@@ -1531,8 +1540,7 @@ namespace YGOPortable.UI
             slot.bgImg.color = highlight.a > 0f
                 ? new Color(highlight.r, highlight.g, highlight.b, selected || cardSelected || attack ? .64f : place ? .09f : .32f) : ZoneTint;
             slot.border.effectColor = place ? Color.clear : highlight;
-            bool reserved = !visible && loc == YgoConstants.LOCATION_MZONE &&
-                CardAnimationManager.Instance?.IsSummonReserved(con, seq) == true;
+            bool reserved = !visible && CardAnimationManager.Instance?.IsFieldArrivalReserved(con, loc, seq) == true;
             slot.bgImg.SetPlacementHighlight(place, reserved);
         }
 
@@ -2191,10 +2199,11 @@ namespace YGOPortable.UI
         private void ClearArrivals()
         {
             _arrivingCards.Clear();
+            _banishedPilePresentation.Clear();
             _materialReadouts.Clear();
             _presentedFieldReadouts.Clear();
             _battleCardDisplays.Clear();
-            _swapInspections.Clear();
+            _movingInspections.Clear();
             _pendingCardReadouts.Clear();
             ResetHandViews(_myHandViews);
             ResetHandViews(_oppHandViews);
@@ -2302,7 +2311,7 @@ namespace YGOPortable.UI
             return key;
         }
 
-        private void CompleteSpecialSummons()
+        private void CompleteFieldArrivals()
         {
             var animator = CardAnimationManager.Instance;
             foreach (var pending in _pendingXyzMaterials.Values)
@@ -2312,7 +2321,7 @@ namespace YGOPortable.UI
                 else foreach (var material in pending) material.Move.Release?.Invoke();
             }
             _pendingXyzMaterials.Clear();
-            animator?.CompleteSpecialSummons();
+            animator?.CompleteFieldArrivals();
         }
 
         private DuelCardReadout ReadFieldStats(uint code, LiveCardState live)
@@ -2338,7 +2347,7 @@ namespace YGOPortable.UI
             void Clear(byte controller, uint location, uint sequence)
             {
                 _presentedFieldReadouts.Remove((controller, location & ~YgoConstants.LOCATION_OVERLAY, sequence));
-                _swapInspections.Remove((controller, location, sequence));
+                _movingInspections.Remove((controller, location, sequence));
                 if (location == YgoConstants.LOCATION_MZONE) _materialReadouts.Remove((controller, sequence));
             }
         }
@@ -2397,7 +2406,7 @@ namespace YGOPortable.UI
             foreach (var (slot, readout) in _pendingCardReadouts.ToArray())
             {
                 // Field modifiers may not apply during the placement of the other cards in this summon.
-                if (animator?.IsSummonReserved(slot.Controller, slot.Sequence) == true) continue;
+                if (animator?.IsFieldArrivalReserved(slot.Controller, YgoConstants.LOCATION_MZONE, slot.Sequence) == true) continue;
                 if (readout.DestinationCard == null)
                 {
                     var live = _session.GetVisibleFieldCard(readout.Code, slot.Controller, YgoConstants.LOCATION_MZONE, slot.Sequence);
@@ -2495,6 +2504,7 @@ namespace YGOPortable.UI
             bool sameZone = e.fromCon == e.toCon && e.fromLoc == e.toLoc && e.fromSeq == e.toSeq;
             CardMotion motion = CardMotion.Transfer;
             if (disappearing) motion = CardMotion.Vanish;
+            else if (e.ReturnEffectId.HasValue) motion = CardMotion.FieldReturn;
             else if ((e.reason & YgoConstants.REASON_DESTROY) != 0) motion = CardMotion.Destroy;
             else if (attaches || detaches) motion = attaches ? CardMotion.AttachMaterial : CardMotion.DetachMaterial;
             else if (sameZone) motion = CardMotion.ChangePosition;
@@ -2509,25 +2519,33 @@ namespace YGOPortable.UI
                 QueuePositionChange(animator, e, flight, readout, held);
                 return held;
             }
-            if (e.PresentationGroup != null && (e.reason & YgoConstants.REASON_DESTROY) != 0 &&
+            bool groupDestruction = e.PresentationGroup != null && (e.reason & YgoConstants.REASON_DESTROY) != 0;
+            if ((e.TemporarilyBanished || groupDestruction) &&
                 (e.fromLoc is YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE) &&
                 (e.toLoc & (YgoConstants.LOCATION_ONFIELD | YgoConstants.LOCATION_OVERLAY)) == 0)
             {
-                var release = disappearing ? null : ReserveCardArrival(e.toCon, e.toLoc, e.toSeq);
-                animator.QueueFieldDestruction(e.PresentationGroup, flight, motion, readout,
+                if (e.TemporarilyBanished && held?.Readout != null) held.InspectWhileHidden = true;
+                var release = ReserveMoveArrival(e);
+                animator.QueueFieldDeparture(e.PresentationGroup, flight, motion, readout,
                     held == null ? null : () => held.Hidden = true, () =>
                     {
                         ReleaseBattleCardDisplay(held);
                         release?.Invoke();
-                    }, Refresh);
+                    }, Refresh, temporary: e.TemporarilyBanished);
                 return held;
             }
             Action detach = sameZone ? null : HoldMaterialReadout(e.fromCon, e.fromLoc, e.fromSeq, -1);
             Action attach = sameZone ? null : HoldMaterialReadout(e.toCon, e.toLoc, e.toSeq, 1);
-            Action depart = held == null && detach == null ? null : () =>
+            var leaveBanish = StageBanishedDeparture(e);
+            Action depart = held == null && detach == null && leaveBanish == null ? null : () =>
             {
                 if (held != null) held.Hidden = true;
                 detach?.Invoke();
+                leaveBanish?.Invoke();
+            };
+            Action departAndRefresh = depart == null ? null : () =>
+            {
+                depart();
                 Refresh();
             };
             if (disappearing || attaches)
@@ -2537,32 +2555,35 @@ namespace YGOPortable.UI
                     ReleaseBattleCardDisplay(held);
                     attach?.Invoke();
                     Refresh();
-                }, readout, depart);
+                }, readout, departAndRefresh);
                 return held;
             }
-            if (e.summonType.HasValue && e.toLoc == YgoConstants.LOCATION_MZONE)
+            if (e.ReturnEffectId.HasValue || e.summonType.HasValue && e.toLoc == YgoConstants.LOCATION_MZONE)
             {
                 var key = ReserveArrival(e.toCon, e.toLoc, e.toSeq);
-                animator.StageSpecialSummon(flight, motion, e.toCon, e.toSeq, readout, depart, () =>
+                var inspection = e.ReturnEffectId.HasValue ? TrackMovingInspection(e, readout, null) : null;
+                animator.StageFieldArrival(flight, motion, e.toCon, e.toLoc, e.toSeq, readout,
+                    e.ReturnEffectId.HasValue ? depart : departAndRefresh, () =>
                 {
                     ReleaseBattleCardDisplay(held);
                     ReleaseArrival(key);
-                }, Refresh);
+                    ReleaseMovingInspection(e, inspection);
+                }, Refresh, e.ReturnEffectId, inspection == null ? null : () => inspection.AtDestination = true);
                 return held;
             }
-            var onArrival = HideUntilArrival(e.toCon, e.toLoc, e.toSeq);
+            var arrive = ReserveMoveArrival(e);
+            void OnArrival()
+            {
+                ReleaseBattleCardDisplay(held);
+                arrive?.Invoke();
+                Refresh();
+            }
             if (motion == CardMotion.Transfer &&
                 e.fromLoc is YgoConstants.LOCATION_DECK or YgoConstants.LOCATION_EXTRA &&
                 e.toLoc is YgoConstants.LOCATION_GRAVE or YgoConstants.LOCATION_REMOVED)
-                animator.QueuePileTransfer(flight, onArrival);
+                animator.QueuePileTransfer(flight, OnArrival);
             else
-            {
-                animator.QueueMove(flight, motion, held == null ? onArrival : () =>
-                {
-                    ReleaseBattleCardDisplay(held);
-                    onArrival();
-                }, readout, depart);
-            }
+                animator.QueueMove(flight, motion, OnArrival, readout, departAndRefresh);
             return held;
         }
 
@@ -2573,12 +2594,14 @@ namespace YGOPortable.UI
             if (held?.Readout != null) held.InspectWhileHidden = true;
             var readout = PrepareMoveReadout(animator, move, flight.StartsFaceDown, flight.EndsFaceDown);
             var detach = HoldMaterialReadout(move.fromCon, move.fromLoc, move.fromSeq, -1);
+            var leaveBanish = StageBanishedDeparture(move);
             bool vanishes = move.toLoc == 0;
-            var release = awaitingXyzHost || vanishes ? null : ReserveCardArrival(move.toCon, move.toLoc, move.toSeq);
+            var release = awaitingXyzHost ? null : ReserveMoveArrival(move);
             var material = new SummonMaterialFlight(flight, readout, () =>
             {
                 if (held != null) held.Hidden = true;
                 detach?.Invoke();
+                leaveBanish?.Invoke();
             }, () =>
             {
                 if (held?.InspectWhileHidden == true)
@@ -2805,7 +2828,7 @@ namespace YGOPortable.UI
 
         private void HandleTurnStarted(int turn, int player)
         {
-            if (_pendingXyzMaterials.Count != 0) CompleteSpecialSummons();
+            if (_pendingXyzMaterials.Count != 0) CompleteFieldArrivals();
             bool opponent = player != _session.HumanPlayerIndex;
             void ApplyTurn()
             {
@@ -3252,7 +3275,8 @@ namespace YGOPortable.UI
                 _modals.IsPromptOpen && !_modals.IsShowingField) return;
             var prompt = session.ActivePrompt;
             bool CanUseActions() => !_modals.IsPromptOpen && _session == session &&
-                ReferenceEquals(session.ActivePrompt, prompt) && CanAcceptPlayerAction;
+                ReferenceEquals(session.ActivePrompt, prompt) && CanAcceptPlayerAction &&
+                (loc != YgoConstants.LOCATION_REMOVED || !_banishedPilePresentation.ContainsKey(con));
 
             if (loc == YgoConstants.LOCATION_DECK)
             {
@@ -3292,7 +3316,8 @@ namespace YGOPortable.UI
                         ShowCardActionsPopup(c.controller, c.location, c.sequence, c.code, c.overlayCodes, actions: actions);
                 },
                 canUseCardActions: CanUseActions,
-                actionsOnly: actionsOnly);
+                actionsOnly: actionsOnly,
+                banished: loc == YgoConstants.LOCATION_REMOVED ? DisplayedBanishedCards(con) : null);
         }
 
         private bool FindFieldCardChoice(byte con, uint loc, uint seq, out int index)
@@ -3782,6 +3807,7 @@ namespace YGOPortable.UI
             }
             var info = CardDatabase.Get(code);
             _zoomFieldCard = fieldCard;
+            _zoomBanishedCard = null;
             RefreshZoomReadout(code, showChanges: false);
             if (info != null)
             {
@@ -3822,6 +3848,7 @@ namespace YGOPortable.UI
         {
             if (!_cardZoomModal.activeSelf) return;
             _zoomFieldCard = null;
+            _zoomBanishedCard = null;
             _cardZoomModal.SetActive(false);
             if (_cardZoomModal.transform.parent != Root.transform) _cardZoomModal.transform.SetParent(Root.transform, false);
             _modals.SetCardDetailsOpen(false);

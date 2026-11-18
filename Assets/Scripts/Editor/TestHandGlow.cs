@@ -47,6 +47,7 @@ namespace YGOPortable.Editor
             VerifyNativeCoLinkedZone();
             VerifyNativeMovingReadout();
             VerifyNativePositionGroup();
+            VerifyNativeTemporaryBanishment();
             VerifyNativeTokenArrivalReadout();
             VerifyNativePendulumArrivalReadout();
             VerifyNativeFieldMaterials(xyz: true);
@@ -552,7 +553,7 @@ namespace YGOPortable.Editor
             VerifyWaiting(rivalTile, "1850");
             Require(inspector.text == "2550", "The selected card lost its live inspector value before it left the field.");
 
-            var departure = steps.Single(step => step.GetType().Name.StartsWith("<PlayFieldDestructions>", StringComparison.Ordinal));
+            var departure = steps.Single(step => step.GetType().Name.StartsWith("<PlayFieldDepartures>", StringComparison.Ordinal));
             Require(departure.MoveNext(), "The destruction did not start with its impact.");
             Require(animator.GetComponentsInChildren<DuelEffectGraphic>().Count(effect => effect.Kind == DuelEffectKind.Break) == 3,
                 "The single effect did not start all three impacts together.");
@@ -1801,6 +1802,220 @@ namespace YGOPortable.Editor
             Debug.Log("[VERIFY DUEL POSITION GROUP] Earthquake rotated four public monsters, Eclipse concealed all four together, then revealed two with live values before the draw.");
         }
 
+        private static void VerifyNativeTemporaryBanishment()
+        {
+            const uint littleKnight = 29301450, doubleSummon = 43422537, darkZone = 18161786, axe = 40619825;
+            const uint goblin = 70368879, earthquake = 82828051;
+            var main = Enumerable.Repeat(KaiserSeaHorse, 16).Concat(Enumerable.Repeat(doubleSummon, 8))
+                .Concat(Enumerable.Repeat(darkZone, 8)).Concat(Enumerable.Repeat(axe, 8)).ToArray();
+            var enemy = Enumerable.Repeat(KaiserSeaHorse, 10).Concat(Enumerable.Repeat(PotOfDesires, 10))
+                .Concat(Enumerable.Repeat(earthquake, 10)).Concat(Enumerable.Repeat(goblin, 10)).ToArray();
+            var ai = new TacticalAI();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Temporary banishment", main, new[] { littleKnight }, enemy,
+                Array.Empty<uint>(), true, session =>
+                {
+                    var mine = session.Players[session.HumanPlayerIndex].hand;
+                    var theirs = session.Players[session.AiPlayerIndex].hand;
+                    return mine.Count(card => card.code == KaiserSeaHorse) >= 2 &&
+                        new[] { doubleSummon, darkZone, axe }.All(code => mine.Exists(card => card.code == code)) &&
+                        new[] { KaiserSeaHorse, earthquake, goblin, PotOfDesires }.All(code => theirs.Exists(card => card.code == code));
+                });
+            void ReachIdle(Func<DuelPrompt, byte[]> choose = null)
+            {
+                YgoProjectBuilder.DriveUntilIdle(duel, ai, choose);
+                Require(duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD && duel.RetryCount == 0,
+                    $"The temporary-banishment fixture stopped at prompt {duel.ActivePrompt?.messageType}.");
+            }
+            void Activate(uint code, Func<DuelPrompt, byte[]> choose = null)
+            {
+                ActivateFromMainPhase(duel, code);
+                ReachIdle(choose);
+            }
+            void SummonKaiser()
+            {
+                int index = duel.ActivePrompt.summonable.FindIndex(card => card.code == KaiserSeaHorse);
+                Require(index >= 0, "The temporary-banishment fixture could not summon Kaiser Sea Horse.");
+                duel.SubmitResponseInt(index << 16);
+                ReachIdle();
+            }
+
+            Activate(doubleSummon);
+            SummonKaiser();
+            SummonKaiser();
+            int summon = duel.ActivePrompt.spSummonable.FindIndex(card => card.code == littleKnight);
+            Require(summon >= 0, "The two effect monsters did not offer the Link Summon.");
+            duel.SubmitResponseInt((summon << 16) | 1);
+            ReachIdle(prompt => prompt.messageType == YgoConstants.MSG_SELECT_CARD && prompt.candidates.Count == 2
+                ? DuelSession.PackCardSelection(0, 1) : null);
+            Activate(darkZone);
+            Activate(axe, prompt => prompt.messageType == YgoConstants.MSG_SELECT_CARD ? SelectCard(prompt, littleKnight) : null);
+            duel.SubmitResponseInt(7);
+            ReachIdle();
+            SummonKaiser();
+            Activate(earthquake);
+            Activate(PotOfDesires);
+
+            var mineOnField = duel.Players[duel.HumanPlayerIndex];
+            var theirsOnField = duel.Players[duel.AiPlayerIndex];
+            var knight = mineOnField.mzone.Single(card => card?.code == littleKnight);
+            var kaiser = theirsOnField.mzone.Single(card => card?.code == KaiserSeaHorse);
+            Require(knight.attack == 3100 && kaiser.IsDefense && theirsOnField.banished.Count == 10 &&
+                theirsOnField.banished.All(card => !card.IsFaceUp), "The banish fixture did not establish its live and hidden cards.");
+            using var ui = new HandUI(duel);
+            var animator = CardAnimationManager.Ensure(ui.Canvas);
+            Canvas.ForceUpdateCanvases();
+            var knightSlot = FieldSlot(ui.Field, knight);
+            var kaiserSlot = FieldSlot(ui.Field, kaiser);
+            knightSlot.GetComponent<CardDragTrigger>().OnRightClick();
+            var inspected = ui.Field.Root.transform.Find("LeftInspector/CardDetails/CombatStats/Attack/Digits/Value").GetComponent<Text>();
+            Transform Pile(string name)
+            {
+                var tile = typeof(DuelFieldUI).GetField(name, PrivateInstance).GetValue(ui.Field);
+                return (Transform)tile.GetType().GetField("root").GetValue(tile);
+            }
+            var ownPile = Pile("_myBanTile");
+            var rivalPile = Pile("_oppBanTile");
+            void CheckPile(Transform pile, int count, uint top)
+            {
+                var card = pile.Find("TopCard/CardView").GetComponent<CompositeCardView>();
+                Require(pile.Find("Total/Amount/Count").GetComponent<Text>().text == count.ToString() &&
+                    card.gameObject.activeSelf == (count > 0) && (count == 0 || card.CurrentCode == top),
+                    $"The banished pile had the wrong cards while {count} should have been present.");
+            }
+            void CheckRivalBrowser(int hidden, bool showKaiser)
+            {
+                rivalPile.GetComponent<Button>().onClick.Invoke();
+                var grid = (RectTransform)typeof(DuelPromptModals).GetField("_zoneGrid", PrivateInstance).GetValue(ui.Modals);
+                var cards = grid.GetComponentsInChildren<CompositeCardView>();
+                Require(ui.Modals.IsZoneViewerOpen && cards.Length == hidden + (showKaiser ? 1 : 0) &&
+                    cards.Count(card => card.CurrentCode == 0) == hidden &&
+                    cards.Any(card => card.CurrentCode == KaiserSeaHorse) == showKaiser,
+                    "The banished list skipped a presented card or exposed a hidden card.");
+                ui.Modals.CloseZoneViewer();
+            }
+            var departures = new List<CardMoveEvent>();
+            var returns = new List<CardMoveEvent>();
+            duel.OnCardMoved += move =>
+            {
+                if (move.TemporarilyBanished) departures.Add(move);
+                if (move.ReturnEffectId.HasValue) returns.Add(move);
+            };
+            Activate(goblin, prompt =>
+            {
+                if (prompt.playerId == duel.HumanPlayerIndex && prompt.messageType == YgoConstants.MSG_SELECT_CHAIN)
+                {
+                    int chain = prompt.candidates.FindIndex(card => card.code == littleKnight);
+                    if (chain >= 0) return BitConverter.GetBytes(chain);
+                }
+                if (prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && prompt.promptCardCode == littleKnight)
+                    return BitConverter.GetBytes(1);
+                if (prompt.messageType == YgoConstants.MSG_SELECT_CARD)
+                    return DuelSession.PackCardSelection(0, 1);
+                return null;
+            });
+            Require(departures.Count == 2 && departures[0].PresentationGroup != null &&
+                departures.All(move => ReferenceEquals(move.PresentationGroup, departures[0].PresentationGroup)),
+                "Little Knight's two removals were not one native group.");
+            ui.Field.Refresh();
+            CheckPile(ownPile, 0, 0);
+            CheckPile(rivalPile, 10, 0);
+            var steps = AnimationSteps(animator);
+            var banish = steps.Single(step => step.GetType().Name.StartsWith("<PlayFieldDepartures>", StringComparison.Ordinal));
+            Require(banish.MoveNext() && banish.Current is IEnumerator, "The temporary removal did not start its shared cue.");
+            TestCardPresentation.SampleAnimation((IEnumerator)banish.Current)(1f);
+            Require(knightSlot.GetComponentInChildren<CompositeCardView>()?.CurrentCode == littleKnight &&
+                kaiserSlot.GetComponentInChildren<CompositeCardView>()?.CurrentCode == KaiserSeaHorse,
+                "A monster left before the exile cue.");
+            Require(banish.MoveNext() && banish.Current is IEnumerator, "Both cards did not enter the removal flight.");
+            var flight = TestCardPresentation.SampleAnimation((IEnumerator)banish.Current);
+            flight(.25f);
+            CheckMovingNumbers("3100");
+            Require(inspected.text == "3100", "Little Knight lost its inspected live numbers before reaching the pile.");
+            CheckPile(ownPile, 0, 0);
+            CheckPile(rivalPile, 10, 0);
+            flight(1f);
+            Require(!banish.MoveNext(), "The temporary removal did not finish.");
+            CheckPile(ownPile, 1, littleKnight);
+            CheckPile(rivalPile, 11, KaiserSeaHorse);
+            steps.Clear();
+            CheckRivalBrowser(10, showKaiser: true);
+
+            bool checkedBetweenPlacements = false;
+            Text zoomAttack = null;
+            duel.SubmitResponseInt(7);
+            ReachIdle(prompt =>
+            {
+                if (prompt.messageType != YgoConstants.MSG_SELECT_PLACE) return null;
+                if (returns.Count == 1)
+                {
+                    Require(animator.IsFieldArrivalReserved(returns[0].toCon, returns[0].toLoc, returns[0].toSeq) &&
+                        steps.All(step => !step.GetType().Name.StartsWith("<PlayFieldArrivalGroup>", StringComparison.Ordinal)),
+                        "One returning card landed before the next placement choice.");
+                    steps.Clear();
+                    ui.Field.Refresh();
+                    CheckPile(rivalPile, 11, KaiserSeaHorse);
+                    CheckRivalBrowser(10, showKaiser: true);
+                    ui.Field.Root.transform.Find("LeftInspector/CardDetails/ArtworkControls/Details/B").GetComponent<Button>().onClick.Invoke();
+                    Require(ui.Field.IsReadingCardDetails, "The inspected banished card's details could not open.");
+                    zoomAttack = ui.Field.Root.transform.Find("Overlay_CardZoom/ZoomWin/Info/CombatStats/Attack/Digits/Value").GetComponent<Text>();
+                    checkedBetweenPlacements = true;
+                }
+                uint sequence = prompt.playerId == duel.HumanPlayerIndex ? 4u : 1u;
+                Require((prompt.placeFlag & (1u << (int)sequence)) == 0, "The desired new return zone was unavailable.");
+                return new[] { prompt.playerId, (byte)YgoConstants.LOCATION_MZONE, (byte)sequence };
+            });
+            Require(checkedBetweenPlacements && returns.Count == 2 && returns[0].ReturnEffectId > 0 &&
+                returns.All(move => move.ReturnEffectId == returns[0].ReturnEffectId && !move.summonType.HasValue &&
+                    move.TemporaryBanishCardId.HasValue && departures.Any(outbound => outbound.code == move.code &&
+                        outbound.TemporaryBanishCardId == move.TemporaryBanishCardId)),
+                "The true return metadata did not match both placements.");
+            ui.Field.Refresh();
+            CheckPile(ownPile, 1, littleKnight);
+            CheckPile(rivalPile, 11, KaiserSeaHorse);
+            var arrival = steps.Single(step => step.GetType().Name.StartsWith("<PlayFieldArrivalGroup>", StringComparison.Ordinal));
+            Require(arrival.MoveNext() && arrival.Current is IEnumerator &&
+                animator.GetComponentsInChildren<DuelEffectGraphic>().Count(effect => effect.Kind == DuelEffectKind.BanishTransit) == 2,
+                "Returning monsters used a summon animation or did not enter together.");
+            CheckPile(ownPile, 0, 0);
+            CheckPile(rivalPile, 10, 0);
+            var comingBack = TestCardPresentation.SampleAnimation((IEnumerator)arrival.Current);
+            comingBack(.4f);
+            Require(inspected.text == "1600" && zoomAttack.text == "1600",
+                "The live numbers in the details changed before the inspected copy returned.");
+            Require(animator.transform.Cast<RectTransform>().Where(rect => rect.name == "MovingCardReadout")
+                .All(rect => !rect.Find("CardReadout").gameObject.activeInHierarchy),
+                "A returned monster displayed field stats while still leaving the banished pile.");
+            comingBack(.88f);
+            CheckMovingNumbers("2100");
+            Require(inspected.text == "2100" && zoomAttack.text == "2100",
+                "The selected copy's current values failed to reach the inspector and details together.");
+            comingBack(1f);
+            Require(!arrival.MoveNext() && mineOnField.mzone[4]?.code == littleKnight && theirsOnField.mzone[1]?.IsDefense == true,
+                "The cards did not finish in their selected slots and original stance.");
+            steps.Clear();
+            ui.Field.HandleDuelPad(new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Cancel));
+            CheckRivalBrowser(10, showKaiser: false);
+            Debug.Log("[VERIFY DUEL TEMPORARY BANISH] S:P left with 3100 ATK and returned with 2100. Both arrivals shared a cue, and the ten concealed cards remained private.");
+
+            void CheckMovingNumbers(string knightAttack)
+            {
+                var cards = animator.GetComponentsInChildren<CompositeCardView>().Where(view => view.name == "MovingCard").ToArray();
+                var panels = animator.transform.Cast<RectTransform>().Where(rect => rect.name == "MovingCardReadout").ToArray();
+                Require(cards.Length == 2 && panels.Length == 2, "The two cards did not travel with separate readouts.");
+                RectTransform Panel(uint code)
+                {
+                    var card = cards.Single(view => view.CurrentCode == code);
+                    return panels.Single(panel => panel.anchoredPosition == ((RectTransform)card.transform).anchoredPosition);
+                }
+                var link = Panel(littleKnight).Find("CardReadout");
+                Require(link.Find("Combat/Attack/Digits/Value").GetComponent<Text>().text == knightAttack &&
+                    !link.Find("Combat/Defense").gameObject.activeSelf &&
+                    link.Find("Labels/Rating/Value").GetComponent<Text>().text == "2",
+                    "Little Knight did not show its current ATK and Link rating during motion.");
+                RequireTravelStats(Panel(KaiserSeaHorse), "1700", "1650", "4", defense: true);
+            }
+        }
+
         private static void VerifyNativeTokenArrivalReadout()
         {
             const uint scapegoat = 73915051, sheepToken = 73915052, gaiaPower = 56594520;
@@ -1918,7 +2133,7 @@ namespace YGOPortable.Editor
             field.Refresh();
             int reserved = field.Root.GetComponentsInChildren<DuelZoneImage>().Count(zone => zone.SummonReserved);
             Require(reserved == pending.Count && pending.Values.All(move => move.DestinationCard == null) &&
-                    !AnimationSteps(animator).Any(step => step.GetType().Name.StartsWith("<PlaySpecialSummonGroup>", StringComparison.Ordinal)),
+                    !AnimationSteps(animator).Any(step => step.GetType().Name.StartsWith("<PlayFieldArrivalGroup>", StringComparison.Ordinal)),
                 "A placement hid the next native choice or showed field numbers before the summon was ready.");
             return reserved;
         }
@@ -1932,7 +2147,7 @@ namespace YGOPortable.Editor
                     !Slot(arrival.DestinationCard).GetComponent<DuelZoneImage>().SummonReserved),
                 "A prepared summon retained a placement mark or reached the field before its moving card.");
             var wave = AnimationSteps(animator).Single(step =>
-                step.GetType().Name.StartsWith("<PlaySpecialSummonGroup>", StringComparison.Ordinal));
+                step.GetType().Name.StartsWith("<PlayFieldArrivalGroup>", StringComparison.Ordinal));
             Require(wave.MoveNext() && wave.Current is IEnumerator, "The summon group did not share one animation.");
             var sample = TestCardPresentation.SampleAnimation((IEnumerator)wave.Current);
             var views = animator.GetComponentsInChildren<CompositeCardView>().Where(card => card.name == "MovingCard").ToArray();

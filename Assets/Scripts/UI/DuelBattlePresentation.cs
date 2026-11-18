@@ -22,9 +22,9 @@ namespace YGOPortable.UI
 
         // The engine can resolve a whole battle before its queued animations have played.
         private readonly Dictionary<(byte Controller, uint Location, uint Sequence), Queue<BattleCardDisplay>> _battleCardDisplays = new();
-        private readonly Dictionary<(byte Controller, uint Location, uint Sequence), SwapInspection> _swapInspections = new();
+        private readonly Dictionary<(byte Controller, uint Location, uint Sequence), MovingFieldInspection> _movingInspections = new();
 
-        private sealed class SwapInspection
+        private sealed class MovingFieldInspection
         {
             internal CardMoveReadoutSnapshot Move;
             internal PresentedFieldReadout Waiting;
@@ -47,8 +47,8 @@ namespace YGOPortable.UI
             var secondHeld = HoldFieldCard(second, secondReadout, keepFaceDown: true);
             var firstMove = PrepareMoveReadout(animator, first, firstFlight.StartsFaceDown, firstFlight.EndsFaceDown);
             var secondMove = PrepareMoveReadout(animator, second, secondFlight.StartsFaceDown, secondFlight.EndsFaceDown);
-            var firstInspection = TrackSwapInspection(first, firstMove, firstHeld?.Readout);
-            var secondInspection = TrackSwapInspection(second, secondMove, secondHeld?.Readout);
+            var firstInspection = TrackMovingInspection(first, firstMove, firstHeld?.Readout);
+            var secondInspection = TrackMovingInspection(second, secondMove, secondHeld?.Readout);
             var releaseFirst = ReserveCardArrival(first.toCon, first.toLoc, first.toSeq);
             var releaseSecond = ReserveCardArrival(second.toCon, second.toLoc, second.toSeq);
 
@@ -71,8 +71,8 @@ namespace YGOPortable.UI
                 ReleaseBattleCardDisplay(secondHeld);
                 releaseFirst();
                 releaseSecond();
-                ReleaseSwapInspection(first, firstInspection);
-                ReleaseSwapInspection(second, secondInspection);
+                ReleaseMovingInspection(first, firstInspection);
+                ReleaseMovingInspection(second, secondInspection);
                 Refresh();
             });
             return true;
@@ -94,21 +94,21 @@ namespace YGOPortable.UI
             return true;
         }
 
-        private SwapInspection TrackSwapInspection(CardMoveEvent move, CardMoveReadoutSnapshot readout,
+        private MovingFieldInspection TrackMovingInspection(CardMoveEvent move, CardMoveReadoutSnapshot readout,
             PresentedFieldReadout waiting)
         {
-            if (readout?.SourceCard == null || move.toLoc != YgoConstants.LOCATION_MZONE ||
+            if (readout == null || move.toLoc != YgoConstants.LOCATION_MZONE ||
                 (move.toPos & YgoConstants.POS_FACEUP) == 0) return null;
-            var inspection = new SwapInspection { Move = readout, Waiting = waiting };
-            _swapInspections[(move.toCon, move.toLoc, move.toSeq)] = inspection;
+            var inspection = new MovingFieldInspection { Move = readout, Waiting = waiting };
+            _movingInspections[(move.toCon, move.toLoc, move.toSeq)] = inspection;
             return inspection;
         }
 
-        private void ReleaseSwapInspection(CardMoveEvent move, SwapInspection inspection)
+        private void ReleaseMovingInspection(CardMoveEvent move, MovingFieldInspection inspection)
         {
             var slot = (move.toCon, move.toLoc, move.toSeq);
-            if (_swapInspections.TryGetValue(slot, out var shown) && ReferenceEquals(shown, inspection))
-                _swapInspections.Remove(slot);
+            if (_movingInspections.TryGetValue(slot, out var shown) && ReferenceEquals(shown, inspection))
+                _movingInspections.Remove(slot);
         }
 
         private BattleCardDisplay GetBattleCardDisplay(byte controller, uint sequence, uint location = YgoConstants.LOCATION_MZONE) =>
@@ -168,7 +168,8 @@ namespace YGOPortable.UI
         {
             var battle = HoldBattleMove(move, motion);
             if (battle != null) return battle;
-            return paired ? null : HoldFieldCard(move, readout, keepFaceDown: move.PresentationGroup != null || move.ChangesPositionInPlace);
+            return paired ? null : HoldFieldCard(move, readout,
+                keepFaceDown: move.PresentationGroup != null || move.ChangesPositionInPlace || move.TemporarilyBanished);
         }
 
         private void QueuePositionChange(CardAnimationManager animator, CardMoveEvent move, CardFlight flight,

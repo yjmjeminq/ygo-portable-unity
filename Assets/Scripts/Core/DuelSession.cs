@@ -50,6 +50,8 @@ namespace YGOPortable.Core
         public uint toPos;
         public uint reason;
         internal uint? summonType;
+        internal uint? ReturnEffectId;
+        internal uint? TemporaryBanishCardId;
         internal LiveCardState SourceReadout;
         internal LiveCardState DestinationReadout;
         internal object PresentationGroup;
@@ -58,6 +60,8 @@ namespace YGOPortable.Core
             (fromLoc is YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE);
         internal uint MaterialMethod => (reason & YgoConstants.REASON_MATERIAL) == 0
             ? 0 : reason & YgoConstants.MATERIAL_METHOD_MASK;
+        internal bool TemporarilyBanished => (reason & YgoConstants.REASON_TEMPORARY) != 0 &&
+            (toLoc is 0 or YgoConstants.LOCATION_REMOVED);
     }
 
     internal enum BattleStatSource : byte { Attack = 1, Defense, Effect }
@@ -269,10 +273,12 @@ namespace YGOPortable.Core
         private ChainLinkInfo _resolvingChainLink;
         private (byte player, ulong hint)? _pendingSelectionHint;
         private Dictionary<(byte Controller, uint Location, uint Sequence), LiveCardState> _fieldReadoutBaseline;
-        private bool _awaitingSpecialSummonCompletion;
+        private bool _awaitingFieldArrivalCompletion;
         private const uint DestructionGroupTag = 0x31444759; // YGD1
         private const uint MaterialGroupTag = 0x314D4759; // YGM1
         private const uint PositionGroupTag = 0x31504759; // YGP1
+        private const uint TemporaryBanishGroupTag = 0x31544759; // YGT1
+        private const uint FieldReturnTag = 0x31524759; // YGR1
         private const uint SwapMoveTag = 0x31534759; // YGS1
         private readonly Stack<(uint Tag, object Key)> _movementGroups = new();
         private readonly HashSet<(byte Player, uint Location, uint Sequence, uint Code)> _confirmedCards =
@@ -290,7 +296,7 @@ namespace YGOPortable.Core
 
         public event Action<CardMoveEvent> OnCardMoved;
         internal event Action<CardMoveEvent, CardMoveEvent> OnCardLocationsChanged;
-        internal event Action OnSpecialSummonBoundary;
+        internal event Action OnFieldArrivalBoundary;
         public event Action<byte, IReadOnlyList<uint>> OnCardsDrawn;
         public event Action<byte, int, int> OnLifePointsChanged;
         internal event Action<byte, int, int, LifePointChangeKind> OnLifePointChange;
@@ -610,12 +616,12 @@ namespace YGOPortable.Core
             }
 
             if (!_loadingPlanningReplay) RefreshZonesFromCore();
-            // A simultaneous summon may need several zone and position selections. A different
-            // prompt, including a summon-negation response, must see the monsters already arriving.
+            // A group can need several zone and position selections before its cards arrive.
+            // Other prompts, including a summon-negation response, see the cards already arriving.
             if (IsFinished || ActivePrompt != null &&
                 ActivePrompt.messageType is not (YgoConstants.MSG_SELECT_PLACE or YgoConstants.MSG_SELECT_POSITION))
             {
-                CompleteSpecialSummonPresentation();
+                CompleteFieldArrivalPresentation();
                 if (!_loadingPlanningReplay) SampleFieldReadouts(fromNative: false);
             }
             if (IsFinished) _fieldReadoutBaseline = null;
@@ -656,15 +662,15 @@ namespace YGOPortable.Core
                 }
                 if (firstSwapMove != null) NotifyCardMoved(firstSwapMove);
                 // The native state reflects the whole returned batch. Queue the new values after its animations.
-                if (sampleReadouts && _movementGroups.Count == 0 && CurrentChain.Count == 0 && !_awaitingSpecialSummonCompletion)
+                if (sampleReadouts && _movementGroups.Count == 0 && CurrentChain.Count == 0 && !_awaitingFieldArrivalCompletion)
                     SampleFieldReadouts();
             }
         }
 
-        private void CompleteSpecialSummonPresentation()
+        private void CompleteFieldArrivalPresentation()
         {
-            _awaitingSpecialSummonCompletion = false;
-            OnSpecialSummonBoundary?.Invoke();
+            _awaitingFieldArrivalCompletion = false;
+            OnFieldArrivalBoundary?.Invoke();
         }
 
         private static SelectableCardItem ReadLocIntoItem(BinaryReader br, uint code)
@@ -740,7 +746,7 @@ namespace YGOPortable.Core
             if (swapPartner != null) InvalidateFieldReadouts(swapPartner);
             if (move.DestinationReadout is { } destination && _fieldReadoutBaseline != null)
                 _fieldReadoutBaseline[(move.toCon, move.toLoc, move.toSeq)] = destination;
-            if (move.summonType.HasValue) _awaitingSpecialSummonCompletion = true;
+            if (move.summonType.HasValue || move.ReturnEffectId.HasValue) _awaitingFieldArrivalCompletion = true;
             if (_chosenAttacker is { } source)
             {
                 var slot = (source.controller, source.location, source.sequence);
@@ -761,7 +767,8 @@ namespace YGOPortable.Core
         private void CaptureMoveSource(CardMoveEvent move, bool paired)
         {
             if ((move.fromLoc == YgoConstants.LOCATION_MZONE ||
-                (paired || move.PresentationGroup != null || move.MaterialMethod != 0 || move.ChangesPositionInPlace) &&
+                (paired || move.PresentationGroup != null || move.MaterialMethod != 0 ||
+                    move.ChangesPositionInPlace || move.TemporarilyBanished) &&
                 move.fromLoc == YgoConstants.LOCATION_SZONE) &&
                 _fieldReadoutBaseline?.TryGetValue((move.fromCon, move.fromLoc, move.fromSeq), out var source) == true &&
                 source.code == move.code && source.position == move.fromPos)
@@ -937,7 +944,7 @@ namespace YGOPortable.Core
                 }
 
                 case YgoConstants.MSG_SPSUMMONED:
-                    CompleteSpecialSummonPresentation();
+                    CompleteFieldArrivalPresentation();
                     break;
 
                 case YgoConstants.MSG_FLIPSUMMONING:
@@ -983,9 +990,19 @@ namespace YGOPortable.Core
                     uint reason = msgEnd - br.BaseStream.Position >= sizeof(uint) ? br.ReadUInt32() : 0;
                     long extraLength = msgEnd - br.BaseStream.Position;
                     uint? presentation = extraLength == sizeof(uint) ? br.ReadUInt32() : null;
-                    uint swapPart = extraLength == 2 * sizeof(uint) && br.ReadUInt32() == SwapMoveTag ? br.ReadUInt32() : 0;
+                    bool tagged = extraLength is 2 * sizeof(uint) or 3 * sizeof(uint);
+                    uint tag = tagged ? br.ReadUInt32() : 0;
+                    uint extraValue = tagged ? br.ReadUInt32() : 0;
+                    uint? temporaryCard = null;
+                    if (tag == TemporaryBanishGroupTag)
+                    {
+                        presentation = tag;
+                        temporaryCard = extraValue;
+                    }
+                    else if (tag == FieldReturnTag && extraLength == 3 * sizeof(uint)) temporaryCard = br.ReadUInt32();
+                    uint swapPart = tag == SwapMoveTag ? extraValue : 0;
                     uint? summonType = tLoc == YgoConstants.LOCATION_MZONE &&
-                        presentation is not (DestructionGroupTag or MaterialGroupTag or PositionGroupTag)
+                        presentation is not (DestructionGroupTag or MaterialGroupTag or PositionGroupTag or TemporaryBanishGroupTag)
                         ? presentation : null;
                     if (_speculatingPlayer >= 0 && fLoc == YgoConstants.LOCATION_DECK && tLoc != YgoConstants.LOCATION_DECK &&
                         (fCon != _speculatingPlayer || !_selectedFromDeck.Remove(code))) SpeculationUncertain = true;
@@ -998,6 +1015,8 @@ namespace YGOPortable.Core
                         toCon = tCon, toLoc = tLoc, toSeq = tSeq, toPos = tPos,
                         reason = reason,
                         summonType = summonType,
+                        ReturnEffectId = tag == FieldReturnTag ? extraValue : null,
+                        TemporaryBanishCardId = temporaryCard,
                         PresentationGroup = _movementGroups.TryPeek(out var group) && presentation == group.Tag ? group.Key : null,
                     };
                     if (firstSwapMove != null)
@@ -1201,13 +1220,13 @@ namespace YGOPortable.Core
                     if (msgEnd - br.BaseStream.Position == sizeof(uint) + sizeof(byte))
                     {
                         uint tag = br.ReadUInt32();
-                        if (tag is DestructionGroupTag or MaterialGroupTag or PositionGroupTag)
+                        if (tag is DestructionGroupTag or MaterialGroupTag or PositionGroupTag or TemporaryBanishGroupTag)
                         {
                             if (br.ReadByte() != 0) _movementGroups.Push((tag, new object()));
                             else if (_movementGroups.TryPeek(out var group) && group.Tag == tag)
                             {
                                 _movementGroups.Pop();
-                                if (_movementGroups.Count == 0 && CurrentChain.Count == 0 && !_awaitingSpecialSummonCompletion)
+                                if (_movementGroups.Count == 0 && CurrentChain.Count == 0 && !_awaitingFieldArrivalCompletion)
                                     SampleFieldReadouts();
                             }
                             break;
@@ -1866,7 +1885,7 @@ namespace YGOPortable.Core
             _planningReplay = null;
             _speculatingPlayer = -1;
             _fieldReadoutBaseline = null;
-            _awaitingSpecialSummonCompletion = false;
+            _awaitingFieldArrivalCompletion = false;
             _movementGroups.Clear();
             if (NativePtr != IntPtr.Zero)
             {

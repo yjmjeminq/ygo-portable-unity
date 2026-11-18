@@ -49,6 +49,7 @@ namespace YGOPortable.UI
         ExtraDeckSummon,
         PendulumSummon,
         TokenSummon,
+        FieldReturn,
         Set,
         ChangePosition,
         AttachMaterial,
@@ -102,11 +103,12 @@ namespace YGOPortable.UI
         private readonly Queue<IEnumerator> _steps = new Queue<IEnumerator>();
         private List<(CardFlight flight, Action onArrive)> _openPileTransfers;
         private List<LifeChangeCue> _openBattleLifeChanges;
-        private DestructionGroup _openDestructions;
+        private FieldDepartureGroup _openFieldDepartures;
         private MaterialDepartureGroup _openMaterials;
         private PositionChangeGroup _openPositionChanges;
-        private List<SpecialSummonArrival> _pendingSpecialSummons;
-        private Action _refreshAfterSpecialSummons;
+        private List<FieldArrival> _pendingFieldArrivals;
+        private uint? _pendingReturnEffect;
+        private Action _refreshAfterFieldArrivals;
         private readonly Stack<CompositeCardView> _cards = new Stack<CompositeCardView>();
         private readonly HashSet<(bool Opponent, uint Code)> _featuredSummons = new();
         private RectTransform _layer;
@@ -118,8 +120,10 @@ namespace YGOPortable.UI
         private const float LifeFeedbackDuration = .46f;
         private const float FieldSwapHandoff = .80f;
         private const float PositionHandoff = .5f;
+        private const float FieldReturnHandoff = .62f;
         private static readonly Color LifeDamageTint = new Color(1f, .61f, .52f);
         private static readonly Color DestructionTint = new Color(.55f, .84f, 1f);
+        private static readonly Color BanishTint = new Color(.65f, .53f, 1f);
 
         private sealed class LifeChangeCue
         {
@@ -130,20 +134,22 @@ namespace YGOPortable.UI
             internal CanvasGroup Feedback;
         }
 
-        private sealed class SpecialSummonArrival
+        private sealed class FieldArrival
         {
-            internal (byte Controller, uint Sequence) Slot;
+            internal (byte Controller, uint Location, uint Sequence) Slot;
             internal CardFlight Flight;
             internal CardMotion Motion;
             internal CardMoveReadoutSnapshot Readout;
             internal Action Depart;
+            internal Action Handoff;
             internal Action Release;
         }
 
-        private sealed class DestructionGroup
+        private sealed class FieldDepartureGroup
         {
             internal object Key;
             internal Action Refresh;
+            internal bool Temporary;
             internal readonly List<(CardFlight Flight, CardMotion Motion, CardMoveReadoutSnapshot Readout,
                 Action Depart, Action Release)> Moves = new();
         }
@@ -191,11 +197,12 @@ namespace YGOPortable.UI
             _steps.Clear();
             _openPileTransfers = null;
             _openBattleLifeChanges = null;
-            _openDestructions = null;
+            _openFieldDepartures = null;
             _openMaterials = null;
             _openPositionChanges = null;
-            _pendingSpecialSummons = null;
-            _refreshAfterSpecialSummons = null;
+            _pendingFieldArrivals = null;
+            _pendingReturnEffect = null;
+            _refreshAfterFieldArrivals = null;
             _cards.Clear();
             _featuredSummons.Clear();
             _previousChainCode = 0;
@@ -273,16 +280,16 @@ namespace YGOPortable.UI
             QueueStep(MoveCard(flight, motion, onArrive, readout, onDepart));
         }
 
-        internal void QueueFieldDestruction(object group, CardFlight flight, CardMotion motion,
-            CardMoveReadoutSnapshot readout, Action depart, Action release, Action refresh)
+        internal void QueueFieldDeparture(object group, CardFlight flight, CardMotion motion,
+            CardMoveReadoutSnapshot readout, Action depart, Action release, Action refresh, bool temporary = false)
         {
-            if (_openDestructions?.Key != group)
+            if (group == null || _openFieldDepartures?.Key != group)
             {
-                var next = new DestructionGroup { Key = group, Refresh = refresh };
-                QueueStep(PlayFieldDestructions(next));
-                _openDestructions = next;
+                var next = new FieldDepartureGroup { Key = group, Refresh = refresh, Temporary = temporary };
+                QueueStep(PlayFieldDepartures(next));
+                _openFieldDepartures = next;
             }
-            _openDestructions.Moves.Add((flight, motion, readout, depart, release));
+            _openFieldDepartures.Moves.Add((flight, motion, readout, depart, release));
         }
 
         internal void QueueFieldSwap((CardFlight Flight, CardMoveReadoutSnapshot Readout) first,
@@ -320,32 +327,38 @@ namespace YGOPortable.UI
             _openPositionChanges.Moves.Add((flight, readout, depart, handoff, release));
         }
 
-        internal void StageSpecialSummon(CardFlight flight, CardMotion motion, byte controller, uint sequence,
-            CardMoveReadoutSnapshot readout, Action depart, Action release, Action refresh)
+        internal void StageFieldArrival(CardFlight flight, CardMotion motion, byte controller, uint location, uint sequence,
+            CardMoveReadoutSnapshot readout, Action depart, Action release, Action refresh, uint? returnEffect = null,
+            Action handoff = null)
         {
-            _openDestructions = null;
+            if (_pendingFieldArrivals != null && (_pendingReturnEffect != returnEffect || returnEffect == 0))
+                CompleteFieldArrivals();
+            _openFieldDepartures = null;
             _openMaterials = null;
             _openPositionChanges = null;
             _openPileTransfers = null;
             _openBattleLifeChanges = null;
-            _pendingSpecialSummons ??= new List<SpecialSummonArrival>();
-            _pendingSpecialSummons.Add(new SpecialSummonArrival
+            _pendingFieldArrivals ??= new List<FieldArrival>();
+            _pendingFieldArrivals.Add(new FieldArrival
             {
-                Slot = (controller, sequence), Flight = flight, Motion = motion, Readout = readout, Depart = depart, Release = release,
+                Slot = (controller, location, sequence), Flight = flight, Motion = motion, Readout = readout,
+                Depart = depart, Handoff = handoff, Release = release,
             });
-            _refreshAfterSpecialSummons = refresh;
+            _pendingReturnEffect = returnEffect;
+            _refreshAfterFieldArrivals = refresh;
         }
 
-        internal bool IsSummonReserved(byte controller, uint sequence) =>
-            _pendingSpecialSummons?.Exists(move => move.Slot == (controller, sequence)) == true;
+        internal bool IsFieldArrivalReserved(byte controller, uint location, uint sequence) =>
+            _pendingFieldArrivals?.Exists(move => move.Slot == (controller, location, sequence)) == true;
 
-        internal void CompleteSpecialSummons()
+        internal void CompleteFieldArrivals()
         {
-            var moves = _pendingSpecialSummons;
+            var moves = _pendingFieldArrivals;
             if (moves == null) return;
-            var refresh = _refreshAfterSpecialSummons;
-            _pendingSpecialSummons = null;
-            _refreshAfterSpecialSummons = null;
+            var refresh = _refreshAfterFieldArrivals;
+            _pendingFieldArrivals = null;
+            _pendingReturnEffect = null;
+            _refreshAfterFieldArrivals = null;
 
             void Land()
             {
@@ -354,8 +367,9 @@ namespace YGOPortable.UI
             }
 
             var first = moves[0];
-            _steps.Enqueue(moves.Count == 1 ? MoveCard(first.Flight, first.Motion, Land, first.Readout, first.Depart)
-                : PlaySpecialSummonGroup(moves, Land));
+            _steps.Enqueue(moves.Count == 1 && first.Motion != CardMotion.FieldReturn
+                ? MoveCard(first.Flight, first.Motion, Land, first.Readout, first.Depart)
+                : PlayFieldArrivalGroup(moves, Land, refresh));
         }
 
         internal void QueueXyzMaterials(IReadOnlyList<SummonMaterialFlight> moves, Action refresh)
@@ -366,8 +380,8 @@ namespace YGOPortable.UI
         internal void QueuePileTransfer(CardFlight flight, Action onArrive)
         {
             // Moves emitted together by one effect overlap. Other animation steps still play in engine order.
-            CompleteSpecialSummons();
-            _openDestructions = null;
+            CompleteFieldArrivals();
+            _openFieldDepartures = null;
             _openMaterials = null;
             _openPositionChanges = null;
             _openBattleLifeChanges = null;
@@ -381,8 +395,8 @@ namespace YGOPortable.UI
 
         private void QueueStep(IEnumerator step)
         {
-            CompleteSpecialSummons();
-            _openDestructions = null;
+            CompleteFieldArrivals();
+            _openFieldDepartures = null;
             _openMaterials = null;
             _openPositionChanges = null;
             _openPileTransfers = null;
@@ -529,9 +543,11 @@ namespace YGOPortable.UI
             }
         }
 
-        private IEnumerator PlaySpecialSummonGroup(IReadOnlyList<SpecialSummonArrival> moves, Action land)
+        private IEnumerator PlayFieldArrivalGroup(IReadOnlyList<FieldArrival> moves, Action land, Action refresh)
         {
+            bool returning = moves[0].Motion == CardMotion.FieldReturn;
             foreach (var move in moves) move.Depart?.Invoke();
+            if (returning) refresh();
             var effects = new DuelEffectGraphic[moves.Count];
             var views = new CompositeCardView[moves.Count];
             var opacity = new CanvasGroup[moves.Count];
@@ -539,7 +555,7 @@ namespace YGOPortable.UI
             for (int i = 0; i < moves.Count; i++)
             {
                 var move = moves[i];
-                var (kind, tint, _) = SummonEffect(move.Flight.Code, move.Motion);
+                var (kind, tint, _) = returning ? (DuelEffectKind.BanishTransit, BanishTint, "") : SummonEffect(move.Flight.Code, move.Motion);
                 effects[i] = CreateEffect(kind, move.Flight.To.Position, move.Flight.To.Size * 1.65f, tint);
                 effects[i].Seek(0f);
             }
@@ -555,11 +571,13 @@ namespace YGOPortable.UI
                 opacity[i] = fade;
             }
             for (int i = 0; i < moves.Count; i++)
-                readouts[i] = CreateMovingReadout(moves[i].Flight, moves[i].Motion, moves[i].Readout);
+                readouts[i] = CreateMovingReadout(moves[i].Flight, moves[i].Motion, moves[i].Readout,
+                    handoff: returning ? FieldReturnHandoff : null);
 
-            const float stagger = .026f;
-            float travel = .37f + (moves.Count - 1) * stagger;
-            LotdAudio.PlaySummon();
+            float stagger = returning ? 0f : .026f;
+            float travel = returning ? .34f : .37f + (moves.Count - 1) * stagger;
+            if (!returning) LotdAudio.PlaySummon();
+            bool revealedReturn = false;
             yield return Animate(travel, progress =>
             {
                 for (int i = 0; i < moves.Count; i++)
@@ -567,11 +585,15 @@ namespace YGOPortable.UI
                     var move = moves[i];
                     float delay = i * stagger;
                     float time = Mathf.Clamp01((progress * travel - delay) / (travel - delay));
-                    ApplyFlight(views[i], move.Flight, time, move.Motion == CardMotion.TokenSummon ? 11f : 32f);
+                    ApplyFlight(views[i], move.Flight, time, returning ? 18f : move.Motion == CardMotion.TokenSummon ? 11f : 32f);
                     opacity[i].alpha = Mathf.SmoothStep(0f, 1f, time / (move.Motion == CardMotion.TokenSummon ? .75f : .22f));
                     readouts[i]?.Follow(views[i], time);
                     effects[i].Seek(time);
                 }
+                if (!returning || revealedReturn || progress < FieldReturnHandoff) return;
+                revealedReturn = true;
+                foreach (var move in moves) move.Handoff?.Invoke();
+                refresh();
             });
 
             for (int i = 0; i < moves.Count; i++)
@@ -584,9 +606,9 @@ namespace YGOPortable.UI
             land();
         }
 
-        private IEnumerator PlayFieldDestructions(DestructionGroup group)
+        private IEnumerator PlayFieldDepartures(FieldDepartureGroup group)
         {
-            if (ReferenceEquals(_openDestructions, group)) _openDestructions = null;
+            if (ReferenceEquals(_openFieldDepartures, group)) _openFieldDepartures = null;
             var moves = group.Moves;
             void Depart()
             {
@@ -599,7 +621,7 @@ namespace YGOPortable.UI
                 group.Refresh();
             }
 
-            if (moves.Count == 1)
+            if (moves.Count == 1 && !group.Temporary)
             {
                 var move = moves[0];
                 yield return MoveCard(move.Flight, move.Motion, Land, move.Readout, Depart);
@@ -610,11 +632,13 @@ namespace YGOPortable.UI
             for (int index = 0; index < moves.Count; index++)
             {
                 var origin = moves[index].Flight.From;
-                effects[index] = CreateEffect(DuelEffectKind.Break, origin.Position, origin.Size * 2.1f, DestructionTint);
+                var kind = group.Temporary ? DuelEffectKind.BanishTransit : DuelEffectKind.Break;
+                effects[index] = CreateEffect(kind, origin.Position, origin.Size * (group.Temporary ? 1.62f : 2.1f),
+                    group.Temporary ? BanishTint : DestructionTint);
                 effects[index].Seek(0f);
             }
-            LotdAudio.PlayDamage();
-            yield return Animate(.18f, time =>
+            if (!group.Temporary) LotdAudio.PlayDamage();
+            yield return Animate(group.Temporary ? .12f : .18f, time =>
             {
                 foreach (var effect in effects) effect.Seek(time);
             });
@@ -642,10 +666,11 @@ namespace YGOPortable.UI
                 bool sharedPile = move.Motion != CardMotion.Vanish && moves.Exists(other =>
                     other.Motion != CardMotion.Vanish && other.Flight.From.Position != move.Flight.From.Position &&
                     other.Flight.To.Position == move.Flight.To.Position);
-                readouts[index] = CreateMovingReadout(move.Flight, move.Motion, move.Readout, sharedPile);
+                readouts[index] = CreateMovingReadout(move.Flight, move.Motion, move.Readout, sharedPile,
+                    handoff: group.Temporary ? sharedPile ? .53f : .68f : null);
             }
 
-            yield return Animate(.27f, time =>
+            yield return Animate(group.Temporary ? .31f : .27f, time =>
             {
                 for (int index = 0; index < moves.Count; index++)
                 {

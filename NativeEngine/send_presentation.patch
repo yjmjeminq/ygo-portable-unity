@@ -1,14 +1,21 @@
 --- a/operations.cpp
 +++ b/operations.cpp
-@@ -4248,6 +4248,21 @@
+@@ -4248,6 +4248,28 @@
  	auto targets = arg.targets;
  	auto reason_effect = arg.reason_effect;
  	auto reason = arg.reason;
 +	constexpr uint32_t destruction_group_tag = 0x31444759; // YGD1
 +	constexpr uint32_t material_group_tag = 0x314d4759; // YGM1
++	constexpr uint32_t temporary_banish_group_tag = 0x31544759; // YGT1
 +	const bool is_summon_material = (reason & REASON_MATERIAL)
 +		&& (reason & (REASON_FUSION | REASON_SYNCHRO | REASON_RITUAL | REASON_XYZ | REASON_LINK));
-+	const uint32_t group_tag = is_summon_material ? material_group_tag : (reason & REASON_DESTROY) ? destruction_group_tag : 0;
++	uint32_t group_tag = 0;
++	if(is_summon_material)
++		group_tag = material_group_tag;
++	else if(reason & REASON_TEMPORARY)
++		group_tag = temporary_banish_group_tag;
++	else if(reason & REASON_DESTROY)
++		group_tag = destruction_group_tag;
 +	const auto grouped_send = [&arg, group_tag]() {
 +		return group_tag && arg.extra_args->cv.size() > 1;
 +	};
@@ -22,7 +29,7 @@
  	auto reason_player = arg.reason_player;
  	switch(arg.step) {
  	case 0: {
-@@ -4427,11 +4442,13 @@
+@@ -4427,11 +4449,13 @@
  			}
  		}
  		param->cvit = param->cv.begin();
@@ -36,20 +43,26 @@
  			arg.step = 8;
  			return FALSE;
  		}
-@@ -4447,6 +4464,8 @@
+@@ -4447,6 +4471,11 @@
  			message->write(pcard->get_info_location());
  			message->write(loc_info{});
  			message->write<uint32_t>(pcard->current.reason);
-+			if(grouped_send())
++			if(group_tag == temporary_banish_group_tag) {
++				message->write<uint32_t>(group_tag);
++				message->write<uint32_t>(pcard->cardid);
++			} else if(grouped_send())
 +				message->write<uint32_t>(group_tag);
  			if(core.current_chain.size() > 0)
  				core.just_sent_cards.insert(pcard);
  			pcard->previous.controler = pcard->current.controler;
-@@ -4506,6 +4525,8 @@
+@@ -4506,6 +4535,11 @@
  			pcard->current.position = pcard->sendto_param.position;
  			message->write(pcard->get_info_location());
  			message->write<uint32_t>(pcard->current.reason);
-+			if(grouped_send())
++			if(group_tag == temporary_banish_group_tag) {
++				message->write<uint32_t>(group_tag);
++				message->write<uint32_t>(pcard->cardid);
++			} else if(grouped_send())
 +				message->write<uint32_t>(group_tag);
  		}
  		if(pcard->current.location == LOCATION_DECK && (core.deck_reversed || (pcard->current.position == POS_FACEUP_DEFENSE)))
