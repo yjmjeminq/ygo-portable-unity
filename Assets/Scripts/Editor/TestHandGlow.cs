@@ -25,6 +25,7 @@ namespace YGOPortable.Editor
             VerifyMainPhaseAndStaleState();
             VerifyOpponentTurnActivation();
             VerifyNativeCombatReadout();
+            VerifyNativeCounterReadout();
             VerifyInspectedCardMoves(swapInPlace: true);
             VerifyInspectedCardMoves(swapInPlace: false);
             VerifyNativeSummonReadout(turnFaceDown: false);
@@ -256,6 +257,92 @@ namespace YGOPortable.Editor
                 readout.Find("Defender/Values/Defense/Digits/Value").GetComponent<Text>().text == "2000",
                 "The attack presentation lost the native equipped attack or the revealed defense.");
             Debug.Log("[VERIFY DUEL BATTLE STATS] Native battle displayed the equipped 2700 ATK and the revealed 2000 DEF.");
+        }
+
+        private static void VerifyNativeCounterReadout()
+        {
+            const uint breaker = 71413901;
+            const uint powerStone = 34029630;
+            const string countPath = "CardReadout/Counters/Number/Value";
+            var empty = Array.Empty<uint>();
+            var main = Enumerable.Repeat(breaker, 20).Concat(Enumerable.Repeat(powerStone, 20)).ToArray();
+            var opponent = Enumerable.Repeat(BlueEyes, 40).ToArray();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Live counter readout", main, empty, opponent, empty,
+                true, session => session.ActivePrompt?.summonable.Exists(card => card.code == breaker) == true &&
+                    session.ActivePrompt.sSetable.Exists(card => card.code == powerStone));
+            using var ui = new HandUI(duel);
+            var ai = new TacticalAI();
+            var mine = duel.Players[duel.HumanPlayerIndex];
+
+            void ReachMainPhase()
+            {
+                YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
+                {
+                    if (prompt.messageType == YgoConstants.MSG_SELECT_CARD)
+                    {
+                        int target = prompt.candidates.FindIndex(card => card.code == powerStone);
+                        Require(target >= 0, "The Breaker effect could not target Pitch-Black Power Stone.");
+                        return DuelSession.PackCardSelection(target);
+                    }
+                    return prompt.messageType == YgoConstants.MSG_SELECT_CHAIN && prompt.forced ? BitConverter.GetBytes(0) : null;
+                });
+                Require(duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD && duel.RetryCount == 0,
+                    "The counter fixture could not reach the next native main phase.");
+            }
+
+            int setIndex = duel.ActivePrompt.sSetable.FindIndex(card => card.code == powerStone);
+            duel.SubmitResponseInt((setIndex << 16) | 4);
+            ReachMainPhase();
+            duel.SubmitResponseInt(7);
+            ReachMainPhase();
+            Require(duel.ActivePrompt.playerId == duel.AiPlayerIndex, "The counter fixture did not switch turns.");
+            duel.SubmitResponseInt(7);
+            ReachMainPhase();
+
+            void Activate(uint code)
+            {
+                int index = duel.ActivePrompt.activatable.FindIndex(card => card.code == code);
+                Require(index >= 0, $"The counter fixture could not activate card {code}.");
+                duel.SubmitResponseInt((index << 16) | 5);
+                ReachMainPhase();
+            }
+
+            Activate(powerStone);
+            var trap = mine.szone.Single(card => card?.code == powerStone);
+            int summon = duel.ActivePrompt.summonable.FindIndex(card => card.code == breaker);
+            Require(summon >= 0, "The counter fixture could not summon Breaker.");
+            duel.SubmitResponseInt(summon << 16);
+            ReachMainPhase();
+            var monster = mine.mzone.Single(card => card?.code == breaker);
+            ui.Field.Refresh();
+            var root = ui.Field.Root.transform;
+            var trapSlot = root.Find($"DuelBoard/Zone_{trap.sequence + 2}_4");
+            var monsterSlot = root.Find($"DuelBoard/Zone_{monster.sequence + 2}_3");
+            var trapCount = trapSlot.Find(countPath)?.GetComponent<Text>();
+            var monsterCount = monsterSlot.Find(countPath)?.GetComponent<Text>();
+            Require(mine.szone[trap.sequence].counterCount == 3 && monster.counterCount == 1 && monster.attack == 1900 &&
+                trapCount?.text == "◆ 3" && monsterCount?.text == "◆ 1" &&
+                !trapSlot.Find("CardReadout/Combat").gameObject.activeSelf,
+                $"The native trap and monster counters did not match their readouts ({mine.szone[trap.sequence].counterCount}, {monster.counterCount}).");
+
+            trapSlot.GetComponent<CardDragTrigger>().OnRightClick();
+            var inspector = root.Find("LeftInspector/CardPreview/Card/AspectBox");
+            var label = inspector.Find("Counters/Number/Value").GetComponent<Text>();
+            Require(label.text == "카운터 3개" && !label.raycastTarget, "Inspecting the trap lost its counter count or blocked input.");
+            monsterSlot.GetComponent<CardDragTrigger>().OnRightClick();
+            inspector.Find("ZoomHit").GetComponent<Button>().onClick.Invoke();
+            var zoom = root.Find("Overlay_CardZoom/ZoomWin/Info/Counters/Number/Value").GetComponent<Text>();
+            Require(label.text == "카운터 1개" && zoom.text == "카운터 1개", "Inspecting Breaker did not update both detail views.");
+
+            Activate(breaker);
+            ui.Field.Refresh();
+            Require(mine.szone[trap.sequence] == null && mine.mzone[monster.sequence].counterCount == 0 &&
+                mine.mzone[monster.sequence].attack == 1600 &&
+                !trapCount.gameObject.activeInHierarchy && !monsterCount.gameObject.activeInHierarchy &&
+                !label.gameObject.activeInHierarchy && !zoom.gameObject.activeInHierarchy &&
+                monsterSlot.Find("CardReadout/Combat/Attack/Digits/Value").GetComponent<Text>().text == "1600",
+                "Counter removal left stale readouts or attack values on the field or in card details.");
+            Debug.Log("[VERIFY DUEL COUNTERS] Pitch-Black Power Stone and Breaker displayed their native counts. Spending a counter updated attack and hid the removed counts in both detail views.");
         }
 
         private static void VerifyInspectedCardMoves(bool swapInPlace)

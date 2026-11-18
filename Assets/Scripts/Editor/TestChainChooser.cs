@@ -767,8 +767,10 @@ namespace YGOPortable.Editor
         private static void VerifyCandidateReadouts()
         {
             const uint code = 89631139;
+            const uint powerStone = 34029630;
             const string card = "Card/V/AspectBox";
             const string attack = "Attack/Digits/Value";
+            const string counters = "CardReadout/Counters";
             using var duel = new DuelSession();
             var canvas = new GameObject("Candidate Readout Verification", typeof(Canvas));
             var modals = new DuelPromptModals(canvas.transform, null, null);
@@ -779,7 +781,14 @@ namespace YGOPortable.Editor
                 duel.Players[0].mzone[0] = Monster(3700, YgoConstants.POS_FACEUP_ATTACK);
                 duel.Players[0].mzone[1] = Monster(2100, YgoConstants.POS_FACEUP_DEFENSE);
                 duel.Players[0].mzone[1].effectsDisabled = true;
+                duel.Players[0].mzone[1].counterCount = 2;
                 duel.Players[1].mzone[0] = Monster(4950, YgoConstants.POS_FACEDOWN_DEFENSE);
+                duel.Players[1].mzone[0].counterCount = 4;
+                duel.Players[0].szone[0] = new LiveCardState
+                {
+                    code = powerStone, type = YgoConstants.TYPE_TRAP | YgoConstants.TYPE_CONTINUOUS,
+                    position = YgoConstants.POS_FACEUP_ATTACK, counterCount = 3,
+                };
                 field.BindSession(duel, null, null);
 
                 var prompt = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_CARD, playerId = 0, min = 1, max = 2 };
@@ -787,6 +796,7 @@ namespace YGOPortable.Editor
                 prompt.candidates.Add(new SelectableCardItem { code = code, location = YgoConstants.LOCATION_MZONE, sequence = 1 });
                 prompt.candidates.Add(new SelectableCardItem { code = code, location = YgoConstants.LOCATION_MZONE, controller = 1 });
                 prompt.candidates.Add(new SelectableCardItem { code = code, location = YgoConstants.LOCATION_MZONE | YgoConstants.LOCATION_OVERLAY });
+                prompt.candidates.Add(new SelectableCardItem { code = powerStone, location = YgoConstants.LOCATION_SZONE });
                 modals.ShowPrompt(duel, prompt);
                 Canvas.ForceUpdateCanvases();
 
@@ -795,12 +805,17 @@ namespace YGOPortable.Editor
                 var second = cards.Find("Tile_1");
                 var hidden = cards.Find("Tile_2").Find(card);
                 var material = cards.Find("Tile_3");
+                var trap = cards.Find($"Tile_4/{card}");
                 Require(first.Find($"{card}/CardReadout/Combat/{attack}").GetComponent<Text>().text == "3700" &&
                         second.Find($"{card}/CardReadout/Combat/{attack}").GetComponent<Text>().text == "2100",
                     "Card choices did not use the correct instance's current attack.");
                 Require(hidden.Find("CardBack").gameObject.activeSelf && hidden.Find("CardReadout") == null &&
                         material.Find($"{card}/CardReadout") == null,
                     "A hidden card or Xyz material exposed the live stats of a field monster.");
+                Require(second.Find($"{card}/{counters}/Number/Value").GetComponent<Text>().text == "◆ 2" &&
+                        trap.Find($"{counters}/Number/Value").GetComponent<Text>().text == "◆ 3" &&
+                        !trap.Find("CardReadout/Combat").gameObject.activeSelf,
+                    "The selection list lost the monster or trap counter count.");
 
                 var inspector = field.Root.transform.Find($"LeftInspector/CardDetails/CombatStats/{attack}").GetComponent<Text>();
                 first.GetComponent<CardDragTrigger>().OnPointerEnterAction();
@@ -811,8 +826,11 @@ namespace YGOPortable.Editor
                 Canvas.ForceUpdateCanvases();
                 var status = RectTransformUtility.CalculateRelativeRectTransformBounds(second, second.Find($"{card}/CardReadout/Labels/Status"));
                 var check = RectTransformUtility.CalculateRelativeRectTransformBounds(second, second.Find("Chk"));
+                var counter = RectTransformUtility.CalculateRelativeRectTransformBounds(second, second.Find($"{card}/{counters}"));
                 Require(status.max.x <= check.min.x || status.max.y <= check.min.y,
                     "The selection check covered the card status.");
+                Require(counter.max.y <= status.min.y + .1f && (counter.max.x <= check.min.x || counter.max.y <= check.min.y),
+                    "The selection check or status covered the counter count.");
                 material.GetComponent<Button>().onClick.Invoke();
                 Require(inspector.text == "3000", "Inspecting a material inherited the host's attack.");
 

@@ -24,6 +24,7 @@ namespace YGOPortable.UI
         private Text _inspName;
         private Image _inspTitle;
         private Text _inspStats;
+        private DuelCounterBadge _inspCounters;
         private DuelStatStrip _inspCombat;
         private Text _inspDesc;
         private Text _logFeed;
@@ -125,6 +126,7 @@ namespace YGOPortable.UI
         private Text _zoomArtworkLabel;
         private Text _zoomName;
         private Text _zoomStats;
+        private DuelCounterBadge _zoomCounters;
         private DuelStatStrip _zoomCombat;
         private (byte controller, uint location, uint sequence)? _zoomFieldCard;
         private Text _zoomPasscode;
@@ -358,6 +360,7 @@ namespace YGOPortable.UI
             _inspName.text = "카드 정보";
             _inspStats.text = "";
             _inspCombat.Hide();
+            _inspCounters.Bind(0);
             SetLinkedZones(0);
             _inspDesc.text = "카드를 선택하면 효과를 확인할 수 있습니다.";
             _inspRaceIcon.gameObject.SetActive(false);
@@ -415,6 +418,7 @@ namespace YGOPortable.UI
             if (live == null) _inspectedFieldCard = null;
             var card = new DuelCardReadout(CardDatabase.Get(_inspectedCode), live);
             _inspStats.text = FormatInspectorStats(card);
+            _inspCounters.Bind(card.CounterCount, showChanges);
             _inspCombat.Bind(card, live != null && _inspectedFieldCard.Value.controller != _session.HumanPlayerIndex,
                 showChanges && live != null);
         }
@@ -539,6 +543,9 @@ namespace YGOPortable.UI
                 ShowCardZoomModal(_inspectedCode, _inspectedFieldCard);
             });
             _duelPadInspectButton = zoom;
+            var counterChip = LotdUiKit.CreateRect("Counters", zoomHit.parent,
+                new Vector2(.44f, .715f), new Vector2(.97f, .829f), Vector2.zero, Vector2.zero);
+            _inspCounters = new DuelCounterBadge(counterChip, compact: false);
 
             var inside = LotdUiKit.FillRect("CardDetails", left, 7f);
             var stats = LotdUiKit.CreateRect("Stats", inside, new Vector2(.018f, .378f), new Vector2(.825f, .454f),
@@ -1258,7 +1265,7 @@ namespace YGOPortable.UI
             {
                 var readout = new DuelCardReadout(CardDatabase.Get(live.code), live);
                 uint? scale = readout.ScaleIn(loc, seq);
-                if (loc == YgoConstants.LOCATION_MZONE && readout.IsMonster || scale.HasValue)
+                if (loc == YgoConstants.LOCATION_MZONE && readout.IsMonster || scale.HasValue || readout.CounterCount != 0)
                     (slot.readout ??= new DuelFieldReadout(slot.root)).Bind(readout, opponent, scale);
                 else slot.readout?.Hide();
             }
@@ -3256,8 +3263,11 @@ namespace YGOPortable.UI
             _zoomCombat = new DuelStatStrip(combat, compact: false);
 
             _zoomPasscode = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Passcode", infoRt,
-                new Vector2(0f, .571f), new Vector2(1f, .626f), Vector2.zero, Vector2.zero),
+                new Vector2(0f, .571f), new Vector2(.60f, .626f), Vector2.zero, Vector2.zero),
                 "P", "", 12, 9, TextAnchor.MiddleLeft, LotdUiKit.CyanAccent);
+            var counterChip = LotdUiKit.CreateRect("Counters", infoRt,
+                new Vector2(.64f, .571f), new Vector2(1f, .626f), Vector2.zero, Vector2.zero);
+            _zoomCounters = new DuelCounterBadge(counterChip, compact: false);
 
             var descBox = LotdUiKit.CreateBorderedPanel(infoRt, "DescBox", new Vector2(0f, 0f), new Vector2(1f, .561f), Vector2.zero, Vector2.zero,
                 new Color(0.02f, 0.05f, 0.12f, 0.95f));
@@ -3342,6 +3352,7 @@ namespace YGOPortable.UI
             var card = new DuelCardReadout(CardDatabase.Get(code), live);
             _zoomCardView.SetCard(code, false, live);
             _zoomStats.text = FormatInspectorStats(card);
+            _zoomCounters.Bind(card.CounterCount, showChanges);
             _zoomCombat.Bind(card, live != null && _zoomFieldCard.Value.controller != _session.HumanPlayerIndex,
                 showChanges && live != null);
         }

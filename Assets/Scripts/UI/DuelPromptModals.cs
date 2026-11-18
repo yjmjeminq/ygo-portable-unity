@@ -2149,7 +2149,7 @@ namespace YGOPortable.UI
 
             var readout = new DuelCardReadout(CardDatabase.Get(code), live);
             uint? scale = readout.ScaleIn(item.location, item.sequence);
-            if (item.location == YgoConstants.LOCATION_MZONE && readout.IsMonster || scale.HasValue)
+            if (item.location == YgoConstants.LOCATION_MZONE && readout.IsMonster || scale.HasValue || readout.CounterCount != 0)
                 new DuelFieldReadout(view.transform.Find("AspectBox"), inPreview: true)
                     .Bind(readout, item.controller != session.HumanPlayerIndex, scale);
         }

@@ -29,6 +29,7 @@ namespace YGOPortable.Core
         public byte owner;
         public bool isPublic;
         public bool effectsDisabled;
+        public uint counterCount;
         public List<uint> overlayCodes = new List<uint>();
 
         public bool IsFaceUp => (position & YgoConstants.POS_FACEUP) != 0;
@@ -1561,6 +1562,13 @@ namespace YGOPortable.Core
                             uint oc = BitConverter.ToUInt32(raw, valPos);
                             for (uint oi = 0; oi < oc; oi++)
                                 card.overlayCodes.Add(BitConverter.ToUInt32(raw, valPos + 4 + (int)oi * 4));
+                            break;
+                        case YgoConstants.QUERY_COUNTERS when blkSize >= 8:
+                            uint entries = BitConverter.ToUInt32(raw, valPos);
+                            int available = (blkSize - 8) / 4;
+                            // Each entry has a 16-bit counter type followed by its 16-bit quantity.
+                            for (int i = 0; i < available && i < entries; i++)
+                                card.counterCount += BitConverter.ToUInt16(raw, valPos + 6 + i * 4);
                             break;
                     }
                     pos = blkStart + blkSize;

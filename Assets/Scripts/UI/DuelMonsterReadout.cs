@@ -27,6 +27,7 @@ namespace YGOPortable.UI
         internal uint RightScale => Live?.rscale ?? Printed?.rscale ?? 0;
         internal uint LinkMarkers => IsLink ? Live?.linkMarker ?? Printed?.link ?? 0 : 0;
         internal int Materials => Live?.overlayCodes.Count ?? 0;
+        internal uint CounterCount => Live?.counterCount ?? 0;
         internal bool Disabled => Live?.effectsDisabled == true;
 
         internal uint? ScaleIn(uint location, uint sequence) =>
@@ -333,6 +334,39 @@ namespace YGOPortable.UI
         }
     }
 
+    internal sealed class DuelCounterBadge
+    {
+        private static readonly Color Ink = new Color(.91f, .82f, 1f);
+        private static readonly Color Backing = new Color(.155f, .105f, .22f, .97f);
+        private readonly Text _value;
+        private readonly bool _compact;
+        internal RectTransform Root { get; }
+
+        internal DuelCounterBadge(RectTransform root, bool compact)
+        {
+            Root = root;
+            _compact = compact;
+            DuelReadoutPlate.Add(root, Backing);
+            var digits = LotdUiKit.CreateRect("Number", root, new Vector2(.06f, 0f), new Vector2(.94f, 1f),
+                Vector2.zero, Vector2.zero);
+            _value = LotdUiKit.AddFittedText(digits, "Value", "", compact ? 14 : 16, 8,
+                TextAnchor.MiddleCenter, Ink, FontStyle.Bold);
+            _value.horizontalOverflow = HorizontalWrapMode.Overflow;
+            _value.gameObject.AddComponent<DuelStatDigitFit>();
+            Bind(0);
+        }
+
+        internal void Bind(uint count, bool showChanges = false)
+        {
+            bool visible = count != 0;
+            string next = !visible ? "" : _compact ? $"◆ {count}" : $"카운터 {count}개";
+            Root.gameObject.SetActive(visible);
+            if (!showChanges || !visible) DuelReadoutPulse.Cancel(Root);
+            else if (_value.text != next) DuelReadoutPulse.Play(Root, Ink);
+            _value.text = next;
+        }
+    }
+
     internal sealed class DuelFieldReadout
     {
         private static readonly Color Backing = new Color(.045f, .068f, .085f, .96f);
@@ -344,6 +378,7 @@ namespace YGOPortable.UI
         private readonly Text _rating;
         private readonly Text _status;
         private readonly bool _inPreview;
+        private DuelCounterBadge _counters;
         private (uint Code, bool Opponent) _lastCard;
 
         internal DuelFieldReadout(Transform slot, bool inPreview = false)
@@ -397,6 +432,25 @@ namespace YGOPortable.UI
                 card.IsXyz ? RankColor : card.IsLink || scale.HasValue ? DuelStyle.Player : DuelStyle.Gold, showChanges);
             SetLabel(_status, card.Status,
                 card.Disabled ? new Color(1f, .65f, .58f) : DuelStyle.Muted, showChanges);
+            BindCounters(card.CounterCount, opponent, showChanges);
+        }
+
+        private void BindCounters(uint count, bool opponent, bool showChanges)
+        {
+            if (_counters == null)
+            {
+                if (count == 0) return;
+                var chip = LotdUiKit.CreateRect("Counters", _root,
+                    new Vector2(_inPreview ? .38f : .50f, 1f), new Vector2(_inPreview ? .79f : .965f, 1f),
+                    new Vector2(0f, _inPreview ? -44f : 0f), new Vector2(0f, _inPreview ? -25f : 0f));
+                _counters = new DuelCounterBadge(chip, compact: true);
+            }
+            if (!_inPreview)
+            {
+                _counters.Root.anchorMin = new Vector2(.50f, opponent ? .245f : .545f);
+                _counters.Root.anchorMax = new Vector2(.965f, opponent ? .455f : .755f);
+            }
+            _counters.Bind(count, showChanges);
         }
 
         private static void SetLabel(Text label, string content, Color color, bool showChanges)
