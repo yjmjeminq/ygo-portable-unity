@@ -49,8 +49,7 @@ namespace YGOPortable.UI
         private RectTransform _raisedCard;
         private Vector2 _lastDuelPointer;
         private bool _hasDuelPointerSample;
-        private readonly List<(RectTransform Rect, bool InHand)> _duelPadCardMotions =
-            new List<(RectTransform, bool)>(4);
+        private readonly List<(RectTransform Rect, bool InHand, FieldSlotView Slot)> _duelPadCardMotions = new(4);
         private PadScope _duelPadScope;
         private bool _usingDuelPad;
 
@@ -480,11 +479,15 @@ namespace YGOPortable.UI
                 !_modals.ResultRoot.activeSelf && CardDragManager.Instance?.IsDragging != true)
                 raised = _duelPointerRaisedCard ?? _cardActionArt;
 
+            if (raised != null && !raised.gameObject.activeInHierarchy) raised = null;
             if (raised != _raisedCard)
             {
                 _raisedCard = raised;
                 if (raised != null && !_duelPadCardMotions.Exists(motion => motion.Rect == raised))
-                    _duelPadCardMotions.Add((raised, raised.parent != null && raised.parent.parent == _myHandBar));
+                {
+                    var slot = _fieldSlotsByRect.Values.FirstOrDefault(candidate => candidate.focusArt == raised);
+                    _duelPadCardMotions.Add((raised, raised.parent != null && raised.parent.parent == _myHandBar, slot));
+                }
                 UpdateHandDepth(_myHandViews, _raisedCard);
             }
 
@@ -505,11 +508,13 @@ namespace YGOPortable.UI
                 Vector3 nextScale = Vector3.Lerp(rect.localScale, scale, step);
                 bool settled = (scale - nextScale).sqrMagnitude < .000001f;
                 nextScale = settled ? scale : nextScale;
+                float focus = Mathf.Clamp01((nextScale.x - 1f) / (focusScale - 1f));
                 if (rect.localScale != nextScale)
                 {
                     rect.localScale = nextScale;
-                    rect.GetComponentInParent<CompositeCardView>()?.SetRarityHighlight((nextScale.x - 1f) / (focusScale - 1f));
+                    rect.GetComponentInParent<CompositeCardView>()?.SetRarityHighlight(focus);
                 }
+                if (motion.Slot != null) ApplyFieldCardFocus(motion.Slot, focus, nextScale.x);
                 if (motion.InHand)
                 {
                     var position = focused ? Vector2.up * Mathf.Min(18f, rect.rect.height * .12f) : Vector2.zero;
@@ -521,6 +526,38 @@ namespace YGOPortable.UI
                 }
                 if (!focused && settled) _duelPadCardMotions.RemoveAt(i);
             }
+        }
+
+        private static void ApplyFieldCardFocus(FieldSlotView slot, float focus, float scale)
+        {
+            float height = Mathf.Min(8f, slot.root.rect.height * .062f) * focus;
+            var lift = Vector2.up * height;
+            if (slot.cardArea.anchoredPosition != lift) slot.cardArea.anchoredPosition = lift;
+            slot.readout?.FollowFocus(lift, scale);
+
+            if (slot.focusShadow == null)
+            {
+                if (focus == 0f) return;
+                var shadow = LotdUiKit.FillRect("FocusShadow", slot.focusArt, -7f);
+                shadow.SetAsFirstSibling();
+                slot.focusShadow = LotdUiKit.AddImage(shadow.gameObject, DuelStyle.CardShadow, Color.clear, false, false);
+                slot.focusShadow.type = Image.Type.Sliced;
+            }
+            var image = slot.focusShadow;
+            image.enabled = focus > 0f;
+            if (!image.enabled) return;
+            // Cast the shadow down toward the board even when the card turns sideways.
+            var down = slot.root.TransformVector(new Vector3(1.5f * focus, -height * .68f, 0f));
+            image.rectTransform.anchoredPosition = slot.focusArt.InverseTransformVector(down);
+            image.color = new Color(.008f, .016f, .024f, .81f * focus);
+        }
+
+        private static void ResetFieldCardFocus(FieldSlotView slot)
+        {
+            if (slot.focusArt.localScale == Vector3.one && slot.cardArea.anchoredPosition == Vector2.zero) return;
+            slot.focusArt.localScale = Vector3.one;
+            slot.cardView.SetRarityHighlight(0f);
+            ApplyFieldCardFocus(slot, 0f, 1f);
         }
 
         private void ClearPointerCard(RectTransform card)
@@ -576,6 +613,11 @@ namespace YGOPortable.UI
             foreach (var motion in _duelPadCardMotions)
             {
                 if (motion.Rect == null) continue;
+                if (motion.Slot != null)
+                {
+                    ResetFieldCardFocus(motion.Slot);
+                    continue;
+                }
                 motion.Rect.localScale = Vector3.one;
                 motion.Rect.GetComponentInParent<CompositeCardView>()?.SetRarityHighlight(0f);
                 if (motion.InHand) motion.Rect.anchoredPosition = Vector2.zero;

@@ -17,6 +17,7 @@ namespace YGOPortable.UI
         private static Texture2D _stone;
         private static Sprite _disc;
         private static Sprite _handGlow;
+        private static Sprite _cardShadow;
         internal static Texture2D Stone => _stone ??= Resources.Load<Texture2D>("Duel/StonePaving");
         internal static Color Side(bool opponent) => opponent ? Opponent : Player;
 
@@ -150,6 +151,36 @@ namespace YGOPortable.UI
                 _handGlow = Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(.5f, .5f),
                     100f, 0, SpriteMeshType.FullRect, new Vector4(18f, 18f, 18f, 18f));
                 return _handGlow;
+            }
+        }
+
+        internal static Sprite CardShadow
+        {
+            get
+            {
+                if (_cardShadow != null) return _cardShadow;
+                const int size = 24, feather = 7;
+                var pixels = new Color32[size * size];
+                for (int y = 0; y < size; y++)
+                {
+                    float vertical = Mathf.SmoothStep(0f, 1f, Mathf.Min(y, size - 1 - y) / (float)feather);
+                    for (int x = 0; x < size; x++)
+                    {
+                        float horizontal = Mathf.SmoothStep(0f, 1f, Mathf.Min(x, size - 1 - x) / (float)feather);
+                        pixels[y * size + x] = new Color32(255, 255, 255, (byte)(vertical * horizontal * 255f));
+                    }
+                }
+                var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+                {
+                    name = "Duel card shadow",
+                    wrapMode = TextureWrapMode.Clamp,
+                    filterMode = FilterMode.Bilinear,
+                };
+                texture.SetPixels32(pixels);
+                texture.Apply(false, true);
+                _cardShadow = Sprite.Create(texture, new Rect(0f, 0f, size, size), Vector2.one * .5f,
+                    100f, 0, SpriteMeshType.FullRect, Vector4.one * feather);
+                return _cardShadow;
             }
         }
 

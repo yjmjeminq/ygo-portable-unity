@@ -262,13 +262,22 @@ namespace YGOPortable.Editor
                 Advance(session, prompt => prompt.playerId == session.HumanPlayerIndex && prompt.messageType == YgoConstants.MSG_SELECT_BATTLECMD);
                 field.Refresh();
                 Require(Get<RectTransform>(field, "_duelPadFocus") == placement, "The monster selection did not survive closing the phase picker.");
+                var fieldCard = (RectTransform)placement.Find("Card");
+                var fieldStats = (RectTransform)placement.Find("CardReadout");
+                var fieldArt = (RectTransform)fieldCard.Find("CardView/AspectBox");
+                Invoke(field, "AdvanceDuelPadCardMotions", .08f);
+                Require(fieldCard.anchoredPosition.y > 0f && fieldStats.anchoredPosition == fieldCard.anchoredPosition &&
+                    fieldStats.localScale == fieldArt.localScale,
+                    "Controller focus did not lift the field card and its stats together.");
                 var attackIcon = handActions.Find("ATTACK/Circle/Button");
                 Require(handActions.gameObject.activeSelf && attackIcon != null &&
                     !Get<GameObject>(field, "_actionPopup").activeSelf,
                     "Focusing a field monster in the Battle Phase did not show the attack icon.");
                 Pad(field, A);
+                Invoke(field, "AdvanceDuelPadCardMotions", .08f);
                 Require(events.currentSelectedGameObject == attackIcon.gameObject &&
-                    session.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_BATTLECMD,
+                    session.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_BATTLECMD &&
+                    fieldCard.anchoredPosition.y > 0f && fieldStats.anchoredPosition == fieldCard.anchoredPosition,
                     "Moving from the monster to its attack icon submitted the command.");
                 Pad(field, A);
                 if (!playerFirst)

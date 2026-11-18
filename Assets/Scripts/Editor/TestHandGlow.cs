@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using YGOPortable.AI;
 using YGOPortable.Core;
@@ -686,14 +687,36 @@ namespace YGOPortable.Editor
             var monster = duel.ActivePrompt.repositionable[0];
             using var ui = new HandUI(duel);
             var animation = CardAnimationManager.Ensure(ui.Canvas);
+            Canvas.ForceUpdateCanvases();
+            var slot = (RectTransform)ui.Field.Root.transform.Find($"DuelBoard/Zone_{monster.sequence + 2}_3");
+            var card = (RectTransform)slot.Find("Card");
+            var art = (RectTransform)card.Find("CardView/AspectBox");
+            var restingReadout = (RectTransform)slot.Find("CardReadout");
+            var trigger = slot.GetComponent<CardDragTrigger>();
+            var pointer = new PointerEventData(EventSystem.current) { pointerId = -1 };
+            var advanceFocus = typeof(DuelFieldUI).GetMethod("AdvanceDuelPadCardMotions", PrivateInstance);
+            void AdvanceFocus(float time) => advanceFocus.Invoke(ui.Field, new object[] { time });
+
+            var hitArea = slot.rect;
+            var restingPosition = slot.anchoredPosition;
+            trigger.OnPointerEnter(pointer);
+            AdvanceFocus(.045f);
+            var shadow = art.Find("FocusShadow")?.GetComponent<Image>();
+            Require(card.anchoredPosition.y > 0f && restingReadout.anchoredPosition == card.anchoredPosition &&
+                art.localScale.x > 1f && art.localScale.x < 1.05f && restingReadout.localScale == art.localScale &&
+                shadow != null && shadow.enabled && !shadow.raycastTarget && slot.rect == hitArea && slot.anchoredPosition == restingPosition,
+                "Pointing at a monster did not smoothly raise the art and stats without moving its hit area.");
+            var focusedPose = animation.GetVisualPose(art);
+            Vector2 focusedStats = animation.GetPoint(restingReadout, Vector2.one) - animation.GetPoint(restingReadout, Vector2.zero);
             duel.SubmitResponseInt(2);
             ReachIdle();
             var pending = (Dictionary<(byte, uint), CardMoveReadoutSnapshot>)typeof(DuelFieldUI)
                 .GetField("_pendingCardReadouts", PrivateInstance).GetValue(ui.Field);
             var snapshot = pending[(monster.controller, monster.sequence)];
             ui.Field.Refresh();
-            Require(snapshot.Card?.IsDefense == true && snapshot.Movement?.StartPosition == YgoConstants.POS_FACEUP_ATTACK,
-                "A position change lost its starting and ending position.");
+            Require(snapshot.Card?.IsDefense == true && snapshot.Movement?.StartPosition == YgoConstants.POS_FACEUP_ATTACK &&
+                Vector2.Distance(snapshot.Movement.Value.StartSize, focusedStats) < .1f && card.anchoredPosition == Vector2.zero,
+                "A position change lost its starting stats or retained a raised card underneath its animation.");
 
             var steps = (Queue<IEnumerator>)typeof(CardAnimationManager).GetField("_steps", PrivateInstance).GetValue(animation);
             var step = steps.Dequeue();
@@ -701,7 +724,8 @@ namespace YGOPortable.Editor
             Require(((IEnumerator)step.Current).MoveNext(), "The field card did not render its first moving frame.");
             var holder = (RectTransform)animation.transform.Find("MovingCardReadout");
             var combat = holder.Find("CardReadout/Combat");
-            Require(combat.Find("Attack/Digits/Value").GetComponent<Text>().text == "1700" &&
+            Require(Vector2.Distance(holder.anchoredPosition, focusedPose.Position) < .2f &&
+                combat.Find("Attack/Digits/Value").GetComponent<Text>().text == "1700" &&
                 combat.Find("Defense/Digits/Value").GetComponent<Text>().text == "1650" &&
                 combat.Find("Attack/Rail").GetComponent<Image>().color.a > combat.Find("Defense/Rail").GetComponent<Image>().color.a &&
                 holder.Find("CardReadout/Labels/Rating/Value").GetComponent<Text>().text == "4" &&
@@ -722,17 +746,30 @@ namespace YGOPortable.Editor
 
             Require(!step.MoveNext() && (holder == null || !holder.gameObject.activeSelf), "The travelling stats remained after landing.");
             UnityEngine.Object.DestroyImmediate(movingCard.gameObject);
-            var slot = ui.Field.Root.transform.Find($"DuelBoard/Zone_{monster.sequence + 2}_3/CardReadout/Combat");
-            Require(slot.gameObject.activeInHierarchy &&
-                slot.Find("Defense/Rail").GetComponent<Image>().color.a > slot.Find("Attack/Rail").GetComponent<Image>().color.a,
+            var landed = restingReadout.Find("Combat");
+            Require(landed.gameObject.activeInHierarchy &&
+                landed.Find("Defense/Rail").GetComponent<Image>().color.a > landed.Find("Attack/Rail").GetComponent<Image>().color.a,
                 "The landing interrupted the defense readout.");
+
+            trigger.OnPointerEnter(pointer);
+            AdvanceFocus(.12f);
+            Require(card.anchoredPosition.y > 0f && restingReadout.localRotation == Quaternion.identity &&
+                restingReadout.anchoredPosition == card.anchoredPosition,
+                "Hovering a defense-position card displaced or turned its digits.");
+            trigger.OnPointerExit(pointer);
+            typeof(DuelFieldUI).GetField("_pointerActionLeftAt", PrivateInstance).SetValue(ui.Field, float.NegativeInfinity);
+            typeof(DuelFieldUI).GetMethod("RefreshCardActions", PrivateInstance).Invoke(ui.Field, null);
+            AdvanceFocus(.5f);
+            Require(card.anchoredPosition == Vector2.zero && restingReadout.anchoredPosition == Vector2.zero &&
+                restingReadout.localScale == Vector3.one && art.localScale == Vector3.one && !shadow.enabled,
+                "The selected monster and its readout did not settle after the pointer left.");
 
             int turnDown = duel.ActivePrompt.activatable.FindIndex(card => card.code == bookOfMoon);
             Require(turnDown >= 0, "The movement fixture could not activate its face-down effect.");
             duel.SubmitResponseInt((turnDown << 16) | 5);
             ReachIdle();
             Require(pending.Count == 0, "A face-down move queued live stats.");
-            Debug.Log("[VERIFY DUEL MOVING STATS] Native Attack-to-Defense rotation kept upright ATK, DEF and Level during motion and hid face-down stats.");
+            Debug.Log("[VERIFY DUEL MOVING STATS] Pointer focus and native Attack-to-Defense rotation kept upright ATK, DEF and Level aligned. Face-down stats stayed hidden.");
         }
 
         private static bool IsAshBlossomPrompt(DuelSession duel, DuelPrompt prompt)

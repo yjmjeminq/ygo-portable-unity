@@ -341,10 +341,20 @@ namespace YGOPortable.UI
         private void PositionCardActions(RectTransform anchor, bool inHand)
         {
             var root = (RectTransform)_cardActionsBar.parent;
-            anchor.GetWorldCorners(_cardActionCorners);
             float top = float.NegativeInfinity;
-            foreach (var corner in _cardActionCorners)
-                top = Mathf.Max(top, root.InverseTransformPoint(corner).y);
+            void IncludeTop(RectTransform area)
+            {
+                area.GetWorldCorners(_cardActionCorners);
+                foreach (var corner in _cardActionCorners)
+                    top = Mathf.Max(top, root.InverseTransformPoint(corner).y);
+            }
+            IncludeTop(anchor);
+            if (_fieldSlotsByRect.TryGetValue(anchor, out var slot) && slot.cardView.gameObject.activeInHierarchy)
+            {
+                IncludeTop(slot.focusArt);
+                if (slot.readout?.Rect is { } readout && readout.gameObject.activeInHierarchy)
+                    IncludeTop(readout);
+            }
             float x = root.InverseTransformPoint(anchor.TransformPoint(anchor.rect.center)).x;
             float inset = _cardActionsBar.sizeDelta.x * .5f + 8f;
             float y = Mathf.Min(root.rect.yMax - CardActionHeight - 8f, top + (inHand ? 20f : 6f));

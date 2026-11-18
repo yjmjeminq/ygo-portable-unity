@@ -453,6 +453,8 @@ namespace YGOPortable.UI
         private DuelCounterBadge _counters;
         private (uint Code, bool Opponent) _lastCard;
 
+        internal RectTransform Rect => _root;
+
         internal DuelFieldReadout(Transform slot, bool inPreview = false)
         {
             _inPreview = inPreview;
@@ -493,6 +495,13 @@ namespace YGOPortable.UI
         }
 
         internal void Hide() => _root.gameObject.SetActive(false);
+
+        internal void FollowFocus(Vector2 lift, float scale)
+        {
+            if (_root.anchoredPosition != lift) _root.anchoredPosition = lift;
+            var size = Vector3.one * scale;
+            if (_root.localScale != size) _root.localScale = size;
+        }
 
         internal void Bind(DuelCardReadout card, bool opponent, uint? scale, uint? position = null)
         {

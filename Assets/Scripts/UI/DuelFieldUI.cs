@@ -91,7 +91,9 @@ namespace YGOPortable.UI
             public DuelZoneImage bgImg;
             public Outline border;
             public CompositeCardView cardView;
+            public RectTransform cardArea;
             public RectTransform focusArt;
+            public Image focusShadow;
             public DuelFieldReadout readout;
             public CardDragTrigger dragTrigger;
             public Vector2Int? linkCell;
@@ -854,6 +856,7 @@ namespace YGOPortable.UI
                 bgImg = (DuelZoneImage)background,
                 border = border,
                 cardView = view,
+                cardArea = card,
                 focusArt = (RectTransform)view.transform.Find("AspectBox"),
                 dragTrigger = cell.gameObject.AddComponent<CardDragTrigger>(),
             };
@@ -1381,7 +1384,11 @@ namespace YGOPortable.UI
                 var readout = new DuelCardReadout(CardDatabase.Get(live.code), live);
                 uint? scale = readout.ScaleIn(loc, seq);
                 if (loc == YgoConstants.LOCATION_MZONE && readout.IsMonster || scale.HasValue || readout.CounterCount != 0)
-                    (slot.readout ??= new DuelFieldReadout(slot.root)).Bind(readout, opponent, scale);
+                {
+                    slot.readout ??= new DuelFieldReadout(slot.root);
+                    slot.readout.Bind(readout, opponent, scale);
+                    slot.readout.FollowFocus(slot.cardArea.anchoredPosition, slot.focusArt.localScale.x);
+                }
                 else slot.readout?.Hide();
             }
             else slot.readout?.Hide();
@@ -1394,6 +1401,7 @@ namespace YGOPortable.UI
             slot.dragTrigger.DataGetter = canDrag ? () => (con, loc, seq) : null;
             if (!visible)
             {
+                ResetFieldCardFocus(slot);
                 ClearPointerCard(slot.focusArt);
                 if (_pointerActionAnchor == slot.root) _pointerActionAnchor = null;
             }
@@ -2319,7 +2327,8 @@ namespace YGOPortable.UI
                         int viewer = _session.HumanPlayerIndex;
                         readout = new CardMoveReadoutSnapshot(e.code)
                         {
-                            Movement = (SizeOf(source.root), SizeOf(destination.root), e.fromPos, e.fromCon != viewer, e.toCon != viewer),
+                            Movement = (SizeOf(source.readout?.Rect ?? source.root), SizeOf(destination.root),
+                                e.fromPos, e.fromCon != viewer, e.toCon != viewer),
                         };
                     }
                 }
