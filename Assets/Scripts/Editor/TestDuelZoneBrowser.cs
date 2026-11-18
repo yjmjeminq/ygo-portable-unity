@@ -99,13 +99,23 @@ namespace YGOPortable.Editor
                     placeActions.Invoke(field, new object[] { slot, false });
 
                     foreach (var element in new[] { left, left.Find("CardDetails/ArtworkControls"), left.Find("CardDetails/CombatStats"), left.Find("CardDetails/Description/Viewport"),
-                        slot.Find("CardReadout"), viewport.Find("DuelBoard"), viewport.Find("PlayerHUD"), viewport.Find("OpponentHUD"),
+                        slot.Find("CardReadout"), viewport.Find("DuelBoard"), viewport.Find("Turn/Dial"),
+                        viewport.Find("PlayerHUD"), viewport.Find("OpponentHUD"),
                         details.Find("ZoomWin"), battle.transform })
                     {
                         Rect bounds = Bounds(element);
                         Require(bounds.xMin >= safe.xMin - .1f && bounds.xMax <= safe.xMax + .1f &&
                             bounds.yMin >= safe.yMin - .1f && bounds.yMax <= safe.yMax + .1f && bounds.width > 0f,
                             $"{element.name} intersected the device cutout or home indicator.");
+                    }
+
+                    foreach (string hudName in new[] { "PlayerHUD", "OpponentHUD" })
+                    {
+                        var status = viewport.Find(hudName + "/Status");
+                        var portrait = Bounds(status.Find("AvatarFrame/PortraitPlate"));
+                        var readout = Bounds(status.Find("Readout"));
+                        Require(!portrait.Overlaps(readout) && portrait.width > 0f,
+                            $"{hudName} let its portrait overlap the name or LP.");
                     }
 
                     var preview = Bounds(left);
@@ -947,7 +957,12 @@ namespace YGOPortable.Editor
             internal void VerifyPhasePicker(DuelPrompt prompt)
             {
                 Field.Refresh();
-                Click(Field.Root.transform.Find("Turn/Dial")?.GetComponent<Button>());
+                var dial = Field.Root.transform.Find("Turn/Dial") as RectTransform;
+                var steps = dial.Find("PhaseSteps");
+                Require(dial.Find("PhaseName/Value").GetComponent<Text>().text == "메인 1" &&
+                    steps.Find("Main1").GetComponent<Image>().color.g > steps.Find("Battle").GetComponent<Image>().color.g,
+                    "The turn HUD did not identify the current phase.");
+                ClickAt(dial, _duel.HumanPlayerIndex == 0 ? -1 : 0);
                 var picker = Field.Root.transform.Find("PhasePicker");
                 Require(picker != null && picker.gameObject.activeInHierarchy, "The phase dial did not open its picker.");
                 float previousX = float.NegativeInfinity;

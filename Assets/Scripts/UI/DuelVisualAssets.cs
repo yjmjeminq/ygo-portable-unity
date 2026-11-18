@@ -13,10 +13,7 @@ namespace YGOPortable.UI
         internal static Texture2D ArenaBackdrop { get; } = Resources.Load<Texture2D>("Duel/ObservatoryBackdrop");
         internal static Sprite MasterDuelLogo { get; } = Resources.Load<Sprite>("Title/MasterDuelLogo") ??
             LoadHudSprite("MasterDuelLogo");
-        internal static Sprite PhaseBase { get; } = LoadHudSprite("PhaseBase");
         internal static Sprite PhaseRim { get; } = LoadHudSprite("PhaseRim");
-        internal static Sprite PlayerLp { get; } = LoadHudSprite("LPPlayer");
-        internal static Sprite OpponentLp { get; } = LoadHudSprite("LPOpponent");
         internal static Sprite DeckBack { get; } = LoadHudSprite("DeckBack");
         internal static Sprite PauseIcon { get; } = LoadHudSprite("Pause");
         internal static Sprite LogIcon { get; } = LoadHudSprite("Log");

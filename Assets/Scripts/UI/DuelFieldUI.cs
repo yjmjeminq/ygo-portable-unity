@@ -53,10 +53,8 @@ namespace YGOPortable.UI
         private Text _chainConfirmationLabel;
 
         // Phase indicator and shortcuts
-        private Image _phasePlate;
         private Image _phaseRim;
-        private Outline _phaseOutline;
-        private Image _phaseIcon;
+        private readonly Image[] _phaseSteps = new Image[PhaseEntries.Length];
         private Button _phaseButton;
         private GameObject _phasePicker;
         private Text _phaseLabel;
@@ -67,11 +65,24 @@ namespace YGOPortable.UI
         private Text _placementHint;
         private Button _placementCancel;
 
-        // Life Points Animated Rolling & Low LP State
-        private float _myDisplayLp = 8000f;
-        private float _oppDisplayLp = 8000f;
-        private int _myTargetLp = 8000;
-        private int _oppTargetLp = 8000;
+        private static readonly Color HudEdge = new Color(.30f, .34f, .33f, .94f);
+        private static readonly Color HudSurface = new Color(.035f, .062f, .076f, .975f);
+        private static readonly Color HudText = new Color(.94f, .95f, .93f);
+        private static readonly (string name, string label, int phase, string icon)[] PhaseEntries =
+        {
+            ("Draw", "드로우", YgoConstants.PHASE_DRAW, "dp"),
+            ("Standby", "스탠바이", YgoConstants.PHASE_STANDBY, "sp"),
+            ("Main1", "메인 1", YgoConstants.PHASE_MAIN1, "mp1"),
+            ("Battle", "배틀", YgoConstants.PHASE_BATTLE, "bp"),
+            ("Main2", "메인 2", YgoConstants.PHASE_MAIN2, "mp2"),
+            ("End", "엔드", YgoConstants.PHASE_END, "ep"),
+        };
+
+        private const int FullLifeTrack = 8000;
+        private double _myDisplayLp;
+        private double _oppDisplayLp;
+        private int _myTargetLp;
+        private int _oppTargetLp;
 
         // Zone slot widgets
         private class FieldSlotView
@@ -252,10 +263,11 @@ namespace YGOPortable.UI
             _hintBannerText.text = "";
             _chainIcon.gameObject.SetActive(false);
             _chainBannerText.text = "";
-            _myTargetLp = _oppTargetLp = 8000;
-            _myDisplayLp = _oppDisplayLp = 8000f;
-            _myLpText.text = _oppLpText.text = "8000";
-            _myLpFill.anchorMax = _oppLpFill.anchorMax = Vector2.one;
+            _myDisplayLp = _myTargetLp = Mathf.Max(0, session.Players[session.HumanPlayerIndex].lp);
+            _oppDisplayLp = _oppTargetLp = Mathf.Max(0, session.Players[session.AiPlayerIndex].lp);
+            WriteLifeReadout(_myLpText, _myLpFill, _myTargetLp);
+            WriteLifeReadout(_oppLpText, _oppLpFill, _oppTargetLp);
+            _myLpText.color = _oppLpText.color = HudText;
             Canvas.ForceUpdateCanvases();
             Refresh();
             var animator = CardAnimationManager.Instance;
@@ -714,37 +726,43 @@ namespace YGOPortable.UI
 
         private static (Text name, Text lp, RectTransform fill, Image portrait) BuildPlayerHud(RectTransform root, bool opponent)
         {
-            var color = DuelStyle.Side(opponent);
-            var panel = LotdUiKit.CreateRect("Status", root, new Vector2(opponent ? 0f : 0.18f, 0.06f),
-                new Vector2(opponent ? 0.82f : 1f, 0.98f), Vector2.zero, Vector2.zero);
-            var backdrop = opponent ? DuelVisualAssets.OpponentLp : DuelVisualAssets.PlayerLp;
-            LotdUiKit.AddImage(panel.gameObject, backdrop ?? LotdUiKit.WhiteSprite,
-                backdrop != null ? Color.white : DuelStyle.PanelColor, false, false);
-            var stripe = LotdUiKit.CreateRect("Side", panel, new Vector2(0f, 0.93f), Vector2.one, Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(stripe.gameObject, LotdUiKit.WhiteSprite, color, false, false);
-            var name = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Name", panel, new Vector2(0.045f, 0.58f),
-                new Vector2(0.95f, 0.93f), Vector2.zero, Vector2.zero), "Text", "", 16, 9,
-                opponent ? TextAnchor.MiddleRight : TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
-            var track = LotdUiKit.CreateRect("LPTrack", panel, new Vector2(0.05f, 0.07f), new Vector2(0.95f, 0.115f),
-                Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(track.gameObject, LotdUiKit.WhiteSprite, new Color(.76f, .82f, .84f, .18f), false, false);
-            var fill = LotdUiKit.FillRect("Fill", track);
-            LotdUiKit.AddImage(fill.gameObject, LotdUiKit.WhiteSprite, color, false, false);
-            LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Caption", panel, new Vector2(0.045f, 0.13f),
-                new Vector2(0.26f, 0.58f), Vector2.zero, Vector2.zero), "Label", "LP", 17, 10,
-                TextAnchor.MiddleLeft, DuelStyle.Muted, FontStyle.Bold);
-            var lp = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Value", panel, new Vector2(0.25f, 0.12f),
-                new Vector2(0.93f, 0.65f), Vector2.zero, Vector2.zero), "Text", "8000", 36, 12,
-                TextAnchor.MiddleRight, Color.white, FontStyle.Bold);
-            DuelStyle.Shadow(lp, 2f);
+            var side = DuelStyle.Side(opponent);
+            var panel = LotdUiKit.FillRect("Status", root, 1f);
+            AddHudSurface(panel, HudEdge, HudSurface);
 
-            var avatar = LotdUiKit.CreateRect("AvatarFrame", root, new Vector2(opponent ? 0.80f : 0f, 0.03f),
-                new Vector2(opponent ? 1f : 0.20f, 1f), Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(avatar.gameObject, DuelStyle.Disc, new Color(.15f, .19f, .23f), true, false);
-            LotdUiKit.AddImage(LotdUiKit.FillRect("Rim", avatar).gameObject,
-                DuelVisualAssets.PhaseRim, color, true, false).enabled = DuelVisualAssets.PhaseRim != null;
-            var portrait = LotdUiKit.AddImage(LotdUiKit.FillRect("Portrait", avatar, 7f).gameObject, null, Color.white, true, false);
+            var avatarHolder = LotdUiKit.CreateRect("AvatarFrame", panel, new Vector2(opponent ? .781f : .017f, .095f),
+                new Vector2(opponent ? .983f : .219f, .905f), Vector2.zero, Vector2.zero);
+            var avatar = LotdUiKit.FillRect("PortraitPlate", avatarHolder);
+            var square = avatar.gameObject.AddComponent<AspectRatioFitter>();
+            square.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+            square.aspectRatio = 1f;
+            AddHudSurface(avatar, Color.Lerp(HudEdge, side, .19f), new Color(.016f, .032f, .041f));
+            var portrait = LotdUiKit.AddImage(LotdUiKit.FillRect("Portrait", avatar, 4f).gameObject, null, Color.white, true, false);
+
+            var readout = LotdUiKit.CreateRect("Readout", panel, new Vector2(opponent ? .038f : .241f, 0f),
+                new Vector2(opponent ? .759f : .962f, 1f), Vector2.zero, Vector2.zero);
+            var name = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Name", readout, new Vector2(0f, .62f),
+                new Vector2(1f, .932f), Vector2.zero, Vector2.zero), "Text", "", 17, 9,
+                opponent ? TextAnchor.MiddleRight : TextAnchor.MiddleLeft, DuelStyle.Muted, FontStyle.Bold);
+            var track = LotdUiKit.CreateRect("LPTrack", readout, new Vector2(0f, .095f), new Vector2(1f, .125f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(track.gameObject, LotdUiKit.WhiteSprite, new Color(.19f, .24f, .27f), false, false);
+            var fill = LotdUiKit.FillRect("Fill", track);
+            LotdUiKit.AddImage(fill.gameObject, LotdUiKit.WhiteSprite, Color.Lerp(HudEdge, side, .69f), false, false);
+            LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Caption", readout, new Vector2(0f, .15f),
+                new Vector2(.18f, .57f), Vector2.zero, Vector2.zero), "Label", "LP", 16, 9,
+                TextAnchor.MiddleLeft, Color.Lerp(DuelStyle.Muted, side, .39f), FontStyle.Bold);
+            var lp = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Value", readout, new Vector2(.18f, .139f),
+                new Vector2(1f, .65f), Vector2.zero, Vector2.zero), "Text", "", 38, 12,
+                TextAnchor.MiddleRight, HudText, FontStyle.Bold);
             return (name, lp, fill, portrait);
+        }
+
+        private static Image AddHudSurface(RectTransform root, Color edge, Color face)
+        {
+            var rim = DuelReadoutPlate.Add(root, edge);
+            DuelReadoutPlate.Add(LotdUiKit.FillRect("Surface", root, 1.3f), face);
+            return rim;
         }
 
         private void BuildCenterBoard(Transform root)
@@ -921,40 +939,7 @@ namespace YGOPortable.UI
             portrait.sprite = LotdUiKit.LoadSprite("LOTD/Busts/yamiyugi_neutral") ?? LotdUiKit.LoadSprite("LOTD/Busts/atem_neutral");
             portrait.enabled = portrait.sprite != null;
 
-            var turnHolder = LotdUiKit.CreateRect("Turn", root, new Vector2(.904f, .451f), new Vector2(.984f, .615f),
-                Vector2.zero, Vector2.zero);
-            var turn = LotdUiKit.FillRect("Dial", turnHolder);
-            var square = turn.gameObject.AddComponent<AspectRatioFitter>();
-            square.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
-            square.aspectRatio = 1f;
-            _phasePlate = LotdUiKit.AddImage(turn.gameObject, DuelVisualAssets.PhaseBase ?? DuelStyle.Disc, Color.white, true);
-            _phaseRim = LotdUiKit.AddImage(LotdUiKit.FillRect("Rim", turn).gameObject, DuelVisualAssets.PhaseRim,
-                DuelStyle.Gold, true, false);
-            _phaseRim.enabled = DuelVisualAssets.PhaseRim != null;
-            if (!_phaseRim.enabled)
-            {
-                _phaseOutline = turn.gameObject.AddComponent<Outline>();
-                _phaseOutline.effectDistance = new Vector2(1.5f, -1.5f);
-            }
-            _phaseButton = turn.gameObject.AddComponent<Button>();
-            _phaseButton.targetGraphic = _phasePlate;
-            _phaseButton.transition = Selectable.Transition.None;
-            _phaseButton.onClick.AddListener(OpenPhasePicker);
-            var phaseIcon = LotdUiKit.CreateRect("PhaseIcon", turn, new Vector2(.414f, .76f), new Vector2(.586f, .921f),
-                Vector2.zero, Vector2.zero);
-            _phaseIcon = LotdUiKit.AddImage(phaseIcon.gameObject, null, DuelStyle.Gold, true, false);
-            _turnBadgeText = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("TurnNumber", turn, new Vector2(.125f, .570f),
-                new Vector2(.875f, .755f), Vector2.zero, Vector2.zero), "Value", "", 15, 9,
-                TextAnchor.MiddleCenter, DuelStyle.Muted, FontStyle.Bold);
-            _phaseLabel = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("PhaseName", turn, new Vector2(.085f, .306f),
-                new Vector2(.915f, .574f), Vector2.zero, Vector2.zero), "Value", "", 23, 11,
-                TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
-            _phaseControlHint = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("ChangePrompt", turn, new Vector2(.13f, .153f),
-                new Vector2(.87f, .302f), Vector2.zero, Vector2.zero), "Label", "‹ 페이즈 변경", 12, 8,
-                TextAnchor.MiddleCenter, DuelStyle.Gold, FontStyle.Bold);
-            DuelStyle.Shadow(_turnBadgeText);
-            DuelStyle.Shadow(_phaseLabel);
-
+            BuildTurnHud(root);
             BuildPhasePicker(root);
             BuildPlacementControls(root);
             var log = LotdUiKit.CreateRect("OpenLog", root, new Vector2(0.910f, 0.035f), new Vector2(0.984f, 0.092f),
@@ -977,56 +962,95 @@ namespace YGOPortable.UI
             _hintBannerText.gameObject.AddComponent<Outline>().effectColor = LotdUiKit.BgDeep;
         }
 
+        private void BuildTurnHud(Transform root)
+        {
+            var holder = LotdUiKit.CreateRect("Turn", root, new Vector2(.904f, .451f), new Vector2(.984f, .615f),
+                Vector2.zero, Vector2.zero);
+            var turn = LotdUiKit.CreateRect("Dial", holder, new Vector2(0f, .12f), new Vector2(1f, .88f),
+                Vector2.zero, Vector2.zero);
+            _phaseRim = AddHudSurface(turn, HudEdge, HudSurface);
+            _phaseButton = AddHudButton(_phaseRim, OpenPhasePicker);
+
+            _turnBadgeText = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("TurnNumber", turn, new Vector2(.08f, .675f),
+                new Vector2(.92f, .935f), Vector2.zero, Vector2.zero), "Value", "", 16, 9,
+                TextAnchor.MiddleCenter, DuelStyle.Muted, FontStyle.Bold);
+            _phaseLabel = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("PhaseName", turn, new Vector2(.07f, .295f),
+                new Vector2(.93f, .682f), Vector2.zero, Vector2.zero), "Value", "", 26, 12,
+                TextAnchor.MiddleCenter, HudText, FontStyle.Bold);
+            var progress = LotdUiKit.CreateRect("PhaseSteps", turn, new Vector2(.13f, .235f), new Vector2(.87f, .268f),
+                Vector2.zero, Vector2.zero);
+            for (int i = 0; i < _phaseSteps.Length; i++)
+            {
+                var step = LotdUiKit.CreateRect(PhaseEntries[i].name, progress,
+                    new Vector2((i + .12f) / _phaseSteps.Length, 0f), new Vector2((i + .88f) / _phaseSteps.Length, 1f),
+                    Vector2.zero, Vector2.zero);
+                _phaseSteps[i] = LotdUiKit.AddImage(step.gameObject, LotdUiKit.WhiteSprite, HudEdge, false, false);
+            }
+            _phaseControlHint = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("ChangePrompt", turn, new Vector2(.09f, .045f),
+                new Vector2(.91f, .213f), Vector2.zero, Vector2.zero), "Label", "페이즈 변경", 13, 8,
+                TextAnchor.MiddleCenter, DuelStyle.Gold, FontStyle.Bold);
+        }
+
+        private static Button AddHudButton(Image rim, Action onClick)
+        {
+            rim.raycastTarget = true;
+            var button = rim.gameObject.AddComponent<Button>();
+            button.targetGraphic = rim;
+            button.navigation = new Navigation { mode = Navigation.Mode.None };
+            var colors = button.colors;
+            colors.normalColor = colors.disabledColor = Color.white;
+            colors.highlightedColor = colors.selectedColor = new Color(1f, .92f, .75f);
+            colors.pressedColor = new Color(.78f, .73f, .68f);
+            colors.fadeDuration = .08f;
+            button.colors = colors;
+            button.onClick.AddListener(() =>
+            {
+                LotdAudio.PlayClick();
+                onClick();
+            });
+            return button;
+        }
+
         private void BuildPhasePicker(Transform root)
         {
             var overlay = LotdUiKit.FillRect("PhasePicker", root);
             _phasePicker = overlay.gameObject;
             var dismiss = overlay.gameObject.AddComponent<Button>();
-            dismiss.targetGraphic = LotdUiKit.AddImage(overlay.gameObject, LotdUiKit.WhiteSprite, new Color(.018f, .03f, .07f, .38f));
+            dismiss.targetGraphic = LotdUiKit.AddImage(overlay.gameObject, LotdUiKit.WhiteSprite, new Color(.018f, .03f, .047f, .28f));
             dismiss.transition = Selectable.Transition.None;
             dismiss.onClick.AddListener(() => _phasePicker.SetActive(false));
 
-            var controls = DuelStyle.Panel(overlay, "PhaseControls", new Vector2(.235f, .218f), new Vector2(.845f, .465f),
-                fill: new Color(.035f, .096f, .146f, .98f), border: new Color(.56f, .73f, .80f, .76f));
-            var header = LotdUiKit.CreateRect("Header", controls, new Vector2(0f, .79f), Vector2.one, Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(header.gameObject, LotdUiKit.WhiteSprite, DuelStyle.PanelColor, false, false);
-            LotdUiKit.AddFittedText(header, "Title", "이동할 페이즈를 선택하세요", 20, 12, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+            var controls = LotdUiKit.CreateRect("PhaseControls", overlay, new Vector2(.302f, .223f), new Vector2(.879f, .415f),
+                Vector2.zero, Vector2.zero);
+            AddHudSurface(controls, HudEdge, HudSurface);
+            var header = LotdUiKit.CreateRect("Header", controls, new Vector2(.027f, .775f), new Vector2(.973f, .953f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddFittedText(header, "Title", "페이즈 변경", 19, 12, TextAnchor.MiddleLeft, HudText, FontStyle.Bold);
 
-            var line = LotdUiKit.CreateRect("Track", controls, new Vector2(.099f, .485f), new Vector2(.901f, .485f),
-                Vector2.zero, new Vector2(0f, 2f));
-            LotdUiKit.AddImage(line.gameObject, LotdUiKit.WhiteSprite, new Color(.43f, .65f, .75f, .46f), false, false);
-            var phases = new[]
+            for (int i = 0; i < PhaseEntries.Length; i++)
             {
-                ("Draw", "드로우", YgoConstants.PHASE_DRAW, "dp"),
-                ("Standby", "스탠바이", YgoConstants.PHASE_STANDBY, "sp"),
-                ("Main1", "메인 1", YgoConstants.PHASE_MAIN1, "mp1"),
-                ("Battle", "배틀", YgoConstants.PHASE_BATTLE, "bp"),
-                ("Main2", "메인 2", YgoConstants.PHASE_MAIN2, "mp2"),
-                ("End", "엔드", YgoConstants.PHASE_END, "ep"),
-            };
-            for (int i = 0; i < phases.Length; i++)
-            {
-                var (name, label, phase, asset) = phases[i];
+                var (name, label, phase, asset) = PhaseEntries[i];
                 float left = .028f + .158f * i;
-                var slot = LotdUiKit.CreateRect(name, controls, new Vector2(left, .244f), new Vector2(left + .150f, .735f),
+                var slot = LotdUiKit.CreateRect(name, controls, new Vector2(left, .297f), new Vector2(left + .150f, .737f),
                     Vector2.zero, Vector2.zero);
-                var button = DuelStyle.RoundButton(slot, "Button", DuelStyle.Player, () =>
+                var rim = AddHudSurface(LotdUiKit.FillRect("Button", slot), HudEdge, new Color(.060f, .101f, .122f));
+                var button = AddHudButton(rim, () =>
                 {
                     _phasePicker.SetActive(false);
                     OnPhaseShortcut(phase);
                 });
-                var iconBox = LotdUiKit.CreateRect("Icon", button.transform, new Vector2(.20f, .46f), new Vector2(.80f, .75f),
+                var iconBox = LotdUiKit.CreateRect("Icon", button.transform, new Vector2(.20f, .48f), new Vector2(.80f, .87f),
                     Vector2.zero, Vector2.zero);
                 Sprite sprite = DuelVisualAssets.PhaseIcon(phase) ?? LotdUiKit.LoadSprite("LOTD/PhaseBar/blue_" + asset);
                 var icon = LotdUiKit.AddImage(iconBox.gameObject, sprite, Color.white, true, false);
                 icon.enabled = sprite != null;
-                var labelBox = LotdUiKit.CreateRect("Caption", button.transform, new Vector2(.06f, .18f), new Vector2(.94f, .43f),
+                var labelBox = LotdUiKit.CreateRect("Caption", button.transform, new Vector2(.06f, .088f), new Vector2(.94f, .448f),
                     Vector2.zero, Vector2.zero);
-                var caption = LotdUiKit.AddFittedText(labelBox, "Label", label, 15, 8, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+                var caption = LotdUiKit.AddFittedText(labelBox, "Label", label, 17, 9, TextAnchor.MiddleCenter, HudText, FontStyle.Bold);
                 _phaseChoices.Add((phase, button, caption, icon));
             }
 
-            var cancel = LotdUiKit.CreateRect("Cancel", controls, new Vector2(.405f, .038f), new Vector2(.595f, .195f),
+            var cancel = LotdUiKit.CreateRect("Cancel", controls, new Vector2(.793f, .060f), new Vector2(.968f, .248f),
                 Vector2.zero, Vector2.zero);
             _phaseCancel = DuelStyle.Button(cancel, "Button", "취소", () => _phasePicker.SetActive(false), 15);
             _phaseCancel.navigation = new Navigation { mode = Navigation.Mode.None };
@@ -1038,10 +1062,7 @@ namespace YGOPortable.UI
             bool waiting = CanAcceptPlayerAction && !IsStagingPlacement;
             bool idle = waiting && prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD;
             bool battle = waiting && prompt.messageType == YgoConstants.MSG_SELECT_BATTLECMD;
-            int current = _session.CurrentPhase;
-            if (current is YgoConstants.PHASE_BATTLE_START or YgoConstants.PHASE_BATTLE_STEP or
-                YgoConstants.PHASE_DAMAGE or YgoConstants.PHASE_DAMAGE_CAL)
-                current = YgoConstants.PHASE_BATTLE;
+            int current = PhaseStep(_session.CurrentPhase);
 
             bool any = false;
             foreach (var (phase, button, label, icon) in _phaseChoices)
@@ -1055,9 +1076,10 @@ namespace YGOPortable.UI
                 };
                 bool active = phase == current;
                 button.interactable = enabled;
-                button.image.color = active ? DuelStyle.Gold : enabled ? DuelStyle.Player : new Color(.29f, .35f, .38f);
-                label.color = active ? DuelStyle.Gold : enabled ? Color.white : new Color(.61f, .67f, .70f);
-                icon.color = active || enabled ? Color.white : new Color(.64f, .68f, .71f, .64f);
+                button.image.color = active ? DuelStyle.Gold : enabled
+                    ? Color.Lerp(HudEdge, DuelStyle.Player, .41f) : new Color(.21f, .26f, .28f);
+                label.color = active ? DuelStyle.Gold : enabled ? HudText : new Color(.61f, .67f, .70f);
+                icon.color = active || enabled ? label.color : new Color(.64f, .68f, .71f, .64f);
                 any |= enabled;
             }
             _phaseButton.interactable = any;
@@ -1273,29 +1295,25 @@ namespace YGOPortable.UI
         private void SetTurnCaption(int turn, bool opponent)
         {
             _turnBadgeText.text = $"{(opponent ? "상대 턴" : "내 턴")} · {turn}";
-            _turnBadgeText.color = DuelStyle.Side(opponent);
+            _turnBadgeText.color = Color.Lerp(HudText, DuelStyle.Side(opponent), .52f);
         }
+
+        private static int PhaseStep(int phase) => phase is YgoConstants.PHASE_BATTLE_START or YgoConstants.PHASE_BATTLE_STEP or
+            YgoConstants.PHASE_DAMAGE or YgoConstants.PHASE_DAMAGE_CAL ? YgoConstants.PHASE_BATTLE : phase;
 
         private void SetPhasePlate(int phase, bool opponent)
         {
             Color accent = DuelStyle.Side(opponent);
-            _phasePlate.color = Color.Lerp(new Color(.15f, .21f, .30f), accent, .36f);
-            _phaseRim.color = accent;
-            if (_phaseOutline != null) _phaseOutline.effectColor = new Color(accent.r, accent.g, accent.b, .62f);
-            _phaseIcon.color = accent;
-            _phaseIcon.sprite = DuelVisualAssets.PhaseIcon(phase);
-            _phaseIcon.enabled = _phaseIcon.sprite != null;
-            _phaseLabel.text = phase switch
+            _phaseRim.color = Color.Lerp(HudEdge, accent, .30f);
+            int stepPhase = PhaseStep(phase);
+            string label = YgoConstants.GetPhaseNameKR(phase);
+            for (int i = 0; i < _phaseSteps.Length; i++)
             {
-                YgoConstants.PHASE_DRAW => "드로우",
-                YgoConstants.PHASE_STANDBY => "스탠바이",
-                YgoConstants.PHASE_MAIN1 => "메인 1",
-                YgoConstants.PHASE_MAIN2 => "메인 2",
-                YgoConstants.PHASE_END => "엔드",
-                YgoConstants.PHASE_BATTLE_START or YgoConstants.PHASE_BATTLE_STEP or YgoConstants.PHASE_BATTLE => "배틀",
-                YgoConstants.PHASE_DAMAGE or YgoConstants.PHASE_DAMAGE_CAL => "데미지",
-                _ => YgoConstants.GetPhaseNameKR(phase),
-            };
+                bool current = PhaseEntries[i].phase == stepPhase;
+                _phaseSteps[i].color = current ? Color.Lerp(HudText, accent, .66f) : HudEdge;
+                if (current) label = PhaseEntries[i].label;
+            }
+            _phaseLabel.text = phase is YgoConstants.PHASE_DAMAGE or YgoConstants.PHASE_DAMAGE_CAL ? "데미지" : label;
             _mat.ShowTurn(opponent);
         }
 
@@ -2408,14 +2426,20 @@ namespace YGOPortable.UI
         private void HandleLifePointsChanged(byte player, int delta, int lifePoints)
         {
             bool mine = player == _session.HumanPlayerIndex;
-            var animator = CardAnimationManager.Instance;
-            if (animator == null) return;
-            var point = animator.GetPoint((mine ? _myLpText : _oppLpText).rectTransform, new Vector2(0.64f, 0.5f));
-            animator.QueueLifeChange(point, delta, () =>
+            void ApplyLifePoints()
             {
-                if (mine) _myTargetLp = lifePoints;
-                else _oppTargetLp = lifePoints;
-            });
+                if (mine) _myTargetLp = Mathf.Max(0, lifePoints);
+                else _oppTargetLp = Mathf.Max(0, lifePoints);
+            }
+
+            var animator = CardAnimationManager.Instance;
+            if (animator == null)
+            {
+                ApplyLifePoints();
+                return;
+            }
+            var point = animator.GetPoint((mine ? _myLpText : _oppLpText).rectTransform, new Vector2(0.64f, 0.5f));
+            animator.QueueLifeChange(point, delta, ApplyLifePoints);
         }
 
         private void HandleTurnStarted(int turn, int player)
@@ -2481,54 +2505,7 @@ namespace YGOPortable.UI
             if (_myHandBar.rect.size != _myHandSize) RefreshHand(_session.Players[me].hand, me, false);
             if (_oppHandBar.rect.size != _oppHandSize) RefreshHand(_session.Players[opponent].hand, opponent, true);
 
-            // Keep the current HP readable while the damage animation is playing.
-            float playbackDelta = Time.deltaTime * PlaybackRate;
-            if (!IsPaused && Mathf.Abs(_myDisplayLp - _myTargetLp) > 0.5f)
-            {
-                float step = Mathf.Max(1200f, Mathf.Abs(_myDisplayLp - _myTargetLp) * 6.5f) * playbackDelta;
-                int oldInt = (int)_myDisplayLp;
-                _myDisplayLp = Mathf.MoveTowards(_myDisplayLp, _myTargetLp, step);
-                int newInt = (int)_myDisplayLp;
-                if (oldInt != newInt)
-                {
-                    LotdAudio.PlayTick();
-                }
-                _myLpText.text = ((int)_myDisplayLp).ToString();
-                _myLpFill.anchorMax = new Vector2(Mathf.Clamp01(_myDisplayLp / 8000f), 1f);
-            }
-
-            if (!IsPaused && Mathf.Abs(_oppDisplayLp - _oppTargetLp) > 0.5f)
-            {
-                float step = Mathf.Max(1200f, Mathf.Abs(_oppDisplayLp - _oppTargetLp) * 6.5f) * playbackDelta;
-                int oldInt = (int)_oppDisplayLp;
-                _oppDisplayLp = Mathf.MoveTowards(_oppDisplayLp, _oppTargetLp, step);
-                int newInt = (int)_oppDisplayLp;
-                if (oldInt != newInt)
-                {
-                    LotdAudio.PlayTick();
-                }
-                _oppLpText.text = ((int)_oppDisplayLp).ToString();
-                _oppLpFill.anchorMax = new Vector2(Mathf.Clamp01(_oppDisplayLp / 8000f), 1f);
-            }
-
-            // Critical low LP warning pulsation (<= 2000 LP)
-            if (_myDisplayLp <= 2000f && _myDisplayLp > 0f)
-            {
-                _myLpText.color = Color.Lerp(Color.white, new Color(1f, 0.22f, 0.22f, 1f), Mathf.PingPong(Time.time * 3.5f, 1f));
-            }
-            else
-            {
-                _myLpText.color = Color.white;
-            }
-
-            if (_oppDisplayLp <= 2000f && _oppDisplayLp > 0f)
-            {
-                _oppLpText.color = Color.Lerp(Color.white, new Color(1f, 0.22f, 0.22f, 1f), Mathf.PingPong(Time.time * 3.5f, 1f));
-            }
-            else
-            {
-                _oppLpText.color = Color.white;
-            }
+            AdvanceLifeReadouts(Time.deltaTime * PlaybackRate);
 
             // Global Cancel / Dismiss via ESC or Right Mouse Button
             if (Input.GetKeyDown(KeyCode.Escape) || Input.GetMouseButtonDown(1))
@@ -2571,6 +2548,42 @@ namespace YGOPortable.UI
 
             if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
                 HandleKeyboardConfirm();
+        }
+
+        private void AdvanceLifeReadouts(float playbackDelta)
+        {
+            if (IsPaused) return;
+            AdvanceLifeReadout(_myLpText, _myLpFill, ref _myDisplayLp, _myTargetLp, playbackDelta);
+            AdvanceLifeReadout(_oppLpText, _oppLpFill, ref _oppDisplayLp, _oppTargetLp, playbackDelta);
+        }
+
+        private static void AdvanceLifeReadout(Text label, RectTransform fill, ref double displayed, int target, float playbackDelta)
+        {
+            double remaining = target - displayed;
+            if (remaining != 0d && playbackDelta > 0f)
+            {
+                int before = (int)Math.Round(displayed);
+                double distance = Math.Abs(remaining);
+                double step = Math.Max(1200d, distance * 6.5d) * playbackDelta;
+                displayed = step >= distance ? target : displayed + Math.Sign(remaining) * step;
+                int lifePoints = (int)Math.Round(displayed);
+                if (lifePoints != before)
+                {
+                    LotdAudio.PlayTick();
+                    WriteLifeReadout(label, fill, lifePoints);
+                }
+            }
+
+            var lowLife = new Color(1f, .66f, .57f);
+            label.color = displayed > 0d && displayed <= 2000d
+                ? Color.Lerp(HudText, lowLife, .34f + Mathf.PingPong(Time.time * 2.1f, .42f))
+                : HudText;
+        }
+
+        private static void WriteLifeReadout(Text label, RectTransform fill, int lifePoints)
+        {
+            label.text = lifePoints.ToString();
+            fill.anchorMax = new Vector2(Mathf.Clamp01((float)lifePoints / FullLifeTrack), 1f);
         }
 
         private void HandleKeyboardConfirm()

@@ -30,15 +30,16 @@ namespace YGOPortable.Editor
         {
             foreach (bool playerFirst in new[] { true, false })
                 VerifyDuel(playerFirst);
-            Debug.Log("[VERIFY DUEL PAD] Both seats passed hand focus/detail/reflow, summons, pile viewing, phase changes, direct attacks and immediate field targeting by mouse, touch or controller.");
+            Debug.Log("[VERIFY DUEL PAD] Both seats passed hand focus/detail/reflow, summons, pile viewing, phase changes, LP updates, direct attacks and immediate field targeting by mouse, touch or controller.");
         }
 
         private static void VerifyDuel(bool playerFirst)
         {
             var main = Enumerable.Repeat(Sparkman, 20).Concat(Enumerable.Repeat(BurstLady, 20)).ToArray();
             var enemy = Enumerable.Repeat(playerFirst ? 89631139u : MysticalElf, 40).ToArray();
+            int startingLp = playerFirst ? 8000 : 12000;
             using var session = new DuelSession();
-            if (!session.StartNewDuel(main, new[] { 69248256u }, enemy, Array.Empty<uint>(), playerFirst, 8000,
+            if (!session.StartNewDuel(main, new[] { 69248256u }, enemy, Array.Empty<uint>(), playerFirst, startingLp,
                 new ulong[] { 718, 391, 27182, 31 }))
                 throw new InvalidOperationException("Could not create the controller test duel.");
 
@@ -77,6 +78,10 @@ namespace YGOPortable.Editor
                 var mine = session.Players[session.HumanPlayerIndex];
                 var enemyField = session.Players[session.AiPlayerIndex];
                 var idle = session.ActivePrompt;
+                var myLp = Get<Text>(field, "_myLpText");
+                var opponentLp = Get<Text>(field, "_oppLpText");
+                Require(myLp.text == startingLp.ToString() && opponentLp.text == startingLp.ToString(),
+                    "Binding a duel did not show its actual starting LP.");
                 Require(Get<uint>(field, "_inspectedCode") == 0 &&
                     !Get<CompositeCardView>(field, "_inspCard").gameObject.activeSelf,
                     "The inspector started with art for a card the player had not selected.");
@@ -278,8 +283,17 @@ namespace YGOPortable.Editor
                         "The controller attack target still required confirmation.");
                 }
                 Advance(session, prompt => prompt.playerId == session.HumanPlayerIndex && prompt.messageType == YgoConstants.MSG_SELECT_BATTLECMD);
-                Require(enemyField.lp < 8000 && session.RetryCount == 0,
+                Require(enemyField.lp < startingLp && session.RetryCount == 0,
                     $"The selected attack caused no battle damage in seat {session.HumanPlayerIndex} (LP {enemyField.lp}, retries {session.RetryCount}).");
+                // Advance the same display animation used by the game, before the field refresh can resync the LP.
+                Invoke(field, "AdvanceLifeReadouts", .02f);
+                Require(int.TryParse(opponentLp.text, out int between) && enemyField.lp < between && between < startingLp,
+                    "Battle damage did not animate the opponent LP toward the native total.");
+                Invoke(field, "AdvanceLifeReadouts", 1f);
+                var opponentFill = Get<RectTransform>(field, "_oppLpFill");
+                Require(opponentLp.text == enemyField.lp.ToString() && myLp.text == mine.lp.ToString() &&
+                    Mathf.Approximately(opponentFill.anchorMax.x, Mathf.Clamp01(enemyField.lp / 8000f)),
+                    "Battle damage settled on the wrong LP value or track length.");
 
                 field.Refresh();
                 var log = Get<Button>(field, "_duelPadLogButton");
