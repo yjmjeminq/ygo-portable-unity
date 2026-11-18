@@ -82,15 +82,15 @@ namespace YGOPortable.UI
 
         internal void Hide() => _root.gameObject.SetActive(false);
 
-        internal void Bind(DuelCardReadout card, bool opponent = false)
+        internal void Bind(DuelCardReadout card, bool opponent = false, bool showChanges = false)
         {
             _root.gameObject.SetActive(card.IsMonster);
             if (!card.IsMonster) return;
 
             Layout(card.IsLink, card.LinkMarkers, opponent);
-            _attack.Bind(card.Attack, card.Live?.baseAttack ?? card.Attack, card.Live?.IsAttack == true);
+            _attack.Bind(card.Attack, card.Live?.baseAttack ?? card.Attack, card.Live?.IsAttack == true, showChanges);
             if (!card.IsLink)
-                _defense.Bind(card.Defense, card.Live?.baseDefense ?? card.Defense, card.Live?.IsDefense == true);
+                _defense.Bind(card.Defense, card.Live?.baseDefense ?? card.Defense, card.Live?.IsDefense == true, showChanges);
         }
 
         internal void BindBattle(BattleCardStats card, bool link)
@@ -124,6 +124,7 @@ namespace YGOPortable.UI
             private readonly Text _value;
             private readonly Text _change;
             private readonly Color _accent;
+            private int _lastValue = -1;
 
             internal StatCell(Transform parent, string key, string label, Color accent, bool compact)
             {
@@ -148,10 +149,18 @@ namespace YGOPortable.UI
                     TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
             }
 
-            internal void Bind(int value, int original, bool active)
+            internal void Bind(int value, int original, bool active, bool showChanges = false)
             {
                 int change = value >= 0 && original >= 0 ? value.CompareTo(original) : 0;
-                _value.text = value >= 0 ? value.ToString() : "?";
+                string number = value >= 0 ? value.ToString() : "?";
+                if (!showChanges) DuelReadoutPulse.Cancel(Rect);
+                else if (_value.text.Length != 0 && _value.text != number)
+                {
+                    int delta = _lastValue >= 0 && value >= 0 ? value.CompareTo(_lastValue) : 0;
+                    DuelReadoutPulse.Play(Rect, delta > 0 ? Increased : delta < 0 ? Decreased : _accent, delta < 0);
+                }
+                _lastValue = value;
+                _value.text = number;
                 _value.color = change > 0 ? Increased : change < 0 ? Decreased : active ? Color.white : DuelStyle.Muted;
                 _change.text = change > 0 ? "▲" : change < 0 ? "▼" : "";
                 _change.color = _value.color;
@@ -241,6 +250,7 @@ namespace YGOPortable.UI
         private readonly Text _rating;
         private readonly Text _status;
         private readonly bool _inPreview;
+        private (uint Code, bool Opponent) _lastCard;
 
         internal DuelFieldReadout(Transform slot, bool inPreview = false)
         {
@@ -277,6 +287,9 @@ namespace YGOPortable.UI
 
         internal void Bind(DuelCardReadout card, bool opponent, uint? scale)
         {
+            var visibleCard = (Code: card.Live?.code ?? 0u, Opponent: opponent);
+            bool showChanges = !_inPreview && _root.gameObject.activeSelf && visibleCard.Code != 0 && visibleCard == _lastCard;
+            _lastCard = visibleCard;
             _root.gameObject.SetActive(true);
             if (!_inPreview)
             {
@@ -285,18 +298,95 @@ namespace YGOPortable.UI
                 _labels.anchorMin = new Vector2(0f, opponent ? .025f : .765f);
                 _labels.anchorMax = new Vector2(1f, opponent ? .235f : .975f);
             }
-            _stats.Bind(card, opponent);
+            _stats.Bind(card, opponent, showChanges);
             SetLabel(_rating, scale.HasValue ? $"스케일 {scale.Value}" : card.Rating,
-                card.IsXyz ? RankColor : card.IsLink || scale.HasValue ? DuelStyle.Player : DuelStyle.Gold);
+                card.IsXyz ? RankColor : card.IsLink || scale.HasValue ? DuelStyle.Player : DuelStyle.Gold, showChanges);
             SetLabel(_status, card.Status,
-                card.Disabled ? new Color(1f, .65f, .58f) : DuelStyle.Muted);
+                card.Disabled ? new Color(1f, .65f, .58f) : DuelStyle.Muted, showChanges);
         }
 
-        private static void SetLabel(Text label, string content, Color color)
+        private static void SetLabel(Text label, string content, Color color, bool showChanges)
         {
-            label.transform.parent.gameObject.SetActive(content.Length != 0);
+            var chip = (RectTransform)label.transform.parent;
+            bool visible = content.Length != 0;
+            chip.gameObject.SetActive(visible);
+            if (!showChanges || !visible) DuelReadoutPulse.Cancel(chip);
+            else if (label.text != content) DuelReadoutPulse.Play(chip, color);
             label.text = content;
             label.color = color;
+        }
+    }
+
+    internal sealed class DuelReadoutPulse : MonoBehaviour
+    {
+        private const float Duration = .44f;
+        private Image _wash;
+        private Image _sweep;
+        private Color _color;
+        private bool _reverse;
+        private float _elapsed;
+
+        internal static void Play(RectTransform surface, Color color, bool reverse = false)
+        {
+            if (!surface.TryGetComponent(out DuelReadoutPulse pulse))
+            {
+                pulse = surface.gameObject.AddComponent<DuelReadoutPulse>();
+                var wash = LotdUiKit.FillRect("ChangePulse", surface);
+                wash.SetAsFirstSibling();
+                pulse._wash = DuelReadoutPlate.Add(wash, Color.clear);
+                var sweep = LotdUiKit.CreateRect("Sweep", wash, Vector2.up, Vector2.one,
+                    new Vector2(0f, -4f), new Vector2(0f, -1f));
+                pulse._sweep = LotdUiKit.AddImage(sweep.gameObject, LotdUiKit.WhiteSprite, Color.clear, false, false);
+            }
+
+            pulse._elapsed = 0f;
+            pulse._color = color;
+            pulse._reverse = reverse;
+            pulse.enabled = true;
+            pulse._wash.gameObject.SetActive(true);
+            pulse.Paint(0f);
+        }
+
+        internal static void Cancel(Transform surface)
+        {
+            if (surface.TryGetComponent(out DuelReadoutPulse pulse)) pulse.Stop();
+        }
+
+        private void Update()
+        {
+            if (CardAnimationManager.Instance?.Paused != true)
+                Advance(Time.unscaledDeltaTime * DuelFieldUI.PlaybackRate);
+        }
+
+        internal void Advance(float deltaTime)
+        {
+            if (!enabled) return;
+            _elapsed += deltaTime;
+            if (_elapsed >= Duration) Stop();
+            else Paint(_elapsed / Duration);
+        }
+
+        private void Paint(float progress)
+        {
+            float strength = 1f - Mathf.SmoothStep(0f, 1f, progress);
+            _wash.color = new Color(_color.r, _color.g, _color.b, .26f * strength);
+            _sweep.color = new Color(_color.r, _color.g, _color.b, strength);
+            float head = Mathf.Lerp(.14f, .95f, progress);
+            float tail = Mathf.Max(.05f, head - .46f);
+            _sweep.rectTransform.anchorMin = new Vector2(_reverse ? 1f - head : tail, 1f);
+            _sweep.rectTransform.anchorMax = new Vector2(_reverse ? 1f - tail : head, 1f);
+        }
+
+        private void Stop()
+        {
+            _wash.gameObject.SetActive(false);
+            enabled = false;
+        }
+
+        private void OnDisable()
+        {
+            if (_wash != null) _wash.gameObject.SetActive(false);
+            _elapsed = Duration;
         }
     }
 

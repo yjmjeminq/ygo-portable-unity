@@ -207,6 +207,23 @@ namespace YGOPortable.Editor
                 "The field and inspector did not reflect the native equip bonus.");
             Debug.Log("[VERIFY DUEL EQUIPPED STATS] Axe of Despair updated the native field and inspected card from 1700 to 2700.");
 
+            var attackCell = slot.Find("CardReadout/Combat/Attack");
+            var pulse = attackCell.GetComponent<DuelReadoutPulse>();
+            var sweep = (RectTransform)attackCell.Find("ChangePulse/Sweep");
+            Require(pulse != null && pulse.enabled && sweep.gameObject.activeInHierarchy &&
+                inspector.transform.parent.parent.Find("ChangePulse").gameObject.activeInHierarchy &&
+                slot.Find("CardReadout/Combat/Defense/ChangePulse") == null,
+                "The native equip bonus did not animate just the changed attack values.");
+            float start = sweep.anchorMax.x;
+            pulse.Advance(.20f);
+            float moved = sweep.anchorMax.x;
+            ui.Field.Refresh();
+            Require(moved > start && sweep.anchorMax.x == moved, "An unchanged field refresh restarted the stat animation.");
+            pulse.Advance(.30f);
+            Require(!sweep.gameObject.activeInHierarchy && attack.text == "2700",
+                "The attack pulse did not return to its unchanged, correct number.");
+            Debug.Log("[VERIFY DUEL STAT MOTION] Native attack increase animated once and kept the current value throughout.");
+
             duel.SubmitResponseInt(7);
             ReachMainPhase();
             Require(duel.ActivePrompt.playerId == duel.AiPlayerIndex && duel.ActivePrompt.mSetable.Count > 0,
@@ -349,17 +366,34 @@ namespace YGOPortable.Editor
                 Require(Label(inspector, "Attack/Digits/Value").text == "3700",
                     "Inspecting a field monster lost its current attack.");
                 Slot("_myMZone", 2).GetComponent<CardDragTrigger>().OnRightClick();
-                Require(Label(inspector, "Attack/Digits/Value").text == "2800",
-                    "Inspecting the second copy of a card kept the first copy's current stats.");
+                Require(Label(inspector, "Attack/Digits/Value").text == "2800" && inspector.Find("Attack/ChangePulse") == null,
+                    "Inspecting a second copy used or animated the first copy's current stats.");
                 var details = (Button)typeof(DuelFieldUI).GetField("_duelPadInspectButton", PrivateInstance).GetValue(Field);
                 details.onClick.Invoke();
                 var zoom = Field.Root.transform.Find("Overlay_CardZoom/ZoomWin/Info/CombatStats");
                 mine.mzone[2].attack = 4200;
                 Field.Refresh();
                 Require(Label(zoom, "Attack/Digits/Value").text == "4200" &&
-                    Label(inspector, "Attack/Digits/Value").text == "4200",
+                    Label(inspector, "Attack/Digits/Value").text == "4200" &&
+                    zoom.Find("Attack/ChangePulse").gameObject.activeInHierarchy,
                     "An open details panel did not follow a change to the selected card's live stats.");
                 typeof(DuelFieldUI).GetMethod("CloseCardZoomModal", PrivateInstance).Invoke(Field, new object[] { false });
+                normalSlot.GetComponent<CardDragTrigger>().OnRightClick();
+                Require(!inspector.Find("Attack/ChangePulse").gameObject.activeInHierarchy,
+                    "An unfinished stat animation followed the focus to a different copy.");
+
+                mine.mzone[0].attack = 3200;
+                mine.mzone[0].defense = 2800;
+                mine.mzone[0].level = 6;
+                Field.Refresh();
+                var reduced = normal.Find("Combat/Attack");
+                var reverse = (RectTransform)reduced.Find("ChangePulse/Sweep");
+                float initial = reverse.anchorMin.x;
+                reduced.GetComponent<DuelReadoutPulse>().Advance(.16f);
+                Require(reverse.anchorMin.x < initial && Label(normal, attack).text == "3200" &&
+                    Label(normal, defense).text == "2800" && normal.Find("Combat/Defense/ChangePulse").gameObject.activeInHierarchy &&
+                    normal.Find("Labels/Rating/ChangePulse").gameObject.activeInHierarchy && Label(normal, rating).text == "레벨 6",
+                    "The updated attack, defense or level did not animate with its current value.");
 
                 var viewport = (RectTransform)Canvas.transform;
                 var originalSize = viewport.sizeDelta;

@@ -310,7 +310,7 @@ namespace YGOPortable.UI
             if (!changed && _inspectedFieldCard == fieldCard) return;
             _inspectedCode = code;
             _inspectedFieldCard = fieldCard;
-            RefreshInspectorReadout();
+            RefreshInspectorReadout(showChanges: false);
             if (!changed) return;
 
             _duelPadInspectButton.interactable = true;
@@ -361,14 +361,15 @@ namespace YGOPortable.UI
         private LiveCardState ReadVisibleFieldCard(uint code, (byte controller, uint location, uint sequence)? location) =>
             location is { } slot ? _session?.GetVisibleFieldCard(code, slot.controller, slot.location, slot.sequence) : null;
 
-        private void RefreshInspectorReadout()
+        private void RefreshInspectorReadout(bool showChanges = true)
         {
             if (_inspectedCode == 0) return;
             var live = ReadVisibleFieldCard(_inspectedCode, _inspectedFieldCard);
             if (live == null) _inspectedFieldCard = null;
             var card = new DuelCardReadout(CardDatabase.Get(_inspectedCode), live);
             _inspStats.text = FormatInspectorStats(card);
-            _inspCombat.Bind(card, live != null && _inspectedFieldCard.Value.controller != _session.HumanPlayerIndex);
+            _inspCombat.Bind(card, live != null && _inspectedFieldCard.Value.controller != _session.HumanPlayerIndex,
+                showChanges && live != null);
         }
 
         private static string FormatInspectorStats(DuelCardReadout card)
@@ -3173,7 +3174,7 @@ namespace YGOPortable.UI
             }
             var info = CardDatabase.Get(code);
             _zoomFieldCard = fieldCard;
-            RefreshZoomReadout(code);
+            RefreshZoomReadout(code, showChanges: false);
             if (info != null)
             {
                 _zoomName.text = info.name;
@@ -3201,14 +3202,15 @@ namespace YGOPortable.UI
             }
         }
 
-        private void RefreshZoomReadout(uint code)
+        private void RefreshZoomReadout(uint code, bool showChanges = true)
         {
             var live = ReadVisibleFieldCard(code, _zoomFieldCard);
             if (live == null) _zoomFieldCard = null;
             var card = new DuelCardReadout(CardDatabase.Get(code), live);
             _zoomCardView.SetCard(code, false, live);
             _zoomStats.text = FormatInspectorStats(card);
-            _zoomCombat.Bind(card, live != null && _zoomFieldCard.Value.controller != _session.HumanPlayerIndex);
+            _zoomCombat.Bind(card, live != null && _zoomFieldCard.Value.controller != _session.HumanPlayerIndex,
+                showChanges && live != null);
         }
 
         private void CloseCardZoomModal(bool restoreFocus = true)
