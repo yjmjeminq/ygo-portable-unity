@@ -102,7 +102,7 @@ namespace YGOPortable.UI
                 _duelPadFocus = EventSystem.current?.currentSelectedGameObject?.transform as RectTransform;
                 _usingDuelPad = true;
             }
-            if (_modals.HandlePad(frame))
+            if (!IsReadingCardDetails && _modals.HandlePad(frame))
             {
                 _duelPadScope = PadScope.None;
                 _duelPadFocus = null;
@@ -123,7 +123,7 @@ namespace YGOPortable.UI
                     case PadScope.Commands: CloseActionPopup(); break;
                     case PadScope.Phase: _phasePicker.SetActive(false); break;
                     case PadScope.Log: CloseDuelLog(); break;
-                    case PadScope.Zoom: _cardZoomModal.SetActive(false); break;
+                    case PadScope.Zoom: CloseCardZoomModal(); break;
                     case PadScope.FieldCards:
                     case PadScope.Piles: _modals.TryCancelOrPass(); break;
                     case PadScope.Place: TryCancelPlacement(); break;
@@ -174,13 +174,13 @@ namespace YGOPortable.UI
 
         private PadScope CurrentDuelPadScope()
         {
+            if (IsReadingCardDetails) return PadScope.Zoom;
             if (_modals.ZoneViewRoot.activeSelf || _modals.ResultRoot.activeSelf) return PadScope.None;
             if (_modals.IsFieldCardSelection)
                 return CanAcceptPlayerAction ? PadScope.FieldCards : PadScope.None;
             if (_modals.IsShowingField) return PadScope.Piles;
             if (_modals.IsPromptOpen) return PadScope.None;
             if (_logWindow.activeSelf) return PadScope.Log;
-            if (_cardZoomModal.activeSelf) return PadScope.Zoom;
             if (_actionPopup.activeSelf) return PadScope.Commands;
             if (_phasePicker.activeSelf) return PadScope.Phase;
             var prompt = _session?.ActivePrompt;
@@ -379,8 +379,9 @@ namespace YGOPortable.UI
             var raisedCard = target.HandVisual != null ? target.HandVisual : target.Art;
             _duelPadRaisedCard = raisedCard;
 
-            var host = target.Rect.IsChildOf(_modals.ModalRoot.transform)
-                ? (RectTransform)_modals.ModalRoot.transform : (RectTransform)Root.transform;
+            var host = scope == PadScope.Zoom ? (RectTransform)_cardZoomModal.transform :
+                target.Rect.IsChildOf(_modals.ModalRoot.transform)
+                    ? (RectTransform)_modals.ModalRoot.transform : (RectTransform)Root.transform;
             ShowDuelPadFrame(target.Art != null ? target.Art : target.Rect, host, sameScope);
         }
 

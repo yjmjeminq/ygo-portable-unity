@@ -56,13 +56,33 @@ namespace YGOPortable.UI
         private int[] _chainCandidateIndices;
 
         // Zone viewer refs
+        private static readonly (uint Location, string Label)[] PileTabs =
+        {
+            (YgoConstants.LOCATION_GRAVE, "묘지"),
+            (YgoConstants.LOCATION_REMOVED, "제외"),
+            (YgoConstants.LOCATION_EXTRA, "엑스트라"),
+        };
         private RectTransform _zoneWindow;
+        private RectTransform _zoneBody;
+        private RectTransform _zoneTabs;
         private Text _zoneTitle;
         private Image _zoneIcon;
         private RectTransform _zoneGrid;
         private ScrollRect _zoneScroll;
         private Text _zoneEmpty;
         private Button _zoneClose;
+        private readonly Button[] _zoneOwnerButtons = new Button[2];
+        private readonly Button[] _zonePileButtons = new Button[PileTabs.Length];
+        private RectTransform _zoneDetailsRow;
+        private Button _zoneDetailsButton;
+        private Text _zoneSelectedName;
+        private uint _zoneSelectedCode;
+        private Outline _zoneSelectedBorder;
+        private Color _zonePreviousBorder;
+        private bool _zoneOpponent;
+        private int _zonePileIndex;
+        private Action<bool, uint> _onBrowsePile;
+        private Action<uint> _onOpenZoneDetails;
         private GameObject _focusBeforePrompt;
         private GameObject _focusBeforeZone;
         private GameObject _focusBeforeKeyboard;
@@ -191,6 +211,12 @@ namespace YGOPortable.UI
         internal void SetBrowsablePiles(params DuelZoneImage[] piles) => _promptShade.BrowsablePiles = piles;
         internal void SetChainConfirmationControl(Button button) => _promptShade.ChainConfirmationControl = button;
 
+        internal void SetZoneBrowserActions(Action<bool, uint> browsePile, Action<uint> openDetails)
+        {
+            _onBrowsePile = browsePile;
+            _onOpenZoneDetails = openDetails;
+        }
+
         internal bool IsPointOverBrowsablePile(Vector2 point)
         {
             var canvas = _promptShade.canvas;
@@ -215,7 +241,7 @@ namespace YGOPortable.UI
             if (_padKeyboard.IsOpen)
                 HandlePadScope(_padKeyboard.Scope, frame, _padKeyboard.DefaultFocus, _padKeyboard.Close);
             else if (IsZoneViewerOpen)
-                HandlePadScope(ZoneViewRoot.transform, frame, FirstFocus(_zoneGrid) ?? _zoneClose, CloseZoneViewer, _zoneScroll);
+                HandleZonePad(frame);
             else if (ResultRoot.activeSelf)
                 HandlePadScope(ResultRoot.transform, frame, _rematchButton, TriggerMenu);
             else if (IsPromptOpen && !IsShowingField && !IsFieldCardSelection)
@@ -224,6 +250,27 @@ namespace YGOPortable.UI
             else return false;
 
             return true;
+        }
+
+        private void HandleZonePad(DeckPadFrame frame)
+        {
+            if (frame.Cancel)
+            {
+                CloseZoneViewer();
+                return;
+            }
+            if (frame.Alternate && _zoneDetailsButton.isActiveAndEnabled && _zoneDetailsButton.IsInteractable())
+            {
+                _zoneDetailsButton.onClick.Invoke();
+                return;
+            }
+            if (_zoneTabs.gameObject.activeSelf && (frame.PreviousArea || frame.NextArea))
+            {
+                int offset = frame.PreviousArea ? PileTabs.Length - 1 : 1;
+                _zonePileButtons[(_zonePileIndex + offset) % PileTabs.Length].onClick.Invoke();
+                return;
+            }
+            HandlePadScope(ZoneViewRoot.transform, frame, FirstFocus(_zoneGrid) ?? _zoneClose, CloseZoneViewer, _zoneScroll);
         }
 
         private void HandlePadScope(Transform scope, DeckPadFrame frame, Selectable initial, Action cancel, ScrollRect scroll = null)
@@ -1531,7 +1578,8 @@ namespace YGOPortable.UI
             dismiss.navigation = new Navigation { mode = Navigation.Mode.None };
             dismiss.onClick.AddListener(CloseZoneViewer);
 
-            var win = _zoneWindow = DuelStyle.Panel(dim, "Win",
+            var content = Application.platform == RuntimePlatform.IPhonePlayer ? MobileSafeArea.Create(dim) : dim;
+            var win = _zoneWindow = DuelStyle.Panel(content, "Win",
                 new Vector2(.208f, .198f), new Vector2(.976f, .646f),
                 fill: new Color(.039f, .071f, .093f, .97f));
             win.gameObject.AddComponent<Button>().navigation = new Navigation { mode = Navigation.Mode.None };
@@ -1552,7 +1600,8 @@ namespace YGOPortable.UI
             var closeRt = LotdUiKit.CreateRect("Close", hdr, new Vector2(0.82f, 0.15f), new Vector2(0.98f, 0.85f), Vector2.zero, Vector2.zero);
             _zoneClose = DuelStyle.Button(closeRt, "B", "✕ 닫기", CloseZoneViewer, 16);
 
-            var body = LotdUiKit.CreateRect("Body", win, Vector2.zero, Vector2.one,
+            BuildPileTabs(win);
+            var body = _zoneBody = LotdUiKit.CreateRect("Body", win, Vector2.zero, Vector2.one,
                 new Vector2(10f, 8f), new Vector2(-10f, -62f));
             _zoneScroll = CreateHorizontalCardGrid(body, out Transform g, ZoneCardWidth, ZoneCardHeight).GetComponent<ScrollRect>();
             _zoneScroll.movementType = ScrollRect.MovementType.Clamped;
@@ -1568,7 +1617,57 @@ namespace YGOPortable.UI
             _zoneEmpty = LotdUiKit.AddFittedText(body, "Empty", "이 존에 카드가 없습니다.", 20, 11,
                 TextAnchor.MiddleCenter, DuelStyle.Muted);
 
+            _zoneDetailsRow = LotdUiKit.CreateRect("CardDetails", win, Vector2.zero, Vector2.right,
+                new Vector2(10f, 8f), new Vector2(-10f, 45f));
+            var selectedName = LotdUiKit.CreateRect("SelectedName", _zoneDetailsRow, Vector2.zero, new Vector2(.57f, 1f),
+                Vector2.zero, Vector2.zero);
+            _zoneSelectedName = LotdUiKit.AddFittedText(selectedName, "Name", "", 15, 9, TextAnchor.MiddleLeft, Color.white);
+            var details = LotdUiKit.CreateRect("Open", _zoneDetailsRow, new Vector2(.60f, 0f), Vector2.one,
+                Vector2.zero, Vector2.zero);
+            _zoneDetailsButton = DuelStyle.Button(details, "Button", "카드 상세 (X)", () =>
+            {
+                if (IsZoneViewerOpen && _zoneSelectedCode != 0) _onOpenZoneDetails?.Invoke(_zoneSelectedCode);
+            }, 13);
+            _zoneDetailsButton.interactable = false;
             ZoneViewRoot.SetActive(false);
+        }
+
+        private void BuildPileTabs(RectTransform window)
+        {
+            _zoneTabs = LotdUiKit.CreateRect("PileTabs", window, Vector2.up, Vector2.one,
+                new Vector2(10f, -143f), new Vector2(-10f, -60f));
+            for (int i = 0; i < _zoneOwnerButtons.Length; i++)
+            {
+                bool opponent = i == 1;
+                float left = i * .51f;
+                var slot = LotdUiKit.CreateRect(opponent ? "Opponent" : "Player", _zoneTabs,
+                    new Vector2(left, .54f), new Vector2(left + .49f, 1f), Vector2.zero, Vector2.zero);
+                _zoneOwnerButtons[i] = CreatePileTab(slot, opponent ? "상대 카드" : "내 카드", () =>
+                {
+                    if (opponent != _zoneOpponent) _onBrowsePile?.Invoke(opponent, PileTabs[_zonePileIndex].Location);
+                });
+            }
+            for (int i = 0; i < PileTabs.Length; i++)
+            {
+                var (location, label) = PileTabs[i];
+                float left = i * .337f;
+                var slot = LotdUiKit.CreateRect($"Pile_{i}", _zoneTabs,
+                    new Vector2(left, 0f), new Vector2(left + .326f, .46f), Vector2.zero, Vector2.zero);
+                _zonePileButtons[i] = CreatePileTab(slot, label, () =>
+                {
+                    if (location != PileTabs[_zonePileIndex].Location) _onBrowsePile?.Invoke(_zoneOpponent, location);
+                });
+            }
+        }
+
+        private static Button CreatePileTab(RectTransform slot, string label, Action onClick)
+        {
+            var button = DuelStyle.Button(slot, "Button", label, onClick, 15);
+            var text = button.GetComponentInChildren<Text>();
+            text.resizeTextForBestFit = true;
+            text.resizeTextMinSize = 9;
+            text.resizeTextMaxSize = 15;
+            return button;
         }
 
         public void CloseZoneViewer()
@@ -1579,6 +1678,15 @@ namespace YGOPortable.UI
             _promptInput.interactable = true;
             if (restoreFocus) SetFocus(IsShowingField ? _fieldViewButton.gameObject : _focusBeforeZone);
             _focusBeforeZone = null;
+            ClearZoneCards();
+        }
+
+        private void ClearZoneCards()
+        {
+            _zoneSelectedBorder = null;
+            _zoneSelectedCode = 0;
+            _zoneSelectedName.text = "카드를 선택하세요";
+            _zoneDetailsButton.interactable = false;
             ClearChildren(_zoneGrid);
             _zoneScroll.StopMovement();
             _zoneGrid.anchoredPosition = Vector2.zero;
@@ -1597,6 +1705,54 @@ namespace YGOPortable.UI
             bool sidePanel = false)
         {
             StartZoneViewer(sidePanel);
+            PopulateZoneCards(cards, hideFaceDown, newestFirst, hasCardActions, onOpenCardActions, canUseCardActions, actionsOnly);
+            FinishZoneViewer(title, icon);
+        }
+
+        internal void ShowPileViewer(bool opponent, uint location, PlayerFieldSnapshot piles,
+            Func<LiveCardState, bool> hasCardActions, Action<LiveCardState> onOpenCardActions,
+            Func<bool> canUseCardActions, bool actionsOnly)
+        {
+            int index = Array.FindIndex(PileTabs, tab => tab.Location == location);
+            if (index < 0) return;
+            IReadOnlyList<LiveCardState> cards = location switch
+            {
+                YgoConstants.LOCATION_GRAVE => piles.grave,
+                YgoConstants.LOCATION_REMOVED => piles.banished,
+                _ => piles.extra,
+            };
+            bool browsePiles = !actionsOnly && _onBrowsePile != null;
+            bool entering = StartZoneViewer(sidePanel: true, browsePiles: browsePiles);
+            _zoneOpponent = opponent;
+            _zonePileIndex = index;
+            if (browsePiles)
+            {
+                DuelStyle.ApplyButton(_zoneOwnerButtons[0], !opponent);
+                DuelStyle.ApplyButton(_zoneOwnerButtons[1], opponent);
+                UpdatePileTab(0, piles.grave.Count);
+                UpdatePileTab(1, piles.banished.Count);
+                UpdatePileTab(2, piles.extra.Count);
+            }
+
+            bool extra = location == YgoConstants.LOCATION_EXTRA;
+            PopulateZoneCards(cards, hideFaceDown: opponent && location != YgoConstants.LOCATION_GRAVE,
+                newestFirst: !extra, hasCardActions, onOpenCardActions, canUseCardActions, actionsOnly);
+            string label = extra ? "엑스트라 덱" : PileTabs[index].Label;
+            FinishZoneViewer($"{(opponent ? "상대" : "내")} {label}", DuelVisualAssets.ZoneIcon(location, opponent), entering,
+                browsePiles ? _zonePileButtons[index] : null);
+        }
+
+        private void UpdatePileTab(int index, int count)
+        {
+            var button = _zonePileButtons[index];
+            button.GetComponentInChildren<Text>().text = $"{PileTabs[index].Label} {count}";
+            DuelStyle.ApplyButton(button, index == _zonePileIndex);
+        }
+
+        private void PopulateZoneCards(IReadOnlyList<LiveCardState> cards, bool hideFaceDown, bool newestFirst,
+            Func<LiveCardState, bool> hasCardActions, Action<LiveCardState> onOpenCardActions,
+            Func<bool> canUseCardActions, bool actionsOnly)
+        {
             int count = cards?.Count ?? 0;
             for (int i = 0; i < count; i++)
             {
@@ -1607,7 +1763,6 @@ namespace YGOPortable.UI
                 if (actionsOnly && !actionable) continue;
                 AddZoneCardTile(hidden ? 0u : card.code, hidden, card, actionable, onOpenCardActions, canUseCardActions, actionsOnly);
             }
-            FinishZoneViewer(title, icon);
         }
 
         public void ShowCodeListViewer(string title, IReadOnlyList<uint> codes)
@@ -1621,13 +1776,20 @@ namespace YGOPortable.UI
             FinishZoneViewer(title);
         }
 
-        private void StartZoneViewer(bool sidePanel = false)
+        private bool StartZoneViewer(bool sidePanel = false, bool browsePiles = false)
         {
-            CloseZoneViewer();
-            _focusBeforeZone = EventSystem.current?.currentSelectedGameObject;
-            _promptInput.interactable = false;
-            ZoneViewRoot.SetActive(true);
-            _zoneWindow.anchorMin = sidePanel ? new Vector2(.817f, .163f) : new Vector2(.208f, .198f);
+            bool switchingPile = browsePiles && IsZoneViewerOpen && _zoneTabs.gameObject.activeSelf;
+            if (switchingPile) ClearZoneCards();
+            else
+            {
+                CloseZoneViewer();
+                _focusBeforeZone = EventSystem.current?.currentSelectedGameObject;
+                _promptInput.interactable = false;
+                ZoneViewRoot.SetActive(true);
+            }
+            _zoneTabs.gameObject.SetActive(browsePiles);
+            _zoneBody.offsetMax = new Vector2(-10f, browsePiles ? -151f : -62f);
+            _zoneWindow.anchorMin = sidePanel ? new Vector2(browsePiles ? .76f : .817f, .163f) : new Vector2(.208f, .198f);
             _zoneWindow.anchorMax = sidePanel ? new Vector2(.988f, .871f) : new Vector2(.976f, .646f);
             ZoneViewRoot.GetComponent<Image>().color = new Color(.015f, .022f, .038f, sidePanel ? .14f : .40f);
 
@@ -1642,9 +1804,10 @@ namespace YGOPortable.UI
             grid.cellSize = sidePanel
                 ? new Vector2(Mathf.Clamp(_zoneScroll.viewport.rect.width - 10f, 52f, ZoneCardWidth), ZoneCardHeight)
                 : new Vector2(ZoneCardWidth, ZoneCardHeight);
+            return !switchingPile;
         }
 
-        private void FinishZoneViewer(string title, Sprite icon = null)
+        private void FinishZoneViewer(string title, Sprite icon = null, bool entering = true, Button emptyFocus = null)
         {
             int count = _zoneGrid.childCount;
             _zoneTitle.text = $"{title}   ·   {count}장";
@@ -1652,14 +1815,18 @@ namespace YGOPortable.UI
             _zoneIcon.enabled = icon != null;
             _zoneTitle.rectTransform.offsetMin = icon != null ? new Vector2(34f, 0f) : Vector2.zero;
             _zoneEmpty.gameObject.SetActive(count == 0);
+            var firstCard = FirstFocus(_zoneGrid);
+            bool showDetails = _onOpenZoneDetails != null && firstCard != null;
+            _zoneDetailsRow.gameObject.SetActive(showDetails);
+            _zoneBody.offsetMin = new Vector2(10f, showDetails ? 51f : 8f);
             _zoneScroll.StopMovement();
             _zoneGrid.anchoredPosition = Vector2.zero;
             ZoneViewRoot.transform.SetAsLastSibling();
             CardAnimationManager.Instance?.BringToFront();
             PrepareFocusControls(ZoneViewRoot.transform, CloseZoneViewer);
             Canvas.ForceUpdateCanvases();
-            SetFocus(FirstFocus(_zoneGrid)?.gameObject ?? _zoneClose.gameObject);
-            UiEntranceMotion.Play(ZoneViewRoot, duration: .13f);
+            SetFocus((firstCard ?? emptyFocus ?? _zoneClose).gameObject);
+            if (entering) UiEntranceMotion.Play(ZoneViewRoot, duration: .13f);
         }
 
         private void AddZoneCardTile(
@@ -1685,8 +1852,8 @@ namespace YGOPortable.UI
             {
                 var btn = tile.gameObject.AddComponent<Button>();
                 btn.targetGraphic = tile.GetComponent<Image>();
-                btn.onClick.AddListener(() => _onInspectCard?.Invoke(code));
-                PreviewOnFocus(btn, code);
+                btn.onClick.AddListener(() => SelectZoneCard(tile, code));
+                SelectionHandler(btn).OnSelected = () => SelectZoneCard(tile, code);
                 var trig = tile.gameObject.AddComponent<CardDragTrigger>();
                 trig.OnPointerEnterAction = () => _onInspectCard?.Invoke(code);
                 if (actionSelection && hasActions && live?.location == YgoConstants.LOCATION_EXTRA)
@@ -1711,8 +1878,24 @@ namespace YGOPortable.UI
                     CloseZoneViewer();
                     onOpenCardActions(live);
                 }, 11, true);
-                PreviewOnFocus(action, code);
+                SelectionHandler(action).OnSelected = () => SelectZoneCard(tile, code);
             }
+        }
+
+        private void SelectZoneCard(RectTransform tile, uint code)
+        {
+            var border = tile.GetComponent<Outline>();
+            if (_zoneSelectedBorder != border)
+            {
+                if (_zoneSelectedBorder != null) _zoneSelectedBorder.effectColor = _zonePreviousBorder;
+                _zoneSelectedBorder = border;
+                _zonePreviousBorder = border.effectColor;
+                border.effectColor = DuelStyle.Player;
+            }
+            _zoneSelectedCode = code;
+            _zoneSelectedName.text = CardDatabase.GetName(code);
+            _zoneDetailsButton.interactable = true;
+            _onInspectCard?.Invoke(code);
         }
 
         // ==================== MATCH RESULT ====================

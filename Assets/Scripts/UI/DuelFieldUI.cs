@@ -115,6 +115,9 @@ namespace YGOPortable.UI
 
         // High-res Card Zoom Modal
         private GameObject _cardZoomModal;
+        private Button _zoomCloseButton;
+        private Button _zoomRelatedButton;
+        private GameObject _focusBeforeZoom;
         private CompositeCardView _zoomCardView;
         private GameObject _zoomArtworkControls;
         private Text _zoomArtworkLabel;
@@ -193,6 +196,7 @@ namespace YGOPortable.UI
                 _myGyTile.root.GetComponent<DuelZoneImage>(), _myExtraTile.root.GetComponent<DuelZoneImage>(),
                 _myBanTile.root.GetComponent<DuelZoneImage>(), _oppGyTile.root.GetComponent<DuelZoneImage>(),
                 _oppExtraTile.root.GetComponent<DuelZoneImage>(), _oppBanTile.root.GetComponent<DuelZoneImage>());
+            _modals.SetZoneBrowserActions(SwitchBrowsablePile, ShowCardZoomModal);
 
             if (CardDragManager.Instance != null)
             {
@@ -233,8 +237,6 @@ namespace YGOPortable.UI
             _myLpText.text = _oppLpText.text = "8000";
             _myLpFill.anchorMax = _oppLpFill.anchorMax = Vector2.one;
             Canvas.ForceUpdateCanvases();
-            _inspectedCode = 0;
-            InspectCard(89631139);
             Refresh();
             var animator = CardAnimationManager.Instance;
             if (session.NativePtr == IntPtr.Zero && animator != null)
@@ -274,8 +276,9 @@ namespace YGOPortable.UI
             _extraSummonButton.gameObject.SetActive(false);
             CloseActionPopup();
             CloseDuelLog();
+            CloseCardZoomModal(restoreFocus: false);
             _modals.CloseZoneViewer();
-            _cardZoomModal.SetActive(false);
+            ResetCardInspector();
             _phasePicker.SetActive(false);
             _responseAttackArrow.gameObject.SetActive(false);
             _placementBanner.SetActive(false);
@@ -288,6 +291,8 @@ namespace YGOPortable.UI
         {
             if (code == 0 || code == _inspectedCode) return;
             _inspectedCode = code;
+            _duelPadInspectButton.interactable = true;
+            _inspCard.gameObject.SetActive(true);
             _inspCard.SetCard(code);
             var info = CardDatabase.Get(code);
             _inspTitle.color = info == null ? DuelStyle.HeaderColor :
@@ -313,6 +318,21 @@ namespace YGOPortable.UI
             _inspRaceIcon.gameObject.SetActive(rSp != null);
         }
 
+        private void ResetCardInspector()
+        {
+            _inspectedCode = 0;
+            _inspCard.SetCard(0);
+            _inspCard.gameObject.SetActive(false);
+            _duelPadInspectButton.interactable = false;
+            _inspTitle.color = DuelStyle.HeaderColor;
+            _inspName.text = "카드 정보";
+            _inspStats.text = "";
+            _inspDesc.text = "카드를 선택하면 효과를 확인할 수 있습니다.";
+            _inspRaceIcon.gameObject.SetActive(false);
+            _inspectScroll.StopMovement();
+            _inspectScroll.content.anchoredPosition = Vector2.zero;
+        }
+
         private static string FormatInspectorStats(CardInfo info)
         {
             string type = YgoConstants.GetTypeTagKR(info.type).Replace(" / ", " · ");
@@ -331,7 +351,7 @@ namespace YGOPortable.UI
             if (code == 0) return;
             var related = CardDatabase.GetRelatedCards(code);
             var codes = related.Select(card => card.code).ToArray();
-            _cardZoomModal.SetActive(false);
+            CloseCardZoomModal();
             _modals.ShowCodeListViewer($"[{CardDatabase.GetName(code)}] 관련 카드", codes);
         }
 
@@ -631,7 +651,7 @@ namespace YGOPortable.UI
             {
                 if (_session == null) return;
                 byte player = (byte)(opponent ? _session.AiPlayerIndex : _session.HumanPlayerIndex);
-                OpenStackZone(player, location, (opponent ? "상대 " : "내 ") + name, opponent && location == YgoConstants.LOCATION_REMOVED);
+                OpenStackZone(player, location, (opponent ? "상대 " : "내 ") + name);
             }
 
             var button = cell.gameObject.AddComponent<Button>();
@@ -2283,7 +2303,7 @@ namespace YGOPortable.UI
                 if (_cardZoomModal != null && _cardZoomModal.activeSelf)
                 {
                     LotdAudio.PlayClick();
-                    _cardZoomModal.SetActive(false);
+                    CloseCardZoomModal();
                 }
                 else if (_actionPopup != null && _actionPopup.activeSelf)
                 {
@@ -2572,7 +2592,14 @@ namespace YGOPortable.UI
                 actionsOnly: true, sidePanel: true);
         }
 
-        private void OpenStackZone(byte con, uint loc, string title, bool hideFaceDown = false, bool actionsOnly = false)
+        private void SwitchBrowsablePile(bool opponent, uint location)
+        {
+            if (_session == null) return;
+            byte controller = (byte)(opponent ? _session.AiPlayerIndex : _session.HumanPlayerIndex);
+            GetStack(controller, location)?.button.onClick.Invoke();
+        }
+
+        private void OpenStackZone(byte con, uint loc, string title, bool actionsOnly = false)
         {
             var session = _session;
             if (session == null || session.IsFinished || IsStagingPlacement || IsPresenting || IsPaused || IsReadingLog ||
@@ -2593,17 +2620,7 @@ namespace YGOPortable.UI
                 return;
             }
 
-            var player = session.Players[con];
-            IReadOnlyList<LiveCardState> cards = loc switch
-            {
-                YgoConstants.LOCATION_EXTRA => player.extra,
-                YgoConstants.LOCATION_GRAVE => player.grave,
-                YgoConstants.LOCATION_REMOVED => player.banished,
-                _ => null,
-            };
-            if (cards == null || actionsOnly && !CanUseActions()) return;
-            hideFaceDown |= con != session.HumanPlayerIndex &&
-                (loc == YgoConstants.LOCATION_EXTRA || loc == YgoConstants.LOCATION_REMOVED);
+            if (actionsOnly && !CanUseActions()) return;
 
             List<(string label, int responseVal, bool gold)> GetZoneCardActions(LiveCardState card)
             {
@@ -2614,11 +2631,10 @@ namespace YGOPortable.UI
             }
 
             LotdAudio.PlayClick();
-            _modals.ShowZoneViewer(
-                title,
-                cards,
-                hideFaceDown,
-                newestFirst: loc != YgoConstants.LOCATION_EXTRA,
+            _modals.ShowPileViewer(
+                con != session.HumanPlayerIndex,
+                loc,
+                session.Players[con],
                 hasCardActions: c => CanUseActions() && GetZoneCardActions(c).Count > 0,
                 onOpenCardActions: c =>
                 {
@@ -2631,8 +2647,7 @@ namespace YGOPortable.UI
                         ShowCardActionsPopup(c.controller, c.location, c.sequence, c.code, c.overlayCodes, actions: actions);
                 },
                 canUseCardActions: CanUseActions,
-                icon: DuelVisualAssets.ZoneIcon(loc, con != session.HumanPlayerIndex),
-                actionsOnly: actionsOnly, sidePanel: true);
+                actionsOnly: actionsOnly);
         }
 
         private bool FindFieldCardChoice(byte con, uint loc, uint seq, out int index)
@@ -3005,26 +3020,29 @@ namespace YGOPortable.UI
             var dim = LotdUiKit.FillRect("Overlay_CardZoom", root);
             _cardZoomModal = dim.gameObject;
             LotdUiKit.AddImage(dim.gameObject, LotdUiKit.WhiteSprite, new Color(0.01f, 0.03f, 0.08f, 0.88f));
-            dim.gameObject.AddComponent<Button>().onClick.AddListener(() => _cardZoomModal.SetActive(false));
+            var backdrop = dim.gameObject.AddComponent<Button>();
+            backdrop.navigation = new Navigation { mode = Navigation.Mode.None };
+            backdrop.onClick.AddListener(() => CloseCardZoomModal());
 
             var content = onIPhone ? MobileSafeArea.Create(dim) : dim;
             var win = DuelStyle.Panel(content, "ZoomWin", onIPhone ? new Vector2(.03f, .027f) : new Vector2(.11f, .045f),
                 onIPhone ? new Vector2(.97f, .973f) : new Vector2(.89f, .955f));
+            win.gameObject.AddComponent<Button>().interactable = false;
 
             // Header bar
             var hdr = LotdUiKit.CreateRect("Hdr", win, new Vector2(0f, 0.90f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
             LotdUiKit.AddImage(hdr.gameObject, LotdUiKit.WhiteSprite, DuelStyle.HeaderColor);
             var title = LotdUiKit.CreateRect("Title", hdr, new Vector2(0.02f, 0.12f), new Vector2(0.63f, 0.88f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddFittedText(title, "T", onIPhone ? "카드 상세 정보" : "카드 상세 정보 (CARD DETAILS)", 18, 12,
+            LotdUiKit.AddFittedText(title, "T", "카드 상세 정보", 18, 12,
                 TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
 
             var relatedRt = LotdUiKit.CreateRect("Related", hdr, new Vector2(0.66f, 0.15f), new Vector2(0.82f, 0.85f),
                 Vector2.zero, Vector2.zero);
-            DuelStyle.Button(relatedRt, "B", "관련 카드", ShowZoomRelatedCards, 15);
+            _zoomRelatedButton = DuelStyle.Button(relatedRt, "B", "관련 카드", ShowZoomRelatedCards, 15);
 
             var closeRt = LotdUiKit.CreateRect("Close", hdr, new Vector2(0.84f, 0.15f), new Vector2(0.98f, 0.85f), Vector2.zero, Vector2.zero);
-            DuelStyle.Button(closeRt, "B", onIPhone ? "닫기" : "닫기 (ESC)", () => _cardZoomModal.SetActive(false), 15);
+            _zoomCloseButton = DuelStyle.Button(closeRt, "B", onIPhone ? "닫기" : "닫기 (ESC)", () => CloseCardZoomModal(), 15);
 
             // Left Side: Large Card View
             float cardRight = onIPhone ? .375f : .448f;
@@ -3091,8 +3109,17 @@ namespace YGOPortable.UI
 
         public void ShowCardZoomModal(uint code)
         {
-            if (code == 0 || _zoomCardView == null) return;
-            _cardZoomModal.SetActive(true);
+            if (code == 0 || !Root.activeInHierarchy) return;
+            bool opening = !_cardZoomModal.activeSelf;
+            if (opening)
+            {
+                _focusBeforeZoom = EventSystem.current?.currentSelectedGameObject;
+                // A detail opened from a pile covers the browser while preserving its list and scroll position.
+                if (IsBrowsingZone) _cardZoomModal.transform.SetParent(Root.transform.parent, false);
+                _cardZoomModal.transform.SetAsLastSibling();
+                _zoomRelatedButton.gameObject.SetActive(!IsBrowsingZone);
+                _cardZoomModal.SetActive(true);
+            }
             var info = CardDatabase.Get(code);
             _zoomCardView.SetCard(code, false);
             if (info != null)
@@ -3117,6 +3144,28 @@ namespace YGOPortable.UI
             UpdateArtworkOptions(code, 0);
             _zoomScroll.StopMovement();
             _zoomScroll.content.anchoredPosition = Vector2.zero;
+            DeckPadUi.LimitKeyboardNavigation(_cardZoomModal.transform);
+            if (opening)
+            {
+                EventSystem.current?.SetSelectedGameObject(_zoomCloseButton.gameObject);
+                UiEntranceMotion.Play(_cardZoomModal, duration: .15f);
+            }
+        }
+
+        private void CloseCardZoomModal(bool restoreFocus = true)
+        {
+            if (!_cardZoomModal.activeSelf) return;
+            _cardZoomModal.SetActive(false);
+            if (_cardZoomModal.transform.parent != Root.transform) _cardZoomModal.transform.SetParent(Root.transform, false);
+            var previous = _focusBeforeZoom;
+            _focusBeforeZoom = null;
+            var events = EventSystem.current;
+            if (events == null) return;
+            if (restoreFocus && previous != null && previous.TryGetComponent<Selectable>(out var control) &&
+                control.isActiveAndEnabled && control.IsInteractable())
+                events.SetSelectedGameObject(previous);
+            else if (events.currentSelectedGameObject?.transform.IsChildOf(_cardZoomModal.transform) == true)
+                events.SetSelectedGameObject(null);
         }
 
         private void CycleArtwork(int direction)

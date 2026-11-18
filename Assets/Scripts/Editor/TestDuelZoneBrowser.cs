@@ -29,7 +29,7 @@ namespace YGOPortable.Editor
                 opens += VerifyBanishAndGrave(humanFirst);
             opens += VerifyPromptAndExtraSummon();
             string hitTest = SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null ? "raycast filters" : "GraphicRaycaster";
-            Debug.Log($"[VERIFY ZONE BROWSER] {opens} successful opens. Piles, effect prompt field view ({hitTest}), separate Extra Deck summon choices, controller navigation and Synchro materials verified.");
+            Debug.Log($"[VERIFY ZONE BROWSER] {opens} successful opens. Pile tabs, nested card details, privacy, effect prompt field view ({hitTest}), separate Extra Deck summon choices and Synchro materials verified.");
         }
 
         private static void VerifyCardDetailsSafeArea()
@@ -126,6 +126,7 @@ namespace YGOPortable.Editor
                 Require(ReferenceEquals(duel.ActivePrompt, prompt), "Checking the stacks after an effect advanced the engine.");
                 if (player == 0) duel.SubmitResponseInt(7);
             }
+            ui.VerifyPileTabsAndDetails(mine, opponent);
             Require(duel.RetryCount == 0 && !duel.IsFinished, "Zone inspection left a retry or ended the duel.");
             return ui.Opens;
         }
@@ -724,6 +725,53 @@ namespace YGOPortable.Editor
                 VerifyRepeated("_myGyTile", player.grave.AsEnumerable().Reverse());
                 VerifyRepeated("_myExtraTile", player.extra);
                 VerifyRepeated("_myBanTile", player.banished.AsEnumerable().Reverse());
+            }
+
+            internal void VerifyPileTabsAndDetails(PlayerFieldSnapshot mine, PlayerFieldSnapshot opponent)
+            {
+                var prompt = _duel.ActivePrompt;
+                OpenStack("_myGyTile", mine.grave.AsEnumerable().Reverse().Select(card => card.code));
+                var tabs = Private<RectTransform>(Modals, "_zoneTabs");
+                var removed = (RectTransform)tabs.Find("Pile_1/Button");
+                Require(removed.GetComponentInChildren<Text>().text == $"제외 {mine.banished.Count}",
+                    "The pile tab did not show the selected owner's count.");
+                ClickAt(removed);
+                var expected = mine.banished.AsEnumerable().Reverse().Select(card => card.code).ToArray();
+                VerifyOpened(prompt, expected);
+
+                var first = _grid.GetChild(0).GetComponent<Button>();
+                Click(first);
+                var scroll = Private<ScrollRect>(Modals, "_zoneScroll");
+                scroll.verticalNormalizedPosition = .43f;
+                Canvas.ForceUpdateCanvases();
+                var scrollPosition = scroll.content.anchoredPosition;
+                var details = Private<Button>(Modals, "_zoneDetailsButton");
+                ClickAt((RectTransform)details.transform, pointerId: 0);
+                var zoom = Private<GameObject>(Field, "_cardZoomModal");
+                Require(zoom.activeSelf && Modals.IsZoneViewerOpen &&
+                    Private<CompositeCardView>(Field, "_zoomCardView").CurrentCode == expected[0] &&
+                    ReferenceEquals(_duel.ActivePrompt, prompt), "Opening a pile card's details replaced the browser or the prompt.");
+
+                var description = (RectTransform)zoom.transform.Find("ZoomWin/Info/DescBox");
+                var hit = Raycast(description, out var pointer);
+                var handler = ExecuteEvents.GetEventHandler<IPointerClickHandler>(hit);
+                Require(handler != null && handler != zoom && handler.transform.IsChildOf(zoom.transform),
+                    "Tapping the card description could dismiss the panel or reach the pile below it.");
+                ExecuteEvents.Execute(handler, pointer, ExecuteEvents.pointerClickHandler);
+                Require(zoom.activeSelf, "A tap inside the description closed the card details.");
+                ClickAt((RectTransform)Private<Button>(Field, "_zoomCloseButton").transform, pointerId: 0);
+                Require(!zoom.activeSelf && Modals.IsZoneViewerOpen && _grid.GetChild(0).gameObject == first.gameObject &&
+                    Vector2.Distance(scroll.content.anchoredPosition, scrollPosition) < .5f &&
+                    Private<uint>(Modals, "_zoneSelectedCode") == expected[0],
+                    "Closing details did not preserve the selected card and list position.");
+
+                ClickAt((RectTransform)tabs.Find("Opponent/Button"));
+                VerifyOpened(prompt, opponent.banished.Select(_ => 0u));
+                Require(!details.gameObject.activeInHierarchy && Private<uint>(Modals, "_zoneSelectedCode") == 0,
+                    "Switching to the opponent's face-down banished cards retained a visible card's detail action.");
+                ClickAt((RectTransform)tabs.Find("Pile_0/Button"));
+                VerifyOpened(prompt, opponent.grave.AsEnumerable().Reverse().Select(card => card.code));
+                Close();
             }
 
             private void VerifyRepeated(string stack, IEnumerable<LiveCardState> cards)

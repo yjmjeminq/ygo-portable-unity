@@ -77,6 +77,9 @@ namespace YGOPortable.Editor
                 var mine = session.Players[session.HumanPlayerIndex];
                 var enemyField = session.Players[session.AiPlayerIndex];
                 var idle = session.ActivePrompt;
+                Require(Get<uint>(field, "_inspectedCode") == 0 &&
+                    !Get<CompositeCardView>(field, "_inspCard").gameObject.activeSelf,
+                    "The inspector started with art for a card the player had not selected.");
                 Require(Get<Text>(field, "_turnBadgeText").text.StartsWith("내 턴") &&
                     Get<Text>(field, "_phaseControlHint").enabled,
                     "The current player's turn and the phase-change control were not visible.");
@@ -162,8 +165,20 @@ namespace YGOPortable.Editor
                 Pad(field, RightShoulder);
                 Pad(field, A);
                 Require(modals.IsZoneViewerOpen && ReferenceEquals(idle, session.ActivePrompt), "The graveyard was not browsable.");
+                Pad(field, LeftShoulder);
+                var cardFocus = events.currentSelectedGameObject;
+                Require(Get<Text>(modals, "_zoneTitle").text.StartsWith("내 엑스트라 덱") &&
+                    cardFocus.transform.IsChildOf(Get<RectTransform>(modals, "_zoneGrid")),
+                    "Controller LB did not switch the open graveyard to the Extra Deck and focus its card.");
+                Pad(field, X);
+                var detail = Get<GameObject>(field, "_cardZoomModal");
+                Require(detail.activeSelf && modals.IsZoneViewerOpen && events.currentSelectedGameObject.transform.IsChildOf(detail.transform),
+                    "Controller X did not put card details above the open pile browser.");
                 Pad(field, B);
-                Require(!modals.IsZoneViewerOpen, "The controller did not close the graveyard.");
+                Require(!detail.activeSelf && modals.IsZoneViewerOpen && events.currentSelectedGameObject == cardFocus &&
+                    ReferenceEquals(idle, session.ActivePrompt), "Controller B did not restore the card's focus before leaving the pile.");
+                Pad(field, B);
+                Require(!modals.IsZoneViewerOpen, "The controller did not close the pile browser.");
                 Pad(field, LeftShoulder);
                 Pad(field, A);
                 Require(modals.IsZoneViewerOpen && ReferenceEquals(idle, session.ActivePrompt), "Field view could not open the Extra Deck with the controller.");
