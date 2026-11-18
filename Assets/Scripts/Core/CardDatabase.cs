@@ -92,6 +92,7 @@ namespace YGOPortable.Core
         private const int DescriptionIndexBits = 20;
         private const ulong DescriptionIndexMask = (1UL << DescriptionIndexBits) - 1;
         private static Dictionary<uint, CardInfo> _byCode;
+        private static readonly Dictionary<uint, CardInfo[]> DeckPrintingsByCode = new();
         private static Dictionary<int, CardInfo> _byLotdId;
         private static List<CardInfo> _allCards;
 
@@ -576,6 +577,7 @@ namespace YGOPortable.Core
             }
 
             LoadDeckEffectCategories(streamingAssetsPath);
+            IndexDeckPrintings();
             _relatedCache.Clear();
             _archetypes = null;
             Debug.Log($"[CardDatabase] Loaded {_allCards.Count} KR cards.");
@@ -1163,6 +1165,29 @@ namespace YGOPortable.Core
             if (_byCode != null && _byCode.TryGetValue(code, out var c)) return c;
             return null;
         }
+
+        private static void IndexDeckPrintings()
+        {
+            DeckPrintingsByCode.Clear();
+            var families = _byCode.Values.Where(card => (card.type & YgoConstants.TYPE_TOKEN) == 0)
+                .GroupBy(card => card.alias != 0 ? card.alias : card.code);
+            foreach (var family in families.Where(group => group.Count() > 1))
+            {
+                // A rules alias can also tie together separate cards such as Umi and A Legendary Ocean.
+                var equivalent = family.GroupBy(card => (card.type, card.desc, Monster: card.IsMonster
+                    ? (card.atk, card.def, card.level, card.race, card.attr, card.lscale, card.rscale, card.link)
+                    : default));
+                foreach (var group in equivalent.Where(group => group.Count() > 1))
+                {
+                    var printings = group.OrderBy(card => card.code != family.Key).ThenBy(card => card.code).ToArray();
+                    foreach (var card in printings) DeckPrintingsByCode.Add(card.code, printings);
+                }
+            }
+        }
+
+        internal static bool TryGetDeckPrintings(uint code, out CardInfo[] printings) => DeckPrintingsByCode.TryGetValue(code, out printings);
+
+        internal static uint GetDeckPrintingKey(uint code) => TryGetDeckPrintings(code, out var printings) ? printings[0].code : code;
 
         public static CardInfo GetByLotdId(int lotdId)
         {

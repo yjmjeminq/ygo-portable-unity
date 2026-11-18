@@ -237,7 +237,7 @@ namespace YGOPortable.Editor
                 "Reload lost crafted ownership, dust, DP, or opponent progression.");
         }
 
-        private static string WithOwnership(string json, uint code, int count)
+        internal static string WithOwnership(string json, uint code, int count)
         {
             var existing = new Regex("\\{\\s*\"code\"\\s*:\\s*" + code + "\\s*,\\s*\"count\"\\s*:\\s*\\d+\\s*\\}");
             string entry = $"{{\"code\":{code},\"count\":{count}}}";

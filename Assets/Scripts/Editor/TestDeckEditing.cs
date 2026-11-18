@@ -40,6 +40,7 @@ namespace YGOPortable.Editor
                 VerifyArchetypeCodex(canvas.transform, events);
                 VerifyMainSorting(editor, events);
                 VerifyTouchDeckMenu(editor, events);
+                VerifyCardPrintings(editor, events, streamingPath, Path.Combine(save, "printings"));
             }
             finally
             {
@@ -378,6 +379,92 @@ namespace YGOPortable.Editor
         private static string TrunkCount(DeckEditorUI editor, uint code) =>
             Field<List<(RectTransform rt, CompositeCardView card, Text count, CardDragTrigger trigger)>>(editor, "_trunkPool")
                 .Single(slot => slot.rt.gameObject.activeInHierarchy && slot.card.CurrentCode == code).count.text;
+
+        private static void VerifyCardPrintings(DeckEditorUI editor, EventSystem events, string streamingPath, string save)
+        {
+            const uint blueEyes = 89631139, blueEyesArt = 89631140;
+            const uint arcray = 6218704, arcrayArt = 6218705, zarc = 13331639;
+            Require(CardDatabase.GetDeckPrintingKey(arcray) == CardDatabase.GetDeckPrintingKey(arcrayArt) &&
+                CardDatabase.GetDeckPrintingKey(arcray) != CardDatabase.GetDeckPrintingKey(zarc),
+                "Arcray's artworks did not group independently of Z-ARC.");
+            Require(CardDatabase.GetDeckPrintingKey(80101899) == CardDatabase.GetDeckPrintingKey(80101900) &&
+                CardDatabase.GetDeckPrintingKey(99267150) == CardDatabase.GetDeckPrintingKey(99267151),
+                "Trap Trick's variant metadata or Five-Headed Dragon's translated names split their editions.");
+            Require(CardDatabase.GetDeckPrintingKey(5405694) != CardDatabase.GetDeckPrintingKey(10000100) &&
+                CardDatabase.GetDeckPrintingKey(22702055) != CardDatabase.GetDeckPrintingKey(295517),
+                "Cards with different effects were merged because they share a name or rules alias.");
+
+            editor.Close();
+            DeckRepository.Load(streamingPath, save, seedDefaultDecks: false);
+            CollectionProgress.Load(save);
+            var starter = CollectionProgress.Starters.First(option => option.Name.Contains("상검"));
+            Require(CollectionProgress.TryChooseStarter(starter.Id, out var starterDeck, out string error), error);
+            string path = Path.Combine(save, CollectionProgress.ProfileFileName);
+            string profile = TestCollectionProgress.WithOwnership(File.ReadAllText(path), blueEyes, 1);
+            File.WriteAllText(path, TestCollectionProgress.WithOwnership(profile, blueEyesArt, 3));
+            CollectionProgress.Load(save);
+            uint other = starterDeck.main.First(code => CardDatabase.GetDeckPrintingKey(code) != blueEyes);
+            var saved = new UserDeck
+            {
+                name = "Artwork fixture",
+                main = new List<uint> { blueEyes, other, blueEyesArt },
+                extra = new List<uint> { arcray, zarc, arcrayArt },
+            };
+            DeckRepository.SaveUserDeck(saved);
+            editor.Open();
+
+            var deck = Field<UserDeck>(editor, "_workingDeck");
+            Require(deck.main.SequenceEqual(new[] { blueEyes, blueEyesArt, other }) &&
+                deck.extra.SequenceEqual(new[] { arcray, arcrayArt, zarc }) &&
+                saved.extra.SequenceEqual(new[] { arcray, zarc, arcrayArt }) &&
+                !(bool)CallResult(editor, "HasUnsavedChanges"), "Loading variants changed the saved deck or split their display order.");
+            var search = Field<InputField>(editor, "_searchInp");
+            var trunk = Field<List<CardInfo>>(editor, "_trunkResults");
+            CardInfo BlueEyesEntry() => trunk.Single(card => CardDatabase.GetDeckPrintingKey(card.code) == blueEyes);
+            search.text = CardDatabase.GetName(blueEyes);
+            Require(BlueEyesEntry().code == blueEyes && TrunkCount(editor, blueEyes) == "×2",
+                "The trunk did not show one Blue-Eyes entry and the combined unused copies.");
+            search.text = blueEyesArt.ToString();
+            Require(BlueEyesEntry().code == blueEyesArt && TrunkCount(editor, blueEyesArt) == "×2",
+                "The alternate passcode did not find the same group with the requested artwork.");
+
+            search.text = blueEyes.ToString();
+            var slots = Field<List<(RectTransform rt, CompositeCardView card, Text count, CardDragTrigger trigger)>>(editor, "_trunkPool");
+            slots.Single(slot => slot.rt.gameObject.activeInHierarchy && slot.card.CurrentCode == blueEyes).trigger.OnRightClick();
+            Require(deck.main.SequenceEqual(new[] { blueEyes, blueEyesArt, blueEyesArt, other }) && TrunkCount(editor, blueEyes) == "×1",
+                "Adding the grouped card did not consume an available owned artwork or keep its copies adjacent.");
+            Call(editor, "TryAddCardToDeck", blueEyesArt, DragSourceType.DeckMain, null, null);
+            Require(deck.main.Count == 4, "A different illustration bypassed the shared copy limit.");
+            Call(editor, "MoveDeckCard", DragSourceType.DeckMain, 2, DragSourceType.DeckSide, -1, null);
+            Require(deck.side.SequenceEqual(new[] { blueEyesArt }) && TrunkCount(editor, blueEyes) == "×1",
+                "Moving an artwork to the side deck changed the available ownership.");
+            Call(editor, "RemoveDeckCard", DragSourceType.DeckSide, 0, null);
+            Require(TrunkCount(editor, blueEyes) == "×2", "Removing an artwork did not restore a copy to the grouped trunk entry.");
+
+            search.text = CardDatabase.GetName(blueEyes);
+            var row = slots.Single(slot => slot.rt.gameObject.activeInHierarchy && slot.card.CurrentCode == blueEyes);
+            row.trigger.OnTouchClick();
+            var artwork = Field<Button>(editor, "_deckCardActionArtwork");
+            Require(artwork.gameObject.activeInHierarchy && artwork.IsInteractable(), "The grouped entry hid its owned alternate artwork.");
+            events.SetSelectedGameObject(artwork.gameObject);
+            var editorType = editor.GetType();
+            editorType.GetField("_padMode", Instance).SetValue(editor, true);
+            var frame = editorType.Assembly.GetType("YGOPortable.UI.DeckPadFrame", true);
+            var buttons = editorType.Assembly.GetType("YGOPortable.UI.DeckPadButtons", true);
+            Call(editor, "HandleDeckPad", Activator.CreateInstance(frame, Instance, null,
+                new object[] { Vector2Int.zero, Enum.Parse(buttons, "Submit"), 0f }, null));
+            Require(BlueEyesEntry().code == blueEyesArt && TrunkCount(editor, blueEyesArt) == "×2" &&
+                events.currentSelectedGameObject == artwork.gameObject &&
+                Field<CompositeCardView>(editor, "_previewCard").CurrentCode == blueEyesArt,
+                "Gamepad artwork selection did not update the row and preview while retaining focus and quantity.");
+            Call(editor, "CloseDeckCardActions");
+            Require(CollectionProgress.GetOwnedCount(blueEyes) == 1 && CollectionProgress.GetOwnedCount(blueEyesArt) == 3,
+                "Grouping cards changed saved ownership per artwork.");
+
+            var variants = CardDatabase.AllCards.Where(card => CardDatabase.GetDeckPrintingKey(card.code) != card.code).ToArray();
+            Debug.Log($"[VERIFY DECK PRINTINGS] {variants.Select(card => CardDatabase.GetDeckPrintingKey(card.code)).Distinct().Count()} " +
+                $"groups, {variants.Length} duplicate catalogue rows. Ownership, search, deck order and artwork selection passed.");
+        }
 
         private static void VerifyMainSorting(DeckEditorUI editor, EventSystem events)
         {
