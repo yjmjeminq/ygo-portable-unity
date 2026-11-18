@@ -35,6 +35,9 @@ namespace YGOPortable.Editor
                 var firstAi = (TacticalAI)FindField(controller, "_ai").GetValue(controller);
                 Require(firstDuel.NativePtr != IntPtr.Zero && !firstDuel.IsFinished && firstDuel.HumanPlayerIndex == 1,
                     "The first duel did not start with the AI going first.");
+                firstAi.Difficulty = AIDifficulty.Smart;
+                Require(firstAi.UsesTrainedPolicy, "The gameplay opponent could not use the included policy.");
+                firstAi.Difficulty = AIDifficulty.Normal;
 
                 // Exhaust this optional effect's per-turn allowance without submitting a synthetic prompt to the core.
                 var effect = new DuelPrompt

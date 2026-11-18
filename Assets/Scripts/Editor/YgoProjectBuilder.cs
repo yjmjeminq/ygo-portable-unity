@@ -366,6 +366,7 @@ namespace YGOPortable.Editor
             VerifyDeckSortDrawOrder(classicDecks[0].main);
             VerifyPossessedDestiny(classicDecks[0].main);
             VerifyMandatoryBattleAttack();
+            VerifyAiTacticalChoices();
             VerifyAiFieldAndTributeChoices();
             VerifyAiKeepsActiveFieldSpell();
             VerifyAiFieldReplacementChoices();
@@ -2252,6 +2253,51 @@ namespace YGOPortable.Editor
             AssertTrue(BitConverter.ToInt32(ai.ComputeResponse(duel, prompt), 0) == 3,
                 "AI did not end the Battle Phase when allowed");
             Debug.Log("[VERIFY MANDATORY ATTACK] AI attacked when both phase transitions were unavailable.");
+        }
+
+        private static void VerifyAiTacticalChoices()
+        {
+            using var duel = new DuelSession();
+            TacticalAI ai = new TacticalAI(null);
+            duel.Players[0].mzone[0] = new LiveCardState { attack = 2300, position = YgoConstants.POS_FACEUP_ATTACK };
+            duel.Players[1].mzone[0] = new LiveCardState { attack = 3000, position = YgoConstants.POS_FACEUP_ATTACK };
+            duel.Players[1].mzone[1] = new LiveCardState { attack = 1600, position = YgoConstants.POS_FACEUP_ATTACK };
+
+            var battle = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_BATTLECMD, canM2 = true };
+            battle.attackable.Add(new SelectableCardItem { sequence = 0 });
+            AssertTrue(BitConverter.ToInt32(ai.ComputeResponse(duel, battle), 0) == 1,
+                "The AI skipped a profitable attack.");
+
+            var targets = new DuelPrompt
+            {
+                messageType = YgoConstants.MSG_SELECT_CARD, min = 1, max = 1, SelectionHint = YgoConstants.HINTMSG_ATTACKTARGET,
+            };
+            targets.candidates.Add(new SelectableCardItem { controller = 1, location = YgoConstants.LOCATION_MZONE, sequence = 0 });
+            targets.candidates.Add(new SelectableCardItem { controller = 1, location = YgoConstants.LOCATION_MZONE, sequence = 1 });
+            var response = ai.ComputeResponse(duel, targets);
+            AssertTrue(response.Length == 12 && BitConverter.ToInt32(response, 8) == 1,
+                "The AI attacked the stronger monster despite having a winning legal target.");
+
+            targets.SelectionHint = DuelTactics.Banish;
+            targets.candidates[0] = new SelectableCardItem { location = YgoConstants.LOCATION_MZONE, sequence = 0 };
+            AssertTrue(BitConverter.ToInt32(ai.ComputeResponse(duel, targets), 8) == 1,
+                "The AI banished its own card while an opposing target was available.");
+
+            duel.Players[0].mzone[1] = new LiveCardState { attack = 100, position = YgoConstants.POS_FACEUP_ATTACK };
+            targets.SelectionHint = 533; // Link Material
+            targets.candidates[1] = new SelectableCardItem { location = YgoConstants.LOCATION_MZONE, sequence = 1 };
+            AssertTrue(BitConverter.ToInt32(ai.ComputeResponse(duel, targets), 8) == 1,
+                "The AI spent its stronger monster as material with a cheaper choice available.");
+
+            var main = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_IDLECMD, canEp = true };
+            main.activatable.Add(new SelectableCardItem { code = 53129443, location = YgoConstants.LOCATION_HAND });
+            Array.Clear(duel.Players[1].mzone, 0, duel.Players[1].mzone.Length);
+            AssertTrue(BitConverter.ToInt32(ai.ComputeResponse(duel, main), 0) == 7,
+                "The AI used Dark Hole to clear only its own monsters.");
+            duel.Players[1].mzone[0] = new LiveCardState { attack = 3000, position = YgoConstants.POS_FACEUP_ATTACK };
+            AssertTrue(BitConverter.ToInt32(ai.ComputeResponse(duel, main), 0) == 5,
+                "The AI did not consider Dark Hole when it could remove an opposing monster.");
+            Debug.Log("[VERIFY AI TACTICS] Legal battle targets, banishing, material choice and avoiding an own-only board wipe passed.");
         }
 
         private static void AssertTrue(bool cond, string msg)

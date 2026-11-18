@@ -337,7 +337,7 @@ namespace YGOPortable.UI
 
             _session?.Dispose();
             _session = new DuelSession();
-            _ai = new TacticalAI { Difficulty = AiDifficulty };
+            _ai = new TacticalAI(DuelAiPolicy.LoadIncluded()) { Difficulty = AiDifficulty };
             _shownHumanPrompt = null;
             _aiTimer = 0f;
             _resultShown = false;
