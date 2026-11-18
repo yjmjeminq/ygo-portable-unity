@@ -374,6 +374,7 @@ namespace YGOPortable.Editor
             // Explicit test for Token generation, effect tokens (Swordsoul Tuner), dynamic/stat tokens, and token disappearance
             TestTokenAndComplexEffects.RunTokenSuiteHeadless();
             TestDuelZoneBrowser.Run();
+            TestCardPresentation.Run();
             TestHandGlow.Run();
             TestChainChooser.Run();
             TestDuelPadNavigation.Run();

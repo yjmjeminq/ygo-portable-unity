@@ -388,6 +388,7 @@ namespace YGOPortable.UI
     public class CompositeCardView : MonoBehaviour
     {
         private Image _artImg;
+        private CardFinishGraphic _finish;
         private Image _frameImg;
         private Image _attrImg;
         private Image _limitImg;
@@ -405,6 +406,7 @@ namespace YGOPortable.UI
 
         public uint CurrentCode { get; private set; }
         internal bool UseDuelArtwork { get; set; }
+        internal Sprite ArtworkSprite => _artImg.sprite;
 
         public static CompositeCardView Create(Transform parent, string name, bool detailedOverlay = false, bool duelArtwork = false)
         {
@@ -496,6 +498,7 @@ namespace YGOPortable.UI
             if (faceDown || code == 0)
             {
                 ReleaseArtwork();
+                HideRarityFinish();
                 _backObj.SetActive(true);
                 return;
             }
@@ -518,6 +521,7 @@ namespace YGOPortable.UI
             }
 
             BindArtwork(code);
+            BindRarityFinish(info);
             _frameImg.sprite = LotdUiKit.LoadSprite($"LOTD/Frames/{YgoConstants.GetCardFrameName(type)}");
 
             if (_detailed)
@@ -583,6 +587,37 @@ namespace YGOPortable.UI
                     _atkDefText.text = "";
                 }
             }
+        }
+
+        internal void SetRarityHighlight(float amount)
+        {
+            if (_finish != null && _finish.gameObject.activeSelf) _finish.SetHighlight(amount);
+        }
+
+        private void BindRarityFinish(CardInfo info)
+        {
+            var rarity = info == null || (info.type & YgoConstants.TYPE_TOKEN) != 0
+                ? CardRarity.Normal : CardRarityCatalog.GetRarity(info.code);
+            if (rarity < CardRarity.SuperRare)
+            {
+                HideRarityFinish();
+                return;
+            }
+            if (_finish == null)
+            {
+                var foil = LotdUiKit.FillRect("RarityFinish", _artImg.transform);
+                _finish = foil.gameObject.AddComponent<CardFinishGraphic>();
+                _finish.raycastTarget = false;
+            }
+            _finish.Bind(info.code, rarity);
+            _finish.gameObject.SetActive(true);
+        }
+
+        private void HideRarityFinish()
+        {
+            if (_finish == null || !_finish.gameObject.activeSelf) return;
+            _finish.SetHighlight(0f);
+            _finish.gameObject.SetActive(false);
         }
 
         private void OnEnable()

@@ -358,6 +358,7 @@ namespace YGOPortable.UI
                 pull.Button.interactable = arrived;
                 float lift = pull.Highlighted && pull.Button.interactable ? 1f : 0f;
                 pull.Lift = Mathf.MoveTowards(pull.Lift, lift, delta / .13f);
+                pull.Card.SetRarityHighlight(pull.Lift);
                 pull.Slot.anchoredPosition = Vector2.up *
                     (6f * Mathf.SmoothStep(0f, 1f, pull.Lift) - 36f * (1f - ease));
                 motionActive |= pull.Lift != lift;
@@ -377,7 +378,11 @@ namespace YGOPortable.UI
             float t = Mathf.Clamp01(pull.FlipAge / FlipTime);
             float width = Mathf.Max(.025f, Mathf.Abs(Mathf.Cos(t * Mathf.PI)));
             pull.Face.localScale = new Vector3(width, 1f + .055f * Mathf.Sin(t * Mathf.PI), 1f);
-            if (t >= .5f) RevealCard(pull, playSound: true);
+            if (t >= .5f)
+            {
+                RevealCard(pull, playSound: true);
+                pull.Card.SetRarityHighlight(Mathf.Max(pull.Lift, Mathf.Sin((t - .5f) * 2f * Mathf.PI)));
+            }
 
             Color foil = pull.Rarity == CardRarity.UltraRare ? Color.HSVToRGB(t, .68f, 1f) : CardRarityStyle.GetColor(pull.Rarity);
             foil.a = Mathf.Sin(t * Mathf.PI) * (pull.Rarity >= CardRarity.SuperRare ? .68f : .25f);

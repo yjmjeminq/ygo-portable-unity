@@ -240,6 +240,7 @@ namespace YGOPortable.UI
 
     internal sealed class DeckCardVisualMotion : MonoBehaviour
     {
+        private CompositeCardView _card;
         private RectTransform _rect;
         private CanvasGroup _canvas;
         private Image _slotTint;
@@ -252,6 +253,7 @@ namespace YGOPortable.UI
         internal static void Bind(CompositeCardView card, Image tint = null)
         {
             var motion = card.gameObject.AddComponent<DeckCardVisualMotion>();
+            motion._card = card;
             motion._rect = (RectTransform)card.transform;
             motion._canvas = card.gameObject.AddComponent<CanvasGroup>();
             motion._slotTint = tint;
@@ -317,6 +319,7 @@ namespace YGOPortable.UI
         {
             _rect.anchoredPosition = _offset + Vector2.up * (_hover * 4f);
             _rect.localScale = Vector3.one * (1f + _hover * .045f - _pulse * .05f);
+            _card.SetRarityHighlight(Mathf.Max(_hover, _pulse));
             _canvas.alpha = _visibility * (1f - _pulse * .24f);
             if (_slotTint != null)
             {

@@ -2083,15 +2083,7 @@ namespace YGOPortable.UI
             else if (sameZone) motion = CardMotion.ChangePosition;
             else if ((e.toLoc & YgoConstants.LOCATION_ONFIELD) != 0 && toBack) motion = CardMotion.Set;
             else if (e.toLoc == YgoConstants.LOCATION_MZONE && e.fromLoc != YgoConstants.LOCATION_MZONE)
-            {
-                uint type = CardDatabase.Get(e.code)?.type ?? 0;
-                bool special = (e.reason & YgoConstants.REASON_SPSUMMON) != 0;
-                if ((type & YgoConstants.TYPE_TOKEN) != 0) motion = CardMotion.TokenSummon;
-                else if (special && (e.fromLoc == YgoConstants.LOCATION_EXTRA && (type & (YgoConstants.TYPE_EXTRA | YgoConstants.TYPE_PENDULUM)) != 0 ||
-                    e.fromLoc == YgoConstants.LOCATION_HAND && (type & YgoConstants.TYPE_RITUAL) != 0))
-                    motion = CardMotion.ExtraDeckSummon;
-                else motion = special ? CardMotion.SpecialSummon : CardMotion.Summon;
-            }
+                motion = MonsterArrivalMotion(e);
 
             var flight = new CardFlight(e.code, from, to, fromBack, toBack);
             if (disappearing || (e.toLoc & YgoConstants.LOCATION_OVERLAY) != 0)
@@ -2105,6 +2097,19 @@ namespace YGOPortable.UI
                 e.toLoc is YgoConstants.LOCATION_GRAVE or YgoConstants.LOCATION_REMOVED)
                 animator.QueuePileTransfer(flight, onArrival);
             else animator.QueueMove(flight, motion, onArrival);
+        }
+
+        internal static CardMotion MonsterArrivalMotion(CardMoveEvent move)
+        {
+            uint type = CardDatabase.Get(move.code)?.type ?? 0;
+            if ((type & YgoConstants.TYPE_TOKEN) != 0) return CardMotion.TokenSummon;
+            if ((move.reason & YgoConstants.REASON_SPSUMMON) == 0) return CardMotion.Summon;
+            if (move.fromLoc == YgoConstants.LOCATION_EXTRA && (move.fromPos & YgoConstants.POS_FACEUP) != 0 &&
+                (type & YgoConstants.TYPE_PENDULUM) != 0) return CardMotion.PendulumSummon;
+            if (move.fromLoc == YgoConstants.LOCATION_EXTRA && (type & (YgoConstants.TYPE_EXTRA | YgoConstants.TYPE_PENDULUM)) != 0 ||
+                move.fromLoc == YgoConstants.LOCATION_HAND && (type & YgoConstants.TYPE_RITUAL) != 0)
+                return CardMotion.ExtraDeckSummon;
+            return CardMotion.SpecialSummon;
         }
 
         private void HandleChainActivatedEvent(ChainLinkInfo link)

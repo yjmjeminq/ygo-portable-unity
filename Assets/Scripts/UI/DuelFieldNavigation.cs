@@ -490,7 +490,11 @@ namespace YGOPortable.UI
                 Vector3 nextScale = Vector3.Lerp(rect.localScale, scale, step);
                 bool settled = (scale - nextScale).sqrMagnitude < .000001f;
                 nextScale = settled ? scale : nextScale;
-                if (rect.localScale != nextScale) rect.localScale = nextScale;
+                if (rect.localScale != nextScale)
+                {
+                    rect.localScale = nextScale;
+                    rect.GetComponentInParent<CompositeCardView>()?.SetRarityHighlight((nextScale.x - 1f) / (focusScale - 1f));
+                }
                 if (motion.InHand)
                 {
                     var position = focused ? Vector2.up * Mathf.Min(18f, rect.rect.height * .12f) : Vector2.zero;
@@ -534,6 +538,7 @@ namespace YGOPortable.UI
             {
                 if (motion.Rect == null) continue;
                 motion.Rect.localScale = Vector3.one;
+                motion.Rect.GetComponentInParent<CompositeCardView>()?.SetRarityHighlight(0f);
                 if (motion.InHand) motion.Rect.anchoredPosition = Vector2.zero;
             }
             _duelPadCardMotions.Clear();
