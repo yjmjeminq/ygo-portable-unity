@@ -12,13 +12,16 @@ namespace YGOPortable.AI
         private const int MaxMainActions = 12;
         private const int MaxResponses = 76;
         private const int MaxSearchesPerTurn = 3;
+        private const int MaxLateLinkSearches = 2;
         private const int BudgetMilliseconds = 75;
         private const int BranchMilliseconds = 26;
+        private const int LateLinkBranchMilliseconds = 42;
         private const uint Machinex = 46593546, Siegfried = 44852429, Gilgamesh = 9024198;
 
         private readonly Queue<(ulong state, int action)> _next = new();
         private int _turn = -1;
         private int _searches;
+        private int _lateLinkSearches;
         private DuelPrompt _prepared;
         internal int SimulatedBranches { get; private set; }
         internal int ChangedLines { get; private set; }
@@ -27,8 +30,34 @@ namespace YGOPortable.AI
         {
             internal double score = double.NegativeInfinity;
             internal bool complete;
+            internal int unpaidLinkTrade = int.MaxValue;
             internal readonly List<(ulong state, int action)> moves = new();
             internal readonly List<(int[] prefix, int[] options)> forks = new();
+        }
+
+        private readonly struct LinkPosition
+        {
+            internal readonly int rank, opposingCards, interaction;
+            internal readonly bool lethal;
+
+            internal LinkPosition(DuelSession duel, byte player, bool canBattle)
+            {
+                var own = duel.Players[player];
+                var rival = duel.Players[1 - player];
+                int attackers = 0;
+                rank = interaction = 0;
+                foreach (var monster in own.mzone)
+                {
+                    if (monster?.IsFaceUp != true) continue;
+                    if (monster.IsAttack) attackers += Math.Max(0, monster.attack);
+                    rank = Math.Max(rank, LinkComboPolicy.Rank(monster.code));
+                    if (!monster.effectsDisabled && CardDatabase.Get(monster.code) is CardInfo card && LinkComboPolicy.IsInteractive(card))
+                        interaction++;
+                }
+                int monsters = rival.mzone.Count(card => card != null);
+                opposingCards = monsters + rival.szone.Count(card => card != null);
+                lethal = canBattle && monsters == 0 && attackers >= rival.lp;
+            }
         }
 
         internal static bool CanDevelop(DuelPrompt prompt)
@@ -62,23 +91,42 @@ namespace YGOPortable.AI
             {
                 _turn = live.TurnNumber;
                 _searches = 0;
+                _lateLinkSearches = 0;
                 _next.Clear();
             }
 
             ulong state = Fingerprint(live, prompt);
-            if (_next.Count > 0)
-            {
-                if (_next.Peek().state == state) yield break;
-                _next.Clear();
-            }
-            if (_searches >= MaxSearchesPerTurn || advisor.ComboMainOptions(live, prompt).Length < 2) yield break;
-            _searches++;
+            var own = live.Players[prompt.playerId];
+            bool CouldTrade(SelectableCardItem item) => LinkComboPolicy.NeedsMaterialProjection(own, item);
+            bool cached = _next.Count > 0 && _next.Peek().state == state;
+            // An opening search may run out before the first strong Link monster reaches the board.
+            bool lateLinkTrade = _searches >= MaxSearchesPerTurn && _lateLinkSearches < MaxLateLinkSearches &&
+                prompt.spSummonable.Any(CouldTrade);
+            if (cached && !lateLinkTrade) yield break;
+            if (!cached) _next.Clear();
+            if (!lateLinkTrade && _searches >= MaxSearchesPerTurn) yield break;
+            var options = advisor.ComboMainOptions(live, prompt);
+            var lateOptions = lateLinkTrade ? options.Where(action => (action & 0xffff) == 1)
+                .Select(action => (action, summon: prompt.spSummonable[action >> 16]))
+                .Where(option => CouldTrade(option.summon))
+                .OrderByDescending(option => LinkComboPolicy.IsBridge(option.summon.code))
+                .ThenBy(option => LinkComboPolicy.Rank(option.summon.code))
+                .Take(3).Select(option => option.action).ToArray() : Array.Empty<int>();
+            if (lateLinkTrade ? lateOptions.Length == 0 : options.Length < 2) yield break;
+            if (lateLinkTrade) _lateLinkSearches++;
+            else _searches++;
 
             var watch = new Stopwatch();
             bool Expired() => watch.ElapsedMilliseconds >= BudgetMilliseconds;
             var queue = new Queue<int[]>();
-            queue.Enqueue(Array.Empty<int>());
+            queue.Enqueue(cached ? _next.Select(move => move.action).ToArray() : Array.Empty<int>());
             var seen = new HashSet<string>();
+            int branchBudget = lateLinkTrade ? LateLinkBranchMilliseconds : BranchMilliseconds;
+            foreach (int option in lateOptions)
+            {
+                queue.Enqueue(new[] { option });
+                seen.Add(option.ToString());
+            }
             Line best = null;
             Line baseline = null;
             for (int attempt = 0; queue.Count != 0 && attempt < MaxBranches && !Expired(); attempt++)
@@ -87,7 +135,7 @@ namespace YGOPortable.AI
                 Line line;
                 long branchStart = watch.ElapsedMilliseconds;
                 watch.Start();
-                bool BranchExpired() => Expired() || watch.ElapsedMilliseconds - branchStart >= BranchMilliseconds;
+                bool BranchExpired() => Expired() || watch.ElapsedMilliseconds - branchStart >= branchBudget;
                 using (var trial = live.ReplayForPlanning(BranchExpired))
                 {
                     if (trial == null || Fingerprint(trial, trial.ActivePrompt) != state) break;
@@ -96,15 +144,17 @@ namespace YGOPortable.AI
                     line = Explore(trial, advisor.ForkForComboSearch(), prompt.playerId, choices, BranchExpired);
                 }
                 baseline ??= line;
-                bool better = best == null || (best.complete && line.complete && line.moves.Count > 0 && line.score > best.score + .08);
-                if (better)
+                bool better = line.unpaidLinkTrade == int.MaxValue && (best == null ||
+                    ((best.complete || lateLinkTrade) && line.complete && line.moves.Count > 0 && line.score > best.score + .08));
+                if (better) best = line;
+                if (better || (line.complete && line.unpaidLinkTrade != int.MaxValue))
                 {
-                    best = line;
                     // Examine both the opening choice and the transition into a possible finish.
-                    for (int offset = 0; offset < Math.Min(6, line.forks.Count) && queue.Count < MaxBranches; offset++)
+                    var forks = better ? line.forks : line.forks.Where(fork => fork.prefix.Length > line.unpaidLinkTrade).ToList();
+                    for (int offset = 0; offset < Math.Min(6, forks.Count) && queue.Count < MaxBranches; offset++)
                     {
-                        int depth = offset % 2 == 0 ? offset / 2 : line.forks.Count - 1 - offset / 2;
-                        var fork = line.forks[depth];
+                        int depth = offset % 2 == 0 ? offset / 2 : forks.Count - 1 - offset / 2;
+                        var fork = forks[depth];
                         foreach (int option in fork.options.Take(2))
                         {
                             var branch = new int[fork.prefix.Length + 1];
@@ -120,6 +170,7 @@ namespace YGOPortable.AI
 
             if (best == null || best.moves.Count == 0) yield break;
             if (best != baseline) ChangedLines++;
+            _next.Clear();
             foreach (var move in best.moves) _next.Enqueue(move);
         }
 
@@ -128,6 +179,24 @@ namespace YGOPortable.AI
             var line = new Line();
             int settledMoves = 0;
             int startTurn = trial.TurnNumber;
+            uint linkTarget = 0;
+            int targetRank = 0;
+            bool canBattle = false;
+            var beforeLink = default(LinkPosition);
+            double beforeLinkScore = 0;
+            var trades = new List<(int index, int rank, double score, LinkPosition before)>();
+            trial.OnCardMoved += move =>
+            {
+                if (targetRank == 0) return;
+                if (move.code == linkTarget && move.toCon == player && move.toLoc == YgoConstants.LOCATION_MZONE &&
+                    (move.reason & YgoConstants.REASON_SPSUMMON) != 0)
+                    targetRank = 0;
+                if (move.fromCon != player || move.fromLoc != YgoConstants.LOCATION_MZONE ||
+                    (move.reason & YgoConstants.REASON_LINK) == 0) return;
+                int rank = LinkComboPolicy.Rank(move.code);
+                if (LinkComboPolicy.IsDowngrade(rank, targetRank))
+                    trades.Add((line.moves.Count - 1, rank, beforeLinkScore, beforeLink));
+            };
             for (int i = 0; i < MaxResponses && !expired() && trial.TurnNumber == startTurn &&
                 trial.RetryCount == 0 && !trial.SpeculationUncertain; i++)
             {
@@ -154,7 +223,8 @@ namespace YGOPortable.AI
                     continue;
                 }
 
-                line.score = BoardValue(trial, player, prompt.canBp) - line.moves.Count * .01;
+                canBattle = prompt.canBp;
+                line.score = BoardValue(trial, player, canBattle) - line.moves.Count * .01;
                 settledMoves = line.moves.Count;
                 if (settledMoves >= MaxMainActions) break;
                 var options = ai.ComboMainOptions(trial, prompt);
@@ -162,6 +232,18 @@ namespace YGOPortable.AI
                 byte[] response = ai.ComputeComboResponse(trial, prompt, forced);
                 int move = BitConverter.ToInt32(response, 0);
                 if (forced.HasValue && forced != move) break;
+                targetRank = 0;
+                if ((move & 0xffff) == 1 && prompt.spSummonable[move >> 16] is { location: YgoConstants.LOCATION_EXTRA } summon)
+                {
+                    int next = LinkComboPolicy.Rank(summon.code);
+                    if (LinkComboPolicy.HasStrongerLink(trial.Players[player], next))
+                    {
+                        linkTarget = summon.code;
+                        targetRank = next;
+                        beforeLink = new LinkPosition(trial, player, canBattle);
+                        beforeLinkScore = line.score;
+                    }
+                }
                 int[] alternatives = options.Where(option => option != move).ToArray();
                 if (alternatives.Length != 0)
                     line.forks.Add((line.moves.Select(entry => entry.action).ToArray(), alternatives));
@@ -175,6 +257,19 @@ namespace YGOPortable.AI
                 trial.SubmitResponse(response);
             }
             if (line.moves.Count > settledMoves) line.moves.RemoveRange(settledMoves, line.moves.Count - settledMoves);
+            if (trades.Count == 0 || (trial.IsFinished && trial.Winner == player)) return line;
+
+            // Leaving more small bodies is insufficient. The projected line must recover the lost Link rating
+            // or gain an actionable advantage against the actual board before committing the material.
+            var end = new LinkPosition(trial, player, canBattle);
+            foreach (var trade in trades)
+            {
+                if (trade.index >= settledMoves) continue;
+                bool payoff = end.rank >= trade.rank || end.opposingCards < trade.before.opposingCards ||
+                    end.interaction > trade.before.interaction || (end.lethal && !trade.before.lethal);
+                if (!line.complete || !payoff || line.score <= trade.score + .08)
+                    line.unpaidLinkTrade = Math.Min(line.unpaidLinkTrade, trade.index);
+            }
             return line;
         }
 

@@ -28,12 +28,38 @@ namespace YGOPortable.Editor
         {
             internal uint summonedTypes;
             internal int extraBodies, specialSummons, pendulumSummons, retries, branches, changes;
-            internal bool stopped, won, lost;
+            internal int downlinkMaterials, strongestSpentLink, finalLink, lowerWithSpareMaterials;
+            internal bool stopped, won, lost, sawDowngradeOption;
             internal double field;
             internal byte failedMessage;
             internal ulong failedHint;
             internal string diagnostic;
+            internal string downlinkTrace;
             internal readonly List<uint> finishers = new List<uint>();
+        }
+
+        internal static void VerifyLinkMaterialProtection()
+        {
+            const uint accesscode = 86066372;
+            var decks = DeckRepository.PresetDecks.ToDictionary(deck => deck.id);
+            var rivals = RivalIds.Select(id => decks[id]).ToArray();
+            var general = DuelAiPolicy.LoadIncluded();
+            var links = LinkComboPolicy.LoadIncluded();
+            Result Opening(int id, int test) => Play(decks[id], PickRival(rivals, id, test, false), test, (test & 1) == 0,
+                false, general, links);
+
+            var cyberse = Opening(385, 5);
+            var sunavalon = Opening(35020, 5);
+            var gGolem = Opening(35000, 2);
+            if (new[] { cyberse, sunavalon, gGolem }.Any(result => !result.stopped || result.retries != 0))
+                throw new InvalidOperationException("A Link material protection fixture did not finish cleanly.");
+            if (!cyberse.sawDowngradeOption || cyberse.downlinkMaterials != 0 || !cyberse.finishers.Contains(accesscode))
+                throw new InvalidOperationException("Cyberse did not retain Accesscode Talker with a lower Link summon available.");
+            bool grewWithSpare = sunavalon.lowerWithSpareMaterials > 0 && sunavalon.finalLink >= 4;
+            bool rebuilt = gGolem.downlinkMaterials > 0 && gGolem.finalLink >= gGolem.strongestSpentLink;
+            if (!grewWithSpare && !rebuilt)
+                throw new InvalidOperationException("The Link material protection prevented both useful development lines.");
+            Debug.Log($"[VERIFY LINK MATERIALS] Accesscode retained. Sunavalon extended with spare materials: {grewWithSpare}. G Golem rebuilt after a lower Link: {rebuilt}.");
         }
 
         internal static void VerifyOtherComboRoutes()
@@ -86,13 +112,15 @@ namespace YGOPortable.Editor
                 var links = LinkComboPolicy.LoadIncluded();
                 if (general == null || links == null) throw new InvalidOperationException("Missing the included duel models.");
                 string run = Environment.GetEnvironmentVariable("YGO_COMBO_AUDIT_RUN");
-                if (run is not ("baseline" or "expanded" or "final" or "diagnostic")) run = "expanded";
+                if (run is not ("baseline" or "expanded" or "final" or "diagnostic" or "link_before" or "link_after")) run = "expanded";
+                bool linkOnly = run is "link_before" or "link_after";
+                if (linkOnly) decks = decks.Where(CanLinkDown).ToArray();
                 int filter = int.TryParse(Environment.GetEnvironmentVariable("YGO_COMBO_AUDIT_DECK"), out int idFilter) ? idFilter : 0;
                 string logDirectory = Path.Combine(Directory.GetParent(Application.dataPath).FullName, "Logs");
                 Directory.CreateDirectory(logDirectory);
                 string report = Path.Combine(logDirectory, $"combo_roster_{run}.tsv");
                 using var writer = new StreamWriter(report);
-                writer.WriteLine("deck\ttitle\tcase\tfirst\trival\tmode\tstopped\twin\tloss\ttypes\textra\tspecial\tpendulum\tretries\tretryMessage\tretryHint\tnativeErrors\tbranches\tchanges\tfield");
+                writer.WriteLine("deck\ttitle\tcase\tfirst\trival\tmode\tstopped\twin\tloss\ttypes\textra\tspecial\tpendulum\tretries\tretryMessage\tretryHint\tnativeErrors\tbranches\tchanges\tfield\tdownlinkMaterials\tstrongestSpentLink\tfinalLink\tdownlinkTrace\tlowerWithSpareMaterials");
                 var elapsed = Stopwatch.StartNew();
                 int checkedDecks = 0, openings = 0, matches = 0, capped = 0, retries = 0;
                 foreach (var deck in decks.Where(deck => filter == 0 || deck.id == filter))
@@ -130,7 +158,8 @@ namespace YGOPortable.Editor
                     writer.WriteLine(string.Join("\t", deck.id, deck.title.Replace('\t', ' '), test, first, rival.id,
                         full ? "full" : "opening", result.stopped, result.won, result.lost, result.summonedTypes, result.extraBodies,
                         result.specialSummons, result.pendulumSummons, result.retries, result.failedMessage, result.failedHint,
-                        scriptErrors - before, result.branches, result.changes, result.field.ToString("F3", CultureInfo.InvariantCulture)));
+                        scriptErrors - before, result.branches, result.changes, result.field.ToString("F3", CultureInfo.InvariantCulture),
+                        result.downlinkMaterials, result.strongestSpentLink, result.finalLink, result.downlinkTrace, result.lowerWithSpareMaterials));
                 }
             }
             catch (Exception exception)
@@ -143,6 +172,13 @@ namespace YGOPortable.Editor
                 YgoNativeBridge.Shutdown();
             }
             if (Application.isBatchMode) EditorApplication.Exit(exit);
+        }
+
+        private static bool CanLinkDown(PresetDeckInfo deck)
+        {
+            if (deck.extra == null) return false;
+            var ratings = deck.extra.Select(LinkComboPolicy.Rank).Where(rank => rank > 0).Distinct().ToArray();
+            return ratings.Length > 1 && ratings.Max() >= 3;
         }
 
         private static PresetDeckInfo PickRival(PresetDeckInfo[] rivals, int deck, int test, bool full) =>
@@ -162,15 +198,36 @@ namespace YGOPortable.Editor
             var result = new Result();
             int turn = first ? 1 : 2;
             int steps = 0;
+            uint linkTarget = 0;
+            bool lowerLinkOffered = false;
+            bool spentStrongMaterial = false;
             var last = new Queue<string>();
             duel.OnCardMoved += move =>
             {
+                int targetRating = LinkComboPolicy.Rank(linkTarget);
+                if (targetRating > 0 && move.fromCon == seat && move.fromLoc == YgoConstants.LOCATION_MZONE &&
+                    (move.reason & YgoConstants.REASON_LINK) != 0)
+                {
+                    int rating = LinkComboPolicy.Rank(move.code);
+                    if (LinkComboPolicy.IsDowngrade(rating, targetRating))
+                    {
+                        spentStrongMaterial = true;
+                        result.downlinkMaterials++;
+                        result.strongestSpentLink = Math.Max(result.strongestSpentLink, rating);
+                        result.downlinkTrace = $"{CardDatabase.GetName(move.code)} ({rating}) -> {CardDatabase.GetName(linkTarget)} ({targetRating})";
+                    }
+                }
                 if (move.toCon != seat || move.toLoc != YgoConstants.LOCATION_MZONE ||
                     (move.reason & YgoConstants.REASON_SPSUMMON) == 0) return;
                 result.specialSummons++;
                 if (CardDatabase.Get(move.code) is not CardInfo card) return;
                 if (move.fromLoc == YgoConstants.LOCATION_EXTRA) result.summonedTypes |= card.type & ExtraTypes;
                 if (move.fromLoc == YgoConstants.LOCATION_HAND) result.summonedTypes |= card.type & YgoConstants.TYPE_RITUAL;
+                if (move.code == linkTarget && move.fromLoc == YgoConstants.LOCATION_EXTRA)
+                {
+                    if (lowerLinkOffered && !spentStrongMaterial) result.lowerWithSpareMaterials++;
+                    linkTarget = 0;
+                }
             };
 
             for (int step = 0; step < (full ? 1100 : 260) && !duel.IsFinished && duel.RetryCount <= 4; step++)
@@ -190,11 +247,20 @@ namespace YGOPortable.Editor
                 last.Enqueue($"{prompt.playerId}/{prompt.messageType}/{prompt.SelectionHint} -> {BitConverter.ToString(response)}");
                 if (tested && prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD)
                 {
+                    result.sawDowngradeOption |= prompt.spSummonable.Any(item => LinkComboPolicy.NeedsMaterialProjection(duel.Players[seat], item));
+                    linkTarget = 0;
+                    lowerLinkOffered = false;
+                    spentStrongMaterial = false;
                     int action = BitConverter.ToInt32(response, 0);
                     int command = action & 0xffff;
                     if (command == 1 && action >> 16 < prompt.spSummonable.Count)
                     {
                         var summon = prompt.spSummonable[action >> 16];
+                        if (summon.location == YgoConstants.LOCATION_EXTRA && LinkComboPolicy.Rank(summon.code) > 0)
+                        {
+                            linkTarget = summon.code;
+                            lowerLinkOffered = LinkComboPolicy.NeedsMaterialProjection(duel.Players[seat], summon);
+                        }
                         if (summon.location is YgoConstants.LOCATION_SZONE or YgoConstants.LOCATION_PZONE &&
                             CardDatabase.Get(summon.code)?.IsPendulum == true) result.pendulumSummons++;
                     }
@@ -226,6 +292,7 @@ namespace YGOPortable.Editor
             foreach (var monster in own.mzone)
             {
                 if (monster?.IsFaceUp != true || CardDatabase.Get(monster.code) is not CardInfo card) continue;
+                if (card.IsLink) result.finalLink = Math.Max(result.finalLink, (int)card.level);
                 if ((card.type & (ExtraTypes | YgoConstants.TYPE_RITUAL)) != 0)
                 {
                     result.extraBodies++;

@@ -151,21 +151,22 @@ namespace YGOPortable.AI
                 if (rank >= 3) largest = Math.Max(largest, rank);
                 else spareBodies++;
             }
-            if (largest == 0) return true;
+            if (largest == 0 || next > largest) return true;
             if (summon.code is 57134592 or 31313405 &&
                 own.szone[YgoConstants.FIELD_ZONE_SEQUENCE] is { code: 1295111, IsFaceUp: true, effectsDisabled: false })
                 return true;
-            return next > largest || spareBodies >= (next == 1 ? 1 : 2);
+            return spareBodies >= (next == 1 ? 1 : 2);
         }
 
-        internal static int? ChooseMaterial(DuelSession session, DuelPrompt prompt, uint linkTarget)
+        internal static int? ChooseMaterial(DuelSession session, DuelPrompt prompt, uint linkTarget, bool planLinks)
         {
             if ((prompt.SelectionHint != LinkMaterial && session.LastHintMsg != LinkMaterial) || linkTarget == 0 ||
                 prompt.candidates.Count == 0 || prompt.finishable) return null;
 
-            var own = session.Players[prompt.playerId];
             int targetRank = Rank(linkTarget);
-            int bodies = own.mzone.Count(card => card?.IsFaceUp == true);
+            if (!planLinks && !prompt.candidates.Any(card => card.controller == prompt.playerId && IsDowngrade(Rank(card.code), targetRank)))
+                return null;
+            int bodies = session.Players[prompt.playerId].mzone.Count(card => card?.IsFaceUp == true);
             int remaining = targetRank - prompt.unselectCandidates.Sum(card => Math.Max(1, Rank(card.code)));
             int? choice = null;
             int best = int.MinValue;
@@ -271,6 +272,11 @@ namespace YGOPortable.AI
         }
 
         internal static int Rank(uint code) => CardDatabase.Get(code) is { IsLink: true } card ? (int)card.level : 0;
+        internal static bool IsDowngrade(int materialRank, int targetRank) => targetRank > 0 && materialRank >= 3 && materialRank > targetRank;
+        internal static bool HasStrongerLink(PlayerFieldSnapshot own, int targetRank) => targetRank > 0 && own.mzone.Any(card =>
+            card?.IsFaceUp == true && IsDowngrade(Rank(card.code), targetRank));
+        internal static bool NeedsMaterialProjection(PlayerFieldSnapshot own, SelectableCardItem summon) =>
+            summon.location == YgoConstants.LOCATION_EXTRA && HasStrongerLink(own, Rank(summon.code));
         internal static bool IsInteractive(CardInfo card) => (card.DeckEffectCategories & Interaction) != 0 ||
             card.code is 24151924 or 98630720 or 20934852 or 24361622;
 
@@ -283,7 +289,7 @@ namespace YGOPortable.AI
             _ => engine ? .85f : 0,
         };
 
-        private static bool IsBridge(uint code) => code is
+        internal static bool IsBridge(uint code) => code is
             14812471 or 87871125 or 30342076 or 46947713 or 45462149 or 59859086 or 73539069 or 11969228 or
             43735670 or 30691817 or 79130389 or 61668670 or 97053215 or 74567889 or 93896655 or 21200905;
 

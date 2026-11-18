@@ -41,6 +41,7 @@ namespace YGOPortable.Core
 
         public const uint REASON_DESTROY = 0x1;
         public const uint REASON_SPSUMMON = 0x800;
+        internal const uint REASON_LINK = 0x10000000;
 
         // Card Types
         public const uint TYPE_MONSTER = 0x1;

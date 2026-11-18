@@ -375,6 +375,7 @@ namespace YGOPortable.Editor
             TestOtherDeckTurnPlans.Run();
             LinkComboTraining.VerifyIncluded();
             TestComboSearch.Run();
+            ComboRosterAudit.VerifyLinkMaterialProtection();
             ComboRosterAudit.VerifyOtherComboRoutes();
             VerifyRainbowDarkDragonMatch();
 

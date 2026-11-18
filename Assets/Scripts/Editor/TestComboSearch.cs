@@ -45,7 +45,9 @@ namespace YGOPortable.Editor
             var scaleLine = PlayOpening(general, links, ddd, 17, 2, search: true);
             Require(monster.opening.SequenceEqual(backrow.opening) && monster.monsters.Contains(Machinex) &&
                 backrow.monsters.Contains(Gilgamesh) && backrow.changed > 0,
-                "D/D/D did not adapt the same hand to a monster versus backrow.");
+                $"D/D/D did not adapt the same hand to a monster versus backrow. " +
+                $"Monster board: {string.Join(",", monster.monsters)} ({monster.branches} branches, {monster.changed} changed). " +
+                $"Backrow: {string.Join(",", backrow.monsters)} ({backrow.branches} branches, {backrow.changed} changed).");
             Require(scaleLine.line.Contains(Gilgamesh.ToString()) && scaleLine.monsters.Contains(Machinex),
                 "D/D/D could not continue from Gilgamesh into Machinex.");
             Require(new[] { previous, upgraded, singularity, monster, backrow, scaleLine }.All(result => result.retries == 0),

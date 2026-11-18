@@ -21,6 +21,7 @@ namespace YGOPortable.AI
         internal int SimulatedComboBranches => _comboSearch?.SimulatedBranches ?? 0;
         internal int ChangedComboLines => _comboSearch?.ChangedLines ?? 0;
         private bool UsesTacticalRules => Difficulty == AIDifficulty.Smart && _tacticalRules;
+        private bool UsesComboPlanning => _comboSearch != null || _comboProjection;
 
         private const uint TrickstarLightStage = 35371948;
         private const uint PrimevalPlanetPerlereino = 77103950;
@@ -47,6 +48,7 @@ namespace YGOPortable.AI
         private readonly DuelAiPolicy _policy;
         private readonly LinkComboPolicy _linkPolicy;
         private readonly ComboSearch _comboSearch;
+        private bool _comboProjection;
         private DuelPrompt _preparingCombo;
         private IEnumerator<bool> _comboPreparation;
         private readonly bool _tacticalRules;
@@ -164,6 +166,7 @@ namespace YGOPortable.AI
                 _lastTurn = _lastTurn,
                 _actionsThisTurn = _actionsThisTurn,
                 _linkDeck = _linkDeck,
+                _comboProjection = true,
             };
             foreach (var pair in _effectCounts) copy._effectCounts.Add(pair.Key, pair.Value);
             copy._repositionedSeqs.UnionWith(_repositionedSeqs);
@@ -182,7 +185,7 @@ namespace YGOPortable.AI
                 for (int i = 0; i < items.Count; i++)
                 {
                     var item = items[i];
-                    if (item.controller != prompt.playerId || !CanUseMainAction(session, prompt, planLinks, command, item) ||
+                    if (item.controller != prompt.playerId || !CanUseMainAction(session, prompt, planLinks, command, item, projected: true) ||
                         (command == 1 && preserveOpeningBoard && item.location == YgoConstants.LOCATION_EXTRA) ||
                         !distinct.Add((command, item.code, item.location, item.description))) continue;
                     var card = CardDatabase.Get(item.code);
@@ -210,11 +213,18 @@ namespace YGOPortable.AI
         private bool PlanLinks(DuelSession session, DuelPrompt prompt) =>
             HasLinkPolicy && (_linkDeck ??= LinkComboPolicy.FitsDeck(session.Players[prompt.playerId]));
 
-        private bool CanUseMainAction(DuelSession session, DuelPrompt prompt, bool planLinks, int command, SelectableCardItem item) =>
+        private bool CanUseMainAction(DuelSession session, DuelPrompt prompt, bool planLinks, int command, SelectableCardItem item,
+            bool projected = false) =>
             CanUseIdleAction(session, command, item) &&
-            (command != 1 || !planLinks || LinkComboPolicy.CanUseSummon(session.Players[prompt.playerId], item)) &&
+            (command != 1 || CanUseSpecialSummon(session.Players[prompt.playerId], item, planLinks, projected)) &&
             (command != 5 || (CanActivate(session, prompt, item) && CanPlayFieldSpell(session, prompt, item) &&
                 CanEndMainPhaseWithEffect(session, prompt, item)));
+
+        private bool CanUseSpecialSummon(PlayerFieldSnapshot own, SelectableCardItem item, bool planLinks, bool projected)
+        {
+            if (UsesTacticalRules && UsesComboPlanning && LinkComboPolicy.NeedsMaterialProjection(own, item)) return projected;
+            return !planLinks || LinkComboPolicy.CanUseSummon(own, item);
+        }
 
         private bool CanEndMainPhaseWithEffect(DuelSession session, DuelPrompt prompt, SelectableCardItem effect)
         {
@@ -268,7 +278,8 @@ namespace YGOPortable.AI
                 if (p.canBp && HasWorthwhileAttack(s, p.playerId)) return BitConverter.GetBytes(6);
                 if (p.canEp) return BitConverter.GetBytes(7);
             }
-            else if (plannedMainAction is int action && UsePlannedMainAction(s, p, action, CanUse) is byte[] response)
+            else if (plannedMainAction is int action && UsePlannedMainAction(s, p, action,
+                (command, item) => CanUseMainAction(s, p, planLinks, command, item, projected: true)) is byte[] response)
             {
                 return response;
             }
@@ -498,7 +509,8 @@ namespace YGOPortable.AI
             if (command == 1 || command == 5)
             {
                 var item = command == 1 ? prompt.spSummonable[index] : prompt.activatable[index];
-                if (_linkDeck == true && command == 1 && item.location == YgoConstants.LOCATION_EXTRA && LinkComboPolicy.Rank(item.code) > 0)
+                if (UsesTacticalRules && (_linkDeck == true || UsesComboPlanning) && command == 1 &&
+                    item.location == YgoConstants.LOCATION_EXTRA && LinkComboPolicy.Rank(item.code) > 0)
                     _linkSummon = item.code;
                 BumpKey(IdleActionKey(session, command, item));
             }
@@ -656,7 +668,8 @@ namespace YGOPortable.AI
             }
 
             if (p.min == 1 && p.max == 1 &&
-                ((_linkDeck == true ? LinkComboPolicy.ChooseSupport(s, p) ?? LinkComboPolicy.ChooseMaterial(s, p, _linkSummon) : null) ??
+                ((_linkDeck == true ? LinkComboPolicy.ChooseSupport(s, p) : null) ??
+                LinkComboPolicy.ChooseMaterial(s, p, _linkSummon, _linkDeck == true) ??
                 DddTurnPlan.ChooseCard(s, p) ?? LinkTurnPlan.ChooseCard(s, p) ??
                 SynchroTurnPlan.ChooseCard(s, p) ?? FusionXyzTurnPlan.ChooseCard(s, p)) is int planned)
                 return PackIndexList(new[] { planned });
@@ -719,7 +732,7 @@ namespace YGOPortable.AI
             }
             if (p.candidates.Count > 0)
             {
-                if (((_linkDeck == true ? LinkComboPolicy.ChooseMaterial(s, p, _linkSummon) : null) ??
+                if ((LinkComboPolicy.ChooseMaterial(s, p, _linkSummon, _linkDeck == true) ??
                     DddTurnPlan.ChooseScale(s, p) ?? LinkTurnPlan.ChooseLinkMaterial(s, p) ??
                     FusionXyzTurnPlan.ChooseLinkMaterial(s, p)) is int material)
                     return PackTwoInts(1, material);
