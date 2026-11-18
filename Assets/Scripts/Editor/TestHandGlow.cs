@@ -27,6 +27,7 @@ namespace YGOPortable.Editor
             VerifyOpponentTurnActivation();
             VerifyNativeCombatReadout(useHonest: true);
             VerifyNativeCombatReadout(useHonest: false);
+            VerifyNativeChainReadouts();
             VerifyDefensePositionBattleReadout(34496660, BattleStatSource.Defense, 1800);
             VerifyDefensePositionBattleReadout(75372290, BattleStatSource.Attack, 1550);
             VerifyEffectModifiedBattleReadout();
@@ -316,6 +317,11 @@ namespace YGOPortable.Editor
             Require(attackerFace.gameObject.activeInHierarchy && slot.Find("CardReadout").gameObject.activeInHierarchy &&
                 duel.Players[duel.AiPlayerIndex].mzone[target.sequence] == null && defenderFace.gameObject.activeInHierarchy,
                 "The waiting attacker or battle-destroyed defender was removed before the attack began.");
+            // The frame sampler skips the preceding animations. Apply their queued card readouts before sampling the strike.
+            foreach (var step in steps.TakeWhile(step => !step.GetType().Name.StartsWith("<Attack>", StringComparison.Ordinal)))
+                if (step.GetType().Name.StartsWith("<ApplyChainReadoutUpdate>", StringComparison.Ordinal))
+                    Require(!step.MoveNext(), "The damage-step effect did not release its card readout.");
+            Require(attack.text == expectedAttack, "The chain's attack value did not reach the field before combat began.");
             TestCardPresentation.VerifyAttackFlight(animation, expectedAttack, "1650", "4", () =>
             {
                 var overlay = animation.transform.Find("DefendingCardReadout");
@@ -340,6 +346,104 @@ namespace YGOPortable.Editor
                 ((IDictionary)typeof(DuelFieldUI).GetField("_battleCardDisplays", PrivateInstance).GetValue(ui.Field)).Count == 0,
                 "A destroyed defender or queued battle display remained on the field.");
             Debug.Log($"[VERIFY DUEL BATTLE STATS] A set defender stayed hidden until its flip, showed 2000 DEF through the {expectedAttack} ATK strike, and left at destruction.");
+        }
+
+        private static void VerifyNativeChainReadouts()
+        {
+            const uint gagagigo = 49003308, ocean = 295517, rush = 70046172;
+            var main = Enumerable.Repeat(gagagigo, 16).Concat(Enumerable.Repeat(ocean, 12))
+                .Concat(Enumerable.Repeat(rush, 12)).ToArray();
+            var ai = new TacticalAI();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Chain combat and level display", main, Array.Empty<uint>(),
+                Enumerable.Repeat(gagagigo, 40).ToArray(), Array.Empty<uint>(), true, session =>
+                {
+                    YgoProjectBuilder.DriveUntilIdle(session, ai);
+                    var hand = session.Players[session.HumanPlayerIndex].hand;
+                    return new[] { gagagigo, ocean, rush }.All(code => hand.Any(card => card.code == code));
+                });
+            for (int turn = 0; turn < 2; turn++)
+            {
+                Require(duel.ActivePrompt?.summonable.Count > 0 && duel.ActivePrompt.playerId == turn,
+                    "The chain fixture could not summon the two copies.");
+                duel.SubmitResponseInt(0);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+                duel.SubmitResponseInt(7);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            }
+            var human = duel.Players[duel.HumanPlayerIndex];
+            var opponent = duel.Players[duel.AiPlayerIndex];
+            var mine = human.mzone.Single(card => card?.code == gagagigo);
+            var theirs = opponent.mzone.Single(card => card?.code == gagagigo);
+            using var ui = new HandUI(duel);
+            var animator = CardAnimationManager.Ensure(ui.Canvas);
+            Canvas.ForceUpdateCanvases();
+            var ownTile = FieldSlot(ui.Field, mine);
+            var rivalTile = FieldSlot(ui.Field, theirs);
+            ownTile.GetComponent<CardDragTrigger>().OnRightClick();
+
+            string Value(Transform tile, string path) => tile.Find($"CardReadout/{path}").GetComponent<Text>().text;
+            void Verify(string ownAttack, string rivalAttack, string defense, string level)
+            {
+                const string attackPath = "Combat/Attack/Digits/Value", defensePath = "Combat/Defense/Digits/Value",
+                    levelPath = "Labels/Rating/Value";
+                var inspector = ui.Field.Root.transform.Find("LeftInspector/CardDetails/CombatStats");
+                Require(Value(ownTile, attackPath) == ownAttack && Value(rivalTile, attackPath) == rivalAttack &&
+                        Value(ownTile, defensePath) == defense && Value(rivalTile, defensePath) == defense &&
+                        Value(ownTile, levelPath) == level && Value(rivalTile, levelPath) == level &&
+                        inspector.Find("Attack/Digits/Value").GetComponent<Text>().text == ownAttack,
+                    $"The chain showed the wrong values for either copy. Expected ATK {ownAttack}/{rivalAttack}, DEF {defense}, Level {level}.");
+            }
+
+            bool chained = false;
+            ActivateFromMainPhase(duel, ocean);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
+            {
+                if (prompt.messageType == YgoConstants.MSG_SELECT_CARD)
+                {
+                    int selected = prompt.candidates.FindIndex(card => card.code == gagagigo && card.controller == duel.HumanPlayerIndex);
+                    Require(selected >= 0, "Rush Recklessly lost its own field target.");
+                    return DuelSession.PackCardSelection(selected);
+                }
+                if (chained || prompt.playerId != duel.HumanPlayerIndex) return null;
+                if (prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && prompt.promptCardCode == rush)
+                {
+                    chained = true;
+                    return BitConverter.GetBytes(1);
+                }
+                if (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN)
+                {
+                    int index = prompt.candidates.FindIndex(card => card.code == rush);
+                    if (index < 0) return null;
+                    chained = true;
+                    return BitConverter.GetBytes(index);
+                }
+                return null;
+            });
+            Require(chained && duel.RetryCount == 0 && duel.SolvedChainLinks.SequenceEqual(new[] { (2, rush), (1, ocean) }) &&
+                    human.mzone[mine.sequence].attack == 2750 && opponent.mzone[theirs.sequence].attack == 2050 &&
+                    human.mzone[mine.sequence].level == 3, "The native two-link sequence did not end with the expected stats.");
+            ui.Field.Refresh();
+            Verify("1850", "1850", "1000", "4");
+
+            var steps = AnimationSteps(animator).Where(step =>
+                step.GetType().Name.StartsWith("<ChainResolution>", StringComparison.Ordinal) ||
+                step.GetType().Name.StartsWith("<ApplyChainReadoutUpdate>", StringComparison.Ordinal)).ToArray();
+            Require(steps.Length == 4, "Each resolved link must publish its own card values.");
+            for (int index = 0; index < steps.Length; index += 2)
+            {
+                Require(steps[index].GetType().Name.StartsWith("<ChainResolution>", StringComparison.Ordinal) &&
+                        steps[index + 1].GetType().Name.StartsWith("<ApplyChainReadoutUpdate>", StringComparison.Ordinal),
+                    "The chain queued its new values before showing the resolving card.");
+                Require(steps[index].MoveNext() && steps[index].Current is IEnumerator, "A link did not have its own resolution animation.");
+                var sample = TestCardPresentation.SampleAnimation((IEnumerator)steps[index].Current);
+                sample(.66f);
+                Verify(index == 0 ? "1850" : "2550", "1850", "1000", "4");
+                sample(1f);
+                Require(!steps[index].MoveNext() && !steps[index + 1].MoveNext(), "The resolved values added a separate delay.");
+                if (index == 0) Verify("2550", "1850", "1000", "4");
+            }
+            Verify("2750", "2050", "1200", "3");
+            Debug.Log("[VERIFY DUEL CHAIN READOUT] Rush changed only one copy to 2550 at link 2. Ocean changed both copies' ATK/DEF and Level at link 1.");
         }
 
         private static void VerifyDefensePositionBattleReadout(uint attacker, BattleStatSource source, int damage)

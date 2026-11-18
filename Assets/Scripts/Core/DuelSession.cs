@@ -260,6 +260,7 @@ namespace YGOPortable.Core
         public DuelPrompt ActivePrompt { get; private set; }
         private ChainLinkInfo _resolvingChainLink;
         private (byte player, ulong hint)? _pendingSelectionHint;
+        private Dictionary<(byte Controller, uint Location, uint Sequence), LiveCardState> _chainReadoutBaseline;
         private readonly HashSet<(byte Player, uint Location, uint Sequence, uint Code)> _confirmedCards =
             new HashSet<(byte, uint, uint, uint)>();
 
@@ -283,6 +284,7 @@ namespace YGOPortable.Core
         public event Action<int, int> OnPhaseChanged;
         public event Action<ChainLinkInfo> OnChainActivated;
         public event Action<ChainLinkInfo> OnChainResolving;
+        internal event Action<IReadOnlyList<(LiveCardState Before, LiveCardState After)>> OnChainReadoutChanged;
         public event Action<byte, uint, uint, byte, uint, uint> OnAttackDeclared;
         internal event Action<BattleCardStats, BattleCardStats> OnBattleResolved;
         public event Action<byte, IReadOnlyList<bool>> OnCoinTossed;
@@ -301,6 +303,7 @@ namespace YGOPortable.Core
             RetryCount = 0;
             LastHintMsg = 0;
             _pendingSelectionHint = null;
+            _chainReadoutBaseline = null;
             ClearAttack();
             ActivePrompt = null;
             CurrentChain.Clear();
@@ -596,7 +599,10 @@ namespace YGOPortable.Core
             // prompt, including a summon-negation response, must see the monsters already arriving.
             if (IsFinished || ActivePrompt != null &&
                 ActivePrompt.messageType is not (YgoConstants.MSG_SELECT_PLACE or YgoConstants.MSG_SELECT_POSITION))
+            {
                 OnSpecialSummonBoundary?.Invoke();
+                if (_chainReadoutBaseline != null) SampleChainReadouts(keepTracking: !IsFinished);
+            }
         }
 
         private void ParseMessages(byte[] buf)
@@ -691,6 +697,8 @@ namespace YGOPortable.Core
 
         private void NotifyCardMoved(CardMoveEvent move, CardMoveEvent swapPartner = null)
         {
+            InvalidateChainReadouts(move);
+            if (swapPartner != null) InvalidateChainReadouts(swapPartner);
             if (_chosenAttacker is { } source)
             {
                 var slot = (source.controller, source.location, source.sequence);
@@ -1054,12 +1062,14 @@ namespace YGOPortable.Core
                         _resolvingChainLink = link;
                         SolvedChainLinks.Add((idx, link.code));
                         AddLog($"체인 {idx} 처리: [{CardDatabase.GetName(link.code)}]");
+                        SampleChainReadouts(keepTracking: true);
                         OnChainResolving?.Invoke(link);
                     }
                     break;
                 }
 
                 case YgoConstants.MSG_CHAIN_SOLVED:
+                    if (_chainReadoutBaseline != null) SampleChainReadouts(keepTracking: true);
                     _resolvingChainLink = null;
                     break;
 
@@ -1074,6 +1084,7 @@ namespace YGOPortable.Core
                 }
 
                 case YgoConstants.MSG_CHAIN_END:
+                    if (_chainReadoutBaseline != null) SampleChainReadouts(keepTracking: false);
                     CurrentChain.Clear();
                     _resolvingChainLink = null;
                     _confirmedCards.Clear();
@@ -1536,6 +1547,57 @@ namespace YGOPortable.Core
                 default: return "?";
             }
         }
+
+        private void InvalidateChainReadouts(CardMoveEvent move)
+        {
+            if (_chainReadoutBaseline == null) return;
+            // A move can replace a copy with the same passcode. Materials have their own timing.
+            _chainReadoutBaseline.Remove((move.fromCon, move.fromLoc & ~YgoConstants.LOCATION_OVERLAY, move.fromSeq));
+            _chainReadoutBaseline.Remove((move.toCon, move.toLoc & ~YgoConstants.LOCATION_OVERLAY, move.toSeq));
+        }
+
+        private void SampleChainReadouts(bool keepTracking)
+        {
+            var listener = OnChainReadoutChanged;
+            if (listener == null || NativePtr == IntPtr.Zero)
+            {
+                _chainReadoutBaseline = null;
+                return;
+            }
+
+            // The native process yields at each message boundary. Query a separate snapshot
+            // here so effects on successive links retain their own presentation values.
+            var field = new Dictionary<(byte Controller, uint Location, uint Sequence), LiveCardState>();
+            for (byte player = 0; player < Players.Length; player++)
+            {
+                AddVisible(QueryLocationCards(player, YgoConstants.LOCATION_MZONE));
+                AddVisible(QueryLocationCards(player, YgoConstants.LOCATION_SZONE));
+            }
+            void AddVisible(List<LiveCardState> cards)
+            {
+                foreach (var card in cards)
+                    if (card?.IsFaceUp == true && card.code != 0)
+                        field.Add((card.controller, card.location, card.sequence), card);
+            }
+
+            var before = _chainReadoutBaseline;
+            _chainReadoutBaseline = keepTracking ? field : null;
+            if (before == null) return;
+            List<(LiveCardState Before, LiveCardState After)> changes = null;
+            foreach (var (slot, previous) in before)
+            {
+                if (!field.TryGetValue(slot, out var current) || previous.code != current.code ||
+                    previous.position != current.position || SameReadouts(previous, current)) continue;
+                (changes ??= new()).Add((previous, current));
+            }
+            if (changes != null) listener(changes);
+        }
+
+        private static bool SameReadouts(LiveCardState a, LiveCardState b) =>
+            a.attack == b.attack && a.defense == b.defense && a.baseAttack == b.baseAttack && a.baseDefense == b.baseDefense &&
+            a.level == b.level && a.rank == b.rank && a.link == b.link && a.linkMarker == b.linkMarker &&
+            a.lscale == b.lscale && a.rscale == b.rscale && a.type == b.type && a.race == b.race && a.attribute == b.attribute &&
+            a.counterCount == b.counterCount && a.effectsDisabled == b.effectsDisabled;
 
         public void RefreshZonesFromCore()
         {

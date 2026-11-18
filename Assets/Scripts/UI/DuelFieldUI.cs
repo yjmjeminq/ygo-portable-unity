@@ -166,6 +166,7 @@ namespace YGOPortable.UI
         private readonly Dictionary<(byte Controller, uint Sequence), CardMoveReadoutSnapshot> _pendingCardReadouts = new();
         private const uint FieldMaterials = YgoConstants.LOCATION_MZONE | YgoConstants.LOCATION_OVERLAY;
         private readonly Dictionary<(byte Controller, uint Sequence), MaterialReadout> _materialReadouts = new();
+        private readonly Dictionary<(byte Controller, uint Location, uint Sequence), ChainCardReadout> _chainCardReadouts = new();
 
         private sealed class MaterialReadout
         {
@@ -202,6 +203,11 @@ namespace YGOPortable.UI
             public object PendingArrival;
         }
 
+        private sealed class ChainCardReadout
+        {
+            internal LiveCardState Shown;
+        }
+
         private DuelPrompt _handGlowPrompt;
 
         // Context Action Popup Menu
@@ -221,6 +227,7 @@ namespace YGOPortable.UI
         internal static float PlaybackRate => Application.platform == RuntimePlatform.IPhonePlayer ? .75f : 1f;
         internal static readonly Rect BattleStatsArea = Rect.MinMaxRect(.015f, .135f, .186f, .193f);
         internal static readonly Rect MobileBattleStatsArea = Rect.MinMaxRect(.015f, .135f, .221f, .193f);
+        private static readonly Rect MobileChainResolutionArea = Rect.MinMaxRect(.897f, .638f, .984f, .872f);
         private bool CanAcceptPlayerAction => _session != null && !_session.IsFinished && !IsPresenting && !IsPaused && !IsReadingLog &&
             _session.ActivePrompt?.playerId == _session.HumanPlayerIndex;
 
@@ -265,6 +272,7 @@ namespace YGOPortable.UI
             session.OnPhaseChanged += HandlePhaseChanged;
             session.OnChainActivated += HandleChainActivatedEvent;
             session.OnChainResolving += HandleChainResolvingEvent;
+            session.OnChainReadoutChanged += QueueChainReadouts;
             session.OnAttackDeclared += HandleAttackEvent;
             session.OnBattleResolved += HandleBattleResolved;
             session.OnCoinTossed += HandleCoinTossedEvent;
@@ -305,6 +313,7 @@ namespace YGOPortable.UI
                 _session.OnPhaseChanged -= HandlePhaseChanged;
                 _session.OnChainActivated -= HandleChainActivatedEvent;
                 _session.OnChainResolving -= HandleChainResolvingEvent;
+                _session.OnChainReadoutChanged -= QueueChainReadouts;
                 _session.OnAttackDeclared -= HandleAttackEvent;
                 _session.OnBattleResolved -= HandleBattleResolved;
                 _session.OnCoinTossed -= HandleCoinTossedEvent;
@@ -399,8 +408,8 @@ namespace YGOPortable.UI
 
         private void HandleCardLocationsChanged(CardMoveEvent move, CardMoveEvent swapPartner)
         {
-            ClearMovedMaterialReadout(move);
-            if (swapPartner != null) ClearMovedMaterialReadout(swapPartner);
+            ClearMovedReadouts(move);
+            if (swapPartner != null) ClearMovedReadouts(swapPartner);
             if (move.fromLoc == YgoConstants.LOCATION_MZONE)
                 _pendingCardReadouts.Remove((move.fromCon, move.fromSeq));
             if (swapPartner?.fromLoc == YgoConstants.LOCATION_MZONE)
@@ -1249,6 +1258,7 @@ namespace YGOPortable.UI
         {
             if (_session == null || !Root.activeInHierarchy) return;
 
+            if (!IsPresenting) _chainCardReadouts.Clear();
             CaptureCardReadouts();
             var prompt = _session.ActivePrompt;
             if (!ReferenceEquals(prompt, _pendingPlacePrompt))
@@ -1396,17 +1406,19 @@ namespace YGOPortable.UI
             uint position = battle?.Position ?? shown?.position ?? 0;
             bool faceUp = (position & YgoConstants.POS_FACEUP) != 0;
             bool visible = battle != null ? !battle.Hidden : live != null && !IsArriving(con, loc, seq);
+            var readout = visible && faceUp && shown.code != 0
+                ? battle?.UseBattleStats == true ? new DuelCardReadout(CardDatabase.Get(shown.code), shown, battle.Stats)
+                    : ReadFieldStats(shown.code, shown)
+                : default;
             slot.cardView.gameObject.SetActive(visible);
             if (visible)
             {
-                slot.cardView.SetCard(faceUp ? shown.code : 0u, !faceUp, shown);
+                slot.cardView.SetCard(faceUp ? shown.code : 0u, !faceUp, readout.Live ?? shown);
                 slot.cardView.transform.localRotation = Quaternion.Euler(0f, 0f, CardAngle(loc, position, opponent));
                 slot.cardView.transform.localScale = Vector3.one * CardScale(slot.root, loc, position);
             }
             if (visible && faceUp && shown.code != 0 && battle?.HideReadout != true)
             {
-                var readout = battle == null ? ReadFieldStats(shown.code, shown) :
-                    new DuelCardReadout(CardDatabase.Get(shown.code), shown, battle.UseBattleStats ? battle.Stats : null);
                 uint? scale = readout.ScaleIn(loc, seq);
                 if (loc == YgoConstants.LOCATION_MZONE && readout.IsMonster || scale.HasValue || readout.CounterCount != 0)
                 {
@@ -2124,6 +2136,7 @@ namespace YGOPortable.UI
         {
             _arrivingCards.Clear();
             _materialReadouts.Clear();
+            _chainCardReadouts.Clear();
             _battleCardDisplays.Clear();
             _pendingCardReadouts.Clear();
             ResetHandViews(_myHandViews);
@@ -2235,6 +2248,10 @@ namespace YGOPortable.UI
 
         private DuelCardReadout ReadFieldStats(uint code, LiveCardState live)
         {
+            if (live?.IsFaceUp == true &&
+                _chainCardReadouts.TryGetValue((live.controller, live.location, live.sequence), out var chain) &&
+                chain.Shown.code == code)
+                live = chain.Shown;
             if (live != null && live.location == YgoConstants.LOCATION_MZONE &&
                 _materialReadouts.TryGetValue((live.controller, live.sequence), out var held) && held.Source.code == code)
                 return new DuelCardReadout(CardDatabase.Get(code), live,
@@ -2242,13 +2259,42 @@ namespace YGOPortable.UI
             return new DuelCardReadout(CardDatabase.Get(code), live);
         }
 
-        private void ClearMovedMaterialReadout(CardMoveEvent move)
+        private void ClearMovedReadouts(CardMoveEvent move)
         {
             bool changesSlot = (move.fromCon, move.fromLoc, move.fromSeq) != (move.toCon, move.toLoc, move.toSeq);
-            if (move.fromLoc == YgoConstants.LOCATION_MZONE && (changesSlot || (move.toPos & YgoConstants.POS_FACEUP) == 0))
-                _materialReadouts.Remove((move.fromCon, move.fromSeq));
-            if (move.toLoc == YgoConstants.LOCATION_MZONE && changesSlot)
-                _materialReadouts.Remove((move.toCon, move.toSeq));
+            if (changesSlot || (move.toPos & YgoConstants.POS_FACEUP) == 0) Clear(move.fromCon, move.fromLoc, move.fromSeq);
+            if (changesSlot) Clear(move.toCon, move.toLoc, move.toSeq);
+
+            void Clear(byte controller, uint location, uint sequence)
+            {
+                _chainCardReadouts.Remove((controller, location & ~YgoConstants.LOCATION_OVERLAY, sequence));
+                if (location == YgoConstants.LOCATION_MZONE) _materialReadouts.Remove((controller, sequence));
+            }
+        }
+
+        private void QueueChainReadouts(IReadOnlyList<(LiveCardState Before, LiveCardState After)> changes)
+        {
+            var animator = CardAnimationManager.Instance;
+            if (animator == null || !Root.activeInHierarchy) return;
+
+            var updates = new (ChainCardReadout Readout, LiveCardState After)[changes.Count];
+            for (int i = 0; i < changes.Count; i++)
+            {
+                var (before, after) = changes[i];
+                var key = (before.controller, before.location, before.sequence);
+                if (!_chainCardReadouts.TryGetValue(key, out var readout))
+                {
+                    readout = new ChainCardReadout { Shown = before };
+                    _chainCardReadouts.Add(key, readout);
+                }
+                updates[i] = (readout, after);
+            }
+            animator.QueueChainReadoutUpdate(() =>
+            {
+                foreach (var (readout, after) in updates)
+                    readout.Shown = after;
+                Refresh();
+            });
         }
 
         private Action HoldMaterialReadout(byte controller, uint location, uint sequence, int change)
@@ -2489,6 +2535,16 @@ namespace YGOPortable.UI
         {
             var animator = CardAnimationManager.Instance;
             if (animator == null) return;
+            if (_mobileLayout)
+            {
+                // Reserve the space between the opponent's LP and the phase control.
+                var playArea = (RectTransform)_boardRect.parent;
+                var area = MobileChainResolutionArea;
+                var size = animator.GetAreaSize(playArea);
+                float height = Mathf.Min(size.x * area.width * .88f, size.y * area.height);
+                animator.QueueChainResolution(animator.GetPoint(playArea, area.center), link.code, link.chainNumber, height);
+                return;
+            }
             var center = animator.GetPoint(_boardRect, new Vector2(.50f, .56f));
             animator.QueueChainResolution(center, link.code, link.chainNumber);
         }
@@ -3631,7 +3687,7 @@ namespace YGOPortable.UI
             var live = ReadVisibleFieldCard(code, _zoomFieldCard);
             if (live == null) _zoomFieldCard = null;
             var card = ReadFieldStats(code, live);
-            _zoomCardView.SetCard(code, false, live, (card.Attack, card.Defense));
+            _zoomCardView.SetCard(code, false, card.Live, (card.Attack, card.Defense));
             _zoomStats.text = FormatInspectorStats(card);
             BindIdentityIcons(card, _zoomRaceIcon, _zoomAttributeIcon);
             _zoomCounters.Bind(card.CounterCount, showChanges);

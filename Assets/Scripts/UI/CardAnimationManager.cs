@@ -297,9 +297,17 @@ namespace YGOPortable.UI
             QueueStep(ChainActivation(source, code, chainNumber, opponent));
         }
 
-        internal void QueueChainResolution(Vector2 center, uint code, int chainNumber)
+        internal void QueueChainResolution(Vector2 center, uint code, int chainNumber, float maxHeight = 206f)
         {
-            QueueStep(ChainResolution(center, code, chainNumber));
+            QueueStep(ChainResolution(center, code, chainNumber, maxHeight));
+        }
+
+        internal void QueueChainReadoutUpdate(Action apply) => QueueStep(ApplyChainReadoutUpdate(apply));
+
+        private static IEnumerator ApplyChainReadoutUpdate(Action apply)
+        {
+            apply();
+            yield break;
         }
 
         internal void QueueAttackArrow(Vector2 from, Vector2 to, bool opponent)
@@ -1058,9 +1066,9 @@ namespace YGOPortable.UI
             Destroy(overlay.gameObject);
         }
 
-        private IEnumerator ChainResolution(Vector2 center, uint code, int chainNumber)
+        private IEnumerator ChainResolution(Vector2 center, uint code, int chainNumber, float maxHeight)
         {
-            float height = Mathf.Min(206f, _layer.rect.height * .29f);
+            float height = Mathf.Min(maxHeight, _layer.rect.height * .29f);
             var size = new Vector2(height * LotdUiKit.CardAspectRatio, height);
             var overlay = LotdUiKit.FillRect("ChainResolution", _layer);
             var card = TakeCard(code, code == 0, true);
