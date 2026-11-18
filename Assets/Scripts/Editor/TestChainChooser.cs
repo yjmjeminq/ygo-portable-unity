@@ -31,6 +31,8 @@ namespace YGOPortable.Editor
             VerifyGagagaLevelInstruction();
             VerifyCardTrooperCount();
             VerifyDragonShrineConfirmation();
+            VerifyPerlereinoConfirmation();
+            VerifyPaidraSelectionHint();
             VerifyChickenGameOptions();
             VerifyBundledOptionDescriptions();
             VerifyKoreanEffectCatalogue();
@@ -616,6 +618,77 @@ namespace YGOPortable.Editor
                     "Dragon Shrine did not resolve the chosen yes/no action.");
             }
             Debug.Log("[VERIFY KOREAN NATIVE OPTIONS] Dragon Shrine showed the optional send in Korean and resolved both responses.");
+        }
+
+        private static void VerifyPerlereinoConfirmation()
+        {
+            const uint fieldSpell = 77103950, reinoheart = 73956664, sparkman = 20721928;
+            var main = Enumerable.Repeat(fieldSpell, 14).Concat(Enumerable.Repeat(reinoheart, 26)).ToArray();
+            var opponent = Enumerable.Repeat(sparkman, 40).ToArray();
+            var empty = Array.Empty<uint>();
+            var ai = new TacticalAI();
+            foreach (bool accept in new[] { false, true })
+            {
+                using var duel = YgoProjectBuilder.StartSeedMatching("Perlereino confirmation", main, empty, opponent, empty,
+                    true, session => session.ActivePrompt?.activatable.Exists(card => card.code == fieldSpell) == true);
+                var player = duel.Players[duel.HumanPlayerIndex];
+                int before = player.hand.Count(card => card.code == reinoheart);
+                int activate = duel.ActivePrompt.activatable.FindIndex(card => card.code == fieldSpell);
+                duel.SubmitResponseInt((activate << 16) | 5);
+                using var view = new ChainView();
+                YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
+                {
+                    if (prompt.messageType == YgoConstants.MSG_SELECT_CARD) return ai.ComputeResponse(duel, prompt);
+                    if (prompt.messageType != YgoConstants.MSG_SELECT_YESNO) return null;
+                    Require(prompt.promptDesc == ((ulong)fieldSpell << 20), "Unexpected Perlereino decision.");
+                    view.Modals.ShowPrompt(duel, prompt);
+                    var question = view.Modals.ModalRoot.GetComponentsInChildren<Text>().Single(label => label.name == "Question");
+                    Require(question.text == "덱에서 티아라멘츠 몬스터 또는 비서스＝스타프로스트 1장을 패에 넣으시겠습니까?",
+                        "Perlereino did not explain the optional search.");
+                    Require(accept ? view.Modals.TryConfirm() : view.Modals.TryCancelOrPass(), "Perlereino could not answer.");
+                    Require(view.Responses.SequenceEqual(new[] { accept ? 1 : 0 }), "Perlereino sent the wrong answer.");
+                    return BitConverter.GetBytes(view.Responses[0]);
+                });
+                Require(view.Responses.Count == 1 && duel.RetryCount == 0 &&
+                        player.hand.Count(card => card.code == reinoheart) == before + (accept ? 1 : 0),
+                    "Perlereino did not resolve the localized search confirmation.");
+            }
+            Debug.Log("[VERIFY KOREAN NATIVE OPTIONS] Perlereino showed the Korean search confirmation and resolved both responses.");
+        }
+
+        private static void VerifyPaidraSelectionHint()
+        {
+            const uint paidra = 39931513, summoning = 30336082, sparkman = 20721928;
+            var main = Enumerable.Repeat(paidra, 20).Concat(Enumerable.Repeat(summoning, 20)).ToArray();
+            var opponent = Enumerable.Repeat(sparkman, 40).ToArray();
+            var empty = Array.Empty<uint>();
+            var ai = new TacticalAI();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Paidra selection hint", main, empty, opponent, empty,
+                true, session => session.ActivePrompt?.summonable.Exists(card => card.code == paidra) == true);
+            var player = duel.Players[duel.HumanPlayerIndex];
+            int before = player.hand.Count(card => card.code == summoning);
+            duel.SubmitResponseInt(duel.ActivePrompt.summonable.FindIndex(card => card.code == paidra) << 16);
+            using var view = new ChainView();
+            bool sawHint = false;
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
+            {
+                if (prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && prompt.promptCardCode == paidra)
+                    return BitConverter.GetBytes(1);
+                if (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN)
+                    return BitConverter.GetBytes(prompt.candidates.FindIndex(card => card.code == paidra));
+                if (prompt.messageType != YgoConstants.MSG_SELECT_CARD) return null;
+
+                Require(prompt.SelectionHint == (((ulong)paidra << 20) | 2), "Unexpected Paidra selection hint.");
+                view.Modals.ShowPrompt(duel, prompt);
+                var title = view.Modals.ModalRoot.GetComponentsInChildren<Text>().First(label => label.name == "Title");
+                Require(title.text == "덱에서 패에 넣거나 세트할 찬환 마법·함정 카드 1장을 선택하세요.",
+                    "Paidra did not explain the destinations of the selected card in Korean.");
+                sawHint = true;
+                return ai.ComputeResponse(duel, prompt);
+            });
+            Require(sawHint && duel.RetryCount == 0 && player.hand.Count(card => card.code == summoning) == before + 1,
+                "Paidra did not resolve the selection described by its Korean hint.");
+            Debug.Log("[VERIFY KOREAN NATIVE OPTIONS] Paidra displayed the Korean selection hint and added the chosen card to hand.");
         }
 
         private static void VerifyChickenGameOptions()
