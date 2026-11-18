@@ -82,15 +82,16 @@ namespace YGOPortable.UI
 
         internal void Hide() => _root.gameObject.SetActive(false);
 
-        internal void Bind(DuelCardReadout card, bool opponent = false, bool showChanges = false)
+        internal void Bind(DuelCardReadout card, bool opponent = false, bool showChanges = false, uint? position = null)
         {
             _root.gameObject.SetActive(card.IsMonster);
             if (!card.IsMonster) return;
 
             Layout(card.IsLink, card.LinkMarkers, opponent);
-            _attack.Bind(card.Attack, card.Live?.baseAttack ?? card.Attack, card.Live?.IsAttack == true, showChanges);
+            uint shownPosition = position ?? card.Live?.position ?? 0;
+            _attack.Bind(card.Attack, card.Live?.baseAttack ?? card.Attack, (shownPosition & YgoConstants.POS_ATTACK) != 0, showChanges);
             if (!card.IsLink)
-                _defense.Bind(card.Defense, card.Live?.baseDefense ?? card.Defense, card.Live?.IsDefense == true, showChanges);
+                _defense.Bind(card.Defense, card.Live?.baseDefense ?? card.Defense, (shownPosition & YgoConstants.POS_DEFENSE) != 0, showChanges);
         }
 
         internal void BindBattle(BattleCardStats card, bool link)
@@ -285,7 +286,7 @@ namespace YGOPortable.UI
 
         internal void Hide() => _root.gameObject.SetActive(false);
 
-        internal void Bind(DuelCardReadout card, bool opponent, uint? scale)
+        internal void Bind(DuelCardReadout card, bool opponent, uint? scale, uint? position = null)
         {
             var visibleCard = (Code: card.Live?.code ?? 0u, Opponent: opponent);
             bool showChanges = !_inPreview && _root.gameObject.activeSelf && visibleCard.Code != 0 && visibleCard == _lastCard;
@@ -298,7 +299,7 @@ namespace YGOPortable.UI
                 _labels.anchorMin = new Vector2(0f, opponent ? .025f : .765f);
                 _labels.anchorMax = new Vector2(1f, opponent ? .235f : .975f);
             }
-            _stats.Bind(card, opponent, showChanges);
+            _stats.Bind(card, opponent, showChanges, position);
             SetLabel(_rating, scale.HasValue ? $"스케일 {scale.Value}" : card.Rating,
                 card.IsXyz ? RankColor : card.IsLink || scale.HasValue ? DuelStyle.Player : DuelStyle.Gold, showChanges);
             SetLabel(_status, card.Status,
@@ -314,6 +315,45 @@ namespace YGOPortable.UI
             else if (label.text != content) DuelReadoutPulse.Play(chip, color);
             label.text = content;
             label.color = color;
+        }
+    }
+
+    internal sealed class DuelMovingReadout
+    {
+        internal RectTransform Root { get; }
+        private readonly DuelFieldReadout _readout;
+        private readonly DuelCardReadout _card;
+        private readonly (Vector2 StartSize, Vector2 EndSize, uint StartPosition, bool StartOpponent, bool EndOpponent) _movement;
+        private readonly CanvasGroup _opacity;
+        private bool _atDestination;
+
+        internal DuelMovingReadout(RectTransform root, CardMoveReadoutSnapshot snapshot, DuelCardReadout card)
+        {
+            Root = root;
+            _movement = snapshot.Movement.Value;
+            _card = card;
+            _readout = new DuelFieldReadout(root);
+            _readout.Bind(card, _movement.StartOpponent, null, _movement.StartPosition);
+            if (_movement.StartOpponent != _movement.EndOpponent)
+            {
+                _opacity = root.gameObject.AddComponent<CanvasGroup>();
+                _opacity.blocksRaycasts = _opacity.interactable = false;
+            }
+        }
+
+        internal void Follow(RectTransform card, float progress)
+        {
+            Root.anchoredPosition = card.anchoredPosition;
+            Root.sizeDelta = Vector2.Lerp(_movement.StartSize, _movement.EndSize, Mathf.SmoothStep(0f, 1f, progress));
+            bool destination = progress >= .5f;
+            if (destination != _atDestination)
+            {
+                _atDestination = destination;
+                _readout.Bind(_card, destination ? _movement.EndOpponent : _movement.StartOpponent,
+                    null, destination ? null : _movement.StartPosition);
+            }
+            if (_opacity != null)
+                _opacity.alpha = Mathf.Lerp(.60f, 1f, Mathf.Abs(progress - .5f) * 5f);
         }
     }
 

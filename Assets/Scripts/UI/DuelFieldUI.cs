@@ -141,7 +141,7 @@ namespace YGOPortable.UI
         private (byte con, uint loc, uint seq)? _preferredDropZone;
         private int _preferredAttackTargetSeq = -1;
         private readonly Dictionary<(byte con, uint loc, uint seq), int> _arrivingCards = new Dictionary<(byte, uint, uint), int>();
-        private readonly Dictionary<(byte Controller, uint Sequence), SummonReadoutSnapshot> _pendingSummonReadouts = new();
+        private readonly Dictionary<(byte Controller, uint Sequence), CardMoveReadoutSnapshot> _pendingCardReadouts = new();
         private readonly Dictionary<(byte controller, uint sequence), List<(uint code, CardPose from, bool faceDown, uint index)>>
             _pendingXyzMaterials = new Dictionary<(byte, uint), List<(uint, CardPose, bool, uint)>>();
         private bool _dragHighlightMZone;
@@ -374,9 +374,9 @@ namespace YGOPortable.UI
         private void HandleCardLocationsChanged(CardMoveEvent move, CardMoveEvent swapPartner)
         {
             if (move.fromLoc == YgoConstants.LOCATION_MZONE)
-                _pendingSummonReadouts.Remove((move.fromCon, move.fromSeq));
+                _pendingCardReadouts.Remove((move.fromCon, move.fromSeq));
             if (swapPartner?.fromLoc == YgoConstants.LOCATION_MZONE)
-                _pendingSummonReadouts.Remove((swapPartner.fromCon, swapPartner.fromSeq));
+                _pendingCardReadouts.Remove((swapPartner.fromCon, swapPartner.fromSeq));
 
             var before = _inspectedFieldCard;
             _inspectedFieldCard = FollowFieldCard(before, _inspectedCode, move, swapPartner);
@@ -1105,7 +1105,7 @@ namespace YGOPortable.UI
         {
             if (_session == null || !Root.activeInHierarchy) return;
 
-            CaptureSummonReadouts();
+            CaptureCardReadouts();
             var prompt = _session.ActivePrompt;
             if (!ReferenceEquals(prompt, _pendingPlacePrompt))
             {
@@ -1966,7 +1966,7 @@ namespace YGOPortable.UI
         private void ClearArrivals()
         {
             _arrivingCards.Clear();
-            _pendingSummonReadouts.Clear();
+            _pendingCardReadouts.Clear();
             ResetHandViews(_myHandViews);
             ResetHandViews(_oppHandViews);
         }
@@ -2061,12 +2061,12 @@ namespace YGOPortable.UI
             return () => ShowArrival(key);
         }
 
-        private void CaptureSummonReadouts()
+        private void CaptureCardReadouts()
         {
             // Read the field refreshed for this response before playing its queued animations.
-            foreach (var (slot, summon) in _pendingSummonReadouts)
-                summon.Card = _session.GetVisibleFieldCard(summon.Code, slot.Controller, YgoConstants.LOCATION_MZONE, slot.Sequence);
-            _pendingSummonReadouts.Clear();
+            foreach (var (slot, readout) in _pendingCardReadouts)
+                readout.Card = _session.GetVisibleFieldCard(readout.Code, slot.Controller, YgoConstants.LOCATION_MZONE, slot.Sequence);
+            _pendingCardReadouts.Clear();
         }
 
         private bool IsFaceDown(byte controller, uint location, uint position)
@@ -2182,13 +2182,29 @@ namespace YGOPortable.UI
                 animator.QueuePileTransfer(flight, onArrival);
             else
             {
-                SummonReadoutSnapshot summon = null;
+                CardMoveReadoutSnapshot readout = null;
                 if (!toBack && CardAnimationManager.IsSummonMotion(motion))
                 {
-                    summon = new SummonReadoutSnapshot(e.code);
-                    _pendingSummonReadouts[(e.toCon, e.toSeq)] = summon;
+                    readout = new CardMoveReadoutSnapshot(e.code);
                 }
-                animator.QueueMove(flight, motion, onArrival, summon);
+                else if (!fromBack && !toBack && (e.fromPos & YgoConstants.POS_FACEUP) != 0 &&
+                    (motion is CardMotion.ChangePosition or CardMotion.Transfer) &&
+                    e.fromLoc == YgoConstants.LOCATION_MZONE && e.toLoc == YgoConstants.LOCATION_MZONE)
+                {
+                    var source = GetSlot(e.fromCon, e.fromLoc, e.fromSeq);
+                    var destination = GetSlot(e.toCon, e.toLoc, e.toSeq);
+                    if (source != null && destination != null)
+                    {
+                        Vector2 SizeOf(RectTransform rect) => animator.GetPoint(rect, Vector2.one) - animator.GetPoint(rect, Vector2.zero);
+                        int viewer = _session.HumanPlayerIndex;
+                        readout = new CardMoveReadoutSnapshot(e.code)
+                        {
+                            Movement = (SizeOf(source.root), SizeOf(destination.root), e.fromPos, e.fromCon != viewer, e.toCon != viewer),
+                        };
+                    }
+                }
+                if (readout != null) _pendingCardReadouts[(e.toCon, e.toSeq)] = readout;
+                animator.QueueMove(flight, motion, onArrival, readout);
             }
         }
 

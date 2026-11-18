@@ -56,12 +56,13 @@ namespace YGOPortable.UI
         Vanish,
     }
 
-    internal sealed class SummonReadoutSnapshot
+    internal sealed class CardMoveReadoutSnapshot
     {
         internal readonly uint Code;
         internal LiveCardState Card;
+        internal (Vector2 StartSize, Vector2 EndSize, uint StartPosition, bool StartOpponent, bool EndOpponent)? Movement;
 
-        internal SummonReadoutSnapshot(uint code) => Code = code;
+        internal CardMoveReadoutSnapshot(uint code) => Code = code;
     }
 
     public class CardAnimationManager : MonoBehaviour
@@ -179,9 +180,9 @@ namespace YGOPortable.UI
             if (flights.Count > 0) QueueStep(FlyCards(flights, onArrive, draw: true));
         }
 
-        internal void QueueMove(CardFlight flight, CardMotion motion, Action onArrive, SummonReadoutSnapshot summonReadout = null)
+        internal void QueueMove(CardFlight flight, CardMotion motion, Action onArrive, CardMoveReadoutSnapshot readout = null)
         {
-            QueueStep(MoveCard(flight, motion, onArrive, summonReadout));
+            QueueStep(MoveCard(flight, motion, onArrive, readout));
         }
 
         internal void QueuePileTransfer(CardFlight flight, Action onArrive)
@@ -322,7 +323,7 @@ namespace YGOPortable.UI
             }
         }
 
-        private IEnumerator MoveCard(CardFlight flight, CardMotion motion, Action onArrive, SummonReadoutSnapshot summonReadout)
+        private IEnumerator MoveCard(CardFlight flight, CardMotion motion, Action onArrive, CardMoveReadoutSnapshot readout)
         {
             if (!flight.From.IsValid || !flight.To.IsValid)
             {
@@ -344,7 +345,7 @@ namespace YGOPortable.UI
             bool reveal = !flight.EndsFaceDown && (extraSummon || featured || _summonArt != null);
             var proxy = TakeCard(flight.StartsFaceDown ? 0u : flight.Code, flight.StartsFaceDown, reveal);
             if (reveal)
-                yield return RevealSummon(proxy, flight, motion, featured, summonReadout?.Card);
+                yield return RevealSummon(proxy, flight, motion, featured, readout?.Card);
             else if (motion == CardMotion.TokenSummon || motion == CardMotion.Vanish)
             {
                 bool appearing = motion == CardMotion.TokenSummon;
@@ -368,7 +369,29 @@ namespace YGOPortable.UI
             {
                 float lift = motion == CardMotion.ChangePosition || motion == CardMotion.Material ? 13f : 31f;
                 float time = motion == CardMotion.Material ? .20f : motion == CardMotion.Transfer ? .23f : .27f;
-                yield return Animate(time, t => ApplyFlight(proxy, flight, t, lift));
+                DuelMovingReadout moving = null;
+                if (!flight.StartsFaceDown && !flight.EndsFaceDown && readout?.Movement is { } movement && readout.Card?.IsFaceUp == true)
+                {
+                    var stats = new DuelCardReadout(CardDatabase.Get(flight.Code), readout.Card);
+                    if (stats.IsMonster)
+                    {
+                        var holder = CenteredVisual("MovingCardReadout", _layer, flight.From.Position, movement.StartSize);
+                        moving = new DuelMovingReadout(holder, readout, stats);
+                        proxy.SetCard(flight.Code, live: readout.Card);
+                    }
+                }
+                yield return Animate(time, t =>
+                {
+                    ApplyFlight(proxy, flight, t, lift);
+                    moving?.Follow((RectTransform)proxy.transform, t);
+                });
+                if (moving != null)
+                {
+                    var holder = moving.Root.gameObject;
+                    holder.SetActive(false);
+                    if (Application.isPlaying) Destroy(holder);
+                    else DestroyImmediate(holder);
+                }
             }
 
             if (reveal)

@@ -30,6 +30,7 @@ namespace YGOPortable.Editor
             VerifyNativeSummonReadout(turnFaceDown: false);
             VerifyNativeSummonReadout(turnFaceDown: true);
             VerifyNativeLinkedZone();
+            VerifyNativeMovingReadout();
             Debug.Log("[VERIFY HAND GLOW] Native summons and effects, distinct hand copies, blocked prompts, animation, off-turn activation and field-only monster ratings passed.");
         }
 
@@ -377,8 +378,8 @@ namespace YGOPortable.Editor
             using var ui = new HandUI(duel);
             var animation = CardAnimationManager.Ensure(ui.Canvas);
             Activate(instantFusion);
-            var pendingField = typeof(DuelFieldUI).GetField("_pendingSummonReadouts", PrivateInstance);
-            var pending = (Dictionary<(byte, uint), SummonReadoutSnapshot>)pendingField.GetValue(ui.Field);
+            var pendingField = typeof(DuelFieldUI).GetField("_pendingCardReadouts", PrivateInstance);
+            var pending = (Dictionary<(byte, uint), CardMoveReadoutSnapshot>)pendingField.GetValue(ui.Field);
             Require(pending.Count == 1 && pending.Values.Single().Code == theseus,
                 "The native Fusion Summon did not queue a readout for its own card.");
             var captured = pending.Single();
@@ -469,6 +470,82 @@ namespace YGOPortable.Editor
                 "The native effect summoned to a different zone than the selected Link arrow indicated.");
             ui.ExpectLinkedZones($"Zone_{target + 2}_3");
             Debug.Log("[VERIFY DUEL LINK ZONES] Link Spider's live downward marker identified the zone used by its native effect.");
+        }
+
+        private static void VerifyNativeMovingReadout()
+        {
+            const uint bookOfMoon = 14087893;
+            uint[] main = Enumerable.Repeat(KaiserSeaHorse, 32).Concat(Enumerable.Repeat(bookOfMoon, 8)).ToArray();
+            uint[] opponent = Enumerable.Repeat(BlueEyes, 40).ToArray();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Animated field readout", main, Array.Empty<uint>(),
+                opponent, Array.Empty<uint>(), true, session => session.ActivePrompt?.summonable.Count > 0 &&
+                    session.Players[session.HumanPlayerIndex].hand.Any(card => card.code == bookOfMoon));
+            var ai = new TacticalAI();
+
+            void ReachIdle()
+            {
+                YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt => prompt.messageType == YgoConstants.MSG_SELECT_CARD &&
+                    prompt.candidates.Count == 1 ? DuelSession.PackCardSelection(0) : null);
+                Require(duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD && duel.RetryCount == 0,
+                    "The native movement fixture did not return to the Main Phase.");
+            }
+
+            duel.SubmitResponseInt(0);
+            ReachIdle();
+            duel.SubmitResponseInt(7);
+            ReachIdle();
+            duel.SubmitResponseInt(7);
+            ReachIdle();
+            Require(duel.ActivePrompt.repositionable.Count == 1, "The native engine did not offer a position change.");
+            var monster = duel.ActivePrompt.repositionable[0];
+            using var ui = new HandUI(duel);
+            var animation = CardAnimationManager.Ensure(ui.Canvas);
+            duel.SubmitResponseInt(2);
+            ReachIdle();
+            var pending = (Dictionary<(byte, uint), CardMoveReadoutSnapshot>)typeof(DuelFieldUI)
+                .GetField("_pendingCardReadouts", PrivateInstance).GetValue(ui.Field);
+            var snapshot = pending[(monster.controller, monster.sequence)];
+            ui.Field.Refresh();
+            Require(snapshot.Card?.IsDefense == true && snapshot.Movement?.StartPosition == YgoConstants.POS_FACEUP_ATTACK,
+                "A position change lost its starting and ending position.");
+
+            var steps = (Queue<IEnumerator>)typeof(CardAnimationManager).GetField("_steps", PrivateInstance).GetValue(animation);
+            var step = steps.Dequeue();
+            Require(step.MoveNext() && step.Current is IEnumerator, "The field card did not enter its motion timeline.");
+            Require(((IEnumerator)step.Current).MoveNext(), "The field card did not render its first moving frame.");
+            var holder = (RectTransform)animation.transform.Find("MovingCardReadout");
+            var combat = holder.Find("CardReadout/Combat");
+            Require(combat.Find("Attack/Digits/Value").GetComponent<Text>().text == "1700" &&
+                combat.Find("Defense/Digits/Value").GetComponent<Text>().text == "1650" &&
+                combat.Find("Attack/Rail").GetComponent<Image>().color.a > combat.Find("Defense/Rail").GetComponent<Image>().color.a &&
+                holder.Find("CardReadout/Labels/Rating/Value").GetComponent<Text>().text == "레벨 4",
+                "The motion did not preserve the monster's stats and starting stance.");
+
+            var readout = LotdUiKit.FillRect("Mid-motion Verification", animation.transform);
+            var sample = new DuelMovingReadout(readout, snapshot, new DuelCardReadout(CardDatabase.Get(monster.code), snapshot.Card));
+            var movingCard = (RectTransform)animation.transform.Find("MovingCard");
+            movingCard.anchoredPosition += new Vector2(20f, 9f);
+            movingCard.localRotation = Quaternion.Euler(0f, 0f, -58f);
+            sample.Follow(movingCard, .66f);
+            var rotated = readout.Find("CardReadout/Combat");
+            Require(readout.anchoredPosition == movingCard.anchoredPosition && readout.localRotation == Quaternion.identity &&
+                rotated.Find("Defense/Rail").GetComponent<Image>().color.a > rotated.Find("Attack/Rail").GetComponent<Image>().color.a,
+                "A moving readout rotated its text or kept highlighting the old stance.");
+            UnityEngine.Object.DestroyImmediate(readout.gameObject);
+
+            Require(!step.MoveNext() && (holder == null || !holder.gameObject.activeSelf), "The travelling stats remained after landing.");
+            UnityEngine.Object.DestroyImmediate(movingCard.gameObject);
+            var slot = ui.Field.Root.transform.Find($"DuelBoard/Zone_{monster.sequence + 2}_3/CardReadout/Combat");
+            Require(slot.gameObject.activeInHierarchy &&
+                slot.Find("Defense/Rail").GetComponent<Image>().color.a > slot.Find("Attack/Rail").GetComponent<Image>().color.a,
+                "The landing interrupted the defense readout.");
+
+            int turnDown = duel.ActivePrompt.activatable.FindIndex(card => card.code == bookOfMoon);
+            Require(turnDown >= 0, "The movement fixture could not activate its face-down effect.");
+            duel.SubmitResponseInt((turnDown << 16) | 5);
+            ReachIdle();
+            Require(pending.Count == 0, "A face-down move queued live stats.");
+            Debug.Log("[VERIFY DUEL MOVING STATS] Native Attack-to-Defense rotation kept upright ATK, DEF and Level during motion and hid face-down stats.");
         }
 
         private static bool IsAshBlossomPrompt(DuelSession duel, DuelPrompt prompt)
