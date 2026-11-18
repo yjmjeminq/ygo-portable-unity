@@ -51,7 +51,8 @@ namespace YGOPortable.UI
         TokenSummon,
         Set,
         ChangePosition,
-        Material,
+        AttachMaterial,
+        DetachMaterial,
         Destroy,
         Vanish,
     }
@@ -108,6 +109,7 @@ namespace YGOPortable.UI
             internal CardFlight Flight;
             internal CardMotion Motion;
             internal CardMoveReadoutSnapshot Readout;
+            internal Action Depart;
             internal Action Release;
         }
 
@@ -220,14 +222,14 @@ namespace YGOPortable.UI
         }
 
         internal void StageSpecialSummon(CardFlight flight, CardMotion motion, byte controller, uint sequence,
-            CardMoveReadoutSnapshot readout, Action release, Action refresh)
+            CardMoveReadoutSnapshot readout, Action depart, Action release, Action refresh)
         {
             _openPileTransfers = null;
             _openBattleLifeChanges = null;
             _pendingSpecialSummons ??= new List<SpecialSummonArrival>();
             _pendingSpecialSummons.Add(new SpecialSummonArrival
             {
-                Slot = (controller, sequence), Flight = flight, Motion = motion, Readout = readout, Release = release,
+                Slot = (controller, sequence), Flight = flight, Motion = motion, Readout = readout, Depart = depart, Release = release,
             });
             _refreshAfterSpecialSummons = refresh;
         }
@@ -250,8 +252,13 @@ namespace YGOPortable.UI
             }
 
             var first = moves[0];
-            _steps.Enqueue(moves.Count == 1 ? MoveCard(first.Flight, first.Motion, Land, first.Readout, null)
+            _steps.Enqueue(moves.Count == 1 ? MoveCard(first.Flight, first.Motion, Land, first.Readout, first.Depart)
                 : PlaySpecialSummonGroup(moves, Land));
+        }
+
+        internal void QueueXyzMaterials(IReadOnlyList<CardFlight> flights, Vector2 center, Vector2 size)
+        {
+            if (flights.Count != 0) QueueStep(GatherXyzMaterials(flights, center, size));
         }
 
         internal void QueuePileTransfer(CardFlight flight, Action onArrive)
@@ -407,6 +414,7 @@ namespace YGOPortable.UI
 
         private IEnumerator PlaySpecialSummonGroup(IReadOnlyList<SpecialSummonArrival> moves, Action land)
         {
+            foreach (var move in moves) move.Depart?.Invoke();
             var effects = new DuelEffectGraphic[moves.Count];
             var views = new CompositeCardView[moves.Count];
             var opacity = new CanvasGroup[moves.Count];
@@ -459,6 +467,40 @@ namespace YGOPortable.UI
             land();
         }
 
+        private IEnumerator GatherXyzMaterials(IReadOnlyList<CardFlight> flights, Vector2 center, Vector2 size)
+        {
+            var effect = CreateEffect(DuelEffectKind.Xyz, center, size * 2.15f, new Color(.71f, .51f, 1f));
+            effect.Seek(0f);
+            var cards = new CompositeCardView[flights.Count];
+            var fades = new CanvasGroup[flights.Count];
+            for (int i = 0; i < flights.Count; i++)
+            {
+                var flight = flights[i];
+                var view = TakeCard(flight.StartsFaceDown ? 0u : flight.Code, flight.StartsFaceDown);
+                if (!view.TryGetComponent<CanvasGroup>(out var fade))
+                    fade = view.gameObject.AddComponent<CanvasGroup>();
+                fade.alpha = 1f;
+                cards[i] = view;
+                fades[i] = fade;
+            }
+
+            yield return Animate(.32f, progress =>
+            {
+                effect.Seek(progress);
+                for (int i = 0; i < cards.Length; i++)
+                {
+                    ApplyFlight(cards[i], flights[i], progress, 18f);
+                    fades[i].alpha = 1f - Mathf.SmoothStep(0f, 1f, (progress - .77f) / .23f);
+                }
+            });
+            for (int i = 0; i < cards.Length; i++)
+            {
+                fades[i].alpha = 1f;
+                RecycleCard(cards[i]);
+            }
+            RemoveTransient(effect.gameObject);
+        }
+
         private DuelMovingReadout CreateMovingReadout(CardFlight flight, CardMotion motion, CardMoveReadoutSnapshot readout)
         {
             if (readout?.SourceCard == null && readout?.DestinationCard == null) return null;
@@ -471,6 +513,7 @@ namespace YGOPortable.UI
         {
             if (!flight.From.IsValid || !flight.To.IsValid)
             {
+                onDepart?.Invoke();
                 onArrive?.Invoke();
                 yield break;
             }
@@ -492,6 +535,26 @@ namespace YGOPortable.UI
             var moving = reveal ? null : CreateMovingReadout(flight, motion, readout);
             if (reveal)
                 yield return RevealSummon(proxy, flight, motion, featured, readout?.DestinationCard);
+            else if (motion is CardMotion.AttachMaterial or CardMotion.DetachMaterial)
+            {
+                bool attaching = motion == CardMotion.AttachMaterial;
+                var material = attaching ? flight.To : flight.From;
+                var effect = CreateEffect(DuelEffectKind.XyzMaterial, material.Position, material.Size * 2.3f, new Color(.71f, .51f, 1f));
+                effect.Seek(0f);
+                proxy.transform.SetAsLastSibling();
+                moving?.Root.SetAsLastSibling();
+                if (!proxy.TryGetComponent<CanvasGroup>(out var fade))
+                    fade = proxy.gameObject.AddComponent<CanvasGroup>();
+                yield return Animate(.24f, t =>
+                {
+                    ApplyFlight(proxy, flight, t, 14f);
+                    moving?.Follow(proxy, t);
+                    fade.alpha = attaching ? 1f - Mathf.SmoothStep(0f, 1f, (t - .79f) / .21f) : 1f;
+                    effect.Seek(attaching ? Mathf.Clamp01((t - .36f) / .64f) : t);
+                });
+                fade.alpha = 1f;
+                RemoveTransient(effect.gameObject);
+            }
             else if (motion == CardMotion.TokenSummon || motion == CardMotion.Vanish)
             {
                 bool appearing = motion == CardMotion.TokenSummon;
@@ -516,8 +579,8 @@ namespace YGOPortable.UI
             }
             else
             {
-                float lift = motion == CardMotion.ChangePosition || motion == CardMotion.Material ? 13f : 31f;
-                float time = motion == CardMotion.Material ? .20f : motion == CardMotion.Transfer ? .23f : .27f;
+                float lift = motion == CardMotion.ChangePosition ? 13f : 31f;
+                float time = motion == CardMotion.Transfer ? .23f : .27f;
                 yield return Animate(time, t =>
                 {
                     ApplyFlight(proxy, flight, t, lift);

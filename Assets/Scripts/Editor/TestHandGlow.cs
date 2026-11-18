@@ -42,6 +42,8 @@ namespace YGOPortable.Editor
             VerifyNativeMovingReadout();
             VerifyNativeTokenArrivalReadout();
             VerifyNativePendulumArrivalReadout();
+            VerifyNativeXyzMaterialGather();
+            VerifyNativeXyzMaterialReadout();
             Debug.Log("[VERIFY HAND GLOW] Native summons and effects, distinct hand copies, blocked prompts, animation, off-turn activation and field-only monster ratings passed.");
         }
 
@@ -1262,6 +1264,176 @@ namespace YGOPortable.Editor
             Require(!wave.MoveNext() && readouts.All(readout => readout == null) &&
                     arrivals.All(arrival => Slot(arrival.DestinationCard).Find("Card/CardView").gameObject.activeInHierarchy),
                 "The group did not land together or left its moving readouts on screen.");
+        }
+
+        private static void VerifyNativeXyzMaterialGather()
+        {
+            const uint sparkman = 20721928, doubleSummon = 43422537, cowboy = 12014404;
+            var main = Enumerable.Repeat(sparkman, 30).Concat(Enumerable.Repeat(doubleSummon, 10)).ToArray();
+            var enemy = Enumerable.Repeat(BlueEyes, 40).ToArray();
+            var ai = new TacticalAI();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Xyz material flights", main, new[] { cowboy }, enemy,
+                Array.Empty<uint>(), true, session =>
+                {
+                    var hand = session.Players[session.HumanPlayerIndex].hand;
+                    return hand.Count(card => card.code == sparkman) >= 2 && hand.Any(card => card.code == doubleSummon);
+                });
+            ActivateFromMainPhase(duel, doubleSummon);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            for (int i = 0; i < 2; i++)
+            {
+                Require(duel.ActivePrompt.summonable.Count != 0, "The Xyz fixture ran out of normal summons.");
+                duel.SubmitResponseInt(0);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            }
+            int summon = duel.ActivePrompt.spSummonable.FindIndex(card => card.code == cowboy);
+            Require(summon >= 0, "The two monsters did not offer an Xyz Summon.");
+            using var ui = new HandUI(duel);
+            var animator = CardAnimationManager.Ensure(ui.Canvas);
+            Canvas.ForceUpdateCanvases();
+            duel.SubmitResponseInt((summon << 16) | 1);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt => prompt.messageType switch
+            {
+                YgoConstants.MSG_SELECT_CARD => DuelSession.PackCardSelection(0, 1),
+                YgoConstants.MSG_SELECT_POSITION => BitConverter.GetBytes((int)YgoConstants.POS_FACEUP_DEFENSE),
+                _ => null,
+            });
+            var host = duel.Players[duel.HumanPlayerIndex].mzone.Single(card => card?.code == cowboy);
+            Require(host.overlayCodes.Count == 2 && duel.RetryCount == 0, "The Xyz fixture did not give Cowboy two materials.");
+            ui.Field.Refresh();
+
+            var queued = AnimationSteps(animator).ToArray();
+            int gather = Array.FindIndex(queued, step => step.GetType().Name.StartsWith("<GatherXyzMaterials>", StringComparison.Ordinal));
+            var arrival = queued.Single(step => FlightCode(step) == cowboy);
+            Require(gather >= 0 && gather < Array.IndexOf(queued, arrival) &&
+                    queued.Count(step => FlightCode(step) == sparkman) == 0,
+                "The engine's two Xyz materials did not converge before the host's arrival.");
+            var step = queued[gather];
+            Require(step.MoveNext() && step.Current is IEnumerator, "The Xyz materials did not share one moving frame.");
+            var sample = TestCardPresentation.SampleAnimation((IEnumerator)step.Current);
+            var cards = animator.GetComponentsInChildren<CompositeCardView>().Where(view => view.name == "MovingCard")
+                .Select(view => (RectTransform)view.transform).ToArray();
+            Require(cards.Length == 2, "The shared Xyz animation omitted a material.");
+            Vector2[] start = cards.Select(card => card.anchoredPosition).ToArray();
+            float distance = Vector2.Distance(start[0], start[1]);
+            sample(.82f);
+            Require(distance > 10f && Vector2.Distance(cards[0].anchoredPosition, cards[1].anchoredPosition) < distance * .5f &&
+                    cards.Select((card, i) => Vector2.Distance(card.anchoredPosition, start[i])).All(moved => moved > 8f),
+                "The Xyz materials did not travel together towards the destination.");
+            sample(1f);
+            Require(!step.MoveNext() && cards.All(card => !card.gameObject.activeInHierarchy) &&
+                    !FieldSlot(ui.Field, host).Find("Card/CardView").gameObject.activeInHierarchy,
+                "The Xyz materials lingered or the host arrived before they merged.");
+            Require(arrival.MoveNext() && !arrival.MoveNext() &&
+                    FieldSlot(ui.Field, host).Find("CardReadout/Labels/Materials/Value").GetComponent<Text>().text == "2",
+                "The host did not land with the two assembled materials.");
+            Debug.Log("[VERIFY DUEL XYZ MATERIAL] Two native materials converged together before Cowboy appeared with material count 2.");
+        }
+
+        private static void VerifyNativeXyzMaterialReadout()
+        {
+            const uint tigermortar = 11510448, thoroughblade = 77150143, ram = 4145852, foolish = 81439173;
+            var main = Enumerable.Repeat(thoroughblade, 14).Concat(Enumerable.Repeat(ram, 14))
+                .Concat(Enumerable.Repeat(foolish, 12)).ToArray();
+            var ai = new TacticalAI();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Live Xyz material count", main, new[] { tigermortar },
+                Enumerable.Repeat(BlueEyes, 40).ToArray(), Array.Empty<uint>(), true, session =>
+                    session.ActivePrompt?.summonable.Exists(card => card.code == thoroughblade) == true &&
+                    session.ActivePrompt.activatable.Exists(card => card.code == foolish));
+            ActivateFromMainPhase(duel, foolish);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt => prompt.messageType == YgoConstants.MSG_SELECT_CARD
+                ? SelectCard(prompt, ram) : null);
+            int summon = duel.ActivePrompt.summonable.FindIndex(card => card.code == thoroughblade);
+            Require(summon >= 0, "The Xyz effect fixture could not summon Thoroughblade.");
+            duel.SubmitResponseInt(summon << 16);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            int xyz = duel.ActivePrompt.spSummonable.FindIndex(card => card.code == tigermortar);
+            Require(xyz >= 0, "The Xyz effect fixture could not summon Tigermortar.");
+            duel.SubmitResponseInt((xyz << 16) | 1);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt => prompt.messageType == YgoConstants.MSG_SELECT_CARD
+                ? SelectCard(prompt, thoroughblade) : null);
+
+            var player = duel.Players[duel.HumanPlayerIndex];
+            using var ui = new HandUI(duel);
+            var animator = CardAnimationManager.Ensure(ui.Canvas);
+            Canvas.ForceUpdateCanvases();
+            var host = player.mzone.Single(card => card?.code == tigermortar);
+            var slot = FieldSlot(ui.Field, host);
+            slot.GetComponent<CardDragTrigger>().OnRightClick();
+            ui.Field.Root.transform.Find("LeftInspector/CardDetails/ArtworkControls/Details/B").GetComponent<Button>().onClick.Invoke();
+            var details = ui.Field.Root.transform.Find("Overlay_CardZoom");
+            Require(details.gameObject.activeInHierarchy, "The Xyz details did not open for the active copy.");
+            var detailCard = details.GetComponentsInChildren<CompositeCardView>().Single(view => view.name == "ZoomCard");
+
+            void VerifyNumbers(string count, string attack, string defense)
+            {
+                Require(slot.Find("CardReadout/Labels/Materials/Value").GetComponent<Text>().text == count &&
+                        slot.Find("CardReadout/Combat/Attack/Digits/Value").GetComponent<Text>().text == attack &&
+                        slot.Find("CardReadout/Combat/Defense/Digits/Value").GetComponent<Text>().text == defense &&
+                        ui.Field.Root.transform.Find("LeftInspector/CardDetails/CombatStats/Attack/Digits/Value")
+                            .GetComponent<Text>().text == attack &&
+                        detailCard.transform.Find("AspectBox/AtkDef/Stat").GetComponent<Text>().text == $"ATK/{attack}  DEF/{defense}",
+                    $"Tigermortar did not present {count} materials and {attack}/{defense} combat values.");
+            }
+
+            VerifyNumbers("1", "1600", "0");
+            ActivateFromMainPhase(duel, tigermortar);
+            if (duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_CARD && duel.LastHintMsg == 519)
+                duel.SubmitResponse(SelectCard(duel.ActivePrompt, thoroughblade));
+            Require(player.mzone[host.sequence].overlayCodes.Count == 0 && player.mzone[host.sequence].attack == 0,
+                "The native cost did not remove the original Zoodiac material.");
+            ui.Field.Refresh();
+            VerifyNumbers("1", "1600", "0");
+
+            var detach = AnimationSteps(animator).Single(step => FlightCode(step) == thoroughblade);
+            Require(detach.MoveNext() && detach.Current is IEnumerator, "The detached material did not leave its host.");
+            var detachFrame = TestCardPresentation.SampleAnimation((IEnumerator)detach.Current);
+            VerifyNumbers("0", "0", "0");
+            detachFrame(1f);
+            Require(!detach.MoveNext(), "The detached material did not finish its movement.");
+
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
+            {
+                if (prompt.messageType != YgoConstants.MSG_SELECT_CARD) return null;
+                return SelectCard(prompt, prompt.candidates.Exists(card => card.code == tigermortar) ? tigermortar : ram);
+            });
+            host = player.mzone[host.sequence];
+            Require(duel.RetryCount == 0 && host.overlayCodes.SequenceEqual(new[] { ram }) &&
+                    host.attack == 400 && host.defense == 2000, "Tigermortar did not gain Ram's native combat values.");
+            ui.Field.Refresh();
+            VerifyNumbers("0", "0", "0");
+
+            var attach = AnimationSteps(animator).Single(step => FlightCode(step) == ram);
+            Require(attach.MoveNext() && attach.Current is IEnumerator, "The new material did not travel to its host.");
+            var attachFrame = TestCardPresentation.SampleAnimation((IEnumerator)attach.Current);
+            attachFrame(.81f);
+            Require(animator.GetComponentsInChildren<DuelEffectGraphic>().Any(graphic => graphic.Kind == DuelEffectKind.XyzMaterial),
+                "A material transfer used the full Xyz Summon effect over the field values.");
+            VerifyNumbers("0", "0", "0");
+            attachFrame(1f);
+            Require(!attach.MoveNext(), "The new material did not finish its movement.");
+            VerifyNumbers("1", "400", "2000");
+            Debug.Log("[VERIFY DUEL XYZ MATERIAL] Tigermortar kept 1600/0 before detach, showed 0/0 on departure, then gained 400/2000 when Ram attached.");
+        }
+
+        private static uint FlightCode(IEnumerator step)
+        {
+            const BindingFlags fields = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            return step.GetType().GetField("flight", fields)?.GetValue(step) is CardFlight flight ? flight.Code : 0;
+        }
+
+        private static byte[] SelectCard(DuelPrompt prompt, uint code)
+        {
+            int index = prompt.candidates.FindIndex(card => card.code == code);
+            Require(index >= 0, $"The Xyz fixture could not select {code}.");
+            return DuelSession.PackCardSelection(index);
+        }
+
+        private static Transform FieldSlot(DuelFieldUI field, LiveCardState card)
+        {
+            var slot = typeof(DuelFieldUI).GetMethod("GetSlot", PrivateInstance)
+                .Invoke(field, new object[] { card.controller, card.location, card.sequence });
+            return (Transform)slot.GetType().GetField("root").GetValue(slot);
         }
 
         private static Queue<IEnumerator> AnimationSteps(CardAnimationManager animator) =>

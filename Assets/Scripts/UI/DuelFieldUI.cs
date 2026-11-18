@@ -164,6 +164,15 @@ namespace YGOPortable.UI
         private int _preferredAttackTargetSeq = -1;
         private readonly Dictionary<(byte con, uint loc, uint seq), int> _arrivingCards = new Dictionary<(byte, uint, uint), int>();
         private readonly Dictionary<(byte Controller, uint Sequence), CardMoveReadoutSnapshot> _pendingCardReadouts = new();
+        private const uint FieldMaterials = YgoConstants.LOCATION_MZONE | YgoConstants.LOCATION_OVERLAY;
+        private readonly Dictionary<(byte Controller, uint Sequence), MaterialReadout> _materialReadouts = new();
+
+        private sealed class MaterialReadout
+        {
+            internal LiveCardState Source;
+            internal int Count;
+            internal int Pending;
+        }
         private readonly Dictionary<(byte controller, uint sequence), List<(uint code, CardPose from, bool faceDown, uint index)>>
             _pendingXyzMaterials = new Dictionary<(byte, uint), List<(uint, CardPose, bool, uint)>>();
         private bool _dragHighlightMZone;
@@ -390,6 +399,8 @@ namespace YGOPortable.UI
 
         private void HandleCardLocationsChanged(CardMoveEvent move, CardMoveEvent swapPartner)
         {
+            ClearMovedMaterialReadout(move);
+            if (swapPartner != null) ClearMovedMaterialReadout(swapPartner);
             if (move.fromLoc == YgoConstants.LOCATION_MZONE)
                 _pendingCardReadouts.Remove((move.fromCon, move.fromSeq));
             if (swapPartner?.fromLoc == YgoConstants.LOCATION_MZONE)
@@ -430,7 +441,7 @@ namespace YGOPortable.UI
             if (_inspectedCode == 0) return;
             var live = ReadVisibleFieldCard(_inspectedCode, _inspectedFieldCard);
             if (live == null) _inspectedFieldCard = null;
-            var card = new DuelCardReadout(CardDatabase.Get(_inspectedCode), live);
+            var card = ReadFieldStats(_inspectedCode, live);
             _inspStats.text = FormatInspectorStats(card, compact: true);
             BindIdentityIcons(card, _inspRaceIcon, _inspAttributeIcon);
             _inspCounters.Bind(card.CounterCount, showChanges);
@@ -1394,8 +1405,8 @@ namespace YGOPortable.UI
             }
             if (visible && faceUp && shown.code != 0 && battle?.HideReadout != true)
             {
-                var readout = new DuelCardReadout(CardDatabase.Get(shown.code), shown,
-                    battle?.UseBattleStats == true ? battle.Stats : null);
+                var readout = battle == null ? ReadFieldStats(shown.code, shown) :
+                    new DuelCardReadout(CardDatabase.Get(shown.code), shown, battle.UseBattleStats ? battle.Stats : null);
                 uint? scale = readout.ScaleIn(loc, seq);
                 if (loc == YgoConstants.LOCATION_MZONE && readout.IsMonster || scale.HasValue || readout.CounterCount != 0)
                 {
@@ -2112,6 +2123,7 @@ namespace YGOPortable.UI
         private void ClearArrivals()
         {
             _arrivingCards.Clear();
+            _materialReadouts.Clear();
             _battleCardDisplays.Clear();
             _pendingCardReadouts.Clear();
             ResetHandViews(_myHandViews);
@@ -2221,6 +2233,45 @@ namespace YGOPortable.UI
 
         private static void CompleteSpecialSummons() => CardAnimationManager.Instance?.CompleteSpecialSummons();
 
+        private DuelCardReadout ReadFieldStats(uint code, LiveCardState live)
+        {
+            if (live != null && live.location == YgoConstants.LOCATION_MZONE &&
+                _materialReadouts.TryGetValue((live.controller, live.sequence), out var held) && held.Source.code == code)
+                return new DuelCardReadout(CardDatabase.Get(code), live,
+                    materialReadout: (held.Count, held.Source.attack, held.Source.defense));
+            return new DuelCardReadout(CardDatabase.Get(code), live);
+        }
+
+        private void ClearMovedMaterialReadout(CardMoveEvent move)
+        {
+            bool changesSlot = (move.fromCon, move.fromLoc, move.fromSeq) != (move.toCon, move.toLoc, move.toSeq);
+            if (move.fromLoc == YgoConstants.LOCATION_MZONE && (changesSlot || (move.toPos & YgoConstants.POS_FACEUP) == 0))
+                _materialReadouts.Remove((move.fromCon, move.fromSeq));
+            if (move.toLoc == YgoConstants.LOCATION_MZONE && changesSlot)
+                _materialReadouts.Remove((move.toCon, move.toSeq));
+        }
+
+        private Action HoldMaterialReadout(byte controller, uint location, uint sequence, int change)
+        {
+            if (location != FieldMaterials || controller >= _session.Players.Length) return null;
+            var host = FindLiveCard(controller, YgoConstants.LOCATION_MZONE, sequence);
+            if (host?.IsFaceUp != true || host.code == 0) return null;
+
+            var slot = (controller, sequence);
+            if (!_materialReadouts.TryGetValue(slot, out var readout))
+            {
+                readout = new MaterialReadout { Source = host, Count = host.overlayCodes.Count };
+                _materialReadouts.Add(slot, readout);
+            }
+            readout.Pending++;
+            return () =>
+            {
+                if (!_materialReadouts.TryGetValue(slot, out var current) || !ReferenceEquals(readout, current)) return;
+                readout.Count = Math.Max(0, readout.Count + change);
+                if (--readout.Pending == 0) _materialReadouts.Remove(slot);
+            };
+        }
+
         private void CaptureCardReadouts()
         {
             // Read the field refreshed for this response before playing its queued animations.
@@ -2316,20 +2367,23 @@ namespace YGOPortable.UI
                 uint hostLocation = e.toLoc == YgoConstants.LOCATION_MZONE ? e.toLoc : e.fromLoc;
                 byte hostController = hostLocation == e.toLoc ? e.toCon : e.fromCon;
                 uint hostSequence = hostLocation == e.toLoc ? e.toSeq : e.fromSeq;
+                var materialFlights = new List<CardFlight>(pending.Count);
                 foreach (var material in pending)
                 {
                     var arrival = GetCardPose(hostController, hostLocation | YgoConstants.LOCATION_OVERLAY, hostSequence, material.index);
-                    var materialFlight = new CardFlight(material.code, material.from, arrival, material.faceDown, material.code == 0);
-                    animator.QueueMove(materialFlight, CardMotion.Material, null);
+                    if (material.from.IsValid && arrival.IsValid)
+                        materialFlights.Add(new CardFlight(material.code, material.from, arrival, material.faceDown, material.code == 0));
                 }
+                animator.QueueXyzMaterials(materialFlights, to.Position, to.Size);
             }
 
-            bool materialMove = ((e.fromLoc | e.toLoc) & YgoConstants.LOCATION_OVERLAY) != 0;
+            bool attaches = (e.toLoc & YgoConstants.LOCATION_OVERLAY) != 0;
+            bool detaches = (e.fromLoc & YgoConstants.LOCATION_OVERLAY) != 0;
             bool sameZone = e.fromCon == e.toCon && e.fromLoc == e.toLoc && e.fromSeq == e.toSeq;
             CardMotion motion = CardMotion.Transfer;
             if (disappearing) motion = CardMotion.Vanish;
             else if ((e.reason & YgoConstants.REASON_DESTROY) != 0) motion = CardMotion.Destroy;
-            else if (materialMove) motion = CardMotion.Material;
+            else if (attaches || detaches) motion = attaches ? CardMotion.AttachMaterial : CardMotion.DetachMaterial;
             else if (sameZone) motion = CardMotion.ChangePosition;
             else if ((e.toLoc & YgoConstants.LOCATION_ONFIELD) != 0 && toBack) motion = CardMotion.Set;
             else if (e.toLoc == YgoConstants.LOCATION_MZONE && e.fromLoc != YgoConstants.LOCATION_MZONE)
@@ -2337,16 +2391,20 @@ namespace YGOPortable.UI
 
             var flight = new CardFlight(e.code, from, to, fromBack, toBack);
             var held = HoldBattleMove(e, motion);
-            Action depart = held == null ? null : () =>
+            Action detach = sameZone ? null : HoldMaterialReadout(e.fromCon, e.fromLoc, e.fromSeq, -1);
+            Action attach = sameZone ? null : HoldMaterialReadout(e.toCon, e.toLoc, e.toSeq, 1);
+            Action depart = held == null && detach == null ? null : () =>
             {
-                held.Hidden = true;
+                if (held != null) held.Hidden = true;
+                detach?.Invoke();
                 Refresh();
             };
-            if (disappearing || (e.toLoc & YgoConstants.LOCATION_OVERLAY) != 0)
+            if (disappearing || attaches)
             {
-                animator.QueueMove(flight, motion, held == null ? null : () =>
+                animator.QueueMove(flight, motion, held == null && attach == null ? null : () =>
                 {
                     ReleaseBattleCardDisplay(held);
+                    attach?.Invoke();
                     Refresh();
                 }, onDepart: depart);
                 return;
@@ -2355,7 +2413,7 @@ namespace YGOPortable.UI
             {
                 var key = ReserveArrival(e.toCon, e.toLoc, e.toSeq);
                 animator.StageSpecialSummon(flight, motion, e.toCon, e.toSeq, PrepareMoveReadout(animator, e, fromBack, toBack),
-                    () => ReleaseArrival(key), Refresh);
+                    depart, () => ReleaseArrival(key), Refresh);
                 return;
             }
             var onArrival = HideUntilArrival(e.toCon, e.toLoc, e.toSeq);
@@ -3572,8 +3630,8 @@ namespace YGOPortable.UI
         {
             var live = ReadVisibleFieldCard(code, _zoomFieldCard);
             if (live == null) _zoomFieldCard = null;
-            var card = new DuelCardReadout(CardDatabase.Get(code), live);
-            _zoomCardView.SetCard(code, false, live);
+            var card = ReadFieldStats(code, live);
+            _zoomCardView.SetCard(code, false, live, (card.Attack, card.Defense));
             _zoomStats.text = FormatInspectorStats(card);
             BindIdentityIcons(card, _zoomRaceIcon, _zoomAttributeIcon);
             _zoomCounters.Bind(card.CounterCount, showChanges);

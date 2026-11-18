@@ -13,12 +13,15 @@ namespace YGOPortable.UI
         internal readonly CardInfo Printed;
         internal readonly LiveCardState Live;
         private readonly BattleCardStats? _battleStats;
+        private readonly (int Count, int Attack, int Defense)? _materialReadout;
 
-        internal DuelCardReadout(CardInfo printed, LiveCardState live = null, BattleCardStats? battleStats = null)
+        internal DuelCardReadout(CardInfo printed, LiveCardState live = null, BattleCardStats? battleStats = null,
+            (int Count, int Attack, int Defense)? materialReadout = null)
         {
             Printed = printed;
             Live = live;
             _battleStats = battleStats;
+            _materialReadout = materialReadout;
         }
 
         internal uint Type => Live?.type > 0 ? Live.type : Printed?.type ?? 0;
@@ -29,14 +32,14 @@ namespace YGOPortable.UI
         internal bool IsScale => Type == (YgoConstants.TYPE_PENDULUM | YgoConstants.TYPE_SPELL);
         internal ulong Race => Live?.race ?? Printed?.race ?? 0;
         internal uint Attribute => Live?.attribute ?? Printed?.attr ?? 0;
-        internal int Attack => _battleStats?.Attack ?? Live?.attack ?? Printed?.atk ?? -1;
-        internal int Defense => _battleStats?.Defense ?? Live?.defense ?? Printed?.def ?? -1;
+        internal int Attack => _battleStats?.Attack ?? _materialReadout?.Attack ?? Live?.attack ?? Printed?.atk ?? -1;
+        internal int Defense => _battleStats?.Defense ?? _materialReadout?.Defense ?? Live?.defense ?? Printed?.def ?? -1;
         internal uint Position => _battleStats?.Position ?? Live?.position ?? 0;
         internal BattleComparisonValue? ComparedValue => _battleStats?.ComparedValue;
         internal uint LeftScale => Live?.lscale ?? Printed?.lscale ?? 0;
         internal uint RightScale => Live?.rscale ?? Printed?.rscale ?? 0;
         internal uint LinkMarkers => IsLink ? Live?.linkMarker ?? Printed?.link ?? 0 : 0;
-        internal int Materials => Live?.overlayCodes.Count ?? 0;
+        internal int Materials => _materialReadout?.Count ?? Live?.overlayCodes.Count ?? 0;
         internal uint CounterCount => Live?.counterCount ?? 0;
         internal bool Disabled => Live?.effectsDisabled == true;
         internal bool HasMaterials => Live != null && (IsXyz || Materials > 0);

@@ -494,6 +494,9 @@ namespace YGOPortable.UI
         }
 
         public void SetCard(uint code, bool faceDown = false, LiveCardState live = null)
+            => SetCard(code, faceDown, live, null);
+
+        internal void SetCard(uint code, bool faceDown, LiveCardState live, (int Attack, int Defense)? combat)
         {
             CurrentCode = code;
             if (faceDown || code == 0)
@@ -574,8 +577,8 @@ namespace YGOPortable.UI
                         _rightScaleText.text = rs.ToString();
                     }
 
-                    int atk = live != null ? live.attack : (info?.atk ?? 0);
-                    int def = live != null ? live.defense : (info?.def ?? 0);
+                    int atk = combat?.Attack ?? live?.attack ?? info?.atk ?? 0;
+                    int def = combat?.Defense ?? live?.defense ?? info?.def ?? 0;
                     string aStr = atk < 0 ? "?" : atk.ToString();
                     string defense = (type & YgoConstants.TYPE_LINK) != 0
                         ? $"LINK-{lv}" : $"DEF/{(def < 0 ? "?" : def.ToString())}";
