@@ -185,7 +185,7 @@ namespace YGOPortable.UI
 
             // Top: Portrait + Name + Series/Bio
             var oppHeader = LotdUiKit.CreateRect("OppHdr", rightPanel,
-                new Vector2(0.03f, 0.67f), new Vector2(0.97f, 0.97f), Vector2.zero, Vector2.zero);
+                new Vector2(.03f, .698f), new Vector2(.97f, .97f), Vector2.zero, Vector2.zero);
             var bustBox = LotdUiKit.CreateBorderedPanel(oppHeader, "BustBox",
                 new Vector2(0f, 0.04f), new Vector2(0.40f, 0.96f), Vector2.zero, Vector2.zero,
                 new Color(0.02f, 0.05f, 0.12f, 1f), LotdUiKit.GoldAccent);
@@ -200,15 +200,15 @@ namespace YGOPortable.UI
 
             // Middle: Opponent Signature Deck Switcher + Ace Card Preview
             var oppDeckBox = LotdUiKit.CreateBorderedPanel(rightPanel, "OppDeckBox",
-                new Vector2(0.03f, 0.36f), new Vector2(0.97f, 0.65f), Vector2.zero, Vector2.zero,
+                new Vector2(.03f, .36f), new Vector2(.97f, .682f), Vector2.zero, Vector2.zero,
                 new Color(0.03f, 0.08f, 0.17f, 0.95f));
 
             var cardHolder = LotdUiKit.CreateRect("SigCard", oppDeckBox,
-                new Vector2(0.02f, 0.06f), new Vector2(0.28f, 0.94f), Vector2.zero, Vector2.zero);
+                new Vector2(.019f, .029f), new Vector2(.319f, .971f), Vector2.zero, Vector2.zero);
             _sigCardPreview = CompositeCardView.Create(cardHolder, "SigPreview", detailedOverlay: false);
 
             var deckMeta = LotdUiKit.CreateRect("DeckMeta", oppDeckBox,
-                new Vector2(0.30f, 0.34f), new Vector2(0.98f, 0.95f), Vector2.zero, Vector2.zero);
+                new Vector2(.339f, .34f), new Vector2(.98f, .95f), Vector2.zero, Vector2.zero);
             var deckPicker = LotdUiKit.CreateRect("DeckPicker", deckMeta, new Vector2(0, 0.67f), Vector2.one, Vector2.zero, Vector2.zero);
             _oppDeckDropdown = LotdUiKit.CreateLotdDropdown(deckPicker, "Dropdown", Array.Empty<string>(), index =>
             {
@@ -224,13 +224,13 @@ namespace YGOPortable.UI
                 new Vector2(1, 0.15f), Vector2.zero, Vector2.zero), "Label", "", 12, 9,
                 TextAnchor.MiddleLeft, LotdUiKit.TextMuted);
 
-            var prevDeckRt = LotdUiKit.CreateRect("PrevOppDeck", oppDeckBox, new Vector2(0.30f, 0.06f), new Vector2(0.48f, 0.30f), Vector2.zero, Vector2.zero);
+            var prevDeckRt = LotdUiKit.CreateRect("PrevOppDeck", oppDeckBox, new Vector2(.339f, .06f), new Vector2(.51f, .30f), Vector2.zero, Vector2.zero);
             _previousOppDeckButton = LotdUiKit.CreateLotdButton(prevDeckRt, "B",
                 CollectionProgress.Initialized ? "◀ 레벨" : "◀ 덱", () => CycleOppDeck(-1), 13);
-            var nextDeckRt = LotdUiKit.CreateRect("NextOppDeck", oppDeckBox, new Vector2(0.49f, 0.06f), new Vector2(0.67f, 0.30f), Vector2.zero, Vector2.zero);
+            var nextDeckRt = LotdUiKit.CreateRect("NextOppDeck", oppDeckBox, new Vector2(.52f, .06f), new Vector2(.691f, .30f), Vector2.zero, Vector2.zero);
             _nextOppDeckButton = LotdUiKit.CreateLotdButton(nextDeckRt, "B",
                 CollectionProgress.Initialized ? "레벨 ▶" : "덱 ▶", () => CycleOppDeck(1), 13);
-            var cloneRt = LotdUiKit.CreateRect("CloneOppDeck", oppDeckBox, new Vector2(0.69f, 0.06f), new Vector2(0.98f, 0.30f), Vector2.zero, Vector2.zero);
+            var cloneRt = LotdUiKit.CreateRect("CloneOppDeck", oppDeckBox, new Vector2(.704f, .06f), new Vector2(.98f, .30f), Vector2.zero, Vector2.zero);
             _cloneOppButton = LotdUiKit.CreateLotdButton(cloneRt, "B", "덱 목록 복제", CloneCurrentOppDeck, 12);
 
             // My Deck Selector Box

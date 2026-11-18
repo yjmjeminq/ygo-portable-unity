@@ -477,12 +477,7 @@ namespace YGOPortable.UI
         {
             if (move == Vector2Int.zero) return;
             int count = _padArea == PadArea.Trunk ? _trunkResults.Count : VisiblePadDeckCount;
-            int cols = _padArea switch
-            {
-                PadArea.Trunk => TrunkCols,
-                PadArea.Extra => OtherDeckCapacity,
-                _ => DeckColumns,
-            };
+            int cols = _padArea == PadArea.Trunk ? TrunkCols : DeckColumns;
             int area = (int)_padArea;
             int index = ClampPadIndex(_padIndices[area], count);
             int row = index / cols;

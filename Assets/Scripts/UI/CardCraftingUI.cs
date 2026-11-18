@@ -139,19 +139,19 @@ namespace YGOPortable.UI
             var heading = Slot(details, "Name", .075f, .768f, .926f, .851f);
             _title = LotdUiKit.AddFittedText(heading, "Text", "", 26, 16,
                 TextAnchor.MiddleCenter, PackShopStyle.TextPrimary, FontStyle.Bold);
-            _art = CompositeCardView.Create(Slot(details, "Art", .075f, .204f, .371f, .745f), "SelectedCard", true);
-            _rarity = ShopRarityBadge.Create(details, new Vector2(.409f, .679f), new Vector2(.49f, .738f), 17);
-            _cardInfo = Label(details, "Ownership", "", .501f, .669f, .925f, .749f, 17,
+            _art = CompositeCardView.Create(Slot(details, "Art", .061f, .085f, .463f, .749f), "SelectedCard", true);
+            _rarity = ShopRarityBadge.Create(details, new Vector2(.491f, .679f), new Vector2(.572f, .738f), 17);
+            _cardInfo = Label(details, "Ownership", "", .583f, .669f, .925f, .749f, 17,
                 TextAnchor.MiddleLeft, PackShopStyle.Accent);
-            _cardStats = Label(details, "Stats", "", .409f, .591f, .925f, .668f, 16, TextAnchor.MiddleLeft, PackShopStyle.TextPrimary);
+            _cardStats = Label(details, "Stats", "", .491f, .591f, .925f, .668f, 16, TextAnchor.MiddleLeft, PackShopStyle.TextPrimary);
             (_descriptionScroll, _description) = CreateDescription(details);
-            _craft = AddButton(details, "Craft", "제작", .407f, .204f, .661f, .281f, () => OpenConfirmation(true), true);
-            _disassemble = AddButton(details, "Disassemble", "분해", .673f, .204f, .926f, .281f, () => OpenConfirmation(false));
-            _status = Label(details, "Status", "", .077f, .126f, .928f, .195f, 17, TextAnchor.MiddleCenter, PackShopStyle.TextPrimary);
+            _craft = AddButton(details, "Craft", "제작", .491f, .204f, .701f, .281f, () => OpenConfirmation(true), true);
+            _disassemble = AddButton(details, "Disassemble", "분해", .715f, .204f, .926f, .281f, () => OpenConfirmation(false));
+            _status = Label(details, "Status", "", .491f, .126f, .928f, .195f, 17, TextAnchor.MiddleCenter, PackShopStyle.TextPrimary);
             string prices = string.Join(" · ", Rarities.Select(rarity =>
                 $"{CardRarityCatalog.GetLabel(rarity)} {CollectionProgress.GetCraftDustCost(rarity)}"));
             Label(details, "Rules", $"제작에 드는 가루   {prices}",
-                .077f, .069f, .928f, .121f, 16, TextAnchor.MiddleCenter, PackShopStyle.TextMuted);
+                .491f, .069f, .928f, .121f, 16, TextAnchor.MiddleCenter, PackShopStyle.TextMuted);
 
             var footer = PackShopStyle.Panel(main, "Footer", new Vector2(.035f, .017f), new Vector2(.965f, .059f));
             LotdUiKit.AddFittedText(footer, "Controls", "방향키 이동   A 선택   Y 검색   LB/RB 페이지   오른쪽 스틱 설명   B 뒤로",
@@ -470,7 +470,7 @@ namespace YGOPortable.UI
 
         private static (ScrollRect, Text) CreateDescription(Transform parent)
         {
-            var holder = Slot(parent, "Description", .407f, .305f, .925f, .585f);
+            var holder = Slot(parent, "Description", .491f, .305f, .925f, .585f);
             LotdUiKit.AddImage(holder.gameObject, LotdUiKit.WhiteSprite, PackShopStyle.SurfaceInset);
             var viewport = LotdUiKit.CreateRect("Viewport", holder, Vector2.zero, Vector2.one, new Vector2(8f, 5f), new Vector2(-20f, -5f));
             viewport.gameObject.AddComponent<RectMask2D>();

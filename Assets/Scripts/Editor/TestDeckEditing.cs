@@ -83,16 +83,27 @@ namespace YGOPortable.Editor
         {
             var saved = Field<UserDeck>(editor, "_workingDeck");
             saved.main.AddRange(Enumerable.Repeat(46986414u, 39));
+            saved.extra.AddRange(Enumerable.Repeat(23995346u, 9));
+            saved.side.Add(46986414u);
             Call(editor, "RefreshDeckGrids");
             Canvas.ForceUpdateCanvases();
             var scroll = Field<ScrollRect>(editor, "_mainDeckScroll");
             var mainSlots = Field<RectTransform>(editor, "_mainDeckSlotGrid");
+            var extraSlots = Field<RectTransform>(editor, "_extraGridRect");
             var sideSlots = Field<RectTransform>(editor, "_sideGridRect");
             VerifyEightColumns(mainSlots, "Main");
+            VerifyEightColumns(extraSlots, "Extra");
             VerifyEightColumns(sideSlots, "Side");
+            var trunk = Field<RectTransform>(editor, "_trunkContent");
+            Require(((RectTransform)trunk.Find("TrunkCard/CardInset/Card/AspectBox")).rect.width >= 82f,
+                "The trunk artwork became too small.");
+            VerifyDeckArtwork(mainSlots, 85f, "Main");
+            VerifyDeckArtwork(extraSlots, 73f, "Extra");
+            VerifyDeckArtwork(sideSlots, 72f, "Side");
             float slotHeight = ((RectTransform)mainSlots.Find("Card_0")).rect.height;
-            Require(Mathf.Abs(scroll.content.rect.height - scroll.viewport.rect.height * 1.25f) < .1f,
+            Require(Mathf.Abs(scroll.content.rect.height - scroll.viewport.rect.height * 2.5f) < .1f,
                 "A 40-card deck did not have five rows at eight cards per row.");
+            Require(Mathf.Abs(scroll.content.anchoredPosition.y) < .1f, "The main deck did not start at its first row.");
 
             saved.main.AddRange(Enumerable.Repeat(46986414u, 21));
             Call(editor, "RefreshDeckGrids");
@@ -114,6 +125,21 @@ namespace YGOPortable.Editor
                 "Controller focus did not scroll the eighth row into view.");
             Require(indices[(int)main] == 59 && saved.main.Count == 61,
                 "An oversized legacy deck broke focus or dropped its unrendered card.");
+
+            var extra = Enum.Parse(area.FieldType, "Extra");
+            area.SetValue(editor, extra);
+            indices[(int)extra] = 0;
+            Call(editor, "NavigatePadCards", Vector2Int.down, false);
+            Require(indices[(int)extra] == 8, "Controller focus did not reach the second Extra Deck row.");
+            saved.extra.Clear();
+            saved.side.Clear();
+            Call(editor, "RefreshDeckGrids");
+        }
+
+        private static void VerifyDeckArtwork(Transform grid, float minHeight, string section)
+        {
+            var art = (RectTransform)grid.Find("Card_0/CardInset/Card/AspectBox");
+            Require(art.rect.height >= minHeight, $"{section} artwork became too small.");
         }
 
         private static void VerifyEightColumns(Transform grid, string section)

@@ -75,14 +75,14 @@ namespace YGOPortable.UI
 
             var details = PackShopStyle.Panel(root, "Details", new Vector2(.459f, .083f), new Vector2(.975f, .882f));
             _cardName = Heading(details, "Name", .075f, .862f, .925f, .93f);
-            _art = CompositeCardView.Create(Slot(details, "Art", .073f, .14f, .459f, .834f), "Card", true);
-            _owner = Label(details, "Owner", .489f, .748f, .822f, .828f, 19, TextAnchor.MiddleLeft, PackShopStyle.Accent);
+            _art = CompositeCardView.Create(Slot(details, "Art", .055f, .093f, .497f, .846f), "Card", true);
+            _owner = Label(details, "Owner", .52f, .748f, .822f, .828f, 19, TextAnchor.MiddleLeft, PackShopStyle.Accent);
             _rarity = ShopRarityBadge.Create(details, new Vector2(.835f, .759f), new Vector2(.919f, .816f), 17);
-            _stats = Label(details, "Stats", .489f, .625f, .919f, .739f, 18, TextAnchor.MiddleLeft, PackShopStyle.TextPrimary);
+            _stats = Label(details, "Stats", .52f, .625f, .919f, .739f, 18, TextAnchor.MiddleLeft, PackShopStyle.TextPrimary);
             (_descriptionScroll, _description) = CreateDescription(details);
             if (onFindPacks != null)
             {
-                _findPacks = AddButton(details, "FindPacks", "이 카드가 든 팩", .487f, .139f, .92f, .213f,
+                _findPacks = AddButton(details, "FindPacks", "이 카드가 든 팩", .52f, .139f, .92f, .213f,
                     () => { if (_selectedCode != 0) onFindPacks(_selectedCode); }, true);
             }
 
@@ -225,7 +225,7 @@ namespace YGOPortable.UI
 
         private static (ScrollRect, Text) CreateDescription(Transform parent)
         {
-            var holder = Slot(parent, "Description", .487f, .232f, .921f, .614f);
+            var holder = Slot(parent, "Description", .52f, .232f, .921f, .614f);
             LotdUiKit.AddImage(holder.gameObject, LotdUiKit.WhiteSprite, PackShopStyle.SurfaceInset);
             var viewport = LotdUiKit.CreateRect("Viewport", holder, Vector2.zero, Vector2.one,
                 new Vector2(8f, 5f), new Vector2(-20f, -5f));

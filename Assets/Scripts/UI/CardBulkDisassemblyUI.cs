@@ -101,16 +101,16 @@ namespace YGOPortable.UI
 
             var details = Panel(root, "Details", .57f, .083f, .975f, .882f);
             _cardName = Heading(details, "Name", "", .08f, .858f, .92f, .93f);
-            _art = CompositeCardView.Create(Slot(details, "Art", .085f, .544f, .375f, .839f), "Card", true);
-            _cardRarity = ShopRarityBadge.Create(details, new Vector2(.408f, .766f), new Vector2(.506f, .827f), 17);
-            _cardInfo = Label(details, "CardInfo", "", .41f, .652f, .92f, .759f, 18, TextAnchor.MiddleLeft);
-            _decrement = AddButton(details, "Decrease", "−", .408f, .563f, .538f, .638f, () => AdjustQuantity(-1));
-            _increment = AddButton(details, "Increase", "+", .55f, .563f, .68f, .638f, () => AdjustQuantity(1));
-            _maximum = AddButton(details, "Maximum", "최대", .696f, .563f, .92f, .638f, SelectMaximum);
-            _selectExcess = AddButton(details, "SelectExcess", "3장 남기고 분해", .08f, .462f, .492f, .537f, SelectExcess);
-            _autoSelect = AddButton(details, "SelectSpare", "카드별 1장 남기기", .508f, .462f, .92f, .537f, SelectSpare);
-            _selectAll = AddButton(details, "SelectAll", "전체 보유 선택", .08f, .375f, .492f, .45f, SelectAll);
-            _clear = AddButton(details, "Clear", "선택 초기화", .508f, .375f, .92f, .45f, ClearSelection);
+            _art = CompositeCardView.Create(Slot(details, "Art", .073f, .382f, .468f, .842f), "Card", true);
+            _cardRarity = ShopRarityBadge.Create(details, new Vector2(.492f, .766f), new Vector2(.59f, .827f), 17);
+            _cardInfo = Label(details, "CardInfo", "", .492f, .652f, .92f, .759f, 18, TextAnchor.MiddleLeft);
+            _decrement = AddButton(details, "Decrease", "−", .492f, .563f, .596f, .638f, () => AdjustQuantity(-1));
+            _increment = AddButton(details, "Increase", "+", .61f, .563f, .714f, .638f, () => AdjustQuantity(1));
+            _maximum = AddButton(details, "Maximum", "최대", .728f, .563f, .92f, .638f, SelectMaximum);
+            _selectExcess = AddButton(details, "SelectExcess", "3장 남기고 분해", .492f, .462f, .70f, .537f, SelectExcess);
+            _autoSelect = AddButton(details, "SelectSpare", "카드별 1장 남기기", .712f, .462f, .92f, .537f, SelectSpare);
+            _selectAll = AddButton(details, "SelectAll", "전체 보유 선택", .492f, .375f, .70f, .45f, SelectAll);
+            _clear = AddButton(details, "Clear", "선택 초기화", .712f, .375f, .92f, .45f, ClearSelection);
             _summary = Label(details, "Summary", "", .085f, .298f, .915f, .365f, 18, TextAnchor.MiddleLeft);
             _dust = BuildDustLabel(details, .217f, .292f);
             _review = AddButton(details, "Review", "분해 내역 확인", .08f, .124f, .92f, .205f, OpenReview, true);

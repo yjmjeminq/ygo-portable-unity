@@ -13,6 +13,7 @@ namespace YGOPortable.UI
         private const float DealGap = .065f;
         private const float FlipTime = .32f;
         private const float FlipGap = .145f;
+        private const int CardsPerRow = 4;
 
         private sealed class Pull
         {
@@ -90,20 +91,20 @@ namespace YGOPortable.UI
             _resultTitle = Label(results, "Title", "", .19f, .875f, .81f, .957f, 32, PackShopStyle.TextPrimary);
             _resultPage = Label(results, "Page", "", .02f, .89f, .16f, .967f, 28, PackShopStyle.TextPrimary);
             _previous = ButtonAt(results, "Previous", "이전 팩", .034f, .048f, .165f, .112f, () => ChangePage(-1));
-            _exit = ButtonAt(results, "Exit", "", .405f, .086f, .595f, .152f, Back, light: true);
+            _exit = ButtonAt(results, "Exit", "", .405f, .081f, .595f, .138f, Back, light: true);
             _skipResult = ButtonAt(results, "Skip", "건너뛰기", .84f, .04f, .967f, .099f, Back);
             _exitLabel = _exit.GetComponentInChildren<Text>();
 
-            var spread = Slot(results, "Cards", .048f, .37f, .952f, .686f);
+            var spread = Slot(results, "Cards", .135f, .222f, .865f, .845f);
             for (int i = 0; i < _pulls.Length; i++)
                 _pulls[i] = BuildPull(spread, i);
-            PackOpeningStage.FloorFade(results, .09f, .375f);
+            PackOpeningStage.FloorFade(results, 0f, .261f);
             _exit.transform.parent.SetAsLastSibling();
             _previous.transform.parent.SetAsLastSibling();
             _skipResult.transform.parent.SetAsLastSibling();
-            _summary = Label(results, "Summary", "", .20f, .206f, .80f, .253f, 19, PackShopStyle.TextMuted);
-            _selected = Label(results, "Selected", "", .16f, .149f, .84f, .204f, 22, PackShopStyle.TextPrimary);
-            _all = ButtonAt(results, "RevealAll", "모두 공개", .405f, .086f, .595f, .152f, RevealAll, light: true);
+            _summary = Label(results, "Summary", "", .20f, .183f, .80f, .22f, 19, PackShopStyle.TextMuted);
+            _selected = Label(results, "Selected", "", .16f, .141f, .84f, .178f, 22, PackShopStyle.TextPrimary);
+            _all = ButtonAt(results, "RevealAll", "모두 공개", .405f, .081f, .595f, .138f, RevealAll, light: true);
             _allLabel = _all.GetComponentInChildren<Text>();
             _controls = Label(results, "Controls", "", .20f, .017f, .8f, .066f, 16, PackShopStyle.TextMuted);
             _playback = results.gameObject.AddComponent<PackOpeningPlayback>();
@@ -201,10 +202,15 @@ namespace YGOPortable.UI
 
         private Pull BuildPull(Transform parent, int index)
         {
-            float stride = 1f / _pulls.Length;
-            var slot = Slot(parent, $"Card_{index}", index * stride + .006f, 0f, (index + 1) * stride - .006f, 1f);
+            int rows = (_pulls.Length + CardsPerRow - 1) / CardsPerRow;
+            int column = index % CardsPerRow;
+            int row = index / CardsPerRow;
+            float top = 1f - row / (float)rows;
+            float bottom = 1f - (row + 1) / (float)rows;
+            var slot = Slot(parent, $"Card_{index}", column / (float)CardsPerRow + .01f, bottom + .008f,
+                (column + 1) / (float)CardsPerRow - .01f, top - .008f);
             var group = slot.gameObject.AddComponent<CanvasGroup>();
-            var buttonBounds = Slot(slot, "Select", 0f, .015f, 1f, .94f);
+            var buttonBounds = Slot(slot, "Select", 0f, .143f, 1f, .95f);
             var clickArea = LotdUiKit.AddImage(buttonBounds.gameObject, LotdUiKit.WhiteSprite, Color.clear);
             var button = buttonBounds.gameObject.AddComponent<Button>();
             button.targetGraphic = clickArea;
@@ -217,10 +223,22 @@ namespace YGOPortable.UI
             shineRect.anchorMax = new Vector2(.97f, .982f);
             var shine = LotdUiKit.AddImage(shineRect.gameObject, LotdUiKit.WhiteSprite, Color.clear, false, false);
             var card = CompositeCardView.Create(face, "View", detailedOverlay: true);
-            var mirror = Slot(card.transform.Find("AspectBox"), "Reflection", 0f, -1f, 1f, 0f);
-            mirror.localScale = new Vector3(1f, -1f, 1f);
-            mirror.gameObject.AddComponent<CanvasGroup>().alpha = .35f;
-            var reflection = CompositeCardView.Create(mirror, "View");
+            var artwork = card.transform.Find("AspectBox");
+            CompositeCardView reflection = null;
+            if (row == rows - 1)
+            {
+                const float reflectionFraction = .3f;
+                var bounds = Slot(artwork, "ReflectionBounds", 0f, -reflectionFraction, 1f, 0f);
+                bounds.gameObject.AddComponent<RectMask2D>().softness = new Vector2Int(0, 18);
+                var mirror = Slot(bounds, "Reflection", 0f, 1f - 1f / reflectionFraction, 1f, 1f);
+                mirror.localScale = new Vector3(1f, -1f, 1f);
+                mirror.gameObject.AddComponent<CanvasGroup>().alpha = .26f;
+                reflection = CompositeCardView.Create(mirror, "View");
+            }
+            var rarity = ShopRarityBadge.Create(artwork, Vector2.one, Vector2.one, 15);
+            var rarityBounds = (RectTransform)rarity.transform.parent;
+            rarityBounds.offsetMin = new Vector2(-24f, -13f);
+            rarityBounds.offsetMax = new Vector2(11f, 7f);
             // The tint overlays the card front briefly at the midpoint of the flip.
             shineRect.SetAsLastSibling();
 
@@ -232,8 +250,8 @@ namespace YGOPortable.UI
                 Card = card,
                 Reflection = reflection,
                 Button = button,
-                Name = Label(slot, "Name", "", 0f, -.23f, 1f, -.105f, 15, PackShopStyle.TextPrimary),
-                RarityLabel = ShopRarityBadge.Create(slot, new Vector2(.74f, .927f), new Vector2(.987f, 1.013f), 15),
+                Name = Label(slot, "Name", "", 0f, 0f, 1f, .13f, 15, PackShopStyle.TextPrimary),
+                RarityLabel = rarity,
                 Shine = shine,
             };
             var focus = button.gameObject.AddComponent<StarterRowFocus>();
@@ -392,7 +410,7 @@ namespace YGOPortable.UI
         private static void SetFace(Pull pull, uint code, bool faceDown)
         {
             pull.Card.SetCard(code, faceDown);
-            pull.Reflection.SetCard(code, faceDown);
+            pull.Reflection?.SetCard(code, faceDown);
         }
 
         private void RefreshStatus()

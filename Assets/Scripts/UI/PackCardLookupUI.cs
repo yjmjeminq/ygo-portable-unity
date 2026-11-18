@@ -98,13 +98,13 @@ namespace YGOPortable.UI
             var heading = Slot("Heading", detail, .073f, .853f, .927f, .929f);
             _cardHeading = LotdUiKit.AddFittedText(heading, "Title", "", 27, 16,
                 TextAnchor.MiddleCenter, PackShopStyle.TextPrimary, FontStyle.Bold);
-            var art = Slot("Art", detail, .073f, .339f, .385f, .822f);
+            var art = Slot("Art", detail, .06f, .25f, .45f, .834f);
             _preview = CompositeCardView.Create(art, "SelectedCard", true);
-            _cardRarity = ShopRarityBadge.Create(detail, new Vector2(.172f, .271f), new Vector2(.286f, .324f), 17);
-            _cardInfo = Label(detail, "CardInfo", .081f, .146f, .378f, .257f, 17,
+            _cardRarity = ShopRarityBadge.Create(detail, new Vector2(.198f, .188f), new Vector2(.312f, .24f), 17);
+            _cardInfo = Label(detail, "CardInfo", .067f, .075f, .443f, .176f, 17,
                 TextAnchor.UpperCenter, PackShopStyle.TextPrimary);
 
-            _packPane = Slot("Packs", detail, .408f, .091f, .927f, .827f);
+            _packPane = Slot("Packs", detail, .475f, .091f, .927f, .827f);
             _packHeading = Label(_packPane, "Count", 0f, .906f, 1f, .997f, 20,
                 TextAnchor.MiddleLeft, PackShopStyle.TextPrimary);
             for (int i = 0; i < PacksPerPage; i++)

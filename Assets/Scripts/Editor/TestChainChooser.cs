@@ -651,10 +651,12 @@ namespace YGOPortable.Editor
 
                 var panel = (RectTransform)modals.ModalRoot.transform.Find("Win");
                 var scroll = panel.Find("Body/Cards")?.GetComponent<ScrollRect>();
-                Require(panel.rect.height < 450f && panel.anchorMax.y < .5f && scroll != null && scroll.horizontal &&
+                Require(panel.rect.height < 450f && panel.anchorMax.y < .65f && scroll != null && scroll.horizontal &&
                         scroll.content.rect.width > scroll.viewport.rect.width, "Material choices did not fit a compact, scrollable panel.");
                 var confirm = panel.Find("Footer/Btn_선택 완료/B").GetComponent<Button>();
                 var first = scroll.content.Find("Tile_0").GetComponent<Button>();
+                Require(((RectTransform)first.transform.Find("Card/V/AspectBox")).rect.height >= 170f,
+                    "The material choice artwork became too small.");
                 first.onClick.Invoke();
                 Require(!confirm.interactable, "A material that failed the required sum enabled confirmation.");
                 confirm.onClick.Invoke();
@@ -720,8 +722,8 @@ namespace YGOPortable.Editor
                             panel.rect.width > 0 && panel.rect.width < size.x * (single ? .5f : .8f),
                         $"Chain chooser is not compact at {size.x}×{size.y}.");
                     var artwork = (RectTransform)Choice(0).Find("Card/V/AspectBox");
-                    Require(artwork.rect.height >= (size.y >= 900f ? 130f : 105f),
-                        $"Chain card artwork became too small at {size.x}×{size.y}.");
+                    Require(artwork.rect.height >= (size.y >= 900f ? 160f : 136f),
+                        $"Chain card artwork was only {artwork.rect.height:F1} high at {size.x}×{size.y}.");
                 }
             }
 

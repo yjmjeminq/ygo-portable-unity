@@ -100,6 +100,11 @@ namespace YGOPortable.Editor
             Require((int)Field(viewer, "_inspected") == 0, "A card already under the pointer did not become inspected on arrival.");
             Call(viewer, "AdvanceResults", 2f);
             Require((int)Field(viewer, "_revealed") == CollectionProgress.CardsPerPack, "The staggered reveal did not finish.");
+            Canvas.ForceUpdateCanvases();
+            var nextRow = ButtonAt(results, "Cards/Card_4/Select");
+            Require(((RectTransform)card.transform.Find("Face/View/AspectBox")).rect.height >= 205f &&
+                card.FindSelectableOnDown() == nextRow && nextRow.FindSelectableOnUp() == card,
+                "Pack cards did not render at the larger size or the second row was unreachable.");
             Call(shop, "HandleShopBack");
             Require(Scope(shop) == shop.Root && buy.IsInteractable(), "Leaving the results did not restore shop controls.");
         }

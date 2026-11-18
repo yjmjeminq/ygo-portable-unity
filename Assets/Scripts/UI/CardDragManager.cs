@@ -73,7 +73,8 @@ namespace YGOPortable.UI
             var ghostGo = new GameObject("GhostCard", typeof(RectTransform));
             ghostGo.transform.SetParent(root, false);
             _ghostRoot = (RectTransform)ghostGo.transform;
-            _ghostRoot.sizeDelta = new Vector2(112f, 162f);
+            const float cardWidth = 126f;
+            _ghostRoot.sizeDelta = new Vector2(cardWidth, cardWidth / LotdUiKit.CardAspectRatio);
             _ghostRoot.pivot = new Vector2(0.5f, 0.5f);
 
             _ghostCanvasGroup = ghostGo.AddComponent<CanvasGroup>();

@@ -424,7 +424,7 @@ namespace YGOPortable.UI
             LotdUiKit.AddImage(heading.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelHeader, false, false);
             catalog.Heading = LotdUiKit.AddFittedText(heading, "Title", "", 28, 17, TextAnchor.MiddleCenter,
                 LotdUiKit.GoldAccent, FontStyle.Bold);
-            catalog.Cover = CompositeCardView.Create(Slot("Cover", details, .08f, .194f, .42f, .835f), "FeaturedCard", true);
+            catalog.Cover = CompositeCardView.Create(Slot("Cover", details, .062f, .10f, .45f, .838f), "FeaturedCard", true);
             catalog.Details = Label(details, "Info", "", .48f, .563f, .914f, .817f, 22, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary);
             catalog.Action = AddButton(details, "Choose", "이 카드군으로 시작", .48f, .466f, .923f, .547f, ChooseSelectedStarter, true);
             catalog.Status = Label(details, "Status", "", .48f, .395f, .923f, .454f, 17, TextAnchor.MiddleLeft, LotdUiKit.TextMuted);

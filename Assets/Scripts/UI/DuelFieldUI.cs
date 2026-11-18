@@ -318,9 +318,9 @@ namespace YGOPortable.UI
             YgoConstants.RaceNamesKR.TryGetValue(info.race, out string race);
             YgoConstants.AttributeNamesKR.TryGetValue(info.attr, out string attribute);
             string rating = info.IsLink ? info.DefString : $"{(info.IsXyz ? "랭크" : "레벨")} {info.level}";
-            string scale = info.IsPendulum ? $"\n스케일 {info.lscale} / {info.rscale}" : "";
-            string defense = info.IsLink ? "" : $"\n수비력 {info.DefString}";
-            return $"{race}\n{attribute} · {rating}\n{type}{scale}\n공격력 {info.AtkString}{defense}";
+            string scale = info.IsPendulum ? $" · 스케일 {info.lscale}/{info.rscale}" : "";
+            string defense = info.IsLink ? "" : $" · 수비력 {info.DefString}";
+            return $"{race} · {attribute} · {rating}\n{type}{scale}\n공격력 {info.AtkString}{defense}";
         }
 
         private void ShowZoomRelatedCards()
@@ -369,7 +369,7 @@ namespace YGOPortable.UI
             var left = DuelStyle.Panel(root, "LeftInspector", new Vector2(0.015f, 0.195f),
                 new Vector2(0.186f, 0.922f));
             var card = LotdUiKit.CreateRect("CardPreview", left,
-                new Vector2(.045f, .529f), new Vector2(.552f, .904f), Vector2.zero, Vector2.zero);
+                new Vector2(.07f, .425f), new Vector2(.93f, .9f), Vector2.zero, Vector2.zero);
             _inspCard = CompositeCardView.Create(card, "Card", duelArtwork: true);
             var zoomHit = LotdUiKit.FillRect("ZoomHit", card);
             var zoom = zoomHit.gameObject.AddComponent<Button>();
@@ -378,12 +378,12 @@ namespace YGOPortable.UI
             _duelPadInspectButton = zoom;
 
             var inside = LotdUiKit.FillRect("CardDetails", left, 7f);
-            var stats = LotdUiKit.CreateRect("Stats", inside, new Vector2(0.56f, 0.575f), new Vector2(0.98f, 0.874f),
+            var stats = LotdUiKit.CreateRect("Stats", inside, new Vector2(.018f, .325f), new Vector2(.825f, .42f),
                 Vector2.zero, Vector2.zero);
             _inspStats = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Info", stats,
                 Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero),
                 "Text", "", 13, 9, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
-            var race = LotdUiKit.CreateRect("Race", inside, new Vector2(.565f, .537f), new Vector2(.72f, .60f),
+            var race = LotdUiKit.CreateRect("Race", inside, new Vector2(.842f, .341f), new Vector2(.987f, .404f),
                 Vector2.zero, Vector2.zero);
             _inspRaceIcon = LotdUiKit.AddImage(race.gameObject, null, Color.white, true, false);
 
@@ -393,7 +393,7 @@ namespace YGOPortable.UI
                 TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
 
             var desc = LotdUiKit.CreateRect("Description", inside,
-                new Vector2(.018f, .103f), new Vector2(.989f, .517f), Vector2.zero, Vector2.zero);
+                new Vector2(.018f, .103f), new Vector2(.989f, .318f), Vector2.zero, Vector2.zero);
             LotdUiKit.AddImage(desc.gameObject, LotdUiKit.WhiteSprite, Color.clear);
             var viewport = LotdUiKit.CreateRect("Viewport", desc, Vector2.zero, Vector2.one,
                 Vector2.zero, new Vector2(-16f, 0f));
@@ -428,8 +428,8 @@ namespace YGOPortable.UI
 
         private void BuildTopHud(Transform root)
         {
-            _oppHandBar = LotdUiKit.CreateRect("OpponentHand", root, new Vector2(0.33f, 0.895f),
-                new Vector2(0.70f, 1.005f), Vector2.zero, Vector2.zero);
+            _oppHandBar = LotdUiKit.CreateRect("OpponentHand", root, new Vector2(.29f, .873f),
+                new Vector2(.735f, .994f), Vector2.zero, Vector2.zero);
             var opponent = LotdUiKit.CreateRect("OpponentHUD", root,
                 new Vector2(0.762f, 0.894f), new Vector2(0.985f, 0.982f), Vector2.zero, Vector2.zero);
             (_oppNameText, _oppLpText, _oppLpFill, _oppBustImg) = BuildPlayerHud(opponent, true);
@@ -494,7 +494,7 @@ namespace YGOPortable.UI
         private void BuildCenterBoard(Transform root)
         {
             var board = LotdUiKit.CreateRect("DuelBoard", root,
-                new Vector2(0.145f, 0.215f), new Vector2(0.894f, 0.897f), Vector2.zero, Vector2.zero);
+                new Vector2(.145f, .221f), new Vector2(.894f, .88f), Vector2.zero, Vector2.zero);
             _boardRect = board;
             _mat = LotdUiKit.FillRect("StoneMat", board).gameObject.AddComponent<DuelMat>();
             _mat.texture = DuelVisualAssets.Field ?? DuelStyle.Stone;
@@ -534,8 +534,8 @@ namespace YGOPortable.UI
         }
 
         private static readonly Color ZoneTint = new Color(0.28f, 0.31f, 0.24f, 0.33f);
-        private static readonly Vector2 SlotCardMin = new Vector2(0.10f, 0.07f);
-        private static readonly Vector2 SlotCardMax = new Vector2(0.90f, 0.98f);
+        private static readonly Vector2 SlotCardMin = new Vector2(.045f, .012f);
+        private static readonly Vector2 SlotCardMax = new Vector2(.955f, .988f);
 
         private FieldSlotView CreateZoneSlot(RectTransform cell)
         {
@@ -653,7 +653,7 @@ namespace YGOPortable.UI
 
         private void BuildBottomHudAndHands(Transform root)
         {
-            _myHandBar = LotdUiKit.CreateRect("PlayerHand", root, new Vector2(0.245f, 0.018f), new Vector2(0.760f, 0.199f),
+            _myHandBar = LotdUiKit.CreateRect("PlayerHand", root, new Vector2(.228f, .012f), new Vector2(.784f, .215f),
                 Vector2.zero, Vector2.zero);
             var player = LotdUiKit.CreateRect("PlayerHUD", root, new Vector2(0.016f, 0.035f), new Vector2(0.221f, 0.132f),
                 Vector2.zero, Vector2.zero);
@@ -1097,7 +1097,7 @@ namespace YGOPortable.UI
             {
                 slot.cardView.SetCard(live.IsFaceUp ? live.code : 0u, !live.IsFaceUp, live);
                 slot.cardView.transform.localRotation = Quaternion.Euler(0f, 0f, CardAngle(loc, live.position, opponent));
-                slot.cardView.transform.localScale = Vector3.one * CardScale(loc, live.position);
+                slot.cardView.transform.localScale = Vector3.one * CardScale(slot.root, loc, live.position);
             }
             if (showStats)
             {
@@ -1181,9 +1181,13 @@ namespace YGOPortable.UI
             return opponent && location != YgoConstants.LOCATION_HAND ? 180f : 0f;
         }
 
-        private static float CardScale(uint location, uint position)
+        private static float CardScale(RectTransform cell, uint location, uint position)
         {
-            return location == YgoConstants.LOCATION_MZONE && (position & YgoConstants.POS_DEFENSE) != 0 ? 0.87f : 1f;
+            if (location != YgoConstants.LOCATION_MZONE || (position & YgoConstants.POS_DEFENSE) == 0)
+                return 1f;
+            var size = Vector2.Scale(cell.rect.size, SlotCardMax - SlotCardMin);
+            float uprightHeight = Mathf.Min(size.y, size.x / LotdUiKit.CardAspectRatio);
+            return Mathf.Clamp01(cell.rect.width * .94f / Mathf.Max(1f, uprightHeight));
         }
 
         private void RefreshHand(IReadOnlyList<LiveCardState> cards, byte controller, bool opponent)
@@ -1793,7 +1797,7 @@ namespace YGOPortable.UI
             var rect = GetSlot(controller, location, sequence)?.root ?? GetStack(controller, location)?.root;
             if (rect == null) return default;
             var center = (SlotCardMin + SlotCardMax) * 0.5f;
-            float scale = CardScale(location, cardPosition);
+            float scale = CardScale(rect, location, cardPosition);
             if (material)
             {
                 // The engine stores the material index in the position field for overlay locations.
@@ -2947,8 +2951,8 @@ namespace YGOPortable.UI
             dim.gameObject.AddComponent<Button>().onClick.AddListener(() => _cardZoomModal.SetActive(false));
 
             var content = onIPhone ? MobileSafeArea.Create(dim) : dim;
-            var win = DuelStyle.Panel(content, "ZoomWin", onIPhone ? new Vector2(.045f, .035f) : new Vector2(.18f, .08f),
-                onIPhone ? new Vector2(.955f, .965f) : new Vector2(.82f, .92f));
+            var win = DuelStyle.Panel(content, "ZoomWin", onIPhone ? new Vector2(.03f, .027f) : new Vector2(.11f, .045f),
+                onIPhone ? new Vector2(.97f, .973f) : new Vector2(.89f, .955f));
 
             // Header bar
             var hdr = LotdUiKit.CreateRect("Hdr", win, new Vector2(0f, 0.90f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
@@ -2966,8 +2970,8 @@ namespace YGOPortable.UI
             DuelStyle.Button(closeRt, "B", onIPhone ? "닫기" : "닫기 (ESC)", () => _cardZoomModal.SetActive(false), 15);
 
             // Left Side: Large Card View
-            float cardRight = onIPhone ? .33f : .42f;
-            var cardHolder = LotdUiKit.CreateRect("CardHolder", win, new Vector2(0.04f, 0.12f), new Vector2(cardRight, 0.88f), Vector2.zero, Vector2.zero);
+            float cardRight = onIPhone ? .375f : .448f;
+            var cardHolder = LotdUiKit.CreateRect("CardHolder", win, new Vector2(.033f, .111f), new Vector2(cardRight, .891f), Vector2.zero, Vector2.zero);
             _zoomCardView = CompositeCardView.Create(cardHolder, "ZoomCard", true, duelArtwork: true);
             var artwork = LotdUiKit.CreateRect("ArtworkOptions", win, new Vector2(.04f, .035f), new Vector2(cardRight, .098f),
                 Vector2.zero, Vector2.zero);

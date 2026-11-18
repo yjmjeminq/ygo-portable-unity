@@ -32,11 +32,13 @@ namespace YGOPortable.UI
         private Image _fieldViewIcon;
         private Text _fieldViewLabel;
         private bool _chainPrompt;
-        private const float ChainCardWidth = 126f;
+        private const float ChainCardWidth = 140f;
         private const float ChainCardGap = 10f;
         private const float ChainLocationTabHeight = 30f;
         private const float ChainGroupPadding = 6f;
-        private const float ChoiceCardWidth = 113f;
+        private const float ChoiceCardWidth = 142f;
+        private const int ZoneCardWidth = 147;
+        private const int ZoneCardHeight = 218;
         private const float ChoiceCardGap = 8f;
         private RectTransform _chainBox;
         private RectTransform _chainCards;
@@ -235,35 +237,13 @@ namespace YGOPortable.UI
             }
             if (frame.Direction != Vector2Int.zero)
             {
-                var next = PadNeighbor(scope, control, frame.Direction);
-                SetFocus(next.gameObject);
-                if (IsZoneViewerOpen && next.transform.IsChildOf(_zoneGrid))
-                {
-                    var tile = next.transform;
-                    while (tile.parent != _zoneGrid) tile = tile.parent;
-                    KeepZoneCardVisible((RectTransform)tile);
-                }
+                SetFocus(PadNeighbor(scope, control, frame.Direction).gameObject);
                 return;
             }
             if (!frame.Submit) return;
             if (control is Button button) button.onClick.Invoke();
             else if (control is InputField field) OpenPadKeyboard(field);
         }
-
-        private void KeepZoneCardVisible(RectTransform tile)
-        {
-            var viewport = _zoneScroll.viewport;
-            float overflow = _zoneGrid.rect.height - viewport.rect.height;
-            if (overflow <= 0f) return;
-
-            var upper = viewport.InverseTransformPoint(tile.TransformPoint(new Vector2(0f, tile.rect.yMax))).y;
-            var lower = viewport.InverseTransformPoint(tile.TransformPoint(new Vector2(0f, tile.rect.yMin))).y;
-            float offset = upper > viewport.rect.yMax ? upper - viewport.rect.yMax :
-                Mathf.Min(0f, lower - viewport.rect.yMin);
-            _zoneScroll.StopMovement();
-            _zoneScroll.verticalNormalizedPosition = Mathf.Clamp01(_zoneScroll.verticalNormalizedPosition + offset / overflow);
-        }
-
 
         private static void ScrollFromPad(ScrollRect scroll, float amount)
         {
@@ -458,11 +438,11 @@ namespace YGOPortable.UI
                 Vector2.zero, Vector2.zero);
             _chainSummary = LotdUiKit.AddFittedText(summary, "Text", "", 18, 11, TextAnchor.MiddleRight, DuelStyle.Gold, FontStyle.Bold);
 
-            var cards = LotdUiKit.CreateRect("Cards", _chainBox, new Vector2(.019f, .162f), new Vector2(.637f, .84f),
+            var cards = LotdUiKit.CreateRect("Cards", _chainBox, new Vector2(.019f, .149f), new Vector2(.695f, .852f),
                 Vector2.zero, Vector2.zero);
             _chainCardScroll = CreateCardStrip(cards, out _chainCards, ChainCardGap);
 
-            var details = _chainDetails = DuelStyle.Panel(_chainBox, "Details", new Vector2(.655f, .176f), new Vector2(.977f, .84f));
+            var details = _chainDetails = DuelStyle.Panel(_chainBox, "Details", new Vector2(.711f, .176f), new Vector2(.977f, .852f));
             var name = LotdUiKit.CreateRect("Name", details, new Vector2(.04f, .77f), new Vector2(.96f, .98f),
                 Vector2.zero, Vector2.zero);
             _chainName = LotdUiKit.AddFittedText(name, "Text", "", 20, 12, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
@@ -590,14 +570,18 @@ namespace YGOPortable.UI
             bool directAttackDecision = prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && prompt.promptDesc == 31;
             _chainPrompt = prompt.messageType == YgoConstants.MSG_SELECT_CHAIN ||
                 (prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && !directAttackDecision);
-            bool tall = prompt.messageType == YgoConstants.MSG_ANNOUNCE_CARD || prompt.messageType == YgoConstants.MSG_ANNOUNCE_RACE;
-            _modalBox.anchorMax = new Vector2(.845f, tall ? .626f : .474f);
+            bool cardChoices = prompt.messageType is YgoConstants.MSG_SELECT_POSITION or YgoConstants.MSG_SELECT_CARD
+                or YgoConstants.MSG_SELECT_TRIBUTE or YgoConstants.MSG_SELECT_SUM or YgoConstants.MSG_SELECT_UNSELECT_CARD
+                or YgoConstants.MSG_SELECT_COUNTER or YgoConstants.MSG_SORT_CARD or YgoConstants.MSG_SORT_CHAIN
+                or YgoConstants.MSG_ANNOUNCE_CARD;
+            bool tall = cardChoices || prompt.messageType == YgoConstants.MSG_ANNOUNCE_RACE;
+            _modalBox.anchorMax = new Vector2(cardChoices ? .923f : .845f, tall ? .626f : .474f);
             _modalHeader.anchorMin = new Vector2(0f, tall ? .873f : .81f);
             _modalBody.anchorMin = new Vector2(.02f, tall ? .135f : .202f);
             _modalBody.anchorMax = new Vector2(.98f, tall ? .855f : .785f);
             _modalFooter.anchorMin = new Vector2(.62f, tall ? .019f : .028f);
             _modalFooter.anchorMax = new Vector2(.98f, tall ? .122f : .183f);
-            _modalBox.anchorMin = new Vector2(.235f, .17f);
+            _modalBox.anchorMin = new Vector2(cardChoices ? .211f : .235f, .17f);
             _modalHeader.anchorMax = Vector2.one;
             BindFieldCardChoices(session, prompt);
             if (_fieldCardIndices.Count > 0)
@@ -705,13 +689,6 @@ namespace YGOPortable.UI
             _modalSubtitle.text = CardDatabase.GetName(p.promptCardCode);
             _onInspectCard?.Invoke(p.promptCardCode);
 
-            var row = LotdUiKit.FillRect("Positions", _modalBody);
-            var layout = row.gameObject.AddComponent<HorizontalLayoutGroup>();
-            layout.childAlignment = TextAnchor.MiddleCenter;
-            layout.childControlWidth = layout.childControlHeight = layout.childForceExpandHeight = true;
-            layout.childForceExpandWidth = false;
-            layout.spacing = 12f;
-
             var choices = new (uint position, string label, bool rotate, bool faceDown)[]
             {
                 (YgoConstants.POS_FACEUP_ATTACK, "앞면 공격 표시", false, false),
@@ -719,11 +696,14 @@ namespace YGOPortable.UI
                 (YgoConstants.POS_FACEDOWN_DEFENSE, "뒷면 수비 표시", true, true),
                 (YgoConstants.POS_FACEDOWN_ATTACK, "뒷면 공격 표시", false, true),
             };
+            const float tileWidth = 178f;
+            var row = BuildChoiceCardStrip(choices.Count(choice => (p.allowedPositions & choice.position) != 0), tileWidth);
             foreach (var choice in choices)
             {
                 if ((p.allowedPositions & choice.position) == 0) continue;
-                var slot = CreateCardStripTile(row, $"Pos_{choice.position}", 153f);
-                var art = LotdUiKit.CreateRect("Card", slot, new Vector2(.14f, .233f), new Vector2(.86f, .967f),
+                var slot = CreateCardStripTile(row, $"Pos_{choice.position}", tileWidth);
+                float inset = choice.rotate ? .18f : .095f;
+                var art = LotdUiKit.CreateRect("Card", slot, new Vector2(inset, .233f), new Vector2(1f - inset, .967f),
                     Vector2.zero, Vector2.zero);
                 if (choice.rotate) art.localRotation = Quaternion.Euler(0f, 0f, -90f);
                 CompositeCardView.Create(art, "V", duelArtwork: true).SetCard(p.promptCardCode, faceDown: choice.faceDown);
@@ -793,10 +773,10 @@ namespace YGOPortable.UI
             }
             bool compact = choices.Count == 1;
             _chainBox.anchorMin = compact ? new Vector2(.30f, .202f) : new Vector2(.222f, .185f);
-            _chainBox.anchorMax = compact ? new Vector2(.795f, .574f) : new Vector2(.922f, .585f);
+            _chainBox.anchorMax = compact ? new Vector2(.795f, .628f) : new Vector2(.922f, .628f);
             var cardStrip = (RectTransform)_chainCardScroll.transform;
-            cardStrip.anchorMax = new Vector2(compact ? .327f : .637f, .84f);
-            _chainDetails.anchorMin = new Vector2(compact ? .347f : .655f, .176f);
+            cardStrip.anchorMax = new Vector2(compact ? .35f : .695f, .852f);
+            _chainDetails.anchorMin = new Vector2(compact ? .37f : .711f, .176f);
             SetFieldView(false);
             bool respondingToAttack = session.HasActiveAttack && session.AttackerCon != session.HumanPlayerIndex;
             _chainTitle.text = prompt.forced ? "필수 효과 순서 선택" :
@@ -1250,7 +1230,6 @@ namespace YGOPortable.UI
             _sortOrder = Enumerable.Range(0, p.candidates.Count).ToArray();
 
             RectTransform grid = BuildChoiceCardStrip(p.candidates.Count);
-            var scroll = grid.GetComponentInParent<ScrollRect>();
             void RebuildTiles(int focusPosition = -1, int focusDirection = 0)
             {
                 ClearChildren(grid);
@@ -1296,11 +1275,7 @@ namespace YGOPortable.UI
                             LotdUiKit.AddImage(icon.gameObject, sprite,
                                 button.interactable ? Color.white : new Color(1f, 1f, 1f, .26f), true, false);
                         }
-                        SelectionHandler(button).OnSelected = () =>
-                        {
-                            RevealSortCard(scroll, tile);
-                            if (code != 0) _onInspectCard?.Invoke(code);
-                        };
+                        PreviewOnFocus(button, code);
                         return button;
                     }
 
@@ -1328,21 +1303,6 @@ namespace YGOPortable.UI
                 Submit(res);
             }, true);
             AddFooterButton("원래 순서로 확정", () => Submit(new byte[] { unchecked((byte)-1) }), false);
-        }
-
-        private static void RevealSortCard(ScrollRect scroll, RectTransform tile)
-        {
-            var viewport = scroll.viewport;
-            float width = viewport.rect.width;
-            if (width <= 0f || scroll.content.rect.width <= width) return;
-
-            float left = viewport.InverseTransformPoint(tile.TransformPoint(tile.rect.min)).x;
-            float right = viewport.InverseTransformPoint(tile.TransformPoint(tile.rect.max)).x;
-            float shift = left < viewport.rect.xMin ? viewport.rect.xMin - left :
-                right > viewport.rect.xMax ? viewport.rect.xMax - right : 0f;
-            if (Mathf.Abs(shift) < .1f) return;
-            scroll.StopMovement();
-            scroll.horizontalNormalizedPosition -= shift / (scroll.content.rect.width - width);
         }
 
         private void RenderAnnounceRace(DuelPrompt p)
@@ -1475,7 +1435,8 @@ namespace YGOPortable.UI
             DuelStyle.Button(keyboardSlot, "B", "화상 입력", () => OpenPadKeyboard(inp), 14);
 
             var gridHolder = LotdUiKit.CreateRect("List", _modalBody, new Vector2(0.0f, 0.0f), new Vector2(1f, 0.84f), Vector2.zero, Vector2.zero);
-            var scroll = CreateHorizontalCardGrid(gridHolder, out Transform grid, 128, 178).GetComponent<ScrollRect>();
+            var scroll = CreateHorizontalCardGrid(gridHolder, out Transform grid, ZoneCardWidth, ZoneCardHeight)
+                .GetComponent<ScrollRect>();
             var empty = LotdUiKit.AddFittedText(gridHolder, "Empty", "조건에 맞는 카드가 없습니다.", 18, 12,
                 TextAnchor.MiddleCenter, DuelStyle.Muted);
 
@@ -1546,7 +1507,7 @@ namespace YGOPortable.UI
             dismiss.onClick.AddListener(CloseZoneViewer);
 
             var win = _zoneWindow = DuelStyle.Panel(dim, "Win",
-                new Vector2(0.226f, 0.205f), new Vector2(0.972f, 0.615f),
+                new Vector2(.208f, .198f), new Vector2(.976f, .646f),
                 fill: new Color(.039f, .071f, .093f, .97f));
             win.gameObject.AddComponent<Button>().navigation = new Navigation { mode = Navigation.Mode.None };
 
@@ -1568,7 +1529,7 @@ namespace YGOPortable.UI
 
             var body = LotdUiKit.CreateRect("Body", win, Vector2.zero, Vector2.one,
                 new Vector2(10f, 8f), new Vector2(-10f, -62f));
-            _zoneScroll = CreateHorizontalCardGrid(body, out Transform g, cellW: 118, cellH: 174).GetComponent<ScrollRect>();
+            _zoneScroll = CreateHorizontalCardGrid(body, out Transform g, ZoneCardWidth, ZoneCardHeight).GetComponent<ScrollRect>();
             _zoneScroll.movementType = ScrollRect.MovementType.Clamped;
             _zoneScroll.viewport.offsetMax = new Vector2(-14f, 0f);
             _zoneScroll.verticalScrollbar = LotdUiKit.AddVerticalScrollbar(body);
@@ -1641,8 +1602,8 @@ namespace YGOPortable.UI
             _focusBeforeZone = EventSystem.current?.currentSelectedGameObject;
             _promptInput.interactable = false;
             ZoneViewRoot.SetActive(true);
-            _zoneWindow.anchorMin = sidePanel ? new Vector2(.865f, .171f) : new Vector2(.226f, .205f);
-            _zoneWindow.anchorMax = sidePanel ? new Vector2(.986f, .871f) : new Vector2(.972f, .615f);
+            _zoneWindow.anchorMin = sidePanel ? new Vector2(.817f, .163f) : new Vector2(.208f, .198f);
+            _zoneWindow.anchorMax = sidePanel ? new Vector2(.988f, .871f) : new Vector2(.976f, .646f);
             ZoneViewRoot.GetComponent<Image>().color = new Color(.015f, .022f, .038f, sidePanel ? .14f : .40f);
 
             var close = (RectTransform)_zoneClose.transform.parent;
@@ -1654,8 +1615,8 @@ namespace YGOPortable.UI
             grid.childAlignment = sidePanel ? TextAnchor.UpperCenter : TextAnchor.UpperLeft;
             grid.padding = sidePanel ? new RectOffset(4, 4, 6, 6) : new RectOffset(10, 10, 10, 10);
             grid.cellSize = sidePanel
-                ? new Vector2(Mathf.Clamp(_zoneScroll.viewport.rect.width - 10f, 52f, 116f), 160f)
-                : new Vector2(118f, 174f);
+                ? new Vector2(Mathf.Clamp(_zoneScroll.viewport.rect.width - 10f, 52f, ZoneCardWidth), ZoneCardHeight)
+                : new Vector2(ZoneCardWidth, ZoneCardHeight);
         }
 
         private void FinishZoneViewer(string title, Sprite icon = null)
@@ -1889,11 +1850,11 @@ namespace YGOPortable.UI
             image.pixelsPerUnitMultiplier = 2.4f;
         }
 
-        private RectTransform BuildChoiceCardStrip(int count)
+        private RectTransform BuildChoiceCardStrip(int count, float cardWidth = ChoiceCardWidth)
         {
             var strip = LotdUiKit.FillRect("Cards", _modalBody);
             ScrollRect scroll = CreateCardStrip(strip, out RectTransform cards, ChoiceCardGap);
-            ResetCardStrip(scroll, count, ChoiceCardWidth, ChoiceCardGap);
+            ResetCardStrip(scroll, count, cardWidth, ChoiceCardGap);
             return cards;
         }
 
@@ -1901,11 +1862,11 @@ namespace YGOPortable.UI
             bool opponent, string detail = null)
         {
             var tile = CreateCardStripTile(parent, name, ChoiceCardWidth);
-            var art = LotdUiKit.CreateRect("Card", tile, new Vector2(.05f, .292f), new Vector2(.95f, .975f),
+            var art = LotdUiKit.CreateRect("Card", tile, new Vector2(.045f, .246f), new Vector2(.955f, .976f),
                 Vector2.zero, Vector2.zero);
             CompositeCardView.Create(art, "V", duelArtwork: true).SetCard(code, faceDown: code == 0);
 
-            var title = LotdUiKit.CreateRect("Name", tile, new Vector2(.04f, .174f), new Vector2(.96f, .29f),
+            var title = LotdUiKit.CreateRect("Name", tile, new Vector2(.04f, .137f), new Vector2(.96f, .244f),
                 Vector2.zero, Vector2.zero);
             LotdUiKit.AddFittedText(title, "Text", code != 0 ? CardDatabase.GetName(code) : "뒷면 카드", 12, 8,
                 TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
@@ -1921,8 +1882,9 @@ namespace YGOPortable.UI
             bool hasDetail = !string.IsNullOrEmpty(detail);
             if (!hasIcon && !hasDetail) return;
 
-            var badge = LotdUiKit.CreateRect("Source", tile, new Vector2(hasDetail ? .065f : .32f, .02f),
-                new Vector2(hasDetail ? .935f : .68f, .166f), Vector2.zero, Vector2.zero);
+            var badge = LotdUiKit.CreateRect("Source", tile, new Vector2(hasDetail ? .065f : .5f, .016f),
+                new Vector2(hasDetail ? .935f : .5f, .016f), new Vector2(hasDetail ? 0f : -17f, 0f),
+                new Vector2(hasDetail ? 0f : 17f, 22f));
             var tone = DuelStyle.Side(opponent);
             LotdUiKit.AddImage(badge.gameObject, LotdUiKit.WhiteSprite,
                 new Color(tone.r * .22f, tone.g * .22f, tone.b * .22f, .95f), false, false);
@@ -1930,14 +1892,15 @@ namespace YGOPortable.UI
             LotdUiKit.AddImage(edge.gameObject, LotdUiKit.WhiteSprite, tone, false, false);
             if (hasIcon)
             {
-                var icon = LotdUiKit.CreateRect("LocationIcon", badge, Vector2.zero,
-                    hasDetail ? new Vector2(.32f, 1f) : Vector2.one, new Vector2(2f, 1f), new Vector2(-2f, -1f));
+                float iconLeft = hasDetail ? 5f : 8f;
+                var icon = LotdUiKit.CreateRect("LocationIcon", badge, Vector2.zero, Vector2.zero,
+                    new Vector2(iconLeft, 1.5f), new Vector2(iconLeft + 18f, 20.5f));
                 DuelPromptLocationIcon.Add(icon, location, opponent);
             }
             if (hasDetail)
             {
-                var caption = LotdUiKit.CreateRect("Detail", badge, new Vector2(hasIcon ? .32f : 0f, 0f), Vector2.one,
-                    Vector2.zero, new Vector2(-2f, 0f));
+                var caption = LotdUiKit.CreateRect("Detail", badge, Vector2.zero, Vector2.one,
+                    new Vector2(hasIcon ? 27f : 0f, 0f), new Vector2(-2f, 0f));
                 LotdUiKit.AddFittedText(caption, "Text", detail, 11, 8, TextAnchor.MiddleCenter, DuelStyle.Muted);
             }
         }
@@ -1951,8 +1914,8 @@ namespace YGOPortable.UI
 
         private static Transform AddSelectionMark(RectTransform tile, bool selected)
         {
-            var mark = LotdUiKit.CreateRect("Chk", tile, new Vector2(.68f, .76f), new Vector2(.94f, .96f),
-                Vector2.zero, Vector2.zero);
+            var mark = LotdUiKit.CreateRect("Chk", tile, Vector2.one, Vector2.one,
+                new Vector2(-30f, -30f), new Vector2(-6f, -6f));
             LotdUiKit.AddImage(mark.gameObject, DuelStyle.Disc, DuelStyle.Gold, true, false);
             var tick = LotdUiKit.CreateRect("Tick", mark, Vector2.one * .17f, Vector2.one * .83f,
                 Vector2.zero, Vector2.zero);
@@ -2231,7 +2194,17 @@ namespace YGOPortable.UI
             {
                 var view = scroll.viewport;
                 var visible = view.rect;
-                var choice = RectTransformUtility.CalculateRelativeRectTransformBounds(view, transform);
+                var item = transform;
+                if (scroll.content.GetComponent<GridLayoutGroup>() != null)
+                {
+                    while (item.parent != scroll.content) item = item.parent;
+                }
+                else if (scroll.horizontal && !scroll.vertical)
+                {
+                    var tile = GetComponentInParent<LayoutElement>();
+                    if (tile != null && tile.transform.IsChildOf(scroll.content)) item = tile.transform;
+                }
+                var choice = RectTransformUtility.CalculateRelativeRectTransformBounds(view, item);
                 var shift = Vector3.zero;
                 if (scroll.horizontal)
                     shift.x = choice.min.x < visible.xMin ? visible.xMin - choice.min.x :
