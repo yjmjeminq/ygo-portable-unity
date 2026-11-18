@@ -172,12 +172,12 @@ namespace YGOPortable.UI
 
     internal sealed class DuelLinkCompass
     {
-        private static readonly (uint mask, string name, Vector2 direction)[] Marks =
+        internal static readonly (uint mask, string name, Vector2Int direction)[] Marks =
         {
-            (0x040, "TopLeft", new Vector2(-1, 1)), (0x080, "Top", Vector2.up),
-            (0x100, "TopRight", new Vector2(1, 1)), (0x008, "Left", Vector2.left),
-            (0x020, "Right", Vector2.right), (0x001, "BottomLeft", new Vector2(-1, -1)),
-            (0x002, "Bottom", Vector2.down), (0x004, "BottomRight", new Vector2(1, -1)),
+            (0x040, "TopLeft", new Vector2Int(-1, 1)), (0x080, "Top", Vector2Int.up),
+            (0x100, "TopRight", new Vector2Int(1, 1)), (0x008, "Left", Vector2Int.left),
+            (0x020, "Right", Vector2Int.right), (0x001, "BottomLeft", new Vector2Int(-1, -1)),
+            (0x002, "Bottom", Vector2Int.down), (0x004, "BottomRight", new Vector2Int(1, -1)),
         };
         private static Sprite _arrow;
         private readonly RectTransform _root;
@@ -198,7 +198,7 @@ namespace YGOPortable.UI
             for (int i = 0; i < Marks.Length; i++)
             {
                 var item = Marks[i];
-                var at = Vector2.one * .5f + item.direction * .328f;
+                var at = Vector2.one * .5f + (Vector2)item.direction * .328f;
                 var marker = LotdUiKit.CreateRect(item.name, map, at - Vector2.one * .137f, at + Vector2.one * .137f,
                     Vector2.zero, Vector2.zero);
                 marker.localRotation = Quaternion.Euler(0f, 0f, Vector2.SignedAngle(Vector2.up, item.direction));

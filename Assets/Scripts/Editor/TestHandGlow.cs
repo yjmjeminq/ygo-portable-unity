@@ -29,6 +29,7 @@ namespace YGOPortable.Editor
             VerifyInspectedCardMoves(swapInPlace: false);
             VerifyNativeSummonReadout(turnFaceDown: false);
             VerifyNativeSummonReadout(turnFaceDown: true);
+            VerifyNativeLinkedZone();
             Debug.Log("[VERIFY HAND GLOW] Native summons and effects, distinct hand copies, blocked prompts, animation, off-turn activation and field-only monster ratings passed.");
         }
 
@@ -428,6 +429,48 @@ namespace YGOPortable.Editor
             Debug.Log("[VERIFY DUEL SUMMON STATS] Native Fusion Summon displayed 2400 ATK, 2000 DEF and Level 4 on the banner, card face and field.");
         }
 
+        private static void VerifyNativeLinkedZone()
+        {
+            const uint linkSpider = 98978921, mysticalElf = 15025844;
+            uint[] main = Enumerable.Repeat(mysticalElf, 40).ToArray();
+            uint[] opponent = Enumerable.Repeat(BlueEyes, 40).ToArray();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Linked zone readout", main, new[] { linkSpider },
+                opponent, Array.Empty<uint>(), true, session => session.ActivePrompt?.summonable.Count > 0);
+            var ai = new TacticalAI();
+
+            void ReachIdle()
+            {
+                YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt => prompt.messageType == YgoConstants.MSG_SELECT_CARD &&
+                    prompt.min == 1 && prompt.candidates.Count != 0 ? DuelSession.PackCardSelection(0) : null);
+                Require(duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD && duel.RetryCount == 0,
+                    $"The Link Spider fixture stopped at prompt {duel.ActivePrompt?.messageType}.");
+            }
+
+            duel.SubmitResponseInt(0);
+            ReachIdle();
+            int summon = duel.ActivePrompt.spSummonable.FindIndex(card => card.code == linkSpider);
+            Require(summon >= 0, "The native engine did not offer the Link Spider summon.");
+            duel.SubmitResponseInt((summon << 16) | 1);
+            ReachIdle();
+            var own = duel.Players[duel.HumanPlayerIndex];
+            var live = own.mzone.Single(card => card?.code == linkSpider);
+            Require(live.sequence is 5 or 6 && live.linkMarker == 0x002, "The native Link Spider did not expose its downward arrow.");
+            uint target = live.sequence == 5 ? 1u : 3u;
+
+            using var ui = new HandUI(duel);
+            ui.Field.Root.transform.Find($"DuelBoard/Zone_{target + 2}_2").GetComponent<CardDragTrigger>().OnRightClick();
+            ui.ExpectLinkedZones($"Zone_{target + 2}_3");
+            int activate = duel.ActivePrompt.activatable.FindIndex(card => card.code == linkSpider);
+            Require(activate >= 0, "Link Spider did not offer its linked-zone summon effect.");
+            duel.SubmitResponseInt((activate << 16) | 5);
+            ReachIdle();
+            ui.Field.Refresh();
+            Require(own.mzone[target]?.code == mysticalElf && own.mzone.Count(card => card?.code == mysticalElf) == 1,
+                "The native effect summoned to a different zone than the selected Link arrow indicated.");
+            ui.ExpectLinkedZones($"Zone_{target + 2}_3");
+            Debug.Log("[VERIFY DUEL LINK ZONES] Link Spider's live downward marker identified the zone used by its native effect.");
+        }
+
         private static bool IsAshBlossomPrompt(DuelSession duel, DuelPrompt prompt)
         {
             if (prompt == null || prompt.playerId != duel.HumanPlayerIndex) return false;
@@ -465,6 +508,17 @@ namespace YGOPortable.Editor
                 uint[] actual = ActiveGlows("_myHandViews", requireElement: true);
                 Require(actual.SequenceEqual(positions), $"Expected hand glows [{string.Join(",", positions)}], got [{string.Join(",", actual)}].");
                 Require(ActiveGlows("_oppHandViews", requireElement: false).Length == 0, "A hidden opponent card displayed a hand action.");
+            }
+
+            internal void ExpectLinkedZones(params string[] expected)
+            {
+                var board = Field.Root.transform.Find("DuelBoard");
+                var active = board.GetComponentsInChildren<DuelZoneImage>()
+                    .Where(zone => zone.LinkHighlighted).Select(zone => zone.name).OrderBy(name => name);
+                Require(active.SequenceEqual(expected.OrderBy(name => name)), "The field highlighted the wrong Link zones.");
+                var rims = board.GetComponentsInChildren<DuelLinkZoneRim>();
+                Require(rims.Length == expected.Length && rims.All(rim => !rim.raycastTarget),
+                    "A Link outline stayed visible after selection ended or blocked card input.");
             }
 
             internal void VerifyFieldReadouts(DuelSession duel)
@@ -536,8 +590,23 @@ namespace YGOPortable.Editor
                     compass.Find("Left").gameObject.activeSelf && !compass.Find("TopLeft").gameObject.activeSelf &&
                     !compass.Find("Bottom").gameObject.activeSelf && !compass.Find("Right").gameObject.activeSelf,
                     "The opponent's live Link markers were not turned to match the board.");
+                Slot("_emz", 0).GetComponent<CardDragTrigger>().OnRightClick();
+                ExpectLinkedZones("Zone_3_1", "Zone_4_3");
+                theirs.mzone[6].linkMarker = 0x004;
+                Field.Refresh();
+                ExpectLinkedZones("Zone_2_1");
+
+                var command = duel.ActivePrompt;
+                SetPrompt(duel, new DuelPrompt { messageType = YgoConstants.MSG_SELECT_PLACE,
+                    playerId = (byte)duel.HumanPlayerIndex, min = 1, placeFlag = ~(1u << 2) });
+                Field.Refresh();
+                ExpectLinkedZones();
+                SetPrompt(duel, command);
+                Field.Refresh();
+                ExpectLinkedZones("Zone_2_1");
 
                 normalSlot.GetComponent<CardDragTrigger>().OnRightClick();
+                ExpectLinkedZones();
                 var inspector = Field.Root.transform.Find("LeftInspector/CardDetails/CombatStats");
                 Require(Label(inspector, "Attack/Digits/Value").text == "3700",
                     "Inspecting a field monster lost its current attack.");
@@ -590,13 +659,24 @@ namespace YGOPortable.Editor
                 }
                 viewport.sizeDelta = originalSize;
 
+                mine.mzone[4] = new LiveCardState
+                {
+                    code = 1861629, type = monster | YgoConstants.TYPE_LINK, link = 3,
+                    position = YgoConstants.POS_FACEUP_ATTACK, attack = 2300, linkMarker = 0x040 | 0x008 | 0x001,
+                };
+                Field.Refresh();
+                Slot("_myMZone", 4).GetComponent<CardDragTrigger>().OnRightClick();
+                ExpectLinkedZones("Zone_5_2", "Zone_5_3", "Zone_5_4");
+                mine.mzone[4].position = YgoConstants.POS_FACEDOWN_DEFENSE;
+
                 mine.mzone[0].level = 0;
                 theirs.mzone[6].position = YgoConstants.POS_FACEDOWN_DEFENSE;
                 mine.mzone[1].overlayCodes.Clear();
                 Field.Refresh();
+                ExpectLinkedZones();
                 Require(!Label(normal, rating).gameObject.activeInHierarchy && !link.gameObject.activeInHierarchy &&
                     Label(xyz, status).text == "소재 0 · 무효", "A field readout kept stale state when a card changed.");
-                mine.mzone[0] = mine.mzone[1] = mine.mzone[2] = theirs.mzone[6] = mine.szone[0] = null;
+                mine.mzone[0] = mine.mzone[1] = mine.mzone[2] = mine.mzone[4] = theirs.mzone[6] = mine.szone[0] = null;
                 Field.Refresh();
                 Require(!xyz.gameObject.activeInHierarchy && !scale.gameObject.activeInHierarchy,
                     "A vacated zone retained a rating or pendulum scale.");

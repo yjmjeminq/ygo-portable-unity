@@ -79,6 +79,7 @@ namespace YGOPortable.UI
             public RectTransform focusArt;
             public DuelFieldReadout readout;
             public CardDragTrigger dragTrigger;
+            public Vector2Int? linkCell;
             public byte mappedCon;
             public uint mappedLoc;
             public uint mappedSeq;
@@ -90,6 +91,8 @@ namespace YGOPortable.UI
         private readonly FieldSlotView[] _oppMZone = new FieldSlotView[5];
         private readonly FieldSlotView[] _oppSZone = new FieldSlotView[6]; // 0..4 s/t, 5 field
         private readonly FieldSlotView[] _emz = new FieldSlotView[2]; // [0]=Human seq5 (Opp seq6), [1]=Human seq6 (Opp seq5)
+        private readonly FieldSlotView[,] _linkGrid = new FieldSlotView[5, 5];
+        private uint _highlightedLinkCells;
 
         // Stack counters (Deck / Extra / GY / Banished)
         private class StackTileView
@@ -314,6 +317,7 @@ namespace YGOPortable.UI
             _inspectedCode = code;
             _inspectedFieldCard = fieldCard;
             RefreshInspectorReadout(showChanges: false);
+            RefreshLinkedZones();
             if (!changed) return;
 
             _duelPadInspectButton.interactable = true;
@@ -352,6 +356,7 @@ namespace YGOPortable.UI
             _inspName.text = "카드 정보";
             _inspStats.text = "";
             _inspCombat.Hide();
+            SetLinkedZones(0);
             _inspDesc.text = "카드를 선택하면 효과를 확인할 수 있습니다.";
             _inspRaceIcon.gameObject.SetActive(false);
             _inspectScroll.StopMovement();
@@ -410,6 +415,47 @@ namespace YGOPortable.UI
             _inspStats.text = FormatInspectorStats(card);
             _inspCombat.Bind(card, live != null && _inspectedFieldCard.Value.controller != _session.HumanPlayerIndex,
                 showChanges && live != null);
+        }
+
+        private void RefreshLinkedZones() => SetLinkedZones(GetSelectedLinkCells());
+
+        private uint GetSelectedLinkCells()
+        {
+            if (_session == null || _session.IsFinished || IsPresenting || IsPaused || IsReadingLog ||
+                IsReadingCardDetails || _phasePicker.activeSelf || IsStagingPlacement || IsNativePlacement(_session.ActivePrompt) ||
+                _modals.IsPromptOpen || _modals.IsZoneViewerOpen || CardDragManager.Instance?.IsDragging == true ||
+                _inspectedFieldCard is not { } source)
+                return 0;
+
+            var card = ReadVisibleFieldCard(_inspectedCode, source);
+            var slot = GetSlot(source.controller, source.location, source.sequence);
+            if (card == null || (card.type & YgoConstants.TYPE_LINK) == 0 || card.linkMarker == 0 ||
+                slot?.linkCell is not { } origin)
+                return 0;
+
+            int facing = source.controller == _session.HumanPlayerIndex ? 1 : -1;
+            uint cells = 0;
+            foreach (var arrow in DuelLinkCompass.Marks)
+            {
+                if ((card.linkMarker & arrow.mask) == 0) continue;
+                var target = origin + new Vector2Int(arrow.direction.x, -arrow.direction.y) * facing;
+                if ((uint)target.x < 5 && (uint)target.y < 5 && _linkGrid[target.x, target.y] != null)
+                    cells |= 1u << (target.y * 5 + target.x);
+            }
+            return cells;
+        }
+
+        private void SetLinkedZones(uint cells)
+        {
+            uint changed = _highlightedLinkCells ^ cells;
+            if (changed == 0) return;
+            _highlightedLinkCells = cells;
+            for (int row = 0; row < 5; row++)
+            for (int column = 0; column < 5; column++)
+            {
+                uint bit = 1u << (row * 5 + column);
+                if ((changed & bit) != 0) _linkGrid[column, row].bgImg.SetLinkHighlight((cells & bit) != 0);
+            }
         }
 
         private static string FormatInspectorStats(DuelCardReadout card)
@@ -617,19 +663,25 @@ namespace YGOPortable.UI
             _mat.texture = DuelVisualAssets.Field ?? DuelStyle.Stone;
             _mat.raycastTarget = false;
             RectTransform Cell(int col, int row) => DuelZoneImage.CreateCell(board, col, row);
+            FieldSlotView LinkCell(int column, int row)
+            {
+                var slot = CreateZoneSlot(Cell(column + 2, row));
+                slot.linkCell = new Vector2Int(column, row);
+                _linkGrid[column, row] = slot;
+                return slot;
+            }
 
             for (int i = 0; i < 5; i++)
             {
-                int col = 2 + i;
                 int oppSeq = 4 - i;
-                _myMZone[i] = CreateZoneSlot(Cell(col, 3));
-                _oppMZone[oppSeq] = CreateZoneSlot(Cell(col, 1));
-                _mySZone[i] = CreateZoneSlot(Cell(col, 4));
-                _oppSZone[oppSeq] = CreateZoneSlot(Cell(col, 0));
+                _myMZone[i] = LinkCell(i, 3);
+                _oppMZone[oppSeq] = LinkCell(i, 1);
+                _mySZone[i] = LinkCell(i, 4);
+                _oppSZone[oppSeq] = LinkCell(i, 0);
             }
 
-            _emz[0] = CreateZoneSlot(Cell(3, 2));
-            _emz[1] = CreateZoneSlot(Cell(5, 2));
+            _emz[0] = LinkCell(1, 2);
+            _emz[1] = LinkCell(3, 2);
             var chain = LotdUiKit.CreateRect("Chain", board, new Vector2(0.472f, 0.486f), new Vector2(0.528f, 0.582f),
                 Vector2.zero, Vector2.zero);
             _chainIcon = LotdUiKit.AddImage(chain.gameObject,
@@ -1108,6 +1160,7 @@ namespace YGOPortable.UI
             RefreshMaterialConfirm();
             RefreshPileActionButtons();
             RefreshDuelPadCursor(layoutChanged: true);
+            RefreshLinkedZones();
             RefreshCardActions();
         }
 
@@ -2294,6 +2347,7 @@ namespace YGOPortable.UI
             UpdateDuelPad();
             if (_session != session || !Root.activeSelf) return;
             RefreshHandGlows();
+            RefreshLinkedZones();
             RefreshAttackResponseArrow();
             UpdateTouchCardActions();
             RefreshCardActions();

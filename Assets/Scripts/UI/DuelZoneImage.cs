@@ -15,11 +15,31 @@ namespace YGOPortable.UI
 
         private Vector4 _edges = new Vector4(0f, 1f, 0f, 1f);
         private bool _placementHighlighted;
+        private DuelLinkZoneRim _linkRim;
+        internal bool LinkHighlighted { get; private set; }
 
         internal void SetPlacementHighlight(bool highlighted)
         {
             if (_placementHighlighted == highlighted) return;
             _placementHighlighted = highlighted;
+            if (_linkRim != null) _linkRim.gameObject.SetActive(LinkHighlighted && !highlighted);
+            SetVerticesDirty();
+        }
+
+        internal void SetLinkHighlight(bool highlighted)
+        {
+            if (LinkHighlighted == highlighted) return;
+            LinkHighlighted = highlighted;
+            if (highlighted && _linkRim == null)
+            {
+                var outline = LotdUiKit.FillRect("LinkZoneRim", transform);
+                outline.SetSiblingIndex(1);
+                _linkRim = outline.gameObject.AddComponent<DuelLinkZoneRim>();
+                _linkRim.Zone = this;
+                _linkRim.texture = Texture2D.whiteTexture;
+                _linkRim.raycastTarget = false;
+            }
+            if (_linkRim != null) _linkRim.gameObject.SetActive(highlighted && !_placementHighlighted);
             SetVerticesDirty();
         }
 
@@ -66,7 +86,9 @@ namespace YGOPortable.UI
             Color tone = color;
             bool paintedZone = DuelVisualAssets.Field != null &&
                 tone.r < .4f && tone.g < .4f && tone.b < .4f;
-            if (paintedZone) tone.a *= .45f;
+            bool link = LinkHighlighted && !_placementHighlighted;
+            if (link) tone = new Color(.27f, .40f, .82f, .48f);
+            else if (paintedZone) tone.a *= .45f;
             int center = mesh.currentVertCount;
             mesh.AddVert(rect.center, tone, Vector2.zero);
             for (int i = 0; i < Corners.Length; i++)
@@ -76,15 +98,11 @@ namespace YGOPortable.UI
 
             if (_placementHighlighted)
             {
-                var edgeColor = new Color(.99f, .90f, .32f, .96f);
-                for (int i = 0; i < Corners.Length; i++)
-                    DuelMat.AddQuad(mesh, Corner(rect, i, .99f), Corner(rect, i, .90f),
-                        Corner(rect, i + 1, .90f), Corner(rect, i + 1, .99f),
-                        edgeColor, edgeColor, Vector2.zero, Vector2.zero);
+                DrawSelectionRim(mesh, rect, new Color(.99f, .90f, .32f, .96f), 0f);
                 return;
             }
 
-            if (paintedZone) return;
+            if (paintedZone || link) return;
             var shadow = new Color(.07f, .08f, .065f, Mathf.Max(.30f, tone.a * .75f));
             var light = new Color(.83f, .82f, .65f, Mathf.Max(.27f, tone.a * .66f));
             for (int i = 0; i < Corners.Length; i++)
@@ -97,6 +115,20 @@ namespace YGOPortable.UI
             }
         }
 
+        internal void DrawSelectionRim(VertexHelper mesh, Rect rect, Color color, float gap)
+        {
+            for (int i = 0; i < Corners.Length; i++)
+            {
+                var outerA = Corner(rect, i, .99f);
+                var innerA = Corner(rect, i, .90f);
+                var innerB = Corner(rect, i + 1, .90f);
+                var outerB = Corner(rect, i + 1, .99f);
+                DuelMat.AddQuad(mesh, Vector2.Lerp(outerA, outerB, gap), Vector2.Lerp(innerA, innerB, gap),
+                    Vector2.Lerp(innerB, innerA, gap), Vector2.Lerp(outerB, outerA, gap),
+                    color, color, Vector2.zero, Vector2.zero);
+            }
+        }
+
         public override bool IsRaycastLocationValid(Vector2 screenPoint, Camera eventCamera)
         {
             if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(rectTransform, screenPoint, eventCamera, out var point))
@@ -106,6 +138,17 @@ namespace YGOPortable.UI
             float u = Mathf.InverseLerp(rect.xMin, rect.xMax, point.x);
             float v = Mathf.InverseLerp(rect.yMin, rect.yMax, point.y);
             return u >= Mathf.Lerp(_edges.x, _edges.z, v) && u <= Mathf.Lerp(_edges.y, _edges.w, v);
+        }
+    }
+
+    internal sealed class DuelLinkZoneRim : RawImage
+    {
+        internal DuelZoneImage Zone;
+
+        protected override void OnPopulateMesh(VertexHelper mesh)
+        {
+            mesh.Clear();
+            if (Zone != null) Zone.DrawSelectionRim(mesh, GetPixelAdjustedRect(), new Color(.75f, .83f, 1f, .97f), .16f);
         }
     }
 
