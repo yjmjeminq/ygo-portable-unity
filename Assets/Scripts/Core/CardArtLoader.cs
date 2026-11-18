@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using UnityEngine;
 
@@ -22,9 +23,11 @@ namespace YGOPortable.Core
         private const int MaxCacheCount = 500;
         private const int TokenArtPackId = -1;
         private const int DuelArtPackId = -2;
+        private const int SupplementalArtPackId = -3;
         private const int BundledArtwork = -1;
         private const string TokenArtFileName = "tokenart.pack";
         private const string DuelArtFileName = "cardart.pack";
+        private const string SupplementalArtFileName = "supplementalart.pack";
         private static readonly Dictionary<(uint code, int variant), ArtEntry> _duelArt = new();
         private static readonly Dictionary<uint, List<int>> _duelVariants = new();
         private static readonly Dictionary<(uint, int), (Sprite sprite, LinkedListNode<(uint, int)> node)> _spriteCache =
@@ -35,7 +38,9 @@ namespace YGOPortable.Core
         private static Sprite _cardBackSprite;
         internal static string LocalDuelVisualsPath => Path.Combine(Application.persistentDataPath, "DuelVisuals");
 
-        public static void Initialize(string streamingAssetsPath)
+        public static void Initialize(string streamingAssetsPath) => Initialize(streamingAssetsPath, LocalDuelVisualsPath);
+
+        internal static void Initialize(string streamingAssetsPath, string localArtworkPath)
         {
             if (_index != null) return;
             _streamingDir = streamingAssetsPath;
@@ -46,13 +51,13 @@ namespace YGOPortable.Core
             if (!ReadArtIndex(idxPath))
                 Debug.LogWarning($"[CardArtLoader] Missing or invalid {idxPath}");
             ReadArtIndex(Path.Combine(streamingAssetsPath, TokenArtFileName));
-            ReadDuelArtIndex();
+            ReadArtIndex(Path.Combine(streamingAssetsPath, SupplementalArtFileName));
+            ReadDuelArtIndex(Path.Combine(localArtworkPath, DuelArtFileName));
             Debug.Log($"[CardArtLoader] Indexed {_index.Count} card artworks.");
         }
 
-        private static void ReadDuelArtIndex()
+        private static void ReadDuelArtIndex(string packPath)
         {
-            string packPath = Path.Combine(LocalDuelVisualsPath, DuelArtFileName);
             if (!File.Exists(packPath)) return;
             FileStream stream = null;
             try
@@ -80,7 +85,8 @@ namespace YGOPortable.Core
                 foreach (var (code, variants) in _duelVariants)
                 {
                     variants.Sort();
-                    if (variants[0] != 0 && TryGetArtEntry(code, out _)) variants.Insert(0, 0);
+                    if (variants[0] != 0 && (_index.ContainsKey(code) || RelatedPrintings(code).Any(_index.ContainsKey)))
+                        variants.Insert(0, 0);
                 }
                 _packStreams[DuelArtPackId] = stream;
                 stream = null;
@@ -136,22 +142,21 @@ namespace YGOPortable.Core
             return true;
         }
 
-        private static bool TryGetArtEntry(uint code, out ArtEntry entry)
+        private static IEnumerable<uint> RelatedPrintings(uint code)
         {
-            entry = default;
-            if (_index == null) return false;
-            if (_index.TryGetValue(code, out entry)) return true;
+            if (CardDatabase.TryGetDeckPrintings(code, out var printings))
+            {
+                foreach (var printing in printings)
+                    if (printing.code != code) yield return printing.code;
+                yield break;
+            }
 
             var info = CardDatabase.Get(code);
-            if (info == null || info.alias == 0) return false;
-            if ((info.type & YgoConstants.TYPE_TOKEN) != 0)
-            {
-                var sharedToken = CardDatabase.Get(info.alias);
-                if (sharedToken == null || (sharedToken.type & YgoConstants.TYPE_TOKEN) == 0 ||
-                    !string.Equals(info.name, sharedToken.name, StringComparison.OrdinalIgnoreCase))
-                    return false;
-            }
-            return _index.TryGetValue(info.alias, out entry);
+            if (info == null || info.alias == 0 || info.alias == code) yield break;
+            var original = CardDatabase.Get(info.alias);
+            if (original != null && ((original.type ^ info.type) & YgoConstants.TYPE_TOKEN) == 0 &&
+                string.Equals(original.name, info.name, StringComparison.OrdinalIgnoreCase))
+                yield return original.code;
         }
 
         public static Sprite GetCardBackSprite()
@@ -184,13 +189,37 @@ namespace YGOPortable.Core
                 _spriteCache.Remove(key);
             }
 
-            Sprite sprite = null;
-            if (variant >= 0 && _duelArt.TryGetValue(key, out var local)) sprite = DecodeArtwork(local);
-            if (sprite == null && TryGetArtEntry(code, out var bundled)) sprite = DecodeArtwork(bundled);
+            if (_index == null) return GetFallbackArt();
+            Sprite sprite = LoadExactArtwork(code, variant);
+            if (sprite == null)
+            {
+                // A rules alias may identify a different card. Use the same card's other printings.
+                foreach (uint relatedCode in RelatedPrintings(code))
+                {
+                    sprite = LoadExactArtwork(relatedCode, BundledArtwork);
+                    if (sprite != null) break;
+                }
+            }
             if (sprite == null) return GetFallbackArt();
             TrimArtwork(MaxCacheCount - 1);
             _spriteCache[key] = (sprite, _lru.AddLast(key));
             return sprite;
+        }
+
+        private static Sprite LoadExactArtwork(uint code, int variant)
+        {
+            if (variant >= 0 && _duelArt.TryGetValue((code, variant), out var preferred) &&
+                DecodeArtwork(preferred) is Sprite preferredSprite) return preferredSprite;
+            if (_index.TryGetValue(code, out var bundled) && DecodeArtwork(bundled) is Sprite bundledSprite)
+                return bundledSprite;
+
+            if (_duelVariants.TryGetValue(code, out var variants))
+            {
+                foreach (int alternative in variants)
+                    if (alternative != variant && _duelArt.TryGetValue((code, alternative), out var local) &&
+                        DecodeArtwork(local) is Sprite localSprite) return localSprite;
+            }
+            return null;
         }
 
         private static Sprite DecodeArtwork(ArtEntry entry)
@@ -202,6 +231,7 @@ namespace YGOPortable.Core
                     string packPath = entry.packId switch
                     {
                         TokenArtPackId => Path.Combine(_streamingDir, TokenArtFileName),
+                        SupplementalArtPackId => Path.Combine(_streamingDir, SupplementalArtFileName),
                         _ => Path.Combine(_streamingDir, $"cardart_{entry.packId}.pack"),
                     };
                     if (!File.Exists(packPath)) return null;
@@ -209,18 +239,20 @@ namespace YGOPortable.Core
                     _packStreams[entry.packId] = fs;
                 }
 
-                byte[] jpg = new byte[entry.length];
+                if (entry.length == 0 || entry.length > int.MaxValue || (long)entry.offset + entry.length > fs.Length)
+                    return null;
+                byte[] image = new byte[entry.length];
                 fs.Seek(entry.offset, SeekOrigin.Begin);
                 int readTotal = 0;
-                while (readTotal < jpg.Length)
+                while (readTotal < image.Length)
                 {
-                    int n = fs.Read(jpg, readTotal, jpg.Length - readTotal);
+                    int n = fs.Read(image, readTotal, image.Length - readTotal);
                     if (n <= 0) return null;
                     readTotal += n;
                 }
 
                 var tex = new Texture2D(2, 2, TextureFormat.RGB24, false);
-                if (!tex.LoadImage(jpg))
+                if (!tex.LoadImage(image))
                 {
                     UnityEngine.Object.Destroy(tex);
                     return null;

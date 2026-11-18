@@ -41,6 +41,7 @@ namespace YGOPortable.Editor
                 VerifyMainSorting(editor, events);
                 VerifyTouchDeckMenu(editor, events);
                 VerifyCardPrintings(editor, events, streamingPath, Path.Combine(save, "printings"));
+                VerifyArtworkSources(editor, streamingPath, Path.Combine(save, "artwork"));
             }
             finally
             {
@@ -464,6 +465,98 @@ namespace YGOPortable.Editor
             var variants = CardDatabase.AllCards.Where(card => CardDatabase.GetDeckPrintingKey(card.code) != card.code).ToArray();
             Debug.Log($"[VERIFY DECK PRINTINGS] {variants.Select(card => CardDatabase.GetDeckPrintingKey(card.code)).Distinct().Count()} " +
                 $"groups, {variants.Length} duplicate catalogue rows. Ownership, search, deck order and artwork selection passed.");
+        }
+
+        private static void VerifyArtworkSources(DeckEditorUI editor, string streamingPath, string save)
+        {
+            const uint recoveredMain = 59106048, recoveredExtra = 82370493, localOnly = 11876803, missing = 68811206;
+            const uint arcray = 6218704, arcrayAlt = 6218705, zarc = 13331639;
+            uint[] recovered = { 16237004, 19491080, 22984000, 53754391, recoveredMain, 60516416, 80843006, recoveredExtra };
+            editor.Close();
+            DeckRepository.Load(streamingPath, save, seedDefaultDecks: false);
+            CollectionProgress.Load(save);
+            var starter = CollectionProgress.Starters.First(option => option.Name.Contains("상검"));
+            Require(CollectionProgress.TryChooseStarter(starter.Id, out _, out string error), error);
+            string path = Path.Combine(save, CollectionProgress.ProfileFileName);
+            string profile = File.ReadAllText(path);
+            foreach (uint code in new[] { recoveredMain, recoveredExtra, localOnly, missing, arcrayAlt })
+                profile = TestCollectionProgress.WithOwnership(profile, code, 1);
+            File.WriteAllText(path, profile);
+            CollectionProgress.Load(save);
+            DeckRepository.SaveUserDeck(new UserDeck
+            {
+                name = "Artwork source fixture",
+                main = new List<uint> { recoveredMain },
+                extra = new List<uint> { recoveredExtra, arcrayAlt },
+                side = new List<uint> { localOnly },
+            });
+
+            WriteLocalArtworkFixture(save, localOnly);
+            CardArtLoader.Shutdown();
+            CardArtLoader.Initialize(streamingPath, save);
+            try
+            {
+                var fallback = CardArtLoader.GetFallbackArt();
+                foreach (uint code in recovered)
+                    Require(CardArtLoader.GetArtSprite(code) != fallback, $"Shared artwork {code} did not load from the build.");
+
+                editor.Open();
+                CompositeCardView FirstSlot(string field) => Field<RectTransform>(editor, field)
+                    .Find("Card_0/CardInset/Card").GetComponent<CompositeCardView>();
+                Require(FirstSlot("_mainDeckSlotGrid").ArtworkSprite == CardArtLoader.GetArtSprite(recoveredMain) &&
+                    FirstSlot("_extraGridRect").ArtworkSprite == CardArtLoader.GetArtSprite(recoveredExtra) &&
+                    FirstSlot("_sideDeckSlotGrid").ArtworkSprite?.texture.width == 8,
+                    "The Main, Extra, or Side Deck did not display the expected bundled or local illustration.");
+
+                var alternate = CardArtLoader.GetArtSprite(arcrayAlt).texture.GetPixels32();
+                Require(alternate.SequenceEqual(CardArtLoader.GetArtSprite(arcray).texture.GetPixels32()) &&
+                    !alternate.SequenceEqual(CardArtLoader.GetArtSprite(zarc).texture.GetPixels32()),
+                    "Arcray's missing alternate illustration borrowed artwork from a different card.");
+
+                var search = Field<InputField>(editor, "_searchInp");
+                var pool = Field<List<(RectTransform rt, CompositeCardView card, Text count, CardDragTrigger trigger)>>(editor, "_trunkPool");
+                var preview = Field<CompositeCardView>(editor, "_previewCard");
+                search.text = missing.ToString();
+                var slot = pool.Single(slot => slot.rt.gameObject.activeInHierarchy);
+                slot.trigger.OnLeftClick();
+                var label = slot.card.transform.Find("AspectBox/Artwork/MissingArtwork");
+                Require(slot.card.CurrentCode == missing && slot.card.ArtworkSprite == fallback &&
+                    label != null && label.gameObject.activeSelf && preview.CurrentCode == missing &&
+                    Field<Text>(editor, "_previewDesc").text == CardDatabase.Get(missing).desc,
+                    "A missing illustration hid the card or its details.");
+
+                search.text = recoveredMain.ToString();
+                slot.trigger.OnLeftClick();
+                Require(slot.card.CurrentCode == recoveredMain && preview.CurrentCode == recoveredMain &&
+                    slot.card.ArtworkSprite == preview.ArtworkSprite && preview.ArtworkSprite != fallback &&
+                    !label.gameObject.activeSelf,
+                    "Reusing the trunk slot or preview did not replace its missing-art indicator.");
+            }
+            finally
+            {
+                editor.Close();
+                CardArtLoader.Shutdown();
+                CardArtLoader.Initialize(streamingPath);
+            }
+            Debug.Log("[VERIFY DECK ARTWORK] Bundled recovery, local artwork, equivalent printings, missing-art labels and reused deck views passed.");
+        }
+
+        private static void WriteLocalArtworkFixture(string folder, uint code)
+        {
+            var texture = new Texture2D(8, 8, TextureFormat.RGB24, false);
+            texture.SetPixels32(Enumerable.Repeat(new Color32(50, 110, 180, 255), 64).ToArray());
+            texture.Apply();
+            byte[] image = texture.EncodeToPNG();
+            UnityEngine.Object.DestroyImmediate(texture);
+            using var pack = new BinaryWriter(File.Create(Path.Combine(folder, "cardart.pack")));
+            pack.Write(0x5241444Du); // MDAR
+            pack.Write(1u); // version
+            pack.Write(1u); // one entry
+            pack.Write(code);
+            pack.Write(0); // base illustration
+            pack.Write(28u); // 12-byte header and one 16-byte entry
+            pack.Write((uint)image.Length);
+            pack.Write(image);
         }
 
         private static void VerifyMainSorting(DeckEditorUI editor, EventSystem events)

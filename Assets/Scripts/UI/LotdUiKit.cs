@@ -388,6 +388,7 @@ namespace YGOPortable.UI
     public class CompositeCardView : MonoBehaviour
     {
         private Image _artImg;
+        private GameObject _missingArtwork;
         private CardFinishGraphic _finish;
         private Image _frameImg;
         private Image _attrImg;
@@ -638,6 +639,14 @@ namespace YGOPortable.UI
             if (code == _retainedArtwork && variant == _retainedVariant && _artImg.sprite != null) return;
             ReleaseArtwork();
             _artImg.sprite = CardArtLoader.RetainArtwork(code, variant);
+            bool missing = _artImg.sprite == CardArtLoader.GetFallbackArt();
+            if (missing && _missingArtwork == null)
+            {
+                var label = LotdUiKit.FillRect("MissingArtwork", _artImg.rectTransform, 2f);
+                LotdUiKit.AddFittedText(label, "Label", "그림 없음", 14, 7, TextAnchor.MiddleCenter, LotdUiKit.TextMuted);
+                _missingArtwork = label.gameObject;
+            }
+            if (_missingArtwork != null) _missingArtwork.SetActive(missing);
             _retainedArtwork = code;
             _retainedVariant = variant;
         }
@@ -646,6 +655,7 @@ namespace YGOPortable.UI
         {
             if (_retainedArtwork == 0) return;
             _artImg.sprite = null;
+            if (_missingArtwork != null) _missingArtwork.SetActive(false);
             CardArtLoader.ReleaseArtwork(_retainedArtwork, _retainedVariant);
             _retainedArtwork = 0;
         }
