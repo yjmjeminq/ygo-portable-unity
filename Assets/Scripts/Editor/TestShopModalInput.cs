@@ -42,6 +42,7 @@ namespace YGOPortable.Editor
                 shop.OpenShop();
                 Canvas.ForceUpdateCanvases();
                 VerifyPack(shop, events);
+                VerifyCardSearch(shop);
                 Require(shop.Root.transform.Find("Crafting") == null, "The pack shop still exposes card crafting.");
                 Call(shop, "CloseShop");
 
@@ -65,6 +66,55 @@ namespace YGOPortable.Editor
                 }
             }
             Debug.Log("[VERIFY SHOP INPUT] Pack/crafting confirmation scopes, cancellation, repeat confirmation, pack hover/reveal and excess-copy disassembly passed.");
+        }
+
+        private static void VerifyCardSearch(CollectionShopUI shop)
+        {
+            const uint vanguard = 25926710;
+            const uint kelbek = 54878498;
+            var packs = CollectionProgress.Packs;
+            var packed = packs.SelectMany(pack => pack.CardPool).ToHashSet();
+            Require(CardDatabase.AllCards.Where(CollectionProgress.IsCraftableCard).All(card => packed.Contains(card.code)),
+                "The shop is missing at least one playable card from all of its packs.");
+            var expectedPacks = packs.Where(pack => pack.CardPool.Contains(vanguard) || pack.CardPool.Contains(kelbek)).ToArray();
+            var catalog = Field(shop, "_shop");
+            var search = shop.CatalogSearch(starter: false);
+            IEnumerable<string> MatchedPackIds() => ((System.Collections.IEnumerable)Field(catalog, "Matches"))
+                .Cast<object>().Select(item => (string)Field(item, "Id"));
+
+            search.text = "켈백";
+            Require(MatchedPackIds().ToHashSet().SetEquals(expectedPacks.Select(pack => pack.Id)),
+                "Searching the shop for 켈백 did not find the packs containing either Kelbek card.");
+            ButtonAt(shop.Root, "Categories/Filter_1/Button").onClick.Invoke();
+            Require(MatchedPackIds().ToHashSet().SetEquals(expectedPacks.Where(pack => pack.Id.StartsWith("archetype-", StringComparison.Ordinal))
+                .Select(pack => pack.Id)), "The card search did not respect the selected pack category.");
+            search.text = "존재하지않는카드명987654321";
+            Require(((Text)Field(catalog, "CountLabel")).text.Contains("전체 팩"),
+                "An empty filtered pack search did not point to the all-packs category.");
+            ButtonAt(shop.Root, "Categories/Filter_0/Button").onClick.Invoke();
+
+            ButtonAt(shop.Root, "CardLookup/Button").onClick.Invoke();
+            var lookup = (PackCardLookupUI)Field(shop, "_cardLookup");
+            IEnumerable<uint> MatchedCardCodes() => ((System.Collections.IEnumerable)Field(lookup, "_matches")).Cast<object>()
+                .Select(item => (uint)item.GetType().GetProperty("Code", Instance).GetValue(item));
+            foreach (string query in new[] { "켈백", "켈 벡", "켈백".Normalize(System.Text.NormalizationForm.FormD) })
+            {
+                lookup.Search.text = query;
+                Require(MatchedCardCodes().OrderBy(code => code).SequenceEqual(new[] { vanguard, kelbek }),
+                    $"The card-to-pack lookup missed a Kelbek card for '{query}'.");
+            }
+            lookup.Search.text = "엑스트라 개이트";
+            Require(MatchedCardCodes().SequenceEqual(new[] { 7405310u }), "The spelling fallback only matched Kelbek.");
+            lookup.Search.text = "２５９２６７１０";
+            Require(MatchedCardCodes().SequenceEqual(new[] { vanguard }), "The card-to-pack lookup lost exact passcode search.");
+            ButtonAt(lookup.Root, "Details/Packs/Pack_0/Button").onClick.Invoke();
+            ButtonAt(shop.Root, "Details/ViewContents/Button").onClick.Invoke();
+            var contents = (PackContentsUI)Field(shop, "_packContents");
+            contents.SearchInput.text = "고첨병 켈백";
+            Require(contents.Root.activeInHierarchy && ((List<(uint Code, string Name)>)Field(contents, "_matches"))
+                .Select(card => card.Code).SequenceEqual(new[] { vanguard }), "The pack contents missed the selected Kelbek printing.");
+            ButtonAt(contents.Root, "Back/Button").onClick.Invoke();
+            Debug.Log("[VERIFY SHOP SEARCH] Both Kelbek cards, category filters, passcodes, pack navigation and complete playable-card coverage passed.");
         }
 
         private static void VerifyPack(CollectionShopUI shop, EventSystem events)

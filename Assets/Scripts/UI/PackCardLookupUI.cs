@@ -17,14 +17,14 @@ namespace YGOPortable.UI
         {
             public uint Code { get; }
             public string Name { get; }
-            public string SearchName { get; }
+            public ShopSearchKey SearchName { get; }
             public List<CollectionPack> Packs { get; } = new();
 
             public Entry(uint code)
             {
                 Code = code;
                 Name = CardDatabase.GetName(code);
-                SearchName = NormalizeName(Name);
+                SearchName = ShopSearchKey.FromName(Name);
             }
         }
 
@@ -189,16 +189,17 @@ namespace YGOPortable.UI
 
         private void FilterCards()
         {
-            string query = Search.text.Trim();
+            string query = ShopSearchKey.NormalizeInput(Search.text);
             bool codeQuery = uint.TryParse(query, out uint code);
-            string nameQuery = NormalizeName(query);
+            var nameQuery = ShopSearchKey.FromName(query);
             _matches.Clear();
             foreach (var entry in _entries)
             {
-                if (query.Length == 0 || (codeQuery ? entry.Code == code :
-                    nameQuery.Length > 0 && entry.SearchName.IndexOf(nameQuery, StringComparison.OrdinalIgnoreCase) >= 0))
+                if (query.Length == 0 || (codeQuery ? entry.Code == code : entry.SearchName.Contains(nameQuery)))
                     _matches.Add(entry);
             }
+            if (_matches.Count == 0 && !codeQuery && nameQuery.CanTrySimilar)
+                _matches.AddRange(_entries.Where(entry => entry.SearchName.Contains(nameQuery, similar: true)));
             _cardPage = 0;
             ShowCardPage();
         }
@@ -312,8 +313,6 @@ namespace YGOPortable.UI
         }
 
         private static int PageCount(int count, int size) => Mathf.Max(1, (count + size - 1) / size);
-
-        private static string NormalizeName(string value) => new string(value.Where(char.IsLetterOrDigit).ToArray());
 
         private static Text FitButtonLabel(Button button)
         {

@@ -14,7 +14,7 @@ namespace YGOPortable.UI
         private readonly Button[] _rows = new Button[PageSize];
         private readonly Text[] _labels = new Text[PageSize];
         private readonly Text[] _rarities = new Text[PageSize];
-        private readonly List<(uint Code, string Name, string SearchName)> _cards = new();
+        private readonly List<(uint Code, string Name, ShopSearchKey SearchName)> _cards = new();
         private readonly List<(uint Code, string Name)> _matches = new();
         private readonly Text _packName;
         private readonly Text _count;
@@ -101,7 +101,7 @@ namespace YGOPortable.UI
             foreach (var code in pack.CardPool.OrderBy(CardDatabase.GetName, StringComparer.OrdinalIgnoreCase).ThenBy(code => code))
             {
                 string name = CardDatabase.GetName(code);
-                _cards.Add((code, name, Normalize(name)));
+                _cards.Add((code, name, ShopSearchKey.FromName(name)));
             }
             SearchInput.SetTextWithoutNotify("");
             Root.SetActive(true);
@@ -148,17 +148,20 @@ namespace YGOPortable.UI
 
         private void Filter()
         {
-            string query = SearchInput.text.Trim();
-            string normalized = Normalize(query);
+            string query = ShopSearchKey.NormalizeInput(SearchInput.text);
+            var nameQuery = ShopSearchKey.FromName(query);
             bool isPasscode = uint.TryParse(query, out uint passcode);
             _matches.Clear();
             foreach (var card in _cards)
             {
                 if (query.Length == 0 || (isPasscode ? card.Code == passcode :
                     card.Name.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    normalized.Length != 0 && card.SearchName.IndexOf(normalized, StringComparison.OrdinalIgnoreCase) >= 0))
+                    card.SearchName.Contains(nameQuery)))
                     _matches.Add((card.Code, card.Name));
             }
+            if (_matches.Count == 0 && !isPasscode && nameQuery.CanTrySimilar)
+                _matches.AddRange(_cards.Where(card => card.SearchName.Contains(nameQuery, similar: true))
+                    .Select(card => (card.Code, card.Name)));
             _page = 0;
             RefreshPage();
         }
@@ -250,8 +253,6 @@ namespace YGOPortable.UI
             scroll.scrollSensitivity = 25f;
             return (scroll, content);
         }
-
-        private static string Normalize(string value) => new string(value.Where(char.IsLetterOrDigit).ToArray());
 
         private static RectTransform Slot(Transform parent, string name, float left, float bottom, float right, float top) =>
             LotdUiKit.CreateRect(name, parent, new Vector2(left, bottom), new Vector2(right, top), Vector2.zero, Vector2.zero);

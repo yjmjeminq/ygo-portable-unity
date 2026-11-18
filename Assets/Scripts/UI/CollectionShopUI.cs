@@ -19,7 +19,7 @@ namespace YGOPortable.UI
             internal string Name;
             internal uint FeaturedCode;
             internal string Details;
-            internal string SearchText;
+            internal ShopSearchKey SearchText;
             internal IReadOnlyList<uint> CardPool;
             internal CollectionStarter Starter;
         }
@@ -106,7 +106,7 @@ namespace YGOPortable.UI
                     Name = pack.Name,
                     FeaturedCode = pack.FeaturedCode,
                     Details = $"수록 {pack.CardPool.Count:N0}종   ·   팩당 {CollectionProgress.CardsPerPack}장",
-                    SearchText = string.Join("\n", pack.CardPool.Select(CardDatabase.GetName)),
+                    SearchText = ShopSearchKey.FromNames(pack.CardPool.Select(CardDatabase.GetName).Prepend(pack.Name)),
                     CardPool = pack.CardPool,
                 }).ToArray();
             }
@@ -135,10 +135,9 @@ namespace YGOPortable.UI
                     Id = starter.Id,
                     Name = starter.Name,
                     FeaturedCode = starter.FeaturedCode,
-                    SearchText = string.Join("\n", starter.ThemeCards.Select(CardDatabase.GetName)
+                    SearchText = ShopSearchKey.FromNames(starter.ThemeCards.Select(CardDatabase.GetName)
                         .Prepend(CardDatabase.GetName(starter.FeaturedCode))
-                        .Prepend(starter.Name)
-                        .Select(NormalizeStarterSearch)),
+                        .Prepend(starter.Name)),
                     CardPool = starter.ThemeCards,
                     Starter = starter,
                 }).ToArray();
@@ -564,26 +563,29 @@ namespace YGOPortable.UI
 
         private void FilterCatalog(Catalog catalog)
         {
-            string query = catalog.Search.text.Trim();
-            string searchText = catalog == _starter ? NormalizeStarterSearch(query) : query;
+            string query = ShopSearchKey.NormalizeInput(catalog.Search.text);
+            var searchText = ShopSearchKey.FromName(query);
             bool codeQuery = uint.TryParse(query, out uint code);
-            catalog.Matches.Clear();
-            foreach (var item in catalog.Items)
+            IEnumerable<CatalogItem> candidates = catalog.Items;
+            if (catalog == _shop && _packFilter != PackFilter.All)
             {
-                if (catalog == _shop && _packFilter != PackFilter.All &&
-                    (item.Id.StartsWith("archetype-", StringComparison.Ordinal) != (_packFilter == PackFilter.Archetype)))
-                    continue;
+                bool archetype = _packFilter == PackFilter.Archetype;
+                candidates = candidates.Where(item => item.Id.StartsWith("archetype-", StringComparison.Ordinal) == archetype);
+            }
+
+            catalog.Matches.Clear();
+            foreach (var item in candidates)
+            {
                 if (query.Length == 0 || item.Name.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0 ||
                     (codeQuery ? item.FeaturedCode == code || item.CardPool?.Contains(code) == true :
-                        searchText.Length > 0 && item.SearchText?.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0))
+                        item.SearchText.Contains(searchText)))
                     catalog.Matches.Add(item);
             }
+            if (catalog == _shop && catalog.Matches.Count == 0 && !codeQuery && searchText.CanTrySimilar)
+                catalog.Matches.AddRange(candidates.Where(item => item.SearchText.Contains(searchText, similar: true)));
             catalog.Page = 0;
             RefreshPage(catalog);
         }
-
-        private static string NormalizeStarterSearch(string value) =>
-            new string(value.Where(char.IsLetterOrDigit).ToArray());
 
         private bool ChangePage(Catalog catalog, int delta)
         {
@@ -607,8 +609,12 @@ namespace YGOPortable.UI
                     catalog.PackTiles[i].sprite = visible ? GetPackCover(catalog.Matches[index]) : null;
             }
             catalog.PageLabel.text = $"{catalog.Page + 1} / {PageCount(catalog)}";
-            catalog.CountLabel.text = catalog.Matches.Count == 0 ? "검색 결과 없음" :
-                catalog == _starter ? $"카드군 {catalog.Matches.Count:N0} / {catalog.Items.Length:N0}종" : $"팩 {catalog.Matches.Count:N0}개";
+            if (catalog.Matches.Count == 0)
+                catalog.CountLabel.text = catalog == _shop && _packFilter != PackFilter.All
+                    ? "이 분류에 결과 없음 · 전체 팩에서 검색" : "검색 결과 없음";
+            else
+                catalog.CountLabel.text = catalog == _starter
+                    ? $"카드군 {catalog.Matches.Count:N0} / {catalog.Items.Length:N0}종" : $"팩 {catalog.Matches.Count:N0}개";
             if (catalog == _shop) _filterCount.text = $"전체 {catalog.Items.Length:N0}팩";
             catalog.Previous.interactable = catalog.Page > 0;
             catalog.Next.interactable = catalog.Page + 1 < PageCount(catalog);
