@@ -192,22 +192,21 @@ namespace YGOPortable.UI
                 }
                 var badge = LotdUiKit.CreateRect("Change", Rect, compact ? new Vector2(.055f, .04f) : new Vector2(.76f, .60f),
                     compact ? new Vector2(.245f, .43f) : new Vector2(.94f, .99f), Vector2.zero, Vector2.zero);
-                _change = LotdUiKit.AddFittedText(badge, "Arrow", "", compact ? 10 : 12, compact ? 6 : 8,
+                _change = LotdUiKit.AddFittedText(badge, "Arrow", "", compact ? 13 : 14, 7,
                     TextAnchor.MiddleCenter, accent, FontStyle.Bold);
-                _change.verticalOverflow = VerticalWrapMode.Overflow;
-                _digits = LotdUiKit.CreateRect("Digits", Rect, compact ? new Vector2(.265f, .085f) : new Vector2(.055f, .035f),
-                    compact ? new Vector2(.96f, .96f) : new Vector2(.945f, .68f), Vector2.zero, Vector2.zero);
+                DuelStatDigitFit.Attach(_change, useGlyphBounds: true);
+                _digits = LotdUiKit.CreateRect("Digits", Rect, compact ? new Vector2(.26f, .055f) : new Vector2(.055f, .035f),
+                    compact ? new Vector2(.975f, .985f) : new Vector2(.945f, .59f), Vector2.zero, Vector2.zero);
                 _value = LotdUiKit.AddFittedText(_digits, "Value", "", compact ? 23 : 28, compact ? 7 : 9,
                     TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
-                _value.horizontalOverflow = HorizontalWrapMode.Overflow;
-                _value.gameObject.AddComponent<DuelStatDigitFit>();
+                DuelStatDigitFit.Attach(_value, useGlyphBounds: true);
             }
 
             internal void BindComparison(int value, bool split)
             {
                 _digits.anchorMin = new Vector2(.265f, .035f);
                 _digits.anchorMax = new Vector2(.97f, .99f);
-                _value.resizeTextMaxSize = split ? 23 : 28;
+                _value.fontSize = split ? 23 : 28;
                 Bind(value, value, active: true);
             }
 
@@ -235,6 +234,18 @@ namespace YGOPortable.UI
 
     internal sealed class DuelStatDigitFit : BaseMeshEffect
     {
+        internal static void Attach(Text label, bool useGlyphBounds)
+        {
+            label.horizontalOverflow = HorizontalWrapMode.Overflow;
+            if (useGlyphBounds)
+            {
+                // Size the painted characters, excluding the font's line spacing.
+                label.resizeTextForBestFit = false;
+                label.verticalOverflow = VerticalWrapMode.Overflow;
+            }
+            label.gameObject.AddComponent<DuelStatDigitFit>();
+        }
+
         public override void ModifyMesh(VertexHelper mesh)
         {
             if (!IsActive() || mesh.currentVertCount == 0) return;
@@ -467,13 +478,7 @@ namespace YGOPortable.UI
                 Vector2.zero, Vector2.zero);
             _value = LotdUiKit.AddFittedText(digits, "Value", "", compact ? 19 : 16, 8,
                 TextAnchor.MiddleCenter, Ink, FontStyle.Bold);
-            _value.horizontalOverflow = HorizontalWrapMode.Overflow;
-            if (compact)
-            {
-                _value.resizeTextForBestFit = false;
-                _value.verticalOverflow = VerticalWrapMode.Overflow;
-            }
-            _value.gameObject.AddComponent<DuelStatDigitFit>();
+            DuelStatDigitFit.Attach(_value, useGlyphBounds: compact);
             Bind(0);
         }
 
@@ -542,14 +547,7 @@ namespace YGOPortable.UI
                 Vector2.zero, Vector2.zero);
             DuelReadoutPlate.Add(chip, Backing);
             var value = LotdUiKit.AddFittedText(chip, "Value", "", size, 8, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
-            value.horizontalOverflow = HorizontalWrapMode.Overflow;
-            if (!_inPreview)
-            {
-                // Fit the painted glyphs so line spacing does not shrink short field labels.
-                value.resizeTextForBestFit = false;
-                value.verticalOverflow = VerticalWrapMode.Overflow;
-            }
-            value.gameObject.AddComponent<DuelStatDigitFit>();
+            DuelStatDigitFit.Attach(value, useGlyphBounds: !_inPreview);
             return value;
         }
 

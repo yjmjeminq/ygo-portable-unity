@@ -1068,7 +1068,7 @@ namespace YGOPortable.Editor
                 Require(!inspector.Find("Attack/ChangePulse").gameObject.activeInHierarchy,
                     "An unfinished stat animation followed the focus to a different copy.");
 
-                mine.mzone[0].attack = 3200;
+                mine.mzone[0].attack = 2900;
                 mine.mzone[0].defense = 2800;
                 mine.mzone[0].level = 6;
                 Field.Refresh();
@@ -1076,7 +1076,7 @@ namespace YGOPortable.Editor
                 var reverse = (RectTransform)reduced.Find("ChangePulse/Sweep");
                 float initial = reverse.anchorMin.x;
                 reduced.GetComponent<DuelReadoutPulse>().Advance(.16f);
-                Require(reverse.anchorMin.x < initial && Label(normal, attack).text == "3200" &&
+                Require(reverse.anchorMin.x < initial && Label(normal, attack).text == "2900" &&
                     Label(normal, defense).text == "2800" && normal.Find("Combat/Defense/ChangePulse").gameObject.activeInHierarchy &&
                     normal.Find("Labels/Rating/ChangePulse").gameObject.activeInHierarchy && Label(normal, rating).text == "6",
                     "The updated attack, defense or level did not animate with its current value.");
@@ -1111,13 +1111,30 @@ namespace YGOPortable.Editor
                             bounds.max.y <= readout.rect.yMax + .01f && label.rectTransform.rect.height > 9f,
                             $"A field stat overflowed when the canvas resized to {size}.");
                     }
-                    VerifyStatGlyphs(Label(normal, attack), "3200");
+                    VerifyStatGlyphs(Label(normal, attack), "2900");
+                    VerifyStatGlyphs(Label(normal, defense), "2800");
+                    VerifyStatGlyphs(Label(normal, "Combat/Attack/Change/Arrow"), "▼");
+                    VerifyStatGlyphs(Label(normal, "Combat/Defense/Change/Arrow"), "▲");
+                    VerifyStatGlyphs(Label(link, attack), "2300");
                     VerifyStatGlyphs(Label(xyz, attack), int.MaxValue.ToString());
                     VerifyStatGlyphs(Label(xyz, defense), int.MaxValue.ToString());
                     VerifyStatGlyphs(Label(xyz, rating), "12");
                     VerifyStatGlyphs(Label(xyz, materials), "10");
                     VerifyStatGlyphs(Label(xyz, counters), "12");
                     VerifyStatGlyphs(Label(xyz, status), "무효");
+                    VerifyStatGlyphs(Label(inspector, "Attack/Digits/Value"), "2900", .48f);
+                    var caption = RectTransformUtility.CalculateRelativeRectTransformBounds(inspector, inspector.Find("Attack/Caption"));
+                    var digits = RectTransformUtility.CalculateRelativeRectTransformBounds(inspector, inspector.Find("Attack/Digits"));
+                    Require(digits.max.y < caption.min.y, "The larger inspection number overlapped its caption.");
+                    foreach (string side in new[] { "Attack", "Defense" })
+                    {
+                        var cell = normal.Find($"Combat/{side}");
+                        var symbol = RectTransformUtility.CalculateRelativeRectTransformBounds(cell, cell.Find("Symbol"));
+                        var arrow = RectTransformUtility.CalculateRelativeRectTransformBounds(cell, cell.Find("Change"));
+                        var number = RectTransformUtility.CalculateRelativeRectTransformBounds(cell, cell.Find("Digits"));
+                        Require(arrow.max.y < symbol.min.y && Mathf.Max(symbol.max.x, arrow.max.x) < number.min.x,
+                            "The field's type icon, change arrow and number overlapped.");
+                    }
 
                     applyFocus.Invoke(null, new[] { xyzView, (object)1f, 1.05f });
                     Canvas.ForceUpdateCanvases();
@@ -1161,11 +1178,11 @@ namespace YGOPortable.Editor
                     "A vacated zone retained a rating or pendulum scale.");
                 typeof(DuelFieldUI).GetMethod("ResetCardInspector", PrivateInstance).Invoke(Field, null);
                 Debug.Log("[VERIFY DUEL CARD READOUT] Verified live combat stats, changing copies, ratings, scales, Link markers, face-down cards and three viewport sizes.");
-                Debug.Log("[VERIFY DUEL STAT FIT] Attack and defense icons left room for larger digits. All ten digits stayed on one line across three viewports.");
+                Debug.Log("[VERIFY DUEL STAT FIT] Field values, Link attack, change arrows, and inspected stats used the available glyph space without overlap. All ten digits stayed on one line across three viewports.");
                 Debug.Log("[VERIFY DUEL RATING BADGES] Distinct rating, material, counter and negation badges stayed separate from the neighboring zone at full focus across three viewports.");
             }
 
-            private static void VerifyStatGlyphs(Text text, string expected)
+            private static void VerifyStatGlyphs(Text text, string expected, float minimumHeightShare = .78f)
             {
                 Require(text.text == expected && text.horizontalOverflow == HorizontalWrapMode.Overflow,
                     "A readout truncated or wrapped its text.");
@@ -1192,7 +1209,7 @@ namespace YGOPortable.Editor
                     Require(top - bottom >= rect.height * .68f, "The field label left too much space unused by its glyphs.");
                 var cell = (RectTransform)text.transform.parent;
                 if (cell.name is "Digits" or "Number") cell = (RectTransform)cell.parent;
-                Require(rect.height / cell.rect.height > .78f, "The compact readout did not give its text most of the available height.");
+                Require(rect.height / cell.rect.height > minimumHeightShare, "The readout text did not use enough of its allotted height.");
             }
 
             private uint[] ActiveGlows(string fieldName, bool requireElement)
