@@ -25,8 +25,6 @@ namespace YGOPortable.UI
         internal static Sprite ChainFrame { get; } = LoadHudSprite("ChainFrame", Vector4.one * 48f);
         internal static Sprite PromptFieldGlow { get; } = LoadHudSprite("PromptFieldGlow");
         internal static Sprite PromptFieldArrow { get; } = LoadHudSprite("PromptFieldArrow");
-        internal static Sprite PromptGroupLabel { get; } = LoadHudSprite("PromptGroupLabel");
-        private static readonly Sprite PromptGrave = LoadHudSprite("PromptGrave");
         private static readonly Sprite PromptBanished = LoadHudSprite("PromptBanished");
         private static readonly Sprite[] PlayerZoneIcons = LoadZoneIcons("Player");
         private static readonly Sprite[] OpponentZoneIcons = LoadZoneIcons("Opponent");
@@ -84,16 +82,8 @@ namespace YGOPortable.UI
             };
         }
 
-        internal static Sprite PromptZoneIcon(uint location, bool opponent)
-        {
-            var icon = location switch
-            {
-                YgoConstants.LOCATION_GRAVE => PromptGrave,
-                YgoConstants.LOCATION_REMOVED => PromptBanished,
-                _ => null,
-            };
-            return icon ?? ZoneIcon(location, opponent);
-        }
+        internal static Sprite PromptZoneIcon(uint location, bool opponent) =>
+            (location == YgoConstants.LOCATION_REMOVED ? PromptBanished : null) ?? ZoneIcon(location, opponent);
 
         private static Sprite[] LoadZoneIcons(string side) => new[]
         {

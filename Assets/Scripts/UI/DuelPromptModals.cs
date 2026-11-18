@@ -32,8 +32,10 @@ namespace YGOPortable.UI
         private Image _fieldViewIcon;
         private Text _fieldViewLabel;
         private bool _chainPrompt;
-        private const float ChainCardWidth = 78f;
-        private const float ChainCardGap = 7f;
+        private const float ChainCardWidth = 126f;
+        private const float ChainCardGap = 10f;
+        private const float ChainLocationTabHeight = 30f;
+        private const float ChainGroupPadding = 6f;
         private const float ChoiceCardWidth = 113f;
         private const float ChoiceCardGap = 8f;
         private RectTransform _chainBox;
@@ -444,40 +446,40 @@ namespace YGOPortable.UI
 
         private void BuildChainPicker(Transform parent)
         {
-            _chainBox = DuelStyle.Panel(parent, "ChainWin", new Vector2(.235f, .214f), new Vector2(.845f, .480f),
+            _chainBox = DuelStyle.Panel(parent, "ChainWin", new Vector2(.222f, .185f), new Vector2(.922f, .585f),
                 fill: new Color(.022f, .038f, .054f, .98f), border: new Color(.45f, .65f, .75f, .58f));
             AddSelectionFrame(_chainBox);
-            var header = LotdUiKit.CreateRect("Hdr", _chainBox, new Vector2(0f, .82f), Vector2.one, Vector2.zero, Vector2.zero);
+            var header = LotdUiKit.CreateRect("Hdr", _chainBox, new Vector2(0f, .86f), Vector2.one, Vector2.zero, Vector2.zero);
             LotdUiKit.AddImage(header.gameObject, LotdUiKit.WhiteSprite, DuelStyle.HeaderColor, false, false);
             var title = LotdUiKit.CreateRect("Title", header, new Vector2(.024f, .05f), new Vector2(.62f, .95f),
                 Vector2.zero, Vector2.zero);
-            _chainTitle = LotdUiKit.AddFittedText(title, "Text", "", 19, 11, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
+            _chainTitle = LotdUiKit.AddFittedText(title, "Text", "", 23, 13, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
             var summary = LotdUiKit.CreateRect("Summary", header, new Vector2(.67f, .07f), new Vector2(.972f, .93f),
                 Vector2.zero, Vector2.zero);
-            _chainSummary = LotdUiKit.AddFittedText(summary, "Text", "", 16, 10, TextAnchor.MiddleRight, DuelStyle.Gold, FontStyle.Bold);
+            _chainSummary = LotdUiKit.AddFittedText(summary, "Text", "", 18, 11, TextAnchor.MiddleRight, DuelStyle.Gold, FontStyle.Bold);
 
-            var cards = LotdUiKit.CreateRect("Cards", _chainBox, new Vector2(.019f, .208f), new Vector2(.563f, .798f),
+            var cards = LotdUiKit.CreateRect("Cards", _chainBox, new Vector2(.019f, .162f), new Vector2(.637f, .84f),
                 Vector2.zero, Vector2.zero);
             _chainCardScroll = CreateCardStrip(cards, out _chainCards, ChainCardGap);
 
-            var details = _chainDetails = DuelStyle.Panel(_chainBox, "Details", new Vector2(.583f, .218f), new Vector2(.977f, .798f));
-            var name = LotdUiKit.CreateRect("Name", details, new Vector2(.04f, .72f), new Vector2(.96f, .98f),
+            var details = _chainDetails = DuelStyle.Panel(_chainBox, "Details", new Vector2(.655f, .176f), new Vector2(.977f, .84f));
+            var name = LotdUiKit.CreateRect("Name", details, new Vector2(.04f, .77f), new Vector2(.96f, .98f),
                 Vector2.zero, Vector2.zero);
-            _chainName = LotdUiKit.AddFittedText(name, "Text", "", 16, 10, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
-            var source = LotdUiKit.CreateRect("Source", details, new Vector2(.04f, .57f), new Vector2(.96f, .73f),
+            _chainName = LotdUiKit.AddFittedText(name, "Text", "", 20, 12, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
+            var source = LotdUiKit.CreateRect("Source", details, new Vector2(.04f, .59f), new Vector2(.96f, .76f),
                 Vector2.zero, Vector2.zero);
-            _chainSource = LotdUiKit.AddFittedText(source, "Text", "", 12, 9, TextAnchor.MiddleLeft, DuelStyle.Gold);
-            var description = LotdUiKit.CreateRect("Description", details, new Vector2(.0f, .025f), new Vector2(1f, .565f),
+            _chainSource = LotdUiKit.AddFittedText(source, "Text", "", 16, 10, TextAnchor.MiddleLeft, DuelStyle.Gold, FontStyle.Bold);
+            var description = LotdUiKit.CreateRect("Description", details, new Vector2(.0f, .025f), new Vector2(1f, .57f),
                 Vector2.zero, Vector2.zero);
             _chainEffectScroll = CreateVerticalScroll(description, out Transform content);
-            _chainEffect = AddDescriptionText(content, "Effect", "", 13);
+            _chainEffect = AddDescriptionText(content, "Effect", "", 16);
 
-            var footer = LotdUiKit.CreateRect("Footer", _chainBox, new Vector2(.021f, .026f), new Vector2(.977f, .181f),
+            var footer = LotdUiKit.CreateRect("Footer", _chainBox, new Vector2(.021f, .024f), new Vector2(.977f, .143f),
                 Vector2.zero, Vector2.zero);
             var pass = LotdUiKit.CreateRect("Pass", footer, new Vector2(.655f, 0f), new Vector2(.817f, 1f), Vector2.zero, Vector2.zero);
-            _chainPass = DuelStyle.Button(pass, "B", "취소", OnModalCloseClicked, 14);
+            _chainPass = DuelStyle.Button(pass, "B", "취소", OnModalCloseClicked, 16);
             var activate = LotdUiKit.CreateRect("Activate", footer, new Vector2(.836f, 0f), Vector2.one, Vector2.zero, Vector2.zero);
-            _chainActivate = DuelStyle.Button(activate, "B", "효과 발동", ConfirmChainChoice, 14, gold: true);
+            _chainActivate = DuelStyle.Button(activate, "B", "효과 발동", ConfirmChainChoice, 16, gold: true);
             _chainBox.gameObject.SetActive(false);
         }
 
@@ -790,11 +792,11 @@ namespace YGOPortable.UI
                 choices = _chainCandidateIndices.Select(index => prompt.candidates[index]).ToArray();
             }
             bool compact = choices.Count == 1;
-            _chainBox.anchorMin = compact ? new Vector2(.324f, .218f) : new Vector2(.235f, .214f);
-            _chainBox.anchorMax = compact ? new Vector2(.776f, .448f) : new Vector2(.845f, .480f);
+            _chainBox.anchorMin = compact ? new Vector2(.30f, .202f) : new Vector2(.222f, .185f);
+            _chainBox.anchorMax = compact ? new Vector2(.795f, .574f) : new Vector2(.922f, .585f);
             var cardStrip = (RectTransform)_chainCardScroll.transform;
-            cardStrip.anchorMax = new Vector2(compact ? .262f : .563f, .798f);
-            _chainDetails.anchorMin = new Vector2(compact ? .278f : .583f, .218f);
+            cardStrip.anchorMax = new Vector2(compact ? .327f : .637f, .84f);
+            _chainDetails.anchorMin = new Vector2(compact ? .347f : .655f, .176f);
             SetFieldView(false);
             bool respondingToAttack = session.HasActiveAttack && session.AttackerCon != session.HumanPlayerIndex;
             _chainTitle.text = prompt.forced ? "필수 효과 순서 선택" :
@@ -821,9 +823,9 @@ namespace YGOPortable.UI
             void Select(int index)
             {
                 if (!CanAnswerPrompt || !ReferenceEquals(_curPrompt, prompt)) return;
-                if (_chainSelection >= 0) frames[_chainSelection].effectColor = DuelStyle.BorderColor;
+                if (_chainSelection >= 0) SetSelectionOutline(frames[_chainSelection], false);
                 _chainSelection = index;
-                frames[index].effectColor = DuelStyle.Gold;
+                SetSelectionOutline(frames[index], true);
                 var item = choices[index];
                 _chainName.text = CardDatabase.GetName(item.code);
                 _chainSource.text = CardSourceLabel(session, item);
@@ -834,14 +836,13 @@ namespace YGOPortable.UI
                 _onInspectCard?.Invoke(item.code);
             }
 
-            const float groupPadding = 10f;
             float stripWidth = 6f - ChainCardGap;
             var groups = Enumerable.Range(0, sources.Length).GroupBy(i => (sources[i].controller, sources[i].location));
             foreach (var group in groups)
             {
                 var (controller, location) = group.Key;
                 int count = group.Count();
-                float width = count * ChainCardWidth + (count - 1) * ChainCardGap + groupPadding;
+                float width = count * ChainCardWidth + (count - 1) * ChainCardGap + 2f * ChainGroupPadding;
                 var row = CreateChainGroup(location, controller != session.HumanPlayerIndex, width);
                 stripWidth += width + ChainCardGap;
                 foreach (int index in group)
@@ -860,7 +861,7 @@ namespace YGOPortable.UI
                         sourceNumbers[source] = ++number;
                         var caption = LotdUiKit.CreateRect("EffectNumber", tile, new Vector2(.04f, .01f),
                             new Vector2(.96f, .16f), Vector2.zero, Vector2.zero);
-                        LotdUiKit.AddFittedText(caption, "Text", $"후보 {number}", 11, 8, TextAnchor.MiddleCenter, DuelStyle.Muted);
+                        LotdUiKit.AddFittedText(caption, "Text", $"후보 {number}", 13, 9, TextAnchor.MiddleCenter, DuelStyle.Muted);
                     }
                     var button = tile.gameObject.AddComponent<Button>();
                     button.targetGraphic = tile.GetComponent<Image>();
@@ -877,30 +878,32 @@ namespace YGOPortable.UI
         {
             var group = LotdUiKit.FillRect("Source_" + location, _chainCards);
             group.gameObject.AddComponent<LayoutElement>().preferredWidth = width;
-            var groupTone = opponent ? new Color(.69f, .21f, .24f) : new Color(.23f, .43f, .77f);
+            var groupTone = opponent ? new Color(.30f, .115f, .15f) : new Color(.086f, .24f, .34f);
             var edge = LotdUiKit.CreateRect("GroupFrame", group, Vector2.zero, Vector2.one,
-                Vector2.zero, new Vector2(0f, -21f));
-            var tint = new Color(groupTone.r, groupTone.g, groupTone.b, .57f);
+                Vector2.zero, new Vector2(0f, -ChainLocationTabHeight));
+            var tint = new Color(groupTone.r, groupTone.g, groupTone.b, .60f);
             LotdUiKit.AddImage(edge.gameObject, LotdUiKit.WhiteSprite, tint, false, false);
-            var row = LotdUiKit.FillRect("Cards", edge, 5f);
+            var row = LotdUiKit.FillRect("Cards", edge, ChainGroupPadding);
             var layout = row.gameObject.AddComponent<HorizontalLayoutGroup>();
             layout.spacing = ChainCardGap;
             layout.childControlWidth = layout.childControlHeight = layout.childForceExpandHeight = true;
             layout.childForceExpandWidth = false;
 
             var tab = LotdUiKit.CreateRect("LocationTab", group, Vector2.up, Vector2.up,
-                new Vector2(0f, -21f), new Vector2(Mathf.Min(width, 112f), 0f));
-            LotdUiKit.AddImage(tab.gameObject, DuelVisualAssets.PromptGroupLabel, groupTone, false, false);
+                new Vector2(0f, -ChainLocationTabHeight), new Vector2(Mathf.Min(width, 174f), 0f));
+            LotdUiKit.AddImage(tab.gameObject, LotdUiKit.WhiteSprite, groupTone, false, false);
+            LotdUiKit.AddImage(LotdUiKit.CreateRect("Accent", tab, Vector2.zero, Vector2.up,
+                Vector2.zero, new Vector2(3f, 0f)).gameObject, LotdUiKit.WhiteSprite, DuelStyle.Side(opponent), false, false);
             bool hasIcon = DuelPromptLocationIcon.Supports(location);
             if (hasIcon)
             {
                 var icon = LotdUiKit.CreateRect("Icon", tab, Vector2.zero, Vector2.up,
-                    new Vector2(4f, 1f), new Vector2(22f, -1f));
+                    new Vector2(8f, 5.5f), new Vector2(26f, -5.5f));
                 DuelPromptLocationIcon.Add(icon, location, opponent);
             }
             var caption = LotdUiKit.CreateRect("Caption", tab, Vector2.zero, Vector2.one,
-                new Vector2(hasIcon ? 25f : 4f, 0f), new Vector2(-3f, 0f));
-            LotdUiKit.AddFittedText(caption, "Location", ChainLocationName(location), 11, 8,
+                new Vector2(hasIcon ? 32f : 8f, 0f), new Vector2(-6f, 0f));
+            LotdUiKit.AddFittedText(caption, "Location", $"{(opponent ? "상대" : "내")} {ChainLocationName(location)}", 15, 10,
                 TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
             return row;
         }
@@ -1921,7 +1924,10 @@ namespace YGOPortable.UI
             var badge = LotdUiKit.CreateRect("Source", tile, new Vector2(hasDetail ? .065f : .32f, .02f),
                 new Vector2(hasDetail ? .935f : .68f, .166f), Vector2.zero, Vector2.zero);
             var tone = DuelStyle.Side(opponent);
-            LotdUiKit.AddImage(badge.gameObject, LotdUiKit.WhiteSprite, new Color(tone.r, tone.g, tone.b, .17f), false, false);
+            LotdUiKit.AddImage(badge.gameObject, LotdUiKit.WhiteSprite,
+                new Color(tone.r * .22f, tone.g * .22f, tone.b * .22f, .95f), false, false);
+            var edge = LotdUiKit.CreateRect("Accent", badge, Vector2.zero, Vector2.right, Vector2.zero, new Vector2(0f, 1f));
+            LotdUiKit.AddImage(edge.gameObject, LotdUiKit.WhiteSprite, tone, false, false);
             if (hasIcon)
             {
                 var icon = LotdUiKit.CreateRect("LocationIcon", badge, Vector2.zero,
@@ -1947,7 +1953,11 @@ namespace YGOPortable.UI
         {
             var mark = LotdUiKit.CreateRect("Chk", tile, new Vector2(.68f, .76f), new Vector2(.94f, .96f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(mark.gameObject, LotdUiKit.LoadSprite("LOTD/Icons/ICON_ID_CHECKMARK"), DuelStyle.Gold, true, false);
+            LotdUiKit.AddImage(mark.gameObject, DuelStyle.Disc, DuelStyle.Gold, true, false);
+            var tick = LotdUiKit.CreateRect("Tick", mark, Vector2.one * .17f, Vector2.one * .83f,
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(tick.gameObject, LotdUiKit.LoadSprite("LOTD/Icons/ICON_ID_CHECKMARK"),
+                new Color(.10f, .15f, .19f), true, false);
             SetSelectionMark(mark, selected);
             return mark;
         }
@@ -1955,7 +1965,13 @@ namespace YGOPortable.UI
         private static void SetSelectionMark(Transform mark, bool selected)
         {
             mark.gameObject.SetActive(selected);
-            mark.parent.GetComponent<Outline>().effectColor = selected ? DuelStyle.Gold : DuelStyle.BorderColor;
+            SetSelectionOutline(mark.parent.GetComponent<Outline>(), selected);
+        }
+
+        private static void SetSelectionOutline(Outline outline, bool selected)
+        {
+            outline.effectColor = selected ? DuelStyle.Gold : DuelStyle.BorderColor;
+            outline.effectDistance = new Vector2(1f, -1f) * (selected ? 3f : 1f);
         }
 
         private static ScrollRect CreateCardStrip(RectTransform cards, out RectTransform content, float gap)
@@ -2093,12 +2109,15 @@ namespace YGOPortable.UI
 
         internal static bool Supports(uint location) => (location & YgoConstants.LOCATION_OVERLAY) != 0 ||
             location is YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_DECK or YgoConstants.LOCATION_EXTRA
-                or YgoConstants.LOCATION_GRAVE or YgoConstants.LOCATION_REMOVED or YgoConstants.LOCATION_ONFIELD
-                or YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE or YgoConstants.LOCATION_FZONE or YgoConstants.LOCATION_PZONE;
+                or YgoConstants.LOCATION_GRAVE or YgoConstants.LOCATION_REMOVED || IsField(location);
+
+        private static bool IsField(uint location) => location is YgoConstants.LOCATION_ONFIELD or YgoConstants.LOCATION_MZONE
+            or YgoConstants.LOCATION_SZONE or YgoConstants.LOCATION_FZONE or YgoConstants.LOCATION_PZONE;
 
         internal static void Add(RectTransform holder, uint location, bool opponent)
         {
-            var sprite = DuelVisualAssets.PromptZoneIcon(location, opponent);
+            bool useGlyph = location is YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_GRAVE || IsField(location);
+            var sprite = useGlyph ? null : DuelVisualAssets.PromptZoneIcon(location, opponent);
             if (sprite != null)
             {
                 LotdUiKit.AddImage(holder.gameObject, sprite, Color.white, true, false);
@@ -2107,7 +2126,12 @@ namespace YGOPortable.UI
 
             var glyph = holder.gameObject.AddComponent<DuelPromptLocationIcon>();
             glyph._location = (location & YgoConstants.LOCATION_OVERLAY) != 0 ? YgoConstants.LOCATION_OVERLAY : location;
-            glyph.color = DuelStyle.Side(opponent);
+            glyph.color = location switch
+            {
+                YgoConstants.LOCATION_HAND => new Color(.42f, .96f, .87f),
+                YgoConstants.LOCATION_GRAVE => new Color(.86f, .73f, 1f),
+                _ => IsField(location) ? DuelStyle.Gold : DuelStyle.Side(opponent),
+            };
             glyph.raycastTarget = false;
         }
 
@@ -2118,10 +2142,19 @@ namespace YGOPortable.UI
             float scale = Mathf.Min(rect.width, rect.height) / 24f;
             if (scale <= 0f) return;
 
+            Vector2 Point(float x, float y) => rect.center + new Vector2(x - 12f, y - 12f) * scale;
+
+            void Shape(Vector2 a, Vector2 b, Vector2 c, Vector2 d, Color tone) => DuelMat.AddQuad(mesh,
+                Point(a.x, a.y), Point(b.x, b.y), Point(c.x, c.y), Point(d.x, d.y),
+                tone, tone, Vector2.zero, Vector2.zero);
+
+            void Fill(float left, float bottom, float right, float top, Color tone) => Shape(
+                new Vector2(left, bottom), new Vector2(left, top), new Vector2(right, top), new Vector2(right, bottom), tone);
+
             void Line(float x1, float y1, float x2, float y2)
             {
-                Vector2 a = rect.center + new Vector2(x1 - 12f, y1 - 12f) * scale;
-                Vector2 b = rect.center + new Vector2(x2 - 12f, y2 - 12f) * scale;
+                Vector2 a = Point(x1, y1);
+                Vector2 b = Point(x2, y2);
                 var delta = (b - a).normalized;
                 var normal = new Vector2(-delta.y, delta.x) * (.85f * scale);
                 var cap = delta * (.65f * scale);
@@ -2138,12 +2171,15 @@ namespace YGOPortable.UI
             void Box(float left, float bottom, float right, float top) =>
                 Path((left, bottom), (left, top), (right, top), (right, bottom), (left, bottom));
 
+            Color ink = new Color(.055f, .085f, .13f, color.a);
+            Color shade = Color.Lerp(color, ink, .36f);
             switch (_location)
             {
                 case YgoConstants.LOCATION_HAND:
-                    Path((4, 5), (2, 15), (7, 18));
-                    Path((20, 5), (22, 15), (17, 18));
-                    Box(8, 4, 16, 20);
+                    Shape(new Vector2(4, 3), new Vector2(1, 17), new Vector2(8, 19), new Vector2(11, 5), shade);
+                    Shape(new Vector2(13, 5), new Vector2(16, 19), new Vector2(23, 17), new Vector2(20, 3), shade);
+                    Fill(7, 4, 17, 21, color);
+                    Fill(9, 7, 15, 16, ink);
                     break;
                 case YgoConstants.LOCATION_DECK:
                     Box(4, 10, 20, 19);
@@ -2156,10 +2192,11 @@ namespace YGOPortable.UI
                     Path((10.5f, 8), (13, 11), (10.5f, 14), (8, 11), (10.5f, 8));
                     break;
                 case YgoConstants.LOCATION_GRAVE:
-                    Path((6, 5), (6, 15), (8, 19), (12, 21), (16, 19), (18, 15), (18, 5));
-                    Line(3, 5, 21, 5);
-                    Line(12, 8, 12, 16);
-                    Line(9, 13, 15, 13);
+                    Fill(5, 5, 19, 17, color);
+                    Shape(new Vector2(5, 17), new Vector2(9, 21), new Vector2(15, 21), new Vector2(19, 17), color);
+                    Fill(2, 2.5f, 22, 5.5f, shade);
+                    Fill(10.8f, 7, 13.2f, 16, ink);
+                    Fill(8.2f, 11.3f, 15.8f, 13.7f, ink);
                     break;
                 case YgoConstants.LOCATION_REMOVED:
                     Path((8, 21), (16, 21), (21, 16), (21, 8), (16, 3), (8, 3), (3, 8), (3, 16), (8, 21));
@@ -2170,10 +2207,13 @@ namespace YGOPortable.UI
                     Path((3, 9), (12, 3), (21, 9));
                     break;
                 default:
-                    Box(2, 6, 22, 18);
-                    Line(2, 12, 22, 12);
-                    Line(9, 6, 9, 18);
-                    Line(15, 6, 15, 18);
+                    Fill(1, 4, 23, 20, shade);
+                    for (int column = 0; column < 3; column++)
+                    {
+                        float left = 3 + column * 6;
+                        Fill(left, 6, left + 5, 11, ink);
+                        Fill(left, 13, left + 5, 18, column == 1 ? color : ink);
+                    }
                     break;
             }
         }

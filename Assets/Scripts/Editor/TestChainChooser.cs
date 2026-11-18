@@ -330,7 +330,8 @@ namespace YGOPortable.Editor
         {
             using var view = new ChainView();
             var prompt = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_CHAIN, playerId = 0 };
-            foreach (uint loc in new[] { YgoConstants.LOCATION_GRAVE, YgoConstants.LOCATION_HAND, YgoConstants.LOCATION_GRAVE })
+            foreach (uint loc in new[] { YgoConstants.LOCATION_GRAVE, YgoConstants.LOCATION_HAND,
+                YgoConstants.LOCATION_GRAVE, YgoConstants.LOCATION_MZONE })
             {
                 prompt.candidates.Add(new SelectableCardItem
                 {
@@ -342,10 +343,18 @@ namespace YGOPortable.Editor
             }
             view.Show(duel, prompt);
             var list = view.Modals.ModalRoot.transform.Find("ChainWin/Cards/Viewport/Content");
-            Require(list.childCount == 2 && list.GetChild(0).Find("GroupFrame/Cards/Ch_0") != null &&
-                list.GetChild(0).Find("GroupFrame/Cards/Ch_2") != null && list.GetChild(1).Find("GroupFrame/Cards/Ch_1") != null,
+            Require(list.childCount == 3 && list.GetChild(0).Find("GroupFrame/Cards/Ch_0") != null &&
+                list.GetChild(0).Find("GroupFrame/Cards/Ch_2") != null && list.GetChild(1).Find("GroupFrame/Cards/Ch_1") != null &&
+                list.GetChild(2).Find("GroupFrame/Cards/Ch_3") != null,
                 "Grouping by location did not retain the original candidate identities.");
+            var icons = Enumerable.Range(0, list.childCount).Select(i =>
+                list.GetChild(i).Find("LocationTab/Icon").GetComponent<Graphic>()).ToArray();
+            Require(icons.All(glyph => !glyph.raycastTarget && glyph.rectTransform.rect.size == new Vector2(18f, 19f)) &&
+                icons.Select(glyph => glyph.color).Distinct().Count() == 3,
+                "The field, hand and graveyard glyphs were enlarged or lost their individual cues.");
             view.SelectChoice(2, LadyLabrynth);
+            Require(view.Choice(2).GetComponent<Outline>().effectDistance.x > view.Choice(0).GetComponent<Outline>().effectDistance.x,
+                "Moving the selection left the stronger outline on the previous card.");
             view.VerifyEffect(prompt.candidates[2]);
             view.ConfirmChoice();
             Require(view.Responses.SequenceEqual(new[] { 2 }), "A grouped chain option sent its visual index to the engine.");
@@ -710,6 +719,9 @@ namespace YGOPortable.Editor
                     Require(panel.rect.height > 0 && panel.rect.height < size.y * .5f &&
                             panel.rect.width > 0 && panel.rect.width < size.x * (single ? .5f : .8f),
                         $"Chain chooser is not compact at {size.x}×{size.y}.");
+                    var artwork = (RectTransform)Choice(0).Find("Card/V/AspectBox");
+                    Require(artwork.rect.height >= (size.y >= 900f ? 130f : 105f),
+                        $"Chain card artwork became too small at {size.x}×{size.y}.");
                 }
             }
 
