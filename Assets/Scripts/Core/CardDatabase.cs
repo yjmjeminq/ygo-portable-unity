@@ -392,6 +392,75 @@ namespace YGOPortable.Core
             { "Token", "토큰" },
             { "Spell Card", "마법 카드" },
             { "Trap Card", "함정 카드" },
+            { "Add it to your hand", "그 카드를 패에 넣는다" },
+            { "Apply 1 of the \"●\" effects?", "●로 표시된 효과 중 1개를 적용하시겠습니까?" },
+            { "Apply an effect", "효과를 적용한다" },
+            { "Apply effects", "효과를 적용한다" },
+            { "Activate 1 effect according to Attribute(s)", "속성 조건을 충족하는 효과 1개를 발동한다" },
+            { "Activate both of these effects", "두 효과를 모두 발동한다" },
+            { "Activate both effects, in sequence", "두 효과를 순서대로 발동한다" },
+            { "Activate effect now?", "지금 효과를 발동하시겠습니까?" },
+            { "Activate only", "추가 효과 없이 발동한다" },
+            { "Attack twice", "2회 공격할 수 있다" },
+            { "Can be activated this turn", "이 턴에 발동할 수 있다" },
+            { "Cannot be destroyed by battle", "전투로는 파괴되지 않는다" },
+            { "Change ATK/DEF", "공격력·수비력을 변경한다" },
+            { "Change name", "카드명을 변경한다" },
+            { "Change its battle position", "그 몬스터의 표시 형식을 변경한다" },
+            { "Change the battle position of 1 monster on the field", "필드의 몬스터 1장의 표시 형식을 변경한다" },
+            { "Detach 1 material from this card", "이 카드의 엑시즈 소재를 1개 제거한다" },
+            { "Destroy 1 card", "카드 1장을 파괴한다" },
+            { "Destroy 1 Spell/Trap your opponent controls", "상대 필드의 마법·함정 카드 1장을 파괴한다" },
+            { "Destroy Spell/Trap", "마법·함정 카드를 파괴한다" },
+            { "Destroy the targeted card", "대상 카드를 파괴한다" },
+            { "Discard 1 card", "패를 1장 버린다" },
+            { "Discard hand", "패를 전부 버린다" },
+            { "Draw 1", "카드를 1장 드로우한다" },
+            { "Draw 2 cards, then discard 1 card", "2장 드로우한 뒤 패를 1장 버린다" },
+            { "Effect already used", "이미 효과를 사용했다" },
+            { "Equip it to this card", "그 카드를 이 카드에 장착한다" },
+            { "Flip face-down", "뒷면 표시로 한다" },
+            { "Increase ATK/DEF", "공격력과 수비력을 올린다" },
+            { "Increase its Level", "그 몬스터의 레벨을 올린다" },
+            { "Inflict 500 damage", "500 데미지를 준다" },
+            { "LP Recovery", "LP를 회복한다" },
+            { "Monster destruction", "몬스터를 파괴한다" },
+            { "Multiple attacks", "여러 번 공격할 수 있다" },
+            { "Negate and destroy Spell Card", "마법 카드의 발동을 무효로 하고 파괴한다" },
+            { "Negate the attack", "공격을 무효로 한다" },
+            { "Negate the effect", "효과를 무효로 한다" },
+            { "Pay 500 LP", "500 LP를 지불한다" },
+            { "Place A-Counters", "A 카운터를 놓는다" },
+            { "Place counters", "카운터를 놓는다" },
+            { "Place on the bottom of the Deck", "덱 맨 아래에 놓는다" },
+            { "Prevent destruction", "파괴를 막는다" },
+            { "Recover", "회복한다" },
+            { "Return 1 card on the field to the hand", "필드의 카드 1장을 패로 되돌린다" },
+            { "Return 1 card your opponent controls to the hand", "상대 필드의 카드 1장을 패로 되돌린다" },
+            { "Return the targeted card to the hand", "대상 카드를 패로 되돌린다" },
+            { "Return to Extra Deck", "엑스트라 덱으로 되돌린다" },
+            { "S/T Destruction", "마법·함정 카드를 파괴한다" },
+            { "Search and Set", "덱에서 카드를 골라 세트한다" },
+            { "Select the card to place on top of your Deck", "덱 맨 위에 놓을 카드를 고른다" },
+            { "Select the monster to add to your hand or Special Summon", "패에 넣거나 특수 소환할 몬스터를 고른다" },
+            { "Self-destruct", "이 카드를 파괴한다" },
+            { "Self Destruct", "이 카드를 파괴한다" },
+            { "Send from deck to the Graveyard", "덱에서 묘지로 보낸다" },
+            { "Send the top 2 cards of your opponent's Deck to the GY", "상대 덱 위에서 카드 2장을 묘지로 보낸다" },
+            { "Set this card from your GY", "자신의 묘지에서 이 카드를 세트한다" },
+            { "Shuffle", "셔플한다" },
+            { "Special Summon from Graveyard", "묘지에서 특수 소환한다" },
+            { "Special Summon it in Defense Position", "그 몬스터를 수비 표시로 특수 소환한다" },
+            { "Special Summon this card as a Normal Monster", "이 카드를 일반 몬스터로 취급하여 특수 소환한다" },
+            { "Special summon itself from hand", "패에서 이 카드를 특수 소환한다" },
+            { "Special Summon the monster", "그 몬스터를 특수 소환한다" },
+            { "Special Summon this card to your field", "이 카드를 자신 필드에 특수 소환한다" },
+            { "Special Summon this card to your opponent's field", "이 카드를 상대 필드에 특수 소환한다" },
+            { "Special Summon 1 \"Runick\" from your Extra Deck", "엑스트라 덱에서 루닉 몬스터 1장을 특수 소환한다" },
+            { "Switch control", "컨트롤을 맞바꾼다" },
+            { "Take damage", "데미지를 받는다" },
+            { "Toss a coin", "코인 토스를 한다" },
+            { "Tribute 1 other monster", "다른 몬스터 1장을 릴리스한다" },
         };
 
         private static readonly Dictionary<ulong, string> CardEffectTextKR = new Dictionary<ulong, string>
@@ -541,6 +610,8 @@ namespace YGOPortable.Core
             _byLotdId = new Dictionary<int, CardInfo>(_allCards.Count);
             foreach (var c in _allCards)
             {
+                if (!string.IsNullOrEmpty(c.desc))
+                    c.desc = LocalizeEffectHeadings(c.desc);
                 if ((c.type & YgoConstants.TYPE_TOKEN) != 0 && !string.IsNullOrEmpty(c.name))
                 {
                     c.name = LocalizeTokenName(c.name);
@@ -1286,7 +1357,8 @@ namespace YGOPortable.Core
         }
 
         private static string LocalizeEffectHeadings(string text) =>
-            text.Replace("[Pendulum Effect]", "[펜듈럼 효과]").Replace("[Monster Effect]", "[몬스터 효과]");
+            text.Replace("[Pendulum Effect]", "[펜듈럼 효과]", StringComparison.OrdinalIgnoreCase)
+                .Replace("[Monster Effect]", "[몬스터 효과]", StringComparison.OrdinalIgnoreCase);
 
         private static CardInfo GetSameNameOriginal(CardInfo card)
         {

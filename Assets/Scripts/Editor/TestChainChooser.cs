@@ -23,6 +23,8 @@ namespace YGOPortable.Editor
             VerifySingleEffect(duel);
             VerifyKoreanEffect(duel);
             VerifyEffectOptions(duel);
+            VerifyKoreanPendulumReadouts(duel);
+            VerifyLightningStormOptions();
             VerifyBundledOptionDescriptions();
             VerifyKoreanEffectCatalogue();
             VerifyGroupedLocations(duel);
@@ -189,11 +191,112 @@ namespace YGOPortable.Editor
                 "Native procedure, attack, phase or cost prompts lost their distinct descriptions.");
         }
 
+        private static void VerifyKoreanPendulumReadouts(DuelSession duel)
+        {
+            const uint kepler = 11609969;
+            string rules = CardDatabase.Get(kepler)?.desc;
+            Require(rules?.Contains("[펜듈럼 효과]") == true, "The loaded card text kept the English Pendulum heading.");
+
+            using var view = new ChainView();
+            var field = new DuelFieldUI(null, view.Modals.ModalRoot.transform.parent, view.Modals, mobileLayout: false);
+            try
+            {
+                field.BindSession(duel, null, null);
+                field.InspectCard(kepler);
+                var root = field.Root.transform;
+                var inspect = root.Find("LeftInspector/CardDetails");
+                Require(inspect.GetComponentsInChildren<Text>().Any(text => text.text == rules),
+                    "The duel inspector lost the localized card rules.");
+                inspect.Find("ArtworkControls/Details/B").GetComponent<Button>().onClick.Invoke();
+                var detail = root.Find("Overlay_CardZoom");
+                Require(detail.gameObject.activeInHierarchy && detail.GetComponentsInChildren<Text>().Any(text => text.text == rules),
+                    "The card detail window lost the localized card rules.");
+
+                var card = CompositeCardView.Create(root, "RulesPreview", detailedOverlay: true, duelArtwork: true);
+                card.SetCard(kepler);
+                Require(card.transform.Find("AspectBox/Rules/Text").GetComponent<Text>().text == rules,
+                    "The card face kept the unlocalized text.");
+            }
+            finally
+            {
+                field.UnbindSession();
+            }
+        }
+
+        private static void VerifyLightningStormOptions()
+        {
+            const uint storm = 14532163, sparkman = 20721928, jarOfGreed = 83968380;
+            ulong description = (ulong)storm << 20;
+            var player = Enumerable.Repeat(storm, 40).ToArray();
+            var opponent = Enumerable.Repeat(sparkman, 20).Concat(Enumerable.Repeat(jarOfGreed, 20)).ToArray();
+            var empty = Array.Empty<uint>();
+            var ai = new TacticalAI();
+            string[] labels =
+            {
+                "상대 필드의 공격 표시 몬스터를 전부 파괴한다",
+                "상대 필드의 마법·함정 카드를 전부 파괴한다",
+            };
+
+            for (int choice = 0; choice < labels.Length; choice++)
+            {
+                using var duel = YgoProjectBuilder.StartSeedMatching("Lightning Storm options", player, empty, opponent, empty,
+                    false, session =>
+                    {
+                        var hand = session.Players[session.AiPlayerIndex].hand;
+                        return hand.Any(card => card.code == sparkman) && hand.Any(card => card.code == jarOfGreed);
+                    });
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+                int summon = duel.ActivePrompt.summonable.FindIndex(card => card.code == sparkman);
+                Require(summon >= 0 && duel.ActivePrompt.playerId == duel.AiPlayerIndex, "Lightning Storm fixture could not summon its target.");
+                duel.SubmitResponseInt(summon << 16);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+                int set = duel.ActivePrompt.sSetable.FindIndex(card => card.code == jarOfGreed);
+                Require(set >= 0, "Lightning Storm fixture could not set its target.");
+                duel.SubmitResponseInt((set << 16) | 4);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+                duel.SubmitResponseInt(7);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+
+                int activate = duel.ActivePrompt.activatable.FindIndex(card => card.code == storm);
+                Require(activate >= 0 && duel.ActivePrompt.playerId == duel.HumanPlayerIndex, "Lightning Storm was not available.");
+                duel.SubmitResponseInt((activate << 16) | 5);
+                using var view = new ChainView();
+                YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
+                {
+                    if (prompt.messageType != YgoConstants.MSG_SELECT_OPTION) return null;
+                    Require(prompt.options.SequenceEqual(new[] { description, description | 1 }),
+                        "Lightning Storm did not offer both expected native choices.");
+                    view.Modals.ShowPrompt(duel, prompt);
+                    var buttons = view.Modals.ModalRoot.GetComponentsInChildren<Button>();
+                    for (int i = 0; i < labels.Length; i++)
+                    {
+                        var option = buttons.Single(button => button.name == $"Opt_{i}");
+                        Require(option.GetComponentInChildren<Text>().text == labels[i], "Lightning Storm displayed an ambiguous label.");
+                    }
+                    buttons.Single(button => button.name == $"Opt_{choice}").onClick.Invoke();
+                    Require(view.Responses.SequenceEqual(new[] { choice }), "The localized option changed the native response index.");
+                    return BitConverter.GetBytes(view.Responses[0]);
+                });
+
+                var target = duel.Players[duel.AiPlayerIndex];
+                Require(view.Responses.Count == 1 && duel.RetryCount == 0 &&
+                    target.grave.Any(card => card.code == (choice == 0 ? sparkman : jarOfGreed)) &&
+                    target.mzone.Any(card => card?.code == sparkman) == (choice == 1) &&
+                    target.szone.Any(card => card?.code == jarOfGreed) == (choice == 0),
+                    "The Korean choice did not match the destroyed cards.");
+            }
+            Debug.Log("[VERIFY KOREAN NATIVE OPTIONS] Lightning Storm offered both Korean choices and resolved the chosen effect twice.");
+        }
+
         private static void VerifyKoreanEffectCatalogue()
         {
             int labels = 0, withDescriptions = 0;
             foreach (var card in CardDatabase.AllCards)
             {
+                string rules = card.desc ?? "";
+                Require(!rules.Contains("[Pendulum Effect]", StringComparison.OrdinalIgnoreCase) &&
+                    !rules.Contains("[Monster Effect]", StringComparison.OrdinalIgnoreCase),
+                    $"An English heading remained in the loaded card text for {card.code}.");
                 for (int i = 0; i < (card.strs?.Length ?? 0); i++)
                 {
                     if (string.IsNullOrWhiteSpace(card.strs[i])) continue;
