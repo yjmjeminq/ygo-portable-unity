@@ -521,7 +521,7 @@ namespace YGOPortable.UI
 
             var bg = LotdUiKit.FillRect("ArenaGround", root);
             var ground = bg.gameObject.AddComponent<DuelArenaGround>();
-            ground.texture = DuelVisualAssets.Ground ?? DuelStyle.Stone;
+            ground.texture = DuelVisualAssets.ArenaBackdrop ?? DuelStyle.Stone;
             ground.raycastTarget = false;
 
             var playArea = _mobileLayout ? MobileSafeArea.Create(root) : root;
@@ -695,8 +695,11 @@ namespace YGOPortable.UI
                 new Vector2(.145f, .221f), new Vector2(.894f, .88f), Vector2.zero, Vector2.zero);
             _boardRect = board;
             _mat = LotdUiKit.FillRect("StoneMat", board).gameObject.AddComponent<DuelMat>();
-            _mat.texture = DuelVisualAssets.Field ?? DuelStyle.Stone;
+            _mat.texture = Texture2D.whiteTexture;
             _mat.raycastTarget = false;
+            var surface = LotdUiKit.FillRect("SlabSurface", board).gameObject.AddComponent<DuelMatSurface>();
+            surface.texture = DuelVisualAssets.ArenaSurface ?? DuelStyle.Stone;
+            surface.raycastTarget = false;
             RectTransform Cell(int col, int row) => DuelZoneImage.CreateCell(board, col, row);
             FieldSlotView LinkCell(int column, int row)
             {
@@ -753,7 +756,7 @@ namespace YGOPortable.UI
             return button;
         }
 
-        private static readonly Color ZoneTint = new Color(0.28f, 0.31f, 0.24f, 0.33f);
+        private static readonly Color ZoneTint = new Color(.032f, .07f, .092f, .42f);
         private static readonly Vector2 SlotCardMin = new Vector2(.045f, .012f);
         private static readonly Vector2 SlotCardMax = new Vector2(.955f, .988f);
 

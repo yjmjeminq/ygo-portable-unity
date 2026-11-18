@@ -61,6 +61,12 @@ namespace YGOPortable.Editor
             {
                 field.BindSession(duel, null, null);
                 var viewport = field.Root.transform.Find("MobileSafeArea");
+                var backdrop = field.Root.transform.Find("ArenaGround").GetComponent<DuelArenaGround>();
+                var surface = viewport.Find("DuelBoard/SlabSurface").GetComponent<DuelMatSurface>();
+                Require(backdrop.texture != null && backdrop.texture.name == "ObservatoryBackdrop" &&
+                    surface.texture != null && surface.texture.name == "ObservatorySlab" &&
+                    !backdrop.raycastTarget && !surface.raycastTarget,
+                    "The arena did not use its bundled art or intercepted field input.");
                 var left = viewport.Find("LeftInspector");
                 var slot = (RectTransform)viewport.Find("DuelBoard/Zone_4_3");
                 var actions = (RectTransform)viewport.Find("CardActions");

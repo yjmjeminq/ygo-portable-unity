@@ -9,8 +9,8 @@ namespace YGOPortable.UI
         private static readonly float[] RowEdges = { 1f, .80f, .60f, .40f, .20f, 0f };
         private static readonly Vector2[] Corners =
         {
-            new Vector2(.20f, .08f), new Vector2(.80f, .08f), new Vector2(.92f, .22f), new Vector2(.92f, .78f),
-            new Vector2(.80f, .92f), new Vector2(.20f, .92f), new Vector2(.08f, .78f), new Vector2(.08f, .22f),
+            new Vector2(.12f, .078f), new Vector2(.88f, .078f), new Vector2(.947f, .153f), new Vector2(.947f, .847f),
+            new Vector2(.88f, .922f), new Vector2(.12f, .922f), new Vector2(.053f, .847f), new Vector2(.053f, .153f),
         };
 
         private Vector4 _edges = new Vector4(0f, 1f, 0f, 1f);
@@ -83,16 +83,13 @@ namespace YGOPortable.UI
             Rect rect = GetPixelAdjustedRect();
             if (rect.width <= 0f || rect.height <= 0f) return;
 
-            Color tone = color;
-            bool paintedZone = DuelVisualAssets.Field != null &&
-                tone.r < .4f && tone.g < .4f && tone.b < .4f;
             bool link = LinkHighlighted && !_placementHighlighted;
-            if (link) tone = new Color(.27f, .40f, .82f, .48f);
-            else if (paintedZone) tone.a *= .45f;
+            Color tone = link ? new Color(.27f, .40f, .82f, .48f) : color;
             int center = mesh.currentVertCount;
             mesh.AddVert(rect.center, tone, Vector2.zero);
+            var recess = new Color(tone.r * .70f, tone.g * .72f, tone.b * .76f, Mathf.Min(1f, tone.a * 1.13f));
             for (int i = 0; i < Corners.Length; i++)
-                mesh.AddVert(Corner(rect, i, .92f), tone, Vector2.zero);
+                mesh.AddVert(Corner(rect, i, .965f), recess, Vector2.zero);
             for (int i = 0; i < Corners.Length; i++)
                 mesh.AddTriangle(center, center + 1 + i, center + 1 + (i + 1) % Corners.Length);
 
@@ -102,16 +99,16 @@ namespace YGOPortable.UI
                 return;
             }
 
-            if (paintedZone || link) return;
-            var shadow = new Color(.07f, .08f, .065f, Mathf.Max(.30f, tone.a * .75f));
-            var light = new Color(.83f, .82f, .65f, Mathf.Max(.27f, tone.a * .66f));
+            if (link) return;
+            var shadow = new Color(.32f, .45f, .51f, .53f);
+            var light = new Color(.57f, .62f, .62f, .48f);
             for (int i = 0; i < Corners.Length; i++)
             {
-                Vector2 a = Corner(rect, i, 1f);
-                Vector2 b = Corner(rect, i + 1, 1f);
                 var rim = i < 4 ? light : shadow;
-                DuelMat.AddQuad(mesh, a, Corner(rect, i, .93f), Corner(rect, i + 1, .93f), b,
-                    rim, rim, Vector2.zero, Vector2.zero);
+                var fade = new Color(rim.r, rim.g, rim.b, 0f);
+                Vector2 a = Corner(rect, i, .991f), b = Corner(rect, i + 1, .991f);
+                DuelMat.AddQuad(mesh, Corner(rect, i, 1.022f), a, b, Corner(rect, i + 1, 1.022f), fade, rim);
+                DuelMat.AddQuad(mesh, a, Corner(rect, i, .944f), Corner(rect, i + 1, .944f), b, rim, fade);
             }
         }
 
@@ -157,42 +154,59 @@ namespace YGOPortable.UI
         protected override void OnPopulateMesh(VertexHelper mesh)
         {
             mesh.Clear();
-            const int columns = 14, rows = 10;
             var rect = GetPixelAdjustedRect();
-            for (int y = 0; y <= rows; y++)
+            if (rect.width <= 0f || rect.height <= 0f) return;
+            float screenAspect = rect.width / rect.height;
+            float textureAspect = (float)mainTexture.width / mainTexture.height;
+            // Fill the screen without stretching the architecture on wider displays.
+            var extent = new Vector2(Mathf.Min(1f, screenAspect / textureAspect), Mathf.Min(1f, textureAspect / screenAspect));
+            Vector2 cropMin = (Vector2.one - extent) * .5f;
+            DuelMat.AddQuad(mesh, rect.min, new Vector2(rect.xMin, rect.yMax), rect.max, new Vector2(rect.xMax, rect.yMin),
+                new Color(.72f, .79f, .87f), new Color(.86f, .92f, .98f), cropMin, cropMin + extent);
+        }
+    }
+
+    internal sealed class DuelMatSurface : RawImage
+    {
+        protected override void OnPopulateMesh(VertexHelper mesh)
+        {
+            mesh.Clear();
+            var rect = GetPixelAdjustedRect();
+            var (nearLeft, nearRight, farLeft, farRight) = DuelMat.Corners(rect);
+            var close = new Color(.98f, 1f, 1f);
+            var far = new Color(.84f, .91f, .99f);
+            const int bands = 16;
+            for (int i = 0; i < bands; i++)
             {
-                for (int x = 0; x <= columns; x++)
-                {
-                    float u = (float)x / columns, v = (float)y / rows;
-                    float patch = Mathf.PerlinNoise(u * 5.2f + 3f, v * 4.6f + 7f);
-                    float edge = Mathf.SmoothStep(.2f, 1f, Mathf.Abs(u - .53f) * 1.85f + Mathf.Abs(v - .51f) * .68f);
-                    var vegetation = Color.Lerp(new Color(.25f, .30f, .19f), new Color(.66f, .72f, .48f), patch);
-                    vegetation *= Mathf.Lerp(1f, .55f, edge);
-                    vegetation.a = 1f;
-                    mesh.AddVert(DuelMat.Point(rect, u, v), vegetation, new Vector2(u * 1.9f, v * 1.37f));
-                }
-            }
-            for (int y = 0; y < rows; y++)
-            {
-                for (int x = 0; x < columns; x++)
-                {
-                    int corner = y * (columns + 1) + x;
-                    mesh.AddTriangle(corner, corner + columns + 1, corner + columns + 2);
-                    mesh.AddTriangle(corner, corner + columns + 2, corner + 1);
-                }
+                float low = (float)i / bands, high = (float)(i + 1) / bands;
+                DuelMat.AddQuad(mesh, Vector2.Lerp(nearLeft, farLeft, low), Vector2.Lerp(nearLeft, farLeft, high),
+                    Vector2.Lerp(nearRight, farRight, high), Vector2.Lerp(nearRight, farRight, low),
+                    Color.Lerp(close, far, low), Color.Lerp(close, far, high), new Vector2(0f, low), new Vector2(1f, high));
             }
         }
     }
 
     internal sealed class DuelMat : RawImage
     {
-        private Color _side = DuelStyle.Player;
+        private static readonly float[] RailStops = { .13f, .19f, .81f, .87f };
+        private static readonly float[] RailOffsets = { -8f, -1.7f, 0f, 1.7f, 8f };
+        private static readonly float[] RailProfile = { 0f, .47f, 1f, .47f, 0f };
+        private bool _opponentTurn;
+        private float _opponentLight;
 
         internal void ShowTurn(bool opponent)
         {
-            var side = DuelStyle.Side(opponent);
-            if (_side == side) return;
-            _side = side;
+            if (_opponentTurn == opponent) return;
+            _opponentTurn = opponent;
+            if (!Application.isPlaying) _opponentLight = opponent ? 1f : 0f;
+            SetVerticesDirty();
+        }
+
+        private void Update()
+        {
+            float target = _opponentTurn ? 1f : 0f;
+            if (_opponentLight == target || CardAnimationManager.Instance?.Paused == true) return;
+            _opponentLight = Mathf.MoveTowards(_opponentLight, target, Time.unscaledDeltaTime * 5f * DuelFieldUI.PlaybackRate);
             SetVerticesDirty();
         }
 
@@ -200,67 +214,71 @@ namespace YGOPortable.UI
         {
             mesh.Clear();
             Rect rect = GetPixelAdjustedRect();
-            Vector2 nearLeft = Point(rect, 0f, 0f);
-            Vector2 nearRight = Point(rect, 1f, 0f);
-            Vector2 farLeft = Point(rect, DuelZoneImage.ProjectX(0f, 1f), 1f);
-            Vector2 farRight = Point(rect, DuelZoneImage.ProjectX(1f, 1f), 1f);
-            Vector2 drop = Vector2.down * Mathf.Clamp(rect.height * .047f, 10f, 33f);
-            var shadow = new Color(0.10f, .11f, .08f, .86f);
+            var (nearLeft, nearRight, farLeft, farRight) = Corners(rect);
+            Vector2 drop = Vector2.down * Mathf.Clamp(rect.height * .041f, 11f, 28f);
+            Vector2 footInset = new Vector2(6f, 0f);
+            Vector2 bottomLeft = nearLeft + drop + footInset;
+            Vector2 bottomRight = nearRight + drop - footInset;
+            float spread = Mathf.Clamp(rect.width * .023f, 10f, 36f);
+            var shadow = new Color(.008f, .022f, .034f, .70f);
+            var transparent = new Color(shadow.r, shadow.g, shadow.b, 0f);
+            AddQuad(mesh, bottomLeft + drop * 1.6f + Vector2.left * spread, bottomLeft, bottomRight,
+                bottomRight + drop * 1.6f + Vector2.right * spread, transparent, shadow);
+            AddQuad(mesh, bottomLeft + Vector2.left * spread, bottomLeft, farLeft + drop * .35f,
+                farLeft + Vector2.left * spread * .8f, transparent, shadow);
+            AddQuad(mesh, farRight + Vector2.right * spread * .8f, farRight + drop * .35f, bottomRight,
+                bottomRight + Vector2.right * spread, transparent, shadow);
 
-            AddQuad(mesh, nearLeft + drop * 1.15f + Vector2.left * 14f, farLeft + Vector2.left * 14f,
-                farRight + Vector2.right * 14f, nearRight + drop * 1.15f + Vector2.right * 14f,
-                shadow, shadow, new Vector2(.07f, .16f), new Vector2(.34f, .54f));
-            var stoneSide = new Color(.43f, .43f, .34f);
-            AddQuad(mesh, nearLeft + drop, nearLeft, nearRight, nearRight + drop,
-                stoneSide * .5f, stoneSide, new Vector2(.04f, .21f), new Vector2(1.14f, .29f));
+            var basalt = new Color(.041f, .073f, .093f);
+            var reflected = new Color(.17f, .243f, .278f);
+            AddQuad(mesh, bottomLeft, nearLeft, nearRight, bottomRight, basalt, reflected);
+            AddQuad(mesh, bottomLeft, nearLeft, farLeft, farLeft + drop * .33f, basalt, reflected * .68f);
+            AddQuad(mesh, farRight + drop * .33f, farRight, nearRight, bottomRight, basalt, reflected * .86f);
+            var lip = new Color(.46f, .42f, .34f, .82f);
+            Line(mesh, nearLeft, nearRight, 3.2f, lip);
+            Line(mesh, nearLeft, farLeft, 3f, lip);
+            Line(mesh, farLeft, farRight, 3f, lip);
+            Line(mesh, farRight, nearRight, 3f, lip);
+            Line(mesh, bottomLeft, bottomRight, 1.4f, new Color(.36f, .47f, .48f, .62f));
 
-            var close = new Color(.85f, .87f, .76f);
-            var far = new Color(.67f, .71f, .61f);
-            if (DuelVisualAssets.Field != null)
-            {
-                close = new Color(.95f, .96f, .91f);
-                far = new Color(.78f, .82f, .74f);
-            }
-            const int rows = 12;
-            for (int i = 0; i < rows; i++)
-            {
-                float low = (float)i / rows, high = (float)(i + 1) / rows;
-                AddQuad(mesh, Vector2.Lerp(nearLeft, farLeft, low), Vector2.Lerp(nearLeft, farLeft, high),
-                    Vector2.Lerp(nearRight, farRight, high), Vector2.Lerp(nearRight, farRight, low),
-                    Color.Lerp(close, far, low), Color.Lerp(close, far, high), new Vector2(0f, low), new Vector2(1f, high));
-            }
-
-            var cutEdge = new Color(.34f, .38f, .25f);
-            var upperEdge = new Color(.60f, .62f, .47f);
-            DrawEdge(mesh, nearLeft, farLeft, upperEdge, cutEdge);
-            DrawEdge(mesh, farLeft, farRight, upperEdge, cutEdge);
-            DrawEdge(mesh, farRight, nearRight, upperEdge, cutEdge);
-            DrawEdge(mesh, nearRight, nearLeft, upperEdge, cutEdge);
-
-            var middleLeft = Vector2.Lerp(nearLeft, farLeft, .49f);
-            var middleRight = Vector2.Lerp(nearRight, farRight, .49f);
-            Line(mesh, middleLeft, middleRight, 1.5f, new Color(.43f, .46f, .32f, .62f));
-            // Only the active side is illuminated.
-            bool opposite = _side == DuelStyle.Opponent;
-            var lineColor = new Color(_side.r, _side.g, _side.b, .77f);
-            float inset = opposite ? .957f : .032f;
-            Vector2 a = Vector2.Lerp(nearLeft, farLeft, inset), b = Vector2.Lerp(nearRight, farRight, inset);
-            Line(mesh, Vector2.Lerp(a, b, .06f), Vector2.Lerp(a, b, .94f), 3f, lineColor);
+            float farPower = Mathf.SmoothStep(0f, 1f, _opponentLight);
+            DrawRail(mesh, nearLeft + drop * .41f, nearRight + drop * .41f, DuelStyle.Player, 1f - farPower);
+            DrawRail(mesh, farLeft + Vector2.up * 3.5f, farRight + Vector2.up * 3.5f, DuelStyle.Opponent, farPower);
         }
 
-        private static void DrawEdge(VertexHelper mesh, Vector2 a, Vector2 b, Color light, Color dark)
+        private static void DrawRail(VertexHelper mesh, Vector2 left, Vector2 right, Color accent, float power)
         {
-            Line(mesh, a, b, 9f, dark);
-            Line(mesh, a, b, 2f, light);
+            int first = mesh.currentVertCount;
+            for (int i = 0; i < RailStops.Length; i++)
+            {
+                Vector2 origin = Vector2.Lerp(left, right, RailStops[i]);
+                float intensity = i == 0 || i == RailStops.Length - 1 ? 0f : Mathf.Lerp(.12f, .91f, power);
+                for (int band = 0; band < RailOffsets.Length; band++)
+                {
+                    var color = new Color(accent.r, accent.g, accent.b, intensity * RailProfile[band]);
+                    mesh.AddVert(origin + Vector2.up * RailOffsets[band], color, Vector2.zero);
+                }
+            }
+            int stride = RailOffsets.Length;
+            for (int i = 0; i < RailStops.Length - 1; i++)
+            for (int band = 0; band < stride - 1; band++)
+            {
+                int v = first + i * stride + band;
+                mesh.AddTriangle(v, v + 1, v + stride + 1);
+                mesh.AddTriangle(v, v + stride + 1, v + stride);
+            }
         }
 
         private static void Line(VertexHelper mesh, Vector2 a, Vector2 b, float width, Color color)
         {
             var delta = (b - a).normalized;
             var normal = new Vector2(-delta.y, delta.x) * (width * .5f);
-            AddQuad(mesh, a - normal, a + normal, b + normal, b - normal, color, color,
-                new Vector2(.355f, .365f), new Vector2(.355f, .365f));
+            AddQuad(mesh, a - normal, a + normal, b + normal, b - normal, color, color);
         }
+
+        internal static (Vector2 NearLeft, Vector2 NearRight, Vector2 FarLeft, Vector2 FarRight) Corners(Rect rect) =>
+            (rect.min, new Vector2(rect.xMax, rect.yMin), Point(rect, DuelZoneImage.ProjectX(0f, 1f), 1f),
+                Point(rect, DuelZoneImage.ProjectX(1f, 1f), 1f));
 
         internal static Vector2 Point(Rect rect, float x, float y)
         {
@@ -268,7 +286,7 @@ namespace YGOPortable.UI
         }
 
         internal static void AddQuad(VertexHelper mesh, Vector2 a, Vector2 b, Vector2 c, Vector2 d,
-            Color low, Color high, Vector2 minUv, Vector2 maxUv)
+            Color low, Color high, Vector2 minUv = default, Vector2 maxUv = default)
         {
             int index = mesh.currentVertCount;
             mesh.AddVert(a, low, minUv);

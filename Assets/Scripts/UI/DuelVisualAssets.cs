@@ -9,8 +9,8 @@ namespace YGOPortable.UI
     internal static class DuelVisualAssets
     {
         private static readonly Dictionary<DuelEffectKind, Sprite> Effects = new();
-        internal static Texture2D Field { get; } = LoadTexture("Field.png", TextureWrapMode.Clamp);
-        internal static Texture2D Ground { get; } = LoadTexture("Ground.png", TextureWrapMode.Repeat);
+        internal static Texture2D ArenaSurface { get; } = Resources.Load<Texture2D>("Duel/ObservatorySlab");
+        internal static Texture2D ArenaBackdrop { get; } = Resources.Load<Texture2D>("Duel/ObservatoryBackdrop");
         internal static Sprite MasterDuelLogo { get; } = Resources.Load<Sprite>("Title/MasterDuelLogo") ??
             LoadHudSprite("MasterDuelLogo");
         internal static Sprite PhaseBase { get; } = LoadHudSprite("PhaseBase");
