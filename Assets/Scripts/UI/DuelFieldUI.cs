@@ -219,6 +219,7 @@ namespace YGOPortable.UI
             UnbindSession();
             _session = session;
             session.OnCardMoved += HandleCardMovedEvent;
+            session.OnCardLocationsChanged += FollowInspectedCards;
             session.OnCardsDrawn += HandleCardsDrawn;
             session.OnLifePointsChanged += HandleLifePointsChanged;
             session.OnTurnStarted += HandleTurnStarted;
@@ -256,6 +257,7 @@ namespace YGOPortable.UI
             if (_session != null)
             {
                 _session.OnCardMoved -= HandleCardMovedEvent;
+                _session.OnCardLocationsChanged -= FollowInspectedCards;
                 _session.OnCardsDrawn -= HandleCardsDrawn;
                 _session.OnLifePointsChanged -= HandleLifePointsChanged;
                 _session.OnTurnStarted -= HandleTurnStarted;
@@ -360,6 +362,38 @@ namespace YGOPortable.UI
 
         private LiveCardState ReadVisibleFieldCard(uint code, (byte controller, uint location, uint sequence)? location) =>
             location is { } slot ? _session?.GetVisibleFieldCard(code, slot.controller, slot.location, slot.sequence) : null;
+
+        private void FollowInspectedCards(CardMoveEvent move, CardMoveEvent swapPartner)
+        {
+            var before = _inspectedFieldCard;
+            _inspectedFieldCard = FollowFieldCard(before, _inspectedCode, move, swapPartner);
+            if (_zoomFieldCard.HasValue)
+                _zoomFieldCard = FollowFieldCard(_zoomFieldCard, _zoomCardView.CurrentCode, move, swapPartner);
+
+            if (before is not { } source || before == _inspectedFieldCard) return;
+            var slot = GetSlot(source.controller, source.location, source.sequence);
+            if (slot == null) return;
+            ClearPointerCard(slot.focusArt);
+            if (_usingDuelPad && (_duelPadBoardFocus == slot.root || _duelPadPendingFieldFocus == slot.root))
+                _duelPadPendingFieldFocus = _inspectedFieldCard is { } destination
+                    ? GetSlot(destination.controller, destination.location, destination.sequence)?.root : null;
+        }
+
+        private static (byte controller, uint location, uint sequence)? FollowFieldCard(
+            (byte controller, uint location, uint sequence)? inspected, uint code, CardMoveEvent move, CardMoveEvent swapPartner)
+        {
+            if (inspected is not { } source) return null;
+            if (source != (move.fromCon, move.fromLoc, move.fromSeq))
+            {
+                if (swapPartner == null || source != (swapPartner.fromCon, swapPartner.fromLoc, swapPartner.fromSeq))
+                    return source;
+                move = swapPartner;
+            }
+            if (move.code != code || (move.toPos & YgoConstants.POS_FACEUP) == 0 ||
+                move.toLoc is not (YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE))
+                return null;
+            return (move.toCon, move.toLoc, move.toSeq);
+        }
 
         private void RefreshInspectorReadout(bool showChanges = true)
         {
@@ -1059,7 +1093,7 @@ namespace YGOPortable.UI
             BindEmz(_emz[1], me, 6, opponent, 5, mine.mzone[6], theirs.mzone[5]);
 
             RefreshInspectorReadout();
-            if (_cardZoomModal.activeSelf && _zoomFieldCard.HasValue) RefreshZoomReadout(_zoomCardView.CurrentCode);
+            if (_cardZoomModal.activeSelf) RefreshZoomReadout(_zoomCardView.CurrentCode);
             RefreshHand(mine.hand, me, false);
             RefreshHand(theirs.hand, opponent, true);
             RefreshLogFeed();
@@ -2745,7 +2779,7 @@ namespace YGOPortable.UI
                     int response = _stagedPlacement.Value.command;
                     _stagedPlacement = null;
                     if (_usingDuelPad)
-                        _duelPadPlacementFocus = GetSlot(con, loc, seq)?.root;
+                        _duelPadPendingFieldFocus = GetSlot(con, loc, seq)?.root;
                     // The staged destination is validated against the engine's placement prompt before use.
                     ExecuteActionInt(response, (con, loc, seq));
                     if (TryAutoFulfillPreferredPrompt()) Refresh();
@@ -2784,7 +2818,7 @@ namespace YGOPortable.UI
                 }
                 _pendingPlaces.Clear();
                 if (_usingDuelPad)
-                    _duelPadPlacementFocus = GetSlot(con, loc, seq)?.root;
+                    _duelPadPendingFieldFocus = GetSlot(con, loc, seq)?.root;
                 _actionPopup.SetActive(false);
                 _session.SubmitResponse(resp);
                 Refresh();

@@ -25,6 +25,8 @@ namespace YGOPortable.Editor
             VerifyMainPhaseAndStaleState();
             VerifyOpponentTurnActivation();
             VerifyNativeCombatReadout();
+            VerifyInspectedCardMoves(swapInPlace: true);
+            VerifyInspectedCardMoves(swapInPlace: false);
             Debug.Log("[VERIFY HAND GLOW] Native summons and effects, distinct hand copies, blocked prompts, animation, off-turn activation and field-only monster ratings passed.");
         }
 
@@ -250,6 +252,97 @@ namespace YGOPortable.Editor
                 readout.Find("Defender/Values/Defense/Digits/Value").GetComponent<Text>().text == "2000",
                 "The attack presentation lost the native equipped attack or the revealed defense.");
             Debug.Log("[VERIFY DUEL BATTLE STATS] Native battle displayed the equipped 2700 ATK and the revealed 2000 DEF.");
+        }
+
+        private static void VerifyInspectedCardMoves(bool swapInPlace)
+        {
+            const uint axe = 40619825, creatureSwap = 31036355, bookOfMoon = 14087893;
+            uint[] main = Enumerable.Repeat(KaiserSeaHorse, 22).Concat(Enumerable.Repeat(axe, 6))
+                .Concat(Enumerable.Repeat(creatureSwap, 6)).Concat(Enumerable.Repeat(bookOfMoon, 6)).ToArray();
+            uint[] enemy = Enumerable.Repeat(KaiserSeaHorse, 40).ToArray();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Inspected card moves", main, Array.Empty<uint>(),
+                enemy, Array.Empty<uint>(), true, session =>
+                {
+                    var hand = session.Players[session.HumanPlayerIndex].hand;
+                    return new[] { KaiserSeaHorse, axe, creatureSwap, bookOfMoon }.All(code => hand.Any(card => card.code == code));
+                });
+            var ai = new TacticalAI();
+
+            void ReachIdle(Func<DuelPrompt, byte[]> choose = null)
+            {
+                YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt => choose?.Invoke(prompt) ??
+                    (prompt.messageType == YgoConstants.MSG_SELECT_CARD && prompt.candidates.Count == 1
+                        ? DuelSession.PackCardSelection(0) : null));
+                Require(duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD && duel.RetryCount == 0,
+                    $"The native transfer fixture stopped at prompt {duel.ActivePrompt?.messageType}, with {duel.RetryCount} retries.");
+            }
+
+            void Activate(uint code)
+            {
+                int index = duel.ActivePrompt.activatable.FindIndex(card => card.code == code);
+                Require(index >= 0, $"The transfer fixture could not activate {CardDatabase.GetName(code)}.");
+                duel.SubmitResponseInt((index << 16) | 5);
+            }
+
+            var mine = duel.Players[duel.HumanPlayerIndex];
+            var theirs = duel.Players[duel.AiPlayerIndex];
+            duel.SubmitResponseInt(0);
+            ReachIdle();
+            Activate(axe);
+            ReachIdle();
+            duel.SubmitResponseInt(7);
+            ReachIdle();
+            duel.SubmitResponseInt(0);
+            ReachIdle();
+            duel.SubmitResponseInt(7);
+            ReachIdle();
+            uint origin = mine.mzone.Single(card => card != null).sequence;
+            uint other = theirs.mzone.Single(card => card != null).sequence;
+            uint destination = swapInPlace ? other : (other + 1) % 5;
+
+            using var ui = new HandUI(duel);
+            const string statPath = "Attack/Digits/Value";
+            var inspector = ui.Field.Root.transform.Find($"LeftInspector/CardDetails/CombatStats/{statPath}").GetComponent<Text>();
+            var zoom = ui.Field.Root.transform.Find($"Overlay_CardZoom/ZoomWin/Info/CombatStats/{statPath}").GetComponent<Text>();
+            var source = ui.Field.Root.transform.Find($"DuelBoard/Zone_{origin + 2}_3");
+            source.GetComponent<CardDragTrigger>().OnRightClick();
+            var focus = typeof(DuelFieldUI).GetField("_duelPadFocus", PrivateInstance);
+            typeof(DuelFieldUI).GetField("_usingDuelPad", PrivateInstance).SetValue(ui.Field, true);
+            focus.SetValue(ui.Field, source);
+            ui.Field.HandleDuelPad(new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Alternate));
+            Require(ui.Field.IsReadingCardDetails && inspector.text == "2700" && zoom.text == "2700",
+                "The selected, equipped copy did not open in the controller's card-details view.");
+
+            bool paired = false;
+            duel.OnCardLocationsChanged += (_, partner) => paired |= partner != null;
+            Activate(creatureSwap);
+            ReachIdle(prompt =>
+            {
+                uint sequence = prompt.playerId == duel.HumanPlayerIndex ? origin : destination;
+                if (prompt.messageType != YgoConstants.MSG_SELECT_PLACE || (prompt.placeFlag & (1u << (int)sequence)) != 0)
+                    return null;
+                return new[] { prompt.playerId, (byte)YgoConstants.LOCATION_MZONE, (byte)sequence };
+            });
+            ui.Field.Refresh();
+            Require(paired == swapInPlace && mine.mzone[origin]?.attack == 1700 && theirs.mzone[destination]?.attack == 2700 &&
+                inspector.text == "2700" && zoom.text == "2700",
+                "The inspector or details switched to the identical card occupying the old zone.");
+            ui.Field.HandleDuelPad(new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Cancel));
+            var expected = ui.Field.Root.transform.Find($"DuelBoard/Zone_{6 - destination}_1");
+            Require(!ui.Field.IsReadingCardDetails && expected != null && (Transform)focus.GetValue(ui.Field) == expected &&
+                inspector.text == "2700", "Controller focus did not return to the same card after the control change.");
+
+            ui.Field.HandleDuelPad(new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Alternate));
+            Activate(bookOfMoon);
+            ReachIdle(prompt => prompt.messageType == YgoConstants.MSG_SELECT_CARD
+                ? DuelSession.PackCardSelection(prompt.candidates.FindIndex(card =>
+                    card.controller == duel.AiPlayerIndex && card.sequence == destination)) : null);
+            ui.Field.Refresh();
+            Require(theirs.mzone[destination]?.position == YgoConstants.POS_FACEDOWN_DEFENSE &&
+                inspector.text == "1700" && zoom.text == "1700" &&
+                typeof(DuelFieldUI).GetField("_zoomFieldCard", PrivateInstance).GetValue(ui.Field) == null,
+                "A face-down transfer kept the captured live stats in its details.");
+            Debug.Log($"[VERIFY DUEL CARD FOLLOW] {(swapInPlace ? "Paired swap" : "Zone transfer")} kept the equipped copy's stats and controller focus, then released its hidden state.");
         }
 
         private static bool IsAshBlossomPrompt(DuelSession duel, DuelPrompt prompt)

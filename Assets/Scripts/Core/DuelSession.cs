@@ -238,6 +238,7 @@ namespace YGOPortable.Core
         }
 
         public event Action<CardMoveEvent> OnCardMoved;
+        internal event Action<CardMoveEvent, CardMoveEvent> OnCardLocationsChanged;
         public event Action<byte, IReadOnlyList<uint>> OnCardsDrawn;
         public event Action<byte, int, int> OnLifePointsChanged;
         public event Action<int, int> OnTurnStarted;
@@ -622,7 +623,14 @@ namespace YGOPortable.Core
             return live?.IsFaceUp == true && live.code == code ? live : null;
         }
 
-        private void NotifyCardMoved(CardMoveEvent move)
+        private void NotifyCardMoved(CardMoveEvent move, CardMoveEvent swapPartner = null)
+        {
+            OnCardLocationsChanged?.Invoke(move, swapPartner);
+            PublishCardMove(move);
+            if (swapPartner != null) PublishCardMove(swapPartner);
+        }
+
+        private void PublishCardMove(CardMoveEvent move)
         {
             if (YgoConstants.IsFieldZone(move.toLoc, move.toSeq) &&
                 (move.fromCon != move.toCon || move.fromLoc != move.toLoc || move.fromSeq != move.toSeq))
@@ -631,15 +639,13 @@ namespace YGOPortable.Core
             OnCardMoved?.Invoke(move);
         }
 
-        private void NotifySwapMove(SelectableCardItem card, SelectableCardItem destination)
-        {
-            NotifyCardMoved(new CardMoveEvent
+        private static CardMoveEvent CreateSwapMove(SelectableCardItem card, SelectableCardItem destination) =>
+            new CardMoveEvent
             {
                 code = card.code,
                 fromCon = card.controller, fromLoc = card.location, fromSeq = card.sequence, fromPos = card.position,
                 toCon = destination.controller, toLoc = destination.location, toSeq = destination.sequence, toPos = card.position,
-            });
-        }
+            };
 
         private void HandleMessage(byte msgType, BinaryReader br, long msgEnd)
         {
@@ -849,8 +855,7 @@ namespace YGOPortable.Core
                     var second = ReadLocIntoItem(br, br.ReadUInt32());
                     _confirmedCards.Remove((first.controller, first.location, first.sequence, first.code));
                     _confirmedCards.Remove((second.controller, second.location, second.sequence, second.code));
-                    NotifySwapMove(first, second);
-                    NotifySwapMove(second, first);
+                    NotifyCardMoved(CreateSwapMove(first, second), CreateSwapMove(second, first));
                     break;
                 }
 

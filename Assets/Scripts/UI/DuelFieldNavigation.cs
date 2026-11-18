@@ -40,7 +40,7 @@ namespace YGOPortable.UI
         private RectTransform _duelPadFrameTarget;
         private RectTransform _duelPadFocus;
         private RectTransform _duelPadBoardFocus;
-        private RectTransform _duelPadPlacementFocus;
+        private RectTransform _duelPadPendingFieldFocus;
         private RectTransform _duelPadRaisedCard;
         private RectTransform _duelPointerRaisedCard;
         private FieldSlotView _duelPointerSlot;
@@ -59,7 +59,7 @@ namespace YGOPortable.UI
             _duelPadInput.Reset();
             _duelPadTargets.Clear();
             _duelPadScope = PadScope.None;
-            _duelPadFocus = _duelPadBoardFocus = _duelPadPlacementFocus = null;
+            _duelPadFocus = _duelPadBoardFocus = _duelPadPendingFieldFocus = null;
             _duelPointerRaisedCard = _duelCommandRaisedCard = _raisedCard = null;
             _duelPointerSlot = null;
             _duelPointerCode = 0;
@@ -79,7 +79,7 @@ namespace YGOPortable.UI
                 DeckPadInput.DirectTouchBegan()))
             {
                 _usingDuelPad = false;
-                _duelPadPlacementFocus = null;
+                _duelPadPendingFieldFocus = null;
                 HideDuelPadFrame();
                 InspectCard(_duelPointerCode, _duelPointerSlot);
                 _hintBannerText.text = "";
@@ -323,11 +323,11 @@ namespace YGOPortable.UI
             if (current >= 0) return current;
             if (scope == PadScope.Board)
             {
-                int placement = FindDuelPadTarget(_duelPadPlacementFocus);
-                if (placement >= 0)
+                int pending = FindDuelPadTarget(_duelPadPendingFieldFocus);
+                if (pending >= 0)
                 {
-                    _duelPadPlacementFocus = null;
-                    return placement;
+                    _duelPadPendingFieldFocus = null;
+                    return pending;
                 }
                 int saved = FindDuelPadTarget(_duelPadBoardFocus);
                 if (saved >= 0) return saved;
@@ -415,14 +415,14 @@ namespace YGOPortable.UI
                 PadScope.Place => _placementCancel.gameObject.activeInHierarchy ? "A 위치 선택  B 취소" : "A 위치 선택",
                 _ => "",
             };
-            if (scope == PadScope.Board && _duelPadPlacementFocus != null)
+            if (scope == PadScope.Board && _duelPadPendingFieldFocus != null)
             {
                 BuildDuelPadTargets(scope);
-                int placement = FindDuelPadTarget(_duelPadPlacementFocus);
-                if (placement >= 0)
+                int pending = FindDuelPadTarget(_duelPadPendingFieldFocus);
+                if (pending >= 0)
                 {
-                    _duelPadPlacementFocus = null;
-                    SetDuelPadFocus(_duelPadTargets[placement], scope);
+                    _duelPadPendingFieldFocus = null;
+                    SetDuelPadFocus(_duelPadTargets[pending], scope);
                     return;
                 }
                 if (IsPresenting)
@@ -430,7 +430,7 @@ namespace YGOPortable.UI
                     HideDuelPadFrame();
                     return;
                 }
-                _duelPadPlacementFocus = null;
+                _duelPadPendingFieldFocus = null;
             }
             if (!layoutChanged && _duelPadScope == scope && _duelPadFocus != null &&
                 _duelPadFocus.gameObject.activeInHierarchy) return;

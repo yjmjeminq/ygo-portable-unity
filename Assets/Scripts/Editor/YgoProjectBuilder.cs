@@ -1145,7 +1145,7 @@ namespace YGOPortable.Editor
             return resp;
         }
 
-        private static void DriveUntilIdle(DuelSession session, TacticalAI ai, Func<DuelPrompt, byte[]> onPrompt = null, int maxSteps = 64)
+        internal static void DriveUntilIdle(DuelSession session, TacticalAI ai, Func<DuelPrompt, byte[]> onPrompt = null, int maxSteps = 64)
         {
             int guard = 0;
             while (!session.IsFinished && guard++ < maxSteps)
