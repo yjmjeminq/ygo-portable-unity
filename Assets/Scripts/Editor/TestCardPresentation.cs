@@ -1,4 +1,7 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.UI;
@@ -26,6 +29,7 @@ namespace YGOPortable.Editor
                 VerifyFeaturedCards(animator);
                 VerifySummonReadout(animator);
                 VerifyBattleVisibility(animator);
+                VerifyLinkDirectAttack(animator);
             }
             finally
             {
@@ -152,6 +156,54 @@ namespace YGOPortable.Editor
                 UnityEngine.Object.DestroyImmediate(direct.gameObject);
                 UnityEngine.Object.DestroyImmediate(unrevealed.gameObject);
             }
+        }
+
+        private static void VerifyLinkDirectAttack(CardAnimationManager animator)
+        {
+            const uint accesscode = 86066372;
+            var link = new BattleCardStats(1, YgoConstants.LOCATION_MZONE, 0, YgoConstants.POS_FACEUP_ATTACK, 5300, 0);
+            var card = new DuelCardReadout(CardDatabase.Get(accesscode), battleStats: link);
+            var start = new CardPose(new Vector2(-80f, 90f), new Vector2(76f, 110f), 180f);
+            var flight = new CardFlight(accesscode, start, start, false, false);
+            var comparison = animator.CreateBattleReadout(DuelFieldUI.BattleStatsArea, link, default, 0, true, false);
+            int arrivals = 0;
+            animator.QueueAttack(flight, new Vector2(100f, -280f), true, true, comparison, card,
+                new Vector2(120f, 115f), () => arrivals++);
+            VerifyAttackFlight(animator, "5300", null, "4");
+            Require(arrivals == 1, "The direct attack did not finish once.");
+        }
+
+        internal static void VerifyAttackFlight(CardAnimationManager animator, string attack, string defense, string rating)
+        {
+            var steps = (Queue<IEnumerator>)typeof(CardAnimationManager)
+                .GetField("_steps", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(animator);
+            var step = steps.Single(candidate => candidate.GetType().Name.StartsWith("<Attack>", StringComparison.Ordinal));
+            Vector2 previous = Vector2.zero;
+            float unitsPerCardHeight = 0f;
+            for (int stage = 0; stage < 3; stage++)
+            {
+                Require(step.MoveNext() && step.Current is IEnumerator, "The attack omitted an animation stage.");
+                Require(((IEnumerator)step.Current).MoveNext(), "The attack did not render its first frame.");
+                var art = (RectTransform)animator.transform.Find("MovingCard");
+                var stats = (RectTransform)animator.transform.Find("AttackingCardReadout");
+                var strip = stats.Find("CardReadout/Combat");
+                float ratio = stats.sizeDelta.x / art.sizeDelta.y;
+                if (stage == 0) unitsPerCardHeight = ratio;
+                Require(art.gameObject.activeInHierarchy && stats.anchoredPosition == art.anchoredPosition &&
+                    stats.localRotation == Quaternion.identity && Mathf.Approximately(unitsPerCardHeight, ratio) &&
+                    (stage == 0 || (stats.anchoredPosition - previous).sqrMagnitude > 1f),
+                    "The attacking monster's stat plate did not follow its pose.");
+                Require(strip.Find("Attack/Digits/Value").GetComponent<Text>().text == attack &&
+                    (defense == null ? !strip.Find("Defense").gameObject.activeSelf :
+                        strip.Find("Defense/Digits/Value").GetComponent<Text>().text == defense) &&
+                    stats.Find("CardReadout/Labels/Rating/Value").GetComponent<Text>().text == rating &&
+                    stats.GetComponentsInChildren<Graphic>().All(graphic => !graphic.raycastTarget),
+                    "The flying card omitted its current stats, rank, link or level, or blocked input.");
+                previous = stats.anchoredPosition;
+            }
+            Require(!step.MoveNext() && animator.transform.Find("AttackingCardReadout") == null &&
+                animator.transform.Find("BattleReadout") == null && !animator.transform.Find("MovingCard").gameObject.activeSelf,
+                "The attack left a transient card or stats on screen.");
         }
 
         private static void Require(bool condition, string message)

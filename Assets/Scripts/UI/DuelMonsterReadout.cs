@@ -11,11 +11,13 @@ namespace YGOPortable.UI
     {
         internal readonly CardInfo Printed;
         internal readonly LiveCardState Live;
+        private readonly BattleCardStats? _battleStats;
 
-        internal DuelCardReadout(CardInfo printed, LiveCardState live = null)
+        internal DuelCardReadout(CardInfo printed, LiveCardState live = null, BattleCardStats? battleStats = null)
         {
             Printed = printed;
             Live = live;
+            _battleStats = battleStats;
         }
 
         internal uint Type => Live?.type > 0 ? Live.type : Printed?.type ?? 0;
@@ -26,8 +28,9 @@ namespace YGOPortable.UI
         internal bool IsScale => Type == (YgoConstants.TYPE_PENDULUM | YgoConstants.TYPE_SPELL);
         internal ulong Race => Live?.race ?? Printed?.race ?? 0;
         internal uint Attribute => Live?.attribute ?? Printed?.attr ?? 0;
-        internal int Attack => Live?.attack ?? Printed?.atk ?? -1;
-        internal int Defense => Live?.defense ?? Printed?.def ?? -1;
+        internal int Attack => _battleStats?.Attack ?? Live?.attack ?? Printed?.atk ?? -1;
+        internal int Defense => _battleStats?.Defense ?? Live?.defense ?? Printed?.def ?? -1;
+        internal uint Position => _battleStats?.Position ?? Live?.position ?? 0;
         internal uint LeftScale => Live?.lscale ?? Printed?.lscale ?? 0;
         internal uint RightScale => Live?.rscale ?? Printed?.rscale ?? 0;
         internal uint LinkMarkers => IsLink ? Live?.linkMarker ?? Printed?.link ?? 0 : 0;
@@ -109,7 +112,7 @@ namespace YGOPortable.UI
             if (!card.IsMonster) return;
 
             Layout(card.IsLink, card.LinkMarkers, opponent);
-            uint shownPosition = position ?? card.Live?.position ?? 0;
+            uint shownPosition = position ?? card.Position;
             _attack.Bind(card.Attack, card.Live?.baseAttack ?? card.Attack, (shownPosition & YgoConstants.POS_ATTACK) != 0, showChanges);
             if (!card.IsLink)
                 _defense.Bind(card.Defense, card.Live?.baseDefense ?? card.Defense, (shownPosition & YgoConstants.POS_DEFENSE) != 0, showChanges);

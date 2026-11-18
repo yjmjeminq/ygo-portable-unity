@@ -173,12 +173,15 @@ namespace YGOPortable.Editor
         private static void VerifyNativeCombatReadout()
         {
             const uint axeOfDespair = 40619825;
+            const uint honest = 37742478;
             const uint mysticalElf = 15025844;
-            uint[] main = Enumerable.Repeat(KaiserSeaHorse, 28).Concat(Enumerable.Repeat(axeOfDespair, 12)).ToArray();
+            uint[] main = Enumerable.Repeat(KaiserSeaHorse, 24).Concat(Enumerable.Repeat(axeOfDespair, 8))
+                .Concat(Enumerable.Repeat(honest, 8)).ToArray();
             uint[] opponent = Enumerable.Repeat(mysticalElf, 40).ToArray();
             using var duel = YgoProjectBuilder.StartSeedMatching("Live combat readout", main, Array.Empty<uint>(),
-                opponent, Array.Empty<uint>(), true, session => session.ActivePrompt?.summonable.Count > 0 &&
-                    session.Players[session.HumanPlayerIndex].hand.Any(card => card.code == axeOfDespair));
+                opponent, Array.Empty<uint>(), true, session => session.ActivePrompt?.summonable.Any(card => card.code == KaiserSeaHorse) == true &&
+                    session.Players[session.HumanPlayerIndex].hand.Any(card => card.code == axeOfDespair) &&
+                    session.Players[session.HumanPlayerIndex].hand.Any(card => card.code == honest));
             using var ui = new HandUI(duel);
             var ai = new TacticalAI();
             var own = duel.Players[duel.HumanPlayerIndex];
@@ -197,7 +200,8 @@ namespace YGOPortable.Editor
                     "The combat readout fixture could not resolve the native action.");
             }
 
-            duel.SubmitResponseInt(0);
+            int summon = duel.ActivePrompt.summonable.FindIndex(card => card.code == KaiserSeaHorse);
+            duel.SubmitResponseInt(summon << 16);
             ReachMainPhase();
             var live = own.mzone.Single(card => card?.code == KaiserSeaHorse);
             ui.Field.Refresh();
@@ -260,12 +264,25 @@ namespace YGOPortable.Editor
                 "The attack picker lost the equipped attack or revealed the face-down target's values.");
             ui.Modals.HideAll();
             duel.SubmitResponse(DuelSession.PackCardSelection(0));
+            bool usedHonest = false;
+            for (int turn = 0; turn < 12 && duel.ActivePrompt is { messageType: YgoConstants.MSG_SELECT_CHAIN } chain; turn++)
+            {
+                int index = usedHonest || chain.playerId != duel.HumanPlayerIndex
+                    ? -1 : chain.candidates.FindIndex(card => card.code == honest && card.location == YgoConstants.LOCATION_HAND);
+                usedHonest |= index >= 0;
+                duel.SubmitResponseInt(index);
+            }
             var readout = animation.transform.Find("BattleReadout");
-            Require(readout != null && duel.RetryCount == 0 &&
-                readout.Find("Attacker/Values/Attack/Digits/Value").GetComponent<Text>().text == "2700" &&
+            Require(usedHonest && readout != null && duel.RetryCount == 0 &&
+                attack.text == "2700" && readout.Find("Attacker/Values/Attack/Digits/Value").GetComponent<Text>().text == "3500" &&
                 readout.Find("Defender/Values/Defense/Digits/Value").GetComponent<Text>().text == "2000",
-                "The attack presentation lost the native equipped attack or the revealed defense.");
-            Debug.Log("[VERIFY DUEL BATTLE STATS] Native battle displayed the equipped 2700 ATK and the revealed 2000 DEF.");
+                "The attack presentation lost the native damage-step increase or the revealed defense.");
+            ui.Field.Refresh();
+            Require(!slot.Find("CardReadout").gameObject.activeInHierarchy, "The static readout remained under the attacking card.");
+            TestCardPresentation.VerifyAttackFlight(animation, "3500", "1650", "4");
+            Require(slot.Find("CardReadout").gameObject.activeInHierarchy && attack.text == "3500",
+                "The card and its current stats did not return to the field.");
+            Debug.Log("[VERIFY DUEL BATTLE STATS] Target selection hid the defender. The attack showed the native damage-step 3500 ATK and revealed 2000 DEF.");
         }
 
         private static void VerifyNativeCounterReadout()

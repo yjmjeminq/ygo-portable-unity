@@ -2323,11 +2323,10 @@ namespace YGOPortable.UI
                     var destination = GetSlot(e.toCon, e.toLoc, e.toSeq);
                     if (source != null && destination != null)
                     {
-                        Vector2 SizeOf(RectTransform rect) => animator.GetPoint(rect, Vector2.one) - animator.GetPoint(rect, Vector2.zero);
                         int viewer = _session.HumanPlayerIndex;
                         readout = new CardMoveReadoutSnapshot(e.code)
                         {
-                            Movement = (SizeOf(source.readout?.Rect ?? source.root), SizeOf(destination.root),
+                            Movement = (animator.GetAreaSize(source.readout?.Rect ?? source.root), animator.GetAreaSize(destination.root),
                                 e.fromPos, e.fromCon != viewer, e.toCon != viewer),
                         };
                     }
@@ -2430,14 +2429,16 @@ namespace YGOPortable.UI
             var hit = AttackTarget(animator, attacker.Controller, defender.Controller, defender.Location, defender.Sequence);
             var arrival = HideUntilArrival(attacker.Controller, attacker.Location, attacker.Sequence);
             var defendingCard = defender.IsFaceUp ? FindLiveCard(defender.Controller, defender.Location, defender.Sequence) : null;
-            bool attackerIsLink = new DuelCardReadout(CardDatabase.Get(card.code), card).IsLink;
+            var combat = new DuelCardReadout(CardDatabase.Get(card.code), card, attacker);
             bool defenderIsLink = defendingCard != null &&
                 new DuelCardReadout(CardDatabase.Get(defendingCard.code), defendingCard).IsLink;
             int viewer = _session.HumanPlayerIndex;
-            var readout = animator.CreateBattleReadout(BattleStatsArea, attacker, defender, viewer, attackerIsLink, defenderIsLink,
+            var readout = animator.CreateBattleReadout(BattleStatsArea, attacker, defender, viewer, combat.IsLink, defenderIsLink,
                 _mobileLayout);
             var flight = new CardFlight(card.code, from, resting, false, false);
-            animator.QueueAttack(flight, hit, defender.Location == 0, attacker.Controller != viewer, readout, arrival);
+            var slot = GetSlot(attacker.Controller, attacker.Location, attacker.Sequence);
+            Vector2 statSize = slot == null ? Vector2.zero : animator.GetAreaSize(slot.readout?.Rect ?? slot.root);
+            animator.QueueAttack(flight, hit, defender.Location == 0, attacker.Controller != viewer, readout, combat, statSize, arrival);
         }
 
         private void HandleLifePointsChanged(byte player, int delta, int lifePoints)

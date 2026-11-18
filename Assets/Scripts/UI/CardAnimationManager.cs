@@ -115,11 +115,7 @@ namespace YGOPortable.UI
             _playing = false;
             Paused = false;
             for (int i = _layer.childCount - 1; i >= 0; i--)
-            {
-                var child = _layer.GetChild(i).gameObject;
-                child.SetActive(false);
-                Destroy(child);
-            }
+                RemoveTransient(_layer.GetChild(i).gameObject);
             ReleaseSummonArt();
         }
 
@@ -156,6 +152,9 @@ namespace YGOPortable.UI
             var local = rect.rect.min + Vector2.Scale(rect.rect.size, normalizedPoint);
             return _layer.InverseTransformPoint(rect.TransformPoint(local));
         }
+
+        internal Vector2 GetAreaSize(RectTransform rect) =>
+            GetPoint(rect, Vector2.one) - GetPoint(rect, Vector2.zero);
 
         internal CardPose GetPose(RectTransform rect, Vector2 normalizedCenter, Vector2 normalizedSize,
             float angle = 0f, float scale = 1f)
@@ -227,9 +226,10 @@ namespace YGOPortable.UI
             QueueStep(AttackArrow(from, to, opponent));
         }
 
-        internal void QueueAttack(CardFlight flight, Vector2 hit, bool direct, bool opponent, CanvasGroup readout, Action onFinish)
+        internal void QueueAttack(CardFlight flight, Vector2 hit, bool direct, bool opponent,
+            CanvasGroup readout, DuelCardReadout attacker, Vector2 statSize, Action onFinish)
         {
-            QueueStep(Attack(flight, hit, direct, opponent, readout, onFinish));
+            QueueStep(Attack(flight, hit, direct, opponent, readout, attacker, statSize, onFinish));
         }
 
         internal void QueueLifeChange(Vector2 point, int delta, Action onStart)
@@ -387,10 +387,7 @@ namespace YGOPortable.UI
                 });
                 if (moving != null)
                 {
-                    var holder = moving.Root.gameObject;
-                    holder.SetActive(false);
-                    if (Application.isPlaying) Destroy(holder);
-                    else DestroyImmediate(holder);
+                    RemoveTransient(moving.Root.gameObject);
                 }
             }
 
@@ -645,49 +642,76 @@ namespace YGOPortable.UI
             return fade;
         }
 
-        private IEnumerator Attack(CardFlight flight, Vector2 to, bool direct, bool opponent, CanvasGroup readout, Action onFinish)
+        private IEnumerator Attack(CardFlight flight, Vector2 to, bool direct, bool opponent,
+            CanvasGroup readout, DuelCardReadout attacker, Vector2 statSize, Action onFinish)
         {
             var from = flight.From;
             uint code = flight.Code;
             if (!from.IsValid || code == 0)
             {
-                if (readout != null) Destroy(readout.gameObject);
+                if (readout != null) RemoveTransient(readout.gameObject);
                 onFinish?.Invoke();
                 yield break;
             }
 
             var proxy = TakeCard(code, false);
+            var art = (RectTransform)proxy.transform;
+            RectTransform stats = null;
+            if (attacker.IsMonster && statSize.x > 0f && statSize.y > 0f)
+            {
+                proxy.SetCard(code, live: attacker.Live);
+                stats = CenteredVisual("AttackingCardReadout", _layer, from.Position, statSize);
+                new DuelFieldReadout(stats).Bind(attacker, opponent, null);
+            }
             if (readout != null) readout.transform.SetAsLastSibling();
+
+            void MoveWithStats(CardFlight path, float time, float lift)
+            {
+                ApplyFlight(proxy, path, time, lift);
+                if (stats == null) return;
+                stats.anchoredPosition = art.anchoredPosition;
+                stats.sizeDelta = statSize * (art.sizeDelta.y / from.Size.y);
+            }
+
             var direction = (to - from.Position).normalized;
             var windup = new CardPose(from.Position - direction * 26f, from.Size * 1.10f, from.Angle);
             var first = new CardFlight(code, from, windup, false, false);
             yield return Animate(.085f, t =>
             {
-                ApplyFlight(proxy, first, t, 5f);
+                MoveWithStats(first, t, 5f);
                 if (readout != null) readout.alpha = Mathf.SmoothStep(0f, 1f, t);
             });
 
             Vector2 hit = Vector2.Lerp(from.Position, to, direct ? .78f : .89f);
             var lunge = new CardPose(hit, from.Size * 1.14f, from.Angle);
             var outFlight = new CardFlight(code, windup, lunge, false, false);
-            yield return Animate(.13f, t => ApplyFlight(proxy, outFlight, t, 27f));
+            yield return Animate(.13f, t => MoveWithStats(outFlight, t, 27f));
 
             if (direct) LotdAudio.PlayDirectAttack();
             else LotdAudio.PlayAttack();
             Color accent = opponent ? DuelStyle.Opponent : new Color(.38f, 1f, .70f);
             var impact = CreateEffect(DuelEffectKind.Strike, to, Vector2.one * (direct ? 335f : 248f), accent);
             impact.rectTransform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg);
+            if (stats != null) stats.SetAsLastSibling();
             var returnFlight = new CardFlight(code, lunge, flight.To.IsValid ? flight.To : from, false, false);
             yield return Animate(.27f, t =>
             {
-                ApplyFlight(proxy, returnFlight, t, 10f);
+                MoveWithStats(returnFlight, t, 10f);
                 impact.Seek(t);
                 if (readout != null) readout.alpha = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.57f, 1f, t));
             });
-            if (readout != null) Destroy(readout.gameObject);
-            Destroy(impact.gameObject);
+            if (readout != null) RemoveTransient(readout.gameObject);
+            if (stats != null) RemoveTransient(stats.gameObject);
+            RemoveTransient(impact.gameObject);
             RecycleCard(proxy);
             onFinish?.Invoke();
+        }
+
+        private static void RemoveTransient(GameObject visual)
+        {
+            visual.SetActive(false);
+            if (Application.isPlaying) Destroy(visual);
+            else DestroyImmediate(visual);
         }
 
         private IEnumerator ChainActivation(CardPose source, uint code, int chainNumber, bool opponent)
