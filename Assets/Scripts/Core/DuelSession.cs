@@ -52,6 +52,7 @@ namespace YGOPortable.Core
     }
 
     internal enum BattleStatSource : byte { Attack = 1, Defense, Effect }
+    internal enum LifePointChangeKind : byte { Damage, BattleDamage, EffectDamage, Recovery, Payment, Adjustment }
 
     internal readonly struct BattleComparisonValue
     {
@@ -275,6 +276,7 @@ namespace YGOPortable.Core
         internal event Action<CardMoveEvent, CardMoveEvent> OnCardLocationsChanged;
         public event Action<byte, IReadOnlyList<uint>> OnCardsDrawn;
         public event Action<byte, int, int> OnLifePointsChanged;
+        internal event Action<byte, int, int, LifePointChangeKind> OnLifePointChange;
         public event Action<int, int> OnTurnStarted;
         public event Action<int, int> OnPhaseChanged;
         public event Action<ChainLinkInfo> OnChainActivated;
@@ -805,9 +807,12 @@ namespace YGOPortable.Core
                 {
                     byte p = br.ReadByte();
                     uint amt = br.ReadUInt32();
+                    uint reason = msgEnd - br.BaseStream.Position == sizeof(uint) ? br.ReadUInt32() : 0;
+                    LifePointChangeKind kind = reason == YgoConstants.REASON_BATTLE ? LifePointChangeKind.BattleDamage :
+                        (reason & YgoConstants.REASON_EFFECT) != 0 ? LifePointChangeKind.EffectDamage : LifePointChangeKind.Damage;
                     Players[p].lp = Math.Max(0, Players[p].lp - (int)amt);
                     AddLog($"{(p == HumanPlayerIndex ? "플레이어" : "상대")} 데미지 -{amt} LP (남은 LP: {Players[p].lp})");
-                    OnLifePointsChanged?.Invoke(p, -(int)amt, Players[p].lp);
+                    NotifyLifePointChange(p, -(int)amt, kind);
                     break;
                 }
 
@@ -817,7 +822,7 @@ namespace YGOPortable.Core
                     uint amt = br.ReadUInt32();
                     Players[p].lp += (int)amt;
                     AddLog($"{(p == HumanPlayerIndex ? "플레이어" : "상대")} 회복 +{amt} LP (LP: {Players[p].lp})");
-                    OnLifePointsChanged?.Invoke(p, (int)amt, Players[p].lp);
+                    NotifyLifePointChange(p, (int)amt, LifePointChangeKind.Recovery);
                     break;
                 }
 
@@ -827,7 +832,7 @@ namespace YGOPortable.Core
                     uint amt = br.ReadUInt32();
                     Players[p].lp = Math.Max(0, Players[p].lp - (int)amt);
                     AddLog($"{(p == HumanPlayerIndex ? "플레이어" : "상대")} LP 코스트 -{amt} (LP: {Players[p].lp})");
-                    OnLifePointsChanged?.Invoke(p, -(int)amt, Players[p].lp);
+                    NotifyLifePointChange(p, -(int)amt, LifePointChangeKind.Payment);
                     break;
                 }
 
@@ -838,7 +843,7 @@ namespace YGOPortable.Core
                     int previous = Players[p].lp;
                     Players[p].lp = Math.Max(0, nlp);
                     if (Players[p].lp != previous)
-                        OnLifePointsChanged?.Invoke(p, Players[p].lp - previous, Players[p].lp);
+                        NotifyLifePointChange(p, Players[p].lp - previous, LifePointChangeKind.Adjustment);
                     break;
                 }
 
@@ -1653,6 +1658,13 @@ namespace YGOPortable.Core
                 seqIdx++;
             }
             return result;
+        }
+
+        private void NotifyLifePointChange(byte player, int delta, LifePointChangeKind kind)
+        {
+            int lp = Players[player].lp;
+            OnLifePointChange?.Invoke(player, delta, lp, kind);
+            OnLifePointsChanged?.Invoke(player, delta, lp);
         }
 
         private void AddLog(string line)

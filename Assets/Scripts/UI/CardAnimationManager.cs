@@ -72,6 +72,7 @@ namespace YGOPortable.UI
 
         private readonly Queue<IEnumerator> _steps = new Queue<IEnumerator>();
         private List<(CardFlight flight, Action onArrive)> _openPileTransfers;
+        private List<LifeChangeCue> _openBattleLifeChanges;
         private readonly Stack<CompositeCardView> _cards = new Stack<CompositeCardView>();
         private readonly HashSet<(bool Opponent, uint Code)> _featuredSummons = new();
         private RectTransform _layer;
@@ -79,6 +80,18 @@ namespace YGOPortable.UI
         private uint _previousChainCode;
         private int _previousChainNumber;
         private bool _playing;
+
+        private const float LifeFeedbackDuration = .46f;
+        private static readonly Color LifeDamageTint = new Color(1f, .61f, .52f);
+
+        private sealed class LifeChangeCue
+        {
+            internal RectTransform Anchor;
+            internal int Delta;
+            internal LifePointChangeKind Kind;
+            internal Action Apply;
+            internal CanvasGroup Feedback;
+        }
 
         public bool IsPresenting => _playing || _steps.Count > 0;
         public bool Paused { get; set; }
@@ -108,6 +121,7 @@ namespace YGOPortable.UI
             StopAllCoroutines();
             _steps.Clear();
             _openPileTransfers = null;
+            _openBattleLifeChanges = null;
             _cards.Clear();
             _featuredSummons.Clear();
             _previousChainCode = 0;
@@ -188,6 +202,7 @@ namespace YGOPortable.UI
         internal void QueuePileTransfer(CardFlight flight, Action onArrive)
         {
             // Moves emitted together by one effect overlap. Other animation steps still play in engine order.
+            _openBattleLifeChanges = null;
             if (_openPileTransfers == null)
             {
                 _openPileTransfers = new List<(CardFlight, Action)>();
@@ -199,6 +214,7 @@ namespace YGOPortable.UI
         private void QueueStep(IEnumerator step)
         {
             _openPileTransfers = null;
+            _openBattleLifeChanges = null;
             _steps.Enqueue(step);
         }
 
@@ -231,12 +247,19 @@ namespace YGOPortable.UI
             CanvasGroup readout, DuelCardReadout attacker, Vector2 statSize, Action onFinish,
             Func<(CardPose Pose, Vector2 ReadoutSize, CardPose Defender, RectTransform DefenderReadout)> onStart = null)
         {
-            QueueStep(Attack(flight, hit, direct, opponent, readout, attacker, statSize, onFinish, onStart));
+            var lifeChanges = new List<LifeChangeCue>(2);
+            QueueStep(Attack(flight, hit, direct, opponent, readout, attacker, statSize, onFinish, onStart, lifeChanges));
+            _openBattleLifeChanges = lifeChanges;
         }
 
-        internal void QueueLifeChange(Vector2 point, int delta, Action onStart)
+        internal void QueueLifeChange(RectTransform anchor, int delta, LifePointChangeKind kind, Action apply)
         {
-            QueueStep(LifeChange(point, delta, onStart));
+            var change = new LifeChangeCue { Anchor = anchor, Delta = delta, Kind = kind, Apply = apply };
+            // Collect only consecutive, confirmed battle damage. A queued effect or a later step keeps its own timing.
+            if (kind == LifePointChangeKind.BattleDamage && _openBattleLifeChanges != null &&
+                !_openBattleLifeChanges.Exists(pending => pending.Anchor == anchor))
+                _openBattleLifeChanges.Add(change);
+            else QueueStep(PlayLifeChanges(new[] { change }));
         }
 
         private CompositeCardView TakeCard(uint code, bool faceDown, bool detailed = false)
@@ -651,14 +674,17 @@ namespace YGOPortable.UI
 
         private IEnumerator Attack(CardFlight flight, Vector2 to, bool direct, bool opponent,
             CanvasGroup readout, DuelCardReadout attacker, Vector2 statSize, Action onFinish,
-            Func<(CardPose Pose, Vector2 ReadoutSize, CardPose Defender, RectTransform DefenderReadout)> onStart)
+            Func<(CardPose Pose, Vector2 ReadoutSize, CardPose Defender, RectTransform DefenderReadout)> onStart,
+            List<LifeChangeCue> lifeChanges)
         {
+            if (ReferenceEquals(_openBattleLifeChanges, lifeChanges)) _openBattleLifeChanges = null;
             var from = flight.From;
             uint code = flight.Code;
             if (!from.IsValid || code == 0)
             {
                 if (readout != null) RemoveTransient(readout.gameObject);
                 onFinish?.Invoke();
+                if (lifeChanges.Count != 0) yield return PlayLifeChanges(lifeChanges);
                 yield break;
             }
 
@@ -747,14 +773,20 @@ namespace YGOPortable.UI
             impact.rectTransform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg);
             if (stats != null) stats.SetAsLastSibling();
             if (defenderStats != null) defenderStats.SetAsLastSibling();
+            const float returnDuration = .27f;
+            bool showDamage = BeginLifeChanges(lifeChanges);
+            float duration = showDamage ? LifeFeedbackDuration : returnDuration;
             var returnFlight = new CardFlight(code, lunge, flight.To.IsValid ? flight.To : from, false, false);
-            yield return Animate(.27f, t =>
+            yield return Animate(duration, t =>
             {
-                float clearance = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.8f, 1f, t));
-                MoveWithStats(returnFlight, t, 10f, clearance);
-                impact.Seek(t);
+                float motion = Mathf.Clamp01(t * duration / returnDuration);
+                float clearance = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.8f, 1f, motion));
+                MoveWithStats(returnFlight, motion, 10f, clearance);
+                impact.Seek(motion);
                 if (readout != null) readout.alpha = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.57f, 1f, t));
+                if (showDamage) UpdateLifeChanges(lifeChanges, t);
             });
+            EndLifeChanges(lifeChanges);
             if (readout != null) RemoveTransient(readout.gameObject);
             if (stats != null) RemoveTransient(stats.gameObject);
             if (defenderStats != null) RemoveTransient(defenderStats.gameObject);
@@ -936,28 +968,69 @@ namespace YGOPortable.UI
 
 
 
-        private IEnumerator LifeChange(Vector2 point, int delta, Action onStart)
+        private IEnumerator PlayLifeChanges(IReadOnlyList<LifeChangeCue> changes)
         {
-            onStart?.Invoke();
-            if (delta == 0) yield break;
-            if (delta < 0) LotdAudio.PlayDamage();
+            if (!BeginLifeChanges(changes)) yield break;
+            yield return Animate(LifeFeedbackDuration, t => UpdateLifeChanges(changes, t));
+            EndLifeChanges(changes);
+        }
 
-            var holder = LotdUiKit.CreateRect("LPChange", _layer, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                Vector2.zero, Vector2.zero);
-            holder.sizeDelta = new Vector2(218f, 61f);
-            var text = LotdUiKit.AddFittedText(holder, "Value", delta > 0 ? $"+{delta}" : delta.ToString(),
-                43, 17, TextAnchor.MiddleCenter, delta > 0 ? LotdUiKit.GreenAccent : new Color(1f, .28f, .23f), FontStyle.Bold);
-            DuelStyle.Shadow(text, 2f);
-            Color tint = text.color;
-            yield return Animate(.46f, t =>
+        private bool BeginLifeChanges(IReadOnlyList<LifeChangeCue> changes)
+        {
+            bool visible = false, damage = false;
+            foreach (var change in changes)
             {
-                float vertical = point.y > _layer.rect.height * .24f ? -1f : 1f;
-                holder.anchoredPosition = point + Vector2.up * vertical * (30f + 33f * t);
-                holder.localScale = Vector3.one * (.94f + .26f * Mathf.Sin(Mathf.Clamp01(t * 2.4f) * Mathf.PI));
-                tint.a = Mathf.Clamp01((1f - t) * 3.8f);
-                text.color = tint;
-            });
-            Destroy(holder.gameObject);
+                change.Apply?.Invoke();
+                if (change.Delta == 0 || change.Anchor == null || !change.Anchor.gameObject.activeInHierarchy) continue;
+                var (label, tint) = change.Kind switch
+                {
+                    LifePointChangeKind.BattleDamage => ("전투 피해", LifeDamageTint),
+                    LifePointChangeKind.EffectDamage => ("효과 피해", LifeDamageTint),
+                    LifePointChangeKind.Damage => ("피해", LifeDamageTint),
+                    LifePointChangeKind.Recovery => ("회복", LotdUiKit.GreenAccent),
+                    LifePointChangeKind.Payment => ("LP 지불", DuelStyle.Gold),
+                    _ => ("LP 변경", DuelStyle.Muted),
+                };
+                var holder = CenteredVisual("LPChange", _layer, GetPoint(change.Anchor, Vector2.one * .5f), GetAreaSize(change.Anchor));
+                var group = holder.gameObject.AddComponent<CanvasGroup>();
+                group.interactable = group.blocksRaycasts = false;
+                DuelReadoutPlate.Add(holder, new Color(.048f, .065f, .079f, .99f));
+                var rim = LotdUiKit.CreateRect("Accent", holder, new Vector2(.025f, 0f), new Vector2(.975f, 0f),
+                    Vector2.zero, new Vector2(0f, 1.35f));
+                LotdUiKit.AddImage(rim.gameObject, LotdUiKit.WhiteSprite, tint, false, false);
+                var kind = LotdUiKit.CreateRect("Kind", holder, new Vector2(.035f, .04f), new Vector2(.49f, .96f),
+                    Vector2.zero, Vector2.zero);
+                LotdUiKit.AddFittedText(kind, "Text", label, 17, 9, TextAnchor.MiddleLeft, tint, FontStyle.Bold);
+                var value = LotdUiKit.CreateRect("Value", holder, new Vector2(.51f, .025f), new Vector2(.96f, .975f),
+                    Vector2.zero, Vector2.zero);
+                var number = LotdUiKit.AddFittedText(value, "Text", change.Delta > 0 ? $"+{change.Delta}" : change.Delta.ToString(),
+                    22, 9, TextAnchor.MiddleRight, tint, FontStyle.Bold);
+                DuelStatDigitFit.Attach(number, useGlyphBounds: true);
+                change.Feedback = group;
+                visible = true;
+                damage |= change.Kind is LifePointChangeKind.BattleDamage or LifePointChangeKind.EffectDamage or LifePointChangeKind.Damage;
+            }
+            if (damage) LotdAudio.PlayDamage();
+            return visible;
+        }
+
+        private void UpdateLifeChanges(IReadOnlyList<LifeChangeCue> changes, float progress)
+        {
+            float alpha = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.80f, 1f, progress));
+            foreach (var change in changes)
+            {
+                if (change.Feedback == null || change.Anchor == null) continue;
+                var holder = (RectTransform)change.Feedback.transform;
+                holder.anchoredPosition = GetPoint(change.Anchor, Vector2.one * .5f);
+                holder.sizeDelta = GetAreaSize(change.Anchor);
+                change.Feedback.alpha = alpha;
+            }
+        }
+
+        private static void EndLifeChanges(IReadOnlyList<LifeChangeCue> changes)
+        {
+            foreach (var change in changes)
+                if (change.Feedback != null) RemoveTransient(change.Feedback.gameObject);
         }
 
         internal void QueueRandomResult(string label, Vector2 boardCenter, bool opponent, Action playSound)

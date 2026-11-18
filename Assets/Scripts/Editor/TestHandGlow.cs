@@ -30,6 +30,8 @@ namespace YGOPortable.Editor
             VerifyDefensePositionBattleReadout(34496660, BattleStatSource.Defense, 1800);
             VerifyDefensePositionBattleReadout(75372290, BattleStatSource.Attack, 1550);
             VerifyEffectModifiedBattleReadout();
+            VerifyNativeBattleDamageFeedback(reflected: false);
+            VerifyNativeBattleDamageFeedback(reflected: true);
             VerifyNativeCounterReadout();
             VerifyNativeIdentityReadout();
             VerifyInspectedCardMoves(swapInPlace: true);
@@ -478,6 +480,95 @@ namespace YGOPortable.Editor
                     "A battle-stat effect was labeled with the unmodified stat.");
             }
             Debug.Log("[VERIFY DUEL BATTLE STATS] Dracoon Lamp compared 2000 and 1400 by effect while its printed attack values remained 500 and 1600.");
+        }
+
+        private static void VerifyNativeBattleDamageFeedback(bool reflected)
+        {
+            const uint spearDragon = 31553716, dimensionWall = 67095270, sparkman = 20721928;
+            var empty = Array.Empty<uint>();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Battle damage feedback",
+                Enumerable.Repeat(spearDragon, 40).ToArray(), empty,
+                Enumerable.Repeat(reflected ? dimensionWall : sparkman, 40).ToArray(), empty, true,
+                session => session.ActivePrompt?.summonable.Count > 0);
+            var ai = new TacticalAI();
+            duel.SubmitResponseInt(0);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            duel.SubmitResponseInt(7);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            var set = duel.ActivePrompt;
+            Require(set?.playerId == duel.AiPlayerIndex &&
+                (reflected ? set.sSetable.Any(card => card.code == dimensionWall) : set.mSetable.Any(card => card.code == sparkman)),
+                "The opponent could not set the battle damage fixture.");
+            duel.SubmitResponseInt(reflected ? 4 : 3);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            duel.SubmitResponseInt(7);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+
+            using var ui = new HandUI(duel);
+            var animation = CardAnimationManager.Ensure(ui.Canvas);
+            var changes = new List<(byte Player, int Delta, int Lp, LifePointChangeKind Kind)>();
+            duel.OnLifePointChange += (player, delta, lp, kind) => changes.Add((player, delta, lp, kind));
+            duel.SubmitResponseInt(6);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            Require(duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_BATTLECMD &&
+                duel.ActivePrompt.attackable.Count == 1, "Spear Dragon could not start the native battle.");
+            duel.SubmitResponseInt(1);
+            if (!reflected)
+            {
+                Require(duel.ActivePrompt?.IsAttackTargetSelection == true &&
+                    duel.ActivePrompt.candidates.Count == 1, "Spear Dragon could not target the set monster.");
+                duel.SubmitResponse(DuelSession.PackCardSelection(0));
+            }
+            bool usedTrap = false;
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
+            {
+                if (!reflected || usedTrap || prompt.playerId != duel.AiPlayerIndex) return null;
+                if (prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && prompt.promptCardCode == dimensionWall)
+                {
+                    usedTrap = true;
+                    return BitConverter.GetBytes(1);
+                }
+                if (prompt.messageType != YgoConstants.MSG_SELECT_CHAIN) return null;
+                int index = prompt.candidates.FindIndex(card => card.code == dimensionWall);
+                usedTrap = index >= 0;
+                return BitConverter.GetBytes(index);
+            });
+
+            byte receiver = (byte)(reflected ? duel.HumanPlayerIndex : duel.AiPlayerIndex);
+            int damage = reflected ? 1900 : 500;
+            Require(usedTrap == reflected && duel.RetryCount == 0 && changes.Count == 1 &&
+                changes[0] == (receiver, -damage, 8000 - damage, LifePointChangeKind.BattleDamage) &&
+                duel.Players[receiver].lp == 8000 - damage,
+                "The native recipient or amount of reflected or piercing damage was wrong.");
+
+            var steps = (Queue<IEnumerator>)typeof(CardAnimationManager).GetField("_steps", PrivateInstance).GetValue(animation);
+            if (!reflected)
+            {
+                var flip = steps.First(step => step.GetType().Name.StartsWith("<MoveCard>", StringComparison.Ordinal));
+                Require(flip.MoveNext() && !flip.MoveNext(), "The defender did not flip before the damage display.");
+            }
+            var hud = ui.Field.Root.transform.Find(reflected ? "PlayerHUD" : "OpponentHUD");
+            var anchor = (RectTransform)hud.Find("Status/Readout/Name");
+            var total = hud.Find("Status/Readout/Value/Text").GetComponent<Text>();
+            var advanceLife = typeof(DuelFieldUI).GetMethod("AdvanceLifeReadouts", PrivateInstance);
+            TestCardPresentation.VerifyAttackFlight(animation, "1900", "0", "4", () =>
+            {
+                advanceLife.Invoke(ui.Field, new object[] { 1f });
+                var popup = (RectTransform)animation.transform.Find("LPChange");
+                if (animation.transform.Find("Strike") == null)
+                {
+                    Require(popup == null && total.text == "8000", "The LP changed before the actual strike.");
+                    return;
+                }
+                Require(popup != null && popup.anchoredPosition == animation.GetPoint(anchor, Vector2.one * .5f) &&
+                    popup.Find("Kind/Text").GetComponent<Text>().text == "전투 피해" &&
+                    popup.Find("Value/Text").GetComponent<Text>().text == $"-{damage}" && total.text == (8000 - damage).ToString(),
+                    "The result showed damage on the wrong HUD, or at the wrong time in the attack.");
+            });
+            Require(animation.transform.Find("LPChange") == null &&
+                !steps.Any(step => step.GetType().Name.StartsWith("<PlayLifeChanges>", StringComparison.Ordinal)),
+                "The same battle damage was queued again after contact.");
+            Debug.Log($"[VERIFY DUEL LP FEEDBACK] Native {(reflected ? "reflected" : "piercing")} damage of {damage} reached seat {receiver} at the strike.");
         }
 
         private static void VerifyNativeCounterReadout()

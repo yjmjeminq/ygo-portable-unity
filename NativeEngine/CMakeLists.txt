@@ -9,19 +9,23 @@ set(YGOPRO_CORE_DIR "C:/Users/y/AppData/Local/YGO-PC-Full/OpenDuelEngine/ygopro-
 
 file(GLOB CORE_CPP "${YGOPRO_CORE_DIR}/*.cpp" "${YGOPRO_CORE_DIR}/RNG/*.cpp")
 
-# Apply project changes to a copy of the processor, keeping the shared core source intact.
+# Apply project changes to build-local sources, keeping the shared core source intact.
 find_package(Git REQUIRED)
-set(CORE_PROCESSOR "${YGOPRO_CORE_DIR}/processor.cpp")
+set(CORE_PATCH_SOURCES processor.cpp operations.cpp)
 set(CORE_PATCHES
     "${CMAKE_CURRENT_SOURCE_DIR}/master_duel_chain_limit.patch"
     "${CMAKE_CURRENT_SOURCE_DIR}/battle_comparison.patch"
+    "${CMAKE_CURRENT_SOURCE_DIR}/life_point_damage_reason.patch"
 )
 set(CORE_PATCH_STAGE "${CMAKE_CURRENT_BINARY_DIR}/core-patch-stage")
-set(CORE_PROCESSOR_PATCHED "${CMAKE_CURRENT_BINARY_DIR}/processor.cpp")
-set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CORE_PROCESSOR}" ${CORE_PATCHES})
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CORE_PATCHES})
 file(MAKE_DIRECTORY "${CORE_PATCH_STAGE}")
-file(READ "${CORE_PROCESSOR}" CORE_PROCESSOR_SOURCE)
-file(WRITE "${CORE_PATCH_STAGE}/processor.cpp" "${CORE_PROCESSOR_SOURCE}")
+foreach(CORE_SOURCE IN LISTS CORE_PATCH_SOURCES)
+    set(CORE_SOURCE_PATH "${YGOPRO_CORE_DIR}/${CORE_SOURCE}")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CORE_SOURCE_PATH}")
+    file(READ "${CORE_SOURCE_PATH}" CORE_SOURCE_TEXT)
+    file(WRITE "${CORE_PATCH_STAGE}/${CORE_SOURCE}" "${CORE_SOURCE_TEXT}")
+endforeach()
 foreach(CORE_PATCH IN LISTS CORE_PATCHES)
     execute_process(
         COMMAND "${CMAKE_COMMAND}" -E env "GIT_CEILING_DIRECTORIES=${CMAKE_CURRENT_BINARY_DIR}"
@@ -34,9 +38,12 @@ foreach(CORE_PATCH IN LISTS CORE_PATCHES)
         message(FATAL_ERROR "Could not apply ${CORE_PATCH}:\n${CORE_PATCH_ERROR}")
     endif()
 endforeach()
-configure_file("${CORE_PATCH_STAGE}/processor.cpp" "${CORE_PROCESSOR_PATCHED}" COPYONLY)
-list(REMOVE_ITEM CORE_CPP "${CORE_PROCESSOR}")
-list(APPEND CORE_CPP "${CORE_PROCESSOR_PATCHED}")
+foreach(CORE_SOURCE IN LISTS CORE_PATCH_SOURCES)
+    set(PATCHED_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/${CORE_SOURCE}")
+    configure_file("${CORE_PATCH_STAGE}/${CORE_SOURCE}" "${PATCHED_SOURCE}" COPYONLY)
+    list(REMOVE_ITEM CORE_CPP "${YGOPRO_CORE_DIR}/${CORE_SOURCE}")
+    list(APPEND CORE_CPP "${PATCHED_SOURCE}")
+endforeach()
 
 file(GLOB LUA_SRC "${YGOPRO_CORE_DIR}/lua/src/*.c")
 list(FILTER LUA_SRC EXCLUDE REGEX ".*(lbitlib|lcorolib|ldblib|linit|loadlib|loslib|ltests|lua|luac|lutf8lib|onelua)\\.c$")

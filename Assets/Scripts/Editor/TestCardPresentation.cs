@@ -33,6 +33,7 @@ namespace YGOPortable.Editor
                 VerifyBattleVisibility(animator);
                 VerifyLinkDirectAttack(animator);
                 VerifyAttackSpacing(animator);
+                VerifyLifeFeedbackRouting(animator);
             }
             finally
             {
@@ -290,6 +291,63 @@ namespace YGOPortable.Editor
                 Require(arrivals == 1, "The spaced attack did not finish once.");
             }
             Debug.Log("[VERIFY DUEL ATTACK SPACING] A focused adjacent attack and a diagonal defense-position attack kept both cards and stat plates separate through windup, contact and return.");
+        }
+
+        private static void VerifyLifeFeedbackRouting(CardAnimationManager animator)
+        {
+            animator.Clear();
+            var own = LotdUiKit.CreateRect("Own LP", animator.transform.parent, new Vector2(.05f, .04f),
+                new Vector2(.19f, .075f), Vector2.zero, Vector2.zero);
+            var rival = LotdUiKit.CreateRect("Rival LP", animator.transform.parent, new Vector2(.77f, .93f),
+                new Vector2(.93f, .965f), Vector2.zero, Vector2.zero);
+            var pose = new CardPose(Vector2.zero, new Vector2(70f, 102f));
+            var card = new DuelCardReadout(CardDatabase.Get(BlueEyes));
+            var updates = new List<int>();
+            animator.QueueAttack(new CardFlight(BlueEyes, pose, pose, false, false), new Vector2(30f, 200f),
+                true, false, null, card, new Vector2(118f, 108f), null);
+            animator.QueueLifeChange(own, -800, LifePointChangeKind.BattleDamage, () => updates.Add(-800));
+            animator.QueueLifeChange(rival, -500, LifePointChangeKind.BattleDamage, () => updates.Add(-500));
+            animator.QueueLifeChange(own, -1000, LifePointChangeKind.Payment, () => updates.Add(-1000));
+            animator.QueueLifeChange(rival, -300, LifePointChangeKind.EffectDamage, () => updates.Add(-300));
+
+            VerifyAttackFlight(animator, "3000", "2500", "8", () =>
+            {
+                var feedback = animator.transform.Cast<Transform>().Where(node => node.name == "LPChange").ToArray();
+                if (animator.transform.Find("Strike") == null)
+                {
+                    Require(feedback.Length == 0 && updates.Count == 0, "LP changed before the strike.");
+                    return;
+                }
+                Require(feedback.Length == 2 && updates.SequenceEqual(new[] { -800, -500 }),
+                    "Two battle damage events did not appear together at contact.");
+                CheckFeedback(feedback[0], own, "전투 피해", "-800");
+                CheckFeedback(feedback[1], rival, "전투 피해", "-500");
+            });
+            Require(animator.transform.Find("LPChange") == null, "Battle damage remained after the strike.");
+            var queue = (Queue<IEnumerator>)typeof(CardAnimationManager)
+                .GetField("_steps", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(animator);
+            var standalone = queue.Where(step => step.GetType().Name.StartsWith("<PlayLifeChanges>", StringComparison.Ordinal)).ToArray();
+            Require(standalone.Length == 2, "An unrelated effect or payment joined the preceding attack.");
+            Require(standalone[0].MoveNext(), "The LP payment did not render.");
+            CheckFeedback(animator.transform.Find("LPChange"), own, "LP 지불", "-1000");
+            Require(!standalone[0].MoveNext() && standalone[1].MoveNext(), "The effect damage was not shown after the payment.");
+            CheckFeedback(animator.transform.Find("LPChange"), rival, "효과 피해", "-300");
+            Require(!standalone[1].MoveNext() && updates.SequenceEqual(new[] { -800, -500, -1000, -300 }),
+                "The displayed LP changes were applied in the wrong order.");
+
+            void CheckFeedback(Transform feedback, RectTransform anchor, string kind, string value)
+            {
+                var rect = (RectTransform)feedback;
+                Require(rect.anchoredPosition == animator.GetPoint(anchor, Vector2.one * .5f) &&
+                    rect.sizeDelta == animator.GetAreaSize(anchor) &&
+                    rect.Find("Kind/Text").GetComponent<Text>().text == kind &&
+                    rect.Find("Value/Text").GetComponent<Text>().text == value &&
+                    rect.GetComponentsInChildren<Graphic>().All(graphic => !graphic.raycastTarget),
+                    "The LP feedback had the wrong owner, reason, amount or boundary.");
+            }
+            UnityEngine.Object.DestroyImmediate(own.gameObject);
+            UnityEngine.Object.DestroyImmediate(rival.gameObject);
+            Debug.Log("[VERIFY DUEL LP FEEDBACK] Two targets received damage at one impact. A later payment and effect used their own HUD steps.");
         }
 
         internal static void VerifyAttackFlight(CardAnimationManager animator, string attack, string defense, string rating,

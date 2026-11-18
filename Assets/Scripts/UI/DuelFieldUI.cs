@@ -83,6 +83,8 @@ namespace YGOPortable.UI
         private double _oppDisplayLp;
         private int _myTargetLp;
         private int _oppTargetLp;
+        private RectTransform _myLpFeedbackAnchor;
+        private RectTransform _oppLpFeedbackAnchor;
 
         // Zone slot widgets
         private class FieldSlotView
@@ -248,7 +250,7 @@ namespace YGOPortable.UI
             session.OnCardMoved += HandleCardMovedEvent;
             session.OnCardLocationsChanged += HandleCardLocationsChanged;
             session.OnCardsDrawn += HandleCardsDrawn;
-            session.OnLifePointsChanged += HandleLifePointsChanged;
+            session.OnLifePointChange += HandleLifePointsChanged;
             session.OnTurnStarted += HandleTurnStarted;
             session.OnPhaseChanged += HandlePhaseChanged;
             session.OnChainActivated += HandleChainActivatedEvent;
@@ -287,7 +289,7 @@ namespace YGOPortable.UI
                 _session.OnCardMoved -= HandleCardMovedEvent;
                 _session.OnCardLocationsChanged -= HandleCardLocationsChanged;
                 _session.OnCardsDrawn -= HandleCardsDrawn;
-                _session.OnLifePointsChanged -= HandleLifePointsChanged;
+                _session.OnLifePointChange -= HandleLifePointsChanged;
                 _session.OnTurnStarted -= HandleTurnStarted;
                 _session.OnPhaseChanged -= HandlePhaseChanged;
                 _session.OnChainActivated -= HandleChainActivatedEvent;
@@ -706,6 +708,7 @@ namespace YGOPortable.UI
             var opponent = LotdUiKit.CreateRect("OpponentHUD", root,
                 new Vector2(0.762f, 0.894f), new Vector2(0.985f, 0.982f), Vector2.zero, Vector2.zero);
             (_oppNameText, _oppLpText, _oppLpFill, _oppBustImg) = BuildPlayerHud(opponent, true);
+            _oppLpFeedbackAnchor = (RectTransform)_oppNameText.transform.parent;
 
             var menu = LotdUiKit.CreateRect("PauseMenu", root, new Vector2(0.016f, 0.936f),
                 new Vector2(0.103f, 0.982f), Vector2.zero, Vector2.zero);
@@ -946,6 +949,7 @@ namespace YGOPortable.UI
                 Vector2.zero, Vector2.zero);
             var (name, lp, fill, portrait) = BuildPlayerHud(player, false);
             name.text = "플레이어";
+            _myLpFeedbackAnchor = (RectTransform)name.transform.parent;
             _myLpText = lp;
             _myLpFill = fill;
             portrait.sprite = LotdUiKit.LoadSprite("LOTD/Busts/yamiyugi_neutral") ?? LotdUiKit.LoadSprite("LOTD/Busts/atem_neutral");
@@ -2502,7 +2506,7 @@ namespace YGOPortable.UI
                 Finish, Start);
         }
 
-        private void HandleLifePointsChanged(byte player, int delta, int lifePoints)
+        private void HandleLifePointsChanged(byte player, int delta, int lifePoints, LifePointChangeKind kind)
         {
             bool mine = player == _session.HumanPlayerIndex;
             void ApplyLifePoints()
@@ -2517,8 +2521,7 @@ namespace YGOPortable.UI
                 ApplyLifePoints();
                 return;
             }
-            var point = animator.GetPoint((mine ? _myLpText : _oppLpText).rectTransform, new Vector2(0.64f, 0.5f));
-            animator.QueueLifeChange(point, delta, ApplyLifePoints);
+            animator.QueueLifeChange(mine ? _myLpFeedbackAnchor : _oppLpFeedbackAnchor, delta, kind, ApplyLifePoints);
         }
 
         private void HandleTurnStarted(int turn, int player)

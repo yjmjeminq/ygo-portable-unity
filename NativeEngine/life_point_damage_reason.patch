@@ -1,0 +1,10 @@
+--- a/operations.cpp
++++ b/operations.cpp
+@@ -603,6 +603,7 @@
+ 		auto message = pduel->new_message(MSG_DAMAGE);
+ 		message->write<uint8_t>(playerid);
+ 		message->write<uint32_t>(amount);
++		message->write<uint32_t>(reason); // Presentation metadata after the standard damage payload.
+ 		raise_event(reason_card, EVENT_DAMAGE, reason_effect, reason, reason_player, playerid, amount);
+ 		if(reason == REASON_BATTLE && reason_card) {
+ 			if((player[playerid].lp <= 0) && (core.attack_target == nullptr) && reason_card->is_affected_by_effect(EFFECT_MATCH_KILL) && !is_player_affected_by_effect(playerid, EFFECT_CANNOT_LOSE_LP)) {
