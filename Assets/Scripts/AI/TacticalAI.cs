@@ -28,6 +28,8 @@ namespace YGOPortable.AI
         private const uint UnionHangar = 66399653;
         private const uint AromaGarden = 5050644;
         private const uint VisasStarfrost = 56099748;
+        private const uint MelffyFootsteps = 25687946;
+        private const ushort MelffySet = 0x147;
         private const ushort TrickstarSet = 0xfb;
         private const ushort TearlamentsSet = 0x182;
         private const ushort SubterrorSet = 0xed;
@@ -171,6 +173,7 @@ namespace YGOPortable.AI
         internal int[] ComboMainOptions(DuelSession session, DuelPrompt prompt)
         {
             bool planLinks = PlanLinks(session, prompt);
+            bool preserveOpeningBoard = prompt.spSummonable.Count > 0 && FusionXyzTurnPlan.PreserveOpeningBoard(session, prompt.playerId);
             var choices = new List<(int action, int priority)>();
             var distinct = new HashSet<(int command, uint code, uint location, ulong description)>();
 
@@ -180,6 +183,7 @@ namespace YGOPortable.AI
                 {
                     var item = items[i];
                     if (item.controller != prompt.playerId || !CanUseMainAction(session, prompt, planLinks, command, item) ||
+                        (command == 1 && preserveOpeningBoard && item.location == YgoConstants.LOCATION_EXTRA) ||
                         !distinct.Add((command, item.code, item.location, item.description))) continue;
                     var card = CardDatabase.Get(item.code);
                     uint tags = card?.DeckEffectCategories ?? 0;
@@ -209,7 +213,21 @@ namespace YGOPortable.AI
         private bool CanUseMainAction(DuelSession session, DuelPrompt prompt, bool planLinks, int command, SelectableCardItem item) =>
             CanUseIdleAction(session, command, item) &&
             (command != 1 || !planLinks || LinkComboPolicy.CanUseSummon(session.Players[prompt.playerId], item)) &&
-            (command != 5 || (CanActivate(session, prompt, item) && CanPlayFieldSpell(session, prompt, item)));
+            (command != 5 || (CanActivate(session, prompt, item) && CanPlayFieldSpell(session, prompt, item) &&
+                CanEndMainPhaseWithEffect(session, prompt, item)));
+
+        private bool CanEndMainPhaseWithEffect(DuelSession session, DuelPrompt prompt, SelectableCardItem effect)
+        {
+            if (!UsesTacticalRules || effect.code != MelffyFootsteps ||
+                effect.location is not (YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_SZONE)) return true;
+
+            // Footsteps advances to the End Phase. Do the other usable plays before starting that effect.
+            if (prompt.summonable.Count != 0 || (prompt.canBp && HasWorthwhileAttack(session, prompt.playerId))) return false;
+            if (prompt.spSummonable.Any(item => CanUseIdleAction(session, 1, item) &&
+                CardDatabase.Get(item.code) is CardInfo card && CardDatabase.ExtractSetcodes(card.setcode).Contains(MelffySet))) return false;
+            return !prompt.sSetable.Any(item => CardDatabase.Get(item.code) is CardInfo card &&
+                (card.IsTrap || (card.type & YgoConstants.TYPE_QUICKPLAY) != 0));
+        }
 
         internal bool AdvanceComboPlanning(DuelSession session, DuelPrompt prompt)
         {
@@ -231,7 +249,8 @@ namespace YGOPortable.AI
 
         private bool CanSearchCombo(DuelSession session, DuelPrompt prompt, bool planLinks) =>
             _comboSearch != null && Difficulty == AIDifficulty.Smart && session.RetryCount == 0 && _actionsThisTurn < 36 &&
-            ReferenceEquals(session.ActivePrompt, prompt) && (planLinks || DddTurnPlan.IsDddDeck(session.Players[prompt.playerId]));
+            ReferenceEquals(session.ActivePrompt, prompt) && (planLinks || DddTurnPlan.IsDddDeck(session.Players[prompt.playerId]) ||
+                ComboSearch.CanDevelop(prompt));
 
         private byte[] BuildIdleCmd(DuelSession s, DuelPrompt p, bool fallback, int? plannedMainAction)
         {
@@ -681,6 +700,13 @@ namespace YGOPortable.AI
         private byte[] BuildSelectUnselect(DuelSession s, DuelPrompt p)
         {
             _unselectCount++;
+            if (UsesTacticalRules && _unselectCount <= 4 && p.SelectionHint == 506 &&
+                s.SelectionChainLink is { code: MelffyFootsteps } source && source.triggerPlayer == p.playerId &&
+                p.candidates.Count > 0 && p.candidates.All(item => item.controller == p.playerId && item.location == YgoConstants.LOCATION_DECK))
+            {
+                int target = p.candidates.FindIndex(item => item.code is 98416533 or 20003027 or 93018428);
+                return PackTwoInts(1, target >= 0 ? target : 0);
+            }
             if (p.finishable && (p.unselectCandidates.Count > 0 || p.candidates.Count == 0 || _unselectCount >= p.candidates.Count + 2))
             {
                 _unselectCount = 0;

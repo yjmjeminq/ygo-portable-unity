@@ -31,6 +31,19 @@ namespace YGOPortable.AI
             internal readonly List<(int[] prefix, int[] options)> forks = new();
         }
 
+        internal static bool CanDevelop(DuelPrompt prompt)
+        {
+            // A usable engine action is stronger evidence than the deck name or the contents of a filler Extra Deck.
+            if (prompt.spSummonable.Any(card => card.controller == prompt.playerId)) return true;
+            return prompt.activatable.Any(card => card.controller == prompt.playerId &&
+                    (card.description == 1160 || CanDevelopFromCard(CardDatabase.Get(card.code)))) ||
+                prompt.summonable.Any(card => card.controller == prompt.playerId && CanDevelopFromCard(CardDatabase.Get(card.code)));
+        }
+
+        private static bool CanDevelopFromCard(CardInfo card) => card != null &&
+            ((card.type & (YgoConstants.TYPE_TUNER | YgoConstants.TYPE_RITUAL)) != 0 ||
+            (card.DeckEffectCategories & ((1u << 5) | (1u << 6) | (1u << 7) | (1u << 18))) != 0);
+
         internal int? Choose(DuelSession live, DuelPrompt prompt, TacticalAI advisor)
         {
             if (!ReferenceEquals(_prepared, prompt))
@@ -180,13 +193,14 @@ namespace YGOPortable.AI
                 if (monster?.IsFaceUp != true || CardDatabase.Get(monster.code) is not CardInfo card) continue;
                 if (monster.IsAttack) attack += Math.Max(0, monster.attack);
                 score += .6 + Math.Clamp(monster.attack, 0, 4200) / 3200.0;
-                if (card.IsExtra) score += .42;
+                bool developed = card.IsExtra || (card.type & YgoConstants.TYPE_RITUAL) != 0;
+                if (developed) score += .42;
                 if (card.IsLink) score += card.level * .35 + (card.level >= 5 ? 1.85 : card.level >= 4 ? .6 : 0);
                 if (monster.effectsDisabled) continue;
                 if (monster.code == Machinex && (contract || monster.overlayCodes.Count >= 2))
                     score += 1.7 + .26 * Math.Min(3, opposingMonsters);
                 else if (monster.code == Siegfried) score += 1.65 + .36 * Math.Min(3, opposingSpells);
-                else if (monster.code != Gilgamesh && card.IsExtra && LinkComboPolicy.IsInteractive(card)) score += .85;
+                else if (monster.code != Gilgamesh && developed && LinkComboPolicy.IsInteractive(card)) score += .85;
             }
             foreach (var monster in rival.mzone)
                 if (monster?.IsFaceUp == true) score -= Math.Max(0, monster.IsDefense ? monster.defense : monster.attack) / 4300.0;

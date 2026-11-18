@@ -375,6 +375,7 @@ namespace YGOPortable.Editor
             TestOtherDeckTurnPlans.Run();
             LinkComboTraining.VerifyIncluded();
             TestComboSearch.Run();
+            ComboRosterAudit.VerifyOtherComboRoutes();
             VerifyRainbowDarkDragonMatch();
 
             // Explicit test for Token generation, effect tokens (Swordsoul Tuner), dynamic/stat tokens, and token disappearance
