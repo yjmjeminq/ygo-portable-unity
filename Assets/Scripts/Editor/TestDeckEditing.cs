@@ -52,7 +52,7 @@ namespace YGOPortable.Editor
                     UnityEngine.Object.DestroyImmediate(events.gameObject);
                 }
             }
-            Debug.Log("[VERIFY DECK EDITING] Transfer continuity, illegal moves, oversized deck navigation, modal focus, grouped copies, live trunk counts, main sort controls and touch pad passed.");
+            Debug.Log("[VERIFY DECK EDITING] Deck row layout, vertical and horizontal scrolling, transfer continuity, modal focus, grouped copies, trunk counts, sorting and touch passed.");
         }
 
         private static void VerifyTransfer(DeckEditorUI editor)
@@ -86,16 +86,22 @@ namespace YGOPortable.Editor
             var saved = Field<UserDeck>(editor, "_workingDeck");
             saved.main.AddRange(Enumerable.Repeat(46986414u, 39));
             saved.extra.AddRange(Enumerable.Repeat(23995346u, 9));
-            saved.side.Add(46986414u);
+            saved.side.AddRange(Enumerable.Repeat(46986414u, 15));
             Call(editor, "RefreshDeckGrids");
             Canvas.ForceUpdateCanvases();
             var scroll = Field<ScrollRect>(editor, "_mainDeckScroll");
             var mainSlots = Field<RectTransform>(editor, "_mainDeckSlotGrid");
             var extraSlots = Field<RectTransform>(editor, "_extraGridRect");
-            var sideSlots = Field<RectTransform>(editor, "_sideGridRect");
+            var sideSlots = Field<RectTransform>(editor, "_sideDeckSlotGrid");
+            var sideScroll = Field<ScrollRect>(editor, "_sideDeckScroll");
             VerifyEightColumns(mainSlots, "Main");
             VerifyEightColumns(extraSlots, "Extra");
-            VerifyEightColumns(sideSlots, "Side");
+            var firstSideSlot = (RectTransform)sideSlots.Find("Card_0");
+            var lastSideSlot = (RectTransform)sideSlots.Find("Card_14");
+            Require(firstSideSlot.anchorMin.y == lastSideSlot.anchorMin.y && firstSideSlot.anchorMax.y == lastSideSlot.anchorMax.y &&
+                lastSideSlot.anchorMin.x > firstSideSlot.anchorMin.x && sideScroll.horizontal && !sideScroll.vertical &&
+                Mathf.Abs(sideScroll.content.rect.width - sideScroll.viewport.rect.width * 15f / 8f) < .1f,
+                "The full Side Deck did not use a single horizontally scrolling row.");
             var trunk = Field<RectTransform>(editor, "_trunkContent");
             Require(((RectTransform)trunk.Find("TrunkCard/CardInset/Card/AspectBox")).rect.width >= 82f,
                 "The trunk artwork became too small.");
@@ -103,8 +109,8 @@ namespace YGOPortable.Editor
             VerifyDeckArtwork(extraSlots, 73f, "Extra");
             VerifyDeckArtwork(sideSlots, 72f, "Side");
             float slotHeight = ((RectTransform)mainSlots.Find("Card_0")).rect.height;
-            Require(Mathf.Abs(scroll.content.rect.height - scroll.viewport.rect.height * 2.5f) < .1f,
-                "A 40-card deck did not have five rows at eight cards per row.");
+            Require(Mathf.Abs(scroll.content.rect.height - scroll.viewport.rect.height * 5f / 3f) < .1f,
+                "A 40-card deck did not have three visible rows and two scrollable rows.");
             Require(Mathf.Abs(scroll.content.anchoredPosition.y) < .1f, "The main deck did not start at its first row.");
 
             saved.main.AddRange(Enumerable.Repeat(46986414u, 21));
@@ -133,9 +139,36 @@ namespace YGOPortable.Editor
             indices[(int)extra] = 0;
             Call(editor, "NavigatePadCards", Vector2Int.down, false);
             Require(indices[(int)extra] == 8, "Controller focus did not reach the second Extra Deck row.");
+
+            var side = Enum.Parse(area.FieldType, "Side");
+            area.SetValue(editor, side);
+            indices[(int)side] = 7;
+            Call(editor, "NavigatePadCards", Vector2Int.right, false);
+            Call(editor, "DrawPadCardFocus");
+            Require(indices[(int)side] == 8 && sideScroll.content.anchoredPosition.x < 0f,
+                "Controller focus did not scroll the Side Deck when it passed the visible cards.");
+            indices[(int)side] = 14;
+            Call(editor, "DrawPadCardFocus");
+            float lastSideRight = sideScroll.viewport.InverseTransformPoint(lastSideSlot.TransformPoint(lastSideSlot.rect.max)).x;
+            Require(lastSideRight > sideScroll.viewport.rect.xMin && lastSideRight <= sideScroll.viewport.rect.xMax + .1f,
+                "The last Side Deck card remained clipped while focused.");
+
+            var finger = new PointerEventData(EventSystem.current)
+            {
+                pointerId = 0,
+                button = PointerEventData.InputButton.Left,
+                pressPosition = new Vector2(320f, 200f),
+                position = new Vector2(260f, 200f),
+            };
+            var trigger = lastSideSlot.GetComponent<CardDragTrigger>();
+            trigger.OnBeginDrag(finger);
+            Require(Field<ScrollRect>(trigger, "_parentScroll") == sideScroll, "A horizontal swipe over a Side Deck card did not scroll the row.");
+            trigger.OnEndDrag(finger);
+
             saved.extra.Clear();
             saved.side.Clear();
             Call(editor, "RefreshDeckGrids");
+            Require(Mathf.Abs(sideScroll.content.anchoredPosition.x) < .1f, "An empty Side Deck held on to its previous scroll offset.");
         }
 
         private static void VerifyDeckArtwork(Transform grid, float minHeight, string section)
@@ -318,7 +351,7 @@ namespace YGOPortable.Editor
             Call(editor, "SetTrunkSource", 0u, archetype);
 
             var mainGrid = Field<RectTransform>(editor, "_mainDeckSlotGrid");
-            var sideGrid = Field<RectTransform>(editor, "_sideGridRect");
+            var sideGrid = Field<RectTransform>(editor, "_sideDeckSlotGrid");
             var mainBadge = mainGrid.Find($"Card_{deck.main.IndexOf(code)}/CardInset/Card/AspectBox/Unowned");
             var sideBadge = sideGrid.Find("Card_0/CardInset/Card/AspectBox/Unowned");
             var preview = Field<Text>(editor, "_previewOwnership");

@@ -39,7 +39,9 @@ namespace YGOPortable.UI
         private const int OtherDeckCapacity = 15;
         private const int MainDeckCapacity = 60;
         private const int MainDeckSlotRows = (MainDeckCapacity + DeckColumns - 1) / DeckColumns;
-        private const int MainDeckVisibleRows = 2;
+        private const int MainDeckVisibleRows = 3;
+        private const int SideDeckColumns = OtherDeckCapacity;
+        private const int SideDeckVisibleColumns = DeckColumns;
         private const string UnownedLabel = "미보유";
         private static readonly Color UnownedBadgeColor = new Color(.39f, .075f, .11f, .96f);
         private static readonly Color TrunkCountBadgeColor = new Color(.02f, .07f, .14f, .93f);
@@ -124,6 +126,8 @@ namespace YGOPortable.UI
         private RectTransform _mainDeckSlotGrid;
         private RectTransform _extraGridRect;
         private RectTransform _sideGridRect;
+        private ScrollRect _sideDeckScroll;
+        private RectTransform _sideDeckSlotGrid;
 
         public DeckEditorUI(GameAppController app, Transform canvasParent)
         {
@@ -254,6 +258,9 @@ namespace YGOPortable.UI
             _mainDeckScroll.StopMovement();
             _mainDeckScroll.content.anchoredPosition = Vector2.zero;
             _mainDeckScroll.verticalScrollbar.SetValueWithoutNotify(1f);
+            _sideDeckScroll.StopMovement();
+            _sideDeckScroll.content.anchoredPosition = Vector2.zero;
+            _sideDeckScroll.horizontalScrollbar.SetValueWithoutNotify(0f);
             UpdateVirtualTrunkSlots(_lastFirstRow, force: true);
         }
 
@@ -505,9 +512,21 @@ namespace YGOPortable.UI
                 17, TextAnchor.MiddleCenter, LotdUiKit.TextMuted);
         }
 
-        private static Scrollbar AddDeckScrollbar(Transform parent)
+        private static Scrollbar AddDeckScrollbar(Transform parent, bool horizontal = false)
         {
             var scrollbar = LotdUiKit.AddVerticalScrollbar(parent);
+            if (horizontal)
+            {
+                var track = (RectTransform)scrollbar.transform;
+                track.anchorMin = Vector2.zero;
+                track.anchorMax = Vector2.right;
+                track.offsetMin = new Vector2(1f, 1f);
+                track.offsetMax = new Vector2(-1f, 9f);
+                scrollbar.direction = Scrollbar.Direction.LeftToRight;
+                var image = track.GetComponent<Image>();
+                image.sprite = LotdUiKit.WhiteSprite;
+                image.color = new Color(.035f, .085f, .13f);
+            }
             var thumb = (Image)scrollbar.targetGraphic;
             thumb.sprite = LotdUiKit.WhiteSprite;
             thumb.color = new Color(.35f, .78f, .96f);
@@ -580,14 +599,15 @@ namespace YGOPortable.UI
             _wholeSortButton = Control(edit, "Sort", "전체 정렬 ▼", 0.595f, 0.19f, OpenWholeDeckSort);
             Control(edit, "Shuffle", "셔플", 0.8f, 0.2f, ShuffleWorkingDeck);
 
-            (_mainGridRect, _mainCountText) = BuildDeckSection(panel, "Main", "메인", .789f, .536f);
+            (_mainGridRect, _mainCountText) = BuildDeckSection(panel, "Main", "메인", .789f, .429f);
             _mainSortButton = AddMainSortButton(panel, OpenMainDeckSort);
-            (_extraGridRect, _extraCountText) = BuildDeckSection(panel, "Extra", "엑스트라", .499f, .280f);
-            (_sideGridRect, _sideCountText) = BuildDeckSection(panel, "Side", "사이드", .243f, .031f);
+            (_extraGridRect, _extraCountText) = BuildDeckSection(panel, "Extra", "엑스트라", .392f, .181f);
+            (_sideGridRect, _sideCountText) = BuildDeckSection(panel, "Side", "사이드", .144f, .025f);
             BuildMainDeckScroll();
+            BuildSideDeckScroll();
             BuildDeckSlots(_mainDeckSlotGrid, _mainSlots, DeckColumns, MainDeckCapacity, DragSourceType.DeckMain);
             BuildDeckSlots(_extraGridRect, _extraSlots, DeckColumns, OtherDeckCapacity, DragSourceType.DeckExtra);
-            BuildDeckSlots(_sideGridRect, _sideSlots, DeckColumns, OtherDeckCapacity, DragSourceType.DeckSide);
+            BuildDeckSlots(_sideDeckSlotGrid, _sideSlots, SideDeckColumns, OtherDeckCapacity, DragSourceType.DeckSide);
         }
 
         private void BuildMainDeckScroll()
@@ -610,6 +630,26 @@ namespace YGOPortable.UI
             _mainDeckScroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
         }
 
+        private void BuildSideDeckScroll()
+        {
+            _sideDeckScroll = _sideGridRect.gameObject.AddComponent<ScrollRect>();
+            _sideDeckScroll.vertical = false;
+            _sideDeckScroll.movementType = ScrollRect.MovementType.Clamped;
+            _sideDeckScroll.scrollSensitivity = 56f;
+
+            var viewport = LotdUiKit.CreateRect("Viewport", _sideGridRect, Vector2.zero, Vector2.one,
+                new Vector2(0f, 10f), Vector2.zero);
+            viewport.gameObject.AddComponent<RectMask2D>();
+            _sideDeckScroll.viewport = viewport;
+            var content = LotdUiKit.FillRect("Content", viewport);
+            content.pivot = new Vector2(0f, .5f);
+            _sideDeckScroll.content = content;
+            _sideDeckSlotGrid = LotdUiKit.FillRect("Slots", content);
+
+            _sideDeckScroll.horizontalScrollbar = AddDeckScrollbar(_sideGridRect, horizontal: true);
+            _sideDeckScroll.horizontalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
+        }
+
         private void ResizeMainDeckScroll()
         {
             int cards = Mathf.Min(_workingDeck.main.Count, MainDeckCapacity);
@@ -627,17 +667,44 @@ namespace YGOPortable.UI
             }
         }
 
-        private void RevealMainDeckSlot(int index)
+        private void ResizeSideDeckScroll()
         {
-            float viewHeight = _mainDeckScroll.viewport.rect.height;
-            float rowHeight = viewHeight / MainDeckVisibleRows;
-            float rowTop = (Mathf.Clamp(index, 0, MainDeckCapacity - 1) / DeckColumns) * rowHeight;
-            var content = _mainDeckScroll.content;
-            float offset = content.anchoredPosition.y;
-            float target = Mathf.Clamp(offset, rowTop + rowHeight - viewHeight, rowTop);
+            int columns = Mathf.Clamp(_workingDeck.side.Count, SideDeckVisibleColumns, SideDeckColumns);
+            var content = _sideDeckScroll.content;
+            content.anchorMax = new Vector2(columns / (float)SideDeckVisibleColumns, 1f);
+            _sideDeckSlotGrid.anchorMax = new Vector2(SideDeckColumns / (float)columns, 1f);
+
+            float maxOffset = Mathf.Max(0f, content.rect.width - _sideDeckScroll.viewport.rect.width);
+            if (content.anchoredPosition.x < -maxOffset)
+            {
+                _sideDeckScroll.StopMovement();
+                content.anchoredPosition = new Vector2(-maxOffset, 0f);
+            }
+        }
+
+        private void RevealDeckSlot(DragSourceType zone, int index)
+        {
+            var scroll = zone switch
+            {
+                DragSourceType.DeckMain => _mainDeckScroll,
+                DragSourceType.DeckSide => _sideDeckScroll,
+                _ => null,
+            };
+            if (scroll == null) return;
+
+            bool vertical = scroll.vertical;
+            Vector2 axis = vertical ? Vector2.up : Vector2.left;
+            float viewSize = vertical ? scroll.viewport.rect.height : scroll.viewport.rect.width;
+            float slotSize = viewSize / (vertical ? MainDeckVisibleRows : SideDeckVisibleColumns);
+            int slot = vertical ? Mathf.Clamp(index, 0, MainDeckCapacity - 1) / DeckColumns :
+                Mathf.Clamp(index, 0, SideDeckColumns - 1);
+            float slotStart = slot * slotSize;
+            var content = scroll.content;
+            float offset = Vector2.Dot(content.anchoredPosition, axis);
+            float target = Mathf.Clamp(offset, slotStart + slotSize - viewSize, slotStart);
             if (Mathf.Approximately(target, offset)) return;
-            _mainDeckScroll.StopMovement();
-            content.anchoredPosition = new Vector2(0f, target);
+            scroll.StopMovement();
+            content.anchoredPosition = axis * target;
         }
 
         private static (RectTransform grid, Text count) BuildDeckSection(Transform panel, string name, string title,
@@ -884,6 +951,7 @@ namespace YGOPortable.UI
             _extraCountText.text = $"{_workingDeck.extra.Count}장";
             _sideCountText.text = $"{_workingDeck.side.Count}장";
             ResizeMainDeckScroll();
+            ResizeSideDeckScroll();
             SyncSlotList(_mainSlots, _workingDeck.main, PadArea.Main);
             SyncSlotList(_extraSlots, _workingDeck.extra, PadArea.Extra);
             SyncSlotList(_sideSlots, _workingDeck.side, PadArea.Side);
@@ -986,7 +1054,7 @@ namespace YGOPortable.UI
             source.RemoveAt(sourceIndex);
             target.Insert(landing, code);
             FinishDeckEdit();
-            if (targetZone == DragSourceType.DeckMain) RevealMainDeckSlot(landing);
+            RevealDeckSlot(targetZone, landing);
             if (dropPosition.HasValue && !_padMode) RememberMouseCard(DeckPadArea(targetZone), landing);
 
             AnimateDeckSlots(sourceZone, sourceIndex, source.Count, sourcePositions, i => i + 1);
@@ -1022,7 +1090,7 @@ namespace YGOPortable.UI
             cards.RemoveRange(start, length);
             cards.InsertRange(startAfterMove, group);
             FinishDeckEdit();
-            if (zone == DragSourceType.DeckMain) RevealMainDeckSlot(landing);
+            RevealDeckSlot(zone, landing);
             var area = DeckPadArea(zone);
             if (_padMode && CurrentPadDeck == zone) _padIndices[(int)area] = landing;
             else if (dropPosition.HasValue && !_padMode) RememberMouseCard(area, landing);
@@ -1210,7 +1278,7 @@ namespace YGOPortable.UI
             var targetPositions = CaptureDeckPositions(destination, target.Count);
             target.Insert(landing, code);
             FinishDeckEdit();
-            if (destination == DragSourceType.DeckMain) RevealMainDeckSlot(landing);
+            RevealDeckSlot(destination, landing);
             AnimateDeckSlots(destination, landing + 1, target.Count, targetPositions, index => index - 1);
             AnimateTransfer(code, from, (RectTransform)GetDeckSlots(destination)[landing].card.transform);
         }

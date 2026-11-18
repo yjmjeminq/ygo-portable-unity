@@ -480,7 +480,12 @@ namespace YGOPortable.UI
         {
             if (move == Vector2Int.zero) return;
             int count = _padArea == PadArea.Trunk ? _trunkResults.Count : VisiblePadDeckCount;
-            int cols = _padArea == PadArea.Trunk ? TrunkCols : DeckColumns;
+            int cols = _padArea switch
+            {
+                PadArea.Trunk => TrunkCols,
+                PadArea.Side => SideDeckColumns,
+                _ => DeckColumns,
+            };
             int area = (int)_padArea;
             int index = ClampPadIndex(_padIndices[area], count);
             int row = index / cols;
@@ -539,7 +544,7 @@ namespace YGOPortable.UI
                 return;
             }
 
-            if (_padArea == PadArea.Main) RevealMainDeckSlot(index);
+            RevealDeckSlot(CurrentPadDeck, index);
             ShowDeckCardActions(GetDeckSlots(CurrentPadDeck)[index].rt, CurrentPadDeck, index, code);
         }
 
@@ -572,7 +577,7 @@ namespace YGOPortable.UI
             var cards = GetDeckList(CurrentPadDeck);
             int count = VisiblePadDeckCount;
             int deckIndex = _padIndices[area] = ClampPadIndex(_padIndices[area], count);
-            if (_padArea == PadArea.Main) RevealMainDeckSlot(deckIndex);
+            RevealDeckSlot(CurrentPadDeck, deckIndex);
             ShowPadCardFocus(GetDeckSlots(CurrentPadDeck)[deckIndex].rt, count > 0 ? cards[deckIndex] : 0);
         }
 
@@ -632,6 +637,7 @@ namespace YGOPortable.UI
             {
                 PadArea.Trunk => _trunkViewport,
                 PadArea.Main => _mainDeckScroll.viewport,
+                PadArea.Side => _sideDeckScroll.viewport,
                 _ => _deckPanel,
             };
             _padCardFocus.Show(target, host, animate);
