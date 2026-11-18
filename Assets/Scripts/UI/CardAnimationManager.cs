@@ -513,7 +513,9 @@ namespace YGOPortable.UI
         {
             if (readout?.SourceCard == null && readout?.DestinationCard == null) return null;
             var holder = CenteredVisual("MovingCardReadout", _layer, flight.From.Position, readout.Movement.StartSize);
-            return new DuelMovingReadout(holder, readout, motion == CardMotion.TokenSummon ? .27f : .5f);
+            float handoff = motion == CardMotion.TokenSummon ? .27f
+                : !flight.EndsFaceDown && readout.DestinationCard == null ? .82f : .5f;
+            return new DuelMovingReadout(holder, readout, handoff);
         }
 
         private IEnumerator MoveCard(CardFlight flight, CardMotion motion, Action onArrive, CardMoveReadoutSnapshot readout,

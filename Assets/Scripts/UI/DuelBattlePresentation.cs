@@ -12,6 +12,7 @@ namespace YGOPortable.UI
             internal LiveCardState Card;
             internal uint Position;
             internal BattleCardStats? Stats;
+            internal PresentedFieldReadout Readout;
             internal bool UseBattleStats;
             internal bool Hidden;
             internal bool HideReadout;
@@ -69,6 +70,19 @@ namespace YGOPortable.UI
                 display.Stats = stats;
                 display.UseBattleStats = true;
             }
+            return display;
+        }
+
+        private BattleCardDisplay HoldMovingFieldCard(CardMoveEvent move, CardMotion motion,
+            PresentedFieldReadout readout, bool paired)
+        {
+            var battle = HoldBattleMove(move, motion);
+            if (battle != null) return battle;
+            var source = move.SourceReadout;
+            if (source == null || paired || IsArriving(move.fromCon, move.fromLoc, move.fromSeq)) return null;
+
+            var display = QueueBattleCardDisplay(move.fromCon, move.fromSeq, source, move.fromPos);
+            display.Readout = readout ?? new PresentedFieldReadout { Shown = source };
             return display;
         }
 

@@ -28,6 +28,7 @@ namespace YGOPortable.Editor
             VerifyNativeCombatReadout(useHonest: true);
             VerifyNativeCombatReadout(useHonest: false);
             VerifyNativeChainReadouts();
+            VerifyDestroyedCopiesKeepTheirReadouts();
             VerifyFieldReplacementReadouts();
             VerifyTurnAndDrawReadouts();
             VerifyDefensePositionBattleReadout(34496660, BattleStatSource.Defense, 1800);
@@ -447,6 +448,112 @@ namespace YGOPortable.Editor
             }
             Verify("2750", "2050", "1200", "3");
             Debug.Log("[VERIFY DUEL CHAIN READOUT] Rush changed only one copy to 2550 at link 2. Ocean changed both copies' ATK/DEF and Level at link 1.");
+        }
+
+        private static void VerifyDestroyedCopiesKeepTheirReadouts()
+        {
+            const uint gagagigo = 49003308, darkHole = 53129443, rush = 70046172;
+            var main = Enumerable.Repeat(gagagigo, 16).Concat(Enumerable.Repeat(darkHole, 12))
+                .Concat(Enumerable.Repeat(rush, 12)).ToArray();
+            var ai = new TacticalAI();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Destroyed copies", main, Array.Empty<uint>(),
+                Enumerable.Repeat(gagagigo, 40).ToArray(), Array.Empty<uint>(), true, session =>
+                {
+                    var hand = session.Players[session.HumanPlayerIndex].hand;
+                    return new[] { gagagigo, darkHole, rush }.All(code => hand.Any(card => card.code == code));
+                });
+            for (int turn = 0; turn < 2; turn++)
+            {
+                Require(duel.ActivePrompt?.summonable.Count > 0 && duel.ActivePrompt.playerId == turn,
+                    "The destruction fixture could not summon both copies.");
+                duel.SubmitResponseInt(0);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+                duel.SubmitResponseInt(7);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            }
+
+            var mine = duel.Players[duel.HumanPlayerIndex].mzone.Single(card => card?.code == gagagigo);
+            var rival = duel.Players[duel.AiPlayerIndex].mzone.Single(card => card?.code == gagagigo);
+            using var ui = new HandUI(duel);
+            var animator = CardAnimationManager.Ensure(ui.Canvas);
+            Canvas.ForceUpdateCanvases();
+            var ownTile = FieldSlot(ui.Field, mine);
+            var rivalTile = FieldSlot(ui.Field, rival);
+            ownTile.GetComponent<CardDragTrigger>().OnRightClick();
+            var inspector = ui.Field.Root.transform.Find("LeftInspector/CardDetails/CombatStats/Attack/Digits/Value").GetComponent<Text>();
+
+            void VerifyWaiting(Transform tile, string attack)
+            {
+                Require(tile.Find("Card/CardView").gameObject.activeInHierarchy &&
+                        tile.Find("CardReadout").gameObject.activeInHierarchy &&
+                        tile.Find("CardReadout/Combat/Attack/Digits/Value").GetComponent<Text>().text == attack,
+                    $"A monster stopped displaying its {attack} ATK before its departure animation.");
+            }
+
+            bool chained = false;
+            ActivateFromMainPhase(duel, darkHole);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
+            {
+                if (prompt.messageType == YgoConstants.MSG_SELECT_CARD)
+                {
+                    int target = prompt.candidates.FindIndex(card => card.code == gagagigo && card.controller == duel.HumanPlayerIndex);
+                    Require(target >= 0, "Rush Recklessly could not target the intended copy.");
+                    return DuelSession.PackCardSelection(target);
+                }
+                if (chained || prompt.playerId != duel.HumanPlayerIndex) return null;
+                if (prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && prompt.promptCardCode == rush)
+                {
+                    chained = true;
+                    return BitConverter.GetBytes(1);
+                }
+                if (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN)
+                {
+                    int option = prompt.candidates.FindIndex(card => card.code == rush);
+                    if (option < 0) return null;
+                    chained = true;
+                    return BitConverter.GetBytes(option);
+                }
+                return null;
+            });
+            Require(chained && duel.RetryCount == 0 && duel.SolvedChainLinks.SequenceEqual(new[] { (2, rush), (1, darkHole) }) &&
+                    duel.Players.All(player => player.grave.Any(card => card.code == gagagigo)),
+                "The native chain did not resolve the boost before destroying the two copies.");
+            ui.Field.Refresh();
+            VerifyWaiting(ownTile, "1850");
+            VerifyWaiting(rivalTile, "1850");
+
+            var steps = AnimationSteps(animator);
+            var update = steps.Single(step => step.GetType().Name.StartsWith("<ApplyFieldReadoutUpdate>", StringComparison.Ordinal));
+            Require(!update.MoveNext(), "The buff readout added a delay.");
+            VerifyWaiting(ownTile, "2550");
+            VerifyWaiting(rivalTile, "1850");
+            Require(inspector.text == "2550", "The selected card lost its live inspector value before it left the field.");
+
+            const BindingFlags fields = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            var departures = steps.Where(step => step.GetType().GetField("flight", fields)?.GetValue(step) is CardFlight flight &&
+                flight.Code == gagagigo).ToArray();
+            Require(departures.Length == 2, "Both destroyed copies need a distinct departure.");
+            foreach (var departure in departures)
+            {
+                var snapshot = (CardMoveReadoutSnapshot)departure.GetType().GetField("readout", fields).GetValue(departure);
+                Require(snapshot?.SourceCard != null, "A destroyed face-up card had no travelling readout.");
+                bool opponent = snapshot.Movement.StartOpponent;
+                var tile = opponent ? rivalTile : ownTile;
+                string attack = opponent ? "1850" : "2550";
+                Require(departure.MoveNext(), "The destruction did not start with its effect.");
+                VerifyWaiting(tile, attack);
+                Require(departure.MoveNext(), "The destroyed card did not fly from the field.");
+                var sample = TestCardPresentation.SampleAnimation((IEnumerator)departure.Current);
+                var readout = (RectTransform)animator.transform.Find("MovingCardReadout");
+                sample(.38f);
+                RequireTravelStats(readout, attack, "1000", "4", defense: false);
+                Require(!tile.Find("Card/CardView").gameObject.activeInHierarchy,
+                    "The source card stayed on the field under its flying copy.");
+                sample(1f);
+                Require(!departure.MoveNext() && readout == null, "The live readout stayed visible in the graveyard.");
+            }
+            Require(inspector.text == "1850", "The inspector kept a field-only buff after the card left.");
+            Debug.Log("[VERIFY DUEL DEPARTURE READOUT] Both copies stayed visible until destruction, and travelled with their own 2550 and 1850 ATK values.");
         }
 
         private static void VerifyFieldReplacementReadouts()
@@ -1081,7 +1188,9 @@ namespace YGOPortable.Editor
                     return null;
                 return new[] { prompt.playerId, (byte)YgoConstants.LOCATION_MZONE, (byte)sequence };
             });
-            var snapshot = PendingMoveReadouts(ui.Field)[((byte)duel.AiPlayerIndex, destination)];
+            var pending = PendingMoveReadouts(ui.Field);
+            var snapshot = pending[((byte)duel.AiPlayerIndex, destination)];
+            var reciprocal = pending[((byte)duel.HumanPlayerIndex, origin)];
             ui.Field.Refresh();
             Require(paired == swapInPlace && mine.mzone[origin]?.attack == 1700 && theirs.mzone[destination]?.attack == 2300 &&
                 inspector.text == "2300" && zoom.text == "2300",
@@ -1093,6 +1202,13 @@ namespace YGOPortable.Editor
             move.Sample(1f);
             Require(!move.Step.MoveNext() && move.Readout == null,
                 "A control change left the moving stat panel behind.");
+            var returning = OpenMove(animator, KaiserSeaHorse, reciprocal);
+            RequireTravelStats(returning.Readout, "1300", "1650", "4", defense: false);
+            returning.Sample(.72f);
+            RequireTravelStats(returning.Readout, "1700", "1650", "4", defense: false);
+            returning.Sample(1f);
+            Require(!returning.Step.MoveNext() && returning.Readout == null,
+                "The other copy did not finish with its own controller's stats.");
             ui.Field.HandleDuelPad(new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Cancel));
             var expected = ui.Field.Root.transform.Find($"DuelBoard/Zone_{6 - destination}_1");
             Require(!ui.Field.IsReadingCardDetails && expected != null && (Transform)focus.GetValue(ui.Field) == expected &&
@@ -1384,12 +1500,16 @@ namespace YGOPortable.Editor
             var snapshot = pending[(monster.controller, monster.sequence)];
             ui.Field.Refresh();
             Require(snapshot.DestinationCard?.IsDefense == true && snapshot.SourceCard?.position == YgoConstants.POS_FACEUP_ATTACK &&
-                Vector2.Distance(snapshot.Movement.StartSize, focusedStats) < .1f && card.anchoredPosition == Vector2.zero,
-                "A position change lost its starting stats or retained a raised card underneath its animation.");
+                Vector2.Distance(snapshot.Movement.StartSize, focusedStats) < .1f &&
+                Vector2.Distance(animation.GetVisualPose(art).Position, focusedPose.Position) < .2f &&
+                restingReadout.gameObject.activeInHierarchy,
+                "A queued position change did not retain the raised card and its attack-position readout.");
 
             var motion = OpenMove(animation, monster.code, snapshot);
             Require(Vector2.Distance(motion.Readout.anchoredPosition, focusedPose.Position) < .2f,
                 "The motion did not start at the raised card pose.");
+            Require(card.anchoredPosition == Vector2.zero && !restingReadout.gameObject.activeInHierarchy,
+                "The field kept a duplicate card or readout after its motion started.");
             RequireTravelStats(motion.Readout, "1700", "1650", "4", defense: false);
             motion.Sample(.66f);
             Require(motion.Readout.anchoredPosition == ((RectTransform)motion.Proxy.transform).anchoredPosition &&

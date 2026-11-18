@@ -50,6 +50,7 @@ namespace YGOPortable.Core
         public uint toPos;
         public uint reason;
         internal uint? summonType;
+        internal LiveCardState SourceReadout;
     }
 
     internal enum BattleStatSource : byte { Attack = 1, Defense, Effect }
@@ -713,6 +714,8 @@ namespace YGOPortable.Core
 
         private void NotifyCardMoved(CardMoveEvent move, CardMoveEvent swapPartner = null)
         {
+            CaptureMoveSource(move);
+            if (swapPartner != null) CaptureMoveSource(swapPartner);
             InvalidateFieldReadouts(move);
             if (swapPartner != null) InvalidateFieldReadouts(swapPartner);
             if (move.summonType.HasValue) _awaitingSpecialSummonCompletion = true;
@@ -726,6 +729,14 @@ namespace YGOPortable.Core
             OnCardLocationsChanged?.Invoke(move, swapPartner);
             PublishCardMove(move);
             if (swapPartner != null) PublishCardMove(swapPartner);
+        }
+
+        private void CaptureMoveSource(CardMoveEvent move)
+        {
+            if (move.fromLoc == YgoConstants.LOCATION_MZONE &&
+                _fieldReadoutBaseline?.TryGetValue((move.fromCon, move.fromLoc, move.fromSeq), out var source) == true &&
+                source.code == move.code && source.position == move.fromPos)
+                move.SourceReadout = source;
         }
 
         private void PublishCardMove(CardMoveEvent move)
