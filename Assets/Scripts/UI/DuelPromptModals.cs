@@ -63,6 +63,7 @@ namespace YGOPortable.UI
             (YgoConstants.LOCATION_EXTRA, "엑스트라"),
         };
         private RectTransform _zoneWindow;
+        private DuelPromptBackdrop _zoneShade;
         private RectTransform _zoneBody;
         private RectTransform _zoneTabs;
         private Text _zoneTitle;
@@ -190,7 +191,7 @@ namespace YGOPortable.UI
             Vector2 local = host.InverseTransformPoint(point);
             _materialConfirmRoot.anchoredPosition = new Vector2(local.x, Mathf.Min(local.y + 32f, host.rect.yMax - 32f));
         }
-        private bool CanAnswerPrompt => IsPromptOpen && !IsZoneViewerOpen && !IsShowingField;
+        private bool CanAnswerPrompt => IsPromptOpen && _promptInput.interactable && !IsShowingField;
 
         public DuelPromptModals(Transform canvasParent, Action<uint> onInspectCard, Action<byte[]> onSubmitResponse)
         {
@@ -210,6 +211,14 @@ namespace YGOPortable.UI
 
         internal void SetBrowsablePiles(params DuelZoneImage[] piles) => _promptShade.BrowsablePiles = piles;
         internal void SetChainConfirmationControl(Button button) => _promptShade.ChainConfirmationControl = button;
+
+        internal void SetInspectorArtworkControl(Button button)
+        {
+            _promptShade.InspectorArtworkControl = button;
+            _zoneShade.InspectorArtworkControl = button;
+        }
+
+        internal void SetCardDetailsOpen(bool open) => _promptInput.interactable = !open && !IsZoneViewerOpen;
 
         internal void SetZoneBrowserActions(Action<bool, uint> browsePile, Action<uint> openDetails)
         {
@@ -448,7 +457,7 @@ namespace YGOPortable.UI
 
         private void ToggleFieldView()
         {
-            if (!IsPromptOpen || IsZoneViewerOpen || IsFieldCardSelection) return;
+            if (!IsPromptOpen || !_promptInput.interactable || IsFieldCardSelection) return;
             LotdAudio.PlayClick();
             SetFieldView(!IsShowingField);
             if (IsShowingField) SetFocus(_fieldViewButton.gameObject);
@@ -519,7 +528,7 @@ namespace YGOPortable.UI
 
         public bool TryCancelOrPass()
         {
-            if (!IsPromptOpen || IsZoneViewerOpen || _curPrompt == null) return false;
+            if (!IsPromptOpen || !_promptInput.interactable || _curPrompt == null) return false;
             if (_padKeyboard.IsOpen)
             {
                 _padKeyboard.Close();
@@ -1573,8 +1582,10 @@ namespace YGOPortable.UI
         {
             var dim = LotdUiKit.FillRect("Overlay_ZoneView", parent);
             ZoneViewRoot = dim.gameObject;
-            LotdUiKit.AddImage(dim.gameObject, LotdUiKit.WhiteSprite, new Color(0.015f, 0.022f, 0.038f, 0.40f));
-            var dismiss = dim.gameObject.AddComponent<Button>();
+            var shade = LotdUiKit.FillRect("Shade", dim);
+            _zoneShade = shade.gameObject.AddComponent<DuelPromptBackdrop>();
+            _zoneShade.sprite = LotdUiKit.WhiteSprite;
+            var dismiss = shade.gameObject.AddComponent<Button>();
             dismiss.navigation = new Navigation { mode = Navigation.Mode.None };
             dismiss.onClick.AddListener(CloseZoneViewer);
 
@@ -1791,7 +1802,7 @@ namespace YGOPortable.UI
             _zoneBody.offsetMax = new Vector2(-10f, browsePiles ? -151f : -62f);
             _zoneWindow.anchorMin = sidePanel ? new Vector2(browsePiles ? .76f : .817f, .163f) : new Vector2(.208f, .198f);
             _zoneWindow.anchorMax = sidePanel ? new Vector2(.988f, .871f) : new Vector2(.976f, .646f);
-            ZoneViewRoot.GetComponent<Image>().color = new Color(.015f, .022f, .038f, sidePanel ? .14f : .40f);
+            _zoneShade.color = new Color(.015f, .022f, .038f, sidePanel ? .14f : .40f);
 
             var close = (RectTransform)_zoneClose.transform.parent;
             close.anchorMin = new Vector2(sidePanel ? .77f : .82f, .15f);
@@ -1982,6 +1993,19 @@ namespace YGOPortable.UI
         }
 
         // ==================== UI HELPERS ====================
+        internal bool RestoreFocusAfterCardDetails(GameObject previous)
+        {
+            if (!IsZoneViewerOpen && !IsPromptOpen) return false;
+
+            var scope = IsZoneViewerOpen ? ZoneViewRoot.transform : _padKeyboard.IsOpen ? _padKeyboard.Scope : ModalRoot.transform;
+            if (previous != null && CanNavigate(previous.GetComponent<Selectable>(), scope)) SetFocus(previous);
+            else if (IsZoneViewerOpen) SetFocus(_zoneSelectedBorder != null ? _zoneSelectedBorder.gameObject : _zoneClose.gameObject);
+            else if (_padKeyboard.IsOpen) SetFocus(_padKeyboard.DefaultFocus.gameObject);
+            else if (IsShowingField) SetFocus(_fieldViewButton.gameObject);
+            else FocusPrompt();
+            return true;
+        }
+
         private void FocusPrompt()
         {
             if (EventSystem.current == null) return;
@@ -2446,6 +2470,7 @@ namespace YGOPortable.UI
         internal bool SelectingFieldCards { get; set; }
         internal Func<Vector2, Camera, bool> FieldCardHitTest { get; set; }
         internal Button ChainConfirmationControl { get; set; }
+        internal Button InspectorArtworkControl { get; set; }
         internal bool ChainConfirmationAvailable { get; set; }
 
         internal bool IsPointOverPile(Vector2 screenPoint, Camera eventCamera)
@@ -2460,12 +2485,15 @@ namespace YGOPortable.UI
 
         public override bool IsRaycastLocationValid(Vector2 screenPoint, Camera eventCamera)
         {
-            var control = ChainConfirmationControl;
-            if (ChainConfirmationAvailable && control != null && control.isActiveAndEnabled && control.IsInteractable() &&
-                RectTransformUtility.RectangleContainsScreenPoint((RectTransform)control.transform, screenPoint, eventCamera))
+            if (HitsControl(InspectorArtworkControl, screenPoint, eventCamera) ||
+                ChainConfirmationAvailable && HitsControl(ChainConfirmationControl, screenPoint, eventCamera))
                 return false;
             if (SelectingFieldCards) return !FieldCardHitTest(screenPoint, eventCamera);
             return !ShowingField || !IsPointOverPile(screenPoint, eventCamera);
         }
+
+        private static bool HitsControl(Button control, Vector2 point, Camera camera) =>
+            control != null && control.isActiveAndEnabled && control.IsInteractable() &&
+            RectTransformUtility.RectangleContainsScreenPoint((RectTransform)control.transform, point, camera);
     }
 }

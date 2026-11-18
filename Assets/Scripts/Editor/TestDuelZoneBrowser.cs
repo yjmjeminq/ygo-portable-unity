@@ -29,7 +29,7 @@ namespace YGOPortable.Editor
                 opens += VerifyBanishAndGrave(humanFirst);
             opens += VerifyPromptAndExtraSummon();
             string hitTest = SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null ? "raycast filters" : "GraphicRaycaster";
-            Debug.Log($"[VERIFY ZONE BROWSER] {opens} successful opens. Pile tabs, nested card details, privacy, effect prompt field view ({hitTest}), separate Extra Deck summon choices and Synchro materials verified.");
+            Debug.Log($"[VERIFY ZONE BROWSER] {opens} successful opens. Pile tabs, inspector artwork details, privacy, effect prompt field view ({hitTest}), separate Extra Deck summon choices and Synchro materials verified.");
         }
 
         private static void VerifyCardDetailsSafeArea()
@@ -268,7 +268,11 @@ namespace YGOPortable.Editor
                     ((RectTransform)canvas.transform).sizeDelta = new Vector2(1600f, 900f);
                     canvas.transform.position = Vector3.zero;
                 }
-                Modals = new DuelPromptModals(_canvas.transform, code => InspectedCode = code,
+                Modals = new DuelPromptModals(_canvas.transform, code =>
+                {
+                    InspectedCode = code;
+                    Field?.InspectCard(code);
+                },
                     onSubmit ?? (_ => throw new InvalidOperationException("Browsing submitted a modal response.")));
                 _controller = _canvas.AddComponent<GameAppController>();
                 Field = new DuelFieldUI(_controller, _canvas.transform, Modals);
@@ -294,6 +298,16 @@ namespace YGOPortable.Editor
                     "The effect prompt did not start with its chooser visible.");
                 var selected = Private<HashSet<int>>(Modals, "_selectedIndices").ToArray();
                 int chainIndex = Private<int>(Modals, "_chainSelection");
+                uint inspected = Private<uint>(Field, "_inspectedCode");
+                if (inspected == 0)
+                {
+                    inspected = mine.hand.First().code;
+                    Field.InspectCard(inspected);
+                }
+                VerifyInspectorArtwork(inspected, prompt, pointerId: 0);
+                Require(panel.gameObject.activeInHierarchy && Private<int>(Modals, "_chainSelection") == chainIndex &&
+                    Private<HashSet<int>>(Modals, "_selectedIndices").SetEquals(selected),
+                    "Reading the preview changed the pending chooser or its selection.");
 
                 var extra = StackRoot("_myExtraTile");
                 var blocked = Raycast(extra, out _);
@@ -418,6 +432,8 @@ namespace YGOPortable.Editor
                     VerifyCardDetails(card.code, prompt);
                     ExecuteEvents.Execute(source.gameObject, pointer, ExecuteEvents.pointerClickHandler);
                 }
+                else ExecuteEvents.Execute(source.gameObject, pointer, ExecuteEvents.pointerClickHandler);
+                VerifyInspectorArtwork(card.code, _duel.ActivePrompt, pointer.pointerId);
                 var hoverArea = (RectTransform)bar.Find("HoverArea");
                 var activate = (RectTransform)bar.Find("ACTION/Circle/Button");
                 Require(bar.gameObject.activeInHierarchy && activate != null, "The hovered hand card had no activation icon.");
@@ -641,12 +657,12 @@ namespace YGOPortable.Editor
                     graphic.Raycast(point, null))?.gameObject;
             }
 
-            private void ClickAt(RectTransform target, int pointerId = -1)
+            private void ClickAt(RectTransform target, int pointerId = -1, GameObject control = null)
             {
                 var hit = Raycast(target, out var pointer);
                 pointer.pointerId = pointerId;
                 var handler = ExecuteEvents.GetEventHandler<IPointerClickHandler>(hit);
-                Require(handler == target.gameObject,
+                Require(handler == (control ?? target.gameObject),
                     $"A pointer click at {target.name} reached {handler?.name ?? hit?.name ?? "nothing"}.");
                 ExecuteEvents.Execute(handler, pointer, ExecuteEvents.pointerClickHandler);
             }
@@ -719,6 +735,22 @@ namespace YGOPortable.Editor
                     "Closing card details changed the active prompt.");
             }
 
+            private void VerifyInspectorArtwork(uint code, DuelPrompt prompt, int pointerId)
+            {
+                var preview = Private<CompositeCardView>(Field, "_inspCard");
+                var artwork = (RectTransform)preview.transform.Find("AspectBox/Artwork");
+                var button = Private<Button>(Field, "_duelPadInspectButton");
+                Require(preview.CurrentCode == code && button.IsInteractable(), "The selected card did not populate the left preview.");
+                ClickAt(artwork, pointerId, button.gameObject);
+                var zoom = Private<GameObject>(Field, "_cardZoomModal");
+                Require(zoom.activeInHierarchy && Private<Text>(Field, "_zoomDesc").text == CardDatabase.Get(code).desc &&
+                    ReferenceEquals(_duel.ActivePrompt, prompt), "Clicking the left artwork did not open the selected card's details.");
+                if (Modals.IsPromptOpen)
+                    Require(!Modals.TryConfirm() && !Modals.TryCancelOrPass(), "The chooser handled a response while card details were open.");
+                ClickAt((RectTransform)Private<Button>(Field, "_zoomCloseButton").transform, pointerId);
+                Require(!zoom.activeSelf && ReferenceEquals(_duel.ActivePrompt, prompt), "Closing the details advanced the duel.");
+            }
+
             internal void VerifyOwnZones(PlayerFieldSnapshot player)
             {
                 Field.Refresh();
@@ -764,6 +796,9 @@ namespace YGOPortable.Editor
                     Vector2.Distance(scroll.content.anchoredPosition, scrollPosition) < .5f &&
                     Private<uint>(Modals, "_zoneSelectedCode") == expected[0],
                     "Closing details did not preserve the selected card and list position.");
+                VerifyInspectorArtwork(expected[0], prompt, pointerId: 0);
+                Require(Modals.IsZoneViewerOpen && Vector2.Distance(scroll.content.anchoredPosition, scrollPosition) < .5f,
+                    "Opening details from the left artwork interrupted the pile browser.");
 
                 ClickAt((RectTransform)tabs.Find("Opponent/Button"));
                 VerifyOpened(prompt, opponent.banished.Select(_ => 0u));

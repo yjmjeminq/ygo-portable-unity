@@ -192,6 +192,7 @@ namespace YGOPortable.UI
             _modals = modals;
             BuildUI(canvasParent);
             _modals.SetFieldCardHitTest(IsPointOverFieldCardChoice);
+            _modals.SetInspectorArtworkControl(_duelPadInspectButton);
             _modals.SetBrowsablePiles(
                 _myGyTile.root.GetComponent<DuelZoneImage>(), _myExtraTile.root.GetComponent<DuelZoneImage>(),
                 _myBanTile.root.GetComponent<DuelZoneImage>(), _oppGyTile.root.GetComponent<DuelZoneImage>(),
@@ -393,10 +394,18 @@ namespace YGOPortable.UI
             var card = LotdUiKit.CreateRect("CardPreview", left,
                 new Vector2(.07f, .425f), new Vector2(.93f, .9f), Vector2.zero, Vector2.zero);
             _inspCard = CompositeCardView.Create(card, "Card", duelArtwork: true);
-            var zoomHit = LotdUiKit.FillRect("ZoomHit", card);
+            var zoomHit = LotdUiKit.FillRect("ZoomHit", _inspCard.transform.Find("AspectBox"));
+            LotdUiKit.AddImage(zoomHit.gameObject, LotdUiKit.WhiteSprite, Color.clear);
             var zoom = zoomHit.gameObject.AddComponent<Button>();
-            zoom.targetGraphic = LotdUiKit.AddImage(zoomHit.gameObject, LotdUiKit.WhiteSprite, Color.clear);
-            zoom.onClick.AddListener(() => ShowCardZoomModal(_inspectedCode));
+            var hint = LotdUiKit.CreateRect("DetailsHint", zoomHit, new Vector2(.15f, .058f), new Vector2(.85f, .206f),
+                Vector2.zero, Vector2.zero);
+            zoom.targetGraphic = LotdUiKit.AddImage(hint.gameObject, LotdUiKit.WhiteSprite, DuelStyle.HeaderColor, false, false);
+            LotdUiKit.AddFittedText(hint, "Label", "상세 보기", 15, 10, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+            zoom.onClick.AddListener(() =>
+            {
+                LotdAudio.PlayClick();
+                ShowCardZoomModal(_inspectedCode);
+            });
             _duelPadInspectButton = zoom;
 
             var inside = LotdUiKit.FillRect("CardDetails", left, 7f);
@@ -3114,10 +3123,10 @@ namespace YGOPortable.UI
             if (opening)
             {
                 _focusBeforeZoom = EventSystem.current?.currentSelectedGameObject;
-                // A detail opened from a pile covers the browser while preserving its list and scroll position.
-                if (IsBrowsingZone) _cardZoomModal.transform.SetParent(Root.transform.parent, false);
+                if (IsBrowsingZone || _modals.IsPromptOpen) _cardZoomModal.transform.SetParent(Root.transform.parent, false);
                 _cardZoomModal.transform.SetAsLastSibling();
                 _zoomRelatedButton.gameObject.SetActive(!IsBrowsingZone);
+                _modals.SetCardDetailsOpen(true);
                 _cardZoomModal.SetActive(true);
             }
             var info = CardDatabase.Get(code);
@@ -3157,10 +3166,12 @@ namespace YGOPortable.UI
             if (!_cardZoomModal.activeSelf) return;
             _cardZoomModal.SetActive(false);
             if (_cardZoomModal.transform.parent != Root.transform) _cardZoomModal.transform.SetParent(Root.transform, false);
+            _modals.SetCardDetailsOpen(false);
             var previous = _focusBeforeZoom;
             _focusBeforeZoom = null;
             var events = EventSystem.current;
             if (events == null) return;
+            if (restoreFocus && _modals.RestoreFocusAfterCardDetails(previous)) return;
             if (restoreFocus && previous != null && previous.TryGetComponent<Selectable>(out var control) &&
                 control.isActiveAndEnabled && control.IsInteractable())
                 events.SetSelectedGameObject(previous);

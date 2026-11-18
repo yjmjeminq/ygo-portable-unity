@@ -640,7 +640,7 @@ namespace YGOPortable.UI
         private void OnHumanModalResponse(byte[] resp)
         {
             if (_session == null || _session.IsFinished ||
-                _duelField.IsPresenting || _duelField.IsPaused || _duelField.IsBrowsingZone) return;
+                _duelField.IsPresenting || _duelField.IsPaused || _duelField.IsBrowsingZone || _duelField.IsReadingCardDetails) return;
             _shownHumanPrompt = null;
             _session.SubmitResponse(resp);
             _duelField.Refresh();
