@@ -755,7 +755,10 @@ namespace YGOPortable.UI
         private void RenderSelectPosition(DuelPrompt p)
         {
             _modalTitle.text = "표시 형식 선택";
-            _modalSubtitle.text = CardDatabase.GetName(p.promptCardCode);
+            var card = new DuelCardReadout(CardDatabase.Get(p.promptCardCode));
+            string name = p.promptCardCode == 0 ? "뒷면 카드" : CardDatabase.GetName(p.promptCardCode);
+            string rating = card.Rating;
+            _modalSubtitle.text = rating.Length == 0 ? name : $"{name} · {rating}";
             _onInspectCard?.Invoke(p.promptCardCode);
 
             var choices = new (uint position, string label, bool rotate, bool faceDown)[]
@@ -764,21 +767,36 @@ namespace YGOPortable.UI
                 (YgoConstants.POS_FACEUP_DEFENSE, "앞면 수비 표시", true, false),
                 (YgoConstants.POS_FACEDOWN_DEFENSE, "뒷면 수비 표시", true, true),
                 (YgoConstants.POS_FACEDOWN_ATTACK, "뒷면 공격 표시", false, true),
-            };
-            const float tileWidth = 178f;
-            var row = BuildChoiceCardStrip(choices.Count(choice => (p.allowedPositions & choice.position) != 0), tileWidth);
-            foreach (var choice in choices)
+            }.Where(choice => (p.allowedPositions & choice.position) != 0).ToArray();
+            float halfWidth = Mathf.Clamp(.022f + choices.Length * .102f, .15f, .356f);
+            const float center = .567f;
+            _modalBox.anchorMin = new Vector2(center - halfWidth, _modalBox.anchorMin.y);
+            _modalBox.anchorMax = new Vector2(center + halfWidth, _modalBox.anchorMax.y);
+            _modalHeader.anchorMin = new Vector2(0f, .76f);
+            _modalBody.anchorMin = new Vector2(.021f, .042f);
+            _modalBody.anchorMax = new Vector2(.98f, .743f);
+            SetFieldView(false);
+
+            for (int i = 0; i < choices.Length; i++)
             {
-                if ((p.allowedPositions & choice.position) == 0) continue;
-                var slot = CreateCardStripTile(row, $"Pos_{choice.position}", tileWidth);
-                float inset = choice.rotate ? .18f : .095f;
-                var art = LotdUiKit.CreateRect("Card", slot, new Vector2(inset, .233f), new Vector2(1f - inset, .967f),
-                    Vector2.zero, Vector2.zero);
-                if (choice.rotate) art.localRotation = Quaternion.Euler(0f, 0f, -90f);
-                CompositeCardView.Create(art, "V", duelArtwork: true).SetCard(p.promptCardCode, faceDown: choice.faceDown);
-                var label = LotdUiKit.CreateRect("Label", slot, new Vector2(.05f, .035f), new Vector2(.95f, .21f),
+                var choice = choices[i];
+                var slot = DuelStyle.Panel(_modalBody, $"Pos_{choice.position}",
+                    new Vector2((float)i / choices.Length, 0f), new Vector2((float)(i + 1) / choices.Length, 1f),
+                    new Vector2(4f, 0f), new Vector2(-4f, 0f));
+                var label = LotdUiKit.CreateRect("Label", slot, new Vector2(.04f, .865f), new Vector2(.96f, .985f),
                     Vector2.zero, Vector2.zero);
                 LotdUiKit.AddFittedText(label, "Text", choice.label, 15, 10, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+                var art = LotdUiKit.CreateRect("Card", slot,
+                    new Vector2(.042f, card.IsMonster ? .175f : .045f), new Vector2(.958f, .851f),
+                    Vector2.zero, Vector2.zero);
+                BuildPositionArtwork(art, p.promptCardCode, choice.rotate, choice.faceDown);
+                if (card.IsMonster)
+                {
+                    var stats = LotdUiKit.CreateRect("CombatStats", slot, new Vector2(.04f, .02f), new Vector2(.96f, .159f),
+                        Vector2.zero, Vector2.zero);
+                    new DuelStatStrip(stats, compact: true).Bind(card, position: choice.position);
+                }
+
                 var button = slot.gameObject.AddComponent<Button>();
                 button.targetGraphic = slot.GetComponent<Image>();
                 button.onClick.AddListener(() =>
@@ -787,6 +805,23 @@ namespace YGOPortable.UI
                     Submit(BitConverter.GetBytes((int)choice.position));
                 });
             }
+        }
+
+        private static void BuildPositionArtwork(RectTransform art, uint code, bool rotate, bool faceDown)
+        {
+            if (rotate)
+            {
+                var holder = LotdUiKit.FillRect("LandscapeFit", art);
+                var fit = holder.gameObject.AddComponent<AspectRatioFitter>();
+                fit.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+                fit.aspectRatio = 1f / LotdUiKit.CardAspectRatio;
+                // Rotate a centered portrait inside the fitted landscape bounds.
+                Vector2 halfSize = new Vector2(LotdUiKit.CardAspectRatio, fit.aspectRatio) * .5f;
+                Vector2 center = Vector2.one * .5f;
+                art = LotdUiKit.CreateRect("Rotated", holder, center - halfSize, center + halfSize, Vector2.zero, Vector2.zero);
+                art.localRotation = Quaternion.Euler(0f, 0f, -90f);
+            }
+            CompositeCardView.Create(art, "V", duelArtwork: true).SetCard(code, faceDown: faceDown || code == 0);
         }
 
         private void RenderOptionList(DuelSession session, DuelPrompt p)

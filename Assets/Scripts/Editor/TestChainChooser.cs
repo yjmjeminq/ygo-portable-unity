@@ -5,6 +5,7 @@ using System.Reflection;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using YGOPortable.AI;
 using YGOPortable.Core;
 using YGOPortable.UI;
 
@@ -550,6 +551,7 @@ namespace YGOPortable.Editor
                 var modals = new DuelPromptModals(canvas.transform, null, responses.Add);
                 const uint dragon = 89631139;
                 var page = modals.ModalRoot.transform.Find("Win");
+                VerifyPositionChoices(duel, modals, (RectTransform)canvas.transform, responses, events);
 
                 // Only the explicit action command should dispatch a move from the Extra Deck viewer.
                 var extraCard = new LiveCardState { code = dragon, location = YgoConstants.LOCATION_EXTRA };
@@ -702,6 +704,126 @@ namespace YGOPortable.Editor
                 mandatory.Find("Detail/Text").GetComponent<Text>().text == "필수 · 4",
                 "The material icon removed required selection details.");
             Debug.Log("[VERIFY PROMPT LOCATION ICONS] Material location, ownership color, hidden cards, and selection indices passed.");
+        }
+
+        private static void VerifyPositionChoices(DuelSession session, DuelPromptModals modals, RectTransform canvas,
+            List<byte[]> responses, EventSystem events)
+        {
+            const uint cyberDragon = 70095154, mysticalElf = 15025844;
+            const uint attack = YgoConstants.POS_FACEUP_ATTACK, defense = YgoConstants.POS_FACEUP_DEFENSE;
+            var empty = Array.Empty<uint>();
+            var main = Enumerable.Repeat(cyberDragon, 40).ToArray();
+            var opponent = Enumerable.Repeat(mysticalElf, 40).ToArray();
+            var ai = new TacticalAI();
+            var window = modals.ModalRoot.transform.Find("Win");
+            var body = window.Find("Body");
+            Vector2 initialSize = canvas.sizeDelta;
+            foreach (bool usePad in new[] { false, true })
+            {
+                using var duel = YgoProjectBuilder.StartSeedMatching("Summon position UI", main, empty, opponent, empty,
+                    false, current => current.ActivePrompt?.summonable.Exists(card => card.code == mysticalElf) == true);
+                duel.SubmitResponseInt(0);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+                duel.SubmitResponseInt(7);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+                int summon = duel.ActivePrompt?.spSummonable.FindIndex(card => card.code == cyberDragon) ?? -1;
+                Require(summon >= 0, "The native fixture could not Special Summon Cyber Dragon.");
+                duel.SubmitResponseInt((summon << 16) | 1);
+                for (int step = 0; step < 8 && duel.ActivePrompt?.messageType != YgoConstants.MSG_SELECT_POSITION; step++)
+                {
+                    if (duel.ActivePrompt is { } pending) duel.SubmitResponse(ai.ComputeResponse(duel, pending));
+                    else duel.StepUntilPrompt();
+                }
+                var prompt = duel.ActivePrompt;
+                Require(prompt?.messageType == YgoConstants.MSG_SELECT_POSITION &&
+                        prompt.allowedPositions == (attack | defense) && prompt.playerId == duel.HumanPlayerIndex,
+                    "The native summon did not offer both face-up poses to the player.");
+
+                modals.ShowPrompt(duel, prompt);
+                var title = window.Find("Hdr/TitleBand/Title").GetComponent<Text>();
+                var subtitle = window.Find("Hdr/SubtitleBand/Sub").GetComponent<Text>();
+                Require(subtitle.text.EndsWith(" · 레벨 5", StringComparison.Ordinal),
+                    "The position picker lost the summon rating.");
+                var attackChoice = body.Find($"Pos_{attack}");
+                var defenseChoice = body.Find($"Pos_{defense}");
+                Require(body.GetComponentsInChildren<Button>().Length == 2, "The position picker showed an illegal choice.");
+                foreach (var choice in new[] { attackChoice, defenseChoice })
+                {
+                    var stats = choice.Find("CombatStats");
+                    Image atkRail = stats.Find("Attack/Rail").GetComponent<Image>();
+                    Image defRail = stats.Find("Defense/Rail").GetComponent<Image>();
+                    Require(stats.Find("Attack/Digits/Value").GetComponent<Text>().text == "2100" &&
+                            stats.Find("Defense/Digits/Value").GetComponent<Text>().text == "1600" &&
+                            (atkRail.color.a > defRail.color.a) == (choice == attackChoice) &&
+                            !stats.GetComponentsInChildren<Graphic>().Any(g => g.raycastTarget),
+                        "The position option did not emphasize the correct combat value or blocked the button.");
+                }
+
+                foreach (var size in new[] { new Vector2(1600, 900), new Vector2(1024, 768), new Vector2(852, 393) })
+                {
+                    canvas.sizeDelta = size;
+                    Canvas.ForceUpdateCanvases();
+                    VerifyPositionArtworkBounds(attackChoice, sideways: false);
+                    VerifyPositionArtworkBounds(defenseChoice, sideways: true);
+                    foreach (var label in new[] { title, subtitle })
+                    {
+                        var generator = label.cachedTextGenerator;
+                        generator.Populate(label.text, label.GetGenerationSettings(label.rectTransform.rect.size));
+                        Require(generator.lineCount == 1 && generator.characterCountVisible >= label.text.Length,
+                            $"The position picker hid {label.name} at {size.x}×{size.y} ({generator.characterCountVisible} rendered characters).");
+                    }
+                }
+                canvas.sizeDelta = initialSize;
+                Canvas.ForceUpdateCanvases();
+                if (usePad)
+                {
+                    Require(events.currentSelectedGameObject == attackChoice.gameObject, "The controller did not focus the first position.");
+                    Pad(modals, Vector2Int.right);
+                    Require(events.currentSelectedGameObject == defenseChoice.gameObject, "The controller could not focus defense.");
+                    Pad(modals, button: "Submit");
+                }
+                else
+                {
+                    ExecuteEvents.Execute(attackChoice.gameObject,
+                        new PointerEventData(events) { button = PointerEventData.InputButton.Left }, ExecuteEvents.pointerClickHandler);
+                }
+
+                uint expected = usePad ? defense : attack;
+                Require(!modals.IsPromptOpen && responses.Count == 1 && BitConverter.ToUInt32(responses[0], 0) == expected,
+                    "The position choice did not preserve the native response.");
+                duel.SubmitResponse(responses[0]);
+                responses.Clear();
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+                Require(duel.RetryCount == 0 && duel.Players[duel.HumanPlayerIndex].mzone
+                        .Any(card => card?.code == cyberDragon && card.position == expected),
+                    "The engine did not apply the selected position.");
+            }
+
+            var hidden = new DuelPrompt
+            {
+                messageType = YgoConstants.MSG_SELECT_POSITION, allowedPositions = (byte)YgoConstants.POS_FACEDOWN_DEFENSE,
+            };
+            modals.ShowPrompt(session, hidden);
+            var hiddenChoice = body.Find($"Pos_{YgoConstants.POS_FACEDOWN_DEFENSE}");
+            var hiddenCard = hiddenChoice.GetComponentInChildren<CompositeCardView>().transform.Find("AspectBox");
+            Require(hiddenChoice.Find("CombatStats") == null && hiddenCard.Find("CardBack").gameObject.activeSelf,
+                "An unknown face-down choice exposed a card face or combat values.");
+            hiddenChoice.GetComponent<Button>().onClick.Invoke();
+            Require(responses.Count == 1 && BitConverter.ToUInt32(responses[0], 0) == YgoConstants.POS_FACEDOWN_DEFENSE,
+                "The single face-down option did not preserve the native response.");
+            responses.Clear();
+            Debug.Log("[VERIFY DUEL POSITIONS] Native Cyber Dragon position choices retained Level 5 and highlighted 2100 ATK or 1600 DEF. Pointer, controller, three viewport sizes and hidden art passed.");
+        }
+
+        private static void VerifyPositionArtworkBounds(Transform choice, bool sideways)
+        {
+            var area = (RectTransform)choice.Find("Card");
+            var art = area.GetComponentInChildren<CompositeCardView>().transform.Find("AspectBox");
+            Bounds bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(area, art);
+            Require(bounds.min.x >= area.rect.xMin - .5f && bounds.max.x <= area.rect.xMax + .5f &&
+                    bounds.min.y >= area.rect.yMin - .5f && bounds.max.y <= area.rect.yMax + .5f &&
+                    Mathf.Min(bounds.size.x, bounds.size.y) > 45f && (bounds.size.x > bounds.size.y) == sideways,
+                "A position preview overlapped its neighboring labels or lost its orientation.");
         }
 
         private static void Pad(DuelPromptModals modals, Vector2Int direction = default, string button = "None")
