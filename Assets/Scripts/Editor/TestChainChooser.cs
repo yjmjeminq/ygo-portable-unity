@@ -23,6 +23,7 @@ namespace YGOPortable.Editor
             VerifyKoreanEffect(duel);
             VerifyEffectOptions(duel);
             VerifyBundledOptionDescriptions();
+            VerifyKoreanEffectCatalogue();
             VerifyGroupedLocations(duel);
             VerifyScrollableChoices(duel);
             VerifyNavigation(duel);
@@ -37,16 +38,21 @@ namespace YGOPortable.Editor
             const uint kaleidoHeart = 28226490;
             const uint legendaryBlackLusterSoldier = 70551291;
             const uint cyberseCodeMagician = 64866;
-            ulong untranslatedOption = (ulong)legendaryBlackLusterSoldier << 20;
-            string rulesText = CardDatabase.Get(legendaryBlackLusterSoldier).desc.Trim();
-            Require(CardDatabase.ResolveDescription(untranslatedOption) == null &&
-                    CardDatabase.ResolveEffectDescription(untranslatedOption, legendaryBlackLusterSoldier) == rulesText,
+            const uint spyralVortex = 35699;
+            ulong untranslated = (ulong)spyralVortex << 20;
+            string rulesText = CardDatabase.GetKoreanCardDescription(spyralVortex);
+            Require(CardDatabase.ResolveOptionDescription(untranslated) == null &&
+                    CardDatabase.ResolveEffectDescription(untranslated, spyralVortex) == rulesText,
                 "An untranslated effect label did not fall back to the Korean card text.");
-            string cyberseRules = CardDatabase.GetKoreanCardDescription(cyberseCodeMagician);
-            Require(CardDatabase.ResolveDescription(untranslatedOption | 1) == "덱으로 되돌린다" &&
-                    !string.IsNullOrWhiteSpace(cyberseRules) &&
-                    CardDatabase.ResolveEffectDescription((ulong)cyberseCodeMagician << 20, cyberseCodeMagician) == cyberseRules,
-                "The option translation or the recovered Korean card text did not resolve.");
+            ulong drawReplacement = (ulong)legendaryBlackLusterSoldier << 20;
+            const string drawLabel = "이번 턴의 일반 드로우 대신 덱에서 의식 마법 카드 1장을 패에 넣는다";
+            Require(CardDatabase.ResolveDescription(drawReplacement | 1) == "덱으로 되돌린다" &&
+                    CardDatabase.ResolveOptionDescription(drawReplacement) == drawLabel,
+                "The Korean choices for Legendary Black Luster Soldier did not resolve.");
+            string baseMagicianLabel = CardDatabase.ResolveOptionDescription(64865UL << 20);
+            Require(baseMagicianLabel != null && baseMagicianLabel.StartsWith("덱에서 사이버스족 몬스터 1장", StringComparison.Ordinal) &&
+                    CardDatabase.ResolveOptionDescription((ulong)cyberseCodeMagician << 20) == baseMagicianLabel,
+                "The alternate artwork did not inherit the new specific Korean effect label.");
 
             using var view = new ChainView();
             var prompt = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_CHAIN, playerId = 0 };
@@ -64,13 +70,27 @@ namespace YGOPortable.Editor
             Require(effect.text == "상대 필드의 카드 1장을 주인의 덱으로 되돌린다.",
                 "Kaleido-Heart's chain preview did not show its Korean effect text.");
 
-            var unknownPrompt = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_EFFECTYN, playerId = 0,
-                promptCardCode = legendaryBlackLusterSoldier, promptDesc = untranslatedOption };
-            view.Modals.ShowPrompt(duel, unknownPrompt);
+            view.Modals.ShowPrompt(duel, new DuelPrompt { messageType = YgoConstants.MSG_SELECT_EFFECTYN, playerId = 0,
+                promptCardCode = legendaryBlackLusterSoldier, promptDesc = drawReplacement });
             effect = view.Modals.ModalRoot.GetComponentsInChildren<Text>()
                 .Single(label => label.gameObject.name == "Effect");
-            Require(effect.text == "Give up your draw to search 1 Ritual Spell" && effect.text != rulesText,
-                "An untranslated chain preview should describe just the available effect.");
+            Require(effect.text == drawLabel, "The chain confirmation did not show the concise Korean draw-replacement effect.");
+
+            view.Modals.ShowPrompt(duel, new DuelPrompt { messageType = YgoConstants.MSG_SELECT_EFFECTYN, playerId = 0,
+                promptCardCode = spyralVortex, promptDesc = untranslated });
+            effect = view.Modals.ModalRoot.GetComponentsInChildren<Text>()
+                .Single(label => label.gameObject.name == "Effect");
+            Require(effect.text == rulesText, "An untranslated English label escaped into the chain preview.");
+            view.Modals.ShowPrompt(duel, new DuelPrompt { messageType = YgoConstants.MSG_SELECT_YESNO, playerId = 0,
+                promptDesc = untranslated });
+            Require(view.Modals.ModalRoot.GetComponentsInChildren<Text>().Single(label => label.name == "Question").text == rulesText,
+                "An untranslated English label escaped into the yes/no confirmation.");
+            var options = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_OPTION, playerId = 0 };
+            options.options.Add(untranslated);
+            options.options.Add(untranslated | 1);
+            view.Modals.ShowPrompt(duel, options);
+            Require(view.Modals.ModalRoot.GetComponentsInChildren<Text>().Single(label => label.name == "CardText").text == rulesText,
+                "An unlabelled choice omitted the Korean source effect.");
         }
 
         private static void VerifyEffectOptions(DuelSession duel)
@@ -136,6 +156,14 @@ namespace YGOPortable.Editor
                     Option(bingo, 5) == "마법·함정 존의 카드 5장을 파괴한다",
                 "Bingo Card's controller and zone prompts used the wrong branches.");
 
+            const uint thorHammer = 59080;
+            Require(Option(thorHammer, 1).Contains("묘지로 보낸다") && Option(thorHammer, 2).Contains("카운터를 2개 제거") &&
+                    Option(thorHammer, 3).Contains("마법사족 몬스터 1장을 특수 소환") && Option(thorHammer, 4).Contains("필드의 다른 카드 1장을 제외"),
+                "The Korean labels failed to distinguish the selectable costs and effects of Thor Hammer.");
+            Require(Option(49238328, 0) == "카드 3장을 제외한다" && Option(49238328, 1) == "카드 6장을 제외한다" &&
+                    Option(30453613, 2) == "자신의 필드 존에 놓는다" && Option(30453613, 3) == "상대의 필드 존에 놓는다",
+                "The options did not retain the original quantity or player in Korean.");
+
             Require(CardDatabase.ResolveOptionDescription(94) == "이 카드의 추가 효과를 적용하시겠습니까?" &&
                     CardDatabase.ResolveOptionDescription(210) == "카드를 1장 더 선택하시겠습니까?",
                 "A bundled system-level yes/no prompt lost its description.");
@@ -152,6 +180,29 @@ namespace YGOPortable.Editor
                     CardDatabase.ResolveOptionDescription(80) == "배틀 페이즈로 이동한다" &&
                     CardDatabase.ResolveOptionDescription(81) == "엔드 페이즈로 이동한다",
                 "Native procedure, attack, phase or cost prompts lost their distinct descriptions.");
+        }
+
+        private static void VerifyKoreanEffectCatalogue()
+        {
+            int labels = 0, withDescriptions = 0;
+            foreach (var card in CardDatabase.AllCards)
+            {
+                for (int i = 0; i < (card.strs?.Length ?? 0); i++)
+                {
+                    if (string.IsNullOrWhiteSpace(card.strs[i])) continue;
+                    ulong id = ((ulong)card.code << 20) | (uint)i;
+                    string label = CardDatabase.ResolveOptionDescription(id);
+                    Require(label == null || label.Any(letter => letter is >= '가' and <= '힣'),
+                        $"An English option label was exposed for {card.code}/{i}.");
+                    string text = CardDatabase.ResolveEffectDescription(id, card.code);
+                    Require(text != null && text.Any(letter => letter is >= '가' and <= '힣') &&
+                        !text.Contains("[Pendulum Effect]"), $"The Korean fallback was missing for {card.code}/{i}.");
+                    labels++;
+                    if (label != null) withDescriptions++;
+                }
+            }
+            Debug.Log($"[VERIFY KOREAN DUEL EFFECTS] {labels} bundled labels checked. {withDescriptions} Korean labels, " +
+                $"{labels - withDescriptions} Korean card-text fallbacks.");
         }
 
         internal static void SubmitNativeChoice(DuelSession duel, int index)
@@ -750,7 +801,7 @@ namespace YGOPortable.Editor
 
             internal void VerifyEffect(SelectableCardItem source)
             {
-                string text = CardDatabase.ResolveOptionDescription(source.description)
+                string text = CardDatabase.ResolveEffectDescription(source.description, source.code)
                     ?? "이 카드의 효과를 발동할 수 있습니다.";
                 string location = YgoConstants.GetLocationNameKR(source.location);
                 var visibleText = Modals.ModalRoot.GetComponentsInChildren<Text>();

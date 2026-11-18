@@ -577,6 +577,7 @@ namespace YGOPortable.Core
             }
 
             LoadDeckEffectCategories(streamingAssetsPath);
+            LoadDuelEffectLabels(streamingAssetsPath);
             IndexDeckPrintings();
             _relatedCache.Clear();
             _archetypes = null;
@@ -1213,6 +1214,27 @@ namespace YGOPortable.Core
             return code <= uint.MaxValue ? (uint)code : 0;
         }
 
+        private static void LoadDuelEffectLabels(string streamingAssetsPath)
+        {
+            string path = Path.Combine(streamingAssetsPath, "duel_effect_labels_ko.tsv");
+            if (!File.Exists(path)) return;
+            try
+            {
+                foreach (string line in File.ReadLines(path))
+                {
+                    if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#", StringComparison.Ordinal)) continue;
+                    var fields = line.Split('\t');
+                    if (fields.Length != 3 || !uint.TryParse(fields[0], out uint code) || code == 0 ||
+                        !uint.TryParse(fields[1], out uint index) || index > DescriptionIndexMask || !HasKoreanText(fields[2])) continue;
+                    CardEffectTextKR.TryAdd(((ulong)code << DescriptionIndexBits) | index, fields[2].Trim());
+                }
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                Debug.LogWarning($"[CardDatabase] Could not read the Korean duel effect labels. {error.Message}");
+            }
+        }
+
         public static string ResolveDescription(ulong desc)
         {
             if (desc <= DescriptionIndexMask)
@@ -1221,7 +1243,12 @@ namespace YGOPortable.Core
 
             int index = (int)(desc & DescriptionIndexMask);
             var card = Get(GetDescriptionCardCode(desc));
-            return ReadLocalizedDescription(card, index) ?? ReadLocalizedDescription(GetSameNameOriginal(card), index);
+            var localized = ReadLocalizedDescription(card, index);
+            if (localized != null) return localized;
+            var original = GetSameNameOriginal(card);
+            if (original != null && CardEffectTextKR.TryGetValue(((ulong)original.code << DescriptionIndexBits) | (uint)index, out specificText))
+                return specificText;
+            return ReadLocalizedDescription(original, index);
         }
 
         public static string ResolveEffectDescription(ulong desc, uint cardCode)
@@ -1231,27 +1258,19 @@ namespace YGOPortable.Core
             return GetKoreanCardDescription(GetDescriptionCardCode(desc)) ?? GetKoreanCardDescription(cardCode);
         }
 
-        internal static string ResolveOptionDescription(ulong desc)
-        {
-            string localized = ResolveDescription(desc);
-            if (localized != null || desc <= DescriptionIndexMask) return localized;
-
-            var card = Get(GetDescriptionCardCode(desc));
-            int index = (int)(desc & DescriptionIndexMask);
-            return ReadDescriptionString(card, index) ?? ReadDescriptionString(GetSameNameOriginal(card), index);
-        }
+        internal static string ResolveOptionDescription(ulong desc) => ResolveDescription(desc);
 
         internal static string GetKoreanCardDescription(uint code)
         {
             string text = Get(code)?.desc;
-            return HasKoreanText(text) ? text.Trim() : null;
+            return HasKoreanText(text) ? LocalizeEffectHeadings(text.Trim()) : null;
         }
 
         private static string ReadLocalizedDescription(CardInfo card, int index)
         {
             string text = ReadDescriptionString(card, index);
             if (text == null) return null;
-            if (HasKoreanText(text)) return text;
+            if (HasKoreanText(text)) return LocalizeEffectHeadings(text);
 
             string key = text.Replace('’', '\'').TrimEnd('.');
             return EffectTextKR.TryGetValue(key, out var localized) ? localized : null;
@@ -1264,6 +1283,9 @@ namespace YGOPortable.Core
                 return null;
             return strings[index].Trim();
         }
+
+        private static string LocalizeEffectHeadings(string text) =>
+            text.Replace("[Pendulum Effect]", "[펜듈럼 효과]").Replace("[Monster Effect]", "[몬스터 효과]");
 
         private static CardInfo GetSameNameOriginal(CardInfo card)
         {

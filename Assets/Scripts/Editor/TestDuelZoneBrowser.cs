@@ -586,7 +586,25 @@ namespace YGOPortable.Editor
                     Field.Refresh();
                     var summonButton = Private<Button>(Field, "_extraSummonButton");
                     Require(summonButton.gameObject.activeInHierarchy, "The Extra Deck summon button was missing.");
-                    ClickAt(StackRoot("_myExtraTile"), pointerId: 0);
+                    var pile = StackRoot("_myExtraTile");
+                    var indicator = (RectTransform)summonButton.transform;
+                    Require(indicator.IsChildOf(pile) && ((RectTransform)indicator.parent).anchorMin.y > .5f,
+                        "Summon availability must be shown at the top of the player's Extra Deck.");
+                    var available = prompt.spSummonable.ToArray();
+                    prompt.spSummonable.RemoveAll(item => item.location == YgoConstants.LOCATION_EXTRA);
+                    try
+                    {
+                        Click(summonButton);
+                        Require(!Modals.IsZoneViewerOpen, "The stale Extra Deck indicator opened an empty summon picker.");
+                        VerifyNoExtraSummon();
+                    }
+                    finally
+                    {
+                        prompt.spSummonable.Clear();
+                        prompt.spSummonable.AddRange(available);
+                    }
+                    Field.Refresh();
+                    ClickAt(pile, pointerId: 0);
                     VerifyOpened(prompt, all.Select(card => card.code));
                     var preview = VisibleCards.Single(card => card.CurrentCode == Chixiao).transform.parent.parent;
                     Click(preview.GetComponent<Button>());
@@ -605,15 +623,15 @@ namespace YGOPortable.Editor
                     Field.Refresh();
 
                     SetPrivate(Field, "_usingDuelPad", true);
-                    SetPrivate(Field, "_duelPadFocus", StackRoot("_myExtraTile"));
+                    SetPrivate(Field, "_duelPadFocus", pile);
                     Field.HandleDuelPad(new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Submit));
                     VerifyOpened(prompt, all.Select(card => card.code));
                     Close();
                     Field.Refresh();
 
-                    SetPrivate(Field, "_duelPadFocus", StackRoot("_myExtraTile"));
-                    Field.HandleDuelPad(new DeckPadFrame(Vector2Int.left, DeckPadButtons.None));
-                    Require(Private<RectTransform>(Field, "_duelPadFocus") == summonButton.transform,
+                    SetPrivate(Field, "_duelPadFocus", pile);
+                    Field.HandleDuelPad(new DeckPadFrame(Vector2Int.up, DeckPadButtons.None));
+                    Require(Private<RectTransform>(Field, "_duelPadFocus") == indicator,
                         "Controller navigation could not reach the Extra Deck summon button from the pile.");
                     Field.HandleDuelPad(new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Submit));
                     VerifyOpened(prompt, legal);

@@ -565,14 +565,21 @@ namespace YGOPortable.UI
             _oppGyTile = CreateStackTile(Cell(1, 1), true, YgoConstants.LOCATION_GRAVE, "묘지");
             _oppBanTile = CreateStackTile(Cell(1, 2), true, YgoConstants.LOCATION_REMOVED, "제외");
 
-            var graveEffect = LotdUiKit.CreateRect("GraveEffect", _myGyTile.root, new Vector2(.14f, .70f),
+            _extraSummonButton = BuildPileActionButton(_myExtraTile, "ExtraSummon", "소환 가능", OpenExtraSummonPicker);
+            _graveEffectButton = BuildPileActionButton(_myGyTile, "GraveEffect", "효과 발동", OpenGraveEffectPicker);
+        }
+
+        private static Button BuildPileActionButton(StackTileView tile, string name, string label, Action action)
+        {
+            var indicator = LotdUiKit.CreateRect(name, tile.root, new Vector2(.14f, .70f),
                 new Vector2(.86f, .93f), Vector2.zero, Vector2.zero);
-            _graveEffectButton = DuelStyle.Button(graveEffect, "Button", "효과 발동", OpenGraveEffectPicker, 15, gold: true);
-            var effectLabel = _graveEffectButton.GetComponentInChildren<Text>();
-            effectLabel.resizeTextForBestFit = true;
-            effectLabel.resizeTextMinSize = 10;
-            effectLabel.resizeTextMaxSize = 15;
-            _graveEffectButton.gameObject.SetActive(false);
+            var button = DuelStyle.Button(indicator, "Button", label, action, 15, gold: true);
+            var text = button.GetComponentInChildren<Text>();
+            text.resizeTextForBestFit = true;
+            text.resizeTextMinSize = 10;
+            text.resizeTextMaxSize = 15;
+            button.gameObject.SetActive(false);
+            return button;
         }
 
         private static readonly Color ZoneTint = new Color(0.28f, 0.31f, 0.24f, 0.33f);
@@ -705,15 +712,6 @@ namespace YGOPortable.UI
             _myLpFill = fill;
             portrait.sprite = LotdUiKit.LoadSprite("LOTD/Busts/yamiyugi_neutral") ?? LotdUiKit.LoadSprite("LOTD/Busts/atem_neutral");
             portrait.enabled = portrait.sprite != null;
-
-            var extraSummon = LotdUiKit.CreateRect("ExtraSummon", root, new Vector2(.107f, .142f),
-                new Vector2(.222f, .188f), Vector2.zero, Vector2.zero);
-            _extraSummonButton = DuelStyle.Button(extraSummon, "Button", "엑스트라 소환", OpenExtraSummonPicker, 17, gold: true);
-            var extraSummonLabel = _extraSummonButton.GetComponentInChildren<Text>();
-            extraSummonLabel.resizeTextForBestFit = true;
-            extraSummonLabel.resizeTextMinSize = 9;
-            extraSummonLabel.resizeTextMaxSize = 17;
-            _extraSummonButton.gameObject.SetActive(false);
 
             var turnHolder = LotdUiKit.CreateRect("Turn", root, new Vector2(.904f, .451f), new Vector2(.984f, .615f),
                 Vector2.zero, Vector2.zero);
@@ -2544,7 +2542,7 @@ namespace YGOPortable.UI
 
         private static string EffectActionLabel(SelectableCardItem item)
         {
-            string desc = CardDatabase.ResolveOptionDescription(item.description);
+            string desc = CardDatabase.ResolveEffectDescription(item.description, item.code);
             return desc == null ? "카드 효과 발동" : $"발동 · {desc}";
         }
 
