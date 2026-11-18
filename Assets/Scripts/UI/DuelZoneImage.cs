@@ -3,6 +3,8 @@ using UnityEngine.UI;
 
 namespace YGOPortable.UI
 {
+    internal enum DuelLinkHighlight { None, Linked, CoLinked }
+
     // Positions and hit areas share the perspective of the engraved playing surface.
     internal sealed class DuelZoneImage : Image
     {
@@ -17,7 +19,9 @@ namespace YGOPortable.UI
         private bool _placementHighlighted;
         private bool _pileActionHighlighted;
         private DuelLinkZoneRim _linkRim;
-        internal bool LinkHighlighted { get; private set; }
+        internal DuelLinkHighlight LinkHighlight { get; private set; }
+        internal bool LinkHighlighted => LinkHighlight != DuelLinkHighlight.None;
+        internal Vector2Int LinkDirection { get; private set; }
         internal bool SummonReserved { get; private set; }
 
         internal void SetPlacementHighlight(bool highlighted, bool summonReserved)
@@ -36,11 +40,12 @@ namespace YGOPortable.UI
             SetVerticesDirty();
         }
 
-        internal void SetLinkHighlight(bool highlighted)
+        internal void SetLinkHighlight(DuelLinkHighlight highlight, Vector2Int direction = default)
         {
-            if (LinkHighlighted == highlighted) return;
-            LinkHighlighted = highlighted;
-            if (highlighted && _linkRim == null)
+            if (LinkHighlight == highlight && LinkDirection == direction) return;
+            LinkHighlight = highlight;
+            LinkDirection = direction;
+            if (LinkHighlighted && _linkRim == null)
             {
                 var outline = LotdUiKit.FillRect("LinkZoneRim", transform);
                 outline.SetSiblingIndex(1);
@@ -49,7 +54,11 @@ namespace YGOPortable.UI
                 _linkRim.texture = Texture2D.whiteTexture;
                 _linkRim.raycastTarget = false;
             }
-            if (_linkRim != null) _linkRim.gameObject.SetActive(highlighted && !_placementHighlighted && !SummonReserved);
+            if (_linkRim != null)
+            {
+                _linkRim.gameObject.SetActive(LinkHighlighted && !_placementHighlighted && !SummonReserved);
+                _linkRim.SetVerticesDirty();
+            }
             SetVerticesDirty();
         }
 
@@ -94,8 +103,9 @@ namespace YGOPortable.UI
             if (rect.width <= 0f || rect.height <= 0f) return;
 
             bool link = LinkHighlighted && !_placementHighlighted && !SummonReserved;
-            Color tone = link ? new Color(.27f, .40f, .82f, .48f)
-                : SummonReserved ? new Color(.11f, .45f, .49f, .48f) : color;
+            Color tone = SummonReserved ? new Color(.11f, .45f, .49f, .48f) : color;
+            if (link)
+                tone = LinkHighlight == DuelLinkHighlight.CoLinked ? new Color(.16f, .54f, .41f, .62f) : new Color(.27f, .40f, .82f, .48f);
             int center = mesh.currentVertCount;
             mesh.AddVert(rect.center, tone, Vector2.zero);
             var recess = new Color(tone.r * .70f, tone.g * .72f, tone.b * .76f, Mathf.Min(1f, tone.a * 1.13f));
@@ -132,14 +142,14 @@ namespace YGOPortable.UI
                 DrawSelectionRim(mesh, rect, new Color(.91f, .74f, .41f, .82f), .09f, .96f);
         }
 
-        internal void DrawSelectionRim(VertexHelper mesh, Rect rect, Color color, float gap, float innerSize = .90f)
+        internal void DrawSelectionRim(VertexHelper mesh, Rect rect, Color color, float gap, float innerSize = .90f, float outerSize = .99f)
         {
             for (int i = 0; i < Corners.Length; i++)
             {
-                var outerA = Corner(rect, i, .99f);
+                var outerA = Corner(rect, i, outerSize);
                 var innerA = Corner(rect, i, innerSize);
                 var innerB = Corner(rect, i + 1, innerSize);
-                var outerB = Corner(rect, i + 1, .99f);
+                var outerB = Corner(rect, i + 1, outerSize);
                 DuelMat.AddQuad(mesh, Vector2.Lerp(outerA, outerB, gap), Vector2.Lerp(innerA, innerB, gap),
                     Vector2.Lerp(innerB, innerA, gap), Vector2.Lerp(outerB, outerA, gap),
                     color, color, Vector2.zero, Vector2.zero);
@@ -160,12 +170,39 @@ namespace YGOPortable.UI
 
     internal sealed class DuelLinkZoneRim : RawImage
     {
+        private static readonly Color LinkedInk = new Color(.75f, .83f, 1f, .97f);
+        private static readonly Color CoLinkedInk = new Color(.60f, 1f, .83f, .98f);
         internal DuelZoneImage Zone;
 
         protected override void OnPopulateMesh(VertexHelper mesh)
         {
             mesh.Clear();
-            if (Zone != null) Zone.DrawSelectionRim(mesh, GetPixelAdjustedRect(), new Color(.75f, .83f, 1f, .97f), .16f);
+            var rect = GetPixelAdjustedRect();
+            if (Zone == null || rect.width <= 0f || rect.height <= 0f) return;
+            if (Zone.LinkHighlight == DuelLinkHighlight.CoLinked)
+            {
+                Zone.DrawSelectionRim(mesh, rect, CoLinkedInk, .07f, .91f);
+                Zone.DrawSelectionRim(mesh, rect, new Color(.60f, 1f, .83f, .65f), .07f, .79f, .86f);
+                return;
+            }
+
+            Zone.DrawSelectionRim(mesh, rect, LinkedInk, .16f);
+            if (Zone.LinkDirection != Vector2Int.zero) DrawDirection(mesh, rect, Zone.LinkDirection);
+        }
+
+        private static void DrawDirection(VertexHelper mesh, Rect rect, Vector2 direction)
+        {
+            var forward = direction.normalized;
+            var across = new Vector2(-forward.y, forward.x);
+            float size = Mathf.Min(rect.width, rect.height) * .20f;
+            var tip = rect.center + forward * size * .68f;
+            var inside = rect.center + forward * size * .04f;
+            var tail = rect.center - forward * size * .62f;
+            var edge = across * size * .84f;
+            var inset = across * size * .43f;
+            var shade = new Color(.54f, .71f, 1f, .62f);
+            DuelMat.AddQuad(mesh, tip, tail + edge, tail + inset, inside, LinkedInk, shade);
+            DuelMat.AddQuad(mesh, tip, inside, tail - inset, tail - edge, LinkedInk, shade);
         }
     }
 

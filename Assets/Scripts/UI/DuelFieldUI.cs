@@ -392,7 +392,7 @@ namespace YGOPortable.UI
             _inspCombat.Hide();
             SizeInspectorDescription(hasCombat: false);
             _inspCounters.Bind(0);
-            SetLinkedZones(0);
+            SetLinkedZones(null);
             _inspDesc.text = "카드를 선택하면 효과를 확인할 수 있습니다.";
             _inspRaceIcon.gameObject.SetActive(false);
             _inspAttributeIcon.gameObject.SetActive(false);
@@ -474,44 +474,60 @@ namespace YGOPortable.UI
             return DuelStyle.Gold;
         }
 
-        private void RefreshLinkedZones() => SetLinkedZones(GetSelectedLinkCells());
+        private void RefreshLinkedZones() => SetLinkedZones(GetSelectedLink());
 
-        private uint GetSelectedLinkCells()
+        private (Vector2Int Origin, uint Markers, bool Opponent)? GetSelectedLink()
         {
             if (_session == null || _session.IsFinished || IsPresenting || IsPaused || IsReadingLog ||
                 IsReadingCardDetails || _phasePicker.activeSelf || IsStagingPlacement || IsNativePlacement(_session.ActivePrompt) ||
                 _modals.IsPromptOpen || _modals.IsZoneViewerOpen || CardDragManager.Instance?.IsDragging == true ||
                 _inspectedFieldCard is not { } source)
-                return 0;
+                return null;
 
             var card = ReadVisibleFieldCard(_inspectedCode, source);
             var slot = GetSlot(source.controller, source.location, source.sequence);
             if (card == null || (card.type & YgoConstants.TYPE_LINK) == 0 || card.linkMarker == 0 ||
                 slot?.linkCell is not { } origin)
-                return 0;
+                return null;
 
-            int facing = source.controller == _session.HumanPlayerIndex ? 1 : -1;
-            uint cells = 0;
-            foreach (var arrow in DuelLinkCompass.Marks)
-            {
-                if ((card.linkMarker & arrow.mask) == 0) continue;
-                var target = origin + new Vector2Int(arrow.direction.x, -arrow.direction.y) * facing;
-                if ((uint)target.x < 5 && (uint)target.y < 5 && _linkGrid[target.x, target.y] != null)
-                    cells |= 1u << (target.y * 5 + target.x);
-            }
-            return cells;
+            return (origin, card.linkMarker, source.controller != _session.HumanPlayerIndex);
         }
 
-        private void SetLinkedZones(uint cells)
+        private void SetLinkedZones((Vector2Int Origin, uint Markers, bool Opponent)? source)
         {
-            uint changed = _highlightedLinkCells ^ cells;
-            if (changed == 0) return;
-            _highlightedLinkCells = cells;
+            uint previous = _highlightedLinkCells;
+            _highlightedLinkCells = 0;
+            if (source is { } link)
+            {
+                var arrows = DuelLinkCompass.Marks;
+                int facing = link.Opponent ? -1 : 1;
+                for (int i = 0; i < arrows.Length; i++)
+                {
+                    var arrow = arrows[i];
+                    if ((link.Markers & arrow.mask) == 0) continue;
+                    var direction = arrow.direction * facing;
+                    var target = link.Origin + new Vector2Int(direction.x, -direction.y);
+                    if ((uint)target.x >= 5 || (uint)target.y >= 5 || _linkGrid[target.x, target.y] is not { } slot)
+                        continue;
+
+                    var neighbor = slot.liveCard;
+                    bool sameFacing = (slot.mappedCon != _session.HumanPlayerIndex) == link.Opponent;
+                    uint backMarker = arrows[sameFacing ? arrows.Length - 1 - i : i].mask;
+                    bool coLinked = neighbor?.IsFaceUp == true && (neighbor.type & YgoConstants.TYPE_LINK) != 0 &&
+                        (neighbor.linkMarker & backMarker) != 0;
+                    slot.bgImg.SetLinkHighlight(coLinked ? DuelLinkHighlight.CoLinked : DuelLinkHighlight.Linked,
+                        neighbor == null ? direction : Vector2Int.zero);
+                    _highlightedLinkCells |= 1u << (target.y * 5 + target.x);
+                }
+            }
+
+            uint cleared = previous & ~_highlightedLinkCells;
+            if (cleared == 0) return;
             for (int row = 0; row < 5; row++)
             for (int column = 0; column < 5; column++)
             {
                 uint bit = 1u << (row * 5 + column);
-                if ((changed & bit) != 0) _linkGrid[column, row].bgImg.SetLinkHighlight((cells & bit) != 0);
+                if ((cleared & bit) != 0) _linkGrid[column, row].bgImg.SetLinkHighlight(DuelLinkHighlight.None);
             }
         }
 

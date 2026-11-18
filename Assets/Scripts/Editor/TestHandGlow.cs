@@ -40,6 +40,7 @@ namespace YGOPortable.Editor
             VerifyNativeSummonReadout(turnFaceDown: false);
             VerifyNativeSummonReadout(turnFaceDown: true);
             VerifyNativeLinkedZone();
+            VerifyNativeCoLinkedZone();
             VerifyNativeMovingReadout();
             VerifyNativeTokenArrivalReadout();
             VerifyNativePendulumArrivalReadout();
@@ -1081,6 +1082,88 @@ namespace YGOPortable.Editor
             Debug.Log("[VERIFY DUEL LINK ZONES] Link Spider's live downward marker identified the zone used by its native effect.");
         }
 
+        private static void VerifyNativeCoLinkedZone()
+        {
+            const uint digitron = 32295838, secretary = 63528891, disciple = 32995276, devotee = 48068378, linkToken = 48068379;
+            var main = Enumerable.Repeat(digitron, 28).Concat(Enumerable.Repeat(secretary, 12)).ToArray();
+            var opponent = Enumerable.Repeat(BlueEyes, 40).ToArray();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Co-linked zones", main, new[] { disciple, devotee }, opponent,
+                Array.Empty<uint>(), true, session =>
+                {
+                    var hand = session.Players[session.HumanPlayerIndex].hand;
+                    return hand.Any(card => card.code == digitron) && hand.Any(card => card.code == secretary);
+                });
+            int seat = duel.HumanPlayerIndex;
+            var own = duel.Players[seat];
+            var ai = new TacticalAI();
+
+            void ReachIdle(int selectZone = -1)
+            {
+                YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
+                {
+                    if (prompt.messageType == YgoConstants.MSG_SELECT_PLACE && selectZone >= 0 &&
+                        prompt.playerId == seat && (prompt.placeFlag & (1u << selectZone)) == 0)
+                        return new[] { (byte)seat, (byte)YgoConstants.LOCATION_MZONE, (byte)selectZone };
+                    if (prompt.messageType == YgoConstants.MSG_SELECT_CARD && prompt.min == 1)
+                        return DuelSession.PackCardSelection(0);
+                    if (prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && prompt.promptCardCode == devotee)
+                        return BitConverter.GetBytes(1);
+                    if (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN)
+                    {
+                        int trigger = prompt.candidates.FindIndex(card => card.code == devotee);
+                        if (trigger >= 0) return BitConverter.GetBytes(trigger);
+                    }
+                    return null;
+                });
+                Require(duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD && duel.RetryCount == 0,
+                    "The co-link fixture did not return to the main phase.");
+            }
+
+            void SpecialSummon(uint code, int selectZone = -1)
+            {
+                int option = duel.ActivePrompt.spSummonable.FindIndex(card => card.code == code);
+                Require(option >= 0, $"The engine did not offer the summon of {code}.");
+                duel.SubmitResponseInt((option << 16) | 1);
+                ReachIdle(selectZone);
+            }
+
+            int normal = duel.ActivePrompt.summonable.FindIndex(card => card.code == digitron);
+            Require(normal >= 0, "The engine did not offer Digitron's normal summon.");
+            duel.SubmitResponseInt(normal << 16);
+            ReachIdle();
+            SpecialSummon(disciple);
+            var origin = own.mzone.Single(card => card?.code == disciple);
+            Require(origin.sequence is 5 or 6, "Link Disciple did not enter an Extra Monster Zone.");
+            int target = origin.sequence == 5 ? 1 : 3;
+            string connected = $"Zone_{target + 2}_3";
+
+            using var ui = new HandUI(duel);
+            ui.Field.Root.transform.Find($"DuelBoard/Zone_{target + 2}_2").GetComponent<CardDragTrigger>().OnRightClick();
+            ui.ExpectLinkedZones(connected);
+            ui.ExpectLinkHighlight(connected, DuelLinkHighlight.Linked, Vector2Int.down);
+
+            SpecialSummon(secretary, target);
+            ui.Field.Refresh();
+            Require(own.mzone[target]?.code == secretary, "Backup Secretary did not enter the indicated linked zone.");
+            ui.ExpectLinkHighlight(connected, DuelLinkHighlight.Linked, Vector2Int.zero);
+
+            SpecialSummon(devotee, target);
+            ui.Field.Refresh();
+            Require(own.mzone[target]?.code == devotee, "Link Devotee did not enter the linked Main Monster Zone.");
+            ui.ExpectLinkHighlight(connected, DuelLinkHighlight.CoLinked, Vector2Int.zero);
+
+            int tribute = duel.ActivePrompt.activatable.FindIndex(card => card.code == disciple);
+            Require(tribute >= 0, "Link Disciple could not tribute its linked monster.");
+            duel.SubmitResponseInt((tribute << 16) | 5);
+            ReachIdle();
+            ui.Field.Refresh();
+            Require(own.mzone.Count(card => card?.code == linkToken) == 2,
+                "Link Devotee did not produce tokens after being tributed while co-linked.");
+            ui.ExpectLinkHighlight(connected, DuelLinkHighlight.Linked,
+                own.mzone[target] == null ? Vector2Int.down : Vector2Int.zero);
+            Debug.Log("[VERIFY DUEL CO-LINK] Direction and occupancy changed correctly. Link Devotee's native co-link effect produced two tokens.");
+        }
+
         private static void VerifyNativeMovingReadout()
         {
             const uint bookOfMoon = 14087893, bookOfTaiyou = 38699854;
@@ -1629,6 +1712,13 @@ namespace YGOPortable.Editor
                     "A Link outline stayed visible after selection ended or blocked card input.");
             }
 
+            internal void ExpectLinkHighlight(string name, DuelLinkHighlight kind, Vector2Int direction)
+            {
+                var zone = Field.Root.transform.Find($"DuelBoard/{name}").GetComponent<DuelZoneImage>();
+                Require(zone.LinkHighlight == kind && zone.LinkDirection == direction,
+                    $"{name} showed {zone.LinkHighlight} ({zone.LinkDirection}) instead of {kind} ({direction}).");
+            }
+
             internal void VerifyFieldReadouts(DuelSession duel)
             {
                 var mine = duel.Players[duel.HumanPlayerIndex];
@@ -1710,6 +1800,19 @@ namespace YGOPortable.Editor
                     "The opponent's live Link markers were not turned to match the board.");
                 Slot("_emz", 0).GetComponent<CardDragTrigger>().OnRightClick();
                 ExpectLinkedZones("Zone_3_1", "Zone_4_3");
+                ExpectLinkHighlight("Zone_3_1", DuelLinkHighlight.Linked, Vector2Int.up);
+                var previousNeighbor = mine.mzone[2];
+                mine.mzone[2] = new LiveCardState
+                {
+                    code = 1861629, type = monster | YgoConstants.TYPE_LINK, position = YgoConstants.POS_FACEUP_ATTACK,
+                    link = 3, linkMarker = 0x040, attack = 2300,
+                };
+                Field.Refresh();
+                ExpectLinkHighlight("Zone_4_3", DuelLinkHighlight.CoLinked, Vector2Int.zero);
+                mine.mzone[2].linkMarker = 0x004;
+                Field.Refresh();
+                ExpectLinkHighlight("Zone_4_3", DuelLinkHighlight.Linked, Vector2Int.zero);
+                mine.mzone[2] = previousNeighbor;
                 theirs.mzone[6].linkMarker = 0x004;
                 Field.Refresh();
                 ExpectLinkedZones("Zone_2_1");
