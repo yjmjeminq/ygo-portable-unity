@@ -1689,7 +1689,7 @@ namespace YGOPortable.UI
                 PreviewOnFocus(btn, code);
                 var trig = tile.gameObject.AddComponent<CardDragTrigger>();
                 trig.OnPointerEnterAction = () => _onInspectCard?.Invoke(code);
-                if (hasActions && live != null && live.location == YgoConstants.LOCATION_EXTRA)
+                if (actionSelection && hasActions && live?.location == YgoConstants.LOCATION_EXTRA)
                 {
                     trig.SourceType = DragSourceType.ExtraDeck;
                     trig.CardCodeGetter = () => canUseCardActions?.Invoke() != false ? code : 0u;
@@ -1702,7 +1702,7 @@ namespace YGOPortable.UI
             {
                 var actRt = LotdUiKit.CreateRect("Act", tile, new Vector2(0.06f, 0.02f), new Vector2(0.94f, 0.16f), Vector2.zero, Vector2.zero);
                 string actionText = actionSelection
-                    ? live.location == YgoConstants.LOCATION_EXTRA ? "선택" : "효과 발동"
+                    ? live.location == YgoConstants.LOCATION_EXTRA ? "특수 소환" : "효과 발동"
                     : "행동 확인";
                 var action = DuelStyle.Button(actRt, "B", actionText, () =>
                 {

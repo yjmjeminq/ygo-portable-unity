@@ -39,11 +39,13 @@ namespace YGOPortable.UI
             _cardActionsBar.gameObject.SetActive(false);
         }
 
-        private bool CanShowCardActions =>
-            CanAcceptPlayerAction && !IsStagingPlacement && !_modals.IsPromptOpen && !IsBrowsingZone && !_modals.ResultRoot.activeSelf &&
+        private bool CanUseCardActions =>
+            CanAcceptPlayerAction && !IsStagingPlacement && !_modals.IsPromptOpen && !_modals.ResultRoot.activeSelf &&
             !_actionPopup.activeSelf && !_phasePicker.activeSelf && !_cardZoomModal.activeSelf &&
             CardDragManager.Instance?.IsDragging != true &&
             _session.ActivePrompt.messageType is YgoConstants.MSG_SELECT_IDLECMD or YgoConstants.MSG_SELECT_BATTLECMD;
+
+        private bool CanShowCardActions => !IsBrowsingZone && CanUseCardActions;
 
         private bool CanOpenTouchCardDetails =>
             _session != null && !_session.IsFinished && !IsPresenting && !IsPaused && !IsReadingLog &&
@@ -195,7 +197,7 @@ namespace YGOPortable.UI
         {
             var session = _session;
             if (pile.controller != session.HumanPlayerIndex ||
-                pile.location is not (YgoConstants.LOCATION_GRAVE or YgoConstants.LOCATION_EXTRA or YgoConstants.LOCATION_REMOVED))
+                pile.location is not (YgoConstants.LOCATION_GRAVE or YgoConstants.LOCATION_REMOVED))
             {
                 HideCardActions();
                 return;
@@ -215,11 +217,8 @@ namespace YGOPortable.UI
                 _cardActionArt = null;
                 _cardActionsPrompt = prompt;
                 ClearCardActionButtons(1);
-                bool summons = pile.location == YgoConstants.LOCATION_EXTRA && actions.Any(action => CommandIcon(action.responseVal) == "SUMMONSP");
                 bool activations = actions.Any(action => CommandIcon(action.responseVal) == "ACTION");
-                string icon = summons ? "SUMMONSP" : "ACTION";
-                string label = summons && !activations ? "특수 소환" : !summons && activations ? "효과 발동" : "행동 선택";
-                AddCardAction(0, icon, label, () =>
+                AddCardAction(0, "ACTION", activations ? "효과 발동" : "행동 선택", () =>
                 {
                     if (!CanShowCardActions || _session != session || !ReferenceEquals(session.ActivePrompt, prompt) ||
                         _cardActionAnchor != pile.root) return;

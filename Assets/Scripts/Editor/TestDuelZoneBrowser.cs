@@ -29,7 +29,7 @@ namespace YGOPortable.Editor
                 opens += VerifyBanishAndGrave(humanFirst);
             opens += VerifyPromptAndExtraSummon();
             string hitTest = SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null ? "raycast filters" : "GraphicRaycaster";
-            Debug.Log($"[VERIFY ZONE BROWSER] {opens} successful opens. Graveyard, Extra Deck, and banished cards verified for both seating orders, including effect prompt field view ({hitTest}), a Synchro summon, and an attack response.");
+            Debug.Log($"[VERIFY ZONE BROWSER] {opens} successful opens. Piles, effect prompt field view ({hitTest}), separate Extra Deck summon choices, controller navigation and Synchro materials verified.");
         }
 
         private static void VerifyCardDetailsSafeArea()
@@ -134,13 +134,15 @@ namespace YGOPortable.Editor
         {
             var main = Enumerable.Repeat(MoYe, 20).Concat(Enumerable.Repeat(Longyuan, 20)).ToArray();
             var otherMain = Enumerable.Repeat(20721928u, 40).ToArray();
-            using var duel = YgoProjectBuilder.StartSeedMatching("Zone browser Synchro", main, ExtraDeck, otherMain, ExtraDeck, true,
+            var synchroExtra = new[] { 44508094u, 96633955u, Chixiao };
+            using var duel = YgoProjectBuilder.StartSeedMatching("Zone browser Synchro", main, synchroExtra, otherMain, ExtraDeck, true,
                 session => session.Players[0].hand.Any(card => card.code == MoYe) &&
                            session.Players[0].hand.Any(card => card.code == Longyuan));
             Action<byte[]> submit = duel.SubmitResponse;
             using var ui = new Browser(duel, bytes => submit(bytes));
             var mine = duel.Players[0];
             var mainPrompt = ReachMainPhase(duel, 0);
+            ui.VerifyNoExtraSummon();
             int normalSummon = mainPrompt.summonable.FindIndex(card => card.code == MoYe);
             Require(normalSummon >= 0, "Mo Ye is not available in the fixture.");
             duel.SubmitResponseInt(normalSummon << 16);
@@ -160,19 +162,7 @@ namespace YGOPortable.Editor
                 if (prompt.playerId == 0 && prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD &&
                     prompt.spSummonable.Any(card => card.code == Chixiao))
                 {
-                    ui.Field.Refresh();
-                    ui.OpenStack("_myExtraTile", mine.extra.Select(card => card.code));
-                    var tile = ui.VisibleCards.Single(card => card.CurrentCode == Chixiao).transform.parent.parent;
-                    Click(tile.GetComponent<Button>());
-                    Require(ui.Modals.ZoneViewRoot.activeSelf && ReferenceEquals(duel.ActivePrompt, prompt) &&
-                            ui.InspectedCode == Chixiao, "Inspecting a summonable card acted on the duel or closed the browser.");
-                    Click(tile.Find("Act/B")?.GetComponent<Button>());
-                    Require(!ui.Modals.ZoneViewRoot.activeSelf && ReferenceEquals(duel.ActivePrompt, prompt),
-                        "Opening the Extra Deck command already submitted a summon.");
-                    var popup = Private<GameObject>(ui.Field, "_actionPopup");
-                    Require(popup.activeSelf, "The explicit Extra Deck command did not open the action popup.");
-                    Click(popup.GetComponent<Button>());
-                    ui.SummonFromPileShortcut(prompt);
+                    ui.VerifyExtraSummonChoices(prompt, mine.extra);
                     choseSummon = true;
                     continue;
                 }
@@ -454,27 +444,73 @@ namespace YGOPortable.Editor
             }
 
 
-            internal void SummonFromPileShortcut(DuelPrompt prompt)
+            internal void VerifyNoExtraSummon()
             {
-                var extra = StackRoot("_myExtraTile");
-                extra.GetComponent<CardDragTrigger>().OnPointerEnterAction.Invoke();
-                var icon = Field.Root.transform.Find("CardActions/SUMMONSP/Circle/Button") as RectTransform;
-                Require(icon != null && icon.gameObject.activeInHierarchy, "The Extra Deck shortcut was missing.");
-                ClickAt(icon);
+                Field.Refresh();
+                Require(!Private<Button>(Field, "_extraSummonButton").gameObject.activeInHierarchy,
+                    "The Extra Deck summon button was visible without a legal summon.");
+            }
 
-                var layout = _grid.GetComponent<GridLayoutGroup>();
-                var window = Private<RectTransform>(Modals, "_zoneWindow");
-                Require(ReferenceEquals(_duel.ActivePrompt, prompt) && Modals.ZoneViewRoot.activeSelf &&
-                    layout.constraint == GridLayoutGroup.Constraint.FixedColumnCount && layout.constraintCount == 1 &&
-                    window.anchorMin.x > .8f, "The shortcut did not open a vertical action list on the right.");
-                var cards = VisibleCards;
-                Require(cards.Length > 0 && cards.All(card => card.transform.parent.parent.Find("Act/B")),
-                    "The action list included a card without a legal command.");
-                var tile = cards.Single(card => card.CurrentCode == Chixiao).transform.parent.parent;
+            internal void VerifyExtraSummonChoices(DuelPrompt prompt, IReadOnlyList<LiveCardState> all)
+            {
+                bool CanSummon(LiveCardState card) => prompt.spSummonable.Any(item => item.controller == card.controller &&
+                    item.location == YgoConstants.LOCATION_EXTRA && item.sequence == card.sequence);
+                var legal = all.Where(CanSummon).Select(card => card.code).ToArray();
+                Require(legal.Contains(Chixiao) && legal.Length < all.Count, "The fixture needs both eligible and blocked monsters.");
+
+                var blocked = all.First(card => !CanSummon(card));
+                var effect = new SelectableCardItem { code = blocked.code, controller = blocked.controller,
+                    location = blocked.location, sequence = blocked.sequence };
+                prompt.activatable.Add(effect);
+                try
+                {
+                    Field.Refresh();
+                    var summonButton = Private<Button>(Field, "_extraSummonButton");
+                    Require(summonButton.gameObject.activeInHierarchy, "The Extra Deck summon button was missing.");
+                    ClickAt(StackRoot("_myExtraTile"), pointerId: 0);
+                    VerifyOpened(prompt, all.Select(card => card.code));
+                    var preview = VisibleCards.Single(card => card.CurrentCode == Chixiao).transform.parent.parent;
+                    Click(preview.GetComponent<Button>());
+                    Require(Modals.IsZoneViewerOpen && InspectedCode == Chixiao && ReferenceEquals(_duel.ActivePrompt, prompt) &&
+                        !preview.Find("Act/B") && VisibleCards.Single(card => card.CurrentCode == blocked.code)
+                            .transform.parent.parent.Find("Act/B"),
+                        "The full list exposed a summon or failed to retain a separate Extra Deck effect.");
+                    Close();
+
+                    ClickAt((RectTransform)summonButton.transform, pointerId: 0);
+                    VerifyOpened(prompt, legal);
+                    Require(VisibleCards.All(card => card.transform.parent.parent.Find("Act/B")
+                            .GetComponentInChildren<Text>().text == "특수 소환"),
+                        "The summon list did not show only Special Summon buttons.");
+                    Close();
+                    Field.Refresh();
+
+                    SetPrivate(Field, "_usingDuelPad", true);
+                    SetPrivate(Field, "_duelPadFocus", StackRoot("_myExtraTile"));
+                    Field.HandleDuelPad(new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Submit));
+                    VerifyOpened(prompt, all.Select(card => card.code));
+                    Close();
+                    Field.Refresh();
+
+                    SetPrivate(Field, "_duelPadFocus", StackRoot("_myExtraTile"));
+                    Field.HandleDuelPad(new DeckPadFrame(Vector2Int.left, DeckPadButtons.None));
+                    Require(Private<RectTransform>(Field, "_duelPadFocus") == summonButton.transform,
+                        "Controller navigation could not reach the Extra Deck summon button from the pile.");
+                    Field.HandleDuelPad(new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Submit));
+                    VerifyOpened(prompt, legal);
+                    var layout = _grid.GetComponent<GridLayoutGroup>();
+                    Require(layout.constraint == GridLayoutGroup.Constraint.FixedColumnCount && layout.constraintCount == 1,
+                        "The Extra Deck summon list was not shown as a vertical list.");
+                }
+                finally
+                {
+                    prompt.activatable.Remove(effect);
+                }
+
+                var tile = VisibleCards.Single(card => card.CurrentCode == Chixiao).transform.parent.parent;
                 Click(tile.Find("Act/B").GetComponent<Button>());
                 Require(!Modals.ZoneViewRoot.activeSelf && !ReferenceEquals(_duel.ActivePrompt, prompt),
-                    "Selecting a legal summon in the shortcut did not advance the duel.");
-                Opens++;
+                    "Selecting a legal summon in the filtered list did not advance the duel.");
             }
 
             internal void SelectSynchroMaterials(DuelPrompt prompt)

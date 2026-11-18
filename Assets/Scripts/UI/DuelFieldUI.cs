@@ -111,6 +111,7 @@ namespace YGOPortable.UI
 
         private StackTileView _myDeckTile, _myExtraTile, _myGyTile, _myBanTile;
         private StackTileView _oppDeckTile, _oppExtraTile, _oppGyTile, _oppBanTile;
+        private Button _extraSummonButton;
 
         // High-res Card Zoom Modal
         private GameObject _cardZoomModal;
@@ -270,6 +271,7 @@ namespace YGOPortable.UI
             ResetDuelPad();
             _pointerActionAnchor = null;
             HideCardActions();
+            _extraSummonButton.gameObject.SetActive(false);
             CloseActionPopup();
             CloseDuelLog();
             _modals.CloseZoneViewer();
@@ -637,7 +639,7 @@ namespace YGOPortable.UI
             button.onClick.AddListener(Open);
             var trigger = cell.gameObject.AddComponent<CardDragTrigger>();
             trigger.OnRightClick = Open;
-            if (location is YgoConstants.LOCATION_GRAVE or YgoConstants.LOCATION_EXTRA or YgoConstants.LOCATION_REMOVED)
+            if (location is YgoConstants.LOCATION_GRAVE or YgoConstants.LOCATION_REMOVED)
             {
                 trigger.OnPointerEnterAction = () => PointAtCardActions(cell);
                 trigger.OnPointerExitAction = () => LeaveCardActions(cell);
@@ -663,6 +665,15 @@ namespace YGOPortable.UI
             _myLpFill = fill;
             portrait.sprite = LotdUiKit.LoadSprite("LOTD/Busts/yamiyugi_neutral") ?? LotdUiKit.LoadSprite("LOTD/Busts/atem_neutral");
             portrait.enabled = portrait.sprite != null;
+
+            var extraSummon = LotdUiKit.CreateRect("ExtraSummon", root, new Vector2(.107f, .142f),
+                new Vector2(.222f, .188f), Vector2.zero, Vector2.zero);
+            _extraSummonButton = DuelStyle.Button(extraSummon, "Button", "엑스트라 소환", OpenExtraSummonPicker, 17, gold: true);
+            var extraSummonLabel = _extraSummonButton.GetComponentInChildren<Text>();
+            extraSummonLabel.resizeTextForBestFit = true;
+            extraSummonLabel.resizeTextMinSize = 9;
+            extraSummonLabel.resizeTextMaxSize = 17;
+            _extraSummonButton.gameObject.SetActive(false);
 
             var turnHolder = LotdUiKit.CreateRect("Turn", root, new Vector2(.904f, .451f), new Vector2(.984f, .615f),
                 Vector2.zero, Vector2.zero);
@@ -994,6 +1005,7 @@ namespace YGOPortable.UI
             RefreshLogFeed();
             RefreshAttackResponseArrow();
             RefreshMaterialConfirm();
+            RefreshExtraSummonButton();
             RefreshDuelPadCursor(layoutChanged: true);
             RefreshCardActions();
         }
@@ -2193,6 +2205,7 @@ namespace YGOPortable.UI
             var session = _session;
             AdvanceHandLayout(Time.unscaledDeltaTime * PlaybackRate);
             AdvanceActionWindow();
+            RefreshExtraSummonButton();
             UpdateDuelPad();
             if (_session != session || !Root.activeSelf) return;
             RefreshHandGlows();
@@ -2518,6 +2531,47 @@ namespace YGOPortable.UI
             Refresh();
         }
 
+        private static int ExtraSummonIndex(DuelPrompt prompt, LiveCardState card) =>
+            card == null || card.code == 0 ? -1 :
+                prompt.spSummonable.FindIndex(item => item.controller == card.controller &&
+                    item.location == YgoConstants.LOCATION_EXTRA && item.sequence == card.sequence);
+
+        private bool ExtraSummonAvailable =>
+            CanUseCardActions && _session.ActivePrompt.messageType == YgoConstants.MSG_SELECT_IDLECMD &&
+            _session.Players[_session.HumanPlayerIndex].extra.Any(card => ExtraSummonIndex(_session.ActivePrompt, card) >= 0);
+
+        private void RefreshExtraSummonButton()
+        {
+            bool available = ExtraSummonAvailable;
+            if (_extraSummonButton.gameObject.activeSelf != available)
+                _extraSummonButton.gameObject.SetActive(available);
+        }
+
+        private void OpenExtraSummonPicker()
+        {
+            if (IsBrowsingZone || !ExtraSummonAvailable) return;
+            var session = _session;
+            var prompt = session.ActivePrompt;
+            bool CanSummon() => _session == session && ReferenceEquals(session.ActivePrompt, prompt) && CanUseCardActions;
+
+            HideCardActions();
+            LotdAudio.PlayClick();
+            _modals.ShowZoneViewer(
+                "엑스트라 소환 가능",
+                session.Players[session.HumanPlayerIndex].extra,
+                newestFirst: false,
+                hasCardActions: card => ExtraSummonIndex(prompt, card) >= 0,
+                onOpenCardActions: card =>
+                {
+                    if (!CanSummon()) return;
+                    int index = ExtraSummonIndex(prompt, card);
+                    if (index >= 0) ExecuteActionInt((index << 16) | 1);
+                },
+                canUseCardActions: CanSummon,
+                icon: DuelVisualAssets.ZoneIcon(YgoConstants.LOCATION_EXTRA, false),
+                actionsOnly: true, sidePanel: true);
+        }
+
         private void OpenStackZone(byte con, uint loc, string title, bool hideFaceDown = false, bool actionsOnly = false)
         {
             var session = _session;
@@ -2551,17 +2605,26 @@ namespace YGOPortable.UI
             hideFaceDown |= con != session.HumanPlayerIndex &&
                 (loc == YgoConstants.LOCATION_EXTRA || loc == YgoConstants.LOCATION_REMOVED);
 
+            List<(string label, int responseVal, bool gold)> GetZoneCardActions(LiveCardState card)
+            {
+                var actions = CollectActions(card.controller, card.location, card.sequence);
+                if (loc == YgoConstants.LOCATION_EXTRA && prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD)
+                    actions.RemoveAll(action => (action.responseVal & 0xffff) == 1);
+                return actions;
+            }
+
             LotdAudio.PlayClick();
             _modals.ShowZoneViewer(
                 title,
                 cards,
                 hideFaceDown,
                 newestFirst: loc != YgoConstants.LOCATION_EXTRA,
-                hasCardActions: c => CanUseActions() && CollectActions(c.controller, c.location, c.sequence).Count > 0,
+                hasCardActions: c => CanUseActions() && GetZoneCardActions(c).Count > 0,
                 onOpenCardActions: c =>
                 {
                     if (!CanUseActions()) return;
-                    var actions = CollectActions(c.controller, c.location, c.sequence);
+                    var actions = GetZoneCardActions(c);
+                    if (actions.Count == 0) return;
                     if (actionsOnly && actions.Count == 1)
                         ExecuteActionInt(actions[0].responseVal);
                     else

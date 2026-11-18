@@ -249,6 +249,7 @@ namespace YGOPortable.UI
             if (scope != PadScope.Board) return;
 
             AddDuelPadPiles(useActions: true);
+            AddDuelPadButton(_extraSummonButton);
             AddDuelPadButton(_phaseButton);
             AddDuelPadButton(_duelPadInspectButton);
             AddDuelPadButton(_chainConfirmationButton);
@@ -258,19 +259,19 @@ namespace YGOPortable.UI
 
         private void AddDuelPadPiles(bool useActions = false)
         {
-            void Add(StackTileView tile, bool player)
+            void Add(StackTileView tile, bool allowActions)
             {
                 var button = tile.button;
                 if (!button.isActiveAndEnabled || !button.IsInteractable()) return;
                 _duelPadTargets.Add(new PadTarget(tile.root, () =>
                 {
-                    if (!useActions || !player || !EnterCardActions())
+                    if (!useActions || !allowActions || !EnterCardActions())
                         button.onClick.Invoke();
                 }));
             }
 
             Add(_myGyTile, true);
-            Add(_myExtraTile, true);
+            Add(_myExtraTile, false);
             Add(_myBanTile, true);
             Add(_oppGyTile, false);
             Add(_oppExtraTile, false);
