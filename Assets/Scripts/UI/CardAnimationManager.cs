@@ -81,6 +81,7 @@ namespace YGOPortable.UI
         private readonly Queue<IEnumerator> _steps = new Queue<IEnumerator>();
         private List<(CardFlight flight, Action onArrive)> _openPileTransfers;
         private List<LifeChangeCue> _openBattleLifeChanges;
+        private DestructionGroup _openDestructions;
         private List<SpecialSummonArrival> _pendingSpecialSummons;
         private Action _refreshAfterSpecialSummons;
         private readonly Stack<CompositeCardView> _cards = new Stack<CompositeCardView>();
@@ -93,6 +94,7 @@ namespace YGOPortable.UI
 
         private const float LifeFeedbackDuration = .46f;
         private static readonly Color LifeDamageTint = new Color(1f, .61f, .52f);
+        private static readonly Color DestructionTint = new Color(.55f, .84f, 1f);
 
         private sealed class LifeChangeCue
         {
@@ -111,6 +113,14 @@ namespace YGOPortable.UI
             internal CardMoveReadoutSnapshot Readout;
             internal Action Depart;
             internal Action Release;
+        }
+
+        private sealed class DestructionGroup
+        {
+            internal object Key;
+            internal Action Refresh;
+            internal readonly List<(CardFlight Flight, CardMotion Motion, CardMoveReadoutSnapshot Readout,
+                Action Depart, Action Release)> Moves = new();
         }
 
         public bool IsPresenting => _playing || _steps.Count > 0;
@@ -142,6 +152,7 @@ namespace YGOPortable.UI
             _steps.Clear();
             _openPileTransfers = null;
             _openBattleLifeChanges = null;
+            _openDestructions = null;
             _pendingSpecialSummons = null;
             _refreshAfterSpecialSummons = null;
             _cards.Clear();
@@ -221,9 +232,22 @@ namespace YGOPortable.UI
             QueueStep(MoveCard(flight, motion, onArrive, readout, onDepart));
         }
 
+        internal void QueueFieldDestruction(object group, CardFlight flight, CardMotion motion,
+            CardMoveReadoutSnapshot readout, Action depart, Action release, Action refresh)
+        {
+            if (_openDestructions?.Key != group)
+            {
+                var next = new DestructionGroup { Key = group, Refresh = refresh };
+                QueueStep(PlayFieldDestructions(next));
+                _openDestructions = next;
+            }
+            _openDestructions.Moves.Add((flight, motion, readout, depart, release));
+        }
+
         internal void StageSpecialSummon(CardFlight flight, CardMotion motion, byte controller, uint sequence,
             CardMoveReadoutSnapshot readout, Action depart, Action release, Action refresh)
         {
+            _openDestructions = null;
             _openPileTransfers = null;
             _openBattleLifeChanges = null;
             _pendingSpecialSummons ??= new List<SpecialSummonArrival>();
@@ -265,6 +289,7 @@ namespace YGOPortable.UI
         {
             // Moves emitted together by one effect overlap. Other animation steps still play in engine order.
             CompleteSpecialSummons();
+            _openDestructions = null;
             _openBattleLifeChanges = null;
             if (_openPileTransfers == null)
             {
@@ -277,6 +302,7 @@ namespace YGOPortable.UI
         private void QueueStep(IEnumerator step)
         {
             CompleteSpecialSummons();
+            _openDestructions = null;
             _openPileTransfers = null;
             _openBattleLifeChanges = null;
             _steps.Enqueue(step);
@@ -475,6 +501,85 @@ namespace YGOPortable.UI
             land();
         }
 
+        private IEnumerator PlayFieldDestructions(DestructionGroup group)
+        {
+            if (ReferenceEquals(_openDestructions, group)) _openDestructions = null;
+            var moves = group.Moves;
+            void Depart()
+            {
+                foreach (var move in moves) move.Depart?.Invoke();
+                group.Refresh();
+            }
+            void Land()
+            {
+                foreach (var move in moves) move.Release?.Invoke();
+                group.Refresh();
+            }
+
+            if (moves.Count == 1)
+            {
+                var move = moves[0];
+                yield return MoveCard(move.Flight, move.Motion, Land, move.Readout, Depart);
+                yield break;
+            }
+
+            var effects = new DuelEffectGraphic[moves.Count];
+            for (int index = 0; index < moves.Count; index++)
+            {
+                var origin = moves[index].Flight.From;
+                effects[index] = CreateEffect(DuelEffectKind.Break, origin.Position, origin.Size * 2.1f, DestructionTint);
+                effects[index].Seek(0f);
+            }
+            LotdAudio.PlayDamage();
+            yield return Animate(.18f, time =>
+            {
+                foreach (var effect in effects) effect.Seek(time);
+            });
+            foreach (var effect in effects) RemoveTransient(effect.gameObject);
+
+            Depart();
+            var cards = new CompositeCardView[moves.Count];
+            var readouts = new DuelMovingReadout[moves.Count];
+            var fading = new CanvasGroup[moves.Count];
+            for (int index = 0; index < moves.Count; index++)
+            {
+                var move = moves[index];
+                var proxy = TakeCard(move.Flight.StartsFaceDown ? 0u : move.Flight.Code, move.Flight.StartsFaceDown);
+                cards[index] = proxy;
+                if (move.Motion == CardMotion.Vanish)
+                {
+                    if (!proxy.TryGetComponent<CanvasGroup>(out var fade))
+                        fade = proxy.gameObject.AddComponent<CanvasGroup>();
+                    fading[index] = fade;
+                }
+            }
+            for (int index = 0; index < moves.Count; index++)
+            {
+                var move = moves[index];
+                bool sharedPile = move.Motion != CardMotion.Vanish && moves.Exists(other =>
+                    other.Motion != CardMotion.Vanish && other.Flight.From.Position != move.Flight.From.Position &&
+                    other.Flight.To.Position == move.Flight.To.Position);
+                readouts[index] = CreateMovingReadout(move.Flight, move.Motion, move.Readout, sharedPile);
+            }
+
+            yield return Animate(.27f, time =>
+            {
+                for (int index = 0; index < moves.Count; index++)
+                {
+                    ApplyFlight(cards[index], moves[index].Flight, time, fading[index] != null ? 6f : 31f);
+                    if (fading[index] != null) fading[index].alpha = 1f - Mathf.SmoothStep(0f, 1f, time);
+                    readouts[index]?.Follow(cards[index], time);
+                }
+            });
+            for (int index = 0; index < moves.Count; index++)
+            {
+                if (fading[index] != null) fading[index].alpha = 1f;
+                RecycleCard(cards[index]);
+                if (readouts[index] != null) RemoveTransient(readouts[index].Root.gameObject);
+            }
+            Land();
+        }
+
         private IEnumerator GatherXyzMaterials(IReadOnlyList<CardFlight> flights, Vector2 center, Vector2 size)
         {
             var effect = CreateEffect(DuelEffectKind.Xyz, center, size * 2.15f, new Color(.71f, .51f, 1f));
@@ -509,12 +614,13 @@ namespace YGOPortable.UI
             RemoveTransient(effect.gameObject);
         }
 
-        private DuelMovingReadout CreateMovingReadout(CardFlight flight, CardMotion motion, CardMoveReadoutSnapshot readout)
+        private DuelMovingReadout CreateMovingReadout(CardFlight flight, CardMotion motion, CardMoveReadoutSnapshot readout,
+            bool sharedPile = false)
         {
             if (readout?.SourceCard == null && readout?.DestinationCard == null) return null;
             var holder = CenteredVisual("MovingCardReadout", _layer, flight.From.Position, readout.Movement.StartSize);
             float handoff = motion == CardMotion.TokenSummon ? .27f
-                : !flight.EndsFaceDown && readout.DestinationCard == null ? .82f : .5f;
+                : !flight.EndsFaceDown && readout.DestinationCard == null && !sharedPile ? .82f : .5f;
             return new DuelMovingReadout(holder, readout, handoff);
         }
 
@@ -532,7 +638,7 @@ namespace YGOPortable.UI
             {
                 LotdAudio.PlayDamage();
                 yield return Burst(DuelEffectKind.Break, flight.From.Position, flight.From.Size * 2.1f,
-                    new Color(.55f, .84f, 1f), .18f);
+                    DestructionTint, .18f);
             }
 
             onDepart?.Invoke();

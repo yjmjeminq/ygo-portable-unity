@@ -462,23 +462,31 @@ namespace YGOPortable.Editor
                     var hand = session.Players[session.HumanPlayerIndex].hand;
                     return new[] { gagagigo, darkHole, rush }.All(code => hand.Any(card => card.code == code));
                 });
-            for (int turn = 0; turn < 2; turn++)
+            for (int turn = 0; turn < 4; turn++)
             {
-                Require(duel.ActivePrompt?.summonable.Count > 0 && duel.ActivePrompt.playerId == turn,
-                    "The destruction fixture could not summon both copies.");
-                duel.SubmitResponseInt(0);
-                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+                Require(duel.ActivePrompt?.playerId == (turn & 1), "The destruction fixture reached the wrong turn.");
+                if (turn < 2 || turn == 3)
+                {
+                    int options = turn == 3 ? duel.ActivePrompt.mSetable.Count : duel.ActivePrompt.summonable.Count;
+                    Require(options > 0, "The destruction fixture could not place a monster.");
+                    duel.SubmitResponseInt(turn == 3 ? 3 : 0);
+                    YgoProjectBuilder.DriveUntilIdle(duel, ai);
+                }
                 duel.SubmitResponseInt(7);
                 YgoProjectBuilder.DriveUntilIdle(duel, ai);
             }
 
             var mine = duel.Players[duel.HumanPlayerIndex].mzone.Single(card => card?.code == gagagigo);
-            var rival = duel.Players[duel.AiPlayerIndex].mzone.Single(card => card?.code == gagagigo);
+            var enemy = duel.Players[duel.AiPlayerIndex];
+            var rival = enemy.mzone.Single(card => card?.code == gagagigo && card.IsFaceUp);
+            var covered = enemy.mzone.Single(card => card != null && !card.IsFaceUp);
             using var ui = new HandUI(duel);
             var animator = CardAnimationManager.Ensure(ui.Canvas);
             Canvas.ForceUpdateCanvases();
             var ownTile = FieldSlot(ui.Field, mine);
             var rivalTile = FieldSlot(ui.Field, rival);
+            var coveredTile = FieldSlot(ui.Field, covered);
+            var coveredView = coveredTile.Find("Card/CardView").GetComponent<CompositeCardView>();
             ownTile.GetComponent<CardDragTrigger>().OnRightClick();
             var inspector = ui.Field.Root.transform.Find("LeftInspector/CardDetails/CombatStats/Attack/Digits/Value").GetComponent<Text>();
 
@@ -491,6 +499,12 @@ namespace YGOPortable.Editor
             }
 
             bool chained = false;
+            var destroyed = new List<CardMoveEvent>();
+            duel.OnCardMoved += move =>
+            {
+                if (move.fromLoc == YgoConstants.LOCATION_MZONE && (move.reason & YgoConstants.REASON_DESTROY) != 0)
+                    destroyed.Add(move);
+            };
             ActivateFromMainPhase(duel, darkHole);
             YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
             {
@@ -516,8 +530,11 @@ namespace YGOPortable.Editor
                 return null;
             });
             Require(chained && duel.RetryCount == 0 && duel.SolvedChainLinks.SequenceEqual(new[] { (2, rush), (1, darkHole) }) &&
-                    duel.Players.All(player => player.grave.Any(card => card.code == gagagigo)),
-                "The native chain did not resolve the boost before destroying the two copies.");
+                    duel.Players[duel.HumanPlayerIndex].grave.Count(card => card.code == gagagigo) == 1 &&
+                    enemy.grave.Count(card => card.code == gagagigo) == 2 && destroyed.Count == 3 &&
+                    destroyed[0].DestructionGroup != null &&
+                    destroyed.All(move => ReferenceEquals(move.DestructionGroup, destroyed[0].DestructionGroup)),
+                "The native chain did not destroy all three cards with one operation after applying the buff.");
             ui.Field.Refresh();
             VerifyWaiting(ownTile, "1850");
             VerifyWaiting(rivalTile, "1850");
@@ -529,31 +546,45 @@ namespace YGOPortable.Editor
             VerifyWaiting(rivalTile, "1850");
             Require(inspector.text == "2550", "The selected card lost its live inspector value before it left the field.");
 
-            const BindingFlags fields = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
-            var departures = steps.Where(step => step.GetType().GetField("flight", fields)?.GetValue(step) is CardFlight flight &&
-                flight.Code == gagagigo).ToArray();
-            Require(departures.Length == 2, "Both destroyed copies need a distinct departure.");
-            foreach (var departure in departures)
+            var departure = steps.Single(step => step.GetType().Name.StartsWith("<PlayFieldDestructions>", StringComparison.Ordinal));
+            Require(departure.MoveNext(), "The destruction did not start with its impact.");
+            Require(animator.GetComponentsInChildren<DuelEffectGraphic>().Count(effect => effect.Kind == DuelEffectKind.Break) == 3,
+                "The single effect did not start all three impacts together.");
+            var impact = TestCardPresentation.SampleAnimation((IEnumerator)departure.Current);
+            impact(.62f);
+            VerifyWaiting(ownTile, "2550");
+            VerifyWaiting(rivalTile, "1850");
+            Require(coveredView.gameObject.activeInHierarchy && coveredView.CurrentCode == 0 &&
+                    coveredTile.Find("CardReadout") == null, "The covered card revealed its name or stats before the impact.");
+            impact(1f);
+            Require(departure.MoveNext(), "The destroyed cards did not leave together.");
+            var sample = TestCardPresentation.SampleAnimation((IEnumerator)departure.Current);
+            sample(.32f);
+            var proxies = animator.GetComponentsInChildren<CompositeCardView>().Where(view => view.name == "MovingCard").ToArray();
+            Require(proxies.Length == 3 && proxies.Count(view => view.CurrentCode == 0) == 1 &&
+                    new[] { ownTile, rivalTile, coveredTile }.All(tile => !tile.Find("Card/CardView").gameObject.activeInHierarchy),
+                "The three cards did not start their flights on the same frame with the set card concealed.");
+            var readouts = Enumerable.Range(0, animator.transform.childCount).Select(index => animator.transform.GetChild(index))
+                .OfType<RectTransform>().Where(rect => rect.name == "MovingCardReadout").ToArray();
+            Require(readouts.Length == 2, "The moving group displayed live stats for a set card or lost a public readout.");
+            foreach (var readout in readouts)
             {
-                var snapshot = (CardMoveReadoutSnapshot)departure.GetType().GetField("readout", fields).GetValue(departure);
-                Require(snapshot?.SourceCard != null, "A destroyed face-up card had no travelling readout.");
-                bool opponent = snapshot.Movement.StartOpponent;
-                var tile = opponent ? rivalTile : ownTile;
-                string attack = opponent ? "1850" : "2550";
-                Require(departure.MoveNext(), "The destruction did not start with its effect.");
-                VerifyWaiting(tile, attack);
-                Require(departure.MoveNext(), "The destroyed card did not fly from the field.");
-                var sample = TestCardPresentation.SampleAnimation((IEnumerator)departure.Current);
-                var readout = (RectTransform)animator.transform.Find("MovingCardReadout");
-                sample(.38f);
+                string attack = readout.Find("CardReadout/Combat/Attack/Digits/Value").GetComponent<Text>().text;
                 RequireTravelStats(readout, attack, "1000", "4", defense: false);
-                Require(!tile.Find("Card/CardView").gameObject.activeInHierarchy,
-                    "The source card stayed on the field under its flying copy.");
-                sample(1f);
-                Require(!departure.MoveNext() && readout == null, "The live readout stayed visible in the graveyard.");
+                Require(proxies.Any(view => view.CurrentCode == gagagigo &&
+                    ((RectTransform)view.transform).anchoredPosition == readout.anchoredPosition),
+                    "A moving readout was detached from its copy.");
             }
+            Require(readouts.Select(rect => rect.Find("CardReadout/Combat/Attack/Digits/Value").GetComponent<Text>().text)
+                .OrderBy(value => value).SequenceEqual(new[] { "1850", "2550" }),
+                "The grouped animation mixed the combat values of the same-named monsters.");
+            sample(.62f);
+            Require(proxies.All(view => view.CurrentCode == gagagigo), "The set card did not turn face-up on the way to the graveyard.");
+            sample(1f);
+            Require(!departure.MoveNext() && animator.transform.Find("MovingCardReadout") == null,
+                "The departure left live readouts in a pile.");
             Require(inspector.text == "1850", "The inspector kept a field-only buff after the card left.");
-            Debug.Log("[VERIFY DUEL DEPARTURE READOUT] Both copies stayed visible until destruction, and travelled with their own 2550 and 1850 ATK values.");
+            Debug.Log("[VERIFY DUEL GROUP DESTRUCTION] Three native Dark Hole targets departed together. The two public copies kept 2550 and 1850 ATK while the set card stayed covered until its flip.");
         }
 
         private static void VerifyFieldReplacementReadouts()
@@ -1295,7 +1326,8 @@ namespace YGOPortable.Editor
 
             var (controller, sequence) = captured.Key;
             var location = (controller, YgoConstants.LOCATION_MZONE, sequence);
-            typeof(DuelFieldUI).GetMethod("ShowArrival", PrivateInstance).Invoke(ui.Field, new object[] { location });
+            typeof(DuelFieldUI).GetMethod("ReleaseArrival", PrivateInstance).Invoke(ui.Field, new object[] { location });
+            ui.Field.Refresh();
             var fieldSlot = typeof(DuelFieldUI).GetMethod("GetSlot", PrivateInstance).Invoke(ui.Field,
                 new object[] { controller, YgoConstants.LOCATION_MZONE, sequence });
             var slot = (Transform)fieldSlot.GetType().GetField("root").GetValue(fieldSlot);

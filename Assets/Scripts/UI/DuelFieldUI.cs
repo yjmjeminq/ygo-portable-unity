@@ -459,8 +459,8 @@ namespace YGOPortable.UI
 
         private DuelCardReadout ReadInspectedStats(uint code, (byte controller, uint location, uint sequence)? location)
         {
-            if (location is { } slot && slot.location == YgoConstants.LOCATION_MZONE &&
-                GetBattleCardDisplay(slot.controller, slot.sequence) is { Readout: not null } held &&
+            if (location is { } slot &&
+                GetBattleCardDisplay(slot.controller, slot.sequence, slot.location) is { Readout: not null } held &&
                 held.Readout.Shown.code == code)
                 return new DuelCardReadout(CardDatabase.Get(code), held.Hidden ? null : held.Readout.Shown);
             return ReadFieldStats(code, ReadVisibleFieldCard(code, location));
@@ -1435,7 +1435,7 @@ namespace YGOPortable.UI
             slot.mappedCon = con;
             slot.mappedLoc = loc;
             slot.mappedSeq = seq;
-            var battle = loc == YgoConstants.LOCATION_MZONE ? GetBattleCardDisplay(con, seq) : null;
+            var battle = GetBattleCardDisplay(con, seq, loc);
             slot.liveCard = battle == null ? live : null;
 
             var shown = battle?.Readout?.Shown ?? battle?.Card ?? live;
@@ -2241,12 +2241,6 @@ namespace YGOPortable.UI
             return _arrivingCards.ContainsKey(ArrivalKey(controller, location, sequence));
         }
 
-        private void ShowArrival((byte, uint, uint) key)
-        {
-            ReleaseArrival(key);
-            Refresh();
-        }
-
         private void ReleaseArrival((byte, uint, uint) key)
         {
             if (_arrivingCards.TryGetValue(key, out int pending))
@@ -2256,7 +2250,10 @@ namespace YGOPortable.UI
             }
         }
 
-        private Action HideUntilArrival(byte controller, uint location, uint sequence)
+        private Action HideUntilArrival(byte controller, uint location, uint sequence) =>
+            ReserveCardArrival(controller, location, sequence, Refresh);
+
+        private Action ReserveCardArrival(byte controller, uint location, uint sequence, Action refresh = null)
         {
             if (location == YgoConstants.LOCATION_HAND)
             {
@@ -2268,11 +2265,15 @@ namespace YGOPortable.UI
                 {
                     if (view.PendingArrival != arrival) return;
                     view.PendingArrival = null;
-                    Refresh();
+                    refresh?.Invoke();
                 };
             }
             var key = ReserveArrival(controller, location, sequence);
-            return () => ShowArrival(key);
+            return () =>
+            {
+                ReleaseArrival(key);
+                refresh?.Invoke();
+            };
         }
 
         private (byte, uint, uint) ReserveArrival(byte controller, uint location, uint sequence)
@@ -2478,6 +2479,19 @@ namespace YGOPortable.UI
             var flight = new CardFlight(e.code, from, to, fromBack, toBack);
             var held = HoldMovingFieldCard(e, motion, previousReadout, paired);
             var readout = PrepareMoveReadout(animator, e, fromBack, toBack);
+            if (e.DestructionGroup != null && (e.reason & YgoConstants.REASON_DESTROY) != 0 &&
+                (e.fromLoc is YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE) &&
+                (e.toLoc & (YgoConstants.LOCATION_ONFIELD | YgoConstants.LOCATION_OVERLAY)) == 0)
+            {
+                var release = disappearing ? null : ReserveCardArrival(e.toCon, e.toLoc, e.toSeq);
+                animator.QueueFieldDestruction(e.DestructionGroup, flight, motion, readout,
+                    held == null ? null : () => held.Hidden = true, () =>
+                    {
+                        ReleaseBattleCardDisplay(held);
+                        release?.Invoke();
+                    }, Refresh);
+                return held;
+            }
             Action detach = sameZone ? null : HoldMaterialReadout(e.fromCon, e.fromLoc, e.fromSeq, -1);
             Action attach = sameZone ? null : HoldMaterialReadout(e.toCon, e.toLoc, e.toSeq, 1);
             Action depart = held == null && detach == null ? null : () =>
@@ -2526,7 +2540,7 @@ namespace YGOPortable.UI
             bool fromBack, bool toBack)
         {
             if (move.code == 0) return null;
-            var sourceCard = fromBack ? null : move.SourceReadout;
+            var sourceCard = !fromBack && move.fromLoc == YgoConstants.LOCATION_MZONE ? move.SourceReadout : null;
             var source = sourceCard == null ? null : GetSlot(move.fromCon, move.fromLoc, move.fromSeq);
             var destination = !toBack && move.toLoc == YgoConstants.LOCATION_MZONE
                 ? GetSlot(move.toCon, move.toLoc, move.toSeq) : null;

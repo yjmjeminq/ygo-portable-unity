@@ -8,7 +8,7 @@ namespace YGOPortable.UI
     {
         private sealed class BattleCardDisplay
         {
-            internal (byte Controller, uint Sequence) Slot;
+            internal (byte Controller, uint Location, uint Sequence) Slot;
             internal LiveCardState Card;
             internal uint Position;
             internal BattleCardStats? Stats;
@@ -19,15 +19,15 @@ namespace YGOPortable.UI
         }
 
         // The engine can resolve a whole battle before its queued animations have played.
-        private readonly Dictionary<(byte Controller, uint Sequence), Queue<BattleCardDisplay>> _battleCardDisplays = new();
+        private readonly Dictionary<(byte Controller, uint Location, uint Sequence), Queue<BattleCardDisplay>> _battleCardDisplays = new();
 
-        private BattleCardDisplay GetBattleCardDisplay(byte controller, uint sequence) =>
-            _battleCardDisplays.TryGetValue((controller, sequence), out var cards) ? cards.Peek() : null;
+        private BattleCardDisplay GetBattleCardDisplay(byte controller, uint sequence, uint location = YgoConstants.LOCATION_MZONE) =>
+            _battleCardDisplays.TryGetValue((controller, location, sequence), out var cards) ? cards.Peek() : null;
 
-        private BattleCardDisplay QueueBattleCardDisplay(byte controller, uint sequence, LiveCardState card, uint position)
+        private BattleCardDisplay QueueBattleCardDisplay(byte controller, uint location, uint sequence, LiveCardState card, uint position)
         {
             if (card == null) return null;
-            var key = (controller, sequence);
+            var key = (controller, location, sequence);
             if (!_battleCardDisplays.TryGetValue(key, out var cards))
                 _battleCardDisplays.Add(key, cards = new Queue<BattleCardDisplay>());
             var display = new BattleCardDisplay { Slot = key, Card = card, Position = position };
@@ -47,7 +47,7 @@ namespace YGOPortable.UI
         {
             if (card == null || stats.Location != YgoConstants.LOCATION_MZONE) return null;
             uint position = GetBattleCardDisplay(stats.Controller, stats.Sequence) != null ? stats.Position : card.position;
-            var display = QueueBattleCardDisplay(stats.Controller, stats.Sequence, card, position);
+            var display = QueueBattleCardDisplay(stats.Controller, stats.Location, stats.Sequence, card, position);
             display.Stats = stats;
             return display;
         }
@@ -59,12 +59,12 @@ namespace YGOPortable.UI
             if (!battleDestruction && (motion != CardMotion.ChangePosition || !IsBattling(move.fromCon, move.fromSeq)))
                 return null;
 
-            var key = (move.fromCon, move.fromSeq);
+            var key = (move.fromCon, move.fromLoc, move.fromSeq);
             var previous = _battleCardDisplays.TryGetValue(key, out var cards) ? cards.Last() : null;
             var card = previous?.Card ?? FindLiveCard(move.fromCon, move.fromLoc, move.fromSeq);
             if (card == null || move.code != 0 && card.code != move.code) return null;
 
-            var display = QueueBattleCardDisplay(move.fromCon, move.fromSeq, card, move.fromPos);
+            var display = QueueBattleCardDisplay(move.fromCon, move.fromLoc, move.fromSeq, card, move.fromPos);
             if (battleDestruction && previous?.Stats is { } stats)
             {
                 display.Stats = stats;
@@ -78,11 +78,16 @@ namespace YGOPortable.UI
         {
             var battle = HoldBattleMove(move, motion);
             if (battle != null) return battle;
+            if (paired || IsArriving(move.fromCon, move.fromLoc, move.fromSeq)) return null;
             var source = move.SourceReadout;
-            if (source == null || paired || IsArriving(move.fromCon, move.fromLoc, move.fromSeq)) return null;
+            if (source == null && move.DestructionGroup != null &&
+                (move.fromLoc is YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE) &&
+                (move.fromPos & YgoConstants.POS_FACEDOWN) != 0)
+                source = new LiveCardState { position = move.fromPos };
+            if (source == null) return null;
 
-            var display = QueueBattleCardDisplay(move.fromCon, move.fromSeq, source, move.fromPos);
-            display.Readout = readout ?? new PresentedFieldReadout { Shown = source };
+            var display = QueueBattleCardDisplay(move.fromCon, move.fromLoc, move.fromSeq, source, move.fromPos);
+            if (source.IsFaceUp) display.Readout = readout ?? new PresentedFieldReadout { Shown = source };
             return display;
         }
 
