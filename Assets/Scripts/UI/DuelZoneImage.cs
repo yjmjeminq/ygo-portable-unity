@@ -18,12 +18,14 @@ namespace YGOPortable.UI
         private bool _pileActionHighlighted;
         private DuelLinkZoneRim _linkRim;
         internal bool LinkHighlighted { get; private set; }
+        internal bool SummonReserved { get; private set; }
 
-        internal void SetPlacementHighlight(bool highlighted)
+        internal void SetPlacementHighlight(bool highlighted, bool summonReserved)
         {
-            if (_placementHighlighted == highlighted) return;
+            if (_placementHighlighted == highlighted && SummonReserved == summonReserved) return;
             _placementHighlighted = highlighted;
-            if (_linkRim != null) _linkRim.gameObject.SetActive(LinkHighlighted && !highlighted);
+            SummonReserved = summonReserved;
+            if (_linkRim != null) _linkRim.gameObject.SetActive(LinkHighlighted && !highlighted && !SummonReserved);
             SetVerticesDirty();
         }
 
@@ -47,7 +49,7 @@ namespace YGOPortable.UI
                 _linkRim.texture = Texture2D.whiteTexture;
                 _linkRim.raycastTarget = false;
             }
-            if (_linkRim != null) _linkRim.gameObject.SetActive(highlighted && !_placementHighlighted);
+            if (_linkRim != null) _linkRim.gameObject.SetActive(highlighted && !_placementHighlighted && !SummonReserved);
             SetVerticesDirty();
         }
 
@@ -91,8 +93,9 @@ namespace YGOPortable.UI
             Rect rect = GetPixelAdjustedRect();
             if (rect.width <= 0f || rect.height <= 0f) return;
 
-            bool link = LinkHighlighted && !_placementHighlighted;
-            Color tone = link ? new Color(.27f, .40f, .82f, .48f) : color;
+            bool link = LinkHighlighted && !_placementHighlighted && !SummonReserved;
+            Color tone = link ? new Color(.27f, .40f, .82f, .48f)
+                : SummonReserved ? new Color(.11f, .45f, .49f, .48f) : color;
             int center = mesh.currentVertCount;
             mesh.AddVert(rect.center, tone, Vector2.zero);
             var recess = new Color(tone.r * .70f, tone.g * .72f, tone.b * .76f, Mathf.Min(1f, tone.a * 1.13f));
@@ -104,6 +107,12 @@ namespace YGOPortable.UI
             if (_placementHighlighted)
             {
                 DrawSelectionRim(mesh, rect, new Color(.99f, .90f, .32f, .96f), 0f);
+                return;
+            }
+
+            if (SummonReserved)
+            {
+                DrawSelectionRim(mesh, rect, new Color(.41f, .83f, .79f, .78f), .09f);
                 return;
             }
 

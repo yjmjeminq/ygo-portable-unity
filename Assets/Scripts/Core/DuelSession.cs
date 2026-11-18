@@ -49,6 +49,7 @@ namespace YGOPortable.Core
         public uint toSeq;
         public uint toPos;
         public uint reason;
+        internal uint? summonType;
     }
 
     internal enum BattleStatSource : byte { Attack = 1, Defense, Effect }
@@ -274,6 +275,7 @@ namespace YGOPortable.Core
 
         public event Action<CardMoveEvent> OnCardMoved;
         internal event Action<CardMoveEvent, CardMoveEvent> OnCardLocationsChanged;
+        internal event Action OnSpecialSummonBoundary;
         public event Action<byte, IReadOnlyList<uint>> OnCardsDrawn;
         public event Action<byte, int, int> OnLifePointsChanged;
         internal event Action<byte, int, int, LifePointChangeKind> OnLifePointChange;
@@ -590,6 +592,11 @@ namespace YGOPortable.Core
             }
 
             if (!_loadingPlanningReplay) RefreshZonesFromCore();
+            // A simultaneous summon may need several zone and position selections. A different
+            // prompt, including a summon-negation response, must see the monsters already arriving.
+            if (IsFinished || ActivePrompt != null &&
+                ActivePrompt.messageType is not (YgoConstants.MSG_SELECT_PLACE or YgoConstants.MSG_SELECT_POSITION))
+                OnSpecialSummonBoundary?.Invoke();
         }
 
         private void ParseMessages(byte[] buf)
@@ -863,6 +870,10 @@ namespace YGOPortable.Core
                     break;
                 }
 
+                case YgoConstants.MSG_SPSUMMONED:
+                    OnSpecialSummonBoundary?.Invoke();
+                    break;
+
                 case YgoConstants.MSG_FLIPSUMMONING:
                 {
                     uint code = br.ReadUInt32();
@@ -903,7 +914,9 @@ namespace YGOPortable.Core
                     byte tLoc = br.ReadByte();
                     uint tSeq = br.ReadUInt32();
                     uint tPos = br.ReadUInt32();
-                    uint reason = (br.BaseStream.Position < msgEnd) ? br.ReadUInt32() : 0;
+                    uint reason = msgEnd - br.BaseStream.Position >= sizeof(uint) ? br.ReadUInt32() : 0;
+                    uint? summonType = tLoc == YgoConstants.LOCATION_MZONE && msgEnd - br.BaseStream.Position == sizeof(uint)
+                        ? br.ReadUInt32() : null;
                     if (_speculatingPlayer >= 0 && fLoc == YgoConstants.LOCATION_DECK && tLoc != YgoConstants.LOCATION_DECK &&
                         (fCon != _speculatingPlayer || !_selectedFromDeck.Remove(code))) SpeculationUncertain = true;
                     _confirmedCards.Remove((fCon, fLoc, fSeq, code));
@@ -914,6 +927,7 @@ namespace YGOPortable.Core
                         fromCon = fCon, fromLoc = fLoc, fromSeq = fSeq, fromPos = fPos,
                         toCon = tCon, toLoc = tLoc, toSeq = tSeq, toPos = tPos,
                         reason = reason,
+                        summonType = summonType,
                     };
                     NotifyCardMoved(ev);
                     break;

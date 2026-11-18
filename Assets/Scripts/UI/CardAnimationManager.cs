@@ -80,6 +80,8 @@ namespace YGOPortable.UI
         private readonly Queue<IEnumerator> _steps = new Queue<IEnumerator>();
         private List<(CardFlight flight, Action onArrive)> _openPileTransfers;
         private List<LifeChangeCue> _openBattleLifeChanges;
+        private List<SpecialSummonArrival> _pendingSpecialSummons;
+        private Action _refreshAfterSpecialSummons;
         private readonly Stack<CompositeCardView> _cards = new Stack<CompositeCardView>();
         private readonly HashSet<(bool Opponent, uint Code)> _featuredSummons = new();
         private RectTransform _layer;
@@ -98,6 +100,15 @@ namespace YGOPortable.UI
             internal LifePointChangeKind Kind;
             internal Action Apply;
             internal CanvasGroup Feedback;
+        }
+
+        private sealed class SpecialSummonArrival
+        {
+            internal (byte Controller, uint Sequence) Slot;
+            internal CardFlight Flight;
+            internal CardMotion Motion;
+            internal CardMoveReadoutSnapshot Readout;
+            internal Action Release;
         }
 
         public bool IsPresenting => _playing || _steps.Count > 0;
@@ -129,6 +140,8 @@ namespace YGOPortable.UI
             _steps.Clear();
             _openPileTransfers = null;
             _openBattleLifeChanges = null;
+            _pendingSpecialSummons = null;
+            _refreshAfterSpecialSummons = null;
             _cards.Clear();
             _featuredSummons.Clear();
             _previousChainCode = 0;
@@ -206,9 +219,45 @@ namespace YGOPortable.UI
             QueueStep(MoveCard(flight, motion, onArrive, readout, onDepart));
         }
 
+        internal void StageSpecialSummon(CardFlight flight, CardMotion motion, byte controller, uint sequence,
+            CardMoveReadoutSnapshot readout, Action release, Action refresh)
+        {
+            _openPileTransfers = null;
+            _openBattleLifeChanges = null;
+            _pendingSpecialSummons ??= new List<SpecialSummonArrival>();
+            _pendingSpecialSummons.Add(new SpecialSummonArrival
+            {
+                Slot = (controller, sequence), Flight = flight, Motion = motion, Readout = readout, Release = release,
+            });
+            _refreshAfterSpecialSummons = refresh;
+        }
+
+        internal bool IsSummonReserved(byte controller, uint sequence) =>
+            _pendingSpecialSummons?.Exists(move => move.Slot == (controller, sequence)) == true;
+
+        internal void CompleteSpecialSummons()
+        {
+            var moves = _pendingSpecialSummons;
+            if (moves == null) return;
+            var refresh = _refreshAfterSpecialSummons;
+            _pendingSpecialSummons = null;
+            _refreshAfterSpecialSummons = null;
+
+            void Land()
+            {
+                foreach (var move in moves) move.Release();
+                refresh();
+            }
+
+            var first = moves[0];
+            _steps.Enqueue(moves.Count == 1 ? MoveCard(first.Flight, first.Motion, Land, first.Readout, null)
+                : PlaySpecialSummonGroup(moves, Land));
+        }
+
         internal void QueuePileTransfer(CardFlight flight, Action onArrive)
         {
             // Moves emitted together by one effect overlap. Other animation steps still play in engine order.
+            CompleteSpecialSummons();
             _openBattleLifeChanges = null;
             if (_openPileTransfers == null)
             {
@@ -220,6 +269,7 @@ namespace YGOPortable.UI
 
         private void QueueStep(IEnumerator step)
         {
+            CompleteSpecialSummons();
             _openPileTransfers = null;
             _openBattleLifeChanges = null;
             _steps.Enqueue(step);
@@ -355,6 +405,67 @@ namespace YGOPortable.UI
             }
         }
 
+        private IEnumerator PlaySpecialSummonGroup(IReadOnlyList<SpecialSummonArrival> moves, Action land)
+        {
+            var effects = new DuelEffectGraphic[moves.Count];
+            var views = new CompositeCardView[moves.Count];
+            var opacity = new CanvasGroup[moves.Count];
+            var readouts = new DuelMovingReadout[moves.Count];
+            for (int i = 0; i < moves.Count; i++)
+            {
+                var move = moves[i];
+                var (kind, tint, _) = SummonEffect(move.Flight.Code, move.Motion);
+                effects[i] = CreateEffect(kind, move.Flight.To.Position, move.Flight.To.Size * 1.65f, tint);
+                effects[i].Seek(0f);
+            }
+
+            for (int i = 0; i < moves.Count; i++)
+            {
+                var flight = moves[i].Flight;
+                var view = TakeCard(flight.StartsFaceDown ? 0u : flight.Code, flight.StartsFaceDown);
+                if (!view.TryGetComponent<CanvasGroup>(out var fade))
+                    fade = view.gameObject.AddComponent<CanvasGroup>();
+                fade.alpha = 0f;
+                views[i] = view;
+                opacity[i] = fade;
+            }
+            for (int i = 0; i < moves.Count; i++)
+                readouts[i] = CreateMovingReadout(moves[i].Flight, moves[i].Motion, moves[i].Readout);
+
+            const float stagger = .026f;
+            float travel = .37f + (moves.Count - 1) * stagger;
+            LotdAudio.PlaySummon();
+            yield return Animate(travel, progress =>
+            {
+                for (int i = 0; i < moves.Count; i++)
+                {
+                    var move = moves[i];
+                    float delay = i * stagger;
+                    float time = Mathf.Clamp01((progress * travel - delay) / (travel - delay));
+                    ApplyFlight(views[i], move.Flight, time, move.Motion == CardMotion.TokenSummon ? 11f : 32f);
+                    opacity[i].alpha = Mathf.SmoothStep(0f, 1f, time / (move.Motion == CardMotion.TokenSummon ? .75f : .22f));
+                    readouts[i]?.Follow(views[i], time);
+                    effects[i].Seek(time);
+                }
+            });
+
+            for (int i = 0; i < moves.Count; i++)
+            {
+                opacity[i].alpha = 1f;
+                RecycleCard(views[i]);
+                if (readouts[i] != null) RemoveTransient(readouts[i].Root.gameObject);
+                RemoveTransient(effects[i].gameObject);
+            }
+            land();
+        }
+
+        private DuelMovingReadout CreateMovingReadout(CardFlight flight, CardMotion motion, CardMoveReadoutSnapshot readout)
+        {
+            if (readout?.SourceCard == null && readout?.DestinationCard == null) return null;
+            var holder = CenteredVisual("MovingCardReadout", _layer, flight.From.Position, readout.Movement.StartSize);
+            return new DuelMovingReadout(holder, readout, motion == CardMotion.TokenSummon ? .27f : .5f);
+        }
+
         private IEnumerator MoveCard(CardFlight flight, CardMotion motion, Action onArrive, CardMoveReadoutSnapshot readout,
             Action onDepart)
         {
@@ -378,12 +489,7 @@ namespace YGOPortable.UI
             if (summons && !featured && !flight.EndsFaceDown) _summonArt = DuelVisualAssets.SummonCutIn(flight.Code);
             bool reveal = !flight.EndsFaceDown && (extraSummon || featured || _summonArt != null);
             var proxy = TakeCard(flight.StartsFaceDown ? 0u : flight.Code, flight.StartsFaceDown, reveal);
-            DuelMovingReadout moving = null;
-            if (!reveal && (readout?.SourceCard != null || readout?.DestinationCard != null))
-            {
-                var holder = CenteredVisual("MovingCardReadout", _layer, flight.From.Position, readout.Movement.StartSize);
-                moving = new DuelMovingReadout(holder, readout, motion == CardMotion.TokenSummon ? .27f : .5f);
-            }
+            var moving = reveal ? null : CreateMovingReadout(flight, motion, readout);
             if (reveal)
                 yield return RevealSummon(proxy, flight, motion, featured, readout?.DestinationCard);
             else if (motion == CardMotion.TokenSummon || motion == CardMotion.Vanish)
@@ -605,6 +711,10 @@ namespace YGOPortable.UI
 
         internal static (DuelEffectKind kind, Color color, string label) SummonEffect(uint code, CardMotion motion)
         {
+            if (motion == CardMotion.TokenSummon)
+                return (DuelEffectKind.Token, DuelStyle.Player, "토큰 소환");
+            if (motion == CardMotion.Set)
+                return (DuelEffectKind.Summon, new Color(.54f, .73f, .90f), "세트");
             if (motion == CardMotion.Summon)
                 return (DuelEffectKind.Summon, DuelStyle.Player, "일반 소환");
             if (motion == CardMotion.SpecialSummon)

@@ -43,6 +43,13 @@ namespace YGOPortable.Core
         internal const uint REASON_BATTLE = 0x20;
         internal const uint REASON_EFFECT = 0x40;
         public const uint REASON_SPSUMMON = 0x800;
+        internal const uint SUMMON_METHOD_MASK = 0xff000000;
+        internal const uint SUMMON_TYPE_FUSION = 0x43000000;
+        internal const uint SUMMON_TYPE_RITUAL = 0x45000000;
+        internal const uint SUMMON_TYPE_SYNCHRO = 0x46000000;
+        internal const uint SUMMON_TYPE_XYZ = 0x49000000;
+        internal const uint SUMMON_TYPE_PENDULUM = 0x4a000000;
+        internal const uint SUMMON_TYPE_LINK = 0x4c000000;
         internal const uint REASON_LINK = 0x10000000;
 
         // Card Types

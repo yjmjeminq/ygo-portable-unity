@@ -41,6 +41,7 @@ namespace YGOPortable.Editor
             VerifyNativeLinkedZone();
             VerifyNativeMovingReadout();
             VerifyNativeTokenArrivalReadout();
+            VerifyNativePendulumArrivalReadout();
             Debug.Log("[VERIFY HAND GLOW] Native summons and effects, distinct hand copies, blocked prompts, animation, off-turn activation and field-only monster ratings passed.");
         }
 
@@ -1122,40 +1123,149 @@ namespace YGOPortable.Editor
                     return session.Players[session.HumanPlayerIndex].hand.Any(c => c.code == scapegoat) &&
                         session.ActivePrompt?.activatable.Any(c => c.code == gaiaPower) == true;
                 });
-            void Activate(uint code)
-            {
-                int index = duel.ActivePrompt.activatable.FindIndex(card => card.code == code);
-                Require(index >= 0, $"The token fixture could not activate {code}.");
-                duel.SubmitResponseInt((index << 16) | 5);
-                YgoProjectBuilder.DriveUntilIdle(duel, ai);
-            }
-            Activate(gaiaPower);
+            ActivateFromMainPhase(duel, gaiaPower);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
             using var ui = new HandUI(duel);
             var animator = CardAnimationManager.Ensure(ui.Canvas);
             Canvas.ForceUpdateCanvases();
-            Activate(scapegoat);
-            var tokens = PendingMoveReadouts(ui.Field).Values
-                .Where(move => move.Code >= sheepToken && move.Code < sheepToken + 4).OrderBy(move => move.Code).ToArray();
-            ui.Field.Refresh();
-            Require(tokens.Select(move => move.Code).SequenceEqual(new[] { sheepToken, sheepToken + 1, sheepToken + 2, sheepToken + 3 }) &&
-                tokens.All(move => move.DestinationCard?.code == move.Code) && duel.RetryCount == 0,
-                "One of the four native Sheep Tokens missed its own field animation.");
-            foreach (var token in tokens)
+            var moves = new List<CardMoveEvent>();
+            duel.OnCardMoved += move => { if (move.summonType.HasValue) moves.Add(move); };
+            ActivateFromMainPhase(duel, scapegoat);
+            int reserved = 0;
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
             {
-                var move = OpenMove(animator, token.Code, token);
-                move.Sample(.14f);
-                Require(!move.Readout.Find("CardReadout").gameObject.activeInHierarchy,
-                    "Token stats appeared before its art formed.");
-                move.Sample(.68f);
-                RequireTravelStats(move.Readout, "500", "0", "1", defense: true);
-                Require(move.Readout.Find("CardReadout/Labels/Status/Value").GetComponent<Text>().text == "토큰",
-                    "The moving Sheep Token lost its token label.");
-                move.Sample(1f);
-                Require(!move.Step.MoveNext() && move.Readout == null,
-                    "A token left its travelling values on the field after landing.");
-            }
-            Debug.Log("[VERIFY DUEL TOKEN ARRIVAL] Four native Sheep Tokens displayed their boosted 500 ATK, 0 DEF and Level 1 in motion.");
+                reserved = Math.Max(reserved, VerifySummonReservations(ui.Field, animator, prompt));
+                return null;
+            });
+            var tokens = PendingMoveReadouts(ui.Field).Values.OrderBy(move => move.Code).ToArray();
+            ui.Field.Refresh();
+            Require(moves.Count == 4 && tokens.Select(move => move.Code).SequenceEqual(
+                        new[] { sheepToken, sheepToken + 1, sheepToken + 2, sheepToken + 3 }) &&
+                    tokens.All(move => move.DestinationCard?.attack == 500 && move.DestinationCard.defense == 0 &&
+                        move.DestinationCard.level == 1 && move.DestinationCard.IsDefense) &&
+                    reserved > 0 && duel.RetryCount == 0,
+                "One of the four native Sheep Tokens missed its live values or interrupted placement of the other tokens.");
+            VerifySpecialSummonGroup(ui.Field, animator, tokens, DuelEffectKind.Token);
+            Debug.Log("[VERIFY DUEL GROUP SUMMON] Four Sheep Tokens kept the native placement prompts and arrived together with 500 ATK, 0 DEF and Level 1.");
         }
+
+        private static void VerifyNativePendulumArrivalReadout()
+        {
+            const uint lowScale = 15146890, highScale = 51531505, sparkman = 20721928, linkSpider = 98978921;
+            var main = Enumerable.Repeat(lowScale, 15).Concat(Enumerable.Repeat(highScale, 10))
+                .Concat(Enumerable.Repeat(sparkman, 15)).ToArray();
+            var opponent = Enumerable.Repeat(BlueEyes, 40).ToArray();
+            var ai = new TacticalAI();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Pendulum arrival", main, new[] { linkSpider },
+                opponent, Array.Empty<uint>(), true, session =>
+                {
+                    var hand = session.Players[session.HumanPlayerIndex].hand;
+                    return session.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD &&
+                        hand.Count(card => card.code == lowScale) >= 2 && hand.Any(card => card.code == highScale) &&
+                        hand.Any(card => card.code == sparkman);
+                });
+            var board = duel.Players[duel.HumanPlayerIndex];
+            int normal = duel.ActivePrompt.summonable.FindIndex(card => card.code == lowScale);
+            Require(normal >= 0, "The fixture could not put a Pendulum Monster on the field.");
+            duel.SubmitResponseInt(normal << 16);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            int link = duel.ActivePrompt.spSummonable.FindIndex(card => card.code == linkSpider);
+            Require(link >= 0, "The fixture could not Link Summon using the low scale as material.");
+            duel.SubmitResponseInt((link << 16) | 1);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt => prompt.messageType == YgoConstants.MSG_SELECT_CARD
+                && prompt.min == 1 && prompt.candidates.Count == 1 ? DuelSession.PackCardSelection(0) : null);
+            Require(board.extra.Any(card => card.code == lowScale && card.IsFaceUp),
+                "The material did not enter the Extra Deck face-up.");
+            ActivateFromMainPhase(duel, highScale);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            ActivateFromMainPhase(duel, lowScale);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+
+            using var ui = new HandUI(duel);
+            var animator = CardAnimationManager.Ensure(ui.Canvas);
+            Canvas.ForceUpdateCanvases();
+            var moves = new List<CardMoveEvent>();
+            duel.OnCardMoved += move => { if (move.summonType.HasValue) moves.Add(move); };
+            int pendulum = duel.ActivePrompt.spSummonable.FindIndex(card => card.location == YgoConstants.LOCATION_SZONE);
+            Require(pendulum >= 0, "The two scales did not offer a Pendulum Summon.");
+            duel.SubmitResponseInt((pendulum << 16) | 1);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
+            {
+                VerifySummonReservations(ui.Field, animator, prompt);
+                if (prompt.messageType != YgoConstants.MSG_SELECT_UNSELECT_CARD) return null;
+                if (prompt.unselectCandidates.Count == 2) return BitConverter.GetBytes(-1);
+                int index = prompt.unselectCandidates.Count == 0
+                    ? prompt.candidates.FindIndex(card => card.code == lowScale && card.location == YgoConstants.LOCATION_EXTRA)
+                    : prompt.candidates.FindIndex(card => card.code == sparkman && card.location == YgoConstants.LOCATION_HAND);
+                Require(index >= 0, "The Pendulum selection did not offer the hand and Extra Deck sources.");
+                return BitConverter.GetBytes(1).Concat(BitConverter.GetBytes(index)).ToArray();
+            });
+            var monsters = PendingMoveReadouts(ui.Field).Values.ToArray();
+            ui.Field.Refresh();
+            Require(duel.RetryCount == 0 && monsters.Length == 2 && moves.Count == 2 &&
+                    moves.Any(move => move.fromLoc == YgoConstants.LOCATION_HAND && move.code == sparkman) &&
+                    moves.Any(move => move.fromLoc == YgoConstants.LOCATION_EXTRA && move.code == lowScale) &&
+                    moves.All(move => (move.summonType & YgoConstants.SUMMON_METHOD_MASK) == YgoConstants.SUMMON_TYPE_PENDULUM),
+                "The native Pendulum Summon did not retain both source zones and its actual summon method.");
+            VerifySpecialSummonGroup(ui.Field, animator, monsters, DuelEffectKind.Pendulum);
+            Debug.Log("[VERIFY DUEL GROUP SUMMON] A native Pendulum Summon from the hand and the face-up Extra Deck shared one Pendulum arrival.");
+        }
+
+        private static void ActivateFromMainPhase(DuelSession duel, uint code)
+        {
+            Require(duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD, "The summon fixture left the Main Phase.");
+            int index = duel.ActivePrompt.activatable.FindIndex(card => card.code == code);
+            Require(index >= 0, $"The summon fixture could not activate {code}.");
+            duel.SubmitResponseInt((index << 16) | 5);
+        }
+
+        private static int VerifySummonReservations(DuelFieldUI field, CardAnimationManager animator, DuelPrompt prompt)
+        {
+            if (prompt.messageType is not (YgoConstants.MSG_SELECT_PLACE or YgoConstants.MSG_SELECT_POSITION)) return 0;
+            var pending = PendingMoveReadouts(field);
+            field.Refresh();
+            int reserved = field.Root.GetComponentsInChildren<DuelZoneImage>().Count(zone => zone.SummonReserved);
+            Require(reserved == pending.Count && pending.Values.All(move => move.DestinationCard == null) &&
+                    !AnimationSteps(animator).Any(step => step.GetType().Name.StartsWith("<PlaySpecialSummonGroup>", StringComparison.Ordinal)),
+                "A placement hid the next native choice or showed field numbers before the summon was ready.");
+            return reserved;
+        }
+
+        private static void VerifySpecialSummonGroup(DuelFieldUI field, CardAnimationManager animator,
+            IReadOnlyList<CardMoveReadoutSnapshot> arrivals, DuelEffectKind effect)
+        {
+            Transform Slot(LiveCardState card) => field.Root.transform.Find($"DuelBoard/Zone_{card.sequence + 2}_3");
+            Require(arrivals.All(arrival => arrival.DestinationCard != null &&
+                    !Slot(arrival.DestinationCard).Find("Card/CardView").gameObject.activeInHierarchy &&
+                    !Slot(arrival.DestinationCard).GetComponent<DuelZoneImage>().SummonReserved),
+                "A prepared summon retained a placement mark or reached the field before its moving card.");
+            var wave = AnimationSteps(animator).Single(step =>
+                step.GetType().Name.StartsWith("<PlaySpecialSummonGroup>", StringComparison.Ordinal));
+            Require(wave.MoveNext() && wave.Current is IEnumerator, "The summon group did not share one animation.");
+            var sample = TestCardPresentation.SampleAnimation((IEnumerator)wave.Current);
+            var views = animator.GetComponentsInChildren<CompositeCardView>().Where(card => card.name == "MovingCard").ToArray();
+            var readouts = animator.transform.Cast<RectTransform>().Where(rect => rect.name == "MovingCardReadout").ToArray();
+            Require(views.Length == arrivals.Count && readouts.Length == arrivals.Count &&
+                    animator.GetComponentsInChildren<DuelEffectGraphic>().Count(graphic => graphic.Kind == effect) == arrivals.Count &&
+                    readouts.All(readout => !readout.Find("CardReadout").gameObject.activeInHierarchy),
+                "A grouped summon omitted a card or revealed its stats too soon.");
+            sample(.82f);
+            for (int i = 0; i < views.Length; i++)
+            {
+                var card = arrivals.Single(arrival => arrival.Code == views[i].CurrentCode).DestinationCard;
+                RequireTravelStats(readouts[i], card.attack.ToString(), card.defense.ToString(), card.level.ToString(), card.IsDefense);
+                Require(readouts[i].anchoredPosition == ((RectTransform)views[i].transform).anchoredPosition &&
+                        !Slot(card).Find("Card/CardView").gameObject.activeInHierarchy,
+                    "A summon showed duplicate stat values or separated the readout from its moving card.");
+            }
+            sample(1f);
+            Require(!wave.MoveNext() && readouts.All(readout => readout == null) &&
+                    arrivals.All(arrival => Slot(arrival.DestinationCard).Find("Card/CardView").gameObject.activeInHierarchy),
+                "The group did not land together or left its moving readouts on screen.");
+        }
+
+        private static Queue<IEnumerator> AnimationSteps(CardAnimationManager animator) =>
+            (Queue<IEnumerator>)typeof(CardAnimationManager).GetField("_steps", PrivateInstance).GetValue(animator);
 
         private static Dictionary<(byte, uint), CardMoveReadoutSnapshot> PendingMoveReadouts(DuelFieldUI field) =>
             (Dictionary<(byte, uint), CardMoveReadoutSnapshot>)typeof(DuelFieldUI)
@@ -1164,7 +1274,7 @@ namespace YGOPortable.Editor
         private static (IEnumerator Step, CompositeCardView Proxy, RectTransform Readout, Action<float> Sample) OpenMove(
             CardAnimationManager animator, uint code, CardMoveReadoutSnapshot snapshot = null)
         {
-            var steps = (Queue<IEnumerator>)typeof(CardAnimationManager).GetField("_steps", PrivateInstance).GetValue(animator);
+            var steps = AnimationSteps(animator);
             const BindingFlags fields = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
             var step = steps.Single(move => move.GetType().GetField("flight", fields)?.GetValue(move) is CardFlight flight &&
                 flight.Code == code && (snapshot == null ? flight.EndsFaceDown :

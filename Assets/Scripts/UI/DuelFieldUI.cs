@@ -249,6 +249,7 @@ namespace YGOPortable.UI
             _session = session;
             session.OnCardMoved += HandleCardMovedEvent;
             session.OnCardLocationsChanged += HandleCardLocationsChanged;
+            session.OnSpecialSummonBoundary += CompleteSpecialSummons;
             session.OnCardsDrawn += HandleCardsDrawn;
             session.OnLifePointChange += HandleLifePointsChanged;
             session.OnTurnStarted += HandleTurnStarted;
@@ -288,6 +289,7 @@ namespace YGOPortable.UI
             {
                 _session.OnCardMoved -= HandleCardMovedEvent;
                 _session.OnCardLocationsChanged -= HandleCardLocationsChanged;
+                _session.OnSpecialSummonBoundary -= CompleteSpecialSummons;
                 _session.OnCardsDrawn -= HandleCardsDrawn;
                 _session.OnLifePointChange -= HandleLifePointsChanged;
                 _session.OnTurnStarted -= HandleTurnStarted;
@@ -1450,7 +1452,9 @@ namespace YGOPortable.UI
             slot.bgImg.color = highlight.a > 0f
                 ? new Color(highlight.r, highlight.g, highlight.b, selected || cardSelected || attack ? .64f : place ? .09f : .32f) : ZoneTint;
             slot.border.effectColor = place ? Color.clear : highlight;
-            slot.bgImg.SetPlacementHighlight(place);
+            bool reserved = !visible && loc == YgoConstants.LOCATION_MZONE &&
+                CardAnimationManager.Instance?.IsSummonReserved(con, seq) == true;
+            slot.bgImg.SetPlacementHighlight(place, reserved);
         }
 
         private static float CardAngle(uint location, uint position, bool opponent)
@@ -2175,12 +2179,17 @@ namespace YGOPortable.UI
 
         private void ShowArrival((byte, uint, uint) key)
         {
+            ReleaseArrival(key);
+            Refresh();
+        }
+
+        private void ReleaseArrival((byte, uint, uint) key)
+        {
             if (_arrivingCards.TryGetValue(key, out int pending))
             {
                 if (pending == 1) _arrivingCards.Remove(key);
                 else _arrivingCards[key] = pending - 1;
             }
-            Refresh();
         }
 
         private Action HideUntilArrival(byte controller, uint location, uint sequence)
@@ -2198,18 +2207,32 @@ namespace YGOPortable.UI
                     Refresh();
                 };
             }
+            var key = ReserveArrival(controller, location, sequence);
+            return () => ShowArrival(key);
+        }
+
+        private (byte, uint, uint) ReserveArrival(byte controller, uint location, uint sequence)
+        {
             var key = ArrivalKey(controller, location, sequence);
             _arrivingCards.TryGetValue(key, out int pending);
             _arrivingCards[key] = pending + 1;
-            return () => ShowArrival(key);
+            return key;
         }
+
+        private static void CompleteSpecialSummons() => CardAnimationManager.Instance?.CompleteSpecialSummons();
 
         private void CaptureCardReadouts()
         {
             // Read the field refreshed for this response before playing its queued animations.
-            foreach (var (slot, readout) in _pendingCardReadouts)
+            if (_pendingCardReadouts.Count == 0) return;
+            var animator = CardAnimationManager.Instance;
+            foreach (var (slot, readout) in _pendingCardReadouts.ToArray())
+            {
+                // Field modifiers may not apply during the placement of the other cards in this summon.
+                if (animator?.IsSummonReserved(slot.Controller, slot.Sequence) == true) continue;
                 readout.DestinationCard = _session.GetVisibleFieldCard(readout.Code, slot.Controller, YgoConstants.LOCATION_MZONE, slot.Sequence);
-            _pendingCardReadouts.Clear();
+                _pendingCardReadouts.Remove(slot);
+            }
         }
 
         private bool IsFaceDown(byte controller, uint location, uint position)
@@ -2328,6 +2351,13 @@ namespace YGOPortable.UI
                 }, onDepart: depart);
                 return;
             }
+            if (e.summonType.HasValue && e.toLoc == YgoConstants.LOCATION_MZONE)
+            {
+                var key = ReserveArrival(e.toCon, e.toLoc, e.toSeq);
+                animator.StageSpecialSummon(flight, motion, e.toCon, e.toSeq, PrepareMoveReadout(animator, e, fromBack, toBack),
+                    () => ReleaseArrival(key), Refresh);
+                return;
+            }
             var onArrival = HideUntilArrival(e.toCon, e.toLoc, e.toSeq);
             if (motion == CardMotion.Transfer &&
                 e.fromLoc is YgoConstants.LOCATION_DECK or YgoConstants.LOCATION_EXTRA &&
@@ -2370,6 +2400,16 @@ namespace YGOPortable.UI
         {
             uint type = CardDatabase.Get(move.code)?.type ?? 0;
             if ((type & YgoConstants.TYPE_TOKEN) != 0) return CardMotion.TokenSummon;
+            if (move.summonType is { } summonType)
+            {
+                return (summonType & YgoConstants.SUMMON_METHOD_MASK) switch
+                {
+                    YgoConstants.SUMMON_TYPE_PENDULUM => CardMotion.PendulumSummon,
+                    YgoConstants.SUMMON_TYPE_FUSION or YgoConstants.SUMMON_TYPE_RITUAL or YgoConstants.SUMMON_TYPE_SYNCHRO or
+                        YgoConstants.SUMMON_TYPE_XYZ or YgoConstants.SUMMON_TYPE_LINK => CardMotion.ExtraDeckSummon,
+                    _ => CardMotion.SpecialSummon,
+                };
+            }
             if ((move.reason & YgoConstants.REASON_SPSUMMON) == 0) return CardMotion.Summon;
             if (move.fromLoc == YgoConstants.LOCATION_EXTRA && (move.fromPos & YgoConstants.POS_FACEUP) != 0 &&
                 (type & YgoConstants.TYPE_PENDULUM) != 0) return CardMotion.PendulumSummon;
