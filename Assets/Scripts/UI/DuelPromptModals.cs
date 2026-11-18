@@ -584,8 +584,10 @@ namespace YGOPortable.UI
                 return;
             }
 
+            // A card effect can delegate the direct-attack decision to the opponent.
+            bool directAttackDecision = prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && prompt.promptDesc == 31;
             _chainPrompt = prompt.messageType == YgoConstants.MSG_SELECT_CHAIN ||
-                prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN;
+                (prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && !directAttackDecision);
             bool tall = prompt.messageType == YgoConstants.MSG_ANNOUNCE_CARD || prompt.messageType == YgoConstants.MSG_ANNOUNCE_RACE;
             _modalBox.anchorMax = new Vector2(.845f, tall ? .626f : .474f);
             _modalHeader.anchorMin = new Vector2(0f, tall ? .873f : .81f);
@@ -622,6 +624,7 @@ namespace YGOPortable.UI
             switch (prompt.messageType)
             {
                 case YgoConstants.MSG_SELECT_YESNO:
+                case YgoConstants.MSG_SELECT_EFFECTYN when directAttackDecision:
                     RenderYesNo(prompt);
                     break;
                 case YgoConstants.MSG_SELECT_POSITION:
@@ -804,11 +807,16 @@ namespace YGOPortable.UI
             _chainName.text = _chainSource.text = _chainEffect.text = "";
 
             var frames = new Outline[choices.Count];
-            var sources = new (byte controller, uint location, uint sequence)[choices.Count];
+            var sources = new (byte controller, uint location, uint sequence, uint material)[choices.Count];
             for (int i = 0; i < choices.Count; i++)
-                sources[i] = (choices[i].controller, choices[i].location, choices[i].sequence);
+            {
+                var choice = choices[i];
+                // For material, the sequence belongs to the host and the position identifies the attached card.
+                uint material = (choice.location & YgoConstants.LOCATION_OVERLAY) != 0 ? choice.position : 0;
+                sources[i] = (choice.controller, choice.location, choice.sequence, material);
+            }
             var sourceCounts = sources.GroupBy(source => source).ToDictionary(group => group.Key, group => group.Count());
-            var sourceNumbers = new Dictionary<(byte, uint, uint), int>();
+            var sourceNumbers = new Dictionary<(byte, uint, uint, uint), int>();
 
             void Select(int index)
             {
@@ -852,7 +860,7 @@ namespace YGOPortable.UI
                         sourceNumbers[source] = ++number;
                         var caption = LotdUiKit.CreateRect("EffectNumber", tile, new Vector2(.04f, .01f),
                             new Vector2(.96f, .16f), Vector2.zero, Vector2.zero);
-                        LotdUiKit.AddFittedText(caption, "Text", $"효과 {number}", 11, 8, TextAnchor.MiddleCenter, DuelStyle.Muted);
+                        LotdUiKit.AddFittedText(caption, "Text", $"후보 {number}", 11, 8, TextAnchor.MiddleCenter, DuelStyle.Muted);
                     }
                     var button = tile.gameObject.AddComponent<Button>();
                     button.targetGraphic = tile.GetComponent<Image>();
@@ -892,13 +900,16 @@ namespace YGOPortable.UI
             }
             var caption = LotdUiKit.CreateRect("Caption", tab, Vector2.zero, Vector2.one,
                 new Vector2(hasIcon ? 25f : 4f, 0f), new Vector2(-3f, 0f));
-            LotdUiKit.AddFittedText(caption, "Location", YgoConstants.GetLocationNameKR(location), 11, 8,
+            LotdUiKit.AddFittedText(caption, "Location", ChainLocationName(location), 11, 8,
                 TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
             return row;
         }
 
         private static string CardSourceLabel(DuelSession session, SelectableCardItem card) =>
-            $"{(card.controller == session.HumanPlayerIndex ? "내" : "상대")} {YgoConstants.GetLocationNameKR(card.location)}";
+            $"{(card.controller == session.HumanPlayerIndex ? "내" : "상대")} {ChainLocationName(card.location)}";
+
+        private static string ChainLocationName(uint location) => YgoConstants.GetLocationNameKR(
+            (location & YgoConstants.LOCATION_OVERLAY) != 0 ? YgoConstants.LOCATION_OVERLAY : location);
 
         private void ConfirmChainChoice()
         {

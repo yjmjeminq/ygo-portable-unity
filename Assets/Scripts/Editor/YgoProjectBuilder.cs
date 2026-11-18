@@ -355,6 +355,7 @@ namespace YGOPortable.Editor
             // Explicit test for non-search effects & prompt handlers (announce, chain negate, destroy/banish, equip/counter/coin/dice/token, reborn/tribute, extra/ritual sum, RPS)
             VerifyOtherCardEffects(classicDecks[0].main);
             VerifyTearlamentsKashtiraDeckChoice();
+            VerifyArcanaReadingCoinChoice();
             VerifyDeckSortDrawOrder(classicDecks[0].main);
             VerifyPossessedDestiny(classicDecks[0].main);
             VerifyMandatoryBattleAttack();
@@ -1188,6 +1189,52 @@ namespace YGOPortable.Editor
                     "Tearlaments Kashtira did not send three cards from the selected deck.");
             }
             Debug.Log("[VERIFY TEARLAMENTS KASHTIRA] Both deck selections sent three cards from the selected deck without retries.");
+        }
+
+        private static void VerifyArcanaReadingCoinChoice()
+        {
+            const uint reading = 11819473;
+            const uint barrier = 73206827;
+            uint[] main = Enumerable.Repeat(reading, 12).Concat(Enumerable.Repeat(barrier, 12))
+                .Concat(Enumerable.Repeat(89631139u, 16)).ToArray();
+            uint[] opponent = Enumerable.Repeat(89631139u, 40).ToArray();
+            var empty = Array.Empty<uint>();
+            var ai = new TacticalAI();
+
+            foreach (ulong side in new ulong[] { 62, 63 })
+            {
+                using var duel = StartSeedMatching("Arcana Reading coin choice", main, empty, opponent, empty, true,
+                    session =>
+                    {
+                        DriveUntilIdle(session, ai);
+                        var available = session.ActivePrompt?.activatable;
+                        return available != null && available.Any(card => card.code == reading) &&
+                            available.Any(card => card.code == barrier);
+                    });
+                int barrierIndex = duel.ActivePrompt.activatable.FindIndex(card => card.code == barrier);
+                duel.SubmitResponseInt((barrierIndex << 16) | 5);
+                DriveUntilIdle(duel, ai);
+                int readingIndex = duel.ActivePrompt.activatable.FindIndex(card => card.code == reading);
+                AssertTrue(readingIndex >= 0, "Arcana Reading could not be played after Light Barrier.");
+                duel.SubmitResponseInt((readingIndex << 16) | 5);
+                if (duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_PLACE)
+                    duel.SubmitResponse(ai.ComputeResponse(duel, duel.ActivePrompt));
+
+                var prompt = duel.ActivePrompt;
+                AssertTrue(prompt?.messageType == YgoConstants.MSG_SELECT_OPTION && prompt.options.Count == 2 &&
+                    prompt.options.Contains(62) && prompt.options.Contains(63) &&
+                    CardDatabase.ResolveOptionDescription(62) == "코인 앞면 효과" &&
+                    CardDatabase.ResolveOptionDescription(63) == "코인 뒷면 효과",
+                    $"Arcana Reading coin choices: prompt {prompt?.messageType}, " +
+                    $"options [{(prompt == null ? "" : string.Join(", ", prompt.options))}], " +
+                    $"field spell {duel.Players[duel.HumanPlayerIndex].szone[5]?.code}, retries {duel.RetryCount}.");
+                duel.SubmitResponseInt(prompt.options.IndexOf(side));
+                int expectedChooser = side == 62 ? duel.HumanPlayerIndex : duel.AiPlayerIndex;
+                AssertTrue(duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_CARD &&
+                    duel.ActivePrompt.playerId == expectedChooser && duel.RetryCount == 0,
+                    "Arcana Reading let the wrong player choose a card after selecting a coin side.");
+            }
+            Debug.Log("[VERIFY ARCANA READING] Light Barrier let each coin effect reach the correct card chooser.");
         }
 
         private static byte[] VerifyAnnounceCardSelection(DuelSession session, DuelPrompt prompt, uint code)

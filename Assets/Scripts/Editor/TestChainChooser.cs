@@ -18,9 +18,11 @@ namespace YGOPortable.Editor
         {
             using var duel = new DuelSession();
             VerifyDuplicateEffectsAndZoneViewer(duel);
+            VerifyOverlayChoices(duel);
             VerifySingleEffect(duel);
             VerifyKoreanEffect(duel);
             VerifyEffectOptions(duel);
+            VerifyBundledOptionDescriptions();
             VerifyGroupedLocations(duel);
             VerifyScrollableChoices(duel);
             VerifyNavigation(duel);
@@ -100,6 +102,54 @@ namespace YGOPortable.Editor
             Require(labels.Single(label => label.name == "Question").text == "자신 또는 상대 덱 위에서 카드 3장을 묘지로 보낸다" &&
                     !labels.Any(label => label.name == "CardText"),
                 "An effect confirmation included unrelated card rules.");
+
+            view.Modals.ShowPrompt(duel, new DuelPrompt { messageType = YgoConstants.MSG_SELECT_EFFECTYN,
+                playerId = 0, promptDesc = 31, promptCardCode = LadyLabrynth });
+            Require(view.Modals.ModalRoot.GetComponentsInChildren<Text>()
+                    .Single(label => label.name == "Question").text == "직접 공격을 선택하시겠습니까?",
+                "An opponent-chosen direct attack was displayed as another effect activation.");
+        }
+
+        private static void VerifyBundledOptionDescriptions()
+        {
+            static string Option(uint cardCode, uint scriptIndex) =>
+                CardDatabase.ResolveOptionDescription(((ulong)cardCode << 20) | scriptIndex);
+
+            const uint roundTable = 55742055;
+            Require(Option(roundTable, 1) == "덱에서 성기사 카드 1장을 묘지로 보낸다" &&
+                    Option(roundTable, 2) == "패에서 성기사 몬스터 1장을 특수 소환한 뒤 패의 성검을 장착할 수 있다" &&
+                    Option(roundTable, 3) == "내 묘지의 성기사 몬스터 1장을 패에 넣는다" &&
+                    Option(roundTable, 4) == "1장 드로우한다",
+                "Round Table's stale database labels did not match the effect branches in Lua.");
+
+            const uint asutra = 1710647;
+            Require(Option(asutra, 3) == "대상 몬스터의 레벨을 1 올린다" &&
+                    Option(asutra, 4) == "대상 몬스터의 레벨을 1 내린다",
+                "The two opposite Level adjustments did not have distinct labels.");
+
+            const uint bingo = 99505609;
+            Require(Option(bingo, 2).StartsWith("내 메인 몬스터 존", StringComparison.Ordinal) &&
+                    Option(bingo, 3).StartsWith("상대 메인 몬스터 존", StringComparison.Ordinal) &&
+                    Option(bingo, 4) == "메인 몬스터 존의 몬스터 5장을 파괴한다" &&
+                    Option(bingo, 5) == "마법·함정 존의 카드 5장을 파괴한다",
+                "Bingo Card's controller and zone prompts used the wrong branches.");
+
+            Require(CardDatabase.ResolveOptionDescription(94) == "이 카드의 추가 효과를 적용하시겠습니까?" &&
+                    CardDatabase.ResolveOptionDescription(210) == "카드를 1장 더 선택하시겠습니까?",
+                "A bundled system-level yes/no prompt lost its description.");
+            Require(CardDatabase.ResolveOptionDescription(60) == "코인 앞면" &&
+                    CardDatabase.ResolveOptionDescription(61) == "코인 뒷면" &&
+                    CardDatabase.ResolveOptionDescription(62) == "코인 앞면 효과" &&
+                    CardDatabase.ResolveOptionDescription(63) == "코인 뒷면 효과",
+                "Coin calls and coin-effect choices must display which side each option represents.");
+
+            ulong[] corePrompts = { 1, 10, 11, 12, 30, 31, 32, 80, 81, 90, 97, 99, 218, 219, 220 };
+            var coreLabels = corePrompts.Select(CardDatabase.ResolveOptionDescription).ToArray();
+            Require(coreLabels.All(label => !string.IsNullOrWhiteSpace(label)) &&
+                    coreLabels.Distinct().Count() == corePrompts.Length &&
+                    CardDatabase.ResolveOptionDescription(80) == "배틀 페이즈로 이동한다" &&
+                    CardDatabase.ResolveOptionDescription(81) == "엔드 페이즈로 이동한다",
+                "Native procedure, attack, phase or cost prompts lost their distinct descriptions.");
         }
 
         internal static void SubmitNativeChoice(DuelSession duel, int index)
@@ -147,6 +197,9 @@ namespace YGOPortable.Editor
 
             view.Show(duel, prompt);
             view.VerifyPassAvailability(true);
+            Require(view.Choice(0).Find("EffectNumber/Text")?.GetComponent<Text>().text == "후보 1" &&
+                    view.Choice(1).Find("EffectNumber/Text")?.GetComponent<Text>().text == "후보 2",
+                "Same-card labels should identify response candidates rather than card effect numbers.");
             view.SelectChoice(0, LadyLabrynth);
             view.VerifyEffect(prompt.candidates[0]);
             view.SelectChoice(1, LadyLabrynth);
@@ -166,6 +219,33 @@ namespace YGOPortable.Editor
             view.VerifyEffect(prompt.candidates[1]);
             view.ConfirmChoice();
             Require(view.Responses.SequenceEqual(new[] { 1 }), "Same-card effects were not submitted by their distinct indices.");
+        }
+
+        private static void VerifyOverlayChoices(DuelSession duel)
+        {
+            using var view = new ChainView();
+            var prompt = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_CHAIN, playerId = 0 };
+            for (uint material = 0; material < 2; material++)
+            {
+                prompt.candidates.Add(new SelectableCardItem
+                {
+                    code = LadyLabrynth,
+                    controller = 0,
+                    location = YgoConstants.LOCATION_MZONE | YgoConstants.LOCATION_OVERLAY,
+                    sequence = 2,
+                    position = material,
+                    description = ((ulong)LadyLabrynth << 20) | material,
+                });
+            }
+            view.Show(duel, prompt);
+            Require(view.Choice(0).Find("EffectNumber") == null && view.Choice(1).Find("EffectNumber") == null,
+                "Separate materials sharing an Xyz monster's field slot were grouped as one card.");
+            view.SelectChoice(1, LadyLabrynth);
+            var source = view.Modals.ModalRoot.transform.Find("ChainWin/Details/Source/Text")?.GetComponent<Text>();
+            Require(source != null && source.text == "내 엑시즈 소재",
+                "The overlay candidate did not identify its material source.");
+            view.ConfirmChoice();
+            Require(view.Responses.SequenceEqual(new[] { 1 }), "Selecting a separate Xyz material sent the wrong native index.");
         }
 
         private static void VerifySingleEffect(DuelSession duel)
