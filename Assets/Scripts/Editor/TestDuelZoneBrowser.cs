@@ -26,10 +26,13 @@ namespace YGOPortable.Editor
             VerifyCardDetailsSafeArea();
             int opens = 0;
             foreach (bool humanFirst in new[] { true, false })
+            {
                 opens += VerifyBanishAndGrave(humanFirst);
+                opens += VerifyGraveEffectPicker(humanFirst);
+            }
             opens += VerifyPromptAndExtraSummon();
             string hitTest = SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null ? "raycast filters" : "GraphicRaycaster";
-            Debug.Log($"[VERIFY ZONE BROWSER] {opens} successful opens. Pile tabs, inspector artwork details, privacy, effect prompt field view ({hitTest}), separate Extra Deck summon choices and Synchro materials verified.");
+            Debug.Log($"[VERIFY ZONE BROWSER] {opens} successful opens. Pile tabs, inspector details, grave effect and Extra Deck summon shortcuts, privacy and effect prompt field view ({hitTest}) verified.");
         }
 
         private static void VerifyCardDetailsSafeArea()
@@ -131,6 +134,44 @@ namespace YGOPortable.Editor
             return ui.Opens;
         }
 
+        private static int VerifyGraveEffectPicker(bool humanFirst)
+        {
+            const uint foolishBurial = 81439173;
+            const uint jetSynchron = 9742784;
+            var empty = Array.Empty<uint>();
+            var main = Enumerable.Repeat(foolishBurial, 12).Concat(Enumerable.Repeat(jetSynchron, 12))
+                .Concat(Enumerable.Repeat(20721928u, 16)).ToArray();
+            var opponent = Enumerable.Repeat(89631139u, 40).ToArray();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Grave effect shortcut", main, empty, opponent, empty,
+                humanFirst, session => session.Players[session.HumanPlayerIndex].hand.Any(card => card.code == foolishBurial));
+            byte human = (byte)duel.HumanPlayerIndex;
+            var prompt = ReachMainPhase(duel, human);
+            using var ui = new Browser(duel);
+            ui.VerifyGraveEffectButton(visible: false);
+
+            int burial = prompt.activatable.FindIndex(item => item.code == foolishBurial);
+            Require(burial >= 0, "The fixture could not activate Foolish Burial.");
+            duel.SubmitResponseInt((burial << 16) | 5);
+            prompt = ReachMainPhase(duel, human, choice =>
+            {
+                int target = choice.candidates.FindIndex(item => item.code == jetSynchron && item.location == YgoConstants.LOCATION_DECK);
+                if (target < 0) return null;
+                return choice.messageType switch
+                {
+                    YgoConstants.MSG_SELECT_CARD => DuelSession.PackCardSelection(target),
+                    YgoConstants.MSG_SELECT_UNSELECT_CARD => BitConverter.GetBytes(target),
+                    _ => null,
+                };
+            });
+            Require(duel.Players[human].grave.Any(card => card.code == jetSynchron), "Foolish Burial did not send Jet Synchron.");
+            ui.VerifyGraveEffectChoices(prompt, jetSynchron);
+            ReachMainPhase(duel, human);
+            ui.VerifyGraveEffectButton(visible: false);
+            Require(duel.Players[human].mzone.Any(card => card?.code == jetSynchron) && duel.RetryCount == 0,
+                "The native duel did not resolve the selected grave effect.");
+            return ui.Opens;
+        }
+
         private static int VerifyPromptAndExtraSummon()
         {
             var main = Enumerable.Repeat(MoYe, 20).Concat(Enumerable.Repeat(Longyuan, 20)).ToArray();
@@ -216,7 +257,7 @@ namespace YGOPortable.Editor
             return ui.Opens;
         }
 
-        private static DuelPrompt ReachMainPhase(DuelSession duel, byte player)
+        private static DuelPrompt ReachMainPhase(DuelSession duel, byte player, Func<DuelPrompt, byte[]> choose = null)
         {
             for (int step = 0; step < 30 && !duel.IsFinished; step++)
             {
@@ -226,7 +267,7 @@ namespace YGOPortable.Editor
                 else if (prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD && prompt.playerId == player)
                     return prompt;
                 else
-                    duel.SubmitResponse(Ai.ComputeResponse(duel, prompt));
+                    duel.SubmitResponse(choose?.Invoke(prompt) ?? Ai.ComputeResponse(duel, prompt));
             }
             throw new InvalidOperationException($"Could not reach main phase for player {player}.");
         }
@@ -466,6 +507,55 @@ namespace YGOPortable.Editor
                 Field.Refresh();
                 Require(!Private<Button>(Field, "_extraSummonButton").gameObject.activeInHierarchy,
                     "The Extra Deck summon button was visible without a legal summon.");
+            }
+
+            internal void VerifyGraveEffectButton(bool visible)
+            {
+                Field.Refresh();
+                Require(Private<Button>(Field, "_graveEffectButton").gameObject.activeInHierarchy == visible,
+                    "The grave effect shortcut did not match the current activation availability.");
+            }
+
+            internal void VerifyGraveEffectChoices(DuelPrompt prompt, uint code)
+            {
+                VerifyGraveEffectButton(visible: true);
+                var button = Private<Button>(Field, "_graveEffectButton");
+                var grave = _duel.Players[_duel.HumanPlayerIndex].grave;
+                OpenStack("_myGyTile", grave.AsEnumerable().Reverse().Select(card => card.code));
+                Close();
+
+                int index = prompt.activatable.FindIndex(item => item.code == code && item.location == YgoConstants.LOCATION_GRAVE);
+                Require(index >= 0, "The fixture was missing its legal grave effect.");
+                var effect = prompt.activatable[index];
+                prompt.activatable.RemoveAt(index);
+                try
+                {
+                    Click(button);
+                    Require(!Modals.IsZoneViewerOpen, "A stale grave effect shortcut opened an empty chooser.");
+                    VerifyGraveEffectButton(visible: false);
+                }
+                finally
+                {
+                    prompt.activatable.Insert(index, effect);
+                }
+                VerifyGraveEffectButton(visible: true);
+
+                ClickAt((RectTransform)button.transform, pointerId: 0);
+                VerifyOpened(prompt, new[] { code });
+                Require(!Private<RectTransform>(Modals, "_zoneTabs").gameObject.activeSelf &&
+                    Private<Text>(Modals, "_zoneTitle").text.StartsWith("묘지 효과 발동 가능"),
+                    "The effect shortcut did not open a distinct filtered graveyard list.");
+                Close();
+
+                SetPrivate(Field, "_usingDuelPad", true);
+                SetPrivate(Field, "_duelPadFocus", (RectTransform)button.transform);
+                Field.HandleDuelPad(new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Submit));
+                VerifyOpened(prompt, new[] { code });
+                var action = VisibleCards.Single().transform.parent.parent.Find("Act/B").GetComponent<Button>();
+                Require(action.GetComponentInChildren<Text>().text == "효과 발동", "The grave effect was not actionable in the chooser.");
+                Click(action);
+                Require(!Modals.IsZoneViewerOpen && !ReferenceEquals(prompt, _duel.ActivePrompt),
+                    "Activating a grave effect did not close the picker and continue the duel.");
             }
 
             internal void VerifyExtraSummonChoices(DuelPrompt prompt, IReadOnlyList<LiveCardState> all)

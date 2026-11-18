@@ -112,6 +112,7 @@ namespace YGOPortable.UI
         private StackTileView _myDeckTile, _myExtraTile, _myGyTile, _myBanTile;
         private StackTileView _oppDeckTile, _oppExtraTile, _oppGyTile, _oppBanTile;
         private Button _extraSummonButton;
+        private Button _graveEffectButton;
 
         // High-res Card Zoom Modal
         private GameObject _cardZoomModal;
@@ -275,6 +276,7 @@ namespace YGOPortable.UI
             _pointerActionAnchor = null;
             HideCardActions();
             _extraSummonButton.gameObject.SetActive(false);
+            _graveEffectButton.gameObject.SetActive(false);
             CloseActionPopup();
             CloseDuelLog();
             CloseCardZoomModal(restoreFocus: false);
@@ -704,6 +706,11 @@ namespace YGOPortable.UI
             extraSummonLabel.resizeTextMaxSize = 17;
             _extraSummonButton.gameObject.SetActive(false);
 
+            var graveEffect = LotdUiKit.CreateRect("GraveEffect", root, new Vector2(.816f, .142f),
+                new Vector2(.932f, .188f), Vector2.zero, Vector2.zero);
+            _graveEffectButton = DuelStyle.Button(graveEffect, "Button", "묘지 효과", OpenGraveEffectPicker, 17, gold: true);
+            _graveEffectButton.gameObject.SetActive(false);
+
             var turnHolder = LotdUiKit.CreateRect("Turn", root, new Vector2(.904f, .451f), new Vector2(.984f, .615f),
                 Vector2.zero, Vector2.zero);
             var turn = LotdUiKit.FillRect("Dial", turnHolder);
@@ -1034,7 +1041,7 @@ namespace YGOPortable.UI
             RefreshLogFeed();
             RefreshAttackResponseArrow();
             RefreshMaterialConfirm();
-            RefreshExtraSummonButton();
+            RefreshPileActionButtons();
             RefreshDuelPadCursor(layoutChanged: true);
             RefreshCardActions();
         }
@@ -2234,7 +2241,7 @@ namespace YGOPortable.UI
             var session = _session;
             AdvanceHandLayout(Time.unscaledDeltaTime * PlaybackRate);
             AdvanceActionWindow();
-            RefreshExtraSummonButton();
+            RefreshPileActionButtons();
             UpdateDuelPad();
             if (_session != session || !Root.activeSelf) return;
             RefreshHandGlows();
@@ -2569,11 +2576,23 @@ namespace YGOPortable.UI
             CanUseCardActions && _session.ActivePrompt.messageType == YgoConstants.MSG_SELECT_IDLECMD &&
             _session.Players[_session.HumanPlayerIndex].extra.Any(card => ExtraSummonIndex(_session.ActivePrompt, card) >= 0);
 
-        private void RefreshExtraSummonButton()
+        private static bool HasGraveEffect(DuelPrompt prompt, LiveCardState card) =>
+            card != null && card.code != 0 && card.location == YgoConstants.LOCATION_GRAVE &&
+            prompt.activatable.Exists(item => item.controller == card.controller &&
+                item.location == card.location && item.sequence == card.sequence);
+
+        private bool GraveEffectAvailable =>
+            CanUseCardActions && _session.ActivePrompt.activatable.Count > 0 &&
+            _session.Players[_session.HumanPlayerIndex].grave.Exists(card => HasGraveEffect(_session.ActivePrompt, card));
+
+        private void RefreshPileActionButtons()
         {
-            bool available = ExtraSummonAvailable;
-            if (_extraSummonButton.gameObject.activeSelf != available)
-                _extraSummonButton.gameObject.SetActive(available);
+            bool canSummon = ExtraSummonAvailable;
+            if (_extraSummonButton.gameObject.activeSelf != canSummon)
+                _extraSummonButton.gameObject.SetActive(canSummon);
+            bool canActivate = GraveEffectAvailable;
+            if (_graveEffectButton.gameObject.activeSelf != canActivate)
+                _graveEffectButton.gameObject.SetActive(canActivate);
         }
 
         private void OpenExtraSummonPicker()
@@ -2598,6 +2617,33 @@ namespace YGOPortable.UI
                 },
                 canUseCardActions: CanSummon,
                 icon: DuelVisualAssets.ZoneIcon(YgoConstants.LOCATION_EXTRA, false),
+                actionsOnly: true, sidePanel: true);
+        }
+
+        private void OpenGraveEffectPicker()
+        {
+            if (IsBrowsingZone || !GraveEffectAvailable) return;
+            var session = _session;
+            var prompt = session.ActivePrompt;
+            bool CanActivate() => _session == session && ReferenceEquals(session.ActivePrompt, prompt) && CanUseCardActions;
+
+            HideCardActions();
+            _modals.ShowZoneViewer(
+                "묘지 효과 발동 가능",
+                session.Players[session.HumanPlayerIndex].grave,
+                hasCardActions: card => HasGraveEffect(prompt, card),
+                onOpenCardActions: card =>
+                {
+                    if (!CanActivate()) return;
+                    int activateCommand = prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD ? 5 : 0;
+                    var actions = CollectActions(card.controller, card.location, card.sequence);
+                    actions.RemoveAll(action => (action.responseVal & 0xffff) != activateCommand);
+                    if (actions.Count == 1) ExecuteActionInt(actions[0].responseVal);
+                    else if (actions.Count > 1)
+                        ShowCardActionsPopup(card.controller, card.location, card.sequence, card.code, card.overlayCodes, actions: actions);
+                },
+                canUseCardActions: CanActivate,
+                icon: DuelVisualAssets.ZoneIcon(YgoConstants.LOCATION_GRAVE, false),
                 actionsOnly: true, sidePanel: true);
         }
 
