@@ -1195,6 +1195,7 @@ namespace YGOPortable.UI
             RefreshMaterialConfirm();
             RefreshPileActionButtons();
             RefreshDuelPadCursor(layoutChanged: true);
+            RefreshAttackSelectionReadout();
             RefreshLinkedZones();
             RefreshCardActions();
         }

@@ -154,6 +154,8 @@ namespace YGOPortable.Editor
         {
             var responses = new List<byte[]>();
             using var ui = new Browser(duel, responses.Add);
+            ui.VerifyAttackComparison(prompt);
+            Require(responses.Count == 0, "Previewing an attack target submitted the attack.");
             foreach (int pointer in new[] { -1, 0 })
             {
                 ui.ClickAttackTarget(prompt, pointer);
@@ -500,6 +502,78 @@ namespace YGOPortable.Editor
                 ClickAt(second);
                 Require(selected.SetEquals(new[] { 1 }) && Modals.TryConfirm() && !Modals.IsPromptOpen,
                     "Changing the target or confirming the field selection failed.");
+            }
+
+            internal void VerifyAttackComparison(DuelPrompt prompt)
+            {
+                var available = prompt.candidates.Single();
+                var zones = _duel.Players[available.controller].mzone;
+                int extra = Array.FindIndex(zones, 0, 5, card => card == null);
+                Require(extra >= 0, "The attack comparison fixture had no open slot for a hidden target.");
+                const uint hiddenCode = 89631139;
+                var concealed = new SelectableCardItem
+                {
+                    code = hiddenCode, controller = available.controller, location = YgoConstants.LOCATION_MZONE,
+                    sequence = (uint)extra, position = YgoConstants.POS_FACEDOWN_DEFENSE,
+                };
+                zones[extra] = new LiveCardState
+                {
+                    code = concealed.code, controller = concealed.controller, location = concealed.location,
+                    sequence = concealed.sequence, position = concealed.position, attack = 3000, defense = 2500,
+                };
+                prompt.candidates.Add(concealed);
+                try
+                {
+                    Modals.ShowPrompt(_duel, prompt);
+                    Field.Refresh();
+                    var body = Modals.ModalRoot.transform.Find("Win/Body");
+                    var targetName = body.Find("AttackTarget/Heading/Name").GetComponent<Text>();
+                    var combat = body.Find("AttackTarget/Combat");
+                    var knownSlot = CardSlot(available);
+                    var hiddenSlot = CardSlot(concealed);
+                    var source = _duel.GetAttackSelectionSource(prompt);
+                    Require(source != null && body.Find("AttackSource/Heading/Name").GetComponent<Text>().text ==
+                            $"공격 · {CardDatabase.GetName(source.code)}" && targetName.text == "공격 대상",
+                        "The comparison showed the wrong attacker or an unfocused target.");
+
+                    void ExpectTarget(bool faceUp)
+                    {
+                        string expected = faceUp ? $"대상 · {CardDatabase.GetName(available.code)}" : "대상 · 뒷면 카드";
+                        Require(targetName.text == expected && combat.gameObject.activeSelf == faceUp,
+                            "Changing targets showed stale or private attack comparison numbers.");
+                        Require(Private<uint>(Field, "_inspectedCode") == (faceUp ? available.code : 0u),
+                            "The card inspector did not follow the public or face-down attack target.");
+                        if (!faceUp) return;
+                        var defender = zones[available.sequence];
+                        Require(combat.Find("Attack/Digits/Value").GetComponent<Text>().text == defender.attack.ToString() &&
+                                combat.Find("Defense/Digits/Value").GetComponent<Text>().text == defender.defense.ToString(),
+                            "The attack comparison lost the focused opponent's native values.");
+                    }
+
+                    knownSlot.GetComponent<CardDragTrigger>().OnPointerEnterAction.Invoke();
+                    ExpectTarget(faceUp: true);
+                    var hiddenTrigger = hiddenSlot.GetComponent<CardDragTrigger>();
+                    hiddenTrigger.OnPointerEnterAction.Invoke();
+                    ExpectTarget(faceUp: false);
+                    hiddenTrigger.OnPointerExitAction.Invoke();
+                    Require(targetName.text == "공격 대상" && !combat.gameObject.activeSelf, "Leaving the target kept its preview.");
+
+                    TestDuelPadNavigation.Pad(Field, direction: Vector2Int.down);
+                    var focus = Private<RectTransform>(Field, "_duelPadFocus");
+                    Require(focus == knownSlot || focus == hiddenSlot, "The controller did not focus either legal target.");
+                    bool known = focus == knownSlot;
+                    ExpectTarget(known);
+                    var next = known ? hiddenSlot : knownSlot;
+                    TestDuelPadNavigation.Pad(Field, direction: next.position.x > focus.position.x ? Vector2Int.right : Vector2Int.left);
+                    ExpectTarget(!known);
+                }
+                finally
+                {
+                    prompt.candidates.RemoveAt(prompt.candidates.Count - 1);
+                    zones[extra] = null;
+                    Modals.HideAll();
+                }
+                Debug.Log("[VERIFY DUEL ATTACK SELECTION] Mouse and controller focus compared the chosen attacker with live public targets, hid face-down values and left the native response pending.");
             }
 
             internal void ClickAttackTarget(DuelPrompt prompt, int pointer)

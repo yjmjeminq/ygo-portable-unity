@@ -111,6 +111,8 @@ namespace YGOPortable.UI
         private int[] _sortOrder;
         private Button _confirmBtn;
         private Button _attackCancel;
+        private (Text Name, DuelStatStrip Values) _attackSourceReadout;
+        private (Text Name, DuelStatStrip Values) _attackTargetReadout;
         private RectTransform _materialConfirmRoot;
         private Button _materialConfirm;
         private bool _fieldMaterialPick;
@@ -242,7 +244,8 @@ namespace YGOPortable.UI
                 IsZoneViewerOpen ? ZoneViewRoot.transform :
                 ResultRoot.activeSelf ? ResultRoot.transform :
                 IsPromptOpen && !IsShowingField && !IsFieldCardSelection ? ModalRoot.transform : null) as RectTransform;
-            target = EventSystem.current?.currentSelectedGameObject?.transform as RectTransform;
+            var focused = EventSystem.current?.currentSelectedGameObject;
+            target = focused != null ? focused.transform as RectTransform : null;
             return host != null && target != null && target.IsChildOf(host) && target.gameObject.activeInHierarchy;
         }
 
@@ -293,7 +296,8 @@ namespace YGOPortable.UI
                 return;
             }
             ScrollFromPad(scroll, frame.DescriptionScroll);
-            var control = EventSystem.current?.currentSelectedGameObject?.GetComponent<Selectable>();
+            var focused = EventSystem.current?.currentSelectedGameObject;
+            var control = focused != null ? focused.GetComponent<Selectable>() : null;
             if (!CanNavigate(control, scope))
             {
                 control = CanNavigate(initial, scope) ? initial : FirstFocus(scope);
@@ -394,6 +398,7 @@ namespace YGOPortable.UI
             _chainSelection = -1;
             _confirmBtn = null;
             _attackCancel = null;
+            _attackSourceReadout = _attackTargetReadout = default;
             _counterAlloc = null;
             _sortOrder = null;
         }
@@ -1070,7 +1075,7 @@ namespace YGOPortable.UI
             bool attackTarget = p.IsAttackTargetSelection;
             if (attackTarget)
             {
-                _modalTitle.text = "공격할 몬스터를 선택하세요";
+                _modalTitle.text = "공격 대상 선택";
                 _modalSubtitle.text = "";
             }
             else if (p.messageType == YgoConstants.MSG_SELECT_TRIBUTE)
@@ -1097,6 +1102,7 @@ namespace YGOPortable.UI
 
             if (attackTarget)
             {
+                if (IsFieldCardSelection) BuildAttackSelectionReadout(p);
                 if (p.cancelable) _attackCancel = AddFooterButton("공격 취소", OnModalCloseClicked, false, alignRight: true);
                 return;
             }
@@ -1195,6 +1201,55 @@ namespace YGOPortable.UI
         {
             if (_confirmBtn == null || !_confirmBtn.interactable) return;
             Submit(DuelSession.PackCardSelection(_selectedIndices.OrderBy(i => i).ToArray()));
+        }
+
+        private void BuildAttackSelectionReadout(DuelPrompt prompt)
+        {
+            _modalBox.anchorMin = new Vector2(.235f, .829f);
+            _modalBox.anchorMax = new Vector2(.878f, .903f);
+            _modalHeader.anchorMax = new Vector2(.215f, 1f);
+            _modalBody.anchorMin = new Vector2(.225f, .055f);
+            _modalBody.anchorMax = new Vector2(prompt.cancelable ? .819f : .987f, .945f);
+            _modalFooter.anchorMin = new Vector2(.675f, .08f);
+            _attackSourceReadout = AddAttackSelectionCard("AttackSource", 0f, .488f, DuelStyle.Player);
+            _attackTargetReadout = AddAttackSelectionCard("AttackTarget", .512f, 1f, DuelStyle.Opponent);
+            RefreshAttackSelectionReadout(prompt, null);
+        }
+
+        private (Text Name, DuelStatStrip Values) AddAttackSelectionCard(string key, float left, float right, Color accent)
+        {
+            var tile = LotdUiKit.CreateRect(key, _modalBody, new Vector2(left, 0f), new Vector2(right, 1f),
+                Vector2.zero, Vector2.zero);
+            var heading = LotdUiKit.CreateRect("Heading", tile, new Vector2(0f, .53f), Vector2.one,
+                Vector2.zero, Vector2.zero);
+            DuelReadoutPlate.Add(heading, new Color(.077f, .115f, .139f, 1f));
+            var name = LotdUiKit.AddFittedText(heading, "Name", "", 15, 9, TextAnchor.MiddleCenter, accent, FontStyle.Bold);
+            var values = LotdUiKit.CreateRect("Combat", tile, Vector2.zero, new Vector2(1f, .51f),
+                Vector2.zero, Vector2.zero);
+            return (name, new DuelStatStrip(values, compact: true));
+        }
+
+        internal void RefreshAttackSelectionReadout(DuelPrompt prompt, (byte controller, uint location, uint sequence)? focus)
+        {
+            if (!IsFieldCardSelection || _attackSourceReadout.Name == null || !ReferenceEquals(prompt, _curPrompt)) return;
+            var source = _curSession.GetAttackSelectionSource(prompt);
+            int index = prompt.candidates.Count == 1 ? 0 : -1;
+            if (focus.HasValue && _fieldCardIndices.TryGetValue(focus.Value, out int focused))
+                index = focused;
+            var candidate = index >= 0 && index < prompt.candidates.Count ? prompt.candidates[index] : null;
+            var target = candidate != null
+                ? _curSession.GetVisibleFieldCard(candidate.code, candidate.controller, candidate.location, candidate.sequence)
+                : null;
+            BindAttackSelectionCard(_attackSourceReadout, source, "공격", "공격 몬스터");
+            BindAttackSelectionCard(_attackTargetReadout, target, "대상", candidate != null ? "대상 · 뒷면 카드" : "공격 대상");
+        }
+
+        private void BindAttackSelectionCard((Text Name, DuelStatStrip Values) tile, LiveCardState card, string label, string fallback)
+        {
+            tile.Name.text = card == null ? fallback : $"{label} · {CardDatabase.GetName(card.code)}";
+            if (card == null) tile.Values.Hide();
+            else tile.Values.Bind(new DuelCardReadout(CardDatabase.Get(card.code), card),
+                opponent: card.controller != _curSession.HumanPlayerIndex);
         }
 
         private void SubmitAttackTarget(int index)

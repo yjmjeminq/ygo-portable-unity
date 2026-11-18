@@ -216,6 +216,7 @@ namespace YGOPortable.Core
         public ulong LastHintMsg { get; private set; }
         public uint AttackerCon, AttackerLoc, AttackerSeq, TargetCon, TargetLoc, TargetSeq;
         public bool HasActiveAttack { get; private set; }
+        private SelectableCardItem _chosenAttacker;
 
         public PlayerFieldSnapshot[] Players { get; } = { new PlayerFieldSnapshot(), new PlayerFieldSnapshot() };
         public List<ChainLinkInfo> CurrentChain { get; } = new List<ChainLinkInfo>();
@@ -264,7 +265,7 @@ namespace YGOPortable.Core
             RetryCount = 0;
             LastHintMsg = 0;
             _pendingSelectionHint = null;
-            HasActiveAttack = false;
+            ClearAttack();
             ActivePrompt = null;
             CurrentChain.Clear();
             _resolvingChainLink = null;
@@ -423,6 +424,13 @@ namespace YGOPortable.Core
                 else _planningReplay.responses.Add((prevPrompt.messageType, prevPrompt.playerId, (byte[])buffer.Clone()));
             }
             if (_speculatingPlayer >= 0) TrackSpeculativeSelection(prevPrompt, buffer);
+            if (prevPrompt?.messageType == YgoConstants.MSG_SELECT_BATTLECMD && buffer?.Length >= sizeof(int))
+            {
+                int command = BitConverter.ToInt32(buffer, 0);
+                int index = command >> 16;
+                _chosenAttacker = (command & 0xffff) == 1 && (uint)index < prevPrompt.attackable.Count
+                    ? prevPrompt.attackable[index] : null;
+            }
             ActivePrompt = null;
             YgoNativeBridge.SetResponse(NativePtr, buffer);
             StepUntilPrompt();
@@ -624,8 +632,29 @@ namespace YGOPortable.Core
             return live?.IsFaceUp == true && live.code == code ? live : null;
         }
 
+        internal LiveCardState GetAttackSelectionSource(DuelPrompt prompt)
+        {
+            if (prompt?.IsAttackTargetSelection != true || !ReferenceEquals(ActivePrompt, prompt) ||
+                _chosenAttacker is not { } source || source.controller != prompt.playerId)
+                return null;
+            return GetVisibleFieldCard(source.code, source.controller, source.location, source.sequence);
+        }
+
+        private void ClearAttack()
+        {
+            HasActiveAttack = false;
+            _chosenAttacker = null;
+        }
+
         private void NotifyCardMoved(CardMoveEvent move, CardMoveEvent swapPartner = null)
         {
+            if (_chosenAttacker is { } source)
+            {
+                var slot = (source.controller, source.location, source.sequence);
+                var from = (move.fromCon, move.fromLoc, move.fromSeq);
+                var to = (move.toCon, move.toLoc, move.toSeq);
+                if (from != to && (slot == from || slot == to)) _chosenAttacker = null;
+            }
             OnCardLocationsChanged?.Invoke(move, swapPartner);
             PublishCardMove(move);
             if (swapPartner != null) PublishCardMove(swapPartner);
@@ -697,7 +726,7 @@ namespace YGOPortable.Core
                     _confirmedCards.Clear();
                     TurnPlayer = br.ReadByte();
                     TurnNumber++;
-                    HasActiveAttack = false;
+                    ClearAttack();
                     string who = TurnPlayer == HumanPlayerIndex ? "내 턴" : "상대 턴";
                     AddLog($"=== 턴 {TurnNumber}: {who} ===");
                     OnTurnStarted?.Invoke(TurnNumber, TurnPlayer);
@@ -707,7 +736,7 @@ namespace YGOPortable.Core
                 case YgoConstants.MSG_NEW_PHASE:
                 {
                     CurrentPhase = br.ReadUInt16();
-                    HasActiveAttack = false;
+                    ClearAttack();
                     AddLog($"[{YgoConstants.GetPhaseNameKR(CurrentPhase)}]");
                     OnPhaseChanged?.Invoke(CurrentPhase, TurnPlayer);
                     break;
@@ -1006,6 +1035,9 @@ namespace YGOPortable.Core
                     TargetLoc = br.ReadByte();
                     TargetSeq = br.ReadUInt32();
                     br.ReadUInt32();
+                    if (_chosenAttacker is { } source &&
+                        (source.controller != AttackerCon || source.location != AttackerLoc || source.sequence != AttackerSeq))
+                        _chosenAttacker = null;
                     HasActiveAttack = true;
                     AddLog(TargetLoc == 0 ? "직접 공격 선언!" : "몬스터 공격 선언!");
                     OnAttackDeclared?.Invoke((byte)AttackerCon, AttackerLoc, AttackerSeq, (byte)TargetCon, TargetLoc, TargetSeq);
@@ -1014,14 +1046,14 @@ namespace YGOPortable.Core
 
                 case YgoConstants.MSG_BATTLE:
                 {
-                    HasActiveAttack = false;
+                    ClearAttack();
                     OnBattleResolved?.Invoke(BattleCardStats.Read(br), BattleCardStats.Read(br));
                     break;
                 }
 
                 case YgoConstants.MSG_ATTACK_DISABLED:
                 case YgoConstants.MSG_DAMAGE_STEP_END:
-                    HasActiveAttack = false;
+                    ClearAttack();
                     break;
 
                 case YgoConstants.MSG_FIELD_DISABLED:
@@ -1030,7 +1062,7 @@ namespace YGOPortable.Core
 
                 case YgoConstants.MSG_SELECT_BATTLECMD:
                 {
-                    HasActiveAttack = false;
+                    ClearAttack();
                     var p = new DuelPrompt { messageType = msgType, playerId = br.ReadByte() };
                     uint actCnt = br.ReadUInt32();
                     for (uint i = 0; i < actCnt; i++)

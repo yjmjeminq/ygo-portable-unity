@@ -345,7 +345,7 @@ namespace YGOPortable.Editor
             throw new InvalidOperationException("The native duel could not reach the requested phase without retries.");
         }
 
-        private static void Pad(DuelFieldUI field, int buttons = 0, Vector2Int direction = default)
+        internal static void Pad(DuelFieldUI field, int buttons = 0, Vector2Int direction = default)
         {
             var packet = Activator.CreateInstance(Frame, Private, null,
                 new[] { (object)direction, Enum.ToObject(Buttons, buttons), 0f }, null);

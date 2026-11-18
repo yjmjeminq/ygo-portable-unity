@@ -251,6 +251,13 @@ namespace YGOPortable.Editor
             duel.SubmitResponseInt(1);
             Require(duel.ActivePrompt?.IsAttackTargetSelection == true && duel.ActivePrompt.candidates.Count == 1,
                 "The battle fixture did not select the face-down defender.");
+            ui.Modals.ShowPrompt(duel, duel.ActivePrompt);
+            var picking = ui.Modals.ModalRoot.transform.Find("Win/Body");
+            Require(picking.Find("AttackSource/Combat/Attack/Digits/Value").GetComponent<Text>().text == "2700" &&
+                    picking.Find("AttackTarget/Heading/Name").GetComponent<Text>().text == "대상 · 뒷면 카드" &&
+                    !picking.Find("AttackTarget/Combat").gameObject.activeSelf,
+                "The attack picker lost the equipped attack or revealed the face-down target's values.");
+            ui.Modals.HideAll();
             duel.SubmitResponse(DuelSession.PackCardSelection(0));
             var readout = animation.transform.Find("BattleReadout");
             Require(readout != null && duel.RetryCount == 0 &&
