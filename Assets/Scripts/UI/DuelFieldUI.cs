@@ -564,6 +564,15 @@ namespace YGOPortable.UI
             _oppDeckTile = CreateStackTile(Cell(1, 0), true, YgoConstants.LOCATION_DECK, "덱");
             _oppGyTile = CreateStackTile(Cell(1, 1), true, YgoConstants.LOCATION_GRAVE, "묘지");
             _oppBanTile = CreateStackTile(Cell(1, 2), true, YgoConstants.LOCATION_REMOVED, "제외");
+
+            var graveEffect = LotdUiKit.CreateRect("GraveEffect", _myGyTile.root, new Vector2(.14f, .70f),
+                new Vector2(.86f, .93f), Vector2.zero, Vector2.zero);
+            _graveEffectButton = DuelStyle.Button(graveEffect, "Button", "효과 발동", OpenGraveEffectPicker, 15, gold: true);
+            var effectLabel = _graveEffectButton.GetComponentInChildren<Text>();
+            effectLabel.resizeTextForBestFit = true;
+            effectLabel.resizeTextMinSize = 10;
+            effectLabel.resizeTextMaxSize = 15;
+            _graveEffectButton.gameObject.SetActive(false);
         }
 
         private static readonly Color ZoneTint = new Color(0.28f, 0.31f, 0.24f, 0.33f);
@@ -705,11 +714,6 @@ namespace YGOPortable.UI
             extraSummonLabel.resizeTextMinSize = 9;
             extraSummonLabel.resizeTextMaxSize = 17;
             _extraSummonButton.gameObject.SetActive(false);
-
-            var graveEffect = LotdUiKit.CreateRect("GraveEffect", root, new Vector2(.816f, .142f),
-                new Vector2(.932f, .188f), Vector2.zero, Vector2.zero);
-            _graveEffectButton = DuelStyle.Button(graveEffect, "Button", "묘지 효과", OpenGraveEffectPicker, 17, gold: true);
-            _graveEffectButton.gameObject.SetActive(false);
 
             var turnHolder = LotdUiKit.CreateRect("Turn", root, new Vector2(.904f, .451f), new Vector2(.984f, .615f),
                 Vector2.zero, Vector2.zero);

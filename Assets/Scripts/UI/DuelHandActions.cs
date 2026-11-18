@@ -197,7 +197,8 @@ namespace YGOPortable.UI
         {
             var session = _session;
             if (pile.controller != session.HumanPlayerIndex ||
-                pile.location is not (YgoConstants.LOCATION_GRAVE or YgoConstants.LOCATION_REMOVED))
+                pile.location is not (YgoConstants.LOCATION_GRAVE or YgoConstants.LOCATION_REMOVED) ||
+                pile == _myGyTile && _graveEffectButton.gameObject.activeInHierarchy)
             {
                 HideCardActions();
                 return;

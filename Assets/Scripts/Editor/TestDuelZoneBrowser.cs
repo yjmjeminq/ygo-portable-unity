@@ -521,7 +521,16 @@ namespace YGOPortable.Editor
                 VerifyGraveEffectButton(visible: true);
                 var button = Private<Button>(Field, "_graveEffectButton");
                 var grave = _duel.Players[_duel.HumanPlayerIndex].grave;
-                OpenStack("_myGyTile", grave.AsEnumerable().Reverse().Select(card => card.code));
+                var pile = StackRoot("_myGyTile");
+                var badge = (RectTransform)button.transform;
+                Require(badge.IsChildOf(pile) && (badge.parent as RectTransform).anchorMin.y > .5f,
+                    "The activation indicator was not placed at the top of the player's graveyard.");
+                var pointer = new PointerEventData(EventSystem.current);
+                ExecuteEvents.Execute(pile.gameObject, pointer, ExecuteEvents.pointerEnterHandler);
+                Require(!Private<RectTransform>(Field, "_cardActionsBar").gameObject.activeSelf,
+                    "Hovering over the graveyard duplicated the activation indicator.");
+                ClickAt(pile, pointerId: 0);
+                VerifyOpened(prompt, grave.AsEnumerable().Reverse().Select(card => card.code));
                 Close();
 
                 int index = prompt.activatable.FindIndex(item => item.code == code && item.location == YgoConstants.LOCATION_GRAVE);
@@ -548,7 +557,10 @@ namespace YGOPortable.Editor
                 Close();
 
                 SetPrivate(Field, "_usingDuelPad", true);
-                SetPrivate(Field, "_duelPadFocus", (RectTransform)button.transform);
+                SetPrivate(Field, "_duelPadFocus", pile);
+                Field.HandleDuelPad(new DeckPadFrame(Vector2Int.up, DeckPadButtons.None));
+                Require(Private<RectTransform>(Field, "_duelPadFocus") == badge,
+                    "The controller could not reach the activation indicator from the graveyard.");
                 Field.HandleDuelPad(new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Submit));
                 VerifyOpened(prompt, new[] { code });
                 var action = VisibleCards.Single().transform.parent.parent.Find("Act/B").GetComponent<Button>();
