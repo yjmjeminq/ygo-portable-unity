@@ -29,6 +29,9 @@ namespace YGOPortable.Editor
             VerifyRunickTipOptions();
             VerifyDreadnoughtServantConfirmation();
             VerifyGagagaLevelInstruction();
+            VerifyCardTrooperCount();
+            VerifyDragonShrineConfirmation();
+            VerifyChickenGameOptions();
             VerifyBundledOptionDescriptions();
             VerifyKoreanEffectCatalogue();
             VerifyGroupedLocations(duel);
@@ -542,6 +545,123 @@ namespace YGOPortable.Editor
                     duel.Players[duel.HumanPlayerIndex].mzone.Any(card => card?.code == magician && card.level == 8),
                 "Gagaga Magician did not apply the selected level.");
             Debug.Log("[VERIFY KOREAN NATIVE OPTIONS] Gagaga Magician displayed the Korean level instruction and applied the chosen level.");
+        }
+
+        private static void VerifyCardTrooperCount()
+        {
+            const uint trooper = 85087012, sparkman = 20721928;
+            var main = Enumerable.Repeat(trooper, 40).ToArray();
+            var opponent = Enumerable.Repeat(sparkman, 40).ToArray();
+            var empty = Array.Empty<uint>();
+            var ai = new TacticalAI();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Card Trooper count", main, empty, opponent, empty,
+                true, session => session.ActivePrompt?.summonable.Exists(card => card.code == trooper) == true);
+            duel.SubmitResponseInt(duel.ActivePrompt.summonable.FindIndex(card => card.code == trooper) << 16);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            int activate = duel.ActivePrompt.activatable.FindIndex(card => card.code == trooper);
+            Require(activate >= 0, "Card Trooper had no effect to send cards to the graveyard.");
+            duel.SubmitResponseInt((activate << 16) | 5);
+            using var view = new ChainView();
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
+            {
+                if (prompt.messageType != YgoConstants.MSG_ANNOUNCE_NUMBER) return null;
+                int index = prompt.options.IndexOf(2);
+                Require(index >= 0 && prompt.SelectionHint == (((ulong)trooper << 20) | 2),
+                    "Card Trooper did not issue its own count instruction.");
+                view.Modals.ShowPrompt(duel, prompt);
+                var window = view.Modals.ModalRoot.transform.Find("Win");
+                Require(window.Find("Hdr/TitleBand/Title").GetComponent<Text>().text == "덱 위에서 몇 장을 묘지로 보낼지 고르세요",
+                    "The localized count prompt did not explain what the number does.");
+                window.GetComponentsInChildren<Button>().Single(button => button.name == $"Opt_{index}").onClick.Invoke();
+                Require(view.Responses.SequenceEqual(new[] { index }), "The count prompt submitted the number instead of its index.");
+                return BitConverter.GetBytes(view.Responses[0]);
+            });
+            var player = duel.Players[duel.HumanPlayerIndex];
+            Require(duel.RetryCount == 0 && view.Responses.Count == 1 && player.grave.Count == 2 &&
+                    player.mzone.Any(card => card?.code == trooper && card.attack == 1400),
+                "The chosen count did not send two cards and add 1000 ATK.");
+            Debug.Log("[VERIFY KOREAN NATIVE OPTIONS] Card Trooper explained the count and applied the corresponding attack increase.");
+        }
+
+        private static void VerifyDragonShrineConfirmation()
+        {
+            const uint shrine = 41620959, dragon = 89631139, sparkman = 20721928;
+            var main = Enumerable.Repeat(shrine, 13).Concat(Enumerable.Repeat(dragon, 27)).ToArray();
+            var opponent = Enumerable.Repeat(sparkman, 40).ToArray();
+            var empty = Array.Empty<uint>();
+            var ai = new TacticalAI();
+            foreach (bool accept in new[] { false, true })
+            {
+                using var duel = YgoProjectBuilder.StartSeedMatching("Dragon Shrine confirmation", main, empty, opponent, empty,
+                    true, session => session.ActivePrompt?.activatable.Exists(card => card.code == shrine) == true);
+                int activate = duel.ActivePrompt.activatable.FindIndex(card => card.code == shrine);
+                duel.SubmitResponseInt((activate << 16) | 5);
+                using var view = new ChainView();
+                YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
+                {
+                    if (prompt.messageType == YgoConstants.MSG_SELECT_CARD) return ai.ComputeResponse(duel, prompt);
+                    if (prompt.messageType != YgoConstants.MSG_SELECT_YESNO) return null;
+                    Require(prompt.promptDesc == ((ulong)shrine << 20), "Unexpected second Dragon Shrine decision.");
+                    view.Modals.ShowPrompt(duel, prompt);
+                    var question = view.Modals.ModalRoot.GetComponentsInChildren<Text>().Single(label => label.name == "Question");
+                    Require(question.text == "덱에서 드래곤족 몬스터 1장을 더 묘지로 보내시겠습니까?",
+                        "Dragon Shrine did not explain the optional second send.");
+                    bool answered = accept ? view.Modals.TryConfirm() : view.Modals.TryCancelOrPass();
+                    Require(answered && view.Responses.SequenceEqual(new[] { accept ? 1 : 0 }),
+                        "Dragon Shrine submitted the wrong yes/no response.");
+                    return BitConverter.GetBytes(view.Responses[0]);
+                });
+                Require(view.Responses.Count == 1 && duel.RetryCount == 0 &&
+                        duel.Players[duel.HumanPlayerIndex].grave.Count(card => card.code == dragon) == (accept ? 2 : 1),
+                    "Dragon Shrine did not resolve the chosen yes/no action.");
+            }
+            Debug.Log("[VERIFY KOREAN NATIVE OPTIONS] Dragon Shrine showed the optional send in Korean and resolved both responses.");
+        }
+
+        private static void VerifyChickenGameOptions()
+        {
+            const uint chicken = 67616300, sparkman = 20721928;
+            var main = Enumerable.Repeat(chicken, 40).ToArray();
+            var opponent = Enumerable.Repeat(sparkman, 40).ToArray();
+            var empty = Array.Empty<uint>();
+            var ai = new TacticalAI();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Chicken Game options", main, empty, opponent, empty,
+                true, session => session.ActivePrompt?.activatable.Exists(card => card.code == chicken) == true);
+            int place = duel.ActivePrompt.activatable.FindIndex(card => card.code == chicken);
+            duel.SubmitResponseInt((place << 16) | 5);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            int activate = duel.ActivePrompt.activatable.FindIndex(card => card.code == chicken && card.location != YgoConstants.LOCATION_HAND);
+            Require(activate >= 0, "Chicken Game did not offer its on-field effect.");
+            duel.SubmitResponseInt((activate << 16) | 5);
+            using var view = new ChainView();
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
+            {
+                if (prompt.messageType != YgoConstants.MSG_SELECT_OPTION) return null;
+                ulong effect = (ulong)chicken << 20;
+                Require(prompt.options.SequenceEqual(new[] { effect | 1, effect | 2, effect | 3 }),
+                    "Chicken Game did not offer its three expected options.");
+                view.Modals.ShowPrompt(duel, prompt);
+                Canvas.ForceUpdateCanvases();
+                var panel = (RectTransform)view.Modals.ModalRoot.transform.Find("Win");
+                var scroll = panel.Find("Body/Scroll").GetComponent<ScrollRect>();
+                Require(scroll.content.rect.height <= scroll.viewport.rect.height,
+                    "The third option required scrolling on a three-choice prompt.");
+                var fieldViewTab = (RectTransform)view.Modals.FieldViewControl.transform.parent;
+                Require(fieldViewTab.anchorMin.y >= panel.anchorMax.y,
+                    "The field-view tab covered the option rows after expanding the panel.");
+                var buttons = view.Modals.ModalRoot.GetComponentsInChildren<Button>();
+                string[] labels = { "카드를 1장 드로우한다", "이 카드를 파괴한다", "상대가 1000 LP를 회복한다" };
+                for (int index = 0; index < labels.Length; index++)
+                    Require(buttons.Single(button => button.name == $"Opt_{index}").GetComponentInChildren<Text>().text == labels[index],
+                        "Chicken Game did not show a distinct Korean description for every option.");
+                buttons.Single(button => button.name == "Opt_2").onClick.Invoke();
+                Require(view.Responses.SequenceEqual(new[] { 2 }), "The third effect did not submit its native index.");
+                return BitConverter.GetBytes(view.Responses[0]);
+            });
+            Require(view.Responses.Count == 1 && duel.RetryCount == 0 &&
+                    duel.Players[duel.HumanPlayerIndex].lp == 7000 && duel.Players[duel.AiPlayerIndex].lp == 9000,
+                "Chicken Game did not charge 1000 LP and restore 1000 LP to the opponent.");
+            Debug.Log("[VERIFY KOREAN NATIVE OPTIONS] Chicken Game displayed all three effects and applied the selected LP recovery.");
         }
 
         private static void VerifyKoreanEffectCatalogue()

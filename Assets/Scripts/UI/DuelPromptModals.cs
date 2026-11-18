@@ -639,8 +639,9 @@ namespace YGOPortable.UI
                 return;
             }
 
-            // Some yes/no prompts ask about a decision during resolution instead of creating a new chain link.
-            bool resolutionDecision = prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && prompt.promptDesc is 31 or 95 or 96;
+            // These engine questions ask about an optional procedure or a replacement effect.
+            bool resolutionDecision = prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN &&
+                prompt.promptDesc is 31 or 94 or 95 or 96 or 97 or 218 or 219 or 220;
             _chainPrompt = prompt.messageType == YgoConstants.MSG_SELECT_CHAIN ||
                 (prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && !resolutionDecision);
             bool cardChoices = prompt.messageType is YgoConstants.MSG_SELECT_POSITION or YgoConstants.MSG_SELECT_CARD
@@ -648,8 +649,9 @@ namespace YGOPortable.UI
                 or YgoConstants.MSG_SELECT_COUNTER or YgoConstants.MSG_SORT_CARD or YgoConstants.MSG_SORT_CHAIN
                 or YgoConstants.MSG_ANNOUNCE_CARD;
             bool tall = cardChoices || prompt.messageType == YgoConstants.MSG_ANNOUNCE_RACE;
+            bool showThreeOptions = prompt.messageType == YgoConstants.MSG_SELECT_OPTION && prompt.options.Count >= 3;
             bool attackTarget = prompt.IsAttackTargetSelection;
-            _modalBox.anchorMax = new Vector2(cardChoices ? .923f : .845f, tall ? .626f : .474f);
+            _modalBox.anchorMax = new Vector2(cardChoices ? .923f : .845f, tall || showThreeOptions ? .626f : .474f);
             _modalHeader.anchorMin = new Vector2(0f, tall ? .873f : .81f);
             _modalTitleBand.anchorMin = new Vector2(.024f, attackTarget ? .06f : .48f);
             _modalBody.anchorMin = new Vector2(.02f, tall ? .135f : .202f);
@@ -687,7 +689,7 @@ namespace YGOPortable.UI
             {
                 case YgoConstants.MSG_SELECT_YESNO:
                 case YgoConstants.MSG_SELECT_EFFECTYN when resolutionDecision:
-                    RenderYesNo(prompt);
+                    RenderYesNo(session, prompt);
                     break;
                 case YgoConstants.MSG_SELECT_POSITION:
                     RenderSelectPosition(prompt);
@@ -741,10 +743,11 @@ namespace YGOPortable.UI
             _onSubmitResponse?.Invoke(bytes);
         }
 
-        private void RenderYesNo(DuelPrompt p)
+        private void RenderYesNo(DuelSession session, DuelPrompt p)
         {
             uint cardCode = CardDatabase.GetDescriptionCardCode(p.promptDesc);
             if (cardCode == 0) cardCode = p.promptCardCode;
+            if (cardCode == 0) cardCode = session.SelectionChainLink?.code ?? 0;
             var card = CardDatabase.Get(cardCode);
             string msg = CardDatabase.ResolveDescription(p.promptDesc) ?? CardDatabase.GetKoreanCardDescription(cardCode)
                 ?? "선택한 처리를 실행하시겠습니까?";
@@ -862,7 +865,7 @@ namespace YGOPortable.UI
                 if (sources.Length > 1 && card != null)
                     text = $"{card.name}\n{text}";
                 var option = LotdUiKit.CreateWrappedButton(content, $"Opt_{i}", text, () => Submit(BitConverter.GetBytes(pick)),
-                    17, i == 0, 54f, sidePadding: 22);
+                    18, i == 0, 54f, sidePadding: 22);
                 DuelStyle.ApplyButton(option, i == 0);
                 PreviewOnFocus(option, card?.code ?? 0);
             }
@@ -1069,12 +1072,12 @@ namespace YGOPortable.UI
             }
 
             _fieldMaterialPick = prompt.messageType != YgoConstants.MSG_SELECT_CARD ||
-                session.LastHintMsg is 511 or 512 or 513 or 531 or 533;
+                prompt.SelectionHint is 511 or 512 or 513 or 531 or 533;
         }
 
         private void RenderCardMultiSelect(DuelSession s, DuelPrompt p)
         {
-            string hint = CardDatabase.ResolveDescription(s.LastHintMsg);
+            string hint = CardDatabase.ResolveDescription(p.SelectionHint);
             bool attackTarget = p.IsAttackTargetSelection;
             if (attackTarget)
             {
@@ -1311,7 +1314,7 @@ namespace YGOPortable.UI
 
         private void RenderUnselectCard(DuelSession s, DuelPrompt p)
         {
-            _modalTitle.text = CardDatabase.ResolveDescription(s.LastHintMsg) ?? "소재 / 대상 선택";
+            _modalTitle.text = CardDatabase.ResolveDescription(p.SelectionHint) ?? "소재 / 대상 선택";
             _modalSubtitle.text = $"선택됨 {p.unselectCandidates.Count}장 · 추가 선택 가능 {p.candidates.Count}장";
             if (!IsFieldCardSelection)
             {
@@ -1505,7 +1508,7 @@ namespace YGOPortable.UI
 
         private void RenderAnnounceRace(DuelPrompt p)
         {
-            _modalTitle.text = "종족 선언";
+            _modalTitle.text = CardDatabase.ResolveDescription(p.SelectionHint) ?? "종족 선언";
             _modalSubtitle.text = $"선언할 종족을 {p.min}개 선택하세요.";
             ulong chosenMask = 0;
 
@@ -1550,7 +1553,7 @@ namespace YGOPortable.UI
 
         private void RenderAnnounceAttrib(DuelPrompt p)
         {
-            _modalTitle.text = "속성 선언";
+            _modalTitle.text = CardDatabase.ResolveDescription(p.SelectionHint) ?? "속성 선언";
             _modalSubtitle.text = $"선언할 속성을 {p.min}개 선택하세요.";
             uint chosenMask = 0;
 
@@ -1616,7 +1619,7 @@ namespace YGOPortable.UI
 
         private void RenderAnnounceCard(DuelPrompt p)
         {
-            _modalTitle.text = "카드명 선언";
+            _modalTitle.text = CardDatabase.ResolveDescription(p.SelectionHint) ?? "카드명 선언";
 
             uint[] validCodes = YgoNativeBridge.FilterDeclarableCards(p.options.ToArray(), 20000);
             uint pickedCode = 0;
