@@ -931,6 +931,10 @@ namespace YGOPortable.Editor
                 Require(first.Find($"{card}/CardReadout/Combat/{attack}").GetComponent<Text>().text == "3700" &&
                         second.Find($"{card}/CardReadout/Combat/{attack}").GetComponent<Text>().text == "2100",
                     "Card choices did not use the correct instance's current attack.");
+                Require(first.Find($"{card}/CardReadout/Labels/Rating/Value").GetComponent<Text>().text == "8" &&
+                        first.Find($"{card}/CardReadout/Labels/Rating/Symbol").GetComponent<Image>().sprite ==
+                            DuelStatSymbols.Rating(DuelRatingKind.Level),
+                    "The compact card choice lost the level value or symbol.");
                 Require(hidden.Find("CardBack").gameObject.activeSelf && hidden.Find("CardReadout") == null &&
                         material.Find($"{card}/CardReadout") == null,
                     "A hidden card or Xyz material exposed the live stats of a field monster.");

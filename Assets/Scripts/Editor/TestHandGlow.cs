@@ -609,7 +609,8 @@ namespace YGOPortable.Editor
             var slot = (Transform)fieldSlot.GetType().GetField("root").GetValue(fieldSlot);
             Require(slot.Find("CardReadout/Combat/Attack/Digits/Value").GetComponent<Text>().text == "2400" &&
                     slot.Find("CardReadout/Combat/Defense/Digits/Value").GetComponent<Text>().text == "2000" &&
-                    slot.Find("CardReadout/Labels/Rating/Value").GetComponent<Text>().text == "레벨 4",
+                    slot.Find("CardReadout/Labels/Rating/Value").GetComponent<Text>().text == "4" &&
+                    slot.Find("CardReadout/Labels/Rating/Symbol").GetComponent<Image>().sprite == DuelStatSymbols.Rating(DuelRatingKind.Level),
                 "The field did not show the same readout after the summon animation.");
             UnityEngine.Object.DestroyImmediate(plate.gameObject);
             Debug.Log("[VERIFY DUEL SUMMON STATS] Native Fusion Summon displayed 2400 ATK, 2000 DEF and Level 4 on the banner, card face and field.");
@@ -703,7 +704,8 @@ namespace YGOPortable.Editor
             Require(combat.Find("Attack/Digits/Value").GetComponent<Text>().text == "1700" &&
                 combat.Find("Defense/Digits/Value").GetComponent<Text>().text == "1650" &&
                 combat.Find("Attack/Rail").GetComponent<Image>().color.a > combat.Find("Defense/Rail").GetComponent<Image>().color.a &&
-                holder.Find("CardReadout/Labels/Rating/Value").GetComponent<Text>().text == "레벨 4",
+                holder.Find("CardReadout/Labels/Rating/Value").GetComponent<Text>().text == "4" &&
+                holder.Find("CardReadout/Labels/Rating/Symbol").GetComponent<Image>().sprite == DuelStatSymbols.Rating(DuelRatingKind.Level),
                 "The motion did not preserve the monster's stats and starting stance.");
 
             var readout = LotdUiKit.FillRect("Mid-motion Verification", animation.transform);
@@ -836,10 +838,18 @@ namespace YGOPortable.Editor
                 var scale = Slot("_mySZone", 0).Find("CardReadout");
                 Require(new[] { normal, xyz, link }.All(readout => readout.gameObject.activeInHierarchy &&
                     !readout.GetComponentsInChildren<Graphic>().Any(graphic => graphic.raycastTarget)) &&
-                    Label(normal, rating).text == "레벨 5" && Label(xyz, rating).text == "랭크 0" &&
-                    Label(link, rating).text == "링크 3" && Label(xyz, status).text == "소재 2 · 무효" &&
-                    Label(scale, rating).text == "스케일 8" && !scale.Find("Combat").gameObject.activeSelf,
+                    Label(normal, rating).text == "5" && Label(xyz, rating).text == "0" &&
+                    Label(link, rating).text == "3" && Label(xyz, status).text == "소재 2 · 무효" &&
+                    Label(scale, rating).text == "8" && !scale.Find("Combat").gameObject.activeSelf,
                     "The field readouts did not show the current rating, materials, effects and scale.");
+                var ratingSymbols = new[] { normal, xyz, link, scale }.Select(readout => readout.Find("Labels/Rating/Symbol").GetComponent<Image>()).ToArray();
+                Require(ratingSymbols.Select(icon => icon.sprite).SequenceEqual(new[]
+                    {
+                        DuelStatSymbols.Rating(DuelRatingKind.Level), DuelStatSymbols.Rating(DuelRatingKind.Rank),
+                        DuelStatSymbols.Rating(DuelRatingKind.Link), DuelStatSymbols.Rating(DuelRatingKind.Scale),
+                    }) && ratingSymbols.All(icon => icon.sprite != null && !icon.raycastTarget) &&
+                    ratingSymbols.Select(icon => icon.sprite).Distinct().Count() == 4,
+                    "The field did not show four distinct non-interactive rating symbols.");
                 Require(Label(normal, attack).text == "3700" && Label(normal, defense).text == "2200" &&
                     Label(normal, "Combat/Attack/Change/Arrow").text == "▲" && Label(normal, "Combat/Defense/Change/Arrow").text == "▼" &&
                     normal.Find("Combat/Defense/Rail").GetComponent<Image>().color.a > normal.Find("Combat/Attack/Rail").GetComponent<Image>().color.a &&
@@ -899,7 +909,7 @@ namespace YGOPortable.Editor
                 reduced.GetComponent<DuelReadoutPulse>().Advance(.16f);
                 Require(reverse.anchorMin.x < initial && Label(normal, attack).text == "3200" &&
                     Label(normal, defense).text == "2800" && normal.Find("Combat/Defense/ChangePulse").gameObject.activeInHierarchy &&
-                    normal.Find("Labels/Rating/ChangePulse").gameObject.activeInHierarchy && Label(normal, rating).text == "레벨 6",
+                    normal.Find("Labels/Rating/ChangePulse").gameObject.activeInHierarchy && Label(normal, rating).text == "6",
                     "The updated attack, defense or level did not animate with its current value.");
 
                 var attackIcon = normal.Find("Combat/Attack/Symbol").GetComponent<Image>();
@@ -908,6 +918,7 @@ namespace YGOPortable.Editor
                     !attackIcon.raycastTarget && !defenseIcon.raycastTarget,
                     "The compact readout did not have separate non-interactive attack and defense symbols.");
                 mine.mzone[1].attack = mine.mzone[1].defense = int.MaxValue;
+                mine.mzone[1].rank = 12;
                 Field.Refresh();
 
                 var viewport = (RectTransform)Canvas.transform;
@@ -929,6 +940,11 @@ namespace YGOPortable.Editor
                     VerifyStatGlyphs(Label(normal, attack), "3200");
                     VerifyStatGlyphs(Label(xyz, attack), int.MaxValue.ToString());
                     VerifyStatGlyphs(Label(xyz, defense), int.MaxValue.ToString());
+                    VerifyStatGlyphs(Label(xyz, rating), "12");
+                    VerifyStatGlyphs(Label(xyz, status), "소재 2 · 무효");
+                    var rank = RectTransformUtility.CalculateRelativeRectTransformBounds(xyz, xyz.Find("Labels/Rating"));
+                    var material = RectTransformUtility.CalculateRelativeRectTransformBounds(xyz, xyz.Find("Labels/Status"));
+                    Require(rank.max.x < material.min.x, "The two-digit rank covered the material or effect status.");
                 }
                 viewport.sizeDelta = originalSize;
 
@@ -956,17 +972,20 @@ namespace YGOPortable.Editor
                 typeof(DuelFieldUI).GetMethod("ResetCardInspector", PrivateInstance).Invoke(Field, null);
                 Debug.Log("[VERIFY DUEL CARD READOUT] Verified live combat stats, changing copies, ratings, scales, Link markers, face-down cards and three viewport sizes.");
                 Debug.Log("[VERIFY DUEL STAT FIT] Attack and defense icons left room for larger digits. All ten digits stayed on one line across three viewports.");
+                Debug.Log("[VERIFY DUEL RATING BADGES] Level, rank, Link and scale used distinct symbols. A live two-digit rank and status fit across three viewports.");
             }
 
             private static void VerifyStatGlyphs(Text text, string expected)
             {
                 Require(text.text == expected && text.horizontalOverflow == HorizontalWrapMode.Overflow,
-                    "A stat field truncated or wrapped the full number.");
+                    "A readout truncated or wrapped its text.");
                 using var mesh = new VertexHelper();
                 var populate = typeof(Text).GetMethod("OnPopulateMesh", PrivateInstance, null, new[] { typeof(VertexHelper) }, null);
                 populate.Invoke(text, new object[] { mesh });
                 text.GetComponent<DuelStatDigitFit>().ModifyMesh(mesh);
-                Require(mesh.currentVertCount == expected.Length * 4, "The stat field omitted rendered digits.");
+                int glyphCount = expected.Count(character => !char.IsWhiteSpace(character));
+                Require(mesh.currentVertCount == glyphCount * 4 && text.cachedTextGenerator.lineCount == 1,
+                    $"The readout omitted or wrapped a glyph in '{expected}'.");
                 Rect rect = text.GetPixelAdjustedRect();
                 var vertex = default(UIVertex);
                 for (int i = 0; i < mesh.currentVertCount; i++)
@@ -974,10 +993,10 @@ namespace YGOPortable.Editor
                     mesh.PopulateUIVertex(ref vertex, i);
                     Require(vertex.position.x >= rect.xMin - .1f && vertex.position.x <= rect.xMax + .1f &&
                         vertex.position.y >= rect.yMin - .1f && vertex.position.y <= rect.yMax + .1f,
-                        "A stat digit rendered outside its allotted space.");
+                        "A readout glyph rendered outside its allotted space.");
                 }
                 var cell = (RectTransform)text.transform.parent.parent;
-                Require(rect.height / cell.rect.height > .78f, "The compact stat did not give its number most of the available height.");
+                Require(rect.height / cell.rect.height > .78f, "The compact readout did not give its text most of the available height.");
             }
 
             private uint[] ActiveGlows(string fieldName, bool requireElement)

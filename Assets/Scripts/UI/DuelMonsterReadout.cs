@@ -1,9 +1,12 @@
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 using YGOPortable.Core;
 
 namespace YGOPortable.UI
 {
+    internal enum DuelRatingKind { None, Level, Rank, Link, Scale }
+
     internal readonly struct DuelCardReadout
     {
         internal readonly CardInfo Printed;
@@ -36,16 +39,31 @@ namespace YGOPortable.UI
             location == YgoConstants.LOCATION_SZONE && IsScale && sequence is 0 or 4
                 ? sequence == 0 ? LeftScale : RightScale : null;
 
+        internal (DuelRatingKind Kind, uint Value) RatingNumber
+        {
+            get
+            {
+                if (!IsMonster) return default;
+                uint printedRating = Printed?.level ?? 0;
+                if (IsLink) return (DuelRatingKind.Link, Live?.link ?? printedRating);
+                if (IsXyz) return (DuelRatingKind.Rank, Live?.rank ?? printedRating);
+                uint level = Live?.level ?? printedRating;
+                return level > 0 ? (DuelRatingKind.Level, level) : default;
+            }
+        }
+
         internal string Rating
         {
             get
             {
-                if (!IsMonster) return "";
-                uint printedRating = Printed?.level ?? 0;
-                if (IsLink) return $"링크 {Live?.link ?? printedRating}";
-                if (IsXyz) return $"랭크 {Live?.rank ?? printedRating}";
-                uint level = Live?.level ?? printedRating;
-                return level > 0 ? $"레벨 {level}" : "";
+                var (kind, value) = RatingNumber;
+                return kind switch
+                {
+                    DuelRatingKind.Level => $"레벨 {value}",
+                    DuelRatingKind.Rank => $"랭크 {value}",
+                    DuelRatingKind.Link => $"링크 {value}",
+                    _ => "",
+                };
             }
         }
 
@@ -219,14 +237,30 @@ namespace YGOPortable.UI
     {
         private static Sprite _blade;
         private static Sprite _shield;
+        private static readonly Sprite[] RatingSprites = new Sprite[(int)DuelRatingKind.Scale + 1];
 
         internal static Sprite Get(bool defense)
         {
-            if (defense) return _shield != null ? _shield : (_shield = Build(defense: true));
-            return _blade != null ? _blade : (_blade = Build(defense: false));
+            if (defense) return _shield != null ? _shield : (_shield = Build("Duel Defense Symbol", InsideShield));
+            return _blade != null ? _blade : (_blade = Build("Duel Attack Symbol", InsideBlade));
         }
 
-        private static Sprite Build(bool defense)
+        internal static Sprite Rating(DuelRatingKind kind)
+        {
+            int index = (int)kind;
+            if (kind == DuelRatingKind.None) return null;
+            if (RatingSprites[index] != null) return RatingSprites[index];
+            return RatingSprites[index] = kind switch
+            {
+                DuelRatingKind.Level => Build("Duel Level Symbol", InsideStar),
+                DuelRatingKind.Rank => Build("Duel Rank Symbol", InsideDiamond),
+                DuelRatingKind.Link => Build("Duel Link Symbol", InsideChain),
+                DuelRatingKind.Scale => Build("Duel Scale Symbol", InsideHourglass),
+                _ => null,
+            };
+        }
+
+        private static Sprite Build(string name, Func<float, float, bool> inside)
         {
             const int size = 24, samples = 3;
             var pixels = new Color32[size * size];
@@ -239,13 +273,13 @@ namespace YGOPortable.UI
                 {
                     float u = (x + (col + .5f) / samples) / size - .5f;
                     float v = (y + (row + .5f) / samples) / size - .5f;
-                    if (defense ? InsideShield(u, v) : InsideBlade(u, v)) covered++;
+                    if (inside(u, v)) covered++;
                 }
                 pixels[y * size + x] = new Color32(255, 255, 255, (byte)(255 * covered / (samples * samples)));
             }
             var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
             {
-                name = defense ? "Duel Defense Symbol" : "Duel Attack Symbol",
+                name = name,
                 wrapMode = TextureWrapMode.Clamp,
                 filterMode = FilterMode.Bilinear,
             };
@@ -264,6 +298,40 @@ namespace YGOPortable.UI
             return along >= -.51f && along <= -.19f && across < .066f ||
                 along >= -.24f && along <= -.12f && across < .24f ||
                 along >= -.13f && along < .52f && across < .127f * Mathf.Clamp01((.52f - along) / .20f);
+        }
+
+        private static bool InsideStar(float x, float y)
+        {
+            const float halfPoint = Mathf.PI / 5f, outer = .47f, inner = .235f;
+            float angle = Mathf.Abs(Mathf.Repeat(Mathf.Atan2(x, y) + halfPoint, 2f * halfPoint) - halfPoint);
+            float distance = Mathf.Sqrt(x * x + y * y);
+            float edge = inner * Mathf.Sin(halfPoint - angle) + outer * Mathf.Sin(angle);
+            return distance * edge <= outer * inner * Mathf.Sin(halfPoint);
+        }
+
+        private static bool InsideDiamond(float x, float y)
+        {
+            float distance = Mathf.Abs(x) + Mathf.Abs(y);
+            return distance <= .48f && (distance >= .27f || distance <= .13f);
+        }
+
+        private static bool InsideChain(float x, float y)
+        {
+            float along = (x + y) * .7071f;
+            float across = (y - x) * .7071f;
+            return InsideChainLink(along - .16f, across) || InsideChainLink(along + .16f, across);
+        }
+
+        private static bool InsideChainLink(float along, float across)
+        {
+            float distance = along * along / (.26f * .26f) + across * across / (.165f * .165f);
+            return distance <= 1f && distance >= .34f;
+        }
+
+        private static bool InsideHourglass(float x, float y)
+        {
+            float height = Mathf.Abs(y);
+            return height <= .41f && Mathf.Abs(x) <= .065f + height * .83f;
         }
     }
 
@@ -373,11 +441,13 @@ namespace YGOPortable.UI
     {
         private static readonly Color Backing = new Color(.045f, .068f, .085f, .96f);
         private static readonly Color RankColor = new Color(.91f, .75f, 1f);
+        private static readonly Color ScaleColor = new Color(.60f, 1f, .83f);
         private readonly RectTransform _root;
         private readonly RectTransform _combat;
         private readonly RectTransform _labels;
         private readonly DuelStatStrip _stats;
         private readonly Text _rating;
+        private readonly Image _ratingIcon;
         private readonly Text _status;
         private readonly bool _inPreview;
         private DuelCounterBadge _counters;
@@ -391,8 +461,13 @@ namespace YGOPortable.UI
             _stats = new DuelStatStrip(_combat, compact: true);
             _labels = LotdUiKit.FillRect("Labels", _root);
             // Leave room for the selection check on choice cards.
-            _rating = CreateLabel("Rating", .035f, inPreview ? .365f : .485f, 15);
-            _status = CreateLabel("Status", inPreview ? .38f : .50f, inPreview ? .79f : .965f, 13);
+            _rating = CreateLabel("Rating", .035f, .355f, 19);
+            _rating.rectTransform.anchorMin = new Vector2(.435f, .04f);
+            _rating.rectTransform.anchorMax = new Vector2(.96f, .96f);
+            var icon = LotdUiKit.CreateRect("Symbol", _rating.transform.parent, new Vector2(.055f, .10f),
+                new Vector2(.435f, .90f), Vector2.zero, Vector2.zero);
+            _ratingIcon = LotdUiKit.AddImage(icon.gameObject, null, Color.white, true, false);
+            _status = CreateLabel("Status", .372f, inPreview ? .79f : .965f, 13);
             if (inPreview)
             {
                 _combat.anchorMin = new Vector2(.03f, 0f);
@@ -411,7 +486,10 @@ namespace YGOPortable.UI
             var chip = LotdUiKit.CreateRect(name, _labels, new Vector2(left, 0f), new Vector2(right, 1f),
                 Vector2.zero, Vector2.zero);
             DuelReadoutPlate.Add(chip, Backing);
-            return LotdUiKit.AddFittedText(chip, "Value", "", size, 8, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+            var value = LotdUiKit.AddFittedText(chip, "Value", "", size, 8, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+            value.horizontalOverflow = HorizontalWrapMode.Overflow;
+            value.gameObject.AddComponent<DuelStatDigitFit>();
+            return value;
         }
 
         internal void Hide() => _root.gameObject.SetActive(false);
@@ -430,11 +508,29 @@ namespace YGOPortable.UI
                 _labels.anchorMax = new Vector2(1f, opponent ? .235f : .975f);
             }
             _stats.Bind(card, opponent, showChanges, position);
-            SetLabel(_rating, scale.HasValue ? $"스케일 {scale.Value}" : card.Rating,
-                card.IsXyz ? RankColor : card.IsLink || scale.HasValue ? DuelStyle.Player : DuelStyle.Gold, showChanges);
+            BindRating(scale.HasValue ? (DuelRatingKind.Scale, scale.Value) : card.RatingNumber, showChanges);
             SetLabel(_status, card.Status,
                 card.Disabled ? new Color(1f, .65f, .58f) : DuelStyle.Muted, showChanges);
             BindCounters(card.CounterCount, opponent, showChanges);
+        }
+
+        private void BindRating((DuelRatingKind Kind, uint Value) rating, bool showChanges)
+        {
+            bool visible = rating.Kind != DuelRatingKind.None;
+            var color = rating.Kind switch
+            {
+                DuelRatingKind.Rank => RankColor,
+                DuelRatingKind.Link => DuelStyle.Player,
+                DuelRatingKind.Scale => ScaleColor,
+                _ => DuelStyle.Gold,
+            };
+            float right = (_inPreview ? .315f : .355f) + (rating.Value >= 10 ? .065f : 0f);
+            var badge = (RectTransform)_rating.transform.parent;
+            badge.anchorMax = new Vector2(right, 1f);
+            ((RectTransform)_status.transform.parent).anchorMin = new Vector2(visible ? right + .017f : .035f, 0f);
+            _ratingIcon.sprite = DuelStatSymbols.Rating(rating.Kind);
+            _ratingIcon.color = color;
+            SetLabel(_rating, visible ? rating.Value.ToString() : "", color, showChanges);
         }
 
         private void BindCounters(uint count, bool opponent, bool showChanges)
