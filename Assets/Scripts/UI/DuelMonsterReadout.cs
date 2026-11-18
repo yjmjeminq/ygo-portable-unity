@@ -21,6 +21,8 @@ namespace YGOPortable.UI
         internal bool IsXyz => (Type & YgoConstants.TYPE_XYZ) != 0;
         internal bool IsPendulum => (Type & YgoConstants.TYPE_PENDULUM) != 0;
         internal bool IsScale => Type == (YgoConstants.TYPE_PENDULUM | YgoConstants.TYPE_SPELL);
+        internal ulong Race => Live?.race ?? Printed?.race ?? 0;
+        internal uint Attribute => Live?.attribute ?? Printed?.attr ?? 0;
         internal int Attack => Live?.attack ?? Printed?.atk ?? -1;
         internal int Defense => Live?.defense ?? Printed?.def ?? -1;
         internal uint LeftScale => Live?.lscale ?? Printed?.lscale ?? 0;

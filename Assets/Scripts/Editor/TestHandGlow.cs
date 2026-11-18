@@ -26,6 +26,7 @@ namespace YGOPortable.Editor
             VerifyOpponentTurnActivation();
             VerifyNativeCombatReadout();
             VerifyNativeCounterReadout();
+            VerifyNativeIdentityReadout();
             VerifyInspectedCardMoves(swapInPlace: true);
             VerifyInspectedCardMoves(swapInPlace: false);
             VerifyNativeSummonReadout(turnFaceDown: false);
@@ -343,6 +344,96 @@ namespace YGOPortable.Editor
                 monsterSlot.Find("CardReadout/Combat/Attack/Digits/Value").GetComponent<Text>().text == "1600",
                 "Counter removal left stale readouts or attack values on the field or in card details.");
             Debug.Log("[VERIFY DUEL COUNTERS] Pitch-Black Power Stone and Breaker displayed their native counts. Spending a counter updated attack and hid the removed counts in both detail views.");
+        }
+
+        private static void VerifyNativeIdentityReadout()
+        {
+            const uint zombieWorld = 4064256, lairOfDarkness = 59160188, mysticalSpaceTyphoon = 5318639;
+            var empty = Array.Empty<uint>();
+            uint[] required = { KaiserSeaHorse, zombieWorld, lairOfDarkness, mysticalSpaceTyphoon };
+            var main = required.SelectMany(code => Enumerable.Repeat(code, 10)).ToArray();
+            var opponent = Enumerable.Repeat(BlueEyes, 40).ToArray();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Live card identity", main, empty, opponent, empty,
+                true, session => required.All(code => session.Players[session.HumanPlayerIndex].hand.Exists(card => card.code == code)));
+            using var ui = new HandUI(duel);
+            var ai = new TacticalAI();
+            var mine = duel.Players[duel.HumanPlayerIndex];
+            int summon = duel.ActivePrompt.summonable.FindIndex(card => card.code == KaiserSeaHorse);
+            Require(summon >= 0, "The identity fixture could not summon Kaiser Sea Horse.");
+            duel.SubmitResponseInt(summon << 16);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            var monster = mine.mzone.Single(card => card?.code == KaiserSeaHorse);
+            uint sequence = monster.sequence;
+            ui.Field.Refresh();
+
+            var root = ui.Field.Root.transform;
+            root.Find($"DuelBoard/Zone_{sequence + 2}_3").GetComponent<CardDragTrigger>().OnRightClick();
+            root.Find("LeftInspector/CardPreview/Card/AspectBox/ZoomHit").GetComponent<Button>().onClick.Invoke();
+            var inspector = root.Find("LeftInspector/CardDetails");
+            var zoom = root.Find("Overlay_CardZoom/ZoomWin/Info");
+            var inspectorText = inspector.Find("Stats/Info/Text").GetComponent<Text>();
+            var zoomText = zoom.Find("Stats/S").GetComponent<Text>();
+            var inspectorRace = inspector.Find("Race").GetComponent<Image>();
+            var zoomRace = zoom.Find("RaceIc").GetComponent<Image>();
+            var inspectorAttribute = inspector.Find("Attribute").GetComponent<Image>();
+            var zoomAttribute = zoom.Find("AttributeIc").GetComponent<Image>();
+
+            void ExpectShown(ulong race, uint attribute)
+            {
+                string identity = $"{YgoConstants.RaceNamesKR[race]} · {YgoConstants.AttributeNamesKR[attribute]}";
+                Sprite raceSprite = LotdUiKit.GetRaceSprite(race);
+                Sprite attrSprite = LotdUiKit.GetAttributeSprite(attribute);
+                Require(inspectorText.text.Contains(identity) && zoomText.text.Contains(identity) &&
+                        raceSprite != null && inspectorRace.sprite == raceSprite && zoomRace.sprite == raceSprite &&
+                        attrSprite != null && inspectorAttribute.sprite == attrSprite && zoomAttribute.sprite == attrSprite &&
+                        new[] { inspectorRace, zoomRace, inspectorAttribute, zoomAttribute }.All(icon => icon.gameObject.activeInHierarchy),
+                    $"The open card views showed the wrong race or attribute for {identity}.");
+                Canvas.ForceUpdateCanvases();
+                var label = inspectorText.cachedTextGenerator;
+                label.Populate(inspectorText.text, inspectorText.GetGenerationSettings(inspectorText.rectTransform.rect.size));
+                Require(label.lineCount == 2 && label.characterCountVisible >= inspectorText.text.Length - 1 &&
+                        label.fontSizeUsedForBestFit >= 12,
+                    "The compact card identity left its words clipped or too small.");
+            }
+
+            void Activate(uint code, uint target = 0)
+            {
+                int index = duel.ActivePrompt.activatable.FindIndex(card => card.code == code);
+                Require(index >= 0, $"The identity fixture could not activate card {code}.");
+                duel.SubmitResponseInt((index << 16) | 5);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
+                {
+                    if (target == 0 || prompt.messageType != YgoConstants.MSG_SELECT_CARD) return null;
+                    int choice = prompt.candidates.FindIndex(card => card.code == target);
+                    Require(choice >= 0, "Mystical Space Typhoon could not target Lair of Darkness.");
+                    return DuelSession.PackCardSelection(choice);
+                });
+                Require(duel.RetryCount == 0 && duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD,
+                    "The native identity change did not finish.");
+                ui.Field.Refresh();
+            }
+
+            ExpectShown(YgoConstants.RACE_SEASERPENT, YgoConstants.ATTRIBUTE_LIGHT);
+            Activate(zombieWorld);
+            Require(mine.mzone[sequence].race == YgoConstants.RACE_ZOMBIE, "Zombie World did not change the native race.");
+            ExpectShown(YgoConstants.RACE_ZOMBIE, YgoConstants.ATTRIBUTE_LIGHT);
+            Activate(lairOfDarkness);
+            Require(mine.mzone[sequence].attribute == YgoConstants.ATTRIBUTE_DARK, "Lair of Darkness did not change the native attribute.");
+            ExpectShown(YgoConstants.RACE_SEASERPENT, YgoConstants.ATTRIBUTE_DARK);
+            Activate(mysticalSpaceTyphoon, lairOfDarkness);
+            ExpectShown(YgoConstants.RACE_SEASERPENT, YgoConstants.ATTRIBUTE_LIGHT);
+
+            monster = mine.mzone[sequence];
+            monster.attribute |= YgoConstants.ATTRIBUTE_DARK;
+            ui.Field.Refresh();
+            Require(inspectorText.text.Contains("빛/어둠") && zoomText.text.Contains("빛/어둠") &&
+                    !inspectorAttribute.gameObject.activeSelf && !zoomAttribute.gameObject.activeSelf,
+                "A second attribute disappeared from the details or left a misleading single icon.");
+            monster.race = YgoConstants.RACE_ZOMBIE;
+            monster.position = YgoConstants.POS_FACEDOWN_DEFENSE;
+            ui.Field.Refresh();
+            ExpectShown(YgoConstants.RACE_SEASERPENT, YgoConstants.ATTRIBUTE_LIGHT);
+            Debug.Log("[VERIFY DUEL IDENTITY] An inspected monster's race and attribute icons followed Zombie World and Lair of Darkness, then returned to normal. Multiple attributes and face-down visibility passed.");
         }
 
         private static void VerifyInspectedCardMoves(bool swapInPlace)

@@ -21,6 +21,7 @@ namespace YGOPortable.UI
         // Left inspector & log
         private CompositeCardView _inspCard;
         private Image _inspRaceIcon;
+        private Image _inspAttributeIcon;
         private Text _inspName;
         private Image _inspTitle;
         private Text _inspStats;
@@ -133,6 +134,7 @@ namespace YGOPortable.UI
         private Text _zoomDesc;
         private ScrollRect _zoomScroll;
         private Image _zoomRaceIcon;
+        private Image _zoomAttributeIcon;
 
         // Multi-place selection accumulator (for MSG_SELECT_PLACE / MSG_SELECT_DISFIELD with min > 1)
         private readonly List<(byte con, uint loc, uint seq)> _pendingPlaces = new List<(byte con, uint loc, uint seq)>();
@@ -337,16 +339,12 @@ namespace YGOPortable.UI
             {
                 _inspName.text = $"카드 #{code}";
                 _inspDesc.text = "";
-                _inspRaceIcon.gameObject.SetActive(false);
                 return;
             }
             _inspName.text = info.name;
             _inspDesc.text = info.desc;
             _inspectScroll.StopMovement();
             _inspectScroll.content.anchoredPosition = Vector2.zero;
-            var rSp = info.IsMonster ? LotdUiKit.GetRaceSprite(info.race) : LotdUiKit.LoadSprite($"LOTD/Icons/{YgoConstants.GetSpellTrapSubSpriteName(info.type)}");
-            _inspRaceIcon.sprite = rSp;
-            _inspRaceIcon.gameObject.SetActive(rSp != null);
         }
 
         private void ResetCardInspector()
@@ -364,6 +362,7 @@ namespace YGOPortable.UI
             SetLinkedZones(0);
             _inspDesc.text = "카드를 선택하면 효과를 확인할 수 있습니다.";
             _inspRaceIcon.gameObject.SetActive(false);
+            _inspAttributeIcon.gameObject.SetActive(false);
             _inspectScroll.StopMovement();
             _inspectScroll.content.anchoredPosition = Vector2.zero;
         }
@@ -417,7 +416,8 @@ namespace YGOPortable.UI
             var live = ReadVisibleFieldCard(_inspectedCode, _inspectedFieldCard);
             if (live == null) _inspectedFieldCard = null;
             var card = new DuelCardReadout(CardDatabase.Get(_inspectedCode), live);
-            _inspStats.text = FormatInspectorStats(card);
+            _inspStats.text = FormatInspectorStats(card, compact: true);
+            BindIdentityIcons(card, _inspRaceIcon, _inspAttributeIcon);
             _inspCounters.Bind(card.CounterCount, showChanges);
             _inspCombat.Bind(card, live != null && _inspectedFieldCard.Value.controller != _session.HumanPlayerIndex,
                 showChanges && live != null);
@@ -464,21 +464,43 @@ namespace YGOPortable.UI
             }
         }
 
-        private static string FormatInspectorStats(DuelCardReadout card)
+        private static void BindIdentityIcons(DuelCardReadout card, Image raceIcon, Image attributeIcon)
+        {
+            Sprite race = null;
+            Sprite attribute = null;
+            if (card.IsMonster)
+            {
+                race = LotdUiKit.GetRaceSprite(card.Race);
+                attribute = LotdUiKit.GetAttributeSprite(card.Attribute);
+            }
+            else if ((card.Type & (YgoConstants.TYPE_SPELL | YgoConstants.TYPE_TRAP)) != 0)
+                race = LotdUiKit.LoadSprite($"LOTD/Icons/{YgoConstants.GetSpellTrapSubSpriteName(card.Type)}");
+            raceIcon.sprite = race;
+            raceIcon.gameObject.SetActive(race != null);
+            attributeIcon.sprite = attribute;
+            attributeIcon.gameObject.SetActive(attribute != null);
+        }
+
+        private static string FormatInspectorStats(DuelCardReadout card, bool compact = false)
         {
             if (card.Type == 0) return "";
             string type = card.IsScale ? "펜듈럼 마법" : YgoConstants.GetTypeTagKR(card.Type).Replace(" / ", " · ");
             if (card.IsPendulum) type += $" · 스케일 {card.LeftScale}/{card.RightScale}";
             if (!card.IsMonster) return type;
 
-            YgoConstants.RaceNamesKR.TryGetValue(card.Live?.race ?? card.Printed?.race ?? 0, out string race);
-            YgoConstants.AttributeNamesKR.TryGetValue(card.Live?.attribute ?? card.Printed?.attr ?? 0, out string attribute);
+            if (!YgoConstants.RaceNamesKR.TryGetValue(card.Race, out string race))
+                race = string.Join("/", YgoConstants.RaceNamesKR.Where(pair => (pair.Key & card.Race) != 0).Select(pair => pair.Value));
+            if (!YgoConstants.AttributeNamesKR.TryGetValue(card.Attribute, out string attribute))
+                attribute = string.Join("/", YgoConstants.AttributeNamesKR.Where(pair => (pair.Key & card.Attribute) != 0).Select(pair => pair.Value));
+            if (compact && race.Contains('/')) race = "복수 종족";
+            if (compact && attribute.Length > 8) attribute = "복수 속성";
             string identity = string.Join(" · ", new[] { race, attribute, card.Rating }.Where(part => !string.IsNullOrEmpty(part)));
             if (card.Live == null) return $"{identity}\n{type}";
 
             string position = card.Live.IsDefense ? "수비 표시" : "공격 표시";
             string status = card.Status;
-            return $"{identity}\n{type}\n{position}{(status.Length > 0 ? " · " + status : "")}";
+            if (status.Length > 0) position += " · " + status;
+            return compact ? $"{identity}\n{type} · {position}" : $"{identity}\n{type}\n{position}";
         }
 
         private void ShowZoomRelatedCards()
@@ -552,13 +574,16 @@ namespace YGOPortable.UI
                 Vector2.zero, Vector2.zero);
             _inspStats = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Info", stats,
                 Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero),
-                "Text", "", 13, 9, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
+                "Text", "", 14, 9, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
             var combat = LotdUiKit.CreateRect("CombatStats", inside, new Vector2(.025f, .323f), new Vector2(.975f, .375f),
                 Vector2.zero, Vector2.zero);
             _inspCombat = new DuelStatStrip(combat, compact: false);
-            var race = LotdUiKit.CreateRect("Race", inside, new Vector2(.842f, .388f), new Vector2(.987f, .445f),
+            var race = LotdUiKit.CreateRect("Race", inside, new Vector2(.841f, .419f), new Vector2(.987f, .453f),
                 Vector2.zero, Vector2.zero);
             _inspRaceIcon = LotdUiKit.AddImage(race.gameObject, null, Color.white, true, false);
+            var attribute = LotdUiKit.CreateRect("Attribute", inside, new Vector2(.841f, .379f), new Vector2(.987f, .413f),
+                Vector2.zero, Vector2.zero);
+            _inspAttributeIcon = LotdUiKit.AddImage(attribute.gameObject, null, Color.white, true, false);
 
             var title = LotdUiKit.CreateRect("Name", inside, new Vector2(0f, 0.908f), Vector2.one, Vector2.zero, Vector2.zero);
             _inspTitle = LotdUiKit.AddImage(title.gameObject, LotdUiKit.WhiteSprite, DuelStyle.HeaderColor, false, false);
@@ -3252,8 +3277,10 @@ namespace YGOPortable.UI
                 new Vector2(0f, 0.88f), new Vector2(0.82f, 1f), Vector2.zero, Vector2.zero),
                 "N", "", 22, 12, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
 
-            var rRt = LotdUiKit.CreateRect("RaceIc", infoRt, new Vector2(0.84f, 0.88f), new Vector2(0.98f, 1f), Vector2.zero, Vector2.zero);
-            _zoomRaceIcon = LotdUiKit.AddImage(rRt.gameObject, null, Color.white, true);
+            var race = LotdUiKit.CreateRect("RaceIc", infoRt, new Vector2(.833f, .88f), new Vector2(.902f, 1f), Vector2.zero, Vector2.zero);
+            _zoomRaceIcon = LotdUiKit.AddImage(race.gameObject, null, Color.white, true, false);
+            var attribute = LotdUiKit.CreateRect("AttributeIc", infoRt, new Vector2(.916f, .88f), new Vector2(.985f, 1f), Vector2.zero, Vector2.zero);
+            _zoomAttributeIcon = LotdUiKit.AddImage(attribute.gameObject, null, Color.white, true, false);
 
             _zoomStats = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Stats", infoRt,
                 new Vector2(0f, .735f), new Vector2(1f, .875f), Vector2.zero, Vector2.zero),
@@ -3323,16 +3350,12 @@ namespace YGOPortable.UI
                 _zoomName.text = info.name;
                 _zoomPasscode.text = $"카드 번호 {info.code:D8}";
                 _zoomDesc.text = info.desc;
-                var rSp = info.IsMonster ? LotdUiKit.GetRaceSprite(info.race) : LotdUiKit.LoadSprite($"LOTD/Icons/{YgoConstants.GetSpellTrapSubSpriteName(info.type)}");
-                _zoomRaceIcon.sprite = rSp;
-                _zoomRaceIcon.gameObject.SetActive(rSp != null);
             }
             else
             {
                 _zoomName.text = $"카드 #{code}";
                 _zoomPasscode.text = $"카드 번호 {code}";
                 _zoomDesc.text = "";
-                _zoomRaceIcon.gameObject.SetActive(false);
             }
             UpdateArtworkOptions(code, 0);
             _zoomScroll.StopMovement();
@@ -3352,6 +3375,7 @@ namespace YGOPortable.UI
             var card = new DuelCardReadout(CardDatabase.Get(code), live);
             _zoomCardView.SetCard(code, false, live);
             _zoomStats.text = FormatInspectorStats(card);
+            BindIdentityIcons(card, _zoomRaceIcon, _zoomAttributeIcon);
             _zoomCounters.Bind(card.CounterCount, showChanges);
             _zoomCombat.Bind(card, live != null && _zoomFieldCard.Value.controller != _session.HumanPlayerIndex,
                 showChanges && live != null);
