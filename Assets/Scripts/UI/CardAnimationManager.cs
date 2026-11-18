@@ -617,32 +617,35 @@ namespace YGOPortable.UI
         {
             if (!attacker.IsFaceUp && !defender.IsFaceUp) return null;
             bool pair = attacker.IsFaceUp && defender.IsFaceUp;
-            if (!pair) area.xMax = Mathf.Lerp(area.xMin, area.xMax, .62f);
+            if (!pair) area.xMax = Mathf.Lerp(area.xMin, area.xMax, mobileLayout ? .72f : .62f);
             var root = LotdUiKit.CreateRect("BattleReadout", _layer, area.min, area.max, Vector2.zero, Vector2.zero);
             if (mobileLayout) MobileSafeArea.Attach(root, area);
             var fade = root.gameObject.AddComponent<CanvasGroup>();
             fade.alpha = 0f;
             fade.blocksRaycasts = fade.interactable = false;
             DuelReadoutPlate.Add(root, new Color(.028f, .052f, .065f, .97f));
+            bool inline = mobileLayout && !attacker.IsDefense;
 
-            void AddCard(string name, BattleCardStats card, bool link, string role, float start, float end)
+            void AddCard(string name, BattleCardStats card, bool link, bool attacking, string role, float start, float end)
             {
                 var segment = LotdUiKit.CreateRect(name, root, new Vector2(start, 0f), new Vector2(end, 1f),
-                    new Vector2(4f, 3f), new Vector2(-4f, -3f));
+                    new Vector2(3f, 2f), new Vector2(-3f, -2f));
                 bool opponent = card.Controller != viewer;
-                var title = LotdUiKit.CreateRect("Role", segment, new Vector2(0f, .677f), Vector2.one,
-                    Vector2.zero, Vector2.zero);
-                LotdUiKit.AddFittedText(title, "Text", $"{(opponent ? "상대" : "내")} {role}", 14, 8,
-                    TextAnchor.MiddleCenter, DuelStyle.Side(opponent), FontStyle.Bold);
-                var values = LotdUiKit.CreateRect("Values", segment, Vector2.zero, new Vector2(1f, .66f),
-                    Vector2.zero, Vector2.zero);
-                new DuelStatStrip(values, compact: true).BindBattle(card, link);
+                var title = LotdUiKit.CreateRect("Role", segment, new Vector2(0f, inline ? 0f : .61f),
+                    new Vector2(inline ? .48f : 1f, 1f), Vector2.zero, Vector2.zero);
+                var titleColor = Color.Lerp(Color.white, DuelStyle.Side(opponent), .33f);
+                LotdUiKit.AddFittedText(title, "Text", $"{(opponent ? "상대" : "내")} {role}", inline ? 20 : 17, 9,
+                    TextAnchor.MiddleCenter, titleColor, FontStyle.Bold);
+                var values = LotdUiKit.CreateRect("Values", segment, new Vector2(inline ? .48f : 0f, 0f),
+                    new Vector2(1f, inline ? 1f : .60f), Vector2.zero, Vector2.zero);
+                new DuelStatStrip(values, compact: true).BindBattle(card, link, attacking);
             }
 
             if (attacker.IsFaceUp)
-                AddCard("Attacker", attacker, attackerIsLink, defender.Location == 0 ? "직접 공격" : "공격", 0f, pair ? .5f : 1f);
+                AddCard("Attacker", attacker, attackerIsLink, true,
+                    defender.Location == 0 ? "직접 공격" : "공격", 0f, pair ? .5f : 1f);
             if (defender.IsFaceUp)
-                AddCard("Defender", defender, defenderIsLink, "대상", pair ? .5f : 0f, 1f);
+                AddCard("Defender", defender, defenderIsLink, false, defender.IsDefense ? "수비" : "대상", pair ? .5f : 0f, 1f);
             return fade;
         }
 

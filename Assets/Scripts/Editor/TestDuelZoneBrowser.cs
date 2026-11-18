@@ -87,7 +87,7 @@ namespace YGOPortable.Editor
                 var opponentExtra = viewport.Find("DuelBoard/Zone_7_0");
                 VerifyPileReadout(myDeck, 36, 0);
                 VerifyPileReadout(opponentExtra, 1, pendulum);
-                battle = animator.CreateBattleReadout(DuelFieldUI.BattleStatsArea,
+                battle = animator.CreateBattleReadout(DuelFieldUI.MobileBattleStatsArea,
                     new BattleCardStats(1, YgoConstants.LOCATION_MZONE, 1, YgoConstants.POS_FACEUP_ATTACK, 1700, 1650),
                     new BattleCardStats(0, YgoConstants.LOCATION_MZONE, 2, YgoConstants.POS_FACEUP_ATTACK, 3400, 2500),
                     0, false, false, mobileLayout: true);
@@ -149,9 +149,28 @@ namespace YGOPortable.Editor
 
                     var preview = Bounds(left);
                     var comparison = Bounds(battle.transform);
-                    Require(Mathf.Abs(preview.xMin - comparison.xMin) < .1f && Mathf.Abs(preview.xMax - comparison.xMax) < .1f &&
-                        comparison.yMax < preview.yMin && comparison.yMin > Bounds(viewport.Find("PlayerHUD")).yMax,
-                        "The live combat comparison left its place between the inspector and player HUD.");
+                    var hand = Bounds(viewport.Find("PlayerHand"));
+                    Require(Mathf.Abs(preview.xMin - comparison.xMin) < .1f &&
+                        comparison.yMax < preview.yMin && comparison.yMin > Bounds(viewport.Find("PlayerHUD")).yMax &&
+                        comparison.xMax > preview.xMax && comparison.xMax < hand.xMin,
+                        "The mobile combat comparison overlapped the inspector, player HUD, or hand.");
+                    foreach (var (side, expectedRole, expectedValue) in new[]
+                    {
+                        ("Attacker", "상대 공격", "1700"), ("Defender", "내 대상", "3400"),
+                    })
+                    {
+                        var segment = battle.transform.Find(side);
+                        var title = segment.Find("Role/Text").GetComponent<Text>();
+                        var number = segment.Find("Values/Attack/Digits/Value").GetComponent<Text>();
+                        var symbol = segment.Find("Values/Attack/Symbol");
+                        var digits = Bounds(number.rectTransform);
+                        Require(title.text == expectedRole && number.text == expectedValue &&
+                            !segment.Find("Values/Defense").gameObject.activeSelf &&
+                            digits.width > comparison.width * .15f && digits.height > comparison.height * .75f &&
+                            !digits.Overlaps(Bounds(title.rectTransform)) &&
+                            !digits.Overlaps(Bounds(symbol)),
+                            "The mobile comparison squeezed the relevant number or overlapped its role or symbol.");
+                    }
                     Require(Mathf.Abs(Bounds(actions).center.x - Bounds(slot).center.x) < .1f,
                         "The card actions lost alignment with the selected card after a layout change.");
                     Require(Bounds(overlay).size == (Vector2)display && Bounds(field.Root.transform.Find("ArenaGround")).size == (Vector2)display,

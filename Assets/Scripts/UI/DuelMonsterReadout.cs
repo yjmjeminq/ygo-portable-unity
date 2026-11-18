@@ -118,14 +118,27 @@ namespace YGOPortable.UI
                 _defense.Bind(card.Defense, card.Live?.baseDefense ?? card.Defense, (shownPosition & YgoConstants.POS_DEFENSE) != 0, showChanges);
         }
 
-        internal void BindBattle(BattleCardStats card, bool link)
+        internal void BindBattle(BattleCardStats card, bool link, bool attacking)
         {
             _root.gameObject.SetActive(card.IsFaceUp);
             if (!card.IsFaceUp) return;
 
-            Layout(link, 0, false);
-            _attack.Bind(card.Attack, card.Attack, !card.IsDefense);
-            if (!link) _defense.Bind(card.Defense, card.Defense, card.IsDefense);
+            _compass?.Hide();
+            bool showDefense = !link && card.IsDefense;
+            // A defense-position attack can use either stat. The battle message reports both card values.
+            bool showAttack = attacking || !showDefense;
+            bool split = showAttack && showDefense;
+            Place(_attack, showAttack, card.Attack, 0f, split ? .49f : 1f);
+            Place(_defense, showDefense, card.Defense, split ? .51f : 0f, 1f);
+
+            void Place(StatCell cell, bool visible, int value, float from, float to)
+            {
+                cell.Rect.gameObject.SetActive(visible);
+                if (!visible) return;
+                cell.Rect.anchorMin = new Vector2(from, 0f);
+                cell.Rect.anchorMax = new Vector2(to, 1f);
+                cell.BindComparison(value, split);
+            }
         }
 
         private void Layout(bool link, uint directions, bool opponent)
@@ -133,6 +146,7 @@ namespace YGOPortable.UI
             bool hasDirections = directions != 0;
             if (hasDirections) (_compass ??= new DuelLinkCompass(_root)).Bind(directions, opponent);
             else _compass?.Hide();
+            _attack.Rect.gameObject.SetActive(true);
             _attack.Rect.anchorMin = link && _compact && !hasDirections ? new Vector2(.21f, 0f) : Vector2.zero;
             float attackWidth = !link ? .493f : hasDirections ? .62f : _compact ? .79f : 1f;
             _attack.Rect.anchorMax = new Vector2(attackWidth, 1f);
@@ -148,6 +162,7 @@ namespace YGOPortable.UI
             private readonly Image _rail;
             private readonly Text _value;
             private readonly Text _change;
+            private readonly RectTransform _digits;
             private readonly RectTransform _symbol;
             private readonly Color _accent;
             private int _lastValue = -1;
@@ -178,12 +193,20 @@ namespace YGOPortable.UI
                 _change = LotdUiKit.AddFittedText(badge, "Arrow", "", compact ? 10 : 12, compact ? 6 : 8,
                     TextAnchor.MiddleCenter, accent, FontStyle.Bold);
                 _change.verticalOverflow = VerticalWrapMode.Overflow;
-                var digits = LotdUiKit.CreateRect("Digits", Rect, compact ? new Vector2(.265f, .085f) : new Vector2(.055f, .035f),
+                _digits = LotdUiKit.CreateRect("Digits", Rect, compact ? new Vector2(.265f, .085f) : new Vector2(.055f, .035f),
                     compact ? new Vector2(.96f, .96f) : new Vector2(.945f, .68f), Vector2.zero, Vector2.zero);
-                _value = LotdUiKit.AddFittedText(digits, "Value", "", compact ? 23 : 28, compact ? 7 : 9,
+                _value = LotdUiKit.AddFittedText(_digits, "Value", "", compact ? 23 : 28, compact ? 7 : 9,
                     TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
                 _value.horizontalOverflow = HorizontalWrapMode.Overflow;
                 _value.gameObject.AddComponent<DuelStatDigitFit>();
+            }
+
+            internal void BindComparison(int value, bool split)
+            {
+                _digits.anchorMin = new Vector2(.265f, .035f);
+                _digits.anchorMax = new Vector2(.97f, .99f);
+                _value.resizeTextMaxSize = split ? 23 : 28;
+                Bind(value, value, active: true);
             }
 
             internal void Bind(int value, int original, bool active, bool showChanges = false)

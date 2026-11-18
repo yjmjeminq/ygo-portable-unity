@@ -208,7 +208,8 @@ namespace YGOPortable.UI
         public bool IsBrowsingZone => _modals.IsZoneViewerOpen;
         internal bool IsReadingCardDetails => _cardZoomModal.activeSelf;
         internal static float PlaybackRate => Application.platform == RuntimePlatform.IPhonePlayer ? .75f : 1f;
-        internal static readonly Rect BattleStatsArea = Rect.MinMaxRect(.015f, .137f, .186f, .190f);
+        internal static readonly Rect BattleStatsArea = Rect.MinMaxRect(.015f, .135f, .186f, .193f);
+        internal static readonly Rect MobileBattleStatsArea = Rect.MinMaxRect(.015f, .135f, .221f, .193f);
         private bool CanAcceptPlayerAction => _session != null && !_session.IsFinished && !IsPresenting && !IsPaused && !IsReadingLog &&
             _session.ActivePrompt?.playerId == _session.HumanPlayerIndex;
 
@@ -2457,7 +2458,8 @@ namespace YGOPortable.UI
             var defense = defender.IsFaceUp && defendingCard?.code > 0
                 ? new DuelCardReadout(CardDatabase.Get(defendingCard.code), defendingCard, defender) : default;
             int viewer = _session.HumanPlayerIndex;
-            var readout = animator.CreateBattleReadout(BattleStatsArea, attacker, defender, viewer, combat.IsLink, defense.IsLink,
+            var comparisonArea = _mobileLayout ? MobileBattleStatsArea : BattleStatsArea;
+            var readout = animator.CreateBattleReadout(comparisonArea, attacker, defender, viewer, combat.IsLink, defense.IsLink,
                 _mobileLayout);
             var flight = new CardFlight(card.code, from, resting, false, false);
             var slot = GetSlot(attacker.Controller, attacker.Location, attacker.Sequence);

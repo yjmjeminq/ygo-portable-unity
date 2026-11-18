@@ -27,6 +27,8 @@ namespace YGOPortable.Editor
             VerifyOpponentTurnActivation();
             VerifyNativeCombatReadout(useHonest: true);
             VerifyNativeCombatReadout(useHonest: false);
+            VerifyDefensePositionBattleReadout(34496660, 1800);
+            VerifyDefensePositionBattleReadout(75372290, 1550);
             VerifyNativeCounterReadout();
             VerifyNativeIdentityReadout();
             VerifyInspectedCardMoves(swapInPlace: true);
@@ -298,7 +300,10 @@ namespace YGOPortable.Editor
             string expectedAttack = useHonest ? "3500" : "2700";
             Require(usedHonest == useHonest && readout != null && duel.RetryCount == 0 &&
                 attack.text == "2700" && readout.Find("Attacker/Values/Attack/Digits/Value").GetComponent<Text>().text == expectedAttack &&
-                readout.Find("Defender/Values/Defense/Digits/Value").GetComponent<Text>().text == "2000",
+                readout.Find("Defender/Values/Defense/Digits/Value").GetComponent<Text>().text == "2000" &&
+                readout.Find("Defender/Role/Text").GetComponent<Text>().text == "상대 수비" &&
+                !readout.Find("Attacker/Values/Defense").gameObject.activeSelf &&
+                !readout.Find("Defender/Values/Attack").gameObject.activeSelf,
                 "The attack presentation lost the native damage-step increase or the revealed defense.");
             ui.Field.Refresh();
             Require(attackerFace.gameObject.activeInHierarchy && slot.Find("CardReadout").gameObject.activeInHierarchy &&
@@ -328,6 +333,69 @@ namespace YGOPortable.Editor
                 ((IDictionary)typeof(DuelFieldUI).GetField("_battleCardDisplays", PrivateInstance).GetValue(ui.Field)).Count == 0,
                 "A destroyed defender or queued battle display remained on the field.");
             Debug.Log($"[VERIFY DUEL BATTLE STATS] A set defender stayed hidden until its flip, showed 2000 DEF through the {expectedAttack} ATK strike, and left at destruction.");
+        }
+
+        private static void VerifyDefensePositionBattleReadout(uint attacker, int damage)
+        {
+            const uint sparkman = 20721928;
+            var deck = Enumerable.Repeat(sparkman, 20).Concat(Enumerable.Repeat(attacker, 20)).ToArray();
+            var empty = Array.Empty<uint>();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Defense-position attack", deck, empty,
+                Enumerable.Repeat(sparkman, 40).ToArray(), empty, true,
+                session => session.Players[session.HumanPlayerIndex].hand.Any(card => card.code == attacker) &&
+                    session.ActivePrompt?.summonable.Any(card => card.code == sparkman) == true);
+            using var ui = new HandUI(duel);
+            var ai = new TacticalAI();
+            var opponent = duel.Players[duel.AiPlayerIndex];
+            int lifeBefore = opponent.lp;
+
+            byte[] Respond(DuelPrompt prompt)
+            {
+                if (prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && prompt.promptCardCode == attacker)
+                    return BitConverter.GetBytes(1);
+                if (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN)
+                {
+                    int index = prompt.candidates.FindIndex(card => card.code == attacker);
+                    if (index >= 0) return BitConverter.GetBytes(index);
+                }
+                return prompt.messageType == YgoConstants.MSG_SELECT_TRIBUTE ? ai.ComputeResponse(duel, prompt) : null;
+            }
+
+            void Summon(uint code)
+            {
+                int index = duel.ActivePrompt.summonable.FindIndex(card => card.code == code);
+                Require(index >= 0, $"The defense attack fixture could not summon {code}.");
+                duel.SubmitResponseInt(index << 16);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai, Respond);
+            }
+
+            Summon(sparkman);
+            for (int turn = 0; turn < 2; turn++)
+            {
+                duel.SubmitResponseInt(7);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            }
+            Summon(attacker);
+            var card = duel.Players[duel.HumanPlayerIndex].mzone.Single(slot => slot?.code == attacker);
+            Require(card.position == YgoConstants.POS_FACEUP_DEFENSE, "The attacker did not change to face-up defense.");
+
+            var animation = CardAnimationManager.Ensure(ui.Canvas);
+            duel.SubmitResponseInt(6);
+            int attack = duel.ActivePrompt.attackable.FindIndex(candidate => candidate.code == attacker);
+            Require(attack >= 0, "The native engine did not offer the defense-position attack.");
+            duel.SubmitResponseInt((attack << 16) | 1);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, Respond);
+
+            var comparison = animation.transform.Find("BattleReadout");
+            var attackValue = comparison?.Find("Attacker/Values/Attack/Digits/Value").GetComponent<Text>();
+            var defenseValue = comparison?.Find("Attacker/Values/Defense/Digits/Value").GetComponent<Text>();
+            Require(opponent.lp == lifeBefore - damage && duel.RetryCount == 0 &&
+                comparison != null && comparison.Find("Defender") == null &&
+                comparison.Find("Attacker/Role/Text").GetComponent<Text>().text == "내 직접 공격" &&
+                attackValue.gameObject.activeInHierarchy && attackValue.text == card.attack.ToString() &&
+                defenseValue.gameObject.activeInHierarchy && defenseValue.text == card.defense.ToString(),
+                "The direct attack in defense omitted one of its card values or disagreed with the native LP result.");
+            Debug.Log($"[VERIFY DUEL BATTLE STATS] {attacker} attacked in defense for {damage} and displayed both raw stats.");
         }
 
         private static void VerifyNativeCounterReadout()
