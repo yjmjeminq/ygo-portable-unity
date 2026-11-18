@@ -26,6 +26,9 @@ namespace YGOPortable.Editor
             VerifyKoreanPendulumReadouts(duel);
             VerifyLightningStormOptions();
             VerifyCyberRaiderOptions();
+            VerifyRunickTipOptions();
+            VerifyDreadnoughtServantConfirmation();
+            VerifyGagagaLevelInstruction();
             VerifyBundledOptionDescriptions();
             VerifyKoreanEffectCatalogue();
             VerifyGroupedLocations(duel);
@@ -44,11 +47,12 @@ namespace YGOPortable.Editor
             const uint legendaryBlackLusterSoldier = 70551291;
             const uint cyberseCodeMagician = 64866;
             const uint spyralVortex = 35699;
-            ulong untranslated = (ulong)spyralVortex << 20;
+            ulong destruction = (ulong)spyralVortex << 20;
+            ulong unknown = destruction | 14;
             string rulesText = CardDatabase.GetKoreanCardDescription(spyralVortex);
-            Require(CardDatabase.ResolveOptionDescription(untranslated) == null &&
-                    CardDatabase.ResolveEffectDescription(untranslated, spyralVortex) == rulesText,
-                "An untranslated effect label did not fall back to the Korean card text.");
+            Require(CardDatabase.ResolveOptionDescription(unknown) == null &&
+                    CardDatabase.ResolveEffectDescription(unknown, spyralVortex) == rulesText,
+                "An unknown effect label did not fall back to the Korean card text.");
             ulong drawReplacement = (ulong)legendaryBlackLusterSoldier << 20;
             const string drawLabel = "이번 턴의 일반 드로우 대신 덱에서 의식 마법 카드 1장을 패에 넣는다";
             Require(CardDatabase.ResolveDescription(drawReplacement | 1) == "덱으로 되돌린다" &&
@@ -82,17 +86,23 @@ namespace YGOPortable.Editor
             Require(effect.text == drawLabel, "The chain confirmation did not show the concise Korean draw-replacement effect.");
 
             view.Modals.ShowPrompt(duel, new DuelPrompt { messageType = YgoConstants.MSG_SELECT_EFFECTYN, playerId = 0,
-                promptCardCode = spyralVortex, promptDesc = untranslated });
+                promptCardCode = spyralVortex, promptDesc = destruction });
+            Require(view.Modals.ModalRoot.GetComponentsInChildren<Text>().Single(label => label.name == "Effect").text ==
+                    "자신 필드의 스파이랄 카드 1장과 상대 필드의 카드 최대 2장을 파괴한다",
+                "SPYRAL Sleeper should show the selected destruction effect without repeating its entire rules text.");
+
+            view.Modals.ShowPrompt(duel, new DuelPrompt { messageType = YgoConstants.MSG_SELECT_EFFECTYN, playerId = 0,
+                promptCardCode = spyralVortex, promptDesc = unknown });
             effect = view.Modals.ModalRoot.GetComponentsInChildren<Text>()
                 .Single(label => label.gameObject.name == "Effect");
             Require(effect.text == rulesText, "An untranslated English label escaped into the chain preview.");
             view.Modals.ShowPrompt(duel, new DuelPrompt { messageType = YgoConstants.MSG_SELECT_YESNO, playerId = 0,
-                promptDesc = untranslated });
+                promptDesc = unknown });
             Require(view.Modals.ModalRoot.GetComponentsInChildren<Text>().Single(label => label.name == "Question").text == rulesText,
                 "An untranslated English label escaped into the yes/no confirmation.");
             var options = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_OPTION, playerId = 0 };
-            options.options.Add(untranslated);
-            options.options.Add(untranslated | 1);
+            options.options.Add(unknown);
+            options.options.Add(unknown | 1);
             view.Modals.ShowPrompt(duel, options);
             Require(view.Modals.ModalRoot.GetComponentsInChildren<Text>().Single(label => label.name == "CardText").text == rulesText,
                 "An unlabelled choice omitted the Korean source effect.");
@@ -135,6 +145,18 @@ namespace YGOPortable.Editor
             Require(view.Modals.ModalRoot.GetComponentsInChildren<Text>()
                     .Single(label => label.name == "Question").text == "직접 공격을 선택하시겠습니까?",
                 "An opponent-chosen direct attack was displayed as another effect activation.");
+
+            const uint hugin = 55990317;
+            view.Modals.ShowPrompt(duel, new DuelPrompt { messageType = YgoConstants.MSG_SELECT_EFFECTYN,
+                playerId = 0, promptDesc = 96, promptCardCode = hugin });
+            var replacement = view.Modals.ModalRoot.transform.Find("Win");
+            Require(!view.Modals.IsChainPromptOpen &&
+                    replacement.Find("Hdr/SubtitleBand/Sub").GetComponent<Text>().text == CardDatabase.GetName(hugin) &&
+                    replacement.GetComponentsInChildren<Text>().Single(label => label.name == "Question").text ==
+                        "이 카드의 대체 효과를 적용하시겠습니까?",
+                "A destruction replacement did not show the translated question and source card.");
+            Require(view.Modals.TryConfirm() && view.Responses.Last() == 1,
+                "A yes/no replacement no longer accepted the engine's affirmative response.");
         }
 
         private static void VerifyBundledOptionDescriptions()
@@ -200,6 +222,22 @@ namespace YGOPortable.Editor
             Require(Option(blackCat, 0) == "패에 넣는다" &&
                     CardDatabase.ResolveDescription(578) == "엑시즈 소재로 할 카드를 선택하십시오.",
                 "A common confirmation or attach-material instruction lost its Korean wording.");
+
+            foreach (uint zeus in new[] { 90448279u, 90448280u, 90448282u })
+                Require(Option(zeus, 0) == "엑시즈 몬스터가 전투한 턴에 자신 필드의 엑시즈 몬스터 위에 겹쳐 엑시즈 소환한다" &&
+                        CardDatabase.ResolveEffectDescription((ulong)zeus << 20, zeus) ==
+                            "엑시즈 소재를 2개 제거해 필드의 다른 카드를 전부 묘지로 보낸다" &&
+                        Option(zeus, 1) == "패·덱·엑스트라 덱의 카드 1장을 이 카드의 엑시즈 소재로 한다",
+                    "The shared Zeus description or an alternate printing mixed its summoning and activated effects.");
+            foreach (uint liebe in new[] { 26096328u, 26096329u })
+                Require(Option(liebe, 0) == "랭크 10 기계족 엑시즈 몬스터 위에 겹쳐 엑시즈 소환한다" &&
+                        CardDatabase.ResolveEffectDescription((ulong)liebe << 20, liebe) ==
+                            "엑시즈 소재를 1개 제거해 공격력과 수비력을 2000 올린다",
+                    "Liebe reused its summoning text in the activated effect.");
+            Require(Option(80666118, 1)?.StartsWith("이 카드의 공격력 이하인", StringComparison.Ordinal) == true &&
+                    Option(58600555, 0) == "엑시즈 소재를 1개 제거해 상대의 수비 표시 몬스터 1장을 덱으로 되돌린다" &&
+                    Option(58600555, 2)?.EndsWith("겹쳐 엑시즈 소환한다", StringComparison.Ordinal) == true,
+                "The stale database slots for Scarlight or Corebage overrode the script's descriptions.");
         }
 
         private static void VerifyKoreanPendulumReadouts(DuelSession duel)
@@ -370,6 +408,140 @@ namespace YGOPortable.Editor
                     "The translated choice did not destroy or move the Equip Spell as labeled.");
             }
             Debug.Log("[VERIFY KOREAN NATIVE OPTIONS] Cyber Raider destroyed and moved the Equip Spell using its respective Korean choices.");
+        }
+
+        private static void VerifyRunickTipOptions()
+        {
+            const uint tip = 31562086, fountain = 92107604, geri = 28373620, sparkman = 20721928;
+            var main = Enumerable.Repeat(tip, 20).Concat(Enumerable.Repeat(fountain, 20)).ToArray();
+            var opponent = Enumerable.Repeat(sparkman, 40).ToArray();
+            var ai = new TacticalAI();
+            string[] labels = {
+                "덱에서 다른 루닉 카드 1장을 패에 넣은 뒤 상대 덱 위에서 카드 1장을 제외한다",
+                "엑스트라 덱에서 루닉 몬스터 1장을 엑스트라 몬스터 존에 특수 소환한다",
+            };
+
+            for (int choice = 0; choice < labels.Length; choice++)
+            {
+                using var duel = YgoProjectBuilder.StartSeedMatching("Runick Tip options", main, new[] { geri },
+                    opponent, Array.Empty<uint>(), true,
+                    session =>
+                    {
+                        YgoProjectBuilder.DriveUntilIdle(session, ai);
+                        return session.ActivePrompt?.activatable.Exists(card => card.code == tip) == true;
+                    });
+                var player = duel.Players[duel.HumanPlayerIndex];
+                int fountains = player.hand.Count(card => card.code == fountain);
+                int activate = duel.ActivePrompt.activatable.FindIndex(card => card.code == tip);
+                duel.SubmitResponseInt((activate << 16) | 5);
+                using var view = new ChainView();
+                YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
+                {
+                    if (prompt.messageType == YgoConstants.MSG_SELECT_CARD) return ai.ComputeResponse(duel, prompt);
+                    if (prompt.messageType != YgoConstants.MSG_SELECT_OPTION) return null;
+                    Require(prompt.options.SequenceEqual(new[] { (ulong)tip << 20, ((ulong)tip << 20) | 1 }),
+                        "Runick Tip did not offer both branches.");
+                    view.Modals.ShowPrompt(duel, prompt);
+                    var buttons = view.Modals.ModalRoot.GetComponentsInChildren<Button>();
+                    for (int i = 0; i < labels.Length; i++)
+                        Require(buttons.Single(button => button.name == $"Opt_{i}").GetComponentInChildren<Text>().text ==
+                            labels[i], "Runick Tip did not display the processing and destination of each effect.");
+                    buttons.Single(button => button.name == $"Opt_{choice}").onClick.Invoke();
+                    Require(view.Responses.SequenceEqual(new[] { choice }), "The Runick choice submitted the wrong index.");
+                    return BitConverter.GetBytes(view.Responses[0]);
+                });
+                Require(view.Responses.Count == 1 && duel.RetryCount == 0 &&
+                        player.hand.Count(card => card.code == fountain) == fountains + (choice == 0 ? 1 : 0) &&
+                        duel.Players[duel.AiPlayerIndex].banished.Count == (choice == 0 ? 1 : 0) &&
+                        player.mzone.Skip(5).Any(card => card?.code == geri) == (choice == 1),
+                    "The Runick option did not search and banish or summon to an Extra Monster Zone as labeled.");
+            }
+            Debug.Log("[VERIFY KOREAN NATIVE OPTIONS] Runick Tip presented and resolved its distinct Korean search and summon options.");
+        }
+
+        private static void VerifyDreadnoughtServantConfirmation()
+        {
+            const uint servant = 98931282, umi = 22702055, polymerization = 24094653, sparkman = 20721928;
+            var main = Enumerable.Repeat(servant, 13).Concat(Enumerable.Repeat(umi, 13))
+                .Concat(Enumerable.Repeat(polymerization, 14)).ToArray();
+            var opponent = Enumerable.Repeat(sparkman, 40).ToArray();
+            var empty = Array.Empty<uint>();
+            var ai = new TacticalAI();
+            foreach (bool accept in new[] { true, false })
+            {
+                using var duel = YgoProjectBuilder.StartSeedMatching("Dreadnought Servant", main, empty, opponent, empty,
+                    true, session => session.Players[session.HumanPlayerIndex].hand.Exists(card => card.code == servant) &&
+                        session.ActivePrompt?.activatable.Exists(card => card.code == umi) == true);
+                var player = duel.Players[duel.HumanPlayerIndex];
+                int fusions = player.hand.Count(card => card.code == polymerization);
+                void Activate(uint code)
+                {
+                    int index = duel.ActivePrompt.activatable.FindIndex(card => card.code == code);
+                    Require(index >= 0, $"Dreadnought Servant fixture could not activate {code}.");
+                    duel.SubmitResponseInt((index << 16) | 5);
+                }
+                Activate(umi);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+                Activate(servant);
+                using var view = new ChainView();
+                YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
+                {
+                    if (prompt.messageType == YgoConstants.MSG_SELECT_CARD) return ai.ComputeResponse(duel, prompt);
+                    if (prompt.messageType != YgoConstants.MSG_SELECT_YESNO) return null;
+                    Require(prompt.promptDesc == (((ulong)servant << 20) | 2),
+                        "Unexpected Servant confirmation description.");
+                    view.Modals.ShowPrompt(duel, prompt);
+                    Require(view.Modals.ModalRoot.GetComponentsInChildren<Text>().Single(label => label.name == "Question")
+                        .text == "자신 필드의 카드 1장을 파괴하고 덱에서 융합 1장을 패에 넣으시겠습니까?",
+                        "A missing native label was replaced with an ambiguous full rules text.");
+                    bool answered = accept ? view.Modals.TryConfirm() : view.Modals.TryCancelOrPass();
+                    Require(answered && view.Responses.SequenceEqual(new[] { accept ? 1 : 0 }),
+                        "The yes/no response changed with the Korean description.");
+                    return BitConverter.GetBytes(view.Responses[0]);
+                });
+                Require(view.Responses.Count == 1 && duel.RetryCount == 0 &&
+                        player.hand.Count(card => card.code == polymerization) == fusions + (accept ? 1 : 0) &&
+                        player.grave.Any(card => card.code == servant || card.code == umi) == accept,
+                    "The displayed confirmation did not match the optional destruction and search.");
+            }
+            Debug.Log("[VERIFY KOREAN NATIVE OPTIONS] Dreadnought Servant showed its Korean confirmation and resolved both responses.");
+        }
+
+        private static void VerifyGagagaLevelInstruction()
+        {
+            const uint magician = 26082117, sparkman = 20721928;
+            var main = Enumerable.Repeat(magician, 40).ToArray();
+            var opponent = Enumerable.Repeat(sparkman, 40).ToArray();
+            var empty = Array.Empty<uint>();
+            var ai = new TacticalAI();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Gagaga level instruction", main, empty, opponent, empty,
+                true, session => session.ActivePrompt?.summonable.Exists(card => card.code == magician) == true);
+            int summon = duel.ActivePrompt.summonable.FindIndex(card => card.code == magician);
+            duel.SubmitResponseInt(summon << 16);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            int activate = duel.ActivePrompt.activatable.FindIndex(card => card.code == magician);
+            Require(activate >= 0, "Gagaga Magician had no level-changing action.");
+            duel.SubmitResponseInt((activate << 16) | 5);
+            using var view = new ChainView();
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
+            {
+                if (prompt.messageType != YgoConstants.MSG_ANNOUNCE_NUMBER) return null;
+                int index = prompt.options.IndexOf(8);
+                Require(index >= 0 && prompt.SelectionHint == (((ulong)magician << 20) | 1),
+                    "Gagaga Magician did not ask for the expected level.");
+                view.Modals.ShowPrompt(duel, prompt);
+                var window = view.Modals.ModalRoot.transform.Find("Win");
+                Require(window.Find("Hdr/TitleBand/Title").GetComponent<Text>().text ==
+                        "1부터 8까지 중 이 카드에 적용할 레벨을 선택하세요",
+                    "The number list did not display the action indicated by the native hint.");
+                window.GetComponentsInChildren<Button>().Single(button => button.name == $"Opt_{index}").onClick.Invoke();
+                Require(view.Responses.SequenceEqual(new[] { index }), "The numeric selection sent the number instead of its index.");
+                return BitConverter.GetBytes(view.Responses[0]);
+            });
+            Require(view.Responses.Count == 1 && duel.RetryCount == 0 &&
+                    duel.Players[duel.HumanPlayerIndex].mzone.Any(card => card?.code == magician && card.level == 8),
+                "Gagaga Magician did not apply the selected level.");
+            Debug.Log("[VERIFY KOREAN NATIVE OPTIONS] Gagaga Magician displayed the Korean level instruction and applied the chosen level.");
         }
 
         private static void VerifyKoreanEffectCatalogue()

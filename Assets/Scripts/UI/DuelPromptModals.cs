@@ -639,10 +639,10 @@ namespace YGOPortable.UI
                 return;
             }
 
-            // A card effect can delegate the direct-attack decision to the opponent.
-            bool directAttackDecision = prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && prompt.promptDesc == 31;
+            // Some yes/no prompts ask about a decision during resolution instead of creating a new chain link.
+            bool resolutionDecision = prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && prompt.promptDesc is 31 or 95 or 96;
             _chainPrompt = prompt.messageType == YgoConstants.MSG_SELECT_CHAIN ||
-                (prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && !directAttackDecision);
+                (prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && !resolutionDecision);
             bool cardChoices = prompt.messageType is YgoConstants.MSG_SELECT_POSITION or YgoConstants.MSG_SELECT_CARD
                 or YgoConstants.MSG_SELECT_TRIBUTE or YgoConstants.MSG_SELECT_SUM or YgoConstants.MSG_SELECT_UNSELECT_CARD
                 or YgoConstants.MSG_SELECT_COUNTER or YgoConstants.MSG_SORT_CARD or YgoConstants.MSG_SORT_CHAIN
@@ -686,7 +686,7 @@ namespace YGOPortable.UI
             switch (prompt.messageType)
             {
                 case YgoConstants.MSG_SELECT_YESNO:
-                case YgoConstants.MSG_SELECT_EFFECTYN when directAttackDecision:
+                case YgoConstants.MSG_SELECT_EFFECTYN when resolutionDecision:
                     RenderYesNo(prompt);
                     break;
                 case YgoConstants.MSG_SELECT_POSITION:
@@ -744,8 +744,9 @@ namespace YGOPortable.UI
         private void RenderYesNo(DuelPrompt p)
         {
             uint cardCode = CardDatabase.GetDescriptionCardCode(p.promptDesc);
+            if (cardCode == 0) cardCode = p.promptCardCode;
             var card = CardDatabase.Get(cardCode);
-            string msg = CardDatabase.ResolveEffectDescription(p.promptDesc, cardCode)
+            string msg = CardDatabase.ResolveDescription(p.promptDesc) ?? CardDatabase.GetKoreanCardDescription(cardCode)
                 ?? "선택한 처리를 실행하시겠습니까?";
 
             _modalTitle.text = "선택 확인";
@@ -834,7 +835,7 @@ namespace YGOPortable.UI
         private void RenderOptionList(DuelSession session, DuelPrompt p)
         {
             bool isNum = p.messageType == YgoConstants.MSG_ANNOUNCE_NUMBER;
-            _modalTitle.text = isNum ? "숫자 선언" : "선택할 항목";
+            _modalTitle.text = CardDatabase.ResolveDescription(p.SelectionHint) ?? (isNum ? "숫자 선언" : "선택할 항목");
             _modalSubtitle.text = "";
 
             CreateVerticalScroll(_modalBody, out Transform content);

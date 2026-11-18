@@ -119,6 +119,8 @@ namespace YGOPortable.Core
             { 81, "엔드 페이즈로 이동한다" },
             { 90, "몬스터를 릴리스하시겠습니까?" },
             { 94, "이 카드의 추가 효과를 적용하시겠습니까?" },
+            { 95, "이 카드의 선택 효과를 적용하시겠습니까?" },
+            { 96, "이 카드의 대체 효과를 적용하시겠습니까?" },
             { 97, "이 카드를 마법·함정 존에 놓으시겠습니까?" },
             { 99, "추가 처리가 없는 방법으로 발동한다" },
             { 210, "카드를 1장 더 선택하시겠습니까?" },
@@ -154,12 +156,16 @@ namespace YGOPortable.Core
             { 526, "확인할 카드를 선택하십시오." },
             { 527, "필드에 놓을 카드를 선택하십시오." },
             { 528, "표시 형식을 변경할 카드를 선택하십시오." },
+            { 529, "자신" },
+            { 530, "상대" },
             { 531, "릴리스할 몬스터를 선택하십시오." },
             { 532, "엑시즈 소재를 떼어낼 카드를 선택하십시오." },
             { 533, "링크 소재로 할 몬스터를 선택하십시오." },
             { 549, "공격 대상으로 삼을 몬스터를 선택하십시오." },
             { 550, "효과를 발동할 카드를 선택하십시오." },
             { 551, "대상을 선택하십시오." },
+            { 552, "코인의 앞면 또는 뒷면을 선언하십시오." },
+            { 553, "주사위의 눈을 선언하십시오." },
             { 554, "카드의 종류를 선언하십시오." },
             { 555, "효과를 선택하십시오." },
             { 556, "적용할 효과를 선택하십시오." },
@@ -522,11 +528,18 @@ namespace YGOPortable.Core
             { "Special Summon the monster", "그 몬스터를 특수 소환한다" },
             { "Special Summon this card to your field", "이 카드를 자신 필드에 특수 소환한다" },
             { "Special Summon this card to your opponent's field", "이 카드를 상대 필드에 특수 소환한다" },
-            { "Special Summon 1 \"Runick\" from your Extra Deck", "엑스트라 덱에서 루닉 몬스터 1장을 특수 소환한다" },
+            { "Special Summon 1 \"Runick\" from your Extra Deck", "엑스트라 덱에서 루닉 몬스터 1장을 엑스트라 몬스터 존에 특수 소환한다" },
             { "Switch control", "컨트롤을 맞바꾼다" },
             { "Take damage", "데미지를 받는다" },
             { "Toss a coin", "코인 토스를 한다" },
             { "Tribute 1 other monster", "다른 몬스터 1장을 릴리스한다" },
+        };
+
+        // These scripts reuse the same description ID for an alternate summon and for an activated effect.
+        private static readonly Dictionary<ulong, string> CardActivationTextKR = new()
+        {
+            { 26096328UL << DescriptionIndexBits, "엑시즈 소재를 1개 제거해 공격력과 수비력을 2000 올린다" },
+            { 90448279UL << DescriptionIndexBits, "엑시즈 소재를 2개 제거해 필드의 다른 카드를 전부 묘지로 보낸다" },
         };
 
         private static readonly Dictionary<ulong, string> CardEffectTextKR = new Dictionary<ulong, string>
@@ -1373,25 +1386,28 @@ namespace YGOPortable.Core
             }
         }
 
-        public static string ResolveDescription(ulong desc)
+        public static string ResolveDescription(ulong desc) => ResolveDescription(desc, activation: false);
+
+        private static string ResolveDescription(ulong desc, bool activation)
         {
             if (desc <= DescriptionIndexMask)
                 return SystemHintsKR.TryGetValue((uint)desc, out var hint) ? hint : null;
-            if (CardEffectTextKR.TryGetValue(desc, out var specificText)) return specificText;
+            if (TryGetCardEffectText(desc, activation, out var specificText)) return specificText;
 
             int index = (int)(desc & DescriptionIndexMask);
             var card = Get(GetDescriptionCardCode(desc));
-            var localized = ReadLocalizedDescription(card, index);
-            if (localized != null) return localized;
             var original = GetSameNameOriginal(card);
-            if (original != null && CardEffectTextKR.TryGetValue(((ulong)original.code << DescriptionIndexBits) | (uint)index, out specificText))
+            if (original != null && TryGetCardEffectText(((ulong)original.code << DescriptionIndexBits) | (uint)index, activation, out specificText))
                 return specificText;
-            return ReadLocalizedDescription(original, index);
+            return ReadLocalizedDescription(card, index) ?? ReadLocalizedDescription(original, index);
         }
+
+        private static bool TryGetCardEffectText(ulong desc, bool activation, out string text) =>
+            (activation && CardActivationTextKR.TryGetValue(desc, out text)) || CardEffectTextKR.TryGetValue(desc, out text);
 
         public static string ResolveEffectDescription(ulong desc, uint cardCode)
         {
-            string text = ResolveDescription(desc);
+            string text = ResolveDescription(desc, activation: true);
             if (text != null) return text;
             return GetKoreanCardDescription(GetDescriptionCardCode(desc)) ?? GetKoreanCardDescription(cardCode);
         }
@@ -1410,11 +1426,13 @@ namespace YGOPortable.Core
             if (text == null) return null;
             if (HasKoreanText(text)) return LocalizeEffectHeadings(text);
 
-            string key = text.Replace('’', '\'').TrimEnd('.');
-            if (EffectTextKR.TryGetValue(key, out var localized)) return localized;
+            if (EffectTextKR.TryGetValue(text, out var localized)) return localized;
 
             // Identical labels can have a printed bullet or use question punctuation in a confirmation.
-            key = key.TrimStart('●', ' ').TrimEnd('?', '!', ';').TrimEnd();
+            string key = text.Replace('’', '\'').Replace('‘', '\'').Replace('“', '"').Replace('”', '"')
+                .Replace('\u00A0', ' ').TrimStart('●', ' ');
+            if (EffectTextKR.TryGetValue(key, out localized)) return localized;
+            key = key.TrimEnd('.', '?', '!', ';', ' ');
             return EffectTextKR.TryGetValue(key, out localized) ? localized : null;
         }
 
