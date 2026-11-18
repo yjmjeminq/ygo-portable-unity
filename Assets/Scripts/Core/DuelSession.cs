@@ -131,6 +131,10 @@ namespace YGOPortable.Core
         public List<SelectableCardItem> mustSelect = new List<SelectableCardItem>();
         public List<SelectableCardItem> candidates = new List<SelectableCardItem>();
         public List<SelectableCardItem> unselectCandidates = new List<SelectableCardItem>();
+        internal ulong SelectionHint { get; set; }
+        internal bool IsAttackTargetSelection =>
+            messageType == YgoConstants.MSG_SELECT_CARD && SelectionHint == YgoConstants.HINTMSG_ATTACKTARGET &&
+            min == 1 && max == 1 && candidates.Count > 0;
     }
 
     public class PlayerFieldSnapshot
@@ -170,6 +174,7 @@ namespace YGOPortable.Core
         public List<string> Logs { get; } = new List<string>();
         public DuelPrompt ActivePrompt { get; private set; }
         private ChainLinkInfo _resolvingChainLink;
+        private (byte player, ulong hint)? _pendingSelectionHint;
         private readonly HashSet<(byte Player, uint Location, uint Sequence, uint Code)> _confirmedCards =
             new HashSet<(byte, uint, uint, uint)>();
 
@@ -207,6 +212,7 @@ namespace YGOPortable.Core
             CurrentPhase = YgoConstants.PHASE_DRAW;
             RetryCount = 0;
             LastHintMsg = 0;
+            _pendingSelectionHint = null;
             HasActiveAttack = false;
             ActivePrompt = null;
             CurrentChain.Clear();
@@ -311,6 +317,16 @@ namespace YGOPortable.Core
             SubmitResponse(BitConverter.GetBytes(val));
         }
 
+        internal static byte[] PackCardSelection(params int[] indices)
+        {
+            using var stream = new MemoryStream(8 + indices.Length * 4);
+            using var writer = new BinaryWriter(stream);
+            writer.Write(0);
+            writer.Write(indices.Length);
+            foreach (int index in indices) writer.Write(index);
+            return stream.ToArray();
+        }
+
         public void Surrender(int losingPlayer)
         {
             IsFinished = true;
@@ -396,7 +412,13 @@ namespace YGOPortable.Core
                     if (sz == 0 || ms.Position + sz > ms.Length) break;
                     long msgEnd = ms.Position + sz;
                     byte msgType = br.ReadByte();
+                    var previousPrompt = ActivePrompt;
                     HandleMessage(msgType, br, msgEnd);
+                    if (ActivePrompt != null && ActivePrompt != previousPrompt && _pendingSelectionHint is { } selection)
+                    {
+                        if (ActivePrompt.playerId == selection.player) ActivePrompt.SelectionHint = selection.hint;
+                        _pendingSelectionHint = null;
+                    }
                     ms.Position = msgEnd;
                 }
             }
@@ -466,6 +488,7 @@ namespace YGOPortable.Core
                     if (htype == YgoConstants.HINT_SELECTMSG)
                     {
                         LastHintMsg = desc;
+                        _pendingSelectionHint = (player, desc);
                     }
                     else if (htype == YgoConstants.HINT_MESSAGE)
                     {

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -21,6 +20,7 @@ namespace YGOPortable.UI
 
         private RectTransform _modalBox;
         private RectTransform _modalHeader;
+        private RectTransform _modalTitleBand;
         private Text _modalTitle;
         private Text _modalSubtitle;
         private RectTransform _modalBody;
@@ -88,6 +88,7 @@ namespace YGOPortable.UI
         private int[] _counterAlloc;
         private int[] _sortOrder;
         private Button _confirmBtn;
+        private Button _attackCancel;
         private RectTransform _materialConfirmRoot;
         private Button _materialConfirm;
         private bool _fieldMaterialPick;
@@ -99,8 +100,8 @@ namespace YGOPortable.UI
         internal bool IsShowingField => IsPromptOpen && _promptShade.ShowingField;
         internal Selectable FieldViewControl => _fieldViewButton;
         internal bool IsFieldCardSelection => IsPromptOpen && _fieldCardIndices.Count > 0;
-        internal Button FieldCardConfirmButton => !IsFieldCardSelection ? null :
-            _materialConfirmRoot.gameObject.activeSelf ? _materialConfirm : _confirmBtn;
+        internal Button FieldCardActionButton => !IsFieldCardSelection ? null :
+            _materialConfirmRoot.gameObject.activeSelf ? _materialConfirm : _confirmBtn ?? _attackCancel;
 
         internal void SetFieldCardHitTest(Func<Vector2, Camera, bool> hitTest) => _promptShade.FieldCardHitTest = hitTest;
 
@@ -117,6 +118,11 @@ namespace YGOPortable.UI
         internal void ToggleFieldCard(int index, byte controller, uint location, uint sequence)
         {
             if (!CanAnswerPrompt || index < 0) return;
+            if (_curPrompt.IsAttackTargetSelection)
+            {
+                SubmitAttackTarget(index);
+                return;
+            }
             _lastMaterial = (controller, location, sequence);
             if (_curPrompt.messageType == YgoConstants.MSG_SELECT_UNSELECT_CARD)
             {
@@ -328,6 +334,7 @@ namespace YGOPortable.UI
             _materialConfirmRoot.gameObject.SetActive(false);
             _chainSelection = -1;
             _confirmBtn = null;
+            _attackCancel = null;
             _counterAlloc = null;
             _sortOrder = null;
         }
@@ -362,11 +369,11 @@ namespace YGOPortable.UI
 
             _modalHeader = LotdUiKit.CreateRect("Hdr", _modalBox, new Vector2(0f, .81f), Vector2.one, Vector2.zero, Vector2.zero);
             LotdUiKit.AddImage(_modalHeader.gameObject, LotdUiKit.WhiteSprite, DuelStyle.HeaderColor, false, false);
-            var titleBand = LotdUiKit.CreateRect("TitleBand", _modalHeader, new Vector2(.024f, .48f), new Vector2(.976f, .94f),
+            _modalTitleBand = LotdUiKit.CreateRect("TitleBand", _modalHeader, new Vector2(.024f, .48f), new Vector2(.976f, .94f),
                 Vector2.zero, Vector2.zero);
             var subBand = LotdUiKit.CreateRect("SubtitleBand", _modalHeader, new Vector2(.024f, .05f), new Vector2(.976f, .47f),
                 Vector2.zero, Vector2.zero);
-            _modalTitle = LotdUiKit.AddFittedText(titleBand, "Title", "", 21, 11, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
+            _modalTitle = LotdUiKit.AddFittedText(_modalTitleBand, "Title", "", 21, 11, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
             _modalSubtitle = LotdUiKit.AddFittedText(subBand, "Sub", "", 15, 10, TextAnchor.MiddleLeft, DuelStyle.Muted);
 
             _modalBody = LotdUiKit.CreateRect("Body", _modalBox, new Vector2(.02f, .202f), new Vector2(.98f, .785f), Vector2.zero, Vector2.zero);
@@ -575,8 +582,10 @@ namespace YGOPortable.UI
                 or YgoConstants.MSG_SELECT_COUNTER or YgoConstants.MSG_SORT_CARD or YgoConstants.MSG_SORT_CHAIN
                 or YgoConstants.MSG_ANNOUNCE_CARD;
             bool tall = cardChoices || prompt.messageType == YgoConstants.MSG_ANNOUNCE_RACE;
+            bool attackTarget = prompt.IsAttackTargetSelection;
             _modalBox.anchorMax = new Vector2(cardChoices ? .923f : .845f, tall ? .626f : .474f);
             _modalHeader.anchorMin = new Vector2(0f, tall ? .873f : .81f);
+            _modalTitleBand.anchorMin = new Vector2(.024f, attackTarget ? .06f : .48f);
             _modalBody.anchorMin = new Vector2(.02f, tall ? .135f : .202f);
             _modalBody.anchorMax = new Vector2(.98f, tall ? .855f : .785f);
             _modalFooter.anchorMin = new Vector2(.62f, tall ? .019f : .028f);
@@ -586,10 +595,11 @@ namespace YGOPortable.UI
             BindFieldCardChoices(session, prompt);
             if (_fieldCardIndices.Count > 0)
             {
-                _modalBox.anchorMin = _fieldMaterialPick ? new Vector2(.286f, .835f) : new Vector2(.305f, .151f);
-                _modalBox.anchorMax = _fieldMaterialPick ? new Vector2(.800f, .898f) : new Vector2(.762f, .214f);
+                bool overhead = _fieldMaterialPick || attackTarget;
+                _modalBox.anchorMin = overhead ? new Vector2(.286f, .835f) : new Vector2(.305f, .151f);
+                _modalBox.anchorMax = overhead ? new Vector2(.800f, .898f) : new Vector2(.762f, .214f);
                 _modalHeader.anchorMin = Vector2.zero;
-                _modalHeader.anchorMax = new Vector2(.56f, 1f);
+                _modalHeader.anchorMax = new Vector2(attackTarget && !prompt.cancelable ? 1f : .56f, 1f);
                 _modalFooter.anchorMin = new Vector2(.56f, .08f);
                 _modalFooter.anchorMax = new Vector2(.98f, .92f);
             }
@@ -944,7 +954,13 @@ namespace YGOPortable.UI
         private void RenderCardMultiSelect(DuelSession s, DuelPrompt p)
         {
             string hint = CardDatabase.ResolveDescription(s.LastHintMsg);
-            if (p.messageType == YgoConstants.MSG_SELECT_TRIBUTE)
+            bool attackTarget = p.IsAttackTargetSelection;
+            if (attackTarget)
+            {
+                _modalTitle.text = "공격할 몬스터를 선택하세요";
+                _modalSubtitle.text = "";
+            }
+            else if (p.messageType == YgoConstants.MSG_SELECT_TRIBUTE)
                 _modalTitle.text = !string.IsNullOrEmpty(hint) ? hint : "릴리스할 몬스터 선택";
             else if (p.messageType == YgoConstants.MSG_SELECT_SUM)
                 _modalTitle.text = !string.IsNullOrEmpty(hint) ? hint : $"소재/합계 선택 (목표 합계: {p.acc & 0xFFFF})";
@@ -961,9 +977,15 @@ namespace YGOPortable.UI
                 for (int i = 0; i < p.candidates.Count; i++)
                     AddMultiSelectCardTile(grid, p.candidates[i], i, lockedMust: false, p, s);
             }
-            else if (p.messageType == YgoConstants.MSG_SELECT_CARD && string.IsNullOrEmpty(hint))
+            else if (!attackTarget && p.messageType == YgoConstants.MSG_SELECT_CARD && string.IsNullOrEmpty(hint))
             {
                 _modalTitle.text = "필드에서 카드를 선택하세요.";
+            }
+
+            if (attackTarget)
+            {
+                if (p.cancelable) _attackCancel = AddFooterButton("공격 취소", OnModalCloseClicked, false, alignRight: true);
+                return;
             }
 
             _confirmBtn = AddFooterButton("선택 완료", OnConfirmMultiSelect, true);
@@ -997,6 +1019,11 @@ namespace YGOPortable.UI
             {
                 if (!CanAnswerPrompt || !ReferenceEquals(_curPrompt, p)) return;
                 if (code != 0) _onInspectCard?.Invoke(code);
+                if (p.IsAttackTargetSelection)
+                {
+                    SubmitAttackTarget(idx);
+                    return;
+                }
                 if (_selectedIndices.Contains(idx))
                 {
                     if (capped && p.max == 1 && p.min == 1 && _confirmBtn.interactable)
@@ -1054,15 +1081,13 @@ namespace YGOPortable.UI
         private void OnConfirmMultiSelect()
         {
             if (_confirmBtn == null || !_confirmBtn.interactable) return;
-            var sorted = _selectedIndices.OrderBy(i => i).ToList();
-            using (var ms = new MemoryStream(8 + sorted.Count * 4))
-            using (var bw = new BinaryWriter(ms))
-            {
-                bw.Write(0);
-                bw.Write(sorted.Count);
-                foreach (int idx in sorted) bw.Write(idx);
-                Submit(ms.ToArray());
-            }
+            Submit(DuelSession.PackCardSelection(_selectedIndices.OrderBy(i => i).ToArray()));
+        }
+
+        private void SubmitAttackTarget(int index)
+        {
+            LotdAudio.PlayClick();
+            Submit(DuelSession.PackCardSelection(index));
         }
 
         public static bool CheckSumSelectionValid(DuelPrompt p, HashSet<int> chosen, int target)
@@ -1778,7 +1803,7 @@ namespace YGOPortable.UI
         {
             if (EventSystem.current == null) return;
             Canvas.ForceUpdateCanvases();
-            SetFocus(PreferredPromptControl().gameObject);
+            SetFocus(IsFieldCardSelection && _curPrompt.IsAttackTargetSelection ? null : PreferredPromptControl().gameObject);
         }
 
         private Selectable PreferredPromptControl()
@@ -1833,10 +1858,11 @@ namespace YGOPortable.UI
             events.SetSelectedGameObject(target);
         }
 
-        private Button AddFooterButton(string label, Action onClick, bool gold)
+        private Button AddFooterButton(string label, Action onClick, bool gold, bool alignRight = false)
         {
+            bool right = gold || alignRight;
             var slot = LotdUiKit.CreateRect($"Btn_{label}", _modalFooter,
-                new Vector2(gold ? .52f : 0f, .03f), new Vector2(gold ? 1f : .48f, .97f), Vector2.zero, Vector2.zero);
+                new Vector2(right ? .52f : 0f, .03f), new Vector2(right ? 1f : .48f, .97f), Vector2.zero, Vector2.zero);
             return DuelStyle.Button(slot, "B", label, onClick, 16, gold);
         }
 

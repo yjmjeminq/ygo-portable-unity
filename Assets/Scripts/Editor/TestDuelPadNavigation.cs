@@ -15,6 +15,7 @@ namespace YGOPortable.Editor
     {
         private const uint Sparkman = 20721928;
         private const uint BurstLady = 58932615;
+        private const uint MysticalElf = 15025844;
         private const int A = 0x1000;
         private const int B = 0x2000;
         private const int X = 0x4000;
@@ -29,13 +30,13 @@ namespace YGOPortable.Editor
         {
             foreach (bool playerFirst in new[] { true, false })
                 VerifyDuel(playerFirst);
-            Debug.Log("[VERIFY DUEL PAD] Both seats passed hand focus/detail/reflow, summon and placement, piles during a chain, phase changes, attack, mouse log and pad pause.");
+            Debug.Log("[VERIFY DUEL PAD] Both seats passed hand focus/detail/reflow, summons, pile viewing, phase changes, direct attacks and immediate field targeting by mouse, touch or controller.");
         }
 
         private static void VerifyDuel(bool playerFirst)
         {
             var main = Enumerable.Repeat(Sparkman, 20).Concat(Enumerable.Repeat(BurstLady, 20)).ToArray();
-            var enemy = Enumerable.Repeat(89631139u, 40).ToArray();
+            var enemy = Enumerable.Repeat(playerFirst ? 89631139u : MysticalElf, 40).ToArray();
             using var session = new DuelSession();
             if (!session.StartNewDuel(main, new[] { 69248256u }, enemy, Array.Empty<uint>(), playerFirst, 8000,
                 new ulong[] { 718, 391, 27182, 31 }))
@@ -64,6 +65,12 @@ namespace YGOPortable.Editor
                 field = new DuelFieldUI(app, canvas.transform, modals);
                 typeof(GameAppController).GetField("_session", Private).SetValue(app, session);
                 typeof(GameAppController).GetField("_duelField", Private).SetValue(app, field);
+                if (!playerFirst)
+                {
+                    Advance(session, prompt => prompt.playerId == session.AiPlayerIndex &&
+                        prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD && prompt.summonable.Count > 0);
+                    session.SubmitResponseInt(0);
+                }
                 Advance(session, prompt => prompt.playerId == session.HumanPlayerIndex && prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD);
                 field.BindSession(session, null, null);
                 Canvas.ForceUpdateCanvases();
@@ -243,8 +250,21 @@ namespace YGOPortable.Editor
                     session.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_BATTLECMD,
                     "Moving from the monster to its attack icon submitted the command.");
                 Pad(field, A);
+                if (!playerFirst)
+                {
+                    var target = session.ActivePrompt;
+                    Require(target?.IsAttackTargetSelection == true && target.candidates.Count == 1 &&
+                        target.candidates[0].code == MysticalElf, "The native battle did not open a field attack target.");
+                    TestDuelZoneBrowser.VerifyAttackTargetClicks(session, target);
+                    modals.ShowPrompt(session, target);
+                    field.Refresh();
+                    Pad(field, A);
+                    Require(!modals.IsPromptOpen && !ReferenceEquals(session.ActivePrompt, target),
+                        "The controller attack target still required confirmation.");
+                }
                 Advance(session, prompt => prompt.playerId == session.HumanPlayerIndex && prompt.messageType == YgoConstants.MSG_SELECT_BATTLECMD);
-                Require(enemyField.lp < 8000 && session.RetryCount == 0, "Confirming the attack caused no battle damage.");
+                Require(enemyField.lp < 8000 && session.RetryCount == 0,
+                    $"The selected attack caused no battle damage in seat {session.HumanPlayerIndex} (LP {enemyField.lp}, retries {session.RetryCount}).");
 
                 field.Refresh();
                 var log = Get<Button>(field, "_duelPadLogButton");

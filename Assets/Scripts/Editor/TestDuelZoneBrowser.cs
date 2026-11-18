@@ -70,6 +70,19 @@ namespace YGOPortable.Editor
             return response;
         }
 
+        internal static void VerifyAttackTargetClicks(DuelSession duel, DuelPrompt prompt)
+        {
+            var responses = new List<byte[]>();
+            using var ui = new Browser(duel, responses.Add);
+            foreach (int pointer in new[] { -1, 0 })
+            {
+                ui.ClickAttackTarget(prompt, pointer);
+                Require(responses.Count == 1 && responses[0].SequenceEqual(DuelSession.PackCardSelection(0)),
+                    "A mouse click or touch on the attack target did not submit its native index immediately.");
+                responses.Clear();
+            }
+        }
+
         private static int VerifyBanishAndGrave(bool humanFirst)
         {
             var main = Enumerable.Repeat(PotOfDesires, 20).Concat(Enumerable.Repeat(89631139u, 20)).ToArray();
@@ -364,6 +377,16 @@ namespace YGOPortable.Editor
                 ClickAt(second);
                 Require(selected.SetEquals(new[] { 1 }) && Modals.TryConfirm() && !Modals.IsPromptOpen,
                     "Changing the target or confirming the field selection failed.");
+            }
+
+            internal void ClickAttackTarget(DuelPrompt prompt, int pointer)
+            {
+                Modals.ShowPrompt(_duel, prompt);
+                Field.Refresh();
+                Require(Modals.IsFieldCardSelection && !Modals.ModalRoot.transform.Find("Win/Footer/Btn_선택 완료") &&
+                    !Modals.TryConfirm(), "The attack target still showed a separate confirmation.");
+                ClickAt(CardSlot(prompt.candidates[0]), pointer);
+                Require(!Modals.IsPromptOpen, "Selecting the target left its prompt open.");
             }
 
             private RectTransform CardSlot(SelectableCardItem card)

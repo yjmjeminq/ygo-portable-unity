@@ -912,9 +912,7 @@ namespace YGOPortable.UI
                 }
             }
 
-            if (_preferredAttackTargetSeq >= 0 &&
-                p.messageType == YgoConstants.MSG_SELECT_CARD &&
-                p.min == 1 && p.max == 1)
+            if (_preferredAttackTargetSeq >= 0 && p.IsAttackTargetSelection)
             {
                 int targetSeq = _preferredAttackTargetSeq;
                 _preferredAttackTargetSeq = -1;
@@ -925,11 +923,7 @@ namespace YGOPortable.UI
                         c.location == YgoConstants.LOCATION_MZONE &&
                         c.sequence == (uint)targetSeq)
                     {
-                        byte[] resp = new byte[12];
-                        Buffer.BlockCopy(BitConverter.GetBytes(0), 0, resp, 0, 4);
-                        Buffer.BlockCopy(BitConverter.GetBytes(1), 0, resp, 4, 4);
-                        Buffer.BlockCopy(BitConverter.GetBytes(i), 0, resp, 8, 4);
-                        _session.SubmitResponse(resp);
+                        _session.SubmitResponse(DuelSession.PackCardSelection(i));
                         return true;
                     }
                 }

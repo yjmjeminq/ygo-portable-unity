@@ -162,6 +162,7 @@ namespace YGOPortable.Core
         public const int HINT_NUMBER = 9;
         public const int HINT_CARD = 10;
         public const int HINT_ZONE = 11;
+        internal const ulong HINTMSG_ATTACKTARGET = 549;
 
         // Messages
         public const byte MSG_RETRY = 1;

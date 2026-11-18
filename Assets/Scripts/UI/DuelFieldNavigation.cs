@@ -244,7 +244,7 @@ namespace YGOPortable.UI
             AddDuelPadSlots(_emz, scope);
             AddDuelPadSlots(_oppMZone, scope);
             AddDuelPadSlots(_oppSZone, scope);
-            if (scope == PadScope.FieldCards) AddDuelPadButton(_modals.FieldCardConfirmButton);
+            if (scope == PadScope.FieldCards) AddDuelPadButton(_modals.FieldCardActionButton);
             if (scope == PadScope.Place) AddDuelPadButton(_placementCancel);
             if (scope != PadScope.Board) return;
 
