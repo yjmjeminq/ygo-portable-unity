@@ -32,6 +32,7 @@ namespace YGOPortable.UI
         internal int Attack => _battleStats?.Attack ?? Live?.attack ?? Printed?.atk ?? -1;
         internal int Defense => _battleStats?.Defense ?? Live?.defense ?? Printed?.def ?? -1;
         internal uint Position => _battleStats?.Position ?? Live?.position ?? 0;
+        internal BattleComparisonValue? ComparedValue => _battleStats?.ComparedValue;
         internal uint LeftScale => Live?.lscale ?? Printed?.lscale ?? 0;
         internal uint RightScale => Live?.rscale ?? Printed?.rscale ?? 0;
         internal uint LinkMarkers => IsLink ? Live?.linkMarker ?? Printed?.link ?? 0 : 0;
@@ -88,6 +89,7 @@ namespace YGOPortable.UI
     {
         private static readonly Color AttackColor = new Color(1f, .76f, .5f);
         private static readonly Color DefenseColor = new Color(.61f, .87f, .98f);
+        private static readonly Color EffectColor = new Color(.87f, .74f, 1f);
         private static readonly Color Increased = new Color(.58f, 1f, .82f);
         private static readonly Color Decreased = new Color(1f, .59f, .56f);
         private static readonly Color Backing = new Color(.045f, .068f, .085f, .98f);
@@ -95,6 +97,7 @@ namespace YGOPortable.UI
         private readonly StatCell _attack;
         private readonly StatCell _defense;
         private readonly bool _compact;
+        private StatCell _effect;
         private DuelLinkCompass _compass;
 
         internal DuelStatStrip(RectTransform root, bool compact)
@@ -115,9 +118,12 @@ namespace YGOPortable.UI
 
             Layout(card.IsLink, card.LinkMarkers, opponent);
             uint shownPosition = position ?? card.Position;
-            _attack.Bind(card.Attack, card.Live?.baseAttack ?? card.Attack, (shownPosition & YgoConstants.POS_ATTACK) != 0, showChanges);
+            var source = card.ComparedValue?.Source;
+            bool activeAttack = source.HasValue ? source == BattleStatSource.Attack : (shownPosition & YgoConstants.POS_ATTACK) != 0;
+            bool activeDefense = source.HasValue ? source == BattleStatSource.Defense : (shownPosition & YgoConstants.POS_DEFENSE) != 0;
+            _attack.Bind(card.Attack, card.Live?.baseAttack ?? card.Attack, activeAttack, showChanges);
             if (!card.IsLink)
-                _defense.Bind(card.Defense, card.Live?.baseDefense ?? card.Defense, (shownPosition & YgoConstants.POS_DEFENSE) != 0, showChanges);
+                _defense.Bind(card.Defense, card.Live?.baseDefense ?? card.Defense, activeDefense, showChanges);
         }
 
         internal void BindBattle(BattleCardStats card, bool link, bool attacking)
@@ -126,20 +132,28 @@ namespace YGOPortable.UI
             if (!card.IsFaceUp) return;
 
             _compass?.Hide();
-            bool showDefense = !link && card.IsDefense;
-            // A defense-position attack can use either stat. The battle message reports both card values.
-            bool showAttack = attacking || !showDefense;
+            var source = card.ComparedValue?.Source;
+            long? value = card.ComparedValue?.Value;
+            // Older builds emit both current stats without the source used for damage.
+            bool showDefense = source.HasValue ? source == BattleStatSource.Defense : !link && card.IsDefense;
+            bool showAttack = source.HasValue ? source == BattleStatSource.Attack : attacking || !showDefense;
             bool split = showAttack && showDefense;
-            Place(_attack, showAttack, card.Attack, 0f, split ? .49f : 1f);
-            Place(_defense, showDefense, card.Defense, split ? .51f : 0f, 1f);
+            Place(_attack, showAttack, value ?? card.Attack, 0f, split ? .49f : 1f);
+            Place(_defense, showDefense, value ?? card.Defense, split ? .51f : 0f, 1f);
+            if (source == BattleStatSource.Effect)
+            {
+                _effect ??= new StatCell(_root, "Effect", "전투 수치", EffectColor, _compact, DuelStatSymbols.BattleEffect);
+                Place(_effect, true, value.Value, 0f, 1f);
+            }
+            else _effect?.Rect.gameObject.SetActive(false);
 
-            void Place(StatCell cell, bool visible, int value, float from, float to)
+            void Place(StatCell cell, bool visible, long number, float from, float to)
             {
                 cell.Rect.gameObject.SetActive(visible);
                 if (!visible) return;
                 cell.Rect.anchorMin = new Vector2(from, 0f);
                 cell.Rect.anchorMax = new Vector2(to, 1f);
-                cell.BindComparison(value, split);
+                cell.BindComparison(number, split);
             }
         }
 
@@ -148,6 +162,7 @@ namespace YGOPortable.UI
             bool hasDirections = directions != 0;
             if (hasDirections) (_compass ??= new DuelLinkCompass(_root)).Bind(directions, opponent);
             else _compass?.Hide();
+            _effect?.Rect.gameObject.SetActive(false);
             _attack.Rect.gameObject.SetActive(true);
             _attack.Rect.anchorMin = link && _compact && !hasDirections ? new Vector2(.21f, 0f) : Vector2.zero;
             float attackWidth = !link ? .493f : hasDirections ? .62f : _compact ? .79f : 1f;
@@ -167,9 +182,9 @@ namespace YGOPortable.UI
             private readonly RectTransform _digits;
             private readonly RectTransform _symbol;
             private readonly Color _accent;
-            private int _lastValue = -1;
+            private long _lastValue = -1;
 
-            internal StatCell(Transform parent, string key, string label, Color accent, bool compact)
+            internal StatCell(Transform parent, string key, string label, Color accent, bool compact, Sprite icon = null)
             {
                 _accent = accent;
                 Rect = LotdUiKit.FillRect(key, parent);
@@ -181,7 +196,7 @@ namespace YGOPortable.UI
                 {
                     _symbol = LotdUiKit.CreateRect("Symbol", Rect, new Vector2(.055f, .17f), new Vector2(.245f, .91f),
                         Vector2.zero, Vector2.zero);
-                    LotdUiKit.AddImage(_symbol.gameObject, DuelStatSymbols.Get(key == "Defense"), accent, true, false);
+                    LotdUiKit.AddImage(_symbol.gameObject, icon ?? DuelStatSymbols.Get(key == "Defense"), accent, true, false);
                 }
                 else
                 {
@@ -202,7 +217,7 @@ namespace YGOPortable.UI
                 DuelStatDigitFit.Attach(_value, useGlyphBounds: true);
             }
 
-            internal void BindComparison(int value, bool split)
+            internal void BindComparison(long value, bool split)
             {
                 _digits.anchorMin = new Vector2(.265f, .035f);
                 _digits.anchorMax = new Vector2(.97f, .99f);
@@ -210,7 +225,7 @@ namespace YGOPortable.UI
                 Bind(value, value, active: true);
             }
 
-            internal void Bind(int value, int original, bool active, bool showChanges = false)
+            internal void Bind(long value, long original, bool active, bool showChanges = false)
             {
                 int change = value >= 0 && original >= 0 ? value.CompareTo(original) : 0;
                 string number = value >= 0 ? value.ToString() : "?";
@@ -282,9 +297,12 @@ namespace YGOPortable.UI
         private static Sprite _blade;
         private static Sprite _shield;
         private static Sprite _counter;
+        private static Sprite _battleEffect;
         private static readonly Sprite[] RatingSprites = new Sprite[(int)DuelRatingKind.Scale + 1];
 
         internal static Sprite Counter => _counter != null ? _counter : (_counter = Build("Duel Counter Symbol", InsideCounter));
+        internal static Sprite BattleEffect => _battleEffect != null ? _battleEffect :
+            (_battleEffect = Build("Duel Battle Effect Symbol", InsideBattleEffect));
 
         internal static Sprite Get(bool defense)
         {
@@ -384,6 +402,10 @@ namespace YGOPortable.UI
         private static bool InsideCounter(float x, float y) =>
             x * x + (y - .21f) * (y - .21f) <= .027f ||
             (Mathf.Abs(x) - .20f) * (Mathf.Abs(x) - .20f) + (y + .17f) * (y + .17f) <= .027f;
+
+        private static bool InsideBattleEffect(float x, float y) => y >= 0f
+            ? y <= .43f && x >= -.30f + y * .55f && x <= .14f + y * .45f
+            : y >= -.43f && x >= -.10f + y * .34f && x <= .34f + y * 1.34f;
     }
 
     internal sealed class DuelLinkCompass

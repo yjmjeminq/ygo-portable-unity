@@ -9,26 +9,31 @@ set(YGOPRO_CORE_DIR "C:/Users/y/AppData/Local/YGO-PC-Full/OpenDuelEngine/ygopro-
 
 file(GLOB CORE_CPP "${YGOPRO_CORE_DIR}/*.cpp" "${YGOPRO_CORE_DIR}/RNG/*.cpp")
 
-# Apply the project's chain rule without changing the shared OpenDuelEngine source.
+# Apply project changes to a copy of the processor, keeping the shared core source intact.
 find_package(Git REQUIRED)
 set(CORE_PROCESSOR "${YGOPRO_CORE_DIR}/processor.cpp")
-set(CHAIN_PATCH "${CMAKE_CURRENT_SOURCE_DIR}/master_duel_chain_limit.patch")
+set(CORE_PATCHES
+    "${CMAKE_CURRENT_SOURCE_DIR}/master_duel_chain_limit.patch"
+    "${CMAKE_CURRENT_SOURCE_DIR}/battle_comparison.patch"
+)
 set(CORE_PATCH_STAGE "${CMAKE_CURRENT_BINARY_DIR}/core-patch-stage")
 set(CORE_PROCESSOR_PATCHED "${CMAKE_CURRENT_BINARY_DIR}/processor.cpp")
-set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CORE_PROCESSOR}" "${CHAIN_PATCH}")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CORE_PROCESSOR}" ${CORE_PATCHES})
 file(MAKE_DIRECTORY "${CORE_PATCH_STAGE}")
 file(READ "${CORE_PROCESSOR}" CORE_PROCESSOR_SOURCE)
 file(WRITE "${CORE_PATCH_STAGE}/processor.cpp" "${CORE_PROCESSOR_SOURCE}")
-execute_process(
-    COMMAND "${CMAKE_COMMAND}" -E env "GIT_CEILING_DIRECTORIES=${CMAKE_CURRENT_BINARY_DIR}"
-        "${GIT_EXECUTABLE}" apply --no-index --ignore-space-change "${CHAIN_PATCH}"
-    WORKING_DIRECTORY "${CORE_PATCH_STAGE}"
-    RESULT_VARIABLE CHAIN_PATCH_RESULT
-    ERROR_VARIABLE CHAIN_PATCH_ERROR
-)
-if(NOT CHAIN_PATCH_RESULT EQUAL 0)
-    message(FATAL_ERROR "Could not apply the chain limit to ygopro-core's processor.cpp:\n${CHAIN_PATCH_ERROR}")
-endif()
+foreach(CORE_PATCH IN LISTS CORE_PATCHES)
+    execute_process(
+        COMMAND "${CMAKE_COMMAND}" -E env "GIT_CEILING_DIRECTORIES=${CMAKE_CURRENT_BINARY_DIR}"
+            "${GIT_EXECUTABLE}" apply --no-index --ignore-space-change "${CORE_PATCH}"
+        WORKING_DIRECTORY "${CORE_PATCH_STAGE}"
+        RESULT_VARIABLE CORE_PATCH_RESULT
+        ERROR_VARIABLE CORE_PATCH_ERROR
+    )
+    if(NOT CORE_PATCH_RESULT EQUAL 0)
+        message(FATAL_ERROR "Could not apply ${CORE_PATCH}:\n${CORE_PATCH_ERROR}")
+    endif()
+endforeach()
 configure_file("${CORE_PATCH_STAGE}/processor.cpp" "${CORE_PROCESSOR_PATCHED}" COPYONLY)
 list(REMOVE_ITEM CORE_CPP "${CORE_PROCESSOR}")
 list(APPEND CORE_CPP "${CORE_PROCESSOR_PATCHED}")

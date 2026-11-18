@@ -624,7 +624,7 @@ namespace YGOPortable.UI
             fade.alpha = 0f;
             fade.blocksRaycasts = fade.interactable = false;
             DuelReadoutPlate.Add(root, new Color(.028f, .052f, .065f, .97f));
-            bool inline = mobileLayout && !attacker.IsDefense;
+            bool inline = mobileLayout && (!attacker.IsDefense || attacker.ComparedValue.HasValue);
 
             void AddCard(string name, BattleCardStats card, bool link, bool attacking, string role, float start, float end)
             {

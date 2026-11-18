@@ -1,0 +1,65 @@
+--- a/processor.cpp
++++ b/processor.cpp
+@@ -2932,7 +2932,9 @@
+ }
+ void field::calculate_battle_damage(effect** pdamchange, card** preason_card, std::array<bool, 2>* battle_destroyed) {
+ 	uint32_t aa = core.attacker->get_attack(), ad = core.attacker->get_defense();
+-	uint32_t da = 0, dd = 0, a = aa, d;
++	uint32_t da = 0, dd = 0, a = aa, d = 0;
++	enum class stat_source : uint8_t { none, attack, defense, effect };
++	stat_source attack_source = stat_source::attack, defense_source = stat_source::none;
+ 	uint8_t pa = core.attacker->current.controler, pd;
+ 	uint8_t damp = 0;
+ 	effect* damchange = nullptr;
+@@ -2942,23 +2944,31 @@
+ 	core.battle_damage[0] = core.battle_damage[1] = 0;
+ 	if(core.attacker->is_position(POS_FACEUP_DEFENSE)) {
+ 		effect* defattack = core.attacker->is_affected_by_effect(EFFECT_DEFENSE_ATTACK);
+-		if(defattack && defattack->get_value(core.attacker))
++		if(defattack && defattack->get_value(core.attacker)) {
+ 			a = ad;
++			attack_source = stat_source::defense;
++		}
+ 	}
+ 	effect* battstat = core.attacker->is_affected_by_effect(EFFECT_CHANGE_BATTLE_STAT);
+-	if(battstat)
++	if(battstat) {
+ 		a = battstat->get_value(core.attacker);
++		attack_source = stat_source::effect;
++	}
+ 	if(core.attack_target) {
+ 		da = core.attack_target->get_attack();
+ 		dd = core.attack_target->get_defense();
+ 		pd = core.attack_target->current.controler;
+ 		battstat = core.attack_target->is_affected_by_effect(EFFECT_CHANGE_BATTLE_STAT);
+-		if(battstat)
++		if(battstat) {
+ 			d = battstat->get_value(core.attack_target);
+-		else if (core.attack_target->is_position(POS_ATTACK))
++			defense_source = stat_source::effect;
++		} else if (core.attack_target->is_position(POS_ATTACK)) {
+ 			d = da;
+-		else
++			defense_source = stat_source::attack;
++		} else {
+ 			d = dd;
++			defense_source = stat_source::defense;
++		}
+ 		if(core.attack_target->is_position(POS_ATTACK)) {
+ 			if(a > d) {
+ 				damp = pd;
+@@ -3252,6 +3262,14 @@
+ 		*preason_card = reason_card;
+ 	if(battle_destroyed) {
+ 		*battle_destroyed = bd;
++		// This is the final calculation. The same process step will also emit MSG_BATTLE.
++		// Keep the standard battle packet intact and report the actual compared values separately.
++		auto message = pduel->new_message(MSG_CUSTOM_MSG);
++		message->write<uint32_t>(0x31424759); // YGB1
++		message->write<uint8_t>(attack_source);
++		message->write<uint32_t>(a);
++		message->write<uint8_t>(defense_source);
++		message->write<uint32_t>(d);
+ 	}
+ }
+ bool field::process(Processors::Turn& arg) {

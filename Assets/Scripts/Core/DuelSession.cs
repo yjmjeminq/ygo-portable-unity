@@ -51,15 +51,46 @@ namespace YGOPortable.Core
         public uint reason;
     }
 
+    internal enum BattleStatSource : byte { Attack = 1, Defense, Effect }
+
+    internal readonly struct BattleComparisonValue
+    {
+        internal readonly BattleStatSource Source;
+        internal readonly uint Value;
+
+        internal BattleComparisonValue(BattleStatSource source, uint value)
+        {
+            Source = source;
+            Value = value;
+        }
+
+        internal static (BattleComparisonValue? Attacker, BattleComparisonValue? Defender) ReadMessage(BinaryReader reader, long end)
+        {
+            // The project adds a versioned custom message just before the engine's normal MSG_BATTLE.
+            if (end - reader.BaseStream.Position != 14 || reader.ReadUInt32() != 0x31424759) return default; // YGB1
+            return (ReadValue(reader), ReadValue(reader));
+        }
+
+        private static BattleComparisonValue? ReadValue(BinaryReader reader)
+        {
+            var source = (BattleStatSource)reader.ReadByte();
+            uint value = reader.ReadUInt32();
+            return source is BattleStatSource.Attack or BattleStatSource.Defense or BattleStatSource.Effect
+                ? new BattleComparisonValue(source, value) : null;
+        }
+    }
+
     internal readonly struct BattleCardStats
     {
         internal readonly byte Controller;
         internal readonly uint Location, Sequence, Position;
         internal readonly int Attack, Defense;
+        internal readonly BattleComparisonValue? ComparedValue;
         internal bool IsFaceUp => Location != 0 && (Position & YgoConstants.POS_FACEUP) != 0;
         internal bool IsDefense => (Position & YgoConstants.POS_DEFENSE) != 0;
 
-        internal BattleCardStats(byte controller, uint location, uint sequence, uint position, int attack, int defense)
+        internal BattleCardStats(byte controller, uint location, uint sequence, uint position, int attack, int defense,
+            BattleComparisonValue? comparedValue = null)
         {
             Controller = controller;
             Location = location;
@@ -67,12 +98,13 @@ namespace YGOPortable.Core
             Position = position;
             Attack = attack;
             Defense = defense;
+            ComparedValue = comparedValue;
         }
 
-        internal static BattleCardStats Read(BinaryReader reader)
+        internal static BattleCardStats Read(BinaryReader reader, BattleComparisonValue? comparedValue)
         {
             var stats = new BattleCardStats(reader.ReadByte(), reader.ReadByte(), reader.ReadUInt32(), reader.ReadUInt32(),
-                reader.ReadInt32(), reader.ReadInt32());
+                reader.ReadInt32(), reader.ReadInt32(), comparedValue);
             reader.ReadByte(); // Battle destruction flag.
             return stats;
         }
@@ -563,6 +595,8 @@ namespace YGOPortable.Core
             using (var ms = new MemoryStream(buf))
             using (var br = new BinaryReader(ms))
             {
+                // Native processing emits the comparison and battle together, with optional hints in between.
+                (BattleComparisonValue? Attacker, BattleComparisonValue? Defender) comparison = default;
                 while (ms.Position + 4 <= ms.Length)
                 {
                     uint sz = br.ReadUInt32();
@@ -570,7 +604,7 @@ namespace YGOPortable.Core
                     long msgEnd = ms.Position + sz;
                     byte msgType = br.ReadByte();
                     var previousPrompt = ActivePrompt;
-                    HandleMessage(msgType, br, msgEnd);
+                    HandleMessage(msgType, br, msgEnd, ref comparison);
                     if (ActivePrompt != null && ActivePrompt != previousPrompt && _pendingSelectionHint is { } selection)
                     {
                         if (ActivePrompt.playerId == selection.player) ActivePrompt.SelectionHint = selection.hint;
@@ -677,7 +711,8 @@ namespace YGOPortable.Core
                 toCon = destination.controller, toLoc = destination.location, toSeq = destination.sequence, toPos = card.position,
             };
 
-        private void HandleMessage(byte msgType, BinaryReader br, long msgEnd)
+        private void HandleMessage(byte msgType, BinaryReader br, long msgEnd,
+            ref (BattleComparisonValue? Attacker, BattleComparisonValue? Defender) comparison)
         {
             if (_speculatingPlayer >= 0 && msgType is YgoConstants.MSG_DRAW or YgoConstants.MSG_CONFIRM_DECKTOP or
                 YgoConstants.MSG_DECK_TOP or YgoConstants.MSG_CONFIRM_EXTRATOP or YgoConstants.MSG_RANDOM_SELECTED or
@@ -1047,7 +1082,16 @@ namespace YGOPortable.Core
                 case YgoConstants.MSG_BATTLE:
                 {
                     ClearAttack();
-                    OnBattleResolved?.Invoke(BattleCardStats.Read(br), BattleCardStats.Read(br));
+                    var values = comparison;
+                    comparison = default;
+                    OnBattleResolved?.Invoke(BattleCardStats.Read(br, values.Attacker), BattleCardStats.Read(br, values.Defender));
+                    break;
+                }
+
+                case YgoConstants.MSG_CUSTOM_MSG:
+                {
+                    var values = BattleComparisonValue.ReadMessage(br, msgEnd);
+                    if (values.Attacker.HasValue) comparison = values;
                     break;
                 }
 

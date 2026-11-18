@@ -27,8 +27,9 @@ namespace YGOPortable.Editor
             VerifyOpponentTurnActivation();
             VerifyNativeCombatReadout(useHonest: true);
             VerifyNativeCombatReadout(useHonest: false);
-            VerifyDefensePositionBattleReadout(34496660, 1800);
-            VerifyDefensePositionBattleReadout(75372290, 1550);
+            VerifyDefensePositionBattleReadout(34496660, BattleStatSource.Defense, 1800);
+            VerifyDefensePositionBattleReadout(75372290, BattleStatSource.Attack, 1550);
+            VerifyEffectModifiedBattleReadout();
             VerifyNativeCounterReadout();
             VerifyNativeIdentityReadout();
             VerifyInspectedCardMoves(swapInPlace: true);
@@ -335,7 +336,7 @@ namespace YGOPortable.Editor
             Debug.Log($"[VERIFY DUEL BATTLE STATS] A set defender stayed hidden until its flip, showed 2000 DEF through the {expectedAttack} ATK strike, and left at destruction.");
         }
 
-        private static void VerifyDefensePositionBattleReadout(uint attacker, int damage)
+        private static void VerifyDefensePositionBattleReadout(uint attacker, BattleStatSource source, int damage)
         {
             const uint sparkman = 20721928;
             var deck = Enumerable.Repeat(sparkman, 20).Concat(Enumerable.Repeat(attacker, 20)).ToArray();
@@ -348,6 +349,8 @@ namespace YGOPortable.Editor
             var ai = new TacticalAI();
             var opponent = duel.Players[duel.AiPlayerIndex];
             int lifeBefore = opponent.lp;
+            BattleComparisonValue? compared = null;
+            duel.OnBattleResolved += (attack, _) => compared = attack.ComparedValue;
 
             byte[] Respond(DuelPrompt prompt)
             {
@@ -389,13 +392,92 @@ namespace YGOPortable.Editor
             var comparison = animation.transform.Find("BattleReadout");
             var attackValue = comparison?.Find("Attacker/Values/Attack/Digits/Value").GetComponent<Text>();
             var defenseValue = comparison?.Find("Attacker/Values/Defense/Digits/Value").GetComponent<Text>();
+            bool usesDefense = source == BattleStatSource.Defense;
+            var activeValue = usesDefense ? defenseValue : attackValue;
+            var inactiveValue = usesDefense ? attackValue : defenseValue;
             Require(opponent.lp == lifeBefore - damage && duel.RetryCount == 0 &&
+                compared?.Source == source && compared?.Value == (uint)damage &&
                 comparison != null && comparison.Find("Defender") == null &&
                 comparison.Find("Attacker/Role/Text").GetComponent<Text>().text == "내 직접 공격" &&
-                attackValue.gameObject.activeInHierarchy && attackValue.text == card.attack.ToString() &&
-                defenseValue.gameObject.activeInHierarchy && defenseValue.text == card.defense.ToString(),
-                "The direct attack in defense omitted one of its card values or disagreed with the native LP result.");
-            Debug.Log($"[VERIFY DUEL BATTLE STATS] {attacker} attacked in defense for {damage} and displayed both raw stats.");
+                activeValue.gameObject.activeInHierarchy && activeValue.text == damage.ToString() &&
+                !inactiveValue.gameObject.activeInHierarchy,
+                "The defense-position comparison disagreed with the native stat source or LP result.");
+            TestCardPresentation.VerifyAttackFlight(animation, card.attack.ToString(), card.defense.ToString(), card.level.ToString(), () =>
+            {
+                var values = animation.transform.Find("AttackingCardReadout/CardReadout/Combat");
+                float attackRail = values.Find("Attack/Rail").GetComponent<Image>().color.a;
+                float defenseRail = values.Find("Defense/Rail").GetComponent<Image>().color.a;
+                Require((defenseRail > attackRail) == usesDefense, "The attacking card highlighted the wrong stat.");
+            });
+            Debug.Log($"[VERIFY DUEL BATTLE STATS] {attacker} attacked in defense using {source} {damage}, matching the LP result.");
+        }
+
+        private static void VerifyEffectModifiedBattleReadout()
+        {
+            const uint lamp = 42596828, sparkman = 20721928;
+            const ulong useDefense = ((ulong)lamp << 20) | 1;
+            var empty = Array.Empty<uint>();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Effect-modified combat",
+                Enumerable.Repeat(lamp, 40).ToArray(), empty, Enumerable.Repeat(sparkman, 40).ToArray(), empty,
+                true, session => session.ActivePrompt?.summonable.Count > 0);
+            using var ui = new HandUI(duel);
+            var ai = new TacticalAI();
+            var animation = CardAnimationManager.Ensure(ui.Canvas);
+            BattleCardStats attacker = default, defender = default;
+            duel.OnBattleResolved += (source, target) => { attacker = source; defender = target; };
+            var opponent = duel.Players[duel.AiPlayerIndex];
+            int lifeBefore = opponent.lp;
+
+            for (int turn = 0; turn < 2; turn++)
+            {
+                Require(duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD &&
+                    duel.ActivePrompt.summonable.Count > 0, "The battle-stat effect fixture could not summon its monster.");
+                duel.SubmitResponseInt(0);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+                duel.SubmitResponseInt(7);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            }
+            duel.SubmitResponseInt(6);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            Require(duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_BATTLECMD &&
+                duel.ActivePrompt.attackable.Count == 1,
+                $"Dracoon Lamp could not enter combat at prompt {duel.ActivePrompt?.messageType}.");
+            duel.SubmitResponseInt(1);
+            Require(duel.ActivePrompt?.IsAttackTargetSelection == true && duel.ActivePrompt.candidates.Count == 1,
+                "Dracoon Lamp could not select its target.");
+            duel.SubmitResponse(DuelSession.PackCardSelection(0));
+
+            bool activated = false;
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
+            {
+                if (prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN)
+                {
+                    bool use = !activated && prompt.playerId == duel.HumanPlayerIndex &&
+                        (prompt.promptDesc == useDefense || prompt.promptEffectDesc == useDefense);
+                    activated |= use;
+                    return BitConverter.GetBytes(use ? 1 : 0);
+                }
+                if (prompt.messageType != YgoConstants.MSG_SELECT_CHAIN || activated ||
+                    prompt.playerId != duel.HumanPlayerIndex) return null;
+                int index = prompt.candidates.FindIndex(card => card.code == lamp && card.description == useDefense);
+                activated = index >= 0;
+                return BitConverter.GetBytes(index);
+            });
+            Require(activated && attacker.Attack == 500 && defender.Attack == 1600 &&
+                attacker.ComparedValue?.Source == BattleStatSource.Effect && attacker.ComparedValue?.Value == 2000 &&
+                defender.ComparedValue?.Source == BattleStatSource.Effect && defender.ComparedValue?.Value == 1400 &&
+                opponent.lp == lifeBefore - 600 && duel.RetryCount == 0,
+                "The final battle values did not match Dracoon Lamp's resolved effect and native damage.");
+            var comparison = animation.transform.Find("BattleReadout");
+            foreach (var (side, value) in new[] { ("Attacker", "2000"), ("Defender", "1400") })
+            {
+                var values = comparison.Find(side + "/Values");
+                Require(values.Find("Effect/Digits/Value").GetComponent<Text>().text == value &&
+                    values.Find("Effect/Symbol").GetComponent<Image>().sprite == DuelStatSymbols.BattleEffect &&
+                    !values.Find("Attack").gameObject.activeSelf && !values.Find("Defense").gameObject.activeSelf,
+                    "A battle-stat effect was labeled with the unmodified stat.");
+            }
+            Debug.Log("[VERIFY DUEL BATTLE STATS] Dracoon Lamp compared 2000 and 1400 by effect while its printed attack values remained 500 and 1600.");
         }
 
         private static void VerifyNativeCounterReadout()

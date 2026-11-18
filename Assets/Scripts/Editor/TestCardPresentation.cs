@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using UnityEngine;
@@ -28,6 +29,7 @@ namespace YGOPortable.Editor
                 var animator = CardAnimationManager.Ensure(canvas);
                 VerifyFeaturedCards(animator);
                 VerifySummonReadout(animator);
+                VerifyBattleComparisonProtocol();
                 VerifyBattleVisibility(animator);
                 VerifyLinkDirectAttack(animator);
                 VerifyAttackSpacing(animator);
@@ -134,6 +136,63 @@ namespace YGOPortable.Editor
             {
                 UnityEngine.Object.DestroyImmediate(plate.gameObject);
             }
+        }
+
+        private static void VerifyBattleComparisonProtocol()
+        {
+            using var duel = new DuelSession();
+            var events = new List<(BattleCardStats Attacker, BattleCardStats Defender)>();
+            duel.OnBattleResolved += (attacker, defender) => events.Add((attacker, defender));
+            var parse = typeof(DuelSession).GetMethod("ParseMessages", BindingFlags.Instance | BindingFlags.NonPublic);
+            using var stream = new MemoryStream();
+            using var writer = new BinaryWriter(stream);
+
+            void WriteComparison()
+            {
+                writer.Write(15u);
+                writer.Write(YgoConstants.MSG_CUSTOM_MSG);
+                writer.Write(0x31424759u);
+                writer.Write((byte)BattleStatSource.Effect);
+                writer.Write(uint.MaxValue);
+                writer.Write((byte)BattleStatSource.Defense);
+                writer.Write(2000u);
+            }
+
+            void WriteBattle()
+            {
+                writer.Write(39u);
+                writer.Write(YgoConstants.MSG_BATTLE);
+                for (byte player = 0; player < 2; player++)
+                {
+                    writer.Write(player);
+                    writer.Write((byte)YgoConstants.LOCATION_MZONE);
+                    writer.Write(0u);
+                    writer.Write(YgoConstants.POS_FACEUP_DEFENSE);
+                    writer.Write(1200);
+                    writer.Write(2000);
+                    writer.Write((byte)0);
+                }
+            }
+
+            WriteComparison();
+            writer.Write(2u);
+            writer.Write(YgoConstants.MSG_CUSTOM_MSG);
+            writer.Write((byte)0);
+            WriteBattle();
+            WriteBattle();
+            WriteComparison(); // An incomplete native step cannot supply values to a later message buffer.
+            parse.Invoke(duel, new object[] { stream.ToArray() });
+            stream.SetLength(0);
+            WriteBattle();
+            parse.Invoke(duel, new object[] { stream.ToArray() });
+            Require(events.Count == 3 &&
+                events[0].Attacker.ComparedValue?.Source == BattleStatSource.Effect &&
+                events[0].Attacker.ComparedValue?.Value == uint.MaxValue &&
+                events[0].Defender.ComparedValue?.Source == BattleStatSource.Defense &&
+                events[0].Defender.ComparedValue?.Value == 2000 &&
+                events.All(item => item.Attacker.Attack == 1200 && item.Defender.Defense == 2000) &&
+                events.Skip(1).All(item => item.Attacker.ComparedValue == null && item.Defender.ComparedValue == null),
+                "Battle comparison data leaked between attacks or replaced their original stats.");
         }
 
         private static void VerifyBattleVisibility(CardAnimationManager animator)
