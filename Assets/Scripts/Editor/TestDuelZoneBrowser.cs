@@ -98,7 +98,7 @@ namespace YGOPortable.Editor
                     Canvas.ForceUpdateCanvases();
                     placeActions.Invoke(field, new object[] { slot, false });
 
-                    foreach (var element in new[] { left, left.Find("CardDetails/CombatStats"), left.Find("CardDetails/Description/Viewport"),
+                    foreach (var element in new[] { left, left.Find("CardDetails/ArtworkControls"), left.Find("CardDetails/CombatStats"), left.Find("CardDetails/Description/Viewport"),
                         slot.Find("CardReadout"), viewport.Find("DuelBoard"), viewport.Find("PlayerHUD"), viewport.Find("OpponentHUD"),
                         details.Find("ZoomWin"), battle.transform })
                     {
@@ -1016,16 +1016,27 @@ namespace YGOPortable.Editor
             {
                 var preview = Private<CompositeCardView>(Field, "_inspCard");
                 var artwork = (RectTransform)preview.transform.Find("AspectBox/Artwork");
-                var button = Private<Button>(Field, "_duelPadInspectButton");
-                Require(preview.CurrentCode == code && button.IsInteractable(), "The selected card did not populate the left preview.");
-                ClickAt(artwork, pointerId, button.gameObject);
+                var artworkHit = Private<Button>(Field, "_inspectorArtworkButton");
+                var details = Private<Button>(Field, "_duelPadInspectButton");
+                Require(preview.CurrentCode == code && artworkHit.IsInteractable() && details.IsInteractable(),
+                    "The selected card did not populate both inspection controls.");
+                Canvas.ForceUpdateCanvases();
+                var card = (RectTransform)preview.transform.Find("AspectBox");
+                var detailRect = (RectTransform)details.transform;
+                Require(detailRect.TransformPoint(new Vector3(0f, detailRect.rect.yMax)).y <
+                        card.TransformPoint(new Vector3(0f, card.rect.yMin)).y,
+                    "The details button obstructed the card.");
                 var zoom = Private<GameObject>(Field, "_cardZoomModal");
-                Require(zoom.activeInHierarchy && Private<Text>(Field, "_zoomDesc").text == CardDatabase.Get(code).desc &&
-                    ReferenceEquals(_duel.ActivePrompt, prompt), "Clicking the left artwork did not open the selected card's details.");
-                if (Modals.IsPromptOpen)
-                    Require(!Modals.TryConfirm() && !Modals.TryCancelOrPass(), "The chooser handled a response while card details were open.");
-                ClickAt((RectTransform)Private<Button>(Field, "_zoomCloseButton").transform, pointerId);
-                Require(!zoom.activeSelf && ReferenceEquals(_duel.ActivePrompt, prompt), "Closing the details advanced the duel.");
+                foreach (var (target, button) in new[] { (artwork, artworkHit), (detailRect, details) })
+                {
+                    ClickAt(target, pointerId, button.gameObject);
+                    Require(zoom.activeInHierarchy && Private<Text>(Field, "_zoomDesc").text == CardDatabase.Get(code).desc &&
+                        ReferenceEquals(_duel.ActivePrompt, prompt), "An inspection control did not open the selected card's details.");
+                    if (Modals.IsPromptOpen)
+                        Require(!Modals.TryConfirm() && !Modals.TryCancelOrPass(), "The chooser handled a response while card details were open.");
+                    ClickAt((RectTransform)Private<Button>(Field, "_zoomCloseButton").transform, pointerId);
+                    Require(!zoom.activeSelf && ReferenceEquals(_duel.ActivePrompt, prompt), "Closing the details advanced the duel.");
+                }
             }
 
             internal void VerifyOwnZones(PlayerFieldSnapshot player)

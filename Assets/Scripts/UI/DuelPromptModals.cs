@@ -215,10 +215,12 @@ namespace YGOPortable.UI
         internal void SetBrowsablePiles(params DuelZoneImage[] piles) => _promptShade.BrowsablePiles = piles;
         internal void SetChainConfirmationControl(Button button) => _promptShade.ChainConfirmationControl = button;
 
-        internal void SetInspectorArtworkControl(Button button)
+        internal void SetInspectorControls(Button artwork, Button details)
         {
-            _promptShade.InspectorArtworkControl = button;
-            _zoneShade.InspectorArtworkControl = button;
+            _promptShade.InspectorArtworkControl = artwork;
+            _zoneShade.InspectorArtworkControl = artwork;
+            _promptShade.InspectorDetailsControl = details;
+            _zoneShade.InspectorDetailsControl = details;
         }
 
         internal void SetCandidateInspector(Action<SelectableCardItem, uint> inspect) => _onInspectCandidate = inspect;
@@ -2606,6 +2608,7 @@ namespace YGOPortable.UI
         internal Func<Vector2, Camera, bool> FieldCardHitTest { get; set; }
         internal Button ChainConfirmationControl { get; set; }
         internal Button InspectorArtworkControl { get; set; }
+        internal Button InspectorDetailsControl { get; set; }
         internal bool ChainConfirmationAvailable { get; set; }
 
         internal bool IsPointOverPile(Vector2 screenPoint, Camera eventCamera)
@@ -2621,6 +2624,7 @@ namespace YGOPortable.UI
         public override bool IsRaycastLocationValid(Vector2 screenPoint, Camera eventCamera)
         {
             if (HitsControl(InspectorArtworkControl, screenPoint, eventCamera) ||
+                HitsControl(InspectorDetailsControl, screenPoint, eventCamera) ||
                 ChainConfirmationAvailable && HitsControl(ChainConfirmationControl, screenPoint, eventCamera))
                 return false;
             if (SelectingFieldCards) return !FieldCardHitTest(screenPoint, eventCamera);

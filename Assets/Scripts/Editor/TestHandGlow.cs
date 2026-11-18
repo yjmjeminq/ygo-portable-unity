@@ -335,7 +335,7 @@ namespace YGOPortable.Editor
 
             trapSlot.GetComponent<CardDragTrigger>().OnRightClick();
             var inspector = root.Find("LeftInspector/CardPreview/Card/AspectBox");
-            var label = inspector.Find("Counters/Number/Value").GetComponent<Text>();
+            var label = root.Find("LeftInspector/CardDetails/ArtworkControls/Counters/Number/Value").GetComponent<Text>();
             Require(label.text == "카운터 3개" && !label.raycastTarget, "Inspecting the trap lost its counter count or blocked input.");
             monsterSlot.GetComponent<CardDragTrigger>().OnRightClick();
             inspector.Find("ZoomHit").GetComponent<Button>().onClick.Invoke();
