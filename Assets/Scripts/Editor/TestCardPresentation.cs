@@ -25,6 +25,7 @@ namespace YGOPortable.Editor
                 var animator = CardAnimationManager.Ensure(canvas);
                 VerifyFeaturedCards(animator);
                 VerifySummonReadout(animator);
+                VerifyBattleVisibility(animator);
             }
             finally
             {
@@ -129,6 +130,29 @@ namespace YGOPortable.Editor
             finally
             {
                 UnityEngine.Object.DestroyImmediate(plate.gameObject);
+            }
+        }
+
+        private static void VerifyBattleVisibility(CardAnimationManager animator)
+        {
+            var link = new BattleCardStats(1, YgoConstants.LOCATION_MZONE, 0, YgoConstants.POS_FACEUP_ATTACK, 2300, 0);
+            var hidden = new BattleCardStats(0, YgoConstants.LOCATION_MZONE, 2, YgoConstants.POS_FACEDOWN_DEFENSE, 800, 2000);
+            var direct = animator.CreateBattleReadout(DuelFieldUI.BattleStatsArea, link, default, 0, true, false);
+            var unrevealed = animator.CreateBattleReadout(DuelFieldUI.BattleStatsArea, link, hidden, 0, true, false);
+            try
+            {
+                Require(direct.transform.Find("Attacker/Role/Text").GetComponent<Text>().text == "상대 직접 공격" &&
+                    !direct.transform.Find("Attacker/Values/Defense").gameObject.activeSelf && direct.transform.Find("Defender") == null,
+                    "A direct attack showed a defender or a Link defense value.");
+                Require(unrevealed.transform.Find("Attacker/Role/Text").GetComponent<Text>().text == "상대 공격" &&
+                    unrevealed.transform.Find("Defender") == null && unrevealed.alpha == 0f && !unrevealed.blocksRaycasts &&
+                    Array.TrueForAll(unrevealed.GetComponentsInChildren<Graphic>(), graphic => !graphic.raycastTarget),
+                    "The queued readout exposed a hidden defender, claimed an attack was direct, or intercepted input.");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(direct.gameObject);
+                UnityEngine.Object.DestroyImmediate(unrevealed.gameObject);
             }
         }
 

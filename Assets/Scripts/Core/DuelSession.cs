@@ -50,6 +50,33 @@ namespace YGOPortable.Core
         public uint reason;
     }
 
+    internal readonly struct BattleCardStats
+    {
+        internal readonly byte Controller;
+        internal readonly uint Location, Sequence, Position;
+        internal readonly int Attack, Defense;
+        internal bool IsFaceUp => Location != 0 && (Position & YgoConstants.POS_FACEUP) != 0;
+        internal bool IsDefense => (Position & YgoConstants.POS_DEFENSE) != 0;
+
+        internal BattleCardStats(byte controller, uint location, uint sequence, uint position, int attack, int defense)
+        {
+            Controller = controller;
+            Location = location;
+            Sequence = sequence;
+            Position = position;
+            Attack = attack;
+            Defense = defense;
+        }
+
+        internal static BattleCardStats Read(BinaryReader reader)
+        {
+            var stats = new BattleCardStats(reader.ReadByte(), reader.ReadByte(), reader.ReadUInt32(), reader.ReadUInt32(),
+                reader.ReadInt32(), reader.ReadInt32());
+            reader.ReadByte(); // Battle destruction flag.
+            return stats;
+        }
+    }
+
     public class ChainLinkInfo
     {
         public int chainNumber;
@@ -218,7 +245,7 @@ namespace YGOPortable.Core
         public event Action<ChainLinkInfo> OnChainActivated;
         public event Action<ChainLinkInfo> OnChainResolving;
         public event Action<byte, uint, uint, byte, uint, uint> OnAttackDeclared;
-        public event Action<byte, uint, uint, byte, uint, uint> OnBattleResolved;
+        internal event Action<BattleCardStats, BattleCardStats> OnBattleResolved;
         public event Action<byte, IReadOnlyList<bool>> OnCoinTossed;
         public event Action<byte, IReadOnlyList<int>> OnDiceRolled;
 
@@ -982,15 +1009,7 @@ namespace YGOPortable.Core
                 case YgoConstants.MSG_BATTLE:
                 {
                     HasActiveAttack = false;
-                    if (OnBattleResolved == null) break;
-                    byte attacker = br.ReadByte();
-                    uint attackLocation = br.ReadByte();
-                    uint attackSequence = br.ReadUInt32();
-                    br.ReadBytes(13); // position, attack, defense, destroyed flag
-                    byte target = br.ReadByte();
-                    uint targetLocation = br.ReadByte();
-                    uint targetSequence = br.ReadUInt32();
-                    OnBattleResolved.Invoke(attacker, attackLocation, attackSequence, target, targetLocation, targetSequence);
+                    OnBattleResolved?.Invoke(BattleCardStats.Read(br), BattleCardStats.Read(br));
                     break;
                 }
 

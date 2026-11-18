@@ -183,6 +183,7 @@ namespace YGOPortable.UI
         public bool IsBrowsingZone => _modals.IsZoneViewerOpen;
         internal bool IsReadingCardDetails => _cardZoomModal.activeSelf;
         internal static float PlaybackRate => Application.platform == RuntimePlatform.IPhonePlayer ? .75f : 1f;
+        internal static readonly Rect BattleStatsArea = Rect.MinMaxRect(.015f, .137f, .186f, .190f);
         private bool CanAcceptPlayerAction => _session != null && !_session.IsFinished && !IsPresenting && !IsPaused && !IsReadingLog &&
             _session.ActivePrompt?.playerId == _session.HumanPlayerIndex;
 
@@ -2155,19 +2156,26 @@ namespace YGOPortable.UI
                     attacker != _session.HumanPlayerIndex);
         }
 
-        private void HandleBattleResolved(byte attacker, uint location, uint sequence, byte target, uint targetLoc, uint targetSeq)
+        private void HandleBattleResolved(BattleCardStats attacker, BattleCardStats defender)
         {
             var animator = CardAnimationManager.Instance;
-            var card = FindLiveCard(attacker, location, sequence);
-            if (animator == null || card == null) return;
+            if (animator == null || !attacker.IsFaceUp) return;
+            var card = FindLiveCard(attacker.Controller, attacker.Location, attacker.Sequence);
+            if (card == null || card.code == 0) return;
 
-            var resting = GetCardPose(attacker, location, sequence, card.position);
-            var from = GetDisplayedCardPose(attacker, location, sequence, card.code);
+            var resting = GetCardPose(attacker.Controller, attacker.Location, attacker.Sequence, attacker.Position);
+            var from = GetDisplayedCardPose(attacker.Controller, attacker.Location, attacker.Sequence, card.code);
             if (!from.IsValid) from = resting;
-            var hit = AttackTarget(animator, attacker, target, targetLoc, targetSeq);
-            var arrival = HideUntilArrival(attacker, location, sequence);
-            animator.QueueAttack(from, hit, card.code, targetLoc == 0, attacker != _session.HumanPlayerIndex,
-                arrival, resting);
+            var hit = AttackTarget(animator, attacker.Controller, defender.Controller, defender.Location, defender.Sequence);
+            var arrival = HideUntilArrival(attacker.Controller, attacker.Location, attacker.Sequence);
+            var defendingCard = defender.IsFaceUp ? FindLiveCard(defender.Controller, defender.Location, defender.Sequence) : null;
+            bool attackerIsLink = new DuelCardReadout(CardDatabase.Get(card.code), card).IsLink;
+            bool defenderIsLink = defendingCard != null &&
+                new DuelCardReadout(CardDatabase.Get(defendingCard.code), defendingCard).IsLink;
+            int viewer = _session.HumanPlayerIndex;
+            var readout = animator.CreateBattleReadout(BattleStatsArea, attacker, defender, viewer, attackerIsLink, defenderIsLink);
+            var flight = new CardFlight(card.code, from, resting, false, false);
+            animator.QueueAttack(flight, hit, defender.Location == 0, attacker.Controller != viewer, readout, arrival);
         }
 
         private void HandleLifePointsChanged(byte player, int delta, int lifePoints)

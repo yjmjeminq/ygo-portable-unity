@@ -164,8 +164,9 @@ namespace YGOPortable.Editor
         private static void VerifyNativeCombatReadout()
         {
             const uint axeOfDespair = 40619825;
+            const uint mysticalElf = 15025844;
             uint[] main = Enumerable.Repeat(KaiserSeaHorse, 28).Concat(Enumerable.Repeat(axeOfDespair, 12)).ToArray();
-            uint[] opponent = Enumerable.Repeat(BlueEyes, 40).ToArray();
+            uint[] opponent = Enumerable.Repeat(mysticalElf, 40).ToArray();
             using var duel = YgoProjectBuilder.StartSeedMatching("Live combat readout", main, Array.Empty<uint>(),
                 opponent, Array.Empty<uint>(), true, session => session.ActivePrompt?.summonable.Count > 0 &&
                     session.Players[session.HumanPlayerIndex].hand.Any(card => card.code == axeOfDespair));
@@ -205,6 +206,33 @@ namespace YGOPortable.Editor
                 slot.Find("CardReadout/Combat/Attack/Change/Arrow").GetComponent<Text>().text == "▲",
                 "The field and inspector did not reflect the native equip bonus.");
             Debug.Log("[VERIFY DUEL EQUIPPED STATS] Axe of Despair updated the native field and inspected card from 1700 to 2700.");
+
+            duel.SubmitResponseInt(7);
+            ReachMainPhase();
+            Require(duel.ActivePrompt.playerId == duel.AiPlayerIndex && duel.ActivePrompt.mSetable.Count > 0,
+                "The native battle fixture could not set the defending monster.");
+            duel.SubmitResponseInt(3);
+            ReachMainPhase();
+            Require(duel.Players[duel.AiPlayerIndex].mzone.Any(card => card?.position == YgoConstants.POS_FACEDOWN_DEFENSE),
+                "The battle fixture did not start with a face-down defender.");
+            duel.SubmitResponseInt(7);
+            ReachMainPhase();
+            ui.Field.Refresh();
+
+            var animation = CardAnimationManager.Ensure(ui.Canvas);
+            duel.SubmitResponseInt(6);
+            Require(duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_BATTLECMD && duel.ActivePrompt.attackable.Count == 1,
+                "The equipped monster could not enter battle.");
+            duel.SubmitResponseInt(1);
+            Require(duel.ActivePrompt?.IsAttackTargetSelection == true && duel.ActivePrompt.candidates.Count == 1,
+                "The battle fixture did not select the face-down defender.");
+            duel.SubmitResponse(DuelSession.PackCardSelection(0));
+            var readout = animation.transform.Find("BattleReadout");
+            Require(readout != null && duel.RetryCount == 0 &&
+                readout.Find("Attacker/Values/Attack/Digits/Value").GetComponent<Text>().text == "2700" &&
+                readout.Find("Defender/Values/Defense/Digits/Value").GetComponent<Text>().text == "2000",
+                "The attack presentation lost the native equipped attack or the revealed defense.");
+            Debug.Log("[VERIFY DUEL BATTLE STATS] Native battle displayed the equipped 2700 ATK and the revealed 2000 DEF.");
         }
 
         private static bool IsAshBlossomPrompt(DuelSession duel, DuelPrompt prompt)

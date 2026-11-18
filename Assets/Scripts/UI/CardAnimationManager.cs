@@ -218,9 +218,9 @@ namespace YGOPortable.UI
             QueueStep(AttackArrow(from, to, opponent));
         }
 
-        internal void QueueAttack(CardPose from, Vector2 to, uint code, bool direct, bool opponent, Action onFinish, CardPose resting)
+        internal void QueueAttack(CardFlight flight, Vector2 hit, bool direct, bool opponent, CanvasGroup readout, Action onFinish)
         {
-            QueueStep(Attack(from, to, code, direct, opponent, onFinish, resting));
+            QueueStep(Attack(flight, hit, direct, opponent, readout, onFinish));
         }
 
         internal void QueueLifeChange(Vector2 point, int delta, Action onStart)
@@ -575,19 +575,61 @@ namespace YGOPortable.UI
             Destroy(arrow.gameObject);
         }
 
-        private IEnumerator Attack(CardPose from, Vector2 to, uint code, bool direct, bool opponent, Action onFinish, CardPose resting)
+        internal CanvasGroup CreateBattleReadout(Rect area, BattleCardStats attacker, BattleCardStats defender,
+            int viewer, bool attackerIsLink, bool defenderIsLink)
         {
+            if (!attacker.IsFaceUp && !defender.IsFaceUp) return null;
+            bool pair = attacker.IsFaceUp && defender.IsFaceUp;
+            float right = pair ? area.xMax : Mathf.Lerp(area.xMin, area.xMax, .62f);
+            var root = LotdUiKit.CreateRect("BattleReadout", _layer, area.min, new Vector2(right, area.yMax),
+                Vector2.zero, Vector2.zero);
+            var fade = root.gameObject.AddComponent<CanvasGroup>();
+            fade.alpha = 0f;
+            fade.blocksRaycasts = fade.interactable = false;
+            DuelReadoutPlate.Add(root, new Color(.028f, .052f, .065f, .97f));
+
+            void AddCard(string name, BattleCardStats card, bool link, string role, float start, float end)
+            {
+                var segment = LotdUiKit.CreateRect(name, root, new Vector2(start, 0f), new Vector2(end, 1f),
+                    new Vector2(4f, 3f), new Vector2(-4f, -3f));
+                bool opponent = card.Controller != viewer;
+                var title = LotdUiKit.CreateRect("Role", segment, new Vector2(0f, .677f), Vector2.one,
+                    Vector2.zero, Vector2.zero);
+                LotdUiKit.AddFittedText(title, "Text", $"{(opponent ? "상대" : "내")} {role}", 14, 8,
+                    TextAnchor.MiddleCenter, DuelStyle.Side(opponent), FontStyle.Bold);
+                var values = LotdUiKit.CreateRect("Values", segment, Vector2.zero, new Vector2(1f, .66f),
+                    Vector2.zero, Vector2.zero);
+                new DuelStatStrip(values, compact: true).BindBattle(card, link);
+            }
+
+            if (attacker.IsFaceUp)
+                AddCard("Attacker", attacker, attackerIsLink, defender.Location == 0 ? "직접 공격" : "공격", 0f, pair ? .5f : 1f);
+            if (defender.IsFaceUp)
+                AddCard("Defender", defender, defenderIsLink, "대상", pair ? .5f : 0f, 1f);
+            return fade;
+        }
+
+        private IEnumerator Attack(CardFlight flight, Vector2 to, bool direct, bool opponent, CanvasGroup readout, Action onFinish)
+        {
+            var from = flight.From;
+            uint code = flight.Code;
             if (!from.IsValid || code == 0)
             {
+                if (readout != null) Destroy(readout.gameObject);
                 onFinish?.Invoke();
                 yield break;
             }
 
             var proxy = TakeCard(code, false);
+            if (readout != null) readout.transform.SetAsLastSibling();
             var direction = (to - from.Position).normalized;
             var windup = new CardPose(from.Position - direction * 26f, from.Size * 1.10f, from.Angle);
             var first = new CardFlight(code, from, windup, false, false);
-            yield return Animate(.085f, t => ApplyFlight(proxy, first, t, 5f));
+            yield return Animate(.085f, t =>
+            {
+                ApplyFlight(proxy, first, t, 5f);
+                if (readout != null) readout.alpha = Mathf.SmoothStep(0f, 1f, t);
+            });
 
             Vector2 hit = Vector2.Lerp(from.Position, to, direct ? .78f : .89f);
             var lunge = new CardPose(hit, from.Size * 1.14f, from.Angle);
@@ -599,12 +641,14 @@ namespace YGOPortable.UI
             Color accent = opponent ? DuelStyle.Opponent : new Color(.38f, 1f, .70f);
             var impact = CreateEffect(DuelEffectKind.Strike, to, Vector2.one * (direct ? 335f : 248f), accent);
             impact.rectTransform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg);
-            var returnFlight = new CardFlight(code, lunge, resting.IsValid ? resting : from, false, false);
+            var returnFlight = new CardFlight(code, lunge, flight.To.IsValid ? flight.To : from, false, false);
             yield return Animate(.27f, t =>
             {
                 ApplyFlight(proxy, returnFlight, t, 10f);
                 impact.Seek(t);
+                if (readout != null) readout.alpha = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.57f, 1f, t));
             });
+            if (readout != null) Destroy(readout.gameObject);
             Destroy(impact.gameObject);
             RecycleCard(proxy);
             onFinish?.Invoke();

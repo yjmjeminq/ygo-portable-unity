@@ -87,18 +87,33 @@ namespace YGOPortable.UI
             _root.gameObject.SetActive(card.IsMonster);
             if (!card.IsMonster) return;
 
-            bool hasDirections = card.LinkMarkers != 0;
-            if (hasDirections) (_compass ??= new DuelLinkCompass(_root)).Bind(card.LinkMarkers, opponent);
-            else _compass?.Hide();
-            _attack.Rect.anchorMin = card.IsLink && _compact && !hasDirections ? new Vector2(.21f, 0f) : Vector2.zero;
-            float attackWidth = !card.IsLink ? .493f : hasDirections ? .62f : _compact ? .79f : 1f;
-            _attack.Rect.anchorMax = new Vector2(attackWidth, 1f);
-            _defense.Rect.anchorMin = new Vector2(.507f, 0f);
-            _defense.Rect.anchorMax = Vector2.one;
-            _defense.Rect.gameObject.SetActive(!card.IsLink);
+            Layout(card.IsLink, card.LinkMarkers, opponent);
             _attack.Bind(card.Attack, card.Live?.baseAttack ?? card.Attack, card.Live?.IsAttack == true);
             if (!card.IsLink)
                 _defense.Bind(card.Defense, card.Live?.baseDefense ?? card.Defense, card.Live?.IsDefense == true);
+        }
+
+        internal void BindBattle(BattleCardStats card, bool link)
+        {
+            _root.gameObject.SetActive(card.IsFaceUp);
+            if (!card.IsFaceUp) return;
+
+            Layout(link, 0, false);
+            _attack.Bind(card.Attack, card.Attack, !card.IsDefense);
+            if (!link) _defense.Bind(card.Defense, card.Defense, card.IsDefense);
+        }
+
+        private void Layout(bool link, uint directions, bool opponent)
+        {
+            bool hasDirections = directions != 0;
+            if (hasDirections) (_compass ??= new DuelLinkCompass(_root)).Bind(directions, opponent);
+            else _compass?.Hide();
+            _attack.Rect.anchorMin = link && _compact && !hasDirections ? new Vector2(.21f, 0f) : Vector2.zero;
+            float attackWidth = !link ? .493f : hasDirections ? .62f : _compact ? .79f : 1f;
+            _attack.Rect.anchorMax = new Vector2(attackWidth, 1f);
+            _defense.Rect.anchorMin = new Vector2(.507f, 0f);
+            _defense.Rect.anchorMax = Vector2.one;
+            _defense.Rect.gameObject.SetActive(!link);
         }
 
         private sealed class StatCell
