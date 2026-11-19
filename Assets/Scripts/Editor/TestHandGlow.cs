@@ -65,6 +65,9 @@ namespace YGOPortable.Editor
             VerifyNativeTemporaryBanishment();
             VerifyNativeTokenArrivalReadout();
             VerifyNativePendulumArrivalReadout();
+            VerifyPendulumScalePair();
+            VerifyNativeChangingPendulumScale(0);
+            VerifyNativeChangingPendulumScale(4);
             VerifyNativeFieldMaterials(xyz: true);
             VerifyNativeFieldMaterials(xyz: false);
             VerifyNativeSynchroMaterials();
@@ -3236,6 +3239,124 @@ namespace YGOPortable.Editor
                 "One of the four native Sheep Tokens missed its live values or interrupted placement of the other tokens.");
             VerifySpecialSummonGroup(ui.Field, animator, tokens, DuelEffectKind.Token);
             Debug.Log("[VERIFY DUEL GROUP SUMMON] Four Sheep Tokens kept the native placement prompts and arrived together with 500 ATK, 0 DEF and Level 1.");
+        }
+
+        private static void VerifyPendulumScalePair()
+        {
+            const uint oddEyes = 16178681;
+            using var duel = new DuelSession();
+            byte player = (byte)duel.HumanPlayerIndex;
+            var material = new LiveCardState
+            {
+                code = oddEyes, controller = player, location = YgoConstants.LOCATION_MZONE, sequence = 2,
+                type = CardDatabase.Get(oddEyes).type, level = 7, lscale = 0, rscale = 12,
+                position = YgoConstants.POS_FACEUP_ATTACK, attack = 2500, defense = 2000,
+                baseAttack = 2500, baseDefense = 2000,
+            };
+            duel.Players[player].mzone[material.sequence] = material;
+            using var ui = new HandUI(duel, mobileLayout: true);
+            FieldSlot(ui.Field, material).GetComponent<CardDragTrigger>().OnRightClick();
+            var root = ui.Field.Root.transform;
+            var sidebar = root.Find("MobileSafeArea/LeftInspector/CardDetails");
+            sidebar.Find("ArtworkControls/Details/B").GetComponent<Button>().onClick.Invoke();
+            var window = root.Find("Overlay_CardZoom/MobileSafeArea/ZoomWin");
+            var details = window.Find("Info");
+            var panels = new[] { sidebar, details };
+            Text Scale(Transform panel, string side) => panel.Find($"Scales/{side}/Number").GetComponent<Text>();
+            Require(panels.All(panel => Scale(panel, "Left").text == "0" && Scale(panel, "Right").text == "12" &&
+                    Scale(panel, "Left").gameObject.activeInHierarchy && Scale(panel, "Right").gameObject.activeInHierarchy &&
+                    panel.Find("Stats/Rating/Number").GetComponent<Text>().text == "7"),
+                "The two Pendulum amounts were exchanged, hidden at zero or substituted for the monster's level.");
+
+            var viewport = (RectTransform)ui.Canvas.transform;
+            foreach (var size in new[] { new Vector2(1740f, 805f), new Vector2(1200f, 680f) })
+            {
+                viewport.sizeDelta = size;
+                Canvas.ForceUpdateCanvases();
+                foreach (var panel in panels)
+                {
+                    var row = RectTransformUtility.CalculateRelativeRectTransformBounds(panel, panel.Find("Scales"));
+                    var combat = RectTransformUtility.CalculateRelativeRectTransformBounds(panel, panel.Find("CombatStats"));
+                    var description = RectTransformUtility.CalculateRelativeRectTransformBounds(panel,
+                        panel.Find(panel == sidebar ? "Description" : "DescBox"));
+                    Require(description.max.y < row.min.y && row.max.y < combat.min.y,
+                        $"The Pendulum scales covered the combat values or effect text at {size}.");
+                }
+            }
+
+            material.rscale = 9;
+            ui.Field.Refresh();
+            Require(panels.All(panel => Scale(panel, "Left").text == "0" &&
+                    Scale(panel, "Left").transform.parent.Find("ChangePulse") == null &&
+                    Scale(panel, "Right").text == "9" &&
+                    Scale(panel, "Right").transform.parent.Find("ChangePulse")?.gameObject.activeInHierarchy == true),
+                "An independent right-scale change moved or replaced the left scale.");
+            window.Find("Hdr/Close/B").GetComponent<Button>().onClick.Invoke();
+            ui.Field.InspectCard(KaiserSeaHorse);
+            Require(!sidebar.Find("Scales").gameObject.activeSelf &&
+                ((RectTransform)sidebar.Find("Description")).anchorMax.y == .275f,
+                "Inspecting a non-Pendulum card kept the previous scale row or shortened the effect area.");
+            Debug.Log("[VERIFY PENDULUM SCALE UI] Asymmetric amounts, zero, independent changes and view bounds passed.");
+        }
+
+        private static void VerifyNativeChangingPendulumScale(uint sequence)
+        {
+            const uint kepler = 11609969;
+            var ai = new TacticalAI();
+            var empty = Array.Empty<uint>();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Changing Pendulum scale",
+                Enumerable.Repeat(kepler, 40).ToArray(), empty, Enumerable.Repeat(BlueEyes, 40).ToArray(), empty,
+                true, session => session.ActivePrompt?.activatable.Exists(card => card.code == kepler) == true);
+            var player = duel.Players[duel.HumanPlayerIndex];
+            byte[] ChoosePlacementOrEffect(DuelPrompt prompt)
+            {
+                if (prompt.messageType == YgoConstants.MSG_SELECT_PLACE && prompt.playerId == duel.HumanPlayerIndex)
+                {
+                    Require((prompt.placeFlag & (1u << (8 + (int)sequence))) == 0,
+                        "The requested Pendulum Zone was not available.");
+                    return new[] { (byte)duel.HumanPlayerIndex, (byte)YgoConstants.LOCATION_SZONE, (byte)sequence };
+                }
+                if (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN && prompt.forced) return BitConverter.GetBytes(0);
+                return prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && prompt.promptCardCode == kepler
+                    ? BitConverter.GetBytes(1) : null;
+            }
+
+            bool right = sequence == 4;
+            uint Value() => right ? player.szone[sequence].rscale : player.szone[sequence].lscale;
+            ActivateFromMainPhase(duel, kepler);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, ChoosePlacementOrEffect);
+            Require(player.szone[sequence]?.code == kepler && Value() == 10,
+                "Kepler did not enter the specified Pendulum Zone at scale 10.");
+
+            using var ui = new HandUI(duel, mobileLayout: true);
+            var slot = FieldSlot(ui.Field, player.szone[sequence]);
+            slot.GetComponent<CardDragTrigger>().OnRightClick();
+            var root = ui.Field.Root.transform;
+            var inspector = root.Find("MobileSafeArea/LeftInspector/CardDetails");
+            inspector.Find("ArtworkControls/Details/B").GetComponent<Button>().onClick.Invoke();
+            var details = root.Find("Overlay_CardZoom/MobileSafeArea/ZoomWin/Info");
+            var field = slot.Find("CardReadout/Labels/Rating/Value").GetComponent<Text>();
+            var preview = inspector.Find("Stats/Rating/Number").GetComponent<Text>();
+            var zoom = details.Find("Stats/Rating/Number").GetComponent<Text>();
+            Require(details.Find("Stats/Rating/Kind/Label").GetComponent<Text>().text == (right ? "오른쪽" : "왼쪽") &&
+                !inspector.Find("Scales").gameObject.activeSelf && !details.Find("Scales").gameObject.activeSelf &&
+                !details.Find("CombatStats").gameObject.activeSelf &&
+                new[] { field, preview, zoom }.All(label => label.text == "10" && label.color == zoom.color),
+                "A Pendulum Spell did not show its own side's scale alone and in the same color.");
+
+            for (int turns = 0; turns < 2 && Value() == 10; turns++)
+            {
+                Require(duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD,
+                    "The scale fixture did not reach the next Main Phase.");
+                duel.SubmitResponseInt(7);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai, ChoosePlacementOrEffect);
+            }
+            ui.Field.Refresh();
+            Require(duel.RetryCount == 0 && Value() == 8 &&
+                new[] { field, preview, zoom }.All(label => label.text == "8" &&
+                    label.transform.parent.Find("ChangePulse")?.gameObject.activeInHierarchy == true),
+                "The native scale reduction did not reach the field and both inspected readings.");
+            Debug.Log($"[VERIFY PENDULUM SCALE UI] Kepler's {(right ? "right" : "left")} scale changed from 10 to 8 in all views.");
         }
 
         private static void VerifyNativePendulumArrivalReadout()

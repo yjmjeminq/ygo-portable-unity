@@ -252,7 +252,8 @@ namespace YGOPortable.Editor
         private static void VerifyKoreanPendulumReadouts(DuelSession duel)
         {
             const uint kepler = 11609969;
-            string rules = CardDatabase.Get(kepler)?.desc;
+            var data = CardDatabase.Get(kepler);
+            string rules = data?.desc;
             Require(rules?.Contains("[펜듈럼 효과]") == true, "The loaded card text kept the English Pendulum heading.");
 
             using var view = new ChainView();
@@ -265,10 +266,18 @@ namespace YGOPortable.Editor
                 var inspect = root.Find("LeftInspector/CardDetails");
                 Require(inspect.GetComponentsInChildren<Text>().Any(text => text.text == rules),
                     "The duel inspector lost the localized card rules.");
+                var left = inspect.Find("Scales/Left/Number")?.GetComponent<Text>();
+                var right = inspect.Find("Scales/Right/Number")?.GetComponent<Text>();
+                Require(left?.text == data.lscale.ToString() && right?.text == data.rscale.ToString() &&
+                    left.font == DuelTypography.NumberFont && right.font == DuelTypography.NumberFont && left.color != right.color,
+                    "The inspector did not give both printed Pendulum scales their own numeric positions.");
                 inspect.Find("ArtworkControls/Details/B").GetComponent<Button>().onClick.Invoke();
                 var detail = root.Find("Overlay_CardZoom");
                 Require(detail.gameObject.activeInHierarchy && detail.GetComponentsInChildren<Text>().Any(text => text.text == rules),
                     "The card detail window lost the localized card rules.");
+                Require(detail.transform.Find("ZoomWin/Info/Scales/Left/Kind/Label")?.GetComponent<Text>().text == "왼쪽" &&
+                    detail.transform.Find("ZoomWin/Info/Scales/Right/Kind/Label")?.GetComponent<Text>().text == "오른쪽",
+                    "The detail window did not identify the two scale sides.");
 
                 var card = CompositeCardView.Create(root, "RulesPreview", detailedOverlay: true, duelArtwork: true);
                 card.SetCard(kepler);

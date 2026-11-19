@@ -29,6 +29,7 @@ namespace YGOPortable.UI
         private Text _inspIdentity;
         private Text _inspStats;
         private DuelRatingBadge _inspRating;
+        private DuelPendulumScalePair _inspScales;
         private DuelCounterBadge _inspCounters;
         private DuelStatStrip _inspCombat;
         private Text _inspDesc;
@@ -142,7 +143,6 @@ namespace YGOPortable.UI
         // High-res Card Zoom Modal
         private GameObject _cardZoomModal;
         private Button _zoomCloseButton;
-        private Button _zoomRelatedButton;
         private GameObject _focusBeforeZoom;
         private CompositeCardView _zoomCardView;
         private GameObject _zoomArtworkControls;
@@ -151,12 +151,14 @@ namespace YGOPortable.UI
         private Text _zoomRulesName;
         private Text _zoomStats;
         private DuelRatingBadge _zoomRating;
+        private DuelPendulumScalePair _zoomScales;
         private DuelCounterBadge _zoomCounters;
         private DuelStatStrip _zoomCombat;
         private (byte controller, uint location, uint sequence)? _zoomFieldCard;
         private Text _zoomPasscode;
         private Text _zoomCounterTypes;
         private Text _zoomDesc;
+        private RectTransform _zoomDescriptionBox;
         private ScrollRect _zoomScroll;
         private Image _zoomRaceIcon;
         private Image _zoomAttributeIcon;
@@ -398,6 +400,7 @@ namespace YGOPortable.UI
             BindRulesName(_inspName, _inspRulesName, null);
             BindInspectorStats(default, showChanges: false);
             _inspCombat.Hide();
+            _inspScales.Bind(default, showChanges: false);
             SizeInspectorDescription(hasCombat: false);
             _inspCounters.Bind(default);
             SetLinkedZones(null);
@@ -509,7 +512,8 @@ namespace YGOPortable.UI
             _inspCounters.Bind(card, showChanges);
             _inspCombat.Bind(card, card.Live != null && card.Live.controller != _session.HumanPlayerIndex,
                 showChanges && card.Live != null);
-            SizeInspectorDescription(card.IsMonster);
+            bool hasScales = _inspScales.Bind(card, showChanges && card.Live != null);
+            SizeInspectorDescription(card.IsMonster, hasScales);
         }
 
         private void BindInspectorStats(DuelCardReadout card, bool showChanges)
@@ -522,13 +526,13 @@ namespace YGOPortable.UI
             _inspStats.text = details;
             var info = (RectTransform)_inspStats.transform.parent;
             info.anchorMax = new Vector2(1f, identity.Length != 0 || hasRating ? .49f : 1f);
-            _inspRating.Bind(rating, showChanges);
+            _inspRating.Bind(rating, showChanges, card.ActiveScale?.Right);
         }
 
-        private void SizeInspectorDescription(bool hasCombat)
+        private void SizeInspectorDescription(bool hasCombat, bool hasScales = false)
         {
             var description = (RectTransform)_inspectScroll.transform;
-            description.anchorMax = new Vector2(description.anchorMax.x, hasCombat ? .275f : .337f);
+            description.anchorMax = new Vector2(description.anchorMax.x, hasScales ? .214f : hasCombat ? .275f : .337f);
         }
 
         private static Text CreateRulesNameLabel(Transform parent, int size)
@@ -682,7 +686,6 @@ namespace YGOPortable.UI
                 card.IsMonster && (card.Type & YgoConstants.TYPE_TRAP) != 0 ? "함정 몬스터" :
                 YgoConstants.GetTypeTagKR(card.Type).Replace(" / ", " · ");
             if (card.InspectionRating.Kind == DuelRatingKind.Scale) return (type, "");
-            if (card.IsPendulum) type += $" · 스케일 {card.LeftScale}/{card.RightScale}";
             if (!card.IsMonster) return ("", type);
 
             if (!YgoConstants.RaceNamesKR.TryGetValue(card.Race, out string race))
@@ -700,17 +703,6 @@ namespace YGOPortable.UI
             if (status.Length > 0) position += " · " + status;
             return (identity, $"{type} · {position}");
         }
-
-        private void ShowZoomRelatedCards()
-        {
-            uint code = _zoomCardView.CurrentCode;
-            if (code == 0) return;
-            var related = CardDatabase.GetRelatedCards(code);
-            var codes = related.Select(card => card.code).ToArray();
-            CloseCardZoomModal();
-            _modals.ShowCodeListViewer($"[{CardDatabase.GetName(code)}] 관련 카드", codes);
-        }
-
 
         private void BuildUI(Transform parent)
         {
@@ -792,6 +784,8 @@ namespace YGOPortable.UI
             var combat = LotdUiKit.CreateRect("CombatStats", inside, new Vector2(.018f, .281f), new Vector2(.982f, .337f),
                 Vector2.zero, Vector2.zero);
             _inspCombat = new DuelStatStrip(combat, compact: false);
+            _inspScales = new DuelPendulumScalePair(LotdUiKit.CreateRect("Scales", inside,
+                new Vector2(.018f, .220f), new Vector2(.982f, .275f), Vector2.zero, Vector2.zero));
             var race = LotdUiKit.CreateRect("Race", inside, new Vector2(.841f, .384f), new Vector2(.987f, .418f),
                 Vector2.zero, Vector2.zero);
             _inspRaceIcon = LotdUiKit.AddImage(race.gameObject, null, Color.white, true, false);
@@ -3867,14 +3861,10 @@ namespace YGOPortable.UI
             var hdr = LotdUiKit.CreateRect("Hdr", win, new Vector2(.012f, .9f), new Vector2(.988f, .985f),
                 Vector2.zero, Vector2.zero);
             DuelReadoutPlate.Add(hdr, new Color(.065f, .113f, .133f, .92f));
-            var title = LotdUiKit.CreateRect("Title", hdr, new Vector2(0.02f, 0.12f), new Vector2(0.63f, 0.88f),
+            var title = LotdUiKit.CreateRect("Title", hdr, new Vector2(0.02f, 0.12f), new Vector2(0.82f, 0.88f),
                 Vector2.zero, Vector2.zero);
             LotdUiKit.AddFittedText(title, "T", "카드 상세 정보", 19, 12,
                 TextAnchor.MiddleLeft, LotdUiKit.GoldAccent);
-
-            var relatedRt = LotdUiKit.CreateRect("Related", hdr, new Vector2(0.66f, 0.15f), new Vector2(0.82f, 0.85f),
-                Vector2.zero, Vector2.zero);
-            _zoomRelatedButton = DuelStyle.Button(relatedRt, "B", "관련 카드", ShowZoomRelatedCards, 15);
 
             var closeRt = LotdUiKit.CreateRect("Close", hdr, new Vector2(0.84f, 0.15f), new Vector2(0.98f, 0.85f), Vector2.zero, Vector2.zero);
             _zoomCloseButton = DuelStyle.Button(closeRt, "B", onIPhone ? "닫기" : "닫기 (ESC)", () => CloseCardZoomModal(), 15);
@@ -3927,7 +3917,9 @@ namespace YGOPortable.UI
                 new Vector2(.64f, .571f), new Vector2(1f, .626f), Vector2.zero, Vector2.zero);
             _zoomCounters = new DuelCounterBadge(counterChip, compact: false);
 
-            var descBox = LotdUiKit.CreateRect("DescBox", infoRt, Vector2.zero, new Vector2(1f, .561f),
+            _zoomScales = new DuelPendulumScalePair(LotdUiKit.CreateRect("Scales", infoRt,
+                new Vector2(0f, .503f), new Vector2(1f, .558f), Vector2.zero, Vector2.zero));
+            var descBox = _zoomDescriptionBox = LotdUiKit.CreateRect("DescBox", infoRt, Vector2.zero, new Vector2(1f, .561f),
                 Vector2.zero, Vector2.zero);
             DuelReadoutPlate.Add(descBox, new Color(.018f, .045f, .061f, .96f)).raycastTarget = true;
             var vp = LotdUiKit.CreateRect("VP", descBox, Vector2.zero, Vector2.one,
@@ -3973,7 +3965,6 @@ namespace YGOPortable.UI
                 _focusBeforeZoom = EventSystem.current?.currentSelectedGameObject;
                 if (IsBrowsingZone || _modals.IsPromptOpen) _cardZoomModal.transform.SetParent(Root.transform.parent, false);
                 _cardZoomModal.transform.SetAsLastSibling();
-                _zoomRelatedButton.gameObject.SetActive(!IsBrowsingZone);
                 _modals.SetCardDetailsOpen(true);
                 _cardZoomModal.SetActive(true);
             }
@@ -4014,7 +4005,9 @@ namespace YGOPortable.UI
             _zoomStats.text = identity.Length == 0 ? details : details.Length == 0 ? identity : $"{identity}\n{details}";
             var rating = card.InspectionRating;
             _zoomStats.rectTransform.anchorMax = new Vector2(rating.Kind == DuelRatingKind.None ? .982f : .70f, .965f);
-            _zoomRating.Bind(rating, showChanges && card.Live != null);
+            _zoomRating.Bind(rating, showChanges && card.Live != null, card.ActiveScale?.Right);
+            bool hasScales = _zoomScales.Bind(card, showChanges && card.Live != null);
+            _zoomDescriptionBox.anchorMax = new Vector2(1f, hasScales ? .494f : .561f);
             BindIdentityIcons(card, _zoomRaceIcon, _zoomAttributeIcon);
             _zoomCounters.Bind(card, showChanges);
             bool mixedCounters = card.Counters.Length > 1;

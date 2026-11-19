@@ -1597,7 +1597,7 @@ namespace YGOPortable.UI
                 metrics = CenteredVisual("ResolutionReadout", overlay, initial.Position, ReadoutSize(initialHeight));
                 var grade = LotdUiKit.CreateRect("Rating", metrics, new Vector2(.035f, .835f), new Vector2(.465f, .985f),
                     Vector2.zero, Vector2.zero);
-                new DuelRatingBadge(grade, compact: true).Bind(rating);
+                new DuelRatingBadge(grade, compact: true).Bind(rating, rightScale: readout.ActiveScale?.Right);
                 var combat = LotdUiKit.CreateRect("Combat", metrics, new Vector2(.02f, .015f), new Vector2(.98f, .205f),
                     Vector2.zero, Vector2.zero);
                 new DuelStatStrip(combat, compact: true).Bind(readout, showModifiers: false);

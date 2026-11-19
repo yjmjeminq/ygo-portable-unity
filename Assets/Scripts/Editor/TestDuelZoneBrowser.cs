@@ -82,6 +82,8 @@ namespace YGOPortable.Editor
                 left.Find("CardPreview/Card/AspectBox/ZoomHit").GetComponent<Button>().onClick.Invoke();
                 var overlay = field.Root.transform.Find("Overlay_CardZoom");
                 var details = overlay.Find("MobileSafeArea");
+                Require(details.Find("ZoomWin/Hdr/Related") == null,
+                    "Duel card details still offer related-card browsing.");
                 var animator = CardAnimationManager.Ensure(canvas);
                 var myDeck = viewport.Find("DuelBoard/Zone_7_4");
                 var opponentExtra = viewport.Find("DuelBoard/Zone_7_0");
