@@ -2842,13 +2842,17 @@ namespace YGOPortable.UI
                 // Reserve the space between the opponent's LP and the phase control.
                 var playArea = (RectTransform)_boardRect.parent;
                 var area = MobileChainResolutionArea;
-                var size = animator.GetAreaSize(playArea);
-                float height = Mathf.Min(size.x * area.width * .88f, size.y * area.height);
-                animator.QueueChainResolution(animator.GetPoint(playArea, area.center), link.code, link.chainNumber, height, link.ActivationReadout);
+                animator.QueueChainResolution(() =>
+                {
+                    var size = animator.GetAreaSize(playArea);
+                    float height = Mathf.Min(size.x * area.width * .88f,
+                        size.y * area.height / CardAnimationManager.CompactChainReadoutHeightRatio);
+                    return (animator.GetPoint(playArea, area.center), height);
+                }, link.code, link.chainNumber, link.ResolutionReadout, compact: true);
                 return;
             }
-            var center = animator.GetPoint(_boardRect, new Vector2(.50f, .56f));
-            animator.QueueChainResolution(center, link.code, link.chainNumber, live: link.ActivationReadout);
+            animator.QueueChainResolution(() => (animator.GetPoint(_boardRect, new Vector2(.50f, .56f)), 206f),
+                link.code, link.chainNumber, link.ResolutionReadout);
         }
 
         private Func<Vector2> CaptureAttackTarget(CardAnimationManager animator, byte attacker, byte target, uint location, uint sequence)

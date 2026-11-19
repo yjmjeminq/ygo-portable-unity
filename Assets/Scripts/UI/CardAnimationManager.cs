@@ -460,9 +460,12 @@ namespace YGOPortable.UI
             QueueStep(ChainActivation(source, code, chainNumber, opponent, live));
         }
 
-        internal void QueueChainResolution(Vector2 center, uint code, int chainNumber, float maxHeight = 206f, LiveCardState live = null)
+        internal const float CompactChainReadoutHeightRatio = 1.25f;
+
+        internal void QueueChainResolution(Func<(Vector2 Center, float MaxHeight)> readLayout, uint code,
+            int chainNumber, LiveCardState live, bool compact = false)
         {
-            QueueStep(ChainResolution(center, code, chainNumber, maxHeight, live));
+            QueueStep(ChainResolution(readLayout, code, chainNumber, live, compact));
         }
 
         internal void QueueFieldReadoutUpdate(Action apply) => QueueStep(ApplyFieldReadoutUpdate(apply));
@@ -1567,26 +1570,66 @@ namespace YGOPortable.UI
             Destroy(overlay.gameObject);
         }
 
-        private IEnumerator ChainResolution(Vector2 center, uint code, int chainNumber, float maxHeight, LiveCardState live)
+        private IEnumerator ChainResolution(Func<(Vector2 Center, float MaxHeight)> readLayout, uint code,
+            int chainNumber, LiveCardState live, bool compact)
         {
-            float height = Mathf.Min(maxHeight, _layer.rect.height * .29f);
-            var size = new Vector2(height * LotdUiKit.CardAspectRatio, height);
+            CardPose ReadPose()
+            {
+                var (center, maximum) = readLayout();
+                float height = Mathf.Min(maximum, _layer.rect.height * .29f);
+                return new CardPose(center, new Vector2(height * LotdUiKit.CardAspectRatio, height), -5f);
+            }
+
+            var initial = ReadPose();
+            if (!initial.IsValid) yield break;
+            float initialHeight = initial.Size.y;
             var overlay = LotdUiKit.FillRect("ChainResolution", _layer);
-            var card = TakeCard(code, code == 0, detailed: true, live: live);
+            var readout = new DuelCardReadout(CardDatabase.Get(code), live);
+            var rating = readout.InspectionRating;
+            bool separateReadout = compact && code != 0 && (readout.IsMonster || rating.Kind != DuelRatingKind.None);
+            var card = TakeCard(code, code == 0, detailed: !separateReadout, live: live);
             card.transform.SetParent(overlay, false);
-            ApplyPose(card, new CardPose(center, size, -5f));
-            var badge = ChainBadge(overlay, center + new Vector2(size.x * .49f, height * .03f),
-                chainNumber, height * .35f, active: true, resolving: true);
+            ApplyPose(card, initial);
+
+            RectTransform metrics = null;
+            if (separateReadout)
+            {
+                metrics = CenteredVisual("ResolutionReadout", overlay, initial.Position, ReadoutSize(initialHeight));
+                var grade = LotdUiKit.CreateRect("Rating", metrics, new Vector2(.035f, .835f), new Vector2(.465f, .985f),
+                    Vector2.zero, Vector2.zero);
+                new DuelRatingBadge(grade, compact: true).Bind(rating);
+                var combat = LotdUiKit.CreateRect("Combat", metrics, new Vector2(.02f, .015f), new Vector2(.98f, .205f),
+                    Vector2.zero, Vector2.zero);
+                new DuelStatStrip(combat, compact: true).Bind(readout, showModifiers: false);
+            }
+
+            var badge = ChainBadge(overlay, BadgePoint(initial), chainNumber, initialHeight * .35f, active: true, resolving: true);
             var fade = overlay.gameObject.AddComponent<CanvasGroup>();
             fade.alpha = 0f;
             yield return Animate(.34f, t =>
             {
                 float appear = Mathf.SmoothStep(0f, 1f, t / .24f);
                 fade.alpha = appear * (1f - Mathf.SmoothStep(0f, 1f, (t - .73f) / .27f));
-                badge.localScale = Vector3.one * Mathf.Lerp(1.28f, 1f, appear);
+                var pose = ReadPose();
+                ApplyPose(card, pose);
+                if (metrics != null)
+                {
+                    metrics.anchoredPosition = pose.Position;
+                    metrics.sizeDelta = ReadoutSize(pose.Size.y);
+                }
+                badge.anchoredPosition = BadgePoint(pose);
+                badge.localScale = Vector3.one * (Mathf.Lerp(1.28f, 1f, appear) * pose.Size.y / initialHeight);
             });
             overlay.gameObject.SetActive(false);
+            if (separateReadout)
+            {
+                RecycleCard(card);
+                card.transform.SetParent(_layer, false);
+            }
             Destroy(overlay.gameObject);
+
+            static Vector2 ReadoutSize(float height) => new Vector2(height * 1.02f, height * CompactChainReadoutHeightRatio);
+            static Vector2 BadgePoint(CardPose pose) => pose.Position + new Vector2(pose.Size.x * .49f, pose.Size.y * .03f);
         }
 
         private static void AddChainConnector(RectTransform overlay, Vector2 from, Vector2 to, float height)

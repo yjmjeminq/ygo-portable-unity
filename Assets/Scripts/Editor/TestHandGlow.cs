@@ -36,7 +36,9 @@ namespace YGOPortable.Editor
             VerifyOpponentEquipmentFocus();
             VerifyNativeMonsterEquip();
             VerifyNativeChainReadouts();
-            VerifyNativeChainCardFace();
+            VerifyNativeChainCardFace(0);
+            VerifyNativeChainCardFace(70046172);
+            VerifyNativeChainCardFace(14087893);
             VerifyDestroyedCopiesKeepTheirReadouts();
             VerifyFieldReplacementReadouts();
             VerifyTurnAndDrawReadouts();
@@ -1172,17 +1174,19 @@ namespace YGOPortable.Editor
             Debug.Log("[VERIFY DUEL CHAIN READOUT] Rush changed only one copy to 2550 at link 2. Ocean changed both copies' ATK/DEF and Level at link 1.");
         }
 
-        private static void VerifyNativeChainCardFace()
+        private static void VerifyNativeChainCardFace(uint responseCode)
         {
-            const uint breaker = 71413901, axe = 40619825;
-            var main = Enumerable.Repeat(breaker, 24).Concat(Enumerable.Repeat(axe, 16)).ToArray();
+            const uint breaker = 71413901, axe = 40619825, rush = 70046172, book = 14087893;
+            var main = Enumerable.Repeat(breaker, 20).Concat(Enumerable.Repeat(axe, 10))
+                .Concat(Enumerable.Repeat(responseCode == 0 ? breaker : responseCode, 10)).ToArray();
             var empty = Array.Empty<uint>();
             var ai = new TacticalAI();
             using var duel = YgoProjectBuilder.StartSeedMatching("Buffed chain card face", main, empty,
                 Enumerable.Repeat(BlueEyes, 40).ToArray(), empty, true, session =>
                 {
                     var hand = session.Players[session.HumanPlayerIndex].hand;
-                    return hand.Exists(card => card.code == breaker) && hand.Exists(card => card.code == axe);
+                    return hand.Exists(card => card.code == breaker) && hand.Exists(card => card.code == axe) &&
+                        (responseCode == 0 || hand.Exists(card => card.code == responseCode));
                 });
             int summon = duel.ActivePrompt.summonable.FindIndex(card => card.code == breaker);
             Require(summon >= 0, "The chain face fixture could not summon Breaker.");
@@ -1196,43 +1200,113 @@ namespace YGOPortable.Editor
             Require(player.mzone.Single(card => card?.code == breaker).attack == 2900,
                 "The native counter and Axe did not give Breaker its two bonuses.");
 
-            using var ui = new HandUI(duel, mobileLayout: true);
+            using var ui = new HandUI(duel, mobileLayout: responseCode != 0);
             var animator = CardAnimationManager.Ensure(ui.Canvas);
             Canvas.ForceUpdateCanvases();
             LiveCardState activation = null;
+            LiveCardState resolution = null;
             duel.OnChainActivated += link => { if (link.code == breaker) activation = link.ActivationReadout; };
+            duel.OnChainResolving += link => { if (link.code == breaker) resolution = link.ResolutionReadout; };
+            bool responded = false;
             ActivateFromMainPhase(duel, breaker);
             YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
-                prompt.messageType == YgoConstants.MSG_SELECT_CARD ? SelectCard(prompt, axe) : null);
-            Require(duel.RetryCount == 0 && player.mzone.Single(card => card?.code == breaker).attack == 1600 &&
+            {
+                if (prompt.messageType == YgoConstants.MSG_SELECT_CARD)
+                    return SelectCard(prompt, responded ? breaker : axe);
+                if (responded || responseCode == 0 || prompt.playerId != duel.HumanPlayerIndex) return null;
+                if (prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && prompt.promptCardCode == responseCode)
+                {
+                    responded = true;
+                    return BitConverter.GetBytes(1);
+                }
+                if (prompt.messageType != YgoConstants.MSG_SELECT_CHAIN) return null;
+                int response = prompt.candidates.FindIndex(card => card.code == responseCode);
+                if (response < 0) return null;
+                responded = true;
+                return BitConverter.GetBytes(response);
+            });
+            var after = player.mzone.Single(card => card?.code == breaker);
+            Require(duel.RetryCount == 0 && responded == (responseCode != 0) &&
+                (responseCode == book ? !after.IsFaceUp : after.attack == (responseCode == rush ? 2300 : 1600)) &&
                 player.grave.Any(card => card.code == axe), "Breaker did not pay the counter and destroy its own Axe.");
             Require(activation?.attack >= 2600, "The chain did not capture Breaker's equipped attack before resolution.");
+            int resolvingAttack = responseCode == rush ? 3300 : responseCode == book ? activation.attack : 2600;
+            Require(resolution?.attack == resolvingAttack,
+                $"The engine snapshot before the first effect was {resolution?.attack}, with {resolvingAttack} ATK expected.");
+            Require(responseCode != book || ReferenceEquals(activation, resolution),
+                "A concealed source was queried for a new public chain face.");
 
             var steps = AnimationSteps(animator).ToArray();
+            var activations = steps.Where(cue => cue.GetType().Name.StartsWith("<ChainActivation>", StringComparison.Ordinal)).ToArray();
+            var resolutions = steps.Where(cue => cue.GetType().Name.StartsWith("<ChainResolution>", StringComparison.Ordinal)).ToArray();
+            int linkCount = responseCode == 0 ? 1 : 2;
+            Require(activations.Length == linkCount && resolutions.Length == linkCount, "The native chain lost an activation or resolution cue.");
             foreach (string phase in new[] { "ChainActivation", "ChainResolution" })
             {
-                var step = steps.Single(cue => cue.GetType().Name.StartsWith($"<{phase}>", StringComparison.Ordinal));
+                bool resolving = phase == "ChainResolution";
+                var step = resolving ? resolutions[^1] : activations[0];
+                if (resolving)
+                    foreach (var update in steps.TakeWhile(cue => !ReferenceEquals(cue, step)).Where(cue =>
+                        cue.GetType().Name.StartsWith("<ApplyFieldReadoutUpdate>", StringComparison.Ordinal)))
+                        Require(!update.MoveNext(), "An earlier link's stat update added a separate animation.");
                 Require(step.MoveNext() && step.Current is IEnumerator, $"The {phase} cue did not show its card.");
-                TestCardPresentation.SampleAnimation((IEnumerator)step.Current)(.68f);
+                var sample = TestCardPresentation.SampleAnimation((IEnumerator)step.Current);
+                sample(.57f);
                 var card = animator.GetComponentsInChildren<CompositeCardView>().Single(view => view.CurrentCode == breaker);
-                var face = card.transform.Find("AspectBox");
-                var attack = face.Find("AtkDef/Attack/Digits/Value")?.GetComponent<Text>();
-                var defense = face.Find("AtkDef/Defense/Digits/Value")?.GetComponent<Text>();
-                var level = face.Find("LevelInfo/Rating/Number")?.GetComponent<Text>();
-                Require(attack?.text == activation.attack.ToString() && attack.font == DuelTypography.NumberFont &&
+                bool compact = resolving && responseCode != 0;
+                var face = compact ? animator.transform.Find("ChainResolution/ResolutionReadout") : card.transform.Find("AspectBox");
+                string combatPath = compact ? "Combat" : "AtkDef";
+                string ratingPath = compact ? "Rating" : "LevelInfo/Rating";
+                var attack = face?.Find(combatPath + "/Attack/Digits/Value")?.GetComponent<Text>();
+                var defense = face?.Find(combatPath + "/Defense/Digits/Value")?.GetComponent<Text>();
+                var level = face?.Find(ratingPath + "/Number")?.GetComponent<Text>();
+                int expectedAttack = resolving ? resolvingAttack : activation.attack;
+                Require(attack?.text == expectedAttack.ToString() && attack.font == DuelTypography.NumberFont &&
                     defense?.text == "1000" && level?.text == "4",
-                    $"The {phase} card showed {attack?.text}/{defense?.text}, level {level?.text}, instead of the values at activation.");
-                Canvas.ForceUpdateCanvases();
+                    $"The {phase} card showed {attack?.text}/{defense?.text}, level {level?.text}, with {expectedAttack} ATK expected.");
+                if (resolving && responseCode == rush)
+                {
+                    var fieldAttack = FieldSlot(ui.Field, after).Find("CardReadout/Combat/Attack/Digits/Value").GetComponent<Text>();
+                    Require(fieldAttack.text == attack.text, "The resolving card and presented field disagreed about the earlier buff.");
+                }
                 var counter = animator.GetComponentsInChildren<RectTransform>().Single(rect => rect.name == "ChainCount");
+                if (compact)
+                {
+                    var playArea = (RectTransform)ui.Field.Root.transform.Find("MobileSafeArea");
+                    var safeArea = playArea.GetComponent<MobileSafeArea>();
+                    var metrics = (RectTransform)face;
+                    Vector2 originalPosition = metrics.anchoredPosition;
+                    Vector2 originalSize = metrics.sizeDelta;
+                    var viewport = (RectTransform)ui.Canvas.transform;
+                    var display = new Vector2Int(1334, 750);
+                    viewport.sizeDelta = (Vector2)display;
+                    safeArea.Reflow(new Rect(0f, 22f, 1180f, 728f), display);
+                    Canvas.ForceUpdateCanvases();
+                    sample(.68f);
+                    Canvas.ForceUpdateCanvases();
+                    Require(metrics.anchoredPosition != originalPosition && metrics.sizeDelta != originalSize,
+                        "The mobile chain resolution retained its former position or size after reflow.");
+                    foreach (var node in new[] { metrics, counter, (RectTransform)card.transform })
+                    {
+                        var bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(playArea, node);
+                        Require(bounds.min.x >= playArea.rect.xMin && bounds.max.x <= playArea.rect.xMax &&
+                            bounds.min.y >= playArea.rect.yMin && bounds.max.y <= playArea.rect.yMax,
+                            "The mobile chain resolution intersected the device cutout after reflow.");
+                    }
+                    Require(attack.text == expectedAttack.ToString(), "The viewport change replaced the saved resolution value.");
+                }
+                Canvas.ForceUpdateCanvases();
                 var counterBounds = RectTransformUtility.CalculateRelativeRectTransformBounds(animator.transform, counter);
-                foreach (string path in new[] { "AtkDef", "LevelInfo/Rating" })
+                foreach (string path in new[] { combatPath, ratingPath })
                 {
                     var valueBounds = RectTransformUtility.CalculateRelativeRectTransformBounds(animator.transform, face.Find(path));
                     Require(!counterBounds.Intersects(valueBounds), $"The {phase} chain count covered {path}.");
                 }
-                animator.Clear();
+                foreach (var child in animator.transform.Cast<Transform>().ToArray())
+                    UnityEngine.Object.DestroyImmediate(child.gameObject);
             }
-            Debug.Log($"[VERIFY DUEL CHAIN CARD FACE] The activated {activation.attack} attack survived both chain cues after the field settled at 1600.");
+            animator.Clear();
+            Debug.Log($"[VERIFY DUEL CHAIN CARD FACE] Verified the native activation and resolution previews with response {responseCode}.");
         }
 
         private static void VerifyDestroyedCopiesKeepTheirReadouts()

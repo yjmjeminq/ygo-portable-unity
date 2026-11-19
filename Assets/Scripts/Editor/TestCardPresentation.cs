@@ -27,6 +27,7 @@ namespace YGOPortable.Editor
                 VerifyFoil(card);
                 VerifySummonMotion(card);
                 VerifyExpandedDuelCard(canvas.transform);
+                VerifyChainSourceIdentity();
                 var animator = CardAnimationManager.Ensure(canvas);
                 VerifyFeaturedCards(animator);
                 VerifySummonReadout(animator);
@@ -161,6 +162,39 @@ namespace YGOPortable.Editor
             Require(synchro.y > xyz.y + 50f && xyz.x > synchro.x + 30f, "The special summons used the same entrance path.");
             CardAnimationManager.ApplySummonEntrance(card, flight, DuelEffectKind.Link, 1f);
             Require(Vector2.Distance(rect.anchoredPosition, to.Position) < .1f, "The reveal did not settle at its target pose.");
+        }
+
+        private static void VerifyChainSourceIdentity()
+        {
+            const uint breaker = 71413901, zone = YgoConstants.LOCATION_MZONE;
+            const uint faceUp = YgoConstants.POS_FACEUP_ATTACK;
+            using var duel = new DuelSession();
+            var first = new ChainLinkInfo { code = breaker, PublicFieldSource = ((byte)0, zone, 0u) };
+            var second = new ChainLinkInfo { code = breaker, PublicFieldSource = ((byte)1, zone, 2u) };
+            duel.CurrentChain.Add(first);
+            duel.CurrentChain.Add(second);
+            var notify = typeof(DuelSession).GetMethod("NotifyCardMoved", BindingFlags.Instance | BindingFlags.NonPublic);
+
+            void Notify(CardMoveEvent move, CardMoveEvent partner = null) => notify.Invoke(duel, new object[] { move, partner });
+
+            Notify(new CardMoveEvent
+                {
+                    code = breaker, fromCon = 0, fromLoc = zone, fromSeq = 0, fromPos = faceUp,
+                    toCon = 1, toLoc = zone, toSeq = 2, toPos = faceUp,
+                },
+                new CardMoveEvent
+                {
+                    code = breaker, fromCon = 1, fromLoc = zone, fromSeq = 2, fromPos = faceUp,
+                    toCon = 0, toLoc = zone, toSeq = 0, toPos = faceUp,
+                });
+            Require(first.PublicFieldSource == ((byte)1, zone, 2u) && second.PublicFieldSource == ((byte)0, zone, 0u),
+                "Simultaneous moves assigned both chain sources to the same copy.");
+            Notify(new CardMoveEvent { code = breaker, fromCon = 1, fromLoc = zone, fromSeq = 2, fromPos = faceUp,
+                toCon = 1, toLoc = YgoConstants.LOCATION_GRAVE });
+            Notify(new CardMoveEvent { code = breaker, fromCon = 1, fromLoc = YgoConstants.LOCATION_HAND,
+                toCon = 1, toLoc = zone, toSeq = 2, toPos = faceUp });
+            Require(first.PublicFieldSource == null && second.PublicFieldSource == ((byte)0, zone, 0u),
+                "A departed chain source was rebound to a newly summoned copy.");
         }
 
         private static void VerifyFeaturedCards(CardAnimationManager animator)

@@ -146,6 +146,8 @@ namespace YGOPortable.Core
         public ulong description;
         public bool negated;
         internal LiveCardState ActivationReadout;
+        internal LiveCardState ResolutionReadout;
+        internal (byte Controller, uint Location, uint Sequence)? PublicFieldSource;
     }
 
     public class SelectableCardItem
@@ -781,6 +783,7 @@ namespace YGOPortable.Core
 
         private void NotifyCardMoved(CardMoveEvent move, CardMoveEvent swapPartner = null)
         {
+            FollowPublicChainSources(move, swapPartner);
             CaptureMoveSource(move, swapPartner != null);
             if (swapPartner != null) CaptureMoveSource(swapPartner, true);
             InvalidateFieldReadouts(move);
@@ -803,6 +806,29 @@ namespace YGOPortable.Core
             var from = (move.fromCon, move.fromLoc, move.fromSeq);
             var to = (move.toCon, move.toLoc, move.toSeq);
             return from != to && (slot == from || slot == to);
+        }
+
+        private void FollowPublicChainSources(CardMoveEvent move, CardMoveEvent partner)
+        {
+            foreach (var link in CurrentChain)
+            {
+                if (link.PublicFieldSource is not { } slot) continue;
+                var transfer = StartsAt(move, slot) ? move : StartsAt(partner, slot) ? partner : null;
+                if (transfer == null)
+                {
+                    if (AffectsSlot(move, slot) || partner != null && AffectsSlot(partner, slot))
+                        link.PublicFieldSource = null;
+                    continue;
+                }
+
+                link.PublicFieldSource = transfer.code == link.code && (transfer.fromPos & YgoConstants.POS_FACEUP) != 0 &&
+                    (transfer.toPos & YgoConstants.POS_FACEUP) != 0 &&
+                    (transfer.toLoc is YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE)
+                        ? (transfer.toCon, transfer.toLoc, transfer.toSeq) : null;
+            }
+
+            static bool StartsAt(CardMoveEvent item, (byte, uint, uint) slot) =>
+                item != null && slot == (item.fromCon, item.fromLoc, item.fromSeq);
         }
 
         private void CaptureMoveSource(CardMoveEvent move, bool paired)
@@ -1175,6 +1201,7 @@ namespace YGOPortable.Core
                     ulong desc = br.ReadUInt64();
                     int chainNo = (int)br.ReadUInt32();
                     if (_speculatingPlayer >= 0 && tCon != _speculatingPlayer) SpeculationUncertain = true;
+                    var activation = CaptureChainFieldCard(source);
                     var link = new ChainLinkInfo
                     {
                         chainNumber = chainNo,
@@ -1183,7 +1210,8 @@ namespace YGOPortable.Core
                         triggerLoc = tLoc,
                         triggerSeq = tSeq,
                         description = desc,
-                        ActivationReadout = CaptureChainFieldCard(source),
+                        ActivationReadout = activation,
+                        PublicFieldSource = activation != null ? (activation.controller, activation.location, activation.sequence) : null,
                     };
                     CurrentChain.Add(link);
                     AddLog($"체인 {chainNo}: [{CardDatabase.GetName(code)}] 발동");
@@ -1202,6 +1230,10 @@ namespace YGOPortable.Core
                         SolvedChainLinks.Add((idx, link.code));
                         AddLog($"체인 {idx} 처리: [{CardDatabase.GetName(link.code)}]");
                         SampleFieldReadouts();
+                        // If the original card has become private or left the field, keep the face it activated with.
+                        link.ResolutionReadout = link.PublicFieldSource is { } slot &&
+                            _fieldReadoutBaseline?.TryGetValue(slot, out var visible) == true && visible.code == link.code
+                                ? visible : link.ActivationReadout;
                         OnChainResolving?.Invoke(link);
                     }
                     break;
