@@ -46,6 +46,7 @@ namespace YGOPortable.Editor
         {
             internal int wins, losses, draws, retries, capped;
             internal double setup, breakthrough, control, lockProgress;
+            internal double lockSurvival, lockKeys, lockDraws;
             internal readonly int[] styleGames = new int[3];
             internal readonly double[] stylePoints = new double[3];
             internal int Games => wins + losses + draws;
@@ -60,9 +61,23 @@ namespace YGOPortable.Editor
 
             internal double StyleObjective(DuelDeckStyle style)
             {
-                double reward = style == DuelDeckStyle.Control ? control : lockProgress;
                 int index = (int)style;
-                return (stylePoints[index] + .12 * reward) / Math.Max(1, styleGames[index]);
+                double score = style == DuelDeckStyle.Lock ? .35 * stylePoints[index] + lockProgress :
+                    stylePoints[index] + (style == DuelDeckStyle.Control ? .12 * control : 0);
+                return score / Math.Max(1, styleGames[index]);
+            }
+
+            internal bool PreservesLockResults(Results reference)
+            {
+                int index = (int)DuelDeckStyle.Lock;
+                return styleGames[index] == reference.styleGames[index] && stylePoints[index] >= reference.stylePoints[index] &&
+                    lockSurvival >= reference.lockSurvival && lockKeys >= reference.lockKeys && lockDraws >= reference.lockDraws;
+            }
+
+            internal string LockSummary()
+            {
+                int games = Math.Max(1, styleGames[(int)DuelDeckStyle.Lock]);
+                return $"survival {lockSurvival / games:F3}, retained keys {lockKeys / games:F3}, effect draws {lockDraws / games:F3}";
             }
         }
 
@@ -108,7 +123,8 @@ namespace YGOPortable.Editor
                     candidatesList.Add((existingPolicy, previousResult));
                     foreach (var style in new[] { DuelDeckStyle.Control, DuelDeckStyle.Lock })
                     {
-                        var specialist = candidatesList.OrderByDescending(entry => entry.results.StyleObjective(style)).First();
+                        var specialist = candidatesList.Where(entry => style != DuelDeckStyle.Lock || entry.results.PreservesLockResults(previousResult))
+                            .OrderByDescending(entry => entry.results.StyleObjective(style)).First();
                         if (specialist.results.StyleObjective(style) <= previousResult.StyleObjective(style)) continue;
                         stylePolicy = stylePolicy.WithStyle(style, specialist.policy);
                         Debug.Log($"[AI TRAIN] {style} profile from {specialist.policy.EnabledDecisions}. " +
@@ -134,6 +150,7 @@ namespace YGOPortable.Editor
                 var rulesVersusPrevious = Evaluate(null, test, existingPolicy);
                 Debug.Log($"[AI EVAL] Held-out vs previous AI {versusPrevious}");
                 Debug.Log($"[AI EVAL] Held-out style results {versusPrevious.StyleSummary()}");
+                Debug.Log($"[AI EVAL] Held-out Lock {versusPrevious.LockSummary()}");
                 Debug.Log($"[AI EVAL] Held-out vs rules-only AI {versusRules}");
                 Debug.Log($"[AI EVAL] Held-out rules-only vs previous AI {rulesVersusPrevious}");
                 Debug.Log($"[AI TRAIN] Time {elapsed.Elapsed.TotalSeconds:F1}s, native script errors {scriptErrors}");
@@ -253,9 +270,13 @@ namespace YGOPortable.Editor
                     var style = DuelDeckStrategy.For(duel, (byte)candidateSeat);
                     int cutEffects = 0, cardsDrawn = 0, previousDraws = 0, observedTurns = 0;
                     double styleProgress = 0;
+                    double lifeProgress = 0, keysProgress = 0, drawProgress = 0;
                     duel.OnCardsDrawn += (player, cards) =>
                     {
-                        if (style == DuelDeckStyle.Lock && player == candidateSeat) cardsDrawn += cards.Count;
+                        if (style != DuelDeckStyle.Lock || player != candidateSeat) return;
+                        bool normalDraw = duel.TurnPlayer == candidateSeat && duel.CurrentPhase == YgoConstants.PHASE_DRAW &&
+                            duel.CurrentChain.Count == 0;
+                        cardsDrawn += Math.Max(0, cards.Count - (normalDraw ? 1 : 0));
                     };
                     duel.OnChainResolving += link =>
                     {
@@ -292,10 +313,9 @@ namespace YGOPortable.Editor
                                 result.breakthrough += duel.IsFinished && duel.Winner == candidateSeat ? 1 : .55 * damage + .45 * board;
                             }
                         }
-                        if (!turnEnded || turnPlayer != candidateSeat || observedTurns >= StyleObservationTurns ||
-                            style == DuelDeckStyle.Development) continue;
+                        if (!turnEnded || observedTurns >= StyleObservationTurns || style == DuelDeckStyle.Development) continue;
                         var own = duel.Players[candidateSeat];
-                        if (style == DuelDeckStyle.Control)
+                        if (style == DuelDeckStyle.Control && turnPlayer == candidateSeat)
                         {
                             var rival = duel.Players[1 - candidateSeat];
                             double advantage = Math.Tanh((AvailableCards(own) - AvailableCards(rival)) / 5.0);
@@ -304,23 +324,41 @@ namespace YGOPortable.Editor
                             styleProgress += .45 * advantage + .25 * Math.Min(3, setDisruption) / 3;
                             observedTurns++;
                         }
-                        if (style == DuelDeckStyle.Lock)
+                        if (style == DuelDeckStyle.Lock && turnPlayer != candidateSeat)
                         {
-                            int heldPieces = own.hand.Count(card => DuelDeckStrategy.IsKeyPiece(card.code));
-                            int activePieces = own.mzone.Concat(own.szone).Count(card => card != null &&
-                                !card.effectsDisabled && DuelDeckStrategy.IsKeyPiece(card.code));
-                            styleProgress += .48 * Math.Clamp(own.lp / 8000.0, 0, 1) +
-                                .32 * Math.Min(4, heldPieces + activePieces) / 4 +
-                                .20 * Math.Min(5, cardsDrawn - previousDraws) / 5;
+                            if (!duel.IsFinished || duel.Winner == candidateSeat)
+                            {
+                                lifeProgress += Math.Clamp(own.lp / 8000.0, 0, 1);
+                                keysProgress += LockKeyProgress(own);
+                            }
+                            drawProgress += Math.Min(5, cardsDrawn - previousDraws) / 5.0;
                             previousDraws = cardsDrawn;
                             observedTurns++;
                         }
                     }
 
                     if (!duel.IsFinished) result.capped++;
-                    // Average completed windows so a longer game alone does not earn a larger reward.
                     if (style == DuelDeckStyle.Control && observedTurns > 0) result.control += styleProgress / observedTurns;
-                    if (style == DuelDeckStyle.Lock && observedTurns > 0) result.lockProgress += styleProgress / observedTurns;
+                    if (style == DuelDeckStyle.Lock)
+                    {
+                        // A loss on the opponent's turn must not keep an earlier full-life score.
+                        // An early win keeps the final state, but does not earn fictitious draws.
+                        int remaining = StyleObservationTurns - observedTurns;
+                        if (remaining > 0)
+                        {
+                            drawProgress += Math.Min(5, cardsDrawn - previousDraws) / 5.0;
+                            if (duel.IsFinished && duel.Winner == candidateSeat)
+                            {
+                                var final = duel.Players[candidateSeat];
+                                lifeProgress += remaining * Math.Clamp(final.lp / 8000.0, 0, 1);
+                                keysProgress += remaining * LockKeyProgress(final);
+                            }
+                        }
+                        result.lockSurvival += lifeProgress / StyleObservationTurns;
+                        result.lockKeys += keysProgress / StyleObservationTurns;
+                        result.lockDraws += drawProgress / StyleObservationTurns;
+                        result.lockProgress += (.50 * lifeProgress + .25 * keysProgress + .25 * drawProgress) / StyleObservationTurns;
+                    }
                     result.control += .30 * Math.Min(4, cutEffects) / 4;
                     result.styleGames[(int)style]++;
                     if (!duel.IsFinished || duel.Winner < 0 || duel.Winner > 1)
@@ -341,5 +379,10 @@ namespace YGOPortable.Editor
 
         private static int AvailableCards(PlayerFieldSnapshot field) =>
             field.hand.Count + field.mzone.Count(card => card != null) + field.szone.Count(card => card != null);
+
+        private static double LockKeyProgress(PlayerFieldSnapshot field) => Math.Min(4,
+            field.hand.Concat(field.mzone).Concat(field.szone)
+                .Where(card => card != null && !card.effectsDisabled && DuelDeckStrategy.IsKeyPiece(card.code))
+                .Select(card => CardDatabase.GetArchetypeCollectionKey(CardDatabase.Get(card.code))).Distinct().Count()) / 4.0;
     }
 }
