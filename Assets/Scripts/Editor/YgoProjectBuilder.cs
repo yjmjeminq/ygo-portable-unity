@@ -460,7 +460,8 @@ namespace YGOPortable.Editor
                 search.text = "";
                 AssertTrue(preview.CurrentCode != 0 && !ui.IsDeckSetupOpen,
                     "Clearing the search should restore the opponent list");
-                VerifyOpponentNavigation(ui, canvas);
+                ui.Root.SetActive(false);
+                VerifyOpponentNavigation(canvas);
             }
             finally
             {
@@ -469,7 +470,7 @@ namespace YGOPortable.Editor
             Debug.Log($"[VERIFY ROSTER] {DeckRepository.Characters.Count} opponents, {DeckRepository.PresetDecks.Count} decks and opponent selection passed.");
         }
 
-        private static void VerifyOpponentNavigation(OpponentSelectUI ui, GameObject canvas)
+        private static void VerifyOpponentNavigation(GameObject canvas)
         {
             var events = EventSystem.current;
             GameObject localEvents = null;
@@ -483,6 +484,9 @@ namespace YGOPortable.Editor
             var selectedBefore = events.currentSelectedGameObject;
             var sample = DeckRepository.PresetDecks[0];
             var ownDeck = new UserDeck { id = "opponent-navigation-fixture", name = sample.title, main = sample.main.ToList(), extra = sample.extra.ToList() };
+            var startedOrders = new List<bool>();
+            var ui = new OpponentSelectUI(canvas.transform, () => { },
+                (opponent, deck, playerDeck, playerGoesFirst) => startedOrders.Add(playerGoesFirst));
             DeckRepository.UserDecks.Insert(0, ownDeck);
             try
             {
@@ -534,18 +538,39 @@ namespace YGOPortable.Editor
                 resolve.Invoke(ui, new object[] { 1, 1 });
                 AssertTrue(rock.gameObject.activeInHierarchy && events.currentSelectedGameObject == rock.gameObject,
                     "A drawn rock-paper-scissors round should keep the hand controls available.");
-                resolve.Invoke(ui, new object[] { 1, 2 });
-                AssertTrue(ui.JankenRoot.activeSelf && !first.gameObject.activeInHierarchy &&
-                    events.currentSelectedGameObject == second.gameObject,
-                    "The player should see the losing result and confirm going second before the duel starts.");
                 Submit(ButtonAt(ui.JankenRoot, "JnkWin/Cancel/B"));
                 AssertTrue(!ui.JankenRoot.activeSelf && start.IsInteractable() && events.currentSelectedGameObject == start.gameObject,
                     "Canceling rock-paper-scissors should return focus to Duel Start.");
                 Submit(start);
                 resolve.Invoke(ui, new object[] { 1, 0 });
-                AssertTrue(first.gameObject.activeInHierarchy && events.currentSelectedGameObject == first.gameObject,
-                    "Winning rock-paper-scissors should focus the turn order controls.");
+                AssertTrue(first.gameObject.activeInHierarchy && second.gameObject.activeInHierarchy &&
+                    events.currentSelectedGameObject == first.gameObject && startedOrders.Count == 0,
+                    "Winning rock-paper-scissors should let the player choose the turn order.");
                 Submit(ButtonAt(ui.JankenRoot, "JnkWin/Cancel/B"));
+
+                var opponentDeck = OpponentDeckLevels.GetDecks(pageOpponent.id)[0];
+                uint[] originalMain = opponentDeck.main;
+                try
+                {
+                    opponentDeck.main = new[] { 89631139u };
+                    Submit(start);
+                    resolve.Invoke(ui, new object[] { 1, 2 });
+                    resolve.Invoke(ui, new object[] { 1, 2 });
+                    AssertTrue(!ui.JankenRoot.activeSelf && startedOrders.SequenceEqual(new[] { false }),
+                        "An AI selecting first should start exactly one duel with the player going second.");
+
+                    ui.Open();
+                    Submit(ButtonAt(ui.Root, firstCell));
+                    opponentDeck.main = new[] { 41418852u };
+                    Submit(start);
+                    resolve.Invoke(ui, new object[] { 1, 2 });
+                    AssertTrue(!ui.JankenRoot.activeSelf && startedOrders.SequenceEqual(new[] { false, true }),
+                        "A Numeron AI selecting second should start immediately with the player going first.");
+                }
+                finally
+                {
+                    opponentDeck.main = originalMain;
+                }
 
                 ui.Root.SetActive(false);
                 var app = canvas.AddComponent<GameAppController>();
@@ -560,7 +585,7 @@ namespace YGOPortable.Editor
                 AssertTrue(!menu.SettingsRoot.activeSelf && settings.IsInteractable() && events.currentSelectedGameObject == settings.gameObject,
                     "Closing settings should restore main menu focus.");
                 VerifyMenuPadInput(app, menu, ui, events, settings, canvas.transform);
-                Debug.Log("[VERIFY OPPONENT NAVIGATION] Page and ace stayed in sync, rock-paper-scissors retained focus through all results, and settings restored focus.");
+                Debug.Log("[VERIFY OPPONENT NAVIGATION] Opponent paging, turn selection after wins and draws, automatic turn order after losses, and settings focus passed.");
             }
             finally
             {

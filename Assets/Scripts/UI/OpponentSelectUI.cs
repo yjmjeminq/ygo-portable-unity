@@ -13,7 +13,8 @@ namespace YGOPortable.UI
         public GameObject Root { get; private set; }
         public GameObject JankenRoot { get; private set; }
 
-        private readonly GameAppController _app;
+        private readonly Action _returnToMenu;
+        private readonly Action<OpponentCharacter, PresetDeckInfo, UserDeck, bool> _startMatch;
 
         private int _seriesFilter = -1;
         private string _searchQuery = "";
@@ -23,6 +24,21 @@ namespace YGOPortable.UI
         private const int PageSize = GridColumns * GridRows;
         private const float MyDeckRowHeight = 52f;
         private const float MyDeckRowStep = 58f;
+        private const uint NumeronNetwork = 41418852;
+        private const uint CyberDragonCore = 23893227;
+        private const uint CyberTwinDragon = 74157028;
+        private const uint AncientGearFusion = 64061284;
+        private const uint ChaosAncientGearGiant = 51788412;
+
+        private static readonly HashSet<uint> BoardBreakers = new()
+        {
+            12580477, // Raigeki
+            14532163, // Lightning Storm
+            15693423, // Evenly Matched
+            18144506, // Harpie's Feather Duster
+            54693926, // Dark Ruler No More
+            55063751, 29726552, 36956512, 48770333, 28674152, // Kaijus
+        };
 
         private readonly List<OpponentCharacter> _filteredChars = new List<OpponentCharacter>();
         private readonly List<GameObject> _gridSlots = new List<GameObject>();
@@ -68,11 +84,18 @@ namespace YGOPortable.UI
         private GameObject _jnkOrderRow;
         private Button _jnkFirstHand;
         private Button _jnkChooseFirst;
-        private Button _jnkChooseSecond;
 
         public OpponentSelectUI(GameAppController app, Transform canvasParent)
+            : this(canvasParent, () => app?.ShowScreen(AppScreen.MainMenu),
+                (opponent, deck, playerDeck, playerGoesFirst) => app?.StartDuelMatch(opponent, deck, playerDeck, playerGoesFirst))
         {
-            _app = app;
+        }
+
+        internal OpponentSelectUI(Transform canvasParent, Action returnToMenu,
+            Action<OpponentCharacter, PresetDeckInfo, UserDeck, bool> startMatch)
+        {
+            _returnToMenu = returnToMenu;
+            _startMatch = startMatch;
             BuildOpponentScreen(canvasParent);
             BuildJankenOverlay(canvasParent);
         }
@@ -125,7 +148,7 @@ namespace YGOPortable.UI
                 TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
             var back = LotdUiKit.CreateRect("Back", browser, new Vector2(.858f, .922f), new Vector2(.981f, .977f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(back, "B", "메인 메뉴", () => _app.ShowScreen(AppScreen.MainMenu), 16);
+            LotdUiKit.CreateLotdButton(back, "B", "메인 메뉴", _returnToMenu, 16);
 
             var tabs = LotdUiKit.CreateMenuPanel(browser, "SeriesTabs", new Vector2(.02f, .825f), new Vector2(.67f, .895f));
             (int id, string label)[] series =
@@ -663,7 +686,7 @@ namespace YGOPortable.UI
             var b1 = LotdUiKit.CreateRect("First", _jnkOrderRow.transform, new Vector2(0f, 0f), new Vector2(0.47f, 1f), Vector2.zero, Vector2.zero);
             _jnkChooseFirst = LotdUiKit.CreateLotdButton(b1, "B", "선공 선택", () => LaunchMatch(true), 20, gold: true);
             var b2 = LotdUiKit.CreateRect("Second", _jnkOrderRow.transform, new Vector2(0.53f, 0f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
-            _jnkChooseSecond = LotdUiKit.CreateLotdButton(b2, "B", "후공으로 시작", () => LaunchMatch(false), 20);
+            LotdUiKit.CreateLotdButton(b2, "B", "후공 선택", () => LaunchMatch(false), 20);
 
             var cancelRt = LotdUiKit.CreateRect("Cancel", win, new Vector2(0.82f, 0.02f), new Vector2(0.97f, 0.09f), Vector2.zero, Vector2.zero);
             LotdUiKit.CreateLotdButton(cancelRt, "B", "취소", CloseJanken, 14);
@@ -672,6 +695,7 @@ namespace YGOPortable.UI
 
         private void ResolveJanken(int playerHand, int oppHand) // 0=scissors, 1=rock, 2=paper
         {
+            if (!JankenRoot.activeSelf || !_jnkHandsRow.activeSelf) return;
             string[] pSprites = { "jnkn_player_scissor_active", "jnkn_player_stone_active", "jnkn_player_paper_active" };
             string[] oSprites = { "jnkn_opp_scissor_active", "jnkn_opp_stone_active", "jnkn_opp_paper_active" };
             _jnkPlayerImg.sprite = LotdUiKit.LoadSprite($"LOTD/Janken/{pSprites[playerHand]}");
@@ -685,26 +709,43 @@ namespace YGOPortable.UI
                 return;
             }
             bool playerWon = (playerHand == 0 && oppHand == 2) || (playerHand == 1 && oppHand == 0) || (playerHand == 2 && oppHand == 1);
-            _jnkStatusText.text = playerWon ? "승리했습니다. 선공 또는 후공을 선택하세요." : "상대가 선공을 선택했습니다.";
             _jnkHandsRow.SetActive(false);
-            _jnkChooseFirst.gameObject.SetActive(playerWon);
-            var secondSlot = (RectTransform)_jnkChooseSecond.transform.parent;
-            secondSlot.anchorMin = new Vector2(playerWon ? 0.53f : 0.265f, 0f);
-            secondSlot.anchorMax = new Vector2(playerWon ? 1f : 0.735f, 1f);
+            if (!playerWon)
+            {
+                if (TryGetSelectedOpponentDeck(out var deck))
+                    LaunchMatch(playerGoesFirst: OpponentPrefersSecond(deck));
+                else
+                    CloseJanken();
+                return;
+            }
+
+            _jnkStatusText.text = "승리했습니다. 선공 또는 후공을 선택하세요.";
             _jnkOrderRow.SetActive(true);
             UiEntranceMotion.Play(_jnkOrderRow, .58f);
-            EventSystem.current?.SetSelectedGameObject((playerWon ? _jnkChooseFirst : _jnkChooseSecond).gameObject);
+            EventSystem.current?.SetSelectedGameObject(_jnkChooseFirst.gameObject);
+        }
+
+        private static bool OpponentPrefersSecond(PresetDeckInfo deck)
+        {
+            if (deck.main is not { } cards) return false;
+
+            // Give attack-focused decks a Battle Phase on their first turn.
+            return cards.Contains(NumeronNetwork) ||
+                (cards.Contains(CyberDragonCore) && deck.extra?.Contains(CyberTwinDragon) == true) ||
+                (cards.Contains(AncientGearFusion) && deck.extra?.Contains(ChaosAncientGearGiant) == true) ||
+                cards.Count(BoardBreakers.Contains) >= 4;
         }
 
         private void LaunchMatch(bool playerGoesFirst)
         {
+            if (!JankenRoot.activeSelf) return;
             if (!TryGetSelectedOpponentDeck(out var oppDeck) || _selectedMyDeck == null)
             {
                 CloseJanken();
                 return;
             }
             JankenRoot.SetActive(false);
-            _app.StartDuelMatch(_selectedChar, oppDeck, _selectedMyDeck, playerGoesFirst);
+            _startMatch(_selectedChar, oppDeck, _selectedMyDeck, playerGoesFirst);
         }
 
         private bool TryGetSelectedOpponentDeck(out PresetDeckInfo deck)
