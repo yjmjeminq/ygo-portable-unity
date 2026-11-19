@@ -568,7 +568,8 @@ namespace YGOPortable.Editor
             ui.Modals.ShowPrompt(duel, choice);
             var window = ui.Modals.ModalRoot.transform.Find("Win");
             Require(window.Find("Hdr/TitleBand/Title").GetComponent<Text>().text == "상대 공격 방식 선택" &&
-                window.Find("Body/AttackSource/Combat/Attack/Digits/Value").GetComponent<Text>().text == "2200",
+                window.Find("Body/AttackSource/Combat/Attack/Digits/Value").GetComponent<Text>().text == "2200" &&
+                window.Find("Body/AttackSource/Heading/Rating/Number")?.GetComponent<Text>().text == "4",
                 "The defender's choice lost the native opponent's combat value.");
             window.Find("Footer/Btn_몬스터 공격/B").GetComponent<Button>().onClick.Invoke();
             Require(response?.Length == 4 && BitConverter.ToInt32(response, 0) == 0,
@@ -593,9 +594,14 @@ namespace YGOPortable.Editor
             var sourceTitle = body.Find("AttackSource/Heading/Name").GetComponent<Text>();
             var targetTitle = body.Find("AttackTarget/Heading/Name").GetComponent<Text>();
             var targetCombat = body.Find("AttackTarget/Combat");
+            var sourceRating = body.Find("AttackSource/Heading/Rating");
+            var targetRating = body.Find("AttackTarget/Heading/Rating");
             Require(sourceTitle.text == $"상대 공격 · {CardDatabase.GetName(wattgiraffe)}" && sourceTitle.color == DuelStyle.Opponent &&
                 body.Find("AttackSource/Combat/Attack/Digits/Value").GetComponent<Text>().text == "2200",
                 "The mobile battle comparison used the defender's side or a stale attack value.");
+            Require(sourceRating?.Find("Number").GetComponent<Text>().text == source.level.ToString() &&
+                sourceRating.Find("Symbol").GetComponent<Image>().sprite == DuelStatSymbols.Rating(DuelRatingKind.Level) &&
+                !targetRating.gameObject.activeSelf, "The comparison lost the attacker's level or showed an unselected target's rating.");
 
             var mine = duel.Players[duel.HumanPlayerIndex];
             var defender = mine.mzone.Single(card => card?.code == patrician);
@@ -605,11 +611,35 @@ namespace YGOPortable.Editor
                 targetCombat.Find("Defense/Digits/Value").GetComponent<Text>().text == defender.defense.ToString() &&
                 targetCombat.Find("Defense/Rail").GetComponent<Image>().color.a > targetCombat.Find("Attack/Rail").GetComponent<Image>().color.a,
                 "The comparison did not show the legal target's controller and current defense.");
+            Require(targetRating.gameObject.activeInHierarchy &&
+                targetRating.Find("Number").GetComponent<Text>().text == defender.level.ToString(),
+                "The focused defender did not show its own live level.");
+            var viewport = (RectTransform)ui.Canvas.transform;
+            foreach (var size in new[] { new Vector2(1740, 805), new Vector2(852, 393) })
+            {
+                viewport.sizeDelta = size;
+                Canvas.ForceUpdateCanvases();
+                foreach (var (title, rating) in new[] { (sourceTitle, sourceRating), (targetTitle, targetRating) })
+                {
+                    var heading = (RectTransform)rating.parent;
+                    var nameBounds = RectTransformUtility.CalculateRelativeRectTransformBounds(heading, title.rectTransform);
+                    var badgeBounds = RectTransformUtility.CalculateRelativeRectTransformBounds(heading, rating);
+                    var generator = title.cachedTextGenerator;
+                    generator.Populate(title.text, title.GetGenerationSettings(title.rectTransform.rect.size));
+                    Require(nameBounds.max.x < badgeBounds.min.x && badgeBounds.max.x <= heading.rect.xMax &&
+                            generator.lineCount == 1 && generator.characterCountVisible >= title.text.Length &&
+                            !rating.GetComponentsInChildren<Graphic>().Any(graphic => graphic.raycastTarget),
+                        $"The comparison did not fit '{title.text}' at {size} " +
+                        $"({generator.characterCountVisible}/{title.text.Length} characters, {generator.lineCount} lines, " +
+                        $"heading {heading.rect.size}, title {title.rectTransform.rect.size}, gap {badgeBounds.min.x - nameBounds.max.x:F1}).");
+                }
+            }
 
             var setTarget = mine.mzone.Single(card => card?.code == sparkman);
             var setTrigger = FieldSlot(ui.Field, setTarget).GetComponent<CardDragTrigger>();
             setTrigger.OnPointerEnterAction.Invoke();
-            Require(targetTitle.text == "대상 · 뒷면 카드" && !targetCombat.gameObject.activeSelf &&
+            Require(targetTitle.text == "대상 · 뒷면 카드" && !targetCombat.gameObject.activeSelf && !targetRating.gameObject.activeSelf &&
+                targetTitle.rectTransform.offsetMax.x == 0f &&
                 sourceTitle.text.Contains(CardDatabase.GetName(wattgiraffe)) && response == null,
                 "Previewing a set target showed stale values or submitted an attack.");
             setTrigger.OnLeftClick.Invoke();
@@ -714,6 +744,7 @@ namespace YGOPortable.Editor
             var window = ui.Modals.ModalRoot.transform.Find("Win");
             Require(window.Find("Hdr/TitleBand/Title").GetComponent<Text>().text == "공격 대상 변경" &&
                 window.Find("Body/AttackSource/Heading/Name").GetComponent<Text>().text == $"공격 · {CardDatabase.GetName(KaiserSeaHorse)}" &&
+                window.Find("Body/AttackSource/Heading/Rating/Number")?.GetComponent<Text>().text == source.level.ToString() &&
                 window.Find("Body/AttackSource/Combat/Attack/Digits/Value").GetComponent<Text>().text == "2700",
                 "The replay window did not identify the reason and actual attacker.");
             string option = continueAttack ? "공격 계속" : "공격 중단";
@@ -2234,7 +2265,8 @@ namespace YGOPortable.Editor
             var pose = new CardPose(Vector2.zero, new Vector2(160, 230));
             var flight = new CardFlight(theseus, pose, pose, true, false);
             var plate = animation.SummonPlate(flight, "융합 소환", Vector2.zero, stats);
-            Require(plate.transform.Find("Caption/Value").GetComponent<Text>().text == "융합 소환 · 레벨 4" &&
+            Require(plate.transform.Find("Caption/Value").GetComponent<Text>().text == "융합 소환" &&
+                    plate.transform.Find("Caption/Rating/Number")?.GetComponent<Text>().text == "4" &&
                     plate.transform.Find("SummonStats/Attack/Digits/Value").GetComponent<Text>().text == "2400" &&
                     plate.transform.Find("SummonStats/Defense/Digits/Value").GetComponent<Text>().text == "2000",
                 "The Fusion Summon banner and the queued live readout disagreed.");

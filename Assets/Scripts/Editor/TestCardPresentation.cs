@@ -129,7 +129,9 @@ namespace YGOPortable.Editor
             try
             {
                 var root = plate.transform;
-                Require(root.Find("Caption/Value").GetComponent<Text>().text == "링크 소환 · 링크 4" &&
+                Require(root.Find("Caption/Value").GetComponent<Text>().text == "링크 소환" &&
+                    root.Find("Caption/Rating/Number")?.GetComponent<Text>().text == "4" &&
+                    root.Find("Caption/Rating/Symbol").GetComponent<Image>().sprite == DuelStatSymbols.Rating(DuelRatingKind.Link) &&
                     root.Find("SummonStats/Attack/Digits/Value").GetComponent<Text>().text == "2300" &&
                     !root.Find("SummonStats/Defense").gameObject.activeSelf,
                     "A Link summon omitted its rating or added a defense value.");

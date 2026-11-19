@@ -91,15 +91,6 @@ namespace YGOPortable.UI
             }
         }
 
-        internal string Rating
-        {
-            get
-            {
-                var (kind, value) = RatingNumber;
-                return kind == DuelRatingKind.None ? "" : $"{DuelStatSymbols.RatingName(kind)} {value}";
-            }
-        }
-
         internal (DuelRatingKind Kind, uint Value) InspectionRating =>
             Live != null && ScaleIn(Live.location, Live.sequence) is uint scale
                 ? (DuelRatingKind.Scale, scale) : RatingNumber;
@@ -683,15 +674,31 @@ namespace YGOPortable.UI
 
     internal sealed class DuelRatingBadge
     {
+        private const float HeadingBadgeWidth = 58f;
+        private const float HeadingGap = 6f;
         private readonly RectTransform _root;
+        private readonly RectTransform _headingText;
+        private readonly Vector2 _headingOffset;
         private readonly Image _symbol;
         private readonly Text _caption;
         private readonly Text _number;
         private (DuelRatingKind Kind, uint Value) _shown;
 
-        internal DuelRatingBadge(RectTransform root, bool compact)
+        internal static DuelRatingBadge AddToHeading(Text heading)
+        {
+            var label = heading.rectTransform;
+            float right = label.anchorMax.x;
+            float offset = label.offsetMax.x;
+            var badge = LotdUiKit.CreateRect("Rating", label.parent, new Vector2(right, .07f), new Vector2(right, .93f),
+                new Vector2(offset - HeadingBadgeWidth, 0f), new Vector2(offset, 0f));
+            return new DuelRatingBadge(badge, compact: true, headingText: label);
+        }
+
+        internal DuelRatingBadge(RectTransform root, bool compact, RectTransform headingText = null)
         {
             _root = root;
+            _headingText = headingText;
+            _headingOffset = headingText != null ? headingText.offsetMax : Vector2.zero;
             DuelReadoutPlate.Add(root, new Color(.073f, .113f, .141f, .98f));
             var icon = LotdUiKit.CreateRect("Symbol", root, new Vector2(.06f, .11f), new Vector2(compact ? .40f : .27f, .89f),
                 Vector2.zero, Vector2.zero);
@@ -712,6 +719,8 @@ namespace YGOPortable.UI
         {
             bool visible = rating.Kind != DuelRatingKind.None;
             _root.gameObject.SetActive(visible);
+            if (_headingText != null)
+                _headingText.offsetMax = _headingOffset - Vector2.right * (visible ? HeadingBadgeWidth + HeadingGap : 0f);
             var tone = DuelStatSymbols.RatingColor(rating.Kind);
             if (!visible || !showChanges) DuelReadoutPulse.Cancel(_root);
             else if (_shown != rating)

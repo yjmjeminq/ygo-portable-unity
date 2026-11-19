@@ -944,7 +944,8 @@ namespace YGOPortable.Editor
                 var field = view.AttachField(duel);
                 view.Modals.ShowPrompt(duel, prompt);
                 var window = view.Modals.ModalRoot.transform.Find("Win");
-                Require(window.Find("Hdr/SubtitleBand/Sub").GetComponent<Text>().text.Contains($"레벨 {level}"),
+                Require(window.Find("Hdr/SubtitleBand/Sub").GetComponent<Text>().text == CardDatabase.GetName(code) &&
+                    window.Find("Hdr/SubtitleBand/Rating/Number")?.GetComponent<Text>().text == level.ToString(),
                     "The position picker did not display the Trap Monster's level.");
                 void CheckCombat(Transform combat)
                 {
@@ -1555,7 +1556,9 @@ namespace YGOPortable.Editor
                 modals.ShowPrompt(duel, prompt);
                 var title = window.Find("Hdr/TitleBand/Title").GetComponent<Text>();
                 var subtitle = window.Find("Hdr/SubtitleBand/Sub").GetComponent<Text>();
-                Require(subtitle.text.EndsWith(" · 레벨 5", StringComparison.Ordinal),
+                var rating = window.Find("Hdr/SubtitleBand/Rating");
+                Require(subtitle.text == CardDatabase.GetName(cyberDragon) && rating?.Find("Number").GetComponent<Text>().text == "5" &&
+                    rating.Find("Symbol").GetComponent<Image>().sprite == DuelStatSymbols.Rating(DuelRatingKind.Level),
                     "The position picker lost the summon rating.");
                 var attackChoice = body.Find($"Pos_{attack}");
                 var defenseChoice = body.Find($"Pos_{defense}");
@@ -1619,7 +1622,8 @@ namespace YGOPortable.Editor
             modals.ShowPrompt(session, hidden);
             var hiddenChoice = body.Find($"Pos_{YgoConstants.POS_FACEDOWN_DEFENSE}");
             var hiddenCard = hiddenChoice.GetComponentInChildren<CompositeCardView>().transform.Find("AspectBox");
-            Require(hiddenChoice.Find("CombatStats") == null && hiddenCard.Find("CardBack").gameObject.activeSelf,
+            Require(hiddenChoice.Find("CombatStats") == null && hiddenCard.Find("CardBack").gameObject.activeSelf &&
+                !window.Find("Hdr/SubtitleBand/Rating").gameObject.activeSelf,
                 "An unknown face-down choice exposed a card face or combat values.");
             hiddenChoice.GetComponent<Button>().onClick.Invoke();
             Require(responses.Count == 1 && BitConverter.ToUInt32(responses[0], 0) == YgoConstants.POS_FACEDOWN_DEFENSE,

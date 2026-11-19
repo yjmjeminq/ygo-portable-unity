@@ -1192,9 +1192,9 @@ namespace YGOPortable.UI
             LotdUiKit.AddImage(rail.gameObject, LotdUiKit.WhiteSprite, accent, false, false);
             var caption = LotdUiKit.CreateRect("Caption", holder, new Vector2(.04f, .60f), new Vector2(.96f, .96f),
                 Vector2.zero, Vector2.zero);
-            string rating = card.Rating;
-            LotdUiKit.AddFittedText(caption, "Value", rating.Length > 0 ? $"{summonType} · {rating}" : summonType,
+            var kind = LotdUiKit.AddFittedText(caption, "Value", summonType,
                 16, 11, TextAnchor.MiddleLeft, accent, FontStyle.Bold);
+            DuelRatingBadge.AddToHeading(kind).Bind(card.RatingNumber);
             var nameArea = LotdUiKit.CreateRect("SummonNameText", holder, new Vector2(.04f, .05f), new Vector2(.96f, .61f),
                 Vector2.zero, Vector2.zero);
             LotdUiKit.AddFittedText(nameArea, "Name", CardDatabase.GetName(flight.Code), 27, 13,

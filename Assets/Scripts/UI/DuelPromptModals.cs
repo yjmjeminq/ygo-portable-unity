@@ -24,6 +24,7 @@ namespace YGOPortable.UI
         private RectTransform _modalTitleBand;
         private Text _modalTitle;
         private Text _modalSubtitle;
+        private DuelRatingBadge _positionRating;
         private RectTransform _modalBody;
         private RectTransform _modalFooter;
         private CanvasGroup _promptInput;
@@ -112,8 +113,8 @@ namespace YGOPortable.UI
         private int[] _sortOrder;
         private Button _confirmBtn;
         private Button _attackCancel;
-        private (Text Name, DuelStatStrip Values) _attackSourceReadout;
-        private (Text Name, DuelStatStrip Values) _attackTargetReadout;
+        private (Text Name, DuelStatStrip Values, DuelRatingBadge Rating) _attackSourceReadout;
+        private (Text Name, DuelStatStrip Values, DuelRatingBadge Rating) _attackTargetReadout;
         private RectTransform _materialConfirmRoot;
         private Button _materialConfirm;
         private bool _fieldMaterialPick;
@@ -402,6 +403,7 @@ namespace YGOPortable.UI
             _confirmBtn = null;
             _attackCancel = null;
             _attackSourceReadout = _attackTargetReadout = default;
+            _positionRating.Bind(default);
             _counterAlloc = null;
             _sortOrder = null;
         }
@@ -442,6 +444,7 @@ namespace YGOPortable.UI
                 Vector2.zero, Vector2.zero);
             _modalTitle = LotdUiKit.AddFittedText(_modalTitleBand, "Title", "", 22, 11, TextAnchor.MiddleLeft, Color.white);
             _modalSubtitle = LotdUiKit.AddFittedText(subBand, "Sub", "", 15, 10, TextAnchor.MiddleLeft, DuelStyle.Muted);
+            _positionRating = DuelRatingBadge.AddToHeading(_modalSubtitle);
 
             _modalBody = LotdUiKit.CreateRect("Body", _modalBox, new Vector2(.02f, .202f), new Vector2(.98f, .785f), Vector2.zero, Vector2.zero);
             _modalFooter = LotdUiKit.CreateRect("Footer", _modalBox, new Vector2(.62f, .028f), new Vector2(.98f, .183f), Vector2.zero, Vector2.zero);
@@ -840,9 +843,8 @@ namespace YGOPortable.UI
         {
             _modalTitle.text = "표시 형식 선택";
             var card = ReadSummonPosition(session, p, out var source);
-            string name = p.promptCardCode == 0 ? "뒷면 카드" : CardDatabase.GetName(p.promptCardCode);
-            string rating = card.Rating;
-            _modalSubtitle.text = rating.Length == 0 ? name : $"{name} · {rating}";
+            _modalSubtitle.text = p.promptCardCode == 0 ? "뒷면 카드" : CardDatabase.GetName(p.promptCardCode);
+            _positionRating.Bind(card.RatingNumber);
             SetFieldView(false);
             InspectChoice(p.promptCardCode, source);
 
@@ -1294,7 +1296,7 @@ namespace YGOPortable.UI
 
         private void BuildAttackSelectionReadout(DuelPrompt prompt)
         {
-            _modalBox.anchorMin = new Vector2(.235f, .829f);
+            _modalBox.anchorMin = new Vector2(.235f, .807f);
             _modalBox.anchorMax = new Vector2(.878f, .903f);
             _modalHeader.anchorMax = new Vector2(.215f, 1f);
             _modalBody.anchorMin = new Vector2(.225f, .055f);
@@ -1305,7 +1307,7 @@ namespace YGOPortable.UI
             RefreshAttackSelectionReadout(prompt, null);
         }
 
-        private (Text Name, DuelStatStrip Values) AddAttackSelectionCard(string key, float left, float right)
+        private (Text Name, DuelStatStrip Values, DuelRatingBadge Rating) AddAttackSelectionCard(string key, float left, float right)
         {
             var tile = LotdUiKit.CreateRect(key, _modalBody, new Vector2(left, 0f), new Vector2(right, 1f),
                 Vector2.zero, Vector2.zero);
@@ -1315,7 +1317,7 @@ namespace YGOPortable.UI
             var name = LotdUiKit.AddFittedText(heading, "Name", "", 16, 9, TextAnchor.MiddleCenter, Color.white);
             var values = LotdUiKit.CreateRect("Combat", tile, Vector2.zero, new Vector2(1f, .51f),
                 Vector2.zero, Vector2.zero);
-            return (name, new DuelStatStrip(values, compact: true));
+            return (name, new DuelStatStrip(values, compact: true), DuelRatingBadge.AddToHeading(name));
         }
 
         internal void RefreshAttackSelectionReadout(DuelPrompt prompt, (byte controller, uint location, uint sequence)? focus)
@@ -1338,14 +1340,21 @@ namespace YGOPortable.UI
                 candidate != null ? "대상 · 뒷면 카드" : "공격 대상");
         }
 
-        private static void BindAttackSelectionCard((Text Name, DuelStatStrip Values) tile, LiveCardState card,
+        private static void BindAttackSelectionCard((Text Name, DuelStatStrip Values, DuelRatingBadge Rating) tile, LiveCardState card,
             bool opponent, string label, string fallback)
         {
             tile.Name.text = card == null ? fallback : $"{label} · {CardDatabase.GetName(card.code)}";
             tile.Name.color = DuelStyle.Side(opponent);
             ((RectTransform)tile.Name.transform.parent).anchorMin = new Vector2(0f, card == null ? 0f : .53f);
-            if (card == null) tile.Values.Hide();
-            else tile.Values.Bind(new DuelCardReadout(CardDatabase.Get(card.code), card), opponent);
+            if (card == null)
+            {
+                tile.Rating.Bind(default);
+                tile.Values.Hide();
+                return;
+            }
+            var readout = new DuelCardReadout(CardDatabase.Get(card.code), card);
+            tile.Rating.Bind(readout.RatingNumber);
+            tile.Values.Bind(readout, opponent);
         }
 
         private void SubmitAttackTarget(int index)
