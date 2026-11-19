@@ -1490,6 +1490,14 @@ namespace YGOPortable.Core
             return GetKoreanCardDescription(GetDescriptionCardCode(desc)) ?? GetKoreanCardDescription(cardCode);
         }
 
+        internal static string ResolveCommandEffectDescription(SelectableCardItem item)
+        {
+            // Jet Synchron's manual graveyard effect has no description in the script.
+            if (item.code == 9742784 && item.location == YgoConstants.LOCATION_GRAVE)
+                return "패 1장을 묘지로 보내고 제트 싱크론을 묘지에서 특수 소환한다. 이렇게 소환된 카드는 필드를 벗어나면 제외된다.";
+            return ResolveEffectDescription(item.description, item.code);
+        }
+
         internal static string ResolveOptionDescription(ulong desc) => ResolveDescription(desc);
 
         internal static string GetKoreanCardDescription(uint code)

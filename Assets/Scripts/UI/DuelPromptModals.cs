@@ -57,6 +57,9 @@ namespace YGOPortable.UI
         private Button _chainPass;
         private int _chainSelection;
         private int[] _chainCandidateIndices;
+        private IReadOnlyList<SelectableCardItem> _activationChoices = Array.Empty<SelectableCardItem>();
+        private Button[] _activationButtons = Array.Empty<Button>();
+        private Action<int> _confirmPileActivation;
 
         // Zone viewer refs
         private static readonly (uint Location, string Label)[] PileTabs =
@@ -124,7 +127,7 @@ namespace YGOPortable.UI
 
         public bool IsPromptOpen => ModalRoot != null && ModalRoot.activeSelf;
         public bool IsZoneViewerOpen => ZoneViewRoot != null && ZoneViewRoot.activeSelf;
-        internal bool IsChainPromptOpen => IsPromptOpen && _chainPrompt;
+        internal bool IsChainPromptOpen => IsPromptOpen && _chainPrompt && _confirmPileActivation == null;
         internal bool IsShowingField => IsPromptOpen && _promptShade.ShowingField;
         internal Selectable FieldViewControl => _fieldViewButton;
         internal bool IsFieldCardSelection => IsPromptOpen && _fieldCardIndices.Count > 0;
@@ -226,6 +229,11 @@ namespace YGOPortable.UI
 
         internal void SetBrowsablePiles(params DuelZoneImage[] piles) => _promptShade.BrowsablePiles = piles;
         internal void SetChainConfirmationControl(Button button) => _promptShade.ChainConfirmationControl = button;
+        internal void SetPileActivationControls(Button grave, Button extra)
+        {
+            _promptShade.GraveActivationControl = grave;
+            _promptShade.ExtraActivationControl = extra;
+        }
 
         internal void SetInspectorControls(Button artwork, Button details)
         {
@@ -236,6 +244,33 @@ namespace YGOPortable.UI
         }
 
         internal void SetCandidateInspector(Action<SelectableCardItem, uint> inspect) => _onInspectCandidate = inspect;
+
+        internal bool HasChainActivationAt(DuelSession session, uint location) => FindChainActivationAt(session, location) >= 0;
+
+        private int FindChainActivationAt(DuelSession session, uint location)
+        {
+            if (!IsChainPromptOpen || !ReferenceEquals(session, _curSession) ||
+                !ReferenceEquals(session.ActivePrompt, _curPrompt)) return -1;
+            for (int i = 0; i < _activationChoices.Count; i++)
+            {
+                var choice = _activationChoices[i];
+                if (choice.code != 0 && choice.controller == session.HumanPlayerIndex && choice.location == location)
+                    return i;
+            }
+            return -1;
+        }
+
+        internal bool FocusChainActivationAt(DuelSession session, uint location)
+        {
+            if (!_promptInput.interactable) return false;
+            int index = FindChainActivationAt(session, location);
+            if (index < 0) return false;
+            if (IsShowingField) ToggleFieldView();
+            var choice = _activationButtons[index];
+            choice.onClick.Invoke();
+            SetFocus(choice.gameObject);
+            return true;
+        }
 
         internal void SetCardDetailsOpen(bool open) => _promptInput.interactable = !open && !IsZoneViewerOpen;
 
@@ -396,6 +431,7 @@ namespace YGOPortable.UI
             _focusBeforeKeyboard = null;
             _padKeyboard.Close();
             ModalRoot.SetActive(false);
+            _confirmPileActivation = null;
             if (restoreFocus) SetFocus(_focusBeforePrompt);
             _focusBeforePrompt = null;
         }
@@ -410,6 +446,10 @@ namespace YGOPortable.UI
             _fieldMaterialPick = false;
             _materialConfirmRoot.gameObject.SetActive(false);
             _chainSelection = -1;
+            _chainCandidateIndices = null;
+            _activationChoices = Array.Empty<SelectableCardItem>();
+            _activationButtons = Array.Empty<Button>();
+            _confirmPileActivation = null;
             _confirmBtn = null;
             _attackCancel = null;
             _sumAmount = _sumTarget = default;
@@ -499,7 +539,7 @@ namespace YGOPortable.UI
         private void SetFieldView(bool showing)
         {
             _promptShade.ShowingField = showing;
-            _promptShade.ChainConfirmationAvailable = _chainPrompt;
+            _promptShade.ChainConfirmationAvailable = _chainPrompt && _confirmPileActivation == null;
             _promptShade.SelectingFieldCards = _fieldCardIndices.Count > 0;
             _promptShade.color = showing || _promptShade.SelectingFieldCards ? Color.clear : new Color(0f, .02f, .07f, .11f);
             _fieldViewTab.gameObject.SetActive(!_promptShade.SelectingFieldCards);
@@ -543,7 +583,7 @@ namespace YGOPortable.UI
             var description = LotdUiKit.CreateRect("Description", details, new Vector2(.0f, .025f), new Vector2(1f, .57f),
                 Vector2.zero, Vector2.zero);
             _chainEffectScroll = CreateVerticalScroll(description, out Transform content);
-            _chainEffect = AddDescriptionText(content, "Effect", "", 16);
+            _chainEffect = AddDescriptionText(content, "Effect", "", 18);
 
             var footer = LotdUiKit.CreateRect("Footer", _chainBox, new Vector2(.021f, .024f), new Vector2(.977f, .143f),
                 Vector2.zero, Vector2.zero);
@@ -565,6 +605,13 @@ namespace YGOPortable.UI
             if (IsShowingField)
             {
                 ToggleFieldView();
+                return true;
+            }
+
+            if (_confirmPileActivation != null)
+            {
+                LotdAudio.PlayClick();
+                HidePrompt();
                 return true;
             }
 
@@ -646,8 +693,7 @@ namespace YGOPortable.UI
             TryCancelOrPass();
         }
 
-        public void ShowPrompt(DuelSession session, DuelPrompt prompt,
-            ChainConfirmationMode chainConfirmation = ChainConfirmationMode.On)
+        private void PreparePrompt(DuelSession session, DuelPrompt prompt)
         {
             if (!IsPromptOpen) _focusBeforePrompt = EventSystem.current?.currentSelectedGameObject;
             _focusBeforeKeyboard = null;
@@ -658,6 +704,37 @@ namespace YGOPortable.UI
             _curSession = session;
             _curPrompt = prompt;
             ClearBodyAndFooter();
+        }
+
+        private void ShowPreparedPrompt()
+        {
+            SetFieldView(false);
+            ModalRoot.transform.SetAsLastSibling();
+            ModalRoot.SetActive(true);
+            UiEntranceMotion.Play((_chainPrompt ? _chainBox : _modalBox).gameObject);
+            CardAnimationManager.Instance?.BringToFront();
+        }
+
+        internal void ShowPileActivationPicker(DuelSession session, DuelPrompt prompt, int[] indices,
+            string title, Action<int> confirm)
+        {
+            if (indices.Length == 0 || IsPromptOpen || IsZoneViewerOpen ||
+                !ReferenceEquals(session.ActivePrompt, prompt)) return;
+            PreparePrompt(session, prompt);
+            _chainPrompt = true;
+            _chainCandidateIndices = indices;
+            _confirmPileActivation = confirm;
+            ShowPreparedPrompt();
+            RenderActivationPicker(session, prompt, indices.Select(index => prompt.activatable[index]).ToArray(),
+                title, $"발동 가능 {indices.Length}개", "닫기");
+            PrepareFocusControls(_chainBox, OnModalCloseClicked);
+            FocusPrompt();
+        }
+
+        public void ShowPrompt(DuelSession session, DuelPrompt prompt,
+            ChainConfirmationMode chainConfirmation = ChainConfirmationMode.On)
+        {
+            PreparePrompt(session, prompt);
             if (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN && !prompt.forced && prompt.candidates.Count == 0)
             {
                 HidePrompt();
@@ -716,11 +793,7 @@ namespace YGOPortable.UI
                 _modalFooter.anchorMin = new Vector2(.56f, .08f);
                 _modalFooter.anchorMax = new Vector2(.98f, .92f);
             }
-            SetFieldView(false);
-            ModalRoot.transform.SetAsLastSibling();
-            ModalRoot.SetActive(true);
-            UiEntranceMotion.Play((_chainPrompt ? _chainBox : _modalBox).gameObject);
-            CardAnimationManager.Instance?.BringToFront();
+            ShowPreparedPrompt();
 
             if (_chainPrompt)
             {
@@ -994,7 +1067,6 @@ namespace YGOPortable.UI
                     description = prompt.promptEffectDesc != 0 ? prompt.promptEffectDesc : prompt.promptDesc,
                 } }
                 : prompt.candidates;
-            _chainCandidateIndices = null;
             if (chainConfirmation != ChainConfirmationMode.On && !singleEffect)
             {
                 // Hide fast responses without changing the indices sent back to the engine.
@@ -1002,20 +1074,32 @@ namespace YGOPortable.UI
                     .Where(index => session.IsChainCandidateVisible(prompt, prompt.candidates[index], chainConfirmation)).ToArray();
                 choices = _chainCandidateIndices.Select(index => prompt.candidates[index]).ToArray();
             }
+            bool respondingToAttack = session.HasActiveAttack && session.AttackerCon != session.HumanPlayerIndex;
+            string title = prompt.forced ? "필수 효과 순서 선택" :
+                respondingToAttack && session.CurrentChain.Count == 0
+                    ? (session.TargetLoc == 0 ? "상대의 직접 공격에 대응하시겠습니까?" : "상대의 공격 선언에 대응하시겠습니까?")
+                    : choices.Count == 1 ? "효과를 발동하시겠습니까?" : "발동할 효과 선택";
+            RenderActivationPicker(session, prompt, choices, title, $"체인 {session.CurrentChain.Count + 1}  ·  {choices.Count}개",
+                prompt.forced ? null : "패스");
+        }
+
+        private void RenderActivationPicker(DuelSession session, DuelPrompt prompt, IReadOnlyList<SelectableCardItem> choices,
+            string title, string summary, string passLabel)
+        {
+            _activationChoices = choices;
+            _activationButtons = new Button[choices.Count];
             bool compact = choices.Count == 1;
             _chainBox.anchorMin = compact ? new Vector2(.30f, .202f) : new Vector2(.222f, .185f);
             _chainBox.anchorMax = compact ? new Vector2(.795f, .628f) : new Vector2(.922f, .628f);
+            float stripEnd = choices.Count switch { 1 => .35f, 2 => .455f, 3 => .615f, _ => .695f };
             var cardStrip = (RectTransform)_chainCardScroll.transform;
-            cardStrip.anchorMax = new Vector2(compact ? .35f : .695f, .852f);
-            _chainDetails.anchorMin = new Vector2(compact ? .37f : .711f, .176f);
+            cardStrip.anchorMax = new Vector2(stripEnd, .852f);
+            _chainDetails.anchorMin = new Vector2(stripEnd + .016f, .176f);
             SetFieldView(false);
-            bool respondingToAttack = session.HasActiveAttack && session.AttackerCon != session.HumanPlayerIndex;
-            _chainTitle.text = prompt.forced ? "필수 효과 순서 선택" :
-                respondingToAttack && session.CurrentChain.Count == 0
-                    ? (session.TargetLoc == 0 ? "상대의 직접 공격에 대응하시겠습니까?" : "상대의 공격 선언에 대응하시겠습니까?")
-                    : compact ? "효과를 발동하시겠습니까?" : "발동할 효과 선택";
-            _chainSummary.text = $"체인 {session.CurrentChain.Count + 1}  ·  {choices.Count}개";
-            _chainPass.transform.parent.gameObject.SetActive(!prompt.forced);
+            _chainTitle.text = title;
+            _chainSummary.text = summary;
+            _chainPass.transform.parent.gameObject.SetActive(passLabel != null);
+            _chainPass.GetComponentInChildren<Text>(true).text = passLabel ?? "";
             _chainActivate.interactable = choices.Count > 0;
             _chainName.text = _chainSource.text = _chainEffect.text = "";
 
@@ -1040,8 +1124,9 @@ namespace YGOPortable.UI
                 var item = choices[index];
                 _chainName.text = CardDatabase.GetName(item.code);
                 _chainSource.text = CardSourceLabel(session, item);
-                _chainEffect.text = CardDatabase.ResolveEffectDescription(item.description, item.code)
-                    ?? "이 카드의 효과를 발동할 수 있습니다.";
+                string text = _confirmPileActivation != null ? CardDatabase.ResolveCommandEffectDescription(item) :
+                    CardDatabase.ResolveEffectDescription(item.description, item.code);
+                _chainEffect.text = text ?? "이 카드의 효과를 발동할 수 있습니다.";
                 _chainEffectScroll.StopMovement();
                 _chainEffectScroll.content.anchoredPosition = Vector2.zero;
                 InspectChoice(item.code, item);
@@ -1075,6 +1160,7 @@ namespace YGOPortable.UI
                         LotdUiKit.AddFittedText(caption, "Text", $"후보 {number}", 13, 9, TextAnchor.MiddleCenter, DuelStyle.Muted);
                     }
                     var button = tile.gameObject.AddComponent<Button>();
+                    _activationButtons[index] = button;
                     button.targetGraphic = tile.GetComponent<Image>();
                     button.onClick.AddListener(() => Select(index));
                     tile.gameObject.AddComponent<DuelPromptSelection>().OnSelected = () => Select(index);
@@ -1127,7 +1213,15 @@ namespace YGOPortable.UI
 
         private void ConfirmChainChoice()
         {
-            if (_chainSelection < 0 || _curPrompt == null) return;
+            if (!CanAnswerPrompt || _chainSelection < 0 || _curPrompt == null) return;
+            if (_confirmPileActivation != null)
+            {
+                var confirm = _confirmPileActivation;
+                int index = _chainCandidateIndices[_chainSelection];
+                HidePrompt();
+                confirm(index);
+                return;
+            }
             if (_curPrompt.messageType == YgoConstants.MSG_SELECT_CHAIN &&
                 _chainSelection < (_chainCandidateIndices?.Length ?? _curPrompt.candidates.Count))
                 Submit(BitConverter.GetBytes(_chainCandidateIndices?[_chainSelection] ?? _chainSelection));
@@ -2311,8 +2405,7 @@ namespace YGOPortable.UI
         {
             if (_chainPrompt)
             {
-                return _chainCards.GetComponentsInChildren<Button>().FirstOrDefault(b => b.name == $"Ch_{_chainSelection}")
-                    ?? _fieldViewButton;
+                return _chainSelection >= 0 ? _activationButtons[_chainSelection] : _fieldViewButton;
             }
             return FirstFocus(_modalBody) ?? FirstFocus(_modalFooter) ?? _fieldViewButton;
         }
@@ -2803,6 +2896,8 @@ namespace YGOPortable.UI
         internal bool SelectingFieldCards { get; set; }
         internal Func<Vector2, Camera, bool> FieldCardHitTest { get; set; }
         internal Button ChainConfirmationControl { get; set; }
+        internal Button GraveActivationControl { get; set; }
+        internal Button ExtraActivationControl { get; set; }
         internal Button InspectorArtworkControl { get; set; }
         internal Button InspectorDetailsControl { get; set; }
         internal bool ChainConfirmationAvailable { get; set; }
@@ -2821,7 +2916,9 @@ namespace YGOPortable.UI
         {
             if (HitsControl(InspectorArtworkControl, screenPoint, eventCamera) ||
                 HitsControl(InspectorDetailsControl, screenPoint, eventCamera) ||
-                ChainConfirmationAvailable && HitsControl(ChainConfirmationControl, screenPoint, eventCamera))
+                ChainConfirmationAvailable && (HitsControl(ChainConfirmationControl, screenPoint, eventCamera) ||
+                    HitsControl(GraveActivationControl, screenPoint, eventCamera) ||
+                    HitsControl(ExtraActivationControl, screenPoint, eventCamera)))
                 return false;
             if (SelectingFieldCards) return !FieldCardHitTest(screenPoint, eventCamera);
             return !ShowingField || !IsPointOverPile(screenPoint, eventCamera);

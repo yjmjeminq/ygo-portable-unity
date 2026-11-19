@@ -31,6 +31,7 @@ namespace YGOPortable.Editor
                 opens += VerifyGraveEffectPicker(humanFirst);
             }
             opens += VerifyPromptAndExtraSummon();
+            opens += VerifyNativeExtraActivation();
             string hitTest = SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null ? "raycast filters" : "GraphicRaycaster";
             Debug.Log($"[VERIFY ZONE BROWSER] {opens} successful opens. Pile counts and visible tops, tabs, card details, filtered action shortcuts, privacy and effect prompt field view ({hitTest}) verified.");
         }
@@ -316,7 +317,7 @@ namespace YGOPortable.Editor
                 return choice.messageType switch
                 {
                     YgoConstants.MSG_SELECT_CARD => DuelSession.PackCardSelection(target),
-                    YgoConstants.MSG_SELECT_UNSELECT_CARD => BitConverter.GetBytes(target),
+                    YgoConstants.MSG_SELECT_UNSELECT_CARD => BitConverter.GetBytes(1).Concat(BitConverter.GetBytes(target)).ToArray(),
                     _ => null,
                 };
             });
@@ -414,6 +415,77 @@ namespace YGOPortable.Editor
             return ui.Opens;
         }
 
+        private static int VerifyNativeExtraActivation()
+        {
+            const uint refrain = 64881644, bacha = 56208713, polymerization = 24094653;
+            var main = Enumerable.Repeat(refrain, 26).Concat(Enumerable.Repeat(polymerization, 14)).ToArray();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Extra Deck activation shortcut", main, new[] { bacha },
+                Enumerable.Repeat(20721928u, 40).ToArray(), Array.Empty<uint>(), true, session =>
+                {
+                    var hand = session.Players[session.HumanPlayerIndex].hand;
+                    return hand.Count(card => card.code == refrain) >= 2 && hand.Any(card => card.code == polymerization);
+                });
+            byte human = (byte)duel.HumanPlayerIndex;
+            var player = duel.Players[human];
+            var command = ReachMainPhase(duel, human);
+            int summon = command.summonable.FindIndex(item => item.code == refrain);
+            Require(summon >= 0, "Refrain was not available for the Extra Deck fixture.");
+            duel.SubmitResponseInt(summon << 16);
+            command = ReachMainPhase(duel, human);
+            int spell = command.activatable.FindIndex(item => item.code == polymerization);
+            Require(spell >= 0, "The Melodious fixture could not start the Fusion Summon.");
+            duel.SubmitResponseInt((spell << 16) | 5);
+
+            int ExtraResponse(DuelPrompt prompt)
+            {
+                if (prompt?.playerId != human) return -1;
+                if (prompt.IsTriggerActivationConfirmation && prompt.promptLoc == YgoConstants.LOCATION_EXTRA &&
+                    prompt.promptCardCode == refrain) return 1;
+                return prompt.messageType == YgoConstants.MSG_SELECT_CHAIN
+                    ? prompt.candidates.FindIndex(item => item.location == YgoConstants.LOCATION_EXTRA && item.code == refrain)
+                    : -1;
+            }
+
+            for (int step = 0; step < 40 && !duel.IsFinished && ExtraResponse(duel.ActivePrompt) < 0; step++)
+            {
+                var prompt = duel.ActivePrompt;
+                if (prompt == null)
+                {
+                    duel.StepUntilPrompt();
+                    continue;
+                }
+                int fieldMaterial = prompt.candidates.FindIndex(item => item.code == refrain && item.location == YgoConstants.LOCATION_MZONE);
+                int handMaterial = prompt.candidates.FindIndex(item => item.code == refrain && item.location == YgoConstants.LOCATION_HAND);
+                if (prompt.messageType == YgoConstants.MSG_SELECT_CARD && fieldMaterial >= 0)
+                    duel.SubmitResponse(prompt.min > 1 && handMaterial >= 0
+                        ? DuelSession.PackCardSelection(fieldMaterial, handMaterial) : DuelSession.PackCardSelection(fieldMaterial));
+                else if (prompt.messageType == YgoConstants.MSG_SELECT_UNSELECT_CARD && !prompt.finishable && fieldMaterial >= 0)
+                    duel.SubmitResponse(BitConverter.GetBytes(1).Concat(BitConverter.GetBytes(fieldMaterial)).ToArray());
+                else if (prompt.IsTriggerActivationConfirmation)
+                    duel.SubmitResponseInt(0);
+                else
+                    duel.SubmitResponse(Ai.ComputeResponse(duel, prompt));
+            }
+
+            var activation = duel.ActivePrompt;
+            int expected = ExtraResponse(activation);
+            Require(expected >= 0 && player.extra.Any(card => card.code == refrain && card.IsFaceUp) &&
+                player.mzone.Any(card => card?.code == bacha), "The engine did not offer Refrain's Extra Deck trigger.");
+            byte[] selected = null;
+            using var ui = new Browser(duel, response => selected = response, mobileLayout: true);
+            ui.VerifyExtraChainSource(activation, refrain);
+            Require(selected != null && BitConverter.ToInt32(selected, 0) == expected,
+                "The Extra Deck shortcut selected a different effect in the native chain.");
+            duel.SubmitResponse(selected);
+            ReachMainPhase(duel, human);
+            ui.Field.Refresh();
+            Require(duel.RetryCount == 0 && player.szone.Any(card => card?.code == refrain) &&
+                !Private<Button>(ui.Field, "_extraEffectButton").gameObject.activeInHierarchy,
+                "The Extra Deck effect did not resolve or retained an expired indicator.");
+            Debug.Log("[VERIFY EXTRA DECK EFFECT] Refrain was offered in the Extra Deck and resolved in the Pendulum Zone.");
+            return ui.Opens;
+        }
+
         private static DuelPrompt ReachMainPhase(DuelSession duel, byte player, Func<DuelPrompt, byte[]> choose = null)
         {
             for (int step = 0; step < 30 && !duel.IsFinished; step++)
@@ -456,7 +528,7 @@ namespace YGOPortable.Editor
             internal int Opens { get; private set; }
             internal CompositeCardView[] VisibleCards => _grid.GetComponentsInChildren<CompositeCardView>();
 
-            internal Browser(DuelSession duel, Action<byte[]> onSubmit = null)
+            internal Browser(DuelSession duel, Action<byte[]> onSubmit = null, bool mobileLayout = false)
             {
                 _duel = duel;
                 _canvas = new GameObject("Zone Browser Verification", typeof(Canvas), typeof(GraphicRaycaster));
@@ -485,7 +557,7 @@ namespace YGOPortable.Editor
                 },
                     onSubmit ?? (_ => throw new InvalidOperationException("Browsing submitted a modal response.")));
                 _controller = _canvas.AddComponent<GameAppController>();
-                Field = new DuelFieldUI(_controller, _canvas.transform, Modals);
+                Field = new DuelFieldUI(_controller, _canvas.transform, Modals, mobileLayout);
                 SetPrivate(_controller, "_session", _duel);
                 SetPrivate(_controller, "_duelField", Field);
                 SetPrivate(_controller, "_modals", Modals);
@@ -781,7 +853,7 @@ namespace YGOPortable.Editor
                 try
                 {
                     Click(button);
-                    Require(!Modals.IsZoneViewerOpen, "A stale grave effect shortcut opened an empty chooser.");
+                    Require(!Modals.IsPromptOpen, "A stale grave effect shortcut opened an empty chooser.");
                     VerifyGraveEffectButton(visible: false);
                 }
                 finally
@@ -791,11 +863,14 @@ namespace YGOPortable.Editor
                 VerifyGraveEffectButton(visible: true);
 
                 ClickAt((RectTransform)button.transform, pointerId: 0);
-                VerifyOpened(prompt, new[] { code });
-                Require(!Private<RectTransform>(Modals, "_zoneTabs").gameObject.activeSelf &&
-                    Private<Text>(Modals, "_zoneTitle").text.StartsWith("묘지 효과 발동 가능"),
-                    "The effect shortcut did not open a distinct filtered graveyard list.");
-                Close();
+                var picker = VerifyActivationPicker(prompt, "묘지 효과 발동", code);
+                Require(picker.Find("Details/Description").GetComponentsInChildren<Text>()
+                    .Any(label => label.text.StartsWith("패 1장을 묘지로 보내고") && label.text.Contains("특수 소환한다")),
+                    "The graveyard picker did not describe the available revival effect.");
+                Click(picker.Find("Footer/Pass/B").GetComponent<Button>());
+                Require(!Modals.IsPromptOpen && ReferenceEquals(_duel.ActivePrompt, prompt),
+                    "Closing the grave activation picker changed the native prompt.");
+                VerifyGraveEffectButton(visible: true);
 
                 SetPrivate(Field, "_usingDuelPad", true);
                 SetPrivate(Field, "_duelPadFocus", pile);
@@ -803,12 +878,64 @@ namespace YGOPortable.Editor
                 Require(Private<RectTransform>(Field, "_duelPadFocus") == badge,
                     "The controller could not reach the activation indicator from the graveyard.");
                 Field.HandleDuelPad(new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Submit));
-                VerifyOpened(prompt, new[] { code });
-                var action = VisibleCards.Single().transform.parent.parent.Find("Act/B").GetComponent<Button>();
+                picker = VerifyActivationPicker(prompt, "묘지 효과 발동", code);
+                var action = picker.Find("Footer/Activate/B").GetComponent<Button>();
                 Require(action.GetComponentInChildren<Text>().text == "효과 발동", "The grave effect was not actionable in the chooser.");
                 Click(action);
-                Require(!Modals.IsZoneViewerOpen && !ReferenceEquals(prompt, _duel.ActivePrompt),
+                Require(!Modals.IsPromptOpen && !ReferenceEquals(prompt, _duel.ActivePrompt),
                     "Activating a grave effect did not close the picker and continue the duel.");
+            }
+
+            private Transform VerifyActivationPicker(DuelPrompt prompt, string title, params uint[] expected)
+            {
+                var window = Modals.ModalRoot.transform.Find("ChainWin");
+                Require(Modals.IsPromptOpen && !Modals.IsZoneViewerOpen && window.gameObject.activeInHierarchy &&
+                    ReferenceEquals(_duel.ActivePrompt, prompt) &&
+                    window.Find("Hdr/Title/Text").GetComponent<Text>().text == title &&
+                    window.Find("Cards").GetComponentsInChildren<CompositeCardView>().Select(card => card.CurrentCode)
+                        .SequenceEqual(expected),
+                    "The activation picker did not show the legal cards in the horizontal strip.");
+                Require(window.Find("Details/Name/Text").GetComponent<Text>().text == CardDatabase.GetName(expected[0]) &&
+                    window.Find("Details/Description").GetComponentsInChildren<Text>().Any(label => label.text.Length > 0),
+                    "The picker did not identify the card and its effect before confirmation.");
+                Opens++;
+                return window;
+            }
+
+            internal void VerifyExtraChainSource(DuelPrompt prompt, uint expected)
+            {
+                Modals.ShowPrompt(_duel, prompt);
+                Field.Refresh();
+                var button = Private<Button>(Field, "_extraEffectButton");
+                var pile = StackRoot("_myExtraTile");
+                Require(button.gameObject.activeInHierarchy && button.transform.IsChildOf(pile) &&
+                    !Private<Button>(Field, "_extraSummonButton").gameObject.activeInHierarchy &&
+                    !Private<Button>(Field, "_graveEffectButton").gameObject.activeInHierarchy,
+                    "The chain did not identify exactly the Extra Deck as an activation source.");
+                var view = (Button)Modals.FieldViewControl;
+                Click(view);
+                Require(Modals.IsShowingField && button.gameObject.activeInHierarchy,
+                    "The Extra Deck activation was unavailable during field inspection.");
+                ClickAt((RectTransform)button.transform, pointerId: 0);
+                Require(!Modals.IsShowingField && ReferenceEquals(_duel.ActivePrompt, prompt),
+                    "Tapping the Extra Deck should focus the pending choice before activation.");
+                var picker = Modals.ModalRoot.transform.Find("ChainWin");
+                Require(picker.Find("Details/Source/Text").GetComponent<Text>().text == "내 엑스트라 덱" &&
+                    picker.Find("Details/Name/Text").GetComponent<Text>().text == CardDatabase.GetName(expected) &&
+                    picker.Find("Details/Description").GetComponentsInChildren<Text>()
+                        .Any(label => label.text == "이 카드를 자신의 펜듈럼 존에 놓는다"),
+                    "The Extra Deck shortcut lost the card's effect or original zone.");
+                Click(view);
+                SetPrivate(Field, "_usingDuelPad", true);
+                SetPrivate(Field, "_duelPadFocus", pile);
+                Field.HandleDuelPad(new DeckPadFrame(Vector2Int.up, DeckPadButtons.None));
+                Require(Private<RectTransform>(Field, "_duelPadFocus") == button.transform,
+                    "A controller could not reach the Extra Deck effect while browsing the field.");
+                Field.HandleDuelPad(new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Submit));
+                Require(!Modals.IsShowingField && ReferenceEquals(_duel.ActivePrompt, prompt),
+                    "The controller did not return to the pending Extra Deck choice.");
+                Click(picker.Find("Footer/Activate/B").GetComponent<Button>());
+                Opens++;
             }
 
             internal void VerifyExtraSummonChoices(DuelPrompt prompt, IReadOnlyList<LiveCardState> all)
@@ -829,8 +956,17 @@ namespace YGOPortable.Editor
                     Require(summonButton.gameObject.activeInHierarchy, "The Extra Deck summon button was missing.");
                     var pile = StackRoot("_myExtraTile");
                     var indicator = (RectTransform)summonButton.transform;
+                    var effectButton = Private<Button>(Field, "_extraEffectButton");
+                    var effectPlate = (RectTransform)effectButton.transform.parent;
                     Require(indicator.IsChildOf(pile) && ((RectTransform)indicator.parent).anchorMin.y > .5f,
                         "Summon availability must be shown at the top of the player's Extra Deck.");
+                    Require(effectButton.gameObject.activeInHierarchy && effectPlate.IsChildOf(pile) &&
+                        effectPlate.anchorMin.y > .5f && ((RectTransform)indicator.parent).anchorMax.x < effectPlate.anchorMin.x,
+                        "The Extra Deck should show separate non-overlapping summon and effect shortcuts.");
+                    ClickAt((RectTransform)effectButton.transform, pointerId: 0);
+                    var effectPicker = VerifyActivationPicker(prompt, "엑스트라 덱 효과 발동", blocked.code);
+                    Click(effectPicker.Find("Footer/Pass/B").GetComponent<Button>());
+                    Field.Refresh();
                     var available = prompt.spSummonable.ToArray();
                     prompt.spSummonable.RemoveAll(item => item.location == YgoConstants.LOCATION_EXTRA);
                     try
@@ -883,6 +1019,9 @@ namespace YGOPortable.Editor
                 finally
                 {
                     prompt.activatable.Remove(effect);
+                    Field.Refresh();
+                    Require(!Private<Button>(Field, "_extraEffectButton").gameObject.activeInHierarchy,
+                        "The Extra Deck effect indicator survived an expired option.");
                 }
 
                 var tile = VisibleCards.Single(card => card.CurrentCode == Chixiao).transform.parent.parent;

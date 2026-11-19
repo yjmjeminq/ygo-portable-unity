@@ -139,6 +139,7 @@ namespace YGOPortable.UI
         private StackTileView _oppDeckTile, _oppExtraTile, _oppGyTile, _oppBanTile;
         private Button _extraSummonButton;
         private Button _graveEffectButton;
+        private Button _extraEffectButton;
 
         // High-res Card Zoom Modal
         private GameObject _cardZoomModal;
@@ -255,6 +256,7 @@ namespace YGOPortable.UI
             _modals.SetFieldCardHitTest(IsPointOverFieldCardChoice);
             _modals.SetInspectorControls(_inspectorArtworkButton, _duelPadInspectButton);
             _modals.SetCandidateInspector(InspectCandidate);
+            _modals.SetPileActivationControls(_graveEffectButton, _extraEffectButton);
             _modals.SetBrowsablePiles(
                 _myGyTile.root.GetComponent<DuelZoneImage>(), _myExtraTile.root.GetComponent<DuelZoneImage>(),
                 _myBanTile.root.GetComponent<DuelZoneImage>(), _oppGyTile.root.GetComponent<DuelZoneImage>(),
@@ -345,6 +347,7 @@ namespace YGOPortable.UI
             HideCardActions();
             _extraSummonButton.gameObject.SetActive(false);
             _graveEffectButton.gameObject.SetActive(false);
+            _extraEffectButton.gameObject.SetActive(false);
             CloseActionPopup();
             CloseDuelLog();
             CloseCardZoomModal(restoreFocus: false);
@@ -996,18 +999,32 @@ namespace YGOPortable.UI
             _oppGyTile = CreateStackTile(Cell(1, 1), true, YgoConstants.LOCATION_GRAVE, "묘지");
             _oppBanTile = CreateStackTile(Cell(1, 2), true, YgoConstants.LOCATION_REMOVED, "제외");
 
-            _extraSummonButton = BuildPileActionButton(_myExtraTile, "ExtraSummon", "소환 가능", OpenExtraSummonPicker);
-            _graveEffectButton = BuildPileActionButton(_myGyTile, "GraveEffect", "효과 발동", OpenGraveEffectPicker);
+            _extraSummonButton = BuildPileActionButton(_myExtraTile, "ExtraSummon", "소환", OpenExtraSummonPicker);
+            _extraEffectButton = BuildPileActionButton(_myExtraTile, "ExtraEffect", "발동",
+                () => OpenPileEffectPicker(YgoConstants.LOCATION_EXTRA), activation: true);
+            _graveEffectButton = BuildPileActionButton(_myGyTile, "GraveEffect", "효과 발동",
+                () => OpenPileEffectPicker(YgoConstants.LOCATION_GRAVE), activation: true);
         }
 
-        private static Button BuildPileActionButton(StackTileView tile, string name, string label, Action action)
+        private static Button BuildPileActionButton(StackTileView tile, string name, string label, Action action, bool activation = false)
         {
-            var indicator = LotdUiKit.CreateRect(name, tile.root, new Vector2(.11f, .714f),
-                new Vector2(.89f, .949f), Vector2.zero, Vector2.zero);
+            var indicator = LotdUiKit.CreateRect(name, tile.root, new Vector2(.07f, .645f),
+                new Vector2(.93f, .965f), Vector2.zero, Vector2.zero);
             var rect = LotdUiKit.FillRect("Button", indicator);
-            var rim = AddHudSurface(rect, DuelStyle.Gold, new Color(.23f, .175f, .087f, .99f));
+            Color tone = activation ? DuelStyle.Gold : DuelStyle.Player;
+            var rim = AddHudSurface(rect, tone, activation
+                ? new Color(.24f, .16f, .066f, .99f) : new Color(.063f, .18f, .22f, .99f));
             var button = AddHudButton(rim, action);
-            LotdUiKit.AddFittedText(rect, "Label", label, 15, 9, TextAnchor.MiddleCenter, DuelStyle.Gold, FontStyle.Bold);
+            var caption = rect;
+            if (activation)
+            {
+                var symbol = LotdUiKit.CreateRect("Effect", rect, new Vector2(.055f, .13f),
+                    new Vector2(.29f, .87f), Vector2.zero, Vector2.zero);
+                LotdUiKit.AddImage(symbol.gameObject, DuelStatSymbols.BattleEffect, tone, true, false);
+                caption = LotdUiKit.CreateRect("Caption", rect, new Vector2(.29f, 0f), new Vector2(.96f, 1f),
+                    Vector2.zero, Vector2.zero);
+            }
+            LotdUiKit.AddFittedText(caption, "Label", label, 17, 9, TextAnchor.MiddleCenter, tone, FontStyle.Bold);
             button.gameObject.SetActive(false);
             return button;
         }
@@ -1520,7 +1537,10 @@ namespace YGOPortable.UI
             tile.controller = controller;
             if (IsArriving(controller, tile.location, 0)) return;
 
-            bool canAct = CanAcceptPlayerAction && CountZoneActions(controller, tile.location) > 0;
+            bool chainEffect = CanAcceptPlayerAction && controller == _session.HumanPlayerIndex &&
+                tile.location is YgoConstants.LOCATION_GRAVE or YgoConstants.LOCATION_EXTRA &&
+                _modals.HasChainActivationAt(_session, tile.location);
+            bool canAct = chainEffect || CanAcceptPlayerAction && CountZoneActions(controller, tile.location) > 0;
             bool hasCards = count > 0;
             tile.count.text = count.ToString();
             tile.count.color = canAct ? DuelStyle.Gold : hasCards ? HudText : DuelStyle.Muted;
@@ -3308,7 +3328,7 @@ namespace YGOPortable.UI
 
         private static string EffectActionLabel(SelectableCardItem item)
         {
-            string desc = CardDatabase.ResolveEffectDescription(item.description, item.code);
+            string desc = CardDatabase.ResolveCommandEffectDescription(item);
             return desc == null ? "카드 효과 발동" : $"발동 · {desc}";
         }
 
@@ -3349,23 +3369,43 @@ namespace YGOPortable.UI
             CanUseCardActions && _session.ActivePrompt.messageType == YgoConstants.MSG_SELECT_IDLECMD &&
             _session.Players[_session.HumanPlayerIndex].extra.Any(card => ExtraSummonIndex(_session.ActivePrompt, card) >= 0);
 
-        private static bool HasGraveEffect(DuelPrompt prompt, LiveCardState card) =>
-            card != null && card.code != 0 && card.location == YgoConstants.LOCATION_GRAVE &&
-            prompt.activatable.Exists(item => item.controller == card.controller &&
-                item.location == card.location && item.sequence == card.sequence);
+        private static bool IsPileEffect(DuelSession session, uint location, SelectableCardItem item)
+        {
+            if (item.code == 0 || item.controller != session.HumanPlayerIndex || item.location != location)
+                return false;
+            var player = session.Players[session.HumanPlayerIndex];
+            var cards = location == YgoConstants.LOCATION_EXTRA ? player.extra : player.grave;
+            return cards.Exists(card => card != null && card.code != 0 && card.sequence == item.sequence);
+        }
 
-        private bool GraveEffectAvailable =>
-            CanUseCardActions && _session.ActivePrompt.activatable.Count > 0 &&
-            _session.Players[_session.HumanPlayerIndex].grave.Exists(card => HasGraveEffect(_session.ActivePrompt, card));
+        private bool PileEffectAvailable(uint location)
+        {
+            return CanAcceptPlayerAction && !IsBrowsingZone && !IsReadingCardDetails &&
+                (_modals.HasChainActivationAt(_session, location) ||
+                 CanUseCardActions && _session.ActivePrompt.activatable.Exists(item => IsPileEffect(_session, location, item)));
+        }
 
         private void RefreshPileActionButtons()
         {
             bool canSummon = ExtraSummonAvailable;
-            if (_extraSummonButton.gameObject.activeSelf != canSummon)
-                _extraSummonButton.gameObject.SetActive(canSummon);
-            bool canActivate = GraveEffectAvailable;
-            if (_graveEffectButton.gameObject.activeSelf != canActivate)
-                _graveEffectButton.gameObject.SetActive(canActivate);
+            bool extraEffect = PileEffectAvailable(YgoConstants.LOCATION_EXTRA);
+            bool both = canSummon && extraEffect;
+            SetAvailability(_extraSummonButton, canSummon, .07f, both ? .49f : .93f);
+            SetAvailability(_extraEffectButton, extraEffect, both ? .51f : .07f, .93f);
+            SetAvailability(_graveEffectButton, PileEffectAvailable(YgoConstants.LOCATION_GRAVE), .07f, .93f);
+
+            static void SetAvailability(Button button, bool available, float left, float right)
+            {
+                if (button.gameObject.activeSelf != available)
+                {
+                    button.gameObject.SetActive(available);
+                    if (available) UiEntranceMotion.Play(button.gameObject);
+                }
+                if (!available) return;
+                var rect = (RectTransform)button.transform.parent;
+                rect.anchorMin = new Vector2(left, rect.anchorMin.y);
+                rect.anchorMax = new Vector2(right, rect.anchorMax.y);
+            }
         }
 
         private void OpenExtraSummonPicker()
@@ -3392,31 +3432,32 @@ namespace YGOPortable.UI
                 actionsOnly: true, sidePanel: true);
         }
 
-        private void OpenGraveEffectPicker()
+        private void OpenPileEffectPicker(uint location)
         {
-            if (IsBrowsingZone || !GraveEffectAvailable) return;
+            if (IsBrowsingZone || !CanAcceptPlayerAction || IsReadingCardDetails) return;
             var session = _session;
-            var prompt = session.ActivePrompt;
-            bool CanActivate() => _session == session && ReferenceEquals(session.ActivePrompt, prompt) && CanUseCardActions;
+            if (_modals.FocusChainActivationAt(session, location) || !CanUseCardActions) return;
 
+            var prompt = session.ActivePrompt;
+            var choices = prompt.activatable.Select((item, index) => (item, index))
+                .Where(choice => IsPileEffect(session, location, choice.item)).ToArray();
+            if (choices.Length == 0)
+            {
+                RefreshPileActionButtons();
+                return;
+            }
             HideCardActions();
-            _modals.ShowZoneViewer(
-                "묘지 효과 발동 가능",
-                session.Players[session.HumanPlayerIndex].grave,
-                hasCardActions: card => HasGraveEffect(prompt, card),
-                onOpenCardActions: card =>
-                {
-                    if (!CanActivate()) return;
-                    int activateCommand = prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD ? 5 : 0;
-                    var actions = CollectActions(card.controller, card.location, card.sequence);
-                    actions.RemoveAll(action => (action.responseVal & 0xffff) != activateCommand);
-                    if (actions.Count == 1) ExecuteActionInt(actions[0].responseVal);
-                    else if (actions.Count > 1)
-                        ShowCardActionsPopup(card.controller, card.location, card.sequence, card.code, card.overlayCodes, actions: actions);
-                },
-                canUseCardActions: CanActivate,
-                icon: DuelVisualAssets.ZoneIcon(YgoConstants.LOCATION_GRAVE, false),
-                actionsOnly: true, sidePanel: true);
+            string title = $"{YgoConstants.GetLocationNameKR(location)} 효과 발동";
+            int activateCommand = prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD ? 5 : 0;
+            _modals.ShowPileActivationPicker(session, prompt, choices.Select(choice => choice.index).ToArray(), title, index =>
+            {
+                if (_session != session || !ReferenceEquals(session.ActivePrompt, prompt) || !CanUseCardActions ||
+                    index >= prompt.activatable.Count) return;
+                var item = prompt.activatable[index];
+                if (choices.Any(choice => choice.index == index && ReferenceEquals(choice.item, item)) &&
+                    IsPileEffect(session, location, item))
+                    ExecuteActionInt((index << 16) | activateCommand);
+            });
         }
 
         private void SwitchBrowsablePile(bool opponent, uint location)

@@ -226,6 +226,8 @@ namespace YGOPortable.UI
                     return;
                 case PadScope.Piles:
                     AddDuelPadButton(_modals.FieldViewControl as Button);
+                    AddDuelPadButton(_graveEffectButton);
+                    AddDuelPadButton(_extraEffectButton);
                     AddDuelPadPiles();
                     return;
             }
@@ -254,6 +256,7 @@ namespace YGOPortable.UI
             AddDuelPadPiles(useActions: true);
             AddDuelPadButton(_extraSummonButton);
             AddDuelPadButton(_graveEffectButton);
+            AddDuelPadButton(_extraEffectButton);
             AddDuelPadButton(_phaseButton);
             AddDuelPadButton(_duelPadInspectButton);
             AddDuelPadButton(_chainConfirmationButton);
