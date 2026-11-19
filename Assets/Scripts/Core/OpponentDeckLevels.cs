@@ -14,6 +14,7 @@ namespace YGOPortable.Core
             public int charId;
             public PresetDeckInfo classic;
             public int[] advancedIds;
+            public int[] deckIds;
         }
 
         [Serializable]
@@ -31,6 +32,18 @@ namespace YGOPortable.Core
             if (roster.Count == 0) return roster;
             _catalog ??= LoadCatalog();
             if (!_catalog.TryGetValue(charId, out var levels)) return roster;
+
+            if (levels.deckIds != null && levels.deckIds.Length > 0)
+            {
+                var ordered = new List<PresetDeckInfo>(levels.deckIds.Length);
+                var seenIds = new HashSet<int>();
+                foreach (int id in levels.deckIds)
+                {
+                    var deck = roster.Find(candidate => candidate.id == id);
+                    if (deck != null && seenIds.Add(id)) ordered.Add(deck);
+                }
+                if (ordered.Count > 0) return ordered;
+            }
 
             var decks = new List<PresetDeckInfo>(roster.Count + 1) { levels.classic };
             var seen = new HashSet<int> { levels.classic.id };
@@ -63,8 +76,11 @@ namespace YGOPortable.Core
                 if (data?.opponents == null) return result;
                 foreach (var entry in data.opponents)
                 {
-                    if (entry.classic?.main?.Length != 40 || entry.classic.charId != entry.charId ||
-                        entry.classic.extra == null || entry.classic.side == null || entry.advancedIds == null)
+                    bool hasDeckIds = entry.deckIds != null && entry.deckIds.Length > 0;
+                    bool hasClassic = entry.classic?.main?.Length >= 40 && entry.classic.main.Length <= 60 &&
+                        entry.classic.charId == entry.charId &&
+                        entry.classic.extra != null && entry.classic.side != null && entry.advancedIds != null;
+                    if (!hasDeckIds && !hasClassic)
                         continue;
                     result[entry.charId] = entry;
                 }
