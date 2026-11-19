@@ -278,6 +278,7 @@ namespace YGOPortable.Core
         public IntPtr NativePtr { get; private set; }
         public int TurnNumber { get; private set; }
         public int TurnPlayer { get; private set; }
+        internal int TurnInterruptions { get; private set; }
         public int CurrentPhase { get; private set; }
         public uint FieldDisabledMask { get; private set; }
         public bool IsFinished { get; private set; }
@@ -346,6 +347,7 @@ namespace YGOPortable.Core
             IsFinished = false;
             Winner = -1;
             TurnNumber = 0;
+            TurnInterruptions = 0;
             CurrentPhase = YgoConstants.PHASE_DRAW;
             RetryCount = 0;
             LastHintMsg = 0;
@@ -845,6 +847,12 @@ namespace YGOPortable.Core
 
         private void PublishCardMove(CardMoveEvent move)
         {
+            if (_resolvingChainLink is { negated: false } source && source.triggerPlayer != TurnPlayer &&
+                move.fromCon == TurnPlayer &&
+                (move.fromLoc is YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE) &&
+                (move.toCon != move.fromCon || move.toLoc != move.fromLoc))
+                TurnInterruptions++;
+
             if (YgoConstants.IsFieldZone(move.toLoc, move.toSeq) &&
                 (move.fromCon != move.toCon || move.fromLoc != move.toLoc || move.fromSeq != move.toSeq))
                 Players[move.toCon].FieldZoneVersion++;
@@ -911,6 +919,7 @@ namespace YGOPortable.Core
                     _confirmedCards.Clear();
                     TurnPlayer = br.ReadByte();
                     TurnNumber++;
+                    TurnInterruptions = 0;
                     ClearAttack();
                     string who = TurnPlayer == HumanPlayerIndex ? "내 턴" : "상대 턴";
                     AddLog($"=== 턴 {TurnNumber}: {who} ===");
@@ -1250,7 +1259,11 @@ namespace YGOPortable.Core
                 {
                     byte idx = br.ReadByte();
                     if (idx > 0 && idx <= CurrentChain.Count)
-                        CurrentChain[idx - 1].negated = true;
+                    {
+                        var link = CurrentChain[idx - 1];
+                        if (!link.negated && link.triggerPlayer == TurnPlayer) TurnInterruptions++;
+                        link.negated = true;
+                    }
                     AddLog($"체인 {idx} 무효화");
                     break;
                 }

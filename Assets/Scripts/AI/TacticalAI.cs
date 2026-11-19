@@ -28,6 +28,7 @@ namespace YGOPortable.AI
         private const uint TheHiddenCity = 5697558;
         private const uint UnionHangar = 66399653;
         private const uint AromaGarden = 5050644;
+        private const uint PotOfGreed = 55144522;
         private const uint VisasStarfrost = 56099748;
         private const uint MelffyFootsteps = 25687946;
         private const ushort MelffySet = 0x147;
@@ -259,8 +260,12 @@ namespace YGOPortable.AI
 
         private bool CanSearchCombo(DuelSession session, DuelPrompt prompt, bool planLinks) =>
             _comboSearch != null && Difficulty == AIDifficulty.Smart && session.RetryCount == 0 && _actionsThisTurn < 36 &&
-            ReferenceEquals(session.ActivePrompt, prompt) && (planLinks || DddTurnPlan.IsDddDeck(session.Players[prompt.playerId]) ||
+            ReferenceEquals(session.ActivePrompt, prompt) && (IsRecovering(session, prompt) || planLinks ||
+                DddTurnPlan.IsDddDeck(session.Players[prompt.playerId]) ||
                 ComboSearch.CanDevelop(prompt));
+
+        private bool IsRecovering(DuelSession session, DuelPrompt prompt) =>
+            _comboSearch != null && UsesTacticalRules && session.TurnPlayer == prompt.playerId && session.TurnInterruptions > 0;
 
         private byte[] BuildIdleCmd(DuelSession s, DuelPrompt p, bool fallback, int? plannedMainAction)
         {
@@ -282,6 +287,15 @@ namespace YGOPortable.AI
                 (command, item) => CanUseMainAction(s, p, planLinks, command, item, projected: true)) is byte[] response)
             {
                 return response;
+            }
+            else if ((plannedMainAction == ComboSearch.KeepSetup || IsRecovering(s, p)) && (p.canEp || p.canBp))
+            {
+                if (IsRecovering(s, p) && s.Players[p.playerId].deckCount >= 2)
+                {
+                    int draw = p.activatable.FindIndex(effect => effect.code == PotOfGreed && CanUse(5, effect));
+                    if (draw >= 0) return EncodeIdleAction(s, p, 5, draw);
+                }
+                return FinishMainPhase(s, p, p.canBp && HasWorthwhileAttack(s, p.playerId), preserveHand: true);
             }
             else if (((planLinks ? _linkPolicy.Choose(s, p, CanUse) : null) ?? ChoosePlannedIdle(s, p, CanUse)) is int planned)
             {
@@ -309,6 +323,11 @@ namespace YGOPortable.AI
                 return EncodeIdleAction(s, p, command, index);
             }
 
+            return FinishMainPhase(s, p, canBattle, preserveHand: false);
+        }
+
+        private byte[] FinishMainPhase(DuelSession s, DuelPrompt p, bool canBattle, bool preserveHand)
+        {
             // Prepare defenders for battle. Smart AI considers defensive changes when it ends its turn.
             if (p.repositionable.Count > 0 && s.CurrentPhase == YgoConstants.PHASE_MAIN1)
             {
@@ -332,7 +351,8 @@ namespace YGOPortable.AI
             }
 
             // 6. Monster Set only if no Normal Summon was possible & monster has solid DEF
-            if (p.mSetable.Count > 0 && CountOwnMonsters(s, p.playerId) == 0)
+            if (p.mSetable.Count > 0 && CountOwnMonsters(s, p.playerId) == 0 &&
+                (!preserveHand || MaxOpponentAtk(s, p.playerId) >= s.Players[p.playerId].lp))
             {
                 int bestIdx = 0;
                 int bestDef = -1;

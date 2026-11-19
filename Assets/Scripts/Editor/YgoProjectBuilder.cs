@@ -1567,6 +1567,7 @@ namespace YGOPortable.Editor
                     "Ash Blossom did not prevent ROTA search");
                 AssertTrue(s.Logs.Any(l => l.Contains("체인 2") && l.Contains("하루 우라라")) && s.Logs.Any(l => l.Contains("체인 1 무효화")),
                     "Missing Chain 2 Ash Blossom / Chain 1 Negated logs");
+                AssertTrue(s.TurnInterruptions > 0, "Ash Blossom did not interrupt the current turn's plan.");
             }
 
             // 3. Field targeting (Mystical Space Typhoon), targeted banish (Cosmic Cyclone) and mass removal
