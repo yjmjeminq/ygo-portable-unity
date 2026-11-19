@@ -28,6 +28,7 @@ namespace YGOPortable.Editor
             VerifyOpponentTurnActivation();
             VerifyNativeCombatReadout(useHonest: true);
             VerifyNativeCombatReadout(useHonest: false);
+            VerifyDirectAttackChoice();
             VerifyDefenderChoosesAttackTarget();
             VerifyNativeEquipHandoff();
             VerifyOpponentEquipmentFocus();
@@ -382,17 +383,126 @@ namespace YGOPortable.Editor
             Debug.Log($"[VERIFY DUEL BATTLE STATS] A set defender stayed hidden until its flip, showed 2000 DEF through the {expectedAttack} ATK strike, and left at destruction.");
         }
 
+        private static void VerifyDirectAttackChoice()
+        {
+            const uint wattgiraffe = 402568, axe = 40619825, sparkman = 20721928;
+            var deck = Enumerable.Repeat(wattgiraffe, 24).Concat(Enumerable.Repeat(axe, 16)).ToArray();
+            var empty = Array.Empty<uint>();
+            var ai = new TacticalAI();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Direct or monster attack", deck, empty,
+                Enumerable.Repeat(sparkman, 40).ToArray(), empty, false,
+                session => session.ActivePrompt?.playerId == session.AiPlayerIndex &&
+                    session.ActivePrompt.summonable.Exists(card => card.code == sparkman) &&
+                    new[] { wattgiraffe, axe }.All(code => session.Players[session.HumanPlayerIndex].hand.Exists(card => card.code == code)));
+            duel.SubmitResponseInt(0);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            duel.SubmitResponseInt(7);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            int summon = duel.ActivePrompt.summonable.FindIndex(card => card.code == wattgiraffe);
+            Require(summon >= 0 && duel.ActivePrompt.playerId == duel.HumanPlayerIndex,
+                "The player could not summon the direct attacker.");
+            duel.SubmitResponseInt(summon << 16);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            ActivateFromMainPhase(duel, axe);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt => prompt.messageType == YgoConstants.MSG_SELECT_CARD
+                ? SelectCard(prompt, wattgiraffe) : null);
+            duel.SubmitResponseInt(6);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            var battle = duel.ActivePrompt;
+            Require(battle?.messageType == YgoConstants.MSG_SELECT_BATTLECMD && battle.attackable.Count == 1 &&
+                battle.attackable[0].code == wattgiraffe && battle.attackable[0].directAttackable,
+                "The direct-attack fixture had no legal attack.");
+            duel.SubmitResponseInt(1);
+            var choice = duel.ActivePrompt;
+            Require(choice?.messageType == YgoConstants.MSG_SELECT_YESNO && choice.IsDirectAttackChoice,
+                "The native core did not offer a choice between the two attacks.");
+            var source = duel.GetAttackSelectionSource(choice);
+            Require(source?.code == wattgiraffe && source.attack == 2200,
+                "Direct attack selection lost the attacking monster's live values.");
+
+            byte[] response = null;
+            using var ui = new HandUI(duel, mobileLayout: true, submitResponse: bytes => response = bytes);
+            ((RectTransform)ui.Canvas.transform).sizeDelta = new Vector2(1740f, 805f);
+            var events = EventSystem.current;
+            var oldFocus = events?.currentSelectedGameObject;
+            GameObject localEvents = null;
+            if (events == null)
+            {
+                localEvents = new GameObject("Attack choice controller events", typeof(EventSystem));
+                events = localEvents.GetComponent<EventSystem>();
+                if (EventSystem.current == null) typeof(EventSystem).GetMethod("OnEnable", PrivateInstance).Invoke(events, null);
+            }
+            try
+            {
+                ui.Modals.ShowPrompt(duel, choice);
+                ui.Field.Refresh();
+                var window = ui.Modals.ModalRoot.transform.Find("Win");
+                Require(window.Find("Hdr/TitleBand/Title").GetComponent<Text>().text == "공격 방식 선택" &&
+                    window.Find("Body/AttackSource/Heading/Name").GetComponent<Text>().text == $"공격 · {CardDatabase.GetName(wattgiraffe)}" &&
+                    window.Find("Body/AttackSource/Combat/Attack/Digits/Value").GetComponent<Text>().text == "2200",
+                    "The choice window did not show the attacker's active values.");
+                events.SetSelectedGameObject(null);
+                Require(!ui.Modals.TryConfirm() && response == null, "An unfocused submit picked a direct attack.");
+                window.Find("Footer/Btn_몬스터 공격/B").GetComponent<Button>().onClick.Invoke();
+                Require(response?.Length == 4 && BitConverter.ToInt32(response, 0) == 0,
+                    "Monster attack did not submit the native alternative.");
+                duel.SubmitResponse(response);
+                var target = duel.ActivePrompt;
+                Require(target?.IsAttackTargetSelection == true && target.candidates.Single().code == sparkman,
+                    "Choosing monster attack did not open its native target selection.");
+                response = null;
+                ui.Modals.ShowPrompt(duel, target);
+                Require(ui.Modals.TryCancelOrPass() && response?.Length == 4 && BitConverter.ToInt32(response, 0) == -1,
+                    "The normal attack could not be canceled at target selection.");
+                duel.SubmitResponse(response);
+                Require(duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_BATTLECMD &&
+                    duel.ActivePrompt.attackable.Count == 1, "Canceling the target spent the attack.");
+
+                duel.SubmitResponseInt(1);
+                choice = duel.ActivePrompt;
+                Require(choice?.IsDirectAttackChoice == true, "The direct option did not return after canceling.");
+                response = null;
+                ui.Modals.ShowPrompt(duel, choice);
+                Canvas.ForceUpdateCanvases();
+                Require(events.currentSelectedGameObject == window.Find("Footer/Btn_몬스터 공격/B").gameObject,
+                    "Controller focus did not start on the first attack option.");
+                ui.Modals.HandlePad(new DeckPadFrame(Vector2Int.right, DeckPadButtons.None));
+                Require(events.currentSelectedGameObject == window.Find("Footer/Btn_직접 공격/B").gameObject,
+                    "Controller focus could not reach the direct attack.");
+                ui.Modals.HandlePad(new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Submit));
+                Require(response?.Length == 4 && BitConverter.ToInt32(response, 0) == 1,
+                    "Direct attack did not submit the native affirmative response.");
+                bool direct = false;
+                duel.OnAttackDeclared += (_, _, _, _, location, _) => direct |= location == 0;
+                duel.SubmitResponse(response);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt => prompt.messageType == YgoConstants.MSG_SELECT_CHAIN && prompt.forced
+                    ? BitConverter.GetBytes(0) : null);
+                Require(direct && duel.Players[duel.AiPlayerIndex].lp == 5800 && duel.RetryCount == 0,
+                    "The selected direct attack did not resolve against the player.");
+            }
+            finally
+            {
+                if (localEvents != null)
+                {
+                    if (EventSystem.current == events) typeof(EventSystem).GetMethod("OnDisable", PrivateInstance).Invoke(events, null);
+                    UnityEngine.Object.DestroyImmediate(localEvents);
+                }
+                else events.SetSelectedGameObject(oldFocus);
+            }
+            Debug.Log("[VERIFY DUEL DIRECT CHOICE] Live stats, focused controls and both native attack branches passed.");
+        }
+
         private static void VerifyDefenderChoosesAttackTarget()
         {
-            const uint patrician = 19153634, mummy = 4861205, sparkman = 20721928, soldier = 49881766, axe = 40619825;
+            const uint patrician = 19153634, mummy = 4861205, sparkman = 20721928, wattgiraffe = 402568, axe = 40619825;
             var required = new[] { patrician, mummy, sparkman };
             var deck = required.SelectMany(code => Enumerable.Repeat(code, 13)).Append(patrician).ToArray();
             var empty = Array.Empty<uint>();
-            var enemy = Enumerable.Repeat(soldier, 24).Concat(Enumerable.Repeat(axe, 16)).ToArray();
+            var enemy = Enumerable.Repeat(wattgiraffe, 24).Concat(Enumerable.Repeat(axe, 16)).ToArray();
             var ai = new TacticalAI();
             using var duel = YgoProjectBuilder.StartSeedMatching("Defender chooses the attack target", deck, empty, enemy, empty, true,
                 session => required.All(code => session.Players[session.HumanPlayerIndex].hand.Exists(card => card.code == code)) &&
-                    new[] { soldier, axe }.All(code => session.Players[session.AiPlayerIndex].hand.Exists(card => card.code == code)));
+                    new[] { wattgiraffe, axe }.All(code => session.Players[session.AiPlayerIndex].hand.Exists(card => card.code == code)));
 
             void StepToMainPhase(uint pick = 0)
             {
@@ -421,18 +531,36 @@ namespace YGOPortable.Editor
             duel.SubmitResponseInt(7);
             StepToMainPhase();
             Require(duel.ActivePrompt.playerId == duel.AiPlayerIndex &&
-                duel.ActivePrompt.summonable.Exists(card => card.code == soldier), "The opponent could not summon its attacker.");
-            int normal = duel.ActivePrompt.summonable.FindIndex(card => card.code == soldier);
+                duel.ActivePrompt.summonable.Exists(card => card.code == wattgiraffe), "The opponent could not summon its attacker.");
+            int normal = duel.ActivePrompt.summonable.FindIndex(card => card.code == wattgiraffe);
             duel.SubmitResponseInt(normal << 16);
             StepToMainPhase();
             ActivateFromMainPhase(duel, axe);
-            StepToMainPhase(soldier);
+            StepToMainPhase(wattgiraffe);
             duel.SubmitResponseInt(6);
             YgoProjectBuilder.DriveUntilIdle(duel, ai);
             var battle = duel.ActivePrompt;
             Require(battle?.messageType == YgoConstants.MSG_SELECT_BATTLECMD && battle.attackable.Count == 1 &&
-                battle.attackable[0].code == soldier, "The opponent did not get its native attack command.");
+                battle.attackable[0].code == wattgiraffe, "The opponent did not get its native attack command.");
             duel.SubmitResponseInt(1);
+            var choice = duel.ActivePrompt;
+            Require(choice?.messageType == YgoConstants.MSG_SELECT_EFFECTYN && choice.IsDirectAttackChoice &&
+                choice.playerId == duel.HumanPlayerIndex && choice.promptCardCode == wattgiraffe,
+                "The defender did not get the native direct-attack choice.");
+
+            byte[] response = null;
+            using var ui = new HandUI(duel, mobileLayout: true, submitResponse: bytes => response = bytes);
+            ((RectTransform)ui.Canvas.transform).sizeDelta = new Vector2(1740f, 805f);
+            ui.Modals.ShowPrompt(duel, choice);
+            var window = ui.Modals.ModalRoot.transform.Find("Win");
+            Require(window.Find("Hdr/TitleBand/Title").GetComponent<Text>().text == "상대 공격 방식 선택" &&
+                window.Find("Body/AttackSource/Combat/Attack/Digits/Value").GetComponent<Text>().text == "2200",
+                "The defender's choice lost the native opponent's combat value.");
+            window.Find("Footer/Btn_몬스터 공격/B").GetComponent<Button>().onClick.Invoke();
+            Require(response?.Length == 4 && BitConverter.ToInt32(response, 0) == 0,
+                "The defender's monster attack decision did not submit the native response.");
+            duel.SubmitResponse(response);
+            response = null;
             var target = duel.ActivePrompt;
             Require(target?.IsAttackTargetSelection == true && target.playerId == duel.HumanPlayerIndex &&
                 target.candidates.Count == 2 && target.candidates.All(card => card.controller == duel.HumanPlayerIndex),
@@ -442,20 +570,17 @@ namespace YGOPortable.Editor
                 string.Join(", ", duel.Players[duel.HumanPlayerIndex].mzone.Where(card => card != null)
                     .Select(card => $"{card.code}/{card.position}")));
             var source = duel.GetAttackSelectionSource(target);
-            Require(source?.code == soldier && source.controller == duel.AiPlayerIndex && source.attack == 2900,
+            Require(source?.code == wattgiraffe && source.controller == duel.AiPlayerIndex && source.attack == 2200,
                 "The attack preview lost the attacker when the other player selected its target.");
 
-            byte[] response = null;
-            using var ui = new HandUI(duel, mobileLayout: true, submitResponse: bytes => response = bytes);
-            ((RectTransform)ui.Canvas.transform).sizeDelta = new Vector2(1740f, 805f);
             ui.Modals.ShowPrompt(duel, target);
             ui.Field.Refresh();
             var body = ui.Modals.ModalRoot.transform.Find("Win/Body");
             var sourceTitle = body.Find("AttackSource/Heading/Name").GetComponent<Text>();
             var targetTitle = body.Find("AttackTarget/Heading/Name").GetComponent<Text>();
             var targetCombat = body.Find("AttackTarget/Combat");
-            Require(sourceTitle.text == $"상대 공격 · {CardDatabase.GetName(soldier)}" && sourceTitle.color == DuelStyle.Opponent &&
-                body.Find("AttackSource/Combat/Attack/Digits/Value").GetComponent<Text>().text == "2900",
+            Require(sourceTitle.text == $"상대 공격 · {CardDatabase.GetName(wattgiraffe)}" && sourceTitle.color == DuelStyle.Opponent &&
+                body.Find("AttackSource/Combat/Attack/Digits/Value").GetComponent<Text>().text == "2200",
                 "The mobile battle comparison used the defender's side or a stale attack value.");
 
             var mine = duel.Players[duel.HumanPlayerIndex];
@@ -471,7 +596,7 @@ namespace YGOPortable.Editor
             var setTrigger = FieldSlot(ui.Field, setTarget).GetComponent<CardDragTrigger>();
             setTrigger.OnPointerEnterAction.Invoke();
             Require(targetTitle.text == "대상 · 뒷면 카드" && !targetCombat.gameObject.activeSelf &&
-                sourceTitle.text.Contains(CardDatabase.GetName(soldier)) && response == null,
+                sourceTitle.text.Contains(CardDatabase.GetName(wattgiraffe)) && response == null,
                 "Previewing a set target showed stale values or submitted an attack.");
             setTrigger.OnLeftClick.Invoke();
             int selected = target.candidates.FindIndex(card => card.sequence == setTarget.sequence);

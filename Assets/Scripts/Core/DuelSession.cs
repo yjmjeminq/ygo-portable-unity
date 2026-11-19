@@ -196,6 +196,9 @@ namespace YGOPortable.Core
         // The core uses 0 and 221 for optional triggers. Lua and rule questions carry the description to display.
         internal bool IsTriggerActivationConfirmation =>
             messageType == YgoConstants.MSG_SELECT_EFFECTYN && promptDesc is 0 or 221;
+        internal bool IsDirectAttackChoice =>
+            (messageType is YgoConstants.MSG_SELECT_YESNO or YgoConstants.MSG_SELECT_EFFECTYN) &&
+            promptDesc == YgoConstants.DESC_DIRECT_ATTACK;
 
         // SelectOption / AnnounceNumber / AnnounceCard
         public List<ulong> options = new List<ulong>();
@@ -744,8 +747,10 @@ namespace YGOPortable.Core
 
         internal LiveCardState GetAttackSelectionSource(DuelPrompt prompt)
         {
-            if (prompt?.IsAttackTargetSelection != true || !ReferenceEquals(ActivePrompt, prompt) ||
-                _chosenAttacker is not { } source)
+            if (prompt == null || !ReferenceEquals(ActivePrompt, prompt)) return null;
+            if (prompt.IsDirectAttackChoice && prompt.promptLoc == YgoConstants.LOCATION_MZONE)
+                return GetVisibleFieldCard(prompt.promptCardCode, prompt.promptCon, prompt.promptLoc, prompt.promptSeq);
+            if (!(prompt.IsDirectAttackChoice || prompt.IsAttackTargetSelection) || _chosenAttacker is not { } source)
                 return null;
             // Some effects let the defender choose the target of the already selected attacker.
             return GetVisibleFieldCard(source.code, source.controller, source.location, source.sequence);

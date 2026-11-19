@@ -585,6 +585,14 @@ namespace YGOPortable.UI
         {
             if (!CanAnswerPrompt || _curPrompt == null) return false;
 
+            if (_curPrompt.IsDirectAttackChoice)
+            {
+                var selected = EventSystem.current?.currentSelectedGameObject;
+                if (selected == null || !selected.TryGetComponent<Button>(out var option) || !CanNavigate(option, _modalFooter))
+                    return false;
+                option.onClick.Invoke();
+                return true;
+            }
             if (_curPrompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN || _curPrompt.messageType == YgoConstants.MSG_SELECT_YESNO)
             {
                 LotdAudio.PlayClick();
@@ -671,6 +679,17 @@ namespace YGOPortable.UI
                 _modalBox.anchorMax = new Vector2(centerX + halfWidth, .699f);
                 _modalFooter.anchorMin = new Vector2(.06f, _modalFooter.anchorMin.y);
             }
+            else if (prompt.IsDirectAttackChoice)
+            {
+                _modalBox.anchorMin = new Vector2(.347f, .168f);
+                _modalBox.anchorMax = new Vector2(.773f, .429f);
+                _modalHeader.anchorMin = new Vector2(0f, .79f);
+                _modalTitleBand.anchorMin = new Vector2(.024f, .06f);
+                _modalBody.anchorMin = new Vector2(.025f, .365f);
+                _modalBody.anchorMax = new Vector2(.975f, .767f);
+                _modalFooter.anchorMin = new Vector2(.025f, .035f);
+                _modalFooter.anchorMax = new Vector2(.975f, .316f);
+            }
             BindFieldCardChoices(session, prompt);
             if (_fieldCardIndices.Count > 0)
             {
@@ -700,7 +719,8 @@ namespace YGOPortable.UI
             {
                 case YgoConstants.MSG_SELECT_YESNO:
                 case YgoConstants.MSG_SELECT_EFFECTYN:
-                    RenderYesNo(session, prompt);
+                    if (prompt.IsDirectAttackChoice) RenderDirectAttackChoice(session, prompt);
+                    else RenderYesNo(session, prompt);
                     break;
                 case YgoConstants.MSG_SELECT_POSITION:
                     RenderSelectPosition(session, prompt);
@@ -772,6 +792,24 @@ namespace YGOPortable.UI
 
             AddFooterButton("예", () => Submit(BitConverter.GetBytes(1)), true);
             AddFooterButton("아니오", () => Submit(BitConverter.GetBytes(0)), false);
+        }
+
+        private void RenderDirectAttackChoice(DuelSession session, DuelPrompt prompt)
+        {
+            var source = session.GetAttackSelectionSource(prompt);
+            bool opponent = (source != null ? source.controller : session.TurnPlayer) != session.HumanPlayerIndex;
+            _modalTitle.text = opponent ? "상대 공격 방식 선택" : "공격 방식 선택";
+            _modalSubtitle.text = "";
+            var tile = AddAttackSelectionCard("AttackSource", 0f, 1f);
+            BindAttackSelectionCard(tile, source, opponent, opponent ? "상대 공격" : "공격", "공격 몬스터");
+            if (source != null)
+                InspectChoice(source.code, new SelectableCardItem
+                {
+                    code = source.code, controller = source.controller, location = source.location,
+                    sequence = source.sequence, position = source.position,
+                });
+            AddFooterButton("몬스터 공격", () => Submit(BitConverter.GetBytes(0)), false);
+            AddFooterButton("직접 공격", () => Submit(BitConverter.GetBytes(1)), true);
         }
 
         private static DuelCardReadout ReadSummonPosition(DuelSession session, DuelPrompt p, out SelectableCardItem source)

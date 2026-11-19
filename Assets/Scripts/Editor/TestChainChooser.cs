@@ -149,9 +149,10 @@ namespace YGOPortable.Editor
                 "An effect confirmation included unrelated card rules.");
 
             view.Modals.ShowPrompt(duel, new DuelPrompt { messageType = YgoConstants.MSG_SELECT_EFFECTYN,
-                playerId = 0, promptDesc = 31, promptCardCode = LadyLabrynth });
-            Require(view.Modals.ModalRoot.GetComponentsInChildren<Text>()
-                    .Single(label => label.name == "Question").text == "직접 공격을 선택하시겠습니까?",
+                playerId = 0, promptDesc = YgoConstants.DESC_DIRECT_ATTACK, promptCardCode = LadyLabrynth });
+            var attackChoice = view.Modals.ModalRoot.transform.Find("Win");
+            Require(!view.Modals.IsChainPromptOpen && attackChoice.Find("Footer/Btn_직접 공격/B") != null &&
+                    attackChoice.Find("Footer/Btn_몬스터 공격/B") != null,
                 "An opponent-chosen direct attack was displayed as another effect activation.");
 
             const uint hugin = 55990317;
