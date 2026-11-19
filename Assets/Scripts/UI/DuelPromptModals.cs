@@ -639,11 +639,8 @@ namespace YGOPortable.UI
                 return;
             }
 
-            // These engine questions ask about an optional procedure or a replacement effect.
-            bool resolutionDecision = prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN &&
-                prompt.promptDesc is 31 or 94 or 95 or 96 or 97 or 218 or 219 or 220;
             _chainPrompt = prompt.messageType == YgoConstants.MSG_SELECT_CHAIN ||
-                (prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && !resolutionDecision);
+                prompt.IsTriggerActivationConfirmation;
             bool cardChoices = prompt.messageType is YgoConstants.MSG_SELECT_POSITION or YgoConstants.MSG_SELECT_CARD
                 or YgoConstants.MSG_SELECT_TRIBUTE or YgoConstants.MSG_SELECT_SUM or YgoConstants.MSG_SELECT_UNSELECT_CARD
                 or YgoConstants.MSG_SELECT_COUNTER or YgoConstants.MSG_SORT_CARD or YgoConstants.MSG_SORT_CHAIN
@@ -688,7 +685,7 @@ namespace YGOPortable.UI
             switch (prompt.messageType)
             {
                 case YgoConstants.MSG_SELECT_YESNO:
-                case YgoConstants.MSG_SELECT_EFFECTYN when resolutionDecision:
+                case YgoConstants.MSG_SELECT_EFFECTYN:
                     RenderYesNo(session, prompt);
                     break;
                 case YgoConstants.MSG_SELECT_POSITION:
@@ -745,8 +742,8 @@ namespace YGOPortable.UI
 
         private void RenderYesNo(DuelSession session, DuelPrompt p)
         {
-            uint cardCode = CardDatabase.GetDescriptionCardCode(p.promptDesc);
-            if (cardCode == 0) cardCode = p.promptCardCode;
+            uint cardCode = p.promptCardCode;
+            if (cardCode == 0) cardCode = CardDatabase.GetDescriptionCardCode(p.promptDesc);
             if (cardCode == 0) cardCode = session.SelectionChainLink?.code ?? 0;
             var card = CardDatabase.Get(cardCode);
             string msg = CardDatabase.ResolveDescription(p.promptDesc) ?? CardDatabase.GetKoreanCardDescription(cardCode)

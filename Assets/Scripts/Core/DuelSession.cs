@@ -181,6 +181,9 @@ namespace YGOPortable.Core
         public uint promptSeq;
         public ulong promptDesc;
         public ulong promptEffectDesc;
+        // The core uses 0 and 221 for optional triggers. Lua and rule questions carry the description to display.
+        internal bool IsTriggerActivationConfirmation =>
+            messageType == YgoConstants.MSG_SELECT_EFFECTYN && promptDesc is 0 or 221;
 
         // SelectOption / AnnounceNumber / AnnounceCard
         public List<ulong> options = new List<ulong>();
@@ -1323,7 +1326,7 @@ namespace YGOPortable.Core
                     };
                     br.ReadUInt32(); // pos
                     p.promptDesc = br.ReadUInt64();
-                    if (p.promptDesc is 0 or 221)
+                    if (p.IsTriggerActivationConfirmation)
                         p.promptEffectDesc = YgoNativeBridge.YGO_GetSingleTriggerDescription(NativePtr, p.playerId, p.promptCardCode, p.promptDesc);
                     ActivePrompt = p;
                     break;

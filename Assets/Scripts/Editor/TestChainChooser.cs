@@ -34,6 +34,8 @@ namespace YGOPortable.Editor
             VerifyPerlereinoConfirmation();
             VerifyPaidraSelectionHint();
             VerifyChickenGameOptions();
+            VerifyRamificationsOptions();
+            VerifyOddEyesDamageConfirmation();
             VerifyBundledOptionDescriptions();
             VerifyKoreanEffectCatalogue();
             VerifyGroupedLocations(duel);
@@ -85,19 +87,19 @@ namespace YGOPortable.Editor
                 "Kaleido-Heart's chain preview did not show its Korean effect text.");
 
             view.Modals.ShowPrompt(duel, new DuelPrompt { messageType = YgoConstants.MSG_SELECT_EFFECTYN, playerId = 0,
-                promptCardCode = legendaryBlackLusterSoldier, promptDesc = drawReplacement });
+                promptCardCode = legendaryBlackLusterSoldier, promptEffectDesc = drawReplacement });
             effect = view.Modals.ModalRoot.GetComponentsInChildren<Text>()
                 .Single(label => label.gameObject.name == "Effect");
             Require(effect.text == drawLabel, "The chain confirmation did not show the concise Korean draw-replacement effect.");
 
             view.Modals.ShowPrompt(duel, new DuelPrompt { messageType = YgoConstants.MSG_SELECT_EFFECTYN, playerId = 0,
-                promptCardCode = spyralVortex, promptDesc = destruction });
+                promptCardCode = spyralVortex, promptEffectDesc = destruction });
             Require(view.Modals.ModalRoot.GetComponentsInChildren<Text>().Single(label => label.name == "Effect").text ==
                     "자신 필드의 스파이랄 카드 1장과 상대 필드의 카드 최대 2장을 파괴한다",
                 "SPYRAL Sleeper should show the selected destruction effect without repeating its entire rules text.");
 
             view.Modals.ShowPrompt(duel, new DuelPrompt { messageType = YgoConstants.MSG_SELECT_EFFECTYN, playerId = 0,
-                promptCardCode = spyralVortex, promptDesc = unknown });
+                promptCardCode = spyralVortex, promptEffectDesc = unknown });
             effect = view.Modals.ModalRoot.GetComponentsInChildren<Text>()
                 .Single(label => label.gameObject.name == "Effect");
             Require(effect.text == rulesText, "An untranslated English label escaped into the chain preview.");
@@ -737,6 +739,146 @@ namespace YGOPortable.Editor
             Debug.Log("[VERIFY KOREAN NATIVE OPTIONS] Chicken Game displayed all three effects and applied the selected LP recovery.");
         }
 
+        private static void VerifyRamificationsOptions()
+        {
+            const uint spell = 81615450, gorgon = 43426903, spawn = 21179143, sparkman = 20721928;
+            var main = Enumerable.Repeat(spell, 8).Concat(Enumerable.Repeat(gorgon, 8))
+                .Concat(Enumerable.Repeat(spawn, 8)).Concat(Enumerable.Repeat(sparkman, 16)).ToArray();
+            string[] labels =
+            {
+                "덱에서 레프티레스 몬스터 1장을 패에 넣는다",
+                "덱에서 레프티레스 래미피케이션 이외의 레프티레스 마법·함정 카드 1장을 패에 넣는다",
+                "상대 필드의 몬스터 1장의 공격력을 0으로 한다",
+            };
+            ulong description = (ulong)spell << 20;
+            ulong[] effects = { description, description | 1, description | 2 };
+            var ai = new TacticalAI();
+            for (int first = 0; first < effects.Length; first++)
+            {
+                int second = (first + 1) % effects.Length;
+                using var duel = StartAgainstSparkman("Reptilianne Ramifications", main, ai,
+                    player => player.hand.Exists(card => card.code == spell) && player.hand.Exists(card => card.code == sparkman));
+                var player = duel.Players[duel.HumanPlayerIndex];
+                int monsters = player.hand.Count(card => card.code == gorgon);
+                int spells = player.hand.Count(card => card.code == spawn);
+                int activate = duel.ActivePrompt.activatable.FindIndex(card => card.code == spell);
+                Require(activate >= 0, "Ramifications could not offer its two effect selections.");
+                duel.SubmitResponseInt((activate << 16) | 5);
+
+                using var view = new ChainView();
+                YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
+                {
+                    if (prompt.messageType == YgoConstants.MSG_SELECT_CARD)
+                    {
+                        int discard = prompt.candidates.FindIndex(card => card.location == YgoConstants.LOCATION_HAND && card.code == sparkman);
+                        return DuelSession.PackCardSelection(discard >= 0 ? discard : 0);
+                    }
+                    if (prompt.messageType != YgoConstants.MSG_SELECT_OPTION) return null;
+                    bool firstChoice = view.Responses.Count == 0;
+                    var offered = firstChoice ? effects : effects.Where(effect => effect != effects[first]).ToArray();
+                    Require(prompt.options.SequenceEqual(offered), "Ramifications lost or reordered a native option.");
+                    view.Modals.ShowPrompt(duel, prompt);
+                    var buttons = view.Modals.ModalRoot.GetComponentsInChildren<Button>();
+                    for (int i = 0; i < offered.Length; i++)
+                    {
+                        int effectIndex = Array.IndexOf(effects, offered[i]);
+                        Require(buttons.Single(button => button.name == $"Opt_{i}").GetComponentInChildren<Text>().text == labels[effectIndex],
+                            "A Ramifications option did not display its distinct Korean action.");
+                    }
+                    int choice = Array.IndexOf(offered, effects[firstChoice ? first : second]);
+                    buttons.Single(button => button.name == $"Opt_{choice}").onClick.Invoke();
+                    Require(view.Responses.Last() == choice, "A localized follow-up changed the native option index.");
+                    return BitConverter.GetBytes(choice);
+                });
+
+                var opponent = duel.Players[duel.AiPlayerIndex].mzone.Single(card => card?.code == sparkman);
+                Require(view.Responses.Count == 2 && duel.RetryCount == 0 &&
+                        player.hand.Count(card => card.code == gorgon) == monsters + (first == 0 || second == 0 ? 1 : 0) &&
+                        player.hand.Count(card => card.code == spawn) == spells + (first == 1 || second == 1 ? 1 : 0) &&
+                        opponent.attack == (first == 2 || second == 2 ? 0 : 1600),
+                    "The two selected Korean effects did not match the cards added or the changed attack.");
+            }
+            Debug.Log("[VERIFY KOREAN NATIVE OPTIONS] Reptilianne Ramifications presented all three Korean effects and resolved each pair.");
+        }
+
+        private static void VerifyOddEyesDamageConfirmation()
+        {
+            const uint oddEyes = 16178681, seaDragoons = 82114013, sparkman = 20721928;
+            var main = Enumerable.Repeat(oddEyes, 8).Concat(Enumerable.Repeat(seaDragoons, 32)).ToArray();
+            var ai = new TacticalAI();
+            foreach (bool accept in new[] { true, false })
+            {
+                using var duel = StartAgainstSparkman("Odd-Eyes damage confirmation", main, ai,
+                    player => player.hand.Exists(card => card.code == oddEyes) && player.hand.Exists(card => card.code == seaDragoons));
+                int activate = duel.ActivePrompt.activatable.FindIndex(card => card.code == oddEyes);
+                Require(activate >= 0, "Odd-Eyes could not be placed in the Pendulum Zone.");
+                duel.SubmitResponseInt((activate << 16) | 5);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+                int summon = duel.ActivePrompt.summonable.FindIndex(card => card.code == seaDragoons);
+                Require(summon >= 0, "A Pendulum monster could not be summoned for the damage confirmation.");
+                duel.SubmitResponseInt(summon << 16);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+                duel.SubmitResponseInt(6);
+                Require(duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_BATTLECMD &&
+                        duel.ActivePrompt.attackable.Count == 1, "The Pendulum monster could not declare an attack.");
+                duel.SubmitResponseInt(1);
+
+                using var view = new ChainView();
+                YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
+                {
+                    if (prompt.IsAttackTargetSelection)
+                    {
+                        Require(prompt.candidates.Single().code == sparkman, "Odd-Eyes fixture selected an unexpected defender.");
+                        return DuelSession.PackCardSelection(0);
+                    }
+                    if (prompt.messageType != YgoConstants.MSG_SELECT_EFFECTYN || prompt.promptCardCode != oddEyes)
+                        return null;
+                    Require(prompt.promptDesc == (((ulong)oddEyes << 20) | 1) && !prompt.IsTriggerActivationConfirmation,
+                        "A continuous effect's rule question was classified as a trigger.");
+                    view.Modals.ShowPrompt(duel, prompt);
+                    Require(!view.Modals.IsChainPromptOpen &&
+                            view.Modals.ModalRoot.GetComponentsInChildren<Text>().Single(label => label.name == "Question").text ==
+                            "이번 전투에서 자신이 받을 전투 데미지를 0으로 하시겠습니까?",
+                        "The engine's damage prevention question did not appear as a Korean confirmation.");
+                    bool submitted = accept ? view.Modals.TryConfirm() : view.Modals.TryCancelOrPass();
+                    Require(submitted && view.Responses.SequenceEqual(new[] { accept ? 1 : 0 }),
+                        "The Korean confirmation changed the native yes/no response.");
+                    return BitConverter.GetBytes(view.Responses[0]);
+                });
+                Require(view.Responses.Count == 1 && duel.RetryCount == 0 &&
+                        duel.Players[duel.HumanPlayerIndex].lp == (accept ? 8000 : 6600),
+                    "The damage received did not match the selected answer.");
+            }
+            Debug.Log("[VERIFY KOREAN NATIVE OPTIONS] Odd-Eyes displayed its Korean damage question and verified both LP results.");
+        }
+
+        private static DuelSession StartAgainstSparkman(string label, uint[] main, TacticalAI ai,
+            Func<PlayerFieldSnapshot, bool> opening)
+        {
+            const uint sparkman = 20721928;
+            var empty = Array.Empty<uint>();
+            var opponent = Enumerable.Repeat(sparkman, 40).ToArray();
+            var duel = YgoProjectBuilder.StartSeedMatching(label, main, empty, opponent, empty, false,
+                session => opening(session.Players[session.HumanPlayerIndex]));
+            try
+            {
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+                Require(duel.ActivePrompt?.playerId == duel.AiPlayerIndex && duel.ActivePrompt.summonable[0].code == sparkman,
+                    $"The opponent could not summon Sparkman for {label}.");
+                duel.SubmitResponseInt(0);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+                duel.SubmitResponseInt(7);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+                Require(duel.ActivePrompt?.playerId == duel.HumanPlayerIndex, $"The player did not get a turn for {label}.");
+                return duel;
+            }
+            catch
+            {
+                duel.Dispose();
+                throw;
+            }
+        }
+
         private static void VerifyKoreanEffectCatalogue()
         {
             int labels = 0, withDescriptions = 0;
@@ -894,7 +1036,8 @@ namespace YGOPortable.Editor
                 promptCon = 0,
                 promptLoc = YgoConstants.LOCATION_HAND,
                 promptCardCode = LadyLabrynth,
-                promptDesc = (ulong)LadyLabrynth << 20,
+                promptDesc = 221,
+                promptEffectDesc = (ulong)LadyLabrynth << 20,
             };
 
             using var view = new ChainView();
@@ -904,7 +1047,7 @@ namespace YGOPortable.Editor
             {
                 code = LadyLabrynth,
                 location = YgoConstants.LOCATION_HAND,
-                description = prompt.promptDesc,
+                description = prompt.promptEffectDesc,
             });
             view.ConfirmChoice();
             Require(view.Responses.SequenceEqual(new[] { 1 }), "A single-effect activation did not submit YES.");

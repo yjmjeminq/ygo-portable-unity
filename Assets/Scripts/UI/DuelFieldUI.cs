@@ -1701,7 +1701,7 @@ namespace YGOPortable.UI
                     return prompt.candidates.Exists(item => item.controller == controller &&
                         item.location == YgoConstants.LOCATION_HAND && item.sequence == sequence &&
                         _session.IsChainCandidateVisible(prompt, item, mode));
-                case YgoConstants.MSG_SELECT_EFFECTYN:
+                case YgoConstants.MSG_SELECT_EFFECTYN when prompt.IsTriggerActivationConfirmation:
                     return prompt.promptCon == controller && prompt.promptLoc == YgoConstants.LOCATION_HAND &&
                         prompt.promptSeq == sequence;
                 default:
