@@ -417,13 +417,15 @@ namespace YGOPortable.Editor
 
         private static int VerifyNativeExtraActivation()
         {
-            const uint refrain = 64881644, bacha = 56208713, polymerization = 24094653;
-            var main = Enumerable.Repeat(refrain, 26).Concat(Enumerable.Repeat(polymerization, 14)).ToArray();
+            const uint refrain = 64881644, bacha = 56208713, polymerization = 24094653, giantTrunade = 42703248;
+            var main = Enumerable.Repeat(refrain, 20).Concat(Enumerable.Repeat(polymerization, 12))
+                .Concat(Enumerable.Repeat(giantTrunade, 8)).ToArray();
             using var duel = YgoProjectBuilder.StartSeedMatching("Extra Deck activation shortcut", main, new[] { bacha },
                 Enumerable.Repeat(20721928u, 40).ToArray(), Array.Empty<uint>(), true, session =>
                 {
                     var hand = session.Players[session.HumanPlayerIndex].hand;
-                    return hand.Count(card => card.code == refrain) >= 2 && hand.Any(card => card.code == polymerization);
+                    return hand.Count(card => card.code == refrain) >= 2 && hand.Any(card => card.code == polymerization) &&
+                        hand.Any(card => card.code == giantTrunade);
                 });
             byte human = (byte)duel.HumanPlayerIndex;
             var player = duel.Players[human];
@@ -476,12 +478,23 @@ namespace YGOPortable.Editor
             ui.VerifyExtraChainSource(activation, refrain);
             Require(selected != null && BitConverter.ToInt32(selected, 0) == expected,
                 "The Extra Deck shortcut selected a different effect in the native chain.");
+            var animator = CardAnimationManager.Ensure(ui.Canvas);
             duel.SubmitResponse(selected);
+            command = ReachMainPhase(duel, human);
+            var scale = player.szone.SingleOrDefault(card => card?.code == refrain);
+            Require(duel.RetryCount == 0 && scale != null, "The Extra Deck effect did not enter the Pendulum Zone.");
+            TestHandGlow.VerifyPendulumScaleFlight(ui.Field, animator, scale, arriving: true);
+            Require(!Private<Button>(ui.Field, "_extraEffectButton").gameObject.activeInHierarchy,
+                "The resolved Extra Deck effect retained an expired indicator.");
+
+            int returnSpell = command.activatable.FindIndex(item => item.code == giantTrunade);
+            Require(returnSpell >= 0, "The native fixture could not return the scale to hand.");
+            duel.SubmitResponseInt((returnSpell << 16) | 5);
             ReachMainPhase(duel, human);
-            ui.Field.Refresh();
-            Require(duel.RetryCount == 0 && player.szone.Any(card => card?.code == refrain) &&
-                !Private<Button>(ui.Field, "_extraEffectButton").gameObject.activeInHierarchy,
-                "The Extra Deck effect did not resolve or retained an expired indicator.");
+            TestHandGlow.VerifyPendulumScaleFlight(ui.Field, animator, scale, arriving: false);
+            Require(duel.RetryCount == 0 && player.szone[scale.sequence] == null &&
+                    player.hand.Any(card => card.code == refrain),
+                "The returning Pendulum card did not finish in hand.");
             Debug.Log("[VERIFY EXTRA DECK EFFECT] Refrain was offered in the Extra Deck and resolved in the Pendulum Zone.");
             return ui.Opens;
         }
@@ -516,6 +529,7 @@ namespace YGOPortable.Editor
         private sealed class Browser : IDisposable
         {
             private readonly GameObject _canvas;
+            internal Canvas Canvas => _canvas.GetComponent<Canvas>();
             private readonly DuelSession _duel;
             private readonly RectTransform _grid;
             private readonly GameAppController _controller;

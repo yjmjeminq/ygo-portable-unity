@@ -62,7 +62,7 @@ namespace YGOPortable.UI
         internal bool IsLink => (Type & YgoConstants.TYPE_LINK) != 0;
         internal bool IsXyz => (Type & YgoConstants.TYPE_XYZ) != 0;
         internal bool IsPendulum => (Type & YgoConstants.TYPE_PENDULUM) != 0;
-        internal bool IsScale => Type == (YgoConstants.TYPE_PENDULUM | YgoConstants.TYPE_SPELL);
+        internal bool IsScale => YgoConstants.IsPendulumScale(Type);
         internal ulong Race => Live?.race ?? Printed?.race ?? 0;
         internal uint Attribute => Live?.attribute ?? Printed?.attr ?? 0;
         internal int Attack => _battleStats?.Attack ?? _materialReadout?.Source.attack ?? Live?.attack ?? Printed?.atk ?? -1;
@@ -129,7 +129,7 @@ namespace YGOPortable.UI
         }
 
         internal DuelRating RatingAt(uint location, uint sequence) =>
-            location == YgoConstants.LOCATION_SZONE && IsScale && sequence is 0 or 4
+            YgoConstants.IsPendulumZone(location, sequence) && IsScale
                 ? ScaleRating(sequence == 4) : RatingNumber;
 
         internal DuelRating InspectionRating => Live != null ? RatingAt(Live.location, Live.sequence) : RatingNumber;
@@ -1098,13 +1098,18 @@ namespace YGOPortable.UI
                 _atDestination = destination;
                 var live = destination ? _snapshot.DestinationCard : _snapshot.SourceCard;
                 if (live?.IsFaceUp == true && live.code != 0 && view.CurrentCode == live.code &&
-                    (live.type & YgoConstants.TYPE_MONSTER) != 0)
+                    (live.IsPendulumScale || live.location == YgoConstants.LOCATION_MZONE && (live.type & YgoConstants.TYPE_MONSTER) != 0))
                 {
                     view.SetCard(live.code, live: live);
                     var card = new DuelCardReadout(CardDatabase.Get(live.code), live);
-                    _readout.Bind(card, destination ? movement.EndOpponent : movement.StartOpponent, card.RatingNumber);
+                    _readout.Bind(card, destination ? movement.EndOpponent : movement.StartOpponent, card.InspectionRating);
                 }
-                else _readout.Hide();
+                else
+                {
+                    if (destination && view.CurrentCode == _snapshot.Code && _snapshot.SourceCard?.IsPendulumScale == true)
+                        view.SetCard(_snapshot.Code);
+                    _readout.Hide();
+                }
             }
             _opacity.alpha = _snapshot.SourceCard == null ? Mathf.SmoothStep(0f, 1f, (progress - _handoff) / .24f)
                 : _snapshot.DestinationCard == null ? Mathf.SmoothStep(0f, 1f, (_handoff - progress) / .24f)

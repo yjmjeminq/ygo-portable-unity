@@ -46,6 +46,7 @@ namespace YGOPortable.Core
         public bool IsFaceUp => (position & YgoConstants.POS_FACEUP) != 0;
         public bool IsDefense => (position & YgoConstants.POS_DEFENSE) != 0;
         public bool IsAttack => (position & YgoConstants.POS_ATTACK) != 0;
+        internal bool IsPendulumScale => YgoConstants.IsPendulumZone(location, sequence) && YgoConstants.IsPendulumScale(type);
         internal uint CurrentNameCode => alias != 0 ? alias : code;
     }
 
@@ -836,7 +837,7 @@ namespace YGOPortable.Core
             if (move.fromLoc is YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE &&
                 _fieldReadoutBaseline?.TryGetValue((move.fromCon, move.fromLoc, move.fromSeq), out var source) == true &&
                 source.code == move.code && source.position == move.fromPos &&
-                (move.fromLoc == YgoConstants.LOCATION_MZONE || source.EquipTarget.HasValue ||
+                (move.fromLoc == YgoConstants.LOCATION_MZONE || source.IsPendulumScale || source.EquipTarget.HasValue ||
                     paired || move.PresentationGroup != null || move.MaterialMethod != 0 ||
                     move.ChangesPositionInPlace || move.TemporarilyBanished))
                 move.SourceReadout = source;

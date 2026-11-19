@@ -2284,8 +2284,8 @@ namespace YGOPortable.Editor
                 return new[] { prompt.playerId, (byte)YgoConstants.LOCATION_MZONE, (byte)sequence };
             });
             var pending = PendingMoveReadouts(ui.Field);
-            var snapshot = pending[((byte)duel.AiPlayerIndex, destination)];
-            pending.TryGetValue(((byte)duel.HumanPlayerIndex, origin), out var reciprocal);
+            var snapshot = pending[((byte)duel.AiPlayerIndex, YgoConstants.LOCATION_MZONE, destination)];
+            pending.TryGetValue(((byte)duel.HumanPlayerIndex, YgoConstants.LOCATION_MZONE, origin), out var reciprocal);
             ui.Field.Refresh();
             Require(paired && snapshot.SourceCard.attack == 2700 && snapshot.DestinationCard.attack == 2300 &&
                 (opponentSets ? reciprocal == null && mine.mzone[origin]?.position == YgoConstants.POS_FACEDOWN_DEFENSE :
@@ -2394,7 +2394,7 @@ namespace YGOPortable.Editor
             {
                 Activate(bookOfMoon);
                 ui.Field.Refresh();
-                Require(duel.Players[captured.Key.Item1].mzone[captured.Key.Item2].position == YgoConstants.POS_FACEDOWN_DEFENSE &&
+                Require(duel.Players[captured.Key.Controller].mzone[captured.Key.Sequence].position == YgoConstants.POS_FACEDOWN_DEFENSE &&
                         pending.Count == 0 && captured.Value.DestinationCard == null,
                     "A summon preview read the live stats of a card that was already hidden when the field refreshed.");
                 Debug.Log("[VERIFY DUEL SUMMON STATS] A pending reveal discarded a card's live stats when the card became hidden.");
@@ -2424,7 +2424,7 @@ namespace YGOPortable.Editor
                     proxy.transform.Find("AspectBox/LevelInfo/Rating/Number")?.GetComponent<Text>().text == "4",
                 "The revealed card face did not keep the same numbers as the summon banner.");
 
-            var (controller, sequence) = captured.Key;
+            var (controller, _, sequence) = captured.Key;
             var location = (controller, YgoConstants.LOCATION_MZONE, sequence);
             typeof(DuelFieldUI).GetMethod("ReleaseArrival", PrivateInstance).Invoke(ui.Field, new object[] { location });
             ui.Field.Refresh();
@@ -2629,7 +2629,7 @@ namespace YGOPortable.Editor
             Vector2 focusedStats = animation.GetPoint(restingReadout, Vector2.one) - animation.GetPoint(restingReadout, Vector2.zero);
             duel.SubmitResponseInt(2);
             ReachIdle();
-            var snapshot = pending[(monster.controller, monster.sequence)];
+            var snapshot = pending[(monster.controller, monster.location, monster.sequence)];
             ui.Field.Refresh();
             Require(snapshot.DestinationCard?.IsDefense == true && snapshot.SourceCard?.position == YgoConstants.POS_FACEUP_ATTACK &&
                 Vector2.Distance(snapshot.Movement.StartSize, focusedStats) < .1f &&
@@ -2687,7 +2687,7 @@ namespace YGOPortable.Editor
             Require(turnUp >= 0, "The movement fixture could not reveal the set card.");
             duel.SubmitResponseInt((turnUp << 16) | 5);
             ReachIdle();
-            var revealed = pending[(monster.controller, monster.sequence)];
+            var revealed = pending[(monster.controller, monster.location, monster.sequence)];
             ui.Field.Refresh();
             var reveal = OpenMove(animation, monster.code, revealed);
             reveal.Sample(.49f);
@@ -3944,8 +3944,48 @@ namespace YGOPortable.Editor
         private static Queue<IEnumerator> AnimationSteps(CardAnimationManager animator) =>
             (Queue<IEnumerator>)typeof(CardAnimationManager).GetField("_steps", PrivateInstance).GetValue(animator);
 
-        private static Dictionary<(byte, uint), CardMoveReadoutSnapshot> PendingMoveReadouts(DuelFieldUI field) =>
-            (Dictionary<(byte, uint), CardMoveReadoutSnapshot>)typeof(DuelFieldUI)
+        internal static void VerifyPendulumScaleFlight(DuelFieldUI field, CardAnimationManager animator,
+            LiveCardState scale, bool arriving)
+        {
+            const BindingFlags fields = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            field.Refresh();
+            var snapshot = AnimationSteps(animator).Select(step =>
+                    step.GetType().GetField("readout", fields)?.GetValue(step) as CardMoveReadoutSnapshot)
+                .SingleOrDefault(move => (arriving ? move?.DestinationCard : move?.SourceCard) is { } card &&
+                    card.code == scale.code && card.location == scale.location && card.sequence == scale.sequence);
+            Require(snapshot != null, $"The Pendulum card had no {(arriving ? "arrival" : "departure")} scale readout.");
+            var slot = FieldSlot(field, scale);
+            var (step, proxy, readout, sample) = OpenMove(animator, scale.code, snapshot);
+            var cardReadout = readout.Find("CardReadout");
+            var expected = new DuelCardReadout(CardDatabase.Get(scale.code), scale).InspectionRating;
+            sample(.29f);
+            CheckScale(!arriving);
+            sample(arriving ? .79f : .91f);
+            CheckScale(arriving);
+            sample(1f);
+            Require(!step.MoveNext() && animator.transform.Find("MovingCardReadout") == null,
+                "The Pendulum move left a duplicate readout behind.");
+            Require(slot.Find("CardReadout")?.gameObject.activeInHierarchy == arriving,
+                "The scale did not hand off to the field at the correct time.");
+
+            void CheckScale(bool visible)
+            {
+                Require(cardReadout.gameObject.activeInHierarchy == visible,
+                    "The moving scale appeared on the wrong side of the transition.");
+                if (!visible) return;
+                var displayed = cardReadout.Find("Labels/Rating/Value").GetComponent<Text>();
+                Require(!cardReadout.Find("Combat").gameObject.activeSelf &&
+                        displayed.text == expected.Value.ToString() &&
+                        displayed.color == expected.ValueColor(DuelStatSymbols.RatingColor(expected.Kind, expected.RightScale)) &&
+                        cardReadout.Find("Labels/Rating/Symbol").GetComponent<Image>().sprite ==
+                            DuelStatSymbols.Rating(DuelRatingKind.Scale) &&
+                        Vector2.Distance(readout.anchoredPosition, ((RectTransform)proxy.transform).anchoredPosition) < .1f,
+                    "The applied Pendulum scale did not follow the moving artwork.");
+            }
+        }
+
+        private static Dictionary<(byte Controller, uint Location, uint Sequence), CardMoveReadoutSnapshot> PendingMoveReadouts(DuelFieldUI field) =>
+            (Dictionary<(byte, uint, uint), CardMoveReadoutSnapshot>)typeof(DuelFieldUI)
                 .GetField("_pendingCardReadouts", PrivateInstance).GetValue(field);
 
         private static (IEnumerator Step, CompositeCardView Proxy, RectTransform Readout, Action<float> Sample) OpenMove(

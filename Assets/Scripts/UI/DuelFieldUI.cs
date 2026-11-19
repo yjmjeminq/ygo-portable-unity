@@ -173,7 +173,7 @@ namespace YGOPortable.UI
         private (byte con, uint loc, uint seq)? _preferredDropZone;
         private int _preferredAttackTargetSeq = -1;
         private readonly Dictionary<(byte con, uint loc, uint seq), int> _arrivingCards = new Dictionary<(byte, uint, uint), int>();
-        private readonly Dictionary<(byte Controller, uint Sequence), CardMoveReadoutSnapshot> _pendingCardReadouts = new();
+        private readonly Dictionary<(byte Controller, uint Location, uint Sequence), CardMoveReadoutSnapshot> _pendingCardReadouts = new();
         private const uint FieldMaterials = YgoConstants.LOCATION_MZONE | YgoConstants.LOCATION_OVERLAY;
         private readonly Dictionary<(byte Controller, uint Sequence), MaterialReadout> _materialReadouts = new();
         private readonly Dictionary<(byte Controller, uint Location, uint Sequence), PresentedFieldReadout> _presentedFieldReadouts = new();
@@ -427,10 +427,8 @@ namespace YGOPortable.UI
             var partnerReadout = ReadoutBeforeMove(swapPartner);
             ClearMovedReadouts(move);
             if (swapPartner != null) ClearMovedReadouts(swapPartner);
-            if (move.fromLoc == YgoConstants.LOCATION_MZONE)
-                _pendingCardReadouts.Remove((move.fromCon, move.fromSeq));
-            if (swapPartner?.fromLoc == YgoConstants.LOCATION_MZONE)
-                _pendingCardReadouts.Remove((swapPartner.fromCon, swapPartner.fromSeq));
+            _pendingCardReadouts.Remove((move.fromCon, move.fromLoc, move.fromSeq));
+            if (swapPartner != null) _pendingCardReadouts.Remove((swapPartner.fromCon, swapPartner.fromLoc, swapPartner.fromSeq));
 
             BattleCardDisplay held = null;
             BattleCardDisplay partnerHeld = null;
@@ -2570,11 +2568,12 @@ namespace YGOPortable.UI
             foreach (var (slot, readout) in _pendingCardReadouts.ToArray())
             {
                 // Field modifiers may not apply during the placement of the other cards in this summon.
-                if (animator?.IsFieldArrivalReserved(slot.Controller, YgoConstants.LOCATION_MZONE, slot.Sequence) == true) continue;
+                if (animator?.IsFieldArrivalReserved(slot.Controller, slot.Location, slot.Sequence) == true) continue;
                 if (readout.DestinationCard == null)
                 {
-                    var live = _session.GetVisibleFieldCard(readout.Code, slot.Controller, YgoConstants.LOCATION_MZONE, slot.Sequence);
-                    readout.DestinationCard = ReadFieldStats(readout.Code, live).Live;
+                    var live = _session.GetVisibleFieldCard(readout.Code, slot.Controller, slot.Location, slot.Sequence);
+                    if (slot.Location == YgoConstants.LOCATION_MZONE || live?.IsPendulumScale == true)
+                        readout.DestinationCard = ReadFieldStats(readout.Code, live).Live;
                 }
                 _pendingCardReadouts.Remove(slot);
             }
@@ -2792,9 +2791,12 @@ namespace YGOPortable.UI
             bool fromBack, bool toBack)
         {
             if (move.code == 0) return null;
-            var sourceCard = !fromBack && move.fromLoc == YgoConstants.LOCATION_MZONE ? move.SourceReadout : null;
+            bool leavesScale = move.SourceReadout?.IsPendulumScale == true;
+            bool placesScale = YgoConstants.IsPendulumZone(move.toLoc, move.toSeq) &&
+                CardDatabase.Get(move.code)?.IsPendulum == true;
+            var sourceCard = !fromBack && (move.fromLoc == YgoConstants.LOCATION_MZONE || leavesScale) ? move.SourceReadout : null;
             var source = sourceCard == null ? null : GetSlot(move.fromCon, move.fromLoc, move.fromSeq);
-            var destination = !toBack && move.toLoc == YgoConstants.LOCATION_MZONE
+            var destination = !toBack && (move.toLoc == YgoConstants.LOCATION_MZONE || placesScale)
                 ? GetSlot(move.toCon, move.toLoc, move.toSeq) : null;
             var startArea = source?.root ?? destination?.root;
             if (startArea == null) return null;
@@ -2805,7 +2807,7 @@ namespace YGOPortable.UI
             {
                 DestinationCard = destination == null ? null : move.DestinationReadout,
             };
-            if (destination != null) _pendingCardReadouts[(move.toCon, move.toSeq)] = readout;
+            if (destination != null) _pendingCardReadouts[(move.toCon, move.toLoc, move.toSeq)] = readout;
             return readout;
 
             (Vector2 StartSize, Vector2 EndSize, bool StartOpponent, bool EndOpponent) ReadMovement()

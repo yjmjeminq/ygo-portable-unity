@@ -29,6 +29,11 @@ namespace YGOPortable.Core
         internal static bool IsFieldZone(uint location, uint sequence) =>
             location == LOCATION_SZONE && sequence == FIELD_ZONE_SEQUENCE;
 
+        internal static bool IsPendulumZone(uint location, uint sequence) =>
+            location == LOCATION_SZONE && sequence is 0 or 4;
+
+        internal static bool IsPendulumScale(uint type) => type == (TYPE_PENDULUM | TYPE_SPELL);
+
         // Positions
         public const uint POS_FACEUP_ATTACK = 0x1;
         public const uint POS_FACEDOWN_ATTACK = 0x2;
