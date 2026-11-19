@@ -21,8 +21,15 @@ namespace YGOPortable.AI
         private const uint GiftCard = 39526584, DarkCure = 3701074, NurseReficule = 67316075, BadReaction = 40633297;
         private const uint DestroyerPhoenix = 60461804, Deadnader = 34909328;
         private const uint CyberEternityDragon = 82315403, AttachmentCybern = 79875526;
+        private const uint PhotonHowling = 28331069, GalaxyPhotonDragon = 85747929, GalaxyZero = 97617181;
+        private const uint GalaxyEyesPhoton = 93717133, GalaxyWarDrake = 19316241, GalaxySummoner = 863795, GalaxyHundred = 897409;
+        private const uint UtopiaLightning = 56832966, UtopiaRayVictory = 87911394;
+        private const uint GogogoGoblindbergh = 35886170, DodododoWarrior = 62880279, AscendedSage = 4647954, Onomatokage = 55088578;
+        private const ushort UtopiaSet = 0x7f;
         private const uint GaiaTheMagicalKnightOfDragons = 15989522, Sunrise = 22908820, RedRain = 5376159;
         internal const uint LightningStorm = 14532163, CrossoutDesignator = 65681983;
+        private const uint WingedKuriboh = 57116033, WingedKuribohLevel6 = 48486809, CyberdarkChimera = 5370235;
+        private const ulong WingedKuribohInterrupt = ((ulong)WingedKuribohLevel6 << 20) | 1;
         private const uint InfiniteImpermanence = 10045474, EffectVeiler = 97268402, BlueEyesTyrant = 11443677;
         private const uint LittleKnight = 29301450, LittleKnightAlternateArt = 29301451, DoomcaliberKnight = 78700060;
         private const uint TripleTacticsTalent = 25311006, ForbiddenCrown = 98829635;
@@ -97,6 +104,8 @@ namespace YGOPortable.AI
         internal static bool CanActivate(DuelSession duel, DuelPrompt prompt, SelectableCardItem effect)
         {
             var last = duel.CurrentChain.LastOrDefault();
+            if (effect.code == WingedKuribohLevel6 && ChooseWingedKuribohTiming(duel, prompt, effect) is bool useWinged)
+                return useWinged;
             if (effect.code == CrossoutDesignator) return FindCrossoutTarget(duel, prompt.playerId).HasValue;
             if (last != null && ResponseNegates.Contains(effect.code) && (last.negated || last.triggerPlayer == prompt.playerId))
                 return false;
@@ -195,6 +204,9 @@ namespace YGOPortable.AI
             if (effect.code == RedZone && prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN &&
                 prompt.promptDesc == ApplyContinuousTrapEffect && !HasFieldCard(rival))
                 return own.banished.Any(IsRedZoneRevivalTarget);
+            if (cardEffect && effectIndex == 2 && effect.code == PhotonHowling &&
+                CanKeepPhotonHowlingMaterials(duel, prompt, effect, own, rival))
+                return false;
             if (firstEffect && effect.code == DestroyerPhoenix)
                 return CanUsePhoenixDestruction(duel, prompt, own, rival);
             if ((firstEffect && effect.code is Deadnader or RedZone or Baronne) ||
@@ -228,6 +240,51 @@ namespace YGOPortable.AI
                 return loss;
             }
         }
+
+        private static bool CanKeepPhotonHowlingMaterials(DuelSession duel, DuelPrompt prompt,
+            SelectableCardItem effect, PlayerFieldSnapshot own, PlayerFieldSnapshot rival)
+        {
+            if (duel.TurnPlayer != prompt.playerId || duel.TurnNumber <= 1 || duel.CurrentChain.Count != 0 ||
+                (prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD && duel.CurrentPhase == YgoConstants.PHASE_MAIN1 && !prompt.canBp) ||
+                rival.szone.Any(card => card is { IsFaceUp: true, effectsDisabled: false }))
+                return false;
+
+            if (effect.location != YgoConstants.LOCATION_MZONE || effect.sequence >= own.mzone.Length ||
+                own.mzone[effect.sequence] is not { code: PhotonHowling, IsFaceUp: true, IsAttack: true } howling)
+                return false;
+
+            var tribute = own.mzone.FirstOrDefault(card => card is { code: GalaxyPhotonDragon, IsFaceUp: true });
+            var revived = own.szone.FirstOrDefault(card => card is { code: GalaxyZero, IsFaceUp: true, effectsDisabled: false });
+            if (tribute == null || revived == null ||
+                own.mzone.Any(card => card != null && card != howling && card != tribute &&
+                    card.code is not (GalaxyEyesPhoton or GalaxyWarDrake or GalaxySummoner)) ||
+                own.szone.Any(card => card is { IsFaceUp: true } && card != revived && card.code != GalaxyHundred) ||
+                (duel.HasActiveAttack && (duel.AttackerCon != prompt.playerId || duel.AttackerSeq != howling.sequence)))
+                return false;
+
+            // Keep the optional blanket negate available on boards with an unknown or reactive effect.
+            foreach (var defender in rival.mzone)
+            {
+                if (defender == null) continue;
+                if (!defender.IsFaceUp) return false;
+                if (defender.code == UtopiaLightning)
+                {
+                    if (!defender.IsAttack || howling.attack <= defender.attack ||
+                        !defender.effectsDisabled && CanPowerUpUtopiaLightning(defender))
+                        return false;
+                }
+                else if (!defender.effectsDisabled && (defender.type & YgoConstants.TYPE_EFFECT) != 0 &&
+                         defender.code is not (UtopiaRayVictory or GogogoGoblindbergh or DodododoWarrior or AscendedSage or Onomatokage))
+                    return false;
+            }
+
+            if (!revived.EquipTarget.HasValue) duel.RefreshVisibleEquipTargets(prompt.playerId);
+            return revived.EquipTarget == (tribute.controller, tribute.sequence);
+        }
+
+        private static bool CanPowerUpUtopiaLightning(LiveCardState defender) => defender.overlayCodes.Count >= 2 &&
+            defender.overlayCodes.Any(code => CardDatabase.Get(code) is not { } material ||
+                material.IsXyz && (material.setcode == 0 || CardDatabase.ExtractSetcodes(material.setcode).Any(set => (set & 0xfff) == UtopiaSet)));
 
         private static bool CanUsePhoenixDestruction(DuelSession duel, DuelPrompt prompt, PlayerFieldSnapshot own,
             PlayerFieldSnapshot rival)
@@ -273,6 +330,82 @@ namespace YGOPortable.AI
 
         private static bool HasFieldCard(PlayerFieldSnapshot side) =>
             side.mzone.Any(card => card != null) || side.szone.Any(card => card != null);
+
+        internal static int FindWingedKuribohSearch(DuelSession duel, DuelPrompt prompt)
+        {
+            if (prompt.SelectionHint != AddToHand || prompt.min != 1 || prompt.max != 1 ||
+                duel.SelectionChainLink is not { code: Stratos, triggerLoc: YgoConstants.LOCATION_MZONE } search ||
+                search.triggerPlayer != prompt.playerId || search.description != (ulong)Stratos << 20)
+                return -1;
+
+            int target = prompt.candidates.FindIndex(card => card.code == WingedKuribohLevel6 &&
+                card.controller == prompt.playerId && card.location == YgoConstants.LOCATION_DECK);
+            if (target < 0) return -1;
+
+            var own = duel.Players[prompt.playerId];
+            var rival = duel.Players[1 - prompt.playerId];
+            if (own.lp > StrongestAttacker(rival) ||
+                own.hand.Concat(own.grave).Concat(own.mzone).Any(card => card?.code == WingedKuribohLevel6))
+                return -1;
+
+            var mainZones = own.mzone.Take(5);
+            if (mainZones.All(card => card != null))
+                return mainZones.Any(card => card.IsFaceUp && CanPayWingedKuribohCost(card)) ? target : -1;
+            return own.hand.Concat(own.grave).Concat(own.mzone.Where(card => card?.IsFaceUp == true))
+                .Any(CanPayWingedKuribohCost) ? target : -1;
+        }
+
+        private static bool CanPayWingedKuribohCost(LiveCardState card) => card != null &&
+            (card.CurrentNameCode == WingedKuriboh || (card.type & YgoConstants.TYPE_FUSION) != 0 &&
+                CardDatabase.Get(card.code) is CardInfo fusion &&
+                CardDatabase.ExtractSetcodes(fusion.setcode).Any(set => (set & 0x3fff) == 0x3008));
+
+        internal static bool? ChooseWingedKuribohTiming(DuelSession duel, DuelPrompt prompt, SelectableCardItem effect)
+        {
+            var own = duel.Players[prompt.playerId];
+            // The attack response and the monster-effect response share this native description.
+            if (effect.code != WingedKuribohLevel6 || effect.description != WingedKuribohInterrupt ||
+                effect.controller != prompt.playerId || effect.location != YgoConstants.LOCATION_MZONE ||
+                effect.sequence >= own.mzone.Length || own.mzone[effect.sequence] is not
+                    { code: WingedKuribohLevel6, IsFaceUp: true, effectsDisabled: false })
+                return null;
+
+            int opponent = 1 - prompt.playerId;
+            var rival = duel.Players[opponent];
+            var last = duel.CurrentChain.LastOrDefault();
+            if (last != null)
+            {
+                if (last.triggerPlayer != opponent || last.triggerLoc != YgoConstants.LOCATION_MZONE || last.negated ||
+                    last.triggerSeq >= rival.mzone.Length || rival.mzone[last.triggerSeq] is not { IsFaceUp: true } source ||
+                    source.code != last.code || (source.type & YgoConstants.TYPE_MONSTER) == 0)
+                    return null;
+
+                if (source.baseAttack >= rival.lp) return true;
+                // Chimera still searches for Power Bond if it is destroyed after activation.
+                if (source.code == CyberdarkChimera && last.description == (ulong)CyberdarkChimera << 20)
+                    return false;
+                return null;
+            }
+
+            if (!duel.HasActiveAttack || duel.AttackerCon != opponent || duel.AttackerLoc != YgoConstants.LOCATION_MZONE ||
+                duel.AttackerSeq >= rival.mzone.Length || rival.mzone[duel.AttackerSeq] is not { IsFaceUp: true } attacker)
+                return null;
+
+            if (attacker.baseAttack >= rival.lp) return true;
+            if (duel.TargetLoc == 0) return attacker.attack >= own.lp ? true : null;
+            // The declared target must be visible in Attack Position to compare these battle stats.
+            if (duel.TargetCon != prompt.playerId || duel.TargetLoc != YgoConstants.LOCATION_MZONE ||
+                duel.TargetSeq >= own.mzone.Length || own.mzone[duel.TargetSeq] is not
+                    { IsFaceUp: true, IsAttack: true, attack: >= 0 } defender || attacker.attack < 0)
+                return null;
+
+            int damage = attacker.attack - defender.attack;
+            if (damage >= own.lp) return true;
+            if (damage > 0 && defender.attack < 1800 && !rival.szone.Any(card => card is { IsFaceUp: false }) &&
+                own.mzone.Any(card => card != null && card != defender && card.code != WingedKuribohLevel6))
+                return false;
+            return null;
+        }
 
         internal static int ChooseHandtrapTarget(DuelSession duel, DuelPrompt prompt)
         {

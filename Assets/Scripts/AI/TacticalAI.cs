@@ -785,6 +785,16 @@ namespace YGOPortable.AI
                 return -1;
 
             string ChainKey(SelectableCardItem effect) => $"ch:{s.TurnNumber}:{effect.code}:{effect.description}:{s.CurrentChain.Count}";
+            if (UsesTacticalRules)
+            {
+                int winged = p.candidates.FindIndex(card => DuelTactics.ChooseWingedKuribohTiming(s, p, card) == true &&
+                    !_effectCounts.ContainsKey(ChainKey(card)));
+                if (winged >= 0)
+                {
+                    BumpKey(ChainKey(p.candidates[winged]));
+                    return winged;
+                }
+            }
             if (UsesTacticalRules && !p.IsTriggerChain &&
                 s.CurrentChain.LastOrDefault() is { negated: false, triggerLoc: YgoConstants.LOCATION_MZONE } opposing &&
                 opposing.triggerPlayer != p.playerId)
@@ -859,6 +869,11 @@ namespace YGOPortable.AI
             }
 
             ulong hint = UsesTacticalRules ? p.SelectionHint : s.LastHintMsg;
+            if (UsesTacticalRules && hint == DuelTactics.AddToHand)
+            {
+                int winged = DuelTactics.FindWingedKuribohSearch(s, p);
+                if (winged >= 0) return PackIndexList(new[] { winged });
+            }
             if (UsesTacticalRules && p.min == 1 && p.max == 1 && hint == DuelTactics.Negate)
             {
                 int target = DuelTactics.ChooseHandtrapTarget(s, p);
