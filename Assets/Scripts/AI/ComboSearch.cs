@@ -20,6 +20,7 @@ namespace YGOPortable.AI
         private const int RecoveryBranchMilliseconds = 110;
         private const uint Machinex = 46593546, Siegfried = 44852429, Gilgamesh = 9024198;
         private const uint PhotonJumper = 97639441, MicroCoder = 2347477, JunkAnchor = 25148255;
+        private const uint RedDragonArchfiend = 70902743;
         private const uint NegatesEffects = 1u << 8;
         private static readonly HashSet<uint> HandDisruption = new()
         {
@@ -93,6 +94,7 @@ namespace YGOPortable.AI
             internal bool exposedBeforeReveal;
             internal bool testedAttackPosition;
             internal bool measuredTurnEnd;
+            internal bool unverifiedArchfiendEndPhase;
             internal Position ending;
             internal int unpaidLinkTrade = int.MaxValue;
             internal readonly List<(ulong state, int action)> moves = new();
@@ -120,6 +122,7 @@ namespace YGOPortable.AI
             internal readonly bool lethal;
             internal readonly bool exposedToBattleLethal;
             internal readonly bool HasSetup;
+            internal readonly bool archfiendEndPhaseRisk;
 
             internal Position(DuelSession duel, byte player, bool canBattle)
             {
@@ -139,6 +142,7 @@ namespace YGOPortable.AI
                     }
                 }
                 int attackers = 0, establishedAttackers = 0, weakestAttack = int.MaxValue;
+                bool activeArchfiend = false;
                 HasSetup = false;
                 exposedToBattleLethal = false;
                 hand = own.hand.Count;
@@ -151,6 +155,7 @@ namespace YGOPortable.AI
                     monsters++;
                     if (monster.IsDefense) defenders++;
                     if (!monster.IsFaceUp) continue;
+                    activeArchfiend |= monster.code == RedDragonArchfiend && !monster.effectsDisabled;
                     if (monster.IsAttack)
                     {
                         attackers += Math.Max(0, monster.attack);
@@ -177,6 +182,7 @@ namespace YGOPortable.AI
                 opposingCards = blockers + rival.szone.Count(card => card != null);
                 pendulumFollowUps = PendulumTurnPlan.ReadyFollowUps(own);
                 lethal = canBattle && blockers == 0 && attackers >= rival.lp;
+                archfiendEndPhaseRisk = activeArchfiend && monsters > 1;
                 HasSetup |= rank >= 3 || pressure >= 2400 || defense >= 2400 || establishedAttackers >= 2 || pendulumFollowUps >= 2;
             }
 
@@ -390,6 +396,7 @@ namespace YGOPortable.AI
             var initial = default(Position);
             (int step, ulong state, double score, Position before)? start = null;
             (int step, ulong state, double score, Position before)? checkpoint = null;
+            (int step, ulong state, double score, Position before)? safeArchfiendCheckpoint = null;
             (int step, ulong state, double score, Position before)? spend = null;
             var safeSets = new List<(int Step, ulong State, double Score, Position Before, uint Code, int SetIndex)>();
             List<(int Step, ulong State, double Score, Position Before, uint Code, int CopiesOnField)> handSupportSummons = null;
@@ -457,9 +464,14 @@ namespace YGOPortable.AI
                     if (prompt.canEp || prompt.canBp) start = (0, state, line.score, initial);
                 }
                 if ((recovering || spend.HasValue || line.ending.HasSetup) && line.moves.Count > 0 && (prompt.canEp || prompt.canBp) &&
-                    line.ending.ImprovesOn(spend?.before ?? initial) &&
-                    (!checkpoint.HasValue || line.score > checkpoint.Value.score))
-                    checkpoint = (line.moves.Count, state, line.score, line.ending);
+                    line.ending.ImprovesOn(spend?.before ?? initial))
+                {
+                    var candidate = (line.moves.Count, state, line.score, line.ending);
+                    if (!checkpoint.HasValue || line.score > checkpoint.Value.score) checkpoint = candidate;
+                    if (!line.ending.archfiendEndPhaseRisk &&
+                        (!safeArchfiendCheckpoint.HasValue || line.score > safeArchfiendCheckpoint.Value.score))
+                        safeArchfiendCheckpoint = candidate;
+                }
                 canKeepSetup = line.ending.HasSetup && (prompt.canEp || prompt.canBp);
                 settledMoves = line.moves.Count;
                 if (settledMoves >= MaxMainActions) break;
@@ -516,15 +528,31 @@ namespace YGOPortable.AI
                 trial.Players[player].mzone.Any(card => card?.code == candidate.Code && card.IsAttack && card.attack < 1800));
             if (line.moves.Count > settledMoves) line.moves.RemoveRange(settledMoves, line.moves.Count - settledMoves);
             if (line.selectedTarget is { } selected && selected.AfterMainActions > settledMoves) line.selectedTarget = null;
-            var stop = !line.complete || (!line.endPhaseDegradedBoard && checkpoint.HasValue && checkpoint.Value.score > line.score + .08)
-                ? checkpoint : null;
-            if (spend is { } investment && !line.ending.ImprovesOn(investment.before))
-                stop ??= investment;
-            else if (spend.HasValue && !line.complete)
-                stop ??= spend;
-            if (line.moves.Count > 1 && start.HasValue && !line.ending.ImprovesOn(initial) &&
-                line.score < start.Value.score - .08)
-                stop ??= start;
+            (int step, ulong state, double score, Position before)? stop;
+            if (line.unverifiedArchfiendEndPhase)
+            {
+                // The End Phase can wipe the apparent gain. Keep only the prefix before that risk.
+                line.complete = false;
+                stop = safeArchfiendCheckpoint ?? start;
+                if (!stop.HasValue)
+                {
+                    line.moves.Clear();
+                    line.selectedTarget = null;
+                    return line;
+                }
+            }
+            else
+            {
+                stop = !line.complete || (!line.endPhaseDegradedBoard && checkpoint.HasValue && checkpoint.Value.score > line.score + .08)
+                    ? checkpoint : null;
+                if (spend is { } investment && !line.ending.ImprovesOn(investment.before))
+                    stop ??= investment;
+                else if (spend.HasValue && !line.complete)
+                    stop ??= spend;
+                if (line.moves.Count > 1 && start.HasValue && !line.ending.ImprovesOn(initial) &&
+                    line.score < start.Value.score - .08)
+                    stop ??= start;
+            }
             int stopAction = KeepSetup;
             foreach (var candidate in safeSets)
             {
@@ -553,7 +581,7 @@ namespace YGOPortable.AI
                 stopAction = (candidate.SetIndex << 16) | 3;
                 break;
             }
-            if (handSupportSummons != null && !line.won)
+            if (handSupportSummons != null && !line.won && !line.unverifiedArchfiendEndPhase)
             {
                 // These cards have a role in the hand. Spend them when they lead to a follow-up.
                 foreach (var candidate in handSupportSummons)
@@ -572,7 +600,7 @@ namespace YGOPortable.AI
                 line.moves.Add((safe.state, stopAction));
                 line.score = safe.score;
                 line.ending = safe.before;
-                line.complete = true;
+                line.complete = !line.unverifiedArchfiendEndPhase;
                 line.measuredTurnEnd = false;
                 line.needsHiddenInformation = false;
                 if (line.selectedTarget is { } picked && picked.AfterMainActions > safe.step) line.selectedTarget = null;
@@ -645,6 +673,7 @@ namespace YGOPortable.AI
             int lifeBefore = trial.Players[1 - player].lp;
             int ownLifeBefore = trial.Players[player].lp;
             var before = line.ending;
+            line.unverifiedArchfiendEndPhase = before.archfiendEndPhaseRisk;
             byte[] finishBattle = null;
             trial.SubmitResponse(enter);
             for (int step = 0; step < 16 && !expired() && trial.RetryCount == 0 && !trial.SpeculationUncertain && !trial.IsFinished; step++)
@@ -669,6 +698,7 @@ namespace YGOPortable.AI
             if (trial.SpeculationUncertain || trial.RetryCount != 0) return;
             if (trial.IsFinished)
             {
+                line.unverifiedArchfiendEndPhase = false;
                 line.won = trial.Winner == player;
                 line.score = line.won ? 100 : trial.Winner == 2 ? 0 : -100;
             }
@@ -679,6 +709,7 @@ namespace YGOPortable.AI
                 line.score += damage / 3300.0 + 1.15 * (before.opposingCards - after.opposingCards) -
                     1.1 * (before.monsters - after.monsters);
                 line.ending = after;
+                line.unverifiedArchfiendEndPhase = after.archfiendEndPhaseRisk;
                 if (finishBattle != null && !expired())
                     MeasureTurnEnd(trial, ai, player, finishBattle, expired, line);
             }
@@ -687,6 +718,7 @@ namespace YGOPortable.AI
         private static void MeasureTurnEnd(DuelSession trial, TacticalAI ai, byte player, byte[] end, Func<bool> expired, Line line)
         {
             int turn = trial.TurnNumber;
+            line.unverifiedArchfiendEndPhase = line.ending.archfiendEndPhaseRisk;
             double before = BoardValue(trial, player, canBattle: false);
             trial.SubmitPlanningResponse(end);
             for (int step = 0; step < 12 && trial.TurnNumber == turn && !expired() && !trial.IsFinished &&
@@ -703,11 +735,13 @@ namespace YGOPortable.AI
             if (trial.SpeculationUncertain || trial.RetryCount != 0) return;
             if (trial.IsFinished)
             {
+                line.unverifiedArchfiendEndPhase = false;
                 line.won = trial.Winner == player;
                 line.score = line.won ? 100 : trial.Winner == 2 ? 0 : -100;
             }
             else if (trial.TurnNumber > turn)
             {
+                line.unverifiedArchfiendEndPhase = false;
                 line.measuredTurnEnd = true;
                 double change = BoardValue(trial, player, canBattle: false) - before;
                 line.score += change;

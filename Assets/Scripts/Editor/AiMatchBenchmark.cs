@@ -355,6 +355,7 @@ namespace YGOPortable.Editor
         {
             VerifyOwnOnlyRemoval();
             VerifyReactiveNegation();
+            VerifyEqualScalesProtection();
             using var duel = new DuelSession();
             var own = duel.Players[0];
             var rival = duel.Players[1];
@@ -629,6 +630,31 @@ namespace YGOPortable.Editor
             byte[] response = new TacticalAI(null).ComputeResponse(duel, target);
             if (response.Length != 12 || BitConverter.ToInt32(response, 8) != 1)
                 throw new InvalidOperationException("Impermanence must target the effect it chained to.");
+        }
+
+        private static void VerifyEqualScalesProtection()
+        {
+            using var duel = new DuelSession();
+            const uint trapCode = 17885118;
+            var own = duel.Players[0];
+            var rival = duel.Players[1];
+            const uint scaleType = YgoConstants.TYPE_PENDULUM | YgoConstants.TYPE_SPELL;
+            var prompt = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_CHAIN };
+            var effect = new SelectableCardItem { code = trapCode, location = YgoConstants.LOCATION_SZONE, sequence = 2 };
+            own.szone[0] = new LiveCardState { code = 41908872, type = scaleType, lscale = 8, sequence = 0,
+                position = YgoConstants.POS_FACEUP_ATTACK };
+            own.szone[4] = new LiveCardState { code = 40318957, type = scaleType, rscale = 8, sequence = 4,
+                position = YgoConstants.POS_FACEUP_ATTACK };
+            own.szone[2] = new LiveCardState { code = trapCode, sequence = 2 };
+            if (DuelTactics.CanActivate(duel, prompt, effect))
+                throw new InvalidOperationException("Pendulum Scale would destroy its only two scales without a known rebuild.");
+            rival.szone[1] = new LiveCardState { code = 53582587, controller = 1, sequence = 1 };
+            if (!DuelTactics.CanActivate(duel, prompt, effect))
+                throw new InvalidOperationException("Equal scales missed a valid opposing Spell/Trap target.");
+            rival.szone[1] = null;
+            own.szone[4].rscale = 5;
+            if (!DuelTactics.CanActivate(duel, prompt, effect))
+                throw new InvalidOperationException("Pendulum Scale blocked an effect with unequal scales.");
         }
 
         private static void VerifyCrossoutResponse()

@@ -14,11 +14,13 @@ namespace YGOPortable.AI
         private const uint TributeToTheDoomed = 79759861, Conquistador = 20590515, SkyIris = 27813661;
         private const uint Baronne = 84815190, CipherBlade = 2530830, DiamondBell = 73667937, Hornet = 69207766;
         private const uint Farewelcome = 32785578, DarkTimeWizard = 40235813;
+        private const uint PendulumScale = 17885118;
         private const uint SalamangreatOfFire = 11962031, Achichi = 15808381, CynetRefresh = 36368606;
         private const uint EarthSlicer = 97584719, Linkslayer = 35595518, Artorigus = 21223277;
         private const uint DarklordRebellion = 50501121, NoblemanOfCrossout = 71044499, HexeTrude = 46294982;
         private const uint GiftCard = 39526584, DarkCure = 3701074, NurseReficule = 67316075, BadReaction = 40633297;
         private const uint DestroyerPhoenix = 60461804, Deadnader = 34909328;
+        private const uint CyberEternityDragon = 82315403, AttachmentCybern = 79875526;
         private const uint GaiaTheMagicalKnightOfDragons = 15989522, Sunrise = 22908820, RedRain = 5376159;
         internal const uint LightningStorm = 14532163, CrossoutDesignator = 65681983;
         private const uint InfiniteImpermanence = 10045474, EffectVeiler = 97268402, BlueEyesTyrant = 11443677;
@@ -130,6 +132,8 @@ namespace YGOPortable.AI
                 return rival.mzone.Any(card => card != null && !card.IsFaceUp);
             if (effect.code == DarklordRebellion)
                 return HasFieldCard(rival);
+            if (effect.code == PendulumScale && MustSpendOnlyEqualScales(own, rival, effect))
+                return false;
             if (effect.code == GalaxyCyclone)
                 return rival.szone.Any(card => card != null && card.IsFaceUp == (effect.location == YgoConstants.LOCATION_GRAVE));
             if (effect.code == WhipViper)
@@ -191,7 +195,9 @@ namespace YGOPortable.AI
             if (effect.code == RedZone && prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN &&
                 prompt.promptDesc == ApplyContinuousTrapEffect && !HasFieldCard(rival))
                 return own.banished.Any(IsRedZoneRevivalTarget);
-            if ((firstEffect && effect.code is DestroyerPhoenix or Deadnader or RedZone or Baronne) ||
+            if (firstEffect && effect.code == DestroyerPhoenix)
+                return CanUsePhoenixDestruction(duel, prompt, own, rival);
+            if ((firstEffect && effect.code is Deadnader or RedZone or Baronne) ||
                 (cardEffect && effectIndex == 1 && effect.code is CipherBlade or DiamondBell or Hornet or EarthSlicer or HexeTrude))
                 return HasFieldCard(rival);
             if (effect.code == Perlereino && (effect.description >> 20) == Perlereino && (effect.description & 0xfffff) == 1)
@@ -222,6 +228,48 @@ namespace YGOPortable.AI
                 return loss;
             }
         }
+
+        private static bool CanUsePhoenixDestruction(DuelSession duel, DuelPrompt prompt, PlayerFieldSnapshot own,
+            PlayerFieldSnapshot rival)
+        {
+            if (!HasFieldCard(rival)) return false;
+
+            var dragon = rival.mzone.FirstOrDefault(card => IsProtectedCyberEternity(card, rival));
+            if (dragon == null || rival.mzone.Any(card => card != null && card != dragon) ||
+                rival.szone.Any(card => card != null && card is not { code: AttachmentCybern, IsFaceUp: true, effectsDisabled: false }) ||
+                duel.CurrentChain.Any(link => link.triggerPlayer != prompt.playerId && !link.negated))
+                return true;
+
+            // Restrict this comparison to confirmed, active copies of Cybern equipped to the protected Dragon.
+            var equipment = rival.szone.Where(card => card != null).ToArray();
+            if (equipment.Length == 0) return true;
+            if (equipment.Any(card => !card.EquipTarget.HasValue))
+                duel.RefreshVisibleEquipTargets(dragon.controller);
+            if (equipment.Any(card => card.EquipTarget != (dragon.controller, dragon.sequence)))
+                return true;
+
+            if (duel.TurnPlayer == prompt.playerId)
+                return !prompt.attackable.Any(card => card.sequence < own.mzone.Length &&
+                    own.mzone[card.sequence] is { IsAttack: true } attacker &&
+                    attacker.attack > (dragon.IsDefense ? dragon.defense : dragon.attack));
+
+            if (!duel.HasActiveAttack || duel.AttackerCon != dragon.controller ||
+                duel.AttackerLoc != YgoConstants.LOCATION_MZONE || duel.AttackerSeq != dragon.sequence)
+                return true;
+
+            // Phoenix destroys one opposing card, so other copies of Cybern keep their ATK bonus.
+            int reducedAttack = Math.Max(0, dragon.attack - 600);
+            if (duel.TargetLoc == 0) return dragon.attack >= own.lp && reducedAttack < own.lp;
+            if (duel.TargetCon != prompt.playerId || duel.TargetSeq >= own.mzone.Length ||
+                own.mzone[duel.TargetSeq] is not { IsFaceUp: true } defender) return true;
+            if (defender.IsDefense) return dragon.attack > defender.defense && reducedAttack <= defender.defense;
+            return dragon.attack >= defender.attack && reducedAttack < defender.attack ||
+                dragon.attack - defender.attack >= own.lp && reducedAttack - defender.attack < own.lp;
+        }
+
+        private static bool IsProtectedCyberEternity(LiveCardState card, PlayerFieldSnapshot controller) =>
+            card is { code: CyberEternityDragon, IsFaceUp: true, effectsDisabled: false } &&
+            controller.grave.Any(c => (c.type & YgoConstants.TYPE_FUSION) != 0 && c.race == YgoConstants.RACE_MACHINE);
 
         private static bool HasFieldCard(PlayerFieldSnapshot side) =>
             side.mzone.Any(card => card != null) || side.szone.Any(card => card != null);
@@ -267,9 +315,27 @@ namespace YGOPortable.AI
             card.IsFaceUp && (card.type & YgoConstants.TYPE_SYNCHRO) != 0 &&
             card.attribute == YgoConstants.ATTRIBUTE_DARK && card.race == YgoConstants.RACE_DRAGON;
 
+        private static bool MustSpendOnlyEqualScales(PlayerFieldSnapshot own, PlayerFieldSnapshot rival, SelectableCardItem effect)
+        {
+            var left = own.szone[6] ?? own.szone[0];
+            var right = own.szone[7] ?? own.szone[4];
+            if (left?.IsFaceUp != true || right?.IsFaceUp != true ||
+                !YgoConstants.IsPendulumScale(left.type) || !YgoConstants.IsPendulumScale(right.type) ||
+                left.lscale != right.rscale || HasOpposingSpellOrTrap(rival))
+                return false;
+
+            // At equal scales the native effect must destroy exactly two Spell/Trap cards, excluding itself.
+            bool hasOtherTarget = own.szone.Any(card => card != null && card != left && card != right &&
+                (effect.location != YgoConstants.LOCATION_SZONE || card.sequence != effect.sequence)) ||
+                own.mzone.Any(IsFaceUpSpellTrapMonster);
+            return !hasOtherTarget && !PendulumTurnPlan.CanRebuildEqualScales(own, rival, left, right);
+        }
+
+        private static bool IsFaceUpSpellTrapMonster(LiveCardState card) =>
+            card?.IsFaceUp == true && (card.type & (YgoConstants.TYPE_SPELL | YgoConstants.TYPE_TRAP)) != 0;
+
         private static bool HasOpposingSpellOrTrap(PlayerFieldSnapshot opponent) =>
-            opponent.szone.Any(card => card != null) || opponent.mzone.Any(card => card?.IsFaceUp == true &&
-                (card.type & (YgoConstants.TYPE_SPELL | YgoConstants.TYPE_TRAP)) != 0);
+            opponent.szone.Any(card => card != null) || opponent.mzone.Any(IsFaceUpSpellTrapMonster);
 
         // The packed scripts' listed_names entries are what the safe search tests using ListsCode.
         private static bool IsDarkTimeWizardSearchTarget(CardInfo card) =>
@@ -468,6 +534,9 @@ namespace YGOPortable.AI
             int value = Math.Max(0, attack);
             if (card != null && (card.type & YgoConstants.TYPE_EFFECT) != 0 && live?.effectsDisabled != true) value += 350;
             if (card?.IsExtra == true) value += 500;
+            if (!own && hint == Destroy && duel.SelectionChainLink is { code: DestroyerPhoenix } phoenix &&
+                phoenix.triggerPlayer == player && IsProtectedCyberEternity(live, side))
+                return 0;
             if (live != null && duel.SelectionChainLink is { code: WhipViper } swap && swap.triggerPlayer == player)
                 return ViperBattleGain(duel, player, live);
             // Conquistador uses the generic face-up selection hint for its optional destruction.

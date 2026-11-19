@@ -1937,6 +1937,20 @@ namespace YGOPortable.Core
             return cards.Exists(card => CardDatabase.Get(card.code) is CardInfo info && matches(info));
         }
 
+        internal void RefreshVisibleEquipTargets(byte playerId)
+        {
+            if (TracksFieldReadouts || NativePtr == IntPtr.Zero) return;
+            const uint flags = YgoConstants.QUERY_CODE | YgoConstants.QUERY_POSITION | YgoConstants.QUERY_EQUIP_CARD;
+            var observed = QueryLocationCards(playerId, YgoConstants.LOCATION_SZONE, flags: flags);
+            var current = Players[playerId].szone;
+            for (int slot = 0; slot < current.Length && slot < observed.Count; slot++)
+            {
+                if (current[slot] is { IsFaceUp: true } equipment && observed[slot] is { IsFaceUp: true } queried &&
+                    equipment.code == queried.code)
+                    equipment.EquipTarget = queried.EquipTarget;
+            }
+        }
+
         private List<LiveCardState> QueryLocationCards(byte playerId, uint loc, bool keepNulls = true, uint flags = YgoConstants.QUERY_DEFAULT)
         {
             var result = new List<LiveCardState>();

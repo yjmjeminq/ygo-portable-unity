@@ -106,6 +106,36 @@ namespace YGOPortable.AI
                 own.extra.Count(card => card.IsFaceUp && Fits(card, fromHand: false));
         }
 
+        internal static bool CanRebuildEqualScales(PlayerFieldSnapshot own, PlayerFieldSnapshot rival,
+            LiveCardState left, LiveCardState right)
+        {
+            var hand = own.hand.Select(live => CardDatabase.Get(live.code)).ToArray();
+            if (hand.Count(card => card?.IsPendulum == true) < 2) return false;
+
+            bool mainZoneOpen = own.mzone.Take(5).Any(card => card == null);
+            bool extraZoneOpen = own.mzone[5] == null && rival.mzone[6] == null ||
+                own.mzone[6] == null && rival.mzone[5] == null;
+            var extra = extraZoneOpen
+                ? own.extra.Where(card => card.IsFaceUp).Append(left).Append(right)
+                    .Select(live => CardDatabase.Get(live.code))
+                    .Where(card => HasReachableLevel(card, fromHand: false) && !card.IsExtra).ToArray()
+                : Array.Empty<CardInfo>();
+            for (int first = 0; first < hand.Length; first++)
+            {
+                if (hand[first]?.IsPendulum != true) continue;
+                for (int second = 0; second < hand.Length; second++)
+                {
+                    if (second == first || hand[second]?.IsPendulum != true) continue;
+                    uint lowSide = hand[first].lscale, highSide = hand[second].rscale;
+                    if (extra.Any(card => WithinScales(card.level, lowSide, highSide))) return true;
+                    if (mainZoneOpen && hand.Where((card, index) => index != first && index != second)
+                        .Any(card => HasReachableLevel(card, fromHand: true) && WithinScales(card.level, lowSide, highSide)))
+                        return true;
+                }
+            }
+            return false;
+        }
+
         private static bool HasReachableLevel(CardInfo card, bool fromHand) => card != null &&
             card.IsMonster && !card.IsLink && !card.IsXyz && card.level > 0 &&
             ((fromHand && card.code == Pendulumgraph) ||
