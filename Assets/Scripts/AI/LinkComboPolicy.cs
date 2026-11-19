@@ -52,6 +52,7 @@ namespace YGOPortable.AI
         }
 
         internal string ToJson() => JsonUtility.ToJson(new Model { version = 1, weights = _weights }, true);
+        internal float[] CopyWeights() => (float[])_weights.Clone();
         internal static float[] InitialWeights() => new[]
         {
             1.2f, 1.1f, 2.5f, 0.9f, 1.0f, .3f, 1.45f, .7f, 1.35f, .32f, .4f, -.8f, .45f,

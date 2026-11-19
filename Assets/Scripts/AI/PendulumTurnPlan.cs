@@ -9,6 +9,7 @@ namespace YGOPortable.AI
         private const ulong PlaceScale = 1160;
         private const int SpecialSummon = 1;
         private const int Activate = 5;
+        private const uint Pendulumgraph = 66425726;
 
         internal static int? ChooseIdle(DuelSession session, DuelPrompt prompt, Func<int, SelectableCardItem, bool> canUse)
         {
@@ -41,19 +42,22 @@ namespace YGOPortable.AI
             int mainSlots = own.mzone.Take(5).Count(card => card == null);
             var hand = own.hand
                 .Select(live => (live.sequence, card: CardDatabase.Get(live.code)))
-                .Where(candidate => HasReachableLevel(candidate.card))
+                .Where(candidate => HasReachableLevel(candidate.card, fromHand: true))
                 .ToArray();
             var faceUpExtra = extraZoneOpen
                 ? own.extra.Where(live => live.IsFaceUp).Select(live => CardDatabase.Get(live.code))
-                    .Where(card => HasReachableLevel(card) && !card.IsExtra).ToArray()
+                    .Where(card => HasReachableLevel(card, fromHand: false) && !card.IsExtra).ToArray()
                 : Array.Empty<CardInfo>();
 
             int Reachable(uint first, uint second, uint firstScaleHandSequence, uint secondScaleHandSequence = uint.MaxValue)
             {
-                int handCount = hand.Count(candidate => candidate.sequence != firstScaleHandSequence &&
-                    candidate.sequence != secondScaleHandSequence && WithinScales(candidate.card.level, first, second));
+                bool Fits((uint sequence, CardInfo card) candidate) => candidate.sequence != firstScaleHandSequence &&
+                    candidate.sequence != secondScaleHandSequence && WithinScales(candidate.card.level, first, second);
+                int handCount = hand.Count(Fits);
                 int extraCount = faceUpExtra.Any(card => WithinScales(card.level, first, second)) ? 1 : 0;
-                return Math.Min(mainSlots, handCount) + extraCount;
+                // Pendulumgraph can be summoned from the hand and gives live Spell negation on its own.
+                int interruption = mainSlots > 0 && hand.Any(candidate => candidate.card.code == Pendulumgraph && Fits(candidate)) ? 1 : 0;
+                return Math.Min(mainSlots, handCount) + extraCount + interruption;
             }
 
             int? next = null;
@@ -89,11 +93,23 @@ namespace YGOPortable.AI
         }
 
         private static bool IsActiveScale(LiveCardState card) =>
-            card != null && card.IsFaceUp && CardDatabase.Get(card.code)?.IsPendulum == true;
+            card != null && card.IsFaceUp && !card.effectsDisabled && CardDatabase.Get(card.code)?.IsPendulum == true;
 
-        private static bool HasReachableLevel(CardInfo card) => card != null &&
+        internal static int ReadyFollowUps(PlayerFieldSnapshot own)
+        {
+            var left = own.szone[6] ?? own.szone[0];
+            var right = own.szone[7] ?? own.szone[4];
+            if (!IsActiveScale(left) || !IsActiveScale(right)) return 0;
+            bool Fits(LiveCardState live, bool fromHand) => CardDatabase.Get(live.code) is CardInfo card &&
+                HasReachableLevel(card, fromHand) && WithinScales(card.level, left.lscale, right.rscale);
+            return own.hand.Count(card => Fits(card, fromHand: true)) +
+                own.extra.Count(card => card.IsFaceUp && Fits(card, fromHand: false));
+        }
+
+        private static bool HasReachableLevel(CardInfo card, bool fromHand) => card != null &&
             card.IsMonster && !card.IsLink && !card.IsXyz && card.level > 0 &&
-            (card.type & (YgoConstants.TYPE_RITUAL | YgoConstants.TYPE_SPSUMMON | YgoConstants.TYPE_TOKEN)) == 0;
+            ((fromHand && card.code == Pendulumgraph) ||
+                (card.type & (YgoConstants.TYPE_RITUAL | YgoConstants.TYPE_SPSUMMON | YgoConstants.TYPE_TOKEN)) == 0);
 
         private static bool WithinScales(uint level, uint first, uint second) =>
             level > Math.Min(first, second) && level < Math.Max(first, second);

@@ -257,11 +257,17 @@ namespace YGOPortable.Core
         private const int MaxReplayResponses = 768;
 
         private readonly bool _recordPlanningReplay;
+        private uint[][] _startingMainDecks;
+        private int[] _startingExtraCounts;
         private PlanningReplay _planningReplay;
         private bool _loadingPlanningReplay;
         private int _speculatingPlayer = -1;
         private readonly List<uint> _selectedFromDeck = new List<uint>();
+        private ChainLinkInfo _deckSelectionEffect;
+        private ulong _deckSelectionHint;
+        private int _planningTurnLimit = -1;
         internal bool SpeculationUncertain { get; private set; }
+        private bool SpeculationPassedTurnLimit => _planningTurnLimit >= 0 && TurnNumber > _planningTurnLimit;
 
         private sealed class PlanningReplay
         {
@@ -279,6 +285,8 @@ namespace YGOPortable.Core
         public int TurnNumber { get; private set; }
         public int TurnPlayer { get; private set; }
         internal int TurnInterruptions { get; private set; }
+        internal IReadOnlyList<uint> StartingMainDeck(byte player) => _startingMainDecks?[player] ?? Array.Empty<uint>();
+        internal int StartingExtraCount(byte player) => _startingExtraCounts?[player] ?? 0;
         public int CurrentPhase { get; private set; }
         public uint FieldDisabledMask { get; private set; }
         public bool IsFinished { get; private set; }
@@ -292,6 +300,10 @@ namespace YGOPortable.Core
 
         public PlayerFieldSnapshot[] Players { get; } = { new PlayerFieldSnapshot(), new PlayerFieldSnapshot() };
         public List<ChainLinkInfo> CurrentChain { get; } = new List<ChainLinkInfo>();
+        private HashSet<(byte Player, ulong Description)> _activatedMonsterEffects;
+        internal bool HasActivatedMonsterEffect(byte player, ulong description) =>
+            _activatedMonsterEffects?.Contains((player, description)) == true;
+        internal ChainLinkInfo ResolvingChainLink => _resolvingChainLink;
         internal ChainLinkInfo SelectionChainLink => _resolvingChainLink ?? (CurrentChain.Count == 1 ? CurrentChain[0] : null);
         public List<(int chainNumber, uint code)> SolvedChainLinks { get; } = new List<(int, uint)>();
         public List<string> Logs { get; } = new List<string>();
@@ -330,6 +342,7 @@ namespace YGOPortable.Core
         public event Action<int, int> OnPhaseChanged;
         public event Action<ChainLinkInfo> OnChainActivated;
         public event Action<ChainLinkInfo> OnChainResolving;
+        internal event Action<ChainLinkInfo> OnChainResolved;
         internal event Action<IReadOnlyList<(LiveCardState Before, LiveCardState After)>> OnFieldReadoutsChanged;
         internal event Action<LiveCardState, LiveCardState, IReadOnlyList<(LiveCardState Before, LiveCardState After)>> OnCardEquipped;
         private bool TracksFieldReadouts => OnFieldReadoutsChanged != null || OnCardEquipped != null;
@@ -355,6 +368,7 @@ namespace YGOPortable.Core
             ClearAttack();
             ActivePrompt = null;
             CurrentChain.Clear();
+            _activatedMonsterEffects?.Clear();
             _resolvingChainLink = null;
             SolvedChainLinks.Clear();
             Logs.Clear();
@@ -396,6 +410,11 @@ namespace YGOPortable.Core
             var turn0Extra = p0GoesFirst ? p0Extra : p1Extra;
             var turn1Main = p0GoesFirst ? p1Main : p0Main;
             var turn1Extra = p0GoesFirst ? p1Extra : p0Extra;
+            // Planning replays already own the immutable starting lists.
+            var firstMain = _loadingPlanningReplay && turn0Main is uint[] savedFirst ? savedFirst : CopyDeck(turn0Main);
+            var secondMain = _loadingPlanningReplay && turn1Main is uint[] savedSecond ? savedSecond : CopyDeck(turn1Main);
+            _startingMainDecks = new[] { firstMain, secondMain };
+            _startingExtraCounts = new[] { turn0Extra?.Count ?? 0, turn1Extra?.Count ?? 0 };
 
             // Reuse the duel seed for deck order so a reported match can be replayed.
             uint shuffleSeed = 2166136261;
@@ -405,8 +424,8 @@ namespace YGOPortable.Core
                 shuffleSeed = unchecked((shuffleSeed ^ (uint)(seed[i] >> 32)) * 16777619);
             }
             var shuffle = new System.Random(unchecked((int)shuffleSeed));
-            LoadDeckForPlayer(0, turn0Main, turn0Extra, shuffle);
-            LoadDeckForPlayer(1, turn1Main, turn1Extra, shuffle);
+            LoadDeckForPlayer(0, firstMain, turn0Extra, shuffle);
+            LoadDeckForPlayer(1, secondMain, turn1Extra, shuffle);
 
             YgoNativeBridge.YGO_StartDuel(NativePtr);
             if (_recordPlanningReplay)
@@ -416,8 +435,8 @@ namespace YGOPortable.Core
                     first = p0GoesFirst,
                     startingLp = startingLp,
                     seed = (ulong[])seed.Clone(),
-                    firstDeck = CopyDeck(p0Main), firstExtra = CopyDeck(p0Extra),
-                    secondDeck = CopyDeck(p1Main), secondExtra = CopyDeck(p1Extra),
+                    firstDeck = p0GoesFirst ? firstMain : secondMain, firstExtra = CopyDeck(p0Extra),
+                    secondDeck = p0GoesFirst ? secondMain : firstMain, secondExtra = CopyDeck(p1Extra),
                 };
             }
             AddLog($"듀얼 개시! ({(p0GoesFirst ? "플레이어 선공" : "AI 선공")}) — 덱 무작위 셔플 완료");
@@ -466,11 +485,12 @@ namespace YGOPortable.Core
             }
         }
 
-        internal void BeginSpeculation(int player)
+        internal void BeginSpeculation(int player, bool stopAfterTurn = false)
         {
             _speculatingPlayer = player;
+            _planningTurnLimit = stopAfterTurn ? TurnNumber : -1;
             SpeculationUncertain = false;
-            _selectedFromDeck.Clear();
+            ClearDeckSelection();
         }
 
         private void LoadDeckForPlayer(byte playerId, IReadOnlyList<uint> main, IReadOnlyList<uint> extra, System.Random shuffle)
@@ -499,7 +519,11 @@ namespace YGOPortable.Core
             }
         }
 
-        public void SubmitResponse(byte[] buffer)
+        public void SubmitResponse(byte[] buffer) => SubmitResponse(buffer, preserveDeckSelection: false);
+
+        internal void SubmitPlanningResponse(byte[] buffer) => SubmitResponse(buffer, preserveDeckSelection: true);
+
+        private void SubmitResponse(byte[] buffer, bool preserveDeckSelection)
         {
             if (NativePtr == IntPtr.Zero || IsFinished) return;
             var prevPrompt = ActivePrompt;
@@ -510,7 +534,7 @@ namespace YGOPortable.Core
                     _planningReplay = null;
                 else _planningReplay.responses.Add((prevPrompt.messageType, prevPrompt.playerId, (byte[])buffer.Clone()));
             }
-            if (_speculatingPlayer >= 0) TrackSpeculativeSelection(prevPrompt, buffer);
+            if (_speculatingPlayer >= 0) TrackSpeculativeSelection(prevPrompt, buffer, preserveDeckSelection);
             if (prevPrompt?.messageType == YgoConstants.MSG_SELECT_BATTLECMD && buffer?.Length >= sizeof(int))
             {
                 int command = BitConverter.ToInt32(buffer, 0);
@@ -527,9 +551,20 @@ namespace YGOPortable.Core
             }
         }
 
-        private void TrackSpeculativeSelection(DuelPrompt prompt, byte[] buffer)
+        private void TrackSpeculativeSelection(DuelPrompt prompt, byte[] buffer, bool preserveDeckSelection)
         {
-            _selectedFromDeck.Clear();
+            bool appendSelection = false;
+            if (preserveDeckSelection && prompt?.playerId == _speculatingPlayer && _selectedFromDeck.Count > 0)
+            {
+                bool sameEffect = _deckSelectionEffect != null && ReferenceEquals(_deckSelectionEffect, SelectionChainLink);
+                // A selected Deck card can still need a zone, position, or destination.
+                if (prompt.messageType is YgoConstants.MSG_SELECT_PLACE or YgoConstants.MSG_SELECT_POSITION ||
+                    prompt.messageType == YgoConstants.MSG_SELECT_OPTION && sameEffect) return;
+                // Some effects ask for distinct cards in separate prompts, then move them together.
+                appendSelection = sameEffect && prompt.messageType == YgoConstants.MSG_SELECT_CARD &&
+                    prompt.SelectionHint == _deckSelectionHint;
+            }
+            if (!appendSelection) ClearDeckSelection();
             if (prompt == null || prompt.playerId != _speculatingPlayer || buffer == null || buffer.Length < 4) return;
             int action = BitConverter.ToInt32(buffer, 0);
             if (prompt.messageType == YgoConstants.MSG_SELECT_CARD && action == 0 && buffer.Length >= 8)
@@ -552,8 +587,22 @@ namespace YGOPortable.Core
             void Remember(SelectableCardItem card)
             {
                 if (card.controller == _speculatingPlayer && card.location == YgoConstants.LOCATION_DECK)
+                {
                     _selectedFromDeck.Add(card.code);
+                    if (preserveDeckSelection)
+                    {
+                        _deckSelectionEffect = SelectionChainLink;
+                        _deckSelectionHint = prompt.SelectionHint;
+                    }
+                }
             }
+        }
+
+        private void ClearDeckSelection()
+        {
+            _selectedFromDeck.Clear();
+            _deckSelectionEffect = null;
+            _deckSelectionHint = 0;
         }
 
         public void SubmitResponseInt(int val)
@@ -631,6 +680,7 @@ namespace YGOPortable.Core
                     IsFinished = true;
                     break;
                 }
+                if (SpeculationPassedTurnLimit) break;
                 if (status == YgoConstants.OCG_DUEL_STATUS_AWAITING)
                 {
                     var prompt = ActivePrompt;
@@ -872,9 +922,9 @@ namespace YGOPortable.Core
             ref (BattleComparisonValue? Attacker, BattleComparisonValue? Defender) comparison, ref CardMoveEvent firstSwapMove,
             ref Dictionary<(byte Controller, uint Location, uint Sequence), LiveCardState> positionReadouts)
         {
-            if (_speculatingPlayer >= 0 && msgType is YgoConstants.MSG_DRAW or YgoConstants.MSG_CONFIRM_DECKTOP or
-                YgoConstants.MSG_DECK_TOP or YgoConstants.MSG_CONFIRM_EXTRATOP or YgoConstants.MSG_RANDOM_SELECTED or
-                YgoConstants.MSG_TOSS_COIN or YgoConstants.MSG_TOSS_DICE)
+            if (_speculatingPlayer >= 0 && msgType is YgoConstants.MSG_CONFIRM_DECKTOP or YgoConstants.MSG_DECK_TOP or
+                YgoConstants.MSG_CONFIRM_EXTRATOP or YgoConstants.MSG_RANDOM_SELECTED or YgoConstants.MSG_TOSS_COIN or
+                YgoConstants.MSG_TOSS_DICE)
                 SpeculationUncertain = true;
             switch (msgType)
             {
@@ -917,6 +967,7 @@ namespace YGOPortable.Core
                 case YgoConstants.MSG_NEW_TURN:
                 {
                     _confirmedCards.Clear();
+                    _activatedMonsterEffects?.Clear();
                     TurnPlayer = br.ReadByte();
                     TurnNumber++;
                     TurnInterruptions = 0;
@@ -939,6 +990,9 @@ namespace YGOPortable.Core
                 case YgoConstants.MSG_DRAW:
                 {
                     byte p = br.ReadByte();
+                    // The planner uses only the opponent's hand size and skips their optional chains.
+                    if (_speculatingPlayer >= 0 && !SpeculationPassedTurnLimit &&
+                        (_planningTurnLimit < 0 || p == _speculatingPlayer)) SpeculationUncertain = true;
                     if (_confirmedCards.Count != 0)
                         _confirmedCards.RemoveWhere(c => c.Player == p &&
                             (c.Location == YgoConstants.LOCATION_HAND || c.Location == YgoConstants.LOCATION_DECK));
@@ -1224,6 +1278,8 @@ namespace YGOPortable.Core
                         PublicFieldSource = activation != null ? (activation.controller, activation.location, activation.sequence) : null,
                     };
                     CurrentChain.Add(link);
+                    if (tLoc == YgoConstants.LOCATION_MZONE && code != 0 && (desc >> 20) == code)
+                        (_activatedMonsterEffects ??= new()).Add((tCon, desc));
                     AddLog($"체인 {chainNo}: [{CardDatabase.GetName(code)}] 발동");
                     OnChainActivated?.Invoke(link);
                     break;
@@ -1251,6 +1307,9 @@ namespace YGOPortable.Core
 
                 case YgoConstants.MSG_CHAIN_SOLVED:
                     SampleFieldReadouts();
+                    if (_resolvingChainLink != null) OnChainResolved?.Invoke(_resolvingChainLink);
+                    if (_deckSelectionEffect != null && ReferenceEquals(_deckSelectionEffect, _resolvingChainLink))
+                        ClearDeckSelection();
                     _resolvingChainLink = null;
                     break;
 

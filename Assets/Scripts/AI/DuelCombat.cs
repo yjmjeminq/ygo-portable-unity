@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using YGOPortable.Core;
 
 namespace YGOPortable.AI
@@ -6,11 +7,114 @@ namespace YGOPortable.AI
     internal static class DuelCombat
     {
         private const int Lethal = 100000;
+        private const uint UtopiaDragonar = 95134948;
+        private const ulong ReduceAttackerToZero = ((ulong)UtopiaDragonar << 20) | 1;
+
+        internal static bool OpenLethal(DuelSession duel, byte player)
+        {
+            var rival = duel.Players[1 - player];
+            return rival.lp > 0 && rival.mzone.All(card => card == null) && rival.szone.All(card => card == null) &&
+                VisibleAttackTotal(duel.Players[player]) >= rival.lp;
+        }
+
+        internal static int VisibleAttackTotal(PlayerFieldSnapshot field) => field.mzone
+            .Where(card => card?.IsFaceUp == true && card.IsAttack).Sum(card => Math.Max(0, card.attack));
+
+        internal static bool IsWeakBattleLiability(int attack, int opposingAttack, int lifePoints) =>
+            attack < 1800 && opposingAttack > Math.Max(0, attack) && opposingAttack >= lifePoints;
+
+        internal static bool CanTestLethalPosition(DuelSession duel, byte player, int addedAttack)
+        {
+            var own = duel.Players[player];
+            var rival = duel.Players[1 - player];
+            var blockers = rival.mzone.Where(card => card != null).ToArray();
+            if (rival.lp <= 0 || blockers.Any(card => !card.IsFaceUp)) return false;
+            int availableAttack = own.mzone.Where(card => card?.IsFaceUp == true && card.IsAttack)
+                .Sum(card => Math.Max(0, card.attack));
+            int damageThreshold = rival.lp + blockers.Sum(card => Math.Max(0, card.IsDefense ? card.defense : card.attack));
+            return availableAttack < damageThreshold && availableAttack + addedAttack >= damageThreshold;
+        }
+
+        internal static (int Attacker, uint? Target)? FindLethal(DuelSession duel, DuelPrompt prompt)
+        {
+            var own = duel.Players[prompt.playerId];
+            var rival = duel.Players[1 - prompt.playerId];
+            var attackers = prompt.attackable.Select((option, index) => (option, index, live: GetMonster(own, option.sequence)))
+                .Where(entry => entry.live?.attack > 0).OrderBy(entry => entry.live.attack).ToArray();
+            foreach (var entry in attackers)
+                if (entry.option.directAttackable && entry.live.attack >= rival.lp) return (entry.index, null);
+            if (attackers.Sum(entry => entry.live.attack) < rival.lp) return null;
+            var defenders = rival.mzone.Where(card => card != null).ToArray();
+            if (attackers.Length == 0 || defenders.Any(card => !card.IsFaceUp)) return null;
+            if (defenders.Length == 0)
+                return attackers.Where(entry => entry.option.directAttackable).Sum(entry => entry.live.attack) >= rival.lp
+                    ? (attackers.Last(entry => entry.option.directAttackable).index, null) : null;
+
+            // Each attacker gets one attack. Recompute from the engine's legal attacks after every battle.
+            int aMask = (1 << attackers.Length) - 1, dMask = (1 << defenders.Length) - 1;
+            int[,] memo = new int[aMask + 1, dMask + 1];
+            var breakable = defenders.Select(card =>
+            {
+                var text = CardDatabase.Get(card.code)?.desc;
+                return card.effectsDisabled || text == null ||
+                    (!text.Contains("전투로는 파괴되지", StringComparison.Ordinal) &&
+                    !text.Contains("이 카드는 전투에 의해서는 파괴되지", StringComparison.Ordinal));
+            }).ToArray();
+
+            int BestDamage(int available, int blocking)
+            {
+                if (available == 0) return 0;
+                if (memo[available, blocking] != 0) return memo[available, blocking] - 1;
+                int best = 0;
+                for (int i = 0; i < attackers.Length; i++)
+                {
+                    if ((available & (1 << i)) == 0) continue;
+                    int remaining = available & ~(1 << i);
+                    if (blocking == 0 || attackers[i].option.directAttackable)
+                        best = Math.Max(best, attackers[i].live.attack + BestDamage(remaining, blocking));
+                    for (int j = 0; j < defenders.Length; j++)
+                    {
+                        if ((blocking & (1 << j)) == 0 || Damage(i, j) is not int hit) continue;
+                        best = Math.Max(best, hit + BestDamage(remaining, AfterHit(blocking, j)));
+                    }
+                }
+                memo[available, blocking] = best + 1;
+                return best;
+            }
+
+            int? Damage(int i, int j)
+            {
+                var defender = defenders[j];
+                int difference = attackers[i].live.attack - (defender.IsDefense ? defender.defense : defender.attack);
+                return difference > 0 || difference == 0 && !defender.IsDefense && breakable[j]
+                    ? (defender.IsDefense ? 0 : difference) : null;
+            }
+
+            int AfterHit(int blocking, int target) => breakable[target] ? blocking & ~(1 << target) : blocking;
+
+            for (int i = 0; i < attackers.Length; i++)
+            {
+                int remaining = aMask & ~(1 << i);
+                if (attackers[i].option.directAttackable && attackers[i].live.attack + BestDamage(remaining, dMask) >= rival.lp)
+                    return (attackers[i].index, null);
+                for (int j = 0; j < defenders.Length; j++)
+                    if (Damage(i, j) is int hit && hit + BestDamage(remaining, AfterHit(dMask, j)) >= rival.lp)
+                        return (attackers[i].index, defenders[j].sequence);
+            }
+            return null;
+        }
 
         internal static int ChooseAttacker(DuelSession duel, DuelPrompt prompt, bool mustAttack)
         {
             var own = duel.Players[prompt.playerId];
             var rival = duel.Players[1 - prompt.playerId];
+            if (!mustAttack && prompt.attackable.Count == 1 &&
+                GetMonster(own, prompt.attackable[0].sequence) is { attack: < 1800 } &&
+                rival.mzone.Any(card => card?.code == UtopiaDragonar && card.IsFaceUp && !card.effectsDisabled) &&
+                !duel.HasActivatedMonsterEffect((byte)(1 - prompt.playerId), ReduceAttackerToZero) &&
+                VisibleAttackTotal(rival) >= own.lp)
+                return -1;
+
             int best = mustAttack ? int.MinValue : 0;
             int choice = mustAttack && prompt.attackable.Count > 0 ? 0 : -1;
             for (int i = 0; i < prompt.attackable.Count; i++)

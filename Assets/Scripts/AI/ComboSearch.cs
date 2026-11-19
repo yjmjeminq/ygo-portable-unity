@@ -9,69 +9,154 @@ namespace YGOPortable.AI
     internal sealed class ComboSearch
     {
         internal const int KeepSetup = -1; // Planner decision, never sent to the duel engine.
-        private const int MaxBranches = 18;
-        private const int MaxMainActions = 12;
-        private const int MaxResponses = 76;
-        private const int MaxSearchesPerTurn = 3;
+        private const int MaxBranches = 36;
+        private const int MaxMainActions = 24;
+        private const int MaxResponses = 144;
+        private const int MaxSearchesPerTurn = 7;
         private const int MaxLateLinkSearches = 2;
-        private const int BudgetMilliseconds = 75;
-        private const int BranchMilliseconds = 26;
-        private const int LateLinkBranchMilliseconds = 42;
+        private const int BudgetMilliseconds = 200;
+        private const int BranchMilliseconds = 46;
+        private const int LateLinkBranchMilliseconds = 48;
+        private const int RecoveryBranchMilliseconds = 110;
         private const uint Machinex = 46593546, Siegfried = 44852429, Gilgamesh = 9024198;
+        private const uint PhotonJumper = 97639441, MicroCoder = 2347477;
+        private const uint NegatesEffects = 1u << 8;
+        private static readonly HashSet<uint> HandDisruption = new()
+        {
+            14558127, 23434538, 97268402, 10045474, 24224830, 73642296, 27204311, 94145021,
+            42141493, 59438930, 38814750, 10443957, PhotonJumper, 52038441, 84192580, 87126721,
+        };
 
-        private readonly bool _thorough;
+        // High-impact boss / omni-negate / floodgate endboard monsters (best for Turn 1 / setup)
+        private static readonly HashSet<uint> Tier1EndboardBosses = new()
+        {
+            84815190, // 플뢰르 드 바로네스
+            37818794, // 초마도용기사-붉은 눈의 드라군
+            21123811, // 코즈믹 블레이저 드래곤
+            89474727, // 진섬광룡 스타더스트 크로니클
+            9753964,  // 염마룡 레드 데몬 어비스
+            99585850, // 스카레드 슈퍼노바 드래곤
+            58481572, // 마스크드 히어로 다크 로우
+            60461804, // 데스티니 히어로 디스트로이 피닉스 가이
+            59822133, // 푸른 눈의 정령룡
+            19652159, // 라이트 앤드 다크니스 드래곤로드
+            47297616, // 라이트 앤드 다크니스 드래곤
+            4280258,  // 소명의 신궁-아폴로우사
+            29301450, // 에스:피 리틀나이트
+            63436931, // 붉은 용
+            26692769, // 팬텀 나이츠 러스티 바르디시
+            61245672, // 디코드 토커 히트소울
+        };
+
+        // Dedicated going-second board-breakers / OTK finishers
+        private static readonly HashSet<uint> GoingSecondFinishers = new()
+        {
+            86066372, // 액세스코드 토커
+            56832966, // SNo.39 유토피아 더 라이트닝
+            64276752, // 아크 리벨리온 엑시즈 드래곤
+            32828466, // Wake Up Your 엘리멘틀 히어로
+            29095552, // 마스크드 히어로 애시드
+            39765958, // 염마룡 레드 데몬
+            90448279, // 네가로기어 아제우스
+            93039339, // 로기어스텔라 티 폰
+            21637210, // 파이어월 드래곤 싱귤래리티
+            68934651, // 파이어월 드래곤 다크플루이드
+        };
+
+        // Graveyard floodgate / anti-GY bosses
+        private static readonly HashSet<uint> GraveyardHateBosses = new()
+        {
+            58481572, // 마스크드 히어로 다크 로우
+            59822133, // 푸른 눈의 정령룡
+            96633955, // 상검대공-승영
+        };
+
         private readonly Queue<(ulong state, int action)> _next = new();
+        private (ulong State, int Index, int AfterMainActions)? _selectedTarget;
         private int _turn = -1;
         private int _searches;
         private int _lateLinkSearches;
         private int _interruptions;
         private DuelPrompt _prepared;
+        internal bool ClearsBattleLethal { get; private set; }
         internal int SimulatedBranches { get; private set; }
         internal int ChangedLines { get; private set; }
-
-        internal ComboSearch(int opponentLevel) => _thorough = opponentLevel >= 8;
+        internal int ChosenAlternatives { get; private set; }
 
         private sealed class Line
         {
             internal double score = double.NegativeInfinity;
             internal bool complete;
             internal bool won;
+            internal bool endPhaseDegradedBoard;
             internal bool needsHiddenInformation;
+            internal bool exposedBeforeReveal;
+            internal bool testedAttackPosition;
+            internal bool measuredTurnEnd;
             internal Position ending;
             internal int unpaidLinkTrade = int.MaxValue;
             internal readonly List<(ulong state, int action)> moves = new();
             internal readonly List<(int[] prefix, int[] options)> forks = new();
+            internal readonly List<(int[] Prefix, ulong State, int[] Options)> targets = new();
+            internal (ulong State, int Index, int AfterMainActions)? selectedTarget;
+        }
+
+        private readonly struct Branch
+        {
+            internal readonly int[] MainActions;
+            internal readonly (ulong State, int Index)? Target;
+
+            internal Branch(int[] mainActions, (ulong State, int Index)? target = null)
+            {
+                MainActions = mainActions;
+                Target = target;
+            }
         }
 
         private readonly struct Position
         {
-            internal readonly int rank, opposingCards, interaction, pressure, defense, monsters, hand;
+            internal readonly int rank, opposingCards, interaction, pressure, defense, defenders, monsters, hand;
+            internal readonly int pendulumFollowUps;
             internal readonly bool lethal;
+            internal readonly bool exposedToBattleLethal;
             internal readonly bool HasSetup;
 
             internal Position(DuelSession duel, byte player, bool canBattle)
             {
                 var own = duel.Players[player];
                 var rival = duel.Players[1 - player];
-                int threat = 0, blockers = 0;
+                int threat = 0, blockers = 0, rivalAttack = 0, rivalAttackTotal = 0;
                 foreach (var monster in rival.mzone)
                 {
                     if (monster == null) continue;
                     blockers++;
-                    if (monster.IsFaceUp) threat = Math.Max(threat, monster.IsDefense ? monster.defense : monster.attack);
+                    if (!monster.IsFaceUp) continue;
+                    threat = Math.Max(threat, monster.IsDefense ? monster.defense : monster.attack);
+                    if (monster.IsAttack)
+                    {
+                        rivalAttack = Math.Max(rivalAttack, monster.attack);
+                        rivalAttackTotal += Math.Max(0, monster.attack);
+                    }
                 }
-                int attackers = 0, establishedAttackers = 0;
+                int attackers = 0, establishedAttackers = 0, weakestAttack = int.MaxValue;
                 HasSetup = false;
+                exposedToBattleLethal = false;
                 hand = own.hand.Count;
-                rank = interaction = pressure = defense = monsters = 0;
+                rank = interaction = pressure = defense = defenders = monsters = 0;
                 bool hasContract = own.szone.Any(card => card?.IsFaceUp == true && !card.effectsDisabled &&
                     DddTurnPlan.IsDarkContract(card.code));
                 foreach (var monster in own.mzone)
                 {
                     if (monster == null) continue;
                     monsters++;
+                    if (monster.IsDefense) defenders++;
                     if (!monster.IsFaceUp) continue;
-                    if (monster.IsAttack) attackers += Math.Max(0, monster.attack);
+                    if (monster.IsAttack)
+                    {
+                        attackers += Math.Max(0, monster.attack);
+                        weakestAttack = Math.Min(weakestAttack, Math.Max(0, monster.attack));
+                        exposedToBattleLethal |= rivalAttack - Math.Max(0, monster.attack) >= own.lp;
+                    }
                     if (monster.attack >= 1500 && monster.attack > threat && (!canBattle || monster.IsAttack))
                     {
                         pressure = Math.Max(pressure, monster.attack);
@@ -87,9 +172,12 @@ namespace YGOPortable.AI
                         HasSetup |= card.IsExtra;
                     }
                 }
+                exposedToBattleLethal |= monsters == 0 && rivalAttackTotal >= own.lp ||
+                    monsters == 1 && weakestAttack < rivalAttack && rivalAttackTotal - weakestAttack >= own.lp;
                 opposingCards = blockers + rival.szone.Count(card => card != null);
+                pendulumFollowUps = PendulumTurnPlan.ReadyFollowUps(own);
                 lethal = canBattle && blockers == 0 && attackers >= rival.lp;
-                HasSetup |= rank >= 3 || pressure >= 2400 || defense >= 2400 || establishedAttackers >= 2;
+                HasSetup |= rank >= 3 || pressure >= 2400 || defense >= 2400 || establishedAttackers >= 2 || pendulumFollowUps >= 2;
             }
 
             internal bool ImprovesOn(Position before) =>
@@ -97,7 +185,7 @@ namespace YGOPortable.AI
                 (interaction >= before.interaction && rank >= before.rank &&
                     (pressure > before.pressure || defense > before.defense ||
                         (rank >= 3 && rank > before.rank && pressure > 0) ||
-                        (hand > before.hand && monsters >= before.monsters)));
+                        (hand > before.hand && monsters >= before.monsters) || pendulumFollowUps > before.pendulumFollowUps));
 
             private static bool HasFieldInteraction(CardInfo card) => LinkComboPolicy.IsInteractive(card) &&
                 CardDatabase.GetArchetypeCollectionKey(card) is not
@@ -117,6 +205,9 @@ namespace YGOPortable.AI
             ((card.type & (YgoConstants.TYPE_TUNER | YgoConstants.TYPE_RITUAL)) != 0 ||
             (card.DeckEffectCategories & ((1u << 5) | (1u << 6) | (1u << 7) | (1u << 18))) != 0);
 
+        internal static bool IsHandDisruption(uint code) => HandDisruption.Contains(code);
+        internal static bool NeedsProvenNormalSummon(uint code) => IsHandDisruption(code) || code == MicroCoder;
+
         internal int? Choose(DuelSession live, DuelPrompt prompt, TacticalAI advisor)
         {
             if (!ReferenceEquals(_prepared, prompt))
@@ -127,40 +218,65 @@ namespace YGOPortable.AI
             return _next.Count > 0 && _next.Peek().state == Fingerprint(live, prompt) ? _next.Dequeue().action : null;
         }
 
+        internal int? TakePlannedSelection(DuelSession live, DuelPrompt prompt)
+        {
+            if (_turn != live.TurnNumber || _selectedTarget is not { } target ||
+                prompt.messageType is not (YgoConstants.MSG_SELECT_CARD or YgoConstants.MSG_SELECT_UNSELECT_CARD or
+                    YgoConstants.MSG_SELECT_OPTION or YgoConstants.MSG_SELECT_POSITION) ||
+                !ReferenceEquals(live.ActivePrompt, prompt) || live.RetryCount != 0 ||
+                Fingerprint(live, prompt) != target.State) return null;
+            _selectedTarget = null;
+            ChosenAlternatives++;
+            return target.Index;
+        }
+
         internal IEnumerable<bool> Prepare(DuelSession live, DuelPrompt prompt, TacticalAI advisor)
         {
             if (ReferenceEquals(_prepared, prompt)) yield break;
             _prepared = prompt;
             if (_turn != live.TurnNumber)
             {
+                ClearsBattleLethal = false;
                 _turn = live.TurnNumber;
                 _searches = 0;
                 _lateLinkSearches = 0;
                 _interruptions = 0;
                 _next.Clear();
+                _selectedTarget = null;
             }
 
             bool recovering = live.TurnPlayer == prompt.playerId && live.TurnInterruptions > 0;
             if (recovering && _interruptions != live.TurnInterruptions)
             {
+                ClearsBattleLethal = false;
                 // Reserve a fresh search after the first disruption, even if the opening search ran out.
                 if (_interruptions == 0) _searches = _lateLinkSearches = 0;
                 _interruptions = live.TurnInterruptions;
                 _next.Clear();
+                _selectedTarget = null;
             }
             ulong state = Fingerprint(live, prompt);
             var own = live.Players[prompt.playerId];
             var held = recovering ? new Position(live, prompt.playerId, prompt.canBp) : default;
             double heldScore = recovering ? BoardValue(live, prompt.playerId, prompt.canBp) : 0;
-            int searchesPerTurn = _thorough ? 9 : MaxSearchesPerTurn;
+            bool needsDefense = recovering && !held.HasSetup &&
+                DuelCombat.VisibleAttackTotal(live.Players[1 - prompt.playerId]) >= own.lp;
+            double AdditionalDefense(Position ending) =>
+                needsDefense && !ending.exposedToBattleLethal && ending.rank >= held.rank && ending.interaction >= held.interaction
+                    ? .38 * Math.Clamp(ending.defenders - held.defenders, 0, 2) : 0;
             bool CouldTrade(SelectableCardItem item) => LinkComboPolicy.NeedsMaterialProjection(own, item);
             bool cached = _next.Count > 0 && _next.Peek().state == state;
             // An opening search may run out before the first strong Link monster reaches the board.
-            bool lateLinkTrade = _searches >= searchesPerTurn && _lateLinkSearches < MaxLateLinkSearches &&
+            bool lateLinkTrade = _searches >= MaxSearchesPerTurn && _lateLinkSearches < MaxLateLinkSearches &&
                 prompt.spSummonable.Any(CouldTrade);
             if (cached && (!lateLinkTrade || _next.Peek().action == KeepSetup)) yield break;
-            if (!cached) _next.Clear();
-            if (!lateLinkTrade && _searches >= searchesPerTurn) yield break;
+            if (!cached)
+            {
+                ClearsBattleLethal = false;
+                _next.Clear();
+                _selectedTarget = null;
+            }
+            if (!lateLinkTrade && _searches >= MaxSearchesPerTurn) yield break;
             var options = advisor.ComboMainOptions(live, prompt);
             var lateOptions = lateLinkTrade ? options.Where(action => (action & 0xffff) == 1)
                 .Select(action => (action, summon: prompt.spSummonable[action >> 16]))
@@ -168,29 +284,28 @@ namespace YGOPortable.AI
                 .OrderByDescending(option => LinkComboPolicy.IsBridge(option.summon.code))
                 .ThenBy(option => LinkComboPolicy.Rank(option.summon.code))
                 .Take(3).Select(option => option.action).ToArray() : Array.Empty<int>();
-            bool protectSetup = _thorough && own.mzone.Any(card => card?.IsFaceUp == true);
-            if (lateLinkTrade ? lateOptions.Length == 0 : options.Length < (recovering || protectSetup ? 1 : 2)) yield break;
+            if (lateLinkTrade ? lateOptions.Length == 0 : options.Length == 0) yield break;
             if (lateLinkTrade) _lateLinkSearches++;
             else _searches++;
 
             var watch = new Stopwatch();
-            int maxBranches = _thorough ? 36 : MaxBranches;
-            int totalBudget = _thorough ? 220 : BudgetMilliseconds;
-            bool Expired() => watch.ElapsedMilliseconds >= totalBudget;
-            var queue = new Queue<int[]>();
-            queue.Enqueue(cached ? _next.TakeWhile(move => move.action != KeepSetup).Select(move => move.action).ToArray() : Array.Empty<int>());
+            bool Expired() => watch.ElapsedMilliseconds >= BudgetMilliseconds;
+            var queue = new Queue<Branch>();
+            queue.Enqueue(new Branch(cached ? _next.TakeWhile(move => move.action != KeepSetup).Select(move => move.action).ToArray() : Array.Empty<int>(),
+                _selectedTarget is { } selected ? (selected.State, selected.Index) : null));
             var seen = new HashSet<string>();
-            int branchBudget = _thorough ? 48 : lateLinkTrade ? LateLinkBranchMilliseconds : BranchMilliseconds;
+            int branchBudget = lateLinkTrade ? LateLinkBranchMilliseconds : BranchMilliseconds;
+            if (needsDefense) branchBudget = RecoveryBranchMilliseconds;
             foreach (int option in lateOptions)
             {
-                queue.Enqueue(new[] { option });
+                queue.Enqueue(new Branch(new[] { option }));
                 seen.Add(option.ToString());
             }
             Line best = null;
             Line baseline = null;
-            for (int attempt = 0; queue.Count != 0 && attempt < maxBranches && !Expired(); attempt++)
+            for (int attempt = 0; queue.Count != 0 && attempt < MaxBranches && !Expired(); attempt++)
             {
-                int[] choices = queue.Dequeue();
+                Branch choices = queue.Dequeue();
                 Line line;
                 long branchStart = watch.ElapsedMilliseconds;
                 watch.Start();
@@ -199,38 +314,50 @@ namespace YGOPortable.AI
                 {
                     if (trial == null || Fingerprint(trial, trial.ActivePrompt) != state) break;
                     SimulatedBranches++;
-                    trial.BeginSpeculation(prompt.playerId);
+                    trial.BeginSpeculation(prompt.playerId, stopAfterTurn: true);
                     line = Explore(trial, advisor.ForkForComboSearch(), prompt.playerId, choices, BranchExpired, recovering);
                 }
                 baseline ??= line;
                 // The default route may be waiting for a draw or another reveal. Keep its confirmed
                 // steps and let the next real prompt replan with the revealed cards.
-                if (!recovering && _thorough && attempt == 0 && line.needsHiddenInformation && line.unpaidLinkTrade == int.MaxValue)
+                if (!recovering && attempt == 0 && line.needsHiddenInformation && !line.exposedBeforeReveal && !line.testedAttackPosition &&
+                    line.unpaidLinkTrade == int.MaxValue && line.moves.Count > 0)
                 {
                     best = line;
                     break;
                 }
-                bool valid = line.unpaidLinkTrade == int.MaxValue && (!_thorough || line.moves.Count > 0);
+                bool valid = line.unpaidLinkTrade == int.MaxValue && line.moves.Count > 0 && (!line.testedAttackPosition || line.won);
                 if (recovering)
-                    valid &= line.complete && (line.won || (line.score > heldScore + .08 && line.ending.ImprovesOn(held)));
-                bool better = valid && (best == null ||
-                    ((best.complete || lateLinkTrade || _thorough) && line.complete && line.moves.Count > 0 && line.score > best.score + .08));
-                if (better) best = line;
-                if (better || ((recovering || _thorough) && attempt == 0) || (line.complete && line.unpaidLinkTrade != int.MaxValue))
                 {
+                    double defenseValue = AdditionalDefense(line.ending);
+                    valid &= line.complete && (line.won || (line.score + defenseValue > heldScore + .08 &&
+                        (defenseValue > 0 || line.ending.ImprovesOn(held))));
+                }
+                double Value(Line candidate) => candidate.score + AdditionalDefense(candidate.ending) + (candidate.ending.HasSetup ? .48 : 0);
+                bool better = valid && (best == null || (line.complete && (!best.complete || Value(line) > Value(best) + .08)));
+                if (better) best = line;
+                if (better || attempt == 0 || (line.complete && line.unpaidLinkTrade != int.MaxValue))
+                {
+                    if (choices.Target == null)
+                    {
+                        foreach (var target in line.targets.Take(3))
+                            foreach (int option in target.Options)
+                                if (seen.Add($"{string.Join(",", target.Prefix)};{target.State};{option}"))
+                                    queue.Enqueue(new Branch(target.Prefix, (target.State, option)));
+                    }
                     // Examine both the opening choice and the transition into a possible finish.
                     var forks = line.unpaidLinkTrade == int.MaxValue
                         ? line.forks : line.forks.Where(fork => fork.prefix.Length > line.unpaidLinkTrade).ToList();
-                    for (int offset = 0; offset < Math.Min(_thorough ? 9 : 6, forks.Count) && queue.Count < maxBranches; offset++)
+                    for (int offset = 0; offset < Math.Min(9, forks.Count) && queue.Count < MaxBranches; offset++)
                     {
                         int depth = offset % 2 == 0 ? offset / 2 : forks.Count - 1 - offset / 2;
                         var fork = forks[depth];
-                        foreach (int option in fork.options.Take(_thorough ? 3 : 2))
+                        foreach (int option in fork.options.Take(3))
                         {
                             var branch = new int[fork.prefix.Length + 1];
                             Array.Copy(fork.prefix, branch, fork.prefix.Length);
                             branch[^1] = option;
-                            if (seen.Add(string.Join(",", branch))) queue.Enqueue(branch);
+                            if (seen.Add(string.Join(",", branch))) queue.Enqueue(new Branch(branch));
                         }
                     }
                 }
@@ -241,10 +368,13 @@ namespace YGOPortable.AI
             if (best == null || best.moves.Count == 0) yield break;
             if (best != baseline) ChangedLines++;
             _next.Clear();
+            ClearsBattleLethal = best.won || (best.measuredTurnEnd && !best.needsHiddenInformation &&
+                !best.ending.exposedToBattleLethal);
+            _selectedTarget = best.selectedTarget;
             foreach (var move in best.moves) _next.Enqueue(move);
         }
 
-        private Line Explore(DuelSession trial, TacticalAI ai, byte player, int[] prefix, Func<bool> expired, bool recovering)
+        private Line Explore(DuelSession trial, TacticalAI ai, byte player, Branch branch, Func<bool> expired, bool recovering)
         {
             var line = new Line();
             int settledMoves = 0;
@@ -255,12 +385,13 @@ namespace YGOPortable.AI
             var beforeLink = default(Position);
             double beforeLinkScore = 0;
             var trades = new List<(int index, int rank, double score, Position before)>();
-            bool assessRisk = _thorough || recovering;
             bool canKeepSetup = false;
-            bool hasInitialPosition = false;
             var initial = default(Position);
+            (int step, ulong state, double score, Position before)? start = null;
             (int step, ulong state, double score, Position before)? checkpoint = null;
             (int step, ulong state, double score, Position before)? spend = null;
+            var safeSets = new List<(int Step, ulong State, double Score, Position Before, uint Code, int SetIndex)>();
+            List<(int Step, ulong State, double Score, Position Before, uint Code, int CopiesOnField)> handSupportSummons = null;
             trial.OnCardMoved += move =>
             {
                 if (canKeepSetup && !spend.HasValue && move.fromCon == player && move.fromLoc == YgoConstants.LOCATION_MZONE &&
@@ -277,9 +408,7 @@ namespace YGOPortable.AI
                 if (LinkComboPolicy.IsDowngrade(rank, targetRank))
                     trades.Add((line.moves.Count - 1, rank, beforeLinkScore, beforeLink));
             };
-            int maxResponses = _thorough ? 144 : MaxResponses;
-            int maxMainActions = _thorough ? 24 : MaxMainActions;
-            for (int i = 0; i < maxResponses && !expired() && trial.TurnNumber == startTurn &&
+            for (int i = 0; i < MaxResponses && !expired() && trial.TurnNumber == startTurn &&
                 trial.RetryCount == 0 && !trial.SpeculationUncertain; i++)
             {
                 if (trial.IsFinished)
@@ -300,36 +429,58 @@ namespace YGOPortable.AI
                 }
                 if (prompt.messageType != YgoConstants.MSG_SELECT_IDLECMD)
                 {
-                    if (prompt.candidates.Any(card => card.controller != player &&
-                        card.location is YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_DECK or YgoConstants.LOCATION_EXTRA)) break;
-                    trial.SubmitResponse(ai.ComputeResponse(trial, prompt));
+                    if (HasPrivateOpponentChoices(prompt)) break;
+                    byte[] choiceResponse = ai.ComputeResponse(trial, prompt);
+                    if (TryTargetOptions(trial, prompt, choiceResponse, out ulong selectionState, out int[] targetAlternatives))
+                    {
+                        if (branch.Target is { } target && target.State == selectionState && targetAlternatives.Contains(target.Index))
+                        {
+                            choiceResponse = TacticalAI.EncodePlannedSelection(prompt, target.Index);
+                            line.selectedTarget = (selectionState, target.Index, line.moves.Count);
+                            line.testedAttackPosition = prompt.messageType == YgoConstants.MSG_SELECT_POSITION;
+                        }
+                        else if (branch.Target == null && line.targets.Count < 3)
+                            line.targets.Add((line.moves.Select(move => move.action).ToArray(), selectionState, targetAlternatives));
+                    }
+                    trial.SubmitPlanningResponse(choiceResponse);
                     continue;
                 }
 
                 canBattle = prompt.canBp;
                 line.score = BoardValue(trial, player, canBattle) - line.moves.Count * .01;
                 ulong state = Fingerprint(trial, prompt);
-                if (assessRisk)
+                line.ending = new Position(trial, player, canBattle);
+                if (line.moves.Count == 0)
                 {
-                    line.ending = new Position(trial, player, canBattle);
-                    if (!hasInitialPosition)
-                    {
-                        initial = line.ending;
-                        hasInitialPosition = true;
-                    }
-                    if ((recovering || spend.HasValue) && line.moves.Count > 0 && (prompt.canEp || prompt.canBp) &&
-                        line.ending.ImprovesOn(spend?.before ?? initial) &&
-                        (!checkpoint.HasValue || line.score > checkpoint.Value.score))
-                        checkpoint = (line.moves.Count, state, line.score, line.ending);
+                    initial = line.ending;
+                    if (prompt.canEp || prompt.canBp) start = (0, state, line.score, initial);
                 }
-                canKeepSetup = assessRisk && line.ending.HasSetup && (prompt.canEp || prompt.canBp);
+                if ((recovering || spend.HasValue || line.ending.HasSetup) && line.moves.Count > 0 && (prompt.canEp || prompt.canBp) &&
+                    line.ending.ImprovesOn(spend?.before ?? initial) &&
+                    (!checkpoint.HasValue || line.score > checkpoint.Value.score))
+                    checkpoint = (line.moves.Count, state, line.score, line.ending);
+                canKeepSetup = line.ending.HasSetup && (prompt.canEp || prompt.canBp);
                 settledMoves = line.moves.Count;
-                if (settledMoves >= maxMainActions) break;
+                if (settledMoves >= MaxMainActions) break;
                 var options = ai.ComboMainOptions(trial, prompt);
-                int? forced = settledMoves < prefix.Length ? prefix[settledMoves] : null;
+                int? forced = settledMoves < branch.MainActions.Length ? branch.MainActions[settledMoves] : null;
                 byte[] response = ai.ComputeComboResponse(trial, prompt, forced);
                 int move = BitConverter.ToInt32(response, 0);
-                if (forced.HasValue && forced != move) break;
+                bool defendedBeforePhaseChange = (forced is 6 or 7) && (move & 0xffff) == 2;
+                if (forced.HasValue && forced != move && !defendedBeforePhaseChange) break;
+                if ((move & 0xffff) == 0 && (prompt.canEp || prompt.canBp) &&
+                    prompt.summonable[move >> 16] is { location: YgoConstants.LOCATION_HAND } normal)
+                {
+                    if (CardDatabase.Get(normal.code)?.atk < 1800 && DuelTactics.ChooseDefensiveSet(trial, prompt, normal,
+                        followupUnproven: true, compareWithBattle: true) is int setIndex)
+                        safeSets.Add((settledMoves, state, line.score, line.ending, normal.code, setIndex));
+                    if (NeedsProvenNormalSummon(normal.code))
+                    {
+                        handSupportSummons ??= new();
+                        int copies = trial.Players[player].mzone.Count(card => card?.code == normal.code);
+                        handSupportSummons.Add((settledMoves, state, line.score, line.ending, normal.code, copies));
+                    }
+                }
                 targetRank = 0;
                 if ((move & 0xffff) == 1 && prompt.spSummonable[move >> 16] is { location: YgoConstants.LOCATION_EXTRA } summon)
                 {
@@ -350,34 +501,87 @@ namespace YGOPortable.AI
                 {
                     settledMoves = line.moves.Count;
                     line.complete = true;
+                    canKeepSetup = false;
+                    if (move == 6)
+                        MeasureBattle(trial, ai, player, response, expired, line);
+                    else
+                        MeasureTurnEnd(trial, ai, player, response, expired, line);
                     break;
                 }
                 trial.SubmitResponse(response);
             }
             line.needsHiddenInformation = trial.SpeculationUncertain;
+            line.exposedBeforeReveal = line.needsHiddenInformation && safeSets.Any(candidate => candidate.Step < settledMoves &&
+                trial.Players[player].mzone.Any(card => card?.code == candidate.Code && card.IsAttack && card.attack < 1800));
             if (line.moves.Count > settledMoves) line.moves.RemoveRange(settledMoves, line.moves.Count - settledMoves);
-            var stop = !line.complete || (checkpoint.HasValue && checkpoint.Value.score > line.score + .08)
+            if (line.selectedTarget is { } selected && selected.AfterMainActions > settledMoves) line.selectedTarget = null;
+            var stop = !line.complete || (!line.endPhaseDegradedBoard && checkpoint.HasValue && checkpoint.Value.score > line.score + .08)
                 ? checkpoint : null;
             if (spend is { } investment && !line.ending.ImprovesOn(investment.before))
                 stop ??= investment;
             else if (spend.HasValue && !line.complete)
                 stop ??= spend;
+            if (line.moves.Count > 1 && start.HasValue && !line.ending.ImprovesOn(initial) &&
+                line.score < start.Value.score - .08)
+                stop ??= start;
+            int stopAction = KeepSetup;
+            foreach (var candidate in safeSets)
+            {
+                if (!line.complete || line.needsHiddenInformation || candidate.Step >= settledMoves ||
+                    stop.HasValue && candidate.Step >= stop.Value.step) continue;
+                var own = trial.Players[player];
+                var attacker = own.mzone.FirstOrDefault(card => card?.code == candidate.Code && card.IsFaceUp &&
+                    card.IsAttack && card.attack < 1800);
+                if (attacker == null) continue;
+                int threat = DuelTactics.StrongestAttacker(trial.Players[1 - player]);
+                int incomingDamage = threat - Math.Max(0, attacker.attack);
+                bool improvesField = line.ending.interaction > candidate.Before.interaction ||
+                    line.ending.rank > candidate.Before.rank || line.ending.pressure > candidate.Before.pressure ||
+                    line.ending.defense > candidate.Before.defense;
+                bool opensLethal = line.ending.exposedToBattleLethal && (line.ending.monsters == 1 ||
+                    !candidate.Before.exposedToBattleLethal && incomingDamage >= own.lp);
+                // A weak monster without a follow-up gives the next turn's effects an attack target.
+                bool clearedOpposingCard = line.ending.opposingCards < candidate.Before.opposingCards;
+                bool risksSurvival = DuelCombat.IsWeakBattleLiability(attacker.attack, threat, own.lp) &&
+                    !improvesField && (!clearedOpposingCard || 2L * incomingDamage >= own.lp);
+                bool needsDefense = (opensLethal || risksSurvival) && !own.hand.Any(card => card.code == PhotonJumper);
+                bool payoff = improvesField || clearedOpposingCard ||
+                    (!attacker.effectsDisabled && CardDatabase.Get(attacker.code) is CardInfo info && LinkComboPolicy.IsInteractive(info));
+                if (!needsDefense && payoff) continue;
+                stop = (candidate.Step, candidate.State, candidate.Score + .15, candidate.Before);
+                stopAction = (candidate.SetIndex << 16) | 3;
+                break;
+            }
+            if (handSupportSummons != null && !line.won)
+            {
+                // These cards have a role in the hand. Spend them when they lead to a follow-up.
+                foreach (var candidate in handSupportSummons)
+                {
+                    if (candidate.Step >= settledMoves || stop.HasValue && candidate.Step > stop.Value.step) break;
+                    if (trial.Players[player].mzone.Count(card => card?.code == candidate.Code) <= candidate.CopiesOnField) continue;
+                    stop = (candidate.Step, candidate.State, candidate.Score, candidate.Before);
+                    stopAction = KeepSetup;
+                    break;
+                }
+            }
             if (stop is { } safe && !line.won)
             {
                 // Return only the proven prefix. The live AI can attack or prepare defenses from this field.
                 line.moves.RemoveRange(safe.step, line.moves.Count - safe.step);
-                line.moves.Add((safe.state, KeepSetup));
+                line.moves.Add((safe.state, stopAction));
                 line.score = safe.score;
                 line.ending = safe.before;
                 line.complete = true;
+                line.measuredTurnEnd = false;
                 line.needsHiddenInformation = false;
+                if (line.selectedTarget is { } picked && picked.AfterMainActions > safe.step) line.selectedTarget = null;
                 trades.RemoveAll(trade => trade.index >= safe.step);
             }
             if (trades.Count == 0 || (trial.IsFinished && trial.Winner == player)) return line;
 
             // Leaving more small bodies is insufficient. The projected line must recover the lost Link rating
             // or gain an actionable advantage against the actual board before committing the material.
-            var end = assessRisk ? line.ending : new Position(trial, player, canBattle);
+            var end = line.ending;
             foreach (var trade in trades)
             {
                 if (trade.index >= settledMoves) continue;
@@ -389,35 +593,224 @@ namespace YGOPortable.AI
             return line;
         }
 
+        private static bool HasPrivateOpponentChoices(DuelPrompt prompt) => prompt.candidates.Any(card => card.controller != prompt.playerId &&
+            card.location is YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_DECK or YgoConstants.LOCATION_EXTRA);
+
+        private static bool TryTargetOptions(DuelSession duel, DuelPrompt prompt, byte[] response, out ulong state, out int[] alternatives)
+        {
+            state = 0;
+            alternatives = Array.Empty<int>();
+            if (prompt.messageType == YgoConstants.MSG_SELECT_POSITION && response.Length == 4 &&
+                BitConverter.ToInt32(response, 0) == YgoConstants.POS_FACEUP_DEFENSE &&
+                (prompt.allowedPositions & YgoConstants.POS_FACEUP_ATTACK) != 0 &&
+                duel.CurrentPhase == YgoConstants.PHASE_MAIN1 && duel.TurnNumber > 1 &&
+                duel.TurnPlayer == prompt.playerId && CardDatabase.Get(prompt.promptCardCode) is { atk: > 0 } monster &&
+                DuelCombat.CanTestLethalPosition(duel, prompt.playerId, monster.atk))
+            {
+                // Test the actual Battle Phase before spending a potential defender as an attacker.
+                alternatives = new[] { (int)YgoConstants.POS_FACEUP_ATTACK };
+                state = Fingerprint(duel, prompt);
+                return true;
+            }
+            if (prompt.messageType == YgoConstants.MSG_SELECT_OPTION && prompt.options.Count is > 1 and <= 6 && response.Length == 4)
+            {
+                int choice = BitConverter.ToInt32(response, 0);
+                alternatives = Enumerable.Range(0, prompt.options.Count).Where(option => option != choice).Take(2).ToArray();
+                state = Fingerprint(duel, prompt);
+                return true;
+            }
+            if (prompt.candidates.Count < 2 || prompt.candidates.Count > 20) return false;
+            int selected;
+            if (prompt.messageType == YgoConstants.MSG_SELECT_CARD && prompt.min == 1 && prompt.max == 1 &&
+                response.Length == 12 && BitConverter.ToInt32(response, 0) == 0)
+                selected = BitConverter.ToInt32(response, 8);
+            else if (prompt.messageType == YgoConstants.MSG_SELECT_UNSELECT_CARD && !prompt.finishable &&
+                response.Length == 8 && BitConverter.ToInt32(response, 0) == 1)
+                selected = BitConverter.ToInt32(response, 4);
+            else return false;
+            if (prompt.SelectionHint is not (501 or 502 or 503 or 504 or 506 or 509 or 511 or 512 or 513 or 533)) return false;
+            alternatives = prompt.candidates.Select((card, index) => (card, index))
+                .Where(entry => entry.index != selected && entry.card.code != 0 &&
+                    (prompt.SelectionHint != DuelTactics.Destroy || entry.card.controller != prompt.playerId))
+                .OrderByDescending(entry => DuelTactics.SelectionPriority(duel, prompt.playerId, entry.card, prompt.SelectionHint))
+                .Take(2).Select(entry => entry.index).ToArray();
+            if (alternatives.Length == 0) return false;
+            state = Fingerprint(duel, prompt);
+            return true;
+        }
+
+        private static void MeasureBattle(DuelSession trial, TacticalAI ai, byte player, byte[] enter, Func<bool> expired, Line line)
+        {
+            int lifeBefore = trial.Players[1 - player].lp;
+            int ownLifeBefore = trial.Players[player].lp;
+            var before = line.ending;
+            byte[] finishBattle = null;
+            trial.SubmitResponse(enter);
+            for (int step = 0; step < 16 && !expired() && trial.RetryCount == 0 && !trial.SpeculationUncertain && !trial.IsFinished; step++)
+            {
+                var prompt = trial.ActivePrompt;
+                if (prompt == null) break;
+                if (prompt.playerId != player)
+                {
+                    if (prompt.messageType != YgoConstants.MSG_SELECT_CHAIN || prompt.forced) break;
+                    trial.SubmitResponseInt(-1);
+                    continue;
+                }
+                if (prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD || HasPrivateOpponentChoices(prompt)) break;
+                byte[] response = ai.ComputeResponse(trial, prompt);
+                if (prompt.messageType == YgoConstants.MSG_SELECT_BATTLECMD && (BitConverter.ToInt32(response, 0) & 0xffff) is 2 or 3)
+                {
+                    finishBattle = response;
+                    break;
+                }
+                trial.SubmitPlanningResponse(response);
+            }
+            if (trial.SpeculationUncertain || trial.RetryCount != 0) return;
+            if (trial.IsFinished)
+            {
+                line.won = trial.Winner == player;
+                line.score = line.won ? 100 : trial.Winner == 2 ? 0 : -100;
+            }
+            else
+            {
+                var after = new Position(trial, player, canBattle: false);
+                int damage = lifeBefore - trial.Players[1 - player].lp - (ownLifeBefore - trial.Players[player].lp);
+                line.score += damage / 3300.0 + 1.15 * (before.opposingCards - after.opposingCards) -
+                    1.1 * (before.monsters - after.monsters);
+                line.ending = after;
+                if (finishBattle != null && !expired())
+                    MeasureTurnEnd(trial, ai, player, finishBattle, expired, line);
+            }
+        }
+
+        private static void MeasureTurnEnd(DuelSession trial, TacticalAI ai, byte player, byte[] end, Func<bool> expired, Line line)
+        {
+            int turn = trial.TurnNumber;
+            double before = BoardValue(trial, player, canBattle: false);
+            trial.SubmitPlanningResponse(end);
+            for (int step = 0; step < 12 && trial.TurnNumber == turn && !expired() && !trial.IsFinished &&
+                !trial.SpeculationUncertain && trial.RetryCount == 0; step++)
+            {
+                var prompt = trial.ActivePrompt;
+                if (prompt == null || HasPrivateOpponentChoices(prompt)) break;
+                if (prompt.playerId == player)
+                    trial.SubmitPlanningResponse(ai.ComputeResponse(trial, prompt));
+                else if (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN && !prompt.forced)
+                    trial.SubmitResponseInt(-1);
+                else break;
+            }
+            if (trial.SpeculationUncertain || trial.RetryCount != 0) return;
+            if (trial.IsFinished)
+            {
+                line.won = trial.Winner == player;
+                line.score = line.won ? 100 : trial.Winner == 2 ? 0 : -100;
+            }
+            else if (trial.TurnNumber > turn)
+            {
+                line.measuredTurnEnd = true;
+                double change = BoardValue(trial, player, canBattle: false) - before;
+                line.score += change;
+                line.ending = new Position(trial, player, canBattle: false);
+                line.endPhaseDegradedBoard = change < -.08;
+            }
+        }
+
         internal static double BoardValue(DuelSession duel, byte player, bool canBattle)
         {
             var own = duel.Players[player];
             var rival = duel.Players[1 - player];
             int opposingMonsters = rival.mzone.Count(card => card != null);
             int opposingSpells = rival.szone.Count(card => card != null);
+            int rivalMaxAtk = DuelTactics.StrongestAttacker(rival);
+            bool breakingBoard = canBattle && duel.TurnNumber > 1;
+            var style = DuelDeckStrategy.For(duel, player);
+            bool controlsResources = style != DuelDeckStyle.Development;
+            bool rivalHeavyBoard = breakingBoard && (opposingMonsters >= 2 || rival.mzone.Any(m => m?.IsFaceUp == true && Math.Max(m.attack, m.defense) >= 2400));
+            bool rivalUsesGrave = rival.grave.Count >= 4;
             bool contract = own.szone.Any(card => card?.IsFaceUp == true && !card.effectsDisabled && DddTurnPlan.IsDarkContract(card.code));
-            double score = .18 * own.hand.Count + .18 * own.szone.Count(card => card != null) -
-                .75 * opposingMonsters - .43 * opposingSpells + (own.lp - rival.lp) / 4800.0;
+            double score = .27 * own.hand.Count - .24 * rival.hand.Count + .06 * Math.Min(own.grave.Count, 12) +
+                (breakingBoard ? .25 : .58) * own.hand.Count(card => HandDisruption.Contains(card.code)) -
+                (breakingBoard ? 1.05 : .75) * opposingMonsters - (breakingBoard ? .64 : .43) * opposingSpells +
+                (own.lp - rival.lp) / (breakingBoard ? 3300.0 : 5200.0);
+            if (controlsResources)
+                score += .24 * own.hand.Count + .16 * (own.szone.Count(card => card != null) - opposingSpells);
+            if (style == DuelDeckStyle.Lock)
+                score += .18 * own.hand.Count + .9 * own.hand.Count(card => DuelDeckStrategy.IsKeyPiece(card.code)) -
+                    Math.Max(0, 3200 - own.lp) / 1400.0;
+            score += .19 * Math.Min(3, PendulumTurnPlan.ReadyFollowUps(own));
+            foreach (var backrow in own.szone)
+            {
+                if (backrow == null) continue;
+                score += .16;
+                if (backrow.effectsDisabled || CardDatabase.Get(backrow.code) is not CardInfo info) continue;
+                if ((!backrow.IsFaceUp && (info.IsTrap || (info.type & YgoConstants.TYPE_QUICKPLAY) != 0)) ||
+                    (backrow.IsFaceUp && info.IsTrap && LinkComboPolicy.IsInteractive(info)))
+                    score += (controlsResources ? .88 : breakingBoard ? .19 : .55) + ((info.DeckEffectCategories & NegatesEffects) != 0 ? .26 : 0);
+                if (style == DuelDeckStyle.Lock && DuelDeckStrategy.IsKeyPiece(backrow.code)) score += 1.2;
+            }
             int attack = 0;
             foreach (var monster in own.mzone)
             {
-                if (monster?.IsFaceUp != true || CardDatabase.Get(monster.code) is not CardInfo card) continue;
-                if (monster.IsAttack) attack += Math.Max(0, monster.attack);
-                score += .6 + Math.Clamp(monster.attack, 0, 4200) / 3200.0;
+                if (monster == null) continue;
+                if (!monster.IsFaceUp)
+                {
+                    score += .26;
+                    continue;
+                }
+                if (CardDatabase.Get(monster.code) is not CardInfo card) continue;
+                if (monster.IsAttack)
+                {
+                    attack += Math.Max(0, monster.attack);
+                    if (!card.IsLink && rivalMaxAtk > monster.attack)
+                    {
+                        score -= monster.attack < 1800 && (monster.effectsDisabled || !LinkComboPolicy.IsInteractive(card))
+                            ? .94 : breakingBoard ? .34 : .68;
+                        if (rivalMaxAtk - Math.Max(0, monster.attack) >= own.lp)
+                            score -= 2.2;
+                    }
+                }
+                else if (!breakingBoard)
+                    score += Math.Clamp(monster.defense, 0, 3300) / 8000.0;
+                score += .6 + Math.Clamp(monster.attack, 0, 4200) / (breakingBoard ? 3000.0 : 4100.0);
                 bool developed = card.IsExtra || (card.type & YgoConstants.TYPE_RITUAL) != 0;
-                if (developed) score += .42;
-                if (card.IsLink) score += card.level * .35 + (card.level >= 5 ? 1.85 : card.level >= 4 ? .6 : 0);
+                if (developed)
+                {
+                    score += .75;
+                    if (!card.IsLink && card.level >= 4) score += .35;
+                    if (!card.IsLink && card.level >= 7) score += .45;
+                    if (!card.IsLink && card.level >= 9) score += .45;
+                }
+                if (card.IsLink) score += card.level * .28 + (card.level >= 5 ? 1.65 : card.level >= 4 ? .55 : 0);
                 if (monster.effectsDisabled) continue;
+                if (style == DuelDeckStyle.Lock && DuelDeckStrategy.IsKeyPiece(monster.code)) score += 1.2;
+                if (!breakingBoard && monster.code == SignatureTurnPlan.ScarredDragonArchfiend) score += .7;
                 if (monster.code == Machinex && (contract || monster.overlayCodes.Count >= 2))
                     score += 1.7 + .26 * Math.Min(3, opposingMonsters);
                 else if (monster.code == Siegfried) score += 1.65 + .36 * Math.Min(3, opposingSpells);
-                else if (monster.code != Gilgamesh && developed && LinkComboPolicy.IsInteractive(card)) score += .85;
+                else if (Tier1EndboardBosses.Contains(monster.code))
+                    score += breakingBoard ? 1.55 : 2.22;
+                else if (monster.code != Gilgamesh && developed && LinkComboPolicy.IsInteractive(card))
+                    score += breakingBoard ? .85 : (card.DeckEffectCategories & NegatesEffects) != 0 ? 1.62 : 1.23;
+
+                if (!breakingBoard && HasProtection(card)) score += .36;
+
+                // Matchup / situation-adaptive bonus:
+                if (GoingSecondFinishers.Contains(monster.code))
+                    score += rivalHeavyBoard ? 1.35 : breakingBoard ? .45 : -.45;
+                if (rivalUsesGrave && GraveyardHateBosses.Contains(monster.code))
+                    score += 0.90;
             }
             foreach (var monster in rival.mzone)
                 if (monster?.IsFaceUp == true) score -= Math.Max(0, monster.IsDefense ? monster.defense : monster.attack) / 4300.0;
-            if (canBattle && opposingMonsters == 0 && attack >= rival.lp) score += 4.5;
+            if (breakingBoard && opposingMonsters == 0 && attack > 0)
+                score += attack >= rival.lp ? 8 : (double)attack / Math.Max(8000, rival.lp);
             return score;
         }
+
+        internal static bool HasProtection(CardInfo card) =>
+            card.desc?.Contains("효과의 대상이 되지", StringComparison.Ordinal) == true ||
+            card.desc?.Contains("효과로는 파괴되지", StringComparison.Ordinal) == true ||
+            card.desc?.Contains("효과를 받지 않는다", StringComparison.Ordinal) == true;
 
         private static ulong Fingerprint(DuelSession duel, DuelPrompt prompt)
         {
@@ -482,6 +875,29 @@ namespace YGOPortable.AI
             Options(prompt.mSetable);
             Options(prompt.sSetable);
             Options(prompt.activatable);
+            if (prompt.messageType != YgoConstants.MSG_SELECT_IDLECMD)
+            {
+                if (prompt.messageType == YgoConstants.MSG_SELECT_POSITION)
+                {
+                    Mix(prompt.promptCardCode);
+                    Mix(prompt.allowedPositions);
+                }
+                Mix(prompt.SelectionHint);
+                Mix(prompt.min);
+                Mix(prompt.max);
+                Mix(prompt.finishable ? 1UL : 0UL);
+                Options(prompt.candidates);
+                Options(prompt.unselectCandidates);
+                Options(prompt.mustSelect);
+                foreach (ulong option in prompt.options) Mix(option);
+                foreach (var link in duel.CurrentChain)
+                {
+                    Mix(link.code);
+                    Mix(link.triggerPlayer);
+                    Mix(link.description);
+                    Mix(link.negated ? 1UL : 0UL);
+                }
+            }
             return hash;
         }
     }

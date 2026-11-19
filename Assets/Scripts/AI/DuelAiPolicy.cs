@@ -10,6 +10,7 @@ namespace YGOPortable.AI
     {
         internal const string ResourceName = "DuelAiPolicy";
         private const int Version = 2;
+        private const int StyleCount = 3;
         private const uint Development = (1u << 4) | (1u << 5) | (1u << 6) | (1u << 14) | (1u << 18);
         private const uint Disruption = (1u << 0) | (1u << 1) | (1u << 2) | (1u << 3) | (1u << 8) | (1u << 13);
         private const uint Negation = 1u << 8;
@@ -33,20 +34,33 @@ namespace YGOPortable.AI
             public int version;
             public float[] weights;
             public Decisions decisions;
+            public StyleModel[] styles;
+        }
+
+        [Serializable]
+        private sealed class StyleModel
+        {
+            public DuelDeckStyle style;
+            public float[] weights;
+            public Decisions decisions;
         }
 
         private readonly float[] _weights;
+        private readonly DuelAiPolicy[] _styles;
         internal Decisions EnabledDecisions { get; }
         internal bool UsesMainPhase => (EnabledDecisions & Decisions.MainPhase) != 0;
         internal bool UsesChains => (EnabledDecisions & Decisions.Chains) != 0;
 
-        internal DuelAiPolicy(float[] weights, Decisions decisions)
+        internal DuelAiPolicy(float[] weights, Decisions decisions) : this(weights, decisions, null) { }
+
+        private DuelAiPolicy(float[] weights, Decisions decisions, DuelAiPolicy[] styles)
         {
             if ((decisions & Decisions.Both) == 0 || (decisions & ~Decisions.Both) != 0 ||
                 weights == null || weights.Length != (int)Feature.Count ||
                 weights.Any(weight => float.IsNaN(weight) || Math.Abs(weight) > 8))
                 throw new ArgumentException("Invalid duel policy weights.", nameof(weights));
             _weights = (float[])weights.Clone();
+            _styles = styles;
             EnabledDecisions = decisions;
         }
 
@@ -57,7 +71,17 @@ namespace YGOPortable.AI
             try
             {
                 var model = JsonUtility.FromJson<Model>(asset.text);
-                return model?.version == Version ? new DuelAiPolicy(model.weights, model.decisions) : null;
+                if (model?.version != Version) return null;
+                if (model.styles == null || model.styles.Length == 0)
+                    return new DuelAiPolicy(model.weights, model.decisions);
+                var styles = new DuelAiPolicy[StyleCount];
+                foreach (var profile in model.styles)
+                {
+                    if (profile == null || (uint)profile.style >= StyleCount || styles[(int)profile.style] != null)
+                        throw new ArgumentException("Invalid duel policy style.");
+                    styles[(int)profile.style] = new DuelAiPolicy(profile.weights, profile.decisions);
+                }
+                return new DuelAiPolicy(model.weights, model.decisions, styles);
             }
             catch (ArgumentException exception)
             {
@@ -66,7 +90,26 @@ namespace YGOPortable.AI
             }
         }
 
-        internal string ToJson() => JsonUtility.ToJson(new Model { version = Version, weights = _weights, decisions = EnabledDecisions }, true);
+        internal string ToJson() => JsonUtility.ToJson(new Model
+        {
+            version = Version,
+            weights = _weights,
+            decisions = EnabledDecisions,
+            styles = _styles?.Select((policy, index) => (policy, index)).Where(entry => entry.policy != null)
+                .Select(entry => new StyleModel { style = (DuelDeckStyle)entry.index, weights = entry.policy._weights,
+                    decisions = entry.policy.EnabledDecisions }).ToArray(),
+        }, true);
+
+        internal DuelAiPolicy ForStyle(DuelDeckStyle style) => _styles?[(int)style] ?? this;
+
+        internal DuelAiPolicy WithStyle(DuelDeckStyle style, DuelAiPolicy policy)
+        {
+            var styles = _styles == null ? new DuelAiPolicy[StyleCount] : (DuelAiPolicy[])_styles.Clone();
+            styles[(int)style] = policy.ForStyle(style);
+            return new DuelAiPolicy(_weights, EnabledDecisions, styles);
+        }
+
+        internal float[] CopyWeights() => (float[])_weights.Clone();
 
         internal static float[] InitialWeights()
         {
@@ -101,6 +144,7 @@ namespace YGOPortable.AI
         {
             var own = session.Players[prompt.playerId];
             var rival = session.Players[1 - prompt.playerId];
+            var style = DuelDeckStrategy.For(session, prompt.playerId);
             int bodies = 0, ownAttack = 0, strongestOwn = 0, strongestRival = 0, directDamage = 0, opposition = 0;
             foreach (var card in own.mzone)
             {
@@ -143,6 +187,8 @@ namespace YGOPortable.AI
                         if ((flags & Development) != 0) score += Weight(Feature.ActivateStarter);
                         if (item.location != YgoConstants.LOCATION_HAND) score += Weight(Feature.ActivateExisting);
                         if ((flags & Disruption) != 0) score += Weight(Feature.ActivateControl) + threat * Weight(Feature.ActivateThreat);
+                        if (style == DuelDeckStyle.Lock && ((flags & (1u << 4)) != 0 || DuelDeckStrategy.IsKeyPiece(item.code)))
+                            score += 1.25f;
                         if (score <= 0 && prompt.canEp) continue;
                     }
                     else
@@ -154,6 +200,9 @@ namespace YGOPortable.AI
                         if ((flags & Disruption) != 0) score += Weight(Feature.SummonControl);
                         if (extra) score += Weight(Feature.ExtraSummon) +
                             Weight(Feature.ExtraCommitment) * Math.Clamp((ownAttack - attack) / 5000, 0, 1);
+                        if (style != DuelDeckStyle.Development && !canBattle && (flags & Disruption) == 0 &&
+                            !DuelDeckStrategy.IsKeyPiece(item.code) && attack < strongestRival)
+                            score -= .95f;
                         if (extra && bodies > 0 && score <= 0 && prompt.canEp) continue;
                     }
 

@@ -18,18 +18,21 @@ namespace YGOPortable.Editor
         private const int TrainingPairs = 19;
         private const int ValidationPairs = 64;
         private const int TestPairs = 120;
+        private const int StyleObservationTurns = 6;
 
         private static readonly int[] TrainingDeckIds =
         {
-            20, 288, 289, 312, 385, 520, 34043, 36036, 20670, 20671, 20672, 20673,
-            20674, 20675, 20676, 20678, 20684, 20686, 1000104, 1000094, 1000133, 1000016,
-            36, 155, 309, 313, 340, 485, 644, 36017, 20677, 20679, 20680, 20681,
-            20682, 20683, 20685, 20687, 20688, 20689, 1000119, 1000187, 1000137, 1000043,
+            51045, 51049, 50947, 50949, 50819, 51039, 51195, 51199, 51379, 51175, 51179, 51099,
+            51369, 50355, 50359, 50165, 50169, 50019, 50109, 50199, 50039, 51749, 51689, 51569,
+            51589, 50725, 50729, 50439, 50719, 50689, 50699, 50619, 51435, 51439, 51899, 51879,
+            20670, 20671, 20672, 20674, 20675, 20678, 20684, 20686,
+            20673, 50962, 51028, 52150,
         };
         private static readonly int[] TestDeckIds =
         {
-            295, 298, 300, 302, 303, 304, 306, 576, 37095, 35000, 35001, 35002,
-            35004, 35005, 33013, 37051, 37057, 588, 117, 157, 83, 97, 109, 36005,
+            51057, 50847, 51029, 51079, 51209, 50369, 51609, 51729, 51469, 50749, 51409, 51779,
+            82024, 83054, 50474, 50404, 51824, 51854, 20677, 20679, 20680, 20682, 20687, 20689,
+            50961, 50964, 52151,
         };
 
         private sealed class Fixture
@@ -42,10 +45,25 @@ namespace YGOPortable.Editor
         private sealed class Results
         {
             internal int wins, losses, draws, retries, capped;
+            internal double setup, breakthrough, control, lockProgress;
+            internal readonly int[] styleGames = new int[3];
+            internal readonly double[] stylePoints = new double[3];
             internal int Games => wins + losses + draws;
             internal double Rate => (wins + .5 * draws) / Games;
-            internal double Objective => Rate - .25 * retries / Games;
-            public override string ToString() => $"{wins}W {losses}L {draws}D in {Games} games ({Rate:P1}), {retries} candidate retries, {capped} capped";
+            internal double Objective => Rate + (.10 * setup + .12 * breakthrough + .12 * control + .12 * lockProgress - .5 * retries - .12 * capped) / Games;
+            public override string ToString() => $"{wins}W {losses}L {draws}D in {Games} games ({Rate:P1}), setup {2 * setup / Games:F2}, " +
+                $"breakthrough {2 * breakthrough / Games:F2}, control {control / Games:F2}, lock {lockProgress / Games:F2}, " +
+                $"{retries} candidate retries, {capped} capped";
+
+            internal string StyleSummary() => string.Join(", ", Enum.GetValues(typeof(DuelDeckStyle)).Cast<DuelDeckStyle>()
+                .Select(style => $"{style} {stylePoints[(int)style]:0.0}/{styleGames[(int)style]}"));
+
+            internal double StyleObjective(DuelDeckStyle style)
+            {
+                double reward = style == DuelDeckStyle.Control ? control : lockProgress;
+                int index = (int)style;
+                return (stylePoints[index] + .12 * reward) / Math.Max(1, styleGames[index]);
+            }
         }
 
         // Unity batch entry point. Self-play uses preset decks and synthetic shuffle seeds only.
@@ -64,33 +82,62 @@ namespace YGOPortable.Editor
                 var available = DeckRepository.Characters.SelectMany(character => OpponentDeckLevels.GetDecks(character.id))
                     .Where(deck => deck.main?.Length >= 40 && deck.extra != null).GroupBy(deck => deck.id)
                     .ToDictionary(group => group.Key, group => group.First());
-                var trainingDecks = TrainingDeckIds.Select(id => available[id]).ToArray();
-                var testDecks = TestDeckIds.Select(id => available[id]).ToArray();
+                var trainingDecks = TrainingDeckIds.Where(id => available.ContainsKey(id)).Select(id => available[id]).ToArray();
+                var testDecks = TestDeckIds.Where(id => available.ContainsKey(id)).Select(id => available[id]).ToArray();
                 var elapsed = Stopwatch.StartNew();
                 var random = new System.Random(38407);
-                float[] initial = DuelAiPolicy.InitialWeights();
+                var existingPolicy = DuelAiPolicy.LoadIncluded();
+                float[] initial = existingPolicy?.CopyWeights() ?? DuelAiPolicy.InitialWeights();
                 var validation = CreateFixtures(trainingDecks, ValidationPairs, 483172);
-                var main = TrainDecisions(initial, DuelAiPolicy.Decisions.MainPhase, trainingDecks, validation, random, elapsed);
-                var chains = TrainDecisions(initial, DuelAiPolicy.Decisions.Chains, trainingDecks, validation, random, elapsed);
+                var main = TrainDecisions(initial, DuelAiPolicy.Decisions.MainPhase, trainingDecks, validation, existingPolicy, random, elapsed);
+                var chains = TrainDecisions(initial, DuelAiPolicy.Decisions.Chains, trainingDecks, validation, existingPolicy, random, elapsed);
                 var combinedWeights = (float[])main.weights.Clone();
                 int chainStart = DuelAiPolicy.FirstChainFeature;
                 Array.Copy(chains.weights, chainStart, combinedWeights, chainStart, combinedWeights.Length - chainStart);
                 var combined = new DuelAiPolicy(combinedWeights, DuelAiPolicy.Decisions.Both);
-                var best = new[] { (main.policy, main.results), (chains.policy, chains.results),
-                        (policy: combined, results: Evaluate(combined, validation, tacticalReference: true)) }
+                var candidatesList = new List<(DuelAiPolicy policy, Results results)>
+                {
+                    (main.policy, main.results),
+                    (chains.policy, chains.results),
+                    (combined, Evaluate(combined, validation, existingPolicy)),
+                };
+                var stylePolicy = existingPolicy;
+                if (existingPolicy != null)
+                {
+                    var previousResult = Evaluate(existingPolicy, validation, existingPolicy);
+                    candidatesList.Add((existingPolicy, previousResult));
+                    foreach (var style in new[] { DuelDeckStyle.Control, DuelDeckStyle.Lock })
+                    {
+                        var specialist = candidatesList.OrderByDescending(entry => entry.results.StyleObjective(style)).First();
+                        if (specialist.results.StyleObjective(style) <= previousResult.StyleObjective(style)) continue;
+                        stylePolicy = stylePolicy.WithStyle(style, specialist.policy);
+                        Debug.Log($"[AI TRAIN] {style} profile from {specialist.policy.EnabledDecisions}. " +
+                            $"Validation {previousResult.StyleObjective(style):F3} -> {specialist.results.StyleObjective(style):F3}");
+                    }
+                    if (!ReferenceEquals(stylePolicy, existingPolicy))
+                        candidatesList.Add((stylePolicy, Evaluate(stylePolicy, validation, existingPolicy)));
+                }
+                var linkPolicy = LinkComboPolicy.LoadIncluded();
+                var plannerFixtures = CreateFixtures(trainingDecks, 18, 782449);
+                var shortlist = candidatesList.OrderByDescending(entry => entry.results.Objective).Take(3)
+                    .Select(entry => entry.policy).ToList();
+                if (stylePolicy != null && !ReferenceEquals(stylePolicy, existingPolicy) && !shortlist.Contains(stylePolicy))
+                    shortlist.Add(stylePolicy);
+                var best = shortlist.Select(policy => (policy, results: Evaluate(policy, plannerFixtures, existingPolicy, linkPolicy)))
                     .OrderByDescending(entry => entry.results.Objective).First();
                 const int trainingGames = Generations * PopulationSize * TrainingPairs * 4;
-                Debug.Log($"[AI TRAIN] Selected {best.policy.EnabledDecisions} after {trainingGames} games with {trainingDecks.Length} training decks. Validation vs rules-only AI {best.results}");
+                Debug.Log($"[AI TRAIN] Selected {best.policy.EnabledDecisions} after {trainingGames} games with {trainingDecks.Length} training decks. Planner validation against the included policy {best.results}");
 
                 var test = CreateFixtures(testDecks, TestPairs, 559236);
-                var versusPrevious = Evaluate(best.policy, test, tacticalReference: false);
-                var versusRules = Evaluate(best.policy, test, tacticalReference: true);
-                var rulesVersusPrevious = Evaluate(null, test, tacticalReference: false);
+                var versusPrevious = Evaluate(best.policy, test, existingPolicy);
+                var versusRules = Evaluate(best.policy, test, null);
+                var rulesVersusPrevious = Evaluate(null, test, existingPolicy);
                 Debug.Log($"[AI EVAL] Held-out vs previous AI {versusPrevious}");
+                Debug.Log($"[AI EVAL] Held-out style results {versusPrevious.StyleSummary()}");
                 Debug.Log($"[AI EVAL] Held-out vs rules-only AI {versusRules}");
                 Debug.Log($"[AI EVAL] Held-out rules-only vs previous AI {rulesVersusPrevious}");
                 Debug.Log($"[AI TRAIN] Time {elapsed.Elapsed.TotalSeconds:F1}s, native script errors {scriptErrors}");
-                if (versusPrevious.Objective <= .52 || versusRules.Objective < .48)
+                if (scriptErrors != 0 || versusPrevious.Rate < .50 || versusRules.Rate < .45 || versusPrevious.retries != 0 || versusPrevious.capped != 0)
                     throw new InvalidOperationException("The selected policy did not meet the held-out strength check.");
 
                 string assetPath = $"Assets/Resources/{DuelAiPolicy.ResourceName}.json";
@@ -112,7 +159,8 @@ namespace YGOPortable.Editor
         }
 
         private static (float[] weights, DuelAiPolicy policy, Results results) TrainDecisions(float[] initial,
-            DuelAiPolicy.Decisions decisions, PresetDeckInfo[] decks, Fixture[] validation, System.Random random, Stopwatch elapsed)
+            DuelAiPolicy.Decisions decisions, PresetDeckInfo[] decks, Fixture[] validation,
+            DuelAiPolicy previousPolicy, System.Random random, Stopwatch elapsed)
         {
             bool chains = decisions == DuelAiPolicy.Decisions.Chains;
             int first = chains ? DuelAiPolicy.FirstChainFeature : 0;
@@ -130,7 +178,7 @@ namespace YGOPortable.Editor
                 candidates[1] = finalists[^1];
                 for (int i = 2; i < candidates.Length; i++)
                     candidates[i] = Sample(center, deviations, random, first, end);
-                var ranked = candidates.Select(weights => (weights, results: Evaluate(new DuelAiPolicy(weights, decisions), fixtures, tacticalReference: true)))
+                var ranked = candidates.Select(weights => (weights, results: Evaluate(new DuelAiPolicy(weights, decisions), fixtures, previousPolicy)))
                     .OrderByDescending(entry => entry.results.Objective).ToArray();
                 finalists.Add(ranked[0].weights);
                 Debug.Log($"[AI TRAIN] {decisions} {generation + 1}/{Generations} best {ranked[0].results} at {elapsed.Elapsed.TotalSeconds:F0}s");
@@ -149,7 +197,7 @@ namespace YGOPortable.Editor
             finalists.Add(center);
             var best = finalists.Where(weights => !weights.SequenceEqual(initial))
                 .Select(weights => (weights, policy: new DuelAiPolicy(weights, decisions)))
-                .Select(entry => (entry.weights, entry.policy, results: Evaluate(entry.policy, validation, tacticalReference: true)))
+                .Select(entry => (entry.weights, entry.policy, results: Evaluate(entry.policy, validation, previousPolicy)))
                 .OrderByDescending(entry => entry.results.Objective).First();
             Debug.Log($"[AI TRAIN] {decisions} validation {best.results}");
             return best;
@@ -159,14 +207,17 @@ namespace YGOPortable.Editor
         {
             var random = new System.Random(shuffleSeed);
             var orderedDecks = decks.OrderBy(_ => random.Next()).ToArray();
+            var styles = orderedDecks.GroupBy(deck => DuelDeckStrategy.Classify(deck.main, deck.extra.Length))
+                .Select(group => group.ToArray()).ToArray();
             var fixtures = new Fixture[count];
             for (int i = 0; i < count; i++)
             {
-                int pair = i % decks.Length;
+                var cohort = styles[i % styles.Length];
+                var first = cohort[i / styles.Length % cohort.Length];
                 fixtures[i] = new Fixture
                 {
-                    first = orderedDecks[pair],
-                    second = i % 4 == 0 ? orderedDecks[pair] : orderedDecks[(pair + random.Next(1, decks.Length)) % decks.Length],
+                    first = first,
+                    second = i % 4 == 0 ? first : orderedDecks[random.Next(orderedDecks.Length)],
                     seed = Enumerable.Range(0, 4).Select(_ => (ulong)random.Next(1, int.MaxValue)).ToArray(),
                 };
             }
@@ -184,7 +235,7 @@ namespace YGOPortable.Editor
             return candidate;
         }
 
-        private static Results Evaluate(DuelAiPolicy policy, Fixture[] fixtures, bool tacticalReference)
+        private static Results Evaluate(DuelAiPolicy policy, Fixture[] fixtures, DuelAiPolicy referencePolicy, LinkComboPolicy links = null)
         {
             var result = new Results();
             foreach (var match in fixtures)
@@ -192,12 +243,28 @@ namespace YGOPortable.Editor
                 // The same shuffled seats are played with the candidate on each side to cancel deck and turn-order bias.
                 for (int candidateSeat = 0; candidateSeat < 2; candidateSeat++)
                 {
-                    using var duel = new DuelSession();
+                    using var duel = new DuelSession(recordPlanningReplay: links != null);
                     if (!duel.StartNewDuel(match.first.main, match.first.extra, match.second.main, match.second.extra, seed: match.seed))
                         throw new InvalidOperationException("Could not start a training duel.");
-                    var candidate = new TacticalAI(policy);
-                    var reference = tacticalReference ? new TacticalAI(null) : new TacticalAI();
-                    for (int step = 0; step < 1200 && duel.TurnNumber <= 60 && !duel.IsFinished && duel.RetryCount <= 4; step++)
+                    var candidate = new TacticalAI(policy, links, searchCombos: links != null);
+                    var reference = new TacticalAI(referencePolicy, links, searchCombos: links != null);
+                    int openingTurn = candidateSeat + 1;
+                    int opposingLpAtMain = 0;
+                    var style = DuelDeckStrategy.For(duel, (byte)candidateSeat);
+                    int cutEffects = 0, cardsDrawn = 0, previousDraws = 0, observedTurns = 0;
+                    double styleProgress = 0;
+                    duel.OnCardsDrawn += (player, cards) =>
+                    {
+                        if (style == DuelDeckStyle.Lock && player == candidateSeat) cardsDrawn += cards.Count;
+                    };
+                    duel.OnChainResolving += link =>
+                    {
+                        if (style == DuelDeckStyle.Control && link.negated && link.triggerPlayer != candidateSeat &&
+                            CardDatabase.Get(link.code) is CardInfo source && ComboSearch.CanDevelopFromCard(source) &&
+                            duel.CurrentChain.Any(answer => answer.triggerPlayer == candidateSeat && answer.chainNumber > link.chainNumber))
+                            cutEffects++;
+                    };
+                    for (int step = 0; step < 6400 && duel.TurnNumber <= 160 && !duel.IsFinished && duel.RetryCount <= 4; step++)
                     {
                         var prompt = duel.ActivePrompt;
                         if (prompt == null)
@@ -207,18 +274,72 @@ namespace YGOPortable.Editor
                         }
 
                         bool candidateTurn = prompt.playerId == candidateSeat;
+                        int turn = duel.TurnNumber;
+                        int turnPlayer = duel.TurnPlayer;
+                        if (candidateTurn && turn == openingTurn && opposingLpAtMain == 0 && prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD)
+                            opposingLpAtMain = duel.Players[1 - candidateSeat].lp;
                         int retries = duel.RetryCount;
                         duel.SubmitResponse((candidateTurn ? candidate : reference).ComputeResponse(duel, prompt));
                         if (candidateTurn) result.retries += duel.RetryCount - retries;
+                        bool turnEnded = duel.TurnNumber > turn || duel.IsFinished;
+                        if (turn == openingTurn && turnEnded && opposingLpAtMain > 0)
+                        {
+                            double board = Math.Tanh(ComboSearch.BoardValue(duel, (byte)candidateSeat, canBattle: false) / 7);
+                            if (candidateSeat == 0) result.setup += board;
+                            else
+                            {
+                                double damage = Math.Clamp((opposingLpAtMain - duel.Players[0].lp) / (double)opposingLpAtMain, 0, 1);
+                                result.breakthrough += duel.IsFinished && duel.Winner == candidateSeat ? 1 : .55 * damage + .45 * board;
+                            }
+                        }
+                        if (!turnEnded || turnPlayer != candidateSeat || observedTurns >= StyleObservationTurns ||
+                            style == DuelDeckStyle.Development) continue;
+                        var own = duel.Players[candidateSeat];
+                        if (style == DuelDeckStyle.Control)
+                        {
+                            var rival = duel.Players[1 - candidateSeat];
+                            double advantage = Math.Tanh((AvailableCards(own) - AvailableCards(rival)) / 5.0);
+                            int setDisruption = own.szone.Count(card => card != null && !card.IsFaceUp &&
+                                CardDatabase.Get(card.code) is CardInfo info && LinkComboPolicy.IsInteractive(info));
+                            styleProgress += .45 * advantage + .25 * Math.Min(3, setDisruption) / 3;
+                            observedTurns++;
+                        }
+                        if (style == DuelDeckStyle.Lock)
+                        {
+                            int heldPieces = own.hand.Count(card => DuelDeckStrategy.IsKeyPiece(card.code));
+                            int activePieces = own.mzone.Concat(own.szone).Count(card => card != null &&
+                                !card.effectsDisabled && DuelDeckStrategy.IsKeyPiece(card.code));
+                            styleProgress += .48 * Math.Clamp(own.lp / 8000.0, 0, 1) +
+                                .32 * Math.Min(4, heldPieces + activePieces) / 4 +
+                                .20 * Math.Min(5, cardsDrawn - previousDraws) / 5;
+                            previousDraws = cardsDrawn;
+                            observedTurns++;
+                        }
                     }
 
                     if (!duel.IsFinished) result.capped++;
-                    if (!duel.IsFinished || duel.Winner < 0 || duel.Winner > 1) result.draws++;
-                    else if (duel.Winner == candidateSeat) result.wins++;
+                    // Average completed windows so a longer game alone does not earn a larger reward.
+                    if (style == DuelDeckStyle.Control && observedTurns > 0) result.control += styleProgress / observedTurns;
+                    if (style == DuelDeckStyle.Lock && observedTurns > 0) result.lockProgress += styleProgress / observedTurns;
+                    result.control += .30 * Math.Min(4, cutEffects) / 4;
+                    result.styleGames[(int)style]++;
+                    if (!duel.IsFinished || duel.Winner < 0 || duel.Winner > 1)
+                    {
+                        result.draws++;
+                        result.stylePoints[(int)style] += .5;
+                    }
+                    else if (duel.Winner == candidateSeat)
+                    {
+                        result.wins++;
+                        result.stylePoints[(int)style]++;
+                    }
                     else result.losses++;
                 }
             }
             return result;
         }
+
+        private static int AvailableCards(PlayerFieldSnapshot field) =>
+            field.hand.Count + field.mzone.Count(card => card != null) + field.szone.Count(card => card != null);
     }
 }

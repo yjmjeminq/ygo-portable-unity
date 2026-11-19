@@ -17,9 +17,9 @@ namespace YGOPortable.Editor
         private const int Population = 10;
         private const int HandsPerDeck = 4;
 
-        private static readonly int[] TrainingDecks = { 385, 502, 519, 485, 497, 508, 35000, 35004, 35020, 35011, 503, 20676 };
-        private static readonly int[] TestDecks = { 495, 481, 35003, 520, 498, 524, 35001, 35005, 35102, 36039, 505, 35007 };
-        private static readonly int[] RivalDecks = { 20670, 20671, 20672, 20674, 20678, 20686, 20, 312 };
+        private static readonly int[] TrainingDecks = { 51433, 51435, 51439, 51873, 51875, 51879, 51895, 51899, 85003, 85004, 85014, 20676 };
+        private static readonly int[] TestDecks = { 51404, 51409, 51775, 51779, 85024, 85033, 85043, 85053, 51414, 51784, 51814, 51884 };
+        private static readonly int[] RivalDecks = { 20670, 20671, 20672, 20674, 20678, 20686, 51049, 50949 };
 
         private sealed class Opening
         {
@@ -35,6 +35,7 @@ namespace YGOPortable.Editor
             internal double score;
             internal readonly Dictionary<uint, int> Finishers = new Dictionary<uint, int>();
             internal double Mean => score / games;
+            internal double SetupQuality => Mean + (.65 * linkThree + 1.1 * linkFour) / games;
             internal string OpeningSummary() => $"{games} openings, Link-3+ {linkThree}, Link-4+ {linkFour}, interactive Link {interactive}, mean {Mean:F2}, {retries} retries";
             internal string MatchSummary() => $"{wins}W {losses}L {draws}D in {games}, {retries} retries";
         }
@@ -69,7 +70,8 @@ namespace YGOPortable.Editor
                 DeckRepository.Load(streaming, Path.Combine(Path.GetTempPath(), "ygo_link_training"), seedDefaultDecks: false);
                 var decks = DeckRepository.PresetDecks.ToDictionary(deck => deck.id);
                 var general = DuelAiPolicy.LoadIncluded() ?? throw new InvalidOperationException("Missing the general AI model.");
-                var initial = LinkComboPolicy.InitialWeights();
+                var previousPolicy = LinkComboPolicy.LoadIncluded();
+                var initial = previousPolicy?.CopyWeights() ?? LinkComboPolicy.InitialWeights();
                 var center = (float[])initial.Clone();
                 var random = new System.Random(273370);
                 var finalists = new List<float[]>();
@@ -83,7 +85,7 @@ namespace YGOPortable.Editor
                     candidates[1] = finalists.Count == 0 ? initial : finalists[^1];
                     for (int i = 2; i < candidates.Length; i++) candidates[i] = Sample(center, random, .8f / (1 + .3f * round));
                     var ranked = candidates.Select(weights => (weights, outcome: Run(general, new LinkComboPolicy(weights), fixtures, fullDuel: false)))
-                        .OrderByDescending(candidate => candidate.outcome.Mean).ToArray();
+                        .OrderByDescending(candidate => candidate.outcome.SetupQuality).ToArray();
                     finalists.Add(ranked[0].weights);
                     var elite = ranked.Take(3).Select(candidate => candidate.weights).ToArray();
                     center = Enumerable.Range(0, initial.Length).Select(i => elite.Average(weights => weights[i])).ToArray();
@@ -93,17 +95,21 @@ namespace YGOPortable.Editor
                 finalists.Add(center);
                 var validation = CreateOpenings(decks, TrainingDecks, 7, 92180);
                 var fullValidation = CreateOpenings(decks, TrainingDecks, 3, 66457);
+                var previousValidation = Run(general, previousPolicy, validation, fullDuel: false);
                 var best = finalists.Where(weights => !weights.SequenceEqual(initial)).Select(weights => new LinkComboPolicy(weights))
                     .Select(policy => (policy, opening: Run(general, policy, validation, fullDuel: false)))
-                    .OrderByDescending(candidate => candidate.opening.Mean).Take(3)
+                    .Where(candidate => KeepsLinkStrength(previousValidation, candidate.opening))
+                    .OrderByDescending(candidate => candidate.opening.SetupQuality).Take(3)
                     .Select(candidate => (candidate.policy, candidate.opening,
                         match: Run(general, candidate.policy, fullValidation, fullDuel: true)))
-                    .OrderByDescending(candidate => candidate.opening.Mean + 2.0 * (candidate.match.wins + .5 * candidate.match.draws) / candidate.match.games)
-                    .First();
+                    .OrderByDescending(candidate => candidate.opening.SetupQuality + 2.0 * (candidate.match.wins + .5 * candidate.match.draws) / candidate.match.games)
+                    .FirstOrDefault();
+                if (best.policy == null)
+                    throw new InvalidOperationException("No trained Link candidate retained the validation Link-3 and Link-4 development rates.");
                 Debug.Log($"[LINK TRAIN] Selected after {trainingOpenings * TrainingDecks.Length} trained openings. Validation {best.opening.OpeningSummary()}, {best.match.MatchSummary()}");
 
                 var test = CreateOpenings(decks, TestDecks, 12, 788353);
-                var previous = Run(general, null, test, fullDuel: false);
+                var previous = Run(general, previousPolicy, test, fullDuel: false);
                 var untuned = Run(general, new LinkComboPolicy(initial), test, fullDuel: false);
                 var trained = Run(general, best.policy, test, fullDuel: false);
                 Debug.Log($"[LINK EVAL] Previous {previous.OpeningSummary()}");
@@ -112,13 +118,14 @@ namespace YGOPortable.Editor
                 Debug.Log($"[LINK EVAL] Finishers {string.Join(", ", trained.Finishers.OrderByDescending(pair => pair.Value).Take(10).Select(pair => $"{CardDatabase.GetName(pair.Key)} {pair.Value}"))}");
 
                 var fullTest = CreateOpenings(decks, TestDecks, 8, 829274);
-                var previousMatches = Run(general, null, fullTest, fullDuel: true);
+                var previousMatches = Run(general, previousPolicy, fullTest, fullDuel: true);
                 var trainedMatches = Run(general, best.policy, fullTest, fullDuel: true);
                 Debug.Log($"[LINK EVAL] Complete duels previous {previousMatches.MatchSummary()} and trained {trainedMatches.MatchSummary()}");
                 Debug.Log($"[LINK TRAIN] Time {elapsed.Elapsed.TotalSeconds:F1}s, native script errors {errors.Count}");
                 if (errors.Count > 0) Debug.LogWarning(string.Join("\n", errors.Take(3)));
 
-                if (trained.Mean <= previous.Mean || trained.linkThree <= previous.linkThree || trainedMatches.wins < previousMatches.wins - 2)
+                if (errors.Count != 0 || !KeepsLinkStrength(previous, trained) || trainedMatches.retries != 0 ||
+                    trainedMatches.wins + .5 * trainedMatches.draws < previousMatches.wins + .5 * previousMatches.draws)
                     throw new InvalidOperationException("The trained Link policy did not improve the held-out boards without losing match strength.");
 
                 string asset = $"Assets/Resources/{LinkComboPolicy.ResourceName}.json";
@@ -139,12 +146,18 @@ namespace YGOPortable.Editor
             if (Application.isBatchMode) EditorApplication.Exit(exit);
         }
 
+        private static bool KeepsLinkStrength(Results previous, Results candidate) =>
+            candidate.linkThree >= previous.linkThree && candidate.linkFour >= previous.linkFour &&
+            candidate.retries == 0 && candidate.Mean >= previous.Mean - .15;
+
         private static Opening[] CreateOpenings(Dictionary<int, PresetDeckInfo> decks, int[] ids, int hands, int seed)
         {
             var random = new System.Random(seed);
-            return ids.SelectMany(id => Enumerable.Range(0, hands).Select(hand => new Opening
+            var validIds = ids.Where(id => decks.ContainsKey(id)).ToArray();
+            var validRivals = RivalDecks.Where(id => decks.ContainsKey(id)).ToArray();
+            return validIds.SelectMany(id => Enumerable.Range(0, hands).Select(hand => new Opening
             {
-                deck = decks[id], opponent = decks[RivalDecks[random.Next(RivalDecks.Length)]], first = (hand & 1) == 0,
+                deck = decks[id], opponent = decks[validRivals[random.Next(validRivals.Length)]], first = (hand & 1) == 0,
                 seed = Enumerable.Range(0, 4).Select(_ => (ulong)random.Next(1, int.MaxValue)).ToArray(),
             })).ToArray();
         }
@@ -191,22 +204,18 @@ namespace YGOPortable.Editor
                     else if (duel.Winner == seat) results.wins++;
                     else results.losses++;
                 }
-                else MeasureBoard(duel, seat, results);
+                else MeasureBoard(duel, seat, !opening.first && duel.CurrentPhase == YgoConstants.PHASE_MAIN1, results);
             }
             return results;
         }
 
-        private static void MeasureBoard(DuelSession duel, int seat, Results results)
+        private static void MeasureBoard(DuelSession duel, int seat, bool canBreakBoard, Results results)
         {
             var own = duel.Players[seat];
-            var rival = duel.Players[1 - seat];
-            int highest = 0, bodies = 0, interaction = 0;
-            double power = 0;
+            int highest = 0, interaction = 0;
             foreach (var monster in own.mzone)
             {
                 if (monster?.IsFaceUp != true) continue;
-                bodies++;
-                power += Math.Min(4000, Math.Max(0, monster.attack)) / 4000.0;
                 int rating = LinkComboPolicy.Rank(monster.code);
                 highest = Math.Max(highest, rating);
                 if (rating >= 3 && !monster.effectsDisabled && CardDatabase.Get(monster.code) is CardInfo card && LinkComboPolicy.IsInteractive(card))
@@ -218,9 +227,8 @@ namespace YGOPortable.Editor
             if (highest >= 3) results.linkThree++;
             if (highest >= 4) results.linkFour++;
             if (interaction > 0) results.interactive++;
-            results.score += highest * .85 + (highest >= 3 ? 1.1 : 0) + (highest >= 4 ? .85 : 0) +
-                .55 * interaction + .26 * power + .22 * bodies + .09 * own.hand.Count + .13 * own.szone.Count(card => card != null) -
-                .18 * rival.mzone.Count(card => card != null) - duel.RetryCount * .7;
+            results.score += .7 * highest + .65 * interaction +
+                .75 * ComboSearch.BoardValue(duel, (byte)seat, canBreakBoard) - duel.RetryCount * 1.5;
         }
     }
 }

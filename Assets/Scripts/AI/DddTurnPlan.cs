@@ -36,6 +36,9 @@ namespace YGOPortable.AI
         private const ulong PlacePendulumScale = 1160;
         private const ulong DescriptionIndexMask = (1UL << 20) - 1;
 
+        internal static bool IsContractSearch(SelectableCardItem item) => item.code == Gate &&
+            item.location is YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_SZONE;
+
         internal static int? ChooseIdle(DuelSession session, DuelPrompt prompt, Func<int, SelectableCardItem, bool> canUse)
         {
             if (prompt.messageType != YgoConstants.MSG_SELECT_IDLECMD) return null;

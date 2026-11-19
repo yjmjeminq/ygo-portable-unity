@@ -336,9 +336,8 @@ namespace YGOPortable.UI
 
             _session?.Dispose();
             _session = new DuelSession(recordPlanningReplay: AiDifficulty == AIDifficulty.Smart);
-            int opponentLevel = OpponentDeckLevels.GetLevel(oppChar.id, oppDeck.id);
             _ai = new TacticalAI(DuelAiPolicy.LoadIncluded(), LinkComboPolicy.LoadIncluded(),
-                searchCombos: true, opponentLevel: opponentLevel) { Difficulty = AiDifficulty };
+                searchCombos: true) { Difficulty = AiDifficulty };
             _shownHumanPrompt = null;
             _aiTimer = 0f;
             _resultShown = false;
