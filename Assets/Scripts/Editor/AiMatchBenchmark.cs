@@ -356,6 +356,7 @@ namespace YGOPortable.Editor
             VerifyOwnOnlyRemoval();
             VerifyReactiveNegation();
             VerifyEqualScalesProtection();
+            VerifyStrongerTributeProtection();
             using var duel = new DuelSession();
             var own = duel.Players[0];
             var rival = duel.Players[1];
@@ -655,6 +656,21 @@ namespace YGOPortable.Editor
             own.szone[4].rscale = 5;
             if (!DuelTactics.CanActivate(duel, prompt, effect))
                 throw new InvalidOperationException("Pendulum Scale blocked an effect with unequal scales.");
+        }
+
+        private static void VerifyStrongerTributeProtection()
+        {
+            using var duel = new DuelSession();
+            var own = duel.Players[0];
+            var prompt = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_IDLECMD };
+            var extraSurveyor = new SelectableCardItem { code = 74387963, location = YgoConstants.LOCATION_HAND };
+            own.mzone[0] = new LiveCardState { code = 5997110, attack = 2000, defense = 2000,
+                position = YgoConstants.POS_FACEUP_ATTACK };
+            if (!DuelTactics.NeedsTributeProjection(duel, prompt, extraSurveyor))
+                throw new InvalidOperationException("A weaker tribute summon would replace the only established attacker.");
+            own.mzone[1] = new LiveCardState { attack = 200, defense = 200, position = YgoConstants.POS_FACEUP_DEFENSE };
+            if (DuelTactics.NeedsTributeProjection(duel, prompt, extraSurveyor))
+                throw new InvalidOperationException("A disposable tribute is available without replacing the stronger attacker.");
         }
 
         private static void VerifyCrossoutResponse()

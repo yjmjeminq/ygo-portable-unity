@@ -669,8 +669,12 @@ namespace YGOPortable.AI
             foreach (var monster in field)
             {
                 if (monster == null) continue;
-                if (monster.IsFaceUp && (monster.type & YgoConstants.TYPE_EXTRA) != 0 &&
-                    BoardAssetValue(monster) > .55 + Math.Max(incoming.atk, incoming.def) / 2800.0)
+                bool developedMaterial = (monster.type & YgoConstants.TYPE_EXTRA) != 0 &&
+                    BoardAssetValue(monster) > .55 + Math.Max(incoming.atk, incoming.def) / 2800.0;
+                bool strongerMaterial = monster.attack >= 1800 &&
+                    monster.attack >= Math.Max(0, incoming.atk) + 500 &&
+                    monster.defense >= Math.Max(0, incoming.def) + 500;
+                if (monster.IsFaceUp && (developedMaterial || strongerMaterial))
                     established = true;
                 else
                     disposable++;

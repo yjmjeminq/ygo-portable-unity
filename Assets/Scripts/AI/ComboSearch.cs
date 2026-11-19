@@ -97,6 +97,9 @@ namespace YGOPortable.AI
             internal bool unverifiedArchfiendEndPhase;
             internal Position ending;
             internal int unpaidLinkTrade = int.MaxValue;
+            internal Branch? defensiveSetFork;
+            internal int opposingCardsBeforeBattle = -1;
+            internal HashSet<uint> battleAttackers;
             internal readonly List<(ulong state, int action)> moves = new();
             internal readonly List<(int[] prefix, int[] options)> forks = new();
             internal readonly List<(int[] Prefix, ulong State, int[] Options)> targets = new();
@@ -310,9 +313,13 @@ namespace YGOPortable.AI
             }
             Line best = null;
             Line baseline = null;
-            for (int attempt = 0; queue.Count != 0 && attempt < MaxBranches && !Expired(); attempt++)
+            Branch? defensiveSet = null;
+            bool comparedDefensiveSet = false;
+            for (int attempt = 0; (defensiveSet.HasValue || queue.Count != 0) && attempt < MaxBranches && !Expired(); attempt++)
             {
-                Branch choices = queue.Dequeue();
+                bool comparingDefense = defensiveSet.HasValue;
+                Branch choices = defensiveSet ?? queue.Dequeue();
+                defensiveSet = null;
                 Line line;
                 long branchStart = watch.ElapsedMilliseconds;
                 watch.Start();
@@ -341,8 +348,17 @@ namespace YGOPortable.AI
                         (defenseValue > 0 || line.ending.ImprovesOn(held))));
                 }
                 double Value(Line candidate) => candidate.score + AdditionalDefense(candidate.ending) + (candidate.ending.HasSetup ? .48 : 0);
+                if (comparingDefense)
+                    valid &= line.won || (line.complete && line.measuredTurnEnd && !line.needsHiddenInformation);
                 bool better = valid && (best == null || (line.complete && (!best.complete || Value(line) > Value(best) + .08)));
                 if (better) best = line;
+                // Compare the legal Set while the original line is still the leading choice.
+                if (better && !comparedDefensiveSet && line.defensiveSetFork is { } sibling &&
+                    seen.Add(string.Join(",", sibling.MainActions)))
+                {
+                    comparedDefensiveSet = true;
+                    defensiveSet = sibling;
+                }
                 if (better || attempt == 0 || (line.complete && line.unpaidLinkTrade != int.MaxValue))
                 {
                     if (choices.Target == null)
@@ -369,7 +385,7 @@ namespace YGOPortable.AI
                     }
                 }
                 watch.Stop();
-                if (queue.Count != 0 && !Expired()) yield return true;
+                if ((defensiveSet.HasValue || queue.Count != 0) && !Expired()) yield return true;
             }
 
             if (best == null || best.moves.Count == 0) yield break;
@@ -516,7 +532,14 @@ namespace YGOPortable.AI
                     line.complete = true;
                     canKeepSetup = false;
                     if (move == 6)
+                    {
+                        if (safeSets.Count != 0)
+                        {
+                            line.opposingCardsBeforeBattle = line.ending.opposingCards;
+                            line.battleAttackers = new HashSet<uint>();
+                        }
                         MeasureBattle(trial, ai, player, response, expired, line);
+                    }
                     else
                         MeasureTurnEnd(trial, ai, player, response, expired, line);
                     break;
@@ -576,7 +599,20 @@ namespace YGOPortable.AI
                 bool needsDefense = (opensLethal || risksSurvival) && !own.hand.Any(card => card.code == PhotonJumper);
                 bool payoff = improvesField || clearedOpposingCard ||
                     (!attacker.effectsDisabled && CardDatabase.Get(attacker.code) is CardInfo info && HasFieldInteraction(info));
-                if (!needsDefense && payoff) continue;
+                if (!needsDefense && payoff)
+                {
+                    if (line.defensiveSetFork == null && !line.won && line.measuredTurnEnd && !improvesField &&
+                        clearedOpposingCard && line.opposingCardsBeforeBattle == candidate.Before.opposingCards &&
+                        line.battleAttackers is { Count: > 0 } && !line.battleAttackers.Contains(candidate.Code) &&
+                        CardDatabase.Get(attacker.code) is CardInfo weak && !HasFieldInteraction(weak) &&
+                        !CanDevelopFromCard(weak) && branch.Target == null)
+                    {
+                        // Resimulate from the same prefix to check whether Set preserves the battle gain.
+                        line.defensiveSetFork = new Branch(line.moves.Take(candidate.Step).Select(entry => entry.action)
+                            .Append((candidate.SetIndex << 16) | 3).ToArray());
+                    }
+                    continue;
+                }
                 stop = (candidate.Step, candidate.State, candidate.Score + .15, candidate.Before);
                 stopAction = (candidate.SetIndex << 16) | 3;
                 break;
@@ -688,10 +724,17 @@ namespace YGOPortable.AI
                 }
                 if (prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD || HasPrivateOpponentChoices(prompt)) break;
                 byte[] response = ai.ComputeResponse(trial, prompt);
-                if (prompt.messageType == YgoConstants.MSG_SELECT_BATTLECMD && (BitConverter.ToInt32(response, 0) & 0xffff) is 2 or 3)
+                if (prompt.messageType == YgoConstants.MSG_SELECT_BATTLECMD && response.Length >= 4)
                 {
-                    finishBattle = response;
-                    break;
+                    int command = BitConverter.ToInt32(response, 0);
+                    if ((command & 0xffff) is 2 or 3)
+                    {
+                        finishBattle = response;
+                        break;
+                    }
+                    int index = command >> 16;
+                    if ((command & 0xffff) == 1 && (uint)index < prompt.attackable.Count)
+                        line.battleAttackers?.Add(prompt.attackable[index].code);
                 }
                 trial.SubmitPlanningResponse(response);
             }
