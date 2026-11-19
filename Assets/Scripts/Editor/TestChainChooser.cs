@@ -36,6 +36,7 @@ namespace YGOPortable.Editor
             VerifyChickenGameOptions();
             VerifyRamificationsOptions();
             VerifyOddEyesDamageConfirmation();
+            VerifyTrapMonsterPosition();
             VerifyBundledOptionDescriptions();
             VerifyKoreanEffectCatalogue();
             VerifyGroupedLocations(duel);
@@ -516,20 +517,28 @@ namespace YGOPortable.Editor
 
         private static void VerifyGagagaLevelInstruction()
         {
-            const uint magician = 26082117, sparkman = 20721928;
-            var main = Enumerable.Repeat(magician, 40).ToArray();
+            const uint magician = 26082117, sparkman = 20721928, axe = 40619825;
+            var main = Enumerable.Repeat(magician, 20).Concat(Enumerable.Repeat(axe, 20)).ToArray();
             var opponent = Enumerable.Repeat(sparkman, 40).ToArray();
             var empty = Array.Empty<uint>();
             var ai = new TacticalAI();
             using var duel = YgoProjectBuilder.StartSeedMatching("Gagaga level instruction", main, empty, opponent, empty,
-                true, session => session.ActivePrompt?.summonable.Exists(card => card.code == magician) == true);
+                true, session => session.ActivePrompt?.summonable.Exists(card => card.code == magician) == true &&
+                    session.Players[session.HumanPlayerIndex].hand.Exists(card => card.code == axe));
             int summon = duel.ActivePrompt.summonable.FindIndex(card => card.code == magician);
             duel.SubmitResponseInt(summon << 16);
             YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            int equip = duel.ActivePrompt.activatable.FindIndex(card => card.code == axe);
+            Require(equip >= 0, "The level instruction fixture could not equip the active monster.");
+            duel.SubmitResponseInt((equip << 16) | 5);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt => prompt.messageType == YgoConstants.MSG_SELECT_CARD
+                ? DuelSession.PackCardSelection(prompt.candidates.FindIndex(card => card.code == magician)) : null);
             int activate = duel.ActivePrompt.activatable.FindIndex(card => card.code == magician);
             Require(activate >= 0, "Gagaga Magician had no level-changing action.");
             duel.SubmitResponseInt((activate << 16) | 5);
             using var view = new ChainView();
+            var field = view.AttachField(duel);
+            var inspector = field.Root.transform.Find("LeftInspector/CardDetails");
             YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
             {
                 if (prompt.messageType != YgoConstants.MSG_ANNOUNCE_NUMBER) return null;
@@ -541,6 +550,8 @@ namespace YGOPortable.Editor
                 Require(window.Find("Hdr/TitleBand/Title").GetComponent<Text>().text ==
                         "1부터 8까지 중 이 카드에 적용할 레벨을 선택하세요",
                     "The number list did not display the action indicated by the native hint.");
+                Require(inspector.Find("CombatStats/Attack/Digits/Value").GetComponent<Text>().text == "2500",
+                    "The number choice inspected the printed copy instead of the live equipped monster.");
                 window.GetComponentsInChildren<Button>().Single(button => button.name == $"Opt_{index}").onClick.Invoke();
                 Require(view.Responses.SequenceEqual(new[] { index }), "The numeric selection sent the number instead of its index.");
                 return BitConverter.GetBytes(view.Responses[0]);
@@ -548,6 +559,10 @@ namespace YGOPortable.Editor
             Require(view.Responses.Count == 1 && duel.RetryCount == 0 &&
                     duel.Players[duel.HumanPlayerIndex].mzone.Any(card => card?.code == magician && card.level == 8),
                 "Gagaga Magician did not apply the selected level.");
+            field.Refresh();
+            Require(inspector.Find("Stats/Info/Text").GetComponent<Text>().text.Contains("레벨 8") &&
+                    inspector.Find("CombatStats/Attack/Digits/Value").GetComponent<Text>().text == "2500",
+                "The inspector did not keep the resolving monster after the number choice.");
             Debug.Log("[VERIFY KOREAN NATIVE OPTIONS] Gagaga Magician displayed the Korean level instruction and applied the chosen level.");
         }
 
@@ -824,6 +839,7 @@ namespace YGOPortable.Editor
                 duel.SubmitResponseInt(1);
 
                 using var view = new ChainView();
+                var field = view.AttachField(duel);
                 YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
                 {
                     if (prompt.IsAttackTargetSelection)
@@ -840,6 +856,10 @@ namespace YGOPortable.Editor
                             view.Modals.ModalRoot.GetComponentsInChildren<Text>().Single(label => label.name == "Question").text ==
                             "이번 전투에서 자신이 받을 전투 데미지를 0으로 하시겠습니까?",
                         "The engine's damage prevention question did not appear as a Korean confirmation.");
+                    var details = field.Root.transform.Find("LeftInspector/CardDetails");
+                    Require(details.Find("Stats/Info/Text").GetComponent<Text>().text == "펜듈럼 마법 · 스케일 4" &&
+                        !details.Find("CombatStats").gameObject.activeSelf,
+                        "The yes/no confirmation lost the actual Pendulum Zone source and showed its printed monster stats.");
                     bool submitted = accept ? view.Modals.TryConfirm() : view.Modals.TryCancelOrPass();
                     Require(submitted && view.Responses.SequenceEqual(new[] { accept ? 1 : 0 }),
                         "The Korean confirmation changed the native yes/no response.");
@@ -877,6 +897,96 @@ namespace YGOPortable.Editor
                 duel.Dispose();
                 throw;
             }
+        }
+
+        private static void VerifyTrapMonsterPosition()
+        {
+            const uint apophis = 28649820, statue = 23626223, sparkman = 20721928;
+            const uint attack = YgoConstants.POS_FACEUP_ATTACK, defense = YgoConstants.POS_FACEUP_DEFENSE;
+            var enemy = Enumerable.Repeat(sparkman, 40).ToArray();
+            var empty = Array.Empty<uint>();
+            var ai = new TacticalAI();
+            foreach (var (code, level, atk, def, chosenPosition) in new[]
+            {
+                (apophis, 4u, 1600, 1800, attack), (statue, 7u, 0, 2500, defense),
+            })
+            {
+                var main = Enumerable.Repeat(code, 40).ToArray();
+                using var duel = YgoProjectBuilder.StartSeedMatching("Trap Monster position", main, empty, enemy, empty, true,
+                    session => session.ActivePrompt?.sSetable.Exists(card => card.code == code) == true);
+                duel.SubmitResponseInt(4);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+                duel.SubmitResponseInt(7);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+                duel.SubmitResponseInt(7);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+                int activate = duel.ActivePrompt?.activatable.FindIndex(card => card.code == code) ?? -1;
+                Require(activate >= 0, "The Trap Monster could not activate on the next turn.");
+                duel.SubmitResponseInt((activate << 16) | 5);
+                for (int i = 0; i < 12 && duel.ActivePrompt?.messageType != YgoConstants.MSG_SELECT_POSITION; i++)
+                {
+                    var pending = duel.ActivePrompt;
+                    if (pending == null) duel.StepUntilPrompt();
+                    else duel.SubmitResponse(ai.ComputeResponse(duel, pending));
+                }
+                var prompt = duel.ActivePrompt;
+                Require(prompt?.messageType == YgoConstants.MSG_SELECT_POSITION && prompt.promptCardCode == code &&
+                    prompt.allowedPositions == (attack | defense) && duel.RetryCount == 0,
+                    "The Trap Monster did not offer both face-up positions.");
+                var source = duel.SelectionChainLink;
+                var registered = source == null ? null : duel.GetVisibleFieldCard(code, source.triggerPlayer, source.triggerLoc, source.triggerSeq);
+                Require(registered != null && registered.level == level && registered.attack == atk && registered.defense == def,
+                    "The engine did not publish the source's registered Trap Monster stats before the choice.");
+                using var view = new ChainView();
+                var field = view.AttachField(duel);
+                view.Modals.ShowPrompt(duel, prompt);
+                var window = view.Modals.ModalRoot.transform.Find("Win");
+                Require(window.Find("Hdr/SubtitleBand/Sub").GetComponent<Text>().text.Contains($"레벨 {level}"),
+                    "The position picker did not display the Trap Monster's level.");
+                void CheckCombat(Transform combat)
+                {
+                    Require(combat != null && combat.gameObject.activeInHierarchy &&
+                        combat.Find("Attack/Digits/Value").GetComponent<Text>().text == atk.ToString() &&
+                        combat.Find("Defense/Digits/Value").GetComponent<Text>().text == def.ToString(),
+                        "A Trap Monster preview did not display its registered combat values.");
+                }
+                foreach (uint position in new[] { attack, defense })
+                    CheckCombat(window.Find($"Body/Pos_{position}/CombatStats"));
+                var inspector = field.Root.transform.Find("LeftInspector/CardDetails");
+                var portrait = field.Root.transform.Find("LeftInspector/CardPreview/Card").GetComponent<CompositeCardView>();
+                Require(portrait?.ArtworkSprite != null && portrait.CurrentCode == code,
+                    "The selected Trap Monster's inspector did not load its artwork on the first render.");
+                Require(inspector.Find("Stats/Info/Text").GetComponent<Text>().text.Contains($"레벨 {level}") &&
+                    inspector.Find("Stats/Info/Text").GetComponent<Text>().text.Contains("함정 몬스터 · 표시 형식 선택"),
+                    "The inspector did not describe the planned Trap Monster before a position was chosen.");
+                CheckCombat(inspector.Find("CombatStats"));
+                inspector.Find("ArtworkControls/Details/B").GetComponent<Button>().onClick.Invoke();
+                var zoom = field.Root.transform.parent.Find("Overlay_CardZoom/ZoomWin");
+                CheckCombat(zoom.Find("Info/CombatStats"));
+                Require(zoom.Find("Info/Stats/S").GetComponent<Text>().text.Contains($"레벨 {level}"),
+                    "The zoom did not keep the position preview.");
+                zoom.Find("Hdr/Close/B").GetComponent<Button>().onClick.Invoke();
+                var fieldView = (Button)view.Modals.FieldViewControl;
+                fieldView.onClick.Invoke();
+                Require(view.Modals.IsShowingField && !inspector.Find("CombatStats").gameObject.activeSelf &&
+                    inspector.Find("Stats/Info/Text").GetComponent<Text>().text == "지속 함정",
+                    "Field view showed the projected monster before its summon.");
+                fieldView.onClick.Invoke();
+                CheckCombat(inspector.Find("CombatStats"));
+                window.Find($"Body/Pos_{chosenPosition}").GetComponent<Button>().onClick.Invoke();
+                Require(view.Responses.SequenceEqual(new[] { (int)chosenPosition }), "The preview changed the native position response.");
+                duel.SubmitResponseInt(view.Responses.Single());
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+                var monster = duel.Players[duel.HumanPlayerIndex].mzone.Single(card => card?.code == code);
+                Require(monster.position == chosenPosition && monster.level == level && monster.attack == atk && monster.defense == def,
+                    "The live Trap Monster did not match the preview.");
+                field.Refresh();
+                CheckCombat(inspector.Find("CombatStats"));
+                string shown = inspector.Find("Stats/Info/Text").GetComponent<Text>().text;
+                Require(shown.Contains(chosenPosition == attack ? "공격 표시" : "수비 표시") && !shown.Contains("표시 형식 선택"),
+                    "The inspector did not follow the same Trap Monster into its chosen position.");
+            }
+            Debug.Log("[VERIFY DUEL TRAP POSITION] Both native Trap Monster previews matched their selected form and final live values.");
         }
 
         private static void VerifyKoreanEffectCatalogue()
@@ -1683,6 +1793,7 @@ namespace YGOPortable.Editor
             private readonly GameObject _canvas = new GameObject("Chain Chooser Verification", typeof(Canvas));
             private readonly RectTransform _canvasRect;
             private readonly List<uint> _inspected = new();
+            private DuelFieldUI _field;
             internal readonly DuelPromptModals Modals;
             internal readonly List<int> Responses = new();
 
@@ -1690,11 +1801,22 @@ namespace YGOPortable.Editor
             {
                 _canvasRect = (RectTransform)_canvas.transform;
                 _canvasRect.sizeDelta = new Vector2(1600, 900);
-                Modals = new DuelPromptModals(_canvas.transform, _inspected.Add, response =>
+                Modals = new DuelPromptModals(_canvas.transform, code =>
+                {
+                    _inspected.Add(code);
+                    _field?.InspectCard(code);
+                }, response =>
                 {
                     Require(response.Length == sizeof(int), "Chain chooser sent a non-integer response.");
                     Responses.Add(BitConverter.ToInt32(response, 0));
                 });
+            }
+
+            internal DuelFieldUI AttachField(DuelSession duel)
+            {
+                _field = new DuelFieldUI(null, _canvas.transform, Modals, mobileLayout: false);
+                _field.BindSession(duel, null, null);
+                return _field;
             }
 
             internal void Show(DuelSession duel, DuelPrompt prompt)
@@ -1774,7 +1896,11 @@ namespace YGOPortable.Editor
                 button.onClick.Invoke();
             }
 
-            public void Dispose() => UnityEngine.Object.DestroyImmediate(_canvas);
+            public void Dispose()
+            {
+                _field?.UnbindSession();
+                UnityEngine.Object.DestroyImmediate(_canvas);
+            }
         }
 
         private static void Require(bool condition, string message)

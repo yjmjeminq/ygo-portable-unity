@@ -470,6 +470,9 @@ namespace YGOPortable.UI
             if (!IsPromptOpen || !_promptInput.interactable || IsFieldCardSelection) return;
             LotdAudio.PlayClick();
             SetFieldView(!IsShowingField);
+            if (_curPrompt?.messageType == YgoConstants.MSG_SELECT_POSITION &&
+                ReadSummonPosition(_curSession, _curPrompt, out var source).ShowsSummonPreview)
+                InspectChoice(_curPrompt.promptCardCode, source);
             if (IsShowingField) SetFocus(_fieldViewButton.gameObject);
             else
             {
@@ -689,7 +692,7 @@ namespace YGOPortable.UI
                     RenderYesNo(session, prompt);
                     break;
                 case YgoConstants.MSG_SELECT_POSITION:
-                    RenderSelectPosition(prompt);
+                    RenderSelectPosition(session, prompt);
                     break;
                 case YgoConstants.MSG_SELECT_OPTION:
                 case YgoConstants.MSG_ANNOUNCE_NUMBER:
@@ -751,7 +754,7 @@ namespace YGOPortable.UI
 
             _modalTitle.text = "선택 확인";
             _modalSubtitle.text = card?.name ?? "";
-            if (card != null) _onInspectCard?.Invoke(card.code);
+            if (card != null) InspectChoice(cardCode, ReadFieldEffectSource(session, p, cardCode));
 
             CreateVerticalScroll(_modalBody, out Transform description);
             AddDescriptionText(description, "Question", msg, 18);
@@ -760,14 +763,38 @@ namespace YGOPortable.UI
             AddFooterButton("아니오", () => Submit(BitConverter.GetBytes(0)), false);
         }
 
-        private void RenderSelectPosition(DuelPrompt p)
+        private static DuelCardReadout ReadSummonPosition(DuelSession session, DuelPrompt p, out SelectableCardItem source)
+        {
+            uint code = p.promptCardCode;
+            source = ReadFieldEffectSource(session, p, code);
+            var live = source == null ? null : session.GetVisibleFieldCard(code, source.controller, source.location, source.sequence);
+            var card = DuelCardReadout.ForSummonPosition(CardDatabase.Get(code), live);
+            if (!card.ShowsSummonPreview) source = null;
+            return card;
+        }
+
+        internal DuelCardReadout? ReadInspectedSummon(uint code, (byte controller, uint location, uint sequence)? location)
+        {
+            var prompt = _curPrompt;
+            if (!IsPromptOpen || IsShowingField || IsZoneViewerOpen || prompt?.messageType != YgoConstants.MSG_SELECT_POSITION ||
+                prompt.promptCardCode != code) return null;
+
+            var card = ReadSummonPosition(_curSession, prompt, out var source);
+            if (!card.ShowsSummonPreview ||
+                location.HasValue && (source == null || location.Value != (source.controller, source.location, source.sequence)))
+                return null;
+            return card;
+        }
+
+        private void RenderSelectPosition(DuelSession session, DuelPrompt p)
         {
             _modalTitle.text = "표시 형식 선택";
-            var card = new DuelCardReadout(CardDatabase.Get(p.promptCardCode));
+            var card = ReadSummonPosition(session, p, out var source);
             string name = p.promptCardCode == 0 ? "뒷면 카드" : CardDatabase.GetName(p.promptCardCode);
             string rating = card.Rating;
             _modalSubtitle.text = rating.Length == 0 ? name : $"{name} · {rating}";
-            _onInspectCard?.Invoke(p.promptCardCode);
+            SetFieldView(false);
+            InspectChoice(p.promptCardCode, source);
 
             var choices = new (uint position, string label, bool rotate, bool faceDown)[]
             {
@@ -783,8 +810,6 @@ namespace YGOPortable.UI
             _modalHeader.anchorMin = new Vector2(0f, .76f);
             _modalBody.anchorMin = new Vector2(.021f, .042f);
             _modalBody.anchorMax = new Vector2(.98f, .743f);
-            SetFieldView(false);
-
             for (int i = 0; i < choices.Length; i++)
             {
                 var choice = choices[i];
@@ -842,6 +867,7 @@ namespace YGOPortable.UI
             var cards = isNum ? Array.Empty<CardInfo>() : p.options
                 .Select(opt => CardDatabase.Get(CardDatabase.GetDescriptionCardCode(opt))).ToArray();
             var sources = cards.Where(card => card != null).Distinct().ToArray();
+            var link = session.SelectionChainLink;
             var rulesNeeded = new HashSet<uint>();
             for (int i = 0; i < p.options.Count; i++)
             {
@@ -864,15 +890,20 @@ namespace YGOPortable.UI
                 var option = LotdUiKit.CreateWrappedButton(content, $"Opt_{i}", text, () => Submit(BitConverter.GetBytes(pick)),
                     18, i == 0, 54f, sidePadding: 22);
                 DuelStyle.ApplyButton(option, i == 0);
-                PreviewOnFocus(option, card?.code ?? 0);
+                uint inspectCode = card?.code ?? link?.code ?? 0;
+                PreviewOnFocus(option, inspectCode, ReadFieldEffectSource(session, p, inspectCode));
             }
             if (sources.Length == 1)
             {
                 _modalSubtitle.text = sources[0].name;
-                _onInspectCard?.Invoke(sources[0].code);
+                uint code = sources[0].code;
+                InspectChoice(code, ReadFieldEffectSource(session, p, code));
             }
-            else if (!isNum && sources.Length == 0 && session.SelectionChainLink is { } link)
+            else if (sources.Length == 0 && link != null)
+            {
                 _modalSubtitle.text = CardDatabase.GetName(link.code);
+                InspectChoice(link.code, ReadFieldEffectSource(session, p, link.code));
+            }
             foreach (uint code in rulesNeeded)
             {
                 string rules = CardDatabase.GetKoreanCardDescription(code);
@@ -2152,6 +2183,24 @@ namespace YGOPortable.UI
             if (code == 0) return;
             if (item != null && _onInspectCandidate != null) _onInspectCandidate(item, code);
             else _onInspectCard?.Invoke(code);
+        }
+
+        private static SelectableCardItem ReadFieldEffectSource(DuelSession session, DuelPrompt prompt, uint code)
+        {
+            if (code == 0) return null;
+            if (prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && prompt.promptCardCode == code)
+                return PublicSource(prompt.promptCon, prompt.promptLoc, prompt.promptSeq);
+            var link = session.SelectionChainLink;
+            return link?.code == code ? PublicSource(link.triggerPlayer, link.triggerLoc, link.triggerSeq) : null;
+
+            SelectableCardItem PublicSource(byte controller, uint location, uint sequence)
+            {
+                var live = session.GetVisibleFieldCard(code, controller, location, sequence);
+                return live == null ? null : new SelectableCardItem
+                {
+                    code = code, controller = controller, location = location, sequence = sequence, position = live.position,
+                };
+            }
         }
 
         private void PreviewOnFocus(Selectable control, uint code, SelectableCardItem item = null)

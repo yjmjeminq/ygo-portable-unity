@@ -14,17 +14,30 @@ namespace YGOPortable.UI
         internal readonly LiveCardState Live;
         private readonly BattleCardStats? _battleStats;
         private readonly (int Count, int Attack, int Defense)? _materialReadout;
+        internal readonly bool ShowsSummonPreview;
 
         internal DuelCardReadout(CardInfo printed, LiveCardState live = null, BattleCardStats? battleStats = null,
-            (int Count, int Attack, int Defense)? materialReadout = null)
+            (int Count, int Attack, int Defense)? materialReadout = null, bool showsSummonPreview = false)
         {
             Printed = printed;
             Live = live;
             _battleStats = battleStats;
             _materialReadout = materialReadout;
+            ShowsSummonPreview = showsSummonPreview;
         }
 
-        internal uint Type => Live?.type > 0 ? Live.type : Printed?.type ?? 0;
+        internal static DuelCardReadout ForSummonPosition(CardInfo printed, LiveCardState source)
+        {
+            var registered = new DuelCardReadout(printed, source);
+            // The position prompt arrives while a Trap Monster is still in its Spell & Trap Zone.
+            if (printed != null && (printed.type & YgoConstants.TYPE_TRAP) != 0 &&
+                (source?.level ?? printed.level) > 0 && registered.Race != 0 && registered.Attribute != 0)
+                return new DuelCardReadout(printed, source, showsSummonPreview: true);
+            return new DuelCardReadout(printed);
+        }
+
+        internal uint Type => (Live?.type > 0 ? Live.type : Printed?.type ?? 0) |
+            (ShowsSummonPreview ? YgoConstants.TYPE_MONSTER : 0u);
         internal bool IsMonster => (Type & YgoConstants.TYPE_MONSTER) != 0;
         internal bool IsLink => (Type & YgoConstants.TYPE_LINK) != 0;
         internal bool IsXyz => (Type & YgoConstants.TYPE_XYZ) != 0;
@@ -34,7 +47,7 @@ namespace YGOPortable.UI
         internal uint Attribute => Live?.attribute ?? Printed?.attr ?? 0;
         internal int Attack => _battleStats?.Attack ?? _materialReadout?.Attack ?? Live?.attack ?? Printed?.atk ?? -1;
         internal int Defense => _battleStats?.Defense ?? _materialReadout?.Defense ?? Live?.defense ?? Printed?.def ?? -1;
-        internal uint Position => _battleStats?.Position ?? Live?.position ?? 0;
+        internal uint Position => ShowsSummonPreview ? 0u : _battleStats?.Position ?? Live?.position ?? 0;
         internal BattleComparisonValue? ComparedValue => _battleStats?.ComparedValue;
         internal uint LeftScale => Live?.lscale ?? Printed?.lscale ?? 0;
         internal uint RightScale => Live?.rscale ?? Printed?.rscale ?? 0;

@@ -361,19 +361,16 @@ namespace YGOPortable.UI
             if (code == 0) return;
             _inspectedBanishedCard = null;
             bool changed = code != _inspectedCode;
-            if (!changed && _inspectedFieldCard == fieldCard) return;
             _inspectedCode = code;
             _inspectedFieldCard = fieldCard;
+            if (changed) _inspCard.gameObject.SetActive(true);
             RefreshInspectorReadout(showChanges: false);
             RefreshLinkedZones();
             if (!changed) return;
 
             _duelPadInspectButton.interactable = true;
             _inspectorArtworkButton.interactable = true;
-            _inspCard.gameObject.SetActive(true);
-            _inspCard.SetCard(code);
             var info = CardDatabase.Get(code);
-            _inspTitleAccent.color = InspectorTitleAccent(info?.type ?? 0);
             _inspName.text = info?.name ?? $"카드 #{code}";
             _inspDesc.text = info?.desc ?? "";
             _inspectScroll.StopMovement();
@@ -471,6 +468,7 @@ namespace YGOPortable.UI
 
         private DuelCardReadout ReadInspectedStats(uint code, (byte controller, uint location, uint sequence)? location)
         {
+            if (_modals.ReadInspectedSummon(code, location) is { } summon) return summon;
             if (location is { } slot)
             {
                 if (_movingInspections.TryGetValue(slot, out var moving) && moving.Move.Code == code)
@@ -494,6 +492,8 @@ namespace YGOPortable.UI
             if (_inspectedCode == 0) return;
             var card = ReadInspectedStats(_inspectedCode, _inspectedFieldCard);
             if (card.Live == null && !IsInspectedCardStillOnField(_inspectedCode, _inspectedFieldCard)) _inspectedFieldCard = null;
+            _inspCard.SetCard(_inspectedCode, live: card.Live);
+            _inspTitleAccent.color = InspectorTitleAccent(card.Type);
             _inspStats.text = FormatInspectorStats(card, compact: true);
             BindIdentityIcons(card, _inspRaceIcon, _inspAttributeIcon);
             _inspCounters.Bind(card.CounterCount, showChanges);
@@ -594,8 +594,14 @@ namespace YGOPortable.UI
         private static string FormatInspectorStats(DuelCardReadout card, bool compact = false)
         {
             if (card.Type == 0) return "";
-            string type = card.IsScale ? "펜듈럼 마법" : YgoConstants.GetTypeTagKR(card.Type).Replace(" / ", " · ");
-            if (card.IsPendulum) type += $" · 스케일 {card.LeftScale}/{card.RightScale}";
+            string type = card.IsScale ? "펜듈럼 마법" :
+                card.IsMonster && (card.Type & YgoConstants.TYPE_TRAP) != 0 ? "함정 몬스터" :
+                YgoConstants.GetTypeTagKR(card.Type).Replace(" / ", " · ");
+            if (card.IsPendulum)
+            {
+                uint? scale = card.Live == null ? null : card.ScaleIn(card.Live.location, card.Live.sequence);
+                type += scale.HasValue ? $" · 스케일 {scale.Value}" : $" · 스케일 {card.LeftScale}/{card.RightScale}";
+            }
             if (!card.IsMonster) return type;
 
             if (!YgoConstants.RaceNamesKR.TryGetValue(card.Race, out string race))
@@ -605,6 +611,7 @@ namespace YGOPortable.UI
             if (compact && race.Contains('/')) race = "복수 종족";
             if (compact && attribute.Length > 8) attribute = "복수 속성";
             string identity = string.Join(" · ", new[] { race, attribute, card.Rating }.Where(part => !string.IsNullOrEmpty(part)));
+            if (card.ShowsSummonPreview) return $"{identity}\n{type} · 표시 형식 선택";
             if (card.Live == null) return $"{identity}\n{type}";
 
             string position = card.Live.IsDefense ? "수비 표시" : "공격 표시";
