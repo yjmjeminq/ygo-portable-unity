@@ -135,6 +135,8 @@ namespace YGOPortable.Core
         private static IReadOnlyList<OpponentCharacter> _opponents;
 
         public static bool Initialized => _profilePath != null;
+        internal static bool AllDeckCardsAvailable { get; set; } = true;
+        internal static bool RequiresOwnedCardsForDecks => Initialized && !AllDeckCardsAvailable;
         internal static event Action SaveChanged;
         public static bool HasStarter => _profile?.starterDeck != null;
         public static int Balance => _profile?.balance ?? 0;
@@ -350,6 +352,7 @@ namespace YGOPortable.Core
                 reason = "먼저 스타터 덱을 선택하세요.";
                 return false;
             }
+            if (AllDeckCardsAvailable) return true;
 
             foreach (var copies in GetDeckCards(deck).GroupBy(code => code))
             {

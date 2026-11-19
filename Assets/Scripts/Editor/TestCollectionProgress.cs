@@ -20,6 +20,14 @@ namespace YGOPortable.Editor
 
         internal static void Run(string streamingPath)
         {
+            bool openDecks = CollectionProgress.AllDeckCardsAvailable;
+            CollectionProgress.AllDeckCardsAvailable = false;
+            try { VerifyCollectionProgress(streamingPath); }
+            finally { CollectionProgress.AllDeckCardsAvailable = openDecks; }
+        }
+
+        private static void VerifyCollectionProgress(string streamingPath)
+        {
             string save = Path.Combine(Path.GetTempPath(), "ygo-collection-test-" + Guid.NewGuid().ToString("N"));
             string profile = Path.Combine(save, "collection-profile.json");
             DeckRepository.Load(streamingPath, save, seedDefaultDecks: false);
@@ -359,6 +367,21 @@ namespace YGOPortable.Editor
                 Require(list.GetComponentsInChildren<Button>().Length == 0 && !start.interactable &&
                     setup.Find("MyDeck/DeckList/Empty/Value").GetComponent<Text>().text.Contains("사용 가능한 덱 없음"),
                     "The empty state did not disable Duel Start and explain that no deck can be used.");
+
+                uint unowned = missingCard.main[0];
+                string profileBeforeOpenAccess = File.ReadAllText(Path.Combine(save, CollectionProgress.ProfileFileName));
+                CollectionProgress.AllDeckCardsAvailable = true;
+                try
+                {
+                    BrowseAndSelect();
+                    Require(list.GetComponentsInChildren<Button>().Length == 1 && RowName(0).text == missingCard.name &&
+                        start.interactable && GameAppController.CanStartWithDeck(missingCard, out _) &&
+                        CollectionProgress.GetDisassembleLimit(unowned) == 0 &&
+                        File.ReadAllText(Path.Combine(save, CollectionProgress.ProfileFileName)) == profileBeforeOpenAccess,
+                        "Open deck access did not admit the unowned card deck or affected the saved collection.");
+                    Debug.Log("[VERIFY OPEN CARD ACCESS] Free Duel accepted a complete deck containing an unowned card.");
+                }
+                finally { CollectionProgress.AllDeckCardsAvailable = false; }
 
                 var manyDecks = Enumerable.Range(0, 12).Select(i => Copy($"picker-many-{i}", $"Deck {i + 1}")).ToArray();
                 DeckRepository.UserDecks.AddRange(manyDecks);

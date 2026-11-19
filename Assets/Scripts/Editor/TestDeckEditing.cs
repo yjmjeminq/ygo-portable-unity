@@ -17,6 +17,14 @@ namespace YGOPortable.Editor
 
         internal static void Run(string streamingPath)
         {
+            bool openDecks = CollectionProgress.AllDeckCardsAvailable;
+            CollectionProgress.AllDeckCardsAvailable = false;
+            try { VerifyDeckEditing(streamingPath); }
+            finally { CollectionProgress.AllDeckCardsAvailable = openDecks; }
+        }
+
+        private static void VerifyDeckEditing(string streamingPath)
+        {
             string save = Path.Combine(Path.GetTempPath(), "ygo-deck-input-test-" + Guid.NewGuid().ToString("N"));
             DeckRepository.Load(streamingPath, save, seedDefaultDecks: false);
             DeckRepository.SaveUserDeck(new UserDeck { name = "Motion fixture", main = new List<uint> { 46986414 } });
@@ -37,6 +45,7 @@ namespace YGOPortable.Editor
                 VerifyArchetypeBrowser(editor, events);
                 VerifyGroupingAndTrunk(editor, streamingPath, Path.Combine(save, "trunk"));
                 VerifyArchetypeSearch(editor);
+                VerifyOpenDeckAccess(editor);
                 VerifyArchetypeCodex(canvas.transform, events);
                 VerifyMainSorting(editor, events);
                 VerifyTouchDeckMenu(editor, events);
@@ -257,6 +266,34 @@ namespace YGOPortable.Editor
             Field<Button>(editor, "_showAllCards").onClick.Invoke();
             Require(Field<ArchetypeInfo>(editor, "_activeArchetypeFilter") == null &&
                 result.All(card => CollectionProgress.GetOwnedCount(card.code) > 0), "The full trunk retained the archetype scope.");
+        }
+
+        private static void VerifyOpenDeckAccess(DeckEditorUI editor)
+        {
+            var query = Field<InputField>(editor, "_searchInp");
+            var deck = Field<UserDeck>(editor, "_workingDeck");
+            var unowned = CardDatabase.AllCards.First(card => card.alias == 0 && !card.IsExtra &&
+                CollectionProgress.IsCraftableCard(card) && CollectionProgress.GetOwnedCount(card.code) == 0 &&
+                !deck.main.Contains(card.code) && !deck.side.Contains(card.code));
+            string originalQuery = query.text;
+            CollectionProgress.AllDeckCardsAvailable = true;
+            try
+            {
+                query.text = unowned.code.ToString();
+                Require(Field<List<CardInfo>>(editor, "_trunkResults").Any(card => card.code == unowned.code) &&
+                    (uint)CallResult(editor, "FindAddableCardCopy", unowned.code, false) == unowned.code,
+                    "Open access did not display or allow adding an unowned card.");
+                for (int i = 0; i < 3; i++) deck.main.Add(unowned.code);
+                Require((uint)CallResult(editor, "FindAddableCardCopy", unowned.code, false) == 0,
+                    "Open access bypassed the three-copy limit.");
+                Debug.Log("[VERIFY OPEN TRUNK] Unowned card search and the three-copy limit passed.");
+            }
+            finally
+            {
+                deck.main.RemoveAll(code => code == unowned.code);
+                CollectionProgress.AllDeckCardsAvailable = false;
+                query.text = originalQuery;
+            }
         }
 
         private static void VerifyArchetypeCodex(Transform canvas, EventSystem events)

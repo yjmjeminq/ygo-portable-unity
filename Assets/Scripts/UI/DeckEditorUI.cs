@@ -154,7 +154,7 @@ namespace YGOPortable.UI
             _userDeckIdx = Mathf.Clamp(_userDeckIdx, 0, Mathf.Max(0, DeckRepository.UserDecks.Count - 1));
             LoadWorkingDeckFromCurrent();
             RefreshTrunkFilter();
-            if (CollectionProgress.Initialized && CollectionProgress.GetOwnedCount(_inspectedCode) == 0 &&
+            if (CollectionProgress.RequiresOwnedCardsForDecks && CollectionProgress.GetOwnedCount(_inspectedCode) == 0 &&
                 _trunkResults.Count > 0)
                 _inspectedCode = (_trunkResults.Find(card => DeckGroupKey(card.code) == DeckGroupKey(_inspectedCode)) ??
                     _trunkResults[0]).code;
@@ -818,12 +818,13 @@ namespace YGOPortable.UI
             }
 
             bool previewUnowned = _activeArchetypeFilter != null || _relatedFilterCode != 0;
-            bool ownedOnly = CollectionProgress.Initialized && !previewUnowned;
+            bool ownedOnly = CollectionProgress.RequiresOwnedCardsForDecks && !previewUnowned;
             uint.TryParse(_searchInp.text, out uint searchedCode);
             var seen = new HashSet<uint>();
             foreach (var card in source)
             {
-                if (card == null || !seen.Add(DeckGroupKey(card.code))) continue;
+                if (card == null || (CollectionProgress.AllDeckCardsAvailable && !CollectionProgress.IsCraftableCard(card)) ||
+                    !seen.Add(DeckGroupKey(card.code))) continue;
                 var entry = PickTrunkPrinting(card, filter, searchedCode, ownedOnly);
                 if (entry != null) _trunkResults.Add(entry);
             }
@@ -840,7 +841,7 @@ namespace YGOPortable.UI
 
             Canvas.ForceUpdateCanvases();
             _trunkCountText.text = CollectionProgress.Initialized ? $"{_trunkResults.Count:N0}종" : $"{_trunkResults.Count:N0}장";
-            _noTrunkResults.text = CollectionProgress.Initialized && !previewUnowned
+            _noTrunkResults.text = ownedOnly
                 ? "조건에 맞는 보유 카드가 없습니다." : "조건에 맞는 카드가 없습니다.";
             _noTrunkResults.gameObject.SetActive(_trunkResults.Count == 0);
             _padIndices[(int)PadArea.Trunk] = 0;
@@ -1006,7 +1007,7 @@ namespace YGOPortable.UI
                 uint code = cards[i];
                 int index = i;
                 view.SetCard(code);
-                view.transform.Find("AspectBox/Unowned").gameObject.SetActive(CollectionProgress.Initialized &&
+                view.transform.Find("AspectBox/Unowned").gameObject.SetActive(CollectionProgress.RequiresOwnedCardsForDecks &&
                     CollectionProgress.GetOwnedCount(code) == 0);
                 trigger.CardCodeGetter = () => code;
                 trigger.IndexGetter = () => index;
@@ -1262,7 +1263,7 @@ namespace YGOPortable.UI
 
         private uint FindAddableCardCopy(uint code, bool showReason = true)
         {
-            if (CollectionProgress.Initialized && !HasUnusedCopy(code))
+            if (CollectionProgress.RequiresOwnedCardsForDecks && !HasUnusedCopy(code))
             {
                 var spare = CardDatabase.TryGetDeckPrintings(code, out var printings)
                     ? Array.Find(printings, printing => HasUnusedCopy(printing.code)) : null;
@@ -1333,6 +1334,12 @@ namespace YGOPortable.UI
 
         private long GetRemainingTrunkCopies(uint code, out long owned, out int inDeck)
         {
+            if (CollectionProgress.AllDeckCardsAvailable)
+            {
+                owned = CollectionProgress.IsCraftableCard(CardDatabase.Get(code)) ? CollectionProgress.DeckCopyLimit : 0;
+                inDeck = CountInWorkingDeck(code);
+                return Math.Max(0, owned - inDeck);
+            }
             if (!CardDatabase.TryGetDeckPrintings(code, out var printings))
             {
                 owned = CollectionProgress.GetOwnedCount(code);
@@ -1362,8 +1369,9 @@ namespace YGOPortable.UI
             if (!visible) return;
 
             long remaining = GetRemainingTrunkCopies(_inspectedCode, out long owned, out int inDeck);
-            _previewOwnership.text = owned == 0 ? $"{UnownedLabel} · 덱에 {inDeck}장" :
-                $"보관함 {remaining}장 · 덱에 {inDeck}장 · 보유 {owned}장";
+            _previewOwnership.text = CollectionProgress.AllDeckCardsAvailable ? $"추가 가능 {remaining}장 · 덱에 {inDeck}장" :
+                owned == 0 ? $"{UnownedLabel} · 덱에 {inDeck}장" :
+                    $"보관함 {remaining}장 · 덱에 {inDeck}장 · 보유 {owned}장";
             _previewOwnership.color = inDeck > owned || owned == 0 ? LotdUiKit.RedAccent : LotdUiKit.TextPrimary;
             var rarity = CardRarityCatalog.GetRarity(_inspectedCode);
             _previewRarity.text = CardRarityCatalog.GetLabel(rarity);
@@ -1905,7 +1913,7 @@ namespace YGOPortable.UI
                     inspectBtn.onClick.RemoveAllListeners();
                     loadBtn.onClick.RemoveAllListeners();
                     loadBtn.GetComponentInChildren<Text>().text = _archForSearch ? "카드 보기" :
-                        CollectionProgress.Initialized ? "보유분 불러오기" : "불러오기";
+                        CollectionProgress.RequiresOwnedCardsForDecks ? "보유분 불러오기" : "불러오기";
                     if (_archForSearch)
                     {
                         inspectBtn.onClick.AddListener(() => ApplyArchetypeSearch(arch));
@@ -1948,7 +1956,7 @@ namespace YGOPortable.UI
         {
             if (arch == null) return;
             var (main, extra) = CardDatabase.BuildPureArchetypeDeck(arch);
-            bool ownedOnly = CollectionProgress.Initialized;
+            bool ownedOnly = CollectionProgress.RequiresOwnedCardsForDecks;
             if (ownedOnly)
             {
                 var used = new Dictionary<uint, int>();

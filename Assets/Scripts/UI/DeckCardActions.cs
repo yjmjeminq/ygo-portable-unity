@@ -128,7 +128,7 @@ namespace YGOPortable.UI
         {
             CardInfo[] choices = Array.Empty<CardInfo>();
             if (source == DragSourceType.Trunk && CardDatabase.TryGetDeckPrintings(code, out var printings))
-                choices = CollectionProgress.Initialized
+                choices = CollectionProgress.RequiresOwnedCardsForDecks
                     ? printings.Where(printing => printing.code == code || CollectionProgress.GetOwnedCount(printing.code) > 0).ToArray()
                     : printings;
 
