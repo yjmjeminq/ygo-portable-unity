@@ -138,6 +138,7 @@ namespace YGOPortable.Core
         public const uint QUERY_BASE_ATTACK = 0x400;
         public const uint QUERY_BASE_DEFENSE = 0x800;
         public const uint QUERY_REASON = 0x1000;
+        internal const uint QUERY_EQUIP_CARD = 0x4000;
         public const uint QUERY_OVERLAY_CARD = 0x10000;
         public const uint QUERY_COUNTERS = 0x20000;
         public const uint QUERY_OWNER = 0x40000;

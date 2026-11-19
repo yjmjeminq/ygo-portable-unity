@@ -106,6 +106,7 @@ namespace YGOPortable.UI
         private FieldDepartureGroup _openFieldDepartures;
         private MaterialDepartureGroup _openMaterials;
         private PositionChangeGroup _openPositionChanges;
+        private EquipCue _openEquip;
         private List<FieldArrival> _pendingFieldArrivals;
         private uint? _pendingReturnEffect;
         private Action _refreshAfterFieldArrivals;
@@ -132,6 +133,14 @@ namespace YGOPortable.UI
             internal LifePointChangeKind Kind;
             internal Action Apply;
             internal CanvasGroup Feedback;
+        }
+
+        private sealed class EquipCue
+        {
+            internal RectTransform Source;
+            internal RectTransform Target;
+            internal uint TargetCode;
+            internal Action OnContact;
         }
 
         private sealed class FieldArrival
@@ -200,6 +209,7 @@ namespace YGOPortable.UI
             _openFieldDepartures = null;
             _openMaterials = null;
             _openPositionChanges = null;
+            _openEquip = null;
             _pendingFieldArrivals = null;
             _pendingReturnEffect = null;
             _refreshAfterFieldArrivals = null;
@@ -367,6 +377,7 @@ namespace YGOPortable.UI
             }
 
             var first = moves[0];
+            _openEquip = null;
             _steps.Enqueue(moves.Count == 1 && first.Motion != CardMotion.FieldReturn
                 ? MoveCard(first.Flight, first.Motion, Land, first.Readout, first.Depart)
                 : PlayFieldArrivalGroup(moves, Land, refresh));
@@ -385,6 +396,7 @@ namespace YGOPortable.UI
             _openMaterials = null;
             _openPositionChanges = null;
             _openBattleLifeChanges = null;
+            _openEquip = null;
             if (_openPileTransfers == null)
             {
                 _openPileTransfers = new List<(CardFlight, Action)>();
@@ -401,6 +413,7 @@ namespace YGOPortable.UI
             _openPositionChanges = null;
             _openPileTransfers = null;
             _openBattleLifeChanges = null;
+            _openEquip = null;
             _steps.Enqueue(step);
         }
 
@@ -425,6 +438,23 @@ namespace YGOPortable.UI
         }
 
         internal void QueueFieldReadoutUpdate(Action apply) => QueueStep(ApplyFieldReadoutUpdate(apply));
+
+        internal void QueueEquip(RectTransform source, RectTransform target, uint targetCode, Action onContact)
+        {
+            var cue = new EquipCue { Source = source, Target = target, TargetCode = targetCode, OnContact = onContact };
+            QueueStep(PlayEquip(cue));
+            if (onContact == null) _openEquip = cue;
+        }
+
+        internal bool TryQueueEquipReadout(RectTransform target, uint code, Action onContact)
+        {
+            // Some effects register the stat change just after the equip packet.
+            if (_openEquip == null || _pendingFieldArrivals != null || target != _openEquip.Target || code != _openEquip.TargetCode)
+                return false;
+            _openEquip.OnContact = onContact;
+            _openEquip = null;
+            return true;
+        }
 
         private static IEnumerator ApplyFieldReadoutUpdate(Action apply)
         {
@@ -1168,6 +1198,35 @@ namespace YGOPortable.UI
             return (DuelEffectKind.Pendulum, new Color(.23f, .70f, 1f), "펜듈럼 소환");
         }
 
+        private IEnumerator PlayEquip(EquipCue cue)
+        {
+            if (ReferenceEquals(_openEquip, cue)) _openEquip = null;
+            if (cue.Source == null || cue.Target == null)
+            {
+                cue.OnContact?.Invoke();
+                yield break;
+            }
+
+            var link = CreateEffect(DuelEffectKind.EquipLink, Vector2.zero, Vector2.one, new Color(1f, .74f, .37f));
+            var rect = link.rectTransform;
+            bool contacted = false;
+            yield return Animate(.33f, progress =>
+            {
+                var center = new Vector2(.5f, .5f);
+                Vector2 from = GetPoint(cue.Source, center);
+                Vector2 to = GetPoint(cue.Target, center);
+                Vector2 direction = to - from;
+                rect.anchoredPosition = (from + to) * .5f;
+                rect.sizeDelta = new Vector2(direction.magnitude, Mathf.Clamp(GetAreaSize(cue.Target).y * .33f, 19f, 36f));
+                rect.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg);
+                link.Seek(progress);
+                if (contacted || progress < DuelEffectGraphic.EquipContactProgress) return;
+                contacted = true;
+                cue.OnContact?.Invoke();
+            });
+            RemoveTransient(link.gameObject);
+        }
+
         private IEnumerator AttackArrow(Vector2 from, Vector2 to, bool opponent)
         {
             Vector2 direction = to - from;
@@ -1593,7 +1652,7 @@ namespace YGOPortable.UI
         {
             var effect = CreateEffect(kind, center, size, color);
             yield return Animate(duration, effect.Seek);
-            Destroy(effect.gameObject);
+            RemoveTransient(effect.gameObject);
         }
 
         private DuelEffectGraphic CreateEffect(DuelEffectKind kind, Vector2 center, Vector2 size, Color color)

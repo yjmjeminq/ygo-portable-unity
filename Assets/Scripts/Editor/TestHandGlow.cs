@@ -27,6 +27,8 @@ namespace YGOPortable.Editor
             VerifyOpponentTurnActivation();
             VerifyNativeCombatReadout(useHonest: true);
             VerifyNativeCombatReadout(useHonest: false);
+            VerifyNativeEquipHandoff();
+            VerifyNativeMonsterEquip();
             VerifyNativeChainReadouts();
             VerifyDestroyedCopiesKeepTheirReadouts();
             VerifyFieldReplacementReadouts();
@@ -357,6 +359,195 @@ namespace YGOPortable.Editor
                 ((IDictionary)typeof(DuelFieldUI).GetField("_battleCardDisplays", PrivateInstance).GetValue(ui.Field)).Count == 0,
                 "A destroyed defender or queued battle display remained on the field.");
             Debug.Log($"[VERIFY DUEL BATTLE STATS] A set defender stayed hidden until its flip, showed 2000 DEF through the {expectedAttack} ATK strike, and left at destruction.");
+        }
+
+        private static void VerifyNativeEquipHandoff()
+        {
+            const uint unity = 56747793, typhoon = 5318639, doubleSummon = 43422537, sparkman = 20721928;
+            var main = new[] { unity, typhoon, doubleSummon, KaiserSeaHorse, sparkman }
+                .SelectMany(code => Enumerable.Repeat(code, 8)).ToArray();
+            var opponent = Enumerable.Repeat(BlueEyes, 40).ToArray();
+            var empty = Array.Empty<uint>();
+            var ai = new TacticalAI();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Equip presentation", main, empty, opponent, empty, true,
+                session => session.Players[session.HumanPlayerIndex].hand.Select(card => card.code).Distinct().Count() == 5);
+            var own = duel.Players[duel.HumanPlayerIndex];
+
+            void ReachIdle(uint choose = 0)
+            {
+                YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt => choose != 0 && prompt.messageType == YgoConstants.MSG_SELECT_CARD
+                    ? SelectCard(prompt, choose) : null);
+                Require(duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD && duel.RetryCount == 0,
+                    "The equipment fixture did not resolve its native action.");
+            }
+            void Summon(uint code)
+            {
+                int index = duel.ActivePrompt.summonable.FindIndex(card => card.code == code);
+                Require(index >= 0, "The equipment fixture did not offer both potential targets.");
+                duel.SubmitResponseInt(index << 16);
+                ReachIdle();
+            }
+            Summon(sparkman);
+            ActivateFromMainPhase(duel, doubleSummon);
+            ReachIdle();
+            Summon(KaiserSeaHorse);
+
+            var target = own.mzone.Single(card => card?.code == KaiserSeaHorse);
+            var other = own.mzone.Single(card => card?.code == sparkman);
+            using var ui = new HandUI(duel);
+            var animator = CardAnimationManager.Ensure(ui.Canvas);
+            var steps = AnimationSteps(animator);
+            var slot = FieldSlot(ui.Field, target);
+            slot.GetComponent<CardDragTrigger>().OnRightClick();
+            ui.Field.Root.transform.Find("LeftInspector/CardDetails/ArtworkControls/Details/B").GetComponent<Button>().onClick.Invoke();
+            Require(ui.Field.IsReadingCardDetails, "The target's details could not open for the equipment fixture.");
+            var inspector = ui.Field.Root.transform.Find("LeftInspector/CardDetails/CombatStats");
+            var zoom = ui.Field.Root.transform.Find("Overlay_CardZoom/ZoomWin/Info/CombatStats");
+            void CheckValues(string attack, string defense)
+            {
+                foreach (var values in new[] { slot.Find("CardReadout/Combat"), inspector, zoom })
+                {
+                    string shownAttack = values.Find("Attack/Digits/Value").GetComponent<Text>().text;
+                    string shownDefense = values.Find("Defense/Digits/Value").GetComponent<Text>().text;
+                    Require(shownAttack == attack && shownDefense == defense,
+                        $"{values.parent.name} showed {shownAttack}/{shownDefense} during equipment, expected {attack}/{defense}.");
+                }
+                Require(FieldSlot(ui.Field, other).Find("CardReadout/Combat/Attack/Digits/Value").GetComponent<Text>().text == "1600",
+                    "Equipment changed the readout of the other eligible target.");
+            }
+            static Action<float> BeginFrames(IEnumerator step)
+            {
+                Require(step.MoveNext() && step.Current is IEnumerator, "The expected equipment movement had no animation frames.");
+                return TestCardPresentation.SampleAnimation((IEnumerator)step.Current);
+            }
+
+            LiveCardState equipped = null;
+            duel.OnCardEquipped += (source, host, changes) =>
+            {
+                Require(equipped == null && source.code == unity && source.EquipTarget == (target.controller, target.sequence) &&
+                    host.code == KaiserSeaHorse && host.sequence == target.sequence && changes?.Count == 1 &&
+                    changes[0].Before.attack == 1700 && changes[0].After.attack == 3300 && changes[0].After.defense == 3250,
+                    "The equipment packet did not carry the chosen target and exact native stat change.");
+                equipped = source;
+            };
+            ActivateFromMainPhase(duel, unity);
+            ReachIdle(KaiserSeaHorse);
+            Require(equipped != null && own.szone[equipped.sequence].EquipTarget == (target.controller, target.sequence),
+                "United We Stand did not retain its native equipment target.");
+            ui.Field.Refresh();
+            CheckValues("1700", "1650");
+
+            var queued = steps.ToArray();
+            var placement = queued.Single(step => FlightCode(step) == unity);
+            var cue = queued.Single(step => step.GetType().Name.StartsWith("<PlayEquip>", StringComparison.Ordinal));
+            Require(Array.IndexOf(queued, placement) < Array.IndexOf(queued, cue), "The equip link started before the card reached its zone.");
+            BeginFrames(placement)(1f);
+            Require(!placement.MoveNext(), "The equipment card did not finish its placement.");
+            var equipmentArt = FieldSlot(ui.Field, equipped).GetComponentInChildren<CompositeCardView>();
+            Require(equipmentArt?.CurrentCode == unity, "The equipment link started on an empty zone.");
+            var sample = BeginFrames(cue);
+            sample(.41f);
+            CheckValues("1700", "1650");
+            var graphic = animator.GetComponentsInChildren<DuelEffectGraphic>().Single(effect => effect.Kind == DuelEffectKind.EquipLink);
+            var track = graphic.rectTransform;
+            var targetArt = slot.GetComponentInChildren<CompositeCardView>();
+            var left = track.TransformPoint(new Vector3(track.rect.xMin, 0f));
+            var right = track.TransformPoint(new Vector3(track.rect.xMax, 0f));
+            var sourceAnchor = (RectTransform)equipmentArt.transform.Find("AspectBox");
+            var targetAnchor = (RectTransform)targetArt.transform.Find("AspectBox");
+            Require(Vector3.Distance(left, sourceAnchor.TransformPoint(sourceAnchor.rect.center)) < .02f &&
+                Vector3.Distance(right, targetAnchor.TransformPoint(targetAnchor.rect.center)) < .02f &&
+                !graphic.raycastTarget, "The equip cue missed a card or blocked the board's input.");
+            sample(DuelEffectGraphic.EquipContactProgress);
+            CheckValues("3300", "3250");
+            sample(1f);
+            Require(!cue.MoveNext() && graphic == null, "The equipment indicator stayed over the settled field.");
+            steps.Clear();
+
+            CardMoveEvent removed = null;
+            duel.OnCardMoved += move => { if (move.code == unity) removed = move; };
+            ActivateFromMainPhase(duel, typhoon);
+            ReachIdle(unity);
+            Require(removed?.SourceReadout?.EquipTarget == (target.controller, target.sequence) &&
+                own.grave.Any(card => card.code == unity) && own.mzone[target.sequence].attack == 1700,
+                "The destroyed card lost its final public equipped state or its live bonus did not expire.");
+            ui.Field.Refresh();
+            CheckValues("3300", "3250");
+            Require(equipmentArt.gameObject.activeInHierarchy && equipmentArt.CurrentCode == unity,
+                "The equip card vanished before its destruction cue.");
+            queued = steps.ToArray();
+            var leave = queued.Single(step => FlightCode(step) == unity);
+            var update = queued.Single(step => step.GetType().Name.StartsWith("<ApplyFieldReadoutUpdate>", StringComparison.Ordinal));
+            Require(Array.IndexOf(queued, update) == Array.IndexOf(queued, leave) + 1,
+                "The lost equipment values were released outside the equipment departure.");
+            Require(leave.MoveNext() && leave.Current is IEnumerator, "The destruction cue did not start.");
+            var burst = (IEnumerator)leave.Current;
+            Require(burst.MoveNext() && burst.Current is IEnumerator, "The destruction cue had no frames.");
+            var impact = TestCardPresentation.SampleAnimation((IEnumerator)burst.Current);
+            impact(.78f);
+            CheckValues("3300", "3250");
+            Require(equipmentArt.gameObject.activeInHierarchy, "The spell was hidden while its destruction effect was still playing.");
+            impact(1f);
+            Require(!burst.MoveNext() && leave.MoveNext(), "The destroyed equipment did not enter its departure.");
+            TestCardPresentation.SampleAnimation((IEnumerator)leave.Current)(1f);
+            Require(!leave.MoveNext() && !update.MoveNext(), "The equipment departure and stat update did not finish.");
+            CheckValues("1700", "1650");
+            Require(equipmentArt.CurrentCode != unity || !equipmentArt.gameObject.activeInHierarchy,
+                "The destroyed Equip Spell remained visible on the field.");
+            Debug.Log("[VERIFY DUEL EQUIP HANDOFF] United We Stand changed both stats at contact and restored them after its destruction.");
+        }
+
+        private static void VerifyNativeMonsterEquip()
+        {
+            const uint fusion = 1845204, restrict = 63519819, sparkman = 20721928;
+            var main = Enumerable.Repeat(fusion, 12).Concat(Enumerable.Repeat(KaiserSeaHorse, 28)).ToArray();
+            var opponent = Enumerable.Repeat(sparkman, 40).ToArray();
+            var ai = new TacticalAI();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Monster equipment", main, new[] { restrict }, opponent,
+                Array.Empty<uint>(), false, session => session.Players[session.HumanPlayerIndex].hand.Exists(card => card.code == fusion));
+            void ReachIdle(uint choose = 0)
+            {
+                YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt => choose != 0 && prompt.messageType == YgoConstants.MSG_SELECT_CARD
+                    ? SelectCard(prompt, choose) : null);
+                Require(duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD && duel.RetryCount == 0,
+                    "The monster equipment fixture did not resolve its native action.");
+            }
+            duel.SubmitResponseInt(0);
+            ReachIdle();
+            duel.SubmitResponseInt(7);
+            ReachIdle();
+            ActivateFromMainPhase(duel, fusion);
+            ReachIdle(restrict);
+
+            var player = duel.Players[duel.HumanPlayerIndex];
+            var target = player.mzone.Single(card => card?.code == restrict);
+            using var ui = new HandUI(duel);
+            var animator = CardAnimationManager.Ensure(ui.Canvas);
+            var field = FieldSlot(ui.Field, target);
+            var attack = field.Find("CardReadout/Combat/Attack/Digits/Value").GetComponent<Text>();
+            var defense = field.Find("CardReadout/Combat/Defense/Digits/Value").GetComponent<Text>();
+            ActivateFromMainPhase(duel, restrict);
+            ReachIdle(sparkman);
+            var equipment = player.szone.Single(card => card?.code == sparkman);
+            Require(equipment.EquipTarget == (target.controller, target.sequence) && (equipment.type & YgoConstants.TYPE_EQUIP) != 0 &&
+                    player.mzone[target.sequence].attack == 1600 && player.mzone[target.sequence].defense == 1400,
+                "The opponent's monster did not become the expected equipment in the native engine.");
+
+            ui.Field.Refresh();
+            Require(attack.text == "0" && defense.text == "0", "The absorbed values appeared while the monster was still traveling.");
+            var queue = AnimationSteps(animator).ToArray();
+            var placement = queue.Single(step => FlightCode(step) == sparkman);
+            var cue = queue.Single(step => step.GetType().Name.StartsWith("<PlayEquip>", StringComparison.Ordinal));
+            Require(Array.IndexOf(queue, placement) < Array.IndexOf(queue, cue) && placement.MoveNext(),
+                "The absorbed monster did not travel from the opponent's field before becoming equipment.");
+            TestCardPresentation.SampleAnimation((IEnumerator)placement.Current)(1f);
+            Require(!placement.MoveNext() && cue.MoveNext(), "The absorbed monster did not reach its equipment cue.");
+            var sample = TestCardPresentation.SampleAnimation((IEnumerator)cue.Current);
+            sample(DuelEffectGraphic.EquipContactProgress);
+            Require(attack.text == "1600" && defense.text == "1400", "The absorbed values did not reach the field at equipment contact.");
+            sample(1f);
+            Require(!cue.MoveNext(), "The absorbed monster left an equipment indicator on the field.");
+            Debug.Log("[VERIFY DUEL EQUIP HANDOFF] Thousand-Eyes Restrict gained the other player's monster's 1600/1400 at contact.");
         }
 
         private static void VerifyNativeChainReadouts()

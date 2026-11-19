@@ -6,12 +6,14 @@ namespace YGOPortable.UI
     internal enum DuelEffectKind
     {
         AttackPath, Strike, Break, Token, Summon, Chain, Fusion, Synchro, Xyz, Link, Ritual, Pendulum, XyzMaterial,
-        SummonMaterial, BanishTransit
+        SummonMaterial, BanishTransit, EquipLink
     }
 
     // Canvas particles and tracks use one mesh, with white fill and vertex tints.
     internal sealed class DuelEffectGraphic : RawImage
     {
+        internal const float EquipContactProgress = .58f;
+
         internal DuelEffectKind Kind;
         internal Color Tint;
         private float _progress;
@@ -56,6 +58,9 @@ namespace YGOPortable.UI
 
             switch (Kind)
             {
+                case DuelEffectKind.EquipLink:
+                    EquipLink(mesh, rect, t, glow);
+                    break;
                 case DuelEffectKind.Strike:
                     Strike(mesh, rect.center, radius, travel, glow);
                     break;
@@ -138,6 +143,41 @@ namespace YGOPortable.UI
                 Line(mesh, point + new Vector2(-width * .65f, width * .48f), point, width * .17f, color);
                 Line(mesh, point, point + new Vector2(-width * .65f, -width * .48f), width * .17f, color);
             }
+        }
+
+        private void EquipLink(VertexHelper mesh, Rect rect, float t, float glow)
+        {
+            var white = Color.Lerp(Tint, Color.white, .68f);
+            float head = Mathf.SmoothStep(0f, 1f, t / EquipContactProgress);
+            float tail = Mathf.SmoothStep(0f, 1f, (t - .15f) / .79f);
+            float width = rect.height * .078f;
+            float bend = Mathf.Min(rect.width * .19f, rect.height * .39f);
+            Vector2 At(float amount) => new Vector2(Mathf.Lerp(rect.xMin, rect.xMax, amount),
+                rect.center.y + Mathf.Sin(amount * Mathf.PI) * bend);
+
+            Vector2 previous = At(tail);
+            const int segments = 14;
+            for (int i = 1; i <= segments; i++)
+            {
+                float section = (float)i / segments;
+                Vector2 point = At(Mathf.Lerp(tail, head, section));
+                float opacity = glow * Mathf.Lerp(.12f, .89f, section);
+                Line(mesh, previous, point, width * 3.7f, Shade(Tint, opacity * .20f));
+                Line(mesh, previous, point, width, Shade(white, opacity));
+                previous = point;
+            }
+
+            if (t < EquipContactProgress)
+            {
+                Glow(mesh, At(head), width * 3.6f, .84f, Shade(white, glow * .92f));
+                return;
+            }
+
+            float contact = Mathf.InverseLerp(EquipContactProgress, 1f, t);
+            float pulse = (1f - contact) * glow;
+            float ring = rect.height * Mathf.Lerp(.17f, .44f, contact);
+            Glow(mesh, At(1f), ring * 1.43f, .82f, Shade(Tint, pulse * .38f));
+            Ring(mesh, At(1f), ring, .82f, width * .83f, .09f, .82f, Shade(white, pulse), 32);
         }
 
         private void Strike(VertexHelper mesh, Vector2 center, float radius, float travel, float glow)

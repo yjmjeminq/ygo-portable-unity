@@ -272,6 +272,7 @@ namespace YGOPortable.UI
             session.OnChainActivated += HandleChainActivatedEvent;
             session.OnChainResolving += HandleChainResolvingEvent;
             session.OnFieldReadoutsChanged += QueueFieldReadouts;
+            session.OnCardEquipped += HandleCardEquipped;
             session.OnAttackDeclared += HandleAttackEvent;
             session.OnBattleResolved += HandleBattleResolved;
             session.OnCoinTossed += HandleCoinTossedEvent;
@@ -312,6 +313,7 @@ namespace YGOPortable.UI
                 _session.OnChainActivated -= HandleChainActivatedEvent;
                 _session.OnChainResolving -= HandleChainResolvingEvent;
                 _session.OnFieldReadoutsChanged -= QueueFieldReadouts;
+                _session.OnCardEquipped -= HandleCardEquipped;
                 _session.OnAttackDeclared -= HandleAttackEvent;
                 _session.OnBattleResolved -= HandleBattleResolved;
                 _session.OnCoinTossed -= HandleCoinTossedEvent;
@@ -2356,7 +2358,30 @@ namespace YGOPortable.UI
         {
             var animator = CardAnimationManager.Instance;
             if (animator == null || !Root.activeInHierarchy) return;
+            var apply = PrepareFieldReadoutUpdate(changes);
+            if (changes.Count == 1)
+            {
+                var card = changes[0].Before;
+                var anchor = GetSlot(card.controller, card.location, card.sequence)?.focusArt;
+                if (anchor != null && animator.TryQueueEquipReadout(anchor, card.code, apply)) return;
+            }
+            animator.QueueFieldReadoutUpdate(apply);
+        }
 
+        private void HandleCardEquipped(LiveCardState source, LiveCardState target,
+            IReadOnlyList<(LiveCardState Before, LiveCardState After)> changes)
+        {
+            var animator = CardAnimationManager.Instance;
+            if (animator == null || !Root.activeInHierarchy) return;
+            var onContact = changes == null ? null : PrepareFieldReadoutUpdate(changes);
+            var from = GetSlot(source.controller, source.location, source.sequence)?.focusArt;
+            var to = GetSlot(target.controller, target.location, target.sequence)?.focusArt;
+            if (from != null && to != null) animator.QueueEquip(from, to, target.code, onContact);
+            else if (onContact != null) animator.QueueFieldReadoutUpdate(onContact);
+        }
+
+        private Action PrepareFieldReadoutUpdate(IReadOnlyList<(LiveCardState Before, LiveCardState After)> changes)
+        {
             var updates = new (PresentedFieldReadout Readout, LiveCardState After)[changes.Count];
             for (int i = 0; i < changes.Count; i++)
             {
@@ -2369,12 +2394,12 @@ namespace YGOPortable.UI
                 }
                 updates[i] = (readout, after);
             }
-            animator.QueueFieldReadoutUpdate(() =>
+            return () =>
             {
                 foreach (var (readout, after) in updates)
                     readout.Shown = after;
                 Refresh();
-            });
+            };
         }
 
         private Action HoldMaterialReadout(byte controller, uint location, uint sequence, int change)

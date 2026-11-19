@@ -31,6 +31,7 @@ namespace YGOPortable.Core
         public bool effectsDisabled;
         public uint counterCount;
         public List<uint> overlayCodes = new List<uint>();
+        internal (byte Controller, uint Sequence)? EquipTarget;
 
         public bool IsFaceUp => (position & YgoConstants.POS_FACEUP) != 0;
         public bool IsDefense => (position & YgoConstants.POS_DEFENSE) != 0;
@@ -308,6 +309,8 @@ namespace YGOPortable.Core
         public event Action<ChainLinkInfo> OnChainActivated;
         public event Action<ChainLinkInfo> OnChainResolving;
         internal event Action<IReadOnlyList<(LiveCardState Before, LiveCardState After)>> OnFieldReadoutsChanged;
+        internal event Action<LiveCardState, LiveCardState, IReadOnlyList<(LiveCardState Before, LiveCardState After)>> OnCardEquipped;
+        private bool TracksFieldReadouts => OnFieldReadoutsChanged != null || OnCardEquipped != null;
         public event Action<byte, uint, uint, byte, uint, uint> OnAttackDeclared;
         internal event Action<BattleCardStats, BattleCardStats> OnBattleResolved;
         public event Action<byte, IReadOnlyList<bool>> OnCoinTossed;
@@ -586,8 +589,8 @@ namespace YGOPortable.Core
         public void StepUntilPrompt()
         {
             if (NativePtr == IntPtr.Zero || IsFinished) return;
-            if (OnFieldReadoutsChanged == null) _fieldReadoutBaseline = null;
-            else _fieldReadoutBaseline ??= CaptureFieldReadouts(fromNative: false);
+            if (!TracksFieldReadouts) _fieldReadoutBaseline = null;
+            else _fieldReadoutBaseline ??= CaptureFieldReadouts(fromNative: true);
 
             int guard = 0;
             while (!IsFinished && guard < 256)
@@ -769,12 +772,12 @@ namespace YGOPortable.Core
 
         private void CaptureMoveSource(CardMoveEvent move, bool paired)
         {
-            if ((move.fromLoc == YgoConstants.LOCATION_MZONE ||
-                (paired || move.PresentationGroup != null || move.MaterialMethod != 0 ||
-                    move.ChangesPositionInPlace || move.TemporarilyBanished) &&
-                move.fromLoc == YgoConstants.LOCATION_SZONE) &&
+            if (move.fromLoc is YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE &&
                 _fieldReadoutBaseline?.TryGetValue((move.fromCon, move.fromLoc, move.fromSeq), out var source) == true &&
-                source.code == move.code && source.position == move.fromPos)
+                source.code == move.code && source.position == move.fromPos &&
+                (move.fromLoc == YgoConstants.LOCATION_MZONE || source.EquipTarget.HasValue ||
+                    paired || move.PresentationGroup != null || move.MaterialMethod != 0 ||
+                    move.ChangesPositionInPlace || move.TemporarilyBanished))
                 move.SourceReadout = source;
         }
 
@@ -1605,15 +1608,20 @@ namespace YGOPortable.Core
 
                 case YgoConstants.MSG_EQUIP:
                 {
-                    byte eCon = br.ReadByte();
-                    br.ReadByte(); // equip location
-                    uint eSeq = br.ReadUInt32();
-                    br.ReadUInt32(); // equip position
-                    byte tCon = br.ReadByte();
-                    br.ReadByte(); // target location
-                    uint tSeq = br.ReadUInt32();
-                    br.ReadUInt32(); // target position
-                    AddLog($"장착: {(eCon == HumanPlayerIndex ? "내" : "상대")} 마함[{eSeq + 1}] -> {(tCon == HumanPlayerIndex ? "내" : "상대")} 몬스터[{tSeq + 1}]");
+                    var source = (Controller: br.ReadByte(), Location: (uint)br.ReadByte(), Sequence: br.ReadUInt32());
+                    uint sourcePosition = br.ReadUInt32();
+                    var target = (Controller: br.ReadByte(), Location: (uint)br.ReadByte(), Sequence: br.ReadUInt32());
+                    uint targetPosition = br.ReadUInt32();
+                    AddLog($"장착: {(source.Controller == HumanPlayerIndex ? "내" : "상대")} 마함[{source.Sequence + 1}] → {(target.Controller == HumanPlayerIndex ? "내" : "상대")} 몬스터[{target.Sequence + 1}]");
+                    if (OnCardEquipped == null || source.Location != YgoConstants.LOCATION_SZONE || target.Location != YgoConstants.LOCATION_MZONE ||
+                        (sourcePosition & YgoConstants.POS_FACEUP) == 0 || (targetPosition & YgoConstants.POS_FACEUP) == 0) break;
+
+                    var changes = CaptureFieldReadoutChanges(fromNative: true);
+                    if (_fieldReadoutBaseline?.TryGetValue(source, out var equipment) == true &&
+                        _fieldReadoutBaseline.TryGetValue(target, out var monster) &&
+                        equipment.EquipTarget == (monster.controller, monster.sequence))
+                        OnCardEquipped(equipment, monster, changes);
+                    else if (changes != null) OnFieldReadoutsChanged?.Invoke(changes);
                     break;
                 }
 
@@ -1710,9 +1718,14 @@ namespace YGOPortable.Core
 
         private void SampleFieldReadouts(bool fromNative = true)
         {
+            var changes = CaptureFieldReadoutChanges(fromNative);
+            if (changes != null) OnFieldReadoutsChanged?.Invoke(changes);
+        }
+
+        private List<(LiveCardState Before, LiveCardState After)> CaptureFieldReadoutChanges(bool fromNative)
+        {
             var before = _fieldReadoutBaseline;
-            var listener = OnFieldReadoutsChanged;
-            if (before == null || listener == null) return;
+            if (before == null) return null;
 
             var field = CaptureFieldReadouts(fromNative);
             _fieldReadoutBaseline = field;
@@ -1723,7 +1736,7 @@ namespace YGOPortable.Core
                     previous.position != current.position || SameReadouts(previous, current)) continue;
                 (changes ??= new()).Add((previous, current));
             }
-            if (changes != null) listener(changes);
+            return changes;
         }
 
         private static bool SameReadouts(LiveCardState a, LiveCardState b) =>
@@ -1785,6 +1798,7 @@ namespace YGOPortable.Core
         private List<LiveCardState> QueryLocationCards(byte playerId, uint loc, bool keepNulls = true, uint flags = YgoConstants.QUERY_DEFAULT)
         {
             var result = new List<LiveCardState>();
+            if (loc == YgoConstants.LOCATION_SZONE && TracksFieldReadouts) flags |= YgoConstants.QUERY_EQUIP_CARD;
             byte[] raw = YgoNativeBridge.QueryLocationBytes(NativePtr, flags, playerId, loc);
             if (raw.Length < 4) return result;
 
@@ -1836,6 +1850,10 @@ namespace YGOPortable.Core
                         case YgoConstants.QUERY_DEFENSE: card.defense = BitConverter.ToInt32(raw, valPos); break;
                         case YgoConstants.QUERY_BASE_ATTACK: card.baseAttack = BitConverter.ToInt32(raw, valPos); break;
                         case YgoConstants.QUERY_BASE_DEFENSE: card.baseDefense = BitConverter.ToInt32(raw, valPos); break;
+                        case YgoConstants.QUERY_EQUIP_CARD when blkSize >= 14 && raw[valPos + 1] == YgoConstants.LOCATION_MZONE &&
+                            (BitConverter.ToUInt32(raw, valPos + 6) & YgoConstants.POS_FACEUP) != 0:
+                            card.EquipTarget = (raw[valPos], BitConverter.ToUInt32(raw, valPos + 2));
+                            break;
                         case YgoConstants.QUERY_OWNER: card.owner = raw[valPos]; break;
                         case YgoConstants.QUERY_IS_PUBLIC: card.isPublic = raw[valPos] != 0; break;
                         case YgoConstants.QUERY_STATUS:
@@ -1863,6 +1881,7 @@ namespace YGOPortable.Core
                     }
                     pos = blkStart + blkSize;
                 }
+                if (!card.IsFaceUp) card.EquipTarget = null;
                 result.Add(card);
                 seqIdx++;
             }
