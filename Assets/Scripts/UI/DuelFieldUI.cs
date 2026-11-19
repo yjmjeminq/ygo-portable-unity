@@ -526,7 +526,7 @@ namespace YGOPortable.UI
             _inspStats.text = details;
             var info = (RectTransform)_inspStats.transform.parent;
             info.anchorMax = new Vector2(1f, identity.Length != 0 || hasRating ? .49f : 1f);
-            _inspRating.Bind(rating, showChanges, card.ActiveScale?.Right);
+            _inspRating.Bind(rating, showChanges);
         }
 
         private void SizeInspectorDescription(bool hasCombat, bool hasScales = false)
@@ -1586,12 +1586,12 @@ namespace YGOPortable.UI
             }
             if (visible && battle?.HideReadout != true)
             {
-                uint? scale = readout.ScaleIn(loc, seq);
-                if (loc == YgoConstants.LOCATION_MZONE && readout.IsMonster || scale.HasValue || readout.CounterCount != 0 ||
-                    sumValue != null)
+                var rating = readout.RatingAt(loc, seq);
+                if (loc == YgoConstants.LOCATION_MZONE && readout.IsMonster || rating.Kind == DuelRatingKind.Scale ||
+                    readout.CounterCount != 0 || sumValue != null)
                 {
                     slot.readout ??= new DuelFieldReadout(slot.root);
-                    slot.readout.Bind(readout, opponent, scale, position, sum: (sumValue, choiceIndex < 0, cardSelected));
+                    slot.readout.Bind(readout, opponent, rating, position, sum: (sumValue, choiceIndex < 0, cardSelected));
                     slot.readout.FollowFocus(slot.cardArea.anchoredPosition, slot.focusArt.localScale.x);
                 }
                 else slot.readout?.Hide();
@@ -4005,7 +4005,7 @@ namespace YGOPortable.UI
             _zoomStats.text = identity.Length == 0 ? details : details.Length == 0 ? identity : $"{identity}\n{details}";
             var rating = card.InspectionRating;
             _zoomStats.rectTransform.anchorMax = new Vector2(rating.Kind == DuelRatingKind.None ? .982f : .70f, .965f);
-            _zoomRating.Bind(rating, showChanges && card.Live != null, card.ActiveScale?.Right);
+            _zoomRating.Bind(rating, showChanges && card.Live != null);
             bool hasScales = _zoomScales.Bind(card, showChanges && card.Live != null);
             _zoomDescriptionBox.anchorMax = new Vector2(1f, hasScales ? .494f : .561f);
             BindIdentityIcons(card, _zoomRaceIcon, _zoomAttributeIcon);

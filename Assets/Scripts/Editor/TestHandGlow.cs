@@ -3339,6 +3339,7 @@ namespace YGOPortable.Editor
             var preview = inspector.Find("Stats/Rating/Number").GetComponent<Text>();
             var zoom = details.Find("Stats/Rating/Number").GetComponent<Text>();
             Require(details.Find("Stats/Rating/Kind/Label").GetComponent<Text>().text == (right ? "오른쪽" : "왼쪽") &&
+                !details.Find("Stats/Rating/Printed").gameObject.activeSelf &&
                 !inspector.Find("Scales").gameObject.activeSelf && !details.Find("Scales").gameObject.activeSelf &&
                 !details.Find("CombatStats").gameObject.activeSelf &&
                 new[] { field, preview, zoom }.All(label => label.text == "10" && label.color == zoom.color),
@@ -3356,6 +3357,13 @@ namespace YGOPortable.Editor
                 new[] { field, preview, zoom }.All(label => label.text == "8" &&
                     label.transform.parent.Find("ChangePulse")?.gameObject.activeInHierarchy == true),
                 "The native scale reduction did not reach the field and both inspected readings.");
+            foreach (var label in new[] { field, preview, zoom })
+                label.transform.parent.GetComponent<DuelReadoutPulse>().Advance(1f);
+            var printed = details.Find("Stats/Rating/Printed/Label").GetComponent<Text>();
+            Require(new[] { field, preview, zoom }.All(label => label.color == DuelStyle.DecreasedValue) &&
+                    printed.text == "기본 10" && printed.gameObject.activeInHierarchy &&
+                    details.Find("Stats/Rating/Kind/Label").GetComponent<Text>().text == (right ? "오른쪽" : "왼쪽"),
+                "A reduced scale lost its original value or side after the animation.");
             Debug.Log($"[VERIFY PENDULUM SCALE UI] Kepler's {(right ? "right" : "left")} scale changed from 10 to 8 in all views.");
         }
 
@@ -4099,6 +4107,11 @@ namespace YGOPortable.Editor
                     }) && ratingSymbols.All(icon => icon.sprite != null && !icon.raycastTarget) &&
                     ratingSymbols.Select(icon => icon.sprite).Distinct().Count() == 4,
                     "The field did not show four distinct non-interactive rating symbols.");
+                Require(Label(normal, rating).color == DuelStyle.DecreasedValue &&
+                    Label(xyz, rating).color == DuelStyle.DecreasedValue &&
+                    Label(link, rating).color == ratingSymbols[2].color &&
+                    Label(scale, rating).color == DuelStyle.IncreasedValue,
+                    "The current ratings did not show their differences from the printed values.");
                 Require(Label(normal, attack).text == "3700" && Label(normal, defense).text == "2200" &&
                     Label(normal, "Combat/Attack/Change/Arrow").text == "▲" && Label(normal, "Combat/Defense/Change/Arrow").text == "▼" &&
                     normal.Find("Combat/Defense/Rail").GetComponent<Image>().color.a > normal.Find("Combat/Attack/Rail").GetComponent<Image>().color.a &&

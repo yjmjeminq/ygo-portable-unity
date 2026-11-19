@@ -13,6 +13,8 @@ namespace YGOPortable.UI
         internal static readonly Color Opponent = new Color(1f, 0.40f, 0.30f);
         internal static readonly Color Gold = new Color(0.98f, 0.82f, 0.45f);
         internal static readonly Color Muted = new Color(0.75f, 0.83f, 0.85f);
+        internal static readonly Color IncreasedValue = new Color(.58f, 1f, .82f);
+        internal static readonly Color DecreasedValue = new Color(1f, .59f, .56f);
 
         private static Texture2D _stone;
         private static Sprite _disc;

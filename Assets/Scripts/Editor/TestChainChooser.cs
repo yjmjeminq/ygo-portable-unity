@@ -573,7 +573,33 @@ namespace YGOPortable.Editor
             Require(inspector.Find("Stats/Rating/Number").GetComponent<Text>().text == "8" &&
                     inspector.Find("CombatStats/Attack/Digits/Value").GetComponent<Text>().text == "2500",
                 "The inspector did not keep the resolving monster after the number choice.");
-            Debug.Log("[VERIFY KOREAN NATIVE OPTIONS] Gagaga Magician displayed the Korean level instruction and applied the chosen level.");
+            var monster = duel.Players[duel.HumanPlayerIndex].mzone.Single(card => card?.code == magician);
+            var slot = field.Root.transform.Find($"DuelBoard/Zone_{monster.sequence + 2}_3");
+            var fieldRating = slot.Find("CardReadout/Labels/Rating");
+            var current = fieldRating.Find("Value").GetComponent<Text>();
+            fieldRating.GetComponent<DuelReadoutPulse>()?.Advance(1f);
+            Require(current.text == "8" && current.color == DuelStyle.IncreasedValue &&
+                    fieldRating.Find("Symbol").GetComponent<Image>().color == DuelStyle.Gold &&
+                    inspector.Find("Stats/Rating/Number").GetComponent<Text>().color == current.color,
+                "The increased level lost its distinct appearance after the number animation.");
+            inspector.Find("ArtworkControls/Details/B").GetComponent<Button>().onClick.Invoke();
+            var zoom = field.Root.transform.Find("Overlay_CardZoom") ?? field.Root.transform.parent.Find("Overlay_CardZoom");
+            var rating = zoom.Find("ZoomWin/Info/Stats/Rating");
+            var printed = rating.Find("Printed/Label")?.GetComponent<Text>();
+            var enlarged = rating.Find("Number").GetComponent<Text>();
+            Require(printed != null && printed.gameObject.activeInHierarchy && printed.text == "기본 4" &&
+                    enlarged.text == "8" && enlarged.color == current.color,
+                "The detail view did not show both the applied and printed levels.");
+            Require(duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD,
+                "The level fixture did not return to Main Phase.");
+            duel.SubmitResponseInt(7);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            field.Refresh();
+            Require(duel.RetryCount == 0 && current.text == "4" && current.color == DuelStyle.Gold &&
+                    enlarged.text == "4" && enlarged.color == DuelStyle.Gold && !printed.gameObject.activeInHierarchy,
+                "The expired level modifier remained visible after the turn ended.");
+            zoom.Find("ZoomWin/Hdr/Close/B").GetComponent<Button>().onClick.Invoke();
+            Debug.Log("[VERIFY KOREAN NATIVE OPTIONS] Gagaga Magician displayed its level change and restored the printed level.");
         }
 
         private static void VerifyCardTrooperCount()
@@ -980,7 +1006,8 @@ namespace YGOPortable.Editor
                 var zoom = field.Root.transform.parent.Find("Overlay_CardZoom/ZoomWin");
                 CheckCombat(zoom.Find("Info/CombatStats"));
                 Require(zoom.Find("Info/Stats/Rating/Number").GetComponent<Text>().text == level.ToString() &&
-                    zoom.Find("Info/Stats/Rating/Kind/Label").GetComponent<Text>().text == "레벨",
+                    zoom.Find("Info/Stats/Rating/Kind/Label").GetComponent<Text>().text == "레벨" &&
+                    !zoom.Find("Info/Stats/Rating/Printed").gameObject.activeSelf,
                     "The zoom did not keep the position preview.");
                 zoom.Find("Hdr/Close/B").GetComponent<Button>().onClick.Invoke();
                 var fieldView = (Button)view.Modals.FieldViewControl;

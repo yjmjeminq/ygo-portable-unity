@@ -2437,11 +2437,11 @@ namespace YGOPortable.UI
             if (live == null) return;
 
             var readout = new DuelCardReadout(CardDatabase.Get(code), live);
-            uint? scale = readout.ScaleIn(item.location, item.sequence);
-            if (item.location == YgoConstants.LOCATION_MZONE && readout.IsMonster || scale.HasValue ||
+            var rating = readout.RatingAt(item.location, item.sequence);
+            if (item.location == YgoConstants.LOCATION_MZONE && readout.IsMonster || rating.Kind == DuelRatingKind.Scale ||
                 showCounters && readout.CounterCount != 0)
                 new DuelFieldReadout(view.transform.Find("AspectBox"), inPreview: true)
-                    .Bind(readout, item.controller != session.HumanPlayerIndex, scale, showCounters: showCounters);
+                    .Bind(readout, item.controller != session.HumanPlayerIndex, rating, showCounters: showCounters);
         }
 
         private static void AddChoiceCardSource(Transform tile, uint location, bool opponent, string detail)

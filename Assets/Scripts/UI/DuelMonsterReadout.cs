@@ -8,6 +8,26 @@ namespace YGOPortable.UI
 {
     internal enum DuelRatingKind { None, Level, Rank, Link, Scale }
 
+    internal readonly struct DuelRating
+    {
+        internal readonly DuelRatingKind Kind;
+        internal readonly uint Value;
+        internal readonly uint PrintedValue;
+        internal readonly bool? RightScale;
+
+        internal DuelRating(DuelRatingKind kind, uint value, uint printedValue, bool? rightScale = null)
+        {
+            Kind = kind;
+            Value = value;
+            PrintedValue = printedValue;
+            RightScale = rightScale;
+        }
+
+        internal bool Changed => Value != PrintedValue;
+        internal Color ValueColor(Color unchanged) => Value > PrintedValue ? DuelStyle.IncreasedValue :
+            Value < PrintedValue ? DuelStyle.DecreasedValue : unchanged;
+    }
+
     internal readonly struct DuelCardReadout
     {
         internal readonly CardInfo Printed;
@@ -74,29 +94,45 @@ namespace YGOPortable.UI
             }
         }
 
-        internal uint? ScaleIn(uint location, uint sequence) =>
-            location == YgoConstants.LOCATION_SZONE && IsScale && sequence is 0 or 4
-                ? sequence == 0 ? LeftScale : RightScale : null;
+        private static DuelRatingKind MonsterRatingKind(uint type)
+        {
+            if ((type & YgoConstants.TYPE_MONSTER) == 0) return DuelRatingKind.None;
+            if ((type & YgoConstants.TYPE_LINK) != 0) return DuelRatingKind.Link;
+            return (type & YgoConstants.TYPE_XYZ) != 0 ? DuelRatingKind.Rank : DuelRatingKind.Level;
+        }
 
-        internal (DuelRatingKind Kind, uint Value) RatingNumber
+        internal DuelRating RatingNumber
         {
             get
             {
-                if (!IsMonster) return default;
+                var kind = MonsterRatingKind(Type);
+                if (kind == DuelRatingKind.None) return default;
                 uint printedRating = Printed?.level ?? 0;
-                if (IsLink) return (DuelRatingKind.Link, Live?.link ?? printedRating);
-                if (IsXyz) return (DuelRatingKind.Rank, Live?.rank ?? printedRating);
-                uint level = Live?.level ?? printedRating;
-                return level > 0 ? (DuelRatingKind.Level, level) : default;
+                uint value = kind switch
+                {
+                    DuelRatingKind.Link => Live?.link ?? printedRating,
+                    DuelRatingKind.Rank => Live?.rank ?? printedRating,
+                    _ => Live?.level ?? printedRating,
+                };
+                if (kind == DuelRatingKind.Level && value == 0) return default;
+                bool hasPrintedRating = Printed != null && MonsterRatingKind(Printed.type) == kind &&
+                    (kind != DuelRatingKind.Level || printedRating != 0);
+                return new DuelRating(kind, value, hasPrintedRating ? printedRating : value);
             }
         }
 
-        internal (uint Value, bool Right)? ActiveScale =>
-            Live != null && ScaleIn(Live.location, Live.sequence) is uint scale
-                ? (scale, Live.sequence == 4) : null;
+        internal DuelRating ScaleRating(bool right)
+        {
+            uint value = right ? RightScale : LeftScale;
+            uint printedScale = Printed?.IsPendulum == true ? (right ? Printed.rscale : Printed.lscale) : value;
+            return new DuelRating(DuelRatingKind.Scale, value, printedScale, right);
+        }
 
-        internal (DuelRatingKind Kind, uint Value) InspectionRating =>
-            ActiveScale is { } scale ? (DuelRatingKind.Scale, scale.Value) : RatingNumber;
+        internal DuelRating RatingAt(uint location, uint sequence) =>
+            location == YgoConstants.LOCATION_SZONE && IsScale && sequence is 0 or 4
+                ? ScaleRating(sequence == 4) : RatingNumber;
+
+        internal DuelRating InspectionRating => Live != null ? RatingAt(Live.location, Live.sequence) : RatingNumber;
 
         internal string Status
         {
@@ -114,8 +150,6 @@ namespace YGOPortable.UI
         private static readonly Color AttackColor = new Color(1f, .76f, .5f);
         private static readonly Color DefenseColor = new Color(.61f, .87f, .98f);
         private static readonly Color EffectColor = new Color(.87f, .74f, 1f);
-        private static readonly Color Increased = new Color(.58f, 1f, .82f);
-        private static readonly Color Decreased = new Color(1f, .59f, .56f);
         private static readonly Color Backing = new Color(.045f, .068f, .085f, .98f);
         private readonly RectTransform _root;
         private readonly StatCell _attack;
@@ -268,13 +302,15 @@ namespace YGOPortable.UI
                 {
                     int delta = _lastValue >= 0 && value >= 0 && value != _lastValue
                         ? value.CompareTo(_lastValue) : adjustment.CompareTo(_lastAdjustment);
-                    DuelReadoutPulse.Play(Rect, delta > 0 ? Increased : delta < 0 ? Decreased : _accent, delta < 0,
+                    Color pulse = delta > 0 ? DuelStyle.IncreasedValue : delta < 0 ? DuelStyle.DecreasedValue : _accent;
+                    DuelReadoutPulse.Play(Rect, pulse, delta < 0,
                         numberChanged && value >= 0 ? _value : null);
                 }
                 _lastValue = value;
                 _lastAdjustment = adjustment;
                 _value.text = number;
-                _value.color = adjustment > 0 ? Increased : adjustment < 0 ? Decreased : active ? Color.white : DuelStyle.Muted;
+                _value.color = adjustment > 0 ? DuelStyle.IncreasedValue : adjustment < 0 ? DuelStyle.DecreasedValue :
+                    active ? Color.white : DuelStyle.Muted;
                 _change.text = change;
                 _change.color = _value.color;
                 _change.gameObject.SetActive(adjustment != 0);
@@ -688,7 +724,9 @@ namespace YGOPortable.UI
         private readonly RectTransform _headingText;
         private readonly Vector2 _headingOffset;
         private readonly Image _symbol;
+        private readonly RectTransform _captionArea;
         private readonly Text _caption;
+        private readonly Text _printed;
         private readonly Text _number;
         private (DuelRatingKind Kind, uint Value) _shown;
 
@@ -713,9 +751,12 @@ namespace YGOPortable.UI
             _symbol = LotdUiKit.AddImage(icon.gameObject, null, Color.white, true, false);
             if (!compact)
             {
-                var title = LotdUiKit.CreateRect("Kind", root, new Vector2(.29f, .10f), new Vector2(.60f, .90f),
+                _captionArea = LotdUiKit.CreateRect("Kind", root, new Vector2(.29f, .10f), new Vector2(.60f, .90f),
                     Vector2.zero, Vector2.zero);
-                _caption = LotdUiKit.AddFittedText(title, "Label", "", 17, 9, TextAnchor.MiddleLeft, Color.white);
+                _caption = LotdUiKit.AddFittedText(_captionArea, "Label", "", 17, 9, TextAnchor.MiddleLeft, Color.white);
+                var printed = LotdUiKit.CreateRect("Printed", root, new Vector2(.29f, .04f), new Vector2(.60f, .49f),
+                    Vector2.zero, Vector2.zero);
+                _printed = LotdUiKit.AddFittedText(printed, "Label", "", 19, 9, TextAnchor.MiddleLeft, DuelStyle.Muted);
             }
             _number = DuelTypography.AddNumber(root, "Number", "", compact ? 22 : 38, TextAnchor.MiddleCenter, Color.white);
             _number.rectTransform.anchorMin = new Vector2(compact ? .42f : .61f, .04f);
@@ -723,25 +764,32 @@ namespace YGOPortable.UI
             Bind(default);
         }
 
-        internal void Bind((DuelRatingKind Kind, uint Value) rating, bool showChanges = false, bool? rightScale = null)
+        internal void Bind(DuelRating rating, bool showChanges = false)
         {
             bool visible = rating.Kind != DuelRatingKind.None;
             _root.gameObject.SetActive(visible);
             if (_headingText != null)
                 _headingText.offsetMax = _headingOffset - Vector2.right * (visible ? HeadingBadgeWidth + HeadingGap : 0f);
-            var tone = DuelStatSymbols.RatingColor(rating.Kind, rightScale);
+            var tone = DuelStatSymbols.RatingColor(rating.Kind, rating.RightScale);
+            var valueTone = rating.ValueColor(tone);
+            var current = (rating.Kind, rating.Value);
             if (!visible || !showChanges) DuelReadoutPulse.Cancel(_root);
-            else if (_shown != rating)
-                DuelReadoutPulse.Play(_root, tone, _shown.Kind == rating.Kind && rating.Value < _shown.Value,
+            else if (_shown != current)
+                DuelReadoutPulse.Play(_root, valueTone, _shown.Kind == rating.Kind && rating.Value < _shown.Value,
                     _shown.Kind == DuelRatingKind.None || rating.Value != _shown.Value ? _number : null);
-            _shown = rating;
+            _shown = current;
             _symbol.sprite = DuelStatSymbols.Rating(rating.Kind);
-            _symbol.color = _number.color = tone;
+            _symbol.color = tone;
+            _number.color = valueTone;
             _number.text = visible ? rating.Value.ToString() : "";
             if (_caption != null)
             {
-                _caption.text = DuelStatSymbols.RatingName(rating.Kind, rightScale);
+                _caption.text = DuelStatSymbols.RatingName(rating.Kind, rating.RightScale);
                 _caption.color = tone;
+                _captionArea.anchorMin = new Vector2(.29f, rating.Changed ? .50f : .10f);
+                _captionArea.anchorMax = new Vector2(.60f, rating.Changed ? .97f : .90f);
+                _printed.text = rating.Changed ? $"기본 {rating.PrintedValue}" : "";
+                _printed.transform.parent.gameObject.SetActive(rating.Changed);
             }
         }
     }
@@ -766,8 +814,8 @@ namespace YGOPortable.UI
         {
             bool visible = card.IsPendulum && card.IsMonster;
             _root.gameObject.SetActive(visible);
-            _left.Bind(visible ? (DuelRatingKind.Scale, card.LeftScale) : default, showChanges, rightScale: false);
-            _right.Bind(visible ? (DuelRatingKind.Scale, card.RightScale) : default, showChanges, rightScale: true);
+            _left.Bind(visible ? card.ScaleRating(right: false) : default, showChanges);
+            _right.Bind(visible ? card.ScaleRating(right: true) : default, showChanges);
             return visible;
         }
     }
@@ -864,7 +912,7 @@ namespace YGOPortable.UI
             }
         }
 
-        internal void Bind(DuelCardReadout card, bool opponent, uint? scale, uint? position = null, bool showCounters = true,
+        internal void Bind(DuelCardReadout card, bool opponent, DuelRating rating, uint? position = null, bool showCounters = true,
             (string Value, bool Required, bool Selected) sum = default)
         {
             var visibleCard = (Code: card.Live?.code ?? 0u, Opponent: opponent);
@@ -878,8 +926,7 @@ namespace YGOPortable.UI
                 _combat.anchorMax = new Vector2(.97f, opponent ? 1f - bottom : top);
             }
             _stats.Bind(card, opponent, showChanges, position);
-            var rating = scale.HasValue ? (DuelRatingKind.Scale, scale.Value) : card.RatingNumber;
-            BindRating(rating, showChanges, card.ActiveScale?.Right);
+            BindRating(rating, showChanges);
             var counterReadout = showCounters ? card : default;
             BindCounters(counterReadout, showChanges);
             if (_inPreview)
@@ -932,10 +979,10 @@ namespace YGOPortable.UI
             _contribution.Caption.color = _contribution.Value.color = sum.Selected ? DuelStyle.Gold : DuelStyle.Player;
         }
 
-        private void BindRating((DuelRatingKind Kind, uint Value) rating, bool showChanges, bool? rightScale)
+        private void BindRating(DuelRating rating, bool showChanges)
         {
             bool visible = rating.Kind != DuelRatingKind.None;
-            var color = DuelStatSymbols.RatingColor(rating.Kind, rightScale);
+            var color = DuelStatSymbols.RatingColor(rating.Kind, rating.RightScale);
             if (_inPreview)
             {
                 float right = .315f + (rating.Value >= 10 ? .065f : 0f);
@@ -945,8 +992,8 @@ namespace YGOPortable.UI
             _ratingIcon.sprite = DuelStatSymbols.Rating(rating.Kind);
             _ratingIcon.color = color;
             bool lower = _lastRating.Kind == rating.Kind && rating.Value < _lastRating.Value;
-            SetLabel(_rating, visible ? rating.Value.ToString() : "", color, showChanges, lower, moveNumber: true);
-            _lastRating = rating;
+            SetLabel(_rating, visible ? rating.Value.ToString() : "", rating.ValueColor(color), showChanges, lower, moveNumber: true);
+            _lastRating = (rating.Kind, rating.Value);
         }
 
         private void BindCounters(DuelCardReadout card, bool showChanges)
@@ -1054,8 +1101,8 @@ namespace YGOPortable.UI
                     (live.type & YgoConstants.TYPE_MONSTER) != 0)
                 {
                     view.SetCard(live.code, live: live);
-                    _readout.Bind(new DuelCardReadout(CardDatabase.Get(live.code), live),
-                        destination ? movement.EndOpponent : movement.StartOpponent, null);
+                    var card = new DuelCardReadout(CardDatabase.Get(live.code), live);
+                    _readout.Bind(card, destination ? movement.EndOpponent : movement.StartOpponent, card.RatingNumber);
                 }
                 else _readout.Hide();
             }

@@ -584,7 +584,7 @@ namespace YGOPortable.UI
                 if (_duelFaceCombat != null)
                 {
                     var rating = readout.InspectionRating;
-                    _duelFaceRating.Bind(rating, rightScale: readout.ActiveScale?.Right);
+                    _duelFaceRating.Bind(rating);
                     _duelFaceCombat.Bind(readout, position: 0, showModifiers: false);
                     _levelText.text = !monster && rating.Kind == DuelRatingKind.None ? YgoConstants.GetTypeTagKR(type) : "";
                     _levelText.color = Color.white;
