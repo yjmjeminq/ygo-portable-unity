@@ -120,19 +120,25 @@ namespace YGOPortable.AI
 
             int AfterHit(int blocking, int target) => breakable[target] ? blocking & ~(1 << target) : blocking;
 
-            (int Attacker, uint? Target)? WinningFirstAttack(int i)
+            (int Attacker, uint? Target)? WinningFirstAttack(int i, bool allowTrade)
             {
                 int remaining = aMask & ~(1 << i);
                 if (attackers[i].direct && attackers[i].live.attack + BestDamage(remaining, dMask) >= rival.lp)
                     return (attackers[i].index, null);
                 for (int j = 0; j < defenders.Length; j++)
+                {
+                    if (!allowTrade && !defenders[j].IsDefense && attackers[i].live.attack == defenders[j].attack) continue;
                     if (Damage(i, j) is int hit && hit + BestDamage(remaining, AfterHit(dMask, j)) >= rival.lp)
                         return (attackers[i].index, defenders[j].sequence);
+                }
                 return null;
             }
-            if (repeat >= 0 && WinningFirstAttack(repeat) is { } continued) return continued;
+            if (repeat >= 0 && WinningFirstAttack(repeat, allowTrade: true) is { } continued) return continued;
+            // Trading an attacker can remove effects that the remaining attackers depend on.
             for (int i = 0; i < attackers.Length; i++)
-                if (i != repeat && WinningFirstAttack(i) is { } attack) return attack;
+                if (i != repeat && WinningFirstAttack(i, allowTrade: false) is { } attack) return attack;
+            for (int i = 0; i < attackers.Length; i++)
+                if (i != repeat && WinningFirstAttack(i, allowTrade: true) is { } trade) return trade;
             return null;
         }
 

@@ -24,6 +24,7 @@ namespace YGOPortable.AI
         private bool UsesTacticalRules => Difficulty == AIDifficulty.Smart && _tacticalRules;
         private bool UsesComboPlanning => _comboSearch != null || _comboProjection;
 
+        private const int IdleRecoveryBudgetMilliseconds = 45;
         private const uint TrickstarLightStage = 35371948;
         private const uint PrimevalPlanetPerlereino = 77103950;
         private const uint TheHiddenCity = 5697558;
@@ -55,6 +56,7 @@ namespace YGOPortable.AI
         private readonly LinkComboPolicy _linkPolicy;
         private readonly ComboSearch _comboSearch;
         private bool _comboProjection;
+        private bool _checkedIdleRecovery;
         private DuelPrompt _preparingCombo;
         private IEnumerator<bool> _comboPreparation;
         private readonly bool _tacticalRules;
@@ -78,6 +80,7 @@ namespace YGOPortable.AI
                 _actionsThisTurn = 0;
                 _battleActions = 0;
                 _checkedDirectAttackOrder = false;
+                _checkedIdleRecovery = false;
                 _unselectCount = 0;
                 _attackerSequence = uint.MaxValue;
                 _lethalTargetSequence = uint.MaxValue;
@@ -914,6 +917,10 @@ namespace YGOPortable.AI
                 .OrderByDescending(x => x.score)
                 .ToList();
 
+            if (UsesTacticalRules && hint == DuelTactics.AddToHand && p.min == 1 && p.max == 1 && ranked.Count > 1 &&
+                ChooseIdleRecovery(s, p, ranked[0].idx) is int recoveryPick)
+                return PackIndexList(new[] { recoveryPick });
+
             int pickCount = (int)p.min;
             if (removalHint && p.max > p.min)
             {
@@ -928,6 +935,62 @@ namespace YGOPortable.AI
             pickCount = Math.Max(1, Math.Min(ranked.Count, pickCount));
 
             return PackIndexList(ranked.Take(pickCount).Select(x => x.idx));
+        }
+
+        private int? ChooseIdleRecovery(DuelSession duel, DuelPrompt prompt, int defaultPick)
+        {
+            if (_checkedIdleRecovery || _comboSearch == null || duel.TurnPlayer != prompt.playerId ||
+                duel.CurrentPhase is not (YgoConstants.PHASE_MAIN1 or YgoConstants.PHASE_MAIN2) ||
+                CardDatabase.Get(prompt.candidates[defaultPick].code)?.IsExtra != true)
+                return null;
+
+            int handPick = -1;
+            int handValue = int.MinValue;
+            for (int index = 0; index < prompt.candidates.Count; index++)
+            {
+                var item = prompt.candidates[index];
+                if (item.controller != prompt.playerId ||
+                    item.location is not (YgoConstants.LOCATION_GRAVE or YgoConstants.LOCATION_REMOVED) ||
+                    (item.location == YgoConstants.LOCATION_REMOVED && (item.position & YgoConstants.POS_FACEUP) == 0) ||
+                    CardDatabase.Get(item.code) is not CardInfo card)
+                    return null;
+                if (card.IsExtra) continue;
+                int score = DuelTactics.SelectionPriority(duel, prompt.playerId, item, prompt.SelectionHint);
+                if (score <= handValue) continue;
+                handPick = index;
+                handValue = score;
+            }
+            if (handPick < 0) return null;
+
+            _checkedIdleRecovery = true;
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            bool Expired() => clock.ElapsedMilliseconds >= IdleRecoveryBudgetMilliseconds;
+            using var trial = duel.ReplayForPlanning(Expired);
+            if (trial == null || Expired() || trial.ActivePrompt is not { } replay || replay.playerId != prompt.playerId ||
+                replay.messageType != prompt.messageType || replay.SelectionHint != prompt.SelectionHint ||
+                replay.min != prompt.min || replay.max != prompt.max || replay.cancelable != prompt.cancelable ||
+                replay.candidates.Count != prompt.candidates.Count)
+                return null;
+            for (int index = 0; index < prompt.candidates.Count; index++)
+            {
+                var original = prompt.candidates[index];
+                var copy = replay.candidates[index];
+                if (original.code != copy.code || original.controller != copy.controller ||
+                    original.location != copy.location || original.sequence != copy.sequence || original.position != copy.position)
+                    return null;
+            }
+
+            // Prefer the recovery that reaches the hand only when the Extra Deck choice yields no immediate play.
+            if (Expired()) return null;
+            trial.BeginSpeculation(prompt.playerId, stopAfterTurn: true);
+            trial.SubmitPlanningResponse(PackIndexList(new[] { defaultPick }));
+            var next = trial.ActivePrompt;
+            bool replace = !Expired() && !trial.SpeculationUncertain && !trial.IsFinished && trial.RetryCount == 0 &&
+                trial.TurnNumber == duel.TurnNumber && trial.CurrentPhase == duel.CurrentPhase &&
+                trial.CurrentChain.Count == 0 && next?.messageType == YgoConstants.MSG_SELECT_IDLECMD &&
+                next.playerId == prompt.playerId && next.summonable.Count == 0 &&
+                next.spSummonable.Count == 0 && next.activatable.Count == 0;
+            return replace ? handPick : null;
         }
 
         private byte[] BuildSelectUnselect(DuelSession s, DuelPrompt p)

@@ -357,6 +357,7 @@ namespace YGOPortable.Editor
             VerifyReactiveNegation();
             VerifyEqualScalesProtection();
             VerifyStrongerTributeProtection();
+            VerifyLethalAttackPreservesAllies();
             using var duel = new DuelSession();
             var own = duel.Players[0];
             var rival = duel.Players[1];
@@ -671,6 +672,26 @@ namespace YGOPortable.Editor
             own.mzone[1] = new LiveCardState { attack = 200, defense = 200, position = YgoConstants.POS_FACEUP_DEFENSE };
             if (DuelTactics.NeedsTributeProjection(duel, prompt, extraSurveyor))
                 throw new InvalidOperationException("A disposable tribute is available without replacing the stronger attacker.");
+        }
+
+        private static void VerifyLethalAttackPreservesAllies()
+        {
+            using var duel = new DuelSession();
+            var own = duel.Players[0];
+            var rival = duel.Players[1];
+            var battle = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_BATTLECMD };
+            own.mzone[0] = new LiveCardState { attack = 3000, position = YgoConstants.POS_FACEUP_ATTACK };
+            own.mzone[1] = new LiveCardState { attack = 6000, sequence = 1, position = YgoConstants.POS_FACEUP_ATTACK };
+            rival.mzone[0] = new LiveCardState { attack = 3000, position = YgoConstants.POS_FACEUP_ATTACK };
+            battle.attackable.Add(new SelectableCardItem { sequence = 0 });
+            battle.attackable.Add(new SelectableCardItem { sequence = 1 });
+            rival.lp = 5200;
+            if (DuelCombat.FindLethal(duel, battle) is not { Attacker: 1, Target: 0u })
+                throw new InvalidOperationException("Lethal should keep both allies when the stronger attacker can clear the blocker.");
+            own.mzone[1].attack = 3000;
+            rival.lp = 1700;
+            if (DuelCombat.FindLethal(duel, battle) is not { Attacker: 0, Target: 0u })
+                throw new InvalidOperationException("Lethal may still trade one attacker when the other can finish.");
         }
 
         private static void VerifyCrossoutResponse()
