@@ -561,7 +561,7 @@ namespace YGOPortable.Editor
                     duel.Players[duel.HumanPlayerIndex].mzone.Any(card => card?.code == magician && card.level == 8),
                 "Gagaga Magician did not apply the selected level.");
             field.Refresh();
-            Require(inspector.Find("Stats/Info/Text").GetComponent<Text>().text.Contains("레벨 8") &&
+            Require(inspector.Find("Stats/Rating/Number").GetComponent<Text>().text == "8" &&
                     inspector.Find("CombatStats/Attack/Digits/Value").GetComponent<Text>().text == "2500",
                 "The inspector did not keep the resolving monster after the number choice.");
             Debug.Log("[VERIFY KOREAN NATIVE OPTIONS] Gagaga Magician displayed the Korean level instruction and applied the chosen level.");
@@ -858,7 +858,9 @@ namespace YGOPortable.Editor
                             "이번 전투에서 자신이 받을 전투 데미지를 0으로 하시겠습니까?",
                         "The engine's damage prevention question did not appear as a Korean confirmation.");
                     var details = field.Root.transform.Find("LeftInspector/CardDetails");
-                    Require(details.Find("Stats/Info/Text").GetComponent<Text>().text == "펜듈럼 마법 · 스케일 4" &&
+                    Require(details.Find("Stats/Identity/Text").GetComponent<Text>().text == "펜듈럼 마법" &&
+                        details.Find("Stats/Rating/Number").GetComponent<Text>().text == "4" &&
+                        details.Find("Stats/Rating/Symbol").GetComponent<Image>().sprite == DuelStatSymbols.Rating(DuelRatingKind.Scale) &&
                         !details.Find("CombatStats").gameObject.activeSelf,
                         "The yes/no confirmation lost the actual Pendulum Zone source and showed its printed monster stats.");
                     bool submitted = accept ? view.Modals.TryConfirm() : view.Modals.TryCancelOrPass();
@@ -960,14 +962,15 @@ namespace YGOPortable.Editor
                 var portrait = field.Root.transform.Find("LeftInspector/CardPreview/Card").GetComponent<CompositeCardView>();
                 Require(portrait?.ArtworkSprite != null && portrait.CurrentCode == code,
                     "The selected Trap Monster's inspector did not load its artwork on the first render.");
-                Require(inspector.Find("Stats/Info/Text").GetComponent<Text>().text.Contains($"레벨 {level}") &&
+                Require(inspector.Find("Stats/Rating/Number").GetComponent<Text>().text == level.ToString() &&
                     inspector.Find("Stats/Info/Text").GetComponent<Text>().text.Contains("함정 몬스터 · 표시 형식 선택"),
                     "The inspector did not describe the planned Trap Monster before a position was chosen.");
                 CheckCombat(inspector.Find("CombatStats"));
                 inspector.Find("ArtworkControls/Details/B").GetComponent<Button>().onClick.Invoke();
                 var zoom = field.Root.transform.parent.Find("Overlay_CardZoom/ZoomWin");
                 CheckCombat(zoom.Find("Info/CombatStats"));
-                Require(zoom.Find("Info/Stats/S").GetComponent<Text>().text.Contains($"레벨 {level}"),
+                Require(zoom.Find("Info/Stats/Rating/Number").GetComponent<Text>().text == level.ToString() &&
+                    zoom.Find("Info/Stats/Rating/Kind/Label").GetComponent<Text>().text == "레벨",
                     "The zoom did not keep the position preview.");
                 zoom.Find("Hdr/Close/B").GetComponent<Button>().onClick.Invoke();
                 var fieldView = (Button)view.Modals.FieldViewControl;

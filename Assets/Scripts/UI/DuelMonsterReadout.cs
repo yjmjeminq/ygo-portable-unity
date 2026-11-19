@@ -96,15 +96,13 @@ namespace YGOPortable.UI
             get
             {
                 var (kind, value) = RatingNumber;
-                return kind switch
-                {
-                    DuelRatingKind.Level => $"레벨 {value}",
-                    DuelRatingKind.Rank => $"랭크 {value}",
-                    DuelRatingKind.Link => $"링크 {value}",
-                    _ => "",
-                };
+                return kind == DuelRatingKind.None ? "" : $"{DuelStatSymbols.RatingName(kind)} {value}";
             }
         }
+
+        internal (DuelRatingKind Kind, uint Value) InspectionRating =>
+            Live != null && ScaleIn(Live.location, Live.sequence) is uint scale
+                ? (DuelRatingKind.Scale, scale) : RatingNumber;
 
         internal string Status
         {
@@ -361,6 +359,23 @@ namespace YGOPortable.UI
         private static Sprite _counter;
         private static Sprite _battleEffect;
         private static readonly Sprite[] RatingSprites = new Sprite[(int)DuelRatingKind.Scale + 1];
+
+        internal static string RatingName(DuelRatingKind kind) => kind switch
+        {
+            DuelRatingKind.Level => "레벨",
+            DuelRatingKind.Rank => "랭크",
+            DuelRatingKind.Link => "링크",
+            DuelRatingKind.Scale => "스케일",
+            _ => "",
+        };
+
+        internal static Color RatingColor(DuelRatingKind kind) => kind switch
+        {
+            DuelRatingKind.Rank => new Color(.91f, .75f, 1f),
+            DuelRatingKind.Link => DuelStyle.Player,
+            DuelRatingKind.Scale => new Color(.60f, 1f, .83f),
+            _ => DuelStyle.Gold,
+        };
 
         internal static Sprite Counter => _counter != null ? _counter : (_counter = Build("Duel Counter Symbol", InsideCounter));
         internal static Sprite BattleEffect => _battleEffect != null ? _battleEffect :
@@ -652,11 +667,55 @@ namespace YGOPortable.UI
         }
     }
 
+    internal sealed class DuelRatingBadge
+    {
+        private readonly RectTransform _root;
+        private readonly Image _symbol;
+        private readonly Text _caption;
+        private readonly Text _number;
+        private (DuelRatingKind Kind, uint Value) _shown;
+
+        internal DuelRatingBadge(RectTransform root, bool compact)
+        {
+            _root = root;
+            DuelReadoutPlate.Add(root, new Color(.073f, .113f, .141f, .98f));
+            var icon = LotdUiKit.CreateRect("Symbol", root, new Vector2(.06f, .11f), new Vector2(compact ? .40f : .27f, .89f),
+                Vector2.zero, Vector2.zero);
+            _symbol = LotdUiKit.AddImage(icon.gameObject, null, Color.white, true, false);
+            if (!compact)
+            {
+                var title = LotdUiKit.CreateRect("Kind", root, new Vector2(.29f, .10f), new Vector2(.60f, .90f),
+                    Vector2.zero, Vector2.zero);
+                _caption = LotdUiKit.AddFittedText(title, "Label", "", 17, 9, TextAnchor.MiddleLeft, Color.white);
+            }
+            _number = DuelTypography.AddNumber(root, "Number", "", compact ? 22 : 38, TextAnchor.MiddleCenter, Color.white);
+            _number.rectTransform.anchorMin = new Vector2(compact ? .42f : .61f, .04f);
+            _number.rectTransform.anchorMax = new Vector2(.96f, .96f);
+            Bind(default);
+        }
+
+        internal void Bind((DuelRatingKind Kind, uint Value) rating, bool showChanges = false)
+        {
+            bool visible = rating.Kind != DuelRatingKind.None;
+            _root.gameObject.SetActive(visible);
+            var tone = DuelStatSymbols.RatingColor(rating.Kind);
+            if (!visible || !showChanges) DuelReadoutPulse.Cancel(_root);
+            else if (_shown.Kind != DuelRatingKind.None && _shown != rating) DuelReadoutPulse.Play(_root, tone);
+            _shown = rating;
+            _symbol.sprite = DuelStatSymbols.Rating(rating.Kind);
+            _symbol.color = _number.color = tone;
+            _number.text = visible ? rating.Value.ToString() : "";
+            if (_caption != null)
+            {
+                _caption.text = DuelStatSymbols.RatingName(rating.Kind);
+                _caption.color = tone;
+            }
+        }
+    }
+
     internal sealed class DuelFieldReadout
     {
         private static readonly Color Backing = new Color(.045f, .068f, .085f, .96f);
-        private static readonly Color RankColor = new Color(.91f, .75f, 1f);
-        private static readonly Color ScaleColor = new Color(.60f, 1f, .83f);
         private static readonly Color MaterialColor = new Color(.80f, .89f, 1f);
         private static readonly Color DisabledColor = new Color(1f, .65f, .58f);
         private readonly RectTransform _root;
@@ -783,13 +842,7 @@ namespace YGOPortable.UI
         private void BindRating((DuelRatingKind Kind, uint Value) rating, bool showChanges)
         {
             bool visible = rating.Kind != DuelRatingKind.None;
-            var color = rating.Kind switch
-            {
-                DuelRatingKind.Rank => RankColor,
-                DuelRatingKind.Link => DuelStyle.Player,
-                DuelRatingKind.Scale => ScaleColor,
-                _ => DuelStyle.Gold,
-            };
+            var color = DuelStatSymbols.RatingColor(rating.Kind);
             if (_inPreview)
             {
                 float right = .315f + (rating.Value >= 10 ? .065f : 0f);

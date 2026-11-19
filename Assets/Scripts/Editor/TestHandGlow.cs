@@ -1665,7 +1665,7 @@ namespace YGOPortable.Editor
                     new[] { powerStone, predaplanning, antiSpell }
                         .All(code => session.ActivePrompt.sSetable.Exists(card => card.code == code)));
             byte[] counterResponse = null;
-            using var ui = new HandUI(duel, submitResponse: bytes => counterResponse = bytes);
+            using var ui = new HandUI(duel, mobileLayout: true, submitResponse: bytes => counterResponse = bytes);
             var ai = new TacticalAI();
             var mine = duel.Players[duel.HumanPlayerIndex];
 
@@ -1716,7 +1716,8 @@ namespace YGOPortable.Editor
             ReachMainPhase();
             var monster = mine.mzone.Single(card => card?.code == breaker);
             ui.Field.Refresh();
-            var root = ui.Field.Root.transform;
+            var fieldRoot = ui.Field.Root.transform;
+            var root = fieldRoot.Find("MobileSafeArea");
             var trapSlot = root.Find($"DuelBoard/Zone_{trap.sequence + 2}_4");
             var monsterSlot = root.Find($"DuelBoard/Zone_{monster.sequence + 2}_3");
             var trapCount = trapSlot.Find(countPath)?.GetComponent<Text>();
@@ -1730,11 +1731,19 @@ namespace YGOPortable.Editor
             var inspector = root.Find("LeftInspector/CardPreview/Card/AspectBox");
             var label = root.Find("LeftInspector/CardDetails/ArtworkControls/Counters/Number/Value").GetComponent<Text>();
             Require(label.text == "마력 카운터 3개" && !label.raycastTarget, "Inspecting the trap lost its counter type or blocked input.");
+            Require(!root.Find("LeftInspector/CardDetails/Stats/Rating").gameObject.activeSelf,
+                "The plain trap acquired a monster rating.");
             monsterSlot.GetComponent<CardDragTrigger>().OnRightClick();
             inspector.Find("ZoomHit").GetComponent<Button>().onClick.Invoke();
-            var zoomWindow = root.Find("Overlay_CardZoom/ZoomWin");
+            var zoomWindow = fieldRoot.Find("Overlay_CardZoom/MobileSafeArea/ZoomWin");
             var zoom = zoomWindow.Find("Info/Counters/Number/Value").GetComponent<Text>();
             Require(label.text == "마력 카운터 1개" && zoom.text == "마력 카운터 1개", "Inspecting Breaker did not update both detail views.");
+            var inspectorLevel = root.Find("LeftInspector/CardDetails/Stats/Rating/Number")?.GetComponent<Text>();
+            var zoomLevel = zoomWindow.Find("Info/Stats/Rating/Number")?.GetComponent<Text>();
+            Require(inspectorLevel?.text == "4" && inspectorLevel.font == DuelTypography.NumberFont &&
+                zoomLevel?.text == "4" && zoomLevel.font == DuelTypography.NumberFont &&
+                zoomWindow.Find("Info/Stats/Rating/Kind/Label").GetComponent<Text>().text == "레벨",
+                "The opened card views did not give the live level its own readout.");
 
             Activate(predaplanning);
             ui.Field.Refresh();
@@ -1742,6 +1751,11 @@ namespace YGOPortable.Editor
             Require(mixed.Counters.AsSpan().SequenceEqual(new (ushort, ushort)[] { (1, 1), (0x1041, 1) }) &&
                 mixed.level == 1 && monsterCount.text == "2",
                 "Predaplanning did not put a second native counter type on Breaker.");
+            Require(monsterSlot.Find("CardReadout/Labels/Rating/Value").GetComponent<Text>().text == "1" &&
+                inspectorLevel.text == "1" && zoomLevel.text == "1" &&
+                inspectorLevel.transform.parent.Find("ChangePulse")?.gameObject.activeInHierarchy == true &&
+                zoomLevel.transform.parent.Find("ChangePulse")?.gameObject.activeInHierarchy == true,
+                "The native level change did not reach and animate both open card views.");
             var breakdown = zoomWindow.Find("Info/DescBox/VP/C/CounterTypes")?.GetComponent<Text>();
             Require(label.text == "카운터 2종" && breakdown != null && breakdown.gameObject.activeInHierarchy &&
                 breakdown.text == "마력 카운터 1개\n포식 카운터 1개",
@@ -1843,7 +1857,7 @@ namespace YGOPortable.Editor
             root.Find("LeftInspector/CardPreview/Card/AspectBox/ZoomHit").GetComponent<Button>().onClick.Invoke();
             var inspector = root.Find("LeftInspector/CardDetails");
             var zoom = root.Find("Overlay_CardZoom/ZoomWin/Info");
-            var inspectorText = inspector.Find("Stats/Info/Text").GetComponent<Text>();
+            var inspectorText = inspector.Find("Stats/Identity/Text").GetComponent<Text>();
             var zoomText = zoom.Find("Stats/S").GetComponent<Text>();
             var inspectorRace = inspector.Find("Race").GetComponent<Image>();
             var zoomRace = zoom.Find("RaceIc").GetComponent<Image>();
@@ -1863,7 +1877,7 @@ namespace YGOPortable.Editor
                 Canvas.ForceUpdateCanvases();
                 var label = inspectorText.cachedTextGenerator;
                 label.Populate(inspectorText.text, inspectorText.GetGenerationSettings(inspectorText.rectTransform.rect.size));
-                Require(label.lineCount == 2 && label.characterCountVisible >= inspectorText.text.Length - 1 &&
+                Require(label.lineCount == 1 && label.characterCountVisible >= inspectorText.text.Length - 1 &&
                         label.fontSizeUsedForBestFit >= 12,
                     "The compact card identity left its words clipped or too small.");
             }
@@ -3674,7 +3688,15 @@ namespace YGOPortable.Editor
                     compass.Find("Left").gameObject.activeSelf && !compass.Find("TopLeft").gameObject.activeSelf &&
                     !compass.Find("Bottom").gameObject.activeSelf && !compass.Find("Right").gameObject.activeSelf,
                     "The opponent's live Link markers were not turned to match the board.");
+                var inspectorRating = Field.Root.transform.Find("LeftInspector/CardDetails/Stats/Rating");
+                xyzSlot.GetComponent<CardDragTrigger>().OnRightClick();
+                Require(Label(inspectorRating, "Number").text == "0" && inspectorRating.gameObject.activeInHierarchy &&
+                    inspectorRating.Find("Symbol").GetComponent<Image>().sprite == DuelStatSymbols.Rating(DuelRatingKind.Rank),
+                    "The inspector treated a valid Rank 0 as a missing level.");
                 Slot("_emz", 0).GetComponent<CardDragTrigger>().OnRightClick();
+                Require(Label(inspectorRating, "Number").text == "3" &&
+                    inspectorRating.Find("Symbol").GetComponent<Image>().sprite == DuelStatSymbols.Rating(DuelRatingKind.Link),
+                    "The inspector showed a level symbol for the native Link rating.");
                 ExpectLinkedZones("Zone_3_1", "Zone_4_3");
                 ExpectLinkHighlight("Zone_3_1", DuelLinkHighlight.Linked, Vector2Int.up);
                 var previousNeighbor = mine.mzone[2];
