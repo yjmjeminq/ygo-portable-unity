@@ -398,6 +398,8 @@ namespace YGOPortable.UI
         private Text _leftScaleText;
         private Text _rightScaleText;
         private Text _atkDefText;
+        private DuelRatingBadge _duelFaceRating;
+        private DuelStatStrip _duelFaceCombat;
         private Text _rulesText;
         private RectTransform _rulesArea;
         private GameObject _backObj;
@@ -456,18 +458,27 @@ namespace YGOPortable.UI
 
                 var lvRt = LotdUiKit.CreateRect("LevelInfo", innerRt,
                     new Vector2(0.095f, 0.825f), new Vector2(0.90f, 0.883f), Vector2.zero, Vector2.zero);
-                _levelText = LotdUiKit.AddFittedText(lvRt, "Lv", "", 12, 7, TextAnchor.MiddleRight, LotdUiKit.GoldAccent, FontStyle.Bold);
+                var levelLabel = UseDuelArtwork ? LotdUiKit.FillRect("Type", lvRt) : lvRt;
+                _levelText = LotdUiKit.AddFittedText(levelLabel, "Lv", "", 12, 7, TextAnchor.MiddleRight, LotdUiKit.GoldAccent, FontStyle.Bold);
                 var ls = _levelText.gameObject.AddComponent<Shadow>();
                 ls.effectColor = Color.black;
+                if (UseDuelArtwork)
+                {
+                    var rating = LotdUiKit.CreateRect("Rating", lvRt, new Vector2(.55f, .02f), new Vector2(.985f, .98f),
+                        Vector2.zero, Vector2.zero);
+                    _duelFaceRating = new DuelRatingBadge(rating, compact: true);
+                }
 
                 var leftScale = LotdUiKit.CreateRect("LeftScale", innerRt,
                     new Vector2(0.077f, 0.263f), new Vector2(0.130f, 0.319f), Vector2.zero, Vector2.zero);
                 var rightScale = LotdUiKit.CreateRect("RightScale", innerRt,
                     new Vector2(0.87f, 0.263f), new Vector2(0.923f, 0.319f), Vector2.zero, Vector2.zero);
-                _leftScaleText = LotdUiKit.AddFittedText(leftScale, "Value", "", 11, 7, TextAnchor.MiddleCenter,
-                    new Color(0.07f, 0.21f, 0.43f), FontStyle.Bold);
-                _rightScaleText = LotdUiKit.AddFittedText(rightScale, "Value", "", 11, 7, TextAnchor.MiddleCenter,
-                    new Color(0.44f, 0.08f, 0.07f), FontStyle.Bold);
+                _leftScaleText = AddScaleValue(leftScale, new Color(.07f, .21f, .43f));
+                _rightScaleText = AddScaleValue(rightScale, new Color(.44f, .08f, .07f));
+
+                Text AddScaleValue(RectTransform parent, Color color) => UseDuelArtwork
+                    ? DuelTypography.AddNumber(parent, "Value", "", 14, TextAnchor.MiddleCenter, color)
+                    : LotdUiKit.AddFittedText(parent, "Value", "", 11, 7, TextAnchor.MiddleCenter, color, FontStyle.Bold);
 
                 _rulesArea = LotdUiKit.CreateRect("Rules", innerRt,
                     new Vector2(0.09f, 0.120f), new Vector2(0.91f, 0.244f), Vector2.zero, Vector2.zero);
@@ -476,9 +487,11 @@ namespace YGOPortable.UI
                 _rulesText.supportRichText = false;
 
                 var statRt = LotdUiKit.CreateRect("AtkDef", innerRt,
-                    new Vector2(0.090f, 0.064f), new Vector2(0.91f, 0.115f), Vector2.zero, Vector2.zero);
-                _atkDefText = LotdUiKit.AddFittedText(statRt, "Stat", "", 11, 7, TextAnchor.MiddleRight,
-                    new Color(0.12f, 0.1f, 0.1f, 1f), FontStyle.Bold);
+                    new Vector2(0.090f, UseDuelArtwork ? .057f : .064f),
+                    new Vector2(0.91f, UseDuelArtwork ? .128f : .115f), Vector2.zero, Vector2.zero);
+                if (UseDuelArtwork) _duelFaceCombat = new DuelStatStrip(statRt, compact: true);
+                else _atkDefText = LotdUiKit.AddFittedText(statRt, "Stat", "", 11, 7, TextAnchor.MiddleRight,
+                        new Color(0.12f, 0.1f, 0.1f, 1f), FontStyle.Bold);
             }
 
             var limRt = LotdUiKit.CreateRect("LimitBadge", innerRt,
@@ -496,13 +509,23 @@ namespace YGOPortable.UI
         public void SetCard(uint code, bool faceDown = false, LiveCardState live = null)
             => SetCard(code, faceDown, live, null);
 
-        internal void SetCard(uint code, bool faceDown, LiveCardState live, (int Attack, int Defense)? combat)
+        internal void SetCard(uint code, DuelCardReadout readout) => SetCard(code, false, readout.Live, readout);
+
+        private void SetCard(uint code, bool faceDown, LiveCardState live, DuelCardReadout? presentation)
         {
             CurrentCode = code;
             if (faceDown || code == 0)
             {
                 ReleaseArtwork();
                 HideRarityFinish();
+                if (_duelFaceCombat != null)
+                {
+                    _duelFaceCombat.Hide();
+                    _duelFaceRating.Bind(default);
+                    _levelText.text = "";
+                    _leftScaleText.gameObject.SetActive(false);
+                    _rightScaleText.gameObject.SetActive(false);
+                }
                 _backObj.SetActive(true);
                 return;
             }
@@ -530,8 +553,10 @@ namespace YGOPortable.UI
 
             if (_detailed)
             {
-                bool monster = (type & YgoConstants.TYPE_MONSTER) != 0;
-                _rulesArea.anchorMin = new Vector2(0.09f, monster ? 0.120f : 0.074f);
+                var readout = presentation ?? new DuelCardReadout(info, live);
+                bool monster = _duelFaceCombat != null ? readout.IsMonster : (type & YgoConstants.TYPE_MONSTER) != 0;
+                float rulesBottom = _duelFaceCombat != null ? .134f : .120f;
+                _rulesArea.anchorMin = new Vector2(0.09f, monster ? rulesBottom : .074f);
                 _rulesText.text = info?.desc ?? "";
                 _titleText.text = info != null ? info.name : $"카드 #{code}";
                 bool darkFrame = (type & (YgoConstants.TYPE_XYZ | YgoConstants.TYPE_LINK | YgoConstants.TYPE_SPELL | YgoConstants.TYPE_TRAP | YgoConstants.TYPE_FUSION)) != 0;
@@ -550,7 +575,21 @@ namespace YGOPortable.UI
 
                 _leftScaleText.gameObject.SetActive(isPend && monster);
                 _rightScaleText.gameObject.SetActive(isPend && monster);
-                if (monster)
+                if (isPend && monster)
+                {
+                    _leftScaleText.text = readout.LeftScale.ToString();
+                    _rightScaleText.text = readout.RightScale.ToString();
+                }
+
+                if (_duelFaceCombat != null)
+                {
+                    var rating = readout.InspectionRating;
+                    _duelFaceRating.Bind(rating);
+                    _duelFaceCombat.Bind(readout, position: 0, showModifiers: false);
+                    _levelText.text = !monster && rating.Kind == DuelRatingKind.None ? YgoConstants.GetTypeTagKR(type) : "";
+                    _levelText.color = Color.white;
+                }
+                else if (monster)
                 {
                     uint lv = live != null ? ((type & YgoConstants.TYPE_XYZ) != 0 ? live.rank : ((type & YgoConstants.TYPE_LINK) != 0 ? live.link : live.level)) : (info?.level ?? 0);
                     if ((type & YgoConstants.TYPE_LINK) != 0)
@@ -569,16 +608,8 @@ namespace YGOPortable.UI
                         _levelText.color = LotdUiKit.GoldAccent;
                     }
 
-                    uint ls = live != null ? live.lscale : (info?.lscale ?? 0);
-                    uint rs = live != null ? live.rscale : (info?.rscale ?? 0);
-                    if (isPend)
-                    {
-                        _leftScaleText.text = ls.ToString();
-                        _rightScaleText.text = rs.ToString();
-                    }
-
-                    int atk = combat?.Attack ?? live?.attack ?? info?.atk ?? 0;
-                    int def = combat?.Defense ?? live?.defense ?? info?.def ?? 0;
+                    int atk = live?.attack ?? info?.atk ?? 0;
+                    int def = live?.defense ?? info?.def ?? 0;
                     string aStr = atk < 0 ? "?" : atk.ToString();
                     string defense = (type & YgoConstants.TYPE_LINK) != 0
                         ? $"LINK-{lv}" : $"DEF/{(def < 0 ? "?" : def.ToString())}";

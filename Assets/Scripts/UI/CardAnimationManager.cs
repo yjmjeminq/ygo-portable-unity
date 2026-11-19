@@ -142,6 +142,7 @@ namespace YGOPortable.UI
         private Sprite _summonArt;
         private uint _previousChainCode;
         private int _previousChainNumber;
+        private LiveCardState _previousChainReadout;
         private bool _playing;
 
         private const float LifeFeedbackDuration = .46f;
@@ -243,6 +244,7 @@ namespace YGOPortable.UI
             _featuredSummons.Clear();
             _previousChainCode = 0;
             _previousChainNumber = 0;
+            _previousChainReadout = null;
             _playing = false;
             Paused = false;
             for (int i = _layer.childCount - 1; i >= 0; i--)
@@ -453,14 +455,14 @@ namespace YGOPortable.UI
             QueueStep(PhaseBanner("DUEL", false, boardCenter, null, intro: true));
         }
 
-        internal void QueueChain(CardPose source, uint code, int chainNumber, bool opponent)
+        internal void QueueChain(CardPose source, uint code, int chainNumber, bool opponent, LiveCardState live = null)
         {
-            QueueStep(ChainActivation(source, code, chainNumber, opponent));
+            QueueStep(ChainActivation(source, code, chainNumber, opponent, live));
         }
 
-        internal void QueueChainResolution(Vector2 center, uint code, int chainNumber, float maxHeight = 206f)
+        internal void QueueChainResolution(Vector2 center, uint code, int chainNumber, float maxHeight = 206f, LiveCardState live = null)
         {
-            QueueStep(ChainResolution(center, code, chainNumber, maxHeight));
+            QueueStep(ChainResolution(center, code, chainNumber, maxHeight, live));
         }
 
         internal void QueueFieldReadoutUpdate(Action apply) => QueueStep(ApplyFieldReadoutUpdate(apply));
@@ -513,7 +515,7 @@ namespace YGOPortable.UI
             else QueueStep(PlayLifeChanges(new[] { change }));
         }
 
-        private CompositeCardView TakeCard(uint code, bool faceDown, bool detailed = false)
+        private CompositeCardView TakeCard(uint code, bool faceDown, bool detailed = false, LiveCardState live = null)
         {
             CompositeCardView view;
             if (detailed || !_cards.TryPop(out view))
@@ -522,7 +524,7 @@ namespace YGOPortable.UI
                 var rect = (RectTransform)view.transform;
                 rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
             }
-            view.SetCard(code, faceDown);
+            view.SetCard(code, faceDown, live);
             view.gameObject.SetActive(true);
             view.transform.SetAsLastSibling();
             return view;
@@ -1497,11 +1499,13 @@ namespace YGOPortable.UI
             else DestroyImmediate(visual);
         }
 
-        private IEnumerator ChainActivation(CardPose source, uint code, int chainNumber, bool opponent)
+        private IEnumerator ChainActivation(CardPose source, uint code, int chainNumber, bool opponent, LiveCardState live)
         {
             uint previous = chainNumber > 1 && _previousChainNumber == chainNumber - 1 ? _previousChainCode : 0;
+            var previousReadout = _previousChainReadout;
             _previousChainNumber = chainNumber;
             _previousChainCode = code;
+            _previousChainReadout = live;
             if (!source.IsValid) yield break;
 
             float side = opponent ? 1f : -1f;
@@ -1518,21 +1522,22 @@ namespace YGOPortable.UI
             {
                 var point = new Vector2(-side * view.x * .135f, center.y + height * .26f);
                 AddChainConnector(overlay, center, point, height);
-                var prior = TakeCard(previous, false, true);
+                var prior = TakeCard(previous, false, detailed: true, live: previousReadout);
                 prior.transform.SetParent(overlay, false);
-                ApplyPose(prior, new CardPose(point, reveal.Size * .66f, -side * 10f));
-                ChainBadge(overlay, point + new Vector2(-side * height * .19f, -height * .27f), chainNumber - 1,
+                Vector2 priorSize = reveal.Size * .66f;
+                ApplyPose(prior, new CardPose(point, priorSize, -side * 10f));
+                ChainBadge(overlay, point + new Vector2(-side * (priorSize.x * .5f + height * .17f), -height * .20f), chainNumber - 1,
                     height * .18f, active: false);
             }
 
             var crest = CreateEffect(DuelEffectKind.Chain, center, new Vector2(height * 1.40f, height * 1.25f), DuelStyle.Gold);
-            var card = TakeCard(code, code == 0, true);
+            var card = TakeCard(code, code == 0, detailed: true, live: live);
             var highlight = LotdUiKit.FillRect("ChainCardHighlight", card.transform, -height * .035f);
             if (DuelVisualAssets.ChainCardHighlight != null)
                 LotdUiKit.AddImage(highlight.gameObject, DuelVisualAssets.ChainCardHighlight, DuelStyle.Gold, false, false);
             var flash = highlight.gameObject.AddComponent<CanvasGroup>();
             flash.alpha = 0f;
-            var badge = ChainBadge(_layer, center + new Vector2(side * reveal.Size.x * .47f, -height * .43f), chainNumber,
+            var badge = ChainBadge(_layer, center + new Vector2(side * (reveal.Size.x * .52f + height * .25f), -height * .35f), chainNumber,
                 height * .32f, active: true);
             var badgeOpacity = badge.gameObject.AddComponent<CanvasGroup>();
             badgeOpacity.alpha = 0f;
@@ -1562,15 +1567,15 @@ namespace YGOPortable.UI
             Destroy(overlay.gameObject);
         }
 
-        private IEnumerator ChainResolution(Vector2 center, uint code, int chainNumber, float maxHeight)
+        private IEnumerator ChainResolution(Vector2 center, uint code, int chainNumber, float maxHeight, LiveCardState live)
         {
             float height = Mathf.Min(maxHeight, _layer.rect.height * .29f);
             var size = new Vector2(height * LotdUiKit.CardAspectRatio, height);
             var overlay = LotdUiKit.FillRect("ChainResolution", _layer);
-            var card = TakeCard(code, code == 0, true);
+            var card = TakeCard(code, code == 0, detailed: true, live: live);
             card.transform.SetParent(overlay, false);
             ApplyPose(card, new CardPose(center, size, -5f));
-            var badge = ChainBadge(overlay, center + new Vector2(size.x * .49f, -height * .32f),
+            var badge = ChainBadge(overlay, center + new Vector2(size.x * .49f, height * .03f),
                 chainNumber, height * .35f, active: true, resolving: true);
             var fade = overlay.gameObject.AddComponent<CanvasGroup>();
             fade.alpha = 0f;

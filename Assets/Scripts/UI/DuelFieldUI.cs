@@ -2830,7 +2830,7 @@ namespace YGOPortable.UI
             var animator = CardAnimationManager.Instance;
             if (animator == null) return;
             var pose = GetCardPose(link.triggerPlayer, link.triggerLoc, link.triggerSeq, YgoConstants.POS_FACEUP_ATTACK);
-            animator.QueueChain(pose, link.code, link.chainNumber, link.triggerPlayer != _session.HumanPlayerIndex);
+            animator.QueueChain(pose, link.code, link.chainNumber, link.triggerPlayer != _session.HumanPlayerIndex, link.ActivationReadout);
         }
 
         private void HandleChainResolvingEvent(ChainLinkInfo link)
@@ -2844,11 +2844,11 @@ namespace YGOPortable.UI
                 var area = MobileChainResolutionArea;
                 var size = animator.GetAreaSize(playArea);
                 float height = Mathf.Min(size.x * area.width * .88f, size.y * area.height);
-                animator.QueueChainResolution(animator.GetPoint(playArea, area.center), link.code, link.chainNumber, height);
+                animator.QueueChainResolution(animator.GetPoint(playArea, area.center), link.code, link.chainNumber, height, link.ActivationReadout);
                 return;
             }
             var center = animator.GetPoint(_boardRect, new Vector2(.50f, .56f));
-            animator.QueueChainResolution(center, link.code, link.chainNumber);
+            animator.QueueChainResolution(center, link.code, link.chainNumber, live: link.ActivationReadout);
         }
 
         private Func<Vector2> CaptureAttackTarget(CardAnimationManager animator, byte attacker, byte target, uint location, uint sequence)
@@ -4004,7 +4004,7 @@ namespace YGOPortable.UI
         {
             var card = ReadInspectedStats(code, _zoomFieldCard);
             if (card.Live == null && !IsInspectedCardStillOnField(code, _zoomFieldCard)) _zoomFieldCard = null;
-            _zoomCardView.SetCard(code, false, card.Live, (card.Attack, card.Defense));
+            _zoomCardView.SetCard(code, card);
             BindRulesName(_zoomName, _zoomRulesName, card.RulesName);
             var (identity, details) = FormatInspectorStats(card);
             _zoomStats.text = identity.Length == 0 ? details : details.Length == 0 ? identity : $"{identity}\n{details}";

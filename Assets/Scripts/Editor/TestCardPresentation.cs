@@ -26,6 +26,7 @@ namespace YGOPortable.Editor
                 var card = CompositeCardView.Create(canvas.transform, "Card", true);
                 VerifyFoil(card);
                 VerifySummonMotion(card);
+                VerifyExpandedDuelCard(canvas.transform);
                 var animator = CardAnimationManager.Ensure(canvas);
                 VerifyFeaturedCards(animator);
                 VerifySummonReadout(animator);
@@ -74,6 +75,61 @@ namespace YGOPortable.Editor
                 "An SR card did not replace the UR finish with its own foil.");
             card.SetCard(sparkman);
             Require(!finish.gameObject.activeSelf, "Reusing a card view left the foil on a normal card.");
+            Require(card.transform.Find("AspectBox/AtkDef/Stat").GetComponent<Text>().text == "ATK/1600  DEF/1400",
+                "The duel face styling changed the printed card used outside a duel.");
+        }
+
+        private static void VerifyExpandedDuelCard(Transform parent)
+        {
+            const uint accesscode = 86066372, utopia = 84013237, oddEyes = 16178681;
+            var card = CompositeCardView.Create(parent, "Expanded Duel Card", detailedOverlay: true, duelArtwork: true);
+            try
+            {
+                var face = card.transform.Find("AspectBox");
+                var badge = face.Find("LevelInfo/Rating");
+                var number = badge.Find("Number").GetComponent<Text>();
+                var symbol = badge.Find("Symbol").GetComponent<Image>();
+                var attack = face.Find("AtkDef/Attack/Digits/Value").GetComponent<Text>();
+                var defense = face.Find("AtkDef/Defense");
+                card.SetCard(accesscode);
+                Require(number.text == "4" && symbol.sprite == DuelStatSymbols.Rating(DuelRatingKind.Link) &&
+                    attack.text == "2300" && attack.font == DuelTypography.NumberFont && !defense.gameObject.activeSelf,
+                    "The enlarged Link card did not use its Link rating and attack alone.");
+
+                card.SetCard(utopia, live: new LiveCardState
+                {
+                    code = utopia, type = CardDatabase.Get(utopia).type, rank = 0,
+                    position = YgoConstants.POS_FACEUP_ATTACK, attack = 2500, defense = 2000,
+                });
+                Require(number.text == "0" && badge.gameObject.activeSelf &&
+                    symbol.sprite == DuelStatSymbols.Rating(DuelRatingKind.Rank) && defense.gameObject.activeSelf,
+                    "A reused enlarged card lost Rank 0 or kept its Link layout.");
+
+                card.SetCard(oddEyes);
+                var left = face.Find("LeftScale/Value").GetComponent<Text>();
+                var right = face.Find("RightScale/Value").GetComponent<Text>();
+                Require(left.text == "4" && right.text == "4" && left.font == DuelTypography.NumberFont &&
+                    right.font == DuelTypography.NumberFont && symbol.sprite == DuelStatSymbols.Rating(DuelRatingKind.Level),
+                    "The displayed Pendulum monster lost its pair of printed scales.");
+
+                card.SetCard(oddEyes, live: new LiveCardState
+                {
+                    code = oddEyes, type = YgoConstants.TYPE_SPELL | YgoConstants.TYPE_PENDULUM,
+                    location = YgoConstants.LOCATION_SZONE, sequence = 4, position = YgoConstants.POS_FACEUP_ATTACK,
+                    lscale = 4, rscale = 7,
+                });
+                Require(number.text == "7" && symbol.sprite == DuelStatSymbols.Rating(DuelRatingKind.Scale) &&
+                    !left.gameObject.activeSelf && !right.gameObject.activeSelf && !face.Find("AtkDef").gameObject.activeSelf,
+                    "The enlarged card did not show the active scale in the right Pendulum Zone.");
+                card.SetCard(0, faceDown: true);
+                Require(!badge.gameObject.activeSelf && !face.Find("AtkDef").gameObject.activeSelf &&
+                    face.Find("CardBack").gameObject.activeSelf,
+                    "A face-down expanded card kept a live combat or rating badge.");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(card.gameObject);
+            }
         }
 
         private static void VerifySummonMotion(CompositeCardView card)

@@ -145,6 +145,7 @@ namespace YGOPortable.Core
         public uint triggerSeq;
         public ulong description;
         public bool negated;
+        internal LiveCardState ActivationReadout;
     }
 
     public class SelectableCardItem
@@ -748,6 +749,19 @@ namespace YGOPortable.Core
             return live?.IsFaceUp == true && live.code == code ? live : null;
         }
 
+        private LiveCardState CaptureChainFieldCard(SelectableCardItem source)
+        {
+            if ((OnChainActivated == null && OnChainResolving == null) || NativePtr == IntPtr.Zero ||
+                source.controller >= Players.Length || source.code == 0 ||
+                (source.position & YgoConstants.POS_FACEUP) == 0 ||
+                source.location is not (YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE))
+                return null;
+
+            var zone = QueryLocationCards(source.controller, source.location);
+            var card = source.sequence < zone.Count ? zone[(int)source.sequence] : null;
+            return card?.IsFaceUp == true && card.code == source.code ? card : null;
+        }
+
         internal LiveCardState GetAttackSelectionSource(DuelPrompt prompt)
         {
             if (prompt == null || !ReferenceEquals(ActivePrompt, prompt)) return null;
@@ -1154,7 +1168,7 @@ namespace YGOPortable.Core
                 case YgoConstants.MSG_CHAINING:
                 {
                     uint code = br.ReadUInt32();
-                    br.ReadBytes(10);
+                    var source = ReadLocIntoItem(br, code);
                     byte tCon = br.ReadByte();
                     byte tLoc = br.ReadByte();
                     uint tSeq = br.ReadUInt32();
@@ -1169,6 +1183,7 @@ namespace YGOPortable.Core
                         triggerLoc = tLoc,
                         triggerSeq = tSeq,
                         description = desc,
+                        ActivationReadout = CaptureChainFieldCard(source),
                     };
                     CurrentChain.Add(link);
                     AddLog($"체인 {chainNo}: [{CardDatabase.GetName(code)}] 발동");

@@ -132,7 +132,8 @@ namespace YGOPortable.UI
 
         internal void Hide() => _root.gameObject.SetActive(false);
 
-        internal void Bind(DuelCardReadout card, bool opponent = false, bool showChanges = false, uint? position = null)
+        internal void Bind(DuelCardReadout card, bool opponent = false, bool showChanges = false, uint? position = null,
+            bool showModifiers = true)
         {
             _root.gameObject.SetActive(card.IsMonster);
             if (!card.IsMonster) return;
@@ -145,9 +146,9 @@ namespace YGOPortable.UI
             if (_compact && activeAttack != activeDefense)
                 split = activeAttack ? .545f : .455f;
             Layout(card.IsLink, card.LinkMarkers, opponent, split);
-            _attack.Bind(card.Attack, card.BaseAttack, activeAttack, showChanges);
+            _attack.Bind(card.Attack, showModifiers ? card.BaseAttack : card.Attack, activeAttack, showChanges);
             if (!card.IsLink)
-                _defense.Bind(card.Defense, card.BaseDefense, activeDefense, showChanges);
+                _defense.Bind(card.Defense, showModifiers ? card.BaseDefense : card.Defense, activeDefense, showChanges);
         }
 
         internal void BindBattle(BattleCardStats card, bool link, bool attacking)

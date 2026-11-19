@@ -36,6 +36,7 @@ namespace YGOPortable.Editor
             VerifyOpponentEquipmentFocus();
             VerifyNativeMonsterEquip();
             VerifyNativeChainReadouts();
+            VerifyNativeChainCardFace();
             VerifyDestroyedCopiesKeepTheirReadouts();
             VerifyFieldReplacementReadouts();
             VerifyTurnAndDrawReadouts();
@@ -1171,6 +1172,69 @@ namespace YGOPortable.Editor
             Debug.Log("[VERIFY DUEL CHAIN READOUT] Rush changed only one copy to 2550 at link 2. Ocean changed both copies' ATK/DEF and Level at link 1.");
         }
 
+        private static void VerifyNativeChainCardFace()
+        {
+            const uint breaker = 71413901, axe = 40619825;
+            var main = Enumerable.Repeat(breaker, 24).Concat(Enumerable.Repeat(axe, 16)).ToArray();
+            var empty = Array.Empty<uint>();
+            var ai = new TacticalAI();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Buffed chain card face", main, empty,
+                Enumerable.Repeat(BlueEyes, 40).ToArray(), empty, true, session =>
+                {
+                    var hand = session.Players[session.HumanPlayerIndex].hand;
+                    return hand.Exists(card => card.code == breaker) && hand.Exists(card => card.code == axe);
+                });
+            int summon = duel.ActivePrompt.summonable.FindIndex(card => card.code == breaker);
+            Require(summon >= 0, "The chain face fixture could not summon Breaker.");
+            duel.SubmitResponseInt(summon << 16);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
+                prompt.messageType == YgoConstants.MSG_SELECT_CHAIN && prompt.forced ? BitConverter.GetBytes(0) : null);
+            ActivateFromMainPhase(duel, axe);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
+                prompt.messageType == YgoConstants.MSG_SELECT_CARD ? SelectCard(prompt, breaker) : null);
+            var player = duel.Players[duel.HumanPlayerIndex];
+            Require(player.mzone.Single(card => card?.code == breaker).attack == 2900,
+                "The native counter and Axe did not give Breaker its two bonuses.");
+
+            using var ui = new HandUI(duel, mobileLayout: true);
+            var animator = CardAnimationManager.Ensure(ui.Canvas);
+            Canvas.ForceUpdateCanvases();
+            LiveCardState activation = null;
+            duel.OnChainActivated += link => { if (link.code == breaker) activation = link.ActivationReadout; };
+            ActivateFromMainPhase(duel, breaker);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
+                prompt.messageType == YgoConstants.MSG_SELECT_CARD ? SelectCard(prompt, axe) : null);
+            Require(duel.RetryCount == 0 && player.mzone.Single(card => card?.code == breaker).attack == 1600 &&
+                player.grave.Any(card => card.code == axe), "Breaker did not pay the counter and destroy its own Axe.");
+            Require(activation?.attack >= 2600, "The chain did not capture Breaker's equipped attack before resolution.");
+
+            var steps = AnimationSteps(animator).ToArray();
+            foreach (string phase in new[] { "ChainActivation", "ChainResolution" })
+            {
+                var step = steps.Single(cue => cue.GetType().Name.StartsWith($"<{phase}>", StringComparison.Ordinal));
+                Require(step.MoveNext() && step.Current is IEnumerator, $"The {phase} cue did not show its card.");
+                TestCardPresentation.SampleAnimation((IEnumerator)step.Current)(.68f);
+                var card = animator.GetComponentsInChildren<CompositeCardView>().Single(view => view.CurrentCode == breaker);
+                var face = card.transform.Find("AspectBox");
+                var attack = face.Find("AtkDef/Attack/Digits/Value")?.GetComponent<Text>();
+                var defense = face.Find("AtkDef/Defense/Digits/Value")?.GetComponent<Text>();
+                var level = face.Find("LevelInfo/Rating/Number")?.GetComponent<Text>();
+                Require(attack?.text == activation.attack.ToString() && attack.font == DuelTypography.NumberFont &&
+                    defense?.text == "1000" && level?.text == "4",
+                    $"The {phase} card showed {attack?.text}/{defense?.text}, level {level?.text}, instead of the values at activation.");
+                Canvas.ForceUpdateCanvases();
+                var counter = animator.GetComponentsInChildren<RectTransform>().Single(rect => rect.name == "ChainCount");
+                var counterBounds = RectTransformUtility.CalculateRelativeRectTransformBounds(animator.transform, counter);
+                foreach (string path in new[] { "AtkDef", "LevelInfo/Rating" })
+                {
+                    var valueBounds = RectTransformUtility.CalculateRelativeRectTransformBounds(animator.transform, face.Find(path));
+                    Require(!counterBounds.Intersects(valueBounds), $"The {phase} chain count covered {path}.");
+                }
+                animator.Clear();
+            }
+            Debug.Log($"[VERIFY DUEL CHAIN CARD FACE] The activated {activation.attack} attack survived both chain cues after the field settled at 1600.");
+        }
+
         private static void VerifyDestroyedCopiesKeepTheirReadouts()
         {
             const uint gagagigo = 49003308, darkHole = 53129443, rush = 70046172;
@@ -2272,14 +2336,15 @@ namespace YGOPortable.Editor
                     plate.transform.Find("SummonStats/Attack/Digits/Value").GetComponent<Text>().text == "2400" &&
                     plate.transform.Find("SummonStats/Defense/Digits/Value").GetComponent<Text>().text == "2000",
                 "The Fusion Summon banner and the queued live readout disagreed.");
-            var proxy = CompositeCardView.Create(ui.Canvas.transform, "Summoned Card", detailedOverlay: true);
+            var proxy = CompositeCardView.Create(ui.Canvas.transform, "Summoned Card", detailedOverlay: true, duelArtwork: true);
             proxy.SetCard(0, faceDown: true);
             CardAnimationManager.ApplySummonEntrance(proxy, flight, DuelEffectKind.Fusion, .25f, stats);
             Require(proxy.CurrentCode == 0 && proxy.transform.Find("AspectBox/CardBack").gameObject.activeSelf,
                 "The moving card exposed its face before the reveal.");
             CardAnimationManager.ApplySummonEntrance(proxy, flight, DuelEffectKind.Fusion, .75f, stats);
-            Require(proxy.transform.Find("AspectBox/AtkDef/Stat").GetComponent<Text>().text == "ATK/2400  DEF/2000" &&
-                    proxy.transform.Find("AspectBox/LevelInfo/Lv").GetComponent<Text>().text == "★★★★",
+            Require(proxy.transform.Find("AspectBox/AtkDef/Attack/Digits/Value")?.GetComponent<Text>().text == "2400" &&
+                    proxy.transform.Find("AspectBox/AtkDef/Defense/Digits/Value")?.GetComponent<Text>().text == "2000" &&
+                    proxy.transform.Find("AspectBox/LevelInfo/Rating/Number")?.GetComponent<Text>().text == "4",
                 "The revealed card face did not keep the same numbers as the summon banner.");
 
             var (controller, sequence) = captured.Key;
@@ -3608,7 +3673,8 @@ namespace YGOPortable.Editor
                         slot.Find("CardReadout/Combat/Defense/Digits/Value").GetComponent<Text>().text == defense &&
                         ui.Field.Root.transform.Find("LeftInspector/CardDetails/CombatStats/Attack/Digits/Value")
                             .GetComponent<Text>().text == attack &&
-                        detailCard.transform.Find("AspectBox/AtkDef/Stat").GetComponent<Text>().text == $"ATK/{attack}  DEF/{defense}",
+                        detailCard.transform.Find("AspectBox/AtkDef/Attack/Digits/Value")?.GetComponent<Text>().text == attack &&
+                        detailCard.transform.Find("AspectBox/AtkDef/Defense/Digits/Value")?.GetComponent<Text>().text == defense,
                     $"Tigermortar did not present {count} materials and {attack}/{defense} combat values.");
             }
 
