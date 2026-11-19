@@ -84,7 +84,7 @@ namespace YGOPortable.UI
             if (move.fromLoc is not (YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE) ||
                 move.toLoc is not (YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE))
                 return false;
-            var from = GetDisplayedCardPose(move.fromCon, move.fromLoc, move.fromSeq, move.code);
+            var from = GetDisplayedCardPose(move.fromCon, move.fromLoc, move.fromSeq, move.code, move.fromPos);
             if (!from.IsValid) from = GetCardPose(move.fromCon, move.fromLoc, move.fromSeq, move.fromPos);
             var to = GetCardPose(move.toCon, move.toLoc, move.toSeq, move.toPos);
             if (!from.IsValid || !to.IsValid) return false;

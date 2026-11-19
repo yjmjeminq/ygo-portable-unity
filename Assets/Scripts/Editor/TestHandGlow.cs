@@ -48,6 +48,8 @@ namespace YGOPortable.Editor
             VerifyNativeLinkedZone();
             VerifyNativeCoLinkedZone();
             VerifyNativeMovingReadout();
+            VerifyMovingReadoutAfterLayoutChange();
+            VerifyCrowdedFieldAfterLayoutChange();
             VerifyNativePositionGroup();
             VerifyNativeTemporaryBanishment();
             VerifyNativeTokenArrivalReadout();
@@ -1835,6 +1837,133 @@ namespace YGOPortable.Editor
             Debug.Log("[VERIFY DUEL MOVING STATS] Native regular summon, pointer focus, rotation and both flip directions preserved public ATK, DEF and Level.");
         }
 
+        private static void VerifyMovingReadoutAfterLayoutChange()
+        {
+            var main = Enumerable.Repeat(KaiserSeaHorse, 40).ToArray();
+            var opponent = Enumerable.Repeat(BlueEyes, 40).ToArray();
+            var empty = Array.Empty<uint>();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Responsive moving readout", main, empty, opponent, empty, true,
+                session => session.ActivePrompt?.summonable.Count > 0);
+            using var ui = new HandUI(duel, mobileLayout: true);
+            var animator = CardAnimationManager.Ensure(ui.Canvas);
+            var screen = (RectTransform)ui.Canvas.transform;
+            var viewport = ui.Field.Root.transform.Find("MobileSafeArea");
+            var safeArea = viewport.GetComponent<MobileSafeArea>();
+            void Reflow(Vector2Int display, Rect safe)
+            {
+                screen.sizeDelta = (Vector2)display;
+                safeArea.Reflow(safe, display);
+                Canvas.ForceUpdateCanvases();
+            }
+
+            Reflow(new Vector2Int(1680, 800), new Rect(0, 18, 1570, 762));
+            ui.Field.Refresh();
+            duel.SubmitResponseInt(0);
+            YgoProjectBuilder.DriveUntilIdle(duel, new TacticalAI());
+            Require(duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD && duel.RetryCount == 0,
+                "The responsive summon did not resolve.");
+            var live = duel.Players[duel.HumanPlayerIndex].mzone.Single(card => card?.code == KaiserSeaHorse);
+            var slot = (RectTransform)FieldSlot(ui.Field, live);
+            var pending = PendingMoveReadouts(ui.Field).Values.Single();
+            Vector2 initialDestination = animator.GetPoint(slot, Vector2.one * .5f);
+
+            // The phone changes which side the cutout occupies while the summon is queued.
+            Reflow(new Vector2Int(1680, 800), new Rect(110, 18, 1570, 762));
+            ui.Field.Refresh();
+            var arrival = OpenMove(animator, KaiserSeaHorse, pending);
+            arrival.Sample(.87f);
+            RequireTravelStats(arrival.Readout, "1700", "1650", "4", defense: false);
+
+            // Resize again while the card and its stats are visible in flight.
+            Reflow(new Vector2Int(1320, 720), new Rect(92, 25, 1174, 674));
+            arrival.Sample(1f);
+            var expected = animator.GetPoint(slot, Vector2.one * .5f);
+            var proxy = (RectTransform)arrival.Proxy.transform;
+            Require(Vector2.Distance(expected, initialDestination) > 20f &&
+                Vector2.Distance(proxy.anchoredPosition, expected) < .08f,
+                $"The summon landed at {proxy.anchoredPosition} after reflow, expected {expected}.");
+            Require(Vector2.Distance(arrival.Readout.anchoredPosition, proxy.anchoredPosition) < .08f &&
+                Vector2.Distance(arrival.Readout.sizeDelta, animator.GetAreaSize(slot)) < .08f,
+                "The moving stats did not stay aligned with the resized summon destination.");
+            RequireTravelStats(arrival.Readout, "1700", "1650", "4", defense: false);
+            Require(arrival.Step.MoveNext() && arrival.Readout == null && arrival.Step.Current is IEnumerator,
+                "The resized summon did not release its flight into the occupied slot.");
+            var burst = (IEnumerator)arrival.Step.Current;
+            Require(burst.MoveNext(), "The summon effect did not begin.");
+            var sampleBurst = TestCardPresentation.SampleAnimation((IEnumerator)burst.Current);
+            Reflow(new Vector2Int(1560, 736), new Rect(0, 20, 1428, 704));
+            sampleBurst(.52f);
+            var effect = animator.GetComponentsInChildren<DuelEffectGraphic>().Single(graphic => graphic.Kind == DuelEffectKind.Summon);
+            Require(Vector2.Distance(effect.rectTransform.anchoredPosition, animator.GetPoint(slot, Vector2.one * .5f)) < .08f,
+                "The settled summon effect stayed at its former location after another resize.");
+            sampleBurst(1f);
+            Require(!burst.MoveNext() && !arrival.Step.MoveNext(), "The resized summon did not finish cleanly.");
+            Require(slot.Find("Card/CardView").gameObject.activeInHierarchy &&
+                slot.Find("CardReadout/Combat/Attack/Digits/Value").GetComponent<Text>().text == "1700",
+                "The field did not take over the moving readout after reflow.");
+            Debug.Log("[VERIFY DUEL RESPONSIVE FLIGHT] A queued native summon followed both cutout and viewport changes with its printed card and live stats.");
+        }
+
+        private static void VerifyCrowdedFieldAfterLayoutChange()
+        {
+            const uint utopia = 84013237, linkSpider = 98978921;
+            uint[] codes = { BlueEyes, KaiserSeaHorse, utopia, linkSpider, KaiserSeaHorse };
+            using var duel = new DuelSession();
+            for (byte player = 0; player < 2; player++)
+            for (uint sequence = 0; sequence < codes.Length; sequence++)
+            {
+                var card = CardDatabase.Get(codes[sequence]);
+                bool link = card.code == linkSpider;
+                duel.Players[player].mzone[sequence] = new LiveCardState
+                {
+                    code = card.code, controller = player, location = YgoConstants.LOCATION_MZONE, sequence = sequence,
+                    position = link ? YgoConstants.POS_FACEUP_ATTACK : YgoConstants.POS_FACEUP_DEFENSE,
+                    type = card.type, level = card.level, rank = card.code == utopia ? card.level : 0,
+                    link = link ? card.level : 0, linkMarker = card.link,
+                    attack = card.atk, defense = card.def, baseAttack = card.atk, baseDefense = card.def,
+                };
+            }
+            using var ui = new HandUI(duel, mobileLayout: true);
+            var animator = CardAnimationManager.Ensure(ui.Canvas);
+            var screen = (RectTransform)ui.Canvas.transform;
+            var viewport = ui.Field.Root.transform.Find("MobileSafeArea");
+            var safeArea = viewport.GetComponent<MobileSafeArea>();
+            screen.sizeDelta = new Vector2(2220f, 900f);
+            safeArea.Reflow(new Rect(150, 20, 2070, 855), new Vector2Int(2220, 900));
+            Canvas.ForceUpdateCanvases();
+            ui.Field.Refresh();
+            var board = viewport.Find("DuelBoard");
+            var focused = (RectTransform)board.Find("Zone_4_3");
+            focused.GetComponent<CardDragTrigger>().OnPointerEnter(new PointerEventData(EventSystem.current) { pointerId = -1 });
+            typeof(DuelFieldUI).GetMethod("AdvanceDuelPadCardMotions", PrivateInstance).Invoke(ui.Field, new object[] { .25f });
+            var focusArt = (RectTransform)focused.Find("Card/CardView/AspectBox");
+            Require(focusArt.localScale.x > 1f, "The occupied field did not retain focus during the layout fixture.");
+
+            screen.sizeDelta = new Vector2(1300f, 890f);
+            safeArea.Reflow(new Rect(0, 32, 1190, 838), new Vector2Int(1300, 890));
+            Canvas.ForceUpdateCanvases();
+            ui.Field.Update();
+            Canvas.ForceUpdateCanvases();
+
+            foreach (var cards in duel.Players.Select(player => player.mzone))
+            foreach (var live in cards.Where(card => card != null))
+            {
+                var slot = (RectTransform)FieldSlot(ui.Field, live);
+                var art = (RectTransform)slot.Find("Card/CardView/AspectBox");
+                var pose = animator.GetVisualPose(art);
+                float radians = pose.Angle * Mathf.Deg2Rad;
+                float visibleWidth = Mathf.Abs(Mathf.Cos(radians)) * pose.Size.x + Mathf.Abs(Mathf.Sin(radians)) * pose.Size.y;
+                Require(visibleWidth <= animator.GetAreaSize(slot).x + .1f,
+                    $"The resized defense card {live.code} covered a neighboring slot.");
+                var plate = slot.Find("CardReadout");
+                Require(plate.Find("Combat/Attack/Digits/Value").GetComponent<Text>().text == live.attack.ToString() &&
+                    plate.Find("Labels/Rating/Value").GetComponent<Text>().text == (live.link > 0 ? live.link : live.rank > 0 ? live.rank : live.level).ToString(),
+                    "A live number or rating was lost in the crowded field update.");
+            }
+            Require(focusArt.localScale.x > 1f, "Reflow dropped the focused defensive card.");
+            Debug.Log("[VERIFY DUEL RESPONSIVE FIELD] Ten occupied slots kept their art and live numbers after a narrow layout and focus change.");
+        }
+
         private static void VerifyNativePositionGroup()
         {
             const uint doubleSummon = 43422537, earthquake = 82828051, eclipse = 35480699, spark = 81777047, sparkman = 20721928;
@@ -2768,13 +2897,13 @@ namespace YGOPortable.Editor
             internal DuelFieldUI Field { get; }
             internal DuelPromptModals Modals { get; }
 
-            internal HandUI(DuelSession duel)
+            internal HandUI(DuelSession duel, bool mobileLayout = false)
             {
                 var root = new GameObject("Hand Glow Verification", typeof(Canvas));
                 Canvas = root.GetComponent<Canvas>();
                 ((RectTransform)root.transform).sizeDelta = new Vector2(1600, 900);
                 Modals = new DuelPromptModals(root.transform, null, null);
-                Field = new DuelFieldUI(null, root.transform, Modals);
+                Field = new DuelFieldUI(null, root.transform, Modals, mobileLayout);
                 Field.BindSession(duel, null, null);
             }
 

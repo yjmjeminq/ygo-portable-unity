@@ -33,6 +33,7 @@ namespace YGOPortable.Editor
                 VerifyBattleVisibility(animator);
                 VerifyLinkDirectAttack(animator);
                 VerifyAttackSpacing(animator);
+                VerifyAttackAfterLayoutChange(animator);
                 VerifyLifeFeedbackRouting(animator);
             }
             finally
@@ -291,6 +292,83 @@ namespace YGOPortable.Editor
                 Require(arrivals == 1, "The spaced attack did not finish once.");
             }
             Debug.Log("[VERIFY DUEL ATTACK SPACING] A focused adjacent attack and a diagonal defense-position attack kept both cards and stat plates separate through windup, contact and return.");
+        }
+
+        private static void VerifyAttackAfterLayoutChange(CardAnimationManager animator)
+        {
+            animator.Clear();
+            var attackerPose = new CardPose(new Vector2(-155f, -64f), new Vector2(68f, 99f));
+            var defenderPose = new CardPose(new Vector2(95f, 70f), new Vector2(68f, 99f), 90f);
+            var attackArea = new Vector2(112f, 105f);
+            var defenseArea = new Vector2(106f, 100f);
+            Vector2 scale = Vector2.one, offset = Vector2.zero;
+            float artScale = 1f;
+            CardPose ReadPose(CardPose pose) =>
+                new(Vector2.Scale(pose.Position, scale) + offset, pose.Size * artScale, pose.Angle);
+            var attacker = attackerPose.FollowLayout(() => ReadPose(attackerPose));
+            var defender = defenderPose.FollowLayout(() => ReadPose(defenderPose));
+            Vector2 ReadHit() => ReadPose(defenderPose).Position;
+            var steps = (Queue<IEnumerator>)typeof(CardAnimationManager)
+                .GetField("_steps", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(animator);
+
+            animator.QueueAttackArrow(attacker, ReadHit, false);
+            var arrow = steps.Dequeue();
+            Require(arrow.MoveNext(), "The queued attack arrow did not begin.");
+            var arrowFrame = SampleAnimation((IEnumerator)arrow.Current);
+            offset = new Vector2(76f, -15f);
+            arrowFrame(.66f);
+            var track = (RectTransform)animator.transform.Find("AttackPath");
+            Require(Vector2.Distance(track.anchoredPosition, (ReadPose(attackerPose).Position + ReadHit()) * .5f) < .08f,
+                "The declared attack arrow stayed behind after moving both field anchors.");
+            arrowFrame(1f);
+            Require(!arrow.MoveNext(), "The responsive attack arrow did not finish.");
+            offset = Vector2.zero;
+
+            const uint mysticalElf = 15025844;
+            var attack = new BattleCardStats(0, YgoConstants.LOCATION_MZONE, 1, YgoConstants.POS_FACEUP_ATTACK, 3000, 2500);
+            var defense = new BattleCardStats(1, YgoConstants.LOCATION_MZONE, 1, YgoConstants.POS_FACEUP_DEFENSE, 800, 2000);
+            var comparison = animator.CreateBattleReadout(DuelFieldUI.MobileBattleStatsArea, attack, defense, 0, false, false, mobileLayout: true);
+            var attackCard = new DuelCardReadout(CardDatabase.Get(BlueEyes), battleStats: attack);
+            var defenseCard = new DuelCardReadout(CardDatabase.Get(mysticalElf), battleStats: defense);
+            var flight = new CardFlight(BlueEyes, attacker, attacker, false, false);
+            int arrivals = 0;
+            animator.QueueAttack(flight, ReadHit(), false, false, comparison, attackCard, attackArea, () => arrivals++,
+                () => (attacker, attackArea, defender, animator.CreateBattleCardReadout("DefendingCardReadout",
+                    defenseCard, true, defenderPose.Position, defenseArea)),
+                () => (ReadHit(), Vector2.Scale(attackArea, scale), Vector2.Scale(defenseArea, scale)));
+            var step = steps.Dequeue();
+            Require(step.MoveNext(), "The responsive attack did not begin.");
+            var windup = SampleAnimation((IEnumerator)step.Current);
+            scale = new Vector2(.79f, .94f);
+            offset = new Vector2(-66f, 28f);
+            artScale = .86f;
+            windup(0f);
+            var art = (RectTransform)animator.transform.Find("MovingCard");
+            var attackingStats = (RectTransform)animator.transform.Find("AttackingCardReadout");
+            var defendingStats = (RectTransform)animator.transform.Find("DefendingCardReadout");
+            Require(Vector2.Distance(art.anchoredPosition, ReadPose(attackerPose).Position) < .08f &&
+                Vector2.Distance(attackingStats.sizeDelta, Vector2.Scale(attackArea, scale)) < .08f &&
+                Vector2.Distance(defendingStats.anchoredPosition, ReadHit()) < .08f &&
+                Vector2.Distance(defendingStats.sizeDelta, Vector2.Scale(defenseArea, scale)) < .08f,
+                "The attack path or one of its stat plates kept the old position or width.");
+            windup(1f);
+            Require(step.MoveNext(), "The resized attack did not reach its target.");
+            SampleAnimation((IEnumerator)step.Current)(1f);
+            Require(!Bounds(attackingStats).Overlaps(Bounds(defendingStats)),
+                "The resized lunge crossed into the defender's live readout.");
+            Require(step.MoveNext(), "The resized attack did not enter its impact and return.");
+            var returning = SampleAnimation((IEnumerator)step.Current);
+            var impact = (RectTransform)animator.transform.Find("Strike");
+            offset = new Vector2(34f, -19f);
+            returning(.43f);
+            Require(Vector2.Distance(impact.anchoredPosition, ReadHit()) < .08f &&
+                Vector2.Distance(defendingStats.anchoredPosition, ReadHit()) < .08f &&
+                defendingStats.Find("CardReadout/Combat/Defense/Digits/Value").GetComponent<Text>().text == "2000",
+                "The impact or live defense value drifted after a second layout change.");
+            returning(1f);
+            Require(Vector2.Distance(art.anchoredPosition, ReadPose(attackerPose).Position) < .08f &&
+                !step.MoveNext() && arrivals == 1, "The attacker did not return to the resized slot.");
+            Debug.Log("[VERIFY DUEL RESPONSIVE ATTACK] The declared path, stat plates and impact followed layout changes through the complete attack.");
         }
 
         private static void VerifyLifeFeedbackRouting(CardAnimationManager animator)

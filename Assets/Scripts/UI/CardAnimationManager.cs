@@ -12,15 +12,38 @@ namespace YGOPortable.UI
         public readonly Vector2 Position;
         public readonly Vector2 Size;
         public readonly float Angle;
+        private readonly Func<CardPose> _readLayout;
 
-        public CardPose(Vector2 position, Vector2 size, float angle = 0f)
+        public CardPose(Vector2 position, Vector2 size, float angle = 0f, Func<CardPose> readLayout = null)
         {
             Position = position;
             Size = size;
             Angle = angle;
+            _readLayout = readLayout;
         }
 
         public bool IsValid => Size.x > 0f && Size.y > 0f;
+
+        internal CardPose FollowLayout(Func<CardPose> readLayout) => new(Position, Size, Angle, readLayout);
+
+        internal CardPose AtLayout()
+        {
+            if (_readLayout == null) return this;
+            var current = _readLayout();
+            return current.IsValid ? current : this;
+        }
+
+        internal CardPose Shift(Vector2 offset, float scale)
+        {
+            var original = this;
+            CardPose Sample()
+            {
+                var current = original.AtLayout();
+                return new CardPose(current.Position + offset, current.Size * scale, current.Angle);
+            }
+            var initial = Sample();
+            return _readLayout == null ? initial : initial.FollowLayout(Sample);
+        }
     }
 
     internal readonly struct CardFlight
@@ -39,6 +62,8 @@ namespace YGOPortable.UI
             StartsFaceDown = startsFaceDown;
             EndsFaceDown = endsFaceDown;
         }
+
+        internal CardFlight AtLayout() => new(Code, From.AtLayout(), To.AtLayout(), StartsFaceDown, EndsFaceDown);
     }
 
     internal enum CardMotion
@@ -62,15 +87,16 @@ namespace YGOPortable.UI
     {
         internal readonly uint Code;
         internal readonly LiveCardState SourceCard;
-        internal readonly (Vector2 StartSize, Vector2 EndSize, bool StartOpponent, bool EndOpponent) Movement;
+        private readonly Func<(Vector2 StartSize, Vector2 EndSize, bool StartOpponent, bool EndOpponent)> _readMovement;
+        internal (Vector2 StartSize, Vector2 EndSize, bool StartOpponent, bool EndOpponent) Movement => _readMovement();
         internal LiveCardState DestinationCard;
 
         internal CardMoveReadoutSnapshot(uint code, LiveCardState sourceCard,
-            (Vector2 StartSize, Vector2 EndSize, bool StartOpponent, bool EndOpponent) movement)
+            Func<(Vector2 StartSize, Vector2 EndSize, bool StartOpponent, bool EndOpponent)> readMovement)
         {
             Code = code;
             SourceCard = sourceCard;
-            Movement = movement;
+            _readMovement = readMovement;
         }
     }
 
@@ -462,17 +488,18 @@ namespace YGOPortable.UI
             yield break;
         }
 
-        internal void QueueAttackArrow(Vector2 from, Vector2 to, bool opponent)
+        internal void QueueAttackArrow(CardPose source, Func<Vector2> readTarget, bool opponent)
         {
-            QueueStep(AttackArrow(from, to, opponent));
+            QueueStep(AttackArrow(source, readTarget, opponent));
         }
 
         internal void QueueAttack(CardFlight flight, Vector2 hit, bool direct, bool opponent,
             CanvasGroup readout, DuelCardReadout attacker, Vector2 statSize, Action onFinish,
-            Func<(CardPose Pose, Vector2 ReadoutSize, CardPose Defender, RectTransform DefenderReadout)> onStart = null)
+            Func<(CardPose Pose, Vector2 ReadoutSize, CardPose Defender, RectTransform DefenderReadout)> onStart = null,
+            Func<(Vector2 Hit, Vector2 AttackerArea, Vector2 DefenderArea)> readLayout = null)
         {
             var lifeChanges = new List<LifeChangeCue>(2);
-            QueueStep(Attack(flight, hit, direct, opponent, readout, attacker, statSize, onFinish, onStart, lifeChanges));
+            QueueStep(Attack(flight, hit, direct, opponent, readout, attacker, statSize, onFinish, onStart, lifeChanges, readLayout));
             _openBattleLifeChanges = lifeChanges;
         }
 
@@ -519,11 +546,13 @@ namespace YGOPortable.UI
         private static void ApplyFlight(CompositeCardView view, CardFlight flight, float t, float lift,
             LiveCardState live = null, Vector2 lateral = default)
         {
+            var from = flight.From.AtLayout();
+            var to = flight.To.AtLayout();
             float eased = t * t * (3f - 2f * t);
             float arc = Mathf.Sin(t * Mathf.PI);
-            Vector2 point = Vector2.Lerp(flight.From.Position, flight.To.Position, eased) + arc * (Vector2.up * lift + lateral);
-            Vector2 size = Vector2.Lerp(flight.From.Size, flight.To.Size, eased) * (1f + arc * 0.10f);
-            float angle = Mathf.LerpAngle(flight.From.Angle, flight.To.Angle, eased);
+            Vector2 point = Vector2.Lerp(from.Position, to.Position, eased) + arc * (Vector2.up * lift + lateral);
+            Vector2 size = Vector2.Lerp(from.Size, to.Size, eased) * (1f + arc * 0.10f);
+            float angle = Mathf.LerpAngle(from.Angle, to.Angle, eased);
             bool turnsOver = flight.StartsFaceDown != flight.EndsFaceDown;
             bool showBack = t < 0.5f ? flight.StartsFaceDown : flight.EndsFaceDown;
             uint visibleCode = showBack ? 0u : flight.Code;
@@ -586,7 +615,7 @@ namespace YGOPortable.UI
             {
                 var move = moves[i];
                 var (kind, tint, _) = returning ? (DuelEffectKind.BanishTransit, BanishTint, "") : SummonEffect(move.Flight.Code, move.Motion);
-                effects[i] = CreateEffect(kind, move.Flight.To.Position, move.Flight.To.Size * 1.65f, tint);
+                effects[i] = CreateEffect(kind, move.Flight.To, 1.65f, tint);
                 effects[i].Seek(0f);
             }
 
@@ -618,7 +647,7 @@ namespace YGOPortable.UI
                     ApplyFlight(views[i], move.Flight, time, returning ? 18f : move.Motion == CardMotion.TokenSummon ? 11f : 32f);
                     opacity[i].alpha = Mathf.SmoothStep(0f, 1f, time / (move.Motion == CardMotion.TokenSummon ? .75f : .22f));
                     readouts[i]?.Follow(views[i], time);
-                    effects[i].Seek(time);
+                    TrackCardEffect(effects[i], move.Flight.To, 1.65f, time);
                 }
                 if (!returning || revealedReturn || progress < FieldReturnHandoff) return;
                 revealedReturn = true;
@@ -663,14 +692,15 @@ namespace YGOPortable.UI
             {
                 var origin = moves[index].Flight.From;
                 var kind = group.Temporary ? DuelEffectKind.BanishTransit : DuelEffectKind.Break;
-                effects[index] = CreateEffect(kind, origin.Position, origin.Size * (group.Temporary ? 1.62f : 2.1f),
+                effects[index] = CreateEffect(kind, origin, group.Temporary ? 1.62f : 2.1f,
                     group.Temporary ? BanishTint : DestructionTint);
                 effects[index].Seek(0f);
             }
             if (!group.Temporary) LotdAudio.PlayDamage();
             yield return Animate(group.Temporary ? .12f : .18f, time =>
             {
-                foreach (var effect in effects) effect.Seek(time);
+                for (int index = 0; index < effects.Length; index++)
+                    TrackCardEffect(effects[index], moves[index].Flight.From, group.Temporary ? 1.62f : 2.1f, time);
             });
             foreach (var effect in effects) RemoveTransient(effect.gameObject);
 
@@ -727,23 +757,23 @@ namespace YGOPortable.UI
             var firstStats = CreateMovingReadout(first.Flight, CardMotion.Transfer, first.Readout, handoff: FieldSwapHandoff);
             var secondStats = CreateMovingReadout(second.Flight, CardMotion.Transfer, second.Readout, handoff: FieldSwapHandoff);
 
-            Vector2 firstTravel = first.Flight.To.Position - first.Flight.From.Position;
-            Vector2 secondTravel = second.Flight.To.Position - second.Flight.From.Position;
-            Vector2 relativeTravel = firstTravel - secondTravel;
-            Vector2 side = new Vector2(-relativeTravel.y, relativeTravel.x).normalized;
-            if (side == Vector2.zero) side = Vector2.right;
-            Vector2 midpointGap = (first.Flight.From.Position + first.Flight.To.Position -
-                second.Flight.From.Position - second.Flight.To.Position) * .5f;
-            if (Vector2.Dot(side, midpointGap) < 0f) side = -side;
-
-            // Use the widest card or stat plate along the crossing direction.
-            Vector2 space = Vector2.Max(SwapSize(first.Flight, first.Readout), SwapSize(second.Flight, second.Readout));
-            Vector2 curve = side * (.55f * Vector2.Dot(new Vector2(Mathf.Abs(side.x), Mathf.Abs(side.y)), space) + 6f);
             bool updated = false;
             yield return Animate(.37f, time =>
             {
-                ApplyFlight(firstCard, first.Flight, time, 0f, lateral: curve);
-                ApplyFlight(secondCard, second.Flight, time, 0f, lateral: -curve);
+                var firstPath = first.Flight.AtLayout();
+                var secondPath = second.Flight.AtLayout();
+                Vector2 firstTravel = firstPath.To.Position - firstPath.From.Position;
+                Vector2 secondTravel = secondPath.To.Position - secondPath.From.Position;
+                Vector2 relativeTravel = firstTravel - secondTravel;
+                Vector2 side = new Vector2(-relativeTravel.y, relativeTravel.x).normalized;
+                if (side == Vector2.zero) side = Vector2.right;
+                Vector2 midpointGap = (firstPath.From.Position + firstPath.To.Position -
+                    secondPath.From.Position - secondPath.To.Position) * .5f;
+                if (Vector2.Dot(side, midpointGap) < 0f) side = -side;
+                Vector2 space = Vector2.Max(SwapSize(firstPath, first.Readout), SwapSize(secondPath, second.Readout));
+                Vector2 curve = side * (.55f * Vector2.Dot(new Vector2(Mathf.Abs(side.x), Mathf.Abs(side.y)), space) + 6f);
+                ApplyFlight(firstCard, firstPath, time, 0f, lateral: curve);
+                ApplyFlight(secondCard, secondPath, time, 0f, lateral: -curve);
                 firstStats?.Follow(firstCard, time);
                 secondStats?.Follow(secondCard, time);
                 if (updated || time < FieldSwapHandoff) return;
@@ -799,7 +829,10 @@ namespace YGOPortable.UI
         {
             Vector2 size = Vector2.Max(flight.From.Size, flight.To.Size) * 1.10f;
             if (readout != null)
-                size = Vector2.Max(size, Vector2.Max(readout.Movement.StartSize, readout.Movement.EndSize));
+            {
+                var movement = readout.Movement;
+                size = Vector2.Max(size, Vector2.Max(movement.StartSize, movement.EndSize));
+            }
             return size;
         }
 
@@ -818,11 +851,12 @@ namespace YGOPortable.UI
             for (int i = 0; i < moves.Count; i++)
             {
                 var origin = moves[i].Flight.From;
-                cues[i] = CreateEffect(DuelEffectKind.SummonMaterial, origin.Position, origin.Size * 1.58f, accent);
+                cues[i] = CreateEffect(DuelEffectKind.SummonMaterial, origin, 1.58f, accent);
             }
             yield return Animate(.105f, time =>
             {
-                foreach (var cue in cues) cue.Seek(time * .56f);
+                for (int i = 0; i < cues.Length; i++)
+                    TrackCardEffect(cues[i], moves[i].Flight.From, 1.58f, time * .56f);
             });
 
             foreach (var move in moves) move.Depart?.Invoke();
@@ -855,7 +889,7 @@ namespace YGOPortable.UI
                 {
                     var move = moves[i];
                     var flight = move.Flight;
-                    cues[i].Seek(.56f + .44f * Mathf.Clamp01(time * 2.4f));
+                    TrackCardEffect(cues[i], flight.From, 1.58f, .56f + .44f * Mathf.Clamp01(time * 2.4f));
                     ApplyFlight(cards[i], flight, time, move.Vanishes ? 6f : 18f, lateral: spread[i]);
                     stats[i]?.Follow(cards[i], time);
                     if (merging || move.Vanishes)
@@ -898,7 +932,7 @@ namespace YGOPortable.UI
             bool sharedPile = false, float? handoff = null)
         {
             if (readout?.SourceCard == null && readout?.DestinationCard == null) return null;
-            var holder = CenteredVisual("MovingCardReadout", _layer, flight.From.Position, readout.Movement.StartSize);
+            var holder = CenteredVisual("MovingCardReadout", _layer, flight.From.AtLayout().Position, readout.Movement.StartSize);
             float transition = handoff ?? (motion == CardMotion.ChangePosition ? PositionHandoff : motion == CardMotion.TokenSummon ? .27f
                 : !flight.EndsFaceDown && readout.DestinationCard == null && !sharedPile ? .82f : .5f);
             return new DuelMovingReadout(holder, readout, transition);
@@ -917,8 +951,7 @@ namespace YGOPortable.UI
             if (motion == CardMotion.Destroy)
             {
                 LotdAudio.PlayDamage();
-                yield return Burst(DuelEffectKind.Break, flight.From.Position, flight.From.Size * 2.1f,
-                    DestructionTint, .18f);
+                yield return Burst(DuelEffectKind.Break, flight.From, 2.1f, DestructionTint, .18f);
             }
 
             onDepart?.Invoke();
@@ -935,7 +968,7 @@ namespace YGOPortable.UI
             {
                 bool attaching = motion == CardMotion.AttachMaterial;
                 var material = attaching ? flight.To : flight.From;
-                var effect = CreateEffect(DuelEffectKind.XyzMaterial, material.Position, material.Size * 2.3f, new Color(.71f, .51f, 1f));
+                var effect = CreateEffect(DuelEffectKind.XyzMaterial, material, 2.3f, new Color(.71f, .51f, 1f));
                 effect.Seek(0f);
                 proxy.transform.SetAsLastSibling();
                 moving?.Root.SetAsLastSibling();
@@ -946,7 +979,7 @@ namespace YGOPortable.UI
                     ApplyFlight(proxy, flight, t, 14f);
                     moving?.Follow(proxy, t);
                     fade.alpha = attaching ? 1f - Mathf.SmoothStep(0f, 1f, (t - .79f) / .21f) : 1f;
-                    effect.Seek(attaching ? Mathf.Clamp01((t - .36f) / .64f) : t);
+                    TrackCardEffect(effect, material, 2.3f, attaching ? Mathf.Clamp01((t - .36f) / .64f) : t);
                 });
                 fade.alpha = 1f;
                 RemoveTransient(effect.gameObject);
@@ -956,9 +989,9 @@ namespace YGOPortable.UI
                 bool appearing = motion == CardMotion.TokenSummon;
                 if (!proxy.TryGetComponent<CanvasGroup>(out var fade))
                     fade = proxy.gameObject.AddComponent<CanvasGroup>();
-                var point = appearing ? flight.To.Position : flight.From.Position;
-                var effect = CreateEffect(appearing ? DuelEffectKind.Token : DuelEffectKind.Break, point,
-                    flight.To.Size * 2.4f, DuelStyle.Player);
+                var origin = appearing ? flight.To : flight.From;
+                float scale = 2.4f * flight.To.Size.y / origin.Size.y;
+                var effect = CreateEffect(appearing ? DuelEffectKind.Token : DuelEffectKind.Break, origin, scale, DuelStyle.Player);
                 proxy.transform.SetAsLastSibling();
                 moving?.Root.SetAsLastSibling();
                 fade.alpha = appearing ? 0f : 1f;
@@ -968,7 +1001,7 @@ namespace YGOPortable.UI
                     ApplyFlight(proxy, flight, t, appearing ? 10f : 6f);
                     moving?.Follow(proxy, t);
                     fade.alpha = appearing ? Mathf.SmoothStep(0f, 1f, t) : 1f - t;
-                    effect.Seek(t);
+                    TrackCardEffect(effect, origin, scale, t);
                 });
                 fade.alpha = 1f;
                 Destroy(effect.gameObject);
@@ -1001,12 +1034,12 @@ namespace YGOPortable.UI
             {
                 LotdAudio.PlaySummon();
                 Color accent = motion == CardMotion.SpecialSummon ? DuelStyle.Gold : new Color(.58f, .87f, 1f);
-                yield return Burst(DuelEffectKind.Summon, flight.To.Position, flight.To.Size * 1.9f, accent, .21f);
+                yield return Burst(DuelEffectKind.Summon, flight.To, 1.9f, accent, .21f);
             }
             else if (motion == CardMotion.Set)
             {
                 LotdAudio.PlayClick();
-                yield return Burst(DuelEffectKind.Summon, flight.To.Position, flight.To.Size * 1.45f,
+                yield return Burst(DuelEffectKind.Summon, flight.To, 1.45f,
                     new Color(.54f, .73f, .90f, .64f), .14f);
             }
         }
@@ -1227,16 +1260,26 @@ namespace YGOPortable.UI
             RemoveTransient(link.gameObject);
         }
 
-        private IEnumerator AttackArrow(Vector2 from, Vector2 to, bool opponent)
+        private IEnumerator AttackArrow(CardPose source, Func<Vector2> readTarget, bool opponent)
         {
+            Vector2 from = source.AtLayout().Position;
+            Vector2 to = readTarget();
             Vector2 direction = to - from;
             if (direction.sqrMagnitude < 1f) yield break;
             var color = opponent ? DuelStyle.Opponent : new Color(1f, .39f, .29f);
             var arrow = CreateEffect(DuelEffectKind.AttackPath, (from + to) * .5f,
                 new Vector2(direction.magnitude, 58f), color);
-            arrow.rectTransform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg);
-            yield return Animate(.23f, arrow.Seek);
-            Destroy(arrow.gameObject);
+            yield return Animate(.23f, progress =>
+            {
+                from = source.AtLayout().Position;
+                to = readTarget();
+                direction = to - from;
+                arrow.rectTransform.anchoredPosition = (from + to) * .5f;
+                arrow.rectTransform.sizeDelta = new Vector2(direction.magnitude, 58f);
+                arrow.rectTransform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg);
+                arrow.Seek(progress);
+            });
+            RemoveTransient(arrow.gameObject);
         }
 
         internal CanvasGroup CreateBattleReadout(Rect area, BattleCardStats attacker, BattleCardStats defender,
@@ -1279,7 +1322,7 @@ namespace YGOPortable.UI
         private IEnumerator Attack(CardFlight flight, Vector2 to, bool direct, bool opponent,
             CanvasGroup readout, DuelCardReadout attacker, Vector2 statSize, Action onFinish,
             Func<(CardPose Pose, Vector2 ReadoutSize, CardPose Defender, RectTransform DefenderReadout)> onStart,
-            List<LifeChangeCue> lifeChanges)
+            List<LifeChangeCue> lifeChanges, Func<(Vector2 Hit, Vector2 AttackerArea, Vector2 DefenderArea)> readLayout)
         {
             if (ReferenceEquals(_openBattleLifeChanges, lifeChanges)) _openBattleLifeChanges = null;
             var from = flight.From;
@@ -1301,7 +1344,6 @@ namespace YGOPortable.UI
                 if (size.x > 0f && size.y > 0f) statSize = size;
                 defenderStats = defending;
                 defender = target;
-                if (defender.IsValid && !direct) to = defender.Position;
             }
             var proxy = TakeCard(code, false);
             var art = (RectTransform)proxy.transform;
@@ -1315,33 +1357,59 @@ namespace YGOPortable.UI
             if (defenderStats != null) defenderStats.SetAsLastSibling();
             if (readout != null) readout.transform.SetAsLastSibling();
 
-            const float fullLungeScale = 1.14f, gap = 5f;
-            Vector2 delta = to - from.Position;
-            Vector2 direction = delta.normalized;
-            Vector2 lungePoint = Vector2.Lerp(from.Position, to, direct ? .78f : .89f);
+            const float gap = 5f;
+            CardPose origin = default, windup = default, lunge = default;
+            Vector2 defenderSize = defenderStats?.sizeDelta ?? Vector2.zero;
+            Vector2 defenderOffset = defenderStats == null ? Vector2.zero : defenderStats.anchoredPosition - defender.Position;
+            var initialLayout = readLayout?.Invoke() ?? default;
+            float attackerFocus = initialLayout.AttackerArea.y > 0f ? statSize.y / initialLayout.AttackerArea.y : 1f;
+            float defenderFocus = initialLayout.DefenderArea.y > 0f ? defenderSize.y / initialLayout.DefenderArea.y : 1f;
+            Vector2 hit = Vector2.zero, direction = Vector2.zero, currentStatSize = Vector2.zero;
             Vector2 approachAxis = Vector2.zero, extentAxis = Vector2.zero;
-            float lungeScale = fullLungeScale, stopEdge = 0f;
-            if (!direct && defender.IsValid && delta.sqrMagnitude > 1f)
+            float stopEdge = 0f;
+            void LayoutAttack()
             {
-                Vector2 attackerHalf = BattleHalfSize(from.Size, from.Angle, stats != null ? statSize : Vector2.zero);
-                Vector2 defenderHalf = BattleHalfSize(defender.Size, defender.Angle, defenderStats?.sizeDelta ?? Vector2.zero);
-                Vector2 reserve = attackerHalf * fullLungeScale + defenderHalf + Vector2.one * gap;
-                // Use the first axis on which both rectangles clear along the attack line.
-                bool horizontal = reserve.x / Mathf.Abs(delta.x) < reserve.y / Mathf.Abs(delta.y);
-                extentAxis = horizontal ? Vector2.right : Vector2.up;
-                approachAxis = extentAxis * Mathf.Sign(Vector2.Dot(extentAxis, delta));
-                float half = Vector2.Dot(extentAxis, attackerHalf);
-                stopEdge = Vector2.Dot(approachAxis, to) - Vector2.Dot(extentAxis, defenderHalf) - gap;
-                float available = stopEdge - Vector2.Dot(approachAxis, from.Position);
-                lungeScale = Mathf.Clamp((available - 8f) / half, 1f, fullLungeScale);
-                float reach = Mathf.Clamp01((available - half * lungeScale) / Vector2.Dot(approachAxis, delta));
-                lungePoint = Vector2.Lerp(from.Position, to, Mathf.Min(.89f, reach));
+                const float fullLungeScale = 1.14f;
+                origin = from.AtLayout();
+                var target = defender.AtLayout();
+                var layout = readLayout?.Invoke() ?? (Hit: to, AttackerArea: Vector2.zero, DefenderArea: Vector2.zero);
+                currentStatSize = layout.AttackerArea.y > 0f ? layout.AttackerArea * attackerFocus : statSize * (origin.Size.y / from.Size.y);
+                if (defenderStats != null && target.IsValid)
+                {
+                    float scale = target.Size.y / defender.Size.y;
+                    defenderStats.anchoredPosition = target.Position + defenderOffset * scale;
+                    defenderStats.sizeDelta = layout.DefenderArea.y > 0f ? layout.DefenderArea * defenderFocus : defenderSize * scale;
+                }
+                hit = !direct && target.IsValid ? target.Position : layout.Hit;
+                Vector2 delta = hit - origin.Position;
+                direction = delta.normalized;
+                Vector2 lungePoint = Vector2.Lerp(origin.Position, hit, direct ? .78f : .89f);
+                float lungeScale = fullLungeScale;
+                approachAxis = Vector2.zero;
+                if (!direct && target.IsValid && delta.sqrMagnitude > 1f)
+                {
+                    Vector2 attackerHalf = BattleHalfSize(origin.Size, origin.Angle, stats != null ? currentStatSize : Vector2.zero);
+                    Vector2 defenderHalf = BattleHalfSize(target.Size, target.Angle, defenderStats?.sizeDelta ?? Vector2.zero);
+                    Vector2 reserve = attackerHalf * fullLungeScale + defenderHalf + Vector2.one * gap;
+                    // Use the first axis on which both rectangles clear along the attack line.
+                    bool horizontal = reserve.x / Mathf.Abs(delta.x) < reserve.y / Mathf.Abs(delta.y);
+                    extentAxis = horizontal ? Vector2.right : Vector2.up;
+                    approachAxis = extentAxis * Mathf.Sign(Vector2.Dot(extentAxis, delta));
+                    float half = Vector2.Dot(extentAxis, attackerHalf);
+                    stopEdge = Vector2.Dot(approachAxis, hit) - Vector2.Dot(extentAxis, defenderHalf) - gap;
+                    float available = stopEdge - Vector2.Dot(approachAxis, origin.Position);
+                    lungeScale = Mathf.Clamp((available - 8f) / half, 1f, fullLungeScale);
+                    float reach = Mathf.Clamp01((available - half * lungeScale) / Vector2.Dot(approachAxis, delta));
+                    lungePoint = Vector2.Lerp(origin.Position, hit, Mathf.Min(.89f, reach));
+                }
+                windup = new CardPose(origin.Position - direction * 26f, origin.Size * Mathf.Lerp(1f, lungeScale, .714f), origin.Angle);
+                lunge = new CardPose(lungePoint, origin.Size * lungeScale, origin.Angle);
             }
 
             void MoveWithStats(CardFlight path, float time, float lift, float clearance = 1f)
             {
                 ApplyFlight(proxy, path, time, lift);
-                Vector2 scaledStats = stats == null ? Vector2.zero : statSize * (art.sizeDelta.y / from.Size.y);
+                Vector2 scaledStats = stats == null ? Vector2.zero : currentStatSize * (art.sizeDelta.y / origin.Size.y);
                 if (approachAxis != Vector2.zero && clearance > 0f)
                 {
                     float extent = Vector2.Dot(extentAxis, BattleHalfSize(art.sizeDelta, art.localEulerAngles.z, scaledStats));
@@ -1351,41 +1419,48 @@ namespace YGOPortable.UI
                 if (stats == null) return;
                 stats.anchoredPosition = art.anchoredPosition;
                 stats.sizeDelta = scaledStats;
-                if (approachAxis == Vector2.zero) return;
+                if (approachAxis == Vector2.zero)
+                {
+                    statContent.anchoredPosition = Vector2.zero;
+                    return;
+                }
                 // A focused card can start closer to its target than its full stat plate allows.
                 float statEdge = Vector2.Dot(approachAxis, art.anchoredPosition) + Vector2.Dot(extentAxis, scaledStats) * .5f;
                 float frameEdge = stopEdge + (gap - 1f) * (1f - clearance);
                 statContent.anchoredPosition = -approachAxis * Mathf.Max(0f, statEdge - frameEdge);
             }
 
-            var windup = new CardPose(from.Position - direction * 26f, from.Size * Mathf.Lerp(1f, lungeScale, .714f), from.Angle);
-            var first = new CardFlight(code, from, windup, false, false);
             yield return Animate(.085f, t =>
             {
-                MoveWithStats(first, t, 5f, Mathf.SmoothStep(0f, 1f, t));
+                LayoutAttack();
+                MoveWithStats(new CardFlight(code, origin, windup, false, false), t, 5f, Mathf.SmoothStep(0f, 1f, t));
                 if (readout != null) readout.alpha = Mathf.SmoothStep(0f, 1f, t);
             });
 
-            var lunge = new CardPose(lungePoint, from.Size * lungeScale, from.Angle);
-            var outFlight = new CardFlight(code, windup, lunge, false, false);
-            yield return Animate(.13f, t => MoveWithStats(outFlight, t, direct ? 27f : 16f));
+            yield return Animate(.13f, t =>
+            {
+                LayoutAttack();
+                MoveWithStats(new CardFlight(code, windup, lunge, false, false), t, direct ? 27f : 16f);
+            });
 
             if (direct) LotdAudio.PlayDirectAttack();
             else LotdAudio.PlayAttack();
             Color accent = opponent ? DuelStyle.Opponent : new Color(.38f, 1f, .70f);
-            var impact = CreateEffect(DuelEffectKind.Strike, to, Vector2.one * (direct ? 335f : 248f), accent);
-            impact.rectTransform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg);
+            var impact = CreateEffect(DuelEffectKind.Strike, hit, Vector2.one * (direct ? 335f : 248f), accent);
             if (stats != null) stats.SetAsLastSibling();
             if (defenderStats != null) defenderStats.SetAsLastSibling();
             const float returnDuration = .27f;
             bool showDamage = BeginLifeChanges(lifeChanges);
             float duration = showDamage ? LifeFeedbackDuration : returnDuration;
-            var returnFlight = new CardFlight(code, lunge, flight.To.IsValid ? flight.To : from, false, false);
             yield return Animate(duration, t =>
             {
+                LayoutAttack();
                 float motion = Mathf.Clamp01(t * duration / returnDuration);
                 float clearance = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.8f, 1f, motion));
+                var returnFlight = new CardFlight(code, lunge, flight.To.IsValid ? flight.To.AtLayout() : origin, false, false);
                 MoveWithStats(returnFlight, motion, 10f, clearance);
+                impact.rectTransform.anchoredPosition = hit;
+                impact.rectTransform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg);
                 impact.Seek(motion);
                 if (readout != null) readout.alpha = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.57f, 1f, t));
                 if (showDamage) UpdateLifeChanges(lifeChanges, t);
@@ -1648,11 +1723,25 @@ namespace YGOPortable.UI
             yield return PhaseBanner(label, opponent, center, null);
         }
 
-        private IEnumerator Burst(DuelEffectKind kind, Vector2 center, Vector2 size, Color color, float duration)
+        private IEnumerator Burst(DuelEffectKind kind, CardPose anchor, float scale, Color color, float duration)
         {
-            var effect = CreateEffect(kind, center, size, color);
-            yield return Animate(duration, effect.Seek);
+            var effect = CreateEffect(kind, anchor, scale, color);
+            yield return Animate(duration, time => TrackCardEffect(effect, anchor, scale, time));
             RemoveTransient(effect.gameObject);
+        }
+
+        private DuelEffectGraphic CreateEffect(DuelEffectKind kind, CardPose anchor, float scale, Color color)
+        {
+            var pose = anchor.AtLayout();
+            return CreateEffect(kind, pose.Position, pose.Size * scale, color);
+        }
+
+        private static void TrackCardEffect(DuelEffectGraphic effect, CardPose anchor, float scale, float progress)
+        {
+            var pose = anchor.AtLayout();
+            effect.rectTransform.anchoredPosition = pose.Position;
+            effect.rectTransform.sizeDelta = pose.Size * scale;
+            effect.Seek(progress);
         }
 
         private DuelEffectGraphic CreateEffect(DuelEffectKind kind, Vector2 center, Vector2 size, Color color)

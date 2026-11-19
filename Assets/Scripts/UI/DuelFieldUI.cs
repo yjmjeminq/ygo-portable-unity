@@ -180,6 +180,7 @@ namespace YGOPortable.UI
         private bool _dragHighlightSZone;
         private bool _dragHighlightAttack;
         private RectTransform _boardRect;
+        private Vector2 _boardLayoutSize;
         private DuelMat _mat;
 
         // Hand rows
@@ -1319,6 +1320,7 @@ namespace YGOPortable.UI
         public void Refresh()
         {
             if (_session == null || !Root.activeInHierarchy) return;
+            _boardLayoutSize = _boardRect.rect.size;
 
             if (!IsPresenting) _presentedFieldReadouts.Clear();
             CaptureCardReadouts();
@@ -2140,8 +2142,14 @@ namespace YGOPortable.UI
             {
                 var row = opponent ? _oppHandBar : _myHandBar;
                 int count = Mathf.Max(1, handCount >= 0 ? handCount : _handCounts[controller]);
-                var bounds = HandCardBounds(row, count, Mathf.Clamp((int)sequence, 0, count - 1), opponent);
-                return animator.GetPose(row, (bounds.min + bounds.max) * 0.5f, bounds.max - bounds.min, bounds.angle);
+                int index = Mathf.Clamp((int)sequence, 0, count - 1);
+                CardPose ReadHandPose()
+                {
+                    if (row == null || animator == null) return default;
+                    var bounds = HandCardBounds(row, count, index, opponent);
+                    return animator.GetPose(row, (bounds.min + bounds.max) * .5f, bounds.max - bounds.min, bounds.angle);
+                }
+                return ReadHandPose().FollowLayout(ReadHandPose);
             }
 
             var slot = GetSlot(controller, location, sequence);
@@ -2149,17 +2157,21 @@ namespace YGOPortable.UI
             if (rect == null) return default;
             var center = Vector2.one * .5f;
             var size = slot != null ? SlotCardMax - SlotCardMin : Vector2.one;
-            float scale = CardScale(rect, location, cardPosition);
             if (material)
             {
                 // The engine stores the material index in the position field for overlay locations.
                 center += new Vector2(.035f * Math.Min(position, 3u), opponent ? .13f : -.13f);
-                scale *= .60f;
             }
-            return animator.GetPose(rect, center, size, angle, scale);
+            CardPose ReadSlotPose()
+            {
+                if (rect == null || animator == null) return default;
+                float scale = CardScale(rect, location, cardPosition) * (material ? .60f : 1f);
+                return animator.GetPose(rect, center, size, angle, scale);
+            }
+            return ReadSlotPose().FollowLayout(ReadSlotPose);
         }
 
-        private CardPose GetDisplayedCardPose(byte controller, uint location, uint sequence, uint code)
+        private CardPose GetDisplayedCardPose(byte controller, uint location, uint sequence, uint code, uint position)
         {
             CompositeCardView view;
             RectTransform art;
@@ -2183,7 +2195,19 @@ namespace YGOPortable.UI
 
             if (!view.gameObject.activeInHierarchy || code != 0 && view.CurrentCode != 0 && view.CurrentCode != code)
                 return default;
-            return CardAnimationManager.Instance.GetVisualPose(art);
+            var visual = CardAnimationManager.Instance.GetVisualPose(art);
+            var resting = GetCardPose(controller, location, sequence, position);
+            if (!visual.IsValid || !resting.IsValid) return visual;
+
+            // A departing card keeps its hover lift even if its widget is recycled before playback.
+            Vector2 lift = visual.Position - resting.Position;
+            float focusScale = visual.Size.y / resting.Size.y;
+            return visual.FollowLayout(() =>
+            {
+                var current = resting.AtLayout();
+                return new CardPose(current.Position + lift * (current.Size.y / resting.Size.y),
+                    current.Size * focusScale, visual.Angle);
+            });
         }
 
         private List<HandCardView> GetHandViews(byte controller) =>
@@ -2480,7 +2504,7 @@ namespace YGOPortable.UI
             if (e.fromLoc == e.toLoc && e.fromCon == e.toCon && e.fromSeq == e.toSeq && e.fromPos == e.toPos) return null;
             if (e.fromLoc == YgoConstants.LOCATION_DECK && e.toLoc == YgoConstants.LOCATION_DECK) return null;
 
-            var from = GetDisplayedCardPose(e.fromCon, e.fromLoc, e.fromSeq, e.code);
+            var from = GetDisplayedCardPose(e.fromCon, e.fromLoc, e.fromSeq, e.code, e.fromPos);
             if (!from.IsValid) from = GetCardPose(e.fromCon, e.fromLoc, e.fromSeq, e.fromPos);
             if (e.fromLoc == YgoConstants.LOCATION_HAND && e.fromCon < _handCounts.Length)
             {
@@ -2498,9 +2522,9 @@ namespace YGOPortable.UI
 
             bool disappearing = e.toLoc == 0;
             if (!from.IsValid)
-                from = new CardPose(to.Position + Vector2.up * 52f, to.Size * 0.58f, to.Angle);
+                from = to.Shift(Vector2.up * 52f, .58f);
             if (!to.IsValid)
-                to = new CardPose(from.Position + Vector2.up * 25f, from.Size * 0.72f, from.Angle);
+                to = from.Shift(Vector2.up * 25f, .72f);
 
             bool fromBack = e.code == 0 || IsFaceDown(e.fromCon, e.fromLoc, e.fromPos);
             bool toBack = disappearing ? fromBack : e.code == 0 || IsFaceDown(e.toCon, e.toLoc, e.toPos);
@@ -2657,19 +2681,24 @@ namespace YGOPortable.UI
             var source = sourceCard == null ? null : GetSlot(move.fromCon, move.fromLoc, move.fromSeq);
             var destination = !toBack && move.toLoc == YgoConstants.LOCATION_MZONE
                 ? GetSlot(move.toCon, move.toLoc, move.toSeq) : null;
-            var startArea = source?.readout?.Rect ?? source?.root ?? destination?.root;
+            var startArea = source?.root ?? destination?.root;
             if (startArea == null) return null;
 
-            var startSize = animator.GetAreaSize(startArea);
-            var endSize = destination == null ? startSize : animator.GetAreaSize(destination.root);
+            float focusScale = source?.readout?.Rect.localScale.x ?? 1f;
             int viewer = _session.HumanPlayerIndex;
-            var readout = new CardMoveReadoutSnapshot(move.code, sourceCard,
-                (startSize, endSize, move.fromCon != viewer, move.toCon != viewer))
+            var readout = new CardMoveReadoutSnapshot(move.code, sourceCard, ReadMovement)
             {
                 DestinationCard = destination == null ? null : move.DestinationReadout,
             };
             if (destination != null) _pendingCardReadouts[(move.toCon, move.toSeq)] = readout;
             return readout;
+
+            (Vector2 StartSize, Vector2 EndSize, bool StartOpponent, bool EndOpponent) ReadMovement()
+            {
+                var startSize = animator.GetAreaSize(startArea) * focusScale;
+                var endSize = destination == null ? startSize : animator.GetAreaSize(destination.root);
+                return (startSize, endSize, move.fromCon != viewer, move.toCon != viewer);
+            }
         }
 
         internal static CardMotion MonsterArrivalMotion(CardMoveEvent move)
@@ -2721,15 +2750,15 @@ namespace YGOPortable.UI
             animator.QueueChainResolution(center, link.code, link.chainNumber);
         }
 
-        private Vector2 AttackTarget(CardAnimationManager animator, byte attacker, byte target, uint location, uint sequence)
+        private Func<Vector2> CaptureAttackTarget(CardAnimationManager animator, byte attacker, byte target, uint location, uint sequence)
         {
             if (location != 0)
             {
                 var pose = GetCardPose(target, location, sequence, YgoConstants.POS_FACEUP_ATTACK);
-                if (pose.IsValid) return pose.Position;
+                if (pose.IsValid) return () => pose.AtLayout().Position;
             }
             var lp = attacker == _session.HumanPlayerIndex ? _oppLpText : _myLpText;
-            return animator.GetPoint(lp.rectTransform, new Vector2(0.5f, 0.5f));
+            return () => animator.GetPoint(lp.rectTransform, Vector2.one * .5f);
         }
 
         private void RefreshAttackResponseArrow()
@@ -2765,10 +2794,11 @@ namespace YGOPortable.UI
         {
             var animator = CardAnimationManager.Instance;
             if (animator == null) return;
-            var from = GetDisplayedCardPose(attacker, location, sequence, 0);
-            if (!from.IsValid) from = GetCardPose(attacker, location, sequence, YgoConstants.POS_FACEUP_ATTACK);
+            uint position = FindLiveCard(attacker, location, sequence)?.position ?? YgoConstants.POS_FACEUP_ATTACK;
+            var from = GetDisplayedCardPose(attacker, location, sequence, 0, position);
+            if (!from.IsValid) from = GetCardPose(attacker, location, sequence, position);
             if (from.IsValid)
-                animator.QueueAttackArrow(from.Position, AttackTarget(animator, attacker, target, targetLoc, targetSeq),
+                animator.QueueAttackArrow(from, CaptureAttackTarget(animator, attacker, target, targetLoc, targetSeq),
                     attacker != _session.HumanPlayerIndex);
         }
 
@@ -2780,9 +2810,9 @@ namespace YGOPortable.UI
             if (card == null || card.code == 0) return;
 
             var resting = GetCardPose(attacker.Controller, attacker.Location, attacker.Sequence, attacker.Position);
-            var from = GetDisplayedCardPose(attacker.Controller, attacker.Location, attacker.Sequence, card.code);
+            var from = GetDisplayedCardPose(attacker.Controller, attacker.Location, attacker.Sequence, card.code, attacker.Position);
             if (!from.IsValid) from = resting;
-            var hit = AttackTarget(animator, attacker.Controller, defender.Controller, defender.Location, defender.Sequence);
+            var readHit = CaptureAttackTarget(animator, attacker.Controller, defender.Controller, defender.Location, defender.Sequence);
             var defendingCard = defender.Location == YgoConstants.LOCATION_MZONE
                 ? FindLiveCard(defender.Controller, defender.Location, defender.Sequence) : null;
             var combat = new DuelCardReadout(CardDatabase.Get(card.code), card, attacker);
@@ -2794,12 +2824,13 @@ namespace YGOPortable.UI
                 _mobileLayout);
             var flight = new CardFlight(card.code, from, resting, false, false);
             var slot = GetSlot(attacker.Controller, attacker.Location, attacker.Sequence);
+            var targetSlot = GetSlot(defender.Controller, defender.Location, defender.Sequence);
             Vector2 statSize = slot == null ? Vector2.zero : animator.GetAreaSize(slot.readout?.Rect ?? slot.root);
             var source = QueueBattleCard(attacker, card);
             var target = QueueBattleCard(defender, defendingCard);
             (CardPose pose, Vector2 size, CardPose defenderPose, RectTransform defenderStats) Start()
             {
-                var pose = GetDisplayedCardPose(attacker.Controller, attacker.Location, attacker.Sequence, card.code);
+                var pose = GetDisplayedCardPose(attacker.Controller, attacker.Location, attacker.Sequence, card.code, attacker.Position);
                 Vector2 size = slot == null ? Vector2.zero : animator.GetAreaSize(slot.readout?.Rect ?? slot.root);
                 RectTransform defenderStats = null;
                 if (source != null) source.Hidden = true;
@@ -2807,7 +2838,6 @@ namespace YGOPortable.UI
                 {
                     target.Position = defender.Position;
                     target.UseBattleStats = true;
-                    var targetSlot = GetSlot(defender.Controller, defender.Location, defender.Sequence);
                     if (defense.IsMonster && targetSlot != null)
                     {
                         ResetFieldCardFocus(targetSlot);
@@ -2818,7 +2848,8 @@ namespace YGOPortable.UI
                     }
                 }
                 Refresh();
-                var targetPose = GetDisplayedCardPose(defender.Controller, defender.Location, defender.Sequence, defendingCard?.code ?? 0);
+                var targetPose = GetDisplayedCardPose(defender.Controller, defender.Location, defender.Sequence,
+                    defendingCard?.code ?? 0, defender.Position);
                 if (!targetPose.IsValid)
                     targetPose = GetCardPose(defender.Controller, defender.Location, defender.Sequence, defender.Position);
                 return (pose, size, targetPose, defenderStats);
@@ -2829,8 +2860,11 @@ namespace YGOPortable.UI
                 ReleaseBattleCardDisplay(target);
                 Refresh();
             }
-            animator.QueueAttack(flight, hit, defender.Location == 0, attacker.Controller != viewer, readout, combat, statSize,
-                Finish, Start);
+            (Vector2 Hit, Vector2 AttackerArea, Vector2 DefenderArea) ReadLayout() =>
+                (readHit(), slot == null ? Vector2.zero : animator.GetAreaSize(slot.root),
+                    targetSlot == null ? Vector2.zero : animator.GetAreaSize(targetSlot.root));
+            animator.QueueAttack(flight, readHit(), defender.Location == 0, attacker.Controller != viewer, readout, combat, statSize,
+                Finish, Start, ReadLayout);
         }
 
         private void HandleLifePointsChanged(byte player, int delta, int lifePoints, LifePointChangeKind kind)
@@ -2888,6 +2922,7 @@ namespace YGOPortable.UI
         {
             if (_session == null || Root == null || !Root.activeSelf) return;
             var session = _session;
+            if (_boardRect.rect.size != _boardLayoutSize) Refresh();
             AdvanceHandLayout(Time.unscaledDeltaTime * PlaybackRate);
             AdvanceActionWindow();
             RefreshPileActionButtons();
