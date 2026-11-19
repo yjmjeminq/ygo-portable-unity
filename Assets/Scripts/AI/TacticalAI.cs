@@ -58,6 +58,7 @@ namespace YGOPortable.AI
         private DuelPrompt _preparingCombo;
         private IEnumerator<bool> _comboPreparation;
         private readonly bool _tacticalRules;
+        private bool _checkedDirectAttackOrder;
 
         public TacticalAI() { }
 
@@ -76,6 +77,7 @@ namespace YGOPortable.AI
                 _lastTurn = turn;
                 _actionsThisTurn = 0;
                 _battleActions = 0;
+                _checkedDirectAttackOrder = false;
                 _unselectCount = 0;
                 _attackerSequence = uint.MaxValue;
                 _lethalTargetSequence = uint.MaxValue;
@@ -478,6 +480,10 @@ namespace YGOPortable.AI
 
         private byte[] EndMainPhase(DuelSession session, DuelPrompt prompt)
         {
+            if (UsesTacticalRules && !_comboProjection && prompt.canBp &&
+                DuelCombat.CanCloseBattleFromMain(session, prompt.playerId))
+                return BitConverter.GetBytes(6);
+
             // Apply end-of-turn positioning after the live AI has committed to ending the Main Phase.
             if (UsesTacticalRules &&
                 DuelTactics.ChooseDefensiveReposition(session, prompt) is int index)
@@ -656,14 +662,23 @@ namespace YGOPortable.AI
         private byte[] BuildBattleCmd(DuelSession s, DuelPrompt p, bool fallback)
         {
             _battleActions++;
+            uint previousAttacker = _attackerSequence;
             _attackerSequence = uint.MaxValue;
             _lethalTargetSequence = uint.MaxValue;
             bool canLeaveBattle = p.canM2 || p.canEp;
-            if (UsesTacticalRules && !fallback && DuelCombat.FindLethal(s, p) is { } lethal)
+            if (UsesTacticalRules && !fallback &&
+                DuelCombat.FindLethal(s, p, _comboProjection ? uint.MaxValue : previousAttacker) is { } lethal)
             {
-                _attackerSequence = p.attackable[lethal.Attacker].sequence;
+                int attacker = lethal.Attacker;
+                if (_comboSearch != null && !_checkedDirectAttackOrder && lethal.Target == null &&
+                    DuelCombat.VerifyDirectAttackOrder(s, p, attacker, this) is int verified)
+                {
+                    _checkedDirectAttackOrder = true;
+                    attacker = verified;
+                }
+                _attackerSequence = p.attackable[attacker].sequence;
                 _lethalTargetSequence = lethal.Target ?? uint.MaxValue;
-                return BitConverter.GetBytes((lethal.Attacker << 16) | 1);
+                return BitConverter.GetBytes((attacker << 16) | 1);
             }
             if (canLeaveBattle && (fallback || _battleActions > 25))
                 return BitConverter.GetBytes(p.canM2 ? 2 : 3);
@@ -843,6 +858,13 @@ namespace YGOPortable.AI
                 if (target >= 0) return PackIndexList(new[] { target });
             }
 
+            ulong hint = UsesTacticalRules ? p.SelectionHint : s.LastHintMsg;
+            if (UsesTacticalRules && p.min == 1 && p.max == 1 && hint == DuelTactics.Negate)
+            {
+                int target = DuelTactics.ChooseHandtrapTarget(s, p);
+                if (target >= 0) return PackIndexList(new[] { target });
+            }
+
             if (p.min == 1 && p.max == 1 &&
                 ((_linkDeck == true ? LinkComboPolicy.ChooseSupport(s, p) : null) ??
                 LinkComboPolicy.ChooseMaterial(s, p, _linkSummon, _linkDeck == true) ??
@@ -851,7 +873,6 @@ namespace YGOPortable.AI
                 SignatureTurnPlan.ChooseCard(s, p)) is int planned)
                 return PackIndexList(new[] { planned });
 
-            ulong hint = UsesTacticalRules ? p.SelectionHint : s.LastHintMsg;
             if (UsesTacticalRules && p.min == 1 && p.max == 1 && hint == DuelTactics.AddToHand &&
                 DuelDeckStrategy.For(s, p.playerId) == DuelDeckStyle.Lock)
             {

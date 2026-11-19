@@ -353,6 +353,8 @@ namespace YGOPortable.Editor
 
         private static void VerifyDecisionRules()
         {
+            VerifyOwnOnlyRemoval();
+            VerifyReactiveNegation();
             using var duel = new DuelSession();
             var own = duel.Players[0];
             var rival = duel.Players[1];
@@ -442,6 +444,8 @@ namespace YGOPortable.Editor
             battle.attackable.Add(new SelectableCardItem { sequence = 1 });
             if (DuelCombat.FindLethal(duel, battle) is not { Attacker: 1, Target: 0u })
                 throw new InvalidOperationException("The weaker attacker must remove the blocker before the 3200 direct attack.");
+            if (!DuelCombat.CanCloseBattleFromMain(duel, 0))
+                throw new InvalidOperationException("The AI could enter battle to remove the blocker and win this turn.");
             own.mzone[0].attack = 2500;
             own.mzone[1].attack = 2100;
             rival.mzone[0] = new LiveCardState { code = 23205979, controller = 1, attack = 300,
@@ -452,6 +456,15 @@ namespace YGOPortable.Editor
             rival.lp = 4100;
             if (DuelCombat.FindLethal(duel, battle) != null)
                 throw new InvalidOperationException("Spirit Reaper still blocks the second direct attack.");
+            rival.mzone[0] = null;
+            foreach (var attacker in battle.attackable) attacker.directAttackable = true;
+            var battlePilot = new TacticalAI(null);
+            rival.lp = 2000;
+            int firstAttack = BitConverter.ToInt32(battlePilot.ComputeResponse(duel, battle), 0);
+            rival.lp = 4500;
+            int consecutiveAttack = BitConverter.ToInt32(battlePilot.ComputeResponse(duel, battle), 0);
+            if (firstAttack != ((1 << 16) | 1) || consecutiveAttack != firstAttack)
+                throw new InvalidOperationException("A legal consecutive attack must stay available when both attacks are needed.");
             idle.canBp = true;
             rival.mzone[0] = new LiveCardState { attack = 2700, position = YgoConstants.POS_FACEUP_ATTACK };
             rival.mzone[1] = new LiveCardState { attack = 2300, position = YgoConstants.POS_FACEUP_ATTACK };
@@ -546,6 +559,76 @@ namespace YGOPortable.Editor
             if (DuelTactics.ChooseResolutionYesNo(duel, destroy) != 1 ||
                 DuelTactics.SelectionPriority(duel, 0, rival, 0) <= DuelTactics.SelectionPriority(duel, 0, ally, 0))
                 throw new InvalidOperationException("Conquistador must destroy the face-up enemy and keep its own Eldlich.");
+        }
+
+        private static void VerifyOwnOnlyRemoval()
+        {
+            using var duel = new DuelSession();
+            var own = duel.Players[0];
+            var rival = duel.Players[1];
+            const uint redZone = 50056656;
+            own.szone[0] = new LiveCardState { code = redZone, position = YgoConstants.POS_FACEUP_ATTACK };
+            var confirmation = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_EFFECTYN,
+                promptCardCode = redZone, promptDesc = 94, promptLoc = YgoConstants.LOCATION_SZONE };
+            int ConfirmRedZone() => BitConverter.ToInt32(new TacticalAI(null).ComputeResponse(duel, confirmation), 0);
+            if (ConfirmRedZone() != 0)
+                throw new InvalidOperationException("Red Zone would apply its additional effect with only allied targets.");
+            own.banished.Add(new LiveCardState { code = 70902743, type = YgoConstants.TYPE_MONSTER | YgoConstants.TYPE_SYNCHRO,
+                race = YgoConstants.RACE_DRAGON, attribute = YgoConstants.ATTRIBUTE_DARK, position = YgoConstants.POS_FACEUP_ATTACK });
+            var mode = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_OPTION };
+            mode.options.Add((ulong)redZone << 20);
+            mode.options.Add(((ulong)redZone << 20) | 1);
+            if (ConfirmRedZone() != 1 || DuelTactics.ChooseOption(duel, mode) != 1)
+                throw new InvalidOperationException("Red Zone missed its revival when only allied cards could be destroyed.");
+            own.banished.Clear();
+
+            var idle = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_IDLECMD };
+            foreach (uint code in new uint[] { 97584719, 35595518, 21223277 })
+            {
+                var removal = new SelectableCardItem { code = code, location = YgoConstants.LOCATION_MZONE,
+                    description = ((ulong)code << 20) | 1 };
+                rival.szone[0] = null;
+                if (DuelTactics.CanActivate(duel, idle, removal))
+                    throw new InvalidOperationException($"{code} would pay to destroy only allied cards.");
+                rival.szone[0] = new LiveCardState { code = 10045474, controller = 1 };
+                if (!DuelTactics.CanActivate(duel, idle, removal))
+                    throw new InvalidOperationException($"{code} missed available opposing backrow removal.");
+            }
+            if (ConfirmRedZone() != 1)
+                throw new InvalidOperationException("Red Zone missed an available opposing removal target.");
+        }
+
+        private static void VerifyReactiveNegation()
+        {
+            using var duel = new DuelSession();
+            const uint impermanence = 10045474, kaibaman = 67768675, tyrant = 11443677;
+            const uint monsterZone = YgoConstants.LOCATION_MZONE, spellZone = YgoConstants.LOCATION_SZONE;
+            var rival = duel.Players[1];
+            rival.mzone[5] = new LiveCardState { code = tyrant, controller = 1, location = monsterZone, sequence = 5,
+                position = YgoConstants.POS_FACEUP_ATTACK, attack = 3400 };
+            var chain = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_CHAIN };
+            var negate = new SelectableCardItem { code = impermanence, location = spellZone, sequence = 2 };
+            if (DuelTactics.CanActivate(duel, chain, negate))
+                throw new InvalidOperationException("Impermanence targets a trap-immune monster across an empty column.");
+            rival.szone[2] = new LiveCardState { code = 55144522, controller = 1, position = YgoConstants.POS_FACEUP_ATTACK };
+            if (!DuelTactics.CanActivate(duel, chain, negate))
+                throw new InvalidOperationException("Set Impermanence can still disable a Spell in its column.");
+            rival.szone[2] = null;
+
+            rival.mzone[3] = new LiveCardState { code = kaibaman, controller = 1, location = monsterZone, sequence = 3,
+                position = YgoConstants.POS_FACEUP_ATTACK, attack = 200 };
+            duel.CurrentChain.Add(new ChainLinkInfo { code = kaibaman, triggerPlayer = 1, triggerLoc = monsterZone, triggerSeq = 3 });
+            if (!DuelTactics.CanActivate(duel, chain, negate))
+                throw new InvalidOperationException("Impermanence missed the live opposing monster effect.");
+            duel.CurrentChain.Add(new ChainLinkInfo { code = impermanence, triggerLoc = spellZone, triggerSeq = 2 });
+
+            var target = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_CARD, min = 1, max = 1,
+                SelectionHint = DuelTactics.Negate };
+            target.candidates.Add(new SelectableCardItem { code = tyrant, controller = 1, location = monsterZone, sequence = 5 });
+            target.candidates.Add(new SelectableCardItem { code = kaibaman, controller = 1, location = monsterZone, sequence = 3 });
+            byte[] response = new TacticalAI(null).ComputeResponse(duel, target);
+            if (response.Length != 12 || BitConverter.ToInt32(response, 8) != 1)
+                throw new InvalidOperationException("Impermanence must target the effect it chained to.");
         }
 
         private static void VerifyCrossoutResponse()

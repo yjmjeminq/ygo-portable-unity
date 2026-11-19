@@ -19,7 +19,7 @@ namespace YGOPortable.AI
         private const int LateLinkBranchMilliseconds = 48;
         private const int RecoveryBranchMilliseconds = 110;
         private const uint Machinex = 46593546, Siegfried = 44852429, Gilgamesh = 9024198;
-        private const uint PhotonJumper = 97639441, MicroCoder = 2347477;
+        private const uint PhotonJumper = 97639441, MicroCoder = 2347477, JunkAnchor = 25148255;
         private const uint NegatesEffects = 1u << 8;
         private static readonly HashSet<uint> HandDisruption = new()
         {
@@ -186,11 +186,12 @@ namespace YGOPortable.AI
                     (pressure > before.pressure || defense > before.defense ||
                         (rank >= 3 && rank > before.rank && pressure > 0) ||
                         (hand > before.hand && monsters >= before.monsters) || pendulumFollowUps > before.pendulumFollowUps));
-
-            private static bool HasFieldInteraction(CardInfo card) => LinkComboPolicy.IsInteractive(card) &&
-                CardDatabase.GetArchetypeCollectionKey(card) is not
-                    (14558127 or 23434538 or 42141493 or 97268402 or 59438930 or 73642296 or 94145021);
         }
+
+        // Junk Anchor banishes its own Synchro materials. That does not threaten the opposing field.
+        private static bool HasFieldInteraction(CardInfo card) => LinkComboPolicy.IsInteractive(card) &&
+            CardDatabase.GetArchetypeCollectionKey(card) is not
+                (JunkAnchor or 14558127 or 23434538 or 42141493 or 97268402 or 59438930 or 73642296 or 94145021);
 
         internal static bool CanDevelop(DuelPrompt prompt)
         {
@@ -546,7 +547,7 @@ namespace YGOPortable.AI
                     !improvesField && (!clearedOpposingCard || 2L * incomingDamage >= own.lp);
                 bool needsDefense = (opensLethal || risksSurvival) && !own.hand.Any(card => card.code == PhotonJumper);
                 bool payoff = improvesField || clearedOpposingCard ||
-                    (!attacker.effectsDisabled && CardDatabase.Get(attacker.code) is CardInfo info && LinkComboPolicy.IsInteractive(info));
+                    (!attacker.effectsDisabled && CardDatabase.Get(attacker.code) is CardInfo info && HasFieldInteraction(info));
                 if (!needsDefense && payoff) continue;
                 stop = (candidate.Step, candidate.State, candidate.Score + .15, candidate.Before);
                 stopAction = (candidate.SetIndex << 16) | 3;

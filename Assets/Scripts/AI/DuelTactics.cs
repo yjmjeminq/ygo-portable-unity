@@ -14,16 +14,21 @@ namespace YGOPortable.AI
         private const uint TributeToTheDoomed = 79759861, Conquistador = 20590515, SkyIris = 27813661;
         private const uint Baronne = 84815190, CipherBlade = 2530830, DiamondBell = 73667937, Hornet = 69207766;
         private const uint Farewelcome = 32785578, DarkTimeWizard = 40235813;
-        private const uint SalamangreatOfFire = 11962031, CynetRefresh = 36368606;
+        private const uint SalamangreatOfFire = 11962031, Achichi = 15808381, CynetRefresh = 36368606;
+        private const uint EarthSlicer = 97584719, Linkslayer = 35595518, Artorigus = 21223277;
+        private const uint DarklordRebellion = 50501121, NoblemanOfCrossout = 71044499, HexeTrude = 46294982;
         private const uint GiftCard = 39526584, DarkCure = 3701074, NurseReficule = 67316075, BadReaction = 40633297;
         private const uint DestroyerPhoenix = 60461804, Deadnader = 34909328;
         private const uint GaiaTheMagicalKnightOfDragons = 15989522, Sunrise = 22908820, RedRain = 5376159;
         internal const uint LightningStorm = 14532163, CrossoutDesignator = 65681983;
+        private const uint InfiniteImpermanence = 10045474, EffectVeiler = 97268402, BlueEyesTyrant = 11443677;
+        private const uint LittleKnight = 29301450, LittleKnightAlternateArt = 29301451, DoomcaliberKnight = 78700060;
         private const uint TripleTacticsTalent = 25311006, ForbiddenCrown = 98829635;
         private const uint RedDragonTyrant = 16172067;
         private const uint RampageDragon = 84058253, CurseOfDragon = 7241272, SpiralDischarge = 29477860;
         private const uint Utopia = 84013237, DoubleOrNothing = 94770493;
         private const uint Stratos = 40044918, RedDragonArchfiend = 70902743, RedZone = 50056656, CrimsonGaia = 98173209;
+        private const ulong ApplyContinuousTrapEffect = 94;
         private const uint ForbiddenDroplet = 24299458, RisingSunUtopia = 76504386;
         private const uint DdGryphon = 28406301;
         private const uint GalaxyCyclone = 5133471, KaliYuga = 15939229, WhipViper = 79967395;
@@ -61,8 +66,8 @@ namespace YGOPortable.AI
             14558127, // 하루 우라라
             23434538, // 증식의 G
             42141493, // 마루챠미 후와로스
-            10045474, // 무한포영
-            97268402, // 이펙트 뵐러
+            InfiniteImpermanence,
+            EffectVeiler,
             24299458, // 금지된 일적
             25311006, // 삼전의 재
             35269904, // 삼전의 호
@@ -76,8 +81,8 @@ namespace YGOPortable.AI
         private static readonly HashSet<uint> ResponseNegates = new()
         {
             14558127, // 하루 우라라
-            97268402, // 이펙트 뵐러
-            10045474, // 무한포영
+            EffectVeiler,
+            InfiniteImpermanence,
             24224830, // 무덤의 지명자
             Baronne,  // 플뢰르 드 바로네스
             37818794, // 초마도용기사-붉은 눈의 드라군
@@ -101,6 +106,11 @@ namespace YGOPortable.AI
 
             var own = duel.Players[prompt.playerId];
             var rival = duel.Players[1 - prompt.playerId];
+            if (effect.code == InfiniteImpermanence &&
+                rival.mzone.Any(card => card?.IsFaceUp == true && !card.effectsDisabled && card.code == BlueEyesTyrant) &&
+                !rival.mzone.Any(card => card?.IsFaceUp == true && !card.effectsDisabled && card.code != BlueEyesTyrant) &&
+                (effect.location != YgoConstants.LOCATION_SZONE || effect.sequence >= 5 || rival.szone[4 - effect.sequence] == null))
+                return false;
             if (effect.code == CrimsonGaia && effect.location == YgoConstants.LOCATION_HAND &&
                 own.szone.Any(card => card?.code == CrimsonGaia && card.IsFaceUp && !card.effectsDisabled))
                 return false;
@@ -109,13 +119,17 @@ namespace YGOPortable.AI
             if (effect.code is GiftCard or DarkCure)
                 return own.mzone.Concat(own.szone).Any(card => card?.IsFaceUp == true && !card.effectsDisabled &&
                     card.code is NurseReficule or BadReaction);
-            if (effect.code == SalamangreatOfFire && effect.location == YgoConstants.LOCATION_GRAVE)
+            if (effect.code is SalamangreatOfFire or Achichi && effect.location == YgoConstants.LOCATION_GRAVE)
                 return LosesCurrentBattle(duel, prompt.playerId) && (duel.AttackerCon == prompt.playerId ||
                     !own.mzone[duel.TargetSeq].IsDefense || rival.mzone[duel.AttackerSeq].code == RedDragonArchfiend);
             if (effect.code is TornadoDragon or MysticalSpaceTyphoon)
                 return HasOpposingSpellOrTrap(rival);
             if (effect.code == TributeToTheDoomed)
                 return rival.mzone.Any(card => card != null);
+            if (effect.code == NoblemanOfCrossout)
+                return rival.mzone.Any(card => card != null && !card.IsFaceUp);
+            if (effect.code == DarklordRebellion)
+                return HasFieldCard(rival);
             if (effect.code == GalaxyCyclone)
                 return rival.szone.Any(card => card != null && card.IsFaceUp == (effect.location == YgoConstants.LOCATION_GRAVE));
             if (effect.code == WhipViper)
@@ -131,6 +145,15 @@ namespace YGOPortable.AI
             ulong effectIndex = effect.description & 0xfffff;
             bool firstEffect = cardEffect && effectIndex == 0;
             bool summonTrigger = effect.isTriggeredEffect || prompt.IsTriggerActivationConfirmation;
+            // Let Doomcaliber wait for an opposing monster effect instead of forcing it to negate our S:P.
+            if (cardEffect && effectIndex == 1 && effect.code is LittleKnight or LittleKnightAlternateArt &&
+                effect.location == YgoConstants.LOCATION_MZONE && prompt.messageType == YgoConstants.MSG_SELECT_CHAIN &&
+                !prompt.forced && last is { negated: false } && last.triggerPlayer != prompt.playerId &&
+                CardDatabase.Get(last.code) is { } source && (source.IsSpell || source.IsTrap) &&
+                own.mzone.Any(card => card is { code: DoomcaliberKnight, IsFaceUp: true, effectsDisabled: false }))
+                return false;
+            if (cardEffect && effectIndex == 1 && effect.code is Linkslayer or Artorigus)
+                return HasOpposingSpellOrTrap(rival);
             if (firstEffect && effect.code == DarkTimeWizard && rival.mzone.All(card => card == null))
                 return duel.HasCardInDeck(prompt.playerId, IsDarkTimeWizardSearchTarget);
             if (firstEffect && effect.code == SkyIris)
@@ -164,9 +187,13 @@ namespace YGOPortable.AI
             // Farewelcome can stop an enemy attack, but stopping our own with only allied targets loses both the attack and a card.
             if (firstEffect && effect.code == Farewelcome && duel.HasActiveAttack && duel.AttackerCon == prompt.playerId)
                 return rival.mzone.Any(card => card != null) || rival.szone.Any(card => card != null);
+            // Turning Red Zone face-up can immediately offer its destruction effect, revival, or both.
+            if (effect.code == RedZone && prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN &&
+                prompt.promptDesc == ApplyContinuousTrapEffect && !HasFieldCard(rival))
+                return own.banished.Any(IsRedZoneRevivalTarget);
             if ((firstEffect && effect.code is DestroyerPhoenix or Deadnader or RedZone or Baronne) ||
-                (cardEffect && effectIndex == 1 && effect.code is CipherBlade or DiamondBell or Hornet))
-                return rival.mzone.Any(card => card != null) || rival.szone.Any(card => card != null);
+                (cardEffect && effectIndex == 1 && effect.code is CipherBlade or DiamondBell or Hornet or EarthSlicer or HexeTrude))
+                return HasFieldCard(rival);
             if (effect.code == Perlereino && (effect.description >> 20) == Perlereino && (effect.description & 0xfffff) == 1)
                 return rival.mzone.Any(card => card != null) || rival.szone.Any(card => card != null);
             bool tyrantWipe = firstEffect && effect.code == RedDragonTyrant;
@@ -195,6 +222,50 @@ namespace YGOPortable.AI
                 return loss;
             }
         }
+
+        private static bool HasFieldCard(PlayerFieldSnapshot side) =>
+            side.mzone.Any(card => card != null) || side.szone.Any(card => card != null);
+
+        internal static int ChooseHandtrapTarget(DuelSession duel, DuelPrompt prompt)
+        {
+            int count = duel.CurrentChain.Count;
+            if (count == 0) return -1;
+            var activation = duel.CurrentChain[count - 1];
+            if (activation.triggerPlayer != prompt.playerId || activation.code is not (InfiniteImpermanence or EffectVeiler))
+                return -1;
+
+            if (count >= 2)
+            {
+                var preceding = duel.CurrentChain[count - 2];
+                if (preceding.triggerPlayer != prompt.playerId && !preceding.negated && preceding.triggerLoc == YgoConstants.LOCATION_MZONE &&
+                    (activation.code != InfiniteImpermanence || preceding.code != BlueEyesTyrant))
+                {
+                    int source = prompt.candidates.FindIndex(card => card.controller == preceding.triggerPlayer &&
+                        card.location == preceding.triggerLoc && card.sequence == preceding.triggerSeq && card.code == preceding.code);
+                    if (source >= 0) return source;
+                }
+            }
+
+            if (activation.code != InfiniteImpermanence || !prompt.candidates.Any(card => card.code == BlueEyesTyrant)) return -1;
+            var rival = duel.Players[1 - prompt.playerId];
+            int best = -1;
+            int bestPriority = int.MinValue;
+            for (int i = 0; i < prompt.candidates.Count; i++)
+            {
+                var target = prompt.candidates[i];
+                if (target.code == BlueEyesTyrant || target.controller == prompt.playerId || target.location != YgoConstants.LOCATION_MZONE ||
+                    target.sequence >= rival.mzone.Length || rival.mzone[target.sequence]?.effectsDisabled != false) continue;
+                int priority = SelectionPriority(duel, prompt.playerId, target, Negate);
+                if (priority <= bestPriority) continue;
+                best = i;
+                bestPriority = priority;
+            }
+            return best;
+        }
+
+        private static bool IsRedZoneRevivalTarget(LiveCardState card) =>
+            card.IsFaceUp && (card.type & YgoConstants.TYPE_SYNCHRO) != 0 &&
+            card.attribute == YgoConstants.ATTRIBUTE_DARK && card.race == YgoConstants.RACE_DRAGON;
 
         private static bool HasOpposingSpellOrTrap(PlayerFieldSnapshot opponent) =>
             opponent.szone.Any(card => card != null) || opponent.mzone.Any(card => card?.IsFaceUp == true &&
@@ -352,6 +423,9 @@ namespace YGOPortable.AI
 
             int searchHero = Option(Stratos, 2);
             if (searchHero >= 0 && rival.szone.All(card => card == null)) return searchHero;
+
+            int reviveDragon = Option(RedZone, 1);
+            if (reviveDragon >= 0 && !HasFieldCard(rival)) return reviveDragon;
 
             int returnFieldCard = Option(Erebus, 4);
             if (returnFieldCard >= 0 && (rival.mzone.Any(card => card != null) || rival.szone.Any(card => card != null)))

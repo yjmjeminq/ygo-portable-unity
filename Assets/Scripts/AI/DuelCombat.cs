@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Linq;
 using YGOPortable.Core;
 
@@ -7,6 +8,7 @@ namespace YGOPortable.AI
     internal static class DuelCombat
     {
         private const int Lethal = 100000;
+        private const int DirectOrderBudgetMilliseconds = 80;
         private const uint UtopiaDragonar = 95134948;
         private const ulong ReduceAttackerToZero = ((ulong)UtopiaDragonar << 20) | 1;
 
@@ -35,20 +37,46 @@ namespace YGOPortable.AI
             return availableAttack < damageThreshold && availableAttack + addedAttack >= damageThreshold;
         }
 
-        internal static (int Attacker, uint? Target)? FindLethal(DuelSession duel, DuelPrompt prompt)
+        internal static (int Attacker, uint? Target)? FindLethal(DuelSession duel, DuelPrompt prompt,
+            uint previousAttacker = uint.MaxValue)
         {
             var own = duel.Players[prompt.playerId];
             var rival = duel.Players[1 - prompt.playerId];
-            var attackers = prompt.attackable.Select((option, index) => (option, index, live: GetMonster(own, option.sequence)))
+            var attackers = prompt.attackable.Select((option, index) =>
+                    (index, live: GetMonster(own, option.sequence), direct: option.directAttackable))
                 .Where(entry => entry.live?.attack > 0).OrderBy(entry => entry.live.attack).ToArray();
+            return FindLethal(rival, attackers, previousAttacker);
+        }
+
+        internal static bool CanCloseBattleFromMain(DuelSession duel, byte player)
+        {
+            var own = duel.Players[player];
+            var rival = duel.Players[1 - player];
+            if (rival.lp <= 0 || VisibleAttackTotal(own) < rival.lp) return false;
+            bool openField = rival.mzone.All(card => card == null);
+            var attackers = own.mzone.Select((live, index) => (index, live, direct: openField))
+                .Where(entry => entry.live?.IsFaceUp == true && entry.live.IsAttack && entry.live.attack > 0)
+                .OrderBy(entry => entry.live.attack).ToArray();
+            return FindLethal(rival, attackers).HasValue;
+        }
+
+        private static (int Attacker, uint? Target)? FindLethal(PlayerFieldSnapshot rival,
+            (int index, LiveCardState live, bool direct)[] attackers, uint previousAttacker = uint.MaxValue)
+        {
             foreach (var entry in attackers)
-                if (entry.option.directAttackable && entry.live.attack >= rival.lp) return (entry.index, null);
+                if (entry.direct && entry.live.attack >= rival.lp) return (entry.index, null);
             if (attackers.Sum(entry => entry.live.attack) < rival.lp) return null;
             var defenders = rival.mzone.Where(card => card != null).ToArray();
             if (attackers.Length == 0 || defenders.Any(card => !card.IsFaceUp)) return null;
+            // An engine-offered consecutive attack can expire once a different monster attacks.
+            int repeat = previousAttacker == uint.MaxValue ? -1 :
+                Array.FindIndex(attackers, entry => entry.live.sequence == previousAttacker);
             if (defenders.Length == 0)
-                return attackers.Where(entry => entry.option.directAttackable).Sum(entry => entry.live.attack) >= rival.lp
-                    ? (attackers.Last(entry => entry.option.directAttackable).index, null) : null;
+            {
+                if (attackers.Where(entry => entry.direct).Sum(entry => entry.live.attack) < rival.lp) return null;
+                if (repeat >= 0 && attackers[repeat].direct) return (attackers[repeat].index, null);
+                return (attackers.Last(entry => entry.direct).index, null);
+            }
 
             // Each attacker gets one attack. Recompute from the engine's legal attacks after every battle.
             int aMask = (1 << attackers.Length) - 1, dMask = (1 << defenders.Length) - 1;
@@ -70,7 +98,7 @@ namespace YGOPortable.AI
                 {
                     if ((available & (1 << i)) == 0) continue;
                     int remaining = available & ~(1 << i);
-                    if (blocking == 0 || attackers[i].option.directAttackable)
+                    if (blocking == 0 || attackers[i].direct)
                         best = Math.Max(best, attackers[i].live.attack + BestDamage(remaining, blocking));
                     for (int j = 0; j < defenders.Length; j++)
                     {
@@ -92,16 +120,74 @@ namespace YGOPortable.AI
 
             int AfterHit(int blocking, int target) => breakable[target] ? blocking & ~(1 << target) : blocking;
 
-            for (int i = 0; i < attackers.Length; i++)
+            (int Attacker, uint? Target)? WinningFirstAttack(int i)
             {
                 int remaining = aMask & ~(1 << i);
-                if (attackers[i].option.directAttackable && attackers[i].live.attack + BestDamage(remaining, dMask) >= rival.lp)
+                if (attackers[i].direct && attackers[i].live.attack + BestDamage(remaining, dMask) >= rival.lp)
                     return (attackers[i].index, null);
                 for (int j = 0; j < defenders.Length; j++)
                     if (Damage(i, j) is int hit && hit + BestDamage(remaining, AfterHit(dMask, j)) >= rival.lp)
                         return (attackers[i].index, defenders[j].sequence);
+                return null;
             }
+            if (repeat >= 0 && WinningFirstAttack(repeat) is { } continued) return continued;
+            for (int i = 0; i < attackers.Length; i++)
+                if (i != repeat && WinningFirstAttack(i) is { } attack) return attack;
             return null;
+        }
+
+        internal static int? VerifyDirectAttackOrder(DuelSession duel, DuelPrompt prompt, int preferred, TacticalAI advisor)
+        {
+            var own = duel.Players[prompt.playerId];
+            var rival = duel.Players[1 - prompt.playerId];
+            if (prompt.attackable.Count < 2 || !prompt.attackable[preferred].directAttackable ||
+                GetMonster(own, prompt.attackable[preferred].sequence)?.attack >= rival.lp ||
+                rival.mzone.Any(card => card != null) || rival.szone.Any(card => card != null))
+                return null;
+
+            var clock = Stopwatch.StartNew();
+            bool Expired() => clock.ElapsedMilliseconds >= DirectOrderBudgetMilliseconds;
+            var options = prompt.attackable.Select((card, index) => (card, index))
+                .Where(entry => entry.card.directAttackable).OrderBy(entry => entry.index != preferred)
+                .Take(3);
+            foreach (var option in options)
+            {
+                using var trial = duel.ReplayForPlanning(Expired);
+                if (trial?.ActivePrompt is not { messageType: YgoConstants.MSG_SELECT_BATTLECMD } start ||
+                    start.playerId != prompt.playerId || option.index >= start.attackable.Count ||
+                    start.attackable[option.index].sequence != option.card.sequence ||
+                    !start.attackable[option.index].directAttackable)
+                    break;
+
+                var pilot = advisor.ForkForComboSearch();
+                trial.BeginSpeculation(prompt.playerId, stopAfterTurn: true);
+                trial.SubmitResponseInt((option.index << 16) | 1);
+                for (int step = 0; step < 16 && !Expired() && !trial.IsFinished && !trial.SpeculationUncertain &&
+                    trial.RetryCount == 0 && trial.TurnNumber == duel.TurnNumber; step++)
+                {
+                    var next = trial.ActivePrompt;
+                    if (next == null || next.messageType == YgoConstants.MSG_SELECT_IDLECMD) break;
+                    if (next.playerId != prompt.playerId)
+                    {
+                        if (next.messageType != YgoConstants.MSG_SELECT_CHAIN || next.forced) break;
+                        // Project an unanswered attack. Do not look at the other player's optional cards.
+                        trial.SubmitResponseInt(-1);
+                        continue;
+                    }
+                    if (next.candidates.Any(card => card.controller != prompt.playerId &&
+                        card.location is YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_DECK or YgoConstants.LOCATION_EXTRA))
+                        break;
+                    var response = pilot.ComputeResponse(trial, next);
+                    if (next.messageType == YgoConstants.MSG_SELECT_BATTLECMD &&
+                        (BitConverter.ToInt32(response, 0) & 0xffff) is 2 or 3)
+                        break;
+                    trial.SubmitPlanningResponse(response);
+                }
+                if (!trial.SpeculationUncertain && trial.RetryCount == 0 && trial.IsFinished &&
+                    trial.Winner == prompt.playerId)
+                    return option.index;
+            }
+            return preferred;
         }
 
         internal static int ChooseAttacker(DuelSession duel, DuelPrompt prompt, bool mustAttack)
@@ -169,7 +255,16 @@ namespace YGOPortable.AI
             int difference = attacker.attack - defense;
             int damage = defender.IsDefense ? 0 : difference;
             if (damage > 0 && damage >= rivalLp) return Lethal + damage;
-            if (difference > 0) return 900 + Threat(defender) + damage;
+            if (difference > 0)
+            {
+                const uint UnstoppableExodia = 83257450;
+                int value = 900 + Threat(defender) + damage;
+                // Exodia's visible zero DEF is a chance to remove its LP-based attack and
+                // Spell/Trap negation in battle. Its printed stats understate that threat.
+                if (defender.IsDefense && defender.code == UnstoppableExodia && !defender.effectsDisabled)
+                    value += 1800;
+                return value;
+            }
             if (difference == 0) return defender.IsDefense ? -1 : Threat(defender) - Threat(attacker) - 200;
             return (defender.IsDefense ? 0 : -900 - Threat(attacker)) + difference;
         }
