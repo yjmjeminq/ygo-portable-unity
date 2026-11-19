@@ -3542,10 +3542,13 @@ namespace YGOPortable.Editor
             var rating = readout.Find("CardReadout/Labels/Rating");
             float attackAccent = combat.Find("Attack/Rail").GetComponent<Image>().color.a;
             float defenseAccent = combat.Find("Defense/Rail").GetComponent<Image>().color.a;
+            float attackWidth = ((RectTransform)combat.Find("Attack")).rect.width;
+            float defenseWidth = ((RectTransform)combat.Find("Defense")).rect.width;
             Require(combat.gameObject.activeInHierarchy &&
                 combat.Find("Attack/Digits/Value").GetComponent<Text>().text == attack &&
                 combat.Find("Defense/Digits/Value").GetComponent<Text>().text == defenseValue &&
                 (defense ? defenseAccent > attackAccent : attackAccent > defenseAccent) &&
+                (defense ? defenseWidth > attackWidth : attackWidth > defenseWidth) &&
                 rating.Find("Value").GetComponent<Text>().text == level &&
                 rating.Find("Symbol").GetComponent<Image>().sprite == DuelStatSymbols.Rating(DuelRatingKind.Level) &&
                 readout.GetComponentsInChildren<Graphic>().All(graphic => !graphic.raycastTarget),
@@ -3811,8 +3814,10 @@ namespace YGOPortable.Editor
                             bounds.max.y <= readout.rect.yMax + .01f && label.rectTransform.rect.height > 9f,
                             $"A field stat overflowed when the canvas resized to {size}.");
                     }
-                    VerifyStatGlyphs(Label(normal, attack), "2900");
-                    VerifyStatGlyphs(Label(normal, defense), "2800");
+                    var attackInk = VerifyStatGlyphs(Label(normal, attack), "2900");
+                    var defenseInk = VerifyStatGlyphs(Label(normal, defense), "2800");
+                    Require(defenseInk.height >= attackInk.height * 1.12f,
+                        $"The active defense value did not stand out at {size} ({defenseInk.height:F1} vs {attackInk.height:F1}).");
                     VerifyStatGlyphs(Label(normal, "Combat/Attack/Change/Arrow"), "▼");
                     VerifyStatGlyphs(Label(normal, "Combat/Defense/Change/Arrow"), "▲");
                     VerifyStatGlyphs(Label(link, attack), "2300");
@@ -3886,7 +3891,7 @@ namespace YGOPortable.Editor
                 Debug.Log("[VERIFY DUEL RATING BADGES] Distinct rating, material, counter and negation badges stayed separate from the neighboring zone at full focus across three viewports.");
             }
 
-            private static void VerifyStatGlyphs(Text text, string expected, float minimumHeightShare = .78f,
+            private static Rect VerifyStatGlyphs(Text text, string expected, float minimumHeightShare = .78f,
                 float minimumInkShare = .49f)
             {
                 Require(text.text == expected && text.horizontalOverflow == HorizontalWrapMode.Overflow,
@@ -3915,6 +3920,7 @@ namespace YGOPortable.Editor
                 var cell = (RectTransform)text.transform.parent;
                 if (cell.name is "Digits" or "Number") cell = (RectTransform)cell.parent;
                 Require(rect.height / cell.rect.height > minimumHeightShare, "The readout text did not use enough of its allotted height.");
+                return fitted;
 
                 Rect BoundsOfText()
                 {

@@ -146,11 +146,14 @@ namespace YGOPortable.UI
             _root.gameObject.SetActive(card.IsMonster);
             if (!card.IsMonster) return;
 
-            Layout(card.IsLink, card.LinkMarkers, opponent);
             uint shownPosition = position ?? card.Position;
             var source = card.ComparedValue?.Source;
             bool activeAttack = source.HasValue ? source == BattleStatSource.Attack : (shownPosition & YgoConstants.POS_ATTACK) != 0;
             bool activeDefense = source.HasValue ? source == BattleStatSource.Defense : (shownPosition & YgoConstants.POS_DEFENSE) != 0;
+            float split = .5f;
+            if (_compact && activeAttack != activeDefense)
+                split = activeAttack ? .545f : .455f;
+            Layout(card.IsLink, card.LinkMarkers, opponent, split);
             _attack.Bind(card.Attack, card.BaseAttack, activeAttack, showChanges);
             if (!card.IsLink)
                 _defense.Bind(card.Defense, card.BaseDefense, activeDefense, showChanges);
@@ -187,7 +190,7 @@ namespace YGOPortable.UI
             }
         }
 
-        private void Layout(bool link, uint directions, bool opponent)
+        private void Layout(bool link, uint directions, bool opponent, float split)
         {
             bool hasDirections = directions != 0;
             if (hasDirections) (_compass ??= new DuelLinkCompass(_root)).Bind(directions, opponent);
@@ -195,9 +198,9 @@ namespace YGOPortable.UI
             _effect?.Rect.gameObject.SetActive(false);
             _attack.Rect.gameObject.SetActive(true);
             _attack.Rect.anchorMin = link && _compact && !hasDirections ? new Vector2(.21f, 0f) : Vector2.zero;
-            float attackWidth = !link ? .493f : hasDirections ? .62f : _compact ? .79f : 1f;
+            float attackWidth = !link ? split - .007f : hasDirections ? .62f : _compact ? .79f : 1f;
             _attack.Rect.anchorMax = new Vector2(attackWidth, 1f);
-            _defense.Rect.anchorMin = new Vector2(.507f, 0f);
+            _defense.Rect.anchorMin = new Vector2(split + .007f, 0f);
             _defense.Rect.anchorMax = Vector2.one;
             _defense.Rect.gameObject.SetActive(!link);
         }
@@ -251,10 +254,10 @@ namespace YGOPortable.UI
 
             internal void BindComparison(long value, bool split)
             {
+                Bind(value, value, active: true);
                 _digits.anchorMin = new Vector2(.225f, .035f);
                 _digits.anchorMax = new Vector2(.97f, .99f);
                 _value.fontSize = split ? 23 : 28;
-                Bind(value, value, active: true);
             }
 
             internal void Bind(long value, long original, bool active, bool showChanges = false)
@@ -278,8 +281,17 @@ namespace YGOPortable.UI
                 _change.text = change;
                 _change.color = _value.color;
                 _change.gameObject.SetActive(adjustment != 0);
-                if (_symbol != null) _symbol.anchorMin = new Vector2(.045f, adjustment == 0 ? .22f : .43f);
-                _plate.color = active ? Color.Lerp(Backing, _accent, .15f) : Backing;
+                if (_symbol != null)
+                {
+                    float symbolRight = active ? .217f : .20f;
+                    _symbol.anchorMin = new Vector2(.045f, adjustment == 0 ? .22f : .43f);
+                    _symbol.anchorMax = new Vector2(symbolRight, .83f);
+                    ((RectTransform)_change.transform.parent).anchorMax = new Vector2(symbolRight, .40f);
+                    _digits.anchorMin = new Vector2(symbolRight + .008f, .055f);
+                    _digits.anchorMax = new Vector2(.982f, .985f);
+                    _value.fontSize = active ? 31 : 23;
+                }
+                _plate.color = active ? Color.Lerp(Backing, _accent, .21f) : Backing;
                 _rail.color = new Color(_accent.r, _accent.g, _accent.b, active ? .72f : .22f);
             }
         }
@@ -742,7 +754,7 @@ namespace YGOPortable.UI
             _stats = new DuelStatStrip(_combat, compact: true);
             _labels = LotdUiKit.FillRect("Labels", _root);
             // Leave room for the selection check on choice cards.
-            _rating = CreateLabel("Rating", .035f, .355f, 21, numeric: true);
+            _rating = CreateLabel("Rating", .035f, .355f, 25, numeric: true);
             var icon = CreateLabelSymbol(_rating);
             _ratingIcon = LotdUiKit.AddImage(icon.gameObject, null, Color.white, true, false);
             _status = CreateLabel("Status", .372f, inPreview ? .79f : .965f, inPreview ? 13 : 16, numeric: false);
@@ -811,8 +823,9 @@ namespace YGOPortable.UI
             _root.gameObject.SetActive(true);
             if (!_inPreview)
             {
-                _combat.anchorMin = new Vector2(.03f, opponent ? .765f : .015f);
-                _combat.anchorMax = new Vector2(.97f, opponent ? .985f : .235f);
+                const float bottom = .015f, top = .265f;
+                _combat.anchorMin = new Vector2(.03f, opponent ? 1f - top : bottom);
+                _combat.anchorMax = new Vector2(.97f, opponent ? 1f - bottom : top);
             }
             _stats.Bind(card, opponent, showChanges, position);
             var rating = scale.HasValue ? (DuelRatingKind.Scale, scale.Value) : card.RatingNumber;
@@ -876,8 +889,9 @@ namespace YGOPortable.UI
             Add((RectTransform)_status.transform.parent, longStatus ? .50f : .31f);
 
             bool twoRows = _fieldLabels.Count == 4;
-            _labels.anchorMin = new Vector2(0f, opponent ? .025f : twoRows ? .548f : .765f);
-            _labels.anchorMax = new Vector2(1f, opponent ? twoRows ? .452f : .235f : .975f);
+            float farEdge = twoRows ? .452f : .26f;
+            _labels.anchorMin = new Vector2(0f, opponent ? .025f : 1f - farEdge);
+            _labels.anchorMax = new Vector2(1f, opponent ? farEdge : .975f);
             if (twoRows)
             {
                 PlaceRow(0, 2, opponent ? 0f : .515f, opponent ? .485f : 1f);
