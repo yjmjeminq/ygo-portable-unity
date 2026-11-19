@@ -1603,12 +1603,12 @@ namespace YGOPortable.UI
             var crest = resolving ? DuelVisualAssets.ChainResolving ?? DuelVisualAssets.ChainActive : DuelVisualAssets.ChainActive;
             if (crest != null)
                 LotdUiKit.AddImage(holder.gameObject, crest, new Color(1f, 1f, 1f, active ? .79f : .54f), true, false);
-            var label = LotdUiKit.AddFittedText(holder, "Link", number.ToString(), Mathf.RoundToInt(size * .84f), 11,
-                TextAnchor.MiddleCenter, Color.white, FontStyle.BoldAndItalic);
+            var label = DuelTypography.AddNumber(holder, "Link", number.ToString(), Mathf.RoundToInt(size * .76f),
+                TextAnchor.MiddleCenter, Color.white);
             var outline = label.gameObject.AddComponent<Outline>();
             outline.effectColor = resolving ? new Color(.84f, .61f, .15f, .93f) :
                 active ? new Color(.13f, .87f, 1f, .93f) : new Color(.12f, .42f, .49f, .95f);
-            outline.effectDistance = Vector2.one * 2f;
+            outline.effectDistance = Vector2.one;
             return holder;
         }
 
@@ -1682,9 +1682,8 @@ namespace YGOPortable.UI
                 LotdUiKit.AddFittedText(kind, "Text", label, 17, 9, TextAnchor.MiddleLeft, tint, FontStyle.Bold);
                 var value = LotdUiKit.CreateRect("Value", holder, new Vector2(.51f, .025f), new Vector2(.96f, .975f),
                     Vector2.zero, Vector2.zero);
-                var number = LotdUiKit.AddFittedText(value, "Text", change.Delta > 0 ? $"+{change.Delta}" : change.Delta.ToString(),
-                    22, 9, TextAnchor.MiddleRight, tint, FontStyle.Bold);
-                DuelStatDigitFit.Attach(number, useGlyphBounds: true);
+                DuelTypography.AddNumber(value, "Text", change.Delta > 0 ? $"+{change.Delta}" : change.Delta.ToString(),
+                    23, TextAnchor.MiddleRight, tint);
                 change.Feedback = group;
                 visible = true;
                 damage |= change.Kind is LifePointChangeKind.BattleDamage or LifePointChangeKind.EffectDamage or LifePointChangeKind.Damage;

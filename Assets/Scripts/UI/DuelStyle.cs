@@ -40,6 +40,11 @@ namespace YGOPortable.UI
 
         internal static void ApplyButton(Button button, bool accent)
         {
+            if (button.GetComponentInChildren<Text>(true) is { } label)
+            {
+                label.fontStyle = FontStyle.Normal;
+                if (label.TryGetComponent<Shadow>(out var shadow)) shadow.enabled = false;
+            }
             var image = button.image;
             image.sprite = LotdUiKit.WhiteSprite;
             image.overrideSprite = null;

@@ -211,7 +211,7 @@ namespace YGOPortable.UI
                 _rail = LotdUiKit.AddImage(rail.gameObject, LotdUiKit.WhiteSprite, accent, false, false);
                 if (compact)
                 {
-                    _symbol = LotdUiKit.CreateRect("Symbol", Rect, new Vector2(.055f, .17f), new Vector2(.245f, .91f),
+                    _symbol = LotdUiKit.CreateRect("Symbol", Rect, new Vector2(.045f, .22f), new Vector2(.217f, .83f),
                         Vector2.zero, Vector2.zero);
                     LotdUiKit.AddImage(_symbol.gameObject, icon ?? DuelStatSymbols.Get(key == "Defense"), accent, true, false);
                 }
@@ -219,24 +219,23 @@ namespace YGOPortable.UI
                 {
                     var heading = LotdUiKit.CreateRect("Caption", Rect, new Vector2(.09f, .60f), new Vector2(.76f, .99f),
                         Vector2.zero, Vector2.zero);
-                    var title = LotdUiKit.AddFittedText(heading, "Label", label, 14, 8, TextAnchor.MiddleLeft, accent, FontStyle.Bold);
+                    var title = LotdUiKit.AddFittedText(heading, "Label", label, 14, 8, TextAnchor.MiddleLeft, accent);
                     title.verticalOverflow = VerticalWrapMode.Overflow;
                 }
-                var badge = LotdUiKit.CreateRect("Change", Rect, compact ? new Vector2(.055f, .04f) : new Vector2(.76f, .60f),
-                    compact ? new Vector2(.245f, .43f) : new Vector2(.94f, .99f), Vector2.zero, Vector2.zero);
+                var badge = LotdUiKit.CreateRect("Change", Rect, compact ? new Vector2(.045f, .04f) : new Vector2(.76f, .60f),
+                    compact ? new Vector2(.217f, .40f) : new Vector2(.94f, .99f), Vector2.zero, Vector2.zero);
                 _change = LotdUiKit.AddFittedText(badge, "Arrow", "", compact ? 13 : 14, 7,
-                    TextAnchor.MiddleCenter, accent, FontStyle.Bold);
+                    TextAnchor.MiddleCenter, accent);
                 DuelStatDigitFit.Attach(_change, useGlyphBounds: true);
-                _digits = LotdUiKit.CreateRect("Digits", Rect, compact ? new Vector2(.26f, .055f) : new Vector2(.055f, .035f),
+                _digits = LotdUiKit.CreateRect("Digits", Rect, compact ? new Vector2(.225f, .055f) : new Vector2(.055f, .035f),
                     compact ? new Vector2(.975f, .985f) : new Vector2(.945f, .59f), Vector2.zero, Vector2.zero);
-                _value = LotdUiKit.AddFittedText(_digits, "Value", "", compact ? 23 : 28, compact ? 7 : 9,
-                    TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
-                DuelStatDigitFit.Attach(_value, useGlyphBounds: true);
+                _value = DuelTypography.AddNumber(_digits, "Value", "", compact ? 23 : 31,
+                    TextAnchor.MiddleCenter, Color.white);
             }
 
             internal void BindComparison(long value, bool split)
             {
-                _digits.anchorMin = new Vector2(.265f, .035f);
+                _digits.anchorMin = new Vector2(.225f, .035f);
                 _digits.anchorMax = new Vector2(.97f, .99f);
                 _value.fontSize = split ? 23 : 28;
                 Bind(value, value, active: true);
@@ -257,10 +256,25 @@ namespace YGOPortable.UI
                 _value.color = change > 0 ? Increased : change < 0 ? Decreased : active ? Color.white : DuelStyle.Muted;
                 _change.text = change > 0 ? "▲" : change < 0 ? "▼" : "";
                 _change.color = _value.color;
-                if (_symbol != null) _symbol.anchorMin = new Vector2(.055f, change == 0 ? .17f : .44f);
+                if (_symbol != null) _symbol.anchorMin = new Vector2(.045f, change == 0 ? .22f : .43f);
                 _plate.color = active ? Color.Lerp(Backing, _accent, .15f) : Backing;
-                _rail.color = new Color(_accent.r, _accent.g, _accent.b, active ? .95f : .28f);
+                _rail.color = new Color(_accent.r, _accent.g, _accent.b, active ? .72f : .22f);
             }
+        }
+    }
+
+    internal static class DuelTypography
+    {
+        private static Font _numberFont;
+        internal static Font NumberFont => _numberFont != null ? _numberFont : _numberFont =
+            Resources.Load<Font>("Fonts/BarlowSemiCondensedTabular-SemiBold") ?? LotdUiKit.FontKR;
+
+        internal static Text AddNumber(Transform parent, string name, string content, int size, TextAnchor align, Color color)
+        {
+            var label = LotdUiKit.AddText(parent, name, content, size, align, color);
+            label.font = NumberFont;
+            DuelStatDigitFit.Attach(label, useGlyphBounds: true);
+            return label;
         }
     }
 
@@ -293,17 +307,24 @@ namespace YGOPortable.UI
                 max = Vector2.Max(max, vertex.position);
             }
             Vector2 size = max - min;
-            bool fitWidth = size.x > 0f && (min.x < rect.xMin || max.x > rect.xMax);
-            bool fitHeight = size.y > 0f && (min.y < rect.yMin || max.y > rect.yMax);
-            if (!fitWidth && !fitHeight) return;
-            Vector2 center = (min + max) * .5f;
-            float scaleX = fitWidth ? Mathf.Min(1f, rect.width / size.x) : 1f;
-            float scaleY = fitHeight ? Mathf.Min(1f, rect.height / size.y) : 1f;
+            if (size.x <= 0f || size.y <= 0f) return;
+
+            // Fit the entire run at one scale so small readouts keep the typeface's proportions.
+            float scale = Mathf.Min(1f, Mathf.Min(rect.width / size.x, rect.height / size.y));
+            float alignment = ((Text)graphic).alignment switch
+            {
+                TextAnchor.UpperLeft or TextAnchor.MiddleLeft or TextAnchor.LowerLeft => rect.xMin,
+                TextAnchor.UpperRight or TextAnchor.MiddleRight or TextAnchor.LowerRight => rect.xMax,
+                _ => rect.center.x,
+            };
+            float x = alignment * (1f - scale);
+            x += Mathf.Clamp(0f, rect.xMin - (min.x * scale + x), rect.xMax - (max.x * scale + x));
+            float y = rect.center.y - (min.y + max.y) * .5f * scale;
             for (int i = 0; i < mesh.currentVertCount; i++)
             {
                 mesh.PopulateUIVertex(ref vertex, i);
-                if (fitWidth) vertex.position.x = rect.center.x + (vertex.position.x - center.x) * scaleX;
-                if (fitHeight) vertex.position.y = rect.center.y + (vertex.position.y - center.y) * scaleY;
+                vertex.position.x = vertex.position.x * scale + x;
+                vertex.position.y = vertex.position.y * scale + y;
                 mesh.SetUIVertex(vertex, i);
             }
         }
@@ -516,9 +537,9 @@ namespace YGOPortable.UI
             }
             var digits = LotdUiKit.CreateRect("Number", root, new Vector2(compact ? .42f : .06f, 0f), new Vector2(.95f, 1f),
                 Vector2.zero, Vector2.zero);
-            _value = LotdUiKit.AddFittedText(digits, "Value", "", compact ? 19 : 16, 8,
-                TextAnchor.MiddleCenter, Ink, FontStyle.Bold);
-            DuelStatDigitFit.Attach(_value, useGlyphBounds: compact);
+            _value = compact
+                ? DuelTypography.AddNumber(digits, "Value", "", 21, TextAnchor.MiddleCenter, Ink)
+                : LotdUiKit.AddFittedText(digits, "Value", "", 16, 8, TextAnchor.MiddleCenter, Ink);
             Bind(default);
         }
 
@@ -638,10 +659,10 @@ namespace YGOPortable.UI
             _stats = new DuelStatStrip(_combat, compact: true);
             _labels = LotdUiKit.FillRect("Labels", _root);
             // Leave room for the selection check on choice cards.
-            _rating = CreateLabel("Rating", .035f, .355f, 19);
+            _rating = CreateLabel("Rating", .035f, .355f, 21, numeric: true);
             var icon = CreateLabelSymbol(_rating);
             _ratingIcon = LotdUiKit.AddImage(icon.gameObject, null, Color.white, true, false);
-            _status = CreateLabel("Status", .372f, inPreview ? .79f : .965f, inPreview ? 13 : 16);
+            _status = CreateLabel("Status", .372f, inPreview ? .79f : .965f, inPreview ? 13 : 16, numeric: false);
             if (inPreview)
             {
                 _combat.anchorMin = new Vector2(.03f, 0f);
@@ -655,14 +676,15 @@ namespace YGOPortable.UI
             }
         }
 
-        private Text CreateLabel(string name, float left, float right, int size)
+        private Text CreateLabel(string name, float left, float right, int size, bool numeric)
         {
             var chip = LotdUiKit.CreateRect(name, _labels, new Vector2(left, 0f), new Vector2(right, 1f),
                 Vector2.zero, Vector2.zero);
             DuelReadoutPlate.Add(chip, Backing);
-            var value = LotdUiKit.AddFittedText(chip, "Value", "", size, 8, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
-            DuelStatDigitFit.Attach(value, useGlyphBounds: !_inPreview);
-            return value;
+            if (numeric) return DuelTypography.AddNumber(chip, "Value", "", size, TextAnchor.MiddleCenter, Color.white);
+            var status = LotdUiKit.AddFittedText(chip, "Value", "", size, 8, TextAnchor.MiddleCenter, Color.white);
+            DuelStatDigitFit.Attach(status, useGlyphBounds: false);
+            return status;
         }
 
         private static RectTransform CreateLabelSymbol(Text label)
@@ -706,8 +728,8 @@ namespace YGOPortable.UI
             _root.gameObject.SetActive(true);
             if (!_inPreview)
             {
-                _combat.anchorMin = new Vector2(.03f, opponent ? .715f : .015f);
-                _combat.anchorMax = new Vector2(.97f, opponent ? .985f : .285f);
+                _combat.anchorMin = new Vector2(.03f, opponent ? .765f : .015f);
+                _combat.anchorMax = new Vector2(.97f, opponent ? .985f : .235f);
             }
             _stats.Bind(card, opponent, showChanges, position);
             var rating = scale.HasValue ? (DuelRatingKind.Scale, scale.Value) : card.RatingNumber;
@@ -722,7 +744,7 @@ namespace YGOPortable.UI
 
             if (card.HasMaterials && _materials == null)
             {
-                _materials = CreateLabel("Materials", 0f, 1f, 19);
+                _materials = CreateLabel("Materials", 0f, 1f, 21, numeric: true);
                 var symbol = CreateLabelSymbol(_materials);
                 DuelPromptLocationIcon.Add(symbol, YgoConstants.LOCATION_OVERLAY, false, glyphOnly: true).color = MaterialColor;
             }

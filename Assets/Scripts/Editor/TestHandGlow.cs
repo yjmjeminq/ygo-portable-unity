@@ -23,6 +23,7 @@ namespace YGOPortable.Editor
 
         internal static void Run()
         {
+            VerifyNumberTypeface();
             VerifyMainPhaseAndStaleState();
             VerifyOpponentTurnActivation();
             VerifyNativeCombatReadout(useHonest: true);
@@ -61,6 +62,20 @@ namespace YGOPortable.Editor
             VerifyNativeMixedMaterials(ritual: true);
             VerifyNativeXyzMaterialReadout();
             Debug.Log("[VERIFY HAND GLOW] Native summons and effects, distinct hand copies, blocked prompts, animation, off-turn activation and field-only monster ratings passed.");
+        }
+
+        private static void VerifyNumberTypeface()
+        {
+            const string figures = "0123456789";
+            var font = DuelTypography.NumberFont;
+            Require(font != LotdUiKit.FontKR && figures.All(font.HasCharacter) && "+-?/".All(font.HasCharacter),
+                "The bundled numeric font could not render all duel values.");
+            font.RequestCharactersInTexture(figures, 24, FontStyle.Normal);
+            Require(font.GetCharacterInfo('0', out var reference, 24) && reference.advance > 0,
+                "The numeric font did not render its tabular figures.");
+            foreach (char digit in figures)
+                Require(font.GetCharacterInfo(digit, out var glyph, 24) && glyph.advance == reference.advance,
+                    $"The glyph {digit} moved a tabular number out of alignment.");
         }
 
         private static void VerifyMainPhaseAndStaleState()
@@ -1303,20 +1318,20 @@ namespace YGOPortable.Editor
             var counterLabel = breakerTile.Find("Lbl/L").GetComponent<Text>();
             var confirm = window.Find("Footer/Btn_확정/B").GetComponent<Button>();
             Require(window.Find("Hdr/TitleBand/Title").GetComponent<Text>().text == "마력 카운터 제거" &&
-                counterLabel.text == "0 / 1개" &&
+                counterLabel.text == "0 / 1" &&
                 breakerTile.Find("Card/V/AspectBox/CardReadout/Counters") == null && !confirm.interactable,
                 "The chooser did not display the correct removable counter type and quantity.");
             var addBreaker = breakerTile.Find("P/B").GetComponent<Button>();
             addBreaker.onClick.Invoke();
             addBreaker.onClick.Invoke();
-            Require(counterLabel.text == "1 / 1개" && !confirm.interactable,
+            Require(counterLabel.text == "1 / 1" && !confirm.interactable,
                 "The chooser accepted a second counter of the wrong type.");
             breakerTile.Find("M/B").GetComponent<Button>().onClick.Invoke();
             var addStone = stoneTile.Find("P/B").GetComponent<Button>();
             addStone.onClick.Invoke();
             addStone.onClick.Invoke();
             addStone.onClick.Invoke();
-            Require(confirm.interactable && stoneTile.Find("Lbl/L").GetComponent<Text>().text == "2 / 3개",
+            Require(confirm.interactable && stoneTile.Find("Lbl/L").GetComponent<Text>().text == "2 / 3",
                 "The chooser did not cap allocation at the requested payment.");
             confirm.onClick.Invoke();
             Require(counterResponse?.Length == 4 && BitConverter.ToUInt16(counterResponse, breakerIndex * 2) == 0 &&
@@ -3202,8 +3217,8 @@ namespace YGOPortable.Editor
                     VerifyStatGlyphs(Label(normal, "Combat/Attack/Change/Arrow"), "▼");
                     VerifyStatGlyphs(Label(normal, "Combat/Defense/Change/Arrow"), "▲");
                     VerifyStatGlyphs(Label(link, attack), "2300");
-                    VerifyStatGlyphs(Label(xyz, attack), int.MaxValue.ToString());
-                    VerifyStatGlyphs(Label(xyz, defense), int.MaxValue.ToString());
+                    VerifyStatGlyphs(Label(xyz, attack), int.MaxValue.ToString(), minimumInkShare: .16f);
+                    VerifyStatGlyphs(Label(xyz, defense), int.MaxValue.ToString(), minimumInkShare: .16f);
                     VerifyStatGlyphs(Label(xyz, rating), "12");
                     VerifyStatGlyphs(Label(xyz, materials), "10");
                     VerifyStatGlyphs(Label(xyz, counters), "12");
@@ -3268,34 +3283,49 @@ namespace YGOPortable.Editor
                 Debug.Log("[VERIFY DUEL RATING BADGES] Distinct rating, material, counter and negation badges stayed separate from the neighboring zone at full focus across three viewports.");
             }
 
-            private static void VerifyStatGlyphs(Text text, string expected, float minimumHeightShare = .78f)
+            private static void VerifyStatGlyphs(Text text, string expected, float minimumHeightShare = .78f,
+                float minimumInkShare = .49f)
             {
                 Require(text.text == expected && text.horizontalOverflow == HorizontalWrapMode.Overflow,
                     "A readout truncated or wrapped its text.");
                 using var mesh = new VertexHelper();
                 var populate = typeof(Text).GetMethod("OnPopulateMesh", PrivateInstance, null, new[] { typeof(VertexHelper) }, null);
                 populate.Invoke(text, new object[] { mesh });
+                Vector2 originalSize = BoundsOfText().size;
                 text.GetComponent<DuelStatDigitFit>().ModifyMesh(mesh);
                 int glyphCount = expected.Count(character => !char.IsWhiteSpace(character));
                 Require(mesh.currentVertCount == glyphCount * 4 && text.cachedTextGenerator.lineCount == 1,
                     $"The readout omitted or wrapped a glyph in '{expected}'.");
                 Rect rect = text.GetPixelAdjustedRect();
-                var vertex = default(UIVertex);
-                float bottom = float.PositiveInfinity, top = float.NegativeInfinity;
-                for (int i = 0; i < mesh.currentVertCount; i++)
-                {
-                    mesh.PopulateUIVertex(ref vertex, i);
-                    Require(vertex.position.x >= rect.xMin - .1f && vertex.position.x <= rect.xMax + .1f &&
-                        vertex.position.y >= rect.yMin - .1f && vertex.position.y <= rect.yMax + .1f,
-                        "A readout glyph rendered outside its allotted space.");
-                    bottom = Mathf.Min(bottom, vertex.position.y);
-                    top = Mathf.Max(top, vertex.position.y);
-                }
+                var fitted = BoundsOfText();
+                Require(fitted.xMin >= rect.xMin - .1f && fitted.xMax <= rect.xMax + .1f &&
+                    fitted.yMin >= rect.yMin - .1f && fitted.yMax <= rect.yMax + .1f,
+                    $"'{expected}' rendered outside its allotted space.");
+                Require(Mathf.Abs(fitted.width / originalSize.x - fitted.height / originalSize.y) < .015f,
+                    $"'{expected}' changed the typeface's shape to fit its bounds.");
+                if (expected.All(char.IsDigit))
+                    Require(text.font == DuelTypography.NumberFont && text.fontStyle == FontStyle.Normal,
+                        $"'{expected}' bypassed the duel numeric font.");
                 if (!text.resizeTextForBestFit)
-                    Require(top - bottom >= rect.height * .68f, "The field label left too much space unused by its glyphs.");
+                    Require(fitted.height >= rect.height * minimumInkShare,
+                        $"'{expected}' only used {fitted.height:F1} of {rect.height:F1} available vertical units.");
                 var cell = (RectTransform)text.transform.parent;
                 if (cell.name is "Digits" or "Number") cell = (RectTransform)cell.parent;
                 Require(rect.height / cell.rect.height > minimumHeightShare, "The readout text did not use enough of its allotted height.");
+
+                Rect BoundsOfText()
+                {
+                    var min = Vector2.positiveInfinity;
+                    var max = Vector2.negativeInfinity;
+                    var vertex = default(UIVertex);
+                    for (int i = 0; i < mesh.currentVertCount; i++)
+                    {
+                        mesh.PopulateUIVertex(ref vertex, i);
+                        min = Vector2.Min(min, vertex.position);
+                        max = Vector2.Max(max, vertex.position);
+                    }
+                    return Rect.MinMaxRect(min.x, min.y, max.x, max.y);
+                }
             }
 
             private uint[] ActiveGlows(string fieldName, bool requireElement)

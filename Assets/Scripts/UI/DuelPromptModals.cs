@@ -440,7 +440,7 @@ namespace YGOPortable.UI
                 Vector2.zero, Vector2.zero);
             var subBand = LotdUiKit.CreateRect("SubtitleBand", _modalHeader, new Vector2(.024f, .05f), new Vector2(.976f, .47f),
                 Vector2.zero, Vector2.zero);
-            _modalTitle = LotdUiKit.AddFittedText(_modalTitleBand, "Title", "", 21, 11, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
+            _modalTitle = LotdUiKit.AddFittedText(_modalTitleBand, "Title", "", 22, 11, TextAnchor.MiddleLeft, Color.white);
             _modalSubtitle = LotdUiKit.AddFittedText(subBand, "Sub", "", 15, 10, TextAnchor.MiddleLeft, DuelStyle.Muted);
 
             _modalBody = LotdUiKit.CreateRect("Body", _modalBox, new Vector2(.02f, .202f), new Vector2(.98f, .785f), Vector2.zero, Vector2.zero);
@@ -510,7 +510,7 @@ namespace YGOPortable.UI
             LotdUiKit.AddImage(header.gameObject, LotdUiKit.WhiteSprite, DuelStyle.HeaderColor, false, false);
             var title = LotdUiKit.CreateRect("Title", header, new Vector2(.024f, .05f), new Vector2(.62f, .95f),
                 Vector2.zero, Vector2.zero);
-            _chainTitle = LotdUiKit.AddFittedText(title, "Text", "", 23, 13, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
+            _chainTitle = LotdUiKit.AddFittedText(title, "Text", "", 24, 13, TextAnchor.MiddleLeft, Color.white);
             var summary = LotdUiKit.CreateRect("Summary", header, new Vector2(.67f, .07f), new Vector2(.972f, .93f),
                 Vector2.zero, Vector2.zero);
             _chainSummary = LotdUiKit.AddFittedText(summary, "Text", "", 18, 11, TextAnchor.MiddleRight, DuelStyle.Gold, FontStyle.Bold);
@@ -522,10 +522,10 @@ namespace YGOPortable.UI
             var details = _chainDetails = DuelStyle.Panel(_chainBox, "Details", new Vector2(.711f, .176f), new Vector2(.977f, .852f));
             var name = LotdUiKit.CreateRect("Name", details, new Vector2(.04f, .77f), new Vector2(.96f, .98f),
                 Vector2.zero, Vector2.zero);
-            _chainName = LotdUiKit.AddFittedText(name, "Text", "", 20, 12, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
+            _chainName = LotdUiKit.AddFittedText(name, "Text", "", 21, 12, TextAnchor.MiddleLeft, Color.white);
             var source = LotdUiKit.CreateRect("Source", details, new Vector2(.04f, .59f), new Vector2(.96f, .76f),
                 Vector2.zero, Vector2.zero);
-            _chainSource = LotdUiKit.AddFittedText(source, "Text", "", 16, 10, TextAnchor.MiddleLeft, DuelStyle.Gold, FontStyle.Bold);
+            _chainSource = LotdUiKit.AddFittedText(source, "Text", "", 16, 10, TextAnchor.MiddleLeft, DuelStyle.Gold);
             var description = LotdUiKit.CreateRect("Description", details, new Vector2(.0f, .025f), new Vector2(1f, .57f),
                 Vector2.zero, Vector2.zero);
             _chainEffectScroll = CreateVerticalScroll(description, out Transform content);
@@ -901,6 +901,11 @@ namespace YGOPortable.UI
                 var option = LotdUiKit.CreateWrappedButton(content, $"Opt_{i}", text, () => Submit(BitConverter.GetBytes(pick)),
                     18, i == 0, 54f, sidePadding: 22);
                 DuelStyle.ApplyButton(option, i == 0);
+                if (isNum)
+                {
+                    var value = option.GetComponentInChildren<Text>();
+                    value.font = DuelTypography.NumberFont;
+                }
                 uint inspectCode = card?.code ?? link?.code ?? 0;
                 PreviewOnFocus(option, inspectCode, ReadFieldEffectSource(session, p, inspectCode));
             }
@@ -1409,16 +1414,16 @@ namespace YGOPortable.UI
                     Vector2.zero, Vector2.zero);
                 BuildCandidateCard(cRt, session, c, code, showCounters: false);
 
-                countLabels[i] = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Lbl", tile, new Vector2(.05f, .215f),
+                countLabels[i] = DuelTypography.AddNumber(LotdUiKit.CreateRect("Lbl", tile, new Vector2(.05f, .215f),
                     new Vector2(.95f, .343f), Vector2.zero, Vector2.zero),
-                    "L", $"0 / {c.currentCounter}개", 19, 9, TextAnchor.MiddleCenter, DuelCounterBadge.Ink, FontStyle.Bold);
+                    "L", $"0 / {c.currentCounter}", 21, TextAnchor.MiddleCenter, DuelCounterBadge.Ink);
 
                 var minus = LotdUiKit.CreateRect("M", tile, new Vector2(.064f, .017f), new Vector2(.465f, .201f),
                     Vector2.zero, Vector2.zero);
                 var decrease = DuelStyle.Button(minus, "B", "−", () =>
                 {
                     if (_counterAlloc[idx] > 0) _counterAlloc[idx]--;
-                    countLabels[idx].text = $"{_counterAlloc[idx]} / {c.currentCounter}개";
+                    countLabels[idx].text = $"{_counterAlloc[idx]} / {c.currentCounter}";
                     UpdateCounterConfirm();
                 }, 21);
                 var plus = LotdUiKit.CreateRect("P", tile, new Vector2(.535f, .017f), new Vector2(.936f, .201f),
@@ -1427,7 +1432,7 @@ namespace YGOPortable.UI
                 {
                     int curSum = _counterAlloc.Sum();
                     if (_counterAlloc[idx] < c.currentCounter && curSum < p.min) _counterAlloc[idx]++;
-                    countLabels[idx].text = $"{_counterAlloc[idx]} / {c.currentCounter}개";
+                    countLabels[idx].text = $"{_counterAlloc[idx]} / {c.currentCounter}";
                     UpdateCounterConfirm();
                 }, 21);
                 PreviewOnFocus(decrease, code, c);
