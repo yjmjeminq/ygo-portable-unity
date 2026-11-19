@@ -59,6 +59,19 @@ namespace YGOPortable.UI
         internal bool HasMaterials => Live != null && (IsXyz || Materials > 0);
         internal bool IsToken => (Type & YgoConstants.TYPE_TOKEN) != 0;
 
+        internal string RulesName
+        {
+            get
+            {
+                if (Live?.IsFaceUp != true || Live.CurrentNameCode == Live.code) return null;
+                // Art variants can share a rules code with their original printing.
+                if (CardDatabase.GetDeckPrintingKey(Live.CurrentNameCode) == CardDatabase.GetDeckPrintingKey(Live.code))
+                    return null;
+                string name = CardDatabase.Get(Live.CurrentNameCode)?.name;
+                return string.Equals(name, Printed?.name, StringComparison.Ordinal) ? null : name;
+            }
+        }
+
         internal uint? ScaleIn(uint location, uint sequence) =>
             location == YgoConstants.LOCATION_SZONE && IsScale && sequence is 0 or 4
                 ? sequence == 0 ? LeftScale : RightScale : null;

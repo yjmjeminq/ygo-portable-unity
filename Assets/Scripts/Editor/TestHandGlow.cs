@@ -41,6 +41,8 @@ namespace YGOPortable.Editor
             VerifyNativeBattleDamageFeedback(reflected: true);
             VerifyNativeCounterReadout();
             VerifyNativeIdentityReadout();
+            VerifyNativeCardName(mobileLayout: false);
+            VerifyNativeCardName(mobileLayout: true);
             VerifyInspectedCardMoves(swapInPlace: true);
             VerifyInspectedCardMoves(swapInPlace: false);
             VerifyInspectedCardMoves(swapInPlace: false, opponentSets: true);
@@ -1445,6 +1447,106 @@ namespace YGOPortable.Editor
             ui.Field.Refresh();
             ExpectShown(YgoConstants.RACE_SEASERPENT, YgoConstants.ATTRIBUTE_LIGHT);
             Debug.Log("[VERIFY DUEL IDENTITY] An inspected monster's race and attribute icons followed Zombie World and Lair of Darkness, then returned to normal. Multiple attributes and face-down visibility passed.");
+        }
+
+        private static void VerifyNativeCardName(bool mobileLayout)
+        {
+            const uint heroMask = 75141056, avian = 21844576;
+            var empty = Array.Empty<uint>();
+            var main = Enumerable.Repeat(KaiserSeaHorse, 20).Concat(Enumerable.Repeat(heroMask, 14))
+                .Concat(Enumerable.Repeat(avian, 6)).ToArray();
+            var ai = new TacticalAI();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Live card name", main, empty,
+                Enumerable.Repeat(BlueEyes, 40).ToArray(), empty, true, session =>
+                {
+                    var hand = session.Players[session.HumanPlayerIndex].hand;
+                    return hand.Any(card => card.code == KaiserSeaHorse) && hand.Any(card => card.code == heroMask);
+                });
+            int summon = duel.ActivePrompt.summonable.FindIndex(card => card.code == KaiserSeaHorse);
+            Require(summon >= 0, "The name change fixture could not summon Kaiser Sea Horse.");
+            duel.SubmitResponseInt(summon << 16);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+
+            var player = duel.Players[duel.HumanPlayerIndex];
+            var monster = player.mzone.Single(card => card?.code == KaiserSeaHorse);
+            using var ui = new HandUI(duel, mobileLayout);
+            if (mobileLayout) ((RectTransform)ui.Canvas.transform).sizeDelta = new Vector2(1740f, 805f);
+            var animator = CardAnimationManager.Ensure(ui.Canvas);
+            var root = ui.Field.Root.transform;
+            var playArea = root.Find("MobileSafeArea") ?? root;
+            var slot = FieldSlot(ui.Field, monster);
+            slot.GetComponent<CardDragTrigger>().OnRightClick();
+            playArea.Find("LeftInspector/CardPreview/Card/AspectBox/ZoomHit").GetComponent<Button>().onClick.Invoke();
+            var inspectorTitle = playArea.Find("LeftInspector/CardDetails/Name/Content");
+            var zoom = root.Find("Overlay_CardZoom");
+            var zoomInfo = (zoom.Find("MobileSafeArea") ?? zoom).Find("ZoomWin/Info");
+            var zoomTitle = zoomInfo.Find("Name");
+
+            ActivateFromMainPhase(duel, heroMask);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
+            {
+                if (prompt.messageType != YgoConstants.MSG_SELECT_CARD) return null;
+                int index = prompt.candidates.FindIndex(card => card.code is KaiserSeaHorse or avian);
+                Require(index >= 0, "Hero Mask lost the face-up target or the HERO in the deck.");
+                return DuelSession.PackCardSelection(index);
+            });
+            var changed = player.mzone[monster.sequence];
+            Require(duel.RetryCount == 0 && changed.code == KaiserSeaHorse && changed.alias == avian &&
+                changed.attack == monster.attack && changed.defense == monster.defense && changed.level == monster.level,
+                "The native fixture did not change only the rules name.");
+            var steps = AnimationSteps(animator).ToArray();
+            var changes = steps.Where(step =>
+                step.GetType().Name.StartsWith("<ApplyFieldReadoutUpdate>", StringComparison.Ordinal)).ToArray();
+            Require(changes.Length == 1, "The native name change did not queue a field readout update.");
+            int resolving = Array.FindIndex(steps, step => step.GetType().Name.StartsWith("<ChainResolution>", StringComparison.Ordinal));
+            Require(resolving >= 0 && Array.IndexOf(steps, changes[0]) > resolving,
+                "The new name was presented ahead of its resolving chain link.");
+
+            var inspectorName = inspectorTitle.Find("CurrentName")?.GetComponent<Text>();
+            var zoomName = zoomTitle.Find("CurrentName")?.GetComponent<Text>();
+            Require(inspectorName != null && zoomName != null, "The card details have no current-name label.");
+            var printed = CardDatabase.Get(KaiserSeaHorse);
+            string effective = $"현재 카드명 · {CardDatabase.GetName(avian)}";
+            ui.Field.Refresh();
+            Require(!inspectorName.gameObject.activeInHierarchy && !zoomName.gameObject.activeInHierarchy,
+                "The changed name appeared before the effect resolved visually.");
+            Require(!changes[0].MoveNext() && inspectorName.text == effective && zoomName.text == effective &&
+                inspectorName.gameObject.activeInHierarchy && zoomName.gameObject.activeInHierarchy &&
+                inspectorTitle.Find("Text").GetComponent<Text>().text == printed.name &&
+                zoomTitle.Find("N").GetComponent<Text>().text == printed.name &&
+                zoomInfo.Find("DescBox/VP/C/EffectText").GetComponent<Text>().text == printed.desc,
+                "The card details did not display both the printed and rules names after resolution.");
+            Canvas.ForceUpdateCanvases();
+            foreach (var label in new[] { inspectorName, zoomName })
+            {
+                var generator = label.cachedTextGenerator;
+                generator.Populate(label.text, label.GetGenerationSettings(label.rectTransform.rect.size));
+                Require(generator.characterCountVisible >= label.text.Length && !label.raycastTarget,
+                    $"The rules name was clipped or obstructed interaction at {ui.Canvas.GetComponent<RectTransform>().rect.size}.");
+            }
+
+            int queued = AnimationSteps(animator).Count;
+            duel.SubmitResponseInt(7);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            Require(player.mzone[monster.sequence].alias == KaiserSeaHorse && duel.RetryCount == 0,
+                "The rules name did not expire at the end of the turn.");
+            var resets = AnimationSteps(animator).Skip(queued).Where(step =>
+                step.GetType().Name.StartsWith("<ApplyFieldReadoutUpdate>", StringComparison.Ordinal)).ToArray();
+            Require(resets.Length == 1 && !resets[0].MoveNext() &&
+                !inspectorName.gameObject.activeInHierarchy && !zoomName.gameObject.activeInHierarchy,
+                "The expired name stayed visible in card details.");
+
+            const uint blueEyesPrinting = 89631135, legendaryOcean = 295517, umi = 22702055;
+            var alternate = new LiveCardState { code = blueEyesPrinting, alias = BlueEyes, position = YgoConstants.POS_FACEUP_ATTACK };
+            Require(new DuelCardReadout(CardDatabase.Get(blueEyesPrinting), alternate).RulesName == null,
+                "Alternate artwork was mistaken for a changed rules name.");
+            var ocean = new LiveCardState { code = legendaryOcean, alias = umi, position = YgoConstants.POS_FACEUP_ATTACK };
+            Require(new DuelCardReadout(CardDatabase.Get(legendaryOcean), ocean).RulesName == CardDatabase.GetName(umi),
+                "A distinct card treated as Umi was mistaken for another printing.");
+            ocean.position = YgoConstants.POS_FACEDOWN_DEFENSE;
+            Require(new DuelCardReadout(CardDatabase.Get(legendaryOcean), ocean).RulesName == null,
+                "A face-down card exposed its rules name.");
+            Debug.Log($"[VERIFY DUEL CARD NAME] Name-only effects, duration and visibility passed in {(mobileLayout ? "mobile" : "desktop")} layout.");
         }
 
         private static void VerifyInspectedCardMoves(bool swapInPlace, bool opponentSets = false)

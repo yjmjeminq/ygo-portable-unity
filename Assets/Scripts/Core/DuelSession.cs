@@ -46,6 +46,7 @@ namespace YGOPortable.Core
         public bool IsFaceUp => (position & YgoConstants.POS_FACEUP) != 0;
         public bool IsDefense => (position & YgoConstants.POS_DEFENSE) != 0;
         public bool IsAttack => (position & YgoConstants.POS_ATTACK) != 0;
+        internal uint CurrentNameCode => alias != 0 ? alias : code;
     }
 
     public class CardMoveEvent
@@ -1754,7 +1755,8 @@ namespace YGOPortable.Core
             a.attack == b.attack && a.defense == b.defense && a.baseAttack == b.baseAttack && a.baseDefense == b.baseDefense &&
             a.level == b.level && a.rank == b.rank && a.link == b.link && a.linkMarker == b.linkMarker &&
             a.lscale == b.lscale && a.rscale == b.rscale && a.type == b.type && a.race == b.race && a.attribute == b.attribute &&
-            a.effectsDisabled == b.effectsDisabled && a.Counters.AsSpan().SequenceEqual(b.Counters);
+            a.CurrentNameCode == b.CurrentNameCode && a.effectsDisabled == b.effectsDisabled &&
+            a.Counters.AsSpan().SequenceEqual(b.Counters);
 
         public void RefreshZonesFromCore()
         {

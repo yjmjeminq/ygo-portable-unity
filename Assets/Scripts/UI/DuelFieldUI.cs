@@ -23,6 +23,7 @@ namespace YGOPortable.UI
         private Image _inspRaceIcon;
         private Image _inspAttributeIcon;
         private Text _inspName;
+        private Text _inspRulesName;
         private Image _inspTitleAccent;
         private Button _inspectorArtworkButton;
         private Text _inspStats;
@@ -145,6 +146,7 @@ namespace YGOPortable.UI
         private GameObject _zoomArtworkControls;
         private Text _zoomArtworkLabel;
         private Text _zoomName;
+        private Text _zoomRulesName;
         private Text _zoomStats;
         private DuelCounterBadge _zoomCounters;
         private DuelStatStrip _zoomCombat;
@@ -390,6 +392,7 @@ namespace YGOPortable.UI
             _inspectorArtworkButton.interactable = false;
             _inspTitleAccent.color = InspectorTitleAccent(0);
             _inspName.text = "카드 정보";
+            BindRulesName(_inspName, _inspRulesName, null);
             _inspStats.text = "";
             _inspCombat.Hide();
             SizeInspectorDescription(hasCombat: false);
@@ -496,6 +499,7 @@ namespace YGOPortable.UI
             if (card.Live == null && !IsInspectedCardStillOnField(_inspectedCode, _inspectedFieldCard)) _inspectedFieldCard = null;
             _inspCard.SetCard(_inspectedCode, live: card.Live);
             _inspTitleAccent.color = InspectorTitleAccent(card.Type);
+            BindRulesName(_inspName, _inspRulesName, card.RulesName);
             _inspStats.text = FormatInspectorStats(card, compact: true);
             BindIdentityIcons(card, _inspRaceIcon, _inspAttributeIcon);
             _inspCounters.Bind(card, showChanges);
@@ -508,6 +512,22 @@ namespace YGOPortable.UI
         {
             var description = (RectTransform)_inspectScroll.transform;
             description.anchorMax = new Vector2(description.anchorMax.x, hasCombat ? .275f : .337f);
+        }
+
+        private static Text CreateRulesNameLabel(Transform parent, int size)
+        {
+            var label = LotdUiKit.AddFittedText(parent, "CurrentName", "", size, 9, TextAnchor.MiddleLeft, DuelStyle.Muted);
+            label.rectTransform.anchorMax = new Vector2(label.rectTransform.anchorMax.x, .445f);
+            label.gameObject.SetActive(false);
+            return label;
+        }
+
+        private static void BindRulesName(Text title, Text label, string name)
+        {
+            bool visible = !string.IsNullOrEmpty(name);
+            label.text = visible ? $"현재 카드명 · {name}" : "";
+            label.gameObject.SetActive(visible);
+            title.rectTransform.anchorMin = new Vector2(title.rectTransform.anchorMin.x, visible ? .455f : .035f);
         }
 
         private static Color InspectorTitleAccent(uint type)
@@ -723,6 +743,7 @@ namespace YGOPortable.UI
                 new Vector2(13f, 0f), new Vector2(-5f, 0f));
             _inspName = LotdUiKit.AddFittedText(titleContent, "Text", "", 21, 10,
                 TextAnchor.MiddleLeft, Color.white);
+            _inspRulesName = CreateRulesNameLabel(titleContent, 14);
 
             var desc = LotdUiKit.CreateRect("Description", inside,
                 new Vector2(.018f, .081f), new Vector2(.982f, .275f), Vector2.zero, Vector2.zero);
@@ -3808,9 +3829,10 @@ namespace YGOPortable.UI
             // Right Side: Card Details
             var infoRt = LotdUiKit.CreateRect("Info", win, new Vector2(cardRight + .03f, .05f), new Vector2(.96f, .88f), Vector2.zero, Vector2.zero);
 
-            _zoomName = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Name", infoRt,
-                new Vector2(0f, 0.88f), new Vector2(0.82f, 1f), Vector2.zero, Vector2.zero),
-                "N", "", 24, 12, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary);
+            var name = LotdUiKit.CreateRect("Name", infoRt,
+                new Vector2(0f, 0.88f), new Vector2(0.82f, 1f), Vector2.zero, Vector2.zero);
+            _zoomName = LotdUiKit.AddFittedText(name, "N", "", 24, 12, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary);
+            _zoomRulesName = CreateRulesNameLabel(name, onIPhone ? 20 : 17);
 
             var race = LotdUiKit.CreateRect("RaceIc", infoRt, new Vector2(.833f, .88f), new Vector2(.902f, 1f), Vector2.zero, Vector2.zero);
             _zoomRaceIcon = LotdUiKit.AddImage(race.gameObject, null, Color.white, true, false);
@@ -3913,6 +3935,7 @@ namespace YGOPortable.UI
             var card = ReadInspectedStats(code, _zoomFieldCard);
             if (card.Live == null && !IsInspectedCardStillOnField(code, _zoomFieldCard)) _zoomFieldCard = null;
             _zoomCardView.SetCard(code, false, card.Live, (card.Attack, card.Defense));
+            BindRulesName(_zoomName, _zoomRulesName, card.RulesName);
             _zoomStats.text = FormatInspectorStats(card);
             BindIdentityIcons(card, _zoomRaceIcon, _zoomAttributeIcon);
             _zoomCounters.Bind(card, showChanges);
