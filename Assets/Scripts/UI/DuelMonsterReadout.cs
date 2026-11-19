@@ -13,11 +13,11 @@ namespace YGOPortable.UI
         internal readonly CardInfo Printed;
         internal readonly LiveCardState Live;
         private readonly BattleCardStats? _battleStats;
-        private readonly (int Count, int Attack, int Defense)? _materialReadout;
+        private readonly (int Count, LiveCardState Source)? _materialReadout;
         internal readonly bool ShowsSummonPreview;
 
         internal DuelCardReadout(CardInfo printed, LiveCardState live = null, BattleCardStats? battleStats = null,
-            (int Count, int Attack, int Defense)? materialReadout = null, bool showsSummonPreview = false)
+            (int Count, LiveCardState Source)? materialReadout = null, bool showsSummonPreview = false)
         {
             Printed = printed;
             Live = live;
@@ -45,8 +45,10 @@ namespace YGOPortable.UI
         internal bool IsScale => Type == (YgoConstants.TYPE_PENDULUM | YgoConstants.TYPE_SPELL);
         internal ulong Race => Live?.race ?? Printed?.race ?? 0;
         internal uint Attribute => Live?.attribute ?? Printed?.attr ?? 0;
-        internal int Attack => _battleStats?.Attack ?? _materialReadout?.Attack ?? Live?.attack ?? Printed?.atk ?? -1;
-        internal int Defense => _battleStats?.Defense ?? _materialReadout?.Defense ?? Live?.defense ?? Printed?.def ?? -1;
+        internal int Attack => _battleStats?.Attack ?? _materialReadout?.Source.attack ?? Live?.attack ?? Printed?.atk ?? -1;
+        internal int Defense => _battleStats?.Defense ?? _materialReadout?.Source.defense ?? Live?.defense ?? Printed?.def ?? -1;
+        internal int BaseAttack => ShowsSummonPreview ? Attack : _materialReadout?.Source.baseAttack ?? Live?.baseAttack ?? Attack;
+        internal int BaseDefense => ShowsSummonPreview ? Defense : _materialReadout?.Source.baseDefense ?? Live?.baseDefense ?? Defense;
         internal uint Position => ShowsSummonPreview ? 0u : _battleStats?.Position ?? Live?.position ?? 0;
         internal BattleComparisonValue? ComparedValue => _battleStats?.ComparedValue;
         internal uint LeftScale => Live?.lscale ?? Printed?.lscale ?? 0;
@@ -151,9 +153,9 @@ namespace YGOPortable.UI
             var source = card.ComparedValue?.Source;
             bool activeAttack = source.HasValue ? source == BattleStatSource.Attack : (shownPosition & YgoConstants.POS_ATTACK) != 0;
             bool activeDefense = source.HasValue ? source == BattleStatSource.Defense : (shownPosition & YgoConstants.POS_DEFENSE) != 0;
-            _attack.Bind(card.Attack, card.Live?.baseAttack ?? card.Attack, activeAttack, showChanges);
+            _attack.Bind(card.Attack, card.BaseAttack, activeAttack, showChanges);
             if (!card.IsLink)
-                _defense.Bind(card.Defense, card.Live?.baseDefense ?? card.Defense, activeDefense, showChanges);
+                _defense.Bind(card.Defense, card.BaseDefense, activeDefense, showChanges);
         }
 
         internal void BindBattle(BattleCardStats card, bool link, bool attacking)
@@ -213,6 +215,7 @@ namespace YGOPortable.UI
             private readonly RectTransform _symbol;
             private readonly Color _accent;
             private long _lastValue = -1;
+            private long _lastAdjustment;
 
             internal StatCell(Transform parent, string key, string label, Color accent, bool compact, Sprite icon = null)
             {
@@ -227,19 +230,21 @@ namespace YGOPortable.UI
                     _symbol = LotdUiKit.CreateRect("Symbol", Rect, new Vector2(.045f, .22f), new Vector2(.217f, .83f),
                         Vector2.zero, Vector2.zero);
                     LotdUiKit.AddImage(_symbol.gameObject, icon ?? DuelStatSymbols.Get(key == "Defense"), accent, true, false);
+                    var badge = LotdUiKit.CreateRect("Change", Rect, new Vector2(.045f, .04f), new Vector2(.217f, .40f),
+                        Vector2.zero, Vector2.zero);
+                    _change = LotdUiKit.AddFittedText(badge, "Arrow", "", 13, 7, TextAnchor.MiddleCenter, accent);
+                    DuelStatDigitFit.Attach(_change, useGlyphBounds: true);
                 }
                 else
                 {
-                    var heading = LotdUiKit.CreateRect("Caption", Rect, new Vector2(.09f, .60f), new Vector2(.76f, .99f),
+                    var heading = LotdUiKit.CreateRect("Caption", Rect, new Vector2(.075f, .60f), new Vector2(.49f, .99f),
                         Vector2.zero, Vector2.zero);
                     var title = LotdUiKit.AddFittedText(heading, "Label", label, 14, 8, TextAnchor.MiddleLeft, accent);
                     title.verticalOverflow = VerticalWrapMode.Overflow;
+                    var badge = LotdUiKit.CreateRect("Change", Rect, new Vector2(.515f, .60f), new Vector2(.93f, .99f),
+                        Vector2.zero, Vector2.zero);
+                    _change = DuelTypography.AddNumber(badge, "Delta", "", 21, TextAnchor.MiddleRight, accent);
                 }
-                var badge = LotdUiKit.CreateRect("Change", Rect, compact ? new Vector2(.045f, .04f) : new Vector2(.76f, .60f),
-                    compact ? new Vector2(.217f, .40f) : new Vector2(.94f, .99f), Vector2.zero, Vector2.zero);
-                _change = LotdUiKit.AddFittedText(badge, "Arrow", "", compact ? 13 : 14, 7,
-                    TextAnchor.MiddleCenter, accent);
-                DuelStatDigitFit.Attach(_change, useGlyphBounds: true);
                 _digits = LotdUiKit.CreateRect("Digits", Rect, compact ? new Vector2(.225f, .055f) : new Vector2(.055f, .035f),
                     compact ? new Vector2(.975f, .985f) : new Vector2(.945f, .59f), Vector2.zero, Vector2.zero);
                 _value = DuelTypography.AddNumber(_digits, "Value", "", compact ? 23 : 31,
@@ -256,20 +261,26 @@ namespace YGOPortable.UI
 
             internal void Bind(long value, long original, bool active, bool showChanges = false)
             {
-                int change = value >= 0 && original >= 0 ? value.CompareTo(original) : 0;
+                long adjustment = value >= 0 && original >= 0 ? value - original : 0;
                 string number = value >= 0 ? value.ToString() : "?";
+                string change = "";
+                if (adjustment > 0) change = _symbol != null ? "▲" : $"+{adjustment}";
+                else if (adjustment < 0) change = _symbol != null ? "▼" : $"−{-adjustment}";
                 if (!showChanges) DuelReadoutPulse.Cancel(Rect);
-                else if (_value.text.Length != 0 && _value.text != number)
+                else if (_value.text.Length != 0 && (_value.text != number || _change.text != change))
                 {
-                    int delta = _lastValue >= 0 && value >= 0 ? value.CompareTo(_lastValue) : 0;
+                    int delta = _lastValue >= 0 && value >= 0 && value != _lastValue
+                        ? value.CompareTo(_lastValue) : adjustment.CompareTo(_lastAdjustment);
                     DuelReadoutPulse.Play(Rect, delta > 0 ? Increased : delta < 0 ? Decreased : _accent, delta < 0);
                 }
                 _lastValue = value;
+                _lastAdjustment = adjustment;
                 _value.text = number;
-                _value.color = change > 0 ? Increased : change < 0 ? Decreased : active ? Color.white : DuelStyle.Muted;
-                _change.text = change > 0 ? "▲" : change < 0 ? "▼" : "";
+                _value.color = adjustment > 0 ? Increased : adjustment < 0 ? Decreased : active ? Color.white : DuelStyle.Muted;
+                _change.text = change;
                 _change.color = _value.color;
-                if (_symbol != null) _symbol.anchorMin = new Vector2(.045f, change == 0 ? .22f : .43f);
+                _change.gameObject.SetActive(adjustment != 0);
+                if (_symbol != null) _symbol.anchorMin = new Vector2(.045f, adjustment == 0 ? .22f : .43f);
                 _plate.color = active ? Color.Lerp(Backing, _accent, .15f) : Backing;
                 _rail.color = new Color(_accent.r, _accent.g, _accent.b, active ? .72f : .22f);
             }

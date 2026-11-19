@@ -949,6 +949,9 @@ namespace YGOPortable.Editor
                         combat.Find("Attack/Digits/Value").GetComponent<Text>().text == atk.ToString() &&
                         combat.Find("Defense/Digits/Value").GetComponent<Text>().text == def.ToString(),
                         "A Trap Monster preview did not display its registered combat values.");
+                    Require(combat.Find("Attack/Change/Delta")?.gameObject.activeSelf != true &&
+                        combat.Find("Defense/Change/Delta")?.gameObject.activeSelf != true,
+                        "Trap Monster registration was shown as a combat modifier.");
                 }
                 foreach (uint position in new[] { attack, defense })
                     CheckCombat(window.Find($"Body/Pos_{position}/CombatStats"));

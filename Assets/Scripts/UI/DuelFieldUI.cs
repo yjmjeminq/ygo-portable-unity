@@ -2393,7 +2393,7 @@ namespace YGOPortable.UI
             if (live != null && live.location == YgoConstants.LOCATION_MZONE &&
                 _materialReadouts.TryGetValue((live.controller, live.sequence), out var held) && held.Source.code == code)
                 return new DuelCardReadout(CardDatabase.Get(code), live,
-                    materialReadout: (held.Count, held.Source.attack, held.Source.defense));
+                    materialReadout: (held.Count, held.Source));
             return new DuelCardReadout(CardDatabase.Get(code), live);
         }
 

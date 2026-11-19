@@ -70,7 +70,7 @@ namespace YGOPortable.Editor
         {
             const string figures = "0123456789";
             var font = DuelTypography.NumberFont;
-            Require(font != LotdUiKit.FontKR && figures.All(font.HasCharacter) && "+-?/".All(font.HasCharacter),
+            Require(font != LotdUiKit.FontKR && figures.All(font.HasCharacter) && "+-−?/".All(font.HasCharacter),
                 "The bundled numeric font could not render all duel values.");
             font.RequestCharactersInTexture(figures, 24, FontStyle.Normal);
             Require(font.GetCharacterInfo('0', out var reference, 24) && reference.advance > 0,
@@ -422,7 +422,7 @@ namespace YGOPortable.Editor
             Require(ui.Field.IsReadingCardDetails, "The target's details could not open for the equipment fixture.");
             var inspector = ui.Field.Root.transform.Find("LeftInspector/CardDetails/CombatStats");
             var zoom = ui.Field.Root.transform.Find("Overlay_CardZoom/ZoomWin/Info/CombatStats");
-            void CheckValues(string attack, string defense)
+            void CheckValues(string attack, string defense, string delta = "")
             {
                 foreach (var values in new[] { slot.Find("CardReadout/Combat"), inspector, zoom })
                 {
@@ -433,6 +433,14 @@ namespace YGOPortable.Editor
                 }
                 Require(FieldSlot(ui.Field, other).Find("CardReadout/Combat/Attack/Digits/Value").GetComponent<Text>().text == "1600",
                     "Equipment changed the readout of the other eligible target.");
+                foreach (var detail in new[] { inspector, zoom })
+                foreach (string kind in new[] { "Attack", "Defense" })
+                {
+                    var label = detail.Find($"{kind}/Change/Delta")?.GetComponent<Text>();
+                    Require(label != null && label.text == delta &&
+                        label.gameObject.activeInHierarchy == (delta.Length != 0),
+                        $"{detail.parent.name} did not show the native equipment adjustment {delta} at the correct time.");
+                }
             }
             static Action<float> BeginFrames(IEnumerator step)
             {
@@ -478,7 +486,9 @@ namespace YGOPortable.Editor
                 Vector3.Distance(right, targetAnchor.TransformPoint(targetAnchor.rect.center)) < .02f &&
                 !graphic.raycastTarget, "The equip cue missed a card or blocked the board's input.");
             sample(DuelEffectGraphic.EquipContactProgress);
-            CheckValues("3300", "3250");
+            CheckValues("3300", "3250", "+1600");
+            Require(slot.Find("CardReadout/Combat/Attack/Change/Delta") == null,
+                "The compact field added details-only text to the card.");
             sample(1f);
             Require(!cue.MoveNext() && graphic == null, "The equipment indicator stayed over the settled field.");
             steps.Clear();
@@ -491,7 +501,7 @@ namespace YGOPortable.Editor
                 own.grave.Any(card => card.code == unity) && own.mzone[target.sequence].attack == 1700,
                 "The destroyed card lost its final public equipped state or its live bonus did not expire.");
             ui.Field.Refresh();
-            CheckValues("3300", "3250");
+            CheckValues("3300", "3250", "+1600");
             Require(equipmentArt.gameObject.activeInHierarchy && equipmentArt.CurrentCode == unity,
                 "The equip card vanished before its destruction cue.");
             queued = steps.ToArray();
@@ -504,7 +514,7 @@ namespace YGOPortable.Editor
             Require(burst.MoveNext() && burst.Current is IEnumerator, "The destruction cue had no frames.");
             var impact = TestCardPresentation.SampleAnimation((IEnumerator)burst.Current);
             impact(.78f);
-            CheckValues("3300", "3250");
+            CheckValues("3300", "3250", "+1600");
             Require(equipmentArt.gameObject.activeInHierarchy, "The spell was hidden while its destruction effect was still playing.");
             impact(1f);
             Require(!burst.MoveNext() && leave.MoveNext(), "The destroyed equipment did not enter its departure.");
@@ -3277,6 +3287,22 @@ namespace YGOPortable.Editor
                     Label(normal, defense).text == "2800" && normal.Find("Combat/Defense/ChangePulse").gameObject.activeInHierarchy &&
                     normal.Find("Labels/Rating/ChangePulse").gameObject.activeInHierarchy && Label(normal, rating).text == "6",
                     "The updated attack, defense or level did not animate with its current value.");
+                var attackDelta = Label(inspector, "Attack/Change/Delta");
+                Require(attackDelta.text == "−100" && Label(inspector, "Defense/Change/Delta").text == "+300",
+                    "The card details lost the direction or amount of a modifier.");
+                var inspectedAttack = inspector.Find("Attack");
+                DuelReadoutPulse.Cancel(inspectedAttack);
+                mine.mzone[0].baseAttack = 3200;
+                Field.Refresh();
+                Require(attackDelta.text == "−300" && Label(inspector, "Attack/Digits/Value").text == "2900" &&
+                    inspectedAttack.Find("ChangePulse").gameObject.activeInHierarchy,
+                    "A base-only change did not update the signed modifier.");
+                mine.mzone[0].baseAttack = -2;
+                Field.Refresh();
+                Require(!attackDelta.gameObject.activeInHierarchy,
+                    "An unknown original attack produced a false modifier.");
+                mine.mzone[0].baseAttack = 3000;
+                Field.Refresh();
 
                 var attackIcon = normal.Find("Combat/Attack/Symbol").GetComponent<Image>();
                 var defenseIcon = normal.Find("Combat/Defense/Symbol").GetComponent<Image>();
@@ -3326,9 +3352,13 @@ namespace YGOPortable.Editor
                     VerifyStatGlyphs(Label(xyz, counters), "12");
                     VerifyStatGlyphs(Label(xyz, status), "무효");
                     VerifyStatGlyphs(Label(inspector, "Attack/Digits/Value"), "2900", .48f);
+                    VerifyStatGlyphs(attackDelta, "−100");
+                    VerifyStatGlyphs(Label(inspector, "Defense/Change/Delta"), "+300");
                     var caption = RectTransformUtility.CalculateRelativeRectTransformBounds(inspector, inspector.Find("Attack/Caption"));
                     var digits = RectTransformUtility.CalculateRelativeRectTransformBounds(inspector, inspector.Find("Attack/Digits"));
-                    Require(digits.max.y < caption.min.y, "The larger inspection number overlapped its caption.");
+                    var modifier = RectTransformUtility.CalculateRelativeRectTransformBounds(inspector, inspector.Find("Attack/Change"));
+                    Require(digits.max.y < caption.min.y && caption.max.x < modifier.min.x,
+                        "The inspection value, caption or modifier overlapped.");
                     foreach (string side in new[] { "Attack", "Defense" })
                     {
                         var cell = normal.Find($"Combat/{side}");
