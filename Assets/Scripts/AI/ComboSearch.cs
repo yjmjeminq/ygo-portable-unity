@@ -18,6 +18,7 @@ namespace YGOPortable.AI
         private const int LateLinkBranchMilliseconds = 42;
         private const uint Machinex = 46593546, Siegfried = 44852429, Gilgamesh = 9024198;
 
+        private readonly bool _thorough;
         private readonly Queue<(ulong state, int action)> _next = new();
         private int _turn = -1;
         private int _searches;
@@ -26,10 +27,13 @@ namespace YGOPortable.AI
         internal int SimulatedBranches { get; private set; }
         internal int ChangedLines { get; private set; }
 
+        internal ComboSearch(int opponentLevel) => _thorough = opponentLevel >= 8;
+
         private sealed class Line
         {
             internal double score = double.NegativeInfinity;
             internal bool complete;
+            internal bool needsHiddenInformation;
             internal int unpaidLinkTrade = int.MaxValue;
             internal readonly List<(ulong state, int action)> moves = new();
             internal readonly List<(int[] prefix, int[] options)> forks = new();
@@ -69,7 +73,7 @@ namespace YGOPortable.AI
                 prompt.summonable.Any(card => card.controller == prompt.playerId && CanDevelopFromCard(CardDatabase.Get(card.code)));
         }
 
-        private static bool CanDevelopFromCard(CardInfo card) => card != null &&
+        internal static bool CanDevelopFromCard(CardInfo card) => card != null &&
             ((card.type & (YgoConstants.TYPE_TUNER | YgoConstants.TYPE_RITUAL)) != 0 ||
             (card.DeckEffectCategories & ((1u << 5) | (1u << 6) | (1u << 7) | (1u << 18))) != 0);
 
@@ -97,14 +101,15 @@ namespace YGOPortable.AI
 
             ulong state = Fingerprint(live, prompt);
             var own = live.Players[prompt.playerId];
+            int searchesPerTurn = _thorough ? 9 : MaxSearchesPerTurn;
             bool CouldTrade(SelectableCardItem item) => LinkComboPolicy.NeedsMaterialProjection(own, item);
             bool cached = _next.Count > 0 && _next.Peek().state == state;
             // An opening search may run out before the first strong Link monster reaches the board.
-            bool lateLinkTrade = _searches >= MaxSearchesPerTurn && _lateLinkSearches < MaxLateLinkSearches &&
+            bool lateLinkTrade = _searches >= searchesPerTurn && _lateLinkSearches < MaxLateLinkSearches &&
                 prompt.spSummonable.Any(CouldTrade);
             if (cached && !lateLinkTrade) yield break;
             if (!cached) _next.Clear();
-            if (!lateLinkTrade && _searches >= MaxSearchesPerTurn) yield break;
+            if (!lateLinkTrade && _searches >= searchesPerTurn) yield break;
             var options = advisor.ComboMainOptions(live, prompt);
             var lateOptions = lateLinkTrade ? options.Where(action => (action & 0xffff) == 1)
                 .Select(action => (action, summon: prompt.spSummonable[action >> 16]))
@@ -117,11 +122,13 @@ namespace YGOPortable.AI
             else _searches++;
 
             var watch = new Stopwatch();
-            bool Expired() => watch.ElapsedMilliseconds >= BudgetMilliseconds;
+            int maxBranches = _thorough ? 36 : MaxBranches;
+            int totalBudget = _thorough ? 220 : BudgetMilliseconds;
+            bool Expired() => watch.ElapsedMilliseconds >= totalBudget;
             var queue = new Queue<int[]>();
             queue.Enqueue(cached ? _next.Select(move => move.action).ToArray() : Array.Empty<int>());
             var seen = new HashSet<string>();
-            int branchBudget = lateLinkTrade ? LateLinkBranchMilliseconds : BranchMilliseconds;
+            int branchBudget = _thorough ? 48 : lateLinkTrade ? LateLinkBranchMilliseconds : BranchMilliseconds;
             foreach (int option in lateOptions)
             {
                 queue.Enqueue(new[] { option });
@@ -129,7 +136,7 @@ namespace YGOPortable.AI
             }
             Line best = null;
             Line baseline = null;
-            for (int attempt = 0; queue.Count != 0 && attempt < MaxBranches && !Expired(); attempt++)
+            for (int attempt = 0; queue.Count != 0 && attempt < maxBranches && !Expired(); attempt++)
             {
                 int[] choices = queue.Dequeue();
                 Line line;
@@ -144,18 +151,27 @@ namespace YGOPortable.AI
                     line = Explore(trial, advisor.ForkForComboSearch(), prompt.playerId, choices, BranchExpired);
                 }
                 baseline ??= line;
-                bool better = line.unpaidLinkTrade == int.MaxValue && (best == null ||
-                    ((best.complete || lateLinkTrade) && line.complete && line.moves.Count > 0 && line.score > best.score + .08));
+                // The default route may be waiting for a draw or another reveal. Keep its confirmed
+                // steps and let the next real prompt replan with the revealed cards.
+                if (_thorough && attempt == 0 && line.needsHiddenInformation && line.unpaidLinkTrade == int.MaxValue)
+                {
+                    best = line;
+                    break;
+                }
+                bool valid = line.unpaidLinkTrade == int.MaxValue && (!_thorough || line.moves.Count > 0);
+                bool better = valid && (best == null ||
+                    ((best.complete || lateLinkTrade || _thorough) && line.complete && line.moves.Count > 0 && line.score > best.score + .08));
                 if (better) best = line;
-                if (better || (line.complete && line.unpaidLinkTrade != int.MaxValue))
+                if (better || (_thorough && attempt == 0) || (line.complete && line.unpaidLinkTrade != int.MaxValue))
                 {
                     // Examine both the opening choice and the transition into a possible finish.
-                    var forks = better ? line.forks : line.forks.Where(fork => fork.prefix.Length > line.unpaidLinkTrade).ToList();
-                    for (int offset = 0; offset < Math.Min(6, forks.Count) && queue.Count < MaxBranches; offset++)
+                    var forks = line.unpaidLinkTrade == int.MaxValue
+                        ? line.forks : line.forks.Where(fork => fork.prefix.Length > line.unpaidLinkTrade).ToList();
+                    for (int offset = 0; offset < Math.Min(_thorough ? 9 : 6, forks.Count) && queue.Count < maxBranches; offset++)
                     {
                         int depth = offset % 2 == 0 ? offset / 2 : forks.Count - 1 - offset / 2;
                         var fork = forks[depth];
-                        foreach (int option in fork.options.Take(2))
+                        foreach (int option in fork.options.Take(_thorough ? 3 : 2))
                         {
                             var branch = new int[fork.prefix.Length + 1];
                             Array.Copy(fork.prefix, branch, fork.prefix.Length);
@@ -174,7 +190,7 @@ namespace YGOPortable.AI
             foreach (var move in best.moves) _next.Enqueue(move);
         }
 
-        private static Line Explore(DuelSession trial, TacticalAI ai, byte player, int[] prefix, Func<bool> expired)
+        private Line Explore(DuelSession trial, TacticalAI ai, byte player, int[] prefix, Func<bool> expired)
         {
             var line = new Line();
             int settledMoves = 0;
@@ -197,7 +213,9 @@ namespace YGOPortable.AI
                 if (LinkComboPolicy.IsDowngrade(rank, targetRank))
                     trades.Add((line.moves.Count - 1, rank, beforeLinkScore, beforeLink));
             };
-            for (int i = 0; i < MaxResponses && !expired() && trial.TurnNumber == startTurn &&
+            int maxResponses = _thorough ? 144 : MaxResponses;
+            int maxMainActions = _thorough ? 24 : MaxMainActions;
+            for (int i = 0; i < maxResponses && !expired() && trial.TurnNumber == startTurn &&
                 trial.RetryCount == 0 && !trial.SpeculationUncertain; i++)
             {
                 if (trial.IsFinished)
@@ -226,7 +244,7 @@ namespace YGOPortable.AI
                 canBattle = prompt.canBp;
                 line.score = BoardValue(trial, player, canBattle) - line.moves.Count * .01;
                 settledMoves = line.moves.Count;
-                if (settledMoves >= MaxMainActions) break;
+                if (settledMoves >= maxMainActions) break;
                 var options = ai.ComboMainOptions(trial, prompt);
                 int? forced = settledMoves < prefix.Length ? prefix[settledMoves] : null;
                 byte[] response = ai.ComputeComboResponse(trial, prompt, forced);
@@ -256,6 +274,7 @@ namespace YGOPortable.AI
                 }
                 trial.SubmitResponse(response);
             }
+            line.needsHiddenInformation = trial.SpeculationUncertain;
             if (line.moves.Count > settledMoves) line.moves.RemoveRange(settledMoves, line.moves.Count - settledMoves);
             if (trades.Count == 0 || (trial.IsFinished && trial.Winner == player)) return line;
 

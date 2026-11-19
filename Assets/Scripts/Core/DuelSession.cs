@@ -254,7 +254,7 @@ namespace YGOPortable.Core
     {
         private const byte TriggeredEffectFlag = 1 << 0;
         private const byte EventSpecificEffectFlag = 1 << 1;
-        private const int MaxReplayResponses = 256;
+        private const int MaxReplayResponses = 768;
 
         private readonly bool _recordPlanningReplay;
         private PlanningReplay _planningReplay;

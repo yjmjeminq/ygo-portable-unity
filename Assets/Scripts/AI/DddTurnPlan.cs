@@ -9,16 +9,20 @@ namespace YGOPortable.AI
     {
         private const uint Gate = 46372010;
         private const uint SwampKing = 73360025;
+        private const uint SpiritKing = 32665564;
         private const uint Kepler = 11609969;
         private const uint Copernicus = 46796664;
         private const uint SwirlSlime = 45206713;
         private const uint NecroSlime = 72291412;
         private const uint Griffin = 28406301;
+        private const uint CountSurveyor = 5997110;
+        private const uint ScaleSurveyor = 42382265;
         private const uint Lamia = 19580308;
         private const uint Ragnarok = 74069667;
         private const uint Genghis = 74583607;
         private const uint HighGenghis = 16006416;
         private const uint Gilgamesh = 9024198;
+        private const uint Solomon = 32232538;
         private const uint Machinex = 46593546;
         private const uint Siegfried = 44852429;
 
@@ -66,7 +70,8 @@ namespace YGOPortable.AI
                 (index < 0 || IsDescription(item.description, code, index)));
 
             // Establish a way to find the part of the combo that the hand is missing.
-            var search = Effect(Gate, YgoConstants.LOCATION_HAND) ?? Effect(Gate, YgoConstants.LOCATION_SZONE);
+            var search = Effect(Gate, YgoConstants.LOCATION_HAND) ?? Effect(Gate, YgoConstants.LOCATION_SZONE)
+                ?? Effect(Solomon, YgoConstants.LOCATION_MZONE);
             if (search.HasValue) return search;
             if (!own.hand.Any(card => card.code == Gate) && !own.szone.Any(card => card?.code == Gate))
             {
@@ -81,7 +86,8 @@ namespace YGOPortable.AI
                 IsSet(item.code, DdSet) && CardDatabase.Get(item.code)?.IsPendulum == true);
             if (pendulum.HasValue) return pendulum;
             var extension = Effect(SwirlSlime, YgoConstants.LOCATION_GRAVE) ??
-                Effect(Griffin, YgoConstants.LOCATION_HAND, 1);
+                Effect(Griffin, YgoConstants.LOCATION_HAND, 1) ??
+                Effect(ScaleSurveyor, YgoConstants.LOCATION_HAND, 0);
             if (extension.HasValue) return extension;
 
             // Clear a visible opposing monster once a spare D/D can pay Ragnarok's cost.
@@ -90,6 +96,9 @@ namespace YGOPortable.AI
                 var removal = Effect(Ragnarok, YgoConstants.LOCATION_MZONE, 2);
                 if (removal.HasValue) return removal;
             }
+
+            // Use the Rank 4 to find a Contract before committing it as material.
+            if (!hasContract && Special(Solomon) is int contractSearch) return contractSearch;
 
             // Link into scales before overlaying the same bodies into an end-board monster.
             if (openScales && own.deckCount >= 2 && own.lp > 1000 &&
@@ -154,11 +163,16 @@ namespace YGOPortable.AI
             bool OnlyFrom(uint location) => prompt.candidates.All(card =>
                 card.controller == prompt.playerId && (card.location & ~YgoConstants.LOCATION_OVERLAY) == location);
             bool HasInHand(uint code) => own.hand.Any(card => card.code == code);
+            bool OnField(uint code) => own.mzone.Any(card => card?.IsFaceUp == true && card.code == code);
             int? Find(uint code) => FindIndex(prompt.candidates, card => card.code == code);
 
-            if (source.code == Gate && OnlyFrom(YgoConstants.LOCATION_DECK))
+            if (source.code is Gate or Solomon or CountSurveyor && OnlyFrom(YgoConstants.LOCATION_DECK))
             {
                 bool hasDddBody = own.mzone.Any(card => card != null && card.IsFaceUp && IsSet(card.code, DdSet));
+                bool hasPendulum = own.mzone.Concat(own.szone).Any(card =>
+                    card?.IsFaceUp == true && CardDatabase.Get(card.code)?.IsPendulum == true && IsSet(card.code, DdSet));
+                if (hasPendulum && !HasInHand(ScaleSurveyor) && !OnField(ScaleSurveyor) && Find(ScaleSurveyor) is int freeBody)
+                    return freeBody;
                 if (hasDddBody && !HasInHand(Griffin))
                 {
                     var extender = Find(Griffin);
@@ -170,15 +184,25 @@ namespace YGOPortable.AI
                     var starter = Find(SwirlSlime);
                     if (starter.HasValue) return starter;
                 }
-                if (!HasInHand(Copernicus)) return Find(Copernicus) ?? Find(Kepler);
+                if (!HasInHand(CountSurveyor) && !OnField(CountSurveyor) &&
+                    own.hand.Any(card => IsSet(card.code, DdSet)) && Find(CountSurveyor) is int deployable)
+                    return deployable;
+                if (!HasInHand(Copernicus) && Find(Copernicus) is int millStarter) return millStarter;
+                if (source.code == Solomon && !HasInHand(Gate) && !own.szone.Any(card => card?.IsFaceUp == true && card.code == Gate))
+                    return Find(Gate) ?? Find(Kepler);
                 return Find(Kepler);
             }
+
+            if (source.code == SpiritKing && OnlyFrom(YgoConstants.LOCATION_DECK))
+                return (!OnField(CountSurveyor) ? Find(CountSurveyor) : null) ?? Find(Kepler) ?? Find(ScaleSurveyor);
 
             if (source.code == Kepler && OnlyFrom(YgoConstants.LOCATION_DECK) &&
                 prompt.candidates.All(card => IsDarkContract(card.code)))
             {
                 bool gateAlreadyAvailable = HasInHand(Gate) || own.szone.Any(card => card?.code == Gate);
-                if (!gateAlreadyAvailable) return Find(Gate) ?? Find(SwampKing);
+                if (!gateAlreadyAvailable) return Find(Gate) ?? Find(SpiritKing) ?? Find(SwampKing);
+                if (!HasInHand(SpiritKing) && !own.szone.Any(card => card?.code == SpiritKing) && Find(SpiritKing) is int deployFromDeck)
+                    return deployFromDeck;
                 if (!HasInHand(SwampKing) && !own.szone.Any(card => card?.code == SwampKing))
                     return Find(SwampKing);
             }
@@ -219,10 +243,10 @@ namespace YGOPortable.AI
                 return null;
 
             var own = session.Players[prompt.playerId];
-            if (!IsDddDeck(own) || own.hand.Any(card => card.code == Gate) ||
-                own.szone.Any(card => card?.code == Gate))
-                return null;
-            return search;
+            bool Available(uint code) => own.hand.Any(card => card.code == code) || own.szone.Any(card => card?.code == code);
+            bool canUseModernContract = own.extra.Concat(own.mzone).Concat(own.grave).Any(card => card?.code == Solomon);
+            return IsDddDeck(own) &&
+                (!Available(Gate) || (canUseModernContract && !Available(SwampKing) && !Available(SpiritKing))) ? search : null;
         }
 
         internal static int? ChooseScale(DuelSession session, DuelPrompt prompt)

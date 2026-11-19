@@ -68,6 +68,7 @@ namespace YGOPortable.AI
         internal static int? ChooseDefensiveSet(DuelSession duel, DuelPrompt prompt, SelectableCardItem summon)
         {
             var card = CardDatabase.Get(summon.code);
+            if (ComboSearch.CanDevelopFromCard(card)) return null;
             // Keep Normal Summon triggers and face-up tuners available for development.
             if (card == null || card.level > 4 || summon.location != YgoConstants.LOCATION_HAND ||
                 (card.type & (YgoConstants.TYPE_NORMAL | YgoConstants.TYPE_FLIP)) == 0 ||

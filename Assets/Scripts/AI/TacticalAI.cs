@@ -55,11 +55,11 @@ namespace YGOPortable.AI
 
         public TacticalAI() { }
 
-        internal TacticalAI(DuelAiPolicy policy, LinkComboPolicy linkPolicy = null, bool searchCombos = false)
+        internal TacticalAI(DuelAiPolicy policy, LinkComboPolicy linkPolicy = null, bool searchCombos = false, int opponentLevel = 1)
         {
             _policy = policy;
             _linkPolicy = linkPolicy;
-            if (searchCombos) _comboSearch = new ComboSearch();
+            if (searchCombos) _comboSearch = new ComboSearch(opponentLevel);
             _tacticalRules = true;
         }
 
