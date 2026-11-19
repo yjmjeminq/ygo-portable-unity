@@ -369,7 +369,7 @@ namespace YGOPortable.UI
             _inspectedFieldCard = fieldCard;
             if (changed) _inspCard.gameObject.SetActive(true);
             RefreshInspectorReadout(showChanges: false);
-            RefreshLinkedZones();
+            RefreshFieldRelationships();
             if (!changed) return;
 
             _duelPadInspectButton.interactable = true;
@@ -398,6 +398,7 @@ namespace YGOPortable.UI
             SizeInspectorDescription(hasCombat: false);
             _inspCounters.Bind(default);
             SetLinkedZones(null);
+            RefreshEquipmentHighlights();
             _inspDesc.text = "카드를 선택하면 효과를 확인할 수 있습니다.";
             _inspRaceIcon.gameObject.SetActive(false);
             _inspAttributeIcon.gameObject.SetActive(false);
@@ -539,14 +540,20 @@ namespace YGOPortable.UI
             return DuelStyle.Gold;
         }
 
-        private void RefreshLinkedZones() => SetLinkedZones(GetSelectedLink());
+        private bool CanShowFieldRelationships => _session != null && !_session.IsFinished && !IsPresenting &&
+            !IsPaused && !IsReadingLog && !IsReadingCardDetails && !_phasePicker.activeSelf && !IsStagingPlacement &&
+            !IsNativePlacement(_session.ActivePrompt) && !_modals.IsPromptOpen && !_modals.IsZoneViewerOpen &&
+            CardDragManager.Instance?.IsDragging != true;
+
+        private void RefreshFieldRelationships()
+        {
+            SetLinkedZones(GetSelectedLink());
+            RefreshEquipmentHighlights();
+        }
 
         private (Vector2Int Origin, uint Markers, bool Opponent)? GetSelectedLink()
         {
-            if (_session == null || _session.IsFinished || IsPresenting || IsPaused || IsReadingLog ||
-                IsReadingCardDetails || _phasePicker.activeSelf || IsStagingPlacement || IsNativePlacement(_session.ActivePrompt) ||
-                _modals.IsPromptOpen || _modals.IsZoneViewerOpen || CardDragManager.Instance?.IsDragging == true ||
-                _inspectedFieldCard is not { } source)
+            if (!CanShowFieldRelationships || _inspectedFieldCard is not { } source)
                 return null;
 
             var card = ReadVisibleFieldCard(_inspectedCode, source);
@@ -557,6 +564,45 @@ namespace YGOPortable.UI
 
             return (origin, card.linkMarker, source.controller != _session.HumanPlayerIndex);
         }
+
+        private FieldSlotView GetEquipmentFocus()
+        {
+            if (!CanShowFieldRelationships || _actionPopup.activeSelf || (_usingDuelPad && _duelPadScope != PadScope.Board))
+                return null;
+            var anchor = _usingDuelPad ? _duelPadFocus : _touchActionAnchor;
+            if (anchor != null) return _fieldSlotsByRect.TryGetValue(anchor, out var slot) ? slot : null;
+            return _usingDuelPad ? null : _duelPointerSlot;
+        }
+
+        private void RefreshEquipmentHighlights()
+        {
+            var focus = GetEquipmentFocus();
+            var card = VisibleBoardCard(focus);
+            (byte Controller, uint Sequence)? focusedMonster = card?.location == YgoConstants.LOCATION_MZONE
+                ? (card.controller, card.sequence) : null;
+            FieldSlotView equippedMonster = null;
+            if (card?.EquipTarget is { } attachment)
+            {
+                var target = GetSlot(attachment.Controller, YgoConstants.LOCATION_MZONE, attachment.Sequence);
+                if (VisibleBoardCard(target) is { } host && host.controller == attachment.Controller &&
+                    host.sequence == attachment.Sequence)
+                    equippedMonster = target;
+            }
+
+            bool found = false;
+            foreach (var slot in _fieldSlotsByRect.Values)
+            {
+                if (slot == focus) continue;
+                bool related = slot == equippedMonster || (focusedMonster.HasValue &&
+                    slot.mappedLoc == YgoConstants.LOCATION_SZONE && VisibleBoardCard(slot)?.EquipTarget == focusedMonster);
+                slot.bgImg.SetEquipmentHighlight(related);
+                found |= related;
+            }
+            focus?.bgImg.SetEquipmentHighlight(found);
+        }
+
+        private static LiveCardState VisibleBoardCard(FieldSlotView slot) =>
+            slot?.liveCard is { IsFaceUp: true, code: not 0 } card && slot.cardView.gameObject.activeInHierarchy ? card : null;
 
         private void SetLinkedZones((Vector2Int Origin, uint Markers, bool Opponent)? source)
         {
@@ -1417,7 +1463,7 @@ namespace YGOPortable.UI
             RefreshPileActionButtons();
             RefreshDuelPadCursor(layoutChanged: true);
             RefreshAttackSelectionReadout();
-            RefreshLinkedZones();
+            RefreshFieldRelationships();
             RefreshCardActions();
         }
 
@@ -2963,7 +3009,7 @@ namespace YGOPortable.UI
             UpdateDuelPad();
             if (_session != session || !Root.activeSelf) return;
             RefreshHandGlows();
-            RefreshLinkedZones();
+            RefreshFieldRelationships();
             RefreshAttackResponseArrow();
             UpdateTouchCardActions();
             RefreshCardActions();

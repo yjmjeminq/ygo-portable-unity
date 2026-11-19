@@ -386,6 +386,7 @@ namespace YGOPortable.UI
                 _fieldSlotsByRect.TryGetValue(target.Rect, out var slot);
                 InspectCard(target.PreviewCode, slot);
             }
+            else RefreshEquipmentHighlights();
             var events = EventSystem.current;
             if (events != null && !events.alreadySelecting && events.currentSelectedGameObject != target.Rect.gameObject)
                 events.SetSelectedGameObject(target.Rect.gameObject);
@@ -566,7 +567,11 @@ namespace YGOPortable.UI
             _duelPointerRaisedCard = null;
             _duelPointerSlot = null;
             _duelPointerCode = 0;
-            if (!_usingDuelPad) RefreshAttackSelectionReadout();
+            if (!_usingDuelPad)
+            {
+                RefreshEquipmentHighlights();
+                RefreshAttackSelectionReadout();
+            }
         }
 
         private void TrackPointerCard(RectTransform card, uint previewCode, FieldSlotView slot = null)
@@ -577,6 +582,7 @@ namespace YGOPortable.UI
             if (!_usingDuelPad)
             {
                 InspectCard(previewCode, slot);
+                if (previewCode == 0) RefreshEquipmentHighlights();
                 RefreshAttackSelectionReadout();
             }
         }

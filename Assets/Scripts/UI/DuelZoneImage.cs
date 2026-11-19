@@ -21,6 +21,7 @@ namespace YGOPortable.UI
         private DuelLinkZoneRim _linkRim;
         internal DuelLinkHighlight LinkHighlight { get; private set; }
         internal bool LinkHighlighted => LinkHighlight != DuelLinkHighlight.None;
+        internal bool EquipmentHighlighted { get; private set; }
         internal Vector2Int LinkDirection { get; private set; }
         internal bool SummonReserved { get; private set; }
 
@@ -37,6 +38,13 @@ namespace YGOPortable.UI
         {
             if (_pileActionHighlighted == highlighted) return;
             _pileActionHighlighted = highlighted;
+            SetVerticesDirty();
+        }
+
+        internal void SetEquipmentHighlight(bool highlighted)
+        {
+            if (EquipmentHighlighted == highlighted) return;
+            EquipmentHighlighted = highlighted;
             SetVerticesDirty();
         }
 
@@ -125,6 +133,9 @@ namespace YGOPortable.UI
                 DrawSelectionRim(mesh, rect, new Color(.41f, .83f, .79f, .78f), .09f);
                 return;
             }
+
+            if (EquipmentHighlighted)
+                DrawSelectionRim(mesh, rect, new Color(1f, .76f, .42f, .96f), .13f, .85f, .945f);
 
             if (link) return;
             var shadow = new Color(.32f, .45f, .51f, .53f);

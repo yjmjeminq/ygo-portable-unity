@@ -29,6 +29,7 @@ namespace YGOPortable.Editor
             VerifyNativeCombatReadout(useHonest: true);
             VerifyNativeCombatReadout(useHonest: false);
             VerifyNativeEquipHandoff();
+            VerifyOpponentEquipmentFocus();
             VerifyNativeMonsterEquip();
             VerifyNativeChainReadouts();
             VerifyDestroyedCopiesKeepTheirReadouts();
@@ -493,6 +494,31 @@ namespace YGOPortable.Editor
             Require(!cue.MoveNext() && graphic == null, "The equipment indicator stayed over the settled field.");
             steps.Clear();
 
+            var equipmentSlot = FieldSlot(ui.Field, equipped);
+            var equipmentTrigger = equipmentSlot.GetComponent<CardDragTrigger>();
+            var targetTrigger = slot.GetComponent<CardDragTrigger>();
+            var otherSlot = FieldSlot(ui.Field, other);
+            void ExpectEquipmentFocus(bool highlighted)
+            {
+                Require(equipmentSlot.GetComponent<DuelZoneImage>().EquipmentHighlighted == highlighted &&
+                    slot.GetComponent<DuelZoneImage>().EquipmentHighlighted == highlighted &&
+                    !otherSlot.GetComponent<DuelZoneImage>().EquipmentHighlighted,
+                    "The field did not identify exactly the active equipment relationship for the focused card.");
+            }
+
+            ui.Field.Root.transform.Find("Overlay_CardZoom/ZoomWin/Hdr/Close/B").GetComponent<Button>().onClick.Invoke();
+            ExpectEquipmentFocus(false);
+            targetTrigger.OnPointerEnterAction.Invoke();
+            ExpectEquipmentFocus(true);
+            targetTrigger.OnPointerExitAction.Invoke();
+            ExpectEquipmentFocus(false);
+            equipmentTrigger.OnPointerEnterAction.Invoke();
+            ExpectEquipmentFocus(true);
+            equipmentTrigger.OnPointerExitAction.Invoke();
+            ExpectEquipmentFocus(false);
+            targetTrigger.OnRightClick();
+            ui.Field.Root.transform.Find("LeftInspector/CardDetails/ArtworkControls/Details/B").GetComponent<Button>().onClick.Invoke();
+
             CardMoveEvent removed = null;
             duel.OnCardMoved += move => { if (move.code == unity) removed = move; };
             ActivateFromMainPhase(duel, typhoon);
@@ -521,9 +547,76 @@ namespace YGOPortable.Editor
             TestCardPresentation.SampleAnimation((IEnumerator)leave.Current)(1f);
             Require(!leave.MoveNext() && !update.MoveNext(), "The equipment departure and stat update did not finish.");
             CheckValues("1700", "1650");
+            ExpectEquipmentFocus(false);
             Require(equipmentArt.CurrentCode != unity || !equipmentArt.gameObject.activeInHierarchy,
                 "The destroyed Equip Spell remained visible on the field.");
             Debug.Log("[VERIFY DUEL EQUIP HANDOFF] United We Stand changed both stats at contact and restored them after its destruction.");
+        }
+
+        private static void VerifyOpponentEquipmentFocus()
+        {
+            const uint axe = 40619825, sparkman = 20721928;
+            var empty = Array.Empty<uint>();
+            var ai = new TacticalAI();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Shared equipment target", Enumerable.Repeat(axe, 40).ToArray(),
+                empty, Enumerable.Repeat(sparkman, 40).ToArray(), empty, false,
+                session => session.ActivePrompt?.playerId == session.AiPlayerIndex &&
+                    session.ActivePrompt.summonable.Exists(card => card.code == sparkman));
+            duel.SubmitResponseInt(0);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            var monster = duel.Players[duel.AiPlayerIndex].mzone.Single(card => card?.code == sparkman);
+            duel.SubmitResponseInt(7);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            Require(duel.ActivePrompt?.playerId == duel.HumanPlayerIndex, "The opponent equipment fixture did not switch turns.");
+
+            using var ui = new HandUI(duel, mobileLayout: true);
+            ((RectTransform)ui.Canvas.transform).sizeDelta = new Vector2(1740f, 805f);
+            for (int copy = 0; copy < 2; copy++)
+            {
+                ActivateFromMainPhase(duel, axe);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt => prompt.messageType == YgoConstants.MSG_SELECT_CARD
+                    ? SelectCard(prompt, sparkman) : null);
+            }
+            var equipment = duel.Players[duel.HumanPlayerIndex].szone.Where(card => card?.code == axe).ToArray();
+            monster = duel.Players[duel.AiPlayerIndex].mzone[monster.sequence];
+            Require(duel.RetryCount == 0 && monster.attack == 3600 && equipment.Length == 2 &&
+                equipment.All(card => card.EquipTarget == (monster.controller, monster.sequence)),
+                "The native duel could not equip both copies to the opponent's monster.");
+
+            ui.Field.Refresh();
+            var host = FieldSlot(ui.Field, monster);
+            var first = FieldSlot(ui.Field, equipment[0]);
+            var second = FieldSlot(ui.Field, equipment[1]);
+            var board = ui.Field.Root.transform.Find("MobileSafeArea/DuelBoard");
+            void Expect(params Transform[] expected)
+            {
+                var active = board.GetComponentsInChildren<DuelZoneImage>().Where(zone => zone.EquipmentHighlighted)
+                    .Select(zone => zone.transform).ToHashSet();
+                Require(active.SetEquals(expected), "The equipment highlight showed the wrong controller, copy or focus.");
+            }
+
+            Expect();
+            host.GetComponent<CardDragTrigger>().OnPointerEnterAction.Invoke();
+            Expect(host, first, second);
+            host.GetComponent<CardDragTrigger>().OnPointerExitAction.Invoke();
+            first.GetComponent<CardDragTrigger>().OnPointerEnterAction.Invoke();
+            Expect(host, first);
+            first.GetComponent<CardDragTrigger>().OnPointerExitAction.Invoke();
+            Expect();
+
+            var focus = typeof(DuelFieldUI).GetField("_duelPadFocus", PrivateInstance);
+            typeof(DuelFieldUI).GetField("_usingDuelPad", PrivateInstance).SetValue(ui.Field, true);
+            focus.SetValue(ui.Field, host);
+            ui.Field.Refresh();
+            Expect(host, first, second);
+            focus.SetValue(ui.Field, second);
+            ui.Field.Refresh();
+            Expect(host, second);
+            ui.Field.HandleDuelPad(new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Alternate));
+            ui.Field.Update();
+            Require(ui.Field.IsReadingCardDetails, "The controller did not open the focused Equip Spell.");
+            Expect();
+            Debug.Log("[VERIFY DUEL EQUIPMENT FOCUS] Two native copies equipped to the opponent lit the right zones for pointer and controller focus.");
         }
 
         private static void VerifyNativeMonsterEquip()
