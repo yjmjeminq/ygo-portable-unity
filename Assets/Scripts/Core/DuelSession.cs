@@ -745,8 +745,9 @@ namespace YGOPortable.Core
         internal LiveCardState GetAttackSelectionSource(DuelPrompt prompt)
         {
             if (prompt?.IsAttackTargetSelection != true || !ReferenceEquals(ActivePrompt, prompt) ||
-                _chosenAttacker is not { } source || source.controller != prompt.playerId)
+                _chosenAttacker is not { } source)
                 return null;
+            // Some effects let the defender choose the target of the already selected attacker.
             return GetVisibleFieldCard(source.code, source.controller, source.location, source.sequence);
         }
 

@@ -28,6 +28,7 @@ namespace YGOPortable.Editor
             VerifyOpponentTurnActivation();
             VerifyNativeCombatReadout(useHonest: true);
             VerifyNativeCombatReadout(useHonest: false);
+            VerifyDefenderChoosesAttackTarget();
             VerifyNativeEquipHandoff();
             VerifyOpponentEquipmentFocus();
             VerifyNativeMonsterEquip();
@@ -379,6 +380,108 @@ namespace YGOPortable.Editor
                 ((IDictionary)typeof(DuelFieldUI).GetField("_battleCardDisplays", PrivateInstance).GetValue(ui.Field)).Count == 0,
                 "A destroyed defender or queued battle display remained on the field.");
             Debug.Log($"[VERIFY DUEL BATTLE STATS] A set defender stayed hidden until its flip, showed 2000 DEF through the {expectedAttack} ATK strike, and left at destruction.");
+        }
+
+        private static void VerifyDefenderChoosesAttackTarget()
+        {
+            const uint patrician = 19153634, mummy = 4861205, sparkman = 20721928, soldier = 49881766, axe = 40619825;
+            var required = new[] { patrician, mummy, sparkman };
+            var deck = required.SelectMany(code => Enumerable.Repeat(code, 13)).Append(patrician).ToArray();
+            var empty = Array.Empty<uint>();
+            var enemy = Enumerable.Repeat(soldier, 24).Concat(Enumerable.Repeat(axe, 16)).ToArray();
+            var ai = new TacticalAI();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Defender chooses the attack target", deck, empty, enemy, empty, true,
+                session => required.All(code => session.Players[session.HumanPlayerIndex].hand.Exists(card => card.code == code)) &&
+                    new[] { soldier, axe }.All(code => session.Players[session.AiPlayerIndex].hand.Exists(card => card.code == code)));
+
+            void StepToMainPhase(uint pick = 0)
+            {
+                YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
+                {
+                    if (pick != 0 && prompt.messageType == YgoConstants.MSG_SELECT_CARD) return SelectCard(prompt, pick);
+                    if (pick == patrician && prompt.messageType == YgoConstants.MSG_SELECT_POSITION)
+                        return BitConverter.GetBytes(YgoConstants.POS_FACEUP_DEFENSE);
+                    return null;
+                });
+                Require(duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD && duel.RetryCount == 0,
+                    "The defender-controlled attack fixture did not resolve its activation.");
+            }
+
+            ActivateFromMainPhase(duel, mummy);
+            StepToMainPhase();
+            int summonEffect = duel.ActivePrompt.activatable.FindIndex(card => card.code == mummy &&
+                card.location == YgoConstants.LOCATION_SZONE);
+            Require(summonEffect >= 0, "Call of the Mummy did not offer its field effect.");
+            duel.SubmitResponseInt((summonEffect << 16) | 5);
+            StepToMainPhase(patrician);
+            int set = duel.ActivePrompt.mSetable.FindIndex(card => card.code == sparkman);
+            Require(set >= 0, "The defender could not set the alternative battle target.");
+            duel.SubmitResponseInt((set << 16) | 3);
+            StepToMainPhase();
+            duel.SubmitResponseInt(7);
+            StepToMainPhase();
+            Require(duel.ActivePrompt.playerId == duel.AiPlayerIndex &&
+                duel.ActivePrompt.summonable.Exists(card => card.code == soldier), "The opponent could not summon its attacker.");
+            int normal = duel.ActivePrompt.summonable.FindIndex(card => card.code == soldier);
+            duel.SubmitResponseInt(normal << 16);
+            StepToMainPhase();
+            ActivateFromMainPhase(duel, axe);
+            StepToMainPhase(soldier);
+            duel.SubmitResponseInt(6);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            var battle = duel.ActivePrompt;
+            Require(battle?.messageType == YgoConstants.MSG_SELECT_BATTLECMD && battle.attackable.Count == 1 &&
+                battle.attackable[0].code == soldier, "The opponent did not get its native attack command.");
+            duel.SubmitResponseInt(1);
+            var target = duel.ActivePrompt;
+            Require(target?.IsAttackTargetSelection == true && target.playerId == duel.HumanPlayerIndex &&
+                target.candidates.Count == 2 && target.candidates.All(card => card.controller == duel.HumanPlayerIndex),
+                $"Patrician of Darkness did not give the defender two native targets. " +
+                $"Prompt {target?.messageType}, player {target?.playerId}, hint {target?.SelectionHint}, " +
+                $"candidates {target?.candidates.Count}. Defending monsters: " +
+                string.Join(", ", duel.Players[duel.HumanPlayerIndex].mzone.Where(card => card != null)
+                    .Select(card => $"{card.code}/{card.position}")));
+            var source = duel.GetAttackSelectionSource(target);
+            Require(source?.code == soldier && source.controller == duel.AiPlayerIndex && source.attack == 2900,
+                "The attack preview lost the attacker when the other player selected its target.");
+
+            byte[] response = null;
+            using var ui = new HandUI(duel, mobileLayout: true, submitResponse: bytes => response = bytes);
+            ((RectTransform)ui.Canvas.transform).sizeDelta = new Vector2(1740f, 805f);
+            ui.Modals.ShowPrompt(duel, target);
+            ui.Field.Refresh();
+            var body = ui.Modals.ModalRoot.transform.Find("Win/Body");
+            var sourceTitle = body.Find("AttackSource/Heading/Name").GetComponent<Text>();
+            var targetTitle = body.Find("AttackTarget/Heading/Name").GetComponent<Text>();
+            var targetCombat = body.Find("AttackTarget/Combat");
+            Require(sourceTitle.text == $"상대 공격 · {CardDatabase.GetName(soldier)}" && sourceTitle.color == DuelStyle.Opponent &&
+                body.Find("AttackSource/Combat/Attack/Digits/Value").GetComponent<Text>().text == "2900",
+                "The mobile battle comparison used the defender's side or a stale attack value.");
+
+            var mine = duel.Players[duel.HumanPlayerIndex];
+            var defender = mine.mzone.Single(card => card?.code == patrician);
+            FieldSlot(ui.Field, defender).GetComponent<CardDragTrigger>().OnPointerEnterAction.Invoke();
+            Require(defender.IsDefense && targetTitle.text == $"대상 · {CardDatabase.GetName(patrician)}" &&
+                targetTitle.color == DuelStyle.Player && targetCombat.gameObject.activeInHierarchy &&
+                targetCombat.Find("Defense/Digits/Value").GetComponent<Text>().text == defender.defense.ToString() &&
+                targetCombat.Find("Defense/Rail").GetComponent<Image>().color.a > targetCombat.Find("Attack/Rail").GetComponent<Image>().color.a,
+                "The comparison did not show the legal target's controller and current defense.");
+
+            var setTarget = mine.mzone.Single(card => card?.code == sparkman);
+            var setTrigger = FieldSlot(ui.Field, setTarget).GetComponent<CardDragTrigger>();
+            setTrigger.OnPointerEnterAction.Invoke();
+            Require(targetTitle.text == "대상 · 뒷면 카드" && !targetCombat.gameObject.activeSelf &&
+                sourceTitle.text.Contains(CardDatabase.GetName(soldier)) && response == null,
+                "Previewing a set target showed stale values or submitted an attack.");
+            setTrigger.OnLeftClick.Invoke();
+            int selected = target.candidates.FindIndex(card => card.sequence == setTarget.sequence);
+            Require(response != null && selected >= 0 && response.SequenceEqual(DuelSession.PackCardSelection(selected)),
+                "Clicking the set target did not immediately submit its native index.");
+            duel.SubmitResponse(response);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            Require(mine.grave.Exists(card => card.code == sparkman) && duel.RetryCount == 0,
+                "The native attack did not resolve on the set card chosen by the defender.");
+            Debug.Log("[VERIFY DUEL DEFENDER CHOICE] Native target transfer, live attacker, defense, set-card privacy and immediate selection passed.");
         }
 
         private static void VerifyNativeEquipHandoff()

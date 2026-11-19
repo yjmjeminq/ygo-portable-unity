@@ -1261,19 +1261,19 @@ namespace YGOPortable.UI
             _modalBody.anchorMin = new Vector2(.225f, .055f);
             _modalBody.anchorMax = new Vector2(prompt.cancelable ? .819f : .987f, .945f);
             _modalFooter.anchorMin = new Vector2(.675f, .08f);
-            _attackSourceReadout = AddAttackSelectionCard("AttackSource", 0f, .488f, DuelStyle.Player);
-            _attackTargetReadout = AddAttackSelectionCard("AttackTarget", .512f, 1f, DuelStyle.Opponent);
+            _attackSourceReadout = AddAttackSelectionCard("AttackSource", 0f, .488f);
+            _attackTargetReadout = AddAttackSelectionCard("AttackTarget", .512f, 1f);
             RefreshAttackSelectionReadout(prompt, null);
         }
 
-        private (Text Name, DuelStatStrip Values) AddAttackSelectionCard(string key, float left, float right, Color accent)
+        private (Text Name, DuelStatStrip Values) AddAttackSelectionCard(string key, float left, float right)
         {
             var tile = LotdUiKit.CreateRect(key, _modalBody, new Vector2(left, 0f), new Vector2(right, 1f),
                 Vector2.zero, Vector2.zero);
             var heading = LotdUiKit.CreateRect("Heading", tile, new Vector2(0f, .53f), Vector2.one,
                 Vector2.zero, Vector2.zero);
             DuelReadoutPlate.Add(heading, new Color(.077f, .115f, .139f, 1f));
-            var name = LotdUiKit.AddFittedText(heading, "Name", "", 15, 9, TextAnchor.MiddleCenter, accent, FontStyle.Bold);
+            var name = LotdUiKit.AddFittedText(heading, "Name", "", 16, 9, TextAnchor.MiddleCenter, Color.white);
             var values = LotdUiKit.CreateRect("Combat", tile, Vector2.zero, new Vector2(1f, .51f),
                 Vector2.zero, Vector2.zero);
             return (name, new DuelStatStrip(values, compact: true));
@@ -1290,16 +1290,23 @@ namespace YGOPortable.UI
             var target = candidate != null
                 ? _curSession.GetVisibleFieldCard(candidate.code, candidate.controller, candidate.location, candidate.sequence)
                 : null;
-            BindAttackSelectionCard(_attackSourceReadout, source, "공격", "공격 몬스터");
-            BindAttackSelectionCard(_attackTargetReadout, target, "대상", candidate != null ? "대상 · 뒷면 카드" : "공격 대상");
+            int attackerSide = source != null ? source.controller : _curSession.TurnPlayer;
+            bool opponentAttacks = attackerSide != _curSession.HumanPlayerIndex;
+            bool opponentTarget = candidate != null ? candidate.controller != _curSession.HumanPlayerIndex : !opponentAttacks;
+            BindAttackSelectionCard(_attackSourceReadout, source, opponentAttacks,
+                opponentAttacks ? "상대 공격" : "공격", opponentAttacks ? "상대 공격 몬스터" : "공격 몬스터");
+            BindAttackSelectionCard(_attackTargetReadout, target, opponentTarget, "대상",
+                candidate != null ? "대상 · 뒷면 카드" : "공격 대상");
         }
 
-        private void BindAttackSelectionCard((Text Name, DuelStatStrip Values) tile, LiveCardState card, string label, string fallback)
+        private static void BindAttackSelectionCard((Text Name, DuelStatStrip Values) tile, LiveCardState card,
+            bool opponent, string label, string fallback)
         {
             tile.Name.text = card == null ? fallback : $"{label} · {CardDatabase.GetName(card.code)}";
+            tile.Name.color = DuelStyle.Side(opponent);
+            ((RectTransform)tile.Name.transform.parent).anchorMin = new Vector2(0f, card == null ? 0f : .53f);
             if (card == null) tile.Values.Hide();
-            else tile.Values.Bind(new DuelCardReadout(CardDatabase.Get(card.code), card),
-                opponent: card.controller != _curSession.HumanPlayerIndex);
+            else tile.Values.Bind(new DuelCardReadout(CardDatabase.Get(card.code), card), opponent);
         }
 
         private void SubmitAttackTarget(int index)
