@@ -267,12 +267,14 @@ namespace YGOPortable.UI
                 string change = "";
                 if (adjustment > 0) change = _symbol != null ? "▲" : $"+{adjustment}";
                 else if (adjustment < 0) change = _symbol != null ? "▼" : $"−{-adjustment}";
+                bool numberChanged = _value.text != number;
                 if (!showChanges) DuelReadoutPulse.Cancel(Rect);
-                else if (_value.text.Length != 0 && (_value.text != number || _change.text != change))
+                else if (_value.text.Length != 0 && (numberChanged || _change.text != change))
                 {
                     int delta = _lastValue >= 0 && value >= 0 && value != _lastValue
                         ? value.CompareTo(_lastValue) : adjustment.CompareTo(_lastAdjustment);
-                    DuelReadoutPulse.Play(Rect, delta > 0 ? Increased : delta < 0 ? Decreased : _accent, delta < 0);
+                    DuelReadoutPulse.Play(Rect, delta > 0 ? Increased : delta < 0 ? Decreased : _accent, delta < 0,
+                        numberChanged && value >= 0 ? _value : null);
                 }
                 _lastValue = value;
                 _lastAdjustment = adjustment;
@@ -712,7 +714,9 @@ namespace YGOPortable.UI
             _root.gameObject.SetActive(visible);
             var tone = DuelStatSymbols.RatingColor(rating.Kind);
             if (!visible || !showChanges) DuelReadoutPulse.Cancel(_root);
-            else if (_shown.Kind != DuelRatingKind.None && _shown != rating) DuelReadoutPulse.Play(_root, tone);
+            else if (_shown != rating)
+                DuelReadoutPulse.Play(_root, tone, _shown.Kind == rating.Kind && rating.Value < _shown.Value,
+                    _shown.Kind == DuelRatingKind.None || rating.Value != _shown.Value ? _number : null);
             _shown = rating;
             _symbol.sprite = DuelStatSymbols.Rating(rating.Kind);
             _symbol.color = _number.color = tone;
@@ -742,6 +746,7 @@ namespace YGOPortable.UI
         private Text _materials;
         private DuelCounterBadge _counters;
         private (uint Code, bool Opponent) _lastCard;
+        private (DuelRatingKind Kind, uint Value) _lastRating;
 
         internal RectTransform Rect => _root;
 
@@ -864,7 +869,9 @@ namespace YGOPortable.UI
             }
             _ratingIcon.sprite = DuelStatSymbols.Rating(rating.Kind);
             _ratingIcon.color = color;
-            SetLabel(_rating, visible ? rating.Value.ToString() : "", color, showChanges);
+            bool lower = _lastRating.Kind == rating.Kind && rating.Value < _lastRating.Value;
+            SetLabel(_rating, visible ? rating.Value.ToString() : "", color, showChanges, lower, moveNumber: true);
+            _lastRating = rating;
         }
 
         private void BindCounters(DuelCardReadout card, bool showChanges)
@@ -923,13 +930,14 @@ namespace YGOPortable.UI
             }
         }
 
-        private static void SetLabel(Text label, string content, Color color, bool showChanges)
+        private static void SetLabel(Text label, string content, Color color, bool showChanges,
+            bool reverse = false, bool moveNumber = false)
         {
             var chip = (RectTransform)label.transform.parent;
             bool visible = content.Length != 0;
             chip.gameObject.SetActive(visible);
             if (!showChanges || !visible) DuelReadoutPulse.Cancel(chip);
-            else if (label.text != content) DuelReadoutPulse.Play(chip, color);
+            else if (label.text != content) DuelReadoutPulse.Play(chip, color, reverse, moveNumber ? label : null);
             label.text = content;
             label.color = color;
         }
@@ -985,13 +993,15 @@ namespace YGOPortable.UI
     internal sealed class DuelReadoutPulse : MonoBehaviour
     {
         private const float Duration = .44f;
+        private const float NumberDuration = .24f;
         private Image _wash;
         private Image _sweep;
         private Color _color;
         private bool _reverse;
         private float _elapsed;
+        private (RectTransform Rect, Vector2 Position, Vector3 Scale) _number;
 
-        internal static void Play(RectTransform surface, Color color, bool reverse = false)
+        internal static void Play(RectTransform surface, Color color, bool reverse = false, Text number = null)
         {
             if (!surface.TryGetComponent(out DuelReadoutPulse pulse))
             {
@@ -1004,6 +1014,12 @@ namespace YGOPortable.UI
                 pulse._sweep = LotdUiKit.AddImage(sweep.gameObject, LotdUiKit.WhiteSprite, Color.clear, false, false);
             }
 
+            pulse.RestoreNumber();
+            if (number != null)
+            {
+                var rect = number.rectTransform;
+                pulse._number = (rect, rect.anchoredPosition, rect.localScale);
+            }
             pulse._elapsed = 0f;
             pulse._color = color;
             pulse._reverse = reverse;
@@ -1040,16 +1056,42 @@ namespace YGOPortable.UI
             float tail = Mathf.Max(.05f, head - .46f);
             _sweep.rectTransform.anchorMin = new Vector2(_reverse ? 1f - head : tail, 1f);
             _sweep.rectTransform.anchorMax = new Vector2(_reverse ? 1f - tail : head, 1f);
+
+            if (_number.Rect == null) return;
+            if (_elapsed >= NumberDuration)
+            {
+                RestoreNumber();
+                return;
+            }
+            float remaining = 1f - _elapsed / NumberDuration;
+            remaining *= remaining;
+            float scale = 1f - .16f * remaining;
+            // Keep the translated glyphs within the room freed by scaling.
+            float offset = _number.Rect.rect.height * _number.Scale.y * .072f * remaining;
+            _number.Rect.anchoredPosition = _number.Position + Vector2.up * (_reverse ? offset : -offset);
+            _number.Rect.localScale = new Vector3(_number.Scale.x * scale, _number.Scale.y * scale, _number.Scale.z);
+        }
+
+        private void RestoreNumber()
+        {
+            if (_number.Rect != null)
+            {
+                _number.Rect.anchoredPosition = _number.Position;
+                _number.Rect.localScale = _number.Scale;
+            }
+            _number = default;
         }
 
         private void Stop()
         {
+            RestoreNumber();
             _wash.gameObject.SetActive(false);
             enabled = false;
         }
 
         private void OnDisable()
         {
+            RestoreNumber();
             if (_wash != null) _wash.gameObject.SetActive(false);
             _elapsed = Duration;
         }

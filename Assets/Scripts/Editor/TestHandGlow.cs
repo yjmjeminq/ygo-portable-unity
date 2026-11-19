@@ -275,14 +275,26 @@ namespace YGOPortable.Editor
                 inspector.transform.parent.parent.Find("ChangePulse").gameObject.activeInHierarchy &&
                 slot.Find("CardReadout/Combat/Defense/ChangePulse") == null,
                 "The native equip bonus did not animate just the changed attack values.");
+            var inspectorPulse = inspector.transform.parent.parent.GetComponent<DuelReadoutPulse>();
+            float entry = attack.rectTransform.anchoredPosition.y;
+            Require(entry < 0f && inspector.rectTransform.anchoredPosition.y < 0f &&
+                attack.rectTransform.localScale.x < 1f && inspector.rectTransform.localScale.x < 1f,
+                "The equipped attack values changed without moving into place.");
             float start = sweep.anchorMax.x;
-            pulse.Advance(.20f);
+            pulse.Advance(.12f);
+            inspectorPulse.Advance(.12f);
             float moved = sweep.anchorMax.x;
+            float rising = attack.rectTransform.anchoredPosition.y;
             ui.Field.Refresh();
-            Require(moved > start && sweep.anchorMax.x == moved, "An unchanged field refresh restarted the stat animation.");
-            pulse.Advance(.30f);
-            Require(!sweep.gameObject.activeInHierarchy && attack.text == "2700",
-                "The attack pulse did not return to its unchanged, correct number.");
+            Require(moved > start && sweep.anchorMax.x == moved && rising > entry && rising < 0f &&
+                attack.rectTransform.anchoredPosition.y == rising && attack.text == "2700" && inspector.text == "2700",
+                "An unchanged refresh restarted the number motion or produced an in-between stat.");
+            pulse.Advance(.40f);
+            inspectorPulse.Advance(.40f);
+            Require(!sweep.gameObject.activeInHierarchy &&
+                new[] { attack, inspector }.All(label => label.text == "2700" &&
+                    label.rectTransform.localScale == Vector3.one && label.rectTransform.anchoredPosition == Vector2.zero),
+                "The attack numbers did not finish centered at their full size.");
             Debug.Log("[VERIFY DUEL STAT MOTION] Native attack increase animated once and kept the current value throughout.");
 
             duel.SubmitResponseInt(7);
@@ -1751,8 +1763,9 @@ namespace YGOPortable.Editor
             Require(mixed.Counters.AsSpan().SequenceEqual(new (ushort, ushort)[] { (1, 1), (0x1041, 1) }) &&
                 mixed.level == 1 && monsterCount.text == "2",
                 "Predaplanning did not put a second native counter type on Breaker.");
-            Require(monsterSlot.Find("CardReadout/Labels/Rating/Value").GetComponent<Text>().text == "1" &&
-                inspectorLevel.text == "1" && zoomLevel.text == "1" &&
+            var fieldLevel = monsterSlot.Find("CardReadout/Labels/Rating/Value").GetComponent<Text>();
+            Require(new[] { fieldLevel, inspectorLevel, zoomLevel }.All(level => level.text == "1" &&
+                    level.rectTransform.anchoredPosition.y > 0f) &&
                 inspectorLevel.transform.parent.Find("ChangePulse")?.gameObject.activeInHierarchy == true &&
                 zoomLevel.transform.parent.Find("ChangePulse")?.gameObject.activeInHierarchy == true,
                 "The native level change did not reach and animate both open card views.");
@@ -3740,13 +3753,22 @@ namespace YGOPortable.Editor
                 var zoom = Field.Root.transform.Find("Overlay_CardZoom/ZoomWin/Info/CombatStats");
                 mine.mzone[2].attack = 4200;
                 Field.Refresh();
-                Require(Label(zoom, "Attack/Digits/Value").text == "4200" &&
-                    Label(inspector, "Attack/Digits/Value").text == "4200" &&
+                var detailAttack = Label(zoom, "Attack/Digits/Value");
+                var previewAttack = Label(inspector, "Attack/Digits/Value");
+                Require(new[] { detailAttack, previewAttack }.All(label => label.text == "4200" &&
+                        label.rectTransform.anchoredPosition.y < 0f) &&
                     zoom.Find("Attack/ChangePulse").gameObject.activeInHierarchy,
                     "An open details panel did not follow a change to the selected card's live stats.");
+                mine.mzone[2].attack = 3300;
+                Field.Refresh();
+                Require(new[] { detailAttack, previewAttack }.All(label => label.text == "3300" &&
+                        label.rectTransform.anchoredPosition.y > 0f),
+                    "A second stat change reused the outgoing number or the first direction of motion.");
                 typeof(DuelFieldUI).GetMethod("CloseCardZoomModal", PrivateInstance).Invoke(Field, new object[] { false });
                 normalSlot.GetComponent<CardDragTrigger>().OnRightClick();
-                Require(!inspector.Find("Attack/ChangePulse").gameObject.activeInHierarchy,
+                Require(!inspector.Find("Attack/ChangePulse").gameObject.activeInHierarchy &&
+                    previewAttack.text == "3700" && previewAttack.rectTransform.anchoredPosition == Vector2.zero &&
+                    previewAttack.rectTransform.localScale == Vector3.one,
                     "An unfinished stat animation followed the focus to a different copy.");
 
                 mine.mzone[0].attack = 2900;
@@ -3769,6 +3791,7 @@ namespace YGOPortable.Editor
                 mine.mzone[0].baseAttack = 3200;
                 Field.Refresh();
                 Require(attackDelta.text == "−300" && Label(inspector, "Attack/Digits/Value").text == "2900" &&
+                    Label(inspector, "Attack/Digits/Value").rectTransform.anchoredPosition == Vector2.zero &&
                     inspectedAttack.Find("ChangePulse").gameObject.activeInHierarchy,
                     "A base-only change did not update the signed modifier.");
                 mine.mzone[0].baseAttack = -2;
