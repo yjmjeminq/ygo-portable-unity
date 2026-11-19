@@ -93,6 +93,7 @@ namespace YGOPortable.Core
             [NonSerialized] internal decimal dust;
             public string starterId;
             public UserDeck starterDeck;
+            public string lastDuelDeckId;
             public List<CardCopies> cards;
             public List<int> unlockedOpponentIds;
             public List<int> clearedOpponentIds;
@@ -140,12 +141,11 @@ namespace YGOPortable.Core
         public static string LoadError { get; private set; } = "";
         public static IReadOnlyList<CollectionStarter> Starters => _starters ??= BuildStarters();
         public static IReadOnlyList<CollectionPack> Packs => _packs ??= BuildPacks();
-        public static int OpponentCount => OpponentOrder.Count;
-        public static int UnlockedOpponentCount => OpponentOrder.Count(opponent => IsOpponentUnlocked(opponent.id));
-        internal static IReadOnlyList<OpponentCharacter> UnlockedOpponents =>
-            OpponentOrder.Where(opponent => IsOpponentUnlocked(opponent.id)).ToArray();
+        public static int OpponentCount => AvailableOpponents.Count;
+        public static int UnlockedOpponentCount => OpponentCount;
+        internal static string LastDuelDeckId => _profile?.lastDuelDeckId;
 
-        private static IReadOnlyList<OpponentCharacter> OpponentOrder =>
+        internal static IReadOnlyList<OpponentCharacter> AvailableOpponents =>
             Initialized ? _opponents ??= BuildOpponentOrder() : BuildOpponentOrder();
 
         public static void Load(string persistentDataPath)
@@ -319,35 +319,15 @@ namespace YGOPortable.Core
             return false;
         }
 
-        public static bool IsOpponentUnlocked(int id)
-        {
-            if (!Initialized) return true;
-            if (_profile != null) return _profile.unlockedOpponentIds.Contains(id);
-            var first = OpponentOrder.FirstOrDefault();
-            return first != null && first.id == id;
-        }
+        public static bool IsOpponentUnlocked(int id) => AvailableOpponents.Any(opponent => opponent.id == id);
 
         public static bool IsOpponentCleared(int id) => _profile?.clearedOpponentIds.Contains(id) == true;
 
-        public static int GetUnlockedDeckCount(int opponentId)
-        {
-            if (!IsOpponentUnlocked(opponentId)) return 0;
-            var levels = OpponentDeckLevels.GetDecks(opponentId);
-            if (levels.Count == 0 || !Initialized) return levels.Count;
+        public static int GetUnlockedDeckCount(int opponentId) =>
+            IsOpponentUnlocked(opponentId) ? OpponentDeckLevels.GetDecks(opponentId).Count : 0;
 
-            var progress = FindDeckProgress(_profile, opponentId);
-            int firstDeckId = levels[0].id;
-            return levels.Count(deck => IsDeckLevelOpen(deck.id, firstDeckId, progress));
-        }
-
-        public static bool IsOpponentDeckUnlocked(int opponentId, int deckId)
-        {
-            if (!IsOpponentUnlocked(opponentId)) return false;
-            var levels = OpponentDeckLevels.GetDecks(opponentId);
-            if (!levels.Any(deck => deck.id == deckId)) return false;
-
-            return !Initialized || IsDeckLevelOpen(deckId, levels[0].id, FindDeckProgress(_profile, opponentId));
-        }
+        public static bool IsOpponentDeckUnlocked(int opponentId, int deckId) =>
+            IsOpponentUnlocked(opponentId) && OpponentDeckLevels.GetDecks(opponentId).Any(deck => deck.id == deckId);
 
         public static bool IsOpponentDeckCleared(int opponentId, int deckId) =>
             FindDeckProgress(_profile, opponentId)?.clearedDeckIds.Contains(deckId) == true;
@@ -500,22 +480,14 @@ namespace YGOPortable.Core
         }
 
         public static bool TryAwardDuel(bool won, out int amount, out string error) =>
-            TryAwardDuel(won, -1, out amount, out _, out error);
+            TryAwardDuel(won, -1, null, out amount, out error);
 
-        public static bool TryAwardDuel(bool won, int opponentId, out int amount, out OpponentCharacter unlockedOpponent,
-            out string error) =>
-            TryAwardDuel(won, opponentId, null, out amount, out unlockedOpponent, out _, out error);
+        public static bool TryAwardDuel(bool won, int opponentId, int deckId, out int amount, out string error) =>
+            TryAwardDuel(won, opponentId, (int?)deckId, out amount, out error);
 
-        public static bool TryAwardDuel(bool won, int opponentId, int deckId, out int amount,
-            out OpponentCharacter unlockedOpponent, out PresetDeckInfo unlockedDeck, out string error) =>
-            TryAwardDuel(won, opponentId, (int?)deckId, out amount, out unlockedOpponent, out unlockedDeck, out error);
-
-        private static bool TryAwardDuel(bool won, int opponentId, int? deckId, out int amount,
-            out OpponentCharacter unlockedOpponent, out PresetDeckInfo unlockedDeck, out string error)
+        private static bool TryAwardDuel(bool won, int opponentId, int? deckId, out int amount, out string error)
         {
             amount = 0;
-            unlockedOpponent = null;
-            unlockedDeck = null;
             if (!CanTransact(out error)) return false;
             if (!HasStarter)
             {
@@ -524,12 +496,12 @@ namespace YGOPortable.Core
             }
             if (opponentId >= 0 && !IsOpponentUnlocked(opponentId))
             {
-                error = "아직 해금하지 않은 상대입니다.";
+                error = "상대 목록에 없는 상대입니다.";
                 return false;
             }
             if (deckId.HasValue && !IsOpponentDeckUnlocked(opponentId, deckId.Value))
             {
-                error = "아직 해금하지 않은 상대 덱입니다.";
+                error = "선택한 상대의 덱 목록에 없는 덱입니다.";
                 return false;
             }
 
@@ -539,21 +511,21 @@ namespace YGOPortable.Core
             if (reward == 0 && !firstOpponentWin && !firstDeckWin) return true;
 
             var next = WithBalance(Balance + reward);
-            OpponentCharacter newlyUnlocked = null;
             if (firstOpponentWin)
-            {
                 next.clearedOpponentIds = new List<int>(_profile.clearedOpponentIds) { opponentId };
-                newlyUnlocked = OpponentOrder.FirstOrDefault(opponent => !IsOpponentUnlocked(opponent.id));
-                if (newlyUnlocked != null)
-                    next.unlockedOpponentIds = new List<int>(_profile.unlockedOpponentIds) { newlyUnlocked.id };
-            }
-            var newlyUnlockedDeck = firstDeckWin ? RecordFirstDeckWin(next, opponentId, deckId.Value) : null;
+            if (firstDeckWin) RecordFirstDeckWin(next, opponentId, deckId.Value);
 
             if (!Write(next, _owned, out error)) return false;
             amount = reward;
-            unlockedOpponent = newlyUnlocked;
-            unlockedDeck = newlyUnlockedDeck;
             return true;
+        }
+
+        internal static void RememberDuelDeck(string deckId)
+        {
+            if (!HasStarter || string.IsNullOrEmpty(deckId) || deckId == LastDuelDeckId || !CanTransact(out _)) return;
+            var next = WithBalance(Balance);
+            next.lastDuelDeckId = deckId;
+            if (!Write(next, _owned, out string error)) Debug.LogWarning($"[Collection] 마지막 대전 덱 저장: {error}");
         }
 
         internal static UserDeck CopyDeck(UserDeck deck) => new UserDeck
@@ -579,6 +551,7 @@ namespace YGOPortable.Core
             version = ProfileVersion,
             starterId = _profile.starterId,
             starterDeck = _profile.starterDeck,
+            lastDuelDeckId = _profile.lastDuelDeckId,
             balance = balance,
             dust = _profile.dust,
             unlockedOpponentIds = _profile.unlockedOpponentIds,
@@ -589,31 +562,21 @@ namespace YGOPortable.Core
         private static OpponentDeckProgress FindDeckProgress(SavedProfile profile, int opponentId) =>
             profile?.opponentDeckProgress.Find(progress => progress != null && progress.opponentId == opponentId);
 
-        private static bool IsDeckLevelOpen(int deckId, int firstDeckId, OpponentDeckProgress progress) =>
-            deckId == firstDeckId || progress?.unlockedDeckIds.Contains(deckId) == true ||
-            progress?.clearedDeckIds.Contains(deckId) == true;
-
-        private static PresetDeckInfo RecordFirstDeckWin(SavedProfile next, int opponentId, int deckId)
+        private static void RecordFirstDeckWin(SavedProfile next, int opponentId, int deckId)
         {
             var previous = FindDeckProgress(next, opponentId);
             var updated = new OpponentDeckProgress
             {
                 opponentId = opponentId,
-                unlockedDeckIds = previous == null ? new List<int>() : new List<int>(previous.unlockedDeckIds),
+                unlockedDeckIds = previous?.unlockedDeckIds ?? new List<int>(),
                 clearedDeckIds = previous == null ? new List<int>() : new List<int>(previous.clearedDeckIds),
             };
             updated.clearedDeckIds.Add(deckId);
-            var levels = OpponentDeckLevels.GetDecks(opponentId);
-            int firstDeckId = levels[0].id;
-            var unlocked = levels.FirstOrDefault(deck => !IsDeckLevelOpen(deck.id, firstDeckId, updated));
-            if (unlocked != null) updated.unlockedDeckIds.Add(unlocked.id);
-
             next.opponentDeckProgress = new List<OpponentDeckProgress>(next.opponentDeckProgress);
             if (previous != null)
                 next.opponentDeckProgress[next.opponentDeckProgress.IndexOf(previous)] = updated;
             else
                 next.opponentDeckProgress.Add(updated);
-            return unlocked;
         }
 
         private static IReadOnlyList<OpponentCharacter> BuildOpponentOrder() => DeckRepository.Characters
@@ -629,28 +592,11 @@ namespace YGOPortable.Core
             profile.clearedOpponentIds ??= new List<int>();
             profile.unlockedOpponentIds ??= new List<int>();
             profile.opponentDeckProgress ??= new List<OpponentDeckProgress>();
-            if (!OpponentOrder.Any(opponent => profile.unlockedOpponentIds.Contains(opponent.id) &&
-                                              !profile.clearedOpponentIds.Contains(opponent.id)))
-            {
-                // Keep character progression available when the roster changes.
-                var next = OpponentOrder.FirstOrDefault(opponent => !profile.unlockedOpponentIds.Contains(opponent.id));
-                if (next != null) profile.unlockedOpponentIds.Add(next.id);
-            }
-
             foreach (var progress in profile.opponentDeckProgress)
             {
                 if (progress == null) continue;
                 progress.clearedDeckIds ??= new List<int>();
                 progress.unlockedDeckIds ??= new List<int>();
-                var levels = OpponentDeckLevels.GetDecks(progress.opponentId);
-                if (levels.Count == 0) continue;
-                int firstDeckId = levels[0].id;
-                if (levels.Any(deck => IsDeckLevelOpen(deck.id, firstDeckId, progress) && !progress.clearedDeckIds.Contains(deck.id)))
-                    continue;
-
-                // Preserve recorded decks by ID while offering a path through added or reordered levels.
-                var next = levels.FirstOrDefault(deck => !IsDeckLevelOpen(deck.id, firstDeckId, progress));
-                if (next != null) progress.unlockedDeckIds.Add(next.id);
             }
         }
 

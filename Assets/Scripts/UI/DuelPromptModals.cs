@@ -100,7 +100,6 @@ namespace YGOPortable.UI
         private Image _resTitleRule;
         private Text _resHeadline;
         private Text _resStats;
-        private Text _resOpponentUnlock;
         private Button _rematchButton;
         private Action _resRematch;
         private Action _resOppSel;
@@ -2320,12 +2319,6 @@ namespace YGOPortable.UI
                 new Vector2(.81f, .469f), Vector2.zero, Vector2.zero), "Value", "", 18, 11,
                 TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
             DuelStyle.Shadow(_resStats);
-            var unlockSlot = LotdUiKit.CreateRect("OpponentUnlock", dim, new Vector2(.17f, .244f),
-                new Vector2(.83f, .332f), Vector2.zero, Vector2.zero);
-            _resOpponentUnlock = LotdUiKit.AddFittedText(unlockSlot, "Value", "", 24, 14,
-                TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
-            DuelStyle.Shadow(_resOpponentUnlock);
-
             var r1 = LotdUiKit.CreateRect("Rematch", dim, new Vector2(.22f, .169f), new Vector2(.397f, .234f), Vector2.zero, Vector2.zero);
             _rematchButton = DuelStyle.Button(r1, "B", "재대결", () => { HideResult(); _resRematch?.Invoke(); }, 18, gold: true);
 
@@ -2339,8 +2332,7 @@ namespace YGOPortable.UI
         }
 
         public void ShowResult(bool playerWon, bool isDraw, OpponentCharacter opp, int turns, int myLp, int oppLp,
-            Action onRematch, Action onOppSelect, Action onMenu, string rewardText = "",
-            OpponentCharacter unlockedOpponent = null, PresetDeckInfo unlockedDeck = null)
+            Action onRematch, Action onOppSelect, Action onMenu, string rewardText = "")
         {
             _resRematch = onRematch;
             _resOppSel = onOppSelect;
@@ -2363,15 +2355,6 @@ namespace YGOPortable.UI
             string result = _resTitleArt.enabled ? $"{headline}  ·  " : "";
             _resStats.text = $"{result}{oppName}  ·  {turns}턴\n내 LP {myLp}  /  상대 LP {oppLp}";
             if (!string.IsNullOrEmpty(rewardText)) _resStats.text += $"\n{rewardText}";
-            string unlockText = unlockedOpponent == null ? "" : $"새 상대 해금 · {unlockedOpponent.name}";
-            if (unlockedDeck != null)
-            {
-                int level = OpponentDeckLevels.GetLevel(unlockedDeck.charId, unlockedDeck.id);
-                if (unlockText.Length != 0) unlockText += "\n";
-                unlockText += $"레벨 {level} 덱 해금 · {unlockedDeck.title}";
-            }
-            _resOpponentUnlock.text = unlockText;
-            _resOpponentUnlock.gameObject.SetActive(unlockText.Length != 0);
             ResultRoot.transform.SetAsLastSibling();
             ResultRoot.SetActive(true);
             CardAnimationManager.Instance?.BringToFront();

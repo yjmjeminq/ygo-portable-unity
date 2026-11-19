@@ -445,25 +445,20 @@ namespace YGOPortable.Editor
             {
                 var ui = new OpponentSelectUI(null, canvas.transform);
                 ui.Open();
-                var dropdown = ui.Root.GetComponentInChildren<Dropdown>();
-                var preview = ui.Root.GetComponentInChildren<CompositeCardView>();
-                var search = ui.Root.GetComponentInChildren<InputField>();
-                var yugiDecks = DeckRepository.GetDecksForCharacter(104);
-                AssertTrue(yugiDecks.Take(3).Select(d => d.id).SequenceEqual(new[] { 30000, 30001, 30002 }),
+                var preview = ui.Root.GetComponentInChildren<CompositeCardView>(true);
+                var search = ui.SearchInput;
+                AssertTrue(DeckRepository.GetDecksForCharacter(104).Take(3).Select(d => d.id).SequenceEqual(new[] { 30000, 30001, 30002 }),
                     "Yugi's Gaia, Dark Magician and Chaos decks should lead the list");
-                AssertTrue(dropdown.options.Count == yugiDecks.Count && preview.CurrentCode == yugiDecks[0].sigCard,
-                    "The DM tab should open with Yami Yugi's Gaia deck");
-                dropdown.value = 2;
-                AssertTrue(preview.CurrentCode == yugiDecks[2].sigCard, "Changing the deck should update the ace card");
-                search.text = "마방기사가이아";
-                AssertTrue(dropdown.value == 0 && preview.CurrentCode == yugiDecks[0].sigCard, "Deck search should select the match");
+                var yugiDecks = OpponentDeckLevels.GetDecks(104);
+                search.text = yugiDecks[0].title;
+                AssertTrue(preview.CurrentCode == yugiDecks[0].sigCard, "Deck search should select the match.");
                 search.text = "Yami Yugi";
-                AssertTrue(dropdown.options.Count == yugiDecks.Count, "Yugi's original name should be searchable");
+                AssertTrue(preview.CurrentCode == yugiDecks[0].sigCard, "Yugi's original name should be searchable.");
                 search.text = "zz-no-opponent";
-                AssertTrue(dropdown.options.Count == 0 && !dropdown.interactable && preview.CurrentCode == 0,
+                AssertTrue(preview.CurrentCode == 0,
                     "An empty search should clear the previous selection");
                 search.text = "";
-                AssertTrue(dropdown.interactable && dropdown.options.Count == yugiDecks.Count,
+                AssertTrue(preview.CurrentCode != 0 && !ui.IsDeckSetupOpen,
                     "Clearing the search should restore the opponent list");
                 VerifyOpponentNavigation(ui, canvas);
             }
@@ -487,7 +482,7 @@ namespace YGOPortable.Editor
             }
             var selectedBefore = events.currentSelectedGameObject;
             var sample = DeckRepository.PresetDecks[0];
-            var ownDeck = new UserDeck { name = sample.title, main = sample.main.ToList(), extra = sample.extra.ToList() };
+            var ownDeck = new UserDeck { id = "opponent-navigation-fixture", name = sample.title, main = sample.main.ToList(), extra = sample.extra.ToList() };
             DeckRepository.UserDecks.Insert(0, ownDeck);
             try
             {
@@ -499,23 +494,34 @@ namespace YGOPortable.Editor
                 }
 
                 ui.Open();
-                string firstCell = "CharGridPanel/GridArea/CharSlot_0_0";
+                const string grid = "OpponentBrowser/CharGridPanel";
+                string firstCell = grid + "/GridArea/CharSlot_0_0";
                 AssertTrue(events.currentSelectedGameObject == ui.Root.transform.Find(firstCell).gameObject,
                     "The opponent controller focus should start on the selected character.");
-                var secondCell = ui.Root.transform.Find("CharGridPanel/GridArea/CharSlot_0_1");
-                var nextOpponent = DeckRepository.Characters.Where(character => character.seriesIdx == 0).ElementAt(1);
+                var secondCell = ui.Root.transform.Find(grid + "/GridArea/CharSlot_0_1");
+                var nextOpponent = CollectionProgress.AvailableOpponents[1];
                 events.SetSelectedGameObject(secondCell.gameObject);
-                AssertTrue(ui.Root.GetComponentInChildren<CompositeCardView>().CurrentCode ==
-                    DeckRepository.GetDecksForCharacter(nextOpponent.id)[0].sigCard,
-                    "Moving focus to an opponent should update the ace preview before confirmation.");
-                var next = ButtonAt(ui.Root, "CharGridPanel/PageBar/Next/B");
-                Submit(next);
-                var pageOpponent = DeckRepository.Characters.Where(character => character.seriesIdx == 0).ElementAt(15);
+                AssertTrue(!ui.IsDeckSetupOpen, "Moving focus opened the matchup before confirming the opponent.");
+                Submit(secondCell.GetComponent<Button>());
                 var preview = ui.Root.GetComponentInChildren<CompositeCardView>();
-                AssertTrue(preview.CurrentCode == DeckRepository.GetDecksForCharacter(pageOpponent.id)[0].sigCard,
+                var levels = OpponentDeckLevels.GetDecks(nextOpponent.id);
+                AssertTrue(ui.IsDeckSetupOpen && preview.CurrentCode == levels[0].sigCard,
+                    "Confirming the opponent should show its first deck.");
+                Submit(ButtonAt(ui.Root, "DuelSetup/OpponentDeck/PreviousDeck/B"));
+                AssertTrue(preview.CurrentCode == levels[^1].sigCard,
+                    "The opponent's final deck was not available on the previous arrow from level one.");
+                Submit(ButtonAt(ui.Root, "DuelSetup/BackToOpponents/B"));
+                AssertTrue(!ui.IsDeckSetupOpen && events.currentSelectedGameObject == secondCell.gameObject,
+                    "Returning from deck selection should focus the same character.");
+                var next = ButtonAt(ui.Root, grid + "/PageBar/Next/B");
+                Submit(next);
+                int pageSize = ui.Root.transform.Find(grid + "/GridArea").childCount;
+                var pageOpponent = CollectionProgress.AvailableOpponents[pageSize];
+                Submit(ButtonAt(ui.Root, firstCell));
+                AssertTrue(preview.CurrentCode == OpponentDeckLevels.GetDecks(pageOpponent.id)[0].sigCard,
                     "The selected opponent stayed on the previous page.");
 
-                var start = ButtonAt(ui.Root, "OppDetailPanel/StartDuelBtn/B");
+                var start = ButtonAt(ui.Root, "DuelSetup/StartDuelBtn/B");
                 Submit(start);
                 var rock = ButtonAt(ui.JankenRoot, "JnkWin/Hands/H1/B");
                 var first = ButtonAt(ui.JankenRoot, "JnkWin/Order/First/B");
@@ -621,8 +627,17 @@ namespace YGOPortable.Editor
             Pad("Submit");
             Pad("Cancel");
             AssertTrue(!keyboard.gameObject.activeSelf && opponents.Root.activeSelf &&
-                events.currentSelectedGameObject == opponents.Root.transform.Find("SearchBox/SearchInput").gameObject,
+                events.currentSelectedGameObject == opponents.SearchInput.gameObject,
                 "Canceling the opponent keyboard should immediately restore focus to the search field.");
+            var character = opponents.Root.transform.Find("OpponentBrowser/CharGridPanel/GridArea/CharSlot_0_0");
+            events.SetSelectedGameObject(character.gameObject);
+            Pad("Submit");
+            AssertTrue(opponents.IsDeckSetupOpen &&
+                events.currentSelectedGameObject.transform.IsChildOf(opponents.Root.transform.Find("DuelSetup/MyDeck")),
+                "Controller confirmation should enter deck selection and focus the chosen deck.");
+            Pad("Cancel");
+            AssertTrue(!opponents.IsDeckSetupOpen && events.currentSelectedGameObject == character.gameObject,
+                "Controller cancel should return to the selected character.");
 
             opponents.Root.SetActive(false);
             var codex = new ArchetypeCodexUI(canvas, () => { });

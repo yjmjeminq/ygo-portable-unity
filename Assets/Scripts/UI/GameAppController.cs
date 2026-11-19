@@ -319,11 +319,10 @@ namespace YGOPortable.UI
                 !CollectionProgress.IsOpponentDeckUnlocked(oppChar.id, oppDeck.id))
             {
                 ShowScreen(AppScreen.OpponentSelect);
-                _oppSelect.ShowStatus("해금된 상대와 덱을 선택하세요.", true);
+                _oppSelect.ShowStatus("목록에 있는 상대와 덱을 선택하세요.", true);
                 return;
             }
-            if (CollectionProgress.Initialized)
-                oppDeck = OpponentDeckLevels.GetDecks(oppChar.id).First(deck => deck.id == oppDeck.id);
+            oppDeck = OpponentDeckLevels.GetDecks(oppChar.id).First(deck => deck.id == oppDeck.id);
             if (!CanStartWithDeck(myDeck, out string reason))
             {
                 ShowScreen(AppScreen.OpponentSelect);
@@ -356,6 +355,7 @@ namespace YGOPortable.UI
                 _oppSelect.ShowStatus("듀얼을 시작하지 못했습니다.", true);
                 return;
             }
+            CollectionProgress.RememberDuelDeck(myDeck.id);
             _duelField.Refresh();
         }
 
@@ -439,13 +439,11 @@ namespace YGOPortable.UI
                     _duelField.Refresh();
                     bool won = _session.Winner == _session.HumanPlayerIndex;
                     bool draw = _session.Winner == 2;
-                    OpponentCharacter unlockedOpponent = null;
-                    PresetDeckInfo unlockedDeck = null;
                     string rewardText = "";
                     if (_session.Winner >= 0 && CollectionProgress.HasStarter)
                     {
                         rewardText = CollectionProgress.TryAwardDuel(won, _activeOppChar.id, _activeOppDeck.id,
-                            out int reward, out unlockedOpponent, out unlockedDeck, out string error)
+                            out int reward, out string error)
                             ? $"듀얼 보상 +{reward:N0} DP  ·  보유 {CollectionProgress.Balance:N0} DP"
                             : error;
                     }
@@ -454,12 +452,8 @@ namespace YGOPortable.UI
                         Mathf.Max(0, _session.Players[_session.HumanPlayerIndex].lp),
                         Mathf.Max(0, _session.Players[_session.AiPlayerIndex].lp),
                         () => StartDuelMatch(_activeOppChar, _activeOppDeck, _activeMyDeck, _activePlayerFirst),
-                        () =>
-                        {
-                            ShowScreen(AppScreen.OpponentSelect);
-                            if (unlockedDeck != null) _oppSelect.FocusUnlockedDeck(unlockedDeck);
-                        },
-                        () => ShowScreen(AppScreen.MainMenu), rewardText, unlockedOpponent, unlockedDeck);
+                        () => ShowScreen(AppScreen.OpponentSelect),
+                        () => ShowScreen(AppScreen.MainMenu), rewardText);
                 }
                 return;
             }
@@ -566,10 +560,12 @@ namespace YGOPortable.UI
             bool cloudSave = _saveSyncMenu?.Root.activeSelf == true;
             bool settings = _titleAndMenu.SettingsRoot.activeInHierarchy;
             bool janken = _oppSelect.JankenRoot.activeInHierarchy;
+            bool selectingOpponent = _screen == AppScreen.OpponentSelect;
+            bool selectingDecks = selectingOpponent && _oppSelect.IsDeckSetupOpen;
             bool selectingStarter = _screen == AppScreen.StarterSelection;
             bool codex = _screen == AppScreen.ArchetypeCodex;
             bool collectionPage = selectingStarter || _screen == AppScreen.CardShop || codex;
-            bool cancel = frame.Cancel || (escape && (cloudSave || settings || janken || _menuPad.HasPopup || collectionPage));
+            bool cancel = frame.Cancel || (escape && (cloudSave || settings || selectingOpponent || _menuPad.HasPopup || collectionPage));
             if (!frame.HasInput && !cancel) return;
 
             GameObject scope = cloudSave ? _saveSyncMenu.Root : _screen switch
@@ -603,7 +599,7 @@ namespace YGOPortable.UI
                         return;
                     }
                 }
-                if (_screen == AppScreen.OpponentSelect && !janken && !cancel)
+                if (selectingOpponent && !janken && !selectingDecks && !cancel)
                 {
                     if (frame.Search)
                     {
@@ -624,6 +620,7 @@ namespace YGOPortable.UI
                 if (cloudSave) CloseSaveSync();
                 else if (settings) _titleAndMenu.CloseSettings();
                 else if (janken) _oppSelect.CloseJanken();
+                else if (selectingDecks) _oppSelect.CloseDeckSetup();
                 else if (selectingStarter) ShowScreen(AppScreen.Title);
                 else if (_screen == AppScreen.CardShop)
                 {

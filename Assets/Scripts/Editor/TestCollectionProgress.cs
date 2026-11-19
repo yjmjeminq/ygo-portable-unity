@@ -26,6 +26,7 @@ namespace YGOPortable.Editor
             CollectionProgress.Load(save);
             Require(!CollectionProgress.HasStarter && !CollectionProgress.TryBuyPack(SupportPack, out _, out _),
                 "A fresh profile bought a pack without choosing a starter.");
+            VerifyOpponentAccess();
 
             var starters = CollectionProgress.Starters;
             Require(starters.Count >= 400 && starters.Select(option => option.Id).Distinct().Count() == starters.Count &&
@@ -41,10 +42,26 @@ namespace YGOPortable.Editor
             var materials = LoadLegacyProfile(save, profile);
             VerifyCrafting(materials, starter, profile);
             VerifyPurchasesAndRewards(save, profile);
-            VerifyMyDeckPicker(starter);
+            VerifyMyDeckPicker(starter, save);
             VerifyDeckCopyLimitAndFullDisassembly(starter);
             Debug.Log($"[VERIFY COLLECTION] {starters.Count} starter deck sizes, legacy saves, uncapped inventory, shared crafting dust, " +
-                "deck copy limits, full disassembly, pack ownership, rollback and opponent progression passed.");
+                "deck copy limits, full disassembly, pack ownership, rollback and opponent access passed.");
+        }
+
+        private static void VerifyOpponentAccess()
+        {
+            var opponents = DeckRepository.Characters.Where(character => OpponentDeckLevels.GetDecks(character.id).Count > 0).ToArray();
+            Require(opponents.Length > 0 && CollectionProgress.UnlockedOpponentCount == opponents.Length,
+                "Some opponents are missing from the available roster.");
+            foreach (var opponent in opponents)
+            {
+                var decks = OpponentDeckLevels.GetDecks(opponent.id);
+                Require(CollectionProgress.GetUnlockedDeckCount(opponent.id) == decks.Count &&
+                    decks.All(deck => CollectionProgress.IsOpponentDeckUnlocked(opponent.id, deck.id)),
+                    $"Some decks for {opponent.name} require a prior win.");
+            }
+            Debug.Log($"[VERIFY OPPONENT ACCESS] {opponents.Length} opponents and " +
+                $"{opponents.Sum(opponent => OpponentDeckLevels.GetDecks(opponent.id).Count)} decks available.");
         }
 
         private static void VerifySaveSync(string save, UserDeck starter)
@@ -210,17 +227,20 @@ namespace YGOPortable.Editor
                     CollectionProgress.GetOwnedCount(group.Key) == beforePurchase[group.Key] + group.Count()),
                 "A bundle did not retain every pull above the former three-copy inventory cap.");
 
-            var first = DeckRepository.Characters.Single(character => CollectionProgress.IsOpponentUnlocked(character.id));
-            var levels = OpponentDeckLevels.GetDecks(first.id);
-            Require(levels.Count > 1 && CollectionProgress.IsOpponentDeckUnlocked(first.id, levels[0].id) &&
-                !CollectionProgress.IsOpponentDeckUnlocked(first.id, levels[1].id),
-                "Fresh progression did not start on deck level one.");
-            Require(!CollectionProgress.TryAwardDuel(true, first.id, levels[1].id, out _, out _, out _, out _),
-                "An unplayed locked deck accepted a reward.");
-            Require(CollectionProgress.TryAwardDuel(false, first.id, levels[0].id, out int loss, out _, out _, out error) &&
-                loss == 150 && !CollectionProgress.IsOpponentDeckUnlocked(first.id, levels[1].id), error);
-            Require(CollectionProgress.TryAwardDuel(true, first.id, levels[0].id, out int win, out var opponent, out var advanced, out error) &&
-                win == 300 && opponent != null && advanced?.id == levels[1].id, error);
+            var opponent = DeckRepository.Characters.Last(character => OpponentDeckLevels.GetDecks(character.id).Count > 1);
+            var levels = OpponentDeckLevels.GetDecks(opponent.id);
+            var finalDeck = levels[^1];
+            const int retiredDeckId = int.MaxValue - 1;
+            File.WriteAllText(profile, Regex.Replace(File.ReadAllText(profile), "\"opponentDeckProgress\"\\s*:\\s*\\[\\s*\\]",
+                $"\"opponentDeckProgress\": [{{\"opponentId\":{opponent.id},\"unlockedDeckIds\":[],\"clearedDeckIds\":[{retiredDeckId}]}}]"));
+            CollectionProgress.Load(save);
+            VerifyOpponentAccess();
+            Require(!CollectionProgress.TryAwardDuel(true, opponent.id, int.MaxValue, out _, out _) &&
+                CollectionProgress.Balance == expectedDp, "An unknown deck accepted a reward.");
+            Require(CollectionProgress.TryAwardDuel(false, opponent.id, finalDeck.id, out int loss, out error) &&
+                loss == 150 && !CollectionProgress.IsOpponentDeckCleared(opponent.id, finalDeck.id), error);
+            Require(CollectionProgress.TryAwardDuel(true, opponent.id, finalDeck.id, out int win, out error) &&
+                win == 300 && CollectionProgress.IsOpponentCleared(opponent.id), error);
             expectedDp += loss + win;
 
             File.AppendAllText(profile, "\n");
@@ -231,10 +251,11 @@ namespace YGOPortable.Editor
             Require(CollectionProgress.Balance == expectedDp &&
                 CollectionProgress.CraftDust == expectedDust &&
                 CollectionProgress.GetOwnedCount(AshBlossom) > 0 &&
-                CollectionProgress.IsOpponentDeckCleared(first.id, levels[0].id) &&
-                CollectionProgress.IsOpponentDeckUnlocked(first.id, levels[1].id) &&
-                CollectionProgress.IsOpponentUnlocked(opponent.id),
-                "Reload lost crafted ownership, dust, DP, or opponent progression.");
+                CollectionProgress.IsOpponentDeckCleared(opponent.id, finalDeck.id) &&
+                CollectionProgress.IsOpponentDeckCleared(opponent.id, retiredDeckId) &&
+                !CollectionProgress.IsOpponentDeckCleared(opponent.id, levels[0].id) &&
+                CollectionProgress.IsOpponentCleared(opponent.id),
+                "Reload lost crafted ownership, dust, DP, or the completed duel.");
         }
 
         internal static string WithOwnership(string json, uint code, int count)
@@ -266,7 +287,7 @@ namespace YGOPortable.Editor
                 $"Full disassembly did not update deck eligibility: {error}");
         }
 
-        private static void VerifyMyDeckPicker(UserDeck starter)
+        private static void VerifyMyDeckPicker(UserDeck starter, string save)
         {
             UserDeck Copy(string id, string name) => new UserDeck
             {
@@ -298,31 +319,55 @@ namespace YGOPortable.Editor
                 DeckRepository.UserDecks.Clear();
                 DeckRepository.UserDecks.AddRange(new[] { incomplete, first, missingCard, second });
                 var ui = new OpponentSelectUI(null, canvas.transform);
-                ui.Open();
-                var picker = ui.Root.transform.Find("OppDetailPanel/MyDeckBox/MyDeckPicker/Dropdown").GetComponent<Dropdown>();
-                var start = ui.Root.transform.Find("OppDetailPanel/StartDuelBtn/B").GetComponent<Button>();
-                Require(picker.interactable && picker.options.Count == 2 && picker.options[0].text.StartsWith(first.name) &&
-                    picker.options[1].text.StartsWith(second.name) && start.interactable,
+                void BrowseAndSelect()
+                {
+                    ui.Open();
+                    Require(!ui.IsDeckSetupOpen, "Opening Free Duel skipped the character browser.");
+                    ui.Root.transform.Find("OpponentBrowser/CharGridPanel/GridArea/CharSlot_0_0")
+                        .GetComponent<Button>().onClick.Invoke();
+                    Require(ui.IsDeckSetupOpen, "Confirming a character did not open the deck choices.");
+                }
+                BrowseAndSelect();
+                var setup = ui.Root.transform.Find("DuelSetup");
+                var list = setup.Find("MyDeck/DeckList/Viewport/Content");
+                var start = setup.Find("StartDuelBtn/B").GetComponent<Button>();
+                Text RowName(int index) => list.GetChild(index).Find("Name/Value").GetComponent<Text>();
+                Require(list.GetComponentsInChildren<Button>().Length == 2 && RowName(0).text == first.name &&
+                    RowName(1).text == second.name && start.interactable,
                     "The list included an unplayable deck or omitted a playable deck.");
 
-                picker.value = 1;
-                var updated = Copy(second.id, "Renamed playable deck");
+                list.GetChild(1).GetComponent<Button>().onClick.Invoke();
+                Require(RowName(1).color == LotdUiKit.GoldAccent && string.IsNullOrEmpty(CollectionProgress.LastDuelDeckId),
+                    "Browsing a deck did not highlight it, or was saved as a played deck.");
+                CollectionProgress.RememberDuelDeck(second.id);
+                CollectionProgress.Load(save);
+                Require(CollectionProgress.LastDuelDeckId == second.id &&
+                    new SaveSyncFiles(save).Capture().profile.Contains(second.id), "The last played deck did not round-trip through the profile.");
+                var updated = Copy(second.id, "Renamed last played deck");
                 DeckRepository.UserDecks.Remove(second);
-                DeckRepository.UserDecks.Insert(0, updated);
-                ui.Open();
-                Require(picker.value == 0 && picker.captionText.text.StartsWith(updated.name),
+                DeckRepository.UserDecks.Insert(1, updated);
+                BrowseAndSelect();
+                Require(RowName(0).text == updated.name && RowName(0).color == LotdUiKit.GoldAccent,
                     "Reopening the screen did not retain the selected deck after a reorder or edit.");
 
                 updated.main.Clear();
-                ui.Open();
-                Require(picker.options.Count == 1 && picker.captionText.text.StartsWith(first.name) && start.interactable,
+                BrowseAndSelect();
+                Require(list.GetComponentsInChildren<Button>().Length == 1 && RowName(0).text == first.name && start.interactable,
                     "The picker did not fall back to an eligible deck after the selection became unusable.");
                 DeckRepository.UserDecks.Remove(first);
-                ui.Open();
-                Require(picker.options.Count == 0 && !picker.interactable && !start.interactable &&
-                    picker.captionText.text.Contains("사용 가능한 덱 없음"),
+                BrowseAndSelect();
+                Require(list.GetComponentsInChildren<Button>().Length == 0 && !start.interactable &&
+                    setup.Find("MyDeck/DeckList/Empty/Value").GetComponent<Text>().text.Contains("사용 가능한 덱 없음"),
                     "The empty state did not disable Duel Start and explain that no deck can be used.");
-                Debug.Log("[VERIFY MY DECK PICKER] Playable-only options, retained selection and empty state passed.");
+
+                var manyDecks = Enumerable.Range(0, 12).Select(i => Copy($"picker-many-{i}", $"Deck {i + 1}")).ToArray();
+                DeckRepository.UserDecks.AddRange(manyDecks);
+                CollectionProgress.RememberDuelDeck(manyDecks[^1].id);
+                BrowseAndSelect();
+                var scroll = setup.Find("MyDeck/DeckList").GetComponent<ScrollRect>();
+                Require(RowName(manyDecks.Length - 1).color == LotdUiKit.GoldAccent && scroll.verticalNormalizedPosition < .01f,
+                    "The list did not bring the last played deck into view.");
+                Debug.Log("[VERIFY MY DECK PICKER] Playable decks, saved selection, empty state and scrolling passed.");
             }
             finally
             {
