@@ -199,6 +199,9 @@ namespace YGOPortable.Core
         internal bool IsDirectAttackChoice =>
             (messageType is YgoConstants.MSG_SELECT_YESNO or YgoConstants.MSG_SELECT_EFFECTYN) &&
             promptDesc == YgoConstants.DESC_DIRECT_ATTACK;
+        internal bool IsAttackReplayChoice =>
+            messageType == YgoConstants.MSG_SELECT_YESNO && promptDesc == YgoConstants.DESC_ATTACK_REPLAY;
+        internal bool IsAttackDecision => IsDirectAttackChoice || IsAttackReplayChoice;
 
         // SelectOption / AnnounceNumber / AnnounceCard
         public List<ulong> options = new List<ulong>();
@@ -750,7 +753,7 @@ namespace YGOPortable.Core
             if (prompt == null || !ReferenceEquals(ActivePrompt, prompt)) return null;
             if (prompt.IsDirectAttackChoice && prompt.promptLoc == YgoConstants.LOCATION_MZONE)
                 return GetVisibleFieldCard(prompt.promptCardCode, prompt.promptCon, prompt.promptLoc, prompt.promptSeq);
-            if (!(prompt.IsDirectAttackChoice || prompt.IsAttackTargetSelection) || _chosenAttacker is not { } source)
+            if (!(prompt.IsAttackDecision || prompt.IsAttackTargetSelection) || _chosenAttacker is not { } source)
                 return null;
             // Some effects let the defender choose the target of the already selected attacker.
             return GetVisibleFieldCard(source.code, source.controller, source.location, source.sequence);

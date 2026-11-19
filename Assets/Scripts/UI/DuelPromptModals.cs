@@ -585,7 +585,7 @@ namespace YGOPortable.UI
         {
             if (!CanAnswerPrompt || _curPrompt == null) return false;
 
-            if (_curPrompt.IsDirectAttackChoice)
+            if (_curPrompt.IsAttackDecision)
             {
                 var selected = EventSystem.current?.currentSelectedGameObject;
                 if (selected == null || !selected.TryGetComponent<Button>(out var option) || !CanNavigate(option, _modalFooter))
@@ -679,7 +679,7 @@ namespace YGOPortable.UI
                 _modalBox.anchorMax = new Vector2(centerX + halfWidth, .699f);
                 _modalFooter.anchorMin = new Vector2(.06f, _modalFooter.anchorMin.y);
             }
-            else if (prompt.IsDirectAttackChoice)
+            else if (prompt.IsAttackDecision)
             {
                 _modalBox.anchorMin = new Vector2(.347f, .168f);
                 _modalBox.anchorMax = new Vector2(.773f, .429f);
@@ -719,7 +719,7 @@ namespace YGOPortable.UI
             {
                 case YgoConstants.MSG_SELECT_YESNO:
                 case YgoConstants.MSG_SELECT_EFFECTYN:
-                    if (prompt.IsDirectAttackChoice) RenderDirectAttackChoice(session, prompt);
+                    if (prompt.IsAttackDecision) RenderAttackDecision(session, prompt);
                     else RenderYesNo(session, prompt);
                     break;
                 case YgoConstants.MSG_SELECT_POSITION:
@@ -794,11 +794,12 @@ namespace YGOPortable.UI
             AddFooterButton("아니오", () => Submit(BitConverter.GetBytes(0)), false);
         }
 
-        private void RenderDirectAttackChoice(DuelSession session, DuelPrompt prompt)
+        private void RenderAttackDecision(DuelSession session, DuelPrompt prompt)
         {
             var source = session.GetAttackSelectionSource(prompt);
             bool opponent = (source != null ? source.controller : session.TurnPlayer) != session.HumanPlayerIndex;
-            _modalTitle.text = opponent ? "상대 공격 방식 선택" : "공격 방식 선택";
+            bool replay = prompt.IsAttackReplayChoice;
+            _modalTitle.text = replay ? "공격 대상 변경" : opponent ? "상대 공격 방식 선택" : "공격 방식 선택";
             _modalSubtitle.text = "";
             var tile = AddAttackSelectionCard("AttackSource", 0f, 1f);
             BindAttackSelectionCard(tile, source, opponent, opponent ? "상대 공격" : "공격", "공격 몬스터");
@@ -808,8 +809,8 @@ namespace YGOPortable.UI
                     code = source.code, controller = source.controller, location = source.location,
                     sequence = source.sequence, position = source.position,
                 });
-            AddFooterButton("몬스터 공격", () => Submit(BitConverter.GetBytes(0)), false);
-            AddFooterButton("직접 공격", () => Submit(BitConverter.GetBytes(1)), true);
+            AddFooterButton(replay ? "공격 중단" : "몬스터 공격", () => Submit(BitConverter.GetBytes(0)), false);
+            AddFooterButton(replay ? "공격 계속" : "직접 공격", () => Submit(BitConverter.GetBytes(1)), true);
         }
 
         private static DuelCardReadout ReadSummonPosition(DuelSession session, DuelPrompt p, out SelectableCardItem source)

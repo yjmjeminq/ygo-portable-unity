@@ -30,6 +30,8 @@ namespace YGOPortable.Editor
             VerifyNativeCombatReadout(useHonest: false);
             VerifyDirectAttackChoice();
             VerifyDefenderChoosesAttackTarget();
+            VerifyAttackReplayChoice(continueAttack: false);
+            VerifyAttackReplayChoice(continueAttack: true);
             VerifyNativeEquipHandoff();
             VerifyOpponentEquipmentFocus();
             VerifyNativeMonsterEquip();
@@ -607,6 +609,132 @@ namespace YGOPortable.Editor
             Require(mine.grave.Exists(card => card.code == sparkman) && duel.RetryCount == 0,
                 "The native attack did not resolve on the set card chosen by the defender.");
             Debug.Log("[VERIFY DUEL DEFENDER CHOICE] Native target transfer, live attacker, defense, set-card privacy and immediate selection passed.");
+        }
+
+        private static void VerifyAttackReplayChoice(bool continueAttack)
+        {
+            const uint axe = 40619825, doubleSummon = 43422537, evacuation = 94192409,
+                sparkman = 20721928, mysticalElf = 15025844;
+            var deck = Enumerable.Repeat(KaiserSeaHorse, 24).Concat(Enumerable.Repeat(axe, 16)).ToArray();
+            var required = new[] { doubleSummon, evacuation, sparkman, mysticalElf };
+            var opponent = required.SelectMany(code => Enumerable.Repeat(code, 10)).ToArray();
+            var empty = Array.Empty<uint>();
+            var ai = new TacticalAI();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Attack replay after a target leaves", deck, empty, opponent, empty,
+                false, session => required.All(code => session.Players[session.AiPlayerIndex].hand.Exists(card => card.code == code)) &&
+                    new[] { KaiserSeaHorse, axe }.All(code => session.Players[session.HumanPlayerIndex].hand.Exists(card => card.code == code)));
+
+            void ReachMainPhase(uint pick = 0)
+            {
+                YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt => pick != 0 && prompt.messageType == YgoConstants.MSG_SELECT_CARD
+                    ? SelectCard(prompt, pick) : null);
+                Require(duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD && duel.RetryCount == 0,
+                    "The attack replay fixture could not reach the main phase.");
+            }
+            void Summon(uint code)
+            {
+                int index = duel.ActivePrompt.summonable.FindIndex(card => card.code == code);
+                Require(index >= 0, $"The replay fixture could not summon {code}.");
+                duel.SubmitResponseInt(index << 16);
+                ReachMainPhase();
+            }
+
+            Summon(sparkman);
+            ActivateFromMainPhase(duel, doubleSummon);
+            ReachMainPhase();
+            Summon(mysticalElf);
+            int set = duel.ActivePrompt.sSetable.FindIndex(card => card.code == evacuation);
+            Require(set >= 0, "The defender could not set Compulsory Evacuation Device.");
+            duel.SubmitResponseInt((set << 16) | 4);
+            ReachMainPhase();
+            duel.SubmitResponseInt(7);
+            ReachMainPhase();
+            Require(duel.ActivePrompt.playerId == duel.HumanPlayerIndex, "The attack replay fixture did not switch turns.");
+            Summon(KaiserSeaHorse);
+            ActivateFromMainPhase(duel, axe);
+            ReachMainPhase(KaiserSeaHorse);
+
+            duel.SubmitResponseInt(6);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            Require(duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_BATTLECMD &&
+                duel.ActivePrompt.attackable.Single().code == KaiserSeaHorse, "The replay fixture did not enter battle.");
+            duel.SubmitResponseInt(1);
+            Require(duel.ActivePrompt?.IsAttackTargetSelection == true && duel.ActivePrompt.candidates.Count == 2,
+                "The attacker did not have both starting targets.");
+            duel.SubmitResponse(SelectCard(duel.ActivePrompt, sparkman));
+
+            bool returned = false;
+            for (int step = 0; step < 20; step++)
+            {
+                var prompt = duel.ActivePrompt;
+                if (prompt == null) duel.StepUntilPrompt();
+                else if (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN)
+                {
+                    int answer = returned ? -1 : prompt.candidates.FindIndex(card => card.code == evacuation);
+                    returned |= answer >= 0;
+                    duel.SubmitResponseInt(answer);
+                }
+                else if (prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN)
+                {
+                    bool useTrap = !returned && prompt.promptCardCode == evacuation;
+                    returned |= useTrap;
+                    duel.SubmitResponseInt(useTrap ? 1 : 0);
+                }
+                else if (returned && prompt.messageType == YgoConstants.MSG_SELECT_CARD)
+                    duel.SubmitResponse(SelectCard(prompt, sparkman));
+                else break;
+            }
+            var replay = duel.ActivePrompt;
+            Require(returned && replay?.IsAttackReplayChoice == true &&
+                duel.Players[duel.AiPlayerIndex].hand.Exists(card => card.code == sparkman) && duel.RetryCount == 0,
+                $"The target removal did not trigger a native attack replay (prompt {replay?.messageType}/{replay?.promptDesc}).");
+            var source = duel.GetAttackSelectionSource(replay);
+            Require(source?.code == KaiserSeaHorse && source.attack == 2700,
+                "The attack replay lost the original attacker and its live equipment bonus.");
+
+            byte[] response = null;
+            using var ui = new HandUI(duel, mobileLayout: true, submitResponse: bytes => response = bytes);
+            ((RectTransform)ui.Canvas.transform).sizeDelta = new Vector2(1740f, 805f);
+            var defender = duel.Players[duel.AiPlayerIndex];
+            int initialLp = defender.lp;
+            ui.Modals.ShowPrompt(duel, replay);
+            ui.Field.Refresh();
+            var window = ui.Modals.ModalRoot.transform.Find("Win");
+            Require(window.Find("Hdr/TitleBand/Title").GetComponent<Text>().text == "공격 대상 변경" &&
+                window.Find("Body/AttackSource/Heading/Name").GetComponent<Text>().text == $"공격 · {CardDatabase.GetName(KaiserSeaHorse)}" &&
+                window.Find("Body/AttackSource/Combat/Attack/Digits/Value").GetComponent<Text>().text == "2700",
+                "The replay window did not identify the reason and actual attacker.");
+            string option = continueAttack ? "공격 계속" : "공격 중단";
+            window.Find($"Footer/Btn_{option}/B").GetComponent<Button>().onClick.Invoke();
+            Require(response?.Length == 4 && BitConverter.ToInt32(response, 0) == (continueAttack ? 1 : 0),
+                "The replay decision did not preserve the native response.");
+            duel.SubmitResponse(response);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+
+            if (continueAttack)
+            {
+                var next = duel.ActivePrompt;
+                Require(next?.IsAttackTargetSelection == true && next.candidates.Single().code == mysticalElf &&
+                    duel.GetAttackSelectionSource(next)?.code == KaiserSeaHorse,
+                    "Continuing did not offer the remaining native target.");
+                response = null;
+                ui.Modals.ShowPrompt(duel, next);
+                ui.Field.Refresh();
+                var elf = defender.mzone.Single(card => card?.code == mysticalElf);
+                FieldSlot(ui.Field, elf).GetComponent<CardDragTrigger>().OnLeftClick.Invoke();
+                Require(response != null && response.SequenceEqual(DuelSession.PackCardSelection(0)),
+                    "The replay target still required a second confirmation.");
+                duel.SubmitResponse(response);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+                Require(defender.grave.Exists(card => card.code == mysticalElf) && defender.lp == initialLp - 1900,
+                    "The original attack did not resolve against the new target.");
+            }
+            else
+                Require(duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_BATTLECMD && !duel.HasActiveAttack &&
+                    defender.mzone.Any(card => card?.code == mysticalElf) && defender.lp == initialLp,
+                    "Stopping the replay still attacked a monster or deducted life points.");
+            Require(duel.RetryCount == 0, "The replay decision caused an engine retry.");
+            Debug.Log($"[VERIFY DUEL ATTACK REPLAY] The live attacker and native {(continueAttack ? "continue" : "stop")} path passed.");
         }
 
         private static void VerifyNativeEquipHandoff()

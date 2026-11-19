@@ -105,7 +105,7 @@ namespace YGOPortable.Core
             { 10, "기본 방법으로 카운터를 제거한다" },
             { 11, "기본 방법으로 LP를 지불한다" },
             { 12, "기본 방법으로 엑시즈 소재를 제거한다" },
-            { 30, "공격을 계속하시겠습니까?" },
+            { YgoConstants.DESC_ATTACK_REPLAY, "공격을 계속하시겠습니까?" },
             { YgoConstants.DESC_DIRECT_ATTACK, "직접 공격을 선택하시겠습니까?" },
             { 32, "배틀 페이즈를 한 번 더 진행하시겠습니까?" },
             { 60, "코인 앞면" },
