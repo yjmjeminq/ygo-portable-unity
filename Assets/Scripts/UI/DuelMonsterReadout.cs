@@ -53,6 +53,7 @@ namespace YGOPortable.UI
         internal uint RightScale => Live?.rscale ?? Printed?.rscale ?? 0;
         internal uint LinkMarkers => IsLink ? Live?.linkMarker ?? Printed?.link ?? 0 : 0;
         internal int Materials => _materialReadout?.Count ?? Live?.overlayCodes.Count ?? 0;
+        internal (ushort Type, ushort Count)[] Counters => Live?.Counters ?? Array.Empty<(ushort, ushort)>();
         internal uint CounterCount => Live?.counterCount ?? 0;
         internal bool Disabled => Live?.effectsDisabled == true;
         internal bool HasMaterials => Live != null && (IsXyz || Materials > 0);
@@ -495,10 +496,11 @@ namespace YGOPortable.UI
 
     internal sealed class DuelCounterBadge
     {
-        private static readonly Color Ink = new Color(.91f, .82f, 1f);
+        internal static readonly Color Ink = new Color(.91f, .82f, 1f);
         private static readonly Color Backing = new Color(.155f, .105f, .22f, .97f);
         private readonly Text _value;
         private readonly bool _compact;
+        private (ushort Type, ushort Count)[] _previousCounters;
         internal RectTransform Root { get; }
 
         internal DuelCounterBadge(RectTransform root, bool compact)
@@ -517,17 +519,91 @@ namespace YGOPortable.UI
             _value = LotdUiKit.AddFittedText(digits, "Value", "", compact ? 19 : 16, 8,
                 TextAnchor.MiddleCenter, Ink, FontStyle.Bold);
             DuelStatDigitFit.Attach(_value, useGlyphBounds: compact);
-            Bind(0);
+            Bind(default);
         }
 
-        internal void Bind(uint count, bool showChanges = false)
+        internal static string TypeName(ushort type)
         {
-            bool visible = count != 0;
-            string next = !visible ? "" : _compact ? count.ToString() : $"카운터 {count}개";
+            // Counter IDs from the duel core's card scripts, named as in the Korean card text.
+            string name = type switch
+            {
+                0x0001 => "마력",
+                0x0003 => "무사도",
+                0x0004 => "사이코",
+                0x0005 => "샤인",
+                0x0006 => "젬",
+                0x0008 => "디포머",
+                0x000A => "제넥스",
+                0x000C => "번개",
+                0x000D => "욕망",
+                0x000F => "웜",
+                0x0010 => "검은 날개",
+                0x0011 => "하이퍼 베놈",
+                0x0012 => "자동기계",
+                0x0013 => "카오스",
+                0x0016 => "마석",
+                0x0017 => "도토리",
+                0x0018 => "플라워",
+                0x001A => "더블",
+                0x001B => "시계",
+                0x001C => "D",
+                0x001D => "정크",
+                0x001E => "게이트",
+                0x0020 => "플랜트",
+                0x0023 => "오션",
+                0x0025 => "크로니클",
+                0x002B => "데스티니",
+                0x002E => "샤크",
+                0x002F => "펌프킨",
+                0x0031 => "호프검",
+                0x0032 => "벌룬",
+                0x0033 => "요선",
+                0x0035 => "음향",
+                0x0036 => "Em(엔터메이지)",
+                0x0037 => "파괴수",
+                0x0147 => "바렐",
+                0x0148 => "서몬",
+                0x0201 => "염성",
+                0x0207 => "황의 열쇠",
+                0x020A => "피스",
+                0x020C => "GG(G골렘)",
+                0x0211 => "향명",
+                0x0217 => "규죄",
+                0x04A0 => "애슬리트",
+                0x1002 => "쐐기",
+                0x1009 => "베놈",
+                0x100E => "A",
+                0x1015 => "아이스",
+                0x1019 => "포그",
+                0x1021 => "가드",
+                0x1022 => "드래고닉",
+                0x1024 => "스트링",
+                0x1038 => "방계",
+                0x1039 => "즈신",
+                0x1041 => "포식",
+                0x1045 => "인분",
+                0x1049 => "경라",
+                0x1101 => "환각",
+                0x1148 => "시그널",
+                0x1149 => "베너미",
+                0x1207 => "연소",
+                0x1208 => "우사미미",
+                _ => null,
+            };
+            return name == null ? $"카운터 #{type:X4}" : $"{name} 카운터";
+        }
+
+        internal void Bind(DuelCardReadout card, bool showChanges = false)
+        {
+            var counters = card.Counters;
+            bool visible = counters.Length != 0;
+            string next = !visible ? "" : _compact ? card.CounterCount.ToString() :
+                counters.Length == 1 ? $"{TypeName(counters[0].Type)} {counters[0].Count}개" : $"카운터 {counters.Length}종";
             Root.gameObject.SetActive(visible);
             if (!showChanges || !visible) DuelReadoutPulse.Cancel(Root);
-            else if (_value.text != next) DuelReadoutPulse.Play(Root, Ink);
-            _value.text = next;
+            else if (!_previousCounters.AsSpan().SequenceEqual(counters)) DuelReadoutPulse.Play(Root, Ink);
+            if (_value.text != next) _value.text = next;
+            _previousCounters = counters;
         }
     }
 
@@ -622,7 +698,7 @@ namespace YGOPortable.UI
             }
         }
 
-        internal void Bind(DuelCardReadout card, bool opponent, uint? scale, uint? position = null)
+        internal void Bind(DuelCardReadout card, bool opponent, uint? scale, uint? position = null, bool showCounters = true)
         {
             var visibleCard = (Code: card.Live?.code ?? 0u, Opponent: opponent);
             bool showChanges = !_inPreview && _root.gameObject.activeSelf && visibleCard.Code != 0 && visibleCard == _lastCard;
@@ -636,7 +712,8 @@ namespace YGOPortable.UI
             _stats.Bind(card, opponent, showChanges, position);
             var rating = scale.HasValue ? (DuelRatingKind.Scale, scale.Value) : card.RatingNumber;
             BindRating(rating, showChanges);
-            BindCounters(card.CounterCount, showChanges);
+            var counterReadout = showCounters ? card : default;
+            BindCounters(counterReadout, showChanges);
             if (_inPreview)
             {
                 SetLabel(_status, card.Status, card.Disabled ? DisabledColor : DuelStyle.Muted, showChanges);
@@ -654,7 +731,7 @@ namespace YGOPortable.UI
             string status = card.IsToken ? "토큰" : "";
             if (card.Disabled) status = card.IsToken ? "토큰 · 무효" : "무효";
             SetLabel(_status, status, card.Disabled ? DisabledColor : DuelStyle.Muted, showChanges);
-            LayoutFieldLabels(rating.Value, card.Materials, card.CounterCount, status.Length > 2, opponent);
+            LayoutFieldLabels(rating.Value, card.Materials, counterReadout.CounterCount, status.Length > 2, opponent);
         }
 
         private void BindRating((DuelRatingKind Kind, uint Value) rating, bool showChanges)
@@ -678,9 +755,9 @@ namespace YGOPortable.UI
             SetLabel(_rating, visible ? rating.Value.ToString() : "", color, showChanges);
         }
 
-        private void BindCounters(uint count, bool showChanges)
+        private void BindCounters(DuelCardReadout card, bool showChanges)
         {
-            if (_counters == null && count != 0)
+            if (_counters == null && card.Counters.Length != 0)
             {
                 var chip = _inPreview
                     ? LotdUiKit.CreateRect("Counters", _root, new Vector2(.38f, 1f), new Vector2(.79f, 1f),
@@ -688,7 +765,7 @@ namespace YGOPortable.UI
                     : LotdUiKit.FillRect("Counters", _labels);
                 _counters = new DuelCounterBadge(chip, compact: true);
             }
-            _counters?.Bind(count, showChanges);
+            _counters?.Bind(card, showChanges);
         }
 
         private void LayoutFieldLabels(uint rating, int materials, uint counters, bool longStatus, bool opponent)

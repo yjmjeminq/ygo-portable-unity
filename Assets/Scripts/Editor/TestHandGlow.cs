@@ -1174,14 +1174,22 @@ namespace YGOPortable.Editor
         {
             const uint breaker = 71413901;
             const uint powerStone = 34029630;
+            const uint predaplanning = 44536921;
+            const uint scorpio = 35272499;
+            const uint antiSpell = 53112492;
+            const uint potOfGreed = 55144522;
             const string countPath = "CardReadout/Labels/Counters/Number/Value";
             var empty = Array.Empty<uint>();
-            var main = Enumerable.Repeat(breaker, 20).Concat(Enumerable.Repeat(powerStone, 20)).ToArray();
-            var opponent = Enumerable.Repeat(BlueEyes, 40).ToArray();
+            var main = Enumerable.Repeat(breaker, 10).Concat(Enumerable.Repeat(powerStone, 10))
+                .Concat(Enumerable.Repeat(predaplanning, 9)).Concat(Enumerable.Repeat(antiSpell, 8))
+                .Concat(Enumerable.Repeat(scorpio, 3)).ToArray();
+            var opponent = Enumerable.Repeat(potOfGreed, 40).ToArray();
             using var duel = YgoProjectBuilder.StartSeedMatching("Live counter readout", main, empty, opponent, empty,
                 true, session => session.ActivePrompt?.summonable.Exists(card => card.code == breaker) == true &&
-                    session.ActivePrompt.sSetable.Exists(card => card.code == powerStone));
-            using var ui = new HandUI(duel);
+                    new[] { powerStone, predaplanning, antiSpell }
+                        .All(code => session.ActivePrompt.sSetable.Exists(card => card.code == code)));
+            byte[] counterResponse = null;
+            using var ui = new HandUI(duel, submitResponse: bytes => counterResponse = bytes);
             var ai = new TacticalAI();
             var mine = duel.Players[duel.HumanPlayerIndex];
 
@@ -1191,8 +1199,10 @@ namespace YGOPortable.Editor
                 {
                     if (prompt.messageType == YgoConstants.MSG_SELECT_CARD)
                     {
-                        int target = prompt.candidates.FindIndex(card => card.code == powerStone);
-                        Require(target >= 0, "The Breaker effect could not target Pitch-Black Power Stone.");
+                        uint targetCode = prompt.candidates.Any(card => card.location == YgoConstants.LOCATION_DECK)
+                            ? scorpio : powerStone;
+                        int target = prompt.candidates.FindIndex(card => card.code == targetCode);
+                        Require(target >= 0, $"The counter fixture could not select {targetCode}.");
                         return DuelSession.PackCardSelection(target);
                     }
                     return prompt.messageType == YgoConstants.MSG_SELECT_CHAIN && prompt.forced ? BitConverter.GetBytes(0) : null;
@@ -1201,9 +1211,13 @@ namespace YGOPortable.Editor
                     "The counter fixture could not reach the next native main phase.");
             }
 
-            int setIndex = duel.ActivePrompt.sSetable.FindIndex(card => card.code == powerStone);
-            duel.SubmitResponseInt((setIndex << 16) | 4);
-            ReachMainPhase();
+            foreach (uint code in new[] { powerStone, predaplanning, antiSpell })
+            {
+                int setIndex = duel.ActivePrompt.sSetable.FindIndex(card => card.code == code);
+                Require(setIndex >= 0, $"The counter fixture could not set {code}.");
+                duel.SubmitResponseInt((setIndex << 16) | 4);
+                ReachMainPhase();
+            }
             duel.SubmitResponseInt(7);
             ReachMainPhase();
             Require(duel.ActivePrompt.playerId == duel.AiPlayerIndex, "The counter fixture did not switch turns.");
@@ -1239,21 +1253,93 @@ namespace YGOPortable.Editor
             trapSlot.GetComponent<CardDragTrigger>().OnRightClick();
             var inspector = root.Find("LeftInspector/CardPreview/Card/AspectBox");
             var label = root.Find("LeftInspector/CardDetails/ArtworkControls/Counters/Number/Value").GetComponent<Text>();
-            Require(label.text == "카운터 3개" && !label.raycastTarget, "Inspecting the trap lost its counter count or blocked input.");
+            Require(label.text == "마력 카운터 3개" && !label.raycastTarget, "Inspecting the trap lost its counter type or blocked input.");
             monsterSlot.GetComponent<CardDragTrigger>().OnRightClick();
             inspector.Find("ZoomHit").GetComponent<Button>().onClick.Invoke();
-            var zoom = root.Find("Overlay_CardZoom/ZoomWin/Info/Counters/Number/Value").GetComponent<Text>();
-            Require(label.text == "카운터 1개" && zoom.text == "카운터 1개", "Inspecting Breaker did not update both detail views.");
+            var zoomWindow = root.Find("Overlay_CardZoom/ZoomWin");
+            var zoom = zoomWindow.Find("Info/Counters/Number/Value").GetComponent<Text>();
+            Require(label.text == "마력 카운터 1개" && zoom.text == "마력 카운터 1개", "Inspecting Breaker did not update both detail views.");
 
+            Activate(predaplanning);
+            ui.Field.Refresh();
+            var mixed = mine.mzone[monster.sequence];
+            Require(mixed.Counters.AsSpan().SequenceEqual(new (ushort, ushort)[] { (1, 1), (0x1041, 1) }) &&
+                mixed.level == 1 && monsterCount.text == "2",
+                "Predaplanning did not put a second native counter type on Breaker.");
+            var breakdown = zoomWindow.Find("Info/DescBox/VP/C/CounterTypes")?.GetComponent<Text>();
+            Require(label.text == "카운터 2종" && breakdown != null && breakdown.gameObject.activeInHierarchy &&
+                breakdown.text == "마력 카운터 1개\n포식 카운터 1개",
+                $"The native mixed counters were only shown as a total ({zoom.text}).");
+            zoomWindow.Find("Hdr/Close/B").GetComponent<Button>().onClick.Invoke();
+
+            duel.SubmitResponseInt(7);
+            ReachMainPhase();
+            Require(duel.ActivePrompt.playerId == duel.AiPlayerIndex, "The spell activation fixture did not switch turns.");
+            int spell = duel.ActivePrompt.activatable.FindIndex(card => card.code == potOfGreed);
+            Require(spell >= 0, "The opponent could not activate Pot of Greed.");
+            duel.SubmitResponseInt((spell << 16) | 5);
+            for (int step = 0; step < 16 && duel.ActivePrompt?.messageType != YgoConstants.MSG_SELECT_COUNTER; step++)
+            {
+                var pending = duel.ActivePrompt;
+                if (pending == null) duel.StepUntilPrompt();
+                else if (pending.messageType == YgoConstants.MSG_SELECT_PLACE) duel.SubmitResponse(ai.ComputeResponse(duel, pending));
+                else if (pending.messageType == YgoConstants.MSG_SELECT_CHAIN)
+                    duel.SubmitResponseInt(pending.candidates.FindIndex(card => card.code == antiSpell));
+                else break;
+            }
+            var payment = duel.ActivePrompt;
+            Require(payment?.messageType == YgoConstants.MSG_SELECT_COUNTER && payment.counterType == 1 &&
+                payment.min == 2 && payment.candidates.Count == 2 && payment.playerId == duel.HumanPlayerIndex,
+                "Anti-Spell did not ask which cards would pay its two Spell Counters.");
+            int breakerIndex = payment.candidates.FindIndex(card => card.code == breaker && card.currentCounter == 1);
+            int stoneIndex = payment.candidates.FindIndex(card => card.code == powerStone && card.currentCounter == 3);
+            Require(breakerIndex >= 0 && stoneIndex >= 0, "The native payment included a different counter type.");
+
+            ui.Modals.ShowPrompt(duel, payment);
+            var window = ui.Modals.ModalRoot.transform.Find("Win");
+            var tiles = window.Find("Body/Cards/Viewport/Content");
+            var breakerTile = tiles.Find($"Cnt_{breakerIndex}");
+            var stoneTile = tiles.Find($"Cnt_{stoneIndex}");
+            var counterLabel = breakerTile.Find("Lbl/L").GetComponent<Text>();
+            var confirm = window.Find("Footer/Btn_확정/B").GetComponent<Button>();
+            Require(window.Find("Hdr/TitleBand/Title").GetComponent<Text>().text == "마력 카운터 제거" &&
+                counterLabel.text == "0 / 1개" &&
+                breakerTile.Find("Card/V/AspectBox/CardReadout/Counters") == null && !confirm.interactable,
+                "The chooser did not display the correct removable counter type and quantity.");
+            var addBreaker = breakerTile.Find("P/B").GetComponent<Button>();
+            addBreaker.onClick.Invoke();
+            addBreaker.onClick.Invoke();
+            Require(counterLabel.text == "1 / 1개" && !confirm.interactable,
+                "The chooser accepted a second counter of the wrong type.");
+            breakerTile.Find("M/B").GetComponent<Button>().onClick.Invoke();
+            var addStone = stoneTile.Find("P/B").GetComponent<Button>();
+            addStone.onClick.Invoke();
+            addStone.onClick.Invoke();
+            addStone.onClick.Invoke();
+            Require(confirm.interactable && stoneTile.Find("Lbl/L").GetComponent<Text>().text == "2 / 3개",
+                "The chooser did not cap allocation at the requested payment.");
+            confirm.onClick.Invoke();
+            Require(counterResponse?.Length == 4 && BitConverter.ToUInt16(counterResponse, breakerIndex * 2) == 0 &&
+                BitConverter.ToUInt16(counterResponse, stoneIndex * 2) == 2,
+                "The UI did not preserve native counter payment indices.");
+            duel.SubmitResponse(counterResponse);
+            ReachMainPhase();
+            ui.Field.Refresh();
+            Require(trapCount.text == "1" && monsterCount.text == "2",
+                "Anti-Spell did not spend only the selected Spell Counters.");
+
+            duel.SubmitResponseInt(7);
+            ReachMainPhase();
             Activate(breaker);
             ui.Field.Refresh();
-            Require(mine.szone[trap.sequence] == null && mine.mzone[monster.sequence].counterCount == 0 &&
-                mine.mzone[monster.sequence].attack == 1600 &&
-                !trapCount.gameObject.activeInHierarchy && !monsterCount.gameObject.activeInHierarchy &&
-                !label.gameObject.activeInHierarchy && !zoom.gameObject.activeInHierarchy &&
-                monsterSlot.Find("CardReadout/Combat/Attack/Digits/Value").GetComponent<Text>().text == "1600",
-                "Counter removal left stale readouts or attack values on the field or in card details.");
-            Debug.Log("[VERIFY DUEL COUNTERS] Pitch-Black Power Stone and Breaker displayed their native counts. Spending a counter updated attack and hid the removed counts in both detail views.");
+            inspector.Find("ZoomHit").GetComponent<Button>().onClick.Invoke();
+            var remaining = mine.mzone[monster.sequence];
+            Require(mine.szone[trap.sequence] == null && remaining.Counters.AsSpan().SequenceEqual(
+                    new (ushort, ushort)[] { (0x1041, 1) }) && remaining.attack == 1600 && remaining.level == 1 &&
+                !trapCount.gameObject.activeInHierarchy && monsterCount.text == "1" && !breakdown.gameObject.activeInHierarchy &&
+                label.text == "포식 카운터 1개" && zoom.text == "포식 카운터 1개",
+                "Spending Breaker's Spell Counter did not preserve the Predator Counter and its remaining level change.");
+            Debug.Log("[VERIFY DUEL COUNTERS] Native mixed details, type-limited payment, and the remaining Predator Counter passed.");
         }
 
         private static void VerifyNativeIdentityReadout()
@@ -2897,12 +2983,12 @@ namespace YGOPortable.Editor
             internal DuelFieldUI Field { get; }
             internal DuelPromptModals Modals { get; }
 
-            internal HandUI(DuelSession duel, bool mobileLayout = false)
+            internal HandUI(DuelSession duel, bool mobileLayout = false, Action<byte[]> submitResponse = null)
             {
                 var root = new GameObject("Hand Glow Verification", typeof(Canvas));
                 Canvas = root.GetComponent<Canvas>();
                 ((RectTransform)root.transform).sizeDelta = new Vector2(1600, 900);
-                Modals = new DuelPromptModals(root.transform, null, null);
+                Modals = new DuelPromptModals(root.transform, null, submitResponse);
                 Field = new DuelFieldUI(null, root.transform, Modals, mobileLayout);
                 Field.BindSession(duel, null, null);
             }
@@ -3082,9 +3168,15 @@ namespace YGOPortable.Editor
                     "The compact readout did not have separate non-interactive attack and defense symbols.");
                 mine.mzone[1].attack = mine.mzone[1].defense = int.MaxValue;
                 mine.mzone[1].rank = 12;
-                mine.mzone[1].counterCount = 12;
+                mine.mzone[1].Counters = new[] { ((ushort)1, (ushort)12) };
                 mine.mzone[1].overlayCodes.AddRange(Enumerable.Repeat(BlueEyes, 8));
                 Field.Refresh();
+                var counterBadge = xyz.Find("Labels/Counters");
+                DuelReadoutPulse.Cancel(counterBadge);
+                mine.mzone[1].Counters = new[] { ((ushort)0x1041, (ushort)12) };
+                Field.Refresh();
+                Require(counterBadge.Find("ChangePulse").gameObject.activeSelf && Label(xyz, counters).text == "12",
+                    "A simultaneous counter-type change did not animate when the total stayed the same.");
 
                 var viewport = (RectTransform)Canvas.transform;
                 var originalSize = viewport.sizeDelta;
@@ -3160,7 +3252,7 @@ namespace YGOPortable.Editor
                 mine.mzone[0].level = 0;
                 theirs.mzone[6].position = YgoConstants.POS_FACEDOWN_DEFENSE;
                 mine.mzone[1].overlayCodes.Clear();
-                mine.mzone[1].counterCount = 0;
+                mine.mzone[1].Counters = Array.Empty<(ushort, ushort)>();
                 Field.Refresh();
                 ExpectLinkedZones();
                 Require(!Label(normal, rating).gameObject.activeInHierarchy && !link.gameObject.activeInHierarchy &&

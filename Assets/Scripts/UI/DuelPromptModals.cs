@@ -38,6 +38,7 @@ namespace YGOPortable.UI
         private const float ChainLocationTabHeight = 30f;
         private const float ChainGroupPadding = 6f;
         private const float ChoiceCardWidth = 142f;
+        private const float CounterCardWidth = 172f;
         private const int ZoneCardWidth = 147;
         private const int ZoneCardHeight = 218;
         private const float ChoiceCardGap = 8f;
@@ -660,6 +661,16 @@ namespace YGOPortable.UI
             _modalFooter.anchorMax = new Vector2(.98f, tall ? .122f : .183f);
             _modalBox.anchorMin = new Vector2(cardChoices ? .211f : .235f, .17f);
             _modalHeader.anchorMax = Vector2.one;
+            if (prompt.messageType == YgoConstants.MSG_SELECT_COUNTER)
+            {
+                float viewportWidth = Mathf.Max(1f, ((RectTransform)ModalRoot.transform).rect.width);
+                float stripWidth = prompt.candidates.Count * (CounterCardWidth + ChoiceCardGap) + 24f;
+                float centerX = (_modalBox.anchorMin.x + _modalBox.anchorMax.x) * .5f;
+                float halfWidth = Mathf.Min(_modalBox.anchorMax.x - centerX, Mathf.Max(266f, stripWidth) / viewportWidth * .5f);
+                _modalBox.anchorMin = new Vector2(centerX - halfWidth, .146f);
+                _modalBox.anchorMax = new Vector2(centerX + halfWidth, .699f);
+                _modalFooter.anchorMin = new Vector2(.06f, _modalFooter.anchorMin.y);
+            }
             BindFieldCardChoices(session, prompt);
             if (_fieldCardIndices.Count > 0)
             {
@@ -1382,10 +1393,10 @@ namespace YGOPortable.UI
 
         private void RenderSelectCounter(DuelSession session, DuelPrompt p)
         {
-            _modalTitle.text = "카운터 제거 선택";
+            _modalTitle.text = $"{DuelCounterBadge.TypeName(p.counterType)} 제거";
             _counterAlloc = new int[p.candidates.Count];
 
-            RectTransform grid = BuildChoiceCardStrip(p.candidates.Count);
+            RectTransform grid = BuildChoiceCardStrip(p.candidates.Count, CounterCardWidth);
             var countLabels = new Text[p.candidates.Count];
 
             for (int i = 0; i < p.candidates.Count; i++)
@@ -1393,28 +1404,32 @@ namespace YGOPortable.UI
                 int idx = i;
                 var c = p.candidates[i];
                 uint code = session.GetVisibleSelectionCode(c);
-                var tile = CreateCardStripTile(grid, $"Cnt_{i}", ChoiceCardWidth);
-                var cRt = LotdUiKit.CreateRect("Card", tile, new Vector2(0.10f, 0.30f), new Vector2(0.90f, 0.95f), Vector2.zero, Vector2.zero);
-                BuildCandidateCard(cRt, session, c, code);
+                var tile = CreateCardStripTile(grid, $"Cnt_{i}", CounterCardWidth);
+                var cRt = LotdUiKit.CreateRect("Card", tile, new Vector2(.055f, .346f), new Vector2(.945f, .966f),
+                    Vector2.zero, Vector2.zero);
+                BuildCandidateCard(cRt, session, c, code, showCounters: false);
 
-                countLabels[i] = LotdUiKit.AddText(LotdUiKit.CreateRect("Lbl", tile, new Vector2(0.05f, 0.16f), new Vector2(0.95f, 0.30f), Vector2.zero, Vector2.zero),
-                    "L", $"0 / {c.currentCounter}개", 14, TextAnchor.MiddleCenter, DuelStyle.Gold, FontStyle.Bold);
+                countLabels[i] = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Lbl", tile, new Vector2(.05f, .215f),
+                    new Vector2(.95f, .343f), Vector2.zero, Vector2.zero),
+                    "L", $"0 / {c.currentCounter}개", 19, 9, TextAnchor.MiddleCenter, DuelCounterBadge.Ink, FontStyle.Bold);
 
-                var minus = LotdUiKit.CreateRect("M", tile, new Vector2(0.10f, 0.03f), new Vector2(0.46f, 0.15f), Vector2.zero, Vector2.zero);
-                var decrease = DuelStyle.Button(minus, "B", "-", () =>
+                var minus = LotdUiKit.CreateRect("M", tile, new Vector2(.064f, .017f), new Vector2(.465f, .201f),
+                    Vector2.zero, Vector2.zero);
+                var decrease = DuelStyle.Button(minus, "B", "−", () =>
                 {
                     if (_counterAlloc[idx] > 0) _counterAlloc[idx]--;
                     countLabels[idx].text = $"{_counterAlloc[idx]} / {c.currentCounter}개";
                     UpdateCounterConfirm();
-                }, 16);
-                var plus = LotdUiKit.CreateRect("P", tile, new Vector2(0.54f, 0.03f), new Vector2(0.90f, 0.15f), Vector2.zero, Vector2.zero);
+                }, 21);
+                var plus = LotdUiKit.CreateRect("P", tile, new Vector2(.535f, .017f), new Vector2(.936f, .201f),
+                    Vector2.zero, Vector2.zero);
                 var increase = DuelStyle.Button(plus, "B", "+", () =>
                 {
                     int curSum = _counterAlloc.Sum();
                     if (_counterAlloc[idx] < c.currentCounter && curSum < p.min) _counterAlloc[idx]++;
                     countLabels[idx].text = $"{_counterAlloc[idx]} / {c.currentCounter}개";
                     UpdateCounterConfirm();
-                }, 16);
+                }, 21);
                 PreviewOnFocus(decrease, code, c);
                 PreviewOnFocus(increase, code, c);
             }
@@ -1437,7 +1452,7 @@ namespace YGOPortable.UI
         {
             if (_counterAlloc == null || _curPrompt == null) return;
             int sum = _counterAlloc.Sum();
-            _modalSubtitle.text = $"제거할 총 카운터 수: {sum} / {_curPrompt.min}";
+            _modalSubtitle.text = $"제거할 수량 {sum} / {_curPrompt.min}개";
             _confirmBtn.interactable = sum == _curPrompt.min;
         }
 
@@ -2282,7 +2297,8 @@ namespace YGOPortable.UI
             return tile;
         }
 
-        private static void BuildCandidateCard(Transform art, DuelSession session, SelectableCardItem item, uint code)
+        private static void BuildCandidateCard(Transform art, DuelSession session, SelectableCardItem item, uint code,
+            bool showCounters = true)
         {
             var live = session.GetVisibleFieldCard(code, item.controller, item.location, item.sequence);
             var view = CompositeCardView.Create(art, "V", duelArtwork: true);
@@ -2291,9 +2307,10 @@ namespace YGOPortable.UI
 
             var readout = new DuelCardReadout(CardDatabase.Get(code), live);
             uint? scale = readout.ScaleIn(item.location, item.sequence);
-            if (item.location == YgoConstants.LOCATION_MZONE && readout.IsMonster || scale.HasValue || readout.CounterCount != 0)
+            if (item.location == YgoConstants.LOCATION_MZONE && readout.IsMonster || scale.HasValue ||
+                showCounters && readout.CounterCount != 0)
                 new DuelFieldReadout(view.transform.Find("AspectBox"), inPreview: true)
-                    .Bind(readout, item.controller != session.HumanPlayerIndex, scale);
+                    .Bind(readout, item.controller != session.HumanPlayerIndex, scale, showCounters: showCounters);
         }
 
         private static void AddChoiceCardSource(Transform tile, uint location, bool opponent, string detail)

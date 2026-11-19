@@ -29,9 +29,19 @@ namespace YGOPortable.Core
         public byte owner;
         public bool isPublic;
         public bool effectsDisabled;
-        public uint counterCount;
         public List<uint> overlayCodes = new List<uint>();
         internal (byte Controller, uint Sequence)? EquipTarget;
+        internal (ushort Type, ushort Count)[] Counters = Array.Empty<(ushort, ushort)>();
+
+        public uint counterCount
+        {
+            get
+            {
+                uint total = 0;
+                foreach (var counter in Counters) total += counter.Count;
+                return total;
+            }
+        }
 
         public bool IsFaceUp => (position & YgoConstants.POS_FACEUP) != 0;
         public bool IsDefense => (position & YgoConstants.POS_DEFENSE) != 0;
@@ -658,7 +668,8 @@ namespace YGOPortable.Core
                     HandleMessage(msgType, br, msgEnd, ref comparison, ref firstSwapMove, ref positionReadouts);
                     sampleReadouts |= msgType is YgoConstants.MSG_MOVE or YgoConstants.MSG_SWAP or YgoConstants.MSG_POS_CHANGE
                         or YgoConstants.MSG_SET or YgoConstants.MSG_SUMMONED or YgoConstants.MSG_FLIPSUMMONED
-                        or YgoConstants.MSG_SPSUMMONED or YgoConstants.MSG_DRAW or YgoConstants.MSG_NEW_TURN or YgoConstants.MSG_NEW_PHASE;
+                        or YgoConstants.MSG_SPSUMMONED or YgoConstants.MSG_ADD_COUNTER or YgoConstants.MSG_REMOVE_COUNTER
+                        or YgoConstants.MSG_DRAW or YgoConstants.MSG_NEW_TURN or YgoConstants.MSG_NEW_PHASE;
                     if (ActivePrompt != null && ActivePrompt != previousPrompt && _pendingSelectionHint is { } selection)
                     {
                         if (ActivePrompt.playerId == selection.player) ActivePrompt.SelectionHint = selection.hint;
@@ -1743,7 +1754,7 @@ namespace YGOPortable.Core
             a.attack == b.attack && a.defense == b.defense && a.baseAttack == b.baseAttack && a.baseDefense == b.baseDefense &&
             a.level == b.level && a.rank == b.rank && a.link == b.link && a.linkMarker == b.linkMarker &&
             a.lscale == b.lscale && a.rscale == b.rscale && a.type == b.type && a.race == b.race && a.attribute == b.attribute &&
-            a.counterCount == b.counterCount && a.effectsDisabled == b.effectsDisabled;
+            a.effectsDisabled == b.effectsDisabled && a.Counters.AsSpan().SequenceEqual(b.Counters);
 
         public void RefreshZonesFromCore()
         {
@@ -1872,12 +1883,24 @@ namespace YGOPortable.Core
                                 card.overlayCodes.Add(BitConverter.ToUInt32(raw, valPos + 4 + (int)oi * 4));
                             break;
                         case YgoConstants.QUERY_COUNTERS when blkSize >= 8:
-                            uint entries = BitConverter.ToUInt32(raw, valPos);
-                            int available = (blkSize - 8) / 4;
-                            // Each entry has a 16-bit counter type followed by its 16-bit quantity.
-                            for (int i = 0; i < available && i < entries; i++)
-                                card.counterCount += BitConverter.ToUInt16(raw, valPos + 6 + i * 4);
+                        {
+                            int count = (int)Math.Min(BitConverter.ToUInt32(raw, valPos), (uint)((blkSize - 8) / 4));
+                            if (count == 0) break;
+                            // The core sends its ordered counter map as 16-bit types paired with 16-bit quantities.
+                            var counters = new (ushort Type, ushort Count)[count];
+                            int visible = 0;
+                            for (int i = 0, offset = valPos + 4; i < count; i++, offset += 4)
+                            {
+                                ushort quantity = BitConverter.ToUInt16(raw, offset + 2);
+                                if (quantity > 0) counters[visible++] = (BitConverter.ToUInt16(raw, offset), quantity);
+                            }
+                            if (visible != 0)
+                            {
+                                if (visible < count) Array.Resize(ref counters, visible);
+                                card.Counters = counters;
+                            }
                             break;
+                        }
                     }
                     pos = blkStart + blkSize;
                 }

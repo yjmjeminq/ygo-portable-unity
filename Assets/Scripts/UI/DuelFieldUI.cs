@@ -149,6 +149,7 @@ namespace YGOPortable.UI
         private DuelStatStrip _zoomCombat;
         private (byte controller, uint location, uint sequence)? _zoomFieldCard;
         private Text _zoomPasscode;
+        private Text _zoomCounterTypes;
         private Text _zoomDesc;
         private ScrollRect _zoomScroll;
         private Image _zoomRaceIcon;
@@ -391,7 +392,7 @@ namespace YGOPortable.UI
             _inspStats.text = "";
             _inspCombat.Hide();
             SizeInspectorDescription(hasCombat: false);
-            _inspCounters.Bind(0);
+            _inspCounters.Bind(default);
             SetLinkedZones(null);
             _inspDesc.text = "카드를 선택하면 효과를 확인할 수 있습니다.";
             _inspRaceIcon.gameObject.SetActive(false);
@@ -496,7 +497,7 @@ namespace YGOPortable.UI
             _inspTitleAccent.color = InspectorTitleAccent(card.Type);
             _inspStats.text = FormatInspectorStats(card, compact: true);
             BindIdentityIcons(card, _inspRaceIcon, _inspAttributeIcon);
-            _inspCounters.Bind(card.CounterCount, showChanges);
+            _inspCounters.Bind(card, showChanges);
             _inspCombat.Bind(card, card.Live != null && card.Live.controller != _session.HumanPlayerIndex,
                 showChanges && card.Live != null);
             SizeInspectorDescription(card.IsMonster);
@@ -3833,14 +3834,17 @@ namespace YGOPortable.UI
             vp.gameObject.AddComponent<RectMask2D>();
             var ct = LotdUiKit.CreateRect("C", vp, new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
             ct.pivot = new Vector2(0.5f, 1f);
-            _zoomDesc = ct.gameObject.AddComponent<Text>();
-            _zoomDesc.font = LotdUiKit.FontKR;
-            _zoomDesc.fontSize = onIPhone ? 23 : 17;
-            _zoomDesc.color = LotdUiKit.TextPrimary;
-            _zoomDesc.alignment = TextAnchor.UpperLeft;
+            var contentLayout = ct.gameObject.AddComponent<VerticalLayoutGroup>();
+            contentLayout.childControlWidth = contentLayout.childControlHeight = true;
+            contentLayout.childForceExpandHeight = false;
+            contentLayout.spacing = 8f;
+            _zoomCounterTypes = LotdUiKit.AddText(ct, "CounterTypes", "", onIPhone ? 21 : 16,
+                TextAnchor.UpperLeft, DuelCounterBadge.Ink, FontStyle.Bold);
+            _zoomCounterTypes.gameObject.SetActive(false);
+            _zoomDesc = LotdUiKit.AddText(ct, "EffectText", "", onIPhone ? 23 : 17,
+                TextAnchor.UpperLeft, LotdUiKit.TextPrimary);
             _zoomDesc.lineSpacing = 1.15f;
             _zoomDesc.supportRichText = false;
-            _zoomDesc.raycastTarget = false;
             ct.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             _zoomScroll = descBox.gameObject.AddComponent<ScrollRect>();
             _zoomScroll.horizontal = false;
@@ -3906,7 +3910,12 @@ namespace YGOPortable.UI
             _zoomCardView.SetCard(code, false, card.Live, (card.Attack, card.Defense));
             _zoomStats.text = FormatInspectorStats(card);
             BindIdentityIcons(card, _zoomRaceIcon, _zoomAttributeIcon);
-            _zoomCounters.Bind(card.CounterCount, showChanges);
+            _zoomCounters.Bind(card, showChanges);
+            bool mixedCounters = card.Counters.Length > 1;
+            _zoomCounterTypes.gameObject.SetActive(mixedCounters);
+            if (mixedCounters)
+                _zoomCounterTypes.text = string.Join("\n", card.Counters.Select(counter =>
+                    $"{DuelCounterBadge.TypeName(counter.Type)} {counter.Count}개"));
             _zoomCombat.Bind(card, card.Live != null && card.Live.controller != _session.HumanPlayerIndex,
                 showChanges && card.Live != null);
         }

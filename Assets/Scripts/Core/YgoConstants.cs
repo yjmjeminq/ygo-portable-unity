@@ -246,6 +246,8 @@ namespace YGOPortable.Core
         public const byte MSG_EQUIP = 93;
         public const byte MSG_LPUPDATE = 94;
         public const byte MSG_PAY_LPCOST = 100;
+        public const byte MSG_ADD_COUNTER = 101;
+        public const byte MSG_REMOVE_COUNTER = 102;
         public const byte MSG_ATTACK = 110;
         public const byte MSG_BATTLE = 111;
         public const byte MSG_ATTACK_DISABLED = 112;

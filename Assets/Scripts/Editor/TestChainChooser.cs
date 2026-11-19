@@ -1709,13 +1709,13 @@ namespace YGOPortable.Editor
                 duel.Players[0].mzone[0] = Monster(3700, YgoConstants.POS_FACEUP_ATTACK);
                 duel.Players[0].mzone[1] = Monster(2100, YgoConstants.POS_FACEUP_DEFENSE);
                 duel.Players[0].mzone[1].effectsDisabled = true;
-                duel.Players[0].mzone[1].counterCount = 2;
+                duel.Players[0].mzone[1].Counters = new[] { ((ushort)1, (ushort)2) };
                 duel.Players[1].mzone[0] = Monster(4950, YgoConstants.POS_FACEDOWN_DEFENSE);
-                duel.Players[1].mzone[0].counterCount = 4;
+                duel.Players[1].mzone[0].Counters = new[] { ((ushort)1, (ushort)4) };
                 duel.Players[0].szone[0] = new LiveCardState
                 {
                     code = powerStone, type = YgoConstants.TYPE_TRAP | YgoConstants.TYPE_CONTINUOUS,
-                    position = YgoConstants.POS_FACEUP_ATTACK, counterCount = 3,
+                    position = YgoConstants.POS_FACEUP_ATTACK, Counters = new[] { ((ushort)1, (ushort)3) },
                 };
                 field.BindSession(duel, null, null);
 
