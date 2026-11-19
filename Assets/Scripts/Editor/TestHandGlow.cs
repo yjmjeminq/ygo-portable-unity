@@ -65,6 +65,8 @@ namespace YGOPortable.Editor
             VerifyNativeFieldMaterials(xyz: true);
             VerifyNativeFieldMaterials(xyz: false);
             VerifyNativeSynchroMaterials();
+            VerifyNativeFieldSumChoice(setSecondMaterial: false);
+            VerifyNativeFieldSumChoice(setSecondMaterial: true);
             VerifyNativeMixedMaterials(ritual: false);
             VerifyNativeMixedMaterials(ritual: true);
             VerifyNativeXyzMaterialReadout();
@@ -3312,6 +3314,118 @@ namespace YGOPortable.Editor
                 "The Synchro send did not remove the Tuner Token and send Mo Ye to the Graveyard.");
             VerifyMaterialTimeline(ui.Field, animator, host, sources, count: 2, vanishes: token);
             Debug.Log("[VERIFY DUEL SUMMON MATERIAL] Synchro kept both Level 4 readouts, faded the Tuner Token and sent Mo Ye to the Graveyard.");
+        }
+
+        private static void VerifyNativeFieldSumChoice(bool setSecondMaterial)
+        {
+            const uint ritual = 39996157, benten = 77235086, sparkman = 20721928, doubleSummon = 43422537;
+            uint[] main = Enumerable.Repeat(sparkman, 16).Concat(Enumerable.Repeat(ritual, 8))
+                .Concat(Enumerable.Repeat(benten, 8)).Concat(Enumerable.Repeat(doubleSummon, 8)).ToArray();
+            var empty = Array.Empty<uint>();
+            var ai = new TacticalAI();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Field ritual sum", main, empty,
+                Enumerable.Repeat(BlueEyes, 40).ToArray(), empty, true, session =>
+                {
+                    var hand = session.Players[session.HumanPlayerIndex].hand;
+                    return hand.Count(card => card.code == sparkman) == 2 &&
+                        new[] { ritual, benten, doubleSummon }.All(code => hand.Exists(card => card.code == code));
+                });
+            ActivateFromMainPhase(duel, doubleSummon);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            for (int i = 0; i < 2; i++)
+            {
+                bool set = setSecondMaterial && i == 1;
+                var choices = set ? duel.ActivePrompt.mSetable : duel.ActivePrompt.summonable;
+                int place = choices.FindIndex(card => card.code == sparkman);
+                Require(place >= 0, "The ritual fixture could not place its field material.");
+                duel.SubmitResponseInt((place << 16) | (set ? 3 : 0));
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            }
+
+            ActivateFromMainPhase(duel, ritual);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, request => request.messageType == YgoConstants.MSG_SELECT_CARD
+                ? SelectCard(request, benten) : null);
+            var prompt = duel.ActivePrompt;
+            Require(prompt?.messageType == YgoConstants.MSG_SELECT_SUM && prompt.sumExactCountZeroAny &&
+                (prompt.acc & 0xFFFF) == 6 && prompt.candidates.Count == 2 &&
+                prompt.candidates.All(card => card.location == YgoConstants.LOCATION_MZONE && card.sumParam == 4),
+                "Machine Angel Ritual did not offer its two Level 4 field materials for the required total of 6.");
+
+            byte[] response = null;
+            using var ui = new HandUI(duel, mobileLayout: true, submitResponse: bytes => response = bytes);
+            ui.Modals.ShowPrompt(duel, prompt);
+            ui.Field.Refresh();
+            var window = ui.Modals.ModalRoot.transform.Find("Win");
+            var subtitle = window.Find("Hdr/SubtitleBand/Sub").GetComponent<Text>();
+            var amount = window.Find("Body/SumAmount/Digits/Value")?.GetComponent<Text>();
+            var target = window.Find("Body/SumTarget/Digits/Value")?.GetComponent<Text>();
+            var amountCaption = window.Find("Body/SumAmount/Heading/Label")?.GetComponent<Text>();
+            var targetCaption = window.Find("Body/SumTarget/Heading/Label")?.GetComponent<Text>();
+            var confirm = window.Find("Footer/Btn_선택 완료/B").GetComponent<Button>();
+            Require(ui.Modals.IsFieldCardSelection && amount?.text == "0" && target?.text == "6" &&
+                amountCaption?.text == "합계" && targetCaption?.text == "최소 필요" && subtitle.text == "선택 0장" &&
+                amount.font == DuelTypography.NumberFont && target.font == DuelTypography.NumberFont && !confirm.interactable,
+                "The empty field selection did not show the native minimum requirement and current total.");
+
+            var player = duel.Players[duel.HumanPlayerIndex];
+            var materials = prompt.candidates.Select(card => player.mzone[card.sequence]).ToArray();
+            Require(materials.Count(card => !card.IsFaceUp) == (setSecondMaterial ? 1 : 0),
+                "The ritual prompt did not retain the fixture's set material.");
+            var slots = materials.Select(card => FieldSlot(ui.Field, card)).ToArray();
+            var amounts = slots.Select(slot => slot.Find("CardReadout/Labels/Contribution/Value")?.GetComponent<Text>()).ToArray();
+            Require(amounts.All(value => value?.text == "4" && value.font == DuelTypography.NumberFont &&
+                    value.gameObject.activeInHierarchy && !value.raycastTarget),
+                "The legal field materials did not show the native contribution.");
+            for (int i = 0; i < slots.Length; i++)
+            {
+                var rating = slots[i].Find("CardReadout/Labels/Rating/Value").GetComponent<Text>();
+                Require(materials[i].IsFaceUp ? rating.text == "4" && rating.gameObject.activeInHierarchy :
+                        !rating.gameObject.activeInHierarchy && !slots[i].Find("CardReadout/Combat").gameObject.activeSelf &&
+                        slots[i].GetComponentInChildren<CompositeCardView>().CurrentCode == 0,
+                    "The contribution replaced a live level or disclosed a set card's face or stats.");
+            }
+
+            void Toggle(int index) => slots[index].GetComponent<CardDragTrigger>().OnLeftClick.Invoke();
+            Toggle(0);
+            Require(amount.text == "4" && subtitle.text == "선택 1장" && !confirm.interactable &&
+                amounts[0].color != amounts[1].color, "Selecting a material did not update the subtotal and emphasis.");
+            Toggle(1);
+            Require(amount.text == "8" && amount.color == DuelStyle.Gold && subtitle.text == "선택 2장" && confirm.interactable,
+                "The valid combined field value did not enable completion.");
+            var viewport = (RectTransform)ui.Canvas.transform;
+            foreach (var size in new[] { new Vector2(1740f, 805f), new Vector2(852f, 393f) })
+            {
+                viewport.sizeDelta = size;
+                Canvas.ForceUpdateCanvases();
+                foreach (var text in new[] { subtitle, amountCaption, targetCaption })
+                {
+                    var generator = text.cachedTextGenerator;
+                    generator.Populate(text.text, text.GetGenerationSettings(text.rectTransform.rect.size));
+                    Require(generator.lineCount == 1 && generator.characterCountVisible >= text.text.Length,
+                        $"The label '{text.text}' clipped at {size} ({generator.characterCountVisible} characters, {generator.lineCount} lines).");
+                }
+                foreach (var slot in slots)
+                {
+                    var level = slot.Find("CardReadout/Labels/Rating");
+                    var rating = RectTransformUtility.CalculateRelativeRectTransformBounds(slot, level);
+                    var contribution = RectTransformUtility.CalculateRelativeRectTransformBounds(slot, slot.Find("CardReadout/Labels/Contribution"));
+                    Require((!level.gameObject.activeSelf || rating.max.x < contribution.min.x) &&
+                            contribution.max.x <= ((RectTransform)slot).rect.xMax,
+                        $"The material value overlapped the level or neighboring slot at {size}.");
+                }
+            }
+            Toggle(0);
+            Require(amount.text == "4" && subtitle.text == "선택 1장" && !confirm.interactable && response == null,
+                "Deselecting a material left an inflated total or submitted a response.");
+            Toggle(0);
+            Require(ui.Modals.TryConfirm() && response != null && response.SequenceEqual(DuelSession.PackCardSelection(0, 1)),
+                "The sum readout changed the native choice indices.");
+            duel.SubmitResponse(response);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            ui.Field.Refresh();
+            Require(duel.RetryCount == 0 && player.mzone.Any(card => card?.code == benten) &&
+                amounts.All(value => !value.gameObject.activeInHierarchy), "The ritual did not resolve or left a stale contribution.");
+            Debug.Log($"[VERIFY DUEL FIELD SUM] Native field choices totaled 0, 4 and 8 for a minimum of 6 (set material {setSecondMaterial}).");
         }
 
         private static void VerifyNativeMixedMaterials(bool ritual)

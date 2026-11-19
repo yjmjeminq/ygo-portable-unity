@@ -113,6 +113,8 @@ namespace YGOPortable.UI
         private int[] _sortOrder;
         private Button _confirmBtn;
         private Button _attackCancel;
+        private (Text Caption, Text Number) _sumAmount;
+        private (Text Caption, Text Number) _sumTarget;
         private (Text Name, DuelStatStrip Values, DuelRatingBadge Rating) _attackSourceReadout;
         private (Text Name, DuelStatStrip Values, DuelRatingBadge Rating) _attackTargetReadout;
         private RectTransform _materialConfirmRoot;
@@ -140,6 +142,14 @@ namespace YGOPortable.UI
 
         internal bool IsFieldCardSelected(int index) => index < 0 || _selectedIndices.Contains(index) ||
             (_curPrompt.messageType == YgoConstants.MSG_SELECT_UNSELECT_CARD && index >= _curPrompt.candidates.Count);
+
+        internal string ReadFieldSumValue(int index)
+        {
+            if (_curPrompt?.messageType != YgoConstants.MSG_SELECT_SUM) return null;
+            var cards = index < 0 ? _curPrompt.mustSelect : _curPrompt.candidates;
+            int slot = index < 0 ? -1 - index : index;
+            return slot < cards.Count ? FormatSumValue(cards[slot]) : null;
+        }
 
         internal void ToggleFieldCard(int index, byte controller, uint location, uint sequence)
         {
@@ -402,6 +412,7 @@ namespace YGOPortable.UI
             _chainSelection = -1;
             _confirmBtn = null;
             _attackCancel = null;
+            _sumAmount = _sumTarget = default;
             _attackSourceReadout = _attackTargetReadout = default;
             _positionRating.Bind(default);
             _counterAlloc = null;
@@ -697,7 +708,8 @@ namespace YGOPortable.UI
             if (_fieldCardIndices.Count > 0)
             {
                 bool overhead = _fieldMaterialPick || attackTarget;
-                _modalBox.anchorMin = overhead ? new Vector2(.286f, .835f) : new Vector2(.305f, .151f);
+                float headerBottom = prompt.messageType == YgoConstants.MSG_SELECT_SUM ? .792f : .835f;
+                _modalBox.anchorMin = overhead ? new Vector2(.286f, headerBottom) : new Vector2(.305f, .151f);
                 _modalBox.anchorMax = overhead ? new Vector2(.800f, .898f) : new Vector2(.762f, .214f);
                 _modalHeader.anchorMin = Vector2.zero;
                 _modalHeader.anchorMax = new Vector2(attackTarget && !prompt.cancelable ? 1f : .56f, 1f);
@@ -1172,7 +1184,7 @@ namespace YGOPortable.UI
             else if (p.messageType == YgoConstants.MSG_SELECT_TRIBUTE)
                 _modalTitle.text = !string.IsNullOrEmpty(hint) ? hint : "릴리스할 몬스터 선택";
             else if (p.messageType == YgoConstants.MSG_SELECT_SUM)
-                _modalTitle.text = !string.IsNullOrEmpty(hint) ? hint : $"소재/합계 선택 (목표 합계: {p.acc & 0xFFFF})";
+                _modalTitle.text = !string.IsNullOrEmpty(hint) ? hint : "합계 선택";
             else
                 _modalTitle.text = !string.IsNullOrEmpty(hint) ? hint : "대상 카드 선택";
 
@@ -1198,7 +1210,11 @@ namespace YGOPortable.UI
                 return;
             }
 
+            bool fieldSum = IsFieldCardSelection && p.messageType == YgoConstants.MSG_SELECT_SUM;
+            if (fieldSum) BuildFieldSumReadout(p.cancelable);
             _confirmBtn = AddFooterButton("선택 완료", OnConfirmMultiSelect, true);
+            if (fieldSum && !p.cancelable)
+                ((RectTransform)_confirmBtn.transform.parent).anchorMin = new Vector2(0f, .03f);
             if (p.cancelable)
                 AddFooterButton("취소", () => Submit(BitConverter.GetBytes(-1)), false);
 
@@ -1211,11 +1227,7 @@ namespace YGOPortable.UI
             string detail = null;
             if (p.messageType == YgoConstants.MSG_SELECT_TRIBUTE && item.releaseParam > 1) detail = $"{item.releaseParam}장분";
             if (p.messageType == YgoConstants.MSG_SELECT_SUM)
-            {
-                uint v1 = item.sumParam & 0xFFFF;
-                uint v2 = (item.sumParam >> 16) & 0xFFFF;
-                detail = $"{(lockedMust ? "필수 · " : "")}{(v2 > 0 ? $"{v1}/{v2}" : $"{v1}")}";
-            }
+                detail = (lockedMust ? "필수 · " : "") + FormatSumValue(item);
 
             var tile = CreateChoiceCardTile(grid, $"Tile_{idx}", s, item, code, detail);
             var mark = AddSelectionMark(tile, lockedMust);
@@ -1282,10 +1294,61 @@ namespace YGOPortable.UI
             {
                 int target = (int)(_curPrompt.acc & 0xFFFF);
                 valid = CheckSumSelectionValid(_curPrompt, _selectedIndices, target);
-                _modalSubtitle.text = $"목표 합계 {target} · 필수 {_curPrompt.mustSelect.Count}장 · 선택 {_selectedIndices.Count}장";
+                int minimum = 0, maximum = 0;
+                foreach (var card in _curPrompt.mustSelect.Concat(_selectedIndices.Select(index => _curPrompt.candidates[index])))
+                {
+                    var (first, alternative) = SumAmounts(card);
+                    minimum += alternative > 0 ? Math.Min(first, alternative) : first;
+                    maximum += Math.Max(first, alternative);
+                }
+                ShowSumTotal(minimum, maximum, target, valid);
             }
 
             _confirmBtn.interactable = valid;
+        }
+
+        private void BuildFieldSumReadout(bool cancelable)
+        {
+            float footerStart = cancelable ? .768f : .818f;
+            _modalBody.anchorMin = new Vector2(.567f, .08f);
+            _modalBody.anchorMax = new Vector2(footerStart - .012f, .92f);
+            _modalFooter.anchorMin = new Vector2(footerStart, .08f);
+            _sumAmount = AddMetric("SumAmount", 0f, .487f);
+            _sumTarget = AddMetric("SumTarget", .513f, 1f);
+
+            (Text Caption, Text Number) AddMetric(string name, float left, float right)
+            {
+                var tile = LotdUiKit.CreateRect(name, _modalBody, new Vector2(left, 0f), new Vector2(right, 1f),
+                    Vector2.zero, Vector2.zero);
+                DuelReadoutPlate.Add(tile, new Color(.075f, .134f, .160f, .98f));
+                var heading = LotdUiKit.CreateRect("Heading", tile, new Vector2(.06f, .57f), new Vector2(.94f, .97f),
+                    Vector2.zero, Vector2.zero);
+                var caption = LotdUiKit.AddFittedText(heading, "Label", "", 14, 8, TextAnchor.MiddleCenter, DuelStyle.Muted);
+                var digits = LotdUiKit.CreateRect("Digits", tile, new Vector2(.05f, .06f), new Vector2(.95f, .55f),
+                    Vector2.zero, Vector2.zero);
+                return (caption, DuelTypography.AddNumber(digits, "Value", "", 30, TextAnchor.MiddleCenter, Color.white));
+            }
+        }
+
+        private void ShowSumTotal(int minimum, int maximum, int target, bool valid)
+        {
+            bool flexible = minimum != maximum;
+            bool atLeast = _curPrompt.sumExactCountZeroAny;
+            if (_sumAmount.Number == null)
+            {
+                string total = flexible ? $"최소 {minimum} · 최대 {maximum}" : $"합계 {maximum}";
+                _modalSubtitle.text = $"{total} · 목표 {target}{(atLeast ? " 이상" : "")}";
+                return;
+            }
+
+            _sumAmount.Caption.text = flexible ? "최소 / 최대" : "합계";
+            _sumAmount.Number.text = flexible ? $"{minimum}/{maximum}" : maximum.ToString();
+            _sumAmount.Number.color = valid ? DuelStyle.Gold : Color.white;
+            _sumTarget.Caption.text = atLeast ? "최소 필요" : "목표 합계";
+            _sumTarget.Number.text = target.ToString();
+            int required = _curPrompt.mustSelect.Count;
+            string fixedCards = required > 0 ? $"필수 {required}장 · " : "";
+            _modalSubtitle.text = $"{fixedCards}선택 {_selectedIndices.Count}장";
         }
 
         private void OnConfirmMultiSelect()
@@ -1363,18 +1426,26 @@ namespace YGOPortable.UI
             Submit(DuelSession.PackCardSelection(index));
         }
 
+        private static (int First, int Alternative) SumAmounts(SelectableCardItem item) =>
+            ((int)(item.sumParam & 0xFFFF), (int)(item.sumParam >> 16));
+
+        private static string FormatSumValue(SelectableCardItem item)
+        {
+            var (first, alternative) = SumAmounts(item);
+            return alternative > 0 && alternative != first ? $"{first}/{alternative}" : first.ToString();
+        }
+
         public static bool CheckSumSelectionValid(DuelPrompt p, HashSet<int> chosen, int target)
         {
             if (p == null || chosen == null) return false;
 
             var items = new List<(int a, int b)>();
             foreach (var m in p.mustSelect)
-                items.Add(((int)(m.sumParam & 0xFFFF), (int)((m.sumParam >> 16) & 0xFFFF)));
+                items.Add(SumAmounts(m));
             foreach (int i in chosen)
             {
                 if (i < 0 || i >= p.candidates.Count) return false;
-                var c = p.candidates[i];
-                items.Add(((int)(c.sumParam & 0xFFFF), (int)((c.sumParam >> 16) & 0xFFFF)));
+                items.Add(SumAmounts(p.candidates[i]));
             }
             if (items.Count == 0) return false;
 

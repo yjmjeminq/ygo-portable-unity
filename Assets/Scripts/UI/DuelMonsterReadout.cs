@@ -754,6 +754,7 @@ namespace YGOPortable.UI
         private readonly List<(RectTransform Rect, float Width)> _fieldLabels;
         private Text _materials;
         private DuelCounterBadge _counters;
+        private (RectTransform Root, Text Caption, Text Value) _contribution;
         private (uint Code, bool Opponent) _lastCard;
         private (DuelRatingKind Kind, uint Value) _lastRating;
 
@@ -762,7 +763,7 @@ namespace YGOPortable.UI
         internal DuelFieldReadout(Transform slot, bool inPreview = false)
         {
             _inPreview = inPreview;
-            _fieldLabels = inPreview ? null : new(4);
+            _fieldLabels = inPreview ? null : new(5);
             _root = LotdUiKit.FillRect("CardReadout", slot);
             _combat = LotdUiKit.FillRect("Combat", _root);
             _stats = new DuelStatStrip(_combat, compact: true);
@@ -829,7 +830,8 @@ namespace YGOPortable.UI
             }
         }
 
-        internal void Bind(DuelCardReadout card, bool opponent, uint? scale, uint? position = null, bool showCounters = true)
+        internal void Bind(DuelCardReadout card, bool opponent, uint? scale, uint? position = null, bool showCounters = true,
+            (string Value, bool Required, bool Selected) sum = default)
         {
             var visibleCard = (Code: card.Live?.code ?? 0u, Opponent: opponent);
             bool showChanges = !_inPreview && _root.gameObject.activeSelf && visibleCard.Code != 0 && visibleCard == _lastCard;
@@ -863,7 +865,37 @@ namespace YGOPortable.UI
             string status = card.IsToken ? "토큰" : "";
             if (card.Disabled) status = card.IsToken ? "토큰 · 무효" : "무효";
             SetLabel(_status, status, card.Disabled ? DisabledColor : DuelStyle.Muted, showChanges);
+            BindContribution(sum);
             LayoutFieldLabels(rating.Value, card.Materials, counterReadout.CounterCount, status.Length > 2, opponent);
+        }
+
+        private void BindContribution((string Value, bool Required, bool Selected) sum)
+        {
+            if (sum.Value == null)
+            {
+                if (_contribution.Root != null) _contribution.Root.gameObject.SetActive(false);
+                return;
+            }
+
+            if (_contribution.Root == null)
+            {
+                var chip = LotdUiKit.FillRect("Contribution", _labels);
+                DuelReadoutPlate.Add(chip, new Color(.050f, .135f, .165f, .98f));
+                var caption = LotdUiKit.CreateRect("Caption", chip, new Vector2(.04f, 0f), new Vector2(.55f, 1f),
+                    Vector2.zero, Vector2.zero);
+                var label = LotdUiKit.AddFittedText(caption, "Label", "", 12, 7, TextAnchor.MiddleCenter, Color.white);
+                var number = DuelTypography.AddNumber(chip, "Value", "", 23, TextAnchor.MiddleCenter, Color.white);
+                number.rectTransform.anchorMax = new Vector2(.97f, .96f);
+                _contribution = (chip, label, number);
+            }
+
+            _contribution.Root.gameObject.SetActive(true);
+            _contribution.Caption.text = sum.Required ? "필수" : "합산";
+            _contribution.Value.text = sum.Value;
+            float split = sum.Value.Length > 2 ? .48f : .56f;
+            _contribution.Value.rectTransform.anchorMin = new Vector2(split + .01f, .04f);
+            ((RectTransform)_contribution.Caption.transform.parent).anchorMax = new Vector2(split - .01f, 1f);
+            _contribution.Caption.color = _contribution.Value.color = sum.Selected ? DuelStyle.Gold : DuelStyle.Player;
         }
 
         private void BindRating((DuelRatingKind Kind, uint Value) rating, bool showChanges)
@@ -900,18 +932,19 @@ namespace YGOPortable.UI
         {
             _fieldLabels.Clear();
             Add((RectTransform)_rating.transform.parent, rating >= 10 ? .38f : .295f);
+            Add(_contribution.Root, _contribution.Value != null && _contribution.Value.text.Length > 2 ? .59f : .43f);
             Add(_materials?.transform.parent as RectTransform, materials >= 10 ? .37f : .28f);
             Add(_counters?.Root, counters >= 10 ? .37f : .28f);
             Add((RectTransform)_status.transform.parent, longStatus ? .50f : .31f);
 
-            bool twoRows = _fieldLabels.Count == 4;
+            bool twoRows = _fieldLabels.Count >= 4;
             float farEdge = twoRows ? .452f : .26f;
             _labels.anchorMin = new Vector2(0f, opponent ? .025f : 1f - farEdge);
             _labels.anchorMax = new Vector2(1f, opponent ? farEdge : .975f);
             if (twoRows)
             {
                 PlaceRow(0, 2, opponent ? 0f : .515f, opponent ? .485f : 1f);
-                PlaceRow(2, 2, opponent ? .515f : 0f, opponent ? 1f : .485f);
+                PlaceRow(2, _fieldLabels.Count - 2, opponent ? .515f : 0f, opponent ? 1f : .485f);
             }
             else PlaceRow(0, _fieldLabels.Count, 0f, 1f);
 

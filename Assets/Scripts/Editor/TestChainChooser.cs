@@ -1667,7 +1667,7 @@ namespace YGOPortable.Editor
                 prompt.mustSelect.Add(fixedMaterial);
                 for (int i = 0; i < 11; i++)
                     prompt.candidates.Add(new SelectableCardItem { code = LadyLabrynth, sumParam = 2 });
-                prompt.candidates.Add(fixedMaterial);
+                prompt.candidates.Add(new SelectableCardItem { code = LadyLabrynth, sumParam = 2 | (4u << 16) });
                 modals.ShowPrompt(duel, prompt);
                 Canvas.ForceUpdateCanvases();
 
@@ -1676,11 +1676,16 @@ namespace YGOPortable.Editor
                 Require(panel.rect.height < 450f && panel.anchorMax.y < .65f && scroll != null && scroll.horizontal &&
                         scroll.content.rect.width > scroll.viewport.rect.width, "Material choices did not fit a compact, scrollable panel.");
                 var confirm = panel.Find("Footer/Btn_선택 완료/B").GetComponent<Button>();
+                var subtitle = panel.Find("Hdr/SubtitleBand/Sub").GetComponent<Text>();
+                Require(subtitle.text == "합계 4 · 목표 8", "The total omitted a required material.");
+                Require(scroll.content.Find("Tile_11/Source/Detail/Text").GetComponent<Text>().text == "2/4",
+                    "The material list lost one of the supplied contribution values.");
                 var first = scroll.content.Find("Tile_0").GetComponent<Button>();
                 Require(((RectTransform)first.transform.Find("Card/V/AspectBox")).rect.height >= 170f,
                     "The material choice artwork became too small.");
                 first.onClick.Invoke();
-                Require(!confirm.interactable, "A material that failed the required sum enabled confirmation.");
+                Require(!confirm.interactable && subtitle.text == "합계 6 · 목표 8",
+                    "An insufficient selection showed the wrong total or enabled confirmation.");
                 confirm.onClick.Invoke();
                 Require(responses.Count == 0, "A disabled material confirmation submitted a response.");
                 first.onClick.Invoke();
@@ -1690,7 +1695,8 @@ namespace YGOPortable.Editor
                 scroll.horizontalNormalizedPosition = 1f;
                 scroll.content.Find("Tile_11").GetComponent<Button>().onClick.Invoke();
                 Require(scroll.content.Find("Tile_-1/Chk").gameObject.activeSelf &&
-                        !scroll.content.Find("Tile_0/Chk").gameObject.activeSelf && confirm.interactable,
+                        !scroll.content.Find("Tile_0/Chk").gameObject.activeSelf && confirm.interactable &&
+                        subtitle.text == "최소 6 · 최대 8 · 목표 8",
                     "Selecting the valid last material did not keep the fixed card and replace the previous choice.");
                 Require(modals.TryConfirm() && !modals.IsPromptOpen && responses.Count == 1 &&
                         responses[0].Length == 12 && BitConverter.ToInt32(responses[0], 0) == 0 &&

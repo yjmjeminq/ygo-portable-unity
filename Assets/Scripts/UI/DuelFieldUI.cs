@@ -1571,6 +1571,11 @@ namespace YGOPortable.UI
             uint position = battle?.Position ?? shown?.position ?? 0;
             bool faceUp = (position & YgoConstants.POS_FACEUP) != 0;
             bool visible = battle != null ? !battle.Hidden : live != null && !IsArriving(con, loc, seq);
+            bool interactive = battle == null && visible;
+            int choiceIndex = -1;
+            bool cardChoice = interactive && FindFieldCardChoice(con, loc, seq, out choiceIndex);
+            bool cardSelected = cardChoice && _modals.IsFieldCardSelected(choiceIndex);
+            string sumValue = cardChoice ? _modals.ReadFieldSumValue(choiceIndex) : null;
             DuelCardReadout readout = default;
             if (visible && faceUp && shown.code != 0)
             {
@@ -1585,20 +1590,20 @@ namespace YGOPortable.UI
                 slot.cardView.transform.localRotation = Quaternion.Euler(0f, 0f, CardAngle(loc, position, opponent));
                 slot.cardView.transform.localScale = Vector3.one * CardScale(slot.root, loc, position);
             }
-            if (visible && faceUp && shown.code != 0 && battle?.HideReadout != true)
+            if (visible && battle?.HideReadout != true)
             {
                 uint? scale = readout.ScaleIn(loc, seq);
-                if (loc == YgoConstants.LOCATION_MZONE && readout.IsMonster || scale.HasValue || readout.CounterCount != 0)
+                if (loc == YgoConstants.LOCATION_MZONE && readout.IsMonster || scale.HasValue || readout.CounterCount != 0 ||
+                    sumValue != null)
                 {
                     slot.readout ??= new DuelFieldReadout(slot.root);
-                    slot.readout.Bind(readout, opponent, scale, position);
+                    slot.readout.Bind(readout, opponent, scale, position, sum: (sumValue, choiceIndex < 0, cardSelected));
                     slot.readout.FollowFocus(slot.cardArea.anchoredPosition, slot.focusArt.localScale.x);
                 }
                 else slot.readout?.Hide();
             }
             else slot.readout?.Hide();
 
-            bool interactive = battle == null && visible;
             bool canDrag = interactive && CanAcceptPlayerAction && !IsStagingPlacement && !_modals.IsFieldCardSelection &&
                 !opponent && loc == YgoConstants.LOCATION_MZONE;
             slot.dragTrigger.SourceType = canDrag ? DragSourceType.FieldMonster : DragSourceType.None;
@@ -1634,9 +1639,6 @@ namespace YGOPortable.UI
                 loc == YgoConstants.LOCATION_SZONE && _dragHighlightSZone);
             bool attack = opponent && loc == YgoConstants.LOCATION_MZONE && _dragHighlightAttack && interactive;
             bool action = interactive && CanAcceptPlayerAction && HasFieldAction(con, loc, seq);
-            int choiceIndex = -1;
-            bool cardChoice = interactive && FindFieldCardChoice(con, loc, seq, out choiceIndex);
-            bool cardSelected = cardChoice && _modals.IsFieldCardSelected(choiceIndex);
             Color highlight = cardSelected ? DuelStyle.Gold : attack ? DuelStyle.Opponent :
                 cardChoice || selected || action ? DuelStyle.Player :
                 place ? new Color(.98f, .89f, .29f) : drag ? DuelStyle.Gold : Color.clear;
