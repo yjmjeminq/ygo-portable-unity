@@ -1,0 +1,42 @@
+{
+  "selection": {
+    "seedStart": 0,
+    "seedCount": 208,
+    "decks": [
+      {"id": 1000, "deck": 50940, "era": "DM", "method": "fusion"},
+      {"id": 1001, "deck": 50430, "era": "ARC-V", "method": "pendulum"},
+      {"id": 1002, "deck": 51190, "era": "GX", "method": "fusion"},
+      {"id": 1003, "deck": 50350, "era": "5D's", "method": "synchro"},
+      {"id": 1004, "deck": 51740, "era": "ZEXAL", "method": "xyz"},
+      {"id": 1005, "deck": 51430, "era": "VRAINS", "method": "link"},
+      {"id": 1006, "deck": 20681, "era": "2026", "method": "xyz"},
+      {"id": 1007, "deck": 20678, "era": "2026", "method": "synchro"},
+      {"id": 1008, "deck": 51954, "era": "DM/Ritual", "method": "ritual"},
+      {"id": 1009, "deck": 20672, "era": "Control", "method": null},
+      {"id": 1010, "deck": 20682, "era": "Control", "method": null},
+      {"id": 1011, "deck": 50964, "era": "Lock", "method": null},
+      {"id": 1012, "deck": 52150, "era": "Lock", "method": null},
+      {"id": 1013, "deck": 20687, "era": "Resource", "method": "link"}
+    ]
+  },
+  "holdout": {
+    "seedStart": 8192,
+    "seedCount": 208,
+    "decks": [
+      {"id": 2000, "deck": 50947, "era": "DM", "method": "fusion"},
+      {"id": 2001, "deck": 50729, "era": "ARC-V", "method": "pendulum"},
+      {"id": 2002, "deck": 51377, "era": "GX", "method": "fusion"},
+      {"id": 2003, "deck": 50169, "era": "5D's", "method": "synchro"},
+      {"id": 2004, "deck": 51569, "era": "ZEXAL", "method": "xyz"},
+      {"id": 2005, "deck": 51879, "era": "VRAINS", "method": "link"},
+      {"id": 2006, "deck": 20686, "era": "2026", "method": "xyz"},
+      {"id": 2007, "deck": 20671, "era": "2026", "method": "fusion"},
+      {"id": 2008, "deck": 51049, "era": "DM/Ritual", "method": "ritual"},
+      {"id": 2009, "deck": 20679, "era": "Control", "method": null},
+      {"id": 2010, "deck": 20675, "era": "Lock", "method": null},
+      {"id": 2011, "deck": 51029, "era": "Lock", "method": null},
+      {"id": 2012, "deck": 50961, "era": "Lock", "method": null},
+      {"id": 2013, "deck": 20673, "era": "Resource", "method": null}
+    ]
+  }
+}
