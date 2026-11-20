@@ -596,7 +596,10 @@ namespace YGOPortable.AI
                 bool clearedOpposingCard = line.ending.opposingCards < candidate.Before.opposingCards;
                 bool risksSurvival = DuelCombat.IsWeakBattleLiability(attacker.attack, threat, own.lp) &&
                     !improvesField && (!clearedOpposingCard || 2L * incomingDamage >= own.lp);
-                bool needsDefense = (opensLethal || risksSurvival) && !own.hand.Any(card => card.code == PhotonJumper);
+                bool revealedLethal = !improvesField && DuelTactics.RisksRevealedBattleLethal(trial, player,
+                    attacker.attack, attacker.baseAttack);
+                bool needsDefense = (opensLethal || risksSurvival || revealedLethal) &&
+                    !own.hand.Any(card => card.code == PhotonJumper);
                 bool payoff = improvesField || clearedOpposingCard ||
                     (!attacker.effectsDisabled && CardDatabase.Get(attacker.code) is CardInfo info && HasFieldInteraction(info));
                 if (!needsDefense && payoff)

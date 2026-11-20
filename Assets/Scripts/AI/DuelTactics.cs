@@ -16,6 +16,8 @@ namespace YGOPortable.AI
         private const uint Farewelcome = 32785578, DarkTimeWizard = 40235813;
         private const uint PendulumScale = 17885118;
         private const uint SalamangreatOfFire = 11962031, Achichi = 15808381, CynetRefresh = 36368606;
+        private const uint SalamangreatSanctuary = 1295111;
+        private const ulong SanctuaryBattleRecovery = ((ulong)SalamangreatSanctuary << 20) | 1;
         private const uint EarthSlicer = 97584719, Linkslayer = 35595518, Artorigus = 21223277;
         private const uint DarklordRebellion = 50501121, NoblemanOfCrossout = 71044499, HexeTrude = 46294982;
         private const uint GiftCard = 39526584, DarkCure = 3701074, NurseReficule = 67316075, BadReaction = 40633297;
@@ -24,6 +26,7 @@ namespace YGOPortable.AI
         private const uint PhotonHowling = 28331069, GalaxyPhotonDragon = 85747929, GalaxyZero = 97617181;
         private const uint GalaxyEyesPhoton = 93717133, GalaxyWarDrake = 19316241, GalaxySummoner = 863795, GalaxyHundred = 897409;
         private const uint UtopiaLightning = 56832966, UtopiaRayVictory = 87911394;
+        private const uint UtopicOnomatopoeia = 8512558;
         private const uint GogogoGoblindbergh = 35886170, DodododoWarrior = 62880279, AscendedSage = 4647954, Onomatokage = 55088578;
         private const ushort UtopiaSet = 0x7f;
         private const uint GaiaTheMagicalKnightOfDragons = 15989522, Sunrise = 22908820, RedRain = 5376159;
@@ -42,7 +45,9 @@ namespace YGOPortable.AI
         private const uint DdGryphon = 28406301;
         private const uint GalaxyCyclone = 5133471, KaliYuga = 15939229, WhipViper = 79967395;
         private const uint Erebus = 23064604;
-        private const ushort HeroSet = 0x8;
+        private const uint MiracleFusion = 45906428, WakeUpElementalHero = 32828466;
+        private const uint Necrovalley = 47355498, ImperialIronWall = 30459350, ChaosHunter = 97940434, Kycoo = 88240808;
+        private const ushort HeroSet = 0x8, ElementalHeroSet = 0x3008;
         private const uint Development = (1u << 5) | (1u << 6) | (1u << 7) | (1u << 18);
 
         // Cards that actively want to be in the Graveyard (for discard / foolish burial / Graceful Charity)
@@ -116,6 +121,14 @@ namespace YGOPortable.AI
                 return false;
 
             var own = duel.Players[prompt.playerId];
+
+            // This ignition has no activation cost and cannot extend while its source is negated.
+            if (effect.code == UtopicOnomatopoeia && effect.controller == prompt.playerId &&
+                prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD && effect.location == YgoConstants.LOCATION_MZONE &&
+                effect.sequence < own.mzone.Length &&
+                own.mzone[effect.sequence] is { code: UtopicOnomatopoeia, IsFaceUp: true, effectsDisabled: true })
+                return false;
+
             var rival = duel.Players[1 - prompt.playerId];
             if (effect.code == InfiniteImpermanence &&
                 rival.mzone.Any(card => card?.IsFaceUp == true && !card.effectsDisabled && card.code == BlueEyesTyrant) &&
@@ -130,6 +143,8 @@ namespace YGOPortable.AI
             if (effect.code is GiftCard or DarkCure)
                 return own.mzone.Concat(own.szone).Any(card => card?.IsFaceUp == true && !card.effectsDisabled &&
                     card.code is NurseReficule or BadReaction);
+            if (effect.code == SalamangreatSanctuary && effect.description == SanctuaryBattleRecovery)
+                return own.mzone.Any(card => SanctuaryLifeGain(duel, prompt.playerId, card) > 0);
             if (effect.code is SalamangreatOfFire or Achichi && effect.location == YgoConstants.LOCATION_GRAVE)
                 return LosesCurrentBattle(duel, prompt.playerId) && (duel.AttackerCon == prompt.playerId ||
                     !own.mzone[duel.TargetSeq].IsDefense || rival.mzone[duel.AttackerSeq].code == RedDragonArchfiend);
@@ -577,6 +592,39 @@ namespace YGOPortable.AI
             return opposingLoss > 0 && Loss(own) <= opposingLoss + .05;
         }
 
+        private static int SanctuaryLifeGain(DuelSession duel, byte player, LiveCardState link, bool costPaid = false)
+        {
+            const int cost = 1000;
+            if (link?.IsFaceUp != true || (link.type & YgoConstants.TYPE_LINK) == 0 || link.attack <= 0)
+                return int.MinValue;
+
+            int gain = link.baseAttack - cost;
+            if (gain <= 0 || !duel.HasActiveAttack) return gain;
+            bool attacks = duel.AttackerCon == player && duel.AttackerLoc == YgoConstants.LOCATION_MZONE &&
+                duel.AttackerSeq == link.sequence;
+            bool defends = duel.TargetCon == player && duel.TargetLoc == YgoConstants.LOCATION_MZONE &&
+                duel.TargetSeq == link.sequence;
+            if (!attacks && !defends) return gain;
+
+            var rival = duel.Players[1 - player];
+            if (attacks && duel.TargetLoc == 0)
+                return link.attack >= rival.lp ? int.MinValue : gain - link.attack;
+
+            uint opposingController = attacks ? duel.TargetCon : duel.AttackerCon;
+            uint opposingLocation = attacks ? duel.TargetLoc : duel.AttackerLoc;
+            uint opposingSlot = attacks ? duel.TargetSeq : duel.AttackerSeq;
+            if (opposingController != 1 - player || opposingLocation != YgoConstants.LOCATION_MZONE ||
+                opposingSlot >= rival.mzone.Length || rival.mzone[opposingSlot] is not { IsFaceUp: true } opponent)
+                return gain;
+
+            int opposingStat = Math.Max(0, attacks && opponent.IsDefense ? opponent.defense : opponent.attack);
+            // Keep a winning attack or an equal-ATK trade. Zeroing a losing Link adds its current ATK to the damage.
+            if (link.attack > opposingStat || !opponent.IsDefense && link.attack == opposingStat)
+                return int.MinValue;
+            int previousLife = duel.Players[player].lp + (costPaid ? cost : 0);
+            return previousLife + gain > opposingStat ? gain - link.attack : int.MinValue;
+        }
+
         private static bool LosesCurrentBattle(DuelSession duel, byte player)
         {
             if (!duel.HasActiveAttack || duel.AttackerLoc != YgoConstants.LOCATION_MZONE ||
@@ -670,6 +718,9 @@ namespace YGOPortable.AI
             if (!own && hint == Destroy && duel.SelectionChainLink is { code: DestroyerPhoenix } phoenix &&
                 phoenix.triggerPlayer == player && IsProtectedCyberEternity(live, side))
                 return 0;
+            if (own && duel.SelectionChainLink is { code: SalamangreatSanctuary, description: SanctuaryBattleRecovery } sanctuary &&
+                sanctuary.triggerPlayer == player)
+                return SanctuaryLifeGain(duel, player, live, costPaid: true);
             if (live != null && duel.SelectionChainLink is { code: WhipViper } swap && swap.triggerPlayer == player)
                 return ViperBattleGain(duel, player, live);
             // Conquistador uses the generic face-up selection hint for its optional destruction.
@@ -738,6 +789,11 @@ namespace YGOPortable.AI
             var rival = duel.Players[1 - prompt.playerId];
             int rivalStrongest = StrongestAttacker(rival);
             var own = duel.Players[prompt.playerId];
+            bool knownBurst = RisksRevealedBattleLethal(duel, prompt.playerId, card.atk, card.atk);
+            if (knownBurst && (compareWithBattle || !prompt.canBp ||
+                !DuelCombat.CanTestLethalPosition(duel, prompt.playerId, card.atk)))
+                return FindSettableIndex(prompt, summon);
+
             int exposedDamage = rivalStrongest - Math.Max(0, card.atk);
             if (exposedDamage <= 0) return null;
             bool hasFieldBodies = own.mzone.Any(m => m != null);
@@ -758,6 +814,41 @@ namespace YGOPortable.AI
 
             return FindSettableIndex(prompt, summon);
         }
+
+        internal static bool RisksRevealedBattleLethal(DuelSession duel, byte defender, int attack, int printedAttack)
+        {
+            int life = duel.Players[defender].lp;
+            // A Set must also survive the possible effect damage after the battle.
+            if (attack >= 1800 || life <= Math.Max(0, printedAttack) ||
+                !duel.IsKnownInOpposingHand(defender, MiracleFusion)) return false;
+
+            var own = duel.Players[defender];
+            var rival = duel.Players[1 - defender];
+            if (rival.extra.Count == 0 || own.szone.Concat(rival.szone).Any(card => IsActive(card, ImperialIronWall)) ||
+                own.mzone.Any(card => IsActive(card, ChaosHunter))) return false;
+
+            // Hidden Extra Deck identities are never needed. Estimate a plausible Fusion ceiling from public materials.
+            var materials = rival.mzone.Where(card => card?.IsFaceUp == true);
+            if (!own.mzone.Any(card => IsActive(card, Kycoo)) &&
+                !own.szone.Concat(rival.szone).Any(card => IsActive(card, Necrovalley)))
+                materials = materials.Concat(rival.grave);
+            int warriors = 0;
+            bool elementalFusion = false;
+            foreach (var material in materials)
+            {
+                bool warrior = (material.race & YgoConstants.RACE_WARRIOR) != 0;
+                warriors += warrior ? 1 : 0;
+                if (!elementalFusion && (material.type & YgoConstants.TYPE_FUSION) != 0 &&
+                    CardDatabase.Get(material.code) is CardInfo info && CardDatabase.ExtractSetcodes(info.setcode).Contains(ElementalHeroSet))
+                    elementalFusion = true;
+            }
+
+            var fusion = CardDatabase.Get(WakeUpElementalHero);
+            return elementalFusion && warriors >= 2 && fusion != null &&
+                fusion.atk + warriors * 300 - Math.Max(0, attack) >= life;
+        }
+
+        private static bool IsActive(LiveCardState card, uint code) => card?.code == code && card.IsFaceUp && !card.effectsDisabled;
 
         internal static int? FindSettableIndex(DuelPrompt prompt, SelectableCardItem summon)
         {

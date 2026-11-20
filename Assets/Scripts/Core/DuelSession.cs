@@ -321,6 +321,7 @@ namespace YGOPortable.Core
         private readonly Stack<(uint Tag, object Key)> _movementGroups = new();
         private readonly HashSet<(byte Player, uint Location, uint Sequence, uint Code)> _confirmedCards =
             new HashSet<(byte, uint, uint, uint)>();
+        private readonly Dictionary<uint, int>[] _knownOpponentHands = new Dictionary<uint, int>[2];
 
         public event Action<string> OnLogAdded;
 
@@ -373,6 +374,7 @@ namespace YGOPortable.Core
             SolvedChainLinks.Clear();
             Logs.Clear();
             _confirmedCards.Clear();
+            Array.Clear(_knownOpponentHands, 0, _knownOpponentHands.Length);
 
             HumanPlayerIndex = p0GoesFirst ? 0 : 1;
 
@@ -790,6 +792,34 @@ namespace YGOPortable.Core
             return (position & YgoConstants.POS_FACEUP) != 0 ? item.code : 0;
         }
 
+        internal bool IsKnownInOpposingHand(byte observer, uint code) =>
+            observer < _knownOpponentHands.Length && _knownOpponentHands[observer]?.ContainsKey(code) == true;
+
+        private void TrackOpposingHandDeparture(byte owner, uint code, uint destination, uint position)
+        {
+            if (owner >= 2 || _knownOpponentHands[1 - owner] is not { Count: > 0 } known) return;
+
+            bool visibleDestination = destination == YgoConstants.LOCATION_GRAVE ||
+                (destination & YgoConstants.LOCATION_OVERLAY) != 0 ||
+                (destination is YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE or
+                    YgoConstants.LOCATION_REMOVED or YgoConstants.LOCATION_EXTRA) && (position & YgoConstants.POS_FACEUP) != 0;
+            if (visibleDestination && code != 0)
+            {
+                ForgetOne(code);
+                return;
+            }
+
+            // Any recorded card could be the one that left through a face-down Set or another concealed move.
+            foreach (uint candidate in new List<uint>(known.Keys)) ForgetOne(candidate);
+
+            void ForgetOne(uint card)
+            {
+                if (!known.TryGetValue(card, out int copies)) return;
+                if (copies == 1) known.Remove(card);
+                else known[card] = copies - 1;
+            }
+        }
+
         internal LiveCardState GetVisibleFieldCard(uint code, byte controller, uint location, uint sequence)
         {
             if (code == 0 || controller >= Players.Length) return null;
@@ -1138,6 +1168,8 @@ namespace YGOPortable.Core
                     if (_speculatingPlayer >= 0 && fLoc == YgoConstants.LOCATION_DECK && tLoc != YgoConstants.LOCATION_DECK &&
                         (fCon != _speculatingPlayer || !_selectedFromDeck.Remove(code))) SpeculationUncertain = true;
                     _confirmedCards.Remove((fCon, fLoc, fSeq, code));
+                    if (fLoc == YgoConstants.LOCATION_HAND && (tLoc != fLoc || tCon != fCon))
+                        TrackOpposingHandDeparture(fCon, code, tLoc, tPos);
 
                     var ev = new CardMoveEvent
                     {
@@ -1172,6 +1204,13 @@ namespace YGOPortable.Core
                     var second = ReadLocIntoItem(br, br.ReadUInt32());
                     _confirmedCards.Remove((first.controller, first.location, first.sequence, first.code));
                     _confirmedCards.Remove((second.controller, second.location, second.sequence, second.code));
+                    if (first.controller != second.controller || first.location != second.location)
+                    {
+                        if (first.location == YgoConstants.LOCATION_HAND && first.controller < 2)
+                            _knownOpponentHands[1 - first.controller]?.Clear();
+                        if (second.location == YgoConstants.LOCATION_HAND && second.controller < 2)
+                            _knownOpponentHands[1 - second.controller]?.Clear();
+                    }
                     NotifyCardMoved(CreateSwapMove(first, second), CreateSwapMove(second, first));
                     break;
                 }
@@ -1204,6 +1243,7 @@ namespace YGOPortable.Core
                     bool shownToHuman = msgType != YgoConstants.MSG_CONFIRM_CARDS || recipient == HumanPlayerIndex;
                     uint cnt = br.ReadUInt32();
                     var names = new List<string>((int)Math.Min(cnt, 4));
+                    Dictionary<uint, HashSet<uint>> handReveals = null;
                     int visibleCount = 0;
                     for (uint i = 0; i < cnt; i++)
                     {
@@ -1211,6 +1251,13 @@ namespace YGOPortable.Core
                         byte controller = br.ReadByte();
                         uint location = br.ReadByte();
                         uint sequence = br.ReadUInt32();
+                        if (msgType == YgoConstants.MSG_CONFIRM_CARDS && recipient < 2 && controller == 1 - recipient &&
+                            location == YgoConstants.LOCATION_HAND && code != 0)
+                        {
+                            handReveals ??= new();
+                            if (!handReveals.TryGetValue(code, out var slots)) handReveals.Add(code, slots = new());
+                            slots.Add(sequence);
+                        }
                         if (_speculatingPlayer >= 0 && recipient == _speculatingPlayer && controller != _speculatingPlayer &&
                             location is YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_DECK or YgoConstants.LOCATION_EXTRA)
                             SpeculationUncertain = true;
@@ -1220,6 +1267,16 @@ namespace YGOPortable.Core
                         visibleCount++;
                         if (names.Count < 4)
                             names.Add($"[{CardDatabase.GetName(code)}]");
+                    }
+                    if (handReveals != null)
+                    {
+                        var known = _knownOpponentHands[recipient] ??= new();
+                        // Repeated confirmations can show the same copy again. Only one packet proves distinct slots.
+                        foreach (var reveal in handReveals)
+                        {
+                            known.TryGetValue(reveal.Key, out int copies);
+                            known[reveal.Key] = Math.Max(copies, reveal.Value.Count);
+                        }
                     }
                     if (names.Count > 0)
                     {
@@ -1252,6 +1309,13 @@ namespace YGOPortable.Core
                     uint location = br.ReadByte();
                     if (_confirmedCards.Count != 0)
                         _confirmedCards.RemoveWhere(c => c.Location == location);
+                    break;
+                }
+
+                case YgoConstants.MSG_TAG_SWAP:
+                {
+                    byte player = br.ReadByte();
+                    if (player < 2) _knownOpponentHands[1 - player]?.Clear();
                     break;
                 }
 
