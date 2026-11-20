@@ -49,6 +49,8 @@ namespace YGOPortable.Core
         internal const uint REASON_MATERIAL = 0x8;
         internal const uint REASON_BATTLE = 0x20;
         internal const uint REASON_EFFECT = 0x40;
+        internal const uint REASON_LOST_TARGET = 0x200;
+        internal const uint REASON_RULE = 0x400;
         public const uint REASON_SPSUMMON = 0x800;
         internal const uint REASON_FUSION = 0x40000;
         internal const uint REASON_SYNCHRO = 0x80000;
@@ -221,6 +223,7 @@ namespace YGOPortable.Core
         public const byte MSG_SHUFFLE_HAND = 33;
         public const byte MSG_SWAP_GRAVE_DECK = 35;
         public const byte MSG_SHUFFLE_SET_CARD = 36;
+        public const byte MSG_REVERSE_DECK = 37;
         public const byte MSG_DECK_TOP = 38;
         public const byte MSG_SHUFFLE_EXTRA = 39;
         public const byte MSG_CONFIRM_EXTRATOP = 42;

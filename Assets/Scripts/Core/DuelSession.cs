@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using UnityEngine;
 
 namespace YGOPortable.Core
@@ -322,6 +323,8 @@ namespace YGOPortable.Core
         private readonly HashSet<(byte Player, uint Location, uint Sequence, uint Code)> _confirmedCards =
             new HashSet<(byte, uint, uint, uint)>();
         private readonly Dictionary<uint, int>[] _knownOpponentHands = new Dictionary<uint, int>[2];
+        private readonly (uint Code, int DeckCount)[] _observedDeckTop = new (uint, int)[2];
+        private (byte Player, int Remaining) _observedTopSort;
 
         public event Action<string> OnLogAdded;
 
@@ -375,6 +378,8 @@ namespace YGOPortable.Core
             Logs.Clear();
             _confirmedCards.Clear();
             Array.Clear(_knownOpponentHands, 0, _knownOpponentHands.Length);
+            Array.Clear(_observedDeckTop, 0, _observedDeckTop.Length);
+            _observedTopSort = default;
 
             HumanPlayerIndex = p0GoesFirst ? 0 : 1;
 
@@ -537,6 +542,7 @@ namespace YGOPortable.Core
                 else _planningReplay.responses.Add((prevPrompt.messageType, prevPrompt.playerId, (byte[])buffer.Clone()));
             }
             if (_speculatingPlayer >= 0) TrackSpeculativeSelection(prevPrompt, buffer, preserveDeckSelection);
+            if (prevPrompt?.messageType == YgoConstants.MSG_SORT_CARD) TrackSortedDeckTop(prevPrompt, buffer);
             if (prevPrompt?.messageType == YgoConstants.MSG_SELECT_BATTLECMD && buffer?.Length >= sizeof(int))
             {
                 int command = BitConverter.ToInt32(buffer, 0);
@@ -547,6 +553,7 @@ namespace YGOPortable.Core
             ActivePrompt = null;
             YgoNativeBridge.SetResponse(NativePtr, buffer);
             StepUntilPrompt();
+            if (_observedTopSort.Remaining > 0) ForgetObservedDeckTop(_observedTopSort.Player);
             if (!IsFinished && ActivePrompt == null && RetryCount > prevRetry && prevPrompt != null)
             {
                 ActivePrompt = prevPrompt;
@@ -795,6 +802,39 @@ namespace YGOPortable.Core
         internal bool IsKnownInOpposingHand(byte observer, uint code) =>
             observer < _knownOpponentHands.Length && _knownOpponentHands[observer]?.ContainsKey(code) == true;
 
+        internal uint GetObservedOwnDeckTop(byte observer) => observer < _observedDeckTop.Length &&
+            _observedDeckTop[observer].DeckCount == Players[observer].deckCount ? _observedDeckTop[observer].Code : 0;
+
+        private void TrackSortedDeckTop(DuelPrompt prompt, byte[] response)
+        {
+            byte player = prompt.playerId;
+            if (player >= _observedDeckTop.Length) return;
+            ForgetObservedDeckTop(player);
+            int count = Players[player].deckCount;
+            var cards = prompt.candidates;
+            if (cards.Count == 0 || cards.Count > count || response == null) return;
+            for (int i = 0; i < cards.Count; i++)
+            {
+                var card = cards[i];
+                // The sort prompt discloses its cards to the deciding player. A bottom sort or another player's deck provides no evidence.
+                if (card.controller != player || card.location != YgoConstants.LOCATION_DECK ||
+                    card.sequence != count - i - 1 || card.code == 0) return;
+            }
+
+            bool retainOrder = response.Length == 1 && response[0] == byte.MaxValue;
+            int top = retainOrder ? 0 :
+                response.Length == cards.Count && response.All(rank => rank < cards.Count) && response.Distinct().Count() == cards.Count
+                    ? Array.IndexOf(response, (byte)0) : -1;
+            _observedDeckTop[player] = top < 0 ? default : (cards[top].code, count);
+            if (top >= 0 && !retainOrder) _observedTopSort = (player, cards.Count);
+        }
+
+        private void ForgetObservedDeckTop(byte player)
+        {
+            if (player < _observedDeckTop.Length) _observedDeckTop[player] = default;
+            if (_observedTopSort.Player == player) _observedTopSort = default;
+        }
+
         private void TrackOpposingHandDeparture(byte owner, uint code, uint destination, uint position)
         {
             if (owner >= 2 || _knownOpponentHands[1 - owner] is not { Count: > 0 } known) return;
@@ -952,6 +992,12 @@ namespace YGOPortable.Core
             ref (BattleComparisonValue? Attacker, BattleComparisonValue? Defender) comparison, ref CardMoveEvent firstSwapMove,
             ref Dictionary<(byte Controller, uint Location, uint Sequence), LiveCardState> positionReadouts)
         {
+            if (msgType is YgoConstants.MSG_RETRY or YgoConstants.MSG_NEW_TURN or YgoConstants.MSG_SWAP_GRAVE_DECK or
+                YgoConstants.MSG_REVERSE_DECK or YgoConstants.MSG_DECK_TOP)
+            {
+                Array.Clear(_observedDeckTop, 0, _observedDeckTop.Length);
+                _observedTopSort = default;
+            }
             if (_speculatingPlayer >= 0 && msgType is YgoConstants.MSG_CONFIRM_DECKTOP or YgoConstants.MSG_DECK_TOP or
                 YgoConstants.MSG_CONFIRM_EXTRATOP or YgoConstants.MSG_RANDOM_SELECTED or YgoConstants.MSG_TOSS_COIN or
                 YgoConstants.MSG_TOSS_DICE)
@@ -1020,6 +1066,7 @@ namespace YGOPortable.Core
                 case YgoConstants.MSG_DRAW:
                 {
                     byte p = br.ReadByte();
+                    ForgetObservedDeckTop(p);
                     // The planner uses only the opponent's hand size and skips their optional chains.
                     if (_speculatingPlayer >= 0 && !SpeculationPassedTurnLimit &&
                         (_planningTurnLimit < 0 || p == _speculatingPlayer)) SpeculationUncertain = true;
@@ -1167,6 +1214,18 @@ namespace YGOPortable.Core
                         ? presentation : null;
                     if (_speculatingPlayer >= 0 && fLoc == YgoConstants.LOCATION_DECK && tLoc != YgoConstants.LOCATION_DECK &&
                         (fCon != _speculatingPlayer || !_selectedFromDeck.Remove(code))) SpeculationUncertain = true;
+                    if (fLoc == YgoConstants.LOCATION_DECK || tLoc == YgoConstants.LOCATION_DECK)
+                    {
+                        // A submitted top sort is echoed as a fixed number of masked moves into the same deck's top slot.
+                        if (_observedTopSort.Remaining > 0 && code == 0 && fCon == _observedTopSort.Player && tCon == fCon &&
+                            fLoc == YgoConstants.LOCATION_DECK && tLoc == fLoc && tSeq == _observedDeckTop[fCon].DeckCount - 1)
+                            _observedTopSort.Remaining--;
+                        else
+                        {
+                            if (fLoc == YgoConstants.LOCATION_DECK) ForgetObservedDeckTop(fCon);
+                            if (tLoc == YgoConstants.LOCATION_DECK) ForgetObservedDeckTop(tCon);
+                        }
+                    }
                     _confirmedCards.Remove((fCon, fLoc, fSeq, code));
                     if (fLoc == YgoConstants.LOCATION_HAND && (tLoc != fLoc || tCon != fCon))
                         TrackOpposingHandDeparture(fCon, code, tLoc, tPos);
@@ -1202,6 +1261,8 @@ namespace YGOPortable.Core
                 {
                     var first = ReadLocIntoItem(br, br.ReadUInt32());
                     var second = ReadLocIntoItem(br, br.ReadUInt32());
+                    if (first.location == YgoConstants.LOCATION_DECK) ForgetObservedDeckTop(first.controller);
+                    if (second.location == YgoConstants.LOCATION_DECK) ForgetObservedDeckTop(second.controller);
                     _confirmedCards.Remove((first.controller, first.location, first.sequence, first.code));
                     _confirmedCards.Remove((second.controller, second.location, second.sequence, second.code));
                     if (first.controller != second.controller || first.location != second.location)
@@ -1297,6 +1358,7 @@ namespace YGOPortable.Core
                 case YgoConstants.MSG_SHUFFLE_EXTRA:
                 {
                     byte player = br.ReadByte();
+                    if (msgType == YgoConstants.MSG_SHUFFLE_DECK) ForgetObservedDeckTop(player);
                     uint location = msgType == YgoConstants.MSG_SHUFFLE_HAND ? YgoConstants.LOCATION_HAND
                         : msgType == YgoConstants.MSG_SHUFFLE_DECK ? YgoConstants.LOCATION_DECK : YgoConstants.LOCATION_EXTRA;
                     if (_confirmedCards.Count != 0)
@@ -1315,6 +1377,7 @@ namespace YGOPortable.Core
                 case YgoConstants.MSG_TAG_SWAP:
                 {
                     byte player = br.ReadByte();
+                    ForgetObservedDeckTop(player);
                     if (player < 2) _knownOpponentHands[1 - player]?.Clear();
                     break;
                 }
