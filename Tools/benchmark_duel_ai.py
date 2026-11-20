@@ -407,13 +407,31 @@ def candidate_styles(summary):
     return styles
 
 
+def first_replay_difference(before, after):
+    old, new = before.get('replay'), after.get('replay')
+    if not old or not new:
+        return 'unavailable', None
+    prompt_fields = ('turn', 'phase', 'player', 'message', 'hint')
+    for step, (prior, current) in enumerate(zip(old, new)):
+        old_prompt = tuple(prior[field] for field in prompt_fields)
+        new_prompt = tuple(current[field] for field in prompt_fields)
+        if old_prompt != new_prompt:
+            return 'differentPrompt', step
+        if prior['answer'] != current['answer']:
+            return ('candidate' if prior['player'] == before['candidate'] else 'reference'), step
+    if len(old) != len(new):
+        return 'differentLength', min(len(old), len(new))
+    return 'identical', None
+
+
 def stage_audit(stage, previous, matches, summary, manifest):
     before = json.loads((previous / 'summary.json').read_bytes())
     if before.get('opponent', 'Baseline-v1') != 'Baseline-v1' or before.get('baselineCommit') != BASELINE_V1 or \
             summary['baselineCommit'] != BASELINE_V1 or \
             before.get('baselineManifestSha256') != summary['baselineManifestSha256']:
         raise ValueError('Adoption stages require both versions measured against the same pinned Baseline-v1.')
-    prior_source = json.loads((previous / 'candidate-source-0.json').read_bytes())
+    prior_manifest = (previous / 'candidate-source-0.json').read_bytes()
+    prior_source = json.loads(prior_manifest)
     current_source = json.loads(manifest)
     def measurement(source):
         return {path: digest for path, digest in source.items() if path.startswith('Assets/Scripts/Core/') or
@@ -430,6 +448,10 @@ def stage_audit(stage, previous, matches, summary, manifest):
         raise ValueError('Adoption stages require identical, complete seat-swapped fixtures.')
 
     differences = Counter()
+    first_differences = Counter()
+    changed_winners = Counter()
+    changed_openings = Counter()
+    replay_examples = []
     def win_points(record):
         return .5 if record['winner'] == 2 else int(record['winner'] == record['candidate'])
 
@@ -437,7 +459,22 @@ def stage_audit(stage, previous, matches, summary, manifest):
         prior = original[key]
         if game['era'] != prior['era'] or [side['deck'] for side in game['sides']] != [side['deck'] for side in prior['sides']]:
             raise ValueError(f'Adoption fixture changed: {key}')
+        if [side['initial'] for side in game['sides']] != [side['initial'] for side in prior['sides']]:
+            raise ValueError(f'Opening hands changed between adoption runs: {key}')
         differences[key[:2]] += win_points(game) - win_points(prior)
+        first, step = first_replay_difference(prior, game)
+        first_differences[first] += 1
+        winner_changed = prior['winner'] != game['winner']
+        old_side, new_side = prior['sides'][key[2]], game['sides'][key[2]]
+        opening_changed = (old_side['methodReached'], old_side['aceReached']) != (new_side['methodReached'], new_side['aceReached'])
+        if winner_changed:
+            changed_winners[first] += 1
+        if opening_changed:
+            changed_openings[first] += 1
+        if winner_changed or opening_changed:
+            replay_examples.append({'matchup': key[0], 'seed': key[1], 'candidateSeat': key[2],
+                                    'firstDifference': first, 'step': step, 'winnerChanged': winner_changed,
+                                    'openingChanged': opening_changed})
     positive = sum(delta > 0 for delta in differences.values())
     negative = sum(delta < 0 for delta in differences.values())
     informative = positive + negative
@@ -479,10 +516,18 @@ def stage_audit(stage, previous, matches, summary, manifest):
                   after_time['meanOrdinaryDecisionMs'] <= 100 and after_time['slowestOrdinaryMs'] <= 300 and
                   0 < after_time['maxPlanMs'] <= 1000,
     }
+    replay_comparison = {
+        'identicalCandidateInputs': manifest == prior_manifest and
+                                    before['candidatePolicySha256'] == summary['candidatePolicySha256'],
+        'firstDifferences': dict(first_differences),
+        'changedWinners': dict(changed_winners),
+        'changedOpenings': dict(changed_openings),
+        'changedFixtures': sorted(replay_examples, key=lambda item: (item['matchup'], item['seed'], item['candidateSeat'])),
+    }
     return {'stage': stage, 'checks': checks, 'accepted': all(checks.values()),
             'pairedOneSidedP': p_value, 'improvedPairs': positive, 'regressedPairs': negative,
             'previousSourceManifestSha256': before['candidateSourceManifestSha256'],
-            'previousPolicySha256': before['candidatePolicySha256']}
+            'previousPolicySha256': before['candidatePolicySha256'], 'replayComparison': replay_comparison}
 
 
 def main():
