@@ -69,9 +69,17 @@ namespace YGOPortable.Editor
 
             internal bool PreservesLockResults(Results reference)
             {
-                int index = (int)DuelDeckStyle.Lock;
-                return styleGames[index] == reference.styleGames[index] && stylePoints[index] >= reference.stylePoints[index] &&
+                return PreservesStyleWins(reference, DuelDeckStyle.Lock) &&
                     lockSurvival >= reference.lockSurvival && lockKeys >= reference.lockKeys && lockDraws >= reference.lockDraws;
+            }
+
+            internal bool PreservesControlResults(Results reference) =>
+                PreservesStyleWins(reference, DuelDeckStyle.Control) && control >= reference.control;
+
+            private bool PreservesStyleWins(Results reference, DuelDeckStyle style)
+            {
+                int index = (int)style;
+                return styleGames[index] == reference.styleGames[index] && stylePoints[index] >= reference.stylePoints[index];
             }
 
             internal string LockSummary()
@@ -133,7 +141,7 @@ namespace YGOPortable.Editor
                     if (!ReferenceEquals(stylePolicy, existingPolicy))
                         candidatesList.Add((stylePolicy, Evaluate(stylePolicy, validation, existingPolicy)));
                 }
-                var linkPolicy = LinkComboPolicy.LoadIncluded();
+                var linkPolicy = LinkComboPolicy.LoadIncluded() ?? throw new InvalidOperationException("Missing the Link AI model.");
                 var plannerFixtures = CreateFixtures(trainingDecks, 18, 782449);
                 var shortlist = candidatesList.OrderByDescending(entry => entry.results.Objective).Take(3)
                     .Select(entry => entry.policy).ToList();
@@ -145,16 +153,22 @@ namespace YGOPortable.Editor
                 Debug.Log($"[AI TRAIN] Selected {best.policy.EnabledDecisions} after {trainingGames} games with {trainingDecks.Length} training decks. Planner validation against the included policy {best.results}");
 
                 var test = CreateFixtures(testDecks, TestPairs, 559236);
-                var versusPrevious = Evaluate(best.policy, test, existingPolicy);
-                var versusRules = Evaluate(best.policy, test, null);
-                var rulesVersusPrevious = Evaluate(null, test, existingPolicy);
+                var included = Evaluate(existingPolicy, test, existingPolicy, linkPolicy);
+                var versusPrevious = Evaluate(best.policy, test, existingPolicy, linkPolicy);
+                var versusRules = Evaluate(best.policy, test, null, linkPolicy);
+                var rulesVersusPrevious = Evaluate(null, test, existingPolicy, linkPolicy);
+                bool controlPreserved = versusPrevious.PreservesControlResults(included);
+                bool lockPreserved = versusPrevious.PreservesLockResults(included);
+                Debug.Log($"[AI EVAL] Held-out included policy {included.StyleSummary()}, {included.LockSummary()}");
                 Debug.Log($"[AI EVAL] Held-out vs previous AI {versusPrevious}");
                 Debug.Log($"[AI EVAL] Held-out style results {versusPrevious.StyleSummary()}");
                 Debug.Log($"[AI EVAL] Held-out Lock {versusPrevious.LockSummary()}");
+                Debug.Log($"[AI EVAL] Held-out preservation with the runtime planner: Control={controlPreserved}, Lock={lockPreserved}");
                 Debug.Log($"[AI EVAL] Held-out vs rules-only AI {versusRules}");
                 Debug.Log($"[AI EVAL] Held-out rules-only vs previous AI {rulesVersusPrevious}");
                 Debug.Log($"[AI TRAIN] Time {elapsed.Elapsed.TotalSeconds:F1}s, native script errors {scriptErrors}");
-                if (scriptErrors != 0 || versusPrevious.Rate < .50 || versusRules.Rate < .45 || versusPrevious.retries != 0 || versusPrevious.capped != 0)
+                if (scriptErrors != 0 || versusPrevious.Rate < .50 || versusRules.Rate < .45 || versusPrevious.retries != 0 ||
+                    versusPrevious.capped != 0 || !controlPreserved || !lockPreserved)
                     throw new InvalidOperationException("The selected policy did not meet the held-out strength check.");
 
                 string assetPath = $"Assets/Resources/{DuelAiPolicy.ResourceName}.json";
