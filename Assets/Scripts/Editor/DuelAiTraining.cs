@@ -19,6 +19,7 @@ namespace YGOPortable.Editor
         private const int ValidationPairs = 64;
         private const int TestPairs = 120;
         private const int StyleObservationTurns = 6;
+        private const int MaxPlannerCandidates = 4;
 
         private static readonly int[] TrainingDeckIds =
         {
@@ -45,15 +46,17 @@ namespace YGOPortable.Editor
         private sealed class Results
         {
             internal int wins, losses, draws, retries, capped;
-            internal double setup, breakthrough, control, lockProgress;
+            internal double setup, breakthrough, control, lockProgress, resource;
+            internal double developmentSetup, developmentBreakthrough;
             internal double lockSurvival, lockKeys, lockDraws;
-            internal readonly int[] styleGames = new int[3];
-            internal readonly double[] stylePoints = new double[3];
+            internal readonly int[] styleGames = new int[DuelDeckStrategy.StyleCount];
+            internal readonly double[] stylePoints = new double[DuelDeckStrategy.StyleCount];
             internal int Games => wins + losses + draws;
             internal double Rate => (wins + .5 * draws) / Games;
-            internal double Objective => Rate + (.10 * setup + .12 * breakthrough + .12 * control + .12 * lockProgress - .5 * retries - .12 * capped) / Games;
+            internal double Objective => Rate + (.10 * setup + .12 * breakthrough + .12 * control + .12 * lockProgress +
+                .12 * resource - .5 * retries - .12 * capped) / Games;
             public override string ToString() => $"{wins}W {losses}L {draws}D in {Games} games ({Rate:P1}), setup {2 * setup / Games:F2}, " +
-                $"breakthrough {2 * breakthrough / Games:F2}, control {control / Games:F2}, lock {lockProgress / Games:F2}, " +
+                $"breakthrough {2 * breakthrough / Games:F2}, control {control / Games:F2}, lock {lockProgress / Games:F2}, resource {resource / Games:F2}, " +
                 $"{retries} candidate retries, {capped} capped";
 
             internal string StyleSummary() => string.Join(", ", Enum.GetValues(typeof(DuelDeckStyle)).Cast<DuelDeckStyle>()
@@ -62,8 +65,13 @@ namespace YGOPortable.Editor
             internal double StyleObjective(DuelDeckStyle style)
             {
                 int index = (int)style;
-                double score = style == DuelDeckStyle.Lock ? .35 * stylePoints[index] + lockProgress :
-                    stylePoints[index] + (style == DuelDeckStyle.Control ? .12 * control : 0);
+                double score = style switch
+                {
+                    DuelDeckStyle.Lock => .35 * stylePoints[index] + lockProgress,
+                    DuelDeckStyle.Control => stylePoints[index] + .12 * control,
+                    DuelDeckStyle.Resource => stylePoints[index] + .22 * resource,
+                    _ => stylePoints[index],
+                };
                 return score / Math.Max(1, styleGames[index]);
             }
 
@@ -75,6 +83,13 @@ namespace YGOPortable.Editor
 
             internal bool PreservesControlResults(Results reference) =>
                 PreservesStyleWins(reference, DuelDeckStyle.Control) && control >= reference.control;
+
+            internal bool PreservesResourceResults(Results reference) =>
+                PreservesStyleWins(reference, DuelDeckStyle.Resource) && resource >= reference.resource;
+
+            internal bool PreservesDevelopmentResults(Results reference) =>
+                PreservesStyleWins(reference, DuelDeckStyle.Development) &&
+                developmentSetup >= reference.developmentSetup && developmentBreakthrough >= reference.developmentBreakthrough;
 
             private bool PreservesStyleWins(Results reference, DuelDeckStyle style)
             {
@@ -124,17 +139,20 @@ namespace YGOPortable.Editor
                     (chains.policy, chains.results),
                     (combined, Evaluate(combined, validation, existingPolicy)),
                 };
+                var individualStyles = new List<(string name, DuelAiPolicy policy)>();
                 var stylePolicy = existingPolicy;
                 if (existingPolicy != null)
                 {
                     var previousResult = Evaluate(existingPolicy, validation, existingPolicy);
                     candidatesList.Add((existingPolicy, previousResult));
-                    foreach (var style in new[] { DuelDeckStyle.Control, DuelDeckStyle.Lock })
+                    foreach (var style in new[] { DuelDeckStyle.Control, DuelDeckStyle.Lock, DuelDeckStyle.Resource })
                     {
                         var specialist = candidatesList.Where(entry => style != DuelDeckStyle.Lock || entry.results.PreservesLockResults(previousResult))
                             .OrderByDescending(entry => entry.results.StyleObjective(style)).First();
                         if (specialist.results.StyleObjective(style) <= previousResult.StyleObjective(style)) continue;
                         stylePolicy = stylePolicy.WithStyle(style, specialist.policy);
+                        individualStyles.Add(($"{style} overlay from {specialist.policy.EnabledDecisions}",
+                            existingPolicy.WithStyle(style, specialist.policy)));
                         Debug.Log($"[AI TRAIN] {style} profile from {specialist.policy.EnabledDecisions}. " +
                             $"Validation {previousResult.StyleObjective(style):F3} -> {specialist.results.StyleObjective(style):F3}");
                     }
@@ -142,33 +160,77 @@ namespace YGOPortable.Editor
                         candidatesList.Add((stylePolicy, Evaluate(stylePolicy, validation, existingPolicy)));
                 }
                 var linkPolicy = LinkComboPolicy.LoadIncluded() ?? throw new InvalidOperationException("Missing the Link AI model.");
-                var plannerFixtures = CreateFixtures(trainingDecks, 18, 782449);
-                var shortlist = candidatesList.OrderByDescending(entry => entry.results.Objective).Take(3)
-                    .Select(entry => entry.policy).ToList();
-                if (stylePolicy != null && !ReferenceEquals(stylePolicy, existingPolicy) && !shortlist.Contains(stylePolicy))
-                    shortlist.Add(stylePolicy);
-                var best = shortlist.Select(policy => (policy, results: Evaluate(policy, plannerFixtures, existingPolicy, linkPolicy)))
-                    .OrderByDescending(entry => entry.results.Objective).First();
+                var plannerFixtures = CreateFixtures(trainingDecks, 18, 782449, alternatePrimarySeat: true);
+                var plannerIncluded = Evaluate(existingPolicy, plannerFixtures, existingPolicy, linkPolicy, "planner included self-play");
+                Debug.Log($"[AI EVAL] Planner included policy: {plannerIncluded.StyleSummary()}, {plannerIncluded.LockSummary()}");
+                if (plannerIncluded.styleGames.Any(games => games == 0))
+                    throw new InvalidOperationException("Runtime-planner validation did not cover all four styles.");
+                var shortlist = new List<(string name, DuelAiPolicy policy)>();
+                var seenPolicies = new HashSet<string>(StringComparer.Ordinal);
+                if (existingPolicy != null) seenPolicies.Add(existingPolicy.ToJson());
+                void AddPlannerCandidate(string name, DuelAiPolicy policy)
+                {
+                    if (policy != null && shortlist.Count < MaxPlannerCandidates && seenPolicies.Add(policy.ToJson()))
+                        shortlist.Add((name, policy));
+                }
+                // Reserve room for isolated profiles, so an aggregate ranking cannot discard their gains.
+                var bestGlobal = candidatesList.Where(entry => !ReferenceEquals(entry.policy, existingPolicy) &&
+                    !ReferenceEquals(entry.policy, stylePolicy)).OrderByDescending(entry => entry.results.Objective).First();
+                AddPlannerCandidate($"global {bestGlobal.policy.EnabledDecisions}", bestGlobal.policy);
+                foreach (var overlay in individualStyles) AddPlannerCandidate(overlay.name, overlay.policy);
+                if (!ReferenceEquals(stylePolicy, existingPolicy)) AddPlannerCandidate("combined style profiles", stylePolicy);
+                foreach (var entry in candidatesList.OrderByDescending(entry => entry.results.Objective))
+                    AddPlannerCandidate($"global {entry.policy.EnabledDecisions}", entry.policy);
+                var retained = new List<(string name, DuelAiPolicy policy, Results results)>();
+                foreach (var entry in shortlist)
+                {
+                    var result = Evaluate(entry.policy, plannerFixtures, existingPolicy, linkPolicy, $"planner {entry.name}");
+                    var changedStyles = Enum.GetValues(typeof(DuelDeckStyle)).Cast<DuelDeckStyle>()
+                        .Where(style => ChangesDecisions(entry.policy, existingPolicy, style)).ToHashSet();
+                    // This shortlist can include a single-style overlay. The independent held-out duels still check every style.
+                    bool development = !changedStyles.Contains(DuelDeckStyle.Development) || result.PreservesDevelopmentResults(plannerIncluded);
+                    bool control = !changedStyles.Contains(DuelDeckStyle.Control) || result.PreservesControlResults(plannerIncluded);
+                    bool locked = !changedStyles.Contains(DuelDeckStyle.Lock) || result.PreservesLockResults(plannerIncluded);
+                    bool resource = !changedStyles.Contains(DuelDeckStyle.Resource) || result.PreservesResourceResults(plannerIncluded);
+                    bool accepted = changedStyles.Count > 0 && result.Rate >= .50 && scriptErrors == 0 && result.retries == 0 && result.capped == 0 &&
+                        development && control && locked && resource;
+                    Debug.Log($"[AI EVAL] Planner candidate {entry.name}: retained={accepted}, {result}, " +
+                        $"{result.StyleSummary()}, changed styles {string.Join(", ", changedStyles)}, " +
+                        $"Development={development}, Control={control}, Lock={locked}, Resource={resource}; " +
+                        $"development setup {result.developmentSetup:F6}/{plannerIncluded.developmentSetup:F6}, " +
+                        $"breakthrough {result.developmentBreakthrough:F6}/{plannerIncluded.developmentBreakthrough:F6}; " +
+                        $"control {result.control:F6}/{plannerIncluded.control:F6}, resource {result.resource:F6}/{plannerIncluded.resource:F6}; " +
+                        $"Lock {result.LockSummary()} vs {plannerIncluded.LockSummary()}");
+                    if (accepted) retained.Add((entry.name, entry.policy, result));
+                }
+                if (retained.Count == 0)
+                    throw new InvalidOperationException("No candidate passed runtime-planner validation.");
+                var best = retained.OrderByDescending(entry => entry.results.Objective).First();
                 const int trainingGames = Generations * PopulationSize * TrainingPairs * 4;
-                Debug.Log($"[AI TRAIN] Selected {best.policy.EnabledDecisions} after {trainingGames} games with {trainingDecks.Length} training decks. Planner validation against the included policy {best.results}");
+                Debug.Log($"[AI TRAIN] Selected {best.name} after {trainingGames} games with {trainingDecks.Length} training decks. Planner validation against the included policy {best.results}");
 
                 var test = CreateFixtures(testDecks, TestPairs, 559236);
-                var included = Evaluate(existingPolicy, test, existingPolicy, linkPolicy);
-                var versusPrevious = Evaluate(best.policy, test, existingPolicy, linkPolicy);
-                var versusRules = Evaluate(best.policy, test, null, linkPolicy);
-                var rulesVersusPrevious = Evaluate(null, test, existingPolicy, linkPolicy);
+                var included = Evaluate(existingPolicy, test, existingPolicy, linkPolicy, "included self-play");
+                var versusPrevious = Evaluate(best.policy, test, existingPolicy, linkPolicy, "candidate vs included");
+                bool developmentPreserved = versusPrevious.PreservesDevelopmentResults(included);
                 bool controlPreserved = versusPrevious.PreservesControlResults(included);
                 bool lockPreserved = versusPrevious.PreservesLockResults(included);
+                bool resourcePreserved = versusPrevious.PreservesResourceResults(included);
                 Debug.Log($"[AI EVAL] Held-out included policy {included.StyleSummary()}, {included.LockSummary()}");
                 Debug.Log($"[AI EVAL] Held-out vs previous AI {versusPrevious}");
                 Debug.Log($"[AI EVAL] Held-out style results {versusPrevious.StyleSummary()}");
                 Debug.Log($"[AI EVAL] Held-out Lock {versusPrevious.LockSummary()}");
-                Debug.Log($"[AI EVAL] Held-out preservation with the runtime planner: Control={controlPreserved}, Lock={lockPreserved}");
+                Debug.Log($"[AI EVAL] Held-out preservation with the runtime planner: Development={developmentPreserved}, Control={controlPreserved}, Lock={lockPreserved}, Resource={resourcePreserved}");
+                if (scriptErrors != 0 || versusPrevious.Rate < .50 || versusPrevious.retries != 0 ||
+                    versusPrevious.capped != 0 || !developmentPreserved || !controlPreserved || !lockPreserved || !resourcePreserved)
+                    throw new InvalidOperationException($"The selected policy did not meet the held-out strength check. Native script errors: {scriptErrors}.");
+
+                var versusRules = Evaluate(best.policy, test, null, linkPolicy, "candidate vs rules-only");
+                var rulesVersusPrevious = Evaluate(null, test, existingPolicy, linkPolicy, "rules-only vs included");
                 Debug.Log($"[AI EVAL] Held-out vs rules-only AI {versusRules}");
                 Debug.Log($"[AI EVAL] Held-out rules-only vs previous AI {rulesVersusPrevious}");
                 Debug.Log($"[AI TRAIN] Time {elapsed.Elapsed.TotalSeconds:F1}s, native script errors {scriptErrors}");
-                if (scriptErrors != 0 || versusPrevious.Rate < .50 || versusRules.Rate < .45 || versusPrevious.retries != 0 ||
-                    versusPrevious.capped != 0 || !controlPreserved || !lockPreserved)
+                if (scriptErrors != 0 || versusRules.Rate < .45 || versusRules.retries != 0 || versusRules.capped != 0)
                     throw new InvalidOperationException("The selected policy did not meet the held-out strength check.");
 
                 string assetPath = $"Assets/Resources/{DuelAiPolicy.ResourceName}.json";
@@ -187,6 +249,14 @@ namespace YGOPortable.Editor
                 if (initialize) YgoNativeBridge.Shutdown();
             }
             if (Application.isBatchMode) EditorApplication.Exit(exitCode);
+        }
+
+        private static bool ChangesDecisions(DuelAiPolicy candidate, DuelAiPolicy reference, DuelDeckStyle style)
+        {
+            var test = candidate.ForStyle(style);
+            var current = reference?.ForStyle(style);
+            return !ReferenceEquals(test, current) && (current == null || test.EnabledDecisions != current.EnabledDecisions ||
+                !test.CopyWeights().SequenceEqual(current.CopyWeights()));
         }
 
         private static (float[] weights, DuelAiPolicy policy, Results results) TrainDecisions(float[] initial,
@@ -234,7 +304,7 @@ namespace YGOPortable.Editor
             return best;
         }
 
-        private static Fixture[] CreateFixtures(PresetDeckInfo[] decks, int count, int shuffleSeed)
+        private static Fixture[] CreateFixtures(PresetDeckInfo[] decks, int count, int shuffleSeed, bool alternatePrimarySeat = false)
         {
             var random = new System.Random(shuffleSeed);
             var orderedDecks = decks.OrderBy(_ => random.Next()).ToArray();
@@ -245,10 +315,13 @@ namespace YGOPortable.Editor
             {
                 var cohort = styles[i % styles.Length];
                 var first = cohort[i / styles.Length % cohort.Length];
+                var second = i % 4 == 0 ? first : orderedDecks[random.Next(orderedDecks.Length)];
+                // Alternate each cohort's primary deck across seats, rather than pinning a style to turn one.
+                if (alternatePrimarySeat && (i / styles.Length % 2) != 0) (first, second) = (second, first);
                 fixtures[i] = new Fixture
                 {
                     first = first,
-                    second = i % 4 == 0 ? first : orderedDecks[random.Next(orderedDecks.Length)],
+                    second = second,
                     seed = Enumerable.Range(0, 4).Select(_ => (ulong)random.Next(1, int.MaxValue)).ToArray(),
                 };
             }
@@ -266,9 +339,13 @@ namespace YGOPortable.Editor
             return candidate;
         }
 
-        private static Results Evaluate(DuelAiPolicy policy, Fixture[] fixtures, DuelAiPolicy referencePolicy, LinkComboPolicy links = null)
+        private static Results Evaluate(DuelAiPolicy policy, Fixture[] fixtures, DuelAiPolicy referencePolicy,
+            LinkComboPolicy links = null, string stage = null)
         {
             var result = new Results();
+            var clock = stage == null ? null : Stopwatch.StartNew();
+            int completed = 0;
+            if (clock != null) Debug.Log($"[AI EVAL] Starting {stage}: {fixtures.Length} paired fixtures.");
             foreach (var match in fixtures)
             {
                 // The same shuffled seats are played with the candidate on each side to cancel deck and turn-order bias.
@@ -320,11 +397,17 @@ namespace YGOPortable.Editor
                         if (turn == openingTurn && turnEnded && opposingLpAtMain > 0)
                         {
                             double board = Math.Tanh(ComboSearch.BoardValue(duel, (byte)candidateSeat, canBattle: false) / 7);
-                            if (candidateSeat == 0) result.setup += board;
+                            if (candidateSeat == 0)
+                            {
+                                result.setup += board;
+                                if (style == DuelDeckStyle.Development) result.developmentSetup += board;
+                            }
                             else
                             {
                                 double damage = Math.Clamp((opposingLpAtMain - duel.Players[0].lp) / (double)opposingLpAtMain, 0, 1);
-                                result.breakthrough += duel.IsFinished && duel.Winner == candidateSeat ? 1 : .55 * damage + .45 * board;
+                                double breakthrough = duel.IsFinished && duel.Winner == candidateSeat ? 1 : .55 * damage + .45 * board;
+                                result.breakthrough += breakthrough;
+                                if (style == DuelDeckStyle.Development) result.developmentBreakthrough += breakthrough;
                             }
                         }
                         if (!turnEnded || observedTurns >= StyleObservationTurns || style == DuelDeckStyle.Development) continue;
@@ -336,6 +419,13 @@ namespace YGOPortable.Editor
                             int setDisruption = own.szone.Count(card => card != null && !card.IsFaceUp &&
                                 CardDatabase.Get(card.code) is CardInfo info && LinkComboPolicy.IsInteractive(info));
                             styleProgress += .45 * advantage + .25 * Math.Min(3, setDisruption) / 3;
+                            observedTurns++;
+                        }
+                        if (style == DuelDeckStyle.Resource && turnPlayer == candidateSeat)
+                        {
+                            var rival = duel.Players[1 - candidateSeat];
+                            styleProgress += Math.Tanh((DuelDeckStrategy.ResourcePosition(duel, (byte)candidateSeat) +
+                                .30 * (AvailableCards(own) - AvailableCards(rival))) / 3);
                             observedTurns++;
                         }
                         if (style == DuelDeckStyle.Lock && turnPlayer != candidateSeat)
@@ -353,6 +443,7 @@ namespace YGOPortable.Editor
 
                     if (!duel.IsFinished) result.capped++;
                     if (style == DuelDeckStyle.Control && observedTurns > 0) result.control += styleProgress / observedTurns;
+                    if (style == DuelDeckStyle.Resource && observedTurns > 0) result.resource += styleProgress / observedTurns;
                     if (style == DuelDeckStyle.Lock)
                     {
                         // A loss on the opponent's turn must not keep an earlier full-life score.
@@ -387,6 +478,10 @@ namespace YGOPortable.Editor
                     }
                     else result.losses++;
                 }
+                completed++;
+                if (clock != null && (completed % 8 == 0 || completed == fixtures.Length))
+                    Debug.Log($"[AI EVAL] {stage}: {completed}/{fixtures.Length} pairs, " +
+                        $"last decks {match.first.id}/{match.second.id}, seed {match.seed[0]}, {result}, {clock.Elapsed.TotalSeconds:F1}s");
             }
             return result;
         }

@@ -10,7 +10,7 @@ namespace YGOPortable.AI
     {
         internal const string ResourceName = "DuelAiPolicy";
         private const int Version = 2;
-        private const int StyleCount = 3;
+        private const int StyleCount = DuelDeckStrategy.StyleCount;
         private const uint Development = (1u << 4) | (1u << 5) | (1u << 6) | (1u << 14) | (1u << 18);
         private const uint Disruption = (1u << 0) | (1u << 1) | (1u << 2) | (1u << 3) | (1u << 8) | (1u << 13);
         private const uint Negation = 1u << 8;
@@ -189,6 +189,8 @@ namespace YGOPortable.AI
                         if ((flags & Disruption) != 0) score += Weight(Feature.ActivateControl) + threat * Weight(Feature.ActivateThreat);
                         if (style == DuelDeckStyle.Lock && ((flags & (1u << 4)) != 0 || DuelDeckStrategy.IsKeyPiece(item.code)))
                             score += 1.25f;
+                        if (style == DuelDeckStyle.Resource && card?.IsSpell == true && (flags & Development) != 0)
+                            score += .8f;
                         if (score <= 0 && prompt.canEp) continue;
                     }
                     else

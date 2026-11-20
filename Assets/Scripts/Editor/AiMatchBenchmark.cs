@@ -36,11 +36,14 @@ namespace YGOPortable.Editor
         };
         private static readonly (string Era, int FirstDeck, int SecondDeck, uint Method)[] StyleMatchups =
         {
-            ("Trap/Deck-out", 20672, 20673, 0),
+            ("Control/Runick", 20672, 20673, 0),
             ("Trap/Lock", 20679, 20675, 0),
             ("Burn/Exodia", 52150, 50964, 0),
             ("Development/Destiny Board", 51199, 51029, 0),
             ("Burn/Millennium", 52150, 50961, 0),
+            ("Sky Striker/Development", 20687, 20686, YgoConstants.SUMMON_TYPE_LINK),
+            ("Sky Striker/Control", 20687, 20682, YgoConstants.SUMMON_TYPE_LINK),
+            ("DM/Ritual", 51049, 51954, YgoConstants.SUMMON_TYPE_RITUAL),
         };
 
         internal readonly struct Pilot
@@ -83,6 +86,7 @@ namespace YGOPortable.Editor
         {
             public int deck, level, decisions, branches, chosenAlternatives, retries, endTurns, openings, threatsSpent, lethalMisses;
             public int exposedAttackers, selfDestruction, wastedHandtraps;
+            public int equipRuleLosses, selfDestructionWithoutEquipRuleLoss;
             public bool reachedMain, methodAvailable, methodReached, aceReached;
             public uint method;
             public uint[] initial;
@@ -170,7 +174,11 @@ namespace YGOPortable.Editor
                 bool captureReplays = Environment.GetEnvironmentVariable("YGO_BENCH_CAPTURE_REPLAYS") == "1";
                 string fixture = Environment.GetEnvironmentVariable("YGO_BENCH_FIXTURE");
                 var matchups = styleSuite ? StyleMatchups : Matchups;
-                if (styleSuite) VerifyDeckStyles(decks);
+                if (styleSuite)
+                {
+                    VerifyDeckStyles(decks);
+                    VerifyResourceStrategy(decks, general, links);
+                }
                 bool referenceOnly = Environment.GetEnvironmentVariable("YGO_BENCH_REFERENCE_ONLY") == "1";
                 Pilot Candidate(int level)
                 {
@@ -804,7 +812,7 @@ namespace YGOPortable.Editor
             throw new InvalidOperationException("Could not find the opening hands for the Rescue Rabbit response test.");
         }
 
-        private static void VerifyNormalSetUnderPressure()
+        internal static void VerifyNormalSetUnderPressure()
         {
             const uint sparkman = 20721928, gazelle = 26889158;
             using var duel = new DuelSession(recordPlanningReplay: true);
@@ -845,8 +853,9 @@ namespace YGOPortable.Editor
             {
                 (51199, DuelDeckStyle.Development), (51439, DuelDeckStyle.Development),
                 (20672, DuelDeckStyle.Control), (20679, DuelDeckStyle.Control), (20682, DuelDeckStyle.Control),
-                (20675, DuelDeckStyle.Lock), (20673, DuelDeckStyle.Lock), (52150, DuelDeckStyle.Lock), (50961, DuelDeckStyle.Lock),
+                (20675, DuelDeckStyle.Lock), (52150, DuelDeckStyle.Lock), (50961, DuelDeckStyle.Lock),
                 (50964, DuelDeckStyle.Lock), (51029, DuelDeckStyle.Lock),
+                (20673, DuelDeckStyle.Resource), (20687, DuelDeckStyle.Resource),
             };
             foreach (var (id, expected) in cases)
             {
@@ -855,6 +864,75 @@ namespace YGOPortable.Editor
                 if (actual != expected) throw new InvalidOperationException($"Deck {id} should play as {expected}, got {actual}.");
                 Debug.Log($"[AI STYLE] {id} {deck.title}: {actual}");
             }
+        }
+
+        private static void VerifyResourceStrategy(Dictionary<int, PresetDeckInfo> decks, DuelAiPolicy general, LinkComboPolicy links)
+        {
+            const uint widowAnchor = 98338152, sparkman = 20721928, kagari = 63288573;
+            var opponent = Enumerable.Repeat(sparkman, 40).ToArray();
+            var skyStriker = Enumerable.Repeat(DuelDeckStrategy.Engage, 10).Concat(Enumerable.Repeat(widowAnchor, 10))
+                .Concat(Enumerable.Repeat(sparkman, 20)).ToArray();
+            var empty = Array.Empty<uint>();
+            using var striker = YgoProjectBuilder.StartSeedMatching("Sky Striker space", skyStriker, new[] { kagari }, opponent, empty, true,
+                duel => duel.ActivePrompt is { messageType: YgoConstants.MSG_SELECT_IDLECMD } prompt &&
+                    prompt.activatable.Any(action => action.code == DuelDeckStrategy.Engage) && prompt.summonable.Any(action => action.code == sparkman));
+            var pilot = new TacticalAI(general, links, searchCombos: true);
+            var opening = striker.ActivePrompt;
+            int response = BitConverter.ToInt32(pilot.ComputeResponse(striker, opening), 0);
+            if ((response & 0xffff) != 5 || opening.activatable[response >> 16].code != DuelDeckStrategy.Engage)
+                throw new InvalidOperationException("Sky Striker must resolve its legal search before filling the main monster zone.");
+            striker.SubmitResponseInt(response);
+            for (int i = 0; i < 16 && striker.ActivePrompt is { } next && next.messageType != YgoConstants.MSG_SELECT_IDLECMD; i++)
+                striker.SubmitResponse(pilot.ComputeResponse(striker, next));
+            var pending = striker.ActivePrompt;
+            if (striker.RetryCount != 0 || pending?.messageType != YgoConstants.MSG_SELECT_IDLECMD ||
+                !striker.Players[0].grave.Any(card => card.code == DuelDeckStrategy.Engage) ||
+                striker.Players[0].mzone.Take(5).Any(card => card != null) ||
+                !striker.Players[0].hand.Any(card => card.code == widowAnchor) ||
+                !pending.summonable.Any(action => action.code == sparkman) ||
+                DuelDeckStrategy.CanFillMainMonsterZone(striker, pending, pending.summonable.First(action => action.code == sparkman), setting: false))
+                throw new InvalidOperationException("Sky Striker did not protect the main monster zone needed by Widow Anchor.");
+            var place = new DuelPrompt { playerId = 0, messageType = YgoConstants.MSG_SELECT_PLACE, min = 1, placeFlag = ~0x44u };
+            if (!pilot.ComputeResponse(striker, place).SequenceEqual(new byte[] { 0, (byte)YgoConstants.LOCATION_MZONE, 6 }))
+                throw new InvalidOperationException("Sky Striker did not choose a legal Extra Monster Zone.");
+
+            var runick = decks[20673];
+            using var fountain = YgoProjectBuilder.StartSeedMatching("Runick Fountain", runick.main, runick.extra, opponent, empty, true,
+                duel => duel.ActivePrompt is { messageType: YgoConstants.MSG_SELECT_IDLECMD } prompt &&
+                    prompt.activatable.Any(action => action.code == DuelDeckStrategy.RunickFountain) &&
+                    !prompt.activatable.Any(action => action.code is 55144522 or 79571449));
+            int runickResponse = BitConverter.ToInt32(
+                new TacticalAI(general, links, searchCombos: true).ComputeResponse(fountain, fountain.ActivePrompt), 0);
+            if ((runickResponse & 0xffff) != 5 || fountain.ActivePrompt.activatable[runickResponse >> 16].code != DuelDeckStrategy.RunickFountain)
+                throw new InvalidOperationException("Runick did not prioritize the legal Fountain activation.");
+            fountain.SubmitResponseInt(runickResponse);
+            if (fountain.RetryCount != 0 || fountain.Players[0].szone[YgoConstants.FIELD_ZONE_SEQUENCE]?.code != DuelDeckStrategy.RunickFountain)
+                throw new InvalidOperationException("Runick Fountain did not resolve as a field spell.");
+
+            const uint hugin = 55990317, geri = 28373620;
+            const ulong summonOption = ((ulong)DuelDeckStrategy.RunickTip << 20) | 1;
+            var runickSearch = Enumerable.Repeat(DuelDeckStrategy.RunickFountain, 3).Concat(Enumerable.Repeat(DuelDeckStrategy.RunickTip, 20))
+                .Concat(Enumerable.Repeat(sparkman, 17)).ToArray();
+            using var fusion = YgoProjectBuilder.StartSeedMatching("Runick Extra Deck", runickSearch, new[] { geri, hugin }, opponent, empty, true,
+                duel =>
+                {
+                    YgoProjectBuilder.DriveUntilIdle(duel, new TacticalAI(), next =>
+                        next.messageType == YgoConstants.MSG_SELECT_CHAIN && !next.forced ? BitConverter.GetBytes(-1) : null);
+                    return duel.ActivePrompt?.activatable.Any(action => action.code == DuelDeckStrategy.RunickTip) == true &&
+                        !duel.Players[0].hand.Any(card => card.code == DuelDeckStrategy.RunickFountain);
+                });
+            var selectionPilot = new TacticalAI(general, links, searchCombos: true);
+            int activation = fusion.ActivePrompt.activatable.FindIndex(action => action.code == DuelDeckStrategy.RunickTip);
+            fusion.SubmitResponseInt((activation << 16) | 5);
+            for (int i = 0; i < 30 && fusion.ActivePrompt is { } next && next.messageType != YgoConstants.MSG_SELECT_IDLECMD; i++)
+            {
+                int summon = next.messageType == YgoConstants.MSG_SELECT_OPTION ? next.options.IndexOf(summonOption) : -1;
+                fusion.SubmitResponse(summon >= 0 ? BitConverter.GetBytes(summon) : selectionPilot.ComputeResponse(fusion, next));
+            }
+            if (fusion.RetryCount != 0 || !fusion.Players[0].mzone.Skip(5).Any(card => card?.code == hugin) ||
+                !fusion.Players[0].hand.Any(card => card.code == DuelDeckStrategy.RunickFountain))
+                throw new InvalidOperationException("Runick did not select Hugin in an Extra Monster Zone and search the available Fountain.");
+            Debug.Log("[AI RESOURCE] Native Sky Striker and Runick searches, Fountain, and Extra Monster Zone choices passed.");
         }
 
         private static Match Play(int matchup, int seed, int candidate, string era, uint method,
@@ -869,6 +947,7 @@ namespace YGOPortable.Editor
             var failures = new[] { new List<string>(), new List<string>() };
             var defensiveOptions = new[] { new HashSet<(uint Sequence, uint Code)>(), new HashSet<(uint Sequence, uint Code)>() };
             var destroyed = new int[2];
+            var lostEquipTargets = new int[2];
             var exposed = new[] { new Dictionary<(uint, uint), string>(), new Dictionary<(uint, uint), string>() };
             var selectedDefense = new[] { new List<(uint Code, string Alternative)>(), new List<(uint Code, string Alternative)>() };
             var endRepositions = new[] { new HashSet<(uint, uint)>(), new HashSet<(uint, uint)>() };
@@ -929,7 +1008,18 @@ namespace YGOPortable.Editor
                 if ((move.reason & YgoConstants.REASON_DESTROY) != 0 &&
                     move.fromLoc is YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE &&
                     duel.SelectionChainLink is { } effect && !effect.negated)
-                    destroyed[effect.triggerPlayer] += move.fromCon == effect.triggerPlayer ? 1 : -1;
+                {
+                    byte owner = effect.triggerPlayer;
+                    bool own = move.fromCon == owner;
+                    destroyed[owner] += own ? 1 : -1;
+                    const uint equipRuleLoss = YgoConstants.REASON_LOST_TARGET | YgoConstants.REASON_RULE;
+                    if (own && move.fromLoc == YgoConstants.LOCATION_SZONE &&
+                        (move.reason & (equipRuleLoss | YgoConstants.REASON_EFFECT)) == equipRuleLoss)
+                    {
+                        lostEquipTargets[owner]++;
+                        result.sides[owner].equipRuleLosses++;
+                    }
+                }
             };
             duel.OnFieldArrivalBoundary += () =>
             {
@@ -1057,12 +1147,14 @@ namespace YGOPortable.Editor
 
                 double beforeBoard = Board(own);
                 Array.Clear(destroyed, 0, destroyed.Length);
+                Array.Clear(lostEquipTargets, 0, lostEquipTargets.Length);
                 duel.SubmitResponse(response);
                 side.retries += duel.RetryCount - before;
                 if (duel.RetryCount != before) Failure(player, "engine_retry", $"prompt={prompt.messageType}, hint={prompt.SelectionHint}, answer={BitConverter.ToString(response)}");
                 if (destroyed[player] > 0 && Board(duel.Players[player]) + 1 < beforeBoard && !duel.IsFinished)
                 {
                     side.selfDestruction++;
+                    if (destroyed[player] > lostEquipTargets[player]) side.selfDestructionWithoutEquipRuleLoss++;
                     Failure(player, "self_destruction", $"own net field losses={destroyed[player]}, choice={card?.code ?? 0}");
                 }
                 if (duel.TurnNumber != turn || duel.IsFinished)
@@ -1072,7 +1164,12 @@ namespace YGOPortable.Editor
                     double board = Board(field);
                     ending.boardTotal += board;
                     ending.endTurns++;
-                    if (turn <= 2) ending.earlyBoard = board;
+                    if (turn <= 2)
+                    {
+                        ending.earlyBoard = board;
+                        ending.aceReached |= field.szone.Any(card => card?.code == presets[turnPlayer].sigCard &&
+                            card.IsFaceUp && !card.effectsDisabled);
+                    }
                     exposedNextTurn.Clear();
                     if (!duel.IsFinished)
                     {
@@ -1248,9 +1345,7 @@ namespace YGOPortable.Editor
                 if (info.IsMonster) value += Math.Max(card.attack, card.defense) / 8000.0;
                 if (card.effectsDisabled) continue;
                 uint flags = info.DeckEffectCategories;
-                if (info.desc?.Contains("효과의 대상이 되지", StringComparison.Ordinal) == true ||
-                    info.desc?.Contains("효과로는 파괴되지", StringComparison.Ordinal) == true ||
-                    info.desc?.Contains("효과를 받지 않는다", StringComparison.Ordinal) == true) value += .55;
+                if (ComboSearch.HasPassiveProtection(info)) value += .55;
                 if ((flags & Negation) != 0) value += 1.6;
                 else if (LinkComboPolicy.IsInteractive(info)) value += .75;
             }

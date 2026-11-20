@@ -20,6 +20,9 @@ STREAMING = (
     'duel_effect_labels_ko.tsv', 'opponents_db.json', 'opponent_deck_levels.json',
 )
 BLUNDERS = ('exposedAttackers', 'selfDestruction', 'lethalMisses', 'wastedHandtraps', 'retries')
+FIRST_TURN_DRAW_HANDTRAP_ACTIONS = frozenset(
+    f'1/11:5:{code}' for code in (23434538, 42141493, 84192580, 87126721)
+)
 
 
 def write(path, data):
@@ -101,6 +104,13 @@ namespace YGOPortable.Editor
 def run_worker(index, arguments, editor, frozen, output):
     worker = arguments.workspace / f'worker-{index}'
     prepare(worker, frozen, arguments.candidate_policies)
+    paths = [
+        *sorted((worker / 'Assets/Scripts/AI').glob('*.cs')),
+        *sorted((worker / 'Assets/Scripts/Core').glob('*.cs')),
+        worker / 'Assets/Scripts/Editor/AiMatchBenchmark.cs',
+    ]
+    hashes = {path.relative_to(worker).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest() for path in paths}
+    write(output / f'candidate-source-{index}.json', (json.dumps(hashes, indent=2) + '\n').encode())
     report = output / f'matches-{index}.jsonl'
     log = output / f'unity-{index}.log'
     env = dict(os.environ, YGO_BENCH_REPORT=str(report), YGO_BENCH_SEEDS=str(arguments.seeds),
@@ -115,7 +125,7 @@ def run_worker(index, arguments, editor, frozen, output):
                YGO_BENCH_INSPECT=str(arguments.inspect_step),
                YGO_BENCH_TRY_RESPONSE=arguments.try_response or '',
                YGO_BENCH_AUDIT_BATTLE='1' if arguments.audit_battle else '0')
-    proc = subprocess.Popen([str(editor), '-batchmode', '-nographics', '-job-worker-count', '2',
+    proc = subprocess.Popen([str(editor), '-batchmode', '-nographics', '-quit', '-job-worker-count', '2',
                              '-projectPath', str(worker), '-logFile', str(log), '-executeMethod',
                              'YGOPortable.Editor.AiMatchBenchmark.Run'], env=env, creationflags=subprocess.CREATE_NO_WINDOW)
     print(f'Unity worker {index} PID {proc.pid}, log {log}', flush=True)
@@ -132,6 +142,9 @@ def summarize(matches):
     examples = {side: {} for side in blunders}
     totals = {side: Counter() for side in blunders}
     exposure_costs = {side: Counter() for side in blunders}
+    destruction_breakdown = {side: Counter() for side in blunders}
+    first_turn_draw_handtraps = dict.fromkeys(blunders, 0)
+    styles = defaultdict(lambda: {side: Counter() for side in blunders})
     paired = Counter()
     for match in matches:
         candidate = match['candidate']
@@ -150,6 +163,12 @@ def summarize(matches):
             role = 'candidate' if seat == candidate else 'baseline'
             for name in BLUNDERS:
                 blunders[role][name] += side[name]
+            first_turn_draw_handtraps[role] += sum(
+                action in FIRST_TURN_DRAW_HANDTRAP_ACTIONS for action in side['earlyActions']
+            )
+            for name in ('equipRuleLosses', 'selfDestructionWithoutEquipRuleLoss'):
+                if name in side:
+                    destruction_breakdown[role][name] += side[name]
             for trace in side.get('exposureTraces', ()):
                 damage = trace.get('damageTaken', 0)
                 exposure_costs[role]['targeted'] += trace.get('targetedNextTurn', False)
@@ -158,6 +177,14 @@ def summarize(matches):
                 exposure_costs[role]['duelsLost'] += trace.get('lostByBattle', False)
             for name in ('decisions', 'decisionMs', 'endTurns', 'boardTotal', 'openings', 'earlyBoard'):
                 totals[role][name] += side[name]
+            style = styles[(side.get('style') or 'Unknown', 'first' if seat == 0 else 'second')][role]
+            if not match.get('openingOnly') and not match['capped'] and winner >= 0:
+                style['games'] += 1
+                style['winPoints'] += .5 if winner == 2 else int(winner == seat)
+            style['openingSuccesses'] += int(side['reachedMain'] and (side['aceReached'] or side['methodReached']))
+            style['openingAttempts'] += int(side['reachedMain'])
+            style['endTurns'] += side['endTurns']
+            style['boardTotal'] += side['boardTotal']
             totals[role]['chosenAlternatives'] += side.get('chosenAlternatives', 0)
             totals[role]['slowestMs'] = max(totals[role]['slowestMs'], side['slowestMs'])
             index = 2 if seat == candidate else 0
@@ -185,11 +212,20 @@ def summarize(matches):
     for data in totals.values():
         data['meanDecisionMs'] = data['decisionMs'] / max(1, data['decisions'])
         data['meanEndBoard'] = data['boardTotal'] / max(1, data['endTurns'])
+    style_report = defaultdict(dict)
+    for (name, turn_order), policies in styles.items():
+        for data in policies.values():
+            data['winRate'] = data['winPoints'] / data['games'] if data['games'] else None
+            data['meanEndBoard'] = data['boardTotal'] / data['endTurns'] if data['endTurns'] else None
+        style_report[name][turn_order] = policies
     return {
         'games': len(matches), 'outcomes': outcomes, 'winRate': wins,
         'gainPercentagePoints': (wins - .5) * 100 if wins is not None else None,
         'pairedOneSidedP': p_value, 'opening': dict(rates), 'blunders': blunders, 'decisionAndBoard': totals,
         'exposureConsequences': exposure_costs,
+        'destructionBreakdown': destruction_breakdown,
+        'firstTurnDrawHandtrapActivationsOutsideChain': first_turn_draw_handtraps,
+        'byStyleAndSeat': dict(style_report),
         'topFailures': {role: [dict(kind=kind, count=count, example=examples[role][kind])
                                for kind, count in counts.most_common(5)] for role, counts in problems.items()},
     }
@@ -223,7 +259,8 @@ def summarize_roster(matches, output, jobs):
 
 
 def acceptance(before, after):
-    if before['games'] != after['games'] or before['opening'].keys() != after['opening'].keys():
+    if (before['games'] != after['games'] or before['opening'].keys() != after['opening'].keys() or
+            before.get('baselineManifestSha256') != after.get('baselineManifestSha256')):
         raise ValueError('Acceptance requires the same fixed suite used for the baseline.')
     opening_gains = {}
     for category, scores in before['opening'].items():
@@ -233,8 +270,11 @@ def acceptance(before, after):
             raise ValueError(f'No comparable openings for {category}.')
         opening_gains[category] = 100 * (successes / total - baseline_successes / baseline_total)
     checks = {
+        'atLeast100MatchesAndSignificantWinGain': after['games'] >= 100 and after['pairedOneSidedP'] < .05,
         'winGainAtLeast8Points': before['winRate'] is not None and after['winRate'] is not None and
                                 after['winRate'] >= .58 and after['winRate'] - before['winRate'] >= .08,
+        'meanEndBoardImproved': after['decisionAndBoard']['candidate']['meanEndBoard'] >
+                                after['decisionAndBoard']['baseline']['meanEndBoard'],
         'everyEraImproved': all(gain > 0 for name, gain in opening_gains.items() if not name.startswith('method-')),
         'noSummonMethodRegressed': all(gain >= 0 for name, gain in opening_gains.items() if name.startswith('method-')),
         'zeroCriticalBlunders': not any(after['blunders']['candidate'].values()),
@@ -268,7 +308,7 @@ def main():
     args = parser.parse_args()
     if not re.fullmatch(r'[\w-]+', args.label) or args.jobs < 1 or args.seeds < 1:
         parser.error('Use a simple run label and positive job/seed counts.')
-    matchups = 5 if args.style_suite else 14
+    matchups = 8 if args.style_suite else 14
     if args.fixture:
         if not re.fullmatch(r'(0|[1-9][0-9]*):(0|[1-9][0-9]*)', args.fixture):
             parser.error('Use MATCHUP:SEED with zero-based indexes, for example 10:21.')
@@ -323,6 +363,9 @@ def main():
             raise RuntimeError('Replay did not verify every requested match.')
         print(f'Verified {len(matches)} exact replay(s): {output}')
         return
+    source_manifests = [(output / f'candidate-source-{index}.json').read_bytes() for index in range(args.jobs)]
+    if any(manifest != source_manifests[0] for manifest in source_manifests[1:]):
+        raise RuntimeError('Benchmark workers used different candidate source files.')
     if args.roster_levels:
         summary = summarize_roster(matches, output, args.jobs)
         write(output / 'summary.json', (json.dumps(summary, ensure_ascii=False, indent=2) + '\n').encode())
@@ -337,6 +380,7 @@ def main():
         raise RuntimeError('Benchmark result is missing fixed fixtures or contains duplicates.')
     summary = summarize(matches)
     summary['baselineManifestSha256'] = hashlib.sha256((frozen / 'manifest.json').read_bytes()).hexdigest()
+    summary['candidateSourceManifestSha256'] = hashlib.sha256(source_manifests[0]).hexdigest()
     first_worker = args.workspace / 'worker-0'
     summary['candidatePolicySha256'] = {
         name: hashlib.sha256((first_worker / 'Assets/Resources' / f'{name}.json').read_bytes()).hexdigest()

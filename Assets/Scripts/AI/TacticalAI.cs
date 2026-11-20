@@ -97,6 +97,9 @@ namespace YGOPortable.AI
             if (prompt == null) return Array.Empty<byte>();
             ResetTurnState(session.TurnNumber);
             if (prompt.messageType != YgoConstants.MSG_ANNOUNCE_CARD) _crossoutDeclaration = null;
+            if (UsesTacticalRules && prompt.messageType == YgoConstants.MSG_SELECT_CARD && prompt.SelectionHint == 551 &&
+                prompt.min == 1 && prompt.max == 1 && DuelTactics.ChooseWidowAnchorTarget(session, prompt) is int anchorTarget)
+                return PackIndexList(new[] { anchorTarget });
             if (_comboSearch?.TakePlannedSelection(session, prompt) is int selected)
             {
                 if (prompt.messageType == YgoConstants.MSG_SELECT_UNSELECT_CARD) _unselectCount++;
@@ -126,6 +129,12 @@ namespace YGOPortable.AI
                     return BitConverter.GetBytes(DecideEffectYesNo(session, prompt));
 
                 case YgoConstants.MSG_SELECT_YESNO:
+                    if (UsesTacticalRules && session.SelectionChainLink is { } source && source.triggerPlayer == prompt.playerId &&
+                        ((source.code is 98338152 or 98338153 && prompt.promptDesc == (((ulong)source.code << 20) | 1)) ||
+                        (source.code == 51227866 && prompt.promptDesc == ((ulong)source.code << 20))) &&
+                        DuelDeckStrategy.ShouldKeepMainMonsterZoneOpen(session, prompt.playerId) &&
+                        DuelCombat.VisibleAttackTotal(session.Players[1 - prompt.playerId]) < session.Players[prompt.playerId].lp)
+                        return BitConverter.GetBytes(0);
                     if (UsesTacticalRules && DuelTactics.ChooseResolutionYesNo(session, prompt) is int answer)
                         return BitConverter.GetBytes(answer);
                     return BitConverter.GetBytes(prompt.IsDirectAttackChoice && _lethalTargetSequence != uint.MaxValue ? 0 : 1);
@@ -235,6 +244,7 @@ namespace YGOPortable.AI
             Add(prompt.summonable, 0);
             foreach (var summon in prompt.summonable)
                 if (DuelTactics.ChooseDefensiveSet(session, prompt, summon, followupUnproven: true, compareWithBattle: true) is int setIndex &&
+                    CanUseMainAction(session, prompt, planLinks, 3, prompt.mSetable[setIndex], projected: true) &&
                     !choices.Any(choice => choice.action == ((setIndex << 16) | 3)))
                     choices.Add(((setIndex << 16) | 3, 510));
             if (prompt.canBp && HasWorthwhileAttack(session, prompt.playerId)) choices.Add((6, 850));
@@ -254,6 +264,10 @@ namespace YGOPortable.AI
                     !DuelTactics.NeedsTributeProjection(session, prompt, item))))) &&
             (command is not (0 or 3) || !UsesTacticalRules || !DuelDeckStrategy.IsExodiaPiece(item.code) ||
                 DuelDeckStrategy.For(session, prompt.playerId) != DuelDeckStyle.Lock) &&
+            (command is not (0 or 3) || !UsesTacticalRules ||
+                DuelDeckStrategy.CanFillMainMonsterZone(session, prompt, item, setting: command == 3)) &&
+            (command != 1 || projected || !UsesTacticalRules || item.location == YgoConstants.LOCATION_EXTRA ||
+                DuelDeckStrategy.CanFillMainMonsterZone(session, prompt, item, setting: false)) &&
             (command != 4 || !UsesTacticalRules || DuelDeckStrategy.CanSetBackrow(session, prompt.playerId, item.code)) &&
             (command != 1 || (CanUseSpecialSummon(session.Players[prompt.playerId], item, planLinks, projected) &&
                 (!UsesTacticalRules || DuelTactics.CanSummonRedDragonSafely(session, prompt, item.code)))) &&
@@ -349,7 +363,8 @@ namespace YGOPortable.AI
             {
                 int index = planned >> 16;
                 if (!_comboProjection && UsesComboPlanning && (planned & 0xffff) == 0 &&
-                    DuelTactics.ChooseDefensiveSet(s, p, p.summonable[index], followupUnproven: true) is int setIndex)
+                    DuelTactics.ChooseDefensiveSet(s, p, p.summonable[index], followupUnproven: true) is int setIndex &&
+                    CanUse(3, p.mSetable[setIndex]))
                     return EncodeIdleAction(s, p, 3, setIndex);
                 return EncodeIdleAction(s, p, planned & 0xffff, planned >> 16);
             }
@@ -373,7 +388,8 @@ namespace YGOPortable.AI
                 int index = selected >> 16;
                 if (command == 6) return StartBattle(s, p);
                 if (UsesTacticalRules && command == 0 &&
-                    DuelTactics.ChooseDefensiveSet(s, p, p.summonable[index], followupUnproven: UsesComboPlanning && !_comboProjection) is int setIndex)
+                    DuelTactics.ChooseDefensiveSet(s, p, p.summonable[index], followupUnproven: UsesComboPlanning && !_comboProjection) is int setIndex &&
+                    CanUse(3, p.mSetable[setIndex]))
                     return EncodeIdleAction(s, p, 3, setIndex);
                 return EncodeIdleAction(s, p, command, index);
             }
@@ -391,17 +407,30 @@ namespace YGOPortable.AI
             bool exposedOpening = session.TurnNumber <= 2 && own.lp > 1000 && own.mzone.All(card => card == null) &&
                 prompt.summonable.Any(card => (CardDatabase.Get(card.code)?.atk ?? 0) <
                     DuelTactics.StrongestAttacker(session.Players[1 - prompt.playerId]));
+            bool canSpendHandtrap = session.TurnNumber <= 2 && prompt.summonable.Any(card => ComboSearch.IsHandDisruption(card.code));
+            bool usableRitualDraw = canSpendHandtrap &&
+                CardDatabase.Get(session.GetObservedOwnDeckTop(prompt.playerId)) is { IsSpell: true } top &&
+                (top.type & YgoConstants.TYPE_RITUAL) != 0 &&
+                own.hand.Any(card => (card.type & YgoConstants.TYPE_RITUAL) != 0 && (card.type & YgoConstants.TYPE_MONSTER) != 0) &&
+                own.mzone.All(card => card == null || card.code == SignatureTurnPlan.MagiciansSouls) &&
+                own.szone.All(card => card == null || card is { code: 47222536, IsFaceUp: true });
             int best = -1, priority = 0;
             for (int i = 0; i < prompt.activatable.Count; i++)
             {
                 var item = prompt.activatable[i];
-                if (item.controller != prompt.playerId || item.location is not (YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_SZONE))
+                bool drawRitual = usableRitualDraw && item.location == YgoConstants.LOCATION_MZONE &&
+                    item.code == SignatureTurnPlan.MagiciansSouls &&
+                    item.description == (((ulong)SignatureTurnPlan.MagiciansSouls << 20) | 1);
+                if (item.controller != prompt.playerId || (!drawRitual && item.location is not (YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_SZONE)))
                     continue;
                 int value = item.code switch
                 {
                     DuelTactics.LightningStorm when DuelTactics.ShouldLeadWithLightningStorm(session, prompt) => 5,
                     PotOfGreed when own.deckCount >= 2 => 4,
                     GracefulCharity when own.deckCount >= 3 => 3,
+                    SignatureTurnPlan.MagiciansSouls when drawRitual => 2,
+                    _ when canSpendHandtrap && CardDatabase.Get(item.code) is { IsSpell: true } ritual &&
+                        (ritual.type & YgoConstants.TYPE_RITUAL) != 0 => 2,
                     // See the result of the search before committing a vulnerable D/D to a Normal Summon or Set.
                     _ when exposedOpening && DddTurnPlan.IsContractSearch(item) => 2,
                     AHeroLives when session.TurnNumber == 1 && own.lp >= 4000 => 2,
@@ -417,6 +446,10 @@ namespace YGOPortable.AI
                 priority = value;
             }
             if (best >= 0) return (best << 16) | 5;
+            if (DuelDeckStrategy.For(session, prompt.playerId) == DuelDeckStyle.Resource &&
+                SignatureTurnPlan.ChooseResourceOpening(session, prompt,
+                    (command, item) => CanUseMainAction(session, prompt, planLinks, command, item)) is int resource)
+                return resource;
             if (session.TurnNumber <= 2 && !DddTurnPlan.IsDddDeck(own) &&
                 DuelDeckStrategy.For(session, prompt.playerId) == DuelDeckStyle.Development)
                 return PendulumTurnPlan.ChooseIdle(session, prompt,
@@ -453,6 +486,7 @@ namespace YGOPortable.AI
                 int bestDef = -1;
                 for (int i = 0; i < p.mSetable.Count; i++)
                 {
+                    if (UsesTacticalRules && !DuelDeckStrategy.CanFillMainMonsterZone(s, p, p.mSetable[i], setting: true)) continue;
                     if (UsesTacticalRules && DuelDeckStrategy.IsExodiaPiece(p.mSetable[i].code) &&
                         MaxOpponentAtk(s, p.playerId) < s.Players[p.playerId].lp) continue;
                     var ci = CardDatabase.Get(p.mSetable[i].code);
@@ -520,7 +554,8 @@ namespace YGOPortable.AI
             };
             if (options == null || index < 0 || index >= options.Count || !canUse(command, options[index])) return null;
             if (command == 0 && UsesTacticalRules && _comboSearch is { ClearsBattleLethal: false } &&
-                DuelTactics.ChooseDefensiveSet(session, prompt, options[index], followupUnproven: true, lethalOnly: true) is int defender)
+                DuelTactics.ChooseDefensiveSet(session, prompt, options[index], followupUnproven: true, lethalOnly: true) is int defender &&
+                canUse(3, prompt.mSetable[defender]))
                 return EncodeIdleAction(session, prompt, 3, defender);
             return EncodeIdleAction(session, prompt, command, index);
         }
@@ -883,6 +918,9 @@ namespace YGOPortable.AI
                 if (target >= 0) return PackIndexList(new[] { target });
             }
 
+            if (UsesTacticalRules && DuelTactics.ChooseResourceCard(s, p) is int resource)
+                return PackIndexList(new[] { resource });
+
             if (p.min == 1 && p.max == 1 &&
                 ((_linkDeck == true ? LinkComboPolicy.ChooseSupport(s, p) : null) ??
                 LinkComboPolicy.ChooseMaterial(s, p, _linkSummon, _linkDeck == true) ??
@@ -1164,6 +1202,9 @@ namespace YGOPortable.AI
             uint avail = ~p.placeFlag;
             byte me = p.playerId;
             byte opp = (byte)(1 - me);
+            if (UsesTacticalRules && needed == 1 && p.messageType == YgoConstants.MSG_SELECT_PLACE && (avail & 0x60) != 0 &&
+                DuelDeckStrategy.For(session, me) == DuelDeckStyle.Resource)
+                return new[] { me, (byte)YgoConstants.LOCATION_MZONE, (byte)((avail & 0x20) != 0 ? 5 : 6) };
             if (_linkDeck == true && session.TurnPlayer == me && needed == 1 && p.messageType == YgoConstants.MSG_SELECT_PLACE &&
                 LinkComboPolicy.ChooseMonsterZone(session.Players[me], avail & 0x7f, _linkSummon) is int zone)
                 return new[] { me, (byte)YgoConstants.LOCATION_MZONE, (byte)zone };

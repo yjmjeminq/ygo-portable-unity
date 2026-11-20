@@ -35,7 +35,7 @@ namespace YGOPortable.AI
 
         // Dark Magician (Yami Yugi)
         private const uint IllusionOfChaos = 12266229;
-        private const uint MagiciansSouls = 97631303;
+        internal const uint MagiciansSouls = 97631303;
         private const uint MagiciansRod = 7084129;
         private const uint DarkMagicalCircle = 47222536;
         private const uint Dragoon = 37818794;
@@ -100,6 +100,36 @@ namespace YGOPortable.AI
         private const uint FirewallDarkfluid = 68934651;
         private const uint FirewallDragon = 5043010;
         private const uint AccesscodeTalker = 86066372;
+
+        internal static int? ChooseResourceOpening(DuelSession session, DuelPrompt prompt, Func<int, SelectableCardItem, bool> canUse)
+        {
+            int best = -1, priority = 0;
+            for (int i = 0; i < prompt.activatable.Count; i++)
+            {
+                var action = prompt.activatable[i];
+                if (action.controller != prompt.playerId || action.location is not (YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_SZONE))
+                    continue;
+                int value = action.code switch
+                {
+                    DuelDeckStrategy.RunickFountain when action.location == YgoConstants.LOCATION_HAND => 4,
+                    DuelDeckStrategy.Engage or 63166096 or 63166097 => 3,
+                    DuelDeckStrategy.RunickTip => 2,
+                    _ when DuelDeckStrategy.RequiresOpenMainZone(action.code) &&
+                        (CardDatabase.Get(action.code)?.type & YgoConstants.TYPE_QUICKPLAY) == 0 => 1,
+                    _ => 0,
+                };
+                if (value <= priority || !canUse(Activate, action)) continue;
+                best = i;
+                priority = value;
+            }
+            if (best >= 0) return (best << 16) | Activate;
+            if (session.TurnNumber != 1) return null;
+
+            int shizuku = prompt.spSummonable.FindIndex(action => action.controller == prompt.playerId &&
+                action.location == YgoConstants.LOCATION_EXTRA && action.code == DuelDeckStrategy.StrikerShizuku &&
+                canUse(SpecialSummon, action));
+            return shizuku >= 0 ? (shizuku << 16) | SpecialSummon : null;
+        }
 
         internal static int? ChooseIdle(DuelSession session, DuelPrompt prompt, Func<int, SelectableCardItem, bool> canUse)
         {
@@ -302,6 +332,17 @@ namespace YGOPortable.AI
 
         internal static int? ChooseCard(DuelSession session, DuelPrompt prompt)
         {
+            const ulong placeInSpellTrapZone = 527;
+            if (prompt.SelectionHint == placeInSpellTrapZone && prompt.min == 1 && prompt.max == 1 &&
+                session.SelectionChainLink is { code: Faris } faris && faris.triggerPlayer == prompt.playerId &&
+                prompt.candidates.All(card => card.controller == prompt.playerId && card.location == YgoConstants.LOCATION_DECK) &&
+                prompt.candidates.Any(card => card.code == Vyon) &&
+                !session.Players[prompt.playerId].szone.Any(card => card?.code == Increase && card.IsFaceUp))
+            {
+                int increase = prompt.candidates.FindIndex(card => card.code == Increase);
+                if (increase >= 0) return increase;
+            }
+
             if (prompt.SelectionHint == DuelTactics.SendToGrave && prompt.min == 1 && prompt.max == 1 &&
                 session.SelectionChainLink is { code: GalaxyHundred } &&
                 prompt.candidates.All(card => card.controller == prompt.playerId && card.location == YgoConstants.LOCATION_DECK))

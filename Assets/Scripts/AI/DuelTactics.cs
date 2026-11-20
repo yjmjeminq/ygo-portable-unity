@@ -46,6 +46,8 @@ namespace YGOPortable.AI
         private const uint GalaxyCyclone = 5133471, KaliYuga = 15939229, WhipViper = 79967395;
         private const uint Erebus = 23064604;
         private const uint MiracleFusion = 45906428, WakeUpElementalHero = 32828466;
+        private const uint RunickHugin = 55990317, RunickGeri = 28373620;
+        private const uint IllusionOfChaos = 12266229, DarkMagician = 46986414;
         private const uint Necrovalley = 47355498, ImperialIronWall = 30459350, ChaosHunter = 97940434, Kycoo = 88240808;
         private const ushort HeroSet = 0x8, ElementalHeroSet = 0x3008;
         private const uint Development = (1u << 5) | (1u << 6) | (1u << 7) | (1u << 18);
@@ -106,6 +108,10 @@ namespace YGOPortable.AI
             4280258,  // 소명의 신궁-아폴로우사
         };
 
+        internal static bool IsFieldMonsterSuppression(SelectableCardItem effect) =>
+            effect.location is YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_SZONE &&
+            effect.code is ForbiddenDroplet or ForbiddenCrown or InfiniteImpermanence or DuelDeckStrategy.WidowAnchor;
+
         internal static bool CanActivate(DuelSession duel, DuelPrompt prompt, SelectableCardItem effect)
         {
             var last = duel.CurrentChain.LastOrDefault();
@@ -130,6 +136,18 @@ namespace YGOPortable.AI
                 return false;
 
             var rival = duel.Players[1 - prompt.playerId];
+            if (effect.code == DuelDeckStrategy.StrikerZero && effect.controller == prompt.playerId &&
+                effect.description == (((ulong)DuelDeckStrategy.StrikerZero << 20) | 1) &&
+                duel.TurnNumber == 1 && duel.TurnPlayer == prompt.playerId && last == null &&
+                !HasFieldCard(rival) && DuelDeckStrategy.ShouldKeepMainMonsterZoneOpen(duel, prompt.playerId))
+                return false;
+            if (effect.code == DuelDeckStrategy.Afterburners && !rival.mzone.Any(card => card?.IsFaceUp == true))
+                return own.grave.Count(card => (card.type & YgoConstants.TYPE_SPELL) != 0) >= 3 &&
+                    rival.szone.Any(card => card != null) && own.mzone.Any(card => card?.IsFaceUp == true &&
+                        (card.type & YgoConstants.TYPE_TOKEN) != 0);
+            if ((effect.code is DuelDeckStrategy.WidowAnchor or 98338153) &&
+                !rival.mzone.Any(card => card is { IsFaceUp: true, effectsDisabled: false } && (card.type & YgoConstants.TYPE_EFFECT) != 0))
+                return false;
             if (effect.code == InfiniteImpermanence &&
                 rival.mzone.Any(card => card?.IsFaceUp == true && !card.effectsDisabled && card.code == BlueEyesTyrant) &&
                 !rival.mzone.Any(card => card?.IsFaceUp == true && !card.effectsDisabled && card.code != BlueEyesTyrant) &&
@@ -498,6 +516,112 @@ namespace YGOPortable.AI
                 !LinkComboPolicy.IsInteractive(monster);
         }
 
+        internal static int? ChooseWidowAnchorTarget(DuelSession duel, DuelPrompt prompt)
+        {
+            if (duel.SelectionChainLink is not { code: (DuelDeckStrategy.WidowAnchor or 98338153) } source ||
+                source.triggerPlayer != prompt.playerId) return null;
+
+            var last = duel.CurrentChain.LastOrDefault(link => !link.negated && link.triggerPlayer != prompt.playerId);
+            double bestValue = double.NegativeInfinity;
+            int? best = null;
+            for (int i = 0; i < prompt.candidates.Count; i++)
+            {
+                var target = prompt.candidates[i];
+                if (target.controller == prompt.playerId || target.location != YgoConstants.LOCATION_MZONE ||
+                    duel.GetVisibleFieldCard(target.code, target.controller, target.location, target.sequence) is not { } monster)
+                    continue;
+                if (!monster.effectsDisabled && last?.code == target.code && last.triggerLoc == target.location &&
+                    last.triggerSeq == target.sequence)
+                    return i;
+                double value = BoardAssetValue(monster) - (monster.effectsDisabled ? 3 : 0);
+                if (value <= bestValue) continue;
+                bestValue = value;
+                best = i;
+            }
+            return best;
+        }
+
+        internal static int? ChooseResourceCard(DuelSession duel, DuelPrompt prompt)
+        {
+            if (prompt.messageType != YgoConstants.MSG_SELECT_CARD || prompt.min != 1 || prompt.max != 1 ||
+                prompt.candidates.Count == 0 || DuelDeckStrategy.For(duel, prompt.playerId) != DuelDeckStyle.Resource)
+                return null;
+
+            byte player = prompt.playerId;
+            var own = duel.Players[player];
+            var source = duel.SelectionChainLink;
+            bool ownSource = source is { negated: false } && source.triggerPlayer == player;
+            if (prompt.SelectionHint == 509 && ownSource && source.code == 26077387 && duel.TurnNumber == 1)
+            {
+                int shizuku = prompt.candidates.FindIndex(card => card.controller == player &&
+                    card.location == YgoConstants.LOCATION_EXTRA && card.code == DuelDeckStrategy.StrikerShizuku);
+                if (shizuku >= 0) return shizuku;
+            }
+            if (prompt.SelectionHint == AddToHand && ownSource &&
+                (source.code is DuelDeckStrategy.StrikerShizuku or DuelDeckStrategy.StrikerZero or DuelDeckStrategy.Engage or 63288573) &&
+                prompt.candidates.All(card => card.controller == player && (card.location is YgoConstants.LOCATION_DECK or YgoConstants.LOCATION_GRAVE) &&
+                    DuelDeckStrategy.IsStrikerSpell(CardDatabase.Get(card.code))))
+            {
+                int engage = prompt.candidates.FindIndex(card => card.code == DuelDeckStrategy.Engage);
+                if (engage >= 0 && !own.hand.Any(card => card.code == DuelDeckStrategy.Engage)) return engage;
+                int anchor = prompt.candidates.FindIndex(card => card.code == DuelDeckStrategy.WidowAnchor);
+                return anchor >= 0 && !own.hand.Any(card => card.code == DuelDeckStrategy.WidowAnchor) ? anchor : null;
+            }
+
+            bool activeFountain = own.szone[YgoConstants.FIELD_ZONE_SEQUENCE] is
+                { code: DuelDeckStrategy.RunickFountain, IsFaceUp: true, effectsDisabled: false };
+            bool handFountain = own.hand.Any(card => card.code == DuelDeckStrategy.RunickFountain);
+
+            if (prompt.SelectionHint == 509 && ownSource &&
+                CardDatabase.Get(source.code) is { IsSpell: true } spell && DuelDeckStrategy.IsRunickCard(spell) &&
+                (spell.type & YgoConstants.TYPE_QUICKPLAY) != 0 &&
+                prompt.candidates.All(card => card.controller == player && card.location == YgoConstants.LOCATION_EXTRA &&
+                    CardDatabase.Get(card.code) is { IsExtra: true } monster && DuelDeckStrategy.IsRunickCard(monster)))
+            {
+                int hugin = prompt.candidates.FindIndex(card => card.code == RunickHugin);
+                if (!activeFountain && !handFountain)
+                {
+                    int geri = prompt.candidates.FindIndex(card => card.code == RunickGeri);
+                    if (geri >= 0 && own.grave.Any(card => card.code == DuelDeckStrategy.RunickFountain)) return geri;
+                    if (hugin >= 0 && own.hand.Count > 0 &&
+                        duel.HasCardInDeck(player, card => card.code == DuelDeckStrategy.RunickFountain))
+                        return hugin;
+                }
+                if (activeFountain && hugin >= 0 &&
+                    !own.mzone.Any(card => card is { code: RunickHugin, IsFaceUp: true, effectsDisabled: false }))
+                    return hugin;
+
+                int threat = StrongestAttacker(duel.Players[1 - player]);
+                if (threat > 0 && !own.mzone.Any(card => card?.IsFaceUp == true &&
+                    Math.Max(card.attack, card.defense) >= threat))
+                    return prompt.candidates.Select((card, index) => (index, defense: CardDatabase.Get(card.code)?.def ?? 0))
+                        .OrderByDescending(card => card.defense).First().index;
+                return null;
+            }
+
+            bool huginCost = source == null
+                ? own.mzone.Any(card => card is { code: RunickHugin, IsFaceUp: true, effectsDisabled: false })
+                : ownSource && source.code == RunickHugin;
+            if (!huginCost || prompt.SelectionHint != Discard ||
+                prompt.candidates.Any(card => card.controller != player || card.location != YgoConstants.LOCATION_HAND))
+                return null;
+
+            int KeepPriority(SelectableCardItem item)
+            {
+                var card = CardDatabase.Get(item.code);
+                uint name = card == null ? item.code : CardDatabase.GetArchetypeCollectionKey(card);
+                int copies = own.hand.Count(held => CardDatabase.Get(held.code) is CardInfo info &&
+                    CardDatabase.GetArchetypeCollectionKey(info) == name);
+                if (copies > 1) return name == DuelDeckStrategy.RunickFountain ? 0 : 1;
+                if (name == DuelDeckStrategy.RunickFountain) return activeFountain ? 2 : 7;
+                if (name == DuelDeckStrategy.RunickTip) return 6;
+                if (ProtectInHand.Contains(name)) return 5;
+                return card is { IsSpell: true } && DuelDeckStrategy.IsRunickCard(card) ? 4 : 3;
+            }
+            return prompt.candidates.Select((card, index) => (index, keep: KeepPriority(card)))
+                .OrderBy(card => card.keep).First().index;
+        }
+
         internal static int? ChooseResolutionYesNo(DuelSession duel, DuelPrompt prompt)
         {
             if (prompt.promptDesc != (((ulong)Conquistador << 20) | 2) ||
@@ -850,6 +974,11 @@ namespace YGOPortable.AI
 
         private static bool IsActive(LiveCardState card, uint code) => card?.code == code && card.IsFaceUp && !card.effectsDisabled;
 
+        internal static bool CanNegateWithIllusionOfChaos(LiveCardState monster, PlayerFieldSnapshot owner, PlayerFieldSnapshot rival) =>
+            IsActive(monster, IllusionOfChaos) && owner.grave.Any(card => card.code == DarkMagician || card.alias == DarkMagician) &&
+            (monster.sequence < 5 || owner.mzone.Take(5).Any(card => card == null)) &&
+            !owner.szone.Concat(rival.szone).Any(card => IsActive(card, Necrovalley));
+
         internal static int? FindSettableIndex(DuelPrompt prompt, SelectableCardItem summon)
         {
             int index = prompt.mSetable.FindIndex(item => item.controller == prompt.playerId &&
@@ -888,6 +1017,9 @@ namespace YGOPortable.AI
                 return false;
 
             var field = duel.Players[prompt.playerId].mzone;
+            if (field.Count(monster => monster != null) == 1 && field.Any(monster => monster?.IsDefense == true) &&
+                DuelCombat.VisibleAttackTotal(duel.Players[1 - prompt.playerId]) >= duel.Players[prompt.playerId].lp)
+                return true;
             int disposable = 0;
             bool established = false;
             foreach (var monster in field)

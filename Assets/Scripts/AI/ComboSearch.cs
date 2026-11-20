@@ -16,11 +16,12 @@ namespace YGOPortable.AI
         private const int MaxLateLinkSearches = 2;
         private const int BudgetMilliseconds = 200;
         private const int BranchMilliseconds = 46;
+        private const int OpeningDevelopmentBranchMilliseconds = 105;
         private const int LateLinkBranchMilliseconds = 48;
         private const int RecoveryBranchMilliseconds = 110;
         private const uint Machinex = 46593546, Siegfried = 44852429, Gilgamesh = 9024198;
-        private const uint PhotonJumper = 97639441, MicroCoder = 2347477, JunkAnchor = 25148255;
-        private const uint RedDragonArchfiend = 70902743;
+        private const uint PhotonJumper = 97639441, MicroCoder = 2347477, JunkAnchor = 25148255, JunkSynchron = 63977008;
+        private const uint RedDragonArchfiend = 70902743, Almiraj = 60303245;
         private const uint NegatesEffects = 1u << 8;
         private static readonly HashSet<uint> HandDisruption = new()
         {
@@ -125,6 +126,7 @@ namespace YGOPortable.AI
             internal readonly bool lethal;
             internal readonly bool exposedToBattleLethal;
             internal readonly bool HasSetup;
+            internal readonly bool lastDefenderAgainstLethal;
             internal readonly bool archfiendEndPhaseRisk;
 
             internal Position(DuelSession duel, byte player, bool canBattle)
@@ -174,14 +176,16 @@ namespace YGOPortable.AI
                         defense = Math.Max(defense, monster.defense);
                     rank = Math.Max(rank, LinkComboPolicy.Rank(monster.code));
                     if (!monster.effectsDisabled && CardDatabase.Get(monster.code) is CardInfo card &&
-                        HasFieldInteraction(card) && (card.code != Machinex || hasContract || monster.overlayCodes.Count >= 2))
+                    (HasFieldInteraction(card) || DuelTactics.CanNegateWithIllusionOfChaos(monster, own, rival)) &&
+                    (card.code != Machinex || hasContract || monster.overlayCodes.Count >= 2))
                     {
                         interaction++;
-                        HasSetup |= card.IsExtra;
+                    HasSetup |= card.IsExtra || (card.type & YgoConstants.TYPE_RITUAL) != 0;
                     }
                 }
                 exposedToBattleLethal |= monsters == 0 && rivalAttackTotal >= own.lp ||
                     monsters == 1 && weakestAttack < rivalAttack && rivalAttackTotal - weakestAttack >= own.lp;
+                lastDefenderAgainstLethal = monsters == 1 && defenders == 1 && rivalAttackTotal >= own.lp;
                 opposingCards = blockers + rival.szone.Count(card => card != null);
                 pendulumFollowUps = PendulumTurnPlan.ReadyFollowUps(own);
                 lethal = canBattle && blockers == 0 && attackers >= rival.lp;
@@ -197,10 +201,10 @@ namespace YGOPortable.AI
                         (hand > before.hand && monsters >= before.monsters) || pendulumFollowUps > before.pendulumFollowUps));
         }
 
-        // Junk Anchor banishes its own Synchro materials. That does not threaten the opposing field.
+        // Material banishment and negating a monster revived on your own field do not interrupt the opponent.
         private static bool HasFieldInteraction(CardInfo card) => LinkComboPolicy.IsInteractive(card) &&
             CardDatabase.GetArchetypeCollectionKey(card) is not
-                (JunkAnchor or 14558127 or 23434538 or 42141493 or 97268402 or 59438930 or 73642296 or 94145021);
+                (JunkAnchor or JunkSynchron or 14558127 or 23434538 or 42141493 or 97268402 or 59438930 or 73642296 or 94145021);
 
         internal static bool CanDevelop(DuelPrompt prompt)
         {
@@ -267,6 +271,7 @@ namespace YGOPortable.AI
             }
             ulong state = Fingerprint(live, prompt);
             var own = live.Players[prompt.playerId];
+            bool keepResourceZoneOpen = DuelDeckStrategy.ShouldKeepMainMonsterZoneOpen(live, prompt.playerId);
             var held = recovering ? new Position(live, prompt.playerId, prompt.canBp) : default;
             double heldScore = recovering ? BoardValue(live, prompt.playerId, prompt.canBp) : 0;
             bool needsDefense = recovering && !held.HasSetup &&
@@ -306,6 +311,21 @@ namespace YGOPortable.AI
             var seen = new HashSet<string>();
             int branchBudget = lateLinkTrade ? LateLinkBranchMilliseconds : BranchMilliseconds;
             if (needsDefense) branchBudget = RecoveryBranchMilliseconds;
+            int openingSuppression = 0;
+            if (!cached && !recovering && !lateLinkTrade && live.TurnNumber == 2 && prompt.canBp &&
+                prompt.summonable.Any(item => !NeedsProvenNormalSummon(item.code) && CanDevelopFromCard(CardDatabase.Get(item.code))) &&
+                live.Players[1 - prompt.playerId].mzone.Any(card => card is { IsFaceUp: true, effectsDisabled: false } &&
+                    (card.type & YgoConstants.TYPE_EFFECT) != 0))
+            {
+                openingSuppression = options.FirstOrDefault(action => (action & 0xffff) == 5 &&
+                    DuelTactics.IsFieldMonsterSuppression(prompt.activatable[action >> 16]));
+                if (openingSuppression != 0)
+                {
+                    // Test the public blocker before Set siblings can consume the summon or the Quick-Play Spell.
+                    queue.Enqueue(new Branch(new[] { openingSuppression }));
+                    seen.Add(openingSuppression.ToString());
+                }
+            }
             foreach (int option in lateOptions)
             {
                 queue.Enqueue(new Branch(new[] { option }));
@@ -315,32 +335,53 @@ namespace YGOPortable.AI
             Line baseline = null;
             Branch? defensiveSet = null;
             bool comparedDefensiveSet = false;
+            bool reservedOpeningBranch = false;
             for (int attempt = 0; (defensiveSet.HasValue || queue.Count != 0) && attempt < MaxBranches && !Expired(); attempt++)
             {
                 bool comparingDefense = defensiveSet.HasValue;
                 Branch choices = defensiveSet ?? queue.Dequeue();
                 defensiveSet = null;
                 Line line;
+                bool blocksResourceZone;
                 long branchStart = watch.ElapsedMilliseconds;
+                int currentBranchBudget = branchBudget;
+                if (openingSuppression != 0 && choices.MainActions.Length == 1 && choices.MainActions[0] == openingSuppression)
+                {
+                    currentBranchBudget = OpeningDevelopmentBranchMilliseconds;
+                    reservedOpeningBranch = true;
+                }
+                else if (!reservedOpeningBranch && !recovering && !lateLinkTrade && live.TurnNumber <= 2 &&
+                    best is { complete: true } && best.moves.Count == 1 && best.moves[0].action is 7 or KeepSetup &&
+                    choices.MainActions.Length == 1 && (choices.MainActions[0] & 0xffff) == 1 &&
+                    (uint)(choices.MainActions[0] >> 16) < (uint)prompt.spSummonable.Count &&
+                    prompt.spSummonable[choices.MainActions[0] >> 16].location == YgoConstants.LOCATION_EXTRA)
+                {
+                    // An early End result leaves time to verify one legal development branch using the same total budget.
+                    currentBranchBudget = OpeningDevelopmentBranchMilliseconds;
+                    reservedOpeningBranch = true;
+                }
                 watch.Start();
-                bool BranchExpired() => Expired() || watch.ElapsedMilliseconds - branchStart >= branchBudget;
+                bool BranchExpired() => Expired() || watch.ElapsedMilliseconds - branchStart >= currentBranchBudget;
                 using (var trial = live.ReplayForPlanning(BranchExpired))
                 {
                     if (trial == null || Fingerprint(trial, trial.ActivePrompt) != state) break;
                     SimulatedBranches++;
                     trial.BeginSpeculation(prompt.playerId, stopAfterTurn: true);
                     line = Explore(trial, advisor.ForkForComboSearch(), prompt.playerId, choices, BranchExpired, recovering);
+                    blocksResourceZone = keepResourceZoneOpen && DuelDeckStrategy.BlocksMainMonsterZoneSpells(trial, prompt.playerId);
                 }
                 baseline ??= line;
                 // The default route may be waiting for a draw or another reveal. Keep its confirmed
                 // steps and let the next real prompt replan with the revealed cards.
-                if (!recovering && attempt == 0 && line.needsHiddenInformation && !line.exposedBeforeReveal && !line.testedAttackPosition &&
+                if (!recovering && attempt == 0 && line.needsHiddenInformation && !blocksResourceZone &&
+                    !line.exposedBeforeReveal && !line.testedAttackPosition &&
                     line.unpaidLinkTrade == int.MaxValue && line.moves.Count > 0)
                 {
                     best = line;
                     break;
                 }
-                bool valid = line.unpaidLinkTrade == int.MaxValue && line.moves.Count > 0 && (!line.testedAttackPosition || line.won);
+                bool valid = line.unpaidLinkTrade == int.MaxValue && line.moves.Count > 0 &&
+                    ((!line.testedAttackPosition && !blocksResourceZone) || line.won);
                 if (recovering)
                 {
                     double defenseValue = AdditionalDefense(line.ending);
@@ -488,7 +529,7 @@ namespace YGOPortable.AI
                         (!safeArchfiendCheckpoint.HasValue || line.score > safeArchfiendCheckpoint.Value.score))
                         safeArchfiendCheckpoint = candidate;
                 }
-                canKeepSetup = line.ending.HasSetup && (prompt.canEp || prompt.canBp);
+                canKeepSetup = (line.ending.HasSetup || line.ending.lastDefenderAgainstLethal) && (prompt.canEp || prompt.canBp);
                 settledMoves = line.moves.Count;
                 if (settledMoves >= MaxMainActions) break;
                 var options = ai.ComboMainOptions(trial, prompt);
@@ -818,6 +859,9 @@ namespace YGOPortable.AI
             if (style == DuelDeckStyle.Lock)
                 score += .18 * own.hand.Count + .9 * own.hand.Count(card => DuelDeckStrategy.IsKeyPiece(card.code)) -
                     Math.Max(0, 3200 - own.lp) / 1400.0;
+            if (style == DuelDeckStyle.Resource)
+                score += DuelDeckStrategy.ResourcePosition(duel, player) +
+                    .18 * (own.hand.Count - rival.hand.Count - opposingMonsters);
             score += .19 * Math.Min(3, PendulumTurnPlan.ReadyFollowUps(own));
             foreach (var backrow in own.szone)
             {
@@ -870,10 +914,12 @@ namespace YGOPortable.AI
                 else if (monster.code == Siegfried) score += 1.65 + .36 * Math.Min(3, opposingSpells);
                 else if (Tier1EndboardBosses.Contains(monster.code))
                     score += breakingBoard ? 1.55 : 2.22;
+                else if (DuelTactics.CanNegateWithIllusionOfChaos(monster, own, rival))
+                    score += breakingBoard ? .85 : 1.62;
                 else if (monster.code != Gilgamesh && developed && LinkComboPolicy.IsInteractive(card))
                     score += breakingBoard ? .85 : (card.DeckEffectCategories & NegatesEffects) != 0 ? 1.62 : 1.23;
 
-                if (!breakingBoard && HasProtection(card)) score += .36;
+                if (!breakingBoard && HasPassiveProtection(card)) score += .36;
 
                 // Matchup / situation-adaptive bonus:
                 if (GoingSecondFinishers.Contains(monster.code))
@@ -888,10 +934,12 @@ namespace YGOPortable.AI
             return score;
         }
 
-        internal static bool HasProtection(CardInfo card) =>
-            card.desc?.Contains("효과의 대상이 되지", StringComparison.Ordinal) == true ||
-            card.desc?.Contains("효과로는 파괴되지", StringComparison.Ordinal) == true ||
-            card.desc?.Contains("효과를 받지 않는다", StringComparison.Ordinal) == true;
+        internal static bool HasPassiveProtection(CardInfo card) =>
+            (card.desc?.Contains("효과의 대상이 되지", StringComparison.Ordinal) == true ||
+             card.desc?.Contains("효과로는 파괴되지", StringComparison.Ordinal) == true ||
+             card.desc?.Contains("효과를 받지 않는다", StringComparison.Ordinal) == true) &&
+            // Almiraj must Tribute itself to protect a target.
+            CardDatabase.GetArchetypeCollectionKey(card) != Almiraj;
 
         private static ulong Fingerprint(DuelSession duel, DuelPrompt prompt)
         {
