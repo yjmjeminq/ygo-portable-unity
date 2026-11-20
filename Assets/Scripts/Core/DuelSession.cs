@@ -152,6 +152,7 @@ namespace YGOPortable.Core
         internal (byte Controller, uint Location, uint Sequence)? PublicFieldSource;
     }
 
+    [Serializable]
     public class SelectableCardItem
     {
         public uint code;
@@ -176,6 +177,7 @@ namespace YGOPortable.Core
         On,
     }
 
+    [Serializable]
     public class DuelPrompt
     {
         public byte messageType;
@@ -258,6 +260,8 @@ namespace YGOPortable.Core
         private const int MaxReplayResponses = 768;
 
         private readonly bool _recordPlanningReplay;
+        private readonly LocalDuelReplayRecorder _playerReplay;
+        private int _automaticReplayResponse, _automaticReplayRetry;
         private uint[][] _startingMainDecks;
         private int[] _startingExtraCounts;
         private PlanningReplay _planningReplay;
@@ -280,7 +284,11 @@ namespace YGOPortable.Core
         }
 
         public DuelSession() { }
-        internal DuelSession(bool recordPlanningReplay) => _recordPlanningReplay = recordPlanningReplay;
+        internal DuelSession(bool recordPlanningReplay, LocalDuelReplayRecorder playerReplay = null)
+        {
+            _recordPlanningReplay = recordPlanningReplay;
+            _playerReplay = playerReplay;
+        }
 
         public IntPtr NativePtr { get; private set; }
         public int TurnNumber { get; private set; }
@@ -381,6 +389,7 @@ namespace YGOPortable.Core
             TurnInterruptions = 0;
             CurrentPhase = YgoConstants.PHASE_DRAW;
             RetryCount = 0;
+            _automaticReplayResponse = 0;
             LastHintMsg = 0;
             _pendingSelectionHint = null;
             ClearAttack();
@@ -461,6 +470,7 @@ namespace YGOPortable.Core
                     secondDeck = p0GoesFirst ? secondMain : firstMain, secondExtra = CopyDeck(p1Extra),
                 };
             }
+            _playerReplay?.Begin(seed, p0Main, p0Extra, p1Main, p1Extra, p0GoesFirst, startingLp);
             AddLog($"듀얼 개시! ({(p0GoesFirst ? "플레이어 선공" : "AI 선공")}) — 덱 무작위 셔플 완료");
             StepUntilPrompt();
             return true;
@@ -545,33 +555,48 @@ namespace YGOPortable.Core
 
         internal void SubmitPlanningResponse(byte[] buffer) => SubmitResponse(buffer, preserveDeckSelection: true);
 
-        private void SubmitResponse(byte[] buffer, bool preserveDeckSelection)
+        internal void SubmitAutomaticResponseInt(int value, string origin) =>
+            SubmitResponse(BitConverter.GetBytes(value), preserveDeckSelection: false, origin: origin);
+
+        private void SubmitResponse(byte[] buffer, bool preserveDeckSelection, string origin = null)
         {
             if (NativePtr == IntPtr.Zero || IsFinished) return;
             var prevPrompt = ActivePrompt;
             int prevRetry = RetryCount;
-            if (_planningReplay != null)
+            int recorded = _playerReplay?.Submitted(prevPrompt, buffer, TurnNumber, CurrentPhase, HumanPlayerIndex, origin) ?? 0;
+            bool processed = false;
+            try
             {
-                if (prevPrompt == null || buffer == null || buffer.Length == 0 || _planningReplay.responses.Count >= MaxReplayResponses)
-                    _planningReplay = null;
-                else _planningReplay.responses.Add((prevPrompt.messageType, prevPrompt.playerId, (byte[])buffer.Clone()));
+                if (_planningReplay != null)
+                {
+                    if (prevPrompt == null || buffer == null || buffer.Length == 0 || _planningReplay.responses.Count >= MaxReplayResponses)
+                        _planningReplay = null;
+                    else _planningReplay.responses.Add((prevPrompt.messageType, prevPrompt.playerId, (byte[])buffer.Clone()));
+                }
+                if (_speculatingPlayer >= 0) TrackSpeculativeSelection(prevPrompt, buffer, preserveDeckSelection);
+                if (prevPrompt?.messageType == YgoConstants.MSG_SORT_CARD) TrackSortedDeckTop(prevPrompt, buffer);
+                if (prevPrompt?.messageType == YgoConstants.MSG_SELECT_BATTLECMD && buffer?.Length >= sizeof(int))
+                {
+                    int command = BitConverter.ToInt32(buffer, 0);
+                    int index = command >> 16;
+                    _chosenAttacker = (command & 0xffff) == 1 && (uint)index < prevPrompt.attackable.Count
+                        ? prevPrompt.attackable[index] : null;
+                }
+                ActivePrompt = null;
+                YgoNativeBridge.SetResponse(NativePtr, buffer);
+                StepUntilPrompt();
+                if (_observedTopSort.Remaining > 0) ForgetObservedDeckTop(_observedTopSort.Player);
+                if (!IsFinished && ActivePrompt == null && RetryCount > prevRetry && prevPrompt != null)
+                {
+                    ActivePrompt = prevPrompt;
+                }
+                processed = true;
             }
-            if (_speculatingPlayer >= 0) TrackSpeculativeSelection(prevPrompt, buffer, preserveDeckSelection);
-            if (prevPrompt?.messageType == YgoConstants.MSG_SORT_CARD) TrackSortedDeckTop(prevPrompt, buffer);
-            if (prevPrompt?.messageType == YgoConstants.MSG_SELECT_BATTLECMD && buffer?.Length >= sizeof(int))
+            finally
             {
-                int command = BitConverter.ToInt32(buffer, 0);
-                int index = command >> 16;
-                _chosenAttacker = (command & 0xffff) == 1 && (uint)index < prevPrompt.attackable.Count
-                    ? prevPrompt.attackable[index] : null;
-            }
-            ActivePrompt = null;
-            YgoNativeBridge.SetResponse(NativePtr, buffer);
-            StepUntilPrompt();
-            if (_observedTopSort.Remaining > 0) ForgetObservedDeckTop(_observedTopSort.Player);
-            if (!IsFinished && ActivePrompt == null && RetryCount > prevRetry && prevPrompt != null)
-            {
-                ActivePrompt = prevPrompt;
+                _playerReplay?.Acknowledge(recorded, processed && prevPrompt != null && buffer?.Length > 0 && RetryCount == prevRetry,
+                    RetryCount - prevRetry);
+                FinishPlayerReplay();
             }
         }
 
@@ -651,6 +676,7 @@ namespace YGOPortable.Core
             WinReason = 0;
             ActivePrompt = null;
             AddLog(losingPlayer == HumanPlayerIndex ? "플레이어가 항복했습니다." : "상대가 항복했습니다.");
+            FinishPlayerReplay("surrender");
         }
 
         public bool ShouldPassChainPrompt(DuelPrompt prompt, ChainConfirmationMode mode)
@@ -698,6 +724,12 @@ namespace YGOPortable.Core
                 {
                     ParseMessages(msgBytes);
                 }
+                if (_automaticReplayResponse != 0)
+                {
+                    _playerReplay?.Acknowledge(_automaticReplayResponse, RetryCount == _automaticReplayRetry,
+                        RetryCount - _automaticReplayRetry);
+                    _automaticReplayResponse = 0;
+                }
 
                 if (status == YgoConstants.OCG_DUEL_STATUS_END)
                 {
@@ -713,6 +745,9 @@ namespace YGOPortable.Core
                         break;
 
                     // The core requests a pass even when no optional chain effects are available.
+                    _automaticReplayResponse = _playerReplay?.Submitted(prompt, BitConverter.GetBytes(-1), TurnNumber,
+                        CurrentPhase, HumanPlayerIndex, "automatic-empty-chain", replayViaSession: false) ?? 0;
+                    _automaticReplayRetry = RetryCount;
                     ActivePrompt = null;
                     YgoNativeBridge.SetResponseInt(NativePtr, -1);
                 }
@@ -727,7 +762,11 @@ namespace YGOPortable.Core
                 CompleteFieldArrivalPresentation();
                 if (!_loadingPlanningReplay) SampleFieldReadouts(fromNative: false);
             }
-            if (IsFinished) _fieldReadoutBaseline = null;
+            if (IsFinished)
+            {
+                _fieldReadoutBaseline = null;
+                FinishPlayerReplay();
+            }
         }
 
         private void ParseMessages(byte[] buf)
@@ -2229,6 +2268,8 @@ namespace YGOPortable.Core
 
         public void Dispose()
         {
+            FinishPlayerReplay(IsFinished && Winner >= 0 ? "finished" : "interrupted", force: true);
+            _playerReplay?.Dispose();
             _planningReplay = null;
             _speculatingPlayer = -1;
             _fieldReadoutBaseline = null;
@@ -2239,6 +2280,13 @@ namespace YGOPortable.Core
                 YgoNativeBridge.YGO_DestroyDuel(NativePtr);
                 NativePtr = IntPtr.Zero;
             }
+        }
+
+        private void FinishPlayerReplay(string status = null, bool force = false)
+        {
+            if (_playerReplay == null || status == null && !IsFinished) return;
+            _playerReplay.End(status ?? (Winner >= 0 ? "finished" : "interrupted"), Winner, WinReason, TurnNumber,
+                RetryCount, new[] { Players[0].lp, Players[1].lp }, force);
         }
     }
 }

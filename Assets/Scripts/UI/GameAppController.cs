@@ -27,6 +27,9 @@ namespace YGOPortable.UI
         public float AiStepDelay { get; set; } = 0.25f;
         public AIDifficulty AiDifficulty { get; set; } = AIDifficulty.Smart;
         internal ChainConfirmationMode ChainConfirmation { get; private set; } = ChainConfirmationMode.Auto;
+        private const string PersonalReplayPreference = "ygo.personal-duel-recording.v1";
+        internal bool PersonalReplayEnabled { get; private set; }
+        private LocalDuelReplayRecorder _personalReplay;
 
         private TitleAndMenuUI _titleAndMenu;
         private OpponentSelectUI _oppSelect;
@@ -84,6 +87,7 @@ namespace YGOPortable.UI
                 Debug.Log($"[GameApp] Start() starting... StreamingAssets: {Application.streamingAssetsPath}");
                 Application.runInBackground = true;
                 LotdAudio.EnsureInit(gameObject);
+                PersonalReplayEnabled = PlayerPrefs.GetInt(PersonalReplayPreference, 0) != 0;
 
                 if (!YgoNativeBridge.IsInitialized)
                 {
@@ -162,7 +166,11 @@ namespace YGOPortable.UI
 
         private void OnNativeLog(int logType, string msg)
         {
-            if (logType == 0) Debug.LogError($"[YGO-Core] {msg}");
+            if (logType == 0)
+            {
+                _personalReplay?.NativeError();
+                Debug.LogError($"[YGO-Core] {msg}");
+            }
         }
 
         private static void EnsureEventSystem()
@@ -335,7 +343,20 @@ namespace YGOPortable.UI
             _activePlayerFirst = playerGoesFirst;
 
             _session?.Dispose();
-            _session = new DuelSession(recordPlanningReplay: AiDifficulty == AIDifficulty.Smart);
+            _personalReplay = null;
+            if (PersonalReplayEnabled && !Application.isBatchMode)
+            {
+                try
+                {
+                    _personalReplay = new LocalDuelReplayRecorder(Application.persistentDataPath, myDeck.id,
+                        oppChar.id, oppDeck.id, AiDifficulty.ToString(), ChainConfirmation.ToString());
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogWarning($"[Personal replay] Could not enable local recording ({exception.GetType().Name}).");
+                }
+            }
+            _session = new DuelSession(recordPlanningReplay: AiDifficulty == AIDifficulty.Smart, playerReplay: _personalReplay);
             _ai = new TacticalAI(DuelAiPolicy.LoadIncluded(), LinkComboPolicy.LoadIncluded(),
                 searchCombos: true) { Difficulty = AiDifficulty };
             _shownHumanPrompt = null;
@@ -392,6 +413,7 @@ namespace YGOPortable.UI
 
         private void Update()
         {
+            _personalReplay?.PollWarning();
             _saveSync?.Tick();
             if (_saveSync?.HasConflict == true)
             {
@@ -491,7 +513,7 @@ namespace YGOPortable.UI
             {
                 _shownHumanPrompt = null;
                 _modals.HideAll();
-                _session.SubmitResponseInt(-1);
+                _session.SubmitAutomaticResponseInt(-1, "automatic-chain-pass");
                 _duelField.Refresh();
                 return;
             }
@@ -644,6 +666,20 @@ namespace YGOPortable.UI
             _duelField.Refresh();
         }
 
+        internal void SetPersonalReplayEnabled(bool enabled)
+        {
+            PersonalReplayEnabled = enabled;
+            try
+            {
+                PlayerPrefs.SetInt(PersonalReplayPreference, enabled ? 1 : 0);
+                PlayerPrefs.Save();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"[Personal replay] Could not persist the recording preference ({exception.GetType().Name}).");
+            }
+        }
+
         private void ProcessCommandLineArgs()
         {
             var args = Environment.GetCommandLineArgs();
@@ -726,6 +762,8 @@ namespace YGOPortable.UI
             _saveSync?.Dispose();
             Debug.Log($"[GameApp] OnDestroy called! Stack:\n{Environment.StackTrace}");
             _session?.Dispose();
+            _personalReplay?.Dispose();
+            _personalReplay?.PollWarning();
             _session = null;
         }
 
@@ -733,6 +771,8 @@ namespace YGOPortable.UI
         {
             Debug.Log($"[GameApp] OnApplicationQuit called! Stack:\n{Environment.StackTrace}");
             _session?.Dispose();
+            _personalReplay?.Dispose();
+            _personalReplay?.PollWarning();
             _session = null;
             CardArtLoader.Shutdown();
             YgoNativeBridge.Shutdown();

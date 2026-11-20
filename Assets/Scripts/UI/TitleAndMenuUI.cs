@@ -184,16 +184,16 @@ namespace YGOPortable.UI
             LotdUiKit.AddImage(bg.gameObject, LotdUiKit.WhiteSprite, new Color(0f, 0f, 0f, 0.72f));
 
             var win = LotdUiKit.CreateMenuPanel(bg, "SettingsWin",
-                new Vector2(0.28f, 0.22f), new Vector2(0.72f, 0.78f));
+                new Vector2(0.26f, 0.14f), new Vector2(0.74f, 0.86f));
             _settingsPanel = win.gameObject;
 
             var hdr = LotdUiKit.CreateRect("Hdr", win,
-                new Vector2(0f, 0.84f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
+                new Vector2(0f, 0.87f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
             LotdUiKit.AddImage(hdr.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelHeader);
             LotdUiKit.AddText(hdr, "T", "환경 설정", 22, TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
 
             // SFX Volume Row
-            var row1 = LotdUiKit.CreateRect("SfxRow", win, new Vector2(0.08f, 0.67f), new Vector2(0.92f, 0.79f), Vector2.zero, Vector2.zero);
+            var row1 = LotdUiKit.CreateRect("SfxRow", win, new Vector2(0.08f, 0.72f), new Vector2(0.92f, 0.83f), Vector2.zero, Vector2.zero);
             var sfxLabel = LotdUiKit.AddText(row1, "L", "효과음 음량: 65%", 17, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary);
             var toggleSfx = LotdUiKit.CreateRect("BtnMute", row1, new Vector2(0.60f, 0.1f), new Vector2(1f, 0.9f), Vector2.zero, Vector2.zero);
             LotdUiKit.CreateLotdButton(toggleSfx, "B", "음소거 전환", () =>
@@ -203,7 +203,7 @@ namespace YGOPortable.UI
             }, 15);
 
             // BGM Volume Row
-            var rowBgm = LotdUiKit.CreateRect("BgmRow", win, new Vector2(0.08f, 0.52f), new Vector2(0.92f, 0.64f), Vector2.zero, Vector2.zero);
+            var rowBgm = LotdUiKit.CreateRect("BgmRow", win, new Vector2(0.08f, 0.57f), new Vector2(0.92f, 0.68f), Vector2.zero, Vector2.zero);
             var bgmLabel = LotdUiKit.AddText(rowBgm, "L", "배경음악 음량: 35%", 17, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary);
             var toggleBgm = LotdUiKit.CreateRect("BtnBgm", rowBgm, new Vector2(0.60f, 0.1f), new Vector2(1f, 0.9f), Vector2.zero, Vector2.zero);
             LotdUiKit.CreateLotdButton(toggleBgm, "B", "음악 전환", () =>
@@ -214,7 +214,7 @@ namespace YGOPortable.UI
             }, 15);
 
             // AI Speed / Level Row
-            var row2 = LotdUiKit.CreateRect("AiRow", win, new Vector2(0.08f, 0.37f), new Vector2(0.92f, 0.49f), Vector2.zero, Vector2.zero);
+            var row2 = LotdUiKit.CreateRect("AiRow", win, new Vector2(0.08f, 0.42f), new Vector2(0.92f, 0.53f), Vector2.zero, Vector2.zero);
             var aiLbl = LotdUiKit.AddText(row2, "L", $"AI 사고 속도: {_app.AiStepDelay:0.00}초", 17, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary);
             var spdBtn = LotdUiKit.CreateRect("BtnSpd", row2, new Vector2(0.60f, 0.1f), new Vector2(1f, 0.9f), Vector2.zero, Vector2.zero);
             LotdUiKit.CreateLotdButton(spdBtn, "B", "속도 전환 (빠름/보통)", () =>
@@ -223,18 +223,34 @@ namespace YGOPortable.UI
                 aiLbl.text = $"AI 사고 속도: {_app.AiStepDelay:0.00}초";
             }, 15);
 
-            var info = LotdUiKit.CreateRect("Rule", win, new Vector2(.08f, .22f), new Vector2(.51f, .34f),
+            var replay = LotdUiKit.CreateRect("PersonalReplay", win, new Vector2(.08f, .27f), new Vector2(.92f, .38f),
+                Vector2.zero, Vector2.zero);
+            var replayLabel = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Label", replay,
+                new Vector2(0f, .40f), new Vector2(.59f, 1f), Vector2.zero, Vector2.zero), "Text",
+                $"개인 대국 기록: {(_app.PersonalReplayEnabled ? "켜짐" : "꺼짐")}", 17, 12,
+                TextAnchor.MiddleLeft, LotdUiKit.TextPrimary);
+            LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Hint", replay,
+                Vector2.zero, new Vector2(.59f, .42f), Vector2.zero, Vector2.zero), "Text",
+                "다음 대국부터 · 이 기기에만 저장", 12, 10, TextAnchor.MiddleLeft, LotdUiKit.TextMuted);
+            LotdUiKit.CreateLotdButton(LotdUiKit.CreateRect("Toggle", replay,
+                new Vector2(.60f, .1f), new Vector2(1f, .9f), Vector2.zero, Vector2.zero), "Button", "기록 켜기 / 끄기", () =>
+                {
+                    _app.SetPersonalReplayEnabled(!_app.PersonalReplayEnabled);
+                    replayLabel.text = $"개인 대국 기록: {(_app.PersonalReplayEnabled ? "켜짐" : "꺼짐")}";
+                }, 15);
+
+            var info = LotdUiKit.CreateRect("Rule", win, new Vector2(.08f, .15f), new Vector2(.51f, .24f),
                 Vector2.zero, Vector2.zero);
             LotdUiKit.AddFittedText(info, "Text", "신 마스터 룰 2020", 17, 12, TextAnchor.MiddleLeft, LotdUiKit.TextMuted);
-            var cloud = LotdUiKit.CreateRect("CloudSave", win, new Vector2(.56f, .22f), new Vector2(.92f, .34f),
+            var cloud = LotdUiKit.CreateRect("CloudSave", win, new Vector2(.56f, .15f), new Vector2(.92f, .24f),
                 Vector2.zero, Vector2.zero);
             LotdUiKit.CreateLotdButton(cloud, "Button", "클라우드 저장", _app.OpenSaveSync, 16);
 
             // Close & Quit
-            var closeRt = LotdUiKit.CreateRect("Close", win, new Vector2(0.55f, 0.05f), new Vector2(0.92f, 0.17f), Vector2.zero, Vector2.zero);
+            var closeRt = LotdUiKit.CreateRect("Close", win, new Vector2(0.55f, 0.03f), new Vector2(0.92f, 0.12f), Vector2.zero, Vector2.zero);
             _settingsCloseButton = LotdUiKit.CreateLotdButton(closeRt, "BtnClose", "닫기", () => CloseSettings(), 18, gold: true);
 
-            var quitRt = LotdUiKit.CreateRect("Quit", win, new Vector2(0.08f, 0.05f), new Vector2(0.45f, 0.17f), Vector2.zero, Vector2.zero);
+            var quitRt = LotdUiKit.CreateRect("Quit", win, new Vector2(0.08f, 0.03f), new Vector2(0.45f, 0.12f), Vector2.zero, Vector2.zero);
             LotdUiKit.CreateLotdButton(quitRt, "BtnQuit", "게임 종료", () => Application.Quit(), 18);
 
             SettingsRoot.SetActive(false);
