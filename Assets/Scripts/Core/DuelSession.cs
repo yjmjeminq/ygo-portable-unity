@@ -321,6 +321,13 @@ namespace YGOPortable.Core
         public PlayerFieldSnapshot[] Players { get; } = { new PlayerFieldSnapshot(), new PlayerFieldSnapshot() };
         public List<ChainLinkInfo> CurrentChain { get; } = new List<ChainLinkInfo>();
         private HashSet<(byte Player, ulong Description)> _activatedMonsterEffects;
+        private const uint BaronneCode = 84815190;
+        private const ulong BaronneNegation = ((ulong)BaronneCode << 20) | 1;
+        private readonly HashSet<(byte Controller, uint Sequence)> _spentBaronneNegates = new();
+        private readonly int[] _summonedMonsters = new int[2];
+        private readonly HashSet<(byte Controller, uint Sequence)> _pendingSpecialSummons = new();
+        internal int SummonedMonstersThisTurn(byte player) => _summonedMonsters[player];
+        internal bool HasSpentBaronneNegate(LiveCardState card) => _spentBaronneNegates.Contains((card.controller, card.sequence));
         private HashSet<(byte FieldController, byte BanishController, uint Code, uint? CardId)> _temporaryAttackers;
         internal bool HasActivatedMonsterEffect(byte player, ulong description) =>
             _activatedMonsterEffects?.Contains((player, description)) == true;
@@ -407,6 +414,8 @@ namespace YGOPortable.Core
             ActivePrompt = null;
             CurrentChain.Clear();
             _activatedMonsterEffects?.Clear();
+            _spentBaronneNegates.Clear();
+            ResetSummonTracking();
             _temporaryAttackers?.Clear();
             _resolvingChainLink = null;
             SolvedChainLinks.Clear();
@@ -998,6 +1007,7 @@ namespace YGOPortable.Core
 
         private void NotifyCardMoved(CardMoveEvent move, CardMoveEvent swapPartner = null)
         {
+            TrackPublicMonsterMoves(move, swapPartner);
             FollowPublicChainSources(move, swapPartner);
             CaptureMoveSource(move, swapPartner != null);
             if (swapPartner != null) CaptureMoveSource(swapPartner, true);
@@ -1014,6 +1024,40 @@ namespace YGOPortable.Core
             OnCardLocationsChanged?.Invoke(move, swapPartner);
             PublishCardMove(move);
             if (swapPartner != null) PublishCardMove(swapPartner);
+        }
+
+        private void ResetSummonTracking()
+        {
+            Array.Clear(_summonedMonsters, 0, _summonedMonsters.Length);
+            _pendingSpecialSummons.Clear();
+        }
+
+        private void TrackPublicMonsterMoves(CardMoveEvent move, CardMoveEvent partner)
+        {
+            bool firstSpent = SpentAtSource(move);
+            bool secondSpent = SpentAtSource(partner);
+            ClearSlots(move);
+            if (partner != null) ClearSlots(partner);
+            if (firstSpent) TransferSpentNegate(move);
+            if (secondSpent) TransferSpentNegate(partner);
+
+            bool SpentAtSource(CardMoveEvent card) => card is { code: BaronneCode, fromLoc: YgoConstants.LOCATION_MZONE } &&
+                (card.fromPos & YgoConstants.POS_FACEUP) != 0 && _spentBaronneNegates.Contains((card.fromCon, card.fromSeq));
+            void ClearSlots(CardMoveEvent card)
+            {
+                if (card.fromLoc == YgoConstants.LOCATION_MZONE)
+                {
+                    _spentBaronneNegates.Remove((card.fromCon, card.fromSeq));
+                    if (card.toLoc != card.fromLoc || card.toCon != card.fromCon || card.toSeq != card.fromSeq)
+                        _pendingSpecialSummons.Remove((card.fromCon, card.fromSeq));
+                }
+                if (card.toLoc == YgoConstants.LOCATION_MZONE) _spentBaronneNegates.Remove((card.toCon, card.toSeq));
+            }
+            void TransferSpentNegate(CardMoveEvent card)
+            {
+                if (card.toLoc == YgoConstants.LOCATION_MZONE && (card.toPos & YgoConstants.POS_FACEUP) != 0)
+                    _spentBaronneNegates.Add((card.toCon, card.toSeq));
+            }
         }
 
         private static bool AffectsSlot(CardMoveEvent move, (byte, uint, uint) slot)
@@ -1150,6 +1194,7 @@ namespace YGOPortable.Core
                 {
                     _confirmedCards.Clear();
                     _activatedMonsterEffects?.Clear();
+                    ResetSummonTracking();
                     _temporaryAttackers?.Clear();
                     TurnPlayer = br.ReadByte();
                     TurnNumber++;
@@ -1250,15 +1295,21 @@ namespace YGOPortable.Core
                     break;
                 }
 
+                case YgoConstants.MSG_SUMMONED:
+                    _summonedMonsters[_resolvingChainLink?.triggerPlayer ?? (byte)TurnPlayer]++;
+                    break;
+
                 case YgoConstants.MSG_SPSUMMONING:
                 {
-                    uint code = br.ReadUInt32();
-                    br.ReadBytes(10);
-                    AddLog(code != 0 ? $"특수 소환: [{CardDatabase.GetName(code)}]" : "뒷면 표시 특수 소환");
+                    var card = ReadLocIntoItem(br, br.ReadUInt32());
+                    _pendingSpecialSummons.Add((card.controller, card.sequence));
+                    AddLog(card.code != 0 ? $"특수 소환: [{CardDatabase.GetName(card.code)}]" : "뒷면 표시 특수 소환");
                     break;
                 }
 
                 case YgoConstants.MSG_SPSUMMONED:
+                    _summonedMonsters[_resolvingChainLink?.triggerPlayer ?? (byte)TurnPlayer] += _pendingSpecialSummons.Count;
+                    _pendingSpecialSummons.Clear();
                     CompleteFieldArrivalPresentation();
                     break;
 
@@ -1512,6 +1563,8 @@ namespace YGOPortable.Core
                         PublicFieldSource = activation != null ? (activation.controller, activation.location, activation.sequence) : null,
                     };
                     CurrentChain.Add(link);
+                    if (code == BaronneCode && desc == BaronneNegation && source.location == YgoConstants.LOCATION_MZONE)
+                        _spentBaronneNegates.Add((source.controller, source.sequence));
                     if (tLoc == YgoConstants.LOCATION_MZONE && code != 0 && (desc >> 20) == code)
                         (_activatedMonsterEffects ??= new()).Add((tCon, desc));
                     AddLog($"체인 {chainNo}: [{CardDatabase.GetName(code)}] 발동");
@@ -1790,7 +1843,7 @@ namespace YGOPortable.Core
                         item.mode = br.ReadByte();
                         p.candidates.Add(item);
                     }
-                    if (cnt != 0 && IsHumanOptionalChainPrompt(p))
+                    if (cnt != 0 && !p.forced && !p.IsTriggerChain)
                     {
                         var triggerFlags = new byte[p.candidates.Count];
                         p.chainTriggerInfoMissing = YgoNativeBridge.YGO_GetChainTriggerFlags(

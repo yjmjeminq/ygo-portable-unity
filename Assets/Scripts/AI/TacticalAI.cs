@@ -171,6 +171,8 @@ namespace YGOPortable.AI
                     return BuildSelectCounter(prompt);
 
                 case YgoConstants.MSG_SORT_CHAIN:
+                    if (UsesTacticalRules) return SortSimultaneousTriggers(prompt);
+                    return new byte[] { unchecked((byte)-1) };
                 case YgoConstants.MSG_SORT_CARD:
                     return new byte[] { unchecked((byte)-1) };
 
@@ -301,6 +303,16 @@ namespace YGOPortable.AI
 
         private bool CanEndMainPhaseWithEffect(DuelSession session, DuelPrompt prompt, SelectableCardItem effect)
         {
+            if (UsesTacticalRules && DuelTactics.IsFieldMonsterSuppression(effect))
+            {
+                // Never activate one-shot monster negations (Impermanence, Droplet, Widow Anchor) as an idle action
+                // right before ending the turn or in Main Phase 2.
+                // Keep them set in backrow or in hand as interruptions for the opponent's upcoming turn!
+                if (session.CurrentPhase == YgoConstants.PHASE_MAIN2) return false;
+                if (prompt.canEp && (!prompt.canBp || !HasWorthwhileAttack(session, prompt.playerId)))
+                    return false;
+            }
+
             if (!UsesTacticalRules || effect.code != MelffyFootsteps ||
                 effect.location is not (YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_SZONE)) return true;
 
@@ -865,12 +877,28 @@ namespace YGOPortable.AI
         private int PickChain(DuelSession s, DuelPrompt p, bool fallback)
         {
             if (p.candidates.Count == 0) return -1;
+            if (fallback) return p.forced ? 0 : -1;
+            if (p.IsTriggerChain && UsesTacticalRules)
+            {
+                int trigger = -1, value = int.MinValue;
+                for (int i = 0; i < p.candidates.Count; i++)
+                {
+                    var choice = p.candidates[i];
+                    if (!p.forced && !CanActivate(s, p, choice)) continue;
+                    int priority = DuelTactics.ChainProtectionPriority(choice);
+                    if (priority <= value) continue;
+                    trigger = i;
+                    value = priority;
+                }
+                return trigger;
+            }
             if (p.forced) return 0;
-            if (fallback || _actionsThisTurn > 48) return -1;
+            if (_actionsThisTurn > 48 && !p.candidates.Any(card => card.isTriggeredEffect)) return -1;
 
             // Avoid chaining a fast/quick effect to our own card if opponent hasn't responded,
             // UNLESS this is a simultaneous trigger chain (SEGOC: speCount == 0x7f, e.g. Tearlaments GY triggers).
-            if (!p.IsTriggerChain && s.CurrentChain.Count > 0 && s.CurrentChain[s.CurrentChain.Count - 1].triggerPlayer == p.playerId)
+            bool ownLastLink = !p.IsTriggerChain && s.CurrentChain.Count > 0 && s.CurrentChain[^1].triggerPlayer == p.playerId;
+            if (ownLastLink && !p.candidates.Any(card => card.isTriggeredEffect))
                 return -1;
 
             string ChainKey(SelectableCardItem effect) => $"ch:{s.TurnNumber}:{effect.code}:{effect.description}:{s.CurrentChain.Count}";
@@ -901,6 +929,20 @@ namespace YGOPortable.AI
                         return ash;
                     }
                 }
+
+                // If the opposing monster is still face-up on the field, Impermanence / Effect Veiler directly negates it!
+                if (opposing.triggerSeq < field.Length && field[opposing.triggerSeq]?.IsFaceUp == true &&
+                    field[opposing.triggerSeq]?.effectsDisabled == false &&
+                    field[opposing.triggerSeq]?.code != DuelTactics.BlueEyesTyrant)
+                {
+                    int negater = p.candidates.FindIndex(card => card.code is DuelTactics.InfiniteImpermanence or DuelTactics.EffectVeiler &&
+                        !_effectCounts.ContainsKey(ChainKey(card)) && CanActivate(s, p, card));
+                    if (negater >= 0)
+                    {
+                        BumpKey(ChainKey(p.candidates[negater]));
+                        return negater;
+                    }
+                }
             }
 
             int preferred = -1;
@@ -910,16 +952,27 @@ namespace YGOPortable.AI
             for (int i = 0; i < p.candidates.Count; i++)
             {
                 var c = p.candidates[i];
+                if (ownLastLink && !c.isTriggeredEffect) continue;
                 if (!CanActivate(s, p, c)) continue;
                 string key = ChainKey(c);
                 if (_effectCounts.ContainsKey(key)) continue;
                 if (policy?.UsesChains != true || p.IsTriggerChain || c.isTriggeredEffect)
                 {
+                    // Do not fire free-chain monster negations in empty chain if opponent didn't activate anything!
+                    if (!p.IsTriggerChain && !c.isTriggeredEffect && s.CurrentChain.Count == 0 &&
+                        c.code is DuelTactics.InfiniteImpermanence or DuelTactics.EffectVeiler)
+                    {
+                        continue;
+                    }
                     BumpKey(key);
                     return i;
                 }
 
-                float priority = policy.ChainPriority(s, p, c) + DuelTactics.ControlChainPriority(s, p, c);
+                if (s.CurrentChain.Count == 0 && c.code is DuelTactics.InfiniteImpermanence or DuelTactics.EffectVeiler)
+                    continue;
+
+                float priority = policy.ChainPriority(s, p, c) + DuelTactics.ControlChainPriority(s, p, c) +
+                    DuelTactics.ChokepointPriority(s, p, c);
                 if (priority <= bestPriority) continue;
                 bestPriority = priority;
                 preferred = i;
@@ -927,6 +980,18 @@ namespace YGOPortable.AI
             }
             if (preferredKey != null) BumpKey(preferredKey);
             return preferred;
+        }
+
+        private static byte[] SortSimultaneousTriggers(DuelPrompt prompt)
+        {
+            int count = prompt.candidates.Count;
+            if (count < 2 || count > sbyte.MaxValue) return new byte[] { unchecked((byte)-1) };
+            var order = Enumerable.Range(0, count).OrderByDescending(index =>
+                DuelTactics.ChainProtectionPriority(prompt.candidates[index])).ToArray();
+            var response = new byte[count];
+            // The wire format maps each original candidate index to its new chain position.
+            for (int i = 0; i < count; i++) response[order[i]] = (byte)i;
+            return response;
         }
 
         private int DecideEffectYesNo(DuelSession s, DuelPrompt p)
@@ -1336,7 +1401,7 @@ namespace YGOPortable.AI
             return (isOpp ? -5000 : 10000) + atk + (item.location == YgoConstants.LOCATION_EXTRA ? 500 : 0);
         }
 
-        private static bool HasWorthwhileAttack(DuelSession s, int playerId)
+        internal static bool HasWorthwhileAttack(DuelSession s, int playerId)
         {
             if (s.TurnNumber <= 1) return false;
             int opp = 1 - playerId;

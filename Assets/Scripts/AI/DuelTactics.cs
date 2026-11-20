@@ -33,7 +33,8 @@ namespace YGOPortable.AI
         internal const uint LightningStorm = 14532163, CrossoutDesignator = 65681983;
         private const uint WingedKuriboh = 57116033, WingedKuribohLevel6 = 48486809, CyberdarkChimera = 5370235;
         private const ulong WingedKuribohInterrupt = ((ulong)WingedKuribohLevel6 << 20) | 1;
-        private const uint InfiniteImpermanence = 10045474, EffectVeiler = 97268402, BlueEyesTyrant = 11443677;
+        internal const uint InfiniteImpermanence = 10045474, EffectVeiler = 97268402, BlueEyesTyrant = 11443677;
+        private const uint AshBlossom = 14558127, UpstartGoblin = 70368879, OriginalSinfulSpoils = 89023486;
         private const uint LittleKnight = 29301450, LittleKnightAlternateArt = 29301451, DoomcaliberKnight = 78700060;
         private const uint TripleTacticsTalent = 25311006, ForbiddenCrown = 98829635;
         private const uint RedDragonTyrant = 16172067;
@@ -173,10 +174,10 @@ namespace YGOPortable.AI
             if ((effect.code is DuelDeckStrategy.WidowAnchor or 98338153) &&
                 !rival.mzone.Any(card => card is { IsFaceUp: true, effectsDisabled: false } && (card.type & YgoConstants.TYPE_EFFECT) != 0))
                 return false;
-            if (effect.code == InfiniteImpermanence &&
-                rival.mzone.Any(card => card?.IsFaceUp == true && !card.effectsDisabled && card.code == BlueEyesTyrant) &&
-                !rival.mzone.Any(card => card?.IsFaceUp == true && !card.effectsDisabled && card.code != BlueEyesTyrant) &&
-                (effect.location != YgoConstants.LOCATION_SZONE || effect.sequence >= 5 || rival.szone[4 - effect.sequence] == null))
+            if (effect.code == AshBlossom && last?.code == UpstartGoblin &&
+                !rival.szone.Any(card => IsActive(card, BadReaction)) && !rival.mzone.Any(card => IsActive(card, NurseReficule)))
+                return false;
+            if (effect.code is InfiniteImpermanence or EffectVeiler && !CanSpendFieldNegation(duel, prompt, effect, last, rival))
                 return false;
             if (effect.code == CrimsonGaia && effect.location == YgoConstants.LOCATION_HAND &&
                 own.szone.Any(card => card?.code == CrimsonGaia && card.IsFaceUp && !card.effectsDisabled))
@@ -465,6 +466,31 @@ namespace YGOPortable.AI
             return null;
         }
 
+        // These shipped monster scripts resolve only away from the field.
+        private static bool OffFieldOnly(uint code) => code is 18789533 or 22567609 or 39191307 or 41859700 or
+            57116033 or 57839750 or 60806437 or 77044671 or 83011277 or 84834865 or 95178994 or 95956346 or 97017120;
+
+        private static bool CanSpendFieldNegation(DuelSession duel, DuelPrompt prompt, SelectableCardItem effect,
+            ChainLinkInfo source, PlayerFieldSnapshot rival)
+        {
+            // Preserve a meaningful set-column response and the actual source of an effect, including a gained effect.
+            if (effect.code == InfiniteImpermanence && effect.location == YgoConstants.LOCATION_SZONE &&
+                effect.sequence < 5 && rival.szone[4 - effect.sequence] != null) return true;
+            if (source is { negated: false, triggerLoc: YgoConstants.LOCATION_MZONE } &&
+                source.triggerPlayer != prompt.playerId && source.triggerSeq < rival.mzone.Length &&
+                rival.mzone[source.triggerSeq] is { IsFaceUp: true, effectsDisabled: false } active && active.code == source.code &&
+                (effect.code != InfiniteImpermanence || active.code != BlueEyesTyrant)) return true;
+
+            // With no threat on the chain, do not spend temporary suppression immediately before it expires.
+            if (source == null && (duel.CurrentPhase == YgoConstants.PHASE_END ||
+                duel.CurrentPhase == YgoConstants.PHASE_MAIN2 && duel.TurnPlayer == prompt.playerId)) return false;
+            return rival.mzone.Any(card => IsUsefulFieldNegationTarget(card, effect.code));
+        }
+
+        private static bool IsUsefulFieldNegationTarget(LiveCardState card, uint negate) =>
+            card is { IsFaceUp: true, effectsDisabled: false } && (card.type & YgoConstants.TYPE_EFFECT) != 0 &&
+            !OffFieldOnly(card.code) && (negate != InfiniteImpermanence || card.code != BlueEyesTyrant);
+
         internal static int ChooseHandtrapTarget(DuelSession duel, DuelPrompt prompt)
         {
             int count = duel.CurrentChain.Count;
@@ -485,15 +511,14 @@ namespace YGOPortable.AI
                 }
             }
 
-            if (activation.code != InfiniteImpermanence || !prompt.candidates.Any(card => card.code == BlueEyesTyrant)) return -1;
             var rival = duel.Players[1 - prompt.playerId];
             int best = -1;
             int bestPriority = int.MinValue;
             for (int i = 0; i < prompt.candidates.Count; i++)
             {
                 var target = prompt.candidates[i];
-                if (target.code == BlueEyesTyrant || target.controller == prompt.playerId || target.location != YgoConstants.LOCATION_MZONE ||
-                    target.sequence >= rival.mzone.Length || rival.mzone[target.sequence]?.effectsDisabled != false) continue;
+                if (target.controller == prompt.playerId || target.location != YgoConstants.LOCATION_MZONE ||
+                    target.sequence >= rival.mzone.Length || !IsUsefulFieldNegationTarget(rival.mzone[target.sequence], activation.code)) continue;
                 int priority = SelectionPriority(duel, prompt.playerId, target, Negate);
                 if (priority <= bestPriority) continue;
                 best = i;
@@ -806,6 +831,26 @@ namespace YGOPortable.AI
                 return (prompt.hintTimingOther & (YgoConstants.TIMING_SPSUMMON | YgoConstants.TIMING_ATTACK)) == 0 ? -.65f : 0;
             uint effectTypes = CardDatabase.Get(target.code)?.DeckEffectCategories ?? 0;
             return (effectTypes & Development) != 0 ? 1.1f : -.2f;
+        }
+
+        internal static float ChokepointPriority(DuelSession duel, DuelPrompt prompt, SelectableCardItem response)
+        {
+            if (!ResponseNegates.Contains(response.code) || duel.CurrentChain.LastOrDefault() is not
+                { negated: false } source || source.triggerPlayer == prompt.playerId) return 0;
+            if (response.code == AshBlossom && source.code == OriginalSinfulSpoils) return 4f;
+            uint categories = CardDatabase.Get(source.code)?.DeckEffectCategories ?? 0;
+            return (categories & Development) != 0 ? 1.8f : 0f;
+        }
+
+        internal static int ChainProtectionPriority(SelectableCardItem trigger)
+        {
+            var card = CardDatabase.Get(trigger.code);
+            if (card == null) return 0;
+            uint categories = card.DeckEffectCategories;
+            const uint development = (1u << 6) | (1u << 7) | (1u << 18), search = 1u << 5, draw = 1u << 4;
+            if ((categories & development) != 0) return 4;
+            if ((categories & search) != 0) return 3;
+            return (categories & draw) != 0 ? 1 : 0;
         }
 
         internal static bool IsRemoval(ulong hint) => hint is Destroy or Banish or SendToGrave or ReturnToHand or
