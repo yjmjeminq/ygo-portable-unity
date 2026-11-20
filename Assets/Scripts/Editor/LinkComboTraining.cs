@@ -29,15 +29,34 @@ namespace YGOPortable.Editor
             internal bool first;
         }
 
+        private sealed class SeatResults
+        {
+            internal int games, linkThree, linkFour, interactive, wins, losses, draws, capped;
+            internal double score, board, damage, removed;
+            internal double Mean => score / Math.Max(1, games);
+            internal double MeanBoard => board / Math.Max(1, games);
+            internal double MatchRate => (wins + .5 * draws) / Math.Max(1, games);
+            internal string OpeningSummary() => $"{games} games, Link-3+ {linkThree}, Link-4+ {linkFour}, " +
+                $"interactive {interactive}, board {MeanBoard:F2}, damage {damage / Math.Max(1, games):P1}, " +
+                $"removed {removed / Math.Max(1, games):F2}, reward {Mean:F2}, {capped} capped";
+            internal string MatchSummary() => $"{wins}W {losses}L {draws}D, {capped} capped";
+        }
+
         private sealed class Results
         {
-            internal int games, linkThree, linkFour, interactive, wins, losses, draws, retries;
+            internal int games, linkThree, linkFour, interactive, wins, losses, draws, retries, capped;
             internal double score;
+            internal readonly SeatResults First = new SeatResults();
+            internal readonly SeatResults Second = new SeatResults();
             internal readonly Dictionary<uint, int> Finishers = new Dictionary<uint, int>();
-            internal double Mean => score / games;
-            internal double SetupQuality => Mean + (.65 * linkThree + 1.1 * linkFour) / games;
-            internal string OpeningSummary() => $"{games} openings, Link-3+ {linkThree}, Link-4+ {linkFour}, interactive Link {interactive}, mean {Mean:F2}, {retries} retries";
-            internal string MatchSummary() => $"{wins}W {losses}L {draws}D in {games}, {retries} retries";
+            internal double Mean => score / Math.Max(1, games);
+            internal double SetupQuality => .5 * (First.Mean + Second.Mean) +
+                (.65 * First.linkThree + 1.1 * First.linkFour) / Math.Max(1, First.games) -
+                4.0 * capped / Math.Max(1, games);
+            internal string OpeningSummary() => $"{games} openings, first [{First.OpeningSummary()}], " +
+                $"second [{Second.OpeningSummary()}], {retries} retries";
+            internal string MatchSummary() => $"{wins}W {losses}L {draws}D in {games}, first [{First.MatchSummary()}], " +
+                $"second [{Second.MatchSummary()}], {retries} retries";
         }
 
         internal static void VerifyIncluded()
@@ -82,11 +101,16 @@ namespace YGOPortable.Editor
                     var fixtures = CreateOpenings(decks, TrainingDecks, HandsPerDeck, 59501 + round);
                     var candidates = new float[Population][];
                     candidates[0] = center;
-                    candidates[1] = finalists.Count == 0 ? initial : finalists[^1];
-                    for (int i = 2; i < candidates.Length; i++) candidates[i] = Sample(center, random, .8f / (1 + .3f * round));
+                    candidates[1] = finalists.Count == 0 ? initial : finalists[^4];
+                    for (int i = 2; i < candidates.Length - 2; i++)
+                        candidates[i] = Sample(center, random, .8f / (1 + .3f * round));
+                    candidates[^2] = Sample(initial, random, .08f);
+                    candidates[^1] = Sample(initial, random, .08f);
                     var ranked = candidates.Select(weights => (weights, outcome: Run(general, new LinkComboPolicy(weights), fixtures, fullDuel: false)))
                         .OrderByDescending(candidate => candidate.outcome.SetupQuality).ToArray();
-                    finalists.Add(ranked[0].weights);
+                    finalists.AddRange(ranked.Take(2).Select(candidate => candidate.weights));
+                    finalists.Add(candidates[^2]);
+                    finalists.Add(candidates[^1]);
                     var elite = ranked.Take(3).Select(candidate => candidate.weights).ToArray();
                     center = Enumerable.Range(0, initial.Length).Select(i => elite.Average(weights => weights[i])).ToArray();
                     Debug.Log($"[LINK TRAIN] Round {round + 1}/{Rounds}, {ranked[0].outcome.OpeningSummary()} at {elapsed.Elapsed.TotalSeconds:F1}s");
@@ -96,16 +120,40 @@ namespace YGOPortable.Editor
                 var validation = CreateOpenings(decks, TrainingDecks, 7, 92180);
                 var fullValidation = CreateOpenings(decks, TrainingDecks, 3, 66457);
                 var previousValidation = Run(general, previousPolicy, validation, fullDuel: false);
-                var best = finalists.Where(weights => !weights.SequenceEqual(initial)).Select(weights => new LinkComboPolicy(weights))
-                    .Select(policy => (policy, opening: Run(general, policy, validation, fullDuel: false)))
-                    .Where(candidate => KeepsLinkStrength(previousValidation, candidate.opening))
+                var previousValidationMatches = Run(general, previousPolicy, fullValidation, fullDuel: true);
+                Debug.Log($"[LINK VALIDATE] Baseline openings {previousValidation.OpeningSummary()}");
+                Debug.Log($"[LINK VALIDATE] Baseline matches {previousValidationMatches.MatchSummary()}");
+                var validated = new List<(string name, LinkComboPolicy policy, Results opening)>();
+                foreach (var candidate in ValidationCandidates(initial, finalists))
+                {
+                    var policy = new LinkComboPolicy(candidate.weights);
+                    var opening = Run(general, policy, validation, fullDuel: false);
+                    bool retained = KeepsLinkStrength(previousValidation, opening);
+                    Debug.Log($"[LINK VALIDATE] {candidate.name}, retained={retained}, " +
+                        $"objective {opening.SetupQuality:F4}, {opening.OpeningSummary()}, " +
+                        $"gate deltas Link-3 {opening.linkThree - previousValidation.linkThree}, " +
+                        $"Link-4 {opening.linkFour - previousValidation.linkFour}, " +
+                        $"first board {opening.First.MeanBoard - previousValidation.First.MeanBoard:F6}, " +
+                        $"first reward {opening.First.Mean - previousValidation.First.Mean:F6}, " +
+                        $"second reward {opening.Second.Mean - previousValidation.Second.Mean:F6}");
+                    if (retained) validated.Add((candidate.name, policy, opening));
+                }
+
+                var best = validated
                     .OrderByDescending(candidate => candidate.opening.SetupQuality).Take(3)
-                    .Select(candidate => (candidate.policy, candidate.opening,
-                        match: Run(general, candidate.policy, fullValidation, fullDuel: true)))
+                    .Select(candidate =>
+                    {
+                        var match = Run(general, candidate.policy, fullValidation, fullDuel: true);
+                        Debug.Log($"[LINK VALIDATE] {candidate.name} matches, retained=" +
+                            $"{KeepsMatchStrength(previousValidationMatches, match)}, {match.MatchSummary()}");
+                        return (candidate.policy, candidate.opening, match);
+                    })
+                    .Where(candidate => KeepsMatchStrength(previousValidationMatches, candidate.match))
                     .OrderByDescending(candidate => candidate.opening.SetupQuality + 2.0 * (candidate.match.wins + .5 * candidate.match.draws) / candidate.match.games)
                     .FirstOrDefault();
                 if (best.policy == null)
-                    throw new InvalidOperationException("No trained Link candidate retained the validation Link-3 and Link-4 development rates.");
+                    throw new InvalidOperationException($"No trained Link candidate passed opening and match preservation. " +
+                        $"{validated.Count} candidates passed the opening gate.");
                 Debug.Log($"[LINK TRAIN] Selected after {trainingOpenings * TrainingDecks.Length} trained openings. Validation {best.opening.OpeningSummary()}, {best.match.MatchSummary()}");
 
                 var test = CreateOpenings(decks, TestDecks, 12, 788353);
@@ -124,8 +172,8 @@ namespace YGOPortable.Editor
                 Debug.Log($"[LINK TRAIN] Time {elapsed.Elapsed.TotalSeconds:F1}s, native script errors {errors.Count}");
                 if (errors.Count > 0) Debug.LogWarning(string.Join("\n", errors.Take(3)));
 
-                if (errors.Count != 0 || !KeepsLinkStrength(previous, trained) || trainedMatches.retries != 0 ||
-                    trainedMatches.wins + .5 * trainedMatches.draws < previousMatches.wins + .5 * previousMatches.draws)
+                if (errors.Count != 0 || !KeepsLinkStrength(previous, trained) ||
+                    trained.SetupQuality <= previous.SetupQuality || !KeepsMatchStrength(previousMatches, trainedMatches))
                     throw new InvalidOperationException("The trained Link policy did not improve the held-out boards without losing match strength.");
 
                 string asset = $"Assets/Resources/{LinkComboPolicy.ResourceName}.json";
@@ -148,13 +196,39 @@ namespace YGOPortable.Editor
 
         private static bool KeepsLinkStrength(Results previous, Results candidate) =>
             candidate.linkThree >= previous.linkThree && candidate.linkFour >= previous.linkFour &&
-            candidate.retries == 0 && candidate.Mean >= previous.Mean - .15;
+            candidate.retries == 0 && candidate.capped == 0 && candidate.Mean >= previous.Mean &&
+            candidate.First.MeanBoard >= previous.First.MeanBoard && candidate.First.Mean >= previous.First.Mean &&
+            candidate.Second.Mean >= previous.Second.Mean;
+
+        private static bool KeepsMatchStrength(Results previous, Results candidate) =>
+            candidate.retries == 0 && candidate.capped == 0 &&
+            candidate.First.games == previous.First.games && candidate.Second.games == previous.Second.games &&
+            candidate.First.MatchRate >= previous.First.MatchRate && candidate.Second.MatchRate >= previous.Second.MatchRate;
+
+        private static IEnumerable<(string name, float[] weights)> ValidationCandidates(float[] initial, List<float[]> finalists)
+        {
+            var seen = new List<float[]>();
+            var fractions = new[] { 1f, .25f, .08f };
+            for (int i = 0; i < finalists.Count; i++)
+            {
+                foreach (float fraction in fractions)
+                {
+                    var weights = Enumerable.Range(0, initial.Length)
+                        .Select(feature => initial[feature] + fraction * (finalists[i][feature] - initial[feature])).ToArray();
+                    if (weights.SequenceEqual(initial) || seen.Any(previous => weights.SequenceEqual(previous))) continue;
+                    seen.Add(weights);
+                    yield return ($"candidate {i + 1}, residual {fraction:P0}", weights);
+                }
+            }
+        }
 
         private static Opening[] CreateOpenings(Dictionary<int, PresetDeckInfo> decks, int[] ids, int hands, int seed)
         {
             var random = new System.Random(seed);
             var validIds = ids.Where(id => decks.ContainsKey(id)).ToArray();
             var validRivals = RivalDecks.Where(id => decks.ContainsKey(id)).ToArray();
+            if (validIds.Length == 0 || validRivals.Length == 0)
+                throw new InvalidOperationException("Link training requires candidate and rival decks.");
             return validIds.SelectMany(id => Enumerable.Range(0, hands).Select(hand => new Opening
             {
                 deck = decks[id], opponent = decks[validRivals[random.Next(validRivals.Length)]], first = (hand & 1) == 0,
@@ -185,31 +259,50 @@ namespace YGOPortable.Editor
                 int comboTurn = opening.first ? 1 : 2;
                 var candidate = new TacticalAI(general, link);
                 var opponent = new TacticalAI(general);
+                int opposingStartLife = 0, opposingStartCards = 0;
                 int limit = fullDuel ? 1000 : 180;
                 for (int step = 0; step < limit && !duel.IsFinished && duel.RetryCount <= 3; step++)
                 {
                     if (duel.TurnNumber > (fullDuel ? 65 : comboTurn)) break;
                     var prompt = duel.ActivePrompt;
                     if (prompt == null) { duel.StepUntilPrompt(); continue; }
+                    if (duel.TurnNumber == comboTurn && prompt.playerId == seat && opposingStartLife == 0)
+                    {
+                        var rival = duel.Players[1 - seat];
+                        opposingStartLife = rival.lp;
+                        opposingStartCards = PublicFieldCards(rival);
+                    }
                     byte[] response = (prompt.playerId == seat ? candidate : opponent).ComputeResponse(duel, prompt);
-                    if (!fullDuel && prompt.playerId == seat && prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD &&
-                        (BitConverter.ToInt32(response, 0) & 0xffff) is 6 or 7) break;
+                    // Going-second openings include Battle and Main Phase 2, so a finisher earns its actual damage.
                     duel.SubmitResponse(response);
                 }
+                var side = opening.first ? results.First : results.Second;
                 results.games++;
+                side.games++;
                 results.retries += duel.RetryCount;
-                if (fullDuel)
+                if (!duel.IsFinished && (fullDuel || duel.TurnNumber <= comboTurn))
                 {
-                    if (!duel.IsFinished || duel.Winner < 0 || duel.Winner > 1) results.draws++;
-                    else if (duel.Winner == seat) results.wins++;
-                    else results.losses++;
+                    results.capped++;
+                    side.capped++;
                 }
-                else MeasureBoard(duel, seat, !opening.first && duel.CurrentPhase == YgoConstants.PHASE_MAIN1, results);
+                else if (duel.IsFinished)
+                {
+                    if (duel.Winner == 2) { results.draws++; side.draws++; }
+                    else if (duel.Winner == seat) { results.wins++; side.wins++; }
+                    else if (duel.Winner == 1 - seat) { results.losses++; side.losses++; }
+                    else { results.capped++; side.capped++; }
+                }
+                if (!fullDuel)
+                    MeasureBoard(duel, seat, opening.first, opposingStartLife, opposingStartCards, side, results);
             }
             return results;
         }
 
-        private static void MeasureBoard(DuelSession duel, int seat, bool canBreakBoard, Results results)
+        private static int PublicFieldCards(PlayerFieldSnapshot player) =>
+            player.mzone.Count(card => card != null) + player.szone.Count(card => card != null);
+
+        private static void MeasureBoard(DuelSession duel, int seat, bool first, int opposingStartLife,
+            int opposingStartCards, SeatResults side, Results results)
         {
             var own = duel.Players[seat];
             int highest = 0, interaction = 0;
@@ -224,11 +317,22 @@ namespace YGOPortable.Editor
                 results.Finishers.TryGetValue(monster.code, out int count);
                 results.Finishers[monster.code] = count + 1;
             }
-            if (highest >= 3) results.linkThree++;
-            if (highest >= 4) results.linkFour++;
-            if (interaction > 0) results.interactive++;
-            results.score += .7 * highest + .65 * interaction +
-                .75 * ComboSearch.BoardValue(duel, (byte)seat, canBreakBoard) - duel.RetryCount * 1.5;
+            if (highest >= 3) { results.linkThree++; side.linkThree++; }
+            if (highest >= 4) { results.linkFour++; side.linkFour++; }
+            if (interaction > 0) { results.interactive++; side.interactive++; }
+            var rival = duel.Players[1 - seat];
+            double board = ComboSearch.BoardValue(duel, (byte)seat, canBattle: false);
+            double damage = opposingStartLife > 0 ? Math.Clamp((opposingStartLife - rival.lp) / (double)opposingStartLife, 0, 1) : 0;
+            int removed = Math.Max(0, opposingStartCards - PublicFieldCards(rival));
+            bool won = duel.IsFinished && duel.Winner == seat;
+            double reward = first ? .7 * highest + .65 * interaction + .75 * board :
+                .25 * highest + .3 * interaction + .5 * board + 3.0 * damage + .75 * removed + (won ? 6.0 : 0);
+            reward -= duel.RetryCount * 1.5;
+            side.score += reward;
+            side.board += board;
+            side.damage += damage;
+            side.removed += removed;
+            results.score += reward;
         }
     }
 }
