@@ -989,7 +989,9 @@ namespace YGOPortable.AI
 
         internal static int? ChooseDefensiveReposition(DuelSession duel, DuelPrompt prompt, bool beforeBattle = false)
         {
-            int threat = StrongestAttacker(duel.Players[1 - prompt.playerId]);
+            int opponent = 1 - prompt.playerId;
+            int threat = StrongestAttacker(duel.Players[opponent]);
+            if (!beforeBattle) threat = Math.Max(threat, duel.PotentialReturningAttack(opponent));
             if (threat <= 0) return null;
             var own = duel.Players[prompt.playerId];
             if (beforeBattle && StrongestAttacker(own) >= threat) return null;

@@ -302,8 +302,22 @@ namespace YGOPortable.Core
         public PlayerFieldSnapshot[] Players { get; } = { new PlayerFieldSnapshot(), new PlayerFieldSnapshot() };
         public List<ChainLinkInfo> CurrentChain { get; } = new List<ChainLinkInfo>();
         private HashSet<(byte Player, ulong Description)> _activatedMonsterEffects;
+        private HashSet<(byte FieldController, byte BanishController, uint Code, uint? CardId)> _temporaryAttackers;
         internal bool HasActivatedMonsterEffect(byte player, ulong description) =>
             _activatedMonsterEffects?.Contains((player, description)) == true;
+        internal int PotentialReturningAttack(int player)
+        {
+            if (_temporaryAttackers == null) return 0;
+            int attack = 0;
+            foreach (var card in _temporaryAttackers)
+            {
+                if (card.FieldController != player) continue;
+                foreach (var banished in Players[card.BanishController].banished)
+                    if (banished.IsFaceUp && banished.code == card.Code)
+                        attack = Math.Max(attack, banished.attack);
+            }
+            return attack;
+        }
         internal ChainLinkInfo ResolvingChainLink => _resolvingChainLink;
         internal ChainLinkInfo SelectionChainLink => _resolvingChainLink ?? (CurrentChain.Count == 1 ? CurrentChain[0] : null);
         public List<(int chainNumber, uint code)> SolvedChainLinks { get; } = new List<(int, uint)>();
@@ -373,6 +387,7 @@ namespace YGOPortable.Core
             ActivePrompt = null;
             CurrentChain.Clear();
             _activatedMonsterEffects?.Clear();
+            _temporaryAttackers?.Clear();
             _resolvingChainLink = null;
             SolvedChainLinks.Clear();
             Logs.Clear();
@@ -967,6 +982,20 @@ namespace YGOPortable.Core
 
         private void PublishCardMove(CardMoveEvent move)
         {
+            if (move.fromLoc == YgoConstants.LOCATION_MZONE && move.fromPos == YgoConstants.POS_FACEUP_ATTACK &&
+                move.toLoc == YgoConstants.LOCATION_REMOVED && (move.toPos & YgoConstants.POS_FACEUP) != 0 &&
+                move.TemporarilyBanished && move.code != 0)
+            {
+                _temporaryAttackers ??= new();
+                _temporaryAttackers.Add((move.fromCon, move.toCon, move.code, move.TemporaryBanishCardId));
+            }
+            else if (_temporaryAttackers?.Count > 0 && move.fromLoc == YgoConstants.LOCATION_REMOVED &&
+                move.toLoc != YgoConstants.LOCATION_REMOVED)
+            {
+                _temporaryAttackers.RemoveWhere(card => card.BanishController == move.fromCon && card.Code == move.code &&
+                    (!move.TemporaryBanishCardId.HasValue || !card.CardId.HasValue || card.CardId == move.TemporaryBanishCardId));
+            }
+
             if (_resolvingChainLink is { negated: false } source && source.triggerPlayer != TurnPlayer &&
                 move.fromCon == TurnPlayer &&
                 (move.fromLoc is YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE) &&
@@ -1044,6 +1073,7 @@ namespace YGOPortable.Core
                 {
                     _confirmedCards.Clear();
                     _activatedMonsterEffects?.Clear();
+                    _temporaryAttackers?.Clear();
                     TurnPlayer = br.ReadByte();
                     TurnNumber++;
                     TurnInterruptions = 0;

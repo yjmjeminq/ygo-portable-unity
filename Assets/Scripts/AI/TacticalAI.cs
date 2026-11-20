@@ -1302,8 +1302,8 @@ namespace YGOPortable.AI
             var oppMons = s.Players[opp].mzone.Where(m => m != null).ToList();
             foreach (var m in s.Players[playerId].mzone)
             {
-                if (m == null || !m.IsAttack) continue;
-                if (oppMons.Count == 0) return true;
+                if (m?.IsFaceUp != true || !m.IsAttack) continue;
+                if (oppMons.Count == 0 && DuelCombat.HasWorthwhileDirectAttack(m)) return true;
                 foreach (var om in oppMons)
                 {
                     if (!om.IsFaceUp && m.attack >= 1400) return true;

@@ -203,6 +203,20 @@ namespace YGOPortable.AI
             return preferred;
         }
 
+        internal static bool HasWorthwhileDirectAttack(LiveCardState attacker)
+        {
+            if (attacker.attack > 0) return true;
+            if (attacker.effectsDisabled || (attacker.type & YgoConstants.TYPE_EFFECT) == 0) return false;
+            if (CardDatabase.Get(attacker.code)?.desc is not { Length: > 0 } text) return true;
+            return text.Contains("공격 선언") || text.Contains("직접 공격") || text.Contains("데미지 스텝") ||
+                text.Contains("데미지 계산") || text.Contains("전투 데미지를 주지") ||
+                text.IndexOf("declares an attack", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                text.IndexOf("declares a direct attack", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                text.IndexOf("damage step", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                text.IndexOf("damage calculation", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                text.IndexOf("inflicts no battle damage", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
         internal static int ChooseAttacker(DuelSession duel, DuelPrompt prompt, bool mustAttack)
         {
             var own = duel.Players[prompt.playerId];
@@ -222,7 +236,7 @@ namespace YGOPortable.AI
                 var attacker = GetMonster(own, action.sequence);
                 if (attacker == null) continue;
                 int value = int.MinValue;
-                if (action.directAttackable)
+                if (action.directAttackable && (mustAttack || HasWorthwhileDirectAttack(attacker)))
                 {
                     value = attacker.attack >= rival.lp ? Lethal + attacker.attack : attacker.attack + 500;
                 }
