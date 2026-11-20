@@ -399,6 +399,10 @@ namespace YGOPortable.AI
 
         private int? ChoosePriorityMainAction(DuelSession session, DuelPrompt prompt, bool planLinks)
         {
+            if (DddTurnPlan.ChooseUpkeepRescue(session, prompt,
+                (command, item) => CanUseMainAction(session, prompt, planLinks, command, item)) is int rescue)
+                return rescue;
+
             if (DuelTactics.ChooseArchfiendEndPhaseUpgrade(session, prompt) is int upgrade &&
                 CanUseMainAction(session, prompt, planLinks, 1, prompt.spSummonable[upgrade]))
                 return (upgrade << 16) | 1;
