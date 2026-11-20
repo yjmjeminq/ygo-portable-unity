@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "monarch",
+  "sourceInput": "Logs/AiBenchmark/DestructionAgent/lock-opening-audit/before/input.json",
+  "sourceInputSha256": "7a6ff05257f76d472c9e846ac0ee84cb79a3b3afbbb7f5c06418d90332955cc4",
+  "matchup": 1,
+  "seed": 12,
+  "candidate": 1,
+  "nativeSeed": ["5209222135","8442532269","12753612579","17423949565"],
+  "resume": 15,
+  "stopTurn": 3,
+  "maxLiveResponses": 180,
+  "expectation": "Graceful discards Prime54241725 plus expendable; retain hand Pantheism draw and native Tribute Erebus23064604 with active Domain84171830.",
+  "decks": [{"id":20679,"main":[95440946,95440946,95440946,20590515,20590515,20590515,93191801,93191801,93191801,56984514,56984514,67007102,67007102,95034141,95034141,22669793,20612097,20612097,20612097,31434645,31434645,31434645,24299458,24299458,68829754,68829754,71278040,71278040,42141493,42141493,25311006,25311006,84192580,84192580,35269904,35269904,52038441,52038441,79571449,55144522],"extra":[90448279,90448279,86066372,26096328,26096328,56910167,56910167,73964868,73964868,98978921,98978921,2857636,37129797,38342335,60303245]},{"id":20675,"main":[23064604,23064604,23064604,33609262,33609262,33609262,79844764,79844764,79844764,84171830,84171830,84171830,54241725,54241725,19870120,22842126,61466310,9283801,9283801,63899196,63899196,59983249,42141493,42141493,24299458,24299458,25311006,25311006,84192580,84192580,35269904,35269904,52038441,52038441,87126721,98829635,10045474,10045474,79571449,55144522],"extra":[]}],
+  "boundary": {"turn":2,"phase":4,"player":1,"message":11,"hint":0,"answer":"05-00-01-00"},
+  "prefix": [
+    {"turn":1,"phase":1,"player":0,"message":16,"hint":0,"answer":"00-00-00-00"},
+    {"turn":1,"phase":1,"player":1,"message":16,"hint":0,"answer":"00-00-00-00"},
+    {"turn":1,"phase":1,"player":0,"message":16,"hint":0,"answer":"00-00-00-00"},
+    {"turn":1,"phase":4,"player":0,"message":11,"hint":0,"answer":"05-00-00-00"},
+    {"turn":1,"phase":4,"player":0,"message":18,"hint":35269904,"answer":"00-08-02"},
+    {"turn":1,"phase":4,"player":0,"message":15,"hint":510,"answer":"00-00-00-00-01-00-00-00-00-00-00-00"},
+    {"turn":1,"phase":4,"player":0,"message":18,"hint":25311006,"answer":"00-08-01"},
+    {"turn":1,"phase":4,"player":0,"message":11,"hint":0,"answer":"05-00-00-00"},
+    {"turn":1,"phase":4,"player":0,"message":18,"hint":95034141,"answer":"00-08-02"},
+    {"turn":1,"phase":4,"player":0,"message":11,"hint":0,"answer":"04-00-00-00"},
+    {"turn":1,"phase":4,"player":0,"message":18,"hint":24299458,"answer":"00-08-03"},
+    {"turn":1,"phase":4,"player":0,"message":11,"hint":0,"answer":"07-00-00-00"},
+    {"turn":1,"phase":512,"player":0,"message":16,"hint":0,"answer":"00-00-00-00"},
+    {"turn":2,"phase":1,"player":1,"message":16,"hint":0,"answer":"00-00-00-00"},
+    {"turn":2,"phase":1,"player":1,"message":18,"hint":79844764,"answer":"01-08-02"}
+  ]
+}

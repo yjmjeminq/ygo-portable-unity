@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "note": "Pinned native/card/script bytes and complete fixture files; AI source/policy changes are fingerprinted at runtime rather than pinned. Frozen deck code arrays are checked against the corresponding current preset before replay.",
+  "fixtures": [
+    "sage.json",
+    "coyote.json",
+    "ddd.json",
+    "snake.json",
+    "monarch.json",
+    "connector.json"
+  ],
+  "files": [
+    {
+      "path": "Assets/Plugins/x86_64/ygoengine.dll",
+      "sha256": "93936408a0edad5d952045d4f7d1362e5fe7353a1a6c6acf989321f7a1f84dbe"
+    },
+    {
+      "path": "Assets/StreamingAssets/cards_prop.bin",
+      "sha256": "c3528fa5fc6f5c7b4f36dd51ec9c6126b7ae774e87cef9ec461b7647ae0400e6"
+    },
+    {
+      "path": "Assets/StreamingAssets/cardscripts.pack",
+      "sha256": "404bfbc08cc7eed6426cdb6b93f7fb5d944e7a70ee9d3e36960d4c42b55f662f"
+    },
+    {
+      "path": "Tools/AiRegression/sage.json",
+      "sha256": "b000356464c890b2ba084c03b6e1afdd762bc8ed40d83a4412c01e9b97e3d4d9"
+    },
+    {
+      "path": "Tools/AiRegression/coyote.json",
+      "sha256": "536a02290d580254642d84a3cd4b0abe86e2beefda11a0e1fa3319322c6ff8f1"
+    },
+    {
+      "path": "Tools/AiRegression/ddd.json",
+      "sha256": "7696c159ef6361acd6586c6c6936a26cec51e531e13c3017d21631e619ea6831"
+    },
+    {
+      "path": "Tools/AiRegression/snake.json",
+      "sha256": "bf353ed9237480aec27ecf8b7fa99aab8677115dd95ecd9a279c8bea9f1c12a6"
+    },
+    {
+      "path": "Tools/AiRegression/monarch.json",
+      "sha256": "364dfa308798b453926d9e85aea15c7d33a927492d48a9f8de524f47df0aae63"
+    },
+    {
+      "path": "Tools/AiRegression/connector.json",
+      "sha256": "dc63ed2625387807138c04c29084253b3e019914c798859e7329490404ee49e1"
+    },
+    {
+      "path": "Assets/StreamingAssets/cards_kr.json",
+      "sha256": "3af9d7c3c05b1fa14e80ceef6886525805752c067a2c9014ddd36d6f515fa9c7"
+    },
+    {
+      "path": "Assets/StreamingAssets/deck_effect_categories.bin",
+      "sha256": "d425f6a312ac5025176ffac655c3f293bb5c12495392e52616f011bbc9193ada"
+    }
+  ]
+}

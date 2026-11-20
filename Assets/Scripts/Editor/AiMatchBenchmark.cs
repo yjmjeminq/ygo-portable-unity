@@ -51,12 +51,24 @@ namespace YGOPortable.Editor
             internal readonly Func<DuelSession, DuelPrompt, byte[]> Choose;
             internal readonly Func<int> Branches;
             internal readonly Func<int> ChosenAlternatives;
+            internal readonly Func<double> MaxPlanMilliseconds;
+            internal readonly Func<double> LastPlanMilliseconds;
 
             internal Pilot(Func<DuelSession, DuelPrompt, byte[]> choose, Func<int> branches, Func<int> chosenAlternatives = null)
+                : this(choose, branches, chosenAlternatives, null) { }
+
+            internal Pilot(Func<DuelSession, DuelPrompt, byte[]> choose, Func<int> branches,
+                Func<int> chosenAlternatives, Func<double> maxPlanMilliseconds)
+                : this(choose, branches, chosenAlternatives, maxPlanMilliseconds, null) { }
+
+            internal Pilot(Func<DuelSession, DuelPrompt, byte[]> choose, Func<int> branches,
+                Func<int> chosenAlternatives, Func<double> maxPlanMilliseconds, Func<double> lastPlanMilliseconds)
             {
                 Choose = choose;
                 Branches = branches;
                 ChosenAlternatives = chosenAlternatives;
+                MaxPlanMilliseconds = maxPlanMilliseconds;
+                LastPlanMilliseconds = lastPlanMilliseconds;
             }
         }
 
@@ -89,14 +101,24 @@ namespace YGOPortable.Editor
             public int equipRuleLosses, selfDestructionWithoutEquipRuleLoss;
             public int selfDefeatTurn, selfDefeatDamage;
             public uint selfDefeatEffect;
+            public int unusedDevelopmentEndTurns, unusedDevelopmentOptions;
+            public int unusedDevelopmentEndTurnsOnLoss, unusedDevelopmentOptionsOnLoss;
+            public int linkMaterialDowngrades, higherLinkMaterialsSpent;
+            public int slowestTurn, slowestMessage, slowestPhase, slowestStep;
+            public int slowestOrdinaryTurn, slowestOrdinaryMessage, slowestOrdinaryPhase, slowestOrdinaryStep;
             public bool reachedMain, methodAvailable, methodReached, aceReached;
+            public bool planTimingAvailable;
+            public bool ordinaryTimingSeparated;
             public uint method;
             public uint[] initial;
-            public double decisionMs, slowestMs, boardTotal, earlyBoard;
+            public double decisionMs, slowestMs, maxPlanMs, boardTotal, earlyBoard;
+            public double ordinaryDecisionMs, slowestOrdinaryMs;
             public string style;
             public string[] earlyActions, failures;
             public DestructionTrace[] destructionTraces;
             public ExposureTrace[] exposureTraces;
+            public UnusedDevelopmentTrace[] unusedDevelopmentTraces;
+            public LinkMaterialDowngradeTrace[] linkMaterialDowngradeTraces;
         }
 
         [Serializable]
@@ -116,6 +138,32 @@ namespace YGOPortable.Editor
             public string alternative;
             public bool endPhaseReposition, attacked, battlePayoff, fieldEffectResolved;
             public bool targetedNextTurn, lostByBattle;
+        }
+
+        // Native options and material movements are raw observations, not proof of a blunder.
+        [Serializable]
+        private sealed class DevelopmentOption
+        {
+            public int command;
+            public uint card, location, sequence;
+            public ulong description;
+        }
+
+        [Serializable]
+        private sealed class UnusedDevelopmentTrace
+        {
+            public int turn, phase, step;
+            public bool eventualLoss;
+            public DevelopmentOption[] options;
+        }
+
+        [Serializable]
+        private sealed class LinkMaterialDowngradeTrace
+        {
+            public int turn, phase, step, targetRank;
+            public uint target;
+            public uint[] materials;
+            public int[] materialRanks;
         }
 
         private static readonly HashSet<uint> Handtraps = new()
@@ -173,11 +221,14 @@ namespace YGOPortable.Editor
                 var general = DuelAiPolicy.LoadIncluded() ?? throw new InvalidOperationException("Missing general AI policy.");
                 var links = LinkComboPolicy.LoadIncluded() ?? throw new InvalidOperationException("Missing Link AI policy.");
                 bool styleSuite = Environment.GetEnvironmentVariable("YGO_BENCH_STYLE_SUITE") == "1";
+                bool fullSuite = Environment.GetEnvironmentVariable("YGO_BENCH_FULL_SUITE") == "1";
                 bool openingOnly = Environment.GetEnvironmentVariable("YGO_BENCH_OPENINGS_ONLY") == "1";
                 bool captureReplays = Environment.GetEnvironmentVariable("YGO_BENCH_CAPTURE_REPLAYS") == "1";
+                bool randomOpponent = Environment.GetEnvironmentVariable("YGO_BENCH_RANDOM_OPPONENT") == "1";
                 string fixture = Environment.GetEnvironmentVariable("YGO_BENCH_FIXTURE");
-                var matchups = styleSuite ? StyleMatchups : Matchups;
-                if (styleSuite)
+                var matchups = fullSuite ? Matchups.Concat(StyleMatchups).ToArray() : styleSuite ? StyleMatchups : Matchups;
+                if (randomOpponent) Debug.Log($"[AI BENCH] Facing {RandomLegalPilot.Version} with independent fixed seeds.");
+                if (fullSuite || styleSuite)
                 {
                     VerifyDeckStyles(decks);
                     VerifyResourceStrategy(decks, general, links);
@@ -187,11 +238,16 @@ namespace YGOPortable.Editor
                 {
                     if (referenceOnly) return baseline(level);
                     var ai = new TacticalAI(general, links, searchCombos: true);
+                    double maxPlanMs = 0, lastPlanMs = 0;
                     return new Pilot((duel, prompt) =>
                     {
+                        long started = Stopwatch.GetTimestamp();
                         while (!ai.AdvanceComboPlanning(duel, prompt)) { }
+                        lastPlanMs = (Stopwatch.GetTimestamp() - started) * 1000.0 / Stopwatch.Frequency;
+                        maxPlanMs = Math.Max(maxPlanMs, lastPlanMs);
                         return ai.ComputeResponse(duel, prompt);
-                    }, () => ai.SimulatedComboBranches, () => ai.ChosenComboAlternatives);
+                    }, () => ai.SimulatedComboBranches, () => ai.ChosenComboAlternatives,
+                        () => maxPlanMs, () => lastPlanMs);
                 }
 
                 if (Environment.GetEnvironmentVariable("YGO_BENCH_ROSTER_LEVELS") == "1")
@@ -213,10 +269,13 @@ namespace YGOPortable.Editor
                         var second = decks[(seed & 1) == 0 ? scenario.SecondDeck : scenario.FirstDeck];
                         int firstLevel = OpponentDeckLevels.GetLevel(first.charId, first.id);
                         int secondLevel = OpponentDeckLevels.GetLevel(second.charId, second.id);
-                        var a = Play(index, seed, 0, scenario.Era, scenario.Method, first, second, Candidate(firstLevel), baseline(secondLevel), openingOnly, captureReplays);
+                        ulong randomSeed = 0xB2A9345F2C186B67UL ^ ((ulong)(uint)index << 33) ^ ((ulong)(uint)seed << 1);
+                        var rivalSecond = randomOpponent ? RandomLegalPilot.Create(randomSeed ^ 1UL) : baseline(secondLevel);
+                        var rivalFirst = randomOpponent ? RandomLegalPilot.Create(randomSeed) : baseline(firstLevel);
+                        var a = Play(index, seed, 0, scenario.Era, scenario.Method, first, second, Candidate(firstLevel), rivalSecond, openingOnly, captureReplays);
                         a.nativeErrors = nativeErrors - before;
                         before = nativeErrors;
-                        var b = Play(index, seed, 1, scenario.Era, scenario.Method, first, second, baseline(firstLevel), Candidate(secondLevel), openingOnly, captureReplays);
+                        var b = Play(index, seed, 1, scenario.Era, scenario.Method, first, second, rivalFirst, Candidate(secondLevel), openingOnly, captureReplays);
                         b.nativeErrors = nativeErrors - before;
                         if (!a.sides[0].initial.SequenceEqual(b.sides[0].initial) || !a.sides[1].initial.SequenceEqual(b.sides[1].initial))
                             throw new InvalidOperationException($"Opening hands changed after swapping policies in fixture {index}/{seed}.");
@@ -1012,6 +1071,11 @@ namespace YGOPortable.Editor
             var exposedNextTurn = new Dictionary<(int Player, uint Slot, uint Code), ExposureTrace>();
             var arrivals = new List<CardMoveEvent>();
             var destructionTraces = new Dictionary<ChainLinkInfo, DestructionTrace>();
+            var unusedDevelopment = new[] { new List<UnusedDevelopmentTrace>(), new List<UnusedDevelopmentTrace>() };
+            var linkDowngrades = new[] { new List<LinkMaterialDowngradeTrace>(), new List<LinkMaterialDowngradeTrace>() };
+            var pendingLinkMaterials = new[] { new List<(uint Card, int Rank)>(), new List<(uint Card, int Rank)>() };
+            var pendingLinkTurns = new int[2];
+            int responseIndex = 0, activeResponseStep = -1;
             using var duel = new DuelSession(recordPlanningReplay: true);
             StartFixture(duel, matchup, seed, first, second);
             for (int player = 0; player < 2; player++)
@@ -1023,6 +1087,7 @@ namespace YGOPortable.Editor
             duel.OnCardMoved += move =>
             {
                 TrackDestruction(duel.ResolvingChainLink, move);
+                TrackLinkMaterialDowngrade(move);
                 if (lastAttack is { } attack && move.fromCon != attack.Player && move.fromLoc == YgoConstants.LOCATION_MZONE &&
                     move.toLoc != YgoConstants.LOCATION_MZONE && (move.reason & YgoConstants.REASON_BATTLE) != 0)
                     combatPayoffs[attack.Player].Add((attack.Slot, attack.Code));
@@ -1142,7 +1207,11 @@ namespace YGOPortable.Editor
             {
                 var prompt = duel.ActivePrompt;
                 if (prompt == null) { duel.StepUntilPrompt(); continue; }
+                if (prompt.messageType is YgoConstants.MSG_SELECT_IDLECMD or YgoConstants.MSG_SELECT_BATTLECMD)
+                    foreach (var pending in pendingLinkMaterials) pending.Clear();
                 byte player = prompt.playerId;
+                int replayStep = responseIndex++;
+                activeResponseStep = replayStep;
                 int turn = duel.TurnNumber;
                 int turnPlayer = duel.TurnPlayer;
                 var side = result.sides[player];
@@ -1154,7 +1223,26 @@ namespace YGOPortable.Editor
                 double ms = (Stopwatch.GetTimestamp() - started) * 1000.0 / Stopwatch.Frequency;
                 side.decisions++;
                 side.decisionMs += ms;
-                side.slowestMs = Math.Max(side.slowestMs, ms);
+                double lastPlanMs = pilots[player].LastPlanMilliseconds?.Invoke() ?? 0;
+                if (double.IsNaN(lastPlanMs) || double.IsInfinity(lastPlanMs)) lastPlanMs = 0;
+                double ordinaryMs = ms - Math.Clamp(lastPlanMs, 0, ms);
+                side.ordinaryDecisionMs += ordinaryMs;
+                if (ordinaryMs > side.slowestOrdinaryMs)
+                {
+                    side.slowestOrdinaryMs = ordinaryMs;
+                    side.slowestOrdinaryTurn = turn;
+                    side.slowestOrdinaryMessage = prompt.messageType;
+                    side.slowestOrdinaryPhase = duel.CurrentPhase;
+                    side.slowestOrdinaryStep = replayStep;
+                }
+                if (ms > side.slowestMs)
+                {
+                    side.slowestMs = ms;
+                    side.slowestTurn = turn;
+                    side.slowestMessage = prompt.messageType;
+                    side.slowestPhase = duel.CurrentPhase;
+                    side.slowestStep = replayStep;
+                }
                 int command = response.Length >= 4 ? BitConverter.ToInt32(response, 0) : -1;
                 responses?.Add(new ReplayResponse {
                     turn = turn, phase = duel.CurrentPhase, player = player, message = prompt.messageType,
@@ -1175,6 +1263,13 @@ namespace YGOPortable.Editor
 
                 if (prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD)
                 {
+                    if (player == turnPlayer && command == 7 && prompt.canEp)
+                    {
+                        var options = NativeDevelopmentOptions(prompt);
+                        if (options.Length != 0 && !unusedDevelopment[player].Any(trace => trace.turn == turn))
+                            unusedDevelopment[player].Add(new UnusedDevelopmentTrace
+                                { turn = turn, phase = duel.CurrentPhase, step = replayStep, options = options });
+                    }
                     if (player == turnPlayer && missedEffectWin == null &&
                         DuelTactics.FindGiftCardWin(duel, prompt, (_, _) => true) is int effectWin && effectWin != command)
                     {
@@ -1296,7 +1391,18 @@ namespace YGOPortable.Editor
                 var side = result.sides[player];
                 side.branches = pilots[player].Branches();
                 side.chosenAlternatives = pilots[player].ChosenAlternatives?.Invoke() ?? 0;
+                side.planTimingAvailable = pilots[player].MaxPlanMilliseconds != null;
+                side.ordinaryTimingSeparated = pilots[player].LastPlanMilliseconds != null;
+                side.maxPlanMs = pilots[player].MaxPlanMilliseconds?.Invoke() ?? 0;
                 side.openings = side.reachedMain ? 1 : 0;
+                bool lost = result.winner == 1 - player;
+                side.unusedDevelopmentEndTurns = unusedDevelopment[player].Count;
+                side.unusedDevelopmentOptions = unusedDevelopment[player].Sum(trace => trace.options.Length);
+                side.unusedDevelopmentEndTurnsOnLoss = lost ? side.unusedDevelopmentEndTurns : 0;
+                side.unusedDevelopmentOptionsOnLoss = lost ? side.unusedDevelopmentOptions : 0;
+                foreach (var trace in unusedDevelopment[player]) trace.eventualLoss = lost;
+                side.unusedDevelopmentTraces = unusedDevelopment[player].ToArray();
+                side.linkMaterialDowngradeTraces = linkDowngrades[player].ToArray();
                 if (side.reachedMain && !side.methodReached && !side.aceReached)
                     Failure(player, side.methodAvailable ? "missed_development" : "no_progression", string.Join(" > ", actions[player]));
                 if (result.winner == 1 - player && side.selfDefeatEffect != 0)
@@ -1311,6 +1417,48 @@ namespace YGOPortable.Editor
             }
             result.replay = responses?.ToArray();
             return result;
+
+            void TrackLinkMaterialDowngrade(CardMoveEvent move)
+            {
+                const uint linkMaterial = YgoConstants.REASON_MATERIAL | YgoConstants.REASON_LINK;
+                if (move.fromCon < 2 && move.fromLoc == YgoConstants.LOCATION_MZONE &&
+                    (move.fromPos & YgoConstants.POS_FACEUP) != 0 && (move.reason & linkMaterial) == linkMaterial)
+                {
+                    int rank = LinkComboPolicy.Rank(move.code);
+                    if (rank > 0)
+                    {
+                        byte owner = move.fromCon;
+                        if (pendingLinkTurns[owner] != duel.TurnNumber) pendingLinkMaterials[owner].Clear();
+                        pendingLinkTurns[owner] = duel.TurnNumber;
+                        pendingLinkMaterials[owner].Add((move.code, rank));
+                    }
+                }
+                if (move.toCon >= 2 || move.fromLoc != YgoConstants.LOCATION_EXTRA ||
+                    move.toLoc != YgoConstants.LOCATION_MZONE || (move.reason & YgoConstants.REASON_SPSUMMON) == 0 ||
+                    (move.summonType & YgoConstants.SUMMON_METHOD_MASK) != YgoConstants.SUMMON_TYPE_LINK)
+                    return;
+
+                byte player = move.toCon;
+                var materials = pendingLinkMaterials[player];
+                int targetRank = LinkComboPolicy.Rank(move.code);
+                if (pendingLinkTurns[player] == duel.TurnNumber && targetRank > 0)
+                {
+                    int higher = materials.Count(material => material.Rank > targetRank);
+                    if (higher > 0)
+                    {
+                        result.sides[player].linkMaterialDowngrades++;
+                        result.sides[player].higherLinkMaterialsSpent += higher;
+                        linkDowngrades[player].Add(new LinkMaterialDowngradeTrace
+                        {
+                            turn = duel.TurnNumber, phase = duel.CurrentPhase, step = activeResponseStep,
+                            target = move.code, targetRank = targetRank,
+                            materials = materials.Select(material => material.Card).ToArray(),
+                            materialRanks = materials.Select(material => material.Rank).ToArray(),
+                        });
+                    }
+                }
+                materials.Clear();
+            }
 
             DestructionTrace Trace(ChainLinkInfo effect)
             {
@@ -1365,6 +1513,29 @@ namespace YGOPortable.Editor
             };
             if (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN) index = command;
             return options != null && index >= 0 && index < options.Count ? options[index] : null;
+        }
+
+        private static DevelopmentOption[] NativeDevelopmentOptions(DuelPrompt prompt)
+        {
+            var options = new List<DevelopmentOption>();
+            void Add(IEnumerable<SelectableCardItem> choices, int command, bool requireDevelopment)
+            {
+                foreach (var item in choices)
+                {
+                    if (item.controller != prompt.playerId || requireDevelopment && item.description != 1160 &&
+                        !ComboSearch.CanDevelopFromCard(CardDatabase.Get(item.code))) continue;
+                    options.Add(new DevelopmentOption
+                    {
+                        command = command, card = item.code, location = item.location,
+                        sequence = item.sequence, description = item.description,
+                    });
+                }
+            }
+            Add(prompt.summonable, 0, requireDevelopment: true);
+            Add(prompt.spSummonable, 1, requireDevelopment: false);
+            Add(prompt.activatable, 5, requireDevelopment: true);
+            return options.GroupBy(option => (option.command, option.card, option.location, option.sequence, option.description))
+                .Select(group => group.First()).ToArray();
         }
 
         private static bool IsMethodCandidate(SelectableCardItem item, uint method) => method switch
