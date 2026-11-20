@@ -1,5 +1,7 @@
 # 듀얼 AI 아침 보고서
 
+**후속 순차 검증 종료. 새 후보 다섯 개가 모두 보류되어 배포 AI `355e905`를 유지합니다.** 아래 후속 검증에는 서로 다른 실책 다섯 건의 고정 재생과 미러 비교 결과를 기록했습니다.
+
 **목표 미달. 연속 다섯 후보 탈락으로 이번 검증을 종료했습니다. 현재 배포 AI는 `355e905`이며 새 채택 태그는 없습니다.** 2026년 11월 20일 16:24 KST에 갱신된 작업에서 전술 후보 세 개와 재학습 후보 두 개를 검증했습니다. 처음에는 `Logs/` 폴더 전체에 5GB 상한을 잘못 적용했습니다. 대전 원본 로그만 다시 집계해 재개했으며, 마지막 선별 시작 시 약 0.93GB였습니다. 원본은 보존했습니다.
 
 ## 단계별 진행
@@ -78,3 +80,17 @@
 ## 되돌리기
 
 보고서와 0단계 미러 도구만 되돌리려면 해당 커밋을 `git revert`로 취소할 수 있습니다. AI 배포 기준은 커밋 `355e905`, 고정 비교 기준은 `1da3213`입니다. `adopted-*` 태그는 없습니다.
+
+## 후속 실책 개선 최종 결과
+
+| 회차 | 시험한 규칙 | 고정 리플레이 | 112판 선별과 판정 |
+|---|---|---|---|
+| 1. 필드 무효 낭비 | 필드 효과가 없고 전투로 파괴된 뒤 묘지에서만 발동하는 것으로 검증한 몬스터에게 포영·뵐러를 아낌 | 실제 포영 두 건을 보류했고 필드 효과를 막는 포영 두 건은 유지. 8갈래 Retry/ScriptErrors 0 | 직접 55승 57패, Baseline-v1 상대 76→74승, 랜덤 양쪽 112전 전승. **보류.** 고정 미러 14덱에는 대상 몬스터와 필드 무효가 함께 들어 있는 덱이 없어 승패 차이를 수정의 효과로 볼 수 없음. [고정 재생](Logs/AiBenchmark/MirrorStage0/cycle1-field-negation-replay/unity.log#L762) · [선별 원본](Logs/AiBenchmark/MirrorStage0/cycle1-field-negation-screen-112/summary.json) |
+| 2. 섬도희 에이스 착지 | 빈 필드에서 여분 일반 마법을 세트해 링케이지 발동 조건을 만들고 제로까지 전개 | 같은 접두사에서 기존판은 링케이지를 세트하고 T12 승리·LP6,100. 후보는 삼전의 호를 세트하고 링케이지→제로를 자동으로 이어 T8 승리·LP8,000. 메인 2 대조 장면의 행동·LP 동일. 4갈래 Retry/ScriptErrors 0 | 112판 직접 56승 56패, Baseline-v1 상대 양쪽 77승, 랜덤 양쪽 전승. 420판 직접 211승 204패 5무(p=.350554), 종료 보드 3.100→3.135. Baseline-v1 상대 268→280승, 랜덤 양쪽 416승. **보류.** 직접 승률 개선 근거가 부족하고 Baseline-v1 상대 자멸은 3→8건, 싱크로 초기 전개는 27→26/60. 2,100판 Retry/ScriptErrors 0. 소환법·성향별 표본 부족. [고정 재생](Logs/AiBenchmark/MirrorStage0/cycle2-linkage-replay/unity.log#L334) · [112판](Logs/AiBenchmark/MirrorStage0/cycle2-linkage-screen-112/summary.json) · [420판](Logs/AiBenchmark/MirrorStage0/cycle2-linkage-confirm-420/summary.json) |
+| 3. 방해 후 노출된 커넥터 | 턴을 마치기 직전 강한 공격 몬스터 앞에 홀로 노출된 커넥터를 합법적인 수비 소생으로 교체 | 기존판은 T3에 종료해 T5까지 LP6,000. 후보는 묘지에서 몬스터를 수비로 소생해 T5 LP8,000. 기존 고정 회귀 1건 통과, 9응답 Retry/ScriptErrors 0 | **보류.** 직접 55승 57패(p=.875), Baseline-v1 상대 양쪽 76승, 랜덤 양쪽 112전 전승. 560판 Retry/ScriptErrors 0. 고정 미러 14덱에는 커넥터가 없어 장면 개선은 고정 재생으로 확인. [고정 재생](Logs/AiBenchmark/MirrorStage0/cycle3-defensive-revival-replay/proof.txt#L27) · [미러 선별](Logs/AiBenchmark/MirrorStage0/cycle3-defensive-revival-screen-112/summary.json) |
+| 4. 일시 제외된 상대 공격수 | 상대 필드가 잠시 비어 있어도 돌아올 공격수에게 약한 새 몬스터를 노출할 위험이 크면 수비 세트 | 현사 고정 장면에서 후보는 카이바맨을 세트하고 현사를 수비로 바꿔 T6 LP8,000. 기존판은 카이바맨을 공격 표시로 내 T6 LP7,800. 고정 회귀 1건 통과 | 112판 직접 59승 53패, Baseline-v1 상대 77→75승, 랜덤 양쪽 전승. 420판 직접 **208승 208패 4무**(p=.574723), 종료 보드 3.053→3.094. Baseline-v1 상대 277→269승, 랜덤 상대 413→411승. **보류.** 자원형과 기준선 상대 승수 하락. 420판 다섯 비교 2,100판 Retry/ScriptErrors 0. 성향·소환법별 표본 부족. [고정 재생](Logs/AiBenchmark/MirrorStage0/cycle4-returning-attacker-replay/proof.txt#L27) · [112판](Logs/AiBenchmark/MirrorStage0/cycle4-returning-attacker-screen-retry-112/summary.json) · [420판](Logs/AiBenchmark/MirrorStage0/cycle4-returning-attacker-confirm-420/summary.json) |
+| 5. 다크 큐어가 있는 상대에게 넘기는 몬스터 | 상대 공개 다크 큐어가 있을 때 열락의 타락천사가 너스－레피큘을 넘기는 선택만 제한 | 같은 수동 시작점 이후 기존판은 너스 선택으로 T8 패배, 후보는 유코백을 자동 선택해 T10 승리. 다크 큐어가 없던 자연 발동에서는 두 AI가 같은 표적을 골라 T5 승리. 히어로 융합 대조 선택 동일. 6갈래 Retry/ScriptErrors 0 | 112판 직접 59승 53패, Baseline-v1 상대 75→80승, 랜덤 111→112승. 420판 직접 **215승 201패 4무**(p=.114741), 종료 보드 3.124→3.128. Baseline-v1 상대 274→269승, 종료 보드 2.976→2.924, 랜덤 413→414승. **보류.** 직접 승률 유의성 미달. 기준선 상대 컨트롤형 35→28승/60판 및 100판당 자원 남긴 패배 종료 40.48→45.48. [고정 재생](Logs/AiBenchmark/MirrorStage0/cycle5-nurse-donation-replay/unity.log#L988) · [자연 발동 대조](Logs/AiBenchmark/MirrorStage0/cycle5-nurse-donation-replay/unity.log#L1262) · [112판](Logs/AiBenchmark/MirrorStage0/cycle5-nurse-donation-screen-112/summary.json) · [420판](Logs/AiBenchmark/MirrorStage0/cycle5-nurse-donation-confirm-420/summary.json) |
+
+112판 선별 다섯 번과 420판 확정 검증 세 번의 다섯 비교군을 합쳐 **9,100판**을 완료했습니다. 엔진 재시도, 스크립트 오류, 상한에 걸린 미완료 대전은 0건입니다. 4회차의 첫 시도는 Unity 패키지 로딩에서 종료돼 이 합계에서 제외했습니다. 단독 임포트 후 같은 소스·덱·시드로 재실행했습니다. [패키지 오류](Logs/AiBenchmark/MirrorStage0/cycle4-returning-attacker-screen-112/unity-1.log#L179) · [재실행](Logs/AiBenchmark/MirrorStage0/cycle4-returning-attacker-screen-retry-112/summary.json)
+
+각 후보는 소스 한 파일만 바꿔 격리 검증했습니다. 1회차와 3회차는 고정 미러에서 해당 상황이 자연 발생할 덱 조합이 없었습니다. 나머지 후보도 고정 장면의 개선과 전체 성적 차이의 인과관계를 구분했습니다. 이번 순차 검증에서 새 후보에 대한 성향·소환법별 400판, 단독 결정 시간, 승격용 홀드아웃은 검증 대상에 도달하지 않았습니다. 배포판과 평가 파일 및 태그 상태를 보존했습니다.
