@@ -10,10 +10,14 @@
 |---|---|---|---|
 | 0. 기존 기준선 | `Baseline-v1` 커밋 `1da3213`, 기존 자동 집계, 리플레이 옵션과 상대 풀을 점검 | 기존 랜덤 상대 131승 1무/132판, 순승률 99.24%. 기존 배포판 고정 회귀 4/6, 현사·커넥터 미해결. 두 기록 모두 Retry/ScriptErrors 0 | 기준선 보존. 새 미러 상대 풀 전수 검증 전. [랜덤 대전](Logs/AiBenchmark/RandomLegalFloor/random-legal-floor-dae1492/summary.json) · [고정 회귀](Logs/AiBenchmark/FixedRegressions/deployed-ai-after-screen/summary.json) |
 | 0. 미러와 단독 시간 | 고정 평가기를 변경 없이 호출하는 별도 도구 추가. 미러 두 덱·시드 3개에서 시작 패가 좌석 교대 전후 동일함을 검사. 선택용·홀드아웃을 덱 내용과 시드 양쪽에서 분리 | Baseline-v1 상대 2워커 9승 3패/12판. 별도 1워커 반복 7승 5패/12판. 단독 일반 평균 0.056ms, 최대 21.66ms, 전개 계획 최대 214.73ms. 두 시험 Retry/ScriptErrors 0 | 통신·입력·시간 측정 스모크 통과. 표본 부족. 홀드아웃 미사용. [미러 대전](Logs/AiBenchmark/MirrorStage0/verified-selection-smoke/summary.json) · [단독 시간](Logs/AiBenchmark/MirrorStage0/verified-standalone-timing/summary.json) |
-| 1. 진단 | 기존 배포판 132판과 푸른 눈 동일 리플레이를 분석 | 발생 상위 분류는 초반 목표 전개 미관측 52건, 패배 50건, 약한 공격 표시 노출 14건, 전개 기회 미사용 4건, 자기 효과 패배 1건. 푸른 눈 T12의 네이티브 응답 200개 복원은 35.43~51.26ms. 기존 분기 한도 46ms에서 제거 검토 전 종료됨 | 새 미러 진단은 검증 안 됨. [기존 대진](Logs/AiBenchmark/StableV1Screen/paired-recovery-removal-screen/previous/summary.json) · [복원 시간](Logs/AiBenchmark/native-late-clone-timing/unity.log) |
+| 0. 미러 상대 풀 | 고정 평가기와 두 AI의 정책을 분리. 동일한 배포 AI를 두 버전으로 넣고 14덱·시드 4개·양쪽 좌석으로 다섯 비교 실행 | 직접 대전 55승 57패/112판(p=.8125). 두 버전의 Baseline-v1 상대 79/112승(70.54%)과 75/112승(66.96%), 평균 종료 보드 2.996과 3.074. 랜덤 상대는 각각 112전 전승. 총 560판 Retry/ScriptErrors 0 | 입력과 대비 경로 확인. 동일 코드 대조이며 채택·승격 없음. [미러 상대 풀](Logs/AiBenchmark/MirrorStage0/stage0-league-112/summary.json) |
+| 0. 단독 전 구간 시간 | 같은 14덱·시드·평가기로 한 프로세스에서 Baseline-v1과 112판 | 일반 평균 0.074ms, 최대 56.41ms, 전개 계획 최대 222.90ms. Retry/ScriptErrors 0 | 이 표본에서 100/300/1000ms 기준 통과. 병렬 결과와 시간 수치를 합치지 않음. [단독 시간](Logs/AiBenchmark/MirrorStage0/stage0-timing-112/summary.json) |
+| 1. 새 미러 진단 | Baseline-v1 상대 112판에서 판단 유형을 분류. 히어로와 너스 번의 종료 결정을 네이티브 리플레이로 확인 | 초반 목표 전개 미관측 45판, 패배한 14판에서 선택지가 남은 종료 34회, 약한 공격 표시 노출 15회 중 보상 없이 피해 6회, 링크 하락 4회, 자기 필드 순손실 3회 | 중복 가능한 관측이며 패배 원인 단정은 보류. 아래 장면 표에 실제 선택과 갈래를 기록. [미러 원본](Logs/AiBenchmark/MirrorStage0/stage0-league-112/baseline/summary.json) |
 | 2. 구조 | 공개 필드 제거 수에 탐색 시간을 배정한 직전 후보 | Baseline-v1 상대 **82/132승 → 79/132승**(62.12% → 59.85%), 평균 종료 보드 2.883 → 2.808, 단측 p=.82038. 일반 평균/최대 0.064/54.63 → 0.074/44.59ms, 계획 최대 243.05 → 233.12ms. Retry/ScriptErrors 0 | 탈락·원복. 성향·소환법 수치는 모두 표본 부족. 시간은 병렬 구동 중 참고값. [전후 비교](Logs/AiBenchmark/StableV1Screen/paired-recovery-removal-screen/summary.json) |
 | 3. 학습 | 기존 두 정책 파일을 기준으로 확인 | 이번 목표에서 재학습과 가중치 교체는 검증 안 됨 | 채택 없음 |
-| 4. 확정 | 증거와 보고서 정리 | 신규 미러 400판, 성향·소환법 구간당 400판, 상대 풀 전체, 홀드아웃 1회는 검증 안 됨 | 승격 없음 |
+| 4. 확정 | 증거와 보고서 정리 | 새 후보 미러 400판, 성향·소환법 구간당 400판, 홀드아웃 1회는 검증 안 됨 | 승격 없음 |
+
+새 미러의 성향별 Baseline-v1 상대 승수는 전개 55/72, 컨트롤 8/16, 락 11/16, 자원 5/8입니다. 1~2턴 소환법별 성공은 융합 1/16, 의식 3/8, 싱크로 8/16, 엑시즈 14/16, 펜듈럼 4/8, 링크 15/16입니다. 모든 구간은 표본 부족입니다. 새 미러의 100판당 자멸·킬각 누락·계측된 견제 낭비는 각각 0, 불필요한 피격 5.36, 자원 남긴 패배 종료 30.36, 링크 하락 3.57입니다.
 
 직전 후보의 1~2턴 전개 성공은 전개형 55/93→57/93, 컨트롤 9/9, 락 7/21, 자원형 5/9였습니다. 소환법별 성공은 융합 15/27→16/27, 엑시즈 11/18→12/18, 의식 0/6, 싱크로 7/15, 펜듈럼 7/12, 링크 17/24였습니다. 모두 표본이 400판보다 적습니다.
 
@@ -37,10 +41,12 @@
 | 서브테러, T1 도사 2장 보유 | 우라라 일반 소환 후 알미라지 | 도사 세트는 리버스와 우라라를 살렸지만 T4 LP는 6,500→5,000. 종합 우위 보류 | [선공 대조](Logs/AiBenchmark/native-control-lanes-probe/unity.log#L545) |
 | T1 킬러 토마토·UFO 터틀 일반 소환 직후 | 손에서 무한포영 사용 | 발동을 넘기면 다음 자기 턴 시작 패 5→6. 두 표적의 효과는 전투 파괴 뒤 묘지에서 발동 | [실제 표적 4건](Logs/AiBenchmark/native-prechain-negation-audit/unity.log#L910) |
 | 고정 회귀의 현사와 네오 스페이스 커넥터 | 뒤따를 전개 없이 약한 몬스터가 노출됨 | 후보에서 수비 세트·수비 특수소환으로 회복했으나 전체 탈락. 배포판은 미해결 | [회귀 결과](Logs/AiBenchmark/FixedRegressions/deployed-ai-after-screen/summary.json) |
+| 히어로 미러, T2 메인 2, 자기 LP 1,000 | 필드에 에어맨 2장과 볼틱 썬더를 남긴 채 종료. T3 패배 | 엔진이 미러클 퓨전을 제시. 묘지 소재로 수비를 보강할 이득이 있었는지 후속 비교 필요 | [응답 44 리플레이](Logs/AiBenchmark/MirrorAudit/mirror-hero-end/unity-0.log#L758) |
+| 너스 번 미러, T2 양쪽 LP 8,000 | 타락천사강림을 세트하고 바로 종료. 같은 검색을 이후에도 남겼고 T15 패배 | 엔진이 타락천사의 추방을 제시. 서치로 실제 번 수단이 열리는지 확인할 장면 | [응답 12 리플레이](Logs/AiBenchmark/MirrorAudit/mirror-nurse-search/unity-0.log#L310) |
 
 ## 아침에 확인할 3가지
 
-1. 미러 `summary.json`의 `games=12`, `workers=2`와 단독 시간 `workers=1`, 최대 계획 시간 214.73ms를 확인.
+1. 미러 `summary.json`의 `league.arms`에서 각 112판, 직접 대전 55승 57패와 랜덤 112전 전승을 확인. 단독 시간 `workers=1`의 최대 계획은 222.90ms입니다.
 2. [선택·홀드아웃 일정](Tools/AiEvaluation/mirror-fixtures.json)의 덱과 시드 범위를 확인. 홀드아웃은 승격용입니다.
 3. 고정 회귀 `summary.json`의 `passed=4`, `failed=2`를 확인. 미러 400판과 새 상대 풀 검증이 필요합니다.
 

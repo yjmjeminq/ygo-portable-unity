@@ -1,10 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using UnityEditor;
 using UnityEngine;
-using YGOPortable.AI;
 using YGOPortable.Core;
 using static YGOPortable.Editor.AiMatchBenchmark;
 
@@ -46,36 +46,65 @@ namespace YGOPortable.Editor
                 CardDatabase.Load(streaming);
                 DeckRepository.Load(streaming, Path.Combine(Path.GetDirectoryName(path), $"benchmark-save-{worker}"), false);
                 var decks = DeckRepository.PresetDecks.ToDictionary(deck => deck.id);
-                var baseline = (Func<int, Pilot>)typeof(AiMatchBenchmark).GetMethod("LoadPilotFactory", PrivateStatic)
-                    .Invoke(null, new object[] { "AiBenchmarkBaselineFactory" });
-                var general = DuelAiPolicy.LoadIncluded() ?? throw new InvalidOperationException("Missing AI policy.");
-                var links = LinkComboPolicy.LoadIncluded() ?? throw new InvalidOperationException("Missing Link policy.");
-                Pilot Candidate()
+                var factory = typeof(AiMatchBenchmark).GetMethod("LoadPilotFactory", PrivateStatic);
+                Func<int, Pilot> Resolve(string name) => (Func<int, Pilot>)factory.Invoke(null, new object[] { name });
+                var baseline = Resolve("AiBenchmarkBaselineFactory");
+                var candidate = Resolve("AiBenchmarkMirrorCandidateFactory");
+                bool league = Environment.GetEnvironmentVariable("YGO_MIRROR_LEAGUE") == "1";
+                var arms = new List<(string Name, Func<int, Pilot> Tested, Func<int, ulong, Pilot> Opponent)>
                 {
-                    var ai = new TacticalAI(general, links, searchCombos: true);
-                    return TimedPilot(ai.ComputeResponse, ai.AdvanceComboPlanning,
-                        () => ai.SimulatedComboBranches, () => ai.ChosenComboAlternatives);
+                    ("baseline", candidate, (level, _) => baseline(level)),
+                };
+                if (league)
+                {
+                    var previous = Resolve("AiBenchmarkPreviousFactory");
+                    arms.Add(("previous-baseline", previous, (level, _) => baseline(level)));
+                    arms.Add(("random", candidate, (_, seed) => RandomLegalPilot.Create(seed)));
+                    arms.Add(("previous-random", previous, (_, seed) => RandomLegalPilot.Create(seed)));
+                    arms.Add(("direct", candidate, (level, _) => previous(level)));
                 }
-                using var output = new StreamWriter(path) { AutoFlush = true };
-                foreach (var fixture in File.ReadLines(fixtures).Select(JsonUtility.FromJson<Fixture>)
-                    .Where((_, ordinal) => ordinal % count == worker))
+
+                var writers = new List<StreamWriter>();
+                try
                 {
-                    var deck = decks[fixture.deck];
-                    int level = OpponentDeckLevels.GetLevel(deck.charId, fixture.deck);
-                    // Keep both seats in one process and alternate their execution order.
-                    for (int order = 0; order < 2; order++)
+                    foreach (var arm in arms)
                     {
-                        int seat = (order + fixture.id + fixture.seed) & 1;
-                        int before = nativeErrors;
-                        var rival = baseline(level);
-                        var pilot = Candidate();
-                        object result = Play.Invoke(null, new object[] { fixture.id, fixture.seed, seat, fixture.era,
-                            fixture.method, deck, deck, seat == 0 ? pilot : rival, seat == 1 ? pilot : rival, false, true });
-                        Errors.SetValue(result, nativeErrors - before);
-                        output.WriteLine(JsonUtility.ToJson(result));
-                        if (nativeErrors != before)
-                            throw new InvalidOperationException($"Native script error in mirror {fixture.id}/{fixture.seed}/{seat}.");
+                        string output = Path.Combine(Path.GetDirectoryName(path), arm.Name, Path.GetFileName(path));
+                        Directory.CreateDirectory(Path.GetDirectoryName(output));
+                        writers.Add(new StreamWriter(output) { AutoFlush = true });
                     }
+                    foreach (var fixture in File.ReadLines(fixtures).Select(JsonUtility.FromJson<Fixture>)
+                        .Where((_, ordinal) => ordinal % count == worker))
+                    {
+                        var deck = decks[fixture.deck];
+                        int level = OpponentDeckLevels.GetLevel(deck.charId, fixture.deck);
+                        int rotation = fixture.id + fixture.seed;
+                        for (int order = 0; order < 2; order++)
+                        {
+                            int seat = (order + rotation) & 1;
+                            // Reuse the random pilot seed across candidate and previous at the same seat.
+                            ulong randomSeed = 0xB2A9345F2C186B67UL ^ ((ulong)(uint)fixture.id << 33) ^
+                                ((ulong)(uint)fixture.seed << 1) ^ (ulong)(1 - seat);
+                            for (int offset = 0; offset < arms.Count; offset++)
+                            {
+                                int index = (offset + rotation + seat) % arms.Count;
+                                var arm = arms[index];
+                                int before = nativeErrors;
+                                var rival = arm.Opponent(level, randomSeed);
+                                var pilot = arm.Tested(level);
+                                object result = Play.Invoke(null, new object[] { fixture.id, fixture.seed, seat, fixture.era,
+                                    fixture.method, deck, deck, seat == 0 ? pilot : rival, seat == 1 ? pilot : rival, false, true });
+                                Errors.SetValue(result, nativeErrors - before);
+                                writers[index].WriteLine(JsonUtility.ToJson(result));
+                                if (nativeErrors != before)
+                                    throw new InvalidOperationException($"Native script error in {arm.Name} {fixture.id}/{fixture.seed}/{seat}.");
+                            }
+                        }
+                    }
+                }
+                finally
+                {
+                    foreach (var writer in writers) writer.Dispose();
                 }
             }
             catch (Exception error)
