@@ -192,10 +192,13 @@ namespace YGOPortable.Editor
                     bool control = !changedStyles.Contains(DuelDeckStyle.Control) || result.PreservesControlResults(plannerIncluded);
                     bool locked = !changedStyles.Contains(DuelDeckStyle.Lock) || result.PreservesLockResults(plannerIncluded);
                     bool resource = !changedStyles.Contains(DuelDeckStyle.Resource) || result.PreservesResourceResults(plannerIncluded);
-                    bool accepted = changedStyles.Count > 0 && result.Rate >= .50 && scriptErrors == 0 && result.retries == 0 && result.capped == 0 &&
+                    // Equivalent policies can make different choices when a wall-clock search stops at a different branch.
+                    double screenedRate = plannerIncluded.stylePoints.Select((points, index) =>
+                        changedStyles.Contains((DuelDeckStyle)index) ? result.stylePoints[index] : points).Sum() / result.Games;
+                    bool accepted = changedStyles.Count > 0 && screenedRate >= .50 && scriptErrors == 0 && result.retries == 0 && result.capped == 0 &&
                         development && control && locked && resource;
                     Debug.Log($"[AI EVAL] Planner candidate {entry.name}: retained={accepted}, {result}, " +
-                        $"{result.StyleSummary()}, changed styles {string.Join(", ", changedStyles)}, " +
+                        $"{result.StyleSummary()}, changed styles {string.Join(", ", changedStyles)}, screening rate {screenedRate:P1}, " +
                         $"Development={development}, Control={control}, Lock={locked}, Resource={resource}; " +
                         $"development setup {result.developmentSetup:F6}/{plannerIncluded.developmentSetup:F6}, " +
                         $"breakthrough {result.developmentBreakthrough:F6}/{plannerIncluded.developmentBreakthrough:F6}; " +
