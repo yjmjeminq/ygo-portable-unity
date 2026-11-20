@@ -417,6 +417,9 @@ namespace YGOPortable.AI
                 CanUse) is int rescue)
                 return rescue;
 
+            if (SignatureTurnPlan.ChooseMonarchOpening(session, prompt, CanUse) is int tributeSetup)
+                return tributeSetup;
+
             if (DuelTactics.ChooseArchfiendEndPhaseUpgrade(session, prompt) is int upgrade &&
                 CanUseMainAction(session, prompt, planLinks, 1, prompt.spSummonable[upgrade]))
                 return (upgrade << 16) | 1;
@@ -952,6 +955,9 @@ namespace YGOPortable.AI
 
             if (UsesTacticalRules && DuelTactics.ChooseResourceCard(s, p) is int resource)
                 return PackIndexList(new[] { resource });
+
+            if (UsesTacticalRules && SignatureTurnPlan.ChooseMonarchSetupCards(s, p) is int[] tributeSetup)
+                return PackIndexList(tributeSetup);
 
             if (p.min == 1 && p.max == 1 &&
                 ((_linkDeck == true ? LinkComboPolicy.ChooseSupport(s, p) : null) ??

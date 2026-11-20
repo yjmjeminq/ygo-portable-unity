@@ -101,6 +101,151 @@ namespace YGOPortable.AI
         private const uint FirewallDragon = 5043010;
         private const uint AccesscodeTalker = 86066372;
 
+        private const uint MonarchDomain = 84171830, MonarchPantheism = 22842126, MonarchPrime = 54241725;
+        private const uint GracefulCharity = 79571449;
+
+        private static bool HasMonarchPackage(DuelSession session, byte player)
+        {
+            var deck = session.StartingMainDeck(player);
+            return session.Players[player].extra.Count == 0 && deck.Contains(MonarchDomain) &&
+                deck.Contains(MonarchPantheism) && deck.Contains(MonarchPrime);
+        }
+
+        private static bool IsMonarchBoss(uint code) => CardDatabase.Get(code) is
+            { IsMonster: true, level: >= 6, def: 1000 } card && card.atk is 2400 or 2800;
+
+        private static bool IsMonarchSupport(uint code)
+        {
+            var card = CardDatabase.Get(code);
+            if (card == null || (!card.IsSpell && !card.IsTrap)) return false;
+            for (ulong sets = card.setcode; sets != 0; sets >>= 16)
+                if ((sets & 0x0fff) == 0xbe) return true;
+            return false;
+        }
+
+        private static bool HasMonarchDomain(PlayerFieldSnapshot own) =>
+            own.hand.Any(card => card.code == MonarchDomain) || own.szone.Any(card => card?.code == MonarchDomain);
+
+        internal static int? ChooseMonarchOpening(DuelSession session, DuelPrompt prompt,
+            Func<int, SelectableCardItem, bool> canUse)
+        {
+            if (prompt.messageType != YgoConstants.MSG_SELECT_IDLECMD || canUse == null ||
+                !HasMonarchPackage(session, prompt.playerId)) return null;
+            var own = session.Players[prompt.playerId];
+            var bosses = own.hand.Where(card => IsMonarchBoss(card.code)).ToArray();
+            bool fieldBoss = own.mzone.Any(card => card?.IsFaceUp == true && IsMonarchBoss(card.code));
+            if (bosses.Length == 0 && !fieldBoss) return null;
+
+            int? Effect(uint code, uint location) {
+                int index = prompt.activatable.FindIndex(card => card.controller == prompt.playerId &&
+                    card.code == code && card.location == location && canUse(Activate, card));
+                return index >= 0 ? (index << 16) | Activate : null;
+            }
+            bool missingDomain = !HasMonarchDomain(own);
+            bool activeDomain = own.szone.Any(card => card is
+                { code: MonarchDomain, IsFaceUp: true, effectsDisabled: false });
+            // Do not replace an unrelated Field Spell or spend another copy of an established Domain.
+            if (!activeDomain && own.szone[YgoConstants.FIELD_ZONE_SEQUENCE] == null &&
+                Effect(MonarchDomain, YgoConstants.LOCATION_HAND) is int domain) return domain;
+
+            // Graceful can put Prime in the GY while retaining Pantheism and its draw cost.
+            // Spending Pantheism first instead removes that preparation and changes the draw order.
+            if (bosses.Length > 0 && !own.mzone.Take(5).Any(card => card != null) &&
+                !own.grave.Any(card => card.code == MonarchPrime) &&
+                own.hand.Any(card => card.code == MonarchPantheism) &&
+                own.hand.Any(card => card.code != MonarchPantheism && IsMonarchSupport(card.code)) &&
+                (own.hand.Any(card => card.code == MonarchPrime) ||
+                    session.HasCardInDeck(prompt.playerId, card => card.code == MonarchPrime)) &&
+                Effect(GracefulCharity, YgoConstants.LOCATION_HAND) is int prepareGraceful)
+                return prepareGraceful;
+
+            if (missingDomain && session.HasCardInDeck(prompt.playerId, card => card.code == MonarchDomain))
+            {
+                if (Effect(MonarchPantheism, YgoConstants.LOCATION_GRAVE) is int search) return search;
+                if (Effect(MonarchPantheism, YgoConstants.LOCATION_HAND) is int draw) return draw;
+            }
+
+            // The native list, rather than a guessed tribute count, proves an available Tribute Summon.
+            int ready = prompt.summonable.FindIndex(card => card.controller == prompt.playerId &&
+                IsMonarchBoss(card.code) && canUse(NormalSummon, card));
+            if (ready >= 0) return ready << 16;
+            if (bosses.Length == 0) return null;
+
+            int bodies = own.mzone.Take(5).Count(card => card != null);
+            bool primeFuel = own.grave.Any(card => card.code == MonarchPrime) &&
+                own.grave.Any(card => card.code != MonarchPrime && IsMonarchSupport(card.code));
+            bool domainBoss = bosses.Any(card => CardDatabase.Get(card.code) is { atk: 2800, def: 1000 });
+            if (activeDomain && domainBoss && (bodies > 0 || primeFuel) &&
+                Effect(MonarchDomain, YgoConstants.LOCATION_SZONE) is int reduce) return reduce;
+
+            bool oneBodyHelps = bosses.Any(card => card.level is > 0 and <= 6) || bodies > 0 ||
+                (activeDomain && domainBoss);
+            if (primeFuel && oneBodyHelps &&
+                Effect(MonarchPrime, YgoConstants.LOCATION_GRAVE) is int revive) return revive;
+
+            // Put Prime in the GY through a legal draw cost only when a tribute body is still missing.
+            if (bodies == 0 && own.hand.Any(card => card.code == MonarchPrime) &&
+                Effect(MonarchPantheism, YgoConstants.LOCATION_HAND) is int prepare) return prepare;
+            return null;
+        }
+
+        internal static int[] ChooseMonarchSetupCards(DuelSession session, DuelPrompt prompt)
+        {
+            if (prompt.messageType != YgoConstants.MSG_SELECT_CARD || !HasMonarchPackage(session, prompt.playerId) ||
+                session.SelectionChainLink is not { negated: false } source || source.triggerPlayer != prompt.playerId)
+                return null;
+            var own = session.Players[prompt.playerId];
+            if (source.code == MonarchPantheism && source.triggerLoc == YgoConstants.LOCATION_GRAVE &&
+                prompt.SelectionHint == DuelTactics.AddToHand && prompt.min == 3 && prompt.max == 3 &&
+                !HasMonarchDomain(own) && (own.hand.Any(card => IsMonarchBoss(card.code)) ||
+                    own.mzone.Any(card => card?.IsFaceUp == true && IsMonarchBoss(card.code))))
+            {
+                // All three public choices are Domain: even the opponent's least helpful choice finds it.
+                int[] domains = prompt.candidates.Select((card, index) => (card, index))
+                    .Where(entry => entry.card.controller == prompt.playerId &&
+                        entry.card.location == YgoConstants.LOCATION_DECK && entry.card.code == MonarchDomain)
+                    .Take(3).Select(entry => entry.index).ToArray();
+                return domains.Length == 3 ? domains : null;
+            }
+
+            if (source.code != GracefulCharity || prompt.SelectionHint != DuelTactics.Discard ||
+                prompt.min != 2 || prompt.max != 2 ||
+                prompt.candidates.Any(card => card.controller != prompt.playerId || card.location != YgoConstants.LOCATION_HAND) ||
+                !own.hand.Any(card => IsMonarchBoss(card.code)) ||
+                !own.hand.Any(card => card.code == MonarchPantheism) ||
+                own.mzone.Take(5).Count(card => card != null) >= 2 ||
+                own.grave.Any(card => card.code == MonarchPrime)) return null;
+
+            int prime = prompt.candidates.FindIndex(card => card.code == MonarchPrime);
+            if (prime < 0) return null;
+            int second = -1, best = int.MinValue;
+            for (int i = 0; i < prompt.candidates.Count; i++)
+            {
+                var card = prompt.candidates[i];
+                if (i == prime || card.code is MonarchPantheism or MonarchDomain ||
+                    IsMonarchBoss(card.code) || DuelDeckStrategy.IsKeyPiece(card.code)) continue;
+                var remaining = prompt.candidates.Where((_, index) => index != prime && index != i).ToArray();
+                // Retain both Pantheism and its separate Monarch S/T activation cost.
+                if (!remaining.Any(item => item.code == MonarchPantheism) ||
+                    !remaining.Any(item => item.code != MonarchPantheism && IsMonarchSupport(item.code) &&
+                        (item.code != MonarchDomain || remaining.Count(other => other.code == MonarchDomain) > 1))) continue;
+
+                int value = card.code switch
+                {
+                    42141493 => 900,
+                    87126721 => 850,
+                    84192580 => 800,
+                    _ when ComboSearch.IsHandDisruption(card.code) => 100,
+                    _ when prompt.candidates.Count(other => other.code == card.code) > 1 => 50,
+                    _ => int.MinValue,
+                };
+                if (value <= best) continue;
+                best = value;
+                second = i;
+            }
+            return second >= 0 ? new[] { prime, second } : null;
+        }
+
         internal static int? ChooseResourceOpening(DuelSession session, DuelPrompt prompt, Func<int, SelectableCardItem, bool> canUse)
         {
             int best = -1, priority = 0;
