@@ -32,6 +32,7 @@ namespace YGOPortable.Editor
             }
             opens += VerifyPromptAndExtraSummon();
             opens += VerifyNativeExtraActivation();
+            VerifyNativeBanishedTrigger();
             string hitTest = SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null ? "raycast filters" : "GraphicRaycaster";
             Debug.Log($"[VERIFY ZONE BROWSER] {opens} successful opens. Pile counts and visible tops, tabs, card details, filtered action shortcuts, privacy and effect prompt field view ({hitTest}) verified.");
         }
@@ -116,6 +117,7 @@ namespace YGOPortable.Editor
                     foreach (var element in new[] { left, left.Find("CardDetails/ArtworkControls"), left.Find("CardDetails/CombatStats"), left.Find("CardDetails/Description/Viewport"),
                         slot.Find("CardReadout"), viewport.Find("DuelBoard"), viewport.Find("Turn/Dial"),
                         viewport.Find("PlayerHUD"), viewport.Find("OpponentHUD"),
+                        viewport.Find("ChainConfirmation/Button"), viewport.Find("OpenLog"),
                         details.Find("ZoomWin"), battle.transform })
                     {
                         Rect bounds = Bounds(element);
@@ -123,6 +125,10 @@ namespace YGOPortable.Editor
                             bounds.yMin >= safe.yMin - .1f && bounds.yMax <= safe.yMax + .1f && bounds.width > 0f,
                             $"{element.name} intersected the device cutout or home indicator.");
                     }
+                    var chainControl = (RectTransform)viewport.Find("ChainConfirmation/Button");
+                    float minimum = MobileSafeArea.MinimumTouchSize(chainControl);
+                    Require(chainControl.rect.width >= minimum - .1f && chainControl.rect.height >= minimum - .1f,
+                        "The chain confirmation toggle is too small after mobile safe area reflow.");
 
                     foreach (string hudName in new[] { "PlayerHUD", "OpponentHUD" })
                     {
@@ -328,6 +334,47 @@ namespace YGOPortable.Editor
             Require(duel.Players[human].mzone.Any(card => card?.code == jetSynchron) && duel.RetryCount == 0,
                 "The native duel did not resolve the selected grave effect.");
             return ui.Opens;
+        }
+
+        private static void VerifyNativeBanishedTrigger()
+        {
+            const uint goldSarcophagus = 75500286, dotscaper = 18789533;
+            var empty = Array.Empty<uint>();
+            var main = Enumerable.Repeat(goldSarcophagus, 12).Concat(Enumerable.Repeat(dotscaper, 12))
+                .Concat(Enumerable.Repeat(20721928u, 16)).ToArray();
+            var opponent = Enumerable.Repeat(89631139u, 40).ToArray();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Banished effect confirmation", main, empty, opponent, empty, true,
+                session => session.ActivePrompt?.activatable.Any(card => card.code == goldSarcophagus) == true);
+            byte[] submitted = null;
+            using var ui = new Browser(duel, bytes => submitted = bytes);
+            int spell = duel.ActivePrompt.activatable.FindIndex(card => card.code == goldSarcophagus);
+            duel.SubmitResponseInt((spell << 16) | 5);
+            bool confirmed = false;
+            ReachMainPhase(duel, 0, prompt =>
+            {
+                if (prompt.messageType == YgoConstants.MSG_SELECT_CARD)
+                {
+                    int index = prompt.candidates.FindIndex(card => card.code == dotscaper && card.location == YgoConstants.LOCATION_DECK);
+                    if (index >= 0) return DuelSession.PackCardSelection(index);
+                }
+
+                bool trigger = prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && prompt.promptCardCode == dotscaper ||
+                    prompt.messageType == YgoConstants.MSG_SELECT_CHAIN && prompt.candidates.Any(card => card.code == dotscaper);
+                if (!trigger || confirmed) return null;
+                ui.Modals.ShowPrompt(duel, prompt, ChainConfirmationMode.Off);
+                ui.Field.Refresh();
+                var shortcut = Private<Button>(ui.Field, "_banishedEffectButton");
+                var glow = shortcut.transform.parent.parent.Find("PlayableGlow");
+                Require(shortcut.gameObject.activeInHierarchy && glow.gameObject.activeInHierarchy,
+                    "A live, optional banished trigger did not light its zone or show its action.");
+                shortcut.onClick.Invoke();
+                Require(ui.Modals.TryConfirm() && submitted != null, "The banished effect shortcut did not select the pending trigger.");
+                confirmed = true;
+                return submitted;
+            });
+            Require(confirmed && duel.Players[0].mzone.Any(card => card?.code == dotscaper) && duel.RetryCount == 0,
+                "The banished Dotscaper did not return through the native effect confirmation.");
+            Debug.Log("[VERIFY BANISHED ACTIVATE] Dotscaper kept its native optional trigger in Off, lit the pile and resolved from the action shortcut. Retry=0");
         }
 
         private static int VerifyPromptAndExtraSummon()
@@ -841,6 +888,8 @@ namespace YGOPortable.Editor
                 Field.Refresh();
                 Require(Private<Button>(Field, "_graveEffectButton").gameObject.activeInHierarchy == visible,
                     "The grave effect shortcut did not match the current activation availability.");
+                Require(StackRoot("_myGyTile").Find("PlayableGlow").gameObject.activeInHierarchy == visible,
+                    "The grave effect glow did not match the current activation availability.");
             }
 
             internal void VerifyGraveEffectChoices(DuelPrompt prompt, uint code)

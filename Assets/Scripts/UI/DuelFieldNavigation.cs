@@ -257,6 +257,8 @@ namespace YGOPortable.UI
             AddDuelPadButton(_extraSummonButton);
             AddDuelPadButton(_graveEffectButton);
             AddDuelPadButton(_extraEffectButton);
+            AddDuelPadButton(_banishedEffectButton);
+            AddDuelPadButton(_extraOptionsButton);
             AddDuelPadButton(_phaseButton);
             AddDuelPadButton(_duelPadInspectButton);
             AddDuelPadButton(_chainConfirmationButton);

@@ -16,7 +16,6 @@ namespace YGOPortable.UI
         internal static Sprite DeckBack { get; } = LoadHudSprite("DeckBack");
         internal static Sprite PauseIcon { get; } = LoadHudSprite("Pause");
         internal static Sprite LogIcon { get; } = LoadHudSprite("Log");
-        internal static Sprite HandGlow { get; } = LoadHudSprite("HandGlow", Vector4.one * 20f);
         internal static Sprite ChainLinks { get; } = LoadHudSprite("ChainLinks");
         internal static Sprite ChainFrame { get; } = LoadHudSprite("ChainFrame", Vector4.one * 48f);
         internal static Sprite PromptFieldGlow { get; } = LoadHudSprite("PromptFieldGlow");
@@ -26,8 +25,6 @@ namespace YGOPortable.UI
         private static readonly Sprite[] OpponentZoneIcons = LoadZoneIcons("Opponent");
         internal static Sprite PhaseBannerPlayer { get; } = LoadHudSprite("PhaseBannerPlayer");
         internal static Sprite PhaseBannerOpponent { get; } = LoadHudSprite("PhaseBannerOpponent");
-        internal static Sprite ChainActive { get; } = LoadHudSprite("ChainActive");
-        internal static Sprite ChainResolving { get; } = LoadHudSprite("ChainResolving");
         internal static Sprite ChainCardHighlight { get; } = LoadHudSprite("ChainCardHighlight");
         internal static Sprite WinnerCrown { get; } = LoadHudSprite("WinnerCrown");
         internal static Sprite DuelStart { get; } = LoadHudSprite("DuelStart");

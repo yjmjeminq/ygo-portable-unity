@@ -15,6 +15,13 @@ namespace YGOPortable.UI
             return content;
         }
 
+        internal static float MinimumTouchSize(Transform control)
+        {
+            var canvas = control.GetComponentInParent<Canvas>();
+            // A 44-point hit area occupies up to 132 screen pixels on a 3x iPhone display.
+            return Mathf.Ceil(132f / Mathf.Max(.01f, canvas?.scaleFactor ?? 1f));
+        }
+
         internal static void Attach(RectTransform content, Rect? area = null)
         {
             var layout = content.gameObject.AddComponent<MobileSafeArea>();

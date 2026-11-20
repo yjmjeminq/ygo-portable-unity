@@ -44,9 +44,112 @@ namespace YGOPortable.Editor
             VerifyNavigation(duel);
             VerifyFilteredChainCandidates(duel);
             VerifyEmptyChain(duel);
+            VerifyActivationSourcesAndDelayedConfirmation(duel);
+            VerifyChainOrderByTapping(duel);
+            VerifyMobileChainTouchTargets(duel);
             VerifyMaterialChoices(duel);
             VerifyCandidateReadouts();
             Debug.Log("[VERIFY CHAIN CHOOSER] Grouped locations, native indices, compact effect options, zone overlay, input focus, empty chain and material selection passed.");
+        }
+
+        private static void VerifyActivationSourcesAndDelayedConfirmation(DuelSession duel)
+        {
+            var prompt = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_CHAIN, playerId = 0 };
+            prompt.candidates.Add(new SelectableCardItem { location = YgoConstants.LOCATION_HAND, sequence = 3 });
+            prompt.candidates.Add(new SelectableCardItem { location = YgoConstants.LOCATION_GRAVE, sequence = 8, isTriggeredEffect = true });
+            prompt.candidates.Add(new SelectableCardItem { location = YgoConstants.LOCATION_REMOVED, sequence = 1 });
+            prompt.candidates.Add(new SelectableCardItem { location = YgoConstants.LOCATION_MZONE | YgoConstants.LOCATION_OVERLAY,
+                sequence = 4, position = 2 });
+            bool Offers(ChainConfirmationMode mode, uint location, uint index) =>
+                duel.HasEffectActivationAt(prompt, mode, 0, location, index);
+            Require(Offers(ChainConfirmationMode.On, YgoConstants.LOCATION_HAND, 3) &&
+                    Offers(ChainConfirmationMode.On, YgoConstants.LOCATION_MZONE, 4) &&
+                    Offers(ChainConfirmationMode.On, YgoConstants.LOCATION_REMOVED, 1) &&
+                    Offers(ChainConfirmationMode.Off, YgoConstants.LOCATION_GRAVE, 8) &&
+                    !Offers(ChainConfirmationMode.Off, YgoConstants.LOCATION_HAND, 3) &&
+                    !Offers(ChainConfirmationMode.On, YgoConstants.LOCATION_GRAVE, 7),
+                "Activation highlighting disagrees with the native card slots or the selected chain mode.");
+
+            var confirmation = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_EFFECTYN, playerId = 0,
+                promptLoc = YgoConstants.LOCATION_GRAVE, promptSeq = 8, promptCardCode = LadyLabrynth };
+            var canvas = new GameObject("Pending confirmation test", typeof(Canvas));
+            try
+            {
+                bool ready = false;
+                int attempts = 0;
+                var modals = new DuelPromptModals(canvas.transform, null, null, (session, pending, response) =>
+                {
+                    Require(session == duel && pending == confirmation && BitConverter.ToInt32(response, 0) == 1,
+                        "The confirmation lost its originating duel, prompt or affirmative response.");
+                    attempts++;
+                    return ready;
+                });
+                modals.ShowPrompt(duel, confirmation, ChainConfirmationMode.Off);
+                modals.TryConfirm();
+                Require(attempts == 1 && modals.IsShowingNativePrompt(duel, confirmation) &&
+                        duel.HasEffectActivationAt(confirmation, ChainConfirmationMode.Off, 0, YgoConstants.LOCATION_GRAVE, 8),
+                    "A blocked response dismissed a pending Graveyard trigger.");
+                ready = true;
+                modals.TryConfirm();
+                Require(attempts == 2 && !modals.IsPromptOpen, "The pending trigger did not dismiss after acceptance.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(canvas); }
+        }
+
+        private static void VerifyChainOrderByTapping(DuelSession duel)
+        {
+            var canvas = new GameObject("Chain order test", typeof(Canvas));
+            try
+            {
+                byte[] submitted = null;
+                var modals = new DuelPromptModals(canvas.transform, null, bytes => submitted = bytes);
+                var prompt = new DuelPrompt { messageType = YgoConstants.MSG_SORT_CHAIN, playerId = 0, isChainSort = true };
+                foreach (uint code in new uint[] { LadyLabrynth, 14087893, 14558127 })
+                    prompt.candidates.Add(new SelectableCardItem { code = code, location = YgoConstants.LOCATION_GRAVE });
+
+                modals.ShowPrompt(duel, prompt);
+                void Pick(int position)
+                {
+                    var tile = modals.ModalRoot.GetComponentsInChildren<Transform>().Single(rt => rt.name == $"Sort_{position}");
+                    tile.Find("Card/PickOrder").GetComponent<Button>().onClick.Invoke();
+                }
+                Pick(2);
+                Pick(1);
+                modals.ModalRoot.transform.Find("Win/Footer/Btn_순서 확정/B").GetComponent<Button>().onClick.Invoke();
+                Require(submitted != null && submitted.SequenceEqual(new byte[] { 1, 2, 0 }),
+                    "Tap ordering sent display indices instead of the native order permutation.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(canvas); }
+        }
+
+        private static void VerifyMobileChainTouchTargets(DuelSession duel)
+        {
+            var canvas = new GameObject("Mobile chain layout test", typeof(Canvas));
+            try
+            {
+                canvas.GetComponent<Canvas>().scaleFactor = 1.5f;
+                ((RectTransform)canvas.transform).sizeDelta = new Vector2(1600f, 900f);
+                var modals = new DuelPromptModals(canvas.transform, null, null, mobileLayout: true);
+                var prompt = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_CHAIN, playerId = 0 };
+                prompt.candidates.Add(new SelectableCardItem { code = LadyLabrynth, location = YgoConstants.LOCATION_HAND });
+                modals.ShowPrompt(duel, prompt);
+                var safe = (RectTransform)modals.ModalRoot.transform.Find("MobileSafeArea");
+                safe.GetComponent<MobileSafeArea>().Reflow(new Rect(107f, 37f, 1382f, 823f), new Vector2Int(1600, 900));
+                Canvas.ForceUpdateCanvases();
+                modals.ShowPrompt(duel, prompt);
+                Canvas.ForceUpdateCanvases();
+                foreach (string path in new[] { "ChainWin/Footer/Pass/B", "ChainWin/Footer/Activate/B", "FieldView/B" })
+                {
+                    var target = (RectTransform)safe.Find(path);
+                    float minimum = MobileSafeArea.MinimumTouchSize(target);
+                    Require(target.rect.width >= minimum - .2f && target.rect.height >= minimum - .2f,
+                        $"{path} does not meet the mobile hit target ({target.rect.size}, need {minimum}).");
+                    var bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(safe, target);
+                    Require(safe.rect.Contains(bounds.min) && safe.rect.Contains(bounds.max),
+                        $"{path} exceeds the safe area.");
+                }
+            }
+            finally { UnityEngine.Object.DestroyImmediate(canvas); }
         }
 
         private static void VerifyKoreanEffect(DuelSession duel)

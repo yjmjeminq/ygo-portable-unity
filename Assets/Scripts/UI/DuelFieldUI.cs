@@ -56,6 +56,8 @@ namespace YGOPortable.UI
         private Image _chainIcon;
         private Button _chainConfirmationButton;
         private Text _chainConfirmationLabel;
+        private RectTransform _chainControlDock;
+        private RectTransform _logControlDock;
 
         // Phase indicator and shortcuts
         private Image _phaseRim;
@@ -70,9 +72,12 @@ namespace YGOPortable.UI
         private Text _placementHint;
         private Button _placementCancel;
 
-        private static readonly Color HudEdge = new Color(.30f, .34f, .33f, .94f);
-        private static readonly Color HudSurface = new Color(.035f, .062f, .076f, .975f);
+        private static readonly Color HudEdge = new Color(.24f, .46f, .51f, .94f);
+        private static readonly Color HudSurface = new Color(.025f, .048f, .068f, .965f);
         private static readonly Color HudText = new Color(.94f, .95f, .93f);
+        private static readonly Color LifeTrackColor = new Color(.28f, .80f, .87f);
+        private static readonly string[] PhaseShortNames = { "DP", "SP", "M1", "BP", "M2", "EP" };
+        private readonly Text[] _phaseStepLabels = new Text[PhaseEntries.Length];
         private static readonly (string name, string label, int phase, string icon)[] PhaseEntries =
         {
             ("Draw", "드로우", YgoConstants.PHASE_DRAW, "dp"),
@@ -100,6 +105,7 @@ namespace YGOPortable.UI
             public CompositeCardView cardView;
             public RectTransform cardArea;
             public RectTransform focusArt;
+            public Image activationGlow;
             public Image focusShadow;
             public DuelFieldReadout readout;
             public CardDragTrigger dragTrigger;
@@ -130,6 +136,7 @@ namespace YGOPortable.UI
             public DuelPileWell well;
             public Graphic wellGlyph;
             public DuelPileDepth depth;
+            public Image activationGlow;
             public Button button;
             public byte controller;
             public uint location;
@@ -140,6 +147,8 @@ namespace YGOPortable.UI
         private Button _extraSummonButton;
         private Button _graveEffectButton;
         private Button _extraEffectButton;
+        private Button _banishedEffectButton;
+        private Button _extraOptionsButton;
 
         // High-res Card Zoom Modal
         private GameObject _cardZoomModal;
@@ -254,9 +263,10 @@ namespace YGOPortable.UI
             _mobileLayout = mobileLayout;
             BuildUI(canvasParent);
             _modals.SetFieldCardHitTest(IsPointOverFieldCardChoice);
+            _modals.SetActivationHitTest(IsPointOverEffectSource);
             _modals.SetInspectorControls(_inspectorArtworkButton, _duelPadInspectButton);
             _modals.SetCandidateInspector(InspectCandidate);
-            _modals.SetPileActivationControls(_graveEffectButton, _extraEffectButton);
+            _modals.SetPileActivationControls(_graveEffectButton, _extraEffectButton, _banishedEffectButton);
             _modals.SetBrowsablePiles(
                 _myGyTile.root.GetComponent<DuelZoneImage>(), _myExtraTile.root.GetComponent<DuelZoneImage>(),
                 _myBanTile.root.GetComponent<DuelZoneImage>(), _oppGyTile.root.GetComponent<DuelZoneImage>(),
@@ -347,6 +357,8 @@ namespace YGOPortable.UI
             HideCardActions();
             _extraSummonButton.gameObject.SetActive(false);
             _graveEffectButton.gameObject.SetActive(false);
+            _banishedEffectButton.gameObject.SetActive(false);
+            _extraOptionsButton.gameObject.SetActive(false);
             _extraEffectButton.gameObject.SetActive(false);
             CloseActionPopup();
             CloseDuelLog();
@@ -911,7 +923,7 @@ namespace YGOPortable.UI
         {
             var side = DuelStyle.Side(opponent);
             var panel = LotdUiKit.FillRect("Status", root, 1f);
-            AddHudSurface(panel, HudEdge, HudSurface);
+            AddHudSurface(panel, Color.Lerp(HudEdge, side, .32f), HudSurface);
 
             var avatarHolder = LotdUiKit.CreateRect("AvatarFrame", panel, new Vector2(opponent ? .781f : .017f, .095f),
                 new Vector2(opponent ? .983f : .219f, .905f), Vector2.zero, Vector2.zero);
@@ -919,7 +931,7 @@ namespace YGOPortable.UI
             var square = avatar.gameObject.AddComponent<AspectRatioFitter>();
             square.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
             square.aspectRatio = 1f;
-            AddHudSurface(avatar, Color.Lerp(HudEdge, side, .19f), new Color(.016f, .032f, .041f));
+            DuelStyle.AddHexPlate(avatar, Color.Lerp(HudEdge, side, .55f), new Color(.020f, .038f, .050f));
             var portrait = LotdUiKit.AddImage(LotdUiKit.FillRect("Portrait", avatar, 4f).gameObject, null, Color.white, true, false);
 
             var readout = LotdUiKit.CreateRect("Readout", panel, new Vector2(opponent ? .038f : .241f, 0f),
@@ -927,11 +939,18 @@ namespace YGOPortable.UI
             var name = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Name", readout, new Vector2(0f, .62f),
                 new Vector2(1f, .932f), Vector2.zero, Vector2.zero), "Text", "", 17, 9,
                 opponent ? TextAnchor.MiddleRight : TextAnchor.MiddleLeft, DuelStyle.Muted);
-            var track = LotdUiKit.CreateRect("LPTrack", readout, new Vector2(0f, .095f), new Vector2(1f, .125f),
+            var track = LotdUiKit.CreateRect("LPTrack", readout, new Vector2(0f, .082f), new Vector2(1f, .172f),
                 Vector2.zero, Vector2.zero);
             LotdUiKit.AddImage(track.gameObject, LotdUiKit.WhiteSprite, new Color(.19f, .24f, .27f), false, false);
             var fill = LotdUiKit.FillRect("Fill", track);
-            LotdUiKit.AddImage(fill.gameObject, LotdUiKit.WhiteSprite, Color.Lerp(HudEdge, side, .69f), false, false);
+            LotdUiKit.AddImage(fill.gameObject, LotdUiKit.WhiteSprite, LifeTrackColor, false, false);
+            for (int i = 1; i < 8; i++)
+            {
+                float x = i / 8f;
+                var divider = LotdUiKit.CreateRect("Tick", track, new Vector2(x, 0f), new Vector2(x, 1f),
+                    Vector2.zero, new Vector2(1f, 0f));
+                LotdUiKit.AddImage(divider.gameObject, LotdUiKit.WhiteSprite, new Color(.024f, .055f, .076f, .56f), false, false);
+            }
             DuelTypography.AddNumber(LotdUiKit.CreateRect("Caption", readout, new Vector2(0f, .15f),
                 new Vector2(.18f, .57f), Vector2.zero, Vector2.zero), "Label", "LP", 17,
                 TextAnchor.MiddleLeft, Color.Lerp(DuelStyle.Muted, side, .39f));
@@ -978,12 +997,12 @@ namespace YGOPortable.UI
 
             _emz[0] = LinkCell(1, 2);
             _emz[1] = LinkCell(3, 2);
-            var chain = LotdUiKit.CreateRect("Chain", board, new Vector2(0.472f, 0.486f), new Vector2(0.528f, 0.582f),
+            _emz[0].bgImg.MarkExtraMonsterZone();
+            _emz[1].bgImg.MarkExtraMonsterZone();
+            var chain = LotdUiKit.CreateRect("Chain", board, new Vector2(.455f, .494f), new Vector2(.545f, .569f),
                 Vector2.zero, Vector2.zero);
-            _chainIcon = LotdUiKit.AddImage(chain.gameObject,
-                DuelVisualAssets.ChainActive ?? LotdUiKit.LoadSprite("LOTD/HUD/chain"), Color.white, true, false);
-            _chainBannerText = DuelTypography.AddNumber(chain, "Count", "", 22, TextAnchor.MiddleCenter, Color.white);
-            _chainBannerText.gameObject.AddComponent<Outline>().effectColor = Color.black;
+            _chainIcon = DuelStyle.AddHexPlate(chain, DuelStyle.Gold, new Color(.13f, .082f, .060f, .96f));
+            _chainBannerText = LotdUiKit.AddFittedText(chain, "Count", "", 18, 9, TextAnchor.MiddleCenter, DuelStyle.Gold, FontStyle.Bold);
 
             _mySZone[5] = CreateZoneSlot(Cell(1, 3));
             _oppSZone[5] = CreateZoneSlot(Cell(7, 1));
@@ -1002,6 +1021,9 @@ namespace YGOPortable.UI
                 () => OpenPileEffectPicker(YgoConstants.LOCATION_EXTRA), activation: true);
             _graveEffectButton = BuildPileActionButton(_myGyTile, "GraveEffect", "효과 발동",
                 () => OpenPileEffectPicker(YgoConstants.LOCATION_GRAVE), activation: true);
+            _banishedEffectButton = BuildPileActionButton(_myBanTile, "BanishedEffect", "효과 발동",
+                () => OpenPileEffectPicker(YgoConstants.LOCATION_REMOVED), activation: true);
+            _extraOptionsButton = BuildPileActionButton(_myExtraTile, "ExtraOptions", "행동 선택", OpenCombinedExtraActions);
         }
 
         private static Button BuildPileActionButton(StackTileView tile, string name, string label, Action action, bool activation = false)
@@ -1034,6 +1056,7 @@ namespace YGOPortable.UI
         private FieldSlotView CreateZoneSlot(RectTransform cell)
         {
             var background = LotdUiKit.AddImage(cell.gameObject, LotdUiKit.WhiteSprite, ZoneTint);
+            ((DuelZoneImage)background).ShowCircuitRing();
             var border = cell.gameObject.AddComponent<Outline>();
             border.effectColor = Color.clear;
             border.effectDistance = new Vector2(2f, -2f);
@@ -1052,6 +1075,7 @@ namespace YGOPortable.UI
                 focusArt = (RectTransform)view.transform.Find("AspectBox"),
                 dragTrigger = cell.gameObject.AddComponent<CardDragTrigger>(),
             };
+            slot.activationGlow = DuelStyle.AddActivationGlow(slot.focusArt);
             _fieldSlotsByRect.Add(cell, slot);
             return slot;
         }
@@ -1125,6 +1149,7 @@ namespace YGOPortable.UI
                 root = cell, cardArea = card, label = label, count = count, background = background, cardView = view,
                 well = well, wellGlyph = wellGlyph, depth = depth, button = button, location = location,
             };
+            if (!opponent) tile.activationGlow = DuelStyle.AddActivationGlow(cell, 5f, behind: false);
             _stackTilesByRect.Add(cell, tile);
             return tile;
         }
@@ -1146,11 +1171,12 @@ namespace YGOPortable.UI
             BuildTurnHud(root);
             BuildPhasePicker(root);
             BuildPlacementControls(root);
-            var log = LotdUiKit.CreateRect("OpenLog", root, new Vector2(0.910f, 0.035f), new Vector2(0.984f, 0.092f),
+            var log = _logControlDock = LotdUiKit.CreateRect("OpenLog", root, new Vector2(0.910f, 0.035f), new Vector2(0.984f, 0.092f),
                 Vector2.zero, Vector2.zero);
             _duelPadLogButton = BuildHudControl(log, DuelVisualAssets.LogIcon, "대전 기록", OpenDuelLog);
-            var chainConfirmation = LotdUiKit.CreateRect("ChainConfirmation", root,
+            var chainConfirmation = _chainControlDock = LotdUiKit.CreateRect("ChainConfirmation", root,
                 new Vector2(.825f, .035f), new Vector2(.901f, .092f), Vector2.zero, Vector2.zero);
+            LayoutMobileDuelControls();
             _chainConfirmationButton = DuelStyle.Button(chainConfirmation, "Button", "AUTO", CycleChainConfirmation, 15);
             _chainConfirmationButton.navigation = new Navigation { mode = Navigation.Mode.None };
             _chainConfirmationLabel = _chainConfirmationButton.GetComponentInChildren<Text>();
@@ -1166,13 +1192,28 @@ namespace YGOPortable.UI
             _hintBannerText.gameObject.AddComponent<Outline>().effectColor = LotdUiKit.BgDeep;
         }
 
+        private static void PositionBottomControl(RectTransform control, float right, float width, float height)
+        {
+            control.anchorMin = control.anchorMax = new Vector2(1f, 0f);
+            control.offsetMin = new Vector2(-right - width, 8f);
+            control.offsetMax = new Vector2(-right, height + 8f);
+        }
+
+        private void LayoutMobileDuelControls()
+        {
+            if (!_mobileLayout) return;
+            float touch = MobileSafeArea.MinimumTouchSize(_chainControlDock);
+            PositionBottomControl(_logControlDock, 8f, touch, touch);
+            PositionBottomControl(_chainControlDock, touch + 16f, Mathf.Max(112f, touch), touch);
+        }
+
         private void BuildTurnHud(Transform root)
         {
             var holder = LotdUiKit.CreateRect("Turn", root, new Vector2(.904f, .451f), new Vector2(.984f, .615f),
                 Vector2.zero, Vector2.zero);
             var turn = LotdUiKit.CreateRect("Dial", holder, new Vector2(0f, .12f), new Vector2(1f, .88f),
                 Vector2.zero, Vector2.zero);
-            _phaseRim = AddHudSurface(turn, HudEdge, HudSurface);
+            _phaseRim = DuelStyle.AddHexPlate(turn, HudEdge, HudSurface);
             _phaseButton = AddHudButton(_phaseRim, OpenPhasePicker);
 
             var turnReadout = LotdUiKit.CreateRect("TurnNumber", turn, new Vector2(.115f, .675f),
@@ -1182,17 +1223,19 @@ namespace YGOPortable.UI
                 TextAnchor.MiddleLeft, DuelStyle.Muted);
             _turnNumber = DuelTypography.AddNumber(LotdUiKit.CreateRect("Count", turnReadout, new Vector2(.670f, 0f),
                 Vector2.one, Vector2.zero, Vector2.zero), "Value", "", 20, TextAnchor.MiddleRight, HudText);
-            _phaseLabel = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("PhaseName", turn, new Vector2(.07f, .295f),
+            _phaseLabel = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("PhaseName", turn, new Vector2(.07f, .42f),
                 new Vector2(.93f, .682f), Vector2.zero, Vector2.zero), "Value", "", 26, 12,
                 TextAnchor.MiddleCenter, HudText);
-            var progress = LotdUiKit.CreateRect("PhaseSteps", turn, new Vector2(.13f, .235f), new Vector2(.87f, .268f),
+            var progress = LotdUiKit.CreateRect("PhaseSteps", turn, new Vector2(.08f, .235f), new Vector2(.92f, .395f),
                 Vector2.zero, Vector2.zero);
             for (int i = 0; i < _phaseSteps.Length; i++)
             {
                 var step = LotdUiKit.CreateRect(PhaseEntries[i].name, progress,
                     new Vector2((i + .12f) / _phaseSteps.Length, 0f), new Vector2((i + .88f) / _phaseSteps.Length, 1f),
                     Vector2.zero, Vector2.zero);
-                _phaseSteps[i] = LotdUiKit.AddImage(step.gameObject, LotdUiKit.WhiteSprite, HudEdge, false, false);
+                _phaseSteps[i] = DuelStyle.AddHexPlate(step, HudEdge, HudSurface);
+                _phaseStepLabels[i] = LotdUiKit.AddFittedText(step, "Phase", PhaseShortNames[i], 11, 7,
+                    TextAnchor.MiddleCenter, DuelStyle.Muted, FontStyle.Bold);
             }
             _phaseControlHint = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("ChangePrompt", turn, new Vector2(.09f, .045f),
                 new Vector2(.91f, .213f), Vector2.zero, Vector2.zero), "Label", "페이즈 변경", 13, 8,
@@ -1228,7 +1271,9 @@ namespace YGOPortable.UI
             dismiss.transition = Selectable.Transition.None;
             dismiss.onClick.AddListener(() => _phasePicker.SetActive(false));
 
-            var controls = LotdUiKit.CreateRect("PhaseControls", overlay, new Vector2(.302f, .223f), new Vector2(.879f, .415f),
+            var controls = LotdUiKit.CreateRect("PhaseControls", overlay,
+                _mobileLayout ? new Vector2(.18f, .19f) : new Vector2(.285f, .223f),
+                _mobileLayout ? new Vector2(.95f, .72f) : new Vector2(.90f, .494f),
                 Vector2.zero, Vector2.zero);
             AddHudSurface(controls, HudEdge, HudSurface);
             var header = LotdUiKit.CreateRect("Header", controls, new Vector2(.027f, .775f), new Vector2(.973f, .953f),
@@ -1241,7 +1286,7 @@ namespace YGOPortable.UI
                 float left = .028f + .158f * i;
                 var slot = LotdUiKit.CreateRect(name, controls, new Vector2(left, .297f), new Vector2(left + .150f, .737f),
                     Vector2.zero, Vector2.zero);
-                var rim = AddHudSurface(LotdUiKit.FillRect("Button", slot), HudEdge, new Color(.060f, .101f, .122f));
+                var rim = DuelStyle.AddHexPlate(LotdUiKit.FillRect("Button", slot), HudEdge, new Color(.060f, .101f, .122f));
                 var button = AddHudButton(rim, () =>
                 {
                     _phasePicker.SetActive(false);
@@ -1254,11 +1299,12 @@ namespace YGOPortable.UI
                 icon.enabled = sprite != null;
                 var labelBox = LotdUiKit.CreateRect("Caption", button.transform, new Vector2(.06f, .088f), new Vector2(.94f, .448f),
                     Vector2.zero, Vector2.zero);
-                var caption = LotdUiKit.AddFittedText(labelBox, "Label", label, 17, 9, TextAnchor.MiddleCenter, HudText, FontStyle.Bold);
+                var caption = LotdUiKit.AddFittedText(labelBox, "Label", $"{PhaseShortNames[i]}  {label}", 17, 9,
+                    TextAnchor.MiddleCenter, HudText, FontStyle.Bold);
                 _phaseChoices.Add((phase, button, caption, icon));
             }
 
-            var cancel = LotdUiKit.CreateRect("Cancel", controls, new Vector2(.793f, .060f), new Vector2(.968f, .248f),
+            var cancel = LotdUiKit.CreateRect("Cancel", controls, new Vector2(.793f, .028f), new Vector2(.968f, .270f),
                 Vector2.zero, Vector2.zero);
             _phaseCancel = DuelStyle.Button(cancel, "Button", "취소", () => _phasePicker.SetActive(false), 15);
             _phaseCancel.navigation = new Navigation { mode = Navigation.Mode.None };
@@ -1344,7 +1390,8 @@ namespace YGOPortable.UI
             close.onClick.AddListener(CloseActionPopup);
 
             var middle = new Vector2(0.5f, 0.5f);
-            _actionWindow = DuelStyle.Panel(overlay, "CommandWindow", middle, middle);
+            _actionWindow = DuelStyle.Panel(overlay, "CommandWindow", middle, middle,
+                fill: DuelStyle.GlassColor, border: DuelStyle.GlassEdge);
             var header = LotdUiKit.CreateRect("Caption", _actionWindow, new Vector2(0f, 1f), Vector2.one,
                 new Vector2(27f, -43f), new Vector2(-27f, -7f));
             _actionHeader = LotdUiKit.AddFittedText(header, "CardName", "", 17, 10, TextAnchor.MiddleCenter,
@@ -1427,6 +1474,7 @@ namespace YGOPortable.UI
         public void Refresh()
         {
             if (_session == null || !Root.activeInHierarchy) return;
+            if (_boardLayoutSize != _boardRect.rect.size) LayoutMobileDuelControls();
             _boardLayoutSize = _boardRect.rect.size;
 
             if (!IsPresenting) _presentedFieldReadouts.Clear();
@@ -1467,7 +1515,7 @@ namespace YGOPortable.UI
 
             int chain = _session.CurrentChain.Count;
             _chainIcon.gameObject.SetActive(chain > 0);
-            _chainBannerText.text = chain > 0 ? chain.ToString() : "";
+            _chainBannerText.text = chain > 0 ? $"CHAIN {chain}" : "";
 
             for (int i = 0; i < 5; i++)
             {
@@ -1523,7 +1571,8 @@ namespace YGOPortable.UI
             for (int i = 0; i < _phaseSteps.Length; i++)
             {
                 bool current = PhaseEntries[i].phase == stepPhase;
-                _phaseSteps[i].color = current ? Color.Lerp(HudText, accent, .66f) : HudEdge;
+                _phaseSteps[i].color = current ? DuelStyle.Gold : HudEdge;
+                _phaseStepLabels[i].color = current ? DuelStyle.Gold : DuelStyle.Muted;
                 if (current) label = PhaseEntries[i].label;
             }
             _phaseLabel.text = phase is YgoConstants.PHASE_DAMAGE or YgoConstants.PHASE_DAMAGE_CAL ? "데미지" : label;
@@ -1734,11 +1783,13 @@ namespace YGOPortable.UI
                 trigger.OnLeftClick = () =>
                 {
                     InspectCard(card.code);
+                    if (_modals.FocusChainActivationAt(_session, YgoConstants.LOCATION_HAND, sequence)) return;
                     PointAtCardActions(view.Rect);
                 };
                 trigger.OnTouchClick = () =>
                 {
                     InspectCard(card.code);
+                    if (_modals.FocusChainActivationAt(_session, YgoConstants.LOCATION_HAND, sequence)) return;
                     SelectTouchCardActions(view.Rect);
                 };
             }
@@ -1790,7 +1841,7 @@ namespace YGOPortable.UI
             if (!changed && prompt == null) return;
             _handGlowPrompt = prompt;
             var hand = prompt == null ? null : _session.Players[_session.HumanPlayerIndex].hand;
-            float alpha = .84f + .16f * Mathf.Sin(Time.unscaledTime * 3.2f);
+            var mode = _app?.ChainConfirmation ?? ChainConfirmationMode.Auto;
             for (int i = 0; i < _myHandViews.Count; i++)
             {
                 var view = _myHandViews[i];
@@ -1799,31 +1850,45 @@ namespace YGOPortable.UI
                 {
                     var card = hand != null && i < hand.Count ? hand[i] : null;
                     bool playable = view.Rect.gameObject.activeSelf && card != null &&
-                        IsPlayableHandCard(prompt, (byte)_session.HumanPlayerIndex, card.sequence);
-                    glow.gameObject.SetActive(playable);
+                        (HasHandAction(card.controller, card.sequence) ||
+                         _session.HasEffectActivationAt(prompt, mode, card.controller, YgoConstants.LOCATION_HAND, card.sequence));
+                    DuelStyle.SetActivationGlow(glow, playable);
                 }
-                if (glow.gameObject.activeSelf) glow.canvasRenderer.SetAlpha(alpha);
+                else if (glow.gameObject.activeSelf) glow.canvasRenderer.SetAlpha(DuelStyle.ActivationPulse);
+            }
+
+            foreach (var slot in _fieldSlotsByRect.Values)
+            {
+                var glow = slot.activationGlow;
+                if (changed)
+                    DuelStyle.SetActivationGlow(glow, prompt != null && slot.cardView.gameObject.activeSelf &&
+                        _session.HasEffectActivationAt(prompt, mode, slot.mappedCon, slot.mappedLoc, slot.mappedSeq));
+                else if (glow.gameObject.activeSelf) glow.canvasRenderer.SetAlpha(DuelStyle.ActivationPulse);
+            }
+            foreach (var tile in _stackTilesByRect.Values)
+            {
+                var glow = tile.activationGlow;
+                if (glow == null) continue;
+                if (changed)
+                    DuelStyle.SetActivationGlow(glow, prompt != null &&
+                        _session.HasEffectActivationAt(prompt, mode, tile.controller, tile.location));
+                else if (glow.gameObject.activeSelf) glow.canvasRenderer.SetAlpha(DuelStyle.ActivationPulse);
             }
         }
 
-        private bool IsPlayableHandCard(DuelPrompt prompt, byte controller, uint sequence)
+        private bool IsPointOverEffectSource(Vector2 point, Camera camera)
         {
-            switch (prompt.messageType)
-            {
-                case YgoConstants.MSG_SELECT_IDLECMD:
-                case YgoConstants.MSG_SELECT_BATTLECMD:
-                    return HasHandAction(controller, sequence);
-                case YgoConstants.MSG_SELECT_CHAIN:
-                    var mode = _app?.ChainConfirmation ?? ChainConfirmationMode.Auto;
-                    return prompt.candidates.Exists(item => item.controller == controller &&
-                        item.location == YgoConstants.LOCATION_HAND && item.sequence == sequence &&
-                        _session.IsChainCandidateVisible(prompt, item, mode));
-                case YgoConstants.MSG_SELECT_EFFECTYN when prompt.IsTriggerActivationConfirmation:
-                    return prompt.promptCon == controller && prompt.promptLoc == YgoConstants.LOCATION_HAND &&
-                        prompt.promptSeq == sequence;
-                default:
-                    return false;
-            }
+            if (!CanAcceptPlayerAction || !_modals.IsChainPromptOpen || IsReadingCardDetails || IsBrowsingZone) return false;
+            foreach (var view in _myHandViews)
+                if (view.PlayableGlow.isActiveAndEnabled && RectTransformUtility.RectangleContainsScreenPoint(view.Rect, point, camera))
+                    return true;
+            foreach (var slot in _fieldSlotsByRect.Values)
+                if (slot.activationGlow.isActiveAndEnabled && RectTransformUtility.RectangleContainsScreenPoint(slot.root, point, camera))
+                    return true;
+            foreach (var tile in _stackTilesByRect.Values)
+                if (tile.activationGlow != null && tile.activationGlow.isActiveAndEnabled &&
+                    RectTransformUtility.RectangleContainsScreenPoint(tile.root, point, camera)) return true;
+            return false;
         }
 
         private static HandCardView CreateHandCard(RectTransform row, bool opponent)
@@ -1836,14 +1901,7 @@ namespace YGOPortable.UI
             if (!opponent)
             {
                 LotdUiKit.AddImage(rect.gameObject, LotdUiKit.WhiteSprite, Color.clear);
-                var original = DuelVisualAssets.HandGlow;
-                var outline = LotdUiKit.FillRect("PlayableGlow", art, original != null ? -10f : -9f);
-                outline.SetAsFirstSibling();
-                glow = LotdUiKit.AddImage(outline.gameObject, original ?? DuelStyle.HandGlow, Color.white, false, false);
-                glow.type = Image.Type.Sliced;
-                glow.fillCenter = false;
-                glow.pixelsPerUnitMultiplier = original != null ? 1.7f : 1f;
-                outline.gameObject.SetActive(false);
+                glow = DuelStyle.AddActivationGlow(art);
                 trigger = rect.gameObject.AddComponent<CardDragTrigger>();
             }
             return new HandCardView
@@ -3143,6 +3201,12 @@ namespace YGOPortable.UI
             label.color = displayed > 0d && displayed <= 2000d
                 ? Color.Lerp(HudText, lowLife, .34f + Mathf.PingPong(Time.time * 2.1f, .42f))
                 : HudText;
+            if (fill.TryGetComponent<Image>(out var gauge))
+            {
+                Color tone = remaining > .01 ? new Color(.26f, 1f, .65f) :
+                    remaining < -.01 ? new Color(1f, .31f, .30f) : LifeTrackColor;
+                gauge.color = Color.Lerp(gauge.color, tone, Mathf.Clamp01(playbackDelta * 12f));
+            }
         }
 
         private static void WriteLifeReadout(Text label, RectTransform fill, int lifePoints)
@@ -3376,7 +3440,12 @@ namespace YGOPortable.UI
             if (item.code == 0 || item.controller != session.HumanPlayerIndex || item.location != location)
                 return false;
             var player = session.Players[session.HumanPlayerIndex];
-            var cards = location == YgoConstants.LOCATION_EXTRA ? player.extra : player.grave;
+            var cards = location switch
+            {
+                YgoConstants.LOCATION_EXTRA => player.extra,
+                YgoConstants.LOCATION_REMOVED => player.banished,
+                _ => player.grave,
+            };
             return cards.Exists(card => card != null && card.code != 0 && card.sequence == item.sequence);
         }
 
@@ -3392,11 +3461,14 @@ namespace YGOPortable.UI
             bool canSummon = ExtraSummonAvailable;
             bool extraEffect = PileEffectAvailable(YgoConstants.LOCATION_EXTRA);
             bool both = canSummon && extraEffect;
-            SetAvailability(_extraSummonButton, canSummon, .07f, both ? .49f : .93f);
-            SetAvailability(_extraEffectButton, extraEffect, both ? .51f : .07f, .93f);
+            bool combined = _mobileLayout && both;
+            SetAvailability(_extraOptionsButton, combined, .07f, .93f);
+            SetAvailability(_extraSummonButton, canSummon && !combined, .07f, both ? .49f : .93f);
+            SetAvailability(_extraEffectButton, extraEffect && !combined, both ? .51f : .07f, .93f);
             SetAvailability(_graveEffectButton, PileEffectAvailable(YgoConstants.LOCATION_GRAVE), .07f, .93f);
+            SetAvailability(_banishedEffectButton, PileEffectAvailable(YgoConstants.LOCATION_REMOVED), .07f, .93f);
 
-            static void SetAvailability(Button button, bool available, float left, float right)
+            void SetAvailability(Button button, bool available, float left, float right)
             {
                 if (button.gameObject.activeSelf != available)
                 {
@@ -3405,9 +3477,38 @@ namespace YGOPortable.UI
                 }
                 if (!available) return;
                 var rect = (RectTransform)button.transform.parent;
+                if (_mobileLayout)
+                {
+                    float touch = MobileSafeArea.MinimumTouchSize(rect);
+                    var pile = (RectTransform)rect.parent;
+                    rect.anchorMin = rect.anchorMax = new Vector2(.5f, .62f);
+                    rect.sizeDelta = new Vector2(Mathf.Max(touch, pile.rect.width * .84f), touch);
+                    rect.anchoredPosition = Vector2.zero;
+                    return;
+                }
                 rect.anchorMin = new Vector2(left, rect.anchorMin.y);
                 rect.anchorMax = new Vector2(right, rect.anchorMax.y);
             }
+        }
+
+        private void OpenCombinedExtraActions()
+        {
+            if (!ExtraSummonAvailable || !PileEffectAvailable(YgoConstants.LOCATION_EXTRA)) return;
+            var session = _session;
+            var prompt = session.ActivePrompt;
+            ClearActionRows();
+            _actionHeader.text = "엑스트라 덱";
+            void Select(Action open)
+            {
+                CloseActionPopup();
+                if (_session == session && ReferenceEquals(session.ActivePrompt, prompt)) open();
+            }
+            AddActionRow("특수 소환 가능 카드", () => Select(OpenExtraSummonPicker), true, "SUMMONSP");
+            AddActionRow("발동 가능 효과", () => Select(() => OpenPileEffectPicker(YgoConstants.LOCATION_EXTRA)), true, "ACTION");
+            AddActionRow("목록 보기", () => Select(() => OpenStackZone((byte)session.HumanPlayerIndex,
+                YgoConstants.LOCATION_EXTRA, "내 엑스트라 덱")), false, "LOOK");
+            AddActionRow("취소", CloseActionPopup, false);
+            PlaceActionWindow(_myExtraTile.root);
         }
 
         private void OpenExtraSummonPicker()
@@ -3472,6 +3573,8 @@ namespace YGOPortable.UI
         private void OpenStackZone(byte con, uint loc, string title, bool actionsOnly = false)
         {
             var session = _session;
+            if (CanAcceptPlayerAction && !IsReadingCardDetails && !IsBrowsingZone && con == session.HumanPlayerIndex &&
+                !_modals.IsShowingField && _modals.FocusChainActivationAt(session, loc)) return;
             if (session == null || session.IsFinished || IsStagingPlacement || IsPresenting || IsPaused || IsReadingLog ||
                 _cardZoomModal.activeSelf || _actionPopup.activeSelf || con >= session.Players.Length ||
                 _modals.IsPromptOpen && !_modals.IsShowingField) return;
@@ -3548,6 +3651,9 @@ namespace YGOPortable.UI
         private void OnSlotClicked(byte con, uint loc, uint seq, bool touch = false)
         {
             if (_session == null || IsPresenting || IsPaused || IsBrowsingZone) return;
+
+            if (CanAcceptPlayerAction && !IsReadingCardDetails && con == _session.HumanPlayerIndex &&
+                _modals.FocusChainActivationAt(_session, loc, seq)) return;
 
             if (_modals.IsFieldCardSelection)
             {
@@ -3728,7 +3834,8 @@ namespace YGOPortable.UI
         private void AddActionRow(string label, Action action, bool selected, string icon = null)
         {
             Sprite iconSprite = icon == null ? null : LotdUiKit.LoadSprite($"LOTD/Icons/ICON_ID_CMDID_48_{icon}");
-            var button = LotdUiKit.CreateWrappedButton(_actionList, "Action", label, action, 15, selected, 42f, iconSprite);
+            float height = _mobileLayout ? MobileSafeArea.MinimumTouchSize(_actionList) : 44f;
+            var button = LotdUiKit.CreateWrappedButton(_actionList, "Action", label, action, 15, selected, height, iconSprite);
             DuelStyle.ApplyButton(button, selected);
         }
 

@@ -18,12 +18,17 @@ namespace YGOPortable.UI
         private Vector4 _edges = new Vector4(0f, 1f, 0f, 1f);
         private bool _placementHighlighted;
         private bool _pileActionHighlighted;
+        private bool _circuitRing;
+        private bool _extraMonsterZone;
         private DuelLinkZoneRim _linkRim;
         internal DuelLinkHighlight LinkHighlight { get; private set; }
         internal bool LinkHighlighted => LinkHighlight != DuelLinkHighlight.None;
         internal bool EquipmentHighlighted { get; private set; }
         internal Vector2Int LinkDirection { get; private set; }
         internal bool SummonReserved { get; private set; }
+
+        internal void ShowCircuitRing() => _circuitRing = true;
+        internal void MarkExtraMonsterZone() => _extraMonsterZone = true;
 
         internal void SetPlacementHighlight(bool highlighted, bool summonReserved)
         {
@@ -99,7 +104,7 @@ namespace YGOPortable.UI
 
         private Vector2 Corner(Rect rect, int index, float size)
         {
-            Vector2 uv = Vector2.Lerp(new Vector2(.5f, .5f), Corners[index % Corners.Length], size);
+            Vector2 uv = Vector2.LerpUnclamped(new Vector2(.5f, .5f), Corners[index % Corners.Length], size);
             float x = Mathf.Lerp(Mathf.Lerp(_edges.x, _edges.z, uv.y), Mathf.Lerp(_edges.y, _edges.w, uv.y), uv.x);
             return new Vector2(rect.xMin + rect.width * x, rect.yMin + rect.height * uv.y);
         }
@@ -122,6 +127,8 @@ namespace YGOPortable.UI
             for (int i = 0; i < Corners.Length; i++)
                 mesh.AddTriangle(center, center + 1 + i, center + 1 + (i + 1) % Corners.Length);
 
+            if (_circuitRing) DrawCircuitRing(mesh, rect, _extraMonsterZone);
+
             if (_placementHighlighted)
             {
                 DrawSelectionRim(mesh, rect, new Color(.99f, .90f, .32f, .96f), 0f);
@@ -138,8 +145,8 @@ namespace YGOPortable.UI
                 DrawSelectionRim(mesh, rect, new Color(1f, .76f, .42f, .96f), .13f, .85f, .945f);
 
             if (link) return;
-            var shadow = new Color(.32f, .45f, .51f, .53f);
-            var light = new Color(.57f, .62f, .62f, .48f);
+            var shadow = new Color(.20f, .45f, .54f, .49f);
+            var light = new Color(.38f, .69f, .72f, .44f);
             for (int i = 0; i < Corners.Length; i++)
             {
                 var rim = i < 4 ? light : shadow;
@@ -151,6 +158,29 @@ namespace YGOPortable.UI
 
             if (_pileActionHighlighted)
                 DrawSelectionRim(mesh, rect, new Color(.91f, .74f, .41f, .82f), .09f, .96f);
+            if (_extraMonsterZone)
+            {
+                DrawSelectionRim(mesh, rect, new Color(.21f, .83f, .94f, .27f), .15f, 1f, 1.085f);
+                DrawSelectionRim(mesh, rect, new Color(.36f, .89f, .96f, .75f), .18f, .966f, 1.014f);
+            }
+        }
+
+        private static void DrawCircuitRing(VertexHelper mesh, Rect rect, bool extra)
+        {
+            const int segments = 28;
+            var radius = new Vector2(rect.width * .33f, rect.height * .26f);
+            var lit = extra ? new Color(.36f, .91f, .98f, .31f) : new Color(.31f, .76f, .82f, .14f);
+            var shade = new Color(.012f, .025f, .044f, .26f);
+            for (int i = 0; i < segments; i++)
+            {
+                if (i % 7 == 6) continue;
+                float start = i * Mathf.PI * 2f / segments;
+                float end = (i + 1) * Mathf.PI * 2f / segments;
+                var a = Vector2.Scale(radius, new Vector2(Mathf.Cos(start), Mathf.Sin(start)));
+                var b = Vector2.Scale(radius, new Vector2(Mathf.Cos(end), Mathf.Sin(end)));
+                DuelMat.AddQuad(mesh, rect.center + a * 1.08f, rect.center + a * .92f,
+                    rect.center + b * .92f, rect.center + b * 1.08f, shade, lit);
+            }
         }
 
         internal void DrawSelectionRim(VertexHelper mesh, Rect rect, Color color, float gap, float innerSize = .90f, float outerSize = .99f)
@@ -198,6 +228,7 @@ namespace YGOPortable.UI
             }
 
             Zone.DrawSelectionRim(mesh, rect, LinkedInk, .16f);
+            Zone.DrawSelectionRim(mesh, rect, new Color(.52f, .74f, 1f, .22f), .16f, 1f, 1.115f);
             if (Zone.LinkDirection != Vector2Int.zero) DrawDirection(mesh, rect, Zone.LinkDirection);
         }
 
@@ -211,6 +242,9 @@ namespace YGOPortable.UI
             var tail = rect.center - forward * size * .62f;
             var edge = across * size * .84f;
             var inset = across * size * .43f;
+            var halo = new Color(.36f, .74f, 1f, .13f);
+            DuelMat.AddQuad(mesh, tip + forward * size * .32f, tail + edge * 1.24f,
+                tail - edge * 1.24f, tip - forward * size * .65f, halo, new Color(halo.r, halo.g, halo.b, 0f));
             var shade = new Color(.54f, .71f, 1f, .62f);
             DuelMat.AddQuad(mesh, tip, tail + edge, tail + inset, inside, LinkedInk, shade);
             DuelMat.AddQuad(mesh, tip, inside, tail - inset, tail - edge, LinkedInk, shade);
@@ -241,8 +275,8 @@ namespace YGOPortable.UI
             mesh.Clear();
             var rect = GetPixelAdjustedRect();
             var (nearLeft, nearRight, farLeft, farRight) = DuelMat.Corners(rect);
-            var close = new Color(.98f, 1f, 1f);
-            var far = new Color(.84f, .91f, .99f);
+            var close = new Color(.53f, .65f, .72f, .93f);
+            var far = new Color(.38f, .52f, .65f, .89f);
             const int bands = 16;
             for (int i = 0; i < bands; i++)
             {
@@ -302,7 +336,7 @@ namespace YGOPortable.UI
             AddQuad(mesh, bottomLeft, nearLeft, nearRight, bottomRight, basalt, reflected);
             AddQuad(mesh, bottomLeft, nearLeft, farLeft, farLeft + drop * .33f, basalt, reflected * .68f);
             AddQuad(mesh, farRight + drop * .33f, farRight, nearRight, bottomRight, basalt, reflected * .86f);
-            var lip = new Color(.46f, .42f, .34f, .82f);
+            var lip = new Color(.29f, .60f, .67f, .79f);
             Line(mesh, nearLeft, nearRight, 3.2f, lip);
             Line(mesh, nearLeft, farLeft, 3f, lip);
             Line(mesh, farLeft, farRight, 3f, lip);

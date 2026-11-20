@@ -134,7 +134,8 @@ namespace YGOPortable.UI
                 _deckEditor = new DeckEditorUI(this, canvas.transform);
 
                 Debug.Log("[GameApp] 8. Constructing DuelPromptModals...");
-                _modals = new DuelPromptModals(canvas.transform, code => _duelField?.InspectCard(code), OnHumanModalResponse);
+                _modals = new DuelPromptModals(canvas.transform, code => _duelField?.InspectCard(code), null,
+                    TrySubmitHumanModalResponse);
 
                 Debug.Log("[GameApp] 9. Constructing DuelFieldUI...");
                 _duelField = new DuelFieldUI(this, canvas.transform, _modals);
@@ -518,16 +519,15 @@ namespace YGOPortable.UI
                 return;
             }
 
-            // Human prompt
-            if (_shownHumanPrompt != prompt)
+            // The core waits on this exact prompt until a response is accepted. Reopen it if an overlay hid it.
+            bool needsModal = prompt.messageType is not (YgoConstants.MSG_SELECT_IDLECMD or YgoConstants.MSG_SELECT_BATTLECMD or
+                YgoConstants.MSG_SELECT_PLACE or YgoConstants.MSG_SELECT_DISFIELD);
+            if (_shownHumanPrompt != prompt || needsModal && !_modals.IsShowingNativePrompt(_session, prompt))
             {
                 _shownHumanPrompt = prompt;
                 _duelField.Refresh();
 
-                if (prompt.messageType != YgoConstants.MSG_SELECT_IDLECMD &&
-                    prompt.messageType != YgoConstants.MSG_SELECT_BATTLECMD &&
-                    prompt.messageType != YgoConstants.MSG_SELECT_PLACE &&
-                    prompt.messageType != YgoConstants.MSG_SELECT_DISFIELD)
+                if (needsModal)
                 {
                     _modals.ShowPrompt(_session, prompt, ChainConfirmation);
                     if (_modals.IsFieldCardSelection || _modals.IsChainPromptOpen) _duelField.Refresh();
@@ -657,13 +657,16 @@ namespace YGOPortable.UI
                 _collectionShop.ScrollShopDescription(frame.DescriptionScroll);
         }
 
-        private void OnHumanModalResponse(byte[] resp)
+        private bool TrySubmitHumanModalResponse(DuelSession session, DuelPrompt prompt, byte[] response)
         {
-            if (_session == null || _session.IsFinished ||
-                _duelField.IsPresenting || _duelField.IsPaused || _duelField.IsBrowsingZone || _duelField.IsReadingCardDetails) return;
+            if (session == null || prompt == null || _session != session || session.IsFinished || !ReferenceEquals(session.ActivePrompt, prompt) ||
+                prompt.playerId != session.HumanPlayerIndex || _duelField.IsPresenting || _duelField.IsPaused ||
+                _duelField.IsReadingLog || _duelField.IsBrowsingZone || _duelField.IsReadingCardDetails)
+                return false;
             _shownHumanPrompt = null;
-            _session.SubmitResponse(resp);
+            session.SubmitResponse(response);
             _duelField.Refresh();
+            return true;
         }
 
         internal void SetPersonalReplayEnabled(bool enabled)

@@ -1509,13 +1509,14 @@ namespace YGOPortable.UI
             _previousChainNumber = chainNumber;
             _previousChainCode = code;
             _previousChainReadout = live;
-            if (!source.IsValid) yield break;
-
             float side = opponent ? 1f : -1f;
             Vector2 view = _layer.rect.size;
             float height = Mathf.Min(350f, view.y * .45f, view.x * .31f);
+            if (height <= 0f) yield break;
             var center = new Vector2(side * view.x * (previous == 0 ? .04f : .088f), view.y * .055f);
             var reveal = new CardPose(center, new Vector2(height * LotdUiKit.CardAspectRatio, height), side * 8f);
+            if (!source.IsValid)
+                source = new CardPose(center + Vector2.down * height * .27f, reveal.Size * .55f, 0f);
             var overlay = LotdUiKit.FillRect("ChainActivation", _layer);
             LotdUiKit.AddImage(overlay.gameObject, LotdUiKit.WhiteSprite, new Color(.01f, .018f, .023f, .38f), false, false);
             var opacity = overlay.gameObject.AddComponent<CanvasGroup>();
@@ -1530,7 +1531,7 @@ namespace YGOPortable.UI
                 Vector2 priorSize = reveal.Size * .66f;
                 ApplyPose(prior, new CardPose(point, priorSize, -side * 10f));
                 ChainBadge(overlay, point + new Vector2(-side * (priorSize.x * .5f + height * .17f), -height * .20f), chainNumber - 1,
-                    height * .18f, active: false);
+                    height * .25f, active: false);
             }
 
             var crest = CreateEffect(DuelEffectKind.Chain, center, new Vector2(height * 1.40f, height * 1.25f), DuelStyle.Gold);
@@ -1541,7 +1542,7 @@ namespace YGOPortable.UI
             var flash = highlight.gameObject.AddComponent<CanvasGroup>();
             flash.alpha = 0f;
             var badge = ChainBadge(_layer, center + new Vector2(side * (reveal.Size.x * .52f + height * .25f), -height * .35f), chainNumber,
-                height * .32f, active: true);
+                height * .32f, active: true, opponent: opponent);
             var badgeOpacity = badge.gameObject.AddComponent<CanvasGroup>();
             badgeOpacity.alpha = 0f;
             LotdAudio.PlayChain();
@@ -1645,18 +1646,23 @@ namespace YGOPortable.UI
         }
 
         private static RectTransform ChainBadge(RectTransform parent, Vector2 point, int number, float size,
-            bool active, bool resolving = false)
+            bool active, bool resolving = false, bool opponent = false)
         {
             var holder = CenteredVisual("ChainCount", parent, point, Vector2.one * size);
-            var crest = resolving ? DuelVisualAssets.ChainResolving ?? DuelVisualAssets.ChainActive : DuelVisualAssets.ChainActive;
-            if (crest != null)
-                LotdUiKit.AddImage(holder.gameObject, crest, new Color(1f, 1f, 1f, active ? .79f : .54f), true, false);
-            var label = DuelTypography.AddNumber(holder, "Link", number.ToString(), Mathf.RoundToInt(size * .76f),
+            Color amber = DuelStyle.Gold;
+            Color ink = opponent ? new Color(1f, .40f, .33f) : amber;
+            if (resolving) ink = new Color(1f, .86f, .50f);
+            if (!active) ink = Color.Lerp(ink, DuelStyle.GlassEdge, .43f);
+            DuelStyle.AddHexPlate(holder, ink, new Color(.097f, .047f, .055f, .96f));
+            var title = LotdUiKit.CreateRect("Caption", holder, new Vector2(.08f, .61f), new Vector2(.92f, .87f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddFittedText(title, "Text", "CHAIN", Mathf.RoundToInt(size * .24f), 7,
+                TextAnchor.MiddleCenter, ink, FontStyle.Bold);
+            var digit = LotdUiKit.CreateRect("Number", holder, new Vector2(.12f, .09f), new Vector2(.88f, .65f),
+                Vector2.zero, Vector2.zero);
+            var label = DuelTypography.AddNumber(digit, "Link", number.ToString(), Mathf.RoundToInt(size * .53f),
                 TextAnchor.MiddleCenter, Color.white);
-            var outline = label.gameObject.AddComponent<Outline>();
-            outline.effectColor = resolving ? new Color(.84f, .61f, .15f, .93f) :
-                active ? new Color(.13f, .87f, 1f, .93f) : new Color(.12f, .42f, .49f, .95f);
-            outline.effectDistance = Vector2.one;
+            DuelStyle.Shadow(label);
             return holder;
         }
 

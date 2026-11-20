@@ -15,13 +15,47 @@ namespace YGOPortable.UI
         internal static readonly Color Muted = new Color(0.75f, 0.83f, 0.85f);
         internal static readonly Color IncreasedValue = new Color(.58f, 1f, .82f);
         internal static readonly Color DecreasedValue = new Color(1f, .59f, .56f);
+        internal static readonly Color GlassColor = new Color(.034f, .055f, .086f, .96f);
+        internal static readonly Color GlassEdge = new Color(.34f, .59f, .69f, .72f);
 
         private static Texture2D _stone;
         private static Sprite _disc;
         private static Sprite _handGlow;
         private static Sprite _cardShadow;
+        private static Sprite _hexagon;
         internal static Texture2D Stone => _stone ??= Resources.Load<Texture2D>("Duel/StonePaving");
         internal static Color Side(bool opponent) => opponent ? Opponent : Player;
+
+        internal static Image AddHexPlate(RectTransform root, Color rim, Color face)
+        {
+            _hexagon ??= BuildHexagon();
+            var edge = LotdUiKit.AddImage(root.gameObject, _hexagon, rim, false, false);
+            LotdUiKit.AddImage(LotdUiKit.FillRect("Surface", root, 2f).gameObject, _hexagon, face, false, false);
+            return edge;
+        }
+
+        private static Sprite BuildHexagon()
+        {
+            const int width = 120, height = 72;
+            var pixels = new Color32[width * height];
+            for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+            {
+                float corner = Mathf.Abs(y + .5f - height * .5f) * .47f;
+                float edge = Mathf.Min(x + .5f, width - x - .5f) - corner;
+                byte alpha = (byte)Mathf.RoundToInt(255f * Mathf.Clamp01(edge + .5f));
+                pixels[y * width + x] = new Color32(255, 255, 255, alpha);
+            }
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            {
+                name = "Duel hexagonal plate",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+            };
+            texture.SetPixels32(pixels);
+            texture.Apply(false, true);
+            return Sprite.Create(texture, new Rect(0, 0, width, height), Vector2.one * .5f, 100f, 0, SpriteMeshType.FullRect);
+        }
 
         internal static RectTransform Panel(Transform parent, string name, Vector2 min, Vector2 max,
             Vector2 offsetMin = default, Vector2 offsetMax = default, Color? fill = null, Color? border = null)
@@ -51,10 +85,10 @@ namespace YGOPortable.UI
             image.sprite = LotdUiKit.WhiteSprite;
             image.overrideSprite = null;
             image.type = Image.Type.Simple;
-            var normal = accent ? new Color(0.29f, 0.42f, 0.27f) : new Color(0.12f, 0.22f, 0.28f);
+            var normal = accent ? new Color(.30f, .22f, .10f) : new Color(.085f, .16f, .22f, .95f);
             var palette = button.colors;
             palette.normalColor = normal;
-            palette.highlightedColor = accent ? new Color(0.39f, 0.54f, 0.26f) : new Color(0.19f, 0.35f, 0.42f);
+            palette.highlightedColor = accent ? new Color(.43f, .32f, .14f) : new Color(.15f, .29f, .38f);
             palette.pressedColor = new Color(0.15f, 0.36f, 0.40f);
             palette.selectedColor = palette.normalColor;
             palette.disabledColor = new Color(0.08f, 0.13f, 0.16f, 0.66f);
@@ -62,7 +96,7 @@ namespace YGOPortable.UI
             button.colors = palette;
             button.transition = Selectable.Transition.ColorTint;
             var stroke = button.GetComponent<Outline>() ?? button.gameObject.AddComponent<Outline>();
-            stroke.effectColor = accent ? new Color(0.61f, 0.80f, 0.46f, 0.65f) : BorderColor;
+            stroke.effectColor = accent ? new Color(.91f, .69f, .32f, .76f) : GlassEdge;
             stroke.effectDistance = new Vector2(1f, -1f);
         }
 
@@ -161,6 +195,25 @@ namespace YGOPortable.UI
             }
         }
 
+        internal static Image AddActivationGlow(Transform parent, float spread = 9f, bool behind = true)
+        {
+            var outline = LotdUiKit.FillRect("PlayableGlow", parent, -spread);
+            if (behind) outline.SetAsFirstSibling();
+            var glow = LotdUiKit.AddImage(outline.gameObject, HandGlow, Color.white, false, false);
+            glow.type = Image.Type.Sliced;
+            glow.fillCenter = false;
+            outline.gameObject.SetActive(false);
+            return glow;
+        }
+
+        internal static float ActivationPulse => .77f + .21f * Mathf.Sin(Time.unscaledTime * 3.2f);
+
+        internal static void SetActivationGlow(Image glow, bool active)
+        {
+            if (glow.gameObject.activeSelf != active) glow.gameObject.SetActive(active);
+            if (active) glow.canvasRenderer.SetAlpha(ActivationPulse);
+        }
+
         internal static Sprite CardShadow
         {
             get
@@ -196,6 +249,15 @@ namespace YGOPortable.UI
             var shadow = label.gameObject.AddComponent<Shadow>();
             shadow.effectColor = new Color(0.01f, 0.02f, 0.025f, 0.9f);
             shadow.effectDistance = new Vector2(distance, -distance);
+        }
+    }
+
+    internal sealed class DuelActivationPulse : MonoBehaviour
+    {
+        internal Image Glow;
+        private void Update()
+        {
+            if (Glow != null) Glow.canvasRenderer.SetAlpha(DuelStyle.ActivationPulse);
         }
     }
 }

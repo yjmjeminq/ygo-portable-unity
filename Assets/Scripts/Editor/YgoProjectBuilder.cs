@@ -49,6 +49,39 @@ namespace YGOPortable.Editor
             }
         }
 
+        public static void VerifyDuelInteractionHeadless()
+        {
+            var errors = new List<string>();
+            int exit = 1;
+            try
+            {
+                string streaming = Application.streamingAssetsPath;
+                AssertTrue(YgoNativeBridge.Initialize(streaming, (kind, message) =>
+                {
+                    if (kind == 0) errors.Add(message);
+                }) == 0, "Could not initialize the duel engine.");
+                CardDatabase.Load(streaming);
+                DeckRepository.Load(streaming, Path.Combine(Path.GetTempPath(), "ygo_duel_ui_verify"), false);
+                CardArtLoader.Initialize(streaming);
+                VerifyFastChainConfirmationModes();
+                TestTokenAndComplexEffects.RunTokenSuiteHeadless();
+                TestChainChooser.Run();
+                TestDuelZoneBrowser.Run();
+                TestHandGlow.Run();
+                TestDuelPadNavigation.Run();
+                AssertTrue(errors.Count == 0, string.Join(" | ", errors.Take(3)));
+                Debug.Log("[VERIFY DUEL UI] Native prompts, touchscreen geometry, controller navigation and presentation passed. ScriptErrors=0");
+                exit = 0;
+            }
+            catch (Exception error) { Debug.LogException(error); }
+            finally
+            {
+                CardArtLoader.Shutdown();
+                YgoNativeBridge.Shutdown();
+                if (Application.isBatchMode) EditorApplication.Exit(exit);
+            }
+        }
+
         [MenuItem("YGO Portable/3. Build Windows Standalone (64-bit)")]
         public static void BuildWindows()
         {
@@ -848,9 +881,10 @@ namespace YGOPortable.Editor
             session.SubmitResponseInt((setBook << 16) | 4);
             DriveUntilIdle(session, ai);
             session.SubmitResponseInt(7);
+            bool sawDraw = false;
             bool sawStandby = false;
             bool sawEnd = false;
-            for (int step = 0; step < 20 && !sawEnd && !session.IsFinished; step++)
+            for (int step = 0; step < 32 && !sawEnd && !session.IsFinished; step++)
             {
                 var prompt = session.ActivePrompt;
                 if (prompt == null) session.StepUntilPrompt();
@@ -860,7 +894,12 @@ namespace YGOPortable.Editor
                 {
                     if (session.TurnPlayer == session.AiPlayerIndex && OffersBook(prompt))
                     {
-                        if (session.CurrentPhase == YgoConstants.PHASE_STANDBY)
+                        if (session.CurrentPhase == YgoConstants.PHASE_DRAW)
+                        {
+                            VerifyBookPolicy(prompt, "in the opponent's Draw Phase", false);
+                            sawDraw = true;
+                        }
+                        else if (session.CurrentPhase == YgoConstants.PHASE_STANDBY)
                         {
                             AssertTrue(prompt.speCount > 0, "The prior hint heuristic would not offer Book of Moon in this Standby Phase.");
                             VerifyBookPolicy(prompt, "in the opponent's Standby Phase", false);
@@ -870,14 +909,27 @@ namespace YGOPortable.Editor
                         {
                             VerifyBookPolicy(prompt, "in the opponent's End Phase", true);
                             sawEnd = true;
+                            session.SubmitResponseInt(prompt.candidates.FindIndex(card => card.code == book));
+                            for (int reply = 0; reply < 16 && !session.Players[0].grave.Any(card => card.code == book); reply++)
+                            {
+                                var follow = session.ActivePrompt;
+                                if (follow == null) session.StepUntilPrompt();
+                                else if (follow.messageType == YgoConstants.MSG_SELECT_CHAIN && !follow.forced)
+                                    session.SubmitResponseInt(-1);
+                                else session.SubmitResponse(ai.ComputeResponse(session, follow));
+                            }
+                            continue;
                         }
                     }
                     session.SubmitResponseInt(-1);
                 }
                 else throw new InvalidOperationException($"Unexpected prompt testing opponent response windows: {prompt.messageType}.");
             }
-            AssertTrue(sawStandby && sawEnd && session.RetryCount == 0, "Did not reach both opponent phase response windows.");
-            Debug.Log("[VERIFY CHAIN CONFIRMATION] AUTO, OFF and ON passed native Summon, Set, Spell and opponent phase windows.");
+            AssertTrue(sawDraw && sawStandby && sawEnd && session.RetryCount == 0 &&
+                session.Players[0].grave.Any(card => card.code == book) &&
+                session.Players[0].mzone.Any(card => card?.code == sparkman && !card.IsFaceUp),
+                "The native phase confirmation did not remain available or Book of Moon failed to resolve.");
+            Debug.Log("[VERIFY CHAIN CONFIRMATION] Auto, Off and On passed native summon, set, spell, draw and phase windows. Retry=0");
         }
 
         private static void VerifyDeckSearchEmergencyCall(uint[] oppDeckMain)

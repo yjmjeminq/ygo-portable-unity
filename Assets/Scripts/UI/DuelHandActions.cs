@@ -10,8 +10,8 @@ namespace YGOPortable.UI
     public partial class DuelFieldUI
     {
         private const float CardActionGap = 5f;
-        private static float CardActionWidth => Application.platform == RuntimePlatform.IPhonePlayer ? 110f : 77f;
-        private static float CardActionHeight => Application.platform == RuntimePlatform.IPhonePlayer ? 100f : 73f;
+        private float CardActionWidth => _mobileLayout ? Mathf.Max(104f, MobileSafeArea.MinimumTouchSize(_cardActionsBar)) : 77f;
+        private float CardActionHeight => _mobileLayout ? Mathf.Max(88f, MobileSafeArea.MinimumTouchSize(_cardActionsBar)) : 73f;
 
         private readonly Dictionary<RectTransform, FieldSlotView> _fieldSlotsByRect = new();
         private readonly Dictionary<RectTransform, StackTileView> _stackTilesByRect = new();
@@ -325,15 +325,17 @@ namespace YGOPortable.UI
             var slot = LotdUiKit.CreateRect(name ?? iconName, _cardActionsBar, Vector2.zero, Vector2.zero,
                 new Vector2(left, 0f), new Vector2(left + CardActionWidth, CardActionHeight));
             bool highlighted = iconName is "ACTION" or "ATTACK" or "SUMMON" or "SUMMONSP";
-            var face = LotdUiKit.CreateRect("Circle", slot, new Vector2(.09f, .25f), new Vector2(.91f, 1f),
-                Vector2.zero, Vector2.zero);
-            var button = DuelStyle.RoundButton(face, "Button", highlighted ? DuelStyle.Gold : DuelStyle.Player, action);
+            var face = _mobileLayout ? LotdUiKit.FillRect("Circle", slot) : LotdUiKit.CreateRect("Circle", slot,
+                new Vector2(.09f, .25f), new Vector2(.91f, 1f), Vector2.zero, Vector2.zero);
+            var button = _mobileLayout
+                ? DuelStyle.Button(face, "Button", "", action, 14, highlighted)
+                : DuelStyle.RoundButton(face, "Button", highlighted ? DuelStyle.Gold : DuelStyle.Player, action);
             var caption = LotdUiKit.CreateRect("Caption", slot, Vector2.zero, new Vector2(1f, .27f),
                 Vector2.zero, Vector2.zero);
             DuelStyle.Shadow(LotdUiKit.AddFittedText(caption, "Label", label, 14, 9, TextAnchor.MiddleCenter,
                 Color.white, FontStyle.Bold), 1.5f);
-            var icon = LotdUiKit.CreateRect("Icon", button.transform, new Vector2(.24f, .24f),
-                new Vector2(.76f, .76f), Vector2.zero, Vector2.zero);
+            var icon = LotdUiKit.CreateRect("Icon", button.transform, new Vector2(.24f, _mobileLayout ? .36f : .24f),
+                new Vector2(.76f, _mobileLayout ? .91f : .76f), Vector2.zero, Vector2.zero);
             LotdUiKit.AddImage(icon.gameObject, LotdUiKit.LoadSprite($"LOTD/Icons/ICON_ID_CMDID_48_{iconName}"),
                 Color.white, true, false);
         }

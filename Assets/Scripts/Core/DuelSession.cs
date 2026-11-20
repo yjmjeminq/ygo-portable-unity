@@ -198,6 +198,7 @@ namespace YGOPortable.Core
         public byte promptCon;
         public uint promptLoc;
         public uint promptSeq;
+        public uint promptPosition;
         public ulong promptDesc;
         public ulong promptEffectDesc;
         // The core uses 0 and 221 for optional triggers. Lua and rule questions carry the description to display.
@@ -209,6 +210,16 @@ namespace YGOPortable.Core
         internal bool IsAttackReplayChoice =>
             messageType == YgoConstants.MSG_SELECT_YESNO && promptDesc == YgoConstants.DESC_ATTACK_REPLAY;
         internal bool IsAttackDecision => IsDirectAttackChoice || IsAttackReplayChoice;
+
+        internal SelectableCardItem ReadEffectConfirmationSource() => new SelectableCardItem
+        {
+            code = promptCardCode,
+            controller = promptCon,
+            location = promptLoc,
+            sequence = promptSeq,
+            position = promptPosition,
+            description = promptEffectDesc != 0 ? promptEffectDesc : promptDesc,
+        };
 
         // SelectOption / AnnounceNumber / AnnounceCard
         public List<ulong> options = new List<ulong>();
@@ -690,6 +701,33 @@ namespace YGOPortable.Core
         public bool IsChainCandidateVisible(DuelPrompt prompt, SelectableCardItem candidate, ChainConfirmationMode mode) =>
             ShouldOfferFastChainEffects(prompt, mode) || candidate.isTriggeredEffect ||
             (mode == ChainConfirmationMode.Auto && candidate.isEventSpecificEffect);
+
+        internal bool HasEffectActivationAt(DuelPrompt prompt, ChainConfirmationMode mode, byte controller,
+            uint location, uint? sequence = null)
+        {
+            if (prompt == null || prompt.playerId != HumanPlayerIndex || controller != HumanPlayerIndex) return false;
+
+            bool Matches(SelectableCardItem item) => item.controller == controller &&
+                IsActivationLocation(item.location, location) && (sequence == null || item.sequence == sequence);
+
+            switch (prompt.messageType)
+            {
+                case YgoConstants.MSG_SELECT_IDLECMD:
+                case YgoConstants.MSG_SELECT_BATTLECMD:
+                    return prompt.activatable.Exists(Matches);
+                case YgoConstants.MSG_SELECT_CHAIN:
+                    return prompt.candidates.Exists(item => Matches(item) && IsChainCandidateVisible(prompt, item, mode));
+                case YgoConstants.MSG_SELECT_EFFECTYN:
+                    return !prompt.IsAttackDecision && prompt.promptCardCode != 0 && prompt.promptCon == controller &&
+                        IsActivationLocation(prompt.promptLoc, location) && (sequence == null || prompt.promptSeq == sequence);
+                default:
+                    return false;
+            }
+        }
+
+        internal static bool IsActivationLocation(uint source, uint location) =>
+            source == location || location == YgoConstants.LOCATION_MZONE &&
+            source == (YgoConstants.LOCATION_MZONE | YgoConstants.LOCATION_OVERLAY);
 
         public bool ShouldOfferFastChainEffects(DuelPrompt prompt, ChainConfirmationMode mode)
         {
@@ -1663,8 +1701,8 @@ namespace YGOPortable.Core
                         promptCon = br.ReadByte(),
                         promptLoc = br.ReadByte(),
                         promptSeq = br.ReadUInt32(),
+                        promptPosition = br.ReadUInt32(),
                     };
-                    br.ReadUInt32(); // pos
                     p.promptDesc = br.ReadUInt64();
                     if (p.IsTriggerActivationConfirmation)
                         p.promptEffectDesc = YgoNativeBridge.YGO_GetSingleTriggerDescription(NativePtr, p.playerId, p.promptCardCode, p.promptDesc);
