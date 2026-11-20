@@ -360,6 +360,8 @@ namespace YGOPortable.Editor
             checkNativeErrors();
 
             int steps = 0;
+            int stepsThisTurn = 0;
+            int longestTurn = 0;
             var summonedExtraA = new List<string>();
             var summonedExtraB = new List<string>();
 
@@ -376,24 +378,28 @@ namespace YGOPortable.Editor
                 if (!list.Contains(cname)) list.Add(cname);
             };
 
-            const int MaxSteps = 400;
             const int MaxTurns = 8;
+            const int MaxResponsesPerTurn = 160;
+            string label = $"{nameA} Lv.{lvA} vs {nameB} Lv.{lvB}";
 
-            while (!session.IsFinished && steps < MaxSteps && session.TurnNumber <= MaxTurns)
+            while (!session.IsFinished && session.TurnNumber <= MaxTurns)
             {
-                string label = $"{nameA} Lv.{lvA} vs {nameB} Lv.{lvB}";
                 var prompt = RequirePrompt(session, label);
                 if (prompt == null) break;
 
+                int turn = session.TurnNumber;
                 var ai = prompt.playerId == 0 ? ai0 : ai1;
                 byte[] resp = PlanResponse(ai, session, prompt, label);
                 session.SubmitResponse(resp);
                 RequireAccepted(session, prompt, resp, label, checkNativeErrors);
                 steps++;
+                longestTurn = Math.Max(longestTurn, ++stepsThisTurn);
+                if (session.TurnNumber != turn) stepsThisTurn = 0;
+                else if (!session.IsFinished && stepsThisTurn >= MaxResponsesPerTurn)
+                    throw new InvalidOperationException($"Representative fixture stalled on turn {turn} after {stepsThisTurn} responses: " +
+                        $"{label}, phase {session.CurrentPhase}, last prompt {prompt.messageType}/{prompt.SelectionHint}. " +
+                        string.Join(" | ", session.Logs.TakeLast(6)));
             }
-            if (!session.IsFinished && steps >= MaxSteps)
-                throw new InvalidOperationException($"Representative fixture reached {MaxSteps} responses before completing turn {MaxTurns}: " +
-                    $"{nameA} Lv.{lvA} vs {nameB} Lv.{lvB}.");
 
             string outcome = session.IsFinished
                 ? $"Winner={(session.Winner == 2 ? "Draw" : session.Winner == 0 ? nameA : nameB)} (Turn {session.TurnNumber})"
@@ -402,7 +408,7 @@ namespace YGOPortable.Editor
             string exA = summonedExtraA.Count > 0 ? string.Join(", ", summonedExtraA) : "없음";
             string exB = summonedExtraB.Count > 0 ? string.Join(", ", summonedExtraB) : "없음";
 
-            Debug.Log($"[SMOKE-DUEL] {nameA} Lv.{lvA} ({deckA.title}) vs {nameB} Lv.{lvB} ({deckB.title}) | {outcome} | Steps={steps}, Retries={session.RetryCount}, Branches={ai0.SimulatedComboBranches}/{ai1.SimulatedComboBranches} | ExtraA=[{exA}] | ExtraB=[{exB}]");
+            Debug.Log($"[SMOKE-DUEL] {nameA} Lv.{lvA} ({deckA.title}) vs {nameB} Lv.{lvB} ({deckB.title}) | {outcome} | Steps={steps}, MaxResponsesInTurn={longestTurn}, Retries={session.RetryCount}, Branches={ai0.SimulatedComboBranches}/{ai1.SimulatedComboBranches} | ExtraA=[{exA}] | ExtraB=[{exB}]");
         }
     }
 }
