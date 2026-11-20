@@ -27,14 +27,45 @@ namespace YGOPortable.AI
             public float[] goingSecondWeights;
         }
 
+        // Keep the legacy serializer unchanged: planner preferences are an explicit v3 opt-in.
+        [Serializable]
+        private sealed class PlannerModel
+        {
+            public int version;
+            public float[] weights;
+            public float[] goingSecondWeights;
+            public float[] plannerWeights;
+            public float[] goingSecondPlannerWeights;
+        }
+
         private readonly float[] _weights;
         private readonly float[] _goingSecondWeights;
+        private readonly float[] _plannerWeights;
+        private readonly float[] _goingSecondPlannerWeights;
 
         internal LinkComboPolicy(float[] weights, float[] goingSecondWeights = null)
         {
             _weights = ValidatedWeights(weights);
             if (goingSecondWeights != null)
                 _goingSecondWeights = ValidatedWeights(goingSecondWeights);
+        }
+
+        private LinkComboPolicy(float[] weights, float[] goingSecondWeights,
+            float[] plannerWeights, float[] goingSecondPlannerWeights) : this(weights, goingSecondWeights)
+        {
+            if (plannerWeights != null) _plannerWeights = ValidatedWeights(plannerWeights);
+            if (goingSecondPlannerWeights != null) _goingSecondPlannerWeights = ValidatedWeights(goingSecondPlannerWeights);
+        }
+
+        internal bool HasPlannerPreferences => _plannerWeights != null || _goingSecondPlannerWeights != null;
+        internal bool HasPlannerPreferencesFor(byte player) => player == 0 ? _plannerWeights != null :
+            player == 1 && _goingSecondPlannerWeights != null;
+        internal LinkComboPolicy WithPlannerPreferences(float[] first, float[] second) =>
+            new LinkComboPolicy(_weights, _goingSecondWeights, first, second);
+        internal float[] CopyPlannerWeights(bool goingSecond = false)
+        {
+            var weights = goingSecond ? _goingSecondPlannerWeights : _plannerWeights;
+            return weights == null ? null : (float[])weights.Clone();
         }
 
         private static float[] ValidatedWeights(float[] weights)
@@ -66,11 +97,27 @@ namespace YGOPortable.AI
             {
                 1 => new LinkComboPolicy(model.weights),
                 2 when model.goingSecondWeights != null => new LinkComboPolicy(model.weights, model.goingSecondWeights),
+                3 => FromPlannerJson(json),
                 _ => null,
             };
         }
 
-        internal string ToJson() => JsonUtility.ToJson(new Model
+        private static LinkComboPolicy FromPlannerJson(string json)
+        {
+            var model = JsonUtility.FromJson<PlannerModel>(json);
+            // JsonUtility can write null optional arrays as []; an absent seat must stay disabled.
+            float[] Optional(float[] weights) => weights is { Length: > 0 } ? weights : null;
+            var first = Optional(model.plannerWeights);
+            var second = Optional(model.goingSecondPlannerWeights);
+            return first == null && second == null ? null : new LinkComboPolicy(model.weights,
+                Optional(model.goingSecondWeights), first, second);
+        }
+
+        internal string ToJson() => HasPlannerPreferences ? JsonUtility.ToJson(new PlannerModel
+        {
+            version = 3, weights = _weights, goingSecondWeights = _goingSecondWeights,
+            plannerWeights = _plannerWeights, goingSecondPlannerWeights = _goingSecondPlannerWeights,
+        }, true) : JsonUtility.ToJson(new Model
         {
             version = _goingSecondWeights == null ? 1 : 2,
             weights = _weights,
@@ -94,6 +141,91 @@ namespace YGOPortable.AI
                 highest = Math.Max(highest, rank);
             }
             return highest >= 3 && links >= 4 && links * 2 >= player.extra.Count;
+        }
+
+        // The caller owns legality and safety anchors. This only orders the supplied 0/1/5 actions;
+        // unsupported entries keep their positions, equal scores keep their original order.
+        internal int[] RankPlannerAlternatives(DuelSession session, DuelPrompt prompt, IReadOnlyList<int> alternatives)
+        {
+            var result = alternatives.ToArray();
+            if (!HasPlannerPreferencesFor(prompt.playerId)) return result;
+            var weights = prompt.playerId == 0 ? _plannerWeights : _goingSecondPlannerWeights;
+            var features = PlannerActionFeatures(session, prompt, alternatives, out var biases);
+            var slots = Enumerable.Range(0, alternatives.Count).Where(index => PlannerItem(prompt, alternatives[index]) != null).ToArray();
+            var ordered = slots.OrderByDescending(index => biases[index] +
+                features[index].Select((value, feature) => value * weights[feature]).Sum()).ToArray();
+            for (int i = 0; i < slots.Length; i++) result[slots[i]] = alternatives[ordered[i]];
+            return result;
+        }
+
+        internal static float[][] PlannerActionFeatures(DuelSession session, DuelPrompt prompt,
+            IReadOnlyList<int> alternatives, out float[] biases)
+        {
+            var own = session.Players[prompt.playerId];
+            var field = own.mzone.Where(card => card?.IsFaceUp == true).ToArray();
+            int highest = field.Length == 0 ? 0 : field.Max(card => Rank(card.code));
+            bool hasOpposition = session.Players[1 - prompt.playerId].mzone.Any(card => card != null);
+            var permitted = alternatives.Select(action => (command: action & 0xffff, item: PlannerItem(prompt, action)))
+                .Where(entry => entry.item != null)
+                .Select(entry => (entry.command, entry.item.code, entry.item.location, entry.item.sequence, entry.item.description)).ToHashSet();
+            int? oldPlan = LinkTurnPlan.ChooseIdle(session, prompt, (command, item) =>
+                permitted.Contains((command, item.code, item.location, item.sequence, item.description)));
+            biases = new float[alternatives.Count];
+            var all = new float[alternatives.Count][];
+            for (int index = 0; index < alternatives.Count; index++)
+            {
+                var features = all[index] = new float[(int)Feature.Count];
+                int action = alternatives[index], command = action & 0xffff;
+                var item = PlannerItem(prompt, action);
+                if (item == null) continue;
+                var card = CardDatabase.Get(item.code);
+                uint tags = card?.DeckEffectCategories ?? 0;
+                bool engine = (tags & Deploy) != 0;
+                if (command == 0)
+                {
+                    features[(int)Feature.Normal] = 1;
+                    features[(int)Feature.Starter] = StarterValue(item.code, engine);
+                    biases[index] = Math.Max(0, card?.atk ?? 0) / 10000f;
+                }
+                else if (command == 5)
+                {
+                    features[(int)Feature.Activate] = 1;
+                    features[(int)Feature.EngineEffect] = engine ? 1 : 0;
+                    features[(int)Feature.OnBoardEffect] = item.location != YgoConstants.LOCATION_HAND ? 1 : 0;
+                    features[(int)Feature.Interaction] = (tags & Interaction) != 0 && hasOpposition ? 1 : 0;
+                    if (item.code == 36668118 && item.location == YgoConstants.LOCATION_SZONE)
+                        features[(int)Feature.EngineEffect]++;
+                }
+                else if (item.location != YgoConstants.LOCATION_EXTRA)
+                    features[(int)Feature.Extend] = 1;
+                else if (card?.IsLink == true)
+                {
+                    int rank = (int)card.level;
+                    features[(int)(rank >= 3 ? Feature.Boss : Feature.SmallLink)] = 1;
+                    features[(int)Feature.Rating] = rank;
+                    features[(int)Feature.Bridge] = IsBridge(item.code) ? 1 : 0;
+                    features[(int)Feature.Interaction] = rank >= 3 && IsInteractive(card) ? 1 : 0;
+                    features[(int)Feature.SpendStrongLink] = highest >= 3 && rank <= highest ? 1 : 0;
+                    biases[index] = Math.Max(0, card.atk) / 15000f;
+                }
+                else if (engine) features[(int)Feature.EngineEffect] = 1;
+                else biases[index] = .15f;
+                features[(int)Feature.ExistingPlan] = action == oldPlan ? 1 : 0;
+            }
+            return all;
+        }
+
+        private static SelectableCardItem PlannerItem(DuelPrompt prompt, int action)
+        {
+            var choices = (action & 0xffff) switch
+            {
+                0 => prompt.summonable,
+                1 => prompt.spSummonable,
+                5 => prompt.activatable,
+                _ => null,
+            };
+            int index = action >> 16;
+            return choices != null && (uint)index < (uint)choices.Count ? choices[index] : null;
         }
 
         internal int? Choose(DuelSession session, DuelPrompt prompt, Func<int, SelectableCardItem, bool> canUse)

@@ -293,12 +293,17 @@ namespace YGOPortable.AI
             }
             if (!lateLinkTrade && _searches >= MaxSearchesPerTurn) yield break;
             var options = advisor.ComboMainOptions(live, prompt);
-            var lateOptions = lateLinkTrade ? options.Where(action => (action & 0xffff) == 1)
-                .Select(action => (action, summon: prompt.spSummonable[action >> 16]))
-                .Where(option => CouldTrade(option.summon))
-                .OrderByDescending(option => LinkComboPolicy.IsBridge(option.summon.code))
-                .ThenBy(option => LinkComboPolicy.Rank(option.summon.code))
-                .Take(3).Select(option => option.action).ToArray() : Array.Empty<int>();
+            var lateOptions = Array.Empty<int>();
+            if (lateLinkTrade)
+            {
+                var trades = options.Where(action => (action & 0xffff) == 1)
+                    .Select(action => (action, summon: prompt.spSummonable[action >> 16]))
+                    .Where(option => CouldTrade(option.summon));
+                if (!advisor.UsesLinkPlannerPreference(live, prompt))
+                    trades = trades.OrderByDescending(option => LinkComboPolicy.IsBridge(option.summon.code))
+                        .ThenBy(option => LinkComboPolicy.Rank(option.summon.code));
+                lateOptions = trades.Take(3).Select(option => option.action).ToArray();
+            }
             if (lateLinkTrade ? lateOptions.Length == 0 : options.Length == 0) yield break;
             if (lateLinkTrade) _lateLinkSearches++;
             else _searches++;

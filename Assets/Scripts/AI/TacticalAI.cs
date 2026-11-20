@@ -252,11 +252,28 @@ namespace YGOPortable.AI
             if (prompt.canBp && HasWorthwhileAttack(session, prompt.playerId)) choices.Add((6, 850));
             if (prompt.canEp && CountOwnMonsters(session, prompt.playerId) > 0 && prompt.sSetable.Count == 0)
                 choices.Add((7, 900));
-            return choices.OrderByDescending(choice => choice.priority).Take(10).Select(choice => choice.action).ToArray();
+            var ordered = choices.OrderByDescending(choice => choice.priority).Select(choice => choice.action);
+            if (!planLinks || !_linkPolicy.HasPlannerPreferencesFor(prompt.playerId)) return ordered.Take(10).ToArray();
+
+            bool IsLinkAlternative(int action)
+            {
+                int command = action & 0xffff;
+                return command is 0 or 1 || command == 5 &&
+                    !DuelTactics.IsFieldMonsterSuppression(prompt.activatable[action >> 16]);
+            }
+
+            var anchored = ordered.ToArray();
+            var ranked = _linkPolicy.RankPlannerAlternatives(session, prompt, anchored.Where(IsLinkAlternative).ToArray());
+            int next = 0;
+            // Reorder development choices while retaining the positions of defensive and phase actions.
+            return anchored.Take(10).Select(action => IsLinkAlternative(action) ? ranked[next++] : action).ToArray();
         }
 
         private bool PlanLinks(DuelSession session, DuelPrompt prompt) =>
             HasLinkPolicy && (_linkDeck ??= LinkComboPolicy.FitsDeck(session.Players[prompt.playerId]));
+
+        internal bool UsesLinkPlannerPreference(DuelSession session, DuelPrompt prompt) =>
+            _linkPolicy?.HasPlannerPreferencesFor(prompt.playerId) == true && PlanLinks(session, prompt);
 
         private bool CanUseMainAction(DuelSession session, DuelPrompt prompt, bool planLinks, int command, SelectableCardItem item,
             bool projected = false) =>
