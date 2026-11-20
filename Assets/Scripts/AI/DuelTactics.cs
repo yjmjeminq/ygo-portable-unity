@@ -114,6 +114,7 @@ namespace YGOPortable.AI
 
         internal static bool CanActivate(DuelSession duel, DuelPrompt prompt, SelectableCardItem effect)
         {
+            if (DddTurnPlan.AddsLethalUpkeep(duel, prompt, effect)) return false;
             var last = duel.CurrentChain.LastOrDefault();
             if (effect.code == WingedKuribohLevel6 && ChooseWingedKuribohTiming(duel, prompt, effect) is bool useWinged)
                 return useWinged;

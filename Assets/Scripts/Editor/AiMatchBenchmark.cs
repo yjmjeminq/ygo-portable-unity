@@ -87,6 +87,8 @@ namespace YGOPortable.Editor
             public int deck, level, decisions, branches, chosenAlternatives, retries, endTurns, openings, threatsSpent, lethalMisses;
             public int exposedAttackers, selfDestruction, wastedHandtraps;
             public int equipRuleLosses, selfDestructionWithoutEquipRuleLoss;
+            public int selfDefeatTurn, selfDefeatDamage;
+            public uint selfDefeatEffect;
             public bool reachedMain, methodAvailable, methodReached, aceReached;
             public uint method;
             public uint[] initial;
@@ -1114,6 +1116,14 @@ namespace YGOPortable.Editor
             };
             duel.OnLifePointChange += (player, delta, life, kind) =>
             {
+                if (kind is LifePointChangeKind.EffectDamage or LifePointChangeKind.Damage && delta < 0 && life <= 0 &&
+                    duel.ResolvingChainLink is { negated: false } source && source.triggerPlayer == player)
+                {
+                    var side = result.sides[player];
+                    side.selfDefeatEffect = source.code;
+                    side.selfDefeatTurn = duel.TurnNumber;
+                    side.selfDefeatDamage = -delta;
+                }
                 if (kind == LifePointChangeKind.BattleDamage && delta < 0 && lastAttack is { } attack && player != attack.Player)
                 {
                     combatPayoffs[attack.Player].Add((attack.Slot, attack.Code));
@@ -1274,6 +1284,8 @@ namespace YGOPortable.Editor
                 side.openings = side.reachedMain ? 1 : 0;
                 if (side.reachedMain && !side.methodReached && !side.aceReached)
                     Failure(player, side.methodAvailable ? "missed_development" : "no_progression", string.Join(" > ", actions[player]));
+                if (result.winner == 1 - player && side.selfDefeatEffect != 0)
+                    Failure(player, "own_effect_defeat", $"{side.selfDefeatEffect} dealt {side.selfDefeatDamage} on turn {side.selfDefeatTurn}");
                 if (result.winner == 1 - player)
                     Failure(player, "lost", $"finished on turn {result.turns}, LP {duel.Players[player].lp}:{duel.Players[1 - player].lp}");
                 side.earlyActions = actions[player].ToArray();

@@ -143,6 +143,7 @@ def summarize(matches):
     totals = {side: Counter() for side in blunders}
     exposure_costs = {side: Counter() for side in blunders}
     destruction_breakdown = {side: Counter() for side in blunders}
+    self_effect_defeats = dict.fromkeys(blunders, 0)
     first_turn_draw_handtraps = dict.fromkeys(blunders, 0)
     styles = defaultdict(lambda: {side: Counter() for side in blunders})
     paired = Counter()
@@ -163,6 +164,8 @@ def summarize(matches):
             role = 'candidate' if seat == candidate else 'baseline'
             for name in BLUNDERS:
                 blunders[role][name] += side[name]
+            if winner == 1 - seat and side.get('selfDefeatEffect', 0):
+                self_effect_defeats[role] += 1
             first_turn_draw_handtraps[role] += sum(
                 action in FIRST_TURN_DRAW_HANDTRAP_ACTIONS for action in side['earlyActions']
             )
@@ -224,6 +227,7 @@ def summarize(matches):
         'pairedOneSidedP': p_value, 'opening': dict(rates), 'blunders': blunders, 'decisionAndBoard': totals,
         'exposureConsequences': exposure_costs,
         'destructionBreakdown': destruction_breakdown,
+        'selfEffectDefeats': self_effect_defeats,
         'firstTurnDrawHandtrapActivationsOutsideChain': first_turn_draw_handtraps,
         'byStyleAndSeat': dict(style_report),
         'topFailures': {role: [dict(kind=kind, count=count, example=examples[role][kind])

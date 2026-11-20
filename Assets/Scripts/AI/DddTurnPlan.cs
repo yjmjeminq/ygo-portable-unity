@@ -18,6 +18,9 @@ namespace YGOPortable.AI
         private const uint CountSurveyor = 5997110;
         private const uint ScaleSurveyor = 42382265;
         private const uint Lamia = 19580308;
+        private const uint Orthros = 72181263;
+        private const uint Leonidas = 92536468;
+        private const uint OracleKing = 82956492;
         private const uint Ragnarok = 74069667;
         private const uint Genghis = 74583607;
         private const uint HighGenghis = 16006416;
@@ -38,6 +41,41 @@ namespace YGOPortable.AI
 
         internal static bool IsContractSearch(SelectableCardItem item) => item.code == Gate &&
             item.location is YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_SZONE;
+
+        internal static bool AddsLethalUpkeep(DuelSession duel, DuelPrompt prompt, SelectableCardItem effect)
+        {
+            if (duel.CurrentPhase != YgoConstants.PHASE_MAIN2 || duel.TurnPlayer != prompt.playerId ||
+                prompt.messageType != YgoConstants.MSG_SELECT_IDLECMD || !prompt.canEp || effect.controller != prompt.playerId)
+                return false;
+
+            int addedDamage = StandbyDamage(effect.code);
+            if (addedDamage == 0) return false;
+            var own = duel.Players[prompt.playerId];
+            bool placingContract = effect.location == YgoConstants.LOCATION_HAND ||
+                effect.location == YgoConstants.LOCATION_SZONE && effect.sequence < own.szone.Length &&
+                own.szone[effect.sequence]?.IsFaceUp == false;
+            if (!placingContract) return false;
+
+            int scheduled = own.szone.Sum(card => card is { IsFaceUp: true, effectsDisabled: false } ? StandbyDamage(card.code) : 0);
+            if (scheduled >= own.lp || scheduled + addedDamage < own.lp) return false;
+
+            // Keep the activation available when the deck can remove a Contract or absorb the damage.
+            if (own.mzone.Any(card => card is { IsFaceUp: true, effectsDisabled: false } &&
+                    card.code is OracleKing or Leonidas or 12298909 or 9637706) ||
+                own.hand.Any(card => card.code is Lamia or Orthros or Leonidas or 20450925 or 46259438) ||
+                own.grave.Any(card => card.code == Lamia) ||
+                own.szone.Any(card => card != null && card.code is Orthros or Leonidas or 34002992 or 46259438))
+                return false;
+
+            return true;
+        }
+
+        private static int StandbyDamage(uint code) => code switch
+        {
+            Gate or SwampKing or SpiritKing or 33814281 or 37209439 or 45974017 or 54936778 or 9030160 or 9765723 => 1000,
+            10833828 or 60168186 => 2000,
+            _ => 0,
+        };
 
         internal static int? ChooseEarlyPendulumRecovery(DuelSession session, DuelPrompt prompt,
             Func<int, SelectableCardItem, bool> canUse)
