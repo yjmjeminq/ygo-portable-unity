@@ -112,6 +112,30 @@ namespace YGOPortable.AI
             effect.location is YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_SZONE &&
             effect.code is ForbiddenDroplet or ForbiddenCrown or InfiniteImpermanence or DuelDeckStrategy.WidowAnchor;
 
+        internal static int? FindGiftCardWin(DuelSession duel, DuelPrompt prompt, Func<int, SelectableCardItem, bool> canUse)
+        {
+            int rivalLife = duel.Players[1 - prompt.playerId].lp;
+            if (rivalLife <= 0 || rivalLife > 3000 * prompt.activatable.Count) return null;
+            var own = duel.Players[prompt.playerId];
+            int firstGift = -1, damage = 0;
+            for (int i = 0; i < prompt.activatable.Count; i++)
+            {
+                var option = prompt.activatable[i];
+                if (option.controller != prompt.playerId || option.code != GiftCard ||
+                    option.location != YgoConstants.LOCATION_SZONE) continue;
+                if (firstGift < 0) firstGift = i;
+                damage += 3000;
+            }
+            if (damage < rivalLife) return null;
+
+            if (own.mzone.Any(card => IsActive(card, NurseReficule)) || own.szone.Any(card => IsActive(card, BadReaction)))
+                return canUse(5, prompt.activatable[firstGift]) ? (firstGift << 16) | 5 : null;
+
+            int nurse = prompt.summonable.FindIndex(card => card.controller == prompt.playerId &&
+                card.code == NurseReficule && canUse(0, card));
+            return nurse < 0 ? null : nurse << 16;
+        }
+
         internal static bool CanActivate(DuelSession duel, DuelPrompt prompt, SelectableCardItem effect)
         {
             if (DddTurnPlan.AddsLethalUpkeep(duel, prompt, effect)) return false;

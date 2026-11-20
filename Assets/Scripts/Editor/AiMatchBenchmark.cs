@@ -998,6 +998,8 @@ namespace YGOPortable.Editor
             var defensiveOptions = new[] { new HashSet<(uint Sequence, uint Code)>(), new HashSet<(uint Sequence, uint Code)>() };
             var destroyed = new int[2];
             var lostEquipTargets = new int[2];
+            string missedEffectWin = null;
+            TacticalAI effectWinPilot = null;
             var exposed = new[] { new Dictionary<(uint, uint), string>(), new Dictionary<(uint, uint), string>() };
             var selectedDefense = new[] { new List<(uint Code, string Alternative)>(), new List<(uint Code, string Alternative)>() };
             var endRepositions = new[] { new HashSet<(uint, uint)>(), new HashSet<(uint, uint)>() };
@@ -1173,6 +1175,13 @@ namespace YGOPortable.Editor
 
                 if (prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD)
                 {
+                    if (player == turnPlayer && missedEffectWin == null &&
+                        DuelTactics.FindGiftCardWin(duel, prompt, (_, _) => true) is int effectWin && effectWin != command)
+                    {
+                        effectWinPilot ??= new TacticalAI(DuelAiPolicy.LoadIncluded(), LinkComboPolicy.LoadIncluded());
+                        if (DuelCombat.VerifyEffectWin(duel, prompt, effectWin, effectWinPilot))
+                            missedEffectWin = $"life={rival.lp}, winning first action={effectWin}, chosen={command}";
+                    }
                     foreach (var option in prompt.repositionable)
                     {
                         defensiveOptions[player].Add((option.sequence, option.code));
@@ -1220,6 +1229,12 @@ namespace YGOPortable.Editor
                 if (duel.TurnNumber != turn || duel.IsFinished)
                 {
                     var ending = result.sides[turnPlayer];
+                    if (missedEffectWin != null && duel.Winner != turnPlayer)
+                    {
+                        ending.lethalMisses++;
+                        Failure(turnPlayer, "missed_effect_lethal", missedEffectWin, turn);
+                    }
+                    missedEffectWin = null;
                     var field = duel.Players[turnPlayer];
                     double board = Board(field);
                     ending.boardTotal += board;
@@ -1328,10 +1343,10 @@ namespace YGOPortable.Editor
                 side.aceReached |= move.code == presets[move.toCon].sigCard;
             }
 
-            void Failure(int player, string kind, string detail)
+            void Failure(int player, string kind, string detail, int? turn = null)
             {
                 if (failures[player].Count >= 40) return;
-                failures[player].Add($"{kind}\tT{duel.TurnNumber}\t{detail}\t{string.Join(" | ", duel.Logs.TakeLast(6))}");
+                failures[player].Add($"{kind}\tT{turn ?? duel.TurnNumber}\t{detail}\t{string.Join(" | ", duel.Logs.TakeLast(6))}");
             }
         }
 

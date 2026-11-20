@@ -61,6 +61,8 @@ namespace YGOPortable.AI
         private IEnumerator<bool> _comboPreparation;
         private readonly bool _tacticalRules;
         private bool _checkedDirectAttackOrder;
+        private DuelPrompt _effectWinPrompt;
+        private bool _verifiedEffectWin;
 
         public TacticalAI() { }
 
@@ -399,8 +401,20 @@ namespace YGOPortable.AI
 
         private int? ChoosePriorityMainAction(DuelSession session, DuelPrompt prompt, bool planLinks)
         {
+            bool CanUse(int command, SelectableCardItem item) => CanUseMainAction(session, prompt, planLinks, command, item);
+            if (DuelTactics.FindGiftCardWin(session, prompt, CanUse) is int effectWin)
+            {
+                if (_comboProjection) return effectWin;
+                if (!ReferenceEquals(_effectWinPrompt, prompt))
+                {
+                    _effectWinPrompt = prompt;
+                    _verifiedEffectWin = DuelCombat.VerifyEffectWin(session, prompt, effectWin, this);
+                }
+                if (_verifiedEffectWin) return effectWin;
+            }
+
             if (DddTurnPlan.ChooseUpkeepRescue(session, prompt,
-                (command, item) => CanUseMainAction(session, prompt, planLinks, command, item)) is int rescue)
+                CanUse) is int rescue)
                 return rescue;
 
             if (DuelTactics.ChooseArchfiendEndPhaseUpgrade(session, prompt) is int upgrade &&

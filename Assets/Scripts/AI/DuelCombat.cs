@@ -73,6 +73,41 @@ namespace YGOPortable.AI
             return FindLethal(rival, attackers).HasValue;
         }
 
+        internal static bool VerifyEffectWin(DuelSession duel, DuelPrompt prompt, int firstAction, TacticalAI advisor)
+        {
+            var clock = Stopwatch.StartNew();
+            bool Expired() => clock.ElapsedMilliseconds >= BattleReplayBudgetMilliseconds;
+            using var trial = duel.ReplayForPlanning(Expired);
+            if (trial?.ActivePrompt is not { messageType: YgoConstants.MSG_SELECT_IDLECMD } start ||
+                start.playerId != prompt.playerId)
+                return false;
+
+            var pilot = advisor.ForkForComboSearch();
+            trial.BeginSpeculation(prompt.playerId, stopAfterTurn: true);
+            trial.SubmitResponseInt(firstAction);
+            for (int step = 0; step < 12 && !Expired() && !trial.IsFinished && !trial.SpeculationUncertain &&
+                trial.RetryCount == 0 && trial.TurnNumber == duel.TurnNumber; step++)
+            {
+                var next = trial.ActivePrompt;
+                if (next == null) break;
+                if (next.playerId != prompt.playerId)
+                {
+                    if (next.messageType != YgoConstants.MSG_SELECT_CHAIN || next.forced) break;
+                    trial.SubmitResponseInt(-1);
+                    continue;
+                }
+                if (next.candidates.Any(card => card.controller != prompt.playerId &&
+                    card.location is YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_DECK or YgoConstants.LOCATION_EXTRA))
+                    break;
+
+                var response = pilot.ComputeResponse(trial, next);
+                if (next.messageType == YgoConstants.MSG_SELECT_IDLECMD && (BitConverter.ToInt32(response, 0) & 0xffff) is 6 or 7)
+                    break;
+                trial.SubmitPlanningResponse(response);
+            }
+            return !trial.SpeculationUncertain && trial.RetryCount == 0 && trial.IsFinished && trial.Winner == prompt.playerId;
+        }
+
         private static (int Attacker, uint? Target)? FindLethal(PlayerFieldSnapshot rival,
             (int index, LiveCardState live, bool direct)[] attackers, uint previousAttacker = uint.MaxValue)
         {
