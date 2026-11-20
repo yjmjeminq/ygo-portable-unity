@@ -97,7 +97,7 @@ def pin_revision(revision):
     return directory
 
 
-def prepare(worker, frozen, candidate_policies=None, candidate_snapshot=None):
+def prepare(worker, frozen, candidate_policies=None, candidate_snapshot=None, previous_snapshot=None):
     for name in ('Assets/Scripts', 'Assets/Plugins/x86_64', 'Packages', 'ProjectSettings'):
         source = PROJECT / name
         ignore = shutil.ignore_patterns('__pycache__')
@@ -138,6 +138,36 @@ namespace YGOPortable.Editor
     if 'int opponentLevel' not in (frozen / 'Assets/Scripts/AI/TacticalAI.cs').read_text(encoding='utf-8-sig'):
         factory = factory.replace(', opponentLevel: level', '')
     write(worker / 'Assets/Scripts/Editor/AiBenchmarkBaselineFactory.cs', factory.encode())
+    if previous_snapshot is not None:
+        for path in (previous_snapshot / 'Assets/Scripts/AI').glob('*.cs'):
+            source = path.read_text(encoding='utf-8-sig').replace(
+                'namespace YGOPortable.AI', 'namespace YGOPortable.BenchmarkPrevious')
+            for name in POLICIES:
+                source = source.replace(f'ResourceName = "{name}"', f'ResourceName = "BenchmarkPrevious{name}"')
+            write(worker / 'Assets/Scripts/BenchmarkPrevious' / path.name, source.encode())
+        for name in POLICIES:
+            resource = Path('Assets/Resources') / f'{name}.json'
+            write(worker / resource.with_name('BenchmarkPrevious' + resource.name),
+                  (previous_snapshot / resource).read_bytes())
+        previous_factory = '''using YGOPortable.BenchmarkPrevious;
+
+namespace YGOPortable.Editor
+{
+    internal static class AiBenchmarkPreviousFactory
+    {
+        public static AiMatchBenchmark.Pilot Create(int level)
+        {
+            var ai = new TacticalAI(DuelAiPolicy.LoadIncluded(), LinkComboPolicy.LoadIncluded(),
+                searchCombos: true, opponentLevel: level);
+            return AiMatchBenchmark.TimedPilot(ai.ComputeResponse, ai.AdvanceComboPlanning,
+                () => ai.SimulatedComboBranches, () => ai.ChosenComboAlternatives);
+        }
+    }
+}
+'''
+        if 'int opponentLevel' not in (previous_snapshot / 'Assets/Scripts/AI/TacticalAI.cs').read_text(encoding='utf-8-sig'):
+            previous_factory = previous_factory.replace(', opponentLevel: level', '')
+        write(worker / 'Assets/Scripts/Editor/AiBenchmarkPreviousFactory.cs', previous_factory.encode())
 
 
 def source_manifest(project, candidate_snapshot=None):
@@ -153,14 +183,61 @@ def source_manifest(project, candidate_snapshot=None):
     return (json.dumps(hashes, indent=2) + '\n').encode()
 
 
-def worker_path(workspace, frozen, index, candidate_snapshot=None):
-    return workspace / 'workers' / frozen.name / (candidate_snapshot.name if candidate_snapshot else 'worktree') / f'worker-{index}'
+def policy_hashes(resource_directory, prefix=''):
+    return {name: hashlib.sha256((resource_directory / f'{prefix}{name}.json').read_bytes()).hexdigest()
+            for name in POLICIES}
+
+
+def summary_identity(summary, frozen, manifest, policies, opponent=None):
+    summary['baselineCommit'] = json.loads((frozen / 'manifest.json').read_bytes())['gitHead']
+    summary['baselineName'] = frozen.name
+    summary['opponent'] = opponent or frozen.name
+    summary['baselineManifestSha256'] = hashlib.sha256((frozen / 'manifest.json').read_bytes()).hexdigest()
+    summary['candidateSourceManifestSha256'] = hashlib.sha256(manifest).hexdigest()
+    summary['candidatePolicySha256'] = policies
+    return summary
+
+
+def complete_fixture_set(matches, expected):
+    return len(matches) == len(expected) and {
+        (record['matchup'], record['seed'], record['candidate']) for record in matches} == expected
+
+
+def verify_interleaved_inputs(previous, current):
+    prior = {(record['matchup'], record['seed'], record['candidate']): record for record in previous}
+    for record in current:
+        key = (record['matchup'], record['seed'], record['candidate'])
+        original = prior[key]
+        if (original['era'] != record['era'] or original['method'] != record['method'] or
+                original.get('openingOnly', False) != record.get('openingOnly', False) or
+                [(side['deck'], side.get('level', 0), side['initial']) for side in original['sides']] !=
+                [(side['deck'], side.get('level', 0), side['initial']) for side in record['sides']]):
+            raise RuntimeError(f'Interleaved previous/candidate fixture inputs differ: {key}')
+        prior_order, current_order = original.get('interleavedOrder'), record.get('interleavedOrder')
+        if ({prior_order, current_order} != {1, 2} or
+                current_order != (2 if sum(key) % 2 == 0 else 1)):
+            raise RuntimeError(f'Interleaved pair does not have alternating 1/2 execution order: {key}')
+
+
+def worker_path(workspace, frozen, index, candidate_snapshot=None, previous_snapshot=None):
+    if previous_snapshot is not None:
+        identity = json.dumps([str(candidate_snapshot) if candidate_snapshot else 'worktree',
+                               str(previous_snapshot)], separators=(',', ':'))
+        digest = hashlib.sha256(identity.encode()).hexdigest()[:16]
+        return workspace / 'workers' / frozen.name / f'paired-{digest}' / f'w{index}'
+    directory = workspace / 'workers' / frozen.name / (candidate_snapshot.name if candidate_snapshot else 'worktree')
+    return directory / f'worker-{index}'
 
 
 def run_worker(index, arguments, editor, frozen, output):
-    worker = worker_path(arguments.workspace, frozen, index, arguments.candidate_snapshot)
-    prepare(worker, frozen, arguments.candidate_policies, arguments.candidate_snapshot)
+    worker = worker_path(arguments.workspace, frozen, index, arguments.candidate_snapshot, arguments.previous_snapshot)
+    prepare(worker, frozen, arguments.candidate_policies, arguments.candidate_snapshot, arguments.previous_snapshot)
     write(output / f'candidate-source-{index}.json', source_manifest(worker))
+    previous_report = None
+    if arguments.previous_snapshot is not None:
+        previous_report = (output / 'previous' / f'matches-{index}.jsonl').resolve()
+        write(previous_report.with_name(f'candidate-source-{index}.json'),
+              source_manifest(worker, arguments.previous_snapshot))
     report = output / f'matches-{index}.jsonl'
     log = output / f'unity-{index}.log'
     env = dict(os.environ, YGO_BENCH_REPORT=str(report), YGO_BENCH_SEEDS=str(arguments.seeds),
@@ -171,17 +248,20 @@ def run_worker(index, arguments, editor, frozen, output):
                YGO_BENCH_OPENINGS_ONLY='1' if arguments.openings_only else '0',
                YGO_BENCH_REFERENCE_ONLY='1' if arguments.reference_only else '0',
                YGO_BENCH_RANDOM_OPPONENT='1' if arguments.random_opponent else '0',
-               YGO_BENCH_CAPTURE_REPLAYS='1' if arguments.capture_replays or arguments.random_opponent else '0',
+               YGO_BENCH_CAPTURE_REPLAYS='1' if arguments.capture_replays or arguments.random_opponent or previous_report else '0',
                YGO_BENCH_FIXTURE=arguments.fixture or '',
                YGO_BENCH_REPLAY=str(output / 'replay-input.jsonl') if arguments.replay else '',
                YGO_BENCH_INSPECT=str(arguments.inspect_step),
                YGO_BENCH_TRY_RESPONSE=arguments.try_response or '',
                YGO_BENCH_AUDIT_BATTLE='1' if arguments.audit_battle else '0')
+    env.pop('YGO_BENCH_PREVIOUS_REPORT', None)
+    if previous_report is not None:
+        env['YGO_BENCH_PREVIOUS_REPORT'] = str(previous_report)
     proc = subprocess.Popen([str(editor), '-batchmode', '-nographics', '-quit', '-job-worker-count', '2',
                              '-projectPath', str(worker), '-logFile', str(log), '-executeMethod',
                              'YGOPortable.Editor.AiMatchBenchmark.Run'], env=env, creationflags=subprocess.CREATE_NO_WINDOW)
     print(f'Unity worker {index} PID {proc.pid}, log {log}', flush=True)
-    if proc.wait() != 0 or not report.is_file():
+    if proc.wait() != 0 or not report.is_file() or previous_report is not None and not previous_report.is_file():
         raise RuntimeError(f'Benchmark worker failed: {log}')
     return [json.loads(line) for line in report.read_text(encoding='utf-8-sig').splitlines()]
 
@@ -557,7 +637,10 @@ def main():
     parser.add_argument('--baseline-revision', default=BASELINE_V1,
                         help='Compare against a separately pinned Git revision. The default is Baseline-v1.')
     parser.add_argument('--stage', choices=('screen', 'confirm'), help='Apply the fixed 100/400-game adoption checks.')
-    parser.add_argument('--previous-run', type=Path, help='The previous AI measured on the same fixtures against Baseline-v1.')
+    prior = parser.add_mutually_exclusive_group()
+    prior.add_argument('--previous-run', type=Path, help='The previous AI measured on the same fixtures against Baseline-v1.')
+    prior.add_argument('--paired-previous-revision', metavar='REV',
+                       help='Interleave this pinned previous AI and the candidate against Baseline-v1 in each Unity worker.')
     parser.add_argument('--screen-run', type=Path, help='The passed screening run for the current source and policy hashes.')
     parser.add_argument('--regression-run', type=Path, help='The passed fixed native regressions for these source and policy hashes.')
     parser.add_argument('--random-floor-run', type=Path, help='The passed RandomLegal-v1 run for these source and policy hashes.')
@@ -586,8 +669,13 @@ def main():
     if args.random_opponent and (args.reference_only or args.replay or args.roster_levels or args.openings_only or
                                  args.fixed_regressions or args.stage or args.require_gates):
         parser.error('The random opponent is a separate completed-duel benchmark, not an adoption stage.')
-    if args.stage and (not args.full_suite or not args.previous_run or args.fixture or args.replay or args.reference_only or args.openings_only):
-        parser.error('An adoption stage requires --full-suite, --previous-run and completed duels against Baseline-v1.')
+    if args.paired_previous_revision and (args.reference_only or args.random_opponent or args.replay or
+                                         args.roster_levels or args.fixed_regressions):
+        parser.error('Interleaved revision comparison requires duel suites or --fixture against Baseline-v1.')
+    if args.stage and (not args.full_suite or not (args.previous_run or args.paired_previous_revision) or
+                       args.fixture or args.replay or args.reference_only or args.openings_only):
+        parser.error('An adoption stage requires --full-suite, a --previous-run or --paired-previous-revision, '
+                     'and completed duels against Baseline-v1.')
     if args.stage and 2 * matchups * args.seeds < (100 if args.stage == 'screen' else 400):
         parser.error('Too few fixtures for the requested adoption stage.')
     if args.stage == 'confirm' and (not args.screen_run or not args.regression_run or not args.random_floor_run):
@@ -617,22 +705,32 @@ def main():
         args.candidate_policies = args.candidate_policies.resolve()
     frozen = pin_revision(args.baseline_revision)
     args.candidate_snapshot = pin_revision(args.candidate_revision) if args.candidate_revision else None
+    args.previous_snapshot = pin_revision(args.paired_previous_revision) if args.paired_previous_revision else None
+    if args.previous_snapshot is not None:
+        if json.loads((frozen / 'manifest.json').read_bytes())['gitHead'] != BASELINE_V1:
+            parser.error('Interleaved revision comparison requires the immutable Baseline-v1 opponent.')
+        previous_ai = (args.previous_snapshot / 'Assets/Scripts/AI/TacticalAI.cs').read_text(encoding='utf-8-sig')
+        if any(name not in previous_ai for name in ('AdvanceComboPlanning', 'SimulatedComboBranches', 'ChosenComboAlternatives')):
+            parser.error('The paired previous revision must expose combo-planning and alternative-count telemetry.')
     if args.stage == 'confirm':
         screen = json.loads((args.screen_run / 'summary.json').read_bytes())
         audit = screen.get('stageAudit', {})
         candidate_dir = args.candidate_policies or (args.candidate_snapshot or PROJECT) / 'Assets/Resources'
-        policy_hashes = {name: hashlib.sha256((candidate_dir / f'{name}.json').read_bytes()).hexdigest()
-                         for name in POLICIES}
-        previous = json.loads((args.previous_run / 'summary.json').read_bytes())
+        current_policy_hashes = policy_hashes(candidate_dir)
+        previous = (dict(candidateSourceManifestSha256=hashlib.sha256(
+                            source_manifest(PROJECT, args.previous_snapshot)).hexdigest(),
+                         candidatePolicySha256=policy_hashes(args.previous_snapshot / 'Assets/Resources'))
+                    if args.previous_snapshot is not None else
+                    json.loads((args.previous_run / 'summary.json').read_bytes()))
         if (audit.get('accepted') is not True or audit.get('stage') != 'screen' or
                 screen.get('baselineManifestSha256') != hashlib.sha256((frozen / 'manifest.json').read_bytes()).hexdigest() or
                 screen.get('candidateSourceManifestSha256') != hashlib.sha256(source_manifest(PROJECT, args.candidate_snapshot)).hexdigest() or
-                screen.get('candidatePolicySha256') != policy_hashes or
+                screen.get('candidatePolicySha256') != current_policy_hashes or
                 audit.get('previousSourceManifestSha256') != previous.get('candidateSourceManifestSha256') or
                 audit.get('previousPolicySha256') != previous.get('candidatePolicySha256')):
             parser.error('Confirmation requires the same source and policies as the passed screen, including the previous AI.')
         if not verify_regression_report(args.regression_run, json.loads(source_manifest(PROJECT, args.candidate_snapshot)),
-                                        policy_hashes):
+                                        current_policy_hashes):
             parser.error('Confirmation requires every fixed scenario to pass with the same source and policies.')
         floor = json.loads((args.random_floor_run / 'summary.json').read_bytes())
         if (floor.get('opponent') != 'RandomLegal-v1' or floor.get('randomFloor', {}).get('accepted') is not True or
@@ -671,20 +769,43 @@ def main():
         return
     expected = {(matchup, seed, seat) for seat in (0, 1)} if args.fixture else {
         (m, s, seat) for m in range(matchups) for s in range(args.seeds) for seat in (0, 1)}
-    if len(matches) != len(expected) or {(r['matchup'], r['seed'], r['candidate']) for r in matches} != expected:
+    if not complete_fixture_set(matches, expected):
         raise RuntimeError('Benchmark result is missing fixed fixtures or contains duplicates.')
-    summary = summarize(matches)
-    metadata = json.loads((frozen / 'manifest.json').read_bytes())
-    summary['baselineCommit'] = metadata['gitHead']
-    summary['baselineName'] = frozen.name
-    summary['opponent'] = 'RandomLegal-v1' if args.random_opponent else frozen.name
-    summary['baselineManifestSha256'] = hashlib.sha256((frozen / 'manifest.json').read_bytes()).hexdigest()
-    summary['candidateSourceManifestSha256'] = hashlib.sha256(source_manifests[0]).hexdigest()
-    first_worker = worker_path(args.workspace, frozen, 0, args.candidate_snapshot)
-    summary['candidatePolicySha256'] = {
-        name: hashlib.sha256((first_worker / 'Assets/Resources' / f'{name}.json').read_bytes()).hexdigest()
-        for name in POLICIES
-    }
+    worker_policies = [policy_hashes(worker_path(args.workspace, frozen, index, args.candidate_snapshot,
+                                                args.previous_snapshot) / 'Assets/Resources')
+                       for index in range(args.jobs)]
+    if any(policies != worker_policies[0] for policies in worker_policies[1:]):
+        raise RuntimeError('Benchmark workers used different candidate policies.')
+    summary = summary_identity(summarize(matches), frozen, source_manifests[0],
+                               worker_policies[0],
+                               'RandomLegal-v1' if args.random_opponent else None)
+    previous_output = args.previous_run
+    if args.previous_snapshot is not None:
+        previous_output = output / 'previous'
+        previous_manifests = [(previous_output / f'candidate-source-{index}.json').read_bytes()
+                              for index in range(args.jobs)]
+        if any(manifest != previous_manifests[0] for manifest in previous_manifests[1:]):
+            raise RuntimeError('Benchmark workers used different previous source files.')
+        previous_matches = [record for index in range(args.jobs)
+                            for record in read_replay_report(previous_output / f'matches-{index}.jsonl')]
+        if not complete_fixture_set(previous_matches, expected):
+            raise RuntimeError('Previous benchmark result is missing fixed fixtures or contains duplicates.')
+        verify_interleaved_inputs(previous_matches, matches)
+        previous_worker_policies = [policy_hashes(worker_path(args.workspace, frozen, index, args.candidate_snapshot,
+                                                             args.previous_snapshot) / 'Assets/Resources', 'BenchmarkPrevious')
+                                    for index in range(args.jobs)]
+        if any(policies != policy_hashes(args.previous_snapshot / 'Assets/Resources')
+               for policies in previous_worker_policies):
+            raise RuntimeError('Benchmark workers used previous policies that differ from the pinned revision.')
+        previous_summary = summary_identity(summarize(previous_matches), frozen, previous_manifests[0], previous_worker_policies[0])
+        previous_summary['candidateRevision'] = json.loads(
+            (args.previous_snapshot / 'manifest.json').read_bytes())['gitHead']
+        write(previous_output / 'summary.json', (json.dumps(previous_summary, ensure_ascii=False, indent=2) + '\n').encode())
+        summary['pairedPrevious'] = {
+            'revision': previous_summary['candidateRevision'], 'reportDirectory': 'previous',
+            'candidateSourceManifestSha256': previous_summary['candidateSourceManifestSha256'],
+            'candidatePolicySha256': previous_summary['candidatePolicySha256'],
+        }
     if args.random_opponent:
         wins = summary['outcomes'].get('win', 0)
         summary['randomFloor'] = {'winRate': wins / len(matches), 'accepted': len(matches) >= 100 and
@@ -699,7 +820,7 @@ def main():
                                             styles[name]['winPoints'] / styles[name]['games'] >= .55 for name in
                                             ('Development', 'Control', 'Lock', 'Resource'))}
     if args.stage:
-        audit = stage_audit(args.stage, args.previous_run, matches, summary, source_manifests[0])
+        audit = stage_audit(args.stage, previous_output, matches, summary, source_manifests[0])
         if args.stage == 'confirm':
             screen = json.loads((args.screen_run / 'summary.json').read_bytes())
             prior_audit = screen.get('stageAudit', {})
@@ -718,7 +839,7 @@ def main():
                                                    'opening', 'blundersPer100', 'decisionAndBoard', 'stageAudit', 'randomFloor')
                       if key in summary}, indent=2))
     print(f'Report: {output / "summary.json"}')
-    if args.require_gates and not summary.get('acceptance', {}).get('accepted', False):
+    if args.require_gates and not summary.get('stageAudit' if args.stage else 'acceptance', {}).get('accepted', False):
         raise SystemExit(2)
     if args.stage and not summary['stageAudit']['accepted']:
         raise SystemExit(2)

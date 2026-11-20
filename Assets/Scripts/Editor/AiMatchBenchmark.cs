@@ -72,6 +72,20 @@ namespace YGOPortable.Editor
             }
         }
 
+        internal static Pilot TimedPilot(Func<DuelSession, DuelPrompt, byte[]> choose,
+            Func<DuelSession, DuelPrompt, bool> prepare, Func<int> branches, Func<int> chosenAlternatives)
+        {
+            double maxPlanMs = 0, lastPlanMs = 0;
+            return new Pilot((duel, prompt) =>
+            {
+                long started = Stopwatch.GetTimestamp();
+                while (!prepare(duel, prompt)) { }
+                lastPlanMs = (Stopwatch.GetTimestamp() - started) * 1000.0 / Stopwatch.Frequency;
+                maxPlanMs = Math.Max(maxPlanMs, lastPlanMs);
+                return choose(duel, prompt);
+            }, branches, chosenAlternatives, () => maxPlanMs, () => lastPlanMs);
+        }
+
         [Serializable]
         private sealed class Match
         {
@@ -79,6 +93,7 @@ namespace YGOPortable.Editor
             public int matchup, seed, candidate, winner, turns, nativeErrors;
             public bool capped, openingOnly;
             public uint method;
+            public int interleavedOrder;
             public Side[] sides;
             public ReplayResponse[] replay;
             public int[] finalLife;
@@ -181,10 +196,7 @@ namespace YGOPortable.Editor
             {
                 string output = Environment.GetEnvironmentVariable("YGO_BENCH_REPORT") ??
                     throw new InvalidOperationException("YGO_BENCH_REPORT is required.");
-                var baseline = (Func<int, Pilot>)Delegate.CreateDelegate(typeof(Func<int, Pilot>),
-                    typeof(AiMatchBenchmark).Assembly.GetType("YGOPortable.Editor.AiBenchmarkBaselineFactory")?.GetMethod(
-                        "Create", BindingFlags.Public | BindingFlags.Static) ??
-                    throw new InvalidOperationException("The fixed AI snapshot is missing. Run Tools/benchmark_duel_ai.py."));
+                var baseline = LoadPilotFactory("AiBenchmarkBaselineFactory");
                 int seeds = int.TryParse(Environment.GetEnvironmentVariable("YGO_BENCH_SEEDS"), out int parsed) ? parsed : DefaultSeeds;
                 int start = int.TryParse(Environment.GetEnvironmentVariable("YGO_BENCH_START"), out parsed) ? parsed : 0;
                 int stride = int.TryParse(Environment.GetEnvironmentVariable("YGO_BENCH_STRIDE"), out parsed) ? parsed : 1;
@@ -234,20 +246,14 @@ namespace YGOPortable.Editor
                     VerifyResourceStrategy(decks, general, links);
                 }
                 bool referenceOnly = Environment.GetEnvironmentVariable("YGO_BENCH_REFERENCE_ONLY") == "1";
+                string previousOutput = Environment.GetEnvironmentVariable("YGO_BENCH_PREVIOUS_REPORT");
+                var previous = string.IsNullOrEmpty(previousOutput) ? null : LoadPilotFactory("AiBenchmarkPreviousFactory");
                 Pilot Candidate(int level)
                 {
                     if (referenceOnly) return baseline(level);
                     var ai = new TacticalAI(general, links, searchCombos: true);
-                    double maxPlanMs = 0, lastPlanMs = 0;
-                    return new Pilot((duel, prompt) =>
-                    {
-                        long started = Stopwatch.GetTimestamp();
-                        while (!ai.AdvanceComboPlanning(duel, prompt)) { }
-                        lastPlanMs = (Stopwatch.GetTimestamp() - started) * 1000.0 / Stopwatch.Frequency;
-                        maxPlanMs = Math.Max(maxPlanMs, lastPlanMs);
-                        return ai.ComputeResponse(duel, prompt);
-                    }, () => ai.SimulatedComboBranches, () => ai.ChosenComboAlternatives,
-                        () => maxPlanMs, () => lastPlanMs);
+                    return TimedPilot(ai.ComputeResponse, ai.AdvanceComboPlanning,
+                        () => ai.SimulatedComboBranches, () => ai.ChosenComboAlternatives);
                 }
 
                 if (Environment.GetEnvironmentVariable("YGO_BENCH_ROSTER_LEVELS") == "1")
@@ -257,6 +263,7 @@ namespace YGOPortable.Editor
                 }
 
                 using var file = new StreamWriter(output) { AutoFlush = true };
+                using var previousFile = previous == null ? null : new StreamWriter(previousOutput) { AutoFlush = true };
                 for (int index = 0; index < matchups.Length; index++)
                 {
                     var scenario = matchups[index];
@@ -264,23 +271,41 @@ namespace YGOPortable.Editor
                     {
                         if ((index * seeds + seed) % stride != start) continue;
                         if (!string.IsNullOrEmpty(fixture) && fixture != $"{index}:{seed}") continue;
-                        int before = nativeErrors;
                         var first = decks[(seed & 1) == 0 ? scenario.FirstDeck : scenario.SecondDeck];
                         var second = decks[(seed & 1) == 0 ? scenario.SecondDeck : scenario.FirstDeck];
                         int firstLevel = OpponentDeckLevels.GetLevel(first.charId, first.id);
                         int secondLevel = OpponentDeckLevels.GetLevel(second.charId, second.id);
                         ulong randomSeed = 0xB2A9345F2C186B67UL ^ ((ulong)(uint)index << 33) ^ ((ulong)(uint)seed << 1);
-                        var rivalSecond = randomOpponent ? RandomLegalPilot.Create(randomSeed ^ 1UL) : baseline(secondLevel);
-                        var rivalFirst = randomOpponent ? RandomLegalPilot.Create(randomSeed) : baseline(firstLevel);
-                        var a = Play(index, seed, 0, scenario.Era, scenario.Method, first, second, Candidate(firstLevel), rivalSecond, openingOnly, captureReplays);
-                        a.nativeErrors = nativeErrors - before;
-                        before = nativeErrors;
-                        var b = Play(index, seed, 1, scenario.Era, scenario.Method, first, second, rivalFirst, Candidate(secondLevel), openingOnly, captureReplays);
-                        b.nativeErrors = nativeErrors - before;
-                        if (!a.sides[0].initial.SequenceEqual(b.sides[0].initial) || !a.sides[1].initial.SequenceEqual(b.sides[1].initial))
-                            throw new InvalidOperationException($"Opening hands changed after swapping policies in fixture {index}/{seed}.");
-                        file.WriteLine(JsonUtility.ToJson(a));
-                        file.WriteLine(JsonUtility.ToJson(b));
+                        Match PlaySeat(Func<int, Pilot> tested, int seat)
+                        {
+                            int before = nativeErrors;
+                            int rivalLevel = seat == 0 ? secondLevel : firstLevel;
+                            var rival = randomOpponent ? RandomLegalPilot.Create(randomSeed ^ (ulong)(1 - seat)) : baseline(rivalLevel);
+                            var result = Play(index, seed, seat, scenario.Era, scenario.Method, first, second,
+                                seat == 0 ? tested(firstLevel) : rival, seat == 1 ? tested(secondLevel) : rival,
+                                openingOnly, captureReplays);
+                            result.nativeErrors = nativeErrors - before;
+                            return result;
+                        }
+
+                        Match opening = null;
+                        for (int seat = 0; seat < 2; seat++)
+                        {
+                            bool previousFirst = previous != null && ((index + seed + seat) & 1) == 0;
+                            var prior = previousFirst ? PlaySeat(previous, seat) : null;
+                            var current = PlaySeat(Candidate, seat);
+                            opening ??= current;
+                            VerifyOpeningHands(opening, current);
+                            if (previous != null)
+                            {
+                                prior ??= PlaySeat(previous, seat);
+                                VerifyOpeningHands(opening, prior);
+                                prior.interleavedOrder = previousFirst ? 1 : 2;
+                                current.interleavedOrder = previousFirst ? 2 : 1;
+                                previousFile.WriteLine(JsonUtility.ToJson(prior));
+                            }
+                            file.WriteLine(JsonUtility.ToJson(current));
+                        }
                     }
                     Debug.Log($"[AI BENCH] {scenario.Era} {scenario.FirstDeck}/{scenario.SecondDeck} done, native errors {nativeErrors}.");
                 }
@@ -295,6 +320,19 @@ namespace YGOPortable.Editor
                 YgoNativeBridge.Shutdown();
                 if (Application.isBatchMode) EditorApplication.Exit(exit);
             }
+        }
+
+        private static Func<int, Pilot> LoadPilotFactory(string name) =>
+            (Func<int, Pilot>)Delegate.CreateDelegate(typeof(Func<int, Pilot>),
+                typeof(AiMatchBenchmark).Assembly.GetType("YGOPortable.Editor." + name)?.GetMethod(
+                    "Create", BindingFlags.Public | BindingFlags.Static) ??
+                throw new InvalidOperationException($"Missing {name}. Run Tools/benchmark_duel_ai.py."));
+
+        private static void VerifyOpeningHands(Match expected, Match actual)
+        {
+            for (int seat = 0; seat < 2; seat++)
+                if (!expected.sides[seat].initial.SequenceEqual(actual.sides[seat].initial))
+                    throw new InvalidOperationException($"Opening hands changed in fixture {expected.matchup}/{expected.seed}, seat {seat}.");
         }
 
         private static Match ReplayRecordedMatch(Match original, int inspectIndex, string alternateAnswer, bool auditBattle,

@@ -24,3 +24,13 @@ Each fixture contains four exact native seeds, ordered main and extra deck code 
 Outputs include a machine-readable summary with final native state and timing, a readable proof log, and per-case JSONL of responses written only after native submission succeeds with Retry=0 and ScriptErrors=0. Current AI source, policy, and engine fingerprints identify the tested implementation. The planning watchdog is an operational stop; measured compute/planning timings still need the separate 100/300/1000 ms adoption gates and full fixed-seed performance benchmark.
 
 The versioned fixtures reproduce known decision points on another PC. Use the full fixed-seed benchmark for overall win rates and runtime performance. Historical captures remain under `Logs/AiBenchmark`.
+
+To compare a pinned previous AI and the candidate in the same Unity process, use an interleaved run. Both play against immutable Baseline-v1. Execution order alternates by fixture and seat.
+
+```text
+python Tools/benchmark_duel_ai.py paired-smoke --fixture 10:0 --paired-previous-revision REV
+python Tools/benchmark_duel_ai.py paired-screen --full-suite --seeds 3 --stage screen --paired-previous-revision REV --capture-replays
+python Tools/benchmark_duel_ai.py paired-confirm --full-suite --seeds 10 --stage confirm --paired-previous-revision REV --screen-run Logs/AiBenchmark/paired-screen --regression-run Logs/AiBenchmark/fixed-scenarios --random-floor-run Logs/AiBenchmark/random-floor
+```
+
+Replace `REV` with the previous Git revision. For an A/A run, omit `--stage` and use `--candidate-revision REV` as well. The previous arm writes reports under `<run>/previous`, which can also be supplied to `--previous-run`. Confirmation checks both source and policy hashes against the passed screen before launching. The paired option applies to duel suites and single fixtures.
