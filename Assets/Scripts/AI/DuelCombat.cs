@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using YGOPortable.Core;
@@ -8,7 +9,7 @@ namespace YGOPortable.AI
     internal static class DuelCombat
     {
         private const int Lethal = 100000;
-        private const int DirectOrderBudgetMilliseconds = 80;
+        private const int BattleReplayBudgetMilliseconds = 80;
         private const uint UtopiaDragonar = 95134948;
         private const ulong ReduceAttackerToZero = ((ulong)UtopiaDragonar << 20) | 1;
 
@@ -21,6 +22,18 @@ namespace YGOPortable.AI
 
         internal static int VisibleAttackTotal(PlayerFieldSnapshot field) => field.mzone
             .Where(card => card?.IsFaceUp == true && card.IsAttack).Sum(card => Math.Max(0, card.attack));
+
+        internal static int CountFavorableBattles(IEnumerable<int> attacks, IEnumerable<int> defenses)
+        {
+            var thresholds = defenses.OrderBy(value => value).ToArray();
+            int matched = 0;
+            foreach (int attack in attacks.OrderBy(value => value))
+            {
+                if (matched == thresholds.Length) break;
+                if (attack > thresholds[matched]) matched++;
+            }
+            return matched;
+        }
 
         internal static bool IsWeakBattleLiability(int attack, int opposingAttack, int lifePoints) =>
             attack < 1800 && opposingAttack > Math.Max(0, attack) && opposingAttack >= lifePoints;
@@ -81,13 +94,7 @@ namespace YGOPortable.AI
             // Each attacker gets one attack. Recompute from the engine's legal attacks after every battle.
             int aMask = (1 << attackers.Length) - 1, dMask = (1 << defenders.Length) - 1;
             int[,] memo = new int[aMask + 1, dMask + 1];
-            var breakable = defenders.Select(card =>
-            {
-                var text = CardDatabase.Get(card.code)?.desc;
-                return card.effectsDisabled || text == null ||
-                    (!text.Contains("전투로는 파괴되지", StringComparison.Ordinal) &&
-                    !text.Contains("이 카드는 전투에 의해서는 파괴되지", StringComparison.Ordinal));
-            }).ToArray();
+            var breakable = defenders.Select(CanDestroyByBattle).ToArray();
 
             int BestDamage(int available, int blocking)
             {
@@ -152,7 +159,7 @@ namespace YGOPortable.AI
                 return null;
 
             var clock = Stopwatch.StartNew();
-            bool Expired() => clock.ElapsedMilliseconds >= DirectOrderBudgetMilliseconds;
+            bool Expired() => clock.ElapsedMilliseconds >= BattleReplayBudgetMilliseconds;
             var options = prompt.attackable.Select((card, index) => (card, index))
                 .Where(entry => entry.card.directAttackable).OrderBy(entry => entry.index != preferred)
                 .Take(3);
@@ -231,6 +238,77 @@ namespace YGOPortable.AI
             return choice;
         }
 
+        internal static (int Attacker, uint Target)? AllocateExtraBattleRemoval(DuelSession duel, DuelPrompt prompt,
+            int greedyIndex, uint previousAttacker)
+        {
+            if (greedyIndex < 0 || prompt.attackable.Count < 2 || prompt.attackable[greedyIndex].directAttackable ||
+                prompt.attackable.Any(action => action.sequence == previousAttacker))
+                return null;
+            var own = duel.Players[prompt.playerId];
+            var rival = duel.Players[1 - prompt.playerId];
+            var defenders = rival.mzone.Where(card => card != null).ToArray();
+            if (defenders.Length < 2 || defenders.Any(card => !card.IsFaceUp)) return null;
+            var destroyable = defenders.Where(CanDestroyByBattle).ToArray();
+            if (destroyable.Length < 2) return null;
+            var attackers = prompt.attackable.Select(action => GetMonster(own, action.sequence)).ToArray();
+            var greedy = attackers[greedyIndex];
+            if (greedy == null) return null;
+            var firstTarget = defenders.OrderByDescending(defender => AttackValue(greedy, defender, rival.lp)).First();
+
+            int RemovalsAfter(int attackIndex, LiveCardState defeated) => 1 +
+                CountFavorableBattles(attackers.Where((card, index) => card != null && index != attackIndex).Select(card => card.attack),
+                    destroyable.Where(other => other != defeated).Select(BattleDefense));
+
+            if (greedy.attack <= BattleDefense(firstTarget) || !destroyable.Contains(firstTarget)) return null;
+            int original = RemovalsAfter(greedyIndex, firstTarget);
+            int possible = CountFavorableBattles(attackers.Where(card => card != null).Select(card => card.attack),
+                destroyable.Select(BattleDefense));
+            if (possible <= original) return null;
+
+            (int Attacker, uint Target)? best = null;
+            int bestValue = int.MinValue;
+            for (int i = 0; i < attackers.Length; i++)
+            {
+                var attacker = attackers[i];
+                if (attacker == null) continue;
+                foreach (var defender in destroyable)
+                {
+                    if (attacker.attack <= BattleDefense(defender) || RemovalsAfter(i, defender) != possible) continue;
+                    int value = AttackValue(attacker, defender, rival.lp);
+                    if (value <= bestValue) continue;
+                    bestValue = value;
+                    best = (i, defender.sequence);
+                }
+            }
+            return best;
+        }
+
+        internal static bool VerifyAllocatedTarget(DuelSession duel, DuelPrompt prompt, int attacker, uint target)
+        {
+            var clock = Stopwatch.StartNew();
+            bool Expired() => clock.ElapsedMilliseconds >= BattleReplayBudgetMilliseconds;
+            using var trial = duel.ReplayForPlanning(Expired);
+            if (trial?.ActivePrompt is not { messageType: YgoConstants.MSG_SELECT_BATTLECMD } start ||
+                start.playerId != prompt.playerId || attacker >= start.attackable.Count ||
+                start.attackable[attacker].sequence != prompt.attackable[attacker].sequence) return false;
+
+            byte player = prompt.playerId;
+            bool declared = false;
+            trial.OnAttackDeclared += (attackerOwner, _, attackerSequence, targetOwner, targetLocation, targetSequence) =>
+                declared |= attackerOwner == player && attackerSequence == start.attackable[attacker].sequence &&
+                    targetOwner == 1 - player && targetLocation == YgoConstants.LOCATION_MZONE && targetSequence == target;
+            trial.BeginSpeculation(player, stopAfterTurn: true);
+            trial.SubmitResponseInt((attacker << 16) | 1);
+            if (!Expired() && trial.RetryCount == 0 && !trial.SpeculationUncertain &&
+                trial.ActivePrompt is { IsDirectAttackChoice: true } direct && direct.playerId == player)
+                trial.SubmitResponseInt(0);
+
+            return !Expired() && trial.RetryCount == 0 && !trial.SpeculationUncertain &&
+                (declared || trial.ActivePrompt is { IsAttackTargetSelection: true } choice && choice.playerId == player &&
+                    choice.candidates.Any(card => card.controller == 1 - player &&
+                        card.location == YgoConstants.LOCATION_MZONE && card.sequence == target));
+        }
+
         internal static int ChooseTarget(DuelSession duel, DuelPrompt prompt, uint attackerSequence)
         {
             var attacker = GetMonster(duel.Players[prompt.playerId], attackerSequence);
@@ -257,7 +335,7 @@ namespace YGOPortable.AI
             // A set monster's printed stats and effects are hidden.
             if (!defender.IsFaceUp) return attacker.attack - 1550;
 
-            int defense = defender.IsDefense ? defender.defense : defender.attack;
+            int defense = BattleDefense(defender);
             int difference = attacker.attack - defense;
             int damage = defender.IsDefense ? 0 : difference;
             if (damage > 0 && damage >= rivalLp) return Lethal + damage;
@@ -278,6 +356,16 @@ namespace YGOPortable.AI
         private static int Threat(LiveCardState card) => Math.Max(card.attack, card.defense) / 3 +
             ((card.type & YgoConstants.TYPE_EXTRA) != 0 ? 500 : 0) +
             ((card.type & YgoConstants.TYPE_EFFECT) != 0 && !card.effectsDisabled ? 250 : 0);
+
+        private static int BattleDefense(LiveCardState defender) => defender.IsDefense ? defender.defense : defender.attack;
+
+        private static bool CanDestroyByBattle(LiveCardState card)
+        {
+            var text = CardDatabase.Get(card.code)?.desc;
+            return card.effectsDisabled || text == null ||
+                (!text.Contains("전투로는 파괴되지", StringComparison.Ordinal) &&
+                 !text.Contains("이 카드는 전투에 의해서는 파괴되지", StringComparison.Ordinal));
+        }
 
         private static LiveCardState GetMonster(PlayerFieldSnapshot player, uint sequence) =>
             sequence < player.mzone.Length ? player.mzone[sequence] : null;

@@ -17,6 +17,7 @@ namespace YGOPortable.Editor
         private const int Population = 10;
         private const int HandsPerDeck = 4;
         private const int RuntimeFinalists = 3;
+        private const int RuntimeValidationPairsPerDeck = 2;
         private const int MinimumRuntimeHeldoutMatches = 120;
 
         private static readonly int[] TrainingDecks = { 51433, 51435, 51439, 51873, 51875, 51879, 51895, 51899, 85003, 85004, 85014, 20676 };
@@ -38,6 +39,7 @@ namespace YGOPortable.Editor
             internal double Mean => score / Math.Max(1, games);
             internal double MeanBoard => board / Math.Max(1, games);
             internal double MatchRate => (wins + .5 * draws) / Math.Max(1, games);
+            internal double SelectionScore => Mean + 2 * MatchRate;
             internal string OpeningSummary() => $"{games} games, Link-3+ {linkThree}, Link-4+ {linkFour}, " +
                 $"interactive {interactive}, board {MeanBoard:F2}, damage {damage / Math.Max(1, games):P1}, " +
                 $"removed {removed / Math.Max(1, games):F2}, reward {Mean:F2}, {capped} capped";
@@ -93,6 +95,12 @@ namespace YGOPortable.Editor
                 var general = DuelAiPolicy.LoadIncluded() ?? throw new InvalidOperationException("Missing the general AI model.");
                 var previousPolicy = LinkComboPolicy.LoadIncluded() ?? throw new InvalidOperationException("Missing the included Link AI model.");
                 var initial = previousPolicy.CopyWeights();
+                var initialSecond = previousPolicy.CopyWeights(goingSecond: true);
+                bool hasSeparateWeights = !initial.SequenceEqual(initialSecond);
+                LinkComboPolicy CandidatePolicy(float[] weights) => hasSeparateWeights
+                    ? new LinkComboPolicy(weights, initialSecond.Select((weight, index) =>
+                        Math.Clamp(weight + (weights[index] - initial[index]), -8f, 8f)).ToArray())
+                    : new LinkComboPolicy(weights);
                 var center = (float[])initial.Clone();
                 var random = new System.Random(273370);
                 var finalists = new List<float[]>();
@@ -108,7 +116,7 @@ namespace YGOPortable.Editor
                         candidates[i] = Sample(center, random, .8f / (1 + .3f * round));
                     candidates[^2] = Sample(initial, random, .08f);
                     candidates[^1] = Sample(initial, random, .08f);
-                    var ranked = candidates.Select(weights => (weights, outcome: Run(general, new LinkComboPolicy(weights), fixtures, fullDuel: false)))
+                    var ranked = candidates.Select(weights => (weights, outcome: Run(general, CandidatePolicy(weights), fixtures, fullDuel: false)))
                         .OrderByDescending(candidate => candidate.outcome.SetupQuality).ToArray();
                     finalists.AddRange(ranked.Take(2).Select(candidate => candidate.weights));
                     finalists.Add(candidates[^2]);
@@ -125,10 +133,10 @@ namespace YGOPortable.Editor
                 var previousValidationMatches = Run(general, previousPolicy, fullValidation, fullDuel: true);
                 Debug.Log($"[LINK VALIDATE] Baseline openings {previousValidation.OpeningSummary()}");
                 Debug.Log($"[LINK VALIDATE] Baseline matches {previousValidationMatches.MatchSummary()}");
-                var validated = new List<(string name, LinkComboPolicy policy, Results opening)>();
+                var validated = new List<(int source, string name, LinkComboPolicy policy, Results opening)>();
                 foreach (var candidate in ValidationCandidates(initial, finalists))
                 {
-                    var policy = new LinkComboPolicy(candidate.weights);
+                    var policy = CandidatePolicy(candidate.weights);
                     var opening = Run(general, policy, validation, fullDuel: false);
                     bool retained = KeepsLinkStrength(previousValidation, opening);
                     Debug.Log($"[LINK VALIDATE] {candidate.name}, retained={retained}, " +
@@ -138,11 +146,12 @@ namespace YGOPortable.Editor
                         $"first board {opening.First.MeanBoard - previousValidation.First.MeanBoard:F6}, " +
                         $"first reward {opening.First.Mean - previousValidation.First.Mean:F6}, " +
                         $"second reward {opening.Second.Mean - previousValidation.Second.Mean:F6}");
-                    if (retained) validated.Add((candidate.name, policy, opening));
+                    if (retained) validated.Add((candidate.source, candidate.name, policy, opening));
                 }
 
-                var shortlist = validated
-                    .OrderByDescending(candidate => candidate.opening.SetupQuality).Take(RuntimeFinalists)
+                // Residual strengths from the same learned weights compete for a single finalist slot.
+                var shortlist = validated.OrderByDescending(candidate => candidate.opening.SetupQuality)
+                    .GroupBy(candidate => candidate.source).Select(group => group.First()).Take(RuntimeFinalists)
                     .Select(candidate =>
                     {
                         var match = Run(general, candidate.policy, fullValidation, fullDuel: true);
@@ -156,11 +165,16 @@ namespace YGOPortable.Editor
                     throw new InvalidOperationException($"No trained Link candidate passed opening and match preservation. " +
                         $"{validated.Count} candidates passed the opening gate.");
 
-                var runtimeValidation = CreateRuntimeOpenings(decks, TrainingDecks, 1, 640813);
+                var runtimeValidation = CreateRuntimeOpenings(decks, TrainingDecks, RuntimeValidationPairsPerDeck, 640813);
                 var previousRuntimeValidation = Run(general, previousPolicy, runtimeValidation, fullDuel: true,
                     runtimePlanning: true, rivalLink: previousPolicy, stage: "validation included");
                 if (errors.Count != 0 || previousRuntimeValidation.retries != 0 || previousRuntimeValidation.capped != 0)
                     throw new InvalidOperationException("The included runtime Link validation did not finish cleanly.");
+                Debug.Log($"[LINK RUNTIME] Included opening board {previousRuntimeValidation.OpeningSummary()}");
+                var firstPolicy = previousPolicy;
+                var secondPolicy = previousPolicy;
+                var firstResult = previousRuntimeValidation.First;
+                var secondResult = previousRuntimeValidation.Second;
                 var runtimeFinalists = new List<(string name, LinkComboPolicy policy, Results opening, Results match, Results runtime)>();
                 foreach (var candidate in shortlist)
                 {
@@ -169,6 +183,37 @@ namespace YGOPortable.Editor
                     bool retained = errors.Count == 0 && KeepsRuntimeStrength(previousRuntimeValidation, runtime);
                     Debug.Log($"[LINK RUNTIME] {candidate.name}, retained={retained}, {runtime.OpeningSummary()}, {runtime.MatchSummary()}");
                     if (retained) runtimeFinalists.Add((candidate.name, candidate.policy, candidate.opening, candidate.match, runtime));
+                    if (errors.Count != 0 || runtime.retries != 0 || runtime.capped != 0) continue;
+                    if (KeepsRuntimeSeat(previousRuntimeValidation.First, runtime.First) &&
+                        runtime.First.SelectionScore > firstResult.SelectionScore + 1e-6)
+                    {
+                        firstPolicy = candidate.policy;
+                        firstResult = runtime.First;
+                    }
+                    if (KeepsRuntimeSeat(previousRuntimeValidation.Second, runtime.Second) &&
+                        runtime.Second.SelectionScore > secondResult.SelectionScore + 1e-6)
+                    {
+                        secondPolicy = candidate.policy;
+                        secondResult = runtime.Second;
+                    }
+                }
+
+                if (!ReferenceEquals(firstPolicy, secondPolicy))
+                {
+                    // Use the included role whenever no measured candidate preserves that role.
+                    var splitPolicy = new LinkComboPolicy(firstPolicy.CopyWeights(), secondPolicy.CopyWeights(goingSecond: true));
+                    var runtime = Run(general, splitPolicy, runtimeValidation, fullDuel: true,
+                        runtimePlanning: true, rivalLink: previousPolicy, stage: "validation separate seats");
+                    bool retained = errors.Count == 0 && KeepsRuntimeStrength(previousRuntimeValidation, runtime);
+                    Debug.Log($"[LINK RUNTIME] Separate seats, retained={retained}, {runtime.OpeningSummary()}, {runtime.MatchSummary()}");
+                    if (retained)
+                    {
+                        var opening = Run(general, splitPolicy, validation, fullDuel: false);
+                        var match = Run(general, splitPolicy, fullValidation, fullDuel: true);
+                        if (errors.Count == 0 && KeepsLinkStrength(previousValidation, opening) &&
+                            KeepsMatchStrength(previousValidationMatches, match))
+                            runtimeFinalists.Add(("separate seats", splitPolicy, opening, match, runtime));
+                    }
                 }
                 var best = runtimeFinalists
                     .OrderByDescending(candidate => candidate.runtime.SetupQuality +
@@ -176,14 +221,12 @@ namespace YGOPortable.Editor
                     .FirstOrDefault();
                 if (best.policy == null)
                     throw new InvalidOperationException("No Link finalist preserved runtime-planner boards, both seat roles and match strength.");
-                Debug.Log($"[LINK TRAIN] Selected after {trainingOpenings * TrainingDecks.Length} trained openings. Validation {best.opening.OpeningSummary()}, {best.match.MatchSummary()}");
+                Debug.Log($"[LINK TRAIN] Selected {best.name} after {trainingOpenings * TrainingDecks.Length} trained openings. Validation {best.opening.OpeningSummary()}, {best.match.MatchSummary()}");
 
                 var test = CreateOpenings(decks, TestDecks, 12, 788353);
                 var previous = Run(general, previousPolicy, test, fullDuel: false);
-                var untuned = Run(general, new LinkComboPolicy(initial), test, fullDuel: false);
                 var trained = Run(general, best.policy, test, fullDuel: false);
                 Debug.Log($"[LINK EVAL] Previous {previous.OpeningSummary()}");
-                Debug.Log($"[LINK EVAL] Before Link training {untuned.OpeningSummary()}");
                 Debug.Log($"[LINK EVAL] Trained {trained.OpeningSummary()}");
                 Debug.Log($"[LINK EVAL] Finishers {string.Join(", ", trained.Finishers.OrderByDescending(pair => pair.Value).Take(10).Select(pair => $"{CardDatabase.GetName(pair.Key)} {pair.Value}"))}");
 
@@ -245,17 +288,18 @@ namespace YGOPortable.Editor
 
         private static bool KeepsRuntimeStrength(Results previous, Results candidate) =>
             previous.retries == 0 && previous.capped == 0 && KeepsLinkStrength(previous, candidate) &&
-            KeepsMatchStrength(previous, candidate) &&
-            candidate.First.linkThree >= previous.First.linkThree && candidate.First.linkFour >= previous.First.linkFour &&
-            candidate.Second.linkThree >= previous.Second.linkThree && candidate.Second.linkFour >= previous.Second.linkFour &&
-            candidate.First.interactive >= previous.First.interactive && candidate.Second.interactive >= previous.Second.interactive &&
-            candidate.Second.MeanBoard >= previous.Second.MeanBoard;
+            KeepsRuntimeSeat(previous.First, candidate.First) && KeepsRuntimeSeat(previous.Second, candidate.Second);
+
+        private static bool KeepsRuntimeSeat(SeatResults previous, SeatResults candidate) =>
+            candidate.games == previous.games && candidate.capped == 0 && candidate.MatchRate >= previous.MatchRate &&
+            candidate.linkThree >= previous.linkThree && candidate.linkFour >= previous.linkFour &&
+            candidate.interactive >= previous.interactive && candidate.MeanBoard >= previous.MeanBoard && candidate.Mean >= previous.Mean;
 
         private static bool HasCompletedRuntimeHeldout(Results results) =>
             results.wins + results.losses + results.draws == results.games &&
             results.games >= MinimumRuntimeHeldoutMatches && results.First.games == results.Second.games;
 
-        private static IEnumerable<(string name, float[] weights)> ValidationCandidates(float[] initial, List<float[]> finalists)
+        private static IEnumerable<(int source, string name, float[] weights)> ValidationCandidates(float[] initial, List<float[]> finalists)
         {
             var seen = new List<float[]>();
             var fractions = new[] { 1f, .25f, .08f };
@@ -267,7 +311,7 @@ namespace YGOPortable.Editor
                         .Select(feature => initial[feature] + fraction * (finalists[i][feature] - initial[feature])).ToArray();
                     if (weights.SequenceEqual(initial) || seen.Any(previous => weights.SequenceEqual(previous))) continue;
                     seen.Add(weights);
-                    yield return ($"candidate {i + 1}, residual {fraction:P0}", weights);
+                    yield return (i, $"candidate {i + 1}, residual {fraction:P0}", weights);
                 }
             }
         }

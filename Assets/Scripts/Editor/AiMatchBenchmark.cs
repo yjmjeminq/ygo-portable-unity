@@ -167,6 +167,7 @@ namespace YGOPortable.Editor
                 VerifyCrossoutResponse();
                 VerifyNegationAfterCost();
                 VerifyNormalSetUnderPressure();
+                VerifyNativeMainBattleAudit();
                 var general = DuelAiPolicy.LoadIncluded() ?? throw new InvalidOperationException("Missing general AI policy.");
                 var links = LinkComboPolicy.LoadIncluded() ?? throw new InvalidOperationException("Missing Link AI policy.");
                 bool styleSuite = Environment.GetEnvironmentVariable("YGO_BENCH_STYLE_SUITE") == "1";
@@ -702,6 +703,53 @@ namespace YGOPortable.Editor
                 throw new InvalidOperationException("Lethal may still trade one attacker when the other can finish.");
         }
 
+        private static void VerifyNativeMainBattleAudit()
+        {
+            var monsters = Enumerable.Repeat(20721928u, 40).ToArray();
+            var extra = Array.Empty<uint>();
+            var ai = new TacticalAI(null);
+            int featureCount = LinkComboPolicy.InitialWeights().Length;
+            var legacy = new LinkComboPolicy(Enumerable.Repeat(1f, featureCount).ToArray());
+            var split = new LinkComboPolicy(legacy.CopyWeights(), Enumerable.Repeat(-8f, featureCount).ToArray());
+            var sharedPolicy = LinkComboPolicy.FromJson(legacy.ToJson());
+            var splitPolicy = LinkComboPolicy.FromJson(split.ToJson());
+            foreach (int startingLife in new[] { 1600, 1601 })
+            {
+                using var duel = new DuelSession(recordPlanningReplay: true);
+                if (!duel.StartNewDuel(monsters, extra, monsters, extra, startingLp: startingLife,
+                    seed: new[] { 11UL, 13UL, 17UL, 19UL }))
+                    throw new InvalidOperationException("Could not start the Main Phase lethal test.");
+                bool summoned = false;
+                for (int step = 0; step < 12 && duel.ActivePrompt is { } prompt; step++)
+                {
+                    if (prompt.messageType != YgoConstants.MSG_SELECT_IDLECMD)
+                    {
+                        duel.SubmitResponse(ai.ComputeResponse(duel, prompt));
+                        continue;
+                    }
+                    if (summoned) break;
+                    if (sharedPolicy?.Choose(duel, prompt, (command, _) => command == 0) != 0 ||
+                        splitPolicy?.Choose(duel, prompt, (command, _) => command == 0) !=
+                        (prompt.playerId == 0 ? 0 : (int?)null))
+                        throw new InvalidOperationException($"Invalid Link policy after serialization at seat {prompt.playerId}.");
+                    if (prompt.playerId == 0)
+                    {
+                        duel.SubmitResponseInt(7);
+                    }
+                    else
+                    {
+                        duel.SubmitResponseInt(0);
+                        summoned = true;
+                    }
+                }
+
+                if (!summoned || duel.ActivePrompt is not { messageType: YgoConstants.MSG_SELECT_IDLECMD, playerId: 1, canBp: true } main ||
+                    CanReplayLethal(duel, main, fromMain: true) != (startingLife == 1600) || duel.RetryCount != 0 || duel.IsFinished)
+                    throw new InvalidOperationException($"Unexpected Main Phase lethal audit at {startingLife} LP.");
+            }
+            Debug.Log("[AI BENCH RULES] Native Main Phase audit verified exact lethal, one-LP survival, and shared and separate Link weights.");
+        }
+
         private static void VerifyCrossoutResponse()
         {
             const uint reinforcement = 32807846, ash = 14558127, stratos = 40044918;
@@ -1128,11 +1176,13 @@ namespace YGOPortable.Editor
                     (prompt.allowedPositions & YgoConstants.POS_FACEUP_DEFENSE) != 0 && command == YgoConstants.POS_FACEUP_ATTACK &&
                     StrongestAttacker(rival) > Attack(prompt.promptCardCode))
                     selectedDefense[player].Add((prompt.promptCardCode, "summon_in_defense"));
-                if (prompt.messageType == YgoConstants.MSG_SELECT_BATTLECMD && (command & 0xffff) is 2 or 3 &&
-                    CanReplayLethal(duel, prompt))
+                bool skippedBattle = prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD && prompt.canBp && command == 7;
+                bool leftBattle = prompt.messageType == YgoConstants.MSG_SELECT_BATTLECMD && (command & 0xffff) is 2 or 3;
+                if ((skippedBattle || leftBattle) && CanReplayLethal(duel, prompt, skippedBattle))
                 {
                     side.lethalMisses++;
-                    Failure(player, "missed_lethal", $"LP={rival.lp}, attackable={string.Join(",", prompt.attackable.Select(a => a.code))}");
+                    Failure(player, "missed_lethal", $"phase={duel.CurrentPhase}, LP={rival.lp}, " +
+                        $"attackers={string.Join(",", own.mzone.Where(monster => monster?.IsAttack == true).Select(monster => monster.code))}");
                 }
                 if (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN && card != null && ReactiveHandtraps.Contains(card.code) &&
                     duel.CurrentChain.LastOrDefault() is { } last)
@@ -1305,14 +1355,21 @@ namespace YGOPortable.Editor
         private static int StrongestAttacker(PlayerFieldSnapshot side) => side.mzone
             .Where(card => card?.IsFaceUp == true && card.IsAttack).Select(card => card.attack).DefaultIfEmpty(0).Max();
 
-        private static bool CanReplayLethal(DuelSession live, DuelPrompt prompt)
+        private static bool CanReplayLethal(DuelSession live, DuelPrompt prompt, bool fromMain)
         {
-            if (DuelCombat.FindLethal(live, prompt) == null) return false;
+            byte player = prompt.playerId;
+            if (fromMain ? !DuelCombat.CanCloseBattleFromMain(live, player) : DuelCombat.FindLethal(live, prompt) == null)
+                return false;
             var clock = Stopwatch.StartNew();
             using var trial = live.ReplayForPlanning(() => clock.ElapsedMilliseconds >= 200);
             if (trial == null) return false;
-            byte player = prompt.playerId;
             trial.BeginSpeculation(player);
+            if (fromMain)
+            {
+                if (trial.ActivePrompt is not { messageType: YgoConstants.MSG_SELECT_IDLECMD, canBp: true } idle ||
+                    idle.playerId != player) return false;
+                trial.SubmitResponseInt(6);
+            }
             var ai = new TacticalAI(null);
             for (int step = 0; step < 36 && clock.ElapsedMilliseconds < 200 && !trial.SpeculationUncertain &&
                 !trial.IsFinished && trial.RetryCount == 0; step++)

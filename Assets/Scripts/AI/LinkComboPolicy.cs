@@ -24,15 +24,24 @@ namespace YGOPortable.AI
         {
             public int version;
             public float[] weights;
+            public float[] goingSecondWeights;
         }
 
         private readonly float[] _weights;
+        private readonly float[] _goingSecondWeights;
 
-        internal LinkComboPolicy(float[] weights)
+        internal LinkComboPolicy(float[] weights, float[] goingSecondWeights = null)
+        {
+            _weights = ValidatedWeights(weights);
+            if (goingSecondWeights != null)
+                _goingSecondWeights = ValidatedWeights(goingSecondWeights);
+        }
+
+        private static float[] ValidatedWeights(float[] weights)
         {
             if (weights?.Length != (int)Feature.Count || weights.Any(w => float.IsNaN(w) || Math.Abs(w) > 8))
                 throw new ArgumentException("Invalid Link policy weights.", nameof(weights));
-            _weights = (float[])weights.Clone();
+            return (float[])weights.Clone();
         }
 
         internal static LinkComboPolicy LoadIncluded()
@@ -41,8 +50,7 @@ namespace YGOPortable.AI
             if (asset == null) return null;
             try
             {
-                var model = JsonUtility.FromJson<Model>(asset.text);
-                return model?.version == 1 ? new LinkComboPolicy(model.weights) : null;
+                return FromJson(asset.text);
             }
             catch (ArgumentException exception)
             {
@@ -51,8 +59,25 @@ namespace YGOPortable.AI
             }
         }
 
-        internal string ToJson() => JsonUtility.ToJson(new Model { version = 1, weights = _weights }, true);
-        internal float[] CopyWeights() => (float[])_weights.Clone();
+        internal static LinkComboPolicy FromJson(string json)
+        {
+            var model = JsonUtility.FromJson<Model>(json);
+            return model?.version switch
+            {
+                1 => new LinkComboPolicy(model.weights),
+                2 when model.goingSecondWeights != null => new LinkComboPolicy(model.weights, model.goingSecondWeights),
+                _ => null,
+            };
+        }
+
+        internal string ToJson() => JsonUtility.ToJson(new Model
+        {
+            version = _goingSecondWeights == null ? 1 : 2,
+            weights = _weights,
+            goingSecondWeights = _goingSecondWeights,
+        }, true);
+        internal float[] CopyWeights(bool goingSecond = false) => (float[])WeightsFor(goingSecond).Clone();
+        private float[] WeightsFor(bool goingSecond) => goingSecond ? _goingSecondWeights ?? _weights : _weights;
         internal static float[] InitialWeights() => new[]
         {
             1.2f, 1.1f, 2.5f, 0.9f, 1.0f, .3f, 1.45f, .7f, 1.35f, .32f, .4f, -.8f, .45f,
@@ -73,6 +98,9 @@ namespace YGOPortable.AI
 
         internal int? Choose(DuelSession session, DuelPrompt prompt, Func<int, SelectableCardItem, bool> canUse)
         {
+            // DuelSession maps the player who started the duel to engine seat 0.
+            var weights = WeightsFor(goingSecond: prompt.playerId == 1);
+            float Weight(Feature feature) => weights[(int)feature];
             var own = session.Players[prompt.playerId];
             var rival = session.Players[1 - prompt.playerId];
             var field = own.mzone.Where(card => card?.IsFaceUp == true).ToArray();
@@ -294,6 +322,5 @@ namespace YGOPortable.AI
             14812471 or 87871125 or 30342076 or 46947713 or 45462149 or 59859086 or 73539069 or 11969228 or
             43735670 or 30691817 or 79130389 or 61668670 or 97053215 or 74567889 or 93896655 or 21200905;
 
-        private float Weight(Feature feature) => _weights[(int)feature];
     }
 }

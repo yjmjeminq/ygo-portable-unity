@@ -39,6 +39,36 @@ namespace YGOPortable.AI
         internal static bool IsContractSearch(SelectableCardItem item) => item.code == Gate &&
             item.location is YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_SZONE;
 
+        internal static int? ChooseEarlyPendulumRecovery(DuelSession session, DuelPrompt prompt,
+            Func<int, SelectableCardItem, bool> canUse)
+        {
+            if (prompt.messageType != YgoConstants.MSG_SELECT_IDLECMD || session.TurnNumber > 2 ||
+                session.TurnPlayer != prompt.playerId || session.CurrentPhase != YgoConstants.PHASE_MAIN1)
+                return null;
+
+            var own = session.Players[prompt.playerId];
+            if (!IsDddDeck(own) || !own.mzone.Any(card =>
+                card is { code: Gilgamesh, IsFaceUp: true, effectsDisabled: false }))
+                return null;
+
+            var left = own.szone[6] ?? own.szone[0];
+            var right = own.szone[7] ?? own.szone[4];
+            bool ActiveScale(LiveCardState card) => card is { IsFaceUp: true, effectsDisabled: false } &&
+                IsSet(card.code, DdSet) && CardDatabase.Get(card.code)?.IsPendulum == true;
+            if (!ActiveScale(left) || !ActiveScale(right) || PendulumTurnPlan.ReadyFollowUps(own) <= 0 ||
+                !own.extra.Any(card => card.IsFaceUp && IsLevelMonster(card.code) &&
+                    CardDatabase.Get(card.code)?.IsPendulum == true &&
+                    IsBetween(card.level, (int)left.lscale, (int)right.rscale)))
+                return null;
+
+            // Recover an available body before ending the turn and setting its supporting Quick-Play cards.
+            int index = prompt.spSummonable.FindIndex(item => item.controller == prompt.playerId &&
+                item.location is YgoConstants.LOCATION_SZONE or YgoConstants.LOCATION_PZONE &&
+                IsSet(item.code, DdSet) && CardDatabase.Get(item.code)?.IsPendulum == true &&
+                canUse(SpecialSummon, item));
+            return index < 0 ? null : (index << 16) | SpecialSummon;
+        }
+
         internal static int? ChooseIdle(DuelSession session, DuelPrompt prompt, Func<int, SelectableCardItem, bool> canUse)
         {
             if (prompt.messageType != YgoConstants.MSG_SELECT_IDLECMD) return null;

@@ -926,7 +926,8 @@ namespace YGOPortable.AI
                 (!hasFieldBodies && DuelCombat.VisibleAttackTotal(rival) - Math.Max(0, card.atk) >= own.lp);
             bool fragileAtLowLife = followupUnproven && DuelCombat.IsWeakBattleLiability(card.atk, rivalStrongest, own.lp);
             if (lethalOnly && !threatensLethal && !fragileAtLowLife) return null;
-            if (!compareWithBattle && !threatensLethal && !fragileAtLowLife && prompt.canBp && CanWinBattle(rival, card.atk)) return null;
+            if (!compareWithBattle && !threatensLethal && !fragileAtLowLife && prompt.canBp &&
+                AddsFavorableBattle(own, rival, card.atk)) return null;
 
             bool isVanillaOrFlip = (card.type & (YgoConstants.TYPE_NORMAL | YgoConstants.TYPE_FLIP)) != 0;
             bool hasImmediateSpecial = prompt.spSummonable.Count > 0;
@@ -1065,6 +1066,20 @@ namespace YGOPortable.AI
         private static bool CanWinBattle(PlayerFieldSnapshot rival, int attack) => attack > 0 &&
             (rival.mzone.All(card => card == null) || rival.mzone.Any(card =>
                 card?.IsFaceUp == true && attack > (card.IsDefense ? card.defense : card.attack)));
+
+        private static bool AddsFavorableBattle(PlayerFieldSnapshot own, PlayerFieldSnapshot rival, int attack)
+        {
+            if (!CanWinBattle(rival, attack)) return false;
+            var monsters = rival.mzone.Where(card => card != null).ToArray();
+            if (monsters.Length == 0) return true;
+            var thresholds = monsters.Where(card => card.IsFaceUp)
+                .Select(card => card.IsDefense ? card.defense : card.attack).ToArray();
+
+            // An extra attacker adds value if it can clear another blocker or follow through to a direct attack.
+            var existing = own.mzone.Where(card => card?.IsFaceUp == true && card.IsAttack).Select(card => card.attack).ToArray();
+            int matched = DuelCombat.CountFavorableBattles(existing, thresholds);
+            return matched == monsters.Length || DuelCombat.CountFavorableBattles(existing.Append(attack), thresholds) > matched;
+        }
 
         internal static int StrongestAttacker(PlayerFieldSnapshot rival)
         {

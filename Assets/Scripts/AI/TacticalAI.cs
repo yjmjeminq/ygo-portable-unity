@@ -46,7 +46,7 @@ namespace YGOPortable.AI
         private int _battleActions;
         private int _unselectCount;
         private uint _attackerSequence = uint.MaxValue;
-        private uint _lethalTargetSequence = uint.MaxValue;
+        private uint _plannedAttackTargetSequence = uint.MaxValue;
         private uint _linkSummon;
         private uint? _crossoutDeclaration;
         private bool? _linkDeck;
@@ -83,7 +83,7 @@ namespace YGOPortable.AI
                 _checkedIdleRecovery = false;
                 _unselectCount = 0;
                 _attackerSequence = uint.MaxValue;
-                _lethalTargetSequence = uint.MaxValue;
+                _plannedAttackTargetSequence = uint.MaxValue;
                 _linkSummon = 0;
                 _effectCounts.Clear();
                 _repositionedSeqs.Clear();
@@ -137,7 +137,7 @@ namespace YGOPortable.AI
                         return BitConverter.GetBytes(0);
                     if (UsesTacticalRules && DuelTactics.ChooseResolutionYesNo(session, prompt) is int answer)
                         return BitConverter.GetBytes(answer);
-                    return BitConverter.GetBytes(prompt.IsDirectAttackChoice && _lethalTargetSequence != uint.MaxValue ? 0 : 1);
+                    return BitConverter.GetBytes(prompt.IsDirectAttackChoice && _plannedAttackTargetSequence != uint.MaxValue ? 0 : 1);
 
                 case YgoConstants.MSG_SELECT_OPTION:
                     return BitConverter.GetBytes(DddTurnPlan.ChooseOption(session, prompt) ??
@@ -446,6 +446,9 @@ namespace YGOPortable.AI
                 priority = value;
             }
             if (best >= 0) return (best << 16) | 5;
+            if (DddTurnPlan.ChooseEarlyPendulumRecovery(session, prompt,
+                (command, item) => CanUseMainAction(session, prompt, planLinks, command, item)) is int pendulum)
+                return pendulum;
             if (DuelDeckStrategy.For(session, prompt.playerId) == DuelDeckStyle.Resource &&
                 SignatureTurnPlan.ChooseResourceOpening(session, prompt,
                     (command, item) => CanUseMainAction(session, prompt, planLinks, command, item)) is int resource)
@@ -702,7 +705,7 @@ namespace YGOPortable.AI
             _battleActions++;
             uint previousAttacker = _attackerSequence;
             _attackerSequence = uint.MaxValue;
-            _lethalTargetSequence = uint.MaxValue;
+            _plannedAttackTargetSequence = uint.MaxValue;
             bool canLeaveBattle = p.canM2 || p.canEp;
             if (UsesTacticalRules && !fallback &&
                 DuelCombat.FindLethal(s, p, _comboProjection ? uint.MaxValue : previousAttacker) is { } lethal)
@@ -715,7 +718,7 @@ namespace YGOPortable.AI
                     attacker = verified;
                 }
                 _attackerSequence = p.attackable[attacker].sequence;
-                _lethalTargetSequence = lethal.Target ?? uint.MaxValue;
+                _plannedAttackTargetSequence = lethal.Target ?? uint.MaxValue;
                 return BitConverter.GetBytes((attacker << 16) | 1);
             }
             if (canLeaveBattle && (fallback || _battleActions > 25))
@@ -730,6 +733,7 @@ namespace YGOPortable.AI
                     string key = $"bpact:{act.code}:{act.description}:{act.sequence}";
                     if (_effectCounts.ContainsKey(key)) continue;
                     BumpKey(key);
+                    _attackerSequence = previousAttacker;
                     return BitConverter.GetBytes((i << 16) | 0);
                 }
             }
@@ -738,6 +742,15 @@ namespace YGOPortable.AI
             {
                 int index = DuelCombat.ChooseAttacker(s, p, !canLeaveBattle);
                 if (index < 0) return BitConverter.GetBytes(p.canM2 ? 2 : 3);
+                if ((_comboProjection || _comboSearch != null) &&
+                    DuelCombat.AllocateExtraBattleRemoval(s, p, index, previousAttacker) is { } allocation &&
+                    // For the existing attacker, the target prompt can reject the alternative without changing the attack.
+                    (_comboProjection || allocation.Attacker == index ||
+                        DuelCombat.VerifyAllocatedTarget(s, p, allocation.Attacker, allocation.Target)))
+                {
+                    index = allocation.Attacker;
+                    _plannedAttackTargetSequence = allocation.Target;
+                }
                 _attackerSequence = p.attackable[index].sequence;
                 return BitConverter.GetBytes((index << 16) | 1);
             }
@@ -880,7 +893,7 @@ namespace YGOPortable.AI
 
         private int DecideEffectYesNo(DuelSession s, DuelPrompt p)
         {
-            if (p.IsDirectAttackChoice) return _lethalTargetSequence == uint.MaxValue ? 1 : 0;
+            if (p.IsDirectAttackChoice) return _plannedAttackTargetSequence == uint.MaxValue ? 1 : 0;
             if (UsesTacticalRules && !DuelTactics.CanActivate(s, p, new SelectableCardItem
                 {
                     code = p.promptCardCode, controller = p.playerId, location = p.promptLoc, sequence = p.promptSeq,
@@ -897,9 +910,10 @@ namespace YGOPortable.AI
         {
             if (UsesTacticalRules && p.IsAttackTargetSelection)
             {
-                if (_lethalTargetSequence != uint.MaxValue)
+                if (_plannedAttackTargetSequence != uint.MaxValue)
                 {
-                    int plannedTarget = p.candidates.FindIndex(card => card.controller != p.playerId && card.sequence == _lethalTargetSequence);
+                    int plannedTarget = p.candidates.FindIndex(card => card.controller == 1 - p.playerId &&
+                        card.location == YgoConstants.LOCATION_MZONE && card.sequence == _plannedAttackTargetSequence);
                     if (plannedTarget >= 0) return PackIndexList(new[] { plannedTarget });
                 }
                 int target = DuelCombat.ChooseTarget(s, p, _attackerSequence);
