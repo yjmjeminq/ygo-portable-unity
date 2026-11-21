@@ -198,6 +198,8 @@ namespace YGOPortable.Editor
             Debug.Log("[VERIFY OVERFRAME RESUMMON] The same ace showed its cut-in on a second face-up summon and stayed hidden on a face-down summon.");
 
             animator.Clear();
+            VerifyGroupedOverframe(animator, queue);
+            animator.Clear();
             animator.QueueChain(start, 9674034, 1, false);
             var chain = queue.Dequeue();
             Require(chain.MoveNext(), "The ace activation did not play its cut-in.");
@@ -211,23 +213,85 @@ namespace YGOPortable.Editor
             animator.Clear();
             Debug.Log("[VERIFY OVERFRAME MESH] Summon and activation reused their subject and shimmer meshes while scaling.");
 
-            static void TrackStableOverframe(Transform overframe, Action<float> frame, float from, float to)
+        }
+
+        private static void TrackStableOverframe(Transform overframe, Action<float> frame, float from, float to)
+        {
+            var subject = overframe.Find("Depth/Subject").GetComponent<CardOverframeGraphic>();
+            var shimmer = overframe.Find("Depth/Shimmer").GetComponent<CardOverframeGraphic>();
+            int dirty = 0;
+            void CountRebuild() => dirty++;
+            subject.RegisterDirtyVerticesCallback(CountRebuild);
+            shimmer.RegisterDirtyVerticesCallback(CountRebuild);
+            for (int i = 0; i < 20; i++)
             {
-                var subject = overframe.Find("Depth/Subject").GetComponent<CardOverframeGraphic>();
-                var shimmer = overframe.Find("Depth/Shimmer").GetComponent<CardOverframeGraphic>();
-                int dirty = 0;
-                void CountRebuild() => dirty++;
-                subject.RegisterDirtyVerticesCallback(CountRebuild);
-                shimmer.RegisterDirtyVerticesCallback(CountRebuild);
-                for (int i = 0; i < 20; i++)
-                {
-                    frame(Mathf.Lerp(from, to, i / 19f));
-                    Canvas.ForceUpdateCanvases();
-                }
-                subject.UnregisterDirtyVerticesCallback(CountRebuild);
-                shimmer.UnregisterDirtyVerticesCallback(CountRebuild);
-                Require(dirty == 0, $"Transform animation requested {dirty} unnecessary overframe mesh rebuilds.");
+                frame(Mathf.Lerp(from, to, i / 19f));
+                Canvas.ForceUpdateCanvases();
             }
+            subject.UnregisterDirtyVerticesCallback(CountRebuild);
+            shimmer.UnregisterDirtyVerticesCallback(CountRebuild);
+            Require(dirty == 0, $"Transform animation requested {dirty} unnecessary overframe mesh rebuilds.");
+        }
+
+        private static void VerifyGroupedOverframe(CardAnimationManager animator, Queue<IEnumerator> queue)
+        {
+            var cardSize = new Vector2(92f, 134f);
+            var targets = new[]
+            {
+                new CardPose(new Vector2(-210f, -110f), cardSize),
+                new CardPose(new Vector2(-100f, -110f), cardSize),
+                new CardPose(new Vector2(10f, -110f), cardSize),
+            };
+            uint[] cards = { BlueEyes, 9674034, 46986414 };
+            int departed = 0, landed = 0, refreshed = 0;
+            for (int i = 0; i < cards.Length; i++)
+            {
+                var from = new CardPose(new Vector2(-80f + i * 100f, -235f), cardSize);
+                var flight = new CardFlight(cards[i], from, targets[i], true, i == 2);
+                animator.StageFieldArrival(flight, CardMotion.SpecialSummon, 0, YgoConstants.LOCATION_MZONE, (uint)i,
+                    null, () => departed++, () => landed++, () => refreshed++);
+            }
+            animator.CompleteFieldArrivals();
+            var arrival = queue.Dequeue();
+            Require(arrival.MoveNext() && arrival.Current is IEnumerator, "The simultaneous arrivals did not enter a shared cut-in.");
+            var reveal = (IEnumerator)arrival.Current;
+            Require(reveal.MoveNext() && departed == cards.Length && landed == 0, "The group left the origin at different times.");
+            var pop = SampleAnimation((IEnumerator)reveal.Current);
+            Require(animator.GetComponentsInChildren<CompositeCardView>().Count(view => view.CurrentCode == 0) == 3,
+                "A grouped card showed its identity before turning over.");
+            pop(.52f);
+            Canvas.ForceUpdateCanvases();
+            var views = animator.GetComponentsInChildren<CompositeCardView>();
+            var ace = views.Single(view => view.CurrentCode == BlueEyes);
+            var excel = views.Single(view => view.CurrentCode == 9674034);
+            var hidden = views.Single(view => view.CurrentCode == 0);
+            TrackStableOverframe(ace.transform.Find("Overframe"), pop, .54f, 1f);
+            TrackStableOverframe(excel.transform.Find("Overframe"), pop, .54f, 1f);
+            var left = (RectTransform)ace.transform;
+            var right = (RectTransform)excel.transform;
+            Require(ace.HasOverframe && excel.HasOverframe && !hidden.HasOverframe && views.Length == 3 &&
+                left.anchoredPosition.x < 0f && right.anchoredPosition.x > 0f &&
+                right.anchoredPosition.x - left.anchoredPosition.x > left.rect.width * 1.48f &&
+                Mathf.Approximately(ace.transform.Find("Overframe/Depth").localScale.x, 1.25f) &&
+                animator.transform.Find("ChainImpactWave").GetComponent<DuelEffectGraphic>().Tint == DuelStyle.ChainGold,
+                "The grouped aces overlapped, lost their bounce, or revealed the face-down card.");
+            Require(reveal.MoveNext(), "The grouped cut-in omitted the settling stage.");
+            SampleAnimation((IEnumerator)reveal.Current)(1f);
+            Require(!reveal.MoveNext() && animator.transform.Find("GroupSummonShade") == null &&
+                landed == 0 && refreshed == 0, "The grouped cut-in published the field too early.");
+            Require(arrival.MoveNext(), "The group omitted its movement to the field.");
+            var land = SampleAnimation((IEnumerator)arrival.Current);
+            land(.5f);
+            Require(landed == 0 && refreshed == 0, "One card became live while the remaining group was still moving.");
+            land(1f);
+            Require(Vector2.Distance(left.anchoredPosition, targets[0].Position) < .1f &&
+                Vector2.Distance(right.anchoredPosition, targets[1].Position) < .1f &&
+                Vector2.Distance(((RectTransform)hidden.transform).anchoredPosition, targets[2].Position) < .1f,
+                "One grouped card did not finish in its original target slot.");
+            Require(!arrival.MoveNext() && landed == cards.Length && refreshed == 1 &&
+                animator.GetComponentsInChildren<CompositeCardView>().Length == 0,
+                "The engine's group did not land together or left a visible proxy on the field.");
+            Debug.Log("[VERIFY OVERFRAME GROUP] Two face-up aces shared the cut-in, the face-down card stayed hidden, and all three arrived together.");
         }
 
         private static void VerifyFoil(CompositeCardView card)

@@ -657,6 +657,7 @@ namespace YGOPortable.UI
         private IEnumerator PlayFieldArrivalGroup(IReadOnlyList<FieldArrival> moves, Action land, Action refresh)
         {
             bool returning = moves[0].Motion == CardMotion.FieldReturn;
+            var showcase = returning ? null : GroupOverframePoses(moves);
             foreach (var move in moves) move.Depart?.Invoke();
             if (returning) refresh();
             var effects = new DuelEffectGraphic[moves.Count];
@@ -674,20 +675,24 @@ namespace YGOPortable.UI
             for (int i = 0; i < moves.Count; i++)
             {
                 var flight = moves[i].Flight;
-                var view = TakeCard(flight.StartsFaceDown ? 0u : flight.Code, flight.StartsFaceDown);
+                bool showAce = showcase != null && showcase[i].IsValid;
+                var view = TakeCard(flight.StartsFaceDown ? 0u : flight.Code, flight.StartsFaceDown, detailed: showAce);
                 if (!view.TryGetComponent<CanvasGroup>(out var fade))
                     fade = view.gameObject.AddComponent<CanvasGroup>();
-                fade.alpha = 0f;
+                fade.alpha = showcase != null && moves[i].Motion != CardMotion.TokenSummon ? 1f : 0f;
                 views[i] = view;
                 opacity[i] = fade;
+                if (showcase != null) ApplyPose(view, flight.From.AtLayout(), layoutHeight: showcase[i].Size.y);
             }
+            if (showcase != null) yield return RevealSummonGroup(moves, showcase, views);
+
             for (int i = 0; i < moves.Count; i++)
-                readouts[i] = CreateMovingReadout(moves[i].Flight, moves[i].Motion, moves[i].Readout,
-                    handoff: returning ? FieldReturnHandoff : null);
+                readouts[i] = CreateMovingReadout(GroupLandingFlight(moves[i].Flight, showcase, i),
+                    moves[i].Motion, moves[i].Readout, handoff: returning ? FieldReturnHandoff : null);
 
             float stagger = returning ? 0f : .026f;
             float travel = returning ? .34f : .37f + (moves.Count - 1) * stagger;
-            if (!returning) LotdAudio.PlaySummon();
+            if (!returning && showcase == null) LotdAudio.PlaySummon();
             bool revealedReturn = false;
             yield return Animate(travel, progress =>
             {
@@ -696,8 +701,13 @@ namespace YGOPortable.UI
                     var move = moves[i];
                     float delay = i * stagger;
                     float time = Mathf.Clamp01((progress * travel - delay) / (travel - delay));
-                    ApplyFlight(views[i], move.Flight, time, returning ? 18f : move.Motion == CardMotion.TokenSummon ? 11f : 32f);
-                    opacity[i].alpha = Mathf.SmoothStep(0f, 1f, time / (move.Motion == CardMotion.TokenSummon ? .75f : .22f));
+                    var flight = GroupLandingFlight(move.Flight, showcase, i);
+                    float layoutHeight = showcase != null ? showcase[i].Size.y : 0f;
+                    ApplyFlight(views[i], flight, time, returning ? 18f : move.Motion == CardMotion.TokenSummon ? 11f : 32f,
+                        layoutHeight: layoutHeight);
+                    if (layoutHeight > 0f) FadeSummonOverframe(views[i], time);
+                    if (showcase == null || move.Motion == CardMotion.TokenSummon)
+                        opacity[i].alpha = Mathf.SmoothStep(0f, 1f, time / (move.Motion == CardMotion.TokenSummon ? .75f : .22f));
                     readouts[i]?.Follow(views[i], time);
                     TrackCardEffect(effects[i], move.Flight.To, 1.65f, time);
                 }
@@ -710,12 +720,90 @@ namespace YGOPortable.UI
             for (int i = 0; i < moves.Count; i++)
             {
                 opacity[i].alpha = 1f;
-                RecycleCard(views[i]);
+                if (showcase != null && showcase[i].IsValid) RemoveTransient(views[i].gameObject);
+                else RecycleCard(views[i]);
                 if (readouts[i] != null) RemoveTransient(readouts[i].Root.gameObject);
                 RemoveTransient(effects[i].gameObject);
             }
             land();
         }
+
+        private CardPose[] GroupOverframePoses(IReadOnlyList<FieldArrival> moves)
+        {
+            List<int> aces = null;
+            for (int i = 0; i < moves.Count; i++)
+            {
+                var move = moves[i];
+                if (IsSummonMotion(move.Motion) && SupportsSummonOverframe(move.Flight))
+                    (aces ??= new List<int>()).Add(i);
+            }
+            if (aces == null) return null;
+
+            Vector2 area = _layer.rect.size;
+            float height = Mathf.Min(352f, area.y * .395f, area.x * .88f / (aces.Count * 1.17f));
+            if (height <= 0f) return null;
+            float spacing = height * 1.17f;
+            var poses = new CardPose[moves.Count];
+            for (int i = 0; i < aces.Count; i++)
+            {
+                float x = (i - (aces.Count - 1) * .5f) * spacing;
+                poses[aces[i]] = new CardPose(new Vector2(x, area.y * .045f),
+                    new Vector2(height * LotdUiKit.CardAspectRatio, height));
+            }
+            return poses;
+        }
+
+        private IEnumerator RevealSummonGroup(IReadOnlyList<FieldArrival> moves, CardPose[] poses, CompositeCardView[] views)
+        {
+            var shade = LotdUiKit.AddImage(LotdUiKit.FillRect("GroupSummonShade", _layer).gameObject,
+                LotdUiKit.WhiteSprite, Color.clear, false, false);
+            Vector2 area = _layer.rect.size;
+            var aura = CreateEffect(DuelEffectKind.Chain, Vector2.up * area.y * .13f, area * .72f, DuelStyle.ChainGold);
+            var wave = CreateEffect(DuelEffectKind.ChainImpactWave, Vector2.zero,
+                new Vector2(area.x * .73f, area.y * .28f), DuelStyle.ChainGold);
+            var flights = new CardFlight[moves.Count];
+            for (int i = 0; i < views.Length; i++)
+            {
+                if (!poses[i].IsValid) continue;
+                var flight = moves[i].Flight;
+                flights[i] = new CardFlight(flight.Code, flight.From, poses[i], flight.StartsFaceDown, false);
+                if (!flight.StartsFaceDown && moves[i].Readout?.DestinationCard is { } live)
+                    views[i].SetCard(flight.Code, live: live);
+                views[i].EnableOverframe();
+                views[i].PoseOverframe(0f, 1f, Vector2.zero, 0f);
+                views[i].transform.SetAsLastSibling();
+            }
+
+            LotdAudio.PlaySummon();
+            yield return Animate(.27f, t =>
+            {
+                shade.color = new Color(.009f, .013f, .02f, Mathf.SmoothStep(0f, .64f, t));
+                aura.Seek(t * .49f);
+                wave.Seek(Mathf.InverseLerp(.70f, 1f, t) * .43f);
+                for (int i = 0; i < views.Length; i++)
+                {
+                    if (!poses[i].IsValid) continue;
+                    ApplyFlight(views[i], flights[i], t, 29f, moves[i].Readout?.DestinationCard, layoutHeight: poses[i].Size.y);
+                    PopSummonOverframe(views[i], t);
+                }
+            });
+            yield return Animate(.27f, t =>
+            {
+                shade.color = new Color(.009f, .013f, .02f, .64f * (1f - t));
+                aura.Seek(.49f + t * .51f);
+                wave.Seek(.43f + t * .57f);
+                for (int i = 0; i < views.Length; i++)
+                    if (poses[i].IsValid) SettleSummonOverframe(views[i], t);
+            });
+
+            RemoveTransient(shade.gameObject);
+            RemoveTransient(aura.gameObject);
+            RemoveTransient(wave.gameObject);
+        }
+
+        private static CardFlight GroupLandingFlight(CardFlight flight, CardPose[] showcase, int index) =>
+            showcase != null && showcase[index].IsValid
+                ? new CardFlight(flight.Code, showcase[index], flight.To, false, flight.EndsFaceDown) : flight;
 
         private IEnumerator PlayFieldDepartures(FieldDepartureGroup group)
         {
@@ -1009,9 +1097,7 @@ namespace YGOPortable.UI
             onDepart?.Invoke();
             bool extraSummon = motion is CardMotion.ExtraDeckSummon or CardMotion.PendulumSummon;
             bool summons = IsSummonMotion(motion);
-            bool overframe = summons && !flight.EndsFaceDown &&
-                CardOverframeProfile.Get(flight.Code, CardArtLoader.GetDuelArtworkVariant(flight.Code)) is { } profile &&
-                profile.Triangles.Length > 0;
+            bool overframe = summons && SupportsSummonOverframe(flight);
             bool featured = summons && TakeFeaturedSummon(flight);
             if (summons && !featured && !overframe && !flight.EndsFaceDown) _summonArt = DuelVisualAssets.SummonCutIn(flight.Code);
             bool reveal = !flight.EndsFaceDown && (extraSummon || featured || overframe || _summonArt != null);
@@ -1098,6 +1184,11 @@ namespace YGOPortable.UI
         internal static bool IsSummonMotion(CardMotion motion) =>
             motion is CardMotion.Summon or CardMotion.SpecialSummon or CardMotion.ExtraDeckSummon or CardMotion.PendulumSummon;
 
+        private static bool SupportsSummonOverframe(CardFlight flight) =>
+            !flight.EndsFaceDown &&
+            CardOverframeProfile.Get(flight.Code, CardArtLoader.GetDuelArtworkVariant(flight.Code)) is { } profile &&
+            profile.Triangles.Length > 0;
+
         internal bool TakeFeaturedSummon(CardFlight flight)
         {
             if (flight.EndsFaceDown || flight.Code == 0) return false;
@@ -1164,11 +1255,7 @@ namespace YGOPortable.UI
                 layout.alpha = Mathf.SmoothStep(0f, 1f, (t - .40f) / .60f);
                 if (overframe)
                 {
-                    float emerge = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.49f, .86f, t));
-                    var lean = new Vector2(.44f * emerge, -.57f * emerge);
-                    proxy.PoseOverframe(emerge, Mathf.Lerp(.88f, 1.25f, emerge), lean, t * .5f);
-                    proxy.transform.localRotation *= Quaternion.Euler(-7f * emerge, -9f * emerge, 0f);
-                    aura.Seek(emerge * .49f);
+                    aura.Seek(PopSummonOverframe(proxy, t) * .49f);
                     wave.Seek(Mathf.InverseLerp(.72f, 1f, t) * .43f);
                 }
                 if (portraitFade != null && t >= .5f)
@@ -1195,10 +1282,7 @@ namespace YGOPortable.UI
                 if (portraitFade != null) portraitFade.transform.localScale = Vector3.one * Mathf.Lerp(1f, 1.025f, t);
                 if (overframe)
                 {
-                    float spring = (1f - t) * (1f - t);
-                    float settle = spring * Mathf.Cos(t * Mathf.PI * 1.65f);
-                    proxy.PoseOverframe(1f, 1f + .25f * settle, new Vector2(.44f, -.57f) * spring, .5f + t * .34f);
-                    proxy.transform.localRotation = Quaternion.Euler(-7f * spring, -9f * spring, 0f);
+                    SettleSummonOverframe(proxy, t);
                     aura.Seek(.49f + t * .28f);
                     wave.Seek(.43f + t * .57f);
                 }
@@ -1215,7 +1299,7 @@ namespace YGOPortable.UI
                 if (portraitFade != null) portraitFade.alpha = 1f - Mathf.SmoothStep(0f, 1f, t * 1.25f);
                 if (overframe)
                 {
-                    proxy.PoseOverframe(1f - Mathf.SmoothStep(0f, 1f, t * 1.6f), 1f, Vector2.zero, .84f + t * .16f);
+                    FadeSummonOverframe(proxy, t);
                     aura.Seek(.77f + t * .23f);
                 }
                 if (artwork != null)
@@ -1233,6 +1317,25 @@ namespace YGOPortable.UI
             if (wave != null) RemoveTransient(wave.gameObject);
             ReleaseSummonArt();
         }
+
+        private static float PopSummonOverframe(CompositeCardView card, float time)
+        {
+            float emerge = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.49f, .86f, time));
+            card.PoseOverframe(emerge, Mathf.Lerp(.88f, 1.25f, emerge), new Vector2(.44f, -.57f) * emerge, time * .5f);
+            card.transform.localRotation *= Quaternion.Euler(-7f * emerge, -9f * emerge, 0f);
+            return emerge;
+        }
+
+        private static void SettleSummonOverframe(CompositeCardView card, float time)
+        {
+            float spring = (1f - time) * (1f - time);
+            float settle = spring * Mathf.Cos(time * Mathf.PI * 1.65f);
+            card.PoseOverframe(1f, 1f + .25f * settle, new Vector2(.44f, -.57f) * spring, .5f + time * .34f);
+            card.transform.localRotation = Quaternion.Euler(-7f * spring, -9f * spring, 0f);
+        }
+
+        private static void FadeSummonOverframe(CompositeCardView card, float time) =>
+            card.PoseOverframe(1f - Mathf.SmoothStep(0f, 1f, time * 1.6f), 1f, Vector2.zero, .84f + time * .16f);
 
         private CanvasGroup CreateFeaturedPortrait(Vector2 center, float size, Color accent, out Image artwork)
         {
