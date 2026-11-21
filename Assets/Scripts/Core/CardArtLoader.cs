@@ -30,7 +30,7 @@ namespace YGOPortable.Core
         private const string SupplementalArtFileName = "supplementalart.pack";
         private static readonly Dictionary<(uint code, int variant), ArtEntry> _duelArt = new();
         private static readonly Dictionary<uint, List<int>> _duelVariants = new();
-        private static readonly Dictionary<(uint, int), (Sprite sprite, LinkedListNode<(uint, int)> node)> _spriteCache =
+        private static readonly Dictionary<(uint, int), (Sprite sprite, LinkedListNode<(uint, int)> node, (uint Code, int Variant) source)> _spriteCache =
             new(MaxCacheCount);
         private static readonly LinkedList<(uint, int)> _lru = new();
         private static readonly Dictionary<(uint, int), int> _visibleArtwork = new();
@@ -118,9 +118,6 @@ namespace YGOPortable.Core
             return variants.Contains(variant) ? variant : variants[0];
         }
 
-        internal static bool UsesLocalArtwork(uint code, int variant) =>
-            variant >= 0 && _duelArt.ContainsKey((code, variant));
-
         internal static void SetDuelArtworkVariant(uint code, int variant)
         {
             if (_duelVariants.TryGetValue(code, out var variants) && variants.Contains(variant))
@@ -145,7 +142,7 @@ namespace YGOPortable.Core
             return true;
         }
 
-        private static IEnumerable<uint> RelatedPrintings(uint code)
+        internal static IEnumerable<uint> RelatedPrintings(uint code)
         {
             if (CardDatabase.TryGetDeckPrintings(code, out var printings))
             {
@@ -175,10 +172,17 @@ namespace YGOPortable.Core
             return _cardBackSprite;
         }
 
-        public static Sprite GetArtSprite(uint code) => GetArtSprite(code, BundledArtwork);
+        public static Sprite GetArtSprite(uint code) => GetArtSprite(code, BundledArtwork, out _);
 
-        private static Sprite GetArtSprite(uint code, int variant)
+        internal static (uint Code, int Variant) GetArtworkSource(uint code, int variant)
         {
+            GetArtSprite(code, variant, out var source);
+            return source;
+        }
+
+        private static Sprite GetArtSprite(uint code, int variant, out (uint Code, int Variant) source)
+        {
+            source = default;
             if (code == 0) return GetCardBackSprite();
             var key = (code, variant);
             if (_spriteCache.TryGetValue(key, out var cached))
@@ -187,40 +191,54 @@ namespace YGOPortable.Core
                 if (cached.sprite != null)
                 {
                     _lru.AddLast(cached.node);
+                    source = cached.source;
                     return cached.sprite;
                 }
                 _spriteCache.Remove(key);
             }
 
             if (_index == null) return GetFallbackArt();
-            Sprite sprite = LoadExactArtwork(code, variant);
+            uint artCode = code;
+            Sprite sprite = LoadExactArtwork(code, variant, out int artVariant);
             if (sprite == null)
             {
                 // A rules alias may identify a different card. Use the same card's other printings.
                 foreach (uint relatedCode in RelatedPrintings(code))
                 {
-                    sprite = LoadExactArtwork(relatedCode, BundledArtwork);
-                    if (sprite != null) break;
+                    sprite = LoadExactArtwork(relatedCode, BundledArtwork, out artVariant);
+                    if (sprite == null) continue;
+                    artCode = relatedCode;
+                    break;
                 }
             }
             if (sprite == null) return GetFallbackArt();
+            source = (artCode, artVariant);
             TrimArtwork(MaxCacheCount - 1);
-            _spriteCache[key] = (sprite, _lru.AddLast(key));
+            _spriteCache[key] = (sprite, _lru.AddLast(key), source);
             return sprite;
         }
 
-        private static Sprite LoadExactArtwork(uint code, int variant)
+        private static Sprite LoadExactArtwork(uint code, int variant, out int artVariant)
         {
+            artVariant = BundledArtwork;
             if (variant >= 0 && _duelArt.TryGetValue((code, variant), out var preferred) &&
-                DecodeArtwork(preferred) is Sprite preferredSprite) return preferredSprite;
+                DecodeArtwork(preferred) is Sprite preferredSprite)
+            {
+                artVariant = variant;
+                return preferredSprite;
+            }
             if (_index.TryGetValue(code, out var bundled) && DecodeArtwork(bundled) is Sprite bundledSprite)
                 return bundledSprite;
 
             if (_duelVariants.TryGetValue(code, out var variants))
             {
                 foreach (int alternative in variants)
-                    if (alternative != variant && _duelArt.TryGetValue((code, alternative), out var local) &&
-                        DecodeArtwork(local) is Sprite localSprite) return localSprite;
+                {
+                    if (alternative == variant || !_duelArt.TryGetValue((code, alternative), out var local) ||
+                        DecodeArtwork(local) is not Sprite localSprite) continue;
+                    artVariant = alternative;
+                    return localSprite;
+                }
             }
             return null;
         }
@@ -270,9 +288,11 @@ namespace YGOPortable.Core
             }
         }
 
-        internal static Sprite RetainArtwork(uint code, int variant = BundledArtwork)
+        internal static Sprite RetainArtwork(uint code, int variant = BundledArtwork) => RetainArtwork(code, variant, out _);
+
+        internal static Sprite RetainArtwork(uint code, int variant, out (uint Code, int Variant) source)
         {
-            var sprite = GetArtSprite(code, variant);
+            var sprite = GetArtSprite(code, variant, out source);
             var key = (code, variant);
             if (_spriteCache.ContainsKey(key))
             {

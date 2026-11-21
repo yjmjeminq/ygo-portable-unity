@@ -1184,10 +1184,12 @@ namespace YGOPortable.UI
         internal static bool IsSummonMotion(CardMotion motion) =>
             motion is CardMotion.Summon or CardMotion.SpecialSummon or CardMotion.ExtraDeckSummon or CardMotion.PendulumSummon;
 
-        private static bool SupportsSummonOverframe(CardFlight flight) =>
-            !flight.EndsFaceDown &&
-            CardOverframeProfile.Get(flight.Code, CardArtLoader.GetDuelArtworkVariant(flight.Code)) is { } profile &&
-            profile.Triangles.Length > 0;
+        private static bool SupportsSummonOverframe(CardFlight flight)
+        {
+            if (flight.EndsFaceDown || !CardOverframeProfile.MayHaveProfile(flight.Code)) return false;
+            var (artCode, artVariant) = CardArtLoader.GetArtworkSource(flight.Code, CardArtLoader.GetDuelArtworkVariant(flight.Code));
+            return CardOverframeProfile.Get(artCode, artVariant) is { } profile && profile.Triangles.Length > 0;
+        }
 
         internal bool TakeFeaturedSummon(CardFlight flight)
         {

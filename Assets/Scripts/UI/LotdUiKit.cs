@@ -406,6 +406,7 @@ namespace YGOPortable.UI
         private bool _detailed;
         private uint _retainedArtwork;
         private int _retainedVariant;
+        private (uint Code, int Variant) _artworkSource;
         private bool _overframeEnabled;
         private CanvasGroup _overframe;
         private RectTransform _overframeTilt;
@@ -685,7 +686,7 @@ namespace YGOPortable.UI
             int variant = UseDuelArtwork ? CardArtLoader.GetDuelArtworkVariant(code) : -1;
             if (code == _retainedArtwork && variant == _retainedVariant && _artImg.sprite != null) return;
             ReleaseArtwork();
-            _artImg.sprite = CardArtLoader.RetainArtwork(code, variant);
+            _artImg.sprite = CardArtLoader.RetainArtwork(code, variant, out _artworkSource);
             bool missing = _artImg.sprite == CardArtLoader.GetFallbackArt();
             if (missing && _missingArtwork == null)
             {
@@ -706,12 +707,12 @@ namespace YGOPortable.UI
 
         private void RefreshOverframe()
         {
-            if (!_overframeEnabled || _retainedArtwork == 0 || _artImg.sprite == CardArtLoader.GetFallbackArt())
+            if (!_overframeEnabled || _artworkSource.Code == 0)
             {
                 HideOverframe();
                 return;
             }
-            var profile = CardOverframeProfile.Get(_retainedArtwork, _retainedVariant);
+            var profile = CardOverframeProfile.Get(_artworkSource.Code, _artworkSource.Variant);
             if (profile == null || profile.Triangles.Length == 0)
             {
                 HideOverframe();
@@ -783,6 +784,7 @@ namespace YGOPortable.UI
             if (_missingArtwork != null) _missingArtwork.SetActive(false);
             CardArtLoader.ReleaseArtwork(_retainedArtwork, _retainedVariant);
             _retainedArtwork = 0;
+            _artworkSource = default;
         }
     }
 

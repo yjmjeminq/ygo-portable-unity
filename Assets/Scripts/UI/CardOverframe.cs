@@ -128,12 +128,17 @@ namespace YGOPortable.UI
             foreach (var profile in LocalProfiles.Values) _ = profile.Triangles;
         }
 
-        internal static CardOverframeProfile Get(uint code, int variant)
+        internal static bool MayHaveProfile(uint code)
         {
-            // A different printing can place its character elsewhere in the illustration.
-            return CardArtLoader.UsesLocalArtwork(code, variant) ? LocalProfiles.GetValueOrDefault((code, variant)) :
-                Profiles.GetValueOrDefault(code);
+            if (Profiles.ContainsKey(code)) return true;
+            foreach (uint printing in CardArtLoader.RelatedPrintings(code))
+                if (Profiles.ContainsKey(printing)) return true;
+            return false;
         }
+
+        // Match the decoded artwork, since a fallback or alternate printing can change the silhouette.
+        internal static CardOverframeProfile Get(uint artCode, int artVariant) =>
+            artVariant >= 0 ? LocalProfiles.GetValueOrDefault((artCode, artVariant)) : Profiles.GetValueOrDefault(artCode);
 
         private static int[] Triangulate(Vector2[] points, bool clockwise)
         {

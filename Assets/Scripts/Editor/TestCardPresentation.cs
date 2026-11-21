@@ -135,6 +135,95 @@ namespace YGOPortable.Editor
                 Debug.Log("[VERIFY OVERFRAME] Four bundled silhouettes, layering, touch parallax, hidden card reuse, summon bounce and chain cut-ins passed.");
             }
             finally { UnityEngine.Object.DestroyImmediate(canvas.gameObject); }
+            VerifyOverframeArtworkSources();
+        }
+
+        private static void VerifyOverframeArtworkSources()
+        {
+            const uint magician = 46986414, blueEyesPrinting = 89631140;
+            string folder = Path.Combine(Path.GetTempPath(), "ygo-overframe-art-" + Guid.NewGuid().ToString("N"));
+            string packPath = Path.Combine(folder, "cardart.pack");
+            Directory.CreateDirectory(folder);
+            const string magic = "MDAR";
+            var texture = new Texture2D(8, 8, TextureFormat.RGB24, false);
+            texture.SetPixels32(Enumerable.Repeat(new Color32(72, 110, 180, 255), 64).ToArray());
+            texture.Apply();
+            byte[] localArt = texture.EncodeToPNG();
+            UnityEngine.Object.DestroyImmediate(texture);
+            byte[] damagedArt = { 1, 2, 3, 4 };
+            using (var pack = new BinaryWriter(File.Create(packPath)))
+            {
+                pack.Write(System.Text.Encoding.ASCII.GetBytes(magic));
+                pack.Write(1u);
+                pack.Write(2u);
+                const uint offset = 12 + 2 * 16;
+                pack.Write(magician);
+                pack.Write(0);
+                pack.Write(offset);
+                pack.Write((uint)damagedArt.Length);
+                pack.Write(BlueEyes);
+                pack.Write(0);
+                pack.Write(offset + (uint)damagedArt.Length);
+                pack.Write((uint)localArt.Length);
+                pack.Write(damagedArt);
+                pack.Write(localArt);
+            }
+
+            var canvas = new GameObject("Overframe Artwork Verification", typeof(Canvas)).GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            ((RectTransform)canvas.transform).sizeDelta = new Vector2(1600f, 900f);
+            CardArtLoader.Shutdown();
+            CardArtLoader.Initialize(Application.streamingAssetsPath, folder);
+            try
+            {
+                var view = CompositeCardView.Create(canvas.transform, "Viewer", detailedOverlay: true, duelArtwork: true);
+                view.EnableOverframe();
+                view.SetCard(magician);
+                var fallback = CardArtLoader.GetArtworkSource(magician, 0);
+                Require(fallback == (magician, -1) && view.HasOverframe,
+                    "An unreadable local painting did not use the bundled painting and its silhouette.");
+                var graphic = view.transform.Find("Overframe/Depth/Subject").GetComponent<CardOverframeGraphic>();
+                var profileField = typeof(CardOverframeGraphic).GetField("_profile", BindingFlags.NonPublic | BindingFlags.Instance);
+                Require(ReferenceEquals(profileField.GetValue(graphic), CardOverframeProfile.Get(magician, -1)) &&
+                    !ReferenceEquals(profileField.GetValue(graphic), CardOverframeProfile.Get(magician, 0)),
+                    "The decoded fallback used the silhouette of the originally selected artwork.");
+
+                view.SetCard(BlueEyes);
+                Require(CardArtLoader.GetArtworkSource(BlueEyes, 0) == (BlueEyes, 0) &&
+                    view.ArtworkSprite.texture.width == 8 && !view.HasOverframe,
+                    "A valid replacement art inherited the unrelated bundled silhouette.");
+                view.SetCard(blueEyesPrinting);
+                Require(CardArtLoader.GetArtworkSource(blueEyesPrinting, -1) == (BlueEyes, -1) && view.HasOverframe &&
+                    ReferenceEquals(profileField.GetValue(graphic), CardOverframeProfile.Get(BlueEyes, -1)) &&
+                    view.CurrentCode == blueEyesPrinting,
+                    "An equivalent printing lost its borrowed silhouette or changed card identity.");
+                view.SetCard(magician);
+                Require(ReferenceEquals(profileField.GetValue(graphic), CardOverframeProfile.Get(magician, -1)),
+                    "Returning to the first card retained an old silhouette in the same viewer.");
+
+                var animator = CardAnimationManager.Ensure(canvas);
+                var pose = new CardPose(new Vector2(0f, -90f), new Vector2(92f, 134f));
+                animator.QueueMove(new CardFlight(blueEyesPrinting, pose, pose, true, false), CardMotion.SpecialSummon, null);
+                var queue = (Queue<IEnumerator>)typeof(CardAnimationManager).GetField("_steps",
+                    BindingFlags.Instance | BindingFlags.NonPublic).GetValue(animator);
+                var move = queue.Dequeue();
+                Require(move.MoveNext() && move.Current is IEnumerator, "The equivalent printing skipped its summon reveal.");
+                var reveal = (IEnumerator)move.Current;
+                Require(reveal.MoveNext(), "The equivalent printing did not show a cut-in.");
+                SampleAnimation((IEnumerator)reveal.Current)(1f);
+                Require(animator.transform.Find("MovingCard/Overframe/Depth/Subject").gameObject.activeInHierarchy,
+                    "The summon and card viewer did not choose the same decoded silhouette.");
+                animator.Clear();
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(canvas.gameObject);
+                CardArtLoader.Shutdown();
+                CardArtLoader.Initialize(Application.streamingAssetsPath);
+                File.Delete(packPath);
+                Directory.Delete(folder);
+            }
+            Debug.Log("[VERIFY OVERFRAME ARTWORK] Local decode failure, valid replacement, and equivalent-printing art kept their own silhouettes.");
         }
 
         private static void VerifyOverframeAnimation(CardAnimationManager animator)
