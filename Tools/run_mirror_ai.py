@@ -159,15 +159,16 @@ def clean(summary):
             not any(counts['retries'] for counts in summary['blunders'].values()))
 
 
-def verify_evaluator():
-    # AI helpers are copied from EVALUATOR by prepare. The remaining host code comes
-    # from the worktree, so check it before copying and evidence collection.
+def verify_evaluator(revision):
+    # The host comes from the worktree. Check it against its declared revision and
+    # retain the original match code and random pilot even for an integration run.
     git = ['git', '-C', str(bench.PROJECT)]
-    status = subprocess.run([*git, 'diff', '--quiet', EVALUATOR, '--', *EVALUATOR_PATHS], check=False)
+    status = subprocess.run([*git, 'diff', '--quiet', revision, '--', *EVALUATOR_PATHS], check=False)
+    match_code = subprocess.run([*git, 'diff', '--quiet', EVALUATOR, '--', *EVALUATOR_PATHS[1:]], check=False)
     untracked = subprocess.check_output(
         [*git, 'ls-files', '--others', '--exclude-standard', '-z', '--', EVALUATOR_PATHS[0]]
     ).split(b'\0')
-    if status.returncode or any(path.endswith(b'.cs') for path in untracked):
+    if status.returncode or match_code.returncode or any(path.endswith(b'.cs') for path in untracked):
         raise ValueError('The protected evaluator or protocol host differs from its fixed revision.')
 
 
@@ -188,6 +189,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('label')
     parser.add_argument('--candidate-revision', default='HEAD')
+    parser.add_argument('--evaluator-revision', default=EVALUATOR,
+                        help='Use the protocol host from this revision for an integration run. '
+                             'The original match code and random pilot are still required.')
     parser.add_argument('--previous-revision',
                         help='Also measure direct mirrors and both policies against Baseline-v1 and RandomLegal-v1.')
     parser.add_argument('--seeds', type=int, default=6)
@@ -200,13 +204,16 @@ def main():
     jobs = args.jobs if args.jobs is not None else 1 if args.timing else 2
     if (jobs == 1) != args.timing:
         parser.error('Use one worker for timing and two to four for win-rate trials.')
-    verify_evaluator()
+    evaluator_revision = subprocess.check_output(
+        ['git', 'rev-parse', '--verify', '--end-of-options', f'{args.evaluator_revision}^{{commit}}'],
+        cwd=bench.PROJECT, text=True).strip()
+    verify_evaluator(evaluator_revision)
     starting_logs = log_bytes()
     if starting_logs > LOG_CAP:
         parser.error(f'Raw logs already exceed 5 GB: {starting_logs} bytes.')
 
     frozen = bench.pin_revision(bench.BASELINE_V1)
-    evaluator = bench.pin_revision(EVALUATOR)
+    evaluator = bench.pin_revision(evaluator_revision)
     candidate = bench.pin_revision(args.candidate_revision)
     previous = bench.pin_revision(args.previous_revision) if args.previous_revision else None
     deck_manifest = FIXTURES.read_bytes()
@@ -232,7 +239,7 @@ def main():
     candidate_revision = json.loads((candidate / 'manifest.json').read_bytes())['gitHead']
     previous_revision = json.loads((previous / 'manifest.json').read_bytes())['gitHead'] if previous else None
     metadata = {
-        'evaluatorRevision': EVALUATOR,
+        'evaluatorRevision': evaluator_revision,
         'evaluatorSourceManifestSha256': hashlib.sha256(evaluator_manifest).hexdigest(),
         'purpose': 'isolated timing' if args.timing else 'selection',
         'workers': jobs,

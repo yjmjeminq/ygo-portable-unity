@@ -63,6 +63,11 @@ namespace YGOPortable.AI
         private bool _checkedDirectAttackOrder;
         private DuelPrompt _effectWinPrompt;
         private bool _verifiedEffectWin;
+        private bool _usedBait;
+        private DuelPrompt _baitPrompt;
+        private int? _baitAction;
+        private DuelPrompt _extensionPrompt;
+        private DuelTactics.ExtensionRisk _extensionRisk;
 
         public TacticalAI() { }
 
@@ -83,6 +88,9 @@ namespace YGOPortable.AI
                 _battleActions = 0;
                 _checkedDirectAttackOrder = false;
                 _checkedIdleRecovery = false;
+                _usedBait = false;
+                _baitPrompt = null;
+                _extensionPrompt = null;
                 _unselectCount = 0;
                 _attackerSequence = uint.MaxValue;
                 _plannedAttackTargetSequence = uint.MaxValue;
@@ -280,6 +288,7 @@ namespace YGOPortable.AI
         private bool CanUseMainAction(DuelSession session, DuelPrompt prompt, bool planLinks, int command, SelectableCardItem item,
             bool projected = false) =>
             CanUseIdleAction(session, command, item) &&
+            (!UsesTacticalRules || DuelTactics.CanExtend(ExtensionRisk(session, prompt), session.Players[prompt.playerId], command, item)) &&
             (command != 0 || projected || !UsesTacticalRules || (!ComboSearch.NeedsProvenNormalSummon(item.code) &&
                 (_comboSearch == null || (!DuelTactics.RisksEndPhaseDestruction(session, prompt) &&
                     !DuelTactics.NeedsTributeProjection(session, prompt, item))))) &&
@@ -294,6 +303,16 @@ namespace YGOPortable.AI
                 (!UsesTacticalRules || DuelTactics.CanSummonRedDragonSafely(session, prompt, item.code)))) &&
             (command != 5 || (CanActivate(session, prompt, item) && CanPlayFieldSpell(session, prompt, item) &&
                 CanEndMainPhaseWithEffect(session, prompt, item)));
+
+        private DuelTactics.ExtensionRisk ExtensionRisk(DuelSession session, DuelPrompt prompt)
+        {
+            if (!ReferenceEquals(_extensionPrompt, prompt))
+            {
+                _extensionPrompt = prompt;
+                _extensionRisk = DuelTactics.GetExtensionRisk(session, prompt);
+            }
+            return _extensionRisk;
+        }
 
         private bool CanUseSpecialSummon(PlayerFieldSnapshot own, SelectableCardItem item, bool planLinks, bool projected)
         {
@@ -357,9 +376,9 @@ namespace YGOPortable.AI
         private byte[] BuildIdleCmd(DuelSession s, DuelPrompt p, bool fallback, int? plannedMainAction)
         {
             bool planLinks = PlanLinks(s, p);
-            int? preparation = plannedMainAction == null && UsesTacticalRules && !fallback
+            int? preparation = plannedMainAction == null && UsesTacticalRules && !fallback && _actionsThisTurn < 48
                 ? ChoosePriorityMainAction(s, p, planLinks) : null;
-            if (plannedMainAction == null && CanSearchCombo(s, p, planLinks))
+            if (preparation == null && plannedMainAction == null && CanSearchCombo(s, p, planLinks))
                 plannedMainAction = _comboSearch.Choose(s, p, this);
 
             _unselectCount = 0;
@@ -369,8 +388,11 @@ namespace YGOPortable.AI
 
             if (plannedMainAction == null && UsesTacticalRules && p.canBp && DuelCombat.OpenLethal(s, p.playerId))
                 return BitConverter.GetBytes(6);
-            if (preparation is int ready && _actionsThisTurn <= 48)
+            if (preparation is int ready)
+            {
+                if (ReferenceEquals(_baitPrompt, p) && _baitAction == ready) _usedBait = true;
                 return EncodeIdleAction(s, p, ready & 0xffff, ready >> 16);
+            }
             if (fallback || _actionsThisTurn > 56)
             {
                 if (p.canBp && HasWorthwhileAttack(s, p.playerId)) return StartBattle(s, p);
@@ -425,7 +447,8 @@ namespace YGOPortable.AI
                 return EncodeIdleAction(s, p, command, index);
             }
 
-            return FinishMainPhase(s, p, canBattle, preserveHand: false);
+            return FinishMainPhase(s, p, canBattle, preserveHand: UsesTacticalRules &&
+                ExtensionRisk(s, p) != DuelTactics.ExtensionRisk.None);
         }
 
         private int? ChoosePriorityMainAction(DuelSession session, DuelPrompt prompt, bool planLinks)
@@ -445,6 +468,19 @@ namespace YGOPortable.AI
             if (DddTurnPlan.ChooseUpkeepRescue(session, prompt,
                 CanUse) is int rescue)
                 return rescue;
+
+            if (!_comboProjection && !_usedBait && session.TurnNumber == 2)
+            {
+                if (!ReferenceEquals(_baitPrompt, prompt))
+                {
+                    _baitPrompt = prompt;
+                    _baitAction = null;
+                    bool hasStorm = prompt.activatable.Any(item => item.code == DuelTactics.LightningStorm &&
+                        CanUse(5, item) && DuelTactics.ShouldLeadWithLightningStorm(session, prompt));
+                    if (!hasStorm) _baitAction = DuelTactics.ChooseGoingSecondBait(session, prompt, CanUse);
+                }
+                if (_baitAction is int bait) return bait;
+            }
 
             if (SignatureTurnPlan.ChooseMonarchOpening(session, prompt, CanUse) is int tributeSetup)
                 return tributeSetup;
@@ -878,18 +914,20 @@ namespace YGOPortable.AI
         {
             if (p.candidates.Count == 0) return -1;
             if (fallback) return p.forced ? 0 : -1;
+            string ChainKey(SelectableCardItem effect) => $"ch:{s.TurnNumber}:{effect.code}:{effect.description}:{s.CurrentChain.Count}";
             if (p.IsTriggerChain && UsesTacticalRules)
             {
                 int trigger = -1, value = int.MinValue;
                 for (int i = 0; i < p.candidates.Count; i++)
                 {
                     var choice = p.candidates[i];
-                    if (!p.forced && !CanActivate(s, p, choice)) continue;
+                    if (!p.forced && (_effectCounts.ContainsKey(ChainKey(choice)) || !CanActivate(s, p, choice))) continue;
                     int priority = DuelTactics.ChainProtectionPriority(choice);
                     if (priority <= value) continue;
                     trigger = i;
                     value = priority;
                 }
+                if (trigger >= 0) BumpKey(ChainKey(p.candidates[trigger]));
                 return trigger;
             }
             if (p.forced) return 0;
@@ -901,10 +939,10 @@ namespace YGOPortable.AI
             if (ownLastLink && !p.candidates.Any(card => card.isTriggeredEffect))
                 return -1;
 
-            string ChainKey(SelectableCardItem effect) => $"ch:{s.TurnNumber}:{effect.code}:{effect.description}:{s.CurrentChain.Count}";
             if (UsesTacticalRules)
             {
-                int winged = p.candidates.FindIndex(card => DuelTactics.ChooseWingedKuribohTiming(s, p, card) == true &&
+                int winged = p.candidates.FindIndex(card => (!ownLastLink || card.isTriggeredEffect) &&
+                    DuelTactics.ChooseWingedKuribohTiming(s, p, card) == true &&
                     !_effectCounts.ContainsKey(ChainKey(card)));
                 if (winged >= 0)
                 {
@@ -919,7 +957,8 @@ namespace YGOPortable.AI
                 var field = s.Players[opposing.triggerPlayer].mzone;
                 const uint ashBlossom = 14558127;
                 // Ash answers the Deck effect even after the monster leaves the field as a cost.
-                if (opposing.triggerSeq < field.Length && field[opposing.triggerSeq]?.IsFaceUp != true)
+                var source = opposing.triggerSeq < field.Length ? field[opposing.triggerSeq] : null;
+                if (source?.IsFaceUp != true || source.code != opposing.code)
                 {
                     int ash = p.candidates.FindIndex(card => card.code == ashBlossom &&
                         !_effectCounts.ContainsKey(ChainKey(card)) && CanActivate(s, p, card));
@@ -931,11 +970,10 @@ namespace YGOPortable.AI
                 }
 
                 // If the opposing monster is still face-up on the field, Impermanence / Effect Veiler directly negates it!
-                if (opposing.triggerSeq < field.Length && field[opposing.triggerSeq]?.IsFaceUp == true &&
-                    field[opposing.triggerSeq]?.effectsDisabled == false &&
-                    field[opposing.triggerSeq]?.code != DuelTactics.BlueEyesTyrant)
+                if (source is { IsFaceUp: true, effectsDisabled: false } && source.code == opposing.code)
                 {
-                    int negater = p.candidates.FindIndex(card => card.code is DuelTactics.InfiniteImpermanence or DuelTactics.EffectVeiler &&
+                    int negater = p.candidates.FindIndex(card =>
+                        (card.code == DuelTactics.EffectVeiler || card.code == DuelTactics.InfiniteImpermanence && source.code != DuelTactics.BlueEyesTyrant) &&
                         !_effectCounts.ContainsKey(ChainKey(card)) && CanActivate(s, p, card));
                     if (negater >= 0)
                     {

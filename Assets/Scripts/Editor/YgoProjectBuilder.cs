@@ -69,6 +69,7 @@ namespace YGOPortable.Editor
                 TestDuelZoneBrowser.Run();
                 TestHandGlow.Run();
                 TestDuelPadNavigation.Run();
+                TestDuelAiTactics.Run();
                 AssertTrue(errors.Count == 0, string.Join(" | ", errors.Take(3)));
                 Debug.Log("[VERIFY DUEL UI] Native prompts, touchscreen geometry, controller navigation and presentation passed. ScriptErrors=0");
                 exit = 0;

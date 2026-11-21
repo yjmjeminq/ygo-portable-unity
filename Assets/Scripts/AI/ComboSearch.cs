@@ -14,7 +14,7 @@ namespace YGOPortable.AI
         private const int MaxResponses = 144;
         private const int MaxSearchesPerTurn = 7;
         private const int MaxLateLinkSearches = 2;
-        private const int BudgetMilliseconds = 200;
+        private const int BudgetMilliseconds = 160;
         private const int BranchMilliseconds = 46;
         private const int OpeningDevelopmentBranchMilliseconds = 105;
         private const int LateLinkBranchMilliseconds = 48;
@@ -962,6 +962,7 @@ namespace YGOPortable.AI
                     Mix((uint)card.attack);
                     Mix((uint)card.defense);
                     Mix(card.effectsDisabled ? 1UL : 0);
+                    if (card.code == 84815190) Mix(duel.HasSpentBaronneNegate(card) ? 1UL : 0);
                     foreach (uint material in card.overlayCodes) Mix(material);
                 }
                 Mix(0xffffffff);
@@ -981,6 +982,8 @@ namespace YGOPortable.AI
 
             Mix((uint)duel.TurnNumber);
             Mix((uint)duel.TurnInterruptions);
+            Mix((uint)duel.SummonedMonstersThisTurn(prompt.playerId));
+            Mix((uint)DuelTactics.GetExtensionRisk(duel, prompt));
             Mix((uint)duel.CurrentPhase);
             Mix(duel.FieldDisabledMask);
             Mix(prompt.playerId);

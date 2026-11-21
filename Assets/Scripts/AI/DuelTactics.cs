@@ -35,6 +35,15 @@ namespace YGOPortable.AI
         private const ulong WingedKuribohInterrupt = ((ulong)WingedKuribohLevel6 << 20) | 1;
         internal const uint InfiniteImpermanence = 10045474, EffectVeiler = 97268402, BlueEyesTyrant = 11443677;
         private const uint AshBlossom = 14558127, UpstartGoblin = 70368879, OriginalSinfulSpoils = 89023486;
+        private const uint Nibiru = 27204311, Apollousa = 4280258, Blazar = 21123811,
+            Dragoon = 37818794, CyberInfinity = 10443957;
+        private const uint Raigeki = 12580477, EvenlyMatched = 15693423, InterruptedKaijuSlumber = 99330325;
+        private const uint Reinforcement = 32807846, FossilDig = 47325505, Tuning = 96363153,
+            Tenki = 57103969, Terraforming = 73628505;
+        private const uint SummoningEffects = (1u << 6) | (1u << 7) | (1u << 18);
+
+        [Flags]
+        internal enum ExtensionRisk { None = 0, Nibiru = 1, Sweeper = 2 }
         private const uint LittleKnight = 29301450, LittleKnightAlternateArt = 29301451, DoomcaliberKnight = 78700060;
         private const uint TripleTacticsTalent = 25311006, ForbiddenCrown = 98829635;
         private const uint RedDragonTyrant = 16172067;
@@ -144,7 +153,8 @@ namespace YGOPortable.AI
             if (effect.code == WingedKuribohLevel6 && ChooseWingedKuribohTiming(duel, prompt, effect) is bool useWinged)
                 return useWinged;
             if (effect.code == CrossoutDesignator) return FindCrossoutTarget(duel, prompt.playerId).HasValue;
-            if (last != null && ResponseNegates.Contains(effect.code) && (last.negated || last.triggerPlayer == prompt.playerId))
+            if (last != null && !prompt.IsTriggerChain && !effect.isTriggeredEffect &&
+                ResponseNegates.Contains(effect.code) && (last.negated || last.triggerPlayer == prompt.playerId))
                 return false;
             if ((effect.code is 23434538 or 42141493 or 84192580 or 87126721) && !effect.isTriggeredEffect &&
                 (duel.TurnPlayer == prompt.playerId || duel.CurrentPhase == YgoConstants.PHASE_END) &&
@@ -833,6 +843,124 @@ namespace YGOPortable.AI
             return (effectTypes & Development) != 0 ? 1.1f : -.2f;
         }
 
+        private static bool HasReadyNegation(DuelSession duel, byte player, bool monsters)
+        {
+            var field = duel.Players[player];
+            foreach (var card in field.mzone)
+            {
+                if (card is not { IsFaceUp: true, effectsDisabled: false }) continue;
+                bool ready = card.code switch
+                {
+                    Baronne => !duel.HasSpentBaronneNegate(card),
+                    Blazar => true,
+                    Dragoon => field.hand.Count > 0 &&
+                        !duel.HasActivatedMonsterEffect(player, ((ulong)Dragoon << 20) | 1),
+                    CyberInfinity => card.overlayCodes.Count > 0,
+                    Apollousa => monsters && card.attack >= 800,
+                    _ => false,
+                };
+                if (ready) return true;
+            }
+            return false;
+        }
+
+        internal static int? ChooseGoingSecondBait(DuelSession duel, DuelPrompt prompt, Func<int, SelectableCardItem, bool> canUse)
+        {
+            if (duel.TurnNumber != 2 || duel.TurnPlayer != prompt.playerId ||
+                duel.CurrentPhase != YgoConstants.PHASE_MAIN1) return null;
+            byte rival = (byte)(1 - prompt.playerId);
+            bool spellNegate = HasReadyNegation(duel, rival, monsters: false);
+            if (!spellNegate && !HasReadyNegation(duel, rival, monsters: true)) return null;
+
+            bool IsOwn(SelectableCardItem item) => item.controller == prompt.playerId;
+            bool hasSummonLine = prompt.spSummonable.Any(item => IsOwn(item) && item.location == YgoConstants.LOCATION_EXTRA && canUse(1, item)) ||
+                prompt.summonable.Any(item => IsOwn(item) && !ComboSearch.NeedsProvenNormalSummon(item.code) &&
+                    ComboSearch.CanDevelopFromCard(CardDatabase.Get(item.code)) && canUse(0, item));
+            int best = -1, bestValue = 0;
+            for (int i = 0; i < prompt.activatable.Count; i++)
+            {
+                var item = prompt.activatable[i];
+                if (!IsOwn(item)) continue;
+                int value = item.location switch
+                {
+                    YgoConstants.LOCATION_MZONE when item.code == Baronne && item.description == ((ulong)Baronne << 20) => 3,
+                    YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_SZONE when spellNegate &&
+                        item.code is Reinforcement or FossilDig or Tuning or Tenki or Terraforming or MysticalSpaceTyphoon => 2,
+                    _ => 0,
+                };
+                if (value <= bestValue || !canUse(5, item)) continue;
+
+                // Do not sacrifice the only entry point. The second legal action must be independent of this copy.
+                if (!hasSummonLine && !prompt.activatable.Any(other => other.code != item.code && IsOwn(other) &&
+                    (CardDatabase.Get(other.code)?.DeckEffectCategories & SummoningEffects) != 0 && canUse(5, other))) continue;
+                best = i;
+                bestValue = value;
+            }
+            return best < 0 ? null : (best << 16) | 5;
+        }
+
+        internal static ExtensionRisk GetExtensionRisk(DuelSession duel, DuelPrompt prompt)
+        {
+            if (duel.TurnPlayer != prompt.playerId || (!prompt.canBp && !prompt.canEp)) return ExtensionRisk.None;
+
+            var own = duel.Players[prompt.playerId];
+            var rival = duel.Players[1 - prompt.playerId];
+            int established = 0, faceUp = 0, fieldBodies = 0, attackPosition = 0;
+            foreach (var card in own.mzone)
+            {
+                if (card == null) continue;
+                fieldBodies++;
+                if (!card.IsFaceUp) continue;
+                faceUp++;
+                if (card.IsAttack) attackPosition++;
+                if (!card.effectsDisabled && CardDatabase.Get(card.code) is { IsExtra: true } info &&
+                    (Math.Max(card.attack, card.defense) >= 2200 || LinkComboPolicy.IsInteractive(info)))
+                    established++;
+            }
+            if (faceUp == 0) return ExtensionRisk.None;
+
+            // An empty field or exposed starter still needs a line. Protect a credible board or two bodies
+            // when the opponent has publicly revealed Nibiru. Its fifth monster may be part of a group summon.
+            bool hasSetInteraction = own.szone.Any(card => card is { IsFaceUp: false } &&
+                CardDatabase.Get(card.code) is { IsTrap: true } trap && LinkComboPolicy.IsInteractive(trap));
+            ExtensionRisk risk = ExtensionRisk.None;
+            if (duel.SummonedMonstersThisTurn(prompt.playerId) >= 4 && rival.hand.Count > 0 &&
+                (established > 0 || fieldBodies >= 2 && (hasSetInteraction || duel.IsKnownInOpposingHand(prompt.playerId, Nibiru))) &&
+                !HasReadyNegation(duel, prompt.playerId, monsters: true))
+                risk |= ExtensionRisk.Nibiru;
+
+            bool knownSweeper = faceUp >= 2 && (duel.IsKnownInOpposingHand(prompt.playerId, Raigeki) ||
+                duel.IsKnownInOpposingHand(prompt.playerId, DarkHole) ||
+                duel.IsKnownInOpposingHand(prompt.playerId, InterruptedKaijuSlumber) ||
+                attackPosition >= 2 && duel.IsKnownInOpposingHand(prompt.playerId, LightningStorm) ||
+                faceUp >= 3 && duel.IsKnownInOpposingHand(prompt.playerId, EvenlyMatched));
+            // Keep recovery in hand behind a developed board even when the opponent has not revealed the wipe.
+            bool exposedSwarm = duel.TurnNumber == 1 && rival.hand.Count > 0 && faceUp >= 3 && established >= 2 &&
+                duel.SummonedMonstersThisTurn(prompt.playerId) >= 4;
+            if ((knownSweeper || exposedSwarm) && !HasReadyNegation(duel, prompt.playerId, monsters: false))
+                risk |= ExtensionRisk.Sweeper;
+            return risk;
+        }
+
+        internal static bool CanExtend(ExtensionRisk risk, PlayerFieldSnapshot field, int command, SelectableCardItem item)
+        {
+            if (risk == ExtensionRisk.None || command is not (0 or 1 or 5)) return true;
+            if (command == 1)
+            {
+                // A live answer on the fifth summon can respond to Nibiru. Do not trade into
+                // monster-only negation when the actual concern is a spell or trap wipe.
+                return item.location == YgoConstants.LOCATION_EXTRA && (item.code switch
+                {
+                    Baronne or Blazar or CyberInfinity => true,
+                    Dragoon => field.hand.Count > 0,
+                    Apollousa => (risk & ExtensionRisk.Sweeper) == 0,
+                    _ => false,
+                });
+            }
+            return command == 5 && item.description != 1160 &&
+                ((CardDatabase.Get(item.code)?.DeckEffectCategories ?? 0) & SummoningEffects) == 0;
+        }
+
         internal static float ChokepointPriority(DuelSession duel, DuelPrompt prompt, SelectableCardItem response)
         {
             if (!ResponseNegates.Contains(response.code) || duel.CurrentChain.LastOrDefault() is not
@@ -847,8 +975,10 @@ namespace YGOPortable.AI
             var card = CardDatabase.Get(trigger.code);
             if (card == null) return 0;
             uint categories = card.DeckEffectCategories;
-            const uint development = (1u << 6) | (1u << 7) | (1u << 18), search = 1u << 5, draw = 1u << 4;
-            if ((categories & development) != 0) return 4;
+            const uint search = 1u << 5, draw = 1u << 4;
+            if (trigger.code is 74078255 or 37961969 or 572850 && (trigger.description & 0xfffff) == 0)
+                return 2; // The on-field mill/extension and Graveyard Fusion have different blocking value.
+            if ((categories & SummoningEffects) != 0) return 4;
             if ((categories & search) != 0) return 3;
             return (categories & draw) != 0 ? 1 : 0;
         }
