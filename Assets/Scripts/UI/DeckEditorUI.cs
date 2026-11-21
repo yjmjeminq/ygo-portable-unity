@@ -1000,17 +1000,10 @@ namespace YGOPortable.UI
                     RememberMouseCard(PadArea.Trunk, index);
                     SetMouseCardVisual(rect, code);
                 };
-                trigger.OnTouchClick = () =>
+                trigger.OnRightClick = trigger.OnTouchClick = trigger.OnTouchHold = () =>
                 {
                     trigger.OnLeftClick();
                     ShowDeckCardActions(rect, DragSourceType.Trunk, index, code);
-                };
-                trigger.OnTouchHold = () => OpenExpandedDeckCard(code);
-                trigger.OnRightClick = () =>
-                {
-                    RememberMouseCard(PadArea.Trunk, index);
-                    SetMouseCardVisual(rect, code);
-                    TryAddCardToDeck(code, origin: (RectTransform)view.transform);
                 };
             }
         }
@@ -1067,16 +1060,10 @@ namespace YGOPortable.UI
                     SetMouseCardVisual(rect, code);
                 };
                 trigger.OnPointerEnterAction = () => SetMouseCardVisual(rect, code);
-                trigger.OnTouchClick = () =>
+                trigger.OnRightClick = trigger.OnTouchClick = trigger.OnTouchHold = () =>
                 {
                     trigger.OnLeftClick();
                     ShowDeckCardActions(rect, trigger.SourceType, index, code);
-                };
-                trigger.OnTouchHold = () => OpenExpandedDeckCard(code);
-                trigger.OnRightClick = () =>
-                {
-                    RememberMouseCard(area, index);
-                    RemoveDeckCard(trigger.SourceType, index);
                 };
             }
         }

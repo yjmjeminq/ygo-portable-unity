@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
-using YGOPortable.Core;
 
 namespace YGOPortable.UI
 {
@@ -126,14 +125,6 @@ namespace YGOPortable.UI
             // Build small CPU-side meshes before the player can open a view or start a duel.
             foreach (var profile in Profiles.Values) _ = profile.Triangles;
             foreach (var profile in LocalProfiles.Values) _ = profile.Triangles;
-        }
-
-        internal static bool MayHaveProfile(uint code)
-        {
-            if (Profiles.ContainsKey(code)) return true;
-            foreach (uint printing in CardArtLoader.RelatedPrintings(code))
-                if (Profiles.ContainsKey(printing)) return true;
-            return false;
         }
 
         // Match the decoded artwork, since a fallback or alternate printing can change the silhouette.

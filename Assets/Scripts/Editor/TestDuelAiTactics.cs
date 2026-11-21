@@ -18,6 +18,8 @@ namespace YGOPortable.Editor
         internal static void Run()
         {
             VerifyNegationTargets();
+            VerifyNativeFieldNegation(Imperm);
+            VerifyNativeFieldNegation(DuelTactics.EffectVeiler);
             VerifyTriggerOrder();
             VerifyNativeTriggerProtection();
             VerifyAshCommitment();
@@ -38,9 +40,52 @@ namespace YGOPortable.Editor
             Require(!DuelTactics.CanActivate(duel, chain, impermanence) && !DuelTactics.CanActivate(duel, chain, veiler),
                 "Field negation should be held against Mystic Tomato and UFO Turtle.");
             duel.Players[0].mzone[2] = new LiveCardState { code = Stratos, position = YgoConstants.POS_FACEUP_ATTACK, type = YgoConstants.TYPE_EFFECT };
+            foreach (var phase in new[] { YgoConstants.PHASE_MAIN1, YgoConstants.PHASE_MAIN2, YgoConstants.PHASE_END })
+            {
+                typeof(DuelSession).GetProperty(nameof(DuelSession.CurrentPhase)).SetValue(duel, phase);
+                Require(!DuelTactics.CanActivate(duel, chain, impermanence) && !DuelTactics.CanActivate(duel, chain, veiler),
+                    $"Idle phase window {phase} spent field negation on a monster with no pending effect.");
+            }
             duel.CurrentChain.Add(new ChainLinkInfo { code = Stratos, triggerLoc = YgoConstants.LOCATION_MZONE, triggerSeq = 2 });
             Require(DuelTactics.CanActivate(duel, chain, impermanence) && DuelTactics.CanActivate(duel, chain, veiler),
-                "Field negation should answer the current Stratos effect.");
+                "Field negation should answer the current Stratos effect, even in the End Phase.");
+            duel.CurrentChain.Add(new ChainLinkInfo { code = Imperm, triggerPlayer = 1 });
+            var targets = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_CARD, playerId = 1 };
+            targets.candidates.Add(new SelectableCardItem { code = 83011277, location = YgoConstants.LOCATION_MZONE });
+            targets.candidates.Add(new SelectableCardItem { code = Stratos, location = YgoConstants.LOCATION_MZONE, sequence = 2 });
+            Require(DuelTactics.ChooseHandtrapTarget(duel, targets) == 1,
+                "Field negation chose an unrelated face-up monster instead of the pending effect source.");
+        }
+
+        private static void VerifyNativeFieldNegation(uint negate)
+        {
+            const uint avian = 21844576;
+            using var duel = YgoProjectBuilder.StartSeedMatching("Native field negation", Deck(Stratos, avian),
+                Empty, Deck(negate), Empty, true, current => current.Players[0].hand.Any(card => card.code == Stratos));
+            var ai = Smart();
+            SubmitIdle(duel, 0, Stratos);
+            var trigger = Drive(duel, prompt =>
+                prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && prompt.promptCardCode == Stratos ||
+                IncludesChainEffect(prompt, Stratos));
+            int activation = trigger.messageType == YgoConstants.MSG_SELECT_EFFECTYN ? 1 :
+                trigger.candidates.FindIndex(card => card.code == Stratos);
+            duel.SubmitResponseInt(activation);
+
+            var responseWindow = Drive(duel, prompt => IncludesChainEffect(prompt, negate));
+            var source = duel.CurrentChain.Single();
+            int response = Read(ai.ComputeResponse(duel, responseWindow));
+            Require(source.code == Stratos && response >= 0 && responseWindow.candidates[response].code == negate,
+                $"{negate} did not answer Stratos as Chain Link 2.");
+            duel.SubmitResponseInt(response);
+            var target = Drive(duel, prompt => prompt.messageType == YgoConstants.MSG_SELECT_CARD && prompt.playerId == 1);
+            int index = target.candidates.FindIndex(card => card.code == Stratos && card.sequence == source.triggerSeq);
+            Require(index >= 0 && ai.ComputeResponse(duel, target).SequenceEqual(DuelSession.PackCardSelection(index)),
+                $"{negate} selected a different card from the live chain source.");
+            duel.SubmitResponse(ai.ComputeResponse(duel, target));
+            Drive(duel, IsIdle);
+            Require(duel.SolvedChainLinks.Any(link => link.code == negate && link.chainNumber == 2) &&
+                source.negated && duel.RetryCount == 0, $"{negate} did not resolve ahead of Stratos.");
+            Debug.Log($"[VERIFY AI FIELD NEGATION] {negate} resolved as CL2 and negated Stratos. Retry=0");
         }
 
         private static void VerifyTriggerOrder()

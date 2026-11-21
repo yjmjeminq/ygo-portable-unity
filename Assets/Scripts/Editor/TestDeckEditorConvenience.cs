@@ -331,9 +331,13 @@ namespace YGOPortable.Editor
             };
             trigger.OnPointerDown(finger);
             Require(!(bool)Call(trigger, "TryCompleteTouchHold", 0, finger.position, Field<float>(trigger, "_touchPressAt") + .15f),
-                "A short touch incorrectly opened the expanded inspector.");
+                "A short touch incorrectly invoked the card hold action.");
             Require((bool)Call(trigger, "TryCompleteTouchHold", 0, finger.position, Field<float>(trigger, "_touchPressAt") + .52f),
-                "A stationary long press did not open the expanded inspector.");
+                "A stationary long press did not open the card menu.");
+            var related = Field<Button>(editor, "_deckCardActionRelated");
+            Require(related.gameObject.activeInHierarchy && related.IsInteractable(),
+                "A stationary long press did not expose related-card search.");
+            Field<Button>(editor, "_deckCardActionDetails").onClick.Invoke();
             var panel = Field<RectTransform>(editor, "_expandedDeckPanel");
             Require(panel.anchoredPosition.x > panel.rect.width, "The expanded inspector did not start off-screen.");
             Call(editor, "UpdateExpandedDeckCard", .3f);

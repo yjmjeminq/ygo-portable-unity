@@ -19,6 +19,7 @@ namespace YGOPortable.Core
         private static Dictionary<uint, ArtEntry> _index;
         private static Dictionary<int, FileStream> _packStreams;
         private static string _streamingDir;
+        private static string _activeDuelVisualsPath;
 
         private const int MaxCacheCount = 500;
         private const int TokenArtPackId = -1;
@@ -37,6 +38,7 @@ namespace YGOPortable.Core
         private static Sprite _fallbackArt;
         private static Sprite _cardBackSprite;
         internal static string LocalDuelVisualsPath => Path.Combine(Application.persistentDataPath, "DuelVisuals");
+        internal static string ActiveDuelVisualsPath => _activeDuelVisualsPath ?? LocalDuelVisualsPath;
 
         public static void Initialize(string streamingAssetsPath) => Initialize(streamingAssetsPath, LocalDuelVisualsPath);
 
@@ -44,6 +46,7 @@ namespace YGOPortable.Core
         {
             if (_index != null) return;
             _streamingDir = streamingAssetsPath;
+            _activeDuelVisualsPath = localArtworkPath;
             _index = new Dictionary<uint, ArtEntry>(16000);
             _packStreams = new Dictionary<int, FileStream>();
 
@@ -370,6 +373,7 @@ namespace YGOPortable.Core
             _visibleArtwork.Clear();
             _duelArt.Clear();
             _duelVariants.Clear();
+            _activeDuelVisualsPath = null;
             _index = null;
         }
     }

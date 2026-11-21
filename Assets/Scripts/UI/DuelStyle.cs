@@ -177,6 +177,7 @@ namespace YGOPortable.UI
         {
             get
             {
+                if (DuelVisualAssets.HandGlow != null) return DuelVisualAssets.HandGlow;
                 if (_handGlow != null) return _handGlow;
                 const int size = 48;
                 const float radius = 4f;

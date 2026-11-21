@@ -9,6 +9,18 @@ namespace YGOPortable.UI
     internal static class DuelVisualAssets
     {
         private static readonly Dictionary<DuelEffectKind, Sprite> Effects = new();
+        private const int CutInCacheLimit = 8;
+
+        private sealed class CutInEntry
+        {
+            internal Sprite Sprite;
+            internal int Readers;
+            internal ulong LastUse;
+        }
+
+        private static readonly Dictionary<string, CutInEntry> CutInCache = new(StringComparer.Ordinal);
+        private static readonly HashSet<string> UnreadableCutIns = new(StringComparer.Ordinal);
+        private static ulong _cutInUse;
         internal static Texture2D ArenaSurface { get; } = Resources.Load<Texture2D>("Duel/ObservatorySlab");
         internal static Texture2D ArenaBackdrop { get; } = Resources.Load<Texture2D>("Duel/ObservatoryBackdrop");
         internal static Sprite MasterDuelLogo { get; } = Resources.Load<Sprite>("Title/MasterDuelLogo") ??
@@ -18,6 +30,27 @@ namespace YGOPortable.UI
         internal static Sprite LogIcon { get; } = LoadHudSprite("Log");
         internal static Sprite ChainLinks { get; } = LoadHudSprite("ChainLinks");
         internal static Sprite ChainFrame { get; } = LoadHudSprite("ChainFrame", Vector4.one * 48f);
+        internal static Sprite ChainActive { get; } = LoadHudSprite("ChainActive");
+        internal static Sprite ChainResolving { get; } = LoadHudSprite("ChainResolving");
+        internal static Sprite ChainCardHighlight { get; } = LoadHudSprite("ChainCardHighlight");
+        internal static Sprite ChainWinding { get; } = LoadHudSprite("ChainWinding");
+        internal static Sprite SummonNamePlayer { get; } = LoadHudSprite("SummonNamePlayer");
+        internal static Sprite SummonNameOpponent { get; } = LoadHudSprite("SummonNameOpponent");
+        internal static Sprite SummonLevel { get; } = LoadHudSprite("SummonLevel");
+        internal static Sprite SummonRank { get; } = LoadHudSprite("SummonRank");
+        internal static Sprite SummonStatsPlayer { get; } = LoadHudSprite("SummonStatsPlayer");
+        internal static Sprite SummonStatsOpponent { get; } = LoadHudSprite("SummonStatsOpponent");
+        internal static Sprite GraveWell { get; } = LoadHudSprite("GraveWell");
+        internal static Sprite BanishedWell { get; } = LoadHudSprite("BanishedWell");
+        internal static Sprite CardStatsBase { get; } = LoadHudSprite("CardStatsBase");
+        internal static Sprite CardStatsBaseAlt { get; } = LoadHudSprite("CardStatsBaseAlt");
+        internal static Sprite LpPlayer { get; } = LoadHudSprite("LPPlayer");
+        internal static Sprite LpOpponent { get; } = LoadHudSprite("LPOpponent");
+        internal static Sprite HandGlow { get; } = LoadHudSprite("HandGlow", Vector4.one * 18f);
+        internal static Sprite PhaseBase { get; } = LoadHudSprite("PhaseBase");
+        internal static Sprite PhaseRim { get; } = LoadHudSprite("PhaseRim");
+        internal static Sprite PromptGrave { get; } = LoadHudSprite("PromptGrave");
+        internal static Sprite PromptGroupLabel { get; } = LoadHudSprite("PromptGroupLabel");
         internal static Sprite PromptFieldGlow { get; } = LoadHudSprite("PromptFieldGlow");
         internal static Sprite PromptFieldArrow { get; } = LoadHudSprite("PromptFieldArrow");
         private static readonly Sprite PromptBanished = LoadHudSprite("PromptBanished");
@@ -59,7 +92,8 @@ namespace YGOPortable.UI
                 YgoConstants.LOCATION_GRAVE => icons[2],
                 YgoConstants.LOCATION_EXTRA => icons[3],
                 YgoConstants.LOCATION_REMOVED => icons[4],
-                YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE => icons[5],
+                YgoConstants.LOCATION_ONFIELD or YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE or
+                    YgoConstants.LOCATION_FZONE or YgoConstants.LOCATION_PZONE => icons[5],
                 _ => null,
             };
         }
@@ -86,37 +120,108 @@ namespace YGOPortable.UI
             return sprite;
         }
 
-        internal static Sprite SummonCutIn(uint code)
+        private static string CutInPath(uint code, int variant) =>
+            Path.Combine(CardArtLoader.ActiveDuelVisualsPath, "CutIns", $"{code}-{variant}.png");
+
+        internal static bool CanDisplayCutIn(uint artCode, int artVariant) => GetCutIn(artCode, artVariant) != null;
+
+        internal static Sprite RetainCutIn(uint artCode, int artVariant)
         {
-            int variant = CardArtLoader.GetDuelArtworkVariant(code);
-            if (variant < 0) return null;
-            string path = Path.Combine("CutIns", $"{code}-{variant}.png");
-            return AsSprite(LoadTexture(path, TextureWrapMode.Clamp));
+            var cutIn = GetCutIn(artCode, artVariant);
+            if (cutIn == null) return null;
+            cutIn.Readers++;
+            return cutIn.Sprite;
+        }
+
+        internal static void ReleaseCutIn(Sprite sprite)
+        {
+            if (sprite == null) return;
+            foreach (var cutIn in CutInCache.Values)
+            {
+                if (cutIn.Sprite != sprite) continue;
+                cutIn.Readers--;
+                break;
+            }
+            TrimCutInCache(CutInCacheLimit);
+        }
+
+        private static CutInEntry GetCutIn(uint artCode, int artVariant)
+        {
+            if (artCode == 0 || artVariant < 0) return null;
+            string path = CutInPath(artCode, artVariant);
+            if (CutInCache.TryGetValue(path, out var cached))
+            {
+                cached.LastUse = ++_cutInUse;
+                return cached;
+            }
+
+            if (UnreadableCutIns.Contains(path) || !File.Exists(path)) return null;
+            var sprite = AsSprite(LoadTextureFile(path, TextureWrapMode.Clamp));
+            if (sprite == null)
+            {
+                UnreadableCutIns.Add(path);
+                return null;
+            }
+            TrimCutInCache(CutInCacheLimit - 1);
+            var entry = new CutInEntry { Sprite = sprite, LastUse = ++_cutInUse };
+            CutInCache.Add(path, entry);
+            return entry;
+        }
+
+        private static void TrimCutInCache(int capacity)
+        {
+            while (CutInCache.Count > capacity)
+            {
+                string oldestPath = null;
+                CutInEntry oldest = null;
+                foreach (var pair in CutInCache)
+                {
+                    if (pair.Value.Readers != 0 || oldest != null && pair.Value.LastUse >= oldest.LastUse) continue;
+                    oldestPath = pair.Key;
+                    oldest = pair.Value;
+                }
+                if (oldest == null) return;
+                CutInCache.Remove(oldestPath);
+                var texture = oldest.Sprite.texture;
+                if (Application.isPlaying)
+                {
+                    UnityEngine.Object.Destroy(oldest.Sprite);
+                    UnityEngine.Object.Destroy(texture);
+                }
+                else
+                {
+                    UnityEngine.Object.DestroyImmediate(oldest.Sprite);
+                    UnityEngine.Object.DestroyImmediate(texture);
+                }
+            }
         }
 
         private static Sprite AsSprite(Texture2D texture, Vector4 border = default) => texture == null ? null :
             Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(.5f, .5f),
                 100f, 0, SpriteMeshType.FullRect, border);
 
-        private static Texture2D LoadTexture(string name, TextureWrapMode wrapMode)
+        private static Texture2D LoadTexture(string name, TextureWrapMode wrapMode) =>
+            LoadTextureFile(Path.Combine(CardArtLoader.LocalDuelVisualsPath, name), wrapMode);
+
+        private static Texture2D LoadTextureFile(string path, TextureWrapMode wrapMode)
         {
-            string path = Path.Combine(CardArtLoader.LocalDuelVisualsPath, name);
             if (!File.Exists(path)) return null;
             try
             {
                 var bytes = File.ReadAllBytes(path);
                 var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false)
                 {
-                    name = Path.GetFileNameWithoutExtension(name),
+                    name = Path.GetFileNameWithoutExtension(path),
                     wrapMode = wrapMode,
                     filterMode = FilterMode.Bilinear,
                 };
                 if (texture.LoadImage(bytes, markNonReadable: true)) return texture;
-                UnityEngine.Object.Destroy(texture);
+                if (Application.isPlaying) UnityEngine.Object.Destroy(texture);
+                else UnityEngine.Object.DestroyImmediate(texture);
             }
             catch (Exception error) when (error is IOException || error is UnauthorizedAccessException)
             {
-                Debug.LogWarning($"[DuelVisualAssets] Cannot read {name}: {error.Message}");
+                Debug.LogWarning($"[DuelVisualAssets] Cannot read {Path.GetFileName(path)}: {error.Message}");
             }
             return null;
         }

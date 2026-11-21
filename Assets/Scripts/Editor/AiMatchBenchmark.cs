@@ -722,8 +722,13 @@ namespace YGOPortable.Editor
             if (DuelTactics.CanActivate(duel, chain, negate))
                 throw new InvalidOperationException("Impermanence targets a trap-immune monster across an empty column.");
             rival.szone[2] = new LiveCardState { code = 55144522, controller = 1, position = YgoConstants.POS_FACEUP_ATTACK };
+            if (DuelTactics.CanActivate(duel, chain, negate))
+                throw new InvalidOperationException("Set Impermanence spent its negation on an idle column.");
+            duel.CurrentChain.Add(new ChainLinkInfo { code = 55144522, triggerPlayer = 1, triggerLoc = spellZone,
+                triggerSeq = 2, ActivationSource = (1, spellZone, 2) });
             if (!DuelTactics.CanActivate(duel, chain, negate))
-                throw new InvalidOperationException("Set Impermanence can still disable a Spell in its column.");
+                throw new InvalidOperationException("Set Impermanence missed a Spell activated in its column.");
+            duel.CurrentChain.Clear();
             rival.szone[2] = null;
 
             rival.mzone[3] = new LiveCardState { code = kaibaman, controller = 1, location = monsterZone, sequence = 3,

@@ -468,7 +468,16 @@ namespace YGOPortable.Editor
 
             search.text = blueEyes.ToString();
             var slots = Field<List<(RectTransform rt, CompositeCardView card, Text count, CardDragTrigger trigger)>>(editor, "_trunkPool");
-            slots.Single(slot => slot.rt.gameObject.activeInHierarchy && slot.card.CurrentCode == blueEyes).trigger.OnRightClick();
+            var grouped = slots.Single(slot => slot.rt.gameObject.activeInHierarchy && slot.card.CurrentCode == blueEyes);
+            var related = Field<Button>(editor, "_deckCardActionRelated");
+            grouped.trigger.OnTouchHold();
+            Require(related.gameObject.activeInHierarchy && related.IsInteractable(),
+                "A touch hold did not expose related-card search.");
+            Call(editor, "CloseDeckCardActions");
+            grouped.trigger.OnRightClick();
+            Require(related.gameObject.activeInHierarchy && related.IsInteractable() && deck.main.Count == 3,
+                "Right-click did not expose related-card search without changing the deck.");
+            Field<Button>(editor, "_deckCardActionMain").onClick.Invoke();
             Require(deck.main.SequenceEqual(new[] { blueEyes, blueEyesArt, blueEyesArt, other }) && TrunkCount(editor, blueEyes) == "×1",
                 "Adding the grouped card did not consume an available owned artwork or keep its copies adjacent.");
             Call(editor, "TryAddCardToDeck", blueEyesArt, DragSourceType.DeckMain, null, null);

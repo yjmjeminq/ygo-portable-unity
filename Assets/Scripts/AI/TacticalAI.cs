@@ -694,7 +694,9 @@ namespace YGOPortable.AI
         }
 
         private bool CanActivate(DuelSession session, DuelPrompt prompt, SelectableCardItem item) =>
-            SynchroTurnPlan.CanActivate(session, prompt, item) && (!UsesTacticalRules || DuelTactics.CanActivate(session, prompt, item));
+            SynchroTurnPlan.CanActivate(session, prompt, item) && (UsesTacticalRules
+                ? DuelTactics.CanActivate(session, prompt, item)
+                : !DuelTactics.IsTemporaryFieldNegation(item) || DuelTactics.CanSpendFieldNegation(session, prompt, item));
 
         private bool CanPlayFieldSpell(DuelSession session, DuelPrompt prompt, SelectableCardItem item)
         {
@@ -968,18 +970,16 @@ namespace YGOPortable.AI
                         return ash;
                     }
                 }
+            }
 
-                // If the opposing monster is still face-up on the field, Impermanence / Effect Veiler directly negates it!
-                if (source is { IsFaceUp: true, effectsDisabled: false } && source.code == opposing.code)
+            if (!p.IsTriggerChain && !ownLastLink && s.CurrentChain.Count > 0)
+            {
+                int negater = p.candidates.FindIndex(card => DuelTactics.IsTemporaryFieldNegation(card) &&
+                    !_effectCounts.ContainsKey(ChainKey(card)) && CanActivate(s, p, card));
+                if (negater >= 0)
                 {
-                    int negater = p.candidates.FindIndex(card =>
-                        (card.code == DuelTactics.EffectVeiler || card.code == DuelTactics.InfiniteImpermanence && source.code != DuelTactics.BlueEyesTyrant) &&
-                        !_effectCounts.ContainsKey(ChainKey(card)) && CanActivate(s, p, card));
-                    if (negater >= 0)
-                    {
-                        BumpKey(ChainKey(p.candidates[negater]));
-                        return negater;
-                    }
+                    BumpKey(ChainKey(p.candidates[negater]));
+                    return negater;
                 }
             }
 
@@ -996,18 +996,9 @@ namespace YGOPortable.AI
                 if (_effectCounts.ContainsKey(key)) continue;
                 if (policy?.UsesChains != true || p.IsTriggerChain || c.isTriggeredEffect)
                 {
-                    // Do not fire free-chain monster negations in empty chain if opponent didn't activate anything!
-                    if (!p.IsTriggerChain && !c.isTriggeredEffect && s.CurrentChain.Count == 0 &&
-                        c.code is DuelTactics.InfiniteImpermanence or DuelTactics.EffectVeiler)
-                    {
-                        continue;
-                    }
                     BumpKey(key);
                     return i;
                 }
-
-                if (s.CurrentChain.Count == 0 && c.code is DuelTactics.InfiniteImpermanence or DuelTactics.EffectVeiler)
-                    continue;
 
                 float priority = policy.ChainPriority(s, p, c) + DuelTactics.ControlChainPriority(s, p, c) +
                     DuelTactics.ChokepointPriority(s, p, c);
@@ -1067,7 +1058,7 @@ namespace YGOPortable.AI
                 int winged = DuelTactics.FindWingedKuribohSearch(s, p);
                 if (winged >= 0) return PackIndexList(new[] { winged });
             }
-            if (UsesTacticalRules && p.min == 1 && p.max == 1 && hint == DuelTactics.Negate)
+            if (p.min == 1 && p.max == 1 && p.SelectionHint == DuelTactics.Negate)
             {
                 int target = DuelTactics.ChooseHandtrapTarget(s, p);
                 if (target >= 0) return PackIndexList(new[] { target });

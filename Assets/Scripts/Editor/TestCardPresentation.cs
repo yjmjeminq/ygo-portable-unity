@@ -143,7 +143,9 @@ namespace YGOPortable.Editor
             const uint magician = 46986414, blueEyesPrinting = 89631140;
             string folder = Path.Combine(Path.GetTempPath(), "ygo-overframe-art-" + Guid.NewGuid().ToString("N"));
             string packPath = Path.Combine(folder, "cardart.pack");
-            Directory.CreateDirectory(folder);
+            string cutIns = Path.Combine(folder, "CutIns");
+            string cutInPath = Path.Combine(cutIns, $"{BlueEyes}-0.png");
+            Directory.CreateDirectory(cutIns);
             const string magic = "MDAR";
             var texture = new Texture2D(8, 8, TextureFormat.RGB24, false);
             texture.SetPixels32(Enumerable.Repeat(new Color32(72, 110, 180, 255), 64).ToArray());
@@ -214,6 +216,50 @@ namespace YGOPortable.Editor
                 Require(animator.transform.Find("MovingCard/Overframe/Depth/Subject").gameObject.activeInHierarchy,
                     "The summon and card viewer did not choose the same decoded silhouette.");
                 animator.Clear();
+
+                var transparent = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                transparent.SetPixels(new[] { Color.clear, Color.white, Color.white, Color.clear });
+                transparent.Apply();
+                File.WriteAllBytes(cutInPath, transparent.EncodeToPNG());
+                UnityEngine.Object.DestroyImmediate(transparent);
+                view.SetCard(BlueEyes);
+                var local = view.transform.Find("Overframe/Depth/LocalCutIn").GetComponent<Image>();
+                var sprite = local.sprite;
+                Require(view.HasOverframe && sprite != null && sprite != view.ArtworkSprite && !local.raycastTarget &&
+                    local.rectTransform.anchorMax.y > 1f && !graphic.gameObject.activeSelf,
+                    "The transparent cut-in did not layer over the exact local artwork.");
+                view.SetCard(BlueEyes, faceDown: true);
+                Require(!view.HasOverframe && local.sprite == null, "A face-down card retained its local cut-in.");
+
+                animator.QueueMove(new CardFlight(BlueEyes, pose, pose, true, false), CardMotion.SpecialSummon, null);
+                move = queue.Dequeue();
+                Require(move.MoveNext() && move.Current is IEnumerator, "The local cut-in card skipped its summon reveal.");
+                reveal = (IEnumerator)move.Current;
+                Require(reveal.MoveNext(), "The local cut-in reveal did not start.");
+                SampleAnimation((IEnumerator)reveal.Current)(1f);
+                var moving = animator.transform.Find("MovingCard/Overframe/Depth/LocalCutIn");
+                Require(moving != null && moving.GetComponent<Image>().sprite == sprite,
+                    "The summon did not reuse the exact local cut-in shown in the card viewer.");
+                animator.Clear();
+
+                animator.QueueChain(pose, BlueEyes, 1, false);
+                var activation = queue.Dequeue();
+                Require(activation.MoveNext(), "The local cut-in skipped chain activation.");
+                var sample = SampleAnimation((IEnumerator)activation.Current);
+                sample(.6f);
+                moving = animator.transform.Find("MovingCard/Overframe/Depth/LocalCutIn");
+                Require(moving != null && moving.GetComponent<Image>().sprite == sprite,
+                    "The chain activation used a different cut-in.");
+                if (DuelVisualAssets.ChainLinks != null)
+                {
+                    var rotor = animator.transform.Find("ChainCount/ChainRotor");
+                    Require(rotor != null && rotor.Find("Links").GetComponent<Image>().sprite == DuelVisualAssets.ChainLinks,
+                        "Chain activation omitted the local chain links.");
+                    Quaternion initial = rotor.localRotation;
+                    sample(.8f);
+                    Require(Quaternion.Angle(initial, rotor.localRotation) > 1f, "The chain ring did not rotate.");
+                }
+                animator.Clear();
             }
             finally
             {
@@ -221,9 +267,11 @@ namespace YGOPortable.Editor
                 CardArtLoader.Shutdown();
                 CardArtLoader.Initialize(Application.streamingAssetsPath);
                 File.Delete(packPath);
+                File.Delete(cutInPath);
+                Directory.Delete(cutIns);
                 Directory.Delete(folder);
             }
-            Debug.Log("[VERIFY OVERFRAME ARTWORK] Local decode failure, valid replacement, and equivalent-printing art kept their own silhouettes.");
+            Debug.Log("[VERIFY OVERFRAME ARTWORK] Decoded artwork and its exact local cut-in stayed in sync across inspection, summon and chain.");
         }
 
         private static void VerifyOverframeAnimation(CardAnimationManager animator)
@@ -274,7 +322,7 @@ namespace YGOPortable.Editor
             reveal = (IEnumerator)move.Current;
             Require(reveal.MoveNext(), "The resummon cut-in did not start.");
             SampleAnimation((IEnumerator)reveal.Current)(1f);
-            Require(animator.transform.Find("MovingCard/Overframe/Depth/Subject").gameObject.activeInHierarchy &&
+            Require(animator.transform.Find("MovingCard").GetComponent<CompositeCardView>().HasOverframe &&
                 animator.transform.Find("ChainImpactWave") != null, "The resummoned ace did not show its subject and shockwave.");
             while (reveal.MoveNext()) SampleAnimation((IEnumerator)reveal.Current)(1f);
             Require(!move.MoveNext() && landed && animator.transform.Find("ChainImpactWave") == null,
@@ -306,19 +354,17 @@ namespace YGOPortable.Editor
 
         private static void TrackStableOverframe(Transform overframe, Action<float> frame, float from, float to)
         {
-            var subject = overframe.Find("Depth/Subject").GetComponent<CardOverframeGraphic>();
-            var shimmer = overframe.Find("Depth/Shimmer").GetComponent<CardOverframeGraphic>();
+            var graphics = overframe.Find("Depth").GetComponentsInChildren<Graphic>();
+            Require(graphics.Length > 0, "The overframe has no active subject.");
             int dirty = 0;
             void CountRebuild() => dirty++;
-            subject.RegisterDirtyVerticesCallback(CountRebuild);
-            shimmer.RegisterDirtyVerticesCallback(CountRebuild);
+            foreach (var graphic in graphics) graphic.RegisterDirtyVerticesCallback(CountRebuild);
             for (int i = 0; i < 20; i++)
             {
                 frame(Mathf.Lerp(from, to, i / 19f));
                 Canvas.ForceUpdateCanvases();
             }
-            subject.UnregisterDirtyVerticesCallback(CountRebuild);
-            shimmer.UnregisterDirtyVerticesCallback(CountRebuild);
+            foreach (var graphic in graphics) graphic.UnregisterDirtyVerticesCallback(CountRebuild);
             Require(dirty == 0, $"Transform animation requested {dirty} unnecessary overframe mesh rebuilds.");
         }
 

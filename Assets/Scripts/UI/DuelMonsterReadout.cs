@@ -251,7 +251,8 @@ namespace YGOPortable.UI
             {
                 _accent = accent;
                 Rect = LotdUiKit.FillRect(key, parent);
-                _plate = DuelReadoutPlate.Add(Rect, Backing);
+                var skin = key == "Defense" ? DuelVisualAssets.CardStatsBaseAlt : DuelVisualAssets.CardStatsBase;
+                _plate = DuelReadoutPlate.Add(Rect, Backing, skin);
                 var rail = LotdUiKit.CreateRect("Rail", Rect, new Vector2(.07f, 0f), new Vector2(.93f, 0f),
                     Vector2.zero, new Vector2(0f, 1.8f));
                 _rail = LotdUiKit.AddImage(rail.gameObject, LotdUiKit.WhiteSprite, accent, false, false);
@@ -764,7 +765,7 @@ namespace YGOPortable.UI
             Bind(default);
         }
 
-        internal void Bind(DuelRating rating, bool showChanges = false)
+        internal void Bind(DuelRating rating, bool showChanges = false, Sprite symbol = null)
         {
             bool visible = rating.Kind != DuelRatingKind.None;
             _root.gameObject.SetActive(visible);
@@ -778,8 +779,8 @@ namespace YGOPortable.UI
                 DuelReadoutPulse.Play(_root, valueTone, _shown.Kind == rating.Kind && rating.Value < _shown.Value,
                     _shown.Kind == DuelRatingKind.None || rating.Value != _shown.Value ? _number : null);
             _shown = current;
-            _symbol.sprite = DuelStatSymbols.Rating(rating.Kind);
-            _symbol.color = tone;
+            _symbol.sprite = symbol ?? DuelStatSymbols.Rating(rating.Kind);
+            _symbol.color = symbol != null ? Color.white : tone;
             _number.color = valueTone;
             _number.text = visible ? rating.Value.ToString() : "";
             if (_caption != null)
@@ -1229,11 +1230,11 @@ namespace YGOPortable.UI
     {
         private static Sprite _corners;
 
-        internal static Image Add(RectTransform root, Color tint)
+        internal static Image Add(RectTransform root, Color tint, Sprite skin = null)
         {
-            if (_corners == null) _corners = BuildCorners();
-            var plate = LotdUiKit.AddImage(root.gameObject, _corners, tint, false, false);
-            plate.type = Image.Type.Sliced;
+            if (skin == null && _corners == null) _corners = BuildCorners();
+            var plate = LotdUiKit.AddImage(root.gameObject, skin ?? _corners, tint, false, false);
+            if (plate.sprite.border != Vector4.zero) plate.type = Image.Type.Sliced;
             return plate;
         }
 

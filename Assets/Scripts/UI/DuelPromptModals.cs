@@ -1249,6 +1249,9 @@ namespace YGOPortable.UI
             var tab = LotdUiKit.CreateRect("LocationTab", group, Vector2.up, Vector2.up,
                 new Vector2(0f, -ChainLocationTabHeight), new Vector2(Mathf.Min(width, 174f), 0f));
             LotdUiKit.AddImage(tab.gameObject, LotdUiKit.WhiteSprite, groupTone, false, false);
+            if (DuelVisualAssets.PromptGroupLabel != null)
+                LotdUiKit.AddImage(LotdUiKit.FillRect("LocalGroupLabel", tab).gameObject, DuelVisualAssets.PromptGroupLabel,
+                    new Color(1f, 1f, 1f, .36f), false, false);
             LotdUiKit.AddImage(LotdUiKit.CreateRect("Accent", tab, Vector2.zero, Vector2.up,
                 Vector2.zero, new Vector2(3f, 0f)).gameObject, LotdUiKit.WhiteSprite, DuelStyle.Side(opponent), false, false);
             bool hasIcon = DuelPromptLocationIcon.Supports(location);
@@ -2220,7 +2223,9 @@ namespace YGOPortable.UI
             PopulateZoneCards(cards, hideFaceDown: opponent && location != YgoConstants.LOCATION_GRAVE,
                 newestFirst: !extra, hasCardActions, onOpenCardActions, canUseCardActions, actionsOnly);
             string label = extra ? "엑스트라 덱" : PileTabs[index].Label;
-            FinishZoneViewer($"{(opponent ? "상대" : "내")} {label}", DuelVisualAssets.ZoneIcon(location, opponent), entering,
+            FinishZoneViewer($"{(opponent ? "상대" : "내")} {label}",
+                (location == YgoConstants.LOCATION_GRAVE ? DuelVisualAssets.PromptGrave : null) ??
+                DuelVisualAssets.ZoneIcon(location, opponent), entering,
                 browsePiles ? _zonePileButtons[index] : null);
         }
 
@@ -2877,19 +2882,19 @@ namespace YGOPortable.UI
 
         internal static Graphic Add(RectTransform holder, uint location, bool opponent, bool glyphOnly = false)
         {
-            bool useGlyph = glyphOnly || location is YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_GRAVE || IsField(location);
-            var sprite = useGlyph ? null : DuelVisualAssets.PromptZoneIcon(location, opponent);
-            if (sprite != null)
-                return LotdUiKit.AddImage(holder.gameObject, sprite, Color.white, true, false);
-
-            var glyph = holder.gameObject.AddComponent<DuelPromptLocationIcon>();
-            glyph._location = (location & YgoConstants.LOCATION_OVERLAY) != 0 ? YgoConstants.LOCATION_OVERLAY : location;
-            glyph.color = location switch
+            var tint = location switch
             {
                 YgoConstants.LOCATION_HAND => new Color(.42f, .96f, .87f),
                 YgoConstants.LOCATION_GRAVE => new Color(.86f, .73f, 1f),
                 _ => IsField(location) ? DuelStyle.Gold : DuelStyle.Side(opponent),
             };
+            var sprite = glyphOnly ? null : DuelVisualAssets.PromptZoneIcon(location, opponent);
+            if (sprite != null)
+                return LotdUiKit.AddImage(holder.gameObject, sprite, Color.Lerp(Color.white, tint, .35f), true, false);
+
+            var glyph = holder.gameObject.AddComponent<DuelPromptLocationIcon>();
+            glyph._location = (location & YgoConstants.LOCATION_OVERLAY) != 0 ? YgoConstants.LOCATION_OVERLAY : location;
+            glyph.color = tint;
             glyph.raycastTarget = false;
             return glyph;
         }

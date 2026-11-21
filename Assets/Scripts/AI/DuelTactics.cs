@@ -189,7 +189,7 @@ namespace YGOPortable.AI
             if (effect.code == AshBlossom && last?.code == UpstartGoblin &&
                 !rival.szone.Any(card => IsActive(card, BadReaction)) && !rival.mzone.Any(card => IsActive(card, NurseReficule)))
                 return false;
-            if (effect.code is InfiniteImpermanence or EffectVeiler && !CanSpendFieldNegation(duel, prompt, effect, last, rival))
+            if (IsTemporaryFieldNegation(effect) && !CanSpendFieldNegation(duel, prompt, effect))
                 return false;
             if (effect.code == CrimsonGaia && effect.location == YgoConstants.LOCATION_HAND &&
                 own.szone.Any(card => card?.code == CrimsonGaia && card.IsFaceUp && !card.effectsDisabled))
@@ -482,21 +482,32 @@ namespace YGOPortable.AI
         private static bool OffFieldOnly(uint code) => code is 18789533 or 22567609 or 39191307 or 41859700 or
             57116033 or 57839750 or 60806437 or 77044671 or 83011277 or 84834865 or 95178994 or 95956346 or 97017120;
 
-        private static bool CanSpendFieldNegation(DuelSession duel, DuelPrompt prompt, SelectableCardItem effect,
-            ChainLinkInfo source, PlayerFieldSnapshot rival)
-        {
-            // Preserve a meaningful set-column response and the actual source of an effect, including a gained effect.
-            if (effect.code == InfiniteImpermanence && effect.location == YgoConstants.LOCATION_SZONE &&
-                effect.sequence < 5 && rival.szone[4 - effect.sequence] != null) return true;
-            if (source is { negated: false, triggerLoc: YgoConstants.LOCATION_MZONE } &&
-                source.triggerPlayer != prompt.playerId && source.triggerSeq < rival.mzone.Length &&
-                rival.mzone[source.triggerSeq] is { IsFaceUp: true, effectsDisabled: false } active && active.code == source.code &&
-                (effect.code != InfiniteImpermanence || active.code != BlueEyesTyrant)) return true;
+        internal static bool IsTemporaryFieldNegation(SelectableCardItem effect) =>
+            effect.code is InfiniteImpermanence or EffectVeiler;
 
-            // With no threat on the chain, do not spend temporary suppression immediately before it expires.
-            if (source == null && (duel.CurrentPhase == YgoConstants.PHASE_END ||
-                duel.CurrentPhase == YgoConstants.PHASE_MAIN2 && duel.TurnPlayer == prompt.playerId)) return false;
-            return rival.mzone.Any(card => IsUsefulFieldNegationTarget(card, effect.code));
+        internal static bool CanSpendFieldNegation(DuelSession duel, DuelPrompt prompt, SelectableCardItem effect)
+        {
+            var rival = duel.Players[1 - prompt.playerId];
+            if (duel.CurrentChain.LastOrDefault() is { negated: false, Resolved: false } source &&
+                source.triggerPlayer != prompt.playerId)
+            {
+                if (source.triggerLoc == YgoConstants.LOCATION_MZONE && source.triggerSeq < rival.mzone.Length &&
+                    rival.mzone[source.triggerSeq] is { IsFaceUp: true, effectsDisabled: false } active && active.code == source.code &&
+                    (effect.code != InfiniteImpermanence || active.code != BlueEyesTyrant)) return true;
+
+                if (effect.code == InfiniteImpermanence && effect.location == YgoConstants.LOCATION_SZONE &&
+                    effect.sequence < 5 && source.ActivationSource == (source.triggerPlayer, YgoConstants.LOCATION_SZONE, 4u - effect.sequence) &&
+                    rival.szone[4 - effect.sequence] is { IsFaceUp: true, effectsDisabled: false } spellTrap &&
+                    spellTrap.code == source.code) return true;
+            }
+
+            // An empty fast-effect window can be the phase pass. Suppression without an active threat is only
+            // considered as part of an actual main or battle action on our own turn.
+            return duel.CurrentChain.Count == 0 && duel.TurnPlayer == prompt.playerId &&
+                duel.CurrentPhase != YgoConstants.PHASE_MAIN2 &&
+                (prompt.messageType == YgoConstants.MSG_SELECT_BATTLECMD ||
+                    prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD && !prompt.canEp) &&
+                rival.mzone.Any(card => IsUsefulFieldNegationTarget(card, effect.code));
         }
 
         private static bool IsUsefulFieldNegationTarget(LiveCardState card, uint negate) =>

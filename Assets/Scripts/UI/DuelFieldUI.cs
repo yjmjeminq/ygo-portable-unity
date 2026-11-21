@@ -963,6 +963,10 @@ namespace YGOPortable.UI
             var side = DuelStyle.Side(opponent);
             var panel = LotdUiKit.FillRect("Status", root, 1f);
             AddHudSurface(panel, Color.Lerp(HudEdge, side, .32f), HudSurface);
+            var lpFace = opponent ? DuelVisualAssets.LpOpponent : DuelVisualAssets.LpPlayer;
+            if (lpFace != null)
+                LotdUiKit.AddImage(LotdUiKit.FillRect("LocalLpPanel", panel, 2f).gameObject, lpFace,
+                    new Color(1f, 1f, 1f, .45f), false, false);
 
             var avatarHolder = LotdUiKit.CreateRect("AvatarFrame", panel, new Vector2(opponent ? .781f : .017f, .095f),
                 new Vector2(opponent ? .983f : .219f, .905f), Vector2.zero, Vector2.zero);
@@ -1135,6 +1139,10 @@ namespace YGOPortable.UI
                 well.texture = Texture2D.whiteTexture;
                 well.raycastTarget = false;
                 well.Accent = grave ? new Color(.38f, .68f, .73f) : new Color(.67f, .55f, .81f);
+                var wellArt = grave ? DuelVisualAssets.GraveWell : DuelVisualAssets.BanishedWell;
+                if (wellArt != null)
+                    LotdUiKit.AddImage(LotdUiKit.FillRect("LocalWell", basin).gameObject, wellArt,
+                        new Color(1f, 1f, 1f, .64f), true, false);
                 var glyph = LotdUiKit.CreateRect("Location", basin, new Vector2(.31f, .31f), new Vector2(.69f, .69f),
                     Vector2.zero, Vector2.zero);
                 wellGlyph = DuelPromptLocationIcon.Add(glyph, location, opponent, glyphOnly: true);
@@ -1318,6 +1326,12 @@ namespace YGOPortable.UI
                 Vector2.zero, Vector2.zero);
             _phaseRim = DuelStyle.AddHexPlate(turn, HudEdge, HudSurface);
             _phaseButton = AddHudButton(_phaseRim, OpenPhasePicker);
+            if (DuelVisualAssets.PhaseBase != null)
+                LotdUiKit.AddImage(LotdUiKit.FillRect("LocalPhaseBase", turn, 3f).gameObject, DuelVisualAssets.PhaseBase,
+                    new Color(1f, 1f, 1f, .54f), true, false);
+            if (DuelVisualAssets.PhaseRim != null)
+                LotdUiKit.AddImage(LotdUiKit.FillRect("LocalPhaseRim", turn).gameObject, DuelVisualAssets.PhaseRim,
+                    new Color(1f, 1f, 1f, .73f), true, false);
 
             var turnReadout = LotdUiKit.CreateRect("TurnNumber", turn, new Vector2(.115f, .675f),
                 new Vector2(.885f, .935f), Vector2.zero, Vector2.zero);
