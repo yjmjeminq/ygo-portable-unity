@@ -39,6 +39,9 @@ namespace YGOPortable.Editor
             VerifyNativeChainCardFace(0);
             VerifyNativeChainCardFace(70046172);
             VerifyNativeChainCardFace(14087893);
+            VerifyNativeImpermanenceRay(setFirst: true);
+            VerifyNativeImpermanenceRay(setFirst: false);
+            VerifyDragColumnAndPhaseShortcut();
             VerifyDestroyedCopiesKeepTheirReadouts();
             VerifyFieldReplacementReadouts();
             VerifyTurnAndDrawReadouts();
@@ -1273,6 +1276,28 @@ namespace YGOPortable.Editor
                     Require(fieldAttack.text == attack.text, "The resolving card and presented field disagreed about the earlier buff.");
                 }
                 var counter = animator.GetComponentsInChildren<RectTransform>().Single(rect => rect.name == "ChainCount");
+                var edge = counter.Find("NeonEdge").GetComponent<Image>();
+                Require(counter.Find("Halo") != null && counter.Find("MetalInset") != null &&
+                    edge.color == (resolving ? DuelStyle.ChainGold : DuelStyle.ChainCyan),
+                    "The three chain medallion layers did not use the activation or resolution tone.");
+                if (!resolving)
+                {
+                    sample(.21f);
+                    Require(Mathf.Abs(counter.localScale.x - 1.60f) < .01f &&
+                        Mathf.Abs(Mathf.DeltaAngle(card.transform.localEulerAngles.x, 0f)) > 1f &&
+                        animator.transform.Find("Chain").GetComponent<DuelEffectGraphic>().Tint == DuelStyle.ChainGold,
+                        "The activation missed the badge impact, card tilt or golden radial aura.");
+                    sample(.98f);
+                    Require(Mathf.Abs(counter.localScale.x - 1f) < .01f, "The chain badge did not settle at full size.");
+                    sample(.57f);
+                }
+                else
+                {
+                    var outcome = animator.transform.Find("ChainResolution/ChainOutcome")?.GetComponentInChildren<DuelEffectGraphic>();
+                    Require(outcome != null && !outcome.raycastTarget &&
+                        outcome.Kind is DuelEffectKind.ChainApplied or DuelEffectKind.Break,
+                        "The resolved native effect did not show a non-interactive outcome.");
+                }
                 if (compact)
                 {
                     var playArea = (RectTransform)ui.Field.Root.transform.Find("MobileSafeArea");
@@ -1362,6 +1387,8 @@ namespace YGOPortable.Editor
 
             bool chained = false;
             var destroyed = new List<CardMoveEvent>();
+            var resolvedLinks = new List<ChainLinkInfo>();
+            duel.OnChainResolved += resolvedLinks.Add;
             duel.OnCardMoved += move =>
             {
                 if (move.fromLoc == YgoConstants.LOCATION_MZONE && (move.reason & YgoConstants.REASON_DESTROY) != 0)
@@ -1391,6 +1418,9 @@ namespace YGOPortable.Editor
                 }
                 return null;
             });
+            Require(resolvedLinks.Count == 2 && resolvedLinks.All(link => link.Resolved) &&
+                !resolvedLinks[0].DestroyedCard && resolvedLinks[1].DestroyedCard,
+                "Destruction was attributed to the wrong native chain link.");
             Require(chained && duel.RetryCount == 0 && duel.SolvedChainLinks.SequenceEqual(new[] { (2, rush), (1, darkHole) }) &&
                     duel.Players[duel.HumanPlayerIndex].grave.Count(card => card.code == gagagigo) == 1 &&
                     enemy.grave.Count(card => card.code == gagagigo) == 2 && destroyed.Count == 3 &&
@@ -1825,10 +1855,21 @@ namespace YGOPortable.Editor
                     popup.Find("Kind/Text").GetComponent<Text>().text == "전투 피해" &&
                     popup.Find("Value/Text").GetComponent<Text>().text == $"-{damage}" && total.text == (8000 - damage).ToString(),
                     "The result showed damage on the wrong HUD, or at the wrong time in the attack.");
+                var sparks = popup.Find("LifeSparks").GetComponent<DuelEffectGraphic>();
+                Require(sparks.Kind == DuelEffectKind.LifeSparks && sparks.Tint.r > sparks.Tint.g && !sparks.raycastTarget,
+                    "Damage did not generate red particles on the correct HUD.");
             });
             Require(animation.transform.Find("LPChange") == null &&
                 !steps.Any(step => step.GetType().Name.StartsWith("<PlayLifeChanges>", StringComparison.Ordinal)),
                 "The same battle damage was queued again after contact.");
+            animation.Clear();
+            animation.QueueLifeChange(anchor, 900, LifePointChangeKind.Recovery, () => { });
+            var recovery = steps.Dequeue();
+            Require(recovery.MoveNext() && recovery.Current is IEnumerator, "Recovery did not open its HUD feedback.");
+            TestCardPresentation.SampleAnimation((IEnumerator)recovery.Current)(.34f);
+            var recoverySparks = animation.transform.Find("LPChange/LifeSparks").GetComponent<DuelEffectGraphic>();
+            Require(recoverySparks.Tint.g > recoverySparks.Tint.r && !recovery.MoveNext() &&
+                animation.transform.Find("LPChange") == null, "Recovery particles used the wrong color or stayed on screen.");
             Debug.Log($"[VERIFY DUEL LP FEEDBACK] Native {(reflected ? "reflected" : "piercing")} damage of {damage} reached seat {receiver} at the strike.");
         }
 
@@ -2461,6 +2502,8 @@ namespace YGOPortable.Editor
             ReachIdle();
             int summon = duel.ActivePrompt.spSummonable.FindIndex(card => card.code == linkSpider);
             Require(summon >= 0, "The native engine did not offer the Link Spider summon.");
+            using var ui = new HandUI(duel);
+            var animator = CardAnimationManager.Ensure(ui.Canvas);
             duel.SubmitResponseInt((summon << 16) | 1);
             ReachIdle();
             var own = duel.Players[duel.HumanPlayerIndex];
@@ -2468,18 +2511,122 @@ namespace YGOPortable.Editor
             Require(live.sequence is 5 or 6 && live.linkMarker == 0x002, "The native Link Spider did not expose its downward arrow.");
             uint target = live.sequence == 5 ? 1u : 3u;
 
-            using var ui = new HandUI(duel);
+            var rayStep = AnimationSteps(animator).Single(step => step.GetType().Name.StartsWith("<FieldRays>", StringComparison.Ordinal));
+            Require(rayStep.MoveNext() && rayStep.Current is IEnumerator, "A native Link Summon did not queue its arrow beam.");
+            TestCardPresentation.SampleAnimation((IEnumerator)rayStep.Current)(.64f);
+            var ray = (RectTransform)animator.transform.Find("LinkRay");
+            var board = ui.Field.Root.transform.Find("DuelBoard");
+            var origin = animator.GetPoint((RectTransform)board.Find($"Zone_{target + 2}_2"), Vector2.one * .5f);
+            var destination = animator.GetPoint((RectTransform)board.Find($"Zone_{target + 2}_3"), Vector2.one * .5f);
+            Require(Vector2.Distance(ray.anchoredPosition, (origin + destination) * .5f) < .1f &&
+                Mathf.Abs(ray.sizeDelta.x - (origin - destination).magnitude) < .1f,
+                "The Link Spider beam did not point at the exact marker destination.");
+            animator.Clear();
+            ui.Field.BindSession(duel, null, null);
             ui.Field.Root.transform.Find($"DuelBoard/Zone_{target + 2}_2").GetComponent<CardDragTrigger>().OnRightClick();
             ui.ExpectLinkedZones($"Zone_{target + 2}_3");
             int activate = duel.ActivePrompt.activatable.FindIndex(card => card.code == linkSpider);
             Require(activate >= 0, "Link Spider did not offer its linked-zone summon effect.");
             duel.SubmitResponseInt((activate << 16) | 5);
             ReachIdle();
+            animator.Clear();
             ui.Field.Refresh();
             Require(own.mzone[target]?.code == mysticalElf && own.mzone.Count(card => card?.code == mysticalElf) == 1,
                 "The native effect summoned to a different zone than the selected Link arrow indicated.");
             ui.ExpectLinkedZones($"Zone_{target + 2}_3");
             Debug.Log("[VERIFY DUEL LINK ZONES] Link Spider's live downward marker identified the zone used by its native effect.");
+        }
+
+        private static void VerifyNativeImpermanenceRay(bool setFirst)
+        {
+            const uint impermanence = 10045474;
+            uint[] player = Enumerable.Repeat(impermanence, 40).ToArray();
+            uint[] opponent = Enumerable.Repeat(KaiserSeaHorse, 40).ToArray();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Impermanence column ray", player, Array.Empty<uint>(),
+                opponent, Array.Empty<uint>(), setFirst, session => session.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD);
+            var ai = new TacticalAI();
+            using var ui = new HandUI(duel);
+            var animator = CardAnimationManager.Ensure(ui.Canvas);
+            if (setFirst)
+            {
+                int set = duel.ActivePrompt.sSetable.FindIndex(item => item.code == impermanence);
+                Require(set >= 0, "The fixture must be able to set Infinite Impermanence.");
+                duel.SubmitResponseInt((set << 16) | 4);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+                duel.SubmitResponseInt(7);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            }
+            var idle = duel.ActivePrompt;
+            Require(idle?.playerId == duel.AiPlayerIndex && idle.summonable.Any(card => card.code == KaiserSeaHorse),
+                "The opposite seat did not reach a legal target summon.");
+            duel.SubmitResponseInt(idle.summonable.FindIndex(card => card.code == KaiserSeaHorse) << 16);
+            SelectableCardItem activation = null;
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
+            {
+                if (activation == null && prompt.messageType == YgoConstants.MSG_SELECT_CHAIN && prompt.playerId == duel.HumanPlayerIndex)
+                {
+                    int index = prompt.candidates.FindIndex(card => card.code == impermanence);
+                    if (index >= 0)
+                    {
+                        activation = prompt.candidates[index];
+                        return BitConverter.GetBytes(index);
+                    }
+                }
+                return prompt.messageType == YgoConstants.MSG_SELECT_CARD && prompt.min == 1 && prompt.candidates.Count != 0
+                    ? DuelSession.PackCardSelection(0) : null;
+            });
+            Require(activation != null && duel.RetryCount == 0, "The engine did not accept the expected Infinite Impermanence activation.");
+            var rays = AnimationSteps(animator).Where(step => step.GetType().Name.StartsWith("<FieldRays>", StringComparison.Ordinal)).ToArray();
+            Require(rays.Length == (setFirst ? 1 : 0), "Only a previously Set Infinite Impermanence should produce the column beam.");
+            if (setFirst)
+            {
+                var step = rays[0];
+                Require(step.MoveNext() && step.Current is IEnumerator, "The column effect failed to produce a beam.");
+                TestCardPresentation.SampleAnimation((IEnumerator)step.Current)(.60f);
+                var rect = (RectTransform)animator.transform.Find("ColumnRay");
+                var board = ui.Field.Root.transform.Find("DuelBoard");
+                var top = animator.GetPoint((RectTransform)board.Find($"Zone_{activation.sequence + 2}_0"), new Vector2(.5f, .93f));
+                var bottom = animator.GetPoint((RectTransform)board.Find($"Zone_{activation.sequence + 2}_4"), new Vector2(.5f, .07f));
+                Require(Vector2.Distance(rect.anchoredPosition, (top + bottom) * .5f) < .1f &&
+                        Mathf.Abs(rect.sizeDelta.x - Vector2.Distance(top, bottom)) < .1f,
+                    "The beam did not span the activated trap's column.");
+            }
+            Debug.Log($"[VERIFY DUEL COLUMN] Native Infinite Impermanence from {(setFirst ? "Set" : "hand")}, matching column beam count {rays.Length}.");
+        }
+
+        private static void VerifyDragColumnAndPhaseShortcut()
+        {
+            var cards = Enumerable.Repeat(KaiserSeaHorse, 40).ToArray();
+            var empty = Array.Empty<uint>();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Field column placement", cards, empty, cards, empty,
+                true, session => session.ActivePrompt?.summonable.Count > 0);
+            using var ui = new HandUI(duel);
+            var drag = CardDragManager.Ensure(ui.Canvas);
+            var board = ui.Field.Root.transform.Find("DuelBoard");
+            var slot = (RectTransform)board.Find("Zone_4_3");
+            Canvas.ForceUpdateCanvases();
+            var point = RectTransformUtility.WorldToScreenPoint(null, slot.TransformPoint(slot.rect.center));
+            var option = duel.ActivePrompt.summonable[0];
+            drag.StartDrag(DragSourceType.Hand, option.code, (int)option.sequence, screenPosition: point);
+            var type = typeof(DuelFieldUI);
+            type.GetMethod("HandleDuelDragStarted", PrivateInstance).Invoke(ui.Field,
+                new object[] { DragSourceType.Hand, option.code, (int)option.sequence, null });
+            type.GetMethod("UpdateDragColumnGuide", PrivateInstance).Invoke(ui.Field, null);
+            var guided = board.GetComponentsInChildren<DuelZoneImage>().Where(zone => zone.ColumnGuided).Select(zone => zone.name).ToArray();
+            Require(guided.Length == 4 && guided.All(zone => zone.StartsWith("Zone_4_", StringComparison.Ordinal)),
+                "Dragging a legal hand card did not light all four zones in the projected column.");
+            drag.CancelDrag();
+            type.GetMethod("HandleDuelDragCancelled", PrivateInstance).Invoke(ui.Field, null);
+            Require(board.GetComponentsInChildren<DuelZoneImage>().All(zone => !zone.ColumnGuided), "The canceled drag left a lit column.");
+
+            var human = duel.HumanPlayerIndex;
+            var end = ui.Field.Root.transform.Find("EndShortcut").GetComponent<Button>();
+            Require(end.gameObject.activeInHierarchy, "A legal End Phase shortcut did not appear.");
+            end.onClick.Invoke();
+            YgoProjectBuilder.DriveUntilIdle(duel, new TacticalAI());
+            Require(duel.TurnNumber == 2 && duel.TurnPlayer != human && duel.RetryCount == 0,
+                "The direct End Phase shortcut did not transfer the native turn.");
+            Debug.Log("[VERIFY DUEL SHORTCUT] Drag column cleared and direct End Phase advanced the native duel.");
         }
 
         private static void VerifyNativeCoLinkedZone()

@@ -17,6 +17,9 @@ namespace YGOPortable.UI
         internal static readonly Color DecreasedValue = new Color(1f, .59f, .56f);
         internal static readonly Color GlassColor = new Color(.034f, .055f, .086f, .96f);
         internal static readonly Color GlassEdge = new Color(.34f, .59f, .69f, .72f);
+        internal static readonly Color ChainCyan = new Color32(0, 245, 255, 255);
+        internal static readonly Color ChainRed = new Color32(255, 59, 48, 255);
+        internal static readonly Color ChainGold = new Color32(255, 215, 0, 255);
 
         private static Texture2D _stone;
         private static Sprite _disc;
@@ -32,6 +35,19 @@ namespace YGOPortable.UI
             var edge = LotdUiKit.AddImage(root.gameObject, _hexagon, rim, false, false);
             LotdUiKit.AddImage(LotdUiKit.FillRect("Surface", root, 2f).gameObject, _hexagon, face, false, false);
             return edge;
+        }
+
+        internal static void AddChainMedallion(RectTransform root, Color neon, float size)
+        {
+            // Separate the atmospheric halo, the lit edge, and the metal inset.
+            _hexagon ??= BuildHexagon();
+            var halo = LotdUiKit.FillRect("Halo", root, -size * .075f);
+            LotdUiKit.AddImage(halo.gameObject, _hexagon, new Color(neon.r, neon.g, neon.b, .18f), false, false);
+            var outer = LotdUiKit.FillRect("NeonEdge", root);
+            AddHexPlate(outer, neon, new Color(.047f, .082f, .105f, .99f));
+            var inset = LotdUiKit.FillRect("MetalInset", root, size * .074f);
+            AddHexPlate(inset, Color.Lerp(new Color(.15f, .23f, .27f), neon, .28f),
+                new Color(.021f, .037f, .054f, .98f));
         }
 
         private static Sprite BuildHexagon()

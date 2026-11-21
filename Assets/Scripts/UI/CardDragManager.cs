@@ -30,9 +30,11 @@ namespace YGOPortable.UI
 
     public class CardDragManager : MonoBehaviour
     {
-        public static CardDragManager Instance { get; private set; }
+        private static CardDragManager _instance;
+        public static CardDragManager Instance => _instance != null ? _instance : null;
 
         public bool IsDragging { get; private set; }
+        internal Vector2 PointerPosition { get; private set; }
         public DragSourceType CurrentSource { get; private set; }
         public uint CurrentCode { get; private set; }
         public int CurrentIndex { get; private set; }
@@ -62,10 +64,15 @@ namespace YGOPortable.UI
             rt.anchorMax = Vector2.one;
             rt.offsetMin = Vector2.zero;
             rt.offsetMax = Vector2.zero;
-            Instance = go.AddComponent<CardDragManager>();
-            Instance.Initialize(rt);
-            Instance.transform.SetAsLastSibling();
-            return Instance;
+            _instance = go.AddComponent<CardDragManager>();
+            _instance.Initialize(rt);
+            _instance.transform.SetAsLastSibling();
+            return _instance;
+        }
+
+        private void OnDestroy()
+        {
+            if (ReferenceEquals(_instance, this)) _instance = null;
         }
 
         private void Initialize(RectTransform root)
@@ -117,6 +124,7 @@ namespace YGOPortable.UI
 
         public void UpdateGhostPosition(Vector2 screenPos)
         {
+            PointerPosition = screenPos;
             if (_ghostRoot == null) return;
             _ghostRoot.position = screenPos;
         }

@@ -20,6 +20,7 @@ namespace YGOPortable.UI
         private bool _pileActionHighlighted;
         private bool _circuitRing;
         private bool _extraMonsterZone;
+        internal bool ColumnGuided { get; private set; }
         private DuelLinkZoneRim _linkRim;
         internal DuelLinkHighlight LinkHighlight { get; private set; }
         internal bool LinkHighlighted => LinkHighlight != DuelLinkHighlight.None;
@@ -29,6 +30,12 @@ namespace YGOPortable.UI
 
         internal void ShowCircuitRing() => _circuitRing = true;
         internal void MarkExtraMonsterZone() => _extraMonsterZone = true;
+        internal void SetColumnGuide(bool enabled)
+        {
+            if (ColumnGuided == enabled) return;
+            ColumnGuided = enabled;
+            SetVerticesDirty();
+        }
 
         internal void SetPlacementHighlight(bool highlighted, bool summonReserved)
         {
@@ -128,6 +135,11 @@ namespace YGOPortable.UI
                 mesh.AddTriangle(center, center + 1 + i, center + 1 + (i + 1) % Corners.Length);
 
             if (_circuitRing) DrawCircuitRing(mesh, rect, _extraMonsterZone);
+            if (ColumnGuided)
+            {
+                DrawSelectionRim(mesh, rect, new Color(.15f, .89f, 1f, .37f), .05f, .83f, .98f);
+                DrawSelectionRim(mesh, rect, new Color(.56f, .98f, 1f, .90f), .22f, .92f, .985f);
+            }
 
             if (_placementHighlighted)
             {

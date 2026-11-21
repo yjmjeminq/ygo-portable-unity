@@ -6,7 +6,7 @@ namespace YGOPortable.UI
     internal enum DuelEffectKind
     {
         AttackPath, Strike, Break, Token, Summon, Chain, Fusion, Synchro, Xyz, Link, Ritual, Pendulum, XyzMaterial,
-        SummonMaterial, BanishTransit, EquipLink
+        SummonMaterial, BanishTransit, EquipLink, ChainNegated, ChainApplied, ColumnRay, LinkRay, LifeSparks, ActionArc
     }
 
     // Canvas particles and tracks use one mesh, with white fill and vertex tints.
@@ -61,6 +61,16 @@ namespace YGOPortable.UI
                 case DuelEffectKind.EquipLink:
                     EquipLink(mesh, rect, t, glow);
                     break;
+                case DuelEffectKind.ColumnRay:
+                case DuelEffectKind.LinkRay:
+                    FieldRay(mesh, rect, travel, glow, Kind == DuelEffectKind.ColumnRay);
+                    break;
+                case DuelEffectKind.LifeSparks:
+                    Sparks(mesh, rect.center, radius * 1.03f, travel, glow, 18, true);
+                    break;
+                case DuelEffectKind.ActionArc:
+                    DrawCommandArc(mesh, rect, glow);
+                    break;
                 case DuelEffectKind.Strike:
                     Strike(mesh, rect.center, radius, travel, glow);
                     break;
@@ -86,10 +96,36 @@ namespace YGOPortable.UI
                     break;
                 case DuelEffectKind.Chain:
                     Glow(mesh, rect.center, radius * 1.19f, 1.06f, Shade(Tint, glow * .67f));
+                    var center = rect.center;
+                    var light = Color.Lerp(Tint, Color.white, .48f);
+                    for (int i = 0; i < 18; i++)
+                    {
+                        float angle = 2f * Mathf.PI * (i / 18f + t * .035f);
+                        var direction = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
+                        var normal = new Vector2(-direction.y, direction.x);
+                        float length = radius * (.76f + (i % 3) * .17f + travel * .19f);
+                        Vector2 start = center + direction * (radius * .36f);
+                        Vector2 tip = center + direction * length;
+                        float width = radius * (i % 3 == 0 ? .037f : .017f);
+                        Triangle(mesh, start - normal * width, tip, start + normal * width,
+                            Shade(i % 3 == 0 ? light : Tint, glow * .61f));
+                    }
                     for (int i = 0; i < 4; i++)
                         Ring(mesh, rect.center, radius * (.65f + .07f * i), 1.18f, (i + 1) * 1.4f, i / 4f + t * .35f,
                             .15f, Shade(Color.Lerp(Tint, Color.white, .37f), glow), 44);
                     Sparks(mesh, rect.center, radius, travel, glow, 22, true);
+                    break;
+                case DuelEffectKind.ChainNegated:
+                    for (int sign = -1; sign <= 1; sign += 2)
+                    {
+                        Vector2 diagonal = new Vector2(.70f, sign * .70f) * radius * travel;
+                        Line(mesh, rect.center - diagonal, rect.center + diagonal, radius * .11f, Shade(Tint, glow * .38f));
+                        Line(mesh, rect.center - diagonal, rect.center + diagonal, radius * .035f, Shade(Tint, glow));
+                    }
+                    break;
+                case DuelEffectKind.ChainApplied:
+                    Ring(mesh, rect.center, radius * (.34f + travel * .57f), .82f, 3.4f, 0f, 1f, Shade(Tint, glow), 32);
+                    Sparks(mesh, rect.center, radius * .9f, travel, glow, 14, true);
                     break;
                 case DuelEffectKind.XyzMaterial:
                     Glow(mesh, rect.center, radius * .69f, .48f, Shade(Tint, glow * .22f));
@@ -142,6 +178,37 @@ namespace YGOPortable.UI
                 var color = Shade(light, glow * (.65f - i * .13f));
                 Line(mesh, point + new Vector2(-width * .65f, width * .48f), point, width * .17f, color);
                 Line(mesh, point, point + new Vector2(-width * .65f, -width * .48f), width * .17f, color);
+            }
+        }
+
+        private void FieldRay(VertexHelper mesh, Rect rect, float travel, float glow, bool column)
+        {
+            Vector2 a = new Vector2(rect.xMin, rect.center.y);
+            Vector2 b = Vector2.Lerp(a, new Vector2(rect.xMax, a.y), Mathf.Clamp01(travel * 1.8f));
+            float width = rect.height * (column ? .33f : .18f);
+            Color white = Color.Lerp(Tint, Color.white, .72f);
+            Line(mesh, a, b, width * 3f, Shade(Tint, glow * .22f));
+            Line(mesh, a, b, width, Shade(Tint, glow * .88f));
+            Line(mesh, a, b, width * .26f, Shade(white, glow));
+            Glow(mesh, b, width * 2.6f, .79f, Shade(Tint, glow * .66f));
+            for (int i = 1; i <= 5; i++)
+            {
+                if (b.x - a.x < i * width * 2f) break;
+                var point = b - Vector2.right * (i * width * 2f);
+                Line(mesh, point + Vector2.up * width, point + Vector2.right * width, width * .14f, Shade(white, glow * .52f));
+                Line(mesh, point - Vector2.up * width, point + Vector2.right * width, width * .14f, Shade(white, glow * .52f));
+            }
+        }
+
+        private void DrawCommandArc(VertexHelper mesh, Rect rect, float glow)
+        {
+            Vector2 Point(float t) => new Vector2(rect.xMin + rect.width * (.13f + .74f * t),
+                rect.yMin + rect.height * (.43f + .31f * Mathf.Sin(Mathf.PI * t)));
+            for (int i = 1; i <= 20; i++)
+            {
+                Vector2 from = Point((i - 1) / 20f), to = Point(i / 20f);
+                Line(mesh, from, to, 8f, Shade(Tint, glow * .14f));
+                Line(mesh, from, to, 2f, Shade(Tint, glow * .64f));
             }
         }
 

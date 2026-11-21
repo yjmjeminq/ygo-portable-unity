@@ -27,6 +27,12 @@ namespace YGOPortable.UI
         private DuelPrompt _cardActionsPrompt;
         private (byte controller, uint location, uint sequence, uint code, int materials) _cardActionKey;
         private bool _infoActionShown;
+        private float _actionArcRadius;
+        private float _actionArcWidth;
+        private float _actionArcDiameter;
+        private float _actionArcOpenedAt;
+        private int _actionArcCount;
+        private readonly List<(RectTransform Rect, Vector2 Position)> _actionArcSlots = new();
         private bool _navigatingCardActions;
 
         private void BuildCardActions(Transform root)
@@ -170,7 +176,7 @@ namespace YGOPortable.UI
 
             var prompt = _session.ActivePrompt;
             var key = CardActionKey(card);
-            bool showInfo = anchor == _touchActionAnchor && CanInspectCardActionSource(card);
+            bool showInfo = CanInspectCardActionSource(card);
             if (anchor != _cardActionAnchor || !ReferenceEquals(prompt, _cardActionsPrompt) ||
                 _cardActionKey != key || _infoActionShown != showInfo)
             {
@@ -232,7 +238,7 @@ namespace YGOPortable.UI
             _cardActionsBar.gameObject.SetActive(true);
         }
 
-        private void ClearCardActionButtons(int count)
+        private void ClearCardActionButtons(int count, bool radial = false)
         {
             for (int i = _cardActionsBar.childCount - 1; i > 0; i--)
             {
@@ -243,8 +249,33 @@ namespace YGOPortable.UI
                 else UnityEngine.Object.DestroyImmediate(old.gameObject);
             }
 
-            _cardActionsBar.sizeDelta = new Vector2(count * (CardActionWidth + CardActionGap) - CardActionGap,
-                CardActionHeight);
+            _actionArcSlots.Clear();
+            _actionArcCount = radial ? count : 0;
+            _actionArcOpenedAt = Time.unscaledTime;
+            if (!radial)
+            {
+                _cardActionsBar.sizeDelta = new Vector2(count * (CardActionWidth + CardActionGap) - CardActionGap,
+                    CardActionHeight);
+                return;
+            }
+
+            _actionArcDiameter = Mathf.Max(CardActionWidth, CardActionHeight);
+            _actionArcWidth = Mathf.Min(152f, 40f * (count - 1));
+            float step = _actionArcWidth * Mathf.Deg2Rad / Mathf.Max(1, count - 1);
+            _actionArcRadius = count == 1 ? 0f : (_actionArcDiameter + 8f) / (2f * Mathf.Sin(step * .5f));
+            float halfArc = _actionArcWidth * .5f * Mathf.Deg2Rad;
+            _cardActionsBar.sizeDelta = new Vector2(_actionArcDiameter + 2f * Mathf.Sin(halfArc) * _actionArcRadius,
+                _actionArcDiameter + (1f - Mathf.Cos(halfArc)) * _actionArcRadius);
+            if (count > 1)
+            {
+                var arc = LotdUiKit.FillRect("CommandArc", _cardActionsBar);
+                var graphic = arc.gameObject.AddComponent<DuelEffectGraphic>();
+                graphic.texture = Texture2D.whiteTexture;
+                graphic.Kind = DuelEffectKind.ActionArc;
+                graphic.Tint = DuelStyle.ChainCyan;
+                graphic.raycastTarget = false;
+                graphic.Seek(.54f);
+            }
         }
 
         private void RebuildCardActions(RectTransform anchor, LiveCardState card, DuelPrompt prompt,
@@ -253,7 +284,7 @@ namespace YGOPortable.UI
             var groups = actions.GroupBy(action => action.responseVal & 0xffff).ToArray();
             bool hasMaterials = card.overlayCodes.Count > 0;
             int infoIndex = groups.Length + (hasMaterials ? 1 : 0);
-            ClearCardActionButtons(infoIndex + (showInfo ? 1 : 0));
+            ClearCardActionButtons(infoIndex + (showInfo ? 1 : 0), radial: true);
             var session = _session;
             var key = CardActionKey(card);
             LiveCardState GetLiveSource()
@@ -321,6 +352,12 @@ namespace YGOPortable.UI
 
         private void AddCardAction(int index, string iconName, string label, Action action, string name = null)
         {
+            if (_actionArcCount > 0)
+            {
+                AddRadialCardAction(index, iconName, label, action, name);
+                return;
+            }
+
             float left = index * (CardActionWidth + CardActionGap);
             var slot = LotdUiKit.CreateRect(name ?? iconName, _cardActionsBar, Vector2.zero, Vector2.zero,
                 new Vector2(left, 0f), new Vector2(left + CardActionWidth, CardActionHeight));
@@ -338,6 +375,30 @@ namespace YGOPortable.UI
                 new Vector2(.76f, _mobileLayout ? .91f : .76f), Vector2.zero, Vector2.zero);
             LotdUiKit.AddImage(icon.gameObject, LotdUiKit.LoadSprite($"LOTD/Icons/ICON_ID_CMDID_48_{iconName}"),
                 Color.white, true, false);
+        }
+
+        private void AddRadialCardAction(int index, string iconName, string label, Action action, string name)
+        {
+            float fraction = _actionArcCount == 1 ? .5f : (float)index / (_actionArcCount - 1);
+            float angle = Mathf.Lerp(-.5f, .5f, fraction) * _actionArcWidth * Mathf.Deg2Rad;
+            float arcFloor = Mathf.Cos(_actionArcWidth * .5f * Mathf.Deg2Rad);
+            float x = _cardActionsBar.sizeDelta.x * .5f + Mathf.Sin(angle) * _actionArcRadius;
+            float y = _actionArcDiameter * .5f + (Mathf.Cos(angle) - arcFloor) * _actionArcRadius;
+            var center = new Vector2(x, y);
+            float half = _actionArcDiameter * .5f;
+            var slot = LotdUiKit.CreateRect(name ?? iconName, _cardActionsBar, Vector2.zero, Vector2.zero,
+                center - Vector2.one * half, center + Vector2.one * half);
+            _actionArcSlots.Add((slot, center));
+            bool primary = iconName is "ACTION" or "ATTACK" or "SUMMON" or "SUMMONSP";
+            var circle = LotdUiKit.FillRect("Circle", slot);
+            var button = DuelStyle.RoundButton(circle, "Button", primary ? DuelStyle.Gold : DuelStyle.ChainCyan, action);
+            var icon = LotdUiKit.CreateRect("Icon", button.transform, new Vector2(.24f, .39f), new Vector2(.76f, .86f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(icon.gameObject, LotdUiKit.LoadSprite($"LOTD/Icons/ICON_ID_CMDID_48_{iconName}"),
+                Color.white, true, false);
+            var caption = LotdUiKit.CreateRect("Caption", button.transform, new Vector2(.08f, .12f), new Vector2(.92f, .39f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddFittedText(caption, "Label", label, 15, 9, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
         }
 
         private void PositionCardActions(RectTransform anchor, bool inHand)
@@ -359,12 +420,18 @@ namespace YGOPortable.UI
             }
             float x = root.InverseTransformPoint(anchor.TransformPoint(anchor.rect.center)).x;
             float inset = _cardActionsBar.sizeDelta.x * .5f + 8f;
-            float y = Mathf.Min(root.rect.yMax - CardActionHeight - 8f, top + (inHand ? 20f : 6f));
+            float y = Mathf.Min(root.rect.yMax - _cardActionsBar.sizeDelta.y - 8f, top + (inHand ? 20f : 6f));
             _cardActionsBar.anchoredPosition = new Vector2(Mathf.Clamp(x, root.rect.xMin + inset, root.rect.xMax - inset), y);
 
             // Keep pointer travel from the card to the controls above cards behind the toolbar.
             float topEdge = root.InverseTransformPoint(anchor.TransformPoint(new Vector2(anchor.rect.center.x, anchor.rect.yMax))).y;
             _cardActionsHoverArea.offsetMin = new Vector2(0f, Mathf.Min(0f, topEdge - y));
+            if (_actionArcSlots.Count == 0) return;
+            float progress = Application.isPlaying ? Mathf.Clamp01((Time.unscaledTime - _actionArcOpenedAt) / .16f) : 1f;
+            float approach = Mathf.SmoothStep(.6f, 1f, progress);
+            var origin = new Vector2(_cardActionsBar.sizeDelta.x * .5f, _actionArcDiameter * .5f);
+            foreach (var (rect, position) in _actionArcSlots)
+                rect.anchoredPosition = Vector2.LerpUnclamped(origin, position, approach);
         }
 
         private void HideCardActions()

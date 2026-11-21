@@ -143,6 +143,8 @@ namespace YGOPortable.UI
         private uint _previousChainCode;
         private int _previousChainNumber;
         private LiveCardState _previousChainReadout;
+        private bool _previousChainOpponent;
+        private readonly HashSet<ChainLinkInfo> _shownChainOutcomes = new();
         private bool _playing;
 
         private const float LifeFeedbackDuration = .46f;
@@ -160,6 +162,7 @@ namespace YGOPortable.UI
             internal LifePointChangeKind Kind;
             internal Action Apply;
             internal CanvasGroup Feedback;
+            internal DuelEffectGraphic Sparks;
         }
 
         private sealed class EquipCue
@@ -245,6 +248,7 @@ namespace YGOPortable.UI
             _previousChainCode = 0;
             _previousChainNumber = 0;
             _previousChainReadout = null;
+            _shownChainOutcomes.Clear();
             _playing = false;
             Paused = false;
             for (int i = _layer.childCount - 1; i >= 0; i--)
@@ -462,10 +466,42 @@ namespace YGOPortable.UI
 
         internal const float CompactChainReadoutHeightRatio = 1.25f;
 
-        internal void QueueChainResolution(Func<(Vector2 Center, float MaxHeight)> readLayout, uint code,
-            int chainNumber, LiveCardState live, bool compact = false)
+        internal void QueueChainResolution(Func<(Vector2 Center, float MaxHeight)> readLayout, ChainLinkInfo link, bool compact = false)
         {
-            QueueStep(ChainResolution(readLayout, code, chainNumber, live, compact));
+            QueueStep(ChainResolution(readLayout, link, compact));
+        }
+
+        internal void QueueChainOutcome(Func<(Vector2 Center, float MaxHeight)> readLayout, ChainLinkInfo link)
+        {
+            QueueStep(ChainOutcome(readLayout, link));
+        }
+
+        internal void QueueFieldRays(RectTransform source, IReadOnlyList<RectTransform> targets, DuelEffectKind kind, Color tint)
+        {
+            if (targets.Count != 0) QueueStep(FieldRays(source, targets, kind, tint));
+        }
+
+        private IEnumerator FieldRays(RectTransform source, IReadOnlyList<RectTransform> targets, DuelEffectKind kind, Color tint)
+        {
+            bool column = kind == DuelEffectKind.ColumnRay;
+            var rays = new DuelEffectGraphic[targets.Count];
+            for (int i = 0; i < rays.Length; i++)
+                rays[i] = CreateEffect(kind, Vector2.zero, Vector2.one, tint);
+            yield return Animate(column ? .44f : .29f, t =>
+            {
+                var start = GetPoint(source, new Vector2(.5f, column ? .93f : .5f));
+                for (int i = 0; i < rays.Length; i++)
+                {
+                    var end = GetPoint(targets[i], new Vector2(.5f, column ? .07f : .5f));
+                    var direction = end - start;
+                    var ray = rays[i].rectTransform;
+                    ray.anchoredPosition = (start + end) * .5f;
+                    ray.sizeDelta = new Vector2(direction.magnitude, column ? 47f : 35f);
+                    ray.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg);
+                    rays[i].Seek(t);
+                }
+            });
+            foreach (var ray in rays) RemoveTransient(ray.gameObject);
         }
 
         internal void QueueFieldReadoutUpdate(Action apply) => QueueStep(ApplyFieldReadoutUpdate(apply));
@@ -1506,6 +1542,8 @@ namespace YGOPortable.UI
         {
             uint previous = chainNumber > 1 && _previousChainNumber == chainNumber - 1 ? _previousChainCode : 0;
             var previousReadout = _previousChainReadout;
+            bool previousOpponent = _previousChainOpponent;
+            _previousChainOpponent = opponent;
             _previousChainNumber = chainNumber;
             _previousChainCode = code;
             _previousChainReadout = live;
@@ -1513,8 +1551,8 @@ namespace YGOPortable.UI
             Vector2 view = _layer.rect.size;
             float height = Mathf.Min(350f, view.y * .45f, view.x * .31f);
             if (height <= 0f) yield break;
-            var center = new Vector2(side * view.x * (previous == 0 ? .04f : .088f), view.y * .055f);
-            var reveal = new CardPose(center, new Vector2(height * LotdUiKit.CardAspectRatio, height), side * 8f);
+            var center = new Vector2(side * view.x * (previous == 0 ? .035f : .075f), view.y * .146f);
+            var reveal = new CardPose(center, new Vector2(height * LotdUiKit.CardAspectRatio, height), side * 3f);
             if (!source.IsValid)
                 source = new CardPose(center + Vector2.down * height * .27f, reveal.Size * .55f, 0f);
             var overlay = LotdUiKit.FillRect("ChainActivation", _layer);
@@ -1531,20 +1569,19 @@ namespace YGOPortable.UI
                 Vector2 priorSize = reveal.Size * .66f;
                 ApplyPose(prior, new CardPose(point, priorSize, -side * 10f));
                 ChainBadge(overlay, point + new Vector2(-side * (priorSize.x * .5f + height * .17f), -height * .20f), chainNumber - 1,
-                    height * .25f, active: false);
+                    height * .25f, active: false, opponent: previousOpponent);
             }
 
-            var crest = CreateEffect(DuelEffectKind.Chain, center, new Vector2(height * 1.40f, height * 1.25f), DuelStyle.Gold);
+            var crest = CreateEffect(DuelEffectKind.Chain, center, new Vector2(height * 1.67f, height * 1.39f), DuelStyle.ChainGold);
             var card = TakeCard(code, code == 0, detailed: true, live: live);
-            var highlight = LotdUiKit.FillRect("ChainCardHighlight", card.transform, -height * .035f);
-            if (DuelVisualAssets.ChainCardHighlight != null)
-                LotdUiKit.AddImage(highlight.gameObject, DuelVisualAssets.ChainCardHighlight, DuelStyle.Gold, false, false);
-            var flash = highlight.gameObject.AddComponent<CanvasGroup>();
-            flash.alpha = 0f;
+            var flash = DuelStyle.AddActivationGlow(card.transform.Find("AspectBox"), height * .025f, behind: false);
+            flash.gameObject.SetActive(true);
+            flash.canvasRenderer.SetAlpha(0f);
             var badge = ChainBadge(_layer, center + new Vector2(side * (reveal.Size.x * .52f + height * .25f), -height * .35f), chainNumber,
                 height * .32f, active: true, opponent: opponent);
             var badgeOpacity = badge.gameObject.AddComponent<CanvasGroup>();
             badgeOpacity.alpha = 0f;
+            badge.localScale = Vector3.one * 1.6f;
             LotdAudio.PlayChain();
 
             var lift = new CardFlight(code, source, reveal, code == 0, code == 0);
@@ -1552,28 +1589,43 @@ namespace YGOPortable.UI
             {
                 crest.Seek(t * .58f);
                 opacity.alpha = Mathf.Clamp01(t * 2.5f);
-                flash.alpha = badgeOpacity.alpha = Mathf.SmoothStep(0f, 1f, (t - .28f) * 2.3f);
-                badge.localScale = Vector3.one * Mathf.Lerp(1.45f, 1f, badgeOpacity.alpha);
-                ApplyFlight(card, lift, t, 22f);
+                flash.canvasRenderer.SetAlpha(Mathf.SmoothStep(0f, .86f, (t - .22f) * 2.2f));
+                float impact = Mathf.Clamp01((t - .26f) / .62f);
+                badgeOpacity.alpha = Mathf.SmoothStep(0f, 1f, impact * 5f);
+                badge.localScale = Vector3.one * Mathf.Lerp(1.6f, 1f, 1f - Mathf.Pow(1f - impact, 3f));
+                ApplyFlight(card, lift, t, height * .095f);
+                TiltChainCard(card, side, t);
             });
             var back = new CardFlight(code, reveal, source, code == 0, code == 0);
-            yield return Animate(.20f, t =>
+            yield return Animate(.24f, t =>
             {
                 crest.Seek(.58f + t * .42f);
                 float returning = Mathf.Clamp01((t - .22f) / .78f);
-                flash.alpha = badgeOpacity.alpha = opacity.alpha = 1f - returning;
-                ApplyFlight(card, back, returning, 13f);
+                flash.canvasRenderer.SetAlpha(1f - returning);
+                badgeOpacity.alpha = opacity.alpha = 1f - returning;
+                ApplyFlight(card, back, returning, height * .037f);
+                TiltChainCard(card, side, (1f - returning) * .5f + .5f, 1f - returning);
             });
-            card.gameObject.SetActive(false);
-            Destroy(card.gameObject);
-            Destroy(crest.gameObject);
-            Destroy(badge.gameObject);
-            Destroy(overlay.gameObject);
+            RemoveTransient(card.gameObject);
+            RemoveTransient(crest.gameObject);
+            RemoveTransient(badge.gameObject);
+            RemoveTransient(overlay.gameObject);
         }
 
-        private IEnumerator ChainResolution(Func<(Vector2 Center, float MaxHeight)> readLayout, uint code,
-            int chainNumber, LiveCardState live, bool compact)
+        private static void TiltChainCard(CompositeCardView card, float side, float progress, float strength = 1f)
         {
+            var rect = (RectTransform)card.transform;
+            float x = Mathf.Sin(progress * Mathf.PI) * -6f * strength;
+            float y = Mathf.Lerp(-6f, 6f, progress) * side * strength;
+            rect.localRotation = Quaternion.Euler(x, y, rect.localEulerAngles.z);
+        }
+
+        private IEnumerator ChainResolution(Func<(Vector2 Center, float MaxHeight)> readLayout, ChainLinkInfo link, bool compact)
+        {
+            uint code = link.code;
+            int chainNumber = link.chainNumber;
+            var live = link.ResolutionReadout;
+
             CardPose ReadPose()
             {
                 var (center, maximum) = readLayout();
@@ -1607,7 +1659,8 @@ namespace YGOPortable.UI
             var badge = ChainBadge(overlay, BadgePoint(initial), chainNumber, initialHeight * .35f, active: true, resolving: true);
             var fade = overlay.gameObject.AddComponent<CanvasGroup>();
             fade.alpha = 0f;
-            yield return Animate(.34f, t =>
+            RectTransform result = null;
+            yield return Animate(.36f, t =>
             {
                 float appear = Mathf.SmoothStep(0f, 1f, t / .24f);
                 fade.alpha = appear * (1f - Mathf.SmoothStep(0f, 1f, (t - .73f) / .27f));
@@ -1620,6 +1673,13 @@ namespace YGOPortable.UI
                 }
                 badge.anchoredPosition = BadgePoint(pose);
                 badge.localScale = Vector3.one * (Mathf.Lerp(1.28f, 1f, appear) * pose.Size.y / initialHeight);
+                if (t < .42f || !link.Resolved) return;
+                if (result == null)
+                {
+                    result = CreateChainOutcomeVisual(overlay, link);
+                    _shownChainOutcomes.Add(link);
+                }
+                ApplyChainOutcomePose(result, pose.Position, pose.Size, Mathf.InverseLerp(.42f, 1f, t));
             });
             overlay.gameObject.SetActive(false);
             if (separateReadout)
@@ -1627,10 +1687,50 @@ namespace YGOPortable.UI
                 RecycleCard(card);
                 card.transform.SetParent(_layer, false);
             }
-            Destroy(overlay.gameObject);
+            RemoveTransient(overlay.gameObject);
 
             static Vector2 ReadoutSize(float height) => new Vector2(height * 1.02f, height * CompactChainReadoutHeightRatio);
             static Vector2 BadgePoint(CardPose pose) => pose.Position + new Vector2(pose.Size.x * .49f, pose.Size.y * .03f);
+        }
+
+        private IEnumerator ChainOutcome(Func<(Vector2 Center, float MaxHeight)> readLayout, ChainLinkInfo link)
+        {
+            // A response prompt may have paused this link before its resolution preview could show the outcome.
+            if (_shownChainOutcomes.Remove(link)) yield break;
+            var result = CreateChainOutcomeVisual(_layer, link);
+            yield return Animate(.24f, t =>
+            {
+                var (center, maxHeight) = readLayout();
+                float height = Mathf.Min(maxHeight, _layer.rect.height * .29f);
+                ApplyChainOutcomePose(result, center, new Vector2(height * LotdUiKit.CardAspectRatio, height), t);
+            });
+            RemoveTransient(result.gameObject);
+        }
+
+        private RectTransform CreateChainOutcomeVisual(Transform parent, ChainLinkInfo link)
+        {
+            var visual = CenteredVisual("ChainOutcome", parent, Vector2.zero, Vector2.one);
+            var kind = link.negated ? DuelEffectKind.ChainNegated : link.DestroyedCard ? DuelEffectKind.Break : DuelEffectKind.ChainApplied;
+            Color tint = link.negated ? DuelStyle.ChainRed : DuelStyle.ChainGold;
+            var effect = CreateEffect(kind, Vector2.zero, Vector2.one, tint, visual);
+            effect.rectTransform.anchorMin = Vector2.zero;
+            effect.rectTransform.anchorMax = Vector2.one;
+            effect.rectTransform.offsetMin = effect.rectTransform.offsetMax = Vector2.zero;
+            var label = LotdUiKit.CreateRect("Status", visual, new Vector2(.06f, .29f), new Vector2(.94f, .49f),
+                Vector2.zero, Vector2.zero);
+            DuelReadoutPlate.Add(label, new Color(.025f, .054f, .075f, .97f));
+            LotdUiKit.AddFittedText(label, "Text", link.negated ? "무효" : link.DestroyedCard ? "파괴" : "효과 처리", 19, 9,
+                TextAnchor.MiddleCenter, tint, FontStyle.Bold);
+            visual.gameObject.AddComponent<CanvasGroup>().alpha = 0f;
+            return visual;
+        }
+
+        private static void ApplyChainOutcomePose(RectTransform visual, Vector2 center, Vector2 cardSize, float progress)
+        {
+            visual.anchoredPosition = center;
+            visual.sizeDelta = new Vector2(cardSize.x * 1.28f, cardSize.y * .88f);
+            visual.GetComponentInChildren<DuelEffectGraphic>().Seek(progress);
+            visual.GetComponent<CanvasGroup>().alpha = Mathf.Clamp01(Mathf.Min(progress * 7f, (1f - progress) * 5f));
         }
 
         private static void AddChainConnector(RectTransform overlay, Vector2 from, Vector2 to, float height)
@@ -1649,11 +1749,9 @@ namespace YGOPortable.UI
             bool active, bool resolving = false, bool opponent = false)
         {
             var holder = CenteredVisual("ChainCount", parent, point, Vector2.one * size);
-            Color amber = DuelStyle.Gold;
-            Color ink = opponent ? new Color(1f, .40f, .33f) : amber;
-            if (resolving) ink = new Color(1f, .86f, .50f);
+            Color ink = resolving ? DuelStyle.ChainGold : opponent ? DuelStyle.ChainRed : DuelStyle.ChainCyan;
             if (!active) ink = Color.Lerp(ink, DuelStyle.GlassEdge, .43f);
-            DuelStyle.AddHexPlate(holder, ink, new Color(.097f, .047f, .055f, .96f));
+            DuelStyle.AddChainMedallion(holder, ink, size);
             var title = LotdUiKit.CreateRect("Caption", holder, new Vector2(.08f, .61f), new Vector2(.92f, .87f),
                 Vector2.zero, Vector2.zero);
             LotdUiKit.AddFittedText(title, "Text", "CHAIN", Mathf.RoundToInt(size * .24f), 7,
@@ -1739,6 +1837,16 @@ namespace YGOPortable.UI
                 DuelTypography.AddNumber(value, "Text", change.Delta > 0 ? $"+{change.Delta}" : change.Delta.ToString(),
                     23, TextAnchor.MiddleRight, tint);
                 change.Feedback = group;
+                if (change.Kind is LifePointChangeKind.BattleDamage or LifePointChangeKind.EffectDamage or
+                    LifePointChangeKind.Damage or LifePointChangeKind.Recovery)
+                {
+                    var sparks = CreateEffect(DuelEffectKind.LifeSparks, Vector2.zero, Vector2.one, tint, holder);
+                    var rect = sparks.rectTransform;
+                    rect.anchorMin = new Vector2(.12f, -.24f);
+                    rect.anchorMax = new Vector2(.95f, 1.24f);
+                    rect.offsetMin = rect.offsetMax = Vector2.zero;
+                    change.Sparks = sparks;
+                }
                 visible = true;
                 damage |= change.Kind is LifePointChangeKind.BattleDamage or LifePointChangeKind.EffectDamage or LifePointChangeKind.Damage;
             }
@@ -1756,6 +1864,7 @@ namespace YGOPortable.UI
                 holder.anchoredPosition = GetPoint(change.Anchor, Vector2.one * .5f);
                 holder.sizeDelta = GetAreaSize(change.Anchor);
                 change.Feedback.alpha = alpha;
+                if (change.Sparks != null) change.Sparks.Seek(Mathf.Clamp01(progress * 1.7f));
             }
         }
 
@@ -1797,9 +1906,9 @@ namespace YGOPortable.UI
             effect.Seek(progress);
         }
 
-        private DuelEffectGraphic CreateEffect(DuelEffectKind kind, Vector2 center, Vector2 size, Color color)
+        private DuelEffectGraphic CreateEffect(DuelEffectKind kind, Vector2 center, Vector2 size, Color color, Transform parent = null)
         {
-            var rect = CenteredVisual(kind.ToString(), _layer, center, size);
+            var rect = CenteredVisual(kind.ToString(), parent ?? _layer, center, size);
             var effect = rect.gameObject.AddComponent<DuelEffectGraphic>();
             effect.texture = Texture2D.whiteTexture;
             effect.Kind = kind;

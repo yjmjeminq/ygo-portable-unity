@@ -143,6 +143,7 @@ namespace YGOPortable.Editor
                             $"{element.name} intersected the device cutout or home indicator.");
                     }
                     foreach (string path in new[] { "ChainConfirmation/Button", "OpenLog", "PauseMenu", "Turn/Dial",
+                        "BattleShortcut", "EndShortcut",
                         "DuelBoard/Zone_3_0", "DuelBoard/Zone_4_3", "DuelBoard/Zone_7_4",
                         "LeftInspector/CardPreview/Card/AspectBox/ZoomHit" })
                         RequireTouch(viewport.Find(path), safe);
@@ -229,6 +230,17 @@ namespace YGOPortable.Editor
                 }
 
                 publicExtra.position = YgoConstants.POS_FACEDOWN_DEFENSE;
+                var dial = viewport.Find("ChainConfirmation/Button");
+                var dialRim = dial.GetComponent<Image>();
+                field.RefreshChainConfirmation(ChainConfirmationMode.Auto);
+                Require(dialRim.color == DuelStyle.ChainCyan && dialRim.sprite == DuelStyle.Disc, "Auto did not use the cyan circular rim.");
+                field.RefreshChainConfirmation(ChainConfirmationMode.On);
+                Require(dialRim.color == DuelStyle.ChainRed && dial.Find("PulseRing").GetComponent<Image>().canvasRenderer.GetAlpha() > .5f,
+                    "On did not light the ruby ring.");
+                field.RefreshChainConfirmation(ChainConfirmationMode.Off);
+                Require(dialRim.color != DuelStyle.ChainCyan && dialRim.color != DuelStyle.ChainRed &&
+                    dial.Find("PulseRing").GetComponent<Image>().canvasRenderer.GetAlpha() == 0f, "Off did not extinguish the ring.");
+                field.RefreshChainConfirmation(ChainConfirmationMode.Auto);
                 field.Refresh();
                 VerifyPileReadout(opponentExtra, 1, 0);
                 duel.Players[1].extra.Clear();
@@ -903,9 +915,12 @@ namespace YGOPortable.Editor
                     float inGap = hoverArea.offsetMin.y * .5f;
                     Require(inGap < -1f, "The activation icon is too close to the hand card for this fixture.");
                     Vector2 gapPoint = RectTransformUtility.WorldToScreenPoint(_camera, bar.TransformPoint(new Vector2(0f, inGap)));
-                    float buttonGap = bar.rect.xMin + ((RectTransform)bar.GetChild(1)).rect.width + 2.5f;
+                    var info = (RectTransform)bar.Find("Details/Circle/Button");
+                    var mid = (activate.position + info.position) * .5f;
                     Vector2 betweenActions = RectTransformUtility.WorldToScreenPoint(_camera,
-                        bar.TransformPoint(new Vector2(buttonGap, 44f)));
+                        mid);
+                    Require(bar.Find("CommandArc").GetComponent<DuelEffectGraphic>().Kind == DuelEffectKind.ActionArc &&
+                        Vector3.Distance(activate.position, info.position) > 5f, "The card commands did not unfold into separate ring targets.");
                     Require(Raycast(gapPoint, out _) == hoverArea.gameObject &&
                         Raycast(betweenActions, out _) == hoverArea.gameObject,
                         "A card behind the action toolbar intercepted the pointer.");
@@ -985,7 +1000,7 @@ namespace YGOPortable.Editor
                 Field.HandleDuelPad(new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Submit));
                 picker = VerifyActivationPicker(prompt, "묘지 효과 발동", code);
                 var action = picker.Find("Footer/Activate/B").GetComponent<Button>();
-                Require(action.GetComponentInChildren<Text>().text == "효과 발동", "The grave effect was not actionable in the chooser.");
+                Require(action.GetComponentInChildren<Text>().text == "발동한다", "The grave effect was not actionable in the chooser.");
                 Click(action);
                 Require(!Modals.IsPromptOpen && !ReferenceEquals(prompt, _duel.ActivePrompt),
                     "Activating a grave effect did not close the picker and continue the duel.");
@@ -1276,7 +1291,10 @@ namespace YGOPortable.Editor
             {
                 Field.Refresh();
                 var dial = Field.Root.transform.Find("Turn/Dial") as RectTransform;
-                var steps = dial.Find("PhaseSteps");
+                var steps = Field.Root.transform.Find("PhaseSteps");
+                Require(Field.Root.transform.Find("BattleShortcut").gameObject.activeInHierarchy == prompt.canBp &&
+                    Field.Root.transform.Find("EndShortcut").gameObject.activeInHierarchy == prompt.canEp,
+                    "The direct phase controls did not match the legal Main Phase responses.");
                 Require(dial.Find("PhaseName/Value").GetComponent<Text>().text == "메인 1" &&
                     steps.Find("Main1").GetComponent<Image>().color.g > steps.Find("Battle").GetComponent<Image>().color.g,
                     "The turn HUD did not identify the current phase.");

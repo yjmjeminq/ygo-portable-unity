@@ -1114,26 +1114,52 @@ namespace YGOPortable.UI
             _activationChoices = choices;
             _activationButtons = new Button[choices.Count];
             bool compact = choices.Count == 1;
-            _chainBox.anchorMin = compact ? new Vector2(.30f, .202f) : new Vector2(.222f, .185f);
-            _chainBox.anchorMax = compact ? new Vector2(.795f, .628f) : new Vector2(.922f, .628f);
-            float stripEnd = choices.Count switch { 1 => .35f, 2 => .455f, 3 => .615f, _ => .695f };
+            _chainBox.anchorMin = compact ? new Vector2(.255f, .200f) : new Vector2(.222f, .185f);
+            _chainBox.anchorMax = compact ? new Vector2(.749f, .655f) : new Vector2(.922f, .628f);
+            float stripEnd = choices.Count switch { 1 => .33f, 2 => .455f, 3 => .615f, _ => .695f };
             var cardStrip = (RectTransform)_chainCardScroll.transform;
+            var pass = (RectTransform)_chainPass.transform.parent;
+            var activate = (RectTransform)_chainActivate.transform.parent;
+            _chainFooter.anchorMin = new Vector2(.021f, .024f);
+            _chainFooter.anchorMax = new Vector2(.977f, .143f);
+            pass.anchorMin = new Vector2(.655f, 0f);
+            pass.anchorMax = new Vector2(.817f, 1f);
+            activate.anchorMin = new Vector2(.836f, 0f);
+            activate.anchorMax = Vector2.one;
+            cardStrip.anchorMin = new Vector2(.019f, .149f);
             cardStrip.anchorMax = new Vector2(stripEnd, .852f);
             _chainDetails.anchorMin = new Vector2(stripEnd + .016f, .176f);
+            _chainDetails.anchorMax = new Vector2(.977f, .852f);
             if (_mobileLayout)
             {
                 _chainBox.anchorMin = new Vector2(.187f, .155f);
                 _chainBox.anchorMax = new Vector2(.905f, .758f);
-                float footerTop = TouchFooterTop(_chainBox, _chainFooter, 1f);
-                _chainFooter.anchorMax = new Vector2(.977f, footerTop);
-                cardStrip.anchorMin = new Vector2(.019f, footerTop + .018f);
-                _chainDetails.anchorMin = new Vector2(stripEnd + .016f, footerTop + .018f);
+                if (!compact)
+                {
+                    float footerTop = TouchFooterTop(_chainBox, _chainFooter, 1f);
+                    _chainFooter.anchorMax = new Vector2(.977f, footerTop);
+                    cardStrip.anchorMin = new Vector2(.019f, footerTop + .018f);
+                    _chainDetails.anchorMin = new Vector2(stripEnd + .016f, footerTop + .018f);
+                }
+            }
+            if (compact)
+            {
+                cardStrip.anchorMin = new Vector2(.019f, .058f);
+                _chainDetails.anchorMin = new Vector2(stripEnd + .016f, .083f);
+                _chainDetails.anchorMax = new Vector2(.726f, .851f);
+                _chainFooter.anchorMin = new Vector2(.745f, .083f);
+                _chainFooter.anchorMax = new Vector2(.977f, .851f);
+                pass.anchorMin = new Vector2(0f, .045f);
+                pass.anchorMax = new Vector2(1f, .453f);
+                activate.anchorMin = new Vector2(0f, .531f);
+                activate.anchorMax = new Vector2(1f, .954f);
             }
             SetFieldView(false);
             _chainTitle.text = title;
             _chainSummary.text = summary;
             _chainPass.transform.parent.gameObject.SetActive(passLabel != null);
-            _chainPass.GetComponentInChildren<Text>(true).text = passLabel ?? "";
+            _chainPass.GetComponentInChildren<Text>(true).text = compact && passLabel != null ? "발동하지 않는다" : passLabel ?? "";
+            _chainActivate.GetComponentInChildren<Text>(true).text = compact ? "발동한다" : "효과 발동";
             _chainActivate.interactable = choices.Count > 0;
             _chainName.text = _chainSource.text = _chainEffect.text = "";
 

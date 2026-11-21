@@ -119,9 +119,12 @@ namespace YGOPortable.Editor
             var ashWindow = Drive(duel, prompt => IncludesChainEffect(prompt, Ash));
             Require(duel.CurrentChain.Count == 2 && duel.CurrentChain[0].code == Merrli && duel.CurrentChain[1].code == Sulliek,
                 "The engine must preserve the AI's chosen order before offering Ash to the other player.");
+            var protectedFusion = duel.CurrentChain[0];
+            var coverSearch = duel.CurrentChain[1];
             duel.SubmitResponseInt(ashWindow.candidates.FindIndex(card => card.code == Ash));
             Drive(duel, IsIdle);
-            Require(duel.Players[0].mzone.Any(card => card?.code == kitkallos) && duel.RetryCount == 0,
+            Require(protectedFusion.Resolved && !protectedFusion.negated && coverSearch.Resolved && coverSearch.negated &&
+                duel.Players[0].mzone.Any(card => card?.code == kitkallos) && duel.RetryCount == 0,
                 "The Graveyard Fusion should resolve after Ash negates the search on top of it.");
         }
 

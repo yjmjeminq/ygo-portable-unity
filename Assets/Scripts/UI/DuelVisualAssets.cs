@@ -25,7 +25,6 @@ namespace YGOPortable.UI
         private static readonly Sprite[] OpponentZoneIcons = LoadZoneIcons("Opponent");
         internal static Sprite PhaseBannerPlayer { get; } = LoadHudSprite("PhaseBannerPlayer");
         internal static Sprite PhaseBannerOpponent { get; } = LoadHudSprite("PhaseBannerOpponent");
-        internal static Sprite ChainCardHighlight { get; } = LoadHudSprite("ChainCardHighlight");
         internal static Sprite WinnerCrown { get; } = LoadHudSprite("WinnerCrown");
         internal static Sprite DuelStart { get; } = LoadHudSprite("DuelStart");
         internal static Sprite DuelVictory { get; } = LoadHudSprite("DuelVictory");

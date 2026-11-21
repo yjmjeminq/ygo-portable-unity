@@ -147,6 +147,8 @@ namespace YGOPortable.Core
         public uint triggerSeq;
         public ulong description;
         public bool negated;
+        internal bool DestroyedCard;
+        internal bool Resolved;
         internal LiveCardState ActivationReadout;
         internal LiveCardState ResolutionReadout;
         internal (byte Controller, uint Location, uint Sequence)? PublicFieldSource;
@@ -1007,6 +1009,8 @@ namespace YGOPortable.Core
 
         private void NotifyCardMoved(CardMoveEvent move, CardMoveEvent swapPartner = null)
         {
+            if (_resolvingChainLink != null && (move.reason & YgoConstants.REASON_DESTROY) != 0)
+                _resolvingChainLink.DestroyedCard = true;
             TrackPublicMonsterMoves(move, swapPartner);
             FollowPublicChainSources(move, swapPartner);
             CaptureMoveSource(move, swapPartner != null);
@@ -1594,7 +1598,11 @@ namespace YGOPortable.Core
 
                 case YgoConstants.MSG_CHAIN_SOLVED:
                     SampleFieldReadouts();
-                    if (_resolvingChainLink != null) OnChainResolved?.Invoke(_resolvingChainLink);
+                    if (_resolvingChainLink != null)
+                    {
+                        _resolvingChainLink.Resolved = true;
+                        OnChainResolved?.Invoke(_resolvingChainLink);
+                    }
                     if (_deckSelectionEffect != null && ReferenceEquals(_deckSelectionEffect, _resolvingChainLink))
                         ClearDeckSelection();
                     _resolvingChainLink = null;

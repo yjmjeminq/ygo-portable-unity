@@ -55,6 +55,9 @@ namespace YGOPortable.UI
         private DuelEffectGraphic _responseAttackArrow;
         private Image _chainIcon;
         private Button _chainConfirmationButton;
+        private Image _chainDialPulse;
+        private Image _chainDialFace;
+        private ChainConfirmationMode _chainDialMode;
         private Text _chainConfirmationLabel;
         private RectTransform _chainControlDock;
         private RectTransform _logControlDock;
@@ -65,6 +68,9 @@ namespace YGOPortable.UI
         private Image _phaseRim;
         private readonly Image[] _phaseSteps = new Image[PhaseEntries.Length];
         private Button _phaseButton;
+        private Button _battleShortcut;
+        private Button _endShortcut;
+        private RectTransform _phaseStrip;
         private GameObject _phasePicker;
         private Text _phaseLabel;
         private Text _phaseControlHint;
@@ -297,6 +303,7 @@ namespace YGOPortable.UI
             session.OnPhaseChanged += HandlePhaseChanged;
             session.OnChainActivated += HandleChainActivatedEvent;
             session.OnChainResolving += HandleChainResolvingEvent;
+            session.OnChainResolved += HandleChainResolvedEvent;
             session.OnFieldReadoutsChanged += QueueFieldReadouts;
             session.OnCardEquipped += HandleCardEquipped;
             session.OnAttackDeclared += HandleAttackEvent;
@@ -338,6 +345,7 @@ namespace YGOPortable.UI
                 _session.OnPhaseChanged -= HandlePhaseChanged;
                 _session.OnChainActivated -= HandleChainActivatedEvent;
                 _session.OnChainResolving -= HandleChainResolvingEvent;
+                _session.OnChainResolved -= HandleChainResolvedEvent;
                 _session.OnFieldReadoutsChanged -= QueueFieldReadouts;
                 _session.OnCardEquipped -= HandleCardEquipped;
                 _session.OnAttackDeclared -= HandleAttackEvent;
@@ -348,6 +356,9 @@ namespace YGOPortable.UI
             }
 
             ClearArrivals();
+            _arrivalLinks.Clear();
+            _revealedImpermanence = null;
+            SetDragColumnGuide(-1);
             _pendingXyzMaterials.Clear();
             Array.Clear(_handCounts, 0, _handCounts.Length);
             _pendingPlaces.Clear();
@@ -439,6 +450,8 @@ namespace YGOPortable.UI
 
         private void HandleCardLocationsChanged(CardMoveEvent move, CardMoveEvent swapPartner)
         {
+            ObserveImpermanenceOrigin(move);
+            ObserveImpermanenceOrigin(swapPartner);
             var readout = ReadoutBeforeMove(move);
             var partnerReadout = ReadoutBeforeMove(swapPartner);
             ClearMovedReadouts(move);
@@ -1135,7 +1148,10 @@ namespace YGOPortable.UI
             var counter = LotdUiKit.CreateRect("Total", cell, new Vector2(.075f, .063f), new Vector2(.925f, .255f),
                 Vector2.zero, Vector2.zero);
             Color side = DuelStyle.Side(opponent);
-            AddHudSurface(counter, Color.Lerp(HudEdge, side, .24f), HudSurface);
+            AddHudSurface(counter, Color.Lerp(DuelStyle.GlassEdge, side, .25f), new Color(.06f, .14f, .19f, .76f));
+            var shine = LotdUiKit.CreateRect("GlassEdge", counter, new Vector2(.038f, 1f), new Vector2(.962f, 1f),
+                new Vector2(0f, -1f), Vector2.zero);
+            LotdUiKit.AddImage(shine.gameObject, LotdUiKit.WhiteSprite, new Color(.68f, .88f, .96f, .48f), false, false);
             var nameRect = LotdUiKit.CreateRect("Caption", counter, new Vector2(.046f, .04f), new Vector2(.745f, .958f),
                 Vector2.zero, Vector2.zero);
             var label = LotdUiKit.AddFittedText(nameRect, "Label", name, 14, 8, TextAnchor.MiddleLeft, DuelStyle.Muted);
@@ -1199,6 +1215,8 @@ namespace YGOPortable.UI
             portrait.enabled = portrait.sprite != null;
 
             BuildTurnHud(root);
+            _battleShortcut = BuildPhaseShortcut(root, "BattleShortcut", "배틀", "BATTLE PHASE", .399f, YgoConstants.PHASE_BATTLE);
+            _endShortcut = BuildPhaseShortcut(root, "EndShortcut", "턴 종료", "END PHASE", .257f, YgoConstants.PHASE_END);
             BuildPhasePicker(root);
             BuildPlacementControls(root);
             var log = _logControlDock = LotdUiKit.CreateRect("OpenLog", root, new Vector2(0.910f, 0.035f), new Vector2(0.984f, 0.092f),
@@ -1207,19 +1225,34 @@ namespace YGOPortable.UI
             var chainConfirmation = _chainControlDock = LotdUiKit.CreateRect("ChainConfirmation", root,
                 new Vector2(.825f, .035f), new Vector2(.901f, .092f), Vector2.zero, Vector2.zero);
             LayoutMobileDuelControls();
-            _chainConfirmationButton = DuelStyle.Button(chainConfirmation, "Button", "AUTO", CycleChainConfirmation, 15);
-            _chainConfirmationButton.navigation = new Navigation { mode = Navigation.Mode.None };
-            _chainConfirmationLabel = _chainConfirmationButton.GetComponentInChildren<Text>();
-            _chainConfirmationLabel.rectTransform.anchorMax = new Vector2(1f, .66f);
-            var chainCaption = LotdUiKit.CreateRect("Caption", _chainConfirmationButton.transform,
-                new Vector2(.04f, .58f), new Vector2(.96f, .99f), Vector2.zero, Vector2.zero);
-            LotdUiKit.AddFittedText(chainCaption, "Label", "체인 확인", 11, 8, TextAnchor.MiddleCenter, DuelStyle.Muted);
+            BuildChainConfirmationDial(chainConfirmation);
             _modals.SetChainConfirmationControl(_chainConfirmationButton);
 
             var hint = LotdUiKit.CreateRect("ActionHint", root, new Vector2(0.294f, 0.187f), new Vector2(0.752f, 0.225f),
                 Vector2.zero, Vector2.zero);
             _hintBannerText = LotdUiKit.AddText(hint, "Text", "", 15, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
             _hintBannerText.gameObject.AddComponent<Outline>().effectColor = LotdUiKit.BgDeep;
+        }
+
+        private void BuildChainConfirmationDial(RectTransform dock)
+        {
+            if (!_mobileLayout)
+                CenterHudControl(dock, new Vector2(.865f, .073f), 60f);
+            _chainConfirmationButton = DuelStyle.RoundButton(dock, "Button", DuelStyle.ChainCyan, CycleChainConfirmation);
+            var dial = _chainConfirmationButton.transform;
+            var halo = LotdUiKit.FillRect("PulseRing", dial, -3f);
+            halo.SetAsFirstSibling();
+            _chainDialPulse = LotdUiKit.AddImage(halo.gameObject, DuelStyle.Disc, Color.clear, false, false);
+            var inset = LotdUiKit.CreateRect("Inset", dial, Vector2.one * .12f, Vector2.one * .88f,
+                Vector2.zero, Vector2.zero);
+            _chainDialFace = LotdUiKit.AddImage(inset.gameObject, DuelStyle.Disc, HudSurface, false, false);
+            var status = LotdUiKit.CreateRect("Status", dial, new Vector2(.08f, .21f), new Vector2(.92f, .63f),
+                Vector2.zero, Vector2.zero);
+            _chainConfirmationLabel = LotdUiKit.AddFittedText(status, "Mode", "AUTO", 20, 9,
+                TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+            var title = LotdUiKit.CreateRect("Caption", dial, new Vector2(.15f, .61f), new Vector2(.85f, .80f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddFittedText(title, "Label", "체인", 12, 8, TextAnchor.MiddleCenter, DuelStyle.Muted);
         }
 
         private static void PositionBottomControl(RectTransform control, float right, float width, float height)
@@ -1249,15 +1282,21 @@ namespace YGOPortable.UI
             _oppHandBar.anchorMin = new Vector2(_oppHandBar.anchorMin.x, Mathf.Max(.873f, bottom + height));
 
             // Keep the smaller HUD shortcuts finger-sized without covering the adjacent pile cells.
-            CenterMobileTarget((RectTransform)_phaseButton.transform, Vector2.one * .5f, touch);
-            CenterMobileTarget(_pauseControlDock, new Vector2(.944f, .799f), touch);
-            CenterMobileTarget(_placementControlDock, new Vector2(.944f, .398f), touch);
+            CenterHudControl((RectTransform)_phaseButton.transform, Vector2.one * .5f, touch);
+            CenterHudControl(_pauseControlDock, new Vector2(.944f, .799f), touch);
+            CenterHudControl(_placementControlDock, new Vector2(.944f, .398f), touch);
+            CenterHudControl((RectTransform)_battleShortcut.transform, new Vector2(.944f, .399f), touch);
+            CenterHudControl((RectTransform)_endShortcut.transform, new Vector2(.944f, .257f), touch);
+            float stripTop = Mathf.Min(.209f, .257f - (touch * .5f + 3f) / safe.rect.height);
+            float stripBottom = Mathf.Min(stripTop - .03f, Mathf.Max(.143f, (touch + 10f) / safe.rect.height));
+            _phaseStrip.anchorMin = new Vector2(.793f, stripBottom);
+            _phaseStrip.anchorMax = new Vector2(.984f, stripTop);
         }
 
-        private static void CenterMobileTarget(RectTransform rect, Vector2 anchor, float touch)
+        private static void CenterHudControl(RectTransform rect, Vector2 anchor, float size)
         {
             rect.anchorMin = rect.anchorMax = anchor;
-            rect.sizeDelta = new Vector2(touch, touch);
+            rect.sizeDelta = new Vector2(size, size);
             rect.anchoredPosition = Vector2.zero;
         }
 
@@ -1280,20 +1319,38 @@ namespace YGOPortable.UI
             _phaseLabel = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("PhaseName", turn, new Vector2(.07f, .42f),
                 new Vector2(.93f, .682f), Vector2.zero, Vector2.zero), "Value", "", 26, 12,
                 TextAnchor.MiddleCenter, HudText);
-            var progress = LotdUiKit.CreateRect("PhaseSteps", turn, new Vector2(.08f, .235f), new Vector2(.92f, .395f),
+            var progress = _phaseStrip = LotdUiKit.CreateRect("PhaseSteps", root, new Vector2(.793f, .155f), new Vector2(.984f, .209f),
                 Vector2.zero, Vector2.zero);
+            DuelReadoutPlate.Add(progress, new Color(.022f, .049f, .068f, .89f));
             for (int i = 0; i < _phaseSteps.Length; i++)
             {
                 var step = LotdUiKit.CreateRect(PhaseEntries[i].name, progress,
                     new Vector2((i + .12f) / _phaseSteps.Length, 0f), new Vector2((i + .88f) / _phaseSteps.Length, 1f),
                     Vector2.zero, Vector2.zero);
                 _phaseSteps[i] = DuelStyle.AddHexPlate(step, HudEdge, HudSurface);
-                _phaseStepLabels[i] = LotdUiKit.AddFittedText(step, "Phase", PhaseShortNames[i], 11, 7,
+                _phaseStepLabels[i] = LotdUiKit.AddFittedText(step, "Phase", PhaseShortNames[i], 18, 9,
                     TextAnchor.MiddleCenter, DuelStyle.Muted, FontStyle.Bold);
             }
             _phaseControlHint = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("ChangePrompt", turn, new Vector2(.09f, .045f),
                 new Vector2(.91f, .213f), Vector2.zero, Vector2.zero), "Label", "페이즈 변경", 13, 8,
                 TextAnchor.MiddleCenter, DuelStyle.Gold);
+        }
+
+        private Button BuildPhaseShortcut(Transform parent, string name, string label, string key, float y, int phase)
+        {
+            var root = LotdUiKit.CreateRect(name, parent, new Vector2(.904f, y - .035f),
+                new Vector2(.984f, y + .035f), Vector2.zero, Vector2.zero);
+            Color tint = phase == YgoConstants.PHASE_BATTLE ? DuelStyle.ChainCyan : DuelStyle.Gold;
+            var button = AddHudButton(DuelStyle.AddHexPlate(root, tint, new Color(.032f, .074f, .103f)),
+                () => OnPhaseShortcut(phase));
+            var heading = LotdUiKit.CreateRect("Label", root, new Vector2(.07f, .34f), new Vector2(.93f, .83f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddFittedText(heading, "Text", label, 19, 10, TextAnchor.MiddleCenter, HudText, FontStyle.Bold);
+            var hint = LotdUiKit.CreateRect("Hint", root, new Vector2(.08f, .11f), new Vector2(.92f, .36f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddFittedText(hint, "Text", key, 11, 7, TextAnchor.MiddleCenter, tint, FontStyle.Bold);
+            button.gameObject.SetActive(false);
+            return button;
         }
 
         private static Button AddHudButton(Image rim, Action onClick)
@@ -1392,6 +1449,10 @@ namespace YGOPortable.UI
                 any |= enabled;
             }
             _phaseButton.interactable = any;
+            bool showShortcuts = !_modals.IsPromptOpen && !_actionPopup.activeSelf && !_phasePicker.activeSelf &&
+                !IsBrowsingZone && !IsReadingCardDetails;
+            _battleShortcut.gameObject.SetActive(showShortcuts && idle && prompt.canBp);
+            _endShortcut.gameObject.SetActive(showShortcuts && (idle || battle) && prompt.canEp);
             _phaseControlHint.enabled = any;
             if (!any) _phasePicker.SetActive(false);
         }
@@ -1424,14 +1485,32 @@ namespace YGOPortable.UI
 
         internal void RefreshChainConfirmation(ChainConfirmationMode mode)
         {
+            _chainDialMode = mode;
             _chainConfirmationLabel.text = mode.ToString().ToUpperInvariant();
-            _chainConfirmationLabel.color = mode switch
+            Color ring = mode switch
             {
-                ChainConfirmationMode.On => DuelStyle.Player,
-                ChainConfirmationMode.Off => DuelStyle.Muted,
-                _ => Color.white
+                ChainConfirmationMode.On => DuelStyle.ChainRed,
+                ChainConfirmationMode.Off => new Color(.29f, .34f, .39f),
+                _ => DuelStyle.ChainCyan
             };
+            _chainConfirmationButton.image.color = ring;
+            _chainConfirmationLabel.color = mode == ChainConfirmationMode.Off ? DuelStyle.Muted : Color.Lerp(ring, Color.white, .36f);
+            _chainDialFace.color = mode == ChainConfirmationMode.Off ? new Color(.045f, .054f, .067f) :
+                Color.Lerp(new Color(.031f, .045f, .065f), ring, .14f);
+            _chainDialPulse.color = new Color(ring.r, ring.g, ring.b, mode == ChainConfirmationMode.On ? .52f : .24f);
+            UpdateChainDialPulse();
             RefreshHandGlows(force: true);
+        }
+
+        private void UpdateChainDialPulse()
+        {
+            float opacity = _chainDialMode switch
+            {
+                ChainConfirmationMode.On => DuelStyle.ActivationPulse,
+                ChainConfirmationMode.Off => 0f,
+                _ => .65f,
+            };
+            _chainDialPulse.canvasRenderer.SetAlpha(opacity);
         }
 
         private void BuildActionPopup(Transform root)
@@ -2140,12 +2219,14 @@ namespace YGOPortable.UI
                 _dragHighlightMZone = false;
                 _dragHighlightSZone = false;
                 _dragHighlightAttack = false;
+                SetDragColumnGuide(-1);
                 Refresh();
             }
         }
 
         private void HandleDuelCardDrop(DragContext ctx)
         {
+            SetDragColumnGuide(-1);
             _dragHighlightMZone = false;
             _dragHighlightSZone = false;
             _dragHighlightAttack = false;
@@ -2605,6 +2686,10 @@ namespace YGOPortable.UI
             }
             _pendingXyzMaterials.Clear();
             animator?.CompleteFieldArrivals();
+            if (animator != null)
+                foreach (var link in _arrivalLinks)
+                    QueueLinkArrivalRays(animator, link.Controller, link.Sequence, link.Markers);
+            _arrivalLinks.Clear();
         }
 
         private DuelCardReadout ReadFieldStats(uint code, LiveCardState live)
@@ -2876,6 +2961,8 @@ namespace YGOPortable.UI
                     ReleaseArrival(key);
                     ReleaseMovingInspection(e, inspection);
                 }, Refresh, e.ReturnEffectId, inspection == null ? null : () => inspection.AtDestination = true);
+                if (e.summonType.HasValue && CardDatabase.Get(e.code) is { IsLink: true, link: not 0 } summon)
+                    _arrivalLinks.Add((e.toCon, e.toSeq, summon.link));
                 return held;
             }
             var arrive = ReserveMoveArrival(e);
@@ -2991,28 +3078,35 @@ namespace YGOPortable.UI
             if (animator == null) return;
             var pose = GetCardPose(link.triggerPlayer, link.triggerLoc, link.triggerSeq, YgoConstants.POS_FACEUP_ATTACK);
             animator.QueueChain(pose, link.code, link.chainNumber, link.triggerPlayer != _session.HumanPlayerIndex, link.ActivationReadout);
+            QueueColumnActivation(animator, link);
         }
 
         private void HandleChainResolvingEvent(ChainLinkInfo link)
         {
             var animator = CardAnimationManager.Instance;
-            if (animator == null) return;
-            if (_mobileLayout)
-            {
-                // Reserve the space between the opponent's LP and the phase control.
-                var playArea = (RectTransform)_boardRect.parent;
-                var area = MobileChainResolutionArea;
-                animator.QueueChainResolution(() =>
-                {
-                    var size = animator.GetAreaSize(playArea);
-                    float height = Mathf.Min(size.x * area.width * .88f,
-                        size.y * area.height / CardAnimationManager.CompactChainReadoutHeightRatio);
-                    return (animator.GetPoint(playArea, area.center), height);
-                }, link.code, link.chainNumber, link.ResolutionReadout, compact: true);
-                return;
-            }
-            animator.QueueChainResolution(() => (animator.GetPoint(_boardRect, new Vector2(.50f, .56f)), 206f),
-                link.code, link.chainNumber, link.ResolutionReadout);
+            if (animator != null)
+                animator.QueueChainResolution(() => ReadChainResolutionLayout(animator), link, compact: _mobileLayout);
+        }
+
+        private void HandleChainResolvedEvent(ChainLinkInfo link)
+        {
+            var animator = CardAnimationManager.Instance;
+            if (animator != null)
+                animator.QueueChainOutcome(() => ReadChainResolutionLayout(animator), link);
+        }
+
+        private (Vector2, float) ReadChainResolutionLayout(CardAnimationManager animator)
+        {
+            if (!_mobileLayout)
+                return (animator.GetPoint(_boardRect, new Vector2(.50f, .56f)), 206f);
+
+            // Keep the chain clear of the opponent LP and the phase dial, including on rotation.
+            var playArea = (RectTransform)_boardRect.parent;
+            var area = MobileChainResolutionArea;
+            var size = animator.GetAreaSize(playArea);
+            float height = Mathf.Min(size.x * area.width * .88f,
+                size.y * area.height / CardAnimationManager.CompactChainReadoutHeightRatio);
+            return (animator.GetPoint(playArea, area.center), height);
         }
 
         private Func<Vector2> CaptureAttackTarget(CardAnimationManager animator, byte attacker, byte target, uint location, uint sequence)
@@ -3214,6 +3308,9 @@ namespace YGOPortable.UI
             if (_myHandBar.rect.size != _myHandSize) RefreshHand(_session.Players[me].hand, me, false);
             if (_oppHandBar.rect.size != _oppHandSize) RefreshHand(_session.Players[opponent].hand, opponent, true);
 
+            UpdateChainDialPulse();
+            UpdateDragColumnGuide();
+            RefreshPhaseChoices(_session.ActivePrompt);
             AdvanceLifeReadouts(Time.deltaTime * PlaybackRate);
 
             // Global Cancel / Dismiss via ESC or Right Mouse Button
