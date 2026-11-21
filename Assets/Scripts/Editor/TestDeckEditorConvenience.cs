@@ -230,7 +230,8 @@ namespace YGOPortable.Editor
         private static void VerifyOpeningHandAndComposition(DeckEditorUI editor)
         {
             var deck = Field<UserDeck>(editor, "_workingDeck");
-            var originals = new[] { BlueEyes, BlueEyes, Magician, Ash, Pot, MirrorForce, 18144506u };
+            const uint blueEyesPrinting = 89631140;
+            var originals = new[] { BlueEyes, blueEyesPrinting, Magician, Ash, Pot, MirrorForce, 18144506u };
             deck.main = new List<uint>(originals);
             Call(editor, "RefreshDeckGrids");
             var counts = Field<Text[]>(editor, "_compositionCounts");
@@ -246,11 +247,35 @@ namespace YGOPortable.Editor
             var cards = Field<Button[]>(editor, "_openingHandButtons");
             uint[] sample = Field<uint[]>(editor, "_openingHand").ToArray();
             Require(cards.Count(button => button.gameObject.activeSelf) == 5 && !cards[5].gameObject.activeSelf, "The first hand did not show five positions.");
+
+            var odds = Field<Text>(editor, "_openingHandOdds");
+            var standby = Field<Button>(editor, "_pickStartersButton");
+            Require(odds.text == "초동을 고르면 확률을 표시합니다", "A deck without marked starters reported a misleading miss percentage.");
+            standby.onClick.Invoke();
+            var picker = Field<RectTransform>(editor, "_starterPickerOverlay");
+            var starter = picker.Find("Window/Card_0").GetComponent<Button>();
+            Require(picker.gameObject.activeInHierarchy && !deckDraw.gameObject.activeSelf &&
+                starter.transform.Find("Caption/Text").GetComponent<Text>().text.EndsWith("2장"),
+                "Alternate printings did not share one starter entry, or the starter picker did not open.");
+            starter.onClick.Invoke();
+            Require(Field<Text>(editor, "_starterPickerPageLabel").text.EndsWith($"미포함 {100d / 21d:0.0}%"),
+                "Changing the starter selection did not update the percentage immediately.");
+            Field<Button>(editor, "_starterPickerDone").onClick.Invoke();
+            Require(!picker.gameObject.activeSelf && deckDraw.gameObject.activeInHierarchy &&
+                EventSystem.current.currentSelectedGameObject == standby.gameObject &&
+                odds.text.StartsWith($"초동 미포함 {100d / 21d:0.0}%"),
+                "Selecting the two printed copies did not calculate the 5-of-7 miss rate or restore controller focus.");
+            var shown = sample.Take(5).ToArray();
+            Require(Enumerable.Range(0, 5).All(i => (cards[i].image.color == LotdUiKit.GoldAccent) ==
+                (CardDatabase.GetDeckPrintingKey(shown[i]) == BlueEyes)), "The sampled hand did not highlight the marked starter copies.");
             deckDraw.Find("Window/Second/Button").GetComponent<Button>().onClick.Invoke();
             Require(cards.All(button => button.gameObject.activeSelf) &&
                 Field<Text>(editor, "_openingHandDrawLabel").gameObject.activeSelf &&
                 Field<uint[]>(editor, "_openingHand").SequenceEqual(sample),
                 "Going second did not reveal the sixth card independently of the opening hand.");
+            Require(odds.text.StartsWith($"초동 미포함 {0d:0.0}%") &&
+                odds.text.EndsWith($"초동 {sample.Count(code => CardDatabase.GetDeckPrintingKey(code) == BlueEyes)}장"),
+                "The sixth card was omitted from the second player's sample or miss rate.");
             for (int i = 0; i < 10; i++)
             {
                 Field<Button>(editor, "_redrawButton").onClick.Invoke();
@@ -263,6 +288,18 @@ namespace YGOPortable.Editor
             Require(Field<RectTransform>(editor, "_expandedDeckOverlay").gameObject.activeSelf,
                 "A sample hand card did not open its expanded inspector.");
             Call(editor, "CloseExpandedDeckCard");
+            Call(editor, "CloseDeckUtility");
+            deck.main.Add(74677422u);
+            Field<Button>(editor, "_openDrawButton").onClick.Invoke();
+            standby.onClick.Invoke();
+            var next = Field<Button>(editor, "_starterNext");
+            Require(next.interactable && starter.transform.Find("Caption/Text").GetComponent<Text>().text.EndsWith("✓"),
+                "Adding a seventh choice lost the preserved selection or did not enable paging.");
+            next.onClick.Invoke();
+            Require(!next.interactable && !picker.Find("Window/Card_1").gameObject.activeSelf &&
+                starter.GetComponentInChildren<CompositeCardView>().CurrentCode == 74677422u,
+                "The next page omitted the final choice or showed stale cards.");
+            Call(editor, "CloseDeckUtility");
             Call(editor, "CloseDeckUtility");
         }
 
@@ -318,6 +355,19 @@ namespace YGOPortable.Editor
             var plus = (RectTransform)Field<Button>(editor, "_deckQuantityPlus").transform;
             Require(overlay.activeSelf && plus.rect.height >= touch - .5f && plus.rect.width >= touch - .5f,
                 $"A normal tap gave the mobile menu a quantity button of {plus.rect.size} instead of {touch}.");
+            Call(editor, "CloseDeckCardActions");
+            Field<Button>(editor, "_openDrawButton").onClick.Invoke();
+            Field<Button>(editor, "_pickStartersButton").onClick.Invoke();
+            Canvas.ForceUpdateCanvases();
+            var starterPicker = Field<RectTransform>(editor, "_starterPickerOverlay");
+            foreach (string path in new[] { "Window/Done/Button", "Window/Previous/Button", "Window/Next/Button", "Window/Card_0" })
+            {
+                var rect = (RectTransform)starterPicker.Find(path);
+                Require(rect.rect.width >= touch - .5f && rect.rect.height >= touch - .5f,
+                    $"Starter picker control {path} has an undersized mobile hit target {rect.rect.size}.");
+            }
+            Call(editor, "CloseDeckUtility");
+            Call(editor, "CloseDeckUtility");
         }
 
         private static T Field<T>(object source, string name) => (T)source.GetType().GetField(name, Instance).GetValue(source);

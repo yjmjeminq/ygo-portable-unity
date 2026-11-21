@@ -174,6 +174,16 @@ namespace YGOPortable.Core
             new string(Ruby.Replace(value, "").Normalize(NormalizationForm.FormKC)
                 .Where(char.IsLetterOrDigit).Select(char.ToUpperInvariant).ToArray());
 
+        internal static double OpeningHandMissChance(int deckCount, int starterCount, int handSize)
+        {
+            int nonStarters = deckCount - starterCount;
+            if (handSize > nonStarters) return 0d;
+            double chance = 1d;
+            for (int i = 0; i < handSize; i++)
+                chance *= (double)(nonStarters - i) / (deckCount - i);
+            return chance;
+        }
+
         public static uint[] DrawOpeningCards(IReadOnlyList<uint> main, Random random)
         {
             var pool = main.ToArray();

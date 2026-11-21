@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEngine;
@@ -22,6 +23,21 @@ namespace YGOPortable.UI
         private readonly CompositeCardView[] _openingHandViews = new CompositeCardView[6];
         private readonly Button[] _openingHandButtons = new Button[6];
         private readonly System.Random _openingHandRandom = new();
+        private const int StarterPageSize = 6;
+        private static readonly Color TurnDrawEdge = new Color(.48f, .32f, .07f);
+        private readonly HashSet<uint> _markedStarters = new();
+        private readonly (Button Button, CompositeCardView Art, Text Caption)[] _starterPickerSlots =
+            new (Button, CompositeCardView, Text)[StarterPageSize];
+        private (uint Code, int Copies)[] _starterChoices = Array.Empty<(uint, int)>();
+        private UserDeck _starterDeck;
+        private int _starterPage;
+        private RectTransform _starterPickerOverlay;
+        private Button _pickStartersButton;
+        private Button _starterPickerDone;
+        private Button _starterPrevious;
+        private Button _starterNext;
+        private Text _starterPickerPageLabel;
+        private Text _openingHandOdds;
         private uint[] _openingHand = Array.Empty<uint>();
         private bool _drawGoingSecond;
         private Text _openingHandTitle;
@@ -134,13 +150,17 @@ namespace YGOPortable.UI
                 () => SetOpeningHandOrder(false)).GetComponentInChildren<Text>();
             _openingHandSecond = DeckButton(draw, "Second", "후공", .19f, .706f, .315f, .81f,
                 () => SetOpeningHandOrder(true)).GetComponentInChildren<Text>();
+            _openingHandOdds = LotdUiKit.AddFittedText(DeckArea(draw, "StarterOdds", .34f, .699f, .699f, .815f),
+                "Text", "", 18, 11, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
+            _pickStartersButton = DeckButton(draw, "PickStarters", "초동 카드 선택", .713f, _mobileLayout ? .661f : .706f,
+                .945f, _mobileLayout ? .846f : .81f, OpenStarterPicker, fontSize: 17);
             for (int i = 0; i < _openingHandViews.Length; i++)
             {
                 int slot = i;
                 float x = .051f + i * .146f + (i == 5 ? .024f : 0f);
-                var cell = DeckArea(draw, $"Card_{i}", x, .218f, x + .132f, .676f);
+                var cell = DeckArea(draw, $"Card_{i}", x, .218f, x + .132f, _mobileLayout ? .651f : .676f);
                 var surface = LotdUiKit.AddImage(cell.gameObject, LotdUiKit.WhiteSprite,
-                    i == 5 ? new Color(.48f, .32f, .07f) : LotdUiKit.PanelNavy);
+                    i == 5 ? TurnDrawEdge : LotdUiKit.PanelNavy);
                 var hit = cell.gameObject.AddComponent<Button>();
                 hit.targetGraphic = surface;
                 hit.onClick.AddListener(() =>
@@ -154,6 +174,7 @@ namespace YGOPortable.UI
                 "Text", "후공 첫 턴 드로우", 18, 12, TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
             _redrawButton = DeckButton(draw, "Redraw", "다시 뽑기", .366f, .049f, .635f, .172f,
                 RedrawOpeningHand, true, 21);
+            BuildStarterPicker(root);
         }
 
         private RectTransform BuildDeckOverlay(Transform root, string name, out RectTransform panel)
@@ -175,10 +196,16 @@ namespace YGOPortable.UI
 
         private void OpenDeckUtility(RectTransform overlay, Selectable first)
         {
-            if (_utilityOverlay != null) CloseDeckUtility();
+            if (_utilityOverlay != null) DismissDeckUtility(restoreFocus: true);
             CancelDeckDrag();
             EndDeckTransfer();
             _utilityReturnFocus = EventSystem.current?.currentSelectedGameObject;
+            ShowDeckUtility(overlay, first);
+        }
+
+        private void ShowDeckUtility(RectTransform overlay, Selectable first)
+        {
+            if (_utilityOverlay != null) _utilityOverlay.gameObject.SetActive(false);
             _padUi.Clear();
             _padCardFocus.Hide();
             _utilityOverlay = overlay;
@@ -190,7 +217,16 @@ namespace YGOPortable.UI
             UiEntranceMotion.Play(overlay.Find("Window").gameObject);
         }
 
-        private void CloseDeckUtility() => DismissDeckUtility(restoreFocus: true);
+        private void CloseDeckUtility()
+        {
+            if (_utilityOverlay == _starterPickerOverlay && _starterPickerOverlay != null)
+            {
+                RefreshOpeningHand();
+                ShowDeckUtility(_deckDrawOverlay, _pickStartersButton);
+                return;
+            }
+            DismissDeckUtility(restoreFocus: true);
+        }
 
         private void DismissDeckUtility(bool restoreFocus)
         {
@@ -208,6 +244,15 @@ namespace YGOPortable.UI
         private void OpenTestDraw()
         {
             if (_workingDeck.main.Count == 0) return;
+            if (!ReferenceEquals(_starterDeck, _workingDeck))
+            {
+                _starterDeck = _workingDeck;
+                _markedStarters.Clear();
+                _starterPage = 0;
+            }
+            _starterChoices = _workingDeck.main.GroupBy(CardDatabase.GetDeckPrintingKey)
+                .Select(group => (group.Key, group.Count())).ToArray();
+            _markedStarters.IntersectWith(_starterChoices.Select(card => card.Code));
             _drawGoingSecond = false;
             RedrawOpeningHand();
             OpenDeckUtility(_deckDrawOverlay, _redrawButton);
@@ -237,11 +282,107 @@ namespace YGOPortable.UI
             {
                 bool visible = i < initial || i == 5 && turnDraw;
                 _openingHandButtons[i].gameObject.SetActive(visible);
-                if (visible) _openingHandViews[i].SetCard(_openingHand[i]);
+                if (!visible) continue;
+                uint code = _openingHand[i];
+                bool starter = _markedStarters.Contains(CardDatabase.GetDeckPrintingKey(code));
+                _openingHandViews[i].SetCard(code);
+                _openingHandButtons[i].image.color = starter ? LotdUiKit.GoldAccent :
+                    i == 5 ? TurnDrawEdge : LotdUiKit.PanelNavy;
             }
+            int starterCount = CountOpeningStarters();
+            int cardsSeen = initial + (turnDraw ? 1 : 0);
+            int hits = _openingHand.Take(cardsSeen).Count(code => _markedStarters.Contains(CardDatabase.GetDeckPrintingKey(code)));
+            double miss = DeckRecipe.OpeningHandMissChance(_workingDeck.main.Count, starterCount, cardsSeen);
+            _openingHandOdds.text = starterCount == 0 ? "초동을 고르면 확률을 표시합니다" :
+                $"초동 미포함 {miss * 100d:0.0}%\n이번 패에 초동 {hits}장";
             _openingHandDrawLabel.gameObject.SetActive(turnDraw);
             if (_deckDrawOverlay.gameObject.activeInHierarchy)
                 DeckPadUi.LimitKeyboardNavigation(_deckDrawOverlay);
+        }
+
+        private int CountOpeningStarters() =>
+            _starterChoices.Where(card => _markedStarters.Contains(card.Code)).Sum(card => card.Copies);
+
+        private void BuildStarterPicker(Transform root)
+        {
+            _starterPickerOverlay = BuildDeckOverlay(root, "StarterPicker", out var picker);
+            LotdUiKit.AddFittedText(DeckArea(picker, "Title", .055f, .843f, .72f, .953f),
+                "Text", "초동 카드 선택", 28, 17, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
+            _starterPickerDone = DeckButton(picker, "Done", "돌아가기", .765f, _mobileLayout ? .765f : .832f,
+                .945f, .954f, CloseDeckUtility, true);
+            LotdUiKit.AddFittedText(DeckArea(picker, "Instructions", .055f, .724f, .746f, .817f), "Text",
+                "첫 턴을 시작하는 데 쓸 카드를 고르세요. 같은 카드의 장수도 계산에 반영됩니다.",
+                20, 12, TextAnchor.MiddleLeft, LotdUiKit.TextMuted);
+            for (int i = 0; i < _starterPickerSlots.Length; i++)
+            {
+                int slot = i;
+                float x = .052f + i * .151f;
+                var cell = DeckArea(picker, $"Card_{i}", x, .198f, x + .140f, .707f);
+                var surface = LotdUiKit.AddImage(cell.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelNavy);
+                var button = cell.gameObject.AddComponent<Button>();
+                button.targetGraphic = surface;
+                button.onClick.AddListener(() => ToggleOpeningStarter(slot));
+                var art = CompositeCardView.Create(DeckArea(cell, "Art", .04f, .176f, .96f, .99f), "Card");
+                var caption = LotdUiKit.AddFittedText(DeckArea(cell, "Caption", .04f, .015f, .96f, .177f),
+                    "Text", "", 15, 9, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
+                caption.supportRichText = false;
+                _starterPickerSlots[i] = (button, art, caption);
+            }
+
+            float footerBottom = _mobileLayout ? .013f : .046f;
+            float footerTop = _mobileLayout ? .194f : .171f;
+            _starterPrevious = DeckButton(picker, "Previous", "이전", .055f, footerBottom, .23f, footerTop,
+                () => ShowStarterPage(_starterPage - 1));
+            _starterNext = DeckButton(picker, "Next", "다음", .771f, footerBottom, .945f, footerTop,
+                () => ShowStarterPage(_starterPage + 1));
+            _starterPickerPageLabel = LotdUiKit.AddFittedText(DeckArea(picker, "Page", .252f, .052f, .748f, .156f),
+                "Text", "", 19, 12, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
+        }
+
+        private void OpenStarterPicker()
+        {
+            ShowDeckUtility(_starterPickerOverlay, _starterPickerDone);
+            ShowStarterPage(_starterPage);
+        }
+
+        private void ToggleOpeningStarter(int slot)
+        {
+            int index = _starterPage * StarterPageSize + slot;
+            if (index >= _starterChoices.Length) return;
+            uint code = _starterChoices[index].Code;
+            if (!_markedStarters.Add(code)) _markedStarters.Remove(code);
+            ShowStarterPage(_starterPage);
+        }
+
+        private void ShowStarterPage(int page)
+        {
+            int pages = Mathf.Max(1, (_starterChoices.Length + StarterPageSize - 1) / StarterPageSize);
+            _starterPage = Mathf.Clamp(page, 0, pages - 1);
+            for (int i = 0; i < _starterPickerSlots.Length; i++)
+            {
+                int index = _starterPage * StarterPageSize + i;
+                var (button, art, caption) = _starterPickerSlots[i];
+                bool visible = index < _starterChoices.Length;
+                button.gameObject.SetActive(visible);
+                if (!visible) continue;
+                var (code, copies) = _starterChoices[index];
+                bool selected = _markedStarters.Contains(code);
+                art.SetCard(code);
+                button.image.color = selected ? TurnDrawEdge : LotdUiKit.PanelNavy;
+                caption.color = selected ? LotdUiKit.GoldAccent : LotdUiKit.TextPrimary;
+                caption.text = $"{CardDatabase.GetName(code)} · {copies}장" + (selected ? " ✓" : "");
+            }
+            _starterPrevious.interactable = _starterPage > 0;
+            _starterNext.interactable = _starterPage + 1 < pages;
+            int starterCount = CountOpeningStarters();
+            int cardsSeen = Mathf.Min(_drawGoingSecond ? 6 : 5, _workingDeck.main.Count);
+            double miss = DeckRecipe.OpeningHandMissChance(_workingDeck.main.Count, starterCount, cardsSeen);
+            _starterPickerPageLabel.text = $"{_starterPage + 1} / {pages}  ·  초동 {starterCount}장";
+            if (starterCount > 0) _starterPickerPageLabel.text += $"  ·  미포함 {miss * 100d:0.0}%";
+            DeckPadUi.LimitKeyboardNavigation(_starterPickerOverlay);
+            var focus = EventSystem.current?.currentSelectedGameObject?.GetComponent<Button>();
+            if (focus != null && (!focus.gameObject.activeInHierarchy || !focus.interactable))
+                EventSystem.current.SetSelectedGameObject(_starterPickerSlots[0].Button.gameObject);
         }
 
         private void CopyDeckRecipe(bool ydk)
