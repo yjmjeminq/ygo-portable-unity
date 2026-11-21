@@ -451,6 +451,12 @@ namespace YGOPortable.UI
                 _padUi.Clear();
             }
             _padArea = area;
+            SwitchMobilePadArea(area);
+            if (_mobileLayout && !_padMode)
+            {
+                _deckHelpLabel.text = "";
+                return;
+            }
             var actions = area switch
             {
                 PadArea.Trunk => "보관함   A 카드 메뉴",

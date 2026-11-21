@@ -305,86 +305,192 @@ namespace YGOPortable.Editor
 
         private static void VerifyMobile(DeckEditorUI editor, EventSystem events)
         {
-            var safe = editor.Root.transform.Find("MobileSafeArea");
-            Require(safe != null && safe.Find("Editor") != null, "The mobile deck editor had no safe-area host.");
+            var safe = (RectTransform)editor.Root.transform.Find("MobileSafeArea");
+            var root = safe.Find("Editor");
             var layout = safe.GetComponent<MobileSafeArea>();
-            layout.Reflow(new Rect(112, 48, 1376, 812), new Vector2Int(1600, 900));
+            var area = new Rect(112, 48, 1376, 812);
+            layout.Reflow(area, new Vector2Int(1600, 900));
             Canvas.ForceUpdateCanvases();
+            Call(editor, "LayoutMobileEditor");
+            var deck = Field<UserDeck>(editor, "_workingDeck");
+            deck.main.Clear();
+            deck.side.Clear();
+            deck.extra.Clear();
+            deck.main.Add(Magician);
+            deck.extra.Add(DragonKnight);
+            deck.side.Add(Pot);
             Call(editor, "RefreshDeckGrids");
-            Call(editor, "ResizeTrunkGrid", true);
-
-            float touch = MobileSafeArea.MinimumTouchSize(safe);
-            var trunk = Field<RectTransform>(editor, "_trunkViewport");
-            var previewScroll = Field<ScrollRect>(editor, "_previewScroll");
-            var previewText = Field<Text>(editor, "_previewDesc");
-            Require(Field<int>(editor, "_trunkColumns") <= 3 && Field<float>(editor, "_colWidth") >= touch + 4f &&
-                trunk.rect.width >= 375f, "The mobile trunk did not leave room for larger card thumbnails.");
-            Require(previewText.fontSize >= 23 && previewScroll.viewport.rect.width >= 235f &&
-                previewScroll.viewport.rect.height >= 195f, "The mobile card rules did not get a readable pane.");
-            foreach (string gridField in new[] { "_mainDeckSlotGrid", "_extraDeckSlotGrid", "_sideDeckSlotGrid" })
-            {
-                var slot = (RectTransform)Field<RectTransform>(editor, gridField).Find("Card_0");
-                Require(slot.rect.width >= touch - .5f && slot.rect.height >= touch - .5f,
-                    $"{gridField}: hit area {slot.rect.size} missed the {touch} minimum.");
-            }
-            var chip = (RectTransform)Field<Button[]>(editor, "_quickFilterButtons")[0].transform;
-            Require(chip.rect.width >= touch - .5f && chip.rect.height >= touch - .5f,
-                "A mobile filter chip did not allow a full touch target.");
+            Canvas.ForceUpdateCanvases();
             var main = Field<RectTransform>(editor, "_mainDeckSlotGrid");
-            var trigger = main.Find("Card_0").GetComponent<CardDragTrigger>();
-            trigger.OnLeftClick();
-            var details = safe.Find("Editor/CardDetails/ReadCard/Button").GetComponent<Button>();
-            details.onClick.Invoke();
-            Require(Field<Text>(editor, "_expandedDeckDescription").fontSize >= 30,
-                "The large rules button did not open the mobile reading layout.");
-            Call(editor, "CloseExpandedDeckCard");
+            var mainGrid = Field<RectTransform>(editor, "_mainGridRect");
+            var extraGrid = Field<RectTransform>(editor, "_extraGridRect");
+            var sideGrid = Field<RectTransform>(editor, "_sideGridRect");
+            var trunkPane = Field<RectTransform>(editor, "_trunkPanel");
+            var deckPane = Field<RectTransform>(editor, "_deckPanel");
+            Require(deckPane.gameObject.activeInHierarchy && !trunkPane.gameObject.activeInHierarchy &&
+                !root.Find("CardDetails").gameObject.activeInHierarchy && deckPane.rect.width > safe.rect.width * .9f,
+                "The mobile editor did not start in its full-width deck tab.");
+            Require(mainGrid.gameObject.activeInHierarchy && !extraGrid.gameObject.activeInHierarchy && !sideGrid.gameObject.activeInHierarchy,
+                "The accordion opened more than one initial section.");
+            var sections = Field<Button[]>(editor, "_mobileSectionButtons");
+            sections[1].onClick.Invoke();
+            Require(extraGrid.gameObject.activeInHierarchy && !mainGrid.gameObject.activeInHierarchy, "Extra Deck did not expand.");
+            sections[1].onClick.Invoke();
+            Require(!extraGrid.gameObject.activeInHierarchy, "The active deck section could not be collapsed.");
+            sections[2].onClick.Invoke();
+            Require(sideGrid.gameObject.activeInHierarchy, "Side Deck did not expand.");
+            sections[0].onClick.Invoke();
+            Canvas.ForceUpdateCanvases();
+            var canvas = (RectTransform)editor.Root.transform.parent;
+            VerifyMobileCardScale(editor, canvas, layout, safe, new Rect(92, 22, 1150, 698), new Vector2Int(1334, 750));
+            VerifyMobileCardScale(editor, canvas, layout, safe, new Rect(0, 0, 1600, 900), new Vector2Int(1600, 900));
+            VerifyMobileCardScale(editor, canvas, layout, safe, area, new Vector2Int(1600, 900));
+            Canvas.ForceUpdateCanvases();
+            var deckArt = (RectTransform)main.Find("Card_0/CardInset/Card/AspectBox");
+            Require(deckArt.Find("DeckCopies/Count").GetComponent<Text>().text == "×1", "The deck did not show the card copy count.");
             var finger = new PointerEventData(events)
             {
                 pointerId = 0, button = PointerEventData.InputButton.Left, position = new Vector2(400, 270),
             };
-            trigger.OnPointerDown(finger);
-            Require(!(bool)Call(trigger, "TryCompleteTouchHold", 0, finger.position, Field<float>(trigger, "_touchPressAt") + .15f),
-                "A short touch incorrectly invoked the card hold action.");
-            Require((bool)Call(trigger, "TryCompleteTouchHold", 0, finger.position, Field<float>(trigger, "_touchPressAt") + .52f),
-                "A stationary long press did not open the card menu.");
-            var related = Field<Button>(editor, "_deckCardActionRelated");
-            Require(related.gameObject.activeInHierarchy && related.IsInteractable(),
-                "A stationary long press did not expose related-card search.");
-            Field<Button>(editor, "_deckCardActionDetails").onClick.Invoke();
-            var panel = Field<RectTransform>(editor, "_expandedDeckPanel");
-            Require(panel.anchoredPosition.x > panel.rect.width, "The expanded inspector did not start off-screen.");
-            Call(editor, "UpdateExpandedDeckCard", .3f);
-            Require(panel.anchoredPosition == Vector2.zero && panel.rect.width > 800 &&
-                Field<Text>(editor, "_expandedDeckDescription").text == CardDatabase.Get(trigger.CardCodeGetter()).desc,
-                "The inspector did not slide in to show readable card details.");
-            trigger.OnPointerUp(finger);
-            trigger.OnPointerClick(finger);
-            Require(!Field<GameObject>(editor, "_deckCardActions").activeSelf, "Releasing a long press also opened the tap menu.");
-            Call(editor, "CloseExpandedDeckCard");
-            trigger.OnPointerDown(finger);
-            Require(!(bool)Call(trigger, "TryCompleteTouchHold", 0, finger.position + Vector2.right * 80f,
-                Field<float>(trigger, "_touchPressAt") + .60f), "A swipe fired the long-press action.");
-            trigger.OnPointerUp(finger);
-            trigger.OnPointerDown(finger);
-            trigger.OnPointerUp(finger);
-            trigger.OnPointerClick(finger);
-            var overlay = Field<GameObject>(editor, "_deckCardActions");
-            var plus = (RectTransform)Field<Button>(editor, "_deckQuantityPlus").transform;
-            Require(overlay.activeSelf && plus.rect.height >= touch - .5f && plus.rect.width >= touch - .5f,
-                $"A normal tap gave the mobile menu a quantity button of {plus.rect.size} instead of {touch}.");
-            Call(editor, "CloseDeckCardActions");
-            Field<Button>(editor, "_openDrawButton").onClick.Invoke();
-            Field<Button>(editor, "_pickStartersButton").onClick.Invoke();
-            Canvas.ForceUpdateCanvases();
-            var starterPicker = Field<RectTransform>(editor, "_starterPickerOverlay");
-            foreach (string path in new[] { "Window/Done/Button", "Window/Previous/Button", "Window/Next/Button", "Window/Card_0" })
+            void Tap(CardDragTrigger trigger)
             {
-                var rect = (RectTransform)starterPicker.Find(path);
-                Require(rect.rect.width >= touch - .5f && rect.rect.height >= touch - .5f,
-                    $"Starter picker control {path} has an undersized mobile hit target {rect.rect.size}.");
+                trigger.OnPointerDown(finger);
+                trigger.OnPointerUp(finger);
+                trigger.OnPointerClick(finger);
             }
+
+            Tap(main.Find("Card_0").GetComponent<CardDragTrigger>());
+            Require(deck.main.Count == 0, "A single deck tap did not remove exactly one card.");
+
+            Field<Button>(editor, "_mobileTrunkTab").onClick.Invoke();
+            Canvas.ForceUpdateCanvases();
+            var trunk = Field<RectTransform>(editor, "_trunkViewport");
+            Require(!deckPane.gameObject.activeInHierarchy && trunkPane.gameObject.activeInHierarchy,
+                "The search tab did not replace the deck view.");
+            var chips = Field<Button[]>(editor, "_quickFilterButtons");
+            Button Chip(string label) => chips.Single(button => button.GetComponentInChildren<Text>().text.TrimStart('•', ' ') == label);
+            var results = Field<List<CardInfo>>(editor, "_trunkResults");
+            Chip("마법").onClick.Invoke();
+            Require(results.Count > 0 && results.All(card => (card.type & YgoConstants.TYPE_SPELL) != 0), "Spell chip did not filter.");
+            Chip("전체").onClick.Invoke();
+            Chip("속성 어둠").onClick.Invoke();
+            Chip("마법사족").onClick.Invoke();
+            Require(results.Count > 0 && results.All(card => card.attr == YgoConstants.ATTRIBUTE_DARK &&
+                card.race == YgoConstants.RACE_SPELLCASTER), "Attribute and race chips did not combine.");
+            Chip("전체").onClick.Invoke();
+            foreach (var (name, type) in new[] { ("함정", YgoConstants.TYPE_TRAP), ("융합", YgoConstants.TYPE_FUSION),
+                ("싱크로", YgoConstants.TYPE_SYNCHRO), ("엑시즈", YgoConstants.TYPE_XYZ), ("링크", YgoConstants.TYPE_LINK) })
+            {
+                Chip(name).onClick.Invoke();
+                Require(results.Count > 0 && results.All(card => (card.type & type) != 0), $"{name} chip did not filter.");
+                Chip("전체").onClick.Invoke();
+            }
+
+            var keyboard = new Rect(0f, 0f, 1600f, 400f);
+            Call(editor, "ApplyMobileKeyboardLayout", keyboard, area);
+            Canvas.ForceUpdateCanvases();
+            var searchRow = (RectTransform)trunkPane.Find("SearchRow");
+            float SafeBottom(RectTransform rect) =>
+                safe.InverseTransformPoint(rect.TransformPoint(new Vector3(rect.rect.xMin, rect.rect.yMin, 0f))).y;
+            float keyboardTop = safe.rect.yMin + (keyboard.yMax - area.yMin) * safe.rect.height / area.height;
+            Require(SafeBottom(trunk) >= keyboardTop && SafeBottom(searchRow) >= keyboardTop && trunk.rect.height > 200f,
+                $"The keyboard top {keyboardTop:F1} crossed the list at {SafeBottom(trunk):F1} or search at {SafeBottom(searchRow):F1}.");
+            Call(editor, "ApplyMobileKeyboardLayout", Rect.zero, area);
+            var search = Field<InputField>(editor, "_searchInp");
+            search.text = Magician.ToString();
+            var pool = Field<List<(RectTransform rt, CompositeCardView card, Text count, CardDragTrigger trigger)>>(editor, "_trunkPool");
+            var tile = pool.First(slot => slot.rt.gameObject.activeInHierarchy && slot.card.CurrentCode == Magician);
+            Tap(tile.trigger);
+            Require(deck.main.SequenceEqual(new[] { Magician }) && tile.count.text == "×2",
+                "A single trunk tap did not add one copy and update the remaining count.");
+            var quantities = Field<Button[]>(editor, "_mobileQuantity");
+            quantities[2].onClick.Invoke();
+            Tap(tile.trigger);
+            Require(deck.main.Count == 3, "The three-copy stepper or copy limit failed.");
+            quantities[1].onClick.Invoke();
+            Require(deck.main.Count == 2, "The two-copy stepper did not set the exact quantity.");
+            quantities[3].onClick.Invoke();
+            Require(deck.main.Count == 0, "The remove stepper did not clear the selected card.");
+            quantities[0].onClick.Invoke();
+            Require(deck.main.SequenceEqual(new[] { Magician }), "The one-copy stepper did not restore the selected card.");
+
+            tile.trigger.OnPointerDown(finger);
+            Require(!(bool)Call(tile.trigger, "TryCompleteTouchHold", 0, finger.position + Vector2.right * 80f,
+                Field<float>(tile.trigger, "_touchPressAt") + .60f), "A swipe fired the long press.");
+            tile.trigger.OnPointerUp(finger);
+            tile.trigger.OnPointerDown(finger);
+            Require((bool)Call(tile.trigger, "TryCompleteTouchHold", 0, finger.position,
+                Field<float>(tile.trigger, "_touchPressAt") + .60f), "A stationary long press did not show card details.");
+            var panel = Field<RectTransform>(editor, "_expandedDeckPanel");
+            Require(panel.anchoredPosition.y < -panel.rect.height && Mathf.Approximately(panel.anchoredPosition.x, 0f),
+                "The mobile card sheet did not start below the viewport.");
+            Call(editor, "UpdateExpandedDeckCard", .3f);
+            var effect = Field<Text>(editor, "_expandedDeckDescription");
+            Require(panel.anchoredPosition == Vector2.zero && effect.fontSize >= 30 && effect.text == CardDatabase.Get(Magician).desc,
+                "The sheet did not rise with readable card details.");
+            tile.trigger.OnPointerUp(finger);
+            tile.trigger.OnPointerClick(finger);
+            Require(deck.main.Count == 1, "Releasing a long press also added a copy.");
+            panel.Find("Related/Button").GetComponent<Button>().onClick.Invoke();
+            Require(Field<uint>(editor, "_relatedFilterCode") == Magician && trunkPane.gameObject.activeInHierarchy &&
+                results.Any(card => card.code == DragonKnight), "Related-card search did not open the filtered trunk.");
+
+            deck.main.Clear();
+            deck.main.AddRange(new[] { Pot, Magician, Ash, MirrorForce, Excel, Diabellstar });
+            root.Find("MobileToolbar/AutoSort/Button").GetComponent<Button>().onClick.Invoke();
+            Require(CardDatabase.Get(deck.main[0]).IsMonster && CardDatabase.Get(deck.main[^1]).IsTrap,
+                "The top autosort did not order cards by frame.");
+            root.Find("MobileToolbar/Save/Button").GetComponent<Button>().onClick.Invoke();
+            Require(!(bool)Call(editor, "HasUnsavedChanges"), "The top save button did not persist the edited deck.");
+            Field<Button>(editor, "_openDrawButton").onClick.Invoke();
+            var hand = Field<Button[]>(editor, "_openingHandButtons");
+            Require(Field<RectTransform>(editor, "_deckDrawOverlay").gameObject.activeInHierarchy &&
+                hand.Count(button => button.gameObject.activeInHierarchy) == 5, "The top draw button did not show five cards.");
+            var firstHand = Field<uint[]>(editor, "_openingHand");
+            Field<Button>(editor, "_redrawButton").onClick.Invoke();
+            Require(!ReferenceEquals(firstHand, Field<uint[]>(editor, "_openingHand")) &&
+                hand.Count(button => button.gameObject.activeInHierarchy) == 5, "The mobile first-hand tool did not redraw.");
             Call(editor, "CloseDeckUtility");
-            Call(editor, "CloseDeckUtility");
+            Debug.Log("[VERIFY MOBILE DECK] Full-width tabs, 1.5× card artwork, accordion, touch edits, filter chips, keyboard inset, sheet and top actions passed.");
+        }
+
+        private static void VerifyMobileCardScale(DeckEditorUI editor, RectTransform canvas, MobileSafeArea layout,
+            RectTransform safe, Rect area, Vector2Int display)
+        {
+            canvas.sizeDelta = (Vector2)display;
+            layout.Reflow(area, display);
+            Canvas.ForceUpdateCanvases();
+            Call(editor, "LayoutMobileEditor");
+            var sectionButtons = Field<Button[]>(editor, "_mobileSectionButtons");
+            float touch = MobileSafeArea.MinimumTouchSize(safe);
+            float oldDeckWidth = safe.rect.width * .411f - 70f;
+            int oldDeckColumns = Mathf.Clamp(Mathf.FloorToInt(oldDeckWidth / (Mathf.Max(111f, touch) + 4f)), 1, 8);
+            float oldHeight = safe.rect.height * .846f * .677f;
+            float oldRow = Mathf.Min(touch + 3f, oldHeight / 3f);
+            float oldMainHeight = oldHeight - oldRow - (oldHeight >= 5f * oldRow ? 2f : 1f) * oldRow;
+            int oldMainRows = Mathf.Clamp(Mathf.FloorToInt(oldMainHeight / oldRow), 1, 3);
+            var oldRows = new[] { oldMainHeight / oldMainRows, oldRow, oldRow };
+            var grids = new[] { "_mainDeckSlotGrid", "_extraDeckSlotGrid", "_sideDeckSlotGrid" };
+            for (int i = 0; i < grids.Length; i++)
+            {
+                if (!Field<RectTransform>(editor, grids[i]).gameObject.activeInHierarchy) sectionButtons[i].onClick.Invoke();
+                Canvas.ForceUpdateCanvases();
+                var artwork = (RectTransform)Field<RectTransform>(editor, grids[i]).Find("Card_0/CardInset/Card/AspectBox");
+                float oldArt = Mathf.Min(oldDeckWidth / oldDeckColumns - 6f, (oldRows[i] - 6f) * LotdUiKit.CardAspectRatio);
+                Require(artwork.rect.width >= oldArt * 1.5f - .5f, $"{display} section {i} grew from {oldArt:F1} to only {artwork.rect.width:F1}.");
+            }
+            Field<Button>(editor, "_mobileTrunkTab").onClick.Invoke();
+            Canvas.ForceUpdateCanvases();
+            float oldTrunkWidth = safe.rect.width * .319f - 51f;
+            int oldTrunkColumns = Mathf.Clamp(Mathf.FloorToInt(oldTrunkWidth / (Mathf.Max(111f, touch) + 4f)), 1, 3);
+            Require(Field<float>(editor, "_colWidth") - 4f >= (oldTrunkWidth / oldTrunkColumns - 4f) * 1.5f - .5f,
+                $"{display} trunk did not enlarge the card slots by 1.5×.");
+            float visibleHeight = Field<RectTransform>(editor, "_trunkViewport").rect.height;
+            float rowHeight = Field<float>(editor, "_rowHeight");
+            Require(visibleHeight >= rowHeight - 4f,
+                $"{display} trunk clipped its first row ({visibleHeight:F1} of {rowHeight:F1}).");
+            Field<Button>(editor, "_mobileDeckTab").onClick.Invoke();
+            if (!Field<RectTransform>(editor, grids[0]).gameObject.activeInHierarchy) sectionButtons[0].onClick.Invoke();
         }
 
         private static T Field<T>(object source, string name) => (T)source.GetType().GetField(name, Instance).GetValue(source);

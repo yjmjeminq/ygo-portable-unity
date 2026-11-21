@@ -214,6 +214,7 @@ namespace YGOPortable.UI
         public Action OnPointerEnterAction;
         public Action OnPointerExitAction;
         public bool EnableHoverLift;
+        internal bool PreferTouchScroll;
 
         private bool _isDraggingThis;
         private bool _hovered;
@@ -346,7 +347,7 @@ namespace YGOPortable.UI
             if (!canDragCard || eventData.pointerId >= 0)
             {
                 var scroll = GetComponentInParent<ScrollRect>();
-                if (!canDragCard || ShouldScrollOnTouch(scroll, eventData.position - eventData.pressPosition))
+                if (!canDragCard || PreferTouchScroll || ShouldScrollOnTouch(scroll, eventData.position - eventData.pressPosition))
                 {
                     _parentScroll = scroll;
                     _parentScroll?.OnBeginDrag(eventData);

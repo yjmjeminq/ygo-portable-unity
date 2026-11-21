@@ -25,10 +25,20 @@ namespace YGOPortable.UI
             var overlay = LotdUiKit.FillRect("ExpandedDeckCard", root);
             _expandedDeckOverlay = overlay;
             overlay.gameObject.AddComponent<RectMask2D>();
-            LotdUiKit.AddImage(overlay.gameObject, LotdUiKit.WhiteSprite, new Color(.012f, .022f, .048f, .85f));
+            var backdrop = LotdUiKit.FillRect("Backdrop", overlay);
+            var shade = LotdUiKit.AddImage(backdrop.gameObject, LotdUiKit.WhiteSprite, new Color(.012f, .022f, .048f, .85f));
+            if (_mobileLayout)
+            {
+                var dismiss = backdrop.gameObject.AddComponent<Button>();
+                dismiss.targetGraphic = shade;
+                dismiss.transition = Selectable.Transition.None;
+                dismiss.navigation = new Navigation { mode = Navigation.Mode.None };
+                dismiss.onClick.AddListener(CloseExpandedDeckCard);
+            }
             _expandedDeckPanel = LotdUiKit.CreateMenuPanel(overlay, "Window",
-                _mobileLayout ? new Vector2(.025f, .049f) : new Vector2(.13f, .081f),
-                new Vector2(.977f, _mobileLayout ? .969f : .943f));
+                _mobileLayout ? new Vector2(.018f, 0f) : new Vector2(.13f, .081f),
+                new Vector2(.982f, _mobileLayout ? .876f : .943f));
+            if (_mobileLayout) _expandedDeckPanel.GetComponent<Image>().raycastTarget = true;
             float artRight = _mobileLayout ? .361f : .422f;
             float rulesLeft = artRight + .025f;
             var art = DeckArea(_expandedDeckPanel, "Artwork", .048f, .084f, artRight, .913f);
@@ -73,14 +83,22 @@ namespace YGOPortable.UI
             _expandedDeckScroll.scrollSensitivity = 49f;
             _expandedDeckScroll.verticalScrollbar = AddDeckScrollbar(rules);
             _expandedDeckScroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
-            DeckButton(_expandedDeckPanel, "Related", "연관 카드 검색", rulesLeft, .073f, .71f, .207f, () =>
-            {
-                uint code = _expandedDeckCode;
-                CloseExpandedDeckCard();
-                CloseDeckUtility();
-                FilterRelatedCards(code);
-                if (_padMode) SwitchPadArea(PadArea.Trunk);
-            });
+            DeckButton(_expandedDeckPanel, "Related", _mobileLayout ? "연관 카드 바로 보기" : "연관 카드 검색",
+                rulesLeft, .073f, .71f, .207f, () =>
+                {
+                    uint code = _expandedDeckCode;
+                    CloseExpandedDeckCard();
+                    CloseDeckUtility();
+                    if (_mobileLayout) ShowMobileRelatedCards(code);
+                    else
+                    {
+                        FilterRelatedCards(code);
+                        if (_padMode) SwitchPadArea(PadArea.Trunk);
+                    }
+                }, accent: _mobileLayout, fontSize: _mobileLayout ? 24 : 18);
+            if (_mobileLayout)
+                DeckButton(_expandedDeckPanel, "Operations", "카드 조작", .737f, .073f, .952f, .207f,
+                    OpenMobileCardActions, fontSize: 23);
             overlay.gameObject.SetActive(false);
         }
 
@@ -95,6 +113,8 @@ namespace YGOPortable.UI
             _padCardFocus.Hide();
             InspectCard(code);
             _expandedDeckCode = code;
+            if (_mobileLayout && _mobileSelectedCode != code)
+                SelectMobileCard(code, CurrentPadDeck == DragSourceType.None ? DragSourceType.Trunk : CurrentPadDeck);
             _expandedDeckName.text = card.name;
             _expandedDeckStats.text = card.FormatStatsLineKR();
             _expandedDeckDescription.text = card.desc;
@@ -116,8 +136,9 @@ namespace YGOPortable.UI
             if (!_expandedDeckOverlay.gameObject.activeSelf || _inspectorSlide >= 1f) return;
             _inspectorSlide = Mathf.MoveTowards(_inspectorSlide, 1f, delta / InspectorSlideSeconds);
             float remaining = 1f - _inspectorSlide;
-            _expandedDeckPanel.anchoredPosition = Vector2.right *
-                ((_expandedDeckPanel.rect.width + 36f) * remaining * remaining * remaining);
+            Vector2 direction = _mobileLayout ? Vector2.down : Vector2.right;
+            float distance = (_mobileLayout ? _expandedDeckPanel.rect.height : _expandedDeckPanel.rect.width) + 36f;
+            _expandedDeckPanel.anchoredPosition = direction * (distance * remaining * remaining * remaining);
         }
 
         private void CloseExpandedDeckCard()
