@@ -21,6 +21,9 @@ namespace YGOPortable.UI
         private bool _circuitRing;
         private bool _extraMonsterZone;
         internal bool ColumnGuided { get; private set; }
+        internal bool ColumnSealed { get; private set; }
+        internal bool DragCandidate { get; private set; }
+        private float _placementPulse;
         private DuelLinkZoneRim _linkRim;
         internal DuelLinkHighlight LinkHighlight { get; private set; }
         internal bool LinkHighlighted => LinkHighlight != DuelLinkHighlight.None;
@@ -34,6 +37,30 @@ namespace YGOPortable.UI
         {
             if (ColumnGuided == enabled) return;
             ColumnGuided = enabled;
+            SetVerticesDirty();
+        }
+
+        internal void SetColumnSealed(bool enabled)
+        {
+            if (ColumnSealed == enabled) return;
+            ColumnSealed = enabled;
+            SetVerticesDirty();
+        }
+
+        internal void SetDragCandidate(bool enabled)
+        {
+            if (DragCandidate == enabled) return;
+            DragCandidate = enabled;
+            _placementPulse = .45f;
+            SetVerticesDirty();
+        }
+
+        private void Update()
+        {
+            if (!DragCandidate) return;
+            float progress = Mathf.Repeat(Time.unscaledTime / 1.24f, 1f);
+            if (Mathf.Abs(progress - _placementPulse) < .018f) return;
+            _placementPulse = progress;
             SetVerticesDirty();
         }
 
@@ -135,11 +162,19 @@ namespace YGOPortable.UI
                 mesh.AddTriangle(center, center + 1 + i, center + 1 + (i + 1) % Corners.Length);
 
             if (_circuitRing) DrawCircuitRing(mesh, rect, _extraMonsterZone);
+            if (ColumnSealed)
+            {
+                DrawSelectionRim(mesh, rect, new Color(.94f, .22f, .31f, .74f), .10f, .85f, .98f);
+                DrawColumnSeal(mesh, rect);
+            }
             if (ColumnGuided)
             {
                 DrawSelectionRim(mesh, rect, new Color(.15f, .89f, 1f, .37f), .05f, .83f, .98f);
                 DrawSelectionRim(mesh, rect, new Color(.56f, .98f, 1f, .90f), .22f, .92f, .985f);
             }
+
+            if (DragCandidate)
+                DrawPlacementPulse(mesh, rect, _placementPulse);
 
             if (_placementHighlighted)
             {
@@ -175,6 +210,49 @@ namespace YGOPortable.UI
                 DrawSelectionRim(mesh, rect, new Color(.21f, .83f, .94f, .27f), .15f, 1f, 1.085f);
                 DrawSelectionRim(mesh, rect, new Color(.36f, .89f, .96f, .75f), .18f, .966f, 1.014f);
             }
+        }
+
+        private static void DrawPlacementPulse(VertexHelper mesh, Rect rect, float progress)
+        {
+            var radius = new Vector2(rect.width * .36f, rect.height * .31f);
+            var center = rect.center;
+            const int segments = 28;
+            for (int i = 0; i < segments; i++)
+            {
+                float start = i * Mathf.PI * 2f / segments;
+                float end = (i + 1) * Mathf.PI * 2f / segments;
+                var a = new Vector2(Mathf.Cos(start), Mathf.Sin(start));
+                var b = new Vector2(Mathf.Cos(end), Mathf.Sin(end));
+                var edge = new Color(.37f, .83f, 1f, .80f);
+                var glow = new Color(.09f, .59f, 1f, (1f - progress) * .57f);
+                DrawRingPart(.75f, .82f, edge);
+                DrawRingPart(.82f + .31f * progress, .90f + .31f * progress, glow);
+
+                void DrawRingPart(float inner, float outer, Color color) =>
+                    DuelMat.AddQuad(mesh, center + Vector2.Scale(radius, a * outer),
+                        center + Vector2.Scale(radius, a * inner), center + Vector2.Scale(radius, b * inner),
+                        center + Vector2.Scale(radius, b * outer), color, color);
+            }
+        }
+
+        private static void DrawColumnSeal(VertexHelper mesh, Rect rect)
+        {
+            var center = rect.center;
+            float width = rect.width * .23f, height = rect.height * .28f;
+            var ink = new Color(1f, .31f, .43f, .65f);
+            var dark = new Color(.42f, .027f, .062f, .23f);
+            for (int i = 0; i < 4; i++)
+            {
+                float angle = (i + .5f) * Mathf.PI * .5f;
+                float next = angle + Mathf.PI * .5f;
+                var from = center + new Vector2(Mathf.Cos(angle) * width, Mathf.Sin(angle) * height);
+                var to = center + new Vector2(Mathf.Cos(next) * width, Mathf.Sin(next) * height);
+                DuelMat.AddQuad(mesh, from, Vector2.Lerp(center, from, .75f), Vector2.Lerp(center, to, .75f), to, ink, dark);
+            }
+            var vector = new Vector2(width * .57f, height * .55f);
+            var normal = new Vector2(-vector.y, vector.x).normalized * 1.4f;
+            DuelMat.AddQuad(mesh, center - vector - normal, center - vector + normal,
+                center + vector + normal, center + vector - normal, ink, ink);
         }
 
         private static void DrawCircuitRing(VertexHelper mesh, Rect rect, bool extra)

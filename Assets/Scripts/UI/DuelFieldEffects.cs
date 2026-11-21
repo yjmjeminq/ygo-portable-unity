@@ -6,7 +6,7 @@ namespace YGOPortable.UI
 {
     public partial class DuelFieldUI
     {
-        private const uint InfiniteImpermanence = 10045474;
+        private int _sealedColumns;
         private (byte Controller, uint Sequence)? _revealedImpermanence;
         private readonly List<(byte Controller, uint Sequence, uint Markers)> _arrivalLinks = new();
         private int _guidedColumn = -1;
@@ -19,7 +19,7 @@ namespace YGOPortable.UI
                  move.toCon == slot.Controller && move.toLoc == YgoConstants.LOCATION_SZONE && move.toSeq == slot.Sequence))
                 _revealedImpermanence = null;
 
-            if (move.code == InfiniteImpermanence && move.ChangesPositionInPlace &&
+            if (move.code == DuelSession.InfiniteImpermanenceCode && move.ChangesPositionInPlace &&
                 move.fromLoc == YgoConstants.LOCATION_SZONE && move.fromSeq < 5 &&
                 (move.fromPos & YgoConstants.POS_FACEDOWN) != 0 && (move.toPos & YgoConstants.POS_FACEUP) != 0)
                 _revealedImpermanence = (move.fromCon, move.fromSeq);
@@ -29,12 +29,55 @@ namespace YGOPortable.UI
         {
             bool wasSet = _revealedImpermanence == (link.triggerPlayer, link.triggerSeq);
             _revealedImpermanence = null;
-            if (!wasSet || link.code != InfiniteImpermanence || link.triggerLoc != YgoConstants.LOCATION_SZONE) return;
+            if (!wasSet || link.code != DuelSession.InfiniteImpermanenceCode || link.triggerLoc != YgoConstants.LOCATION_SZONE) return;
 
             int column = link.triggerPlayer == _session.HumanPlayerIndex ? (int)link.triggerSeq : 4 - (int)link.triggerSeq;
             var upper = _linkGrid[column, 0].root;
             var lower = _linkGrid[column, 4].root;
-            animator.QueueFieldRays(upper, new[] { lower }, DuelEffectKind.ColumnRay, new Color(.74f, .41f, 1f));
+            animator.QueueFieldRays(upper, new[] { lower }, DuelEffectKind.ColumnRay, new Color(1f, .34f, .63f));
+        }
+
+        private void ApplyColumnNegation(ChainLinkInfo link)
+        {
+            int column = link.triggerPlayer == _session.HumanPlayerIndex ? (int)link.triggerSeq : 4 - (int)link.triggerSeq;
+            int pending = 1 << column;
+            _sealedColumns |= pending;
+            _linkGrid[column, 0].bgImg.SetColumnSealed(true);
+            _linkGrid[column, 4].bgImg.SetColumnSealed(true);
+        }
+
+        private void ClearColumnNegations()
+        {
+            if (_sealedColumns == 0) return;
+            for (int i = 0; i < 5; i++)
+            {
+                if ((_sealedColumns & (1 << i)) == 0) continue;
+                _linkGrid[i, 0]?.bgImg.SetColumnSealed(false);
+                _linkGrid[i, 4]?.bgImg.SetColumnSealed(false);
+            }
+            _sealedColumns = 0;
+        }
+
+        private static void SetLiveLinkBeams(FieldSlotView slot, LiveCardState card, bool opponent)
+        {
+            uint marks = card != null && (card.type & YgoConstants.TYPE_LINK) != 0 ? card.linkMarker : 0;
+            if (marks != 0 && slot.linkBeams == null)
+            {
+                var rect = LotdUiKit.FillRect("LinkBeams", slot.focusArt);
+                slot.linkBeams = rect.gameObject.AddComponent<DuelEffectGraphic>();
+                slot.linkBeams.Kind = DuelEffectKind.LiveLinkDirections;
+                slot.linkBeams.texture = Texture2D.whiteTexture;
+                slot.linkBeams.raycastTarget = false;
+            }
+            if (slot.linkBeams == null) return;
+            Color tint = opponent ? DuelStyle.ChainRed : DuelStyle.ChainCyan;
+            if (slot.linkBeams.DirectionMask != marks || slot.linkBeams.Tint != tint)
+            {
+                slot.linkBeams.DirectionMask = marks;
+                slot.linkBeams.Tint = tint;
+                slot.linkBeams.SetVerticesDirty();
+            }
+            slot.linkBeams.gameObject.SetActive(marks != 0);
         }
 
         private void QueueLinkArrivalRays(CardAnimationManager animator, byte controller, uint sequence, uint markers)
@@ -70,9 +113,24 @@ namespace YGOPortable.UI
                     }
                 }
 
-                bool Matches(FieldSlotView slot) => slot.liveCard == null && CardDragManager.ContainsScreenPoint(slot.root, point);
+                bool Matches(FieldSlotView slot) => slot.bgImg.DragCandidate &&
+                    CardDragManager.ContainsScreenPoint(slot.root, point);
             }
             SetDragColumnGuide(column);
+        }
+
+        private bool IsHandDragPlacement(byte controller, uint location, uint sequence)
+        {
+            if (CardDragManager.Instance is not { IsDragging: true, CurrentSource: DragSourceType.Hand } drag ||
+                controller != _session.HumanPlayerIndex) return false;
+            uint zoneShift = (uint)(16 * controller + (location == YgoConstants.LOCATION_SZONE ? 8 : 0));
+            if ((_session.FieldDisabledMask & (1u << (int)(zoneShift + sequence))) != 0) return false;
+            if (location == YgoConstants.LOCATION_MZONE) return sequence < 5;
+            var card = CardDatabase.Get(drag.CurrentCode);
+            if (card == null) return false;
+            if ((card.type & YgoConstants.TYPE_FIELD) != 0) return sequence == 5;
+            if (card.IsPendulum) return sequence is 0 or 4;
+            return sequence < 5;
         }
 
         private void SetDragColumnGuide(int column)

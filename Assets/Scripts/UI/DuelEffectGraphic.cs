@@ -6,7 +6,7 @@ namespace YGOPortable.UI
     internal enum DuelEffectKind
     {
         AttackPath, Strike, Break, Token, Summon, Chain, Fusion, Synchro, Xyz, Link, Ritual, Pendulum, XyzMaterial,
-        SummonMaterial, BanishTransit, EquipLink, ChainNegated, ChainApplied, ColumnRay, LinkRay, LifeSparks, ActionArc
+        SummonMaterial, BanishTransit, EquipLink, ChainNegated, ChainShatter, ChainApplied, DisabledChains, ColumnRay, LinkRay, LiveLinkDirections, LifeSparks, ActionArc
     }
 
     // Canvas particles and tracks use one mesh, with white fill and vertex tints.
@@ -16,6 +16,7 @@ namespace YGOPortable.UI
 
         internal DuelEffectKind Kind;
         internal Color Tint;
+        internal uint DirectionMask;
         private float _progress;
         private Image _texture;
 
@@ -47,6 +48,16 @@ namespace YGOPortable.UI
             if (radius < 1f) return;
 
             float t = _progress;
+            if (Kind == DuelEffectKind.DisabledChains)
+            {
+                DisabledChains(mesh, rect, t);
+                return;
+            }
+            if (Kind == DuelEffectKind.LiveLinkDirections)
+            {
+                DrawLiveLinkDirections(mesh, rect, t);
+                return;
+            }
             float glow = Mathf.SmoothStep(0f, 1f, Mathf.Min(t * 6f, (1f - t) * 4.2f));
             if (glow <= 0f) return;
             float travel = 1f - (1f - t) * (1f - t);
@@ -116,15 +127,13 @@ namespace YGOPortable.UI
                     Sparks(mesh, rect.center, radius, travel, glow, 22, true);
                     break;
                 case DuelEffectKind.ChainNegated:
-                    for (int sign = -1; sign <= 1; sign += 2)
-                    {
-                        Vector2 diagonal = new Vector2(.70f, sign * .70f) * radius * travel;
-                        Line(mesh, rect.center - diagonal, rect.center + diagonal, radius * .11f, Shade(Tint, glow * .38f));
-                        Line(mesh, rect.center - diagonal, rect.center + diagonal, radius * .035f, Shade(Tint, glow));
-                    }
+                case DuelEffectKind.ChainShatter:
+                    DrawNegatedImpact(mesh, rect, t, glow);
                     break;
                 case DuelEffectKind.ChainApplied:
                     Ring(mesh, rect.center, radius * (.34f + travel * .57f), .82f, 3.4f, 0f, 1f, Shade(Tint, glow), 32);
+                    Ring(mesh, rect.center, radius * (.26f + travel * .60f), .82f, 1.7f, 0f, 1f,
+                        Shade(new Color(1f, .97f, .87f), glow * .78f), 32);
                     Sparks(mesh, rect.center, radius * .9f, travel, glow, 14, true);
                     break;
                 case DuelEffectKind.XyzMaterial:
@@ -312,6 +321,85 @@ namespace YGOPortable.UI
                     break;
             }
             Sparks(mesh, center, radius * 1.07f, t, glow, 34, Kind != DuelEffectKind.Xyz);
+        }
+
+        private void DrawLiveLinkDirections(VertexHelper mesh, Rect rect, float phase)
+        {
+            float scale = Mathf.Min(rect.width, rect.height);
+            Color light = Color.Lerp(Tint, Color.white, .60f);
+            float shimmer = .64f + .24f * Mathf.Sin(phase * Mathf.PI * 2f);
+            var half = rect.size * .5f;
+            foreach (var mark in DuelLinkCompass.Marks)
+            {
+                if ((DirectionMask & mark.mask) == 0) continue;
+                var direction = ((Vector2)mark.direction).normalized;
+                var root = rect.center + Vector2.Scale(half, (Vector2)mark.direction) * .90f;
+                var tip = root + direction * (scale * .30f);
+                Line(mesh, root, tip, scale * .094f, Shade(Tint, shimmer * .26f));
+                Line(mesh, root, tip, scale * .033f, Shade(Tint, shimmer));
+                var spark = Vector2.Lerp(root, tip, phase);
+                Line(mesh, spark - direction * (scale * .046f), spark, scale * .015f, Shade(light, shimmer));
+                Glow(mesh, root, scale * .072f, 1f, Shade(Tint, shimmer * .58f));
+            }
+        }
+
+        private void DrawNegatedImpact(VertexHelper mesh, Rect rect, float t, float glow)
+        {
+            var bright = Color.Lerp(Tint, new Color(1f, .89f, .79f), .46f);
+            float length = Mathf.SmoothStep(.56f, 1f, Mathf.Clamp01(t * 6f));
+            float strike = glow * (1f - Mathf.SmoothStep(.35f, .92f, t));
+            float width = Mathf.Min(rect.width, rect.height);
+            for (int sign = -1; sign <= 1; sign += 2)
+            {
+                var diagonal = new Vector2(rect.width * .40f, sign * rect.height * .34f) * length;
+                Line(mesh, rect.center - diagonal, rect.center + diagonal, width * .18f, Shade(Tint, strike * .29f));
+                Line(mesh, rect.center - diagonal, rect.center + diagonal, width * .062f, Shade(Tint, strike));
+                Line(mesh, rect.center - diagonal, rect.center + diagonal, width * .016f, Shade(bright, strike));
+            }
+
+            if (Kind != DuelEffectKind.ChainShatter || t < .20f) return;
+            float spread = Mathf.InverseLerp(.20f, 1f, t);
+            float shardGlow = Mathf.Lerp(.95f, 0f, spread);
+            for (int i = 0; i < 23; i++)
+            {
+                float angle = i * 2.39996f;
+                var direction = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
+                var cross = new Vector2(-direction.y, direction.x);
+                float force = .22f + (i % 6) * .093f;
+                Vector2 origin = rect.center + direction * (width * (.09f + spread * force)) +
+                    Vector2.down * (width * spread * spread * .19f);
+                float size = width * (.033f + (i % 5) * .012f) * (1f - .61f * spread);
+                Triangle(mesh, origin + direction * size, origin - cross * size * .62f, origin - direction * size,
+                    Shade(i % 3 == 0 ? bright : Tint, shardGlow));
+                Line(mesh, origin, origin + direction * size, 1.2f, Shade(bright, shardGlow * .64f));
+            }
+        }
+
+        private void DisabledChains(VertexHelper mesh, Rect rect, float time)
+        {
+            float pulse = .70f + .24f * Mathf.Sin(time * Mathf.PI * 2f);
+            Color metal = Color.Lerp(Tint, new Color(.95f, .82f, 1f), .36f);
+            float scale = Mathf.Min(rect.width, rect.height);
+            for (int pass = 0; pass < 2; pass++)
+            {
+                Vector2 from = rect.center + new Vector2(-rect.width * .47f, rect.height * (pass == 0 ? .18f : -.30f));
+                Vector2 to = rect.center + new Vector2(rect.width * .47f, rect.height * (pass == 0 ? -.25f : .13f));
+                var direction = (to - from).normalized;
+                var across = new Vector2(-direction.y, direction.x);
+                Line(mesh, from, to, scale * .095f, Shade(Tint, pulse * .30f));
+                for (int i = 0; i < 9; i++)
+                {
+                    Vector2 center = Vector2.Lerp(from, to, Mathf.Repeat((i + .5f) / 9f + (pass == 0 ? time : -time) * .11f, 1f));
+                    var along = direction * scale * .063f;
+                    var width = across * scale * (i % 2 == 0 ? .031f : .018f);
+                    float edge = Mathf.Max(1.1f, scale * .016f);
+                    Color shine = Shade(metal, pulse * (i % 2 == 0 ? .91f : .67f));
+                    Line(mesh, center - along, center - width, edge, shine);
+                    Line(mesh, center - width, center + along, edge, shine);
+                    Line(mesh, center + along, center + width, edge, shine);
+                    Line(mesh, center + width, center - along, edge, shine);
+                }
+            }
         }
 
         private void Sparks(VertexHelper mesh, Vector2 center, float radius, float t, float glow, int count, bool rising)

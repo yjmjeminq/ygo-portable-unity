@@ -147,6 +147,8 @@ namespace YGOPortable.Core
         public uint triggerSeq;
         public ulong description;
         public bool negated;
+        internal bool ActivationNegated;
+        internal bool AppliedColumnNegation;
         internal bool DestroyedCard;
         internal bool Resolved;
         internal LiveCardState ActivationReadout;
@@ -323,6 +325,17 @@ namespace YGOPortable.Core
         public PlayerFieldSnapshot[] Players { get; } = { new PlayerFieldSnapshot(), new PlayerFieldSnapshot() };
         public List<ChainLinkInfo> CurrentChain { get; } = new List<ChainLinkInfo>();
         private HashSet<(byte Player, ulong Description)> _activatedMonsterEffects;
+        private HashSet<(byte Player, uint Code)> _usedSharedTurnEffects;
+
+        internal bool HasUsedSharedTurnEffect(byte player, uint code) =>
+            _usedSharedTurnEffects?.Contains((player, CardDatabase.GetDeckPrintingKey(code))) == true;
+
+        private static bool HasSharedOncePerTurnText(CardInfo card)
+        {
+            string effect = card?.desc;
+            return effect != null && effect.Contains("이 카드명의 효과는 1턴에 1번밖에 사용할 수 없다");
+        }
+        internal const uint InfiniteImpermanenceCode = 10045474;
         private const uint BaronneCode = 84815190;
         private const ulong BaronneNegation = ((ulong)BaronneCode << 20) | 1;
         private readonly HashSet<(byte Controller, uint Sequence)> _spentBaronneNegates = new();
@@ -416,6 +429,7 @@ namespace YGOPortable.Core
             ActivePrompt = null;
             CurrentChain.Clear();
             _activatedMonsterEffects?.Clear();
+            _usedSharedTurnEffects?.Clear();
             _spentBaronneNegates.Clear();
             ResetSummonTracking();
             _temporaryAttackers?.Clear();
@@ -1142,6 +1156,21 @@ namespace YGOPortable.Core
                 toCon = destination.controller, toLoc = destination.location, toSeq = destination.sequence, toPos = card.position,
             };
 
+        private void ReportSkippedChainNegations(int nextLink)
+        {
+            // The engine can skip SOLVING/SOLVED entirely after a link's activation is negated.
+            // Publish these outcomes before the next lower link so presentation follows chain resolution order.
+            for (int i = CurrentChain.Count - 1; i >= nextLink; i--)
+            {
+                var link = CurrentChain[i];
+                if (!link.negated || link.Resolved) continue;
+                link.ResolutionReadout ??= link.ActivationReadout;
+                link.Resolved = true;
+                OnChainResolving?.Invoke(link);
+                OnChainResolved?.Invoke(link);
+            }
+        }
+
         private void HandleMessage(byte msgType, BinaryReader br, long msgEnd,
             ref (BattleComparisonValue? Attacker, BattleComparisonValue? Defender) comparison, ref CardMoveEvent firstSwapMove,
             ref Dictionary<(byte Controller, uint Location, uint Sequence), LiveCardState> positionReadouts)
@@ -1178,6 +1207,14 @@ namespace YGOPortable.Core
                         string message = desc > 499 ? CardDatabase.ResolveDescription(desc) : null;
                         if (message != null) AddLog(message);
                     }
+                    else if (htype == YgoConstants.HINT_ZONE &&
+                        _resolvingChainLink is { code: InfiniteImpermanenceCode, negated: false,
+                            triggerLoc: YgoConstants.LOCATION_SZONE, triggerSeq: < 5 } link &&
+                        player == link.triggerPlayer && desc == (1UL << ((int)link.triggerSeq + 8)))
+                    {
+                        // The Lua effect sends this hint only after both negations have been applied.
+                        link.AppliedColumnNegation = true;
+                    }
                     break;
                 }
 
@@ -1198,6 +1235,7 @@ namespace YGOPortable.Core
                 {
                     _confirmedCards.Clear();
                     _activatedMonsterEffects?.Clear();
+                    _usedSharedTurnEffects?.Clear();
                     ResetSummonTracking();
                     _temporaryAttackers?.Clear();
                     TurnPlayer = br.ReadByte();
@@ -1571,6 +1609,8 @@ namespace YGOPortable.Core
                         _spentBaronneNegates.Add((source.controller, source.sequence));
                     if (tLoc == YgoConstants.LOCATION_MZONE && code != 0 && (desc >> 20) == code)
                         (_activatedMonsterEffects ??= new()).Add((tCon, desc));
+                    if (HasSharedOncePerTurnText(CardDatabase.Get(code)))
+                        (_usedSharedTurnEffects ??= new()).Add((tCon, CardDatabase.GetDeckPrintingKey(code)));
                     AddLog($"체인 {chainNo}: [{CardDatabase.GetName(code)}] 발동");
                     OnChainActivated?.Invoke(link);
                     break;
@@ -1579,6 +1619,7 @@ namespace YGOPortable.Core
                 case YgoConstants.MSG_CHAIN_SOLVING:
                 {
                     byte idx = br.ReadByte();
+                    ReportSkippedChainNegations(idx);
                     _resolvingChainLink = null;
                     if (idx > 0 && idx <= CurrentChain.Count)
                     {
@@ -1617,6 +1658,7 @@ namespace YGOPortable.Core
                         var link = CurrentChain[idx - 1];
                         if (!link.negated && link.triggerPlayer == TurnPlayer) TurnInterruptions++;
                         link.negated = true;
+                        link.ActivationNegated |= msgType == YgoConstants.MSG_CHAIN_NEGATED;
                     }
                     AddLog($"체인 {idx} 무효화");
                     break;
@@ -1624,6 +1666,7 @@ namespace YGOPortable.Core
 
                 case YgoConstants.MSG_CHAIN_END:
                     SampleFieldReadouts();
+                    ReportSkippedChainNegations(0);
                     CurrentChain.Clear();
                     _resolvingChainLink = null;
                     _confirmedCards.Clear();

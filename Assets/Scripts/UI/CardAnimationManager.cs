@@ -161,6 +161,7 @@ namespace YGOPortable.UI
             internal int Delta;
             internal LifePointChangeKind Kind;
             internal Action Apply;
+            internal Action<float> Impact;
             internal CanvasGroup Feedback;
             internal DuelEffectGraphic Sparks;
         }
@@ -544,9 +545,10 @@ namespace YGOPortable.UI
             _openBattleLifeChanges = lifeChanges;
         }
 
-        internal void QueueLifeChange(RectTransform anchor, int delta, LifePointChangeKind kind, Action apply)
+        internal void QueueLifeChange(RectTransform anchor, int delta, LifePointChangeKind kind, Action apply,
+            Action<float> impact = null)
         {
-            var change = new LifeChangeCue { Anchor = anchor, Delta = delta, Kind = kind, Apply = apply };
+            var change = new LifeChangeCue { Anchor = anchor, Delta = delta, Kind = kind, Apply = apply, Impact = impact };
             // Collect only consecutive, confirmed battle damage. A queued effect or a later step keeps its own timing.
             if (kind == LifePointChangeKind.BattleDamage && _openBattleLifeChanges != null &&
                 !_openBattleLifeChanges.Exists(pending => pending.Anchor == anchor))
@@ -1673,7 +1675,7 @@ namespace YGOPortable.UI
                 }
                 badge.anchoredPosition = BadgePoint(pose);
                 badge.localScale = Vector3.one * (Mathf.Lerp(1.28f, 1f, appear) * pose.Size.y / initialHeight);
-                if (t < .42f || !link.Resolved) return;
+                if (t < .42f || !link.Resolved || link.negated) return;
                 if (result == null)
                 {
                     result = CreateChainOutcomeVisual(overlay, link);
@@ -1697,30 +1699,47 @@ namespace YGOPortable.UI
         {
             // A response prompt may have paused this link before its resolution preview could show the outcome.
             if (_shownChainOutcomes.Remove(link)) yield break;
+            var card = link.negated ? TakeCard(link.code, link.code == 0, detailed: true,
+                live: link.ResolutionReadout ?? link.ActivationReadout) : null;
+            var cardOpacity = card != null ? card.gameObject.AddComponent<CanvasGroup>() : null;
             var result = CreateChainOutcomeVisual(_layer, link);
-            yield return Animate(.24f, t =>
+            yield return Animate(link.negated ? .48f : .24f, t =>
             {
                 var (center, maxHeight) = readLayout();
-                float height = Mathf.Min(maxHeight, _layer.rect.height * .29f);
-                ApplyChainOutcomePose(result, center, new Vector2(height * LotdUiKit.CardAspectRatio, height), t);
+                float height = Mathf.Min(maxHeight, _layer.rect.height * (link.negated ? .40f : .29f));
+                Vector2 size = new Vector2(height * LotdUiKit.CardAspectRatio, height);
+                if (card != null)
+                {
+                    float settle = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t * 5f));
+                    float fadeAt = link.ActivationNegated || link.DestroyedCard ? .32f : .68f;
+                    float remaining = 1f - Mathf.SmoothStep(fadeAt, 1f, t);
+                    var shake = Vector2.right * (Mathf.Sin(t * 47f) * height * .025f * (1f - settle));
+                    ApplyPose(card, new CardPose(center + shake, size * Mathf.Lerp(1.13f, 1f, settle), -2f));
+                    cardOpacity.alpha = Mathf.Min(settle * 2f, remaining);
+                }
+                ApplyChainOutcomePose(result, center, size, t);
             });
+            if (card != null) RemoveTransient(card.gameObject);
             RemoveTransient(result.gameObject);
         }
 
         private RectTransform CreateChainOutcomeVisual(Transform parent, ChainLinkInfo link)
         {
             var visual = CenteredVisual("ChainOutcome", parent, Vector2.zero, Vector2.one);
-            var kind = link.negated ? DuelEffectKind.ChainNegated : link.DestroyedCard ? DuelEffectKind.Break : DuelEffectKind.ChainApplied;
+            var kind = link.negated
+                ? (link.ActivationNegated || link.DestroyedCard ? DuelEffectKind.ChainShatter : DuelEffectKind.ChainNegated)
+                : link.DestroyedCard ? DuelEffectKind.Break : DuelEffectKind.ChainApplied;
             Color tint = link.negated ? DuelStyle.ChainRed : DuelStyle.ChainGold;
             var effect = CreateEffect(kind, Vector2.zero, Vector2.one, tint, visual);
             effect.rectTransform.anchorMin = Vector2.zero;
             effect.rectTransform.anchorMax = Vector2.one;
             effect.rectTransform.offsetMin = effect.rectTransform.offsetMax = Vector2.zero;
-            var label = LotdUiKit.CreateRect("Status", visual, new Vector2(.06f, .29f), new Vector2(.94f, .49f),
-                Vector2.zero, Vector2.zero);
-            DuelReadoutPlate.Add(label, new Color(.025f, .054f, .075f, .97f));
-            LotdUiKit.AddFittedText(label, "Text", link.negated ? "무효" : link.DestroyedCard ? "파괴" : "효과 처리", 19, 9,
-                TextAnchor.MiddleCenter, tint, FontStyle.Bold);
+            var label = LotdUiKit.CreateRect("Status", visual, new Vector2(.06f, link.negated ? .16f : .29f),
+                new Vector2(.94f, link.negated ? .36f : .49f), Vector2.zero, Vector2.zero);
+            DuelReadoutPlate.Add(label, link.negated ? new Color(.19f, .022f, .045f, .97f) : new Color(.025f, .054f, .075f, .97f));
+            LotdUiKit.AddFittedText(label, "Text", link.negated ? "무효 · NEGATED" : link.DestroyedCard ? "파괴" : "효과 처리",
+                link.negated ? 30 : 19, 9, TextAnchor.MiddleCenter, tint, FontStyle.Bold);
+            if (link.negated) label.localRotation = Quaternion.Euler(0f, 0f, -5f);
             visual.gameObject.AddComponent<CanvasGroup>().alpha = 0f;
             return visual;
         }
@@ -1729,7 +1748,13 @@ namespace YGOPortable.UI
         {
             visual.anchoredPosition = center;
             visual.sizeDelta = new Vector2(cardSize.x * 1.28f, cardSize.y * .88f);
-            visual.GetComponentInChildren<DuelEffectGraphic>().Seek(progress);
+            var effect = visual.GetComponentInChildren<DuelEffectGraphic>();
+            effect.Seek(progress);
+            if (effect.Kind is DuelEffectKind.ChainNegated or DuelEffectKind.ChainShatter)
+            {
+                var stamp = visual.Find("Status");
+                stamp.localScale = Vector3.one * Mathf.Lerp(1.48f, 1f, Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(progress * 7f)));
+            }
             visual.GetComponent<CanvasGroup>().alpha = Mathf.Clamp01(Mathf.Min(progress * 7f, (1f - progress) * 5f));
         }
 
@@ -1856,6 +1881,12 @@ namespace YGOPortable.UI
 
         private void UpdateLifeChanges(IReadOnlyList<LifeChangeCue> changes, float progress)
         {
+            for (int i = 0; i < changes.Count; i++)
+            {
+                if (changes[i].Impact == null || changes[i].Feedback == null) continue;
+                changes[i].Impact(progress);
+                break;
+            }
             float alpha = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.80f, 1f, progress));
             foreach (var change in changes)
             {
@@ -1871,7 +1902,11 @@ namespace YGOPortable.UI
         private static void EndLifeChanges(IReadOnlyList<LifeChangeCue> changes)
         {
             foreach (var change in changes)
-                if (change.Feedback != null) RemoveTransient(change.Feedback.gameObject);
+            {
+                if (change.Feedback == null) continue;
+                change.Impact?.Invoke(1f);
+                RemoveTransient(change.Feedback.gameObject);
+            }
         }
 
         internal void QueueRandomResult(string label, Vector2 boardCenter, bool opponent, Action playSound)

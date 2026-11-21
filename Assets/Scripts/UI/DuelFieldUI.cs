@@ -114,6 +114,9 @@ namespace YGOPortable.UI
             public RectTransform cardArea;
             public RectTransform focusArt;
             public Image activationGlow;
+            public Image unavailableShade;
+            public DuelEffectGraphic disabledChains;
+            public DuelEffectGraphic linkBeams;
             public Image focusShadow;
             public DuelFieldReadout readout;
             public CardDragTrigger dragTrigger;
@@ -227,6 +230,7 @@ namespace YGOPortable.UI
             public CompositeCardView Card;
             public RectTransform FocusArt;
             public Image PlayableGlow;
+            public Image UnavailableShade;
             public CardDragTrigger Trigger;
             public (Vector2 min, Vector2 max, float angle) Layout;
             public bool HasLayout;
@@ -358,6 +362,7 @@ namespace YGOPortable.UI
             ClearArrivals();
             _arrivalLinks.Clear();
             _revealedImpermanence = null;
+            ClearColumnNegations();
             SetDragColumnGuide(-1);
             _pendingXyzMaterials.Clear();
             Array.Clear(_handCounts, 0, _handCounts.Length);
@@ -370,6 +375,8 @@ namespace YGOPortable.UI
             ResetDuelPad();
             _pointerActionAnchor = null;
             HideCardActions();
+            HideActivationNotice();
+            ShakeBoardForDamage(1f);
             _extraSummonButton.gameObject.SetActive(false);
             _graveEffectButton.gameObject.SetActive(false);
             _banishedEffectButton.gameObject.SetActive(false);
@@ -554,6 +561,7 @@ namespace YGOPortable.UI
             _inspIdentity.text = identity;
             _inspIdentity.rectTransform.anchorMax = new Vector2(hasRating ? .665f : .982f, .965f);
             _inspStats.text = details;
+            _inspectorDisabledBadge.SetActive(card.Disabled);
             var info = (RectTransform)_inspStats.transform.parent;
             info.anchorMax = new Vector2(1f, identity.Length != 0 || hasRating ? .49f : 1f);
             _inspRating.Bind(rating, showChanges);
@@ -762,6 +770,7 @@ namespace YGOPortable.UI
             BuildActionPopup(playArea);
             BuildCardZoomModal(root, _mobileLayout);
             BuildDuelLog(playArea);
+            BuildActivationNotice(playArea);
             Root.SetActive(false);
         }
 
@@ -775,6 +784,7 @@ namespace YGOPortable.UI
             _inspCard = CompositeCardView.Create(card, "Card", duelArtwork: true);
             var aspect = _inspCard.transform.Find("AspectBox");
             AddInspectorArtworkFrame(aspect);
+            _inspectorDisabledBadge = BuildDisabledBadge(_inspCard.transform, 17);
             var zoomHit = LotdUiKit.FillRect("ZoomHit", aspect);
             var hitImage = LotdUiKit.AddImage(zoomHit.gameObject, LotdUiKit.WhiteSprite, Color.clear);
             _inspectorArtworkButton = zoomHit.gameObject.AddComponent<Button>();
@@ -1785,6 +1795,8 @@ namespace YGOPortable.UI
                 slot.cardView.transform.localRotation = Quaternion.Euler(0f, 0f, CardAngle(loc, position, opponent));
                 slot.cardView.transform.localScale = Vector3.one * CardScale(slot.root, loc, position);
             }
+            SetLiveLinkBeams(slot, visible && faceUp && loc == YgoConstants.LOCATION_MZONE ? readout.Live ?? shown : null, opponent);
+            SetDisabledChains(slot, visible && faceUp && loc == YgoConstants.LOCATION_MZONE && readout.Disabled);
             if (visible && battle?.HideReadout != true)
             {
                 var rating = readout.RatingAt(loc, seq);
@@ -1832,11 +1844,15 @@ namespace YGOPortable.UI
             bool place = IsPlaceSelectable(con, loc, seq);
             bool drag = !opponent && live == null && (loc == YgoConstants.LOCATION_MZONE && _dragHighlightMZone ||
                 loc == YgoConstants.LOCATION_SZONE && _dragHighlightSZone);
+            bool handDrag = drag && CardDragManager.Instance?.CurrentSource == DragSourceType.Hand;
+            bool dragCandidate = handDrag && (place || IsHandDragPlacement(con, loc, seq));
+            slot.bgImg.SetDragCandidate(dragCandidate);
             bool attack = opponent && loc == YgoConstants.LOCATION_MZONE && _dragHighlightAttack && interactive;
             bool action = interactive && CanAcceptPlayerAction && HasFieldAction(con, loc, seq);
             Color highlight = cardSelected ? DuelStyle.Gold : attack ? DuelStyle.Opponent :
                 cardChoice || selected || action ? DuelStyle.Player :
-                place ? new Color(.98f, .89f, .29f) : drag ? DuelStyle.Gold : Color.clear;
+                place ? new Color(.98f, .89f, .29f) :
+                dragCandidate ? DuelStyle.ChainCyan : drag && !handDrag ? DuelStyle.Gold : Color.clear;
             slot.bgImg.color = highlight.a > 0f
                 ? new Color(highlight.r, highlight.g, highlight.b, selected || cardSelected || attack ? .64f : place ? .09f : .32f) : ZoneTint;
             slot.border.effectColor = place ? Color.clear : highlight;
@@ -1928,13 +1944,13 @@ namespace YGOPortable.UI
                 {
                     InspectCard(card.code);
                     if (_modals.FocusChainActivationAt(_session, YgoConstants.LOCATION_HAND, sequence)) return;
-                    PointAtCardActions(view.Rect);
+                    if (!ShowUnavailableEffect(card)) PointAtCardActions(view.Rect);
                 };
                 trigger.OnTouchClick = () =>
                 {
                     InspectCard(card.code);
                     if (_modals.FocusChainActivationAt(_session, YgoConstants.LOCATION_HAND, sequence)) return;
-                    SelectTouchCardActions(view.Rect);
+                    if (!ShowUnavailableEffect(card)) SelectTouchCardActions(view.Rect);
                 };
             }
             UpdateHandDepth(views, opponent ? null : _raisedCard);
@@ -1997,6 +2013,7 @@ namespace YGOPortable.UI
                         (HasHandAction(card.controller, card.sequence) ||
                          _session.HasEffectActivationAt(prompt, mode, card.controller, YgoConstants.LOCATION_HAND, card.sequence));
                     DuelStyle.SetActivationGlow(glow, playable);
+                    SetAvailabilityDim(view.FocusArt, ref view.UnavailableShade, !playable && CanShowUnavailableEffect(prompt, card));
                 }
                 else if (glow.gameObject.activeSelf) glow.canvasRenderer.SetAlpha(DuelStyle.ActivationPulse);
             }
@@ -2005,8 +2022,13 @@ namespace YGOPortable.UI
             {
                 var glow = slot.activationGlow;
                 if (changed)
-                    DuelStyle.SetActivationGlow(glow, prompt != null && slot.cardView.gameObject.activeSelf &&
-                        _session.HasEffectActivationAt(prompt, mode, slot.mappedCon, slot.mappedLoc, slot.mappedSeq));
+                {
+                    bool playable = prompt != null && slot.cardView.gameObject.activeSelf &&
+                        _session.HasEffectActivationAt(prompt, mode, slot.mappedCon, slot.mappedLoc, slot.mappedSeq);
+                    DuelStyle.SetActivationGlow(glow, playable);
+                    SetAvailabilityDim(slot.focusArt, ref slot.unavailableShade,
+                        !playable && CanShowUnavailableEffect(prompt, slot.liveCard));
+                }
                 else if (glow.gameObject.activeSelf) glow.canvasRenderer.SetAlpha(DuelStyle.ActivationPulse);
             }
             foreach (var tile in _stackTilesByRect.Values)
@@ -3092,7 +3114,14 @@ namespace YGOPortable.UI
         {
             var animator = CardAnimationManager.Instance;
             if (animator != null)
-                animator.QueueChainOutcome(() => ReadChainResolutionLayout(animator), link);
+                animator.QueueChainOutcome(() => link.negated
+                    ? (animator.GetPoint(_boardRect, new Vector2(.50f, .62f)), 306f)
+                    : ReadChainResolutionLayout(animator), link);
+            if (!link.AppliedColumnNegation || link.negated) return;
+            if (animator != null)
+                animator.QueueFieldReadoutUpdate(() => ApplyColumnNegation(link));
+            else
+                ApplyColumnNegation(link);
         }
 
         private (Vector2, float) ReadChainResolutionLayout(CardAnimationManager animator)
@@ -3241,7 +3270,9 @@ namespace YGOPortable.UI
                 ApplyLifePoints();
                 return;
             }
-            animator.QueueLifeChange(mine ? _myLpFeedbackAnchor : _oppLpFeedbackAnchor, delta, kind, ApplyLifePoints);
+            bool damaging = kind is LifePointChangeKind.BattleDamage or LifePointChangeKind.EffectDamage or LifePointChangeKind.Damage;
+            animator.QueueLifeChange(mine ? _myLpFeedbackAnchor : _oppLpFeedbackAnchor, delta, kind, ApplyLifePoints,
+                damaging ? ShakeBoardForDamage : null);
         }
 
         private void HandleTurnStarted(int turn, int player)
@@ -3250,6 +3281,7 @@ namespace YGOPortable.UI
             bool opponent = player != _session.HumanPlayerIndex;
             void ApplyTurn()
             {
+                ClearColumnNegations();
                 SetTurnCaption(turn, opponent);
                 SetPhasePlate(YgoConstants.PHASE_DRAW, opponent);
             }
@@ -3288,6 +3320,7 @@ namespace YGOPortable.UI
             UpdateDuelPad();
             if (_session != session || !Root.activeSelf) return;
             RefreshHandGlows();
+            UpdateNegativeFeedback();
             RefreshFieldRelationships();
             RefreshAttackResponseArrow();
             UpdateTouchCardActions();
@@ -3912,6 +3945,7 @@ namespace YGOPortable.UI
             if (live == null) return;
             bool canInspect = live.IsFaceUp || live.isPublic || con == _session.HumanPlayerIndex;
             if (canInspect) InspectCard(live.code, GetSlot(con, loc, seq));
+            if (canInspect && ShowUnavailableEffect(live) && live.overlayCodes.Count == 0) return;
 
             if (CanShowCardActions || (touch && canInspect && CanOpenTouchCardDetails))
             {
@@ -4210,6 +4244,7 @@ namespace YGOPortable.UI
                 new Vector2(cardRight, onIPhone ? .812f : .891f), Vector2.zero, Vector2.zero);
             _zoomCardView = CompositeCardView.Create(cardHolder, "ZoomCard", true, duelArtwork: true);
             AddInspectorArtworkFrame(_zoomCardView.transform.Find("AspectBox"));
+            _zoomDisabledBadge = BuildDisabledBadge(_zoomCardView.transform, 24);
             var artwork = LotdUiKit.CreateRect("ArtworkOptions", win, new Vector2(.04f, onIPhone ? .025f : .035f),
                 new Vector2(cardRight, onIPhone ? .178f : .098f),
                 Vector2.zero, Vector2.zero);
@@ -4340,6 +4375,7 @@ namespace YGOPortable.UI
             var card = ReadInspectedStats(code, _zoomFieldCard);
             if (card.Live == null && !IsInspectedCardStillOnField(code, _zoomFieldCard)) _zoomFieldCard = null;
             _zoomCardView.SetCard(code, card);
+            _zoomDisabledBadge.SetActive(card.Disabled);
             BindRulesName(_zoomName, _zoomRulesName, card.RulesName);
             var (identity, details) = FormatInspectorStats(card);
             _zoomStats.text = identity.Length == 0 ? details : details.Length == 0 ? identity : $"{identity}\n{details}";

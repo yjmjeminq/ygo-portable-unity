@@ -39,6 +39,8 @@ namespace YGOPortable.Editor
             VerifyNativeChainCardFace(0);
             VerifyNativeChainCardFace(70046172);
             VerifyNativeChainCardFace(14087893);
+            VerifyNativeNegationOutcome(activationNegated: false);
+            VerifyNativeNegationOutcome(activationNegated: true);
             VerifyNativeImpermanenceRay(setFirst: true);
             VerifyNativeImpermanenceRay(setFirst: false);
             VerifyDragColumnAndPhaseShortcut();
@@ -141,6 +143,15 @@ namespace YGOPortable.Editor
             SetPrompt(duel, command);
             ui.Field.Refresh();
             ui.Expect(new[] { availableCopy });
+            var inactive = handRow.GetChild((int)duplicateSlots[0]);
+            var shade = inactive.GetComponentInChildren<CompositeCardView>().transform.Find("AspectBox/UnavailableShade");
+            Require(shade != null && shade.gameObject.activeInHierarchy && !shade.GetComponent<Image>().raycastTarget,
+                "A hand effect without a legal action was not dimmed.");
+            inactive.GetComponent<CardDragTrigger>().OnLeftClick();
+            var notice = ui.Field.Root.transform.Find("ActivationNotice");
+            Require(notice.gameObject.activeInHierarchy && notice.Find("Reason").GetComponent<Text>().text ==
+                    "발동 조건을 만족하지 않았습니다.",
+                "An unavailable hand effect did not explain the failed activation.");
 
             var mandatory = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_CARD, playerId = player, min = 1, max = 1 };
             mandatory.candidates.Add(HandChoice(player, availableCopy, KaiserSeaHorse));
@@ -1842,6 +1853,9 @@ namespace YGOPortable.Editor
             var anchor = (RectTransform)hud.Find("Status/Readout/Name");
             var total = hud.Find("Status/Readout/Value/Text").GetComponent<Text>();
             var advanceLife = typeof(DuelFieldUI).GetMethod("AdvanceLifeReadouts", PrivateInstance);
+            var board = (RectTransform)ui.Field.Root.transform.Find("DuelBoard");
+            Vector2 boardRest = board.anchoredPosition;
+            bool shook = false;
             TestCardPresentation.VerifyAttackFlight(animation, "1900", "0", "4", () =>
             {
                 advanceLife.Invoke(ui.Field, new object[] { 1f });
@@ -1855,10 +1869,13 @@ namespace YGOPortable.Editor
                     popup.Find("Kind/Text").GetComponent<Text>().text == "전투 피해" &&
                     popup.Find("Value/Text").GetComponent<Text>().text == $"-{damage}" && total.text == (8000 - damage).ToString(),
                     "The result showed damage on the wrong HUD, or at the wrong time in the attack.");
+                shook |= (board.anchoredPosition - boardRest).sqrMagnitude > .1f;
                 var sparks = popup.Find("LifeSparks").GetComponent<DuelEffectGraphic>();
                 Require(sparks.Kind == DuelEffectKind.LifeSparks && sparks.Tint.r > sparks.Tint.g && !sparks.raycastTarget,
                     "Damage did not generate red particles on the correct HUD.");
             });
+            Require(shook && (board.anchoredPosition - boardRest).sqrMagnitude < .0001f,
+                "Damage did not shake the playing area and return it to rest.");
             Require(animation.transform.Find("LPChange") == null &&
                 !steps.Any(step => step.GetType().Name.StartsWith("<PlayLifeChanges>", StringComparison.Ordinal)),
                 "The same battle damage was queued again after contact.");
@@ -2523,7 +2540,11 @@ namespace YGOPortable.Editor
                 "The Link Spider beam did not point at the exact marker destination.");
             animator.Clear();
             ui.Field.BindSession(duel, null, null);
-            ui.Field.Root.transform.Find($"DuelBoard/Zone_{target + 2}_2").GetComponent<CardDragTrigger>().OnRightClick();
+            var linkSlot = ui.Field.Root.transform.Find($"DuelBoard/Zone_{target + 2}_2");
+            var links = linkSlot.Find("Card/CardView/AspectBox/LinkBeams").GetComponent<DuelEffectGraphic>();
+            Require(links.isActiveAndEnabled && links.DirectionMask == live.linkMarker && !links.raycastTarget,
+                "A public Link Monster did not keep its live markers lit.");
+            linkSlot.GetComponent<CardDragTrigger>().OnRightClick();
             ui.ExpectLinkedZones($"Zone_{target + 2}_3");
             int activate = duel.ActivePrompt.activatable.FindIndex(card => card.code == linkSpider);
             Require(activate >= 0, "Link Spider did not offer its linked-zone summon effect.");
@@ -2535,6 +2556,62 @@ namespace YGOPortable.Editor
                 "The native effect summoned to a different zone than the selected Link arrow indicated.");
             ui.ExpectLinkedZones($"Zone_{target + 2}_3");
             Debug.Log("[VERIFY DUEL LINK ZONES] Link Spider's live downward marker identified the zone used by its native effect.");
+        }
+
+        private static void VerifyNativeNegationOutcome(bool activationNegated)
+        {
+            const uint reinforcement = 32807846, stratos = 40044918, judgment = 41420027;
+            uint response = activationNegated ? judgment : AshBlossom;
+            var player = Enumerable.Repeat(reinforcement, 21).Concat(Enumerable.Repeat(stratos, 19)).ToArray();
+            var enemy = Enumerable.Repeat(response, 40).ToArray();
+            var empty = Array.Empty<uint>();
+            var ai = new TacticalAI();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Native negation presentation", player, empty, enemy, empty,
+                !activationNegated, session => session.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD &&
+                    session.Players[session.HumanPlayerIndex].hand.Any(card => card.code == reinforcement));
+            if (activationNegated)
+            {
+                int set = duel.ActivePrompt.sSetable.FindIndex(card => card.code == judgment);
+                Require(set >= 0, "Solemn Judgment could not be set in the native fixture.");
+                duel.SubmitResponseInt((set << 16) | 4);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+                duel.SubmitResponseInt(7);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            }
+            using var ui = new HandUI(duel);
+            var animator = CardAnimationManager.Ensure(ui.Canvas);
+            var resolved = new List<ChainLinkInfo>();
+            duel.OnChainResolved += resolved.Add;
+            int spell = duel.ActivePrompt.activatable.FindIndex(card => card.code == reinforcement);
+            Require(spell >= 0, "The native fixture could not activate Reinforcement of the Army.");
+            duel.SubmitResponseInt((spell << 16) | 5);
+            bool sent = false;
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
+            {
+                if (sent || prompt.playerId != duel.AiPlayerIndex || prompt.messageType != YgoConstants.MSG_SELECT_CHAIN) return null;
+                int index = prompt.candidates.FindIndex(card => card.code == response);
+                if (index < 0) return null;
+                sent = true;
+                return BitConverter.GetBytes(index);
+            });
+            Require(sent && duel.RetryCount == 0 && resolved.Select(link => link.chainNumber).SequenceEqual(new[] { 2, 1 }),
+                "Native negation did not publish each outcome in reverse chain order.");
+            var negated = resolved[1];
+            Require(negated.code == reinforcement && negated.negated && negated.ActivationNegated == activationNegated,
+                "The chain did not distinguish effect negation from activation negation.");
+            if (!activationNegated)
+                Require(duel.HasUsedSharedTurnEffect((byte)duel.AiPlayerIndex, AshBlossom),
+                    "The native hand effect was not recorded for once-per-turn feedback.");
+
+            var outcome = AnimationSteps(animator).Last(step => step.GetType().Name.StartsWith("<ChainOutcome>", StringComparison.Ordinal));
+            Require(outcome.MoveNext() && outcome.Current is IEnumerator, "The negated link did not get a separate outcome.");
+            TestCardPresentation.SampleAnimation((IEnumerator)outcome.Current)(.52f);
+            var result = animator.transform.Find("ChainOutcome");
+            var impact = result.GetComponentInChildren<DuelEffectGraphic>();
+            Require(impact.Kind == (activationNegated ? DuelEffectKind.ChainShatter : DuelEffectKind.ChainNegated) &&
+                result.Find("Status/Text").GetComponent<Text>().text == "무효 · NEGATED", "The wrong negation animation or stamp appeared.");
+            Require(!outcome.MoveNext(), "The negation animation did not release its transient objects.");
+            Debug.Log($"[VERIFY DUEL NEGATION] Native {(activationNegated ? "activation" : "effect")} negation resolved CL2 before CL1 with the matching impact.");
         }
 
         private static void VerifyNativeImpermanenceRay(bool setFirst)
@@ -2561,6 +2638,11 @@ namespace YGOPortable.Editor
                 "The opposite seat did not reach a legal target summon.");
             duel.SubmitResponseInt(idle.summonable.FindIndex(card => card.code == KaiserSeaHorse) << 16);
             SelectableCardItem activation = null;
+            ChainLinkInfo columnEffect = null;
+            duel.OnChainResolved += link =>
+            {
+                if (link.code == impermanence) columnEffect = link;
+            };
             YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
             {
                 if (activation == null && prompt.messageType == YgoConstants.MSG_SELECT_CHAIN && prompt.playerId == duel.HumanPlayerIndex)
@@ -2591,7 +2673,32 @@ namespace YGOPortable.Editor
                         Mathf.Abs(rect.sizeDelta.x - Vector2.Distance(top, bottom)) < .1f,
                     "The beam did not span the activated trap's column.");
             }
-            Debug.Log($"[VERIFY DUEL COLUMN] Native Infinite Impermanence from {(setFirst ? "Set" : "hand")}, matching column beam count {rays.Length}.");
+            Require(columnEffect != null && columnEffect.AppliedColumnNegation == setFirst,
+                "The native column hint did not match Infinite Impermanence's eligible resolution.");
+            var field = ui.Field.Root.transform.Find("DuelBoard");
+            if (setFirst)
+            {
+                typeof(DuelFieldUI).GetMethod("ApplyColumnNegation", PrivateInstance).Invoke(ui.Field, new object[] { columnEffect });
+                var marked = field.GetComponentsInChildren<DuelZoneImage>().Where(zone => zone.ColumnSealed)
+                    .Select(zone => zone.name).OrderBy(name => name, StringComparer.Ordinal).ToArray();
+                Require(marked.SequenceEqual(new[] { $"Zone_{activation.sequence + 2}_0", $"Zone_{activation.sequence + 2}_4" }),
+                    $"The red seal covered the wrong spell and trap zones: {string.Join(", ", marked)}.");
+                typeof(DuelFieldUI).GetMethod("ClearColumnNegations", PrivateInstance).Invoke(ui.Field, null);
+                Require(field.GetComponentsInChildren<DuelZoneImage>().All(zone => !zone.ColumnSealed),
+                    "The red zone seals did not clear at the next turn.");
+            }
+            animator.Clear();
+            ui.Field.BindSession(duel, null, null);
+            var target = duel.Players[duel.AiPlayerIndex].mzone.Single(card => card?.code == KaiserSeaHorse);
+            Require(target.effectsDisabled, "The native target was not disabled.");
+            var targetSlot = field.Find($"Zone_{6 - target.sequence}_1");
+            Require(targetSlot?.Find("Card/CardView/AspectBox/DisabledChains")?.gameObject.activeInHierarchy == true,
+                "A native disabled monster did not receive its field chains.");
+            targetSlot.GetComponent<CardDragTrigger>().OnRightClick();
+            var badge = ui.Field.Root.transform.Find("LeftInspector/CardPreview/Card/AspectBox/EffectDisabled");
+            Require(badge.gameObject.activeInHierarchy && badge.Find("Label").GetComponent<Text>().text == "효과 무효화됨",
+                "The inspector did not display the disabled effect badge.");
+            Debug.Log($"[VERIFY DUEL COLUMN] Native Infinite Impermanence from {(setFirst ? "Set" : "hand")}, matching beam and seal count {rays.Length}.");
         }
 
         private static void VerifyDragColumnAndPhaseShortcut()
@@ -2613,11 +2720,15 @@ namespace YGOPortable.Editor
                 new object[] { DragSourceType.Hand, option.code, (int)option.sequence, null });
             type.GetMethod("UpdateDragColumnGuide", PrivateInstance).Invoke(ui.Field, null);
             var guided = board.GetComponentsInChildren<DuelZoneImage>().Where(zone => zone.ColumnGuided).Select(zone => zone.name).ToArray();
+            Require(slot.GetComponent<DuelZoneImage>().DragCandidate &&
+                board.GetComponentsInChildren<DuelZoneImage>().Count(zone => zone.DragCandidate) == 5,
+                "The dragged summon did not animate each legal Main Monster Zone.");
             Require(guided.Length == 4 && guided.All(zone => zone.StartsWith("Zone_4_", StringComparison.Ordinal)),
                 "Dragging a legal hand card did not light all four zones in the projected column.");
             drag.CancelDrag();
             type.GetMethod("HandleDuelDragCancelled", PrivateInstance).Invoke(ui.Field, null);
-            Require(board.GetComponentsInChildren<DuelZoneImage>().All(zone => !zone.ColumnGuided), "The canceled drag left a lit column.");
+            Require(board.GetComponentsInChildren<DuelZoneImage>().All(zone => !zone.ColumnGuided && !zone.DragCandidate),
+                "The canceled drag left a lit placement zone.");
 
             var human = duel.HumanPlayerIndex;
             var end = ui.Field.Root.transform.Find("EndShortcut").GetComponent<Button>();
