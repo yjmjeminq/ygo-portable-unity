@@ -19,6 +19,7 @@ namespace YGOPortable.Editor
         {
             using var duel = new DuelSession();
             VerifyDuplicateEffectsAndZoneViewer(duel);
+            VerifyActivationChoicesAcrossReopen(duel);
             VerifyOverlayChoices(duel);
             VerifySingleEffect(duel);
             VerifyKoreanEffect(duel);
@@ -1233,9 +1234,11 @@ namespace YGOPortable.Editor
 
             view.Show(duel, prompt);
             view.VerifyPassAvailability(true);
-            Require(view.Choice(0).Find("EffectNumber/Text")?.GetComponent<Text>().text == "후보 1" &&
-                    view.Choice(1).Find("EffectNumber/Text")?.GetComponent<Text>().text == "후보 2",
-                "Same-card labels should identify response candidates rather than card effect numbers.");
+            Require(view.Choice(0).GetComponentInChildren<CompositeCardView>().CurrentCode == LadyLabrynth &&
+                    view.FindChoice(1) == null &&
+                    view.EffectOption(0).GetComponentInChildren<Text>().text.StartsWith("①번 효과", StringComparison.Ordinal) &&
+                    view.EffectOption(1).GetComponentInChildren<Text>().text.StartsWith("②번 효과", StringComparison.Ordinal),
+                "The same card did not present both numbered effects beside a single artwork tile.");
             view.SelectChoice(0, LadyLabrynth);
             view.VerifyEffect(prompt.candidates[0]);
             view.SelectChoice(1, LadyLabrynth);
@@ -1255,6 +1258,48 @@ namespace YGOPortable.Editor
             view.VerifyEffect(prompt.candidates[1]);
             view.ConfirmChoice();
             Require(view.Responses.SequenceEqual(new[] { 1 }), "Same-card effects were not submitted by their distinct indices.");
+        }
+
+        private static void VerifyActivationChoicesAcrossReopen(DuelSession duel)
+        {
+            using var view = new ChainView();
+            var prompt = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_CHAIN, playerId = 0 };
+            prompt.candidates.Add(new SelectableCardItem { code = 14087893, location = YgoConstants.LOCATION_HAND });
+            prompt.candidates.Add(Repeated(0));
+            prompt.candidates.Add(new SelectableCardItem { code = 14558127, location = YgoConstants.LOCATION_HAND, sequence = 1 });
+            prompt.candidates.Add(Repeated(1));
+            view.Modals.ShowPrompt(duel, prompt, ChainConfirmationMode.Off);
+            var previous = view.EffectOption(1).onClick;
+            view.SelectChoice(1, LadyLabrynth);
+            view.VerifyEffect(prompt.candidates[3]);
+            view.ConfirmChoice();
+            Require(view.Responses.SequenceEqual(new[] { 3 }),
+                "A filtered duplicate effect did not submit its noncontiguous engine index.");
+
+            var reopened = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_CHAIN, playerId = 0 };
+            reopened.candidates.Add(prompt.candidates[1]);
+            reopened.candidates.Add(prompt.candidates[0]);
+            reopened.candidates.Add(prompt.candidates[3]);
+            view.Modals.ShowPrompt(duel, reopened, ChainConfirmationMode.On);
+            previous.Invoke();
+            view.VerifyEffect(reopened.candidates[0]);
+            view.EffectOption(2).GetComponent<DuelPromptSelection>().OnSelect(null);
+            view.VerifyEffect(reopened.candidates[2]);
+            var chosen = reopened.candidates[2];
+            reopened.candidates[2] = reopened.candidates[1];
+            view.ConfirmChoice();
+            Require(view.Modals.IsPromptOpen && view.Responses.SequenceEqual(new[] { 3 }),
+                "The chooser sent a replacement candidate at the selected engine index.");
+            reopened.candidates[2] = chosen;
+            view.ConfirmChoice();
+            Require(view.Responses.SequenceEqual(new[] { 3, 2 }),
+                "Reopening the chooser carried the previous prompt's native candidate mapping into the new choice.");
+
+            SelectableCardItem Repeated(uint effect) => new SelectableCardItem
+            {
+                code = LadyLabrynth, controller = 0, location = YgoConstants.LOCATION_MZONE, sequence = 2,
+                description = ((ulong)LadyLabrynth << 20) | effect, isTriggeredEffect = true,
+            };
         }
 
         private static void VerifyOverlayChoices(DuelSession duel)
@@ -1981,8 +2026,13 @@ namespace YGOPortable.Editor
                 Require(Modals.IsPromptOpen, "A chain with available choices did not open.");
                 Canvas.ForceUpdateCanvases();
                 for (int i = 0; i < prompt.candidates.Count; i++)
-                    Require(Choice(i).GetComponentInChildren<CompositeCardView>().CurrentCode == prompt.candidates[i].code,
-                        $"Wrong source card for chain choice {i}.");
+                {
+                    var tile = FindChoice(i);
+                    Require(tile != null
+                            ? tile.GetComponentInChildren<CompositeCardView>().CurrentCode == prompt.candidates[i].code
+                            : EffectOption(i) != null,
+                        $"Wrong source card or missing effect for chain choice {i}.");
+                }
                 if (prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN)
                     Require(Choice(0).GetComponentInChildren<CompositeCardView>().CurrentCode == prompt.promptCardCode,
                         "Single-effect chooser displayed the wrong card.");
@@ -2009,15 +2059,31 @@ namespace YGOPortable.Editor
                 Require(canPass == optional, "The pass button did not match the engine's optional/forced flag.");
             }
 
-            internal Transform Choice(int index) =>
-                Modals.ModalRoot.GetComponentsInChildren<Transform>().Single(child => child.name == $"Ch_{index}");
+            internal Transform FindChoice(int index) =>
+                Modals.ModalRoot.GetComponentsInChildren<Transform>().SingleOrDefault(child => child.name == $"Ch_{index}");
+
+            internal Transform Choice(int index) => FindChoice(index) ??
+                throw new InvalidOperationException($"Missing card tile {index}.");
+
+            internal Button EffectOption(int index) => Modals.ModalRoot.GetComponentsInChildren<Button>(true)
+                .SingleOrDefault(button => button.name == $"Effect_{index}");
 
             internal void SelectChoice(int index, uint source)
             {
-                var button = Choice(index).GetComponent<Button>();
-                Require(button != null && button.interactable, $"Chain choice {index} cannot be selected.");
+                int previousResponses = Responses.Count;
+                var option = EffectOption(index);
+                var button = option;
+                if (option != null && !option.gameObject.activeInHierarchy)
+                {
+                    var tiles = (Button[])typeof(DuelPromptModals).GetField("_activationButtons",
+                        BindingFlags.Instance | BindingFlags.NonPublic).GetValue(Modals);
+                    tiles[index].onClick.Invoke();
+                }
+                else if (option == null) button = Choice(index).GetComponent<Button>();
+                Require(button != null && button.IsInteractable() && button.gameObject.activeInHierarchy,
+                    $"Chain choice {index} cannot be selected.");
                 button.onClick.Invoke();
-                Require(Modals.IsPromptOpen && Responses.Count == 0 && _inspected.LastOrDefault() == source,
+                Require(Modals.IsPromptOpen && Responses.Count == previousResponses && _inspected.LastOrDefault() == source,
                     $"Previewing chain choice {index} did not inspect the corresponding card.");
             }
 
@@ -2029,9 +2095,14 @@ namespace YGOPortable.Editor
                 var visibleText = Modals.ModalRoot.GetComponentsInChildren<Text>();
                 var labels = visibleText.Select(label => label.text).ToArray();
                 var effect = visibleText.SingleOrDefault(label => label.gameObject.name == "Effect");
+                bool chosenEffectVisible = effect != null && effect.text.Contains(text) ||
+                    Modals.ModalRoot.GetComponentsInChildren<Button>()
+                        .Where(button => button.name.StartsWith("Effect_", StringComparison.Ordinal))
+                        .Any(button => button.GetComponent<Outline>().effectDistance.x > 1f &&
+                            button.GetComponentInChildren<Text>().text.Contains(text));
                 Require(labels.Any(label => label.Contains(CardDatabase.GetName(source.code))) &&
                         labels.Any(label => label.Contains(location)) && !string.IsNullOrWhiteSpace(text) &&
-                        effect != null && effect.text.Contains(text),
+                        chosenEffectVisible,
                     "The preview did not show the selected card, source zone and effect description.");
             }
 

@@ -231,6 +231,15 @@ namespace YGOPortable.Editor
                 view.SetCard(BlueEyes, faceDown: true);
                 Require(!view.HasOverframe && local.sprite == null, "A face-down card retained its local cut-in.");
 
+                var deck = new DeckEditorUI(null, canvas.transform, mobileLayout: false);
+                typeof(DeckEditorUI).GetMethod("OpenExpandedDeckCard", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(deck, new object[] { BlueEyes });
+                var deckArtwork = deck.Root.transform.Find("Editor/ExpandedDeckCard/Window/Artwork/Card");
+                Require(deckArtwork != null && deckArtwork.GetComponent<CompositeCardView>().HasOverframe &&
+                    deckArtwork.Find("Overframe/Depth/LocalCutIn").GetComponent<Image>().sprite == sprite,
+                    "The expanded deck inspector did not use the same local artwork and cut-in.");
+                deck.Close();
+
                 animator.QueueMove(new CardFlight(BlueEyes, pose, pose, true, false), CardMotion.SpecialSummon, null);
                 move = queue.Dequeue();
                 Require(move.MoveNext() && move.Current is IEnumerator, "The local cut-in card skipped its summon reveal.");

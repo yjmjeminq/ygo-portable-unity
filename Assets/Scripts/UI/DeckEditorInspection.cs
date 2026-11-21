@@ -32,7 +32,7 @@ namespace YGOPortable.UI
             float artRight = _mobileLayout ? .361f : .422f;
             float rulesLeft = artRight + .025f;
             var art = DeckArea(_expandedDeckPanel, "Artwork", .048f, .084f, artRight, .913f);
-            _expandedDeckArt = CompositeCardView.Create(art, "Card", true);
+            _expandedDeckArt = CompositeCardView.Create(art, "Card", detailedOverlay: true, duelArtwork: true);
             _expandedDeckArt.EnableOverframe();
             CardOverframeInput.Attach(art, _expandedDeckArt, _mobileLayout,
                 Rect.MinMaxRect(.048f, .084f, artRight, .913f), Rect.MinMaxRect(.073f, .104f, artRight - .04f, .805f));
@@ -98,9 +98,9 @@ namespace YGOPortable.UI
             _expandedDeckName.text = card.name;
             _expandedDeckStats.text = card.FormatStatsLineKR();
             _expandedDeckDescription.text = card.desc;
-            _expandedDeckArt.SetCard(code);
             _expandedDeckOverlay.SetAsLastSibling();
             _expandedDeckOverlay.gameObject.SetActive(true);
+            _expandedDeckArt.SetCard(code);
             Canvas.ForceUpdateCanvases();
             _expandedDeckScroll.StopMovement();
             _expandedDeckScroll.content.anchoredPosition = Vector2.zero;

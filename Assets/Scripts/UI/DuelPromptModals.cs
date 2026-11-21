@@ -58,10 +58,22 @@ namespace YGOPortable.UI
         private Text _chainEffect;
         private Button _chainActivate;
         private Button _chainPass;
+        private readonly struct ActivationChoice
+        {
+            internal readonly SelectableCardItem Card;
+            internal readonly int EngineIndex;
+
+            internal ActivationChoice(SelectableCardItem card, int engineIndex)
+            {
+                Card = card;
+                EngineIndex = engineIndex;
+            }
+        }
+
         private int _chainSelection;
-        private int[] _chainCandidateIndices;
-        private IReadOnlyList<SelectableCardItem> _activationChoices = Array.Empty<SelectableCardItem>();
+        private ActivationChoice[] _activationChoices = Array.Empty<ActivationChoice>();
         private Button[] _activationButtons = Array.Empty<Button>();
+        private Button _selectedActivationCard;
         private Action<int> _confirmPileActivation;
 
         // Zone viewer refs
@@ -262,9 +274,9 @@ namespace YGOPortable.UI
         {
             if (!IsChainPromptOpen || !ReferenceEquals(session, _curSession) ||
                 !ReferenceEquals(session.ActivePrompt, _curPrompt)) return -1;
-            for (int i = 0; i < _activationChoices.Count; i++)
+            for (int i = 0; i < _activationChoices.Length; i++)
             {
-                var choice = _activationChoices[i];
+                var choice = _activationChoices[i].Card;
                 if (choice.code != 0 && choice.controller == session.HumanPlayerIndex &&
                     DuelSession.IsActivationLocation(choice.location, location) && (sequence == null || choice.sequence == sequence))
                     return i;
@@ -443,7 +455,7 @@ namespace YGOPortable.UI
             _focusBeforeKeyboard = null;
             _padKeyboard.Close();
             ModalRoot.SetActive(false);
-            _confirmPileActivation = null;
+            ResetActivationChoices();
             if (restoreFocus) SetFocus(_focusBeforePrompt);
             _focusBeforePrompt = null;
         }
@@ -453,15 +465,14 @@ namespace YGOPortable.UI
             ClearChildren(_modalBody);
             ClearChildren(_modalFooter);
             ClearChildren(_chainCards);
+            for (int i = _chainEffectScroll.content.childCount - 1; i > 0; i--)
+                RemovePromptChild(_chainEffectScroll.content.GetChild(i));
+            _chainEffect.gameObject.SetActive(true);
             _selectedIndices.Clear();
             _fieldCardIndices.Clear();
             _fieldMaterialPick = false;
             _materialConfirmRoot.gameObject.SetActive(false);
-            _chainSelection = -1;
-            _chainCandidateIndices = null;
-            _activationChoices = Array.Empty<SelectableCardItem>();
-            _activationButtons = Array.Empty<Button>();
-            _confirmPileActivation = null;
+            ResetActivationChoices();
             _confirmBtn = null;
             _attackCancel = null;
             _sumAmount = _sumTarget = default;
@@ -471,19 +482,30 @@ namespace YGOPortable.UI
             _sortOrder = null;
         }
 
+        private void ResetActivationChoices()
+        {
+            _chainSelection = -1;
+            _activationChoices = Array.Empty<ActivationChoice>();
+            _activationButtons = Array.Empty<Button>();
+            _selectedActivationCard = null;
+            _confirmPileActivation = null;
+        }
+
         private static void ClearChildren(Transform parent)
         {
             for (int i = parent.childCount - 1; i >= 0; i--)
+                RemovePromptChild(parent.GetChild(i));
+        }
+
+        private static void RemovePromptChild(Transform child)
+        {
+            if (Application.isPlaying)
             {
-                var child = parent.GetChild(i);
-                if (Application.isPlaying)
-                {
-                    child.gameObject.SetActive(false);
-                    child.SetParent(null, false);
-                    UnityEngine.Object.Destroy(child.gameObject);
-                }
-                else UnityEngine.Object.DestroyImmediate(child.gameObject);
+                child.gameObject.SetActive(false);
+                child.SetParent(null, false);
+                UnityEngine.Object.Destroy(child.gameObject);
             }
+            else UnityEngine.Object.DestroyImmediate(child.gameObject);
         }
 
         private void BuildPromptModalShell(Transform parent)
@@ -747,11 +769,10 @@ namespace YGOPortable.UI
                 !ReferenceEquals(session.ActivePrompt, prompt)) return;
             PreparePrompt(session, prompt);
             _chainPrompt = true;
-            _chainCandidateIndices = indices;
             _confirmPileActivation = confirm;
             ShowPreparedPrompt();
-            RenderActivationPicker(session, prompt, indices.Select(index => prompt.activatable[index]).ToArray(),
-                title, $"발동 가능 {indices.Length}개", "닫기");
+            var choices = indices.Select(index => new ActivationChoice(prompt.activatable[index], index)).ToArray();
+            RenderActivationPicker(session, prompt, choices, title, $"발동 가능 {choices.Length}개", "닫기");
             PrepareFocusControls(_chainBox, OnModalCloseClicked);
             FocusPrompt();
         }
@@ -1090,34 +1111,38 @@ namespace YGOPortable.UI
         private void RenderChainPicker(DuelSession session, DuelPrompt prompt, ChainConfirmationMode chainConfirmation)
         {
             bool singleEffect = prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN;
-            IReadOnlyList<SelectableCardItem> choices = singleEffect
-                ? new[] { prompt.ReadEffectConfirmationSource() }
-                : prompt.candidates;
-            if (chainConfirmation != ChainConfirmationMode.On && !singleEffect)
-            {
-                // Hide fast responses without changing the indices sent back to the engine.
-                _chainCandidateIndices = Enumerable.Range(0, prompt.candidates.Count)
-                    .Where(index => session.IsChainCandidateVisible(prompt, prompt.candidates[index], chainConfirmation)).ToArray();
-                choices = _chainCandidateIndices.Select(index => prompt.candidates[index]).ToArray();
-            }
+            var choices = singleEffect
+                ? new[] { new ActivationChoice(prompt.ReadEffectConfirmationSource(), 1) }
+                : prompt.candidates.Select((card, index) => new ActivationChoice(card, index))
+                    .Where(choice => chainConfirmation == ChainConfirmationMode.On ||
+                        session.IsChainCandidateVisible(prompt, choice.Card, chainConfirmation)).ToArray();
             bool respondingToAttack = session.HasActiveAttack && session.AttackerCon != session.HumanPlayerIndex;
             string title = prompt.forced ? "필수 효과 순서 선택" :
                 respondingToAttack && session.CurrentChain.Count == 0
                     ? (session.TargetLoc == 0 ? "상대의 직접 공격에 대응하시겠습니까?" : "상대의 공격 선언에 대응하시겠습니까?")
-                    : choices.Count == 1 ? "효과를 발동하시겠습니까?" : "발동할 효과 선택";
-            RenderActivationPicker(session, prompt, choices, title, $"체인 {session.CurrentChain.Count + 1}  ·  {choices.Count}개",
+                    : choices.Length == 1 ? "효과를 발동하시겠습니까?" : "발동할 효과 선택";
+            RenderActivationPicker(session, prompt, choices, title, $"체인 {session.CurrentChain.Count + 1}  ·  {choices.Length}개",
                 prompt.forced ? null : "패스");
         }
 
-        private void RenderActivationPicker(DuelSession session, DuelPrompt prompt, IReadOnlyList<SelectableCardItem> choices,
+        private void RenderActivationPicker(DuelSession session, DuelPrompt prompt, ActivationChoice[] choices,
             string title, string summary, string passLabel)
         {
             _activationChoices = choices;
-            _activationButtons = new Button[choices.Count];
-            bool compact = choices.Count == 1;
+            _activationButtons = new Button[choices.Length];
+            var cards = Enumerable.Range(0, choices.Length).GroupBy(i =>
+            {
+                var card = choices[i].Card;
+                // Materials share their host sequence. Their material indices identify the physical cards.
+                uint material = (card.location & YgoConstants.LOCATION_OVERLAY) != 0 ? card.position : 0;
+                return (card.controller, card.location, card.sequence, material, card.code);
+            }).ToArray();
+            bool hasEffectLists = cards.Any(card => card.Count() > 1);
+            bool compact = choices.Length == 1;
             _chainBox.anchorMin = compact ? new Vector2(.255f, .200f) : new Vector2(.222f, .185f);
             _chainBox.anchorMax = compact ? new Vector2(.749f, .655f) : new Vector2(.922f, .628f);
-            float stripEnd = choices.Count switch { 1 => .33f, 2 => .455f, 3 => .615f, _ => .695f };
+            float stripEnd = cards.Length switch { 1 => .33f, 2 => .455f, 3 => .615f, _ => .695f };
+            if (hasEffectLists) stripEnd = Mathf.Min(.49f, stripEnd);
             var cardStrip = (RectTransform)_chainCardScroll.transform;
             var pass = (RectTransform)_chainPass.transform.parent;
             var activate = (RectTransform)_chainActivate.transform.parent;
@@ -1161,78 +1186,104 @@ namespace YGOPortable.UI
             _chainPass.transform.parent.gameObject.SetActive(passLabel != null);
             _chainPass.GetComponentInChildren<Text>(true).text = compact && passLabel != null ? "발동하지 않는다" : passLabel ?? "";
             _chainActivate.GetComponentInChildren<Text>(true).text = compact ? "발동한다" : "효과 발동";
-            _chainActivate.interactable = choices.Count > 0;
+            _chainActivate.interactable = choices.Length > 0;
             _chainName.text = _chainSource.text = _chainEffect.text = "";
 
-            var frames = new Outline[choices.Count];
-            var sources = new (byte controller, uint location, uint sequence, uint material)[choices.Count];
-            for (int i = 0; i < choices.Count; i++)
-            {
-                var choice = choices[i];
-                // For material, the sequence belongs to the host and the position identifies the attached card.
-                uint material = (choice.location & YgoConstants.LOCATION_OVERLAY) != 0 ? choice.position : 0;
-                sources[i] = (choice.controller, choice.location, choice.sequence, material);
-            }
-            var sourceCounts = sources.GroupBy(source => source).ToDictionary(group => group.Key, group => group.Count());
-            var sourceNumbers = new Dictionary<(byte, uint, uint, uint), int>();
+            var frames = new Outline[choices.Length];
+            var options = new Button[choices.Length];
+            var optionFrames = new Outline[choices.Length];
+            var cardEffects = new int[choices.Length][];
+            var effects = choices.Select(choice =>
+                (_confirmPileActivation != null ? CardDatabase.ResolveCommandEffectDescription(choice.Card) :
+                    CardDatabase.ResolveEffectDescription(choice.Card.description, choice.Card.code)) ??
+                    "이 카드의 효과를 발동할 수 있습니다.").ToArray();
             bool respondingToOpponent = _confirmPileActivation == null && prompt.messageType == YgoConstants.MSG_SELECT_CHAIN &&
                 session.CurrentChain.LastOrDefault() is { code: not 0 } link && link.triggerPlayer != session.HumanPlayerIndex;
 
             void Select(int index, bool inspect)
             {
-                if (!CanAnswerPrompt || !ReferenceEquals(_curPrompt, prompt)) return;
-                if (_chainSelection >= 0) SetSelectionOutline(frames[_chainSelection], false);
+                if (!CanAnswerPrompt || !ReferenceEquals(_curPrompt, prompt) || !ReferenceEquals(_activationChoices, choices))
+                    return;
+                int previous = _chainSelection;
+                var group = cardEffects[index];
+                bool sourceChanged = previous < 0 || cardEffects[previous] != group;
+                if (previous >= 0)
+                {
+                    SetSelectionOutline(frames[previous], false);
+                    if (optionFrames[previous] != null) SetSelectionOutline(optionFrames[previous], false);
+                    if (sourceChanged)
+                        foreach (int effect in cardEffects[previous]) options[effect]?.gameObject.SetActive(false);
+                }
                 _chainSelection = index;
+                _selectedActivationCard = _activationButtons[index];
                 SetSelectionOutline(frames[index], true);
-                var item = choices[index];
+                if (sourceChanged)
+                {
+                    _chainEffect.gameObject.SetActive(group.Length == 1);
+                    foreach (int effect in group) options[effect]?.gameObject.SetActive(true);
+                    _chainEffectScroll.StopMovement();
+                    _chainEffectScroll.content.anchoredPosition = Vector2.zero;
+                }
+                if (optionFrames[index] != null) SetSelectionOutline(optionFrames[index], true);
+                var item = choices[index].Card;
                 _chainName.text = CardDatabase.GetName(item.code);
                 _chainSource.text = CardSourceLabel(session, item);
-                string text = _confirmPileActivation != null ? CardDatabase.ResolveCommandEffectDescription(item) :
-                    CardDatabase.ResolveEffectDescription(item.description, item.code);
-                _chainEffect.text = text ?? "이 카드의 효과를 발동할 수 있습니다.";
-                _chainEffectScroll.StopMovement();
-                _chainEffectScroll.content.anchoredPosition = Vector2.zero;
+                _chainEffect.text = effects[index];
                 if (inspect) InspectChoice(item.code, item);
             }
 
             float stripWidth = 6f - ChainCardGap;
-            var groups = Enumerable.Range(0, sources.Length).GroupBy(i => (sources[i].controller, sources[i].location));
-            foreach (var group in groups)
+            foreach (var group in cards.GroupBy(card => (card.Key.controller, card.Key.location)))
             {
                 var (controller, location) = group.Key;
                 int count = group.Count();
                 float width = count * ChainCardWidth + (count - 1) * ChainCardGap + 2f * ChainGroupPadding;
                 var row = CreateChainGroup(location, controller != session.HumanPlayerIndex, width);
                 stripWidth += width + ChainCardGap;
-                foreach (int index in group)
+                foreach (var card in group)
                 {
-                    var tile = CreateCardStripTile(row, $"Ch_{index}", ChainCardWidth);
-                    frames[index] = tile.GetComponent<Outline>();
-                    var source = sources[index];
-                    bool duplicate = sourceCounts[source] > 1;
-                    var art = LotdUiKit.CreateRect("Card", tile, new Vector2(.055f, duplicate ? .16f : .035f),
+                    int[] indices = card.ToArray();
+                    int first = indices[0];
+                    var tile = CreateCardStripTile(row, $"Ch_{first}", ChainCardWidth);
+                    var frame = tile.GetComponent<Outline>();
+                    var art = LotdUiKit.CreateRect("Card", tile, new Vector2(.055f, .035f),
                         new Vector2(.945f, .975f), Vector2.zero, Vector2.zero);
-                    BuildCandidateCard(art, session, choices[index], choices[index].code);
-
-                    if (duplicate)
-                    {
-                        sourceNumbers.TryGetValue(source, out int number);
-                        sourceNumbers[source] = ++number;
-                        var caption = LotdUiKit.CreateRect("EffectNumber", tile, new Vector2(.04f, .01f),
-                            new Vector2(.96f, .16f), Vector2.zero, Vector2.zero);
-                        LotdUiKit.AddFittedText(caption, "Text", $"후보 {number}", 13, 9, TextAnchor.MiddleCenter, DuelStyle.Muted);
-                    }
+                    BuildCandidateCard(art, session, choices[first].Card, choices[first].Card.code);
                     var button = tile.gameObject.AddComponent<Button>();
-                    _activationButtons[index] = button;
                     button.targetGraphic = tile.GetComponent<Image>();
-                    button.onClick.AddListener(() => Select(index, inspect: true));
-                    tile.gameObject.AddComponent<DuelPromptSelection>().OnSelected = () =>
-                        Select(index, inspect: !respondingToOpponent || index != _chainSelection);
+
+                    int SelectedOnThisCard() =>
+                        _chainSelection >= 0 && cardEffects[_chainSelection] == indices ? _chainSelection : first;
+                    button.onClick.AddListener(() => Select(SelectedOnThisCard(), inspect: true));
+                    SelectionHandler(button).OnSelected = () =>
+                        Select(SelectedOnThisCard(), inspect: !respondingToOpponent || _selectedActivationCard != button);
+
+                    for (int ordinal = 0; ordinal < indices.Length; ordinal++)
+                    {
+                        int index = indices[ordinal];
+                        frames[index] = frame;
+                        _activationButtons[index] = button;
+                        cardEffects[index] = indices;
+                        if (indices.Length == 1) continue;
+
+                        string number = ordinal < 20 ? ((char)('①' + ordinal)).ToString() : (ordinal + 1).ToString();
+                        float height = _mobileLayout ? MobileSafeArea.MinimumTouchSize(_chainDetails) : 44f;
+                        var option = LotdUiKit.CreateWrappedButton(_chainEffectScroll.content, $"Effect_{index}",
+                            $"{number}번 효과 · {effects[index]}", () => Select(index, inspect: true),
+                            _mobileLayout ? 20 : 17, false, height, sidePadding: 14);
+                        options[index] = option;
+                        optionFrames[index] = option.gameObject.AddComponent<Outline>();
+                        SetSelectionOutline(optionFrames[index], false);
+                        var selection = SelectionHandler(option);
+                        selection.OnSelected = () => Select(index, inspect: true);
+                        selection.OnCancelled = OnModalCloseClicked;
+                        option.gameObject.SetActive(false);
+                    }
                 }
             }
 
             ResetCardStrip(_chainCardScroll, stripWidth);
-            if (choices.Count > 0) Select(0, inspect: !respondingToOpponent);
+            if (choices.Length > 0) Select(0, inspect: !respondingToOpponent);
         }
 
         private RectTransform CreateChainGroup(uint location, bool opponent, float width)
@@ -1280,22 +1331,25 @@ namespace YGOPortable.UI
 
         private void ConfirmChainChoice()
         {
-            if (!CanAnswerPrompt || _chainSelection < 0 || _curPrompt == null) return;
+            if (!CanAnswerPrompt || _chainSelection < 0 || _chainSelection >= _activationChoices.Length) return;
+            var choice = _activationChoices[_chainSelection];
             if (_confirmPileActivation != null)
             {
+                if (!StillHasActivationChoice(_curPrompt.activatable, choice)) return;
                 var confirm = _confirmPileActivation;
-                int index = _chainCandidateIndices[_chainSelection];
                 HidePrompt();
-                confirm(index);
+                confirm(choice.EngineIndex);
                 return;
             }
-            if (_curPrompt.messageType == YgoConstants.MSG_SELECT_CHAIN &&
-                _chainSelection < (_chainCandidateIndices?.Length ?? _curPrompt.candidates.Count))
-                Submit(BitConverter.GetBytes(_chainCandidateIndices?[_chainSelection] ?? _chainSelection));
-            else if (_curPrompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN)
-                Submit(BitConverter.GetBytes(1));
+
+            if (_curPrompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN ||
+                _curPrompt.messageType == YgoConstants.MSG_SELECT_CHAIN && StillHasActivationChoice(_curPrompt.candidates, choice))
+                Submit(BitConverter.GetBytes(choice.EngineIndex));
         }
 
+        private static bool StillHasActivationChoice(IReadOnlyList<SelectableCardItem> candidates, ActivationChoice choice) =>
+            choice.EngineIndex >= 0 && choice.EngineIndex < candidates.Count &&
+            ReferenceEquals(candidates[choice.EngineIndex], choice.Card);
 
         private void BindFieldCardChoices(DuelSession session, DuelPrompt prompt)
         {
