@@ -177,6 +177,26 @@ namespace YGOPortable.Editor
             Require(!reveal.MoveNext() && !move.MoveNext() && landed && (view == null || !view.gameObject.activeSelf) &&
                 animator.transform.Find("ChainImpactWave") == null, "The overframe cut-in outlived the summon.");
 
+            landed = false;
+            animator.QueueMove(new CardFlight(BlueEyes, start, end, false, false), CardMotion.SpecialSummon, () => landed = true);
+            move = queue.Dequeue();
+            Require(move.MoveNext() && move.Current.GetType().Name.StartsWith("<RevealSummon>", StringComparison.Ordinal),
+                "An ace that left the field lost its overframe on the next summon of the same duel.");
+            reveal = (IEnumerator)move.Current;
+            Require(reveal.MoveNext(), "The resummon cut-in did not start.");
+            SampleAnimation((IEnumerator)reveal.Current)(1f);
+            Require(animator.transform.Find("MovingCard/Overframe/Depth/Subject").gameObject.activeInHierarchy &&
+                animator.transform.Find("ChainImpactWave") != null, "The resummoned ace did not show its subject and shockwave.");
+            while (reveal.MoveNext()) SampleAnimation((IEnumerator)reveal.Current)(1f);
+            Require(!move.MoveNext() && landed && animator.transform.Find("ChainImpactWave") == null,
+                "The resummoned ace did not complete its field arrival.");
+
+            animator.QueueMove(new CardFlight(BlueEyes, start, end, true, true), CardMotion.SpecialSummon, null);
+            move = queue.Dequeue();
+            Require(move.MoveNext() && !move.Current.GetType().Name.StartsWith("<RevealSummon>", StringComparison.Ordinal) &&
+                animator.transform.Find("MovingCard/Overframe") == null, "A face-down summon exposed the ace's identity.");
+            Debug.Log("[VERIFY OVERFRAME RESUMMON] The same ace showed its cut-in on a second face-up summon and stayed hidden on a face-down summon.");
+
             animator.Clear();
             animator.QueueChain(start, 9674034, 1, false);
             var chain = queue.Dequeue();

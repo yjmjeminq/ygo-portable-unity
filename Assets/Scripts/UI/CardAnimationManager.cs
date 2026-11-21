@@ -1009,13 +1009,16 @@ namespace YGOPortable.UI
             onDepart?.Invoke();
             bool extraSummon = motion is CardMotion.ExtraDeckSummon or CardMotion.PendulumSummon;
             bool summons = IsSummonMotion(motion);
+            bool overframe = summons && !flight.EndsFaceDown &&
+                CardOverframeProfile.Get(flight.Code, CardArtLoader.GetDuelArtworkVariant(flight.Code)) is { } profile &&
+                profile.Triangles.Length > 0;
             bool featured = summons && TakeFeaturedSummon(flight);
-            if (summons && !featured && !flight.EndsFaceDown) _summonArt = DuelVisualAssets.SummonCutIn(flight.Code);
-            bool reveal = !flight.EndsFaceDown && (extraSummon || featured || _summonArt != null);
+            if (summons && !featured && !overframe && !flight.EndsFaceDown) _summonArt = DuelVisualAssets.SummonCutIn(flight.Code);
+            bool reveal = !flight.EndsFaceDown && (extraSummon || featured || overframe || _summonArt != null);
             var proxy = TakeCard(flight.StartsFaceDown ? 0u : flight.Code, flight.StartsFaceDown, reveal);
             var moving = reveal ? null : CreateMovingReadout(flight, motion, readout);
             if (reveal)
-                yield return RevealSummon(proxy, flight, motion, featured, readout?.DestinationCard);
+                yield return RevealSummon(proxy, flight, motion, featured, overframe, readout?.DestinationCard);
             else if (motion is CardMotion.AttachMaterial or CardMotion.DetachMaterial)
             {
                 bool attaching = motion == CardMotion.AttachMaterial;
@@ -1107,15 +1110,14 @@ namespace YGOPortable.UI
                 _featuredSummons.Add((flight.To.Angle > 45f, key));
         }
 
-        private IEnumerator RevealSummon(CompositeCardView proxy, CardFlight flight, CardMotion motion, bool featured, LiveCardState live)
+        private IEnumerator RevealSummon(CompositeCardView proxy, CardFlight flight, CardMotion motion, bool featured,
+            bool overframe, LiveCardState live)
         {
             if (!flight.StartsFaceDown && live != null) proxy.SetCard(flight.Code, live: live);
             var (kind, accent, title) = SummonEffect(flight.Code, motion);
             Vector2 view = _layer.rect.size;
             var center = new Vector2(view.x * .035f, view.y * .045f);
             float height = Mathf.Min(352f, view.y * .395f);
-            var profile = featured ? CardOverframeProfile.Get(flight.Code, CardArtLoader.GetDuelArtworkVariant(flight.Code)) : null;
-            bool overframe = profile != null && profile.Triangles.Length > 0;
             float layoutHeight = overframe ? height : 0f;
             if (overframe)
             {
@@ -1151,7 +1153,7 @@ namespace YGOPortable.UI
             }
             proxy.transform.SetAsLastSibling();
             var layout = SummonPlate(flight, title,
-                center - Vector2.up * view.y * (featured ? .29f : artwork == null ? .24f : .32f), live);
+                center - Vector2.up * view.y * (featured || overframe ? .29f : artwork == null ? .24f : .32f), live);
 
             LotdAudio.PlaySummon();
             yield return Animate(.28f, t =>
@@ -1186,7 +1188,7 @@ namespace YGOPortable.UI
                     cardFade.alpha = 1f - crossfade;
                 }
             });
-            yield return Animate(featured ? .29f : artwork == null ? .18f : .37f, t =>
+            yield return Animate(featured || overframe ? .29f : artwork == null ? .18f : .37f, t =>
             {
                 effect.Seek(.54f + t * .22f);
                 proxy.SetRarityHighlight(Mathf.Lerp(.85f, .25f, t));
