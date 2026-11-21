@@ -43,6 +43,7 @@ namespace YGOPortable.Editor
             VerifyNativeNegationOutcome(activationNegated: true);
             VerifyNativeImpermanenceRay(setFirst: true);
             VerifyNativeImpermanenceRay(setFirst: false);
+            VerifyMobileUnavailableEffectDetails();
             VerifyDragColumnAndPhaseShortcut();
             VerifyNativeFieldSpellDrag();
             VerifyDestroyedCopiesKeepTheirReadouts();
@@ -2740,6 +2741,75 @@ namespace YGOPortable.Editor
             Require(badge.gameObject.activeInHierarchy && badge.Find("Label").GetComponent<Text>().text == "효과 무효화됨",
                 "The inspector did not display the disabled effect badge.");
             Debug.Log($"[VERIFY DUEL COLUMN] Native Infinite Impermanence from {(setFirst ? "Set" : "hand")}, matching beam and seal count {rays.Length}.");
+        }
+
+        private static void VerifyMobileUnavailableEffectDetails()
+        {
+            const uint impermanence = 10045474;
+            var player = Enumerable.Repeat(KaiserSeaHorse, 40).ToArray();
+            var enemy = Enumerable.Repeat(impermanence, 40).ToArray();
+            var empty = Array.Empty<uint>();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Disabled card touch details", player, empty, enemy, empty, true,
+                session => session.ActivePrompt?.summonable.Any(option => option.code == KaiserSeaHorse) == true);
+            int summon = duel.ActivePrompt.summonable.FindIndex(option => option.code == KaiserSeaHorse);
+            duel.SubmitResponseInt(summon << 16);
+            bool activated = false;
+            YgoProjectBuilder.DriveUntilIdle(duel, new TacticalAI(), prompt =>
+            {
+                if (!activated && prompt.messageType == YgoConstants.MSG_SELECT_CHAIN && prompt.playerId == duel.AiPlayerIndex)
+                {
+                    int index = prompt.candidates.FindIndex(option => option.code == impermanence);
+                    if (index >= 0)
+                    {
+                        activated = true;
+                        return BitConverter.GetBytes(index);
+                    }
+                }
+                return prompt.messageType == YgoConstants.MSG_SELECT_CARD && prompt.min == 1 && prompt.candidates.Count == 1
+                    ? DuelSession.PackCardSelection(0) : null;
+            });
+            var owner = duel.Players[duel.HumanPlayerIndex];
+            var monster = owner.mzone.Single(card => card?.code == KaiserSeaHorse);
+            Require(activated && monster.effectsDisabled && duel.RetryCount == 0 &&
+                    duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD,
+                "A native Infinite Impermanence did not disable the player's monster during the Main Phase.");
+
+            using var ui = new HandUI(duel, mobileLayout: true);
+            var root = ui.Field.Root.transform;
+            var safeArea = root.Find("MobileSafeArea");
+            var home = safeArea.Find("ActivationNotice");
+            var detail = root.Find("Overlay_CardZoom/MobileSafeArea/ZoomWin");
+            var close = detail.Find("Hdr/Close/B").GetComponent<Button>();
+            var slot = safeArea.Find($"DuelBoard/Zone_{monster.sequence + 2}_3");
+            var trigger = slot.GetComponent<CardDragTrigger>();
+            var current = duel.ActivePrompt;
+            trigger.OnTouchClick();
+            var badge = detail.Find("CardHolder/ZoomCard/AspectBox/EffectDisabled");
+            Require(detail.gameObject.activeInHierarchy && badge.gameObject.activeInHierarchy &&
+                    detail.Find("Hdr/ActivationNotice") == home &&
+                    home.Find("Reason").GetComponent<Text>().text == "이 카드의 효과가 무효화되어 있습니다.",
+                "One tap on the disabled monster did not show its detailed face, badge and activation reason together.");
+            Canvas.ForceUpdateCanvases();
+            var bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(detail, home);
+            var closeBounds = RectTransformUtility.CalculateRelativeRectTransformBounds(detail, close.transform);
+            Require(!bounds.Intersects(closeBounds) && !home.GetComponent<CanvasGroup>().blocksRaycasts,
+                "The activation reason overlapped or blocked the detail close control.");
+            close.onClick.Invoke();
+            Require(!detail.gameObject.activeInHierarchy && !home.gameObject.activeSelf && home.parent == safeArea &&
+                    Mathf.Approximately(((RectTransform)detail.Find("Hdr/Title")).anchorMax.x, .82f) &&
+                    ReferenceEquals(duel.ActivePrompt, current),
+                "Closing the details left a stale notice, a narrow header or submitted a duel command.");
+
+            var handCard = safeArea.Find("PlayerHand/Cards").GetChild((int)owner.hand[0].sequence);
+            handCard.GetComponent<CardDragTrigger>().OnTouchClick();
+            Require(detail.gameObject.activeInHierarchy && !badge.gameObject.activeInHierarchy && home.parent == detail.Find("Hdr") &&
+                    home.Find("Reason").GetComponent<Text>().text == "발동 조건을 만족하지 않았습니다.",
+                "An unavailable hand card did not open its own face and reason.");
+            typeof(DuelFieldUI).GetField("_activationNoticeUntil", PrivateInstance).SetValue(ui.Field, -1f);
+            typeof(DuelFieldUI).GetMethod("UpdateNegativeFeedback", PrivateInstance).Invoke(ui.Field, null);
+            Require(detail.gameObject.activeInHierarchy && !home.gameObject.activeSelf && home.parent == safeArea,
+                "Expiring the notice prematurely closed or distorted the card details.");
+            Debug.Log("[VERIFY DUEL TOUCH DETAILS] Native disabled monster and unavailable hand card showed their reasons without obstructing inspection.");
         }
 
         private static void VerifyDragColumnAndPhaseShortcut()

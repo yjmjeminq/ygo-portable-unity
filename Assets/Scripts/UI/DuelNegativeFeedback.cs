@@ -8,7 +8,11 @@ namespace YGOPortable.UI
     {
         private static readonly Color DisabledInk = new Color(1f, .39f, .50f);
         private static readonly Color BindingInk = new Color(.72f, .38f, 1f);
+        private static readonly Vector2 ActivationNoticeMin = new Vector2(.24f, .86f);
+        private static readonly Vector2 ActivationNoticeMax = new Vector2(.76f, .943f);
         private RectTransform _activationNotice;
+        private Transform _activationNoticeHome;
+        private RectTransform _zoomHeaderTitle;
         private CanvasGroup _activationNoticeGroup;
         private Text _activationNoticeText;
         private float _activationNoticeUntil;
@@ -28,8 +32,9 @@ namespace YGOPortable.UI
 
         private void BuildActivationNotice(Transform parent)
         {
-            _activationNotice = LotdUiKit.CreateRect("ActivationNotice", parent, new Vector2(.24f, .86f),
-                new Vector2(.76f, .943f), Vector2.zero, Vector2.zero);
+            _activationNoticeHome = parent;
+            _activationNotice = LotdUiKit.CreateRect("ActivationNotice", parent, ActivationNoticeMin,
+                ActivationNoticeMax, Vector2.zero, Vector2.zero);
             DuelReadoutPlate.Add(_activationNotice, new Color(.041f, .063f, .088f, .95f)).raycastTarget = false;
             var line = LotdUiKit.CreateRect("Accent", _activationNotice, new Vector2(.017f, .20f), new Vector2(.023f, .80f),
                 Vector2.zero, Vector2.zero);
@@ -45,7 +50,31 @@ namespace YGOPortable.UI
         private void HideActivationNotice()
         {
             _activationNoticePrompt = null;
-            _activationNotice?.gameObject.SetActive(false);
+            if (_activationNotice == null) return;
+            _activationNotice.gameObject.SetActive(false);
+            if (ActivationNoticeInDetails)
+            {
+                _zoomHeaderTitle.anchorMax = new Vector2(.82f, .88f);
+                MoveActivationNotice(_activationNoticeHome, ActivationNoticeMin, ActivationNoticeMax);
+            }
+        }
+
+        private bool ActivationNoticeInDetails =>
+            _zoomHeaderTitle != null && _activationNotice.parent == _zoomHeaderTitle.parent;
+
+        private void ShowActivationNoticeInCardDetails()
+        {
+            _zoomHeaderTitle.anchorMax = new Vector2(.25f, .88f);
+            MoveActivationNotice(_zoomHeaderTitle.parent, new Vector2(.266f, .11f), new Vector2(.83f, .89f));
+        }
+
+        private void MoveActivationNotice(Transform parent, Vector2 min, Vector2 max)
+        {
+            _activationNotice.SetParent(parent, false);
+            _activationNotice.anchorMin = min;
+            _activationNotice.anchorMax = max;
+            _activationNotice.offsetMin = _activationNotice.offsetMax = Vector2.zero;
+            _activationNotice.SetAsLastSibling();
         }
 
         private void UpdateNegativeFeedback()

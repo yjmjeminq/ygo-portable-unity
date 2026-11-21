@@ -83,10 +83,13 @@ namespace YGOPortable.UI
                 (!CanShowCardActions || (card.overlayCodes.Count == 0 &&
                     CollectActions(card.controller, card.location, card.sequence).Count == 0)))
             {
+                bool showNotice = ShowUnavailableEffect(card);
                 HideCardActions();
                 ShowCardZoomModal(card);
+                if (showNotice) ShowActivationNoticeInCardDetails();
                 return;
             }
+            if (ShowUnavailableEffect(card) && card.overlayCodes.Count == 0) return;
 
             _touchActionAnchor = anchor;
             _touchActionPrompt = _session.ActivePrompt;

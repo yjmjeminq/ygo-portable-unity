@@ -1952,7 +1952,7 @@ namespace YGOPortable.UI
                 {
                     InspectCard(card.code);
                     if (_modals.FocusChainActivationAt(_session, YgoConstants.LOCATION_HAND, sequence)) return;
-                    if (!ShowUnavailableEffect(card)) SelectTouchCardActions(view.Rect);
+                    SelectTouchCardActions(view.Rect);
                 };
             }
             UpdateHandDepth(views, opponent ? null : _raisedCard);
@@ -3961,14 +3961,18 @@ namespace YGOPortable.UI
             var live = FindLiveCard(con, loc, seq);
             if (live == null) return;
             bool canInspect = live.IsFaceUp || live.isPublic || con == _session.HumanPlayerIndex;
-            if (canInspect) InspectCard(live.code, GetSlot(con, loc, seq));
+            var slot = GetSlot(con, loc, seq);
+            if (canInspect) InspectCard(live.code, slot);
+            if (touch && (CanShowCardActions || canInspect && CanOpenTouchCardDetails))
+            {
+                SelectTouchCardActions(slot?.root);
+                return;
+            }
             if (canInspect && ShowUnavailableEffect(live) && live.overlayCodes.Count == 0) return;
 
-            if (CanShowCardActions || (touch && canInspect && CanOpenTouchCardDetails))
+            if (CanShowCardActions)
             {
-                var anchor = GetSlot(con, loc, seq)?.root;
-                if (touch) SelectTouchCardActions(anchor);
-                else PointAtCardActions(anchor);
+                PointAtCardActions(slot?.root);
                 return;
             }
 
@@ -4246,7 +4250,8 @@ namespace YGOPortable.UI
                 new Vector2(.988f, onIPhone ? .991f : .985f),
                 Vector2.zero, Vector2.zero);
             DuelReadoutPlate.Add(hdr, new Color(.065f, .113f, .133f, .92f));
-            var title = LotdUiKit.CreateRect("Title", hdr, new Vector2(0.02f, 0.12f), new Vector2(0.82f, 0.88f),
+            var title = _zoomHeaderTitle = LotdUiKit.CreateRect("Title", hdr,
+                new Vector2(.02f, .12f), new Vector2(.82f, .88f),
                 Vector2.zero, Vector2.zero);
             LotdUiKit.AddFittedText(title, "T", "카드 상세 정보", 19, 12,
                 TextAnchor.MiddleLeft, LotdUiKit.GoldAccent);
@@ -4417,6 +4422,7 @@ namespace YGOPortable.UI
             if (!_cardZoomModal.activeSelf) return;
             _zoomFieldCard = null;
             _zoomBanishedCard = null;
+            if (ActivationNoticeInDetails) HideActivationNotice();
             _cardZoomModal.SetActive(false);
             if (_cardZoomModal.transform.parent != Root.transform) _cardZoomModal.transform.SetParent(Root.transform, false);
             _modals.SetCardDetailsOpen(false);
