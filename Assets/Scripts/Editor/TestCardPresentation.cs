@@ -132,10 +132,15 @@ namespace YGOPortable.Editor
             var view = animator.transform.Find("MovingCard");
             Require(view.GetComponent<CompositeCardView>().CurrentCode == 0 && view.Find("Overframe") == null,
                 "The summon revealed the subject before its card was turned up.");
-            enter(1f);
+            enter(.51f);
             Canvas.ForceUpdateCanvases();
             var layer = view.Find("Overframe");
             var tilt = layer.Find("Depth");
+            var fixedRect = (RectTransform)view;
+            Vector2 initialSize = fixedRect.sizeDelta;
+            TrackStableOverframe(layer, enter, .53f, 1f);
+            Require(fixedRect.sizeDelta == initialSize && Mathf.Approximately(fixedRect.localScale.y, 1f),
+                "The summoned card did not reach its display size without changing its layout.");
             Require(layer.gameObject.activeSelf && Mathf.Approximately(tilt.localScale.x, 1.25f) &&
                 animator.transform.Find("ChainImpactWave").GetComponent<DuelEffectGraphic>().Tint == DuelStyle.ChainGold &&
                 animator.transform.Find("Chain").GetComponent<DuelEffectGraphic>().Tint == DuelStyle.ChainGold,
@@ -144,7 +149,10 @@ namespace YGOPortable.Editor
             SampleAnimation((IEnumerator)reveal.Current)(1f);
             Require(Mathf.Approximately(tilt.localScale.x, 1f), "The subject did not settle to its intended size.");
             Require(reveal.MoveNext(), "The ace did not travel to the field.");
-            SampleAnimation((IEnumerator)reveal.Current)(1f);
+            TrackStableOverframe(layer, SampleAnimation((IEnumerator)reveal.Current), .05f, 1f);
+            float fittedHeight = Mathf.Min(end.Size.y, end.Size.x / LotdUiKit.CardAspectRatio);
+            Require(fixedRect.sizeDelta == initialSize && Mathf.Abs(fixedRect.rect.height * fixedRect.localScale.y - fittedHeight) < .1f &&
+                Vector2.Distance(fixedRect.anchoredPosition, end.Position) < .1f, "The fixed summon layout missed its destination.");
             Require(!reveal.MoveNext() && !move.MoveNext() && landed && (view == null || !view.gameObject.activeSelf) &&
                 animator.transform.Find("ChainImpactWave") == null, "The overframe cut-in outlived the summon.");
 
@@ -152,10 +160,33 @@ namespace YGOPortable.Editor
             animator.QueueChain(start, 9674034, 1, false);
             var chain = queue.Dequeue();
             Require(chain.MoveNext(), "The ace activation did not play its cut-in.");
-            SampleAnimation((IEnumerator)chain.Current)(.93f);
-            Require(animator.transform.Find("MovingCard/Overframe/Depth/Subject").gameObject.activeInHierarchy,
+            var sample = SampleAnimation((IEnumerator)chain.Current);
+            sample(.49f);
+            Canvas.ForceUpdateCanvases();
+            var cutIn = animator.transform.Find("MovingCard/Overframe");
+            Require(cutIn != null && cutIn.Find("Depth/Subject").gameObject.activeInHierarchy,
                 "The ace activation omitted its overframe subject.");
+            TrackStableOverframe(cutIn, sample, .51f, .98f);
             animator.Clear();
+            Debug.Log("[VERIFY OVERFRAME MESH] Summon and activation reused their subject and shimmer meshes while scaling.");
+
+            static void TrackStableOverframe(Transform overframe, Action<float> frame, float from, float to)
+            {
+                var subject = overframe.Find("Depth/Subject").GetComponent<CardOverframeGraphic>();
+                var shimmer = overframe.Find("Depth/Shimmer").GetComponent<CardOverframeGraphic>();
+                int dirty = 0;
+                void CountRebuild() => dirty++;
+                subject.RegisterDirtyVerticesCallback(CountRebuild);
+                shimmer.RegisterDirtyVerticesCallback(CountRebuild);
+                for (int i = 0; i < 20; i++)
+                {
+                    frame(Mathf.Lerp(from, to, i / 19f));
+                    Canvas.ForceUpdateCanvases();
+                }
+                subject.UnregisterDirtyVerticesCallback(CountRebuild);
+                shimmer.UnregisterDirtyVerticesCallback(CountRebuild);
+                Require(dirty == 0, $"Transform animation requested {dirty} unnecessary overframe mesh rebuilds.");
+            }
         }
 
         private static void VerifyFoil(CompositeCardView card)

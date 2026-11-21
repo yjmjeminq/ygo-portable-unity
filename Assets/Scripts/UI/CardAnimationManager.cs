@@ -578,17 +578,25 @@ namespace YGOPortable.UI
             _cards.Push(view);
         }
 
-        private static void ApplyPose(CompositeCardView view, CardPose pose, float horizontalScale = 1f)
+        private static void ApplyPose(CompositeCardView view, CardPose pose, float horizontalScale = 1f, float layoutHeight = 0f)
         {
             var rect = (RectTransform)view.transform;
-            rect.sizeDelta = pose.Size;
+            float scale = 1f;
+            if (layoutHeight > 0f)
+            {
+                // Scale the fitted face without rebuilding the artwork and outline meshes every frame.
+                var layoutSize = new Vector2(layoutHeight * LotdUiKit.CardAspectRatio, layoutHeight);
+                if (rect.sizeDelta != layoutSize) rect.sizeDelta = layoutSize;
+                scale = Mathf.Min(pose.Size.x / layoutSize.x, pose.Size.y / layoutSize.y);
+            }
+            else rect.sizeDelta = pose.Size;
             rect.anchoredPosition = pose.Position;
             rect.localRotation = Quaternion.Euler(0f, 0f, pose.Angle);
-            rect.localScale = new Vector3(horizontalScale, 1f, 1f);
+            rect.localScale = new Vector3(horizontalScale * scale, scale, 1f);
         }
 
         private static void ApplyFlight(CompositeCardView view, CardFlight flight, float t, float lift,
-            LiveCardState live = null, Vector2 lateral = default)
+            LiveCardState live = null, Vector2 lateral = default, float layoutHeight = 0f)
         {
             var from = flight.From.AtLayout();
             var to = flight.To.AtLayout();
@@ -602,7 +610,7 @@ namespace YGOPortable.UI
             uint visibleCode = showBack ? 0u : flight.Code;
             if (view.CurrentCode != visibleCode) view.SetCard(visibleCode, showBack, live);
             float flip = turnsOver ? Mathf.Max(0.035f, Mathf.Abs(Mathf.Cos(t * Mathf.PI))) : 1f;
-            ApplyPose(view, new CardPose(point, size, angle), flip);
+            ApplyPose(view, new CardPose(point, size, angle), flip, layoutHeight);
         }
 
         private IEnumerator PlayPileTransfers(List<(CardFlight flight, Action onArrive)> transfers)
@@ -1108,6 +1116,7 @@ namespace YGOPortable.UI
             float height = Mathf.Min(352f, view.y * .395f);
             var profile = featured ? CardOverframeProfile.Get(flight.Code, CardArtLoader.GetDuelArtworkVariant(flight.Code)) : null;
             bool overframe = profile != null && profile.Triangles.Length > 0;
+            float layoutHeight = overframe ? height : 0f;
             if (overframe)
             {
                 proxy.EnableOverframe();
@@ -1147,7 +1156,7 @@ namespace YGOPortable.UI
             LotdAudio.PlaySummon();
             yield return Animate(.28f, t =>
             {
-                ApplySummonEntrance(proxy, first, kind, t, live);
+                ApplySummonEntrance(proxy, first, kind, t, live, layoutHeight);
                 effect.Seek(t * .54f);
                 background.color = new Color(.009f, .013f, .02f, Mathf.SmoothStep(0f, .64f, t));
                 layout.alpha = Mathf.SmoothStep(0f, 1f, (t - .40f) / .60f);
@@ -1196,7 +1205,7 @@ namespace YGOPortable.UI
             var last = new CardFlight(flight.Code, reveal, flight.To, false, flight.EndsFaceDown);
             yield return Animate(.22f, t =>
             {
-                ApplyFlight(proxy, last, t, 23f, live);
+                ApplyFlight(proxy, last, t, 23f, live, layoutHeight: layoutHeight);
                 proxy.SetRarityHighlight(.25f * (1f - t));
                 effect.Seek(.76f + t * .24f);
                 layout.alpha = 1f - t;
@@ -1240,7 +1249,7 @@ namespace YGOPortable.UI
         }
 
         internal static void ApplySummonEntrance(CompositeCardView proxy, CardFlight flight, DuelEffectKind kind, float progress,
-            LiveCardState live = null)
+            LiveCardState live = null, float layoutHeight = 0f)
         {
             var (lift, shift, roll) = kind switch
             {
@@ -1252,7 +1261,7 @@ namespace YGOPortable.UI
                 DuelEffectKind.Pendulum => (51f, 32f, -10f),
                 _ => (38f, 0f, 0f),
             };
-            ApplyFlight(proxy, flight, progress, lift, live);
+            ApplyFlight(proxy, flight, progress, lift, live, layoutHeight: layoutHeight);
             float swing = Mathf.Sin(progress * Mathf.PI);
             var rect = (RectTransform)proxy.transform;
             rect.anchoredPosition += Vector2.right * (shift * swing);
@@ -1617,6 +1626,7 @@ namespace YGOPortable.UI
             var card = TakeCard(code, code == 0, detailed: true, live: live);
             card.EnableOverframe();
             card.PoseOverframe(0f, 1f, Vector2.zero, 0f);
+            float layoutHeight = card.HasOverframe ? height : 0f;
             var flash = DuelStyle.AddActivationGlow(card.transform.Find("AspectBox"), height * .025f, behind: false);
             flash.gameObject.SetActive(true);
             flash.canvasRenderer.SetAlpha(0f);
@@ -1640,7 +1650,7 @@ namespace YGOPortable.UI
                 wave.Seek(impact * .68f);
                 float rebound = Mathf.Sin(impact * Mathf.PI * 2.25f) * impact * (1f - impact) * .18f;
                 badge.localScale = Vector3.one * (Mathf.Lerp(1.6f, 1f, 1f - Mathf.Pow(1f - impact, 3f)) + rebound);
-                ApplyFlight(card, lift, t, height * .095f);
+                ApplyFlight(card, lift, t, height * .095f, layoutHeight: layoutHeight);
                 TiltChainCard(card, side, t);
                 float depth = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.48f, .91f, t));
                 card.PoseOverframe(depth, Mathf.Lerp(.92f, 1.08f, depth), Vector2.right * (side * depth * .4f), t * .56f);
@@ -1653,7 +1663,7 @@ namespace YGOPortable.UI
                 float returning = Mathf.Clamp01((t - .22f) / .78f);
                 flash.canvasRenderer.SetAlpha(1f - returning);
                 badgeOpacity.alpha = opacity.alpha = 1f - returning;
-                ApplyFlight(card, back, returning, height * .037f);
+                ApplyFlight(card, back, returning, height * .037f, layoutHeight: layoutHeight);
                 TiltChainCard(card, side, (1f - returning) * .5f + .5f, 1f - returning);
                 float depth = 1f - returning;
                 card.PoseOverframe(depth, Mathf.Lerp(.92f, 1.08f, depth), Vector2.right * (side * depth * .4f), .56f + t * .44f);
