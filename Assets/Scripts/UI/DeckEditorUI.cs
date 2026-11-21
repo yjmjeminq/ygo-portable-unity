@@ -1334,7 +1334,7 @@ namespace YGOPortable.UI
                 code = spare.code;
             }
 
-            int limit = CollectionProgress.GetDeckCopyLimit(code);
+            int limit = CollectionProgress.DeckCopyLimit;
             if (CountInWorkingDeck(code) < limit) return code;
             if (showReason) ShowToast($"동명 카드는 세 덱을 합해 최대 {limit}장입니다.");
             return 0;
@@ -1411,7 +1411,7 @@ namespace YGOPortable.UI
         {
             if (CollectionProgress.AllDeckCardsAvailable)
             {
-                owned = CollectionProgress.IsCraftableCard(CardDatabase.Get(code)) ? CollectionProgress.GetDeckCopyLimit(code) : 0;
+                owned = CollectionProgress.IsCraftableCard(CardDatabase.Get(code)) ? CollectionProgress.DeckCopyLimit : 0;
                 inDeck = CountInWorkingDeck(code);
                 return Math.Max(0, owned - inDeck);
             }
@@ -2023,7 +2023,7 @@ namespace YGOPortable.UI
                     uint key = CollectionProgress.GetDeckCopyKey(code);
                     used.TryGetValue(code, out int copies);
                     usedByName.TryGetValue(key, out int sameName);
-                    if (copies >= CollectionProgress.GetOwnedCount(code) || sameName >= CollectionProgress.GetDeckCopyLimit(code))
+                    if (copies >= CollectionProgress.GetOwnedCount(code) || sameName >= CollectionProgress.DeckCopyLimit)
                         return false;
                     used[code] = copies + 1;
                     usedByName[key] = sameName + 1;

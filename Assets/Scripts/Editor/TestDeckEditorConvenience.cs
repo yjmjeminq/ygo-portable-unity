@@ -145,10 +145,21 @@ namespace YGOPortable.Editor
             max.onClick.Invoke();
             Require(deck.main.Count == 2 && deck.side.Count == 1, "MAX did not count Side Deck copies.");
             Call(editor, "AddDeckCopies", Pot, DragSourceType.DeckMain, 3, null, null);
-            Require(deck.main.Count(code => code == Pot) == 1, "The local one-copy rule did not survive a MAX edit.");
+            Require(deck.main.Count(code => code == Pot) == 3,
+                "An OCG reference badge incorrectly blocked the existing local three-copy rule.");
             var badge = main.Find($"Card_{deck.main.IndexOf(Pot)}/CardInset/Card/AspectBox/Regulation");
             Require(badge.gameObject.activeSelf && badge.Find("Label").GetComponent<Text>().text == "0",
                 "The deck card lacked its reference badge.");
+            var playable = new UserDeck
+            {
+                main = Enumerable.Repeat(Pot, 3).Concat(CardDatabase.AllCards.Where(card => !card.IsExtra &&
+                    card.alias == 0 && card.code != Pot && CollectionProgress.IsCraftableCard(card))
+                    .Select(card => card.code).Distinct().Take(37)).ToList(),
+            };
+            Require(CollectionProgress.CanUseDeck(playable, out string reason), $"The local deck could not duel. {reason}");
+            playable.side.Add(Pot);
+            Require(!CollectionProgress.CanUseDeck(playable, out reason) && reason.Contains("3장"),
+                "The same-name cap did not include the Side Deck during duel validation.");
 
             uint AnyCard(uint flags) => CardDatabase.AllCards.First(card => card.alias == 0 &&
                 (card.type & flags) == flags && CollectionProgress.IsCraftableCard(card)).code;
@@ -212,6 +223,12 @@ namespace YGOPortable.Editor
             var imported = Field<UserDeck>(editor, "_workingDeck");
             Require(DeckRepository.UserDecks.Count == 3 && imported.id != copy.id && imported.main.SequenceEqual(copy.main),
                 "Importing with pending edits did not create a separate saved deck.");
+            DeckRepository.ReloadUserDecks();
+            var persisted = DeckRepository.UserDecks.Single(deck => deck.id == imported.id);
+            Require(persisted.main.SequenceEqual(imported.main) && persisted.extra.SequenceEqual(imported.extra) &&
+                persisted.side.SequenceEqual(imported.side) &&
+                DeckRepository.UserDecks.Single(deck => deck.id == source.id).main.SequenceEqual(source.main),
+                "The imported deck or its original changed when reading saved files back.");
         }
 
         private static void VerifyOpeningHandAndComposition(DeckEditorUI editor)

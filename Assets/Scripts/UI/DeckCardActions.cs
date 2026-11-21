@@ -120,7 +120,7 @@ namespace YGOPortable.UI
             }
 
             var quantityZone = source == DragSourceType.Trunk ? home : source;
-            int max = CollectionProgress.GetDeckCopyLimit(code);
+            int max = CollectionProgress.DeckCopyLimit;
             bool canIncrease = FindAddableCardCopy(code, showReason: false) != 0 &&
                 CanPlaceCard(card, quantityZone, GetDeckList(quantityZone), showReason: false);
             var removal = source == DragSourceType.Trunk ? FindTrunkRemoval(code, home) : (source, index);
