@@ -18,8 +18,12 @@ namespace YGOPortable.UI
         internal static float MinimumTouchSize(Transform control)
         {
             var canvas = control.GetComponentInParent<Canvas>();
-            // A 44-point hit area occupies up to 132 screen pixels on a 3x iPhone display.
-            return Mathf.Ceil(132f / Mathf.Max(.01f, canvas?.scaleFactor ?? 1f));
+            // The supported 2x iPhone/iPad panels are below 400 dpi. Use the more
+            // conservative 3x target when display density is unavailable.
+            float density = Screen.dpi;
+            float pixelsPerPoint = Application.platform == RuntimePlatform.IPhonePlayer &&
+                density > 0f && density < 400f ? 2f : 3f;
+            return Mathf.Ceil(44f * pixelsPerPoint / Mathf.Max(.01f, canvas?.scaleFactor ?? 1f));
         }
 
         internal static void Attach(RectTransform content, Rect? area = null)

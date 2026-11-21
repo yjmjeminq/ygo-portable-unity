@@ -14,7 +14,7 @@ namespace YGOPortable.AI
         private const int MaxResponses = 144;
         private const int MaxSearchesPerTurn = 7;
         private const int MaxLateLinkSearches = 2;
-        private const int BudgetMilliseconds = 160;
+        private const int BudgetMilliseconds = 195;
         private const int BranchMilliseconds = 46;
         private const int OpeningDevelopmentBranchMilliseconds = 105;
         private const int LateLinkBranchMilliseconds = 48;

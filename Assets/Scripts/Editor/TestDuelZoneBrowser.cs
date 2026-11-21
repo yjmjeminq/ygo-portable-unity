@@ -62,8 +62,13 @@ namespace YGOPortable.Editor
                 code = pendulum, controller = 1, location = YgoConstants.LOCATION_EXTRA, position = YgoConstants.POS_FACEUP_ATTACK,
             };
             duel.Players[0].deckCount = 36;
+            for (int i = 0; i < 12; i++)
+                duel.Players[0].hand.Add(new LiveCardState
+                {
+                    code = dragon, location = YgoConstants.LOCATION_HAND, sequence = (uint)i,
+                });
             duel.Players[1].extra.Add(publicExtra);
-            var modals = new DuelPromptModals(screen, null, null);
+            var modals = new DuelPromptModals(screen, null, null, mobileLayout: true);
             var field = new DuelFieldUI(null, screen, modals, mobileLayout: true);
             CanvasGroup battle = null;
             try
@@ -104,6 +109,16 @@ namespace YGOPortable.Editor
                     return Rect.MinMaxRect(min.x, min.y, max.x, max.y);
                 }
 
+                void RequireTouch(Transform target, Rect allowed)
+                {
+                    Rect bounds = Bounds(target);
+                    float minimum = MobileSafeArea.MinimumTouchSize(target);
+                    Require(bounds.width >= minimum - .1f && bounds.height >= minimum - .1f &&
+                        bounds.xMin >= allowed.xMin - .1f && bounds.xMax <= allowed.xMax + .1f &&
+                        bounds.yMin >= allowed.yMin - .1f && bounds.yMax <= allowed.yMax + .1f,
+                        $"{target.name} is smaller than the mobile target or outside its safe viewport ({bounds}).");
+                }
+
                 var placeActions = typeof(DuelFieldUI).GetMethod("PositionCardActions", BindingFlags.Instance | BindingFlags.NonPublic);
                 var cardPose = typeof(DuelFieldUI).GetMethod("GetCardPose", BindingFlags.Instance | BindingFlags.NonPublic);
                 foreach (var safe in new[] { new Rect(144, 36, 2256, 1044), new Rect(0, 36, 2256, 1044) })
@@ -111,6 +126,8 @@ namespace YGOPortable.Editor
                     viewport.GetComponent<MobileSafeArea>().Reflow(safe, display);
                     details.GetComponent<MobileSafeArea>().Reflow(safe, display);
                     battle.GetComponent<MobileSafeArea>().Reflow(safe, display);
+                    Canvas.ForceUpdateCanvases();
+                    field.Refresh();
                     Canvas.ForceUpdateCanvases();
                     placeActions.Invoke(field, new object[] { slot, false });
 
@@ -125,10 +142,35 @@ namespace YGOPortable.Editor
                             bounds.yMin >= safe.yMin - .1f && bounds.yMax <= safe.yMax + .1f && bounds.width > 0f,
                             $"{element.name} intersected the device cutout or home indicator.");
                     }
-                    var chainControl = (RectTransform)viewport.Find("ChainConfirmation/Button");
-                    float minimum = MobileSafeArea.MinimumTouchSize(chainControl);
-                    Require(chainControl.rect.width >= minimum - .1f && chainControl.rect.height >= minimum - .1f,
-                        "The chain confirmation toggle is too small after mobile safe area reflow.");
+                    foreach (string path in new[] { "ChainConfirmation/Button", "OpenLog", "PauseMenu", "Turn/Dial",
+                        "DuelBoard/Zone_3_0", "DuelBoard/Zone_4_3", "DuelBoard/Zone_7_4",
+                        "LeftInspector/CardPreview/Card/AspectBox/ZoomHit" })
+                        RequireTouch(viewport.Find(path), safe);
+                    foreach (string path in new[] { "Hdr/Close/B", "ArtworkOptions/Previous/Button", "ArtworkOptions/Next/Button" })
+                        RequireTouch(details.Find("ZoomWin/" + path), safe);
+                    foreach (var phase in new[] { "Draw", "Standby", "Main1", "Battle", "Main2", "End", "Cancel" })
+                        RequireTouch(viewport.Find("PhasePicker/PhaseControls/" + phase + "/Button"), safe);
+
+                    var handScroll = viewport.Find("PlayerHand").GetComponent<ScrollRect>();
+                    var strip = handScroll.content;
+                    Require(strip.childCount == 12 && strip.rect.width > handScroll.viewport.rect.width,
+                        "A large hand must scroll instead of shrinking card targets.");
+                    handScroll.horizontalNormalizedPosition = 0f;
+                    Canvas.ForceUpdateCanvases();
+                    RequireTouch(strip.GetChild(0), Bounds(handScroll.viewport));
+                    var reveal = typeof(DuelFieldUI).GetMethod("RevealDuelPadTarget", BindingFlags.Static | BindingFlags.NonPublic);
+                    reveal.Invoke(null, new[] { strip.GetChild(11) });
+                    Canvas.ForceUpdateCanvases();
+                    RequireTouch(strip.GetChild(11), Bounds(handScroll.viewport));
+
+                    modals.ShowPileViewer(true, YgoConstants.LOCATION_EXTRA, duel.Players[1], null, null, null, false);
+                    var zone = modals.ZoneViewRoot.transform.Find("MobileSafeArea");
+                    zone.GetComponent<MobileSafeArea>().Reflow(safe, display);
+                    Canvas.ForceUpdateCanvases();
+                    foreach (string path in new[] { "Hdr/Close/B", "PileTabs/Player/Button", "PileTabs/Opponent/Button",
+                        "PileTabs/Pile_0/Button", "PileTabs/Pile_1/Button", "PileTabs/Pile_2/Button" })
+                        RequireTouch(zone.Find("Win/" + path), safe);
+                    modals.CloseZoneViewer();
 
                     foreach (string hudName in new[] { "PlayerHUD", "OpponentHUD" })
                     {

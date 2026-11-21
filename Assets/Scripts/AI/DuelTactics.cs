@@ -913,8 +913,9 @@ namespace YGOPortable.AI
                 if (!card.IsFaceUp) continue;
                 faceUp++;
                 if (card.IsAttack) attackPosition++;
-                if (!card.effectsDisabled && CardDatabase.Get(card.code) is { IsExtra: true } info &&
-                    (Math.Max(card.attack, card.defense) >= 2200 || LinkComboPolicy.IsInteractive(info)))
+                if (!card.effectsDisabled && !LinkComboPolicy.IsBridge(card.code) &&
+                    CardDatabase.Get(card.code) is { IsExtra: true } info &&
+                    (Math.Max(card.attack, card.defense) >= 2500 || LinkComboPolicy.IsInteractive(info)))
                     established++;
             }
             if (faceUp == 0) return ExtensionRisk.None;
@@ -924,10 +925,17 @@ namespace YGOPortable.AI
             bool hasSetInteraction = own.szone.Any(card => card is { IsFaceUp: false } &&
                 CardDatabase.Get(card.code) is { IsTrap: true } trap && LinkComboPolicy.IsInteractive(trap));
             ExtensionRisk risk = ExtensionRisk.None;
-            if (duel.SummonedMonstersThisTurn(prompt.playerId) >= 4 && rival.hand.Count > 0 &&
-                (established > 0 || fieldBodies >= 2 && (hasSetInteraction || duel.IsKnownInOpposingHand(prompt.playerId, Nibiru))) &&
-                !HasReadyNegation(duel, prompt.playerId, monsters: true))
-                risk |= ExtensionRisk.Nibiru;
+            int summoned = duel.SummonedMonstersThisTurn(prompt.playerId);
+            if (summoned >= 4 && rival.hand.Count > 0 && !HasReadyNegation(duel, prompt.playerId, monsters: true))
+            {
+                bool knownNibiru = fieldBodies >= 2 && duel.IsKnownInOpposingHand(prompt.playerId, Nibiru);
+                bool stableAgainstBattle = rival.mzone.All(card => card == null || !card.IsFaceUp) ||
+                    own.mzone.Any(card => card is { IsFaceUp: true } &&
+                        Math.Max(card.attack, card.defense) >= StrongestAttacker(rival));
+                // A single bridge or a board that already loses combat still needs a playable continuation.
+                bool canHold = stableAgainstBattle && (established >= 2 || hasSetInteraction && fieldBodies >= 3);
+                if (knownNibiru || canHold) risk |= ExtensionRisk.Nibiru;
+            }
 
             bool knownSweeper = faceUp >= 2 && (duel.IsKnownInOpposingHand(prompt.playerId, Raigeki) ||
                 duel.IsKnownInOpposingHand(prompt.playerId, DarkHole) ||
@@ -936,7 +944,7 @@ namespace YGOPortable.AI
                 faceUp >= 3 && duel.IsKnownInOpposingHand(prompt.playerId, EvenlyMatched));
             // Keep recovery in hand behind a developed board even when the opponent has not revealed the wipe.
             bool exposedSwarm = duel.TurnNumber == 1 && rival.hand.Count > 0 && faceUp >= 3 && established >= 2 &&
-                duel.SummonedMonstersThisTurn(prompt.playerId) >= 4;
+                summoned >= 4;
             if ((knownSweeper || exposedSwarm) && !HasReadyNegation(duel, prompt.playerId, monsters: false))
                 risk |= ExtensionRisk.Sweeper;
             return risk;

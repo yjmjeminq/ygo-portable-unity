@@ -58,6 +58,8 @@ namespace YGOPortable.UI
         private Text _chainConfirmationLabel;
         private RectTransform _chainControlDock;
         private RectTransform _logControlDock;
+        private RectTransform _pauseControlDock;
+        private RectTransform _placementControlDock;
 
         // Phase indicator and shortcuts
         private Image _phaseRim;
@@ -204,6 +206,8 @@ namespace YGOPortable.UI
 
         // Hand rows
         private RectTransform _myHandBar;
+        private RectTransform _myHandContent;
+        private ScrollRect _myHandScroll;
         private RectTransform _oppHandBar;
         private readonly int[] _handCounts = new int[2];
         private readonly List<HandCardView> _myHandViews = new List<HandCardView>();
@@ -772,15 +776,26 @@ namespace YGOPortable.UI
 
             var artworkControls = LotdUiKit.CreateRect("ArtworkControls", inside, new Vector2(.02f, .425f),
                 new Vector2(.98f, .477f), Vector2.zero, Vector2.zero);
-            var details = LotdUiKit.CreateRect("Details", artworkControls, new Vector2(.542f, 0f), Vector2.one,
-                Vector2.zero, Vector2.zero);
-            _duelPadInspectButton = DuelStyle.Button(details, "B", "상세 보기", OpenInspectedCardDetails, 14);
-            var detailsLabel = _duelPadInspectButton.GetComponentInChildren<Text>();
-            detailsLabel.resizeTextForBestFit = true;
-            detailsLabel.resizeTextMinSize = 9;
-            detailsLabel.resizeTextMaxSize = 14;
+            if (_mobileLayout)
+            {
+                _duelPadInspectButton = _inspectorArtworkButton;
+                var cue = LotdUiKit.CreateRect("DetailsCue", zoomHit, new Vector2(.10f, .015f), new Vector2(.90f, .12f),
+                    Vector2.zero, Vector2.zero);
+                DuelReadoutPlate.Add(cue, new Color(.02f, .05f, .07f, .94f));
+                LotdUiKit.AddFittedText(cue, "Label", "상세 보기", 16, 9, TextAnchor.MiddleCenter, HudText);
+            }
+            else
+            {
+                var details = LotdUiKit.CreateRect("Details", artworkControls, new Vector2(.542f, 0f), Vector2.one,
+                    Vector2.zero, Vector2.zero);
+                _duelPadInspectButton = DuelStyle.Button(details, "B", "상세 보기", OpenInspectedCardDetails, 14);
+                var detailsLabel = _duelPadInspectButton.GetComponentInChildren<Text>();
+                detailsLabel.resizeTextForBestFit = true;
+                detailsLabel.resizeTextMinSize = 9;
+                detailsLabel.resizeTextMaxSize = 14;
+            }
             var counterChip = LotdUiKit.CreateRect("Counters", artworkControls, Vector2.zero,
-                new Vector2(.512f, 1f), Vector2.zero, Vector2.zero);
+                new Vector2(_mobileLayout ? 1f : .512f, 1f), Vector2.zero, Vector2.zero);
             _inspCounters = new DuelCounterBadge(counterChip, compact: false);
 
             var stats = LotdUiKit.CreateRect("Stats", inside, new Vector2(.016f, .342f), new Vector2(.825f, .419f),
@@ -897,8 +912,9 @@ namespace YGOPortable.UI
             (_oppNameText, _oppLpText, _oppLpFill, _oppBustImg) = BuildPlayerHud(opponent, true);
             _oppLpFeedbackAnchor = (RectTransform)_oppNameText.transform.parent;
 
-            var menu = LotdUiKit.CreateRect("PauseMenu", root, new Vector2(0.016f, 0.936f),
-                new Vector2(0.103f, 0.982f), Vector2.zero, Vector2.zero);
+            var menu = _pauseControlDock = LotdUiKit.CreateRect("PauseMenu", root,
+                _mobileLayout ? new Vector2(.904f, .724f) : new Vector2(.016f, .936f),
+                _mobileLayout ? new Vector2(.984f, .874f) : new Vector2(.103f, .982f), Vector2.zero, Vector2.zero);
             _duelPadPauseButton = BuildHudControl(menu, DuelVisualAssets.PauseIcon, "일시 정지", OnPauseClicked);
         }
 
@@ -1158,6 +1174,20 @@ namespace YGOPortable.UI
         {
             _myHandBar = LotdUiKit.CreateRect("PlayerHand", root, new Vector2(.228f, .012f), new Vector2(.784f, .215f),
                 Vector2.zero, Vector2.zero);
+            _myHandContent = _myHandBar;
+            if (_mobileLayout)
+            {
+                _myHandBar.gameObject.AddComponent<RectMask2D>();
+                LotdUiKit.AddImage(_myHandBar.gameObject, LotdUiKit.WhiteSprite, Color.clear);
+                _myHandScroll = _myHandBar.gameObject.AddComponent<ScrollRect>();
+                _myHandScroll.horizontal = true;
+                _myHandScroll.vertical = false;
+                _myHandScroll.movementType = ScrollRect.MovementType.Clamped;
+                _myHandScroll.viewport = _myHandBar;
+                _myHandContent = LotdUiKit.CreateRect("Cards", _myHandBar, Vector2.zero, Vector2.up, Vector2.zero, Vector2.zero);
+                _myHandContent.pivot = new Vector2(0f, .5f);
+                _myHandScroll.content = _myHandContent;
+            }
             var player = LotdUiKit.CreateRect("PlayerHUD", root, new Vector2(0.016f, 0.035f), new Vector2(0.221f, 0.132f),
                 Vector2.zero, Vector2.zero);
             var (name, lp, fill, portrait) = BuildPlayerHud(player, false);
@@ -1205,6 +1235,30 @@ namespace YGOPortable.UI
             float touch = MobileSafeArea.MinimumTouchSize(_chainControlDock);
             PositionBottomControl(_logControlDock, 8f, touch, touch);
             PositionBottomControl(_chainControlDock, touch + 16f, Mathf.Max(112f, touch), touch);
+
+            var safe = (RectTransform)_boardRect.parent;
+            if (safe.rect.width <= 0f || safe.rect.height <= 0f) return;
+            // Account for the narrowest perspective cell and the spacing between rows.
+            float width = Mathf.Clamp(touch * 9f / (.968f * .81f * safe.rect.width), .749f, .901f);
+            float height = Mathf.Clamp(touch / (.196f * safe.rect.height), .659f, .745f);
+            float bottom = .55f - height * .5f;
+            float left = Mathf.Min(.145f, .995f - width);
+            _boardRect.anchorMin = new Vector2(left, bottom);
+            _boardRect.anchorMax = new Vector2(left + width, bottom + height);
+            _myHandBar.anchorMax = new Vector2(_myHandBar.anchorMax.x, bottom - .006f);
+            _oppHandBar.anchorMin = new Vector2(_oppHandBar.anchorMin.x, Mathf.Max(.873f, bottom + height));
+
+            // Keep the smaller HUD shortcuts finger-sized without covering the adjacent pile cells.
+            CenterMobileTarget((RectTransform)_phaseButton.transform, Vector2.one * .5f, touch);
+            CenterMobileTarget(_pauseControlDock, new Vector2(.944f, .799f), touch);
+            CenterMobileTarget(_placementControlDock, new Vector2(.944f, .398f), touch);
+        }
+
+        private static void CenterMobileTarget(RectTransform rect, Vector2 anchor, float touch)
+        {
+            rect.anchorMin = rect.anchorMax = anchor;
+            rect.sizeDelta = new Vector2(touch, touch);
+            rect.anchoredPosition = Vector2.zero;
         }
 
         private void BuildTurnHud(Transform root)
@@ -1304,8 +1358,9 @@ namespace YGOPortable.UI
                 _phaseChoices.Add((phase, button, caption, icon));
             }
 
-            var cancel = LotdUiKit.CreateRect("Cancel", controls, new Vector2(.793f, .028f), new Vector2(.968f, .270f),
-                Vector2.zero, Vector2.zero);
+            var cancel = LotdUiKit.CreateRect("Cancel", controls,
+                new Vector2(.793f, _mobileLayout ? .010f : .028f),
+                new Vector2(.968f, _mobileLayout ? .285f : .270f), Vector2.zero, Vector2.zero);
             _phaseCancel = DuelStyle.Button(cancel, "Button", "취소", () => _phasePicker.SetActive(false), 15);
             _phaseCancel.navigation = new Navigation { mode = Navigation.Mode.None };
             _phasePicker.SetActive(false);
@@ -1350,7 +1405,7 @@ namespace YGOPortable.UI
             _placementHint = LotdUiKit.AddFittedText(panel, "Text", "", 22, 11, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
             _placementBanner.SetActive(false);
 
-            var cancel = LotdUiKit.CreateRect("PlacementCancel", root, new Vector2(.904f, .368f), new Vector2(.984f, .450f),
+            var cancel = _placementControlDock = LotdUiKit.CreateRect("PlacementCancel", root, new Vector2(.904f, .368f), new Vector2(.984f, .450f),
                 Vector2.zero, Vector2.zero);
             _placementCancel = DuelStyle.RoundButton(cancel, "Button", DuelStyle.Player, () => TryCancelPlacement());
             LotdUiKit.AddFittedText(_placementCancel.transform, "Label", "취소", 17, 10, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
@@ -1728,10 +1783,20 @@ namespace YGOPortable.UI
 
         private void RefreshHand(IReadOnlyList<LiveCardState> cards, byte controller, bool opponent)
         {
-            var row = opponent ? _oppHandBar : _myHandBar;
+            var row = opponent ? _oppHandBar : _myHandContent;
             var views = opponent ? _oppHandViews : _myHandViews;
             if (opponent) _oppHandSize = row.rect.size;
-            else _myHandSize = row.rect.size;
+            else
+            {
+                _myHandSize = _myHandBar.rect.size;
+                if (_myHandScroll != null)
+                {
+                    float extent = Mathf.Max(_myHandSize.x, MobileHandCardWidth(row) * cards.Count + 4f * (cards.Count + 1));
+                    row.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, extent);
+                    if (row.anchoredPosition.x < _myHandSize.x - extent)
+                        row.anchoredPosition = new Vector2(_myHandSize.x - extent, row.anchoredPosition.y);
+                }
+            }
             while (views.Count < cards.Count) views.Add(CreateHandCard(row, opponent));
 
             for (int i = 0; i < views.Count; i++)
@@ -1914,8 +1979,22 @@ namespace YGOPortable.UI
             };
         }
 
-        private static (Vector2 min, Vector2 max, float angle) HandCardBounds(RectTransform row, int count, int index, bool opponent)
+        private static float MobileHandCardWidth(RectTransform row) =>
+            Mathf.Max(MobileSafeArea.MinimumTouchSize(row), .86f * row.rect.height * LotdUiKit.CardAspectRatio);
+
+        private (Vector2 min, Vector2 max, float angle) HandCardBounds(RectTransform row, int count, int index, bool opponent)
         {
+            if (!opponent && _myHandScroll != null)
+            {
+                float widthUnits = MobileHandCardWidth(row);
+                float rowWidth = Mathf.Max(1f, row.rect.width);
+                float left = Mathf.Max(4f, (rowWidth - widthUnits * count - 4f * (count - 1)) * .5f);
+                float xStart = (left + (widthUnits + 4f) * index) / rowWidth;
+                float cardHeight = Mathf.Clamp01(Mathf.Max(.86f,
+                    MobileSafeArea.MinimumTouchSize(row) / Mathf.Max(1f, row.rect.height)));
+                return (new Vector2(xStart, .5f * (1f - cardHeight)),
+                    new Vector2(xStart + widthUnits / rowWidth, .5f * (1f + cardHeight)), 0f);
+            }
             const float height = .91f;
             float width = Mathf.Clamp(row.rect.height * height * LotdUiKit.CardAspectRatio / Mathf.Max(1f, row.rect.width),
                 0.045f, 0.25f);
@@ -1939,14 +2018,16 @@ namespace YGOPortable.UI
             _logWindow = dim.gameObject;
             LotdUiKit.AddImage(_logWindow, LotdUiKit.WhiteSprite, new Color(0f, 0.02f, 0.08f, 0.82f));
             var panel = DuelStyle.Panel(dim, "Window", new Vector2(0.20f, 0.15f), new Vector2(0.80f, 0.86f));
-            var header = LotdUiKit.CreateRect("Header", panel, new Vector2(0.03f, 0.87f), new Vector2(0.97f, 0.97f),
+            var header = LotdUiKit.CreateRect("Header", panel, new Vector2(.03f, _mobileLayout ? .72f : .87f),
+                new Vector2(.97f, .97f),
                 Vector2.zero, Vector2.zero);
             LotdUiKit.AddText(header, "Title", "대전 기록", 25, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
-            var close = LotdUiKit.CreateRect("Close", header, new Vector2(0.84f, 0.12f), new Vector2(1f, 0.88f),
+            var close = LotdUiKit.CreateRect("Close", header, new Vector2(.84f, _mobileLayout ? .07f : .12f),
+                new Vector2(1f, _mobileLayout ? .93f : .88f),
                 Vector2.zero, Vector2.zero);
             DuelStyle.Button(close, "Button", "닫기", CloseDuelLog, 15);
 
-            var body = DuelStyle.Panel(panel, "Log", new Vector2(0.026f, 0.035f), new Vector2(0.974f, 0.85f));
+            var body = DuelStyle.Panel(panel, "Log", new Vector2(.026f, .035f), new Vector2(.974f, _mobileLayout ? .70f : .85f));
             var viewport = LotdUiKit.CreateRect("Viewport", body, Vector2.zero, Vector2.one,
                 new Vector2(8f, 5f), new Vector2(-20f, -5f));
             viewport.gameObject.AddComponent<RectMask2D>();
@@ -2311,7 +2392,7 @@ namespace YGOPortable.UI
             float angle = CardAngle(location, cardPosition, opponent);
             if (location == YgoConstants.LOCATION_HAND)
             {
-                var row = opponent ? _oppHandBar : _myHandBar;
+                var row = opponent ? _oppHandBar : _myHandContent;
                 int count = Mathf.Max(1, handCount >= 0 ? handCount : _handCounts[controller]);
                 int index = Mathf.Clamp((int)sequence, 0, count - 1);
                 CardPose ReadHandPose()
@@ -2404,13 +2485,18 @@ namespace YGOPortable.UI
             _pendingCardReadouts.Clear();
             ResetHandViews(_myHandViews);
             ResetHandViews(_oppHandViews);
+            if (_myHandScroll != null)
+            {
+                _myHandScroll.StopMovement();
+                _myHandContent.anchoredPosition = Vector2.zero;
+            }
         }
 
         private HandCardView EnsureHandView(byte controller, int index)
         {
             var views = GetHandViews(controller);
             bool opponent = controller != _session.HumanPlayerIndex;
-            var row = opponent ? _oppHandBar : _myHandBar;
+            var row = opponent ? _oppHandBar : _myHandContent;
             while (views.Count <= index) views.Add(CreateHandCard(row, opponent));
             return views[index];
         }
@@ -4008,7 +4094,8 @@ namespace YGOPortable.UI
             win.gameObject.AddComponent<Button>().interactable = false;
 
             // Header bar
-            var hdr = LotdUiKit.CreateRect("Hdr", win, new Vector2(.012f, .9f), new Vector2(.988f, .985f),
+            var hdr = LotdUiKit.CreateRect("Hdr", win, new Vector2(.012f, onIPhone ? .822f : .9f),
+                new Vector2(.988f, onIPhone ? .991f : .985f),
                 Vector2.zero, Vector2.zero);
             DuelReadoutPlate.Add(hdr, new Color(.065f, .113f, .133f, .92f));
             var title = LotdUiKit.CreateRect("Title", hdr, new Vector2(0.02f, 0.12f), new Vector2(0.82f, 0.88f),
@@ -4016,29 +4103,35 @@ namespace YGOPortable.UI
             LotdUiKit.AddFittedText(title, "T", "카드 상세 정보", 19, 12,
                 TextAnchor.MiddleLeft, LotdUiKit.GoldAccent);
 
-            var closeRt = LotdUiKit.CreateRect("Close", hdr, new Vector2(0.84f, 0.15f), new Vector2(0.98f, 0.85f), Vector2.zero, Vector2.zero);
+            var closeRt = LotdUiKit.CreateRect("Close", hdr, new Vector2(.84f, onIPhone ? .04f : .15f),
+                new Vector2(.98f, onIPhone ? .96f : .85f), Vector2.zero, Vector2.zero);
             _zoomCloseButton = DuelStyle.Button(closeRt, "B", onIPhone ? "닫기" : "닫기 (ESC)", () => CloseCardZoomModal(), 15);
 
             // Left Side: Large Card View
             float cardRight = onIPhone ? .375f : .448f;
-            var cardHolder = LotdUiKit.CreateRect("CardHolder", win, new Vector2(.033f, .111f), new Vector2(cardRight, .891f), Vector2.zero, Vector2.zero);
+            var cardHolder = LotdUiKit.CreateRect("CardHolder", win, new Vector2(.033f, onIPhone ? .195f : .111f),
+                new Vector2(cardRight, onIPhone ? .812f : .891f), Vector2.zero, Vector2.zero);
             _zoomCardView = CompositeCardView.Create(cardHolder, "ZoomCard", true, duelArtwork: true);
             AddInspectorArtworkFrame(_zoomCardView.transform.Find("AspectBox"));
-            var artwork = LotdUiKit.CreateRect("ArtworkOptions", win, new Vector2(.04f, .035f), new Vector2(cardRight, .098f),
+            var artwork = LotdUiKit.CreateRect("ArtworkOptions", win, new Vector2(.04f, onIPhone ? .025f : .035f),
+                new Vector2(cardRight, onIPhone ? .178f : .098f),
                 Vector2.zero, Vector2.zero);
             _zoomArtworkControls = artwork.gameObject;
-            var previous = LotdUiKit.CreateRect("Previous", artwork, Vector2.zero, new Vector2(.19f, 1f),
+            float artworkButtonWidth = onIPhone ? .30f : .19f;
+            var previous = LotdUiKit.CreateRect("Previous", artwork, Vector2.zero, new Vector2(artworkButtonWidth, 1f),
                 Vector2.zero, Vector2.zero);
             DuelStyle.Button(previous, "Button", "‹", () => CycleArtwork(-1), 20);
-            var next = LotdUiKit.CreateRect("Next", artwork, new Vector2(.81f, 0f), Vector2.one,
+            var next = LotdUiKit.CreateRect("Next", artwork, new Vector2(1f - artworkButtonWidth, 0f), Vector2.one,
                 Vector2.zero, Vector2.zero);
             DuelStyle.Button(next, "Button", "›", () => CycleArtwork(1), 20);
-            var counter = LotdUiKit.CreateRect("Counter", artwork, new Vector2(.20f, 0f), new Vector2(.80f, 1f),
+            var counter = LotdUiKit.CreateRect("Counter", artwork,
+                new Vector2(artworkButtonWidth + .01f, 0f), new Vector2(.99f - artworkButtonWidth, 1f),
                 Vector2.zero, Vector2.zero);
             _zoomArtworkLabel = LotdUiKit.AddFittedText(counter, "Label", "", 15, 9, TextAnchor.MiddleCenter, Color.white);
 
             // Right Side: Card Details
-            var infoRt = LotdUiKit.CreateRect("Info", win, new Vector2(cardRight + .03f, .05f), new Vector2(.96f, .88f), Vector2.zero, Vector2.zero);
+            var infoRt = LotdUiKit.CreateRect("Info", win, new Vector2(cardRight + .03f, .05f),
+                new Vector2(.96f, onIPhone ? .81f : .88f), Vector2.zero, Vector2.zero);
 
             var name = LotdUiKit.CreateRect("Name", infoRt,
                 new Vector2(0f, 0.88f), new Vector2(0.82f, 1f), Vector2.zero, Vector2.zero);

@@ -72,6 +72,7 @@ namespace YGOPortable.UI
             (YgoConstants.LOCATION_EXTRA, "엑스트라"),
         };
         private RectTransform _zoneWindow;
+        private RectTransform _zoneHeader;
         private DuelPromptBackdrop _zoneShade;
         private RectTransform _zoneBody;
         private RectTransform _zoneTabs;
@@ -2039,7 +2040,7 @@ namespace YGOPortable.UI
                 fill: new Color(.039f, .071f, .093f, .97f));
             win.gameObject.AddComponent<Button>().navigation = new Navigation { mode = Navigation.Mode.None };
 
-            var hdr = LotdUiKit.CreateRect("Hdr", win, new Vector2(0f, 1f), Vector2.one, new Vector2(0f, -53f), Vector2.zero);
+            var hdr = _zoneHeader = LotdUiKit.CreateRect("Hdr", win, Vector2.up, Vector2.one, new Vector2(0f, -53f), Vector2.zero);
             LotdUiKit.AddImage(hdr.gameObject, LotdUiKit.WhiteSprite, DuelStyle.HeaderColor);
             var accent = LotdUiKit.CreateRect("Accent", hdr, new Vector2(0f, 1f), Vector2.one,
                 new Vector2(0f, -2f), Vector2.zero);
@@ -2246,6 +2247,12 @@ namespace YGOPortable.UI
             _zoneBody.offsetMax = new Vector2(-10f, browsePiles ? -151f : -62f);
             _zoneWindow.anchorMin = sidePanel ? new Vector2(browsePiles ? .76f : .817f, .163f) : new Vector2(.208f, .198f);
             _zoneWindow.anchorMax = sidePanel ? new Vector2(.988f, .871f) : new Vector2(.976f, .646f);
+            if (_mobileLayout)
+            {
+                _zoneWindow.anchorMin = sidePanel
+                    ? new Vector2(browsePiles ? .67f : .735f, .055f) : new Vector2(.208f, .14f);
+                _zoneWindow.anchorMax = sidePanel ? new Vector2(.988f, .945f) : new Vector2(.976f, .805f);
+            }
             _zoneShade.color = new Color(.015f, .022f, .038f, sidePanel ? .14f : .40f);
 
             var close = (RectTransform)_zoneClose.transform.parent;
@@ -2259,6 +2266,11 @@ namespace YGOPortable.UI
             grid.cellSize = sidePanel
                 ? new Vector2(Mathf.Clamp(_zoneScroll.viewport.rect.width - 10f, 52f, ZoneCardWidth), ZoneCardHeight)
                 : new Vector2(ZoneCardWidth, ZoneCardHeight);
+            if (_mobileLayout)
+            {
+                float touch = MobileSafeArea.MinimumTouchSize(_zoneWindow);
+                grid.cellSize = new Vector2(Mathf.Max(grid.cellSize.x, touch), Mathf.Max(grid.cellSize.y, touch * 1.22f));
+            }
             return !switchingPile;
         }
 
@@ -2274,6 +2286,7 @@ namespace YGOPortable.UI
             bool showDetails = _onOpenZoneDetails != null && firstCard != null;
             _zoneDetailsRow.gameObject.SetActive(showDetails);
             _zoneBody.offsetMin = new Vector2(10f, showDetails ? 51f : 8f);
+            if (_mobileLayout) LayoutMobileZoneControls(showDetails);
             _zoneScroll.StopMovement();
             _zoneGrid.anchoredPosition = Vector2.zero;
             ZoneViewRoot.transform.SetAsLastSibling();
@@ -2282,6 +2295,28 @@ namespace YGOPortable.UI
             Canvas.ForceUpdateCanvases();
             SetFocus((firstCard ?? emptyFocus ?? _zoneClose).gameObject);
             if (entering) UiEntranceMotion.Play(ZoneViewRoot, duration: .13f);
+        }
+
+        private void LayoutMobileZoneControls(bool details)
+        {
+            float touch = MobileSafeArea.MinimumTouchSize(_zoneWindow);
+            float header = touch + 8f;
+            _zoneHeader.offsetMin = new Vector2(0f, -header);
+            var close = (RectTransform)_zoneClose.transform.parent;
+            float closeLeft = Mathf.Min(close.anchorMin.x, close.anchorMax.x - touch / Mathf.Max(touch, _zoneWindow.rect.width));
+            close.anchorMin = new Vector2(closeLeft, 0f);
+            var title = (RectTransform)_zoneTitle.transform.parent;
+            title.anchorMax = new Vector2(Mathf.Min(.80f, closeLeft - .02f), title.anchorMax.y);
+            close.anchorMax = new Vector2(close.anchorMax.x, 1f);
+            close.offsetMin = new Vector2(0f, 4f);
+            close.offsetMax = new Vector2(0f, -4f);
+
+            float tabs = Mathf.Ceil(touch / .46f);
+            _zoneTabs.offsetMax = new Vector2(-10f, -header - 6f);
+            _zoneTabs.offsetMin = new Vector2(10f, -header - 6f - tabs);
+            _zoneDetailsRow.offsetMax = new Vector2(-10f, 8f + touch);
+            _zoneBody.offsetMax = new Vector2(-10f, -header - (_zoneTabs.gameObject.activeSelf ? tabs + 14f : 8f));
+            _zoneBody.offsetMin = new Vector2(10f, details ? touch + 14f : 8f);
         }
 
         private void AddZoneCardTile(
@@ -2318,7 +2353,7 @@ namespace YGOPortable.UI
                 onOpenCardActions?.Invoke(live);
             }
 
-            bool fullTileAction = hasActions && _mobileLayout && !actionSelection;
+            bool fullTileAction = hasActions && _mobileLayout;
             if (!faceDown && code != 0)
             {
                 var btn = tile.gameObject.AddComponent<Button>();

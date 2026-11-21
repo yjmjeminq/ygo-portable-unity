@@ -3258,7 +3258,7 @@ namespace YGOPortable.Editor
             FieldSlot(ui.Field, material).GetComponent<CardDragTrigger>().OnRightClick();
             var root = ui.Field.Root.transform;
             var sidebar = root.Find("MobileSafeArea/LeftInspector/CardDetails");
-            sidebar.Find("ArtworkControls/Details/B").GetComponent<Button>().onClick.Invoke();
+            root.Find("MobileSafeArea/LeftInspector/CardPreview/Card/AspectBox/ZoomHit").GetComponent<Button>().onClick.Invoke();
             var window = root.Find("Overlay_CardZoom/MobileSafeArea/ZoomWin");
             var details = window.Find("Info");
             var panels = new[] { sidebar, details };
@@ -3333,7 +3333,7 @@ namespace YGOPortable.Editor
             slot.GetComponent<CardDragTrigger>().OnRightClick();
             var root = ui.Field.Root.transform;
             var inspector = root.Find("MobileSafeArea/LeftInspector/CardDetails");
-            inspector.Find("ArtworkControls/Details/B").GetComponent<Button>().onClick.Invoke();
+            root.Find("MobileSafeArea/LeftInspector/CardPreview/Card/AspectBox/ZoomHit").GetComponent<Button>().onClick.Invoke();
             var details = root.Find("Overlay_CardZoom/MobileSafeArea/ZoomWin/Info");
             var field = slot.Find("CardReadout/Labels/Rating/Value").GetComponent<Text>();
             var preview = inspector.Find("Stats/Rating/Number").GetComponent<Text>();

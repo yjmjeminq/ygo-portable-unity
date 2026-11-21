@@ -639,17 +639,27 @@ namespace YGOPortable.UI
         private static void RevealDuelPadTarget(RectTransform target)
         {
             var scroll = target.GetComponentInParent<ScrollRect>();
-            if (scroll == null || !scroll.vertical || scroll.viewport == null || scroll.content == null ||
-                !target.IsChildOf(scroll.content)) return;
+            if (scroll == null || scroll.viewport == null || scroll.content == null || !target.IsChildOf(scroll.content)) return;
             var view = scroll.viewport;
-            float overflow = scroll.content.rect.height - view.rect.height;
-            if (overflow <= 0f) return;
             var bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(view, target);
-            float delta = bounds.min.y < view.rect.yMin ? bounds.min.y - view.rect.yMin :
-                Mathf.Max(0f, bounds.max.y - view.rect.yMax);
-            if (delta == 0f) return;
-            scroll.StopMovement();
-            scroll.verticalNormalizedPosition = Mathf.Clamp01(scroll.verticalNormalizedPosition + delta / overflow);
+            if (scroll.horizontal && scroll.content.rect.width > view.rect.width)
+            {
+                float overflow = scroll.content.rect.width - view.rect.width;
+                float delta = bounds.min.x < view.rect.xMin ? bounds.min.x - view.rect.xMin :
+                    Mathf.Max(0f, bounds.max.x - view.rect.xMax);
+                if (delta == 0f) return;
+                scroll.StopMovement();
+                scroll.horizontalNormalizedPosition = Mathf.Clamp01(scroll.horizontalNormalizedPosition + delta / overflow);
+            }
+            else if (scroll.vertical && scroll.content.rect.height > view.rect.height)
+            {
+                float overflow = scroll.content.rect.height - view.rect.height;
+                float delta = bounds.min.y < view.rect.yMin ? bounds.min.y - view.rect.yMin :
+                    Mathf.Max(0f, bounds.max.y - view.rect.yMax);
+                if (delta == 0f) return;
+                scroll.StopMovement();
+                scroll.verticalNormalizedPosition = Mathf.Clamp01(scroll.verticalNormalizedPosition + delta / overflow);
+            }
         }
 
         private static void ScrollDuelPadDescription(ScrollRect scroll, float direction)

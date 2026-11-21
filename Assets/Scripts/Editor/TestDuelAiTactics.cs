@@ -175,6 +175,9 @@ namespace YGOPortable.Editor
             int keepRaigeki = selection.candidates.FindIndex(card => card.controller == 1 && card.code == GeminiElf);
             Require(keepRaigeki >= 0, "Dragged Down should be able to discard the monster while revealing Raigeki.");
             duel.SubmitResponse(TacticalAI.EncodePlannedSelection(selection, keepRaigeki));
+            var discardOwn = Drive(duel, prompt => prompt.messageType == YgoConstants.MSG_SELECT_CARD);
+            int spare = discardOwn.candidates.FindIndex(card => card.code != Passcode);
+            duel.SubmitResponse(TacticalAI.EncodePlannedSelection(discardOwn, Mathf.Max(0, spare)));
             var afterReveal = Drive(duel, IsIdle);
             var risk = DuelTactics.GetExtensionRisk(duel, afterReveal);
             var extender = afterReveal.activatable.FirstOrDefault(card => card.code == Passcode);
