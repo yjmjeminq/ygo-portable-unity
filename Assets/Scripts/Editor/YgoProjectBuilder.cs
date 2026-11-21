@@ -68,6 +68,7 @@ namespace YGOPortable.Editor
                 TestChainChooser.Run();
                 TestDuelZoneBrowser.Run();
                 TestHandGlow.Run();
+                TestCardPresentation.VerifyOverframePaths();
                 TestDuelPadNavigation.Run();
                 TestDuelAiTactics.Run();
                 AssertTrue(errors.Count == 0, string.Join(" | ", errors.Take(3)));

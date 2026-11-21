@@ -406,6 +406,15 @@ namespace YGOPortable.UI
         private bool _detailed;
         private uint _retainedArtwork;
         private int _retainedVariant;
+        private bool _overframeEnabled;
+        private CanvasGroup _overframe;
+        private RectTransform _overframeTilt;
+        private CardOverframeGraphic _overframeArt;
+        private CardOverframeGraphic _overframeEdge;
+        private Image _overframeShade;
+        private bool _overframeFoil;
+
+        internal bool HasOverframe => _overframe != null && _overframe.gameObject.activeSelf;
 
         public uint CurrentCode { get; private set; }
         internal bool UseDuelArtwork { get; set; }
@@ -549,6 +558,7 @@ namespace YGOPortable.UI
 
             BindArtwork(code);
             BindRarityFinish(info);
+            RefreshOverframe();
             _frameImg.sprite = LotdUiKit.LoadSprite($"LOTD/Frames/{YgoConstants.GetCardFrameName(type)}");
 
             if (_detailed)
@@ -658,7 +668,10 @@ namespace YGOPortable.UI
         private void OnEnable()
         {
             if (_backObj != null && !_backObj.activeSelf)
+            {
                 BindArtwork(CurrentCode);
+                RefreshOverframe();
+            }
         }
 
         private void OnDisable()
@@ -685,8 +698,87 @@ namespace YGOPortable.UI
             _retainedVariant = variant;
         }
 
+        internal void EnableOverframe()
+        {
+            _overframeEnabled = true;
+            RefreshOverframe();
+        }
+
+        private void RefreshOverframe()
+        {
+            if (!_overframeEnabled || _retainedArtwork == 0 || _artImg.sprite == CardArtLoader.GetFallbackArt())
+            {
+                HideOverframe();
+                return;
+            }
+            var profile = CardOverframeProfile.Get(_retainedArtwork, _retainedVariant);
+            if (profile == null || profile.Triangles.Length == 0)
+            {
+                HideOverframe();
+                return;
+            }
+
+            if (_overframe == null)
+            {
+                var layer = LotdUiKit.FillRect("Overframe", transform);
+                var aspect = layer.gameObject.AddComponent<AspectRatioFitter>();
+                aspect.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+                aspect.aspectRatio = LotdUiKit.CardAspectRatio;
+                _overframe = layer.gameObject.AddComponent<CanvasGroup>();
+                _overframe.blocksRaycasts = _overframe.interactable = false;
+                _overframeTilt = LotdUiKit.FillRect("Depth", layer);
+                _overframeTilt.pivot = new Vector2(.5f, .78f);
+                _overframeEdge = AddLayer("Shimmer");
+                _overframeArt = AddLayer("Subject");
+                var shade = LotdUiKit.FillRect("OverframeShade", _artImg.rectTransform);
+                _overframeShade = LotdUiKit.AddImage(shade.gameObject, LotdUiKit.WhiteSprite,
+                    new Color(.021f, .033f, .048f), false, false);
+                layer.SetAsLastSibling();
+            }
+            bool wasVisible = HasOverframe;
+            _overframeArt.Bind(_artImg.sprite, profile, edge: false);
+            _overframeEdge.Bind(_artImg.sprite, profile, edge: true);
+            _overframeFoil = CardRarityCatalog.GetRarity(_retainedArtwork) >= CardRarity.SuperRare;
+            _overframeShade.gameObject.SetActive(true);
+            _overframe.gameObject.SetActive(true);
+            if (!wasVisible) PoseOverframe(1f, 1f, Vector2.zero, 0f);
+
+            CardOverframeGraphic AddLayer(string name)
+            {
+                var graphic = LotdUiKit.FillRect(name, _overframeTilt).gameObject.AddComponent<CardOverframeGraphic>();
+                graphic.maskable = false;
+                graphic.raycastTarget = false;
+                return graphic;
+            }
+        }
+
+        internal void PoseOverframe(float opacity, float scale, Vector2 parallax, float shimmer)
+        {
+            if (!HasOverframe) return;
+            _overframe.alpha = Mathf.Clamp01(opacity);
+            _overframeShade.canvasRenderer.SetAlpha(.72f * _overframe.alpha);
+            _overframeTilt.localScale = Vector3.one * scale;
+            _overframeTilt.anchoredPosition = Vector2.Scale(_overframeTilt.rect.size, parallax) * .024f;
+            _overframeTilt.localRotation = Quaternion.Euler(parallax.y * 3f, -parallax.x * 6f, 0f);
+            var tint = _overframeFoil
+                ? Color.Lerp(DuelStyle.ChainGold, Color.HSVToRGB(Mathf.Repeat(shimmer, 1f), .53f, 1f), .66f)
+                : Color.Lerp(DuelStyle.ChainGold, new Color(.68f, .91f, 1f), .33f + .19f * Mathf.Sin(shimmer * 6.28f));
+            tint.a = .58f;
+            _overframeEdge.canvasRenderer.SetColor(tint);
+        }
+
+        private void HideOverframe()
+        {
+            if (_overframe == null || !_overframe.gameObject.activeSelf) return;
+            _overframeArt.Bind(null, null, edge: false);
+            _overframeEdge.Bind(null, null, edge: true);
+            _overframeShade.gameObject.SetActive(false);
+            _overframe.gameObject.SetActive(false);
+        }
+
         private void ReleaseArtwork()
         {
+            HideOverframe();
             if (_retainedArtwork == 0) return;
             _artImg.sprite = null;
             if (_missingArtwork != null) _missingArtwork.SetActive(false);

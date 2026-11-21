@@ -1814,7 +1814,6 @@ namespace YGOPortable.UI
             bool canDrag = interactive && CanAcceptPlayerAction && !IsStagingPlacement && !_modals.IsFieldCardSelection &&
                 !opponent && loc == YgoConstants.LOCATION_MZONE;
             slot.dragTrigger.SourceType = canDrag ? DragSourceType.FieldMonster : DragSourceType.None;
-            slot.dragTrigger.CardCodeGetter = canDrag ? () => live.code : null;
             slot.dragTrigger.IndexGetter = canDrag ? () => (int)seq : null;
             slot.dragTrigger.DataGetter = canDrag ? () => (con, loc, seq) : null;
             if (!visible)
@@ -1825,6 +1824,11 @@ namespace YGOPortable.UI
                 if (_pointerActionAnchor == slot.root) _pointerActionAnchor = null;
             }
             uint previewCode = interactive && (live.IsFaceUp || live.isPublic || !opponent) ? live.code : 0;
+            slot.dragTrigger.CardCodeGetter = previewCode != 0 ? () => previewCode : null;
+            slot.dragTrigger.OnTouchHold = previewCode != 0 ? () =>
+            {
+                if (CanOpenTouchCardDetails) ShowCardZoomModal(live);
+            } : null;
             if (interactive) RefreshPointerCard(slot.focusArt, previewCode);
             slot.dragTrigger.OnPointerEnterAction = battle != null ? null : () =>
             {
@@ -1927,7 +1931,11 @@ namespace YGOPortable.UI
                 var trigger = view.Trigger;
                 if (trigger == null) continue;
                 trigger.SourceType = actionable ? DragSourceType.Hand : DragSourceType.None;
-                trigger.CardCodeGetter = actionable ? () => card.code : null;
+                trigger.CardCodeGetter = () => card.code;
+                trigger.OnTouchHold = () =>
+                {
+                    if (CanOpenTouchCardDetails) ShowCardZoomModal(card);
+                };
                 trigger.IndexGetter = actionable ? () => (int)sequence : null;
                 var art = (RectTransform)view.Card.transform;
                 RefreshPointerCard(art, card.code);
@@ -4270,6 +4278,10 @@ namespace YGOPortable.UI
             var cardHolder = LotdUiKit.CreateRect("CardHolder", win, new Vector2(.033f, onIPhone ? .195f : .111f),
                 new Vector2(cardRight, onIPhone ? .812f : .891f), Vector2.zero, Vector2.zero);
             _zoomCardView = CompositeCardView.Create(cardHolder, "ZoomCard", true, duelArtwork: true);
+            _zoomCardView.EnableOverframe();
+            CardOverframeInput.Attach(cardHolder, _zoomCardView, onIPhone,
+                new Rect(.033f, onIPhone ? .195f : .111f, cardRight - .033f, onIPhone ? .617f : .780f),
+                onIPhone ? Rect.MinMaxRect(.068f, .206f, .360f, .707f) : Rect.MinMaxRect(.068f, .117f, .438f, .760f));
             AddInspectorArtworkFrame(_zoomCardView.transform.Find("AspectBox"));
             _zoomDisabledBadge = BuildDisabledBadge(_zoomCardView.transform, 24);
             var artwork = LotdUiKit.CreateRect("ArtworkOptions", win, new Vector2(.04f, onIPhone ? .025f : .035f),

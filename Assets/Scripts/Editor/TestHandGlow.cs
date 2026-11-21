@@ -45,6 +45,7 @@ namespace YGOPortable.Editor
             VerifyNativeImpermanenceRay(setFirst: false);
             VerifyMobileUnavailableEffectDetails();
             VerifyDragColumnAndPhaseShortcut();
+            VerifyDuelOverframeLongPress();
             VerifyNativeFieldSpellDrag();
             VerifyDestroyedCopiesKeepTheirReadouts();
             VerifyFieldReplacementReadouts();
@@ -2895,6 +2896,49 @@ namespace YGOPortable.Editor
             Require(detail.gameObject.activeInHierarchy && !home.gameObject.activeSelf && home.parent == safeArea,
                 "Expiring the notice prematurely closed or distorted the card details.");
             Debug.Log("[VERIFY DUEL TOUCH DETAILS] Native disabled monster and unavailable hand card showed their reasons without obstructing inspection.");
+        }
+
+        private static void VerifyDuelOverframeLongPress()
+        {
+            const uint excel = 9674034;
+            uint[] player = Enumerable.Repeat(excel, 40).ToArray();
+            uint[] opponent = Enumerable.Repeat(KaiserSeaHorse, 40).ToArray();
+            var empty = Array.Empty<uint>();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Duel overframe on touch", player, empty, opponent, empty,
+                true, session => session.ActivePrompt?.summonable.Any(card => card.code == excel) == true);
+            using var ui = new HandUI(duel, mobileLayout: true);
+            var root = ui.Field.Root.transform;
+            var safe = root.Find("MobileSafeArea");
+            var window = root.Find("Overlay_CardZoom/MobileSafeArea/ZoomWin");
+            var view = window.Find("CardHolder/ZoomCard").GetComponent<CompositeCardView>();
+            var trigger = safe.Find("PlayerHand/Cards").GetChild(0).GetComponent<CardDragTrigger>();
+            Hold(trigger);
+            Require(window.gameObject.activeInHierarchy && view.CurrentCode == excel && view.HasOverframe,
+                "Long-pressing the hand did not reveal the card's overframe details.");
+            window.Find("Hdr/Close/B").GetComponent<Button>().onClick.Invoke();
+
+            int index = duel.ActivePrompt.summonable.FindIndex(card => card.code == excel);
+            duel.SubmitResponseInt(index << 16);
+            YgoProjectBuilder.DriveUntilIdle(duel, new TacticalAI());
+            CardAnimationManager.Instance?.Clear();
+            ui.Field.Refresh();
+            var own = duel.Players[duel.HumanPlayerIndex];
+            var card = own.mzone.Single(c => c?.code == excel);
+            var zone = safe.Find($"DuelBoard/Zone_{card.sequence + 2}_3");
+            Hold(zone.GetComponent<CardDragTrigger>());
+            Require(window.gameObject.activeInHierarchy && view.CurrentCode == excel && view.HasOverframe &&
+                duel.RetryCount == 0, "Long-pressing the field did not open overframe inspection.");
+            Debug.Log("[VERIFY OVERFRAME TOUCH] Hand and field long presses opened the same mobile detail view.");
+
+            static void Hold(CardDragTrigger source)
+            {
+                var pointer = new PointerEventData(EventSystem.current) { pointerId = 5, button = PointerEventData.InputButton.Left };
+                source.OnPointerDown(pointer);
+                float started = (float)typeof(CardDragTrigger).GetField("_touchPressAt", PrivateInstance).GetValue(source);
+                Require(source.TryCompleteTouchHold(5, pointer.position, started + .5f), "The card did not accept a stationary long press.");
+                source.OnPointerUp(pointer);
+                source.OnPointerClick(pointer);
+            }
         }
 
         private static void VerifyDragColumnAndPhaseShortcut()

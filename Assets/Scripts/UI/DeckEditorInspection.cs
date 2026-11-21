@@ -30,6 +30,9 @@ namespace YGOPortable.UI
                 new Vector2(.13f, .081f), new Vector2(.977f, .943f));
             var art = DeckArea(_expandedDeckPanel, "Artwork", .048f, .084f, .422f, .913f);
             _expandedDeckArt = CompositeCardView.Create(art, "Card", true);
+            _expandedDeckArt.EnableOverframe();
+            CardOverframeInput.Attach(art, _expandedDeckArt, _mobileLayout,
+                Rect.MinMaxRect(.048f, .084f, .422f, .913f), Rect.MinMaxRect(.073f, .104f, .382f, .805f));
             var name = DeckArea(_expandedDeckPanel, "Name", .447f, .804f, .759f, .928f);
             _expandedDeckName = LotdUiKit.AddFittedText(name, "Text", "", 30, 16, TextAnchor.MiddleLeft,
                 LotdUiKit.GoldAccent, FontStyle.Bold);

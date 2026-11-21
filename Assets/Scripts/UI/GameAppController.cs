@@ -86,6 +86,7 @@ namespace YGOPortable.UI
             {
                 Debug.Log($"[GameApp] Start() starting... StreamingAssets: {Application.streamingAssetsPath}");
                 Application.runInBackground = true;
+                if (Application.isMobilePlatform) Application.targetFrameRate = 60;
                 LotdAudio.EnsureInit(gameObject);
                 PersonalReplayEnabled = PlayerPrefs.GetInt(PersonalReplayPreference, 0) != 0;
 

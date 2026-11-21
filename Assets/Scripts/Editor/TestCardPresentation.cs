@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using YGOPortable.Core;
 using YGOPortable.UI;
@@ -43,6 +44,118 @@ namespace YGOPortable.Editor
                 UnityEngine.Object.DestroyImmediate(canvas.gameObject);
             }
             Debug.Log("[VERIFY CARD PRESENTATION] Foil geometry, hidden and reused cards, signature reveals and distinct summon paths passed.");
+        }
+
+        internal static void VerifyOverframePaths()
+        {
+            var canvas = new GameObject("Overframe Verification", typeof(Canvas)).GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            ((RectTransform)canvas.transform).sizeDelta = new Vector2(1600f, 900f);
+            try
+            {
+                var holder = LotdUiKit.CreateRect("View", canvas.transform, new Vector2(.25f, .16f), new Vector2(.52f, .83f),
+                    Vector2.zero, Vector2.zero);
+                var card = CompositeCardView.Create(holder, "Detailed", detailedOverlay: true);
+                card.EnableOverframe();
+                CardOverframeInput.Attach(holder, card, false, Rect.MinMaxRect(.25f, .16f, .52f, .83f), Rect.MinMaxRect(.28f, .19f, .50f, .74f));
+                foreach (uint code in new[] { 84815190u, 46986414u, BlueEyes, 9674034u })
+                {
+                    card.SetCard(code);
+                    Canvas.ForceUpdateCanvases();
+                    var layer = card.transform.Find("Overframe");
+                    var graphic = layer?.Find("Depth/Subject").GetComponent<CardOverframeGraphic>();
+                    Require(card.HasOverframe && !graphic.maskable && !graphic.raycastTarget &&
+                        layer.parent == card.transform && layer.GetSiblingIndex() == card.transform.childCount - 1 &&
+                        graphic.mainTexture == card.ArtworkSprite.texture,
+                        $"The face of {code} did not use its own art in a separate unmasked overlay.");
+                    using var mesh = new VertexHelper();
+                    typeof(CardOverframeGraphic).GetMethod("OnPopulateMesh", BindingFlags.Instance | BindingFlags.NonPublic,
+                        null, new[] { typeof(VertexHelper) }, null).Invoke(graphic, new object[] { mesh });
+                    var profile = CardOverframeProfile.Get(code, -1);
+                    Require(mesh.currentVertCount == profile.Uv.Length * 2 && mesh.currentIndexCount == (profile.Uv.Length * 3 - 2) * 3,
+                        $"The silhouette of {code} did not triangulate.");
+                    float bottom = float.PositiveInfinity, top = float.NegativeInfinity, right = float.NegativeInfinity;
+                    UIVertex v = default;
+                    for (int i = 0; i < mesh.currentVertCount; i++)
+                    {
+                        mesh.PopulateUIVertex(ref v, i);
+                        bottom = Mathf.Min(bottom, v.position.y);
+                        top = Mathf.Max(top, v.position.y);
+                        right = Mathf.Max(right, v.position.x);
+                    }
+                    var rect = graphic.rectTransform.rect;
+                    Require(bottom > rect.yMin + .30f * rect.height && top > rect.yMax + .15f * rect.height && right > rect.xMax,
+                        $"The silhouette of {code} did not clear the upper and side edges or crossed the lower text.");
+                }
+
+                var input = holder.GetComponent<CardOverframeInput>();
+                var tick = typeof(CardOverframeInput).GetMethod("LateUpdate", BindingFlags.Instance | BindingFlags.NonPublic);
+                tick.Invoke(input, null);
+                var pointer = new PointerEventData(EventSystem.current) { pointerId = 4, button = PointerEventData.InputButton.Left };
+                pointer.position = RectTransformUtility.WorldToScreenPoint(null, holder.position);
+                input.OnPointerDown(pointer);
+                pointer.position += new Vector2(80f, 40f);
+                input.OnBeginDrag(pointer);
+                var drag = (Vector2)typeof(CardOverframeInput).GetField("_drag", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(input);
+                Require(drag.sqrMagnitude > .05f, "Dragging the viewer did not set a parallax offset.");
+                typeof(CardOverframeInput).GetMethod("ShowDepth", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(input, new object[] { drag, .21f });
+                var tilt = (RectTransform)card.transform.Find("Overframe/Depth");
+                Require(tilt.anchoredPosition.sqrMagnitude > 1f && tilt.localRotation != Quaternion.identity &&
+                    card.transform.localRotation != Quaternion.identity, "Frame and portrait did not tilt independently.");
+                input.OnEndDrag(pointer);
+                card.SetCard(BlueEyes, faceDown: true);
+                Require(!card.HasOverframe, "A face-down view leaked the featured artwork.");
+                card.SetCard(20721928);
+                Require(!card.HasOverframe, "Reusing the viewer leaked the previous contour.");
+
+                var animator = CardAnimationManager.Ensure(canvas);
+                VerifyOverframeAnimation(animator);
+                Debug.Log("[VERIFY OVERFRAME] Four bundled silhouettes, layering, touch parallax, hidden card reuse, summon bounce and chain cut-ins passed.");
+            }
+            finally { UnityEngine.Object.DestroyImmediate(canvas.gameObject); }
+        }
+
+        private static void VerifyOverframeAnimation(CardAnimationManager animator)
+        {
+            var start = new CardPose(new Vector2(-80f, -160f), new Vector2(92f, 134f));
+            var end = new CardPose(new Vector2(220f, -80f), new Vector2(92f, 134f));
+            var queue = (Queue<IEnumerator>)typeof(CardAnimationManager).GetField("_steps",
+                BindingFlags.Instance | BindingFlags.NonPublic).GetValue(animator);
+            bool landed = false;
+            animator.QueueMove(new CardFlight(BlueEyes, start, end, true, false), CardMotion.SpecialSummon, () => landed = true);
+            var move = queue.Dequeue();
+            Require(move.MoveNext() && move.Current is IEnumerator, "The ace did not play its summon reveal.");
+            var reveal = (IEnumerator)move.Current;
+            Require(reveal.MoveNext(), "The overframe summon did not start.");
+            var enter = SampleAnimation((IEnumerator)reveal.Current);
+            var view = animator.transform.Find("MovingCard");
+            Require(view.GetComponent<CompositeCardView>().CurrentCode == 0 && view.Find("Overframe") == null,
+                "The summon revealed the subject before its card was turned up.");
+            enter(1f);
+            Canvas.ForceUpdateCanvases();
+            var layer = view.Find("Overframe");
+            var tilt = layer.Find("Depth");
+            Require(layer.gameObject.activeSelf && Mathf.Approximately(tilt.localScale.x, 1.25f) &&
+                animator.transform.Find("ChainImpactWave").GetComponent<DuelEffectGraphic>().Tint == DuelStyle.ChainGold &&
+                animator.transform.Find("Chain").GetComponent<DuelEffectGraphic>().Tint == DuelStyle.ChainGold,
+                "The summon did not produce gold feedback or enlarge the overframe at impact.");
+            Require(reveal.MoveNext(), "The summon omitted the overframe landing.");
+            SampleAnimation((IEnumerator)reveal.Current)(1f);
+            Require(Mathf.Approximately(tilt.localScale.x, 1f), "The subject did not settle to its intended size.");
+            Require(reveal.MoveNext(), "The ace did not travel to the field.");
+            SampleAnimation((IEnumerator)reveal.Current)(1f);
+            Require(!reveal.MoveNext() && !move.MoveNext() && landed && (view == null || !view.gameObject.activeSelf) &&
+                animator.transform.Find("ChainImpactWave") == null, "The overframe cut-in outlived the summon.");
+
+            animator.Clear();
+            animator.QueueChain(start, 9674034, 1, false);
+            var chain = queue.Dequeue();
+            Require(chain.MoveNext(), "The ace activation did not play its cut-in.");
+            SampleAnimation((IEnumerator)chain.Current)(.93f);
+            Require(animator.transform.Find("MovingCard/Overframe/Depth/Subject").gameObject.activeInHierarchy,
+                "The ace activation omitted its overframe subject.");
+            animator.Clear();
         }
 
         private static void VerifyFoil(CompositeCardView card)

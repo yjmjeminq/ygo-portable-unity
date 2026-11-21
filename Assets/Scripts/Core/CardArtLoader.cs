@@ -118,6 +118,9 @@ namespace YGOPortable.Core
             return variants.Contains(variant) ? variant : variants[0];
         }
 
+        internal static bool UsesLocalArtwork(uint code, int variant) =>
+            variant >= 0 && _duelArt.ContainsKey((code, variant));
+
         internal static void SetDuelArtworkVariant(uint code, int variant)
         {
             if (_duelVariants.TryGetValue(code, out var variants) && variants.Contains(variant))
