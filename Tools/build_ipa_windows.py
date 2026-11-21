@@ -27,6 +27,12 @@ class BuildError(Exception):
     pass
 
 
+class GitHubHttpError(BuildError):
+    def __init__(self, method, path, status):
+        super().__init__(f"GitHub 요청 실패 ({method} {path}, HTTP {status}).")
+        self.status = status
+
+
 def git(*args, check=True, stdin=None):
     return subprocess.run(
         ["git", "-c", "credential.interactive=false", *args], cwd=PROJECT,
@@ -74,7 +80,7 @@ class GitHub:
             except HTTPError as error:
                 error.close()
                 if error.code not in (429, 500, 502, 503, 504) or attempt == attempts - 1:
-                    raise BuildError(f"GitHub 요청 실패 ({method} {host.path}, HTTP {error.code}).") from None
+                    raise GitHubHttpError(method, host.path, error.code) from None
             except (URLError, TimeoutError, ConnectionError) as error:
                 if attempt == attempts - 1:
                     raise BuildError(f"GitHub 연결 실패 ({method} {host.path}, {type(error).__name__}).") from None
@@ -96,10 +102,18 @@ class GitHub:
         run_id = dispatch["workflow_run_id"]
         link = f"https://github.com/{self.repository}/actions/runs/{run_id}"
         print(f"    GitHub Actions {link}")
-        deadline = time.monotonic() + timeout_minutes * 60
+        started = time.monotonic()
+        deadline = started + timeout_minutes * 60
         previous_status = None
         while time.monotonic() < deadline:
-            run = self.json(f"/actions/runs/{run_id}")
+            try:
+                run = self.json(f"/actions/runs/{run_id}")
+            except GitHubHttpError as error:
+                # Dispatch can return the ID before the run is visible. Keep the Xcode asset available.
+                if error.status != 404 or previous_status is not None or time.monotonic() - started >= 60:
+                    raise
+                time.sleep(3)
+                continue
             if run["head_sha"] != revision:
                 raise BuildError("빌드 중 원격 브랜치가 변경되었습니다. CMD를 다시 실행하세요.")
             status = run["status"]
