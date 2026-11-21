@@ -19,6 +19,7 @@ namespace YGOPortable.Editor
         {
             VerifyNegationTargets();
             VerifyTriggerOrder();
+            VerifyNativeTriggerProtection();
             VerifyAshCommitment();
             VerifyBaitAgainstBaronne();
             VerifySummonBudget();
@@ -85,6 +86,43 @@ namespace YGOPortable.Editor
             Drive(duel, IsIdle);
             Require(duel.SolvedChainLinks.Any(link => link.code == Ash) &&
                 duel.Players[0].mzone.All(card => card?.code != SnakeEyeAsh), "The native engine did not resolve the Ash response.");
+        }
+
+        private static void VerifyNativeTriggerProtection()
+        {
+            const uint painfulChoice = 74191942, aquaSpirit = 40916023, kitkallos = 92731385;
+            uint[] offered = { Merrli, Sulliek, aquaSpirit, Passcode, GeminiElf };
+            using var duel = YgoProjectBuilder.StartSeedMatching("Native chain blocking",
+                Deck(offered.Append(painfulChoice).ToArray()), new[] { kitkallos }, Deck(Ash), Empty, true,
+                current => current.Players[0].hand.Any(card => card.code == painfulChoice));
+            SubmitIdle(duel, 5, painfulChoice);
+            var selectFive = Drive(duel, prompt => prompt.messageType == YgoConstants.MSG_SELECT_CARD && prompt.min == 5);
+            int[] indices = offered.Select(code => selectFive.candidates.FindIndex(card => card.code == code)).ToArray();
+            Require(indices.All(index => index >= 0), "The five chain-blocking fixture cards must be available in the Deck.");
+            duel.SubmitResponse(DuelSession.PackCardSelection(indices));
+            var opponentPick = Drive(duel, prompt => prompt.messageType == YgoConstants.MSG_SELECT_CARD && prompt.playerId == 1);
+            int elf = opponentPick.candidates.FindIndex(card => card.code == GeminiElf);
+            Require(elf >= 0, "The opponent must be able to return Gemini Elf to hand.");
+            duel.SubmitResponse(DuelSession.PackCardSelection(elf));
+
+            var ai = Smart();
+            var simultaneous = Drive(duel, prompt => prompt.IsTriggerChain && prompt.candidates.Count == 2);
+            int fusion = Read(ai.ComputeResponse(duel, simultaneous));
+            Require(fusion >= 0 && simultaneous.candidates[fusion].code == Merrli,
+                "The actual simultaneous window should put the Graveyard Fusion on Chain Link 1.");
+            duel.SubmitResponseInt(fusion);
+            var followUp = Drive(duel, prompt => prompt.IsTriggerChain);
+            int search = Read(ai.ComputeResponse(duel, followUp));
+            Require(search >= 0 && followUp.candidates[search].code == Sulliek,
+                "The legal Sulliek search should occupy Chain Link 2.");
+            duel.SubmitResponseInt(search);
+            var ashWindow = Drive(duel, prompt => IncludesChainEffect(prompt, Ash));
+            Require(duel.CurrentChain.Count == 2 && duel.CurrentChain[0].code == Merrli && duel.CurrentChain[1].code == Sulliek,
+                "The engine must preserve the AI's chosen order before offering Ash to the other player.");
+            duel.SubmitResponseInt(ashWindow.candidates.FindIndex(card => card.code == Ash));
+            Drive(duel, IsIdle);
+            Require(duel.Players[0].mzone.Any(card => card?.code == kitkallos) && duel.RetryCount == 0,
+                "The Graveyard Fusion should resolve after Ash negates the search on top of it.");
         }
 
         private static void VerifyBaitAgainstBaronne()
