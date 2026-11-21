@@ -760,10 +760,9 @@ namespace YGOPortable.UI
             _overframeTilt.localScale = Vector3.one * scale;
             _overframeTilt.anchoredPosition = Vector2.Scale(_overframeTilt.rect.size, parallax) * .024f;
             _overframeTilt.localRotation = Quaternion.Euler(parallax.y * 3f, -parallax.x * 6f, 0f);
-            var tint = _overframeFoil
-                ? Color.Lerp(DuelStyle.ChainGold, Color.HSVToRGB(Mathf.Repeat(shimmer, 1f), .53f, 1f), .66f)
-                : Color.Lerp(DuelStyle.ChainGold, new Color(.68f, .91f, 1f), .33f + .19f * Mathf.Sin(shimmer * 6.28f));
-            tint.a = .58f;
+            var spectrum = Color.HSVToRGB(Mathf.Repeat(shimmer, 1f), .63f, 1f);
+            var tint = Color.Lerp(DuelStyle.ChainGold, spectrum, _overframeFoil ? .78f : .65f);
+            tint.a = _overframeFoil ? .58f : .47f;
             _overframeEdge.canvasRenderer.SetColor(tint);
         }
 

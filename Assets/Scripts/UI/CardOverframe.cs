@@ -12,7 +12,8 @@ namespace YGOPortable.UI
     {
         internal readonly Vector2[] Uv;
         internal readonly Vector2[] Layout;
-        internal readonly int[] Triangles;
+        private int[] _triangles;
+        internal int[] Triangles => _triangles ??= Triangulate(Uv, Clockwise);
         internal readonly bool Clockwise;
 
         private static readonly Dictionary<uint, CardOverframeProfile> Profiles = new()
@@ -118,7 +119,13 @@ namespace YGOPortable.UI
             for (int i = 0; i < Uv.Length; i++)
                 area += Cross(Uv[i], Uv[(i + 1) % Uv.Length]);
             Clockwise = area < 0f;
-            Triangles = Triangulate(Uv, Clockwise);
+        }
+
+        internal static void PrepareContours()
+        {
+            // Build small CPU-side meshes before the player can open a view or start a duel.
+            foreach (var profile in Profiles.Values) _ = profile.Triangles;
+            foreach (var profile in LocalProfiles.Values) _ = profile.Triangles;
         }
 
         internal static CardOverframeProfile Get(uint code, int variant)
@@ -143,11 +150,7 @@ namespace YGOPortable.UI
                     int a = remaining[(i + remaining.Count - 1) % remaining.Count], b = remaining[i],
                         c = remaining[(i + 1) % remaining.Count];
                     if (Cross(points[b] - points[a], points[c] - points[a]) <= .000001f) continue;
-                    bool occupied = remaining.Exists(p => p != a && p != b && p != c &&
-                        Cross(points[b] - points[a], points[p] - points[a]) >= 0f &&
-                        Cross(points[c] - points[b], points[p] - points[b]) >= 0f &&
-                        Cross(points[a] - points[c], points[p] - points[c]) >= 0f);
-                    if (occupied) continue;
+                    if (ContainsOtherVertex(points, remaining, a, b, c)) continue;
                     result.Add(a);
                     result.Add(b);
                     result.Add(c);
@@ -158,6 +161,20 @@ namespace YGOPortable.UI
                 if (!found) return System.Array.Empty<int>();
             }
             return result.ToArray();
+        }
+
+        private static bool ContainsOtherVertex(Vector2[] points, List<int> remaining, int a, int b, int c)
+        {
+            Vector2 aa = points[a], bb = points[b], cc = points[c];
+            Vector2 ab = bb - aa, bc = cc - bb, ca = aa - cc;
+            foreach (int index in remaining)
+            {
+                if (index == a || index == b || index == c) continue;
+                Vector2 point = points[index];
+                if (Cross(ab, point - aa) >= 0f && Cross(bc, point - bb) >= 0f && Cross(ca, point - cc) >= 0f)
+                    return true;
+            }
+            return false;
         }
 
         private static float Cross(Vector2 a, Vector2 b) => a.x * b.y - a.y * b.x;

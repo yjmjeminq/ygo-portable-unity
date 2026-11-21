@@ -48,6 +48,20 @@ namespace YGOPortable.Editor
 
         internal static void VerifyOverframePaths()
         {
+            CardOverframeProfile.PrepareContours();
+            var profileType = typeof(CardOverframeProfile);
+            const BindingFlags profileFields = BindingFlags.NonPublic | BindingFlags.Static;
+            var bundled = (Dictionary<uint, CardOverframeProfile>)profileType.GetField("Profiles", profileFields).GetValue(null);
+            var local = (Dictionary<(uint, int), CardOverframeProfile>)profileType.GetField("LocalProfiles", profileFields).GetValue(null);
+            var indices = profileType.GetField("_triangles", BindingFlags.NonPublic | BindingFlags.Instance);
+            foreach (var contour in bundled.Values.Concat(local.Values).Distinct())
+            {
+                var prepared = (int[])indices.GetValue(contour);
+                Require(prepared != null && prepared.Length == (contour.Uv.Length - 2) * 3,
+                    "Startup did not prepare a complete triangulation for all artwork variants.");
+            }
+            Debug.Log("[VERIFY OVERFRAME PREP] Bundled and alternate silhouettes triangulated before the card renderer bound them.");
+
             var canvas = new GameObject("Overframe Verification", typeof(Canvas)).GetComponent<Canvas>();
             canvas.renderMode = RenderMode.WorldSpace;
             ((RectTransform)canvas.transform).sizeDelta = new Vector2(1600f, 900f);
@@ -83,6 +97,13 @@ namespace YGOPortable.Editor
                         top = Mathf.Max(top, v.position.y);
                         right = Mathf.Max(right, v.position.x);
                     }
+                    var shimmer = layer.Find("Depth/Shimmer").GetComponent<CardOverframeGraphic>();
+                    card.PoseOverframe(1f, 1f, Vector2.zero, .02f);
+                    var warm = shimmer.canvasRenderer.GetColor();
+                    card.PoseOverframe(1f, 1f, Vector2.zero, .61f);
+                    var cool = shimmer.canvasRenderer.GetColor();
+                    Require(warm.r > cool.r && cool.b > warm.b, $"The shimmer of ace {code} did not cycle through the spectrum.");
+
                     var rect = graphic.rectTransform.rect;
                     Require(bottom > rect.yMin + .30f * rect.height && top > rect.yMax + .15f * rect.height && right > rect.xMax,
                         $"The silhouette of {code} did not clear the upper and side edges or crossed the lower text.");
