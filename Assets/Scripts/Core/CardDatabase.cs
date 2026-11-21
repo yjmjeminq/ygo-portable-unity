@@ -869,13 +869,14 @@ namespace YGOPortable.Core
             var target = Get(code);
             if (target == null || _allCards == null) return results;
 
-            string tname = (target.name ?? "").Trim();
-            string tdesc = target.desc ?? "";
+            string tname = StripRuby(target.name);
+            string tdesc = StripRuby(target.desc);
+            bool snakeEyeFamily = IsSnakeEyeFamily(tname);
             var targetSetcodes = ExtractSetcodes(target.setcode);
 
-            // Extract quoted archetype keywords: "..." or 「...」
+            // Localized card text uses several different quote pairs.
             var descKeywords = new List<string>();
-            var matches = System.Text.RegularExpressions.Regex.Matches(tdesc, "[\"「]([^\"」]+)[\"」]");
+            var matches = System.Text.RegularExpressions.Regex.Matches(tdesc, "[\"“「『]([^\"”」』]+)[\"”」』]");
             foreach (System.Text.RegularExpressions.Match m in matches)
             {
                 if (m.Groups.Count > 1)
@@ -903,8 +904,14 @@ namespace YGOPortable.Core
                     }
                 }
 
+                string otherName = StripRuby(c.name);
+                if (snakeEyeFamily && IsSnakeEyeFamily(otherName))
+                {
+                    results.Add(c);
+                    continue;
+                }
+
                 string otherDesc = c.desc ?? "";
-                string otherName = c.name ?? "";
 
                 // 2. Other card mentions target card's exact name
                 if (tname.Length >= 2 && otherDesc.Contains(tname))
@@ -940,6 +947,12 @@ namespace YGOPortable.Core
             _relatedCache[code] = results;
             return results;
         }
+
+        private static bool IsSnakeEyeFamily(string name) =>
+            name.Contains("스네이크아이") || name.Contains("디아벨스타") || name.Contains("죄보") ||
+            name.Contains("Snake-Eye", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Diabellstar", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Sinful Spoils", StringComparison.OrdinalIgnoreCase);
 
         private static List<ArchetypeInfo> _archetypes;
         private static readonly System.Text.RegularExpressions.Regex _archQuoteRegex =

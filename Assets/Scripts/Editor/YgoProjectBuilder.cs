@@ -83,6 +83,27 @@ namespace YGOPortable.Editor
             }
         }
 
+        public static void VerifyDeckEditingHeadless()
+        {
+            int exit = 1;
+            try
+            {
+                string streaming = Application.streamingAssetsPath;
+                CardDatabase.Load(streaming);
+                CardArtLoader.Initialize(streaming);
+                TestDeckEditing.Run(streaming);
+                TestDeckEditorConvenience.Run(streaming);
+                Debug.Log("[VERIFY DECK EDITOR] All deck editor checks passed.");
+                exit = 0;
+            }
+            catch (Exception error) { Debug.LogException(error); }
+            finally
+            {
+                CardArtLoader.Shutdown();
+                if (Application.isBatchMode) EditorApplication.Exit(exit);
+            }
+        }
+
         [MenuItem("YGO Portable/3. Build Windows Standalone (64-bit)")]
         public static void BuildWindows()
         {

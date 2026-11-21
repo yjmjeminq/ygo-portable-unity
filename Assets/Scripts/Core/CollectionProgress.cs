@@ -340,6 +340,9 @@ namespace YGOPortable.Core
             return card != null && card.alias != 0 ? card.alias : code;
         }
 
+        public static int GetDeckCopyLimit(uint code) =>
+            GetDeckCopyKey(code) is 55144522 or 79571449 or 12580477 or 18144506 ? 1 : DeckCopyLimit;
+
         public static UserDeck CreateStarterDeck() => HasStarter ? CopyDeck(_profile.starterDeck) : null;
 
         public static bool CanUseDeck(UserDeck deck, out string reason)
@@ -698,7 +701,7 @@ namespace YGOPortable.Core
                 if (pile.Count >= size || !IsDeckCard(card) || card.IsExtra != extraPile) return false;
                 uint key = GetDeckCopyKey(code);
                 counts.TryGetValue(key, out int count);
-                if (count >= DeckCopyLimit) return false;
+                if (count >= GetDeckCopyLimit(code)) return false;
                 counts[key] = count + 1;
                 pile.Add(code);
                 return true;
@@ -828,8 +831,9 @@ namespace YGOPortable.Core
             }
             foreach (var group in GetDeckCards(deck).GroupBy(GetDeckCopyKey))
             {
-                if (group.Count() <= DeckCopyLimit) continue;
-                reason = $"{CardDatabase.GetName(group.Key)}은(는) 덱에 {DeckCopyLimit}장까지 넣을 수 있습니다.";
+                int limit = GetDeckCopyLimit(group.Key);
+                if (group.Count() <= limit) continue;
+                reason = $"{CardDatabase.GetName(group.Key)}은(는) 덱에 {limit}장까지 넣을 수 있습니다.";
                 return false;
             }
             reason = "";

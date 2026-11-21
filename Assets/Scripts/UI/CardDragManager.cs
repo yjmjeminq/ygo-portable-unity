@@ -200,7 +200,8 @@ namespace YGOPortable.UI
         }
     }
 
-    public class CardDragTrigger : MonoBehaviour, IPointerDownHandler, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler, IPointerEnterHandler, IPointerExitHandler
+    public class CardDragTrigger : MonoBehaviour, IPointerDownHandler, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler, IPointerEnterHandler, IPointerExitHandler,
+        IPointerUpHandler
     {
         public DragSourceType SourceType = DragSourceType.None;
         public Func<uint> CardCodeGetter;
@@ -208,6 +209,7 @@ namespace YGOPortable.UI
         public Func<object> DataGetter;
         public Action OnLeftClick;
         public Action OnTouchClick;
+        public Action OnTouchHold;
         public Action OnRightClick;
         public Action OnPointerEnterAction;
         public Action OnPointerExitAction;
@@ -218,6 +220,12 @@ namespace YGOPortable.UI
         private int _restingSibling;
         private CanvasGroup _cg;
         private ScrollRect _parentScroll;
+        private const float TouchHoldSeconds = .46f;
+        private int _touchPressId = -1;
+        private int _consumedTouchId = -1;
+        private uint _touchPressCode;
+        private Vector2 _touchPressPoint;
+        private float _touchPressAt;
 
         private bool HandlesTouchTap(PointerEventData data) => data.pointerId >= 0 && OnTouchClick != null;
 
@@ -237,6 +245,7 @@ namespace YGOPortable.UI
 
         public void OnPointerExit(PointerEventData eventData)
         {
+            if (eventData.pointerId == _touchPressId) _touchPressId = -1;
             if (!_isDraggingThis && !HandlesTouchTap(eventData))
             {
                 EndHover();
@@ -246,6 +255,17 @@ namespace YGOPortable.UI
 
         private void Update()
         {
+            if (_touchPressId >= 0)
+            {
+                for (int i = 0; i < Input.touchCount; i++)
+                {
+                    var touch = Input.GetTouch(i);
+                    if (touch.fingerId != _touchPressId) continue;
+                    if (touch.phase == TouchPhase.Canceled) _touchPressId = -1;
+                    else TryCompleteTouchHold(touch.fingerId, touch.position, Time.unscaledTime);
+                    break;
+                }
+            }
             if (!EnableHoverLift || _isDraggingThis || !(transform is RectTransform rect)) return;
             float lift = _hovered ? 25f : 0f;
             float smoothing = 1f - Mathf.Exp(-24f * Time.unscaledDeltaTime);
@@ -284,12 +304,44 @@ namespace YGOPortable.UI
 
         public void OnPointerDown(PointerEventData eventData)
         {
-            // Allow drag detection
+            if (eventData.pointerId < 0 || eventData.button != PointerEventData.InputButton.Left) return;
+            if (_consumedTouchId == eventData.pointerId) _consumedTouchId = -1;
+            if (OnTouchHold == null || CardCodeGetter == null || _touchPressId >= 0) return;
+            _touchPressCode = CardCodeGetter();
+            if (_touchPressCode == 0) return;
+            _touchPressId = eventData.pointerId;
+            _touchPressPoint = eventData.position;
+            _touchPressAt = Time.unscaledTime;
+        }
+
+        public void OnPointerUp(PointerEventData eventData)
+        {
+            if (eventData.pointerId == _touchPressId) _touchPressId = -1;
+        }
+
+        internal bool TryCompleteTouchHold(int finger, Vector2 position, float now)
+        {
+            if (_touchPressId < 0 || finger != _touchPressId) return false;
+            float threshold = Mathf.Max(EventSystem.current?.pixelDragThreshold ?? 10, Screen.dpi * .035f);
+            if ((position - _touchPressPoint).sqrMagnitude > threshold * threshold ||
+                CardCodeGetter?.Invoke() != _touchPressCode || OnTouchHold == null ||
+                CardDragManager.Instance?.IsDragging == true)
+            {
+                _touchPressId = -1;
+                return false;
+            }
+            if (now - _touchPressAt < TouchHoldSeconds) return false;
+            _touchPressId = -1;
+            _consumedTouchId = finger;
+            OnTouchHold.Invoke();
+            return true;
         }
 
         public void OnBeginDrag(PointerEventData eventData)
         {
+            if (eventData.pointerId == _touchPressId) _touchPressId = -1;
             _parentScroll = null;
+            if (eventData.pointerId >= 0 && eventData.pointerId == _consumedTouchId) return;
             bool canDragCard = SourceType != DragSourceType.None && CardCodeGetter != null;
             if (!canDragCard || eventData.pointerId >= 0)
             {
@@ -356,6 +408,8 @@ namespace YGOPortable.UI
 
         private void OnDisable()
         {
+            _touchPressId = -1;
+            _consumedTouchId = -1;
             _parentScroll = null;
             if (_isDraggingThis || EnableHoverLift)
             {
@@ -367,6 +421,11 @@ namespace YGOPortable.UI
         public void OnPointerClick(PointerEventData eventData)
         {
             if (_isDraggingThis || _parentScroll != null) return;
+            if (eventData.pointerId >= 0 && eventData.pointerId == _consumedTouchId)
+            {
+                _consumedTouchId = -1;
+                return;
+            }
             if (eventData.button == PointerEventData.InputButton.Right)
             {
                 OnRightClick?.Invoke();

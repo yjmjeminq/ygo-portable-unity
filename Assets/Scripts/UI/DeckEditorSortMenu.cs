@@ -68,7 +68,7 @@ namespace YGOPortable.UI
                     () => ChooseMainSort(choice), 17);
             }
             _wholeSortOptions[0] = LotdUiKit.CreateLotdButton(SortMenuRow(menu, "WholeDefault", .640f, .767f),
-                "Button", "기본 정렬", () => ChooseWholeSort(byFrame: false), 17);
+                "Button", "종류·이름순", () => ChooseWholeSort(byFrame: false), 17);
             _wholeSortOptions[1] = LotdUiKit.CreateLotdButton(SortMenuRow(menu, "WholeFrame", .465f, .592f),
                 "Button", "카드 프레임별", () => ChooseWholeSort(byFrame: true), 17);
             var cancel = SortMenuRow(menu, "Cancel", .075f, .182f);
@@ -137,7 +137,7 @@ namespace YGOPortable.UI
         {
             if (!_mainSortMenu.activeSelf) return;
             _lastWholeSort = byFrame ? 1 : 0;
-            SortWorkingDeck(byFrame);
+            SortWorkingDeck(byFrame, byName: !byFrame);
             CloseMainDeckSort();
         }
 

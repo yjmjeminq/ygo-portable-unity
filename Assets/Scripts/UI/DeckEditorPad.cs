@@ -73,8 +73,8 @@ namespace YGOPortable.UI
             _padCardFocus.Hide();
             ClearCardVisual(ref _padVisualSlot);
             _trunkPadScrollTarget = null;
-            _deckHelpLabel.text = Application.platform == RuntimePlatform.IPhonePlayer
-                ? "카드 탭  정보 보기    드래그  이동    X  정렬    Y  검색    +  저장"
+            _deckHelpLabel.text = _mobileLayout
+                ? "카드 탭  조작    길게 눌러 상세 보기    드래그  이동"
                 : MouseHelp;
             _padMousePoint = Input.mousePosition;
         }
@@ -107,12 +107,14 @@ namespace YGOPortable.UI
             }
             bool cardActionsOpen = _deckCardActions.activeSelf;
             bool mainSortOpen = _mainSortMenu.activeSelf;
-            var overlay = cardActionsOpen ? _deckCardActionPanel.gameObject :
-                _deckDialog.activeSelf ? _deckDialog : _cardFilterDialog.activeSelf ? _cardFilterDialog :
+            bool expandedOpen = _expandedDeckOverlay.gameObject.activeSelf;
+            var overlay = expandedOpen ? _expandedDeckOverlay.gameObject : cardActionsOpen ? _deckCardActionPanel.gameObject :
+                _deckDialog.activeSelf ? _deckDialog : _utilityOverlay != null ? _utilityOverlay.gameObject :
+                _cardFilterDialog.activeSelf ? _cardFilterDialog :
                 mainSortOpen ? _mainSortMenu :
                 _archModalRoot.activeSelf ? _archModalRoot : null;
             var scope = overlay != null ? overlay.transform : Root.transform;
-            bool resetFilters = frame.ResetFilters && !cardActionsOpen && !mainSortOpen &&
+            bool resetFilters = frame.ResetFilters && !expandedOpen && _utilityOverlay == null && !cardActionsOpen && !mainSortOpen &&
                 !_deckDialog.activeSelf && !_archModalRoot.activeSelf;
             if (!resetFilters && !_padUi.HasPopup &&
                 _padUi.HandleOpenedDropdown(scope, frame.Direction, frame.Submit, frame.Cancel, findAny: frame.HasInput))
@@ -175,6 +177,21 @@ namespace YGOPortable.UI
                 if (frame.HasInput) _padUi.AdoptPointerFocus(_deckDialog.transform);
                 _padUi.Handle(_deckDialog.transform, frame.Direction, frame.Submit, frame.Cancel,
                     () => CloseDeckDialog(), _deckDialogCancel);
+                return;
+            }
+            if (expandedOpen || _utilityOverlay != null)
+            {
+                _padCardFocus.Hide();
+                if (frame.HasInput) _padUi.AdoptPointerFocus(scope);
+                if (expandedOpen)
+                {
+                    if (frame.Alternate || frame.Search)
+                        _expandedDeckScroll.verticalNormalizedPosition = Mathf.Clamp01(
+                            _expandedDeckScroll.verticalNormalizedPosition + (frame.Alternate ? .18f : -.18f));
+                    _padUi.Handle(scope, frame.Direction, frame.Submit, frame.Cancel, CloseExpandedDeckCard, _expandedDeckClose);
+                }
+                else
+                    _padUi.Handle(scope, frame.Direction, frame.Submit, frame.Cancel, CloseDeckUtility, _utilityDefault);
                 return;
             }
             if (mainSortOpen)
@@ -482,9 +499,10 @@ namespace YGOPortable.UI
             int count = _padArea == PadArea.Trunk ? _trunkResults.Count : VisiblePadDeckCount;
             int cols = _padArea switch
             {
-                PadArea.Trunk => TrunkCols,
+                PadArea.Trunk => _trunkColumns,
                 PadArea.Side => SideDeckColumns,
-                _ => DeckColumns,
+                PadArea.Extra => _extraColumns,
+                _ => _mainColumns,
             };
             int area = (int)_padArea;
             int index = ClampPadIndex(_padIndices[area], count);
@@ -538,7 +556,7 @@ namespace YGOPortable.UI
             if (_padArea == PadArea.Trunk)
             {
                 EnsureTrunkPadVisible(index, snap: true);
-                int slot = index - _lastFirstRow * TrunkCols;
+                int slot = index - _lastFirstRow * _trunkColumns;
                 if (slot >= 0 && slot < _trunkPool.Count)
                     ShowDeckCardActions(_trunkPool[slot].rt, DragSourceType.Trunk, index, code);
                 return;
@@ -562,7 +580,7 @@ namespace YGOPortable.UI
                 int index = _padIndices[area] = ClampPadIndex(_padIndices[area], _trunkResults.Count);
                 EnsureTrunkPadVisible(index);
                 UpdateTrunkPadScroll(Time.unscaledDeltaTime);
-                int slot = index - _lastFirstRow * TrunkCols;
+                int slot = index - _lastFirstRow * _trunkColumns;
                 if (slot >= 0 && slot < _trunkPool.Count)
                     ShowPadCardFocus(_trunkPool[slot].rt, _trunkResults[index].code);
                 else
@@ -585,7 +603,7 @@ namespace YGOPortable.UI
         {
             float height = _trunkViewport.rect.height;
             if (height <= 0f) return;
-            float top = (index / TrunkCols) * _rowHeight;
+            float top = (index / _trunkColumns) * _rowHeight;
             float offset = _trunkContent.anchoredPosition.y;
             float destination = offset;
             if (top < offset) destination = top;
@@ -637,6 +655,7 @@ namespace YGOPortable.UI
             {
                 PadArea.Trunk => _trunkViewport,
                 PadArea.Main => _mainDeckScroll.viewport,
+                PadArea.Extra when _extraDeckScroll != null => _extraDeckScroll.viewport,
                 PadArea.Side => _sideDeckScroll.viewport,
                 _ => _deckPanel,
             };

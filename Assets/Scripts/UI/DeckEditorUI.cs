@@ -39,7 +39,6 @@ namespace YGOPortable.UI
         private const int DeckColumns = 8;
         private const int OtherDeckCapacity = 15;
         private const int MainDeckCapacity = 60;
-        private const int MainDeckSlotRows = (MainDeckCapacity + DeckColumns - 1) / DeckColumns;
         private const int MainDeckVisibleRows = 3;
         private const int SideDeckColumns = OtherDeckCapacity;
         private const int SideDeckVisibleColumns = DeckColumns;
@@ -130,9 +129,10 @@ namespace YGOPortable.UI
         private ScrollRect _sideDeckScroll;
         private RectTransform _sideDeckSlotGrid;
 
-        public DeckEditorUI(GameAppController app, Transform canvasParent)
+        public DeckEditorUI(GameAppController app, Transform canvasParent, bool? mobileLayout = null)
         {
             _app = app;
+            _mobileLayout = mobileLayout ?? Application.platform == RuntimePlatform.IPhonePlayer;
             BuildUI(canvasParent);
 
             if (CardDragManager.Instance != null)
@@ -174,6 +174,8 @@ namespace YGOPortable.UI
             CloseDeckDialog(restoreFocus: false);
             CloseArchetypeModal(restoreFocus: false);
             CloseMainDeckSort(restoreFocus: false);
+            CloseExpandedDeckCard();
+            DismissDeckUtility(restoreFocus: false);
             _cardCrafting?.Hide();
             Root.SetActive(false);
             _editorContent.SetActive(true);
@@ -193,6 +195,9 @@ namespace YGOPortable.UI
                 return;
             }
             UpdateDeckTransfer(Time.unscaledDeltaTime);
+            UpdateExpandedDeckCard(Time.unscaledDeltaTime);
+            if (_mobileLayout && _workingDeck != null && _deckPanel.rect.size != _mobileDeckSize)
+                RefreshDeckGrids();
             if (_trunkViewport.rect.size != _trunkSize)
                 ResizeTrunkGrid(false);
             if (PollDeckPad()) return;
@@ -211,6 +216,15 @@ namespace YGOPortable.UI
             if (_deckDialog.activeSelf)
             {
                 if (Input.GetKeyDown(KeyCode.Escape)) CloseDeckDialog();
+                return;
+            }
+            if (_expandedDeckOverlay.gameObject.activeSelf || _utilityOverlay != null)
+            {
+                if (Input.GetKeyDown(KeyCode.Escape))
+                {
+                    if (_expandedDeckOverlay.gameObject.activeSelf) CloseExpandedDeckCard();
+                    else CloseDeckUtility();
+                }
                 return;
             }
             if (_mainSortMenu.activeSelf)
@@ -262,7 +276,12 @@ namespace YGOPortable.UI
             _mainDeckScroll.verticalScrollbar.SetValueWithoutNotify(1f);
             _sideDeckScroll.StopMovement();
             _sideDeckScroll.content.anchoredPosition = Vector2.zero;
-            _sideDeckScroll.horizontalScrollbar.SetValueWithoutNotify(0f);
+            _sideDeckScroll.horizontalScrollbar?.SetValueWithoutNotify(0f);
+            if (_extraDeckScroll != null)
+            {
+                _extraDeckScroll.StopMovement();
+                _extraDeckScroll.content.anchoredPosition = Vector2.zero;
+            }
             UpdateVirtualTrunkSlots(_lastFirstRow, force: true);
         }
 
@@ -282,7 +301,9 @@ namespace YGOPortable.UI
         {
             var screen = LotdUiKit.FillRect("Screen_DeckEditor", parent);
             Root = screen.gameObject;
-            var root = LotdUiKit.FillRect("Editor", screen);
+            if (_mobileLayout)
+                LotdUiKit.AddImage(Root, LotdUiKit.WhiteSprite, new Color(.025f, .02f, .05f), false, false);
+            var root = LotdUiKit.FillRect("Editor", _mobileLayout ? MobileSafeArea.Create(screen) : screen);
             _editorContent = root.gameObject;
             LotdUiKit.AddImage(LotdUiKit.FillRect("DeckBackground", root).gameObject,
                 LotdUiKit.LoadSprite("LOTD/Background/bg_vrains"), new Color(0.86f, 0.53f, 0.61f), false, false);
@@ -290,6 +311,8 @@ namespace YGOPortable.UI
                 LotdUiKit.WhiteSprite, new Color(0.12f, 0.014f, 0.033f, 0.60f), false, false);
             LotdUiKit.AddMenuHeader(root, "덱 편집");
 
+            _openDrawButton = DeckButton(root, "OpenTestDraw", "테스트 드로우", .027f, .918f, .172f, .976f,
+                OpenTestDraw, fontSize: 16);
             var examples = LotdUiKit.CreateRect("Examples", root, new Vector2(0.765f, 0.918f), new Vector2(0.871f, 0.976f),
                 Vector2.zero, Vector2.zero);
             LotdUiKit.CreateLotdButton(examples, "Button", "카드군 예시 덱", OpenArchetypeModal, 15);
@@ -317,19 +340,26 @@ namespace YGOPortable.UI
             BuildArchetypeModal(root);
             BuildDeckDialog(root);
             BuildDetailedSearch(root);
-            BuildPadNavigation(screen);
+            BuildPadNavigation(_mobileLayout ? root.parent : screen);
             BuildDeckCardActions(root);
             BuildMainSortMenu(root);
+            BuildDeckUtilities(root);
+            BuildExpandedDeckCard(root);
         }
 
         private void BuildCardDetails(Transform root)
         {
             var panel = LotdUiKit.CreateMenuPanel(root, "CardDetails",
-                new Vector2(0.301f, 0.053f), new Vector2(0.553f, 0.899f));
+                new Vector2(_mobileLayout ? .314f : .301f, .053f), new Vector2(_mobileLayout ? .508f : .553f, .899f));
             var card = LotdUiKit.CreateRect("LargeCard", panel,
                 new Vector2(.066f, .501f), new Vector2(.934f, .956f), Vector2.zero, Vector2.zero);
             _previewCard = CompositeCardView.Create(card, "Preview", true);
             DeckCardVisualMotion.Bind(_previewCard);
+            var previewHit = LotdUiKit.FillRect("PreviewHit", card);
+            var previewGraphic = LotdUiKit.AddImage(previewHit.gameObject, LotdUiKit.WhiteSprite, Color.clear);
+            var previewButton = previewHit.gameObject.AddComponent<Button>();
+            previewButton.targetGraphic = previewGraphic;
+            previewButton.onClick.AddListener(() => OpenExpandedDeckCard(_inspectedCode));
 
             var stats = LotdUiKit.CreateRect("Stats", panel,
                 new Vector2(0f, .418f), new Vector2(1f, .497f), new Vector2(28f, 0f), new Vector2(-28f, 0f));
@@ -388,14 +418,14 @@ namespace YGOPortable.UI
 
             var related = LotdUiKit.CreateRect("RelatedCards", panel,
                 new Vector2(0f, 0.094f), new Vector2(0.5f, 0.145f), new Vector2(28f, 0f), new Vector2(-4f, 0f));
-            LotdUiKit.CreateLotdButton(related, "Button", "관련 카드", () => FilterRelatedCards(_inspectedCode), 14);
+            LotdUiKit.CreateLotdButton(related, "Button", "연관 카드 검색", () => FilterRelatedCards(_inspectedCode), 14);
             var crafting = LotdUiKit.CreateRect("Crafting", panel,
                 new Vector2(0.5f, 0.094f), new Vector2(1f, 0.145f), new Vector2(4f, 0f), new Vector2(-28f, 0f));
             _cardCraftingButton = LotdUiKit.CreateLotdButton(crafting, "Button", "제작·분해",
                 () => OpenCardCrafting(_inspectedCode), 14);
             var add = LotdUiKit.CreateRect("AddCard", panel,
                 new Vector2(0f, 0.034f), new Vector2(1f, 0.085f), new Vector2(28f, 0f), new Vector2(-28f, 0f));
-            LotdUiKit.CreateLotdButton(add, "Button", "덱에 추가", () => TryAddCardToDeck(_inspectedCode), 14, true);
+            LotdUiKit.CreateLotdButton(add, "Button", "카드 조작", OpenInspectedCardActions, 14, true);
         }
 
         private void OpenCardCrafting(uint code)
@@ -433,7 +463,7 @@ namespace YGOPortable.UI
         private void BuildTrunkPanel(Transform rt)
         {
             var col = LotdUiKit.CreateMenuPanel(rt, "Trunk",
-                new Vector2(0.015f, 0.053f), new Vector2(0.296f, 0.899f));
+                new Vector2(.015f, .053f), new Vector2(_mobileLayout ? .310f : .296f, .899f));
             _trunkPanel = col;
 
             var insideLeft = new Vector2(28f, 0f);
@@ -485,8 +515,10 @@ namespace YGOPortable.UI
                 Vector2.one, Vector2.zero, Vector2.zero);
             LotdUiKit.CreateLotdButton(archetype, "Button", "카드군 검색", OpenArchetypeSearch, 15);
 
+            BuildQuickFilters(col, insideLeft, insideRight);
+
             var scrollHolder = LotdUiKit.CreateRect("TrunkScrollHolder", col,
-                new Vector2(0f, .101f), new Vector2(1f, .752f), insideLeft, insideRight);
+                new Vector2(0f, .101f), new Vector2(1f, .662f), insideLeft, insideRight);
             LotdUiKit.AddImage(scrollHolder.gameObject, LotdUiKit.WhiteSprite, Color.clear);
             _trunkScroll = scrollHolder.gameObject.AddComponent<ScrollRect>();
             _trunkScroll.horizontal = false;
@@ -555,6 +587,7 @@ namespace YGOPortable.UI
                 var hit = LotdUiKit.AddImage(slot.gameObject, LotdUiKit.WhiteSprite, Color.clear);
                 var card = CompositeCardView.Create(LotdUiKit.FillRect("CardInset", slot, 1.8f), "Card");
                 DeckCardVisualMotion.Bind(card, hit);
+                BuildRegulationBadge(card);
                 var countBox = LotdUiKit.CreateRect("Copies", slot, new Vector2(0.24f, 0.032f), new Vector2(0.76f, 0.215f),
                     Vector2.zero, Vector2.zero);
                 LotdUiKit.AddImage(countBox.gameObject, LotdUiKit.WhiteSprite, TrunkCountBadgeColor, false, false);
@@ -571,7 +604,7 @@ namespace YGOPortable.UI
         private void BuildDeckPanel(Transform root)
         {
             var panel = LotdUiKit.CreateMenuPanel(root, "Deck",
-                new Vector2(0.558f, 0.053f), new Vector2(0.985f, 0.899f), true);
+                new Vector2(_mobileLayout ? .513f : .558f, .053f), new Vector2(.985f, .899f), true);
             _deckPanel = panel;
 
             var header = LotdUiKit.CreateRect("DeckControls", panel,
@@ -596,40 +629,43 @@ namespace YGOPortable.UI
             var edit = LotdUiKit.CreateRect("EditControls", panel,
                 new Vector2(0f, .827f), new Vector2(1f, .878f), new Vector2(28f, 0f), new Vector2(-28f, 0f));
             _deckNameInput = LotdUiKit.CreateInputField(LotdUiKit.CreateRect("DeckName", edit, Vector2.zero,
-                new Vector2(0.579f, 1f), Vector2.zero, Vector2.zero), "Input", "덱 이름", 15);
+                new Vector2(0.430f, 1f), Vector2.zero, Vector2.zero), "Input", "덱 이름", 15);
             _deckNameInput.onValueChanged.AddListener(_ => RefreshSaveLabel());
-            _wholeSortButton = Control(edit, "Sort", "전체 정렬 ▼", 0.595f, 0.19f, OpenWholeDeckSort);
-            Control(edit, "Shuffle", "셔플", 0.8f, 0.2f, ShuffleWorkingDeck);
+            _wholeSortButton = Control(edit, "Sort", "정렬 옵션", .442f, .17f, OpenWholeDeckSort);
+            Control(edit, "AutoSort", "자동 정렬", .625f, .18f, () => SortWorkingDeck());
+            Control(edit, "DeckTools", "덱 관리", .819f, .181f, OpenDeckTools);
 
             (_mainGridRect, _mainCountText) = BuildDeckSection(panel, "Main", "메인", .789f, .429f);
             _mainSortButton = AddMainSortButton(panel, OpenMainDeckSort);
+            BuildComposition();
             (_extraGridRect, _extraCountText) = BuildDeckSection(panel, "Extra", "엑스트라", .392f, .181f);
             (_sideGridRect, _sideCountText) = BuildDeckSection(panel, "Side", "사이드", .144f, .025f);
-            BuildMainDeckScroll();
+            _mainDeckScroll = BuildVerticalDeckScroll(_mainGridRect, out _mainDeckSlotGrid);
             BuildSideDeckScroll();
+            if (_mobileLayout)
+                _extraDeckScroll = BuildVerticalDeckScroll(_extraGridRect, out _extraDeckSlotGrid);
             BuildDeckSlots(_mainDeckSlotGrid, _mainSlots, DeckColumns, MainDeckCapacity, DragSourceType.DeckMain);
-            BuildDeckSlots(_extraGridRect, _extraSlots, DeckColumns, OtherDeckCapacity, DragSourceType.DeckExtra);
+            BuildDeckSlots(_extraDeckSlotGrid ?? _extraGridRect, _extraSlots, DeckColumns, OtherDeckCapacity, DragSourceType.DeckExtra);
             BuildDeckSlots(_sideDeckSlotGrid, _sideSlots, SideDeckColumns, OtherDeckCapacity, DragSourceType.DeckSide);
         }
 
-        private void BuildMainDeckScroll()
+        private static ScrollRect BuildVerticalDeckScroll(RectTransform grid, out RectTransform slots)
         {
-            _mainDeckScroll = _mainGridRect.gameObject.AddComponent<ScrollRect>();
-            _mainDeckScroll.horizontal = false;
-            _mainDeckScroll.movementType = ScrollRect.MovementType.Clamped;
-            _mainDeckScroll.scrollSensitivity = 56f;
-
-            var viewport = LotdUiKit.CreateRect("Viewport", _mainGridRect, Vector2.zero, Vector2.one,
+            var scroll = grid.gameObject.AddComponent<ScrollRect>();
+            scroll.horizontal = false;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = 56f;
+            var viewport = LotdUiKit.CreateRect("Viewport", grid, Vector2.zero, Vector2.one,
                 Vector2.zero, new Vector2(-14f, 0f));
             viewport.gameObject.AddComponent<RectMask2D>();
-            _mainDeckScroll.viewport = viewport;
+            scroll.viewport = viewport;
             var content = LotdUiKit.FillRect("Content", viewport);
-            content.pivot = new Vector2(0.5f, 1f);
-            _mainDeckScroll.content = content;
-            _mainDeckSlotGrid = LotdUiKit.FillRect("Slots", content);
-
-            _mainDeckScroll.verticalScrollbar = AddDeckScrollbar(_mainGridRect);
-            _mainDeckScroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
+            content.pivot = new Vector2(.5f, 1f);
+            scroll.content = content;
+            slots = LotdUiKit.FillRect("Slots", content);
+            scroll.verticalScrollbar = AddDeckScrollbar(grid);
+            scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
+            return scroll;
         }
 
         private void BuildSideDeckScroll()
@@ -640,7 +676,7 @@ namespace YGOPortable.UI
             _sideDeckScroll.scrollSensitivity = 56f;
 
             var viewport = LotdUiKit.CreateRect("Viewport", _sideGridRect, Vector2.zero, Vector2.one,
-                new Vector2(0f, 10f), Vector2.zero);
+                new Vector2(0f, _mobileLayout ? 0f : 10f), Vector2.zero);
             viewport.gameObject.AddComponent<RectMask2D>();
             _sideDeckScroll.viewport = viewport;
             var content = LotdUiKit.FillRect("Content", viewport);
@@ -648,32 +684,35 @@ namespace YGOPortable.UI
             _sideDeckScroll.content = content;
             _sideDeckSlotGrid = LotdUiKit.FillRect("Slots", content);
 
-            _sideDeckScroll.horizontalScrollbar = AddDeckScrollbar(_sideGridRect, horizontal: true);
-            _sideDeckScroll.horizontalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
+            if (!_mobileLayout)
+            {
+                _sideDeckScroll.horizontalScrollbar = AddDeckScrollbar(_sideGridRect, horizontal: true);
+                _sideDeckScroll.horizontalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
+            }
         }
 
-        private void ResizeMainDeckScroll()
+        private static void ResizeVerticalDeckScroll(ScrollRect scroll, RectTransform slots, int cards,
+            int capacity, int columns, int visibleRows)
         {
-            int cards = Mathf.Min(_workingDeck.main.Count, MainDeckCapacity);
-            int rows = Mathf.Max(MainDeckVisibleRows, (cards + DeckColumns - 1) / DeckColumns);
-            var content = _mainDeckScroll.content;
-            content.anchorMin = new Vector2(0f, 1f - rows / (float)MainDeckVisibleRows);
-            // Keep slot height constant as the scrollable content gains or loses rows.
-            _mainDeckSlotGrid.anchorMin = new Vector2(0f, 1f - MainDeckSlotRows / (float)rows);
+            int rows = Mathf.Max(visibleRows, (Mathf.Min(cards, capacity) + columns - 1) / columns);
+            int slotRows = (capacity + columns - 1) / columns;
+            var content = scroll.content;
+            content.anchorMin = new Vector2(0f, 1f - rows / (float)visibleRows);
+            slots.anchorMin = new Vector2(0f, 1f - slotRows / (float)rows);
 
-            float maxOffset = Mathf.Max(0f, content.rect.height - _mainDeckScroll.viewport.rect.height);
+            float maxOffset = Mathf.Max(0f, content.rect.height - scroll.viewport.rect.height);
             if (content.anchoredPosition.y > maxOffset)
             {
-                _mainDeckScroll.StopMovement();
+                scroll.StopMovement();
                 content.anchoredPosition = new Vector2(0f, maxOffset);
             }
         }
 
         private void ResizeSideDeckScroll()
         {
-            int columns = Mathf.Clamp(_workingDeck.side.Count, SideDeckVisibleColumns, SideDeckColumns);
+            int columns = Mathf.Clamp(_workingDeck.side.Count, _sideVisibleColumns, SideDeckColumns);
             var content = _sideDeckScroll.content;
-            content.anchorMax = new Vector2(columns / (float)SideDeckVisibleColumns, 1f);
+            content.anchorMax = new Vector2(columns / (float)_sideVisibleColumns, 1f);
             _sideDeckSlotGrid.anchorMax = new Vector2(SideDeckColumns / (float)columns, 1f);
 
             float maxOffset = Mathf.Max(0f, content.rect.width - _sideDeckScroll.viewport.rect.width);
@@ -689,6 +728,7 @@ namespace YGOPortable.UI
             var scroll = zone switch
             {
                 DragSourceType.DeckMain => _mainDeckScroll,
+                DragSourceType.DeckExtra => _extraDeckScroll,
                 DragSourceType.DeckSide => _sideDeckScroll,
                 _ => null,
             };
@@ -697,9 +737,10 @@ namespace YGOPortable.UI
             bool vertical = scroll.vertical;
             Vector2 axis = vertical ? Vector2.up : Vector2.left;
             float viewSize = vertical ? scroll.viewport.rect.height : scroll.viewport.rect.width;
-            float slotSize = viewSize / (vertical ? MainDeckVisibleRows : SideDeckVisibleColumns);
-            int slot = vertical ? Mathf.Clamp(index, 0, MainDeckCapacity - 1) / DeckColumns :
-                Mathf.Clamp(index, 0, SideDeckColumns - 1);
+            bool main = zone == DragSourceType.DeckMain;
+            float slotSize = viewSize / (vertical ? (main ? _mainVisibleRows : _extraVisibleRows) : _sideVisibleColumns);
+            int slot = vertical ? Mathf.Clamp(index, 0, (main ? MainDeckCapacity : OtherDeckCapacity) - 1) /
+                (main ? _mainColumns : _extraColumns) : Mathf.Clamp(index, 0, SideDeckColumns - 1);
             float slotStart = slot * slotSize;
             var content = scroll.content;
             float offset = Vector2.Dot(content.anchoredPosition, axis);
@@ -732,13 +773,12 @@ namespace YGOPortable.UI
             int rows = (capacity + cols - 1) / cols;
             for (int i = 0; i < capacity; i++)
             {
-                int row = i / cols;
-                int col = i % cols;
-                var slot = LotdUiKit.CreateRect($"Card_{i}", parent, new Vector2(col / (float)cols, 1f - (row + 1f) / rows),
-                    new Vector2((col + 1f) / cols, 1f - row / (float)rows), new Vector2(1.2f, 1.2f), new Vector2(-1.2f, -1.2f));
+                var slot = LotdUiKit.FillRect($"Card_{i}", parent, 1.2f);
+                SetDeckSlotPosition(slot, i, cols, rows);
                 var hit = LotdUiKit.AddImage(slot.gameObject, LotdUiKit.WhiteSprite, Color.clear);
                 var card = CompositeCardView.Create(LotdUiKit.FillRect("CardInset", slot, 1.8f), "Card");
                 DeckCardVisualMotion.Bind(card, hit);
+                BuildRegulationBadge(card);
                 var trigger = slot.gameObject.AddComponent<CardDragTrigger>();
                 trigger.SourceType = source;
                 var badge = LotdUiKit.CreateRect("Unowned", card.transform.Find("AspectBox"),
@@ -776,6 +816,9 @@ namespace YGOPortable.UI
         {
             _queryBeforeFilters = "";
             ClearDetailedSearch();
+            SetQuickFilter(0, refresh: false);
+            _quickFilterScroll.StopMovement();
+            _quickFilterScroll.horizontalNormalizedPosition = 0f;
             if (_cardFilterDialog.activeSelf)
             {
                 ResetDetailedDraft();
@@ -812,7 +855,8 @@ namespace YGOPortable.UI
             }
             else if (_relatedFilterCode != 0)
             {
-                source = CardDatabase.GetRelatedCards(_relatedFilterCode);
+                var related = CardDatabase.GetRelatedCards(_relatedFilterCode);
+                source = related.Prepend(CardDatabase.Get(_relatedFilterCode));
                 _trunkHeading.text = $"관련 카드 · {CardDatabase.GetName(_relatedFilterCode)}";
                 _trunkHeading.color = LotdUiKit.GoldAccent;
             }
@@ -824,7 +868,7 @@ namespace YGOPortable.UI
             foreach (var card in source)
             {
                 if (card == null || (CollectionProgress.AllDeckCardsAvailable && !CollectionProgress.IsCraftableCard(card)) ||
-                    !seen.Add(DeckGroupKey(card.code))) continue;
+                    !MatchesQuickFilter(card) || !seen.Add(DeckGroupKey(card.code))) continue;
                 var entry = PickTrunkPrinting(card, filter, searchedCode, ownedOnly);
                 if (entry != null) _trunkResults.Add(entry);
             }
@@ -870,15 +914,18 @@ namespace YGOPortable.UI
         private void ResizeTrunkGrid(bool startAtTop)
         {
             if (startAtTop) _trunkPadScrollTarget = null;
+            LayoutMobileQuickFilters();
             _trunkSize = _trunkViewport.rect.size;
             float scroll = startAtTop ? 1f : _trunkScroll.verticalNormalizedPosition;
             float vpWidth = _trunkViewport.rect.width > 10 ? _trunkViewport.rect.width : 405f;
-            _colWidth = vpWidth / TrunkCols;
+            _trunkColumns = _mobileLayout ? Mathf.Clamp(Mathf.FloorToInt(vpWidth /
+                (MobileSafeArea.MinimumTouchSize(_trunkViewport) + 4f)), 1, TrunkCols) : TrunkCols;
+            _colWidth = vpWidth / _trunkColumns;
             _rowHeight = Mathf.Max(20f, Mathf.Round((_colWidth - 4f) / LotdUiKit.CardAspectRatio + 4f));
 
-            _totalRows = Mathf.Max(1, (_trunkResults.Count + TrunkCols - 1) / TrunkCols);
+            _totalRows = Mathf.Max(1, (_trunkResults.Count + _trunkColumns - 1) / _trunkColumns);
             int rows = Mathf.CeilToInt(_trunkViewport.rect.height / _rowHeight) + 2;
-            EnsureTrunkPool(Mathf.Min(_totalRows, rows) * TrunkCols);
+            EnsureTrunkPool(Mathf.Min(_totalRows, rows) * _trunkColumns);
             _trunkContent.sizeDelta = new Vector2(0f, _totalRows * _rowHeight);
             _trunkScrollbar.gameObject.SetActive(_trunkContent.rect.height > _trunkViewport.rect.height);
 
@@ -910,9 +957,9 @@ namespace YGOPortable.UI
             for (int i = 0; i < _trunkPool.Count; i++)
             {
                 var (rect, view, count, trigger) = _trunkPool[i];
-                int row = firstRow + i / TrunkCols;
-                int col = i % TrunkCols;
-                int index = row * TrunkCols + col;
+                int row = firstRow + i / _trunkColumns;
+                int col = i % _trunkColumns;
+                int index = row * _trunkColumns + col;
                 if (index >= _trunkResults.Count)
                 {
                     ResetCardBinding(rect, view);
@@ -926,6 +973,7 @@ namespace YGOPortable.UI
                 uint code = _trunkResults[index].code;
                 if (view.CurrentCode != code) ResetCardBinding(rect, view);
                 view.SetCard(code);
+                RefreshRegulationBadge(view, code);
 
                 var countBox = count.transform.parent;
                 var countBackground = countBox.GetComponent<Image>();
@@ -960,6 +1008,7 @@ namespace YGOPortable.UI
                     trigger.OnLeftClick();
                     ShowDeckCardActions(rect, DragSourceType.Trunk, index, code);
                 };
+                trigger.OnTouchHold = () => OpenExpandedDeckCard(code);
                 trigger.OnRightClick = () =>
                 {
                     RememberMouseCard(PadArea.Trunk, index);
@@ -972,12 +1021,15 @@ namespace YGOPortable.UI
         private void RefreshDeckGrids()
         {
             _deckHeaderText.text = $"{_userDeckIdx + 1} / {Mathf.Max(1, DeckRepository.UserDecks.Count)}";
-            _mainCountText.text = $"{_workingDeck.main.Count}장";
+            RefreshComposition();
             _mainCountText.color = _workingDeck.main.Count >= 40 && _workingDeck.main.Count <= MainDeckCapacity
                 ? Color.white : new Color(1f, 0.55f, 0.45f);
-            _extraCountText.text = $"{_workingDeck.extra.Count}장";
-            _sideCountText.text = $"{_workingDeck.side.Count}장";
-            ResizeMainDeckScroll();
+            ReflowMobileDeck();
+            ResizeVerticalDeckScroll(_mainDeckScroll, _mainDeckSlotGrid, _workingDeck.main.Count,
+                MainDeckCapacity, _mainColumns, _mainVisibleRows);
+            if (_extraDeckScroll != null)
+                ResizeVerticalDeckScroll(_extraDeckScroll, _extraDeckSlotGrid, _workingDeck.extra.Count,
+                    OtherDeckCapacity, _extraColumns, _extraVisibleRows);
             ResizeSideDeckScroll();
             SyncSlotList(_mainSlots, _workingDeck.main, PadArea.Main);
             SyncSlotList(_extraSlots, _workingDeck.extra, PadArea.Extra);
@@ -999,6 +1051,7 @@ namespace YGOPortable.UI
                 trigger.IndexGetter = null;
                 trigger.OnLeftClick = null;
                 trigger.OnTouchClick = null;
+                trigger.OnTouchHold = null;
                 trigger.OnRightClick = null;
                 trigger.OnPointerEnterAction = null;
                 trigger.OnPointerExitAction = () => ClearMouseCardVisual(rect);
@@ -1007,6 +1060,7 @@ namespace YGOPortable.UI
                 uint code = cards[i];
                 int index = i;
                 view.SetCard(code);
+                RefreshRegulationBadge(view, code);
                 view.transform.Find("AspectBox/Unowned").gameObject.SetActive(CollectionProgress.RequiresOwnedCardsForDecks &&
                     CollectionProgress.GetOwnedCount(code) == 0);
                 trigger.CardCodeGetter = () => code;
@@ -1022,6 +1076,7 @@ namespace YGOPortable.UI
                     trigger.OnLeftClick();
                     ShowDeckCardActions(rect, trigger.SourceType, index, code);
                 };
+                trigger.OnTouchHold = () => OpenExpandedDeckCard(code);
                 trigger.OnRightClick = () =>
                 {
                     RememberMouseCard(area, index);
@@ -1034,7 +1089,7 @@ namespace YGOPortable.UI
         {
             if (!_editorContent.activeInHierarchy || _workingDeck == null || _deckDialog.activeSelf ||
                 _deckCardActions.activeSelf || _archModalRoot.activeSelf || _cardFilterDialog.activeSelf ||
-                _mainSortMenu.activeSelf) return;
+                _mainSortMenu.activeSelf || _utilityOverlay != null || _expandedDeckOverlay.gameObject.activeSelf) return;
             var destination = FindDropZone(context.DropPosition);
             if (context.SourceType == DragSourceType.Trunk)
             {
@@ -1279,7 +1334,7 @@ namespace YGOPortable.UI
                 code = spare.code;
             }
 
-            int limit = CollectionProgress.DeckCopyLimit;
+            int limit = CollectionProgress.GetDeckCopyLimit(code);
             if (CountInWorkingDeck(code) < limit) return code;
             if (showReason) ShowToast($"동명 카드는 세 덱을 합해 최대 {limit}장입니다.");
             return 0;
@@ -1289,6 +1344,12 @@ namespace YGOPortable.UI
             CollectionProgress.GetOwnedCount(code) > CountInWorkingDeck(code, combineAlternateArts: false);
 
         private void TryAddCardToDeck(uint code, DragSourceType destination = DragSourceType.None,
+            RectTransform origin = null, Vector2? dropPosition = null)
+        {
+            AddDeckCopies(code, destination, 1, origin, dropPosition);
+        }
+
+        private void AddDeckCopies(uint code, DragSourceType destination, int quantity,
             RectTransform origin = null, Vector2? dropPosition = null)
         {
             if (_workingDeck == null || CardDatabase.Get(code) == null) return;
@@ -1308,13 +1369,27 @@ namespace YGOPortable.UI
                 origin = inspected;
             if (origin == null && SameCard(_previewCard)) origin = (RectTransform)_previewCard.transform;
             var from = dropPosition.HasValue ? DropPose(dropPosition.Value) : CardPose(origin);
-            int landing = FindDeckInsertionIndex(target, code, -1);
+            int landing = -1;
             var targetPositions = CaptureDeckPositions(destination, target.Count);
-            target.Insert(landing, code);
+            var inserted = new List<int>();
+            for (int copy = 0; copy < quantity; copy++)
+            {
+                if (copy > 0)
+                {
+                    code = FindAddableCardCopy(code, showReason: false);
+                    if (code == 0 || !CanPlaceCard(CardDatabase.Get(code), destination, target, showReason: false)) break;
+                }
+                landing = FindDeckInsertionIndex(target, code, -1);
+                target.Insert(landing, code);
+                for (int i = 0; i < inserted.Count; i++)
+                    if (inserted[i] >= landing) inserted[i]++;
+                inserted.Add(landing);
+            }
             FinishDeckEdit();
             RevealDeckSlot(destination, landing);
-            AnimateDeckSlots(destination, landing + 1, target.Count, targetPositions, index => index - 1);
-            AnimateTransfer(code, from, (RectTransform)GetDeckSlots(destination)[landing].card.transform);
+            int PreviousIndex(int index) => inserted.Contains(index) ? -1 : index - inserted.Count(added => added < index);
+            AnimateDeckSlots(destination, inserted.Min(), target.Count, targetPositions, PreviousIndex);
+            AnimateTransfer(target[landing], from, (RectTransform)GetDeckSlots(destination)[landing].card.transform);
         }
 
         private bool CanPlaceCard(CardInfo card, DragSourceType destination, List<uint> target, bool showReason = true)
@@ -1336,7 +1411,7 @@ namespace YGOPortable.UI
         {
             if (CollectionProgress.AllDeckCardsAvailable)
             {
-                owned = CollectionProgress.IsCraftableCard(CardDatabase.Get(code)) ? CollectionProgress.DeckCopyLimit : 0;
+                owned = CollectionProgress.IsCraftableCard(CardDatabase.Get(code)) ? CollectionProgress.GetDeckCopyLimit(code) : 0;
                 inDeck = CountInWorkingDeck(code);
                 return Math.Max(0, owned - inDeck);
             }
@@ -1498,7 +1573,7 @@ namespace YGOPortable.UI
                 });
         }
 
-        private void SortWorkingDeck(bool byFrame = false)
+        private void SortWorkingDeck(bool byFrame = false, bool byName = false)
         {
             var main = _workingDeck.main.ToArray();
             var extra = _workingDeck.extra.ToArray();
@@ -1508,38 +1583,20 @@ namespace YGOPortable.UI
             var sidePositions = CaptureDeckPositions(DragSourceType.DeckSide, side.Length);
             CancelDeckDrag();
             EndDeckTransfer();
-            if (byFrame)
+            var mode = byFrame ? DeckMainSortMode.Frame : DeckMainSortMode.Auto;
+            foreach (var section in new[] { _workingDeck.main, _workingDeck.extra, _workingDeck.side })
             {
-                foreach (var section in new[] { _workingDeck.main, _workingDeck.extra, _workingDeck.side })
-                {
-                    var ordered = OrderDeckGroups(section, DeckMainSortMode.Frame);
-                    section.Clear();
-                    section.AddRange(ordered);
-                }
-            }
-            else
-            {
-                static int RankCard(uint code)
-                {
-                    var card = CardDatabase.Get(code);
-                    if (card == null) return 9;
-                    if (card.IsMonster) return 0;
-                    return card.IsSpell ? 1 : 2;
-                }
-
-                static int CompareNames(uint a, uint b) =>
-                    string.Compare(CardDatabase.GetName(a), CardDatabase.GetName(b), StringComparison.Ordinal);
-
-                _workingDeck.main.Sort((a, b) =>
-                {
-                    int rank = RankCard(a).CompareTo(RankCard(b));
-                    return rank != 0 ? rank : CompareNames(a, b);
-                });
-                _workingDeck.extra.Sort(CompareNames);
-                _workingDeck.side.Sort(CompareNames);
-                GroupDeckCopies(_workingDeck.main);
-                GroupDeckCopies(_workingDeck.extra);
-                GroupDeckCopies(_workingDeck.side);
+                var ordered = byName
+                    ? OrderDeckGroups(section, DeckMainSortMode.Name)
+                    : OrderDeckGroups(section, mode);
+                if (byName && section == _workingDeck.main)
+                    ordered = ordered.OrderBy(code =>
+                    {
+                        var card = CardDatabase.Get(code);
+                        return card == null ? 3 : card.IsMonster ? 0 : card.IsSpell ? 1 : 2;
+                    }).ToArray();
+                section.Clear();
+                section.AddRange(ordered);
             }
             RefreshDeckGrids();
             AnimateOrderedDeck(DragSourceType.DeckMain, _workingDeck.main, main, mainPositions);
@@ -1966,7 +2023,7 @@ namespace YGOPortable.UI
                     uint key = CollectionProgress.GetDeckCopyKey(code);
                     used.TryGetValue(code, out int copies);
                     usedByName.TryGetValue(key, out int sameName);
-                    if (copies >= CollectionProgress.GetOwnedCount(code) || sameName >= CollectionProgress.DeckCopyLimit)
+                    if (copies >= CollectionProgress.GetOwnedCount(code) || sameName >= CollectionProgress.GetDeckCopyLimit(code))
                         return false;
                     used[code] = copies + 1;
                     usedByName[key] = sameName + 1;

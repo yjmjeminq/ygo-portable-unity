@@ -11,6 +11,7 @@ namespace YGOPortable.Core
         Attack,
         Defense,
         Level,
+        Auto,
     }
 
     public static class DeckMainSorter
@@ -20,6 +21,9 @@ namespace YGOPortable.Core
             var entries = cards.Select(code => (Code: code, Card: CardDatabase.Get(code)));
             var ordered = mode switch
             {
+                DeckMainSortMode.Auto => entries.OrderBy(entry => AutoOrder(entry.Card))
+                    .ThenByDescending(entry => Level(entry.Card))
+                    .ThenByDescending(entry => Attack(entry.Card)),
                 DeckMainSortMode.Frame => entries.OrderBy(entry => FrameOrder(entry.Card)),
                 DeckMainSortMode.Attack => entries.OrderByDescending(entry => Attack(entry.Card)),
                 DeckMainSortMode.Defense => entries.OrderByDescending(entry => Defense(entry.Card)),
@@ -32,6 +36,32 @@ namespace YGOPortable.Core
                 .ThenBy(entry => entry.Card?.name, StringComparer.Ordinal)
                 .Select(entry => entry.Code)
                 .ToArray();
+        }
+
+        private static int AutoOrder(CardInfo card)
+        {
+            if (card == null) return int.MaxValue;
+            uint type = card.type;
+            if (card.IsExtra)
+            {
+                if ((type & YgoConstants.TYPE_FUSION) != 0) return 20;
+                if ((type & YgoConstants.TYPE_SYNCHRO) != 0) return 21;
+                if (card.IsXyz) return 22;
+                return 23;
+            }
+            if (card.IsMonster) return 0;
+            if (card.IsSpell)
+            {
+                if ((type & YgoConstants.TYPE_QUICKPLAY) != 0) return 2;
+                if ((type & YgoConstants.TYPE_CONTINUOUS) != 0) return 3;
+                if ((type & YgoConstants.TYPE_EQUIP) != 0) return 4;
+                if ((type & YgoConstants.TYPE_FIELD) != 0) return 5;
+                if ((type & YgoConstants.TYPE_RITUAL) != 0) return 6;
+                return 1;
+            }
+            if ((type & YgoConstants.TYPE_CONTINUOUS) != 0) return 8;
+            if ((type & YgoConstants.TYPE_COUNTER) != 0) return 9;
+            return 7;
         }
 
         private static int? Attack(CardInfo card) => card?.IsMonster == true && card.atk >= 0 ? card.atk : null;

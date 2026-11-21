@@ -185,7 +185,8 @@ namespace YGOPortable.UI
             _pointerSlot = slot;
             if (_padMode) return;
             if (_deckCardActions.activeSelf || _deckDialog.activeSelf || _cardFilterDialog.activeSelf ||
-                _archModalRoot.activeSelf || _mainSortMenu.activeSelf)
+                _archModalRoot.activeSelf || _mainSortMenu.activeSelf || _utilityOverlay != null ||
+                _expandedDeckOverlay.gameObject.activeSelf)
                 return;
             if (_hoveredSlot != slot)
             {

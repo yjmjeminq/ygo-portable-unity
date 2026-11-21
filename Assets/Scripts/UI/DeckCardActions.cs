@@ -9,14 +9,18 @@ namespace YGOPortable.UI
 {
     public partial class DeckEditorUI
     {
-        private const float CardActionWidth = 300f;
-        private const float CardActionHeight = 292f;
+        private const float CardActionWidth = 352f;
+        private const float CardActionHeight = 360f;
         private GameObject _deckCardActions;
         private RectTransform _deckCardActionPanel;
         private Text _deckCardActionTitle;
+        private Button _deckQuantityMinus;
+        private Button _deckQuantityPlus;
+        private Button _deckQuantityMax;
         private Button _deckCardActionMain;
         private Button _deckCardActionAlternate;
         private Button _deckCardActionRelated;
+        private Button _deckCardActionDetails;
         private Button _deckCardActionCrafting;
         private Button _deckCardActionArtwork;
         private Button _deckCardActionCancel;
@@ -50,14 +54,27 @@ namespace YGOPortable.UI
                 return LotdUiKit.CreateLotdButton(row, "Button", label, action, 17);
             }
 
+            var quantity = LotdUiKit.CreateRect("Quantity", _deckCardActionPanel, new Vector2(.10f, .685f),
+                new Vector2(.90f, .803f), Vector2.zero, Vector2.zero);
+            Button Amount(string name, string label, float min, float max)
+            {
+                var cell = LotdUiKit.CreateRect(name, quantity, new Vector2(min, 0f), new Vector2(max, 1f),
+                    Vector2.zero, Vector2.zero);
+                return LotdUiKit.CreateLotdButton(cell, "Button", label, null, 19);
+            }
+            _deckQuantityMinus = Amount("Remove", "−", 0f, .23f);
+            _deckQuantityPlus = Amount("Add", "+", .26f, .49f);
+            _deckQuantityMax = Amount("Max", "MAX", .52f, 1f);
+
             _deckCardActionMain = AddRow("MainAction");
             _deckCardActionAlternate = AddRow("AlternateAction");
             _deckCardActionRelated = AddRow("Related");
+            _deckCardActionDetails = AddRow("Details");
             _deckCardActionCrafting = AddRow("Crafting");
             _deckCardActionArtwork = AddRow("Artwork");
             _deckCardActionCancel = AddRow("Cancel", "취소", CloseDeckCardActions);
             _deckCardActionRows = new[] { _deckCardActionMain, _deckCardActionAlternate, _deckCardActionRelated,
-                _deckCardActionCrafting, _deckCardActionArtwork, _deckCardActionCancel };
+                _deckCardActionDetails, _deckCardActionCrafting, _deckCardActionArtwork, _deckCardActionCancel };
             overlay.gameObject.SetActive(false);
         }
 
@@ -102,15 +119,27 @@ namespace YGOPortable.UI
                 });
             }
 
-            SetDeckCardAction(_deckCardActionRelated, "관련 카드", true, () =>
+            var quantityZone = source == DragSourceType.Trunk ? home : source;
+            int max = CollectionProgress.GetDeckCopyLimit(code);
+            bool canIncrease = FindAddableCardCopy(code, showReason: false) != 0 &&
+                CanPlaceCard(card, quantityZone, GetDeckList(quantityZone), showReason: false);
+            var removal = source == DragSourceType.Trunk ? FindTrunkRemoval(code, home) : (source, index);
+            SetDeckCardAction(_deckQuantityMinus, "−", removal.Item2 >= 0,
+                () => RemoveDeckCard(removal.Item1, removal.Item2));
+            SetDeckCardAction(_deckQuantityPlus, "+", canIncrease,
+                () => TryAddCardToDeck(code, quantityZone, CardVisual(anchor)));
+            SetDeckCardAction(_deckQuantityMax, $"{max}장 투입 (MAX)", canIncrease,
+                () => AddDeckCopies(code, quantityZone, max, CardVisual(anchor)));
+
+            SetDeckCardAction(_deckCardActionRelated, "연관 카드 검색", true, () =>
             {
                 FilterRelatedCards(code);
                 SwitchPadArea(PadArea.Trunk);
             });
+            SetDeckCardAction(_deckCardActionDetails, "카드 상세 보기", true, () => OpenExpandedDeckCard(code));
             SetDeckCardAction(_deckCardActionCrafting, "제작·분해",
                 CollectionProgress.HasStarter && CollectionProgress.IsCraftableCard(card), () => OpenCardCrafting(code));
             ConfigureTrunkArtworkAction(anchor, source, index, code);
-            SetDeckCardActionNavigation();
             _deckCardActionTitle.text = card.name;
             InspectCard(code);
             var overlay = (RectTransform)_deckCardActions.transform;
@@ -121,7 +150,36 @@ namespace YGOPortable.UI
                 _deckCardActions.SetActive(true);
                 UiEntranceMotion.Play(_deckCardActionPanel.gameObject);
             }
+            SetDeckCardActionNavigation();
             EventSystem.current?.SetSelectedGameObject(_deckCardActionDefault.gameObject);
+        }
+
+        private void OpenInspectedCardActions()
+        {
+            var selected = _inspectedSource?.GetComponent<CardDragTrigger>();
+            if (selected == null || selected.CardCodeGetter?.Invoke() != _inspectedCode)
+            {
+                int index = _trunkResults.FindIndex(card => card.code == _inspectedCode);
+                if (index < 0 || _trunkPool.Count == 0) return;
+                ShowDeckCardActions((RectTransform)_previewCard.transform, DragSourceType.Trunk, index, _inspectedCode);
+                return;
+            }
+            ShowDeckCardActions((RectTransform)selected.transform, selected.SourceType, selected.IndexGetter(),
+                _inspectedCode);
+        }
+
+        private (DragSourceType zone, int index) FindTrunkRemoval(uint code, DragSourceType home)
+        {
+            var homeCards = GetDeckList(home);
+            var side = _workingDeck.side;
+            int index = homeCards.LastIndexOf(code);
+            if (index >= 0) return (home, index);
+            index = side.LastIndexOf(code);
+            if (index >= 0) return (DragSourceType.DeckSide, index);
+            uint key = CollectionProgress.GetDeckCopyKey(code);
+            bool SameName(uint other) => CollectionProgress.GetDeckCopyKey(other) == key;
+            index = homeCards.FindLastIndex(SameName);
+            return index >= 0 ? (home, index) : (DragSourceType.DeckSide, side.FindLastIndex(SameName));
         }
 
         private void ConfigureTrunkArtworkAction(RectTransform anchor, DragSourceType source, int index, uint code)
@@ -150,36 +208,29 @@ namespace YGOPortable.UI
                 }, closeMenu: false);
             }
 
+            if (_mobileLayout)
+            {
+                LayoutMobileCardActions(show);
+                return;
+            }
             _deckCardActionPanel.sizeDelta = new Vector2(CardActionWidth, show ? CardActionHeight + 40f : CardActionHeight);
-            float step = show ? .120f : .138f;
+            float step = show ? .089f : .107f;
             int rowIndex = 0;
             foreach (var button in _deckCardActionRows)
             {
                 if (!button.gameObject.activeSelf) continue;
                 var row = (RectTransform)button.transform.parent;
-                float top = .785f - rowIndex++ * step;
-                row.anchorMin = new Vector2(.10f, top - .112f);
+                float top = .666f - rowIndex++ * step;
+                row.anchorMin = new Vector2(.10f, top - .084f);
                 row.anchorMax = new Vector2(.90f, top);
             }
         }
 
         private void SetDeckCardActionNavigation()
         {
-            _deckCardActionDefault = null;
-            Button previous = null;
-            foreach (var button in _deckCardActionRows)
-            {
-                if (!button.gameObject.activeSelf || !button.interactable) continue;
-                if (_deckCardActionDefault == null) _deckCardActionDefault = button;
-                button.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnUp = previous };
-                if (previous != null)
-                {
-                    var navigation = previous.navigation;
-                    navigation.selectOnDown = button;
-                    previous.navigation = navigation;
-                }
-                previous = button;
-            }
+            _deckCardActionDefault = Array.Find(_deckCardActionRows,
+                button => button.gameObject.activeSelf && button.interactable);
+            DeckPadUi.LimitKeyboardNavigation(_deckCardActionPanel);
         }
 
         private void SetDeckCardAction(Button button, string label, bool available, Action action, bool closeMenu = true)
@@ -200,6 +251,12 @@ namespace YGOPortable.UI
 
         private void PositionDeckCardActions(RectTransform anchor, RectTransform overlay)
         {
+            if (_mobileLayout)
+            {
+                _deckCardActionPanel.anchoredPosition = new Vector2(-_deckCardActionPanel.rect.width * .5f,
+                    _deckCardActionPanel.rect.height * .5f);
+                return;
+            }
             const float gap = 10f;
             var bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(overlay, anchor);
             var screen = overlay.rect;

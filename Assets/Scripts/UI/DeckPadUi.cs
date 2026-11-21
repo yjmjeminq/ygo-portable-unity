@@ -364,18 +364,26 @@ namespace YGOPortable.UI
         {
             if (control == null) return;
             var scroll = control.GetComponentInParent<ScrollRect>();
-            if (scroll == null || !scroll.vertical || scroll.content == null || scroll.viewport == null ||
+            if (scroll == null || scroll.content == null || scroll.viewport == null ||
                 !control.transform.IsChildOf(scroll.content)) return;
             var viewport = scroll.viewport;
-            float overflow = scroll.content.rect.height - viewport.rect.height;
-            if (overflow <= 0f) return;
             var rect = viewport.rect;
             var item = RectTransformUtility.CalculateRelativeRectTransformBounds(viewport, control.transform);
-            float offset = item.min.y < rect.yMin ? item.min.y - rect.yMin :
-                Mathf.Max(0f, item.max.y - rect.yMax);
-            if (offset == 0f) return;
             scroll.StopMovement();
-            scroll.verticalNormalizedPosition = Mathf.Clamp01(scroll.verticalNormalizedPosition + offset / overflow);
+            float height = scroll.content.rect.height - rect.height;
+            if (scroll.vertical && height > 0f)
+            {
+                float offset = item.min.y < rect.yMin ? item.min.y - rect.yMin : Mathf.Max(0f, item.max.y - rect.yMax);
+                if (offset != 0f)
+                    scroll.verticalNormalizedPosition = Mathf.Clamp01(scroll.verticalNormalizedPosition + offset / height);
+            }
+            float width = scroll.content.rect.width - rect.width;
+            if (scroll.horizontal && width > 0f)
+            {
+                float offset = item.min.x < rect.xMin ? item.min.x - rect.xMin : Mathf.Max(0f, item.max.x - rect.xMax);
+                if (offset != 0f)
+                    scroll.horizontalNormalizedPosition = Mathf.Clamp01(scroll.horizontalNormalizedPosition + offset / width);
+            }
         }
 
         private void OpenChoice(Dropdown dropdown)
