@@ -36,7 +36,9 @@ namespace YGOPortable.AI
         internal const uint InfiniteImpermanence = 10045474, EffectVeiler = 97268402, BlueEyesTyrant = 11443677;
         private const uint AshBlossom = 14558127, UpstartGoblin = 70368879, OriginalSinfulSpoils = 89023486;
         private const uint Nibiru = 27204311, Apollousa = 4280258, Blazar = 21123811,
-            Dragoon = 37818794, CyberInfinity = 10443957;
+            Dragoon = 37818794, CyberInfinity = 10443957, Dragonlord = 19652159, Quasar = 35952884,
+            ShootingMajestic = 40939228, Savage = 27548199, CrystalWing = 50954680, Rulkallos = 84330567;
+        private const uint ShiEn = 29981921, NaturiaBeast = 33198837;
         private const uint Raigeki = 12580477, EvenlyMatched = 15693423, InterruptedKaijuSlumber = 99330325;
         private const uint Reinforcement = 32807846, FossilDig = 47325505, Tuning = 96363153,
             Tenki = 57103969, Terraforming = 73628505;
@@ -846,6 +848,8 @@ namespace YGOPortable.AI
         private static bool HasReadyNegation(DuelSession duel, byte player, bool monsters)
         {
             var field = duel.Players[player];
+            bool Unused(uint code, int effect = 0) =>
+                !duel.HasActivatedMonsterEffect(player, ((ulong)code << 20) | (uint)effect);
             foreach (var card in field.mzone)
             {
                 if (card is not { IsFaceUp: true, effectsDisabled: false }) continue;
@@ -853,10 +857,15 @@ namespace YGOPortable.AI
                 {
                     Baronne => !duel.HasSpentBaronneNegate(card),
                     Blazar => true,
-                    Dragoon => field.hand.Count > 0 &&
-                        !duel.HasActivatedMonsterEffect(player, ((ulong)Dragoon << 20) | 1),
+                    Dragoon => field.hand.Count > 0 && Unused(Dragoon, 1),
                     CyberInfinity => card.overlayCodes.Count > 0,
+                    Dragonlord => card.attack >= 1000 && card.defense >= 1000,
+                    Quasar => Unused(Quasar),
+                    ShootingMajestic => Unused(ShootingMajestic, 1),
+                    Savage => Unused(Savage, 1) && Array.Exists(card.Counters, counter => counter.Type == 0x147 && counter.Count > 0),
                     Apollousa => monsters && card.attack >= 800,
+                    CrystalWing => monsters && Unused(CrystalWing),
+                    Rulkallos => monsters && Unused(Rulkallos),
                     _ => false,
                 };
                 if (ready) return true;
@@ -869,7 +878,11 @@ namespace YGOPortable.AI
             if (duel.TurnNumber != 2 || duel.TurnPlayer != prompt.playerId ||
                 duel.CurrentPhase != YgoConstants.PHASE_MAIN1) return null;
             byte rival = (byte)(1 - prompt.playerId);
-            bool spellNegate = HasReadyNegation(duel, rival, monsters: false);
+            var opposingField = duel.Players[rival];
+            bool spellNegate = HasReadyNegation(duel, rival, monsters: false) ||
+                opposingField.mzone.Any(card => card is { IsFaceUp: true, effectsDisabled: false } &&
+                    (card.code == NaturiaBeast && opposingField.deckCount >= 2 ||
+                     card.code == ShiEn && !duel.HasActivatedMonsterEffect(rival, (ulong)ShiEn << 20)));
             if (!spellNegate && !HasReadyNegation(duel, rival, monsters: true)) return null;
 
             bool IsOwn(SelectableCardItem item) => item.controller == prompt.playerId;
@@ -883,7 +896,8 @@ namespace YGOPortable.AI
                 if (!IsOwn(item)) continue;
                 int value = item.location switch
                 {
-                    YgoConstants.LOCATION_MZONE when item.code == Baronne && item.description == ((ulong)Baronne << 20) => 3,
+                    YgoConstants.LOCATION_MZONE when item.code == Baronne && item.description == ((ulong)Baronne << 20) &&
+                        HasFieldCard(opposingField) => 3,
                     YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_SZONE when spellNegate &&
                         item.code is Reinforcement or FossilDig or Tuning or Tenki or Terraforming or MysticalSpaceTyphoon => 2,
                     _ => 0,
@@ -929,9 +943,9 @@ namespace YGOPortable.AI
             if (summoned >= 4 && rival.hand.Count > 0 && !HasReadyNegation(duel, prompt.playerId, monsters: true))
             {
                 bool knownNibiru = fieldBodies >= 2 && duel.IsKnownInOpposingHand(prompt.playerId, Nibiru);
-                bool stableAgainstBattle = rival.mzone.All(card => card == null || !card.IsFaceUp) ||
-                    own.mzone.Any(card => card is { IsFaceUp: true } &&
-                        Math.Max(card.attack, card.defense) >= StrongestAttacker(rival));
+                int opposingAttack = StrongestAttacker(rival);
+                bool stableAgainstBattle = own.mzone.Any(card => card is { IsFaceUp: true } &&
+                    Math.Max(card.attack, card.defense) >= opposingAttack);
                 // A single bridge or a board that already loses combat still needs a playable continuation.
                 bool canHold = stableAgainstBattle && (established >= 2 || hasSetInteraction && fieldBodies >= 3);
                 if (knownNibiru || canHold) risk |= ExtensionRisk.Nibiru;
@@ -959,9 +973,9 @@ namespace YGOPortable.AI
                 // monster-only negation when the actual concern is a spell or trap wipe.
                 return item.location == YgoConstants.LOCATION_EXTRA && (item.code switch
                 {
-                    Baronne or Blazar or CyberInfinity => true,
+                    Baronne or Blazar or CyberInfinity or Dragonlord or Quasar or ShootingMajestic => true,
                     Dragoon => field.hand.Count > 0,
-                    Apollousa => (risk & ExtensionRisk.Sweeper) == 0,
+                    Apollousa or CrystalWing or Rulkallos => (risk & ExtensionRisk.Sweeper) == 0,
                     _ => false,
                 });
             }
