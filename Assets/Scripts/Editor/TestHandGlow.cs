@@ -39,6 +39,7 @@ namespace YGOPortable.Editor
             VerifyNativeChainCardFace(0);
             VerifyNativeChainCardFace(70046172);
             VerifyNativeChainCardFace(14087893);
+            VerifyOpponentActivationInspector();
             VerifyNativeNegationOutcome(activationNegated: false);
             VerifyNativeNegationOutcome(activationNegated: true);
             VerifyNativeImpermanenceRay(setFirst: true);
@@ -1194,6 +1195,72 @@ namespace YGOPortable.Editor
             Debug.Log("[VERIFY DUEL CHAIN READOUT] Rush changed only one copy to 2550 at link 2. Ocean changed both copies' ATK/DEF and Level at link 1.");
         }
 
+        private static void VerifyOpponentActivationInspector()
+        {
+            const uint pot = 55144522, upstart = 70368879, ash = 14558127;
+            var ai = new TacticalAI();
+            var empty = Array.Empty<uint>();
+            uint[] rival = Enumerable.Range(0, 40).Select(i => i % 2 == 0 ? pot : upstart).ToArray();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Opponent activation inspector",
+                Enumerable.Repeat(ash, 40).ToArray(), empty, rival, empty, false, session =>
+                    session.Players[session.AiPlayerIndex].hand.Any(card => card.code == pot) &&
+                    session.Players[session.AiPlayerIndex].hand.Any(card => card.code == upstart));
+            using var ui = new HandUI(duel, mobileLayout: true);
+            var animator = CardAnimationManager.Ensure(ui.Canvas);
+            Canvas.ForceUpdateCanvases();
+            var inspector = ui.Field.Root.transform.Find("MobileSafeArea/LeftInspector");
+            var preview = inspector.Find("CardPreview/Card").GetComponent<CompositeCardView>();
+            var rules = inspector.Find("CardDetails/Description/Viewport/Content").GetComponent<Text>();
+            ui.Field.InspectCard(BlueEyes);
+
+            ActivateFromMainPhase(duel, pot);
+            for (int i = 0; i < 12 && !IsAshResponse(duel.ActivePrompt); i++)
+            {
+                var pending = duel.ActivePrompt;
+                if (pending == null) duel.StepUntilPrompt();
+                else duel.SubmitResponse(ai.ComputeResponse(duel, pending));
+            }
+            var prompt = duel.ActivePrompt;
+            Require(IsAshResponse(prompt) && preview.CurrentCode == BlueEyes,
+                "The opponent spell did not create a response window or changed the inspector before its animation.");
+            ShowActivation(pot);
+            ui.Modals.ShowPrompt(duel, prompt);
+            Require(preview.CurrentCode == pot && rules.text.Contains(CardDatabase.GetKoreanCardDescription(pot)),
+                "The response picker replaced the opponent's description before the player inspected a choice.");
+            var description = (RectTransform)inspector.Find("CardDetails/Description");
+            Vector2 scrollPoint = RectTransformUtility.WorldToScreenPoint(null, description.TransformPoint(description.rect.center));
+            Require(!ui.Modals.ModalRoot.GetComponentInChildren<DuelPromptBackdrop>().IsRaycastLocationValid(scrollPoint, null),
+                "The response prompt prevented scrolling the opponent's description.");
+            ui.Modals.ModalRoot.GetComponentsInChildren<Button>().First(button => button.name.StartsWith("Ch_", StringComparison.Ordinal))
+                .onClick.Invoke();
+            Require(preview.CurrentCode == ash, "The player could not manually inspect a response after the opponent's activation.");
+            ui.Modals.HideAll();
+            duel.SubmitResponseInt(-1);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            animator.Clear();
+            ActivateFromMainPhase(duel, upstart);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            ShowActivation(upstart);
+            ui.Field.InspectCard(upstart);
+            Require(rules.text == CardDatabase.Get(upstart).desc && duel.RetryCount == 0,
+                "Manual inspection retained a previous activation heading or the native duel retried.");
+            Debug.Log("[VERIFY OPPONENT ACTIVATION INSPECTOR] Native opponent spells updated the sidebar in presentation order and preserved the response preview until explicit selection.");
+
+            bool IsAshResponse(DuelPrompt pending) => pending?.messageType == YgoConstants.MSG_SELECT_CHAIN &&
+                pending.playerId == duel.HumanPlayerIndex && pending.candidates.Any(candidate => candidate.code == ash);
+
+            void ShowActivation(uint code)
+            {
+                var animation = AnimationSteps(animator).Single(step =>
+                    step.GetType().Name.StartsWith("<ChainActivation>", StringComparison.Ordinal));
+                Require(animation.MoveNext(), "The opponent's chain animation never began.");
+                Require(preview.CurrentCode == code && rules.text.StartsWith("상대 발동 · 체인 1", StringComparison.Ordinal) &&
+                    rules.text.Contains(CardDatabase.GetKoreanCardDescription(code)),
+                    "The inspector did not show the opponent's active card and rules.");
+                animator.Clear();
+            }
+        }
+
         private static void VerifyNativeChainCardFace(uint responseCode)
         {
             const uint breaker = 71413901, axe = 40619825, rush = 70046172, book = 14087893;
@@ -2134,6 +2201,7 @@ namespace YGOPortable.Editor
             ReachMainPhase();
             Activate(breaker);
             ui.Field.Refresh();
+            monsterSlot.GetComponent<CardDragTrigger>().OnRightClick();
             inspector.Find("ZoomHit").GetComponent<Button>().onClick.Invoke();
             var remaining = mine.mzone[monster.sequence];
             Require(mine.szone[trap.sequence] == null && remaining.Counters.AsSpan().SequenceEqual(

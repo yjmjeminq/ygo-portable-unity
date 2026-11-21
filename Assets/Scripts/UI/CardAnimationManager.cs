@@ -449,9 +449,10 @@ namespace YGOPortable.UI
             QueueStep(PhaseBanner("DUEL", false, boardCenter, null, intro: true));
         }
 
-        internal void QueueChain(CardPose source, uint code, int chainNumber, bool opponent, LiveCardState live = null)
+        internal void QueueChain(CardPose source, uint code, int chainNumber, bool opponent, LiveCardState live = null,
+            Action onStart = null)
         {
-            QueueStep(ChainActivation(source, code, chainNumber, opponent, live));
+            QueueStep(ChainActivation(source, code, chainNumber, opponent, live, onStart));
         }
 
         internal const float CompactChainReadoutHeightRatio = 1.25f;
@@ -1678,8 +1679,10 @@ namespace YGOPortable.UI
             else DestroyImmediate(visual);
         }
 
-        private IEnumerator ChainActivation(CardPose source, uint code, int chainNumber, bool opponent, LiveCardState live)
+        private IEnumerator ChainActivation(CardPose source, uint code, int chainNumber, bool opponent, LiveCardState live,
+            Action onStart)
         {
+            onStart?.Invoke();
             uint previous = chainNumber > 1 && _previousChainNumber == chainNumber - 1 ? _previousChainCode : 0;
             var previousReadout = _previousChainReadout;
             bool previousOpponent = _previousChainOpponent;

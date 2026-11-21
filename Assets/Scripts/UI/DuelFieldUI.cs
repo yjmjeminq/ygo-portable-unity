@@ -39,6 +39,7 @@ namespace YGOPortable.UI
         private readonly List<Text> _logBlocks = new List<Text>();
         private ScrollRect _inspectScroll;
         private uint _inspectedCode;
+        private ChainLinkInfo _inspectedActivation;
         private (byte controller, uint location, uint sequence)? _inspectedFieldCard;
 
         // Opponent and player HUD
@@ -278,7 +279,7 @@ namespace YGOPortable.UI
             BuildUI(canvasParent);
             _modals.SetFieldCardHitTest(IsPointOverFieldCardChoice);
             _modals.SetActivationHitTest(IsPointOverEffectSource);
-            _modals.SetInspectorControls(_inspectorArtworkButton, _duelPadInspectButton);
+            _modals.SetInspectorControls(_inspectorArtworkButton, _duelPadInspectButton, (RectTransform)_inspectScroll.transform);
             _modals.SetCandidateInspector(InspectCandidate);
             _modals.SetPileActivationControls(_graveEffectButton, _extraEffectButton, _banishedEffectButton);
             _modals.SetBrowsablePiles(
@@ -402,12 +403,14 @@ namespace YGOPortable.UI
         private void InspectCandidate(SelectableCardItem item, uint code) =>
             InspectCardAt(code, (item.controller, item.location, item.sequence));
 
-        private void InspectCardAt(uint code, (byte controller, uint location, uint sequence)? fieldCard)
+        private void InspectCardAt(uint code, (byte controller, uint location, uint sequence)? fieldCard,
+            ChainLinkInfo activation = null)
         {
             if (code == 0) return;
             _inspectedBanishedCard = null;
-            bool changed = code != _inspectedCode;
+            bool changed = code != _inspectedCode || !ReferenceEquals(_inspectedActivation, activation);
             _inspectedCode = code;
+            _inspectedActivation = activation;
             _inspectedFieldCard = fieldCard;
             if (changed) _inspCard.gameObject.SetActive(true);
             RefreshInspectorReadout(showChanges: false);
@@ -418,7 +421,17 @@ namespace YGOPortable.UI
             _inspectorArtworkButton.interactable = true;
             var info = CardDatabase.Get(code);
             _inspName.text = info?.name ?? $"카드 #{code}";
-            _inspDesc.text = info?.desc ?? "";
+            string rules = info?.desc ?? "";
+            if (activation != null)
+            {
+                rules = CardDatabase.GetKoreanCardDescription(code) ?? rules;
+                string effect = CardDatabase.ResolveEffectDescription(activation.description, code);
+                string activationLabel = $"상대 발동 · 체인 {activation.chainNumber}";
+                if (!string.IsNullOrWhiteSpace(effect) && !string.Equals(effect.Trim(), rules.Trim(), StringComparison.Ordinal))
+                    rules = string.IsNullOrWhiteSpace(rules) ? effect : $"{effect}\n\n카드 설명\n{rules}";
+                rules = $"{activationLabel}\n{rules}";
+            }
+            _inspDesc.text = rules;
             _inspectScroll.StopMovement();
             _inspectScroll.content.anchoredPosition = Vector2.zero;
         }
@@ -426,6 +439,7 @@ namespace YGOPortable.UI
         private void ResetCardInspector()
         {
             _inspectedCode = 0;
+            _inspectedActivation = null;
             _inspectedFieldCard = null;
             _inspectedBanishedCard = null;
             _inspCard.SetCard(0);
@@ -866,7 +880,9 @@ namespace YGOPortable.UI
             content.pivot = new Vector2(0.5f, 1f);
             _inspDesc = content.gameObject.AddComponent<Text>();
             _inspDesc.font = LotdUiKit.FontKR;
-            _inspDesc.fontSize = _mobileLayout ? 16 : 15;
+            _inspDesc.fontSize = _mobileLayout ? 18 : 15;
+            _inspDesc.verticalOverflow = VerticalWrapMode.Overflow;
+            _inspDesc.lineSpacing = 1.12f;
             _inspDesc.color = LotdUiKit.TextPrimary;
             _inspDesc.raycastTarget = false;
             _inspDesc.alignment = TextAnchor.UpperLeft;
@@ -3138,10 +3154,22 @@ namespace YGOPortable.UI
 
         private void HandleChainActivatedEvent(ChainLinkInfo link)
         {
+            var session = _session;
+            bool opponent = link.triggerPlayer != session.HumanPlayerIndex;
+            Action showCard = opponent && link.code != 0 ? () =>
+            {
+                if (ReferenceEquals(_session, session))
+                    InspectCardAt(link.code, link.PublicFieldSource, link);
+            } : null;
             var animator = CardAnimationManager.Instance;
-            if (animator == null) return;
+            if (animator == null)
+            {
+                showCard?.Invoke();
+                return;
+            }
+
             var pose = GetCardPose(link.triggerPlayer, link.triggerLoc, link.triggerSeq, YgoConstants.POS_FACEUP_ATTACK);
-            animator.QueueChain(pose, link.code, link.chainNumber, link.triggerPlayer != _session.HumanPlayerIndex, link.ActivationReadout);
+            animator.QueueChain(pose, link.code, link.chainNumber, opponent, link.ActivationReadout, showCard);
             QueueColumnActivation(animator, link);
         }
 

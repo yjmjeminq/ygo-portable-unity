@@ -245,12 +245,13 @@ namespace YGOPortable.UI
             _promptShade.BanishedActivationControl = banished;
         }
 
-        internal void SetInspectorControls(Button artwork, Button details)
+        internal void SetInspectorControls(Button artwork, Button details, RectTransform description)
         {
             _promptShade.InspectorArtworkControl = artwork;
             _zoneShade.InspectorArtworkControl = artwork;
             _promptShade.InspectorDetailsControl = details;
             _zoneShade.InspectorDetailsControl = details;
+            _promptShade.InspectorDescription = _zoneShade.InspectorDescription = description;
         }
 
         internal void SetCandidateInspector(Action<SelectableCardItem, uint> inspect) => _onInspectCandidate = inspect;
@@ -1174,8 +1175,10 @@ namespace YGOPortable.UI
             }
             var sourceCounts = sources.GroupBy(source => source).ToDictionary(group => group.Key, group => group.Count());
             var sourceNumbers = new Dictionary<(byte, uint, uint, uint), int>();
+            bool respondingToOpponent = _confirmPileActivation == null && prompt.messageType == YgoConstants.MSG_SELECT_CHAIN &&
+                session.CurrentChain.LastOrDefault() is { code: not 0 } link && link.triggerPlayer != session.HumanPlayerIndex;
 
-            void Select(int index)
+            void Select(int index, bool inspect)
             {
                 if (!CanAnswerPrompt || !ReferenceEquals(_curPrompt, prompt)) return;
                 if (_chainSelection >= 0) SetSelectionOutline(frames[_chainSelection], false);
@@ -1189,7 +1192,7 @@ namespace YGOPortable.UI
                 _chainEffect.text = text ?? "이 카드의 효과를 발동할 수 있습니다.";
                 _chainEffectScroll.StopMovement();
                 _chainEffectScroll.content.anchoredPosition = Vector2.zero;
-                InspectChoice(item.code, item);
+                if (inspect) InspectChoice(item.code, item);
             }
 
             float stripWidth = 6f - ChainCardGap;
@@ -1222,13 +1225,14 @@ namespace YGOPortable.UI
                     var button = tile.gameObject.AddComponent<Button>();
                     _activationButtons[index] = button;
                     button.targetGraphic = tile.GetComponent<Image>();
-                    button.onClick.AddListener(() => Select(index));
-                    tile.gameObject.AddComponent<DuelPromptSelection>().OnSelected = () => Select(index);
+                    button.onClick.AddListener(() => Select(index, inspect: true));
+                    tile.gameObject.AddComponent<DuelPromptSelection>().OnSelected = () =>
+                        Select(index, inspect: !respondingToOpponent || index != _chainSelection);
                 }
             }
 
             ResetCardStrip(_chainCardScroll, stripWidth);
-            if (choices.Count > 0) Select(0);
+            if (choices.Count > 0) Select(0, inspect: !respondingToOpponent);
         }
 
         private RectTransform CreateChainGroup(uint location, bool opponent, float width)
@@ -3043,6 +3047,7 @@ namespace YGOPortable.UI
         internal Button BanishedActivationControl { get; set; }
         internal Button InspectorArtworkControl { get; set; }
         internal Button InspectorDetailsControl { get; set; }
+        internal RectTransform InspectorDescription { get; set; }
         internal bool ChainConfirmationAvailable { get; set; }
         internal Func<Vector2, Camera, bool> ActivationHitTest { get; set; }
 
@@ -3060,6 +3065,8 @@ namespace YGOPortable.UI
         {
             if (HitsControl(InspectorArtworkControl, screenPoint, eventCamera) ||
                 HitsControl(InspectorDetailsControl, screenPoint, eventCamera) ||
+                InspectorDescription != null && InspectorDescription.gameObject.activeInHierarchy &&
+                    RectTransformUtility.RectangleContainsScreenPoint(InspectorDescription, screenPoint, eventCamera) ||
                 ChainConfirmationAvailable && (HitsControl(ChainConfirmationControl, screenPoint, eventCamera) ||
                     HitsControl(GraveActivationControl, screenPoint, eventCamera) ||
                     HitsControl(ExtraActivationControl, screenPoint, eventCamera) ||

@@ -6,6 +6,7 @@ namespace YGOPortable.UI
 {
     public partial class DeckEditorUI
     {
+        private const float MinimumMobileCardCellWidth = 111f;
         private readonly bool _mobileLayout;
         private int _trunkColumns = TrunkCols;
         private int _mainColumns = DeckColumns;
@@ -59,7 +60,7 @@ namespace YGOPortable.UI
         }
 
         private int ColumnsForTouch(float width, int max) =>
-            Mathf.Clamp(Mathf.FloorToInt(width / (_mobileTouchSize + 4f)), 1, max);
+            Mathf.Clamp(Mathf.FloorToInt(width / (Mathf.Max(MinimumMobileCardCellWidth, _mobileTouchSize) + 4f)), 1, max);
 
         private void PositionDeckSection(string name, RectTransform grid, Text count, float top, float bottom)
         {

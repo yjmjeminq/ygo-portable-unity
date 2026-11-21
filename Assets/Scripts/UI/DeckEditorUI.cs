@@ -350,9 +350,10 @@ namespace YGOPortable.UI
         private void BuildCardDetails(Transform root)
         {
             var panel = LotdUiKit.CreateMenuPanel(root, "CardDetails",
-                new Vector2(_mobileLayout ? .314f : .301f, .053f), new Vector2(_mobileLayout ? .508f : .553f, .899f));
+                new Vector2(_mobileLayout ? .340f : .301f, .053f), new Vector2(_mobileLayout ? .566f : .553f, .899f));
+            float inset = _mobileLayout ? 17f : 28f;
             var card = LotdUiKit.CreateRect("LargeCard", panel,
-                new Vector2(.066f, .501f), new Vector2(.934f, .956f), Vector2.zero, Vector2.zero);
+                new Vector2(.066f, _mobileLayout ? .677f : .501f), new Vector2(.934f, .956f), Vector2.zero, Vector2.zero);
             _previewCard = CompositeCardView.Create(card, "Preview", true);
             DeckCardVisualMotion.Bind(_previewCard);
             var previewHit = LotdUiKit.FillRect("PreviewHit", card);
@@ -362,7 +363,8 @@ namespace YGOPortable.UI
             previewButton.onClick.AddListener(() => OpenExpandedDeckCard(_inspectedCode));
 
             var stats = LotdUiKit.CreateRect("Stats", panel,
-                new Vector2(0f, .418f), new Vector2(1f, .497f), new Vector2(28f, 0f), new Vector2(-28f, 0f));
+                new Vector2(0f, _mobileLayout ? .590f : .418f), new Vector2(1f, _mobileLayout ? .673f : .497f),
+                new Vector2(inset, 0f), new Vector2(-inset, 0f));
             LotdUiKit.AddImage(stats.gameObject, LotdUiKit.LoadSprite("LOTD/HUD/cardbar_texture"),
                 new Color(0.86f, 0.68f, 0.38f, 0.86f), false, false);
             var icon = LotdUiKit.CreateRect("TypeIcon", stats, new Vector2(0.83f, 0.06f), new Vector2(0.975f, 0.94f),
@@ -370,15 +372,17 @@ namespace YGOPortable.UI
             _previewRaceIcon = LotdUiKit.AddImage(icon.gameObject, null, Color.white, true, false);
             _previewStats = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Info", stats,
                 new Vector2(0.03f, 0f), new Vector2(0.81f, 1f), Vector2.zero, Vector2.zero),
-                "Text", "", 14, 9, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
+                "Text", "", _mobileLayout ? 19 : 14, _mobileLayout ? 12 : 9, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
             var name = LotdUiKit.CreateRect("Name", panel,
-                new Vector2(0f, .349f), new Vector2(1f, .412f), new Vector2(28f, 0f), new Vector2(-28f, 0f));
+                new Vector2(0f, _mobileLayout ? .511f : .349f), new Vector2(1f, _mobileLayout ? .585f : .412f),
+                new Vector2(inset, 0f), new Vector2(-inset, 0f));
             LotdUiKit.AddImage(name.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelNavy, false, false);
-            _previewName = LotdUiKit.AddFittedText(name, "Text", "", 20, 11,
+            _previewName = LotdUiKit.AddFittedText(name, "Text", "", _mobileLayout ? 25 : 20, _mobileLayout ? 14 : 11,
                 TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
 
             var desc = LotdUiKit.CreateRect("Description", panel,
-                new Vector2(0f, .155f), new Vector2(1f, .343f), new Vector2(28f, 0f), new Vector2(-28f, 0f));
+                new Vector2(0f, .155f), new Vector2(1f, _mobileLayout ? .506f : .343f),
+                new Vector2(inset, 0f), new Vector2(-inset, 0f));
             LotdUiKit.AddImage(desc.gameObject, LotdUiKit.WhiteSprite, new Color(0.025f, 0.067f, 0.118f, 0.64f));
             var ownership = LotdUiKit.CreateRect("Ownership", desc, Vector2.up, Vector2.one,
                 new Vector2(8f, -29f), new Vector2(-10f, -4f));
@@ -393,12 +397,12 @@ namespace YGOPortable.UI
                 TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
             ownership.gameObject.SetActive(false);
             var viewport = LotdUiKit.CreateRect("Viewport", desc, Vector2.zero, Vector2.one,
-                new Vector2(8f, 16f), new Vector2(-21f, -5f));
+                new Vector2(8f, _mobileLayout ? 7f : 16f), new Vector2(-21f, -5f));
             viewport.gameObject.AddComponent<RectMask2D>();
-            _previewDesc = LotdUiKit.AddText(viewport, "Content", "", 16, TextAnchor.UpperLeft, LotdUiKit.TextPrimary);
+            _previewDesc = LotdUiKit.AddText(viewport, "Content", "", _mobileLayout ? 23 : 16, TextAnchor.UpperLeft, LotdUiKit.TextPrimary);
             _previewDesc.supportRichText = false;
             _previewDesc.verticalOverflow = VerticalWrapMode.Overflow;
-            _previewDesc.lineSpacing = 1.08f;
+            _previewDesc.lineSpacing = _mobileLayout ? 1.16f : 1.08f;
             var content = _previewDesc.rectTransform;
             content.anchorMin = new Vector2(0f, 1f);
             content.anchorMax = Vector2.one;
@@ -417,15 +421,22 @@ namespace YGOPortable.UI
             _previewScroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
 
             var related = LotdUiKit.CreateRect("RelatedCards", panel,
-                new Vector2(0f, 0.094f), new Vector2(0.5f, 0.145f), new Vector2(28f, 0f), new Vector2(-4f, 0f));
+                new Vector2(0f, .094f), new Vector2(.5f, .145f), new Vector2(inset, 0f), new Vector2(-4f, 0f));
             LotdUiKit.CreateLotdButton(related, "Button", "연관 카드 검색", () => FilterRelatedCards(_inspectedCode), 14);
             var crafting = LotdUiKit.CreateRect("Crafting", panel,
-                new Vector2(0.5f, 0.094f), new Vector2(1f, 0.145f), new Vector2(4f, 0f), new Vector2(-28f, 0f));
+                new Vector2(.5f, .094f), new Vector2(1f, .145f), new Vector2(4f, 0f), new Vector2(-inset, 0f));
             _cardCraftingButton = LotdUiKit.CreateLotdButton(crafting, "Button", "제작·분해",
                 () => OpenCardCrafting(_inspectedCode), 14);
             var add = LotdUiKit.CreateRect("AddCard", panel,
-                new Vector2(0f, 0.034f), new Vector2(1f, 0.085f), new Vector2(28f, 0f), new Vector2(-28f, 0f));
+                new Vector2(0f, .034f), new Vector2(_mobileLayout ? .5f : 1f, .085f),
+                new Vector2(inset, 0f), new Vector2(_mobileLayout ? -4f : -inset, 0f));
             LotdUiKit.CreateLotdButton(add, "Button", "카드 조작", OpenInspectedCardActions, 14, true);
+            if (_mobileLayout)
+            {
+                var read = LotdUiKit.CreateRect("ReadCard", panel, new Vector2(.5f, .034f), new Vector2(1f, .085f),
+                    new Vector2(4f, 0f), new Vector2(-inset, 0f));
+                LotdUiKit.CreateLotdButton(read, "Button", "효과 크게 보기", () => OpenExpandedDeckCard(_inspectedCode), 17);
+            }
         }
 
         private void OpenCardCrafting(uint code)
@@ -463,11 +474,11 @@ namespace YGOPortable.UI
         private void BuildTrunkPanel(Transform rt)
         {
             var col = LotdUiKit.CreateMenuPanel(rt, "Trunk",
-                new Vector2(.015f, .053f), new Vector2(_mobileLayout ? .310f : .296f, .899f));
+                new Vector2(.015f, .053f), new Vector2(_mobileLayout ? .334f : .296f, .899f));
             _trunkPanel = col;
 
-            var insideLeft = new Vector2(28f, 0f);
-            var insideRight = new Vector2(-28f, 0f);
+            var insideLeft = new Vector2(_mobileLayout ? 17f : 28f, 0f);
+            var insideRight = -insideLeft;
             var caption = LotdUiKit.CreateBorderedPanel(col, "TrunkHeading",
                 new Vector2(0f, .889f), new Vector2(1f, .944f), insideLeft, insideRight,
                 LotdUiKit.PanelNavy, new Color(.27f, .63f, .82f, .74f));
@@ -603,7 +614,7 @@ namespace YGOPortable.UI
         private void BuildDeckPanel(Transform root)
         {
             var panel = LotdUiKit.CreateMenuPanel(root, "Deck",
-                new Vector2(_mobileLayout ? .513f : .558f, .053f), new Vector2(.985f, .899f), true);
+                new Vector2(_mobileLayout ? .574f : .558f, .053f), new Vector2(.985f, .899f), true);
             _deckPanel = panel;
 
             var header = LotdUiKit.CreateRect("DeckControls", panel,
@@ -917,7 +928,7 @@ namespace YGOPortable.UI
             float scroll = startAtTop ? 1f : _trunkScroll.verticalNormalizedPosition;
             float vpWidth = _trunkViewport.rect.width > 10 ? _trunkViewport.rect.width : 405f;
             _trunkColumns = _mobileLayout ? Mathf.Clamp(Mathf.FloorToInt(vpWidth /
-                (MobileSafeArea.MinimumTouchSize(_trunkViewport) + 4f)), 1, TrunkCols) : TrunkCols;
+                (Mathf.Max(MinimumMobileCardCellWidth, MobileSafeArea.MinimumTouchSize(_trunkViewport)) + 4f)), 1, 3) : TrunkCols;
             _colWidth = vpWidth / _trunkColumns;
             _rowHeight = Mathf.Max(20f, Mathf.Round((_colWidth - 4f) / LotdUiKit.CardAspectRatio + 4f));
 

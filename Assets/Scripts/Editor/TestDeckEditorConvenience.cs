@@ -314,6 +314,13 @@ namespace YGOPortable.Editor
             Call(editor, "ResizeTrunkGrid", true);
 
             float touch = MobileSafeArea.MinimumTouchSize(safe);
+            var trunk = Field<RectTransform>(editor, "_trunkViewport");
+            var previewScroll = Field<ScrollRect>(editor, "_previewScroll");
+            var previewText = Field<Text>(editor, "_previewDesc");
+            Require(Field<int>(editor, "_trunkColumns") <= 3 && Field<float>(editor, "_colWidth") >= touch + 4f &&
+                trunk.rect.width >= 375f, "The mobile trunk did not leave room for larger card thumbnails.");
+            Require(previewText.fontSize >= 23 && previewScroll.viewport.rect.width >= 235f &&
+                previewScroll.viewport.rect.height >= 195f, "The mobile card rules did not get a readable pane.");
             foreach (string gridField in new[] { "_mainDeckSlotGrid", "_extraDeckSlotGrid", "_sideDeckSlotGrid" })
             {
                 var slot = (RectTransform)Field<RectTransform>(editor, gridField).Find("Card_0");
@@ -325,6 +332,12 @@ namespace YGOPortable.Editor
                 "A mobile filter chip did not allow a full touch target.");
             var main = Field<RectTransform>(editor, "_mainDeckSlotGrid");
             var trigger = main.Find("Card_0").GetComponent<CardDragTrigger>();
+            trigger.OnLeftClick();
+            var details = safe.Find("Editor/CardDetails/ReadCard/Button").GetComponent<Button>();
+            details.onClick.Invoke();
+            Require(Field<Text>(editor, "_expandedDeckDescription").fontSize >= 30,
+                "The large rules button did not open the mobile reading layout.");
+            Call(editor, "CloseExpandedDeckCard");
             var finger = new PointerEventData(events)
             {
                 pointerId = 0, button = PointerEventData.InputButton.Left, position = new Vector2(400, 270),

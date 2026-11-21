@@ -27,29 +27,32 @@ namespace YGOPortable.UI
             overlay.gameObject.AddComponent<RectMask2D>();
             LotdUiKit.AddImage(overlay.gameObject, LotdUiKit.WhiteSprite, new Color(.012f, .022f, .048f, .85f));
             _expandedDeckPanel = LotdUiKit.CreateMenuPanel(overlay, "Window",
-                new Vector2(.13f, .081f), new Vector2(.977f, .943f));
-            var art = DeckArea(_expandedDeckPanel, "Artwork", .048f, .084f, .422f, .913f);
+                _mobileLayout ? new Vector2(.025f, .049f) : new Vector2(.13f, .081f),
+                new Vector2(.977f, _mobileLayout ? .969f : .943f));
+            float artRight = _mobileLayout ? .361f : .422f;
+            float rulesLeft = artRight + .025f;
+            var art = DeckArea(_expandedDeckPanel, "Artwork", .048f, .084f, artRight, .913f);
             _expandedDeckArt = CompositeCardView.Create(art, "Card", true);
             _expandedDeckArt.EnableOverframe();
             CardOverframeInput.Attach(art, _expandedDeckArt, _mobileLayout,
-                Rect.MinMaxRect(.048f, .084f, .422f, .913f), Rect.MinMaxRect(.073f, .104f, .382f, .805f));
-            var name = DeckArea(_expandedDeckPanel, "Name", .447f, .804f, .759f, .928f);
-            _expandedDeckName = LotdUiKit.AddFittedText(name, "Text", "", 30, 16, TextAnchor.MiddleLeft,
+                Rect.MinMaxRect(.048f, .084f, artRight, .913f), Rect.MinMaxRect(.073f, .104f, artRight - .04f, .805f));
+            var name = DeckArea(_expandedDeckPanel, "Name", rulesLeft, .804f, .759f, .928f);
+            _expandedDeckName = LotdUiKit.AddFittedText(name, "Text", "", _mobileLayout ? 36 : 30, _mobileLayout ? 20 : 16, TextAnchor.MiddleLeft,
                 LotdUiKit.GoldAccent, FontStyle.Bold);
             _expandedDeckName.supportRichText = false;
             _expandedDeckClose = DeckButton(_expandedDeckPanel, "Close", "닫기", .777f, .788f, .952f, .922f,
                 CloseExpandedDeckCard);
-            var stats = DeckArea(_expandedDeckPanel, "Stats", .447f, .669f, .952f, .787f);
-            _expandedDeckStats = LotdUiKit.AddFittedText(stats, "Text", "", 20, 13,
+            var stats = DeckArea(_expandedDeckPanel, "Stats", rulesLeft, _mobileLayout ? .708f : .669f, .952f, .787f);
+            _expandedDeckStats = LotdUiKit.AddFittedText(stats, "Text", "", _mobileLayout ? 24 : 20, _mobileLayout ? 16 : 13,
                 TextAnchor.MiddleLeft, LotdUiKit.TextMuted);
             _expandedDeckStats.supportRichText = false;
 
-            var rules = DeckArea(_expandedDeckPanel, "Rules", .447f, .229f, .952f, .651f);
+            var rules = DeckArea(_expandedDeckPanel, "Rules", rulesLeft, .229f, .952f, _mobileLayout ? .696f : .651f);
             LotdUiKit.AddImage(rules.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelNavy);
             var viewport = LotdUiKit.FillRect("Viewport", rules, 13f);
             viewport.offsetMax = new Vector2(-31f, -13f);
             viewport.gameObject.AddComponent<RectMask2D>();
-            _expandedDeckDescription = LotdUiKit.AddText(viewport, "Effect", "", 23, TextAnchor.UpperLeft,
+            _expandedDeckDescription = LotdUiKit.AddText(viewport, "Effect", "", _mobileLayout ? 31 : 23, TextAnchor.UpperLeft,
                 LotdUiKit.TextPrimary);
             _expandedDeckDescription.supportRichText = false;
             _expandedDeckDescription.verticalOverflow = VerticalWrapMode.Overflow;
@@ -70,7 +73,7 @@ namespace YGOPortable.UI
             _expandedDeckScroll.scrollSensitivity = 49f;
             _expandedDeckScroll.verticalScrollbar = AddDeckScrollbar(rules);
             _expandedDeckScroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
-            DeckButton(_expandedDeckPanel, "Related", "연관 카드 검색", .447f, .073f, .71f, .207f, () =>
+            DeckButton(_expandedDeckPanel, "Related", "연관 카드 검색", rulesLeft, .073f, .71f, .207f, () =>
             {
                 uint code = _expandedDeckCode;
                 CloseExpandedDeckCard();
