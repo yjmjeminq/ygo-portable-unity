@@ -17,7 +17,7 @@ namespace YGOPortable.UI
         internal DuelEffectKind Kind;
         internal Color Tint;
         internal uint DirectionMask;
-        internal Vector2 ShardTravel;
+        internal Vector2? ShardTravel;
         private float _progress;
         private Image _texture;
 
@@ -363,9 +363,9 @@ namespace YGOPortable.UI
         {
             var bright = Color.Lerp(Tint, new Color(1f, .89f, .79f), .46f);
             float length = Mathf.SmoothStep(.56f, 1f, Mathf.Clamp01(t * 6f));
-            float strike = glow * (1f - Mathf.SmoothStep(.35f, .92f, t));
+            float strike = glow * (1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.35f, .82f, t)));
             float width = Mathf.Min(rect.width, rect.height);
-            for (int sign = -1; sign <= 1; sign += 2)
+            for (int sign = -1; strike > 0f && sign <= 1; sign += 2)
             {
                 var diagonal = new Vector2(rect.width * .40f, sign * rect.height * .34f) * length;
                 Line(mesh, rect.center - diagonal, rect.center + diagonal, width * .18f, Shade(Tint, strike * .29f));
@@ -375,15 +375,19 @@ namespace YGOPortable.UI
 
             if (Kind != DuelEffectKind.ChainShatter || t < .20f) return;
             float spread = Mathf.InverseLerp(.20f, 1f, t);
-            float shardGlow = Mathf.Lerp(.95f, 0f, spread);
+            float arrival = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.30f, .85f, t));
+            float shardGlow = ShardTravel.HasValue
+                ? .95f * (1f - Mathf.InverseLerp(.84f, 1f, t)) : Mathf.Lerp(.95f, 0f, spread);
             for (int i = 0; i < 23; i++)
             {
                 float angle = i * 2.39996f;
                 var direction = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
                 var cross = new Vector2(-direction.y, direction.x);
                 float force = .22f + (i % 6) * .093f;
-                Vector2 origin = rect.center + direction * (width * (.09f + spread * force)) +
-                    (Vector2.down * (width * .19f) + ShardTravel) * (spread * spread);
+                Vector2 scatter = direction * (width * (.09f + spread * force)) +
+                    Vector2.down * (width * .19f * spread * spread);
+                Vector2 origin = rect.center + (ShardTravel.HasValue
+                    ? Vector2.Lerp(scatter, ShardTravel.Value + direction * (width * .035f), arrival) : scatter);
                 float size = width * (.033f + (i % 5) * .012f) * (1f - .61f * spread);
                 Triangle(mesh, origin + direction * size, origin - cross * size * .62f, origin - direction * size,
                     Shade(i % 3 == 0 ? bright : Tint, shardGlow));

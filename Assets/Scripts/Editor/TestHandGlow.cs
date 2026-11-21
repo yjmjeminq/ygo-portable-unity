@@ -2681,15 +2681,34 @@ namespace YGOPortable.Editor
 
             var outcome = AnimationSteps(animator).Last(step => step.GetType().Name.StartsWith("<ChainOutcome>", StringComparison.Ordinal));
             Require(outcome.MoveNext() && outcome.Current is IEnumerator, "The negated link did not get a separate outcome.");
-            TestCardPresentation.SampleAnimation((IEnumerator)outcome.Current)(.52f);
+            var sampleOutcome = TestCardPresentation.SampleAnimation((IEnumerator)outcome.Current);
+            sampleOutcome(.52f);
             var result = animator.transform.Find("ChainOutcome");
             var impact = result.GetComponentInChildren<DuelEffectGraphic>();
             Require(impact.Kind == (activationNegated ? DuelEffectKind.ChainShatter : DuelEffectKind.ChainNegated) &&
                 result.Find("Status/Text").GetComponent<Text>().text == "무효 · NEGATED", "The wrong negation animation or stamp appeared.");
             Require(activationNegated
-                    ? negated.NegatedGraveController == duel.HumanPlayerIndex && impact.ShardTravel.sqrMagnitude > 1f
-                    : negated.NegatedGraveController == null && impact.ShardTravel == Vector2.zero,
+                    ? negated.NegatedGraveController == duel.HumanPlayerIndex && impact.ShardTravel.HasValue
+                    : negated.NegatedGraveController == null && !impact.ShardTravel.HasValue,
                 "The red shards did not follow a confirmed grave destination or invented a grave movement.");
+            if (activationNegated)
+            {
+                sampleOutcome(.87f);
+                Canvas.ForceUpdateCanvases();
+                using var mesh = new VertexHelper();
+                var populate = typeof(DuelEffectGraphic).GetMethod("OnPopulateMesh", PrivateInstance, types: new[] { typeof(VertexHelper) },
+                    binder: null, modifiers: null);
+                populate.Invoke(impact, new object[] { mesh });
+                Require(mesh.currentVertCount > 0, "The shards disappeared before reaching the grave.");
+                var vertex = default(UIVertex);
+                Vector2 destination = impact.rectTransform.rect.center + impact.ShardTravel.Value;
+                for (int i = 0; i < mesh.currentVertCount; i++)
+                {
+                    mesh.PopulateUIVertex(ref vertex, i);
+                    Require(vertex.color.a > 100 && Vector2.Distance(vertex.position, destination) < impact.rectTransform.rect.width * .10f,
+                        "A shard faded early or overshot the grave.");
+                }
+            }
             Require(!outcome.MoveNext(), "The negation animation did not release its transient objects.");
             Debug.Log($"[VERIFY DUEL NEGATION] Native {(activationNegated ? "activation" : "effect")} negation resolved CL2 before CL1 with the matching impact.");
         }

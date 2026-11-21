@@ -1726,8 +1726,8 @@ namespace YGOPortable.UI
                     ApplyPose(card, new CardPose(center + shake, size * Mathf.Lerp(1.13f, 1f, settle), -2f));
                     cardOpacity.alpha = Mathf.Min(settle * 2f, remaining);
                 }
-                if (impact.Kind == DuelEffectKind.ChainShatter && readGrave() is { } grave)
-                    impact.ShardTravel = grave - center;
+                if (impact.Kind == DuelEffectKind.ChainShatter)
+                    impact.ShardTravel = readGrave() - center;
                 ApplyChainOutcomePose(result, center, size, t);
             });
             if (card != null) RemoveTransient(card.gameObject);
@@ -1751,7 +1751,7 @@ namespace YGOPortable.UI
             LotdUiKit.AddFittedText(label, "Text", link.negated ? "무효 · NEGATED" : link.DestroyedCard ? "파괴" : "효과 처리",
                 link.negated ? 30 : 19, 9, TextAnchor.MiddleCenter, tint, FontStyle.Bold);
             if (link.negated) label.localRotation = Quaternion.Euler(0f, 0f, -5f);
-            visual.gameObject.AddComponent<CanvasGroup>().alpha = 0f;
+            label.gameObject.AddComponent<CanvasGroup>().alpha = 0f;
             return visual;
         }
 
@@ -1761,12 +1761,10 @@ namespace YGOPortable.UI
             visual.sizeDelta = new Vector2(cardSize.x * 1.28f, cardSize.y * .88f);
             var effect = visual.GetComponentInChildren<DuelEffectGraphic>();
             effect.Seek(progress);
+            var stamp = visual.Find("Status");
             if (effect.Kind is DuelEffectKind.ChainNegated or DuelEffectKind.ChainShatter)
-            {
-                var stamp = visual.Find("Status");
                 stamp.localScale = Vector3.one * Mathf.Lerp(1.48f, 1f, Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(progress * 7f)));
-            }
-            visual.GetComponent<CanvasGroup>().alpha = Mathf.Clamp01(Mathf.Min(progress * 7f, (1f - progress) * 5f));
+            stamp.GetComponent<CanvasGroup>().alpha = Mathf.Clamp01(Mathf.Min(progress * 7f, (1f - progress) * 5f));
         }
 
         private static void AddChainConnector(RectTransform overlay, Vector2 from, Vector2 to, float height)
