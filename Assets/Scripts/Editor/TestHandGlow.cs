@@ -2610,6 +2610,10 @@ namespace YGOPortable.Editor
             var impact = result.GetComponentInChildren<DuelEffectGraphic>();
             Require(impact.Kind == (activationNegated ? DuelEffectKind.ChainShatter : DuelEffectKind.ChainNegated) &&
                 result.Find("Status/Text").GetComponent<Text>().text == "무효 · NEGATED", "The wrong negation animation or stamp appeared.");
+            Require(activationNegated
+                    ? negated.NegatedGraveController == duel.HumanPlayerIndex && impact.ShardTravel.sqrMagnitude > 1f
+                    : negated.NegatedGraveController == null && impact.ShardTravel == Vector2.zero,
+                "The red shards did not follow a confirmed grave destination or invented a grave movement.");
             Require(!outcome.MoveNext(), "The negation animation did not release its transient objects.");
             Debug.Log($"[VERIFY DUEL NEGATION] Native {(activationNegated ? "activation" : "effect")} negation resolved CL2 before CL1 with the matching impact.");
         }

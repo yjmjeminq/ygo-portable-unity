@@ -17,6 +17,7 @@ namespace YGOPortable.UI
         internal DuelEffectKind Kind;
         internal Color Tint;
         internal uint DirectionMask;
+        internal Vector2 ShardTravel;
         private float _progress;
         private Image _texture;
 
@@ -367,7 +368,7 @@ namespace YGOPortable.UI
                 var cross = new Vector2(-direction.y, direction.x);
                 float force = .22f + (i % 6) * .093f;
                 Vector2 origin = rect.center + direction * (width * (.09f + spread * force)) +
-                    Vector2.down * (width * spread * spread * .19f);
+                    (Vector2.down * (width * .19f) + ShardTravel) * (spread * spread);
                 float size = width * (.033f + (i % 5) * .012f) * (1f - .61f * spread);
                 Triangle(mesh, origin + direction * size, origin - cross * size * .62f, origin - direction * size,
                     Shade(i % 3 == 0 ? bright : Tint, shardGlow));

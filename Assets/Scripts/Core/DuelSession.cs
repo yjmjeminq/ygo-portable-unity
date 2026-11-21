@@ -149,6 +149,8 @@ namespace YGOPortable.Core
         public bool negated;
         internal bool ActivationNegated;
         internal bool AppliedColumnNegation;
+        internal (byte Controller, uint Location, uint Sequence) ActivationSource;
+        internal byte? NegatedGraveController;
         internal bool DestroyedCard;
         internal bool Resolved;
         internal LiveCardState ActivationReadout;
@@ -1025,6 +1027,7 @@ namespace YGOPortable.Core
         {
             if (_resolvingChainLink != null && (move.reason & YgoConstants.REASON_DESTROY) != 0)
                 _resolvingChainLink.DestroyedCard = true;
+            TrackNegatedGraveMovement(move);
             TrackPublicMonsterMoves(move, swapPartner);
             FollowPublicChainSources(move, swapPartner);
             CaptureMoveSource(move, swapPartner != null);
@@ -1083,6 +1086,19 @@ namespace YGOPortable.Core
             var from = (move.fromCon, move.fromLoc, move.fromSeq);
             var to = (move.toCon, move.toLoc, move.toSeq);
             return from != to && (slot == from || slot == to);
+        }
+
+        private void TrackNegatedGraveMovement(CardMoveEvent move)
+        {
+            if (move.toLoc != YgoConstants.LOCATION_GRAVE) return;
+            for (int i = CurrentChain.Count - 1; i >= 0; i--)
+            {
+                var link = CurrentChain[i];
+                if (!link.ActivationNegated || link.NegatedGraveController.HasValue || link.code != move.code ||
+                    link.ActivationSource != (move.fromCon, move.fromLoc, move.fromSeq)) continue;
+                link.NegatedGraveController = move.toCon;
+                break;
+            }
         }
 
         private void FollowPublicChainSources(CardMoveEvent move, CardMoveEvent partner)
@@ -1601,6 +1617,7 @@ namespace YGOPortable.Core
                         triggerLoc = tLoc,
                         triggerSeq = tSeq,
                         description = desc,
+                        ActivationSource = (source.controller, source.location, source.sequence),
                         ActivationReadout = activation,
                         PublicFieldSource = activation != null ? (activation.controller, activation.location, activation.sequence) : null,
                     };

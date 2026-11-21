@@ -3116,7 +3116,9 @@ namespace YGOPortable.UI
             if (animator != null)
                 animator.QueueChainOutcome(() => link.negated
                     ? (animator.GetPoint(_boardRect, new Vector2(.50f, .62f)), 306f)
-                    : ReadChainResolutionLayout(animator), link);
+                    : ReadChainResolutionLayout(animator), link, () => link.NegatedGraveController is { } owner
+                    ? animator.GetPoint(GetStack(owner, YgoConstants.LOCATION_GRAVE).root, Vector2.one * .5f)
+                    : null);
             if (!link.AppliedColumnNegation || link.negated) return;
             if (animator != null)
                 animator.QueueFieldReadoutUpdate(() => ApplyColumnNegation(link));

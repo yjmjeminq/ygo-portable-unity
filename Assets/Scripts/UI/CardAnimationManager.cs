@@ -472,9 +472,10 @@ namespace YGOPortable.UI
             QueueStep(ChainResolution(readLayout, link, compact));
         }
 
-        internal void QueueChainOutcome(Func<(Vector2 Center, float MaxHeight)> readLayout, ChainLinkInfo link)
+        internal void QueueChainOutcome(Func<(Vector2 Center, float MaxHeight)> readLayout, ChainLinkInfo link,
+            Func<Vector2?> readGrave)
         {
-            QueueStep(ChainOutcome(readLayout, link));
+            QueueStep(ChainOutcome(readLayout, link, readGrave));
         }
 
         internal void QueueFieldRays(RectTransform source, IReadOnlyList<RectTransform> targets, DuelEffectKind kind, Color tint)
@@ -1695,7 +1696,8 @@ namespace YGOPortable.UI
             static Vector2 BadgePoint(CardPose pose) => pose.Position + new Vector2(pose.Size.x * .49f, pose.Size.y * .03f);
         }
 
-        private IEnumerator ChainOutcome(Func<(Vector2 Center, float MaxHeight)> readLayout, ChainLinkInfo link)
+        private IEnumerator ChainOutcome(Func<(Vector2 Center, float MaxHeight)> readLayout, ChainLinkInfo link,
+            Func<Vector2?> readGrave)
         {
             // A response prompt may have paused this link before its resolution preview could show the outcome.
             if (_shownChainOutcomes.Remove(link)) yield break;
@@ -1703,6 +1705,7 @@ namespace YGOPortable.UI
                 live: link.ResolutionReadout ?? link.ActivationReadout) : null;
             var cardOpacity = card != null ? card.gameObject.AddComponent<CanvasGroup>() : null;
             var result = CreateChainOutcomeVisual(_layer, link);
+            var impact = result.GetComponentInChildren<DuelEffectGraphic>();
             yield return Animate(link.negated ? .48f : .24f, t =>
             {
                 var (center, maxHeight) = readLayout();
@@ -1717,6 +1720,8 @@ namespace YGOPortable.UI
                     ApplyPose(card, new CardPose(center + shake, size * Mathf.Lerp(1.13f, 1f, settle), -2f));
                     cardOpacity.alpha = Mathf.Min(settle * 2f, remaining);
                 }
+                if (impact.Kind == DuelEffectKind.ChainShatter && readGrave() is { } grave)
+                    impact.ShardTravel = grave - center;
                 ApplyChainOutcomePose(result, center, size, t);
             });
             if (card != null) RemoveTransient(card.gameObject);
