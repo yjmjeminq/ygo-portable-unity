@@ -759,7 +759,7 @@ namespace YGOPortable.UI
             _responseAttackArrow = arrow.gameObject.AddComponent<DuelEffectGraphic>();
             _responseAttackArrow.texture = Texture2D.whiteTexture;
             _responseAttackArrow.Kind = DuelEffectKind.AttackPath;
-            _responseAttackArrow.Tint = DuelStyle.Player;
+            _responseAttackArrow.Tint = DuelStyle.ChainRed;
             _responseAttackArrow.raycastTarget = false;
             _responseAttackArrow.Seek(.66f);
             arrow.gameObject.SetActive(false);
@@ -3159,15 +3159,11 @@ namespace YGOPortable.UI
             return (animator.GetPoint(playArea, area.center), height);
         }
 
-        private Func<Vector2> CaptureAttackTarget(CardAnimationManager animator, byte attacker, byte target, uint location, uint sequence)
+        private RectTransform AttackTargetAnchor(byte attacker, byte target, uint location, uint sequence)
         {
-            if (location != 0)
-            {
-                var pose = GetCardPose(target, location, sequence, YgoConstants.POS_FACEUP_ATTACK);
-                if (pose.IsValid) return () => pose.AtLayout().Position;
-            }
-            var lp = attacker == _session.HumanPlayerIndex ? _oppLpText : _myLpText;
-            return () => animator.GetPoint(lp.rectTransform, Vector2.one * .5f);
+            if (location == 0)
+                return (attacker == _session.HumanPlayerIndex ? _oppLpText : _myLpText).rectTransform;
+            return GetSlot(target, location, sequence)?.root;
         }
 
         private void RefreshAttackResponseArrow()
@@ -3181,8 +3177,8 @@ namespace YGOPortable.UI
                 return;
             }
 
-            var target = _session.TargetLoc == 0 ? _myLpText.rectTransform :
-                GetSlot((byte)_session.TargetCon, _session.TargetLoc, _session.TargetSeq)?.root;
+            var target = AttackTargetAnchor((byte)_session.AttackerCon, (byte)_session.TargetCon,
+                _session.TargetLoc, _session.TargetSeq);
             if (target == null)
             {
                 _responseAttackArrow.gameObject.SetActive(false);
@@ -3206,8 +3202,9 @@ namespace YGOPortable.UI
             uint position = FindLiveCard(attacker, location, sequence)?.position ?? YgoConstants.POS_FACEUP_ATTACK;
             var from = GetDisplayedCardPose(attacker, location, sequence, 0, position);
             if (!from.IsValid) from = GetCardPose(attacker, location, sequence, position);
-            if (from.IsValid)
-                animator.QueueAttackArrow(from, CaptureAttackTarget(animator, attacker, target, targetLoc, targetSeq),
+            var destination = AttackTargetAnchor(attacker, target, targetLoc, targetSeq);
+            if (from.IsValid && destination != null)
+                animator.QueueAttackArrow(from, () => animator.GetPoint(destination, Vector2.one * .5f),
                     attacker != _session.HumanPlayerIndex);
         }
 
@@ -3221,7 +3218,9 @@ namespace YGOPortable.UI
             var resting = GetCardPose(attacker.Controller, attacker.Location, attacker.Sequence, attacker.Position);
             var from = GetDisplayedCardPose(attacker.Controller, attacker.Location, attacker.Sequence, card.code, attacker.Position);
             if (!from.IsValid) from = resting;
-            var readHit = CaptureAttackTarget(animator, attacker.Controller, defender.Controller, defender.Location, defender.Sequence);
+            var destination = AttackTargetAnchor(attacker.Controller, defender.Controller, defender.Location, defender.Sequence);
+            if (destination == null) return;
+            Vector2 ReadHit() => animator.GetPoint(destination, Vector2.one * .5f);
             var defendingCard = defender.Location == YgoConstants.LOCATION_MZONE
                 ? FindLiveCard(defender.Controller, defender.Location, defender.Sequence) : null;
             var combat = new DuelCardReadout(CardDatabase.Get(card.code), card, attacker);
@@ -3270,9 +3269,9 @@ namespace YGOPortable.UI
                 Refresh();
             }
             (Vector2 Hit, Vector2 AttackerArea, Vector2 DefenderArea) ReadLayout() =>
-                (readHit(), slot == null ? Vector2.zero : animator.GetAreaSize(slot.root),
+                (ReadHit(), slot == null ? Vector2.zero : animator.GetAreaSize(slot.root),
                     targetSlot == null ? Vector2.zero : animator.GetAreaSize(targetSlot.root));
-            animator.QueueAttack(flight, readHit(), defender.Location == 0, attacker.Controller != viewer, readout, combat, statSize,
+            animator.QueueAttack(flight, ReadHit(), defender.Location == 0, attacker.Controller != viewer, readout, combat, statSize,
                 Finish, Start, ReadLayout);
         }
 
@@ -3424,8 +3423,13 @@ namespace YGOPortable.UI
             {
                 int before = (int)Math.Round(displayed);
                 double distance = Math.Abs(remaining);
-                double step = Math.Max(1200d, distance * 6.5d) * playbackDelta;
-                displayed = step >= distance ? target : displayed + Math.Sign(remaining) * step;
+                const double decay = 6.5d, minimumRate = 1200d;
+                const double threshold = minimumRate / decay;
+                double decelerationTime = distance > threshold ? Math.Log(distance / threshold) / decay : 0d;
+                double after = playbackDelta < decelerationTime
+                    ? distance * Math.Exp(-decay * playbackDelta)
+                    : Math.Max(0d, Math.Min(distance, threshold) - minimumRate * (playbackDelta - decelerationTime));
+                displayed = target - Math.Sign(remaining) * after;
                 int lifePoints = (int)Math.Round(displayed);
                 if (lifePoints != before)
                 {

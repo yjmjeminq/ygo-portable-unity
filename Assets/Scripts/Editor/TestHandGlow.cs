@@ -1838,6 +1838,9 @@ namespace YGOPortable.Editor
             var animation = CardAnimationManager.Ensure(ui.Canvas);
             var changes = new List<(byte Player, int Delta, int Lp, LifePointChangeKind Kind)>();
             duel.OnLifePointChange += (player, delta, lp, kind) => changes.Add((player, delta, lp, kind));
+            (uint Source, uint TargetLocation, uint TargetSequence)? attack = null;
+            duel.OnAttackDeclared += (_, _, sequence, _, targetLocation, targetSequence) =>
+                attack = (sequence, targetLocation, targetSequence);
             duel.SubmitResponseInt(6);
             YgoProjectBuilder.DriveUntilIdle(duel, ai);
             Require(duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_BATTLECMD &&
@@ -1871,7 +1874,27 @@ namespace YGOPortable.Editor
                 duel.Players[receiver].lp == 8000 - damage,
                 "The native recipient or amount of reflected or piercing damage was wrong.");
 
-            var steps = (Queue<IEnumerator>)typeof(CardAnimationManager).GetField("_steps", PrivateInstance).GetValue(animation);
+            var steps = AnimationSteps(animation);
+            Require(attack.HasValue && (attack.Value.TargetLocation == 0) == reflected,
+                "The native attack announced the wrong kind of target.");
+            var cue = steps.Single(step => step.GetType().Name.StartsWith("<AttackArrow>", StringComparison.Ordinal));
+            Require(cue.MoveNext() && cue.Current is IEnumerator, "The native declaration did not show a targeting line.");
+            var sampleArrow = TestCardPresentation.SampleAnimation((IEnumerator)cue.Current);
+            var arrow = animation.transform.Find("AttackPath").GetComponent<DuelEffectGraphic>();
+            var fieldRoot = ui.Field.Root.transform;
+            var source = (RectTransform)fieldRoot.Find($"DuelBoard/Zone_{attack.Value.Source + 2}_3");
+            var destination = reflected
+                ? (RectTransform)fieldRoot.Find("OpponentHUD/Status/Readout/Value/Text")
+                : (RectTransform)fieldRoot.Find($"DuelBoard/Zone_{6 - attack.Value.TargetSequence}_1");
+            Canvas.ForceUpdateCanvases();
+            sampleArrow(.63f);
+            var from = animation.GetPoint(source, Vector2.one * .5f);
+            var to = animation.GetPoint(destination, Vector2.one * .5f);
+            Require(Vector2.Distance(arrow.rectTransform.anchoredPosition, (from + to) * .5f) < .16f &&
+                    Mathf.Abs(arrow.rectTransform.sizeDelta.x - Vector2.Distance(from, to)) < .16f &&
+                    arrow.Tint.r > arrow.Tint.g && !arrow.raycastTarget,
+                "The declared attack did not track the native target or the directly attacked opponent's LP.");
+            Require(!cue.MoveNext(), "The attack declaration left its targeting visual active.");
             if (!reflected)
             {
                 var flip = steps.First(step => step.GetType().Name.StartsWith("<MoveCard>", StringComparison.Ordinal));
@@ -1884,15 +1907,30 @@ namespace YGOPortable.Editor
             var board = (RectTransform)ui.Field.Root.transform.Find("DuelBoard");
             Vector2 boardRest = board.anchoredPosition;
             bool shook = false;
+            bool verifiedRoll = false;
             TestCardPresentation.VerifyAttackFlight(animation, "1900", "0", "4", () =>
             {
-                advanceLife.Invoke(ui.Field, new object[] { 1f });
                 var popup = (RectTransform)animation.transform.Find("LPChange");
                 if (animation.transform.Find("Strike") == null)
                 {
+                    advanceLife.Invoke(ui.Field, new object[] { .016f });
                     Require(popup == null && total.text == "8000", "The LP changed before the actual strike.");
                     return;
                 }
+                if (!verifiedRoll)
+                {
+                    advanceLife.Invoke(ui.Field, new object[] { .20f });
+                    int longFrame = int.Parse(total.text);
+                    Require(longFrame > 8000 - damage && longFrame < 8000, "The damage did not start a visible LP countdown.");
+                    typeof(DuelFieldUI).GetField(reflected ? "_myDisplayLp" : "_oppDisplayLp", PrivateInstance)
+                        .SetValue(ui.Field, 8000d);
+                    for (int i = 0; i < 20; i++)
+                        advanceLife.Invoke(ui.Field, new object[] { .01f });
+                    Require(Math.Abs(int.Parse(total.text) - longFrame) <= 1,
+                        "The LP countdown speed changed significantly with frame rate.");
+                    verifiedRoll = true;
+                }
+                advanceLife.Invoke(ui.Field, new object[] { 1f });
                 Require(popup != null && popup.anchoredPosition == animation.GetPoint(anchor, Vector2.one * .5f) &&
                     popup.Find("Kind/Text").GetComponent<Text>().text == "전투 피해" &&
                     popup.Find("Value/Text").GetComponent<Text>().text == $"-{damage}" && total.text == (8000 - damage).ToString(),
@@ -1902,8 +1940,8 @@ namespace YGOPortable.Editor
                 Require(sparks.Kind == DuelEffectKind.LifeSparks && sparks.Tint.r > sparks.Tint.g && !sparks.raycastTarget,
                     "Damage did not generate red particles on the correct HUD.");
             });
-            Require(shook && (board.anchoredPosition - boardRest).sqrMagnitude < .0001f,
-                "Damage did not shake the playing area and return it to rest.");
+            Require(verifiedRoll && shook && (board.anchoredPosition - boardRest).sqrMagnitude < .0001f,
+                "Damage did not roll the LP, shake the playing area and return it to rest.");
             Require(animation.transform.Find("LPChange") == null &&
                 !steps.Any(step => step.GetType().Name.StartsWith("<PlayLifeChanges>", StringComparison.Ordinal)),
                 "The same battle damage was queued again after contact.");

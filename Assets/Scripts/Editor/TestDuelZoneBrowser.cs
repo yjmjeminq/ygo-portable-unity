@@ -1235,9 +1235,15 @@ namespace YGOPortable.Editor
 
                 Modals.ShowPrompt(_duel, response);
                 Field.Refresh();
-                Require(arrow.gameObject.activeInHierarchy && title.text.Contains("공격 선언"),
-                    "An attack response did not show the declaration and arrow.");
+                Require(arrow.gameObject.activeInHierarchy && title.text.Contains("공격 선언") &&
+                    arrow.GetComponent<DuelEffectGraphic>().Tint == DuelStyle.ChainRed,
+                    "An attack response did not show the declaration and red arrow.");
 
+                uint original = _duel.TargetSeq;
+                _duel.TargetSeq = 8;
+                Field.Refresh();
+                Require(!arrow.gameObject.activeSelf, "An unresolvable field target was presented as a direct attack.");
+                _duel.TargetSeq = original;
                 _duel.TargetLoc = 0;
                 Modals.ShowPrompt(_duel, response);
                 Field.Refresh();
