@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -26,20 +25,8 @@ namespace YGOPortable.UI
             99330325, 48130397, 10000080, 102380, 55063751, 8267140, 23002292, 35480699, 35269904, 19613556,
         };
 
-        [Serializable]
-        private sealed class RegulationSnapshot
-        {
-            public string effective;
-            public int[] forbidden;
-            public int[] limited;
-            public int[] semiLimited;
-        }
-
-        private static Dictionary<int, int> _referenceLimits;
-        private static string _regulationDate;
         private int _quickFilter;
         private ScrollRect _quickFilterScroll;
-        private RectTransform _quickFilterLegend;
         private Button[] _quickFilterButtons;
         private Text[] _quickFilterCaptions;
 
@@ -91,12 +78,6 @@ namespace YGOPortable.UI
             content.sizeDelta = new Vector2(x, 0f);
             content.anchoredPosition = Vector2.zero;
             SetQuickFilter(0, refresh: false);
-
-            LoadReferenceLimits();
-            var legend = _quickFilterLegend = LotdUiKit.CreateRect("RegulationLegend", panel, new Vector2(0f, .668f),
-                new Vector2(1f, .699f), left, right);
-            LotdUiKit.AddFittedText(legend, "Text", $"OCG 참고 {_regulationDate}  ·  0 금지  1 제한  2 준제한",
-                14, 10, TextAnchor.MiddleLeft, LotdUiKit.TextMuted);
         }
 
         private void LayoutMobileQuickFilters()
@@ -106,8 +87,7 @@ namespace YGOPortable.UI
             float minimum = MobileSafeArea.MinimumTouchSize(_trunkPanel) + 2f;
             float bottom = top - Mathf.Min(.24f, minimum / _trunkPanel.rect.height);
             SetVerticalAnchors((RectTransform)_quickFilterScroll.transform, bottom, top);
-            SetVerticalAnchors(_quickFilterLegend, bottom - .037f, bottom - .004f);
-            SetVerticalAnchors((RectTransform)_trunkScroll.transform, .101f, bottom - .043f);
+            SetVerticalAnchors((RectTransform)_trunkScroll.transform, .101f, bottom - .008f);
         }
 
         private void SetQuickFilter(int filter, bool refresh = true)
@@ -131,50 +111,5 @@ namespace YGOPortable.UI
             BoardBreakerFilter => BoardBreakers.Contains(DeckGroupKey(card.code)),
             _ => (card.type & QuickFilterTypes[_quickFilter]) != 0,
         };
-
-        private static void LoadReferenceLimits()
-        {
-            if (_referenceLimits != null) return;
-            _referenceLimits = new Dictionary<int, int>();
-            var asset = Resources.Load<TextAsset>("DeckReferenceLimits");
-            if (asset == null) return;
-            var snapshot = JsonUtility.FromJson<RegulationSnapshot>(asset.text);
-            _regulationDate = snapshot.effective.Replace('-', '.');
-            foreach (int id in snapshot.forbidden) _referenceLimits[id] = 0;
-            foreach (int id in snapshot.limited) _referenceLimits[id] = 1;
-            foreach (int id in snapshot.semiLimited) _referenceLimits[id] = 2;
-        }
-
-        private static void BuildRegulationBadge(CompositeCardView card)
-        {
-            var badge = LotdUiKit.CreateRect("Regulation", card.transform.Find("AspectBox"),
-                new Vector2(.68f, .79f), new Vector2(.981f, .985f), Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(badge.gameObject, LotdUiKit.WhiteSprite, Color.white, false, false);
-            var label = LotdUiKit.AddFittedText(badge, "Label", "", 20, 8, TextAnchor.MiddleCenter,
-                Color.white, FontStyle.Bold);
-            label.raycastTarget = false;
-            var outline = badge.gameObject.AddComponent<Outline>();
-            outline.effectColor = new Color(0.04f, 0.05f, 0.09f);
-            outline.effectDistance = new Vector2(1.25f, -1.25f);
-            badge.gameObject.SetActive(false);
-        }
-
-        private static void RefreshRegulationBadge(CompositeCardView view, uint code)
-        {
-            var badge = view.transform.Find("AspectBox/Regulation");
-            var card = CardDatabase.Get(DeckGroupKey(code)) ?? CardDatabase.Get(code);
-            int id = card == null ? 0 : card.konamiId > 0 ? card.konamiId : card.lotdId;
-            LoadReferenceLimits();
-            bool visible = _referenceLimits.TryGetValue(id, out int limit);
-            badge.gameObject.SetActive(visible);
-            if (!visible) return;
-            badge.GetComponent<Image>().color = limit switch
-            {
-                0 => new Color(.74f, .11f, .18f),
-                1 => new Color(.69f, .30f, .06f),
-                _ => new Color(.12f, .43f, .70f),
-            };
-            badge.GetChild(0).GetComponent<Text>().text = limit.ToString();
-        }
     }
 }

@@ -60,7 +60,7 @@ namespace YGOPortable.Editor
                 UnityEngine.Object.DestroyImmediate(canvas);
                 CollectionProgress.AllDeckCardsAvailable = previousAccess;
             }
-            Debug.Log("[VERIFY DECK QOL] Related cards, chips, reference badges, quantities, autosort, recipe actions, test draws and mobile hit areas passed.");
+            Debug.Log("[VERIFY DECK QOL] Related cards, chips, quantities, autosort, recipe actions, test draws and mobile hit areas passed.");
         }
 
         private static void VerifyQuickSearch(DeckEditorUI editor)
@@ -102,17 +102,14 @@ namespace YGOPortable.Editor
             Require(strip.horizontalNormalizedPosition > 0f, "Controller focus did not reveal a clipped filter chip.");
             Call(editor, "ResetTrunkFilters");
 
+            var trunkPanel = Field<RectTransform>(editor, "_trunkPanel");
             var search = Field<InputField>(editor, "_searchInp");
+            search.text = Pot.ToString();
             var slots = Field<List<(RectTransform rt, CompositeCardView card, Text count, CardDragTrigger trigger)>>(editor, "_trunkPool");
-            foreach (var (code, expected) in new[] { (Pot, "0"), (18144506u, "1"), (48130397u, "2"), (BlueEyes, "") })
-            {
-                search.text = code.ToString();
-                var view = slots.Single(slot => slot.card.CurrentCode == code && slot.rt.gameObject.activeInHierarchy).card;
-                var badge = view.transform.Find("AspectBox/Regulation");
-                Require(expected.Length == 0 ? !badge.gameObject.activeSelf :
-                    badge.gameObject.activeSelf && badge.Find("Label").GetComponent<Text>().text == expected,
-                    $"Regulation badge was incorrect for {code}.");
-            }
+            var view = slots.Single(slot => slot.card.CurrentCode == Pot && slot.rt.gameObject.activeInHierarchy).card;
+            Require(trunkPanel.Find("RegulationLegend") == null &&
+                view.transform.Find("AspectBox/Regulation") == null,
+                "The trunk still showed an OCG reference block.");
             Call(editor, "ResetTrunkFilters");
         }
 
@@ -146,10 +143,9 @@ namespace YGOPortable.Editor
             Require(deck.main.Count == 2 && deck.side.Count == 1, "MAX did not count Side Deck copies.");
             Call(editor, "AddDeckCopies", Pot, DragSourceType.DeckMain, 3, null, null);
             Require(deck.main.Count(code => code == Pot) == 3,
-                "An OCG reference badge incorrectly blocked the existing local three-copy rule.");
+                "MAX did not preserve the existing local three-copy rule.");
             var badge = main.Find($"Card_{deck.main.IndexOf(Pot)}/CardInset/Card/AspectBox/Regulation");
-            Require(badge.gameObject.activeSelf && badge.Find("Label").GetComponent<Text>().text == "0",
-                "The deck card lacked its reference badge.");
+            Require(badge == null, "The deck card still showed an OCG reference badge.");
             var playable = new UserDeck
             {
                 main = Enumerable.Repeat(Pot, 3).Concat(CardDatabase.AllCards.Where(card => !card.IsExtra &&

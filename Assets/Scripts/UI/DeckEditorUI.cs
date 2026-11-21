@@ -518,7 +518,7 @@ namespace YGOPortable.UI
             BuildQuickFilters(col, insideLeft, insideRight);
 
             var scrollHolder = LotdUiKit.CreateRect("TrunkScrollHolder", col,
-                new Vector2(0f, .101f), new Vector2(1f, .662f), insideLeft, insideRight);
+                new Vector2(0f, .101f), new Vector2(1f, .694f), insideLeft, insideRight);
             LotdUiKit.AddImage(scrollHolder.gameObject, LotdUiKit.WhiteSprite, Color.clear);
             _trunkScroll = scrollHolder.gameObject.AddComponent<ScrollRect>();
             _trunkScroll.horizontal = false;
@@ -587,7 +587,6 @@ namespace YGOPortable.UI
                 var hit = LotdUiKit.AddImage(slot.gameObject, LotdUiKit.WhiteSprite, Color.clear);
                 var card = CompositeCardView.Create(LotdUiKit.FillRect("CardInset", slot, 1.8f), "Card");
                 DeckCardVisualMotion.Bind(card, hit);
-                BuildRegulationBadge(card);
                 var countBox = LotdUiKit.CreateRect("Copies", slot, new Vector2(0.24f, 0.032f), new Vector2(0.76f, 0.215f),
                     Vector2.zero, Vector2.zero);
                 LotdUiKit.AddImage(countBox.gameObject, LotdUiKit.WhiteSprite, TrunkCountBadgeColor, false, false);
@@ -778,7 +777,6 @@ namespace YGOPortable.UI
                 var hit = LotdUiKit.AddImage(slot.gameObject, LotdUiKit.WhiteSprite, Color.clear);
                 var card = CompositeCardView.Create(LotdUiKit.FillRect("CardInset", slot, 1.8f), "Card");
                 DeckCardVisualMotion.Bind(card, hit);
-                BuildRegulationBadge(card);
                 var trigger = slot.gameObject.AddComponent<CardDragTrigger>();
                 trigger.SourceType = source;
                 var badge = LotdUiKit.CreateRect("Unowned", card.transform.Find("AspectBox"),
@@ -973,7 +971,6 @@ namespace YGOPortable.UI
                 uint code = _trunkResults[index].code;
                 if (view.CurrentCode != code) ResetCardBinding(rect, view);
                 view.SetCard(code);
-                RefreshRegulationBadge(view, code);
 
                 var countBox = count.transform.parent;
                 var countBackground = countBox.GetComponent<Image>();
@@ -1060,7 +1057,6 @@ namespace YGOPortable.UI
                 uint code = cards[i];
                 int index = i;
                 view.SetCard(code);
-                RefreshRegulationBadge(view, code);
                 view.transform.Find("AspectBox/Unowned").gameObject.SetActive(CollectionProgress.RequiresOwnedCardsForDecks &&
                     CollectionProgress.GetOwnedCount(code) == 0);
                 trigger.CardCodeGetter = () => code;
