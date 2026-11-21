@@ -1842,17 +1842,19 @@ namespace YGOPortable.UI
 
             bool selected = IsPlacePending(con, loc, seq);
             bool place = IsPlaceSelectable(con, loc, seq);
-            bool drag = !opponent && live == null && (loc == YgoConstants.LOCATION_MZONE && _dragHighlightMZone ||
+            bool drag = !opponent && (loc == YgoConstants.LOCATION_MZONE && _dragHighlightMZone ||
                 loc == YgoConstants.LOCATION_SZONE && _dragHighlightSZone);
-            bool handDrag = drag && CardDragManager.Instance?.CurrentSource == DragSourceType.Hand;
-            bool dragCandidate = handDrag && (place || IsHandDragPlacement(con, loc, seq));
+            var gesture = CardDragManager.Instance;
+            bool handDrag = gesture is { IsDragging: true, CurrentSource: DragSourceType.Hand };
+            bool dragCandidate = handDrag && drag && (place ||
+                CanPlaceHandCard(CardDatabase.Get(gesture.CurrentCode), con, loc, seq));
             slot.bgImg.SetDragCandidate(dragCandidate);
             bool attack = opponent && loc == YgoConstants.LOCATION_MZONE && _dragHighlightAttack && interactive;
             bool action = interactive && CanAcceptPlayerAction && HasFieldAction(con, loc, seq);
             Color highlight = cardSelected ? DuelStyle.Gold : attack ? DuelStyle.Opponent :
                 cardChoice || selected || action ? DuelStyle.Player :
                 place ? new Color(.98f, .89f, .29f) :
-                dragCandidate ? DuelStyle.ChainCyan : drag && !handDrag ? DuelStyle.Gold : Color.clear;
+                dragCandidate ? DuelStyle.ChainCyan : drag && !handDrag && live == null ? DuelStyle.Gold : Color.clear;
             slot.bgImg.color = highlight.a > 0f
                 ? new Color(highlight.r, highlight.g, highlight.b, selected || cardSelected || attack ? .64f : place ? .09f : .32f) : ZoneTint;
             slot.border.effectColor = place ? Color.clear : highlight;
@@ -2387,6 +2389,11 @@ namespace YGOPortable.UI
             if (p == null) return;
 
             byte me = (byte)_session.HumanPlayerIndex;
+            if (!MatchesDraggedHandCard(me, handSeq, cardCode))
+            {
+                Refresh();
+                return;
+            }
             var actions = CollectActions(me, YgoConstants.LOCATION_HAND, handSeq);
             if (actions.Count == 1)
             {
@@ -2422,6 +2429,12 @@ namespace YGOPortable.UI
             }
 
             var card = CardDatabase.Get(cardCode);
+            if (!MatchesDraggedHandCard(con, handSeq, cardCode) || !CanPlaceHandCard(card, con, loc, seq))
+            {
+                Refresh();
+                return;
+            }
+
             var actions = CollectActions(con, YgoConstants.LOCATION_HAND, handSeq);
             actions.RemoveAll(action => HandActionPlacement(p.messageType, card, action.responseVal) != loc);
             var placement = (con, loc, seq);
@@ -2431,6 +2444,12 @@ namespace YGOPortable.UI
                 ShowCardActionsPopup(con, YgoConstants.LOCATION_HAND, handSeq, cardCode, null, placement, actions);
             else
                 Refresh();
+        }
+
+        private bool MatchesDraggedHandCard(byte controller, uint sequence, uint code)
+        {
+            var hand = _session.Players[controller].hand;
+            return sequence < hand.Count && hand[(int)sequence]?.code == code;
         }
 
         private static uint HandActionPlacement(byte messageType, CardInfo card, int response)
@@ -3476,14 +3495,10 @@ namespace YGOPortable.UI
                 location = YgoConstants.LOCATION_SZONE;
             else return false;
 
-            var player = _session.Players[source.controller];
-            var zones = location == YgoConstants.LOCATION_MZONE ? player.mzone : player.szone;
-            uint disabled = _session.FieldDisabledMask >> (16 * source.controller + (location == YgoConstants.LOCATION_SZONE ? 8 : 0));
-            bool fieldSpell = (card.type & YgoConstants.TYPE_FIELD) != 0;
             uint available = 0;
-            for (int i = fieldSpell ? 5 : 0; i < (fieldSpell ? 6 : 5); i++)
-                if (zones[i] == null && (disabled & (1u << i)) == 0)
-                    available |= 1u << i;
+            for (uint i = 0; i < 6; i++)
+                if (CanPlaceHandCard(card, source.controller, location, i))
+                    available |= 1u << (int)i;
             if (available == 0) return false;
 
             _stagedPlacement = (_session.ActivePrompt, response, source.code, location, available, _cardActionArt);

@@ -44,6 +44,7 @@ namespace YGOPortable.Editor
             VerifyNativeImpermanenceRay(setFirst: true);
             VerifyNativeImpermanenceRay(setFirst: false);
             VerifyDragColumnAndPhaseShortcut();
+            VerifyNativeFieldSpellDrag();
             VerifyDestroyedCopiesKeepTheirReadouts();
             VerifyFieldReplacementReadouts();
             VerifyTurnAndDrawReadouts();
@@ -1298,6 +1299,15 @@ namespace YGOPortable.Editor
                         Mathf.Abs(Mathf.DeltaAngle(card.transform.localEulerAngles.x, 0f)) > 1f &&
                         animator.transform.Find("Chain").GetComponent<DuelEffectGraphic>().Tint == DuelStyle.ChainGold,
                         "The activation missed the badge impact, card tilt or golden radial aura.");
+                    var wave = animator.transform.Find("ChainImpactWave").GetComponent<DuelEffectGraphic>();
+                    Require(wave.Tint == DuelStyle.ChainCyan && !wave.raycastTarget &&
+                        wave.rectTransform.anchoredPosition == counter.anchoredPosition,
+                        "The player's shockwave did not originate at the cyan badge.");
+                    sample(.48f);
+                    float initialWave = EffectExtent(wave);
+                    sample(.88f);
+                    Require(initialWave > 0f && EffectExtent(wave) > initialWave + 5f,
+                        "The chain medallion's shockwave did not expand during the impact.");
                     sample(.98f);
                     Require(Mathf.Abs(counter.localScale.x - 1f) < .01f, "The chain badge did not settle at full size.");
                     sample(.57f);
@@ -1346,6 +1356,23 @@ namespace YGOPortable.Editor
             }
             animator.Clear();
             Debug.Log($"[VERIFY DUEL CHAIN CARD FACE] Verified the native activation and resolution previews with response {responseCode}.");
+        }
+
+        private static float EffectExtent(DuelEffectGraphic effect)
+        {
+            Canvas.ForceUpdateCanvases();
+            using var mesh = new VertexHelper();
+            var populate = typeof(DuelEffectGraphic).GetMethod("OnPopulateMesh", PrivateInstance, types: new[] { typeof(VertexHelper) },
+                binder: null, modifiers: null);
+            populate.Invoke(effect, new object[] { mesh });
+            var vertex = new UIVertex();
+            float extent = 0f;
+            for (int i = 0; i < mesh.currentVertCount; i++)
+            {
+                mesh.PopulateUIVertex(ref vertex, i);
+                extent = Mathf.Max(extent, vertex.position.magnitude);
+            }
+            return extent;
         }
 
         private static void VerifyDestroyedCopiesKeepTheirReadouts()
@@ -2603,6 +2630,16 @@ namespace YGOPortable.Editor
                 Require(duel.HasUsedSharedTurnEffect((byte)duel.AiPlayerIndex, AshBlossom),
                     "The native hand effect was not recorded for once-per-turn feedback.");
 
+            var opposingCutIn = AnimationSteps(animator).Last(step =>
+                step.GetType().Name.StartsWith("<ChainActivation>", StringComparison.Ordinal));
+            Require(opposingCutIn.MoveNext() && opposingCutIn.Current is IEnumerator, "The opposing activation did not appear.");
+            TestCardPresentation.SampleAnimation((IEnumerator)opposingCutIn.Current)(.67f);
+            var wave = animator.transform.Find("ChainImpactWave").GetComponent<DuelEffectGraphic>();
+            var edge = animator.transform.Find("ChainCount/NeonEdge").GetComponent<Image>();
+            Require(wave.Tint == DuelStyle.ChainRed && edge.color == DuelStyle.ChainRed && EffectExtent(wave) > 0f,
+                "The opposing activation did not use a crimson badge and wave.");
+            while (opposingCutIn.MoveNext()) { }
+
             var outcome = AnimationSteps(animator).Last(step => step.GetType().Name.StartsWith("<ChainOutcome>", StringComparison.Ordinal));
             Require(outcome.MoveNext() && outcome.Current is IEnumerator, "The negated link did not get a separate outcome.");
             TestCardPresentation.SampleAnimation((IEnumerator)outcome.Current)(.52f);
@@ -2734,7 +2771,28 @@ namespace YGOPortable.Editor
             Require(board.GetComponentsInChildren<DuelZoneImage>().All(zone => !zone.ColumnGuided && !zone.DragCandidate),
                 "The canceled drag left a lit placement zone.");
 
-            var human = duel.HumanPlayerIndex;
+            int human = duel.HumanPlayerIndex;
+            var stillWaiting = duel.ActivePrompt;
+            var fieldLock = typeof(DuelSession).GetProperty(nameof(DuelSession.FieldDisabledMask));
+            uint baseline = duel.FieldDisabledMask;
+            fieldLock.SetValue(duel, baseline | (1u << (human * 16 + 2)));
+            drag.StartDrag(DragSourceType.Hand, option.code, (int)option.sequence, screenPosition: point);
+            type.GetMethod("HandleDuelDragStarted", PrivateInstance).Invoke(ui.Field,
+                new object[] { DragSourceType.Hand, option.code, (int)option.sequence, null });
+            Require(!slot.GetComponent<DuelZoneImage>().DragCandidate &&
+                board.GetComponentsInChildren<DuelZoneImage>().Count(zone => zone.DragCandidate) == 4,
+                "A disabled monster zone was indicated as a valid drop destination.");
+            drag.CancelDrag();
+            type.GetMethod("HandleDuelCardDrop", PrivateInstance).Invoke(ui.Field, new object[] { new DragContext
+            {
+                SourceType = DragSourceType.Hand, SourceIndex = (int)option.sequence, CardCode = option.code,
+                DropPosition = point,
+            } });
+            Require(ReferenceEquals(stillWaiting, duel.ActivePrompt) &&
+                !ui.Field.Root.transform.Find("CardCommands").gameObject.activeSelf,
+                "Dropping into an invalid zone submitted an action or opened a misleading chooser.");
+            fieldLock.SetValue(duel, baseline);
+
             var end = ui.Field.Root.transform.Find("EndShortcut").GetComponent<Button>();
             Require(end.gameObject.activeInHierarchy, "A legal End Phase shortcut did not appear.");
             end.onClick.Invoke();
@@ -2742,6 +2800,64 @@ namespace YGOPortable.Editor
             Require(duel.TurnNumber == 2 && duel.TurnPlayer != human && duel.RetryCount == 0,
                 "The direct End Phase shortcut did not transfer the native turn.");
             Debug.Log("[VERIFY DUEL SHORTCUT] Drag column cleared and direct End Phase advanced the native duel.");
+        }
+
+        private static void VerifyNativeFieldSpellDrag()
+        {
+            const uint umi = 22702055;
+            var cards = Enumerable.Repeat(umi, 40).ToArray();
+            var enemy = Enumerable.Repeat(KaiserSeaHorse, 40).ToArray();
+            var empty = Array.Empty<uint>();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Field Zone replacement gesture", cards, empty,
+                enemy, empty, true, session => session.ActivePrompt?.sSetable.Any(option => option.code == umi) == true);
+            var ai = new TacticalAI();
+            int set = duel.ActivePrompt.sSetable.FindIndex(option => option.code == umi);
+            duel.SubmitResponseInt((set << 16) | 4);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            var prompt = duel.ActivePrompt;
+            var copy = prompt.sSetable.First(option => option.code == umi);
+            var human = duel.Players[duel.HumanPlayerIndex];
+            Require(human.szone[5]?.code == umi, "The native fixture did not have an occupied Field Zone.");
+            using var ui = new HandUI(duel);
+            var drag = CardDragManager.Ensure(ui.Canvas);
+            var type = typeof(DuelFieldUI);
+            var board = ui.Field.Root.transform.Find("DuelBoard");
+            var drop = (RectTransform)board.Find("Zone_4_4");
+            Canvas.ForceUpdateCanvases();
+            Vector2 point = RectTransformUtility.WorldToScreenPoint(null, drop.TransformPoint(drop.rect.center));
+            drag.StartDrag(DragSourceType.Hand, copy.code, (int)copy.sequence, screenPosition: point);
+            type.GetMethod("HandleDuelDragStarted", PrivateInstance).Invoke(ui.Field,
+                new object[] { DragSourceType.Hand, copy.code, (int)copy.sequence, null });
+            var legal = board.GetComponentsInChildren<DuelZoneImage>().Where(zone => zone.DragCandidate).ToArray();
+            var fieldZone = (RectTransform)board.Find("Zone_1_3");
+            Require(legal.Length == 1 && legal[0].transform == fieldZone,
+                $"A Field Spell marked [{string.Join(", ", legal.Select(zone => zone.name))}] instead of its occupied Field Zone.");
+            drag.CancelDrag();
+            type.GetMethod("HandleDuelCardDrop", PrivateInstance).Invoke(ui.Field, new object[] { new DragContext
+            {
+                SourceType = DragSourceType.Hand, SourceIndex = (int)copy.sequence, CardCode = umi, DropPosition = point,
+            } });
+            Require(ReferenceEquals(prompt, duel.ActivePrompt) && !ui.Field.Root.transform.Find("CardCommands").gameObject.activeSelf,
+                "Dropping a Field Spell into a standard Spell and Trap Zone triggered a command.");
+            int handBefore = human.hand.Count;
+            int graveBefore = human.grave.Count;
+            Vector2 fieldPoint = RectTransformUtility.WorldToScreenPoint(null, fieldZone.TransformPoint(fieldZone.rect.center));
+            type.GetMethod("HandleDuelCardDrop", PrivateInstance).Invoke(ui.Field, new object[] { new DragContext
+            {
+                SourceType = DragSourceType.Hand, SourceIndex = (int)copy.sequence, CardCode = umi, DropPosition = fieldPoint,
+            } });
+            var chooser = ui.Field.Root.transform.Find("CardCommands");
+            if (chooser.gameObject.activeSelf)
+            {
+                var setAction = chooser.GetComponentsInChildren<Button>().Single(button => button.transform != chooser &&
+                    button.GetComponentsInChildren<Text>().Any(text => text.text == "마법·함정 세트"));
+                setAction.onClick.Invoke();
+            }
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            Require(human.hand.Count == handBefore - 1 && human.grave.Count == graveBefore + 1 &&
+                    human.szone[5]?.code == umi && duel.RetryCount == 0,
+                "Dropping onto the valid occupied Field Zone did not replace the native card.");
+            Debug.Log("[VERIFY DUEL HAND PLACEMENT] The only highlighted zone accepted Field Spell replacement and the invalid drop submitted nothing.");
         }
 
         private static void VerifyNativeCoLinkedZone()

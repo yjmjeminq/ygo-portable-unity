@@ -6,7 +6,7 @@ namespace YGOPortable.UI
     internal enum DuelEffectKind
     {
         AttackPath, Strike, Break, Token, Summon, Chain, Fusion, Synchro, Xyz, Link, Ritual, Pendulum, XyzMaterial,
-        SummonMaterial, BanishTransit, EquipLink, ChainNegated, ChainShatter, ChainApplied, DisabledChains, ColumnRay, LinkRay, LiveLinkDirections, LifeSparks, ActionArc
+        SummonMaterial, BanishTransit, EquipLink, ChainNegated, ChainShatter, ChainApplied, DisabledChains, ColumnRay, LinkRay, LiveLinkDirections, LifeSparks, ActionArc, ChainImpactWave
     }
 
     // Canvas particles and tracks use one mesh, with white fill and vertex tints.
@@ -126,6 +126,9 @@ namespace YGOPortable.UI
                         Ring(mesh, rect.center, radius * (.65f + .07f * i), 1.18f, (i + 1) * 1.4f, i / 4f + t * .35f,
                             .15f, Shade(Color.Lerp(Tint, Color.white, .37f), glow), 44);
                     Sparks(mesh, rect.center, radius, travel, glow, 22, true);
+                    break;
+                case DuelEffectKind.ChainImpactWave:
+                    DrawChainImpactWave(mesh, rect.center, radius, t, travel, glow);
                     break;
                 case DuelEffectKind.ChainNegated:
                 case DuelEffectKind.ChainShatter:
@@ -322,6 +325,18 @@ namespace YGOPortable.UI
                     break;
             }
             Sparks(mesh, center, radius * 1.07f, t, glow, 34, Kind != DuelEffectKind.Xyz);
+        }
+
+        private void DrawChainImpactWave(VertexHelper mesh, Vector2 center, float radius, float progress,
+            float travel, float glow)
+        {
+            var white = Color.Lerp(Tint, Color.white, .74f);
+            float distance = radius * (.47f + .70f * travel);
+            float width = Mathf.Lerp(4.4f, 1.1f, progress);
+            Ring(mesh, center, distance, .85f, width, 0f, 1f, Shade(Tint, glow), 6);
+            Ring(mesh, center, distance, .85f, width * .35f, 0f, 1f, Shade(white, glow), 6);
+            if (progress > .18f)
+                Ring(mesh, center, distance * .82f, .85f, 1.2f, 0f, 1f, Shade(Tint, glow * .44f), 6);
         }
 
         private void DrawLiveLinkDirections(VertexHelper mesh, Rect rect, float phase)

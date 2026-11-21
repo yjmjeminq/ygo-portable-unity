@@ -1580,8 +1580,10 @@ namespace YGOPortable.UI
             var flash = DuelStyle.AddActivationGlow(card.transform.Find("AspectBox"), height * .025f, behind: false);
             flash.gameObject.SetActive(true);
             flash.canvasRenderer.SetAlpha(0f);
-            var badge = ChainBadge(_layer, center + new Vector2(side * (reveal.Size.x * .52f + height * .25f), -height * .35f), chainNumber,
-                height * .32f, active: true, opponent: opponent);
+            var badgePoint = center + new Vector2(side * (reveal.Size.x * .52f + height * .25f), -height * .35f);
+            var wave = CreateEffect(DuelEffectKind.ChainImpactWave, badgePoint, Vector2.one * (height * .76f),
+                opponent ? DuelStyle.ChainRed : DuelStyle.ChainCyan);
+            var badge = ChainBadge(_layer, badgePoint, chainNumber, height * .32f, active: true, opponent: opponent);
             var badgeOpacity = badge.gameObject.AddComponent<CanvasGroup>();
             badgeOpacity.alpha = 0f;
             badge.localScale = Vector3.one * 1.6f;
@@ -1595,7 +1597,9 @@ namespace YGOPortable.UI
                 flash.canvasRenderer.SetAlpha(Mathf.SmoothStep(0f, .86f, (t - .22f) * 2.2f));
                 float impact = Mathf.Clamp01((t - .26f) / .62f);
                 badgeOpacity.alpha = Mathf.SmoothStep(0f, 1f, impact * 5f);
-                badge.localScale = Vector3.one * Mathf.Lerp(1.6f, 1f, 1f - Mathf.Pow(1f - impact, 3f));
+                wave.Seek(impact * .68f);
+                float rebound = Mathf.Sin(impact * Mathf.PI * 2.25f) * impact * (1f - impact) * .18f;
+                badge.localScale = Vector3.one * (Mathf.Lerp(1.6f, 1f, 1f - Mathf.Pow(1f - impact, 3f)) + rebound);
                 ApplyFlight(card, lift, t, height * .095f);
                 TiltChainCard(card, side, t);
             });
@@ -1603,6 +1607,7 @@ namespace YGOPortable.UI
             yield return Animate(.24f, t =>
             {
                 crest.Seek(.58f + t * .42f);
+                wave.Seek(.68f + t * .32f);
                 float returning = Mathf.Clamp01((t - .22f) / .78f);
                 flash.canvasRenderer.SetAlpha(1f - returning);
                 badgeOpacity.alpha = opacity.alpha = 1f - returning;
@@ -1611,6 +1616,7 @@ namespace YGOPortable.UI
             });
             RemoveTransient(card.gameObject);
             RemoveTransient(crest.gameObject);
+            RemoveTransient(wave.gameObject);
             RemoveTransient(badge.gameObject);
             RemoveTransient(overlay.gameObject);
         }

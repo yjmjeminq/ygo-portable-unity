@@ -119,18 +119,24 @@ namespace YGOPortable.UI
             SetDragColumnGuide(column);
         }
 
-        private bool IsHandDragPlacement(byte controller, uint location, uint sequence)
+        private bool CanPlaceHandCard(CardInfo card, byte controller, uint location, uint sequence)
         {
-            if (CardDragManager.Instance is not { IsDragging: true, CurrentSource: DragSourceType.Hand } drag ||
-                controller != _session.HumanPlayerIndex) return false;
-            uint zoneShift = (uint)(16 * controller + (location == YgoConstants.LOCATION_SZONE ? 8 : 0));
-            if ((_session.FieldDisabledMask & (1u << (int)(zoneShift + sequence))) != 0) return false;
-            if (location == YgoConstants.LOCATION_MZONE) return sequence < 5;
-            var card = CardDatabase.Get(drag.CurrentCode);
-            if (card == null) return false;
+            if (card == null || controller != _session.HumanPlayerIndex) return false;
+            var player = _session.Players[controller];
+            if (location == YgoConstants.LOCATION_MZONE)
+                return sequence < 5 && player.mzone[sequence] == null && IsHandZoneEnabled(controller, location, sequence);
+            if (location != YgoConstants.LOCATION_SZONE || sequence > 5 || !IsHandZoneEnabled(controller, location, sequence))
+                return false;
+
             if ((card.type & YgoConstants.TYPE_FIELD) != 0) return sequence == 5;
-            if (card.IsPendulum) return sequence is 0 or 4;
-            return sequence < 5;
+            if (sequence >= 5 || player.szone[sequence] != null) return false;
+            return !card.IsPendulum || sequence is 0 or 4;
+        }
+
+        private bool IsHandZoneEnabled(byte controller, uint location, uint sequence)
+        {
+            int shift = 16 * controller + (location == YgoConstants.LOCATION_SZONE ? 8 : 0);
+            return (_session.FieldDisabledMask & (1u << (shift + (int)sequence))) == 0;
         }
 
         private void SetDragColumnGuide(int column)
