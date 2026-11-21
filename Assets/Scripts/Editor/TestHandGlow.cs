@@ -2626,15 +2626,15 @@ namespace YGOPortable.Editor
 
         private static void VerifyNativeNegationOutcome(bool activationNegated)
         {
-            const uint reinforcement = 32807846, stratos = 40044918, judgment = 41420027;
+            const uint judgment = 41420027;
             uint response = activationNegated ? judgment : AshBlossom;
-            var player = Enumerable.Repeat(reinforcement, 21).Concat(Enumerable.Repeat(stratos, 19)).ToArray();
+            var player = Enumerable.Repeat(PotOfDesires, 21).Concat(Enumerable.Repeat(BlueEyes, 19)).ToArray();
             var enemy = Enumerable.Repeat(response, 40).ToArray();
             var empty = Array.Empty<uint>();
             var ai = new TacticalAI();
             using var duel = YgoProjectBuilder.StartSeedMatching("Native negation presentation", player, empty, enemy, empty,
                 !activationNegated, session => session.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD &&
-                    session.Players[session.HumanPlayerIndex].hand.Any(card => card.code == reinforcement));
+                    session.Players[session.HumanPlayerIndex].hand.Count(card => card.code == PotOfDesires) >= 2);
             if (activationNegated)
             {
                 int set = duel.ActivePrompt.sSetable.FindIndex(card => card.code == judgment);
@@ -2648,8 +2648,8 @@ namespace YGOPortable.Editor
             var animator = CardAnimationManager.Ensure(ui.Canvas);
             var resolved = new List<ChainLinkInfo>();
             duel.OnChainResolved += resolved.Add;
-            int spell = duel.ActivePrompt.activatable.FindIndex(card => card.code == reinforcement);
-            Require(spell >= 0, "The native fixture could not activate Reinforcement of the Army.");
+            int spell = duel.ActivePrompt.activatable.FindIndex(card => card.code == PotOfDesires);
+            Require(spell >= 0, "The native fixture could not activate Pot of Desires.");
             duel.SubmitResponseInt((spell << 16) | 5);
             bool sent = false;
             YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt =>
@@ -2663,8 +2663,10 @@ namespace YGOPortable.Editor
             Require(sent && duel.RetryCount == 0 && resolved.Select(link => link.chainNumber).SequenceEqual(new[] { 2, 1 }),
                 "Native negation did not publish each outcome in reverse chain order.");
             var negated = resolved[1];
-            Require(negated.code == reinforcement && negated.negated && negated.ActivationNegated == activationNegated,
+            Require(negated.code == PotOfDesires && negated.negated && negated.ActivationNegated == activationNegated,
                 "The chain did not distinguish effect negation from activation negation.");
+            Require(negated.IsCardActivation && negated.HasOncePerTurnActivationLimit &&
+                resolved[0].IsCardActivation == activationNegated, "Native activation flags did not distinguish a spell, Counter Trap and monster effect.");
             if (!activationNegated)
                 Require(duel.HasUsedSharedTurnEffect((byte)duel.AiPlayerIndex, AshBlossom),
                     "The native hand effect was not recorded for once-per-turn feedback.");
@@ -2710,6 +2712,32 @@ namespace YGOPortable.Editor
                 }
             }
             Require(!outcome.MoveNext(), "The negation animation did not release its transient objects.");
+
+            byte human = (byte)duel.HumanPlayerIndex;
+            var prompt = duel.ActivePrompt;
+            Require(prompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD &&
+                prompt.activatable.Any(card => card.code == PotOfDesires) == activationNegated &&
+                duel.HasUsedSharedTurnActivation(human, PotOfDesires) != activationNegated,
+                "The once-per-turn notice disagreed with the native Oath limit after negation.");
+            if (!activationNegated)
+            {
+                animator.Clear();
+                ui.Field.Refresh();
+                var copy = prompt.sSetable.First(card => card.code == PotOfDesires);
+                var hand = ui.Field.Root.transform.Find("PlayerHand");
+                var trigger = hand.GetChild((int)copy.sequence).GetComponent<CardDragTrigger>();
+                trigger.OnTouchClick();
+                var notice = ui.Field.Root.transform.Find("ActivationNotice");
+                var actions = ui.Field.Root.transform.Find("CardActions");
+                Require(notice.gameObject.activeInHierarchy && notice.Find("Reason").GetComponent<Text>().text ==
+                        "이 턴에는 이 카드명으로 더 이상 발동할 수 없습니다." &&
+                        actions.gameObject.activeInHierarchy && actions.Find("SET/Circle/Button/Icon") != null &&
+                        actions.Find("ACTION") == null && ReferenceEquals(duel.ActivePrompt, prompt),
+                    "The turn limit notice hid the legal Set or offered an illegal activation.");
+                duel.SubmitResponseInt(7);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+                Require(!duel.HasUsedSharedTurnActivation(human, PotOfDesires), "The turn activation limit notice survived the turn change.");
+            }
             Debug.Log($"[VERIFY DUEL NEGATION] Native {(activationNegated ? "activation" : "effect")} negation resolved CL2 before CL1 with the matching impact.");
         }
 

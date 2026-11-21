@@ -101,13 +101,14 @@ namespace YGOPortable.UI
         {
             var prompt = CanAcceptPlayerAction && !IsStagingPlacement && !IsReadingCardDetails && !_phasePicker.activeSelf
                 ? _session.ActivePrompt : null;
-            if (!CanShowUnavailableEffect(prompt, card)) return false;
+            if (!IsEffectUnavailable(prompt, card)) return false;
             string reason = card.effectsDisabled ? "이 카드의 효과가 무효화되어 있습니다." :
+                UsesTurnActivationLimit(card) ? "이 턴에는 이 카드명으로 더 이상 발동할 수 없습니다." :
                 _session.HasUsedSharedTurnEffect(card.controller, card.code)
                     ? "이 턴에는 더 이상 이 카드의 효과를 발동할 수 없습니다." :
-                CannotMatchChainSpeed(prompt, card)
-                    ? "체인할 수 있는 스펠 스피드가 아닙니다." : "발동 조건을 만족하지 않았습니다.";
-            _activationNoticeText.text = reason;
+                CannotMatchChainSpeed(prompt, card) ? "체인할 수 있는 스펠 스피드가 아닙니다." : null;
+            if (reason == null && CollectActions(card.controller, card.location, card.sequence).Count != 0) return false;
+            _activationNoticeText.text = reason ?? "발동 조건을 만족하지 않았습니다.";
             _activationNoticePrompt = prompt;
             _activationNoticeUntil = Time.unscaledTime + 2.25f;
             _activationNoticeGroup.alpha = 1f;
@@ -116,13 +117,19 @@ namespace YGOPortable.UI
             return true;
         }
 
-        private bool CanShowUnavailableEffect(DuelPrompt prompt, LiveCardState card)
+        private bool CanDimUnavailableEffect(DuelPrompt prompt, LiveCardState card) =>
+            IsEffectUnavailable(prompt, card) && CollectActions(card.controller, card.location, card.sequence).Count == 0;
+
+        private bool UsesTurnActivationLimit(LiveCardState card) =>
+            (card.location == YgoConstants.LOCATION_HAND || card.location == YgoConstants.LOCATION_SZONE && !card.IsFaceUp) &&
+            _session.HasUsedSharedTurnActivation(card.controller, card.code);
+
+        private bool IsEffectUnavailable(DuelPrompt prompt, LiveCardState card)
         {
             if (prompt == null || card == null || card.controller != _session.HumanPlayerIndex ||
                 prompt.messageType is not (YgoConstants.MSG_SELECT_IDLECMD or YgoConstants.MSG_SELECT_BATTLECMD or YgoConstants.MSG_SELECT_CHAIN) ||
                 !HasPotentialEffect(card)) return false;
-            return !_session.HasEffectActivationAt(prompt, ChainConfirmationMode.On, card.controller, card.location, card.sequence) &&
-                CollectActions(card.controller, card.location, card.sequence).Count == 0;
+            return !_session.HasEffectActivationAt(prompt, ChainConfirmationMode.On, card.controller, card.location, card.sequence);
         }
 
         private static bool HasPotentialEffect(LiveCardState card)
@@ -140,8 +147,9 @@ namespace YGOPortable.UI
             if (prompt.messageType != YgoConstants.MSG_SELECT_CHAIN || _session.CurrentChain.Count == 0) return false;
             uint type = card.type != 0 ? card.type : CardDatabase.Get(card.code)?.type ?? 0;
             // A Counter Trap needs another Counter Trap; a normal-speed hand Spell cannot respond to a link.
-            uint chainType = CardDatabase.Get(_session.CurrentChain[^1].code)?.type ?? 0;
-            if ((chainType & (YgoConstants.TYPE_TRAP | YgoConstants.TYPE_COUNTER)) ==
+            var topLink = _session.CurrentChain[^1];
+            uint chainType = CardDatabase.Get(topLink.code)?.type ?? 0;
+            if (topLink.IsCardActivation && (chainType & (YgoConstants.TYPE_TRAP | YgoConstants.TYPE_COUNTER)) ==
                 (YgoConstants.TYPE_TRAP | YgoConstants.TYPE_COUNTER))
                 return (type & (YgoConstants.TYPE_TRAP | YgoConstants.TYPE_COUNTER)) !=
                     (YgoConstants.TYPE_TRAP | YgoConstants.TYPE_COUNTER);

@@ -89,7 +89,7 @@ namespace YGOPortable.UI
                 if (showNotice) ShowActivationNoticeInCardDetails();
                 return;
             }
-            if (ShowUnavailableEffect(card) && card.overlayCodes.Count == 0) return;
+            ShowUnavailableEffect(card);
 
             _touchActionAnchor = anchor;
             _touchActionPrompt = _session.ActivePrompt;

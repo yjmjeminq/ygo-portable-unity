@@ -148,6 +148,8 @@ namespace YGOPortable.Core
         public ulong description;
         public bool negated;
         internal bool ActivationNegated;
+        internal bool IsCardActivation;
+        internal bool HasOncePerTurnActivationLimit;
         internal bool AppliedColumnNegation;
         internal (byte Controller, uint Location, uint Sequence) ActivationSource;
         internal byte? NegatedGraveController;
@@ -328,9 +330,13 @@ namespace YGOPortable.Core
         public List<ChainLinkInfo> CurrentChain { get; } = new List<ChainLinkInfo>();
         private HashSet<(byte Player, ulong Description)> _activatedMonsterEffects;
         private HashSet<(byte Player, uint Code)> _usedSharedTurnEffects;
+        private HashSet<(byte Player, uint Code)> _usedSharedTurnActivations;
 
         internal bool HasUsedSharedTurnEffect(byte player, uint code) =>
             _usedSharedTurnEffects?.Contains((player, CardDatabase.GetDeckPrintingKey(code))) == true;
+
+        internal bool HasUsedSharedTurnActivation(byte player, uint code) =>
+            _usedSharedTurnActivations?.Contains((player, CardDatabase.GetDeckPrintingKey(code))) == true;
 
         private static bool HasSharedOncePerTurnText(CardInfo card)
         {
@@ -432,6 +438,7 @@ namespace YGOPortable.Core
             CurrentChain.Clear();
             _activatedMonsterEffects?.Clear();
             _usedSharedTurnEffects?.Clear();
+            _usedSharedTurnActivations?.Clear();
             _spentBaronneNegates.Clear();
             ResetSummonTracking();
             _temporaryAttackers?.Clear();
@@ -1252,6 +1259,7 @@ namespace YGOPortable.Core
                     _confirmedCards.Clear();
                     _activatedMonsterEffects?.Clear();
                     _usedSharedTurnEffects?.Clear();
+                    _usedSharedTurnActivations?.Clear();
                     ResetSummonTracking();
                     _temporaryAttackers?.Clear();
                     TurnPlayer = br.ReadByte();
@@ -1607,6 +1615,8 @@ namespace YGOPortable.Core
                     uint tSeq = br.ReadUInt32();
                     ulong desc = br.ReadUInt64();
                     int chainNo = (int)br.ReadUInt32();
+                    // The bundled engine appends flags to the length-delimited MSG_CHAINING.
+                    byte activationFlags = br.BaseStream.Position < msgEnd ? br.ReadByte() : (byte)0;
                     if (_speculatingPlayer >= 0 && tCon != _speculatingPlayer) SpeculationUncertain = true;
                     var activation = CaptureChainFieldCard(source);
                     var link = new ChainLinkInfo
@@ -1617,6 +1627,8 @@ namespace YGOPortable.Core
                         triggerLoc = tLoc,
                         triggerSeq = tSeq,
                         description = desc,
+                        IsCardActivation = (activationFlags & 1) != 0,
+                        HasOncePerTurnActivationLimit = (activationFlags & 2) != 0,
                         ActivationSource = (source.controller, source.location, source.sequence),
                         ActivationReadout = activation,
                         PublicFieldSource = activation != null ? (activation.controller, activation.location, activation.sequence) : null,
@@ -1658,8 +1670,12 @@ namespace YGOPortable.Core
                     SampleFieldReadouts();
                     if (_resolvingChainLink != null)
                     {
-                        _resolvingChainLink.Resolved = true;
-                        OnChainResolved?.Invoke(_resolvingChainLink);
+                        var link = _resolvingChainLink;
+                        link.Resolved = true;
+                        if (link.HasOncePerTurnActivationLimit && !link.ActivationNegated &&
+                            CardDatabase.Get(link.code)?.desc?.Contains("이 카드명의 카드는 1턴에 1장밖에 발동할 수 없") == true)
+                            (_usedSharedTurnActivations ??= new()).Add((link.triggerPlayer, CardDatabase.GetDeckPrintingKey(link.code)));
+                        OnChainResolved?.Invoke(link);
                     }
                     if (_deckSelectionEffect != null && ReferenceEquals(_deckSelectionEffect, _resolvingChainLink))
                         ClearDeckSelection();

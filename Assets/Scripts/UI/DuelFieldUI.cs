@@ -1946,7 +1946,8 @@ namespace YGOPortable.UI
                 {
                     InspectCard(card.code);
                     if (_modals.FocusChainActivationAt(_session, YgoConstants.LOCATION_HAND, sequence)) return;
-                    if (!ShowUnavailableEffect(card)) PointAtCardActions(view.Rect);
+                    ShowUnavailableEffect(card);
+                    PointAtCardActions(view.Rect);
                 };
                 trigger.OnTouchClick = () =>
                 {
@@ -2015,7 +2016,7 @@ namespace YGOPortable.UI
                         (HasHandAction(card.controller, card.sequence) ||
                          _session.HasEffectActivationAt(prompt, mode, card.controller, YgoConstants.LOCATION_HAND, card.sequence));
                     DuelStyle.SetActivationGlow(glow, playable);
-                    SetAvailabilityDim(view.FocusArt, ref view.UnavailableShade, !playable && CanShowUnavailableEffect(prompt, card));
+                    SetAvailabilityDim(view.FocusArt, ref view.UnavailableShade, !playable && CanDimUnavailableEffect(prompt, card));
                 }
                 else if (glow.gameObject.activeSelf) glow.canvasRenderer.SetAlpha(DuelStyle.ActivationPulse);
             }
@@ -2029,7 +2030,7 @@ namespace YGOPortable.UI
                         _session.HasEffectActivationAt(prompt, mode, slot.mappedCon, slot.mappedLoc, slot.mappedSeq);
                     DuelStyle.SetActivationGlow(glow, playable);
                     SetAvailabilityDim(slot.focusArt, ref slot.unavailableShade,
-                        !playable && CanShowUnavailableEffect(prompt, slot.liveCard));
+                        !playable && CanDimUnavailableEffect(prompt, slot.liveCard));
                 }
                 else if (glow.gameObject.activeSelf) glow.canvasRenderer.SetAlpha(DuelStyle.ActivationPulse);
             }
@@ -3972,7 +3973,7 @@ namespace YGOPortable.UI
                 SelectTouchCardActions(slot?.root);
                 return;
             }
-            if (canInspect && ShowUnavailableEffect(live) && live.overlayCodes.Count == 0) return;
+            if (canInspect) ShowUnavailableEffect(live);
 
             if (CanShowCardActions)
             {

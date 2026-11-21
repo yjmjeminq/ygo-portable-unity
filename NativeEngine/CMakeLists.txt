@@ -20,6 +20,7 @@ set(CORE_PATCHES
     "${CMAKE_CURRENT_SOURCE_DIR}/send_presentation.patch"
     "${CMAKE_CURRENT_SOURCE_DIR}/position_presentation.patch"
     "${CMAKE_CURRENT_SOURCE_DIR}/swap_presentation.patch"
+    "${CMAKE_CURRENT_SOURCE_DIR}/chain_activation_presentation.patch"
 )
 set(CORE_PATCH_STAGE "${CMAKE_CURRENT_BINARY_DIR}/core-patch-stage")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CORE_PATCHES})
