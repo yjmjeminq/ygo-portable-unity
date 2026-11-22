@@ -73,8 +73,8 @@ namespace YGOPortable.UI
             _deckCardActionCrafting = AddRow("Crafting");
             _deckCardActionArtwork = AddRow("Artwork");
             _deckCardActionCancel = AddRow("Cancel", "취소", CloseDeckCardActions);
-            _deckCardActionRows = new[] { _deckCardActionMain, _deckCardActionAlternate, _deckCardActionRelated,
-                _deckCardActionDetails, _deckCardActionCrafting, _deckCardActionArtwork, _deckCardActionCancel };
+            _deckCardActionRows = new[] { _deckCardActionDetails, _deckCardActionMain, _deckCardActionAlternate,
+                _deckCardActionRelated, _deckCardActionCrafting, _deckCardActionArtwork, _deckCardActionCancel };
             overlay.gameObject.SetActive(false);
         }
 
@@ -141,6 +141,7 @@ namespace YGOPortable.UI
                 CollectionProgress.HasStarter && CollectionProgress.IsCraftableCard(card), () => OpenCardCrafting(code));
             ConfigureTrunkArtworkAction(anchor, source, index, code);
             _deckCardActionTitle.text = card.name;
+            if (_mobileLayout) SelectMobileCard(code, source);
             InspectCard(code);
             var overlay = (RectTransform)_deckCardActions.transform;
             PositionDeckCardActions(anchor, overlay);

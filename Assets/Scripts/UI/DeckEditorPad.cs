@@ -74,7 +74,7 @@ namespace YGOPortable.UI
             ClearCardVisual(ref _padVisualSlot);
             _trunkPadScrollTarget = null;
             _deckHelpLabel.text = _mobileLayout
-                ? "카드 탭  조작    길게 눌러 상세 보기    드래그  이동"
+                ? "카드 탭  상세 보기    카드 조작  추가·이동·제거"
                 : MouseHelp;
             _padMousePoint = Input.mousePosition;
         }

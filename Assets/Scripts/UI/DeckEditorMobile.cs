@@ -316,7 +316,7 @@ namespace YGOPortable.UI
             }
             _mobileSelectionLabel.text = selected
                 ? $"{CardDatabase.GetName(_mobileSelectedCode)}  ·  {copies}장"
-                : "탭으로 추가·제거 · 길게 눌러 상세";
+                : "카드를 탭하여 상세 보기";
             for (int i = 0; i < _mobileQuantity.Length; i++)
             {
                 int target = (i + 1) % 4;
@@ -385,10 +385,10 @@ namespace YGOPortable.UI
 
             Place((RectTransform)_deckCardActionPanel.Find("Title"), 0, .07f, .71f);
             Place((RectTransform)_deckCardActionPanel.Find("Quantity"), 1);
-            PlaceButton(_deckCardActionMain, 2, .07f, .495f);
-            PlaceButton(_deckCardActionAlternate, 2, .505f, .93f);
-            PlaceButton(_deckCardActionRelated, 3, .07f, .495f);
-            PlaceButton(_deckCardActionDetails, 3, .505f, .93f);
+            PlaceButton(_deckCardActionDetails, 2, .07f, .495f);
+            PlaceButton(_deckCardActionRelated, 2, .505f, .93f);
+            PlaceButton(_deckCardActionMain, 3, .07f, .495f);
+            PlaceButton(_deckCardActionAlternate, 3, .505f, .93f);
             PlaceButton(_deckCardActionCrafting, 4, .07f, showArtwork ? .495f : .93f);
             PlaceButton(_deckCardActionArtwork, 4, .505f, .93f);
             PlaceButton(_deckCardActionCancel, 0, .724f, .93f);

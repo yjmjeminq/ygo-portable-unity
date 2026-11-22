@@ -1043,27 +1043,7 @@ namespace YGOPortable.UI
                 trigger.CardCodeGetter = () => code;
                 trigger.IndexGetter = () => index;
                 trigger.OnPointerEnterAction = () => SetMouseCardVisual(rect, code);
-                trigger.OnLeftClick = () =>
-                {
-                    RememberMouseCard(PadArea.Trunk, index);
-                    SetMouseCardVisual(rect, code);
-                };
-                trigger.OnRightClick = () =>
-                {
-                    trigger.OnLeftClick();
-                    ShowDeckCardActions(rect, DragSourceType.Trunk, index, code);
-                };
-                trigger.OnTouchClick = !_mobileLayout ? trigger.OnRightClick : () =>
-                {
-                    trigger.OnLeftClick();
-                    SelectMobileCard(code, DragSourceType.Trunk);
-                    TryAddCardToDeck(code, origin: CardVisual(rect));
-                };
-                trigger.OnTouchHold = !_mobileLayout ? trigger.OnRightClick : () =>
-                {
-                    SelectMobileCard(code, DragSourceType.Trunk);
-                    OpenExpandedDeckCard(code);
-                };
+                BindDeckTileActions(rect, trigger, PadArea.Trunk, index, code);
             }
         }
 
@@ -1118,30 +1098,34 @@ namespace YGOPortable.UI
                     CollectionProgress.GetOwnedCount(code) == 0);
                 trigger.CardCodeGetter = () => code;
                 trigger.IndexGetter = () => index;
-                trigger.OnLeftClick = () =>
-                {
-                    RememberMouseCard(area, index);
-                    SetMouseCardVisual(rect, code);
-                };
                 trigger.OnPointerEnterAction = () => SetMouseCardVisual(rect, code);
                 trigger.PreferTouchScroll = _mobileLayout;
-                trigger.OnRightClick = () =>
-                {
-                    trigger.OnLeftClick();
-                    ShowDeckCardActions(rect, trigger.SourceType, index, code);
-                };
-                trigger.OnTouchClick = !_mobileLayout ? trigger.OnRightClick : () =>
-                {
-                    trigger.OnLeftClick();
-                    SelectMobileCard(code, trigger.SourceType);
-                    RemoveDeckCard(trigger.SourceType, index);
-                };
-                trigger.OnTouchHold = !_mobileLayout ? trigger.OnRightClick : () =>
-                {
-                    SelectMobileCard(code, trigger.SourceType);
-                    OpenExpandedDeckCard(code);
-                };
+                BindDeckTileActions(rect, trigger, area, index, code);
             }
+        }
+
+        private void BindDeckTileActions(RectTransform rect, CardDragTrigger trigger, PadArea area, int index, uint code)
+        {
+            void FocusCard()
+            {
+                RememberMouseCard(area, index);
+                SetMouseCardVisual(rect, code);
+            }
+
+            trigger.OnLeftClick = () =>
+            {
+                FocusCard();
+                if (!_mobileLayout) return;
+                SelectMobileCard(code, trigger.SourceType);
+                OpenExpandedDeckCard(code);
+            };
+            trigger.OnRightClick = () =>
+            {
+                FocusCard();
+                ShowDeckCardActions(rect, trigger.SourceType, index, code);
+            };
+            trigger.OnTouchClick = _mobileLayout ? trigger.OnLeftClick : trigger.OnRightClick;
+            trigger.OnTouchHold = trigger.OnTouchClick;
         }
 
         private void HandleCardDrop(DragContext context)

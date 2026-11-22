@@ -355,8 +355,33 @@ namespace YGOPortable.Editor
                 trigger.OnPointerClick(finger);
             }
 
+            var sheet = Field<RectTransform>(editor, "_expandedDeckOverlay");
+            var panel = Field<RectTransform>(editor, "_expandedDeckPanel");
+            var effect = Field<Text>(editor, "_expandedDeckDescription");
+            var actions = Field<GameObject>(editor, "_deckCardActions");
+            var operations = panel.Find("Operations/Button").GetComponent<Button>();
+            var close = Field<Button>(editor, "_expandedDeckClose");
+            foreach (var (zone, grid, code) in new[]
+            {
+                (DragSourceType.DeckMain, main, Magician),
+                (DragSourceType.DeckExtra, Field<RectTransform>(editor, "_extraDeckSlotGrid"), DragonKnight),
+                (DragSourceType.DeckSide, Field<RectTransform>(editor, "_sideDeckSlotGrid"), Pot),
+            })
+            {
+                Tap(grid.Find("Card_0").GetComponent<CardDragTrigger>());
+                Require(sheet.gameObject.activeInHierarchy && !actions.activeSelf && effect.text == CardDatabase.Get(code).desc &&
+                    Field<DragSourceType>(editor, "_mobileSelectedSource") == zone &&
+                    deck.main.SequenceEqual(new[] { Magician }) && deck.extra.SequenceEqual(new[] { DragonKnight }) &&
+                    deck.side.SequenceEqual(new[] { Pot }), "Tapping a deck card did not inspect its original zone without edits.");
+                close.onClick.Invoke();
+            }
+
             Tap(main.Find("Card_0").GetComponent<CardDragTrigger>());
-            Require(deck.main.Count == 0, "A single deck tap did not remove exactly one card.");
+            operations.onClick.Invoke();
+            Require(actions.activeInHierarchy && !sheet.gameObject.activeSelf && deck.main.SequenceEqual(new[] { Magician }),
+                "Opening deck operations did not preserve the selected copy.");
+            Field<Button>(editor, "_deckCardActionAlternate").onClick.Invoke();
+            Require(deck.main.Count == 0, "Explicitly removing the inspected card did not remove one copy.");
 
             var trunk = Field<RectTransform>(editor, "_trunkViewport");
             Require(deckPane.gameObject.activeInHierarchy && trunkPane.gameObject.activeInHierarchy,
@@ -397,13 +422,25 @@ namespace YGOPortable.Editor
             search.text = Magician.ToString();
             var pool = Field<List<(RectTransform rt, CompositeCardView card, Text count, CardDragTrigger trigger)>>(editor, "_trunkPool");
             var tile = pool.First(slot => slot.rt.gameObject.activeInHierarchy && slot.card.CurrentCode == Magician);
+            string available = tile.count.text;
             Tap(tile.trigger);
+            Require(sheet.gameObject.activeInHierarchy && effect.text == CardDatabase.Get(Magician).desc &&
+                Field<DragSourceType>(editor, "_mobileSelectedSource") == DragSourceType.Trunk &&
+                deck.main.Count == 0 && tile.count.text == available,
+                "A trunk tap changed deck ownership instead of opening card details.");
+            close.onClick.Invoke();
+            Tap(tile.trigger);
+            operations.onClick.Invoke();
+            Require(actions.activeInHierarchy && deck.main.Count == 0, "Opening trunk operations changed the deck.");
+            Field<Button>(editor, "_deckCardActionMain").onClick.Invoke();
             Require(deck.main.SequenceEqual(new[] { Magician }) && tile.count.text == "×2",
-                "A single trunk tap did not add one copy and update the remaining count.");
+                "Explicitly adding the inspected card did not update the remaining count.");
             var quantities = Field<Button[]>(editor, "_mobileQuantity");
             quantities[2].onClick.Invoke();
             Tap(tile.trigger);
-            Require(deck.main.Count == 3, "The three-copy stepper or copy limit failed.");
+            Require(sheet.gameObject.activeInHierarchy && deck.main.Count == 3,
+                "Inspecting a card after increasing its quantity changed the number of copies.");
+            close.onClick.Invoke();
             quantities[1].onClick.Invoke();
             Require(deck.main.Count == 2, "The two-copy stepper did not set the exact quantity.");
             quantities[3].onClick.Invoke();
@@ -418,16 +455,15 @@ namespace YGOPortable.Editor
             tile.trigger.OnPointerDown(finger);
             Require((bool)Call(tile.trigger, "TryCompleteTouchHold", 0, finger.position,
                 Field<float>(tile.trigger, "_touchPressAt") + .60f), "A stationary long press did not show card details.");
-            var panel = Field<RectTransform>(editor, "_expandedDeckPanel");
             Require(panel.anchoredPosition.y < -panel.rect.height && Mathf.Approximately(panel.anchoredPosition.x, 0f),
                 "The mobile card sheet did not start below the viewport.");
             Call(editor, "UpdateExpandedDeckCard", .3f);
-            var effect = Field<Text>(editor, "_expandedDeckDescription");
             Require(panel.anchoredPosition == Vector2.zero && effect.fontSize >= 30 && effect.text == CardDatabase.Get(Magician).desc,
                 "The sheet did not rise with readable card details.");
             tile.trigger.OnPointerUp(finger);
             tile.trigger.OnPointerClick(finger);
-            Require(deck.main.Count == 1, "Releasing a long press also added a copy.");
+            Require(deck.main.Count == 1 && panel.anchoredPosition == Vector2.zero,
+                "Releasing a long press edited the deck or opened the details a second time.");
             panel.Find("Related/Button").GetComponent<Button>().onClick.Invoke();
             Require(Field<uint>(editor, "_relatedFilterCode") == Magician && trunkPane.gameObject.activeInHierarchy &&
                 deckPane.gameObject.activeInHierarchy && results.Any(card => card.code == DragonKnight),
@@ -449,7 +485,7 @@ namespace YGOPortable.Editor
             Require(!ReferenceEquals(firstHand, Field<uint[]>(editor, "_openingHand")) &&
                 hand.Count(button => button.gameObject.activeInHierarchy) == 5, "The mobile first-hand tool did not redraw.");
             Call(editor, "CloseDeckUtility");
-            Debug.Log("[VERIFY MOBILE DECK] Shared deck and trunk, compact card rows, independent sections, touch edits, keyboard inset, sheet and top actions passed.");
+            Debug.Log("[VERIFY MOBILE DECK] Shared deck and trunk, compact card rows, touch inspection before explicit edits, keyboard inset, and top actions passed.");
         }
 
         private static void VerifyMobileOverview(DeckEditorUI editor, RectTransform canvas, MobileSafeArea layout,

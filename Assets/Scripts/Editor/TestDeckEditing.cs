@@ -819,9 +819,20 @@ namespace YGOPortable.Editor
             var overlay = Field<GameObject>(editor, "_deckCardActions");
             var finger = new PointerEventData(events) { pointerId = 0, button = PointerEventData.InputButton.Left };
             ExecuteEvents.Execute(card.trigger.gameObject, finger, ExecuteEvents.pointerClickHandler);
-            Require(overlay.activeInHierarchy, "Tapping a card did not open its deck actions.");
-            overlay.transform.Find("Window/Cancel/Button").GetComponent<Button>().onClick.Invoke();
-            Require(!overlay.activeSelf, "The touch card menu could not be dismissed.");
+            var details = Field<Button>(editor, "_deckCardActionDetails");
+            Require(overlay.activeInHierarchy && events.currentSelectedGameObject == details.gameObject,
+                "The card menu did not start on the safe inspection action.");
+            var deck = Field<UserDeck>(editor, "_workingDeck");
+            var before = deck.main.Concat(deck.extra).Concat(deck.side).ToArray();
+            var assembly = editor.GetType().Assembly;
+            var frame = assembly.GetType("YGOPortable.UI.DeckPadFrame", true);
+            var buttons = assembly.GetType("YGOPortable.UI.DeckPadButtons", true);
+            Call(editor, "HandleDeckPad", Activator.CreateInstance(frame, Instance, null,
+                new object[] { Vector2Int.zero, Enum.Parse(buttons, "Submit"), 0f }, null));
+            Require(!overlay.activeSelf && Field<RectTransform>(editor, "_expandedDeckOverlay").gameObject.activeInHierarchy &&
+                before.SequenceEqual(deck.main.Concat(deck.extra).Concat(deck.side)),
+                "Controller confirm on the default card action changed the deck instead of inspecting.");
+            Call(editor, "CloseExpandedDeckCard");
             var mouse = new PointerEventData(events) { pointerId = -1, button = PointerEventData.InputButton.Left };
             ExecuteEvents.Execute(card.trigger.gameObject, mouse, ExecuteEvents.pointerClickHandler);
             Require(!overlay.activeSelf, "Mouse preview unexpectedly opened the touch card menu.");
