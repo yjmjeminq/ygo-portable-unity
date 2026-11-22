@@ -343,7 +343,7 @@ namespace YGOPortable.Editor
 
             var arriving = HandRect(1);
             var neighbor = HandRect(2);
-            var complete = (Action)Invoke(field, "HideUntilArrival", controller, YgoConstants.LOCATION_HAND, 1u);
+            var complete = (Action)Invoke(field, "ReserveCardArrival", controller, YgoConstants.LOCATION_HAND, 1u, (Action)field.Refresh);
             player.hand.RemoveAt(0);
             Invoke(field, "RemoveHandView", controller, 0u);
             field.Refresh();

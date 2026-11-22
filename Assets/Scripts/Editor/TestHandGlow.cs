@@ -36,6 +36,7 @@ namespace YGOPortable.Editor
             VerifyOpponentEquipmentFocus();
             VerifyNativeMonsterEquip();
             VerifyNativeChainReadouts();
+            VerifyNativeFieldTargetContinuity();
             VerifyNativeChainCardFace(0);
             VerifyNativeChainCardFace(70046172);
             VerifyNativeChainCardFace(14087893);
@@ -193,8 +194,8 @@ namespace YGOPortable.Editor
             ui.Field.Refresh();
             ui.Expect(new[] { availableCopy });
 
-            var completeArrival = (Action)typeof(DuelFieldUI).GetMethod("HideUntilArrival", PrivateInstance)
-                .Invoke(ui.Field, new object[] { player, YgoConstants.LOCATION_HAND, availableCopy });
+            var completeArrival = (Action)typeof(DuelFieldUI).GetMethod("ReserveCardArrival", PrivateInstance)
+                .Invoke(ui.Field, new object[] { player, YgoConstants.LOCATION_HAND, availableCopy, (Action)ui.Field.Refresh });
             ui.Field.Refresh();
             ui.Expect(Array.Empty<uint>());
             completeArrival();
@@ -302,6 +303,12 @@ namespace YGOPortable.Editor
                 slot.Find("CardReadout/Combat/Defense/ChangePulse") == null,
                 "The native equip bonus did not animate just the changed attack values.");
             var inspectorPulse = inspector.transform.parent.parent.GetComponent<DuelReadoutPulse>();
+            var previousAttack = attackCell.Find("Digits/PreviousValue").GetComponent<Text>();
+            var previousInspector = inspector.transform.parent.Find("PreviousValue").GetComponent<Text>();
+            Require(previousAttack.gameObject.activeInHierarchy && previousInspector.gameObject.activeInHierarchy &&
+                    previousAttack.text == "1700" && previousInspector.text == "1700" &&
+                    previousAttack.canvasRenderer.GetAlpha() > .99f,
+                "The previous number did not remain visible at the start of the handoff.");
             float entry = attack.rectTransform.anchoredPosition.y;
             Require(entry < 0f && inspector.rectTransform.anchoredPosition.y < 0f &&
                 attack.rectTransform.localScale.x < 1f && inspector.rectTransform.localScale.x < 1f,
@@ -313,11 +320,13 @@ namespace YGOPortable.Editor
             float rising = attack.rectTransform.anchoredPosition.y;
             ui.Field.Refresh();
             Require(moved > start && sweep.anchorMax.x == moved && rising > entry && rising < 0f &&
-                attack.rectTransform.anchoredPosition.y == rising && attack.text == "2700" && inspector.text == "2700",
+                attack.rectTransform.anchoredPosition.y == rising && attack.text == "2700" && inspector.text == "2700" &&
+                previousAttack.canvasRenderer.GetAlpha() > 0f && attack.canvasRenderer.GetAlpha() > 0f,
                 "An unchanged refresh restarted the number motion or produced an in-between stat.");
             pulse.Advance(.40f);
             inspectorPulse.Advance(.40f);
-            Require(!sweep.gameObject.activeInHierarchy &&
+            Require(!sweep.gameObject.activeInHierarchy && !previousAttack.gameObject.activeSelf &&
+                !previousInspector.gameObject.activeSelf && attack.canvasRenderer.GetAlpha() > .99f &&
                 new[] { attack, inspector }.All(label => label.text == "2700" &&
                     label.rectTransform.localScale == Vector3.one && label.rectTransform.anchoredPosition == Vector2.zero),
                 "The attack numbers did not finish centered at their full size.");
@@ -1193,6 +1202,117 @@ namespace YGOPortable.Editor
             }
             Verify("2750", "2050", "1200", "3");
             Debug.Log("[VERIFY DUEL CHAIN READOUT] Rush changed only one copy to 2550 at link 2. Ocean changed both copies' ATK/DEF and Level at link 1.");
+        }
+
+        private static void VerifyNativeFieldTargetContinuity()
+        {
+            const uint compulsory = 94192409;
+            var main = Enumerable.Repeat(KaiserSeaHorse, 24).Concat(Enumerable.Repeat(compulsory, 16)).ToArray();
+            var ai = new TacticalAI();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Field target and bounce", main, Array.Empty<uint>(),
+                Enumerable.Repeat(BlueEyes, 40).ToArray(), Array.Empty<uint>(), true, session =>
+                    session.ActivePrompt?.summonable.Exists(card => card.code == KaiserSeaHorse) == true &&
+                    session.ActivePrompt.sSetable.Exists(card => card.code == compulsory));
+            duel.SubmitResponseInt(duel.ActivePrompt.summonable.FindIndex(card => card.code == KaiserSeaHorse) << 16);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            duel.SubmitResponseInt((duel.ActivePrompt.sSetable.FindIndex(card => card.code == compulsory) << 16) | 4);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            for (int turn = 0; turn < 2; turn++)
+            {
+                duel.SubmitResponseInt(7);
+                YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            }
+            ActivateFromMainPhase(duel, compulsory);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            var prompt = duel.ActivePrompt;
+            Require(prompt?.messageType == YgoConstants.MSG_SELECT_CARD && prompt.candidates.Count == 1,
+                "The native bounce fixture did not open a single-target field prompt.");
+
+            var player = duel.Players[duel.HumanPlayerIndex];
+            var target = player.mzone.Single(card => card?.code == KaiserSeaHorse);
+            var source = player.szone.Single(card => card?.code == compulsory);
+            using var ui = new HandUI(duel, mobileLayout: true, submitResponse: duel.SubmitResponse);
+            var animator = CardAnimationManager.Ensure(ui.Canvas);
+            Canvas.ForceUpdateCanvases();
+            var targetSlot = FieldSlot(ui.Field, target);
+            var sourceSlot = FieldSlot(ui.Field, source);
+            var targetView = targetSlot.Find("Card/CardView").GetComponent<CompositeCardView>();
+            var sourceView = sourceSlot.Find("Card/CardView").GetComponent<CompositeCardView>();
+            var attack = targetSlot.Find("CardReadout/Combat/Attack/Digits/Value").GetComponent<Text>();
+            var targetAddress = (target.controller, target.location, target.sequence);
+            var sourceAddress = (source.controller, source.location, source.sequence);
+            int packets = 0;
+            duel.OnCardsTargeted += (origin, targets) =>
+            {
+                if (origin == sourceAddress && targets.SequenceEqual(new[] { targetAddress })) packets++;
+            };
+
+            ui.Modals.ShowPrompt(duel, prompt);
+            ui.Field.Refresh();
+            var markers = ui.Field.Root.GetComponentsInChildren<DuelEffectGraphic>().Where(effect => effect.TargetChoice).ToArray();
+            Require(markers.Length == 1 && markers[0].transform.IsChildOf(targetView.transform) &&
+                !markers[0].raycastTarget && !markers[0].TargetLocked && targetView.gameObject.activeInHierarchy,
+                "The field prompt marked an ineligible card or replaced its original view.");
+            var originalPose = ((RectTransform)targetView.transform).anchoredPosition;
+            targetSlot.GetComponent<CardDragTrigger>().OnTouchClick();
+            Require(markers[0].TargetLocked && ((RectTransform)targetView.transform).anchoredPosition == originalPose &&
+                targetView.gameObject.activeInHierarchy && attack.text == "1700",
+                "Locking a target moved the field card or cleared its stats.");
+            Require(ui.Modals.TryConfirm(), "The selected target could not be confirmed.");
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            ui.Modals.HideAll();
+            ui.Field.Refresh();
+            Require(packets == 1 && duel.RetryCount == 0 &&
+                    player.hand.Any(card => card.code == KaiserSeaHorse) && player.mzone[target.sequence] == null,
+                "The actual engine did not announce and return the target.");
+            Require(targetView.gameObject.activeInHierarchy && sourceView.gameObject.activeInHierarchy &&
+                    attack.gameObject.activeInHierarchy && attack.text == "1700" && !markers[0].gameObject.activeSelf,
+                "The engine consumed the cards or their readouts before presentation caught up.");
+
+            var steps = AnimationSteps(animator).ToArray();
+            var locked = steps.Single(step => step.GetType().Name.StartsWith("<PlayTargetLocks>", StringComparison.Ordinal));
+            var bounce = steps.Single(step => FlightCode(step) == KaiserSeaHorse);
+            var leaveField = steps.Single(step => FlightCode(step) == compulsory);
+            Require(Array.IndexOf(steps, locked) < Array.IndexOf(steps, bounce) && locked.MoveNext(),
+                "The effect had no target presentation before departure.");
+            var mark = TestCardPresentation.SampleAnimation((IEnumerator)locked.Current);
+            mark(.55f);
+            var drawn = animator.GetComponentsInChildren<DuelEffectGraphic>();
+            Require(drawn.Count(effect => effect.Kind == DuelEffectKind.TargetReticle) == 1 &&
+                    drawn.Count(effect => effect.Kind == DuelEffectKind.TargetBeam) == 1 &&
+                    targetView.gameObject.activeInHierarchy && attack.text == "1700" && sourceView.gameObject.activeInHierarchy,
+                "Target feedback hid a card or missed its beam.");
+            var populate = typeof(DuelEffectGraphic).GetMethod("OnPopulateMesh", PrivateInstance | BindingFlags.DeclaredOnly);
+            foreach (var effect in drawn.Where(effect => effect.Kind is DuelEffectKind.TargetReticle or DuelEffectKind.TargetBeam))
+            {
+                using var mesh = new VertexHelper();
+                populate.Invoke(effect, new object[] { mesh });
+                Require(mesh.currentVertCount > 24 && !effect.raycastTarget, "The target feedback did not draw visible, non-blocking geometry.");
+            }
+            mark(1f);
+            Require(!locked.MoveNext() && !animator.GetComponentsInChildren<DuelEffectGraphic>()
+                    .Any(effect => effect.Kind is DuelEffectKind.TargetReticle or DuelEffectKind.TargetBeam),
+                "The confirmed target left its effect overlay active.");
+
+            void VerifyDeparture(IEnumerator step, CompositeCardView fieldView, uint code)
+            {
+                var art = (RectTransform)fieldView.transform.Find("AspectBox");
+                var departure = animator.GetVisualPose(art);
+                Require(fieldView.gameObject.activeInHierarchy && departure.IsValid && step.MoveNext(),
+                    "The card disappeared before its actual flight step.");
+                var proxy = animator.GetComponentsInChildren<CompositeCardView>().Single(view =>
+                    view.name == "MovingCard" && view.CurrentCode == code);
+                Require(!fieldView.gameObject.activeInHierarchy &&
+                        Vector2.Distance(((RectTransform)proxy.transform).anchoredPosition, departure.Position) < .1f,
+                    "The source slot cleared before its moving card was in place.");
+                TestCardPresentation.SampleAnimation((IEnumerator)step.Current)(1f);
+                Require(!step.MoveNext() && !proxy.gameObject.activeSelf && !fieldView.gameObject.activeSelf,
+                    "The source or moving view was left active after arrival.");
+            }
+
+            VerifyDeparture(bounce, targetView, KaiserSeaHorse);
+            VerifyDeparture(leaveField, sourceView, compulsory);
+            Debug.Log("[VERIFY DUEL TARGET CONTINUITY] Native candidate, stable lock and beam, bounce, and spell-zone departure passed.");
         }
 
         private static void VerifyOpponentActivationInspector()
@@ -2582,15 +2702,37 @@ namespace YGOPortable.Editor
             Require(pending.Count == 1 && pending.Values.Single().Code == theseus,
                 "The native Fusion Summon did not queue a readout for its own card.");
             var captured = pending.Single();
+            var summon = AnimationSteps(animation).First(step => FlightCode(step) == theseus);
+            void FinishSummon()
+            {
+                Require(summon.MoveNext() && summon.Current is IEnumerator, "The native arrival did not start.");
+                var reveal = (IEnumerator)summon.Current;
+                while (reveal.MoveNext()) TestCardPresentation.SampleAnimation((IEnumerator)reveal.Current)(1f);
+                Require(!summon.MoveNext(), "The native arrival did not release its own reservation.");
+            }
 
             if (turnFaceDown)
             {
                 Activate(bookOfMoon);
                 ui.Field.Refresh();
-                Require(duel.Players[captured.Key.Controller].mzone[captured.Key.Sequence].position == YgoConstants.POS_FACEDOWN_DEFENSE &&
-                        pending.Count == 0 && captured.Value.DestinationCard == null,
+                var hidden = duel.Players[captured.Key.Controller].mzone[captured.Key.Sequence];
+                Require(hidden.position == YgoConstants.POS_FACEDOWN_DEFENSE && pending.Count == 0 &&
+                        captured.Value.DestinationCard == null,
                     "A summon preview read the live stats of a card that was already hidden when the field refreshed.");
-                Debug.Log("[VERIFY DUEL SUMMON STATS] A pending reveal discarded a card's live stats when the card became hidden.");
+                var queued = AnimationSteps(animation).ToArray();
+                var flip = queued.Skip(Array.IndexOf(queued, summon) + 1).First(step =>
+                    FlightCode(step) == theseus || step.GetType().Name.StartsWith("<PlayPositionChanges>", StringComparison.Ordinal));
+                var card = FieldSlot(ui.Field, hidden).Find("Card/CardView").GetComponent<CompositeCardView>();
+                Require(!card.gameObject.activeSelf, "The queued flip put the card in the slot before the summon arrived.");
+                FinishSummon();
+                Require(card.gameObject.activeInHierarchy && card.CurrentCode == theseus,
+                    "The older reservation concealed the card between its summon and its next movement.");
+                Require(flip.MoveNext() && flip.Current is IEnumerator && !card.gameObject.activeSelf,
+                    "The queued position change did not take over the same slot.");
+                TestCardPresentation.SampleAnimation((IEnumerator)flip.Current)(1f);
+                Require(!flip.MoveNext() && card.gameObject.activeInHierarchy && card.CurrentCode == 0,
+                    "The position change did not leave the slot with its private card back.");
+                Debug.Log("[VERIFY DUEL SUMMON STATS] Queued summon and concealment kept their distinct field handoffs without showing private stats.");
                 return;
             }
 
@@ -2618,8 +2760,7 @@ namespace YGOPortable.Editor
                 "The revealed card face did not keep the same numbers as the summon banner.");
 
             var (controller, _, sequence) = captured.Key;
-            var location = (controller, YgoConstants.LOCATION_MZONE, sequence);
-            typeof(DuelFieldUI).GetMethod("ReleaseArrival", PrivateInstance).Invoke(ui.Field, new object[] { location });
+            FinishSummon();
             ui.Field.Refresh();
             var fieldSlot = typeof(DuelFieldUI).GetMethod("GetSlot", PrivateInstance).Invoke(ui.Field,
                 new object[] { controller, YgoConstants.LOCATION_MZONE, sequence });

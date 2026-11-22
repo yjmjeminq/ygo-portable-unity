@@ -490,7 +490,7 @@ namespace YGOPortable.UI
                 !_modals.ResultRoot.activeSelf && CardDragManager.Instance?.IsDragging != true)
                 raised = _duelPointerRaisedCard ?? _cardActionArt;
 
-            if (raised != null && !raised.gameObject.activeInHierarchy) raised = null;
+            if (_modals.IsFieldTargetSelection || raised != null && !raised.gameObject.activeInHierarchy) raised = null;
             if (raised != _raisedCard)
             {
                 _raisedCard = raised;

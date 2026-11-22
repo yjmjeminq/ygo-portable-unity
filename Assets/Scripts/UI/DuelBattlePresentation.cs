@@ -14,10 +14,14 @@ namespace YGOPortable.UI
             internal BattleCardStats? Stats;
             internal PresentedFieldReadout Readout;
             internal bool UseBattleStats;
+            internal bool UsePrintedReadout;
             internal bool Hidden;
+            internal bool AwaitingArrival;
+            internal bool Released;
             internal bool HideReadout;
             internal bool InspectWhileHidden;
             internal bool PositionChanging;
+            internal bool Visible => !Hidden && !AwaitingArrival;
         }
 
         // The engine can resolve a whole battle before its queued animations have played.
@@ -43,10 +47,10 @@ namespace YGOPortable.UI
                 !TryGetSwapFlight(first, out var firstFlight) || !TryGetSwapFlight(second, out var secondFlight))
                 return false;
 
-            var firstHeld = HoldFieldCard(first, firstReadout, keepFaceDown: true);
-            var secondHeld = HoldFieldCard(second, secondReadout, keepFaceDown: true);
-            var firstMove = PrepareMoveReadout(animator, first, firstFlight.StartsFaceDown, firstFlight.EndsFaceDown);
-            var secondMove = PrepareMoveReadout(animator, second, secondFlight.StartsFaceDown, secondFlight.EndsFaceDown);
+            var firstHeld = HoldFieldCard(first, firstReadout);
+            var secondHeld = HoldFieldCard(second, secondReadout);
+            var firstMove = PrepareMoveReadout(animator, first, firstFlight.StartsFaceDown, firstFlight.EndsFaceDown, firstHeld);
+            var secondMove = PrepareMoveReadout(animator, second, secondFlight.StartsFaceDown, secondFlight.EndsFaceDown, secondHeld);
             var firstInspection = TrackMovingInspection(first, firstMove, firstHeld?.Readout);
             var secondInspection = TrackMovingInspection(second, secondMove, secondHeld?.Readout);
             var releaseFirst = ReserveCardArrival(first.toCon, first.toLoc, first.toSeq);
@@ -127,10 +131,20 @@ namespace YGOPortable.UI
 
         private void ReleaseBattleCardDisplay(BattleCardDisplay display)
         {
-            if (display == null || !_battleCardDisplays.TryGetValue(display.Slot, out var cards) ||
-                !ReferenceEquals(cards.Peek(), display)) return;
-            cards.Dequeue();
+            if (display == null || !_battleCardDisplays.TryGetValue(display.Slot, out var cards)) return;
+            display.Released = true;
+            while (cards.TryPeek(out var head) && head.Released) cards.Dequeue();
             if (cards.Count == 0) _battleCardDisplays.Remove(display.Slot);
+        }
+
+        private void ReleaseDepartingFieldCard(CardMoveEvent move, BattleCardDisplay display)
+        {
+            if (display?.Readout != null && move.toLoc is not (YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE))
+            {
+                if (_inspectedFieldCard == display.Slot && _inspectedCode == move.code) _inspectedFieldCard = null;
+                if (_zoomFieldCard == display.Slot && _zoomCardView.CurrentCode == move.code) _zoomFieldCard = null;
+            }
+            ReleaseBattleCardDisplay(display);
         }
 
         private BattleCardDisplay QueueBattleCard(BattleCardStats stats, LiveCardState card)
@@ -163,14 +177,8 @@ namespace YGOPortable.UI
             return display;
         }
 
-        private BattleCardDisplay HoldMovingFieldCard(CardMoveEvent move, CardMotion motion,
-            PresentedFieldReadout readout, bool paired)
-        {
-            var battle = HoldBattleMove(move, motion);
-            if (battle != null) return battle;
-            return paired ? null : HoldFieldCard(move, readout,
-                keepFaceDown: move.PresentationGroup != null || move.ChangesPositionInPlace || move.TemporarilyBanished);
-        }
+        private BattleCardDisplay HoldMovingFieldCard(CardMoveEvent move, CardMotion motion, PresentedFieldReadout readout) =>
+            HoldBattleMove(move, motion) ?? HoldFieldCard(move, readout);
 
         private void QueuePositionChange(CardAnimationManager animator, CardMoveEvent move, CardFlight flight,
             CardMoveReadoutSnapshot readout, BattleCardDisplay held)
@@ -201,20 +209,34 @@ namespace YGOPortable.UI
             }, Refresh);
         }
 
-        private BattleCardDisplay HoldFieldCard(CardMoveEvent move, PresentedFieldReadout readout, bool keepFaceDown)
+        private BattleCardDisplay HoldFieldCard(CardMoveEvent move, PresentedFieldReadout readout)
         {
-            bool arriving = IsArriving(move.fromCon, move.fromLoc, move.fromSeq);
-            if (arriving && !move.ChangesPositionInPlace) return null;
-            var source = move.SourceReadout;
-            if (source == null && keepFaceDown &&
-                (move.fromLoc is YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE) &&
-                (move.fromPos & YgoConstants.POS_FACEDOWN) != 0)
-                source = new LiveCardState { position = move.fromPos };
-            if (source == null) return null;
+            if (move.fromLoc is not (YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE) || move.fromPos == 0)
+                return null;
 
-            var display = QueueBattleCardDisplay(move.fromCon, move.fromLoc, move.fromSeq, source, move.fromPos);
-            display.Hidden = arriving;
-            if (source.IsFaceUp) display.Readout = readout ?? new PresentedFieldReadout { Shown = source };
+            var key = (move.fromCon, move.fromLoc, move.fromSeq);
+            _arrivingCards.TryGetValue(key, out var arrivals);
+            var arrival = arrivals?.Count > 0 ? arrivals[^1] : null;
+            var source = move.SourceReadout;
+            if (source == null && arrival == null &&
+                FindLiveCard(move.fromCon, move.fromLoc, move.fromSeq) is { } live &&
+                live.code == move.code && live.position == move.fromPos)
+                source = live;
+
+            // Hidden cards need a card back, and a short-lived face-up copy may only have its move packet.
+            var display = QueueBattleCardDisplay(move.fromCon, move.fromLoc, move.fromSeq,
+                source ?? new LiveCardState { code = move.code, position = move.fromPos }, move.fromPos);
+            display.UsePrintedReadout = source == null;
+            if (source?.IsFaceUp == true)
+            {
+                display.Readout = readout ?? new PresentedFieldReadout { Shown = source };
+                display.InspectWhileHidden = true;
+            }
+            if (arrival != null && arrival.Departing == null)
+            {
+                display.AwaitingArrival = true;
+                arrival.Departing = display;
+            }
             return display;
         }
 

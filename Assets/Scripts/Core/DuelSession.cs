@@ -408,6 +408,7 @@ namespace YGOPortable.Core
         public event Action<int, int> OnTurnStarted;
         public event Action<int, int> OnPhaseChanged;
         public event Action<ChainLinkInfo> OnChainActivated;
+        internal event Action<(byte Controller, uint Location, uint Sequence)?, IReadOnlyList<(byte Controller, uint Location, uint Sequence)>> OnCardsTargeted;
         public event Action<ChainLinkInfo> OnChainResolving;
         internal event Action<ChainLinkInfo> OnChainResolved;
         internal event Action<IReadOnlyList<(LiveCardState Before, LiveCardState After)>> OnFieldReadoutsChanged;
@@ -1037,8 +1038,8 @@ namespace YGOPortable.Core
             TrackNegatedGraveMovement(move);
             TrackPublicMonsterMoves(move, swapPartner);
             FollowPublicChainSources(move, swapPartner);
-            CaptureMoveSource(move, swapPartner != null);
-            if (swapPartner != null) CaptureMoveSource(swapPartner, true);
+            CaptureMoveSource(move);
+            if (swapPartner != null) CaptureMoveSource(swapPartner);
             InvalidateFieldReadouts(move);
             if (swapPartner != null) InvalidateFieldReadouts(swapPartner);
             if (move.DestinationReadout is { } destination && _fieldReadoutBaseline != null)
@@ -1131,14 +1132,11 @@ namespace YGOPortable.Core
                 item != null && slot == (item.fromCon, item.fromLoc, item.fromSeq);
         }
 
-        private void CaptureMoveSource(CardMoveEvent move, bool paired)
+        private void CaptureMoveSource(CardMoveEvent move)
         {
             if (move.fromLoc is YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE &&
                 _fieldReadoutBaseline?.TryGetValue((move.fromCon, move.fromLoc, move.fromSeq), out var source) == true &&
-                source.code == move.code && source.position == move.fromPos &&
-                (move.fromLoc == YgoConstants.LOCATION_MZONE || source.IsPendulumScale || source.EquipTarget.HasValue ||
-                    paired || move.PresentationGroup != null || move.MaterialMethod != 0 ||
-                    move.ChangesPositionInPlace || move.TemporarilyBanished))
+                source.code == move.code && source.position == move.fromPos)
                 move.SourceReadout = source;
         }
 
@@ -1642,6 +1640,31 @@ namespace YGOPortable.Core
                         (_usedSharedTurnEffects ??= new()).Add((tCon, CardDatabase.GetDeckPrintingKey(code)));
                     AddLog($"체인 {chainNo}: [{CardDatabase.GetName(code)}] 발동");
                     OnChainActivated?.Invoke(link);
+                    break;
+                }
+
+                case YgoConstants.MSG_BECOME_TARGET:
+                {
+                    if (OnCardsTargeted == null || msgEnd - br.BaseStream.Position < sizeof(uint)) break;
+                    uint count = br.ReadUInt32();
+                    const int locationSize = 2 * sizeof(byte) + 2 * sizeof(uint);
+                    if (count != (msgEnd - br.BaseStream.Position) / locationSize ||
+                        (msgEnd - br.BaseStream.Position) % locationSize != 0) break;
+
+                    var targets = new List<(byte Controller, uint Location, uint Sequence)>();
+                    for (uint i = 0; i < count; i++)
+                    {
+                        byte controller = br.ReadByte();
+                        uint location = br.ReadByte();
+                        uint sequence = br.ReadUInt32();
+                        br.ReadUInt32(); // Position is not needed to mark a slot, including a concealed card.
+                        if (controller < Players.Length && location is YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE)
+                            targets.Add((controller, location, sequence));
+                    }
+                    if (targets.Count == 0) break;
+
+                    var link = _resolvingChainLink ?? CurrentChain.LastOrDefault(item => !item.Resolved);
+                    OnCardsTargeted.Invoke(link?.PublicFieldSource ?? link?.ActivationSource, targets);
                     break;
                 }
 
@@ -2187,7 +2210,7 @@ namespace YGOPortable.Core
         private void InvalidateFieldReadouts(CardMoveEvent move)
         {
             if (_fieldReadoutBaseline == null) return;
-            // A move can replace a copy with the same passcode. Materials have their own timing.
+            // A move can replace a same-name copy. Overlay changes refresh at their material handoff.
             _fieldReadoutBaseline.Remove((move.fromCon, move.fromLoc & ~YgoConstants.LOCATION_OVERLAY, move.fromSeq));
             _fieldReadoutBaseline.Remove((move.toCon, move.toLoc & ~YgoConstants.LOCATION_OVERLAY, move.toSeq));
         }

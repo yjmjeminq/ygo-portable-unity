@@ -146,6 +146,8 @@ namespace YGOPortable.UI
         internal bool IsShowingField => IsPromptOpen && _promptShade.ShowingField;
         internal Selectable FieldViewControl => _fieldViewButton;
         internal bool IsFieldCardSelection => IsPromptOpen && _fieldCardIndices.Count > 0;
+        internal bool IsFieldTargetSelection =>
+            IsFieldCardSelection && _curPrompt?.messageType == YgoConstants.MSG_SELECT_CARD && !_fieldMaterialPick;
         internal Button FieldCardActionButton => !IsFieldCardSelection ? null :
             _materialConfirmRoot.gameObject.activeSelf ? _materialConfirm : _confirmBtn ?? _attackCancel;
 

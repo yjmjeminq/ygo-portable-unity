@@ -237,6 +237,7 @@ namespace YGOPortable.UI
         {
             StopAllCoroutines();
             _steps.Clear();
+            _openTargetLocks = null;
             _openPileTransfers = null;
             _openBattleLifeChanges = null;
             _openFieldDepartures = null;
@@ -369,6 +370,7 @@ namespace YGOPortable.UI
         {
             if (_pendingFieldArrivals != null && (_pendingReturnEffect != returnEffect || returnEffect == 0))
                 CompleteFieldArrivals();
+            _openTargetLocks = null;
             _openFieldDepartures = null;
             var kind = SummonEffect(flight.Code, motion).kind;
             int signatureUnits = kind == DuelEffectKind.Xyz ? xyzMaterials : 0;
@@ -427,6 +429,7 @@ namespace YGOPortable.UI
         {
             // Moves emitted together by one effect overlap. Other animation steps still play in engine order.
             CompleteFieldArrivals();
+            _openTargetLocks = null;
             _openFieldDepartures = null;
             _openMaterials = null;
             _openPositionChanges = null;
@@ -443,6 +446,7 @@ namespace YGOPortable.UI
         private void QueueStep(IEnumerator step)
         {
             CompleteFieldArrivals();
+            _openTargetLocks = null;
             _openFieldDepartures = null;
             _openMaterials = null;
             _openPositionChanges = null;
@@ -570,8 +574,16 @@ namespace YGOPortable.UI
                 rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
             }
             view.SetCard(code, faceDown, live);
+            if (view.TryGetComponent<CanvasGroup>(out var opacity)) opacity.alpha = 1f;
             view.gameObject.SetActive(true);
             view.transform.SetAsLastSibling();
+            return view;
+        }
+
+        private CompositeCardView PrepareFlightCard(CardFlight flight, bool detailed = false)
+        {
+            var view = TakeCard(flight.StartsFaceDown ? 0u : flight.Code, flight.StartsFaceDown, detailed);
+            ApplyFlight(view, flight, 0f, 0f);
             return view;
         }
 
@@ -848,14 +860,13 @@ namespace YGOPortable.UI
             });
             foreach (var effect in effects) RemoveTransient(effect.gameObject);
 
-            Depart();
             var cards = new CompositeCardView[moves.Count];
             var readouts = new DuelMovingReadout[moves.Count];
             var fading = new CanvasGroup[moves.Count];
             for (int index = 0; index < moves.Count; index++)
             {
                 var move = moves[index];
-                var proxy = TakeCard(move.Flight.StartsFaceDown ? 0u : move.Flight.Code, move.Flight.StartsFaceDown);
+                var proxy = PrepareFlightCard(move.Flight);
                 cards[index] = proxy;
                 if (move.Motion == CardMotion.Vanish)
                 {
@@ -872,8 +883,10 @@ namespace YGOPortable.UI
                     other.Flight.To.Position == move.Flight.To.Position);
                 readouts[index] = CreateMovingReadout(move.Flight, move.Motion, move.Readout, sharedPile,
                     handoff: group.Temporary ? sharedPile ? .53f : .68f : null);
+                readouts[index]?.Follow(cards[index], 0f);
             }
 
+            Depart();
             yield return Animate(group.Temporary ? .31f : .27f, time =>
             {
                 for (int index = 0; index < moves.Count; index++)
@@ -895,11 +908,13 @@ namespace YGOPortable.UI
         private IEnumerator PlayFieldSwap((CardFlight Flight, CardMoveReadoutSnapshot Readout) first,
             (CardFlight Flight, CardMoveReadoutSnapshot Readout) second, Action depart, Action handoff, Action arrive)
         {
-            depart();
-            var firstCard = TakeCard(first.Flight.StartsFaceDown ? 0 : first.Flight.Code, first.Flight.StartsFaceDown);
-            var secondCard = TakeCard(second.Flight.StartsFaceDown ? 0 : second.Flight.Code, second.Flight.StartsFaceDown);
+            var firstCard = PrepareFlightCard(first.Flight);
+            var secondCard = PrepareFlightCard(second.Flight);
             var firstStats = CreateMovingReadout(first.Flight, CardMotion.Transfer, first.Readout, handoff: FieldSwapHandoff);
             var secondStats = CreateMovingReadout(second.Flight, CardMotion.Transfer, second.Readout, handoff: FieldSwapHandoff);
+            firstStats?.Follow(firstCard, 0f);
+            secondStats?.Follow(secondCard, 0f);
+            depart();
 
             bool updated = false;
             yield return Animate(.37f, time =>
@@ -935,18 +950,20 @@ namespace YGOPortable.UI
         {
             if (ReferenceEquals(_openPositionChanges, group)) _openPositionChanges = null;
             var moves = group.Moves;
-            foreach (var move in moves) move.Depart();
-            group.Refresh();
             var views = new CompositeCardView[moves.Count];
             var readouts = new DuelMovingReadout[moves.Count];
             for (int i = 0; i < moves.Count; i++)
             {
-                var flight = moves[i].Flight;
-                views[i] = TakeCard(flight.StartsFaceDown ? 0 : flight.Code, flight.StartsFaceDown);
+                views[i] = PrepareFlightCard(moves[i].Flight);
             }
             for (int i = 0; i < moves.Count; i++)
+            {
                 readouts[i] = CreateMovingReadout(moves[i].Flight, CardMotion.ChangePosition, moves[i].Readout);
+                readouts[i]?.Follow(views[i], 0f);
+            }
 
+            foreach (var move in moves) move.Depart();
+            group.Refresh();
             bool turned = false;
             yield return Animate(.27f, time =>
             {
@@ -1004,8 +1021,6 @@ namespace YGOPortable.UI
                     TrackCardEffect(cues[i], moves[i].Flight.From, 1.58f, time * .56f);
             });
 
-            foreach (var move in moves) move.Depart?.Invoke();
-            refresh();
             var cards = new CompositeCardView[moves.Count];
             var fades = new CanvasGroup[moves.Count];
             var stats = new DuelMovingReadout[moves.Count];
@@ -1016,8 +1031,7 @@ namespace YGOPortable.UI
             var orbs = new DuelEffectGraphic[moves.Count];
             for (int i = 0; i < moves.Count; i++)
             {
-                var flight = moves[i].Flight;
-                var view = TakeCard(flight.StartsFaceDown ? 0u : flight.Code, flight.StartsFaceDown);
+                var view = PrepareFlightCard(moves[i].Flight);
                 if (!view.TryGetComponent<CanvasGroup>(out var fade))
                     fade = view.gameObject.AddComponent<CanvasGroup>();
                 fade.alpha = 1f;
@@ -1033,8 +1047,11 @@ namespace YGOPortable.UI
                 stats[i] = CreateMovingReadout(move.Flight, CardMotion.Transfer, move.Readout,
                     handoff: moves.Count > 1 || move.Flight.EndsFaceDown ? .61f : .75f);
                 if (stats[i] != null) spread[i] = MaterialSpread(moves, i, merging);
+                stats[i]?.Follow(cards[i], 0f);
             }
 
+            foreach (var move in moves) move.Depart?.Invoke();
+            refresh();
             yield return Animate(portal != null ? .48f : .30f, time =>
             {
                 if (portal != null)
@@ -1128,14 +1145,15 @@ namespace YGOPortable.UI
                 yield return Burst(DuelEffectKind.Break, flight.From, 2.1f, DestructionTint, .18f);
             }
 
-            onDepart?.Invoke();
             bool extraSummon = motion is CardMotion.ExtraDeckSummon or CardMotion.PendulumSummon;
             bool summons = IsSummonMotion(motion);
             bool overframe = summons && SupportsSummonOverframe(flight);
             bool featured = summons && TakeFeaturedSummon(flight);
             bool reveal = !flight.EndsFaceDown && (extraSummon || featured || overframe);
-            var proxy = TakeCard(flight.StartsFaceDown ? 0u : flight.Code, flight.StartsFaceDown, reveal);
+            var proxy = PrepareFlightCard(flight, reveal);
             var moving = reveal ? null : CreateMovingReadout(flight, motion, readout);
+            moving?.Follow(proxy, 0f);
+            onDepart?.Invoke();
             if (reveal)
                 yield return RevealSummon(proxy, flight, motion, featured, overframe, readout?.DestinationCard, signatureUnits);
             else if (motion is CardMotion.AttachMaterial or CardMotion.DetachMaterial)

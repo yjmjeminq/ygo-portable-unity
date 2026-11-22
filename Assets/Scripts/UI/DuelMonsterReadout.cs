@@ -305,7 +305,7 @@ namespace YGOPortable.UI
                         ? value.CompareTo(_lastValue) : adjustment.CompareTo(_lastAdjustment);
                     Color pulse = delta > 0 ? DuelStyle.IncreasedValue : delta < 0 ? DuelStyle.DecreasedValue : _accent;
                     DuelReadoutPulse.Play(Rect, pulse, delta < 0,
-                        numberChanged && value >= 0 ? _value : null);
+                        numberChanged && value >= 0 ? _value : null, fadePrevious: _lastValue >= 0);
                 }
                 _lastValue = value;
                 _lastAdjustment = adjustment;
@@ -1128,9 +1128,11 @@ namespace YGOPortable.UI
         private Color _color;
         private bool _reverse;
         private float _elapsed;
-        private (RectTransform Rect, Vector2 Position, Vector3 Scale) _number;
+        private (RectTransform Rect, Vector2 Position, Vector3 Scale, CanvasRenderer Renderer) _number;
+        private Text _previousNumber;
 
-        internal static void Play(RectTransform surface, Color color, bool reverse = false, Text number = null)
+        internal static void Play(RectTransform surface, Color color, bool reverse = false, Text number = null,
+            bool fadePrevious = false)
         {
             if (!surface.TryGetComponent(out DuelReadoutPulse pulse))
             {
@@ -1147,7 +1149,21 @@ namespace YGOPortable.UI
             if (number != null)
             {
                 var rect = number.rectTransform;
-                pulse._number = (rect, rect.anchoredPosition, rect.localScale);
+                pulse._number = (rect, rect.anchoredPosition, rect.localScale, number.canvasRenderer);
+                if (fadePrevious)
+                {
+                    var previous = pulse._previousNumber ??= DuelTypography.AddNumber(number.transform.parent,
+                        "PreviousValue", "", number.fontSize, number.alignment, number.color);
+                    previous.raycastTarget = false;
+                    previous.rectTransform.anchorMin = rect.anchorMin;
+                    previous.rectTransform.anchorMax = rect.anchorMax;
+                    previous.rectTransform.offsetMin = rect.offsetMin;
+                    previous.rectTransform.offsetMax = rect.offsetMax;
+                    previous.fontSize = number.fontSize;
+                    previous.color = number.color;
+                    previous.text = number.text;
+                    previous.gameObject.SetActive(true);
+                }
             }
             pulse._elapsed = 0f;
             pulse._color = color;
@@ -1192,6 +1208,12 @@ namespace YGOPortable.UI
                 RestoreNumber();
                 return;
             }
+            if (_previousNumber != null && _previousNumber.gameObject.activeSelf)
+            {
+                float blend = Mathf.SmoothStep(0f, 1f, _elapsed / NumberDuration);
+                _previousNumber.canvasRenderer.SetAlpha(1f - blend);
+                _number.Renderer.SetAlpha(blend);
+            }
             float remaining = 1f - _elapsed / NumberDuration;
             remaining *= remaining;
             float scale = 1f - .16f * remaining;
@@ -1207,7 +1229,9 @@ namespace YGOPortable.UI
             {
                 _number.Rect.anchoredPosition = _number.Position;
                 _number.Rect.localScale = _number.Scale;
+                _number.Renderer.SetAlpha(1f);
             }
+            if (_previousNumber != null) _previousNumber.gameObject.SetActive(false);
             _number = default;
         }
 
