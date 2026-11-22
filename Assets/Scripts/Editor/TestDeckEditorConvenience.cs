@@ -327,24 +327,20 @@ namespace YGOPortable.Editor
             var sideGrid = Field<RectTransform>(editor, "_sideGridRect");
             var trunkPane = Field<RectTransform>(editor, "_trunkPanel");
             var deckPane = Field<RectTransform>(editor, "_deckPanel");
-            Require(deckPane.gameObject.activeInHierarchy && !trunkPane.gameObject.activeInHierarchy &&
-                !root.Find("CardDetails").gameObject.activeInHierarchy && deckPane.rect.width > safe.rect.width * .9f,
-                "The mobile editor did not start in its full-width deck tab.");
-            Require(mainGrid.gameObject.activeInHierarchy && !extraGrid.gameObject.activeInHierarchy && !sideGrid.gameObject.activeInHierarchy,
-                "The accordion opened more than one initial section.");
+            Require(deckPane.gameObject.activeInHierarchy && trunkPane.gameObject.activeInHierarchy &&
+                !root.Find("CardDetails").gameObject.activeInHierarchy, "The mobile editor did not show the trunk and deck together.");
+            Require(mainGrid.gameObject.activeInHierarchy && extraGrid.gameObject.activeInHierarchy && sideGrid.gameObject.activeInHierarchy,
+                "The mobile editor did not show all three deck sections by default.");
             var sections = Field<Button[]>(editor, "_mobileSectionButtons");
             sections[1].onClick.Invoke();
-            Require(extraGrid.gameObject.activeInHierarchy && !mainGrid.gameObject.activeInHierarchy, "Extra Deck did not expand.");
+            Require(!extraGrid.gameObject.activeInHierarchy && mainGrid.gameObject.activeInHierarchy &&
+                sideGrid.gameObject.activeInHierarchy, "Collapsing the Extra Deck changed the other sections.");
             sections[1].onClick.Invoke();
-            Require(!extraGrid.gameObject.activeInHierarchy, "The active deck section could not be collapsed.");
-            sections[2].onClick.Invoke();
-            Require(sideGrid.gameObject.activeInHierarchy, "Side Deck did not expand.");
-            sections[0].onClick.Invoke();
-            Canvas.ForceUpdateCanvases();
+            Require(extraGrid.gameObject.activeInHierarchy, "The Extra Deck could not be reopened.");
             var canvas = (RectTransform)editor.Root.transform.parent;
-            VerifyMobileCardScale(editor, canvas, layout, safe, new Rect(92, 22, 1150, 698), new Vector2Int(1334, 750));
-            VerifyMobileCardScale(editor, canvas, layout, safe, new Rect(0, 0, 1600, 900), new Vector2Int(1600, 900));
-            VerifyMobileCardScale(editor, canvas, layout, safe, area, new Vector2Int(1600, 900));
+            VerifyMobileOverview(editor, canvas, layout, safe, new Rect(92, 22, 1150, 698), new Vector2Int(1334, 750));
+            VerifyMobileOverview(editor, canvas, layout, safe, new Rect(0, 0, 1600, 900), new Vector2Int(1600, 900));
+            VerifyMobileOverview(editor, canvas, layout, safe, area, new Vector2Int(1600, 900));
             Canvas.ForceUpdateCanvases();
             var deckArt = (RectTransform)main.Find("Card_0/CardInset/Card/AspectBox");
             Require(deckArt.Find("DeckCopies/Count").GetComponent<Text>().text == "×1", "The deck did not show the card copy count.");
@@ -362,11 +358,9 @@ namespace YGOPortable.Editor
             Tap(main.Find("Card_0").GetComponent<CardDragTrigger>());
             Require(deck.main.Count == 0, "A single deck tap did not remove exactly one card.");
 
-            Field<Button>(editor, "_mobileTrunkTab").onClick.Invoke();
-            Canvas.ForceUpdateCanvases();
             var trunk = Field<RectTransform>(editor, "_trunkViewport");
-            Require(!deckPane.gameObject.activeInHierarchy && trunkPane.gameObject.activeInHierarchy,
-                "The search tab did not replace the deck view.");
+            Require(deckPane.gameObject.activeInHierarchy && trunkPane.gameObject.activeInHierarchy,
+                "Removing a card hid one of the two panes.");
             var chips = Field<Button[]>(editor, "_quickFilterButtons");
             Button Chip(string label) => chips.Single(button => button.GetComponentInChildren<Text>().text.TrimStart('•', ' ') == label);
             var results = Field<List<CardInfo>>(editor, "_trunkResults");
@@ -393,9 +387,12 @@ namespace YGOPortable.Editor
             float SafeBottom(RectTransform rect) =>
                 safe.InverseTransformPoint(rect.TransformPoint(new Vector3(rect.rect.xMin, rect.rect.yMin, 0f))).y;
             float keyboardTop = safe.rect.yMin + (keyboard.yMax - area.yMin) * safe.rect.height / area.height;
-            Require(SafeBottom(trunk) >= keyboardTop && SafeBottom(searchRow) >= keyboardTop && trunk.rect.height > 200f,
+            Require(SafeBottom(trunk) >= keyboardTop && SafeBottom(searchRow) >= keyboardTop &&
+                trunk.rect.height > 200f && !deckPane.gameObject.activeInHierarchy && trunkPane.rect.width > .9f * safe.rect.width,
                 $"The keyboard top {keyboardTop:F1} crossed the list at {SafeBottom(trunk):F1} or search at {SafeBottom(searchRow):F1}.");
             Call(editor, "ApplyMobileKeyboardLayout", Rect.zero, area);
+            Require(deckPane.gameObject.activeInHierarchy && trunkPane.rect.width < .5f * safe.rect.width,
+                "Dismissing the keyboard did not restore both panes.");
             var search = Field<InputField>(editor, "_searchInp");
             search.text = Magician.ToString();
             var pool = Field<List<(RectTransform rt, CompositeCardView card, Text count, CardDragTrigger trigger)>>(editor, "_trunkPool");
@@ -433,7 +430,8 @@ namespace YGOPortable.Editor
             Require(deck.main.Count == 1, "Releasing a long press also added a copy.");
             panel.Find("Related/Button").GetComponent<Button>().onClick.Invoke();
             Require(Field<uint>(editor, "_relatedFilterCode") == Magician && trunkPane.gameObject.activeInHierarchy &&
-                results.Any(card => card.code == DragonKnight), "Related-card search did not open the filtered trunk.");
+                deckPane.gameObject.activeInHierarchy && results.Any(card => card.code == DragonKnight),
+                "Related-card search did not filter the trunk while leaving the deck visible.");
 
             deck.main.Clear();
             deck.main.AddRange(new[] { Pot, Magician, Ash, MirrorForce, Excel, Diabellstar });
@@ -451,46 +449,32 @@ namespace YGOPortable.Editor
             Require(!ReferenceEquals(firstHand, Field<uint[]>(editor, "_openingHand")) &&
                 hand.Count(button => button.gameObject.activeInHierarchy) == 5, "The mobile first-hand tool did not redraw.");
             Call(editor, "CloseDeckUtility");
-            Debug.Log("[VERIFY MOBILE DECK] Full-width tabs, 1.5× card artwork, accordion, touch edits, filter chips, keyboard inset, sheet and top actions passed.");
+            Debug.Log("[VERIFY MOBILE DECK] Shared deck and trunk, compact card rows, independent sections, touch edits, keyboard inset, sheet and top actions passed.");
         }
 
-        private static void VerifyMobileCardScale(DeckEditorUI editor, RectTransform canvas, MobileSafeArea layout,
+        private static void VerifyMobileOverview(DeckEditorUI editor, RectTransform canvas, MobileSafeArea layout,
             RectTransform safe, Rect area, Vector2Int display)
         {
             canvas.sizeDelta = (Vector2)display;
             layout.Reflow(area, display);
             Canvas.ForceUpdateCanvases();
             Call(editor, "LayoutMobileEditor");
-            var sectionButtons = Field<Button[]>(editor, "_mobileSectionButtons");
-            float touch = MobileSafeArea.MinimumTouchSize(safe);
-            float oldDeckWidth = safe.rect.width * .411f - 70f;
-            int oldDeckColumns = Mathf.Clamp(Mathf.FloorToInt(oldDeckWidth / (Mathf.Max(111f, touch) + 4f)), 1, 8);
-            float oldHeight = safe.rect.height * .846f * .677f;
-            float oldRow = Mathf.Min(touch + 3f, oldHeight / 3f);
-            float oldMainHeight = oldHeight - oldRow - (oldHeight >= 5f * oldRow ? 2f : 1f) * oldRow;
-            int oldMainRows = Mathf.Clamp(Mathf.FloorToInt(oldMainHeight / oldRow), 1, 3);
-            var oldRows = new[] { oldMainHeight / oldMainRows, oldRow, oldRow };
-            var grids = new[] { "_mainDeckSlotGrid", "_extraDeckSlotGrid", "_sideDeckSlotGrid" };
-            for (int i = 0; i < grids.Length; i++)
-            {
-                if (!Field<RectTransform>(editor, grids[i]).gameObject.activeInHierarchy) sectionButtons[i].onClick.Invoke();
-                Canvas.ForceUpdateCanvases();
-                var artwork = (RectTransform)Field<RectTransform>(editor, grids[i]).Find("Card_0/CardInset/Card/AspectBox");
-                float oldArt = Mathf.Min(oldDeckWidth / oldDeckColumns - 6f, (oldRows[i] - 6f) * LotdUiKit.CardAspectRatio);
-                Require(artwork.rect.width >= oldArt * 1.5f - .5f, $"{display} section {i} grew from {oldArt:F1} to only {artwork.rect.width:F1}.");
-            }
-            Field<Button>(editor, "_mobileTrunkTab").onClick.Invoke();
             Canvas.ForceUpdateCanvases();
-            float oldTrunkWidth = safe.rect.width * .319f - 51f;
-            int oldTrunkColumns = Mathf.Clamp(Mathf.FloorToInt(oldTrunkWidth / (Mathf.Max(111f, touch) + 4f)), 1, 3);
-            Require(Field<float>(editor, "_colWidth") - 4f >= (oldTrunkWidth / oldTrunkColumns - 4f) * 1.5f - .5f,
-                $"{display} trunk did not enlarge the card slots by 1.5×.");
-            float visibleHeight = Field<RectTransform>(editor, "_trunkViewport").rect.height;
-            float rowHeight = Field<float>(editor, "_rowHeight");
-            Require(visibleHeight >= rowHeight - 4f,
-                $"{display} trunk clipped its first row ({visibleHeight:F1} of {rowHeight:F1}).");
-            Field<Button>(editor, "_mobileDeckTab").onClick.Invoke();
-            if (!Field<RectTransform>(editor, grids[0]).gameObject.activeInHierarchy) sectionButtons[0].onClick.Invoke();
+            var trunkPane = Field<RectTransform>(editor, "_trunkPanel");
+            var deckPane = Field<RectTransform>(editor, "_deckPanel");
+            var trunk = Field<RectTransform>(editor, "_trunkViewport");
+            int trunkColumns = Field<int>(editor, "_trunkColumns");
+            int mainColumns = Field<int>(editor, "_mainColumns");
+            int rows = Mathf.FloorToInt(trunk.rect.height / Field<float>(editor, "_rowHeight"));
+            float rightOfTrunk = safe.InverseTransformPoint(trunkPane.TransformPoint(new Vector3(trunkPane.rect.xMax, 0f))).x;
+            float leftOfDeck = safe.InverseTransformPoint(deckPane.TransformPoint(new Vector3(deckPane.rect.xMin, 0f))).x;
+            Require(rightOfTrunk < leftOfDeck && trunkPane.gameObject.activeInHierarchy && deckPane.gameObject.activeInHierarchy,
+                $"{display} did not fit both mobile panes side by side.");
+            Require(trunkColumns >= 5 && rows >= 2 && mainColumns >= 7 &&
+                Field<int>(editor, "_mainVisibleRows") == 3 && Field<int>(editor, "_extraVisibleRows") == 2,
+                $"{display} showed only {trunkColumns}×{rows} trunk cards or {mainColumns} main-deck columns.");
+            var mainArt = (RectTransform)Field<RectTransform>(editor, "_mainDeckSlotGrid").Find("Card_0/CardInset/Card/AspectBox");
+            Require(mainArt.rect.width >= 44f, $"{display} deck artwork became too small ({mainArt.rect.width:F1}).");
         }
 
         private static T Field<T>(object source, string name) => (T)source.GetType().GetField(name, Instance).GetValue(source);

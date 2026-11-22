@@ -10,7 +10,7 @@ namespace YGOPortable.UI
 {
     public partial class DeckEditorUI
     {
-        private const float MinimumMobileCardCellWidth = 111f;
+        private const float MobileTrunkRight = .447f;
         private readonly bool _mobileLayout;
         private int _trunkColumns = TrunkCols;
         private int _mainColumns = DeckColumns;
@@ -19,43 +19,37 @@ namespace YGOPortable.UI
         private int _extraVisibleRows = 2;
         private int _sideVisibleColumns = SideDeckVisibleColumns;
         private Vector2 _mobileDeckSize;
-        private float _mobileTouchSize;
-        private float _trunkGridOffset;
         private ScrollRect _extraDeckScroll;
         private RectTransform _extraDeckSlotGrid;
 
         private static readonly DragSourceType[] MobileDeckSections =
             { DragSourceType.DeckMain, DragSourceType.DeckExtra, DragSourceType.DeckSide };
         private static readonly string[] MobileSectionNames = { "메인 덱", "엑스트라 덱", "사이드 덱" };
+        private static readonly int[] MobileSectionRows = { MainDeckVisibleRows, 2, 1 };
         private RectTransform _mobileEditor;
         private RectTransform _mobileToolbar;
-        private RectTransform _mobileTabs;
+        private RectTransform _mobileTitle;
         private RectTransform _mobileSelection;
-        private Button _mobileDeckTab;
-        private Button _mobileTrunkTab;
         private Text _mobileSelectionLabel;
         private Button[] _mobileQuantity;
         private Button _mobileRelated;
         private Button _mobileDetails;
         private Text _mobileTrunkSort;
         private readonly Button[] _mobileSectionButtons = new Button[3];
-        private DragSourceType _mobileOpenSection = DragSourceType.DeckMain;
+        private readonly bool[] _mobileSectionsOpen = { true, true, true };
         private DragSourceType _mobileSelectedZone;
         private DragSourceType _mobileSelectedSource;
         private uint _mobileSelectedCode;
-        private bool _mobileViewingTrunk;
         private float _mobileKeyboardInset;
         private Vector2 _mobileEditorSize;
 
         private void BuildMobileEditor(RectTransform root)
         {
             _mobileEditor = root;
-            _mobileToolbar = DeckArea(root, "MobileToolbar", .47f, 0f, .985f, 1f);
-            _mobileTabs = DeckArea(root, "MobileTabs", .015f, 0f, .47f, 1f);
-            _mobileDeckTab = DeckButton(_mobileTabs, "Deck", "덱 보기", .02f, 0f, .492f, 1f,
-                () => SwitchPadArea(PadAreaForMobileSection()), accent: true, fontSize: 27);
-            _mobileTrunkTab = DeckButton(_mobileTabs, "Trunk", "카드 검색 · 보관함", .508f, 0f, .98f, 1f,
-                () => SwitchPadArea(PadArea.Trunk), fontSize: 27);
+            _mobileTitle = DeckArea(root, "MobileTitle", .027f, 0f, .265f, 1f);
+            LotdUiKit.AddFittedText(_mobileTitle, "Title", "덱 편집", 35, 21, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary,
+                FontStyle.Bold);
+            _mobileToolbar = DeckArea(root, "MobileToolbar", .28f, 0f, .985f, 1f);
             DeckButton(_mobileToolbar, "AutoSort", "자동 정렬", .02f, 0f, .215f, 1f, () => SortWorkingDeck(), fontSize: 24);
             _openDrawButton = DeckButton(_mobileToolbar, "TestDraw", "5장 테스트 드로우", .227f, 0f, .504f, 1f,
                 OpenTestDraw, fontSize: 24);
@@ -91,8 +85,13 @@ namespace YGOPortable.UI
             for (int i = 0; i < MobileDeckSections.Length; i++)
             {
                 int section = i;
-                _mobileSectionButtons[i] = DeckButton(_deckPanel, $"MobileSection{i}", MobileSectionNames[i], .018f, 0f, .982f, 1f,
-                    () => ToggleMobileDeckSection(MobileDeckSections[section]), fontSize: 22);
+                var button = _mobileSectionButtons[i] = DeckButton(_deckPanel, $"MobileSection{i}", MobileSectionNames[i],
+                    .018f, 0f, .982f, 1f, () => ToggleMobileDeckSection(MobileDeckSections[section]), fontSize: 17);
+                var label = button.GetComponentInChildren<Text>();
+                label.verticalOverflow = VerticalWrapMode.Overflow;
+                label.resizeTextForBestFit = true;
+                label.resizeTextMinSize = 10;
+                label.resizeTextMaxSize = 17;
             }
             foreach (string name in new[] { "MainTab", "ExtraTab", "SideTab", "MainCount", "ExtraCount", "SideCount" })
                 _deckPanel.Find(name).gameObject.SetActive(false);
@@ -108,48 +107,30 @@ namespace YGOPortable.UI
             _searchInp.placeholder.GetComponent<Text>().fontSize = 24;
             _trunkPanel.Find("TrunkHeading").GetComponent<Image>().color = LotdUiKit.PanelNavy;
             root.Find("CardDetails").gameObject.SetActive(false);
-            SetMobileDeckView(trunk: false);
             LayoutMobileEditor();
+            _deckHelpLabel.text = "";
         }
-
-        private PadArea PadAreaForMobileSection() => _mobileOpenSection switch
-        {
-            DragSourceType.DeckExtra => PadArea.Extra,
-            DragSourceType.DeckSide => PadArea.Side,
-            _ => PadArea.Main,
-        };
 
         private void SwitchMobilePadArea(PadArea area)
         {
-            if (!_mobileLayout || _mobileEditor == null || area == PadArea.Controls) return;
-            SetMobileDeckView(area == PadArea.Trunk);
-            if (area == PadArea.Trunk) return;
-            var section = area == PadArea.Extra ? DragSourceType.DeckExtra : area == PadArea.Side
-                ? DragSourceType.DeckSide : DragSourceType.DeckMain;
-            if (_mobileOpenSection != section)
+            if (!_mobileLayout || _mobileEditor == null) return;
+            int section = area switch
             {
-                _mobileOpenSection = section;
-                RelayoutMobileDeck();
-            }
-        }
-
-        private void SetMobileDeckView(bool trunk)
-        {
-            bool changed = _trunkPanel.gameObject.activeSelf != trunk || _deckPanel.gameObject.activeSelf == trunk;
-            _mobileViewingTrunk = trunk;
-            _trunkPanel.gameObject.SetActive(trunk);
-            _deckPanel.gameObject.SetActive(!trunk);
-            _mobileTrunkTab.GetComponentInChildren<Text>().color = trunk ? LotdUiKit.GoldAccent : Color.white;
-            _mobileDeckTab.GetComponentInChildren<Text>().color = trunk ? Color.white : LotdUiKit.GoldAccent;
-            if (!changed || _workingDeck == null) return;
-            Canvas.ForceUpdateCanvases();
-            if (trunk) ResizeTrunkGrid(false);
-            else RelayoutMobileDeck();
+                PadArea.Main => 0,
+                PadArea.Extra => 1,
+                PadArea.Side => 2,
+                _ => -1,
+            };
+            if (section < 0 || _mobileSectionsOpen[section]) return;
+            _mobileSectionsOpen[section] = true;
+            RelayoutMobileDeck();
         }
 
         private void ToggleMobileDeckSection(DragSourceType section)
         {
-            _mobileOpenSection = _mobileOpenSection == section ? DragSourceType.None : section;
+            int index = Array.IndexOf(MobileDeckSections, section);
+            if (index < 0) return;
+            _mobileSectionsOpen[index] = !_mobileSectionsOpen[index];
             RelayoutMobileDeck();
         }
 
@@ -166,22 +147,20 @@ namespace YGOPortable.UI
             _mobileEditorSize = _mobileEditor.rect.size;
             if (_mobileEditorSize.y <= 0f) return;
             float touch = MobileSafeArea.MinimumTouchSize(_mobileEditor);
-            float bar = Mathf.Clamp(touch * .72f, 57f, 92f) * MobileHeightScale;
-            float selection = Mathf.Clamp(touch * .55f, 49f, 79f) * MobileHeightScale;
+            float bar = Mathf.Clamp(touch * .48f, 47f, 66f) * MobileHeightScale;
+            float selection = Mathf.Clamp(touch * .40f, 43f, 57f) * MobileHeightScale;
             PositionFromTop(_mobileToolbar, 8f, 8f + bar);
-            PositionFromTop(_mobileTabs, 8f, 8f + bar);
+            PositionFromTop(_mobileTitle, 8f, 8f + bar);
             _mobileSelection.anchorMin = new Vector2(.02f, 0f);
             _mobileSelection.anchorMax = new Vector2(.98f, 0f);
             _mobileSelection.offsetMin = new Vector2(0f, 34f);
             _mobileSelection.offsetMax = new Vector2(0f, 34f + selection);
-            foreach (var pane in new[] { _trunkPanel, _deckPanel })
-            {
-                pane.anchorMin = new Vector2(.014f, 0f);
-                pane.anchorMax = new Vector2(.986f, 1f);
-                pane.offsetMin = new Vector2(0f, 40f + selection);
-                pane.offsetMax = new Vector2(0f, -(16f + bar));
-                pane.ForceUpdateRectTransforms();
-            }
+            _deckPanel.anchorMin = new Vector2(.458f, 0f);
+            _deckPanel.anchorMax = new Vector2(.986f, 1f);
+            _deckPanel.offsetMin = new Vector2(0f, 36f + selection);
+            _deckPanel.offsetMax = new Vector2(0f, -(16f + bar));
+            _deckPanel.ForceUpdateRectTransforms();
+            PositionMobileTrunk();
 
             LayoutMobileQuickFilters();
             if (_workingDeck != null)
@@ -200,7 +179,7 @@ namespace YGOPortable.UI
                 LayoutMobileEditor();
                 _mobileKeyboardInset = -1f;
             }
-            Rect keyboard = _mobileViewingTrunk && TouchScreenKeyboard.visible ? TouchScreenKeyboard.area : Rect.zero;
+            Rect keyboard = _searchInp.isFocused && TouchScreenKeyboard.visible ? TouchScreenKeyboard.area : Rect.zero;
             ApplyMobileKeyboardLayout(keyboard, Screen.safeArea);
         }
 
@@ -214,15 +193,22 @@ namespace YGOPortable.UI
             if (Mathf.Abs(inset - _mobileKeyboardInset) < .5f) return;
             _mobileKeyboardInset = inset;
             // Keep the search bar at the safe top while reclaiming the space used by the editor controls.
-            bool typing = inset > 0f && _mobileViewingTrunk;
-            _mobileToolbar.gameObject.SetActive(!typing);
-            _mobileTabs.gameObject.SetActive(!typing);
-            _mobileSelection.gameObject.SetActive(!typing);
-            var pane = _trunkPanel;
-            pane.offsetMin = new Vector2(0f, typing ? inset + 4f : _deckPanel.offsetMin.y);
-            pane.offsetMax = new Vector2(0f, typing ? -5f : _deckPanel.offsetMax.y);
-            pane.ForceUpdateRectTransforms();
+            PositionMobileTrunk();
             if (_workingDeck != null) ResizeTrunkGrid(false);
+        }
+
+        private void PositionMobileTrunk()
+        {
+            bool typing = _mobileKeyboardInset > 0f;
+            _mobileToolbar.gameObject.SetActive(!typing);
+            _mobileTitle.gameObject.SetActive(!typing);
+            _mobileSelection.gameObject.SetActive(!typing);
+            _deckPanel.gameObject.SetActive(!typing);
+            _trunkPanel.anchorMin = new Vector2(.014f, 0f);
+            _trunkPanel.anchorMax = new Vector2(typing ? .986f : MobileTrunkRight, 1f);
+            _trunkPanel.offsetMin = new Vector2(0f, typing ? _mobileKeyboardInset + 4f : _deckPanel.offsetMin.y);
+            _trunkPanel.offsetMax = new Vector2(0f, typing ? -5f : _deckPanel.offsetMax.y);
+            _trunkPanel.ForceUpdateRectTransforms();
         }
 
         private static void PositionFromTop(RectTransform rect, float top, float bottom)
@@ -240,53 +226,41 @@ namespace YGOPortable.UI
             float height = _deckPanel.rect.height;
             if (height <= 0f) return;
             _mobileDeckSize = _deckPanel.rect.size;
-            _mobileTouchSize = MobileSafeArea.MinimumTouchSize(_deckPanel);
+            float commands = 40f * MobileHeightScale;
+            float header = 25f * MobileHeightScale;
+            const float gap = 4f;
+            PositionFromTop((RectTransform)_deckPanel.Find("DeckControls"), 8f, 8f + commands);
+            PositionFromTop((RectTransform)_deckPanel.Find("EditControls"), 8f, 8f + commands);
+            float y = 13f + commands;
+            int openRows = 0;
+            for (int i = 0; i < MobileSectionRows.Length; i++)
+                if (_mobileSectionsOpen[i]) openRows += MobileSectionRows[i];
 
-            float commands = Mathf.Clamp(_mobileTouchSize * .45f, 43f, 62f);
-            float header = Mathf.Clamp(_mobileTouchSize * .35f, 38f, 49f);
-            PositionFromTop((RectTransform)_deckPanel.Find("DeckControls"), 12f, 12f + commands);
-            PositionFromTop((RectTransform)_deckPanel.Find("EditControls"), 12f, 12f + commands);
-            float y = 22f + commands;
-            float body = Mathf.Max(1f, height - y - (header + 5f) * MobileDeckSections.Length - 9f);
-
+            float body = Mathf.Max(1f, height - y - (header + gap) * MobileDeckSections.Length - 9f);
+            float rowHeight = body / Mathf.Max(1, openRows);
             var grids = new[] { _mainGridRect, _extraGridRect, _sideGridRect };
             for (int i = 0; i < grids.Length; i++)
             {
                 PositionFromTop((RectTransform)_mobileSectionButtons[i].transform.parent, y, y + header);
-                y += header + 5f;
-                bool expanded = _mobileOpenSection == MobileDeckSections[i];
-                PositionFromTop(grids[i], y, y + body);
-                grids[i].gameObject.SetActive(expanded);
-                if (expanded) y += body;
+                y += header + gap;
+                float sectionHeight = rowHeight * MobileSectionRows[i];
+                PositionFromTop(grids[i], y, y + sectionHeight);
+                grids[i].gameObject.SetActive(_mobileSectionsOpen[i]);
+                if (_mobileSectionsOpen[i]) y += sectionHeight;
             }
 
             _mainDeckScroll.viewport.ForceUpdateRectTransforms();
             _extraDeckScroll.viewport.ForceUpdateRectTransforms();
             _sideDeckScroll.viewport.ForceUpdateRectTransforms();
-            float oldHeight = _mobileEditor.rect.height * .846f;
-            float oldWidth = _mobileEditor.rect.width * .411f - 70f;
-            float oldGridHeight = oldHeight * .677f;
-            float oldRowGoal = Mathf.Min(_mobileTouchSize + 3f, oldGridHeight / 3f);
-            float oldExtraHeight = oldGridHeight >= 5f * oldRowGoal ? 2f * oldRowGoal : oldRowGoal;
-            float oldMainHeight = oldGridHeight - oldExtraHeight - oldRowGoal;
-            float oldMainRows = Mathf.Clamp(Mathf.FloorToInt(oldMainHeight / Mathf.Max(1f, oldRowGoal)), 1, MainDeckVisibleRows);
-            float oldCellWidth = oldWidth / ColumnsForTouch(oldWidth, DeckColumns);
-            float target = 1.5f * Mathf.Min(oldCellWidth, Mathf.Max(oldMainHeight / oldMainRows, oldRowGoal) * LotdUiKit.CardAspectRatio);
-            target = Mathf.Max(MinimumMobileCardCellWidth * 1.5f, target);
-            _mainColumns = MobileGridColumns(_mainDeckScroll.viewport.rect.width, target);
-            _extraColumns = MobileGridColumns(_extraDeckScroll.viewport.rect.width, target);
-            _sideVisibleColumns = Mathf.Min(SideDeckVisibleColumns, MobileGridColumns(_sideDeckScroll.viewport.rect.width, target));
-            _mainVisibleRows = Mathf.Clamp(Mathf.FloorToInt(body * LotdUiKit.CardAspectRatio / target), 1, MainDeckVisibleRows);
-            _extraVisibleRows = Mathf.Clamp(Mathf.FloorToInt(body * LotdUiKit.CardAspectRatio / target), 1, 2);
+            _mainColumns = MobileDeckColumns(_mainDeckScroll.viewport.rect.width);
+            _extraColumns = MobileDeckColumns(_extraDeckScroll.viewport.rect.width);
+            _sideVisibleColumns = MobileDeckColumns(_sideDeckScroll.viewport.rect.width);
             SetSlotLayout(_mainSlots, _mainColumns);
             SetSlotLayout(_extraSlots, _extraColumns);
         }
 
-        private int ColumnsForTouch(float width, int max) =>
-            Mathf.Clamp(Mathf.FloorToInt(width / (Mathf.Max(MinimumMobileCardCellWidth, _mobileTouchSize) + 4f)), 1, max);
-
-        private static int MobileGridColumns(float width, float target) =>
-            Mathf.Clamp(Mathf.FloorToInt(width / (target + 6f)), 1, DeckColumns);
+        private static int MobileDeckColumns(float width) =>
+            Mathf.Clamp(Mathf.FloorToInt(width / 72f), 1, DeckColumns);
 
         private void RefreshMobileSectionLabels()
         {
@@ -294,7 +268,7 @@ namespace YGOPortable.UI
             for (int i = 0; i < MobileDeckSections.Length; i++)
             {
                 var section = MobileDeckSections[i];
-                bool expanded = _mobileOpenSection == section;
+                bool expanded = _mobileSectionsOpen[i];
                 _mobileSectionButtons[i].GetComponentInChildren<Text>().text =
                     $"{(expanded ? "▾" : "▸")}  {MobileSectionNames[i]}   {GetDeckList(section).Count}장";
             }
