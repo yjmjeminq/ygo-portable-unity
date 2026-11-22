@@ -4411,6 +4411,8 @@ namespace YGOPortable.Editor
             field.Refresh();
             var slots = sources.Select(card => FieldSlot(field, card)).ToArray();
             var queued = AnimationSteps(animator).ToArray();
+            var kind = CardAnimationManager.SummonEffect(host.code, CardMotion.ExtraDeckSummon).kind;
+            bool hasSignature = DuelEffectGraphic.HasSummonSignature(kind);
             var step = queued.Single(cue => cue.GetType().Name.StartsWith("<PlaySummonMaterials>", StringComparison.Ordinal));
             var arrival = queued.Single(cue => FlightCode(cue) == host.code);
             Require(Array.IndexOf(queued, step) < Array.IndexOf(queued, arrival),
@@ -4452,6 +4454,41 @@ namespace YGOPortable.Editor
                 Require(cards.Count(card => card.anchoredPosition == readout.anchoredPosition) == 1,
                     "A material's live values did not follow its artwork.");
             }
+            if (hasSignature)
+            {
+                sample(.46f);
+                var portal = animator.GetComponentsInChildren<DuelEffectGraphic>()
+                    .Single(graphic => graphic.SummonSignature && !graphic.SummonFinale);
+                Require(portal.Kind == kind, "A real summon used the wrong material portal.");
+                var orbs = animator.GetComponentsInChildren<DuelEffectGraphic>()
+                    .Where(graphic => graphic.Kind == DuelEffectKind.SummonOrb).ToArray();
+                if (kind == DuelEffectKind.Synchro)
+                {
+                    int tunerLevels = sources.Where(card => (card.type & YgoConstants.TYPE_TUNER) != 0)
+                        .Sum(card => (int)card.level);
+                    int otherLevels = sources.Sum(card => (int)card.level) - tunerLevels;
+                    Require(portal.SummonUnits == tunerLevels && orbs.Sum(orb => orb.SummonUnits) == otherLevels,
+                        "The Synchro corridor did not match the native tuner and other material levels.");
+                }
+                if (kind == DuelEffectKind.Xyz)
+                    Require(orbs.Length == count && orbs.All(orb => orb.SummonUnits == 1),
+                        "The Xyz overlay missed a material orb.");
+                if (kind == DuelEffectKind.Link)
+                {
+                    uint first = DuelEffectGraphic.LitLinkMarkers(portal.DirectionMask, .18f);
+                    Require(orbs.Length == count && portal.DirectionMask == host.linkMarker && first != 0 &&
+                            (first & (first - 1)) == 0 && DuelEffectGraphic.LitLinkMarkers(portal.DirectionMask, .62f) == host.linkMarker,
+                        "The Link circuit did not illuminate the real markers one at a time.");
+                }
+                if (kind == DuelEffectKind.Fusion)
+                {
+                    float radius = cards.Max(card => Vector2.Distance(card.anchoredPosition, portal.rectTransform.anchoredPosition));
+                    sample(.87f);
+                    Require(cards.All(card => Vector2.Distance(card.anchoredPosition, portal.rectTransform.anchoredPosition) < radius * .35f),
+                        "The Fusion materials did not spiral into their shared center.");
+                }
+                sample(.20f);
+            }
             if (merging)
             {
                 float separation = Vector2.Distance(cards[0].anchoredPosition, cards[1].anchoredPosition);
@@ -4473,7 +4510,33 @@ namespace YGOPortable.Editor
                     !hostSlot.Find("Card/CardView").gameObject.activeInHierarchy,
                 "The materials lingered or the new monster arrived during their departure.");
             if (inspected != null) CheckInspectedAttack(CardDatabase.Get(inspected.code).atk);
-            Require(arrival.MoveNext() && !arrival.MoveNext() &&
+            Require(arrival.MoveNext(), "The summon did not start its reveal.");
+            if (hasSignature)
+            {
+                var reveal = (IEnumerator)arrival.Current;
+                Require(reveal.MoveNext(), "The signature finale did not start.");
+                TestCardPresentation.SampleAnimation((IEnumerator)reveal.Current)(.96f);
+                var finale = animator.GetComponentsInChildren<DuelEffectGraphic>().Single(graphic => graphic.SummonFinale);
+                var flash = animator.transform.Find("SummonPeakFlash").GetComponent<Image>();
+                Require(finale.Kind == kind && flash.color.a > .1f &&
+                        ((RectTransform)animator.transform).anchoredPosition.sqrMagnitude > .01f,
+                    "The signature finale missed its flash or shake.");
+                if (kind == DuelEffectKind.Xyz)
+                    Require(finale.SummonUnits == host.overlayCodes.Count, "The finale did not orbit the actual Xyz materials.");
+                if (kind == DuelEffectKind.Link)
+                    Require(finale.DirectionMask == host.linkMarker && animator.transform.Find("LinkCircuitClosed") != null,
+                        "The Link finale omitted its circuit confirmation.");
+                using var mesh = new VertexHelper();
+                var populate = typeof(DuelEffectGraphic).GetMethod("OnPopulateMesh", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+                populate.Invoke(finale, new object[] { mesh });
+                Require(mesh.currentVertCount is > 100 and < 12000, "The signature finale produced an empty or excessive mesh.");
+                while (reveal.MoveNext()) TestCardPresentation.SampleAnimation((IEnumerator)reveal.Current)(1f);
+                Require(animator.transform.Find("SummonPeakFlash") == null &&
+                        ((RectTransform)animator.transform).anchoredPosition.sqrMagnitude < .001f,
+                    "The finale left a flash or moved the stage after the animation.");
+                Debug.Log($"[VERIFY SIGNATURE SUMMON] {kind} material transition and finale passed.");
+            }
+            Require(!arrival.MoveNext() &&
                     hostSlot.GetComponentInChildren<CompositeCardView>()?.CurrentCode == host.code,
                 "The summoned monster did not land once the materials cleared.");
             return hostSlot;

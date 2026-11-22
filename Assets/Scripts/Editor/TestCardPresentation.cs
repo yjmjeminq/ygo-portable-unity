@@ -344,6 +344,24 @@ namespace YGOPortable.Editor
             Debug.Log("[VERIFY OVERFRAME RESUMMON] The same ace showed its cut-in on a second face-up summon and stayed hidden on a face-down summon.");
 
             animator.Clear();
+            const uint baronne = 84815190;
+            animator.QueueMove(new CardFlight(baronne, start, end, true, false), CardMotion.ExtraDeckSummon, null);
+            move = queue.Dequeue();
+            Require(move.MoveNext() && move.Current is IEnumerator, "The Synchro ace skipped its signature reveal.");
+            reveal = (IEnumerator)move.Current;
+            Require(reveal.MoveNext(), "The Synchro ace did not start its entrance.");
+            enter = SampleAnimation((IEnumerator)reveal.Current);
+            enter(.96f);
+            var synchro = animator.transform.Find("Synchro").GetComponent<DuelEffectGraphic>();
+            var subject = animator.transform.Find("MovingCard/Overframe").GetComponent<CanvasGroup>();
+            Require(synchro.SummonFinale && subject.alpha > .9f && animator.transform.Find("SummonPeakFlash") != null,
+                "The signature finale did not flow into the ace's overframe.");
+            while (reveal.MoveNext()) SampleAnimation((IEnumerator)reveal.Current)(1f);
+            Require(!move.MoveNext() && animator.transform.Find("Synchro") == null,
+                "The signature ace cut-in left its arena overlay active.");
+            Debug.Log("[VERIFY SIGNATURE OVERFRAME] The Synchro impact flowed into the supported artwork and cleared on arrival.");
+
+            animator.Clear();
             VerifyGroupedOverframe(animator, queue);
             animator.Clear();
             animator.QueueChain(start, 9674034, 1, false);

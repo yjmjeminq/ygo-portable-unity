@@ -121,7 +121,7 @@ namespace YGOPortable.UI
             new(new CardFlight(Flight.Code, Flight.From, to, Flight.StartsFaceDown, Flight.EndsFaceDown), Readout, Depart, Release, Vanishes);
     }
 
-    public class CardAnimationManager : MonoBehaviour
+    public partial class CardAnimationManager : MonoBehaviour
     {
         private static CardAnimationManager _instance;
         public static CardAnimationManager Instance => _instance != null ? _instance : null;
@@ -182,6 +182,7 @@ namespace YGOPortable.UI
             internal Action Depart;
             internal Action Handoff;
             internal Action Release;
+            internal int SignatureUnits;
         }
 
         private sealed class FieldDepartureGroup
@@ -196,6 +197,8 @@ namespace YGOPortable.UI
         private sealed class MaterialDepartureGroup
         {
             internal object Key;
+            internal uint Method;
+            internal uint LinkMarkers;
             internal readonly List<SummonMaterialFlight> Moves = new();
         }
 
@@ -251,6 +254,7 @@ namespace YGOPortable.UI
             _shownChainOutcomes.Clear();
             _playing = false;
             Paused = false;
+            _layer.anchoredPosition = Vector2.zero;
             for (int i = _layer.childCount - 1; i >= 0; i--)
                 RemoveTransient(_layer.GetChild(i).gameObject);
         }
@@ -334,8 +338,8 @@ namespace YGOPortable.UI
         {
             if (group == null || _openMaterials?.Key != group)
             {
-                var next = new MaterialDepartureGroup { Key = group };
-                QueueStep(PlaySummonMaterials(next.Moves, method, refresh, merging: false));
+                var next = new MaterialDepartureGroup { Key = group, Method = method };
+                QueueStep(PlaySummonMaterials(next.Moves, method, refresh, merging: false, group: next));
                 _openMaterials = next;
             }
             _openMaterials.Moves.Add(move);
@@ -361,11 +365,20 @@ namespace YGOPortable.UI
 
         internal void StageFieldArrival(CardFlight flight, CardMotion motion, byte controller, uint location, uint sequence,
             CardMoveReadoutSnapshot readout, Action depart, Action release, Action refresh, uint? returnEffect = null,
-            Action handoff = null)
+            Action handoff = null, int xyzMaterials = 0)
         {
             if (_pendingFieldArrivals != null && (_pendingReturnEffect != returnEffect || returnEffect == 0))
                 CompleteFieldArrivals();
             _openFieldDepartures = null;
+            var kind = SummonEffect(flight.Code, motion).kind;
+            int signatureUnits = kind == DuelEffectKind.Xyz ? xyzMaterials : 0;
+            if (_openMaterials != null && !flight.EndsFaceDown)
+            {
+                if (_openMaterials.Method == YgoConstants.REASON_LINK && kind == DuelEffectKind.Link)
+                    _openMaterials.LinkMarkers = SummonedLinkMarkers(flight.Code, readout?.DestinationCard);
+                if (_openMaterials.Method == YgoConstants.REASON_SYNCHRO && kind == DuelEffectKind.Synchro)
+                    signatureUnits = SummonTunerLevels(_openMaterials.Moves);
+            }
             _openMaterials = null;
             _openPositionChanges = null;
             _openPileTransfers = null;
@@ -374,7 +387,7 @@ namespace YGOPortable.UI
             _pendingFieldArrivals.Add(new FieldArrival
             {
                 Slot = (controller, location, sequence), Flight = flight, Motion = motion, Readout = readout,
-                Depart = depart, Handoff = handoff, Release = release,
+                Depart = depart, Handoff = handoff, Release = release, SignatureUnits = signatureUnits,
             });
             _pendingReturnEffect = returnEffect;
             _refreshAfterFieldArrivals = refresh;
@@ -401,7 +414,7 @@ namespace YGOPortable.UI
             var first = moves[0];
             _openEquip = null;
             _steps.Enqueue(moves.Count == 1 && first.Motion != CardMotion.FieldReturn
-                ? MoveCard(first.Flight, first.Motion, Land, first.Readout, first.Depart)
+                ? MoveCard(first.Flight, first.Motion, Land, first.Readout, first.Depart, signatureUnits: first.SignatureUnits)
                 : PlayFieldArrivalGroup(moves, Land, refresh));
         }
 
@@ -967,7 +980,8 @@ namespace YGOPortable.UI
             return size;
         }
 
-        private IEnumerator PlaySummonMaterials(IReadOnlyList<SummonMaterialFlight> moves, uint method, Action refresh, bool merging)
+        private IEnumerator PlaySummonMaterials(IReadOnlyList<SummonMaterialFlight> moves, uint method, Action refresh, bool merging,
+            MaterialDepartureGroup group = null)
         {
             if (ReferenceEquals(_openMaterials?.Moves, moves)) _openMaterials = null;
             Color accent = method switch
@@ -996,6 +1010,10 @@ namespace YGOPortable.UI
             var fades = new CanvasGroup[moves.Count];
             var stats = new DuelMovingReadout[moves.Count];
             var spread = new Vector2[moves.Count];
+            var kind = MaterialSignature(method);
+            var shade = kind.HasValue ? SummonScreenTint("SummonMaterialShade") : null;
+            var portal = kind.HasValue ? CreateMaterialPortal(moves, kind.Value, accent, group?.LinkMarkers ?? 0) : null;
+            var orbs = new DuelEffectGraphic[moves.Count];
             for (int i = 0; i < moves.Count; i++)
             {
                 var flight = moves[i].Flight;
@@ -1006,6 +1024,9 @@ namespace YGOPortable.UI
                 cards[i] = view;
                 fades[i] = fade;
             }
+            if (portal != null)
+                for (int i = 0; i < moves.Count; i++)
+                    orbs[i] = CreateMaterialOrb(moves[i], portal.Kind, accent);
             for (int i = 0; i < moves.Count; i++)
             {
                 var move = moves[i];
@@ -1014,28 +1035,50 @@ namespace YGOPortable.UI
                 if (stats[i] != null) spread[i] = MaterialSpread(moves, i, merging);
             }
 
-            yield return Animate(.30f, time =>
+            yield return Animate(portal != null ? .48f : .30f, time =>
             {
+                if (portal != null)
+                {
+                    portal.Seek(time);
+                    shade.color = new Color(.008f, .012f, .021f, Mathf.Sin(time * Mathf.PI) * .58f);
+                }
                 for (int i = 0; i < moves.Count; i++)
                 {
                     var move = moves[i];
                     var flight = move.Flight;
                     TrackCardEffect(cues[i], flight.From, 1.58f, .56f + .44f * Mathf.Clamp01(time * 2.4f));
                     ApplyFlight(cards[i], flight, time, move.Vanishes ? 6f : 18f, lateral: spread[i]);
-                    stats[i]?.Follow(cards[i], time);
-                    if (merging || move.Vanishes)
+                    if (portal != null)
                     {
-                        float fadeStart = move.Vanishes ? .48f : .75f;
-                        fades[i].alpha = 1f - Mathf.SmoothStep(0f, 1f, (time - fadeStart) / (1f - fadeStart));
+                        if (orbs[i] != null) PoseMaterialOrb(orbs[i], portal, move, i, time);
+                        if (kind == DuelEffectKind.Fusion) PullFusionCard(cards[i], flight, portal.rectTransform.anchoredPosition, i, time);
+                    }
+                    stats[i]?.Follow(cards[i], time);
+                    if (merging || move.Vanishes || kind == DuelEffectKind.Fusion)
+                    {
+                        float fadeStart = move.Vanishes && portal == null ? .48f : .29f;
+                        fades[i].alpha = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(fadeStart, .94f, time));
+                    }
+                    else if (kind is DuelEffectKind.Synchro or DuelEffectKind.Link)
+                    {
+                        float convert = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.24f, .46f, time));
+                        float arrive = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.66f, .90f, time));
+                        fades[i].alpha = 1f - .94f * convert * (1f - arrive);
                     }
                 }
             });
+            if (portal != null)
+            {
+                RemoveTransient(portal.gameObject);
+                RemoveTransient(shade.gameObject);
+            }
             for (int i = 0; i < cards.Length; i++)
             {
                 fades[i].alpha = 1f;
                 RecycleCard(cards[i]);
                 if (stats[i] != null) RemoveTransient(stats[i].Root.gameObject);
                 RemoveTransient(cues[i].gameObject);
+                if (orbs[i] != null) RemoveTransient(orbs[i].gameObject);
                 moves[i].Release?.Invoke();
             }
             refresh();
@@ -1070,7 +1113,7 @@ namespace YGOPortable.UI
         }
 
         private IEnumerator MoveCard(CardFlight flight, CardMotion motion, Action onArrive, CardMoveReadoutSnapshot readout,
-            Action onDepart, Action onHandoff = null)
+            Action onDepart, Action onHandoff = null, int signatureUnits = 0)
         {
             if (!flight.From.IsValid || !flight.To.IsValid)
             {
@@ -1094,7 +1137,7 @@ namespace YGOPortable.UI
             var proxy = TakeCard(flight.StartsFaceDown ? 0u : flight.Code, flight.StartsFaceDown, reveal);
             var moving = reveal ? null : CreateMovingReadout(flight, motion, readout);
             if (reveal)
-                yield return RevealSummon(proxy, flight, motion, featured, overframe, readout?.DestinationCard);
+                yield return RevealSummon(proxy, flight, motion, featured, overframe, readout?.DestinationCard, signatureUnits);
             else if (motion is CardMotion.AttachMaterial or CardMotion.DetachMaterial)
             {
                 bool attaching = motion == CardMotion.AttachMaterial;
@@ -1196,12 +1239,13 @@ namespace YGOPortable.UI
         }
 
         private IEnumerator RevealSummon(CompositeCardView proxy, CardFlight flight, CardMotion motion, bool featured,
-            bool overframe, LiveCardState live)
+            bool overframe, LiveCardState live, int signatureUnits)
         {
             if (!flight.StartsFaceDown && live != null) proxy.SetCard(flight.Code, live: live);
             var (kind, accent, title) = SummonEffect(flight.Code, motion);
             Vector2 view = _layer.rect.size;
-            var center = new Vector2(view.x * .035f, view.y * .045f);
+            var center = SummonShowcaseCenter(view);
+            bool signature = DuelEffectGraphic.HasSummonSignature(kind);
             float height = Mathf.Min(352f, view.y * .395f);
             float layoutHeight = overframe ? height : 0f;
             if (overframe)
@@ -1212,9 +1256,22 @@ namespace YGOPortable.UI
             var cardCenter = featured && !overframe ? center + Vector2.left * (height * .48f) : center;
             var reveal = new CardPose(cardCenter, new Vector2(height * LotdUiKit.CardAspectRatio, height), 0f);
             var first = new CardFlight(flight.Code, flight.From, reveal, flight.StartsFaceDown, false);
-            var background = LotdUiKit.AddImage(LotdUiKit.FillRect("SummonShade", _layer).gameObject, LotdUiKit.WhiteSprite,
-                Color.clear, false, false);
-            var effect = CreateEffect(kind, center, new Vector2(view.x * .76f, view.y * .83f), accent);
+            var background = SummonScreenTint("SummonShade");
+            var effect = signature
+                ? CreateSignatureEffect(kind, center, view, accent, finale: true)
+                : CreateEffect(kind, center, new Vector2(view.x * .76f, view.y * .83f), accent);
+            effect.SummonUnits = LimitSummonUnits(kind == DuelEffectKind.Xyz
+                ? Mathf.Max(signatureUnits, live?.overlayCodes.Count ?? 0) : signatureUnits);
+            if (kind == DuelEffectKind.Link) effect.DirectionMask = SummonedLinkMarkers(flight.Code, live);
+            var flash = signature ? SummonScreenTint("SummonPeakFlash") : null;
+            Text circuitClosed = null;
+            if (kind == DuelEffectKind.Link)
+            {
+                var banner = CenteredVisual("LinkCircuitClosed", _layer, center + Vector2.up * view.y * .35f,
+                    new Vector2(view.x * .35f, view.y * .066f));
+                circuitClosed = LotdUiKit.AddFittedText(banner, "Message", "LINK CLOSED!", 30, 16,
+                    TextAnchor.MiddleCenter, Color.clear, FontStyle.Bold);
+            }
             Image portrait = null;
             CanvasGroup portraitFade = null;
             Vector2 portraitCenter = center + new Vector2(height * .40f, height * .03f);
@@ -1234,16 +1291,24 @@ namespace YGOPortable.UI
             var layout = SummonPlate(flight, title,
                 center - Vector2.up * view.y * (featured || overframe ? .29f : .24f), live);
 
-            LotdAudio.PlaySummon();
-            yield return Animate(.28f, t =>
+            bool playedImpact = !signature;
+            if (playedImpact) LotdAudio.PlaySummon();
+            yield return Animate(signature ? .36f : .28f, t =>
             {
-                ApplySummonEntrance(proxy, first, kind, t, live, layoutHeight);
+                if (!playedImpact && t >= .88f)
+                {
+                    playedImpact = true;
+                    LotdAudio.PlaySummon();
+                }
+                float arrival = signature ? Mathf.InverseLerp(.20f, .97f, t) : t;
+                ApplySummonEntrance(proxy, first, kind, arrival, live, layoutHeight);
                 effect.Seek(t * .54f);
+                if (signature) PoseSummonPeak(flash, circuitClosed, t * .54f, view.y);
                 background.color = new Color(.009f, .013f, .02f, Mathf.SmoothStep(0f, .64f, t));
                 layout.alpha = Mathf.SmoothStep(0f, 1f, (t - .40f) / .60f);
                 if (overframe)
                 {
-                    aura.Seek(PopSummonOverframe(proxy, t) * .49f);
+                    aura.Seek(PopSummonOverframe(proxy, signature ? Mathf.InverseLerp(.30f, 1f, t) : t) * .49f);
                     wave.Seek(Mathf.InverseLerp(.72f, 1f, t) * .43f);
                 }
                 if (portraitFade != null && t >= .5f)
@@ -1259,6 +1324,7 @@ namespace YGOPortable.UI
             yield return Animate(featured || overframe ? .29f : .18f, t =>
             {
                 effect.Seek(.54f + t * .22f);
+                if (signature) PoseSummonPeak(flash, circuitClosed, .54f + t * .22f, view.y);
                 proxy.SetRarityHighlight(Mathf.Lerp(.85f, .25f, t));
                 if (portraitFade != null) portraitFade.transform.localScale = Vector3.one * Mathf.Lerp(1f, 1.025f, t);
                 if (overframe)
@@ -1275,6 +1341,7 @@ namespace YGOPortable.UI
                 ApplyFlight(proxy, last, t, 23f, live, layoutHeight: layoutHeight);
                 proxy.SetRarityHighlight(.25f * (1f - t));
                 effect.Seek(.76f + t * .24f);
+                if (signature) PoseSummonPeak(flash, circuitClosed, .76f + t * .24f, view.y);
                 layout.alpha = 1f - t;
                 background.color = new Color(.009f, .013f, .02f, .64f * (1f - t));
                 if (portraitFade != null) portraitFade.alpha = 1f - Mathf.SmoothStep(0f, 1f, t * 1.25f);
@@ -1287,6 +1354,8 @@ namespace YGOPortable.UI
             RemoveTransient(background.gameObject);
             RemoveTransient(effect.gameObject);
             RemoveTransient(layout.gameObject);
+            if (flash != null) RemoveTransient(flash.gameObject);
+            if (circuitClosed != null) RemoveTransient(circuitClosed.transform.parent.gameObject);
             if (portraitFade != null) RemoveTransient(portraitFade.gameObject);
             if (aura != null) RemoveTransient(aura.gameObject);
             if (wave != null) RemoveTransient(wave.gameObject);

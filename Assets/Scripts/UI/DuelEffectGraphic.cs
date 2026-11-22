@@ -6,11 +6,11 @@ namespace YGOPortable.UI
     internal enum DuelEffectKind
     {
         AttackPath, Strike, Break, Token, Summon, Chain, Fusion, Synchro, Xyz, Link, Ritual, Pendulum, XyzMaterial,
-        SummonMaterial, BanishTransit, EquipLink, ChainNegated, ChainShatter, ChainApplied, DisabledChains, ColumnRay, LinkRay, LiveLinkDirections, LifeSparks, ActionArc, ChainImpactWave
+        SummonMaterial, BanishTransit, EquipLink, ChainNegated, ChainShatter, ChainApplied, DisabledChains, ColumnRay, LinkRay, LiveLinkDirections, LifeSparks, ActionArc, ChainImpactWave, SummonOrb
     }
 
     // Canvas particles and tracks use one mesh, with white fill and vertex tints.
-    internal sealed class DuelEffectGraphic : RawImage
+    internal sealed partial class DuelEffectGraphic : RawImage
     {
         internal const float EquipContactProgress = .58f;
 
@@ -65,6 +65,17 @@ namespace YGOPortable.UI
             if (Kind == DuelEffectKind.AttackPath)
             {
                 AttackPath(mesh, rect, t, glow);
+                return;
+            }
+
+            if (SummonSignature && HasSummonSignature(Kind))
+            {
+                DrawSummonSignature(mesh, rect, radius, t, glow);
+                return;
+            }
+            if (Kind == DuelEffectKind.SummonOrb)
+            {
+                DrawSummonOrb(mesh, rect, radius, glow);
                 return;
             }
 

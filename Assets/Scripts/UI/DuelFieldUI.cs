@@ -2954,6 +2954,7 @@ namespace YGOPortable.UI
             var flight = new CardFlight(e.code, from, to, fromBack, toBack);
             if (e.toLoc == (YgoConstants.LOCATION_EXTRA | YgoConstants.LOCATION_OVERLAY))
                 return QueueSummonMaterial(animator, e, flight, previousReadout, awaitingXyzHost: true);
+            int xyzMaterials = 0;
             if (e.fromLoc == YgoConstants.LOCATION_EXTRA && _pendingXyzMaterials.Remove((e.fromCon, e.fromSeq), out var pending))
             {
                 uint hostLocation = e.toLoc == YgoConstants.LOCATION_MZONE ? e.toLoc : e.fromLoc;
@@ -2965,6 +2966,7 @@ namespace YGOPortable.UI
                     var arrival = GetCardPose(hostController, hostLocation | YgoConstants.LOCATION_OVERLAY, hostSequence, material.Index);
                     materialFlights.Add(arrival.IsValid ? material.Move.AimAt(arrival) : material.Move);
                 }
+                xyzMaterials = materialFlights.Count;
                 animator.QueueXyzMaterials(materialFlights, Refresh);
             }
 
@@ -3040,7 +3042,7 @@ namespace YGOPortable.UI
                     ReleaseBattleCardDisplay(held);
                     ReleaseArrival(key);
                     ReleaseMovingInspection(e, inspection);
-                }, Refresh, e.ReturnEffectId, inspection == null ? null : () => inspection.AtDestination = true);
+                }, Refresh, e.ReturnEffectId, inspection == null ? null : () => inspection.AtDestination = true, xyzMaterials);
                 if (e.summonType.HasValue && CardDatabase.Get(e.code) is { IsLink: true, link: not 0 } summon)
                     _arrivalLinks.Add((e.toCon, e.toSeq, summon.link));
                 return held;
