@@ -41,7 +41,7 @@ namespace YGOPortable.Editor
             {
                 var app = canvas.AddComponent<GameAppController>();
                 editor = new DeckEditorUI(app, canvas.transform);
-                editor.Open();
+                TestDeckEditing.OpenSavedDeck(editor);
                 VerifyQuickSearch(editor);
                 VerifyQuantitiesAndSort(editor);
                 VerifyRecipeActions(editor);
@@ -49,7 +49,7 @@ namespace YGOPortable.Editor
                 editor.Close();
 
                 mobile = new DeckEditorUI(app, canvas.transform, mobileLayout: true);
-                mobile.Open();
+                TestDeckEditing.OpenSavedDeck(mobile);
                 VerifyMobile(mobile, events);
             }
             finally

@@ -144,14 +144,21 @@ namespace YGOPortable.UI
         public void Open()
         {
             Root.SetActive(true);
+            StartPadNavigation();
+            ShowDeckPicker();
+        }
+
+        private void EnterDeckEditor(int index)
+        {
+            if (index < 0 || index >= DeckRepository.UserDecks.Count) return;
+            _userDeckIdx = index;
+            _deckPicker.gameObject.SetActive(false);
+            _editorContent.SetActive(true);
+            _padUi.Clear();
+            _padArea = PadArea.Trunk;
             CloseDeckCardActions();
             CloseDetailedSearch();
-            StartPadNavigation();
-            if (DeckRepository.UserDecks.Count == 0)
-                DeckRepository.Load(Application.streamingAssetsPath, Application.persistentDataPath,
-                    seedDefaultDecks: !CollectionProgress.Initialized);
-
-            _userDeckIdx = Mathf.Clamp(_userDeckIdx, 0, Mathf.Max(0, DeckRepository.UserDecks.Count - 1));
+            Canvas.ForceUpdateCanvases();
             LoadWorkingDeckFromCurrent();
             RefreshTrunkFilter();
             if (CollectionProgress.RequiresOwnedCardsForDecks && CollectionProgress.GetOwnedCount(_inspectedCode) == 0 &&
@@ -178,12 +185,18 @@ namespace YGOPortable.UI
             DismissDeckUtility(restoreFocus: false);
             _cardCrafting?.Hide();
             Root.SetActive(false);
+            _deckPicker.gameObject.SetActive(false);
             _editorContent.SetActive(true);
         }
 
         public void Update()
         {
             if (!Root.activeInHierarchy) return;
+            if (IsDeckPickerOpen)
+            {
+                UpdateDeckPicker();
+                return;
+            }
             if (_cardCrafting?.IsOpen == true)
             {
                 if (!PollDeckPad() && Input.GetKeyDown(KeyCode.Escape))
@@ -244,6 +257,11 @@ namespace YGOPortable.UI
                 return;
             }
 
+            if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                ReturnToDeckPicker();
+                return;
+            }
             if (!Input.GetKey(KeyCode.LeftControl) && !Input.GetKey(KeyCode.RightControl)) return;
             if (Input.GetKeyDown(KeyCode.F))
             {
@@ -322,8 +340,7 @@ namespace YGOPortable.UI
                 LotdUiKit.CreateLotdButton(examples, "Button", "카드군 예시 덱", OpenArchetypeModal, 15);
                 var back = LotdUiKit.CreateRect("Back", root, new Vector2(0.878f, 0.918f), new Vector2(0.985f, 0.976f),
                     Vector2.zero, Vector2.zero);
-                LotdUiKit.CreateLotdButton(back, "Button", "메인 메뉴",
-                    () => BeforeReplacingEdits(() => _app.ShowScreen(AppScreen.MainMenu)), 15);
+                LotdUiKit.CreateLotdButton(back, "Button", "덱 목록", ReturnToDeckPicker, 15);
 
             }
 
@@ -352,6 +369,7 @@ namespace YGOPortable.UI
             BuildDeckUtilities(root);
             BuildExpandedDeckCard(root);
             if (_mobileLayout) BuildMobileEditor(root);
+            BuildDeckPicker(root.parent);
         }
 
         private void BuildCardDetails(Transform root)
@@ -1539,14 +1557,21 @@ namespace YGOPortable.UI
                 try
                 {
                     DeckRepository.SaveUserDeck(new UserDeck { name = $"새 커스텀 덱 {DeckRepository.UserDecks.Count + 1}" });
-                    _userDeckIdx = DeckRepository.UserDecks.Count - 1;
-                    LoadWorkingDeckFromCurrent();
+                    int createdIndex = DeckRepository.UserDecks.Count - 1;
+                    if (IsDeckPickerOpen) EnterDeckEditor(createdIndex);
+                    else
+                    {
+                        _userDeckIdx = createdIndex;
+                        LoadWorkingDeckFromCurrent();
+                    }
                     ShowToast("새 빈 덱을 생성했습니다.");
                 }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
                 {
                     Debug.LogWarning($"[DeckEditor] Could not create a deck: {ex.Message}");
-                    ShowToast("덱을 만들 수 없습니다. 저장 폴더를 확인하세요.");
+                    const string message = "덱을 만들 수 없습니다. 저장 폴더를 확인하세요.";
+                    if (IsDeckPickerOpen) _deckPickerStatus.text = message;
+                    else ShowToast(message);
                 }
             });
         }

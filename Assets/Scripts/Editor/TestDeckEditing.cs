@@ -19,8 +19,91 @@ namespace YGOPortable.Editor
         {
             bool openDecks = CollectionProgress.AllDeckCardsAvailable;
             CollectionProgress.AllDeckCardsAvailable = false;
-            try { VerifyDeckEditing(streamingPath); }
+            try
+            {
+                VerifyDeckPicker(streamingPath);
+                VerifyDeckEditing(streamingPath);
+            }
             finally { CollectionProgress.AllDeckCardsAvailable = openDecks; }
+        }
+
+        internal static void OpenSavedDeck(DeckEditorUI editor, int index = 0)
+        {
+            editor.Open();
+            var rows = Field<RectTransform>(editor, "_deckPickerRows");
+            if (rows.childCount == 0)
+                Field<Button>(editor, "_deckPickerNew").onClick.Invoke();
+            else
+                rows.Find($"SavedDeck_{index}").GetComponent<Button>().onClick.Invoke();
+            Require(Field<UserDeck>(editor, "_workingDeck") != null, "Selecting a deck did not open the editor.");
+        }
+
+        private static void VerifyDeckPicker(string streamingPath)
+        {
+            string save = Path.Combine(Path.GetTempPath(), "ygo-picker-" + Guid.NewGuid().ToString("N"));
+            DeckRepository.Load(streamingPath, save, seedDefaultDecks: false);
+            var previousEvents = EventSystem.current;
+            var originalSelection = previousEvents?.currentSelectedGameObject;
+            var events = previousEvents ?? new GameObject("Deck picker input", typeof(EventSystem)).GetComponent<EventSystem>();
+            if (EventSystem.current == null) Call(events, "OnEnable");
+            var canvas = new GameObject("Deck picker canvas", typeof(Canvas), typeof(GraphicRaycaster)).GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            ((RectTransform)canvas.transform).sizeDelta = new Vector2(1600f, 900f);
+            var editor = new DeckEditorUI(null, canvas.transform, mobileLayout: true);
+            try
+            {
+                editor.Open();
+                var picker = Field<RectTransform>(editor, "_deckPicker");
+                var body = Field<GameObject>(editor, "_editorContent");
+                var rows = Field<RectTransform>(editor, "_deckPickerRows");
+                Require(picker.gameObject.activeInHierarchy && !body.activeInHierarchy && rows.childCount == 0 &&
+                    DeckRepository.UserDecks.Count == 0 && Field<UserDeck>(editor, "_workingDeck") == null,
+                    "Opening the deck editor skipped the empty picker or created an implicit deck.");
+                Field<Button>(editor, "_deckPickerNew").onClick.Invoke();
+                var first = Field<UserDeck>(editor, "_workingDeck");
+                Require(first != null && first.main.Count == 0 && body.activeInHierarchy && !picker.gameObject.activeInHierarchy,
+                    "Creating a deck from the picker did not open that empty deck.");
+
+                var second = new UserDeck { name = "두 번째 덱", main = new List<uint> { 46986414 } };
+                DeckRepository.SaveUserDeck(second);
+                var back = body.transform.Find("MobileToolbar/Back/Button").GetComponent<Button>();
+                Field<InputField>(editor, "_deckNameInput").text = "이름 바꾼 덱";
+                back.onClick.Invoke();
+                var confirmation = Field<GameObject>(editor, "_deckDialog");
+                Require(confirmation.activeInHierarchy && !picker.gameObject.activeInHierarchy,
+                    "Returning to the picker skipped the unsaved-edits confirmation.");
+                Field<Button>(editor, "_deckDialogCancel").onClick.Invoke();
+                Require(body.activeInHierarchy && Field<UserDeck>(editor, "_workingDeck") == first && !confirmation.activeInHierarchy,
+                    "Canceling the confirmation lost the working deck.");
+                back.onClick.Invoke();
+                Field<Button>(editor, "_deckDialogPrimary").onClick.Invoke();
+                Require(picker.gameObject.activeInHierarchy && rows.childCount == 2 &&
+                    rows.Find("SavedDeck_0/Name/Text").GetComponent<Text>().text == "이름 바꾼 덱",
+                    "Returning to the list after saving did not show the updated deck.");
+                var secondRow = rows.Find("SavedDeck_1").GetComponent<Button>();
+                var pad = Field<DeckPadUi>(editor, "_padUi");
+                pad.FocusInScope(picker, secondRow);
+                pad.Handle(picker, Vector2Int.zero, submit: true, cancel: false, onCancel: null, defaultFocus: secondRow);
+                Require(!picker.gameObject.activeInHierarchy && Field<UserDeck>(editor, "_workingDeck").id == second.id &&
+                    Field<UserDeck>(editor, "_workingDeck").main.SequenceEqual(second.main),
+                    "Selecting the second deck with controller input entered a different deck.");
+                editor.Close();
+                editor.Open();
+                Require(picker.gameObject.activeInHierarchy && Field<UserDeck>(editor, "_workingDeck") == null,
+                    "Reopening the editor bypassed the list.");
+                Debug.Log("[VERIFY DECK PICKER] Empty list, explicit creation, save/cancel on return, controller selection and reopen passed.");
+            }
+            finally
+            {
+                editor.Close();
+                if (previousEvents != null) previousEvents.SetSelectedGameObject(originalSelection);
+                else
+                {
+                    if (EventSystem.current == events) Call(events, "OnDisable");
+                    UnityEngine.Object.DestroyImmediate(events.gameObject);
+                }
+                UnityEngine.Object.DestroyImmediate(canvas.gameObject);
+            }
         }
 
         private static void VerifyDeckEditing(string streamingPath)
@@ -38,7 +121,7 @@ namespace YGOPortable.Editor
             var editor = new DeckEditorUI(canvas.AddComponent<GameAppController>(), canvas.transform);
             try
             {
-                editor.Open();
+                OpenSavedDeck(editor);
                 VerifyTransfer(editor);
                 VerifyLegacyDeck(editor);
                 VerifyConfirmation(editor, events);
@@ -350,7 +433,7 @@ namespace YGOPortable.Editor
             uint other = starter.main.First(code => CollectionProgress.GetDeckCopyKey(code) != CollectionProgress.GetDeckCopyKey(repeated));
             var saved = new UserDeck { name = "Split copies fixture", main = new List<uint> { repeated, other, repeated } };
             DeckRepository.SaveUserDeck(saved);
-            editor.Open();
+            OpenSavedDeck(editor, DeckRepository.UserDecks.IndexOf(saved));
 
             var deck = Field<UserDeck>(editor, "_workingDeck");
             Require(deck.main.SequenceEqual(new[] { repeated, repeated, other }) &&
@@ -449,7 +532,7 @@ namespace YGOPortable.Editor
                 extra = new List<uint> { arcray, zarc, arcrayArt },
             };
             DeckRepository.SaveUserDeck(saved);
-            editor.Open();
+            OpenSavedDeck(editor, DeckRepository.UserDecks.IndexOf(saved));
 
             var deck = Field<UserDeck>(editor, "_workingDeck");
             Require(deck.main.SequenceEqual(new[] { blueEyes, blueEyesArt, other }) &&
@@ -546,7 +629,7 @@ namespace YGOPortable.Editor
                 foreach (uint code in recovered)
                     Require(CardArtLoader.GetArtSprite(code) != fallback, $"Shared artwork {code} did not load from the build.");
 
-                editor.Open();
+                OpenSavedDeck(editor);
                 CompositeCardView FirstSlot(string field) => Field<RectTransform>(editor, field)
                     .Find("Card_0/CardInset/Card").GetComponent<CompositeCardView>();
                 Require(FirstSlot("_mainDeckSlotGrid").ArtworkSprite == CardArtLoader.GetArtSprite(recoveredMain) &&

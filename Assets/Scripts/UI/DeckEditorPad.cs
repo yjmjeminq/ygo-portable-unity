@@ -281,7 +281,7 @@ namespace YGOPortable.UI
             }
             if (frame.Cancel)
             {
-                BeforeReplacingEdits(() => _app.ShowScreen(AppScreen.MainMenu));
+                ReturnToDeckPicker();
                 if (_deckDialog.activeSelf) _padCardFocus.Hide();
                 return;
             }

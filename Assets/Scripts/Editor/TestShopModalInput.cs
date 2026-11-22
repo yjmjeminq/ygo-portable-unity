@@ -47,7 +47,7 @@ namespace YGOPortable.Editor
                 Call(shop, "CloseShop");
 
                 var editor = new DeckEditorUI(canvasObject.AddComponent<GameAppController>(), canvasObject.transform);
-                editor.Open();
+                TestDeckEditing.OpenSavedDeck(editor);
                 try
                 {
                     VerifyDeckDisassembly(editor, events);

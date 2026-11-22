@@ -55,8 +55,8 @@ namespace YGOPortable.UI
                 OpenTestDraw, fontSize: 24);
             _saveButtonText = DeckButton(_mobileToolbar, "Save", "저장", .516f, 0f, .716f, 1f,
                 () => TrySaveCurrentDeck(), accent: true, fontSize: 24).GetComponentInChildren<Text>();
-            DeckButton(_mobileToolbar, "Back", "메인 메뉴", .728f, 0f, .98f, 1f,
-                () => BeforeReplacingEdits(() => _app.ShowScreen(AppScreen.MainMenu)), fontSize: 23);
+            DeckButton(_mobileToolbar, "Back", "덱 목록", .728f, 0f, .98f, 1f,
+                ReturnToDeckPicker, fontSize: 23);
 
             _mobileSelection = LotdUiKit.FillRect("MobileCardSelection", root);
             LotdUiKit.AddImage(_mobileSelection.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelNavy, false, false);
