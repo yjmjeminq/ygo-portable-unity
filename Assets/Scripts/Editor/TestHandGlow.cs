@@ -2371,9 +2371,8 @@ namespace YGOPortable.Editor
                 Sprite raceSprite = DuelUiKit.GetRaceSprite(race);
                 Sprite attrSprite = DuelUiKit.GetAttributeSprite(attribute);
                 Require(inspectorText.text.Contains(identity) && zoomText.text.Contains(identity) &&
-                        raceSprite != null && inspectorRace.sprite == raceSprite && zoomRace.sprite == raceSprite &&
-                        attrSprite != null && inspectorAttribute.sprite == attrSprite && zoomAttribute.sprite == attrSprite &&
-                        new[] { inspectorRace, zoomRace, inspectorAttribute, zoomAttribute }.All(icon => icon.gameObject.activeInHierarchy),
+                        Matches(inspectorRace, raceSprite) && Matches(zoomRace, raceSprite) &&
+                        Matches(inspectorAttribute, attrSprite) && Matches(zoomAttribute, attrSprite),
                     $"The open card views showed the wrong race or attribute for {identity}.");
                 Canvas.ForceUpdateCanvases();
                 var label = inspectorText.cachedTextGenerator;
@@ -2382,6 +2381,9 @@ namespace YGOPortable.Editor
                         label.fontSizeUsedForBestFit >= 12,
                     "The compact card identity left its words clipped or too small.");
             }
+
+            bool Matches(Image icon, Sprite expected) =>
+                icon.sprite == expected && icon.gameObject.activeInHierarchy == (expected != null);
 
             void Activate(uint code, uint target = 0)
             {

@@ -370,7 +370,7 @@ namespace YGOPortable.UI
             _frame.Show(target, host != null ? host : (RectTransform)_root);
         }
 
-        private static void ScrollTo(Selectable control)
+        internal static void ScrollTo(Selectable control)
         {
             if (control == null) return;
             var scroll = control.GetComponentInParent<ScrollRect>();

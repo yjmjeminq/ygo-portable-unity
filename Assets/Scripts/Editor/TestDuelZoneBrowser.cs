@@ -31,6 +31,7 @@ namespace YGOPortable.Editor
                 opens += VerifyGraveEffectPicker(humanFirst);
             }
             opens += VerifyPromptAndExtraSummon();
+            opens += VerifyPromptAndExtraSummon(mobileLayout: true);
             opens += VerifyNativeExtraActivation();
             VerifyNativeBanishedTrigger();
             string hitTest = SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null ? "raycast filters" : "GraphicRaycaster";
@@ -431,7 +432,7 @@ namespace YGOPortable.Editor
             Debug.Log("[VERIFY BANISHED ACTIVATE] Dotscaper kept its native optional trigger in Off, lit the pile and resolved from the action shortcut. Retry=0");
         }
 
-        private static int VerifyPromptAndExtraSummon()
+        private static int VerifyPromptAndExtraSummon(bool mobileLayout = false)
         {
             var main = Enumerable.Repeat(MoYe, 20).Concat(Enumerable.Repeat(Longyuan, 20)).ToArray();
             var otherMain = Enumerable.Repeat(20721928u, 40).ToArray();
@@ -440,7 +441,7 @@ namespace YGOPortable.Editor
                 session => session.Players[0].hand.Any(card => card.code == MoYe) &&
                            session.Players[0].hand.Any(card => card.code == Longyuan));
             Action<byte[]> submit = duel.SubmitResponse;
-            using var ui = new Browser(duel, bytes => submit(bytes));
+            using var ui = new Browser(duel, bytes => submit(bytes), mobileLayout);
             var mine = duel.Players[0];
             var mainPrompt = ReachMainPhase(duel, 0);
             ui.VerifyNoExtraSummon();
@@ -463,7 +464,8 @@ namespace YGOPortable.Editor
                 if (prompt.playerId == 0 && prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD &&
                     prompt.spSummonable.Any(card => card.code == Chixiao))
                 {
-                    ui.VerifyExtraSummonChoices(prompt, mine.extra);
+                    if (mobileLayout) ui.VerifyMobileExtraSummonChoices(prompt, mine.extra);
+                    else ui.VerifyExtraSummonChoices(prompt, mine.extra);
                     choseSummon = true;
                     continue;
                 }
@@ -479,7 +481,7 @@ namespace YGOPortable.Editor
                 bool cardPrompt = prompt.messageType == YgoConstants.MSG_SELECT_CHAIN ||
                                   prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN ||
                                   prompt.messageType == YgoConstants.MSG_SELECT_CARD;
-                if (!inspectedDuringPrompt && prompt.playerId == 0 && cardPrompt)
+                if (!mobileLayout && !inspectedDuringPrompt && prompt.playerId == 0 && cardPrompt)
                 {
                     ui.VerifyPromptFieldView(prompt);
                     inspectedDuringPrompt = true;
@@ -500,12 +502,14 @@ namespace YGOPortable.Editor
                 }
             }
 
-            Require(inspectedDuringPrompt && choseSummon && choseMaterials && mine.mzone.Any(card => card?.code == Chixiao) && duel.RetryCount == 0,
+            Require((mobileLayout || inspectedDuringPrompt) && choseSummon && choseMaterials &&
+                mine.mzone.Any(card => card?.code == Chixiao) && duel.RetryCount == 0,
                 "The Synchro summon or modal inspection could not finish.");
             ui.Field.Refresh();
-            ui.VerifyOwnZones(mine);
             Require(mine.extra.All(card => card.code != Chixiao) && mine.grave.Any(card => card.code == MoYe),
                 "The three stacks no longer match the native duel after the summon.");
+            if (mobileLayout) return ui.Opens;
+            ui.VerifyOwnZones(mine);
             var summoned = mine.mzone.Single(card => card?.code == Chixiao);
             byte[] confirmation = null;
             submit = bytes => confirmation = bytes;
@@ -648,6 +652,7 @@ namespace YGOPortable.Editor
             internal uint InspectedCode { get; private set; }
             internal int Opens { get; private set; }
             internal CompositeCardView[] VisibleCards => _grid.GetComponentsInChildren<CompositeCardView>();
+            private Transform ModalContent => Modals.ModalRoot.transform.Find("MobileSafeArea") ?? Modals.ModalRoot.transform;
 
             internal Browser(DuelSession duel, Action<byte[]> onSubmit = null, bool mobileLayout = false)
             {
@@ -671,12 +676,18 @@ namespace YGOPortable.Editor
                     ((RectTransform)canvas.transform).sizeDelta = new Vector2(1600f, 900f);
                     canvas.transform.position = Vector3.zero;
                 }
+                else if (mobileLayout)
+                {
+                    canvas.renderMode = RenderMode.WorldSpace;
+                    ((RectTransform)canvas.transform).sizeDelta = new Vector2(1600f, 900f);
+                }
                 Modals = new DuelPromptModals(_canvas.transform, code =>
                 {
                     InspectedCode = code;
                     Field?.InspectCard(code);
                 },
-                    onSubmit ?? (_ => throw new InvalidOperationException("Browsing submitted a modal response.")));
+                    onSubmit ?? (_ => throw new InvalidOperationException("Browsing submitted a modal response.")),
+                    mobileLayout: mobileLayout);
                 _controller = _canvas.AddComponent<GameAppController>();
                 Field = new DuelFieldUI(_controller, _canvas.transform, Modals, mobileLayout);
                 SetPrivate(_controller, "_session", _duel);
@@ -771,8 +782,9 @@ namespace YGOPortable.Editor
                 var first = CardSlot(prompt.candidates[0]);
                 var second = CardSlot(prompt.candidates[1]);
                 var blocked = Raycast(StackRoot("_oppGyTile"), out _);
-                Require(first.GetComponent<Outline>().effectColor.a > 0f &&
-                    second.GetComponent<Outline>().effectColor.a > 0f &&
+                bool HasTargetReticle(Transform slot) => slot.GetComponentsInChildren<DuelEffectGraphic>()
+                    .Any(graphic => graphic.TargetChoice && graphic.isActiveAndEnabled && !graphic.raycastTarget);
+                Require(HasTargetReticle(first) && HasTargetReticle(second) &&
                     blocked != null && blocked.transform.IsChildOf(modal),
                     "The picker did not highlight targets or block unrelated board actions.");
 
@@ -1045,7 +1057,7 @@ namespace YGOPortable.Editor
                 ClickAt((RectTransform)button.transform, pointerId: 0);
                 Require(!Modals.IsShowingField && ReferenceEquals(_duel.ActivePrompt, prompt),
                     "Tapping the Extra Deck should focus the pending choice before activation.");
-                var picker = Modals.ModalRoot.transform.Find("ChainWin");
+                var picker = ModalContent.Find("ChainWin");
                 Require(picker.Find("Details/Source/Text").GetComponent<Text>().text == "내 엑스트라 덱" &&
                     picker.Find("Details/Name/Text").GetComponent<Text>().text == CardDatabase.GetName(expected) &&
                     picker.Find("Details/Description").GetComponentsInChildren<Text>()
@@ -1156,11 +1168,72 @@ namespace YGOPortable.Editor
                     "Selecting a legal summon in the filtered list did not advance the duel.");
             }
 
+            internal void VerifyMobileExtraSummonChoices(DuelPrompt prompt, IReadOnlyList<LiveCardState> all)
+            {
+                bool Eligible(LiveCardState card) => prompt.spSummonable.Any(item => item.controller == card.controller &&
+                    item.location == card.location && item.sequence == card.sequence && item.code == card.code);
+                var legal = all.Where(Eligible).Select(card => card.code).ToArray();
+                var blocked = all.First(card => !Eligible(card));
+                var effect = new SelectableCardItem { controller = blocked.controller, location = blocked.location,
+                    sequence = blocked.sequence, code = blocked.code };
+                var action = Private<Button>(Modals, "_zoneActionButton");
+                prompt.activatable.Add(effect);
+                try
+                {
+                    Field.Refresh();
+                    var pile = StackRoot("_myExtraTile");
+                    var browse = (RectTransform)pile.Find("Total");
+                    var summon = Private<Button>(Field, "_extraSummonButton");
+                    var activate = Private<Button>(Field, "_extraEffectButton");
+                    Require(browse.Find("Caption/Label").GetComponent<Text>().text == "엑스트라 확인" &&
+                        summon.isActiveAndEnabled && activate.isActiveAndEnabled,
+                        "The mobile field hid its dedicated Extra Deck commands behind a combined menu.");
+                    ClickAt(browse, pointerId: 0, control: pile.gameObject);
+                    VerifyOpened(prompt, all.Select(card => card.code));
+                    var tile = VisibleCards.Single(card => card.CurrentCode == blocked.code).transform.parent.parent;
+                    DeckPadUi.ScrollTo(tile.GetComponent<Button>());
+                    ClickAt((RectTransform)tile, pointerId: 0);
+                    Require(Modals.IsZoneViewerOpen && ReferenceEquals(_duel.ActivePrompt, prompt) &&
+                        InspectedCode == blocked.code && action.gameObject.activeInHierarchy &&
+                        action.GetComponentInChildren<Text>().text == "행동 확인",
+                        "Tapping an actionable card in the mobile pile did not keep inspection separate from activation.");
+                    Close();
+                }
+                finally { prompt.activatable.Remove(effect); }
+
+                Field.Refresh();
+                ClickAt((RectTransform)Private<Button>(Field, "_extraSummonButton").transform, pointerId: 0);
+                VerifyOpened(prompt, legal);
+                var target = (RectTransform)VisibleCards.Single(card => card.CurrentCode == Chixiao).transform.parent.parent;
+                DeckPadUi.ScrollTo(target.GetComponent<Button>());
+                ClickAt(target, pointerId: 0);
+                Rect rect = ((RectTransform)action.transform).rect;
+                float touch = MobileSafeArea.MinimumTouchSize(action.transform);
+                Require(ReferenceEquals(_duel.ActivePrompt, prompt) && Modals.IsZoneViewerOpen &&
+                    action.GetComponentInChildren<Text>().text == "특수 소환" && rect.width >= touch && rect.height >= touch,
+                    "The mobile picker did not reserve a separate touch-sized summon action.");
+
+                var command = prompt.spSummonable.Single(option => option.location == YgoConstants.LOCATION_EXTRA &&
+                    option.code == Chixiao);
+                command.code = blocked.code;
+                try
+                {
+                    ClickAt((RectTransform)action.transform, pointerId: 0);
+                    Require(ReferenceEquals(_duel.ActivePrompt, prompt) && Modals.IsZoneViewerOpen,
+                        "A stale choice used the command for a different card at the same Extra Deck sequence.");
+                }
+                finally { command.code = Chixiao; }
+
+                ClickAt((RectTransform)action.transform, pointerId: 0);
+                Require(!Modals.IsZoneViewerOpen && !ReferenceEquals(_duel.ActivePrompt, prompt),
+                    "Confirming the selected mobile summon did not advance the native duel.");
+            }
+
             internal void SelectSynchroMaterials(DuelPrompt prompt)
             {
                 Modals.ShowPrompt(_duel, prompt);
                 Field.Refresh();
-                var modal = Modals.ModalRoot.transform;
+                var modal = ModalContent;
                 Require(Modals.IsPromptOpen && !modal.Find("FieldView").gameObject.activeSelf && !modal.Find("Win/Body/Cards"),
                     "The Synchro materials were not selectable on the field.");
 

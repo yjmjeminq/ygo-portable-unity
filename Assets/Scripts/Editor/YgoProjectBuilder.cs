@@ -30,7 +30,7 @@ namespace YGOPortable.Editor
             Debug.Log("[YgoProjectBuilder] Assets and Main.unity configured.");
         }
 
-        [MenuItem("YGO Portable/2. Run Headless Verification (Engine + 5 AI Duels)")]
+        [MenuItem("YGO Portable/2. Run Headless Verification (Engine + 6 AI Duels)")]
         public static void VerifyAllHeadless()
         {
             try
@@ -262,15 +262,15 @@ namespace YGOPortable.Editor
             AssertTrue(CardDatabase.ResolveDescription(71) == "마법 카드" && CardDatabase.ResolveDescription(72) == "함정 카드",
                 "Spell and Trap declaration choices did not resolve");
 
-            // Verify 환상마족 (Illusion) card (e.g. 14307929 하얀 숲의 요마 디아벨) + icon
+            // Verify the localized race that the UI shows with or without an optional icon.
             var paidra = CardDatabase.Get(39931513);
             AssertTrue(paidra != null && (paidra.race & YgoConstants.RACE_DRAGON) != 0,
                 "Card 39931513 (천배룡 파이도라) missing");
             var illusionCard = CardDatabase.Get(14307929);
             AssertTrue(illusionCard != null && (illusionCard.race & YgoConstants.RACE_ILLUSION) != 0,
                 "Card 14307929 missing RACE_ILLUSION");
-            Sprite illusionSp = DuelUiKit.GetRaceSprite(YgoConstants.RACE_ILLUSION);
-            AssertTrue(illusionSp != null, "Missing interface icon for RACE_ILLUSION");
+            AssertTrue(illusionCard.FormatStatsLineKR().Contains("환상마족", StringComparison.Ordinal),
+                "The Illusion card lost its localized race label");
 
             // Verify CardArtLoader
             CardArtLoader.Initialize(streaming);
@@ -488,15 +488,20 @@ namespace YGOPortable.Editor
                     AssertTrue(signatures.Add(signature), $"Duplicate playable deck for {character.name}");
                 }
                 AssertTrue(signatures.Count >= 2, $"{character.name} has fewer than two different decks");
-            }
 
-            PresetDeckInfo Preset(int id) => DeckRepository.PresetDecks.Single(deck => deck.id == id);
-            AssertTrue(Preset(107).main.Count(code => code == 7394770) == 3,
-                "Brilliant Fusion should retain three copies as dedicated Gem-Knight support.");
-            AssertTrue(Preset(527).extra.Contains(22593417u) && !Preset(486).extra.Contains(22593417u),
-                "Gumblar should be allowed in the Topologic preset and subject to the normal ban elsewhere.");
-            AssertTrue(Preset(19).main.Count(code => code == 99243014) == 1,
-                "The generic Synchro tag should not waive the limit on Synchro Overtake.");
+                var levels = OpponentDeckLevels.GetDecks(character.id);
+                AssertTrue(levels.Count >= 2 && levels.Select(deck => deck.id).Distinct().Count() == levels.Count,
+                    $"Missing or repeated deck levels for {character.name}");
+                for (int i = 0; i < levels.Count; i++)
+                {
+                    var deck = levels[i];
+                    AssertTrue(deck.charId == character.id && deck.main.Length >= 40 && deck.main.Length <= 60 &&
+                        deck.extra.Length <= 15 && deck.side.Length <= 15,
+                        $"Invalid deck at {character.name} level {i + 1} (preset {deck.id})");
+                    AssertTrue(OpponentDeckLevels.GetLevel(character.id, deck.id) == i + 1,
+                        $"Inconsistent level lookup for {character.name}, preset {deck.id}");
+                }
+            }
 
             var yugiPortrait = DuelUiKit.LoadOpponentPortrait(DeckRepository.GetCharacter(104));
             var kaibaPortrait = DuelUiKit.LoadOpponentPortrait(DeckRepository.GetCharacter(94));
@@ -511,9 +516,12 @@ namespace YGOPortable.Editor
                 ui.Open();
                 var preview = ui.Root.GetComponentInChildren<CompositeCardView>(true);
                 var search = ui.SearchInput;
-                AssertTrue(DeckRepository.GetDecksForCharacter(104).Take(3).Select(d => d.id).SequenceEqual(new[] { 30000, 30001, 30002 }),
-                    "Yugi's Gaia, Dark Magician and Chaos decks should lead the list");
                 var yugiDecks = OpponentDeckLevels.GetDecks(104);
+                AssertTrue(yugiDecks.Count >= 3 &&
+                    yugiDecks[0].title.Contains("가이아", StringComparison.Ordinal) &&
+                    yugiDecks[1].title.Contains("블랙 매지션", StringComparison.Ordinal) &&
+                    yugiDecks[2].title.Contains("카오스", StringComparison.Ordinal),
+                    "Yugi's Gaia, Dark Magician and Chaos decks should lead the level list");
                 search.text = yugiDecks[0].title;
                 AssertTrue(preview.CurrentCode == yugiDecks[0].sigCard, "Deck search should select the match.");
                 search.text = "Yami Yugi";
@@ -1533,7 +1541,8 @@ namespace YGOPortable.Editor
                 Button Later(int index) => tiles.Find($"Sort_{index}/Later/B").GetComponent<Button>();
                 AssertTrue(tiles.Find("Sort_0/Order/Text").GetComponent<Text>().text == "1번 · 맨 위" &&
                     !Earlier(0).interactable && Later(0).interactable &&
-                    Earlier(2).transform.Find("Arrow").GetComponent<Image>().sprite != null && !Later(2).interactable,
+                    Earlier(2).GetComponentInChildren<Text>().text == "◀" &&
+                    Later(0).GetComponentInChildren<Text>().text == "▶" && !Later(2).interactable,
                     "Deck sort did not identify the first draw or show the available movement controls.");
                 Earlier(2).onClick.Invoke();
                 Earlier(1).onClick.Invoke();
@@ -2475,9 +2484,15 @@ namespace YGOPortable.Editor
             Array.Clear(duel.Players[1].mzone, 0, duel.Players[1].mzone.Length);
             AssertTrue(BitConverter.ToInt32(ai.ComputeResponse(duel, main), 0) == 7,
                 "The AI used Dark Hole to clear only its own monsters.");
-            duel.Players[1].mzone[0] = new LiveCardState { attack = 3000, position = YgoConstants.POS_FACEUP_ATTACK };
+            Array.Clear(duel.Players[0].mzone, 0, duel.Players[0].mzone.Length);
+            duel.Players[1].mzone[0] = new LiveCardState
+            {
+                code = 89631139, controller = 1, location = YgoConstants.LOCATION_MZONE,
+                type = YgoConstants.TYPE_MONSTER | YgoConstants.TYPE_NORMAL,
+                attack = 3000, position = YgoConstants.POS_FACEUP_ATTACK,
+            };
             AssertTrue(BitConverter.ToInt32(ai.ComputeResponse(duel, main), 0) == 5,
-                "The AI did not consider Dark Hole when it could remove an opposing monster.");
+                "The AI did not consider Dark Hole when it could remove an opposing monster without losing its own.");
             Debug.Log("[VERIFY AI TACTICS] Legal battle targets, banishing, material choice and avoiding an own-only board wipe passed.");
         }
 

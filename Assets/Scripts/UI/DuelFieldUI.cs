@@ -165,7 +165,6 @@ namespace YGOPortable.UI
         private Button _graveEffectButton;
         private Button _extraEffectButton;
         private Button _banishedEffectButton;
-        private Button _extraOptionsButton;
 
         // High-res Card Zoom Modal
         private GameObject _cardZoomModal;
@@ -405,7 +404,6 @@ namespace YGOPortable.UI
             _extraSummonButton.gameObject.SetActive(false);
             _graveEffectButton.gameObject.SetActive(false);
             _banishedEffectButton.gameObject.SetActive(false);
-            _extraOptionsButton.gameObject.SetActive(false);
             _extraEffectButton.gameObject.SetActive(false);
             CloseActionPopup();
             CloseDuelLog();
@@ -1100,6 +1098,7 @@ namespace YGOPortable.UI
             _mySZone[5] = CreateZoneSlot(Cell(1, 3));
             _oppSZone[5] = CreateZoneSlot(Cell(7, 1));
             _myExtraTile = CreateStackTile(Cell(1, 4), false, YgoConstants.LOCATION_EXTRA, "엑스트라 덱");
+            _myExtraTile.label.text = "엑스트라 확인";
             _myDeckTile = CreateStackTile(Cell(7, 4), false, YgoConstants.LOCATION_DECK, "덱");
             _myGyTile = CreateStackTile(Cell(7, 3), false, YgoConstants.LOCATION_GRAVE, "묘지");
             _myBanTile = CreateStackTile(Cell(7, 2), false, YgoConstants.LOCATION_REMOVED, "제외");
@@ -1109,14 +1108,13 @@ namespace YGOPortable.UI
             _oppGyTile = CreateStackTile(Cell(1, 1), true, YgoConstants.LOCATION_GRAVE, "묘지");
             _oppBanTile = CreateStackTile(Cell(1, 2), true, YgoConstants.LOCATION_REMOVED, "제외");
 
-            _extraSummonButton = BuildPileActionButton(_myExtraTile, "ExtraSummon", "소환", OpenExtraSummonPicker);
+            _extraSummonButton = BuildPileActionButton(_myExtraTile, "ExtraSummon", "특수 소환", OpenExtraSummonPicker);
             _extraEffectButton = BuildPileActionButton(_myExtraTile, "ExtraEffect", "발동",
                 () => OpenPileEffectPicker(YgoConstants.LOCATION_EXTRA), activation: true);
             _graveEffectButton = BuildPileActionButton(_myGyTile, "GraveEffect", "효과 발동",
                 () => OpenPileEffectPicker(YgoConstants.LOCATION_GRAVE), activation: true);
             _banishedEffectButton = BuildPileActionButton(_myBanTile, "BanishedEffect", "효과 발동",
                 () => OpenPileEffectPicker(YgoConstants.LOCATION_REMOVED), activation: true);
-            _extraOptionsButton = BuildPileActionButton(_myExtraTile, "ExtraOptions", "행동 선택", OpenCombinedExtraActions);
         }
 
         private static Button BuildPileActionButton(StackTileView tile, string name, string label, Action action, bool activation = false)
@@ -2411,7 +2409,7 @@ namespace YGOPortable.UI
 
                 if (target >= 0)
                 {
-                    var summons = CollectActions(me, YgoConstants.LOCATION_EXTRA, card.sequence)
+                    var summons = CollectActions(me, YgoConstants.LOCATION_EXTRA, card.sequence, card.code)
                         .Where(action => (action.responseVal & 0xffff) == 1).ToList();
                     if (summons.Count > 0)
                     {
@@ -3749,10 +3747,11 @@ namespace YGOPortable.UI
             return desc == null ? "카드 효과 발동" : $"발동 · {desc}";
         }
 
-        private List<(string label, int responseVal, bool gold)> CollectActions(byte con, uint loc, uint seq)
+        private List<(string label, int responseVal, bool gold)> CollectActions(byte con, uint loc, uint seq, uint code = 0)
         {
             var matched = new List<(SelectableCardItem item, string label, int responseVal, bool gold)>();
-            AppendMatchingActions(it => it.controller == con && it.location == loc && it.sequence == seq, matched);
+            AppendMatchingActions(it => it.controller == con && it.location == loc && it.sequence == seq &&
+                (code == 0 || it.code == code), matched);
             var res = new List<(string, int, bool)>(matched.Count);
             for (int i = 0; i < matched.Count; i++)
                 res.Add((matched[i].label, matched[i].responseVal, matched[i].gold));
@@ -3778,9 +3777,9 @@ namespace YGOPortable.UI
         }
 
         private static int ExtraSummonIndex(DuelPrompt prompt, LiveCardState card) =>
-            card == null || card.code == 0 ? -1 :
-                prompt.spSummonable.FindIndex(item => item.controller == card.controller &&
-                    item.location == YgoConstants.LOCATION_EXTRA && item.sequence == card.sequence);
+            card == null || card.code == 0 || card.location != YgoConstants.LOCATION_EXTRA ? -1 :
+                prompt.spSummonable.FindIndex(item => item.controller == card.controller && item.code == card.code &&
+                    item.location == card.location && item.sequence == card.sequence);
 
         private bool ExtraSummonAvailable =>
             CanUseCardActions && _session.ActivePrompt.messageType == YgoConstants.MSG_SELECT_IDLECMD &&
@@ -3797,7 +3796,7 @@ namespace YGOPortable.UI
                 YgoConstants.LOCATION_REMOVED => player.banished,
                 _ => player.grave,
             };
-            return cards.Exists(card => card != null && card.code != 0 && card.sequence == item.sequence);
+            return cards.Exists(card => card != null && card.code == item.code && card.sequence == item.sequence);
         }
 
         private bool PileEffectAvailable(uint location)
@@ -3812,10 +3811,8 @@ namespace YGOPortable.UI
             bool canSummon = ExtraSummonAvailable;
             bool extraEffect = PileEffectAvailable(YgoConstants.LOCATION_EXTRA);
             bool both = canSummon && extraEffect;
-            bool combined = _mobileLayout && both;
-            SetAvailability(_extraOptionsButton, combined, .07f, .93f);
-            SetAvailability(_extraSummonButton, canSummon && !combined, .07f, both ? .49f : .93f);
-            SetAvailability(_extraEffectButton, extraEffect && !combined, both ? .51f : .07f, .93f);
+            SetAvailability(_extraSummonButton, canSummon, .07f, both ? .49f : .93f);
+            SetAvailability(_extraEffectButton, extraEffect, both ? .51f : .07f, .93f);
             SetAvailability(_graveEffectButton, PileEffectAvailable(YgoConstants.LOCATION_GRAVE), .07f, .93f);
             SetAvailability(_banishedEffectButton, PileEffectAvailable(YgoConstants.LOCATION_REMOVED), .07f, .93f);
 
@@ -3832,8 +3829,11 @@ namespace YGOPortable.UI
                 {
                     float touch = MobileSafeArea.MinimumTouchSize(rect);
                     var pile = (RectTransform)rect.parent;
-                    rect.anchorMin = rect.anchorMax = new Vector2(.5f, .62f);
-                    rect.sizeDelta = new Vector2(Mathf.Max(touch, pile.rect.width * .84f), touch);
+                    bool extra = pile == _myExtraTile.root;
+                    rect.anchorMin = rect.anchorMax = new Vector2((left + right) * .5f, extra ? .79f : .62f);
+                    rect.sizeDelta = extra
+                        ? new Vector2(pile.rect.width * (right - left), Mathf.Min(touch, pile.rect.height * .42f))
+                        : new Vector2(Mathf.Max(touch, pile.rect.width * .84f), touch);
                     rect.anchoredPosition = Vector2.zero;
                     return;
                 }
@@ -3842,42 +3842,26 @@ namespace YGOPortable.UI
             }
         }
 
-        private void OpenCombinedExtraActions()
-        {
-            if (!ExtraSummonAvailable || !PileEffectAvailable(YgoConstants.LOCATION_EXTRA)) return;
-            var session = _session;
-            var prompt = session.ActivePrompt;
-            ClearActionRows();
-            _actionHeader.text = "엑스트라 덱";
-            void Select(Action open)
-            {
-                CloseActionPopup();
-                if (_session == session && ReferenceEquals(session.ActivePrompt, prompt)) open();
-            }
-            AddActionRow("특수 소환 가능 카드", () => Select(OpenExtraSummonPicker), true, "SUMMONSP");
-            AddActionRow("발동 가능 효과", () => Select(() => OpenPileEffectPicker(YgoConstants.LOCATION_EXTRA)), true, "ACTION");
-            AddActionRow("목록 보기", () => Select(() => OpenStackZone((byte)session.HumanPlayerIndex,
-                YgoConstants.LOCATION_EXTRA, "내 엑스트라 덱")), false, "LOOK");
-            AddActionRow("취소", CloseActionPopup, false);
-            PlaceActionWindow(_myExtraTile.root);
-        }
-
         private void OpenExtraSummonPicker()
         {
             if (IsBrowsingZone || !ExtraSummonAvailable) return;
             var session = _session;
             var prompt = session.ActivePrompt;
+            var extra = session.Players[session.HumanPlayerIndex].extra;
             bool CanSummon() => _session == session && ReferenceEquals(session.ActivePrompt, prompt) && CanUseCardActions;
+            bool IsSummonChoice(LiveCardState card) => CanSummon() && ExtraSummonIndex(prompt, card) >= 0 &&
+                session.Players[session.HumanPlayerIndex].extra.Exists(current => current != null &&
+                    current.sequence == card.sequence && current.code == card.code);
 
             HideCardActions();
             _modals.ShowZoneViewer(
                 "엑스트라 소환 가능",
-                session.Players[session.HumanPlayerIndex].extra,
+                extra,
                 newestFirst: false,
-                hasCardActions: card => ExtraSummonIndex(prompt, card) >= 0,
+                hasCardActions: IsSummonChoice,
                 onOpenCardActions: card =>
                 {
-                    if (!CanSummon()) return;
+                    if (!IsSummonChoice(card)) return;
                     int index = ExtraSummonIndex(prompt, card);
                     if (index >= 0) ExecuteActionInt((index << 16) | 1);
                 },
@@ -3949,7 +3933,7 @@ namespace YGOPortable.UI
 
             List<(string label, int responseVal, bool gold)> GetZoneCardActions(LiveCardState card)
             {
-                var actions = CollectActions(card.controller, card.location, card.sequence);
+                var actions = CollectActions(card.controller, card.location, card.sequence, card.code);
                 if (loc == YgoConstants.LOCATION_EXTRA && prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD)
                     actions.RemoveAll(action => (action.responseVal & 0xffff) == 1);
                 return actions;

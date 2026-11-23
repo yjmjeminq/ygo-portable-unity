@@ -15,6 +15,7 @@ namespace YGOPortable.UI
         }
 
         private static readonly Dictionary<string, Sprite> Sprites = new(StringComparer.Ordinal);
+        private static readonly Dictionary<string, Sprite> CardIdentity = new(StringComparer.Ordinal);
         private static readonly Dictionary<string, Rect> Cells = new(StringComparer.Ordinal);
         private static Texture2D _texture;
         private static bool _loaded;
@@ -36,6 +37,13 @@ namespace YGOPortable.UI
         internal static Sprite Action(string key) => key == null ? null : Find("action/" + key.ToLowerInvariant());
 
         internal static Sprite Filter(string key) => Find("filter/" + key.ToLowerInvariant());
+
+        internal static Sprite FindCardIdentity(string key)
+        {
+            if (!CardIdentity.TryGetValue(key, out var sprite))
+                CardIdentity[key] = sprite = DuelUiKit.LoadSprite("Duel/CardIcons/" + key);
+            return sprite;
+        }
 
         private static void Load()
         {

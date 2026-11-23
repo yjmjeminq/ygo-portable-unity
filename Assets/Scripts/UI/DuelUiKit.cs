@@ -69,12 +69,12 @@ namespace YGOPortable.UI
 
         public static Sprite GetRaceSprite(ulong race)
         {
-            return YgoConstants.RaceSpriteNames.TryGetValue(race, out var key) ? DuelUiIcons.Find(key) : null;
+            return YgoConstants.RaceSpriteNames.TryGetValue(race, out var key) ? DuelUiIcons.FindCardIdentity(key) : null;
         }
 
         public static Sprite GetAttributeSprite(uint attr)
         {
-            return YgoConstants.AttributeSpriteNames.TryGetValue(attr, out var key) ? DuelUiIcons.Find(key) : null;
+            return YgoConstants.AttributeSpriteNames.TryGetValue(attr, out var key) ? DuelUiIcons.FindCardIdentity(key) : null;
         }
 
         internal static Sprite GetSpellTrapSprite(uint type) => DuelUiIcons.Find(YgoConstants.GetSpellTrapIconKey(type));
@@ -551,8 +551,8 @@ namespace YGOPortable.UI
 
                 uint attr = live != null && live.attribute != 0 ? live.attribute : (info?.attr ?? 0);
                 Sprite attrSp = null;
-                if ((type & YgoConstants.TYPE_SPELL) != 0) attrSp = DuelUiIcons.Find("attribute/spell");
-                else if ((type & YgoConstants.TYPE_TRAP) != 0) attrSp = DuelUiIcons.Find("attribute/trap");
+                if ((type & YgoConstants.TYPE_SPELL) != 0) attrSp = DuelUiIcons.FindCardIdentity("attribute/spell");
+                else if ((type & YgoConstants.TYPE_TRAP) != 0) attrSp = DuelUiIcons.FindCardIdentity("attribute/trap");
                 else attrSp = DuelUiKit.GetAttributeSprite(attr);
 
                 _attrImg.gameObject.SetActive(attrSp != null);

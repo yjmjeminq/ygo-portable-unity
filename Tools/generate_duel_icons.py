@@ -13,22 +13,6 @@ CELL = 128
 COLUMNS = 8
 SCALE = 2
 
-ATTRIBUTES = {
-    "earth": ("땅", "#ffb67c"), "water": ("물", "#73d3ff"),
-    "fire": ("화염", "#ff8e84"), "wind": ("바람", "#83e8ba"),
-    "light": ("빛", "#ffde8d"), "dark": ("어둠", "#c0a8ff"),
-    "god": ("신", "#faf0b5"), "spell": ("마법", "#71e2c6"),
-    "trap": ("함정", "#f0a3df"),
-}
-RACES = {
-    "soldier": "전사", "wizard": "마법사", "angel": "천사", "devil": "악마",
-    "undead": "언데드", "machine": "기계", "aquarius": "물", "flame": "화염",
-    "sandrock": "암석", "bird": "비행", "botanical": "식물", "insect": "곤충",
-    "thunder": "번개", "dragon": "용", "beast": "야수", "beastbtl": "야수전",
-    "dinosaurs": "공룡", "fish": "어류", "poseidon": "해룡", "reptiles": "파충",
-    "psychic": "사이킥", "god": "환신", "creator": "창조", "mystdragon": "환룡",
-    "cyverse": "사이버", "illusion": "환상",
-}
 SPELLS = {
     "quick_play": "속공", "continuous": "지속", "equip": "장착",
     "field": "필드", "ritual": "의식", "normal": "일반",
@@ -47,10 +31,7 @@ PHASES = {"draw": "D", "standby": "S", "main1": "1", "battle": "B", "main2": "2"
 
 
 def entries():
-    for key, (label, color) in ATTRIBUTES.items():
-        yield f"attribute/{key}", label, color, "orb"
     for group, labels, color, shape in (
-        ("race", RACES, "#96d8e2", "orb"),
         ("spell", SPELLS, "#8ce0c4", "orb"),
         ("trap", TRAPS, "#e7a7d7", "orb"),
         ("filter", FILTERS, "#bad6e1", "plate"),
