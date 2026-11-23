@@ -112,11 +112,14 @@ namespace YGOPortable.Editor
                 Canvas.ForceUpdateCanvases();
                 var aspect = card.transform.Find("AspectBox");
                 var layer = aspect.Find("Overframe");
+                var title = aspect.Find("CardTitle");
+                var header = aspect.Find("OverframeHeader").GetComponent<Image>();
                 var bounds = (RectTransform)layer.Find("PortraitBounds");
                 var image = bounds.Find("Depth/LocalCutIn").GetComponent<Image>();
                 Require(card.HasOverframe && image.sprite == zero && image.maskable && !image.raycastTarget &&
                     layer.GetSiblingIndex() > aspect.Find("Frame").GetSiblingIndex() &&
-                    layer.GetSiblingIndex() < aspect.Find("CardTitle").GetSiblingIndex() &&
+                    header.enabled && header.color.a > .85f && !header.raycastTarget &&
+                    layer.GetSiblingIndex() < header.transform.GetSiblingIndex() && header.transform.GetSiblingIndex() < title.GetSiblingIndex() &&
                     bounds.GetComponent<RectMask2D>() == null &&
                     layer.Find("OverframeTrim").GetSiblingIndex() < bounds.GetSiblingIndex() &&
                     layer.Find("FaceArtwork").GetComponent<RectMask2D>() != null &&
@@ -139,7 +142,7 @@ namespace YGOPortable.Editor
                 Require(holder.anchorMin == new Vector2(.25f, .16f) && holder.anchorMax == new Vector2(.52f, .83f),
                     "The detail card shifted when its overframe became visible.");
                 card.SetCard(BlueEyes, faceDown: true);
-                Require(!card.HasOverframe && image.sprite == null, "The face-down card exposed its portrait.");
+                Require(!card.HasOverframe && image.sprite == null && !header.enabled, "The face-down card exposed its portrait or title backing.");
                 card.SetCard(unrelated);
                 Require(!card.HasOverframe && aspect.Find("Rules/Text").GetComponent<Text>().color.r < .2f,
                     "The next regular card kept the extended artwork or ink.");

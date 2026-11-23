@@ -243,6 +243,7 @@ namespace YGOPortable.UI
                 reflection = CompositeCardView.Create(mirror, "View");
             }
             var rarity = ShopRarityBadge.Create(slot, new Vector2(.245f, .010f), new Vector2(.365f, .074f), 14);
+            rarity.resizeTextMinSize = 8;
             // The tint overlays the card front briefly at the midpoint of the flip.
             shineRect.SetAsLastSibling();
 

@@ -418,6 +418,7 @@ namespace YGOPortable.UI
         private RectTransform _overframeTilt;
         private Image _overframeShade;
         private Image _overframeBackground;
+        private Image _overframeHeader;
         private AspectRatioFitter _overframeBackgroundFit;
         private CardFinishGraphic _overframeFinish;
         private CardOverframeGraphic _overframeTrim;
@@ -464,8 +465,8 @@ namespace YGOPortable.UI
             _frameImg = LotdUiKit.AddImage(frameRt.gameObject, null, Color.white, false, false);
 
             var titleRt = LotdUiKit.CreateRect("CardTitle", innerRt,
-                new Vector2(.080f, .899f), new Vector2(detailed ? .81f : .921f, .958f), Vector2.zero, Vector2.zero);
-            _titleText = LotdUiKit.AddFittedText(titleRt, "T", "", detailed ? 22 : 13, detailed ? 8 : 4,
+                new Vector2(.080f, .894f), new Vector2(detailed ? .81f : .921f, .967f), Vector2.zero, Vector2.zero);
+            _titleText = LotdUiKit.AddFittedText(titleRt, "T", "", detailed ? 22 : 13, detailed ? 6 : 4,
                 TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
             var ts = _titleText.gameObject.AddComponent<Shadow>();
             ts.effectColor = new Color(0, 0, 0, 0.85f);
@@ -577,7 +578,6 @@ namespace YGOPortable.UI
                 bool monster = readout.IsMonster;
                 _rulesArea.anchorMin = new Vector2(.080f, monster ? .124f : .057f);
                 _rulesText.text = info?.desc ?? "";
-                ApplyOverframeInk();
 
                 uint attr = live != null && live.attribute != 0 ? live.attribute : (info?.attr ?? 0);
                 Sprite attrSp = null;
@@ -804,8 +804,19 @@ namespace YGOPortable.UI
 
         private void ApplyOverframeInk()
         {
-            if (!_detailed || _cinematicOverframe) return;
-            _rulesText.color = HasOverframe ? new Color(.92f, .94f, 1f) : new Color(.075f, .09f, .12f);
+            if (_cinematicOverframe) return;
+            if (_detailed)
+                _rulesText.color = HasOverframe ? new Color(.92f, .94f, 1f) : new Color(.075f, .09f, .12f);
+            bool shown = HasOverframePortrait;
+            if (shown && _overframeHeader == null)
+            {
+                var title = _titleText.transform.parent;
+                var header = LotdUiKit.CreateRect("OverframeHeader", title.parent,
+                    new Vector2(.069f, .890f), new Vector2(.936f, .972f), Vector2.zero, Vector2.zero);
+                header.SetSiblingIndex(title.GetSiblingIndex());
+                _overframeHeader = DuelReadoutPlate.Add(header, new Color(.023f, .034f, .062f, .88f));
+            }
+            if (_overframeHeader != null) _overframeHeader.enabled = shown;
         }
 
         internal void PoseOverframe(float opacity, float scale, Vector2 parallax, float shimmer)
@@ -845,6 +856,7 @@ namespace YGOPortable.UI
             _overframeShade.gameObject.SetActive(false);
             if (_cinematicOverframe) _overframeFinish.gameObject.SetActive(false);
             _overframe.gameObject.SetActive(false);
+            ApplyOverframeInk();
         }
 
         private void ReleaseArtwork()
