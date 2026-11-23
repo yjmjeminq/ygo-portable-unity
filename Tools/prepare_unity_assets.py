@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Builds all Unity runtime & streaming assets for YGO Portable Unity:
+Prepares card data, streaming assets, and fonts for YGO Portable Unity:
   1. Assets/StreamingAssets/cards_prop.bin      (sorted 64B PackedCard structs for ygoengine.dll)
   2. Assets/StreamingAssets/cardscripts.pack    (all CardScripts Lua packed into 1 fast binary)
   3. Assets/StreamingAssets/cards_kr.json       (unified Korean card DB + hint strings + ID maps)
   4. Assets/StreamingAssets/opponents_db.json   (modern Free Duel decks for LOTD and additional characters)
   5. Assets/StreamingAssets/cardart.idx + cardart_*.pack (<40MB chunks of 224x224 JPEG artwork)
-  6. Assets/Resources/LOTD/... + Fonts/NotoSansKR.ttf    (sliced LOTD UI sprites, frames, Busts, TypeIcons)
+  6. Assets/Resources/Fonts/NotoSansKR.ttf      (Korean UI font)
   7. Assets/StreamingAssets/tokenart.pack      (token artwork and its index)
   8. Assets/StreamingAssets/deck_effect_categories.bin (deck editor effect filters)
 """
@@ -29,10 +29,7 @@ OPENDUEL = pathlib.Path(r"C:\Users\y\AppData\Local\YGO-PC-Full\OpenDuelEngine")
 STRAWHAT_FONT = pathlib.Path(r"c:\jeminFolder\자체개발\strawhat-survivors-unity\Assets\Resources\Strawhat\Fonts\NotoSansKR.ttf")
 
 STREAMING = UNITY_ROOT / "Assets" / "StreamingAssets"
-RES_LOTD = UNITY_ROOT / "Assets" / "Resources" / "LOTD"
 RES_FONTS = UNITY_ROOT / "Assets" / "Resources" / "Fonts"
-LOTD_UI = UNITY_ROOT / "Assets" / "Textures" / "LOTD_UI"
-TYPE_ICONS_SRC = UNITY_ROOT / "Assets" / "Textures" / "TypeIcons"
 BUSTS_SRC = UNITY_ROOT / "Assets" / "Textures" / "Characters" / "Busts"
 ORIG_YDC_DIR = UNITY_ROOT / "Assets" / "Data" / "Decks" / "Original"
 META_DECKS_JSON = UNITY_ROOT / "Assets" / "Data" / "Decks" / "decks.json"
@@ -1142,124 +1139,10 @@ def build_opponents_db(lotd_to_pass: dict, kr_cards):
     print(f"  opponents_db.json: {len(final_chars)} characters, {len(final_decks)} selectable decks")
 
 
-def slice_dfymoo(dfymoo_path: pathlib.Path, png_path: pathlib.Path, out_dir: pathlib.Path, keep_prefix=None, apply_offset=False):
-    out_dir.mkdir(parents=True, exist_ok=True)
-    im = Image.open(png_path).convert("RGBA")
-    text = dfymoo_path.read_text(encoding="utf-8", errors="ignore")
-    blocks = text.split("~")
-    saved = 0
-    for blk in blocks:
-        name = None
-        s_rect = None
-        o_rect = None
-        for line in blk.splitlines():
-            parts = line.strip().split()
-            if not parts:
-                continue
-            if parts[0] == "n" and len(parts) >= 2:
-                name = line.strip()[2:].strip()
-            elif parts[0] == "s" and len(parts) >= 5:
-                s_rect = tuple(int(x) for x in parts[1:5])
-            elif parts[0] == "o" and len(parts) >= 5:
-                o_rect = tuple(int(x) for x in parts[1:5])
-        if not name or not s_rect:
-            continue
-        if keep_prefix is not None and not any(name.startswith(p) for p in keep_prefix):
-            continue
-        sx, sy, sw, sh = s_rect
-        crop = im.crop((sx, sy, sx + sw, sy + sh))
-        if apply_offset and o_rect:
-            ox, oy, ow, oh = o_rect
-            canvas = Image.new("RGBA", (ow, oh), (0, 0, 0, 0))
-            canvas.paste(crop, (ox, oy))
-            crop = canvas
-        safe_name = name.replace("/", "_").replace("\\", "_")
-        crop.save(out_dir / f"{safe_name}.png", format="PNG", optimize=True)
-        saved += 1
-    return saved
-
-
-def build_resources_lotd():
-    print("[5/5] Preparing Assets/Resources/LOTD + Fonts/NotoSansKR.ttf ...")
+def prepare_fonts():
     RES_FONTS.mkdir(parents=True, exist_ok=True)
-    if STRAWHAT_FONT.exists():
+    if STRAWHAT_FONT.is_file():
         shutil.copy2(STRAWHAT_FONT, RES_FONTS / "NotoSansKR.ttf")
-
-    pdui = LOTD_UI / "pdui"
-    sliced_total = 0
-    sliced_total += slice_dfymoo(pdui / "duel" / "PhaseBar.dfymoo", pdui / "duel" / "PhaseBar.png", RES_LOTD / "PhaseBar", apply_offset=True)
-    sliced_total += slice_dfymoo(pdui / "hud.dfymoo", pdui / "hud.png", RES_LOTD / "HUD", apply_offset=False)
-    sliced_total += slice_dfymoo(pdui / "field.dfymoo", pdui / "field.png", RES_LOTD / "Field", apply_offset=True)
-    sliced_total += slice_dfymoo(pdui / "doShared.dfymoo", pdui / "doShared.png", RES_LOTD / "Shared", apply_offset=False)
-    sliced_total += slice_dfymoo(pdui / "panel_parts.dfymoo", pdui / "panel_parts.png", RES_LOTD / "Panel", apply_offset=False)
-    sliced_total += slice_dfymoo(pdui / "MatchResult.dfymoo", pdui / "MatchResult.png", RES_LOTD / "MatchResult", apply_offset=True)
-    sliced_total += slice_dfymoo(pdui / "TurnCounter.dfymoo", pdui / "TurnCounter.png", RES_LOTD / "TurnCounter", apply_offset=True)
-    sliced_total += slice_dfymoo(pdui / "SeriesLogo.dfymoo", pdui / "SeriesLogo.png", RES_LOTD / "SeriesLogo", apply_offset=False)
-    sliced_total += slice_dfymoo(pdui / "Janken.dfymoo", pdui / "Janken.png", RES_LOTD / "Janken", apply_offset=True)
-    sliced_total += slice_dfymoo(pdui / "title_logo.dfymoo", pdui / "title_logo.png", RES_LOTD / "Title", apply_offset=False)
-    sliced_total += slice_dfymoo(pdui / "pendulum.dfymoo", pdui / "pendulum.png", RES_LOTD / "Pendulum", apply_offset=False)
-    sliced_total += slice_dfymoo(pdui / "segment-link.dfymoo", pdui / "segment-link.png", RES_LOTD / "Link", apply_offset=False)
-    sliced_total += slice_dfymoo(pdui / "Settings.dfymoo", pdui / "Settings.png", RES_LOTD / "Settings", apply_offset=False)
-    sliced_total += slice_dfymoo(pdui / "ds_btn_active.dfymoo", pdui / "ds_btn_active.png", RES_LOTD / "Buttons", keep_prefix=["ds_btn_active01"])
-    sliced_total += slice_dfymoo(pdui / "ds_btn_inactive.dfymoo", pdui / "ds_btn_inactive.png", RES_LOTD / "Buttons", keep_prefix=["ds_btn_inactive01"])
-    sliced_total += slice_dfymoo(pdui / "ds_btn_active_yellow.dfymoo", pdui / "ds_btn_active_yellow.png", RES_LOTD / "Buttons_Yellow", keep_prefix=["ds_btn_active01"])
-    sliced_total += slice_dfymoo(pdui / "ds_btn_inactive_yellow.dfymoo", pdui / "ds_btn_inactive_yellow.png", RES_LOTD / "Buttons_Yellow", keep_prefix=["ds_btn_inactive01"])
-
-    keep_steam = [
-        "ICON_ID_ATTR_", "ICON_ID_TYPE_", "ICON_ID_LEVEL", "ICON_ID_L_LEVEL",
-        "ICON_ID_RANK", "ICON_ID_L_RANK", "ICON_ID_ATK", "ICON_ID_DEF",
-        "ICON_ID_LIMIT_", "ICON_ID_FLINK_", "ICON_ID_FRAME_", "ICON_ID_ICON_SORT_",
-        "ICON_ID_FILTER_", "ICON_ID_SORT_", "ICON_ID_ORDER_", "ICON_ID_SEARCH",
-        "ICON_ID_SCALE_", "ICON_ID_CMDID_48_", "ICON_ID_BANNED", "ICON_ID_CHECKMARK",
-        "ICON_ID_MATCH_",
-    ]
-    sliced_total += slice_dfymoo(pdui / "STEAM_icons.dfymoo", pdui / "STEAM_icons.png", RES_LOTD / "Icons", keep_prefix=keep_steam)
-
-    # Copy Illusion custom icon (48x48) + all TypeIcons cleanly
-    t_dir = RES_LOTD / "TypeIcons"
-    t_dir.mkdir(parents=True, exist_ok=True)
-    for p in TYPE_ICONS_SRC.glob("*.png"):
-        shutil.copy2(p, t_dir / p.name)
-    ill_48 = pdui / "ICON_ID_TYPE_ILLUSION.png"
-    if ill_48.exists():
-        shutil.copy2(ill_48, t_dir / "ICON_ID_TYPE_ILLUSION.png")
-        shutil.copy2(ill_48, RES_LOTD / "Icons" / "ICON_ID_TYPE_ILLUSION.png")
-
-    # Copy 400x580 card frames + LP fill + shared frames + background
-    # The shared card back is maintained directly in Resources.
-    f_dir = RES_LOTD / "Frames"
-    f_dir.mkdir(parents=True, exist_ok=True)
-    for p in (LOTD_UI / "duel" / "frame").glob("card_*.png"):
-        shutil.copy2(p, f_dir / p.name)
-
-    (RES_LOTD / "Link").mkdir(parents=True, exist_ok=True)
-    shutil.copy2(LOTD_UI / "duel" / "hud-pd" / "LP_FILL.png", RES_LOTD / "HUD" / "LP_FILL.png")
-    shutil.copy2(LOTD_UI / "duel" / "effect" / "chain.png", RES_LOTD / "HUD" / "chain.png")
-    shutil.copy2(LOTD_UI / "duel" / "effect" / "mark_link.png", RES_LOTD / "Link" / "mark_link.png")
-
-    sh_dir = RES_LOTD / "Shared"
-    sh_dir.mkdir(parents=True, exist_ok=True)
-    for p in (pdui / "shared").glob("*.png"):
-        shutil.copy2(p, sh_dir / p.name)
-
-    bg_dir = RES_LOTD / "Background"
-    bg_dir.mkdir(parents=True, exist_ok=True)
-    for bname in ["noise_bgtec_small.png", "noise_classic_small.png", "noise_gx_small.png", "noise_5ds_small.png", "noise_zexal_small.png", "noise_arcv_small.png"]:
-        bp = pdui / bname
-        if bp.exists():
-            shutil.copy2(bp, bg_dir / bname)
-
-    # Compact 256x256 character Busts into Resources/LOTD/Busts (fast load & low repo size!)
-    b_out = RES_LOTD / "Busts"
-    b_out.mkdir(parents=True, exist_ok=True)
-    for p in BUSTS_SRC.glob("*.png"):
-        im = Image.open(p).convert("RGBA")
-        if im.size != (256, 256):
-            im = im.resize((256, 256), Image.Resampling.LANCZOS)
-        im.save(b_out / p.name, format="PNG", optimize=True)
-
-    res_mb = sum(f.stat().st_size for f in RES_LOTD.rglob("*") if f.is_file()) / 1024 / 1024
-    print(f"  Resources/LOTD: {sliced_total} sliced UI sprites + frames + busts ({res_mb:.2f} MB)")
 
 
 def main():
@@ -1272,15 +1155,15 @@ def main():
         build_opponents_db(load_lotd_passcodes(), cards)
         return
     if "--only-resources" in sys.argv:
-        build_resources_lotd()
-        print("Resources preparation COMPLETE!")
+        prepare_fonts()
+        print("Font preparation COMPLETE!")
         return
     all_codes, lotd_to_pass, mod_by_pass, _pk, _pl, kr_cards = build_cards()
     build_script_pack(all_codes)
     build_card_art(all_codes, lotd_to_pass, mod_by_pass)
     build_token_art(kr_cards)
     build_opponents_db(lotd_to_pass, kr_cards)
-    build_resources_lotd()
+    prepare_fonts()
     print("Asset preparation COMPLETE!")
 
 
