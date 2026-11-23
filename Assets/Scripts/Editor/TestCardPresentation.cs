@@ -208,6 +208,7 @@ namespace YGOPortable.Editor
                     "Previewing the edition changed its stock or crafting dust.");
                 toggle.onClick.Invoke();
                 Require(!shopCard.HasOverframe, "The crafting preview did not return to the regular face.");
+                VerifyOverframeCraftAvailability(canvas.transform, crafting, unrelated);
                 crafting.Hide();
 
                 VerifyOverframeOffsets(canvas.transform, folder, magician);
@@ -228,6 +229,44 @@ namespace YGOPortable.Editor
                 Directory.Delete(folder);
             }
             VerifyPackagedOverframe(portraitBytes);
+        }
+
+        private static void VerifyOverframeCraftAvailability(Transform parent, CardCraftingUI crafting, uint ordinary)
+        {
+            var actions = crafting.Root.transform.Find("Main/Details");
+            var standardCraft = actions.Find("Craft");
+            var overframeCraft = actions.Find("CraftOverframe");
+            Require(overframeCraft.gameObject.activeInHierarchy, "A supported card hid Overframe crafting.");
+            crafting.Search.text = ordinary.ToString();
+            Require(standardCraft.gameObject.activeInHierarchy && !overframeCraft.gameObject.activeSelf,
+                "An ordinary card still displayed Overframe crafting in the catalog.");
+            crafting.Show(ordinary, CardTradeAction.CraftOverframe);
+            Require(crafting.ActiveRoot == actions.parent.gameObject && !overframeCraft.gameObject.activeSelf,
+                "An unsupported Overframe shortcut opened the crafting confirmation.");
+
+            foreach (bool compact in new[] { false, true })
+            {
+                var holder = LotdUiKit.FillRect("TradeButtons", parent);
+                var shortcuts = new CardTradeControls(holder, (_, _) => { }, compact, deckEditor: compact);
+                var standard = (RectTransform)holder.Find("Craft");
+                var special = holder.Find("CraftOverframe");
+                var specialDisassemble = holder.Find("DisassembleOverframe");
+                shortcuts.Bind(BlueEyes);
+                Require(special.gameObject.activeInHierarchy && specialDisassemble.gameObject.activeInHierarchy,
+                    "A supported card hid the Overframe shortcuts.");
+                Vector2 supportedSize = standard.anchorMax - standard.anchorMin;
+                shortcuts.Bind(ordinary);
+                Vector2 regularSize = standard.anchorMax - standard.anchorMin;
+                Require(!special.gameObject.activeSelf && !specialDisassemble.gameObject.activeSelf &&
+                    standard.gameObject.activeInHierarchy && regularSize.x * regularSize.y > supportedSize.x * supportedSize.y,
+                    "The ordinary card's shortcuts left an unavailable edition visible or an empty slot.");
+                shortcuts.Bind(BlueEyes);
+                Require(special.gameObject.activeInHierarchy &&
+                    standard.anchorMax - standard.anchorMin == supportedSize,
+                    "Switching back to a supported card did not restore its Overframe crafting layout.");
+                UnityEngine.Object.DestroyImmediate(holder.gameObject);
+            }
+            Debug.Log("[VERIFY OVERFRAME CRAFT] Catalog and card shortcuts hid unavailable Overframe actions.");
         }
 
         private static void VerifyOverframeOffsets(Transform parent, string directory, uint magician)

@@ -426,6 +426,7 @@ namespace YGOPortable.UI
             if (_selected == null || _confirmation.activeSelf) return;
             var card = _selected;
             uint code = card.Card.code;
+            if (crafting && overframe && !CardArtLoader.SupportsOverframe(code)) return;
             if (crafting)
             {
                 int room = CollectionProgress.GetCraftLimit(code, overframe);
