@@ -679,7 +679,7 @@ namespace YGOPortable.UI
                     return true;
                 }
             }
-            else if (_curPrompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN || _curPrompt.messageType == YgoConstants.MSG_SELECT_YESNO)
+            else if (_curPrompt.messageType is YgoConstants.MSG_SELECT_EFFECTYN or YgoConstants.MSG_SELECT_YESNO or YgoConstants.MSG_DESTINY_DRAW)
             {
                 LotdAudio.PlayClick();
                 Submit(BitConverter.GetBytes(0)); // NO
@@ -836,7 +836,8 @@ namespace YGOPortable.UI
             }
             BindFieldCardChoices(session, prompt);
             if (_mobileLayout &&
-                (prompt.messageType is YgoConstants.MSG_SELECT_EFFECTYN or YgoConstants.MSG_SORT_CHAIN or YgoConstants.MSG_SELECT_YESNO))
+                (prompt.messageType is YgoConstants.MSG_SELECT_EFFECTYN or YgoConstants.MSG_SORT_CHAIN or
+                     YgoConstants.MSG_SELECT_YESNO or YgoConstants.MSG_DESTINY_DRAW))
                 EnlargeConfirmationFooter();
             if (_fieldCardIndices.Count > 0)
             {
@@ -861,6 +862,9 @@ namespace YGOPortable.UI
 
             switch (prompt.messageType)
             {
+                case YgoConstants.MSG_DESTINY_DRAW:
+                    RenderDestinyDraw();
+                    break;
                 case YgoConstants.MSG_SELECT_YESNO:
                 case YgoConstants.MSG_SELECT_EFFECTYN:
                     if (prompt.IsAttackDecision) RenderAttackDecision(session, prompt);
@@ -942,6 +946,20 @@ namespace YGOPortable.UI
 
             AddFooterButton("예", () => Submit(BitConverter.GetBytes(1)), true);
             AddFooterButton("아니오", () => Submit(BitConverter.GetBytes(0)), false);
+        }
+
+        private void RenderDestinyDraw()
+        {
+            _modalTitle.text = "데스티니 드로우";
+            _modalSubtitle.text = "LP 2,000 이하 · 듀얼당 1회";
+            var halo = LotdUiKit.FillRect("DestinyDrawGlow", _modalBody);
+            LotdUiKit.AddImage(halo.gameObject, LotdUiKit.WhiteSprite, new Color(.37f, .056f, .078f, .86f), false, false);
+            LotdUiKit.AddFittedText(LotdUiKit.FillRect("Description", halo, 18f), "Text",
+                "메인 덱에 남은 데스티니 카드 중 한 장을 통상 드로우로 뽑습니다.", 26, 16,
+                TextAnchor.MiddleCenter, DuelStyle.ChainGold, FontStyle.Bold);
+            UiEntranceMotion.Play(halo.gameObject, .65f, .24f);
+            AddFooterButton("데스티니 드로우 발동!", () => Submit(BitConverter.GetBytes(1)), true);
+            AddFooterButton("통상 드로우", () => Submit(BitConverter.GetBytes(0)), false);
         }
 
         private void RenderAttackDecision(DuelSession session, DuelPrompt prompt)

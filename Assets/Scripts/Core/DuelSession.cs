@@ -289,7 +289,7 @@ namespace YGOPortable.Core
         internal int FieldZoneVersion { get; set; }
     }
 
-    public class DuelSession : IDisposable
+    public partial class DuelSession : IDisposable
     {
         private const byte TriggeredEffectFlag = 1 << 0;
         private const byte EventSpecificEffectFlag = 1 << 1;
@@ -317,6 +317,8 @@ namespace YGOPortable.Core
             internal bool first;
             internal int startingLp;
             internal DuelOpening? opponentOpening;
+            internal UserDeck destinyDeck;
+            internal uint[] opponentDestiny;
             internal readonly List<(byte message, byte player, byte[] bytes)> responses = new();
         }
 
@@ -446,11 +448,12 @@ namespace YGOPortable.Core
             IReadOnlyList<uint> p0Main, IReadOnlyList<uint> p0Extra,
             IReadOnlyList<uint> p1Main, IReadOnlyList<uint> p1Extra,
             bool p0GoesFirst = true, int startingLp = 8000, ulong[] seed = null, UserDeck playerDeckAppearance = null,
-            DuelOpening? opponentOpening = null)
+            DuelOpening? opponentOpening = null, IReadOnlyList<uint> opponentDestiny = null)
         {
             Dispose();
-            UsesDeckAppearances = playerDeckAppearance != null;
+            UsesDeckAppearances = playerDeckAppearance != null && !_loadingPlanningReplay;
             _deckAppearances.Clear();
+            ResetDestinyDraw();
             IsFinished = false;
             Winner = -1;
             TurnNumber = 0;
@@ -528,8 +531,9 @@ namespace YGOPortable.Core
                 shuffleSeed = unchecked((shuffleSeed ^ (uint)(seed[i] >> 32)) * 16777619);
             }
             var shuffle = new System.Random(unchecked((int)shuffleSeed));
-            LoadDeckForPlayer(0, firstMain, turn0Extra, shuffle, p0GoesFirst ? playerDeckAppearance : null);
-            LoadDeckForPlayer(1, secondMain, turn1Extra, shuffle, p0GoesFirst ? null : playerDeckAppearance);
+            _destinyRandom = new System.Random(unchecked((int)(shuffleSeed ^ 0xD571D2A7)));
+            LoadDeckForPlayer(0, firstMain, turn0Extra, shuffle, p0GoesFirst ? playerDeckAppearance : null, p0GoesFirst ? null : opponentDestiny);
+            LoadDeckForPlayer(1, secondMain, turn1Extra, shuffle, p0GoesFirst ? null : playerDeckAppearance, p0GoesFirst ? opponentDestiny : null);
             if (opponentOpening is { FieldCard: > 0 } opening) PlaceOpeningCard((byte)AiPlayerIndex, opening.FieldCard);
 
             YgoNativeBridge.YGO_StartDuel(NativePtr);
@@ -540,6 +544,8 @@ namespace YGOPortable.Core
                     first = p0GoesFirst,
                     startingLp = startingLp,
                     opponentOpening = opponentOpening,
+                    destinyDeck = _destinyCards[HumanPlayerIndex].Count == 0 ? null : CollectionProgress.CopyDeck(playerDeckAppearance),
+                    opponentDestiny = CopyDeck(opponentDestiny),
                     seed = (ulong[])seed.Clone(),
                     firstDeck = p0GoesFirst ? firstMain : secondMain, firstExtra = CopyDeck(p0Extra),
                     secondDeck = p0GoesFirst ? secondMain : firstMain, secondExtra = CopyDeck(p1Extra),
@@ -568,7 +574,8 @@ namespace YGOPortable.Core
             try
             {
                 if (!copy.StartNewDuel(replay.firstDeck, replay.firstExtra, replay.secondDeck, replay.secondExtra,
-                    replay.first, replay.startingLp, replay.seed, opponentOpening: replay.opponentOpening)) return null;
+                    replay.first, replay.startingLp, replay.seed, replay.destinyDeck,
+                    replay.opponentOpening, replay.opponentDestiny)) return null;
                 foreach (var response in replay.responses)
                 {
                     if (expired() || copy.IsFinished) return null;
@@ -601,7 +608,7 @@ namespace YGOPortable.Core
         }
 
         private void LoadDeckForPlayer(byte playerId, IReadOnlyList<uint> main, IReadOnlyList<uint> extra,
-            System.Random shuffle, UserDeck appearanceDeck)
+            System.Random shuffle, UserDeck appearanceDeck, IReadOnlyList<uint> opponentDestiny)
         {
             if (main != null && main.Count > 0)
             {
@@ -624,11 +631,16 @@ namespace YGOPortable.Core
 
             void AddDeckCard(uint code, uint location, DeckCardAppearance appearance)
             {
-                uint before = appearance.IsDefault ? 0 : YgoNativeBridge.YGO_QueryCount(NativePtr, playerId, location);
+                bool marked = location == YgoConstants.LOCATION_DECK &&
+                    (appearance.destinyDraw || opponentDestiny?.Contains(code) == true);
+                bool styled = UsesDeckAppearances && !appearance.IsDefault;
+                uint before = marked || styled ? YgoNativeBridge.YGO_QueryCount(NativePtr, playerId, location) : 0;
                 YgoNativeBridge.YGO_AddCard(NativePtr, playerId, 0, code, playerId, location, 0, YgoConstants.POS_FACEDOWN_DEFENSE);
-                if (appearance.IsDefault || YgoNativeBridge.YGO_QueryCount(NativePtr, playerId, location) != before + 1) return;
+                if ((!marked && !styled) || YgoNativeBridge.YGO_QueryCount(NativePtr, playerId, location) != before + 1) return;
                 uint identity = YgoNativeBridge.YGO_QueryCardIdentity(NativePtr, playerId, location, before);
-                if (identity != 0) _deckAppearances[identity] = appearance;
+                if (identity == 0) return;
+                if (marked) _destinyCards[playerId].Add(identity);
+                if (styled) _deckAppearances[identity] = appearance;
             }
         }
 
@@ -685,7 +697,9 @@ namespace YGOPortable.Core
                         ? prevPrompt.attackable[index] : null;
                 }
                 ActivePrompt = null;
-                YgoNativeBridge.SetResponse(NativePtr, buffer);
+                if (prevPrompt?.messageType == YgoConstants.MSG_DESTINY_DRAW)
+                    ResolveDestinyDraw(prevPrompt.playerId, buffer?.Length >= sizeof(int) && BitConverter.ToInt32(buffer, 0) == 1);
+                else YgoNativeBridge.SetResponse(NativePtr, buffer);
                 StepUntilPrompt();
                 if (_observedTopSort.Remaining > 0) ForgetObservedDeckTop(_observedTopSort.Player);
                 if (!IsFinished && ActivePrompt == null && RetryCount > prevRetry && prevPrompt != null)
@@ -839,7 +853,7 @@ namespace YGOPortable.Core
 
         public void StepUntilPrompt()
         {
-            if (NativePtr == IntPtr.Zero || IsFinished) return;
+            if (NativePtr == IntPtr.Zero || IsFinished || ActivePrompt?.messageType == YgoConstants.MSG_DESTINY_DRAW) return;
             if (!TracksFieldReadouts) _fieldReadoutBaseline = null;
             else _fieldReadoutBaseline ??= CaptureFieldReadouts(fromNative: true);
 
@@ -866,6 +880,7 @@ namespace YGOPortable.Core
                     break;
                 }
                 if (SpeculationPassedTurnLimit) break;
+                if (ActivePrompt?.messageType == YgoConstants.MSG_DESTINY_DRAW) break;
                 if (status == YgoConstants.OCG_DUEL_STATUS_AWAITING)
                 {
                     var prompt = ActivePrompt;
@@ -1837,6 +1852,11 @@ namespace YGOPortable.Core
                     if (msgEnd - br.BaseStream.Position == sizeof(uint) + sizeof(byte))
                     {
                         uint tag = br.ReadUInt32();
+                        if (tag == DestinyDrawTag)
+                        {
+                            OfferDestinyDraw(br.ReadByte());
+                            break;
+                        }
                         if (tag is DestructionGroupTag or MaterialGroupTag or PositionGroupTag or TemporaryBanishGroupTag)
                         {
                             if (br.ReadByte() != 0) _movementGroups.Push((tag, new object()));

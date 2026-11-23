@@ -33,6 +33,7 @@ namespace YGOPortable.UI
         }
 
         private readonly Action _onClose;
+        private readonly Action<string> _openSecretPack;
         private readonly GameObject _main;
         private readonly CanvasGroup _mainControls;
         private readonly InputField _finder;
@@ -59,6 +60,8 @@ namespace YGOPortable.UI
         private readonly Button _disassemble;
         private readonly Button _craftOverframe;
         private readonly Button _disassembleOverframe;
+        private readonly Button _secretPack;
+        private readonly Text _prices;
         private readonly Text _status;
         private readonly GameObject _confirmation;
         private readonly GameObject _confirmationWindow;
@@ -88,9 +91,10 @@ namespace YGOPortable.UI
         internal InputField Search => _bulk.IsOpen ? _bulk.Search :
             _confirmation.activeSelf ? null : _finder;
 
-        internal CardCraftingUI(Transform parent, Action close, string backLabel = "덱 편집으로")
+        internal CardCraftingUI(Transform parent, Action close, string backLabel = "덱 편집으로", Action<string> openSecretPack = null)
         {
             _onClose = close;
+            _openSecretPack = openSecretPack;
             var root = LotdUiKit.FillRect("Screen_CardCrafting", parent);
             Root = root.gameObject;
             var main = LotdUiKit.FillRect("Main", root);
@@ -160,8 +164,9 @@ namespace YGOPortable.UI
             _status = Label(details, "Status", "", .491f, .082f, .928f, .142f, 17, TextAnchor.MiddleCenter, PackShopStyle.TextPrimary);
             string prices = string.Join(" · ", Rarities.Select(rarity =>
                 $"{CardRarityCatalog.GetLabel(rarity)} {CollectionProgress.GetCraftDustCost(rarity)}"));
-            Label(details, "Rules", $"제작에 드는 가루   {prices}",
+            _prices = Label(details, "Rules", $"제작에 드는 가루   {prices}",
                 .491f, .035f, .928f, .078f, 15, TextAnchor.MiddleCenter, PackShopStyle.TextMuted);
+            _secretPack = AddButton(details, "SecretPack", "해금된 시크릿 팩 열기", .491f, .032f, .928f, .079f, OpenSecretPack);
 
             var footer = PackShopStyle.Panel(main, "Footer", new Vector2(.035f, .017f), new Vector2(.965f, .059f));
             LotdUiKit.AddFittedText(footer, "Controls", "방향키 이동   A 선택   Y 검색   LB/RB 페이지   오른쪽 스틱 설명   B 뒤로",
@@ -346,6 +351,9 @@ namespace YGOPortable.UI
             bool supports = CardArtLoader.SupportsOverframe(code);
             int owned = CollectionProgress.GetOwnedCount(code);
             int special = CollectionProgress.GetOwnedOverframeCount(code);
+            bool hasSecretPack = UnlockedSecretPack(entry) != null;
+            _secretPack.transform.parent.gameObject.SetActive(hasSecretPack);
+            _prices.gameObject.SetActive(!hasSecretPack);
             _cardInfo.text = code == 0 ? "" : supports || special > 0
                 ? $"일반판 {owned:N0}장 · 특별판 {special:N0}장" : $"보유 {owned:N0}장";
             _craftOverframe.transform.parent.gameObject.SetActive(supports);
@@ -362,6 +370,16 @@ namespace YGOPortable.UI
             int first = _page * PageSize;
             for (int i = 0; i < _rows.Length && first + i < _matches.Count; i++)
                 SetButtonLabelColor(_rowNames[i], _matches[first + i] == entry ? PackShopStyle.Accent : PackShopStyle.TextPrimary);
+        }
+
+        private CollectionPack UnlockedSecretPack(Entry entry) => _openSecretPack == null || entry == null ||
+            entry.Rarity < CardRarity.SuperRare ? null :
+            CollectionProgress.SecretPacksForCard(entry.Card.code).FirstOrDefault(CollectionProgress.IsPackUnlocked);
+
+        private void OpenSecretPack()
+        {
+            var pack = UnlockedSecretPack(_selected);
+            if (pack != null) _openSecretPack.Invoke(pack.Id);
         }
 
 

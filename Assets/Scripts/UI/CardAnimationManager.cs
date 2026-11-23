@@ -472,6 +472,34 @@ namespace YGOPortable.UI
             QueueStep(PhaseBanner("DUEL", false, boardCenter, null, intro: true));
         }
 
+        internal void QueueDestinyDraw(bool opponent, Vector2 center) => QueueStep(PlayDestinyDraw(opponent, center));
+
+        private IEnumerator PlayDestinyDraw(bool opponent, Vector2 center)
+        {
+            var shade = SummonScreenTint("DestinyDrawTint");
+            Vector2 area = _layer.rect.size;
+            var wave = CreateEffect(DuelEffectKind.ChainImpactWave, center, new Vector2(area.x * .71f, area.y * .43f),
+                DuelStyle.ChainGold);
+            var band = CenteredVisual("DestinyDraw", _layer, center,
+                new Vector2(Mathf.Min(660f, area.x * .66f), Mathf.Min(132f, area.y * .15f)));
+            LotdUiKit.AddImage(band.gameObject, LotdUiKit.WhiteSprite, new Color(.36f, .022f, .052f, .94f), false, false);
+            LotdUiKit.AddFittedText(band, "Label", opponent ? "상대의 데스티니 드로우" : "데스티니 드로우",
+                47, 20, TextAnchor.MiddleCenter, DuelStyle.ChainGold, FontStyle.Bold);
+            var opacity = band.gameObject.AddComponent<CanvasGroup>();
+            LotdAudio.PlayChain();
+            yield return Animate(.65f, t =>
+            {
+                float appearance = Mathf.Clamp01(Mathf.Min(t * 8f, (1f - t) * 6f));
+                shade.color = new Color(.63f, .055f, .095f, appearance * .24f);
+                opacity.alpha = appearance;
+                band.localScale = Vector3.one * Mathf.Lerp(.92f, 1.08f, t);
+                wave.Seek(t);
+            });
+            RemoveTransient(wave.gameObject);
+            RemoveTransient(band.gameObject);
+            RemoveTransient(shade.gameObject);
+        }
+
         internal void QueueChain(CardPose source, uint code, int chainNumber, bool opponent, LiveCardState live = null,
             Action onStart = null, DeckCardAppearance? appearance = null)
         {

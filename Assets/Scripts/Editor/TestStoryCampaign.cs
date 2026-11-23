@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -93,6 +94,25 @@ namespace YGOPortable.Editor
                 Control(scene, "Choices/Choice_2").onClick.Invoke();
                 Require(!scene.Find("Choices").gameObject.activeSelf && line.text.Length == 0, "Replay did not return to the first unread line.");
                 story.Back();
+                var dm = (StoryScriptRoot)typeof(StoryModeUI).GetProperty("Script", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .GetValue(story);
+                var first = dm.episodes[0];
+                story.ShowDuelResult(first, false, false, "+150 DP");
+                Control(scene, "DialogueBox/Skip").onClick.Invoke();
+                Require(Control(scene, "Choices/Choice_0").GetComponentInChildren<Text>().text.Contains("재도전") &&
+                    Control(scene, "Choices/Choice_1").GetComponentInChildren<Text>().text.Contains("덱 변경"),
+                    "The loss result did not expose retry and deck change.");
+                story.Back();
+                Require(CollectionProgress.TryAwardStoryDuel(first.id, true, null, null, out _, out _, out string error), error);
+                story.Open();
+                story.ShowDuelResult(first, true, false, "+300 DP");
+                Control(scene, "DialogueBox/Skip").onClick.Invoke();
+                var next = Control(scene, "Choices/Choice_0");
+                Require(next.IsInteractable() && next.GetComponentInChildren<Text>().text.Contains("다음 에피소드"),
+                    "The win result did not expose the next episode.");
+                next.onClick.Invoke();
+                Require(scene.Find("Episode/Label").GetComponent<Text>().text == dm.episodes[1].title,
+                    "The next-episode choice did not begin the newly unlocked episode.");
                 story.Close();
             }
             finally
@@ -127,6 +147,8 @@ namespace YGOPortable.Editor
                         (card.type & (YgoConstants.TYPE_FIELD | YgoConstants.TYPE_CONTINUOUS)) != 0) &&
                         boss.Opening.Hand == 5 + episode.chapter && boss.WinDp > CollectionProgress.WinReward,
                         $"Invalid raid conditions for {episode.id}.");
+                    var rival = OpponentDeckLevels.GetDecks(episode.charId)[^1];
+                    VerifyNativeOpening(episode.id, boss, rival.main, rival.extra, humanFirst: true);
                 }
             }
             Require(ids.Count == 300 && raids == 40, "Some episodes were not included.");
@@ -136,20 +158,8 @@ namespace YGOPortable.Editor
         private static void VerifyOpeningAndSave(string save)
         {
             var raid = StoryRaid.For("arcv", 44).Value;
-            const uint normal = 20721928;
-            var deck = Enumerable.Repeat(normal, 40).ToArray();
-            foreach (bool humanFirst in new[] { true, false })
-            {
-                using var duel = new DuelSession();
-                Require(duel.StartNewDuel(deck, Array.Empty<uint>(), deck, Array.Empty<uint>(), humanFirst,
-                    seed: new ulong[] { 222, 17, 821, 909 }, opponentOpening: raid.Opening), "Could not start the raid.");
-                var boss = duel.Players[duel.AiPlayerIndex];
-                Require(boss.lp == 30000 && boss.hand.Count == 10 && duel.Players[duel.HumanPlayerIndex].lp == 8000 &&
-                    boss.mzone.Any(card => card?.code == raid.Opening.FieldCard && card.IsFaceUp),
-                    "The boss opening was not applied to the engine seat.");
-            }
-
             var opponent = OpponentDeckLevels.GetDecks(74)[^1];
+            VerifyNativeOpening("arcv_ep_44", raid, opponent.main, opponent.extra, humanFirst: false);
             int before = CollectionProgress.Balance;
             Require(CollectionProgress.TryAwardStoryDuel("arcv_ep_44", true, raid, opponent, out int gained,
                 out var cardReward, out string error), error);
@@ -161,6 +171,19 @@ namespace YGOPortable.Editor
             CollectionProgress.Load(save);
             Require(CollectionProgress.IsStoryEpisodeCleared("arcv_ep_44") &&
                 !CollectionProgress.IsStoryEpisodeCleared("vrains_ep_44"), "Campaign progress did not survive an independent reload.");
+        }
+
+        private static void VerifyNativeOpening(string name, StoryRaid raid, uint[] rival, uint[] extra, bool humanFirst)
+        {
+            var player = Enumerable.Repeat(20721928u, 40).ToArray();
+            using var duel = new DuelSession();
+            Require(duel.StartNewDuel(player, Array.Empty<uint>(), rival, extra ?? Array.Empty<uint>(), humanFirst,
+                seed: new ulong[] { 222, 17, 821, 909 }, opponentOpening: raid.Opening), $"Could not start the raid {name}.");
+            var boss = duel.Players[duel.AiPlayerIndex];
+            Require(boss.lp == raid.Opening.Life && boss.hand.Count == raid.Opening.Hand &&
+                duel.Players[duel.HumanPlayerIndex].lp == 8000 && boss.mzone.Concat(boss.szone)
+                    .Any(card => card?.code == raid.Opening.FieldCard && card.IsFaceUp),
+                $"The configured LP, hand or opening field was missing in {name}.");
         }
 
         private static void Require(bool condition, string reason)

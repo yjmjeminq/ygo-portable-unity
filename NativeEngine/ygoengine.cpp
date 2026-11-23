@@ -373,6 +373,18 @@ YGO_API uint32_t YGO_QueryCardIdentity(void* handle, uint8_t controller, uint32_
     return card ? card->cardid + 1 : 0;
 }
 
+YGO_API int32_t YGO_MoveDeckCardToTop(void* handle, uint8_t controller, uint32_t sequence) {
+    if (!handle || controller > 1) return 0;
+    auto& field = *static_cast<duel*>(handle)->game_field;
+    auto& deck = field.player[controller].list_main;
+    if (sequence >= deck.size()) return 0;
+    auto* selected = deck[sequence];
+    deck.erase(deck.begin() + sequence);
+    deck.push_back(selected);
+    field.reset_sequence(controller, LOCATION_DECK);
+    return 1;
+}
+
 YGO_API const void* YGO_QueryCard(void* duel, uint32_t flags, uint8_t con, uint32_t loc,
                                   uint32_t seq, uint32_t overlaySeq, uint32_t* outLen)
 {

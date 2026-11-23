@@ -201,13 +201,16 @@ namespace YGOPortable.UI
             if (index < 0) return;
             SelectEpisode(index);
             string result = won ? "승리" : draw ? "무승부" : "패배";
-            PlayDialogue(episode, won ? episode.postWinDialogues : episode.postLoseDialogues, $"{episode.title} · {result}", () =>
+            PlayDialogue(episode, won ? episode.postWinDialogues : episode.postLoseDialogues, $"{TitleOf(episode)} · {result}", () =>
             {
                 if (won)
+                {
+                    if (Application.isPlaying) LotdAudio.PlayWin();
                     _dialogue.ShowChoices(() => reward,
                         new("다음 에피소드 바로 시작", () => OpenEpisode(index + 1), () =>
                             index + 1 < Script.episodes.Length && CanPlay(Script.episodes[index + 1])),
                         new("에피소드 목록으로", ReturnToEpisodes));
+                }
                 else
                     _dialogue.ShowChoices(() => reward,
                         new("즉시 재도전", () => LaunchDuel(episode), () => _playableDecks.Count > 0),
@@ -348,10 +351,11 @@ namespace YGOPortable.UI
                 bool locked = episodeIndex > _unlockedIndex;
                 string state = cleared ? "클리어" : locked ? "잠김" : "도전 가능";
                 var label = _episodeButtons[row].GetComponentInChildren<Text>();
-                bool raid = GetRaid(episode) != null;
-                label.text = $"  {episodeIndex + 1:00}화  {(raid ? "◆ BOSS RAID  " : "")}{TitleOf(episode)}  ·  {state}";
+                var raid = GetRaid(episode);
+                string badge = raid is { } challenge ? $"◆ BOSS RAID {challenge.Opening.Life:N0} LP  " : "";
+                label.text = $"  {episodeIndex + 1:00}화  {badge}{TitleOf(episode)}  ·  {state}";
                 label.color = episodeIndex == index ? LotdUiKit.GoldAccent : locked ? LotdUiKit.TextMuted :
-                    raid ? LotdUiKit.RedAccent : LotdUiKit.TextPrimary;
+                    raid.HasValue ? LotdUiKit.RedAccent : LotdUiKit.TextPrimary;
             }
 
             var current = Script.episodes[index];
@@ -365,10 +369,12 @@ namespace YGOPortable.UI
             _opponentDeck.text = deck == null ? "" : $"Lv. {level}/{levelCount}  ·  {deck.title}";
             bool ready = opponent != null && deck != null;
             _start.interactable = CanPlay(current) && ready;
-            ShowStatus(!CanPlay(current) ? "이전 에피소드를 클리어하면 열립니다." :
+            string status = !CanPlay(current) ? "이전 에피소드를 클리어하면 열립니다." :
                 !ready ? "상대 덱을 불러오지 못했습니다." :
-                GetRaid(current) is { } raidInfo ? raidInfo.Summary :
-                _playableDecks.Count == 0 ? "덱 편집에서 사용할 수 있는 덱을 완성하세요." : "");
+                _playableDecks.Count == 0 ? "덱 편집에서 사용할 수 있는 덱을 완성하세요." : "";
+            ShowStatus(GetRaid(current) is { } raidInfo
+                ? string.IsNullOrEmpty(status) ? raidInfo.Summary : $"{raidInfo.Summary}\n{status}"
+                : status);
         }
 
         private void LoadDeckChoices()

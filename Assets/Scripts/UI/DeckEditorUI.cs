@@ -477,7 +477,8 @@ namespace YGOPortable.UI
             ClearCardVisual(ref _hoveredSlot);
             ClearCardVisual(ref _padVisualSlot);
             _pointerSlot = _inspectedSource = null;
-            _cardCrafting ??= new CardCraftingUI(Root.transform, ReturnFromCardCrafting);
+            _cardCrafting ??= new CardCraftingUI(Root.transform, ReturnFromCardCrafting,
+                openSecretPack: _app == null ? null : _app.OpenSecretPackShop);
             _cardCrafting.Root.transform.SetAsLastSibling();
             _editorContent.SetActive(false);
             _cardCrafting.Show(code, action);
@@ -1111,6 +1112,7 @@ namespace YGOPortable.UI
                 int index = i;
                 var appearance = _workingDeck.GetAppearance(cards, index);
                 view.SetDeckCard(code, appearance);
+                view.SetDestinyBadge(area == PadArea.Main && appearance.destinyDraw);
                 int owned = appearance.overframe ? CollectionProgress.GetOwnedOverframeCount(code) : CollectionProgress.GetOwnedCount(code);
                 view.transform.Find("AspectBox/Unowned").gameObject.SetActive(CollectionProgress.RequiresOwnedCardsForDecks && owned == 0);
                 trigger.CardCodeGetter = () => code;

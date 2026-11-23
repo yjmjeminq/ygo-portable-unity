@@ -316,6 +316,7 @@ namespace YGOPortable.UI
             session.OnCardLocationsChanged += HandleCardLocationsChanged;
             session.OnFieldArrivalBoundary += CompleteFieldArrivals;
             session.OnStyledCardsDrawn += HandleCardsDrawn;
+            session.OnDestinyDraw += HandleDestinyDraw;
             session.OnLifePointChange += HandleLifePointsChanged;
             session.OnTurnStarted += HandleTurnStarted;
             session.OnPhaseChanged += HandlePhaseChanged;
@@ -359,6 +360,7 @@ namespace YGOPortable.UI
                 _session.OnCardLocationsChanged -= HandleCardLocationsChanged;
                 _session.OnFieldArrivalBoundary -= CompleteFieldArrivals;
                 _session.OnStyledCardsDrawn -= HandleCardsDrawn;
+                _session.OnDestinyDraw -= HandleDestinyDraw;
                 _session.OnLifePointChange -= HandleLifePointsChanged;
                 _session.OnTurnStarted -= HandleTurnStarted;
                 _session.OnPhaseChanged -= HandlePhaseChanged;
@@ -3387,6 +3389,13 @@ namespace YGOPortable.UI
             }
             var center = animator.GetPoint(_boardRect, new Vector2(0.5f, 0.54f));
             animator.QueuePhase(opponent ? "상대 턴" : "내 턴", opponent, center, ApplyTurn);
+        }
+
+        private void HandleDestinyDraw(byte player)
+        {
+            var animator = CardAnimationManager.Instance;
+            if (animator == null) return;
+            animator.QueueDestinyDraw(player != _session.HumanPlayerIndex, animator.GetPoint(_boardRect, new Vector2(.5f, .56f)));
         }
 
         private void HandlePhaseChanged(int phase, int player)

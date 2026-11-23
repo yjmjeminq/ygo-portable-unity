@@ -38,6 +38,7 @@ namespace YGOPortable.UI
         private DuelPromptModals _modals;
         private DuelFieldUI _duelField;
         private CollectionShopUI _collectionShop;
+        private SecretPackToast _secretPackToast;
         private ArchetypeCodexUI _archetypeCodex;
         private StoryModeUI _storyMode;
         private bool _storyDeckEditorOpen;
@@ -130,6 +131,7 @@ namespace YGOPortable.UI
                 _collectionShop = new CollectionShopUI(canvas.transform,
                     () => ShowScreen(_screen == AppScreen.StarterSelection ? AppScreen.Title : AppScreen.MainMenu),
                     CompleteStarterSelection);
+                _secretPackToast = new SecretPackToast(canvas.transform);
                 _archetypeCodex = new ArchetypeCodexUI(canvas.transform, () => ShowScreen(AppScreen.MainMenu));
                 _storyMode = new StoryModeUI(this, canvas.transform);
 
@@ -313,6 +315,12 @@ namespace YGOPortable.UI
 
         internal void CloseDeckEditor() => ShowScreen(_storyDeckEditorOpen ? AppScreen.StoryMode : AppScreen.MainMenu);
 
+        internal void OpenSecretPackShop(string id)
+        {
+            ShowScreen(AppScreen.CardShop);
+            if (_screen == AppScreen.CardShop) _collectionShop.ShowPackFromLookup(id);
+        }
+
         private void CompleteStarterSelection(UserDeck deck)
         {
             RegisterStarterDeck(deck);
@@ -419,13 +427,24 @@ namespace YGOPortable.UI
             if (!_session.StartNewDuel(
                 myDeck.main, myDeck.extra,
                 oppDeck.main, oppDeck.extra,
-                p0GoesFirst: playerGoesFirst, playerDeckAppearance: myDeck, opponentOpening: raid?.Opening))
+                p0GoesFirst: playerGoesFirst, playerDeckAppearance: myDeck, opponentOpening: raid?.Opening,
+                opponentDestiny: GetOpponentDestinyCards(oppDeck)))
             {
                 ShowDuelStartFailure(isStoryDuel, "듀얼을 시작하지 못했습니다.");
                 return;
             }
             CollectionProgress.RememberDuelDeck(myDeck.id);
             _duelField.Refresh();
+        }
+
+        private static uint[] GetOpponentDestinyCards(PresetDeckInfo deck)
+        {
+            if (deck.main.Contains(deck.sigCard)) return new[] { deck.sigCard };
+            return deck.main.Distinct().Select(CardDatabase.Get)
+                .Where(card => card?.IsMonster == true && !card.IsExtra)
+                .OrderByDescending(card => card.atk >= 2400 && (card.type & YgoConstants.TYPE_EFFECT) != 0)
+                .ThenByDescending(card => CardRarityCatalog.GetRarity(card.code))
+                .ThenByDescending(card => card.atk).Take(2).Select(card => card.code).ToArray();
         }
 
         private void ShowDuelStartFailure(bool isStoryDuel, string message)
@@ -467,6 +486,7 @@ namespace YGOPortable.UI
 
         private void Update()
         {
+            _secretPackToast?.Update(Time.unscaledDeltaTime);
             _personalReplay?.PollWarning();
             _saveSync?.Tick();
             if (_saveSync?.HasConflict == true)
@@ -566,6 +586,12 @@ namespace YGOPortable.UI
 
             if (prompt.playerId == _session.AiPlayerIndex)
             {
+                if (prompt.messageType == YgoConstants.MSG_DESTINY_DRAW)
+                {
+                    _session.SubmitAutomaticResponseInt(1, "opponent-destiny-draw");
+                    _duelField.Refresh();
+                    return;
+                }
                 _aiTimer += Time.deltaTime * DuelFieldUI.PlaybackRate;
                 if (_ai.AdvanceComboPlanning(_session, prompt) && _aiTimer >= AiStepDelay)
                 {
@@ -833,6 +859,7 @@ namespace YGOPortable.UI
 
         private void OnDestroy()
         {
+            _secretPackToast?.Dispose();
             _saveSync?.Dispose();
             Debug.Log($"[GameApp] OnDestroy called! Stack:\n{Environment.StackTrace}");
             _session?.Dispose();

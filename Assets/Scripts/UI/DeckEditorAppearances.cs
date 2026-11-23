@@ -11,13 +11,14 @@ namespace YGOPortable.UI
         private readonly Dictionary<uint, DeckCardAppearance> _trunkAppearances = new();
         private Button _inspectEdition;
         private Button _inspectArtwork;
+        private Button _inspectDestiny;
 
         private void BuildAppearanceControls(Transform panel, float inset)
         {
-            var left = LotdUiKit.CreateRect("Edition", panel, new Vector2(0f, .924f), new Vector2(.5f, .982f),
+            var left = LotdUiKit.CreateRect("Edition", panel, new Vector2(0f, .924f), new Vector2(.33f, .982f),
                 new Vector2(inset, 0f), new Vector2(-4f, 0f));
-            var right = LotdUiKit.CreateRect("Artwork", panel, new Vector2(.5f, .924f), new Vector2(1f, .982f),
-                new Vector2(4f, 0f), new Vector2(-inset, 0f));
+            var right = LotdUiKit.CreateRect("Artwork", panel, new Vector2(.33f, .924f), new Vector2(.666f, .982f),
+                new Vector2(3f, 0f), new Vector2(-3f, 0f));
             _inspectEdition = LotdUiKit.CreateLotdButton(left, "Button", "일반판", () =>
             {
                 var (cards, index) = InspectedDeckSlot(_inspectedCode);
@@ -28,6 +29,20 @@ namespace YGOPortable.UI
                 var (cards, index) = InspectedDeckSlot(_inspectedCode);
                 ChangeArtwork(_inspectedCode, cards, index);
             }, 13);
+            var destiny = LotdUiKit.CreateRect("DestinyDraw", panel, new Vector2(.666f, .924f), new Vector2(1f, .982f),
+                new Vector2(4f, 0f), new Vector2(-inset, 0f));
+            _inspectDestiny = LotdUiKit.CreateLotdButton(destiny, "Button", "데스티니 지정", () =>
+            {
+                var (cards, index) = InspectedDeckSlot(_inspectedCode);
+                ToggleDestiny(_inspectedCode, cards, index);
+            }, 13);
+            foreach (var button in new[] { _inspectEdition, _inspectArtwork, _inspectDestiny })
+            {
+                var text = button.GetComponentInChildren<Text>();
+                text.resizeTextForBestFit = true;
+                text.resizeTextMinSize = 8;
+                text.resizeTextMaxSize = 14;
+            }
         }
 
         private (List<uint> Cards, int Index) InspectedDeckSlot(uint code)
@@ -152,6 +167,20 @@ namespace YGOPortable.UI
             label.color = appearance.overframe ? LotdUiKit.GoldAccent : LotdUiKit.TextPrimary;
             _inspectEdition.interactable = CanChangeEdition(code, cards, appearance);
             _inspectArtwork.interactable = ArtworkChoices(code, appearance, cards != null).Count > 1;
+            bool eligible = cards != null && ReferenceEquals(cards, _workingDeck.main);
+            _inspectDestiny.interactable = eligible;
+            var destiny = _inspectDestiny.GetComponentInChildren<Text>();
+            destiny.text = eligible && appearance.destinyDraw ? "★ 데스티니" : "데스티니 지정";
+            destiny.color = eligible && appearance.destinyDraw ? LotdUiKit.GoldAccent : LotdUiKit.TextPrimary;
+        }
+
+        private void ToggleDestiny(uint code, List<uint> cards, int index)
+        {
+            if (cards == null || !ReferenceEquals(cards, _workingDeck.main) || index < 0 ||
+                index >= cards.Count || cards[index] != code) return;
+            var appearance = _workingDeck.GetAppearance(cards, index);
+            appearance.destinyDraw = !appearance.destinyDraw;
+            ApplyAppearance(code, code, cards, index, appearance);
         }
     }
 }

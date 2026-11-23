@@ -409,6 +409,7 @@ namespace YGOPortable.UI
         private (uint Code, int Variant) _artworkSource;
         private DeckCardAppearance? _deckAppearance;
         private GameObject _deckEditionBadge;
+        private GameObject _destinyBadge;
         private bool _overframeEnabled;
         private bool _overframeBound;
         private Sprite _retainedCutIn;
@@ -722,6 +723,19 @@ namespace YGOPortable.UI
                 _deckEditionBadge = badge.gameObject;
             }
             if (_deckEditionBadge != null) _deckEditionBadge.SetActive(shown);
+        }
+
+        internal void SetDestinyBadge(bool shown)
+        {
+            if (shown && _destinyBadge == null)
+            {
+                var badge = LotdUiKit.CreateRect("DestinyDraw", _artImg.transform.parent,
+                    new Vector2(.686f, .767f), new Vector2(.97f, .968f), Vector2.zero, Vector2.zero);
+                LotdUiKit.AddImage(badge.gameObject, LotdUiKit.WhiteSprite, new Color(.29f, .135f, .019f, .96f), false, false);
+                LotdUiKit.AddFittedText(badge, "Star", "★", 24, 8, TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
+                _destinyBadge = badge.gameObject;
+            }
+            if (_destinyBadge != null) _destinyBadge.SetActive(shown);
         }
 
         internal void EnableOverframe()

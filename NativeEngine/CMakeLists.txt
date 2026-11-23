@@ -22,6 +22,7 @@ set(CORE_PATCHES
     "${CMAKE_CURRENT_SOURCE_DIR}/swap_presentation.patch"
     "${CMAKE_CURRENT_SOURCE_DIR}/chain_activation_presentation.patch"
     "${CMAKE_CURRENT_SOURCE_DIR}/card_identity_presentation.patch"
+    "${CMAKE_CURRENT_SOURCE_DIR}/destiny_draw.patch"
 )
 set(CORE_PATCH_STAGE "${CMAKE_CURRENT_BINARY_DIR}/core-patch-stage")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CORE_PATCHES})

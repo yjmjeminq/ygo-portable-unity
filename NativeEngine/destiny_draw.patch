@@ -1,0 +1,14 @@
+--- a/processor.cpp
++++ b/processor.cpp
+@@ -3385,6 +3385,11 @@
+                     count = std::max<int32_t>(static_cast<int32_t>(5 - player[turn_player].list_hand.size()), count);
+                 }
+                 if(count > 0) {
++                    if(player[turn_player].lp <= 2000 && !player[turn_player].list_main.empty()) {
++                        auto message = pduel->new_message(MSG_CUSTOM_MSG);
++                        message->write<uint32_t>(0x31444459); // YDD1: normal draw is queued but has not executed.
++                        message->write<uint8_t>(turn_player);
++                    }
+                     draw(nullptr, REASON_RULE, turn_player, turn_player, count);
+                     emplace_process<Processors::PointEvent>(false, false, false);
+                 }

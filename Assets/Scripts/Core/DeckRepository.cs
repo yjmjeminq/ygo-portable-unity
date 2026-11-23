@@ -50,8 +50,9 @@ namespace YGOPortable.Core
         public bool overframe;
         // Zero uses bundled artwork. Other values store the local artwork variant plus one.
         public int artwork;
+        public bool destinyDraw;
         internal int ArtworkVariant => artwork - 1;
-        internal bool IsDefault => !overframe && artwork == 0;
+        internal bool IsDefault => !overframe && artwork == 0 && !destinyDraw;
     }
 
     [Serializable]
@@ -94,6 +95,7 @@ namespace YGOPortable.Core
 
         internal void InsertCard(List<uint> cards, int index, uint code, DeckCardAppearance appearance)
         {
+            if (!ReferenceEquals(cards, main)) appearance.destinyDraw = false;
             var appearances = Appearances(cards);
             cards.Insert(index, code);
             if (index < appearances.Count) appearances.Insert(index, appearance);

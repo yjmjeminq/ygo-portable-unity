@@ -86,7 +86,8 @@ namespace YGOPortable.Editor
             var packed = packs.SelectMany(pack => pack.CardPool).ToHashSet();
             Require(CardDatabase.AllCards.Where(CollectionProgress.IsCraftableCard).All(card => packed.Contains(card.code)),
                 "The shop is missing at least one playable card from all of its packs.");
-            var expectedPacks = packs.Where(pack => pack.CardPool.Contains(vanguard) || pack.CardPool.Contains(kelbek)).ToArray();
+            var expectedPacks = packs.Where(pack => CollectionProgress.IsPackUnlocked(pack) &&
+                (pack.CardPool.Contains(vanguard) || pack.CardPool.Contains(kelbek))).ToArray();
             var catalog = Field(shop, "_shop");
             var search = shop.CatalogSearch(starter: false);
             IEnumerable<string> MatchedPackIds() => ((System.Collections.IEnumerable)Field(catalog, "Matches"))

@@ -24,6 +24,7 @@ namespace YGOPortable.UI
         private Button _deckCardActionCrafting;
         private Button _deckCardActionArtwork;
         private Button _deckCardActionEdition;
+        private Button _deckCardActionDestiny;
         private Button _deckCardActionCancel;
         private Button _deckCardActionDefault;
         private Button[] _deckCardActionRows;
@@ -74,10 +75,11 @@ namespace YGOPortable.UI
             _deckCardActionCrafting = AddRow("Crafting");
             _deckCardActionArtwork = AddRow("Artwork");
             _deckCardActionEdition = AddRow("Edition");
+            _deckCardActionDestiny = AddRow("DestinyDraw");
             _deckCardActionCancel = AddRow("Cancel", "취소", CloseDeckCardActions);
             _deckCardActionRows = new[] { _deckCardActionDetails, _deckCardActionMain, _deckCardActionAlternate,
                 _deckCardActionRelated, _deckCardActionCrafting, _deckCardActionArtwork, _deckCardActionEdition,
-                _deckCardActionCancel };
+                _deckCardActionDestiny, _deckCardActionCancel };
             overlay.gameObject.SetActive(false);
         }
 
@@ -194,8 +196,17 @@ namespace YGOPortable.UI
             var choices = ArtworkChoices(code, appearance, cards != null);
             bool artwork = choices.Count > 1;
             bool edition = appearance.overframe || CardArtLoader.SupportsOverframe(code);
+            bool destiny = source == DragSourceType.DeckMain;
             _deckCardActionArtwork.gameObject.SetActive(artwork);
             _deckCardActionEdition.gameObject.SetActive(edition);
+            _deckCardActionDestiny.gameObject.SetActive(destiny);
+            if (destiny)
+                SetDeckCardAction(_deckCardActionDestiny, appearance.destinyDraw ? "★ 데스티니 지정 해제" : "★ 데스티니 카드 지정",
+                    true, () =>
+                    {
+                        ToggleDestiny(code, cards, index);
+                        RefreshAppearanceMenu(_deckCardActionDestiny);
+                    }, closeMenu: false);
             if (artwork)
             {
                 int choice = choices.IndexOf((code, appearance.artwork));
@@ -223,7 +234,7 @@ namespace YGOPortable.UI
 
             if (_mobileLayout)
             {
-                LayoutMobileCardActions(artwork, edition);
+                LayoutMobileCardActions(artwork, edition, destiny);
                 return;
             }
             int rows = _deckCardActionRows.Count(button => button.gameObject.activeSelf);

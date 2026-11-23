@@ -228,6 +228,7 @@ namespace YGOPortable.UI
                 _summary = summary;
                 _choiceRoot.SetActive(true);
                 RefreshChoices();
+                UiEntranceMotion.Play(_choiceRoot, .78f, .18f);
             }
 
             internal void RefreshChoices()

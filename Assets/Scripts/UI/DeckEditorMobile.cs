@@ -366,12 +366,12 @@ namespace YGOPortable.UI
             rt.anchorMax = new Vector2((col + 1f) / cols, 1f - row / (float)rows);
         }
 
-        private void LayoutMobileCardActions(bool showArtwork, bool showEdition)
+        private void LayoutMobileCardActions(bool showArtwork, bool showEdition, bool showDestiny)
         {
             var overlay = (RectTransform)_deckCardActions.transform;
             float touch = MobileSafeArea.MinimumTouchSize(overlay);
             float width = Mathf.Min(overlay.rect.width - 20f, Mathf.Max(550f, 5.2f * touch));
-            int lines = showEdition ? 6 : 5;
+            int lines = showEdition || showDestiny ? 6 : 5;
             float height = Mathf.Min(overlay.rect.height - 18f, touch * lines + 49f);
             _deckCardActionPanel.sizeDelta = new Vector2(width, height);
             float step = (height - 32f) / lines;
@@ -392,7 +392,8 @@ namespace YGOPortable.UI
             PlaceButton(_deckCardActionAlternate, 3, .505f, .93f);
             PlaceButton(_deckCardActionCrafting, 4, .07f, showArtwork ? .495f : .93f);
             PlaceButton(_deckCardActionArtwork, 4, .505f, .93f);
-            if (showEdition) PlaceButton(_deckCardActionEdition, 5, .07f, .93f);
+            if (showEdition) PlaceButton(_deckCardActionEdition, 5, .07f, showDestiny ? .495f : .93f);
+            if (showDestiny) PlaceButton(_deckCardActionDestiny, 5, showEdition ? .505f : .07f, .93f);
             PlaceButton(_deckCardActionCancel, 0, .724f, .93f);
         }
     }

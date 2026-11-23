@@ -41,13 +41,16 @@ namespace YGOPortable.Core
         public string Name { get; }
         public uint FeaturedCode { get; }
         public IReadOnlyList<uint> CardPool { get; }
+        internal bool IsSecret => ThemeCards != null;
+        internal IReadOnlyCollection<uint> ThemeCards { get; }
 
-        internal CollectionPack(string id, string name, uint featuredCode, uint[] codes)
+        internal CollectionPack(string id, string name, uint featuredCode, uint[] codes, IReadOnlyCollection<uint> themeCards = null)
         {
             Id = id;
             Name = name;
             FeaturedCode = codes.Contains(featuredCode) ? featuredCode : codes[0];
             CardPool = Array.AsReadOnly(codes);
+            ThemeCards = themeCards;
         }
     }
 
@@ -66,7 +69,7 @@ namespace YGOPortable.Core
         }
     }
 
-    public static class CollectionProgress
+    public static partial class CollectionProgress
     {
         public const int PackCost = 100;
         public const int PackBundleSize = 10;
@@ -117,6 +120,7 @@ namespace YGOPortable.Core
             public List<OpponentDeckProgress> opponentDeckProgress;
             public List<string> clearedStoryEpisodes = new();
             public bool storyProgressMigrated;
+            public SecretShopSave shop;
         }
 
         [Serializable]
@@ -176,6 +180,7 @@ namespace YGOPortable.Core
             _profilePath = Path.Combine(persistentDataPath, ProfileFileName);
             _starters = null;
             _packs = null;
+            _secretPacksByCard = null;
             _opponents = null;
             _profile = null;
             _savedJson = null;
@@ -190,6 +195,11 @@ namespace YGOPortable.Core
                 if (json == null) return;
                 var saved = ParseProfile(json, out var owned, out var overframes);
                 InitializeOpponentProgress(saved);
+                if (saved.shop == null)
+                {
+                    saved.shop = new SecretShopSave();
+                    UnlockSecretPacks(saved, owned.Keys.Concat(overframes.Keys));
+                }
                 _profile = saved;
                 _owned = owned;
                 _ownedOverframes = overframes;
@@ -236,6 +246,8 @@ namespace YGOPortable.Core
 
             owned = ReadOwnership(saved.cards);
             overframes = ReadOwnership(saved.overframeCards);
+            if (saved.shop is { } shop && (shop.mileage < 0 || shop.mileage >= PackMileageTarget || shop.urTickets < 0))
+                throw new InvalidDataException("Invalid shop mileage.");
             return saved;
         }
 
@@ -335,6 +347,7 @@ namespace YGOPortable.Core
             var updated = new Dictionary<uint, int>(copies) { [code] = copies.GetValueOrDefault(code) + quantity };
             var next = WithBalance(Balance);
             next.dust -= cost;
+            UnlockSecretPacks(next, new[] { code });
             return Write(next, overframe ? _owned : updated, out error, overframe ? updated : null);
         }
 
@@ -477,6 +490,7 @@ namespace YGOPortable.Core
                 starterId = starter.Id,
                 starterDeck = selected,
                 balance = StartingBalance,
+                shop = new SecretShopSave(),
             };
             InitializeOpponentProgress(next);
             if (!Write(next, owned, out error)) return false;
@@ -526,6 +540,11 @@ namespace YGOPortable.Core
                 error = "판매 중인 팩을 선택하세요.";
                 return false;
             }
+            if (!IsPackUnlocked(pack))
+            {
+                error = "해당 카드군의 SR 또는 UR 카드를 얻으면 시크릿 팩이 열립니다.";
+                return false;
+            }
 
             var packGroups = new List<uint>[CardRarityCatalog.TierCount];
             for (int tier = 0; tier < packGroups.Length; tier++)
@@ -536,19 +555,23 @@ namespace YGOPortable.Core
             var owned = new Dictionary<uint, int>(_owned);
             var overframes = new Dictionary<uint, int>(_ownedOverframes);
             var openedPacks = new IReadOnlyList<PackPull>[packCount];
+            bool bundle = packCount == PackBundleSize;
+            bool requireUltraRare = bundle && NextBundleGuaranteesUr;
+            CardRarity guarantee = requireUltraRare ? CardRarity.UltraRare : CardRarity.SuperRare;
             bool guaranteedRarityFound = false;
+            bool pulledUltraRare = false;
             for (int packIndex = 0; packIndex < openedPacks.Length; packIndex++)
             {
                 var opened = new PackPull[CardsPerPack];
                 for (int cardIndex = 0; cardIndex < opened.Length; cardIndex++)
                 {
-                    bool bonus = packCount == PackBundleSize && !guaranteedRarityFound &&
+                    bool bonus = bundle && !guaranteedRarityFound &&
                         packIndex == packCount - 1 && cardIndex == opened.Length - 1;
-                    var group = RollPackRarity(packGroups, PackRandom, bonus ? CardRarity.SuperRare : CardRarity.Normal);
+                    var group = RollPackRarity(packGroups, PackRandom, bonus ? guarantee : CardRarity.Normal);
                     if (group == null && bonus)
-                    {
-                        group = HighRarityPool;
-                    }
+                        group = requireUltraRare
+                            ? HighRarityPool.Where(code => CardRarityCatalog.GetRarity(code) == CardRarity.UltraRare).ToList()
+                            : HighRarityPool;
                     if (group == null || group.Count == 0)
                     {
                         error = "팩을 개봉할 수 없습니다. 수록 카드 정보를 확인하세요.";
@@ -556,7 +579,9 @@ namespace YGOPortable.Core
                     }
 
                     uint code = group[PackRandom.Next(group.Count)];
-                    guaranteedRarityFound |= CardRarityCatalog.GetRarity(code) >= CardRarity.SuperRare;
+                    var rarity = CardRarityCatalog.GetRarity(code);
+                    guaranteedRarityFound |= rarity >= guarantee;
+                    pulledUltraRare |= rarity == CardRarity.UltraRare;
                     bool overframe = CardArtLoader.SupportsOverframe(code) && PackRandom.Next(100) < OverframePullChance;
                     var inventory = overframe ? overframes : owned;
                     int count = inventory.GetValueOrDefault(code);
@@ -573,7 +598,10 @@ namespace YGOPortable.Core
                 openedPacks[packIndex] = Array.AsReadOnly(opened);
             }
 
-            if (!Write(WithBalance(Balance - cost), owned, out error, overframes)) return false;
+            var next = WithBalance(Balance - cost);
+            RecordPackOpening(next, packCount, bundle, pulledUltraRare);
+            UnlockSecretPacks(next, openedPacks.SelectMany(opened => opened).Select(card => card.Code));
+            if (!Write(next, owned, out error, overframes)) return false;
             pulls = Array.AsReadOnly(openedPacks);
             return true;
         }
@@ -664,6 +692,7 @@ namespace YGOPortable.Core
             if (firstClear)
                 next.clearedStoryEpisodes = new List<string>(_profile.clearedStoryEpisodes) { episodeId };
             next.storyProgressMigrated = true;
+            if (bonus is { } pull) UnlockSecretPacks(next, new[] { pull.Code });
             if (!Write(next, owned, out error, overframes)) return false;
             amount = reward;
             awardedCard = bonus;
@@ -747,6 +776,7 @@ namespace YGOPortable.Core
             opponentDeckProgress = _profile.opponentDeckProgress,
             clearedStoryEpisodes = _profile.clearedStoryEpisodes,
             storyProgressMigrated = _profile.storyProgressMigrated,
+            shop = _profile.shop,
         };
 
         private static OpponentDeckProgress FindDeckProgress(SavedProfile profile, int opponentId) =>
@@ -833,10 +863,12 @@ namespace YGOPortable.Core
                     catch (UnauthorizedAccessException) { }
                 }
             }
+            var priorShop = _profile?.shop;
             _profile = next;
             _owned = owned;
             _ownedOverframes = overframes;
             SaveChanged?.Invoke();
+            NotifySecretPacks(priorShop, next.shop);
             return true;
         }
 
@@ -951,11 +983,11 @@ namespace YGOPortable.Core
             var packs = new List<CollectionPack>();
             var packed = new HashSet<uint>();
 
-            void AddPack(string id, string name, uint featured, IEnumerable<uint> codes)
+            void AddPack(string id, string name, uint featured, IEnumerable<uint> codes, IReadOnlyCollection<uint> themeCards = null)
             {
                 var pool = codes.Distinct().ToArray();
                 if (pool.Length == 0) return;
-                packs.Add(new CollectionPack(id, name, featured, pool));
+                packs.Add(new CollectionPack(id, name, featured, pool, themeCards));
                 packed.UnionWith(pool);
             }
 
@@ -964,7 +996,8 @@ namespace YGOPortable.Core
             {
                 string id = "archetype-" + archetype.setcodes.Min().ToString("X4");
                 var cards = archetype.coreCards.Concat(archetype.supportCards).Where(IsDeckCard).Select(card => card.code);
-                AddPack(id, archetype.name + " 팩", archetype.representativeCode, cards);
+                AddPack(id, archetype.name + " 시크릿 팩", archetype.representativeCode, cards,
+                    archetype.coreCards.Where(IsDeckCard).Select(card => card.code).ToArray());
             }
 
             var remaining = CardDatabase.AllCards.Where(card => IsDeckCard(card) && !packed.Contains(card.code));
@@ -979,6 +1012,7 @@ namespace YGOPortable.Core
                     AddPack($"general-{group.Key}-{i + 1}", name, 0, contents);
                 }
             }
+            AddPack("general-master", "마스터 팩", 46986414, CardDatabase.AllCards.Where(IsDeckCard).Select(card => card.code));
             return packs.AsReadOnly();
         }
 

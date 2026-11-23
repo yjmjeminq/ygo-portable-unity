@@ -295,7 +295,7 @@ namespace YGOPortable.UI
                 _packRows[row].transform.parent.gameObject.SetActive(visible);
                 if (!visible) continue;
                 var pack = _selected.Packs[index];
-                _packLabels[row].text = pack.Name;
+                _packLabels[row].text = CollectionProgress.IsPackUnlocked(pack) ? pack.Name : $"잠김 · {pack.Name}";
                 _packCovers[row].sprite = PackCoverArt.Get(pack.Id, pack.FeaturedCode, pack.CardPool);
                 _packCovers[row].enabled = _packCovers[row].sprite != null;
             }
