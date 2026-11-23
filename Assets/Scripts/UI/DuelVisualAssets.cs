@@ -159,7 +159,8 @@ namespace YGOPortable.UI
             }
 
             if (UnreadableCutIns.Contains(path) || !File.Exists(path)) return null;
-            var sprite = AsSprite(LoadTextureFile(path, TextureWrapMode.Clamp));
+            var texture = LoadTextureFile(path, TextureWrapMode.Clamp, markNonReadable: false);
+            var sprite = texture == null ? null : CreateCutInSprite(texture);
             if (sprite == null)
             {
                 UnreadableCutIns.Add(path);
@@ -169,6 +170,35 @@ namespace YGOPortable.UI
             var entry = new CutInEntry { Sprite = sprite, LastUse = ++_cutInUse };
             CutInCache.Add(path, entry);
             return entry;
+        }
+
+        private static Sprite CreateCutInSprite(Texture2D texture)
+        {
+            int width = texture.width;
+            int height = texture.height;
+            var pixels = texture.GetPixels32();
+            int left = width, right = -1, bottom = height, top = -1;
+            for (int y = 0; y < height; y++)
+            {
+                int row = y * width;
+                for (int x = 0; x < width; x++)
+                {
+                    if (pixels[row + x].a == 0) continue;
+                    left = Math.Min(left, x);
+                    right = Math.Max(right, x);
+                    bottom = Math.Min(bottom, y);
+                    top = Math.Max(top, y);
+                }
+            }
+            if (right < left)
+            {
+                if (Application.isPlaying) UnityEngine.Object.Destroy(texture);
+                else UnityEngine.Object.DestroyImmediate(texture);
+                return null;
+            }
+            texture.Apply(false, true);
+            return Sprite.Create(texture, new Rect(left, bottom, right - left + 1, top - bottom + 1),
+                new Vector2(.5f, .5f), 100f, 0, SpriteMeshType.FullRect);
         }
 
         private static void TrimCutInCache(int capacity)
@@ -206,7 +236,7 @@ namespace YGOPortable.UI
         private static Texture2D LoadTexture(string name, TextureWrapMode wrapMode) =>
             LoadTextureFile(Path.Combine(CardArtLoader.LocalDuelVisualsPath, name), wrapMode);
 
-        private static Texture2D LoadTextureFile(string path, TextureWrapMode wrapMode)
+        private static Texture2D LoadTextureFile(string path, TextureWrapMode wrapMode, bool markNonReadable = true)
         {
             if (!File.Exists(path)) return null;
             try
@@ -218,7 +248,7 @@ namespace YGOPortable.UI
                     wrapMode = wrapMode,
                     filterMode = FilterMode.Bilinear,
                 };
-                if (texture.LoadImage(bytes, markNonReadable: true)) return texture;
+                if (texture.LoadImage(bytes, markNonReadable)) return texture;
                 if (Application.isPlaying) UnityEngine.Object.Destroy(texture);
                 else UnityEngine.Object.DestroyImmediate(texture);
             }

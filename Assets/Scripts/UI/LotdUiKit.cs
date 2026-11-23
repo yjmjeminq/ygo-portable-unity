@@ -750,10 +750,9 @@ namespace YGOPortable.UI
                     _overframeBackgroundFit.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
                     _overframeFinish = LotdUiKit.FillRect("ExpandedFinish", face).gameObject.AddComponent<CardFinishGraphic>();
                     _overframeFinish.raycastTarget = false;
-                    // Preserve the scroll view's clipping while letting the subject cross the card's edge.
-                    portraitBounds = LotdUiKit.CreateRect("PortraitBounds", layer, new Vector2(-.080f, .20f),
-                        new Vector2(1.080f, 1.10f), Vector2.zero, Vector2.zero);
-                    portraitBounds.gameObject.AddComponent<RectMask2D>();
+                    // Leave clipping to the enclosing viewport so tilt can carry the subject past the card.
+                    portraitBounds = LotdUiKit.CreateRect("PortraitBounds", layer, new Vector2(-.105f, .28f),
+                        new Vector2(1.105f, 1.115f), Vector2.zero, Vector2.zero);
                 }
                 var shade = LotdUiKit.FillRect("OverframeShade", _cinematicOverframe ? _artImg.rectTransform : layer);
                 _overframeShade = LotdUiKit.AddImage(shade.gameObject,
@@ -765,17 +764,18 @@ namespace YGOPortable.UI
                     // Keep the tint between the expanded art and the prismatic finish.
                     shade.SetParent(_overframeFinish.transform.parent, false);
                     shade.SetSiblingIndex(_overframeFinish.transform.GetSiblingIndex());
+                    CreateOverframeTrim(layer);
+                    _overframeTrim.transform.SetSiblingIndex(portraitBounds.GetSiblingIndex());
                 }
                 _overframeTilt = LotdUiKit.FillRect("Depth", portraitBounds);
                 _overframeTilt.pivot = new Vector2(.5f, .78f);
                 var portrait = LotdUiKit.CreateRect("LocalCutIn", _overframeTilt,
-                    _cinematicOverframe ? new Vector2(-.13f, .405f) : new Vector2(-.02f, -.007f),
-                    _cinematicOverframe ? new Vector2(1.13f, 1.166f) : new Vector2(1.02f, 1.007f),
+                    _cinematicOverframe ? new Vector2(-.13f, .405f) : Vector2.zero,
+                    _cinematicOverframe ? new Vector2(1.13f, 1.166f) : Vector2.one,
                     Vector2.zero, Vector2.zero);
                 portrait.pivot = new Vector2(.5f, 1f);
                 _overframePortrait = LotdUiKit.AddImage(portrait.gameObject, null, Color.white, true, false);
                 _overframePortrait.maskable = !_cinematicOverframe;
-                if (!_cinematicOverframe) CreateOverframeTrim(layer);
             }
             if (_overframeBackground != null)
             {

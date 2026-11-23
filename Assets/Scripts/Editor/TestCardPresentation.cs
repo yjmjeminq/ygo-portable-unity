@@ -97,6 +97,8 @@ namespace YGOPortable.Editor
                 var alternate = DuelVisualAssets.RetainCutIn(BlueEyes, 23);
                 Require(zero != null && bundled == zero && alternate != null && alternate != zero &&
                     !DuelVisualAssets.CanDisplayCutIn(BlueEyes, 24), "Default and exact alternate artwork did not resolve independently.");
+                Require(zero.rect == new Rect(3f, 0f, 5f, 8f) && !zero.texture.isReadable,
+                    "Transparent padding still shrank the portrait, or the decoded pixels remained in CPU memory.");
                 DuelVisualAssets.ReleaseCutIn(alternate);
                 DuelVisualAssets.ReleaseCutIn(bundled);
                 DuelVisualAssets.ReleaseCutIn(zero);
@@ -115,7 +117,8 @@ namespace YGOPortable.Editor
                 Require(card.HasOverframe && image.sprite == zero && image.maskable && !image.raycastTarget &&
                     layer.GetSiblingIndex() > aspect.Find("Frame").GetSiblingIndex() &&
                     layer.GetSiblingIndex() < aspect.Find("CardTitle").GetSiblingIndex() &&
-                    bounds.GetComponent<RectMask2D>() != null && layer.Find("OverframeTrim") != null &&
+                    bounds.GetComponent<RectMask2D>() == null &&
+                    layer.Find("OverframeTrim").GetSiblingIndex() < bounds.GetSiblingIndex() &&
                     layer.Find("FaceArtwork").GetComponent<RectMask2D>() != null &&
                     bounds.anchorMin.x < 0f && bounds.anchorMax.x > 1f && bounds.anchorMax.y > 1f &&
                     aspect.Find("Rules/Text").GetComponent<Text>().color.r > .8f,
