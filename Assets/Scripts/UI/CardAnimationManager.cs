@@ -1273,10 +1273,15 @@ namespace YGOPortable.UI
         private static bool SupportsSummonOverframe(CardFlight flight)
         {
             if (flight.EndsFaceDown || flight.Appearance?.overframe == false) return false;
+            var (artCode, artVariant) = ResolveSummonPortrait(flight);
+            return DuelVisualAssets.CanDisplayCutIn(artCode, artVariant);
+        }
+
+        private static (uint, int) ResolveSummonPortrait(CardFlight flight)
+        {
             int selected = flight.Appearance?.ArtworkVariant ?? CardArtLoader.GetDuelArtworkVariant(flight.Code);
             var (artCode, artVariant) = CardArtLoader.GetArtworkSource(flight.Code, selected);
-            return artCode == 0 ? DuelVisualAssets.CanDisplayCutIn(flight.Code, selected) :
-                DuelVisualAssets.CanDisplayCutIn(artCode, artVariant);
+            return artCode == 0 ? (flight.Code, selected) : (artCode, artVariant);
         }
 
         internal bool TakeFeaturedSummon(CardFlight flight)
@@ -1306,8 +1311,7 @@ namespace YGOPortable.UI
                 proxy.EnableOverframe();
                 proxy.PoseOverframe(0f, 1f, Vector2.zero, 0f);
             }
-            var cardCenter = featured && !overframe ? center + Vector2.left * (height * .48f) : center;
-            var reveal = new CardPose(cardCenter, new Vector2(height * LotdUiKit.CardAspectRatio, height), 0f);
+            var reveal = new CardPose(center, new Vector2(height * LotdUiKit.CardAspectRatio, height), 0f);
             var first = new CardFlight(flight.Code, flight.From, reveal, flight.StartsFaceDown, false, flight.Appearance);
             var background = SummonScreenTint("SummonShade");
             var effect = signature
@@ -1325,9 +1329,7 @@ namespace YGOPortable.UI
                 circuitClosed = LotdUiKit.AddFittedText(banner, "Message", "LINK CLOSED!", 30, 16,
                     TextAnchor.MiddleCenter, Color.clear, FontStyle.Bold);
             }
-            Image portrait = null;
-            CanvasGroup portraitFade = null;
-            Vector2 portraitCenter = center + new Vector2(height * .40f, height * .03f);
+            Vector2 portraitCenter = center + new Vector2(view.x * .065f, view.y * .032f);
             DuelEffectGraphic aura = null;
             DuelEffectGraphic wave = null;
             if (overframe)
@@ -1338,11 +1340,24 @@ namespace YGOPortable.UI
                 wave = CreateEffect(DuelEffectKind.ChainImpactWave, center - Vector2.up * height * .13f,
                     new Vector2(height * 1.41f, height * .61f), DuelStyle.ChainGold);
             }
-            else if (featured)
-                portraitFade = CreateFeaturedPortrait(portraitCenter, Mathf.Min(height * 1.17f, view.x * .37f), accent, out portrait);
             proxy.transform.SetAsLastSibling();
-            var layout = SummonPlate(flight, title,
-                center - Vector2.up * view.y * (featured || overframe ? .29f : .24f), live);
+            SummonPortraitView portrait = null;
+            CanvasGroup movingFace = null;
+            if (featured || overframe)
+            {
+                var (artCode, artVariant) = ResolveSummonPortrait(flight);
+                var sprite = DuelVisualAssets.RetainCutIn(artCode, artVariant);
+                if (sprite != null)
+                {
+                    var holder = CenteredVisual("SummonPortrait", _layer, portraitCenter, new Vector2(view.x * .86f, view.y * .77f));
+                    portrait = holder.gameObject.AddComponent<SummonPortraitView>();
+                    portrait.Bind(sprite, accent);
+                    if (!proxy.TryGetComponent(out movingFace)) movingFace = proxy.gameObject.AddComponent<CanvasGroup>();
+                }
+            }
+            var nameCenter = center - new Vector2(portrait != null ? view.x * .083f : 0f, view.y * (portrait != null ? .30f : .24f));
+            var layout = SummonPlate(flight, title, nameCenter, live);
+            var layoutRect = (RectTransform)layout.transform;
 
             bool playedImpact = !signature;
             if (playedImpact) LotdAudio.PlaySummon();
@@ -1359,19 +1374,18 @@ namespace YGOPortable.UI
                 if (signature) PoseSummonPeak(flash, circuitClosed, t * .54f, view.y);
                 background.color = new Color(.009f, .013f, .02f, Mathf.SmoothStep(0f, .64f, t));
                 layout.alpha = Mathf.SmoothStep(0f, 1f, (t - .40f) / .60f);
+                layoutRect.anchoredPosition = nameCenter + Vector2.left * (42f * (1f - layout.alpha));
                 if (overframe)
                 {
                     aura.Seek(PopSummonOverframe(proxy, signature ? Mathf.InverseLerp(.30f, 1f, t) : t) * .49f);
                     wave.Seek(Mathf.InverseLerp(.72f, 1f, t) * .43f);
                 }
-                if (portraitFade != null && t >= .5f)
+                if (portrait != null)
                 {
-                    portrait.sprite ??= proxy.ArtworkSprite;
-                    float emerge = Mathf.SmoothStep(0f, 1f, (t - .5f) * 2f);
-                    portraitFade.alpha = emerge;
-                    var rect = (RectTransform)portraitFade.transform;
-                    rect.anchoredPosition = portraitCenter + Vector2.right * (34f * (1f - emerge));
-                    rect.localScale = Vector3.one * Mathf.Lerp(.91f, 1f, emerge);
+                    float emerge = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(signature ? .58f : .48f, .95f, t));
+                    portrait.Pose(portraitCenter + Vector2.right * (view.x * .17f * (1f - emerge)), emerge,
+                        Mathf.Lerp(.90f, 1.055f, emerge));
+                    movingFace.alpha = 1f - emerge;
                 }
             });
             yield return Animate(featured || overframe ? .29f : .18f, t =>
@@ -1379,7 +1393,12 @@ namespace YGOPortable.UI
                 effect.Seek(.54f + t * .22f);
                 if (signature) PoseSummonPeak(flash, circuitClosed, .54f + t * .22f, view.y);
                 proxy.SetRarityHighlight(Mathf.Lerp(.85f, .25f, t));
-                if (portraitFade != null) portraitFade.transform.localScale = Vector3.one * Mathf.Lerp(1f, 1.025f, t);
+                if (portrait != null)
+                {
+                    float impact = (1f - t) * (1f - t);
+                    var movement = new Vector2(Mathf.Sin(t * 25f), Mathf.Sin(t * 18f)) * (4f * impact);
+                    portrait.Pose(portraitCenter + movement, 1f, 1f + .055f * impact);
+                }
                 if (overframe)
                 {
                     SettleSummonOverframe(proxy, t);
@@ -1397,7 +1416,13 @@ namespace YGOPortable.UI
                 if (signature) PoseSummonPeak(flash, circuitClosed, .76f + t * .24f, view.y);
                 layout.alpha = 1f - t;
                 background.color = new Color(.009f, .013f, .02f, .64f * (1f - t));
-                if (portraitFade != null) portraitFade.alpha = 1f - Mathf.SmoothStep(0f, 1f, t * 1.25f);
+                if (portrait != null)
+                {
+                    float dissolve = Mathf.SmoothStep(0f, 1f, t * 2.5f);
+                    portrait.Pose(Vector2.Lerp(portraitCenter, flight.To.AtLayout().Position, dissolve * .28f),
+                        1f - dissolve, Mathf.Lerp(1f, .84f, dissolve));
+                    movingFace.alpha = dissolve;
+                }
                 if (overframe)
                 {
                     FadeSummonOverframe(proxy, t);
@@ -1409,7 +1434,7 @@ namespace YGOPortable.UI
             RemoveTransient(layout.gameObject);
             if (flash != null) RemoveTransient(flash.gameObject);
             if (circuitClosed != null) RemoveTransient(circuitClosed.transform.parent.gameObject);
-            if (portraitFade != null) RemoveTransient(portraitFade.gameObject);
+            if (portrait != null) RemoveTransient(portrait.gameObject);
             if (aura != null) RemoveTransient(aura.gameObject);
             if (wave != null) RemoveTransient(wave.gameObject);
         }
@@ -1432,22 +1457,6 @@ namespace YGOPortable.UI
 
         private static void FadeSummonOverframe(CompositeCardView card, float time) =>
             card.PoseOverframe(1f - Mathf.SmoothStep(0f, 1f, time * 1.6f), 1f, Vector2.zero, .84f + time * .16f);
-
-        private CanvasGroup CreateFeaturedPortrait(Vector2 center, float size, Color accent, out Image artwork)
-        {
-            var holder = CenteredVisual("FeaturedArtwork", _layer, center, Vector2.one * size);
-            var group = holder.gameObject.AddComponent<CanvasGroup>();
-            group.alpha = 0f;
-            var shadow = LotdUiKit.CreateRect("Shadow", holder, Vector2.zero, Vector2.one,
-                new Vector2(8f, -11f), new Vector2(8f, -11f));
-            LotdUiKit.AddImage(shadow.gameObject, LotdUiKit.WhiteSprite, new Color(.008f, .013f, .034f, .81f), false, false);
-            var panel = DuelStyle.Panel(holder, "Portrait", Vector2.zero, Vector2.one, fill: new Color(.045f, .065f, .10f),
-                border: Color.Lerp(accent, Color.white, .31f));
-            artwork = LotdUiKit.AddImage(LotdUiKit.FillRect("Artwork", panel, 7f).gameObject, null, Color.white, true, false);
-            var edge = LotdUiKit.CreateRect("LightEdge", panel, Vector2.up, Vector2.one, new Vector2(0f, -3f), Vector2.zero);
-            LotdUiKit.AddImage(edge.gameObject, LotdUiKit.WhiteSprite, Color.Lerp(accent, Color.white, .62f), false, false);
-            return group;
-        }
 
         internal static void ApplySummonEntrance(CompositeCardView proxy, CardFlight flight, DuelEffectKind kind, float progress,
             LiveCardState live = null, float layoutHeight = 0f)
@@ -1478,9 +1487,7 @@ namespace YGOPortable.UI
             group.alpha = 0f;
             var card = new DuelCardReadout(CardDatabase.Get(flight.Code), live);
             var accent = DuelStyle.Side(flight.To.Angle > 45f);
-            var plate = flight.To.Angle > 45f ? DuelVisualAssets.SummonNameOpponent : DuelVisualAssets.SummonNamePlayer;
-            if (plate != null) LotdUiKit.AddImage(holder.gameObject, plate, Color.white, false, false);
-            else DuelReadoutPlate.Add(holder, new Color(.045f, .068f, .085f, .98f));
+            DuelReadoutPlate.Add(holder, new Color(.031f, .049f, .085f, .97f));
             var rail = LotdUiKit.CreateRect("Accent", holder, new Vector2(.008f, .16f), new Vector2(.008f, .88f),
                 Vector2.zero, new Vector2(3f, 0f));
             LotdUiKit.AddImage(rail.gameObject, LotdUiKit.WhiteSprite, accent, false, false);
@@ -1489,22 +1496,13 @@ namespace YGOPortable.UI
             var kind = LotdUiKit.AddFittedText(caption, "Value", summonType,
                 16, 11, TextAnchor.MiddleLeft, accent, FontStyle.Bold);
             var rating = card.RatingNumber;
-            var symbol = rating.Kind switch
-            {
-                DuelRatingKind.Level => DuelVisualAssets.SummonLevel,
-                DuelRatingKind.Rank => DuelVisualAssets.SummonRank,
-                _ => null,
-            };
-            DuelRatingBadge.AddToHeading(kind).Bind(rating, symbol: symbol);
+            DuelRatingBadge.AddToHeading(kind).Bind(rating);
             var nameArea = LotdUiKit.CreateRect("SummonNameText", holder, new Vector2(.04f, .05f), new Vector2(.96f, .61f),
                 Vector2.zero, Vector2.zero);
             LotdUiKit.AddFittedText(nameArea, "Name", CardDatabase.GetName(flight.Code), 27, 13,
                 TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
 
             var stats = CenteredVisual("SummonStats", holder, new Vector2(width * .20f, -55f), new Vector2(width * .60f, 40f));
-            var statsFace = flight.To.Angle > 45f ? DuelVisualAssets.SummonStatsOpponent : DuelVisualAssets.SummonStatsPlayer;
-            if (statsFace != null)
-                LotdUiKit.AddImage(stats.gameObject, statsFace, new Color(1f, 1f, 1f, .67f), false, false);
             new DuelStatStrip(stats, compact: false).Bind(card, opponent: flight.To.Angle > 45f);
             return group;
         }
@@ -1884,6 +1882,7 @@ namespace YGOPortable.UI
                 TiltChainCard(card, side, t);
                 float depth = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.48f, .91f, t));
                 card.PoseOverframe(depth, Mathf.Lerp(.92f, 1.08f, depth), Vector2.right * (side * depth * .4f), t * .56f);
+                if (appearance?.overframe == true) card.SetRarityHighlight(depth);
             });
             var back = new CardFlight(code, reveal, source, code == 0, code == 0);
             yield return Animate(.24f, t =>
@@ -1899,6 +1898,7 @@ namespace YGOPortable.UI
                 TiltChainCard(card, side, (1f - returning) * .5f + .5f, 1f - returning);
                 float depth = 1f - returning;
                 card.PoseOverframe(depth, Mathf.Lerp(.92f, 1.08f, depth), Vector2.right * (side * depth * .4f), .56f + t * .44f);
+                if (appearance?.overframe == true) card.SetRarityHighlight(depth);
             });
             if (highlight != null) RemoveTransient(highlight.gameObject);
             RemoveTransient(card.gameObject);

@@ -418,6 +418,10 @@ namespace YGOPortable.UI
         private CanvasGroup _overframe;
         private RectTransform _overframeTilt;
         private Image _overframeShade;
+        private Image _overframeBackground;
+        private AspectRatioFitter _overframeBackgroundFit;
+        private CardFinishGraphic _overframeFinish;
+        private CardOverframeGraphic _overframeTrim;
 
         internal bool HasOverframe => _overframe != null && _overframe.gameObject.activeSelf;
 
@@ -454,23 +458,23 @@ namespace YGOPortable.UI
             arf.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
             arf.aspectRatio = LotdUiKit.CardAspectRatio;
 
-            // Artwork box behind the cutout of card_*.png (LOTD 400x580 frame: art box ~ 12.2%..87.8% X, 29.6%..81.5% Y from bottom)
-            var artRt = LotdUiKit.CreateRect("Artwork", innerRt,
-                new Vector2(0.115f, 0.292f), new Vector2(0.885f, 0.822f), Vector2.zero, Vector2.zero);
+            var artRt = LotdUiKit.CreateRect("Artwork", innerRt, CardFaceFrame.Artwork.min, CardFaceFrame.Artwork.max,
+                Vector2.zero, Vector2.zero);
             _artImg = LotdUiKit.AddImage(artRt.gameObject, null, Color.white, false, false);
 
             var frameRt = LotdUiKit.FillRect("Frame", innerRt);
-            _frameImg = LotdUiKit.AddImage(frameRt.gameObject, LotdUiKit.LoadSprite("LOTD/Frames/card_kouka"), Color.white, false, false);
+            _frameImg = LotdUiKit.AddImage(frameRt.gameObject, null, Color.white, false, false);
+
+            var titleRt = LotdUiKit.CreateRect("CardTitle", innerRt,
+                new Vector2(.09f, .89f), new Vector2(detailed ? .795f : .91f, .953f), Vector2.zero, Vector2.zero);
+            _titleText = LotdUiKit.AddFittedText(titleRt, "T", "", detailed ? 22 : 13, detailed ? 8 : 4,
+                TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
+            var ts = _titleText.gameObject.AddComponent<Shadow>();
+            ts.effectColor = new Color(0, 0, 0, 0.85f);
+            ts.effectDistance = new Vector2(1, -1);
 
             if (detailed)
             {
-                var titleRt = LotdUiKit.CreateRect("CardTitle", innerRt,
-                    new Vector2(0.09f, 0.89f), new Vector2(0.795f, 0.953f), Vector2.zero, Vector2.zero);
-                _titleText = LotdUiKit.AddFittedText(titleRt, "T", "", 14, 8, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
-                var ts = _titleText.gameObject.AddComponent<Shadow>();
-                ts.effectColor = new Color(0, 0, 0, 0.7f);
-                ts.effectDistance = new Vector2(1, -1);
-
                 var attrRt = LotdUiKit.CreateRect("AttrIcon", innerRt,
                     new Vector2(0.822f, 0.89f), new Vector2(0.914f, 0.946f), Vector2.zero, Vector2.zero);
                 _attrImg = LotdUiKit.AddImage(attrRt.gameObject, null, Color.white, true, false);
@@ -539,11 +543,11 @@ namespace YGOPortable.UI
             appearance ??= live?.Appearance;
             if (!Nullable.Equals(_deckAppearance, appearance)) HideOverframe();
             _deckAppearance = appearance;
-            SetDeckEditionBadge(!_detailed && !_cinematicOverframe && appearance?.overframe == true && code != 0 && !faceDown);
             CurrentCode = code;
             if (faceDown || code == 0)
             {
                 ReleaseArtwork();
+                SetDeckEditionBadge(false);
                 HideRarityFinish();
                 if (_duelFaceCombat != null)
                 {
@@ -559,25 +563,20 @@ namespace YGOPortable.UI
             _backObj.SetActive(false);
 
             var info = CardDatabase.Get(code);
+            _titleText.text = info != null ? info.name : $"카드 #{code}";
             uint type = live != null && live.type != 0 ? live.type : (info?.type ?? YgoConstants.TYPE_EFFECT);
             bool isPend = (type & YgoConstants.TYPE_PENDULUM) != 0;
 
             var artRt = _artImg.rectTransform;
-            if (isPend)
-            {
-                artRt.anchorMin = new Vector2(0.068f, 0.265f);
-                artRt.anchorMax = new Vector2(0.932f, 0.822f);
-            }
-            else
-            {
-                artRt.anchorMin = new Vector2(0.120f, 0.295f);
-                artRt.anchorMax = new Vector2(0.880f, 0.818f);
-            }
+            Rect artwork = isPend ? CardFaceFrame.PendulumArtwork : CardFaceFrame.Artwork;
+            artRt.anchorMin = artwork.min;
+            artRt.anchorMax = artwork.max;
 
             BindArtwork(code);
             BindRarityFinish(info);
             RefreshOverframe();
-            _frameImg.sprite = LotdUiKit.LoadSprite($"LOTD/Frames/{YgoConstants.GetCardFrameName(type)}");
+            SetDeckEditionBadge(!_detailed && !_cinematicOverframe && appearance?.overframe == true);
+            _frameImg.sprite = CardFaceFrame.Get(type);
 
             if (_detailed)
             {
@@ -586,11 +585,7 @@ namespace YGOPortable.UI
                 float rulesBottom = _duelFaceCombat != null ? .134f : .120f;
                 _rulesArea.anchorMin = new Vector2(0.09f, monster ? rulesBottom : .074f);
                 _rulesText.text = info?.desc ?? "";
-                _titleText.text = info != null ? info.name : $"카드 #{code}";
-                bool darkFrame = (type & (YgoConstants.TYPE_XYZ | YgoConstants.TYPE_LINK | YgoConstants.TYPE_SPELL | YgoConstants.TYPE_TRAP | YgoConstants.TYPE_FUSION)) != 0;
-                _titleText.color = darkFrame ? Color.white : new Color(0.10f, 0.08f, 0.06f, 1f);
-                var tShadow = _titleText.GetComponent<Shadow>();
-                if (tShadow != null) tShadow.effectColor = darkFrame ? new Color(0, 0, 0, 0.85f) : new Color(1f, 1f, 1f, 0.35f);
+                ApplyOverframeInk();
 
                 uint attr = live != null && live.attribute != 0 ? live.attribute : (info?.attr ?? 0);
                 Sprite attrSp = null;
@@ -655,6 +650,14 @@ namespace YGOPortable.UI
         internal void SetRarityHighlight(float amount)
         {
             if (_finish != null && _finish.gameObject.activeSelf) _finish.SetHighlight(amount);
+            if (_overframeFinish != null && HasOverframe) _overframeFinish.SetHighlight(Mathf.Lerp(.18f, .72f, amount));
+        }
+
+        internal void SetReadoutFocus(float amount)
+        {
+            SetRarityHighlight(amount);
+            if (!_cinematicOverframe && HasOverframe)
+                PoseOverframe(1f, 1f + .04f * amount, Vector2.up * amount, amount);
         }
 
         private void BindRarityFinish(CardInfo info)
@@ -754,12 +757,11 @@ namespace YGOPortable.UI
 
         private void RefreshOverframe()
         {
-            if (!(_detailed || _overframeEnabled || _cinematicOverframe) ||
-                !(_deckAppearance?.overframe ?? _overframeEnabled) || _overframeBound || _retainedArtwork == 0) return;
+            if (!(_deckAppearance?.overframe ?? _overframeEnabled) || _overframeBound || _retainedArtwork == 0) return;
             _overframeBound = true;
             var (code, variant) = _artworkSource.Code == 0 ? (_retainedArtwork, _retainedVariant) : _artworkSource;
             _retainedCutIn = DuelVisualAssets.RetainCutIn(code, variant);
-            if (_retainedCutIn == null) return;
+            if (_retainedCutIn == null && _deckAppearance?.overframe != true) return;
             if (_overframe == null)
             {
                 var layer = LotdUiKit.FillRect("Overframe", _cinematicOverframe ? transform : _frameImg.transform.parent);
@@ -769,34 +771,90 @@ namespace YGOPortable.UI
                     aspect.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
                     aspect.aspectRatio = LotdUiKit.CardAspectRatio;
                 }
-                else layer.SetSiblingIndex(_frameImg.transform.GetSiblingIndex() + 1);
+                else
+                {
+                    layer.SetSiblingIndex(_frameImg.transform.GetSiblingIndex() + 1);
+                    layer.gameObject.AddComponent<RectMask2D>();
+                }
                 _overframe = layer.gameObject.AddComponent<CanvasGroup>();
                 _overframe.blocksRaycasts = _overframe.interactable = false;
-                _overframeTilt = LotdUiKit.FillRect("Depth", layer);
-                _overframeTilt.pivot = new Vector2(.5f, .78f);
-                var shade = LotdUiKit.FillRect("OverframeShade", _artImg.rectTransform);
+                if (!_cinematicOverframe)
+                {
+                    var background = LotdUiKit.FillRect("ExpandedArtwork", layer);
+                    _overframeBackground = LotdUiKit.AddImage(background.gameObject, null, new Color(.55f, .63f, .76f), false, false);
+                    _overframeBackgroundFit = background.gameObject.AddComponent<AspectRatioFitter>();
+                    _overframeBackgroundFit.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
+                }
+                var shade = LotdUiKit.FillRect("OverframeShade", _cinematicOverframe ? _artImg.rectTransform : layer);
                 _overframeShade = LotdUiKit.AddImage(shade.gameObject,
                     _cinematicOverframe ? LotdUiKit.WhiteSprite : DuelStyle.OverframeBackdrop,
-                    _cinematicOverframe ? new Color(.021f, .033f, .048f) : Color.white, false, false);
+                    _cinematicOverframe ? new Color(.021f, .033f, .048f) : new Color(1f, 1f, 1f, .51f), false, false);
+                if (_cinematicOverframe) CreateOverframeTrim(layer);
+                else
+                {
+                    _overframeFinish = LotdUiKit.FillRect("ExpandedFinish", layer).gameObject.AddComponent<CardFinishGraphic>();
+                    _overframeFinish.raycastTarget = false;
+                }
+                _overframeTilt = LotdUiKit.FillRect("Depth", layer);
+                _overframeTilt.pivot = new Vector2(.5f, .78f);
                 var portrait = LotdUiKit.CreateRect("LocalCutIn", _overframeTilt,
-                    _cinematicOverframe ? new Vector2(-.13f, .405f) : new Vector2(.057f, .293f),
-                    _cinematicOverframe ? new Vector2(1.13f, 1.166f) : new Vector2(.943f, .853f),
+                    _cinematicOverframe ? new Vector2(-.13f, .405f) : new Vector2(-.088f, .055f),
+                    _cinematicOverframe ? new Vector2(1.13f, 1.166f) : new Vector2(1.088f, 1.07f),
                     Vector2.zero, Vector2.zero);
                 portrait.pivot = new Vector2(.5f, 1f);
                 _overframePortrait = LotdUiKit.AddImage(portrait.gameObject, null, Color.white, true, false);
                 _overframePortrait.maskable = !_cinematicOverframe;
+                if (!_cinematicOverframe) CreateOverframeTrim(layer);
+            }
+            if (_overframeBackground != null)
+            {
+                _overframeBackground.sprite = _artImg.sprite;
+                Rect art = _artImg.sprite.rect;
+                _overframeBackgroundFit.aspectRatio = art.width / Mathf.Max(1f, art.height);
+                _overframeFinish.Bind(_retainedArtwork, CardRarity.UltraRare);
+                _overframeFinish.SetHighlight(.18f);
             }
             _overframePortrait.sprite = _retainedCutIn;
+            _overframePortrait.enabled = _retainedCutIn != null;
             _overframeShade.gameObject.SetActive(true);
             _overframe.gameObject.SetActive(true);
+            ApplyOverframeInk();
             PoseOverframe(1f, 1f, Vector2.zero, 0f);
+        }
+
+        private void CreateOverframeTrim(Transform layer)
+        {
+            _overframeTrim = LotdUiKit.FillRect("OverframeTrim", layer).gameObject.AddComponent<CardOverframeGraphic>();
+            _overframeTrim.Configure(_cinematicOverframe, _overframeFinish?.canvasRenderer);
+        }
+
+        private void ApplyOverframeInk()
+        {
+            if (!_detailed || _cinematicOverframe) return;
+            bool fullArt = HasOverframe;
+            _rulesText.color = fullArt ? new Color(.92f, .94f, 1f) : new Color(.09f, .07f, .05f);
+            if (_atkDefText != null)
+                _atkDefText.color = fullArt ? Color.white : new Color(.12f, .10f, .10f);
+            _leftScaleText.color = fullArt ? new Color(.54f, .80f, 1f) : new Color(.07f, .21f, .43f);
+            _rightScaleText.color = fullArt ? new Color(1f, .66f, .62f) : new Color(.44f, .08f, .07f);
         }
 
         internal void PoseOverframe(float opacity, float scale, Vector2 parallax, float shimmer)
         {
             if (!HasOverframe) return;
             _overframe.alpha = Mathf.Clamp01(opacity);
-            _overframeShade.canvasRenderer.SetAlpha((_cinematicOverframe ? .72f : 1f) * _overframe.alpha);
+            if (_cinematicOverframe)
+            {
+                _overframeShade.canvasRenderer.SetAlpha(.72f * _overframe.alpha);
+                float spread = Mathf.Sin(Mathf.Clamp01(shimmer) * Mathf.PI);
+                _overframeTrim.transform.localScale = Vector3.one * (1.03f + spread * .26f);
+                _overframeTrim.canvasRenderer.SetAlpha(_deckAppearance?.overframe == true ? .42f + spread * .52f : 0f);
+            }
+            else
+            {
+                var artwork = _overframeBackground.rectTransform;
+                artwork.anchoredPosition = Vector2.Scale(artwork.rect.size, parallax) * -.012f;
+            }
             _overframeTilt.localScale = Vector3.one * scale;
             _overframeTilt.anchoredPosition = Vector2.Scale(_overframeTilt.rect.size, parallax) * .024f;
             _overframeTilt.localRotation = Quaternion.Euler(parallax.y * 3f, -parallax.x * 6f, 0f);
@@ -807,8 +865,9 @@ namespace YGOPortable.UI
         private void HideOverframe()
         {
             _overframeBound = false;
-            if (_retainedCutIn == null) return;
+            if (!HasOverframe) return;
             _overframePortrait.sprite = null;
+            if (_overframeBackground != null) _overframeBackground.sprite = null;
             DuelVisualAssets.ReleaseCutIn(_retainedCutIn);
             _retainedCutIn = null;
             _overframeShade.gameObject.SetActive(false);

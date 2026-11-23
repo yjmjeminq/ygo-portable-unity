@@ -523,7 +523,7 @@ namespace YGOPortable.UI
                 if (rect.localScale != nextScale)
                 {
                     rect.localScale = nextScale;
-                    rect.GetComponentInParent<CompositeCardView>()?.SetRarityHighlight(focus);
+                    rect.GetComponentInParent<CompositeCardView>()?.SetReadoutFocus(focus);
                 }
                 if (motion.Slot != null) ApplyFieldCardFocus(motion.Slot, focus, nextScale.x);
                 if (motion.InHand)
@@ -567,7 +567,7 @@ namespace YGOPortable.UI
         {
             if (slot.focusArt.localScale == Vector3.one && slot.cardArea.anchoredPosition == Vector2.zero) return;
             slot.focusArt.localScale = Vector3.one;
-            slot.cardView.SetRarityHighlight(0f);
+            slot.cardView.SetReadoutFocus(0f);
             ApplyFieldCardFocus(slot, 0f, 1f);
         }
 
@@ -635,7 +635,7 @@ namespace YGOPortable.UI
                     continue;
                 }
                 motion.Rect.localScale = Vector3.one;
-                motion.Rect.GetComponentInParent<CompositeCardView>()?.SetRarityHighlight(0f);
+                motion.Rect.GetComponentInParent<CompositeCardView>()?.SetReadoutFocus(0f);
                 if (motion.InHand) motion.Rect.anchoredPosition = Vector2.zero;
             }
             _duelPadCardMotions.Clear();

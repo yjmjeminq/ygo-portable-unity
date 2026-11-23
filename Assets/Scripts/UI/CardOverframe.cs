@@ -4,7 +4,7 @@ using UnityEngine.EventSystems;
 namespace YGOPortable.UI
 {
     internal sealed class CardOverframeInput : MonoBehaviour, IPointerDownHandler, IPointerUpHandler,
-        IBeginDragHandler, IDragHandler, IEndDragHandler
+        IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerMoveHandler, IPointerExitHandler
     {
         private CompositeCardView _card;
         private RectTransform _holder;
@@ -16,6 +16,7 @@ namespace YGOPortable.UI
         private Vector2 _origin;
         private Vector2 _drag;
         private Vector2 _depth;
+        private Vector2? _hover;
         private bool _overframeVisible;
 
         internal static void Attach(RectTransform holder, CompositeCardView card, bool motionSensor)
@@ -43,7 +44,7 @@ namespace YGOPortable.UI
                 return;
             }
 
-            Vector2 target = _pressed ? _drag : ReadMotion();
+            Vector2 target = _pressed ? _drag : _hover ?? ReadMotion();
             _depth = Vector2.Lerp(_depth, target, 1f - Mathf.Exp(-17f * Time.unscaledDeltaTime));
             ShowDepth(_depth, Time.unscaledTime);
         }
@@ -93,8 +94,22 @@ namespace YGOPortable.UI
         {
             SetSensorEnabled(false);
             _overframeVisible = false;
+            _hover = null;
             if (_holder != null) ResetPose();
         }
+
+        public void OnPointerMove(PointerEventData data)
+        {
+            if (!_card.HasOverframe || _pressed || Application.isMobilePlatform) return;
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(_holder, data.position, data.enterEventCamera, out var point))
+                return;
+            Rect area = _holder.rect;
+            var depth = point - area.center;
+            _hover = Vector2.ClampMagnitude(new Vector2(depth.x / Mathf.Max(1f, area.width),
+                depth.y / Mathf.Max(1f, area.height)) * 1.7f, 1f);
+        }
+
+        public void OnPointerExit(PointerEventData data) => _hover = null;
 
         public void OnPointerDown(PointerEventData data)
         {

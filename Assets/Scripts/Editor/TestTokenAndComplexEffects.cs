@@ -133,7 +133,7 @@ namespace YGOPortable.Editor
                 view.SetCard(token.code, live: token);
                 var box = view.transform.Find("AspectBox");
                 if (box.Find("Artwork").GetComponent<Image>().sprite != CardArtLoader.GetArtSprite(token.code) ||
-                    box.Find("Frame").GetComponent<Image>().sprite != LotdUiKit.LoadSprite("LOTD/Frames/card_token") ||
+                    box.Find("Frame").GetComponent<Image>().sprite != CardFaceFrame.Get(token.type) ||
                     box.Find("CardTitle/T").GetComponent<Text>().text != "상검 토큰")
                     throw new Exception("The live Swordsoul Token had the wrong artwork, frame or name in the duel view");
             }

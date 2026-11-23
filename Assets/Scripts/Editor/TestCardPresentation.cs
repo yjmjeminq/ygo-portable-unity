@@ -113,14 +113,20 @@ namespace YGOPortable.Editor
                 Require(card.HasOverframe && image.sprite == zero && image.maskable && !image.raycastTarget &&
                     layer.GetSiblingIndex() > aspect.Find("Frame").GetSiblingIndex() &&
                     layer.GetSiblingIndex() < aspect.Find("CardTitle").GetSiblingIndex() &&
-                    image.rectTransform.anchorMax.y <= .88f && image.rectTransform.anchorMin.y >= .26f,
-                    "The portrait was not layered over the illustration and behind the face labels.");
+                    layer.GetComponent<RectMask2D>() != null && layer.Find("OverframeTrim") != null &&
+                    ((RectTransform)layer.Find("OverframeShade")).anchorMax == Vector2.one &&
+                    image.rectTransform.anchorMax.y > 1f && image.rectTransform.anchorMin.y < .15f &&
+                    aspect.Find("Rules/Text").GetComponent<Text>().color.r > .8f,
+                    "Extended artwork did not cover the face behind readable title and rules layers.");
                 var input = holder.GetComponent<CardOverframeInput>();
                 typeof(CardOverframeInput).GetMethod("ShowDepth", BindingFlags.Instance | BindingFlags.NonPublic)
                     .Invoke(input, new object[] { new Vector2(.6f, .3f), .21f });
                 var tilt = (RectTransform)layer.Find("Depth");
+                var background = layer.Find("ExpandedArtwork").GetComponent<Image>();
                 Require(tilt.anchoredPosition.sqrMagnitude > 1f && tilt.localRotation != Quaternion.identity &&
-                    card.transform.localRotation != Quaternion.identity, "The portrait and frame did not tilt independently.");
+                    card.transform.localRotation != Quaternion.identity && background.sprite == card.ArtworkSprite &&
+                    Vector2.Dot(background.rectTransform.anchoredPosition, tilt.anchoredPosition) < 0f,
+                    "The portrait, artwork and frame did not move independently.");
                 typeof(CardOverframeInput).GetMethod("LateUpdate", BindingFlags.Instance | BindingFlags.NonPublic)
                     .Invoke(input, null);
                 Require(holder.anchorMin == new Vector2(.25f, .16f) && holder.anchorMax == new Vector2(.52f, .83f),
@@ -128,7 +134,11 @@ namespace YGOPortable.Editor
                 card.SetCard(BlueEyes, faceDown: true);
                 Require(!card.HasOverframe && image.sprite == null, "The face-down card exposed its portrait.");
                 card.SetCard(unrelated);
-                Require(!card.HasOverframe, "A different artwork inherited an ace portrait.");
+                Require(!card.HasOverframe && aspect.Find("Rules/Text").GetComponent<Text>().color.r < .2f,
+                    "The next regular card kept the extended artwork or ink.");
+                Require(CardFaceFrame.Get(YgoConstants.TYPE_EFFECT) != CardFaceFrame.Get(YgoConstants.TYPE_SPELL) &&
+                    CardFaceFrame.Get(YgoConstants.TYPE_XYZ) != CardFaceFrame.Get(YgoConstants.TYPE_XYZ | YgoConstants.TYPE_PENDULUM),
+                    "Distinct card types reused the same face.");
 
                 var deck = new DeckEditorUI(null, canvas.transform, mobileLayout: false);
                 const BindingFlags instance = BindingFlags.Instance | BindingFlags.NonPublic;
@@ -144,9 +154,20 @@ namespace YGOPortable.Editor
                 var expanded = (CompositeCardView)typeof(DeckEditorUI).GetField("_expandedDeckArt", instance).GetValue(deck);
                 Require(expanded.HasOverframe, "The expanded deck viewer did not show the decoded portrait.");
                 var thumbnail = CompositeCardView.Create(holder, "Compact");
-                thumbnail.SetDeckCard(BlueEyes, new DeckCardAppearance { overframe = true });
-                Require(!thumbnail.HasOverframe && thumbnail.transform.Find("AspectBox/DeckEdition").gameObject.activeSelf,
-                    "The compact card did not use a badge in place of the full portrait.");
+                var special = new DeckCardAppearance { overframe = true };
+                thumbnail.SetCard(BlueEyes, live: new LiveCardState { code = BlueEyes, Appearance = special });
+                Require(thumbnail.HasOverframe && thumbnail.transform.Find("AspectBox/DeckEdition").gameObject.activeSelf,
+                    "The live hand or field card did not show its extended face and edition marker.");
+                thumbnail.SetReadoutFocus(1f);
+                Require(thumbnail.transform.Find("AspectBox/Overframe/Depth").localScale.x > 1f,
+                    "Focusing a live copy did not lift the artwork.");
+                thumbnail.SetDeckCard(unrelated, special);
+                var fallback = thumbnail.transform.Find("AspectBox/Overframe");
+                Require(thumbnail.HasOverframe && !fallback.Find("Depth/LocalCutIn").GetComponent<Image>().enabled,
+                    "An owned variant without a portrait did not fall back to its artwork.");
+                thumbnail.SetDeckCard(unrelated, special, faceDown: true);
+                Require(!thumbnail.HasOverframe && !fallback.gameObject.activeSelf,
+                    "The fallback artwork was visible through a face-down card.");
                 deck.Close();
 
                 VerifyOverframeAnimation(CardAnimationManager.Ensure(canvas));
@@ -269,8 +290,12 @@ namespace YGOPortable.Editor
             Require(reveal.MoveNext(), "The overframe summon did not start.");
             var enter = SampleAnimation((IEnumerator)reveal.Current);
             var view = animator.transform.Find("MovingCard");
+            var fullscreen = animator.transform.Find("SummonPortrait");
             Require(view.GetComponent<CompositeCardView>().CurrentCode == 0 && view.Find("Overframe") == null,
                 "The summon revealed the subject before its card was turned up.");
+            Require(fullscreen != null && fullscreen.GetComponent<CanvasGroup>().alpha == 0f &&
+                ((RectTransform)fullscreen).rect.height >= ((RectTransform)animator.transform).rect.height * .70f,
+                "The large summon subject was missing or showed before the card was public.");
             enter(.51f);
             Canvas.ForceUpdateCanvases();
             var layer = view.Find("Overframe");
@@ -282,7 +307,8 @@ namespace YGOPortable.Editor
                 "The summoned card did not reach its display size without changing its layout.");
             Require(layer.gameObject.activeSelf && Mathf.Approximately(tilt.localScale.x, 1.25f) &&
                 animator.transform.Find("ChainImpactWave").GetComponent<DuelEffectGraphic>().Tint == DuelStyle.ChainGold &&
-                animator.transform.Find("Chain").GetComponent<DuelEffectGraphic>().Tint == DuelStyle.ChainGold,
+                animator.transform.Find("Chain").GetComponent<DuelEffectGraphic>().Tint == DuelStyle.ChainGold &&
+                fullscreen.GetComponent<CanvasGroup>().alpha > .95f && view.GetComponent<CanvasGroup>().alpha < .05f,
                 "The summon did not produce gold feedback or enlarge the overframe at impact.");
             Require(reveal.MoveNext(), "The summon omitted the overframe landing.");
             SampleAnimation((IEnumerator)reveal.Current)(1f);
@@ -293,7 +319,8 @@ namespace YGOPortable.Editor
             Require(fixedRect.sizeDelta == initialSize && Mathf.Abs(fixedRect.rect.height * fixedRect.localScale.y - fittedHeight) < .1f &&
                 Vector2.Distance(fixedRect.anchoredPosition, end.Position) < .1f, "The fixed summon layout missed its destination.");
             Require(!reveal.MoveNext() && !move.MoveNext() && landed && (view == null || !view.gameObject.activeSelf) &&
-                animator.transform.Find("ChainImpactWave") == null, "The overframe cut-in outlived the summon.");
+                animator.transform.Find("ChainImpactWave") == null && animator.transform.Find("SummonPortrait") == null,
+                "The overframe cut-in outlived the summon.");
 
             landed = false;
             animator.QueueMove(new CardFlight(BlueEyes, start, end, false, false,
@@ -345,7 +372,7 @@ namespace YGOPortable.Editor
             animator.Clear();
             VerifyGroupedOverframe(animator, queue);
             animator.Clear();
-            animator.QueueChain(start, 9674034, 1, false);
+            animator.QueueChain(start, 9674034, 1, false, appearance: new DeckCardAppearance { overframe = true });
             var chain = queue.Dequeue();
             Require(chain.MoveNext(), "The ace activation did not play its cut-in.");
             var sample = SampleAnimation((IEnumerator)chain.Current);
@@ -355,6 +382,8 @@ namespace YGOPortable.Editor
             Require(cutIn != null && cutIn.Find("Depth/LocalCutIn").gameObject.activeInHierarchy,
                 "The ace activation omitted its overframe subject.");
             TrackStableOverframe(cutIn, sample, .51f, .98f);
+            Require(cutIn.Find("OverframeTrim").GetComponent<CardOverframeGraphic>().canvasRenderer.GetAlpha() > .4f,
+                "The special edition activation did not show its frame flash.");
             animator.Clear();
             Debug.Log("[VERIFY OVERFRAME MESH] Summon and activation reused their subject and shimmer meshes while scaling.");
 
