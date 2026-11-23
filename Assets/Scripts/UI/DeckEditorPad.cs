@@ -516,10 +516,12 @@ namespace YGOPortable.UI
             int row = index / cols;
             int col = index % cols;
             int next = index + move.x - move.y * cols;
+            int towardDeck = _mobileLayout ? 1 : -1;
+            bool horizontalEdge = move.x < 0 ? col == 0 : col == cols - 1 || next >= count;
 
-            if (!stayInArea && move.x > 0 && _padArea == PadArea.Trunk && (col == cols - 1 || next >= count))
+            if (!stayInArea && horizontalEdge && move.x == towardDeck && _padArea == PadArea.Trunk)
                 SwitchPadArea(PadArea.Main);
-            else if (!stayInArea && move.x < 0 && col == 0 && _padArea != PadArea.Trunk)
+            else if (!stayInArea && horizontalEdge && move.x == -towardDeck && _padArea != PadArea.Trunk)
                 SwitchPadArea(PadArea.Trunk);
             else if (!stayInArea && move.y < 0 && (row + 1) * cols >= count && (_padArea == PadArea.Main || _padArea == PadArea.Extra))
                 SwitchPadArea(_padArea == PadArea.Main ? PadArea.Extra : PadArea.Side);

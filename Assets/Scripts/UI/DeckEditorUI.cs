@@ -64,6 +64,7 @@ namespace YGOPortable.UI
         private Text _previewDesc;
         private Text _previewOwnership;
         private Text _previewRarity;
+        private Text _dustBalance;
         private ScrollRect _previewScroll;
 
         private ScrollRect _trunkScroll;
@@ -327,6 +328,11 @@ namespace YGOPortable.UI
 
                 _openDrawButton = DeckButton(root, "OpenTestDraw", "테스트 드로우", .027f, .918f, .172f, .976f,
                     OpenTestDraw, fontSize: 16);
+                var wallet = DuelUiKit.CreateRect("CraftDust", root, new Vector2(.181f, .918f),
+                    new Vector2(.341f, .976f), Vector2.zero, Vector2.zero);
+                DeckEditorStyle.Fill(wallet, DeckEditorStyle.Inset, false);
+                _dustBalance = DuelUiKit.AddFittedText(wallet, "Balance", "", 17, 12,
+                    TextAnchor.MiddleCenter, DeckEditorStyle.Accent, FontStyle.Bold);
                 var examples = DuelUiKit.CreateRect("Examples", root, new Vector2(0.765f, 0.918f), new Vector2(0.871f, 0.976f),
                     Vector2.zero, Vector2.zero);
                 DeckEditorStyle.Button(examples, "Button", "카드군 예시 덱", OpenArchetypeModal, 15);
@@ -367,8 +373,8 @@ namespace YGOPortable.UI
         private void BuildCardDetails(Transform root)
         {
             var panel = DeckEditorStyle.Panel(root, "CardDetails",
-                new Vector2(_mobileLayout ? .340f : .301f, .053f), new Vector2(_mobileLayout ? .566f : .553f, .899f));
-            float inset = _mobileLayout ? 17f : 28f;
+                new Vector2(_mobileLayout ? .340f : .015f, .053f), new Vector2(_mobileLayout ? .566f : .240f, .899f));
+            float inset = _mobileLayout ? 17f : 20f;
             var card = DuelUiKit.CreateRect("LargeCard", panel,
                 new Vector2(.066f, _mobileLayout ? .677f : .501f), new Vector2(.934f, .917f), Vector2.zero, Vector2.zero);
             BuildAppearanceControls(panel, inset);
@@ -390,12 +396,12 @@ namespace YGOPortable.UI
             _previewRaceIcon = DuelUiKit.AddImage(icon.gameObject, null, Color.white, true, false);
             _previewStats = DuelUiKit.AddFittedText(DuelUiKit.CreateRect("Info", stats,
                 new Vector2(0.03f, 0f), new Vector2(0.81f, 1f), Vector2.zero, Vector2.zero),
-                "Text", "", _mobileLayout ? 19 : 14, _mobileLayout ? 12 : 9, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
+                "Text", "", _mobileLayout ? 19 : 17, 12, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
             var name = DuelUiKit.CreateRect("Name", panel,
                 new Vector2(0f, _mobileLayout ? .511f : .349f), new Vector2(1f, _mobileLayout ? .585f : .412f),
                 new Vector2(inset, 0f), new Vector2(-inset, 0f));
             DuelUiKit.AddImage(name.gameObject, DuelUiKit.WhiteSprite, DeckEditorStyle.Surface, false, false);
-            _previewName = DuelUiKit.AddFittedText(name, "Text", "", _mobileLayout ? 25 : 20, _mobileLayout ? 14 : 11,
+            _previewName = DuelUiKit.AddFittedText(name, "Text", "", _mobileLayout ? 25 : 22, _mobileLayout ? 14 : 13,
                 TextAnchor.MiddleCenter, DuelUiKit.GoldAccent, FontStyle.Bold);
 
             var desc = DuelUiKit.CreateRect("Description", panel,
@@ -417,7 +423,7 @@ namespace YGOPortable.UI
             var viewport = DuelUiKit.CreateRect("Viewport", desc, Vector2.zero, Vector2.one,
                 new Vector2(8f, _mobileLayout ? 7f : 16f), new Vector2(-21f, -5f));
             viewport.gameObject.AddComponent<RectMask2D>();
-            _previewDesc = DuelUiKit.AddText(viewport, "Content", "", _mobileLayout ? 23 : 16, TextAnchor.UpperLeft, DuelUiKit.TextPrimary);
+            _previewDesc = DuelUiKit.AddText(viewport, "Content", "", _mobileLayout ? 23 : 18, TextAnchor.UpperLeft, DuelUiKit.TextPrimary);
             _previewDesc.supportRichText = false;
             _previewDesc.verticalOverflow = VerticalWrapMode.Overflow;
             _previewDesc.lineSpacing = _mobileLayout ? 1.16f : 1.08f;
@@ -498,7 +504,7 @@ namespace YGOPortable.UI
         private void BuildTrunkPanel(Transform rt)
         {
             var col = DeckEditorStyle.Panel(rt, "Trunk",
-                new Vector2(.015f, .053f), new Vector2(_mobileLayout ? .334f : .296f, .899f));
+                new Vector2(_mobileLayout ? .015f : .710f, .053f), new Vector2(_mobileLayout ? .334f : .985f, .899f));
             _trunkPanel = col;
 
             var insideLeft = new Vector2(_mobileLayout ? 17f : 28f, 0f);
@@ -648,7 +654,7 @@ namespace YGOPortable.UI
         private void BuildDeckPanel(Transform root)
         {
             var panel = DeckEditorStyle.Panel(root, "Deck",
-                new Vector2(_mobileLayout ? .574f : .558f, .053f), new Vector2(.985f, .899f));
+                new Vector2(_mobileLayout ? .574f : .250f, .053f), new Vector2(_mobileLayout ? .985f : .700f, .899f));
             _deckPanel = panel;
 
             var header = DuelUiKit.CreateRect("DeckControls", panel,
@@ -1507,6 +1513,8 @@ namespace YGOPortable.UI
 
         private void RefreshPreviewOwnership()
         {
+            if (_dustBalance != null)
+                _dustBalance.text = $"제작 가루 {CollectionProgress.CraftDust:N0}";
             bool visible = CollectionProgress.Initialized && _workingDeck != null && CardDatabase.Get(_inspectedCode) != null;
             _previewOwnership.transform.parent.gameObject.SetActive(visible);
             _previewScroll.viewport.offsetMax = new Vector2(-21f, visible ? -33f : -5f);

@@ -42,6 +42,7 @@ namespace YGOPortable.Editor
                 var app = canvas.AddComponent<GameAppController>();
                 editor = new DeckEditorUI(app, canvas.transform);
                 TestDeckEditing.OpenSavedDeck(editor);
+                VerifyDesktopLayout(editor);
                 VerifyQuickSearch(editor);
                 VerifyQuantitiesAndSort(editor);
                 VerifyRecipeActions(editor);
@@ -60,7 +61,25 @@ namespace YGOPortable.Editor
                 UnityEngine.Object.DestroyImmediate(canvas);
                 CollectionProgress.AllDeckCardsAvailable = previousAccess;
             }
-            Debug.Log("[VERIFY DECK QOL] Related cards, chips, quantities, autosort, recipe actions, test draws and mobile hit areas passed.");
+            Debug.Log("[VERIFY DECK QOL] Desktop pane navigation, related cards, chips, quantities, autosort, recipe actions, test draws and mobile hit areas passed.");
+        }
+
+        private static void VerifyDesktopLayout(DeckEditorUI editor)
+        {
+            var details = (RectTransform)editor.Root.transform.Find("Editor/CardDetails");
+            var deck = Field<RectTransform>(editor, "_deckPanel");
+            var trunk = Field<RectTransform>(editor, "_trunkPanel");
+            Require(details.anchorMax.x < deck.anchorMin.x && deck.anchorMax.x < trunk.anchorMin.x,
+                "The desktop editor must place the inspector, deck, and collection in that order.");
+            Require(Field<Text>(editor, "_dustBalance").text == $"제작 가루 {CollectionProgress.CraftDust:N0}",
+                "The deck editor wallet did not show the shared crafting balance.");
+
+            Call(editor, "NavigatePadCards", Vector2Int.left, false);
+            Require(Field<object>(editor, "_padArea").ToString() == "Main",
+                "Moving left from the collection did not focus the center deck.");
+            Call(editor, "NavigatePadCards", Vector2Int.right, false);
+            Require(Field<object>(editor, "_padArea").ToString() == "Trunk",
+                "Moving right from the deck did not return to the collection.");
         }
 
         private static void VerifyQuickSearch(DeckEditorUI editor)
