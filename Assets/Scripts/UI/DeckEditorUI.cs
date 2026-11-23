@@ -377,6 +377,7 @@ namespace YGOPortable.UI
             DeckCardVisualMotion.Bind(_previewCard);
             var previewHit = LotdUiKit.FillRect("PreviewHit", card);
             var previewGraphic = LotdUiKit.AddImage(previewHit.gameObject, LotdUiKit.WhiteSprite, Color.clear);
+            CardOverframeInput.Attach(previewHit, _previewCard, motionSensor: false);
             var previewButton = previewHit.gameObject.AddComponent<Button>();
             previewButton.targetGraphic = previewGraphic;
             previewButton.onClick.AddListener(() => OpenExpandedDeckCard(_inspectedCode));

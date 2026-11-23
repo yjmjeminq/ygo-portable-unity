@@ -774,16 +774,24 @@ namespace YGOPortable.UI
                 else
                 {
                     layer.SetSiblingIndex(_frameImg.transform.GetSiblingIndex() + 1);
-                    layer.gameObject.AddComponent<RectMask2D>();
                 }
                 _overframe = layer.gameObject.AddComponent<CanvasGroup>();
                 _overframe.blocksRaycasts = _overframe.interactable = false;
+                RectTransform portraitBounds = layer;
                 if (!_cinematicOverframe)
                 {
-                    var background = LotdUiKit.FillRect("ExpandedArtwork", layer);
+                    var face = LotdUiKit.FillRect("FaceArtwork", layer);
+                    face.gameObject.AddComponent<RectMask2D>();
+                    var background = LotdUiKit.FillRect("ExpandedArtwork", face);
                     _overframeBackground = LotdUiKit.AddImage(background.gameObject, null, new Color(.55f, .63f, .76f), false, false);
                     _overframeBackgroundFit = background.gameObject.AddComponent<AspectRatioFitter>();
                     _overframeBackgroundFit.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
+                    _overframeFinish = LotdUiKit.FillRect("ExpandedFinish", face).gameObject.AddComponent<CardFinishGraphic>();
+                    _overframeFinish.raycastTarget = false;
+                    // Preserve the scroll view's clipping while letting the subject cross the card's edge.
+                    portraitBounds = LotdUiKit.CreateRect("PortraitBounds", layer, new Vector2(-.048f, 0f),
+                        new Vector2(1.048f, 1.075f), Vector2.zero, Vector2.zero);
+                    portraitBounds.gameObject.AddComponent<RectMask2D>();
                 }
                 var shade = LotdUiKit.FillRect("OverframeShade", _cinematicOverframe ? _artImg.rectTransform : layer);
                 _overframeShade = LotdUiKit.AddImage(shade.gameObject,
@@ -792,14 +800,15 @@ namespace YGOPortable.UI
                 if (_cinematicOverframe) CreateOverframeTrim(layer);
                 else
                 {
-                    _overframeFinish = LotdUiKit.FillRect("ExpandedFinish", layer).gameObject.AddComponent<CardFinishGraphic>();
-                    _overframeFinish.raycastTarget = false;
+                    // Keep the tint between the expanded art and the prismatic finish.
+                    shade.SetParent(_overframeFinish.transform.parent, false);
+                    shade.SetSiblingIndex(_overframeFinish.transform.GetSiblingIndex());
                 }
-                _overframeTilt = LotdUiKit.FillRect("Depth", layer);
+                _overframeTilt = LotdUiKit.FillRect("Depth", portraitBounds);
                 _overframeTilt.pivot = new Vector2(.5f, .78f);
                 var portrait = LotdUiKit.CreateRect("LocalCutIn", _overframeTilt,
-                    _cinematicOverframe ? new Vector2(-.13f, .405f) : new Vector2(-.088f, .055f),
-                    _cinematicOverframe ? new Vector2(1.13f, 1.166f) : new Vector2(1.088f, 1.07f),
+                    _cinematicOverframe ? new Vector2(-.13f, .405f) : new Vector2(-.032f, .052f),
+                    _cinematicOverframe ? new Vector2(1.13f, 1.166f) : new Vector2(1.032f, .997f),
                     Vector2.zero, Vector2.zero);
                 portrait.pivot = new Vector2(.5f, 1f);
                 _overframePortrait = LotdUiKit.AddImage(portrait.gameObject, null, Color.white, true, false);

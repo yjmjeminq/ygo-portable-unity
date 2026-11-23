@@ -3145,6 +3145,7 @@ namespace YGOPortable.Editor
                 inspected.CurrentCode == excel && inspected.HasOverframe == supported && duel.RetryCount == 0,
                 "The duel inspector and zoom did not show the same supported portrait.");
             Debug.Log("[VERIFY OVERFRAME TOUCH] Hand and field long presses opened the same mobile detail view.");
+            VerifyStyledDuelSurfaces();
 
             static void Hold(CardDragTrigger source)
             {
@@ -3155,6 +3156,56 @@ namespace YGOPortable.Editor
                 source.OnPointerUp(pointer);
                 source.OnPointerClick(pointer);
             }
+        }
+
+        private static void VerifyStyledDuelSurfaces()
+        {
+            const uint excel = 9674034;
+            var deck = new UserDeck();
+            for (int i = 0; i < 40; i++)
+                deck.InsertCard(deck.main, i, excel, new DeckCardAppearance
+                {
+                    overframe = i % 2 == 0,
+                    artwork = i % 2 == 0 ? CardArtLoader.FirstOverframeVariant(excel) + 1 : 0,
+                });
+            using var duel = new DuelSession();
+            Require(duel.StartNewDuel(deck.main, deck.extra, Enumerable.Repeat(KaiserSeaHorse, 40).ToArray(),
+                Array.Empty<uint>(), seed: new ulong[] { 718, 391, 27182, 31 }, playerDeckAppearance: deck),
+                "Could not start the styled field fixture.");
+            if (duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_CHAIN)
+                duel.SubmitResponseInt(-1);
+            using var ui = new HandUI(duel, mobileLayout: true);
+            var safe = ui.Field.Root.transform.Find("MobileSafeArea");
+            var row = safe.Find("PlayerHand/Cards");
+            var mine = duel.Players[duel.HumanPlayerIndex];
+            Require(mine.hand.Any(card => card.Appearance?.overframe == false) &&
+                mine.hand.Any(card => card.Appearance?.overframe == true), "The opening hand lacked both editions.");
+            for (int i = 0; i < mine.hand.Count; i++)
+            {
+                var face = row.GetChild(i).GetComponentInChildren<CompositeCardView>();
+                Require(face.HasOverframe == (mine.hand[i].Appearance?.overframe == true),
+                    "The rendered hand mixed up copies of the same card.");
+            }
+            int choice = duel.ActivePrompt.summonable.FindIndex(card => mine.hand[(int)card.sequence].Appearance?.overframe == true);
+            Require(choice >= 0, "The special copy could not be summoned in the field fixture.");
+            var chosen = row.GetChild((int)duel.ActivePrompt.summonable[choice].sequence);
+            chosen.GetComponent<CardDragTrigger>().OnPointerEnterAction.Invoke();
+            typeof(DuelFieldUI).GetMethod("AdvanceDuelPadCardMotions", PrivateInstance).Invoke(ui.Field, new object[] { .25f });
+            var focused = (RectTransform)chosen.GetComponentInChildren<CompositeCardView>().transform;
+            Require(focused.anchoredPosition.y > 1f &&
+                focused.Find("AspectBox/Overframe/PortraitBounds/Depth").localScale.x > 1f,
+                "A special card in the touch layout did not lift both its card and artwork.");
+
+            duel.SubmitResponseInt(choice << 16);
+            YgoProjectBuilder.DriveUntilIdle(duel, new TacticalAI());
+            CardAnimationManager.Instance?.Clear();
+            ui.Field.Refresh();
+            var placed = mine.mzone.Single(card => card?.code == excel);
+            var slot = safe.Find($"DuelBoard/Zone_{placed.sequence + 2}_3");
+            var fieldFace = slot.GetComponentInChildren<CompositeCardView>();
+            Require(fieldFace.CurrentCode == excel && fieldFace.HasOverframe && duel.RetryCount == 0,
+                "The selected physical copy did not keep its edition on the actual duel field.");
+            Debug.Log("[VERIFY OVERFRAME SURFACES] Mixed editions, touch-layout lift and native field identity passed.");
         }
 
         private static void VerifyDragColumnAndPhaseShortcut()

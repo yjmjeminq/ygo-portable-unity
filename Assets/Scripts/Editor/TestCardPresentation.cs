@@ -109,20 +109,21 @@ namespace YGOPortable.Editor
                 Canvas.ForceUpdateCanvases();
                 var aspect = card.transform.Find("AspectBox");
                 var layer = aspect.Find("Overframe");
-                var image = layer.Find("Depth/LocalCutIn").GetComponent<Image>();
+                var bounds = (RectTransform)layer.Find("PortraitBounds");
+                var image = bounds.Find("Depth/LocalCutIn").GetComponent<Image>();
                 Require(card.HasOverframe && image.sprite == zero && image.maskable && !image.raycastTarget &&
                     layer.GetSiblingIndex() > aspect.Find("Frame").GetSiblingIndex() &&
                     layer.GetSiblingIndex() < aspect.Find("CardTitle").GetSiblingIndex() &&
-                    layer.GetComponent<RectMask2D>() != null && layer.Find("OverframeTrim") != null &&
-                    ((RectTransform)layer.Find("OverframeShade")).anchorMax == Vector2.one &&
-                    image.rectTransform.anchorMax.y > 1f && image.rectTransform.anchorMin.y < .15f &&
+                    bounds.GetComponent<RectMask2D>() != null && layer.Find("OverframeTrim") != null &&
+                    layer.Find("FaceArtwork").GetComponent<RectMask2D>() != null &&
+                    bounds.anchorMin.x < 0f && bounds.anchorMax.x > 1f && bounds.anchorMax.y > 1f &&
                     aspect.Find("Rules/Text").GetComponent<Text>().color.r > .8f,
                     "Extended artwork did not cover the face behind readable title and rules layers.");
                 var input = holder.GetComponent<CardOverframeInput>();
                 typeof(CardOverframeInput).GetMethod("ShowDepth", BindingFlags.Instance | BindingFlags.NonPublic)
                     .Invoke(input, new object[] { new Vector2(.6f, .3f), .21f });
-                var tilt = (RectTransform)layer.Find("Depth");
-                var background = layer.Find("ExpandedArtwork").GetComponent<Image>();
+                var tilt = (RectTransform)bounds.Find("Depth");
+                var background = layer.Find("FaceArtwork/ExpandedArtwork").GetComponent<Image>();
                 Require(tilt.anchoredPosition.sqrMagnitude > 1f && tilt.localRotation != Quaternion.identity &&
                     card.transform.localRotation != Quaternion.identity && background.sprite == card.ArtworkSprite &&
                     Vector2.Dot(background.rectTransform.anchoredPosition, tilt.anchoredPosition) < 0f,
@@ -159,16 +160,32 @@ namespace YGOPortable.Editor
                 Require(thumbnail.HasOverframe && thumbnail.transform.Find("AspectBox/DeckEdition").gameObject.activeSelf,
                     "The live hand or field card did not show its extended face and edition marker.");
                 thumbnail.SetReadoutFocus(1f);
-                Require(thumbnail.transform.Find("AspectBox/Overframe/Depth").localScale.x > 1f,
+                Require(thumbnail.transform.Find("AspectBox/Overframe/PortraitBounds/Depth").localScale.x > 1f,
                     "Focusing a live copy did not lift the artwork.");
                 thumbnail.SetDeckCard(unrelated, special);
                 var fallback = thumbnail.transform.Find("AspectBox/Overframe");
-                Require(thumbnail.HasOverframe && !fallback.Find("Depth/LocalCutIn").GetComponent<Image>().enabled,
+                Require(thumbnail.HasOverframe && !fallback.Find("PortraitBounds/Depth/LocalCutIn").GetComponent<Image>().enabled,
                     "An owned variant without a portrait did not fall back to its artwork.");
                 thumbnail.SetDeckCard(unrelated, special, faceDown: true);
                 Require(!thumbnail.HasOverframe && !fallback.gameObject.activeSelf,
                     "The fallback artwork was visible through a face-down card.");
                 deck.Close();
+
+                var crafting = new CardCraftingUI(canvas.transform, null);
+                crafting.Show(BlueEyes);
+                var shopCard = (CompositeCardView)typeof(CardCraftingUI).GetField("_art", instance).GetValue(crafting);
+                var toggle = (Button)typeof(CardCraftingUI).GetField("_editionPreview", instance).GetValue(crafting);
+                Require(shopCard.CurrentCode == BlueEyes && !shopCard.HasOverframe && toggle.gameObject.activeInHierarchy,
+                    "The crafting screen did not open on the standard card or offer its alternate preview.");
+                int inventory = CollectionProgress.GetOwnedOverframeCount(BlueEyes);
+                decimal dust = CollectionProgress.CraftDust;
+                toggle.onClick.Invoke();
+                Require(shopCard.HasOverframe && CollectionProgress.CraftDust == dust &&
+                    CollectionProgress.GetOwnedOverframeCount(BlueEyes) == inventory,
+                    "Previewing the edition changed its stock or crafting dust.");
+                toggle.onClick.Invoke();
+                Require(!shopCard.HasOverframe, "The crafting preview did not return to the regular face.");
+                crafting.Hide();
 
                 VerifyOverframeAnimation(CardAnimationManager.Ensure(canvas));
                 VerifyPhysicalDeckAppearances();
@@ -259,7 +276,7 @@ namespace YGOPortable.Editor
                 view.SetCard(BlueEyes);
                 Require(CardArtLoader.GetArtworkSource(BlueEyes, 0) == (BlueEyes, 0) &&
                     view.HasOverframe && view.ArtworkSprite.texture.width == 8 &&
-                    view.transform.Find("AspectBox/Overframe/Depth/LocalCutIn").GetComponent<Image>().sprite.texture.width == 8,
+                    view.transform.Find("AspectBox/Overframe/PortraitBounds/Depth/LocalCutIn").GetComponent<Image>().sprite.texture.width == 8,
                     "An empty app profile could not use the artwork and cut-in from packaged StreamingAssets.");
                 Debug.Log("[VERIFY PACKAGED OVERFRAME] Fresh install loaded its matching artwork and portrait from the IPA resource layout.");
             }
@@ -323,7 +340,9 @@ namespace YGOPortable.Editor
                 "The overframe cut-in outlived the summon.");
 
             landed = false;
-            animator.QueueMove(new CardFlight(BlueEyes, start, end, false, false,
+            Vector2 liveEnd = end.Position;
+            var responsiveEnd = end.FollowLayout(() => new CardPose(liveEnd, end.Size));
+            animator.QueueMove(new CardFlight(BlueEyes, start, responsiveEnd, false, false,
                 new DeckCardAppearance { overframe = true }), CardMotion.SpecialSummon, () => landed = true);
             move = queue.Dequeue();
             Require(move.MoveNext() && move.Current.GetType().Name.StartsWith("<RevealSummon>", StringComparison.Ordinal),
@@ -334,8 +353,18 @@ namespace YGOPortable.Editor
             Require(animator.transform.Find("MovingCard").GetComponent<CompositeCardView>().HasOverframe &&
                 animator.transform.Find("ChainImpactWave") != null, "The resummoned ace did not show its subject and shockwave.");
             while (reveal.MoveNext()) SampleAnimation((IEnumerator)reveal.Current)(1f);
-            Require(!move.MoveNext() && landed && animator.transform.Find("ChainImpactWave") == null,
-                "The resummoned ace did not complete its field arrival.");
+            Require(move.MoveNext() && landed && animator.transform.Find("ChainImpactWave") == null,
+                "The field card was not published before the landing wave.");
+            var landing = (IEnumerator)move.Current;
+            Require(landing.MoveNext(), "The special edition did not produce a landing wave.");
+            var pulse = SampleAnimation((IEnumerator)landing.Current);
+            liveEnd += new Vector2(36f, 12f);
+            pulse(.5f);
+            Require(Vector2.Distance(((RectTransform)animator.transform.Find("OverframeLanding")).anchoredPosition, liveEnd) < .1f,
+                "The wave missed the slot after the layout changed.");
+            pulse(1f);
+            Require(!landing.MoveNext() && !move.MoveNext() && animator.transform.Find("OverframeLanding") == null,
+                "The landing wave outlived the animation.");
 
             animator.QueueMove(new CardFlight(BlueEyes, start, end, false, false, default(DeckCardAppearance)),
                 CardMotion.SpecialSummon, null);
@@ -419,7 +448,8 @@ namespace YGOPortable.Editor
             for (int i = 0; i < cards.Length; i++)
             {
                 var from = new CardPose(new Vector2(-80f + i * 100f, -235f), cardSize);
-                var flight = new CardFlight(cards[i], from, targets[i], true, i == 2);
+                var flight = new CardFlight(cards[i], from, targets[i], true, i == 2,
+                    new DeckCardAppearance { overframe = true });
                 animator.StageFieldArrival(flight, CardMotion.SpecialSummon, 0, YgoConstants.LOCATION_MZONE, (uint)i,
                     null, () => departed++, () => landed++, () => refreshed++);
             }
@@ -460,9 +490,18 @@ namespace YGOPortable.Editor
                 Vector2.Distance(right.anchoredPosition, targets[1].Position) < .1f &&
                 Vector2.Distance(((RectTransform)hidden.transform).anchoredPosition, targets[2].Position) < .1f,
                 "One grouped card did not finish in its original target slot.");
-            Require(!arrival.MoveNext() && landed == cards.Length && refreshed == 1 &&
+            Require(arrival.MoveNext() && landed == cards.Length && refreshed == 1 &&
                 animator.GetComponentsInChildren<CompositeCardView>().Length == 0,
                 "The engine's group did not land together or left a visible proxy on the field.");
+            var landing = (IEnumerator)arrival.Current;
+            Require(landing.MoveNext(), "The group skipped the special edition landing waves.");
+            var waves = animator.GetComponentsInChildren<DuelEffectGraphic>()
+                .Where(effect => effect.name == "OverframeLanding").ToArray();
+            Require(waves.Length == 2 && targets.Take(2).All(target =>
+                waves.Any(wave => Vector2.Distance(wave.rectTransform.anchoredPosition, target.Position) < .1f)),
+                "The group failed to mark the public slots selectively.");
+            SampleAnimation((IEnumerator)landing.Current)(1f);
+            Require(!landing.MoveNext() && !arrival.MoveNext(), "The group landing did not finish.");
             Debug.Log("[VERIFY OVERFRAME GROUP] Two face-up aces shared the cut-in, the face-down card stayed hidden, and all three arrived together.");
         }
 

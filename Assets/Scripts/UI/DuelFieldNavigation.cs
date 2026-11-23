@@ -497,7 +497,7 @@ namespace YGOPortable.UI
                 if (raised != null && !_duelPadCardMotions.Exists(motion => motion.Rect == raised))
                 {
                     var slot = _fieldSlotsByRect.Values.FirstOrDefault(candidate => candidate.focusArt == raised);
-                    _duelPadCardMotions.Add((raised, raised.parent != null && raised.parent.parent == _myHandBar, slot));
+                    _duelPadCardMotions.Add((raised, _myHandViews.Exists(view => view.Card.transform == raised), slot));
                 }
                 UpdateHandDepth(_myHandViews, _raisedCard);
             }

@@ -777,6 +777,14 @@ namespace YGOPortable.UI
                 RemoveTransient(effects[i].gameObject);
             }
             land();
+            if (!returning)
+            {
+                List<CardPose> slots = null;
+                foreach (var move in moves)
+                    if (IsSummonMotion(move.Motion) && IsSpecialEditionLanding(move.Flight))
+                        (slots ??= new List<CardPose>(moves.Count)).Add(move.Flight.To);
+                if (slots != null) yield return PlayOverframeLanding(slots);
+            }
         }
 
         private CardPose[] GroupOverframePoses(IReadOnlyList<FieldArrival> moves)
@@ -1252,8 +1260,9 @@ namespace YGOPortable.UI
             if (reveal) RemoveTransient(proxy.gameObject);
             else RecycleCard(proxy);
             onArrive?.Invoke();
-
-            if (summons && !reveal)
+            if (summons && IsSpecialEditionLanding(flight))
+                yield return PlayOverframeLanding(flight.To);
+            else if (summons && !reveal)
             {
                 LotdAudio.PlaySummon();
                 Color accent = motion == CardMotion.SpecialSummon ? DuelStyle.Gold : new Color(.58f, .87f, 1f);
@@ -1269,6 +1278,33 @@ namespace YGOPortable.UI
 
         internal static bool IsSummonMotion(CardMotion motion) =>
             motion is CardMotion.Summon or CardMotion.SpecialSummon or CardMotion.ExtraDeckSummon or CardMotion.PendulumSummon;
+
+        private static bool IsSpecialEditionLanding(CardFlight flight) =>
+            !flight.EndsFaceDown && flight.Appearance?.overframe == true;
+
+        private IEnumerator PlayOverframeLanding(CardPose slot)
+            => PlayOverframeLanding(new[] { slot });
+
+        private IEnumerator PlayOverframeLanding(IReadOnlyList<CardPose> slots)
+        {
+            const float scale = 2.04f;
+            var waves = new DuelEffectGraphic[slots.Count];
+            for (int i = 0; i < slots.Count; i++)
+            {
+                var tint = Color.Lerp(DuelStyle.Side(slots[i].Angle > 45f), DuelStyle.ChainGold, .36f);
+                var wave = CreateEffect(DuelEffectKind.ChainImpactWave, slots[i], scale, tint);
+                wave.name = "OverframeLanding";
+                wave.Seek(0f);
+                waves[i] = wave;
+            }
+            LotdAudio.PlaySummon();
+            yield return Animate(.18f, t =>
+            {
+                for (int i = 0; i < waves.Length; i++)
+                    TrackCardEffect(waves[i], slots[i], scale, t);
+            });
+            foreach (var wave in waves) RemoveTransient(wave.gameObject);
+        }
 
         private static bool SupportsSummonOverframe(CardFlight flight)
         {

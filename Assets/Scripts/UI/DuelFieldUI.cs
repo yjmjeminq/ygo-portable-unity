@@ -827,6 +827,7 @@ namespace YGOPortable.UI
             _inspectorDisabledBadge = BuildDisabledBadge(_inspCard.transform, 17);
             var zoomHit = LotdUiKit.FillRect("ZoomHit", aspect);
             var hitImage = LotdUiKit.AddImage(zoomHit.gameObject, LotdUiKit.WhiteSprite, Color.clear);
+            CardOverframeInput.Attach(zoomHit, _inspCard, motionSensor: false);
             _inspectorArtworkButton = zoomHit.gameObject.AddComponent<Button>();
             _inspectorArtworkButton.targetGraphic = hitImage;
             _inspectorArtworkButton.transition = Selectable.Transition.None;

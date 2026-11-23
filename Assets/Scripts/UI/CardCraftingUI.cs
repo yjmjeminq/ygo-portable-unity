@@ -54,6 +54,7 @@ namespace YGOPortable.UI
         private readonly Text _cardStats;
         private readonly Text _rarity;
         private readonly CompositeCardView _art;
+        private readonly Button _editionPreview;
         private readonly ScrollRect _descriptionScroll;
         private readonly Text _description;
         private readonly Button _craft;
@@ -83,6 +84,7 @@ namespace YGOPortable.UI
         private int _maxQuantity;
         private bool _crafting;
         private bool _overframe;
+        private bool _previewOverframe;
 
         internal GameObject Root { get; }
         internal bool IsOpen => Root.activeSelf;
@@ -149,7 +151,11 @@ namespace YGOPortable.UI
             var heading = Slot(details, "Name", .075f, .768f, .926f, .851f);
             _title = LotdUiKit.AddFittedText(heading, "Text", "", 26, 16,
                 TextAnchor.MiddleCenter, PackShopStyle.TextPrimary, FontStyle.Bold);
-            _art = CompositeCardView.Create(Slot(details, "Art", .061f, .085f, .463f, .749f), "SelectedCard", true, duelArtwork: true);
+            var art = Slot(details, "Art", .061f, .090f, .463f, .718f);
+            _art = CompositeCardView.Create(art, "SelectedCard", true, duelArtwork: true);
+            CardOverframeInput.Attach(art, _art, motionSensor: true);
+            _editionPreview = AddButton(details, "EditionPreview", "오버프레임 보기", .087f, .029f, .435f, .082f,
+                () => SetEditionPreview(!_previewOverframe));
             _rarity = ShopRarityBadge.Create(details, new Vector2(.491f, .679f), new Vector2(.572f, .738f), 17);
             _cardInfo = Label(details, "Ownership", "", .583f, .669f, .925f, .749f, 17,
                 TextAnchor.MiddleLeft, PackShopStyle.Accent);
@@ -199,6 +205,7 @@ namespace YGOPortable.UI
             Root.SetActive(true);
             _main.SetActive(true);
             _filter = 0;
+            _previewOverframe = false;
             _collectionFilters.Selection = default;
             _finder.SetTextWithoutNotify("");
             RefreshDust();
@@ -208,9 +215,9 @@ namespace YGOPortable.UI
             switch (action)
             {
                 case CardTradeAction.Craft: OpenConfirmation(true); break;
-                case CardTradeAction.CraftOverframe: OpenConfirmation(true, overframe: true); break;
+                case CardTradeAction.CraftOverframe: SetEditionPreview(true); OpenConfirmation(true, overframe: true); break;
                 case CardTradeAction.Disassemble: OpenConfirmation(false); break;
-                case CardTradeAction.DisassembleOverframe: OpenConfirmation(false, overframe: true); break;
+                case CardTradeAction.DisassembleOverframe: SetEditionPreview(true); OpenConfirmation(false, overframe: true); break;
             }
         }
 
@@ -337,6 +344,7 @@ namespace YGOPortable.UI
             uint code = entry?.Card.code ?? 0;
             if (entry != _selected)
             {
+                _previewOverframe = false;
                 _status.text = "";
                 _description.text = entry?.Card.desc ?? "";
                 _descriptionScroll.StopMovement();
@@ -345,7 +353,7 @@ namespace YGOPortable.UI
             _selected = entry;
             _title.text = entry?.Name ?? "선택 카드 없음";
             _cardStats.text = entry?.Card.FormatStatsLineKR() ?? "";
-            PackShopStyle.ShowCardPreview(_art, code);
+            SetEditionPreview(_previewOverframe);
             ShopRarityBadge.Update(_rarity, code);
             _craft.interactable = _disassemble.interactable = code != 0;
             bool supports = CardArtLoader.SupportsOverframe(code);
@@ -370,6 +378,21 @@ namespace YGOPortable.UI
             int first = _page * PageSize;
             for (int i = 0; i < _rows.Length && first + i < _matches.Count; i++)
                 SetButtonLabelColor(_rowNames[i], _matches[first + i] == entry ? PackShopStyle.Accent : PackShopStyle.TextPrimary);
+        }
+
+        private void SetEditionPreview(bool overframe)
+        {
+            uint code = _selected?.Card.code ?? 0;
+            bool available = CardArtLoader.SupportsOverframe(code) || CollectionProgress.GetOwnedOverframeCount(code) > 0;
+            _previewOverframe = overframe && available;
+            _editionPreview.transform.parent.gameObject.SetActive(available);
+            SetButtonText(_editionPreview, _previewOverframe ? "일반판 보기" : "오버프레임 보기");
+            bool changed = _art.CurrentCode != code;
+            _art.gameObject.SetActive(code != 0);
+            _art.SetDeckCard(code, _previewOverframe
+                ? new DeckCardAppearance { artwork = CardArtLoader.FirstOverframeVariant(code) + 1, overframe = true }
+                : null);
+            if (changed && code != 0) UiEntranceMotion.Play(_art.gameObject, .72f, .14f);
         }
 
         private CollectionPack UnlockedSecretPack(Entry entry) => _openSecretPack == null || entry == null ||
