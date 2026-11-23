@@ -20,6 +20,7 @@ namespace YGOPortable.UI
         StarterSelection,
         CardShop,
         ArchetypeCodex,
+        StoryMode,
     }
 
     public class GameAppController : MonoBehaviour
@@ -38,6 +39,7 @@ namespace YGOPortable.UI
         private DuelFieldUI _duelField;
         private CollectionShopUI _collectionShop;
         private ArchetypeCodexUI _archetypeCodex;
+        private StoryModeUI _storyMode;
         private GitHubSaveSync _saveSync;
         private SaveSyncMenu _saveSyncMenu;
         private GameObject _focusBeforeSaveSync;
@@ -57,6 +59,7 @@ namespace YGOPortable.UI
         private PresetDeckInfo _activeOppDeck;
         private UserDeck _activeMyDeck;
         private bool _activePlayerFirst;
+        private StoryEpisodeData _activeStoryEpisode;
 
         private bool _initialized;
 
@@ -127,6 +130,7 @@ namespace YGOPortable.UI
                     () => ShowScreen(_screen == AppScreen.StarterSelection ? AppScreen.Title : AppScreen.MainMenu),
                     CompleteStarterSelection);
                 _archetypeCodex = new ArchetypeCodexUI(canvas.transform, () => ShowScreen(AppScreen.MainMenu));
+                _storyMode = new StoryModeUI(this, canvas.transform);
 
                 Debug.Log("[GameApp] 6. Constructing OpponentSelectUI...");
                 _oppSelect = new OpponentSelectUI(this, canvas.transform);
@@ -232,6 +236,7 @@ namespace YGOPortable.UI
             _collectionShop?.StarterRoot.SetActive(false);
             _collectionShop?.CloseShop();
             _archetypeCodex.Close();
+            if (screen != AppScreen.StoryMode) _storyMode.Close();
             _oppSelect.Root.SetActive(screen == AppScreen.OpponentSelect);
             _oppSelect.JankenRoot.SetActive(false);
             if (screen != AppScreen.DeckEditor) _deckEditor.Close();
@@ -244,6 +249,7 @@ namespace YGOPortable.UI
             else
             {
                 LotdAudio.PlayMenuBgm();
+                _activeStoryEpisode = null;
                 if (_session != null)
                 {
                     _duelField.UnbindSession();
@@ -262,6 +268,8 @@ namespace YGOPortable.UI
                 _collectionShop.OpenShop();
             else if (screen == AppScreen.ArchetypeCodex)
                 _archetypeCodex.Open();
+            else if (screen == AppScreen.StoryMode)
+                _storyMode.Open();
             else if (screen == AppScreen.MainMenu)
                 _titleAndMenu.FocusMainMenu(previousScreen);
             else if (screen == AppScreen.Title)
@@ -282,6 +290,7 @@ namespace YGOPortable.UI
                     AppScreen.StarterSelection => _collectionShop.StarterRoot,
                     AppScreen.CardShop => _collectionShop.Root,
                     AppScreen.ArchetypeCodex => _archetypeCodex.Root,
+                    AppScreen.StoryMode => _storyMode.Root,
                     _ => null,
                 };
                 if (root != null) UiEntranceMotion.Play(root, .67f, .19f);
@@ -323,20 +332,32 @@ namespace YGOPortable.UI
             return reason.Length == 0;
         }
 
-        public void StartDuelMatch(OpponentCharacter oppChar, PresetDeckInfo oppDeck, UserDeck myDeck, bool playerGoesFirst)
+        internal void StartStoryDuel(StoryEpisodeData episode, UserDeck myDeck)
+        {
+            if (_screen != AppScreen.StoryMode || !_storyMode.CanPlay(episode)) return;
+            _activeStoryEpisode = episode;
+            var opponent = DeckRepository.GetCharacter(episode.charId);
+            var deck = StoryModeUI.GetOpponentDeck(episode.charId);
+            StartDuelMatch(opponent, deck, myDeck, playerGoesFirst: true, isStoryDuel: true);
+        }
+
+        public void StartDuelMatch(OpponentCharacter oppChar, PresetDeckInfo oppDeck, UserDeck myDeck,
+            bool playerGoesFirst, bool isStoryDuel = false)
         {
             if (oppChar == null || oppDeck == null || oppDeck.charId != oppChar.id ||
-                !CollectionProgress.IsOpponentDeckUnlocked(oppChar.id, oppDeck.id))
+                (isStoryDuel ? _activeStoryEpisode?.charId != oppChar.id : !CollectionProgress.IsOpponentDeckUnlocked(oppChar.id, oppDeck.id)))
             {
-                ShowScreen(AppScreen.OpponentSelect);
-                _oppSelect.ShowStatus("목록에 있는 상대와 덱을 선택하세요.", true);
+                ShowDuelStartFailure(isStoryDuel, "목록에 있는 상대와 덱을 선택하세요.");
                 return;
             }
-            oppDeck = OpponentDeckLevels.GetDecks(oppChar.id).First(deck => deck.id == oppDeck.id);
+            if (!isStoryDuel)
+            {
+                _activeStoryEpisode = null;
+                oppDeck = OpponentDeckLevels.GetDecks(oppChar.id).First(deck => deck.id == oppDeck.id);
+            }
             if (!CanStartWithDeck(myDeck, out string reason))
             {
-                ShowScreen(AppScreen.OpponentSelect);
-                _oppSelect.ShowStatus(reason, true);
+                ShowDuelStartFailure(isStoryDuel, reason);
                 return;
             }
             _activeOppChar = oppChar;
@@ -375,12 +396,18 @@ namespace YGOPortable.UI
                 oppDeck.main, oppDeck.extra,
                 p0GoesFirst: playerGoesFirst))
             {
-                ShowScreen(AppScreen.OpponentSelect);
-                _oppSelect.ShowStatus("듀얼을 시작하지 못했습니다.", true);
+                ShowDuelStartFailure(isStoryDuel, "듀얼을 시작하지 못했습니다.");
                 return;
             }
             CollectionProgress.RememberDuelDeck(myDeck.id);
             _duelField.Refresh();
+        }
+
+        private void ShowDuelStartFailure(bool isStoryDuel, string message)
+        {
+            ShowScreen(isStoryDuel ? AppScreen.StoryMode : AppScreen.OpponentSelect);
+            if (isStoryDuel) _storyMode.ShowStatus(message);
+            else _oppSelect.ShowStatus(message, true);
         }
 
         private bool CanApplyCloudSave() => _screen is AppScreen.Title or AppScreen.MainMenu;
@@ -464,6 +491,21 @@ namespace YGOPortable.UI
                     _duelField.Refresh();
                     bool won = _session.Winner == _session.HumanPlayerIndex;
                     bool draw = _session.Winner == 2;
+                    if (_activeStoryEpisode is { } episode)
+                    {
+                        string storyReward = "";
+                        if (won)
+                        {
+                            storyReward = CollectionProgress.TryAwardDuel(true, out int amount, out string error)
+                                ? $"듀얼 보상 +{amount:N0} DP"
+                                : error;
+                            _storyMode.RecordWin(episode);
+                        }
+                        ShowScreen(AppScreen.StoryMode);
+                        _storyMode.ShowDuelResult(episode, won, draw, storyReward);
+                        SyncFrontMenuFocus();
+                        return;
+                    }
                     string rewardText = "";
                     if (_session.Winner >= 0 && CollectionProgress.HasStarter)
                     {
@@ -573,6 +615,7 @@ namespace YGOPortable.UI
                 AppScreen.StarterSelection => _collectionShop?.StarterRoot,
                 AppScreen.CardShop => _collectionShop?.ActiveShopRoot,
                 AppScreen.ArchetypeCodex => _archetypeCodex.Root,
+                AppScreen.StoryMode => _storyMode.ActiveRoot,
                 _ => null,
             };
             if (page != null && page.activeInHierarchy)
@@ -589,7 +632,8 @@ namespace YGOPortable.UI
             bool selectingStarter = _screen == AppScreen.StarterSelection;
             bool codex = _screen == AppScreen.ArchetypeCodex;
             bool collectionPage = selectingStarter || _screen == AppScreen.CardShop || codex;
-            bool cancel = frame.Cancel || (escape && (cloudSave || settings || selectingOpponent || _menuPad.HasPopup || collectionPage));
+            bool story = _screen == AppScreen.StoryMode;
+            bool cancel = frame.Cancel || (escape && (cloudSave || settings || selectingOpponent || _menuPad.HasPopup || collectionPage || story));
             if (!frame.HasInput && !cancel) return;
 
             GameObject scope = cloudSave ? _saveSyncMenu.Root : _screen switch
@@ -600,6 +644,7 @@ namespace YGOPortable.UI
                 AppScreen.StarterSelection => _collectionShop?.StarterRoot,
                 AppScreen.CardShop => _collectionShop?.ActiveShopRoot,
                 AppScreen.ArchetypeCodex => _archetypeCodex.Root,
+                AppScreen.StoryMode => _storyMode.ActiveRoot,
                 _ => null,
             };
             if (scope == null || !scope.activeInHierarchy) return;
@@ -650,6 +695,7 @@ namespace YGOPortable.UI
                 {
                     if (!_collectionShop.HandleShopBack()) ShowScreen(AppScreen.MainMenu);
                 }
+                else if (story) _storyMode.Back();
                 else if (_screen is AppScreen.OpponentSelect or AppScreen.ArchetypeCodex) ShowScreen(AppScreen.MainMenu);
                 else if (_screen == AppScreen.MainMenu) ShowScreen(AppScreen.Title);
             }
