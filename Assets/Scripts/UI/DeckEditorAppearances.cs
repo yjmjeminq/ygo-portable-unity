@@ -40,9 +40,9 @@ namespace YGOPortable.UI
 
         private void BuildAppearanceControls(Transform panel, float inset)
         {
-            var left = LotdUiKit.CreateRect("Edition", panel, new Vector2(0f, .924f), new Vector2(.33f, .982f),
+            var left = DuelUiKit.CreateRect("Edition", panel, new Vector2(0f, .924f), new Vector2(.33f, .982f),
                 new Vector2(inset, 0f), new Vector2(-4f, 0f));
-            var right = LotdUiKit.CreateRect("Artwork", panel, new Vector2(.33f, .924f), new Vector2(.666f, .982f),
+            var right = DuelUiKit.CreateRect("Artwork", panel, new Vector2(.33f, .924f), new Vector2(.666f, .982f),
                 new Vector2(3f, 0f), new Vector2(-3f, 0f));
             _inspectEdition = DeckEditorStyle.Button(left, "Button", "일반판", () =>
             {
@@ -54,7 +54,7 @@ namespace YGOPortable.UI
                 var (cards, index) = InspectedDeckSlot(_inspectedCode);
                 ChangeArtwork(_inspectedCode, cards, index);
             }, 13);
-            var destiny = LotdUiKit.CreateRect("DestinyDraw", panel, new Vector2(.666f, .924f), new Vector2(1f, .982f),
+            var destiny = DuelUiKit.CreateRect("DestinyDraw", panel, new Vector2(.666f, .924f), new Vector2(1f, .982f),
                 new Vector2(4f, 0f), new Vector2(-inset, 0f));
             _inspectDestiny = DeckEditorStyle.Button(destiny, "Button", "데스티니 지정", () =>
             {
@@ -165,14 +165,14 @@ namespace YGOPortable.UI
             _previewCard.SetDeckCard(code, appearance);
             var label = _inspectEdition.GetComponentInChildren<Text>();
             label.text = appearance.overframe ? "오버프레임" : "일반판";
-            label.color = appearance.overframe ? LotdUiKit.GoldAccent : LotdUiKit.TextPrimary;
+            label.color = appearance.overframe ? DuelUiKit.GoldAccent : DuelUiKit.TextPrimary;
             _inspectEdition.interactable = CanChangeEdition(code, cards, appearance);
             _inspectArtwork.gameObject.SetActive(CardArtLoader.GetSelectableArtwork(code, appearance.overframe).Length > 1);
             bool eligible = cards != null && ReferenceEquals(cards, _workingDeck.main);
             _inspectDestiny.interactable = eligible;
             var destiny = _inspectDestiny.GetComponentInChildren<Text>();
             destiny.text = eligible && appearance.destinyDraw ? "★ 데스티니" : "데스티니 지정";
-            destiny.color = eligible && appearance.destinyDraw ? LotdUiKit.GoldAccent : LotdUiKit.TextPrimary;
+            destiny.color = eligible && appearance.destinyDraw ? DuelUiKit.GoldAccent : DuelUiKit.TextPrimary;
         }
 
         private void ToggleDestiny(uint code, List<uint> cards, int index)

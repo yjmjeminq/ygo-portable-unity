@@ -36,7 +36,7 @@ namespace YGOPortable.UI
             }
             if (slot.targetChoice == null)
             {
-                var outline = LotdUiKit.FillRect("TargetChoice", slot.focusArt, -2.5f);
+                var outline = DuelUiKit.FillRect("TargetChoice", slot.focusArt, -2.5f);
                 slot.targetChoice = outline.gameObject.AddComponent<DuelEffectGraphic>();
                 slot.targetChoice.texture = Texture2D.whiteTexture;
                 slot.targetChoice.Kind = DuelEffectKind.TargetReticle;

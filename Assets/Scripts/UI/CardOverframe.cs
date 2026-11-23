@@ -23,7 +23,7 @@ namespace YGOPortable.UI
 
         internal static CardOverframeInput Attach(RectTransform holder, CompositeCardView card, bool motionSensor)
         {
-            var hit = LotdUiKit.AddImage(holder.gameObject, LotdUiKit.WhiteSprite, Color.clear);
+            var hit = DuelUiKit.AddImage(holder.gameObject, DuelUiKit.WhiteSprite, Color.clear);
             var input = holder.gameObject.AddComponent<CardOverframeInput>();
             input._card = card;
             input._holder = holder;

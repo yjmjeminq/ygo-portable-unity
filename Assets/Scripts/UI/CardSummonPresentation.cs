@@ -178,7 +178,7 @@ namespace YGOPortable.UI
         }
 
         private Image SummonScreenTint(string name) =>
-            LotdUiKit.AddImage(LotdUiKit.FillRect(name, _layer).gameObject, LotdUiKit.WhiteSprite, Color.clear, false, false);
+            DuelUiKit.AddImage(DuelUiKit.FillRect(name, _layer).gameObject, DuelUiKit.WhiteSprite, Color.clear, false, false);
 
         private static Color SummonPortraitAccent(uint attribute, Color fallback) => attribute switch
         {
@@ -194,16 +194,16 @@ namespace YGOPortable.UI
 
         private static CanvasGroup CreateSummonFraming(RectTransform parent, Color accent)
         {
-            var framing = LotdUiKit.FillRect("SummonFraming", parent);
+            var framing = DuelUiKit.FillRect("SummonFraming", parent);
             var visibility = framing.gameObject.AddComponent<CanvasGroup>();
             visibility.interactable = visibility.blocksRaycasts = false;
             visibility.alpha = 0f;
             Color shade = new Color(.016f, .020f, .038f, .98f);
-            var top = LotdUiKit.CreateRect("Top", framing, new Vector2(0f, .952f), Vector2.one,
+            var top = DuelUiKit.CreateRect("Top", framing, new Vector2(0f, .952f), Vector2.one,
                 Vector2.zero, Vector2.zero);
-            var bottom = LotdUiKit.CreateRect("Bottom", framing, Vector2.zero, new Vector2(1f, .057f),
+            var bottom = DuelUiKit.CreateRect("Bottom", framing, Vector2.zero, new Vector2(1f, .057f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(top.gameObject, LotdUiKit.WhiteSprite, shade, false, false);
+            DuelUiKit.AddImage(top.gameObject, DuelUiKit.WhiteSprite, shade, false, false);
             AddBandBackground(bottom, null, Color.Lerp(shade, accent, .40f));
             return visibility;
         }

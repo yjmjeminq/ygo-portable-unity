@@ -24,8 +24,8 @@ namespace YGOPortable.UI
         internal void ApplyTexture(Sprite sprite)
         {
             if (sprite == null) return;
-            var layer = LotdUiKit.FillRect("Particles", transform);
-            _texture = LotdUiKit.AddImage(layer.gameObject, sprite, new Color(1f, 1f, 1f, 0f), true, false);
+            var layer = DuelUiKit.FillRect("Particles", transform);
+            _texture = DuelUiKit.AddImage(layer.gameObject, sprite, new Color(1f, 1f, 1f, 0f), true, false);
         }
 
         internal void Seek(float progress)

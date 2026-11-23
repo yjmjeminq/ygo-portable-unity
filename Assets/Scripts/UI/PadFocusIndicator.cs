@@ -44,7 +44,7 @@ namespace YGOPortable.UI
 
         internal static PadFocusIndicator Create(Transform parent, string name)
         {
-            var frame = LotdUiKit.FillRect(name, parent);
+            var frame = DuelUiKit.FillRect(name, parent);
             frame.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
             var indicator = frame.gameObject.AddComponent<PadFocusIndicator>();
             indicator._home = parent;
@@ -175,7 +175,7 @@ namespace YGOPortable.UI
 
         private void BuildOutline()
         {
-            _outline = LotdUiKit.FillRect("Outline", _frame);
+            _outline = DuelUiKit.FillRect("Outline", _frame);
             _track = CreateLayer("Track");
             _tips = CreateLayer("Corners");
 
@@ -199,7 +199,7 @@ namespace YGOPortable.UI
 
         private CanvasGroup CreateLayer(string name)
         {
-            var layer = LotdUiKit.FillRect(name, _outline).gameObject.AddComponent<CanvasGroup>();
+            var layer = DuelUiKit.FillRect(name, _outline).gameObject.AddComponent<CanvasGroup>();
             layer.interactable = false;
             layer.blocksRaycasts = false;
             return layer;
@@ -208,8 +208,8 @@ namespace YGOPortable.UI
         private static RectTransform AddStroke(Transform parent, Vector2 min, Vector2 max, Vector2 offsetMin,
             Vector2 offsetMax, Color color)
         {
-            var stroke = LotdUiKit.CreateRect("Stroke", parent, min, max, offsetMin, offsetMax);
-            LotdUiKit.AddImage(stroke.gameObject, LotdUiKit.WhiteSprite, color, false, false);
+            var stroke = DuelUiKit.CreateRect("Stroke", parent, min, max, offsetMin, offsetMax);
+            DuelUiKit.AddImage(stroke.gameObject, DuelUiKit.WhiteSprite, color, false, false);
             return stroke;
         }
     }

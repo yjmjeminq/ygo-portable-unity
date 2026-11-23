@@ -40,7 +40,7 @@ namespace YGOPortable.UI
         internal PackContentsUI(Transform parent, Action onBack, Action<uint> onFindPacks = null,
             Action<uint, CardTradeAction> trade = null)
         {
-            var root = LotdUiKit.FillRect("Screen_PackContents", parent);
+            var root = DuelUiKit.FillRect("Screen_PackContents", parent);
             Root = root.gameObject;
             PackShopStyle.Backdrop(root);
             PackShopStyle.Header(root, "팩 수록 카드");
@@ -93,7 +93,7 @@ namespace YGOPortable.UI
             }
 
             var footer = PackShopStyle.Panel(root, "Footer", new Vector2(.035f, .017f), new Vector2(.965f, .059f));
-            LotdUiKit.AddFittedText(footer, "Controls", "방향키 이동   A 선택   Y 검색   LB/RB 페이지   오른쪽 스틱 설명   B 뒤로",
+            DuelUiKit.AddFittedText(footer, "Controls", "방향키 이동   A 선택   Y 검색   LB/RB 페이지   오른쪽 스틱 설명   B 뒤로",
                 16, 11, TextAnchor.MiddleCenter, PackShopStyle.TextMuted);
 
             SearchInput.onValueChanged.AddListener(_ => Filter());
@@ -231,11 +231,11 @@ namespace YGOPortable.UI
         private static (ScrollRect, Text) CreateDescription(Transform parent, bool trade)
         {
             var holder = Slot(parent, "Description", .52f, trade ? .283f : .232f, .921f, .614f);
-            LotdUiKit.AddImage(holder.gameObject, LotdUiKit.WhiteSprite, PackShopStyle.SurfaceInset);
-            var viewport = LotdUiKit.CreateRect("Viewport", holder, Vector2.zero, Vector2.one,
+            DuelUiKit.AddImage(holder.gameObject, DuelUiKit.WhiteSprite, PackShopStyle.SurfaceInset);
+            var viewport = DuelUiKit.CreateRect("Viewport", holder, Vector2.zero, Vector2.one,
                 new Vector2(8f, 5f), new Vector2(-20f, -5f));
             viewport.gameObject.AddComponent<RectMask2D>();
-            var content = LotdUiKit.AddText(viewport, "Text", "", 18, TextAnchor.UpperLeft, PackShopStyle.TextPrimary);
+            var content = DuelUiKit.AddText(viewport, "Text", "", 18, TextAnchor.UpperLeft, PackShopStyle.TextPrimary);
             content.supportRichText = false;
             content.verticalOverflow = VerticalWrapMode.Overflow;
             content.rectTransform.anchorMin = Vector2.up;
@@ -257,17 +257,17 @@ namespace YGOPortable.UI
         }
 
         private static RectTransform Slot(Transform parent, string name, float left, float bottom, float right, float top) =>
-            LotdUiKit.CreateRect(name, parent, new Vector2(left, bottom), new Vector2(right, top), Vector2.zero, Vector2.zero);
+            DuelUiKit.CreateRect(name, parent, new Vector2(left, bottom), new Vector2(right, top), Vector2.zero, Vector2.zero);
 
         private static Text Heading(Transform parent, string name, float left, float bottom, float right, float top)
         {
             var slot = Slot(parent, name, left, bottom, right, top);
-            return LotdUiKit.AddFittedText(slot, "Text", "", 24, 15, TextAnchor.MiddleCenter,
+            return DuelUiKit.AddFittedText(slot, "Text", "", 24, 15, TextAnchor.MiddleCenter,
                 PackShopStyle.TextPrimary, FontStyle.Bold);
         }
 
         private static Text Label(Transform parent, string name, float left, float bottom, float right, float top,
-            int size, TextAnchor alignment, Color color) => LotdUiKit.AddFittedText(Slot(parent, name, left, bottom, right, top),
+            int size, TextAnchor alignment, Color color) => DuelUiKit.AddFittedText(Slot(parent, name, left, bottom, right, top),
             "Text", "", size, Mathf.Max(11, size - 7), alignment, color);
 
         private static Button AddButton(Transform parent, string name, string text, float left, float bottom, float right, float top,

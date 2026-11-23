@@ -88,11 +88,11 @@ namespace YGOPortable.UI
 
             internal StoryDialogueView(Transform parent)
             {
-                var overlay = LotdUiKit.FillRect("StoryDialogue", parent);
+                var overlay = DuelUiKit.FillRect("StoryDialogue", parent);
                 _root = overlay.gameObject;
-                var back = LotdUiKit.AddImage(_root, LotdUiKit.WhiteSprite, new Color(.014f, .026f, .058f, .95f));
-                var surface = LotdUiKit.FillRect("AdvanceSurface", overlay);
-                var pointer = LotdUiKit.AddImage(surface.gameObject, LotdUiKit.WhiteSprite, Color.clear);
+                var back = DuelUiKit.AddImage(_root, DuelUiKit.WhiteSprite, new Color(.014f, .026f, .058f, .95f));
+                var surface = DuelUiKit.FillRect("AdvanceSurface", overlay);
+                var pointer = DuelUiKit.AddImage(surface.gameObject, DuelUiKit.WhiteSprite, Color.clear);
                 _advanceSurface = surface.gameObject.AddComponent<Button>();
                 _advanceSurface.targetGraphic = pointer;
                 _advanceSurface.transition = Selectable.Transition.None;
@@ -100,24 +100,24 @@ namespace YGOPortable.UI
                 _advanceSurface.onClick.AddListener(Advance);
                 back.raycastTarget = true;
 
-                var scene = LotdUiKit.FillRect("Scene", overlay);
+                var scene = DuelUiKit.FillRect("Scene", overlay);
                 var content = Application.isMobilePlatform ? MobileSafeArea.Create(scene) : scene;
                 _scene = content.gameObject.AddComponent<CanvasGroup>();
-                _heading = AddLabel(content, "Episode", .06f, .88f, .94f, .965f, 29, color: LotdUiKit.GoldAccent);
+                _heading = AddLabel(content, "Episode", .06f, .88f, .94f, .965f, 29, color: DuelUiKit.GoldAccent);
                 _heroIdentity = AddLabel(content, "ProtagonistIdentity", .065f, .837f, .495f, .884f, 17, color: HeroColor);
                 var hero = Region(content, "Protagonist", .07f, .26f, .493f, .855f);
                 var opponent = Region(content, "Opponent", .508f, .26f, .93f, .855f);
-                _hero = LotdUiKit.AddImage(hero.gameObject, LotdUiKit.LoadSprite("Story/Protagonist"), Color.white, true, false);
-                _opponent = LotdUiKit.AddImage(opponent.gameObject, null, Listening, true, false);
+                _hero = DuelUiKit.AddImage(hero.gameObject, DuelUiKit.LoadSprite("Story/Protagonist"), Color.white, true, false);
+                _opponent = DuelUiKit.AddImage(opponent.gameObject, null, Listening, true, false);
 
-                var dialogue = LotdUiKit.CreateMenuPanel(content, "DialogueBox",
+                var dialogue = DuelUiKit.CreateMenuPanel(content, "DialogueBox",
                     new Vector2(.054f, .064f), new Vector2(.946f, .406f));
                 var dialogueHit = dialogue.gameObject.AddComponent<Button>();
                 dialogueHit.transition = Selectable.Transition.None;
                 dialogueHit.navigation = new Navigation { mode = Navigation.Mode.None };
                 dialogueHit.onClick.AddListener(Advance);
                 var speakerPlate = Region(dialogue, "SpeakerBadge", .038f, .703f, .35f, .95f);
-                LotdUiKit.AddImage(speakerPlate.gameObject, LotdUiKit.WhiteSprite, new Color(.028f, .063f, .13f, .94f), false, false);
+                DuelUiKit.AddImage(speakerPlate.gameObject, DuelUiKit.WhiteSprite, new Color(.028f, .063f, .13f, .94f), false, false);
                 _speaker = AddLabel(speakerPlate, "Speaker", .08f, .05f, .94f, .95f, 23, TextAnchor.MiddleLeft);
                 _text = AddLabel(dialogue, "Text", .047f, .234f, .947f, .69f, 29, TextAnchor.UpperLeft);
                 _text.supportRichText = false;
@@ -128,9 +128,9 @@ namespace YGOPortable.UI
                 _skip = AddButton(dialogue, "Skip", "건너뛰기", .797f, .727f, .952f, .927f, Finish);
                 _next = AddButton(dialogue, "Next", "다음 ▶", .778f, .042f, .952f, .214f, Advance, gold: true);
 
-                var choices = LotdUiKit.CreateMenuPanel(content, "Choices", new Vector2(.261f, .408f), new Vector2(.739f, .833f));
+                var choices = DuelUiKit.CreateMenuPanel(content, "Choices", new Vector2(.261f, .408f), new Vector2(.739f, .833f));
                 _choiceRoot = choices.gameObject;
-                _choiceSummary = AddLabel(choices, "Summary", .065f, .762f, .935f, .966f, 21, color: LotdUiKit.GoldAccent);
+                _choiceSummary = AddLabel(choices, "Summary", .065f, .762f, .935f, .966f, 21, color: DuelUiKit.GoldAccent);
                 for (int i = 0; i < _choiceButtons.Length; i++)
                 {
                     int index = i;
@@ -141,35 +141,35 @@ namespace YGOPortable.UI
 
                 var log = BuildPopup(overlay, "Backlog", .12f, .102f, .88f, .901f);
                 _logRoot = log.Root;
-                AddLabel(log.Panel, "Title", .075f, .85f, .927f, .954f, 26, color: LotdUiKit.GoldAccent).text = "대화 로그";
+                AddLabel(log.Panel, "Title", .075f, .85f, .927f, .954f, 26, color: DuelUiKit.GoldAccent).text = "대화 로그";
                 var scrollHost = Region(log.Panel, "Scroll", .068f, .19f, .922f, .825f);
                 _logScroll = scrollHost.gameObject.AddComponent<ScrollRect>();
                 _logScroll.horizontal = false;
                 _logScroll.movementType = ScrollRect.MovementType.Clamped;
                 _logScroll.scrollSensitivity = 38f;
-                var viewport = LotdUiKit.FillRect("Viewport", scrollHost);
-                LotdUiKit.AddImage(viewport.gameObject, LotdUiKit.WhiteSprite, new Color(.009f, .023f, .048f, .92f));
+                var viewport = DuelUiKit.FillRect("Viewport", scrollHost);
+                DuelUiKit.AddImage(viewport.gameObject, DuelUiKit.WhiteSprite, new Color(.009f, .023f, .048f, .92f));
                 viewport.gameObject.AddComponent<RectMask2D>();
-                var history = LotdUiKit.CreateRect("History", viewport, new Vector2(0f, 1f), Vector2.one,
+                var history = DuelUiKit.CreateRect("History", viewport, new Vector2(0f, 1f), Vector2.one,
                     new Vector2(14f, -4f), new Vector2(-20f, -4f));
                 history.pivot = new Vector2(.5f, 1f);
-                _logText = LotdUiKit.AddFittedText(history, "Text", "", 23, 23, TextAnchor.UpperLeft, LotdUiKit.TextPrimary);
+                _logText = DuelUiKit.AddFittedText(history, "Text", "", 23, 23, TextAnchor.UpperLeft, DuelUiKit.TextPrimary);
                 _logText.resizeTextForBestFit = false;
                 _logText.supportRichText = false;
                 _logText.verticalOverflow = VerticalWrapMode.Overflow;
                 _logScroll.viewport = viewport;
                 _logScroll.content = history;
-                _logScroll.verticalScrollbar = LotdUiKit.AddVerticalScrollbar(scrollHost);
+                _logScroll.verticalScrollbar = DuelUiKit.AddVerticalScrollbar(scrollHost);
                 AddButton(log.Panel, "LogUp", "위로", .075f, .065f, .225f, .163f, () => ScrollLog(.23f));
                 AddButton(log.Panel, "LogDown", "아래로", .235f, .065f, .385f, .163f, () => ScrollLog(-.23f));
                 _logClose = AddButton(log.Panel, "LogClose", "닫기", .735f, .065f, .925f, .163f, () => ClosePopup(), gold: true);
 
                 var picker = BuildPopup(overlay, "DeckSelection", .219f, .212f, .781f, .789f);
                 _pickerRoot = picker.Root;
-                AddLabel(picker.Panel, "Title", .09f, .755f, .91f, .943f, 28, color: LotdUiKit.GoldAccent).text = "내 덱 변경";
+                AddLabel(picker.Panel, "Title", .09f, .755f, .91f, .943f, 28, color: DuelUiKit.GoldAccent).text = "내 덱 변경";
                 var dropdown = Region(picker.Panel, "Decks", .092f, .526f, .908f, .704f);
-                _picker = LotdUiKit.CreateLotdDropdown(dropdown, "StoryDeck", Array.Empty<string>(), _ => { }, dynamicChoices: true);
-                _pickerStatus = AddLabel(picker.Panel, "DeckStatus", .092f, .469f, .908f, .532f, 18, color: LotdUiKit.TextMuted);
+                _picker = DuelUiKit.CreateDropdown(dropdown, "StoryDeck", Array.Empty<string>(), _ => { }, dynamicChoices: true);
+                _pickerStatus = AddLabel(picker.Panel, "DeckStatus", .092f, .469f, .908f, .532f, 18, color: DuelUiKit.TextMuted);
                 _pickerApply = AddButton(picker.Panel, "Apply", "선택한 덱 적용", .517f, .315f, .908f, .472f, ApplyDeck, gold: true);
                 _pickerEdit = AddButton(picker.Panel, "Edit", "덱 편집 열기", .092f, .315f, .483f, .472f, () => _editDeck?.Invoke());
                 AddButton(picker.Panel, "Back", "돌아가기", .31f, .098f, .69f, .246f, CloseDeckPicker);
@@ -467,9 +467,9 @@ namespace YGOPortable.UI
             private static (GameObject Root, RectTransform Panel) BuildPopup(Transform parent, string name,
                 float left, float bottom, float right, float top)
             {
-                var overlay = LotdUiKit.FillRect(name, parent);
-                LotdUiKit.AddImage(overlay.gameObject, LotdUiKit.WhiteSprite, new Color(.008f, .018f, .047f, .88f));
-                var panel = LotdUiKit.CreateMenuPanel(overlay, "Window", new Vector2(left, bottom), new Vector2(right, top));
+                var overlay = DuelUiKit.FillRect(name, parent);
+                DuelUiKit.AddImage(overlay.gameObject, DuelUiKit.WhiteSprite, new Color(.008f, .018f, .047f, .88f));
+                var panel = DuelUiKit.CreateMenuPanel(overlay, "Window", new Vector2(left, bottom), new Vector2(right, top));
                 return (overlay.gameObject, panel);
             }
         }

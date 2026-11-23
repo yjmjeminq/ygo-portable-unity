@@ -18,25 +18,25 @@ namespace YGOPortable.UI
             for (int i = 0; i < 2; i++)
             {
                 float y = .21f + i * .48f;
-                var light = LotdUiKit.CreateRect("Light", transform, new Vector2(-.08f, y),
+                var light = DuelUiKit.CreateRect("Light", transform, new Vector2(-.08f, y),
                     new Vector2(1.08f, y + .013f), Vector2.zero, Vector2.zero);
                 light.localRotation = Quaternion.Euler(0f, 0f, 17f);
-                LotdUiKit.AddImage(light.gameObject, LotdUiKit.WhiteSprite,
+                DuelUiKit.AddImage(light.gameObject, DuelUiKit.WhiteSprite,
                     new Color(accent.r, accent.g, accent.b, .39f - i * .16f), false, false);
             }
             RectTransform holder = (RectTransform)transform;
             if (artworkPanel)
             {
-                holder = LotdUiKit.CreateRect("ArtworkPanel", transform, new Vector2(.17f, .08f),
+                holder = DuelUiKit.CreateRect("ArtworkPanel", transform, new Vector2(.17f, .08f),
                     new Vector2(.83f, .92f), Vector2.zero, Vector2.zero);
-                var plate = LotdUiKit.FillRect("Projection", holder);
+                var plate = DuelUiKit.FillRect("Projection", holder);
                 var fit = plate.gameObject.AddComponent<AspectRatioFitter>();
                 fit.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
                 fit.aspectRatio = portrait.rect.width / portrait.rect.height;
                 DuelReadoutPlate.Add(plate, new Color(accent.r * .45f, accent.g * .45f, accent.b * .45f, .97f));
-                holder = LotdUiKit.FillRect("Inset", plate, 6f);
+                holder = DuelUiKit.FillRect("Inset", plate, 6f);
             }
-            LotdUiKit.AddImage(LotdUiKit.FillRect("Subject", holder).gameObject, portrait, Color.white, true, false);
+            DuelUiKit.AddImage(DuelUiKit.FillRect("Subject", holder).gameObject, portrait, Color.white, true, false);
         }
 
         internal void Pose(Vector2 center, float opacity, float scale)

@@ -113,7 +113,7 @@ namespace YGOPortable.Editor
                 DuelVisualAssets.ReleaseCutIn(bundled);
                 DuelVisualAssets.ReleaseCutIn(zero);
 
-                var holder = LotdUiKit.CreateRect("View", canvas.transform, new Vector2(.25f, .16f), new Vector2(.52f, .83f),
+                var holder = DuelUiKit.CreateRect("View", canvas.transform, new Vector2(.25f, .16f), new Vector2(.52f, .83f),
                     Vector2.zero, Vector2.zero);
                 var card = CompositeCardView.Create(holder, "Detailed", detailedOverlay: true);
                 card.EnableOverframe();
@@ -246,7 +246,7 @@ namespace YGOPortable.Editor
 
             foreach (bool compact in new[] { false, true })
             {
-                var holder = LotdUiKit.FillRect("TradeButtons", parent);
+                var holder = DuelUiKit.FillRect("TradeButtons", parent);
                 var shortcuts = new CardTradeControls(holder, (_, _) => { }, compact, deckEditor: compact);
                 var standard = (RectTransform)holder.Find("Craft");
                 var special = holder.Find("CraftOverframe");
@@ -278,7 +278,7 @@ namespace YGOPortable.Editor
                 OverframeOffsetCatalog.GetOffset(magician) == (Vector2.zero, 1f),
                 "Startup did not load the bundled card corrections or default an unlisted card.");
 
-            var holder = LotdUiKit.CreateRect("OffsetVerification", parent, Vector2.zero, Vector2.zero,
+            var holder = DuelUiKit.CreateRect("OffsetVerification", parent, Vector2.zero, Vector2.zero,
                 Vector2.zero, new Vector2(300f, 420f));
             var view = CompositeCardView.Create(holder, "Detail", detailedOverlay: true);
             var cinematic = CompositeCardView.Create(holder, "Cinematic", detailedOverlay: true, cinematicOverframe: true);
@@ -407,7 +407,7 @@ namespace YGOPortable.Editor
         private static void VerifyPackFaces(Transform parent)
         {
             var opening = new PackOpeningView(parent, null);
-            opening.Show(LotdUiKit.WhiteSprite, "카드 프레임 검증",
+            opening.Show(DuelUiKit.WhiteSprite, "카드 프레임 검증",
                 new IReadOnlyList<PackPull>[] { new[] { new PackPull(BlueEyes, true, 1), new PackPull(BlueEyes, false, 2) } });
             const BindingFlags instance = BindingFlags.Instance | BindingFlags.NonPublic;
             typeof(PackOpeningView).GetMethod("ShowResults", instance).Invoke(opening, null);
@@ -459,7 +459,7 @@ namespace YGOPortable.Editor
         private static void VerifyPackRarityReveals(PackOpeningView opening, Transform results)
         {
             const uint macroCosmos = 30241314, acidGolem = 23995346, sparkman = 20721928;
-            opening.Show(LotdUiKit.WhiteSprite, "팩 등급 검증", new IReadOnlyList<PackPull>[]
+            opening.Show(DuelUiKit.WhiteSprite, "팩 등급 검증", new IReadOnlyList<PackPull>[]
             {
                 new[] { new PackPull(BlueEyes, false, 1), new PackPull(macroCosmos, false, 1),
                     new PackPull(acidGolem, false, 1), new PackPull(sparkman, false, 1) },
@@ -809,7 +809,7 @@ namespace YGOPortable.Editor
                 "The subject or stat strip did not settle before the card travelled to the field.");
             Require(reveal.MoveNext(), "The ace did not travel to the field.");
             TrackStableOverframe(layer, SampleAnimation((IEnumerator)reveal.Current), .05f, 1f);
-            float fittedHeight = Mathf.Min(end.Size.y, end.Size.x / LotdUiKit.CardAspectRatio);
+            float fittedHeight = Mathf.Min(end.Size.y, end.Size.x / DuelUiKit.CardAspectRatio);
             Require(fixedRect.sizeDelta == initialSize && Mathf.Abs(fixedRect.rect.height * fixedRect.localScale.y - fittedHeight) < .1f &&
                 Vector2.Distance(fixedRect.anchoredPosition, end.Position) < .1f, "The fixed summon layout missed its destination.");
             Require(!reveal.MoveNext() && !move.MoveNext() && landed && (view == null || !view.gameObject.activeSelf) &&
@@ -1388,7 +1388,7 @@ namespace YGOPortable.Editor
                 var resting = new CardPose(opponent ? start : start - Vector2.up * 7f, new Vector2(70f, 102f), opponent ? 90f : 0f);
                 var from = new CardPose(start, resting.Size * (opponent ? 1f : 1.05f), resting.Angle);
                 var defender = new CardPose(end, new Vector2(70f, 102f), -90f);
-                var targetArt = LotdUiKit.CreateRect("Target Card", animator.transform, Vector2.one * .5f,
+                var targetArt = DuelUiKit.CreateRect("Target Card", animator.transform, Vector2.one * .5f,
                     Vector2.one * .5f, Vector2.zero, Vector2.zero);
                 targetArt.anchoredPosition = end;
                 targetArt.sizeDelta = defender.Size;
@@ -1514,9 +1514,9 @@ namespace YGOPortable.Editor
         private static void VerifyLifeFeedbackRouting(CardAnimationManager animator)
         {
             animator.Clear();
-            var own = LotdUiKit.CreateRect("Own LP", animator.transform.parent, new Vector2(.05f, .04f),
+            var own = DuelUiKit.CreateRect("Own LP", animator.transform.parent, new Vector2(.05f, .04f),
                 new Vector2(.19f, .075f), Vector2.zero, Vector2.zero);
-            var rival = LotdUiKit.CreateRect("Rival LP", animator.transform.parent, new Vector2(.77f, .93f),
+            var rival = DuelUiKit.CreateRect("Rival LP", animator.transform.parent, new Vector2(.77f, .93f),
                 new Vector2(.93f, .965f), Vector2.zero, Vector2.zero);
             var pose = new CardPose(Vector2.zero, new Vector2(70f, 102f));
             var card = new DuelCardReadout(CardDatabase.Get(BlueEyes));

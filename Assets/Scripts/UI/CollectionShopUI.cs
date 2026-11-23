@@ -341,20 +341,20 @@ namespace YGOPortable.UI
         private Catalog BuildShop(Transform parent)
         {
             var catalog = new Catalog();
-            var root = LotdUiKit.FillRect("Screen_CollectionShop", parent);
+            var root = DuelUiKit.FillRect("Screen_CollectionShop", parent);
             catalog.Root = root.gameObject;
             _shopControls = root.gameObject.AddComponent<CanvasGroup>();
             PackShopStyle.Backdrop(root);
             PackShopStyle.Header(root, "상점");
             var wallet = Slot("Wallet", root, .716f, .918f, .835f, .969f);
-            LotdUiKit.AddImage(wallet.gameObject, LotdUiKit.WhiteSprite, new Color32(82, 83, 86, 214), false, false);
-            _balance = LotdUiKit.AddFittedText(wallet, "Balance", "", 21, 14, TextAnchor.MiddleCenter,
+            DuelUiKit.AddImage(wallet.gameObject, DuelUiKit.WhiteSprite, new Color32(82, 83, 86, 214), false, false);
+            _balance = DuelUiKit.AddFittedText(wallet, "Balance", "", 21, 14, TextAnchor.MiddleCenter,
                 PackShopStyle.TextPrimary, FontStyle.Bold);
             var mileage = Slot("Mileage", root, .037f, .922f, .283f, .969f);
-            LotdUiKit.AddImage(mileage.gameObject, LotdUiKit.WhiteSprite, PackShopStyle.SurfaceInset, false, false);
-            _mileageFill = LotdUiKit.AddImage(LotdUiKit.FillRect("Fill", mileage).gameObject,
-                LotdUiKit.WhiteSprite, new Color(.23f, .51f, .5f, .82f), false, false);
-            _mileage = LotdUiKit.AddFittedText(mileage, "Value", "", 18, 11, TextAnchor.MiddleCenter, PackShopStyle.TextPrimary);
+            DuelUiKit.AddImage(mileage.gameObject, DuelUiKit.WhiteSprite, PackShopStyle.SurfaceInset, false, false);
+            _mileageFill = DuelUiKit.AddImage(DuelUiKit.FillRect("Fill", mileage).gameObject,
+                DuelUiKit.WhiteSprite, new Color(.23f, .51f, .5f, .82f), false, false);
+            _mileage = DuelUiKit.AddFittedText(mileage, "Value", "", 18, 11, TextAnchor.MiddleCenter, PackShopStyle.TextPrimary);
             ShopButton(root, "Back", "메인 메뉴", .853f, .918f, .965f, .971f, _onBack);
 
             PackShopStyle.SetSelected(ShopButton(root, "Packs", "팩 상점", .035f, .819f, .192f, .885f,
@@ -417,7 +417,7 @@ namespace YGOPortable.UI
                 title.supportRichText = false;
                 catalog.Labels[i] = title;
                 var art = Slot("PackCover", button.transform, .06f, .238f, .94f, .957f);
-                catalog.PackTiles[i] = LotdUiKit.AddImage(art.gameObject, null, Color.white, true, false);
+                catalog.PackTiles[i] = DuelUiKit.AddImage(art.gameObject, null, Color.white, true, false);
                 ((PackShopButtonLabel)button).SetMovingArtwork(art);
             }
             catalog.Previous = ShopButton(grid, "Previous", "‹ 이전", .027f, .025f, .235f, .104f, () => ChangePage(catalog, -1));
@@ -427,7 +427,7 @@ namespace YGOPortable.UI
             var detail = PackShopStyle.Panel(root, "Details", new Vector2(.71f, .109f), new Vector2(.965f, .800f));
             catalog.Heading = Label(detail, "Heading", "", .067f, .870f, .933f, .972f, 26, TextAnchor.MiddleCenter, PackShopStyle.TextPrimary);
             var preview = Slot("Cover", detail, .113f, .47f, .887f, .866f);
-            catalog.PackCover = LotdUiKit.AddImage(preview.gameObject, null, Color.white, true, false);
+            catalog.PackCover = DuelUiKit.AddImage(preview.gameObject, null, Color.white, true, false);
             catalog.Details = Label(detail, "Info", "", .073f, .395f, .927f, .463f, 16, TextAnchor.MiddleCenter, PackShopStyle.TextMuted);
             _packGuarantee = Label(detail, "Guarantee", "", .066f, .324f, .934f, .392f, 15, TextAnchor.MiddleCenter, PackShopStyle.Accent);
             _viewContentsButton = ShopButton(detail, "ViewContents", "수록 카드", .065f, .237f, .490f, .315f, ViewSelectedPack);
@@ -450,20 +450,20 @@ namespace YGOPortable.UI
         private Catalog BuildStarter(Transform parent)
         {
             var catalog = new Catalog();
-            var root = LotdUiKit.FillRect("Screen_StarterSelection", parent);
+            var root = DuelUiKit.FillRect("Screen_StarterSelection", parent);
             catalog.Root = root.gameObject;
-            LotdUiKit.AddImage(LotdUiKit.FillRect("Backdrop", root).gameObject,
-                LotdUiKit.LoadSprite("LOTD/Background/bg_vrains"), new Color(.52f, .63f, .79f), false, false);
-            LotdUiKit.AddMenuHeader(root, "스타터 카드군 선택");
+            DuelUiKit.AddImage(DuelUiKit.FillRect("Backdrop", root).gameObject,
+                DuelUiChrome.Backdrop, Color.white, false, false);
+            DuelUiKit.AddMenuHeader(root, "스타터 카드군 선택");
             AddButton(root, "Back", "타이틀", .825f, .917f, .968f, .975f, _onBack);
 
-            var list = LotdUiKit.CreateMenuPanel(root, "Catalog", new Vector2(.025f, .083f), new Vector2(.405f, .882f));
-            var details = LotdUiKit.CreateMenuPanel(root, "Details", new Vector2(.419f, .083f), new Vector2(.975f, .882f));
+            var list = DuelUiKit.CreateMenuPanel(root, "Catalog", new Vector2(.025f, .083f), new Vector2(.405f, .882f));
+            var details = DuelUiKit.CreateMenuPanel(root, "Details", new Vector2(.419f, .083f), new Vector2(.975f, .882f));
             var search = Slot("Search", list, .08f, .851f, .92f, .924f);
-            catalog.Search = LotdUiKit.CreateInputField(search, "Input", "카드군·카드명·카드 번호 검색", 17);
+            catalog.Search = DuelUiKit.CreateInputField(search, "Input", "카드군·카드명·카드 번호 검색", 17);
             catalog.Search.onValueChanged.AddListener(_ => FilterCatalog(catalog));
             catalog.CountLabel = Label(list, "Count", "", .087f, .796f, .914f, .838f, 16,
-                TextAnchor.MiddleLeft, LotdUiKit.TextMuted);
+                TextAnchor.MiddleLeft, DuelUiKit.TextMuted);
             for (int i = 0; i < PageSize; i++)
             {
                 int row = i;
@@ -491,33 +491,33 @@ namespace YGOPortable.UI
             }
             catalog.Previous = AddButton(list, "Previous", "이전", .08f, .073f, .28f, .139f, () => ChangePage(catalog, -1));
             catalog.Next = AddButton(list, "Next", "다음", .72f, .073f, .92f, .139f, () => ChangePage(catalog, 1));
-            catalog.PageLabel = Label(list, "Page", "", .31f, .073f, .69f, .139f, 18, TextAnchor.MiddleCenter, LotdUiKit.TextMuted);
+            catalog.PageLabel = Label(list, "Page", "", .31f, .073f, .69f, .139f, 18, TextAnchor.MiddleCenter, DuelUiKit.TextMuted);
 
             var heading = Slot("Heading", details, .075f, .853f, .925f, .928f);
-            LotdUiKit.AddImage(heading.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelHeader, false, false);
-            catalog.Heading = LotdUiKit.AddFittedText(heading, "Title", "", 28, 17, TextAnchor.MiddleCenter,
-                LotdUiKit.GoldAccent, FontStyle.Bold);
+            DuelUiKit.AddImage(heading.gameObject, DuelUiKit.WhiteSprite, DuelUiKit.PanelHeader, false, false);
+            catalog.Heading = DuelUiKit.AddFittedText(heading, "Title", "", 28, 17, TextAnchor.MiddleCenter,
+                DuelUiKit.GoldAccent, FontStyle.Bold);
             catalog.Cover = CompositeCardView.Create(Slot("Cover", details, .062f, .10f, .45f, .838f), "FeaturedCard", true);
-            catalog.Details = Label(details, "Info", "", .48f, .563f, .914f, .817f, 22, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary);
+            catalog.Details = Label(details, "Info", "", .48f, .563f, .914f, .817f, 22, TextAnchor.MiddleLeft, DuelUiKit.TextPrimary);
             catalog.Action = AddButton(details, "Choose", "이 카드군으로 시작", .48f, .466f, .923f, .547f, ChooseSelectedStarter, true);
-            catalog.Status = Label(details, "Status", "", .48f, .395f, .923f, .454f, 17, TextAnchor.MiddleLeft, LotdUiKit.TextMuted);
+            catalog.Status = Label(details, "Status", "", .48f, .395f, .923f, .454f, 17, TextAnchor.MiddleLeft, DuelUiKit.TextMuted);
             Label(details, "StarterInfo", $"전체 카드군 중 하나를 처음 한 번만 고릅니다.\n고른 카드군의 스타터 덱과 {CollectionProgress.StartingBalance:N0} DP를 받습니다.",
-                .48f, .204f, .923f, .362f, 18, TextAnchor.UpperLeft, LotdUiKit.TextMuted);
-            var footer = LotdUiKit.CreateBorderedPanel(root, "Footer", new Vector2(.035f, .017f), new Vector2(.965f, .059f),
+                .48f, .204f, .923f, .362f, 18, TextAnchor.UpperLeft, DuelUiKit.TextMuted);
+            var footer = DuelUiKit.CreateBorderedPanel(root, "Footer", new Vector2(.035f, .017f), new Vector2(.965f, .059f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddFittedText(footer, "Controls", "방향키 이동   A 선택   Y 검색   LB/RB 페이지   B 뒤로",
-                16, 11, TextAnchor.MiddleCenter, LotdUiKit.TextMuted);
+            DuelUiKit.AddFittedText(footer, "Controls", "방향키 이동   A 선택   Y 검색   LB/RB 페이지   B 뒤로",
+                16, 11, TextAnchor.MiddleCenter, DuelUiKit.TextMuted);
             root.gameObject.SetActive(false);
             return catalog;
         }
 
         private void BuildShopDialog(Transform parent)
         {
-            var modal = LotdUiKit.FillRect("ShopDialog", parent);
+            var modal = DuelUiKit.FillRect("ShopDialog", parent);
             _shopDialog = modal.gameObject;
             // Keep the confirmation navigable while keyboard navigation behind it is blocked.
             _shopDialog.AddComponent<CanvasGroup>().ignoreParentGroups = true;
-            LotdUiKit.AddImage(modal.gameObject, LotdUiKit.WhiteSprite, PackShopStyle.Scrim);
+            DuelUiKit.AddImage(modal.gameObject, DuelUiKit.WhiteSprite, PackShopStyle.Scrim);
             var box = PackShopStyle.Panel(modal, "Window", new Vector2(.295f, .276f), new Vector2(.705f, .724f));
             _dialogWindow = box.gameObject;
             _dialogHeading = Label(box, "Heading", "", .07f, .770f, .93f, .931f, 27, TextAnchor.MiddleCenter, PackShopStyle.TextPrimary);
@@ -812,7 +812,7 @@ namespace YGOPortable.UI
             for (int i = 0; i < PageSize && first + i < catalog.Matches.Count; i++)
             {
                 bool selected = catalog.Matches[first + i] == item;
-                if (starter) catalog.Labels[i].color = selected ? LotdUiKit.GoldAccent : LotdUiKit.TextPrimary;
+                if (starter) catalog.Labels[i].color = selected ? DuelUiKit.GoldAccent : DuelUiKit.TextPrimary;
                 else PackShopStyle.SetSelected(catalog.Rows[i], selected);
             }
         }
@@ -845,7 +845,7 @@ namespace YGOPortable.UI
         {
             catalog.Status.text = message;
             if (catalog == _starter)
-                catalog.Status.color = error ? LotdUiKit.RedAccent : LotdUiKit.TextMuted;
+                catalog.Status.color = error ? DuelUiKit.RedAccent : DuelUiKit.TextMuted;
             else catalog.Status.color = error ? PackShopStyle.Danger : PackShopStyle.TextMuted;
         }
 
@@ -856,16 +856,16 @@ namespace YGOPortable.UI
         private static int PageCount(Catalog catalog) => Mathf.Max(1, (catalog.Matches.Count + PageSize - 1) / PageSize);
 
         private static RectTransform Slot(string name, Transform parent, float left, float bottom, float right, float top) =>
-            LotdUiKit.CreateRect(name, parent, new Vector2(left, bottom), new Vector2(right, top), Vector2.zero, Vector2.zero);
+            DuelUiKit.CreateRect(name, parent, new Vector2(left, bottom), new Vector2(right, top), Vector2.zero, Vector2.zero);
 
         private static Text Label(Transform parent, string name, string text, float left, float bottom, float right, float top,
             int size, TextAnchor alignment, Color color) =>
-            LotdUiKit.AddFittedText(Slot(name, parent, left, bottom, right, top), "Text", text, size, Mathf.Max(11, size - 7),
+            DuelUiKit.AddFittedText(Slot(name, parent, left, bottom, right, top), "Text", text, size, Mathf.Max(11, size - 7),
                 alignment, color);
 
         private static Button AddButton(Transform parent, string name, string caption, float left, float bottom,
             float right, float top, Action click, bool gold = false) =>
-            LotdUiKit.CreateLotdButton(Slot(name, parent, left, bottom, right, top), "Button", caption, click, 18, gold);
+            DuelUiKit.CreateButton(Slot(name, parent, left, bottom, right, top), "Button", caption, click, 18, gold);
 
         private static Button ShopButton(Transform parent, string name, string caption, float left, float bottom,
             float right, float top, Action click, bool primary = false,
@@ -877,9 +877,9 @@ namespace YGOPortable.UI
     {
         internal static Text Create(Transform parent, Vector2 anchorMin, Vector2 anchorMax, int fontSize)
         {
-            var holder = LotdUiKit.CreateRect("Rarity", parent, anchorMin, anchorMax, Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(holder.gameObject, LotdUiKit.WhiteSprite, PackShopStyle.SurfaceInset, raycast: false);
-            var text = LotdUiKit.AddFittedText(holder, "Text", "", fontSize, Mathf.Min(10, fontSize),
+            var holder = DuelUiKit.CreateRect("Rarity", parent, anchorMin, anchorMax, Vector2.zero, Vector2.zero);
+            DuelUiKit.AddImage(holder.gameObject, DuelUiKit.WhiteSprite, PackShopStyle.SurfaceInset, raycast: false);
+            var text = DuelUiKit.AddFittedText(holder, "Text", "", fontSize, Mathf.Min(10, fontSize),
                 TextAnchor.MiddleCenter, PackShopStyle.TextPrimary, FontStyle.Bold);
             var shadow = text.gameObject.AddComponent<Shadow>();
             shadow.effectColor = PackShopStyle.Ink;

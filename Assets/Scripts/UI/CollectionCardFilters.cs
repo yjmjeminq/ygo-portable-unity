@@ -30,10 +30,10 @@ namespace YGOPortable.UI
         {
             Dropdown Add(string name, string[] choices, float left, float right)
             {
-                var holder = LotdUiKit.CreateRect(name, parent, new Vector2(left, 0f), new Vector2(right, 1f),
+                var holder = DuelUiKit.CreateRect(name, parent, new Vector2(left, 0f), new Vector2(right, 1f),
                     Vector2.zero, Vector2.zero);
                 return deckEditor ? DeckEditorStyle.Dropdown(holder, "Dropdown", choices, _ => changed()) :
-                    LotdUiKit.CreateLotdDropdown(holder, "Dropdown", choices, _ => changed());
+                    DuelUiKit.CreateDropdown(holder, "Dropdown", choices, _ => changed());
             }
 
             if (includeRarity) _rarity = Add("Rarity", Rarities, 0f, .265f);

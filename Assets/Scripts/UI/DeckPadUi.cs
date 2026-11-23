@@ -36,27 +36,27 @@ namespace YGOPortable.UI
             _root = root;
             _useShopPalette = useShopPalette;
             _deckEditor = deckEditor;
-            var overlay = LotdUiKit.FillRect("PadChoices", root);
+            var overlay = DuelUiKit.FillRect("PadChoices", root);
             _choicePanel = overlay;
-            LotdUiKit.AddImage(overlay.gameObject, LotdUiKit.WhiteSprite,
+            DuelUiKit.AddImage(overlay.gameObject, DuelUiKit.WhiteSprite,
                 deckEditor ? DeckEditorStyle.Scrim : new Color(.01f, .025f, .07f, .80f));
             overlay.gameObject.AddComponent<DeckChoiceWheel>().MoveChoice = MoveChoice;
             var min = new Vector2(.265f, .147f);
             var max = new Vector2(.735f, .853f);
             var panel = deckEditor ? DeckEditorStyle.Panel(overlay, "Window", min, max) :
-                LotdUiKit.CreateMenuPanel(overlay, "Window", min, max);
+                DuelUiKit.CreateMenuPanel(overlay, "Window", min, max);
             Button CreateChoiceButton(Transform holder, string label, Action action, int size) =>
                 deckEditor ? DeckEditorStyle.Button(holder, "Button", label, action, size) :
-                    LotdUiKit.CreateLotdButton(holder, "Button", label, action, size);
-            var header = LotdUiKit.CreateRect("Header", panel, new Vector2(.09f, .843f), new Vector2(.91f, .955f),
+                    DuelUiKit.CreateButton(holder, "Button", label, action, size);
+            var header = DuelUiKit.CreateRect("Header", panel, new Vector2(.09f, .843f), new Vector2(.91f, .955f),
                 Vector2.zero, Vector2.zero);
-            _choiceStatus = LotdUiKit.AddFittedText(header, "Status", "", 20, 13, TextAnchor.MiddleCenter,
-                deckEditor ? DeckEditorStyle.Accent : LotdUiKit.CyanAccent, FontStyle.Bold);
+            _choiceStatus = DuelUiKit.AddFittedText(header, "Status", "", 20, 13, TextAnchor.MiddleCenter,
+                deckEditor ? DeckEditorStyle.Accent : DuelUiKit.CyanAccent, FontStyle.Bold);
             for (int i = 0; i < VisibleChoices; i++)
             {
                 int rowIndex = i;
                 float top = .822f - i * .100f;
-                var row = LotdUiKit.CreateRect("Choice" + i, panel, new Vector2(.11f, top - .085f), new Vector2(.89f, top),
+                var row = DuelUiKit.CreateRect("Choice" + i, panel, new Vector2(.11f, top - .085f), new Vector2(.89f, top),
                     Vector2.zero, Vector2.zero);
                 _choiceButtons[i] = CreateChoiceButton(row, "", () => AcceptChoice(_firstChoice + rowIndex), 17);
                 _choiceLabels[i] = _choiceButtons[i].GetComponentInChildren<Text>();
@@ -64,10 +64,10 @@ namespace YGOPortable.UI
                 _choiceLabels[i].resizeTextMinSize = 11;
                 _choiceLabels[i].resizeTextMaxSize = 17;
             }
-            var hint = LotdUiKit.CreateRect("Hint", panel, new Vector2(.08f, .063f), new Vector2(.65f, .124f),
+            var hint = DuelUiKit.CreateRect("Hint", panel, new Vector2(.08f, .063f), new Vector2(.65f, .124f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddFittedText(hint, "Text", "휠/↑↓ 이동   클릭/A 선택", 15, 10, TextAnchor.MiddleCenter, LotdUiKit.TextMuted);
-            var cancel = LotdUiKit.CreateRect("Cancel", panel, new Vector2(.69f, .054f), new Vector2(.89f, .132f),
+            DuelUiKit.AddFittedText(hint, "Text", "휠/↑↓ 이동   클릭/A 선택", 15, 10, TextAnchor.MiddleCenter, DuelUiKit.TextMuted);
+            var cancel = DuelUiKit.CreateRect("Cancel", panel, new Vector2(.69f, .054f), new Vector2(.89f, .132f),
                 Vector2.zero, Vector2.zero);
             CreateChoiceButton(cancel, "취소 (B)", CloseChoice, 14);
             overlay.gameObject.SetActive(false);

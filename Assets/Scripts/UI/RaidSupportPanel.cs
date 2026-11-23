@@ -24,25 +24,25 @@ namespace YGOPortable.UI
 
         internal RaidSupportPanel(Transform parent, Action close)
         {
-            var overlay = LotdUiKit.FillRect("RaidSupport", parent);
+            var overlay = DuelUiKit.FillRect("RaidSupport", parent);
             Root = overlay.gameObject;
-            LotdUiKit.AddImage(Root, LotdUiKit.WhiteSprite, new Color(.008f, .019f, .038f, .93f));
-            var panel = LotdUiKit.CreateMenuPanel(overlay, "Window", new Vector2(.13f, .095f), new Vector2(.87f, .91f));
-            Label(panel, "Title", "전술 서포트", .055f, .85f, .53f, .965f, 28, LotdUiKit.GoldAccent);
-            _wallet = Label(panel, "Wallet", "", .55f, .851f, .939f, .965f, 22, LotdUiKit.GoldAccent);
+            DuelUiKit.AddImage(Root, DuelUiKit.WhiteSprite, new Color(.008f, .019f, .038f, .93f));
+            var panel = DuelUiKit.CreateMenuPanel(overlay, "Window", new Vector2(.13f, .095f), new Vector2(.87f, .91f));
+            Label(panel, "Title", "전술 서포트", .055f, .85f, .53f, .965f, 28, DuelUiKit.GoldAccent);
+            _wallet = Label(panel, "Wallet", "", .55f, .851f, .939f, .965f, 22, DuelUiKit.GoldAccent);
             for (int i = 0; i < RaidSupportCatalog.Items.Length; i++)
             {
                 int index = i;
                 var item = RaidSupportCatalog.Items[i];
                 float top = .825f - i * .125f;
                 var row = Region(panel, $"Item_{i}", .06f, top - .111f, .94f, top);
-                LotdUiKit.AddImage(row.gameObject, LotdUiKit.WhiteSprite, new Color(.026f, .074f, .13f, .94f), false, false);
+                DuelUiKit.AddImage(row.gameObject, DuelUiKit.WhiteSprite, new Color(.026f, .074f, .13f, .94f), false, false);
                 Label(row, "Description", $"{item.Name}\n{item.Description}", .025f, .05f, .48f, .95f, 19);
-                _counts[i] = Label(row, "Count", "", .485f, .10f, .562f, .90f, 18, LotdUiKit.TextMuted);
+                _counts[i] = Label(row, "Count", "", .485f, .10f, .562f, .90f, 18, DuelUiKit.TextMuted);
                 _equip[i] = MakeButton(row, "Equip", "", .57f, .08f, .734f, .92f, () => Toggle(index));
                 _buy[i] = MakeButton(row, "Buy", $"구매 {item.Cost:N0} DP", .745f, .08f, .975f, .92f, () => Buy(index));
             }
-            _status = Label(panel, "Status", "", .061f, .118f, .939f, .193f, 18, LotdUiKit.GoldAccent);
+            _status = Label(panel, "Status", "", .061f, .118f, .939f, .193f, 18, DuelUiKit.GoldAccent);
             _close = MakeButton(panel, "Close", "돌아가기", .58f, .036f, .749f, .112f, close);
             _apply = MakeButton(panel, "Apply", "장착 적용", .762f, .036f, .94f, .112f, () =>
             {
@@ -102,14 +102,14 @@ namespace YGOPortable.UI
         }
 
         private static RectTransform Region(Transform parent, string name, float left, float bottom, float right, float top) =>
-            LotdUiKit.CreateRect(name, parent, new Vector2(left, bottom), new Vector2(right, top), Vector2.zero, Vector2.zero);
+            DuelUiKit.CreateRect(name, parent, new Vector2(left, bottom), new Vector2(right, top), Vector2.zero, Vector2.zero);
 
         private static Text Label(Transform parent, string name, string text, float left, float bottom, float right, float top,
-            int size, Color? color = null) => LotdUiKit.AddFittedText(Region(parent, name, left, bottom, right, top),
-                "Text", text, size, 12, TextAnchor.MiddleCenter, color ?? LotdUiKit.TextPrimary);
+            int size, Color? color = null) => DuelUiKit.AddFittedText(Region(parent, name, left, bottom, right, top),
+                "Text", text, size, 12, TextAnchor.MiddleCenter, color ?? DuelUiKit.TextPrimary);
 
         private static Button MakeButton(Transform parent, string name, string text, float left, float bottom, float right, float top,
-            Action click, bool gold = false) => LotdUiKit.CreateLotdButton(Region(parent, name, left, bottom, right, top),
+            Action click, bool gold = false) => DuelUiKit.CreateButton(Region(parent, name, left, bottom, right, top),
                 "Button", text, click, 17, gold);
     }
 }

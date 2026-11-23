@@ -66,9 +66,9 @@ namespace YGOPortable.UI
         {
             var motion = button.gameObject.AddComponent<MenuButtonMotion>();
             motion._button = button;
-            var shine = LotdUiKit.CreateRect("HighlightMotion", button.transform, new Vector2(.08f, .04f),
+            var shine = DuelUiKit.CreateRect("HighlightMotion", button.transform, new Vector2(.08f, .04f),
                 new Vector2(.92f, .095f), Vector2.zero, Vector2.zero);
-            motion._shine = LotdUiKit.AddImage(shine.gameObject, LotdUiKit.WhiteSprite, Color.clear, false, false);
+            motion._shine = DuelUiKit.AddImage(shine.gameObject, DuelUiKit.WhiteSprite, Color.clear, false, false);
             return button;
         }
 
@@ -93,7 +93,7 @@ namespace YGOPortable.UI
         private void Paint(float amount)
         {
             float eased = Mathf.SmoothStep(0f, 1f, amount);
-            var color = LotdUiKit.CyanAccent;
+            var color = DuelUiKit.CyanAccent;
             color.a = .78f * eased;
             _shine.color = color;
             _shine.rectTransform.localScale = new Vector3(Mathf.Lerp(.38f, 1f, eased), 1f, 1f);

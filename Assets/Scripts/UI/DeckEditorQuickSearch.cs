@@ -44,12 +44,12 @@ namespace YGOPortable.UI
 
         private void BuildQuickFilters(RectTransform panel, Vector2 left, Vector2 right)
         {
-            var row = LotdUiKit.CreateRect("QuickFilters", panel, new Vector2(0f, .702f),
+            var row = DuelUiKit.CreateRect("QuickFilters", panel, new Vector2(0f, .702f),
                 new Vector2(1f, .757f), left, right);
-            LotdUiKit.AddImage(row.gameObject, LotdUiKit.WhiteSprite, DeckEditorStyle.Surface);
-            var viewport = LotdUiKit.FillRect("Viewport", row);
+            DuelUiKit.AddImage(row.gameObject, DuelUiKit.WhiteSprite, DeckEditorStyle.Surface);
+            var viewport = DuelUiKit.FillRect("Viewport", row);
             viewport.gameObject.AddComponent<RectMask2D>();
-            var content = LotdUiKit.CreateRect("Chips", viewport, Vector2.zero, Vector2.up,
+            var content = DuelUiKit.CreateRect("Chips", viewport, Vector2.zero, Vector2.up,
                 Vector2.zero, Vector2.zero);
             content.pivot = new Vector2(0f, .5f);
             var scroll = _quickFilterScroll = row.gameObject.AddComponent<ScrollRect>();
@@ -72,7 +72,7 @@ namespace YGOPortable.UI
                 var filter = _quickChips[i];
                 float width = filter.label.Length * (_mobileLayout ? 22f : 15f) + 34f;
                 if (_mobileLayout) width = Mathf.Max(width, MobileSafeArea.MinimumTouchSize(row) + 6f);
-                var chip = LotdUiKit.CreateRect($"Chip_{i}", content, Vector2.zero, Vector2.up,
+                var chip = DuelUiKit.CreateRect($"Chip_{i}", content, Vector2.zero, Vector2.up,
                     new Vector2(x + 2f, 1f), new Vector2(x + width - 2f, -1f));
                 var button = DeckEditorStyle.Button(chip, "Button", filter.label, () =>
                     ToggleQuickFilter(filter.kind, filter.index), _mobileLayout ? 22 : 15);
@@ -174,7 +174,7 @@ namespace YGOPortable.UI
                 bool active = SelectedQuickChip(kind) == index && (index != 0 ||
                     _mobileFrameFilter == 0 && _mobileAttributeFilter == 0 && _mobileRaceFilter == 0);
                 caption.text = active ? "• " + label : label;
-                caption.color = active ? DeckEditorStyle.Accent : LotdUiKit.TextPrimary;
+                caption.color = active ? DeckEditorStyle.Accent : DuelUiKit.TextPrimary;
             }
         }
 

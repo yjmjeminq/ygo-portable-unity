@@ -87,18 +87,17 @@ namespace YGOPortable.UI
         internal StoryModeUI(GameAppController app, Transform parent)
         {
             _app = app;
-            var root = LotdUiKit.FillRect("Screen_StoryMode", parent);
+            var root = DuelUiKit.FillRect("Screen_StoryMode", parent);
             Root = root.gameObject;
-            LotdUiKit.AddImage(root.gameObject, LotdUiKit.LoadSprite("LOTD/Background/bg_vrains"),
-                new Color(.36f, .44f, .58f), false, false);
+            DuelUiKit.AddImage(root.gameObject, DuelUiChrome.Backdrop, Color.white, false, false);
 
-            var browser = LotdUiKit.FillRect("StoryBrowser", root);
+            var browser = DuelUiKit.FillRect("StoryBrowser", root);
             _browser = browser.gameObject.AddComponent<CanvasGroup>();
             var content = Application.isMobilePlatform ? MobileSafeArea.Create(browser) : browser;
             var header = Region(content, "Header", .032f, .892f, .655f, .977f);
-            LotdUiKit.AddImage(header.gameObject, LotdUiKit.LoadSprite("LOTD/Shared/menuheader"), Color.white, false, false);
-            _seriesTitle = LotdUiKit.AddFittedText(header, "Title", "", 32, 16,
-                TextAnchor.MiddleCenter, new Color(.025f, .075f, .14f), FontStyle.Bold);
+            DuelUiKit.AddImage(header.gameObject, DuelUiChrome.Header, Color.white, false, false).type = Image.Type.Sliced;
+            _seriesTitle = DuelUiKit.AddFittedText(header, "Title", "", 32, 16,
+                TextAnchor.MiddleCenter, DuelUiKit.TextPrimary, FontStyle.Bold);
             _seriesTabs = new (string, Button, StoryScriptRoot)[Series.Length];
             for (int i = 0; i < Series.Length; i++)
             {
@@ -123,7 +122,7 @@ namespace YGOPortable.UI
                     left, .742f, left + tabWidth - .007f, .809f, () => SelectChapter(index));
             }
 
-            var listing = LotdUiKit.CreateMenuPanel(content, "Episodes", new Vector2(.032f, .08f), new Vector2(.57f, .73f));
+            var listing = DuelUiKit.CreateMenuPanel(content, "Episodes", new Vector2(.032f, .08f), new Vector2(.57f, .73f));
             for (int row = 0; row < _episodeButtons.Length; row++)
             {
                 int index = row;
@@ -133,22 +132,22 @@ namespace YGOPortable.UI
                 _episodeButtons[row].GetComponentInChildren<Text>().alignment = TextAnchor.MiddleLeft;
             }
 
-            var details = LotdUiKit.CreateMenuPanel(content, "EpisodeDetails",
+            var details = DuelUiKit.CreateMenuPanel(content, "EpisodeDetails",
                 new Vector2(.587f, .08f), new Vector2(.968f, .73f));
-            _episodeHeading = AddLabel(details, "Chapter", .07f, .88f, .93f, .955f, 21, color: LotdUiKit.GoldAccent);
+            _episodeHeading = AddLabel(details, "Chapter", .07f, .88f, .93f, .955f, 21, color: DuelUiKit.GoldAccent);
             _episodeTitle = AddLabel(details, "EpisodeTitle", .07f, .758f, .93f, .885f, 26);
             var portrait = Region(details, "OpponentPortrait", .13f, .445f, .87f, .753f);
-            _portrait = LotdUiKit.AddImage(portrait.gameObject, null, Color.white, true, false);
+            _portrait = DuelUiKit.AddImage(portrait.gameObject, null, Color.white, true, false);
             _opponentName = AddLabel(details, "OpponentName", .07f, .379f, .93f, .442f, 23);
-            _opponentDeck = AddLabel(details, "OpponentDeck", .07f, .317f, .93f, .375f, 19, color: LotdUiKit.TextMuted);
+            _opponentDeck = AddLabel(details, "OpponentDeck", .07f, .317f, .93f, .375f, 19, color: DuelUiKit.TextMuted);
             AddLabel(details, "DeckLabel", .07f, .268f, .93f, .314f, 18,
-                TextAnchor.MiddleLeft, LotdUiKit.TextMuted).text = "내 덱";
+                TextAnchor.MiddleLeft, DuelUiKit.TextMuted).text = "내 덱";
             var picker = Region(details, "DeckPicker", .07f, .19f, .93f, .268f);
-            _deckPicker = LotdUiKit.CreateLotdDropdown(picker, "SelectDeck", Array.Empty<string>(), SelectDeck, dynamicChoices: true);
+            _deckPicker = DuelUiKit.CreateDropdown(picker, "SelectDeck", Array.Empty<string>(), SelectDeck, dynamicChoices: true);
             _deckPicker.captionText.resizeTextMaxSize = 22;
             _deckPicker.captionText.fontSize = 22;
             _start = AddButton(details, "StartEpisode", "이야기 시작", .16f, .062f, .84f, .163f, StartEpisode, gold: true);
-            _status = AddLabel(content, "Status", .045f, .018f, .955f, .073f, 21, color: LotdUiKit.GoldAccent);
+            _status = AddLabel(content, "Status", .045f, .018f, .955f, .073f, 21, color: DuelUiKit.GoldAccent);
 
             _dialogue = new StoryDialogueView(root);
 
@@ -215,7 +214,7 @@ namespace YGOPortable.UI
             {
                 if (won)
                 {
-                    if (Application.isPlaying) LotdAudio.PlayWin();
+                    if (Application.isPlaying) DuelAudio.PlayWin();
                     _dialogue.ShowChoices(() => reward,
                         new("다음 에피소드 바로 시작", () => OpenEpisode(index + 1), () =>
                             index + 1 < Script.episodes.Length && CanPlay(Script.episodes[index + 1])),
@@ -315,7 +314,7 @@ namespace YGOPortable.UI
             {
                 var tab = _seriesTabs[i];
                 tab.Button.interactable = tab.Script != null;
-                tab.Button.GetComponentInChildren<Text>().color = i == index ? LotdUiKit.GoldAccent : LotdUiKit.TextPrimary;
+                tab.Button.GetComponentInChildren<Text>().color = i == index ? DuelUiKit.GoldAccent : DuelUiKit.TextPrimary;
             }
             for (int i = 0; i < _chapterButtons.Length; i++)
             {
@@ -352,7 +351,7 @@ namespace YGOPortable.UI
             _selectedIndex = index;
             int chapter = index / EpisodesPerChapter;
             for (int i = 0; i < _chapterButtons.Length; i++)
-                _chapterButtons[i].GetComponentInChildren<Text>().color = i == chapter ? LotdUiKit.GoldAccent : LotdUiKit.TextPrimary;
+                _chapterButtons[i].GetComponentInChildren<Text>().color = i == chapter ? DuelUiKit.GoldAccent : DuelUiKit.TextPrimary;
 
             for (int row = 0; row < _episodeButtons.Length; row++)
             {
@@ -365,8 +364,8 @@ namespace YGOPortable.UI
                 var raid = GetRaid(episode);
                 string badge = raid is { } challenge ? $"◆ BOSS RAID {challenge.Opening.Life:N0} LP  " : "";
                 label.text = $"  {episodeIndex + 1:00}화  {badge}{TitleOf(episode)}  ·  {state}";
-                label.color = episodeIndex == index ? LotdUiKit.GoldAccent : locked ? LotdUiKit.TextMuted :
-                    raid.HasValue ? LotdUiKit.RedAccent : LotdUiKit.TextPrimary;
+                label.color = episodeIndex == index ? DuelUiKit.GoldAccent : locked ? DuelUiKit.TextMuted :
+                    raid.HasValue ? DuelUiKit.RedAccent : DuelUiKit.TextPrimary;
             }
 
             var current = Script.episodes[index];
@@ -375,7 +374,7 @@ namespace YGOPortable.UI
             _episodeTitle.text = TitleOf(current);
             int bond = CollectionProgress.GetStoryBond(current.charId);
             _opponentName.text = bond > 0 ? $"{current.opponentName} · 유대도 {bond:N0}" : current.opponentName;
-            _portrait.sprite = LotdUiKit.LoadOpponentPortrait(opponent);
+            _portrait.sprite = DuelUiKit.LoadOpponentPortrait(opponent);
             _portrait.enabled = _portrait.sprite != null;
             var (deck, level, levelCount) = GetOpponentMatch(current);
             _opponentDeck.text = deck == null ? "" : $"Lv. {level}/{levelCount}  ·  {deck.title}";
@@ -476,7 +475,7 @@ namespace YGOPortable.UI
         {
             _browser.interactable = false;
             _browser.blocksRaycasts = false;
-            var portrait = LotdUiKit.LoadOpponentPortrait(DeckRepository.GetCharacter(episode.charId));
+            var portrait = DuelUiKit.LoadOpponentPortrait(DeckRepository.GetCharacter(episode.charId));
             _dialogue.Open(heading, Script.protagonist, portrait, lines, onFinish);
         }
 
@@ -494,17 +493,17 @@ namespace YGOPortable.UI
         }
 
         private static RectTransform Region(Transform parent, string name, float left, float bottom, float right, float top) =>
-            LotdUiKit.CreateRect(name, parent, new Vector2(left, bottom), new Vector2(right, top), Vector2.zero, Vector2.zero);
+            DuelUiKit.CreateRect(name, parent, new Vector2(left, bottom), new Vector2(right, top), Vector2.zero, Vector2.zero);
 
         private static Text AddLabel(Transform parent, string name, float left, float bottom, float right, float top,
             int size, TextAnchor alignment = TextAnchor.MiddleCenter, Color? color = null) =>
-            LotdUiKit.AddFittedText(Region(parent, name, left, bottom, right, top), "Label", "", size, 13,
-                alignment, color ?? LotdUiKit.TextPrimary, FontStyle.Bold);
+            DuelUiKit.AddFittedText(Region(parent, name, left, bottom, right, top), "Label", "", size, 13,
+                alignment, color ?? DuelUiKit.TextPrimary, FontStyle.Bold);
 
         private static Button AddButton(Transform parent, string name, string label,
             float left, float bottom, float right, float top, Action action, bool gold = false)
         {
-            var button = LotdUiKit.CreateLotdButton(Region(parent, name, left, bottom, right, top), "Button", label, action, 22, gold);
+            var button = DuelUiKit.CreateButton(Region(parent, name, left, bottom, right, top), "Button", label, action, 22, gold);
             var text = button.GetComponentInChildren<Text>();
             text.resizeTextForBestFit = true;
             text.resizeTextMinSize = 13;

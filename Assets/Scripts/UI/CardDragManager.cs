@@ -81,7 +81,7 @@ namespace YGOPortable.UI
             ghostGo.transform.SetParent(root, false);
             _ghostRoot = (RectTransform)ghostGo.transform;
             const float cardWidth = 126f;
-            _ghostRoot.sizeDelta = new Vector2(cardWidth, cardWidth / LotdUiKit.CardAspectRatio);
+            _ghostRoot.sizeDelta = new Vector2(cardWidth, cardWidth / DuelUiKit.CardAspectRatio);
             _ghostRoot.pivot = new Vector2(0.5f, 0.5f);
 
             _ghostCanvasGroup = ghostGo.AddComponent<CanvasGroup>();
@@ -90,7 +90,7 @@ namespace YGOPortable.UI
             _ghostCanvasGroup.alpha = 0.94f;
 
             _ghostOutline = ghostGo.AddComponent<Outline>();
-            _ghostOutline.effectColor = LotdUiKit.CyanAccent;
+            _ghostOutline.effectColor = DuelUiKit.CyanAccent;
             _ghostOutline.effectDistance = new Vector2(3f, -3f);
 
             _ghostCardView = CompositeCardView.Create(_ghostRoot, "CV", false);
@@ -114,9 +114,9 @@ namespace YGOPortable.UI
             _ghostCardView.SetDeckCard(cardCode, appearance);
             UpdateGhostPosition(screenPosition ?? (Vector2)Input.mousePosition);
 
-            _ghostOutline.effectColor = source == DragSourceType.FieldMonster ? LotdUiKit.RedAccent
-                : (source == DragSourceType.Hand || source == DragSourceType.ExtraDeck ? LotdUiKit.GoldAccent : LotdUiKit.CyanAccent);
-            LotdAudio.PlayClick();
+            _ghostOutline.effectColor = source == DragSourceType.FieldMonster ? DuelUiKit.RedAccent
+                : (source == DragSourceType.Hand || source == DragSourceType.ExtraDeck ? DuelUiKit.GoldAccent : DuelUiKit.CyanAccent);
+            DuelAudio.PlayClick();
             OnDragStarted?.Invoke(source, cardCode, index, customData);
         }
 

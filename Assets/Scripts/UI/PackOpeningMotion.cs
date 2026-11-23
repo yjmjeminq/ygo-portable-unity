@@ -34,7 +34,7 @@ namespace YGOPortable.UI
         internal void Initialize(Sprite face, CardRarity highestRarity, Action onFinished)
         {
             if (_stage == null) Build();
-            _cover = face ?? LotdUiKit.WhiteSprite;
+            _cover = face ?? DuelUiKit.WhiteSprite;
             _rarity = highestRarity;
             _accent = highestRarity switch
             {
@@ -43,7 +43,7 @@ namespace YGOPortable.UI
                 _ => new Color32(131, 201, 251, 255),
             };
             _reflection.sprite = _cover;
-            _highlight.sprite = LotdUiKit.LoadSprite("PackShop/PackHighlightFlare" + (highestRarity switch
+            _highlight.sprite = DuelUiKit.LoadSprite("PackShop/PackHighlightFlare" + (highestRarity switch
             {
                 CardRarity.UltraRare => "UR",
                 CardRarity.SuperRare => "SR",
@@ -51,8 +51,8 @@ namespace YGOPortable.UI
             }));
             _burstBackdrop.sprite = highestRarity switch
             {
-                CardRarity.UltraRare => LotdUiKit.LoadSprite("PackShop/PackOpenBGBottom_ur"),
-                CardRarity.SuperRare => LotdUiKit.LoadSprite("PackShop/PackOpenBGBottom_sr"),
+                CardRarity.UltraRare => DuelUiKit.LoadSprite("PackShop/PackOpenBGBottom_ur"),
+                CardRarity.SuperRare => DuelUiKit.LoadSprite("PackShop/PackOpenBGBottom_sr"),
                 _ => null,
             };
             _burstBackdrop.enabled = _burstBackdrop.sprite != null;
@@ -142,25 +142,25 @@ namespace YGOPortable.UI
 
         private void Build()
         {
-            _stage = LotdUiKit.FillRect("PackOpeningStage", transform);
+            _stage = DuelUiKit.FillRect("PackOpeningStage", transform);
             _glow = MakeGlow("Aura", _stage);
-            _reflection = LotdUiKit.AddImage(Centered("PackReflection", _stage).gameObject,
+            _reflection = DuelUiKit.AddImage(Centered("PackReflection", _stage).gameObject,
                 null, Color.clear, false, false);
             _reflection.rectTransform.localScale = new Vector3(1f, -1f, 1f);
             PackOpeningStage.FloorFade(_stage, .058f, .234f);
-            _burstBackdrop = LotdUiKit.AddImage(LotdUiKit.FillRect("BurstBackdrop", _stage).gameObject,
+            _burstBackdrop = DuelUiKit.AddImage(DuelUiKit.FillRect("BurstBackdrop", _stage).gameObject,
                 null, Color.clear, false, false);
             _wrapper = Centered("Wrapper", _stage);
-            _body = LotdUiKit.FillRect("Body", _wrapper).gameObject.AddComponent<PackWrapperSlice>();
-            _seal = LotdUiKit.FillRect("Seal", _wrapper).gameObject.AddComponent<PackWrapperSlice>();
-            _highlight = LotdUiKit.AddImage(Centered("Highlight", _stage).gameObject,
+            _body = DuelUiKit.FillRect("Body", _wrapper).gameObject.AddComponent<PackWrapperSlice>();
+            _seal = DuelUiKit.FillRect("Seal", _wrapper).gameObject.AddComponent<PackWrapperSlice>();
+            _highlight = DuelUiKit.AddImage(Centered("Highlight", _stage).gameObject,
                 null, Color.clear, false, false);
-            _sparks = LotdUiKit.FillRect("LightTrails", _stage).gameObject.AddComponent<PackOpeningSparks>();
+            _sparks = DuelUiKit.FillRect("LightTrails", _stage).gameObject.AddComponent<PackOpeningSparks>();
             _sparks.raycastTarget = false;
             _flash = MakeGlow("Burst", _stage);
         }
 
-        private static RectTransform Centered(string name, Transform parent) => LotdUiKit.CreateRect(name,
+        private static RectTransform Centered(string name, Transform parent) => DuelUiKit.CreateRect(name,
             parent, new Vector2(.5f, .5f), new Vector2(.5f, .5f), Vector2.zero, Vector2.zero);
 
         private static Image MakeGlow(string name, Transform parent)
@@ -183,7 +183,7 @@ namespace YGOPortable.UI
                 _bloomSprite = Sprite.Create(texture, new Rect(0f, 0f, size, size),
                     new Vector2(.5f, .5f), 100f, 0, SpriteMeshType.FullRect);
             }
-            return LotdUiKit.AddImage(Centered(name, parent).gameObject, _bloomSprite, Color.clear, false, false);
+            return DuelUiKit.AddImage(Centered(name, parent).gameObject, _bloomSprite, Color.clear, false, false);
         }
 
         private static void SetPiece(PackWrapperSlice slice, Vector2 movement, float rotation, float opacity)
@@ -225,12 +225,12 @@ namespace YGOPortable.UI
     {
         private static Sprite _floorFade;
 
-        internal static void Backdrop(RectTransform root) => LotdUiKit.AddImage(
-            LotdUiKit.FillRect("OpeningBackdrop", root).gameObject,
-            LotdUiKit.LoadSprite("PackShop/ShopBGBase03"), Color.white);
+        internal static void Backdrop(RectTransform root) => DuelUiKit.AddImage(
+            DuelUiKit.FillRect("OpeningBackdrop", root).gameObject,
+            DuelUiKit.LoadSprite("PackShop/ShopBGBase03"), Color.white);
 
-        internal static void FloorFade(Transform parent, float bottom, float top) => LotdUiKit.AddImage(
-            LotdUiKit.CreateRect("ReflectionFade", parent, new Vector2(0f, bottom), new Vector2(1f, top),
+        internal static void FloorFade(Transform parent, float bottom, float top) => DuelUiKit.AddImage(
+            DuelUiKit.CreateRect("ReflectionFade", parent, new Vector2(0f, bottom), new Vector2(1f, top),
                 Vector2.zero, Vector2.zero).gameObject,
             _floorFade ??= CreateFloorFade(), Color.white, false, false);
 

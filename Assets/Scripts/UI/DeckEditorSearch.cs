@@ -110,7 +110,7 @@ namespace YGOPortable.UI
 
         private void BuildDetailedSearch(Transform parent)
         {
-            var panel = LotdUiKit.CreateRect("TrunkFilterPanel", parent, _deckPanel.anchorMin, _deckPanel.anchorMax,
+            var panel = DuelUiKit.CreateRect("TrunkFilterPanel", parent, _deckPanel.anchorMin, _deckPanel.anchorMax,
                 Vector2.zero, Vector2.zero);
             _cardFilterDialog = panel.gameObject;
             var conditions = DeckEditorStyle.Panel(panel, "Conditions", Vector2.zero, new Vector2(.526f, 1f));
@@ -118,15 +118,15 @@ namespace YGOPortable.UI
             AddFilterHeading(conditions, "보관함 필터");
             _optionHeading = AddFilterHeading(options, "");
 
-            var queryRow = LotdUiKit.CreateRect("TextSearch", conditions, new Vector2(.087f, .803f),
+            var queryRow = DuelUiKit.CreateRect("TextSearch", conditions, new Vector2(.087f, .803f),
                 new Vector2(.638f, .868f), Vector2.zero, Vector2.zero);
             _detailedQueryInput = DeckEditorStyle.Input(queryRow, "Query", "카드명·효과·카드 번호", 16);
             _detailedQueryInput.onValueChanged.AddListener(_ => RefreshDetailedDraft());
-            var archetype = LotdUiKit.CreateRect("ArchetypeSearch", conditions, new Vector2(.656f, .803f),
+            var archetype = DuelUiKit.CreateRect("ArchetypeSearch", conditions, new Vector2(.656f, .803f),
                 new Vector2(.913f, .868f), Vector2.zero, Vector2.zero);
             DeckEditorStyle.Button(archetype, "Button", "카드군 검색", OpenArchetypeSearch, 14);
 
-            var collectionFilters = LotdUiKit.CreateRect("CollectionFilters", conditions,
+            var collectionFilters = DuelUiKit.CreateRect("CollectionFilters", conditions,
                 new Vector2(.087f, .726f), new Vector2(.913f, .791f), Vector2.zero, Vector2.zero);
             _trunkCollectionFilters = new CollectionCardFilters(collectionFilters, RefreshDetailedDraft, deckEditor: true);
             var conditionRows = BuildFilterRows(conditions, "ConditionsList", .105f, .710f, out _);
@@ -145,17 +145,17 @@ namespace YGOPortable.UI
                 caption.rectTransform.anchorMin = new Vector2(.137f, .06f);
                 caption.rectTransform.anchorMax = new Vector2(.58f, .94f);
                 caption.rectTransform.offsetMin = caption.rectTransform.offsetMax = Vector2.zero;
-                var sprite = LotdUiKit.LoadSprite("LOTD/Icons/ICON_ID_FILTER_CARD_" + icon);
+                var sprite = DuelUiKit.LoadSprite("LOTD/Icons/ICON_ID_FILTER_CARD_" + icon);
                 if (sprite != null)
                 {
-                    var image = LotdUiKit.CreateRect("Icon", button.transform, new Vector2(.039f, .10f),
+                    var image = DuelUiKit.CreateRect("Icon", button.transform, new Vector2(.039f, .10f),
                         new Vector2(.121f, .90f), Vector2.zero, Vector2.zero);
-                    LotdUiKit.AddImage(image.gameObject, sprite, Color.white, true, false);
+                    DuelUiKit.AddImage(image.gameObject, sprite, Color.white, true, false);
                 }
-                var value = LotdUiKit.CreateRect("Value", button.transform, new Vector2(.595f, .06f),
+                var value = DuelUiKit.CreateRect("Value", button.transform, new Vector2(.595f, .06f),
                     new Vector2(.96f, .94f), Vector2.zero, Vector2.zero);
-                _facetValues[index] = LotdUiKit.AddFittedText(value, "Text", "", 14, 10, TextAnchor.MiddleRight,
-                    LotdUiKit.TextPrimary);
+                _facetValues[index] = DuelUiKit.AddFittedText(value, "Text", "", 14, 10, TextAnchor.MiddleRight,
+                    DuelUiKit.TextPrimary);
             }
 
             AddFacet(Facet.Kind, "카드 종류", "FRAME", new[] { "전체", "메인 몬스터", "마법", "함정", "엑스트라 몬스터" });
@@ -176,19 +176,19 @@ namespace YGOPortable.UI
 
             _attackEditor = BuildStatInputs(options, "Attack", 0);
             _defenseEditor = BuildStatInputs(options, "Defense", 2);
-            _effectTextEditor = LotdUiKit.CreateRect("EffectText", options, new Vector2(.087f, .803f),
+            _effectTextEditor = DuelUiKit.CreateRect("EffectText", options, new Vector2(.087f, .803f),
                 new Vector2(.913f, .868f), Vector2.zero, Vector2.zero);
             _effectTextInput = DeckEditorStyle.Input(_effectTextEditor, "Query", "예: 특수 소환", 16);
             _effectTextInput.onValueChanged.AddListener(_ => RefreshDetailedDraft());
-            var status = LotdUiKit.CreateRect("Status", options, new Vector2(.087f, .033f), new Vector2(.913f, .099f),
+            var status = DuelUiKit.CreateRect("Status", options, new Vector2(.087f, .033f), new Vector2(.913f, .099f),
                 Vector2.zero, Vector2.zero);
-            _filterError = LotdUiKit.AddFittedText(status, "Text", "", 15, 11, TextAnchor.MiddleCenter, LotdUiKit.RedAccent);
+            _filterError = DuelUiKit.AddFittedText(status, "Text", "", 15, 11, TextAnchor.MiddleCenter, DuelUiKit.RedAccent);
 
-            var footer = LotdUiKit.CreateRect("Actions", conditions, new Vector2(.084f, .039f), new Vector2(.916f, .094f),
+            var footer = DuelUiKit.CreateRect("Actions", conditions, new Vector2(.084f, .039f), new Vector2(.916f, .094f),
                 Vector2.zero, Vector2.zero);
             void ActionButton(string name, string label, float left, float right, Action action, bool gold = false)
             {
-                var slot = LotdUiKit.CreateRect(name, footer, new Vector2(left, 0f), new Vector2(right, 1f),
+                var slot = DuelUiKit.CreateRect(name, footer, new Vector2(left, 0f), new Vector2(right, 1f),
                     Vector2.zero, Vector2.zero);
                 DeckEditorStyle.Button(slot, "Button", label, action, 15, gold);
             }
@@ -200,22 +200,22 @@ namespace YGOPortable.UI
 
         private static Text AddFilterHeading(RectTransform panel, string title)
         {
-            var header = LotdUiKit.CreateRect("Heading", panel, new Vector2(.087f, .884f), new Vector2(.913f, .946f),
+            var header = DuelUiKit.CreateRect("Heading", panel, new Vector2(.087f, .884f), new Vector2(.913f, .946f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(header.gameObject, LotdUiKit.WhiteSprite, DeckEditorStyle.Header, false, false);
-            return LotdUiKit.AddFittedText(header, "Title", title, 21, 14, TextAnchor.MiddleCenter,
+            DuelUiKit.AddImage(header.gameObject, DuelUiKit.WhiteSprite, DeckEditorStyle.Header, false, false);
+            return DuelUiKit.AddFittedText(header, "Title", title, 21, 14, TextAnchor.MiddleCenter,
                 Color.white, FontStyle.Bold);
         }
 
         private static RectTransform BuildFilterRows(RectTransform panel, string name, float bottom, float top, out ScrollRect scroll)
         {
-            var holder = LotdUiKit.CreateRect(name, panel, new Vector2(.087f, bottom), new Vector2(.913f, top),
+            var holder = DuelUiKit.CreateRect(name, panel, new Vector2(.087f, bottom), new Vector2(.913f, top),
                 Vector2.zero, Vector2.zero);
-            var viewport = LotdUiKit.CreateRect("Viewport", holder, Vector2.zero, Vector2.one,
+            var viewport = DuelUiKit.CreateRect("Viewport", holder, Vector2.zero, Vector2.one,
                 Vector2.zero, new Vector2(-15f, 0f));
-            LotdUiKit.AddImage(viewport.gameObject, LotdUiKit.WhiteSprite, Color.clear);
+            DuelUiKit.AddImage(viewport.gameObject, DuelUiKit.WhiteSprite, Color.clear);
             viewport.gameObject.AddComponent<RectMask2D>();
-            var rows = LotdUiKit.CreateRect("Rows", viewport, new Vector2(0f, 1f), Vector2.one,
+            var rows = DuelUiKit.CreateRect("Rows", viewport, new Vector2(0f, 1f), Vector2.one,
                 Vector2.zero, Vector2.zero);
             rows.pivot = new Vector2(.5f, 1f);
             var layout = rows.gameObject.AddComponent<VerticalLayoutGroup>();
@@ -238,19 +238,19 @@ namespace YGOPortable.UI
 
         private static RectTransform AddFilterRow(RectTransform rows, string name)
         {
-            var row = LotdUiKit.FillRect(name, rows);
+            var row = DuelUiKit.FillRect(name, rows);
             row.gameObject.AddComponent<LayoutElement>().preferredHeight = 31f;
             return row;
         }
 
         private RectTransform BuildStatInputs(RectTransform parent, string name, int start)
         {
-            var group = LotdUiKit.CreateRect(name, parent, new Vector2(.087f, .66f), new Vector2(.913f, .868f),
+            var group = DuelUiKit.CreateRect(name, parent, new Vector2(.087f, .66f), new Vector2(.913f, .868f),
                 Vector2.zero, Vector2.zero);
             for (int i = 0; i < 2; i++)
             {
                 string label = i == 0 ? "최소" : "최대";
-                var row = LotdUiKit.CreateRect(label, group, new Vector2(0f, i == 0 ? .54f : .04f),
+                var row = DuelUiKit.CreateRect(label, group, new Vector2(0f, i == 0 ? .54f : .04f),
                     new Vector2(1f, i == 0 ? 1f : .5f), Vector2.zero, Vector2.zero);
                 var input = DeckEditorStyle.Input(row, "Number", label, 16);
                 input.contentType = InputField.ContentType.IntegerNumber;
@@ -399,10 +399,10 @@ namespace YGOPortable.UI
                 };
                 bool enabled = _facetButtons[i].interactable;
                 bool selected = (Facet)i == _activeFacet;
-                _facetLabels[i].color = !enabled ? LotdUiKit.TextMuted : selected ? DeckEditorStyle.Accent : Color.white;
+                _facetLabels[i].color = !enabled ? DuelUiKit.TextMuted : selected ? DeckEditorStyle.Accent : Color.white;
                 _facetValues[i].text = value.Length > 0 ? value : "전체";
                 _facetValues[i].color = enabled && _facetValues[i].text != "전체"
-                    ? DeckEditorStyle.Accent : LotdUiKit.TextMuted;
+                    ? DeckEditorStyle.Accent : DuelUiKit.TextMuted;
             }
 
             var choices = _facetOptions[(int)_activeFacet];

@@ -40,30 +40,30 @@ namespace YGOPortable.UI
         internal DeckPadKeyboard(Transform parent, Action onClosed = null, bool shopColors = false, bool deckEditor = false)
         {
             _onClosed = onClosed;
-            _overlay = LotdUiKit.FillRect("PadKeyboard", parent);
-            LotdUiKit.AddImage(_overlay.gameObject, LotdUiKit.WhiteSprite,
+            _overlay = DuelUiKit.FillRect("PadKeyboard", parent);
+            DuelUiKit.AddImage(_overlay.gameObject, DuelUiKit.WhiteSprite,
                 deckEditor ? DeckEditorStyle.Scrim : shopColors ? PackShopStyle.Scrim : new Color(.012f, .021f, .05f, .88f));
             var min = new Vector2(.15f, .21f);
             var max = new Vector2(.85f, .79f);
             var panel = deckEditor ? DeckEditorStyle.Panel(_overlay, "Window", min, max) :
                 shopColors ? PackShopStyle.Panel(_overlay, "Window", min, max) :
-                LotdUiKit.CreateMenuPanel(_overlay, "Window", min, max);
-            var title = LotdUiKit.CreateRect("Title", panel, new Vector2(.08f, .865f), new Vector2(.92f, .957f),
+                DuelUiKit.CreateMenuPanel(_overlay, "Window", min, max);
+            var title = DuelUiKit.CreateRect("Title", panel, new Vector2(.08f, .865f), new Vector2(.92f, .957f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddFittedText(title, "Text", "패드로 입력", 23, 14, TextAnchor.MiddleLeft,
-                deckEditor ? DeckEditorStyle.Accent : shopColors ? PackShopStyle.TextPrimary : LotdUiKit.CyanAccent, FontStyle.Bold);
-            var preview = LotdUiKit.CreateRect("Entry", panel, new Vector2(.068f, .744f), new Vector2(.932f, .851f),
+            DuelUiKit.AddFittedText(title, "Text", "패드로 입력", 23, 14, TextAnchor.MiddleLeft,
+                deckEditor ? DeckEditorStyle.Accent : shopColors ? PackShopStyle.TextPrimary : DuelUiKit.CyanAccent, FontStyle.Bold);
+            var preview = DuelUiKit.CreateRect("Entry", panel, new Vector2(.068f, .744f), new Vector2(.932f, .851f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(preview.gameObject, LotdUiKit.WhiteSprite,
+            DuelUiKit.AddImage(preview.gameObject, DuelUiKit.WhiteSprite,
                 deckEditor ? DeckEditorStyle.Inset : shopColors ? PackShopStyle.SurfaceInset : new Color(.03f, .09f, .17f));
-            _preview = LotdUiKit.AddFittedText(preview, "Text", "", 25, 14, TextAnchor.MiddleLeft,
-                shopColors ? PackShopStyle.TextPrimary : LotdUiKit.TextPrimary);
+            _preview = DuelUiKit.AddFittedText(preview, "Text", "", 25, 14, TextAnchor.MiddleLeft,
+                shopColors ? PackShopStyle.TextPrimary : DuelUiKit.TextPrimary);
             _preview.rectTransform.offsetMin = new Vector2(8f, 0f);
             for (int i = 0; i < _keys.Length; i++)
             {
                 float x = .068f + (i % Columns) * .087f;
                 float y = .605f - (i / Columns) * .113f;
-                var cell = LotdUiKit.CreateRect("Key" + i, panel, new Vector2(x, y), new Vector2(x + .080f, y + .093f),
+                var cell = DuelUiKit.CreateRect("Key" + i, panel, new Vector2(x, y), new Vector2(x + .080f, y + .093f),
                     Vector2.zero, Vector2.zero);
                 int index = i;
                 _keys[i] = CreateButton(cell, "", () => PressLetter(index), 20, false);
@@ -72,7 +72,7 @@ namespace YGOPortable.UI
 
             Button ActionButton(string name, string label, float left, float right, Action action, bool accent = false)
             {
-                var slot = LotdUiKit.CreateRect(name, panel, new Vector2(left, .137f), new Vector2(right, .237f),
+                var slot = DuelUiKit.CreateRect(name, panel, new Vector2(left, .137f), new Vector2(right, .237f),
                     Vector2.zero, Vector2.zero);
                 return CreateButton(slot, label, action, 16, accent);
             }
@@ -81,7 +81,7 @@ namespace YGOPortable.UI
             {
                 if (deckEditor) return DeckEditorStyle.Button(slot, "Button", label, action, size, accent);
                 return shopColors ? PackShopStyle.Button(slot, "Button", label, action, size, accent) :
-                    LotdUiKit.CreateLotdButton(slot, "Button", label, action, size, accent);
+                    DuelUiKit.CreateButton(slot, "Button", label, action, size, accent);
             }
 
             _pageButton = ActionButton("Page", "", .068f, .225f, NextPage);
@@ -91,10 +91,10 @@ namespace YGOPortable.UI
             ActionButton("Erase", "지우기", .524f, .657f, Erase);
             ActionButton("Cancel", "취소", .668f, .789f, Close);
             ActionButton("Apply", "입력 완료", .800f, .932f, Apply, true);
-            var hint = LotdUiKit.CreateRect("Hint", panel, new Vector2(.08f, .048f), new Vector2(.92f, .118f),
+            var hint = DuelUiKit.CreateRect("Hint", panel, new Vector2(.08f, .048f), new Vector2(.92f, .118f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddFittedText(hint, "Text", "방향키 이동   A 글자 선택   B 취소", 15, 10,
-                TextAnchor.MiddleCenter, shopColors ? PackShopStyle.TextMuted : LotdUiKit.TextMuted);
+            DuelUiKit.AddFittedText(hint, "Text", "방향키 이동   A 글자 선택   B 취소", 15, 10,
+                TextAnchor.MiddleCenter, shopColors ? PackShopStyle.TextMuted : DuelUiKit.TextMuted);
             _overlay.gameObject.SetActive(false);
         }
 

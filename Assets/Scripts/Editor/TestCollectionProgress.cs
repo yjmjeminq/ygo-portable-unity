@@ -384,7 +384,7 @@ namespace YGOPortable.Editor
                     "The list included an unplayable deck or omitted a playable deck.");
 
                 list.GetChild(1).GetComponent<Button>().onClick.Invoke();
-                Require(RowName(1).color == LotdUiKit.GoldAccent && string.IsNullOrEmpty(CollectionProgress.LastDuelDeckId),
+                Require(RowName(1).color == DuelUiKit.GoldAccent && string.IsNullOrEmpty(CollectionProgress.LastDuelDeckId),
                     "Browsing a deck did not highlight it, or was saved as a played deck.");
                 CollectionProgress.RememberDuelDeck(second.id);
                 CollectionProgress.Load(save);
@@ -394,7 +394,7 @@ namespace YGOPortable.Editor
                 DeckRepository.UserDecks.Remove(second);
                 DeckRepository.UserDecks.Insert(1, updated);
                 BrowseAndSelect();
-                Require(RowName(0).text == updated.name && RowName(0).color == LotdUiKit.GoldAccent,
+                Require(RowName(0).text == updated.name && RowName(0).color == DuelUiKit.GoldAccent,
                     "Reopening the screen did not retain the selected deck after a reorder or edit.");
 
                 updated.main.Clear();
@@ -430,7 +430,7 @@ namespace YGOPortable.Editor
                 CollectionProgress.RememberDuelDeck(manyDecks[^1].id);
                 BrowseAndSelect();
                 var scroll = setup.Find("MyDeck/DeckList").GetComponent<ScrollRect>();
-                Require(RowName(manyDecks.Length - 1).color == LotdUiKit.GoldAccent && scroll.verticalNormalizedPosition < .01f,
+                Require(RowName(manyDecks.Length - 1).color == DuelUiKit.GoldAccent && scroll.verticalNormalizedPosition < .01f,
                     "The list did not bring the last played deck into view.");
                 Debug.Log("[VERIFY MY DECK PICKER] Playable decks, saved selection, empty state and scrolling passed.");
             }

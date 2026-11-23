@@ -36,8 +36,8 @@ namespace YGOPortable.UI
 
         private void BuildDeckMotion(Transform root)
         {
-            _deckMotionLayer = LotdUiKit.FillRect("DeckCardMotion", root);
-            _transferRect = LotdUiKit.CreateRect("Transfer", _deckMotionLayer, _deckMotionLayer.pivot,
+            _deckMotionLayer = DuelUiKit.FillRect("DeckCardMotion", root);
+            _transferRect = DuelUiKit.CreateRect("Transfer", _deckMotionLayer, _deckMotionLayer.pivot,
                 _deckMotionLayer.pivot, Vector2.zero, Vector2.zero);
             _transferGroup = _transferRect.gameObject.AddComponent<CanvasGroup>();
             _transferGroup.blocksRaycasts = false;
@@ -52,8 +52,8 @@ namespace YGOPortable.UI
                 return null;
             Vector2 center = _deckMotionLayer.InverseTransformPoint(rect.TransformPoint(rect.rect.center));
             Vector2 size = _deckMotionLayer.InverseTransformVector(rect.TransformVector(rect.rect.size));
-            float height = Mathf.Min(Mathf.Abs(size.y), Mathf.Abs(size.x) / LotdUiKit.CardAspectRatio);
-            return new VisualPose(center, new Vector2(height * LotdUiKit.CardAspectRatio, height));
+            float height = Mathf.Min(Mathf.Abs(size.y), Mathf.Abs(size.x) / DuelUiKit.CardAspectRatio);
+            return new VisualPose(center, new Vector2(height * DuelUiKit.CardAspectRatio, height));
         }
 
         private VisualPose? DropPose(Vector2 screenPoint)

@@ -25,27 +25,27 @@ namespace YGOPortable.UI
         internal SaveSyncMenu(Transform canvas, GitHubSaveSync sync, Action close)
         {
             _sync = sync;
-            var root = LotdUiKit.FillRect("Overlay_SaveSync", canvas);
+            var root = DuelUiKit.FillRect("Overlay_SaveSync", canvas);
             Root = root.gameObject;
-            LotdUiKit.AddImage(Root, LotdUiKit.WhiteSprite, new Color(0f, 0f, 0f, .76f));
-            var win = LotdUiKit.CreateMenuPanel(root, "SaveSync",
+            DuelUiKit.AddImage(Root, DuelUiKit.WhiteSprite, new Color(0f, 0f, 0f, .76f));
+            var win = DuelUiKit.CreateMenuPanel(root, "SaveSync",
                 new Vector2(.23f, .23f), new Vector2(.77f, .77f));
             var header = Row(win, "Header", .055f, .79f, .945f, .95f);
-            LotdUiKit.AddFittedText(header, "Title", "클라우드 저장", 32, 23, TextAnchor.MiddleLeft,
-                LotdUiKit.GoldAccent, FontStyle.Bold);
+            DuelUiKit.AddFittedText(header, "Title", "클라우드 저장", 32, 23, TextAnchor.MiddleLeft,
+                DuelUiKit.GoldAccent, FontStyle.Bold);
 
             var status = Row(win, "Status", .055f, .59f, .945f, .78f);
-            _status = LotdUiKit.AddFittedText(status, "Text", "", 21, 14, TextAnchor.MiddleLeft,
-                LotdUiKit.TextPrimary, FontStyle.Bold);
+            _status = DuelUiKit.AddFittedText(status, "Text", "", 21, 14, TextAnchor.MiddleLeft,
+                DuelUiKit.TextPrimary, FontStyle.Bold);
 
-            var setup = LotdUiKit.FillRect("Setup", win);
+            var setup = DuelUiKit.FillRect("Setup", win);
             _setup = setup.gameObject;
             var instructions = Row(setup, "Instructions", .055f, .40f, .945f, .58f);
-            LotdUiKit.AddFittedText(instructions, "Text",
+            DuelUiKit.AddFittedText(instructions, "Text",
                 "토큰은 " + GitHubSaveSync.Repository + " 전용으로 만드세요.\nRepository permissions에서 Contents를 Read and write로 설정하세요.",
-                18, 13, TextAnchor.MiddleLeft, LotdUiKit.TextMuted);
+                18, 13, TextAnchor.MiddleLeft, DuelUiKit.TextMuted);
             var entry = Row(setup, "Entry", .055f, .255f, .945f, .385f);
-            _token = LotdUiKit.CreateInputField(entry, "GitHubToken", "fine-grained 토큰 붙여넣기", 18);
+            _token = DuelUiKit.CreateInputField(entry, "GitHubToken", "fine-grained 토큰 붙여넣기", 18);
             _token.contentType = InputField.ContentType.Password;
             _token.characterLimit = 512;
             AddButton(setup, "TokenPage", "GitHub 토큰 만들기", .055f, .49f,
@@ -58,23 +58,23 @@ namespace YGOPortable.UI
                 _sync.Connect(value);
             }, y: .10f);
 
-            var connected = LotdUiKit.FillRect("Connected", win);
+            var connected = DuelUiKit.FillRect("Connected", win);
             _connected = connected.gameObject;
             var details = Row(connected, "Details", .055f, .38f, .945f, .57f);
-            LotdUiKit.AddFittedText(details, "Text", "카드, 재화, 대전 해금과 편집한 덱을 자동으로 동기화합니다.",
-                19, 14, TextAnchor.MiddleLeft, LotdUiKit.TextMuted);
+            DuelUiKit.AddFittedText(details, "Text", "카드, 재화, 대전 해금과 편집한 덱을 자동으로 동기화합니다.",
+                19, 14, TextAnchor.MiddleLeft, DuelUiKit.TextMuted);
             _refresh = AddButton(connected, "Refresh", "지금 확인", .055f, .46f, () => _sync.RequestSync(), y: .22f);
             _disconnect = AddButton(connected, "Disconnect", "이 기기 연결 해제", .49f, .945f, _sync.Disconnect, y: .22f);
 
-            var conflict = LotdUiKit.FillRect("Conflict", win);
+            var conflict = DuelUiKit.FillRect("Conflict", win);
             _conflict = conflict.gameObject;
             var notice = Row(conflict, "Notice", .055f, .38f, .945f, .57f);
-            LotdUiKit.AddFittedText(notice, "Text", "클라우드 저장을 적용하면 이 기기의 기존 저장은 백업됩니다.",
-                19, 14, TextAnchor.MiddleLeft, LotdUiKit.TextMuted);
+            DuelUiKit.AddFittedText(notice, "Text", "클라우드 저장을 적용하면 이 기기의 기존 저장은 백업됩니다.",
+                19, 14, TextAnchor.MiddleLeft, DuelUiKit.TextMuted);
             _local = AddButton(conflict, "UseLocal", "이 기기 저장 사용", .055f, .46f, () => _sync.Resolve(false), y: .22f);
             _cloud = AddButton(conflict, "UseCloud", "클라우드 저장 사용", .49f, .945f, () => _sync.Resolve(true), y: .22f);
 
-            _close = LotdUiKit.CreateLotdButton(Row(win, "Close", .69f, .825f, .945f, .96f),
+            _close = DuelUiKit.CreateButton(Row(win, "Close", .69f, .825f, .945f, .96f),
                 "Button", "닫기", close, 18);
             Root.SetActive(false);
         }
@@ -110,10 +110,10 @@ namespace YGOPortable.UI
         }
 
         private static RectTransform Row(Transform parent, string name, float left, float bottom, float right, float top) =>
-            LotdUiKit.CreateRect(name, parent, new Vector2(left, bottom), new Vector2(right, top), Vector2.zero, Vector2.zero);
+            DuelUiKit.CreateRect(name, parent, new Vector2(left, bottom), new Vector2(right, top), Vector2.zero, Vector2.zero);
 
         private static Button AddButton(Transform parent, string name, string text, float left, float right, Action click, float y = .10f) =>
-            LotdUiKit.CreateLotdButton(Row(parent, name, left, y, right, y + .125f),
+            DuelUiKit.CreateButton(Row(parent, name, left, y, right, y + .125f),
                 "Button", text, click, 18);
     }
 }

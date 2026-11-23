@@ -35,7 +35,7 @@ namespace YGOPortable.UI
 
         private static Button AddMainSortButton(Transform panel, Action open)
         {
-            var holder = LotdUiKit.CreateRect("MainSort", panel, new Vector2(.23f, .79f),
+            var holder = DuelUiKit.CreateRect("MainSort", panel, new Vector2(.23f, .79f),
                 new Vector2(.56f, .824f), Vector2.zero, Vector2.zero);
             var button = DeckEditorStyle.Button(holder, "Button", "메인 정렬 ▼", open, 15);
             var caption = button.GetComponentInChildren<Text>();
@@ -47,9 +47,9 @@ namespace YGOPortable.UI
 
         private void BuildMainSortMenu(Transform parent)
         {
-            var overlay = LotdUiKit.FillRect("MainDeckSort", parent);
+            var overlay = DuelUiKit.FillRect("MainDeckSort", parent);
             _mainSortMenu = overlay.gameObject;
-            var backdrop = LotdUiKit.FillRect("Dismiss", overlay);
+            var backdrop = DuelUiKit.FillRect("Dismiss", overlay);
             DeckEditorStyle.Fill(backdrop, new Color(DeckEditorStyle.Scrim.r, DeckEditorStyle.Scrim.g, DeckEditorStyle.Scrim.b, .48f));
             var dismiss = new EventTrigger.Entry { eventID = EventTriggerType.PointerClick };
             dismiss.callback.AddListener(_ => CloseMainDeckSort());
@@ -57,8 +57,8 @@ namespace YGOPortable.UI
 
             var menu = DeckEditorStyle.Panel(overlay, "Window", new Vector2(.635f, .274f), new Vector2(.96f, .723f));
             var title = SortMenuRow(menu, "Title", .833f, .956f);
-            _deckSortTitle = LotdUiKit.AddFittedText(title, "Text", "메인 덱 정렬", 23, 15, TextAnchor.MiddleCenter,
-                LotdUiKit.GoldAccent, FontStyle.Bold);
+            _deckSortTitle = DuelUiKit.AddFittedText(title, "Text", "메인 덱 정렬", 23, 15, TextAnchor.MiddleCenter,
+                DuelUiKit.GoldAccent, FontStyle.Bold);
             for (int index = 0; index < MainSortOptions.Length; index++)
             {
                 int choice = index;
@@ -77,7 +77,7 @@ namespace YGOPortable.UI
         }
 
         private static RectTransform SortMenuRow(Transform parent, string name, float bottom, float top) =>
-            LotdUiKit.CreateRect(name, parent, new Vector2(.092f, bottom), new Vector2(.908f, top),
+            DuelUiKit.CreateRect(name, parent, new Vector2(.092f, bottom), new Vector2(.908f, top),
                 Vector2.zero, Vector2.zero);
 
         private void OpenMainDeckSort() => OpenDeckSort(wholeDeck: false);

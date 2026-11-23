@@ -20,11 +20,11 @@ namespace YGOPortable.UI
             for (int i = 0; i < labels.Length; i++)
             {
                 var action = (CardTradeAction)(i + 1);
-                var holder = LotdUiKit.FillRect(action.ToString(), parent);
+                var holder = DuelUiKit.FillRect(action.ToString(), parent);
                 int size = compact ? 14 : 18;
                 var button = deckEditor
                     ? DeckEditorStyle.Button(holder, "Button", labels[i], () => open(_code, action), size, i < 2)
-                    : LotdUiKit.CreateLotdButton(holder, "Button", labels[i], () => open(_code, action), size, i < 2);
+                    : DuelUiKit.CreateButton(holder, "Button", labels[i], () => open(_code, action), size, i < 2);
                 var text = button.GetComponentInChildren<Text>();
                 text.resizeTextForBestFit = true;
                 text.resizeTextMinSize = compact ? 8 : 11;

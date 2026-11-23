@@ -10,7 +10,7 @@ namespace YGOPortable.UI
 
         internal static RectTransform Create(Transform fullScreenParent)
         {
-            var content = LotdUiKit.FillRect("MobileSafeArea", fullScreenParent);
+            var content = DuelUiKit.FillRect("MobileSafeArea", fullScreenParent);
             Attach(content);
             return content;
         }

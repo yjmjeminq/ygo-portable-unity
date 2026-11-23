@@ -58,8 +58,8 @@ namespace YGOPortable.UI
         internal static Image AddHexPlate(RectTransform root, Color rim, Color face)
         {
             _hexagon ??= BuildHexagon();
-            var edge = LotdUiKit.AddImage(root.gameObject, _hexagon, rim, false, false);
-            LotdUiKit.AddImage(LotdUiKit.FillRect("Surface", root, 2f).gameObject, _hexagon, face, false, false);
+            var edge = DuelUiKit.AddImage(root.gameObject, _hexagon, rim, false, false);
+            DuelUiKit.AddImage(DuelUiKit.FillRect("Surface", root, 2f).gameObject, _hexagon, face, false, false);
             return edge;
         }
 
@@ -67,11 +67,11 @@ namespace YGOPortable.UI
         {
             // Separate the atmospheric halo, the lit edge, and the metal inset.
             _hexagon ??= BuildHexagon();
-            var halo = LotdUiKit.FillRect("Halo", root, -size * .075f);
-            LotdUiKit.AddImage(halo.gameObject, _hexagon, new Color(neon.r, neon.g, neon.b, .18f), false, false);
-            var outer = LotdUiKit.FillRect("NeonEdge", root);
+            var halo = DuelUiKit.FillRect("Halo", root, -size * .075f);
+            DuelUiKit.AddImage(halo.gameObject, _hexagon, new Color(neon.r, neon.g, neon.b, .18f), false, false);
+            var outer = DuelUiKit.FillRect("NeonEdge", root);
             AddHexPlate(outer, neon, new Color(.047f, .082f, .105f, .99f));
-            var inset = LotdUiKit.FillRect("MetalInset", root, size * .074f);
+            var inset = DuelUiKit.FillRect("MetalInset", root, size * .074f);
             AddHexPlate(inset, Color.Lerp(new Color(.15f, .23f, .27f), neon, .28f),
                 new Color(.021f, .037f, .054f, .98f));
         }
@@ -102,7 +102,7 @@ namespace YGOPortable.UI
         internal static RectTransform Panel(Transform parent, string name, Vector2 min, Vector2 max,
             Vector2 offsetMin = default, Vector2 offsetMax = default, Color? fill = null, Color? border = null)
         {
-            var panel = LotdUiKit.CreateBorderedPanel(parent, name, min, max, offsetMin, offsetMax,
+            var panel = DuelUiKit.CreateBorderedPanel(parent, name, min, max, offsetMin, offsetMax,
                 fill ?? PanelColor, border ?? BorderColor);
             panel.GetComponent<Outline>().effectDistance = new Vector2(1f, -1f);
             return panel;
@@ -111,7 +111,7 @@ namespace YGOPortable.UI
         internal static Button Button(Transform parent, string name, string label, Action action, int size,
             bool gold = false)
         {
-            var button = LotdUiKit.CreateLotdButton(parent, name, label, action, size);
+            var button = DuelUiKit.CreateButton(parent, name, label, action, size);
             ApplyButton(button, gold);
             return button;
         }
@@ -124,7 +124,7 @@ namespace YGOPortable.UI
                 if (label.TryGetComponent<Shadow>(out var shadow)) shadow.enabled = false;
             }
             var image = button.image;
-            image.sprite = LotdUiKit.WhiteSprite;
+            image.sprite = DuelUiKit.WhiteSprite;
             image.overrideSprite = null;
             image.type = Image.Type.Simple;
             var normal = accent ? new Color(.30f, .22f, .10f) : new Color(.085f, .16f, .22f, .95f);
@@ -144,13 +144,13 @@ namespace YGOPortable.UI
 
         internal static Button RoundButton(RectTransform parent, string name, Color accent, Action action)
         {
-            var rect = LotdUiKit.FillRect(name, parent);
+            var rect = DuelUiKit.FillRect(name, parent);
             var circle = rect.gameObject.AddComponent<AspectRatioFitter>();
             circle.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
             circle.aspectRatio = 1f;
-            var rim = LotdUiKit.AddImage(rect.gameObject, Disc, accent, true);
-            var face = LotdUiKit.FillRect("Face", rect, 2.5f);
-            LotdUiKit.AddImage(face.gameObject, Disc, new Color(.074f, .145f, .214f), true, false);
+            var rim = DuelUiKit.AddImage(rect.gameObject, Disc, accent, true);
+            var face = DuelUiKit.FillRect("Face", rect, 2.5f);
+            DuelUiKit.AddImage(face.gameObject, Disc, new Color(.074f, .145f, .214f), true, false);
             var button = rect.gameObject.AddComponent<Button>();
             button.targetGraphic = rim;
             button.navigation = new Navigation { mode = Navigation.Mode.None };
@@ -166,7 +166,7 @@ namespace YGOPortable.UI
             };
             button.onClick.AddListener(() =>
             {
-                LotdAudio.PlayClick();
+                DuelAudio.PlayClick();
                 action?.Invoke();
             });
             return button;
@@ -240,9 +240,9 @@ namespace YGOPortable.UI
 
         internal static Image AddActivationGlow(Transform parent, float spread = 9f, bool behind = true)
         {
-            var outline = LotdUiKit.FillRect("PlayableGlow", parent, -spread);
+            var outline = DuelUiKit.FillRect("PlayableGlow", parent, -spread);
             if (behind) outline.SetAsFirstSibling();
-            var glow = LotdUiKit.AddImage(outline.gameObject, HandGlow, Color.white, false, false);
+            var glow = DuelUiKit.AddImage(outline.gameObject, HandGlow, Color.white, false, false);
             glow.type = Image.Type.Sliced;
             glow.fillCenter = false;
             outline.gameObject.SetActive(false);

@@ -38,14 +38,14 @@ namespace YGOPortable.UI
         private void BuildActivationNotice(Transform parent)
         {
             _activationNoticeHome = parent;
-            _activationNotice = LotdUiKit.CreateRect("ActivationNotice", parent, ActivationNoticeMin,
+            _activationNotice = DuelUiKit.CreateRect("ActivationNotice", parent, ActivationNoticeMin,
                 ActivationNoticeMax, Vector2.zero, Vector2.zero);
             DuelReadoutPlate.Add(_activationNotice, new Color(.041f, .063f, .088f, .95f)).raycastTarget = false;
-            var line = LotdUiKit.CreateRect("Accent", _activationNotice, new Vector2(.017f, .20f), new Vector2(.023f, .80f),
+            var line = DuelUiKit.CreateRect("Accent", _activationNotice, new Vector2(.017f, .20f), new Vector2(.023f, .80f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(line.gameObject, LotdUiKit.WhiteSprite, DisabledInk, false, false);
-            _activationNoticeText = LotdUiKit.AddFittedText(_activationNotice, "Reason", "", 22, 12,
-                TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
+            DuelUiKit.AddImage(line.gameObject, DuelUiKit.WhiteSprite, DisabledInk, false, false);
+            _activationNoticeText = DuelUiKit.AddFittedText(_activationNotice, "Reason", "", 22, 12,
+                TextAnchor.MiddleCenter, DuelUiKit.TextPrimary, FontStyle.Bold);
             _activationNoticeGroup = _activationNotice.gameObject.AddComponent<CanvasGroup>();
             _activationNoticeGroup.blocksRaycasts = false;
             _activationNoticeGroup.interactable = false;
@@ -166,8 +166,8 @@ namespace YGOPortable.UI
         {
             if (visible && shade == null)
             {
-                var rect = LotdUiKit.FillRect("UnavailableShade", art);
-                shade = LotdUiKit.AddImage(rect.gameObject, LotdUiKit.WhiteSprite,
+                var rect = DuelUiKit.FillRect("UnavailableShade", art);
+                shade = DuelUiKit.AddImage(rect.gameObject, DuelUiKit.WhiteSprite,
                     new Color(.14f, .16f, .19f, .32f), false, false);
             }
             if (shade != null) shade.gameObject.SetActive(visible);
@@ -177,7 +177,7 @@ namespace YGOPortable.UI
         {
             if (visible && slot.disabledChains == null)
             {
-                var rect = LotdUiKit.FillRect("DisabledChains", slot.focusArt);
+                var rect = DuelUiKit.FillRect("DisabledChains", slot.focusArt);
                 slot.disabledChains = rect.gameObject.AddComponent<DuelEffectGraphic>();
                 slot.disabledChains.texture = Texture2D.whiteTexture;
                 slot.disabledChains.Kind = DuelEffectKind.DisabledChains;
@@ -193,10 +193,10 @@ namespace YGOPortable.UI
 
         private static GameObject BuildDisabledBadge(Transform cardView, int fontSize)
         {
-            var area = LotdUiKit.CreateRect("EffectDisabled", cardView.Find("AspectBox"), new Vector2(.054f, .055f),
+            var area = DuelUiKit.CreateRect("EffectDisabled", cardView.Find("AspectBox"), new Vector2(.054f, .055f),
                 new Vector2(.946f, .225f), Vector2.zero, Vector2.zero);
             DuelReadoutPlate.Add(area, new Color(.13f, .029f, .067f, .96f)).raycastTarget = false;
-            LotdUiKit.AddFittedText(area, "Label", "효과 무효화됨", fontSize, 9,
+            DuelUiKit.AddFittedText(area, "Label", "효과 무효화됨", fontSize, 9,
                 TextAnchor.MiddleCenter, DisabledInk, FontStyle.Bold);
             area.gameObject.SetActive(false);
             return area.gameObject;

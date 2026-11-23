@@ -153,7 +153,7 @@ namespace YGOPortable.Editor
                     var episode = script.episodes[i];
                     var opponent = DeckRepository.GetCharacter(episode.charId);
                     Require(ids.Add(episode.id) && opponent != null && !string.IsNullOrWhiteSpace(episode.title) &&
-                        LotdUiKit.LoadOpponentPortrait(opponent) != null &&
+                        DuelUiKit.LoadOpponentPortrait(opponent) != null &&
                         OpponentDeckLevels.GetDecks(episode.charId).Any(deck => deck.main?.Length >= 40),
                         $"Missing cast or decks for {episode.id}.");
                     var raid = StoryRaid.For(series, i + 1);
@@ -170,7 +170,7 @@ namespace YGOPortable.Editor
                 }
             }
             Require(ids.Count == 300 && raids == 40, "Some episodes were not included.");
-            Require(LotdUiKit.LoadSprite("Story/Protagonist") != null, "Missing standing player artwork.");
+            Require(DuelUiKit.LoadSprite("Story/Protagonist") != null, "Missing standing player artwork.");
         }
 
         private static void VerifyOpeningAndSave(string save)

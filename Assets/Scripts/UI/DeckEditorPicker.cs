@@ -18,7 +18,7 @@ namespace YGOPortable.UI
 
         private void BuildDeckPicker(Transform parent)
         {
-            _deckPicker = LotdUiKit.FillRect("DeckPicker", parent);
+            _deckPicker = DuelUiKit.FillRect("DeckPicker", parent);
             DeckEditorStyle.Backdrop(_deckPicker);
             DeckEditorStyle.AddHeader(_deckPicker, "편집할 덱 선택");
             DeckButton(_deckPicker, "Back", "메인 메뉴", .833f, .914f, .981f, .979f,
@@ -26,17 +26,17 @@ namespace YGOPortable.UI
 
             var panel = DeckEditorStyle.Panel(_deckPicker, "SavedDecks", new Vector2(.047f, .053f), new Vector2(.953f, .9f));
             var title = DeckArea(panel, "Title", .025f, .843f, .62f, .95f);
-            LotdUiKit.AddFittedText(title, "Label", "저장된 덱", _mobileLayout ? 30 : 26, 16,
-                TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
+            DuelUiKit.AddFittedText(title, "Label", "저장된 덱", _mobileLayout ? 30 : 26, 16,
+                TextAnchor.MiddleLeft, DuelUiKit.TextPrimary, FontStyle.Bold);
             _deckPickerNew = DeckButton(panel, "NewDeck", "새 덱 만들기", .694f, .846f, .973f, .946f,
                 CreateNewUserDeck, accent: true, fontSize: _mobileLayout ? 24 : 19);
 
             var list = DeckArea(panel, "List", .025f, .104f, .976f, .826f);
             DeckEditorStyle.Fill(list, DeckEditorStyle.Inset);
-            var viewport = LotdUiKit.FillRect("Viewport", list, 6f);
+            var viewport = DuelUiKit.FillRect("Viewport", list, 6f);
             viewport.offsetMax = new Vector2(-20f, -6f);
             viewport.gameObject.AddComponent<RectMask2D>();
-            _deckPickerRows = LotdUiKit.CreateRect("Rows", viewport, Vector2.up, Vector2.one, Vector2.zero, Vector2.zero);
+            _deckPickerRows = DuelUiKit.CreateRect("Rows", viewport, Vector2.up, Vector2.one, Vector2.zero, Vector2.zero);
             _deckPickerRows.pivot = new Vector2(.5f, 1f);
             var layout = _deckPickerRows.gameObject.AddComponent<VerticalLayoutGroup>();
             layout.spacing = 7f;
@@ -53,8 +53,8 @@ namespace YGOPortable.UI
             _deckPickerScroll.movementType = ScrollRect.MovementType.Clamped;
             _deckPickerScroll.verticalScrollbar = AddDeckScrollbar(list);
             _deckPickerScroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
-            _deckPickerStatus = LotdUiKit.AddFittedText(DeckArea(panel, "Status", .035f, .026f, .962f, .089f),
-                "Text", "", _mobileLayout ? 19 : 16, 12, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary);
+            _deckPickerStatus = DuelUiKit.AddFittedText(DeckArea(panel, "Status", .035f, .026f, .962f, .089f),
+                "Text", "", _mobileLayout ? 19 : 16, 12, TextAnchor.MiddleLeft, DuelUiKit.TextPrimary);
             _deckPicker.gameObject.SetActive(false);
         }
 
@@ -93,11 +93,11 @@ namespace YGOPortable.UI
                     else ShowDeckPicker();
                 });
                 item.gameObject.AddComponent<LayoutElement>().preferredHeight = rowHeight;
-                LotdUiKit.AddFittedText(DeckArea(item.transform, "Name", .036f, .075f, .565f, .925f),
+                DuelUiKit.AddFittedText(DeckArea(item.transform, "Name", .036f, .075f, .565f, .925f),
                     "Text", deck.name, _mobileLayout ? 25 : 22, 14, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
-                LotdUiKit.AddFittedText(DeckArea(item.transform, "Counts", .575f, .075f, .965f, .925f), "Text",
+                DuelUiKit.AddFittedText(DeckArea(item.transform, "Counts", .575f, .075f, .965f, .925f), "Text",
                     $"메인 {deck.main.Count}장  ·  엑스트라 {deck.extra.Count}장  ·  사이드 {deck.side.Count}장",
-                    _mobileLayout ? 19 : 17, 12, TextAnchor.MiddleRight, LotdUiKit.TextPrimary);
+                    _mobileLayout ? 19 : 17, 12, TextAnchor.MiddleRight, DuelUiKit.TextPrimary);
                 if (i == 0 || i == _userDeckIdx) _deckPickerFocus = item;
             }
 

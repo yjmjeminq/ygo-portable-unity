@@ -94,7 +94,7 @@ namespace YGOPortable.UI
             LinkDirection = direction;
             if (LinkHighlighted && _linkRim == null)
             {
-                var outline = LotdUiKit.FillRect("LinkZoneRim", transform);
+                var outline = DuelUiKit.FillRect("LinkZoneRim", transform);
                 outline.SetSiblingIndex(1);
                 _linkRim = outline.gameObject.AddComponent<DuelLinkZoneRim>();
                 _linkRim.Zone = this;
@@ -123,7 +123,7 @@ namespace YGOPortable.UI
             float max = Mathf.Max(bottomRight, topRight);
             float width = max - min;
 
-            var cell = LotdUiKit.CreateRect($"Zone_{column}_{row}", board,
+            var cell = DuelUiKit.CreateRect($"Zone_{column}_{row}", board,
                 new Vector2(min, bottom), new Vector2(max, top), Vector2.zero, Vector2.zero);
             cell.gameObject.AddComponent<DuelZoneImage>()._edges = new Vector4(
                 (bottomLeft - min) / width, (bottomRight - min) / width,

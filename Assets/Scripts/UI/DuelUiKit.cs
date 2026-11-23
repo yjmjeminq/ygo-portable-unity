@@ -6,7 +6,7 @@ using YGOPortable.Core;
 
 namespace YGOPortable.UI
 {
-    public static class LotdUiKit
+    public static class DuelUiKit
     {
         public const float CardAspectRatio = 400f / 580f;
         public static readonly Color BgDeep = new Color(0.03f, 0.065f, 0.135f, 1f);
@@ -180,11 +180,7 @@ namespace YGOPortable.UI
             Vector2 anchorMin, Vector2 anchorMax, bool highlighted = false)
         {
             var panel = CreateRect(name, parent, anchorMin, anchorMax, Vector2.zero, Vector2.zero);
-            AddImage(panel.gameObject, LoadSprite("LOTD/Shared/opponentframe_fill"), Color.white);
-            var frame = AddImage(FillRect("Frame", panel).gameObject, LoadSprite("LOTD/Shared/menuframe"),
-                Color.white, false, false);
-            if (frame.sprite.border.sqrMagnitude > 0f)
-                frame.type = Image.Type.Sliced;
+            AddImage(panel.gameObject, DuelUiChrome.Panel, Color.white).type = Image.Type.Sliced;
             if (highlighted)
             {
                 var outline = panel.gameObject.AddComponent<Outline>();
@@ -198,19 +194,18 @@ namespace YGOPortable.UI
         {
             var header = CreateRect("MenuHeader", parent, new Vector2(0.25f, 0.90f), new Vector2(0.75f, 0.995f),
                 Vector2.zero, Vector2.zero);
-            AddImage(header.gameObject, LoadSprite("LOTD/Shared/menuheader"), Color.white, false, false);
-            AddText(header, "Heading", title, 32, TextAnchor.MiddleCenter,
-                new Color(0.025f, 0.075f, 0.14f), FontStyle.Bold);
+            AddImage(header.gameObject, DuelUiChrome.Header, Color.white, false, false).type = Image.Type.Sliced;
+            AddFittedText(header, "Heading", title, 32, 18, TextAnchor.MiddleCenter, TextPrimary, FontStyle.Bold);
         }
 
         public static Scrollbar AddVerticalScrollbar(Transform parent)
         {
             var track = CreateRect("Scrollbar", parent, new Vector2(1f, 0f), Vector2.one,
                 new Vector2(-14f, 1f), new Vector2(-2f, -1f));
-            AddImage(track.gameObject, LoadSprite("LOTD/Shared/scrollbar_blue_track"), Color.white);
+            AddImage(track.gameObject, WhiteSprite, new Color32(23, 33, 43, 255));
             var slide = FillRect("SlidingArea", track, 1f);
             var thumb = FillRect("Handle", slide);
-            var image = AddImage(thumb.gameObject, LoadSprite("LOTD/Shared/scrollbar_blue_thumb"), Color.white);
+            var image = AddImage(thumb.gameObject, WhiteSprite, new Color32(104, 142, 156, 255));
             var scrollbar = track.gameObject.AddComponent<Scrollbar>();
             scrollbar.direction = Scrollbar.Direction.BottomToTop;
             scrollbar.handleRect = thumb;
@@ -218,30 +213,14 @@ namespace YGOPortable.UI
             return scrollbar;
         }
 
-        public static Button CreateLotdButton(Transform parent, string name, string label,
+        public static Button CreateButton(Transform parent, string name, string label,
             Action onClick, int fontSize = 18, bool gold = false)
         {
             var rt = CreateRect(name, parent, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            string activePath = gold ? "LOTD/Buttons_Yellow/ds_btn_active01" : "LOTD/Buttons/ds_btn_active01";
-            string inactivePath = gold ? "LOTD/Buttons_Yellow/ds_btn_inactive01" : "LOTD/Buttons/ds_btn_inactive01";
-            var spInact = LoadSprite(inactivePath);
-            var spAct = LoadSprite(activePath);
-
-            var img = AddImage(rt.gameObject, spInact ?? WhiteSprite,
-                spInact != null ? Color.white : (gold ? new Color(0.65f, 0.45f, 0.1f, 1f) : new Color(0.10f, 0.25f, 0.50f, 1f)));
-            img.type = Image.Type.Simple;
-
+            var img = AddImage(rt.gameObject, WhiteSprite, Color.white);
             var btn = rt.gameObject.AddComponent<Button>();
             btn.targetGraphic = img;
-            var ss = new SpriteState();
-            if (spAct != null)
-            {
-                ss.highlightedSprite = spAct;
-                ss.pressedSprite = spAct;
-                ss.selectedSprite = spAct;
-                btn.transition = Selectable.Transition.SpriteSwap;
-                btn.spriteState = ss;
-            }
+            DuelUiChrome.ApplyControl(btn, img, gold);
             var txt = AddText(rt, "Label", label, fontSize, TextAnchor.MiddleCenter, TextPrimary, FontStyle.Bold);
             var sh = txt.gameObject.AddComponent<Shadow>();
             sh.effectColor = new Color(0f, 0f, 0f, 0.85f);
@@ -249,7 +228,7 @@ namespace YGOPortable.UI
 
             btn.onClick.AddListener(() =>
             {
-                LotdAudio.PlayClick();
+                DuelAudio.PlayClick();
                 onClick?.Invoke();
             });
             return btn;
@@ -258,7 +237,7 @@ namespace YGOPortable.UI
         public static Button CreateWrappedButton(Transform parent, string name, string label, Action onClick,
             int fontSize, bool gold, float minHeight, Sprite icon = null, int sidePadding = 24)
         {
-            var button = CreateLotdButton(parent, name, label, onClick, fontSize, gold);
+            var button = CreateButton(parent, name, label, onClick, fontSize, gold);
             button.gameObject.AddComponent<LayoutElement>().minHeight = minHeight;
             var layout = button.gameObject.AddComponent<HorizontalLayoutGroup>();
             layout.padding = new RectOffset(sidePadding, sidePadding, 8, 8);
@@ -289,13 +268,13 @@ namespace YGOPortable.UI
             return button;
         }
 
-        public static Dropdown CreateLotdDropdown(Transform parent, string name, IReadOnlyList<string> choices,
+        public static Dropdown CreateDropdown(Transform parent, string name, IReadOnlyList<string> choices,
             Action<int> onChanged, bool dynamicChoices = false)
         {
             const float rowHeight = 28f;
             const int visibleRows = 7;
             var root = FillRect(name, parent);
-            var background = AddImage(root.gameObject, LoadSprite("LOTD/Buttons/ds_btn_inactive01"), Color.white);
+            var background = AddImage(root.gameObject, WhiteSprite, Color.white);
             var caption = AddText(root, "Caption", "", 13, TextAnchor.MiddleLeft, TextPrimary, FontStyle.Bold);
             caption.rectTransform.offsetMin = new Vector2(7f, 0f);
             caption.rectTransform.offsetMax = new Vector2(-17f, 0f);
@@ -346,6 +325,7 @@ namespace YGOPortable.UI
 
             var dropdown = root.gameObject.AddComponent<Dropdown>();
             dropdown.targetGraphic = background;
+            DuelUiChrome.ApplyControl(dropdown, background);
             dropdown.template = template;
             dropdown.captionText = caption;
             dropdown.itemText = label;
@@ -354,7 +334,7 @@ namespace YGOPortable.UI
             dropdown.RefreshShownValue();
             dropdown.onValueChanged.AddListener(value =>
             {
-                LotdAudio.PlayClick();
+                DuelAudio.PlayClick();
                 onChanged(value);
             });
             template.gameObject.SetActive(false);
@@ -465,21 +445,21 @@ namespace YGOPortable.UI
         {
             _detailed = detailed;
 
-            var innerRt = LotdUiKit.FillRect("AspectBox", transform);
+            var innerRt = DuelUiKit.FillRect("AspectBox", transform);
             var arf = innerRt.gameObject.AddComponent<AspectRatioFitter>();
             arf.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
-            arf.aspectRatio = LotdUiKit.CardAspectRatio;
+            arf.aspectRatio = DuelUiKit.CardAspectRatio;
 
-            var artRt = LotdUiKit.CreateRect("Artwork", innerRt, CardFaceFrame.Artwork.min, CardFaceFrame.Artwork.max,
+            var artRt = DuelUiKit.CreateRect("Artwork", innerRt, CardFaceFrame.Artwork.min, CardFaceFrame.Artwork.max,
                 Vector2.zero, Vector2.zero);
-            _artImg = LotdUiKit.AddImage(artRt.gameObject, null, Color.white, false, false);
+            _artImg = DuelUiKit.AddImage(artRt.gameObject, null, Color.white, false, false);
 
-            var frameRt = LotdUiKit.FillRect("Frame", innerRt);
-            _frameImg = LotdUiKit.AddImage(frameRt.gameObject, null, Color.white, false, false);
+            var frameRt = DuelUiKit.FillRect("Frame", innerRt);
+            _frameImg = DuelUiKit.AddImage(frameRt.gameObject, null, Color.white, false, false);
 
-            var titleRt = LotdUiKit.CreateRect("CardTitle", innerRt,
+            var titleRt = DuelUiKit.CreateRect("CardTitle", innerRt,
                 new Vector2(.080f, .894f), new Vector2(detailed ? .81f : .921f, .967f), Vector2.zero, Vector2.zero);
-            _titleText = LotdUiKit.AddFittedText(titleRt, "T", "", detailed ? 22 : 13, detailed ? 6 : 4,
+            _titleText = DuelUiKit.AddFittedText(titleRt, "T", "", detailed ? 22 : 13, detailed ? 6 : 4,
                 TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
             var ts = _titleText.gameObject.AddComponent<Shadow>();
             ts.effectColor = new Color(0, 0, 0, 0.85f);
@@ -487,22 +467,22 @@ namespace YGOPortable.UI
 
             if (detailed)
             {
-                var attrRt = LotdUiKit.CreateRect("AttrIcon", innerRt,
+                var attrRt = DuelUiKit.CreateRect("AttrIcon", innerRt,
                     new Vector2(.828f, .901f), new Vector2(.923f, .953f), Vector2.zero, Vector2.zero);
-                _attrImg = LotdUiKit.AddImage(attrRt.gameObject, null, Color.white, true, false);
+                _attrImg = DuelUiKit.AddImage(attrRt.gameObject, null, Color.white, true, false);
 
-                var lvRt = LotdUiKit.CreateRect("LevelInfo", innerRt,
+                var lvRt = DuelUiKit.CreateRect("LevelInfo", innerRt,
                     new Vector2(.079f, .844f), new Vector2(.921f, .886f), Vector2.zero, Vector2.zero);
-                var levelLabel = LotdUiKit.CreateRect("Type", lvRt, Vector2.zero, new Vector2(.70f, 1f), Vector2.zero, Vector2.zero);
-                _levelText = LotdUiKit.AddFittedText(levelLabel, "Lv", "", 15, 7,
+                var levelLabel = DuelUiKit.CreateRect("Type", lvRt, Vector2.zero, new Vector2(.70f, 1f), Vector2.zero, Vector2.zero);
+                _levelText = DuelUiKit.AddFittedText(levelLabel, "Lv", "", 15, 7,
                     TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
-                var rating = LotdUiKit.CreateRect("Rating", lvRt, new Vector2(.74f, .045f), new Vector2(1f, .955f),
+                var rating = DuelUiKit.CreateRect("Rating", lvRt, new Vector2(.74f, .045f), new Vector2(1f, .955f),
                     Vector2.zero, Vector2.zero);
                 _faceRating = new DuelRatingBadge(rating, compact: true);
 
-                var leftScale = LotdUiKit.CreateRect("LeftScale", innerRt,
+                var leftScale = DuelUiKit.CreateRect("LeftScale", innerRt,
                     new Vector2(.073f, .240f), new Vector2(.143f, .298f), Vector2.zero, Vector2.zero);
-                var rightScale = LotdUiKit.CreateRect("RightScale", innerRt,
+                var rightScale = DuelUiKit.CreateRect("RightScale", innerRt,
                     new Vector2(.857f, .240f), new Vector2(.927f, .298f), Vector2.zero, Vector2.zero);
                 _leftScaleText = AddScaleValue(leftScale, new Color(.56f, .82f, 1f));
                 _rightScaleText = AddScaleValue(rightScale, new Color(1f, .68f, .64f));
@@ -513,24 +493,24 @@ namespace YGOPortable.UI
                     return DuelTypography.AddNumber(parent, "Value", "", 16, TextAnchor.MiddleCenter, color);
                 }
 
-                _rulesArea = LotdUiKit.CreateRect("Rules", innerRt,
+                _rulesArea = DuelUiKit.CreateRect("Rules", innerRt,
                     new Vector2(.080f, .124f), new Vector2(.920f, .218f), Vector2.zero, Vector2.zero);
                 _rulesArea.gameObject.AddComponent<RectMask2D>();
-                _rulesText = LotdUiKit.AddText(_rulesArea, "Text", "", 11, TextAnchor.UpperLeft, new Color(.075f, .09f, .12f));
+                _rulesText = DuelUiKit.AddText(_rulesArea, "Text", "", 11, TextAnchor.UpperLeft, new Color(.075f, .09f, .12f));
                 _rulesText.supportRichText = false;
 
-                var statRt = LotdUiKit.CreateRect("AtkDef", innerRt,
+                var statRt = DuelUiKit.CreateRect("AtkDef", innerRt,
                     new Vector2(.080f, .054f), new Vector2(.920f, .118f), Vector2.zero, Vector2.zero);
                 _faceStats = new DuelStatStrip(statRt, compact: true, useHudSkin: false);
             }
 
-            var limRt = LotdUiKit.CreateRect("LimitBadge", innerRt,
+            var limRt = DuelUiKit.CreateRect("LimitBadge", innerRt,
                 new Vector2(0.03f, 0.78f), new Vector2(0.28f, 0.95f), Vector2.zero, Vector2.zero);
-            _limitImg = LotdUiKit.AddImage(limRt.gameObject, null, Color.white, true, false);
+            _limitImg = DuelUiKit.AddImage(limRt.gameObject, null, Color.white, true, false);
             _limitImg.gameObject.SetActive(false);
 
-            var backRt = LotdUiKit.FillRect("CardBack", innerRt);
-            LotdUiKit.AddImage(backRt.gameObject, CardArtLoader.GetCardBackSprite(), Color.white, false, false);
+            var backRt = DuelUiKit.FillRect("CardBack", innerRt);
+            DuelUiKit.AddImage(backRt.gameObject, CardArtLoader.GetCardBackSprite(), Color.white, false, false);
             _backObj = backRt.gameObject;
             _backObj.SetActive(false);
         }
@@ -594,9 +574,9 @@ namespace YGOPortable.UI
 
                 uint attr = live != null && live.attribute != 0 ? live.attribute : (info?.attr ?? 0);
                 Sprite attrSp = null;
-                if ((type & YgoConstants.TYPE_SPELL) != 0) attrSp = LotdUiKit.LoadSprite("LOTD/Icons/ICON_ID_ATTR_MAGIC");
-                else if ((type & YgoConstants.TYPE_TRAP) != 0) attrSp = LotdUiKit.LoadSprite("LOTD/Icons/ICON_ID_ATTR_TRAP");
-                else attrSp = LotdUiKit.GetAttributeSprite(attr);
+                if ((type & YgoConstants.TYPE_SPELL) != 0) attrSp = DuelUiKit.LoadSprite("LOTD/Icons/ICON_ID_ATTR_MAGIC");
+                else if ((type & YgoConstants.TYPE_TRAP) != 0) attrSp = DuelUiKit.LoadSprite("LOTD/Icons/ICON_ID_ATTR_TRAP");
+                else attrSp = DuelUiKit.GetAttributeSprite(attr);
 
                 _attrImg.gameObject.SetActive(attrSp != null);
                 _attrImg.sprite = attrSp;
@@ -644,7 +624,7 @@ namespace YGOPortable.UI
             }
             if (_finish == null)
             {
-                var foil = LotdUiKit.FillRect("RarityFinish", _artImg.transform);
+                var foil = DuelUiKit.FillRect("RarityFinish", _artImg.transform);
                 _finish = foil.gameObject.AddComponent<CardFinishGraphic>();
                 _finish.raycastTarget = false;
             }
@@ -699,8 +679,8 @@ namespace YGOPortable.UI
             bool missing = _artImg.sprite == CardArtLoader.GetFallbackArt();
             if (missing && _missingArtwork == null)
             {
-                var label = LotdUiKit.FillRect("MissingArtwork", _artImg.rectTransform, 2f);
-                LotdUiKit.AddFittedText(label, "Label", "그림 없음", 14, 7, TextAnchor.MiddleCenter, LotdUiKit.TextMuted);
+                var label = DuelUiKit.FillRect("MissingArtwork", _artImg.rectTransform, 2f);
+                DuelUiKit.AddFittedText(label, "Label", "그림 없음", 14, 7, TextAnchor.MiddleCenter, DuelUiKit.TextMuted);
                 _missingArtwork = label.gameObject;
             }
             if (_missingArtwork != null) _missingArtwork.SetActive(missing);
@@ -712,9 +692,9 @@ namespace YGOPortable.UI
         {
             if (sprite != null && _sourceFace == null)
             {
-                var face = LotdUiKit.FillRect("OverframeCardFace", _artImg.transform.parent);
+                var face = DuelUiKit.FillRect("OverframeCardFace", _artImg.transform.parent);
                 face.SetSiblingIndex(_artImg.transform.GetSiblingIndex());
-                _sourceFace = LotdUiKit.AddImage(face.gameObject, null, Color.white, false, false);
+                _sourceFace = DuelUiKit.AddImage(face.gameObject, null, Color.white, false, false);
             }
             if (_sourceFace == null) return;
             _sourceFace.sprite = sprite;
@@ -728,9 +708,9 @@ namespace YGOPortable.UI
             if (shown && _deckEditionBadge == null)
             {
                 var aspect = _artImg.transform.parent;
-                var badge = LotdUiKit.CreateRect("DeckEdition", aspect, new Vector2(.058f, .048f),
+                var badge = DuelUiKit.CreateRect("DeckEdition", aspect, new Vector2(.058f, .048f),
                     new Vector2(.255f, .166f), Vector2.zero, Vector2.zero);
-                var rim = LotdUiKit.AddFittedText(badge, "Diamond", "◆", 24, 6, TextAnchor.MiddleCenter,
+                var rim = DuelUiKit.AddFittedText(badge, "Diamond", "◆", 24, 6, TextAnchor.MiddleCenter,
                     new Color(.85f, .67f, 1f), FontStyle.Bold);
                 var stroke = rim.gameObject.AddComponent<Outline>();
                 stroke.effectColor = new Color(.16f, .075f, .26f);
@@ -744,10 +724,10 @@ namespace YGOPortable.UI
         {
             if (shown && _destinyBadge == null)
             {
-                var badge = LotdUiKit.CreateRect("DestinyDraw", _artImg.transform.parent,
+                var badge = DuelUiKit.CreateRect("DestinyDraw", _artImg.transform.parent,
                     new Vector2(.686f, .767f), new Vector2(.97f, .968f), Vector2.zero, Vector2.zero);
-                LotdUiKit.AddImage(badge.gameObject, LotdUiKit.WhiteSprite, new Color(.29f, .135f, .019f, .96f), false, false);
-                LotdUiKit.AddFittedText(badge, "Star", "★", 24, 8, TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
+                DuelUiKit.AddImage(badge.gameObject, DuelUiKit.WhiteSprite, new Color(.29f, .135f, .019f, .96f), false, false);
+                DuelUiKit.AddFittedText(badge, "Star", "★", 24, 8, TextAnchor.MiddleCenter, DuelUiKit.GoldAccent, FontStyle.Bold);
                 _destinyBadge = badge.gameObject;
             }
             if (_destinyBadge != null) _destinyBadge.SetActive(shown);
@@ -770,12 +750,12 @@ namespace YGOPortable.UI
             if (!hasPortrait && _deckAppearance?.overframe != true) return;
             if (_overframe == null)
             {
-                var layer = LotdUiKit.FillRect("Overframe", _cinematicOverframe ? transform : _frameImg.transform.parent);
+                var layer = DuelUiKit.FillRect("Overframe", _cinematicOverframe ? transform : _frameImg.transform.parent);
                 if (_cinematicOverframe)
                 {
                     var aspect = layer.gameObject.AddComponent<AspectRatioFitter>();
                     aspect.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
-                    aspect.aspectRatio = LotdUiKit.CardAspectRatio;
+                    aspect.aspectRatio = DuelUiKit.CardAspectRatio;
                 }
                 else
                 {
@@ -787,30 +767,30 @@ namespace YGOPortable.UI
                 RectTransform finishBounds = _artImg.rectTransform;
                 if (!_cinematicOverframe)
                 {
-                    var face = LotdUiKit.CreateRect("FaceArtwork", layer, new Vector2(.032f, .026f),
+                    var face = DuelUiKit.CreateRect("FaceArtwork", layer, new Vector2(.032f, .026f),
                         new Vector2(.968f, .974f), Vector2.zero, Vector2.zero);
                     face.gameObject.AddComponent<RectMask2D>();
                     finishBounds = face;
-                    var background = LotdUiKit.FillRect("ExpandedArtwork", face);
-                    _overframeBackground = LotdUiKit.AddImage(background.gameObject, null, new Color(.86f, .91f, .98f), false, false);
+                    var background = DuelUiKit.FillRect("ExpandedArtwork", face);
+                    _overframeBackground = DuelUiKit.AddImage(background.gameObject, null, new Color(.86f, .91f, .98f), false, false);
                     _overframeBackgroundFit = background.gameObject.AddComponent<AspectRatioFitter>();
                     _overframeBackgroundFit.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
                     // Leave clipping to the enclosing viewport so tilt can carry the subject past the card.
-                    portraitBounds = LotdUiKit.CreateRect("PortraitBounds", layer, new Vector2(-.105f, .28f),
+                    portraitBounds = DuelUiKit.CreateRect("PortraitBounds", layer, new Vector2(-.105f, .28f),
                         new Vector2(1.105f, 1.115f), Vector2.zero, Vector2.zero);
                 }
-                var shade = LotdUiKit.FillRect("OverframeShade", finishBounds);
-                _overframeShade = LotdUiKit.AddImage(shade.gameObject, DuelStyle.OverframeBackdrop,
+                var shade = DuelUiKit.FillRect("OverframeShade", finishBounds);
+                _overframeShade = DuelUiKit.AddImage(shade.gameObject, DuelStyle.OverframeBackdrop,
                     _cinematicOverframe ? Color.white : new Color(1f, 1f, 1f, .23f), false, false);
-                var finish = LotdUiKit.FillRect(_cinematicOverframe ? "CinematicFinish" : "ExpandedFinish", finishBounds);
+                var finish = DuelUiKit.FillRect(_cinematicOverframe ? "CinematicFinish" : "ExpandedFinish", finishBounds);
                 _overframeFinish = finish.gameObject.AddComponent<CardFinishGraphic>();
                 _overframeFinish.raycastTarget = false;
                 CreateOverframeTrim(layer);
                 if (!_cinematicOverframe)
                     _overframeTrim.transform.SetSiblingIndex(portraitBounds.GetSiblingIndex());
-                _overframeTilt = LotdUiKit.FillRect("Depth", portraitBounds);
+                _overframeTilt = DuelUiKit.FillRect("Depth", portraitBounds);
                 _overframeTilt.pivot = new Vector2(.5f, .78f);
-                var portrait = LotdUiKit.CreateRect("LocalCutIn", _overframeTilt,
+                var portrait = DuelUiKit.CreateRect("LocalCutIn", _overframeTilt,
                     _cinematicOverframe ? new Vector2(-.13f, .405f) : Vector2.zero,
                     _cinematicOverframe ? new Vector2(1.13f, 1.166f) : Vector2.one,
                     Vector2.zero, Vector2.zero);
@@ -845,7 +825,7 @@ namespace YGOPortable.UI
 
         private void CreateOverframeTrim(Transform layer)
         {
-            _overframeTrim = LotdUiKit.FillRect("OverframeTrim", layer).gameObject.AddComponent<CardOverframeGraphic>();
+            _overframeTrim = DuelUiKit.FillRect("OverframeTrim", layer).gameObject.AddComponent<CardOverframeGraphic>();
             _overframeTrim.Configure(_cinematicOverframe, _cinematicOverframe ? null : _overframeFinish.canvasRenderer);
         }
 
@@ -858,7 +838,7 @@ namespace YGOPortable.UI
             if (shown && _overframeHeader == null)
             {
                 var title = _titleText.transform.parent;
-                var header = LotdUiKit.CreateRect("OverframeHeader", title.parent,
+                var header = DuelUiKit.CreateRect("OverframeHeader", title.parent,
                     new Vector2(.069f, .890f), new Vector2(.936f, .972f), Vector2.zero, Vector2.zero);
                 header.SetSiblingIndex(title.GetSiblingIndex());
                 _overframeHeader = DuelReadoutPlate.Add(header, new Color(.023f, .034f, .062f, .88f));
@@ -955,7 +935,7 @@ namespace YGOPortable.UI
         }
     }
 
-    public static class LotdAudio
+    public static class DuelAudio
     {
         private static AudioSource _sfxSource;
         private static AudioSource _bgmSource;

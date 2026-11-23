@@ -24,10 +24,10 @@ namespace YGOPortable.UI
 
         private void BuildExpandedDeckCard(Transform root)
         {
-            var overlay = LotdUiKit.FillRect("ExpandedDeckCard", root);
+            var overlay = DuelUiKit.FillRect("ExpandedDeckCard", root);
             _expandedDeckOverlay = overlay;
             overlay.gameObject.AddComponent<RectMask2D>();
-            var backdrop = LotdUiKit.FillRect("Backdrop", overlay);
+            var backdrop = DuelUiKit.FillRect("Backdrop", overlay);
             var shade = DeckEditorStyle.Fill(backdrop, DeckEditorStyle.Scrim);
             if (_mobileLayout)
             {
@@ -53,23 +53,23 @@ namespace YGOPortable.UI
                 }, fontSize: _mobileLayout ? 22 : 17);
             _expandedDeckArtworkLabel = _expandedDeckArtwork.GetComponentInChildren<Text>();
             var name = DeckArea(_expandedDeckPanel, "Name", rulesLeft, .804f, .759f, .928f);
-            _expandedDeckName = LotdUiKit.AddFittedText(name, "Text", "", _mobileLayout ? 36 : 30, _mobileLayout ? 20 : 16, TextAnchor.MiddleLeft,
-                LotdUiKit.GoldAccent, FontStyle.Bold);
+            _expandedDeckName = DuelUiKit.AddFittedText(name, "Text", "", _mobileLayout ? 36 : 30, _mobileLayout ? 20 : 16, TextAnchor.MiddleLeft,
+                DuelUiKit.GoldAccent, FontStyle.Bold);
             _expandedDeckName.supportRichText = false;
             _expandedDeckClose = DeckButton(_expandedDeckPanel, "Close", "닫기", .777f, .788f, .952f, .922f,
                 CloseExpandedDeckCard);
             var stats = DeckArea(_expandedDeckPanel, "Stats", rulesLeft, _mobileLayout ? .708f : .669f, .952f, .787f);
-            _expandedDeckStats = LotdUiKit.AddFittedText(stats, "Text", "", _mobileLayout ? 24 : 20, _mobileLayout ? 16 : 13,
-                TextAnchor.MiddleLeft, LotdUiKit.TextMuted);
+            _expandedDeckStats = DuelUiKit.AddFittedText(stats, "Text", "", _mobileLayout ? 24 : 20, _mobileLayout ? 16 : 13,
+                TextAnchor.MiddleLeft, DuelUiKit.TextMuted);
             _expandedDeckStats.supportRichText = false;
 
             var rules = DeckArea(_expandedDeckPanel, "Rules", rulesLeft, .229f, .952f, _mobileLayout ? .696f : .651f);
             DeckEditorStyle.Fill(rules, DeckEditorStyle.Inset);
-            var viewport = LotdUiKit.FillRect("Viewport", rules, 13f);
+            var viewport = DuelUiKit.FillRect("Viewport", rules, 13f);
             viewport.offsetMax = new Vector2(-31f, -13f);
             viewport.gameObject.AddComponent<RectMask2D>();
-            _expandedDeckDescription = LotdUiKit.AddText(viewport, "Effect", "", _mobileLayout ? 31 : 23, TextAnchor.UpperLeft,
-                LotdUiKit.TextPrimary);
+            _expandedDeckDescription = DuelUiKit.AddText(viewport, "Effect", "", _mobileLayout ? 31 : 23, TextAnchor.UpperLeft,
+                DuelUiKit.TextPrimary);
             _expandedDeckDescription.supportRichText = false;
             _expandedDeckDescription.verticalOverflow = VerticalWrapMode.Overflow;
             _expandedDeckDescription.lineSpacing = 1.13f;

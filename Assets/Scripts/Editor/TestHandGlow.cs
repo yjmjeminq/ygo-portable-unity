@@ -94,7 +94,7 @@ namespace YGOPortable.Editor
         {
             const string figures = "0123456789";
             var font = DuelTypography.NumberFont;
-            Require(font != LotdUiKit.FontKR && figures.All(font.HasCharacter) && "+-−?/".All(font.HasCharacter),
+            Require(font != DuelUiKit.FontKR && figures.All(font.HasCharacter) && "+-−?/".All(font.HasCharacter),
                 "The bundled numeric font could not render all duel values.");
             font.RequestCharactersInTexture(figures, 24, FontStyle.Normal);
             Require(font.GetCharacterInfo('0', out var reference, 24) && reference.advance > 0,
@@ -2368,8 +2368,8 @@ namespace YGOPortable.Editor
             void ExpectShown(ulong race, uint attribute)
             {
                 string identity = $"{YgoConstants.RaceNamesKR[race]} · {YgoConstants.AttributeNamesKR[attribute]}";
-                Sprite raceSprite = LotdUiKit.GetRaceSprite(race);
-                Sprite attrSprite = LotdUiKit.GetAttributeSprite(attribute);
+                Sprite raceSprite = DuelUiKit.GetRaceSprite(race);
+                Sprite attrSprite = DuelUiKit.GetAttributeSprite(attribute);
                 Require(inspectorText.text.Contains(identity) && zoomText.text.Contains(identity) &&
                         raceSprite != null && inspectorRace.sprite == raceSprite && zoomRace.sprite == raceSprite &&
                         attrSprite != null && inspectorAttribute.sprite == attrSprite && zoomAttribute.sprite == attrSprite &&

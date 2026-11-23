@@ -266,7 +266,7 @@ namespace YGOPortable.Editor
                 odds.text.StartsWith($"초동 미포함 {100d / 21d:0.0}%"),
                 "Selecting the two printed copies did not calculate the 5-of-7 miss rate or restore controller focus.");
             var shown = sample.Take(5).ToArray();
-            Require(Enumerable.Range(0, 5).All(i => (cards[i].image.color == LotdUiKit.GoldAccent) ==
+            Require(Enumerable.Range(0, 5).All(i => (cards[i].image.color == DuelUiKit.GoldAccent) ==
                 (CardDatabase.GetDeckPrintingKey(shown[i]) == BlueEyes)), "The sampled hand did not highlight the marked starter copies.");
             deckDraw.Find("Window/Second/Button").GetComponent<Button>().onClick.Invoke();
             Require(cards.All(button => button.gameObject.activeSelf) &&

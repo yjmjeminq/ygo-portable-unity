@@ -550,9 +550,9 @@ namespace YGOPortable.UI
             if (slot.focusShadow == null)
             {
                 if (focus == 0f) return;
-                var shadow = LotdUiKit.FillRect("FocusShadow", slot.focusArt, -7f);
+                var shadow = DuelUiKit.FillRect("FocusShadow", slot.focusArt, -7f);
                 shadow.SetAsFirstSibling();
-                slot.focusShadow = LotdUiKit.AddImage(shadow.gameObject, DuelStyle.CardShadow, Color.clear, false, false);
+                slot.focusShadow = DuelUiKit.AddImage(shadow.gameObject, DuelStyle.CardShadow, Color.clear, false, false);
                 slot.focusShadow.type = Image.Type.Sliced;
             }
             var image = slot.focusShadow;

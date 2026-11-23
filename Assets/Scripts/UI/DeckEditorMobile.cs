@@ -47,7 +47,7 @@ namespace YGOPortable.UI
         {
             _mobileEditor = root;
             _mobileTitle = DeckArea(root, "MobileTitle", .027f, 0f, .265f, 1f);
-            LotdUiKit.AddFittedText(_mobileTitle, "Title", "덱 편집", 35, 21, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary,
+            DuelUiKit.AddFittedText(_mobileTitle, "Title", "덱 편집", 35, 21, TextAnchor.MiddleLeft, DuelUiKit.TextPrimary,
                 FontStyle.Bold);
             _mobileToolbar = DeckArea(root, "MobileToolbar", .28f, 0f, .985f, 1f);
             DeckButton(_mobileToolbar, "AutoSort", "자동 정렬", .02f, 0f, .215f, 1f, () => SortWorkingDeck(), fontSize: 24);
@@ -58,9 +58,9 @@ namespace YGOPortable.UI
             DeckButton(_mobileToolbar, "Back", "덱 목록", .728f, 0f, .98f, 1f,
                 ReturnToDeckPicker, fontSize: 23);
 
-            _mobileSelection = LotdUiKit.FillRect("MobileCardSelection", root);
-            LotdUiKit.AddImage(_mobileSelection.gameObject, LotdUiKit.WhiteSprite, DeckEditorStyle.Surface, false, false);
-            _mobileSelectionLabel = LotdUiKit.AddFittedText(DeckArea(_mobileSelection, "Card", .018f, .05f, .255f, .95f),
+            _mobileSelection = DuelUiKit.FillRect("MobileCardSelection", root);
+            DuelUiKit.AddImage(_mobileSelection.gameObject, DuelUiKit.WhiteSprite, DeckEditorStyle.Surface, false, false);
+            _mobileSelectionLabel = DuelUiKit.AddFittedText(DeckArea(_mobileSelection, "Card", .018f, .05f, .255f, .95f),
                 "Label", "", 22, 12, TextAnchor.MiddleLeft, Color.white);
             _mobileQuantity = new Button[4];
             for (int i = 0; i < _mobileQuantity.Length; i++)
@@ -271,7 +271,7 @@ namespace YGOPortable.UI
                 var label = _mobileSectionButtons[i].GetComponentInChildren<Text>();
                 string shortage = missing[i] == 0 ? "" : $" · 부족 {missing[i]}장";
                 label.text = $"{(expanded ? "▾" : "▸")}  {MobileSectionNames[i]}   {GetDeckList(section).Count}장{shortage}";
-                label.color = missing[i] == 0 ? LotdUiKit.TextPrimary : LotdUiKit.RedAccent;
+                label.color = missing[i] == 0 ? DuelUiKit.TextPrimary : DuelUiKit.RedAccent;
             }
         }
 

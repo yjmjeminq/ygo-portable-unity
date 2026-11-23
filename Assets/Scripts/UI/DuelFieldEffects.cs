@@ -63,7 +63,7 @@ namespace YGOPortable.UI
             uint marks = card != null && (card.type & YgoConstants.TYPE_LINK) != 0 ? card.linkMarker : 0;
             if (marks != 0 && slot.linkBeams == null)
             {
-                var rect = LotdUiKit.FillRect("LinkBeams", slot.focusArt);
+                var rect = DuelUiKit.FillRect("LinkBeams", slot.focusArt);
                 slot.linkBeams = rect.gameObject.AddComponent<DuelEffectGraphic>();
                 slot.linkBeams.Kind = DuelEffectKind.LiveLinkDirections;
                 slot.linkBeams.texture = Texture2D.whiteTexture;

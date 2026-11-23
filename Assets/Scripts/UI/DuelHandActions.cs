@@ -37,11 +37,11 @@ namespace YGOPortable.UI
 
         private void BuildCardActions(Transform root)
         {
-            _cardActionsBar = LotdUiKit.CreateRect("CardActions", root, new Vector2(.5f, .5f),
+            _cardActionsBar = DuelUiKit.CreateRect("CardActions", root, new Vector2(.5f, .5f),
                 new Vector2(.5f, .5f), Vector2.zero, Vector2.zero);
             _cardActionsBar.pivot = new Vector2(.5f, 0f);
-            _cardActionsHoverArea = LotdUiKit.FillRect("HoverArea", _cardActionsBar);
-            LotdUiKit.AddImage(_cardActionsHoverArea.gameObject, LotdUiKit.WhiteSprite, Color.clear);
+            _cardActionsHoverArea = DuelUiKit.FillRect("HoverArea", _cardActionsBar);
+            DuelUiKit.AddImage(_cardActionsHoverArea.gameObject, DuelUiKit.WhiteSprite, Color.clear);
             _cardActionsBar.gameObject.SetActive(false);
         }
 
@@ -271,7 +271,7 @@ namespace YGOPortable.UI
                 _actionArcDiameter + (1f - Mathf.Cos(halfArc)) * _actionArcRadius);
             if (count > 1)
             {
-                var arc = LotdUiKit.FillRect("CommandArc", _cardActionsBar);
+                var arc = DuelUiKit.FillRect("CommandArc", _cardActionsBar);
                 var graphic = arc.gameObject.AddComponent<DuelEffectGraphic>();
                 graphic.texture = Texture2D.whiteTexture;
                 graphic.Kind = DuelEffectKind.ActionArc;
@@ -362,21 +362,21 @@ namespace YGOPortable.UI
             }
 
             float left = index * (CardActionWidth + CardActionGap);
-            var slot = LotdUiKit.CreateRect(name ?? iconName, _cardActionsBar, Vector2.zero, Vector2.zero,
+            var slot = DuelUiKit.CreateRect(name ?? iconName, _cardActionsBar, Vector2.zero, Vector2.zero,
                 new Vector2(left, 0f), new Vector2(left + CardActionWidth, CardActionHeight));
             bool highlighted = iconName is "ACTION" or "ATTACK" or "SUMMON" or "SUMMONSP";
-            var face = _mobileLayout ? LotdUiKit.FillRect("Circle", slot) : LotdUiKit.CreateRect("Circle", slot,
+            var face = _mobileLayout ? DuelUiKit.FillRect("Circle", slot) : DuelUiKit.CreateRect("Circle", slot,
                 new Vector2(.09f, .25f), new Vector2(.91f, 1f), Vector2.zero, Vector2.zero);
             var button = _mobileLayout
                 ? DuelStyle.Button(face, "Button", "", action, 14, highlighted)
                 : DuelStyle.RoundButton(face, "Button", highlighted ? DuelStyle.Gold : DuelStyle.Player, action);
-            var caption = LotdUiKit.CreateRect("Caption", slot, Vector2.zero, new Vector2(1f, .27f),
+            var caption = DuelUiKit.CreateRect("Caption", slot, Vector2.zero, new Vector2(1f, .27f),
                 Vector2.zero, Vector2.zero);
-            DuelStyle.Shadow(LotdUiKit.AddFittedText(caption, "Label", label, 14, 9, TextAnchor.MiddleCenter,
+            DuelStyle.Shadow(DuelUiKit.AddFittedText(caption, "Label", label, 14, 9, TextAnchor.MiddleCenter,
                 Color.white, FontStyle.Bold), 1.5f);
-            var icon = LotdUiKit.CreateRect("Icon", button.transform, new Vector2(.24f, _mobileLayout ? .36f : .24f),
+            var icon = DuelUiKit.CreateRect("Icon", button.transform, new Vector2(.24f, _mobileLayout ? .36f : .24f),
                 new Vector2(.76f, _mobileLayout ? .91f : .76f), Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(icon.gameObject, LotdUiKit.LoadSprite($"LOTD/Icons/ICON_ID_CMDID_48_{iconName}"),
+            DuelUiKit.AddImage(icon.gameObject, DuelUiKit.LoadSprite($"LOTD/Icons/ICON_ID_CMDID_48_{iconName}"),
                 Color.white, true, false);
         }
 
@@ -389,19 +389,19 @@ namespace YGOPortable.UI
             float y = _actionArcDiameter * .5f + (Mathf.Cos(angle) - arcFloor) * _actionArcRadius;
             var center = new Vector2(x, y);
             float half = _actionArcDiameter * .5f;
-            var slot = LotdUiKit.CreateRect(name ?? iconName, _cardActionsBar, Vector2.zero, Vector2.zero,
+            var slot = DuelUiKit.CreateRect(name ?? iconName, _cardActionsBar, Vector2.zero, Vector2.zero,
                 center - Vector2.one * half, center + Vector2.one * half);
             _actionArcSlots.Add((slot, center));
             bool primary = iconName is "ACTION" or "ATTACK" or "SUMMON" or "SUMMONSP";
-            var circle = LotdUiKit.FillRect("Circle", slot);
+            var circle = DuelUiKit.FillRect("Circle", slot);
             var button = DuelStyle.RoundButton(circle, "Button", primary ? DuelStyle.Gold : DuelStyle.ChainCyan, action);
-            var icon = LotdUiKit.CreateRect("Icon", button.transform, new Vector2(.24f, .39f), new Vector2(.76f, .86f),
+            var icon = DuelUiKit.CreateRect("Icon", button.transform, new Vector2(.24f, .39f), new Vector2(.76f, .86f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(icon.gameObject, LotdUiKit.LoadSprite($"LOTD/Icons/ICON_ID_CMDID_48_{iconName}"),
+            DuelUiKit.AddImage(icon.gameObject, DuelUiKit.LoadSprite($"LOTD/Icons/ICON_ID_CMDID_48_{iconName}"),
                 Color.white, true, false);
-            var caption = LotdUiKit.CreateRect("Caption", button.transform, new Vector2(.08f, .12f), new Vector2(.92f, .39f),
+            var caption = DuelUiKit.CreateRect("Caption", button.transform, new Vector2(.08f, .12f), new Vector2(.92f, .39f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddFittedText(caption, "Label", label, 15, 9, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+            DuelUiKit.AddFittedText(caption, "Label", label, 15, 9, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
         }
 
         private void PositionCardActions(RectTransform anchor, bool inHand)

@@ -268,7 +268,7 @@ namespace YGOPortable.Editor
             var illusionCard = CardDatabase.Get(14307929);
             AssertTrue(illusionCard != null && (illusionCard.race & YgoConstants.RACE_ILLUSION) != 0,
                 "Card 14307929 missing RACE_ILLUSION");
-            Sprite illusionSp = LotdUiKit.GetRaceSprite(YgoConstants.RACE_ILLUSION);
+            Sprite illusionSp = DuelUiKit.GetRaceSprite(YgoConstants.RACE_ILLUSION);
             AssertTrue(illusionSp != null, "Missing LOTD/TypeIcons sprite for RACE_ILLUSION");
 
             // Verify CardArtLoader
@@ -466,7 +466,7 @@ namespace YGOPortable.Editor
                 "Duplicate preset deck IDs");
             foreach (var character in DeckRepository.Characters)
             {
-                AssertTrue(LotdUiKit.LoadOpponentPortrait(character) != null, $"Missing portrait for {character.name}");
+                AssertTrue(DuelUiKit.LoadOpponentPortrait(character) != null, $"Missing portrait for {character.name}");
                 var decks = DeckRepository.GetDecksForCharacter(character.id);
                 var signatures = new HashSet<string>();
                 foreach (var deck in decks)
@@ -665,7 +665,7 @@ namespace YGOPortable.Editor
             var padFrame = appType.Assembly.GetType("YGOPortable.UI.DeckPadFrame");
             var padButtons = appType.Assembly.GetType("YGOPortable.UI.DeckPadButtons");
             var handle = appType.GetMethod("HandleMenuInput", privateInstance);
-            var layer = LotdUiKit.FillRect("MenuPadTest", canvas);
+            var layer = DuelUiKit.FillRect("MenuPadTest", canvas);
             var padField = appType.GetField("_menuPad", privateInstance);
             padField.SetValue(app, Activator.CreateInstance(padField.FieldType, privateInstance, null, new object[] { layer }, null));
             appType.GetField("_titleAndMenu", privateInstance).SetValue(app, menu);

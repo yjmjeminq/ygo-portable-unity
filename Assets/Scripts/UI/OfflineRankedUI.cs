@@ -46,12 +46,12 @@ namespace YGOPortable.UI
         internal OfflineRankedUI(GameAppController app, Transform parent, bool? mobileLayout = null)
         {
             _app = app;
-            var root = LotdUiKit.FillRect("Screen_OfflineRanked", parent);
+            var root = DuelUiKit.FillRect("Screen_OfflineRanked", parent);
             Root = root.gameObject;
             DeckEditorStyle.Backdrop(root);
             var area = (mobileLayout ?? Application.isMobilePlatform) ? MobileSafeArea.Create(root) : root;
 
-            _lobby = LotdUiKit.FillRect("Lobby", area);
+            _lobby = DuelUiKit.FillRect("Lobby", area);
             Title(_lobby, "랭크 매치", () => _app.ShowScreen(AppScreen.MainMenu));
             _season = Label(_lobby, "Season", .415f, .914f, .80f, .975f, 18, center: false, tone: Mint);
             var rankPanel = Panel(_lobby, "Rank", .029f, .379f, .468f, .881f);
@@ -60,7 +60,7 @@ namespace YGOPortable.UI
             _emblem = Label(insignia, "Emblem", .09f, .26f, .91f, .73f, 64, tone: Gold);
             _rank = Label(rankPanel, "RankLabel", .05f, .275f, .95f, .407f, 37);
             _streak = Label(rankPanel, "Streak", .66f, .848f, .96f, .959f, 21, tone: Gold);
-            _progress = Label(rankPanel, "Progress", .06f, .195f, .94f, .277f, 21, tone: LotdUiKit.TextMuted);
+            _progress = Label(rankPanel, "Progress", .06f, .195f, .94f, .277f, 21, tone: DuelUiKit.TextMuted);
             for (int i = 0; i < _wins.Length; i++)
             {
                 float x = .15f + i * .143f;
@@ -74,21 +74,21 @@ namespace YGOPortable.UI
             _deckPreview = CompositeCardView.Create(art, "Card");
             Label(deckPanel, "Heading", .28f, .751f, .86f, .944f, 21, "출전 덱", false);
             _deckName = Label(deckPanel, "DeckName", .28f, .478f, .94f, .744f, 27, center: false);
-            _deckAce = Label(deckPanel, "AceName", .28f, .364f, .94f, .481f, 15, center: false, tone: LotdUiKit.TextMuted);
+            _deckAce = Label(deckPanel, "AceName", .28f, .364f, .94f, .481f, 15, center: false, tone: DuelUiKit.TextMuted);
             _previous = Button(deckPanel, "Previous", "◀", .28f, .10f, .435f, .302f, () => ChangeDeck(-1));
             _next = Button(deckPanel, "Next", "▶", .45f, .10f, .605f, .302f, () => ChangeDeck(1));
             Button(deckPanel, "Edit", "덱 편집", .621f, .10f, .95f, .302f, () => _app.OpenRankedDeckEditor());
 
             var history = Panel(_lobby, "History", .482f, .118f, .971f, .881f);
             Label(history, "Title", .043f, .888f, .54f, .966f, 26, "랭크 전적", false);
-            _record = Label(history, "Record", .047f, .765f, .953f, .885f, 19, center: false, tone: LotdUiKit.TextMuted);
+            _record = Label(history, "Record", .047f, .765f, .953f, .885f, 19, center: false, tone: DuelUiKit.TextMuted);
             Label(history, "HistoryTitle", .047f, .688f, .95f, .756f, 17, "최근 10경기", false, Mint);
             var headers = Slot(history, "Columns", .045f, .645f, .955f, .684f);
-            Label(headers, "Result", .013f, 0f, .108f, 1f, 13, "결과", tone: LotdUiKit.TextMuted);
-            Label(headers, "Order", .113f, 0f, .203f, 1f, 13, "순서", tone: LotdUiKit.TextMuted);
-            Label(headers, "Player", .219f, 0f, .486f, 1f, 13, "출전 덱", false, LotdUiKit.TextMuted);
-            Label(headers, "Opponent", .50f, 0f, .985f, 1f, 13, "상대 캐릭터 · 덱", false, LotdUiKit.TextMuted);
-            _emptyHistory = Label(history, "Empty", .09f, .365f, .91f, .625f, 17, "기록된 랭크 경기가 없습니다.", tone: LotdUiKit.TextMuted);
+            Label(headers, "Result", .013f, 0f, .108f, 1f, 13, "결과", tone: DuelUiKit.TextMuted);
+            Label(headers, "Order", .113f, 0f, .203f, 1f, 13, "순서", tone: DuelUiKit.TextMuted);
+            Label(headers, "Player", .219f, 0f, .486f, 1f, 13, "출전 덱", false, DuelUiKit.TextMuted);
+            Label(headers, "Opponent", .50f, 0f, .985f, 1f, 13, "상대 캐릭터 · 덱", false, DuelUiKit.TextMuted);
+            _emptyHistory = Label(history, "Empty", .09f, .365f, .91f, .625f, 17, "기록된 랭크 경기가 없습니다.", tone: DuelUiKit.TextMuted);
             for (int i = 0; i < 10; i++)
             {
                 float top = .644f - i * .061f;
@@ -97,16 +97,16 @@ namespace YGOPortable.UI
                 _history[i] = new[]
                 {
                     Label(row, "Outcome", .013f, .05f, .108f, .95f, 16),
-                    Label(row, "Turn", .113f, .05f, .203f, .95f, 14, tone: LotdUiKit.TextMuted),
+                    Label(row, "Turn", .113f, .05f, .203f, .95f, 14, tone: DuelUiKit.TextMuted),
                     Label(row, "MyDeck", .219f, .06f, .486f, .94f, 14, center: false),
                     Label(row, "OpponentDeck", .50f, .035f, .985f, .965f, 15, center: false),
                 };
             }
             _queue = Button(_lobby, "Queue", "랭크 매칭 시작", .029f, .033f, .286f, .098f, Begin, true);
             _resetSeason = Button(_lobby, "ResetSeason", "새 시즌 시작", .302f, .033f, .467f, .098f, ShowReset);
-            _status = Label(_lobby, "Status", .485f, .032f, .973f, .103f, 16, center: false, tone: LotdUiKit.TextMuted);
+            _status = Label(_lobby, "Status", .485f, .032f, .973f, .103f, 16, center: false, tone: DuelUiKit.TextMuted);
 
-            _versus = LotdUiKit.FillRect("Versus", area);
+            _versus = DuelUiKit.FillRect("Versus", area);
             DeckEditorStyle.Backdrop(_versus);
             Title(_versus, "랭크 매칭", Back);
             var mine = Panel(_versus, "Player", .046f, .235f, .343f, .83f);
@@ -115,19 +115,19 @@ namespace YGOPortable.UI
             var playerMark = Slot(mine, "Profile", .22f, .38f, .78f, .84f);
             DuelStyle.AddHexPlate(playerMark, Mint, new Color(.077f, .148f, .185f));
             var profile = Slot(playerMark, "Portrait", .10f, .10f, .90f, .90f);
-            LotdUiKit.AddImage(profile.gameObject, LotdUiKit.LoadSprite("LOTD/Busts/yamiyugi_neutral") ??
-                LotdUiKit.LoadSprite("LOTD/Busts/atem_neutral"), Color.white, true, false);
+            DuelUiKit.AddImage(profile.gameObject, DuelUiKit.LoadSprite("LOTD/Busts/yamiyugi_neutral") ??
+                DuelUiKit.LoadSprite("LOTD/Busts/atem_neutral"), Color.white, true, false);
             var portrait = Slot(opponent, "Portrait", .06f, .31f, .94f, .96f);
-            _opponentPortrait = LotdUiKit.AddImage(portrait.gameObject, null, Color.white, true, false);
+            _opponentPortrait = DuelUiKit.AddImage(portrait.gameObject, null, Color.white, true, false);
             _vsOpponent = Label(opponent, "Name", .045f, .175f, .955f, .315f, 31);
-            _vsDeck = Label(opponent, "Deck", .05f, .045f, .95f, .17f, 17, tone: LotdUiKit.TextMuted);
+            _vsDeck = Label(opponent, "Deck", .05f, .045f, .95f, .17f, 17, tone: DuelUiKit.TextMuted);
             Label(_versus, "VS", .375f, .708f, .625f, .835f, 67, "VS", tone: Gold);
             _vsNotice = Label(_versus, "Stakes", .18f, .848f, .82f, .905f, 24, tone: Gold);
             _versusStakes = DeckEditorStyle.Fill((RectTransform)_vsNotice.rectTransform.parent, Color.clear, false);
             _coin = Square(Slot(_versus, "Coin", .429f, .376f, .571f, .636f));
-            LotdUiKit.AddImage(_coin.gameObject, DuelStyle.Disc, Gold, true, false);
-            var face = LotdUiKit.FillRect("MintedFace", _coin, 6f);
-            LotdUiKit.AddImage(face.gameObject, DuelStyle.Disc, new Color(.25f, .16f, .082f), true, false);
+            DuelUiKit.AddImage(_coin.gameObject, DuelStyle.Disc, Gold, true, false);
+            var face = DuelUiKit.FillRect("MintedFace", _coin, 6f);
+            DuelUiKit.AddImage(face.gameObject, DuelStyle.Disc, new Color(.25f, .16f, .082f), true, false);
             _coinText = Label(face, "Face", .08f, .13f, .92f, .86f, 64, "★", tone: Gold);
             _toss = Label(_versus, "TossResult", .28f, .236f, .72f, .351f, 27);
             _first = Button(_versus, "First", "선공", .303f, .095f, .491f, .187f, () => Start(true), true);
@@ -272,7 +272,7 @@ namespace YGOPortable.UI
             _vsOpponent.text = opponent.Character.name;
             _vsDeck.text = $"{(state.rank == OfflineRanked.Champion ? $"AI 레이팅 {opponent.Rating}" : $"Lv.{opponent.Level}  ·  {OfflineRanked.Label(state.rank)}")}\n{opponent.Deck.title}";
             ShowStakes(_vsNotice, _versusStakes, state);
-            _opponentPortrait.sprite = LotdUiKit.LoadOpponentPortrait(opponent.Character);
+            _opponentPortrait.sprite = DuelUiKit.LoadOpponentPortrait(opponent.Character);
             _toss.text = "코인 토스";
             _coinText.text = "★";
             _coin.localScale = Vector3.one;
@@ -283,8 +283,8 @@ namespace YGOPortable.UI
             _tossAge = 0f;
             _tossing = true;
             EventSystem.current?.SetSelectedGameObject(null);
-            LotdAudio.PlayChain();
-            LotdAudio.PlayCoin();
+            DuelAudio.PlayChain();
+            DuelAudio.PlayCoin();
             UiEntranceMotion.Play(_versus.gameObject, .72f, .20f);
         }
 
@@ -339,7 +339,7 @@ namespace YGOPortable.UI
             _retry.gameObject.SetActive(!saved);
             _resultHeading.text = saved && prize.Promoted ? "TIER UP!" : Outcome(_lastOutcome);
             _resultRank.text = saved ? OfflineRanked.Label(prize.RankAfter) : "경기 기록 저장 실패";
-            _resultBadge.color = saved ? TierColors[prize.RankAfter / 5] : LotdUiKit.TextMuted;
+            _resultBadge.color = saved ? TierColors[prize.RankAfter / 5] : DuelUiKit.TextMuted;
             _resultDetails.text = !saved ? error :
                 $"{(prize.Demoted ? "디비전 하락\n" : "")}+{prize.Dp:N0} DP  ·  +{prize.Dust:N0} 가루" +
                 (prize.Card == 0 ? "" : $"\n획득  {CardDatabase.GetName(prize.Card)}{(prize.Overframe ? " · 오버프레임" : "")}") +
@@ -349,7 +349,7 @@ namespace YGOPortable.UI
             {
                 _lastMatch = null;
                 Refresh();
-                if (prize.Promoted) LotdAudio.PlayWin();
+                if (prize.Promoted) DuelAudio.PlayWin();
             }
             Focus(saved ? _return : _retry);
             UiEntranceMotion.Play(_result.gameObject, .60f, .22f);
@@ -415,7 +415,7 @@ namespace YGOPortable.UI
         {
             var badge = DuelStyle.Panel(parent, "RankedChampion", min, max, fill: new Color(.19f, .12f, .039f), border: Gold);
             badge.GetComponent<Image>().raycastTarget = false;
-            LotdUiKit.AddFittedText(badge, "Title", "★  MASTER I 챔피언", 20, 9,
+            DuelUiKit.AddFittedText(badge, "Title", "★  MASTER I 챔피언", 20, 9,
                 TextAnchor.MiddleCenter, Gold, FontStyle.Bold);
             return badge.gameObject;
         }
@@ -431,14 +431,14 @@ namespace YGOPortable.UI
 
         private static RectTransform Dialog(Transform parent, string name)
         {
-            var overlay = LotdUiKit.FillRect(name, parent);
+            var overlay = DuelUiKit.FillRect(name, parent);
             DeckEditorStyle.Fill(overlay, DeckEditorStyle.Scrim);
             return overlay;
         }
 
         private static RectTransform Square(RectTransform holder)
         {
-            var face = LotdUiKit.FillRect("Face", holder);
+            var face = DuelUiKit.FillRect("Face", holder);
             var fit = face.gameObject.AddComponent<AspectRatioFitter>();
             fit.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
             fit.aspectRatio = 1f;
@@ -446,13 +446,13 @@ namespace YGOPortable.UI
         }
 
         private static RectTransform Slot(Transform parent, string name, float x1, float y1, float x2, float y2) =>
-            LotdUiKit.CreateRect(name, parent, new Vector2(x1, y1), new Vector2(x2, y2), Vector2.zero, Vector2.zero);
+            DuelUiKit.CreateRect(name, parent, new Vector2(x1, y1), new Vector2(x2, y2), Vector2.zero, Vector2.zero);
         private static RectTransform Panel(Transform parent, string name, float x1, float y1, float x2, float y2) =>
             DeckEditorStyle.Panel(parent, name, new Vector2(x1, y1), new Vector2(x2, y2));
         private static Text Label(Transform parent, string name, float x1, float y1, float x2, float y2, int size,
             string text = "", bool center = true, Color? tone = null) =>
-            LotdUiKit.AddFittedText(Slot(parent, name, x1, y1, x2, y2), "Text", text, size, Math.Min(size, 10),
-                center ? TextAnchor.MiddleCenter : TextAnchor.MiddleLeft, tone ?? LotdUiKit.TextPrimary, FontStyle.Bold);
+            DuelUiKit.AddFittedText(Slot(parent, name, x1, y1, x2, y2), "Text", text, size, Math.Min(size, 10),
+                center ? TextAnchor.MiddleCenter : TextAnchor.MiddleLeft, tone ?? DuelUiKit.TextPrimary, FontStyle.Bold);
         private static Button Button(Transform parent, string name, string text, float x1, float y1, float x2, float y2,
             Action action, bool primary = false) =>
             DeckEditorStyle.Button(Slot(parent, name, x1, y1, x2, y2), "Button", text, action, 22, primary);

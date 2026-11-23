@@ -26,24 +26,24 @@ namespace YGOPortable.UI
 
         internal static void Backdrop(RectTransform root)
         {
-            var background = LotdUiKit.FillRect("ShopBackdrop", root);
-            LotdUiKit.AddImage(background.gameObject, LotdUiKit.LoadSprite("PackShop/ShopBGBase02"), Color.white);
+            var background = DuelUiKit.FillRect("ShopBackdrop", root);
+            DuelUiKit.AddImage(background.gameObject, DuelUiKit.LoadSprite("PackShop/ShopBGBase02"), Color.white);
         }
 
         internal static void Header(Transform parent, string label)
         {
-            var box = LotdUiKit.CreateRect("ShopHeader", parent, new Vector2(.035f, .902f),
+            var box = DuelUiKit.CreateRect("ShopHeader", parent, new Vector2(.035f, .902f),
                 new Vector2(.795f, .98f), Vector2.zero, Vector2.zero);
-            LotdUiKit.AddFittedText(box, "Title", label, 33, 22, TextAnchor.MiddleLeft, TextPrimary, FontStyle.Bold);
-            var rule = LotdUiKit.CreateRect("HeaderRule", parent, new Vector2(.032f, .901f),
+            DuelUiKit.AddFittedText(box, "Title", label, 33, 22, TextAnchor.MiddleLeft, TextPrimary, FontStyle.Bold);
+            var rule = DuelUiKit.CreateRect("HeaderRule", parent, new Vector2(.032f, .901f),
                 new Vector2(.969f, .903f), Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(rule.gameObject, LotdUiKit.WhiteSprite, Alpha(Line, .63f), false, false);
+            DuelUiKit.AddImage(rule.gameObject, DuelUiKit.WhiteSprite, Alpha(Line, .63f), false, false);
         }
 
         internal static RectTransform Panel(Transform parent, string name, Vector2 min, Vector2 max, float opacity = .78f)
         {
-            var box = LotdUiKit.CreateRect(name, parent, min, max, Vector2.zero, Vector2.zero);
-            var panel = LotdUiKit.AddImage(box.gameObject, _panelSprite ??= CreatePanelSprite(),
+            var box = DuelUiKit.CreateRect(name, parent, min, max, Vector2.zero, Vector2.zero);
+            var panel = DuelUiKit.AddImage(box.gameObject, _panelSprite ??= CreatePanelSprite(),
                 Alpha(Color.white, opacity));
             panel.type = Image.Type.Sliced;
             return box;
@@ -51,7 +51,7 @@ namespace YGOPortable.UI
 
         internal static InputField Search(Transform parent, string name, string placeholder, int fontSize = 16)
         {
-            var field = LotdUiKit.CreateInputField(parent, name, placeholder, fontSize);
+            var field = DuelUiKit.CreateInputField(parent, name, placeholder, fontSize);
             field.GetComponent<Image>().color = new Color32(63, 65, 69, 247);
             field.GetComponent<Outline>().effectColor = Line;
             field.textComponent.color = TextPrimary;
@@ -68,12 +68,12 @@ namespace YGOPortable.UI
 
         internal static Scrollbar AddVerticalScrollbar(Transform parent)
         {
-            var scrollbar = LotdUiKit.AddVerticalScrollbar(parent);
+            var scrollbar = DuelUiKit.AddVerticalScrollbar(parent);
             var track = scrollbar.GetComponent<Image>();
-            track.sprite = LotdUiKit.WhiteSprite;
+            track.sprite = DuelUiKit.WhiteSprite;
             track.color = new Color32(47, 49, 54, 255);
             var thumb = (Image)scrollbar.targetGraphic;
-            thumb.sprite = LotdUiKit.WhiteSprite;
+            thumb.sprite = DuelUiKit.WhiteSprite;
             thumb.color = Line;
             return scrollbar;
         }
@@ -81,18 +81,18 @@ namespace YGOPortable.UI
         internal static Button Button(Transform parent, string name, string caption, Action click, int fontSize = 18,
             bool primary = false, ButtonKind kind = ButtonKind.Standard)
         {
-            var holder = LotdUiKit.FillRect(name, parent);
-            var image = LotdUiKit.AddImage(holder.gameObject, LotdUiKit.WhiteSprite, Color.white);
+            var holder = DuelUiKit.FillRect(name, parent);
+            var image = DuelUiKit.AddImage(holder.gameObject, DuelUiKit.WhiteSprite, Color.white);
             image.type = Image.Type.Sliced;
             var button = holder.gameObject.AddComponent<PackShopButtonLabel>();
             button.targetGraphic = image;
             button.transition = Selectable.Transition.None;
-            button.Label = LotdUiKit.AddFittedText(holder, "Label", caption, fontSize, Mathf.Max(10, fontSize - 6),
+            button.Label = DuelUiKit.AddFittedText(holder, "Label", caption, fontSize, Mathf.Max(10, fontSize - 6),
                 TextAnchor.MiddleCenter, TextPrimary, FontStyle.Bold);
             button.Configure(kind, primary);
             button.onClick.AddListener(() =>
             {
-                LotdAudio.PlayClick();
+                DuelAudio.PlayClick();
                 click?.Invoke();
             });
             return button;

@@ -81,18 +81,18 @@ namespace YGOPortable.UI
         internal PackOpeningView(Transform parent, Action close)
         {
             _close = close;
-            var root = LotdUiKit.FillRect("Screen_PackOpening", parent);
+            var root = DuelUiKit.FillRect("Screen_PackOpening", parent);
             _root = root.gameObject;
-            var opening = LotdUiKit.FillRect("Opening", root);
+            var opening = DuelUiKit.FillRect("Opening", root);
             _opening = opening.gameObject;
             PackOpeningStage.Backdrop(opening);
-            _motion = LotdUiKit.FillRect("Motion", opening).gameObject.AddComponent<PackOpeningMotion>();
+            _motion = DuelUiKit.FillRect("Motion", opening).gameObject.AddComponent<PackOpeningMotion>();
             _openingTitle = Label(opening, "Title", "", .18f, .88f, .82f, .965f, 31, PackShopStyle.TextPrimary);
             _openingPage = Label(opening, "Page", "", .02f, .89f, .16f, .967f, 28, PackShopStyle.TextPrimary);
             _skip = ButtonAt(opening, "Skip", "건너뛰기", .84f, .04f, .967f, .099f, Back);
             _skipBatch = ButtonAt(opening, "SkipBatch", "전체 빠른 공개", .655f, .04f, .826f, .099f, SkipBatch);
 
-            var results = LotdUiKit.FillRect("Results", root);
+            var results = DuelUiKit.FillRect("Results", root);
             _results = results.gameObject;
             PackOpeningStage.Backdrop(results);
             _resultTitle = Label(results, "Title", "", .19f, .875f, .81f, .957f, 32, PackShopStyle.TextPrimary);
@@ -222,22 +222,22 @@ namespace YGOPortable.UI
                 (column + 1) / (float)CardsPerRow - .01f, top - .008f);
             var group = slot.gameObject.AddComponent<CanvasGroup>();
             var buttonBounds = Slot(slot, "Select", 0f, .172f, 1f, .975f);
-            var clickArea = LotdUiKit.AddImage(buttonBounds.gameObject, LotdUiKit.WhiteSprite, Color.clear);
+            var clickArea = DuelUiKit.AddImage(buttonBounds.gameObject, DuelUiKit.WhiteSprite, Color.clear);
             var button = buttonBounds.gameObject.AddComponent<Button>();
             button.targetGraphic = clickArea;
             button.transition = Selectable.Transition.None;
             button.onClick.AddListener(() => SelectCard(index));
 
-            var face = LotdUiKit.FillRect("Face", buttonBounds);
-            var shineRect = LotdUiKit.FillRect("Shine", face);
+            var face = DuelUiKit.FillRect("Face", buttonBounds);
+            var shineRect = DuelUiKit.FillRect("Shine", face);
             shineRect.anchorMin = new Vector2(.03f, .018f);
             shineRect.anchorMax = new Vector2(.97f, .982f);
-            var shine = LotdUiKit.AddImage(shineRect.gameObject, LotdUiKit.WhiteSprite, Color.clear, false, false);
+            var shine = DuelUiKit.AddImage(shineRect.gameObject, DuelUiKit.WhiteSprite, Color.clear, false, false);
             var card = CompositeCardView.Create(face, "View", detailedOverlay: true);
             var tilt = CardOverframeInput.Attach(buttonBounds, card, motionSensor: false);
             tilt.enabled = false;
             var artwork = card.transform.Find("AspectBox");
-            var rim = LotdUiKit.FillRect("RarityRim", artwork).gameObject.AddComponent<PackPullRarityGraphic>();
+            var rim = DuelUiKit.FillRect("RarityRim", artwork).gameObject.AddComponent<PackPullRarityGraphic>();
             rim.transform.SetAsFirstSibling();
             rim.raycastTarget = false;
             rim.gameObject.SetActive(false);
@@ -258,8 +258,8 @@ namespace YGOPortable.UI
             shineRect.SetAsLastSibling();
 
             var special = Slot(slot, "OverframeBadge", .567f, .010f, .791f, .074f);
-            LotdUiKit.AddImage(special.gameObject, LotdUiKit.WhiteSprite, new Color(.09f, .035f, .175f, .96f), false, false);
-            var specialLabel = LotdUiKit.AddFittedText(special, "Label", "오버프레임", 14, 9,
+            DuelUiKit.AddImage(special.gameObject, DuelUiKit.WhiteSprite, new Color(.09f, .035f, .175f, .96f), false, false);
+            var specialLabel = DuelUiKit.AddFittedText(special, "Label", "오버프레임", 14, 9,
                 TextAnchor.MiddleCenter, new Color(.9f, .78f, 1f), FontStyle.Bold);
             special.gameObject.SetActive(false);
             var pull = new Pull
@@ -314,7 +314,7 @@ namespace YGOPortable.UI
                 pull.Ownership.text = "";
                 pull.SpecialEdition.transform.parent.gameObject.SetActive(false);
             }
-            if (Application.isPlaying) LotdAudio.PlayDraw();
+            if (Application.isPlaying) DuelAudio.PlayDraw();
             RefreshStatus();
             AdvanceResults(0f);
             Focus(_all);
@@ -442,13 +442,13 @@ namespace YGOPortable.UI
             pull.Name.color = pull.Rarity >= CardRarity.SuperRare
                 ? CardRarityStyle.GetColor(pull.Rarity) : PackShopStyle.TextPrimary;
             pull.Ownership.text = pull.Award.IsNew ? "NEW" : $"보유 {pull.Award.OwnedCopies:N0}장";
-            pull.Ownership.color = pull.Award.IsNew ? LotdUiKit.GoldAccent : PackShopStyle.TextMuted;
+            pull.Ownership.color = pull.Award.IsNew ? DuelUiKit.GoldAccent : PackShopStyle.TextMuted;
             pull.SpecialEdition.transform.parent.gameObject.SetActive(pull.Award.Overframe);
             if (playSound && Application.isPlaying)
             {
-                if (pull.Rarity == CardRarity.UltraRare) LotdAudio.PlayWin();
-                else if (pull.Rarity == CardRarity.SuperRare) LotdAudio.PlayChain();
-                else LotdAudio.PlayTick();
+                if (pull.Rarity == CardRarity.UltraRare) DuelAudio.PlayWin();
+                else if (pull.Rarity == CardRarity.SuperRare) DuelAudio.PlayChain();
+                else DuelAudio.PlayTick();
             }
             RefreshStatus();
         }
@@ -501,11 +501,11 @@ namespace YGOPortable.UI
             EventSystem.current?.SetSelectedGameObject(control.gameObject);
 
         private static RectTransform Slot(Transform parent, string name, float left, float bottom, float right, float top) =>
-            LotdUiKit.CreateRect(name, parent, new Vector2(left, bottom), new Vector2(right, top), Vector2.zero, Vector2.zero);
+            DuelUiKit.CreateRect(name, parent, new Vector2(left, bottom), new Vector2(right, top), Vector2.zero, Vector2.zero);
 
         private static Text Label(Transform parent, string name, string text, float left, float bottom, float right, float top,
             int size, Color color) =>
-            LotdUiKit.AddFittedText(Slot(parent, name, left, bottom, right, top), "Text", text, size,
+            DuelUiKit.AddFittedText(Slot(parent, name, left, bottom, right, top), "Text", text, size,
                 Mathf.Max(11, size - 8), TextAnchor.MiddleCenter, color, FontStyle.Bold);
 
         private static Button ButtonAt(Transform parent, string name, string text, float left, float bottom, float right, float top,

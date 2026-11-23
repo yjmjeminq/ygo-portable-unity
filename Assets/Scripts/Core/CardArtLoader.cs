@@ -295,18 +295,7 @@ namespace YGOPortable.Core
                 yield return original.code;
         }
 
-        public static Sprite GetCardBackSprite()
-        {
-            if (_cardBackSprite != null) return _cardBackSprite;
-            _cardBackSprite = Resources.Load<Sprite>("LOTD/Frames/card_back");
-            if (_cardBackSprite == null)
-            {
-                var tex = Resources.Load<Texture2D>("LOTD/Frames/card_back");
-                if (tex != null)
-                    _cardBackSprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
-            }
-            return _cardBackSprite;
-        }
+        public static Sprite GetCardBackSprite() => _cardBackSprite ??= CardSleeveArt.Create();
 
         public static Sprite GetArtSprite(uint code) => GetArtSprite(code, BundledArtwork, out _);
 

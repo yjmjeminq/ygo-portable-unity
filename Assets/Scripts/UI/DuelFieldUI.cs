@@ -339,8 +339,8 @@ namespace YGOPortable.UI
             _oppNameText.text = opponent?.name ?? opponentDeck?.title ?? "AI 듀얼리스트";
             bool champion = CollectionProgress.IsRankedChampion;
             _rankedChampionBadge.SetActive(champion);
-            _rankedAvatarRim.color = champion ? LotdUiKit.GoldAccent : _normalAvatarRim;
-            _oppBustImg.sprite = LotdUiKit.LoadOpponentPortrait(opponent);
+            _rankedAvatarRim.color = champion ? DuelUiKit.GoldAccent : _normalAvatarRim;
+            _oppBustImg.sprite = DuelUiKit.LoadOpponentPortrait(opponent);
             _oppBustImg.enabled = _oppBustImg.sprite != null;
             SetTurnCaption(Mathf.Max(session.TurnNumber, 1), session.TurnPlayer != session.HumanPlayerIndex);
             SetPhasePlate(session.TurnNumber == 0 ? YgoConstants.PHASE_DRAW : session.CurrentPhase,
@@ -621,7 +621,7 @@ namespace YGOPortable.UI
 
         private static Text CreateRulesNameLabel(Transform parent, int size)
         {
-            var label = LotdUiKit.AddFittedText(parent, "CurrentName", "", size, 9, TextAnchor.MiddleLeft, DuelStyle.Muted);
+            var label = DuelUiKit.AddFittedText(parent, "CurrentName", "", size, 9, TextAnchor.MiddleLeft, DuelStyle.Muted);
             label.rectTransform.anchorMax = new Vector2(label.rectTransform.anchorMax.x, .445f);
             label.gameObject.SetActive(false);
             return label;
@@ -752,11 +752,11 @@ namespace YGOPortable.UI
             Sprite attribute = null;
             if (card.IsMonster)
             {
-                race = LotdUiKit.GetRaceSprite(card.Race);
-                attribute = LotdUiKit.GetAttributeSprite(card.Attribute);
+                race = DuelUiKit.GetRaceSprite(card.Race);
+                attribute = DuelUiKit.GetAttributeSprite(card.Attribute);
             }
             else if ((card.Type & (YgoConstants.TYPE_SPELL | YgoConstants.TYPE_TRAP)) != 0)
-                race = LotdUiKit.LoadSprite($"LOTD/Icons/{YgoConstants.GetSpellTrapSubSpriteName(card.Type)}");
+                race = DuelUiKit.LoadSprite($"LOTD/Icons/{YgoConstants.GetSpellTrapSubSpriteName(card.Type)}");
             raceIcon.sprite = race;
             raceIcon.gameObject.SetActive(race != null);
             attributeIcon.sprite = attribute;
@@ -790,17 +790,17 @@ namespace YGOPortable.UI
 
         private void BuildUI(Transform parent)
         {
-            var root = LotdUiKit.FillRect("Screen_DuelField", parent);
+            var root = DuelUiKit.FillRect("Screen_DuelField", parent);
             Root = root.gameObject;
 
-            var bg = LotdUiKit.FillRect("ArenaGround", root);
+            var bg = DuelUiKit.FillRect("ArenaGround", root);
             var ground = bg.gameObject.AddComponent<DuelArenaGround>();
             ground.texture = DuelVisualAssets.ArenaBackdrop ?? DuelStyle.Stone;
             ground.raycastTarget = false;
 
             var playArea = _mobileLayout ? MobileSafeArea.Create(root) : root;
             BuildCenterBoard(playArea);
-            var arrow = LotdUiKit.CreateRect("ResponseAttackArrow", playArea, Vector2.one * .5f, Vector2.one * .5f,
+            var arrow = DuelUiKit.CreateRect("ResponseAttackArrow", playArea, Vector2.one * .5f, Vector2.one * .5f,
                 Vector2.zero, Vector2.zero);
             _responseAttackArrow = arrow.gameObject.AddComponent<DuelEffectGraphic>();
             _responseAttackArrow.texture = Texture2D.whiteTexture;
@@ -824,16 +824,16 @@ namespace YGOPortable.UI
         {
             var left = CreateInspectorSurface(root, "LeftInspector", new Vector2(.015f, .195f),
                 new Vector2(0.186f, 0.922f));
-            var inside = LotdUiKit.FillRect("CardDetails", left, 9f);
-            var card = LotdUiKit.CreateRect("CardPreview", left,
+            var inside = DuelUiKit.FillRect("CardDetails", left, 9f);
+            var card = DuelUiKit.CreateRect("CardPreview", left,
                 new Vector2(.055f, .483f), new Vector2(.945f, .901f), Vector2.zero, Vector2.zero);
             _inspCard = CompositeCardView.Create(card, "Card");
             _inspCard.UsePrintedFaceOnly();
             var aspect = _inspCard.transform.Find("AspectBox");
             AddInspectorArtworkFrame(aspect);
             _inspectorDisabledBadge = BuildDisabledBadge(_inspCard.transform, 17);
-            var zoomHit = LotdUiKit.FillRect("ZoomHit", aspect);
-            var hitImage = LotdUiKit.AddImage(zoomHit.gameObject, LotdUiKit.WhiteSprite, Color.clear);
+            var zoomHit = DuelUiKit.FillRect("ZoomHit", aspect);
+            var hitImage = DuelUiKit.AddImage(zoomHit.gameObject, DuelUiKit.WhiteSprite, Color.clear);
             CardOverframeInput.Attach(zoomHit, _inspCard, motionSensor: false);
             _inspectorArtworkButton = zoomHit.gameObject.AddComponent<Button>();
             _inspectorArtworkButton.targetGraphic = hitImage;
@@ -841,23 +841,23 @@ namespace YGOPortable.UI
             _inspectorArtworkButton.navigation = new Navigation { mode = Navigation.Mode.None };
             _inspectorArtworkButton.onClick.AddListener(() =>
             {
-                LotdAudio.PlayClick();
+                DuelAudio.PlayClick();
                 OpenInspectedCardDetails();
             });
 
-            var artworkControls = LotdUiKit.CreateRect("ArtworkControls", inside, new Vector2(.02f, .425f),
+            var artworkControls = DuelUiKit.CreateRect("ArtworkControls", inside, new Vector2(.02f, .425f),
                 new Vector2(.98f, .477f), Vector2.zero, Vector2.zero);
             if (_mobileLayout)
             {
                 _duelPadInspectButton = _inspectorArtworkButton;
-                var cue = LotdUiKit.CreateRect("DetailsCue", zoomHit, new Vector2(.10f, .015f), new Vector2(.90f, .12f),
+                var cue = DuelUiKit.CreateRect("DetailsCue", zoomHit, new Vector2(.10f, .015f), new Vector2(.90f, .12f),
                     Vector2.zero, Vector2.zero);
                 DuelReadoutPlate.Add(cue, new Color(.02f, .05f, .07f, .94f));
-                LotdUiKit.AddFittedText(cue, "Label", "상세 보기", 16, 9, TextAnchor.MiddleCenter, HudText);
+                DuelUiKit.AddFittedText(cue, "Label", "상세 보기", 16, 9, TextAnchor.MiddleCenter, HudText);
             }
             else
             {
-                var details = LotdUiKit.CreateRect("Details", artworkControls, new Vector2(.542f, 0f), Vector2.one,
+                var details = DuelUiKit.CreateRect("Details", artworkControls, new Vector2(.542f, 0f), Vector2.one,
                     Vector2.zero, Vector2.zero);
                 _duelPadInspectButton = DuelStyle.Button(details, "B", "상세 보기", OpenInspectedCardDetails, 14);
                 var detailsLabel = _duelPadInspectButton.GetComponentInChildren<Text>();
@@ -865,59 +865,59 @@ namespace YGOPortable.UI
                 detailsLabel.resizeTextMinSize = 9;
                 detailsLabel.resizeTextMaxSize = 14;
             }
-            var counterChip = LotdUiKit.CreateRect("Counters", artworkControls, Vector2.zero,
+            var counterChip = DuelUiKit.CreateRect("Counters", artworkControls, Vector2.zero,
                 new Vector2(_mobileLayout ? 1f : .512f, 1f), Vector2.zero, Vector2.zero);
             _inspCounters = new DuelCounterBadge(counterChip, compact: false);
 
-            var stats = LotdUiKit.CreateRect("Stats", inside, new Vector2(.016f, .342f), new Vector2(.825f, .419f),
+            var stats = DuelUiKit.CreateRect("Stats", inside, new Vector2(.016f, .342f), new Vector2(.825f, .419f),
                 Vector2.zero, Vector2.zero);
-            var identity = LotdUiKit.CreateRect("Identity", stats, new Vector2(0f, .505f), Vector2.one,
+            var identity = DuelUiKit.CreateRect("Identity", stats, new Vector2(0f, .505f), Vector2.one,
                 Vector2.zero, Vector2.zero);
-            _inspIdentity = LotdUiKit.AddFittedText(identity, "Text", "", 14, 9, TextAnchor.MiddleLeft, Color.white);
-            var rating = LotdUiKit.CreateRect("Rating", stats, new Vector2(.695f, .515f), Vector2.one,
+            _inspIdentity = DuelUiKit.AddFittedText(identity, "Text", "", 14, 9, TextAnchor.MiddleLeft, Color.white);
+            var rating = DuelUiKit.CreateRect("Rating", stats, new Vector2(.695f, .515f), Vector2.one,
                 Vector2.zero, Vector2.zero);
             _inspRating = new DuelRatingBadge(rating, compact: true);
-            _inspStats = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Info", stats,
+            _inspStats = DuelUiKit.AddFittedText(DuelUiKit.CreateRect("Info", stats,
                 Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero),
                 "Text", "", 14, 9, TextAnchor.MiddleLeft, Color.white);
-            var combat = LotdUiKit.CreateRect("CombatStats", inside, new Vector2(.018f, .281f), new Vector2(.982f, .337f),
+            var combat = DuelUiKit.CreateRect("CombatStats", inside, new Vector2(.018f, .281f), new Vector2(.982f, .337f),
                 Vector2.zero, Vector2.zero);
             _inspCombat = new DuelStatStrip(combat, compact: false);
-            _inspScales = new DuelPendulumScalePair(LotdUiKit.CreateRect("Scales", inside,
+            _inspScales = new DuelPendulumScalePair(DuelUiKit.CreateRect("Scales", inside,
                 new Vector2(.018f, .220f), new Vector2(.982f, .275f), Vector2.zero, Vector2.zero));
-            var race = LotdUiKit.CreateRect("Race", inside, new Vector2(.841f, .384f), new Vector2(.987f, .418f),
+            var race = DuelUiKit.CreateRect("Race", inside, new Vector2(.841f, .384f), new Vector2(.987f, .418f),
                 Vector2.zero, Vector2.zero);
-            _inspRaceIcon = LotdUiKit.AddImage(race.gameObject, null, Color.white, true, false);
-            var attribute = LotdUiKit.CreateRect("Attribute", inside, new Vector2(.841f, .345f), new Vector2(.987f, .379f),
+            _inspRaceIcon = DuelUiKit.AddImage(race.gameObject, null, Color.white, true, false);
+            var attribute = DuelUiKit.CreateRect("Attribute", inside, new Vector2(.841f, .345f), new Vector2(.987f, .379f),
                 Vector2.zero, Vector2.zero);
-            _inspAttributeIcon = LotdUiKit.AddImage(attribute.gameObject, null, Color.white, true, false);
+            _inspAttributeIcon = DuelUiKit.AddImage(attribute.gameObject, null, Color.white, true, false);
 
-            var title = LotdUiKit.CreateRect("Name", inside, new Vector2(0f, .912f), Vector2.one, Vector2.zero, Vector2.zero);
+            var title = DuelUiKit.CreateRect("Name", inside, new Vector2(0f, .912f), Vector2.one, Vector2.zero, Vector2.zero);
             DuelReadoutPlate.Add(title, new Color(.065f, .113f, .133f, .92f));
-            var accent = LotdUiKit.CreateRect("TypeAccent", title, new Vector2(0f, .18f), new Vector2(0f, .82f),
+            var accent = DuelUiKit.CreateRect("TypeAccent", title, new Vector2(0f, .18f), new Vector2(0f, .82f),
                 new Vector2(4f, 0f), new Vector2(6f, 0f));
-            _inspTitleAccent = LotdUiKit.AddImage(accent.gameObject, LotdUiKit.WhiteSprite, DuelStyle.Muted, false, false);
-            var titleContent = LotdUiKit.CreateRect("Content", title, Vector2.zero, Vector2.one,
+            _inspTitleAccent = DuelUiKit.AddImage(accent.gameObject, DuelUiKit.WhiteSprite, DuelStyle.Muted, false, false);
+            var titleContent = DuelUiKit.CreateRect("Content", title, Vector2.zero, Vector2.one,
                 new Vector2(13f, 0f), new Vector2(-5f, 0f));
-            _inspName = LotdUiKit.AddFittedText(titleContent, "Text", "", 21, 10,
+            _inspName = DuelUiKit.AddFittedText(titleContent, "Text", "", 21, 10,
                 TextAnchor.MiddleLeft, Color.white);
             _inspRulesName = CreateRulesNameLabel(titleContent, 14);
 
-            var desc = LotdUiKit.CreateRect("Description", inside,
+            var desc = DuelUiKit.CreateRect("Description", inside,
                 new Vector2(.018f, .081f), new Vector2(.982f, .275f), Vector2.zero, Vector2.zero);
             DuelReadoutPlate.Add(desc, new Color(.018f, .045f, .061f, .91f)).raycastTarget = true;
-            var viewport = LotdUiKit.CreateRect("Viewport", desc, Vector2.zero, Vector2.one,
+            var viewport = DuelUiKit.CreateRect("Viewport", desc, Vector2.zero, Vector2.one,
                 new Vector2(8f, 5f), new Vector2(-14f, -5f));
             viewport.gameObject.AddComponent<RectMask2D>();
-            var content = LotdUiKit.CreateRect("Content", viewport, new Vector2(0f, 1f), new Vector2(1f, 1f),
+            var content = DuelUiKit.CreateRect("Content", viewport, new Vector2(0f, 1f), new Vector2(1f, 1f),
                 Vector2.zero, Vector2.zero);
             content.pivot = new Vector2(0.5f, 1f);
             _inspDesc = content.gameObject.AddComponent<Text>();
-            _inspDesc.font = LotdUiKit.FontKR;
+            _inspDesc.font = DuelUiKit.FontKR;
             _inspDesc.fontSize = _mobileLayout ? 18 : 15;
             _inspDesc.verticalOverflow = VerticalWrapMode.Overflow;
             _inspDesc.lineSpacing = 1.12f;
-            _inspDesc.color = LotdUiKit.TextPrimary;
+            _inspDesc.color = DuelUiKit.TextPrimary;
             _inspDesc.raycastTarget = false;
             _inspDesc.alignment = TextAnchor.UpperLeft;
             _inspDesc.supportRichText = false;
@@ -932,9 +932,9 @@ namespace YGOPortable.UI
             scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
             _inspectScroll = scroll;
 
-            var log = LotdUiKit.CreateRect("RecentActions", inside, new Vector2(.023f, .011f), new Vector2(.977f, .073f),
+            var log = DuelUiKit.CreateRect("RecentActions", inside, new Vector2(.023f, .011f), new Vector2(.977f, .073f),
                 Vector2.zero, Vector2.zero);
-            _logFeed = LotdUiKit.AddText(log, "Log", "", 11, TextAnchor.UpperLeft, DuelStyle.Muted);
+            _logFeed = DuelUiKit.AddText(log, "Log", "", 11, TextAnchor.UpperLeft, DuelStyle.Muted);
             _logFeed.supportRichText = false;
             log.gameObject.AddComponent<RectMask2D>();
         }
@@ -947,45 +947,45 @@ namespace YGOPortable.UI
 
         private static void AddInspectorArtworkFrame(Transform aspect)
         {
-            var frame = LotdUiKit.FillRect("ArtworkFrame", aspect, -2.5f);
+            var frame = DuelUiKit.FillRect("ArtworkFrame", aspect, -2.5f);
             frame.SetAsFirstSibling();
             DuelReadoutPlate.Add(frame, new Color(.30f, .27f, .22f, .97f));
         }
 
         private static RectTransform CreateInspectorSurface(Transform parent, string name, Vector2 min, Vector2 max)
         {
-            var shell = LotdUiKit.CreateRect(name, parent, min, max, Vector2.zero, Vector2.zero);
+            var shell = DuelUiKit.CreateRect(name, parent, min, max, Vector2.zero, Vector2.zero);
             DuelReadoutPlate.Add(shell, new Color(.38f, .34f, .27f, .95f)).raycastTarget = true;
-            var surface = LotdUiKit.FillRect("Surface", shell, 1.2f);
+            var surface = DuelUiKit.FillRect("Surface", shell, 1.2f);
             DuelReadoutPlate.Add(surface, new Color(.029f, .060f, .081f, .975f));
             return shell;
         }
 
         private static Scrollbar CreateInspectorScrollbar(RectTransform parent)
         {
-            var scrollbar = LotdUiKit.AddVerticalScrollbar(parent);
+            var scrollbar = DuelUiKit.AddVerticalScrollbar(parent);
             var track = (RectTransform)scrollbar.transform;
             track.offsetMin = new Vector2(-10f, 5f);
             track.offsetMax = new Vector2(-3f, -5f);
             var rail = track.GetComponent<Image>();
-            rail.sprite = LotdUiKit.WhiteSprite;
+            rail.sprite = DuelUiKit.WhiteSprite;
             rail.color = new Color(.084f, .16f, .20f, .85f);
             var thumb = (Image)scrollbar.targetGraphic;
-            thumb.sprite = LotdUiKit.WhiteSprite;
+            thumb.sprite = DuelUiKit.WhiteSprite;
             thumb.color = new Color(.40f, .70f, .76f, .95f);
             return scrollbar;
         }
 
         private void BuildTopHud(Transform root)
         {
-            _oppHandBar = LotdUiKit.CreateRect("OpponentHand", root, new Vector2(.29f, .873f),
+            _oppHandBar = DuelUiKit.CreateRect("OpponentHand", root, new Vector2(.29f, .873f),
                 new Vector2(.735f, .994f), Vector2.zero, Vector2.zero);
-            var opponent = LotdUiKit.CreateRect("OpponentHUD", root,
+            var opponent = DuelUiKit.CreateRect("OpponentHUD", root,
                 new Vector2(0.762f, 0.894f), new Vector2(0.985f, 0.982f), Vector2.zero, Vector2.zero);
             (_oppNameText, _oppLpText, _oppLpFill, _oppBustImg) = BuildPlayerHud(opponent, true);
             _oppLpFeedbackAnchor = (RectTransform)_oppNameText.transform.parent;
 
-            var menu = _pauseControlDock = LotdUiKit.CreateRect("PauseMenu", root,
+            var menu = _pauseControlDock = DuelUiKit.CreateRect("PauseMenu", root,
                 _mobileLayout ? new Vector2(.904f, .724f) : new Vector2(.016f, .936f),
                 _mobileLayout ? new Vector2(.984f, .874f) : new Vector2(.103f, .982f), Vector2.zero, Vector2.zero);
             _duelPadPauseButton = BuildHudControl(menu, DuelVisualAssets.PauseIcon, "일시 정지", OnPauseClicked);
@@ -996,14 +996,14 @@ namespace YGOPortable.UI
             if (sprite == null)
                 return DuelStyle.Button(holder, "Button", label, action, 13);
 
-            var icon = LotdUiKit.CreateRect(label, holder, Vector2.zero, new Vector2(.45f, 1f), Vector2.zero, Vector2.zero);
-            var image = LotdUiKit.AddImage(icon.gameObject, sprite, Color.white, true, false);
+            var icon = DuelUiKit.CreateRect(label, holder, Vector2.zero, new Vector2(.45f, 1f), Vector2.zero, Vector2.zero);
+            var image = DuelUiKit.AddImage(icon.gameObject, sprite, Color.white, true, false);
             var button = holder.gameObject.AddComponent<Button>();
-            LotdUiKit.AddImage(holder.gameObject, LotdUiKit.WhiteSprite, Color.clear);
+            DuelUiKit.AddImage(holder.gameObject, DuelUiKit.WhiteSprite, Color.clear);
             button.targetGraphic = image;
             button.onClick.AddListener(action.Invoke);
-            var text = LotdUiKit.CreateRect("Label", holder, new Vector2(.43f, .10f), new Vector2(1f, .90f), Vector2.zero, Vector2.zero);
-            var caption = LotdUiKit.AddFittedText(text, "Text", label, 13, 8, TextAnchor.MiddleLeft, Color.white);
+            var text = DuelUiKit.CreateRect("Label", holder, new Vector2(.43f, .10f), new Vector2(1f, .90f), Vector2.zero, Vector2.zero);
+            var caption = DuelUiKit.AddFittedText(text, "Text", label, 13, 8, TextAnchor.MiddleLeft, Color.white);
             DuelStyle.Shadow(caption, 1.75f);
             return button;
         }
@@ -1011,43 +1011,43 @@ namespace YGOPortable.UI
         private static (Text name, Text lp, RectTransform fill, Image portrait) BuildPlayerHud(RectTransform root, bool opponent)
         {
             var side = DuelStyle.Side(opponent);
-            var panel = LotdUiKit.FillRect("Status", root, 1f);
+            var panel = DuelUiKit.FillRect("Status", root, 1f);
             AddHudSurface(panel, Color.Lerp(HudEdge, side, .32f), HudSurface);
             var lpFace = opponent ? DuelVisualAssets.LpOpponent : DuelVisualAssets.LpPlayer;
             if (lpFace != null)
-                LotdUiKit.AddImage(LotdUiKit.FillRect("LocalLpPanel", panel, 2f).gameObject, lpFace,
+                DuelUiKit.AddImage(DuelUiKit.FillRect("LocalLpPanel", panel, 2f).gameObject, lpFace,
                     new Color(1f, 1f, 1f, .45f), false, false);
 
-            var avatarHolder = LotdUiKit.CreateRect("AvatarFrame", panel, new Vector2(opponent ? .781f : .017f, .095f),
+            var avatarHolder = DuelUiKit.CreateRect("AvatarFrame", panel, new Vector2(opponent ? .781f : .017f, .095f),
                 new Vector2(opponent ? .983f : .219f, .905f), Vector2.zero, Vector2.zero);
-            var avatar = LotdUiKit.FillRect("PortraitPlate", avatarHolder);
+            var avatar = DuelUiKit.FillRect("PortraitPlate", avatarHolder);
             var square = avatar.gameObject.AddComponent<AspectRatioFitter>();
             square.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
             square.aspectRatio = 1f;
             DuelStyle.AddHexPlate(avatar, Color.Lerp(HudEdge, side, .55f), new Color(.020f, .038f, .050f));
-            var portrait = LotdUiKit.AddImage(LotdUiKit.FillRect("Portrait", avatar, 4f).gameObject, null, Color.white, true, false);
+            var portrait = DuelUiKit.AddImage(DuelUiKit.FillRect("Portrait", avatar, 4f).gameObject, null, Color.white, true, false);
 
-            var readout = LotdUiKit.CreateRect("Readout", panel, new Vector2(opponent ? .038f : .241f, 0f),
+            var readout = DuelUiKit.CreateRect("Readout", panel, new Vector2(opponent ? .038f : .241f, 0f),
                 new Vector2(opponent ? .759f : .962f, 1f), Vector2.zero, Vector2.zero);
-            var name = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Name", readout, new Vector2(0f, .62f),
+            var name = DuelUiKit.AddFittedText(DuelUiKit.CreateRect("Name", readout, new Vector2(0f, .62f),
                 new Vector2(1f, .932f), Vector2.zero, Vector2.zero), "Text", "", 17, 9,
                 opponent ? TextAnchor.MiddleRight : TextAnchor.MiddleLeft, DuelStyle.Muted);
-            var track = LotdUiKit.CreateRect("LPTrack", readout, new Vector2(0f, .082f), new Vector2(1f, .172f),
+            var track = DuelUiKit.CreateRect("LPTrack", readout, new Vector2(0f, .082f), new Vector2(1f, .172f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(track.gameObject, LotdUiKit.WhiteSprite, new Color(.19f, .24f, .27f), false, false);
-            var fill = LotdUiKit.FillRect("Fill", track);
-            LotdUiKit.AddImage(fill.gameObject, LotdUiKit.WhiteSprite, LifeTrackColor, false, false);
+            DuelUiKit.AddImage(track.gameObject, DuelUiKit.WhiteSprite, new Color(.19f, .24f, .27f), false, false);
+            var fill = DuelUiKit.FillRect("Fill", track);
+            DuelUiKit.AddImage(fill.gameObject, DuelUiKit.WhiteSprite, LifeTrackColor, false, false);
             for (int i = 1; i < 8; i++)
             {
                 float x = i / 8f;
-                var divider = LotdUiKit.CreateRect("Tick", track, new Vector2(x, 0f), new Vector2(x, 1f),
+                var divider = DuelUiKit.CreateRect("Tick", track, new Vector2(x, 0f), new Vector2(x, 1f),
                     Vector2.zero, new Vector2(1f, 0f));
-                LotdUiKit.AddImage(divider.gameObject, LotdUiKit.WhiteSprite, new Color(.024f, .055f, .076f, .56f), false, false);
+                DuelUiKit.AddImage(divider.gameObject, DuelUiKit.WhiteSprite, new Color(.024f, .055f, .076f, .56f), false, false);
             }
-            DuelTypography.AddNumber(LotdUiKit.CreateRect("Caption", readout, new Vector2(0f, .15f),
+            DuelTypography.AddNumber(DuelUiKit.CreateRect("Caption", readout, new Vector2(0f, .15f),
                 new Vector2(.18f, .57f), Vector2.zero, Vector2.zero), "Label", "LP", 17,
                 TextAnchor.MiddleLeft, Color.Lerp(DuelStyle.Muted, side, .39f));
-            var lp = DuelTypography.AddNumber(LotdUiKit.CreateRect("Value", readout, new Vector2(.18f, .139f),
+            var lp = DuelTypography.AddNumber(DuelUiKit.CreateRect("Value", readout, new Vector2(.18f, .139f),
                 new Vector2(1f, .65f), Vector2.zero, Vector2.zero), "Text", "", 38, TextAnchor.MiddleRight, HudText);
             return (name, lp, fill, portrait);
         }
@@ -1055,19 +1055,19 @@ namespace YGOPortable.UI
         private static Image AddHudSurface(RectTransform root, Color edge, Color face)
         {
             var rim = DuelReadoutPlate.Add(root, edge);
-            DuelReadoutPlate.Add(LotdUiKit.FillRect("Surface", root, 1.3f), face);
+            DuelReadoutPlate.Add(DuelUiKit.FillRect("Surface", root, 1.3f), face);
             return rim;
         }
 
         private void BuildCenterBoard(Transform root)
         {
-            var board = LotdUiKit.CreateRect("DuelBoard", root,
+            var board = DuelUiKit.CreateRect("DuelBoard", root,
                 new Vector2(.142f, .221f), new Vector2(.903f, .886f), Vector2.zero, Vector2.zero);
             _boardRect = board;
-            _mat = LotdUiKit.FillRect("StoneMat", board).gameObject.AddComponent<DuelMat>();
+            _mat = DuelUiKit.FillRect("StoneMat", board).gameObject.AddComponent<DuelMat>();
             _mat.texture = Texture2D.whiteTexture;
             _mat.raycastTarget = false;
-            var surface = LotdUiKit.FillRect("SlabSurface", board).gameObject.AddComponent<DuelMatSurface>();
+            var surface = DuelUiKit.FillRect("SlabSurface", board).gameObject.AddComponent<DuelMatSurface>();
             surface.texture = DuelVisualAssets.ArenaSurface ?? DuelStyle.Stone;
             surface.raycastTarget = false;
             RectTransform Cell(int col, int row) => DuelZoneImage.CreateCell(board, col, row);
@@ -1092,10 +1092,10 @@ namespace YGOPortable.UI
             _emz[1] = LinkCell(3, 2);
             _emz[0].bgImg.MarkExtraMonsterZone();
             _emz[1].bgImg.MarkExtraMonsterZone();
-            var chain = LotdUiKit.CreateRect("Chain", board, new Vector2(.455f, .494f), new Vector2(.545f, .569f),
+            var chain = DuelUiKit.CreateRect("Chain", board, new Vector2(.455f, .494f), new Vector2(.545f, .569f),
                 Vector2.zero, Vector2.zero);
             _chainIcon = DuelStyle.AddHexPlate(chain, DuelStyle.Gold, new Color(.13f, .082f, .060f, .96f));
-            _chainBannerText = LotdUiKit.AddFittedText(chain, "Count", "", 18, 9, TextAnchor.MiddleCenter, DuelStyle.Gold, FontStyle.Bold);
+            _chainBannerText = DuelUiKit.AddFittedText(chain, "Count", "", 18, 9, TextAnchor.MiddleCenter, DuelStyle.Gold, FontStyle.Bold);
 
             _mySZone[5] = CreateZoneSlot(Cell(1, 3));
             _oppSZone[5] = CreateZoneSlot(Cell(7, 1));
@@ -1121,9 +1121,9 @@ namespace YGOPortable.UI
 
         private static Button BuildPileActionButton(StackTileView tile, string name, string label, Action action, bool activation = false)
         {
-            var indicator = LotdUiKit.CreateRect(name, tile.root, new Vector2(.07f, .645f),
+            var indicator = DuelUiKit.CreateRect(name, tile.root, new Vector2(.07f, .645f),
                 new Vector2(.93f, .965f), Vector2.zero, Vector2.zero);
-            var rect = LotdUiKit.FillRect("Button", indicator);
+            var rect = DuelUiKit.FillRect("Button", indicator);
             Color tone = activation ? DuelStyle.Gold : DuelStyle.Player;
             var rim = AddHudSurface(rect, tone, activation
                 ? new Color(.24f, .16f, .066f, .99f) : new Color(.063f, .18f, .22f, .99f));
@@ -1131,13 +1131,13 @@ namespace YGOPortable.UI
             var caption = rect;
             if (activation)
             {
-                var symbol = LotdUiKit.CreateRect("Effect", rect, new Vector2(.055f, .13f),
+                var symbol = DuelUiKit.CreateRect("Effect", rect, new Vector2(.055f, .13f),
                     new Vector2(.29f, .87f), Vector2.zero, Vector2.zero);
-                LotdUiKit.AddImage(symbol.gameObject, DuelStatSymbols.BattleEffect, tone, true, false);
-                caption = LotdUiKit.CreateRect("Caption", rect, new Vector2(.29f, 0f), new Vector2(.96f, 1f),
+                DuelUiKit.AddImage(symbol.gameObject, DuelStatSymbols.BattleEffect, tone, true, false);
+                caption = DuelUiKit.CreateRect("Caption", rect, new Vector2(.29f, 0f), new Vector2(.96f, 1f),
                     Vector2.zero, Vector2.zero);
             }
-            LotdUiKit.AddFittedText(caption, "Label", label, 17, 9, TextAnchor.MiddleCenter, tone, FontStyle.Bold);
+            DuelUiKit.AddFittedText(caption, "Label", label, 17, 9, TextAnchor.MiddleCenter, tone, FontStyle.Bold);
             button.gameObject.SetActive(false);
             return button;
         }
@@ -1149,13 +1149,13 @@ namespace YGOPortable.UI
 
         private FieldSlotView CreateZoneSlot(RectTransform cell)
         {
-            var background = LotdUiKit.AddImage(cell.gameObject, LotdUiKit.WhiteSprite, ZoneTint);
+            var background = DuelUiKit.AddImage(cell.gameObject, DuelUiKit.WhiteSprite, ZoneTint);
             ((DuelZoneImage)background).ShowCircuitRing();
             var border = cell.gameObject.AddComponent<Outline>();
             border.effectColor = Color.clear;
             border.effectDistance = new Vector2(2f, -2f);
 
-            var card = LotdUiKit.CreateRect("Card", cell, SlotCardMin, SlotCardMax, Vector2.zero, Vector2.zero);
+            var card = DuelUiKit.CreateRect("Card", cell, SlotCardMin, SlotCardMax, Vector2.zero, Vector2.zero);
             var view = CompositeCardView.Create(card, "CardView");
             view.UsePrintedFaceOnly();
             view.gameObject.SetActive(false);
@@ -1177,7 +1177,7 @@ namespace YGOPortable.UI
 
         private StackTileView CreateStackTile(RectTransform cell, bool opponent, uint location, string name)
         {
-            var background = (DuelZoneImage)LotdUiKit.AddImage(cell.gameObject, LotdUiKit.WhiteSprite, ZoneTint);
+            var background = (DuelZoneImage)DuelUiKit.AddImage(cell.gameObject, DuelUiKit.WhiteSprite, ZoneTint);
 
             bool grave = location == YgoConstants.LOCATION_GRAVE;
             bool usesWell = grave || location == YgoConstants.LOCATION_REMOVED;
@@ -1185,7 +1185,7 @@ namespace YGOPortable.UI
             Graphic wellGlyph = null;
             if (usesWell)
             {
-                var basin = LotdUiKit.CreateRect("Well", cell, new Vector2(.12f, .229f), new Vector2(.88f, .985f),
+                var basin = DuelUiKit.CreateRect("Well", cell, new Vector2(.12f, .229f), new Vector2(.88f, .985f),
                     Vector2.zero, Vector2.zero);
                 well = basin.gameObject.AddComponent<DuelPileWell>();
                 well.texture = Texture2D.whiteTexture;
@@ -1193,14 +1193,14 @@ namespace YGOPortable.UI
                 well.Accent = grave ? new Color(.38f, .68f, .73f) : new Color(.67f, .55f, .81f);
                 var wellArt = grave ? DuelVisualAssets.GraveWell : DuelVisualAssets.BanishedWell;
                 if (wellArt != null)
-                    LotdUiKit.AddImage(LotdUiKit.FillRect("LocalWell", basin).gameObject, wellArt,
+                    DuelUiKit.AddImage(DuelUiKit.FillRect("LocalWell", basin).gameObject, wellArt,
                         new Color(1f, 1f, 1f, .64f), true, false);
-                var glyph = LotdUiKit.CreateRect("Location", basin, new Vector2(.31f, .31f), new Vector2(.69f, .69f),
+                var glyph = DuelUiKit.CreateRect("Location", basin, new Vector2(.31f, .31f), new Vector2(.69f, .69f),
                     Vector2.zero, Vector2.zero);
                 wellGlyph = DuelPromptLocationIcon.Add(glyph, location, opponent, glyphOnly: true);
                 wellGlyph.color = Color.Lerp(DuelStyle.Muted, well.Accent, .52f);
             }
-            var card = LotdUiKit.CreateRect("TopCard", cell, usesWell ? new Vector2(.19f, .322f) : new Vector2(.15f, .312f),
+            var card = DuelUiKit.CreateRect("TopCard", cell, usesWell ? new Vector2(.19f, .322f) : new Vector2(.15f, .312f),
                 usesWell ? new Vector2(.81f, .889f) : new Vector2(.85f, .949f), Vector2.zero, Vector2.zero);
             var view = CompositeCardView.Create(card, "CardView");
             view.UsePrintedFaceOnly();
@@ -1208,7 +1208,7 @@ namespace YGOPortable.UI
             DuelPileDepth depth = null;
             if (!usesWell)
             {
-                var layer = LotdUiKit.FillRect("StackDepth", view.transform.Find("AspectBox"));
+                var layer = DuelUiKit.FillRect("StackDepth", view.transform.Find("AspectBox"));
                 layer.SetAsFirstSibling();
                 depth = layer.gameObject.AddComponent<DuelPileDepth>();
                 depth.texture = Texture2D.whiteTexture;
@@ -1216,17 +1216,17 @@ namespace YGOPortable.UI
                 depth.raycastTarget = false;
             }
             view.gameObject.SetActive(false);
-            var counter = LotdUiKit.CreateRect("Total", cell, new Vector2(.075f, .063f), new Vector2(.925f, .255f),
+            var counter = DuelUiKit.CreateRect("Total", cell, new Vector2(.075f, .063f), new Vector2(.925f, .255f),
                 Vector2.zero, Vector2.zero);
             Color side = DuelStyle.Side(opponent);
             AddHudSurface(counter, Color.Lerp(DuelStyle.GlassEdge, side, .25f), new Color(.06f, .14f, .19f, .76f));
-            var shine = LotdUiKit.CreateRect("GlassEdge", counter, new Vector2(.038f, 1f), new Vector2(.962f, 1f),
+            var shine = DuelUiKit.CreateRect("GlassEdge", counter, new Vector2(.038f, 1f), new Vector2(.962f, 1f),
                 new Vector2(0f, -1f), Vector2.zero);
-            LotdUiKit.AddImage(shine.gameObject, LotdUiKit.WhiteSprite, new Color(.68f, .88f, .96f, .48f), false, false);
-            var nameRect = LotdUiKit.CreateRect("Caption", counter, new Vector2(.046f, .04f), new Vector2(.745f, .958f),
+            DuelUiKit.AddImage(shine.gameObject, DuelUiKit.WhiteSprite, new Color(.68f, .88f, .96f, .48f), false, false);
+            var nameRect = DuelUiKit.CreateRect("Caption", counter, new Vector2(.046f, .04f), new Vector2(.745f, .958f),
                 Vector2.zero, Vector2.zero);
-            var label = LotdUiKit.AddFittedText(nameRect, "Label", name, 14, 8, TextAnchor.MiddleLeft, DuelStyle.Muted);
-            var amountRect = LotdUiKit.CreateRect("Amount", counter, new Vector2(.748f, .04f), new Vector2(.953f, .958f),
+            var label = DuelUiKit.AddFittedText(nameRect, "Label", name, 14, 8, TextAnchor.MiddleLeft, DuelStyle.Muted);
+            var amountRect = DuelUiKit.CreateRect("Amount", counter, new Vector2(.748f, .04f), new Vector2(.953f, .958f),
                 Vector2.zero, Vector2.zero);
             var count = DuelTypography.AddNumber(amountRect, "Count", "", 18, TextAnchor.MiddleRight, HudText);
 
@@ -1259,30 +1259,30 @@ namespace YGOPortable.UI
 
         private void BuildBottomHudAndHands(Transform root)
         {
-            _myHandBar = LotdUiKit.CreateRect("PlayerHand", root, new Vector2(.228f, .012f), new Vector2(.784f, .215f),
+            _myHandBar = DuelUiKit.CreateRect("PlayerHand", root, new Vector2(.228f, .012f), new Vector2(.784f, .215f),
                 Vector2.zero, Vector2.zero);
             _myHandContent = _myHandBar;
             if (_mobileLayout)
             {
                 _myHandMask = _myHandBar.gameObject.AddComponent<RectMask2D>();
-                LotdUiKit.AddImage(_myHandBar.gameObject, LotdUiKit.WhiteSprite, Color.clear);
+                DuelUiKit.AddImage(_myHandBar.gameObject, DuelUiKit.WhiteSprite, Color.clear);
                 _myHandScroll = _myHandBar.gameObject.AddComponent<ScrollRect>();
                 _myHandScroll.horizontal = true;
                 _myHandScroll.vertical = false;
                 _myHandScroll.movementType = ScrollRect.MovementType.Clamped;
                 _myHandScroll.viewport = _myHandBar;
-                _myHandContent = LotdUiKit.CreateRect("Cards", _myHandBar, Vector2.zero, Vector2.up, Vector2.zero, Vector2.zero);
+                _myHandContent = DuelUiKit.CreateRect("Cards", _myHandBar, Vector2.zero, Vector2.up, Vector2.zero, Vector2.zero);
                 _myHandContent.pivot = new Vector2(0f, .5f);
                 _myHandScroll.content = _myHandContent;
             }
-            var player = LotdUiKit.CreateRect("PlayerHUD", root, new Vector2(0.016f, 0.035f), new Vector2(0.221f, 0.132f),
+            var player = DuelUiKit.CreateRect("PlayerHUD", root, new Vector2(0.016f, 0.035f), new Vector2(0.221f, 0.132f),
                 Vector2.zero, Vector2.zero);
             var (name, lp, fill, portrait) = BuildPlayerHud(player, false);
             name.text = "플레이어";
             _myLpFeedbackAnchor = (RectTransform)name.transform.parent;
             _myLpText = lp;
             _myLpFill = fill;
-            portrait.sprite = LotdUiKit.LoadSprite("LOTD/Busts/yamiyugi_neutral") ?? LotdUiKit.LoadSprite("LOTD/Busts/atem_neutral");
+            portrait.sprite = DuelUiKit.LoadSprite("LOTD/Busts/yamiyugi_neutral") ?? DuelUiKit.LoadSprite("LOTD/Busts/atem_neutral");
             portrait.enabled = portrait.sprite != null;
             _rankedChampionBadge = OfflineRankedUI.AddChampionBadge(player, new Vector2(.23f, 1.01f), new Vector2(1f, 1.32f));
             _rankedChampionBadge.SetActive(false);
@@ -1294,19 +1294,19 @@ namespace YGOPortable.UI
             _endShortcut = BuildPhaseShortcut(root, "EndShortcut", "턴 종료", "END PHASE", .257f, YgoConstants.PHASE_END);
             BuildPhasePicker(root);
             BuildPlacementControls(root);
-            var log = _logControlDock = LotdUiKit.CreateRect("OpenLog", root, new Vector2(0.910f, 0.035f), new Vector2(0.984f, 0.092f),
+            var log = _logControlDock = DuelUiKit.CreateRect("OpenLog", root, new Vector2(0.910f, 0.035f), new Vector2(0.984f, 0.092f),
                 Vector2.zero, Vector2.zero);
             _duelPadLogButton = BuildHudControl(log, DuelVisualAssets.LogIcon, "대전 기록", OpenDuelLog);
-            var chainConfirmation = _chainControlDock = LotdUiKit.CreateRect("ChainConfirmation", root,
+            var chainConfirmation = _chainControlDock = DuelUiKit.CreateRect("ChainConfirmation", root,
                 new Vector2(.825f, .035f), new Vector2(.901f, .092f), Vector2.zero, Vector2.zero);
             LayoutMobileDuelControls();
             BuildChainConfirmationDial(chainConfirmation);
             _modals.SetChainConfirmationControl(_chainConfirmationButton);
 
-            var hint = LotdUiKit.CreateRect("ActionHint", root, new Vector2(0.294f, 0.187f), new Vector2(0.752f, 0.225f),
+            var hint = DuelUiKit.CreateRect("ActionHint", root, new Vector2(0.294f, 0.187f), new Vector2(0.752f, 0.225f),
                 Vector2.zero, Vector2.zero);
-            _hintBannerText = LotdUiKit.AddText(hint, "Text", "", 15, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
-            _hintBannerText.gameObject.AddComponent<Outline>().effectColor = LotdUiKit.BgDeep;
+            _hintBannerText = DuelUiKit.AddText(hint, "Text", "", 15, TextAnchor.MiddleCenter, DuelUiKit.TextPrimary, FontStyle.Bold);
+            _hintBannerText.gameObject.AddComponent<Outline>().effectColor = DuelUiKit.BgDeep;
         }
 
         private void BuildChainConfirmationDial(RectTransform dock)
@@ -1315,19 +1315,19 @@ namespace YGOPortable.UI
                 CenterHudControl(dock, new Vector2(.865f, .073f), 60f);
             _chainConfirmationButton = DuelStyle.RoundButton(dock, "Button", DuelStyle.ChainCyan, CycleChainConfirmation);
             var dial = _chainConfirmationButton.transform;
-            var halo = LotdUiKit.FillRect("PulseRing", dial, -3f);
+            var halo = DuelUiKit.FillRect("PulseRing", dial, -3f);
             halo.SetAsFirstSibling();
-            _chainDialPulse = LotdUiKit.AddImage(halo.gameObject, DuelStyle.Disc, Color.clear, false, false);
-            var inset = LotdUiKit.CreateRect("Inset", dial, Vector2.one * .12f, Vector2.one * .88f,
+            _chainDialPulse = DuelUiKit.AddImage(halo.gameObject, DuelStyle.Disc, Color.clear, false, false);
+            var inset = DuelUiKit.CreateRect("Inset", dial, Vector2.one * .12f, Vector2.one * .88f,
                 Vector2.zero, Vector2.zero);
-            _chainDialFace = LotdUiKit.AddImage(inset.gameObject, DuelStyle.Disc, HudSurface, false, false);
-            var status = LotdUiKit.CreateRect("Status", dial, new Vector2(.08f, .21f), new Vector2(.92f, .63f),
+            _chainDialFace = DuelUiKit.AddImage(inset.gameObject, DuelStyle.Disc, HudSurface, false, false);
+            var status = DuelUiKit.CreateRect("Status", dial, new Vector2(.08f, .21f), new Vector2(.92f, .63f),
                 Vector2.zero, Vector2.zero);
-            _chainConfirmationLabel = LotdUiKit.AddFittedText(status, "Mode", "AUTO", 20, 9,
+            _chainConfirmationLabel = DuelUiKit.AddFittedText(status, "Mode", "AUTO", 20, 9,
                 TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
-            var title = LotdUiKit.CreateRect("Caption", dial, new Vector2(.15f, .61f), new Vector2(.85f, .80f),
+            var title = DuelUiKit.CreateRect("Caption", dial, new Vector2(.15f, .61f), new Vector2(.85f, .80f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddFittedText(title, "Label", "체인", 12, 8, TextAnchor.MiddleCenter, DuelStyle.Muted);
+            DuelUiKit.AddFittedText(title, "Label", "체인", 12, 8, TextAnchor.MiddleCenter, DuelStyle.Muted);
         }
 
         private static void PositionBottomControl(RectTransform control, float right, float width, float height)
@@ -1377,59 +1377,59 @@ namespace YGOPortable.UI
 
         private void BuildTurnHud(Transform root)
         {
-            var holder = LotdUiKit.CreateRect("Turn", root, new Vector2(.904f, .451f), new Vector2(.984f, .615f),
+            var holder = DuelUiKit.CreateRect("Turn", root, new Vector2(.904f, .451f), new Vector2(.984f, .615f),
                 Vector2.zero, Vector2.zero);
-            var turn = LotdUiKit.CreateRect("Dial", holder, new Vector2(0f, .12f), new Vector2(1f, .88f),
+            var turn = DuelUiKit.CreateRect("Dial", holder, new Vector2(0f, .12f), new Vector2(1f, .88f),
                 Vector2.zero, Vector2.zero);
             _phaseRim = DuelStyle.AddHexPlate(turn, HudEdge, HudSurface);
             _phaseButton = AddHudButton(_phaseRim, OpenPhasePicker);
             if (DuelVisualAssets.PhaseBase != null)
-                LotdUiKit.AddImage(LotdUiKit.FillRect("LocalPhaseBase", turn, 3f).gameObject, DuelVisualAssets.PhaseBase,
+                DuelUiKit.AddImage(DuelUiKit.FillRect("LocalPhaseBase", turn, 3f).gameObject, DuelVisualAssets.PhaseBase,
                     new Color(1f, 1f, 1f, .54f), true, false);
             if (DuelVisualAssets.PhaseRim != null)
-                LotdUiKit.AddImage(LotdUiKit.FillRect("LocalPhaseRim", turn).gameObject, DuelVisualAssets.PhaseRim,
+                DuelUiKit.AddImage(DuelUiKit.FillRect("LocalPhaseRim", turn).gameObject, DuelVisualAssets.PhaseRim,
                     new Color(1f, 1f, 1f, .73f), true, false);
 
-            var turnReadout = LotdUiKit.CreateRect("TurnNumber", turn, new Vector2(.115f, .675f),
+            var turnReadout = DuelUiKit.CreateRect("TurnNumber", turn, new Vector2(.115f, .675f),
                 new Vector2(.885f, .935f), Vector2.zero, Vector2.zero);
-            _turnBadgeText = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Owner", turnReadout, Vector2.zero,
+            _turnBadgeText = DuelUiKit.AddFittedText(DuelUiKit.CreateRect("Owner", turnReadout, Vector2.zero,
                 new Vector2(.655f, 1f), Vector2.zero, Vector2.zero), "Label", "", 16, 9,
                 TextAnchor.MiddleLeft, DuelStyle.Muted);
-            _turnNumber = DuelTypography.AddNumber(LotdUiKit.CreateRect("Count", turnReadout, new Vector2(.670f, 0f),
+            _turnNumber = DuelTypography.AddNumber(DuelUiKit.CreateRect("Count", turnReadout, new Vector2(.670f, 0f),
                 Vector2.one, Vector2.zero, Vector2.zero), "Value", "", 20, TextAnchor.MiddleRight, HudText);
-            _phaseLabel = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("PhaseName", turn, new Vector2(.07f, .42f),
+            _phaseLabel = DuelUiKit.AddFittedText(DuelUiKit.CreateRect("PhaseName", turn, new Vector2(.07f, .42f),
                 new Vector2(.93f, .682f), Vector2.zero, Vector2.zero), "Value", "", 26, 12,
                 TextAnchor.MiddleCenter, HudText);
-            var progress = _phaseStrip = LotdUiKit.CreateRect("PhaseSteps", root, new Vector2(.793f, .155f), new Vector2(.984f, .209f),
+            var progress = _phaseStrip = DuelUiKit.CreateRect("PhaseSteps", root, new Vector2(.793f, .155f), new Vector2(.984f, .209f),
                 Vector2.zero, Vector2.zero);
             DuelReadoutPlate.Add(progress, new Color(.022f, .049f, .068f, .89f));
             for (int i = 0; i < _phaseSteps.Length; i++)
             {
-                var step = LotdUiKit.CreateRect(PhaseEntries[i].name, progress,
+                var step = DuelUiKit.CreateRect(PhaseEntries[i].name, progress,
                     new Vector2((i + .12f) / _phaseSteps.Length, 0f), new Vector2((i + .88f) / _phaseSteps.Length, 1f),
                     Vector2.zero, Vector2.zero);
                 _phaseSteps[i] = DuelStyle.AddHexPlate(step, HudEdge, HudSurface);
-                _phaseStepLabels[i] = LotdUiKit.AddFittedText(step, "Phase", PhaseShortNames[i], 18, 9,
+                _phaseStepLabels[i] = DuelUiKit.AddFittedText(step, "Phase", PhaseShortNames[i], 18, 9,
                     TextAnchor.MiddleCenter, DuelStyle.Muted, FontStyle.Bold);
             }
-            _phaseControlHint = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("ChangePrompt", turn, new Vector2(.09f, .045f),
+            _phaseControlHint = DuelUiKit.AddFittedText(DuelUiKit.CreateRect("ChangePrompt", turn, new Vector2(.09f, .045f),
                 new Vector2(.91f, .213f), Vector2.zero, Vector2.zero), "Label", "페이즈 변경", 13, 8,
                 TextAnchor.MiddleCenter, DuelStyle.Gold);
         }
 
         private Button BuildPhaseShortcut(Transform parent, string name, string label, string key, float y, int phase)
         {
-            var root = LotdUiKit.CreateRect(name, parent, new Vector2(.904f, y - .035f),
+            var root = DuelUiKit.CreateRect(name, parent, new Vector2(.904f, y - .035f),
                 new Vector2(.984f, y + .035f), Vector2.zero, Vector2.zero);
             Color tint = phase == YgoConstants.PHASE_BATTLE ? DuelStyle.ChainCyan : DuelStyle.Gold;
             var button = AddHudButton(DuelStyle.AddHexPlate(root, tint, new Color(.032f, .074f, .103f)),
                 () => OnPhaseShortcut(phase));
-            var heading = LotdUiKit.CreateRect("Label", root, new Vector2(.07f, .34f), new Vector2(.93f, .83f),
+            var heading = DuelUiKit.CreateRect("Label", root, new Vector2(.07f, .34f), new Vector2(.93f, .83f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddFittedText(heading, "Text", label, 19, 10, TextAnchor.MiddleCenter, HudText, FontStyle.Bold);
-            var hint = LotdUiKit.CreateRect("Hint", root, new Vector2(.08f, .11f), new Vector2(.92f, .36f),
+            DuelUiKit.AddFittedText(heading, "Text", label, 19, 10, TextAnchor.MiddleCenter, HudText, FontStyle.Bold);
+            var hint = DuelUiKit.CreateRect("Hint", root, new Vector2(.08f, .11f), new Vector2(.92f, .36f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddFittedText(hint, "Text", key, 11, 7, TextAnchor.MiddleCenter, tint, FontStyle.Bold);
+            DuelUiKit.AddFittedText(hint, "Text", key, 11, 7, TextAnchor.MiddleCenter, tint, FontStyle.Bold);
             button.gameObject.SetActive(false);
             return button;
         }
@@ -1448,7 +1448,7 @@ namespace YGOPortable.UI
             button.colors = colors;
             button.onClick.AddListener(() =>
             {
-                LotdAudio.PlayClick();
+                DuelAudio.PlayClick();
                 onClick();
             });
             return button;
@@ -1456,47 +1456,47 @@ namespace YGOPortable.UI
 
         private void BuildPhasePicker(Transform root)
         {
-            var overlay = LotdUiKit.FillRect("PhasePicker", root);
+            var overlay = DuelUiKit.FillRect("PhasePicker", root);
             _phasePicker = overlay.gameObject;
             var dismiss = overlay.gameObject.AddComponent<Button>();
-            dismiss.targetGraphic = LotdUiKit.AddImage(overlay.gameObject, LotdUiKit.WhiteSprite, new Color(.018f, .03f, .047f, .28f));
+            dismiss.targetGraphic = DuelUiKit.AddImage(overlay.gameObject, DuelUiKit.WhiteSprite, new Color(.018f, .03f, .047f, .28f));
             dismiss.transition = Selectable.Transition.None;
             dismiss.onClick.AddListener(() => _phasePicker.SetActive(false));
 
-            var controls = LotdUiKit.CreateRect("PhaseControls", overlay,
+            var controls = DuelUiKit.CreateRect("PhaseControls", overlay,
                 _mobileLayout ? new Vector2(.18f, .19f) : new Vector2(.285f, .223f),
                 _mobileLayout ? new Vector2(.95f, .72f) : new Vector2(.90f, .494f),
                 Vector2.zero, Vector2.zero);
             AddHudSurface(controls, HudEdge, HudSurface);
-            var header = LotdUiKit.CreateRect("Header", controls, new Vector2(.027f, .775f), new Vector2(.973f, .953f),
+            var header = DuelUiKit.CreateRect("Header", controls, new Vector2(.027f, .775f), new Vector2(.973f, .953f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddFittedText(header, "Title", "페이즈 변경", 19, 12, TextAnchor.MiddleLeft, HudText, FontStyle.Bold);
+            DuelUiKit.AddFittedText(header, "Title", "페이즈 변경", 19, 12, TextAnchor.MiddleLeft, HudText, FontStyle.Bold);
 
             for (int i = 0; i < PhaseEntries.Length; i++)
             {
                 var (name, label, phase, asset) = PhaseEntries[i];
                 float left = .028f + .158f * i;
-                var slot = LotdUiKit.CreateRect(name, controls, new Vector2(left, .297f), new Vector2(left + .150f, .737f),
+                var slot = DuelUiKit.CreateRect(name, controls, new Vector2(left, .297f), new Vector2(left + .150f, .737f),
                     Vector2.zero, Vector2.zero);
-                var rim = DuelStyle.AddHexPlate(LotdUiKit.FillRect("Button", slot), HudEdge, new Color(.060f, .101f, .122f));
+                var rim = DuelStyle.AddHexPlate(DuelUiKit.FillRect("Button", slot), HudEdge, new Color(.060f, .101f, .122f));
                 var button = AddHudButton(rim, () =>
                 {
                     _phasePicker.SetActive(false);
                     OnPhaseShortcut(phase);
                 });
-                var iconBox = LotdUiKit.CreateRect("Icon", button.transform, new Vector2(.20f, .48f), new Vector2(.80f, .87f),
+                var iconBox = DuelUiKit.CreateRect("Icon", button.transform, new Vector2(.20f, .48f), new Vector2(.80f, .87f),
                     Vector2.zero, Vector2.zero);
-                Sprite sprite = DuelVisualAssets.PhaseIcon(phase) ?? LotdUiKit.LoadSprite("LOTD/PhaseBar/blue_" + asset);
-                var icon = LotdUiKit.AddImage(iconBox.gameObject, sprite, Color.white, true, false);
+                Sprite sprite = DuelVisualAssets.PhaseIcon(phase) ?? DuelUiKit.LoadSprite("LOTD/PhaseBar/blue_" + asset);
+                var icon = DuelUiKit.AddImage(iconBox.gameObject, sprite, Color.white, true, false);
                 icon.enabled = sprite != null;
-                var labelBox = LotdUiKit.CreateRect("Caption", button.transform, new Vector2(.06f, .088f), new Vector2(.94f, .448f),
+                var labelBox = DuelUiKit.CreateRect("Caption", button.transform, new Vector2(.06f, .088f), new Vector2(.94f, .448f),
                     Vector2.zero, Vector2.zero);
-                var caption = LotdUiKit.AddFittedText(labelBox, "Label", $"{PhaseShortNames[i]}  {label}", 17, 9,
+                var caption = DuelUiKit.AddFittedText(labelBox, "Label", $"{PhaseShortNames[i]}  {label}", 17, 9,
                     TextAnchor.MiddleCenter, HudText, FontStyle.Bold);
                 _phaseChoices.Add((phase, button, caption, icon));
             }
 
-            var cancel = LotdUiKit.CreateRect("Cancel", controls,
+            var cancel = DuelUiKit.CreateRect("Cancel", controls,
                 new Vector2(.793f, _mobileLayout ? .010f : .028f),
                 new Vector2(.968f, _mobileLayout ? .285f : .270f), Vector2.zero, Vector2.zero);
             _phaseCancel = DuelStyle.Button(cancel, "Button", "취소", () => _phasePicker.SetActive(false), 15);
@@ -1544,13 +1544,13 @@ namespace YGOPortable.UI
                 fill: new Color(.033f, .083f, .135f, .94f), border: new Color(.72f, .82f, .86f, .57f));
             panel.GetComponent<Image>().raycastTarget = false;
             _placementBanner = panel.gameObject;
-            _placementHint = LotdUiKit.AddFittedText(panel, "Text", "", 22, 11, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+            _placementHint = DuelUiKit.AddFittedText(panel, "Text", "", 22, 11, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
             _placementBanner.SetActive(false);
 
-            var cancel = _placementControlDock = LotdUiKit.CreateRect("PlacementCancel", root, new Vector2(.904f, .368f), new Vector2(.984f, .450f),
+            var cancel = _placementControlDock = DuelUiKit.CreateRect("PlacementCancel", root, new Vector2(.904f, .368f), new Vector2(.984f, .450f),
                 Vector2.zero, Vector2.zero);
             _placementCancel = DuelStyle.RoundButton(cancel, "Button", DuelStyle.Player, () => TryCancelPlacement());
-            LotdUiKit.AddFittedText(_placementCancel.transform, "Label", "취소", 17, 10, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+            DuelUiKit.AddFittedText(_placementCancel.transform, "Label", "취소", 17, 10, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
             cancel.gameObject.SetActive(false);
         }
 
@@ -1596,9 +1596,9 @@ namespace YGOPortable.UI
 
         private void BuildActionPopup(Transform root)
         {
-            var overlay = LotdUiKit.FillRect("CardCommands", root);
+            var overlay = DuelUiKit.FillRect("CardCommands", root);
             _actionPopup = overlay.gameObject;
-            var backdrop = LotdUiKit.AddImage(_actionPopup, LotdUiKit.WhiteSprite, new Color(0f, 0.015f, 0.045f, 0.23f));
+            var backdrop = DuelUiKit.AddImage(_actionPopup, DuelUiKit.WhiteSprite, new Color(0f, 0.015f, 0.045f, 0.23f));
             var close = _actionPopup.AddComponent<Button>();
             close.targetGraphic = backdrop;
             close.transition = Selectable.Transition.None;
@@ -1607,24 +1607,24 @@ namespace YGOPortable.UI
             var middle = new Vector2(0.5f, 0.5f);
             _actionWindow = DuelStyle.Panel(overlay, "CommandWindow", middle, middle,
                 fill: DuelStyle.GlassColor, border: DuelStyle.GlassEdge);
-            var header = LotdUiKit.CreateRect("Caption", _actionWindow, new Vector2(0f, 1f), Vector2.one,
+            var header = DuelUiKit.CreateRect("Caption", _actionWindow, new Vector2(0f, 1f), Vector2.one,
                 new Vector2(27f, -43f), new Vector2(-27f, -7f));
-            _actionHeader = LotdUiKit.AddFittedText(header, "CardName", "", 17, 10, TextAnchor.MiddleCenter,
-                LotdUiKit.GoldAccent, FontStyle.Bold);
+            _actionHeader = DuelUiKit.AddFittedText(header, "CardName", "", 17, 10, TextAnchor.MiddleCenter,
+                DuelUiKit.GoldAccent, FontStyle.Bold);
 
-            var scrollArea = LotdUiKit.CreateRect("ScrollArea", _actionWindow, Vector2.zero, Vector2.one,
+            var scrollArea = DuelUiKit.CreateRect("ScrollArea", _actionWindow, Vector2.zero, Vector2.one,
                 new Vector2(25f, 18f), new Vector2(-25f, -45f));
-            var viewport = LotdUiKit.CreateRect("Viewport", scrollArea, Vector2.zero, Vector2.one,
+            var viewport = DuelUiKit.CreateRect("Viewport", scrollArea, Vector2.zero, Vector2.one,
                 Vector2.zero, new Vector2(-15f, 0f));
             viewport.gameObject.AddComponent<RectMask2D>();
             var scroll = _actionWindow.gameObject.AddComponent<ScrollRect>();
             scroll.viewport = viewport;
             scroll.horizontal = false;
             scroll.movementType = ScrollRect.MovementType.Clamped;
-            scroll.verticalScrollbar = LotdUiKit.AddVerticalScrollbar(scrollArea);
+            scroll.verticalScrollbar = DuelUiKit.AddVerticalScrollbar(scrollArea);
             scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
 
-            _actionList = LotdUiKit.CreateRect("Actions", viewport, new Vector2(0f, 1f), Vector2.one,
+            _actionList = DuelUiKit.CreateRect("Actions", viewport, new Vector2(0f, 1f), Vector2.one,
                 Vector2.zero, Vector2.zero);
             _actionList.pivot = new Vector2(0.5f, 1f);
             scroll.content = _actionList;
@@ -1953,7 +1953,7 @@ namespace YGOPortable.UI
             if (location != YgoConstants.LOCATION_MZONE || (position & YgoConstants.POS_DEFENSE) == 0)
                 return 1f;
             var size = Vector2.Scale(cell.rect.size, SlotCardMax - SlotCardMin);
-            float uprightHeight = Mathf.Min(size.y, size.x / LotdUiKit.CardAspectRatio);
+            float uprightHeight = Mathf.Min(size.y, size.x / DuelUiKit.CardAspectRatio);
             return Mathf.Clamp01(cell.rect.width * .94f / Mathf.Max(1f, uprightHeight));
         }
 
@@ -2148,7 +2148,7 @@ namespace YGOPortable.UI
 
         private static HandCardView CreateHandCard(RectTransform row, bool opponent)
         {
-            var rect = LotdUiKit.FillRect("HandCard", row);
+            var rect = DuelUiKit.FillRect("HandCard", row);
             var card = CompositeCardView.Create(rect, "CardView");
             card.UsePrintedFaceOnly(showEditionBadge: false);
             var art = (RectTransform)card.transform.Find("AspectBox");
@@ -2156,7 +2156,7 @@ namespace YGOPortable.UI
             Image glow = null;
             if (!opponent)
             {
-                LotdUiKit.AddImage(rect.gameObject, LotdUiKit.WhiteSprite, Color.clear);
+                DuelUiKit.AddImage(rect.gameObject, DuelUiKit.WhiteSprite, Color.clear);
                 glow = DuelStyle.AddActivationGlow(art);
                 trigger = rect.gameObject.AddComponent<CardDragTrigger>();
             }
@@ -2173,7 +2173,7 @@ namespace YGOPortable.UI
         private const float HandFaceHeight = .96f;
 
         private static float MobileHandCardWidth(RectTransform row) =>
-            Mathf.Max(MobileSafeArea.MinimumTouchSize(row), HandFaceHeight * row.rect.height * LotdUiKit.CardAspectRatio);
+            Mathf.Max(MobileSafeArea.MinimumTouchSize(row), HandFaceHeight * row.rect.height * DuelUiKit.CardAspectRatio);
 
         private (Vector2 min, Vector2 max, float angle) HandCardBounds(RectTransform row, int count, int index, bool opponent)
         {
@@ -2189,7 +2189,7 @@ namespace YGOPortable.UI
                     new Vector2(xStart + widthUnits / rowWidth, .5f * (1f + cardHeight)), 0f);
             }
             const float height = HandFaceHeight;
-            float width = Mathf.Clamp(row.rect.height * height * LotdUiKit.CardAspectRatio / Mathf.Max(1f, row.rect.width),
+            float width = Mathf.Clamp(row.rect.height * height * DuelUiKit.CardAspectRatio / Mathf.Max(1f, row.rect.width),
                 0.045f, 0.25f);
             float spacing = Mathf.Min(width * .90f, (0.93f - width) / Mathf.Max(1, count - 1));
             float x = (1f - width - spacing * (count - 1)) * 0.5f + spacing * index;
@@ -2207,24 +2207,24 @@ namespace YGOPortable.UI
 
         private void BuildDuelLog(Transform root)
         {
-            var dim = LotdUiKit.FillRect("Modal_DuelLog", root);
+            var dim = DuelUiKit.FillRect("Modal_DuelLog", root);
             _logWindow = dim.gameObject;
-            LotdUiKit.AddImage(_logWindow, LotdUiKit.WhiteSprite, new Color(0f, 0.02f, 0.08f, 0.82f));
+            DuelUiKit.AddImage(_logWindow, DuelUiKit.WhiteSprite, new Color(0f, 0.02f, 0.08f, 0.82f));
             var panel = DuelStyle.Panel(dim, "Window", new Vector2(0.20f, 0.15f), new Vector2(0.80f, 0.86f));
-            var header = LotdUiKit.CreateRect("Header", panel, new Vector2(.03f, _mobileLayout ? .72f : .87f),
+            var header = DuelUiKit.CreateRect("Header", panel, new Vector2(.03f, _mobileLayout ? .72f : .87f),
                 new Vector2(.97f, .97f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddText(header, "Title", "대전 기록", 25, TextAnchor.MiddleLeft, LotdUiKit.GoldAccent, FontStyle.Bold);
-            var close = LotdUiKit.CreateRect("Close", header, new Vector2(.84f, _mobileLayout ? .07f : .12f),
+            DuelUiKit.AddText(header, "Title", "대전 기록", 25, TextAnchor.MiddleLeft, DuelUiKit.GoldAccent, FontStyle.Bold);
+            var close = DuelUiKit.CreateRect("Close", header, new Vector2(.84f, _mobileLayout ? .07f : .12f),
                 new Vector2(1f, _mobileLayout ? .93f : .88f),
                 Vector2.zero, Vector2.zero);
             DuelStyle.Button(close, "Button", "닫기", CloseDuelLog, 15);
 
             var body = DuelStyle.Panel(panel, "Log", new Vector2(.026f, .035f), new Vector2(.974f, _mobileLayout ? .70f : .85f));
-            var viewport = LotdUiKit.CreateRect("Viewport", body, Vector2.zero, Vector2.one,
+            var viewport = DuelUiKit.CreateRect("Viewport", body, Vector2.zero, Vector2.one,
                 new Vector2(8f, 5f), new Vector2(-20f, -5f));
             viewport.gameObject.AddComponent<RectMask2D>();
-            var content = LotdUiKit.CreateRect("Content", viewport, Vector2.up, Vector2.one, Vector2.zero, Vector2.zero);
+            var content = DuelUiKit.CreateRect("Content", viewport, Vector2.up, Vector2.one, Vector2.zero, Vector2.zero);
             content.pivot = new Vector2(0.5f, 1f);
             var layout = content.gameObject.AddComponent<VerticalLayoutGroup>();
             layout.padding = new RectOffset(8, 8, 6, 6);
@@ -2239,7 +2239,7 @@ namespace YGOPortable.UI
             _logScroll.horizontal = false;
             _logScroll.scrollSensitivity = 45f;
             _logScroll.movementType = ScrollRect.MovementType.Clamped;
-            _logScroll.verticalScrollbar = LotdUiKit.AddVerticalScrollbar(body);
+            _logScroll.verticalScrollbar = DuelUiKit.AddVerticalScrollbar(body);
             _logScroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
             _logWindow.SetActive(false);
         }
@@ -2259,7 +2259,7 @@ namespace YGOPortable.UI
             int blocks = Mathf.Max(1, (log.Count + entriesPerBlock - 1) / entriesPerBlock);
             while (_logBlocks.Count < blocks)
             {
-                var text = LotdUiKit.AddText(_logScroll.content, "Entries", "", 17, TextAnchor.UpperLeft, LotdUiKit.TextPrimary);
+                var text = DuelUiKit.AddText(_logScroll.content, "Entries", "", 17, TextAnchor.UpperLeft, DuelUiKit.TextPrimary);
                 text.verticalOverflow = VerticalWrapMode.Overflow;
                 text.supportRichText = false;
                 text.lineSpacing = 1.16f;
@@ -2570,7 +2570,7 @@ namespace YGOPortable.UI
                     if (atker.sequence == mySeq)
                     {
                         _preferredAttackTargetSeq = isDirect ? -1 : (int)targetSeq;
-                        LotdAudio.PlayAttack();
+                        DuelAudio.PlayAttack();
                         ExecuteActionInt((i << 16) | 1);
                         return;
                     }
@@ -3491,17 +3491,17 @@ namespace YGOPortable.UI
             {
                 if (_cardZoomModal != null && _cardZoomModal.activeSelf)
                 {
-                    LotdAudio.PlayClick();
+                    DuelAudio.PlayClick();
                     CloseCardZoomModal();
                 }
                 else if (_actionPopup != null && _actionPopup.activeSelf)
                 {
-                    LotdAudio.PlayClick();
+                    DuelAudio.PlayClick();
                     CloseActionPopup();
                 }
                 else if (IsBrowsingZone)
                 {
-                    LotdAudio.PlayClick();
+                    DuelAudio.PlayClick();
                     _modals.CloseZoneViewer();
                 }
                 else if (_modals != null && _modals.ModalRoot != null && _modals.ModalRoot.activeSelf)
@@ -3513,7 +3513,7 @@ namespace YGOPortable.UI
                 }
                 else if (TryCancelPlacement())
                 {
-                    LotdAudio.PlayClick();
+                    DuelAudio.PlayClick();
                 }
                 else if (Input.GetKeyDown(KeyCode.Escape) && _modals != null && _modals.ResultRoot != null && _modals.ResultRoot.activeSelf)
                 {
@@ -3553,7 +3553,7 @@ namespace YGOPortable.UI
                 int lifePoints = (int)Math.Round(displayed);
                 if (lifePoints != before)
                 {
-                    LotdAudio.PlayTick();
+                    DuelAudio.PlayTick();
                     WriteLifeReadout(label, fill, lifePoints);
                 }
             }
@@ -3776,7 +3776,7 @@ namespace YGOPortable.UI
         {
             if (!CanAcceptPlayerAction || IsStagingPlacement || IsBrowsingZone) return;
             _preferredDropZone = placement;
-            LotdAudio.PlayClick();
+            DuelAudio.PlayClick();
             _actionPopup.SetActive(false);
             _modals.HideAll();
             _session.SubmitResponseInt(responseVal);
@@ -3945,7 +3945,7 @@ namespace YGOPortable.UI
                 var zoneActions = CanUseActions() ? CollectZoneActions(con, loc) : null;
                 if (zoneActions != null && zoneActions.Count > 0)
                 {
-                    LotdAudio.PlayClick();
+                    DuelAudio.PlayClick();
                     ShowZoneActionsPopup(title, zoneActions);
                 }
                 return;
@@ -3961,7 +3961,7 @@ namespace YGOPortable.UI
                 return actions;
             }
 
-            LotdAudio.PlayClick();
+            DuelAudio.PlayClick();
             _modals.ShowPileViewer(
                 con != session.HumanPlayerIndex,
                 loc,
@@ -4042,7 +4042,7 @@ namespace YGOPortable.UI
                     return;
                 }
 
-                LotdAudio.PlayClick();
+                DuelAudio.PlayClick();
                 if (IsPlacePending(con, loc, seq))
                 {
                     for (int i = 0; i < _pendingPlaces.Count; i++)
@@ -4195,9 +4195,9 @@ namespace YGOPortable.UI
 
         private void AddActionRow(string label, Action action, bool selected, string icon = null)
         {
-            Sprite iconSprite = icon == null ? null : LotdUiKit.LoadSprite($"LOTD/Icons/ICON_ID_CMDID_48_{icon}");
+            Sprite iconSprite = icon == null ? null : DuelUiKit.LoadSprite($"LOTD/Icons/ICON_ID_CMDID_48_{icon}");
             float height = _mobileLayout ? MobileSafeArea.MinimumTouchSize(_actionList) : 44f;
-            var button = LotdUiKit.CreateWrappedButton(_actionList, "Action", label, action, 15, selected, height, iconSprite);
+            var button = DuelUiKit.CreateWrappedButton(_actionList, "Action", label, action, 15, selected, height, iconSprite);
             DuelStyle.ApplyButton(button, selected);
         }
 
@@ -4343,7 +4343,7 @@ namespace YGOPortable.UI
             if (animator == null || coins.Count == 0) return;
             var point = animator.GetPoint(_boardRect, new Vector2(0.5f, 0.54f));
             animator.QueueRandomResult(string.Join("   /   ", coins.Select(coin => coin ? "앞면" : "뒷면")),
-                point, player != _session.HumanPlayerIndex, LotdAudio.PlayCoin);
+                point, player != _session.HumanPlayerIndex, DuelAudio.PlayCoin);
         }
 
         private void HandleDiceRolledEvent(byte player, IReadOnlyList<int> dice)
@@ -4352,14 +4352,14 @@ namespace YGOPortable.UI
             if (animator == null || dice.Count == 0) return;
             var point = animator.GetPoint(_boardRect, new Vector2(0.5f, 0.54f));
             animator.QueueRandomResult("주사위   " + string.Join("   /   ", dice),
-                point, player != _session.HumanPlayerIndex, LotdAudio.PlayDice);
+                point, player != _session.HumanPlayerIndex, DuelAudio.PlayDice);
         }
 
         private void BuildCardZoomModal(Transform root, bool onIPhone)
         {
-            var dim = LotdUiKit.FillRect("Overlay_CardZoom", root);
+            var dim = DuelUiKit.FillRect("Overlay_CardZoom", root);
             _cardZoomModal = dim.gameObject;
-            LotdUiKit.AddImage(dim.gameObject, LotdUiKit.WhiteSprite, new Color(.012f, .026f, .044f, .83f));
+            DuelUiKit.AddImage(dim.gameObject, DuelUiKit.WhiteSprite, new Color(.012f, .026f, .044f, .83f));
             var backdrop = dim.gameObject.AddComponent<Button>();
             backdrop.navigation = new Navigation { mode = Navigation.Mode.None };
             backdrop.onClick.AddListener(() => CloseCardZoomModal());
@@ -4370,95 +4370,95 @@ namespace YGOPortable.UI
             win.gameObject.AddComponent<Button>().interactable = false;
 
             // Header bar
-            var hdr = LotdUiKit.CreateRect("Hdr", win, new Vector2(.012f, onIPhone ? .822f : .9f),
+            var hdr = DuelUiKit.CreateRect("Hdr", win, new Vector2(.012f, onIPhone ? .822f : .9f),
                 new Vector2(.988f, onIPhone ? .991f : .985f),
                 Vector2.zero, Vector2.zero);
             DuelReadoutPlate.Add(hdr, new Color(.065f, .113f, .133f, .92f));
-            var title = _zoomHeaderTitle = LotdUiKit.CreateRect("Title", hdr,
+            var title = _zoomHeaderTitle = DuelUiKit.CreateRect("Title", hdr,
                 new Vector2(.02f, .12f), new Vector2(.82f, .88f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddFittedText(title, "T", "카드 상세 정보", 19, 12,
-                TextAnchor.MiddleLeft, LotdUiKit.GoldAccent);
+            DuelUiKit.AddFittedText(title, "T", "카드 상세 정보", 19, 12,
+                TextAnchor.MiddleLeft, DuelUiKit.GoldAccent);
 
-            var closeRt = LotdUiKit.CreateRect("Close", hdr, new Vector2(.84f, onIPhone ? .04f : .15f),
+            var closeRt = DuelUiKit.CreateRect("Close", hdr, new Vector2(.84f, onIPhone ? .04f : .15f),
                 new Vector2(.98f, onIPhone ? .96f : .85f), Vector2.zero, Vector2.zero);
             _zoomCloseButton = DuelStyle.Button(closeRt, "B", onIPhone ? "닫기" : "닫기 (ESC)", () => CloseCardZoomModal(), 15);
 
             // Left Side: Large Card View
             float cardRight = onIPhone ? .375f : .448f;
-            var cardHolder = LotdUiKit.CreateRect("CardHolder", win, new Vector2(.033f, onIPhone ? .172f : .111f),
+            var cardHolder = DuelUiKit.CreateRect("CardHolder", win, new Vector2(.033f, onIPhone ? .172f : .111f),
                 new Vector2(cardRight, onIPhone ? .812f : .891f), Vector2.zero, Vector2.zero);
             _zoomCardView = CompositeCardView.Create(cardHolder, "ZoomCard", true);
             _zoomCardView.UsePrintedFaceOnly();
             CardOverframeInput.Attach(cardHolder, _zoomCardView, onIPhone);
             AddInspectorArtworkFrame(_zoomCardView.transform.Find("AspectBox"));
             _zoomDisabledBadge = BuildDisabledBadge(_zoomCardView.transform, 24);
-            var artwork = LotdUiKit.CreateRect("ArtworkOptions", win, new Vector2(.04f, onIPhone ? .018f : .035f),
+            var artwork = DuelUiKit.CreateRect("ArtworkOptions", win, new Vector2(.04f, onIPhone ? .018f : .035f),
                 new Vector2(cardRight, onIPhone ? .157f : .098f),
                 Vector2.zero, Vector2.zero);
             _zoomArtworkControls = artwork.gameObject;
             float artworkButtonWidth = onIPhone ? .30f : .19f;
-            var previous = LotdUiKit.CreateRect("Previous", artwork, Vector2.zero, new Vector2(artworkButtonWidth, 1f),
+            var previous = DuelUiKit.CreateRect("Previous", artwork, Vector2.zero, new Vector2(artworkButtonWidth, 1f),
                 Vector2.zero, Vector2.zero);
             DuelStyle.Button(previous, "Button", "‹", () => CycleArtwork(-1), 20);
-            var next = LotdUiKit.CreateRect("Next", artwork, new Vector2(1f - artworkButtonWidth, 0f), Vector2.one,
+            var next = DuelUiKit.CreateRect("Next", artwork, new Vector2(1f - artworkButtonWidth, 0f), Vector2.one,
                 Vector2.zero, Vector2.zero);
             DuelStyle.Button(next, "Button", "›", () => CycleArtwork(1), 20);
-            var counter = LotdUiKit.CreateRect("Counter", artwork,
+            var counter = DuelUiKit.CreateRect("Counter", artwork,
                 new Vector2(artworkButtonWidth + .01f, 0f), new Vector2(.99f - artworkButtonWidth, 1f),
                 Vector2.zero, Vector2.zero);
-            _zoomArtworkLabel = LotdUiKit.AddFittedText(counter, "Label", "", 15, 9, TextAnchor.MiddleCenter, Color.white);
+            _zoomArtworkLabel = DuelUiKit.AddFittedText(counter, "Label", "", 15, 9, TextAnchor.MiddleCenter, Color.white);
 
             // Right Side: Card Details
-            var infoRt = LotdUiKit.CreateRect("Info", win, new Vector2(cardRight + .03f, .05f),
+            var infoRt = DuelUiKit.CreateRect("Info", win, new Vector2(cardRight + .03f, .05f),
                 new Vector2(.96f, onIPhone ? .81f : .88f), Vector2.zero, Vector2.zero);
 
-            var name = LotdUiKit.CreateRect("Name", infoRt,
+            var name = DuelUiKit.CreateRect("Name", infoRt,
                 new Vector2(0f, 0.88f), new Vector2(0.82f, 1f), Vector2.zero, Vector2.zero);
-            _zoomName = LotdUiKit.AddFittedText(name, "N", "", 27, 12, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary);
+            _zoomName = DuelUiKit.AddFittedText(name, "N", "", 27, 12, TextAnchor.MiddleLeft, DuelUiKit.TextPrimary);
             _zoomRulesName = CreateRulesNameLabel(name, onIPhone ? 20 : 17);
 
-            var race = LotdUiKit.CreateRect("RaceIc", infoRt, new Vector2(.833f, .88f), new Vector2(.902f, 1f), Vector2.zero, Vector2.zero);
-            _zoomRaceIcon = LotdUiKit.AddImage(race.gameObject, null, Color.white, true, false);
-            var attribute = LotdUiKit.CreateRect("AttributeIc", infoRt, new Vector2(.916f, .88f), new Vector2(.985f, 1f), Vector2.zero, Vector2.zero);
-            _zoomAttributeIcon = LotdUiKit.AddImage(attribute.gameObject, null, Color.white, true, false);
+            var race = DuelUiKit.CreateRect("RaceIc", infoRt, new Vector2(.833f, .88f), new Vector2(.902f, 1f), Vector2.zero, Vector2.zero);
+            _zoomRaceIcon = DuelUiKit.AddImage(race.gameObject, null, Color.white, true, false);
+            var attribute = DuelUiKit.CreateRect("AttributeIc", infoRt, new Vector2(.916f, .88f), new Vector2(.985f, 1f), Vector2.zero, Vector2.zero);
+            _zoomAttributeIcon = DuelUiKit.AddImage(attribute.gameObject, null, Color.white, true, false);
 
-            var stats = LotdUiKit.CreateRect("Stats", infoRt,
+            var stats = DuelUiKit.CreateRect("Stats", infoRt,
                 new Vector2(0f, .735f), new Vector2(1f, .875f), Vector2.zero, Vector2.zero);
-            _zoomStats = LotdUiKit.AddFittedText(stats, "S", "", 21, 10, TextAnchor.MiddleLeft, DuelStyle.Muted);
-            var rating = LotdUiKit.CreateRect("Rating", stats, new Vector2(.725f, .19f), new Vector2(.985f, .81f),
+            _zoomStats = DuelUiKit.AddFittedText(stats, "S", "", 21, 10, TextAnchor.MiddleLeft, DuelStyle.Muted);
+            var rating = DuelUiKit.CreateRect("Rating", stats, new Vector2(.725f, .19f), new Vector2(.985f, .81f),
                 Vector2.zero, Vector2.zero);
             _zoomRating = new DuelRatingBadge(rating, compact: false);
-            var combat = LotdUiKit.CreateRect("CombatStats", infoRt,
+            var combat = DuelUiKit.CreateRect("CombatStats", infoRt,
                 new Vector2(0f, .635f), new Vector2(1f, .721f), Vector2.zero, Vector2.zero);
             _zoomCombat = new DuelStatStrip(combat, compact: false);
 
-            _zoomPasscode = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Passcode", infoRt,
+            _zoomPasscode = DuelUiKit.AddFittedText(DuelUiKit.CreateRect("Passcode", infoRt,
                 new Vector2(0f, .571f), new Vector2(.60f, .626f), Vector2.zero, Vector2.zero),
-                "P", "", 12, 9, TextAnchor.MiddleLeft, LotdUiKit.CyanAccent);
-            var counterChip = LotdUiKit.CreateRect("Counters", infoRt,
+                "P", "", 12, 9, TextAnchor.MiddleLeft, DuelUiKit.CyanAccent);
+            var counterChip = DuelUiKit.CreateRect("Counters", infoRt,
                 new Vector2(.64f, .571f), new Vector2(1f, .626f), Vector2.zero, Vector2.zero);
             _zoomCounters = new DuelCounterBadge(counterChip, compact: false);
 
-            _zoomScales = new DuelPendulumScalePair(LotdUiKit.CreateRect("Scales", infoRt,
+            _zoomScales = new DuelPendulumScalePair(DuelUiKit.CreateRect("Scales", infoRt,
                 new Vector2(0f, .503f), new Vector2(1f, .558f), Vector2.zero, Vector2.zero));
-            var descBox = _zoomDescriptionBox = LotdUiKit.CreateRect("DescBox", infoRt, Vector2.zero, new Vector2(1f, .561f),
+            var descBox = _zoomDescriptionBox = DuelUiKit.CreateRect("DescBox", infoRt, Vector2.zero, new Vector2(1f, .561f),
                 Vector2.zero, Vector2.zero);
             DuelReadoutPlate.Add(descBox, new Color(.018f, .045f, .061f, .96f)).raycastTarget = true;
-            var vp = LotdUiKit.CreateRect("VP", descBox, Vector2.zero, Vector2.one,
+            var vp = DuelUiKit.CreateRect("VP", descBox, Vector2.zero, Vector2.one,
                 new Vector2(10f, 8f), new Vector2(-19f, -8f));
             vp.gameObject.AddComponent<RectMask2D>();
-            var ct = LotdUiKit.CreateRect("C", vp, new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
+            var ct = DuelUiKit.CreateRect("C", vp, new Vector2(0f, 1f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
             ct.pivot = new Vector2(0.5f, 1f);
             var contentLayout = ct.gameObject.AddComponent<VerticalLayoutGroup>();
             contentLayout.childControlWidth = contentLayout.childControlHeight = true;
             contentLayout.childForceExpandHeight = false;
             contentLayout.spacing = 8f;
-            _zoomCounterTypes = LotdUiKit.AddText(ct, "CounterTypes", "", onIPhone ? 21 : 16,
+            _zoomCounterTypes = DuelUiKit.AddText(ct, "CounterTypes", "", onIPhone ? 21 : 16,
                 TextAnchor.UpperLeft, DuelCounterBadge.Ink);
             _zoomCounterTypes.gameObject.SetActive(false);
-            _zoomDesc = LotdUiKit.AddText(ct, "EffectText", "", onIPhone ? 23 : 17,
-                TextAnchor.UpperLeft, LotdUiKit.TextPrimary);
+            _zoomDesc = DuelUiKit.AddText(ct, "EffectText", "", onIPhone ? 23 : 17,
+                TextAnchor.UpperLeft, DuelUiKit.TextPrimary);
             _zoomDesc.lineSpacing = 1.15f;
             _zoomDesc.supportRichText = false;
             ct.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;

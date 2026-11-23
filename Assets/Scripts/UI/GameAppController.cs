@@ -101,7 +101,7 @@ namespace YGOPortable.UI
                 Debug.Log($"[GameApp] Start() starting... StreamingAssets: {Application.streamingAssetsPath}");
                 Application.runInBackground = true;
                 if (Application.isMobilePlatform) Application.targetFrameRate = 60;
-                LotdAudio.EnsureInit(gameObject);
+                DuelAudio.EnsureInit(gameObject);
                 PersonalReplayEnabled = PlayerPrefs.GetInt(PersonalReplayPreference, 0) != 0;
 
                 if (!YgoNativeBridge.IsInitialized)
@@ -158,7 +158,7 @@ namespace YGOPortable.UI
 
                 Debug.Log("[GameApp] 9. Constructing DuelFieldUI...");
                 _duelField = new DuelFieldUI(this, canvas.transform, _modals);
-                _menuPad = new DeckPadUi(LotdUiKit.FillRect("MenuPad", canvas.transform),
+                _menuPad = new DeckPadUi(DuelUiKit.FillRect("MenuPad", canvas.transform),
                     () => _screen is AppScreen.CardShop or AppScreen.ArchetypeCodex);
 
                 // Ensure Modals, Animation Layer, and Drag Ghost Layer render ABOVE DuelFieldUI and DeckEditorUI
@@ -261,11 +261,11 @@ namespace YGOPortable.UI
 
             if (screen == AppScreen.Duel)
             {
-                LotdAudio.PlayDuelBgm();
+                DuelAudio.PlayDuelBgm();
             }
             else
             {
-                LotdAudio.PlayMenuBgm();
+                DuelAudio.PlayMenuBgm();
                 _activeStoryEpisode = null;
                 _activeTournament = null;
                 _activeRanked = null;

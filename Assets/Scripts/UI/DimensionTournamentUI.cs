@@ -39,22 +39,22 @@ namespace YGOPortable.UI
         internal DimensionTournamentUI(GameAppController app, Transform parent)
         {
             _app = app;
-            var root = LotdUiKit.FillRect("DimensionTournament", parent);
+            var root = DuelUiKit.FillRect("DimensionTournament", parent);
             Root = root.gameObject;
-            LotdUiKit.AddImage(Root, LotdUiKit.WhiteSprite, new Color(.016f, .035f, .073f, 1f), false, false);
-            var content = LotdUiKit.FillRect("BracketView", root);
+            DuelUiKit.AddImage(Root, DuelUiKit.WhiteSprite, new Color(.016f, .035f, .073f, 1f), false, false);
+            var content = DuelUiKit.FillRect("BracketView", root);
             _browser = content.gameObject.AddComponent<CanvasGroup>();
             var area = Application.isMobilePlatform ? MobileSafeArea.Create(content) : content;
-            AddLabel(area, "Title", "시공 초월 차원 대항전", .04f, .903f, .69f, .978f, 32, LotdUiKit.GoldAccent);
+            AddLabel(area, "Title", "시공 초월 차원 대항전", .04f, .903f, .69f, .978f, 32, DuelUiKit.GoldAccent);
             _back = AddButton(area, "Back", "스토리로", .834f, .9f, .968f, .973f, Back);
-            _fame = AddLabel(area, "HallOfFame", "", .045f, .839f, .955f, .898f, 22, LotdUiKit.TextPrimary);
-            var board = LotdUiKit.CreateMenuPanel(area, "Bracket", new Vector2(.033f, .228f), new Vector2(.966f, .83f));
-            _bracket = LotdUiKit.FillRect("Draw", board);
-            _status = AddLabel(area, "Status", "", .044f, .158f, .957f, .22f, 18, LotdUiKit.GoldAccent);
+            _fame = AddLabel(area, "HallOfFame", "", .045f, .839f, .955f, .898f, 22, DuelUiKit.TextPrimary);
+            var board = DuelUiKit.CreateMenuPanel(area, "Bracket", new Vector2(.033f, .228f), new Vector2(.966f, .83f));
+            _bracket = DuelUiKit.FillRect("Draw", board);
+            _status = AddLabel(area, "Status", "", .044f, .158f, .957f, .22f, 18, DuelUiKit.GoldAccent);
             _eight = AddButton(area, "Eight", "8강 참가", .041f, .049f, .195f, .144f, () => Begin(8));
             _sixteen = AddButton(area, "Sixteen", "16강 참가", .21f, .049f, .364f, .144f, () => Begin(16));
             var deck = Region(area, "PlayerDeck", .385f, .049f, .732f, .144f);
-            _deck = LotdUiKit.CreateLotdDropdown(deck, "SelectDeck", Array.Empty<string>(), index =>
+            _deck = DuelUiKit.CreateDropdown(deck, "SelectDeck", Array.Empty<string>(), index =>
             {
                 if (index >= 0 && index < _decks.Count) _deckId = _decks[index].id;
             }, dynamicChoices: true);
@@ -62,11 +62,11 @@ namespace YGOPortable.UI
             _dialogue = new StoryModeUI.StoryDialogueView(root);
             var trophy = Region(root, "ChampionTrophy", .76f, .60f, .918f, .8f);
             _trophy = trophy.gameObject;
-            LotdUiKit.AddImage(trophy.gameObject, LotdUiKit.WhiteSprite, new Color(.20f, .126f, .040f, .97f), false, false);
+            DuelUiKit.AddImage(trophy.gameObject, DuelUiKit.WhiteSprite, new Color(.20f, .126f, .040f, .97f), false, false);
             var crown = Region(trophy, "Crown", .21f, .31f, .79f, .94f);
-            LotdUiKit.AddImage(crown.gameObject, DuelVisualAssets.WinnerCrown, LotdUiKit.GoldAccent, true, false).enabled =
+            DuelUiKit.AddImage(crown.gameObject, DuelVisualAssets.WinnerCrown, DuelUiKit.GoldAccent, true, false).enabled =
                 DuelVisualAssets.WinnerCrown != null;
-            AddLabel(trophy, "Champion", "우승 트로피", .04f, .05f, .96f, .31f, 20, LotdUiKit.GoldAccent);
+            AddLabel(trophy, "Champion", "우승 트로피", .04f, .05f, .96f, .31f, 20, DuelUiKit.GoldAccent);
             Close();
         }
 
@@ -124,7 +124,7 @@ namespace YGOPortable.UI
                 {
                     _trophy.SetActive(true);
                     UiEntranceMotion.Play(_trophy, .65f, .35f);
-                    if (Application.isPlaying) LotdAudio.PlayWin();
+                    if (Application.isPlaying) DuelAudio.PlayWin();
                 }
                 _dialogue.ShowChoices(() => result, new StoryModeUI.StoryChoice("대진표로", Back));
             });
@@ -212,7 +212,7 @@ namespace YGOPortable.UI
         private void OpenDialogue(OpponentCharacter opponent, string title, StoryDialogueLine[] lines, Action onFinish)
         {
             _browser.blocksRaycasts = _browser.interactable = false;
-            _dialogue.Open(title, "차원 대항전 참가자", LotdUiKit.LoadOpponentPortrait(opponent), lines, onFinish);
+            _dialogue.Open(title, "차원 대항전 참가자", DuelUiKit.LoadOpponentPortrait(opponent), lines, onFinish);
         }
 
         private void CloseDialogue()
@@ -252,7 +252,7 @@ namespace YGOPortable.UI
             }
             if (_run == null)
             {
-                AddLabel(_bracket, "Empty", "DM · GX · 5D’s · ZEXAL · ARC-V · VRAINS", .08f, .4f, .92f, .6f, 29, LotdUiKit.TextPrimary);
+                AddLabel(_bracket, "Empty", "DM · GX · 5D’s · ZEXAL · ARC-V · VRAINS", .08f, .4f, .92f, .6f, 29, DuelUiKit.TextPrimary);
                 return;
             }
 
@@ -262,7 +262,7 @@ namespace YGOPortable.UI
                 int slots = _run.size >> level;
                 float left = .038f + level * column;
                 float right = left + column * .88f;
-                AddLabel(_bracket, "Round", DimensionTournament.RoundTitle(slots), left, .886f, right, .958f, 19, LotdUiKit.GoldAccent);
+                AddLabel(_bracket, "Round", DimensionTournament.RoundTitle(slots), left, .886f, right, .958f, 19, DuelUiKit.GoldAccent);
                 for (int row = 0; row < slots; row++)
                 {
                     int node = slots + row;
@@ -280,18 +280,18 @@ namespace YGOPortable.UI
                     int entry = _aiResults.GetValueOrDefault(node, _run.bracket[node]);
                     bool nextOpponent = _run.Active && node == (_run.PlayerNode ^ 1);
                     var cell = Region(_bracket, $"Match_{node}", left, center - half, right, center + half);
-                    LotdUiKit.AddImage(cell.gameObject, LotdUiKit.WhiteSprite,
+                    DuelUiKit.AddImage(cell.gameObject, DuelUiKit.WhiteSprite,
                         entry == DimensionTournament.Player ? new Color(.36f, .23f, .078f) :
                         nextOpponent ? new Color(.28f, .086f, .098f) : Panel, false, false);
                     string name = entry == DimensionTournament.Player && node == 1 ? "나 · 우승" : Name(entry);
-                    LotdUiKit.AddFittedText(cell, "Name", name, 19, 10, TextAnchor.MiddleCenter,
-                        entry == DimensionTournament.Player ? LotdUiKit.GoldAccent : LotdUiKit.TextPrimary);
+                    DuelUiKit.AddFittedText(cell, "Name", name, 19, 10, TextAnchor.MiddleCenter,
+                        entry == DimensionTournament.Player ? DuelUiKit.GoldAccent : DuelUiKit.TextPrimary);
                 }
             }
 
             void Line(float left, float bottom, float right, float top) =>
-                LotdUiKit.AddImage(Region(_bracket, "Connector", left, bottom, right, top).gameObject,
-                    LotdUiKit.WhiteSprite, new Color(.25f, .38f, .52f), false, false);
+                DuelUiKit.AddImage(Region(_bracket, "Connector", left, bottom, right, top).gameObject,
+                    DuelUiKit.WhiteSprite, new Color(.25f, .38f, .52f), false, false);
         }
 
         private static string EntranceLine(int opponent, int slots) => opponent switch
@@ -320,12 +320,12 @@ namespace YGOPortable.UI
             DeckRepository.GetCharacter(id)?.name ?? "미정";
         private static void Focus(Selectable control) => EventSystem.current?.SetSelectedGameObject(control.gameObject);
         private static RectTransform Region(Transform parent, string name, float left, float bottom, float right, float top) =>
-            LotdUiKit.CreateRect(name, parent, new Vector2(left, bottom), new Vector2(right, top), Vector2.zero, Vector2.zero);
+            DuelUiKit.CreateRect(name, parent, new Vector2(left, bottom), new Vector2(right, top), Vector2.zero, Vector2.zero);
         private static Text AddLabel(Transform parent, string name, string text, float left, float bottom, float right, float top,
-            int size, Color color) => LotdUiKit.AddFittedText(Region(parent, name, left, bottom, right, top),
+            int size, Color color) => DuelUiKit.AddFittedText(Region(parent, name, left, bottom, right, top),
                 "Text", text, size, 11, TextAnchor.MiddleCenter, color);
         private static Button AddButton(Transform parent, string name, string text, float left, float bottom, float right, float top,
-            Action action, bool gold = false) => LotdUiKit.CreateLotdButton(Region(parent, name, left, bottom, right, top),
+            Action action, bool gold = false) => DuelUiKit.CreateButton(Region(parent, name, left, bottom, right, top),
                 "Button", text, action, 20, gold);
     }
 }

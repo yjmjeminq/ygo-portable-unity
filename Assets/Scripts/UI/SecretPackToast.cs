@@ -16,13 +16,13 @@ namespace YGOPortable.UI
 
         internal SecretPackToast(Transform parent)
         {
-            _root = LotdUiKit.CreateRect("SecretPackUnlocked", parent, new Vector2(.225f, .83f), new Vector2(.775f, .895f),
+            _root = DuelUiKit.CreateRect("SecretPackUnlocked", parent, new Vector2(.225f, .83f), new Vector2(.775f, .895f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(_root.gameObject, LotdUiKit.WhiteSprite, new Color(.044f, .152f, .18f, .97f), false, false);
+            DuelUiKit.AddImage(_root.gameObject, DuelUiKit.WhiteSprite, new Color(.044f, .152f, .18f, .97f), false, false);
             _canvas = _root.gameObject.AddComponent<CanvasGroup>();
             _canvas.interactable = _canvas.blocksRaycasts = false;
-            _message = LotdUiKit.AddFittedText(LotdUiKit.FillRect("Message", _root, 10f), "Label", "", 24, 14,
-                TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
+            _message = DuelUiKit.AddFittedText(DuelUiKit.FillRect("Message", _root, 10f), "Label", "", 24, 14,
+                TextAnchor.MiddleCenter, DuelUiKit.GoldAccent, FontStyle.Bold);
             _root.gameObject.SetActive(false);
             CollectionProgress.SecretPacksUnlocked += Enqueue;
         }

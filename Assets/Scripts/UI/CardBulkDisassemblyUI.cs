@@ -432,7 +432,7 @@ namespace YGOPortable.UI
             }
             else
             {
-                LotdUiKit.AddImage(holder.gameObject, LotdUiKit.WhiteSprite, PackShopStyle.SurfaceInset, false, false);
+                DuelUiKit.AddImage(holder.gameObject, DuelUiKit.WhiteSprite, PackShopStyle.SurfaceInset, false, false);
             }
             row.Name = Label(content, "Name", "", .06f, 0f, .633f, 1f, 18, TextAnchor.MiddleLeft);
             row.Quantity = Label(content, "Quantity", "", .635f, 0f, .814f, 1f, 16);
@@ -443,14 +443,14 @@ namespace YGOPortable.UI
         private static Text BuildDustLabel(Transform parent, float bottom, float top)
         {
             var slot = Slot(parent, "Dust", .08f, bottom, .92f, top);
-            LotdUiKit.AddImage(slot.gameObject, LotdUiKit.WhiteSprite, PackShopStyle.SurfaceInset, false, false);
-            return LotdUiKit.AddFittedText(slot, "Text", "", 21, 12, TextAnchor.MiddleCenter,
+            DuelUiKit.AddImage(slot.gameObject, DuelUiKit.WhiteSprite, PackShopStyle.SurfaceInset, false, false);
+            return DuelUiKit.AddFittedText(slot, "Text", "", 21, 12, TextAnchor.MiddleCenter,
                 PackShopStyle.Accent, FontStyle.Bold);
         }
 
         private static RectTransform BuildScreen(Transform parent, string name, string title, string back, Action close)
         {
-            var root = LotdUiKit.FillRect(name, parent);
+            var root = DuelUiKit.FillRect(name, parent);
             PackShopStyle.Backdrop(root);
             PackShopStyle.Header(root, title);
             AddButton(root, "Back", back, .825f, .917f, .968f, .975f, close);
@@ -460,7 +460,7 @@ namespace YGOPortable.UI
         private static void Footer(Transform root, string controls)
         {
             var panel = PackShopStyle.Panel(root, "Footer", new Vector2(.035f, .017f), new Vector2(.965f, .059f));
-            LotdUiKit.AddFittedText(panel, "Controls", controls, 16, 11, TextAnchor.MiddleCenter, PackShopStyle.TextMuted);
+            DuelUiKit.AddFittedText(panel, "Controls", controls, 16, 11, TextAnchor.MiddleCenter, PackShopStyle.TextMuted);
         }
 
 
@@ -470,18 +470,18 @@ namespace YGOPortable.UI
             PackShopStyle.Panel(parent, name, new Vector2(left, bottom), new Vector2(right, top));
 
         private static RectTransform Slot(Transform parent, string name, float left, float bottom, float right, float top) =>
-            LotdUiKit.CreateRect(name, parent, new Vector2(left, bottom), new Vector2(right, top), Vector2.zero, Vector2.zero);
+            DuelUiKit.CreateRect(name, parent, new Vector2(left, bottom), new Vector2(right, top), Vector2.zero, Vector2.zero);
 
         private static Text Heading(Transform parent, string name, string value, float left, float bottom, float right, float top)
         {
             var slot = Slot(parent, name, left, bottom, right, top);
-            return LotdUiKit.AddFittedText(slot, "Text", value, 23, 14, TextAnchor.MiddleCenter,
+            return DuelUiKit.AddFittedText(slot, "Text", value, 23, 14, TextAnchor.MiddleCenter,
                 PackShopStyle.TextPrimary, FontStyle.Bold);
         }
 
         private static Text Label(Transform parent, string name, string text, float left, float bottom, float right, float top,
             int size, TextAnchor align = TextAnchor.MiddleCenter) =>
-            LotdUiKit.AddFittedText(Slot(parent, name, left, bottom, right, top),
+            DuelUiKit.AddFittedText(Slot(parent, name, left, bottom, right, top),
                 "Text", text, size, Mathf.Max(11, size - 6), align, PackShopStyle.TextPrimary);
 
         private static Button AddButton(Transform parent, string name, string title, float left, float bottom, float right,

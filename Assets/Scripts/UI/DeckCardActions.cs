@@ -31,10 +31,10 @@ namespace YGOPortable.UI
 
         private void BuildDeckCardActions(Transform root)
         {
-            var overlay = LotdUiKit.FillRect("DeckCardActions", root);
+            var overlay = DuelUiKit.FillRect("DeckCardActions", root);
             _deckCardActions = overlay.gameObject;
-            var backdrop = LotdUiKit.FillRect("Dismiss", overlay);
-            LotdUiKit.AddImage(backdrop.gameObject, LotdUiKit.WhiteSprite, Color.clear);
+            var backdrop = DuelUiKit.FillRect("Dismiss", overlay);
+            DuelUiKit.AddImage(backdrop.gameObject, DuelUiKit.WhiteSprite, Color.clear);
             var dismiss = backdrop.gameObject.AddComponent<Button>();
             dismiss.transition = Selectable.Transition.None;
             dismiss.navigation = new Navigation { mode = Navigation.Mode.None };
@@ -43,24 +43,24 @@ namespace YGOPortable.UI
             _deckCardActionPanel = DeckEditorStyle.Panel(overlay, "Window", overlay.pivot, overlay.pivot);
             _deckCardActionPanel.pivot = new Vector2(0f, 1f);
             _deckCardActionPanel.sizeDelta = new Vector2(CardActionWidth, CardActionHeight);
-            var title = LotdUiKit.CreateRect("Title", _deckCardActionPanel, new Vector2(.10f, .81f), new Vector2(.90f, .906f),
+            var title = DuelUiKit.CreateRect("Title", _deckCardActionPanel, new Vector2(.10f, .81f), new Vector2(.90f, .906f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(title.gameObject, LotdUiKit.WhiteSprite, DeckEditorStyle.Surface, false, false);
-            _deckCardActionTitle = LotdUiKit.AddFittedText(title, "Text", "", 18, 12,
-                TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
+            DuelUiKit.AddImage(title.gameObject, DuelUiKit.WhiteSprite, DeckEditorStyle.Surface, false, false);
+            _deckCardActionTitle = DuelUiKit.AddFittedText(title, "Text", "", 18, 12,
+                TextAnchor.MiddleCenter, DuelUiKit.GoldAccent, FontStyle.Bold);
 
             Button AddRow(string name, string label = "", Action action = null)
             {
-                var row = LotdUiKit.CreateRect(name, _deckCardActionPanel, Vector2.zero, Vector2.one,
+                var row = DuelUiKit.CreateRect(name, _deckCardActionPanel, Vector2.zero, Vector2.one,
                     Vector2.zero, Vector2.zero);
                 return DeckEditorStyle.Button(row, "Button", label, action, 17);
             }
 
-            var quantity = LotdUiKit.CreateRect("Quantity", _deckCardActionPanel, new Vector2(.10f, .685f),
+            var quantity = DuelUiKit.CreateRect("Quantity", _deckCardActionPanel, new Vector2(.10f, .685f),
                 new Vector2(.90f, .803f), Vector2.zero, Vector2.zero);
             Button Amount(string name, string label, float min, float max)
             {
-                var cell = LotdUiKit.CreateRect(name, quantity, new Vector2(min, 0f), new Vector2(max, 1f),
+                var cell = DuelUiKit.CreateRect(name, quantity, new Vector2(min, 0f), new Vector2(max, 1f),
                     Vector2.zero, Vector2.zero);
                 return DeckEditorStyle.Button(cell, "Button", label, null, 19);
             }
@@ -262,13 +262,13 @@ namespace YGOPortable.UI
         {
             var caption = button.GetComponentInChildren<Text>();
             caption.text = label;
-            caption.color = available ? LotdUiKit.TextPrimary : LotdUiKit.TextMuted;
+            caption.color = available ? DuelUiKit.TextPrimary : DuelUiKit.TextMuted;
             button.interactable = available;
             button.onClick.RemoveAllListeners();
             button.onClick.AddListener(() =>
             {
                 if (!button.isActiveAndEnabled || !button.IsInteractable()) return;
-                LotdAudio.PlayClick();
+                DuelAudio.PlayClick();
                 if (closeMenu) CloseDeckCardActions();
                 action();
             });

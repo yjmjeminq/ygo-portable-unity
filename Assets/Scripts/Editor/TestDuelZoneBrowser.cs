@@ -912,9 +912,9 @@ namespace YGOPortable.Editor
                 var hoverArea = (RectTransform)bar.Find("HoverArea");
                 var activate = (RectTransform)bar.Find("ACTION/Circle/Button");
                 Require(bar.gameObject.activeInHierarchy && activate != null, "The hovered hand card had no activation icon.");
-                var behind = LotdUiKit.FillRect("CardBehindActions", bar.parent);
+                var behind = DuelUiKit.FillRect("CardBehindActions", bar.parent);
                 behind.SetSiblingIndex(bar.GetSiblingIndex());
-                LotdUiKit.AddImage(behind.gameObject, LotdUiKit.WhiteSprite, Color.white);
+                DuelUiKit.AddImage(behind.gameObject, DuelUiKit.WhiteSprite, Color.white);
                 try
                 {
                     Canvas.ForceUpdateCanvases();

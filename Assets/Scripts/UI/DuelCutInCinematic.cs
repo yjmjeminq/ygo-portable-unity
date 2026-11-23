@@ -25,7 +25,7 @@ namespace YGOPortable.UI
         internal static DuelCutInCinematic Create(RectTransform parent, uint cardCode, Sprite portrait,
             DuelCardReadout card, string method, Color accent, bool opponent)
         {
-            var root = LotdUiKit.FillRect("DuelCutInCinematic", parent);
+            var root = DuelUiKit.FillRect("DuelCutInCinematic", parent);
             var cinematic = root.gameObject.AddComponent<DuelCutInCinematic>();
             cinematic.Build(cardCode, portrait, card, method, accent, opponent);
             return cinematic;
@@ -36,22 +36,22 @@ namespace YGOPortable.UI
             _portrait = portrait;
             var input = gameObject.AddComponent<CanvasGroup>();
             input.ignoreParentGroups = true;
-            _dim = LotdUiKit.AddImage(gameObject, LotdUiKit.WhiteSprite, Color.clear);
+            _dim = DuelUiKit.AddImage(gameObject, DuelUiKit.WhiteSprite, Color.clear);
 
-            var bars = LotdUiKit.FillRect("Letterbox", transform);
+            var bars = DuelUiKit.FillRect("Letterbox", transform);
             _letterbox = bars.gameObject.AddComponent<CanvasGroup>();
             foreach (float y in new[] { 0f, .94f })
-                LotdUiKit.AddImage(Area("Bar", bars, 0f, y, 1f, y + .06f).gameObject,
-                    LotdUiKit.WhiteSprite, new Color(.012f, .021f, .032f, .98f), false, false);
+                DuelUiKit.AddImage(Area("Bar", bars, 0f, y, 1f, y + .06f).gameObject,
+                    DuelUiKit.WhiteSprite, new Color(.012f, .021f, .032f, .98f), false, false);
 
-            _stage = LotdUiKit.FillRect("WideStage", transform);
+            _stage = DuelUiKit.FillRect("WideStage", transform);
             var fit = _stage.gameObject.AddComponent<AspectRatioFitter>();
             fit.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
             fit.aspectRatio = 16f / 9f;
 
             _subject = Area("Portrait", _stage, .12f, .085f, .94f, .955f);
             _picture = _subject.gameObject.AddComponent<CanvasGroup>();
-            var source = LotdUiKit.FillRect("SourceCanvas", _subject);
+            var source = DuelUiKit.FillRect("SourceCanvas", _subject);
             var image = source.gameObject.AddComponent<RawImage>();
             image.texture = portrait.texture;
             image.raycastTarget = false;
@@ -62,15 +62,15 @@ namespace YGOPortable.UI
             var band = Area("MonsterReadout", _stage, .045f, .086f, .445f, .271f);
             _caption = band.gameObject.AddComponent<CanvasGroup>();
             DuelReadoutPlate.Add(band, new Color(.035f, .066f, .088f, .95f));
-            LotdUiKit.AddImage(Area("Accent", band, 0f, 0f, .012f, 1f).gameObject,
-                LotdUiKit.WhiteSprite, accent, false, false);
-            LotdUiKit.AddFittedText(Area("Method", band, .043f, .76f, .83f, .96f), "Text", method,
+            DuelUiKit.AddImage(Area("Accent", band, 0f, 0f, .012f, 1f).gameObject,
+                DuelUiKit.WhiteSprite, accent, false, false);
+            DuelUiKit.AddFittedText(Area("Method", band, .043f, .76f, .83f, .96f), "Text", method,
                 22, 12, TextAnchor.MiddleLeft, accent, FontStyle.Bold);
-            LotdUiKit.AddFittedText(Area("MonsterName", band, .043f, .40f, .83f, .75f), "Text",
+            DuelUiKit.AddFittedText(Area("MonsterName", band, .043f, .40f, .83f, .75f), "Text",
                 CardDatabase.GetName(code), 32, 13, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
-            var symbol = LotdUiKit.GetAttributeSprite(card.Attribute);
+            var symbol = DuelUiKit.GetAttributeSprite(card.Attribute);
             if (symbol != null)
-                LotdUiKit.AddImage(Area("Attribute", band, .84f, .43f, .97f, .91f).gameObject,
+                DuelUiKit.AddImage(Area("Attribute", band, .84f, .43f, .97f, .91f).gameObject,
                     symbol, Color.white, true, false);
             var values = Area("Values", band, .043f, .07f, card.IsLink ? .66f : .96f, .36f);
             new DuelStatStrip(values, compact: false).Bind(card, opponent);
@@ -79,8 +79,8 @@ namespace YGOPortable.UI
                 var directions = Area("Arrows", band, .55f, .045f, .96f, .40f);
                 new DuelLinkCompass(directions).Bind(card.LinkMarkers, opponent);
             }
-            _flash = LotdUiKit.AddImage(LotdUiKit.FillRect("Impact", transform).gameObject,
-                LotdUiKit.WhiteSprite, Color.clear, false, false);
+            _flash = DuelUiKit.AddImage(DuelUiKit.FillRect("Impact", transform).gameObject,
+                DuelUiKit.WhiteSprite, Color.clear, false, false);
             Pose(0f);
         }
 
@@ -94,7 +94,7 @@ namespace YGOPortable.UI
                 if (!played && elapsed >= SlideStart)
                 {
                     played = true;
-                    LotdAudio.PlaySummon();
+                    DuelAudio.PlaySummon();
                 }
                 if (elapsed >= LandingStart)
                     land?.Invoke(Mathf.InverseLerp(LandingStart, Duration, elapsed));
@@ -133,6 +133,6 @@ namespace YGOPortable.UI
         }
 
         private static RectTransform Area(string name, Transform parent, float left, float bottom, float right, float top) =>
-            LotdUiKit.CreateRect(name, parent, new Vector2(left, bottom), new Vector2(right, top), Vector2.zero, Vector2.zero);
+            DuelUiKit.CreateRect(name, parent, new Vector2(left, bottom), new Vector2(right, top), Vector2.zero, Vector2.zero);
     }
 }

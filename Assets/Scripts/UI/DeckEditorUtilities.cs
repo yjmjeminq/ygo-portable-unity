@@ -57,7 +57,7 @@ namespace YGOPortable.UI
         private Text _deckRecipeStatus;
 
         private static RectTransform DeckArea(Transform parent, string name, float x1, float y1, float x2, float y2) =>
-            LotdUiKit.CreateRect(name, parent, new Vector2(x1, y1), new Vector2(x2, y2), Vector2.zero, Vector2.zero);
+            DuelUiKit.CreateRect(name, parent, new Vector2(x1, y1), new Vector2(x2, y2), Vector2.zero, Vector2.zero);
 
         private static Button DeckButton(Transform parent, string name, string label, float x1, float y1,
             float x2, float y2, Action action, bool accent = false, int fontSize = 18) =>
@@ -68,14 +68,14 @@ namespace YGOPortable.UI
             var holder = (RectTransform)_mainCountText.rectTransform.parent;
             _mainCountText.rectTransform.anchorMin = new Vector2(.55f, .22f);
             var rail = DeckArea(holder, "Composition", .0f, .03f, 1f, .21f);
-            LotdUiKit.AddImage(rail.gameObject, LotdUiKit.WhiteSprite, DeckEditorStyle.Surface, false, false);
+            DuelUiKit.AddImage(rail.gameObject, DuelUiKit.WhiteSprite, DeckEditorStyle.Surface, false, false);
             for (int i = 0; i < _compositionSegments.Length; i++)
             {
                 var segment = DeckArea(rail, $"Type_{i}", 0f, 0f, 0f, 1f);
-                LotdUiKit.AddImage(segment.gameObject, LotdUiKit.WhiteSprite, CompositionColors[i], false, false);
+                DuelUiKit.AddImage(segment.gameObject, DuelUiKit.WhiteSprite, CompositionColors[i], false, false);
                 _compositionSegments[i] = segment;
                 var value = DeckArea(holder, $"Count_{i}", i * .182f, .22f, (i + 1) * .182f, 1f);
-                _compositionCounts[i] = LotdUiKit.AddFittedText(value, "Text", "", 14, 8,
+                _compositionCounts[i] = DuelUiKit.AddFittedText(value, "Text", "", 14, 8,
                     TextAnchor.MiddleLeft, CompositionColors[i], FontStyle.Bold);
                 _compositionCounts[i].raycastTarget = false;
             }
@@ -120,14 +120,14 @@ namespace YGOPortable.UI
         private static void SetDeckSectionCount(Text label, string count, string hint, int missing, Color color)
         {
             label.text = missing == 0 ? $"{count} · {hint}" : $"{count} · 부족 {missing}장";
-            label.color = missing == 0 ? color : LotdUiKit.RedAccent;
+            label.color = missing == 0 ? color : DuelUiKit.RedAccent;
         }
 
         private void BuildDeckUtilities(Transform root)
         {
             _deckToolsOverlay = BuildDeckOverlay(root, "DeckTools", out var tools);
-            LotdUiKit.AddFittedText(DeckArea(tools, "Title", .06f, .847f, .73f, .955f),
-                "Text", "덱 관리 · 레시피", 27, 16, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
+            DuelUiKit.AddFittedText(DeckArea(tools, "Title", .06f, .847f, .73f, .955f),
+                "Text", "덱 관리 · 레시피", 27, 16, TextAnchor.MiddleLeft, DuelUiKit.TextPrimary, FontStyle.Bold);
             _deckToolsClose = DeckButton(tools, "Close", "닫기", .79f, .847f, .945f, .948f, CloseDeckUtility);
             DeckButton(tools, "Duplicate", "덱 복제", .055f, .705f, .255f, .812f, DuplicateWorkingDeck, true);
             DeckButton(tools, "CopyYdk", "YDK 복사", .272f, .705f, .47f, .812f, () => CopyDeckRecipe(ydk: true));
@@ -142,8 +142,8 @@ namespace YGOPortable.UI
             _deckRecipeInput.textComponent.alignment = TextAnchor.UpperLeft;
             if (_deckRecipeInput.placeholder is Text placeholder) placeholder.alignment = TextAnchor.UpperLeft;
 
-            _deckRecipeStatus = LotdUiKit.AddFittedText(DeckArea(tools, "Status", .055f, .151f, .945f, .225f),
-                "Text", "", 17, 12, TextAnchor.MiddleLeft, LotdUiKit.TextMuted);
+            _deckRecipeStatus = DuelUiKit.AddFittedText(DeckArea(tools, "Status", .055f, .151f, .945f, .225f),
+                "Text", "", 17, 12, TextAnchor.MiddleLeft, DuelUiKit.TextMuted);
             _deckRecipeStatus.supportRichText = false;
             DeckButton(tools, "Paste", "클립보드 붙여넣기", .055f, .048f, .324f, .139f, PasteDeckRecipe);
             DeckButton(tools, "Shuffle", "메인 덱 섞기", .346f, .048f, .622f, .139f, () =>
@@ -154,15 +154,15 @@ namespace YGOPortable.UI
             DeckButton(tools, "Import", "새 덱으로 불러오기", .644f, .048f, .945f, .139f, ImportDeckRecipe, true);
 
             _deckDrawOverlay = BuildDeckOverlay(root, "TestDraw", out var draw);
-            _openingHandTitle = LotdUiKit.AddFittedText(DeckArea(draw, "Title", .055f, .847f, .73f, .955f),
-                "Text", "", 28, 17, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
+            _openingHandTitle = DuelUiKit.AddFittedText(DeckArea(draw, "Title", .055f, .847f, .73f, .955f),
+                "Text", "", 28, 17, TextAnchor.MiddleLeft, DuelUiKit.TextPrimary, FontStyle.Bold);
             _drawClose = DeckButton(draw, "Close", "닫기", .79f, .847f, .945f, .948f, CloseDeckUtility);
             _openingHandFirst = DeckButton(draw, "First", "선공", .055f, .706f, .18f, .81f,
                 () => SetOpeningHandOrder(false)).GetComponentInChildren<Text>();
             _openingHandSecond = DeckButton(draw, "Second", "후공", .19f, .706f, .315f, .81f,
                 () => SetOpeningHandOrder(true)).GetComponentInChildren<Text>();
-            _openingHandOdds = LotdUiKit.AddFittedText(DeckArea(draw, "StarterOdds", .34f, .699f, .699f, .815f),
-                "Text", "", 18, 11, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
+            _openingHandOdds = DuelUiKit.AddFittedText(DeckArea(draw, "StarterOdds", .34f, .699f, .699f, .815f),
+                "Text", "", 18, 11, TextAnchor.MiddleLeft, DuelUiKit.TextPrimary, FontStyle.Bold);
             _pickStartersButton = DeckButton(draw, "PickStarters", "초동 카드 선택", .713f, _mobileLayout ? .661f : .706f,
                 .945f, _mobileLayout ? .846f : .81f, OpenStarterPicker, fontSize: 17);
             for (int i = 0; i < _openingHandViews.Length; i++)
@@ -170,7 +170,7 @@ namespace YGOPortable.UI
                 int slot = i;
                 float x = .051f + i * .146f + (i == 5 ? .024f : 0f);
                 var cell = DeckArea(draw, $"Card_{i}", x, .218f, x + .132f, _mobileLayout ? .651f : .676f);
-                var surface = LotdUiKit.AddImage(cell.gameObject, LotdUiKit.WhiteSprite,
+                var surface = DuelUiKit.AddImage(cell.gameObject, DuelUiKit.WhiteSprite,
                     i == 5 ? TurnDrawEdge : DeckEditorStyle.Surface);
                 var hit = cell.gameObject.AddComponent<Button>();
                 hit.targetGraphic = surface;
@@ -179,10 +179,10 @@ namespace YGOPortable.UI
                     if (slot < _openingHand.Length) OpenExpandedDeckCard(_openingHand[slot]);
                 });
                 _openingHandButtons[i] = hit;
-                _openingHandViews[i] = CompositeCardView.Create(LotdUiKit.FillRect("CardInset", cell, 5f), "Card");
+                _openingHandViews[i] = CompositeCardView.Create(DuelUiKit.FillRect("CardInset", cell, 5f), "Card");
             }
-            _openingHandDrawLabel = LotdUiKit.AddFittedText(DeckArea(draw, "TurnDraw", .798f, .158f, .946f, .209f),
-                "Text", "후공 첫 턴 드로우", 18, 12, TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
+            _openingHandDrawLabel = DuelUiKit.AddFittedText(DeckArea(draw, "TurnDraw", .798f, .158f, .946f, .209f),
+                "Text", "후공 첫 턴 드로우", 18, 12, TextAnchor.MiddleCenter, DuelUiKit.GoldAccent, FontStyle.Bold);
             _redrawButton = DeckButton(draw, "Redraw", "다시 뽑기", .366f, .049f, .635f, .172f,
                 RedrawOpeningHand, true, 21);
             BuildStarterPicker(root);
@@ -190,7 +190,7 @@ namespace YGOPortable.UI
 
         private RectTransform BuildDeckOverlay(Transform root, string name, out RectTransform panel)
         {
-            var dim = LotdUiKit.FillRect(name, root);
+            var dim = DuelUiKit.FillRect(name, root);
             DeckEditorStyle.Fill(dim, DeckEditorStyle.Scrim);
             panel = DeckEditorStyle.Panel(dim, "Window", _mobileLayout ? new Vector2(.048f, .048f) : new Vector2(.105f, .123f),
                 _mobileLayout ? new Vector2(.952f, .952f) : new Vector2(.895f, .877f));
@@ -279,7 +279,7 @@ namespace YGOPortable.UI
         {
             _openingHand = DeckRecipe.DrawOpeningCards(_workingDeck.main, _openingHandRandom);
             RefreshOpeningHand();
-            LotdAudio.PlayDraw();
+            DuelAudio.PlayDraw();
         }
 
         private void RefreshOpeningHand()
@@ -287,8 +287,8 @@ namespace YGOPortable.UI
             int initial = Mathf.Min(5, _openingHand.Length);
             bool turnDraw = _drawGoingSecond && _openingHand.Length > 5;
             _openingHandTitle.text = $"테스트 드로우 · 시작 패 {initial}장" + (turnDraw ? " + 첫 턴 1장" : "");
-            _openingHandFirst.color = _drawGoingSecond ? LotdUiKit.TextPrimary : LotdUiKit.GoldAccent;
-            _openingHandSecond.color = _drawGoingSecond ? LotdUiKit.GoldAccent : LotdUiKit.TextPrimary;
+            _openingHandFirst.color = _drawGoingSecond ? DuelUiKit.TextPrimary : DuelUiKit.GoldAccent;
+            _openingHandSecond.color = _drawGoingSecond ? DuelUiKit.GoldAccent : DuelUiKit.TextPrimary;
             for (int i = 0; i < _openingHandViews.Length; i++)
             {
                 bool visible = i < initial || i == 5 && turnDraw;
@@ -297,7 +297,7 @@ namespace YGOPortable.UI
                 uint code = _openingHand[i];
                 bool starter = _markedStarters.Contains(CardDatabase.GetDeckPrintingKey(code));
                 _openingHandViews[i].SetCard(code);
-                _openingHandButtons[i].image.color = starter ? LotdUiKit.GoldAccent :
+                _openingHandButtons[i].image.color = starter ? DuelUiKit.GoldAccent :
                     i == 5 ? TurnDrawEdge : DeckEditorStyle.Surface;
             }
             int starterCount = CountOpeningStarters();
@@ -317,25 +317,25 @@ namespace YGOPortable.UI
         private void BuildStarterPicker(Transform root)
         {
             _starterPickerOverlay = BuildDeckOverlay(root, "StarterPicker", out var picker);
-            LotdUiKit.AddFittedText(DeckArea(picker, "Title", .055f, .843f, .72f, .953f),
-                "Text", "초동 카드 선택", 28, 17, TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
+            DuelUiKit.AddFittedText(DeckArea(picker, "Title", .055f, .843f, .72f, .953f),
+                "Text", "초동 카드 선택", 28, 17, TextAnchor.MiddleLeft, DuelUiKit.TextPrimary, FontStyle.Bold);
             _starterPickerDone = DeckButton(picker, "Done", "돌아가기", .765f, _mobileLayout ? .765f : .832f,
                 .945f, .954f, CloseDeckUtility, true);
-            LotdUiKit.AddFittedText(DeckArea(picker, "Instructions", .055f, .724f, .746f, .817f), "Text",
+            DuelUiKit.AddFittedText(DeckArea(picker, "Instructions", .055f, .724f, .746f, .817f), "Text",
                 "첫 턴을 시작하는 데 쓸 카드를 고르세요. 같은 카드의 장수도 계산에 반영됩니다.",
-                20, 12, TextAnchor.MiddleLeft, LotdUiKit.TextMuted);
+                20, 12, TextAnchor.MiddleLeft, DuelUiKit.TextMuted);
             for (int i = 0; i < _starterPickerSlots.Length; i++)
             {
                 int slot = i;
                 float x = .052f + i * .151f;
                 var cell = DeckArea(picker, $"Card_{i}", x, .198f, x + .140f, .707f);
-                var surface = LotdUiKit.AddImage(cell.gameObject, LotdUiKit.WhiteSprite, DeckEditorStyle.Surface);
+                var surface = DuelUiKit.AddImage(cell.gameObject, DuelUiKit.WhiteSprite, DeckEditorStyle.Surface);
                 var button = cell.gameObject.AddComponent<Button>();
                 button.targetGraphic = surface;
                 button.onClick.AddListener(() => ToggleOpeningStarter(slot));
                 var art = CompositeCardView.Create(DeckArea(cell, "Art", .04f, .176f, .96f, .99f), "Card");
-                var caption = LotdUiKit.AddFittedText(DeckArea(cell, "Caption", .04f, .015f, .96f, .177f),
-                    "Text", "", 15, 9, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
+                var caption = DuelUiKit.AddFittedText(DeckArea(cell, "Caption", .04f, .015f, .96f, .177f),
+                    "Text", "", 15, 9, TextAnchor.MiddleCenter, DuelUiKit.TextPrimary, FontStyle.Bold);
                 caption.supportRichText = false;
                 _starterPickerSlots[i] = (button, art, caption);
             }
@@ -346,8 +346,8 @@ namespace YGOPortable.UI
                 () => ShowStarterPage(_starterPage - 1));
             _starterNext = DeckButton(picker, "Next", "다음", .771f, footerBottom, .945f, footerTop,
                 () => ShowStarterPage(_starterPage + 1));
-            _starterPickerPageLabel = LotdUiKit.AddFittedText(DeckArea(picker, "Page", .252f, .052f, .748f, .156f),
-                "Text", "", 19, 12, TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
+            _starterPickerPageLabel = DuelUiKit.AddFittedText(DeckArea(picker, "Page", .252f, .052f, .748f, .156f),
+                "Text", "", 19, 12, TextAnchor.MiddleCenter, DuelUiKit.TextPrimary, FontStyle.Bold);
         }
 
         private void OpenStarterPicker()
@@ -380,7 +380,7 @@ namespace YGOPortable.UI
                 bool selected = _markedStarters.Contains(code);
                 art.SetCard(code);
                 button.image.color = selected ? TurnDrawEdge : DeckEditorStyle.Surface;
-                caption.color = selected ? LotdUiKit.GoldAccent : LotdUiKit.TextPrimary;
+                caption.color = selected ? DuelUiKit.GoldAccent : DuelUiKit.TextPrimary;
                 caption.text = $"{CardDatabase.GetName(code)} · {copies}장" + (selected ? " ✓" : "");
             }
             _starterPrevious.interactable = _starterPage > 0;
