@@ -1225,14 +1225,12 @@ def build_resources_lotd():
         shutil.copy2(ill_48, t_dir / "ICON_ID_TYPE_ILLUSION.png")
         shutil.copy2(ill_48, RES_LOTD / "Icons" / "ICON_ID_TYPE_ILLUSION.png")
 
-    # Copy 400x580 card frames + card back + LP fill + shared frames + background
+    # Copy 400x580 card frames + LP fill + shared frames + background
+    # The shared card back is maintained directly in Resources.
     f_dir = RES_LOTD / "Frames"
     f_dir.mkdir(parents=True, exist_ok=True)
     for p in (LOTD_UI / "duel" / "frame").glob("card_*.png"):
         shutil.copy2(p, f_dir / p.name)
-    cb = LOTD_UI / "card" / "0000.png"
-    if cb.exists():
-        shutil.copy2(cb, f_dir / "card_back.png")
 
     (RES_LOTD / "Link").mkdir(parents=True, exist_ok=True)
     shutil.copy2(LOTD_UI / "duel" / "hud-pd" / "LP_FILL.png", RES_LOTD / "HUD" / "LP_FILL.png")

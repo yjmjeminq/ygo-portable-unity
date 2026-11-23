@@ -622,9 +622,15 @@ namespace YGOPortable.Editor
             Require(amount.text == count.ToString() && top.gameObject.activeSelf == (count > 0),
                 "The board pile did not track the native count.");
             if (count == 0) return;
-            bool back = top.transform.Find("AspectBox/CardBack").gameObject.activeSelf;
-            Require(top.CurrentCode == visibleCode && back == (visibleCode == 0),
+            var back = top.transform.Find("AspectBox/CardBack").GetComponent<Image>();
+            Require(top.CurrentCode == visibleCode && back.gameObject.activeSelf == (visibleCode == 0),
                 "The board pile lost a public top card or exposed a hidden one.");
+            if (visibleCode == 0)
+            {
+                var defaultBack = CardArtLoader.GetCardBackSprite();
+                Require(defaultBack != null && back.sprite == defaultBack,
+                    "The hidden pile card did not use the bundled card back.");
+            }
         }
 
         private sealed class Browser : IDisposable

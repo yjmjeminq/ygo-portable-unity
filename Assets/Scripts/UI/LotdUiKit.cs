@@ -510,8 +510,7 @@ namespace YGOPortable.UI
             _limitImg.gameObject.SetActive(false);
 
             var backRt = LotdUiKit.FillRect("CardBack", innerRt);
-            var backSprite = UseDuelArtwork ? DuelVisualAssets.DeckBack : null;
-            LotdUiKit.AddImage(backRt.gameObject, backSprite ?? CardArtLoader.GetCardBackSprite(), Color.white, false, false);
+            LotdUiKit.AddImage(backRt.gameObject, CardArtLoader.GetCardBackSprite(), Color.white, false, false);
             _backObj = backRt.gameObject;
             _backObj.SetActive(false);
         }
