@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -133,6 +134,7 @@ namespace YGOPortable.Editor
                 VerifyMainSorting(editor, events);
                 VerifyTouchDeckMenu(editor, events);
                 VerifyCardPrintings(editor, events, streamingPath, Path.Combine(save, "printings"));
+                VerifyOverframeSlots(editor, streamingPath, Path.Combine(save, "overframe"));
                 VerifyArtworkSources(editor, streamingPath, Path.Combine(save, "artwork"));
             }
             finally
@@ -478,6 +480,7 @@ namespace YGOPortable.Editor
             var mainGrid = Field<RectTransform>(editor, "_mainDeckSlotGrid");
             var sideGrid = Field<RectTransform>(editor, "_sideDeckSlotGrid");
             var mainBadge = mainGrid.Find($"Card_{deck.main.IndexOf(code)}/CardInset/Card/AspectBox/Unowned");
+            var secondBadge = mainGrid.Find($"Card_{deck.main.LastIndexOf(code)}/CardInset/Card/AspectBox/Unowned");
             var sideBadge = sideGrid.Find("Card_0/CardInset/Card/AspectBox/Unowned");
             var preview = Field<Text>(editor, "_previewOwnership");
             Call(editor, "InspectCard", code);
@@ -494,15 +497,85 @@ namespace YGOPortable.Editor
             Call(editor, "OpenCardCrafting", code, CardTradeAction.Browse);
             Require(CollectionProgress.TryCraftCard(code, 1, out error), error);
             Call(editor, "ReturnFromCardCrafting");
-            Require(!mainBadge.gameObject.activeInHierarchy && !sideBadge.gameObject.activeInHierarchy &&
+            Require(!mainBadge.gameObject.activeInHierarchy && secondBadge.gameObject.activeInHierarchy &&
+                sideBadge.gameObject.activeInHierarchy &&
+                Field<Text>(editor, "_mainCountText").text.Contains("부족 1장") &&
+                Field<Text>(editor, "_sideCountText").text.Contains("부족 1장") &&
                 TrunkCount(editor, code) == "×0" && preview.text.Contains("보유 1장"),
-                "Crafting a copy did not remove the unowned markers.");
+                "Crafting one copy should clear just one of the three missing copies across Main and Side.");
+
+            Call(editor, "OpenCardCrafting", code, CardTradeAction.Browse);
+            Require(CollectionProgress.TryCraftCard(code, 2, out error), error);
+            Call(editor, "ReturnFromCardCrafting");
+            Require(!secondBadge.gameObject.activeInHierarchy && !sideBadge.gameObject.activeInHierarchy &&
+                !Field<Text>(editor, "_mainCountText").text.Contains("부족") &&
+                !Field<Text>(editor, "_sideCountText").text.Contains("부족"),
+                "Obtaining the remaining copies did not clear the badges and section counters.");
             Call(editor, "SetTrunkSource", 0u, null);
         }
 
         private static string TrunkCount(DeckEditorUI editor, uint code) =>
             Field<List<(RectTransform rt, CompositeCardView card, Text count, CardDragTrigger trigger)>>(editor, "_trunkPool")
                 .Single(slot => slot.rt.gameObject.activeInHierarchy && slot.card.CurrentCode == code).count.text;
+
+        private static void VerifyOverframeSlots(DeckEditorUI editor, string streamingPath, string save)
+        {
+            const uint masquerena = 65741786;
+            var overframe = new DeckCardAppearance { overframe = true };
+            editor.Close();
+            DeckRepository.Load(streamingPath, save, seedDefaultDecks: false);
+            CollectionProgress.Load(save);
+            var starter = CollectionProgress.Starters.First(option => option.Name.Contains("상검"));
+            Require(CollectionProgress.TryChooseStarter(starter.Id, out _, out string error), error);
+            string path = Path.Combine(save, CollectionProgress.ProfileFileName);
+            string profile = TestCollectionProgress.WithOwnership(File.ReadAllText(path), masquerena, 1);
+            File.WriteAllText(path, Regex.Replace(profile, "\"overframeCards\"\\s*:\\s*\\[[^\\]]*\\]",
+                $"\"overframeCards\":[{{\"code\":{masquerena},\"count\":1}}]"));
+            CollectionProgress.Load(save);
+            var saved = new UserDeck { name = "Overframe shortage fixture", extra = { masquerena, masquerena }, side = { masquerena } };
+            saved.SetAppearance(saved.side, 0, overframe);
+            DeckRepository.SaveUserDeck(saved);
+            OpenSavedDeck(editor);
+
+            var deck = Field<UserDeck>(editor, "_workingDeck");
+            var extra = Field<RectTransform>(editor, "_extraGridRect");
+            var side = Field<RectTransform>(editor, "_sideDeckSlotGrid");
+            var extraBadge = extra.Find("Card_1/CardInset/Card/AspectBox/Unowned").gameObject;
+            var sideBadge = side.Find("Card_0/CardInset/Card/AspectBox/Unowned").gameObject;
+            Require(extraBadge.activeInHierarchy && !sideBadge.activeInHierarchy,
+                "An explicitly assigned Overframe should be reserved before filling ordinary Extra Deck slots.");
+
+            deck.SetAppearance(deck.side, 0, default);
+            Call(editor, "RefreshDeckGrids");
+            Require(!extraBadge.activeInHierarchy && sideBadge.activeInHierarchy,
+                "An unused Overframe should fill an ordinary slot, with only the final excess copy marked.");
+
+            deck.SetAppearance(deck.extra, 1, overframe);
+            deck.SetAppearance(deck.side, 0, overframe);
+            Call(editor, "RefreshDeckGrids");
+            Require(!extraBadge.activeInHierarchy && sideBadge.activeInHierarchy,
+                "Two explicit Overframe slots with one owned edition should flag the excess edition.");
+            var slot = (RectTransform)extra.Find("Card_1");
+            Field<Dictionary<uint, DeckCardAppearance>>(editor, "_trunkAppearances")[masquerena] = overframe;
+            Field<InputField>(editor, "_searchInp").text = masquerena.ToString();
+            var trunk = Field<List<(RectTransform rt, CompositeCardView card, Text count, CardDragTrigger trigger)>>(editor, "_trunkPool")
+                .Single(item => item.rt.gameObject.activeInHierarchy && item.card.CurrentCode == masquerena).card;
+            Call(editor, "SetPadCardVisual", slot, masquerena);
+            Call(editor, "OpenExpandedDeckCard", masquerena);
+            foreach (var view in new[]
+            {
+                slot.Find("CardInset/Card").GetComponent<CompositeCardView>(), trunk,
+                Field<CompositeCardView>(editor, "_previewCard"), Field<CompositeCardView>(editor, "_expandedDeckArt"),
+            })
+            {
+                Require(view.Appearance?.overframe == true && !view.HasOverframe &&
+                    view.transform.Find("AspectBox/Artwork").GetComponent<Image>().preserveAspect &&
+                    view.transform.Find("AspectBox/DeckEdition").gameObject.activeInHierarchy,
+                    "A deck view should show an in-frame illustration and the Overframe edition badge.");
+            }
+            Call(editor, "CloseExpandedDeckCard");
+            Debug.Log("[VERIFY DECK SHORTAGES] Partial ownership across sections, reserved Overframes, and printed edition views passed.");
+        }
 
         private static void VerifyCardPrintings(DeckEditorUI editor, EventSystem events, string streamingPath, string save)
         {

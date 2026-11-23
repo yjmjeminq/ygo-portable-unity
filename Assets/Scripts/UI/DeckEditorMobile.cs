@@ -261,15 +261,17 @@ namespace YGOPortable.UI
         private static int MobileDeckColumns(float width) =>
             Mathf.Clamp(Mathf.FloorToInt(width / 72f), 1, DeckColumns);
 
-        private void RefreshMobileSectionLabels()
+        private void RefreshMobileSectionLabels(int[] missing)
         {
             if (!_mobileLayout || _mobileEditor == null || _workingDeck == null) return;
             for (int i = 0; i < MobileDeckSections.Length; i++)
             {
                 var section = MobileDeckSections[i];
                 bool expanded = _mobileSectionsOpen[i];
-                _mobileSectionButtons[i].GetComponentInChildren<Text>().text =
-                    $"{(expanded ? "▾" : "▸")}  {MobileSectionNames[i]}   {GetDeckList(section).Count}장";
+                var label = _mobileSectionButtons[i].GetComponentInChildren<Text>();
+                string shortage = missing[i] == 0 ? "" : $" · 부족 {missing[i]}장";
+                label.text = $"{(expanded ? "▾" : "▸")}  {MobileSectionNames[i]}   {GetDeckList(section).Count}장{shortage}";
+                label.color = missing[i] == 0 ? LotdUiKit.TextPrimary : LotdUiKit.RedAccent;
             }
         }
 

@@ -13,6 +13,31 @@ namespace YGOPortable.UI
         private Button _inspectArtwork;
         private Button _inspectDestiny;
 
+        private static CompositeCardView CreatePrintedDeckCard(Transform parent, string name, bool detailedOverlay = false)
+        {
+            var view = CompositeCardView.Create(parent, name, detailedOverlay);
+            view.UsePrintedFaceOnly();
+            return view;
+        }
+
+        private Dictionary<(uint Code, bool Overframe), long> AvailableDeckCopies()
+        {
+            if (!CollectionProgress.RequiresOwnedCardsForDecks) return null;
+
+            var available = new Dictionary<(uint Code, bool Overframe), long>();
+            foreach (var copies in _workingDeck.Copies().GroupBy(copy => copy.Code))
+            {
+                uint code = copies.Key;
+                int overframes = CollectionProgress.GetOwnedOverframeCount(code);
+                int requestedOverframes = copies.Count(copy => copy.Appearance.overframe);
+                // Duel preparation reserves explicitly selected Overframes before filling ordinary slots.
+                int reservedOverframes = Mathf.Min(overframes, requestedOverframes);
+                available[(code, true)] = reservedOverframes;
+                available[(code, false)] = (long)CollectionProgress.GetOwnedCount(code) + overframes - reservedOverframes;
+            }
+            return available;
+        }
+
         private void BuildAppearanceControls(Transform panel, float inset)
         {
             var left = LotdUiKit.CreateRect("Edition", panel, new Vector2(0f, .924f), new Vector2(.33f, .982f),

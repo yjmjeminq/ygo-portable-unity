@@ -81,7 +81,7 @@ namespace YGOPortable.UI
             }
         }
 
-        private void RefreshComposition()
+        private void RefreshComposition(int[] missing)
         {
             int monsters = 0, spells = 0, traps = 0;
             foreach (uint code in _workingDeck.main)
@@ -92,9 +92,10 @@ namespace YGOPortable.UI
                 else if (card?.IsTrap == true) traps++;
             }
             int total = _workingDeck.main.Count;
-            _mainCountText.text = $"{total}장 · 40–60";
-            _extraCountText.text = $"{_workingDeck.extra.Count} / {OtherDeckCapacity}장 · 남은 {Mathf.Max(0, OtherDeckCapacity - _workingDeck.extra.Count)}칸";
-            _sideCountText.text = $"{_workingDeck.side.Count} / {OtherDeckCapacity}장 · 남은 {Mathf.Max(0, OtherDeckCapacity - _workingDeck.side.Count)}칸";
+            var mainCountColor = total >= 40 && total <= MainDeckCapacity ? Color.white : new Color(1f, .55f, .45f);
+            SetDeckSectionCount(_mainCountText, $"{total}장", "40–60", missing[0], mainCountColor);
+            SetOtherDeckSectionCount(_extraCountText, _workingDeck.extra.Count, missing[1]);
+            SetOtherDeckSectionCount(_sideCountText, _workingDeck.side.Count, missing[2]);
             _compositionCounts[0].text = $"몬스터 {monsters}";
             _compositionCounts[1].text = $"마법 {spells}";
             _compositionCounts[2].text = $"함정 {traps}";
@@ -110,6 +111,16 @@ namespace YGOPortable.UI
             _compositionSegments[segment].anchorMin = new Vector2(start, 0f);
             _compositionSegments[segment].anchorMax = new Vector2(end, 1f);
             _compositionSegments[segment].gameObject.SetActive(end > start);
+        }
+
+        private static void SetOtherDeckSectionCount(Text label, int count, int missing) =>
+            SetDeckSectionCount(label, $"{count} / {OtherDeckCapacity}장",
+                $"남은 {Mathf.Max(0, OtherDeckCapacity - count)}칸", missing, Color.white);
+
+        private static void SetDeckSectionCount(Text label, string count, string hint, int missing, Color color)
+        {
+            label.text = missing == 0 ? $"{count} · {hint}" : $"{count} · 부족 {missing}장";
+            label.color = missing == 0 ? color : LotdUiKit.RedAccent;
         }
 
         private void BuildDeckUtilities(Transform root)

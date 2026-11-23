@@ -372,7 +372,7 @@ namespace YGOPortable.UI
             var card = LotdUiKit.CreateRect("LargeCard", panel,
                 new Vector2(.066f, _mobileLayout ? .677f : .501f), new Vector2(.934f, .917f), Vector2.zero, Vector2.zero);
             BuildAppearanceControls(panel, inset);
-            _previewCard = CompositeCardView.Create(card, "Preview", detailedOverlay: true);
+            _previewCard = CreatePrintedDeckCard(card, "Preview", detailedOverlay: true);
             DeckCardVisualMotion.Bind(_previewCard);
             var previewHit = LotdUiKit.FillRect("PreviewHit", card);
             var previewGraphic = LotdUiKit.AddImage(previewHit.gameObject, LotdUiKit.WhiteSprite, Color.clear);
@@ -628,7 +628,7 @@ namespace YGOPortable.UI
                     Vector2.zero, Vector2.zero);
                 slot.pivot = new Vector2(0f, 1f);
                 var hit = LotdUiKit.AddImage(slot.gameObject, LotdUiKit.WhiteSprite, Color.clear);
-                var card = CompositeCardView.Create(LotdUiKit.FillRect("CardInset", slot, GridCardInset), "Card");
+                var card = CreatePrintedDeckCard(LotdUiKit.FillRect("CardInset", slot, GridCardInset), "Card");
                 DeckCardVisualMotion.Bind(card, hit);
                 var countBox = LotdUiKit.CreateRect("Copies", slot, new Vector2(0.24f, 0.032f), new Vector2(0.76f, 0.215f),
                     Vector2.zero, Vector2.zero);
@@ -820,14 +820,14 @@ namespace YGOPortable.UI
                 var slot = LotdUiKit.FillRect($"Card_{i}", parent, 1.2f);
                 SetDeckSlotPosition(slot, i, cols, rows);
                 var hit = LotdUiKit.AddImage(slot.gameObject, LotdUiKit.WhiteSprite, Color.clear);
-                var card = CompositeCardView.Create(LotdUiKit.FillRect("CardInset", slot, GridCardInset), "Card");
+                var card = CreatePrintedDeckCard(LotdUiKit.FillRect("CardInset", slot, GridCardInset), "Card");
                 DeckCardVisualMotion.Bind(card, hit);
                 var trigger = slot.gameObject.AddComponent<CardDragTrigger>();
                 trigger.SourceType = source;
                 var badge = LotdUiKit.CreateRect("Unowned", card.transform.Find("AspectBox"),
-                    new Vector2(.03f, .04f), new Vector2(.97f, .25f), Vector2.zero, Vector2.zero);
+                    new Vector2(.03f, .18f), new Vector2(.97f, .36f), Vector2.zero, Vector2.zero);
                 LotdUiKit.AddImage(badge.gameObject, LotdUiKit.WhiteSprite, UnownedBadgeColor, false, false);
-                LotdUiKit.AddFittedText(badge, "Label", UnownedLabel, 14, 7, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+                LotdUiKit.AddFittedText(badge, "Label", "부족", 14, 7, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
                 badge.gameObject.SetActive(false);
                 target.Add((slot, card, trigger));
             }
@@ -1063,9 +1063,6 @@ namespace YGOPortable.UI
         private void RefreshDeckGrids()
         {
             _deckHeaderText.text = $"{_userDeckIdx + 1} / {Mathf.Max(1, DeckRepository.UserDecks.Count)}";
-            RefreshComposition();
-            _mainCountText.color = _workingDeck.main.Count >= 40 && _workingDeck.main.Count <= MainDeckCapacity
-                ? Color.white : new Color(1f, 0.55f, 0.45f);
             ReflowMobileDeck();
             ResizeVerticalDeckScroll(_mainDeckScroll, _mainDeckSlotGrid, _workingDeck.main.Count,
                 MainDeckCapacity, _mainColumns, _mainVisibleRows);
@@ -1073,23 +1070,43 @@ namespace YGOPortable.UI
                 ResizeVerticalDeckScroll(_extraDeckScroll, _extraDeckSlotGrid, _workingDeck.extra.Count,
                     OtherDeckCapacity, _extraColumns, _extraVisibleRows);
             ResizeSideDeckScroll();
-            SyncSlotList(_mainSlots, _workingDeck.main, PadArea.Main);
-            SyncSlotList(_extraSlots, _workingDeck.extra, PadArea.Extra);
-            SyncSlotList(_sideSlots, _workingDeck.side, PadArea.Side);
+            var available = AvailableDeckCopies();
+            var missing = new[]
+            {
+                SyncSlotList(_mainSlots, _workingDeck.main, PadArea.Main, available),
+                SyncSlotList(_extraSlots, _workingDeck.extra, PadArea.Extra, available),
+                SyncSlotList(_sideSlots, _workingDeck.side, PadArea.Side, available),
+            };
+            RefreshComposition(missing);
             RefreshPreviewOwnership();
             RefreshSaveLabel();
-            RefreshMobileSectionLabels();
+            RefreshMobileSectionLabels(missing);
             RefreshMobileCardSelection();
         }
 
-        private void SyncSlotList(List<(RectTransform rt, CompositeCardView card, CardDragTrigger trigger)> slots,
-            List<uint> cards, PadArea area)
+        private int SyncSlotList(List<(RectTransform rt, CompositeCardView card, CardDragTrigger trigger)> slots,
+            List<uint> cards, PadArea area, Dictionary<(uint Code, bool Overframe), long> available)
         {
-            for (int i = 0; i < slots.Count; i++)
+            int missing = 0;
+            int count = Mathf.Max(slots.Count, cards.Count);
+            for (int i = 0; i < count; i++)
             {
-                var (rect, view, trigger) = slots[i];
                 bool filled = i < cards.Count;
-                if (filled ? view.CurrentCode != cards[i] : view.gameObject.activeSelf) ResetCardBinding(rect, view);
+                uint code = filled ? cards[i] : 0;
+                var appearance = filled ? _workingDeck.GetAppearance(cards, i) : default;
+                bool shortage = false;
+                if (filled && available != null)
+                {
+                    var edition = (code, appearance.overframe);
+                    long copiesLeft = available[edition];
+                    shortage = copiesLeft == 0;
+                    if (shortage) missing++;
+                    else available[edition] = copiesLeft - 1;
+                }
+
+                if (i >= slots.Count) continue;
+                var (rect, view, trigger) = slots[i];
+                if (filled ? view.CurrentCode != code : view.gameObject.activeSelf) ResetCardBinding(rect, view);
                 view.gameObject.SetActive(filled);
                 trigger.CardCodeGetter = null;
                 trigger.IndexGetter = null;
@@ -1101,19 +1118,17 @@ namespace YGOPortable.UI
                 trigger.OnPointerExitAction = () => ClearMouseCardVisual(rect);
                 if (!filled) continue;
 
-                uint code = cards[i];
                 int index = i;
-                var appearance = _workingDeck.GetAppearance(cards, index);
                 view.SetDeckCard(code, appearance);
                 view.SetDestinyBadge(area == PadArea.Main && appearance.destinyDraw);
-                int owned = appearance.overframe ? CollectionProgress.GetOwnedOverframeCount(code) : CollectionProgress.GetOwnedCount(code);
-                view.transform.Find("AspectBox/Unowned").gameObject.SetActive(CollectionProgress.RequiresOwnedCardsForDecks && owned == 0);
+                view.transform.Find("AspectBox/Unowned").gameObject.SetActive(shortage);
                 trigger.CardCodeGetter = () => code;
                 trigger.IndexGetter = () => index;
                 trigger.OnPointerEnterAction = () => SetMouseCardVisual(rect, code);
                 trigger.PreferTouchScroll = _mobileLayout;
                 BindDeckTileActions(rect, trigger, area, index, code);
             }
+            return missing;
         }
 
         private void BindDeckTileActions(RectTransform rect, CardDragTrigger trigger, PadArea area, int index, uint code)

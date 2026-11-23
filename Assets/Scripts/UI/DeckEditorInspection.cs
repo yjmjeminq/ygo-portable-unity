@@ -44,8 +44,7 @@ namespace YGOPortable.UI
             float artRight = _mobileLayout ? .361f : .422f;
             float rulesLeft = artRight + .025f;
             var art = DeckArea(_expandedDeckPanel, "Artwork", .048f, .166f, artRight, .913f);
-            _expandedDeckArt = CompositeCardView.Create(art, "Card", detailedOverlay: true);
-            _expandedDeckArt.UsePrintedFaceOnly();
+            _expandedDeckArt = CreatePrintedDeckCard(art, "Card", detailedOverlay: true);
             _expandedDeckArtwork = DeckButton(_expandedDeckPanel, "ChangeArtwork", "일러스트 변경",
                 .048f, .044f, artRight, .149f, () =>
                 {
