@@ -116,7 +116,8 @@ namespace YGOPortable.Editor
                     !lobby.Find("ResetSeason").GetComponentInChildren<Button>(true).gameObject.activeSelf,
                     "The mobile ranked lobby did not initialize correctly.");
                 lobby.Find("Queue/Button").GetComponent<Button>().onClick.Invoke();
-                Require(ui.ActiveRoot.name == "Versus" && ui.ActiveRoot.transform.Find("Coin/Face/MintedFace/Face/Text") != null,
+                var coinMark = ui.ActiveRoot.transform.Find("Coin/Disc/Face/Mark")?.GetComponent<Text>();
+                Require(ui.ActiveRoot.name == "Versus" && coinMark != null,
                     "Queueing did not open a VS coin toss.");
                 ui.Update(1.2f);
                 Require(ui.ActiveRoot.transform.Find("TossResult/Text").GetComponent<Text>().text.Contains("선공") ||

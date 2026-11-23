@@ -44,9 +44,11 @@ namespace YGOPortable.Core
             new(MaxCacheCount);
         private static readonly LinkedList<(uint, int)> _lru = new();
         private static readonly Dictionary<(uint, int), int> _visibleArtwork = new();
+        private static readonly Dictionary<string, Sprite> DuelVisualSprites = new(StringComparer.Ordinal);
         private static Sprite _fallbackArt;
         private static Sprite _cardBackSprite;
         internal const string CardSleeveResource = "Duel/CardSleeve";
+        internal const string CardSleeveFile = "Hud/DeckBack.png";
         internal static string LocalDuelVisualsPath => Path.Combine(Application.persistentDataPath, "DuelVisuals");
         internal static string ActiveDuelVisualsPath => _activeDuelVisualsPath ?? LocalDuelVisualsPath;
         internal static string PackagedDuelVisualsPath =>
@@ -296,7 +298,46 @@ namespace YGOPortable.Core
                 yield return original.code;
         }
 
-        public static Sprite GetCardBackSprite() => _cardBackSprite ??= LoadCardSleeve();
+        public static Sprite GetCardBackSprite() => GetDuelVisualsSprite(CardSleeveFile) ?? (_cardBackSprite ??= LoadCardSleeve());
+
+        internal static Sprite GetDuelVisualsSprite(string relativePath)
+        {
+            if (DuelVisualSprites.TryGetValue(relativePath, out var sprite)) return sprite;
+
+            string local = Path.Combine(ActiveDuelVisualsPath, relativePath);
+            string packaged = Path.Combine(PackagedDuelVisualsPath, relativePath);
+            sprite = LoadDuelVisualsSprite(local);
+            if (sprite == null && !string.Equals(local, packaged, StringComparison.Ordinal))
+                sprite = LoadDuelVisualsSprite(packaged);
+            DuelVisualSprites.Add(relativePath, sprite);
+            return sprite;
+        }
+
+        private static Sprite LoadDuelVisualsSprite(string path)
+        {
+            if (!File.Exists(path)) return null;
+            byte[] bytes;
+            try { bytes = File.ReadAllBytes(path); }
+            catch (Exception error) when (error is IOException || error is UnauthorizedAccessException)
+            {
+                Debug.LogWarning($"[CardArtLoader] Cannot read {Path.GetFileName(path)}: {error.Message}");
+                return null;
+            }
+
+            var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false)
+            {
+                name = Path.GetFileNameWithoutExtension(path),
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+            };
+            if (texture.LoadImage(bytes, markNonReadable: true))
+                return Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), Vector2.one * .5f);
+
+            if (Application.isPlaying) UnityEngine.Object.Destroy(texture);
+            else UnityEngine.Object.DestroyImmediate(texture);
+            Debug.LogWarning($"[CardArtLoader] Cannot decode {Path.GetFileName(path)}.");
+            return null;
+        }
 
         private static Sprite LoadCardSleeve()
         {
@@ -515,6 +556,9 @@ namespace YGOPortable.Core
             }
             foreach (var entry in _spriteCache.Values)
                 DestroyArtwork(entry.sprite);
+            foreach (var sprite in DuelVisualSprites.Values)
+                DestroyArtwork(sprite);
+            DuelVisualSprites.Clear();
             _spriteCache.Clear();
             _lru.Clear();
             _visibleArtwork.Clear();

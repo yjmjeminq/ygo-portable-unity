@@ -24,18 +24,72 @@ namespace YGOPortable.Editor
             foreach (string key in YgoConstants.RaceSpriteNames.Values.Concat(YgoConstants.AttributeSpriteNames.Values))
             {
                 Require(DuelUiIcons.Find(key) == null, $"A generated fallback is still registered for {key}.");
-                var supplied = DuelUiKit.LoadSprite("Duel/CardIcons/" + key);
+                var supplied = CardArtLoader.GetDuelVisualsSprite("CardIcons/" + key + ".png") ??
+                    DuelUiKit.LoadSprite("Duel/CardIcons/" + key);
                 Require(DuelUiIcons.FindCardIdentity(key) == supplied, $"Could not resolve the supplied icon for {key}.");
             }
             Require(DuelUiIcons.Find("phase/main2") != null && DuelUiIcons.Action("SUMMONSP") != null &&
                 DuelUiKit.GetSpellTrapSprite(YgoConstants.TYPE_TRAP | YgoConstants.TYPE_COUNTER) != null,
                 "A phase, command, or spell and trap icon did not resolve.");
             var suppliedSleeve = Resources.Load<Texture2D>(CardArtLoader.CardSleeveResource);
+            var fileSleeve = CardArtLoader.GetDuelVisualsSprite(CardArtLoader.CardSleeveFile);
             var sleeve = CardArtLoader.GetCardBackSprite();
             Require(sleeve != null && CardArtLoader.GetArtSprite(0) == sleeve &&
-                (suppliedSleeve == null || sleeve.texture == suppliedSleeve),
+                (fileSleeve != null ? sleeve == fileSleeve : suppliedSleeve == null || sleeve.texture == suppliedSleeve),
                 "The card back ignored a supplied sleeve or rendered inconsistently for hidden cards.");
+            if (fileSleeve != null)
+                Debug.Log($"[VERIFY DUEL SLEEVE] File-backed card sleeve active at {sleeve.texture.width}×{sleeve.texture.height}.");
+            VerifyDuelVisualsOverrides();
             Debug.Log("[VERIFY DUEL ICONS] Optional race and attribute artwork, phases, commands and spell/trap icons passed.");
+        }
+
+        private static void VerifyDuelVisualsOverrides()
+        {
+            string testRoot = Path.Combine(Path.GetTempPath(), "ygo-duel-visuals-" + Guid.NewGuid().ToString("N"));
+            string local = Path.Combine(testRoot, "Local");
+            string streaming = Path.Combine(testRoot, "StreamingAssets");
+            string packaged = Path.Combine(streaming, "DuelVisuals");
+            string previous = CardArtLoader.ActiveDuelVisualsPath;
+            try
+            {
+                WriteImage(local, CardArtLoader.CardSleeveFile, 16, 24);
+                WriteImage(packaged, CardArtLoader.CardSleeveFile, 24, 36);
+                WriteImage(local, "CardIcons/attribute/light.png", 18, 18);
+                WriteImage(packaged, "CardIcons/attribute/light.png", 24, 24);
+                WriteImage(packaged, "CardIcons/race/dragon.png", 24, 24);
+                File.Copy(Path.Combine(Application.streamingAssetsPath, "cardart.idx"), Path.Combine(streaming, "cardart.idx"));
+
+                CardArtLoader.Shutdown();
+                CardArtLoader.Initialize(streaming, local);
+                var sleeve = CardArtLoader.GetCardBackSprite();
+                Require(sleeve.texture.width == 16 && CardArtLoader.GetArtSprite(0) == sleeve &&
+                    DuelUiKit.GetAttributeSprite(YgoConstants.ATTRIBUTE_LIGHT)?.texture.width == 18,
+                    "Local duel visuals did not override packaged artwork for the sleeve and attribute.");
+                Require(DuelUiKit.GetRaceSprite(YgoConstants.RACE_DRAGON)?.texture.width == 24,
+                    "The race icon did not fall back to the packaged visuals.");
+
+                CardArtLoader.Shutdown();
+                File.Delete(Path.Combine(local, CardArtLoader.CardSleeveFile));
+                CardArtLoader.Initialize(streaming, local);
+                Require(CardArtLoader.GetCardBackSprite().texture.width == 24,
+                    "Reinitializing with a removed local sleeve did not restore the packaged one.");
+            }
+            finally
+            {
+                CardArtLoader.Shutdown();
+                CardArtLoader.Initialize(Application.streamingAssetsPath, previous);
+                if (Directory.Exists(testRoot)) Directory.Delete(testRoot, recursive: true);
+            }
+            Debug.Log("[VERIFY DUEL VISUALS] Local sleeve and attribute overrides, packaged fallbacks, and reinitialization passed.");
+
+            static void WriteImage(string directory, string relative, int width, int height)
+            {
+                string path = Path.Combine(directory, relative);
+                Directory.CreateDirectory(Path.GetDirectoryName(path));
+                var texture = new Texture2D(width, height);
+                try { File.WriteAllBytes(path, texture.EncodeToPNG()); }
+                finally { UnityEngine.Object.DestroyImmediate(texture); }
+            }
         }
 
         internal static void Run()

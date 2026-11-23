@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using YGOPortable.Core;
 
 namespace YGOPortable.UI
 {
@@ -40,6 +41,8 @@ namespace YGOPortable.UI
 
         internal static Sprite FindCardIdentity(string key)
         {
+            var supplied = CardArtLoader.GetDuelVisualsSprite("CardIcons/" + key + ".png");
+            if (supplied != null) return supplied;
             if (!CardIdentity.TryGetValue(key, out var sprite))
                 CardIdentity[key] = sprite = DuelUiKit.LoadSprite("Duel/CardIcons/" + key);
             return sprite;
