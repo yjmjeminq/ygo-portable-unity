@@ -17,6 +17,8 @@ namespace YGOPortable.UI
         private CanvasGroup _titleControls;
         private CanvasGroup _settingsControls;
         private Button _freeDuelButton;
+        private Button _rankedButton;
+        private GameObject _championBadge;
         private Button _storyButton;
         private Button _deckEditorButton;
         private Button _shopButton;
@@ -56,7 +58,11 @@ namespace YGOPortable.UI
             _menuControls.interactable = !open && !SettingsRoot.activeSelf;
         }
 
-        internal void RefreshWallet() => _shopBalance.text = $"보유 {CollectionProgress.Balance:N0} DP";
+        internal void RefreshWallet()
+        {
+            _shopBalance.text = $"보유 {CollectionProgress.Balance:N0} DP";
+            _championBadge.SetActive(CollectionProgress.IsRankedChampion);
+        }
 
         internal void FocusMainMenu(AppScreen previousScreen)
         {
@@ -67,6 +73,7 @@ namespace YGOPortable.UI
                 AppScreen.DeckEditor => _deckEditorButton,
                 AppScreen.StoryMode => _storyButton,
                 AppScreen.ArchetypeCodex => _codexButton,
+                AppScreen.Ranked => _rankedButton,
                 _ => _freeDuelButton,
             };
             EventSystem.current?.SetSelectedGameObject(selected.gameObject);
@@ -103,13 +110,16 @@ namespace YGOPortable.UI
             AddLogo(logo);
             var menu = LotdUiKit.CreateMenuPanel(root, "Menu", new Vector2(.205f, .132f),
                 new Vector2(.538f, .643f));
-            _storyButton = AddMenuEntry(menu, "StoryMode", .81f, "스토리 모드", () => _app.ShowScreen(AppScreen.StoryMode));
-            _freeDuelButton = AddMenuEntry(menu, "FreeDuel", .665f, "프리 듀얼", () => _app.ShowScreen(AppScreen.OpponentSelect));
-            _deckEditorButton = AddMenuEntry(menu, "DeckEditor", .52f, "덱 편집", () => _app.ShowScreen(AppScreen.DeckEditor));
-            _codexButton = AddMenuEntry(menu, "ArchetypeCodex", .375f, "카드군 도감", () => _app.ShowScreen(AppScreen.ArchetypeCodex));
-            _settingsOpenButton = AddMenuEntry(menu, "Settings", .23f, "환경 설정", OpenSettings);
-            AddMenuEntry(menu, "ReturnToTitle", .085f, "타이틀로 돌아가기", () => _app.ShowScreen(AppScreen.Title));
+            _storyButton = AddMenuEntry(menu, "StoryMode", .834f, "스토리 모드", () => _app.ShowScreen(AppScreen.StoryMode));
+            _rankedButton = AddMenuEntry(menu, "Ranked", .708f, "랭크 매치", () => _app.ShowScreen(AppScreen.Ranked));
+            _freeDuelButton = AddMenuEntry(menu, "FreeDuel", .582f, "프리 듀얼", () => _app.ShowScreen(AppScreen.OpponentSelect));
+            _deckEditorButton = AddMenuEntry(menu, "DeckEditor", .456f, "덱 편집", () => _app.ShowScreen(AppScreen.DeckEditor));
+            _codexButton = AddMenuEntry(menu, "ArchetypeCodex", .330f, "카드군 도감", () => _app.ShowScreen(AppScreen.ArchetypeCodex));
+            _settingsOpenButton = AddMenuEntry(menu, "Settings", .204f, "환경 설정", OpenSettings);
+            AddMenuEntry(menu, "ReturnToTitle", .078f, "타이틀로 돌아가기", () => _app.ShowScreen(AppScreen.Title));
             BuildShopTile(root);
+            _championBadge = OfflineRankedUI.AddChampionBadge(root, new Vector2(.726f, .908f), new Vector2(.971f, .966f));
+            _championBadge.SetActive(false);
         }
 
         private void BuildShopTile(Transform root)
@@ -174,7 +184,7 @@ namespace YGOPortable.UI
 
         private static Button AddMenuEntry(Transform parent, string name, float y, string label, Action action)
         {
-            var row = LotdUiKit.CreateRect(name, parent, new Vector2(0.097f, y), new Vector2(0.91f, y + .117f),
+            var row = LotdUiKit.CreateRect(name, parent, new Vector2(0.097f, y), new Vector2(0.91f, y + .106f),
                 Vector2.zero, Vector2.zero);
             return MenuButtonMotion.Attach(LotdUiKit.CreateLotdButton(row, "Button", label, action, 23));
         }

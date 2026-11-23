@@ -49,6 +49,9 @@ namespace YGOPortable.UI
         private Text _oppLpText;
         private RectTransform _oppLpFill;
         private Text _myLpText;
+        private GameObject _rankedChampionBadge;
+        private Image _rankedAvatarRim;
+        private Color _normalAvatarRim;
         private RectTransform _myLpFill;
         private Text _turnBadgeText;
         private Text _turnNumber;
@@ -333,6 +336,9 @@ namespace YGOPortable.UI
 
             Root.SetActive(true);
             _oppNameText.text = opponent?.name ?? opponentDeck?.title ?? "AI 듀얼리스트";
+            bool champion = CollectionProgress.IsRankedChampion;
+            _rankedChampionBadge.SetActive(champion);
+            _rankedAvatarRim.color = champion ? LotdUiKit.GoldAccent : _normalAvatarRim;
             _oppBustImg.sprite = LotdUiKit.LoadOpponentPortrait(opponent);
             _oppBustImg.enabled = _oppBustImg.sprite != null;
             SetTurnCaption(Mathf.Max(session.TurnNumber, 1), session.TurnPlayer != session.HumanPlayerIndex);
@@ -1274,6 +1280,10 @@ namespace YGOPortable.UI
             _myLpFill = fill;
             portrait.sprite = LotdUiKit.LoadSprite("LOTD/Busts/yamiyugi_neutral") ?? LotdUiKit.LoadSprite("LOTD/Busts/atem_neutral");
             portrait.enabled = portrait.sprite != null;
+            _rankedChampionBadge = OfflineRankedUI.AddChampionBadge(player, new Vector2(.23f, 1.01f), new Vector2(1f, 1.32f));
+            _rankedChampionBadge.SetActive(false);
+            _rankedAvatarRim = portrait.transform.parent.GetComponent<Image>();
+            _normalAvatarRim = _rankedAvatarRim.color;
 
             BuildTurnHud(root);
             _battleShortcut = BuildPhaseShortcut(root, "BattleShortcut", "배틀", "BATTLE PHASE", .399f, YgoConstants.PHASE_BATTLE);

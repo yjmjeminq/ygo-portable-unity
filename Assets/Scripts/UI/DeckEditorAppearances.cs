@@ -76,7 +76,8 @@ namespace YGOPortable.UI
 
         private static DeckCardAppearance FitEditionArtwork(uint code, DeckCardAppearance appearance)
         {
-            if (!appearance.overframe || CardArtLoader.SupportsOverframe(code, appearance.ArtworkVariant)) return appearance;
+            if (!appearance.overframe || !CardArtLoader.SupportsOverframe(code) ||
+                CardArtLoader.SupportsOverframe(code, appearance.ArtworkVariant)) return appearance;
             appearance.artwork = CardArtLoader.FirstOverframeVariant(code) + 1;
             return appearance;
         }
@@ -85,7 +86,7 @@ namespace YGOPortable.UI
         {
             if (code == 0) return false;
             bool targetOverframe = !appearance.overframe;
-            if (targetOverframe && (!CardArtLoader.SupportsOverframe(code) || CollectionProgress.GetOwnedOverframeCount(code) == 0))
+            if (targetOverframe && CollectionProgress.GetOwnedOverframeCount(code) == 0)
                 return false;
             return cards == null || !CollectionProgress.RequiresOwnedCardsForDecks || HasUnusedEdition(code, targetOverframe);
         }

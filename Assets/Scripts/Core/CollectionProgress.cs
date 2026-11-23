@@ -124,6 +124,7 @@ namespace YGOPortable.Core
             public StoryTacticsSave tactics = new();
             public DimensionTournament tournament;
             public int tournamentWins;
+            public RankedSave ranked = new();
         }
 
         [Serializable]
@@ -241,6 +242,9 @@ namespace YGOPortable.Core
             if (saved.tournamentWins < 0 || (saved.tournament != null && !saved.tournament.IsValid) ||
                 saved.shop?.freeSecretBundles < 0)
                 throw new InvalidDataException("Invalid tournament progress.");
+            saved.ranked ??= new RankedSave();
+            if (!saved.ranked.IsValid)
+                throw new InvalidDataException("Invalid offline ranked progress.");
 
             if (saved.version < SharedDustVersion)
             {
@@ -829,6 +833,7 @@ namespace YGOPortable.Core
             tactics = _profile.tactics,
             tournament = _profile.tournament,
             tournamentWins = _profile.tournamentWins,
+            ranked = _profile.ranked,
         };
 
         private static OpponentDeckProgress FindDeckProgress(SavedProfile profile, int opponentId) =>
