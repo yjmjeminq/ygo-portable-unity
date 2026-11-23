@@ -337,12 +337,18 @@ namespace YGOPortable.UI
             if (_screen != AppScreen.StoryMode || !_storyMode.CanPlay(episode)) return;
             _activeStoryEpisode = episode;
             var opponent = DeckRepository.GetCharacter(episode.charId);
-            var deck = StoryModeUI.GetOpponentDeck(episode.charId);
-            StartDuelMatch(opponent, deck, myDeck, playerGoesFirst: true, isStoryDuel: true);
+            var (deck, level, levelCount) = _storyMode.GetOpponentMatch(episode);
+            float planningScale = levelCount > 1
+                ? Mathf.Lerp(1f, ComboSearch.MaxPlanningScale, (level - 1f) / (levelCount - 1f)) : 1f;
+            StartDuelMatch(opponent, deck, myDeck, playerGoesFirst: true, isStoryDuel: true, planningScale: planningScale);
         }
 
         public void StartDuelMatch(OpponentCharacter oppChar, PresetDeckInfo oppDeck, UserDeck myDeck,
-            bool playerGoesFirst, bool isStoryDuel = false)
+            bool playerGoesFirst, bool isStoryDuel = false) =>
+            StartDuelMatch(oppChar, oppDeck, myDeck, playerGoesFirst, isStoryDuel, planningScale: 1f);
+
+        private void StartDuelMatch(OpponentCharacter oppChar, PresetDeckInfo oppDeck, UserDeck myDeck,
+            bool playerGoesFirst, bool isStoryDuel, float planningScale)
         {
             if (oppChar == null || oppDeck == null || oppDeck.charId != oppChar.id ||
                 (isStoryDuel ? _activeStoryEpisode?.charId != oppChar.id : !CollectionProgress.IsOpponentDeckUnlocked(oppChar.id, oppDeck.id)))
@@ -381,7 +387,7 @@ namespace YGOPortable.UI
             }
             _session = new DuelSession(recordPlanningReplay: AiDifficulty == AIDifficulty.Smart, playerReplay: _personalReplay);
             _ai = new TacticalAI(DuelAiPolicy.LoadIncluded(), LinkComboPolicy.LoadIncluded(),
-                searchCombos: true) { Difficulty = AiDifficulty };
+                searchCombos: true, planningScale: planningScale) { Difficulty = AiDifficulty };
             _shownHumanPrompt = null;
             _aiTimer = 0f;
             _resultShown = false;

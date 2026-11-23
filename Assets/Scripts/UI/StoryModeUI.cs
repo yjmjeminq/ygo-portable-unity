@@ -73,6 +73,7 @@ namespace YGOPortable.UI
         private readonly Text _episodeHeading;
         private readonly Text _episodeTitle;
         private readonly Text _opponentName;
+        private readonly Text _opponentDeck;
         private readonly Text _status;
         private readonly Text _dialogueHeading;
         private readonly Text _speaker;
@@ -142,10 +143,11 @@ namespace YGOPortable.UI
                 new Vector2(.587f, .08f), new Vector2(.968f, .751f));
             _episodeHeading = AddLabel(details, "Chapter", .07f, .88f, .93f, .955f, 21, color: LotdUiKit.GoldAccent);
             _episodeTitle = AddLabel(details, "EpisodeTitle", .07f, .758f, .93f, .885f, 26);
-            var portrait = Region(details, "OpponentPortrait", .13f, .392f, .87f, .753f);
+            var portrait = Region(details, "OpponentPortrait", .13f, .445f, .87f, .753f);
             _portrait = LotdUiKit.AddImage(portrait.gameObject, null, Color.white, true, false);
-            _opponentName = AddLabel(details, "OpponentName", .07f, .327f, .93f, .39f, 23);
-            AddLabel(details, "DeckLabel", .07f, .271f, .93f, .323f, 18,
+            _opponentName = AddLabel(details, "OpponentName", .07f, .379f, .93f, .442f, 23);
+            _opponentDeck = AddLabel(details, "OpponentDeck", .07f, .317f, .93f, .375f, 19, color: LotdUiKit.TextMuted);
+            AddLabel(details, "DeckLabel", .07f, .268f, .93f, .314f, 18,
                 TextAnchor.MiddleLeft, LotdUiKit.TextMuted).text = "내 덱";
             var picker = Region(details, "DeckPicker", .07f, .19f, .93f, .268f);
             _deckPicker = LotdUiKit.CreateLotdDropdown(picker, "SelectDeck", Array.Empty<string>(), SelectDeck, dynamicChoices: true);
@@ -234,9 +236,33 @@ namespace YGOPortable.UI
 
         internal void ShowStatus(string status) => _status.text = status;
 
-        internal static PresetDeckInfo GetOpponentDeck(int characterId) =>
-            OpponentDeckLevels.GetDecks(characterId).FirstOrDefault() ??
-            DeckRepository.GetDecksForCharacter(characterId).FirstOrDefault();
+        internal (PresetDeckInfo Deck, int Level, int LevelCount) GetOpponentMatch(StoryEpisodeData episode)
+        {
+            int episodeIndex = IndexOf(episode);
+            if (episodeIndex < 0) return default;
+
+            var decks = OpponentDeckLevels.GetDecks(episode.charId);
+            if (decks.Count == 0) decks = DeckRepository.GetDecksForCharacter(episode.charId);
+            if (decks.Count == 0) return default;
+
+            var episodes = Script.episodes;
+            int appearances = episodes.Count(entry => entry.charId == episode.charId);
+            int remaining = appearances;
+            int level = 0;
+            int finalIndex = episodes.Length - 1;
+            for (int i = 0; i <= episodeIndex; i++)
+            {
+                if (episodes[i].charId != episode.charId) continue;
+                remaining--;
+                int progressLevel = 1 + (i * (decks.Count - 1) + finalIndex / 2) / finalIndex;
+                // Reserve a higher deck for each rematch when the opponent has enough levels.
+                level = appearances <= decks.Count
+                    ? Math.Clamp(progressLevel, level + 1, decks.Count - remaining)
+                    : progressLevel;
+            }
+
+            return (decks[level - 1], level, decks.Count);
+        }
 
         private static string UnlockedKey(string seriesId) => $"ygo.story.{seriesId}.unlocked_idx";
 
@@ -340,7 +366,9 @@ namespace YGOPortable.UI
             _opponentName.text = current.opponentName;
             _portrait.sprite = LotdUiKit.LoadOpponentPortrait(opponent);
             _portrait.enabled = _portrait.sprite != null;
-            bool ready = opponent != null && GetOpponentDeck(current.charId) != null;
+            var (deck, level, levelCount) = GetOpponentMatch(current);
+            _opponentDeck.text = deck == null ? "" : $"Lv. {level}/{levelCount}  ·  {deck.title}";
+            bool ready = opponent != null && deck != null;
             _start.interactable = CanPlay(current) && ready && _playableDecks.Count > 0;
             ShowStatus(!CanPlay(current) ? "이전 에피소드를 클리어하면 열립니다." :
                 !ready ? "상대 덱을 불러오지 못했습니다." :
