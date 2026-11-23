@@ -113,22 +113,22 @@ namespace YGOPortable.UI
             var panel = LotdUiKit.CreateRect("TrunkFilterPanel", parent, _deckPanel.anchorMin, _deckPanel.anchorMax,
                 Vector2.zero, Vector2.zero);
             _cardFilterDialog = panel.gameObject;
-            var conditions = LotdUiKit.CreateMenuPanel(panel, "Conditions", Vector2.zero, new Vector2(.526f, 1f));
-            var options = LotdUiKit.CreateMenuPanel(panel, "Options", new Vector2(.536f, 0f), Vector2.one);
+            var conditions = DeckEditorStyle.Panel(panel, "Conditions", Vector2.zero, new Vector2(.526f, 1f));
+            var options = DeckEditorStyle.Panel(panel, "Options", new Vector2(.536f, 0f), Vector2.one);
             AddFilterHeading(conditions, "보관함 필터");
             _optionHeading = AddFilterHeading(options, "");
 
             var queryRow = LotdUiKit.CreateRect("TextSearch", conditions, new Vector2(.087f, .803f),
                 new Vector2(.638f, .868f), Vector2.zero, Vector2.zero);
-            _detailedQueryInput = LotdUiKit.CreateInputField(queryRow, "Query", "카드명·효과·카드 번호", 16);
+            _detailedQueryInput = DeckEditorStyle.Input(queryRow, "Query", "카드명·효과·카드 번호", 16);
             _detailedQueryInput.onValueChanged.AddListener(_ => RefreshDetailedDraft());
             var archetype = LotdUiKit.CreateRect("ArchetypeSearch", conditions, new Vector2(.656f, .803f),
                 new Vector2(.913f, .868f), Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(archetype, "Button", "카드군 검색", OpenArchetypeSearch, 14);
+            DeckEditorStyle.Button(archetype, "Button", "카드군 검색", OpenArchetypeSearch, 14);
 
             var collectionFilters = LotdUiKit.CreateRect("CollectionFilters", conditions,
                 new Vector2(.087f, .726f), new Vector2(.913f, .791f), Vector2.zero, Vector2.zero);
-            _trunkCollectionFilters = new CollectionCardFilters(collectionFilters, RefreshDetailedDraft);
+            _trunkCollectionFilters = new CollectionCardFilters(collectionFilters, RefreshDetailedDraft, deckEditor: true);
             var conditionRows = BuildFilterRows(conditions, "ConditionsList", .105f, .710f, out _);
             _optionRows = BuildFilterRows(options, "OptionList", .105f, .868f, out _optionScroll);
 
@@ -137,7 +137,7 @@ namespace YGOPortable.UI
                 int index = (int)facet;
                 _facetOptions[index] = values;
                 var row = AddFilterRow(conditionRows, facet.ToString());
-                var button = LotdUiKit.CreateLotdButton(row, "Button", label, () => ShowDetailedFacet(facet), 15);
+                var button = DeckEditorStyle.Button(row, "Button", label, () => ShowDetailedFacet(facet), 15);
                 _facetButtons[index] = button;
                 var caption = button.GetComponentInChildren<Text>();
                 _facetLabels[index] = caption;
@@ -178,7 +178,7 @@ namespace YGOPortable.UI
             _defenseEditor = BuildStatInputs(options, "Defense", 2);
             _effectTextEditor = LotdUiKit.CreateRect("EffectText", options, new Vector2(.087f, .803f),
                 new Vector2(.913f, .868f), Vector2.zero, Vector2.zero);
-            _effectTextInput = LotdUiKit.CreateInputField(_effectTextEditor, "Query", "예: 특수 소환", 16);
+            _effectTextInput = DeckEditorStyle.Input(_effectTextEditor, "Query", "예: 특수 소환", 16);
             _effectTextInput.onValueChanged.AddListener(_ => RefreshDetailedDraft());
             var status = LotdUiKit.CreateRect("Status", options, new Vector2(.087f, .033f), new Vector2(.913f, .099f),
                 Vector2.zero, Vector2.zero);
@@ -190,7 +190,7 @@ namespace YGOPortable.UI
             {
                 var slot = LotdUiKit.CreateRect(name, footer, new Vector2(left, 0f), new Vector2(right, 1f),
                     Vector2.zero, Vector2.zero);
-                LotdUiKit.CreateLotdButton(slot, "Button", label, action, 15, gold);
+                DeckEditorStyle.Button(slot, "Button", label, action, 15, gold);
             }
             ActionButton("Reset", "초기화", 0f, .31f, ResetTrunkFilters);
             ActionButton("Cancel", "취소", .345f, .655f, CloseDetailedSearch);
@@ -202,7 +202,7 @@ namespace YGOPortable.UI
         {
             var header = LotdUiKit.CreateRect("Heading", panel, new Vector2(.087f, .884f), new Vector2(.913f, .946f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(header.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelHeader, false, false);
+            LotdUiKit.AddImage(header.gameObject, LotdUiKit.WhiteSprite, DeckEditorStyle.Header, false, false);
             return LotdUiKit.AddFittedText(header, "Title", title, 21, 14, TextAnchor.MiddleCenter,
                 Color.white, FontStyle.Bold);
         }
@@ -252,7 +252,7 @@ namespace YGOPortable.UI
                 string label = i == 0 ? "최소" : "최대";
                 var row = LotdUiKit.CreateRect(label, group, new Vector2(0f, i == 0 ? .54f : .04f),
                     new Vector2(1f, i == 0 ? 1f : .5f), Vector2.zero, Vector2.zero);
-                var input = LotdUiKit.CreateInputField(row, "Number", label, 16);
+                var input = DeckEditorStyle.Input(row, "Number", label, 16);
                 input.contentType = InputField.ContentType.IntegerNumber;
                 input.characterLimit = 6;
                 input.onValueChanged.AddListener(_ => RefreshDetailedDraft());
@@ -370,7 +370,7 @@ namespace YGOPortable.UI
                 {
                     int choice = _optionButtons.Count;
                     var row = AddFilterRow(_optionRows, $"Option_{choice}");
-                    _optionButtons.Add(LotdUiKit.CreateLotdButton(row, "Button", "", () =>
+                    _optionButtons.Add(DeckEditorStyle.Button(row, "Button", "", () =>
                     {
                         OnDetailedChoiceChanged(_activeFacet, choice);
                         RefreshDetailedDraft();
@@ -399,10 +399,10 @@ namespace YGOPortable.UI
                 };
                 bool enabled = _facetButtons[i].interactable;
                 bool selected = (Facet)i == _activeFacet;
-                _facetLabels[i].color = !enabled ? LotdUiKit.TextMuted : selected ? LotdUiKit.GoldAccent : Color.white;
+                _facetLabels[i].color = !enabled ? LotdUiKit.TextMuted : selected ? DeckEditorStyle.Accent : Color.white;
                 _facetValues[i].text = value.Length > 0 ? value : "전체";
                 _facetValues[i].color = enabled && _facetValues[i].text != "전체"
-                    ? LotdUiKit.GoldAccent : LotdUiKit.TextMuted;
+                    ? DeckEditorStyle.Accent : LotdUiKit.TextMuted;
             }
 
             var choices = _facetOptions[(int)_activeFacet];
@@ -412,7 +412,7 @@ namespace YGOPortable.UI
                 var label = _optionButtons[i].GetComponentInChildren<Text>();
                 bool selected = i == _draftFacets[(int)_activeFacet];
                 label.text = selected ? $"●  {choices[i]}" : choices[i];
-                label.color = selected ? LotdUiKit.GoldAccent : Color.white;
+                label.color = selected ? DeckEditorStyle.Accent : Color.white;
             }
         }
 

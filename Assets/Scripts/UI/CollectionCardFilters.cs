@@ -26,13 +26,14 @@ namespace YGOPortable.UI
             }
         }
 
-        internal CollectionCardFilters(Transform parent, Action changed, bool includeRarity = true)
+        internal CollectionCardFilters(Transform parent, Action changed, bool includeRarity = true, bool deckEditor = false)
         {
             Dropdown Add(string name, string[] choices, float left, float right)
             {
                 var holder = LotdUiKit.CreateRect(name, parent, new Vector2(left, 0f), new Vector2(right, 1f),
                     Vector2.zero, Vector2.zero);
-                return LotdUiKit.CreateLotdDropdown(holder, "Dropdown", choices, _ => changed());
+                return deckEditor ? DeckEditorStyle.Dropdown(holder, "Dropdown", choices, _ => changed()) :
+                    LotdUiKit.CreateLotdDropdown(holder, "Dropdown", choices, _ => changed());
             }
 
             if (includeRarity) _rarity = Add("Rarity", Rarities, 0f, .265f);

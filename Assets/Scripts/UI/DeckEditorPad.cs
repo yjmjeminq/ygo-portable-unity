@@ -31,6 +31,7 @@ namespace YGOPortable.UI
         {
             _padUi = new DeckPadUi(root);
             _padCardFocus = PadFocusIndicator.Create(root, "PadCardFocus");
+            _padCardFocus.SetColors(DeckEditorStyle.FocusTrack, DeckEditorStyle.Accent);
         }
 
         private void StartPadNavigation()

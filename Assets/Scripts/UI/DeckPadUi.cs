@@ -11,6 +11,7 @@ namespace YGOPortable.UI
         private readonly Transform _root;
         private readonly DeckPadKeyboard _keyboard;
         private readonly Func<bool> _useShopPalette;
+        private readonly bool _deckEditor;
         private DeckPadKeyboard _shopKeyboard;
         private readonly Button[] _choiceButtons = new Button[VisibleChoices];
         private readonly Text[] _choiceLabels = new Text[VisibleChoices];
@@ -28,28 +29,36 @@ namespace YGOPortable.UI
         internal bool IsTyping => ActiveKeyboard.IsOpen;
         internal bool HasPopup => IsTyping || _choicePanel.gameObject.activeSelf;
 
-        internal DeckPadUi(Transform root) : this(root, null) { }
+        internal DeckPadUi(Transform root) : this(root, null, deckEditor: true) { }
 
-        internal DeckPadUi(Transform root, Func<bool> useShopPalette)
+        internal DeckPadUi(Transform root, Func<bool> useShopPalette, bool deckEditor = false)
         {
             _root = root;
             _useShopPalette = useShopPalette;
+            _deckEditor = deckEditor;
             var overlay = LotdUiKit.FillRect("PadChoices", root);
             _choicePanel = overlay;
-            LotdUiKit.AddImage(overlay.gameObject, LotdUiKit.WhiteSprite, new Color(.01f, .025f, .07f, .80f));
+            LotdUiKit.AddImage(overlay.gameObject, LotdUiKit.WhiteSprite,
+                deckEditor ? DeckEditorStyle.Scrim : new Color(.01f, .025f, .07f, .80f));
             overlay.gameObject.AddComponent<DeckChoiceWheel>().MoveChoice = MoveChoice;
-            var panel = LotdUiKit.CreateMenuPanel(overlay, "Window", new Vector2(.265f, .147f), new Vector2(.735f, .853f));
+            var min = new Vector2(.265f, .147f);
+            var max = new Vector2(.735f, .853f);
+            var panel = deckEditor ? DeckEditorStyle.Panel(overlay, "Window", min, max) :
+                LotdUiKit.CreateMenuPanel(overlay, "Window", min, max);
+            Button CreateChoiceButton(Transform holder, string label, Action action, int size) =>
+                deckEditor ? DeckEditorStyle.Button(holder, "Button", label, action, size) :
+                    LotdUiKit.CreateLotdButton(holder, "Button", label, action, size);
             var header = LotdUiKit.CreateRect("Header", panel, new Vector2(.09f, .843f), new Vector2(.91f, .955f),
                 Vector2.zero, Vector2.zero);
             _choiceStatus = LotdUiKit.AddFittedText(header, "Status", "", 20, 13, TextAnchor.MiddleCenter,
-                LotdUiKit.CyanAccent, FontStyle.Bold);
+                deckEditor ? DeckEditorStyle.Accent : LotdUiKit.CyanAccent, FontStyle.Bold);
             for (int i = 0; i < VisibleChoices; i++)
             {
                 int rowIndex = i;
                 float top = .822f - i * .100f;
                 var row = LotdUiKit.CreateRect("Choice" + i, panel, new Vector2(.11f, top - .085f), new Vector2(.89f, top),
                     Vector2.zero, Vector2.zero);
-                _choiceButtons[i] = LotdUiKit.CreateLotdButton(row, "Button", "", () => AcceptChoice(_firstChoice + rowIndex), 17);
+                _choiceButtons[i] = CreateChoiceButton(row, "", () => AcceptChoice(_firstChoice + rowIndex), 17);
                 _choiceLabels[i] = _choiceButtons[i].GetComponentInChildren<Text>();
                 _choiceLabels[i].resizeTextForBestFit = true;
                 _choiceLabels[i].resizeTextMinSize = 11;
@@ -60,9 +69,9 @@ namespace YGOPortable.UI
             LotdUiKit.AddFittedText(hint, "Text", "휠/↑↓ 이동   클릭/A 선택", 15, 10, TextAnchor.MiddleCenter, LotdUiKit.TextMuted);
             var cancel = LotdUiKit.CreateRect("Cancel", panel, new Vector2(.69f, .054f), new Vector2(.89f, .132f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(cancel, "Button", "취소 (B)", CloseChoice, 14);
+            CreateChoiceButton(cancel, "취소 (B)", CloseChoice, 14);
             overlay.gameObject.SetActive(false);
-            _keyboard = new DeckPadKeyboard(root, RestorePopupFocus);
+            _keyboard = new DeckPadKeyboard(root, RestorePopupFocus, deckEditor: deckEditor);
         }
 
         internal void OpenText(InputField target)
@@ -356,6 +365,7 @@ namespace YGOPortable.UI
                 track.a = .68f;
                 _frame.SetColors(track, PackShopStyle.Accent);
             }
+            else if (_deckEditor) _frame.SetColors(DeckEditorStyle.FocusTrack, DeckEditorStyle.Accent);
             else _frame.SetColors();
             _frame.Show(target, host != null ? host : (RectTransform)_root);
         }

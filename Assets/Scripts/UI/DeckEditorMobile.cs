@@ -59,7 +59,7 @@ namespace YGOPortable.UI
                 ReturnToDeckPicker, fontSize: 23);
 
             _mobileSelection = LotdUiKit.FillRect("MobileCardSelection", root);
-            LotdUiKit.AddImage(_mobileSelection.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelNavy, false, false);
+            LotdUiKit.AddImage(_mobileSelection.gameObject, LotdUiKit.WhiteSprite, DeckEditorStyle.Surface, false, false);
             _mobileSelectionLabel = LotdUiKit.AddFittedText(DeckArea(_mobileSelection, "Card", .018f, .05f, .255f, .95f),
                 "Label", "", 22, 12, TextAnchor.MiddleLeft, Color.white);
             _mobileQuantity = new Button[4];
@@ -105,7 +105,6 @@ namespace YGOPortable.UI
                 () => _sortFilter.value = (_sortFilter.value + 1) % SortOptions.Length, fontSize: 18).GetComponentInChildren<Text>();
             _searchInp.textComponent.fontSize = 25;
             _searchInp.placeholder.GetComponent<Text>().fontSize = 24;
-            _trunkPanel.Find("TrunkHeading").GetComponent<Image>().color = LotdUiKit.PanelNavy;
             root.Find("CardDetails").gameObject.SetActive(false);
             LayoutMobileEditor();
             _deckHelpLabel.text = "";
@@ -322,7 +321,7 @@ namespace YGOPortable.UI
                 int target = (i + 1) % 4;
                 _mobileQuantity[i].interactable = selected && target != copies;
                 _mobileQuantity[i].GetComponentInChildren<Text>().color =
-                    selected && target == copies ? LotdUiKit.GoldAccent : Color.white;
+                    selected && target == copies ? DeckEditorStyle.Accent : Color.white;
             }
             _mobileRelated.interactable = _mobileDetails.interactable = selected;
         }

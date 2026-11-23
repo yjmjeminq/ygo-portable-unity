@@ -26,7 +26,7 @@ namespace YGOPortable.UI
             _expandedDeckOverlay = overlay;
             overlay.gameObject.AddComponent<RectMask2D>();
             var backdrop = LotdUiKit.FillRect("Backdrop", overlay);
-            var shade = LotdUiKit.AddImage(backdrop.gameObject, LotdUiKit.WhiteSprite, new Color(.012f, .022f, .048f, .85f));
+            var shade = DeckEditorStyle.Fill(backdrop, DeckEditorStyle.Scrim);
             if (_mobileLayout)
             {
                 var dismiss = backdrop.gameObject.AddComponent<Button>();
@@ -35,7 +35,7 @@ namespace YGOPortable.UI
                 dismiss.navigation = new Navigation { mode = Navigation.Mode.None };
                 dismiss.onClick.AddListener(CloseExpandedDeckCard);
             }
-            _expandedDeckPanel = LotdUiKit.CreateMenuPanel(overlay, "Window",
+            _expandedDeckPanel = DeckEditorStyle.Panel(overlay, "Window",
                 _mobileLayout ? new Vector2(.018f, 0f) : new Vector2(.13f, .081f),
                 new Vector2(.982f, _mobileLayout ? .876f : .943f));
             if (_mobileLayout) _expandedDeckPanel.GetComponent<Image>().raycastTarget = true;
@@ -57,7 +57,7 @@ namespace YGOPortable.UI
             _expandedDeckStats.supportRichText = false;
 
             var rules = DeckArea(_expandedDeckPanel, "Rules", rulesLeft, .229f, .952f, _mobileLayout ? .696f : .651f);
-            LotdUiKit.AddImage(rules.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelNavy);
+            DeckEditorStyle.Fill(rules, DeckEditorStyle.Inset);
             var viewport = LotdUiKit.FillRect("Viewport", rules, 13f);
             viewport.offsetMax = new Vector2(-31f, -13f);
             viewport.gameObject.AddComponent<RectMask2D>();

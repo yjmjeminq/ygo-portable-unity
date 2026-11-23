@@ -46,7 +46,7 @@ namespace YGOPortable.UI
         {
             var row = LotdUiKit.CreateRect("QuickFilters", panel, new Vector2(0f, .702f),
                 new Vector2(1f, .757f), left, right);
-            LotdUiKit.AddImage(row.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelNavy);
+            LotdUiKit.AddImage(row.gameObject, LotdUiKit.WhiteSprite, DeckEditorStyle.Surface);
             var viewport = LotdUiKit.FillRect("Viewport", row);
             viewport.gameObject.AddComponent<RectMask2D>();
             var content = LotdUiKit.CreateRect("Chips", viewport, Vector2.zero, Vector2.up,
@@ -74,7 +74,7 @@ namespace YGOPortable.UI
                 if (_mobileLayout) width = Mathf.Max(width, MobileSafeArea.MinimumTouchSize(row) + 6f);
                 var chip = LotdUiKit.CreateRect($"Chip_{i}", content, Vector2.zero, Vector2.up,
                     new Vector2(x + 2f, 1f), new Vector2(x + width - 2f, -1f));
-                var button = LotdUiKit.CreateLotdButton(chip, "Button", filter.label, () =>
+                var button = DeckEditorStyle.Button(chip, "Button", filter.label, () =>
                     ToggleQuickFilter(filter.kind, filter.index), _mobileLayout ? 22 : 15);
                 _quickFilterButtons[i] = button;
                 _quickFilterCaptions[i] = button.GetComponentInChildren<Text>();
@@ -174,7 +174,7 @@ namespace YGOPortable.UI
                 bool active = SelectedQuickChip(kind) == index && (index != 0 ||
                     _mobileFrameFilter == 0 && _mobileAttributeFilter == 0 && _mobileRaceFilter == 0);
                 caption.text = active ? "• " + label : label;
-                caption.color = active ? LotdUiKit.GoldAccent : LotdUiKit.TextPrimary;
+                caption.color = active ? DeckEditorStyle.Accent : LotdUiKit.TextPrimary;
             }
         }
 

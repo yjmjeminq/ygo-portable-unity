@@ -324,7 +324,7 @@ namespace YGOPortable.UI
             _canvas.alpha = _visibility * (1f - _pulse * .24f);
             if (_slotTint != null)
             {
-                Color tint = LotdUiKit.GoldAccent;
+                Color tint = DeckEditorStyle.Accent;
                 tint.a = _hover * .83f;
                 _slotTint.color = tint;
             }

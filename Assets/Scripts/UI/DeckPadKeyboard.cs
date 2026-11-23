@@ -37,24 +37,25 @@ namespace YGOPortable.UI
         internal Selectable DefaultFocus => _keys[0];
         internal bool IsOpen => _overlay.gameObject.activeSelf;
 
-        internal DeckPadKeyboard(Transform parent, Action onClosed = null, bool shopColors = false)
+        internal DeckPadKeyboard(Transform parent, Action onClosed = null, bool shopColors = false, bool deckEditor = false)
         {
             _onClosed = onClosed;
             _overlay = LotdUiKit.FillRect("PadKeyboard", parent);
             LotdUiKit.AddImage(_overlay.gameObject, LotdUiKit.WhiteSprite,
-                shopColors ? PackShopStyle.Scrim : new Color(.012f, .021f, .05f, .88f));
+                deckEditor ? DeckEditorStyle.Scrim : shopColors ? PackShopStyle.Scrim : new Color(.012f, .021f, .05f, .88f));
             var min = new Vector2(.15f, .21f);
             var max = new Vector2(.85f, .79f);
-            var panel = shopColors ? PackShopStyle.Panel(_overlay, "Window", min, max) :
+            var panel = deckEditor ? DeckEditorStyle.Panel(_overlay, "Window", min, max) :
+                shopColors ? PackShopStyle.Panel(_overlay, "Window", min, max) :
                 LotdUiKit.CreateMenuPanel(_overlay, "Window", min, max);
             var title = LotdUiKit.CreateRect("Title", panel, new Vector2(.08f, .865f), new Vector2(.92f, .957f),
                 Vector2.zero, Vector2.zero);
             LotdUiKit.AddFittedText(title, "Text", "패드로 입력", 23, 14, TextAnchor.MiddleLeft,
-                shopColors ? PackShopStyle.TextPrimary : LotdUiKit.CyanAccent, FontStyle.Bold);
+                deckEditor ? DeckEditorStyle.Accent : shopColors ? PackShopStyle.TextPrimary : LotdUiKit.CyanAccent, FontStyle.Bold);
             var preview = LotdUiKit.CreateRect("Entry", panel, new Vector2(.068f, .744f), new Vector2(.932f, .851f),
                 Vector2.zero, Vector2.zero);
             LotdUiKit.AddImage(preview.gameObject, LotdUiKit.WhiteSprite,
-                shopColors ? PackShopStyle.SurfaceInset : new Color(.03f, .09f, .17f));
+                deckEditor ? DeckEditorStyle.Inset : shopColors ? PackShopStyle.SurfaceInset : new Color(.03f, .09f, .17f));
             _preview = LotdUiKit.AddFittedText(preview, "Text", "", 25, 14, TextAnchor.MiddleLeft,
                 shopColors ? PackShopStyle.TextPrimary : LotdUiKit.TextPrimary);
             _preview.rectTransform.offsetMin = new Vector2(8f, 0f);
@@ -76,9 +77,12 @@ namespace YGOPortable.UI
                 return CreateButton(slot, label, action, 16, accent);
             }
 
-            Button CreateButton(Transform slot, string label, Action action, int size, bool accent) => shopColors
-                ? PackShopStyle.Button(slot, "Button", label, action, size, accent)
-                : LotdUiKit.CreateLotdButton(slot, "Button", label, action, size, accent);
+            Button CreateButton(Transform slot, string label, Action action, int size, bool accent)
+            {
+                if (deckEditor) return DeckEditorStyle.Button(slot, "Button", label, action, size, accent);
+                return shopColors ? PackShopStyle.Button(slot, "Button", label, action, size, accent) :
+                    LotdUiKit.CreateLotdButton(slot, "Button", label, action, size, accent);
+            }
 
             _pageButton = ActionButton("Page", "", .068f, .225f, NextPage);
             _pageLabel = _pageButton.GetComponentInChildren<Text>();

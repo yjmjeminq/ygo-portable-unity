@@ -61,14 +61,14 @@ namespace YGOPortable.UI
 
         private static Button DeckButton(Transform parent, string name, string label, float x1, float y1,
             float x2, float y2, Action action, bool accent = false, int fontSize = 18) =>
-            LotdUiKit.CreateLotdButton(DeckArea(parent, name, x1, y1, x2, y2), "Button", label, action, fontSize, accent);
+            DeckEditorStyle.Button(DeckArea(parent, name, x1, y1, x2, y2), "Button", label, action, fontSize, accent);
 
         private void BuildComposition()
         {
             var holder = (RectTransform)_mainCountText.rectTransform.parent;
             _mainCountText.rectTransform.anchorMin = new Vector2(.55f, .22f);
             var rail = DeckArea(holder, "Composition", .0f, .03f, 1f, .21f);
-            LotdUiKit.AddImage(rail.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelNavy, false, false);
+            LotdUiKit.AddImage(rail.gameObject, LotdUiKit.WhiteSprite, DeckEditorStyle.Surface, false, false);
             for (int i = 0; i < _compositionSegments.Length; i++)
             {
                 var segment = DeckArea(rail, $"Type_{i}", 0f, 0f, 0f, 1f);
@@ -123,7 +123,7 @@ namespace YGOPortable.UI
             DeckButton(tools, "CopyText", "텍스트 복사", .487f, .705f, .701f, .812f, () => CopyDeckRecipe(ydk: false));
             DeckButton(tools, "Clear", "덱 비우기", .72f, .705f, .945f, .812f, ConfirmClearWorkingDeck);
 
-            _deckRecipeInput = LotdUiKit.CreateInputField(
+            _deckRecipeInput = DeckEditorStyle.Input(
                 DeckArea(tools, "Recipe", .055f, .243f, .945f, .681f), "Input",
                 "YDK 또는 카드 이름과 수량을 붙여넣으세요.", 19);
             _deckRecipeInput.lineType = InputField.LineType.MultiLineNewline;
@@ -160,7 +160,7 @@ namespace YGOPortable.UI
                 float x = .051f + i * .146f + (i == 5 ? .024f : 0f);
                 var cell = DeckArea(draw, $"Card_{i}", x, .218f, x + .132f, _mobileLayout ? .651f : .676f);
                 var surface = LotdUiKit.AddImage(cell.gameObject, LotdUiKit.WhiteSprite,
-                    i == 5 ? TurnDrawEdge : LotdUiKit.PanelNavy);
+                    i == 5 ? TurnDrawEdge : DeckEditorStyle.Surface);
                 var hit = cell.gameObject.AddComponent<Button>();
                 hit.targetGraphic = surface;
                 hit.onClick.AddListener(() =>
@@ -180,8 +180,8 @@ namespace YGOPortable.UI
         private RectTransform BuildDeckOverlay(Transform root, string name, out RectTransform panel)
         {
             var dim = LotdUiKit.FillRect(name, root);
-            LotdUiKit.AddImage(dim.gameObject, LotdUiKit.WhiteSprite, new Color(.015f, .026f, .065f, .87f));
-            panel = LotdUiKit.CreateMenuPanel(dim, "Window", _mobileLayout ? new Vector2(.048f, .048f) : new Vector2(.105f, .123f),
+            DeckEditorStyle.Fill(dim, DeckEditorStyle.Scrim);
+            panel = DeckEditorStyle.Panel(dim, "Window", _mobileLayout ? new Vector2(.048f, .048f) : new Vector2(.105f, .123f),
                 _mobileLayout ? new Vector2(.952f, .952f) : new Vector2(.895f, .877f));
             dim.gameObject.SetActive(false);
             return dim;
@@ -287,7 +287,7 @@ namespace YGOPortable.UI
                 bool starter = _markedStarters.Contains(CardDatabase.GetDeckPrintingKey(code));
                 _openingHandViews[i].SetCard(code);
                 _openingHandButtons[i].image.color = starter ? LotdUiKit.GoldAccent :
-                    i == 5 ? TurnDrawEdge : LotdUiKit.PanelNavy;
+                    i == 5 ? TurnDrawEdge : DeckEditorStyle.Surface;
             }
             int starterCount = CountOpeningStarters();
             int cardsSeen = initial + (turnDraw ? 1 : 0);
@@ -318,7 +318,7 @@ namespace YGOPortable.UI
                 int slot = i;
                 float x = .052f + i * .151f;
                 var cell = DeckArea(picker, $"Card_{i}", x, .198f, x + .140f, .707f);
-                var surface = LotdUiKit.AddImage(cell.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelNavy);
+                var surface = LotdUiKit.AddImage(cell.gameObject, LotdUiKit.WhiteSprite, DeckEditorStyle.Surface);
                 var button = cell.gameObject.AddComponent<Button>();
                 button.targetGraphic = surface;
                 button.onClick.AddListener(() => ToggleOpeningStarter(slot));
@@ -368,7 +368,7 @@ namespace YGOPortable.UI
                 var (code, copies) = _starterChoices[index];
                 bool selected = _markedStarters.Contains(code);
                 art.SetCard(code);
-                button.image.color = selected ? TurnDrawEdge : LotdUiKit.PanelNavy;
+                button.image.color = selected ? TurnDrawEdge : DeckEditorStyle.Surface;
                 caption.color = selected ? LotdUiKit.GoldAccent : LotdUiKit.TextPrimary;
                 caption.text = $"{CardDatabase.GetName(code)} · {copies}장" + (selected ? " ✓" : "");
             }

@@ -315,25 +315,22 @@ namespace YGOPortable.UI
             var screen = LotdUiKit.FillRect("Screen_DeckEditor", parent);
             Root = screen.gameObject;
             if (_mobileLayout)
-                LotdUiKit.AddImage(Root, LotdUiKit.WhiteSprite, new Color(.025f, .02f, .05f), false, false);
+                LotdUiKit.AddImage(Root, LotdUiKit.WhiteSprite, DeckEditorStyle.Inset, false, false);
             var root = LotdUiKit.FillRect("Editor", _mobileLayout ? MobileSafeArea.Create(screen) : screen);
             _editorContent = root.gameObject;
-            LotdUiKit.AddImage(LotdUiKit.FillRect("DeckBackground", root).gameObject,
-                LotdUiKit.LoadSprite("LOTD/Background/bg_vrains"), new Color(0.86f, 0.53f, 0.61f), false, false);
-            LotdUiKit.AddImage(LotdUiKit.FillRect("Backdrop", root).gameObject,
-                LotdUiKit.WhiteSprite, new Color(0.12f, 0.014f, 0.033f, 0.60f), false, false);
+            DeckEditorStyle.Backdrop(root);
             if (!_mobileLayout)
             {
-                LotdUiKit.AddMenuHeader(root, "덱 편집");
+                DeckEditorStyle.AddHeader(root, "덱 편집");
 
                 _openDrawButton = DeckButton(root, "OpenTestDraw", "테스트 드로우", .027f, .918f, .172f, .976f,
                     OpenTestDraw, fontSize: 16);
                 var examples = LotdUiKit.CreateRect("Examples", root, new Vector2(0.765f, 0.918f), new Vector2(0.871f, 0.976f),
                     Vector2.zero, Vector2.zero);
-                LotdUiKit.CreateLotdButton(examples, "Button", "카드군 예시 덱", OpenArchetypeModal, 15);
+                DeckEditorStyle.Button(examples, "Button", "카드군 예시 덱", OpenArchetypeModal, 15);
                 var back = LotdUiKit.CreateRect("Back", root, new Vector2(0.878f, 0.918f), new Vector2(0.985f, 0.976f),
                     Vector2.zero, Vector2.zero);
-                LotdUiKit.CreateLotdButton(back, "Button", "덱 목록", ReturnToDeckPicker, 15);
+                DeckEditorStyle.Button(back, "Button", "덱 목록", ReturnToDeckPicker, 15);
 
             }
 
@@ -344,7 +341,7 @@ namespace YGOPortable.UI
 
             var footer = LotdUiKit.CreateRect("Controls", root, new Vector2(0.015f, 0.002f), new Vector2(0.985f, 0.041f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(footer.gameObject, LotdUiKit.WhiteSprite, new Color(0.02f, 0.045f, 0.10f, 0.92f), false, false);
+            DeckEditorStyle.Fill(footer, DeckEditorStyle.Inset, false);
             _deckHelpLabel = LotdUiKit.AddFittedText(LotdUiKit.CreateRect("Help", footer, new Vector2(0.01f, 0f),
                 new Vector2(0.58f, 1f), Vector2.zero, Vector2.zero), "Text", MouseHelp, 13, 9,
                 TextAnchor.MiddleLeft, LotdUiKit.TextPrimary);
@@ -367,7 +364,7 @@ namespace YGOPortable.UI
 
         private void BuildCardDetails(Transform root)
         {
-            var panel = LotdUiKit.CreateMenuPanel(root, "CardDetails",
+            var panel = DeckEditorStyle.Panel(root, "CardDetails",
                 new Vector2(_mobileLayout ? .340f : .301f, .053f), new Vector2(_mobileLayout ? .566f : .553f, .899f));
             float inset = _mobileLayout ? 17f : 28f;
             var card = LotdUiKit.CreateRect("LargeCard", panel,
@@ -385,8 +382,7 @@ namespace YGOPortable.UI
             var stats = LotdUiKit.CreateRect("Stats", panel,
                 new Vector2(0f, _mobileLayout ? .590f : .418f), new Vector2(1f, _mobileLayout ? .673f : .497f),
                 new Vector2(inset, 0f), new Vector2(-inset, 0f));
-            LotdUiKit.AddImage(stats.gameObject, LotdUiKit.LoadSprite("LOTD/HUD/cardbar_texture"),
-                new Color(0.86f, 0.68f, 0.38f, 0.86f), false, false);
+            DeckEditorStyle.Fill(stats, DeckEditorStyle.Header, false);
             var icon = LotdUiKit.CreateRect("TypeIcon", stats, new Vector2(0.83f, 0.06f), new Vector2(0.975f, 0.94f),
                 Vector2.zero, Vector2.zero);
             _previewRaceIcon = LotdUiKit.AddImage(icon.gameObject, null, Color.white, true, false);
@@ -396,23 +392,23 @@ namespace YGOPortable.UI
             var name = LotdUiKit.CreateRect("Name", panel,
                 new Vector2(0f, _mobileLayout ? .511f : .349f), new Vector2(1f, _mobileLayout ? .585f : .412f),
                 new Vector2(inset, 0f), new Vector2(-inset, 0f));
-            LotdUiKit.AddImage(name.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelNavy, false, false);
+            LotdUiKit.AddImage(name.gameObject, LotdUiKit.WhiteSprite, DeckEditorStyle.Surface, false, false);
             _previewName = LotdUiKit.AddFittedText(name, "Text", "", _mobileLayout ? 25 : 20, _mobileLayout ? 14 : 11,
                 TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
 
             var desc = LotdUiKit.CreateRect("Description", panel,
                 new Vector2(0f, .211f), new Vector2(1f, _mobileLayout ? .506f : .343f),
                 new Vector2(inset, 0f), new Vector2(-inset, 0f));
-            LotdUiKit.AddImage(desc.gameObject, LotdUiKit.WhiteSprite, new Color(0.025f, 0.067f, 0.118f, 0.64f));
+            DeckEditorStyle.Fill(desc, DeckEditorStyle.Inset);
             var ownership = LotdUiKit.CreateRect("Ownership", desc, Vector2.up, Vector2.one,
                 new Vector2(8f, -29f), new Vector2(-10f, -4f));
-            LotdUiKit.AddImage(ownership.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelNavy, false, false);
+            LotdUiKit.AddImage(ownership.gameObject, LotdUiKit.WhiteSprite, DeckEditorStyle.Surface, false, false);
             _previewOwnership = LotdUiKit.AddFittedText(ownership, "Count", "", 15, 11,
                 TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
             _previewOwnership.rectTransform.anchorMax = new Vector2(.79f, .965f);
             var rarity = LotdUiKit.CreateRect("Rarity", ownership, new Vector2(.815f, .08f),
                 new Vector2(.984f, .92f), Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(rarity.gameObject, LotdUiKit.WhiteSprite, new Color(.09f, .15f, .26f), false, false);
+            DeckEditorStyle.Fill(rarity, DeckEditorStyle.Inset, false);
             _previewRarity = LotdUiKit.AddFittedText(rarity, "Value", "", 17, 12,
                 TextAnchor.MiddleCenter, LotdUiKit.TextPrimary, FontStyle.Bold);
             ownership.gameObject.SetActive(false);
@@ -442,24 +438,24 @@ namespace YGOPortable.UI
 
             var trade = LotdUiKit.CreateRect("Trade", panel, new Vector2(0f, .150f), new Vector2(1f, .205f),
                 new Vector2(inset, 0f), new Vector2(-inset, 0f));
-            _previewTrade = new CardTradeControls(trade, OpenCardCrafting, compact: true);
+            _previewTrade = new CardTradeControls(trade, OpenCardCrafting, compact: true, deckEditor: true);
 
             var related = LotdUiKit.CreateRect("RelatedCards", panel,
                 new Vector2(0f, .094f), new Vector2(.5f, .145f), new Vector2(inset, 0f), new Vector2(-4f, 0f));
-            LotdUiKit.CreateLotdButton(related, "Button", "연관 카드 검색", () => FilterRelatedCards(_inspectedCode), 14);
+            DeckEditorStyle.Button(related, "Button", "연관 카드 검색", () => FilterRelatedCards(_inspectedCode), 14);
             var crafting = LotdUiKit.CreateRect("Crafting", panel,
                 new Vector2(.5f, .094f), new Vector2(1f, .145f), new Vector2(4f, 0f), new Vector2(-inset, 0f));
-            _cardCraftingButton = LotdUiKit.CreateLotdButton(crafting, "Button", "제작·분해",
+            _cardCraftingButton = DeckEditorStyle.Button(crafting, "Button", "제작·분해",
                 () => OpenCardCrafting(_inspectedCode), 14);
             var add = LotdUiKit.CreateRect("AddCard", panel,
                 new Vector2(0f, .034f), new Vector2(_mobileLayout ? .5f : 1f, .085f),
                 new Vector2(inset, 0f), new Vector2(_mobileLayout ? -4f : -inset, 0f));
-            LotdUiKit.CreateLotdButton(add, "Button", "카드 조작", OpenInspectedCardActions, 14, true);
+            DeckEditorStyle.Button(add, "Button", "카드 조작", OpenInspectedCardActions, 14, true);
             if (_mobileLayout)
             {
                 var read = LotdUiKit.CreateRect("ReadCard", panel, new Vector2(.5f, .034f), new Vector2(1f, .085f),
                     new Vector2(4f, 0f), new Vector2(-inset, 0f));
-                LotdUiKit.CreateLotdButton(read, "Button", "효과 크게 보기", () => OpenExpandedDeckCard(_inspectedCode), 17);
+                DeckEditorStyle.Button(read, "Button", "효과 크게 보기", () => OpenExpandedDeckCard(_inspectedCode), 17);
             }
         }
 
@@ -499,7 +495,7 @@ namespace YGOPortable.UI
 
         private void BuildTrunkPanel(Transform rt)
         {
-            var col = LotdUiKit.CreateMenuPanel(rt, "Trunk",
+            var col = DeckEditorStyle.Panel(rt, "Trunk",
                 new Vector2(.015f, .053f), new Vector2(_mobileLayout ? .334f : .296f, .899f));
             _trunkPanel = col;
 
@@ -507,14 +503,14 @@ namespace YGOPortable.UI
             var insideRight = -insideLeft;
             var caption = LotdUiKit.CreateBorderedPanel(col, "TrunkHeading",
                 new Vector2(0f, .889f), new Vector2(1f, .944f), insideLeft, insideRight,
-                LotdUiKit.PanelNavy, new Color(.27f, .63f, .82f, .74f));
+                DeckEditorStyle.Header, DeckEditorStyle.Edge);
             var heading = LotdUiKit.CreateRect("Title", caption, new Vector2(.225f, 0f), new Vector2(.775f, 1f),
                 Vector2.zero, Vector2.zero);
             _trunkHeading = LotdUiKit.AddFittedText(heading, "Label", "보관함", 21, 12,
                 TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
             var showAll = LotdUiKit.CreateRect("ShowAll", caption, new Vector2(.012f, .10f), new Vector2(.221f, .90f),
                 Vector2.zero, Vector2.zero);
-            _showAllCards = LotdUiKit.CreateLotdButton(showAll, "Button", "전체 카드", ExitTrunkScope, 13);
+            _showAllCards = DeckEditorStyle.Button(showAll, "Button", "전체 카드", ExitTrunkScope, 13);
             var count = LotdUiKit.CreateRect("Total", caption, new Vector2(.785f, 0f), new Vector2(.978f, 1f),
                 Vector2.zero, Vector2.zero);
             _trunkCountText = LotdUiKit.AddFittedText(count, "Count", "", 17, 12, TextAnchor.MiddleRight, Color.white, FontStyle.Bold);
@@ -523,11 +519,11 @@ namespace YGOPortable.UI
                 new Vector2(1f, .878f), insideLeft, insideRight);
             var search = LotdUiKit.CreateRect("SearchBox", searchRow, Vector2.zero, new Vector2(0.74f, 1f),
                 Vector2.zero, Vector2.zero);
-            _searchInp = LotdUiKit.CreateInputField(search, "Search", "카드명·효과·카드 번호", 15);
+            _searchInp = DeckEditorStyle.Input(search, "Search", "카드명·효과·카드 번호", 15);
             _searchInp.onValueChanged.AddListener(_ => RefreshTrunkFilter());
             var reset = LotdUiKit.CreateRect("ResetFilters", searchRow, new Vector2(0.76f, 0f), Vector2.one,
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(reset, "Button", "필터 초기화", ResetTrunkFilters, 14);
+            DeckEditorStyle.Button(reset, "Button", "필터 초기화", ResetTrunkFilters, 14);
 
             var filters = LotdUiKit.CreateRect("Filters", col, new Vector2(0f, .764f), new Vector2(1f, .816f),
                 insideLeft, insideRight);
@@ -535,7 +531,7 @@ namespace YGOPortable.UI
             {
                 var slot = LotdUiKit.CreateRect(name, filters, new Vector2(left, 0f), new Vector2(right, 1f),
                     Vector2.zero, Vector2.zero);
-                var dropdown = LotdUiKit.CreateLotdDropdown(slot, "Dropdown", choices, changed);
+                var dropdown = DeckEditorStyle.Dropdown(slot, "Dropdown", choices, changed);
                 dropdown.captionText.alignment = TextAnchor.MiddleCenter;
                 return dropdown;
             }
@@ -543,7 +539,7 @@ namespace YGOPortable.UI
             _sortFilter = AddFilter("Sort", .336f, .632f, SortOptions, _ => RefreshTrunkFilter());
             var ownership = LotdUiKit.CreateRect("Ownership", filters, new Vector2(.647f, 0f), Vector2.one,
                 Vector2.zero, Vector2.zero);
-            _trunkOwnershipToggle = LotdUiKit.CreateLotdButton(ownership, "Button", "보유 카드만", () =>
+            _trunkOwnershipToggle = DeckEditorStyle.Button(ownership, "Button", "보유 카드만", () =>
             {
                 var selection = _trunkCollectionFilters.Selection;
                 _trunkOwnedOnly = selection.Ownership == 0 ? !TrunkShowsOwnedOnly : selection.Ownership == 2;
@@ -559,11 +555,11 @@ namespace YGOPortable.UI
                 new Vector2(1f, .093f), insideLeft, insideRight);
             var advanced = LotdUiKit.CreateRect("DetailedSearch", searchOptions, Vector2.zero,
                 new Vector2(.49f, 1f), Vector2.zero, Vector2.zero);
-            _detailButtonText = LotdUiKit.CreateLotdButton(advanced, "Button", "필터", ToggleDetailedSearch, 15, true)
+            _detailButtonText = DeckEditorStyle.Button(advanced, "Button", "필터", ToggleDetailedSearch, 15, true)
                 .GetComponentInChildren<Text>();
             var archetype = LotdUiKit.CreateRect("ArchetypeSearch", searchOptions, new Vector2(.51f, 0f),
                 Vector2.one, Vector2.zero, Vector2.zero);
-            LotdUiKit.CreateLotdButton(archetype, "Button", "카드군 검색", OpenArchetypeSearch, 15);
+            DeckEditorStyle.Button(archetype, "Button", "카드군 검색", OpenArchetypeSearch, 15);
 
             BuildQuickFilters(col, insideLeft, insideRight);
 
@@ -607,13 +603,8 @@ namespace YGOPortable.UI
                 track.offsetMin = new Vector2(1f, 1f);
                 track.offsetMax = new Vector2(-1f, 9f);
                 scrollbar.direction = Scrollbar.Direction.LeftToRight;
-                var image = track.GetComponent<Image>();
-                image.sprite = LotdUiKit.WhiteSprite;
-                image.color = new Color(.035f, .085f, .13f);
             }
-            var thumb = (Image)scrollbar.targetGraphic;
-            thumb.sprite = LotdUiKit.WhiteSprite;
-            thumb.color = new Color(.35f, .78f, .96f);
+            DeckEditorStyle.ApplyScrollbar(scrollbar);
             return scrollbar;
         }
 
@@ -654,8 +645,8 @@ namespace YGOPortable.UI
 
         private void BuildDeckPanel(Transform root)
         {
-            var panel = LotdUiKit.CreateMenuPanel(root, "Deck",
-                new Vector2(_mobileLayout ? .574f : .558f, .053f), new Vector2(.985f, .899f), true);
+            var panel = DeckEditorStyle.Panel(root, "Deck",
+                new Vector2(_mobileLayout ? .574f : .558f, .053f), new Vector2(.985f, .899f));
             _deckPanel = panel;
 
             var header = LotdUiKit.CreateRect("DeckControls", panel,
@@ -664,7 +655,7 @@ namespace YGOPortable.UI
             {
                 var holder = LotdUiKit.CreateRect(name, row, new Vector2(x, 0f), new Vector2(x + width, 1f),
                     Vector2.zero, Vector2.zero);
-                return LotdUiKit.CreateLotdButton(holder, "Button", label, action, 14, gold);
+                return DeckEditorStyle.Button(holder, "Button", label, action, 14, gold);
             }
 
             Control(header, "Previous", "◀", 0f, 0.081f, () => SwitchUserDeck(-1));
@@ -679,7 +670,7 @@ namespace YGOPortable.UI
 
             var edit = LotdUiKit.CreateRect("EditControls", panel,
                 new Vector2(0f, .827f), new Vector2(1f, .878f), new Vector2(28f, 0f), new Vector2(-28f, 0f));
-            _deckNameInput = LotdUiKit.CreateInputField(LotdUiKit.CreateRect("DeckName", edit, Vector2.zero,
+            _deckNameInput = DeckEditorStyle.Input(LotdUiKit.CreateRect("DeckName", edit, Vector2.zero,
                 new Vector2(0.430f, 1f), Vector2.zero, Vector2.zero), "Input", "덱 이름", 15);
             _deckNameInput.onValueChanged.AddListener(_ => RefreshSaveLabel());
             _wholeSortButton = Control(edit, "Sort", "정렬 옵션", .442f, .17f, OpenWholeDeckSort);
@@ -806,15 +797,15 @@ namespace YGOPortable.UI
         {
             var label = LotdUiKit.CreateRect(name + "Tab", panel, new Vector2(0f, top),
                 new Vector2(0.194f, top + 0.033f), new Vector2(28f, 0f), Vector2.zero);
-            LotdUiKit.AddImage(label.gameObject, LotdUiKit.LoadSprite("LOTD/Shared/tab-title-box"), Color.white, false, false);
+            DeckEditorStyle.Fill(label, DeckEditorStyle.Header, false);
             LotdUiKit.AddText(label, "Label", title, 14, TextAnchor.MiddleCenter,
-                new Color(0.02f, 0.09f, 0.17f), FontStyle.Bold);
+                LotdUiKit.TextPrimary, FontStyle.Bold);
             var count = LotdUiKit.AddFittedText(LotdUiKit.CreateRect(name + "Count", panel,
                 new Vector2(0.6f, top), new Vector2(1f, top + 0.034f), Vector2.zero, new Vector2(-28f, 0f)),
                 "Text", "", 16, 11, TextAnchor.MiddleRight, Color.white, FontStyle.Bold);
             var grid = LotdUiKit.CreateRect(name + "Grid", panel, new Vector2(0f, bottom),
                 new Vector2(1f, top), new Vector2(28f, 0f), new Vector2(-28f, 0f));
-            LotdUiKit.AddImage(grid.gameObject, LotdUiKit.WhiteSprite, new Color(0.08f, 0.35f, 0.47f, 0.68f));
+            DeckEditorStyle.Fill(grid, DeckEditorStyle.Inset);
             return (grid, count);
         }
 
@@ -1746,8 +1737,8 @@ namespace YGOPortable.UI
         {
             var dim = LotdUiKit.FillRect("Modal_DeckChanges", parent);
             _deckDialog = dim.gameObject;
-            LotdUiKit.AddImage(_deckDialog, LotdUiKit.WhiteSprite, new Color(0f, 0.02f, 0.08f, 0.80f));
-            var window = LotdUiKit.CreateMenuPanel(dim, "Window", new Vector2(0.29f, 0.36f), new Vector2(0.71f, 0.64f));
+            LotdUiKit.AddImage(_deckDialog, LotdUiKit.WhiteSprite, DeckEditorStyle.Scrim);
+            var window = DeckEditorStyle.Panel(dim, "Window", new Vector2(0.29f, 0.36f), new Vector2(0.71f, 0.64f));
             var title = LotdUiKit.CreateRect("Title", window, new Vector2(0.05f, 0.72f), new Vector2(0.95f, 0.93f),
                 Vector2.zero, Vector2.zero);
             _deckDialogTitle = LotdUiKit.AddText(title, "Text", "", 23, TextAnchor.MiddleCenter,
@@ -1761,7 +1752,7 @@ namespace YGOPortable.UI
             {
                 var holder = LotdUiKit.CreateRect(name, window, new Vector2(left, 0.10f), new Vector2(right, 0.29f),
                     Vector2.zero, Vector2.zero);
-                return LotdUiKit.CreateLotdButton(holder, "Button", label, action, 15, gold);
+                return DeckEditorStyle.Button(holder, "Button", label, action, 15, gold);
             }
             _deckDialogCancel = AddButton("Cancel", "취소", 0.05f, 0.33f, () => CloseDeckDialog());
             _deckDialogSecondary = AddButton("Secondary", "", 0.36f, 0.64f, null);
@@ -1831,18 +1822,18 @@ namespace YGOPortable.UI
         {
             var dim = LotdUiKit.FillRect("Modal_ArchetypeBrowser", parent);
             _archModalRoot = dim.gameObject;
-            LotdUiKit.AddImage(dim.gameObject, LotdUiKit.WhiteSprite, new Color(0f, 0.02f, 0.08f, 0.80f));
+            DeckEditorStyle.Fill(dim, DeckEditorStyle.Scrim);
             var backdrop = dim.gameObject.AddComponent<Button>();
             backdrop.navigation = new Navigation { mode = Navigation.Mode.None };
             backdrop.onClick.AddListener(() => CloseArchetypeModal());
 
-            var win = LotdUiKit.CreateMenuPanel(dim, "Win",
+            var win = DeckEditorStyle.Panel(dim, "Win",
                 new Vector2(.105f, .075f), new Vector2(.895f, .925f));
             win.gameObject.AddComponent<Button>().interactable = false; // Catch clicks on the panel background without taking focus.
 
             var hdr = LotdUiKit.CreateRect("Hdr", win, new Vector2(.034f, .854f), new Vector2(.966f, .956f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(hdr.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelHeader, false, false);
+            LotdUiKit.AddImage(hdr.gameObject, LotdUiKit.WhiteSprite, DeckEditorStyle.Header, false, false);
             var title = LotdUiKit.CreateRect("Title", hdr, new Vector2(.17f, .43f), new Vector2(.83f, .97f),
                 Vector2.zero, Vector2.zero);
             _archTitle = LotdUiKit.AddFittedText(title, "T", "", 26, 20, TextAnchor.MiddleCenter,
@@ -1854,16 +1845,16 @@ namespace YGOPortable.UI
 
             var closeRt = LotdUiKit.CreateRect("Close", hdr, new Vector2(.855f, .20f), new Vector2(.985f, .80f),
                 Vector2.zero, Vector2.zero);
-            _archCloseButton = LotdUiKit.CreateLotdButton(closeRt, "B", "닫기", () => CloseArchetypeModal(), 16);
+            _archCloseButton = DeckEditorStyle.Button(closeRt, "B", "닫기", () => CloseArchetypeModal(), 16);
 
             var filterRow = LotdUiKit.CreateRect("FilterRow", win, new Vector2(.034f, .777f), new Vector2(.966f, .839f),
                 Vector2.zero, Vector2.zero);
-            _archSearchInp = LotdUiKit.CreateInputField(
+            _archSearchInp = DeckEditorStyle.Input(
                 LotdUiKit.CreateRect("ArchSearch", filterRow, Vector2.zero, new Vector2(.58f, 1f), Vector2.zero, Vector2.zero),
                 "S", "카드군 이름·소속 카드명 검색", 17);
             _archSearchInp.onValueChanged.AddListener(_ => RefreshArchetypeModal());
 
-            var sortBtn = LotdUiKit.CreateLotdButton(
+            var sortBtn = DeckEditorStyle.Button(
                 LotdUiKit.CreateRect("SortArch", filterRow, new Vector2(.60f, 0f), new Vector2(.80f, 1f), Vector2.zero, Vector2.zero),
                 "B", "정렬 · 카드 수", () =>
                 {
@@ -1875,7 +1866,7 @@ namespace YGOPortable.UI
 
             var count = LotdUiKit.CreateRect("ArchCnt", filterRow, new Vector2(.82f, .08f), new Vector2(1f, .92f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(count.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelNavy, false, false);
+            LotdUiKit.AddImage(count.gameObject, LotdUiKit.WhiteSprite, DeckEditorStyle.Surface, false, false);
             _archCountText = LotdUiKit.AddFittedText(count, "C", "0개 카드군", 17, 13, TextAnchor.MiddleCenter,
                 LotdUiKit.TextPrimary, FontStyle.Bold);
 
@@ -1906,7 +1897,7 @@ namespace YGOPortable.UI
                 {
                     var tile = LotdUiKit.CreateBorderedPanel(_archContent, $"ArchTile_{r}_{c}",
                         new Vector2(0, 1), new Vector2(0, 1), Vector2.zero, Vector2.zero,
-                        new Color(0.04f, 0.10f, 0.22f, 0.96f), LotdUiKit.CyanAccent);
+                        DeckEditorStyle.Inset, DeckEditorStyle.Edge);
                     tile.pivot = new Vector2(0, 1);
 
                     var thumbRt = LotdUiKit.CreateRect("Card", tile, new Vector2(.025f, .043f), new Vector2(.365f, .957f), Vector2.zero, Vector2.zero);
@@ -1925,7 +1916,7 @@ namespace YGOPortable.UI
 
                     var btnRt = LotdUiKit.CreateRect("LoadBtn", tile, new Vector2(.39f, .07f), new Vector2(.96f, .36f),
                         Vector2.zero, Vector2.zero);
-                    var loadBtn = LotdUiKit.CreateLotdButton(btnRt, "B", "", null, 15, gold: true);
+                    var loadBtn = DeckEditorStyle.Button(btnRt, "B", "", null, 15, primary: true);
 
                     _archPool.Add((tile, cv, tTxt, sTxt, loadBtn, inspectBtn));
                 }

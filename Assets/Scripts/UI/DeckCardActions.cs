@@ -40,12 +40,12 @@ namespace YGOPortable.UI
             dismiss.navigation = new Navigation { mode = Navigation.Mode.None };
             dismiss.onClick.AddListener(CloseDeckCardActions);
 
-            _deckCardActionPanel = LotdUiKit.CreateMenuPanel(overlay, "Window", overlay.pivot, overlay.pivot);
+            _deckCardActionPanel = DeckEditorStyle.Panel(overlay, "Window", overlay.pivot, overlay.pivot);
             _deckCardActionPanel.pivot = new Vector2(0f, 1f);
             _deckCardActionPanel.sizeDelta = new Vector2(CardActionWidth, CardActionHeight);
             var title = LotdUiKit.CreateRect("Title", _deckCardActionPanel, new Vector2(.10f, .81f), new Vector2(.90f, .906f),
                 Vector2.zero, Vector2.zero);
-            LotdUiKit.AddImage(title.gameObject, LotdUiKit.WhiteSprite, LotdUiKit.PanelNavy, false, false);
+            LotdUiKit.AddImage(title.gameObject, LotdUiKit.WhiteSprite, DeckEditorStyle.Surface, false, false);
             _deckCardActionTitle = LotdUiKit.AddFittedText(title, "Text", "", 18, 12,
                 TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
 
@@ -53,7 +53,7 @@ namespace YGOPortable.UI
             {
                 var row = LotdUiKit.CreateRect(name, _deckCardActionPanel, Vector2.zero, Vector2.one,
                     Vector2.zero, Vector2.zero);
-                return LotdUiKit.CreateLotdButton(row, "Button", label, action, 17);
+                return DeckEditorStyle.Button(row, "Button", label, action, 17);
             }
 
             var quantity = LotdUiKit.CreateRect("Quantity", _deckCardActionPanel, new Vector2(.10f, .685f),
@@ -62,7 +62,7 @@ namespace YGOPortable.UI
             {
                 var cell = LotdUiKit.CreateRect(name, quantity, new Vector2(min, 0f), new Vector2(max, 1f),
                     Vector2.zero, Vector2.zero);
-                return LotdUiKit.CreateLotdButton(cell, "Button", label, null, 19);
+                return DeckEditorStyle.Button(cell, "Button", label, null, 19);
             }
             _deckQuantityMinus = Amount("Remove", "−", 0f, .23f);
             _deckQuantityPlus = Amount("Add", "+", .26f, .49f);

@@ -19,19 +19,19 @@ namespace YGOPortable.UI
                 new Vector2(inset, 0f), new Vector2(-4f, 0f));
             var right = LotdUiKit.CreateRect("Artwork", panel, new Vector2(.33f, .924f), new Vector2(.666f, .982f),
                 new Vector2(3f, 0f), new Vector2(-3f, 0f));
-            _inspectEdition = LotdUiKit.CreateLotdButton(left, "Button", "일반판", () =>
+            _inspectEdition = DeckEditorStyle.Button(left, "Button", "일반판", () =>
             {
                 var (cards, index) = InspectedDeckSlot(_inspectedCode);
                 ChangeEdition(_inspectedCode, cards, index);
             }, 14);
-            _inspectArtwork = LotdUiKit.CreateLotdButton(right, "Button", "일러스트 변경", () =>
+            _inspectArtwork = DeckEditorStyle.Button(right, "Button", "일러스트 변경", () =>
             {
                 var (cards, index) = InspectedDeckSlot(_inspectedCode);
                 ChangeArtwork(_inspectedCode, cards, index);
             }, 13);
             var destiny = LotdUiKit.CreateRect("DestinyDraw", panel, new Vector2(.666f, .924f), new Vector2(1f, .982f),
                 new Vector2(4f, 0f), new Vector2(-inset, 0f));
-            _inspectDestiny = LotdUiKit.CreateLotdButton(destiny, "Button", "데스티니 지정", () =>
+            _inspectDestiny = DeckEditorStyle.Button(destiny, "Button", "데스티니 지정", () =>
             {
                 var (cards, index) = InspectedDeckSlot(_inspectedCode);
                 ToggleDestiny(_inspectedCode, cards, index);

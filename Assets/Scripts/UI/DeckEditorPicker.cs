@@ -19,13 +19,12 @@ namespace YGOPortable.UI
         private void BuildDeckPicker(Transform parent)
         {
             _deckPicker = LotdUiKit.FillRect("DeckPicker", parent);
-            LotdUiKit.AddImage(LotdUiKit.FillRect("Backdrop", _deckPicker).gameObject,
-                LotdUiKit.LoadSprite("LOTD/Background/bg_vrains"), new Color(.48f, .30f, .41f), false, false);
-            LotdUiKit.AddMenuHeader(_deckPicker, "편집할 덱 선택");
+            DeckEditorStyle.Backdrop(_deckPicker);
+            DeckEditorStyle.AddHeader(_deckPicker, "편집할 덱 선택");
             DeckButton(_deckPicker, "Back", "메인 메뉴", .833f, .914f, .981f, .979f,
                 CloseDeckPickerToMenu, fontSize: _mobileLayout ? 22 : 17);
 
-            var panel = LotdUiKit.CreateMenuPanel(_deckPicker, "SavedDecks", new Vector2(.047f, .053f), new Vector2(.953f, .9f));
+            var panel = DeckEditorStyle.Panel(_deckPicker, "SavedDecks", new Vector2(.047f, .053f), new Vector2(.953f, .9f));
             var title = DeckArea(panel, "Title", .025f, .843f, .62f, .95f);
             LotdUiKit.AddFittedText(title, "Label", "저장된 덱", _mobileLayout ? 30 : 26, 16,
                 TextAnchor.MiddleLeft, LotdUiKit.TextPrimary, FontStyle.Bold);
@@ -33,7 +32,7 @@ namespace YGOPortable.UI
                 CreateNewUserDeck, accent: true, fontSize: _mobileLayout ? 24 : 19);
 
             var list = DeckArea(panel, "List", .025f, .104f, .976f, .826f);
-            LotdUiKit.AddImage(list.gameObject, LotdUiKit.WhiteSprite, new Color(.026f, .056f, .103f, .92f));
+            DeckEditorStyle.Fill(list, DeckEditorStyle.Inset);
             var viewport = LotdUiKit.FillRect("Viewport", list, 6f);
             viewport.offsetMax = new Vector2(-20f, -6f);
             viewport.gameObject.AddComponent<RectMask2D>();
@@ -87,7 +86,7 @@ namespace YGOPortable.UI
             {
                 var deck = DeckRepository.UserDecks[i];
                 string id = deck.id;
-                var item = LotdUiKit.CreateLotdButton(_deckPickerRows, $"SavedDeck_{i}", "", () =>
+                var item = DeckEditorStyle.Button(_deckPickerRows, $"SavedDeck_{i}", "", () =>
                 {
                     int index = DeckRepository.UserDecks.FindIndex(candidate => candidate.id == id);
                     if (index >= 0) EnterDeckEditor(index);

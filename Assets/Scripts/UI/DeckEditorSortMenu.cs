@@ -37,7 +37,7 @@ namespace YGOPortable.UI
         {
             var holder = LotdUiKit.CreateRect("MainSort", panel, new Vector2(.23f, .79f),
                 new Vector2(.56f, .824f), Vector2.zero, Vector2.zero);
-            var button = LotdUiKit.CreateLotdButton(holder, "Button", "메인 정렬 ▼", open, 15);
+            var button = DeckEditorStyle.Button(holder, "Button", "메인 정렬 ▼", open, 15);
             var caption = button.GetComponentInChildren<Text>();
             caption.resizeTextForBestFit = true;
             caption.resizeTextMaxSize = 15;
@@ -50,12 +50,12 @@ namespace YGOPortable.UI
             var overlay = LotdUiKit.FillRect("MainDeckSort", parent);
             _mainSortMenu = overlay.gameObject;
             var backdrop = LotdUiKit.FillRect("Dismiss", overlay);
-            LotdUiKit.AddImage(backdrop.gameObject, LotdUiKit.WhiteSprite, new Color(0f, .02f, .065f, .42f));
+            DeckEditorStyle.Fill(backdrop, new Color(DeckEditorStyle.Scrim.r, DeckEditorStyle.Scrim.g, DeckEditorStyle.Scrim.b, .48f));
             var dismiss = new EventTrigger.Entry { eventID = EventTriggerType.PointerClick };
             dismiss.callback.AddListener(_ => CloseMainDeckSort());
             backdrop.gameObject.AddComponent<EventTrigger>().triggers.Add(dismiss);
 
-            var menu = LotdUiKit.CreateMenuPanel(overlay, "Window", new Vector2(.635f, .274f), new Vector2(.96f, .723f));
+            var menu = DeckEditorStyle.Panel(overlay, "Window", new Vector2(.635f, .274f), new Vector2(.96f, .723f));
             var title = SortMenuRow(menu, "Title", .833f, .956f);
             _deckSortTitle = LotdUiKit.AddFittedText(title, "Text", "메인 덱 정렬", 23, 15, TextAnchor.MiddleCenter,
                 LotdUiKit.GoldAccent, FontStyle.Bold);
@@ -64,15 +64,15 @@ namespace YGOPortable.UI
                 int choice = index;
                 float top = .813f - index * .123f;
                 var row = SortMenuRow(menu, $"Order_{index}", top - .103f, top);
-                _mainSortOptions[index] = LotdUiKit.CreateLotdButton(row, "Button", MainSortOptions[index].Label,
+                _mainSortOptions[index] = DeckEditorStyle.Button(row, "Button", MainSortOptions[index].Label,
                     () => ChooseMainSort(choice), 17);
             }
-            _wholeSortOptions[0] = LotdUiKit.CreateLotdButton(SortMenuRow(menu, "WholeDefault", .640f, .767f),
+            _wholeSortOptions[0] = DeckEditorStyle.Button(SortMenuRow(menu, "WholeDefault", .640f, .767f),
                 "Button", "종류·이름순", () => ChooseWholeSort(byFrame: false), 17);
-            _wholeSortOptions[1] = LotdUiKit.CreateLotdButton(SortMenuRow(menu, "WholeFrame", .465f, .592f),
+            _wholeSortOptions[1] = DeckEditorStyle.Button(SortMenuRow(menu, "WholeFrame", .465f, .592f),
                 "Button", "카드 프레임별", () => ChooseWholeSort(byFrame: true), 17);
             var cancel = SortMenuRow(menu, "Cancel", .075f, .182f);
-            LotdUiKit.CreateLotdButton(cancel, "Button", "취소", () => CloseMainDeckSort(), 16);
+            DeckEditorStyle.Button(cancel, "Button", "취소", () => CloseMainDeckSort(), 16);
             _mainSortMenu.SetActive(false);
         }
 

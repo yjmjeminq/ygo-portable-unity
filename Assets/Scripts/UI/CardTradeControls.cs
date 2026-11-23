@@ -10,7 +10,8 @@ namespace YGOPortable.UI
         private readonly Button[] _actions = new Button[4];
         private uint _code;
 
-        internal CardTradeControls(Transform parent, Action<uint, CardTradeAction> open, bool compact = false)
+        internal CardTradeControls(Transform parent, Action<uint, CardTradeAction> open, bool compact = false,
+            bool deckEditor = false)
         {
             string[] labels = compact ? new[] { "제작", "특별판 제작", "분해", "특별판 분해" } :
                 new[] { "일반 제작", "오버프레임 제작", "분해", "오버프레임 분해" };
@@ -24,8 +25,10 @@ namespace YGOPortable.UI
                 var holder = LotdUiKit.CreateRect(action.ToString(), parent,
                     new Vector2(left + .008f, top - 1f / rows + .025f),
                     new Vector2(left + 1f / columns - .008f, top - .025f), Vector2.zero, Vector2.zero);
-                var button = LotdUiKit.CreateLotdButton(holder, "Button", labels[i], () => open(_code, action),
-                    compact ? 14 : 18, i < 2);
+                int size = compact ? 14 : 18;
+                var button = deckEditor
+                    ? DeckEditorStyle.Button(holder, "Button", labels[i], () => open(_code, action), size, i < 2)
+                    : LotdUiKit.CreateLotdButton(holder, "Button", labels[i], () => open(_code, action), size, i < 2);
                 var text = button.GetComponentInChildren<Text>();
                 text.resizeTextForBestFit = true;
                 text.resizeTextMinSize = compact ? 8 : 11;
