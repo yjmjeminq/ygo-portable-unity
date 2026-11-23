@@ -339,7 +339,6 @@ namespace YGOPortable.UI
                 var back = DuelUiKit.CreateRect("Back", root, new Vector2(0.878f, 0.918f), new Vector2(0.985f, 0.976f),
                     Vector2.zero, Vector2.zero);
                 DeckEditorStyle.Button(back, "Button", "덱 목록", ReturnToDeckPicker, 15);
-
             }
 
             BuildTrunkPanel(root);
@@ -376,7 +375,7 @@ namespace YGOPortable.UI
                 new Vector2(_mobileLayout ? .340f : .015f, .053f), new Vector2(_mobileLayout ? .566f : .240f, .899f));
             float inset = _mobileLayout ? 17f : 20f;
             var card = DuelUiKit.CreateRect("LargeCard", panel,
-                new Vector2(.066f, _mobileLayout ? .677f : .501f), new Vector2(.934f, .917f), Vector2.zero, Vector2.zero);
+                new Vector2(.066f, _mobileLayout ? .677f : .558f), new Vector2(.934f, .917f), Vector2.zero, Vector2.zero);
             BuildAppearanceControls(panel, inset);
             _previewCard = CreatePrintedDeckCard(card, "Preview", detailedOverlay: true);
             DeckCardVisualMotion.Bind(_previewCard);
@@ -388,7 +387,7 @@ namespace YGOPortable.UI
             previewButton.onClick.AddListener(() => OpenExpandedDeckCard(_inspectedCode));
 
             var stats = DuelUiKit.CreateRect("Stats", panel,
-                new Vector2(0f, _mobileLayout ? .590f : .418f), new Vector2(1f, _mobileLayout ? .673f : .497f),
+                new Vector2(0f, _mobileLayout ? .590f : .499f), new Vector2(1f, _mobileLayout ? .673f : .553f),
                 new Vector2(inset, 0f), new Vector2(-inset, 0f));
             DeckEditorStyle.Fill(stats, DeckEditorStyle.Header, false);
             var icon = DuelUiKit.CreateRect("TypeIcon", stats, new Vector2(0.83f, 0.06f), new Vector2(0.975f, 0.94f),
@@ -398,14 +397,14 @@ namespace YGOPortable.UI
                 new Vector2(0.03f, 0f), new Vector2(0.81f, 1f), Vector2.zero, Vector2.zero),
                 "Text", "", _mobileLayout ? 19 : 17, 12, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
             var name = DuelUiKit.CreateRect("Name", panel,
-                new Vector2(0f, _mobileLayout ? .511f : .349f), new Vector2(1f, _mobileLayout ? .585f : .412f),
+                new Vector2(0f, _mobileLayout ? .511f : .441f), new Vector2(1f, _mobileLayout ? .585f : .493f),
                 new Vector2(inset, 0f), new Vector2(-inset, 0f));
             DuelUiKit.AddImage(name.gameObject, DuelUiKit.WhiteSprite, DeckEditorStyle.Surface, false, false);
             _previewName = DuelUiKit.AddFittedText(name, "Text", "", _mobileLayout ? 25 : 22, _mobileLayout ? 14 : 13,
                 TextAnchor.MiddleCenter, DuelUiKit.GoldAccent, FontStyle.Bold);
 
             var desc = DuelUiKit.CreateRect("Description", panel,
-                new Vector2(0f, .211f), new Vector2(1f, _mobileLayout ? .506f : .343f),
+                new Vector2(0f, .211f), new Vector2(1f, _mobileLayout ? .506f : .434f),
                 new Vector2(inset, 0f), new Vector2(-inset, 0f));
             DeckEditorStyle.Fill(desc, DeckEditorStyle.Inset);
             var ownership = DuelUiKit.CreateRect("Ownership", desc, Vector2.up, Vector2.one,
@@ -421,7 +420,7 @@ namespace YGOPortable.UI
                 TextAnchor.MiddleCenter, DuelUiKit.TextPrimary, FontStyle.Bold);
             ownership.gameObject.SetActive(false);
             var viewport = DuelUiKit.CreateRect("Viewport", desc, Vector2.zero, Vector2.one,
-                new Vector2(8f, _mobileLayout ? 7f : 16f), new Vector2(-21f, -5f));
+                new Vector2(8f, 7f), new Vector2(-21f, -5f));
             viewport.gameObject.AddComponent<RectMask2D>();
             _previewDesc = DuelUiKit.AddText(viewport, "Content", "", _mobileLayout ? 23 : 18, TextAnchor.UpperLeft, DuelUiKit.TextPrimary);
             _previewDesc.supportRichText = false;
@@ -443,6 +442,7 @@ namespace YGOPortable.UI
             _previewScroll.movementType = ScrollRect.MovementType.Clamped;
             _previewScroll.verticalScrollbar = AddDeckScrollbar(desc);
             _previewScroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
+            ((RectTransform)_previewScroll.verticalScrollbar.transform).offsetMin = new Vector2(-14f, 7f);
 
             var trade = DuelUiKit.CreateRect("Trade", panel, new Vector2(0f, .150f), new Vector2(1f, .205f),
                 new Vector2(inset, 0f), new Vector2(-inset, 0f));
@@ -1517,7 +1517,9 @@ namespace YGOPortable.UI
                 _dustBalance.text = $"제작 가루 {CollectionProgress.CraftDust:N0}";
             bool visible = CollectionProgress.Initialized && _workingDeck != null && CardDatabase.Get(_inspectedCode) != null;
             _previewOwnership.transform.parent.gameObject.SetActive(visible);
-            _previewScroll.viewport.offsetMax = new Vector2(-21f, visible ? -33f : -5f);
+            float top = visible ? -33f : -5f;
+            _previewScroll.viewport.offsetMax = new Vector2(-21f, top);
+            ((RectTransform)_previewScroll.verticalScrollbar.transform).offsetMax = new Vector2(-2f, top);
             if (!visible) return;
 
             long remaining = GetRemainingTrunkCopies(_inspectedCode, out long owned, out int inDeck);

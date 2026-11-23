@@ -43,6 +43,7 @@ namespace YGOPortable.Editor
                 editor = new DeckEditorUI(app, canvas.transform);
                 TestDeckEditing.OpenSavedDeck(editor);
                 VerifyDesktopLayout(editor);
+                VerifyDesktopCardDescription(editor, (RectTransform)canvas.transform);
                 VerifyQuickSearch(editor);
                 VerifyQuantitiesAndSort(editor);
                 VerifyRecipeActions(editor);
@@ -80,6 +81,46 @@ namespace YGOPortable.Editor
             Call(editor, "NavigatePadCards", Vector2Int.right, false);
             Require(Field<object>(editor, "_padArea").ToString() == "Trunk",
                 "Moving right from the deck did not return to the collection.");
+        }
+
+        private static void VerifyDesktopCardDescription(DeckEditorUI editor, RectTransform canvas)
+        {
+            var scroll = Field<ScrollRect>(editor, "_previewScroll");
+            var effect = Field<Text>(editor, "_previewDesc");
+            var ownership = Field<Text>(editor, "_previewOwnership").transform.parent;
+            var track = (RectTransform)scroll.verticalScrollbar.transform;
+            var longCard = CardDatabase.AllCards.First(card => card.desc?.Length > 500);
+            var originalSize = canvas.sizeDelta;
+            uint originalCard = Field<uint>(editor, "_inspectedCode");
+            try
+            {
+                foreach (var size in new[] { new Vector2(1600f, 900f), new Vector2(1280f, 720f) })
+                {
+                    canvas.sizeDelta = size;
+                    Canvas.ForceUpdateCanvases();
+                    Call(editor, "InspectCard", Magician);
+                    Call(editor, "InspectCard", longCard.code);
+                    Require(ownership.gameObject.activeInHierarchy && scroll.viewport.GetComponent<RectMask2D>() != null &&
+                        scroll.viewport.rect.height >= 5f * effect.fontSize,
+                        $"The effect preview did not have five lines of space with ownership shown at {size}.");
+                    Require(track.offsetMax.y == scroll.viewport.offsetMax.y && track.offsetMin.y == scroll.viewport.offsetMin.y,
+                        "The scrollbar did not align to the description below the ownership row.");
+                    Require(effect.text == longCard.desc && scroll.verticalScrollbar.gameObject.activeInHierarchy,
+                        "The full effect text was not available to scroll.");
+                    scroll.verticalNormalizedPosition = 0f;
+                    Require(scroll.content.anchoredPosition.y > 0f, "The effect preview could not scroll to its end.");
+                    Call(editor, "InspectCard", Magician);
+                    Require(Mathf.Approximately(scroll.content.anchoredPosition.y, 0f),
+                        "Changing cards retained the previous card's scroll position.");
+                }
+            }
+            finally
+            {
+                canvas.sizeDelta = originalSize;
+                Canvas.ForceUpdateCanvases();
+                Call(editor, "InspectCard", originalCard);
+            }
+            Debug.Log("[VERIFY DESKTOP DESCRIPTION] Long effects, ownership, and scrolling passed at 1600x900 and 1280x720.");
         }
 
         private static void VerifyQuickSearch(DeckEditorUI editor)
