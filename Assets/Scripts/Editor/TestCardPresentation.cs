@@ -220,23 +220,46 @@ namespace YGOPortable.Editor
             typeof(PackOpeningView).GetMethod("ShowResults", instance).Invoke(opening, null);
             opening.AdvanceResults(1f);
             var slot = parent.Find("Screen_PackOpening/Results/Cards/Card_0");
+            var select = (RectTransform)slot.Find("Select");
+            var tilt = select.GetComponent<CardOverframeInput>();
             var face = slot.Find("Select/Face/View").GetComponent<CompositeCardView>();
             var edition = (RectTransform)slot.Find("OverframeBadge");
             var rarity = (RectTransform)slot.Find("Rarity");
-            Require(!face.HasOverframe && !edition.gameObject.activeSelf && !rarity.gameObject.activeSelf,
+            Require(!face.HasOverframe && !tilt.enabled && !edition.gameObject.activeSelf && !rarity.gameObject.activeSelf,
                 "A sealed card in the pack exposed its edition or rarity.");
             slot.GetComponentInChildren<Button>().onClick.Invoke();
             opening.AdvanceResults(.241f);
             var portrait = face.transform.Find("AspectBox/Overframe/PortraitBounds/Depth");
             Require(face.HasOverframe && portrait.localScale.x > 1.07f && edition.gameObject.activeSelf &&
-                edition.anchorMax.y < ((RectTransform)slot.Find("Select")).anchorMin.y &&
-                rarity.gameObject.activeSelf && rarity.anchorMax.y < ((RectTransform)slot.Find("Select")).anchorMin.y &&
-                face.transform.Find("AspectBox/AtkDef").gameObject.activeInHierarchy,
+                edition.anchorMax.y < select.anchorMin.y &&
+                rarity.gameObject.activeSelf && rarity.anchorMax.y < select.anchorMin.y &&
+                !tilt.enabled && face.transform.Find("AspectBox/AtkDef").gameObject.activeInHierarchy,
                 "The pack's special portrait did not lift or its captions obscured the card face.");
             opening.AdvanceResults(1f);
-            Require(portrait.localScale.x <= 1.04f, "The opened card did not settle after flipping.");
+            Require(tilt.enabled && portrait.localScale.x <= 1.04f, "The opened card did not settle after flipping.");
+            var focus = select.GetComponent<StarterRowFocus>();
+            var pointer = new PointerEventData(EventSystem.current) { pointerId = 3, button = PointerEventData.InputButton.Left };
+            focus.OnSelect(pointer);
+            opening.AdvanceResults(.15f);
+            Canvas.ForceUpdateCanvases();
+            pointer.position = RectTransformUtility.WorldToScreenPoint(null, select.TransformPoint(select.rect.center));
+            tilt.OnPointerDown(pointer);
+            pointer.position += Vector2.right * select.rect.width * .19f;
+            tilt.OnDrag(pointer);
+            tilt.AdvancePose(.15f, 1f);
+            var background = (RectTransform)face.transform.Find("AspectBox/Overframe/FaceArtwork/ExpandedArtwork");
+            Require(Quaternion.Angle(face.transform.localRotation, Quaternion.identity) > 2f &&
+                ((RectTransform)portrait).anchoredPosition.x > 0f && background.anchoredPosition.x < 0f &&
+                portrait.localScale.x > 1.03f,
+                "Dragging the revealed card did not animate its three layers while retaining selection lift.");
+            tilt.OnPointerUp(pointer);
+            focus.OnDeselect(pointer);
+            opening.AdvanceResults(.15f);
+            tilt.AdvancePose(1f, 2f);
+            Require(Quaternion.Angle(face.transform.localRotation, Quaternion.identity) < .1f &&
+                Mathf.Approximately(portrait.localScale.x, 1f), "The tilted card did not reset after release.");
             opening.Hide();
-            Debug.Log("[VERIFY OVERFRAME PACK] Both captions stayed below the card and the portrait lifted after the flip.");
+            Debug.Log("[VERIFY OVERFRAME PACK] Captions, flip lift, drag parallax, selection and release passed.");
         }
 
         private static void VerifyPhysicalDeckAppearances()

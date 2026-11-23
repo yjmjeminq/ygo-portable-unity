@@ -19,7 +19,9 @@ namespace YGOPortable.UI
         private Vector2? _hover;
         private bool _overframeVisible;
 
-        internal static void Attach(RectTransform holder, CompositeCardView card, bool motionSensor)
+        internal float Lift { get; set; }
+
+        internal static CardOverframeInput Attach(RectTransform holder, CompositeCardView card, bool motionSensor)
         {
             var hit = LotdUiKit.AddImage(holder.gameObject, LotdUiKit.WhiteSprite, Color.clear);
             var input = holder.gameObject.AddComponent<CardOverframeInput>();
@@ -27,9 +29,12 @@ namespace YGOPortable.UI
             input._holder = holder;
             input._gyro = motionSensor && Application.isMobilePlatform && SystemInfo.supportsGyroscope ? Input.gyro : null;
             hit.raycastTarget = true;
+            return input;
         }
 
-        private void LateUpdate()
+        private void LateUpdate() => AdvancePose(Time.unscaledDeltaTime, Time.unscaledTime);
+
+        internal void AdvancePose(float delta, float elapsed)
         {
             if (_card == null) return;
             bool visible = _card.HasOverframe;
@@ -45,8 +50,8 @@ namespace YGOPortable.UI
             }
 
             Vector2 target = _pressed ? _drag : _hover ?? ReadMotion();
-            _depth = Vector2.Lerp(_depth, target, 1f - Mathf.Exp(-17f * Time.unscaledDeltaTime));
-            ShowDepth(_depth, Time.unscaledTime);
+            _depth = Vector2.Lerp(_depth, target, 1f - Mathf.Exp(-17f * delta));
+            ShowDepth(_depth, elapsed);
         }
 
         private void SetSensorEnabled(bool visible)
@@ -79,7 +84,8 @@ namespace YGOPortable.UI
         private void ShowDepth(Vector2 depth, float elapsed)
         {
             _card.transform.localRotation = Quaternion.Euler(-depth.y * 6f, depth.x * 9f, 0f);
-            _card.PoseOverframe(1f, 1f, depth, elapsed * .27f + depth.x * .18f);
+            var parallax = Vector2.ClampMagnitude(depth + Vector2.up * Lift * .45f, 1f);
+            _card.PoseOverframe(1f, 1f + .04f * Lift, parallax, elapsed * .27f + depth.x * .18f);
         }
 
         private void ResetPose()
@@ -95,6 +101,7 @@ namespace YGOPortable.UI
             SetSensorEnabled(false);
             _overframeVisible = false;
             _hover = null;
+            Lift = 0f;
             if (_holder != null) ResetPose();
         }
 

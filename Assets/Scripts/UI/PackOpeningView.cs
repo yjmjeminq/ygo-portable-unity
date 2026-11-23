@@ -22,6 +22,7 @@ namespace YGOPortable.UI
             internal RectTransform Face;
             internal CompositeCardView Card;
             internal CompositeCardView Reflection;
+            internal CardOverframeInput Tilt;
             internal Button Button;
             internal Text Name;
             internal Text RarityLabel;
@@ -227,6 +228,8 @@ namespace YGOPortable.UI
             shineRect.anchorMax = new Vector2(.97f, .982f);
             var shine = LotdUiKit.AddImage(shineRect.gameObject, LotdUiKit.WhiteSprite, Color.clear, false, false);
             var card = CompositeCardView.Create(face, "View", detailedOverlay: true);
+            var tilt = CardOverframeInput.Attach(buttonBounds, card, motionSensor: false);
+            tilt.enabled = false;
             var artwork = card.transform.Find("AspectBox");
             CompositeCardView reflection = null;
             if (row == rows - 1)
@@ -255,6 +258,7 @@ namespace YGOPortable.UI
                 Face = face,
                 Card = card,
                 Reflection = reflection,
+                Tilt = tilt,
                 Button = button,
                 Name = Label(slot, "Name", "", 0f, .081f, 1f, .173f, 15, PackShopStyle.TextPrimary),
                 Ownership = Label(slot, "Ownership", "", .373f, 0f, .56f, .079f, 13, PackShopStyle.TextMuted),
@@ -377,6 +381,8 @@ namespace YGOPortable.UI
                     UpdateFlip(pull, delta);
                     motionActive |= pull.Flipping;
                 }
+                pull.Tilt.enabled = pull.FaceUp && !pull.Flipping && pull.Card.HasOverframe;
+                pull.Tilt.Lift = pull.Lift;
             }
             _playback.enabled = motionActive;
         }
@@ -430,6 +436,7 @@ namespace YGOPortable.UI
 
         private static void SetFace(Pull pull, uint code, bool faceDown)
         {
+            if (faceDown) pull.Tilt.enabled = false;
             var appearance = pull.Award.Overframe && !faceDown
                 ? new DeckCardAppearance { overframe = true, artwork = CardArtLoader.FirstOverframeVariant(code) + 1 }
                 : default;
