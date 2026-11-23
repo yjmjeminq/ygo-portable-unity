@@ -21,13 +21,27 @@ namespace YGOPortable.Editor
 
         internal static void VerifyInterfaceIcons()
         {
-            foreach (string key in YgoConstants.RaceSpriteNames.Values.Concat(YgoConstants.AttributeSpriteNames.Values))
+            var identityKeys = YgoConstants.RaceSpriteNames.Values.Concat(YgoConstants.AttributeSpriteNames.Values)
+                .Concat(new[] { "attribute/spell", "attribute/trap" });
+            foreach (string key in identityKeys)
             {
-                Require(DuelUiIcons.Find(key) == null, $"A generated fallback is still registered for {key}.");
-                var supplied = CardArtLoader.GetDuelVisualsSprite("CardIcons/" + key + ".png") ??
-                    DuelUiKit.LoadSprite("Duel/CardIcons/" + key);
-                Require(DuelUiIcons.FindCardIdentity(key) == supplied, $"Could not resolve the supplied icon for {key}.");
+                var fallback = DuelUiIcons.Find(key);
+                Require(fallback != null, $"Missing built-in identity icon for {key}.");
+                VerifyIcon(key);
             }
+            foreach (var (key, type) in new (string, uint)[]
+            {
+                ("quickplay", YgoConstants.TYPE_SPELL | YgoConstants.TYPE_QUICKPLAY),
+                ("continuous", YgoConstants.TYPE_SPELL | YgoConstants.TYPE_CONTINUOUS),
+                ("equip", YgoConstants.TYPE_SPELL | YgoConstants.TYPE_EQUIP),
+                ("field", YgoConstants.TYPE_SPELL | YgoConstants.TYPE_FIELD),
+                ("ritual", YgoConstants.TYPE_SPELL | YgoConstants.TYPE_RITUAL),
+                ("counter", YgoConstants.TYPE_TRAP | YgoConstants.TYPE_COUNTER),
+            })
+                Require(DuelUiKit.GetSpellTrapSprite(type) == VerifyIcon("spelltrap/" + key),
+                    $"The card did not display its {key} subtype icon.");
+            Require(DuelUiKit.GetSpellTrapSprite(YgoConstants.TYPE_TRAP | YgoConstants.TYPE_CONTINUOUS) ==
+                DuelUiIcons.FindCardIdentity("spelltrap/continuous"), "Continuous traps did not share the requested icon.");
             Require(DuelUiIcons.Find("phase/main2") != null && DuelUiIcons.Action("SUMMONSP") != null &&
                 DuelUiKit.GetSpellTrapSprite(YgoConstants.TYPE_TRAP | YgoConstants.TYPE_COUNTER) != null,
                 "A phase, command, or spell and trap icon did not resolve.");
@@ -40,7 +54,20 @@ namespace YGOPortable.Editor
             if (fileSleeve != null)
                 Debug.Log($"[VERIFY DUEL SLEEVE] File-backed card sleeve active at {sleeve.texture.width}×{sleeve.texture.height}.");
             VerifyDuelVisualsOverrides();
-            Debug.Log("[VERIFY DUEL ICONS] Optional race and attribute artwork, phases, commands and spell/trap icons passed.");
+            Debug.Log("[VERIFY DUEL ICONS] All 41 packaged badges and override routes passed.");
+
+            static Sprite VerifyIcon(string key)
+            {
+                string assetName = DuelUiIcons.IdentityAssetName(key);
+                var packaged = DuelUiKit.LoadSprite("Duel/CardIcons/" + assetName);
+                Require(packaged != null && packaged.rect.width == 128f && packaged.rect.height == 128f,
+                    $"Missing or incorrectly sized packaged badge for {assetName}.");
+                var supplied = CardArtLoader.GetDuelVisualsSprite("CardIcons/" + assetName + ".png") ??
+                    CardArtLoader.GetDuelVisualsSprite("CardIcons/" + key + ".png");
+                var shown = DuelUiIcons.FindCardIdentity(key);
+                Require(shown == (supplied ?? packaged), $"Could not resolve the configured badge for {assetName}.");
+                return shown;
+            }
         }
 
         private static void VerifyDuelVisualsOverrides()
@@ -57,6 +84,7 @@ namespace YGOPortable.Editor
                 WriteImage(local, "CardIcons/attribute/light.png", 18, 18);
                 WriteImage(packaged, "CardIcons/attribute/light.png", 24, 24);
                 WriteImage(packaged, "CardIcons/race/dragon.png", 24, 24);
+                WriteImage(local, "CardIcons/race/soldier.png", 19, 19);
                 File.Copy(Path.Combine(Application.streamingAssetsPath, "cardart.idx"), Path.Combine(streaming, "cardart.idx"));
 
                 CardArtLoader.Shutdown();
@@ -67,6 +95,8 @@ namespace YGOPortable.Editor
                     "Local duel visuals did not override packaged artwork for the sleeve and attribute.");
                 Require(DuelUiKit.GetRaceSprite(YgoConstants.RACE_DRAGON)?.texture.width == 24,
                     "The race icon did not fall back to the packaged visuals.");
+                Require(DuelUiKit.GetRaceSprite(YgoConstants.RACE_WARRIOR)?.texture.width == 19,
+                    "The renamed warrior icon did not preserve a user's existing override.");
 
                 CardArtLoader.Shutdown();
                 File.Delete(Path.Combine(local, CardArtLoader.CardSleeveFile));

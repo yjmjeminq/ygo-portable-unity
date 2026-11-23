@@ -1755,6 +1755,10 @@ namespace YGOPortable.Editor
                 Require(body.GetComponentsInChildren<Button>().Length == 2, "The position picker showed an illegal choice.");
                 foreach (var choice in new[] { attackChoice, defenseChoice })
                 {
+                    var entry = CardDatabase.Get(cyberDragon);
+                    Require(choice.Find("Attribute")?.GetComponent<Image>().sprite == DuelUiKit.GetAttributeSprite(entry.attr) &&
+                        choice.Find("Race")?.GetComponent<Image>().sprite == DuelUiKit.GetRaceSprite(entry.race),
+                        "A face-up summon choice did not display its attribute and race badges.");
                     var stats = choice.Find("CombatStats");
                     Image atkRail = stats.Find("Attack/Rail").GetComponent<Image>();
                     Image defRail = stats.Find("Defense/Rail").GetComponent<Image>();
@@ -1812,7 +1816,8 @@ namespace YGOPortable.Editor
             modals.ShowPrompt(session, hidden);
             var hiddenChoice = body.Find($"Pos_{YgoConstants.POS_FACEDOWN_DEFENSE}");
             var hiddenCard = hiddenChoice.GetComponentInChildren<CompositeCardView>().transform.Find("AspectBox");
-            Require(hiddenChoice.Find("CombatStats") == null && hiddenCard.Find("CardBack").gameObject.activeSelf &&
+            Require(hiddenChoice.Find("CombatStats") == null && hiddenChoice.Find("Race") == null &&
+                hiddenChoice.Find("Attribute") == null && hiddenCard.Find("CardBack").gameObject.activeSelf &&
                 !window.Find("Hdr/SubtitleBand/Rating").gameObject.activeSelf,
                 "An unknown face-down choice exposed a card face or combat values.");
             hiddenChoice.GetComponent<Button>().onClick.Invoke();

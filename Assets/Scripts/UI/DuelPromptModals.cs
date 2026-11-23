@@ -1040,9 +1040,16 @@ namespace YGOPortable.UI
                 var slot = DuelStyle.Panel(_modalBody, $"Pos_{choice.position}",
                     new Vector2((float)i / choices.Length, 0f), new Vector2((float)(i + 1) / choices.Length, 1f),
                     new Vector2(4f, 0f), new Vector2(-4f, 0f));
-                var label = DuelUiKit.CreateRect("Label", slot, new Vector2(.04f, .865f), new Vector2(.96f, .985f),
+                bool showIdentity = card.IsMonster && !choice.faceDown;
+                var label = DuelUiKit.CreateRect("Label", slot, new Vector2(showIdentity ? .21f : .04f, .865f),
+                    new Vector2(showIdentity ? .79f : .96f, .985f),
                     Vector2.zero, Vector2.zero);
                 DuelUiKit.AddFittedText(label, "Text", choice.label, 15, 10, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+                if (showIdentity)
+                {
+                    AddIdentity("Attribute", DuelUiKit.GetAttributeSprite(card.Attribute), .055f, .195f);
+                    AddIdentity("Race", DuelUiKit.GetRaceSprite(card.Race), .805f, .945f);
+                }
                 var art = DuelUiKit.CreateRect("Card", slot,
                     new Vector2(.042f, card.IsMonster ? .175f : .045f), new Vector2(.958f, .851f),
                     Vector2.zero, Vector2.zero);
@@ -1061,6 +1068,14 @@ namespace YGOPortable.UI
                     DuelAudio.PlayClick();
                     Submit(BitConverter.GetBytes((int)choice.position));
                 });
+
+                void AddIdentity(string name, Sprite sprite, float min, float max)
+                {
+                    if (sprite == null) return;
+                    var icon = DuelUiKit.CreateRect(name, slot, new Vector2(min, .865f), new Vector2(max, .985f),
+                        Vector2.zero, Vector2.zero);
+                    DuelUiKit.AddImage(icon.gameObject, sprite, Color.white, true, false);
+                }
             }
         }
 

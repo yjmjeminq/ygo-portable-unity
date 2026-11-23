@@ -44,6 +44,7 @@ namespace YGOPortable.Editor
                 TestDeckEditing.OpenSavedDeck(editor);
                 VerifyDesktopLayout(editor);
                 VerifyDesktopCardDescription(editor, (RectTransform)canvas.transform);
+                VerifyIdentityBadges(editor);
                 VerifyQuickSearch(editor);
                 VerifyQuantitiesAndSort(editor);
                 VerifyRecipeActions(editor);
@@ -121,6 +122,43 @@ namespace YGOPortable.Editor
                 Call(editor, "InspectCard", originalCard);
             }
             Debug.Log("[VERIFY DESKTOP DESCRIPTION] Long effects, ownership, and scrolling passed at 1600x900 and 1280x720.");
+        }
+
+        private static void VerifyIdentityBadges(DeckEditorUI editor)
+        {
+            uint previous = Field<uint>(editor, "_inspectedCode");
+            var card = CardDatabase.Get(Magician);
+            var race = DuelUiKit.GetRaceSprite(card.race);
+            var attribute = DuelUiKit.GetAttributeSprite(card.attr);
+            Call(editor, "InspectCard", Magician);
+            Require(Field<Image>(editor, "_previewRaceIcon").sprite == race &&
+                Field<Image>(editor, "_previewAttributeIcon").sprite == attribute && race != null && attribute != null,
+                "The deck inspector did not show both card badges.");
+
+            Call(editor, "OpenDetailedSearch");
+            try
+            {
+                foreach (var (name, expected) in new[]
+                {
+                    ("Race", race), ("Attribute", attribute),
+                    ("SpellTrap", DuelUiKit.GetSpellTrapSprite(YgoConstants.TYPE_TRAP | YgoConstants.TYPE_COUNTER)),
+                })
+                {
+                    var facet = Field<Button[]>(editor, "_facetButtons").Single(button => button.transform.parent.name == name);
+                    facet.onClick.Invoke();
+                    var options = Field<List<Button>>(editor, "_optionButtons");
+                    Require(expected != null && !options[0].transform.Find("Icon").GetComponent<Image>().enabled &&
+                        options.Where(button => button.gameObject.activeInHierarchy).Any(button =>
+                            button.transform.Find("Icon").GetComponent<Image>() is { enabled: true } icon &&
+                            icon.sprite == expected), $"The {name} filter did not show the expected badge.");
+                }
+            }
+            finally
+            {
+                Call(editor, "CloseDetailedSearch");
+                Call(editor, "InspectCard", previous);
+            }
+            Debug.Log("[VERIFY DECK BADGES] Card details and race, attribute and subtype filters passed.");
         }
 
         private static void VerifyQuickSearch(DeckEditorUI editor)

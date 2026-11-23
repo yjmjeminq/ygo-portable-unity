@@ -77,7 +77,7 @@ namespace YGOPortable.UI
             return YgoConstants.AttributeSpriteNames.TryGetValue(attr, out var key) ? DuelUiIcons.FindCardIdentity(key) : null;
         }
 
-        internal static Sprite GetSpellTrapSprite(uint type) => DuelUiIcons.Find(YgoConstants.GetSpellTrapIconKey(type));
+        internal static Sprite GetSpellTrapSprite(uint type) => DuelUiIcons.FindSpellTrap(type);
 
         public static RectTransform CreateRect(string name, Transform parent,
             Vector2 anchorMin, Vector2 anchorMax, Vector2 offsetMin, Vector2 offsetMax)

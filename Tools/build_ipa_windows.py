@@ -256,7 +256,7 @@ def build(editor, github, branch, revision, scratch, local_cutins=None, local_in
     if local_interface:
         interface = prepare_local_interface(local_interface)
         visuals.update(interface)
-        print(f"    최종 IPA에 로컬 슬리브·속성·종족 이미지 {len(interface)}개를 포함합니다.")
+        print(f"    최종 IPA에 로컬 슬리브·페이즈·카드 아이콘 {len(interface)}개를 포함합니다.")
     snapshot = scratch / "Project"
     for name in ("Assets", "Packages", "ProjectSettings"):
         shutil.copytree(PROJECT / name, snapshot / name)
@@ -323,7 +323,7 @@ def main():
     parser.add_argument("--local-cutins", type=Path, metavar="DUEL_VISUALS",
                         help="PC의 DuelVisuals에서 컷인과 대응 일러스트를 최종 미서명 IPA에 추가합니다.")
     parser.add_argument("--local-interface", type=Path, metavar="DUEL_VISUALS",
-                        help="PC의 DuelVisuals에서 슬리브와 속성·종족 이미지를 최종 미서명 IPA에 추가합니다.")
+                        help="PC의 DuelVisuals에서 슬리브·페이즈·카드 아이콘을 최종 미서명 IPA에 추가합니다.")
     options = parser.parse_args()
     if sys.version_info < (3, 9):
         raise BuildError("Python 3.9 이상이 필요합니다.")

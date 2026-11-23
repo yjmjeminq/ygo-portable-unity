@@ -71,10 +71,12 @@ def prepare_local_visuals(directory):
 
 
 def prepare_local_interface(directory):
-    """Select the sleeve and individual identity icons supported by the game."""
+    """Select the sleeve, phase marks and identity icons supported by the game."""
     directory = directory.resolve(strict=True)
-    files = [directory / "Hud" / "DeckBack.png"]
-    for group in ("attribute", "race"):
+    files = [directory / "Hud" / f"{name}.png" for name in (
+        "DeckBack", "PhaseDraw", "PhaseStandby", "PhaseMain1", "PhaseBattle", "PhaseMain2", "PhaseEnd"
+    )]
+    for group in ("attribute", "race", "spelltrap"):
         files.extend(sorted((directory / "CardIcons" / group).glob("*.png")))
 
     visuals = {}
@@ -89,7 +91,7 @@ def prepare_local_interface(directory):
                 raise ValueError(f"Invalid local interface PNG: {relative}.")
         visuals[relative] = file
     if not visuals:
-        raise ValueError("No local sleeve or card identity PNG files were found.")
+        raise ValueError("No local sleeve, phase or card identity PNG files were found.")
     return visuals
 
 

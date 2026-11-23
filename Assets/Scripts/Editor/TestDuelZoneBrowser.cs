@@ -1388,6 +1388,7 @@ namespace YGOPortable.Editor
                 Require(picker != null && picker.gameObject.activeInHierarchy, "The phase dial did not open its picker.");
                 float previousX = float.NegativeInfinity;
                 float? rowY = null;
+                int suppliedMarks = 0;
                 foreach (var (name, enabled) in new[]
                 {
                     ("Draw", false), ("Standby", false), ("Main1", false),
@@ -1396,6 +1397,13 @@ namespace YGOPortable.Editor
                 {
                     var choice = picker.Find($"PhaseControls/{name}/Button")?.GetComponent<Button>();
                     Require(choice != null && choice.IsInteractable() == enabled, $"The phase picker mishandled the {name} command.");
+                    var mark = steps.Find($"{name}/Phase");
+                    var supplied = DuelUiIcons.FindPhaseArtwork(name);
+                    if (supplied != null) suppliedMarks++;
+                    var expected = supplied ?? DuelUiIcons.Find("phase/" + name.ToLowerInvariant());
+                    Require(choice.transform.Find("Icon").GetComponent<Image>().sprite == expected &&
+                        (supplied != null ? mark.GetComponent<Image>()?.sprite == supplied : mark.GetComponent<Text>() != null),
+                        $"The field and picker did not display the configured {name} phase mark.");
                     var position = ((RectTransform)choice.transform.parent).anchorMin;
                     Require(position.x > previousX && (rowY == null || Mathf.Approximately(position.y, rowY.Value)),
                         "Phase buttons were not shown in order on the same row.");
@@ -1408,6 +1416,7 @@ namespace YGOPortable.Editor
                 Click(picker.GetComponent<Button>());
                 Require(!picker.gameObject.activeSelf && ReferenceEquals(_duel.ActivePrompt, prompt),
                     "Dismissing the phase picker submitted an action.");
+                Debug.Log($"[VERIFY PHASE MARKS] Verified all six phase marks on the field and in the picker ({suppliedMarks} supplied).");
             }
 
             internal void VerifyAiWaitsWhileBrowsing(PlayerFieldSnapshot mine)

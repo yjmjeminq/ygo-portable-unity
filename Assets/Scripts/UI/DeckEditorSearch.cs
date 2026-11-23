@@ -370,11 +370,15 @@ namespace YGOPortable.UI
                 {
                     int choice = _optionButtons.Count;
                     var row = AddFilterRow(_optionRows, $"Option_{choice}");
-                    _optionButtons.Add(DeckEditorStyle.Button(row, "Button", "", () =>
+                    var button = DeckEditorStyle.Button(row, "Button", "", () =>
                     {
                         OnDetailedChoiceChanged(_activeFacet, choice);
                         RefreshDetailedDraft();
-                    }, 15));
+                    }, 15);
+                    var icon = DuelUiKit.CreateRect("Icon", button.transform, new Vector2(.045f, .08f),
+                        new Vector2(.17f, .92f), Vector2.zero, Vector2.zero);
+                    DuelUiKit.AddImage(icon.gameObject, null, Color.white, true, false);
+                    _optionButtons.Add(button);
                 }
                 for (int i = 0; i < _optionButtons.Count; i++)
                     _optionButtons[i].transform.parent.gameObject.SetActive(i < choices.Count);
@@ -409,7 +413,20 @@ namespace YGOPortable.UI
             if (choices == null) return;
             for (int i = 0; i < choices.Count; i++)
             {
-                var label = _optionButtons[i].GetComponentInChildren<Text>();
+                var button = _optionButtons[i];
+                var label = button.GetComponentInChildren<Text>();
+                var icon = button.transform.Find("Icon").GetComponent<Image>();
+                icon.sprite = _activeFacet switch
+                {
+                    Facet.Race => DuelUiKit.GetRaceSprite(RaceOptions[i].mask),
+                    Facet.Attribute => DuelUiKit.GetAttributeSprite(AttributeOptions[i].mask),
+                    Facet.SpellTrap => DuelUiKit.GetSpellTrapSprite(SpellTrapTypes[i].required),
+                    _ => null,
+                };
+                icon.enabled = icon.sprite != null;
+                label.rectTransform.anchorMin = new Vector2(icon.enabled ? .202f : .045f, .05f);
+                label.rectTransform.anchorMax = new Vector2(.965f, .95f);
+                label.alignment = icon.enabled ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter;
                 bool selected = i == _draftFacets[(int)_activeFacet];
                 label.text = selected ? $"●  {choices[i]}" : choices[i];
                 label.color = selected ? DeckEditorStyle.Accent : Color.white;

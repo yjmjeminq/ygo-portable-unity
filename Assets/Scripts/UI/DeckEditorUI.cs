@@ -59,6 +59,7 @@ namespace YGOPortable.UI
         // UI widgets
         private CompositeCardView _previewCard;
         private Image _previewRaceIcon;
+        private Image _previewAttributeIcon;
         private Text _previewName;
         private Text _previewStats;
         private Text _previewDesc;
@@ -390,11 +391,14 @@ namespace YGOPortable.UI
                 new Vector2(0f, _mobileLayout ? .590f : .499f), new Vector2(1f, _mobileLayout ? .673f : .553f),
                 new Vector2(inset, 0f), new Vector2(-inset, 0f));
             DeckEditorStyle.Fill(stats, DeckEditorStyle.Header, false);
-            var icon = DuelUiKit.CreateRect("TypeIcon", stats, new Vector2(0.83f, 0.06f), new Vector2(0.975f, 0.94f),
+            var attribute = DuelUiKit.CreateRect("AttributeIcon", stats, new Vector2(.78f, .06f), new Vector2(.88f, .94f),
+                Vector2.zero, Vector2.zero);
+            _previewAttributeIcon = DuelUiKit.AddImage(attribute.gameObject, null, Color.white, true, false);
+            var icon = DuelUiKit.CreateRect("TypeIcon", stats, new Vector2(.885f, .06f), new Vector2(.985f, .94f),
                 Vector2.zero, Vector2.zero);
             _previewRaceIcon = DuelUiKit.AddImage(icon.gameObject, null, Color.white, true, false);
             _previewStats = DuelUiKit.AddFittedText(DuelUiKit.CreateRect("Info", stats,
-                new Vector2(0.03f, 0f), new Vector2(0.81f, 1f), Vector2.zero, Vector2.zero),
+                new Vector2(0.03f, 0f), new Vector2(.765f, 1f), Vector2.zero, Vector2.zero),
                 "Text", "", _mobileLayout ? 19 : 17, 12, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
             var name = DuelUiKit.CreateRect("Name", panel,
                 new Vector2(0f, _mobileLayout ? .511f : .441f), new Vector2(1f, _mobileLayout ? .585f : .493f),
@@ -1551,11 +1555,13 @@ namespace YGOPortable.UI
             LayoutRebuilder.ForceRebuildLayoutImmediate(_previewScroll.content);
             UpdateDeckScrollbar(_previewScroll);
 
-            Sprite raceSp = null;
-            if (ci != null)
-                raceSp = ci.IsMonster ? DuelUiKit.GetRaceSprite(ci.race) : DuelUiKit.GetSpellTrapSprite(ci.type);
+            Sprite raceSp = ci == null ? null : ci.IsMonster ? DuelUiKit.GetRaceSprite(ci.race) : DuelUiKit.GetSpellTrapSprite(ci.type);
+            Sprite attributeSp = ci == null ? null : ci.IsMonster ? DuelUiKit.GetAttributeSprite(ci.attr) :
+                DuelUiIcons.FindCardIdentity((ci.type & YgoConstants.TYPE_SPELL) != 0 ? "attribute/spell" : "attribute/trap");
             _previewRaceIcon.gameObject.SetActive(raceSp != null);
             _previewRaceIcon.sprite = raceSp;
+            _previewAttributeIcon.gameObject.SetActive(attributeSp != null);
+            _previewAttributeIcon.sprite = attributeSp;
         }
 
         private void SwitchUserDeck(int delta)

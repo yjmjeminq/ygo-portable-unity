@@ -17,6 +17,19 @@ namespace YGOPortable.UI
 
         private static readonly Dictionary<string, Sprite> Sprites = new(StringComparer.Ordinal);
         private static readonly Dictionary<string, Sprite> CardIdentity = new(StringComparer.Ordinal);
+        private static readonly Dictionary<string, string> IdentityAssetNames = new(StringComparer.Ordinal)
+        {
+            { "attribute/god", "attribute/divine" }, { "race/soldier", "race/warrior" },
+            { "race/wizard", "race/spellcaster" }, { "race/angel", "race/fairy" },
+            { "race/devil", "race/fiend" }, { "race/undead", "race/zombie" },
+            { "race/aquarius", "race/aqua" }, { "race/flame", "race/pyro" },
+            { "race/sandrock", "race/rock" }, { "race/bird", "race/wingedbeast" },
+            { "race/botanical", "race/plant" }, { "race/beastbtl", "race/beastwarrior" },
+            { "race/dinosaurs", "race/dinosaur" }, { "race/poseidon", "race/seaserpent" },
+            { "race/reptiles", "race/reptile" }, { "race/god", "race/divinebeast" },
+            { "race/creator", "race/creatorgod" }, { "race/mystdragon", "race/wyrm" },
+            { "race/cyverse", "race/cyberse" },
+        };
         private static readonly Dictionary<string, Rect> Cells = new(StringComparer.Ordinal);
         private static Texture2D _texture;
         private static bool _loaded;
@@ -39,13 +52,30 @@ namespace YGOPortable.UI
 
         internal static Sprite Filter(string key) => Find("filter/" + key.ToLowerInvariant());
 
+        internal static Sprite FindPhaseArtwork(string phase) => CardArtLoader.GetDuelVisualsSprite($"Hud/Phase{phase}.png");
+
+        internal static string IdentityAssetName(string key) => IdentityAssetNames.GetValueOrDefault(key, key);
+
         internal static Sprite FindCardIdentity(string key)
         {
-            var supplied = CardArtLoader.GetDuelVisualsSprite("CardIcons/" + key + ".png");
+            var assetName = IdentityAssetName(key);
+            var supplied = CardArtLoader.GetDuelVisualsSprite("CardIcons/" + assetName + ".png");
+            if (supplied == null && assetName != key)
+                supplied = CardArtLoader.GetDuelVisualsSprite("CardIcons/" + key + ".png");
             if (supplied != null) return supplied;
             if (!CardIdentity.TryGetValue(key, out var sprite))
-                CardIdentity[key] = sprite = DuelUiKit.LoadSprite("Duel/CardIcons/" + key);
-            return sprite;
+                CardIdentity[key] = sprite = DuelUiKit.LoadSprite("Duel/CardIcons/" + assetName) ??
+                    (assetName != key ? DuelUiKit.LoadSprite("Duel/CardIcons/" + key) : null);
+            return sprite ?? Find(key);
+        }
+
+        internal static Sprite FindSpellTrap(uint type)
+        {
+            string key = YgoConstants.GetSpellTrapIconKey(type);
+            int slash = key.IndexOf('/');
+            if (slash < 0) return null;
+            string subtype = key[(slash + 1)..];
+            return FindCardIdentity("spelltrap/" + (subtype == "quick_play" ? "quickplay" : subtype)) ?? Find(key);
         }
 
         private static void Load()

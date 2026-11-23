@@ -90,7 +90,7 @@ namespace YGOPortable.UI
         private static readonly Color HudText = new Color(.94f, .95f, .93f);
         private static readonly Color LifeTrackColor = new Color(.28f, .80f, .87f);
         private static readonly string[] PhaseShortNames = { "DP", "SP", "M1", "BP", "M2", "EP" };
-        private readonly Text[] _phaseStepLabels = new Text[PhaseEntries.Length];
+        private readonly Graphic[] _phaseStepMarks = new Graphic[PhaseEntries.Length];
         private static readonly (string name, string label, int phase)[] PhaseEntries =
         {
             ("Draw", "드로우", YgoConstants.PHASE_DRAW),
@@ -1401,8 +1401,16 @@ namespace YGOPortable.UI
                     new Vector2((i + .12f) / _phaseSteps.Length, 0f), new Vector2((i + .88f) / _phaseSteps.Length, 1f),
                     Vector2.zero, Vector2.zero);
                 _phaseSteps[i] = DuelStyle.AddHexPlate(step, HudEdge, HudSurface);
-                _phaseStepLabels[i] = DuelUiKit.AddFittedText(step, "Phase", PhaseShortNames[i], 18, 9,
-                    TextAnchor.MiddleCenter, DuelStyle.Muted, FontStyle.Bold);
+                var artwork = DuelUiIcons.FindPhaseArtwork(PhaseEntries[i].name);
+                if (artwork != null)
+                {
+                    var face = DuelUiKit.CreateRect("Phase", step, new Vector2(.21f, .22f), new Vector2(.79f, .78f),
+                        Vector2.zero, Vector2.zero);
+                    _phaseStepMarks[i] = DuelUiKit.AddImage(face.gameObject, artwork, DuelStyle.Muted, true, false);
+                }
+                else
+                    _phaseStepMarks[i] = DuelUiKit.AddFittedText(step, "Phase", PhaseShortNames[i], 18, 9,
+                        TextAnchor.MiddleCenter, DuelStyle.Muted, FontStyle.Bold);
             }
             _phaseControlHint = DuelUiKit.AddFittedText(DuelUiKit.CreateRect("ChangePrompt", turn, new Vector2(.09f, .045f),
                 new Vector2(.91f, .213f), Vector2.zero, Vector2.zero), "Label", "페이즈 변경", 13, 8,
@@ -1478,12 +1486,13 @@ namespace YGOPortable.UI
                 });
                 var iconBox = DuelUiKit.CreateRect("Icon", button.transform, new Vector2(.20f, .48f), new Vector2(.80f, .87f),
                     Vector2.zero, Vector2.zero);
-                Sprite sprite = DuelUiIcons.Find("phase/" + name.ToLowerInvariant());
+                Sprite artwork = DuelUiIcons.FindPhaseArtwork(name);
+                Sprite sprite = artwork ?? DuelUiIcons.Find("phase/" + name.ToLowerInvariant());
                 var icon = DuelUiKit.AddImage(iconBox.gameObject, sprite, Color.white, true, false);
                 icon.enabled = sprite != null;
                 var labelBox = DuelUiKit.CreateRect("Caption", button.transform, new Vector2(.06f, .088f), new Vector2(.94f, .448f),
                     Vector2.zero, Vector2.zero);
-                var caption = DuelUiKit.AddFittedText(labelBox, "Label", $"{PhaseShortNames[i]}  {label}", 17, 9,
+                var caption = DuelUiKit.AddFittedText(labelBox, "Label", artwork != null ? label : $"{PhaseShortNames[i]}  {label}", 17, 9,
                     TextAnchor.MiddleCenter, HudText, FontStyle.Bold);
                 _phaseChoices.Add((phase, button, caption, icon));
             }
@@ -1779,7 +1788,7 @@ namespace YGOPortable.UI
             {
                 bool current = PhaseEntries[i].phase == stepPhase;
                 _phaseSteps[i].color = current ? DuelStyle.Gold : HudEdge;
-                _phaseStepLabels[i].color = current ? DuelStyle.Gold : DuelStyle.Muted;
+                _phaseStepMarks[i].color = current ? DuelStyle.Gold : DuelStyle.Muted;
                 if (current) label = PhaseEntries[i].label;
             }
             _phaseLabel.text = phase is YgoConstants.PHASE_DAMAGE or YgoConstants.PHASE_DAMAGE_CAL ? "데미지" : label;
