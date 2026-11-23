@@ -29,6 +29,7 @@ namespace YGOPortable.UI
             internal Text Ownership;
             internal Text SpecialEdition;
             internal Image Shine;
+            internal PackPullRarityGraphic RarityRim;
             internal uint Code;
             internal PackPull Award;
             internal CardRarity Rarity;
@@ -67,6 +68,8 @@ namespace YGOPortable.UI
         private int _packIndex;
         private int _count;
         private int _revealed;
+        private int _ultraCount;
+        private int _superCount;
         private int _inspected;
         private float _dealAge;
         private bool _allQueued;
@@ -139,6 +142,7 @@ namespace YGOPortable.UI
             var cards = _packs[index];
             _count = cards.Count;
             _revealed = 0;
+            _ultraCount = _superCount = 0;
             _inspected = -1;
             _allQueued = false;
             _dealAge = 0f;
@@ -150,6 +154,8 @@ namespace YGOPortable.UI
                 pull.Award = cards[i];
                 pull.Code = pull.Award.Code;
                 pull.Rarity = CardRarityCatalog.GetRarity(pull.Code);
+                if (pull.Rarity == CardRarity.UltraRare) _ultraCount++;
+                else if (pull.Rarity == CardRarity.SuperRare) _superCount++;
                 if (pull.Rarity > highest) highest = pull.Rarity;
             }
             string page = $"{_packIndex + 1} / {_packs.Count}";
@@ -231,6 +237,10 @@ namespace YGOPortable.UI
             var tilt = CardOverframeInput.Attach(buttonBounds, card, motionSensor: false);
             tilt.enabled = false;
             var artwork = card.transform.Find("AspectBox");
+            var rim = LotdUiKit.FillRect("RarityRim", artwork).gameObject.AddComponent<PackPullRarityGraphic>();
+            rim.transform.SetAsFirstSibling();
+            rim.raycastTarget = false;
+            rim.gameObject.SetActive(false);
             CompositeCardView reflection = null;
             if (row == rows - 1)
             {
@@ -242,7 +252,7 @@ namespace YGOPortable.UI
                 mirror.gameObject.AddComponent<CanvasGroup>().alpha = .26f;
                 reflection = CompositeCardView.Create(mirror, "View");
             }
-            var rarity = ShopRarityBadge.Create(slot, new Vector2(.245f, .010f), new Vector2(.365f, .074f), 14);
+            var rarity = ShopRarityBadge.Create(slot, new Vector2(.205f, .010f), new Vector2(.365f, .074f), 14);
             rarity.resizeTextMinSize = 8;
             // The tint overlays the card front briefly at the midpoint of the flip.
             shineRect.SetAsLastSibling();
@@ -266,6 +276,7 @@ namespace YGOPortable.UI
                 SpecialEdition = specialLabel,
                 RarityLabel = rarity,
                 Shine = shine,
+                RarityRim = rim,
             };
             var focus = button.gameObject.AddComponent<StarterRowFocus>();
             focus.PreviewOnHover = true;
@@ -297,6 +308,7 @@ namespace YGOPortable.UI
                 pull.Face.localScale = Vector3.one;
                 pull.Shine.color = Color.clear;
                 SetFace(pull, pull.Code, true);
+                pull.RarityRim.Show(CardRarity.Normal, burst: false);
                 pull.RarityLabel.transform.parent.gameObject.SetActive(false);
                 pull.Name.text = "";
                 pull.Ownership.text = "";
@@ -351,6 +363,7 @@ namespace YGOPortable.UI
                 pull.Flipping = false;
                 pull.Face.localScale = Vector3.one;
                 pull.Shine.color = Color.clear;
+                pull.RarityRim.FinishBurst();
             }
             _dealAge = DealTime + DealGap * _count;
             AdvanceResults(0f);
@@ -384,6 +397,7 @@ namespace YGOPortable.UI
                 }
                 pull.Tilt.enabled = pull.FaceUp && !pull.Flipping && pull.Card.HasOverframe;
                 pull.Tilt.Lift = pull.Lift;
+                motionActive |= pull.RarityRim.Advance(delta);
             }
             _playback.enabled = motionActive;
         }
@@ -421,8 +435,12 @@ namespace YGOPortable.UI
             pull.FaceUp = true;
             _revealed++;
             SetFace(pull, pull.Code, false);
+            pull.RarityRim.Show(pull.Rarity, burst: playSound);
             ShopRarityBadge.Update(pull.RarityLabel, pull.Code);
+            pull.RarityLabel.resizeTextMaxSize = pull.Rarity == CardRarity.UltraRare ? 18 : 14;
             pull.Name.text = CardDatabase.GetName(pull.Code);
+            pull.Name.color = pull.Rarity >= CardRarity.SuperRare
+                ? CardRarityStyle.GetColor(pull.Rarity) : PackShopStyle.TextPrimary;
             pull.Ownership.text = pull.Award.IsNew ? "NEW" : $"보유 {pull.Award.OwnedCopies:N0}장";
             pull.Ownership.color = pull.Award.IsNew ? LotdUiKit.GoldAccent : PackShopStyle.TextMuted;
             pull.SpecialEdition.transform.parent.gameObject.SetActive(pull.Award.Overframe);
@@ -452,6 +470,9 @@ namespace YGOPortable.UI
             _previous.gameObject.SetActive(_packIndex > 0);
             _previous.interactable = finished;
             _summary.text = finished ? $"카드 {_count}장 공개 완료" : $"공개 {_revealed} / {_count}";
+            if (finished && _ultraCount > 0) _summary.text += $"   ·   UR {_ultraCount}장";
+            if (finished && _superCount > 0) _summary.text += $"   ·   SR {_superCount}장";
+            _summary.color = finished && _ultraCount > 0 ? CardRarityStyle.GetColor(CardRarity.UltraRare) : PackShopStyle.TextMuted;
             _exitLabel.text = _packIndex + 1 < _packs.Count ? "다음 팩" : "상점으로";
             _controls.text = finished
                 ? _packs.Count > 1 ? "방향키 카드 선택   LB/RB 팩 이동" : "방향키 카드 선택   B 상점으로"
@@ -491,6 +512,87 @@ namespace YGOPortable.UI
             Action click, bool light = false) =>
             PackShopStyle.Button(Slot(parent, name, left, bottom, right, top), "Button", text, click, 19,
                 kind: light ? PackShopStyle.ButtonKind.OpeningAction : PackShopStyle.ButtonKind.OpeningSkip);
+    }
+
+    internal sealed class PackPullRarityGraphic : MaskableGraphic
+    {
+        private static readonly Vector2[] Corners =
+        {
+            new Vector2(-1f, -1f), new Vector2(1f, -1f), new Vector2(1f, 1f), new Vector2(-1f, 1f),
+        };
+        private static readonly Color[] UltraColors =
+        {
+            new Color(.43f, .96f, 1f), new Color(.73f, .56f, 1f),
+            new Color(1f, .62f, .84f), new Color(1f, .93f, .52f),
+        };
+
+        private CardRarity _rarity;
+        private float _progress = 1f;
+
+        internal void Show(CardRarity rarity, bool burst)
+        {
+            _rarity = rarity;
+            _progress = burst ? 0f : 1f;
+            gameObject.SetActive(rarity >= CardRarity.SuperRare);
+            SetVerticesDirty();
+        }
+
+        internal bool Advance(float delta)
+        {
+            if (!gameObject.activeSelf || _progress >= 1f) return false;
+            float duration = _rarity == CardRarity.UltraRare ? .55f : .33f;
+            _progress = Mathf.Clamp01(_progress + delta / duration);
+            SetVerticesDirty();
+            return _progress < 1f;
+        }
+
+        internal void FinishBurst()
+        {
+            _progress = 1f;
+            SetVerticesDirty();
+        }
+
+        protected override void OnPopulateMesh(VertexHelper mesh)
+        {
+            mesh.Clear();
+            Rect face = rectTransform.rect;
+            if (face.width < 1f || face.height < 1f || _rarity < CardRarity.SuperRare) return;
+
+            bool ultra = _rarity == CardRarity.UltraRare;
+            float width = face.width;
+            float edge = width * (ultra ? .023f : .013f);
+            float gap = width * .006f;
+            DrawRim(mesh, face, gap, edge, ultra ? .94f : .79f, soft: false);
+            DrawRim(mesh, face, gap + edge, width * (ultra ? .075f : .038f), ultra ? .66f : .40f, soft: true);
+            if (_progress >= 1f) return;
+
+            float expand = 1f - (1f - _progress) * (1f - _progress);
+            float fade = (1f - _progress) * (1f - _progress);
+            float distance = width * Mathf.Lerp(.026f, ultra ? .15f : .087f, expand);
+            DrawRim(mesh, face, distance, width * (ultra ? .044f : .023f), (ultra ? .92f : .62f) * fade, soft: true);
+        }
+
+        private void DrawRim(VertexHelper mesh, Rect face, float gap, float width, float opacity, bool soft)
+        {
+            int first = mesh.currentVertCount;
+            var inner = face.size * .5f + Vector2.one * gap;
+            var outer = inner + Vector2.one * width;
+            for (int i = 0; i < Corners.Length; i++)
+            {
+                Color tint = _rarity == CardRarity.UltraRare ? UltraColors[i] : CardRarityStyle.GetColor(_rarity);
+                tint.a = opacity;
+                mesh.AddVert(face.center + Vector2.Scale(inner, Corners[i]), tint, Vector2.zero);
+                if (soft) tint.a = 0f;
+                mesh.AddVert(face.center + Vector2.Scale(outer, Corners[i]), tint, Vector2.zero);
+            }
+            for (int i = 0; i < Corners.Length; i++)
+            {
+                int innerCorner = first + i * 2;
+                int nextInner = first + (i + 1) % Corners.Length * 2;
+                mesh.AddTriangle(innerCorner, nextInner, nextInner + 1);
+                mesh.AddTriangle(innerCorner, nextInner + 1, innerCorner + 1);
+            }
+        }
     }
 
     internal sealed class PackOpeningPlayback : MonoBehaviour

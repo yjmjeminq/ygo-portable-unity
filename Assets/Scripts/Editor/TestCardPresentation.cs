@@ -414,6 +414,69 @@ namespace YGOPortable.Editor
                 Mathf.Approximately(portrait.localScale.x, 1f), "The tilted card did not reset after release.");
             opening.Hide();
             Debug.Log("[VERIFY OVERFRAME PACK] Captions, flip lift, drag parallax, selection and release passed.");
+            VerifyPackRarityReveals(opening, parent.Find("Screen_PackOpening/Results"));
+        }
+
+        private static void VerifyPackRarityReveals(PackOpeningView opening, Transform results)
+        {
+            const uint macroCosmos = 30241314, acidGolem = 23995346, sparkman = 20721928;
+            opening.Show(LotdUiKit.WhiteSprite, "팩 등급 검증", new IReadOnlyList<PackPull>[]
+            {
+                new[] { new PackPull(BlueEyes, false, 1), new PackPull(macroCosmos, false, 1),
+                    new PackPull(acidGolem, false, 1), new PackPull(sparkman, false, 1) },
+                new[] { new PackPull(sparkman, false, 2) },
+            });
+            opening.Back();
+            opening.AdvanceResults(1f);
+            Canvas.ForceUpdateCanvases();
+
+            var cards = results.Find("Cards");
+            var slots = Enumerable.Range(0, 4).Select(index => cards.Find($"Card_{index}")).ToArray();
+            var rims = slots.Select(slot => slot.Find("Select/Face/View/AspectBox/RarityRim")
+                .GetComponent<PackPullRarityGraphic>()).ToArray();
+            var summary = results.Find("Summary/Text").GetComponent<Text>();
+            Require(rims.All(rim => !rim.gameObject.activeSelf) && !summary.text.Contains("UR"),
+                "A face-down pack result exposed the rare card or its effect.");
+
+            using var mesh = new VertexHelper();
+            var populate = typeof(PackPullRarityGraphic).GetMethod("OnPopulateMesh",
+                BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
+            int CountVertices(PackPullRarityGraphic rim)
+            {
+                populate.Invoke(rim, new object[] { mesh });
+                return mesh.currentVertCount;
+            }
+
+            slots[0].GetComponentInChildren<Button>().onClick.Invoke();
+            opening.AdvanceResults(.19f);
+            int revealVertices = CountVertices(rims[0]);
+            Require(rims[0].isActiveAndEnabled && !rims[1].isActiveAndEnabled &&
+                slots[0].Find("Rarity/Text").GetComponent<Text>().text == "UR",
+                "Flipping the UR card did not show its own result badge and highlight.");
+            opening.AdvanceResults(1f);
+            int steadyVertices = CountVertices(rims[0]);
+            Require(steadyVertices > 0 && revealVertices > steadyVertices,
+                "The UR reveal did not leave a steady frame after its expanding rim.");
+
+            slots[1].GetComponentInChildren<Button>().onClick.Invoke();
+            opening.AdvanceResults(.18f);
+            Require(rims[1].isActiveAndEnabled && CountVertices(rims[1]) > steadyVertices,
+                "Flipping an SR card did not show its own highlight animation.");
+            opening.Back();
+            Require(!rims[2].isActiveAndEnabled && !rims[3].isActiveAndEnabled &&
+                CountVertices(rims[1]) == steadyVertices && summary.text.Contains("UR 1장") && summary.text.Contains("SR 1장"),
+                "Fast reveal did not settle the effects or report the correct rarity totals.");
+
+            opening.ChangePage(1);
+            opening.Back();
+            Require(rims.All(rim => !rim.isActiveAndEnabled), "Changing packs kept a previous rare card's highlight.");
+            opening.Back();
+            Require(!summary.text.Contains("UR") && !summary.text.Contains("SR"), "The next pack reused the earlier rarity totals.");
+            opening.ChangePage(-1);
+            Require(rims[0].isActiveAndEnabled && CountVertices(rims[0]) == steadyVertices && summary.text.Contains("UR 1장"),
+                "Returning to a revealed pack did not restore its steady highlights and totals.");
+            opening.Hide();
+            Debug.Log("[VERIFY PACK RARITY] Individual reveals, persistent UR/SR frames, fast reveal, and pack navigation passed.");
         }
 
         private static void VerifyPhysicalDeckAppearances()
