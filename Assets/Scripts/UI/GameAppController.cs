@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEngine;
@@ -21,6 +22,7 @@ namespace YGOPortable.UI
         CardShop,
         ArchetypeCodex,
         StoryMode,
+        Tournament,
     }
 
     public class GameAppController : MonoBehaviour
@@ -41,6 +43,7 @@ namespace YGOPortable.UI
         private SecretPackToast _secretPackToast;
         private ArchetypeCodexUI _archetypeCodex;
         private StoryModeUI _storyMode;
+        private DimensionTournamentUI _tournament;
         private bool _storyDeckEditorOpen;
         private GitHubSaveSync _saveSync;
         private SaveSyncMenu _saveSyncMenu;
@@ -62,6 +65,8 @@ namespace YGOPortable.UI
         private UserDeck _activeMyDeck;
         private bool _activePlayerFirst;
         private StoryEpisodeData _activeStoryEpisode;
+        private StoryBattlePlan _activeStoryPlan;
+        private (int Seed, int Round, int Slots, int Opponent)? _activeTournament;
 
         private bool _initialized;
 
@@ -134,6 +139,7 @@ namespace YGOPortable.UI
                 _secretPackToast = new SecretPackToast(canvas.transform);
                 _archetypeCodex = new ArchetypeCodexUI(canvas.transform, () => ShowScreen(AppScreen.MainMenu));
                 _storyMode = new StoryModeUI(this, canvas.transform);
+                _tournament = new DimensionTournamentUI(this, canvas.transform);
 
                 Debug.Log("[GameApp] 6. Constructing OpponentSelectUI...");
                 _oppSelect = new OpponentSelectUI(this, canvas.transform);
@@ -239,6 +245,7 @@ namespace YGOPortable.UI
             _collectionShop?.StarterRoot.SetActive(false);
             _collectionShop?.CloseShop();
             _archetypeCodex.Close();
+            if (screen != AppScreen.Tournament) _tournament.Close();
             if (screen == AppScreen.DeckEditor && _storyDeckEditorOpen) _storyMode.SuspendForDeckEditor();
             else if (screen != AppScreen.StoryMode) _storyMode.Close();
             _oppSelect.Root.SetActive(screen == AppScreen.OpponentSelect);
@@ -254,6 +261,7 @@ namespace YGOPortable.UI
             {
                 LotdAudio.PlayMenuBgm();
                 _activeStoryEpisode = null;
+                _activeTournament = null;
                 if (_session != null)
                 {
                     _duelField.UnbindSession();
@@ -272,6 +280,8 @@ namespace YGOPortable.UI
                 _collectionShop.OpenShop();
             else if (screen == AppScreen.ArchetypeCodex)
                 _archetypeCodex.Open();
+            else if (screen == AppScreen.Tournament)
+                _tournament.Open();
             else if (screen == AppScreen.StoryMode)
             {
                 if (_storyDeckEditorOpen && previousScreen == AppScreen.DeckEditor) _storyMode.ResumeFromDeckEditor();
@@ -298,6 +308,7 @@ namespace YGOPortable.UI
                     AppScreen.CardShop => _collectionShop.Root,
                     AppScreen.ArchetypeCodex => _archetypeCodex.Root,
                     AppScreen.StoryMode => _storyMode.Root,
+                    AppScreen.Tournament => _tournament.Root,
                     _ => null,
                 };
                 if (root != null) UiEntranceMotion.Play(root, .67f, .19f);
@@ -355,10 +366,16 @@ namespace YGOPortable.UI
             return reason.Length == 0;
         }
 
-        internal void StartStoryDuel(StoryEpisodeData episode, UserDeck myDeck)
+        internal void StartStoryDuel(StoryEpisodeData episode, UserDeck myDeck, StoryBattlePlan plan = default)
         {
             if (_screen != AppScreen.StoryMode || !_storyMode.CanPlay(episode)) return;
+            if (!CollectionProgress.CanEquipRaidSupports(plan.Supports, _storyMode.GetRaid(episode).HasValue))
+            {
+                _storyMode.ShowStatus("장착한 아이템을 확인하세요.");
+                return;
+            }
             _activeStoryEpisode = episode;
+            _activeStoryPlan = plan;
             var opponent = DeckRepository.GetCharacter(episode.charId);
             var (deck, level, levelCount) = _storyMode.GetOpponentMatch(episode);
             float deckStrength = levelCount > 1 ? (level - 1f) / (levelCount - 1f) : (episode.chapter - 1f) / 4f;
@@ -367,28 +384,44 @@ namespace YGOPortable.UI
             StartDuelMatch(opponent, deck, myDeck, playerGoesFirst: true, isStoryDuel: true, planningScale: planningScale);
         }
 
+        internal void StartTournamentDuel(DimensionTournament run, UserDeck myDeck)
+        {
+            var current = CollectionProgress.Tournament;
+            if (_screen != AppScreen.Tournament || current?.Active != true || current.seed != run.seed ||
+                current.round != run.round || current.Opponent <= 0 || current.PendingAiMatches().Any()) return;
+            _activeTournament = (current.seed, current.round, current.PlayerNode, current.Opponent);
+            var opponent = DeckRepository.GetCharacter(current.Opponent);
+            var deck = DimensionTournament.HighestDeck(current.Opponent);
+            StartDuelMatch(opponent, deck, myDeck, playerGoesFirst: true, isStoryDuel: false,
+                planningScale: ComboSearch.MaxPlanningScale, isTournamentDuel: true);
+        }
+
         public void StartDuelMatch(OpponentCharacter oppChar, PresetDeckInfo oppDeck, UserDeck myDeck,
             bool playerGoesFirst, bool isStoryDuel = false) =>
             StartDuelMatch(oppChar, oppDeck, myDeck, playerGoesFirst, isStoryDuel,
                 planningScale: isStoryDuel ? 1f : ComboSearch.MaxPlanningScale);
 
         private void StartDuelMatch(OpponentCharacter oppChar, PresetDeckInfo oppDeck, UserDeck myDeck,
-            bool playerGoesFirst, bool isStoryDuel, float planningScale)
+            bool playerGoesFirst, bool isStoryDuel, float planningScale, bool isTournamentDuel = false)
         {
+            bool isCampaignMatch = isStoryDuel || isTournamentDuel;
             if (oppChar == null || oppDeck == null || oppDeck.charId != oppChar.id ||
-                (isStoryDuel ? _activeStoryEpisode?.charId != oppChar.id : !CollectionProgress.IsOpponentDeckUnlocked(oppChar.id, oppDeck.id)))
+                (isStoryDuel && _activeStoryEpisode?.charId != oppChar.id) ||
+                (isTournamentDuel && _activeTournament?.Opponent != oppChar.id) ||
+                (!isCampaignMatch && !CollectionProgress.IsOpponentDeckUnlocked(oppChar.id, oppDeck.id)))
             {
-                ShowDuelStartFailure(isStoryDuel, "목록에 있는 상대와 덱을 선택하세요.");
+                ShowDuelStartFailure(isStoryDuel, "목록에 있는 상대와 덱을 선택하세요.", isTournamentDuel);
                 return;
             }
-            if (!isStoryDuel)
+            if (!isCampaignMatch)
             {
                 _activeStoryEpisode = null;
+                _activeTournament = null;
                 oppDeck = OpponentDeckLevels.GetDecks(oppChar.id).First(deck => deck.id == oppDeck.id);
             }
             if (!CanStartWithDeck(myDeck, out string reason))
             {
-                ShowDuelStartFailure(isStoryDuel, reason);
+                ShowDuelStartFailure(isStoryDuel, reason, isTournamentDuel);
                 return;
             }
             _activeOppChar = oppChar;
@@ -410,8 +443,11 @@ namespace YGOPortable.UI
                     Debug.LogWarning($"[Personal replay] Could not enable local recording ({exception.GetType().Name}).");
                 }
             }
-            var difficulty = isStoryDuel ? AIDifficulty.Smart : AiDifficulty;
+            var difficulty = isCampaignMatch ? AIDifficulty.Smart : AiDifficulty;
             var raid = isStoryDuel ? _storyMode.GetRaid(_activeStoryEpisode) : null;
+            var opening = isStoryDuel ? _activeStoryPlan.Apply(raid) : ((DuelOpening Player, DuelOpening Opponent)?)null;
+            if (isTournamentDuel)
+                opening = (new DuelOpening(8000, 5, 0), DimensionTournament.Opening(_activeTournament.Value.Slots, oppDeck));
             _session = new DuelSession(recordPlanningReplay: difficulty == AIDifficulty.Smart, playerReplay: _personalReplay);
             _ai = new TacticalAI(DuelAiPolicy.LoadIncluded(), LinkComboPolicy.LoadIncluded(),
                 searchCombos: true, planningScale: planningScale) { Difficulty = difficulty };
@@ -427,10 +463,15 @@ namespace YGOPortable.UI
             if (!_session.StartNewDuel(
                 myDeck.main, myDeck.extra,
                 oppDeck.main, oppDeck.extra,
-                p0GoesFirst: playerGoesFirst, playerDeckAppearance: myDeck, opponentOpening: raid?.Opening,
-                opponentDestiny: GetOpponentDestinyCards(oppDeck)))
+                p0GoesFirst: playerGoesFirst, playerDeckAppearance: myDeck, opponentOpening: opening?.Opponent,
+                opponentDestiny: GetOpponentDestinyCards(oppDeck), playerOpening: opening?.Player))
             {
-                ShowDuelStartFailure(isStoryDuel, "듀얼을 시작하지 못했습니다.");
+                ShowDuelStartFailure(isStoryDuel, "듀얼을 시작하지 못했습니다.", isTournamentDuel);
+                return;
+            }
+            if (isStoryDuel && !CollectionProgress.TryConsumeRaidSupports(_activeStoryPlan.Supports, raid.HasValue, out string error))
+            {
+                ShowDuelStartFailure(isStoryDuel, error);
                 return;
             }
             CollectionProgress.RememberDuelDeck(myDeck.id);
@@ -447,9 +488,10 @@ namespace YGOPortable.UI
                 .ThenByDescending(card => card.atk).Take(2).Select(card => card.code).ToArray();
         }
 
-        private void ShowDuelStartFailure(bool isStoryDuel, string message)
+        private void ShowDuelStartFailure(bool isStoryDuel, string message, bool isTournamentDuel = false)
         {
-            ShowScreen(isStoryDuel ? AppScreen.StoryMode : AppScreen.OpponentSelect);
+            ShowScreen(isTournamentDuel ? AppScreen.Tournament : isStoryDuel ? AppScreen.StoryMode : AppScreen.OpponentSelect);
+            if (isTournamentDuel) { _tournament.ShowStatus(message); return; }
             if (isStoryDuel) _storyMode.ShowStatus(message);
             else _oppSelect.ShowStatus(message, true);
         }
@@ -503,6 +545,7 @@ namespace YGOPortable.UI
             if (_session == null)
             {
                 if (_screen == AppScreen.StoryMode) _storyMode?.Update(Time.unscaledDeltaTime);
+                if (_screen == AppScreen.Tournament) _tournament?.Update(Time.unscaledDeltaTime);
                 if (_screen == AppScreen.DeckEditor) _deckEditor?.Update();
                 else if (_menuPad != null)
                 {
@@ -537,16 +580,24 @@ namespace YGOPortable.UI
                     _duelField.Refresh();
                     bool won = _session.Winner == _session.HumanPlayerIndex;
                     bool draw = _session.Winner == 2;
+                    if (_activeTournament is { } match)
+                    {
+                        var opponent = _activeOppChar;
+                        CollectionProgress.TryFinishTournamentRound(match.Seed, match.Round, match.Opponent, won,
+                            out var prize, out string error);
+                        ShowScreen(AppScreen.Tournament);
+                        _tournament.ShowResult(opponent, match.Slots, won, draw, prize, error);
+                        SyncFrontMenuFocus();
+                        return;
+                    }
                     if (_activeStoryEpisode is { } episode)
                     {
                         var raid = _storyMode.GetRaid(episode);
-                        string storyReward = CollectionProgress.TryAwardStoryDuel(episode.id, won, raid, _activeOppDeck,
-                            out int amount, out var bonus, out string error) ? $"듀얼 보상 +{amount:N0} DP" : error;
-                        if (bonus is { } card)
-                            storyReward += $"\n{CardRarityCatalog.GetLabel(CardRarityCatalog.GetRarity(card.Code))} · " +
-                                $"{CardDatabase.GetName(card.Code)}{(card.Overframe ? " · OVERFRAME" : "")}";
+                        var plan = _activeStoryPlan;
+                        string storyReward = CollectionProgress.TryAwardStoryDuel(episode.id, won, raid, _activeOppDeck, plan,
+                            out var prize, out string error) ? FormatStoryPrize(prize) : error;
                         ShowScreen(AppScreen.StoryMode);
-                        _storyMode.ShowDuelResult(episode, won, draw, storyReward);
+                        _storyMode.ShowDuelResult(episode, won, draw, storyReward, plan.Stance);
                         SyncFrontMenuFocus();
                         return;
                     }
@@ -632,6 +683,20 @@ namespace YGOPortable.UI
             }
         }
 
+        private static string FormatStoryPrize(CollectionProgress.StoryPrize prize)
+        {
+            var lines = new List<string> { $"듀얼 보상 +{prize.Dp:N0} DP · 가루 +{prize.Dust:N0}" };
+            if (prize.RaidCard is { } raidCard) lines.Add(DescribeCard(raidCard));
+            if (prize.ThemeCard is { } themeCard) lines.Add($"테마 드롭 · {DescribeCard(themeCard)}");
+            if (prize.Bond > 0) lines.Add($"유대도 {prize.Bond:N0} (+1)");
+            if (prize.Support != RaidSupport.None)
+                lines.Add($"전술 서포트 · {RaidSupportCatalog.Items[RaidSupportCatalog.IndexOf(prize.Support)].Name}");
+            return string.Join("\n", lines);
+
+            static string DescribeCard(PackPull card) => $"{CardRarityCatalog.GetLabel(CardRarityCatalog.GetRarity(card.Code))} · " +
+                $"{CardDatabase.GetName(card.Code)}{(card.Overframe ? " · OVERFRAME" : "")}";
+        }
+
         internal void CycleChainConfirmation()
         {
             if (_session == null || _session.IsFinished || _duelField.IsPaused ||
@@ -666,6 +731,7 @@ namespace YGOPortable.UI
                 AppScreen.CardShop => _collectionShop?.ActiveShopRoot,
                 AppScreen.ArchetypeCodex => _archetypeCodex.Root,
                 AppScreen.StoryMode => _storyMode.ActiveRoot,
+                AppScreen.Tournament => _tournament.ActiveRoot,
                 _ => null,
             };
             if (page != null && page.activeInHierarchy)
@@ -683,7 +749,8 @@ namespace YGOPortable.UI
             bool codex = _screen == AppScreen.ArchetypeCodex;
             bool collectionPage = selectingStarter || _screen == AppScreen.CardShop || codex;
             bool story = _screen == AppScreen.StoryMode;
-            bool cancel = frame.Cancel || (escape && (cloudSave || settings || selectingOpponent || _menuPad.HasPopup || collectionPage || story));
+            bool tournament = _screen == AppScreen.Tournament;
+            bool cancel = frame.Cancel || (escape && (cloudSave || settings || selectingOpponent || _menuPad.HasPopup || collectionPage || story || tournament));
             if (!frame.HasInput && !cancel) return;
 
             GameObject scope = cloudSave ? _saveSyncMenu.Root : _screen switch
@@ -695,6 +762,7 @@ namespace YGOPortable.UI
                 AppScreen.CardShop => _collectionShop?.ActiveShopRoot,
                 AppScreen.ArchetypeCodex => _archetypeCodex.Root,
                 AppScreen.StoryMode => _storyMode.ActiveRoot,
+                AppScreen.Tournament => _tournament.ActiveRoot,
                 _ => null,
             };
             if (scope == null || !scope.activeInHierarchy) return;
@@ -746,6 +814,7 @@ namespace YGOPortable.UI
                     if (!_collectionShop.HandleShopBack()) ShowScreen(AppScreen.MainMenu);
                 }
                 else if (story) _storyMode.Back();
+                else if (tournament) _tournament.Back();
                 else if (_screen is AppScreen.OpponentSelect or AppScreen.ArchetypeCodex) ShowScreen(AppScreen.MainMenu);
                 else if (_screen == AppScreen.MainMenu) ShowScreen(AppScreen.Title);
             }
@@ -859,6 +928,7 @@ namespace YGOPortable.UI
 
         private void OnDestroy()
         {
+            _tournament?.Close();
             _secretPackToast?.Dispose();
             _saveSync?.Dispose();
             Debug.Log($"[GameApp] OnDestroy called! Stack:\n{Environment.StackTrace}");

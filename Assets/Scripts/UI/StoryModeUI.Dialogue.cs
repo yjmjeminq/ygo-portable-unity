@@ -11,7 +11,7 @@ namespace YGOPortable.UI
 {
     internal sealed partial class StoryModeUI
     {
-        private readonly struct StoryChoice
+        internal readonly struct StoryChoice
         {
             internal readonly string Label;
             internal readonly Action Select;
@@ -25,7 +25,7 @@ namespace YGOPortable.UI
             }
         }
 
-        private sealed class StoryDialogueView
+        internal sealed class StoryDialogueView
         {
             private static readonly Color HeroColor = new(.47f, .85f, 1f);
             private static readonly Color OpponentColor = new(1f, .76f, .43f);
@@ -50,7 +50,8 @@ namespace YGOPortable.UI
             private readonly Button _logButton;
             private readonly GameObject _choiceRoot;
             private readonly Text _choiceSummary;
-            private readonly Button[] _choiceButtons = new Button[4];
+            private readonly Button[] _choiceButtons = new Button[5];
+            private readonly RaidSupportPanel _supports;
             private readonly GameObject _logRoot;
             private readonly Text _logText;
             private readonly ScrollRect _logScroll;
@@ -76,9 +77,13 @@ namespace YGOPortable.UI
             private bool _heroSpeaking;
             private bool _opponentSpeaking;
             private Selectable _popupReturn;
+            private int _branchLine;
+            private Action _branch;
+            private bool _waitingBranch;
 
             internal bool IsOpen => _root.activeSelf;
-            internal GameObject ActiveRoot => _logRoot.activeSelf ? _logRoot : _pickerRoot.activeSelf ? _pickerRoot : _root;
+            internal GameObject ActiveRoot => _logRoot.activeSelf ? _logRoot : _pickerRoot.activeSelf ? _pickerRoot :
+                _supports.Root.activeSelf ? _supports.Root : _root;
 
             internal StoryDialogueView(Transform parent)
             {
@@ -128,8 +133,8 @@ namespace YGOPortable.UI
                 for (int i = 0; i < _choiceButtons.Length; i++)
                 {
                     int index = i;
-                    float top = .75f - i * .17f;
-                    _choiceButtons[i] = AddButton(choices, $"Choice_{i}", "", .075f, top - .142f, .925f, top,
+                    float top = .75f - i * .14f;
+                    _choiceButtons[i] = AddButton(choices, $"Choice_{i}", "", .075f, top - .122f, .925f, top,
                         () => _choices[index].Select(), gold: i == 0);
                 }
 
@@ -166,6 +171,7 @@ namespace YGOPortable.UI
                 _pickerApply = AddButton(picker.Panel, "Apply", "선택한 덱 적용", .517f, .315f, .908f, .472f, ApplyDeck, gold: true);
                 _pickerEdit = AddButton(picker.Panel, "Edit", "덱 편집 열기", .092f, .315f, .483f, .472f, () => _editDeck?.Invoke());
                 AddButton(picker.Panel, "Back", "돌아가기", .31f, .098f, .69f, .246f, CloseDeckPicker);
+                _supports = new RaidSupportPanel(overlay, CloseSupportPicker);
                 Close();
             }
 
@@ -191,11 +197,14 @@ namespace YGOPortable.UI
                 _picker.Hide();
                 _pickerRoot.SetActive(false);
                 _choiceRoot.SetActive(false);
+                _supports.Root.SetActive(false);
                 _scene.interactable = _scene.blocksRaycasts = true;
                 _dialogue = null;
                 _onEnd = null;
                 _choices = null;
                 _summary = null;
+                _branch = null;
+                _waitingBranch = false;
                 _popupReturn = null;
                 _finished = false;
                 _autoPlay = false;
@@ -209,7 +218,7 @@ namespace YGOPortable.UI
                 if (_dialogue == null || !_root.activeInHierarchy) return;
                 AnimatePortrait(_hero, _heroSpeaking, delta);
                 AnimatePortrait(_opponent, _opponentSpeaking, delta);
-                if (_finished || _logRoot.activeSelf || _pickerRoot.activeSelf) return;
+                if (_finished || _waitingBranch || _logRoot.activeSelf || _pickerRoot.activeSelf || _supports.Root.activeSelf) return;
                 if (_visible < _characters.Length)
                 {
                     _typed += delta * CharactersPerSecond;
@@ -240,6 +249,11 @@ namespace YGOPortable.UI
                     var button = _choiceButtons[i];
                     button.gameObject.SetActive(i < _choices.Length);
                     if (i >= _choices.Length) continue;
+                    var row = (RectTransform)button.transform.parent;
+                    float step = .70f / Mathf.Max(3, _choices.Length);
+                    float top = .75f - i * step;
+                    row.anchorMin = new Vector2(.075f, top - step + .015f);
+                    row.anchorMax = new Vector2(.925f, top);
                     button.GetComponentInChildren<Text>().text = _choices[i].Label;
                     button.interactable = _choices[i].Available?.Invoke() != false;
                 }
@@ -279,6 +293,7 @@ namespace YGOPortable.UI
             {
                 if (_logRoot.activeSelf) HidePopup(_logRoot);
                 else if (_pickerRoot.activeSelf) CloseDeckPicker();
+                else if (_supports.Root.activeSelf) CloseSupportPicker();
                 else return false;
                 return true;
             }
@@ -311,8 +326,9 @@ namespace YGOPortable.UI
 
             private void Advance()
             {
-                if (_finished || _dialogue == null) return;
+                if (_finished || _waitingBranch || _dialogue == null) return;
                 if (_visible < _characters.Length) Reveal(_characters.Length);
+                else if (_branch != null && _index == _branchLine) OfferBranch();
                 else if (_index + 1 == _dialogue.Length) Finish();
                 else BindLine(_index + 1);
             }
@@ -332,7 +348,12 @@ namespace YGOPortable.UI
 
             private void Finish()
             {
-                if (_finished || _dialogue == null) return;
+                if (_finished || _waitingBranch || _dialogue == null) return;
+                if (_branch != null)
+                {
+                    OfferBranch();
+                    return;
+                }
                 BindLine(_dialogue.Length - 1);
                 Reveal(_characters.Length);
                 _finished = true;
@@ -340,6 +361,52 @@ namespace YGOPortable.UI
                 _previous.interactable = _auto.interactable = _next.interactable = _skip.interactable = false;
                 _onEnd?.Invoke();
                 _onEnd = null;
+            }
+
+            internal void SetBranch(int line, Action present)
+            {
+                _branchLine = line;
+                _branch = present;
+            }
+
+            private void OfferBranch()
+            {
+                BindLine(_branchLine);
+                Reveal(_characters.Length);
+                _waitingBranch = true;
+                _advanceSurface.interactable = false;
+                _previous.interactable = _auto.interactable = _next.interactable = _skip.interactable = false;
+                _branch.Invoke();
+            }
+
+            internal void AnswerBranch(string reply, string opponent, string response)
+            {
+                if (!_waitingBranch) return;
+                _dialogue = _dialogue.Take(_branchLine + 1).Concat(new[]
+                {
+                    new StoryDialogueLine { speaker = "주인공", text = reply },
+                    new StoryDialogueLine { speaker = opponent, text = response },
+                }).Concat(_dialogue.Skip(_branchLine + 1)).ToArray();
+                _branch = null;
+                _waitingBranch = false;
+                _choiceRoot.SetActive(false);
+                _choices = null;
+                _summary = null;
+                _auto.interactable = _next.interactable = _skip.interactable = _advanceSurface.interactable = true;
+                BindLine(_branchLine + 1);
+                Focus(_next);
+            }
+
+            internal void OpenSupportPicker(bool raid, RaidSupport selection, Action<RaidSupport> save)
+            {
+                _supports.Prepare(raid, selection, save);
+                OpenPopup(_supports.Root, _supports.DefaultFocus);
+            }
+
+            private void CloseSupportPicker()
+            {
+                HidePopup(_supports.Root);
+                RefreshChoices();
             }
 
             private void OpenLog()
@@ -381,7 +448,7 @@ namespace YGOPortable.UI
             {
                 popup.SetActive(false);
                 _scene.interactable = _scene.blocksRaycasts = true;
-                _advanceSurface.interactable = !_finished;
+                _advanceSurface.interactable = !_finished && !_waitingBranch;
                 if (_popupReturn != null && _popupReturn.IsInteractable()) Focus(_popupReturn);
                 _popupReturn = null;
             }

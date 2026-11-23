@@ -863,7 +863,7 @@ namespace YGOPortable.UI
             switch (prompt.messageType)
             {
                 case YgoConstants.MSG_DESTINY_DRAW:
-                    RenderDestinyDraw();
+                    RenderDestinyDraw(session, prompt.playerId);
                     break;
                 case YgoConstants.MSG_SELECT_YESNO:
                 case YgoConstants.MSG_SELECT_EFFECTYN:
@@ -948,10 +948,10 @@ namespace YGOPortable.UI
             AddFooterButton("아니오", () => Submit(BitConverter.GetBytes(0)), false);
         }
 
-        private void RenderDestinyDraw()
+        private void RenderDestinyDraw(DuelSession session, byte player)
         {
             _modalTitle.text = "데스티니 드로우";
-            _modalSubtitle.text = "LP 2,000 이하 · 듀얼당 1회";
+            _modalSubtitle.text = $"LP {session.DestinyLimit(player):N0} 이하 · 남은 횟수 {session.DestinyUsesLeft(player)}회";
             var halo = LotdUiKit.FillRect("DestinyDrawGlow", _modalBody);
             LotdUiKit.AddImage(halo.gameObject, LotdUiKit.WhiteSprite, new Color(.37f, .056f, .078f, .86f), false, false);
             LotdUiKit.AddFittedText(LotdUiKit.FillRect("Description", halo, 18f), "Text",

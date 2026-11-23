@@ -11,12 +11,16 @@ namespace YGOPortable.Core
         internal readonly int Life;
         internal readonly int Hand;
         internal readonly uint FieldCard;
+        internal readonly int DestinyLimit;
+        internal readonly int DestinyUses;
 
-        internal DuelOpening(int life, int hand, uint fieldCard)
+        internal DuelOpening(int life, int hand, uint fieldCard, int destinyLimit = 2000, int destinyUses = 1)
         {
             Life = life;
             Hand = hand;
             FieldCard = fieldCard;
+            DestinyLimit = destinyLimit;
+            DestinyUses = destinyUses;
         }
     }
 
@@ -317,6 +321,7 @@ namespace YGOPortable.Core
             internal bool first;
             internal int startingLp;
             internal DuelOpening? opponentOpening;
+            internal DuelOpening? playerOpening;
             internal UserDeck destinyDeck;
             internal uint[] opponentDestiny;
             internal readonly List<(byte message, byte player, byte[] bytes)> responses = new();
@@ -448,12 +453,14 @@ namespace YGOPortable.Core
             IReadOnlyList<uint> p0Main, IReadOnlyList<uint> p0Extra,
             IReadOnlyList<uint> p1Main, IReadOnlyList<uint> p1Extra,
             bool p0GoesFirst = true, int startingLp = 8000, ulong[] seed = null, UserDeck playerDeckAppearance = null,
-            DuelOpening? opponentOpening = null, IReadOnlyList<uint> opponentDestiny = null)
+            DuelOpening? opponentOpening = null, IReadOnlyList<uint> opponentDestiny = null, DuelOpening? playerOpening = null)
         {
             Dispose();
             UsesDeckAppearances = playerDeckAppearance != null && !_loadingPlanningReplay;
             _deckAppearances.Clear();
             ResetDestinyDraw();
+            _playerDestinyLimit = playerOpening?.DestinyLimit ?? 2000;
+            _playerDestinyUses = playerOpening?.DestinyUses ?? 1;
             IsFinished = false;
             Winner = -1;
             TurnNumber = 0;
@@ -495,11 +502,13 @@ namespace YGOPortable.Core
 
             int bossLife = opponentOpening?.Life ?? startingLp;
             int bossHand = opponentOpening?.Hand ?? 5;
-            int firstLife = p0GoesFirst ? startingLp : bossLife;
-            int secondLife = p0GoesFirst ? bossLife : startingLp;
+            int playerLife = playerOpening?.Life ?? startingLp;
+            int playerHand = playerOpening?.Hand ?? 5;
+            int firstLife = p0GoesFirst ? playerLife : bossLife;
+            int secondLife = p0GoesFirst ? bossLife : playerLife;
             NativePtr = YgoNativeBridge.CreateDuel(seed, YgoConstants.DUEL_MODE_MR5,
-                firstLife, p0GoesFirst ? 5 : bossHand, 1,
-                secondLife, p0GoesFirst ? bossHand : 5, 1);
+                firstLife, p0GoesFirst ? playerHand : bossHand, 1,
+                secondLife, p0GoesFirst ? bossHand : playerHand, 1);
 
             if (NativePtr == IntPtr.Zero) return false;
             if (YgoNativeBridge.YGO_LoadBaseScripts(NativePtr) == 0)
@@ -544,6 +553,7 @@ namespace YGOPortable.Core
                     first = p0GoesFirst,
                     startingLp = startingLp,
                     opponentOpening = opponentOpening,
+                    playerOpening = playerOpening,
                     destinyDeck = _destinyCards[HumanPlayerIndex].Count == 0 ? null : CollectionProgress.CopyDeck(playerDeckAppearance),
                     opponentDestiny = CopyDeck(opponentDestiny),
                     seed = (ulong[])seed.Clone(),
@@ -575,7 +585,7 @@ namespace YGOPortable.Core
             {
                 if (!copy.StartNewDuel(replay.firstDeck, replay.firstExtra, replay.secondDeck, replay.secondExtra,
                     replay.first, replay.startingLp, replay.seed, replay.destinyDeck,
-                    replay.opponentOpening, replay.opponentDestiny)) return null;
+                    replay.opponentOpening, replay.opponentDestiny, replay.playerOpening)) return null;
                 foreach (var response in replay.responses)
                 {
                     if (expired() || copy.IsFinished) return null;

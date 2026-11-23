@@ -80,7 +80,7 @@ namespace YGOPortable.Core
         public const int DeckCopyLimit = 3;
 
         private const int SharedDustVersion = 6;
-        private const int ProfileVersion = 8;
+        private const int ProfileVersion = 9;
         private const int OverframePullChance = 15;
         private const int GenericPackSize = 160;
         internal const string ProfileFileName = "collection-profile.json";
@@ -121,6 +121,9 @@ namespace YGOPortable.Core
             public List<string> clearedStoryEpisodes = new();
             public bool storyProgressMigrated;
             public SecretShopSave shop;
+            public StoryTacticsSave tactics = new();
+            public DimensionTournament tournament;
+            public int tournamentWins;
         }
 
         [Serializable]
@@ -195,6 +198,9 @@ namespace YGOPortable.Core
                 if (json == null) return;
                 var saved = ParseProfile(json, out var owned, out var overframes);
                 InitializeOpponentProgress(saved);
+                saved.tactics ??= new StoryTacticsSave();
+                saved.tactics.bonds ??= new List<StoryBond>();
+                saved.tactics.supports ??= new int[RaidSupportCatalog.Items.Length];
                 if (saved.shop == null)
                 {
                     saved.shop = new SecretShopSave();
@@ -228,6 +234,13 @@ namespace YGOPortable.Core
                 saved.starterDeck.id != "collection_" + saved.starterId ||
                 saved.starterDeck.main == null || saved.starterDeck.extra == null || saved.starterDeck.side == null)
                 throw new InvalidDataException("Invalid collection profile.");
+            if (saved.tactics?.supports is { } supports &&
+                (supports.Length != RaidSupportCatalog.Items.Length || supports.Any(count => count < 0)))
+                throw new InvalidDataException("Invalid raid support inventory.");
+            if (saved.tournament?.IsEmpty == true) saved.tournament = null;
+            if (saved.tournamentWins < 0 || (saved.tournament != null && !saved.tournament.IsValid) ||
+                saved.shop?.freeSecretBundles < 0)
+                throw new InvalidDataException("Invalid tournament progress.");
 
             if (saved.version < SharedDustVersion)
             {
@@ -514,7 +527,8 @@ namespace YGOPortable.Core
             return true;
         }
 
-        internal static bool TryBuyPackContents(string id, int packCount, out IReadOnlyList<IReadOnlyList<PackPull>> pulls, out string error)
+        internal static bool TryBuyPackContents(string id, int packCount, out IReadOnlyList<IReadOnlyList<PackPull>> pulls,
+            out string error, bool useFreeSecretBundle = false)
         {
             pulls = Array.Empty<IReadOnlyList<PackPull>>();
             if (!CanTransact(out error)) return false;
@@ -528,7 +542,7 @@ namespace YGOPortable.Core
                 error = $"팩은 1개 또는 {PackBundleSize}개씩 구매할 수 있습니다.";
                 return false;
             }
-            int cost = PackCost * packCount;
+            int cost = useFreeSecretBundle ? 0 : PackCost * packCount;
             if (Balance < cost)
             {
                 error = "DP가 부족합니다.";
@@ -543,6 +557,11 @@ namespace YGOPortable.Core
             if (!IsPackUnlocked(pack))
             {
                 error = "해당 카드군의 SR 또는 UR 카드를 얻으면 시크릿 팩이 열립니다.";
+                return false;
+            }
+            if (useFreeSecretBundle && (!pack.IsSecret || packCount != PackBundleSize || FreeSecretBundles <= 0))
+            {
+                error = "해금된 시크릿 팩에서만 무료 10팩권을 사용할 수 있습니다.";
                 return false;
             }
 
@@ -600,6 +619,7 @@ namespace YGOPortable.Core
 
             var next = WithBalance(Balance - cost);
             RecordPackOpening(next, packCount, bundle, pulledUltraRare);
+            if (useFreeSecretBundle) next.shop.freeSecretBundles--;
             UnlockSecretPacks(next, openedPacks.SelectMany(opened => opened).Select(card => card.Code));
             if (!Write(next, owned, out error, overframes)) return false;
             pulls = Array.AsReadOnly(openedPacks);
@@ -651,8 +671,17 @@ namespace YGOPortable.Core
         internal static bool TryAwardStoryDuel(string episodeId, bool won, StoryRaid? raid, PresetDeckInfo opponentDeck,
             out int amount, out PackPull? awardedCard, out string error)
         {
-            amount = 0;
-            awardedCard = null;
+            bool saved = TryAwardStoryDuel(episodeId, won, raid, opponentDeck, default, out var prize, out error);
+            amount = prize.Dp;
+            awardedCard = prize.RaidCard;
+            return saved;
+        }
+
+        internal static bool TryAwardStoryDuel(string episodeId, bool won, StoryRaid? raid, PresetDeckInfo opponentDeck,
+            StoryBattlePlan plan, out StoryPrize prize, out string error, System.Random random = null)
+        {
+            prize = default;
+            random ??= PackRandom;
             if (!CanTransact(out error)) return false;
             if (!HasStarter || string.IsNullOrWhiteSpace(episodeId))
             {
@@ -660,7 +689,8 @@ namespace YGOPortable.Core
                 return false;
             }
 
-            int reward = Math.Min(int.MaxValue - Balance, won ? raid?.WinDp ?? WinReward : LossReward);
+            int reward = Math.Min(int.MaxValue - Balance, won ? plan.ScaleWinReward(raid?.WinDp ?? WinReward) : LossReward);
+            int dust = won ? plan.ScaleWinReward(raid.HasValue ? 100 : 20) : 0;
             bool firstClear = won && !IsStoryEpisodeCleared(episodeId);
             var owned = _owned;
             var overframes = _ownedOverframes;
@@ -680,23 +710,42 @@ namespace YGOPortable.Core
                     error = "보스 보상을 보관할 공간이 부족합니다.";
                     return false;
                 }
-                bool overframe = CardArtLoader.SupportsOverframe(code) && GetOwnedOverframeCount(code) < int.MaxValue &&
-                    PackRandom.Next(100) < OverframePullChance;
-                if (overframe) overframes = new Dictionary<uint, int>(_ownedOverframes);
-                else owned = new Dictionary<uint, int>(_owned);
-                var inventory = overframe ? overframes : owned;
-                inventory[code] = inventory.GetValueOrDefault(code) + 1;
-                bonus = new PackPull(code, overframe, CombinedCount(owned.GetValueOrDefault(code), overframes.GetValueOrDefault(code)));
+                bonus = AwardCard(code);
+            }
+            PackPull? theme = null;
+            if (won && opponentDeck != null && random.Next(100) < plan.ThemeDropChance)
+            {
+                var candidates = new[] { opponentDeck.sigCard }.Concat(opponentDeck.extra ?? Array.Empty<uint>())
+                    .Concat(opponentDeck.main ?? Array.Empty<uint>()).Distinct()
+                    .Where(code => owned.GetValueOrDefault(code) < int.MaxValue && IsDeckCard(CardDatabase.Get(code)))
+                    .OrderByDescending(code => code == opponentDeck.sigCard)
+                    .ThenByDescending(code => CardRarityCatalog.GetRarity(code)).Take(5).ToArray();
+                if (candidates.Length > 0) theme = AwardCard(candidates[random.Next(candidates.Length)]);
             }
             var next = WithBalance(Balance + reward);
+            next.dust += dust;
+            next.tactics = next.tactics.Copy();
+            int bond = won && plan.Stance == StoryStance.Bond && opponentDeck != null
+                ? IncreaseStoryBond(next, opponentDeck.charId) : 0;
+            RaidSupport drop = won && !raid.HasValue ? TryRollSupport(next, random) : RaidSupport.None;
             if (firstClear)
                 next.clearedStoryEpisodes = new List<string>(_profile.clearedStoryEpisodes) { episodeId };
             next.storyProgressMigrated = true;
-            if (bonus is { } pull) UnlockSecretPacks(next, new[] { pull.Code });
+            UnlockSecretPacks(next, new[] { bonus?.Code ?? 0, theme?.Code ?? 0 }.Where(code => code != 0));
             if (!Write(next, owned, out error, overframes)) return false;
-            amount = reward;
-            awardedCard = bonus;
+            prize = new StoryPrize(reward, dust, bonus, theme, drop, bond);
             return true;
+
+            PackPull AwardCard(uint code)
+            {
+                bool overframe = CardArtLoader.SupportsOverframe(code) && overframes.GetValueOrDefault(code) < int.MaxValue &&
+                    random.Next(100) < OverframePullChance;
+                if (overframe && ReferenceEquals(overframes, _ownedOverframes)) overframes = new Dictionary<uint, int>(_ownedOverframes);
+                if (!overframe && ReferenceEquals(owned, _owned)) owned = new Dictionary<uint, int>(_owned);
+                var inventory = overframe ? overframes : owned;
+                inventory[code] = inventory.GetValueOrDefault(code) + 1;
+                return new PackPull(code, overframe, CombinedCount(owned.GetValueOrDefault(code), overframes.GetValueOrDefault(code)));
+            }
         }
 
         private static bool TryAwardDuel(bool won, int opponentId, int? deckId, out int amount, out string error)
@@ -777,6 +826,9 @@ namespace YGOPortable.Core
             clearedStoryEpisodes = _profile.clearedStoryEpisodes,
             storyProgressMigrated = _profile.storyProgressMigrated,
             shop = _profile.shop,
+            tactics = _profile.tactics,
+            tournament = _profile.tournament,
+            tournamentWins = _profile.tournamentWins,
         };
 
         private static OpponentDeckProgress FindDeckProgress(SavedProfile profile, int opponentId) =>

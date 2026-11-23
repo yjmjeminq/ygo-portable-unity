@@ -7,9 +7,14 @@ namespace YGOPortable.Core
     {
         private const uint DestinyDrawTag = 0x31444459;
         private readonly HashSet<uint>[] _destinyCards = { new(), new() };
-        private readonly bool[] _destinyUsed = new bool[2];
+        private readonly int[] _destinyUsed = new int[2];
         private readonly List<uint> _destinyPositions = new();
         private Random _destinyRandom;
+        private int _playerDestinyLimit;
+        private int _playerDestinyUses;
+
+        internal int DestinyLimit(byte player) => player == HumanPlayerIndex ? _playerDestinyLimit : 2000;
+        internal int DestinyUsesLeft(byte player) => (player == HumanPlayerIndex ? _playerDestinyUses : 1) - _destinyUsed[player];
 
         internal event Action<byte> OnDestinyDraw;
 
@@ -22,7 +27,8 @@ namespace YGOPortable.Core
 
         private void OfferDestinyDraw(byte player)
         {
-            if (player > 1 || _destinyUsed[player] || _destinyCards[player].Count == 0) return;
+            if (player > 1 || DestinyUsesLeft(player) <= 0 || Players[player].lp > DestinyLimit(player) ||
+                _destinyCards[player].Count == 0) return;
             _destinyPositions.Clear();
             uint deckSize = YgoNativeBridge.YGO_QueryCount(NativePtr, player, YgoConstants.LOCATION_DECK);
             for (uint i = 0; i < deckSize; i++)
@@ -41,7 +47,7 @@ namespace YGOPortable.Core
                 uint selected = _destinyPositions[_destinyRandom.Next(_destinyPositions.Count)];
                 if (YgoNativeBridge.YGO_MoveDeckCardToTop(NativePtr, player, selected) != 0)
                 {
-                    _destinyUsed[player] = true;
+                    _destinyUsed[player]++;
                     ForgetObservedDeckTop(player);
                     AddLog($"{(player == HumanPlayerIndex ? "플레이어" : "상대")} 데스티니 드로우 발동!");
                     OnDestinyDraw?.Invoke(player);

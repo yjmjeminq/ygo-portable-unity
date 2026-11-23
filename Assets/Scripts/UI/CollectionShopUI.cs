@@ -75,6 +75,7 @@ namespace YGOPortable.UI
         private Button _dialogReturn;
         private CatalogItem _purchaseItem;
         private int _purchaseCount;
+        private bool _purchaseFreeBundle;
         private bool _redeemingTicket;
         private Button _ticketButton;
         private Button _cardLookupButton;
@@ -82,13 +83,15 @@ namespace YGOPortable.UI
         private Button _oddsButton;
         private Button _buyBundleButton;
         private bool _lookupFromContents;
+        private readonly RaidSupportPanel _supportShop;
+        private Button _supportShopButton;
 
         public GameObject Root => _shop.Root;
         public GameObject StarterRoot => _starter.Root;
         private bool OpeningIsOpen => _openingView?.IsOpen == true;
         private bool ShopDialogIsOpen => _shopDialog.activeSelf;
         private bool CraftingIsOpen => _crafting?.IsOpen == true;
-        internal GameObject ActiveShopRoot => CraftingIsOpen ? _crafting.ActiveRoot :
+        internal GameObject ActiveShopRoot => _supportShop.Root.activeSelf ? _supportShop.Root : CraftingIsOpen ? _crafting.ActiveRoot :
             OpeningIsOpen ? _openingView.ActiveRoot :
             ShopDialogIsOpen ? _shopDialog :
             _cardLookup.Root.activeSelf ? _cardLookup.Root :
@@ -102,6 +105,7 @@ namespace YGOPortable.UI
             _starter = BuildStarter(parent);
             _packContents = new PackContentsUI(parent, ReturnFromContents, OpenLookupForCard, OpenCrafting);
             _cardLookup = new PackCardLookupUI(parent, ReturnFromLookup, ShowPackFromLookup, OpenCrafting);
+            _supportShop = new RaidSupportPanel(parent, CloseSupportShop);
         }
 
         public void OpenShop()
@@ -127,6 +131,7 @@ namespace YGOPortable.UI
 
         internal void CloseShop()
         {
+            _supportShop.Root.SetActive(false);
             _openingView?.Hide();
             _crafting?.Hide();
             _craftingOrigin = _craftingReturnFocus = null;
@@ -196,6 +201,11 @@ namespace YGOPortable.UI
 
         internal bool HandleShopBack()
         {
+            if (_supportShop.Root.activeSelf)
+            {
+                CloseSupportShop();
+                return true;
+            }
             if (CraftingIsOpen)
             {
                 _crafting.Back();
@@ -355,6 +365,8 @@ namespace YGOPortable.UI
                 () => OpenCrafting(0, CardTradeAction.Browse), kind: PackShopStyle.ButtonKind.Category);
             ShopButton(root, "Excess", "3장 초과 일괄 분해", .568f, .819f, .758f, .885f,
                 () => ShowCrafting(0, CardTradeAction.Browse, excess: true), kind: PackShopStyle.ButtonKind.Category);
+            _supportShopButton = ShopButton(root, "TacticalSupport", "전술 서포트", .77f, .819f, .965f, .885f,
+                OpenSupportShop, kind: PackShopStyle.ButtonKind.Category);
 
 
             var rail = PackShopStyle.Panel(root, "Categories", new Vector2(.035f, .109f), new Vector2(.151f, .800f), .36f);
@@ -532,8 +544,9 @@ namespace YGOPortable.UI
             if (_purchaseItem == null || OpeningIsOpen || !ShopDialogIsOpen || _purchaseCount == 0) return;
             var item = _purchaseItem;
             int count = _purchaseCount;
+            bool free = _purchaseFreeBundle;
             _openingView ??= new PackOpeningView(Root.transform.parent, ReturnFromOpening);
-            if (!CollectionProgress.TryBuyPackContents(item.Id, count, out var cards, out string error))
+            if (!CollectionProgress.TryBuyPackContents(item.Id, count, out var cards, out string error, free))
             {
                 CloseShopDialog();
                 SetStatus(_shop, error, true);
@@ -541,7 +554,7 @@ namespace YGOPortable.UI
             }
             HideShopDialog();
             RefreshBalance();
-            SetStatus(_shop, $"{count}팩 구매 완료   ·   −{count * CollectionProgress.PackCost:N0} DP", false);
+            SetStatus(_shop, free ? "시크릿 팩 무료 10팩권 사용" : $"{count}팩 구매 완료   ·   −{count * CollectionProgress.PackCost:N0} DP", false);
             Root.SetActive(false);
             _openingView.Show(GetPackCover(item), item.Name, cards);
         }
@@ -583,13 +596,16 @@ namespace YGOPortable.UI
             if (!CollectionProgress.IsPackUnlocked(_shop.Selected?.Pack) || OpeningIsOpen || ShopDialogIsOpen) return;
             _purchaseItem = _shop.Selected;
             _purchaseCount = count;
+            _purchaseFreeBundle = count == CollectionProgress.PackBundleSize && CanUseFreeBundle(_purchaseItem.Pack);
             _dialogReturn = count == 1 ? _shop.Action : _buyBundleButton;
-            int cost = count * CollectionProgress.PackCost;
+            int cost = _purchaseFreeBundle ? 0 : count * CollectionProgress.PackCost;
             _dialogHeading.text = "팩 구매 확인";
             string guarantee = count != CollectionProgress.PackBundleSize ? "" :
                 CollectionProgress.NextBundleGuaranteesUr ? "  ·  UR 1장 확정" : "  ·  SR 이상 1장 확정";
-            _dialogText.text = $"{_purchaseItem.Name}   ×{count}\n카드 {count * CollectionProgress.CardsPerPack}장{guarantee}\n\n보유 DP   {CollectionProgress.Balance:N0} → {CollectionProgress.Balance - cost:N0}";
-            _dialogConfirmLabel.text = $"구매   {cost:N0} DP";
+            string payment = _purchaseFreeBundle ? "무료 10팩권 1장 사용" :
+                $"보유 DP   {CollectionProgress.Balance:N0} → {CollectionProgress.Balance - cost:N0}";
+            _dialogText.text = $"{_purchaseItem.Name}   ×{count}\n카드 {count * CollectionProgress.CardsPerPack}장{guarantee}\n\n{payment}";
+            _dialogConfirmLabel.text = _purchaseFreeBundle ? "무료 10팩권 사용" : $"구매   {cost:N0} DP";
             _dialogCancel.GetComponentInChildren<Text>().text = "취소";
             _dialogConfirm.gameObject.SetActive(true);
             ShowShopDialog();
@@ -631,6 +647,7 @@ namespace YGOPortable.UI
             _purchaseItem = null;
             _purchaseCount = 0;
             _redeemingTicket = false;
+            _purchaseFreeBundle = false;
         }
 
         private void ReturnFromOpening()
@@ -657,6 +674,24 @@ namespace YGOPortable.UI
             for (int i = 0; i < _filterButtons.Length; i++)
                 PackShopStyle.SetSelected(_filterButtons[i], i == (int)filter);
             if (refresh) FilterCatalog(_shop);
+        }
+
+        private void OpenSupportShop()
+        {
+            _supportShop.Prepare(raid: true);
+            _shopControls.interactable = false;
+            _supportShop.Root.transform.SetAsLastSibling();
+            _supportShop.Root.SetActive(true);
+            EventSystem.current?.SetSelectedGameObject(_supportShop.DefaultFocus.gameObject);
+        }
+
+        private void CloseSupportShop()
+        {
+            _supportShop.Root.SetActive(false);
+            _shopControls.interactable = true;
+            RefreshBalance();
+            RefreshShopActions();
+            EventSystem.current?.SetSelectedGameObject(_supportShopButton.gameObject);
         }
 
         private void RefreshBalance()
@@ -790,12 +825,19 @@ namespace YGOPortable.UI
             bool canBuy = unlocked && string.IsNullOrEmpty(CollectionProgress.LoadError);
             _viewContentsButton.interactable = _oddsButton.interactable = selected;
             _shop.Action.interactable = canBuy && CollectionProgress.Balance >= CollectionProgress.PackCost;
-            _buyBundleButton.interactable = canBuy && CollectionProgress.Balance >= CollectionProgress.PackCost * CollectionProgress.PackBundleSize;
+            bool free = CanUseFreeBundle(pack);
+            int cost = CollectionProgress.PackCost * CollectionProgress.PackBundleSize;
+            _buyBundleButton.interactable = canBuy && (free || CollectionProgress.Balance >= cost);
+            _buyBundleButton.GetComponentInChildren<Text>().text = free ? "무료 10팩권 사용" : $"{CollectionProgress.PackBundleSize}팩    {cost:N0} DP";
             _ticketButton.interactable = canBuy && CollectionProgress.CanRedeemPackTicket(pack);
             string guarantee = CollectionProgress.NextBundleGuaranteesUr ? "다음 10팩 · UR 확정" : "10팩 · SR 이상 확정";
             _packGuarantee.text = !selected ? "" : !unlocked ? "잠긴 시크릿 팩 · 해당 카드군 SR/UR 획득으로 해금" :
-                $"{guarantee}\n천장 {CollectionProgress.PackMileage}/{CollectionProgress.PackMileageTarget}";
+                $"{guarantee}\n천장 {CollectionProgress.PackMileage}/{CollectionProgress.PackMileageTarget}" +
+                (free ? $" · 무료 10팩권 {CollectionProgress.FreeSecretBundles}장" : "");
         }
+
+        private static bool CanUseFreeBundle(CollectionPack pack) =>
+            pack?.IsSecret == true && CollectionProgress.IsPackUnlocked(pack) && CollectionProgress.FreeSecretBundles > 0;
 
         private static Sprite GetPackCover(CatalogItem item) => PackCoverArt.Get(item.Id, item.FeaturedCode, item.CardPool);
 

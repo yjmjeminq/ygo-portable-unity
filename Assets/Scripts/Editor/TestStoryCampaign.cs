@@ -75,7 +75,15 @@ namespace YGOPortable.Editor
                 Control(scene, "DialogueBox/Next").onClick.Invoke();
                 Require(partial > 0 && line.text.Length > partial, "The first advance did not finish revealing the current line.");
                 Control(scene, "DialogueBox/Next").onClick.Invoke();
-                Require(line.text.Length == 0, "The second advance did not move to the next line.");
+                var branch = Control(scene, "Choices/Choice_1");
+                Require(branch.IsInteractable() && branch.GetComponentInChildren<Text>().text.Contains("한 장씩 읽고 준비"),
+                    "The authored dialogue choice did not interrupt the conversation.");
+                branch.onClick.Invoke();
+                Require(line.text.Length == 0, "The branch did not move to the player's reply.");
+                Control(scene, "DialogueBox/Next").onClick.Invoke();
+                Control(scene, "DialogueBox/Next").onClick.Invoke();
+                Control(scene, "DialogueBox/Next").onClick.Invoke();
+                Require(line.text.Contains("그 태도가 중요하지"), "The chosen opponent response was not shown.");
                 Control(scene, "DialogueBox/Previous").onClick.Invoke();
                 Require(line.text.Length > 0, "Previous did not restore the last line.");
                 Control(scene, "DialogueBox/Log").onClick.Invoke();
@@ -84,6 +92,16 @@ namespace YGOPortable.Editor
                 Control(scene, "DialogueBox/Skip").onClick.Invoke();
                 Require(scene.Find("Choices").gameObject.activeInHierarchy && story.ActiveRoot == dialogue.gameObject,
                     "Skipping the conversation did not leave the player at the choices.");
+                Require(scene.Find("Choices/Summary/Label").GetComponent<Text>().text.Contains("내 LP 9,000"),
+                    "The selected Calm stance did not change the preparation readout.");
+                Control(scene, "Choices/Choice_4").onClick.Invoke();
+                var support = dialogue.Find("RaidSupport/Window");
+                Control(support, "Item_0/Buy").onClick.Invoke();
+                Control(support, "Item_0/Equip").onClick.Invoke();
+                Control(support, "Apply").onClick.Invoke();
+                Require(scene.Find("Choices/Summary/Label").GetComponent<Text>().text.Contains("패 7장") &&
+                    CollectionProgress.GetSupportCount(RaidSupport.QuickDraw) == 1,
+                    "Buying and equipping an item from the story did not update preparation, or consumed it too early.");
                 Control(scene, "Choices/Choice_1").onClick.Invoke();
                 var pick = dialogue.Find("DeckSelection/Window");
                 Require(Control(pick, "Apply").IsInteractable(), "The popup did not allow choosing a deck.");

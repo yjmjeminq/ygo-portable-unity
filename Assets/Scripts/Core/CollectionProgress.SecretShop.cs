@@ -13,6 +13,7 @@ namespace YGOPortable.Core
             public bool nextBundleUr;
             public int mileage;
             public int urTickets;
+            public int freeSecretBundles;
 
             internal SecretShopSave Copy() => new()
             {
@@ -20,6 +21,7 @@ namespace YGOPortable.Core
                 nextBundleUr = nextBundleUr,
                 mileage = mileage,
                 urTickets = urTickets,
+                freeSecretBundles = freeSecretBundles,
             };
         }
 

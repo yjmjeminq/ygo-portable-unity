@@ -28,6 +28,8 @@ namespace YGOPortable.UI
         public StoryDialogueLine[] preDialogues;
         public StoryDialogueLine[] postWinDialogues;
         public StoryDialogueLine[] postLoseDialogues;
+        public StoryDialogueOption[] choices;
+        public int choiceAfterLine;
     }
 
     [Serializable]
@@ -58,6 +60,7 @@ namespace YGOPortable.UI
         private readonly CanvasGroup _browser;
         private readonly StoryDialogueView _dialogue;
         private readonly Button _mainMenu;
+        private readonly Button _tournament;
         private readonly Button _start;
         private readonly Dropdown _deckPicker;
         private readonly Image _portrait;
@@ -72,6 +75,8 @@ namespace YGOPortable.UI
         private int _unlockedIndex;
         private int _selectedIndex;
         private string _deckId;
+        private StoryStance _stance;
+        private RaidSupport _supports;
 
         internal GameObject Root { get; }
         internal GameObject ActiveRoot => _dialogue.IsOpen ? _dialogue.ActiveRoot : Root;
@@ -90,7 +95,7 @@ namespace YGOPortable.UI
             var browser = LotdUiKit.FillRect("StoryBrowser", root);
             _browser = browser.gameObject.AddComponent<CanvasGroup>();
             var content = Application.isMobilePlatform ? MobileSafeArea.Create(browser) : browser;
-            var header = Region(content, "Header", .032f, .892f, .82f, .977f);
+            var header = Region(content, "Header", .032f, .892f, .655f, .977f);
             LotdUiKit.AddImage(header.gameObject, LotdUiKit.LoadSprite("LOTD/Shared/menuheader"), Color.white, false, false);
             _seriesTitle = LotdUiKit.AddFittedText(header, "Title", "", 32, 16,
                 TextAnchor.MiddleCenter, new Color(.025f, .075f, .14f), FontStyle.Bold);
@@ -106,6 +111,8 @@ namespace YGOPortable.UI
             _selectedSeries = Mathf.Max(0, Array.FindIndex(_seriesTabs, tab => tab.Script != null));
             _mainMenu = AddButton(content, "MainMenu", "메인 메뉴", .83f, .897f, .968f, .973f,
                 () => _app.ShowScreen(AppScreen.MainMenu));
+            _tournament = AddButton(content, "DimensionTournament", "차원 대항전", .667f, .897f, .82f, .973f,
+                () => _app.ShowScreen(AppScreen.Tournament), gold: true);
 
             const float tabWidth = .1872f;
             for (int chapter = 0; chapter < _chapterButtons.Length; chapter++)
@@ -157,6 +164,7 @@ namespace YGOPortable.UI
                     PlayerPrefs.GetInt(ClearedKey(tab.Id, episode.id), 0) != 0).Select(episode => episode.id)));
             LoadDeckChoices();
             SelectSeries(_selectedSeries);
+            _tournament.GetComponentInChildren<Text>().text = DimensionTournament.Unlocked ? "차원 대항전" : "차원 대항전 · 잠김";
             Focus(Script != null ? _episodeButtons[_selectedIndex % EpisodesPerChapter] : _mainMenu);
         }
 
@@ -195,11 +203,13 @@ namespace YGOPortable.UI
             return index >= 0 && index <= _unlockedIndex;
         }
 
-        internal void ShowDuelResult(StoryEpisodeData episode, bool won, bool draw, string reward)
+        internal void ShowDuelResult(StoryEpisodeData episode, bool won, bool draw, string reward, StoryStance stance = StoryStance.Neutral)
         {
             int index = IndexOf(episode);
             if (index < 0) return;
             SelectEpisode(index);
+            _stance = stance;
+            _supports = RaidSupport.None;
             string result = won ? "승리" : draw ? "무승부" : "패배";
             PlayDialogue(episode, won ? episode.postWinDialogues : episode.postLoseDialogues, $"{TitleOf(episode)} · {result}", () =>
             {
@@ -215,7 +225,8 @@ namespace YGOPortable.UI
                     _dialogue.ShowChoices(() => reward,
                         new("즉시 재도전", () => LaunchDuel(episode), () => _playableDecks.Count > 0),
                         new("내 덱 변경 후 재도전", PickDeck),
-                        new("에피소드 목록으로", ReturnToEpisodes));
+                        new("에피소드 목록으로", ReturnToEpisodes),
+                        new("전술 서포트 장착", () => PickSupports(episode)));
             });
         }
 
@@ -362,7 +373,8 @@ namespace YGOPortable.UI
             var opponent = DeckRepository.GetCharacter(current.charId);
             _episodeHeading.text = current.chapterTitle;
             _episodeTitle.text = TitleOf(current);
-            _opponentName.text = current.opponentName;
+            int bond = CollectionProgress.GetStoryBond(current.charId);
+            _opponentName.text = bond > 0 ? $"{current.opponentName} · 유대도 {bond:N0}" : current.opponentName;
             _portrait.sprite = LotdUiKit.LoadOpponentPortrait(opponent);
             _portrait.enabled = _portrait.sprite != null;
             var (deck, level, levelCount) = GetOpponentMatch(current);
@@ -406,13 +418,39 @@ namespace YGOPortable.UI
             SelectEpisode(index);
             var episode = Script.episodes[index];
             var raid = GetRaid(episode);
+            _stance = StoryStance.Neutral;
+            _supports = RaidSupport.None;
+            var deck = GetOpponentMatch(episode).Deck;
+            var choices = StoryDialogueBranch.Create(episode, raid.HasValue,
+                deck?.sigCard is > 0 ? CardDatabase.GetName(deck.sigCard) : "");
             PlayDialogue(episode, episode.preDialogues, TitleOf(episode), () =>
-                _dialogue.ShowChoices(() => raid is { } challenge ? $"{challenge.Summary}\n{SelectedStoryDeckLabel()}" : SelectedStoryDeckLabel(),
+                _dialogue.ShowChoices(() => PreparationSummary(raid),
                     new("듀얼 개시!", () => LaunchDuel(episode), () => _playableDecks.Count > 0),
                     new("내 덱 변경", PickDeck),
                     new("대화 다시 보기", () => OpenEpisode(index)),
-                    new("에피소드 목록으로", ReturnToEpisodes)));
+                    new("에피소드 목록으로", ReturnToEpisodes),
+                    new("전술 서포트 장착 · 최대 2개", () => PickSupports(episode))));
+            _dialogue.SetBranch(StoryDialogueBranch.AfterLine(episode), () =>
+                _dialogue.ShowChoices(() => "어떻게 답할까?", choices.Select(choice => new StoryChoice(
+                    $"{choice.Reply}\n{StoryDialogueBranch.Effect(choice.Stance)}", () =>
+                    {
+                        _stance = choice.Stance;
+                        _dialogue.AnswerBranch(choice.Reply, episode.opponentName, choice.Response);
+                    })).ToArray()));
         }
+
+        private string PreparationSummary(StoryRaid? raid)
+        {
+            var (player, opponent) = new StoryBattlePlan(_stance, _supports).Apply(raid);
+            string field = raid.HasValue ? $"\n초기 필드 · {CardDatabase.GetName(opponent.FieldCard)}" : "";
+            string equipped = string.Join(" · ", RaidSupportCatalog.Items.Where(item => (_supports & item.Id) != 0)
+                .Select(item => item.Name));
+            string supports = equipped.Length > 0 ? $"\n장착 · {equipped}" : "";
+            return $"{SelectedStoryDeckLabel()}\n내 LP {player.Life:N0} · 패 {player.Hand}장 / 상대 LP {opponent.Life:N0} · 패 {opponent.Hand}장{field}{supports}";
+        }
+
+        private void PickSupports(StoryEpisodeData episode) => _dialogue.OpenSupportPicker(GetRaid(episode).HasValue, _supports,
+            items => { _supports = items; });
 
         private static string TitleOf(StoryEpisodeData episode) =>
             episode.title.StartsWith("[BOSS RAID] ", StringComparison.Ordinal) ? episode.title.Substring(12) : episode.title;
@@ -430,7 +468,8 @@ namespace YGOPortable.UI
 
         private void LaunchDuel(StoryEpisodeData episode)
         {
-            if (_playableDecks.Count > 0) _app.StartStoryDuel(episode, _playableDecks[_deckPicker.value]);
+            if (_playableDecks.Count > 0)
+                _app.StartStoryDuel(episode, _playableDecks[_deckPicker.value], new StoryBattlePlan(_stance, _supports));
         }
 
         private void PlayDialogue(StoryEpisodeData episode, StoryDialogueLine[] lines, string heading, Action onFinish)
