@@ -1236,8 +1236,8 @@ namespace YGOPortable.Editor
             view.VerifyPassAvailability(true);
             Require(view.Choice(0).GetComponentInChildren<CompositeCardView>().CurrentCode == LadyLabrynth &&
                     view.FindChoice(1) == null &&
-                    view.EffectOption(0).GetComponentInChildren<Text>().text.StartsWith("①번 효과", StringComparison.Ordinal) &&
-                    view.EffectOption(1).GetComponentInChildren<Text>().text.StartsWith("②번 효과", StringComparison.Ordinal),
+                    view.EffectOption(0).GetComponentInChildren<Text>().text.StartsWith("① ", StringComparison.Ordinal) &&
+                    view.EffectOption(1).GetComponentInChildren<Text>().text.StartsWith("② ", StringComparison.Ordinal),
                 "The same card did not present both numbered effects beside a single artwork tile.");
             view.SelectChoice(0, LadyLabrynth);
             view.VerifyEffect(prompt.candidates[0]);
@@ -1291,6 +1291,12 @@ namespace YGOPortable.Editor
             Require(view.Modals.IsPromptOpen && view.Responses.SequenceEqual(new[] { 3 }),
                 "The chooser sent a replacement candidate at the selected engine index.");
             reopened.candidates[2] = chosen;
+            ulong description = chosen.description;
+            chosen.description ^= 1;
+            view.ConfirmChoice();
+            Require(view.Modals.IsPromptOpen && view.Responses.SequenceEqual(new[] { 3 }),
+                "The chooser submitted an effect whose meaning changed after rendering.");
+            chosen.description = description;
             view.ConfirmChoice();
             Require(view.Responses.SequenceEqual(new[] { 3, 2 }),
                 "Reopening the chooser carried the previous prompt's native candidate mapping into the new choice.");

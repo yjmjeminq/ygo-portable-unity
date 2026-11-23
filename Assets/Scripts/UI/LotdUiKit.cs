@@ -413,10 +413,7 @@ namespace YGOPortable.UI
         private Image _overframePortrait;
         private CanvasGroup _overframe;
         private RectTransform _overframeTilt;
-        private CardOverframeGraphic _overframeArt;
-        private CardOverframeGraphic _overframeEdge;
         private Image _overframeShade;
-        private bool _overframeFoil;
 
         internal bool HasOverframe => _overframe != null && _overframe.gameObject.activeSelf;
 
@@ -710,13 +707,11 @@ namespace YGOPortable.UI
 
         private void RefreshOverframe()
         {
-            if (!_overframeEnabled || _overframeBound || _artworkSource.Code == 0) return;
+            if (!_overframeEnabled || _overframeBound || _retainedArtwork == 0) return;
             _overframeBound = true;
-            _retainedCutIn = DuelVisualAssets.RetainCutIn(_artworkSource.Code, _artworkSource.Variant);
-            bool local = _retainedCutIn != null;
-            var profile = local ? null : CardOverframeProfile.Get(_artworkSource.Code, _artworkSource.Variant);
-            if (!local && (profile == null || profile.Triangles.Length == 0)) return;
-
+            var (code, variant) = _artworkSource.Code == 0 ? (_retainedArtwork, _retainedVariant) : _artworkSource;
+            _retainedCutIn = DuelVisualAssets.RetainCutIn(code, variant);
+            if (_retainedCutIn == null) return;
             if (_overframe == null)
             {
                 var layer = LotdUiKit.FillRect("Overframe", transform);
@@ -730,43 +725,17 @@ namespace YGOPortable.UI
                 var shade = LotdUiKit.FillRect("OverframeShade", _artImg.rectTransform);
                 _overframeShade = LotdUiKit.AddImage(shade.gameObject, LotdUiKit.WhiteSprite,
                     new Color(.021f, .033f, .048f), false, false);
-                layer.SetAsLastSibling();
+                var portrait = LotdUiKit.CreateRect("LocalCutIn", _overframeTilt,
+                    new Vector2(-.13f, .405f), new Vector2(1.13f, 1.166f), Vector2.zero, Vector2.zero);
+                portrait.pivot = new Vector2(.5f, 1f);
+                _overframePortrait = LotdUiKit.AddImage(portrait.gameObject, null, Color.white, true, false);
+                _overframePortrait.maskable = false;
             }
-            if (local)
-            {
-                if (_overframePortrait == null)
-                {
-                    var portrait = LotdUiKit.CreateRect("LocalCutIn", _overframeTilt,
-                        new Vector2(-.13f, .405f), new Vector2(1.13f, 1.166f), Vector2.zero, Vector2.zero);
-                    portrait.pivot = new Vector2(.5f, 1f);
-                    _overframePortrait = LotdUiKit.AddImage(portrait.gameObject, null, Color.white, true, false);
-                    _overframePortrait.maskable = false;
-                }
-                _overframePortrait.sprite = _retainedCutIn;
-                _overframePortrait.gameObject.SetActive(true);
-                _overframePortrait.transform.SetAsLastSibling();
-            }
-            else
-            {
-                _overframeEdge ??= AddLayer("Shimmer");
-                _overframeArt ??= AddLayer("Subject");
-                _overframeArt.Bind(_artImg.sprite, profile, edge: false);
-                _overframeEdge.Bind(_artImg.sprite, profile, edge: true);
-                _overframeArt.gameObject.SetActive(true);
-                _overframeEdge.gameObject.SetActive(true);
-                _overframeFoil = CardRarityCatalog.GetRarity(_retainedArtwork) >= CardRarity.SuperRare;
-            }
+            _overframe.transform.SetAsLastSibling();
+            _overframePortrait.sprite = _retainedCutIn;
             _overframeShade.gameObject.SetActive(true);
             _overframe.gameObject.SetActive(true);
             PoseOverframe(1f, 1f, Vector2.zero, 0f);
-
-            CardOverframeGraphic AddLayer(string name)
-            {
-                var graphic = LotdUiKit.FillRect(name, _overframeTilt).gameObject.AddComponent<CardOverframeGraphic>();
-                graphic.maskable = false;
-                graphic.raycastTarget = false;
-                return graphic;
-            }
         }
 
         internal void PoseOverframe(float opacity, float scale, Vector2 parallax, float shimmer)
@@ -777,31 +746,17 @@ namespace YGOPortable.UI
             _overframeTilt.localScale = Vector3.one * scale;
             _overframeTilt.anchoredPosition = Vector2.Scale(_overframeTilt.rect.size, parallax) * .024f;
             _overframeTilt.localRotation = Quaternion.Euler(parallax.y * 3f, -parallax.x * 6f, 0f);
-            if (_overframeEdge == null || !_overframeEdge.gameObject.activeSelf) return;
-            var spectrum = Color.HSVToRGB(Mathf.Repeat(shimmer, 1f), .63f, 1f);
-            var tint = Color.Lerp(DuelStyle.ChainGold, spectrum, _overframeFoil ? .78f : .65f);
-            tint.a = _overframeFoil ? .58f : .47f;
-            _overframeEdge.canvasRenderer.SetColor(tint);
+            float shine = .96f + .04f * Mathf.Cos(shimmer * Mathf.PI * 2f);
+            _overframePortrait.canvasRenderer.SetColor(new Color(1f, shine, shine, 1f));
         }
 
         private void HideOverframe()
         {
             _overframeBound = false;
-            if (_overframe == null || !_overframe.gameObject.activeSelf) return;
-            if (_overframePortrait != null)
-            {
-                _overframePortrait.sprite = null;
-                _overframePortrait.gameObject.SetActive(false);
-            }
+            if (_retainedCutIn == null) return;
+            _overframePortrait.sprite = null;
             DuelVisualAssets.ReleaseCutIn(_retainedCutIn);
             _retainedCutIn = null;
-            if (_overframeArt != null)
-            {
-                _overframeArt.Bind(null, null, edge: false);
-                _overframeEdge.Bind(null, null, edge: true);
-                _overframeArt.gameObject.SetActive(false);
-                _overframeEdge.gameObject.SetActive(false);
-            }
             _overframeShade.gameObject.SetActive(false);
             _overframe.gameObject.SetActive(false);
         }

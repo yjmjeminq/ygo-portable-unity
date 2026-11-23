@@ -1064,24 +1064,23 @@ namespace YGOPortable.UI
                     var move = moves[i];
                     var flight = move.Flight;
                     TrackCardEffect(cues[i], flight.From, 1.58f, .56f + .44f * Mathf.Clamp01(time * 2.4f));
-                    ApplyFlight(cards[i], flight, time, move.Vanishes ? 6f : 18f, lateral: spread[i]);
+                    if (portal != null && kind != DuelEffectKind.Fusion)
+                        ApproachMaterialPortal(cards[i], flight, portal, i, time);
+                    else
+                        ApplyFlight(cards[i], flight, time, move.Vanishes ? 6f : 18f, lateral: spread[i]);
+                    if (orbs[i] != null) PoseMaterialOrb(orbs[i], portal, move, i, time);
+                    if (kind == DuelEffectKind.Fusion)
+                        PullFusionCard(cards[i], flight, portal.rectTransform.anchoredPosition, i, time);
+
                     if (portal != null)
                     {
-                        if (orbs[i] != null) PoseMaterialOrb(orbs[i], portal, move, i, time);
-                        if (kind == DuelEffectKind.Fusion) PullFusionCard(cards[i], flight, portal.rectTransform.anchoredPosition, i, time);
+                        float fadeStart = kind == DuelEffectKind.Fusion ? .50f : .36f;
+                        float fadeEnd = kind == DuelEffectKind.Fusion ? .96f : .71f;
+                        fades[i].alpha = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(fadeStart, fadeEnd, time));
                     }
-                    stats[i]?.Follow(cards[i], time);
-                    if (merging || move.Vanishes || kind == DuelEffectKind.Fusion)
-                    {
-                        float fadeStart = move.Vanishes && portal == null ? .48f : .29f;
-                        fades[i].alpha = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(fadeStart, .94f, time));
-                    }
-                    else if (kind is DuelEffectKind.Synchro or DuelEffectKind.Link)
-                    {
-                        float convert = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.24f, .46f, time));
-                        float arrive = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.66f, .90f, time));
-                        fades[i].alpha = 1f - .94f * convert * (1f - arrive);
-                    }
+                    else if (move.Vanishes)
+                        fades[i].alpha = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.48f, .94f, time));
+                    stats[i]?.Follow(cards[i], time, fades[i].alpha);
                 }
             });
             if (portal != null)
@@ -1240,8 +1239,8 @@ namespace YGOPortable.UI
             if (flight.EndsFaceDown) return false;
             int selected = CardArtLoader.GetDuelArtworkVariant(flight.Code);
             var (artCode, artVariant) = CardArtLoader.GetArtworkSource(flight.Code, selected);
-            return DuelVisualAssets.CanDisplayCutIn(artCode, artVariant) ||
-                CardOverframeProfile.Get(artCode, artVariant) is { } profile && profile.Triangles.Length > 0;
+            return artCode == 0 ? DuelVisualAssets.CanDisplayCutIn(flight.Code, selected) :
+                DuelVisualAssets.CanDisplayCutIn(artCode, artVariant);
         }
 
         internal bool TakeFeaturedSummon(CardFlight flight)
@@ -1252,7 +1251,7 @@ namespace YGOPortable.UI
             uint key = CardDatabase.GetArchetypeCollectionKey(card);
             bool signature = DeckRepository.PresetDecks.Exists(deck => deck.sigCard == key || deck.sigCard == flight.Code);
             bool rareBoss = (card.IsExtra || card.atk >= 2400) && CardRarityCatalog.GetRarity(flight.Code) == CardRarity.UltraRare;
-            return (signature || rareBoss || CardOverframeProfile.Get(flight.Code, -1) != null) &&
+            return (signature || rareBoss) &&
                 _featuredSummons.Add((flight.To.Angle > 45f, key));
         }
 

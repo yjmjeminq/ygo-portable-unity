@@ -85,6 +85,7 @@ namespace YGOPortable.Editor
             VerifyNativeFieldSumChoice(setSecondMaterial: true);
             VerifyNativeMixedMaterials(ritual: false);
             VerifyNativeMixedMaterials(ritual: true);
+            VerifyNativeGraveFusionMaterials();
             VerifyNativeXyzMaterialReadout();
             Debug.Log("[VERIFY HAND GLOW] Native summons and effects, distinct hand copies, blocked prompts, animation, off-turn activation and field-only monster ratings passed.");
         }
@@ -3121,8 +3122,10 @@ namespace YGOPortable.Editor
             var window = root.Find("Overlay_CardZoom/MobileSafeArea/ZoomWin");
             var view = window.Find("CardHolder/ZoomCard").GetComponent<CompositeCardView>();
             var trigger = safe.Find("PlayerHand/Cards").GetChild(0).GetComponent<CardDragTrigger>();
+            var source = CardArtLoader.GetArtworkSource(excel, CardArtLoader.GetDuelArtworkVariant(excel));
+            bool supported = DuelVisualAssets.CanDisplayCutIn(source.Code, source.Variant);
             Hold(trigger);
-            Require(window.gameObject.activeInHierarchy && view.CurrentCode == excel && view.HasOverframe,
+            Require(window.gameObject.activeInHierarchy && view.CurrentCode == excel && view.HasOverframe == supported,
                 "Long-pressing the hand did not reveal the card's overframe details.");
             window.Find("Hdr/Close/B").GetComponent<Button>().onClick.Invoke();
 
@@ -3134,9 +3137,13 @@ namespace YGOPortable.Editor
             var own = duel.Players[duel.HumanPlayerIndex];
             var card = own.mzone.Single(c => c?.code == excel);
             var zone = safe.Find($"DuelBoard/Zone_{card.sequence + 2}_3");
-            Hold(zone.GetComponent<CardDragTrigger>());
-            Require(window.gameObject.activeInHierarchy && view.CurrentCode == excel && view.HasOverframe &&
-                duel.RetryCount == 0, "Long-pressing the field did not open overframe inspection.");
+            var fieldCard = zone.GetComponent<CardDragTrigger>();
+            fieldCard.OnRightClick();
+            Hold(fieldCard);
+            var inspected = (CompositeCardView)typeof(DuelFieldUI).GetField("_inspCard", PrivateInstance).GetValue(ui.Field);
+            Require(window.gameObject.activeInHierarchy && view.CurrentCode == excel && view.HasOverframe == supported &&
+                inspected.CurrentCode == excel && inspected.HasOverframe == supported && duel.RetryCount == 0,
+                "The duel inspector and zoom did not show the same supported portrait.");
             Debug.Log("[VERIFY OVERFRAME TOUCH] Hand and field long presses opened the same mobile detail view.");
 
             static void Hold(CardDragTrigger source)
@@ -4319,7 +4326,7 @@ namespace YGOPortable.Editor
             Require(duel.RetryCount == 0 && (xyz ? host.overlayCodes.Count == 2 : host.link == 2),
                 "The material fixture did not complete the intended summon.");
             if (!xyz) VerifyNativeSendGroup(send, YgoConstants.REASON_LINK);
-            var slot = VerifyMaterialTimeline(ui.Field, animator, host, sources, count: 2, merging: xyz, inspected: focused);
+            var slot = VerifyMaterialTimeline(ui.Field, animator, host, sources, count: 2, inspected: focused);
             if (xyz)
                 Require(slot.Find("CardReadout/Labels/Materials/Value").GetComponent<Text>().text == "2",
                     "The Xyz monster did not land with both assembled materials.");
@@ -4529,6 +4536,41 @@ namespace YGOPortable.Editor
             Debug.Log($"[VERIFY DUEL SUMMON MATERIAL] {(ritual ? "Ritual" : "Fusion")} kept the hand and field origins and respected the set card's visibility.");
         }
 
+        private static void VerifyNativeGraveFusionMaterials()
+        {
+            const uint sparkman = 20721928, foolish = 81439173, miracle = 45906428, shining = 22061412;
+            var main = Enumerable.Repeat(sparkman, 20).Concat(Enumerable.Repeat(foolish, 10))
+                .Concat(Enumerable.Repeat(miracle, 10)).ToArray();
+            var ai = new TacticalAI();
+            using var duel = YgoProjectBuilder.StartSeedMatching("Fusion material from the graveyard", main, new[] { shining },
+                Enumerable.Repeat(BlueEyes, 40).ToArray(), Array.Empty<uint>(), true, session =>
+                    session.ActivePrompt?.summonable.Exists(card => card.code == sparkman) == true &&
+                    session.ActivePrompt.activatable.Exists(card => card.code == foolish) &&
+                    session.Players[session.HumanPlayerIndex].hand.Exists(card => card.code == miracle));
+            ActivateFromMainPhase(duel, foolish);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt => prompt.messageType == YgoConstants.MSG_SELECT_CARD
+                ? SelectCard(prompt, sparkman) : null);
+            duel.SubmitResponseInt(duel.ActivePrompt.summonable.FindIndex(card => card.code == sparkman) << 16);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai);
+            var player = duel.Players[duel.HumanPlayerIndex];
+            var source = player.mzone.Single(card => card?.code == sparkman);
+            using var ui = new HandUI(duel);
+            var animator = CardAnimationManager.Ensure(ui.Canvas);
+            Canvas.ForceUpdateCanvases();
+            var sent = new List<CardMoveEvent>();
+            duel.OnCardMoved += move => { if (move.MaterialMethod == YgoConstants.REASON_FUSION) sent.Add(move); };
+            ActivateFromMainPhase(duel, miracle);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt => prompt.messageType == YgoConstants.MSG_SELECT_CARD
+                ? ai.ComputeResponse(duel, prompt) : null);
+            var host = player.mzone.Single(card => card?.code == shining);
+            Require(duel.RetryCount == 0 && sent.Count == 2 &&
+                sent.Any(move => move.fromLoc == YgoConstants.LOCATION_GRAVE && move.toLoc == YgoConstants.LOCATION_REMOVED) &&
+                sent.Any(move => move.fromLoc == YgoConstants.LOCATION_MZONE && move.toLoc == YgoConstants.LOCATION_REMOVED),
+                "Miracle Fusion did not use its native field and graveyard materials.");
+            VerifyMaterialTimeline(ui.Field, animator, host, new[] { source }, count: 2);
+            Debug.Log("[VERIFY DUEL GRAVE MATERIAL] Miracle Fusion flew both visible copies from the field and graveyard into the vortex.");
+        }
+
         private static void VerifyNativeSendGroup(IReadOnlyList<CardMoveEvent> moves, uint method)
         {
             Require(moves.Count == 2 && moves[0].PresentationGroup != null &&
@@ -4537,7 +4579,7 @@ namespace YGOPortable.Editor
         }
 
         private static Transform VerifyMaterialTimeline(DuelFieldUI field, CardAnimationManager animator, LiveCardState host,
-            IReadOnlyList<LiveCardState> sources, int count, bool merging = false, int faceDown = 0, uint vanishes = 0,
+            IReadOnlyList<LiveCardState> sources, int count, int faceDown = 0, uint vanishes = 0,
             LiveCardState inspected = null)
         {
             void CheckInspectedAttack(int attack)
@@ -4630,20 +4672,19 @@ namespace YGOPortable.Editor
                 }
                 sample(.20f);
             }
-            if (merging)
+            if (hasSignature)
             {
-                float separation = Vector2.Distance(cards[0].anchoredPosition, cards[1].anchoredPosition);
-                sample(.91f);
-                Require(separation > 10f && Vector2.Distance(cards[0].anchoredPosition, cards[1].anchoredPosition) < separation * .5f,
-                    "The Xyz materials did not converge on the chosen slot.");
-            }
-            if (vanishes != 0)
-            {
-                sample(.91f);
-                var token = cards.Single(card => card.GetComponent<CompositeCardView>().CurrentCode == vanishes);
-                var other = cards.Single(card => card != token);
-                Require(token.GetComponent<CanvasGroup>().alpha < .3f && other.GetComponent<CanvasGroup>().alpha == 1f,
-                    "The consumed token did not fade separately from the material sent to the Graveyard.");
+                var portal = animator.GetComponentsInChildren<DuelEffectGraphic>()
+                    .Single(graphic => graphic.SummonSignature && !graphic.SummonFinale);
+                Vector2 center = portal.rectTransform.anchoredPosition;
+                float distance = cards.Average(card => Vector2.Distance(card.anchoredPosition, center));
+                float size = cards.Sum(card => card.rect.height * card.localScale.y);
+                sample(.76f);
+                float remaining = cards.Average(card => Vector2.Distance(card.anchoredPosition, center));
+                Require(remaining < distance && cards.Sum(card => card.rect.height * card.localScale.y) < size &&
+                    cards.All(card => card.GetComponent<CanvasGroup>().alpha < .6f) &&
+                    (vanishes == 0 || cards.Any(card => card.GetComponent<CompositeCardView>().CurrentCode == vanishes)),
+                    $"The {kind} materials did not reach the center before absorption ({distance:F1} to {remaining:F1}).");
             }
             sample(1f);
             var hostSlot = FieldSlot(field, host);

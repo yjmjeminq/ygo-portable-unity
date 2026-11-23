@@ -103,7 +103,6 @@ namespace YGOPortable.UI
 
                 Debug.Log("[GameApp] 2. Initializing CardArtLoader...");
                 CardArtLoader.Initialize(Application.streamingAssetsPath);
-                CardOverframeProfile.PrepareContours();
 
                 var saveFiles = new SaveSyncFiles(Application.persistentDataPath);
                 saveFiles.Recover();

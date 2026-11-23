@@ -48,239 +48,103 @@ namespace YGOPortable.Editor
 
         internal static void VerifyOverframePaths()
         {
-            CardOverframeProfile.PrepareContours();
-            var profileType = typeof(CardOverframeProfile);
-            const BindingFlags profileFields = BindingFlags.NonPublic | BindingFlags.Static;
-            var bundled = (Dictionary<uint, CardOverframeProfile>)profileType.GetField("Profiles", profileFields).GetValue(null);
-            var local = (Dictionary<(uint, int), CardOverframeProfile>)profileType.GetField("LocalProfiles", profileFields).GetValue(null);
-            var indices = profileType.GetField("_triangles", BindingFlags.NonPublic | BindingFlags.Instance);
-            foreach (var contour in bundled.Values.Concat(local.Values).Distinct())
+            var installed = Path.Combine(CardArtLoader.ActiveDuelVisualsPath, "CutIns");
+            if (Directory.Exists(installed))
             {
-                var prepared = (int[])indices.GetValue(contour);
-                Require(prepared != null && prepared.Length == (contour.Uv.Length - 2) * 3,
-                    "Startup did not prepare a complete triangulation for all artwork variants.");
+                int verified = 0;
+                foreach (string file in Directory.EnumerateFiles(installed, "*.png"))
+                {
+                    var parts = Path.GetFileNameWithoutExtension(file).Split('-');
+                    if (parts.Length != 2 || !uint.TryParse(parts[0], out uint code) ||
+                        !int.TryParse(parts[1], out int variant)) continue;
+                    var source = CardArtLoader.GetArtworkSource(code, variant);
+                    Require(source == (code, variant), $"The installed portrait {code}-{variant} had no matching card art.");
+                    var portrait = DuelVisualAssets.RetainCutIn(source.Code, source.Variant);
+                    Require(portrait != null && portrait.rect.width > 0, $"The installed cut-in {code}-{variant} did not decode.");
+                    if (variant == 0)
+                        Require(DuelVisualAssets.CanDisplayCutIn(code, -1), $"Bundled art skipped the installed {code}-0 cut-in.");
+                    DuelVisualAssets.ReleaseCutIn(portrait);
+                    verified++;
+                }
+                Debug.Log($"[VERIFY OVERFRAME LIBRARY] Decoded {verified} installed cut-ins and checked the bundled default lookup.");
             }
-            Debug.Log("[VERIFY OVERFRAME PREP] Bundled and alternate silhouettes triangulated before the card renderer bound them.");
 
+            const uint magician = 46986414, baronne = 84815190, excel = 9674034, unrelated = 20721928;
+            string folder = Path.Combine(Path.GetTempPath(), "ygo-overframe-art-" + Guid.NewGuid().ToString("N"));
+            string directory = Path.Combine(folder, "CutIns");
+            Directory.CreateDirectory(directory);
+            var texture = new Texture2D(8, 8, TextureFormat.RGBA32, false);
+            texture.SetPixels32(Enumerable.Range(0, 64).Select(i => i % 8 < 3
+                ? new Color32(0, 0, 0, 0) : new Color32(72, 110, 180, 255)).ToArray());
+            texture.Apply();
+            byte[] portraitBytes = texture.EncodeToPNG();
+            UnityEngine.Object.DestroyImmediate(texture);
+            foreach (uint code in new[] { BlueEyes, magician, baronne, excel })
+                File.WriteAllBytes(Path.Combine(directory, $"{code}-0.png"), portraitBytes);
+            File.WriteAllBytes(Path.Combine(directory, $"{BlueEyes}-23.png"), portraitBytes);
+
+            string previous = CardArtLoader.ActiveDuelVisualsPath;
             var canvas = new GameObject("Overframe Verification", typeof(Canvas)).GetComponent<Canvas>();
             canvas.renderMode = RenderMode.WorldSpace;
-            ((RectTransform)canvas.transform).sizeDelta = new Vector2(1600f, 900f);
+            ((RectTransform)canvas.transform).sizeDelta = new Vector2(1600, 900);
+            CardArtLoader.Shutdown();
+            CardArtLoader.Initialize(Application.streamingAssetsPath, folder);
             try
             {
+                var zero = DuelVisualAssets.RetainCutIn(BlueEyes, 0);
+                var bundled = DuelVisualAssets.RetainCutIn(BlueEyes, -1);
+                var alternate = DuelVisualAssets.RetainCutIn(BlueEyes, 23);
+                Require(zero != null && bundled == zero && alternate != null && alternate != zero &&
+                    !DuelVisualAssets.CanDisplayCutIn(BlueEyes, 24), "Default and exact alternate artwork did not resolve independently.");
+                DuelVisualAssets.ReleaseCutIn(alternate);
+                DuelVisualAssets.ReleaseCutIn(bundled);
+                DuelVisualAssets.ReleaseCutIn(zero);
+
                 var holder = LotdUiKit.CreateRect("View", canvas.transform, new Vector2(.25f, .16f), new Vector2(.52f, .83f),
                     Vector2.zero, Vector2.zero);
                 var card = CompositeCardView.Create(holder, "Detailed", detailedOverlay: true);
                 card.EnableOverframe();
                 CardOverframeInput.Attach(holder, card, false, Rect.MinMaxRect(.25f, .16f, .52f, .83f), Rect.MinMaxRect(.28f, .19f, .50f, .74f));
-                foreach (uint code in new[] { 84815190u, 46986414u, BlueEyes, 9674034u })
-                {
-                    card.SetCard(code);
-                    Canvas.ForceUpdateCanvases();
-                    var layer = card.transform.Find("Overframe");
-                    var graphic = layer?.Find("Depth/Subject").GetComponent<CardOverframeGraphic>();
-                    Require(card.HasOverframe && !graphic.maskable && !graphic.raycastTarget &&
-                        layer.parent == card.transform && layer.GetSiblingIndex() == card.transform.childCount - 1 &&
-                        graphic.mainTexture == card.ArtworkSprite.texture,
-                        $"The face of {code} did not use its own art in a separate unmasked overlay.");
-                    using var mesh = new VertexHelper();
-                    typeof(CardOverframeGraphic).GetMethod("OnPopulateMesh", BindingFlags.Instance | BindingFlags.NonPublic,
-                        null, new[] { typeof(VertexHelper) }, null).Invoke(graphic, new object[] { mesh });
-                    var profile = CardOverframeProfile.Get(code, -1);
-                    Require(mesh.currentVertCount == profile.Uv.Length * 2 && mesh.currentIndexCount == (profile.Uv.Length * 3 - 2) * 3,
-                        $"The silhouette of {code} did not triangulate.");
-                    float bottom = float.PositiveInfinity, top = float.NegativeInfinity, right = float.NegativeInfinity;
-                    UIVertex v = default;
-                    for (int i = 0; i < mesh.currentVertCount; i++)
-                    {
-                        mesh.PopulateUIVertex(ref v, i);
-                        bottom = Mathf.Min(bottom, v.position.y);
-                        top = Mathf.Max(top, v.position.y);
-                        right = Mathf.Max(right, v.position.x);
-                    }
-                    var shimmer = layer.Find("Depth/Shimmer").GetComponent<CardOverframeGraphic>();
-                    card.PoseOverframe(1f, 1f, Vector2.zero, .02f);
-                    var warm = shimmer.canvasRenderer.GetColor();
-                    card.PoseOverframe(1f, 1f, Vector2.zero, .61f);
-                    var cool = shimmer.canvasRenderer.GetColor();
-                    Require(warm.r > cool.r && cool.b > warm.b, $"The shimmer of ace {code} did not cycle through the spectrum.");
-
-                    var rect = graphic.rectTransform.rect;
-                    Require(bottom > rect.yMin + .30f * rect.height && top > rect.yMax + .15f * rect.height && right > rect.xMax,
-                        $"The silhouette of {code} did not clear the upper and side edges or crossed the lower text.");
-                }
-
+                card.SetCard(BlueEyes);
+                Canvas.ForceUpdateCanvases();
+                var layer = card.transform.Find("Overframe");
+                var image = layer.Find("Depth/LocalCutIn").GetComponent<Image>();
+                Require(card.HasOverframe && image.sprite == zero && !image.maskable && !image.raycastTarget &&
+                    layer.GetSiblingIndex() == card.transform.childCount - 1 && image.rectTransform.anchorMax.y > 1f,
+                    "Bundled card art did not display the unmasked portrait past its frame.");
                 var input = holder.GetComponent<CardOverframeInput>();
-                var tick = typeof(CardOverframeInput).GetMethod("LateUpdate", BindingFlags.Instance | BindingFlags.NonPublic);
-                tick.Invoke(input, null);
-                var pointer = new PointerEventData(EventSystem.current) { pointerId = 4, button = PointerEventData.InputButton.Left };
-                pointer.position = RectTransformUtility.WorldToScreenPoint(null, holder.position);
-                input.OnPointerDown(pointer);
-                pointer.position += new Vector2(80f, 40f);
-                input.OnBeginDrag(pointer);
-                var drag = (Vector2)typeof(CardOverframeInput).GetField("_drag", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(input);
-                Require(drag.sqrMagnitude > .05f, "Dragging the viewer did not set a parallax offset.");
                 typeof(CardOverframeInput).GetMethod("ShowDepth", BindingFlags.Instance | BindingFlags.NonPublic)
-                    .Invoke(input, new object[] { drag, .21f });
-                var tilt = (RectTransform)card.transform.Find("Overframe/Depth");
+                    .Invoke(input, new object[] { new Vector2(.6f, .3f), .21f });
+                var tilt = (RectTransform)layer.Find("Depth");
                 Require(tilt.anchoredPosition.sqrMagnitude > 1f && tilt.localRotation != Quaternion.identity &&
-                    card.transform.localRotation != Quaternion.identity, "Frame and portrait did not tilt independently.");
-                input.OnEndDrag(pointer);
+                    card.transform.localRotation != Quaternion.identity, "The portrait and frame did not tilt independently.");
                 card.SetCard(BlueEyes, faceDown: true);
-                Require(!card.HasOverframe, "A face-down view leaked the featured artwork.");
-                card.SetCard(20721928);
-                Require(!card.HasOverframe, "Reusing the viewer leaked the previous contour.");
-
-                var animator = CardAnimationManager.Ensure(canvas);
-                VerifyOverframeAnimation(animator);
-                Debug.Log("[VERIFY OVERFRAME] Four bundled silhouettes, layering, touch parallax, hidden card reuse, summon bounce and chain cut-ins passed.");
-            }
-            finally { UnityEngine.Object.DestroyImmediate(canvas.gameObject); }
-            VerifyOverframeArtworkSources();
-        }
-
-        private static void VerifyOverframeArtworkSources()
-        {
-            const uint magician = 46986414, blueEyesPrinting = 89631140;
-            string folder = Path.Combine(Path.GetTempPath(), "ygo-overframe-art-" + Guid.NewGuid().ToString("N"));
-            string packPath = Path.Combine(folder, "cardart.pack");
-            string cutIns = Path.Combine(folder, "CutIns");
-            string cutInPath = Path.Combine(cutIns, $"{BlueEyes}-0.png");
-            Directory.CreateDirectory(cutIns);
-            const string magic = "MDAR";
-            var texture = new Texture2D(8, 8, TextureFormat.RGB24, false);
-            texture.SetPixels32(Enumerable.Repeat(new Color32(72, 110, 180, 255), 64).ToArray());
-            texture.Apply();
-            byte[] localArt = texture.EncodeToPNG();
-            UnityEngine.Object.DestroyImmediate(texture);
-            byte[] damagedArt = { 1, 2, 3, 4 };
-            using (var pack = new BinaryWriter(File.Create(packPath)))
-            {
-                pack.Write(System.Text.Encoding.ASCII.GetBytes(magic));
-                pack.Write(1u);
-                pack.Write(2u);
-                const uint offset = 12 + 2 * 16;
-                pack.Write(magician);
-                pack.Write(0);
-                pack.Write(offset);
-                pack.Write((uint)damagedArt.Length);
-                pack.Write(BlueEyes);
-                pack.Write(0);
-                pack.Write(offset + (uint)damagedArt.Length);
-                pack.Write((uint)localArt.Length);
-                pack.Write(damagedArt);
-                pack.Write(localArt);
-            }
-
-            var canvas = new GameObject("Overframe Artwork Verification", typeof(Canvas)).GetComponent<Canvas>();
-            canvas.renderMode = RenderMode.WorldSpace;
-            ((RectTransform)canvas.transform).sizeDelta = new Vector2(1600f, 900f);
-            CardArtLoader.Shutdown();
-            CardArtLoader.Initialize(Application.streamingAssetsPath, folder);
-            try
-            {
-                var view = CompositeCardView.Create(canvas.transform, "Viewer", detailedOverlay: true, duelArtwork: true);
-                view.EnableOverframe();
-                view.SetCard(magician);
-                var fallback = CardArtLoader.GetArtworkSource(magician, 0);
-                Require(fallback == (magician, -1) && view.HasOverframe,
-                    "An unreadable local painting did not use the bundled painting and its silhouette.");
-                var graphic = view.transform.Find("Overframe/Depth/Subject").GetComponent<CardOverframeGraphic>();
-                var profileField = typeof(CardOverframeGraphic).GetField("_profile", BindingFlags.NonPublic | BindingFlags.Instance);
-                Require(ReferenceEquals(profileField.GetValue(graphic), CardOverframeProfile.Get(magician, -1)) &&
-                    !ReferenceEquals(profileField.GetValue(graphic), CardOverframeProfile.Get(magician, 0)),
-                    "The decoded fallback used the silhouette of the originally selected artwork.");
-
-                view.SetCard(BlueEyes);
-                Require(CardArtLoader.GetArtworkSource(BlueEyes, 0) == (BlueEyes, 0) &&
-                    view.ArtworkSprite.texture.width == 8 && !view.HasOverframe,
-                    "A valid replacement art inherited the unrelated bundled silhouette.");
-                view.SetCard(blueEyesPrinting);
-                Require(CardArtLoader.GetArtworkSource(blueEyesPrinting, -1) == (BlueEyes, -1) && view.HasOverframe &&
-                    ReferenceEquals(profileField.GetValue(graphic), CardOverframeProfile.Get(BlueEyes, -1)) &&
-                    view.CurrentCode == blueEyesPrinting,
-                    "An equivalent printing lost its borrowed silhouette or changed card identity.");
-                view.SetCard(magician);
-                Require(ReferenceEquals(profileField.GetValue(graphic), CardOverframeProfile.Get(magician, -1)),
-                    "Returning to the first card retained an old silhouette in the same viewer.");
-
-                var animator = CardAnimationManager.Ensure(canvas);
-                var pose = new CardPose(new Vector2(0f, -90f), new Vector2(92f, 134f));
-                animator.QueueMove(new CardFlight(blueEyesPrinting, pose, pose, true, false), CardMotion.SpecialSummon, null);
-                var queue = (Queue<IEnumerator>)typeof(CardAnimationManager).GetField("_steps",
-                    BindingFlags.Instance | BindingFlags.NonPublic).GetValue(animator);
-                var move = queue.Dequeue();
-                Require(move.MoveNext() && move.Current is IEnumerator, "The equivalent printing skipped its summon reveal.");
-                var reveal = (IEnumerator)move.Current;
-                Require(reveal.MoveNext(), "The equivalent printing did not show a cut-in.");
-                SampleAnimation((IEnumerator)reveal.Current)(1f);
-                Require(animator.transform.Find("MovingCard/Overframe/Depth/Subject").gameObject.activeInHierarchy,
-                    "The summon and card viewer did not choose the same decoded silhouette.");
-                animator.Clear();
-
-                var transparent = new Texture2D(2, 2, TextureFormat.RGBA32, false);
-                transparent.SetPixels(new[] { Color.clear, Color.white, Color.white, Color.clear });
-                transparent.Apply();
-                File.WriteAllBytes(cutInPath, transparent.EncodeToPNG());
-                UnityEngine.Object.DestroyImmediate(transparent);
-                view.SetCard(BlueEyes);
-                var local = view.transform.Find("Overframe/Depth/LocalCutIn").GetComponent<Image>();
-                var sprite = local.sprite;
-                Require(view.HasOverframe && sprite != null && sprite != view.ArtworkSprite && !local.raycastTarget &&
-                    local.rectTransform.anchorMax.y > 1f && !graphic.gameObject.activeSelf,
-                    "The transparent cut-in did not layer over the exact local artwork.");
-                view.SetCard(BlueEyes, faceDown: true);
-                Require(!view.HasOverframe && local.sprite == null, "A face-down card retained its local cut-in.");
+                Require(!card.HasOverframe && image.sprite == null, "The face-down card exposed its portrait.");
+                card.SetCard(unrelated);
+                Require(!card.HasOverframe, "A different artwork inherited an ace portrait.");
 
                 var deck = new DeckEditorUI(null, canvas.transform, mobileLayout: false);
-                typeof(DeckEditorUI).GetMethod("OpenExpandedDeckCard", BindingFlags.Instance | BindingFlags.NonPublic)
-                    .Invoke(deck, new object[] { BlueEyes });
-                var deckArtwork = deck.Root.transform.Find("Editor/ExpandedDeckCard/Window/Artwork/Card");
-                Require(deckArtwork != null && deckArtwork.GetComponent<CompositeCardView>().HasOverframe &&
-                    deckArtwork.Find("Overframe/Depth/LocalCutIn").GetComponent<Image>().sprite == sprite,
-                    "The expanded deck inspector did not use the same local artwork and cut-in.");
+                const BindingFlags instance = BindingFlags.Instance | BindingFlags.NonPublic;
+                typeof(DeckEditorUI).GetMethod("InspectCard", instance).Invoke(deck, new object[] { BlueEyes });
+                var preview = (CompositeCardView)typeof(DeckEditorUI).GetField("_previewCard", instance).GetValue(deck);
+                Require(preview.HasOverframe, "The deck preview did not show the decoded portrait.");
+                typeof(DeckEditorUI).GetMethod("OpenExpandedDeckCard", instance).Invoke(deck, new object[] { BlueEyes });
+                var expanded = (CompositeCardView)typeof(DeckEditorUI).GetField("_expandedDeckArt", instance).GetValue(deck);
+                Require(expanded.HasOverframe, "The expanded deck viewer did not show the decoded portrait.");
                 deck.Close();
 
-                animator.QueueMove(new CardFlight(BlueEyes, pose, pose, true, false), CardMotion.SpecialSummon, null);
-                move = queue.Dequeue();
-                Require(move.MoveNext() && move.Current is IEnumerator, "The local cut-in card skipped its summon reveal.");
-                reveal = (IEnumerator)move.Current;
-                Require(reveal.MoveNext(), "The local cut-in reveal did not start.");
-                SampleAnimation((IEnumerator)reveal.Current)(1f);
-                var moving = animator.transform.Find("MovingCard/Overframe/Depth/LocalCutIn");
-                Require(moving != null && moving.GetComponent<Image>().sprite == sprite,
-                    "The summon did not reuse the exact local cut-in shown in the card viewer.");
-                animator.Clear();
-
-                animator.QueueChain(pose, BlueEyes, 1, false);
-                var activation = queue.Dequeue();
-                Require(activation.MoveNext(), "The local cut-in skipped chain activation.");
-                var sample = SampleAnimation((IEnumerator)activation.Current);
-                sample(.6f);
-                moving = animator.transform.Find("MovingCard/Overframe/Depth/LocalCutIn");
-                Require(moving != null && moving.GetComponent<Image>().sprite == sprite,
-                    "The chain activation used a different cut-in.");
-                if (DuelVisualAssets.ChainLinks != null)
-                {
-                    var rotor = animator.transform.Find("ChainCount/ChainRotor");
-                    Require(rotor != null && rotor.Find("Links").GetComponent<Image>().sprite == DuelVisualAssets.ChainLinks,
-                        "Chain activation omitted the local chain links.");
-                    Quaternion initial = rotor.localRotation;
-                    sample(.8f);
-                    Require(Quaternion.Angle(initial, rotor.localRotation) > 1f, "The chain ring did not rotate.");
-                }
-                animator.Clear();
+                VerifyOverframeAnimation(CardAnimationManager.Ensure(canvas));
+                Debug.Log("[VERIFY OVERFRAME] Bundled and exact alternate portraits, deck preview, tucking hidden cards, summon finish and chain animation passed.");
             }
             finally
             {
                 UnityEngine.Object.DestroyImmediate(canvas.gameObject);
                 CardArtLoader.Shutdown();
-                CardArtLoader.Initialize(Application.streamingAssetsPath);
-                File.Delete(packPath);
-                File.Delete(cutInPath);
-                Directory.Delete(cutIns);
+                CardArtLoader.Initialize(Application.streamingAssetsPath, previous);
+                foreach (string file in Directory.EnumerateFiles(directory)) File.Delete(file);
+                Directory.Delete(directory);
                 Directory.Delete(folder);
             }
-            Debug.Log("[VERIFY OVERFRAME ARTWORK] Decoded artwork and its exact local cut-in stayed in sync across inspection, summon and chain.");
         }
 
         private static void VerifyOverframeAnimation(CardAnimationManager animator)
@@ -371,7 +235,7 @@ namespace YGOPortable.Editor
             sample(.49f);
             Canvas.ForceUpdateCanvases();
             var cutIn = animator.transform.Find("MovingCard/Overframe");
-            Require(cutIn != null && cutIn.Find("Depth/Subject").gameObject.activeInHierarchy,
+            Require(cutIn != null && cutIn.Find("Depth/LocalCutIn").gameObject.activeInHierarchy,
                 "The ace activation omitted its overframe subject.");
             TrackStableOverframe(cutIn, sample, .51f, .98f);
             animator.Clear();

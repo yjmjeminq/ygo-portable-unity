@@ -147,8 +147,9 @@ namespace YGOPortable.UI
 
         private static CutInEntry GetCutIn(uint artCode, int artVariant)
         {
-            if (artCode == 0 || artVariant < 0) return null;
-            string path = CutInPath(artCode, artVariant);
+            if (artCode == 0 || artVariant < -1) return null;
+            // Bundled card art uses -1. Its matching default cut-in is stored as variant 0.
+            string path = CutInPath(artCode, artVariant == -1 ? 0 : artVariant);
             if (CutInCache.TryGetValue(path, out var cached))
             {
                 cached.LastUse = ++_cutInUse;

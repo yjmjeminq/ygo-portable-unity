@@ -62,11 +62,13 @@ namespace YGOPortable.UI
         {
             internal readonly SelectableCardItem Card;
             internal readonly int EngineIndex;
+            internal readonly ulong Description;
 
             internal ActivationChoice(SelectableCardItem card, int engineIndex)
             {
                 Card = card;
                 EngineIndex = engineIndex;
+                Description = card.description;
             }
         }
 
@@ -1271,7 +1273,7 @@ namespace YGOPortable.UI
                         string number = ordinal < 20 ? ((char)('①' + ordinal)).ToString() : (ordinal + 1).ToString();
                         float height = _mobileLayout ? MobileSafeArea.MinimumTouchSize(_chainDetails) : 44f;
                         var option = LotdUiKit.CreateWrappedButton(_chainEffectScroll.content, $"Effect_{index}",
-                            $"{number}번 효과 · {effects[index]}", () => Select(index, inspect: true),
+                            $"{number} {effects[index]}", () => Select(index, inspect: true),
                             _mobileLayout ? 20 : 17, false, height, sidePadding: 14);
                         options[index] = option;
                         optionFrames[index] = option.gameObject.AddComponent<Outline>();
@@ -1351,7 +1353,7 @@ namespace YGOPortable.UI
 
         private static bool StillHasActivationChoice(IReadOnlyList<SelectableCardItem> candidates, ActivationChoice choice) =>
             choice.EngineIndex >= 0 && choice.EngineIndex < candidates.Count &&
-            ReferenceEquals(candidates[choice.EngineIndex], choice.Card);
+            ReferenceEquals(candidates[choice.EngineIndex], choice.Card) && choice.Card.description == choice.Description;
 
         private void BindFieldCardChoices(DuelSession session, DuelPrompt prompt)
         {

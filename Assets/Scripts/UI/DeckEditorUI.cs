@@ -379,7 +379,8 @@ namespace YGOPortable.UI
             float inset = _mobileLayout ? 17f : 28f;
             var card = LotdUiKit.CreateRect("LargeCard", panel,
                 new Vector2(.066f, _mobileLayout ? .677f : .501f), new Vector2(.934f, .956f), Vector2.zero, Vector2.zero);
-            _previewCard = CompositeCardView.Create(card, "Preview", true);
+            _previewCard = CompositeCardView.Create(card, "Preview", detailedOverlay: true, duelArtwork: true);
+            _previewCard.EnableOverframe();
             DeckCardVisualMotion.Bind(_previewCard);
             var previewHit = LotdUiKit.FillRect("PreviewHit", card);
             var previewGraphic = LotdUiKit.AddImage(previewHit.gameObject, LotdUiKit.WhiteSprite, Color.clear);
@@ -822,15 +823,6 @@ namespace YGOPortable.UI
                 LotdUiKit.AddImage(badge.gameObject, LotdUiKit.WhiteSprite, UnownedBadgeColor, false, false);
                 LotdUiKit.AddFittedText(badge, "Label", UnownedLabel, 14, 7, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
                 badge.gameObject.SetActive(false);
-                if (_mobileLayout)
-                {
-                    var copies = LotdUiKit.CreateRect("DeckCopies", card.transform.Find("AspectBox"),
-                        new Vector2(.54f, .62f), new Vector2(.98f, .81f), Vector2.zero, Vector2.zero);
-                    LotdUiKit.AddImage(copies.gameObject, LotdUiKit.WhiteSprite, TrunkCountBadgeColor, false, false);
-                    var count = LotdUiKit.AddFittedText(copies, "Count", "", 15, 7,
-                        TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
-                    count.verticalOverflow = VerticalWrapMode.Overflow;
-                }
                 target.Add((slot, card, trigger));
             }
         }
@@ -1072,7 +1064,6 @@ namespace YGOPortable.UI
         private void SyncSlotList(List<(RectTransform rt, CompositeCardView card, CardDragTrigger trigger)> slots,
             List<uint> cards, PadArea area)
         {
-            var copies = _mobileLayout ? cards.GroupBy(DeckGroupKey).ToDictionary(group => group.Key, group => group.Count()) : null;
             for (int i = 0; i < slots.Count; i++)
             {
                 var (rect, view, trigger) = slots[i];
@@ -1092,8 +1083,6 @@ namespace YGOPortable.UI
                 uint code = cards[i];
                 int index = i;
                 view.SetCard(code);
-                if (copies != null)
-                    view.transform.Find("AspectBox/DeckCopies/Count").GetComponent<Text>().text = $"×{copies[DeckGroupKey(code)]}";
                 view.transform.Find("AspectBox/Unowned").gameObject.SetActive(CollectionProgress.RequiresOwnedCardsForDecks &&
                     CollectionProgress.GetOwnedCount(code) == 0);
                 trigger.CardCodeGetter = () => code;

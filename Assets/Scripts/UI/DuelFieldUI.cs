@@ -809,6 +809,7 @@ namespace YGOPortable.UI
             var card = LotdUiKit.CreateRect("CardPreview", left,
                 new Vector2(.055f, .483f), new Vector2(.945f, .901f), Vector2.zero, Vector2.zero);
             _inspCard = CompositeCardView.Create(card, "Card", duelArtwork: true);
+            _inspCard.EnableOverframe();
             var aspect = _inspCard.transform.Find("AspectBox");
             AddInspectorArtworkFrame(aspect);
             _inspectorDisabledBadge = BuildDisabledBadge(_inspCard.transform, 17);

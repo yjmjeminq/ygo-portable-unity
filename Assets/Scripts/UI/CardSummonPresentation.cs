@@ -93,8 +93,8 @@ namespace YGOPortable.UI
         {
             Vector2 center = portal.rectTransform.anchoredPosition;
             float radius = portal.rectTransform.rect.height * .46f;
-            Vector2 origin = move.Flight.From.AtLayout().Position;
-            float travel = Mathf.InverseLerp(.12f + Mathf.Min(index, 6) * .018f, .90f, time);
+            Vector2 origin = MaterialIntake(move.Flight, portal, index);
+            float travel = Mathf.InverseLerp(.37f + Mathf.Min(index, 6) * .013f, .96f, time);
             Vector2 point;
             switch (portal.Kind)
             {
@@ -117,8 +117,31 @@ namespace YGOPortable.UI
             }
             orb.rectTransform.anchoredPosition = point;
             orb.rectTransform.localScale = Vector3.one * Mathf.Lerp(.72f, 1.12f, travel);
-            orb.OrbLight = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.81f, 1f, time));
+            float formed = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.35f, .58f, time));
+            float absorbed = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.86f, 1f, time));
+            orb.OrbLight = formed * (1f - absorbed);
             orb.Seek(time);
+        }
+
+        private static Vector2 MaterialIntake(CardFlight flight, DuelEffectGraphic portal, int index)
+        {
+            var center = portal.rectTransform.anchoredPosition;
+            float radius = portal.rectTransform.rect.height * .46f;
+            Vector2 offset = flight.From.AtLayout().Position - center;
+            Vector2 intake = portal.Kind == DuelEffectKind.Synchro
+                ? new Vector2(Mathf.Sin(index * 2.4f) * .10f, -.64f) * radius
+                : offset.normalized * (radius * .42f);
+            return center + Vector2.ClampMagnitude(intake, offset.magnitude * .44f);
+        }
+
+        private static void ApproachMaterialPortal(CompositeCardView card, CardFlight flight, DuelEffectGraphic portal,
+            int index, float time)
+        {
+            var from = flight.From.AtLayout();
+            float travel = Mathf.Clamp01(time / (.62f + Mathf.Min(index, 6) * .012f));
+            var intake = new CardPose(MaterialIntake(flight, portal, index), from.Size * .34f);
+            ApplyFlight(card, new CardFlight(flight.Code, from, intake, flight.StartsFaceDown, flight.StartsFaceDown),
+                travel, 26f);
         }
 
         private static Vector2 LinkMaterialTarget(uint mask, int index, Vector2 center, float radius)

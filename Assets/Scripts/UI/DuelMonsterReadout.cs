@@ -1088,7 +1088,7 @@ namespace YGOPortable.UI
             _opacity.blocksRaycasts = _opacity.interactable = false;
         }
 
-        internal void Follow(CompositeCardView view, float progress)
+        internal void Follow(CompositeCardView view, float progress, float cardOpacity = 1f)
         {
             var movement = _snapshot.Movement;
             Root.anchoredPosition = ((RectTransform)view.transform).anchoredPosition;
@@ -1112,10 +1112,11 @@ namespace YGOPortable.UI
                     _readout.Hide();
                 }
             }
-            _opacity.alpha = _snapshot.SourceCard == null ? Mathf.SmoothStep(0f, 1f, (progress - _handoff) / .24f)
+            float readoutOpacity = _snapshot.SourceCard == null ? Mathf.SmoothStep(0f, 1f, (progress - _handoff) / .24f)
                 : _snapshot.DestinationCard == null ? Mathf.SmoothStep(0f, 1f, (_handoff - progress) / .24f)
                 : movement.StartOpponent != movement.EndOpponent ? Mathf.Lerp(.60f, 1f, Mathf.Abs(progress - _handoff) * 5f)
                 : 1f;
+            _opacity.alpha = readoutOpacity * cardOpacity;
         }
     }
 

@@ -42,7 +42,8 @@ namespace YGOPortable.UI
             for (int i = 0; i < SummonUnits; i++)
             {
                 float depth = (i + .5f) / SummonUnits;
-                float form = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(i * .038f, .38f + i * .014f, time));
+                float forming = SummonFinale ? time : Mathf.InverseLerp(.34f, .86f, time);
+                float form = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(i * .038f, .38f + i * .014f, forming));
                 var point = center + Vector2.up * (radius * Mathf.Lerp(-.69f, .53f, depth) * form);
                 float size = radius * Mathf.Lerp(.54f, .33f, depth) * form;
                 var ink = Color.Lerp(Tint, Color.white, depth * .55f);
@@ -122,7 +123,7 @@ namespace YGOPortable.UI
             Glow(mesh, center, radius * form, .72f, Shade(Tint, glow * .49f));
             Ring(mesh, center, radius * .89f * form, .76f, 3.8f, .0625f, 1f, baseInk, 8);
             Ring(mesh, center, radius * .61f * form, .76f, 2.2f, .0625f, 1f, baseInk, 8);
-            uint lit = LitLinkMarkers(DirectionMask, time);
+            uint lit = LitLinkMarkers(DirectionMask, SummonFinale ? time : Mathf.InverseLerp(.48f, .96f, time));
 
             foreach (var mark in DuelLinkCompass.Marks)
             {

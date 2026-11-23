@@ -343,7 +343,7 @@ namespace YGOPortable.Editor
             VerifyMobileOverview(editor, canvas, layout, safe, area, new Vector2Int(1600, 900));
             Canvas.ForceUpdateCanvases();
             var deckArt = (RectTransform)main.Find("Card_0/CardInset/Card/AspectBox");
-            Require(deckArt.Find("DeckCopies/Count").GetComponent<Text>().text == "×1", "The deck did not show the card copy count.");
+            Require(deckArt.Find("DeckCopies") == null, "The deck grid still covered its artwork with a duplicate count.");
             var finger = new PointerEventData(events)
             {
                 pointerId = 0, button = PointerEventData.InputButton.Left, position = new Vector2(400, 270),
@@ -440,6 +440,12 @@ namespace YGOPortable.Editor
             Tap(tile.trigger);
             Require(sheet.gameObject.activeInHierarchy && deck.main.Count == 3,
                 "Inspecting a card after increasing its quantity changed the number of copies.");
+            for (int slotIndex = 0; slotIndex < 3; slotIndex++)
+            {
+                var copy = main.Find($"Card_{slotIndex}/CardInset/Card").GetComponent<CompositeCardView>();
+                Require(copy.CurrentCode == Magician && copy.transform.Find("AspectBox/DeckCopies") == null,
+                    "Copies should occupy separate deck slots without an artwork badge.");
+            }
             close.onClick.Invoke();
             quantities[1].onClick.Invoke();
             Require(deck.main.Count == 2, "The two-copy stepper did not set the exact quantity.");
