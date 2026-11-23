@@ -126,10 +126,11 @@ namespace YGOPortable.Editor
                 var tilt = (RectTransform)bounds.Find("Depth");
                 var background = layer.Find("FaceArtwork/ExpandedArtwork").GetComponent<Image>();
                 Require(tilt.anchoredPosition.sqrMagnitude > 1f && tilt.localRotation != Quaternion.identity &&
-                    card.transform.localRotation != Quaternion.identity && background.sprite == card.ArtworkSprite &&
+                    card.transform.localRotation != Quaternion.identity &&
+                    background.sprite == DuelStyle.OverframeBackdrop && background.sprite != card.ArtworkSprite &&
                     background.color.r > .8f && bounds.anchorMin.y >= .20f &&
                     Vector2.Dot(background.rectTransform.anchoredPosition, tilt.anchoredPosition) < 0f,
-                    "The portrait, artwork and frame did not move independently.");
+                    "The portrait and frame did not move independently of the subject-free background.");
                 typeof(CardOverframeInput).GetMethod("LateUpdate", BindingFlags.Instance | BindingFlags.NonPublic)
                     .Invoke(input, null);
                 Require(holder.anchorMin == new Vector2(.25f, .16f) && holder.anchorMax == new Vector2(.52f, .83f),
@@ -166,7 +167,8 @@ namespace YGOPortable.Editor
                     "Focusing a live copy did not lift the artwork.");
                 thumbnail.SetDeckCard(unrelated, special);
                 var fallback = thumbnail.transform.Find("AspectBox/Overframe");
-                Require(thumbnail.HasOverframe && !fallback.Find("PortraitBounds/Depth/LocalCutIn").GetComponent<Image>().enabled,
+                Require(thumbnail.HasOverframe && !fallback.Find("PortraitBounds/Depth/LocalCutIn").GetComponent<Image>().enabled &&
+                    fallback.Find("FaceArtwork/ExpandedArtwork").GetComponent<Image>().sprite == thumbnail.ArtworkSprite,
                     "An owned variant without a portrait did not fall back to its artwork.");
                 thumbnail.SetDeckCard(unrelated, special, faceDown: true);
                 Require(!thumbnail.HasOverframe && !fallback.gameObject.activeSelf,
@@ -192,7 +194,7 @@ namespace YGOPortable.Editor
                 VerifyPackFaces(canvas.transform);
                 VerifyOverframeAnimation(CardAnimationManager.Ensure(canvas));
                 VerifyPhysicalDeckAppearances();
-                Debug.Log("[VERIFY OVERFRAME] Bundled and exact alternate portraits, deck preview, tucking hidden cards, summon finish and chain animation passed.");
+                Debug.Log("[VERIFY OVERFRAME] Subject-free backdrops, artwork fallback, hidden cards, summon finish and chain animation passed.");
             }
             finally
             {

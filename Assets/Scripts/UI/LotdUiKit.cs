@@ -721,7 +721,8 @@ namespace YGOPortable.UI
             _overframeBound = true;
             var (code, variant) = _artworkSource.Code == 0 ? (_retainedArtwork, _retainedVariant) : _artworkSource;
             _retainedCutIn = DuelVisualAssets.RetainCutIn(code, variant);
-            if (_retainedCutIn == null && _deckAppearance?.overframe != true) return;
+            bool hasPortrait = _retainedCutIn != null;
+            if (!hasPortrait && _deckAppearance?.overframe != true) return;
             if (_overframe == null)
             {
                 var layer = LotdUiKit.FillRect("Overframe", _cinematicOverframe ? transform : _frameImg.transform.parent);
@@ -778,15 +779,17 @@ namespace YGOPortable.UI
             }
             if (_overframeBackground != null)
             {
-                _overframeBackground.sprite = _artImg.sprite;
-                Rect art = _artImg.sprite.rect;
+                // The base illustration contains the same subject. Keep it as the fallback for editions without a cut-in.
+                _overframeBackground.sprite = hasPortrait ? DuelStyle.OverframeBackdrop : _artImg.sprite;
+                _overframeBackground.color = hasPortrait ? Color.white : new Color(.86f, .91f, .98f);
+                Rect art = _overframeBackground.sprite.rect;
                 _overframeBackgroundFit.aspectRatio = art.width / Mathf.Max(1f, art.height);
                 _overframeFinish.Bind(_retainedArtwork, CardRarity.UltraRare);
                 _overframeFinish.SetHighlight(.18f);
             }
             _overframePortrait.sprite = _retainedCutIn;
-            _overframePortrait.enabled = _retainedCutIn != null;
-            _overframeShade.gameObject.SetActive(true);
+            _overframePortrait.enabled = hasPortrait;
+            _overframeShade.gameObject.SetActive(_cinematicOverframe || !hasPortrait);
             _overframe.gameObject.SetActive(true);
             ApplyOverframeInk();
             PoseOverframe(1f, 1f, Vector2.zero, 0f);
@@ -810,7 +813,8 @@ namespace YGOPortable.UI
             _overframe.alpha = Mathf.Clamp01(opacity);
             if (_cinematicOverframe)
             {
-                _overframeShade.canvasRenderer.SetAlpha((HasOverframePortrait ? .72f : .27f) * _overframe.alpha);
+                float shade = HasOverframePortrait ? Mathf.Clamp01(_overframe.alpha * 1.5f) : .27f * _overframe.alpha;
+                _overframeShade.canvasRenderer.SetAlpha(shade);
                 float spread = Mathf.Sin(Mathf.Clamp01(shimmer) * Mathf.PI);
                 _overframeTrim.transform.localScale = Vector3.one * (1.03f + spread * .26f);
                 _overframeTrim.canvasRenderer.SetAlpha(_deckAppearance?.overframe == true ? .42f + spread * .52f : 0f);
