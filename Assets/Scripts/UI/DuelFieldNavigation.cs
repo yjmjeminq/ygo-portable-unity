@@ -523,7 +523,8 @@ namespace YGOPortable.UI
                 if (rect.localScale != nextScale)
                 {
                     rect.localScale = nextScale;
-                    rect.GetComponentInParent<CompositeCardView>()?.SetReadoutFocus(focus);
+                    var face = motion.Slot?.cardView ?? rect.GetComponentInParent<CompositeCardView>();
+                    face?.SetReadoutFocus(focus);
                 }
                 if (motion.Slot != null) ApplyFieldCardFocus(motion.Slot, focus, nextScale.x);
                 if (motion.InHand)

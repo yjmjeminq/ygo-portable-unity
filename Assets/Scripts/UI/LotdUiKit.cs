@@ -740,23 +740,24 @@ namespace YGOPortable.UI
                 RectTransform portraitBounds = layer;
                 if (!_cinematicOverframe)
                 {
-                    var face = LotdUiKit.FillRect("FaceArtwork", layer);
+                    var face = LotdUiKit.CreateRect("FaceArtwork", layer, new Vector2(.032f, .026f),
+                        new Vector2(.968f, .974f), Vector2.zero, Vector2.zero);
                     face.gameObject.AddComponent<RectMask2D>();
                     var background = LotdUiKit.FillRect("ExpandedArtwork", face);
-                    _overframeBackground = LotdUiKit.AddImage(background.gameObject, null, new Color(.55f, .63f, .76f), false, false);
+                    _overframeBackground = LotdUiKit.AddImage(background.gameObject, null, new Color(.86f, .91f, .98f), false, false);
                     _overframeBackgroundFit = background.gameObject.AddComponent<AspectRatioFitter>();
                     _overframeBackgroundFit.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
                     _overframeFinish = LotdUiKit.FillRect("ExpandedFinish", face).gameObject.AddComponent<CardFinishGraphic>();
                     _overframeFinish.raycastTarget = false;
                     // Preserve the scroll view's clipping while letting the subject cross the card's edge.
-                    portraitBounds = LotdUiKit.CreateRect("PortraitBounds", layer, new Vector2(-.048f, 0f),
-                        new Vector2(1.048f, 1.075f), Vector2.zero, Vector2.zero);
+                    portraitBounds = LotdUiKit.CreateRect("PortraitBounds", layer, new Vector2(-.080f, .20f),
+                        new Vector2(1.080f, 1.10f), Vector2.zero, Vector2.zero);
                     portraitBounds.gameObject.AddComponent<RectMask2D>();
                 }
                 var shade = LotdUiKit.FillRect("OverframeShade", _cinematicOverframe ? _artImg.rectTransform : layer);
                 _overframeShade = LotdUiKit.AddImage(shade.gameObject,
                     _cinematicOverframe ? LotdUiKit.WhiteSprite : DuelStyle.OverframeBackdrop,
-                    _cinematicOverframe ? new Color(.021f, .033f, .048f) : new Color(1f, 1f, 1f, .51f), false, false);
+                    _cinematicOverframe ? new Color(.021f, .033f, .048f) : new Color(1f, 1f, 1f, .23f), false, false);
                 if (_cinematicOverframe) CreateOverframeTrim(layer);
                 else
                 {
@@ -767,8 +768,8 @@ namespace YGOPortable.UI
                 _overframeTilt = LotdUiKit.FillRect("Depth", portraitBounds);
                 _overframeTilt.pivot = new Vector2(.5f, .78f);
                 var portrait = LotdUiKit.CreateRect("LocalCutIn", _overframeTilt,
-                    _cinematicOverframe ? new Vector2(-.13f, .405f) : new Vector2(-.032f, .052f),
-                    _cinematicOverframe ? new Vector2(1.13f, 1.166f) : new Vector2(1.032f, .997f),
+                    _cinematicOverframe ? new Vector2(-.13f, .405f) : new Vector2(-.02f, -.007f),
+                    _cinematicOverframe ? new Vector2(1.13f, 1.166f) : new Vector2(1.02f, 1.007f),
                     Vector2.zero, Vector2.zero);
                 portrait.pivot = new Vector2(.5f, 1f);
                 _overframePortrait = LotdUiKit.AddImage(portrait.gameObject, null, Color.white, true, false);

@@ -713,7 +713,7 @@ namespace YGOPortable.UI
         private IEnumerator PlayFieldArrivalGroup(IReadOnlyList<FieldArrival> moves, Action land, Action refresh)
         {
             bool returning = moves[0].Motion == CardMotion.FieldReturn;
-            var showcase = returning ? null : GroupOverframePoses(moves);
+            var showcase = returning ? null : GroupSummonPoses(moves);
             foreach (var move in moves) move.Depart?.Invoke();
             if (returning) refresh();
             var effects = new DuelEffectGraphic[moves.Count];
@@ -740,7 +740,7 @@ namespace YGOPortable.UI
                 opacity[i] = fade;
                 if (showcase != null) ApplyPose(view, flight.From.AtLayout(), layoutHeight: showcase[i].Size.y);
             }
-            if (showcase != null) yield return RevealSummonGroup(moves, showcase, views);
+            if (showcase != null) yield return RevealSummonGroup(moves, showcase, views, opacity);
 
             for (int i = 0; i < moves.Count; i++)
                 readouts[i] = CreateMovingReadout(GroupLandingFlight(moves[i].Flight, showcase, i),
@@ -792,20 +792,21 @@ namespace YGOPortable.UI
             }
         }
 
-        private CardPose[] GroupOverframePoses(IReadOnlyList<FieldArrival> moves)
+        private CardPose[] GroupSummonPoses(IReadOnlyList<FieldArrival> moves)
         {
+            Vector2 area = _layer.rect.size;
+            if (area.x <= 0f || area.y <= 0f) return null;
             List<int> aces = null;
             for (int i = 0; i < moves.Count; i++)
             {
                 var move = moves[i];
-                if (IsSummonMotion(move.Motion) && SupportsSummonOverframe(move.Flight))
+                if (IsSummonMotion(move.Motion) && (IsSpecialEditionLanding(move.Flight) || SupportsSummonOverframe(move.Flight) ||
+                    TakeFeaturedSummon(move.Flight, requirePortrait: true)))
                     (aces ??= new List<int>()).Add(i);
             }
             if (aces == null) return null;
 
-            Vector2 area = _layer.rect.size;
             float height = Mathf.Min(352f, area.y * .395f, area.x * .88f / (aces.Count * 1.17f));
-            if (height <= 0f) return null;
             float spacing = height * 1.17f;
             var poses = new CardPose[moves.Count];
             for (int i = 0; i < aces.Count; i++)
@@ -817,7 +818,8 @@ namespace YGOPortable.UI
             return poses;
         }
 
-        private IEnumerator RevealSummonGroup(IReadOnlyList<FieldArrival> moves, CardPose[] poses, CompositeCardView[] views)
+        private IEnumerator RevealSummonGroup(IReadOnlyList<FieldArrival> moves, CardPose[] poses, CompositeCardView[] views,
+            CanvasGroup[] opacity)
         {
             var shade = LotdUiKit.AddImage(LotdUiKit.FillRect("GroupSummonShade", _layer).gameObject,
                 LotdUiKit.WhiteSprite, Color.clear, false, false);
@@ -827,6 +829,7 @@ namespace YGOPortable.UI
             var wave = CreateEffect(DuelEffectKind.ChainImpactWave, Vector2.zero,
                 new Vector2(area.x * .73f, area.y * .28f), DuelStyle.ChainGold);
             var flights = new CardFlight[moves.Count];
+            var standardPortraits = new SummonPortraitView[moves.Count];
             for (int i = 0; i < views.Length; i++)
             {
                 if (!poses[i].IsValid) continue;
@@ -834,8 +837,18 @@ namespace YGOPortable.UI
                 flights[i] = new CardFlight(flight.Code, flight.From, poses[i], flight.StartsFaceDown, false, flight.Appearance);
                 if (!flight.StartsFaceDown && moves[i].Readout?.DestinationCard is { } live)
                     views[i].SetDeckCard(flight.Code, flight.Appearance, live: live);
-                views[i].EnableOverframe();
-                views[i].PoseOverframe(0f, 1f, Vector2.zero, 0f);
+                if (!SupportsSummonOverframe(flight))
+                {
+                    var (_, accent, _) = SummonEffect(flight.Code, moves[i].Motion);
+                    float h = poses[i].Size.y;
+                    standardPortraits[i] = CreateSummonPortrait("GroupSummonPortrait", flight, poses[i].Position,
+                        new Vector2(h * 1.10f, h * 1.40f), accent, artworkFallback: IsSpecialEditionLanding(flight));
+                }
+                else
+                {
+                    views[i].EnableOverframe();
+                    views[i].PoseOverframe(0f, 1f, Vector2.zero, 0f);
+                }
                 views[i].transform.SetAsLastSibling();
             }
 
@@ -849,7 +862,14 @@ namespace YGOPortable.UI
                 {
                     if (!poses[i].IsValid) continue;
                     ApplyFlight(views[i], flights[i], t, 29f, moves[i].Readout?.DestinationCard, layoutHeight: poses[i].Size.y);
-                    PopSummonOverframe(views[i], t);
+                    if (standardPortraits[i] is { } portrait)
+                    {
+                        float emerge = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.52f, .94f, t));
+                        Vector2 center = poses[i].Position + Vector2.up * (poses[i].Size.y * .23f);
+                        portrait.Pose(center + Vector2.down * (22f * (1f - emerge)), emerge, .92f + emerge * .08f);
+                        opacity[i].alpha = Mathf.Lerp(1f, .32f, emerge);
+                    }
+                    else if (views[i].HasOverframe) PopSummonOverframe(views[i], t);
                 }
             });
             yield return Animate(.27f, t =>
@@ -858,9 +878,20 @@ namespace YGOPortable.UI
                 aura.Seek(.49f + t * .51f);
                 wave.Seek(.43f + t * .57f);
                 for (int i = 0; i < views.Length; i++)
-                    if (poses[i].IsValid) SettleSummonOverframe(views[i], t);
+                {
+                    if (!poses[i].IsValid) continue;
+                    if (standardPortraits[i] is { } portrait)
+                    {
+                        Vector2 center = poses[i].Position + Vector2.up * (poses[i].Size.y * .23f);
+                        portrait.Pose(center + Vector2.up * (18f * t), 1f - t, 1f + t * .035f);
+                        opacity[i].alpha = Mathf.Lerp(.32f, 1f, t);
+                    }
+                    else if (views[i].HasOverframe) SettleSummonOverframe(views[i], t);
+                }
             });
 
+            foreach (var portrait in standardPortraits)
+                if (portrait != null) RemoveTransient(portrait.gameObject);
             RemoveTransient(shade.gameObject);
             RemoveTransient(aura.gameObject);
             RemoveTransient(wave.gameObject);
@@ -1195,7 +1226,7 @@ namespace YGOPortable.UI
 
             bool extraSummon = motion is CardMotion.ExtraDeckSummon or CardMotion.PendulumSummon;
             bool summons = IsSummonMotion(motion);
-            bool overframe = summons && SupportsSummonOverframe(flight);
+            bool overframe = summons && (IsSpecialEditionLanding(flight) || SupportsSummonOverframe(flight));
             bool featured = summons && TakeFeaturedSummon(flight);
             bool reveal = !flight.EndsFaceDown && (extraSummon || featured || overframe);
             var proxy = PrepareFlightCard(flight, reveal);
@@ -1336,7 +1367,7 @@ namespace YGOPortable.UI
             return artCode == 0 ? (flight.Code, selected) : (artCode, artVariant);
         }
 
-        internal bool TakeFeaturedSummon(CardFlight flight)
+        internal bool TakeFeaturedSummon(CardFlight flight, bool requirePortrait = false)
         {
             if (flight.EndsFaceDown || flight.Code == 0) return false;
             var card = CardDatabase.Get(flight.Code);
@@ -1346,8 +1377,28 @@ namespace YGOPortable.UI
             bool rareBoss = (card.IsExtra || card.atk >= 2400) && CardRarityCatalog.GetRarity(flight.Code) == CardRarity.UltraRare;
             var (artCode, artVariant) = ResolveSummonPortrait(flight);
             bool hasPortrait = CardArtLoader.SupportsOverframe(artCode, Mathf.Max(0, artVariant));
-            return (signature || rareBoss || hasPortrait) &&
+            return (hasPortrait || !requirePortrait && (signature || rareBoss)) &&
                 _featuredSummons.Add((flight.To.Angle > 45f, key));
+        }
+
+        private SummonPortraitView CreateSummonPortrait(string name, CardFlight flight, Vector2 center, Vector2 size,
+            Color accent, bool artworkFallback = false)
+        {
+            var (artCode, artVariant) = ResolveSummonPortrait(flight);
+            var sprite = DuelVisualAssets.RetainCutIn(artCode, artVariant);
+            bool usesArtwork = sprite == null;
+            if (usesArtwork && !artworkFallback) return null;
+            int selected = flight.Appearance?.ArtworkVariant ?? CardArtLoader.GetDuelArtworkVariant(flight.Code);
+            if (usesArtwork)
+            {
+                sprite = CardArtLoader.RetainArtwork(flight.Code, selected);
+                if (sprite == CardArtLoader.GetFallbackArt()) return null;
+            }
+            var holder = CenteredVisual(name, _layer, center, size);
+            var portrait = holder.gameObject.AddComponent<SummonPortraitView>();
+            portrait.Bind(sprite, accent, usesArtwork,
+                usesArtwork ? () => CardArtLoader.ReleaseArtwork(flight.Code, selected) : () => DuelVisualAssets.ReleaseCutIn(sprite));
+            return portrait;
         }
 
         private IEnumerator RevealSummon(CompositeCardView proxy, CardFlight flight, CardMotion motion, bool featured,
@@ -1399,15 +1450,10 @@ namespace YGOPortable.UI
             CanvasGroup movingFace = null;
             if (featured || overframe)
             {
-                var (artCode, artVariant) = ResolveSummonPortrait(flight);
-                var sprite = DuelVisualAssets.RetainCutIn(artCode, artVariant);
-                if (sprite != null)
-                {
-                    var holder = CenteredVisual("SummonPortrait", _layer, portraitCenter, new Vector2(view.x * .86f, view.y * .77f));
-                    portrait = holder.gameObject.AddComponent<SummonPortraitView>();
-                    portrait.Bind(sprite, accent);
-                    if (!proxy.TryGetComponent(out movingFace)) movingFace = proxy.gameObject.AddComponent<CanvasGroup>();
-                }
+                portrait = CreateSummonPortrait("SummonPortrait", flight, portraitCenter, new Vector2(view.x * .86f, view.y * .77f),
+                    accent, artworkFallback: IsSpecialEditionLanding(flight));
+                if (portrait != null && !proxy.TryGetComponent(out movingFace))
+                    movingFace = proxy.gameObject.AddComponent<CanvasGroup>();
             }
             var nameCenter = center - new Vector2(portrait != null ? view.x * .083f : 0f, view.y * (portrait != null ? .30f : .24f));
             var layout = SummonPlate(flight, title, nameCenter, live);

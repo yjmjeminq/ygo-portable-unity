@@ -239,16 +239,13 @@ namespace YGOPortable.UI
                 mirror.gameObject.AddComponent<CanvasGroup>().alpha = .26f;
                 reflection = CompositeCardView.Create(mirror, "View");
             }
-            var rarity = ShopRarityBadge.Create(artwork, Vector2.one, Vector2.one, 15);
-            var rarityBounds = (RectTransform)rarity.transform.parent;
-            rarityBounds.offsetMin = new Vector2(-24f, -13f);
-            rarityBounds.offsetMax = new Vector2(11f, 7f);
+            var rarity = ShopRarityBadge.Create(slot, new Vector2(.245f, .010f), new Vector2(.365f, .074f), 14);
             // The tint overlays the card front briefly at the midpoint of the flip.
             shineRect.SetAsLastSibling();
 
-            var special = Slot(artwork, "OverframeBadge", .045f, .018f, .955f, .111f);
+            var special = Slot(slot, "OverframeBadge", .567f, .010f, .791f, .074f);
             LotdUiKit.AddImage(special.gameObject, LotdUiKit.WhiteSprite, new Color(.09f, .035f, .175f, .96f), false, false);
-            var specialLabel = LotdUiKit.AddFittedText(special, "Label", "OVERFRAME", 16, 10,
+            var specialLabel = LotdUiKit.AddFittedText(special, "Label", "오버프레임", 14, 9,
                 TextAnchor.MiddleCenter, new Color(.9f, .78f, 1f), FontStyle.Bold);
             special.gameObject.SetActive(false);
             var pull = new Pull
@@ -260,7 +257,7 @@ namespace YGOPortable.UI
                 Reflection = reflection,
                 Button = button,
                 Name = Label(slot, "Name", "", 0f, .081f, 1f, .173f, 15, PackShopStyle.TextPrimary),
-                Ownership = Label(slot, "Ownership", "", 0f, 0f, 1f, .079f, 14, PackShopStyle.TextMuted),
+                Ownership = Label(slot, "Ownership", "", .373f, 0f, .56f, .079f, 13, PackShopStyle.TextMuted),
                 SpecialEdition = specialLabel,
                 RarityLabel = rarity,
                 Shine = shine,
@@ -371,7 +368,7 @@ namespace YGOPortable.UI
                 pull.Button.interactable = arrived;
                 float lift = pull.Highlighted && pull.Button.interactable ? 1f : 0f;
                 pull.Lift = Mathf.MoveTowards(pull.Lift, lift, delta / .13f);
-                pull.Card.SetRarityHighlight(pull.Lift);
+                pull.Card.SetReadoutFocus(pull.Lift);
                 pull.Slot.anchoredPosition = Vector2.up *
                     (6f * Mathf.SmoothStep(0f, 1f, pull.Lift) - 36f * (1f - ease));
                 motionActive |= pull.Lift != lift;
@@ -394,7 +391,10 @@ namespace YGOPortable.UI
             if (t >= .5f)
             {
                 RevealCard(pull, playSound: true);
-                pull.Card.SetRarityHighlight(Mathf.Max(pull.Lift, Mathf.Sin((t - .5f) * 2f * Mathf.PI)));
+                float pulse = Mathf.Sin((t - .5f) * 2f * Mathf.PI);
+                pull.Card.SetReadoutFocus(Mathf.Max(pull.Lift, pulse));
+                if (pull.Card.HasOverframe && t < 1f)
+                    pull.Card.PoseOverframe(1f, 1f + pulse * .095f, new Vector2(pulse * (1f - t), pulse), t);
             }
 
             Color foil = pull.Rarity == CardRarity.UltraRare ? Color.HSVToRGB(t, .68f, 1f) : CardRarityStyle.GetColor(pull.Rarity);

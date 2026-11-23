@@ -28,15 +28,15 @@ namespace YGOPortable.UI
             Rect panel = rectTransform.rect;
             if (panel.width < 1f || panel.height < 1f) return;
 
-            var shadow = new Color(.018f, .028f, .065f, .94f);
-            var translucent = new Color(.038f, .058f, .115f, .77f);
+            var shadow = new Color(.018f, .028f, .065f, .96f);
+            var translucent = new Color(.038f, .058f, .115f, .86f);
             var clear = new Color(shadow.r, shadow.g, shadow.b, 0f);
             if (!_reveal)
             {
-                Shade(0f, .20f, shadow, translucent);
-                Shade(.20f, .365f, translucent, clear);
-                Shade(.775f, .927f, clear, translucent);
-                Shade(.927f, 1f, translucent, shadow);
+                Shade(.026f, .215f, shadow, translucent);
+                Shade(.215f, .327f, translucent, clear);
+                Shade(.80f, .909f, clear, translucent);
+                Shade(.909f, .974f, translucent, shadow);
             }
 
             var lavender = new Color(.79f, .68f, 1f, .88f);
@@ -55,7 +55,7 @@ namespace YGOPortable.UI
             Line(.035f, .054f, .035f, .835f, edge);
 
             void Shade(float from, float to, Color bottom, Color top) =>
-                Quad(At(0f, from), At(1f, from), At(1f, to), At(0f, to), bottom, top);
+                Quad(At(.032f, from), At(.968f, from), At(.968f, to), At(.032f, to), bottom, top);
 
             void Line(float x1, float y1, float x2, float y2, Color tint)
             {

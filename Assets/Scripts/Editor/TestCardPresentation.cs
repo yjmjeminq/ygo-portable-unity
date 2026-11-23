@@ -127,6 +127,7 @@ namespace YGOPortable.Editor
                 var background = layer.Find("FaceArtwork/ExpandedArtwork").GetComponent<Image>();
                 Require(tilt.anchoredPosition.sqrMagnitude > 1f && tilt.localRotation != Quaternion.identity &&
                     card.transform.localRotation != Quaternion.identity && background.sprite == card.ArtworkSprite &&
+                    background.color.r > .8f && bounds.anchorMin.y >= .20f &&
                     Vector2.Dot(background.rectTransform.anchoredPosition, tilt.anchoredPosition) < 0f,
                     "The portrait, artwork and frame did not move independently.");
                 typeof(CardOverframeInput).GetMethod("LateUpdate", BindingFlags.Instance | BindingFlags.NonPublic)
@@ -188,6 +189,7 @@ namespace YGOPortable.Editor
                 Require(!shopCard.HasOverframe, "The crafting preview did not return to the regular face.");
                 crafting.Hide();
 
+                VerifyPackFaces(canvas.transform);
                 VerifyOverframeAnimation(CardAnimationManager.Ensure(canvas));
                 VerifyPhysicalDeckAppearances();
                 Debug.Log("[VERIFY OVERFRAME] Bundled and exact alternate portraits, deck preview, tucking hidden cards, summon finish and chain animation passed.");
@@ -202,6 +204,34 @@ namespace YGOPortable.Editor
                 Directory.Delete(folder);
             }
             VerifyPackagedOverframe(portraitBytes);
+        }
+
+        private static void VerifyPackFaces(Transform parent)
+        {
+            var opening = new PackOpeningView(parent, null);
+            opening.Show(LotdUiKit.WhiteSprite, "카드 프레임 검증",
+                new IReadOnlyList<PackPull>[] { new[] { new PackPull(BlueEyes, true, 1), new PackPull(BlueEyes, false, 2) } });
+            const BindingFlags instance = BindingFlags.Instance | BindingFlags.NonPublic;
+            typeof(PackOpeningView).GetMethod("ShowResults", instance).Invoke(opening, null);
+            opening.AdvanceResults(1f);
+            var slot = parent.Find("Screen_PackOpening/Results/Cards/Card_0");
+            var face = slot.Find("Select/Face/View").GetComponent<CompositeCardView>();
+            var edition = (RectTransform)slot.Find("OverframeBadge");
+            var rarity = (RectTransform)slot.Find("Rarity");
+            Require(!face.HasOverframe && !edition.gameObject.activeSelf && !rarity.gameObject.activeSelf,
+                "A sealed card in the pack exposed its edition or rarity.");
+            slot.GetComponentInChildren<Button>().onClick.Invoke();
+            opening.AdvanceResults(.241f);
+            var portrait = face.transform.Find("AspectBox/Overframe/PortraitBounds/Depth");
+            Require(face.HasOverframe && portrait.localScale.x > 1.07f && edition.gameObject.activeSelf &&
+                edition.anchorMax.y < ((RectTransform)slot.Find("Select")).anchorMin.y &&
+                rarity.gameObject.activeSelf && rarity.anchorMax.y < ((RectTransform)slot.Find("Select")).anchorMin.y &&
+                face.transform.Find("AspectBox/AtkDef").gameObject.activeInHierarchy,
+                "The pack's special portrait did not lift or its captions obscured the card face.");
+            opening.AdvanceResults(1f);
+            Require(portrait.localScale.x <= 1.04f, "The opened card did not settle after flipping.");
+            opening.Hide();
+            Debug.Log("[VERIFY OVERFRAME PACK] Both captions stayed below the card and the portrait lifted after the flip.");
         }
 
         private static void VerifyPhysicalDeckAppearances()
@@ -443,6 +473,29 @@ namespace YGOPortable.Editor
             Debug.Log("[VERIFY OVERFRAME MESH] Summon and activation reused their subject and shimmer meshes while scaling.");
             VerifyStandardCutIn(animator, queue, start, end);
             VerifyOverframeActivationProjection(animator, queue, start);
+            VerifySummonArtworkFallback(animator, queue, start, end);
+        }
+
+        private static void VerifySummonArtworkFallback(CardAnimationManager animator, Queue<IEnumerator> queue,
+            CardPose start, CardPose end)
+        {
+            const uint sparkman = 20721928;
+            animator.QueueMove(new CardFlight(sparkman, start, end, true, false,
+                new DeckCardAppearance { overframe = true }), CardMotion.Summon, null);
+            var move = queue.Dequeue();
+            Require(move.MoveNext() && move.Current is IEnumerator, "The special card without a cut-in skipped its reveal.");
+            var reveal = (IEnumerator)move.Current;
+            Require(reveal.MoveNext(), "The special card did not enter its reveal.");
+            var portrait = animator.transform.Find("SummonPortrait");
+            Require(portrait != null && portrait.GetComponent<CanvasGroup>().alpha == 0f &&
+                portrait.Find("ArtworkPanel/Projection/Inset/Subject").GetComponent<Image>().sprite == CardArtLoader.GetArtSprite(sparkman),
+                "The fallback did not wait for the reveal or use the selected copy's artwork.");
+            SampleAnimation((IEnumerator)reveal.Current)(1f);
+            Require(portrait.GetComponent<CanvasGroup>().alpha > .95f, "The fallback artwork did not become visible.");
+            while (reveal.MoveNext()) SampleAnimation((IEnumerator)reveal.Current)(1f);
+            Require(animator.transform.Find("SummonPortrait") == null, "The projection remained over the duel after the reveal.");
+            animator.Clear();
+            Debug.Log("[VERIFY OVERFRAME SUMMON ART] A special edition without a portrait revealed its own artwork and cleared on arrival.");
         }
 
         private static void VerifyStandardCutIn(CardAnimationManager animator, Queue<IEnumerator> queue, CardPose start, CardPose end)
@@ -523,14 +576,15 @@ namespace YGOPortable.Editor
                 new CardPose(new Vector2(-210f, -110f), cardSize),
                 new CardPose(new Vector2(-100f, -110f), cardSize),
                 new CardPose(new Vector2(10f, -110f), cardSize),
+                new CardPose(new Vector2(120f, -110f), cardSize),
             };
-            uint[] cards = { BlueEyes, 9674034, 46986414 };
+            uint[] cards = { BlueEyes, 9674034, SkullRedBird, 46986414 };
             int departed = 0, landed = 0, refreshed = 0;
             for (int i = 0; i < cards.Length; i++)
             {
                 var from = new CardPose(new Vector2(-80f + i * 100f, -235f), cardSize);
-                var flight = new CardFlight(cards[i], from, targets[i], true, i == 2,
-                    new DeckCardAppearance { overframe = true });
+                var flight = new CardFlight(cards[i], from, targets[i], true, i == 3,
+                    new DeckCardAppearance { overframe = i != 2 });
                 animator.StageFieldArrival(flight, CardMotion.SpecialSummon, 0, YgoConstants.LOCATION_MZONE, (uint)i,
                     null, () => departed++, () => landed++, () => refreshed++);
             }
@@ -540,20 +594,23 @@ namespace YGOPortable.Editor
             var reveal = (IEnumerator)arrival.Current;
             Require(reveal.MoveNext() && departed == cards.Length && landed == 0, "The group left the origin at different times.");
             var pop = SampleAnimation((IEnumerator)reveal.Current);
-            Require(animator.GetComponentsInChildren<CompositeCardView>().Count(view => view.CurrentCode == 0) == 3,
+            Require(animator.GetComponentsInChildren<CompositeCardView>().Count(view => view.CurrentCode == 0) == cards.Length &&
+                animator.transform.Find("GroupSummonPortrait").GetComponent<CanvasGroup>().alpha == 0f,
                 "A grouped card showed its identity before turning over.");
             pop(.52f);
             Canvas.ForceUpdateCanvases();
             var views = animator.GetComponentsInChildren<CompositeCardView>();
             var ace = views.Single(view => view.CurrentCode == BlueEyes);
             var excel = views.Single(view => view.CurrentCode == 9674034);
+            var standard = views.Single(view => view.CurrentCode == SkullRedBird);
             var hidden = views.Single(view => view.CurrentCode == 0);
             TrackStableOverframe(ace.transform.Find("Overframe"), pop, .54f, 1f);
             TrackStableOverframe(excel.transform.Find("Overframe"), pop, .54f, 1f);
             var left = (RectTransform)ace.transform;
             var right = (RectTransform)excel.transform;
-            Require(ace.HasOverframe && excel.HasOverframe && !hidden.HasOverframe && views.Length == 3 &&
-                left.anchoredPosition.x < 0f && right.anchoredPosition.x > 0f &&
+            Require(ace.HasOverframe && excel.HasOverframe && !standard.HasOverframe && !hidden.HasOverframe &&
+                animator.transform.Find("GroupSummonPortrait").GetComponent<CanvasGroup>().alpha > .95f &&
+                views.Length == cards.Length && left.anchoredPosition.x < right.anchoredPosition.x &&
                 right.anchoredPosition.x - left.anchoredPosition.x > left.rect.width * 1.48f &&
                 Mathf.Approximately(ace.transform.Find("Overframe/Depth").localScale.x, 1.25f) &&
                 animator.transform.Find("ChainImpactWave").GetComponent<DuelEffectGraphic>().Tint == DuelStyle.ChainGold,
@@ -561,6 +618,7 @@ namespace YGOPortable.Editor
             Require(reveal.MoveNext(), "The grouped cut-in omitted the settling stage.");
             SampleAnimation((IEnumerator)reveal.Current)(1f);
             Require(!reveal.MoveNext() && animator.transform.Find("GroupSummonShade") == null &&
+                animator.transform.Find("GroupSummonPortrait") == null &&
                 landed == 0 && refreshed == 0, "The grouped cut-in published the field too early.");
             Require(arrival.MoveNext(), "The group omitted its movement to the field.");
             var land = SampleAnimation((IEnumerator)arrival.Current);
@@ -569,7 +627,8 @@ namespace YGOPortable.Editor
             land(1f);
             Require(Vector2.Distance(left.anchoredPosition, targets[0].Position) < .1f &&
                 Vector2.Distance(right.anchoredPosition, targets[1].Position) < .1f &&
-                Vector2.Distance(((RectTransform)hidden.transform).anchoredPosition, targets[2].Position) < .1f,
+                Vector2.Distance(((RectTransform)standard.transform).anchoredPosition, targets[2].Position) < .1f &&
+                Vector2.Distance(((RectTransform)hidden.transform).anchoredPosition, targets[3].Position) < .1f,
                 "One grouped card did not finish in its original target slot.");
             Require(arrival.MoveNext() && landed == cards.Length && refreshed == 1 &&
                 animator.GetComponentsInChildren<CompositeCardView>().Length == 0,
@@ -583,7 +642,7 @@ namespace YGOPortable.Editor
                 "The group failed to mark the public slots selectively.");
             SampleAnimation((IEnumerator)landing.Current)(1f);
             Require(!landing.MoveNext() && !arrival.MoveNext(), "The group landing did not finish.");
-            Debug.Log("[VERIFY OVERFRAME GROUP] Two face-up aces shared the cut-in, the face-down card stayed hidden, and all three arrived together.");
+            Debug.Log("[VERIFY OVERFRAME GROUP] Standard and special portraits shared the reveal, the hidden card stayed covered, and all four arrived together.");
         }
 
         private static void VerifyFoil(CompositeCardView card)

@@ -320,7 +320,7 @@ namespace YGOPortable.UI
         {
             _rect.anchoredPosition = _offset + Vector2.up * (_hover * 4f);
             _rect.localScale = Vector3.one * (1f + _hover * .045f - _pulse * .05f);
-            _card.SetRarityHighlight(Mathf.Max(_hover, _pulse));
+            _card.SetReadoutFocus(Mathf.Max(_hover, _pulse));
             _canvas.alpha = _visibility * (1f - _pulse * .24f);
             if (_slotTint != null)
             {
