@@ -3146,6 +3146,7 @@ namespace YGOPortable.Editor
                 "The duel inspector and zoom did not show the same supported portrait.");
             Debug.Log("[VERIFY OVERFRAME TOUCH] Hand and field long presses opened the same mobile detail view.");
             VerifyStyledDuelSurfaces();
+            VerifyNativeStyledActivations();
 
             static void Hold(CardDragTrigger source)
             {
@@ -3196,16 +3197,112 @@ namespace YGOPortable.Editor
                 focused.Find("AspectBox/Overframe/PortraitBounds/Depth").localScale.x > 1f,
                 "A special card in the touch layout did not lift both its card and artwork.");
 
+            var animator = CardAnimationManager.Ensure(ui.Canvas);
             duel.SubmitResponseInt(choice << 16);
             YgoProjectBuilder.DriveUntilIdle(duel, new TacticalAI());
-            CardAnimationManager.Instance?.Clear();
-            ui.Field.Refresh();
+            var move = AnimationSteps(animator).Single(step => FlightCode(step) == excel &&
+                step.GetType().Name.StartsWith("<MoveCard>", StringComparison.Ordinal));
+            Require(move.MoveNext() && move.Current is IEnumerator, "The native summon did not start its card movement.");
+            var travel = (IEnumerator)move.Current;
+            if (travel.GetType().Name.StartsWith("<RevealSummon>", StringComparison.Ordinal))
+            {
+                while (travel.MoveNext()) TestCardPresentation.SampleAnimation((IEnumerator)travel.Current)(1f);
+            }
+            else TestCardPresentation.SampleAnimation(travel)(1f);
+            Require(move.MoveNext() && move.Current is IEnumerator, "The native summon did not hand off to the landing cue.");
             var placed = mine.mzone.Single(card => card?.code == excel);
             var slot = safe.Find($"DuelBoard/Zone_{placed.sequence + 2}_3");
             var fieldFace = slot.GetComponentInChildren<CompositeCardView>();
             Require(fieldFace.CurrentCode == excel && fieldFace.HasOverframe && duel.RetryCount == 0,
                 "The selected physical copy did not keep its edition on the actual duel field.");
+            var landing = (IEnumerator)move.Current;
+            Require(landing.MoveNext(), "The field landing did not animate.");
+            var board = (RectTransform)safe.Find("DuelBoard");
+            Vector2 rest = board.anchoredPosition;
+            var portrait = fieldFace.transform.Find("AspectBox/Overframe/PortraitBounds/Depth");
+            TestCardPresentation.SampleAnimation((IEnumerator)landing.Current)(.18f);
+            Require(Vector2.Distance(board.anchoredPosition, rest) > .1f && portrait.localScale.x > 1f,
+                "The destination field and its actual card did not react to the landing.");
+            animator.Clear();
+            Require(Vector2.Distance(board.anchoredPosition, rest) < .01f && Mathf.Approximately(portrait.localScale.x, 1f),
+                "Interrupting the animation left the board or card offset.");
             Debug.Log("[VERIFY OVERFRAME SURFACES] Mixed editions, touch-layout lift and native field identity passed.");
+        }
+
+        private static void VerifyNativeStyledActivations()
+        {
+            const uint burial = 81439173, beast = 3717252, jar = 83968380;
+            var deck = new UserDeck();
+            foreach (uint code in Enumerable.Repeat(burial, 17).Concat(Enumerable.Repeat(jar, 17)).Concat(Enumerable.Repeat(beast, 6)))
+                deck.InsertCard(deck.main, deck.main.Count, code, new DeckCardAppearance { overframe = true });
+            using var duel = OpenFixture();
+            using var ui = new HandUI(duel, mobileLayout: true);
+            var animator = CardAnimationManager.Ensure(ui.Canvas);
+            var ai = new TacticalAI();
+            var links = new List<ChainLinkInfo>();
+            bool spellFromHand = false;
+            duel.OnChainActivated += links.Add;
+            duel.OnCardMoved += move => spellFromHand |= move.code == burial && move.fromLoc == YgoConstants.LOCATION_HAND;
+
+            ActivateFromMainPhase(duel, burial);
+            YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt => prompt.messageType == YgoConstants.MSG_SELECT_CARD
+                ? SelectCard(prompt, beast) : ReplyTo(prompt, beast));
+            Require(spellFromHand && links.Any(link => link.code == burial && link.Appearance?.overframe == true) &&
+                links.Any(link => link.code == beast && link.triggerLoc == YgoConstants.LOCATION_GRAVE &&
+                    link.Appearance?.overframe == true), "A native activation from the hand or graveyard lost its edition.");
+
+            int set = duel.ActivePrompt.sSetable.FindIndex(card => card.code == jar);
+            Require(set >= 0, "The special trap was unavailable to set.");
+            duel.SubmitResponseInt((set << 16) | 4);
+            for (int phase = 0; phase < 5 && !links.Any(link => link.code == jar); phase++)
+            {
+                YgoProjectBuilder.DriveUntilIdle(duel, ai, prompt => ReplyTo(prompt, jar));
+                if (links.Any(link => link.code == jar)) break;
+                var prompt = duel.ActivePrompt;
+                Require(prompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD, "The native trap fixture stalled.");
+                if (prompt.playerId == duel.HumanPlayerIndex && duel.TurnNumber > 1 &&
+                    prompt.activatable.Any(card => card.code == jar)) ActivateFromMainPhase(duel, jar);
+                else duel.SubmitResponseInt(7);
+            }
+            Require(links.Any(link => link.code == jar && link.triggerLoc == YgoConstants.LOCATION_SZONE &&
+                link.Appearance?.overframe == true) && duel.RetryCount == 0,
+                "A native field trap lost its edition or could not activate.");
+            var cues = AnimationSteps(animator).Where(cue =>
+                cue.GetType().Name.StartsWith("<ChainActivation>", StringComparison.Ordinal)).ToArray();
+            Require(cues.Length == 3, "The native activation events did not all enter the duel interface queue.");
+            foreach (var cue in cues)
+            {
+                Require(cue.MoveNext(), "A queued native activation omitted its presentation.");
+                TestCardPresentation.SampleAnimation((IEnumerator)cue.Current)(.94f);
+                Require(animator.transform.Find("OverframeActivation") != null,
+                    "A native activation did not show its special edition flare.");
+                while (cue.MoveNext()) TestCardPresentation.SampleAnimation((IEnumerator)cue.Current)(1f);
+            }
+            animator.Clear();
+            Debug.Log("[VERIFY OVERFRAME NATIVE ACTIVATIONS] Hand spell, graveyard monster and set trap kept their edition.");
+
+            DuelSession OpenFixture()
+            {
+                for (ulong seed = 1; seed <= 16; seed++)
+                {
+                    var session = new DuelSession();
+                    if (session.StartNewDuel(deck.main, deck.extra, Enumerable.Repeat(KaiserSeaHorse, 40).ToArray(),
+                        Array.Empty<uint>(), seed: new[] { seed * 29, seed * 47, seed * 71, seed * 97 },
+                        playerDeckAppearance: deck) && session.ActivePrompt?.activatable.Any(card => card.code == burial) == true &&
+                        session.ActivePrompt.sSetable.Any(card => card.code == jar)) return session;
+                    session.Dispose();
+                }
+                throw new InvalidOperationException("An opening with both the spell and trap could not be found.");
+            }
+
+            static byte[] ReplyTo(DuelPrompt prompt, uint code)
+            {
+                if (prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && prompt.promptCardCode == code)
+                    return BitConverter.GetBytes(1);
+                if (prompt.messageType != YgoConstants.MSG_SELECT_CHAIN) return null;
+                int index = prompt.candidates.FindIndex(card => card.code == code);
+                return index < 0 ? null : BitConverter.GetBytes(index);
+            }
         }
 
         private static void VerifyDragColumnAndPhaseShortcut()

@@ -149,6 +149,7 @@ namespace YGOPortable.UI
         private DeckCardAppearance? _previousChainAppearance;
         private bool _previousChainOpponent;
         private readonly HashSet<ChainLinkInfo> _shownChainOutcomes = new();
+        private Action<float> _activeLandingImpact;
         private bool _playing;
 
         private const float LifeFeedbackDuration = .46f;
@@ -187,6 +188,7 @@ namespace YGOPortable.UI
             internal Action Depart;
             internal Action Handoff;
             internal Action Release;
+            internal Action<float> LandingImpact;
             internal int SignatureUnits;
         }
 
@@ -241,6 +243,7 @@ namespace YGOPortable.UI
         public void Clear()
         {
             StopAllCoroutines();
+            ResetLandingImpact();
             _steps.Clear();
             _openTargetLocks = null;
             _openPileTransfers = null;
@@ -268,6 +271,7 @@ namespace YGOPortable.UI
 
         private void OnDestroy()
         {
+            ResetLandingImpact();
             if (ReferenceEquals(_instance, this)) _instance = null;
         }
 
@@ -318,9 +322,9 @@ namespace YGOPortable.UI
         }
 
         internal void QueueMove(CardFlight flight, CardMotion motion, Action onArrive, CardMoveReadoutSnapshot readout = null,
-            Action onDepart = null)
+            Action onDepart = null, Action<float> landingImpact = null)
         {
-            QueueStep(MoveCard(flight, motion, onArrive, readout, onDepart));
+            QueueStep(MoveCard(flight, motion, onArrive, readout, onDepart, landingImpact: landingImpact));
         }
 
         internal void QueueFieldDeparture(object group, CardFlight flight, CardMotion motion,
@@ -372,7 +376,7 @@ namespace YGOPortable.UI
 
         internal void StageFieldArrival(CardFlight flight, CardMotion motion, byte controller, uint location, uint sequence,
             CardMoveReadoutSnapshot readout, Action depart, Action release, Action refresh, uint? returnEffect = null,
-            Action handoff = null, int xyzMaterials = 0)
+            Action handoff = null, int xyzMaterials = 0, Action<float> landingImpact = null)
         {
             if (_pendingFieldArrivals != null && (_pendingReturnEffect != returnEffect || returnEffect == 0))
                 CompleteFieldArrivals();
@@ -395,7 +399,7 @@ namespace YGOPortable.UI
             _pendingFieldArrivals.Add(new FieldArrival
             {
                 Slot = (controller, location, sequence), Flight = flight, Motion = motion, Readout = readout,
-                Depart = depart, Handoff = handoff, Release = release, SignatureUnits = signatureUnits,
+                Depart = depart, Handoff = handoff, Release = release, SignatureUnits = signatureUnits, LandingImpact = landingImpact,
             });
             _pendingReturnEffect = returnEffect;
             _refreshAfterFieldArrivals = refresh;
@@ -422,7 +426,8 @@ namespace YGOPortable.UI
             var first = moves[0];
             _openEquip = null;
             _steps.Enqueue(moves.Count == 1 && first.Motion != CardMotion.FieldReturn
-                ? MoveCard(first.Flight, first.Motion, Land, first.Readout, first.Depart, signatureUnits: first.SignatureUnits)
+                ? MoveCard(first.Flight, first.Motion, Land, first.Readout, first.Depart, signatureUnits: first.SignatureUnits,
+                    landingImpact: first.LandingImpact)
                 : PlayFieldArrivalGroup(moves, Land, refresh));
         }
 
@@ -779,10 +784,10 @@ namespace YGOPortable.UI
             land();
             if (!returning)
             {
-                List<CardPose> slots = null;
+                List<(CardPose Slot, Action<float> Impact)> slots = null;
                 foreach (var move in moves)
                     if (IsSummonMotion(move.Motion) && IsSpecialEditionLanding(move.Flight))
-                        (slots ??= new List<CardPose>(moves.Count)).Add(move.Flight.To);
+                        (slots ??= new List<(CardPose, Action<float>)>(moves.Count)).Add((move.Flight.To, move.LandingImpact));
                 if (slots != null) yield return PlayOverframeLanding(slots);
             }
         }
@@ -1173,7 +1178,7 @@ namespace YGOPortable.UI
         }
 
         private IEnumerator MoveCard(CardFlight flight, CardMotion motion, Action onArrive, CardMoveReadoutSnapshot readout,
-            Action onDepart, Action onHandoff = null, int signatureUnits = 0)
+            Action onDepart, Action onHandoff = null, int signatureUnits = 0, Action<float> landingImpact = null)
         {
             if (!flight.From.IsValid || !flight.To.IsValid)
             {
@@ -1261,7 +1266,7 @@ namespace YGOPortable.UI
             else RecycleCard(proxy);
             onArrive?.Invoke();
             if (summons && IsSpecialEditionLanding(flight))
-                yield return PlayOverframeLanding(flight.To);
+                yield return PlayOverframeLanding(new[] { (flight.To, landingImpact) });
             else if (summons && !reveal)
             {
                 LotdAudio.PlaySummon();
@@ -1282,28 +1287,39 @@ namespace YGOPortable.UI
         private static bool IsSpecialEditionLanding(CardFlight flight) =>
             !flight.EndsFaceDown && flight.Appearance?.overframe == true;
 
-        private IEnumerator PlayOverframeLanding(CardPose slot)
-            => PlayOverframeLanding(new[] { slot });
-
-        private IEnumerator PlayOverframeLanding(IReadOnlyList<CardPose> slots)
+        private IEnumerator PlayOverframeLanding(IReadOnlyList<(CardPose Slot, Action<float> Impact)> slots)
         {
             const float scale = 2.04f;
             var waves = new DuelEffectGraphic[slots.Count];
             for (int i = 0; i < slots.Count; i++)
             {
-                var tint = Color.Lerp(DuelStyle.Side(slots[i].Angle > 45f), DuelStyle.ChainGold, .36f);
-                var wave = CreateEffect(DuelEffectKind.ChainImpactWave, slots[i], scale, tint);
+                var anchor = slots[i].Slot;
+                var tint = Color.Lerp(DuelStyle.Side(anchor.Angle > 45f), DuelStyle.ChainGold, .36f);
+                var wave = CreateEffect(DuelEffectKind.ChainImpactWave, anchor, scale, tint);
                 wave.name = "OverframeLanding";
                 wave.Seek(0f);
                 waves[i] = wave;
             }
+            _activeLandingImpact = progress =>
+            {
+                foreach (var slot in slots) slot.Impact?.Invoke(progress);
+            };
             LotdAudio.PlaySummon();
             yield return Animate(.18f, t =>
             {
+                _activeLandingImpact?.Invoke(t);
                 for (int i = 0; i < waves.Length; i++)
-                    TrackCardEffect(waves[i], slots[i], scale, t);
+                    TrackCardEffect(waves[i], slots[i].Slot, scale, t);
             });
+            ResetLandingImpact();
             foreach (var wave in waves) RemoveTransient(wave.gameObject);
+        }
+
+        private void ResetLandingImpact()
+        {
+            var impact = _activeLandingImpact;
+            _activeLandingImpact = null;
+            impact?.Invoke(1f);
         }
 
         private static bool SupportsSummonOverframe(CardFlight flight)
@@ -1328,7 +1344,9 @@ namespace YGOPortable.UI
             uint key = CardDatabase.GetArchetypeCollectionKey(card);
             bool signature = DeckRepository.PresetDecks.Exists(deck => deck.sigCard == key || deck.sigCard == flight.Code);
             bool rareBoss = (card.IsExtra || card.atk >= 2400) && CardRarityCatalog.GetRarity(flight.Code) == CardRarity.UltraRare;
-            return (signature || rareBoss) &&
+            var (artCode, artVariant) = ResolveSummonPortrait(flight);
+            bool hasPortrait = CardArtLoader.SupportsOverframe(artCode, Mathf.Max(0, artVariant));
+            return (signature || rareBoss || hasPortrait) &&
                 _featuredSummons.Add((flight.To.Angle > 45f, key));
         }
 
@@ -1839,6 +1857,7 @@ namespace YGOPortable.UI
             Action onStart, DeckCardAppearance? appearance)
         {
             onStart?.Invoke();
+            appearance ??= live?.Appearance;
             uint previous = chainNumber > 1 && _previousChainNumber == chainNumber - 1 ? _previousChainCode : 0;
             var previousReadout = _previousChainReadout;
             var previousAppearance = _previousChainAppearance;
@@ -1878,12 +1897,33 @@ namespace YGOPortable.UI
             card.EnableOverframe();
             card.PoseOverframe(0f, 1f, Vector2.zero, 0f);
             float layoutHeight = card.HasOverframe ? height : 0f;
+            bool special = code != 0 && appearance?.overframe == true;
+            DuelEffectGraphic editionFlare = null;
+            CanvasGroup projectedArt = null;
+            Vector2 projectionCenter = Vector2.zero;
+            float projectionSide = previous == 0 ? -side : side;
+            if (special)
+            {
+                uint type = live?.type ?? CardDatabase.Get(code)?.type ?? 0;
+                var tint = (type & YgoConstants.TYPE_TRAP) != 0 ? new Color(.91f, .53f, 1f) :
+                    (type & YgoConstants.TYPE_SPELL) != 0 ? new Color(.28f, .92f, .77f) :
+                    new Color(.71f, .88f, 1f);
+                editionFlare = CreateEffect(DuelEffectKind.ChainApplied, center, reveal.Size * 1.6f, tint);
+                editionFlare.name = "OverframeActivation";
+                if (!card.HasOverframePortrait && card.ArtworkSprite != null &&
+                    card.ArtworkSprite != CardArtLoader.GetFallbackArt())
+                {
+                    projectionCenter = center + new Vector2(projectionSide * height * .64f, height * .25f);
+                    projectedArt = CreateChainArtProjection(projectionCenter, height, projectionSide, card.ArtworkSprite, tint);
+                }
+                card.transform.SetAsLastSibling();
+            }
             var aspect = card.transform.Find("AspectBox");
             var flash = DuelStyle.AddActivationGlow(aspect, height * .025f, behind: false);
             flash.gameObject.SetActive(true);
             flash.canvasRenderer.SetAlpha(0f);
             Image highlight = null;
-            if (code != 0 && DuelVisualAssets.ChainCardHighlight != null)
+            if (!special && code != 0 && DuelVisualAssets.ChainCardHighlight != null)
             {
                 var bounds = LotdUiKit.CreateRect("ChainCardHighlight", aspect, new Vector2(-.17f, -.06f),
                     new Vector2(1.17f, 1.06f), Vector2.zero, Vector2.zero);
@@ -1918,7 +1958,13 @@ namespace YGOPortable.UI
                 TiltChainCard(card, side, t);
                 float depth = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.48f, .91f, t));
                 card.PoseOverframe(depth, Mathf.Lerp(.92f, 1.08f, depth), Vector2.right * (side * depth * .4f), t * .56f);
-                if (appearance?.overframe == true) card.SetRarityHighlight(depth);
+                if (special)
+                {
+                    card.SetRarityHighlight(depth);
+                    editionFlare.rectTransform.anchoredPosition = ((RectTransform)card.transform).anchoredPosition;
+                    editionFlare.Seek(Mathf.InverseLerp(.34f, .94f, t) * .62f);
+                    PoseChainArtProjection(projectedArt, projectionCenter, projectionSide, height, depth);
+                }
             });
             var back = new CardFlight(code, reveal, source, code == 0, code == 0);
             yield return Animate(.24f, t =>
@@ -1934,14 +1980,43 @@ namespace YGOPortable.UI
                 TiltChainCard(card, side, (1f - returning) * .5f + .5f, 1f - returning);
                 float depth = 1f - returning;
                 card.PoseOverframe(depth, Mathf.Lerp(.92f, 1.08f, depth), Vector2.right * (side * depth * .4f), .56f + t * .44f);
-                if (appearance?.overframe == true) card.SetRarityHighlight(depth);
+                if (special)
+                {
+                    card.SetRarityHighlight(depth);
+                    editionFlare.rectTransform.anchoredPosition = ((RectTransform)card.transform).anchoredPosition;
+                    editionFlare.Seek(.62f + .38f * returning);
+                    PoseChainArtProjection(projectedArt, projectionCenter, projectionSide, height, depth);
+                }
             });
             if (highlight != null) RemoveTransient(highlight.gameObject);
+            if (editionFlare != null) RemoveTransient(editionFlare.gameObject);
+            if (projectedArt != null) RemoveTransient(projectedArt.gameObject);
             RemoveTransient(card.gameObject);
             RemoveTransient(crest.gameObject);
             RemoveTransient(wave.gameObject);
             RemoveTransient(badge.gameObject);
             RemoveTransient(overlay.gameObject);
+        }
+
+        private CanvasGroup CreateChainArtProjection(Vector2 center, float cardHeight, float side, Sprite sprite, Color tint)
+        {
+            var frame = CenteredVisual("OverframeArtProjection", _layer, center, Vector2.one * (cardHeight * .68f));
+            frame.localRotation = Quaternion.Euler(0f, 0f, side * 8f);
+            var group = frame.gameObject.AddComponent<CanvasGroup>();
+            group.alpha = 0f;
+            group.blocksRaycasts = group.interactable = false;
+            LotdUiKit.AddImage(frame.gameObject, LotdUiKit.WhiteSprite, new Color(tint.r, tint.g, tint.b, .72f), false, false);
+            LotdUiKit.AddImage(LotdUiKit.FillRect("Artwork", frame, 2.5f).gameObject, sprite, Color.white, true, false);
+            return group;
+        }
+
+        private static void PoseChainArtProjection(CanvasGroup projection, Vector2 center, float side, float height, float depth)
+        {
+            if (projection == null) return;
+            projection.alpha = .84f * depth;
+            var rect = (RectTransform)projection.transform;
+            rect.anchoredPosition = center - Vector2.right * (side * height * .22f * (1f - depth));
+            rect.localScale = Vector3.one * Mathf.Lerp(.87f, 1f, depth);
         }
 
         private static void TiltChainCard(CompositeCardView card, float side, float progress, float strength = 1f)

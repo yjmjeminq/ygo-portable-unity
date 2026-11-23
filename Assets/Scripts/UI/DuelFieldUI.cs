@@ -3015,6 +3015,8 @@ namespace YGOPortable.UI
             else if (e.toLoc == YgoConstants.LOCATION_MZONE && e.fromLoc != YgoConstants.LOCATION_MZONE)
                 motion = MonsterArrivalMotion(e);
 
+            Action<float> landingImpact = !toBack && e.Appearance?.overframe == true && CardAnimationManager.IsSummonMotion(motion)
+                ? progress => PoseSpecialEditionLanding(e.toCon, e.toLoc, e.toSeq, e.code, progress) : null;
             var held = HoldMovingFieldCard(e, motion, previousReadout);
             var readout = PrepareMoveReadout(animator, e, fromBack, toBack, held);
             if (motion == CardMotion.ChangePosition && e.ChangesPositionInPlace)
@@ -3070,7 +3072,8 @@ namespace YGOPortable.UI
                     ReleaseBattleCardDisplay(held);
                     ReleaseArrival(key);
                     ReleaseMovingInspection(e, inspection);
-                }, Refresh, e.ReturnEffectId, inspection == null ? null : () => inspection.AtDestination = true, xyzMaterials);
+                }, Refresh, e.ReturnEffectId, inspection == null ? null : () => inspection.AtDestination = true, xyzMaterials,
+                    landingImpact);
                 if (e.summonType.HasValue && CardDatabase.Get(e.code) is { IsLink: true, link: not 0 } summon)
                     _arrivalLinks.Add((e.toCon, e.toSeq, summon.link));
                 return held;
@@ -3087,8 +3090,19 @@ namespace YGOPortable.UI
                 e.toLoc is YgoConstants.LOCATION_GRAVE or YgoConstants.LOCATION_REMOVED)
                 animator.QueuePileTransfer(flight, OnArrival);
             else
-                animator.QueueMove(flight, motion, OnArrival, readout, departAndRefresh);
+                animator.QueueMove(flight, motion, OnArrival, readout, departAndRefresh, landingImpact);
             return held;
+        }
+
+        private void PoseSpecialEditionLanding(byte controller, uint location, uint sequence, uint code, float progress)
+        {
+            ShakeBoardForSummon(progress);
+            if (_session == null) return;
+            var view = GetSlot(controller, location, sequence)?.cardView;
+            if (view == null || !view.isActiveAndEnabled || view.CurrentCode != code || !view.HasOverframe) return;
+            float settle = 1f - Mathf.Clamp01(progress);
+            float lift = Mathf.SmoothStep(0f, 1f, progress * 7f) * settle * settle;
+            view.SetReadoutFocus(lift);
         }
 
         private BattleCardDisplay QueueSummonMaterial(CardAnimationManager animator, CardMoveEvent move, CardFlight flight,

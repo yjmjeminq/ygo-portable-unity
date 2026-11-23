@@ -16,6 +16,7 @@ namespace YGOPortable.Editor
     {
         private const uint BlueEyes = 89631139;
         private const uint AlternateBlueEyes = 89631134;
+        private const uint SkullRedBird = 10202894;
 
         internal static void Run()
         {
@@ -79,7 +80,7 @@ namespace YGOPortable.Editor
             texture.Apply();
             byte[] portraitBytes = texture.EncodeToPNG();
             UnityEngine.Object.DestroyImmediate(texture);
-            foreach (uint code in new[] { BlueEyes, magician, baronne, excel })
+            foreach (uint code in new[] { BlueEyes, magician, baronne, excel, SkullRedBird })
                 File.WriteAllBytes(Path.Combine(directory, $"{code}-0.png"), portraitBytes);
             File.WriteAllBytes(Path.Combine(directory, $"{BlueEyes}-23.png"), portraitBytes);
 
@@ -415,7 +416,62 @@ namespace YGOPortable.Editor
                 "The special edition activation did not show its frame flash.");
             animator.Clear();
             Debug.Log("[VERIFY OVERFRAME MESH] Summon and activation reused their subject and shimmer meshes while scaling.");
+            VerifyStandardCutIn(animator, queue, start, end);
+            VerifyOverframeActivationProjection(animator, queue, start);
+        }
 
+        private static void VerifyStandardCutIn(CardAnimationManager animator, Queue<IEnumerator> queue, CardPose start, CardPose end)
+        {
+            var flight = new CardFlight(SkullRedBird, start, end, false, false, default(DeckCardAppearance));
+            animator.QueueMove(flight, CardMotion.Summon, null);
+            var move = queue.Dequeue();
+            Require(move.MoveNext() && move.Current.GetType().Name.StartsWith("<RevealSummon>", StringComparison.Ordinal),
+                "A supported standard monster missed its first summon cut-in.");
+            var reveal = (IEnumerator)move.Current;
+            Require(reveal.MoveNext(), "The standard reveal did not start.");
+            SampleAnimation((IEnumerator)reveal.Current)(1f);
+            Require(animator.transform.Find("SummonPortrait").GetComponent<CanvasGroup>().alpha > .95f &&
+                !animator.transform.Find("MovingCard").GetComponent<CompositeCardView>().HasOverframe,
+                "The standard cut-in was absent or received the special card finish.");
+            while (reveal.MoveNext()) SampleAnimation((IEnumerator)reveal.Current)(1f);
+            Require(!move.MoveNext() && animator.transform.Find("OverframeLanding") == null,
+                "The standard copy used the special edition landing.");
+            animator.QueueMove(flight, CardMotion.Summon, null);
+            move = queue.Dequeue();
+            Require(move.MoveNext() && !move.Current.GetType().Name.StartsWith("<RevealSummon>", StringComparison.Ordinal),
+                "The same standard monster replayed the full introduction.");
+            while (move.MoveNext()) { }
+            animator.Clear();
+            Debug.Log("[VERIFY STANDARD CUT-IN] A matching standard card showed its first portrait and kept its regular finish.");
+        }
+
+        private static void VerifyOverframeActivationProjection(CardAnimationManager animator, Queue<IEnumerator> queue, CardPose start)
+        {
+            const uint pot = 55144522, mirrorForce = 44095762;
+            foreach (uint code in new[] { pot, mirrorForce })
+            {
+                animator.QueueChain(start, code, 1, code == mirrorForce, appearance: new DeckCardAppearance { overframe = true });
+                var link = queue.Dequeue();
+                Require(link.MoveNext(), "The spell or trap activation did not animate.");
+                SampleAnimation((IEnumerator)link.Current)(.94f);
+                var card = animator.transform.Find("MovingCard").GetComponent<CompositeCardView>();
+                var projection = animator.transform.Find("OverframeArtProjection");
+                Require(card.HasOverframe && !card.HasOverframePortrait &&
+                    projection.GetComponent<CanvasGroup>().alpha > .7f &&
+                    projection.Find("Artwork").GetComponent<Image>().sprite == card.ArtworkSprite &&
+                    animator.transform.Find("OverframeActivation") != null,
+                    "The special spell or trap did not project the matching artwork with its own flare.");
+                Require(link.MoveNext(), "The projected artwork did not return to the field.");
+                SampleAnimation((IEnumerator)link.Current)(1f);
+                Require(!link.MoveNext() && animator.transform.Find("OverframeArtProjection") == null &&
+                    animator.transform.Find("OverframeActivation") == null, "The edition flare was not cleaned up.");
+            }
+            animator.QueueChain(start, 0, 1, true, appearance: new DeckCardAppearance { overframe = true });
+            var concealed = queue.Dequeue();
+            Require(concealed.MoveNext() && animator.transform.Find("OverframeArtProjection") == null &&
+                animator.transform.Find("OverframeActivation") == null, "The projection exposed an unidentified card.");
+            animator.Clear();
+            Debug.Log("[VERIFY OVERFRAME ACTIVATION] Spell and trap artwork, edition flare and concealment passed.");
         }
 
         private static void TrackStableOverframe(Transform overframe, Action<float> frame, float from, float to)

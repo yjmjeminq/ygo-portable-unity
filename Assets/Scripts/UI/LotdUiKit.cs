@@ -424,6 +424,7 @@ namespace YGOPortable.UI
         private CardOverframeGraphic _overframeTrim;
 
         internal bool HasOverframe => _overframe != null && _overframe.gameObject.activeSelf;
+        internal bool HasOverframePortrait => HasOverframe && _retainedCutIn != null;
 
         public uint CurrentCode { get; private set; }
         internal bool UseDuelArtwork { get; set; }
@@ -854,7 +855,7 @@ namespace YGOPortable.UI
             _overframe.alpha = Mathf.Clamp01(opacity);
             if (_cinematicOverframe)
             {
-                _overframeShade.canvasRenderer.SetAlpha(.72f * _overframe.alpha);
+                _overframeShade.canvasRenderer.SetAlpha((HasOverframePortrait ? .72f : .27f) * _overframe.alpha);
                 float spread = Mathf.Sin(Mathf.Clamp01(shimmer) * Mathf.PI);
                 _overframeTrim.transform.localScale = Vector3.one * (1.03f + spread * .26f);
                 _overframeTrim.canvasRenderer.SetAlpha(_deckAppearance?.overframe == true ? .42f + spread * .52f : 0f);

@@ -21,11 +21,16 @@ namespace YGOPortable.UI
         private GameObject _zoomDisabledBadge;
         private Vector2 _boardDamageOffset;
 
-        private void ShakeBoardForDamage(float progress)
+        private void ShakeBoardForDamage(float progress) => ShakeBoard(progress, 1f);
+
+        private void ShakeBoardForSummon(float progress) => ShakeBoard(progress, .36f);
+
+        private void ShakeBoard(float progress, float strength)
         {
+            if (_boardRect == null) return;
             _boardRect.anchoredPosition -= _boardDamageOffset;
             float envelope = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(progress / .42f));
-            float amplitude = Mathf.Clamp(_boardRect.rect.width * .010f, 3f, 11f) * envelope;
+            float amplitude = Mathf.Clamp(_boardRect.rect.width * .010f, 3f, 11f) * envelope * strength;
             _boardDamageOffset = new Vector2(Mathf.Sin(progress * 72f), Mathf.Sin(progress * 47f) * .45f) * amplitude;
             _boardRect.anchoredPosition += _boardDamageOffset;
         }
