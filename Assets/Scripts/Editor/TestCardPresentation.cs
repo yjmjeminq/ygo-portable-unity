@@ -145,6 +145,56 @@ namespace YGOPortable.Editor
                 Directory.Delete(directory);
                 Directory.Delete(folder);
             }
+            VerifyPackagedOverframe(portraitBytes);
+        }
+
+        private static void VerifyPackagedOverframe(byte[] image)
+        {
+            string freshApp = Path.Combine(Path.GetTempPath(), "ygo-packaged-visuals-" + Guid.NewGuid().ToString("N"));
+            string visuals = Path.Combine(freshApp, "DuelVisuals");
+            string cutIns = Path.Combine(visuals, "CutIns");
+            Directory.CreateDirectory(cutIns);
+            string portrait = Path.Combine(cutIns, $"{BlueEyes}-0.png");
+            string pack = Path.Combine(visuals, "cardart.pack");
+            File.WriteAllBytes(portrait, image);
+            using (var writer = new BinaryWriter(File.Create(pack)))
+            {
+                writer.Write(0x5241444Du);
+                writer.Write(1u);
+                writer.Write(1u);
+                writer.Write(BlueEyes);
+                writer.Write(0);
+                writer.Write(28u);
+                writer.Write((uint)image.Length);
+                writer.Write(image);
+            }
+
+            string previous = CardArtLoader.ActiveDuelVisualsPath;
+            var canvas = new GameObject("Fresh install CutIn", typeof(Canvas));
+            CardArtLoader.Shutdown();
+            CardArtLoader.Initialize(freshApp, Path.Combine(freshApp, "EmptyProfile"));
+            try
+            {
+                var view = CompositeCardView.Create(canvas.transform, "Portrait", duelArtwork: true);
+                view.EnableOverframe();
+                view.SetCard(BlueEyes);
+                Require(CardArtLoader.GetArtworkSource(BlueEyes, 0) == (BlueEyes, 0) &&
+                    view.HasOverframe && view.ArtworkSprite.texture.width == 8 &&
+                    view.transform.Find("Overframe/Depth/LocalCutIn").GetComponent<Image>().sprite.texture.width == 8,
+                    "An empty app profile could not use the artwork and cut-in from packaged StreamingAssets.");
+                Debug.Log("[VERIFY PACKAGED OVERFRAME] Fresh install loaded its matching artwork and portrait from the IPA resource layout.");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(canvas);
+                CardArtLoader.Shutdown();
+                CardArtLoader.Initialize(Application.streamingAssetsPath, previous);
+                File.Delete(portrait);
+                File.Delete(pack);
+                Directory.Delete(cutIns);
+                Directory.Delete(visuals);
+                Directory.Delete(freshApp);
+            }
         }
 
         private static void VerifyOverframeAnimation(CardAnimationManager animator)

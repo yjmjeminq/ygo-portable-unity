@@ -25,6 +25,7 @@ namespace YGOPortable.Core
         private const int TokenArtPackId = -1;
         private const int DuelArtPackId = -2;
         private const int SupplementalArtPackId = -3;
+        private const int PackagedDuelArtPackId = -4;
         private const int BundledArtwork = -1;
         private const string TokenArtFileName = "tokenart.pack";
         private const string DuelArtFileName = "cardart.pack";
@@ -39,6 +40,8 @@ namespace YGOPortable.Core
         private static Sprite _cardBackSprite;
         internal static string LocalDuelVisualsPath => Path.Combine(Application.persistentDataPath, "DuelVisuals");
         internal static string ActiveDuelVisualsPath => _activeDuelVisualsPath ?? LocalDuelVisualsPath;
+        internal static string PackagedDuelVisualsPath =>
+            Path.Combine(_streamingDir ?? Application.streamingAssetsPath, "DuelVisuals");
 
         public static void Initialize(string streamingAssetsPath) => Initialize(streamingAssetsPath, LocalDuelVisualsPath);
 
@@ -55,11 +58,18 @@ namespace YGOPortable.Core
                 Debug.LogWarning($"[CardArtLoader] Missing or invalid {idxPath}");
             ReadArtIndex(Path.Combine(streamingAssetsPath, TokenArtFileName));
             ReadArtIndex(Path.Combine(streamingAssetsPath, SupplementalArtFileName));
-            ReadDuelArtIndex(Path.Combine(localArtworkPath, DuelArtFileName));
-            Debug.Log($"[CardArtLoader] Indexed {_index.Count} card artworks.");
+            ReadDuelArtIndex(Path.Combine(localArtworkPath, DuelArtFileName), DuelArtPackId);
+            ReadDuelArtIndex(Path.Combine(PackagedDuelVisualsPath, DuelArtFileName), PackagedDuelArtPackId);
+            foreach (var (code, variants) in _duelVariants)
+            {
+                variants.Sort();
+                if (variants[0] != 0 && (_index.ContainsKey(code) || RelatedPrintings(code).Any(_index.ContainsKey)))
+                    variants.Insert(0, 0);
+            }
+            Debug.Log($"[CardArtLoader] Indexed {_index.Count} card artworks and {_duelArt.Count} duel artworks.");
         }
 
-        private static void ReadDuelArtIndex(string packPath)
+        private static void ReadDuelArtIndex(string packPath, int packId)
         {
             if (!File.Exists(packPath)) return;
             FileStream stream = null;
@@ -71,6 +81,7 @@ namespace YGOPortable.Core
                 uint count = reader.ReadUInt32();
                 long indexEnd = 12L + count * 16L;
                 if (indexEnd > stream.Length) return;
+                var entries = new List<((uint Code, int Variant) Key, ArtEntry Entry)>();
                 for (uint i = 0; i < count; i++)
                 {
                     uint code = reader.ReadUInt32();
@@ -79,27 +90,21 @@ namespace YGOPortable.Core
                     uint length = reader.ReadUInt32();
                     if (code == 0 || variant < 0 || offset < indexEnd || length == 0 ||
                         (long)offset + length > stream.Length) continue;
-                    if (!_duelArt.TryAdd((code, variant), new ArtEntry
-                        { packId = DuelArtPackId, offset = offset, length = length })) continue;
-                    if (!_duelVariants.TryGetValue(code, out var variants))
-                        _duelVariants[code] = variants = new List<int>();
-                    variants.Add(variant);
+                    entries.Add(((code, variant), new ArtEntry { packId = packId, offset = offset, length = length }));
                 }
-                foreach (var (code, variants) in _duelVariants)
+                foreach (var (key, entry) in entries)
                 {
-                    variants.Sort();
-                    if (variants[0] != 0 && (_index.ContainsKey(code) || RelatedPrintings(code).Any(_index.ContainsKey)))
-                        variants.Insert(0, 0);
+                    if (!_duelArt.TryAdd(key, entry)) continue;
+                    if (!_duelVariants.TryGetValue(key.Code, out var variants))
+                        _duelVariants[key.Code] = variants = new List<int>();
+                    variants.Add(key.Variant);
                 }
-                _packStreams[DuelArtPackId] = stream;
+                _packStreams.Add(packId, stream);
                 stream = null;
-                Debug.Log($"[CardArtLoader] Indexed {_duelArt.Count} local duel artworks for {_duelVariants.Count} cards.");
             }
             catch (Exception error) when (error is IOException || error is UnauthorizedAccessException)
             {
-                _duelArt.Clear();
-                _duelVariants.Clear();
-                Debug.LogWarning($"[CardArtLoader] Cannot read local duel artwork index: {error.Message}");
+                Debug.LogWarning($"[CardArtLoader] Cannot read duel artwork index: {error.Message}");
             }
             finally
             {
@@ -374,6 +379,7 @@ namespace YGOPortable.Core
             _duelArt.Clear();
             _duelVariants.Clear();
             _activeDuelVisualsPath = null;
+            _streamingDir = null;
             _index = null;
         }
     }

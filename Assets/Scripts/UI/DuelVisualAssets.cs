@@ -120,9 +120,6 @@ namespace YGOPortable.UI
             return sprite;
         }
 
-        private static string CutInPath(uint code, int variant) =>
-            Path.Combine(CardArtLoader.ActiveDuelVisualsPath, "CutIns", $"{code}-{variant}.png");
-
         internal static bool CanDisplayCutIn(uint artCode, int artVariant) => GetCutIn(artCode, artVariant) != null;
 
         internal static Sprite RetainCutIn(uint artCode, int artVariant)
@@ -149,7 +146,13 @@ namespace YGOPortable.UI
         {
             if (artCode == 0 || artVariant < -1) return null;
             // Bundled card art uses -1. Its matching default cut-in is stored as variant 0.
-            string path = CutInPath(artCode, artVariant == -1 ? 0 : artVariant);
+            string file = $"{artCode}-{(artVariant == -1 ? 0 : artVariant)}.png";
+            return ReadCutIn(Path.Combine(CardArtLoader.ActiveDuelVisualsPath, "CutIns", file)) ??
+                ReadCutIn(Path.Combine(CardArtLoader.PackagedDuelVisualsPath, "CutIns", file));
+        }
+
+        private static CutInEntry ReadCutIn(string path)
+        {
             if (CutInCache.TryGetValue(path, out var cached))
             {
                 cached.LastUse = ++_cutInUse;
