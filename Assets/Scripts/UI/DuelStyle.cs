@@ -26,8 +26,34 @@ namespace YGOPortable.UI
         private static Sprite _handGlow;
         private static Sprite _cardShadow;
         private static Sprite _hexagon;
+        private static Sprite _overframeBackdrop;
         internal static Texture2D Stone => _stone ??= Resources.Load<Texture2D>("Duel/StonePaving");
+        internal static Sprite OverframeBackdrop => _overframeBackdrop ??= BuildOverframeBackdrop();
         internal static Color Side(bool opponent) => opponent ? Opponent : Player;
+
+        private static Sprite BuildOverframeBackdrop()
+        {
+            const int size = 32;
+            var pixels = new Color32[size * size];
+            var shadow = new Color32(13, 20, 36, 255);
+            var light = new Color32(59, 91, 124, 255);
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                var position = new Vector2((x + .5f) / size, (y + .5f) / size);
+                float falloff = Mathf.Clamp01(Vector2.Distance(position, new Vector2(.5f, .66f)) * 1.6f);
+                pixels[y * size + x] = Color32.Lerp(light, shadow, Mathf.SmoothStep(0f, 1f, falloff));
+            }
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                name = "Overframe backdrop",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+            };
+            texture.SetPixels32(pixels);
+            texture.Apply(false, true);
+            return Sprite.Create(texture, new Rect(0, 0, size, size), Vector2.one * .5f, 100f, 0, SpriteMeshType.FullRect);
+        }
 
         internal static Image AddHexPlate(RectTransform root, Color rim, Color face)
         {

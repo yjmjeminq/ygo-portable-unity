@@ -8,8 +8,6 @@ namespace YGOPortable.UI
     {
         private CompositeCardView _card;
         private RectTransform _holder;
-        private Rect _flatArea;
-        private Rect _depthArea;
         private Gyroscope _gyro;
         private bool _ownsGyro;
         private Vector2? _gravityReference;
@@ -18,16 +16,14 @@ namespace YGOPortable.UI
         private Vector2 _origin;
         private Vector2 _drag;
         private Vector2 _depth;
-        private bool _laidOutForDepth;
+        private bool _overframeVisible;
 
-        internal static void Attach(RectTransform holder, CompositeCardView card, bool motionSensor, Rect flatArea, Rect depthArea)
+        internal static void Attach(RectTransform holder, CompositeCardView card, bool motionSensor)
         {
             var hit = LotdUiKit.AddImage(holder.gameObject, LotdUiKit.WhiteSprite, Color.clear);
             var input = holder.gameObject.AddComponent<CardOverframeInput>();
             input._card = card;
             input._holder = holder;
-            input._flatArea = flatArea;
-            input._depthArea = depthArea;
             input._gyro = motionSensor && Application.isMobilePlatform && SystemInfo.supportsGyroscope ? Input.gyro : null;
             hit.raycastTarget = true;
         }
@@ -36,12 +32,9 @@ namespace YGOPortable.UI
         {
             if (_card == null) return;
             bool visible = _card.HasOverframe;
-            if (visible != _laidOutForDepth)
+            if (visible != _overframeVisible)
             {
-                _laidOutForDepth = visible;
-                Rect area = visible ? _depthArea : _flatArea;
-                _holder.anchorMin = area.min;
-                _holder.anchorMax = area.max;
+                _overframeVisible = visible;
                 SetSensorEnabled(visible);
             }
             if (!visible)
@@ -99,13 +92,8 @@ namespace YGOPortable.UI
         private void OnDisable()
         {
             SetSensorEnabled(false);
-            _laidOutForDepth = false;
-            if (_holder != null)
-            {
-                _holder.anchorMin = _flatArea.min;
-                _holder.anchorMax = _flatArea.max;
-                ResetPose();
-            }
+            _overframeVisible = false;
+            if (_holder != null) ResetPose();
         }
 
         public void OnPointerDown(PointerEventData data)

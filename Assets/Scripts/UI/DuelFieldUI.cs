@@ -4353,9 +4353,7 @@ namespace YGOPortable.UI
                 new Vector2(cardRight, onIPhone ? .812f : .891f), Vector2.zero, Vector2.zero);
             _zoomCardView = CompositeCardView.Create(cardHolder, "ZoomCard", true, duelArtwork: true);
             _zoomCardView.EnableOverframe();
-            CardOverframeInput.Attach(cardHolder, _zoomCardView, onIPhone,
-                new Rect(.033f, onIPhone ? .195f : .111f, cardRight - .033f, onIPhone ? .617f : .780f),
-                onIPhone ? Rect.MinMaxRect(.068f, .206f, .360f, .707f) : Rect.MinMaxRect(.068f, .117f, .438f, .760f));
+            CardOverframeInput.Attach(cardHolder, _zoomCardView, onIPhone);
             AddInspectorArtworkFrame(_zoomCardView.transform.Find("AspectBox"));
             _zoomDisabledBadge = BuildDisabledBadge(_zoomCardView.transform, 24);
             var artwork = LotdUiKit.CreateRect("ArtworkOptions", win, new Vector2(.04f, onIPhone ? .025f : .035f),

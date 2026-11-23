@@ -44,8 +44,7 @@ namespace YGOPortable.UI
             var art = DeckArea(_expandedDeckPanel, "Artwork", .048f, .084f, artRight, .913f);
             _expandedDeckArt = CompositeCardView.Create(art, "Card", detailedOverlay: true, duelArtwork: true);
             _expandedDeckArt.EnableOverframe();
-            CardOverframeInput.Attach(art, _expandedDeckArt, _mobileLayout,
-                Rect.MinMaxRect(.048f, .084f, artRight, .913f), Rect.MinMaxRect(.073f, .104f, artRight - .04f, .805f));
+            CardOverframeInput.Attach(art, _expandedDeckArt, _mobileLayout);
             var name = DeckArea(_expandedDeckPanel, "Name", rulesLeft, .804f, .759f, .928f);
             _expandedDeckName = LotdUiKit.AddFittedText(name, "Text", "", _mobileLayout ? 36 : 30, _mobileLayout ? 20 : 16, TextAnchor.MiddleLeft,
                 LotdUiKit.GoldAccent, FontStyle.Bold);

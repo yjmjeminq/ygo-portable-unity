@@ -104,20 +104,27 @@ namespace YGOPortable.Editor
                     Vector2.zero, Vector2.zero);
                 var card = CompositeCardView.Create(holder, "Detailed", detailedOverlay: true);
                 card.EnableOverframe();
-                CardOverframeInput.Attach(holder, card, false, Rect.MinMaxRect(.25f, .16f, .52f, .83f), Rect.MinMaxRect(.28f, .19f, .50f, .74f));
+                CardOverframeInput.Attach(holder, card, false);
                 card.SetCard(BlueEyes);
                 Canvas.ForceUpdateCanvases();
-                var layer = card.transform.Find("Overframe");
+                var aspect = card.transform.Find("AspectBox");
+                var layer = aspect.Find("Overframe");
                 var image = layer.Find("Depth/LocalCutIn").GetComponent<Image>();
-                Require(card.HasOverframe && image.sprite == zero && !image.maskable && !image.raycastTarget &&
-                    layer.GetSiblingIndex() == card.transform.childCount - 1 && image.rectTransform.anchorMax.y > 1f,
-                    "Bundled card art did not display the unmasked portrait past its frame.");
+                Require(card.HasOverframe && image.sprite == zero && image.maskable && !image.raycastTarget &&
+                    layer.GetSiblingIndex() > aspect.Find("Frame").GetSiblingIndex() &&
+                    layer.GetSiblingIndex() < aspect.Find("CardTitle").GetSiblingIndex() &&
+                    image.rectTransform.anchorMax.y <= .88f && image.rectTransform.anchorMin.y >= .26f,
+                    "The portrait was not layered over the illustration and behind the face labels.");
                 var input = holder.GetComponent<CardOverframeInput>();
                 typeof(CardOverframeInput).GetMethod("ShowDepth", BindingFlags.Instance | BindingFlags.NonPublic)
                     .Invoke(input, new object[] { new Vector2(.6f, .3f), .21f });
                 var tilt = (RectTransform)layer.Find("Depth");
                 Require(tilt.anchoredPosition.sqrMagnitude > 1f && tilt.localRotation != Quaternion.identity &&
                     card.transform.localRotation != Quaternion.identity, "The portrait and frame did not tilt independently.");
+                typeof(CardOverframeInput).GetMethod("LateUpdate", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(input, null);
+                Require(holder.anchorMin == new Vector2(.25f, .16f) && holder.anchorMax == new Vector2(.52f, .83f),
+                    "The detail card shifted when its overframe became visible.");
                 card.SetCard(BlueEyes, faceDown: true);
                 Require(!card.HasOverframe && image.sprite == null, "The face-down card exposed its portrait.");
                 card.SetCard(unrelated);
@@ -136,6 +143,10 @@ namespace YGOPortable.Editor
                 typeof(DeckEditorUI).GetMethod("OpenExpandedDeckCard", instance).Invoke(deck, new object[] { BlueEyes });
                 var expanded = (CompositeCardView)typeof(DeckEditorUI).GetField("_expandedDeckArt", instance).GetValue(deck);
                 Require(expanded.HasOverframe, "The expanded deck viewer did not show the decoded portrait.");
+                var thumbnail = CompositeCardView.Create(holder, "Compact");
+                thumbnail.SetDeckCard(BlueEyes, new DeckCardAppearance { overframe = true });
+                Require(!thumbnail.HasOverframe && thumbnail.transform.Find("AspectBox/DeckEdition").gameObject.activeSelf,
+                    "The compact card did not use a badge in place of the full portrait.");
                 deck.Close();
 
                 VerifyOverframeAnimation(CardAnimationManager.Ensure(canvas));
@@ -227,7 +238,7 @@ namespace YGOPortable.Editor
                 view.SetCard(BlueEyes);
                 Require(CardArtLoader.GetArtworkSource(BlueEyes, 0) == (BlueEyes, 0) &&
                     view.HasOverframe && view.ArtworkSprite.texture.width == 8 &&
-                    view.transform.Find("Overframe/Depth/LocalCutIn").GetComponent<Image>().sprite.texture.width == 8,
+                    view.transform.Find("AspectBox/Overframe/Depth/LocalCutIn").GetComponent<Image>().sprite.texture.width == 8,
                     "An empty app profile could not use the artwork and cut-in from packaged StreamingAssets.");
                 Debug.Log("[VERIFY PACKAGED OVERFRAME] Fresh install loaded its matching artwork and portrait from the IPA resource layout.");
             }

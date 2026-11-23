@@ -411,6 +411,7 @@ namespace YGOPortable.UI
         private GameObject _deckEditionBadge;
         private GameObject _destinyBadge;
         private bool _overframeEnabled;
+        private bool _cinematicOverframe;
         private bool _overframeBound;
         private Sprite _retainedCutIn;
         private Image _overframePortrait;
@@ -425,6 +426,10 @@ namespace YGOPortable.UI
         internal Sprite ArtworkSprite => _artImg.sprite;
 
         public static CompositeCardView Create(Transform parent, string name, bool detailedOverlay = false, bool duelArtwork = false)
+            => Create(parent, name, detailedOverlay, duelArtwork, cinematicOverframe: false);
+
+        internal static CompositeCardView Create(Transform parent, string name, bool detailedOverlay, bool duelArtwork,
+            bool cinematicOverframe)
         {
             var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent, false);
@@ -435,6 +440,7 @@ namespace YGOPortable.UI
             rt.offsetMax = Vector2.zero;
             var view = go.AddComponent<CompositeCardView>();
             view.UseDuelArtwork = duelArtwork;
+            view._cinematicOverframe = cinematicOverframe;
             view.BuildHierarchy(detailedOverlay);
             return view;
         }
@@ -533,7 +539,7 @@ namespace YGOPortable.UI
             appearance ??= live?.Appearance;
             if (!Nullable.Equals(_deckAppearance, appearance)) HideOverframe();
             _deckAppearance = appearance;
-            SetDeckEditionBadge(appearance?.overframe == true && code != 0 && !faceDown);
+            SetDeckEditionBadge(!_detailed && !_cinematicOverframe && appearance?.overframe == true && code != 0 && !faceDown);
             CurrentCode = code;
             if (faceDown || code == 0)
             {
@@ -715,11 +721,13 @@ namespace YGOPortable.UI
             if (shown && _deckEditionBadge == null)
             {
                 var aspect = _artImg.transform.parent;
-                var badge = LotdUiKit.CreateRect("DeckEdition", aspect, new Vector2(.07f, .13f),
-                    new Vector2(.93f, .218f), Vector2.zero, Vector2.zero);
-                LotdUiKit.AddImage(badge.gameObject, LotdUiKit.WhiteSprite, new Color(.11f, .05f, .20f, .91f), false, false);
-                LotdUiKit.AddFittedText(badge, "Label", "OVERFRAME", 18, 7,
-                    TextAnchor.MiddleCenter, new Color(.91f, .79f, 1f), FontStyle.Bold);
+                var badge = LotdUiKit.CreateRect("DeckEdition", aspect, new Vector2(.058f, .048f),
+                    new Vector2(.255f, .166f), Vector2.zero, Vector2.zero);
+                var rim = LotdUiKit.AddFittedText(badge, "Diamond", "◆", 24, 6, TextAnchor.MiddleCenter,
+                    new Color(.85f, .67f, 1f), FontStyle.Bold);
+                var stroke = rim.gameObject.AddComponent<Outline>();
+                stroke.effectColor = new Color(.16f, .075f, .26f);
+                stroke.effectDistance = new Vector2(1f, -1f);
                 _deckEditionBadge = badge.gameObject;
             }
             if (_deckEditionBadge != null) _deckEditionBadge.SetActive(shown);
@@ -746,31 +754,38 @@ namespace YGOPortable.UI
 
         private void RefreshOverframe()
         {
-            if (!(_deckAppearance?.overframe ?? _overframeEnabled) || _overframeBound || _retainedArtwork == 0) return;
+            if (!(_detailed || _overframeEnabled || _cinematicOverframe) ||
+                !(_deckAppearance?.overframe ?? _overframeEnabled) || _overframeBound || _retainedArtwork == 0) return;
             _overframeBound = true;
             var (code, variant) = _artworkSource.Code == 0 ? (_retainedArtwork, _retainedVariant) : _artworkSource;
             _retainedCutIn = DuelVisualAssets.RetainCutIn(code, variant);
             if (_retainedCutIn == null) return;
             if (_overframe == null)
             {
-                var layer = LotdUiKit.FillRect("Overframe", transform);
-                var aspect = layer.gameObject.AddComponent<AspectRatioFitter>();
-                aspect.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
-                aspect.aspectRatio = LotdUiKit.CardAspectRatio;
+                var layer = LotdUiKit.FillRect("Overframe", _cinematicOverframe ? transform : _frameImg.transform.parent);
+                if (_cinematicOverframe)
+                {
+                    var aspect = layer.gameObject.AddComponent<AspectRatioFitter>();
+                    aspect.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+                    aspect.aspectRatio = LotdUiKit.CardAspectRatio;
+                }
+                else layer.SetSiblingIndex(_frameImg.transform.GetSiblingIndex() + 1);
                 _overframe = layer.gameObject.AddComponent<CanvasGroup>();
                 _overframe.blocksRaycasts = _overframe.interactable = false;
                 _overframeTilt = LotdUiKit.FillRect("Depth", layer);
                 _overframeTilt.pivot = new Vector2(.5f, .78f);
                 var shade = LotdUiKit.FillRect("OverframeShade", _artImg.rectTransform);
-                _overframeShade = LotdUiKit.AddImage(shade.gameObject, LotdUiKit.WhiteSprite,
-                    new Color(.021f, .033f, .048f), false, false);
+                _overframeShade = LotdUiKit.AddImage(shade.gameObject,
+                    _cinematicOverframe ? LotdUiKit.WhiteSprite : DuelStyle.OverframeBackdrop,
+                    _cinematicOverframe ? new Color(.021f, .033f, .048f) : Color.white, false, false);
                 var portrait = LotdUiKit.CreateRect("LocalCutIn", _overframeTilt,
-                    new Vector2(-.13f, .405f), new Vector2(1.13f, 1.166f), Vector2.zero, Vector2.zero);
+                    _cinematicOverframe ? new Vector2(-.13f, .405f) : new Vector2(.057f, .293f),
+                    _cinematicOverframe ? new Vector2(1.13f, 1.166f) : new Vector2(.943f, .853f),
+                    Vector2.zero, Vector2.zero);
                 portrait.pivot = new Vector2(.5f, 1f);
                 _overframePortrait = LotdUiKit.AddImage(portrait.gameObject, null, Color.white, true, false);
-                _overframePortrait.maskable = false;
+                _overframePortrait.maskable = !_cinematicOverframe;
             }
-            _overframe.transform.SetAsLastSibling();
             _overframePortrait.sprite = _retainedCutIn;
             _overframeShade.gameObject.SetActive(true);
             _overframe.gameObject.SetActive(true);
@@ -781,7 +796,7 @@ namespace YGOPortable.UI
         {
             if (!HasOverframe) return;
             _overframe.alpha = Mathf.Clamp01(opacity);
-            _overframeShade.canvasRenderer.SetAlpha(.72f * _overframe.alpha);
+            _overframeShade.canvasRenderer.SetAlpha((_cinematicOverframe ? .72f : 1f) * _overframe.alpha);
             _overframeTilt.localScale = Vector3.one * scale;
             _overframeTilt.anchoredPosition = Vector2.Scale(_overframeTilt.rect.size, parallax) * .024f;
             _overframeTilt.localRotation = Quaternion.Euler(parallax.y * 3f, -parallax.x * 6f, 0f);
