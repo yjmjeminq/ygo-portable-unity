@@ -1282,7 +1282,7 @@ namespace YGOPortable.UI
             _myLpFeedbackAnchor = (RectTransform)name.transform.parent;
             _myLpText = lp;
             _myLpFill = fill;
-            portrait.sprite = DuelUiKit.LoadSprite("LOTD/Busts/yamiyugi_neutral") ?? DuelUiKit.LoadSprite("LOTD/Busts/atem_neutral");
+            portrait.sprite = DuelProfileArt.Player;
             portrait.enabled = portrait.sprite != null;
             _rankedChampionBadge = OfflineRankedUI.AddChampionBadge(player, new Vector2(.23f, 1.01f), new Vector2(1f, 1.32f));
             _rankedChampionBadge.SetActive(false);

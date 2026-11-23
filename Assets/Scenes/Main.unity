@@ -130,7 +130,7 @@ GameObject:
   - component: {fileID: 46453257}
   - component: {fileID: 46453256}
   m_Layer: 0
-  m_Name: LOTD_App
+  m_Name: DuelApp
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -336,7 +336,7 @@ GameObject:
   - component: {fileID: 2120988132}
   - component: {fileID: 2120988131}
   m_Layer: 0
-  m_Name: LOTD_Canvas
+  m_Name: DuelCanvas
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

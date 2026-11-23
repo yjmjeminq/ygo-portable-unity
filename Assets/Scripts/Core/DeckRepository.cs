@@ -15,7 +15,6 @@ namespace YGOPortable.Core
         public string seriesName;
         public string name;
         public string bio;
-        public string portrait;
         public uint portraitCard;
         public string[] aliases;
         public bool isMeta2026;
@@ -212,6 +211,7 @@ namespace YGOPortable.Core
                 {
                     foreach (var d in wrapper.decks)
                     {
+                        ResolvePresetAce(d);
                         PresetDecks.Add(d);
                         if (!_decksByChar.TryGetValue(d.charId, out var list))
                         {
@@ -228,6 +228,22 @@ namespace YGOPortable.Core
             _userDeckDir = Path.Combine(persistentDataPath, "Decks");
             LoadUserDecks(seedDefaultDecks);
             Debug.Log($"[DeckRepository] Loaded {Characters.Count} chars, {PresetDecks.Count} preset decks, {UserDecks.Count} user decks.");
+        }
+
+        private static void ResolvePresetAce(PresetDeckInfo deck)
+        {
+            var main = deck.main ?? Array.Empty<uint>();
+            var extra = deck.extra ?? Array.Empty<uint>();
+            if (deck.sigCard != 0 && (main.Contains(deck.sigCard) || extra.Contains(deck.sigCard))) return;
+
+            var cards = main.Concat(extra);
+            uint ace = 0;
+            if (deck.sigCard != 0)
+            {
+                uint printing = CardDatabase.GetDeckPrintingKey(deck.sigCard);
+                ace = cards.FirstOrDefault(code => code != 0 && CardDatabase.GetDeckPrintingKey(code) == printing);
+            }
+            deck.sigCard = ace != 0 ? ace : cards.FirstOrDefault(code => code != 0);
         }
 
         public static OpponentCharacter GetCharacter(int charId)

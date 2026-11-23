@@ -30,7 +30,6 @@ STRAWHAT_FONT = pathlib.Path(r"c:\jeminFolder\자체개발\strawhat-survivors-un
 
 STREAMING = UNITY_ROOT / "Assets" / "StreamingAssets"
 RES_FONTS = UNITY_ROOT / "Assets" / "Resources" / "Fonts"
-BUSTS_SRC = UNITY_ROOT / "Assets" / "Textures" / "Characters" / "Busts"
 ORIG_YDC_DIR = UNITY_ROOT / "Assets" / "Data" / "Decks" / "Original"
 META_DECKS_JSON = UNITY_ROOT / "Assets" / "Data" / "Decks" / "decks.json"
 META_CHARS_JSON = UNITY_ROOT / "Assets" / "Data" / "Decks" / "characters.json"
@@ -824,21 +823,6 @@ def build_token_art(cards):
     print(f"  tokenart: {original_count} token codes with LOTD artwork, {count-original_count} with source card artwork")
 
 
-def resolve_portrait_name(key: str, bust_map: dict) -> str:
-    if not key:
-        return "atem_neutral"
-    lk = key.lower().replace(".png", "")
-    candidates = [
-        lk,
-        f"{lk}_neutral",
-        lk.replace("_neutral", "") + "_neutral",
-    ]
-    for c in candidates:
-        if c in bust_map:
-            return bust_map[c]
-    return "atem_neutral"
-
-
 def load_lotd_passcodes():
     toc = parse_toc(YGO_PC / "YGO_2020.toc")
     with (YGO_PC / "YGO_2020.dat").open("rb") as archive:
@@ -872,7 +856,7 @@ def playable_deck(deck, extra_deck_codes):
             and not (set(deck["main"]) & extra_deck_codes) and set(deck["extra"]) <= extra_deck_codes)
 
 
-def apply_opponent_themes(characters, decks, cards, extra_deck_codes, bust_map):
+def apply_opponent_themes(characters, decks, cards, extra_deck_codes):
     catalog = json.loads(OPPONENT_THEMES_JSON.read_text(encoding="utf-8"))
     char_by_id = {character["id"]: character for character in characters}
     for raw_id, name in catalog["names"].items():
@@ -888,13 +872,11 @@ def apply_opponent_themes(characters, decks, cards, extra_deck_codes, bust_map):
         if cid in char_by_id:
             raise ValueError(f"Duplicate opponent character id {cid}")
         series = profile["seriesIdx"]
-        portrait = profile.get("portrait", "")
         portrait_card = profile.get("portraitCard", 0)
-        if series not in range(6) or (portrait and portrait.lower() not in bust_map):
-            raise ValueError(f"Bad series or portrait for {profile['name']}")
-        if not portrait and portrait_card not in cards:
-            raise ValueError(f"Missing portrait for {profile['name']}")
-        character = {**profile, "seriesName": SERIES_NAMES[series], "isMeta2026": False}
+        if series not in range(6) or (portrait_card and portrait_card not in cards):
+            raise ValueError(f"Bad series or ace portrait for {profile['name']}")
+        character = {key: value for key, value in profile.items() if key != "portrait"}
+        character.update(seriesName=SERIES_NAMES[series], isMeta2026=False)
         characters.append(character)
         char_by_id[cid] = character
 
@@ -960,9 +942,6 @@ def build_opponents_db(lotd_to_pass: dict, kr_cards):
     cards = {card["code"]: card for card in kr_cards}
     all_codes = cards.keys()
     extra_deck_codes = {code for code, card in cards.items() if card["type"] & TYPE_EXTRA}
-    bust_map = {}
-    for p in sorted(BUSTS_SRC.glob("*.png")):
-        bust_map[p.stem.lower()] = p.stem
 
     main_toc = parse_toc(YGO_PC / "YGO_2020.toc")
     with open(YGO_PC / "YGO_2020.dat", "rb") as f:
@@ -982,14 +961,12 @@ def build_opponents_db(lotd_to_pass: dict, kr_cards):
         cid, series, _bust_id, selectable = rec[0], rec[1], rec[2], rec[3]
         key = read_ascii(cd, rec[8]).strip()
         name = read_utf16(cd, rec[9]).strip() or key
-        portrait = resolve_portrait_name(key, bust_map)
         cobj = {
             "id": cid,
             "seriesIdx": series,
             "seriesName": SERIES_NAMES.get(series, "DM"),
             "name": name,
             "bio": "",
-            "portrait": portrait,
             "isMeta2026": False,
         }
         char_list.append(cobj)
@@ -1026,14 +1003,12 @@ def build_opponents_db(lotd_to_pass: dict, kr_cards):
         orig_id = mc["id"]
         cid = next_meta_cid
         next_meta_cid += 1
-        portrait = resolve_portrait_name(mc.get("portrait", "") or mc.get("key", ""), bust_map)
         cobj = {
             "id": cid,
             "seriesIdx": 6,
             "seriesName": "2026 메타",
             "name": f"[2026] {mc['name']}",
             "bio": "",
-            "portrait": portrait,
             "isMeta2026": True,
         }
         all_chars.append(cobj)
@@ -1129,7 +1104,7 @@ def build_opponents_db(lotd_to_pass: dict, kr_cards):
         signatures[char_id].add(key)
         all_decks.append(deck)
 
-    final_chars = apply_opponent_themes(all_chars, all_decks, cards, extra_deck_codes, bust_map)
+    final_chars = apply_opponent_themes(all_chars, all_decks, cards, extra_deck_codes)
     final_decks = modernize_opponents(final_chars, all_decks, cards, STREAMING / "cards_prop.bin")
     out_obj = {"characters": final_chars, "decks": final_decks}
     (STREAMING / "opponents_db.json").write_text(

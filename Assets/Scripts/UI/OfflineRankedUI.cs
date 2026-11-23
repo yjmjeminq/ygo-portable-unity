@@ -115,8 +115,7 @@ namespace YGOPortable.UI
             var playerMark = Slot(mine, "Profile", .22f, .38f, .78f, .84f);
             DuelStyle.AddHexPlate(playerMark, Mint, new Color(.077f, .148f, .185f));
             var profile = Slot(playerMark, "Portrait", .10f, .10f, .90f, .90f);
-            DuelUiKit.AddImage(profile.gameObject, DuelUiKit.LoadSprite("LOTD/Busts/yamiyugi_neutral") ??
-                DuelUiKit.LoadSprite("LOTD/Busts/atem_neutral"), Color.white, true, false);
+            DuelUiKit.AddImage(profile.gameObject, DuelProfileArt.Player, Color.white, true, false);
             var portrait = Slot(opponent, "Portrait", .06f, .31f, .94f, .96f);
             _opponentPortrait = DuelUiKit.AddImage(portrait.gameObject, null, Color.white, true, false);
             _vsOpponent = Label(opponent, "Name", .045f, .175f, .955f, .315f, 31);

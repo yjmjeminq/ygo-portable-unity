@@ -107,6 +107,37 @@ namespace YGOPortable.Editor
             }
         }
 
+        public static void VerifyOpponentSelectionHeadless()
+        {
+            int exit = 1;
+            var canvas = new GameObject("Opponent Selection Verification", typeof(Canvas));
+            try
+            {
+                string streaming = Application.streamingAssetsPath;
+                string saves = Path.Combine(Path.GetTempPath(), "ygo-opponent-selection-" + Guid.NewGuid().ToString("N"));
+                CardDatabase.Load(streaming);
+                CardArtLoader.Initialize(streaming);
+                DeckRepository.Load(streaming, saves, seedDefaultDecks: false);
+                AssertTrue(DeckRepository.PresetDecks.All(deck => deck.sigCard != 0 &&
+                    (deck.main.Contains(deck.sigCard) || deck.extra.Contains(deck.sigCard))),
+                    "A preset deck displayed an ace that is not in its main or Extra Deck.");
+                var portraits = DeckRepository.Characters.Select(DuelUiKit.LoadOpponentPortrait).ToArray();
+                AssertTrue(portraits.All(sprite => sprite != null) &&
+                    portraits.Count(sprite => sprite != DuelProfileArt.Player) >= 250,
+                    "The opponent roster did not resolve its ace portraits.");
+                VerifyOpponentNavigation(canvas);
+                Debug.Log($"[VERIFY OPPONENT SELECTION] {portraits.Length} avatars, mouse and controller flow, and turn-order selection passed.");
+                exit = 0;
+            }
+            catch (Exception error) { Debug.LogException(error); }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(canvas);
+                CardArtLoader.Shutdown();
+                if (Application.isBatchMode) EditorApplication.Exit(exit);
+            }
+        }
+
         [MenuItem("YGO Portable/3. Build Windows Standalone (64-bit)")]
         public static void BuildWindows()
         {
@@ -166,37 +197,6 @@ namespace YGOPortable.Editor
             {
                 Debug.LogWarning($"[YgoProjectBuilder] Native plugin not found at {DllAssetPath}");
             }
-
-            // 2. LOTD Resource sprites: ensure TextureImporterType.Sprite & mipmapEnabled=false
-            string[] texGuids = AssetDatabase.FindAssets("t:Texture2D", new[] { "Assets/Resources/LOTD" });
-            var toReimport = new List<string>();
-            AssetDatabase.StartAssetEditing();
-            try
-            {
-                foreach (string guid in texGuids)
-                {
-                    string path = AssetDatabase.GUIDToAssetPath(guid);
-                    var ti = AssetImporter.GetAtPath(path) as TextureImporter;
-                    if (ti == null) continue;
-                    if (ti.textureType != TextureImporterType.Sprite || ti.mipmapEnabled)
-                    {
-                        ti.textureType = TextureImporterType.Sprite;
-                        ti.spriteImportMode = SpriteImportMode.Single;
-                        ti.spritePixelsPerUnit = 100f;
-                        ti.mipmapEnabled = false;
-                        ti.npotScale = TextureImporterNPOTScale.None;
-                        ti.alphaIsTransparency = true;
-                        ti.SaveAndReimport();
-                        toReimport.Add(path);
-                    }
-                }
-            }
-            finally
-            {
-                AssetDatabase.StopAssetEditing();
-            }
-            if (toReimport.Count > 0)
-                Debug.Log($"[YgoProjectBuilder] Converted {toReimport.Count} LOTD textures to Sprite.");
         }
 
         public static void CreateMainScene()
@@ -211,7 +211,7 @@ namespace YGOPortable.Editor
             cam.backgroundColor = new Color(0.03f, 0.065f, 0.135f, 1f);
             cam.orthographic = true;
 
-            var canvasGo = new GameObject("LOTD_Canvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+            var canvasGo = new GameObject("DuelCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             var canvas = canvasGo.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             var scaler = canvasGo.GetComponent<CanvasScaler>();
@@ -221,7 +221,7 @@ namespace YGOPortable.Editor
             scaler.matchWidthOrHeight = 0.5f;
 
             new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
-            new GameObject("LOTD_App", typeof(GameAppController));
+            new GameObject("DuelApp", typeof(GameAppController));
 
             EditorSceneManager.SaveScene(scene, MainScenePath);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(MainScenePath, true) };
@@ -497,6 +497,12 @@ namespace YGOPortable.Editor
                 "Gumblar should be allowed in the Topologic preset and subject to the normal ban elsewhere.");
             AssertTrue(Preset(19).main.Count(code => code == 99243014) == 1,
                 "The generic Synchro tag should not waive the limit on Synchro Overtake.");
+
+            var yugiPortrait = DuelUiKit.LoadOpponentPortrait(DeckRepository.GetCharacter(104));
+            var kaibaPortrait = DuelUiKit.LoadOpponentPortrait(DeckRepository.GetCharacter(94));
+            AssertTrue(yugiPortrait != null && kaibaPortrait != null && yugiPortrait != DuelProfileArt.Player &&
+                kaibaPortrait != DuelProfileArt.Player && yugiPortrait != kaibaPortrait,
+                "The first two opponents did not show distinct ace portraits.");
 
             var canvas = new GameObject("Opponent Roster Test", typeof(Canvas));
             try

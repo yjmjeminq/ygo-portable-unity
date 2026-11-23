@@ -11,7 +11,6 @@ namespace YGOPortable.Core
     {
         public uint code;
         public uint alias;
-        public int lotdId;
         public int konamiId;
         public string name;
         public string desc;
@@ -93,7 +92,6 @@ namespace YGOPortable.Core
         private const ulong DescriptionIndexMask = (1UL << DescriptionIndexBits) - 1;
         private static Dictionary<uint, CardInfo> _byCode;
         private static readonly Dictionary<uint, CardInfo[]> DeckPrintingsByCode = new();
-        private static Dictionary<int, CardInfo> _byLotdId;
         private static List<CardInfo> _allCards;
 
         public static bool IsLoaded => _allCards != null;
@@ -757,14 +755,12 @@ namespace YGOPortable.Core
                 Debug.LogError($"[CardDatabase] Missing {path}");
                 _allCards = new List<CardInfo>();
                 _byCode = new Dictionary<uint, CardInfo>();
-                _byLotdId = new Dictionary<int, CardInfo>();
                 return;
             }
             string json = File.ReadAllText(path);
             var wrapper = JsonUtility.FromJson<CardKrWrapper>(json);
             _allCards = new List<CardInfo>(wrapper?.cards ?? Array.Empty<CardInfo>());
             _byCode = new Dictionary<uint, CardInfo>(_allCards.Count);
-            _byLotdId = new Dictionary<int, CardInfo>(_allCards.Count);
             foreach (var c in _allCards)
             {
                 if (!string.IsNullOrEmpty(c.desc))
@@ -774,7 +770,6 @@ namespace YGOPortable.Core
                     c.name = LocalizeTokenName(c.name);
                 }
                 if (c.code != 0) _byCode[c.code] = c;
-                if (c.lotdId > 0 && !_byLotdId.ContainsKey(c.lotdId)) _byLotdId[c.lotdId] = c;
             }
 
             string propPath = Path.Combine(streamingAssetsPath, "cards_prop.bin");
@@ -1431,12 +1426,6 @@ namespace YGOPortable.Core
         internal static bool TryGetDeckPrintings(uint code, out CardInfo[] printings) => DeckPrintingsByCode.TryGetValue(code, out printings);
 
         internal static uint GetDeckPrintingKey(uint code) => TryGetDeckPrintings(code, out var printings) ? printings[0].code : code;
-
-        public static CardInfo GetByLotdId(int lotdId)
-        {
-            if (_byLotdId != null && _byLotdId.TryGetValue(lotdId, out var c)) return c;
-            return null;
-        }
 
         public static string GetName(uint code)
         {

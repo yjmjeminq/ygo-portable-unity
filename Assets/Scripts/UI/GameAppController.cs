@@ -217,7 +217,7 @@ namespace YGOPortable.UI
             var canvas = FindFirstObjectByType<Canvas>();
             if (canvas == null)
             {
-                var go = new GameObject("LOTD_Canvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+                var go = new GameObject("DuelCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
                 canvas = go.GetComponent<Canvas>();
                 canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             }

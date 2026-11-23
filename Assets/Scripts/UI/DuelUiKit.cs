@@ -21,7 +21,6 @@ namespace YGOPortable.UI
 
         private static Font _fontKR;
         private static readonly Dictionary<string, Sprite> _spriteCache = new Dictionary<string, Sprite>();
-        private static readonly Dictionary<uint, Sprite> _opponentCardPortraits = new Dictionary<uint, Sprite>();
         private static Sprite _whiteSprite;
 
         public static Font FontKR
@@ -66,23 +65,7 @@ namespace YGOPortable.UI
             return sp;
         }
 
-        public static Sprite LoadOpponentPortrait(OpponentCharacter opponent)
-        {
-            if (opponent == null) return null;
-            if (!string.IsNullOrEmpty(opponent.portrait))
-            {
-                var bust = LoadSprite($"LOTD/Busts/{opponent.portrait}");
-                if (bust != null) return bust;
-            }
-            if (opponent.portraitCard != 0)
-            {
-                // These images also live on the duel HUD after the opponent screen closes.
-                if (!_opponentCardPortraits.TryGetValue(opponent.portraitCard, out var cardArt) || cardArt == null)
-                    _opponentCardPortraits[opponent.portraitCard] = cardArt = CardArtLoader.RetainArtwork(opponent.portraitCard);
-                if (cardArt != null) return cardArt;
-            }
-            return LoadSprite("LOTD/Busts/atem_neutral");
-        }
+        public static Sprite LoadOpponentPortrait(OpponentCharacter opponent) => DuelProfileArt.Opponent(opponent);
 
         public static Sprite GetRaceSprite(ulong race)
         {
