@@ -49,6 +49,7 @@ namespace YGOPortable.Core
         internal static void Initialize(string streamingAssetsPath, string localArtworkPath)
         {
             if (_index != null) return;
+            OverframeOffsetCatalog.Load(streamingAssetsPath);
             _streamingDir = streamingAssetsPath;
             _activeDuelVisualsPath = localArtworkPath;
             _index = new Dictionary<uint, ArtEntry>(16000);

@@ -413,7 +413,7 @@ namespace YGOPortable.UI
         private bool _cinematicOverframe;
         private bool _overframeBound;
         private Sprite _retainedCutIn;
-        private Image _overframePortrait;
+        private OverframePortraitImage _overframePortrait;
         private CanvasGroup _overframe;
         private RectTransform _overframeTilt;
         private Image _overframeShade;
@@ -770,7 +770,9 @@ namespace YGOPortable.UI
                     _cinematicOverframe ? new Vector2(1.13f, 1.166f) : Vector2.one,
                     Vector2.zero, Vector2.zero);
                 portrait.pivot = new Vector2(.5f, 1f);
-                _overframePortrait = LotdUiKit.AddImage(portrait.gameObject, null, Color.white, true, false);
+                _overframePortrait = portrait.gameObject.AddComponent<OverframePortraitImage>();
+                _overframePortrait.preserveAspect = true;
+                _overframePortrait.raycastTarget = false;
                 _overframePortrait.maskable = !_cinematicOverframe;
             }
             if (_overframeBackground != null)
@@ -788,7 +790,7 @@ namespace YGOPortable.UI
                 _overframeFinish.Bind(_retainedArtwork, CardRarity.UltraRare);
                 _overframeFinish.SetHighlight(_cinematicOverframe ? .54f : .18f);
             }
-            _overframePortrait.sprite = _retainedCutIn;
+            _overframePortrait.Bind(_retainedCutIn, code);
             _overframePortrait.enabled = hasPortrait;
             _overframeShade.gameObject.SetActive(_cinematicOverframe || !hasPortrait);
             _overframe.gameObject.SetActive(true);
@@ -868,6 +870,41 @@ namespace YGOPortable.UI
             CardArtLoader.ReleaseArtwork(_retainedArtwork, _retainedVariant);
             _retainedArtwork = 0;
             _artworkSource = default;
+        }
+    }
+
+    internal sealed class OverframePortraitImage : Image
+    {
+        private Vector2 _sourceOffset;
+
+        internal void Bind(Sprite portrait, uint code)
+        {
+            sprite = portrait;
+            var (offset, scale) = portrait == null ? (Vector2.zero, 1f) : OverframeOffsetCatalog.GetOffset(code);
+            _sourceOffset = offset;
+            rectTransform.localScale = Vector3.one * scale;
+            ApplyOffset();
+        }
+
+        protected override void OnRectTransformDimensionsChange()
+        {
+            base.OnRectTransformDimensionsChange();
+            if (_sourceOffset != Vector2.zero) ApplyOffset();
+        }
+
+        private void ApplyOffset()
+        {
+            if (_sourceOffset == Vector2.zero || sprite == null)
+            {
+                rectTransform.anchoredPosition = Vector2.zero;
+                return;
+            }
+
+            // Match Image.preserveAspect so one source pixel scales with the portrait in every card size.
+            Vector2 box = GetPixelAdjustedRect().size;
+            Vector2 artwork = sprite.rect.size;
+            float fit = Mathf.Min(box.x / artwork.x, box.y / artwork.y);
+            rectTransform.anchoredPosition = _sourceOffset * fit;
         }
     }
 

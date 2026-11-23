@@ -17,6 +17,7 @@ namespace YGOPortable.Editor
         private const uint BlueEyes = 89631139;
         private const uint AlternateBlueEyes = 89631134;
         private const uint SkullRedBird = 10202894;
+        private const uint Masquerena = 65741786;
 
         internal static void Run()
         {
@@ -89,7 +90,7 @@ namespace YGOPortable.Editor
             texture.Apply();
             byte[] portraitBytes = texture.EncodeToPNG();
             UnityEngine.Object.DestroyImmediate(texture);
-            foreach (uint code in new[] { BlueEyes, magician, baronne, excel, SkullRedBird })
+            foreach (uint code in new[] { BlueEyes, magician, baronne, excel, SkullRedBird, Masquerena })
                 File.WriteAllBytes(Path.Combine(directory, $"{code}-0.png"), portraitBytes);
             File.WriteAllBytes(Path.Combine(directory, $"{BlueEyes}-23.png"), portraitBytes);
 
@@ -206,6 +207,7 @@ namespace YGOPortable.Editor
                 Require(!shopCard.HasOverframe, "The crafting preview did not return to the regular face.");
                 crafting.Hide();
 
+                VerifyOverframeOffsets(canvas.transform, folder, magician);
                 VerifyPackFaces(canvas.transform);
                 VerifyOverframeAnimation(CardAnimationManager.Ensure(canvas));
                 VerifyPhysicalDeckAppearances();
@@ -221,6 +223,93 @@ namespace YGOPortable.Editor
                 Directory.Delete(folder);
             }
             VerifyPackagedOverframe(portraitBytes);
+        }
+
+        private static void VerifyOverframeOffsets(Transform parent, string directory, uint magician)
+        {
+            var masquerenaOffset = new Vector2(-136f, -145f);
+            Require(OverframeOffsetCatalog.GetOffset(Masquerena) == (masquerenaOffset, 1f) &&
+                OverframeOffsetCatalog.GetOffset(54603525) == (new Vector2(210f, 0f), 1f) &&
+                OverframeOffsetCatalog.GetOffset(76072561) == (new Vector2(235f, 0f), 1f) &&
+                OverframeOffsetCatalog.GetOffset(magician) == (Vector2.zero, 1f),
+                "Startup did not load the bundled card corrections or default an unlisted card.");
+
+            var holder = LotdUiKit.CreateRect("OffsetVerification", parent, Vector2.zero, Vector2.zero,
+                Vector2.zero, new Vector2(300f, 420f));
+            var view = CompositeCardView.Create(holder, "Detail", detailedOverlay: true);
+            var cinematic = CompositeCardView.Create(holder, "Cinematic", detailedOverlay: true, cinematicOverframe: true);
+            var appearance = new DeckCardAppearance { overframe = true };
+            view.SetDeckCard(Masquerena, appearance);
+            cinematic.SetDeckCard(Masquerena, appearance);
+            Canvas.ForceUpdateCanvases();
+            var portrait = view.transform.Find("AspectBox/Overframe/PortraitBounds/Depth/LocalCutIn").GetComponent<Image>();
+            var projection = cinematic.transform.Find("Overframe/Depth/LocalCutIn").GetComponent<Image>();
+            VerifyPlacement(portrait, masquerenaOffset, 1f);
+            VerifyPlacement(projection, masquerenaOffset, 1f);
+            Vector2 original = portrait.rectTransform.anchoredPosition;
+            holder.sizeDelta *= .5f;
+            Canvas.ForceUpdateCanvases();
+            VerifyPlacement(portrait, masquerenaOffset, 1f);
+            Require(Vector2.Distance(portrait.rectTransform.anchoredPosition, original * .5f) < .02f,
+                "Resizing a retained card did not adapt its correction to the portrait's new size.");
+            view.SetDeckCard(magician, appearance);
+            VerifyPlacement(portrait, Vector2.zero, 1f);
+
+            string path = Path.Combine(directory, OverframeOffsetCatalog.FileName);
+            try
+            {
+                OverframeOffsetCatalog.Load(directory);
+                Require(OverframeOffsetCatalog.GetOffset(Masquerena) == (Vector2.zero, 1f),
+                    "A missing file kept a stale correction.");
+
+                File.WriteAllText(path, "{\"65741786\":{\"offsetX\":2,\"offsetY\":-3,\"scale\":1.25}}");
+                OverframeOffsetCatalog.Load(directory);
+                File.WriteAllText(path, "{\"65741786\":");
+                Require(OverframeOffsetCatalog.GetOffset(Masquerena) == (new Vector2(2f, -3f), 1.25f),
+                    "A lookup did not use the startup cache after the file changed.");
+                view.SetDeckCard(Masquerena, appearance);
+                VerifyPlacement(portrait, new Vector2(2f, -3f), 1.25f);
+                Vector2 neutral = portrait.rectTransform.anchoredPosition;
+                var tilt = (RectTransform)portrait.transform.parent;
+                view.PoseOverframe(1f, 1.16f, new Vector2(.55f, -.22f), .2f);
+                Require(portrait.rectTransform.anchoredPosition == neutral &&
+                    portrait.rectTransform.localScale == Vector3.one * 1.25f &&
+                    tilt.anchoredPosition != Vector2.zero && tilt.localRotation != Quaternion.identity &&
+                    tilt.localScale == Vector3.one * 1.16f,
+                    "Animated tilt overwrote the catalog position or scale.");
+
+                foreach (string malformed in new[] { "{\"65741786\":", "[]", "{\"65741786\":{\"scale\":0}}",
+                    "{\"65741786\":{\"offsetX\":-136,\"scale\":\"1\"}}",
+                    "{\"65741786\":{\"offsetX\":-136,\"offsetY\":1e999}}",
+                    "{\"65741786\":{\"offsetX\":-136},\"bad-key\":{}}",
+                    "{\"65741786\":{\"offsetX\":-136}} junk" })
+                {
+                    File.WriteAllText(path, malformed);
+                    OverframeOffsetCatalog.Load(directory);
+                    Require(OverframeOffsetCatalog.GetOffset(Masquerena) == (Vector2.zero, 1f),
+                        "Malformed catalog data did not safely restore the defaults.");
+                }
+                view.SetDeckCard(magician, appearance);
+                view.SetDeckCard(Masquerena, appearance);
+                VerifyPlacement(portrait, Vector2.zero, 1f);
+            }
+            finally
+            {
+                File.Delete(path);
+                OverframeOffsetCatalog.Load(Application.streamingAssetsPath);
+                UnityEngine.Object.DestroyImmediate(holder.gameObject);
+            }
+            Debug.Log("[VERIFY OVERFRAME OFFSETS] Startup and cache, missing/malformed files, recycled cards, responsive positioning and tilt passed.");
+
+            static void VerifyPlacement(Image image, Vector2 pixels, float scale)
+            {
+                Require(image.sprite != null, "The offset test did not bind a portrait.");
+                Vector2 box = image.GetPixelAdjustedRect().size;
+                Vector2 art = image.sprite.rect.size;
+                float fit = Mathf.Min(box.x / art.x, box.y / art.y);
+                Require(fit > 0f && Vector2.Distance(image.rectTransform.anchoredPosition, pixels * fit) < .02f &&
+                    image.rectTransform.localScale == Vector3.one * scale, "The portrait did not use its configured offset and scale.");
+            }
         }
 
         private static void VerifyPackFaces(Transform parent)
