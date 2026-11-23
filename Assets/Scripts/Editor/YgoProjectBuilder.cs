@@ -33,19 +33,25 @@ namespace YGOPortable.Editor
         [MenuItem("YGO Portable/2. Run Headless Verification (Engine + 6 AI Duels)")]
         public static void VerifyAllHeadless()
         {
+            int exit = 1;
             try
             {
                 ConfigureAssets();
                 CreateMainScene();
                 RunVerificationSuite();
                 Debug.Log("[VERIFY] ALL HEADLESS CHECKS PASSED");
-                if (Application.isBatchMode) EditorApplication.Exit(0);
+                exit = 0;
             }
             catch (Exception ex)
             {
                 Debug.LogError($"[VERIFY FAILED] {ex}");
-                if (Application.isBatchMode) EditorApplication.Exit(1);
-                else throw;
+                if (!Application.isBatchMode) throw;
+            }
+            finally
+            {
+                CardArtLoader.Shutdown();
+                if (YgoNativeBridge.IsInitialized) YgoNativeBridge.Shutdown();
+                if (Application.isBatchMode) EditorApplication.Exit(exit);
             }
         }
 
@@ -71,6 +77,7 @@ namespace YGOPortable.Editor
                 TestHandGlow.Run();
                 TestCardPresentation.VerifyOverframePaths();
                 TestDuelPadNavigation.Run();
+                TestDuelRematch.Run();
                 TestDuelAiTactics.Run();
                 AssertTrue(errors.Count == 0, string.Join(" | ", errors.Take(3)));
                 Debug.Log("[VERIFY DUEL UI] Native prompts, touchscreen geometry, controller navigation and presentation passed. ScriptErrors=0");
@@ -434,10 +441,21 @@ namespace YGOPortable.Editor
             VerifyDddTurnPlanning();
             TestOtherDeckTurnPlans.Run();
             LinkComboTraining.VerifyIncluded();
-            TestComboSearch.Run();
-            ComboRosterAudit.VerifyLinkMaterialProtection();
-            ComboRosterAudit.VerifyOtherComboRoutes();
-            VerifyRainbowDarkDragonMatch();
+            var comboFailures = new List<Exception>();
+            VerifyCombo("Adaptive opening", TestComboSearch.Run);
+            VerifyCombo("Link material protection", ComboRosterAudit.VerifyLinkMaterialProtection);
+            VerifyCombo("Summon routes", ComboRosterAudit.VerifyOtherComboRoutes);
+            VerifyCombo("Rainbow Dark Dragon match", VerifyRainbowDarkDragonMatch);
+
+            void VerifyCombo(string name, Action verify)
+            {
+                try { verify(); }
+                catch (Exception failure)
+                {
+                    comboFailures.Add(new InvalidOperationException(name, failure));
+                    Debug.LogError($"[VERIFY COMBO FAILED] {name}: {failure.Message}");
+                }
+            }
 
             // Explicit test for Token generation, effect tokens (Swordsoul Tuner), dynamic/stat tokens, and token disappearance
             TestTokenAndComplexEffects.RunTokenSuiteHeadless();
@@ -453,8 +471,8 @@ namespace YGOPortable.Editor
 
             AssertTrue(luaErrors.Count == 0, $"Native/Lua error logs detected: {string.Join(" | ", luaErrors.Take(3))}");
 
-            CardArtLoader.Shutdown();
-            YgoNativeBridge.Shutdown();
+            if (comboFailures.Count != 0)
+                throw new AggregateException("One or more seeded AI regressions failed.", comboFailures);
         }
 
         private static void VerifyOpponentRoster()
@@ -2148,8 +2166,8 @@ namespace YGOPortable.Editor
 
         private static void VerifyRainbowDarkDragonMatch()
         {
-            var rainbow = DeckRepository.PresetDecks.Single(deck => deck.id == 340);
-            var earthbound = DeckRepository.PresetDecks.Single(deck => deck.id == 36);
+            var rainbow = ComboRegressionDecks.Get(340);
+            var earthbound = ComboRegressionDecks.Get(36);
             ulong[] seed = { 31157, 114085, 128029, 241025 };
             using var session = new DuelSession();
             var players = new[] { new TacticalAI(), new TacticalAI() };
@@ -2173,9 +2191,9 @@ namespace YGOPortable.Editor
         private static void VerifyDddTurnPlanning()
         {
             const uint gilgamesh = 9024198, machinex = 46593546, siegfried = 44852429;
-            var deck = DeckRepository.PresetDecks.SingleOrDefault(candidate => candidate.id == 34043);
-            AssertTrue(deck != null && deck.charId == 43 && deck.main.Length == 40 && deck.extra.Length == 15 &&
-                deck.extra.Contains(gilgamesh) && deck.extra.Contains(machinex), "The planned D/D/D deck is not selectable.");
+            AssertTrue(OpponentDeckLevels.GetDecks(43).Any(deck => deck.main.Length is >= 40 and <= 60 &&
+                deck.extra.Contains(gilgamesh) && deck.extra.Contains(machinex)),
+                "The current D/D/D lineup lacks a deck with Gilgamesh and Machinex.");
 
             using var session = new DuelSession();
             var own = session.Players[0];

@@ -30,6 +30,11 @@ namespace YGOPortable.Editor
             Require(DuelUiIcons.Find("phase/main2") != null && DuelUiIcons.Action("SUMMONSP") != null &&
                 DuelUiKit.GetSpellTrapSprite(YgoConstants.TYPE_TRAP | YgoConstants.TYPE_COUNTER) != null,
                 "A phase, command, or spell and trap icon did not resolve.");
+            var suppliedSleeve = Resources.Load<Texture2D>(CardArtLoader.CardSleeveResource);
+            var sleeve = CardArtLoader.GetCardBackSprite();
+            Require(sleeve != null && CardArtLoader.GetArtSprite(0) == sleeve &&
+                (suppliedSleeve == null || sleeve.texture == suppliedSleeve),
+                "The card back ignored a supplied sleeve or rendered inconsistently for hidden cards.");
             Debug.Log("[VERIFY DUEL ICONS] Optional race and attribute artwork, phases, commands and spell/trap icons passed.");
         }
 

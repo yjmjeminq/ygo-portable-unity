@@ -41,11 +41,10 @@ namespace YGOPortable.Editor
         internal static void VerifyLinkMaterialProtection()
         {
             const uint accesscode = 86066372;
-            var decks = DeckRepository.PresetDecks.ToDictionary(deck => deck.id);
-            var rivals = RivalIds.Select(id => decks[id]).ToArray();
+            var rivals = RivalIds.Select(ComboRegressionDecks.Get).ToArray();
             var general = DuelAiPolicy.LoadIncluded();
             var links = LinkComboPolicy.LoadIncluded();
-            Result Opening(int id, int test) => Play(decks[id], PickRival(rivals, id, test, false), test, (test & 1) == 0,
+            Result Opening(int id, int test) => Play(ComboRegressionDecks.Get(id), PickRival(rivals, id, test, false), test, (test & 1) == 0,
                 false, general, links);
 
             var cyberse = Opening(385, 5);
@@ -64,8 +63,7 @@ namespace YGOPortable.Editor
 
         internal static void VerifyOtherComboRoutes()
         {
-            var decks = DeckRepository.PresetDecks.ToDictionary(deck => deck.id);
-            var rivals = RivalIds.Select(id => decks[id]).ToArray();
+            var rivals = RivalIds.Select(ComboRegressionDecks.Get).ToArray();
             var general = DuelAiPolicy.LoadIncluded();
             var links = LinkComboPolicy.LoadIncluded();
             var routes = new (int deck, int test, uint type, bool pendulum)[]
@@ -78,7 +76,7 @@ namespace YGOPortable.Editor
             };
             foreach (var route in routes)
             {
-                var deck = decks[route.deck];
+                var deck = ComboRegressionDecks.Get(route.deck);
                 var result = Play(deck, PickRival(rivals, route.deck, route.test, false), route.test, (route.test & 1) == 0,
                     false, general, links);
                 if (!result.stopped || result.retries != 0 || result.branches == 0 ||
@@ -107,7 +105,18 @@ namespace YGOPortable.Editor
                 var decks = DeckRepository.Characters.SelectMany(character => OpponentDeckLevels.GetDecks(character.id))
                     .GroupBy(deck => deck.id).Select(group => group.First()).OrderBy(deck => deck.id).ToArray();
                 var byId = decks.ToDictionary(deck => deck.id);
-                var rivals = RivalIds.Select(id => byId[id]).ToArray();
+                PresetDeckInfo CurrentRecipe(int id)
+                {
+                    if (byId.TryGetValue(id, out var exact)) return exact;
+                    var fixture = ComboRegressionDecks.Get(id);
+                    var cards = new HashSet<uint>(fixture.main.Concat(fixture.extra));
+                    return decks.Where(deck => deck.charId == fixture.charId)
+                        .OrderByDescending(deck => deck.main.Concat(deck.extra).Count(cards.Contains))
+                        .ThenBy(deck => deck.id).FirstOrDefault() ??
+                        throw new InvalidOperationException($"No current deck for fixture {id} ({fixture.title}).");
+                }
+                var rivals = RivalIds.Select(CurrentRecipe).ToArray();
+                var matchDecks = MatchIds.Select(CurrentRecipe).Distinct().ToArray();
                 var general = DuelAiPolicy.LoadIncluded();
                 var links = LinkComboPolicy.LoadIncluded();
                 if (general == null || links == null) throw new InvalidOperationException("Missing the included duel models.");
@@ -135,8 +144,8 @@ namespace YGOPortable.Editor
                         Debug.Log($"[COMBO ROSTER] {checkedDecks}/{decks.Length} decks, {openings} openings, {elapsed.Elapsed.TotalSeconds:F0}s.");
                     }
                 }
-                foreach (int id in MatchIds.Where(id => filter == 0 || id == filter))
-                    for (int test = 0; test < MatchesPerDeck; test++) Record(byId[id], test, true);
+                foreach (var deck in matchDecks.Where(deck => filter == 0 || deck.id == filter))
+                    for (int test = 0; test < MatchesPerDeck; test++) Record(deck, test, true);
                 Debug.Log($"[COMBO ROSTER] {checkedDecks} decks, {openings} openings, {matches} complete-match attempts, " +
                     $"{capped} capped, {retries} retries, {scriptErrors} native errors in {elapsed.Elapsed.TotalSeconds:F0}s. Path {report}");
                 foreach (string error in errors.Take(8)) Debug.LogWarning($"[COMBO ROSTER LUA] {error}");

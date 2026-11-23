@@ -46,6 +46,7 @@ namespace YGOPortable.Core
         private static readonly Dictionary<(uint, int), int> _visibleArtwork = new();
         private static Sprite _fallbackArt;
         private static Sprite _cardBackSprite;
+        internal const string CardSleeveResource = "Duel/CardSleeve";
         internal static string LocalDuelVisualsPath => Path.Combine(Application.persistentDataPath, "DuelVisuals");
         internal static string ActiveDuelVisualsPath => _activeDuelVisualsPath ?? LocalDuelVisualsPath;
         internal static string PackagedDuelVisualsPath =>
@@ -295,7 +296,18 @@ namespace YGOPortable.Core
                 yield return original.code;
         }
 
-        public static Sprite GetCardBackSprite() => _cardBackSprite ??= CardSleeveArt.Create();
+        public static Sprite GetCardBackSprite() => _cardBackSprite ??= LoadCardSleeve();
+
+        private static Sprite LoadCardSleeve()
+        {
+            var sleeve = Resources.Load<Sprite>(CardSleeveResource);
+            if (sleeve != null) return sleeve;
+
+            var texture = Resources.Load<Texture2D>(CardSleeveResource);
+            return texture != null
+                ? Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), Vector2.one * .5f)
+                : CardSleeveArt.Create();
+        }
 
         public static Sprite GetArtSprite(uint code) => GetArtSprite(code, BundledArtwork, out _);
 

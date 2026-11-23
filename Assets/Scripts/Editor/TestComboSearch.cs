@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
@@ -29,30 +28,34 @@ namespace YGOPortable.Editor
 
         internal static void Run()
         {
+            var failures = new List<string>();
             var general = DuelAiPolicy.LoadIncluded();
             var links = LinkComboPolicy.LoadIncluded();
-            var firewall = DeckRepository.PresetDecks.Single(deck => deck.id == 495);
+            var firewall = ComboRegressionDecks.Get(495);
             var previous = PlayOpening(general, links, firewall, 4, 1, search: false);
             var upgraded = PlayOpening(general, links, firewall, 4, 1, search: true);
             var singularity = PlayOpening(general, links, firewall, 6, 0, search: true);
-            Require(previous.opening.SequenceEqual(upgraded.opening) && previous.rank == 4 && upgraded.monsters.Contains(Darkfluid) &&
-                upgraded.changed > 0, "Firewall did not choose the available Link-5 upgrade from the same hand.");
-            Require(singularity.monsters.Contains(Singularity), "Firewall could not resolve its Link-6 line.");
+            if (!previous.opening.SequenceEqual(upgraded.opening) || previous.rank != 4 ||
+                !upgraded.monsters.Contains(Darkfluid) || upgraded.changed == 0)
+                failures.Add($"Firewall did not choose the available Link-5 upgrade from the same hand. " +
+                    $"Reference: {Describe(previous)}. Planner: {Describe(upgraded)}.");
+            if (!singularity.monsters.Contains(Singularity))
+                failures.Add($"Firewall could not resolve its Link-6 line. {Describe(singularity)}.");
 
-            var ddd = DeckRepository.PresetDecks.Single(deck => deck.id == 34043);
+            var ddd = ComboRegressionDecks.Get(34043);
             var monster = PlayOpening(general, links, ddd, 1, 1, search: true);
             var backrow = PlayOpening(general, links, ddd, 1, 2, search: true);
             var scaleLine = PlayOpening(general, links, ddd, 17, 2, search: true);
-            Require(monster.opening.SequenceEqual(backrow.opening) && monster.monsters.Contains(Machinex) &&
-                backrow.monsters.Contains(Gilgamesh) && backrow.changed > 0,
-                $"D/D/D did not adapt the same hand to a monster versus backrow. " +
-                $"Monster board: {string.Join(",", monster.monsters)} ({monster.branches} branches, {monster.changed} changed). " +
-                $"Backrow: {string.Join(",", backrow.monsters)} ({backrow.branches} branches, {backrow.changed} changed).");
-            Require(scaleLine.line.Contains(Gilgamesh.ToString()) && scaleLine.monsters.Contains(Machinex),
-                "D/D/D could not continue from Gilgamesh into Machinex.");
-            Require(new[] { previous, upgraded, singularity, monster, backrow, scaleLine }.All(result => result.retries == 0),
-                "An adaptive opening produced an illegal engine response.");
+            if (!monster.opening.SequenceEqual(backrow.opening) || !monster.monsters.Contains(Machinex) ||
+                !backrow.monsters.Contains(Gilgamesh) || backrow.changed == 0)
+                failures.Add($"D/D/D did not adapt the same hand to a monster versus backrow. " +
+                    $"Monster board: {Describe(monster)}. Backrow: {Describe(backrow)}.");
+            if (!scaleLine.line.Contains(Gilgamesh.ToString()) || !scaleLine.monsters.Contains(Machinex))
+                failures.Add($"D/D/D could not continue from Gilgamesh into Machinex. {Describe(scaleLine)}.");
+            if (new[] { previous, upgraded, singularity, monster, backrow, scaleLine }.Any(result => result.retries != 0))
+                failures.Add("An adaptive opening produced an illegal engine response.");
             VerifyUncertainDraw();
+            Require(failures.Count == 0, string.Join("\n", failures));
             Debug.Log("[VERIFY COMBO SEARCH] Firewall reached Link-5 and Link-6. D/D/D changed the route with the same hand and an alternate public board. Draw outcomes were excluded.");
         }
 
@@ -89,6 +92,10 @@ namespace YGOPortable.Editor
             if (!condition) throw new InvalidOperationException(message);
         }
 
+        private static string Describe(Output output) =>
+            $"hand [{string.Join(",", output.opening)}], Link-{output.rank}, " +
+            $"field [{string.Join(",", output.monsters)}], {output.branches} branches, {output.changed} changes, {output.retries} retries";
+
         public static void Probe()
         {
             int exit = 0;
@@ -98,14 +105,13 @@ namespace YGOPortable.Editor
                 if (YgoNativeBridge.Initialize(streaming, (type, message) => { if (type == 0) Debug.LogWarning(message); }) != 0)
                     throw new InvalidOperationException("Could not initialize the duel engine.");
                 CardDatabase.Load(streaming);
-                DeckRepository.Load(streaming, Path.Combine(Path.GetTempPath(), "ygo_combo_probe"), seedDefaultDecks: false);
                 var general = DuelAiPolicy.LoadIncluded();
                 var links = LinkComboPolicy.LoadIncluded();
                 if (general == null || links == null) throw new InvalidOperationException("Missing trained policies.");
 
                 foreach (int id in new[] { 495, 481, 498, 35006, 34043, 136 })
                 {
-                    var deck = DeckRepository.PresetDecks.Single(item => item.id == id);
+                    var deck = ComboRegressionDecks.Get(id);
                     int oldFive = 0, newFive = 0, branches = 0, changed = 0, better = 0;
                     double maxTime = 0;
                     for (int seed = 1; seed <= 18; seed++)
@@ -130,7 +136,7 @@ namespace YGOPortable.Editor
                     Debug.Log($"[COMBO PROBE] {id} {deck.title}, Link-5+ {oldFive}/{newFive}, better {better}/18, branches {branches}, changes {changed}, max {maxTime:F1} ms");
                 }
 
-                var ddd = DeckRepository.PresetDecks.Single(item => item.id == 34043);
+                var ddd = ComboRegressionDecks.Get(34043);
                 for (int seed = 1; seed <= 26; seed++)
                 {
                     var monsters = PlayOpening(general, links, ddd, seed, 1, search: true);

@@ -14,7 +14,7 @@ namespace YGOPortable.Editor
 
         internal static void Run()
         {
-            var opponent = DeckRepository.PresetDecks.First(d => d.id == 30000);
+            var opponent = OpponentDeckLevels.GetDecks(104).First();
             var player = DeckRepository.PresetDecks.First(d => d.charId != opponent.charId);
             var deck = new UserDeck { name = player.title, main = player.main.ToList(), extra = player.extra.ToList() };
             var canvas = new GameObject("Duel Rematch Verification", typeof(Canvas));
