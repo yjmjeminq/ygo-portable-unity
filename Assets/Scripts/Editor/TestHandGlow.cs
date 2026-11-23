@@ -3193,9 +3193,18 @@ namespace YGOPortable.Editor
             chosen.GetComponent<CardDragTrigger>().OnPointerEnterAction.Invoke();
             typeof(DuelFieldUI).GetMethod("AdvanceDuelPadCardMotions", PrivateInstance).Invoke(ui.Field, new object[] { .25f });
             var focused = (RectTransform)chosen.GetComponentInChildren<CompositeCardView>().transform;
+            var depth = focused.Find("AspectBox/Overframe/PortraitBounds/Depth");
             Require(focused.anchoredPosition.y > 1f &&
-                focused.Find("AspectBox/Overframe/PortraitBounds/Depth").localScale.x > 1f,
+                depth.localScale.x > 1f,
                 "A special card in the touch layout did not lift both its card and artwork.");
+            Canvas.ForceUpdateCanvases();
+            var mask = row.parent.GetComponent<RectMask2D>();
+            var cutIn = (RectTransform)depth.Find("LocalCutIn");
+            var cardTop = cutIn.TransformPoint(new Vector3(cutIn.rect.center.x, cutIn.rect.yMax));
+            float topInCanvas = ui.Canvas.transform.InverseTransformPoint(cardTop).y;
+            Require(topInCanvas > mask.canvasRect.yMax && topInCanvas < mask.canvasRect.yMax - mask.padding.w &&
+                mask.padding.x == 0f && mask.padding.z == 0f,
+                "The mobile hand clipped the raised portrait or lost its horizontal clipping.");
 
             var animator = CardAnimationManager.Ensure(ui.Canvas);
             duel.SubmitResponseInt(choice << 16);
@@ -3226,7 +3235,7 @@ namespace YGOPortable.Editor
             animator.Clear();
             Require(Vector2.Distance(board.anchoredPosition, rest) < .01f && Mathf.Approximately(portrait.localScale.x, 1f),
                 "Interrupting the animation left the board or card offset.");
-            Debug.Log("[VERIFY OVERFRAME SURFACES] Mixed editions, touch-layout lift and native field identity passed.");
+            Debug.Log("[VERIFY OVERFRAME SURFACES] Mixed editions, unclipped mobile lift, horizontal clipping and native field identity passed.");
         }
 
         private static void VerifyNativeStyledActivations()

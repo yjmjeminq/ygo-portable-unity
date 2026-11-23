@@ -232,6 +232,7 @@ namespace YGOPortable.UI
         private RectTransform _myHandBar;
         private RectTransform _myHandContent;
         private ScrollRect _myHandScroll;
+        private RectMask2D _myHandMask;
         private RectTransform _oppHandBar;
         private readonly int[] _handCounts = new int[2];
         private readonly List<HandCardView> _myHandViews = new List<HandCardView>();
@@ -1260,7 +1261,7 @@ namespace YGOPortable.UI
             _myHandContent = _myHandBar;
             if (_mobileLayout)
             {
-                _myHandBar.gameObject.AddComponent<RectMask2D>();
+                _myHandMask = _myHandBar.gameObject.AddComponent<RectMask2D>();
                 LotdUiKit.AddImage(_myHandBar.gameObject, LotdUiKit.WhiteSprite, Color.clear);
                 _myHandScroll = _myHandBar.gameObject.AddComponent<ScrollRect>();
                 _myHandScroll.horizontal = true;
@@ -1963,6 +1964,9 @@ namespace YGOPortable.UI
                 _myHandSize = _myHandBar.rect.size;
                 if (_myHandScroll != null)
                 {
+                    // Preserve the horizontal scroll edge while giving a lifted portrait room above the row.
+                    var padding = new Vector4(0f, 0f, 0f, -_myHandMask.canvasRect.height * .25f);
+                    if (_myHandMask.padding != padding) _myHandMask.padding = padding;
                     float extent = Mathf.Max(_myHandSize.x, MobileHandCardWidth(row) * cards.Count + 4f * (cards.Count + 1));
                     row.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, extent);
                     if (row.anchoredPosition.x < _myHandSize.x - extent)
