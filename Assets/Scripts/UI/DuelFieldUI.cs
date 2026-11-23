@@ -91,14 +91,14 @@ namespace YGOPortable.UI
         private static readonly Color LifeTrackColor = new Color(.28f, .80f, .87f);
         private static readonly string[] PhaseShortNames = { "DP", "SP", "M1", "BP", "M2", "EP" };
         private readonly Text[] _phaseStepLabels = new Text[PhaseEntries.Length];
-        private static readonly (string name, string label, int phase, string icon)[] PhaseEntries =
+        private static readonly (string name, string label, int phase)[] PhaseEntries =
         {
-            ("Draw", "드로우", YgoConstants.PHASE_DRAW, "dp"),
-            ("Standby", "스탠바이", YgoConstants.PHASE_STANDBY, "sp"),
-            ("Main1", "메인 1", YgoConstants.PHASE_MAIN1, "mp1"),
-            ("Battle", "배틀", YgoConstants.PHASE_BATTLE, "bp"),
-            ("Main2", "메인 2", YgoConstants.PHASE_MAIN2, "mp2"),
-            ("End", "엔드", YgoConstants.PHASE_END, "ep"),
+            ("Draw", "드로우", YgoConstants.PHASE_DRAW),
+            ("Standby", "스탠바이", YgoConstants.PHASE_STANDBY),
+            ("Main1", "메인 1", YgoConstants.PHASE_MAIN1),
+            ("Battle", "배틀", YgoConstants.PHASE_BATTLE),
+            ("Main2", "메인 2", YgoConstants.PHASE_MAIN2),
+            ("End", "엔드", YgoConstants.PHASE_END),
         };
 
         private const int FullLifeTrack = 8000;
@@ -756,7 +756,7 @@ namespace YGOPortable.UI
                 attribute = DuelUiKit.GetAttributeSprite(card.Attribute);
             }
             else if ((card.Type & (YgoConstants.TYPE_SPELL | YgoConstants.TYPE_TRAP)) != 0)
-                race = DuelUiKit.LoadSprite($"LOTD/Icons/{YgoConstants.GetSpellTrapSubSpriteName(card.Type)}");
+                race = DuelUiKit.GetSpellTrapSprite(card.Type);
             raceIcon.sprite = race;
             raceIcon.gameObject.SetActive(race != null);
             attributeIcon.sprite = attribute;
@@ -1383,12 +1383,6 @@ namespace YGOPortable.UI
                 Vector2.zero, Vector2.zero);
             _phaseRim = DuelStyle.AddHexPlate(turn, HudEdge, HudSurface);
             _phaseButton = AddHudButton(_phaseRim, OpenPhasePicker);
-            if (DuelVisualAssets.PhaseBase != null)
-                DuelUiKit.AddImage(DuelUiKit.FillRect("LocalPhaseBase", turn, 3f).gameObject, DuelVisualAssets.PhaseBase,
-                    new Color(1f, 1f, 1f, .54f), true, false);
-            if (DuelVisualAssets.PhaseRim != null)
-                DuelUiKit.AddImage(DuelUiKit.FillRect("LocalPhaseRim", turn).gameObject, DuelVisualAssets.PhaseRim,
-                    new Color(1f, 1f, 1f, .73f), true, false);
 
             var turnReadout = DuelUiKit.CreateRect("TurnNumber", turn, new Vector2(.115f, .675f),
                 new Vector2(.885f, .935f), Vector2.zero, Vector2.zero);
@@ -1474,7 +1468,7 @@ namespace YGOPortable.UI
 
             for (int i = 0; i < PhaseEntries.Length; i++)
             {
-                var (name, label, phase, asset) = PhaseEntries[i];
+                var (name, label, phase) = PhaseEntries[i];
                 float left = .028f + .158f * i;
                 var slot = DuelUiKit.CreateRect(name, controls, new Vector2(left, .297f), new Vector2(left + .150f, .737f),
                     Vector2.zero, Vector2.zero);
@@ -1486,7 +1480,7 @@ namespace YGOPortable.UI
                 });
                 var iconBox = DuelUiKit.CreateRect("Icon", button.transform, new Vector2(.20f, .48f), new Vector2(.80f, .87f),
                     Vector2.zero, Vector2.zero);
-                Sprite sprite = DuelVisualAssets.PhaseIcon(phase) ?? DuelUiKit.LoadSprite("LOTD/PhaseBar/blue_" + asset);
+                Sprite sprite = DuelUiIcons.Find("phase/" + name.ToLowerInvariant());
                 var icon = DuelUiKit.AddImage(iconBox.gameObject, sprite, Color.white, true, false);
                 icon.enabled = sprite != null;
                 var labelBox = DuelUiKit.CreateRect("Caption", button.transform, new Vector2(.06f, .088f), new Vector2(.94f, .448f),
@@ -4195,7 +4189,7 @@ namespace YGOPortable.UI
 
         private void AddActionRow(string label, Action action, bool selected, string icon = null)
         {
-            Sprite iconSprite = icon == null ? null : DuelUiKit.LoadSprite($"LOTD/Icons/ICON_ID_CMDID_48_{icon}");
+            Sprite iconSprite = DuelUiIcons.Action(icon);
             float height = _mobileLayout ? MobileSafeArea.MinimumTouchSize(_actionList) : 44f;
             var button = DuelUiKit.CreateWrappedButton(_actionList, "Action", label, action, 15, selected, height, iconSprite);
             DuelStyle.ApplyButton(button, selected);

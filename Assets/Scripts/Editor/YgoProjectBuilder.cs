@@ -63,6 +63,7 @@ namespace YGOPortable.Editor
                 CardDatabase.Load(streaming);
                 DeckRepository.Load(streaming, Path.Combine(Path.GetTempPath(), "ygo_duel_ui_verify"), false);
                 CardArtLoader.Initialize(streaming);
+                TestCardPresentation.VerifyInterfaceIcons();
                 VerifyFastChainConfirmationModes();
                 TestTokenAndComplexEffects.RunTokenSuiteHeadless();
                 TestChainChooser.Run();
@@ -269,7 +270,7 @@ namespace YGOPortable.Editor
             AssertTrue(illusionCard != null && (illusionCard.race & YgoConstants.RACE_ILLUSION) != 0,
                 "Card 14307929 missing RACE_ILLUSION");
             Sprite illusionSp = DuelUiKit.GetRaceSprite(YgoConstants.RACE_ILLUSION);
-            AssertTrue(illusionSp != null, "Missing LOTD/TypeIcons sprite for RACE_ILLUSION");
+            AssertTrue(illusionSp != null, "Missing interface icon for RACE_ILLUSION");
 
             // Verify CardArtLoader
             CardArtLoader.Initialize(streaming);

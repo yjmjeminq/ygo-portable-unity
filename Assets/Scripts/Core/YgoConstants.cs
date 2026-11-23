@@ -291,13 +291,13 @@ namespace YGOPortable.Core
 
         public static readonly Dictionary<uint, string> AttributeSpriteNames = new Dictionary<uint, string>
         {
-            { ATTRIBUTE_EARTH, "ICON_ID_ATTR_EARTH" },
-            { ATTRIBUTE_WATER, "ICON_ID_ATTR_WATER" },
-            { ATTRIBUTE_FIRE, "ICON_ID_ATTR_FIRE" },
-            { ATTRIBUTE_WIND, "ICON_ID_ATTR_WIND" },
-            { ATTRIBUTE_LIGHT, "ICON_ID_ATTR_LIGHT" },
-            { ATTRIBUTE_DARK, "ICON_ID_ATTR_DARK" },
-            { ATTRIBUTE_DIVINE, "ICON_ID_ATTR_GOD" },
+            { ATTRIBUTE_EARTH, "attribute/earth" },
+            { ATTRIBUTE_WATER, "attribute/water" },
+            { ATTRIBUTE_FIRE, "attribute/fire" },
+            { ATTRIBUTE_WIND, "attribute/wind" },
+            { ATTRIBUTE_LIGHT, "attribute/light" },
+            { ATTRIBUTE_DARK, "attribute/dark" },
+            { ATTRIBUTE_DIVINE, "attribute/god" },
         };
 
         public static readonly Dictionary<ulong, string> RaceNamesKR = new Dictionary<ulong, string>
@@ -332,32 +332,32 @@ namespace YGOPortable.Core
 
         public static readonly Dictionary<ulong, string> RaceSpriteNames = new Dictionary<ulong, string>
         {
-            { RACE_WARRIOR, "ICON_ID_TYPE_SOLDIER" },
-            { RACE_SPELLCASTER, "ICON_ID_TYPE_WIZARD" },
-            { RACE_FAIRY, "ICON_ID_TYPE_ANGEL" },
-            { RACE_FIEND, "ICON_ID_TYPE_DEVIL" },
-            { RACE_ZOMBIE, "ICON_ID_TYPE_UNDEAD" },
-            { RACE_MACHINE, "ICON_ID_TYPE_MACHINE" },
-            { RACE_AQUA, "ICON_ID_TYPE_AQUARIUS" },
-            { RACE_PYRO, "ICON_ID_TYPE_FLAME" },
-            { RACE_ROCK, "ICON_ID_TYPE_SANDROCK" },
-            { RACE_WINGEDBEAST, "ICON_ID_TYPE_BIRD" },
-            { RACE_PLANT, "ICON_ID_TYPE_BOTANICAL" },
-            { RACE_INSECT, "ICON_ID_TYPE_INSECT" },
-            { RACE_THUNDER, "ICON_ID_TYPE_THUNDER" },
-            { RACE_DRAGON, "ICON_ID_TYPE_DRAGON" },
-            { RACE_BEAST, "ICON_ID_TYPE_BEAST" },
-            { RACE_BEASTWARRIOR, "ICON_ID_TYPE_BEASTBTL" },
-            { RACE_DINOSAUR, "ICON_ID_TYPE_DINOSAURS" },
-            { RACE_FISH, "ICON_ID_TYPE_FISH" },
-            { RACE_SEASERPENT, "ICON_ID_TYPE_POSEIDON" },
-            { RACE_REPTILE, "ICON_ID_TYPE_REPTILES" },
-            { RACE_PSYCHIC, "ICON_ID_TYPE_PSYCHIC" },
-            { RACE_DIVINE, "ICON_ID_TYPE_GOD" },
-            { RACE_CREATORGOD, "ICON_ID_TYPE_CREATOR" },
-            { RACE_WYRM, "ICON_ID_TYPE_MYSTDRAGON" },
-            { RACE_CYBERSE, "ICON_ID_TYPE_CYVERSE" },
-            { RACE_ILLUSION, "ICON_ID_TYPE_ILLUSION" },
+            { RACE_WARRIOR, "race/soldier" },
+            { RACE_SPELLCASTER, "race/wizard" },
+            { RACE_FAIRY, "race/angel" },
+            { RACE_FIEND, "race/devil" },
+            { RACE_ZOMBIE, "race/undead" },
+            { RACE_MACHINE, "race/machine" },
+            { RACE_AQUA, "race/aquarius" },
+            { RACE_PYRO, "race/flame" },
+            { RACE_ROCK, "race/sandrock" },
+            { RACE_WINGEDBEAST, "race/bird" },
+            { RACE_PLANT, "race/botanical" },
+            { RACE_INSECT, "race/insect" },
+            { RACE_THUNDER, "race/thunder" },
+            { RACE_DRAGON, "race/dragon" },
+            { RACE_BEAST, "race/beast" },
+            { RACE_BEASTWARRIOR, "race/beastbtl" },
+            { RACE_DINOSAUR, "race/dinosaurs" },
+            { RACE_FISH, "race/fish" },
+            { RACE_SEASERPENT, "race/poseidon" },
+            { RACE_REPTILE, "race/reptiles" },
+            { RACE_PSYCHIC, "race/psychic" },
+            { RACE_DIVINE, "race/god" },
+            { RACE_CREATORGOD, "race/creator" },
+            { RACE_WYRM, "race/mystdragon" },
+            { RACE_CYBERSE, "race/cyverse" },
+            { RACE_ILLUSION, "race/illusion" },
         };
 
         public static string GetCardFrameName(uint type)
@@ -417,22 +417,22 @@ namespace YGOPortable.Core
             return string.Join(" / ", parts);
         }
 
-        public static string GetSpellTrapSubSpriteName(uint type)
+        public static string GetSpellTrapIconKey(uint type)
         {
             if ((type & TYPE_SPELL) != 0)
             {
-                if ((type & TYPE_QUICKPLAY) != 0) return "ICON_ID_ICON_SORT_MAGIC_QUICK_PLAY";
-                if ((type & TYPE_CONTINUOUS) != 0) return "ICON_ID_ICON_SORT_MAGIC_CONTINUOUS";
-                if ((type & TYPE_EQUIP) != 0) return "ICON_ID_ICON_SORT_MAGIC_EQUIP";
-                if ((type & TYPE_FIELD) != 0) return "ICON_ID_ICON_SORT_MAGIC_FIELD";
-                if ((type & TYPE_RITUAL) != 0) return "ICON_ID_ICON_SORT_MAGIC_RITUAL";
-                return "ICON_ID_ICON_SORT_MAGIC_NORMAL";
+                if ((type & TYPE_QUICKPLAY) != 0) return "spell/quick_play";
+                if ((type & TYPE_CONTINUOUS) != 0) return "spell/continuous";
+                if ((type & TYPE_EQUIP) != 0) return "spell/equip";
+                if ((type & TYPE_FIELD) != 0) return "spell/field";
+                if ((type & TYPE_RITUAL) != 0) return "spell/ritual";
+                return "spell/normal";
             }
             if ((type & TYPE_TRAP) != 0)
             {
-                if ((type & TYPE_CONTINUOUS) != 0) return "ICON_ID_ICON_SORT_TRAP_CONTINUOUS";
-                if ((type & TYPE_COUNTER) != 0) return "ICON_ID_ICON_SORT_TRAP_COUNTER";
-                return "ICON_ID_ICON_SORT_TRAP_NORMAL";
+                if ((type & TYPE_CONTINUOUS) != 0) return "trap/continuous";
+                if ((type & TYPE_COUNTER) != 0) return "trap/counter";
+                return "trap/normal";
             }
             return "";
         }

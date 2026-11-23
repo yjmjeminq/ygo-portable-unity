@@ -19,6 +19,20 @@ namespace YGOPortable.Editor
         private const uint SkullRedBird = 10202894;
         private const uint Masquerena = 65741786;
 
+        internal static void VerifyInterfaceIcons()
+        {
+            var races = YgoConstants.RaceNamesKR.Keys.Select(DuelUiKit.GetRaceSprite).ToArray();
+            var attributes = YgoConstants.AttributeNamesKR.Keys.Select(DuelUiKit.GetAttributeSprite).ToArray();
+            Require(races.All(icon => icon != null && icon.rect.width == 128) && races.Distinct().Count() == races.Length,
+                "A monster race was missing its distinct atlas icon.");
+            Require(attributes.All(icon => icon != null && icon.rect.height == 128) && attributes.Distinct().Count() == attributes.Length,
+                "An attribute was missing its distinct atlas icon.");
+            Require(DuelUiIcons.Find("phase/main2") != null && DuelUiIcons.Action("SUMMONSP") != null &&
+                DuelUiKit.GetSpellTrapSprite(YgoConstants.TYPE_TRAP | YgoConstants.TYPE_COUNTER) != null,
+                "A phase, command, or spell and trap icon did not resolve.");
+            Debug.Log("[VERIFY DUEL ICONS] Races, attributes, phases, commands and spell/trap icons passed.");
+        }
+
         internal static void Run()
         {
             var canvas = new GameObject("Card Presentation Verification", typeof(Canvas)).GetComponent<Canvas>();

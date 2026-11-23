@@ -145,7 +145,7 @@ namespace YGOPortable.UI
                 caption.rectTransform.anchorMin = new Vector2(.137f, .06f);
                 caption.rectTransform.anchorMax = new Vector2(.58f, .94f);
                 caption.rectTransform.offsetMin = caption.rectTransform.offsetMax = Vector2.zero;
-                var sprite = DuelUiKit.LoadSprite("LOTD/Icons/ICON_ID_FILTER_CARD_" + icon);
+                var sprite = DuelUiIcons.Filter(icon);
                 if (sprite != null)
                 {
                     var image = DuelUiKit.CreateRect("Icon", button.transform, new Vector2(.039f, .10f),

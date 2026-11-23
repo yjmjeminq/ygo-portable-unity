@@ -47,8 +47,6 @@ namespace YGOPortable.UI
         internal static Sprite LpPlayer { get; } = LoadHudSprite("LPPlayer");
         internal static Sprite LpOpponent { get; } = LoadHudSprite("LPOpponent");
         internal static Sprite HandGlow { get; } = LoadHudSprite("HandGlow", Vector4.one * 18f);
-        internal static Sprite PhaseBase { get; } = LoadHudSprite("PhaseBase");
-        internal static Sprite PhaseRim { get; } = LoadHudSprite("PhaseRim");
         internal static Sprite PromptGrave { get; } = LoadHudSprite("PromptGrave");
         internal static Sprite PromptGroupLabel { get; } = LoadHudSprite("PromptGroupLabel");
         internal static Sprite PromptFieldGlow { get; } = LoadHudSprite("PromptFieldGlow");
@@ -63,25 +61,6 @@ namespace YGOPortable.UI
         internal static Sprite DuelVictory { get; } = LoadHudSprite("DuelVictory");
         internal static Sprite DuelDefeat { get; } = LoadHudSprite("DuelDefeat");
         internal static Sprite DuelDraw { get; } = LoadHudSprite("DuelDraw");
-        private static readonly Sprite DrawPhase = LoadHudSprite("PhaseDraw");
-        private static readonly Sprite StandbyPhase = LoadHudSprite("PhaseStandby");
-        private static readonly Sprite MainOnePhase = LoadHudSprite("PhaseMain1");
-        private static readonly Sprite BattlePhase = LoadHudSprite("PhaseBattle");
-        private static readonly Sprite MainTwoPhase = LoadHudSprite("PhaseMain2");
-        private static readonly Sprite EndPhase = LoadHudSprite("PhaseEnd");
-
-        internal static Sprite PhaseIcon(int phase) => phase switch
-        {
-            YgoConstants.PHASE_DRAW => DrawPhase,
-            YgoConstants.PHASE_STANDBY => StandbyPhase,
-            YgoConstants.PHASE_MAIN1 => MainOnePhase,
-            YgoConstants.PHASE_MAIN2 => MainTwoPhase,
-            YgoConstants.PHASE_END => EndPhase,
-            YgoConstants.PHASE_BATTLE_START or YgoConstants.PHASE_BATTLE_STEP or YgoConstants.PHASE_BATTLE
-                or YgoConstants.PHASE_DAMAGE or YgoConstants.PHASE_DAMAGE_CAL => BattlePhase,
-            _ => null,
-        };
-
         internal static Sprite ZoneIcon(uint location, bool opponent)
         {
             var icons = opponent ? OpponentZoneIcons : PlayerZoneIcons;

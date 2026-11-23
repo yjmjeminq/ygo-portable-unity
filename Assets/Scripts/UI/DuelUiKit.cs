@@ -86,21 +86,15 @@ namespace YGOPortable.UI
 
         public static Sprite GetRaceSprite(ulong race)
         {
-            if (YgoConstants.RaceSpriteNames.TryGetValue(race, out var name))
-            {
-                return LoadSprite($"LOTD/TypeIcons/{name}") ?? LoadSprite($"LOTD/Icons/{name}");
-            }
-            return null;
+            return YgoConstants.RaceSpriteNames.TryGetValue(race, out var key) ? DuelUiIcons.Find(key) : null;
         }
 
         public static Sprite GetAttributeSprite(uint attr)
         {
-            if (YgoConstants.AttributeSpriteNames.TryGetValue(attr, out var name))
-            {
-                return LoadSprite($"LOTD/Icons/{name}");
-            }
-            return null;
+            return YgoConstants.AttributeSpriteNames.TryGetValue(attr, out var key) ? DuelUiIcons.Find(key) : null;
         }
+
+        internal static Sprite GetSpellTrapSprite(uint type) => DuelUiIcons.Find(YgoConstants.GetSpellTrapIconKey(type));
 
         public static RectTransform CreateRect(string name, Transform parent,
             Vector2 anchorMin, Vector2 anchorMax, Vector2 offsetMin, Vector2 offsetMax)
@@ -574,8 +568,8 @@ namespace YGOPortable.UI
 
                 uint attr = live != null && live.attribute != 0 ? live.attribute : (info?.attr ?? 0);
                 Sprite attrSp = null;
-                if ((type & YgoConstants.TYPE_SPELL) != 0) attrSp = DuelUiKit.LoadSprite("LOTD/Icons/ICON_ID_ATTR_MAGIC");
-                else if ((type & YgoConstants.TYPE_TRAP) != 0) attrSp = DuelUiKit.LoadSprite("LOTD/Icons/ICON_ID_ATTR_TRAP");
+                if ((type & YgoConstants.TYPE_SPELL) != 0) attrSp = DuelUiIcons.Find("attribute/spell");
+                else if ((type & YgoConstants.TYPE_TRAP) != 0) attrSp = DuelUiIcons.Find("attribute/trap");
                 else attrSp = DuelUiKit.GetAttributeSprite(attr);
 
                 _attrImg.gameObject.SetActive(attrSp != null);

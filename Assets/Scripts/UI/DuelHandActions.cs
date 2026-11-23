@@ -376,8 +376,7 @@ namespace YGOPortable.UI
                 Color.white, FontStyle.Bold), 1.5f);
             var icon = DuelUiKit.CreateRect("Icon", button.transform, new Vector2(.24f, _mobileLayout ? .36f : .24f),
                 new Vector2(.76f, _mobileLayout ? .91f : .76f), Vector2.zero, Vector2.zero);
-            DuelUiKit.AddImage(icon.gameObject, DuelUiKit.LoadSprite($"LOTD/Icons/ICON_ID_CMDID_48_{iconName}"),
-                Color.white, true, false);
+            DuelUiKit.AddImage(icon.gameObject, DuelUiIcons.Action(iconName), Color.white, true, false);
         }
 
         private void AddRadialCardAction(int index, string iconName, string label, Action action, string name)
@@ -397,8 +396,7 @@ namespace YGOPortable.UI
             var button = DuelStyle.RoundButton(circle, "Button", primary ? DuelStyle.Gold : DuelStyle.ChainCyan, action);
             var icon = DuelUiKit.CreateRect("Icon", button.transform, new Vector2(.24f, .39f), new Vector2(.76f, .86f),
                 Vector2.zero, Vector2.zero);
-            DuelUiKit.AddImage(icon.gameObject, DuelUiKit.LoadSprite($"LOTD/Icons/ICON_ID_CMDID_48_{iconName}"),
-                Color.white, true, false);
+            DuelUiKit.AddImage(icon.gameObject, DuelUiIcons.Action(iconName), Color.white, true, false);
             var caption = DuelUiKit.CreateRect("Caption", button.transform, new Vector2(.08f, .12f), new Vector2(.92f, .39f),
                 Vector2.zero, Vector2.zero);
             DuelUiKit.AddFittedText(caption, "Label", label, 15, 9, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);

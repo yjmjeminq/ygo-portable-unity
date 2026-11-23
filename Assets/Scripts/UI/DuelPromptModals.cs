@@ -2808,7 +2808,7 @@ namespace YGOPortable.UI
             DuelUiKit.AddImage(mark.gameObject, DuelStyle.Disc, DuelStyle.Gold, true, false);
             var tick = DuelUiKit.CreateRect("Tick", mark, Vector2.one * .17f, Vector2.one * .83f,
                 Vector2.zero, Vector2.zero);
-            DuelUiKit.AddImage(tick.gameObject, DuelUiKit.LoadSprite("LOTD/Icons/ICON_ID_CHECKMARK"),
+            DuelUiKit.AddImage(tick.gameObject, DuelUiIcons.Find("check"),
                 new Color(.10f, .15f, .19f), true, false);
             SetSelectionMark(mark, selected);
             return mark;

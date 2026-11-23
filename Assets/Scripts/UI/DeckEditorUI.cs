@@ -1551,7 +1551,7 @@ namespace YGOPortable.UI
 
             Sprite raceSp = null;
             if (ci != null)
-                raceSp = ci.IsMonster ? DuelUiKit.GetRaceSprite(ci.race) : DuelUiKit.LoadSprite($"LOTD/Icons/{YgoConstants.GetSpellTrapSubSpriteName(ci.type)}");
+                raceSp = ci.IsMonster ? DuelUiKit.GetRaceSprite(ci.race) : DuelUiKit.GetSpellTrapSprite(ci.type);
             _previewRaceIcon.gameObject.SetActive(raceSp != null);
             _previewRaceIcon.sprite = raceSp;
         }
