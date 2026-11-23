@@ -43,17 +43,22 @@ namespace YGOPortable.UI
 
     internal sealed class StoryModeUI
     {
-        internal const string UnlockedKey = "ygo.story.gx.unlocked_idx";
+        private const int ChapterCount = 5;
         private const int EpisodesPerChapter = 10;
-        private static readonly string[] ChapterNames =
+        private static readonly string[] GxChapterLabels =
         {
             "1장 기숙사", "2장 세븐스타즈 삼환마", "3장 빛의결사 제넥스", "4장 이차원", "5장 다크니스 졸업",
         };
 
+        private static readonly string[] FiveDsChapterLabels =
+        {
+            "1장 언더 크라운", "2장 랩 제로", "3장 네오 제로 리버스", "4장 프로젝트 크로노스", "5장 아크 크레이들",
+        };
+
         private readonly GameAppController _app;
-        private readonly StoryScriptRoot _script;
+        private readonly (string Id, Button Button, StoryScriptRoot Script, string[] ChapterLabels)[] _seriesTabs;
         private readonly List<UserDeck> _playableDecks = new();
-        private readonly Button[] _chapterButtons = new Button[ChapterNames.Length];
+        private readonly Button[] _chapterButtons = new Button[ChapterCount];
         private readonly Button[] _episodeButtons = new Button[EpisodesPerChapter];
         private readonly CanvasGroup _browser;
         private readonly GameObject _dialogue;
@@ -64,6 +69,7 @@ namespace YGOPortable.UI
         private readonly Dropdown _deckPicker;
         private readonly Image _portrait;
         private readonly Image _dialoguePortrait;
+        private readonly Text _seriesTitle;
         private readonly Text _episodeHeading;
         private readonly Text _episodeTitle;
         private readonly Text _opponentName;
@@ -73,6 +79,7 @@ namespace YGOPortable.UI
         private readonly Text _line;
         private readonly Text _counter;
 
+        private int _selectedSeries;
         private int _unlockedIndex;
         private int _selectedIndex;
         private string _deckId;
@@ -83,10 +90,12 @@ namespace YGOPortable.UI
         internal GameObject Root { get; }
         internal GameObject ActiveRoot => _dialogue.activeSelf ? _dialogue : Root;
 
+        private StoryScriptRoot Script => _seriesTabs[_selectedSeries].Script;
+        private string SeriesId => _seriesTabs[_selectedSeries].Id;
+
         internal StoryModeUI(GameAppController app, Transform parent)
         {
             _app = app;
-            _script = LoadScript();
             var root = LotdUiKit.FillRect("Screen_StoryMode", parent);
             Root = root.gameObject;
             LotdUiKit.AddImage(root.gameObject, LotdUiKit.LoadSprite("LOTD/Background/bg_vrains"),
@@ -95,10 +104,18 @@ namespace YGOPortable.UI
             var browser = LotdUiKit.FillRect("StoryBrowser", root);
             _browser = browser.gameObject.AddComponent<CanvasGroup>();
             var content = Application.isMobilePlatform ? MobileSafeArea.Create(browser) : browser;
-            var header = Region(content, "Header", .032f, .865f, .79f, .963f);
+            var header = Region(content, "Header", .032f, .865f, .575f, .963f);
             LotdUiKit.AddImage(header.gameObject, LotdUiKit.LoadSprite("LOTD/Shared/menuheader"), Color.white, false, false);
-            LotdUiKit.AddFittedText(header, "Title", _script?.seriesTitle ?? "유희왕 GX: 홍련의 듀얼 퀸", 32, 18,
+            _seriesTitle = LotdUiKit.AddFittedText(header, "Title", "", 32, 16,
                 TextAnchor.MiddleCenter, new Color(.025f, .075f, .14f), FontStyle.Bold);
+            var gx = AddButton(content, "Series_GX", "GX", .587f, .874f, .685f, .954f, () => SelectSeries(0));
+            var fiveDs = AddButton(content, "Series_5DS", "5D's", .697f, .874f, .797f, .954f, () => SelectSeries(1));
+            _seriesTabs = new[]
+            {
+                ("gx", gx, LoadScript("gx"), GxChapterLabels),
+                ("5ds", fiveDs, LoadScript("5ds"), FiveDsChapterLabels),
+            };
+            _selectedSeries = Mathf.Max(0, Array.FindIndex(_seriesTabs, tab => tab.Script != null));
             _mainMenu = AddButton(content, "MainMenu", "메인 메뉴", .81f, .874f, .968f, .954f,
                 () => _app.ShowScreen(AppScreen.MainMenu));
 
@@ -107,7 +124,7 @@ namespace YGOPortable.UI
             {
                 int index = chapter;
                 float left = .032f + index * tabWidth;
-                _chapterButtons[index] = AddButton(content, $"Chapter_{index + 1}", ChapterNames[index],
+                _chapterButtons[index] = AddButton(content, $"Chapter_{index + 1}", "",
                     left, .773f, left + tabWidth - .007f, .848f, () => SelectChapter(index));
             }
 
@@ -161,9 +178,8 @@ namespace YGOPortable.UI
             Root.SetActive(true);
             ResetDialogue();
             LoadDeckChoices();
-            _unlockedIndex = Mathf.Clamp(PlayerPrefs.GetInt(UnlockedKey, 0), 0, (_script?.episodes.Length ?? 1) - 1);
-            SelectEpisode(_unlockedIndex);
-            Focus(_script != null ? _episodeButtons[_selectedIndex % EpisodesPerChapter] : _mainMenu);
+            SelectSeries(_selectedSeries);
+            Focus(Script != null ? _episodeButtons[_selectedIndex % EpisodesPerChapter] : _mainMenu);
         }
 
         internal void Close()
@@ -194,9 +210,9 @@ namespace YGOPortable.UI
         {
             if (!CanPlay(episode)) return;
             int index = IndexOf(episode);
-            _unlockedIndex = Mathf.Max(_unlockedIndex, Mathf.Min(index + 1, _script.episodes.Length - 1));
-            PlayerPrefs.SetInt(ClearedKey(episode.id), 1);
-            PlayerPrefs.SetInt(UnlockedKey, _unlockedIndex);
+            _unlockedIndex = Mathf.Max(_unlockedIndex, Mathf.Min(index + 1, Script.episodes.Length - 1));
+            PlayerPrefs.SetInt(ClearedKey(SeriesId, episode.id), 1);
+            PlayerPrefs.SetInt(UnlockedKey(SeriesId), _unlockedIndex);
             PlayerPrefs.Save();
         }
 
@@ -222,19 +238,21 @@ namespace YGOPortable.UI
             OpponentDeckLevels.GetDecks(characterId).FirstOrDefault() ??
             DeckRepository.GetDecksForCharacter(characterId).FirstOrDefault();
 
-        internal static string ClearedKey(string episodeId) => $"ygo.story.gx.cleared.{episodeId}";
+        private static string UnlockedKey(string seriesId) => $"ygo.story.{seriesId}.unlocked_idx";
+
+        private static string ClearedKey(string seriesId, string episodeId) => $"ygo.story.{seriesId}.cleared.{episodeId}";
 
         private int IndexOf(StoryEpisodeData episode) =>
-            _script == null || episode == null ? -1 : Array.IndexOf(_script.episodes, episode);
+            Script == null || episode == null ? -1 : Array.IndexOf(Script.episodes, episode);
 
-        private static StoryScriptRoot LoadScript()
+        private static StoryScriptRoot LoadScript(string seriesId)
         {
-            string path = Path.Combine(Application.streamingAssetsPath, "story_gx_script.json");
+            string path = Path.Combine(Application.streamingAssetsPath, $"story_{seriesId}_script.json");
             try
             {
                 var script = JsonUtility.FromJson<StoryScriptRoot>(File.ReadAllText(path));
-                int count = ChapterNames.Length * EpisodesPerChapter;
-                if (script == null || script.seriesId != "gx" || script.totalChapters != ChapterNames.Length ||
+                int count = ChapterCount * EpisodesPerChapter;
+                if (script == null || script.seriesId != seriesId || script.totalChapters != ChapterCount ||
                     script.totalEpisodes != count || script.episodes?.Length != count)
                     throw new InvalidDataException("Expected five chapters of ten episodes.");
 
@@ -244,6 +262,7 @@ namespace YGOPortable.UI
                     var episode = script.episodes[i];
                     if (episode == null || episode.chapter != i / EpisodesPerChapter + 1 ||
                         string.IsNullOrWhiteSpace(episode.id) || !ids.Add(episode.id) ||
+                        string.IsNullOrWhiteSpace(episode.chapterTitle) || string.IsNullOrWhiteSpace(episode.title) ||
                         !HasDialogue(episode.preDialogues) || !HasDialogue(episode.postWinDialogues) ||
                         !HasDialogue(episode.postLoseDialogues))
                         throw new InvalidDataException($"Incomplete episode at index {i}.");
@@ -252,7 +271,7 @@ namespace YGOPortable.UI
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is InvalidDataException)
             {
-                Debug.LogWarning($"[StoryMode] Could not load GX campaign: {ex.Message}");
+                Debug.LogWarning($"[StoryMode] Could not load {seriesId} campaign: {ex.Message}");
                 return null;
             }
         }
@@ -260,15 +279,34 @@ namespace YGOPortable.UI
         private static bool HasDialogue(StoryDialogueLine[] lines) => lines?.Length > 0 &&
             lines.All(line => line != null && !string.IsNullOrWhiteSpace(line.speaker) && !string.IsNullOrWhiteSpace(line.text));
 
+        private void SelectSeries(int index)
+        {
+            if (!Root.activeSelf || _dialogue.activeSelf) return;
+            _selectedSeries = index;
+            _seriesTitle.text = Script?.seriesTitle ?? "스토리 모드";
+            for (int i = 0; i < _seriesTabs.Length; i++)
+            {
+                var tab = _seriesTabs[i];
+                tab.Button.interactable = tab.Script != null;
+                tab.Button.GetComponentInChildren<Text>().color = i == index ? LotdUiKit.GoldAccent : LotdUiKit.TextPrimary;
+            }
+            for (int i = 0; i < _chapterButtons.Length; i++)
+                _chapterButtons[i].GetComponentInChildren<Text>().text = _seriesTabs[index].ChapterLabels[i];
+
+            int lastEpisode = (Script?.episodes.Length ?? 1) - 1;
+            _unlockedIndex = Mathf.Clamp(PlayerPrefs.GetInt(UnlockedKey(SeriesId), 0), 0, lastEpisode);
+            SelectEpisode(_unlockedIndex);
+        }
+
         private void SelectChapter(int chapter)
         {
-            if (_script == null) return;
+            if (Script == null) return;
             SelectEpisode(Mathf.Clamp(_unlockedIndex, chapter * EpisodesPerChapter, (chapter + 1) * EpisodesPerChapter - 1));
         }
 
         private void SelectEpisode(int index)
         {
-            if (_script == null)
+            if (Script == null)
             {
                 foreach (var button in _chapterButtons) button.interactable = false;
                 foreach (var button in _episodeButtons) button.interactable = false;
@@ -286,8 +324,8 @@ namespace YGOPortable.UI
             for (int row = 0; row < _episodeButtons.Length; row++)
             {
                 int episodeIndex = chapter * EpisodesPerChapter + row;
-                var episode = _script.episodes[episodeIndex];
-                bool cleared = PlayerPrefs.GetInt(ClearedKey(episode.id), 0) != 0;
+                var episode = Script.episodes[episodeIndex];
+                bool cleared = PlayerPrefs.GetInt(ClearedKey(SeriesId, episode.id), 0) != 0;
                 bool locked = episodeIndex > _unlockedIndex;
                 string state = cleared ? "클리어" : locked ? "잠김" : "도전 가능";
                 var label = _episodeButtons[row].GetComponentInChildren<Text>();
@@ -295,9 +333,9 @@ namespace YGOPortable.UI
                 label.color = episodeIndex == index ? LotdUiKit.GoldAccent : locked ? LotdUiKit.TextMuted : LotdUiKit.TextPrimary;
             }
 
-            var current = _script.episodes[index];
+            var current = Script.episodes[index];
             var opponent = DeckRepository.GetCharacter(current.charId);
-            _episodeHeading.text = $"{ChapterNames[chapter]}  ·  {index + 1:00}화";
+            _episodeHeading.text = current.chapterTitle;
             _episodeTitle.text = current.title;
             _opponentName.text = current.opponentName;
             _portrait.sprite = LotdUiKit.LoadOpponentPortrait(opponent);
@@ -331,7 +369,7 @@ namespace YGOPortable.UI
         private void StartEpisode()
         {
             if (!_start.interactable || _dialogue.activeSelf) return;
-            var episode = _script.episodes[_selectedIndex];
+            var episode = Script.episodes[_selectedIndex];
             var deck = _playableDecks[_deckPicker.value];
             PlayDialogue(episode, episode.preDialogues, episode.title, () => _app.StartStoryDuel(episode, deck));
         }
