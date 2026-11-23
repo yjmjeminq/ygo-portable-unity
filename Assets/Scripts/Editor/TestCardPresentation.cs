@@ -430,10 +430,17 @@ namespace YGOPortable.Editor
             animator.QueueMove(new CardFlight(BlueEyes, start, end, false, false, default(DeckCardAppearance)),
                 CardMotion.SpecialSummon, null);
             move = queue.Dequeue();
-            Require(move.MoveNext() && !move.Current.GetType().Name.StartsWith("<RevealSummon>", StringComparison.Ordinal) &&
+            Require(move.MoveNext() && move.Current.GetType().Name.StartsWith("<RevealSummon>", StringComparison.Ordinal),
+                "The regular copy lost its portrait after a special copy of the same card was summoned.");
+            reveal = (IEnumerator)move.Current;
+            Require(reveal.MoveNext(), "The regular copy's reveal did not start.");
+            SampleAnimation((IEnumerator)reveal.Current)(1f);
+            Require(animator.transform.Find("SummonPortrait").GetComponent<CanvasGroup>().alpha > .95f &&
                 !animator.transform.Find("MovingCard").GetComponent<CompositeCardView>().HasOverframe,
-                "The standard edition borrowed another copy's summon presentation.");
-            while (move.MoveNext()) { }
+                "The regular copy borrowed the special edition finish.");
+            while (reveal.MoveNext()) SampleAnimation((IEnumerator)reveal.Current)(1f);
+            Require(!move.MoveNext() && animator.transform.Find("OverframeLanding") == null,
+                "The regular copy borrowed the special edition landing.");
 
             animator.QueueMove(new CardFlight(BlueEyes, start, end, true, true), CardMotion.SpecialSummon, null);
             move = queue.Dequeue();
@@ -505,27 +512,27 @@ namespace YGOPortable.Editor
 
         private static void VerifyStandardCutIn(CardAnimationManager animator, Queue<IEnumerator> queue, CardPose start, CardPose end)
         {
-            var flight = new CardFlight(SkullRedBird, start, end, false, false, default(DeckCardAppearance));
-            animator.QueueMove(flight, CardMotion.Summon, null);
-            var move = queue.Dequeue();
-            Require(move.MoveNext() && move.Current.GetType().Name.StartsWith("<RevealSummon>", StringComparison.Ordinal),
-                "A supported standard monster missed its first summon cut-in.");
-            var reveal = (IEnumerator)move.Current;
-            Require(reveal.MoveNext(), "The standard reveal did not start.");
-            SampleAnimation((IEnumerator)reveal.Current)(1f);
-            Require(animator.transform.Find("SummonPortrait").GetComponent<CanvasGroup>().alpha > .95f &&
-                !animator.transform.Find("MovingCard").GetComponent<CompositeCardView>().HasOverframe,
-                "The standard cut-in was absent or received the special card finish.");
-            while (reveal.MoveNext()) SampleAnimation((IEnumerator)reveal.Current)(1f);
-            Require(!move.MoveNext() && animator.transform.Find("OverframeLanding") == null,
-                "The standard copy used the special edition landing.");
-            animator.QueueMove(flight, CardMotion.Summon, null);
-            move = queue.Dequeue();
-            Require(move.MoveNext() && !move.Current.GetType().Name.StartsWith("<RevealSummon>", StringComparison.Ordinal),
-                "The same standard monster replayed the full introduction.");
-            while (move.MoveNext()) { }
+            var flight = new CardFlight(SkullRedBird, start, end, true, false, default(DeckCardAppearance));
+            foreach (var motion in new[] { CardMotion.Summon, CardMotion.SpecialSummon })
+            {
+                animator.QueueMove(flight, motion, null);
+                var move = queue.Dequeue();
+                Require(move.MoveNext() && move.Current.GetType().Name.StartsWith("<RevealSummon>", StringComparison.Ordinal),
+                    $"A supported standard monster missed its {motion} cut-in after appearing in a group.");
+                var reveal = (IEnumerator)move.Current;
+                Require(reveal.MoveNext(), "The standard reveal did not start.");
+                var portrait = animator.transform.Find("SummonPortrait").GetComponent<CanvasGroup>();
+                Require(portrait.alpha == 0f, "The standard portrait appeared before the card turned up.");
+                SampleAnimation((IEnumerator)reveal.Current)(1f);
+                Require(portrait.alpha > .95f &&
+                    !animator.transform.Find("MovingCard").GetComponent<CompositeCardView>().HasOverframe,
+                    "The standard cut-in was absent or received the special card finish.");
+                while (reveal.MoveNext()) SampleAnimation((IEnumerator)reveal.Current)(1f);
+                Require(!move.MoveNext() && animator.transform.Find("OverframeLanding") == null,
+                    "The standard copy used the special edition landing.");
+            }
             animator.Clear();
-            Debug.Log("[VERIFY STANDARD CUT-IN] A matching standard card showed its first portrait and kept its regular finish.");
+            Debug.Log("[VERIFY STANDARD CUT-IN] A regular copy replayed its portrait on normal and special summons while keeping its regular finish.");
         }
 
         private static void VerifyOverframeActivationProjection(CardAnimationManager animator, Queue<IEnumerator> queue, CardPose start)

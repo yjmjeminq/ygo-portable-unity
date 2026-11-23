@@ -800,8 +800,7 @@ namespace YGOPortable.UI
             for (int i = 0; i < moves.Count; i++)
             {
                 var move = moves[i];
-                if (IsSummonMotion(move.Motion) && (IsSpecialEditionLanding(move.Flight) || SupportsSummonOverframe(move.Flight) ||
-                    TakeFeaturedSummon(move.Flight, requirePortrait: true)))
+                if (IsSummonMotion(move.Motion) && (IsSpecialEditionLanding(move.Flight) || HasSummonPortrait(move.Flight)))
                     (aces ??= new List<int>()).Add(i);
             }
             if (aces == null) return null;
@@ -837,7 +836,7 @@ namespace YGOPortable.UI
                 flights[i] = new CardFlight(flight.Code, flight.From, poses[i], flight.StartsFaceDown, false, flight.Appearance);
                 if (!flight.StartsFaceDown && moves[i].Readout?.DestinationCard is { } live)
                     views[i].SetDeckCard(flight.Code, flight.Appearance, live: live);
-                if (!SupportsSummonOverframe(flight))
+                if (flight.Appearance?.overframe == false || !HasSummonPortrait(flight))
                 {
                     var (_, accent, _) = SummonEffect(flight.Code, moves[i].Motion);
                     float h = poses[i].Size.y;
@@ -1226,8 +1225,9 @@ namespace YGOPortable.UI
 
             bool extraSummon = motion is CardMotion.ExtraDeckSummon or CardMotion.PendulumSummon;
             bool summons = IsSummonMotion(motion);
-            bool overframe = summons && (IsSpecialEditionLanding(flight) || SupportsSummonOverframe(flight));
-            bool featured = summons && TakeFeaturedSummon(flight);
+            bool hasPortrait = summons && HasSummonPortrait(flight);
+            bool overframe = summons && (IsSpecialEditionLanding(flight) || (hasPortrait && flight.Appearance?.overframe != false));
+            bool featured = summons && (hasPortrait || TakeFeaturedSummon(flight));
             bool reveal = !flight.EndsFaceDown && (extraSummon || featured || overframe);
             var proxy = PrepareFlightCard(flight, reveal);
             var moving = reveal ? null : CreateMovingReadout(flight, motion, readout);
@@ -1353,9 +1353,11 @@ namespace YGOPortable.UI
             impact?.Invoke(1f);
         }
 
-        private static bool SupportsSummonOverframe(CardFlight flight)
+        private static bool HasSummonPortrait(CardFlight flight)
         {
-            if (flight.EndsFaceDown || flight.Appearance?.overframe == false) return false;
+            if (flight.EndsFaceDown || flight.Code == 0) return false;
+            var card = CardDatabase.Get(flight.Code);
+            if (card?.IsMonster != true || (card.type & YgoConstants.TYPE_TOKEN) != 0) return false;
             var (artCode, artVariant) = ResolveSummonPortrait(flight);
             return DuelVisualAssets.CanDisplayCutIn(artCode, artVariant);
         }
@@ -1367,7 +1369,7 @@ namespace YGOPortable.UI
             return artCode == 0 ? (flight.Code, selected) : (artCode, artVariant);
         }
 
-        internal bool TakeFeaturedSummon(CardFlight flight, bool requirePortrait = false)
+        internal bool TakeFeaturedSummon(CardFlight flight)
         {
             if (flight.EndsFaceDown || flight.Code == 0) return false;
             var card = CardDatabase.Get(flight.Code);
@@ -1375,10 +1377,7 @@ namespace YGOPortable.UI
             uint key = CardDatabase.GetArchetypeCollectionKey(card);
             bool signature = DeckRepository.PresetDecks.Exists(deck => deck.sigCard == key || deck.sigCard == flight.Code);
             bool rareBoss = (card.IsExtra || card.atk >= 2400) && CardRarityCatalog.GetRarity(flight.Code) == CardRarity.UltraRare;
-            var (artCode, artVariant) = ResolveSummonPortrait(flight);
-            bool hasPortrait = CardArtLoader.SupportsOverframe(artCode, Mathf.Max(0, artVariant));
-            return (hasPortrait || !requirePortrait && (signature || rareBoss)) &&
-                _featuredSummons.Add((flight.To.Angle > 45f, key));
+            return (signature || rareBoss) && _featuredSummons.Add((flight.To.Angle > 45f, key));
         }
 
         private SummonPortraitView CreateSummonPortrait(string name, CardFlight flight, Vector2 center, Vector2 size,
