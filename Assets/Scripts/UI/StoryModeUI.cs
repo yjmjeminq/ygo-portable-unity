@@ -53,6 +53,8 @@ namespace YGOPortable.UI
         };
 
         private readonly GameAppController _app;
+        private static readonly string[] TurnOrderHands = { "가위", "바위", "보" };
+        private readonly System.Random _turnOrderRandom;
         private readonly (string Id, Button Button, StoryScriptRoot Script)[] _seriesTabs;
         private readonly List<UserDeck> _playableDecks = new();
         private readonly Button[] _chapterButtons = new Button[ChapterCount];
@@ -77,6 +79,9 @@ namespace YGOPortable.UI
         private string _deckId;
         private StoryStance _stance;
         private RaidSupport _supports;
+        private Action _returnFromTurnOrder;
+        private Action _startAfterLoss;
+        private float _lossRevealTime;
 
         internal GameObject Root { get; }
         internal GameObject ActiveRoot => _dialogue.IsOpen ? _dialogue.ActiveRoot : Root;
@@ -84,9 +89,10 @@ namespace YGOPortable.UI
         private StoryScriptRoot Script => _seriesTabs[_selectedSeries].Script;
         private string SeriesId => _seriesTabs[_selectedSeries].Id;
 
-        internal StoryModeUI(GameAppController app, Transform parent)
+        internal StoryModeUI(GameAppController app, Transform parent, System.Random turnOrderRandom = null)
         {
             _app = app;
+            _turnOrderRandom = turnOrderRandom ?? new System.Random();
             var root = DuelUiKit.FillRect("Screen_StoryMode", parent);
             Root = root.gameObject;
             DuelUiKit.AddImage(root.gameObject, DuelUiChrome.Backdrop, Color.white, false, false);
@@ -184,7 +190,12 @@ namespace YGOPortable.UI
             _dialogue.RefreshChoices();
         }
 
-        internal void Update(float delta) => _dialogue.Update(delta);
+        internal void Update(float delta)
+        {
+            _dialogue.Update(delta);
+            if (_startAfterLoss != null && (_lossRevealTime -= delta) <= 0f)
+                _startAfterLoss();
+        }
 
         internal void Back()
         {
@@ -193,7 +204,9 @@ namespace YGOPortable.UI
                 _app.ShowScreen(AppScreen.MainMenu);
                 return;
             }
-            if (!_dialogue.ClosePopup()) ReturnToEpisodes();
+            if (_dialogue.ClosePopup()) return;
+            if (_returnFromTurnOrder != null) CancelTurnOrder();
+            else ReturnToEpisodes();
         }
 
         internal bool CanPlay(StoryEpisodeData episode)
@@ -220,13 +233,14 @@ namespace YGOPortable.UI
                             index + 1 < Script.episodes.Length && CanPlay(Script.episodes[index + 1])),
                         new("에피소드 목록으로", ReturnToEpisodes));
                 }
-                else
-                    _dialogue.ShowChoices(() => reward,
-                        new("즉시 재도전", () => LaunchDuel(episode), () => _playableDecks.Count > 0),
-                        new("내 덱 변경 후 재도전", PickDeck),
-                        new("에피소드 목록으로", ReturnToEpisodes),
-                        new("전술 서포트 장착", () => PickSupports(episode)));
+                else ShowRetry();
             });
+
+            void ShowRetry() => _dialogue.ShowChoices(() => reward,
+                new("즉시 재도전", () => ChooseTurnOrder(episode, ShowRetry), () => _playableDecks.Count > 0),
+                new("내 덱 변경 후 재도전", PickDeck),
+                new("에피소드 목록으로", ReturnToEpisodes),
+                new("전술 서포트 장착", () => PickSupports(episode)));
         }
 
         internal void ShowStatus(string status) => _status.text = status;
@@ -422,13 +436,7 @@ namespace YGOPortable.UI
             var deck = GetOpponentMatch(episode).Deck;
             var choices = StoryDialogueBranch.Create(episode, raid.HasValue,
                 deck?.sigCard is > 0 ? CardDatabase.GetName(deck.sigCard) : "");
-            PlayDialogue(episode, episode.preDialogues, TitleOf(episode), () =>
-                _dialogue.ShowChoices(() => PreparationSummary(raid),
-                    new("듀얼 개시!", () => LaunchDuel(episode), () => _playableDecks.Count > 0),
-                    new("내 덱 변경", PickDeck),
-                    new("대화 다시 보기", () => OpenEpisode(index)),
-                    new("에피소드 목록으로", ReturnToEpisodes),
-                    new("전술 서포트 장착 · 최대 2개", () => PickSupports(episode))));
+            PlayDialogue(episode, episode.preDialogues, TitleOf(episode), ShowPreparation);
             _dialogue.SetBranch(StoryDialogueBranch.AfterLine(episode), () =>
                 _dialogue.ShowChoices(() => "어떻게 답할까?", choices.Select(choice => new StoryChoice(
                     $"{choice.Reply}\n{StoryDialogueBranch.Effect(choice.Stance)}", () =>
@@ -436,6 +444,13 @@ namespace YGOPortable.UI
                         _stance = choice.Stance;
                         _dialogue.AnswerBranch(choice.Reply, episode.opponentName, choice.Response);
                     })).ToArray()));
+
+            void ShowPreparation() => _dialogue.ShowChoices(() => PreparationSummary(raid),
+                new("듀얼 개시!", () => ChooseTurnOrder(episode, ShowPreparation), () => _playableDecks.Count > 0),
+                new("내 덱 변경", PickDeck),
+                new("대화 다시 보기", () => OpenEpisode(index)),
+                new("에피소드 목록으로", ReturnToEpisodes),
+                new("전술 서포트 장착 · 최대 2개", () => PickSupports(episode)));
         }
 
         private string PreparationSummary(StoryRaid? raid)
@@ -465,10 +480,59 @@ namespace YGOPortable.UI
             _dialogue.RefreshChoices();
         }, _app.OpenStoryDeckEditor, _deckId);
 
-        private void LaunchDuel(StoryEpisodeData episode)
+        private void ChooseTurnOrder(StoryEpisodeData episode, Action restore)
         {
-            if (_playableDecks.Count > 0)
-                _app.StartStoryDuel(episode, _playableDecks[_deckPicker.value], new StoryBattlePlan(_stance, _supports));
+            if (_playableDecks.Count == 0 || _returnFromTurnOrder != null) return;
+            var myDeck = _playableDecks[_deckPicker.value];
+            var rivalDeck = GetOpponentMatch(episode).Deck;
+            if (rivalDeck == null) return;
+            var plan = new StoryBattlePlan(_stance, _supports);
+            _returnFromTurnOrder = restore;
+            ShowHands("가위바위보 · 이기면 선공 또는 후공을 선택합니다.");
+
+            void ShowHands(string summary) => _dialogue.ShowChoices(() => summary,
+                new(TurnOrderHands[0], () => PlayHand(0)), new(TurnOrderHands[1], () => PlayHand(1)),
+                new(TurnOrderHands[2], () => PlayHand(2)), new("돌아가기", CancelTurnOrder));
+
+            void PlayHand(int hand)
+            {
+                int opponent = _turnOrderRandom.Next(TurnOrderHands.Length);
+                string result = $"나 {TurnOrderHands[hand]} · 상대 {TurnOrderHands[opponent]}";
+                if (hand == opponent)
+                    ShowHands(result + "\n무승부 · 다시 선택하세요.");
+                else if ((hand - opponent + TurnOrderHands.Length) % TurnOrderHands.Length == 1)
+                    _dialogue.ShowChoices(() => result + "\n승리 · 선공 또는 후공을 선택하세요.",
+                        new("선공", () => Start(true)), new("후공", () => Start(false)), new("돌아가기", CancelTurnOrder));
+                else
+                {
+                    bool rivalFirst = OfflineRanked.OpponentTakesFirst(rivalDeck);
+                    _startAfterLoss = () => Start(!rivalFirst);
+                    _lossRevealTime = 1.1f;
+                    _dialogue.ShowChoices(() => result + (rivalFirst ? "\n상대가 선공을 선택했습니다." : "\n상대가 후공을 선택했습니다."),
+                        new("듀얼 시작", _startAfterLoss), new("돌아가기", CancelTurnOrder));
+                }
+            }
+
+            void Start(bool playerFirst)
+            {
+                if (_returnFromTurnOrder == null) return;
+                ClearTurnOrder();
+                _app.StartStoryDuel(episode, myDeck, playerFirst, plan);
+                if (Root.activeInHierarchy) restore();
+            }
+        }
+
+        private void CancelTurnOrder()
+        {
+            var restore = _returnFromTurnOrder;
+            ClearTurnOrder();
+            restore?.Invoke();
+        }
+
+        private void ClearTurnOrder()
+        {
+            _returnFromTurnOrder = null;
+            _startAfterLoss = null;
         }
 
         private void PlayDialogue(StoryEpisodeData episode, StoryDialogueLine[] lines, string heading, Action onFinish)
@@ -487,6 +551,7 @@ namespace YGOPortable.UI
 
         private void ResetDialogue()
         {
+            ClearTurnOrder();
             _dialogue.Close();
             _browser.interactable = true;
             _browser.blocksRaycasts = true;

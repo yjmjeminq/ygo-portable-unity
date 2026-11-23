@@ -55,7 +55,7 @@ namespace YGOPortable.Editor
             var app = canvas.AddComponent<GameAppController>();
             try
             {
-                var story = new StoryModeUI(app, canvas.transform);
+                var story = new StoryModeUI(app, canvas.transform, new StoryHandSequence(0, 0, 2));
                 var root = story.Root.transform;
                 Transform dialogue = root.Find("StoryDialogue");
                 Button Control(Transform scope, string path) => scope.Find(path + "/Button").GetComponent<Button>();
@@ -109,6 +109,27 @@ namespace YGOPortable.Editor
                 Control(pick, "Apply").onClick.Invoke();
                 Require(scene.Find("Choices/Summary/Label").GetComponent<Text>().text.Contains(second.name),
                     "Changing decks lost the conversation or kept the old deck.");
+                var summary = scene.Find("Choices/Summary/Label").GetComponent<Text>();
+                Button Choice(int index) => Control(scene, $"Choices/Choice_{index}");
+                Choice(0).onClick.Invoke();
+                Require(summary.text.Contains("가위바위보") && Choice(1).GetComponentInChildren<Text>().text == "바위",
+                    "A story duel bypassed the turn order chooser.");
+                Choice(0).onClick.Invoke();
+                Require(summary.text.Contains("무승부") && Choice(2).IsInteractable(), "A tied hand did not reopen the choices.");
+                Choice(1).onClick.Invoke();
+                Require(summary.text.Contains("승리") && Choice(0).GetComponentInChildren<Text>().text == "선공" &&
+                    Choice(1).GetComponentInChildren<Text>().text == "후공", "A won hand did not let the player choose either order.");
+                story.Back();
+                Require(summary.text.Contains(second.name) && summary.text.Contains("패 7장"),
+                    "Backing out of turn order discarded the selected deck or raid support.");
+                Choice(0).onClick.Invoke();
+                Choice(1).onClick.Invoke();
+                Require(summary.text.Contains("상대가 선공을 선택했습니다") || summary.text.Contains("상대가 후공을 선택했습니다"),
+                    "A lost hand did not show the opponent's turn choice.");
+                story.Update(.4f);
+                Require(summary.text.Contains("상대가"), "A lost hand skipped the turn-order result.");
+                story.Update(.8f);
+                Require(summary.text.Contains(second.name), "A lost hand did not proceed after the result display.");
                 Control(scene, "Choices/Choice_2").onClick.Invoke();
                 Require(!scene.Find("Choices").gameObject.activeSelf && line.text.Length == 0, "Replay did not return to the first unread line.");
                 story.Back();
@@ -120,6 +141,12 @@ namespace YGOPortable.Editor
                 Require(Control(scene, "Choices/Choice_0").GetComponentInChildren<Text>().text.Contains("재도전") &&
                     Control(scene, "Choices/Choice_1").GetComponentInChildren<Text>().text.Contains("덱 변경"),
                     "The loss result did not expose retry and deck change.");
+                Choice(0).onClick.Invoke();
+                Require(summary.text.Contains("가위바위보"), "A story rematch bypassed the turn order chooser.");
+                story.Back();
+                Require(Choice(0).GetComponentInChildren<Text>().text.Contains("재도전"),
+                    "Backing out of a rematch did not restore the result options.");
+                Debug.Log("[VERIFY STORY TURN ORDER] Draw, choice after a win, automatic loss result, cancel and replay passed.");
                 story.Back();
                 Require(CollectionProgress.TryAwardStoryDuel(first.id, true, null, null, out _, out _, out string error), error);
                 story.Open();
@@ -138,6 +165,15 @@ namespace YGOPortable.Editor
                 UnityEngine.Object.DestroyImmediate(events);
                 UnityEngine.Object.DestroyImmediate(canvas);
             }
+        }
+
+        private sealed class StoryHandSequence : System.Random
+        {
+            private readonly Queue<int> _hands;
+
+            internal StoryHandSequence(params int[] hands) => _hands = new Queue<int>(hands);
+
+            public override int Next(int maxValue) => _hands.Dequeue();
         }
 
         private static void VerifyCampaigns()

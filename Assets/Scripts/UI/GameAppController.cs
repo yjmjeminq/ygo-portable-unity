@@ -385,7 +385,7 @@ namespace YGOPortable.UI
             return reason.Length == 0;
         }
 
-        internal void StartStoryDuel(StoryEpisodeData episode, UserDeck myDeck, StoryBattlePlan plan = default)
+        internal void StartStoryDuel(StoryEpisodeData episode, UserDeck myDeck, bool playerGoesFirst, StoryBattlePlan plan = default)
         {
             if (_screen != AppScreen.StoryMode || !_storyMode.CanPlay(episode)) return;
             if (!CollectionProgress.CanEquipRaidSupports(plan.Supports, _storyMode.GetRaid(episode).HasValue))
@@ -400,7 +400,7 @@ namespace YGOPortable.UI
             float deckStrength = levelCount > 1 ? (level - 1f) / (levelCount - 1f) : (episode.chapter - 1f) / 4f;
             float planningScale = _storyMode.GetRaid(episode) != null ? ComboSearch.MaxPlanningScale :
                 Mathf.Lerp(1f, ComboSearch.MaxPlanningScale, deckStrength);
-            StartDuelMatch(opponent, deck, myDeck, playerGoesFirst: true, isStoryDuel: true, planningScale: planningScale);
+            StartDuelMatch(opponent, deck, myDeck, playerGoesFirst, isStoryDuel: true, planningScale: planningScale);
         }
 
         internal void StartTournamentDuel(DimensionTournament run, UserDeck myDeck)
