@@ -22,7 +22,7 @@ namespace YGOPortable.UI
         private static readonly HashSet<string> UnreadableCutIns = new(StringComparer.Ordinal);
         private static ulong _cutInUse;
         internal static Texture2D ArenaSurface { get; } = Resources.Load<Texture2D>("Duel/ObservatorySlab");
-        internal static Texture2D ArenaBackdrop { get; } = Resources.Load<Texture2D>("Duel/ObservatoryBackdrop");
+        internal static Texture2D ArenaBackdrop { get; } = Resources.Load<Texture2D>("Duel/AqueductGarden");
         internal static Sprite MasterDuelLogo { get; } = Resources.Load<Sprite>("Title/MasterDuelLogo") ??
             LoadHudSprite("MasterDuelLogo");
         internal static Sprite PauseIcon { get; } = LoadHudSprite("Pause");
