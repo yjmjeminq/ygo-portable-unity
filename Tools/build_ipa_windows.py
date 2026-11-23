@@ -17,9 +17,9 @@ from urllib.request import Request, urlopen
 import zipfile
 
 if __package__:
-    from .ipa_local_visuals import append_local_visuals, prepare_local_visuals
+    from .ipa_local_visuals import append_local_visuals, prepare_local_interface, prepare_local_visuals
 else:
-    from ipa_local_visuals import append_local_visuals, prepare_local_visuals
+    from ipa_local_visuals import append_local_visuals, prepare_local_interface, prepare_local_visuals
 
 
 PROJECT = Path(__file__).resolve().parents[1]
@@ -244,14 +244,19 @@ def verify_ipa(ipa, snapshot):
                 raise BuildError(f"IPA에 포함된 {name} 파일이 작업 폴더와 다릅니다.")
 
 
-def build(editor, github, branch, revision, scratch, local_cutins=None):
-    visuals = prepare_local_visuals(local_cutins) if local_cutins else None
-    if visuals is not None:
+def build(editor, github, branch, revision, scratch, local_cutins=None, local_interface=None):
+    visuals = {}
+    if local_cutins:
+        visuals.update(prepare_local_visuals(local_cutins))
         portraits = sum(name.startswith("CutIns/") for name in visuals)
         message = f"    최종 IPA에 로컬 컷인 {portraits}개와 전체 일러스트 팩을 포함합니다."
         if "overframeart.pack" in visuals:
             message += " 원본 오버프레임 앞면 팩도 포함합니다."
         print(message)
+    if local_interface:
+        interface = prepare_local_interface(local_interface)
+        visuals.update(interface)
+        print(f"    최종 IPA에 로컬 슬리브·속성·종족 이미지 {len(interface)}개를 포함합니다.")
     snapshot = scratch / "Project"
     for name in ("Assets", "Packages", "ProjectSettings"):
         shutil.copytree(PROJECT / name, snapshot / name)
@@ -294,7 +299,7 @@ def build(editor, github, branch, revision, scratch, local_cutins=None):
     ipa = scratch / "YGO-Portable-unsigned.ipa"
     with zipfile.ZipFile(artifact_zip) as artifact, artifact.open(ipa.name) as source, ipa.open("wb") as output:
         shutil.copyfileobj(source, output)
-    if visuals is not None:
+    if visuals:
         append_local_visuals(ipa, visuals)
     verify_ipa(ipa, snapshot)
     out_dir = PROJECT / "Builds/iOS/IPA"
@@ -307,7 +312,7 @@ def build(editor, github, branch, revision, scratch, local_cutins=None):
     finally:
         partial.unlink(missing_ok=True)
     print(f"\n완료 {destination}")
-    artifact_label = "GitHub 기본 빌드" if visuals is not None else "GitHub 다운로드"
+    artifact_label = "GitHub 기본 빌드" if visuals else "GitHub 다운로드"
     print(f"{artifact_label} https://github.com/{github.repository}/actions/runs/{run['id']}/artifacts/{artifact_id}")
     print("아이폰에서 기존 방식으로 서명해 설치하는 미서명 IPA입니다.")
 
@@ -317,6 +322,8 @@ def main():
     parser.add_argument("--check", action="store_true", help="빌드 없이 설치 상태와 GitHub 연결을 확인합니다.")
     parser.add_argument("--local-cutins", type=Path, metavar="DUEL_VISUALS",
                         help="PC의 DuelVisuals에서 컷인과 대응 일러스트를 최종 미서명 IPA에 추가합니다.")
+    parser.add_argument("--local-interface", type=Path, metavar="DUEL_VISUALS",
+                        help="PC의 DuelVisuals에서 슬리브와 속성·종족 이미지를 최종 미서명 IPA에 추가합니다.")
     options = parser.parse_args()
     if sys.version_info < (3, 9):
         raise BuildError("Python 3.9 이상이 필요합니다.")
@@ -329,7 +336,7 @@ def main():
     temp_root = Path(tempfile.gettempdir()).resolve()
     scratch = Path(tempfile.mkdtemp(prefix="ygo-ipa-", dir=temp_root)).resolve()
     try:
-        build(editor, github, branch, revision, scratch, options.local_cutins)
+        build(editor, github, branch, revision, scratch, options.local_cutins, options.local_interface)
     finally:
         # Remove only the temporary directory allocated for this build.
         if scratch.resolve().parent == temp_root and scratch.name.startswith("ygo-ipa-"):

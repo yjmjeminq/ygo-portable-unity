@@ -70,6 +70,29 @@ def prepare_local_visuals(directory):
     return visuals
 
 
+def prepare_local_interface(directory):
+    """Select the sleeve and individual identity icons supported by the game."""
+    directory = directory.resolve(strict=True)
+    files = [directory / "Hud" / "DeckBack.png"]
+    for group in ("attribute", "race"):
+        files.extend(sorted((directory / "CardIcons" / group).glob("*.png")))
+
+    visuals = {}
+    for file in files:
+        if not file.exists():
+            continue
+        relative = file.relative_to(directory).as_posix()
+        if not file.is_file() or file.resolve(strict=True) != file:
+            raise ValueError(f"Unexpected local interface artwork: {relative}.")
+        with file.open("rb") as image:
+            if image.read(len(PNG_HEADER)) != PNG_HEADER:
+                raise ValueError(f"Invalid local interface PNG: {relative}.")
+        visuals[relative] = file
+    if not visuals:
+        raise ValueError("No local sleeve or card identity PNG files were found.")
+    return visuals
+
+
 def _app_visual_path(package):
     apps = [name[:-len("/Info.plist")] for name in package.namelist()
             if re.fullmatch(r"Payload/[^/]+[.]app/Info[.]plist", name)]
@@ -88,8 +111,12 @@ def _digest(handle):
 def append_local_visuals(ipa, sources):
     with zipfile.ZipFile(ipa, "a") as package:
         prefix = _app_visual_path(package)
-        if any(name.startswith(prefix) for name in package.namelist()):
+        existing = set(package.namelist())
+        if "cardart.pack" in sources and any(name.startswith(prefix) for name in existing):
             raise ValueError("The IPA already contains a duel visuals package.")
+        for relative in sources:
+            if prefix + relative in existing:
+                raise ValueError(f"The IPA already contains {relative}.")
         for relative, source in sources.items():
             package.write(source, prefix + relative, compress_type=zipfile.ZIP_STORED)
 
