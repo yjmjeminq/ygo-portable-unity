@@ -369,11 +369,19 @@ namespace YGOPortable.Editor
             var enter = SampleAnimation((IEnumerator)reveal.Current);
             var view = animator.transform.Find("MovingCard");
             var fullscreen = animator.transform.Find("SummonPortrait");
+            var name = animator.transform.Find("SummonName").GetComponent<CanvasGroup>();
+            var stats = name.transform.Find("SummonStats").GetComponent<CanvasGroup>();
+            var framing = animator.transform.Find("SummonShade/SummonFraming").GetComponent<CanvasGroup>();
             Require(view.GetComponent<CompositeCardView>().CurrentCode == 0 && view.Find("Overframe") == null,
                 "The summon revealed the subject before its card was turned up.");
             Require(fullscreen != null && fullscreen.GetComponent<CanvasGroup>().alpha == 0f &&
-                ((RectTransform)fullscreen).rect.height >= ((RectTransform)animator.transform).rect.height * .70f,
+                ((RectTransform)fullscreen).rect.height >= ((RectTransform)animator.transform).rect.height * .70f &&
+                name.alpha == 0f && stats.alpha == 0f && framing.alpha == 0f,
                 "The large summon subject was missing or showed before the card was public.");
+            enter(.69f);
+            var light = fullscreen.Find("Light").GetComponent<Image>().color;
+            Require(framing.alpha > 0f && name.alpha == 0f && stats.alpha == 0f && light.r > light.g && light.g > light.b,
+                "The portrait did not enter with its attribute tint before the name and stats.");
             enter(.51f);
             Canvas.ForceUpdateCanvases();
             var layer = view.Find("Overframe");
@@ -388,17 +396,27 @@ namespace YGOPortable.Editor
                 animator.transform.Find("Chain").GetComponent<DuelEffectGraphic>().Tint == DuelStyle.ChainGold &&
                 fullscreen.GetComponent<CanvasGroup>().alpha > .95f && view.GetComponent<CanvasGroup>().alpha < .05f,
                 "The summon did not produce gold feedback or enlarge the overframe at impact.");
+            Require(name.alpha > .95f && stats.alpha == 0f, "The stats covered the portrait entrance.");
             Require(reveal.MoveNext(), "The summon omitted the overframe landing.");
-            SampleAnimation((IEnumerator)reveal.Current)(1f);
-            Require(Mathf.Approximately(tilt.localScale.x, 1f), "The subject did not settle to its intended size.");
+            var settle = SampleAnimation((IEnumerator)reveal.Current);
+            var statsRect = (RectTransform)stats.transform;
+            float statsStartX = statsRect.anchoredPosition.x;
+            settle(.31f);
+            Require(stats.alpha is > 0f and < 1f && statsRect.anchoredPosition.x < statsStartX,
+                "The stat strip did not slide into view during the hold.");
+            settle(1f);
+            Require(Mathf.Approximately(tilt.localScale.x, 1f) && stats.alpha == 1f,
+                "The subject or stat strip did not settle before the card travelled to the field.");
             Require(reveal.MoveNext(), "The ace did not travel to the field.");
             TrackStableOverframe(layer, SampleAnimation((IEnumerator)reveal.Current), .05f, 1f);
             float fittedHeight = Mathf.Min(end.Size.y, end.Size.x / LotdUiKit.CardAspectRatio);
             Require(fixedRect.sizeDelta == initialSize && Mathf.Abs(fixedRect.rect.height * fixedRect.localScale.y - fittedHeight) < .1f &&
                 Vector2.Distance(fixedRect.anchoredPosition, end.Position) < .1f, "The fixed summon layout missed its destination.");
             Require(!reveal.MoveNext() && !move.MoveNext() && landed && (view == null || !view.gameObject.activeSelf) &&
-                animator.transform.Find("ChainImpactWave") == null && animator.transform.Find("SummonPortrait") == null,
+                animator.transform.Find("ChainImpactWave") == null && animator.transform.Find("SummonPortrait") == null &&
+                animator.transform.Find("SummonShade") == null && animator.transform.Find("SummonName") == null,
                 "The overframe cut-in outlived the summon.");
+            Debug.Log("[VERIFY SUMMON STAGING] Attribute portrait, framing, name, stats and field handoff passed.");
 
             landed = false;
             Vector2 liveEnd = end.Position;
@@ -831,7 +849,7 @@ namespace YGOPortable.Editor
         {
             const uint accesscode = 86066372;
             var pose = new CardPose(Vector2.zero, new Vector2(160, 230));
-            var plate = animator.SummonPlate(new CardFlight(accesscode, pose, pose, false, false), "링크 소환", Vector2.zero);
+            var (plate, _) = animator.SummonPlate(new CardFlight(accesscode, pose, pose, false, false), "링크 소환", Vector2.zero);
             try
             {
                 var root = plate.transform;

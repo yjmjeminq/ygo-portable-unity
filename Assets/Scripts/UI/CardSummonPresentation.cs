@@ -180,6 +180,34 @@ namespace YGOPortable.UI
         private Image SummonScreenTint(string name) =>
             LotdUiKit.AddImage(LotdUiKit.FillRect(name, _layer).gameObject, LotdUiKit.WhiteSprite, Color.clear, false, false);
 
+        private static Color SummonPortraitAccent(uint attribute, Color fallback) => attribute switch
+        {
+            YgoConstants.ATTRIBUTE_EARTH => new Color(.91f, .64f, .40f),
+            YgoConstants.ATTRIBUTE_WATER => new Color(.31f, .79f, 1f),
+            YgoConstants.ATTRIBUTE_FIRE => new Color(1f, .40f, .21f),
+            YgoConstants.ATTRIBUTE_WIND => new Color(.36f, .91f, .63f),
+            YgoConstants.ATTRIBUTE_LIGHT => new Color(1f, .87f, .54f),
+            YgoConstants.ATTRIBUTE_DARK => new Color(.75f, .55f, 1f),
+            YgoConstants.ATTRIBUTE_DIVINE => new Color(1f, .76f, .38f),
+            _ => fallback,
+        };
+
+        private static CanvasGroup CreateSummonFraming(RectTransform parent, Color accent)
+        {
+            var framing = LotdUiKit.FillRect("SummonFraming", parent);
+            var visibility = framing.gameObject.AddComponent<CanvasGroup>();
+            visibility.interactable = visibility.blocksRaycasts = false;
+            visibility.alpha = 0f;
+            Color shade = new Color(.016f, .020f, .038f, .98f);
+            var top = LotdUiKit.CreateRect("Top", framing, new Vector2(0f, .952f), Vector2.one,
+                Vector2.zero, Vector2.zero);
+            var bottom = LotdUiKit.CreateRect("Bottom", framing, Vector2.zero, new Vector2(1f, .057f),
+                Vector2.zero, Vector2.zero);
+            LotdUiKit.AddImage(top.gameObject, LotdUiKit.WhiteSprite, shade, false, false);
+            AddBandBackground(bottom, null, Color.Lerp(shade, accent, .40f));
+            return visibility;
+        }
+
         private void PoseSummonPeak(Image flash, Text circuitClosed, float progress, float canvasHeight)
         {
             float shock = Mathf.InverseLerp(.48f, .67f, progress);

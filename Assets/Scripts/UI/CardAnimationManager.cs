@@ -1446,17 +1446,27 @@ namespace YGOPortable.UI
             }
             proxy.transform.SetAsLastSibling();
             SummonPortraitView portrait = null;
+            CanvasGroup framing = null;
             CanvasGroup movingFace = null;
             if (featured || overframe)
             {
+                var tint = SummonPortraitAccent(new DuelCardReadout(CardDatabase.Get(flight.Code), live).Attribute, accent);
                 portrait = CreateSummonPortrait("SummonPortrait", flight, portraitCenter, new Vector2(view.x * .86f, view.y * .77f),
-                    accent, artworkFallback: IsSpecialEditionLanding(flight));
-                if (portrait != null && !proxy.TryGetComponent(out movingFace))
-                    movingFace = proxy.gameObject.AddComponent<CanvasGroup>();
+                    tint, artworkFallback: IsSpecialEditionLanding(flight));
+                if (portrait != null)
+                {
+                    framing = CreateSummonFraming(background.rectTransform, tint);
+                    if (!proxy.TryGetComponent(out movingFace))
+                        movingFace = proxy.gameObject.AddComponent<CanvasGroup>();
+                }
             }
             var nameCenter = center - new Vector2(portrait != null ? view.x * .083f : 0f, view.y * (portrait != null ? .30f : .24f));
-            var layout = SummonPlate(flight, title, nameCenter, live);
-            var layoutRect = (RectTransform)layout.transform;
+            var (name, stats) = SummonPlate(flight, title, nameCenter, live);
+            var nameRect = (RectTransform)name.transform;
+            var statsRect = (RectTransform)stats.transform;
+            Vector2 statsCenter = statsRect.anchoredPosition;
+            Vector2 statsEntrance = Vector2.right * Mathf.Min(62f, view.x * .045f);
+            statsRect.anchoredPosition = statsCenter + statsEntrance;
 
             bool playedImpact = !signature;
             if (playedImpact) LotdAudio.PlaySummon();
@@ -1472,8 +1482,8 @@ namespace YGOPortable.UI
                 effect.Seek(t * .54f);
                 if (signature) PoseSummonPeak(flash, circuitClosed, t * .54f, view.y);
                 background.color = new Color(.009f, .013f, .02f, Mathf.SmoothStep(0f, .64f, t));
-                layout.alpha = Mathf.SmoothStep(0f, 1f, (t - .40f) / .60f);
-                layoutRect.anchoredPosition = nameCenter + Vector2.left * (42f * (1f - layout.alpha));
+                name.alpha = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(portrait != null ? .74f : .47f, 1f, t));
+                nameRect.anchoredPosition = nameCenter + Vector2.left * (42f * (1f - name.alpha));
                 if (overframe)
                 {
                     aura.Seek(PopSummonOverframe(proxy, signature ? Mathf.InverseLerp(.30f, 1f, t) : t) * .49f);
@@ -1484,6 +1494,7 @@ namespace YGOPortable.UI
                     float emerge = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(signature ? .58f : .48f, .95f, t));
                     portrait.Pose(portraitCenter + Vector2.right * (view.x * .17f * (1f - emerge)), emerge,
                         Mathf.Lerp(.90f, 1.055f, emerge));
+                    framing.alpha = emerge;
                     movingFace.alpha = 1f - emerge;
                 }
             });
@@ -1491,6 +1502,8 @@ namespace YGOPortable.UI
             {
                 effect.Seek(.54f + t * .22f);
                 if (signature) PoseSummonPeak(flash, circuitClosed, .54f + t * .22f, view.y);
+                stats.alpha = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.04f, .67f, t));
+                statsRect.anchoredPosition = statsCenter + statsEntrance * (1f - stats.alpha);
                 proxy.SetRarityHighlight(Mathf.Lerp(.85f, .25f, t));
                 if (portrait != null)
                 {
@@ -1513,13 +1526,14 @@ namespace YGOPortable.UI
                 proxy.SetRarityHighlight(.25f * (1f - t));
                 effect.Seek(.76f + t * .24f);
                 if (signature) PoseSummonPeak(flash, circuitClosed, .76f + t * .24f, view.y);
-                layout.alpha = 1f - t;
+                name.alpha = 1f - t;
                 background.color = new Color(.009f, .013f, .02f, .64f * (1f - t));
                 if (portrait != null)
                 {
                     float dissolve = Mathf.SmoothStep(0f, 1f, t * 2.5f);
                     portrait.Pose(Vector2.Lerp(portraitCenter, flight.To.AtLayout().Position, dissolve * .28f),
                         1f - dissolve, Mathf.Lerp(1f, .84f, dissolve));
+                    framing.alpha = 1f - dissolve;
                     movingFace.alpha = dissolve;
                 }
                 if (overframe)
@@ -1530,7 +1544,7 @@ namespace YGOPortable.UI
             });
             RemoveTransient(background.gameObject);
             RemoveTransient(effect.gameObject);
-            RemoveTransient(layout.gameObject);
+            RemoveTransient(name.gameObject);
             if (flash != null) RemoveTransient(flash.gameObject);
             if (circuitClosed != null) RemoveTransient(circuitClosed.transform.parent.gameObject);
             if (portrait != null) RemoveTransient(portrait.gameObject);
@@ -1578,7 +1592,8 @@ namespace YGOPortable.UI
             proxy.SetRarityHighlight(Mathf.SmoothStep(0f, .85f, progress));
         }
 
-        internal CanvasGroup SummonPlate(CardFlight flight, string summonType, Vector2 center, LiveCardState live = null)
+        internal (CanvasGroup Name, CanvasGroup Stats) SummonPlate(CardFlight flight, string summonType, Vector2 center,
+            LiveCardState live = null)
         {
             float width = Mathf.Min(_layer.rect.width * .64f, 678f);
             var holder = CenteredVisual("SummonName", _layer, center, new Vector2(width, 65f));
@@ -1603,7 +1618,9 @@ namespace YGOPortable.UI
 
             var stats = CenteredVisual("SummonStats", holder, new Vector2(width * .20f, -55f), new Vector2(width * .60f, 40f));
             new DuelStatStrip(stats, compact: false).Bind(card, opponent: flight.To.Angle > 45f);
-            return group;
+            var statsGroup = stats.gameObject.AddComponent<CanvasGroup>();
+            statsGroup.alpha = 0f;
+            return (group, statsGroup);
         }
 
         internal static (DuelEffectKind kind, Color color, string label) SummonEffect(uint code, CardMotion motion)

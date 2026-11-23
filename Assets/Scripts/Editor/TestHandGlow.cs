@@ -2743,7 +2743,7 @@ namespace YGOPortable.Editor
                 "The summon readout missed a continuous effect applied before presentation.");
             var pose = new CardPose(Vector2.zero, new Vector2(160, 230));
             var flight = new CardFlight(theseus, pose, pose, true, false);
-            var plate = animation.SummonPlate(flight, "융합 소환", Vector2.zero, stats);
+            var (plate, _) = animation.SummonPlate(flight, "융합 소환", Vector2.zero, stats);
             Require(plate.transform.Find("Caption/Value").GetComponent<Text>().text == "융합 소환" &&
                     plate.transform.Find("Caption/Rating/Number")?.GetComponent<Text>().text == "4" &&
                     plate.transform.Find("SummonStats/Attack/Digits/Value").GetComponent<Text>().text == "2400" &&
