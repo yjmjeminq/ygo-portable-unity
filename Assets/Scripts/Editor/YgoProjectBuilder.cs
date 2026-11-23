@@ -94,6 +94,7 @@ namespace YGOPortable.Editor
                 CardArtLoader.Initialize(streaming);
                 TestDeckEditing.Run(streaming);
                 TestDeckEditorConvenience.Run(streaming);
+                TestCollectionProgress.Run(streaming);
                 Debug.Log("[VERIFY DECK EDITOR] All deck editor checks passed.");
                 exit = 0;
             }

@@ -58,6 +58,7 @@ namespace YGOPortable.UI
             private readonly Button _logClose;
             private readonly GameObject _pickerRoot;
             private readonly Dropdown _picker;
+            private readonly Text _pickerStatus;
             private readonly Button _pickerApply;
             private readonly Button _pickerEdit;
             private StoryDialogueLine[] _dialogue;
@@ -168,6 +169,7 @@ namespace YGOPortable.UI
                 AddLabel(picker.Panel, "Title", .09f, .755f, .91f, .943f, 28, color: LotdUiKit.GoldAccent).text = "내 덱 변경";
                 var dropdown = Region(picker.Panel, "Decks", .092f, .526f, .908f, .704f);
                 _picker = LotdUiKit.CreateLotdDropdown(dropdown, "StoryDeck", Array.Empty<string>(), _ => { }, dynamicChoices: true);
+                _pickerStatus = AddLabel(picker.Panel, "DeckStatus", .092f, .469f, .908f, .532f, 18, color: LotdUiKit.TextMuted);
                 _pickerApply = AddButton(picker.Panel, "Apply", "선택한 덱 적용", .517f, .315f, .908f, .472f, ApplyDeck, gold: true);
                 _pickerEdit = AddButton(picker.Panel, "Edit", "덱 편집 열기", .092f, .315f, .483f, .472f, () => _editDeck?.Invoke());
                 AddButton(picker.Panel, "Back", "돌아가기", .31f, .098f, .69f, .246f, CloseDeckPicker);
@@ -260,7 +262,8 @@ namespace YGOPortable.UI
                 Focus(_choiceButtons.First(button => button.gameObject.activeSelf && button.interactable));
             }
 
-            internal void OpenDeckPicker(IReadOnlyList<UserDeck> decks, int selected, Action<int> apply, Action edit)
+            internal void OpenDeckPicker(IReadOnlyList<UserDeck> decks, int selected, Action<int> apply, Action edit,
+                string preferredId)
             {
                 _confirmDeck = apply;
                 _editDeck = edit;
@@ -268,6 +271,7 @@ namespace YGOPortable.UI
                 _picker.AddOptions(decks.Count == 0 ? new List<string> { "사용 가능한 덱 없음" } : decks.Select(deck => deck.name).ToList());
                 _picker.SetValueWithoutNotify(decks.Count == 0 ? 0 : Mathf.Clamp(selected, 0, decks.Count - 1));
                 _picker.RefreshShownValue();
+                _pickerStatus.text = decks.Count == 0 ? DuelDeckAvailability.ExplainEmptyList(preferredId) : "";
                 _picker.interactable = _pickerApply.interactable = decks.Count > 0;
                 OpenPopup(_pickerRoot, decks.Count == 0 ? _pickerEdit : _picker);
             }

@@ -51,7 +51,7 @@ namespace YGOPortable.Editor
             VerifyCrafting(materials, starter, profile);
             VerifyPurchasesAndRewards(save, profile);
             VerifyMyDeckPicker(starter, save);
-            VerifyDeckCopyLimitAndFullDisassembly(starter);
+            VerifyDeckCopyLimitAndFullDisassembly(starter, profile);
             Debug.Log($"[VERIFY COLLECTION] {starters.Count} starter deck sizes, legacy saves, uncapped inventory, shared crafting dust, " +
                 "deck copy limits, full disassembly, pack ownership, rollback and opponent access passed.");
         }
@@ -275,7 +275,7 @@ namespace YGOPortable.Editor
                 new Regex("\"cards\"\\s*:\\s*\\[").Replace(json, "\"cards\":[" + entry + ",", 1);
         }
 
-        private static void VerifyDeckCopyLimitAndFullDisassembly(UserDeck starter)
+        private static void VerifyDeckCopyLimitAndFullDisassembly(UserDeck starter, string profile)
         {
             var deck = new UserDeck
             {
@@ -289,11 +289,49 @@ namespace YGOPortable.Editor
                 "A fourth copy in Side bypassed the total deck copy limit.");
             deck.side.Clear();
 
+            VerifyMixedDeckEditions(deck, profile);
             int copies = CollectionProgress.GetOwnedCount(GracefulCharity);
             Require(CollectionProgress.TryDisassembleCards(new Dictionary<uint, int> { [GracefulCharity] = copies },
                     out string error) && CollectionProgress.GetOwnedCount(GracefulCharity) == 0 &&
                 !CollectionProgress.CanUseDeck(deck, out reason) && reason.Contains("보유 0장"),
                 $"Full disassembly did not update deck eligibility: {error}");
+        }
+
+        private static void VerifyMixedDeckEditions(UserDeck deck, string profile)
+        {
+            string original = File.ReadAllText(profile);
+            string save = Path.GetDirectoryName(profile);
+            string mixed = Regex.Replace(WithOwnership(original, GracefulCharity, 1),
+                "\"overframeCards\"\\s*:\\s*\\[[^\\]]*\\]",
+                $"\"overframeCards\":[{{\"code\":{GracefulCharity},\"count\":2}}]");
+            int start = deck.main.IndexOf(GracefulCharity);
+            try
+            {
+                File.WriteAllText(profile, mixed);
+                CollectionProgress.Load(save);
+                deck.SetAppearance(deck.main, start, new DeckCardAppearance { overframe = true });
+                deck.SetAppearance(deck.main, start + 2, new DeckCardAppearance { destinyDraw = true });
+                Require(CollectionProgress.CanUseDeck(deck, out string reason), reason);
+                Require(CollectionProgress.TryPrepareDeckForDuel(deck, out var prepared, out reason) &&
+                    prepared.main.SequenceEqual(deck.main) &&
+                    prepared.GetAppearance(prepared.main, start).overframe &&
+                    !prepared.GetAppearance(prepared.main, start + 1).overframe &&
+                    prepared.GetAppearance(prepared.main, start + 2).overframe &&
+                    prepared.GetAppearance(prepared.main, start + 2).destinyDraw &&
+                    !deck.GetAppearance(deck.main, start + 2).overframe && File.ReadAllText(profile) == mixed,
+                    $"Mixed editions did not preserve the saved deck and assign both owned Overframes. {reason}");
+                deck.SetAppearance(deck.main, start + 1, new DeckCardAppearance { overframe = true });
+                deck.SetAppearance(deck.main, start + 2, new DeckCardAppearance { overframe = true });
+                Require(!CollectionProgress.CanUseDeck(deck, out reason) && reason.Contains("오버프레임 보유 2장 / 필요 3장"),
+                    "The deck accepted more explicit Overframes than the player owns.");
+                Debug.Log("[VERIFY MIXED DECK EDITIONS] Owned Overframes filled regular slots without changing the saved deck.");
+            }
+            finally
+            {
+                for (int i = start; i < start + 3; i++) deck.SetAppearance(deck.main, i, default);
+                File.WriteAllText(profile, original);
+                CollectionProgress.Load(save);
+            }
         }
 
         private static void VerifyMyDeckPicker(UserDeck starter, string save)
@@ -365,8 +403,11 @@ namespace YGOPortable.Editor
                     "The picker did not fall back to an eligible deck after the selection became unusable.");
                 DeckRepository.UserDecks.Remove(first);
                 BrowseAndSelect();
+                string emptyMessage = setup.Find("MyDeck/DeckList/Empty/Value").GetComponent<Text>().text;
                 Require(list.GetComponentsInChildren<Button>().Length == 0 && !start.interactable &&
-                    setup.Find("MyDeck/DeckList/Empty/Value").GetComponent<Text>().text.Contains("사용 가능한 덱 없음"),
+                    emptyMessage.Contains("사용 가능한 덱 없음") && emptyMessage.Contains(updated.name) &&
+                    emptyMessage.Contains("40~60장") &&
+                    DuelDeckAvailability.ExplainEmptyList(missingCard.id).Contains("보유 0장 / 필요 1장"),
                     "The empty state did not disable Duel Start and explain that no deck can be used.");
 
                 uint unowned = missingCard.main[0];

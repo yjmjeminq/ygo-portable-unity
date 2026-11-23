@@ -53,6 +53,14 @@ namespace YGOPortable.Core
         public bool destinyDraw;
         internal int ArtworkVariant => artwork - 1;
         internal bool IsDefault => !overframe && artwork == 0 && !destinyDraw;
+
+        internal DeckCardAppearance WithAvailableArtwork(uint code)
+        {
+            var appearance = this;
+            if (overframe && CardArtLoader.SupportsOverframe(code) && !CardArtLoader.SupportsOverframe(code, ArtworkVariant))
+                appearance.artwork = CardArtLoader.FirstOverframeVariant(code) + 1;
+            return appearance;
+        }
     }
 
     [Serializable]

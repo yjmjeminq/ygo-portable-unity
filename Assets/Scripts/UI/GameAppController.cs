@@ -447,7 +447,12 @@ namespace YGOPortable.UI
                 _activeTournament = null;
                 oppDeck = OpponentDeckLevels.GetDecks(oppChar.id).First(deck => deck.id == oppDeck.id);
             }
-            if (!CanStartWithDeck(myDeck, out string reason))
+            var duelDeck = myDeck;
+            string reason;
+            bool deckReady = CollectionProgress.Initialized
+                ? CollectionProgress.TryPrepareDeckForDuel(myDeck, out duelDeck, out reason)
+                : CanStartWithDeck(myDeck, out reason);
+            if (!deckReady)
             {
                 ShowDuelStartFailure(isStoryDuel, reason, isTournamentDuel, isRankedDuel);
                 return;
@@ -491,7 +496,7 @@ namespace YGOPortable.UI
             if (!_session.StartNewDuel(
                 myDeck.main, myDeck.extra,
                 oppDeck.main, oppDeck.extra,
-                p0GoesFirst: playerGoesFirst, playerDeckAppearance: myDeck, opponentOpening: opening?.Opponent,
+                p0GoesFirst: playerGoesFirst, playerDeckAppearance: duelDeck, opponentOpening: opening?.Opponent,
                 opponentDestiny: GetOpponentDestinyCards(oppDeck), playerOpening: opening?.Player))
             {
                 ShowDuelStartFailure(isStoryDuel, "듀얼을 시작하지 못했습니다.", isTournamentDuel, isRankedDuel);

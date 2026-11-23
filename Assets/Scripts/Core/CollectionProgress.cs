@@ -457,8 +457,12 @@ namespace YGOPortable.Core
 
         public static UserDeck CreateStarterDeck() => HasStarter ? CopyDeck(_profile.starterDeck) : null;
 
-        public static bool CanUseDeck(UserDeck deck, out string reason)
+        public static bool CanUseDeck(UserDeck deck, out string reason) =>
+            ValidateDeckOwnership(deck, out _, out reason);
+
+        private static bool ValidateDeckOwnership(UserDeck deck, out bool useSpareOverframes, out string reason)
         {
+            useSpareOverframes = false;
             if (!ValidateDeck(deck, out reason)) return false;
             if (!Initialized) return true;
             if (!CanTransact(out reason)) return false;
@@ -469,15 +473,57 @@ namespace YGOPortable.Core
             }
             if (AllDeckCardsAvailable) return true;
 
-            foreach (var copies in deck.Copies().GroupBy(copy => (copy.Code, copy.Appearance.overframe)))
+            foreach (var copies in deck.Copies().GroupBy(copy => copy.Code))
             {
+                uint code = copies.Key;
                 int needed = copies.Count();
-                var (code, overframe) = copies.Key;
-                int owned = overframe ? GetOwnedOverframeCount(code) : GetOwnedCount(code);
-                if (owned >= needed) continue;
-                string edition = overframe ? " 오버프레임" : "";
-                reason = $"{CardDatabase.GetName(code)}{edition} 보유 {owned}장 / 필요 {needed}장";
-                return false;
+                int neededOverframes = copies.Count(copy => copy.Appearance.overframe);
+                int overframes = GetOwnedOverframeCount(code);
+                if (overframes < neededOverframes)
+                {
+                    reason = $"{CardDatabase.GetName(code)} 오버프레임 보유 {overframes}장 / 필요 {neededOverframes}장";
+                    return false;
+                }
+
+                int regular = GetOwnedCount(code);
+                int owned = CombinedCount(regular, overframes);
+                if (owned < needed)
+                {
+                    reason = $"{CardDatabase.GetName(code)} 보유 {owned}장 / 필요 {needed}장";
+                    return false;
+                }
+
+                useSpareOverframes |= regular < needed - neededOverframes;
+            }
+            return true;
+        }
+
+        internal static bool TryPrepareDeckForDuel(UserDeck deck, out UserDeck prepared, out string reason)
+        {
+            prepared = deck;
+            if (!ValidateDeckOwnership(deck, out bool useSpareOverframes, out reason)) return false;
+            if (!useSpareOverframes) return true;
+
+            // Keep the saved appearance preferences and use the actual editions for this duel.
+            prepared = CopyDeck(deck);
+            var regularUsed = new Dictionary<uint, int>();
+            foreach (var section in new[] { prepared.main, prepared.extra, prepared.side })
+            {
+                for (int index = 0; index < section.Count; index++)
+                {
+                    var appearance = prepared.GetAppearance(section, index);
+                    if (appearance.overframe) continue;
+                    uint code = section[index];
+                    int used = regularUsed.GetValueOrDefault(code);
+                    if (used < GetOwnedCount(code))
+                    {
+                        regularUsed[code] = used + 1;
+                        continue;
+                    }
+
+                    appearance.overframe = true;
+                    prepared.SetAppearance(section, index, appearance.WithAvailableArtwork(code));
+                }
             }
             return true;
         }

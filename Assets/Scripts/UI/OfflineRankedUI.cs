@@ -225,7 +225,8 @@ namespace YGOPortable.UI
                 row[3].text = $"{entry.opponent}\n{entry.opponentDeck}";
             }
             _resetSeason.gameObject.SetActive(OfflineRanked.CanReset(state));
-            _status.text = _decks.Length == 0 ? "출전 가능한 덱을 덱 편집에서 준비하세요." : $"보유 {CollectionProgress.Balance:N0} DP";
+            _status.text = _decks.Length == 0 ? DuelDeckAvailability.ExplainEmptyList(preferred) :
+                $"보유 {CollectionProgress.Balance:N0} DP";
             ShowDeck();
         }
 

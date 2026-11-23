@@ -383,7 +383,7 @@ namespace YGOPortable.UI
             _start.interactable = CanPlay(current) && ready;
             string status = !CanPlay(current) ? "이전 에피소드를 클리어하면 열립니다." :
                 !ready ? "상대 덱을 불러오지 못했습니다." :
-                _playableDecks.Count == 0 ? "덱 편집에서 사용할 수 있는 덱을 완성하세요." : "";
+                _playableDecks.Count == 0 ? DuelDeckAvailability.ExplainEmptyList(_deckId) : "";
             ShowStatus(GetRaid(current) is { } raidInfo
                 ? string.IsNullOrEmpty(status) ? raidInfo.Summary : $"{raidInfo.Summary}\n{status}"
                 : status);
@@ -456,7 +456,7 @@ namespace YGOPortable.UI
             episode.title.StartsWith("[BOSS RAID] ", StringComparison.Ordinal) ? episode.title.Substring(12) : episode.title;
 
         private string SelectedStoryDeckLabel() => _playableDecks.Count == 0
-            ? "사용 가능한 덱이 없습니다." : $"내 덱 · {_playableDecks[_deckPicker.value].name}";
+            ? DuelDeckAvailability.ExplainEmptyList(_deckId) : $"내 덱 · {_playableDecks[_deckPicker.value].name}";
 
         private void PickDeck() => _dialogue.OpenDeckPicker(_playableDecks, _deckPicker.value, index =>
         {
@@ -464,7 +464,7 @@ namespace YGOPortable.UI
             _deckPicker.RefreshShownValue();
             SelectDeck(index);
             _dialogue.RefreshChoices();
-        }, _app.OpenStoryDeckEditor);
+        }, _app.OpenStoryDeckEditor, _deckId);
 
         private void LaunchDuel(StoryEpisodeData episode)
         {

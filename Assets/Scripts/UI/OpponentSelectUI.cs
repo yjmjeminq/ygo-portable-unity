@@ -538,8 +538,7 @@ namespace YGOPortable.UI
                 count == 0 ? 0f : (count - 1) * MyDeckRowStep + MyDeckRowHeight);
             _emptyMyDecks.gameObject.SetActive(count == 0);
             if (count == 0)
-                _emptyMyDecks.text = DeckRepository.UserDecks.Count == 0 ? "저장된 덱 없음" :
-                    "사용 가능한 덱 없음\n덱 편집에서 덱을 확인하세요.";
+                _emptyMyDecks.text = $"사용 가능한 덱 없음\n{DuelDeckAvailability.ExplainEmptyList(preferredId)}";
             Canvas.ForceUpdateCanvases();
             SelectMyDeck(Mathf.Max(0, index));
         }
@@ -615,9 +614,9 @@ namespace YGOPortable.UI
         {
             if (!TryGetSelectedOpponentDeck(out var d)) return;
             var cloned = DeckRepository.ClonePresetToUserDeck(d);
-            bool playable = GameAppController.CanStartWithDeck(cloned, out _);
+            bool playable = GameAppController.CanStartWithDeck(cloned, out string reason);
             RefreshMyDecks(playable ? cloned : null);
-            ShowStatus(playable ? "덱 목록을 복제했습니다." : "덱 목록 복제 완료. 덱 편집에서 사용 조건을 확인하세요.");
+            ShowStatus(playable ? "덱 목록을 복제했습니다." : $"덱 목록 복제 완료 · {reason}");
         }
 
         private void OpenJanken()

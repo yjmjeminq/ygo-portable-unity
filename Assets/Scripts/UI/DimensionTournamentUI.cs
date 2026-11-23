@@ -235,7 +235,7 @@ namespace YGOPortable.UI
             _status.text = !unlocked ? "아무 시리즈의 50화를 클리어하면 대항전이 열립니다." :
                 _run == null ? "8강은 3연승, 16강은 4연승으로 우승합니다." :
                 _run.Champion ? "우승" : _run.lost ? "이번 대진에서 탈락했습니다." :
-                _decks.Count == 0 ? "듀얼에 사용할 수 있는 완성된 덱이 필요합니다." :
+                _decks.Count == 0 ? DuelDeckAvailability.ExplainEmptyList(_deckId) :
                 $"{DimensionTournament.RoundTitle(_run.PlayerNode)} · 다음 상대 {Name(_run.Opponent)}";
             DrawBracket();
         }

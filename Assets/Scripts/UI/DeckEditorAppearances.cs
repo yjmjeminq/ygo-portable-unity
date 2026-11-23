@@ -57,10 +57,15 @@ namespace YGOPortable.UI
         private DeckCardAppearance ReadAppearance(uint code, List<uint> cards, int index) =>
             cards != null ? _workingDeck.GetAppearance(cards, index) : _trunkAppearances.GetValueOrDefault(code);
 
-        private bool HasUnusedEdition(uint code, bool overframe)
+        private bool HasUnusedEdition(uint code, bool overframe) => UnusedEditionCount(code, overframe) > 0;
+
+        private int UnusedEditionCount(uint code, bool overframe, int releaseRegular = 0)
         {
             int owned = overframe ? CollectionProgress.GetOwnedOverframeCount(code) : CollectionProgress.GetOwnedCount(code);
-            return owned > CountEditionCopies(code, overframe);
+            int used = CountEditionCopies(code, overframe);
+            if (overframe)
+                used += Mathf.Max(0, CountEditionCopies(code, false) - releaseRegular - CollectionProgress.GetOwnedCount(code));
+            return Mathf.Max(0, owned - used);
         }
 
         private int CountEditionCopies(uint code, bool overframe) =>
@@ -71,15 +76,7 @@ namespace YGOPortable.UI
             var appearance = _trunkAppearances.GetValueOrDefault(code);
             if (!CollectionProgress.RequiresOwnedCardsForDecks || HasUnusedEdition(code, appearance.overframe)) return appearance;
             appearance.overframe = !appearance.overframe;
-            return FitEditionArtwork(code, appearance);
-        }
-
-        private static DeckCardAppearance FitEditionArtwork(uint code, DeckCardAppearance appearance)
-        {
-            if (!appearance.overframe || !CardArtLoader.SupportsOverframe(code) ||
-                CardArtLoader.SupportsOverframe(code, appearance.ArtworkVariant)) return appearance;
-            appearance.artwork = CardArtLoader.FirstOverframeVariant(code) + 1;
-            return appearance;
+            return appearance.WithAvailableArtwork(code);
         }
 
         private bool CanChangeEdition(uint code, List<uint> cards, DeckCardAppearance appearance)
@@ -88,7 +85,8 @@ namespace YGOPortable.UI
             bool targetOverframe = !appearance.overframe;
             if (targetOverframe && CollectionProgress.GetOwnedOverframeCount(code) == 0)
                 return false;
-            return cards == null || !CollectionProgress.RequiresOwnedCardsForDecks || HasUnusedEdition(code, targetOverframe);
+            return cards == null || !CollectionProgress.RequiresOwnedCardsForDecks ||
+                UnusedEditionCount(code, targetOverframe, releaseRegular: targetOverframe ? 1 : 0) > 0;
         }
 
         private void ChangeEdition(uint code, List<uint> cards, int index)
@@ -96,7 +94,7 @@ namespace YGOPortable.UI
             var appearance = ReadAppearance(code, cards, index);
             if (!CanChangeEdition(code, cards, appearance)) return;
             appearance.overframe = !appearance.overframe;
-            ApplyAppearance(code, code, cards, index, FitEditionArtwork(code, appearance));
+            ApplyAppearance(code, code, cards, index, appearance.WithAvailableArtwork(code));
         }
 
         private List<(uint Code, int Artwork)> ArtworkChoices(uint code, DeckCardAppearance appearance, bool deckSlot)

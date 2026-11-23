@@ -1473,8 +1473,7 @@ namespace YGOPortable.UI
             {
                 owned = CollectionProgress.GetTotalOwnedCount(code);
                 inDeck = CountInWorkingDeck(code, combineAlternateArts: false);
-                return Math.Max(0, CollectionProgress.GetOwnedCount(code) - CountEditionCopies(code, false)) +
-                    (long)Math.Max(0, CollectionProgress.GetOwnedOverframeCount(code) - CountEditionCopies(code, true));
+                return UnusedEditionCount(code, false) + (long)UnusedEditionCount(code, true);
             }
 
             owned = 0;
@@ -1485,8 +1484,7 @@ namespace YGOPortable.UI
                 uint variant = printing.code;
                 owned += CollectionProgress.GetTotalOwnedCount(variant);
                 inDeck += CountInWorkingDeck(variant, combineAlternateArts: false);
-                remaining += Math.Max(0, CollectionProgress.GetOwnedCount(variant) - CountEditionCopies(variant, false)) +
-                    (long)Math.Max(0, CollectionProgress.GetOwnedOverframeCount(variant) - CountEditionCopies(variant, true));
+                remaining += UnusedEditionCount(variant, false) + (long)UnusedEditionCount(variant, true);
             }
             return remaining;
         }
@@ -1617,7 +1615,8 @@ namespace YGOPortable.UI
             _workingDeck.name = snapshot.name;
             _deckNameInput.SetTextWithoutNotify(snapshot.name);
             RefreshSaveLabel();
-            ShowToast($"'{snapshot.name}' 저장 완료");
+            ShowToast(GameAppController.CanStartWithDeck(snapshot, out string reason)
+                ? $"'{snapshot.name}' 저장 완료" : $"저장 완료 · 출전 불가 · {reason}");
             return true;
         }
 
@@ -2100,7 +2099,7 @@ namespace YGOPortable.UI
                         usedByCode[code] = copies + 1;
                         usedByName[key] = sameName + 1;
                         var appearance = new DeckCardAppearance { overframe = copies >= CollectionProgress.GetOwnedCount(code) };
-                        recipe.InsertCard(section, section.Count, code, FitEditionArtwork(code, appearance));
+                        recipe.InsertCard(section, section.Count, code, appearance.WithAvailableArtwork(code));
                     }
                 }
 
