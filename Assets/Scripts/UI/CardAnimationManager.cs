@@ -53,17 +53,20 @@ namespace YGOPortable.UI
         public readonly CardPose To;
         public readonly bool StartsFaceDown;
         public readonly bool EndsFaceDown;
+        public readonly DeckCardAppearance? Appearance;
 
-        public CardFlight(uint code, CardPose from, CardPose to, bool startsFaceDown, bool endsFaceDown)
+        public CardFlight(uint code, CardPose from, CardPose to, bool startsFaceDown, bool endsFaceDown,
+            DeckCardAppearance? appearance = null)
         {
             Code = code;
             From = from;
             To = to;
             StartsFaceDown = startsFaceDown;
             EndsFaceDown = endsFaceDown;
+            Appearance = appearance;
         }
 
-        internal CardFlight AtLayout() => new(Code, From.AtLayout(), To.AtLayout(), StartsFaceDown, EndsFaceDown);
+        internal CardFlight AtLayout() => new(Code, From.AtLayout(), To.AtLayout(), StartsFaceDown, EndsFaceDown, Appearance);
     }
 
     internal enum CardMotion
@@ -118,7 +121,8 @@ namespace YGOPortable.UI
         }
 
         internal SummonMaterialFlight AimAt(CardPose to) =>
-            new(new CardFlight(Flight.Code, Flight.From, to, Flight.StartsFaceDown, Flight.EndsFaceDown), Readout, Depart, Release, Vanishes);
+            new(new CardFlight(Flight.Code, Flight.From, to, Flight.StartsFaceDown, Flight.EndsFaceDown, Flight.Appearance),
+                Readout, Depart, Release, Vanishes);
     }
 
     public partial class CardAnimationManager : MonoBehaviour
@@ -142,6 +146,7 @@ namespace YGOPortable.UI
         private uint _previousChainCode;
         private int _previousChainNumber;
         private LiveCardState _previousChainReadout;
+        private DeckCardAppearance? _previousChainAppearance;
         private bool _previousChainOpponent;
         private readonly HashSet<ChainLinkInfo> _shownChainOutcomes = new();
         private bool _playing;
@@ -252,6 +257,7 @@ namespace YGOPortable.UI
             _previousChainCode = 0;
             _previousChainNumber = 0;
             _previousChainReadout = null;
+            _previousChainAppearance = null;
             _shownChainOutcomes.Clear();
             _playing = false;
             Paused = false;
@@ -467,9 +473,9 @@ namespace YGOPortable.UI
         }
 
         internal void QueueChain(CardPose source, uint code, int chainNumber, bool opponent, LiveCardState live = null,
-            Action onStart = null)
+            Action onStart = null, DeckCardAppearance? appearance = null)
         {
-            QueueStep(ChainActivation(source, code, chainNumber, opponent, live, onStart));
+            QueueStep(ChainActivation(source, code, chainNumber, opponent, live, onStart, appearance));
         }
 
         internal const float CompactChainReadoutHeightRatio = 1.25f;
@@ -564,7 +570,8 @@ namespace YGOPortable.UI
             else QueueStep(PlayLifeChanges(new[] { change }));
         }
 
-        private CompositeCardView TakeCard(uint code, bool faceDown, bool detailed = false, LiveCardState live = null)
+        private CompositeCardView TakeCard(uint code, bool faceDown, bool detailed = false, LiveCardState live = null,
+            DeckCardAppearance? appearance = null)
         {
             CompositeCardView view;
             if (detailed || !_cards.TryPop(out view))
@@ -573,7 +580,7 @@ namespace YGOPortable.UI
                 var rect = (RectTransform)view.transform;
                 rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
             }
-            view.SetCard(code, faceDown, live);
+            view.SetDeckCard(code, appearance, faceDown, live);
             if (view.TryGetComponent<CanvasGroup>(out var opacity)) opacity.alpha = 1f;
             view.gameObject.SetActive(true);
             view.transform.SetAsLastSibling();
@@ -582,7 +589,8 @@ namespace YGOPortable.UI
 
         private CompositeCardView PrepareFlightCard(CardFlight flight, bool detailed = false)
         {
-            var view = TakeCard(flight.StartsFaceDown ? 0u : flight.Code, flight.StartsFaceDown, detailed);
+            var view = TakeCard(flight.StartsFaceDown ? 0u : flight.Code, flight.StartsFaceDown, detailed,
+                appearance: flight.Appearance);
             ApplyFlight(view, flight, 0f, 0f);
             return view;
         }
@@ -623,7 +631,7 @@ namespace YGOPortable.UI
             bool turnsOver = flight.StartsFaceDown != flight.EndsFaceDown;
             bool showBack = t < 0.5f ? flight.StartsFaceDown : flight.EndsFaceDown;
             uint visibleCode = showBack ? 0u : flight.Code;
-            if (view.CurrentCode != visibleCode) view.SetCard(visibleCode, showBack, live);
+            if (view.CurrentCode != visibleCode) view.SetDeckCard(visibleCode, flight.Appearance, showBack, live);
             float flip = turnsOver ? Mathf.Max(0.035f, Mathf.Abs(Mathf.Cos(t * Mathf.PI))) : 1f;
             ApplyPose(view, new CardPose(point, size, angle), flip, layoutHeight);
         }
@@ -650,7 +658,7 @@ namespace YGOPortable.UI
                 while (started < flights.Count && elapsed >= started * stagger)
                 {
                     var flight = flights[started];
-                    views[started] = TakeCard(flight.StartsFaceDown ? 0u : flight.Code, flight.StartsFaceDown);
+                    views[started] = PrepareFlightCard(flight);
                     if (draw) LotdAudio.PlayDraw();
                     started++;
                 }
@@ -691,7 +699,7 @@ namespace YGOPortable.UI
             {
                 var flight = moves[i].Flight;
                 bool showAce = showcase != null && showcase[i].IsValid;
-                var view = TakeCard(flight.StartsFaceDown ? 0u : flight.Code, flight.StartsFaceDown, detailed: showAce);
+                var view = PrepareFlightCard(flight, detailed: showAce);
                 if (!view.TryGetComponent<CanvasGroup>(out var fade))
                     fade = view.gameObject.AddComponent<CanvasGroup>();
                 fade.alpha = showcase != null && moves[i].Motion != CardMotion.TokenSummon ? 1f : 0f;
@@ -782,9 +790,9 @@ namespace YGOPortable.UI
             {
                 if (!poses[i].IsValid) continue;
                 var flight = moves[i].Flight;
-                flights[i] = new CardFlight(flight.Code, flight.From, poses[i], flight.StartsFaceDown, false);
+                flights[i] = new CardFlight(flight.Code, flight.From, poses[i], flight.StartsFaceDown, false, flight.Appearance);
                 if (!flight.StartsFaceDown && moves[i].Readout?.DestinationCard is { } live)
-                    views[i].SetCard(flight.Code, live: live);
+                    views[i].SetDeckCard(flight.Code, flight.Appearance, live: live);
                 views[i].EnableOverframe();
                 views[i].PoseOverframe(0f, 1f, Vector2.zero, 0f);
                 views[i].transform.SetAsLastSibling();
@@ -819,7 +827,7 @@ namespace YGOPortable.UI
 
         private static CardFlight GroupLandingFlight(CardFlight flight, CardPose[] showcase, int index) =>
             showcase != null && showcase[index].IsValid
-                ? new CardFlight(flight.Code, showcase[index], flight.To, false, flight.EndsFaceDown) : flight;
+                ? new CardFlight(flight.Code, showcase[index], flight.To, false, flight.EndsFaceDown, flight.Appearance) : flight;
 
         private IEnumerator PlayFieldDepartures(FieldDepartureGroup group)
         {
@@ -1236,8 +1244,8 @@ namespace YGOPortable.UI
 
         private static bool SupportsSummonOverframe(CardFlight flight)
         {
-            if (flight.EndsFaceDown) return false;
-            int selected = CardArtLoader.GetDuelArtworkVariant(flight.Code);
+            if (flight.EndsFaceDown || flight.Appearance?.overframe == false) return false;
+            int selected = flight.Appearance?.ArtworkVariant ?? CardArtLoader.GetDuelArtworkVariant(flight.Code);
             var (artCode, artVariant) = CardArtLoader.GetArtworkSource(flight.Code, selected);
             return artCode == 0 ? DuelVisualAssets.CanDisplayCutIn(flight.Code, selected) :
                 DuelVisualAssets.CanDisplayCutIn(artCode, artVariant);
@@ -1258,7 +1266,7 @@ namespace YGOPortable.UI
         private IEnumerator RevealSummon(CompositeCardView proxy, CardFlight flight, CardMotion motion, bool featured,
             bool overframe, LiveCardState live, int signatureUnits)
         {
-            if (!flight.StartsFaceDown && live != null) proxy.SetCard(flight.Code, live: live);
+            if (!flight.StartsFaceDown && live != null) proxy.SetDeckCard(flight.Code, flight.Appearance, live: live);
             var (kind, accent, title) = SummonEffect(flight.Code, motion);
             Vector2 view = _layer.rect.size;
             var center = SummonShowcaseCenter(view);
@@ -1272,7 +1280,7 @@ namespace YGOPortable.UI
             }
             var cardCenter = featured && !overframe ? center + Vector2.left * (height * .48f) : center;
             var reveal = new CardPose(cardCenter, new Vector2(height * LotdUiKit.CardAspectRatio, height), 0f);
-            var first = new CardFlight(flight.Code, flight.From, reveal, flight.StartsFaceDown, false);
+            var first = new CardFlight(flight.Code, flight.From, reveal, flight.StartsFaceDown, false, flight.Appearance);
             var background = SummonScreenTint("SummonShade");
             var effect = signature
                 ? CreateSignatureEffect(kind, center, view, accent, finale: true)
@@ -1352,7 +1360,7 @@ namespace YGOPortable.UI
                 }
             });
 
-            var last = new CardFlight(flight.Code, reveal, flight.To, false, flight.EndsFaceDown);
+            var last = new CardFlight(flight.Code, reveal, flight.To, false, flight.EndsFaceDown, flight.Appearance);
             yield return Animate(.22f, t =>
             {
                 ApplyFlight(proxy, last, t, 23f, live, layoutHeight: layoutHeight);
@@ -1766,16 +1774,18 @@ namespace YGOPortable.UI
         }
 
         private IEnumerator ChainActivation(CardPose source, uint code, int chainNumber, bool opponent, LiveCardState live,
-            Action onStart)
+            Action onStart, DeckCardAppearance? appearance)
         {
             onStart?.Invoke();
             uint previous = chainNumber > 1 && _previousChainNumber == chainNumber - 1 ? _previousChainCode : 0;
             var previousReadout = _previousChainReadout;
+            var previousAppearance = _previousChainAppearance;
             bool previousOpponent = _previousChainOpponent;
             _previousChainOpponent = opponent;
             _previousChainNumber = chainNumber;
             _previousChainCode = code;
             _previousChainReadout = live;
+            _previousChainAppearance = appearance;
             float side = opponent ? 1f : -1f;
             Vector2 view = _layer.rect.size;
             float height = Mathf.Min(350f, view.y * .45f, view.x * .31f);
@@ -1793,7 +1803,7 @@ namespace YGOPortable.UI
             {
                 var point = new Vector2(-side * view.x * .135f, center.y + height * .26f);
                 AddChainConnector(overlay, center, point, height);
-                var prior = TakeCard(previous, false, detailed: true, live: previousReadout);
+                var prior = TakeCard(previous, false, detailed: true, live: previousReadout, appearance: previousAppearance);
                 prior.transform.SetParent(overlay, false);
                 Vector2 priorSize = reveal.Size * .66f;
                 ApplyPose(prior, new CardPose(point, priorSize, -side * 10f));
@@ -1802,7 +1812,7 @@ namespace YGOPortable.UI
             }
 
             var crest = CreateEffect(DuelEffectKind.Chain, center, new Vector2(height * 1.67f, height * 1.39f), DuelStyle.ChainGold);
-            var card = TakeCard(code, code == 0, detailed: true, live: live);
+            var card = TakeCard(code, code == 0, detailed: true, live: live, appearance: appearance);
             card.EnableOverframe();
             card.PoseOverframe(0f, 1f, Vector2.zero, 0f);
             float layoutHeight = card.HasOverframe ? height : 0f;
@@ -1898,7 +1908,7 @@ namespace YGOPortable.UI
             var readout = new DuelCardReadout(CardDatabase.Get(code), live);
             var rating = readout.InspectionRating;
             bool separateReadout = compact && code != 0 && (readout.IsMonster || rating.Kind != DuelRatingKind.None);
-            var card = TakeCard(code, code == 0, detailed: !separateReadout, live: live);
+            var card = TakeCard(code, code == 0, detailed: !separateReadout, live: live, appearance: link.Appearance);
             card.transform.SetParent(overlay, false);
             ApplyPose(card, initial);
 
@@ -1959,7 +1969,7 @@ namespace YGOPortable.UI
             // A response prompt may have paused this link before its resolution preview could show the outcome.
             if (_shownChainOutcomes.Remove(link)) yield break;
             var card = link.negated ? TakeCard(link.code, link.code == 0, detailed: true,
-                live: link.ResolutionReadout ?? link.ActivationReadout) : null;
+                live: link.ResolutionReadout ?? link.ActivationReadout, appearance: link.Appearance) : null;
             var cardOpacity = card != null ? card.gameObject.AddComponent<CanvasGroup>() : null;
             var result = CreateChainOutcomeVisual(_layer, link);
             var impact = result.GetComponentInChildren<DuelEffectGraphic>();

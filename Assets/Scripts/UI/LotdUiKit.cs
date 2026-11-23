@@ -407,6 +407,8 @@ namespace YGOPortable.UI
         private uint _retainedArtwork;
         private int _retainedVariant;
         private (uint Code, int Variant) _artworkSource;
+        private DeckCardAppearance? _deckAppearance;
+        private GameObject _deckEditionBadge;
         private bool _overframeEnabled;
         private bool _overframeBound;
         private Sprite _retainedCutIn;
@@ -518,10 +520,19 @@ namespace YGOPortable.UI
         public void SetCard(uint code, bool faceDown = false, LiveCardState live = null)
             => SetCard(code, faceDown, live, null);
 
-        internal void SetCard(uint code, DuelCardReadout readout) => SetCard(code, false, readout.Live, readout);
+        internal void SetCard(uint code, DuelCardReadout readout, DeckCardAppearance? appearance = null) =>
+            SetCard(code, false, readout.Live, readout, appearance);
 
-        private void SetCard(uint code, bool faceDown, LiveCardState live, DuelCardReadout? presentation)
+        internal void SetDeckCard(uint code, DeckCardAppearance? appearance, bool faceDown = false, LiveCardState live = null)
+            => SetCard(code, faceDown, live, null, appearance);
+
+        private void SetCard(uint code, bool faceDown, LiveCardState live, DuelCardReadout? presentation,
+            DeckCardAppearance? appearance = null)
         {
+            appearance ??= live?.Appearance;
+            if (!Nullable.Equals(_deckAppearance, appearance)) HideOverframe();
+            _deckAppearance = appearance;
+            SetDeckEditionBadge(appearance?.overframe == true && code != 0 && !faceDown);
             CurrentCode = code;
             if (faceDown || code == 0)
             {
@@ -682,7 +693,7 @@ namespace YGOPortable.UI
         private void BindArtwork(uint code)
         {
             if (code == 0 || !isActiveAndEnabled) return;
-            int variant = UseDuelArtwork ? CardArtLoader.GetDuelArtworkVariant(code) : -1;
+            int variant = _deckAppearance?.ArtworkVariant ?? (UseDuelArtwork ? CardArtLoader.GetDuelArtworkVariant(code) : -1);
             if (code == _retainedArtwork && variant == _retainedVariant && _artImg.sprite != null) return;
             ReleaseArtwork();
             _artImg.sprite = CardArtLoader.RetainArtwork(code, variant, out _artworkSource);
@@ -698,6 +709,21 @@ namespace YGOPortable.UI
             _retainedVariant = variant;
         }
 
+        private void SetDeckEditionBadge(bool shown)
+        {
+            if (shown && _deckEditionBadge == null)
+            {
+                var aspect = _artImg.transform.parent;
+                var badge = LotdUiKit.CreateRect("DeckEdition", aspect, new Vector2(.07f, .13f),
+                    new Vector2(.93f, .218f), Vector2.zero, Vector2.zero);
+                LotdUiKit.AddImage(badge.gameObject, LotdUiKit.WhiteSprite, new Color(.11f, .05f, .20f, .91f), false, false);
+                LotdUiKit.AddFittedText(badge, "Label", "OVERFRAME", 18, 7,
+                    TextAnchor.MiddleCenter, new Color(.91f, .79f, 1f), FontStyle.Bold);
+                _deckEditionBadge = badge.gameObject;
+            }
+            if (_deckEditionBadge != null) _deckEditionBadge.SetActive(shown);
+        }
+
         internal void EnableOverframe()
         {
             _overframeEnabled = true;
@@ -706,7 +732,7 @@ namespace YGOPortable.UI
 
         private void RefreshOverframe()
         {
-            if (!_overframeEnabled || _overframeBound || _retainedArtwork == 0) return;
+            if (!(_deckAppearance?.overframe ?? _overframeEnabled) || _overframeBound || _retainedArtwork == 0) return;
             _overframeBound = true;
             var (code, variant) = _artworkSource.Code == 0 ? (_retainedArtwork, _retainedVariant) : _artworkSource;
             _retainedCutIn = DuelVisualAssets.RetainCutIn(code, variant);

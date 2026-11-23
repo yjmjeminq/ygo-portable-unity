@@ -92,6 +92,8 @@ namespace YGOPortable.UI
         private readonly int?[] _savedStats = new int?[4];
         private readonly List<Button> _optionButtons = new List<Button>();
         private string _savedEffectText = "";
+        private CollectionCardFilters _trunkCollectionFilters;
+        private (int Rarity, int Ownership, int Edition) _savedCollectionFilters;
         private string _queryBeforeFilters = "";
         private GameObject _cardFilterDialog;
         private InputField _detailedQueryInput;
@@ -124,7 +126,10 @@ namespace YGOPortable.UI
                 new Vector2(.913f, .868f), Vector2.zero, Vector2.zero);
             LotdUiKit.CreateLotdButton(archetype, "Button", "카드군 검색", OpenArchetypeSearch, 14);
 
-            var conditionRows = BuildFilterRows(conditions, "ConditionsList", .105f, .783f, out _);
+            var collectionFilters = LotdUiKit.CreateRect("CollectionFilters", conditions,
+                new Vector2(.087f, .726f), new Vector2(.913f, .791f), Vector2.zero, Vector2.zero);
+            _trunkCollectionFilters = new CollectionCardFilters(collectionFilters, RefreshDetailedDraft);
+            var conditionRows = BuildFilterRows(conditions, "ConditionsList", .105f, .710f, out _);
             _optionRows = BuildFilterRows(options, "OptionList", .105f, .868f, out _optionScroll);
 
             void AddFacet(Facet facet, string label, string icon, IReadOnlyList<string> values = null)
@@ -429,6 +434,7 @@ namespace YGOPortable.UI
             if (_cardFilterDialog.activeSelf) return;
             _queryBeforeFilters = _searchInp.text;
             _savedFacets[(int)Facet.Kind] = _kindFilter.value;
+            _trunkCollectionFilters.Selection = _savedCollectionFilters;
             Array.Copy(_savedFacets, _draftFacets, _savedFacets.Length);
             Array.Copy(_savedStats, _draftStats, _savedStats.Length);
             _detailedQueryInput.SetTextWithoutNotify(_queryBeforeFilters);
@@ -456,6 +462,7 @@ namespace YGOPortable.UI
             _deckPanel.gameObject.SetActive(true);
             _searchInp.SetTextWithoutNotify(_queryBeforeFilters);
             _kindFilter.SetValueWithoutNotify(_savedFacets[(int)Facet.Kind]);
+            _trunkCollectionFilters.Selection = _savedCollectionFilters;
             _searchInp.interactable = true;
             _kindFilter.interactable = true;
             RefreshTrunkFilter();
@@ -512,6 +519,7 @@ namespace YGOPortable.UI
             Array.Copy(_draftFacets, _savedFacets, _draftFacets.Length);
             Array.Copy(_draftStats, _savedStats, _draftStats.Length);
             _savedEffectText = _effectTextInput.text.Trim();
+            _savedCollectionFilters = _trunkCollectionFilters.Selection;
             _queryBeforeFilters = _detailedQueryInput.text.Trim();
             CloseDetailedSearch();
         }
@@ -521,6 +529,8 @@ namespace YGOPortable.UI
             Array.Clear(_savedFacets, 0, _savedFacets.Length);
             Array.Clear(_savedStats, 0, _savedStats.Length);
             _savedEffectText = "";
+            _savedCollectionFilters = default;
+            _trunkCollectionFilters.Selection = default;
         }
 
         private void UpdateDetailedSearchButton()
@@ -536,6 +546,9 @@ namespace YGOPortable.UI
             if (_savedStats[0].HasValue || _savedStats[1].HasValue) active++;
             if (_savedStats[2].HasValue || _savedStats[3].HasValue) active++;
             if (_savedEffectText.Length > 0) active++;
+            if (_savedCollectionFilters.Rarity != 0) active++;
+            if (_savedCollectionFilters.Ownership != 0) active++;
+            if (_savedCollectionFilters.Edition != 0) active++;
             _detailButtonText.text = active == 0 ? "필터" : $"필터 ({active})";
         }
 

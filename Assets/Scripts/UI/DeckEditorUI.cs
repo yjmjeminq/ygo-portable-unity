@@ -71,6 +71,8 @@ namespace YGOPortable.UI
         private Text _trunkHeading;
         private Text _trunkCountText;
         private Button _showAllCards;
+        private Button _trunkOwnershipToggle;
+        private bool? _trunkOwnedOnly;
         private Text _noTrunkResults;
         private uint _relatedFilterCode = 0;
         private ArchetypeInfo _activeArchetypeFilter = null;
@@ -111,6 +113,7 @@ namespace YGOPortable.UI
         private GameObject _editorContent;
         private Button _cardCraftingButton;
         private CardCraftingUI _cardCrafting;
+        private CardTradeControls _previewTrade;
         private GameObject _deckDialog;
         private Text _deckDialogTitle;
         private Text _deckDialogMessage;
@@ -161,7 +164,7 @@ namespace YGOPortable.UI
             Canvas.ForceUpdateCanvases();
             LoadWorkingDeckFromCurrent();
             RefreshTrunkFilter();
-            if (CollectionProgress.RequiresOwnedCardsForDecks && CollectionProgress.GetOwnedCount(_inspectedCode) == 0 &&
+            if (CollectionProgress.RequiresOwnedCardsForDecks && CollectionProgress.GetTotalOwnedCount(_inspectedCode) == 0 &&
                 _trunkResults.Count > 0)
                 _inspectedCode = (_trunkResults.Find(card => DeckGroupKey(card.code) == DeckGroupKey(_inspectedCode)) ??
                     _trunkResults[0]).code;
@@ -305,17 +308,7 @@ namespace YGOPortable.UI
             UpdateVirtualTrunkSlots(_lastFirstRow, force: true);
         }
 
-        private static UserDeck CopyDeck(UserDeck deck)
-        {
-            return new UserDeck
-            {
-                id = deck.id,
-                name = deck.name,
-                main = new List<uint>(deck.main),
-                extra = new List<uint>(deck.extra),
-                side = new List<uint>(deck.side),
-            };
-        }
+        private static UserDeck CopyDeck(UserDeck deck) => CollectionProgress.CopyDeck(deck);
 
         private void BuildUI(Transform parent)
         {
@@ -378,9 +371,9 @@ namespace YGOPortable.UI
                 new Vector2(_mobileLayout ? .340f : .301f, .053f), new Vector2(_mobileLayout ? .566f : .553f, .899f));
             float inset = _mobileLayout ? 17f : 28f;
             var card = LotdUiKit.CreateRect("LargeCard", panel,
-                new Vector2(.066f, _mobileLayout ? .677f : .501f), new Vector2(.934f, .956f), Vector2.zero, Vector2.zero);
+                new Vector2(.066f, _mobileLayout ? .677f : .501f), new Vector2(.934f, .917f), Vector2.zero, Vector2.zero);
+            BuildAppearanceControls(panel, inset);
             _previewCard = CompositeCardView.Create(card, "Preview", detailedOverlay: true, duelArtwork: true);
-            _previewCard.EnableOverframe();
             DeckCardVisualMotion.Bind(_previewCard);
             var previewHit = LotdUiKit.FillRect("PreviewHit", card);
             var previewGraphic = LotdUiKit.AddImage(previewHit.gameObject, LotdUiKit.WhiteSprite, Color.clear);
@@ -407,7 +400,7 @@ namespace YGOPortable.UI
                 TextAnchor.MiddleCenter, LotdUiKit.GoldAccent, FontStyle.Bold);
 
             var desc = LotdUiKit.CreateRect("Description", panel,
-                new Vector2(0f, .155f), new Vector2(1f, _mobileLayout ? .506f : .343f),
+                new Vector2(0f, .211f), new Vector2(1f, _mobileLayout ? .506f : .343f),
                 new Vector2(inset, 0f), new Vector2(-inset, 0f));
             LotdUiKit.AddImage(desc.gameObject, LotdUiKit.WhiteSprite, new Color(0.025f, 0.067f, 0.118f, 0.64f));
             var ownership = LotdUiKit.CreateRect("Ownership", desc, Vector2.up, Vector2.one,
@@ -446,6 +439,10 @@ namespace YGOPortable.UI
             _previewScroll.verticalScrollbar = AddDeckScrollbar(desc);
             _previewScroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
 
+            var trade = LotdUiKit.CreateRect("Trade", panel, new Vector2(0f, .150f), new Vector2(1f, .205f),
+                new Vector2(inset, 0f), new Vector2(-inset, 0f));
+            _previewTrade = new CardTradeControls(trade, OpenCardCrafting, compact: true);
+
             var related = LotdUiKit.CreateRect("RelatedCards", panel,
                 new Vector2(0f, .094f), new Vector2(.5f, .145f), new Vector2(inset, 0f), new Vector2(-4f, 0f));
             LotdUiKit.CreateLotdButton(related, "Button", "연관 카드 검색", () => FilterRelatedCards(_inspectedCode), 14);
@@ -465,7 +462,7 @@ namespace YGOPortable.UI
             }
         }
 
-        private void OpenCardCrafting(uint code)
+        private void OpenCardCrafting(uint code, CardTradeAction action = CardTradeAction.Browse)
         {
             if (!CollectionProgress.HasStarter)
             {
@@ -483,7 +480,7 @@ namespace YGOPortable.UI
             _cardCrafting ??= new CardCraftingUI(Root.transform, ReturnFromCardCrafting);
             _cardCrafting.Root.transform.SetAsLastSibling();
             _editorContent.SetActive(false);
-            _cardCrafting.Show(code);
+            _cardCrafting.Show(code, action);
         }
 
         private void ReturnFromCardCrafting()
@@ -493,6 +490,7 @@ namespace YGOPortable.UI
             _editorContent.SetActive(true);
             RefreshDeckGrids();
             RefreshTrunkFilter();
+            InspectCard(_inspectedCode);
             if (_padMode && _padArea != PadArea.Controls) DrawPadCardFocus();
             else EventSystem.current?.SetSelectedGameObject(_cardCraftingButton.gameObject);
         }
@@ -539,8 +537,21 @@ namespace YGOPortable.UI
                 dropdown.captionText.alignment = TextAnchor.MiddleCenter;
                 return dropdown;
             }
-            _kindFilter = AddFilter("Kind", 0f, .49f, CardKinds, ChangeTrunkKind);
-            _sortFilter = AddFilter("Sort", .51f, 1f, SortOptions, _ => RefreshTrunkFilter());
+            _kindFilter = AddFilter("Kind", 0f, .322f, CardKinds, ChangeTrunkKind);
+            _sortFilter = AddFilter("Sort", .336f, .632f, SortOptions, _ => RefreshTrunkFilter());
+            var ownership = LotdUiKit.CreateRect("Ownership", filters, new Vector2(.647f, 0f), Vector2.one,
+                Vector2.zero, Vector2.zero);
+            _trunkOwnershipToggle = LotdUiKit.CreateLotdButton(ownership, "Button", "보유 카드만", () =>
+            {
+                var selection = _trunkCollectionFilters.Selection;
+                _trunkOwnedOnly = selection.Ownership == 0 ? !TrunkShowsOwnedOnly : selection.Ownership == 2;
+                _trunkCollectionFilters.Selection = (selection.Rarity, 0, selection.Edition);
+                RefreshTrunkFilter();
+            }, 13);
+            var ownershipLabel = _trunkOwnershipToggle.GetComponentInChildren<Text>();
+            ownershipLabel.resizeTextForBestFit = true;
+            ownershipLabel.resizeTextMinSize = 10;
+            ownershipLabel.resizeTextMaxSize = 13;
 
             var searchOptions = LotdUiKit.CreateRect("SearchOptions", col, new Vector2(0f, .038f),
                 new Vector2(1f, .093f), insideLeft, insideRight);
@@ -844,6 +855,7 @@ namespace YGOPortable.UI
 
         private void ResetTrunkFilters()
         {
+            _trunkOwnedOnly = null;
             _relatedFilterCode = 0;
             _activeArchetypeFilter = null;
             ClearTrunkFilterValues();
@@ -874,6 +886,9 @@ namespace YGOPortable.UI
             RefreshTrunkFilter();
         }
 
+        private bool TrunkShowsOwnedOnly => CollectionProgress.Initialized &&
+            (_trunkOwnedOnly ?? (CollectionProgress.RequiresOwnedCardsForDecks && _activeArchetypeFilter == null && _relatedFilterCode == 0));
+
         private void RefreshTrunkFilter()
         {
             _trunkResults.Clear();
@@ -898,13 +913,16 @@ namespace YGOPortable.UI
                 _trunkHeading.color = LotdUiKit.GoldAccent;
             }
 
-            bool previewUnowned = _activeArchetypeFilter != null || _relatedFilterCode != 0;
-            bool ownedOnly = CollectionProgress.RequiresOwnedCardsForDecks && !previewUnowned;
+            bool explicitOwnership = _trunkCollectionFilters.Selection.Ownership != 0;
+            bool ownedOnly = !explicitOwnership && TrunkShowsOwnedOnly;
+            _trunkOwnershipToggle.interactable = CollectionProgress.Initialized;
+            _trunkOwnershipToggle.GetComponentInChildren<Text>().text = explicitOwnership ? "보유 필터 적용" :
+                ownedOnly ? "보유 카드만" : "미보유 포함";
             uint.TryParse(_searchInp.text, out uint searchedCode);
             var seen = new HashSet<uint>();
             foreach (var card in source)
             {
-                if (card == null || (CollectionProgress.AllDeckCardsAvailable && !CollectionProgress.IsCraftableCard(card)) ||
+                if (!CollectionProgress.IsCraftableCard(card) ||
                     !MatchesQuickFilter(card) || !seen.Add(DeckGroupKey(card.code))) continue;
                 var entry = PickTrunkPrinting(card, filter, searchedCode, ownedOnly);
                 if (entry != null) _trunkResults.Add(entry);
@@ -921,6 +939,13 @@ namespace YGOPortable.UI
                 return frame != 0 ? frame : string.Compare(a.name, b.name, StringComparison.Ordinal);
             });
 
+            if (filter.HasSearchQuery)
+            {
+                var ranked = _trunkResults.OrderBy(filter.SearchRank).ToArray();
+                _trunkResults.Clear();
+                _trunkResults.AddRange(ranked);
+            }
+
             Canvas.ForceUpdateCanvases();
             _trunkCountText.text = CollectionProgress.Initialized ? $"{_trunkResults.Count:N0}종" : $"{_trunkResults.Count:N0}장";
             _noTrunkResults.text = ownedOnly
@@ -932,20 +957,22 @@ namespace YGOPortable.UI
 
         private CardInfo PickTrunkPrinting(CardInfo card, DeckCardFilter filter, uint searchedCode, bool ownedOnly)
         {
+            bool Matches(CardInfo candidate) => _trunkCollectionFilters.Matches(candidate.code) && filter.Matches(candidate);
             if (!CardDatabase.TryGetDeckPrintings(card.code, out var printings))
-                return (!ownedOnly || CollectionProgress.GetOwnedCount(card.code) > 0) && filter.Matches(card) ? card : null;
+                return (!ownedOnly || CollectionProgress.GetTotalOwnedCount(card.code) > 0) && Matches(card) ? card : null;
 
-            var owned = printings.FirstOrDefault(printing => CollectionProgress.GetOwnedCount(printing.code) > 0);
+            var owned = printings.FirstOrDefault(printing => CollectionProgress.GetTotalOwnedCount(printing.code) > 0 && Matches(printing));
             if (ownedOnly && owned == null) return null;
-            var matching = printings.FirstOrDefault(filter.Matches);
+            var matching = printings.FirstOrDefault(Matches);
             if (matching == null) return null;
 
             var exact = Array.Find(printings, printing => printing.code == searchedCode);
-            if (exact != null && (!ownedOnly || CollectionProgress.GetOwnedCount(exact.code) > 0) && filter.Matches(exact))
+            if (exact != null && (!ownedOnly || CollectionProgress.GetTotalOwnedCount(exact.code) > 0) && Matches(exact))
                 return exact;
             if (_trunkPrintChoices.TryGetValue(printings[0].code, out uint preference) &&
-                (!ownedOnly || CollectionProgress.GetOwnedCount(preference) > 0))
-                return CardDatabase.Get(preference);
+                (!ownedOnly || CollectionProgress.GetTotalOwnedCount(preference) > 0) &&
+                CardDatabase.Get(preference) is { } preferred && Matches(preferred))
+                return preferred;
             return owned ?? matching;
         }
 
@@ -1010,7 +1037,7 @@ namespace YGOPortable.UI
                 rect.gameObject.SetActive(true);
                 uint code = _trunkResults[index].code;
                 if (view.CurrentCode != code) ResetCardBinding(rect, view);
-                view.SetCard(code);
+                view.SetDeckCard(code, ReadAppearance(code, null, -1));
 
                 var countBox = count.transform.parent;
                 var countBackground = countBox.GetComponent<Image>();
@@ -1082,9 +1109,10 @@ namespace YGOPortable.UI
 
                 uint code = cards[i];
                 int index = i;
-                view.SetCard(code);
-                view.transform.Find("AspectBox/Unowned").gameObject.SetActive(CollectionProgress.RequiresOwnedCardsForDecks &&
-                    CollectionProgress.GetOwnedCount(code) == 0);
+                var appearance = _workingDeck.GetAppearance(cards, index);
+                view.SetDeckCard(code, appearance);
+                int owned = appearance.overframe ? CollectionProgress.GetOwnedOverframeCount(code) : CollectionProgress.GetOwnedCount(code);
+                view.transform.Find("AspectBox/Unowned").gameObject.SetActive(CollectionProgress.RequiresOwnedCardsForDecks && owned == 0);
                 trigger.CardCodeGetter = () => code;
                 trigger.IndexGetter = () => index;
                 trigger.OnPointerEnterAction = () => SetMouseCardVisual(rect, code);
@@ -1165,8 +1193,8 @@ namespace YGOPortable.UI
             var targetPositions = CaptureDeckPositions(targetZone, target.Count);
             var origin = dropPosition.HasValue ? DropPose(dropPosition.Value) :
                 sourceIndex < sourcePositions.Length ? sourcePositions[sourceIndex] : null;
-            source.RemoveAt(sourceIndex);
-            target.Insert(landing, code);
+            var appearance = _workingDeck.RemoveCard(source, sourceIndex);
+            _workingDeck.InsertCard(target, landing, code, appearance);
             FinishDeckEdit();
             RevealDeckSlot(targetZone, landing);
             if (dropPosition.HasValue && !_padMode) RememberMouseCard(DeckPadArea(targetZone), landing);
@@ -1200,9 +1228,11 @@ namespace YGOPortable.UI
             var origin = dropPosition.HasValue ? DropPose(dropPosition.Value) :
                 sourceIndex < oldPositions.Length ? oldPositions[sourceIndex] : null;
             uint code = cards[sourceIndex];
-            var group = cards.GetRange(start, length);
-            cards.RemoveRange(start, length);
-            cards.InsertRange(startAfterMove, group);
+            var reordered = new List<uint>(cards);
+            var group = reordered.GetRange(start, length);
+            reordered.RemoveRange(start, length);
+            reordered.InsertRange(startAfterMove, group);
+            _workingDeck.ReorderCards(cards, reordered);
             FinishDeckEdit();
             RevealDeckSlot(zone, landing);
             var area = DeckPadArea(zone);
@@ -1226,12 +1256,7 @@ namespace YGOPortable.UI
         private static IEnumerable<uint> GroupedDeckOrder(List<uint> cards) =>
             cards.GroupBy(DeckGroupKey).SelectMany(group => group);
 
-        private static void GroupDeckCopies(List<uint> cards)
-        {
-            var grouped = GroupedDeckOrder(cards).ToArray();
-            cards.Clear();
-            cards.AddRange(grouped);
-        }
+        private void GroupDeckCopies(List<uint> cards) => _workingDeck.ReorderCards(cards, GroupedDeckOrder(cards));
 
         private static int DeckGroupStart(List<uint> cards, int index)
         {
@@ -1265,7 +1290,7 @@ namespace YGOPortable.UI
             var positions = CaptureDeckPositions(zone, cards.Count);
             var origin = dropPosition.HasValue ? DropPose(dropPosition.Value) :
                 index < positions.Length ? positions[index] : null;
-            cards.RemoveAt(index);
+            _workingDeck.RemoveCard(cards, index);
             FinishDeckEdit();
             AnimateDeckSlots(zone, index, cards.Count, positions, i => i + 1);
             var visibleCopy = _trunkPool.Find(slot => slot.rt.gameObject.activeInHierarchy &&
@@ -1373,7 +1398,7 @@ namespace YGOPortable.UI
         }
 
         private bool HasUnusedCopy(uint code) =>
-            CollectionProgress.GetOwnedCount(code) > CountInWorkingDeck(code, combineAlternateArts: false);
+            HasUnusedEdition(code, overframe: false) || HasUnusedEdition(code, overframe: true);
 
         private void TryAddCardToDeck(uint code, DragSourceType destination = DragSourceType.None,
             RectTransform origin = null, Vector2? dropPosition = null)
@@ -1412,7 +1437,7 @@ namespace YGOPortable.UI
                     if (code == 0 || !CanPlaceCard(CardDatabase.Get(code), destination, target, showReason: false)) break;
                 }
                 landing = FindDeckInsertionIndex(target, code, -1);
-                target.Insert(landing, code);
+                _workingDeck.InsertCard(target, landing, code, AppearanceForAddition(code));
                 for (int i = 0; i < inserted.Count; i++)
                     if (inserted[i] >= landing) inserted[i]++;
                 inserted.Add(landing);
@@ -1452,9 +1477,10 @@ namespace YGOPortable.UI
             }
             if (!CardDatabase.TryGetDeckPrintings(code, out var printings))
             {
-                owned = CollectionProgress.GetOwnedCount(code);
+                owned = CollectionProgress.GetTotalOwnedCount(code);
                 inDeck = CountInWorkingDeck(code, combineAlternateArts: false);
-                return Math.Max(0, owned - inDeck);
+                return Math.Max(0, CollectionProgress.GetOwnedCount(code) - CountEditionCopies(code, false)) +
+                    (long)Math.Max(0, CollectionProgress.GetOwnedOverframeCount(code) - CountEditionCopies(code, true));
             }
 
             owned = 0;
@@ -1462,11 +1488,11 @@ namespace YGOPortable.UI
             long remaining = 0;
             foreach (var printing in printings)
             {
-                int copies = CollectionProgress.GetOwnedCount(printing.code);
-                int used = CountInWorkingDeck(printing.code, combineAlternateArts: false);
-                owned += copies;
-                inDeck += used;
-                remaining += Math.Max(0, copies - used);
+                uint variant = printing.code;
+                owned += CollectionProgress.GetTotalOwnedCount(variant);
+                inDeck += CountInWorkingDeck(variant, combineAlternateArts: false);
+                remaining += Math.Max(0, CollectionProgress.GetOwnedCount(variant) - CountEditionCopies(variant, false)) +
+                    (long)Math.Max(0, CollectionProgress.GetOwnedOverframeCount(variant) - CountEditionCopies(variant, true));
             }
             return remaining;
         }
@@ -1491,11 +1517,13 @@ namespace YGOPortable.UI
         private void InspectCard(uint code)
         {
             _inspectedCode = code;
-            if (_previewCard.CurrentCode == code) return;
-            var ci = CardDatabase.Get(code);
-            _previewCard.SetCard(code);
-            _previewCard.GetComponent<DeckCardVisualMotion>().Pulse();
+            bool changed = _previewCard.CurrentCode != code;
+            RefreshInspectedAppearance(code);
+            _previewTrade.Bind(code);
             RefreshPreviewOwnership();
+            if (!changed) return;
+            var ci = CardDatabase.Get(code);
+            _previewCard.GetComponent<DeckCardVisualMotion>().Pulse();
 
             _previewName.text = ci?.name ?? "";
             _previewStats.text = ci?.FormatStatsLineKR() ?? "";
@@ -1556,10 +1584,16 @@ namespace YGOPortable.UI
         {
             if (_workingDeck == null) return false;
             var saved = DeckRepository.UserDecks.FirstOrDefault(deck => deck.id == _workingDeck.id);
-            return saved == null || DeckNameForSave != saved.name ||
-                !_workingDeck.main.SequenceEqual(GroupedDeckOrder(saved.main)) ||
-                !_workingDeck.extra.SequenceEqual(GroupedDeckOrder(saved.extra)) ||
-                !_workingDeck.side.SequenceEqual(GroupedDeckOrder(saved.side));
+            if (saved == null || DeckNameForSave != saved.name) return true;
+            bool Changed(List<uint> current, List<uint> previous)
+            {
+                var ordered = previous.Select((code, index) => (Code: code, Appearance: saved.GetAppearance(previous, index)))
+                    .GroupBy(card => DeckGroupKey(card.Code)).SelectMany(group => group);
+                var working = current.Select((code, index) => (Code: code, Appearance: _workingDeck.GetAppearance(current, index)));
+                return !working.SequenceEqual(ordered);
+            }
+            return Changed(_workingDeck.main, saved.main) || Changed(_workingDeck.extra, saved.extra) ||
+                Changed(_workingDeck.side, saved.side);
         }
 
         private void RefreshSaveLabel()
@@ -1637,8 +1671,7 @@ namespace YGOPortable.UI
                         var card = CardDatabase.Get(code);
                         return card == null ? 3 : card.IsMonster ? 0 : card.IsSpell ? 1 : 2;
                     }).ToArray();
-                section.Clear();
-                section.AddRange(ordered);
+                _workingDeck.ReorderCards(section, ordered);
             }
             RefreshDeckGrids();
             AnimateOrderedDeck(DragSourceType.DeckMain, _workingDeck.main, main, mainPositions);
@@ -1666,8 +1699,7 @@ namespace YGOPortable.UI
                     (groups[i], groups[j]) = (groups[j], groups[i]);
                 }
             }
-            _workingDeck.main.Clear();
-            _workingDeck.main.AddRange(groups.SelectMany(group => group));
+            _workingDeck.ReorderCards(_workingDeck.main, groups.SelectMany(group => group));
             LotdAudio.PlayDraw();
             RefreshDeckGrids();
             AnimateOrderedDeck(DragSourceType.DeckMain, _workingDeck.main, main, positions);
@@ -2056,25 +2088,31 @@ namespace YGOPortable.UI
             if (arch == null) return;
             var (main, extra) = CardDatabase.BuildPureArchetypeDeck(arch);
             bool ownedOnly = CollectionProgress.RequiresOwnedCardsForDecks;
+            var recipe = new UserDeck { main = main, extra = extra };
             if (ownedOnly)
             {
-                var used = new Dictionary<uint, int>();
+                recipe = new UserDeck();
                 var usedByName = new Dictionary<uint, int>();
-                bool TakeOwnedCopy(uint code)
+                var usedByCode = new Dictionary<uint, int>();
+                void AddOwnedCopies(IEnumerable<uint> codes, List<uint> section)
                 {
-                    uint key = CollectionProgress.GetDeckCopyKey(code);
-                    used.TryGetValue(code, out int copies);
-                    usedByName.TryGetValue(key, out int sameName);
-                    if (copies >= CollectionProgress.GetOwnedCount(code) || sameName >= CollectionProgress.DeckCopyLimit)
-                        return false;
-                    used[code] = copies + 1;
-                    usedByName[key] = sameName + 1;
-                    return true;
+                    foreach (uint code in codes)
+                    {
+                        uint key = CollectionProgress.GetDeckCopyKey(code);
+                        int copies = usedByCode.GetValueOrDefault(code);
+                        int sameName = usedByName.GetValueOrDefault(key);
+                        if (copies >= CollectionProgress.GetTotalOwnedCount(code) || sameName >= CollectionProgress.DeckCopyLimit)
+                            continue;
+                        usedByCode[code] = copies + 1;
+                        usedByName[key] = sameName + 1;
+                        var appearance = new DeckCardAppearance { overframe = copies >= CollectionProgress.GetOwnedCount(code) };
+                        recipe.InsertCard(section, section.Count, code, FitEditionArtwork(code, appearance));
+                    }
                 }
 
-                main = main.Where(TakeOwnedCopy).ToList();
-                extra = extra.Where(TakeOwnedCopy).ToList();
-                if (main.Count + extra.Count == 0)
+                AddOwnedCopies(main, recipe.main);
+                AddOwnedCopies(extra, recipe.extra);
+                if (recipe.main.Count + recipe.extra.Count == 0)
                 {
                     CloseArchetypeModal();
                     ShowToast("이 예시 덱에 넣을 보유 카드가 없습니다.");
@@ -2085,9 +2123,11 @@ namespace YGOPortable.UI
             BeforeReplacingEdits(() =>
             {
                 _workingDeck.name = $"[순수] {arch.name}";
-                _workingDeck.main = main;
-                _workingDeck.extra = extra;
-                _workingDeck.side.Clear();
+                _workingDeck.ClearCards(_workingDeck.side);
+                _workingDeck.main = recipe.main;
+                _workingDeck.extra = recipe.extra;
+                _workingDeck.mainAppearances = recipe.mainAppearances;
+                _workingDeck.extraAppearances = recipe.extraAppearances;
                 _deckNameInput.SetTextWithoutNotify(_workingDeck.name);
                 SortWorkingDeck();
                 SetTrunkSource(archetype: arch);
@@ -2095,7 +2135,7 @@ namespace YGOPortable.UI
                     InspectCard(arch.representativeCode);
                 CloseArchetypeModal();
                 string action = ownedOnly ? "보유 카드로 구성" : "불러옴";
-                ShowToast($"'{_workingDeck.name}' {action} · 메인 {main.Count}장 / 엑스트라 {extra.Count}장");
+                ShowToast($"'{_workingDeck.name}' {action} · 메인 {recipe.main.Count}장 / 엑스트라 {recipe.extra.Count}장");
             });
         }
     }

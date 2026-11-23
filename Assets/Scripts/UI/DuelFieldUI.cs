@@ -41,6 +41,7 @@ namespace YGOPortable.UI
         private uint _inspectedCode;
         private ChainLinkInfo _inspectedActivation;
         private (byte controller, uint location, uint sequence)? _inspectedFieldCard;
+        private DeckCardAppearance? _inspectedAppearance;
 
         // Opponent and player HUD
         private Image _oppBustImg;
@@ -178,6 +179,7 @@ namespace YGOPortable.UI
         private DuelCounterBadge _zoomCounters;
         private DuelStatStrip _zoomCombat;
         private (byte controller, uint location, uint sequence)? _zoomFieldCard;
+        private DeckCardAppearance? _zoomAppearance;
         private Text _zoomPasscode;
         private Text _zoomCounterTypes;
         private Text _zoomDesc;
@@ -295,7 +297,9 @@ namespace YGOPortable.UI
                 _myGyTile.root.GetComponent<DuelZoneImage>(), _myExtraTile.root.GetComponent<DuelZoneImage>(),
                 _myBanTile.root.GetComponent<DuelZoneImage>(), _oppGyTile.root.GetComponent<DuelZoneImage>(),
                 _oppExtraTile.root.GetComponent<DuelZoneImage>(), _oppBanTile.root.GetComponent<DuelZoneImage>());
-            _modals.SetZoneBrowserActions(SwitchBrowsablePile, ShowCardZoomModal);
+            _modals.SetZoneBrowserActions(SwitchBrowsablePile,
+                (code, live) => { if (live == null) ShowCardZoomModal(code); else ShowCardZoomModal(live); },
+                live => InspectCardAt(live.code, null, appearance: live.Appearance));
 
             if (CardDragManager.Instance != null)
             {
@@ -311,7 +315,7 @@ namespace YGOPortable.UI
             _session = session;
             session.OnCardLocationsChanged += HandleCardLocationsChanged;
             session.OnFieldArrivalBoundary += CompleteFieldArrivals;
-            session.OnCardsDrawn += HandleCardsDrawn;
+            session.OnStyledCardsDrawn += HandleCardsDrawn;
             session.OnLifePointChange += HandleLifePointsChanged;
             session.OnTurnStarted += HandleTurnStarted;
             session.OnPhaseChanged += HandlePhaseChanged;
@@ -354,7 +358,7 @@ namespace YGOPortable.UI
             {
                 _session.OnCardLocationsChanged -= HandleCardLocationsChanged;
                 _session.OnFieldArrivalBoundary -= CompleteFieldArrivals;
-                _session.OnCardsDrawn -= HandleCardsDrawn;
+                _session.OnStyledCardsDrawn -= HandleCardsDrawn;
                 _session.OnLifePointChange -= HandleLifePointsChanged;
                 _session.OnTurnStarted -= HandleTurnStarted;
                 _session.OnPhaseChanged -= HandlePhaseChanged;
@@ -412,10 +416,14 @@ namespace YGOPortable.UI
         private void InspectCard(uint code, FieldSlotView slot) => InspectCardAt(code, InspectionLocation(slot));
 
         private void InspectCandidate(SelectableCardItem item, uint code) =>
-            InspectCardAt(code, (item.controller, item.location, item.sequence));
+            InspectCardAt(code, (item.controller, item.location, item.sequence),
+                appearance: _session?.GetDeckAppearance(item.controller, item.location, item.sequence));
+
+        private DeckCardAppearance? DefaultDuelAppearance =>
+            _session?.UsesDeckAppearances == true ? default(DeckCardAppearance) : null;
 
         private void InspectCardAt(uint code, (byte controller, uint location, uint sequence)? fieldCard,
-            ChainLinkInfo activation = null)
+            ChainLinkInfo activation = null, DeckCardAppearance? appearance = null)
         {
             if (code == 0) return;
             _inspectedBanishedCard = null;
@@ -424,6 +432,7 @@ namespace YGOPortable.UI
             _inspectedCode = code;
             _inspectedActivation = activation;
             _inspectedFieldCard = fieldCard;
+            _inspectedAppearance = appearance ?? activation?.Appearance;
             if (changed) _inspCard.gameObject.SetActive(true);
             RefreshInspectorReadout(showChanges: sameSource);
             RefreshFieldRelationships();
@@ -453,6 +462,7 @@ namespace YGOPortable.UI
             _inspectedCode = 0;
             _inspectedActivation = null;
             _inspectedFieldCard = null;
+            _inspectedAppearance = null;
             _inspectedBanishedCard = null;
             _inspCard.SetCard(0);
             _inspCard.gameObject.SetActive(false);
@@ -568,7 +578,7 @@ namespace YGOPortable.UI
             if (_inspectedCode == 0) return;
             var card = ReadInspectedStats(_inspectedCode, _inspectedFieldCard);
             if (card.Live == null && !IsInspectedCardStillOnField(_inspectedCode, _inspectedFieldCard)) _inspectedFieldCard = null;
-            _inspCard.SetCard(_inspectedCode, live: card.Live);
+            _inspCard.SetDeckCard(_inspectedCode, card.Live?.Appearance ?? _inspectedAppearance ?? DefaultDuelAppearance, live: card.Live);
             _inspTitleAccent.color = InspectorTitleAccent(card.Type);
             BindRulesName(_inspName, _inspRulesName, card.RulesName);
             BindInspectorStats(card, showChanges && card.Live != null);
@@ -921,7 +931,7 @@ namespace YGOPortable.UI
 
         private void OpenInspectedCardDetails()
         {
-            ShowCardZoomModal(_inspectedCode, _inspectedFieldCard);
+            ShowCardZoomModal(_inspectedCode, _inspectedFieldCard, _inspectedAppearance);
             if (_cardZoomModal.activeSelf) _zoomBanishedCard = _inspectedBanishedCard;
         }
 
@@ -1997,17 +2007,17 @@ namespace YGOPortable.UI
                     ClearPointerCard(art);
                     LeaveCardActions(view.Rect);
                 };
-                trigger.OnRightClick = () => InspectCard(card.code);
+                trigger.OnRightClick = () => InspectCardAt(card.code, null, appearance: card.Appearance);
                 trigger.OnLeftClick = () =>
                 {
-                    InspectCard(card.code);
+                    InspectCardAt(card.code, null, appearance: card.Appearance);
                     if (_modals.FocusChainActivationAt(_session, YgoConstants.LOCATION_HAND, sequence)) return;
                     ShowUnavailableEffect(card);
                     PointAtCardActions(view.Rect);
                 };
                 trigger.OnTouchClick = () =>
                 {
-                    InspectCard(card.code);
+                    InspectCardAt(card.code, null, appearance: card.Appearance);
                     if (_modals.FocusChainActivationAt(_session, YgoConstants.LOCATION_HAND, sequence)) return;
                     SelectTouchCardActions(view.Rect);
                 };
@@ -2914,7 +2924,7 @@ namespace YGOPortable.UI
             return (position & YgoConstants.POS_FACEDOWN) != 0 && location != YgoConstants.LOCATION_GRAVE;
         }
 
-        private void HandleCardsDrawn(byte controller, IReadOnlyList<uint> cards)
+        private void HandleCardsDrawn(byte controller, IReadOnlyList<uint> cards, IReadOnlyList<DeckCardAppearance?> appearances)
         {
             var animator = CardAnimationManager.Instance;
             if (animator == null || controller >= _handCounts.Length || cards.Count == 0) return;
@@ -2928,7 +2938,7 @@ namespace YGOPortable.UI
                 var to = GetCardPose(controller, YgoConstants.LOCATION_HAND, sequence, 0);
                 if (!from.IsValid || !to.IsValid) return;
                 // The session masks hidden draws for the other duelist with code zero.
-                flights.Add(new CardFlight(cards[i], from, to, true, cards[i] == 0));
+                flights.Add(new CardFlight(cards[i], from, to, true, cards[i] == 0, appearances[i]));
             }
             var arrivals = new Action[flights.Count];
             for (int i = 0; i < arrivals.Length; i++)
@@ -2967,7 +2977,7 @@ namespace YGOPortable.UI
 
             bool fromBack = e.code == 0 || IsFaceDown(e.fromCon, e.fromLoc, e.fromPos);
             bool toBack = disappearing ? fromBack : e.code == 0 || IsFaceDown(e.toCon, e.toLoc, e.toPos);
-            var flight = new CardFlight(e.code, from, to, fromBack, toBack);
+            var flight = new CardFlight(e.code, from, to, fromBack, toBack, MoveAppearance(e));
             if (e.toLoc == (YgoConstants.LOCATION_EXTRA | YgoConstants.LOCATION_OVERLAY))
                 return QueueSummonMaterial(animator, e, flight, previousReadout, awaitingXyzHost: true);
             int xyzMaterials = 0;
@@ -3181,7 +3191,7 @@ namespace YGOPortable.UI
             }
 
             var pose = GetCardPose(link.triggerPlayer, link.triggerLoc, link.triggerSeq, YgoConstants.POS_FACEUP_ATTACK);
-            animator.QueueChain(pose, link.code, link.chainNumber, opponent, link.ActivationReadout, showCard);
+            animator.QueueChain(pose, link.code, link.chainNumber, opponent, link.ActivationReadout, showCard, link.Appearance);
             QueueColumnActivation(animator, link);
         }
 
@@ -3293,7 +3303,7 @@ namespace YGOPortable.UI
             var comparisonArea = _mobileLayout ? MobileBattleStatsArea : BattleStatsArea;
             var readout = animator.CreateBattleReadout(comparisonArea, attacker, defender, viewer, combat.IsLink, defense.IsLink,
                 _mobileLayout);
-            var flight = new CardFlight(card.code, from, resting, false, false);
+            var flight = new CardFlight(card.code, from, resting, false, false, card.Appearance);
             var slot = GetSlot(attacker.Controller, attacker.Location, attacker.Sequence);
             var targetSlot = GetSlot(defender.Controller, defender.Location, defender.Sequence);
             Vector2 statSize = slot == null ? Vector2.zero : animator.GetAreaSize(slot.readout?.Rect ?? slot.root);
@@ -4423,9 +4433,10 @@ namespace YGOPortable.UI
         public void ShowCardZoomModal(uint code) => ShowCardZoomModal(code, null);
 
         private void ShowCardZoomModal(LiveCardState card) =>
-            ShowCardZoomModal(card.code, InspectionLocation(GetSlot(card.controller, card.location, card.sequence)));
+            ShowCardZoomModal(card.code, InspectionLocation(GetSlot(card.controller, card.location, card.sequence)), card.Appearance);
 
-        private void ShowCardZoomModal(uint code, (byte controller, uint location, uint sequence)? fieldCard)
+        private void ShowCardZoomModal(uint code, (byte controller, uint location, uint sequence)? fieldCard,
+            DeckCardAppearance? appearance = null)
         {
             if (code == 0 || !Root.activeInHierarchy) return;
             bool opening = !_cardZoomModal.activeSelf;
@@ -4439,6 +4450,7 @@ namespace YGOPortable.UI
             }
             var info = CardDatabase.Get(code);
             _zoomFieldCard = fieldCard;
+            _zoomAppearance = appearance;
             _zoomBanishedCard = null;
             RefreshZoomReadout(code, showChanges: false);
             if (info != null)
@@ -4468,7 +4480,7 @@ namespace YGOPortable.UI
         {
             var card = ReadInspectedStats(code, _zoomFieldCard);
             if (card.Live == null && !IsInspectedCardStillOnField(code, _zoomFieldCard)) _zoomFieldCard = null;
-            _zoomCardView.SetCard(code, card);
+            _zoomCardView.SetCard(code, card, card.Live?.Appearance ?? _zoomAppearance ?? DefaultDuelAppearance);
             _zoomDisabledBadge.SetActive(card.Disabled);
             BindRulesName(_zoomName, _zoomRulesName, card.RulesName);
             var (identity, details) = FormatInspectorStats(card);
@@ -4493,6 +4505,7 @@ namespace YGOPortable.UI
         {
             if (!_cardZoomModal.activeSelf) return;
             _zoomFieldCard = null;
+            _zoomAppearance = null;
             _zoomBanishedCard = null;
             if (ActivationNoticeInDetails) HideActivationNotice();
             _cardZoomModal.SetActive(false);
@@ -4521,6 +4534,11 @@ namespace YGOPortable.UI
 
         private void UpdateArtworkOptions(uint code, int direction)
         {
+            if (_session?.UsesDeckAppearances == true)
+            {
+                _zoomArtworkControls.SetActive(false);
+                return;
+            }
             var choices = CardArtLoader.GetDuelArtworkChoices(code);
             _zoomArtworkControls.SetActive(choices.Count > 1);
             if (choices.Count < 2) return;

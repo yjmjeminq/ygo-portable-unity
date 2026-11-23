@@ -1,0 +1,143 @@
+--- a/field.cpp
++++ b/field.cpp
+@@ -277,6 +277,8 @@
+             if (pcard->current.location == LOCATION_DECK) {
+                 if(preplayer == playerid) {
+                     auto message = pduel->new_message(MSG_MOVE);
++					message->write<uint32_t>(0x31494759); // YGI1: physical card identity for presentation.
++					message->write<uint32_t>(pcard->cardid + 1);
+                     message->write<uint32_t>(pcard->data.code);
+                     message->write(pcard->get_info_location());
+                     player[preplayer].list_main.erase(player[preplayer].list_main.begin() + pcard->current.sequence);
+@@ -311,6 +313,8 @@
+                 duel::duel_message* message = nullptr;
+                 if(preplayer == playerid) {
+                     message = pduel->new_message(MSG_MOVE);
++					message->write<uint32_t>(0x31494759); // YGI1: physical card identity for presentation.
++					message->write<uint32_t>(pcard->cardid + 1);
+                     message->write<uint32_t>(pcard->data.code);
+                     message->write(pcard->get_info_location());
+                 }
+@@ -354,6 +358,8 @@
+                     if(pcard->current.sequence == player[pcard->current.controler].list_grave.size() - 1)
+                         return false;
+                     auto message = pduel->new_message(MSG_MOVE);
++					message->write<uint32_t>(0x31494759); // YGI1: physical card identity for presentation.
++					message->write<uint32_t>(pcard->cardid + 1);
+                     message->write<uint32_t>(pcard->data.code);
+                     message->write(pcard->get_info_location());
+                     player[pcard->current.controler].list_grave.erase(player[pcard->current.controler].list_grave.begin() + pcard->current.sequence);
+@@ -365,6 +371,8 @@
+                     if(pcard->current.sequence == player[pcard->current.controler].list_remove.size() - 1)
+                         return false;
+                     auto message = pduel->new_message(MSG_MOVE);
++					message->write<uint32_t>(0x31494759); // YGI1: physical card identity for presentation.
++					message->write<uint32_t>(pcard->cardid + 1);
+                     message->write<uint32_t>(pcard->data.code);
+                     message->write(pcard->get_info_location());
+                     player[pcard->current.controler].list_remove.erase(player[pcard->current.controler].list_remove.begin() + pcard->current.sequence);
+@@ -374,6 +382,8 @@
+                     message->write<uint32_t>(pcard->current.reason);
+                 } else {
+                     auto message = pduel->new_message(MSG_MOVE);
++					message->write<uint32_t>(0x31494759); // YGI1: physical card identity for presentation.
++					message->write<uint32_t>(pcard->cardid + 1);
+                     message->write<uint32_t>(pcard->data.code);
+                     message->write(pcard->get_info_location());
+                     player[pcard->current.controler].list_extra.erase(player[pcard->current.controler].list_extra.begin() + pcard->current.sequence);
+@@ -472,6 +482,8 @@
+         constexpr uint32_t swap_move_tag = 0x31534759; // YGS1
+         const auto send_swap_move = [&](card* pcard, const loc_info& previous, uint32_t part) {
+             auto message = pduel->new_message(MSG_MOVE);
++			message->write<uint32_t>(0x31494759); // YGI1: physical card identity for presentation.
++			message->write<uint32_t>(pcard->cardid + 1);
+             message->write<uint32_t>(pcard->data.code);
+             message->write(previous);
+             message->write(pcard->get_info_location());
+--- a/operations.cpp
++++ b/operations.cpp
+@@ -486,6 +486,8 @@
+                 message->write<uint32_t>(pcard->data.code);
+                 message->write<uint32_t>(pcard->current.position);
+             }
++			for(const auto& pcard : cv)
++				message->write<uint32_t>(pcard->cardid + 1);
+             if(core.deck_reversed && (public_count < drawn)) {
+                 message = pduel->new_message(MSG_CONFIRM_CARDS);
+                 message->write<uint8_t>(1 - playerid);
+@@ -1011,6 +1011,8 @@
+             }
+             pcard->clear_card_target();
+             auto message = pduel->new_message(MSG_MOVE);
++			message->write<uint32_t>(0x31494759); // YGI1: physical card identity for presentation.
++			message->write<uint32_t>(pcard->cardid + 1);
+             message->write<uint32_t>(pcard->data.code);
+             message->write(pcard->get_info_location());
+             if(pcard->overlay_target) {
+@@ -4468,6 +4470,8 @@
+         pcard->enable_field_effect(false);
+         if(pcard->data.type & TYPE_TOKEN) {
+             auto message = pduel->new_message(MSG_MOVE);
++			message->write<uint32_t>(0x31494759); // YGI1: physical card identity for presentation.
++			message->write<uint32_t>(pcard->cardid + 1);
+             message->write<uint32_t>(pcard->data.code);
+             message->write(pcard->get_info_location());
+             message->write(loc_info{});
+@@ -4526,6 +4530,8 @@
+         //call move_card()
+         if(pcard->current.controler != playerid || pcard->current.location != dest) {
+             auto message = pduel->new_message(MSG_MOVE);
++			message->write<uint32_t>(0x31494759); // YGI1: physical card identity for presentation.
++			message->write<uint32_t>(pcard->cardid + 1);
+             message->write<uint32_t>(pcard->data.code);
+             message->write(pcard->get_info_location());
+             if(pcard->overlay_target) {
+@@ -4580,6 +4586,8 @@
+         uint8_t oloc = pcard->current.location;
+         uint8_t seq = returns.at<int8_t>(2);
+         auto message = pduel->new_message(MSG_MOVE);
++		message->write<uint32_t>(0x31494759); // YGI1: physical card identity for presentation.
++		message->write<uint32_t>(pcard->cardid + 1);
+         message->write<uint32_t>(pcard->data.code);
+         message->write(pcard->get_info_location());
+         if(pcard->overlay_target) {
+@@ -4841,6 +4849,8 @@
+                     pcard->reset(RESET_REMOVE, RESET_EVENT);
+             }
+             auto message = pduel->new_message(MSG_MOVE);
++			message->write<uint32_t>(0x31494759); // YGI1: physical card identity for presentation.
++			message->write<uint32_t>(pcard->cardid + 1);
+             message->write<uint32_t>(pcard->data.code);
+             message->write(pcard->get_info_location());
+             pcard->enable_field_effect(false);
+@@ -5109,6 +5119,8 @@
+             }
+         }
+         auto message = pduel->new_message(MSG_MOVE);
++		message->write<uint32_t>(0x31494759); // YGI1: physical card identity for presentation.
++		message->write<uint32_t>(target->cardid + 1);
+         message->write<uint32_t>(target->data.code);
+         message->write(target->get_info_location());
+         if(target->overlay_target)
+--- a/processor.cpp
++++ b/processor.cpp
+@@ -5129,6 +5129,8 @@
+             else
+                 pcard = tc[count - i - 1];
+             auto message = pduel->new_message(MSG_MOVE);
++			message->write<uint32_t>(0x31494759); // YGI1: physical card identity for presentation.
++			message->write<uint32_t>(pcard->cardid + 1);
+             message->write<uint32_t>(0);
+             message->write(pcard->get_info_location());
+             list.erase(list.begin() + pcard->current.sequence);
+--- a/libduel.cpp
++++ b/libduel.cpp
+@@ -744,6 +744,8 @@
+         if(res = field.move_card(playerid, pcard, pcard->current.location, seq, pzone); res) {
+             if(cur_pzone != pzone) {
+                 auto message = pduel->new_message(MSG_MOVE);
++				message->write<uint32_t>(0x31494759); // YGI1: physical card identity for presentation.
++				message->write<uint32_t>(pcard->cardid + 1);
+                 message->write<uint32_t>(previous_code);
+                 message->write(previous_loc_info);
+                 message->write(pcard->get_info_location());

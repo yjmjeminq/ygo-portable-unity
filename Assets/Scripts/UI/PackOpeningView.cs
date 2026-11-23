@@ -25,8 +25,11 @@ namespace YGOPortable.UI
             internal Button Button;
             internal Text Name;
             internal Text RarityLabel;
+            internal Text Ownership;
+            internal Text SpecialEdition;
             internal Image Shine;
             internal uint Code;
+            internal PackPull Award;
             internal CardRarity Rarity;
             internal float FlipAge;
             internal float Lift;
@@ -57,7 +60,7 @@ namespace YGOPortable.UI
         private readonly Text _controls;
         private readonly Pull[] _pulls = new Pull[CollectionProgress.CardsPerPack];
         private readonly Action _close;
-        private IReadOnlyList<IReadOnlyList<uint>> _packs;
+        private IReadOnlyList<IReadOnlyList<PackPull>> _packs;
         private bool[] _opened;
         private Sprite _cover;
         private int _packIndex;
@@ -113,7 +116,7 @@ namespace YGOPortable.UI
             Hide();
         }
 
-        internal void Show(Sprite cover, string name, IReadOnlyList<IReadOnlyList<uint>> packs)
+        internal void Show(Sprite cover, string name, IReadOnlyList<IReadOnlyList<PackPull>> packs)
         {
             Hide();
             _root.transform.SetAsLastSibling();
@@ -143,7 +146,8 @@ namespace YGOPortable.UI
             for (int i = 0; i < _count; i++)
             {
                 var pull = _pulls[i];
-                pull.Code = cards[i];
+                pull.Award = cards[i];
+                pull.Code = pull.Award.Code;
                 pull.Rarity = CardRarityCatalog.GetRarity(pull.Code);
                 if (pull.Rarity > highest) highest = pull.Rarity;
             }
@@ -210,7 +214,7 @@ namespace YGOPortable.UI
             var slot = Slot(parent, $"Card_{index}", column / (float)CardsPerRow + .01f, bottom + .008f,
                 (column + 1) / (float)CardsPerRow - .01f, top - .008f);
             var group = slot.gameObject.AddComponent<CanvasGroup>();
-            var buttonBounds = Slot(slot, "Select", 0f, .143f, 1f, .95f);
+            var buttonBounds = Slot(slot, "Select", 0f, .179f, 1f, .95f);
             var clickArea = LotdUiKit.AddImage(buttonBounds.gameObject, LotdUiKit.WhiteSprite, Color.clear);
             var button = buttonBounds.gameObject.AddComponent<Button>();
             button.targetGraphic = clickArea;
@@ -242,6 +246,11 @@ namespace YGOPortable.UI
             // The tint overlays the card front briefly at the midpoint of the flip.
             shineRect.SetAsLastSibling();
 
+            var special = Slot(artwork, "OverframeBadge", .045f, .018f, .955f, .111f);
+            LotdUiKit.AddImage(special.gameObject, LotdUiKit.WhiteSprite, new Color(.09f, .035f, .175f, .96f), false, false);
+            var specialLabel = LotdUiKit.AddFittedText(special, "Label", "OVERFRAME", 16, 10,
+                TextAnchor.MiddleCenter, new Color(.9f, .78f, 1f), FontStyle.Bold);
+            special.gameObject.SetActive(false);
             var pull = new Pull
             {
                 Slot = slot,
@@ -250,7 +259,9 @@ namespace YGOPortable.UI
                 Card = card,
                 Reflection = reflection,
                 Button = button,
-                Name = Label(slot, "Name", "", 0f, 0f, 1f, .13f, 15, PackShopStyle.TextPrimary),
+                Name = Label(slot, "Name", "", 0f, .081f, 1f, .173f, 15, PackShopStyle.TextPrimary),
+                Ownership = Label(slot, "Ownership", "", 0f, 0f, 1f, .079f, 14, PackShopStyle.TextMuted),
+                SpecialEdition = specialLabel,
                 RarityLabel = rarity,
                 Shine = shine,
             };
@@ -286,6 +297,8 @@ namespace YGOPortable.UI
                 SetFace(pull, pull.Code, true);
                 pull.RarityLabel.transform.parent.gameObject.SetActive(false);
                 pull.Name.text = "";
+                pull.Ownership.text = "";
+                pull.SpecialEdition.transform.parent.gameObject.SetActive(false);
             }
             if (Application.isPlaying) LotdAudio.PlayDraw();
             RefreshStatus();
@@ -403,6 +416,9 @@ namespace YGOPortable.UI
             SetFace(pull, pull.Code, false);
             ShopRarityBadge.Update(pull.RarityLabel, pull.Code);
             pull.Name.text = CardDatabase.GetName(pull.Code);
+            pull.Ownership.text = pull.Award.IsNew ? "NEW" : $"보유 {pull.Award.OwnedCopies:N0}장";
+            pull.Ownership.color = pull.Award.IsNew ? LotdUiKit.GoldAccent : PackShopStyle.TextMuted;
+            pull.SpecialEdition.transform.parent.gameObject.SetActive(pull.Award.Overframe);
             if (playSound && Application.isPlaying)
             {
                 if (pull.Rarity == CardRarity.UltraRare) LotdAudio.PlayWin();
@@ -414,8 +430,11 @@ namespace YGOPortable.UI
 
         private static void SetFace(Pull pull, uint code, bool faceDown)
         {
-            pull.Card.SetCard(code, faceDown);
-            pull.Reflection?.SetCard(code, faceDown);
+            var appearance = pull.Award.Overframe && !faceDown
+                ? new DeckCardAppearance { overframe = true, artwork = CardArtLoader.FirstOverframeVariant(code) + 1 }
+                : default;
+            pull.Card.SetDeckCard(code, appearance, faceDown);
+            pull.Reflection?.SetDeckCard(code, appearance, faceDown);
         }
 
         private void RefreshStatus()
@@ -443,8 +462,9 @@ namespace YGOPortable.UI
         {
             _inspected = index;
             var pull = index >= 0 ? _pulls[index] : null;
+            string edition = pull?.Award.Overframe == true ? " · 오버프레임" : "";
             _selected.text = pull?.FaceUp == true
-                ? $"{pull.Name.text} · {CardRarityCatalog.GetLabel(pull.Rarity)} · 보유 {CollectionProgress.GetOwnedCount(pull.Code)}장"
+                ? $"{pull.Name.text} · {CardRarityCatalog.GetLabel(pull.Rarity)}{edition} · 보유 {pull.Award.OwnedCopies:N0}장"
                 : _revealed < _count ? "카드를 선택해 뒤집으세요" : "";
         }
 

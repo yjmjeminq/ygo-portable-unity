@@ -1,6 +1,6 @@
 --- a/processor.cpp
 +++ b/processor.cpp
-@@ -3705,6 +3705,14 @@
+@@ -3705,6 +3705,15 @@
          message->write<uint32_t>(clit.triggering_sequence);
          message->write<uint64_t>(peffect->description);
          message->write<uint32_t>(core.current_chain.size() + 1);
@@ -12,6 +12,7 @@
 +				activation_flags |= 2;
 +		}
 +		message->write<uint8_t>(activation_flags);
++		message->write<uint32_t>(peffect->get_handler()->cardid + 1);
          for(auto& ch_lim : core.chain_limit)
              pduel->lua->release_function_handle(pduel->lua->lua_state, ch_lim.function);
          core.chain_limit.clear();

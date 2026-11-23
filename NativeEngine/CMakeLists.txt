@@ -11,7 +11,7 @@ file(GLOB CORE_CPP "${YGOPRO_CORE_DIR}/*.cpp" "${YGOPRO_CORE_DIR}/RNG/*.cpp")
 
 # Apply project changes to build-local sources, keeping the shared core source intact.
 find_package(Git REQUIRED)
-set(CORE_PATCH_SOURCES processor.cpp operations.cpp field.cpp)
+set(CORE_PATCH_SOURCES processor.cpp operations.cpp field.cpp libduel.cpp)
 set(CORE_PATCHES
     "${CMAKE_CURRENT_SOURCE_DIR}/master_duel_chain_limit.patch"
     "${CMAKE_CURRENT_SOURCE_DIR}/battle_comparison.patch"
@@ -21,6 +21,7 @@ set(CORE_PATCHES
     "${CMAKE_CURRENT_SOURCE_DIR}/position_presentation.patch"
     "${CMAKE_CURRENT_SOURCE_DIR}/swap_presentation.patch"
     "${CMAKE_CURRENT_SOURCE_DIR}/chain_activation_presentation.patch"
+    "${CMAKE_CURRENT_SOURCE_DIR}/card_identity_presentation.patch"
 )
 set(CORE_PATCH_STAGE "${CMAKE_CURRENT_BINARY_DIR}/core-patch-stage")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CORE_PATCHES})

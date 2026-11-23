@@ -429,6 +429,9 @@ namespace YGOPortable.Editor
             CollectionProgress.Load(save);
             var selection = CollectionProgress.Starters.First(option => option.Name.Contains("상검"));
             Require(CollectionProgress.TryChooseStarter(selection.Id, out var starter, out string error), error);
+            string profile = Path.Combine(save, CollectionProgress.ProfileFileName);
+            File.WriteAllText(profile, File.ReadAllText(profile).Replace("\"craftDust\": \"0\"", "\"craftDust\": \"900\""));
+            CollectionProgress.Load(save);
             uint repeated = starter.main.GroupBy(code => code).First(group => group.Count() == 3).Key;
             uint other = starter.main.First(code => CollectionProgress.GetDeckCopyKey(code) != CollectionProgress.GetDeckCopyKey(repeated));
             var saved = new UserDeck { name = "Split copies fixture", main = new List<uint> { repeated, other, repeated } };
@@ -481,14 +484,14 @@ namespace YGOPortable.Editor
             Require(!mainBadge.gameObject.activeInHierarchy && !sideBadge.gameObject.activeInHierarchy &&
                 TrunkCount(editor, code) == "×0", "Spending all available copies in the deck marked the card as unowned.");
 
-            Call(editor, "OpenCardCrafting", code);
+            Call(editor, "OpenCardCrafting", code, CardTradeAction.Browse);
             Require(CollectionProgress.TryDisassembleCards(new Dictionary<uint, int> { [code] = 3 }, out string error), error);
             Call(editor, "ReturnFromCardCrafting");
             Require(mainBadge.gameObject.activeInHierarchy && sideBadge.gameObject.activeInHierarchy &&
                 TrunkCount(editor, code) == "미보유" && preview.text.Contains("미보유"),
                 "Disassembling the last copy did not refresh the deck, card list and preview.");
 
-            Call(editor, "OpenCardCrafting", code);
+            Call(editor, "OpenCardCrafting", code, CardTradeAction.Browse);
             Require(CollectionProgress.TryCraftCard(code, 1, out error), error);
             Call(editor, "ReturnFromCardCrafting");
             Require(!mainBadge.gameObject.activeInHierarchy && !sideBadge.gameObject.activeInHierarchy &&
@@ -583,10 +586,14 @@ namespace YGOPortable.Editor
             var buttons = editorType.Assembly.GetType("YGOPortable.UI.DeckPadButtons", true);
             Call(editor, "HandleDeckPad", Activator.CreateInstance(frame, Instance, null,
                 new object[] { Vector2Int.zero, Enum.Parse(buttons, "Submit"), 0f }, null));
-            Require(BlueEyesEntry().code == blueEyesArt && TrunkCount(editor, blueEyesArt) == "×2" &&
+            uint shownPrinting = BlueEyesEntry().code;
+            string shownCount = TrunkCount(editor, shownPrinting);
+            uint inspectedPrinting = Field<CompositeCardView>(editor, "_previewCard").CurrentCode;
+            Require(shownPrinting == blueEyesArt && shownCount == "×2" &&
                 events.currentSelectedGameObject == artwork.gameObject &&
-                Field<CompositeCardView>(editor, "_previewCard").CurrentCode == blueEyesArt,
-                "Gamepad artwork selection did not update the row and preview while retaining focus and quantity.");
+                inspectedPrinting == blueEyesArt,
+                $"Gamepad artwork selection showed {shownPrinting} ({shownCount}), inspected {inspectedPrinting}, " +
+                $"and retained artwork focus: {events.currentSelectedGameObject == artwork.gameObject}.");
             Call(editor, "CloseDeckCardActions");
             Require(CollectionProgress.GetOwnedCount(blueEyes) == 1 && CollectionProgress.GetOwnedCount(blueEyesArt) == 3,
                 "Grouping cards changed saved ownership per artwork.");

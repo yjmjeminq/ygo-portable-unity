@@ -173,7 +173,7 @@ namespace YGOPortable.UI
             _ownership.Clear();
             foreach (var card in CardDatabase.AllCards)
             {
-                int count = CollectionProgress.GetOwnedCount(card.code);
+                int count = CollectionProgress.GetTotalOwnedCount(card.code);
                 if (count == 0) continue;
                 uint key = CardDatabase.GetArchetypeCollectionKey(card);
                 _ownership.TryGetValue(key, out var copies);

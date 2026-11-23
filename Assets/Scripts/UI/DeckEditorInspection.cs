@@ -120,7 +120,8 @@ namespace YGOPortable.UI
             _expandedDeckDescription.text = card.desc;
             _expandedDeckOverlay.SetAsLastSibling();
             _expandedDeckOverlay.gameObject.SetActive(true);
-            _expandedDeckArt.SetCard(code);
+            var (cards, index) = InspectedDeckSlot(code);
+            _expandedDeckArt.SetDeckCard(code, ReadAppearance(code, cards, index));
             Canvas.ForceUpdateCanvases();
             _expandedDeckScroll.StopMovement();
             _expandedDeckScroll.content.anchoredPosition = Vector2.zero;

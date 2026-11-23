@@ -32,6 +32,7 @@ namespace YGOPortable.Core
         public bool effectsDisabled;
         public List<uint> overlayCodes = new List<uint>();
         internal (byte Controller, uint Sequence)? EquipTarget;
+        internal DeckCardAppearance? Appearance;
         internal (ushort Type, ushort Count)[] Counters = Array.Empty<(ushort, ushort)>();
 
         public uint counterCount
@@ -68,6 +69,7 @@ namespace YGOPortable.Core
         internal uint? TemporaryBanishCardId;
         internal LiveCardState SourceReadout;
         internal LiveCardState DestinationReadout;
+        internal DeckCardAppearance? Appearance;
         internal object PresentationGroup;
         internal bool ChangesPositionInPlace =>
             fromCon == toCon && fromLoc == toLoc && fromSeq == toSeq && fromPos != toPos &&
@@ -140,6 +142,7 @@ namespace YGOPortable.Core
 
     public class ChainLinkInfo
     {
+        internal DeckCardAppearance? Appearance;
         public int chainNumber;
         public uint code;
         public byte triggerPlayer;
@@ -403,6 +406,7 @@ namespace YGOPortable.Core
         internal event Action<CardMoveEvent, CardMoveEvent> OnCardLocationsChanged;
         internal event Action OnFieldArrivalBoundary;
         public event Action<byte, IReadOnlyList<uint>> OnCardsDrawn;
+        internal event Action<byte, IReadOnlyList<uint>, IReadOnlyList<DeckCardAppearance?>> OnStyledCardsDrawn;
         public event Action<byte, int, int> OnLifePointsChanged;
         internal event Action<byte, int, int, LifePointChangeKind> OnLifePointChange;
         public event Action<int, int> OnTurnStarted;
@@ -419,12 +423,18 @@ namespace YGOPortable.Core
         public event Action<byte, IReadOnlyList<bool>> OnCoinTossed;
         public event Action<byte, IReadOnlyList<int>> OnDiceRolled;
 
+        private const uint CardIdentityTag = 0x31494759;
+        private readonly Dictionary<uint, DeckCardAppearance> _deckAppearances = new();
+        internal bool UsesDeckAppearances { get; private set; }
+
         public bool StartNewDuel(
             IReadOnlyList<uint> p0Main, IReadOnlyList<uint> p0Extra,
             IReadOnlyList<uint> p1Main, IReadOnlyList<uint> p1Extra,
-            bool p0GoesFirst = true, int startingLp = 8000, ulong[] seed = null)
+            bool p0GoesFirst = true, int startingLp = 8000, ulong[] seed = null, UserDeck playerDeckAppearance = null)
         {
             Dispose();
+            UsesDeckAppearances = playerDeckAppearance != null;
+            _deckAppearances.Clear();
             IsFinished = false;
             Winner = -1;
             TurnNumber = 0;
@@ -501,8 +511,8 @@ namespace YGOPortable.Core
                 shuffleSeed = unchecked((shuffleSeed ^ (uint)(seed[i] >> 32)) * 16777619);
             }
             var shuffle = new System.Random(unchecked((int)shuffleSeed));
-            LoadDeckForPlayer(0, firstMain, turn0Extra, shuffle);
-            LoadDeckForPlayer(1, secondMain, turn1Extra, shuffle);
+            LoadDeckForPlayer(0, firstMain, turn0Extra, shuffle, p0GoesFirst ? playerDeckAppearance : null);
+            LoadDeckForPlayer(1, secondMain, turn1Extra, shuffle, p0GoesFirst ? null : playerDeckAppearance);
 
             YgoNativeBridge.YGO_StartDuel(NativePtr);
             if (_recordPlanningReplay)
@@ -571,31 +581,48 @@ namespace YGOPortable.Core
             ClearDeckSelection();
         }
 
-        private void LoadDeckForPlayer(byte playerId, IReadOnlyList<uint> main, IReadOnlyList<uint> extra, System.Random shuffle)
+        private void LoadDeckForPlayer(byte playerId, IReadOnlyList<uint> main, IReadOnlyList<uint> extra,
+            System.Random shuffle, UserDeck appearanceDeck)
         {
             if (main != null && main.Count > 0)
             {
-                var shuffled = new List<uint>(main);
-                for (int i = shuffled.Count - 1; i > 0; i--)
+                var shuffled = Enumerable.Range(0, main.Count).ToArray();
+                for (int i = shuffled.Length - 1; i > 0; i--)
                 {
                     int j = shuffle.Next(i + 1);
                     (shuffled[i], shuffled[j]) = (shuffled[j], shuffled[i]);
                 }
-                for (int i = shuffled.Count - 1; i >= 0; i--)
-                {
-                    YgoNativeBridge.YGO_AddCard(NativePtr, playerId, 0, shuffled[i],
-                        playerId, YgoConstants.LOCATION_DECK, 0, YgoConstants.POS_FACEDOWN_DEFENSE);
-                }
+                for (int i = shuffled.Length - 1; i >= 0; i--)
+                    AddDeckCard(main[shuffled[i]], YgoConstants.LOCATION_DECK,
+                        appearanceDeck?.GetAppearance(appearanceDeck.main, shuffled[i]) ?? default);
             }
             if (extra != null)
             {
                 for (int i = 0; i < extra.Count; i++)
-                {
-                    YgoNativeBridge.YGO_AddCard(NativePtr, playerId, 0, extra[i],
-                        playerId, YgoConstants.LOCATION_EXTRA, 0, YgoConstants.POS_FACEDOWN_DEFENSE);
-                }
+                    AddDeckCard(extra[i], YgoConstants.LOCATION_EXTRA,
+                        appearanceDeck?.GetAppearance(appearanceDeck.extra, i) ?? default);
+            }
+
+            void AddDeckCard(uint code, uint location, DeckCardAppearance appearance)
+            {
+                uint before = appearance.IsDefault ? 0 : YgoNativeBridge.YGO_QueryCount(NativePtr, playerId, location);
+                YgoNativeBridge.YGO_AddCard(NativePtr, playerId, 0, code, playerId, location, 0, YgoConstants.POS_FACEDOWN_DEFENSE);
+                if (appearance.IsDefault || YgoNativeBridge.YGO_QueryCount(NativePtr, playerId, location) != before + 1) return;
+                uint identity = YgoNativeBridge.YGO_QueryCardIdentity(NativePtr, playerId, location, before);
+                if (identity != 0) _deckAppearances[identity] = appearance;
             }
         }
+
+        internal DeckCardAppearance? GetDeckAppearance(byte player, uint location, uint sequence)
+        {
+            if (!UsesDeckAppearances) return null;
+            if (_deckAppearances.Count == 0) return default(DeckCardAppearance);
+            uint identity = YgoNativeBridge.YGO_QueryCardIdentity(NativePtr, player, location, sequence);
+            return AppearanceOf(identity);
+        }
+
+        private DeckCardAppearance? AppearanceOf(uint identity) =>
+            UsesDeckAppearances ? _deckAppearances.GetValueOrDefault(identity) : null;
 
         public void SubmitResponse(byte[] buffer) => SubmitResponse(buffer, preserveDeckSelection: false);
 
@@ -1292,7 +1319,7 @@ namespace YGOPortable.Core
                     uint cnt = br.ReadUInt32();
                     string who = p == HumanPlayerIndex ? "플레이어" : "상대";
                     AddLog($"{who} 드로우 {cnt}장");
-                    if (OnCardsDrawn != null && cnt <= (msgEnd - br.BaseStream.Position) / 8)
+                    if ((OnCardsDrawn != null || OnStyledCardsDrawn != null) && cnt <= (msgEnd - br.BaseStream.Position) / 8)
                     {
                         var codes = new uint[cnt];
                         for (int i = 0; i < codes.Length; i++)
@@ -1302,7 +1329,18 @@ namespace YGOPortable.Core
                             if (p == HumanPlayerIndex || (position & YgoConstants.POS_FACEUP) != 0)
                                 codes[i] = code;
                         }
-                        OnCardsDrawn.Invoke(p, codes);
+                        OnCardsDrawn?.Invoke(p, codes);
+                        if (OnStyledCardsDrawn != null)
+                        {
+                            var appearances = new DeckCardAppearance?[codes.Length];
+                            bool hasIdentities = msgEnd - br.BaseStream.Position >= codes.Length * sizeof(uint);
+                            for (int i = 0; i < codes.Length; i++)
+                            {
+                                uint identity = hasIdentities ? br.ReadUInt32() : 0;
+                                appearances[i] = AppearanceOf(codes[i] == 0 ? 0 : identity);
+                            }
+                            OnStyledCardsDrawn.Invoke(p, codes, appearances);
+                        }
                     }
                     break;
                 }
@@ -1409,6 +1447,12 @@ namespace YGOPortable.Core
                 case YgoConstants.MSG_MOVE:
                 {
                     uint code = br.ReadUInt32();
+                    uint identity = 0;
+                    if (code == CardIdentityTag && msgEnd - br.BaseStream.Position >= 32)
+                    {
+                        identity = br.ReadUInt32();
+                        code = br.ReadUInt32();
+                    }
                     byte fCon = br.ReadByte();
                     byte fLoc = br.ReadByte();
                     uint fSeq = br.ReadUInt32();
@@ -1461,6 +1505,7 @@ namespace YGOPortable.Core
                         summonType = summonType,
                         ReturnEffectId = tag == FieldReturnTag ? extraValue : null,
                         TemporaryBanishCardId = temporaryCard,
+                        Appearance = AppearanceOf(identity),
                         PresentationGroup = _movementGroups.TryPeek(out var group) && presentation == group.Tag ? group.Key : null,
                     };
                     if (firstSwapMove != null)
@@ -1615,6 +1660,7 @@ namespace YGOPortable.Core
                     int chainNo = (int)br.ReadUInt32();
                     // The bundled engine appends flags to the length-delimited MSG_CHAINING.
                     byte activationFlags = br.BaseStream.Position < msgEnd ? br.ReadByte() : (byte)0;
+                    uint identity = msgEnd - br.BaseStream.Position >= sizeof(uint) ? br.ReadUInt32() : 0;
                     if (_speculatingPlayer >= 0 && tCon != _speculatingPlayer) SpeculationUncertain = true;
                     var activation = CaptureChainFieldCard(source);
                     var link = new ChainLinkInfo
@@ -1629,6 +1675,7 @@ namespace YGOPortable.Core
                         HasOncePerTurnActivationLimit = (activationFlags & 2) != 0,
                         ActivationSource = (source.controller, source.location, source.sequence),
                         ActivationReadout = activation,
+                        Appearance = AppearanceOf(identity),
                         PublicFieldSource = activation != null ? (activation.controller, activation.location, activation.sequence) : null,
                     };
                     CurrentChain.Add(link);
@@ -2370,6 +2417,7 @@ namespace YGOPortable.Core
                     controller = playerId,
                     location = loc,
                     sequence = (uint)seqIdx,
+                    Appearance = GetDeckAppearance(playerId, loc, (uint)seqIdx),
                 };
                 // First block was ALREADY read into headerLen! Rewind 2 bytes to parse block loop cleanly
                 pos -= 2;

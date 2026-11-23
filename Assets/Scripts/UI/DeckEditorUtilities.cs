@@ -452,8 +452,8 @@ namespace YGOPortable.UI
             }
             ShowDeckDialog("덱 비우기", "메인 덱과 엑스트라 덱의 카드를 모두 빼시겠습니까?", "비우기", () =>
             {
-                _workingDeck.main.Clear();
-                _workingDeck.extra.Clear();
+                _workingDeck.ClearCards(_workingDeck.main);
+                _workingDeck.ClearCards(_workingDeck.extra);
                 FinishDeckEdit();
                 CloseDeckDialog(restoreFocus: false);
                 CloseDeckUtility();

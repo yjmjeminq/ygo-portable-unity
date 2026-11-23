@@ -127,13 +127,19 @@ namespace YGOPortable.Editor
                 const BindingFlags instance = BindingFlags.Instance | BindingFlags.NonPublic;
                 typeof(DeckEditorUI).GetMethod("InspectCard", instance).Invoke(deck, new object[] { BlueEyes });
                 var preview = (CompositeCardView)typeof(DeckEditorUI).GetField("_previewCard", instance).GetValue(deck);
-                Require(preview.HasOverframe, "The deck preview did not show the decoded portrait.");
+                Require(!preview.HasOverframe, "The regular deck preview borrowed the special edition portrait.");
+                var selected = (Dictionary<uint, DeckCardAppearance>)typeof(DeckEditorUI)
+                    .GetField("_trunkAppearances", instance).GetValue(deck);
+                selected[BlueEyes] = new DeckCardAppearance { overframe = true };
+                typeof(DeckEditorUI).GetMethod("InspectCard", instance).Invoke(deck, new object[] { BlueEyes });
+                Require(preview.HasOverframe, "The selected special edition preview did not show the decoded portrait.");
                 typeof(DeckEditorUI).GetMethod("OpenExpandedDeckCard", instance).Invoke(deck, new object[] { BlueEyes });
                 var expanded = (CompositeCardView)typeof(DeckEditorUI).GetField("_expandedDeckArt", instance).GetValue(deck);
                 Require(expanded.HasOverframe, "The expanded deck viewer did not show the decoded portrait.");
                 deck.Close();
 
                 VerifyOverframeAnimation(CardAnimationManager.Ensure(canvas));
+                VerifyPhysicalDeckAppearances();
                 Debug.Log("[VERIFY OVERFRAME] Bundled and exact alternate portraits, deck preview, tucking hidden cards, summon finish and chain animation passed.");
             }
             finally
@@ -146,6 +152,47 @@ namespace YGOPortable.Editor
                 Directory.Delete(folder);
             }
             VerifyPackagedOverframe(portraitBytes);
+        }
+
+        private static void VerifyPhysicalDeckAppearances()
+        {
+            const uint Sparkman = 20721928;
+            var deck = new UserDeck();
+            for (int i = 0; i < 40; i++)
+                deck.InsertCard(deck.main, i, Sparkman, new DeckCardAppearance { overframe = i % 2 == 0 });
+            var opponent = Enumerable.Repeat(Sparkman, 40).ToArray();
+            foreach (bool special in new[] { false, true })
+            {
+                using var session = new DuelSession();
+                IReadOnlyList<DeckCardAppearance?> drawn = null;
+                CardMoveEvent summon = null;
+                session.OnStyledCardsDrawn += (player, _, editions) =>
+                {
+                    if (player == session.HumanPlayerIndex) drawn = editions;
+                };
+                session.OnCardMoved += move =>
+                {
+                    if (move.toLoc == YgoConstants.LOCATION_MZONE) summon = move;
+                };
+                Require(session.StartNewDuel(deck.main, deck.extra, opponent, Array.Empty<uint>(),
+                    seed: new ulong[] { 718, 391, 27182, 31 }, playerDeckAppearance: deck),
+                    "Could not start the physical card edition fixture.");
+                if (session.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_CHAIN)
+                    session.SubmitResponseInt(-1);
+                var hand = session.Players[session.HumanPlayerIndex].hand;
+                int index = session.ActivePrompt.summonable.FindIndex(option =>
+                    hand[(int)option.sequence].Appearance?.overframe == special);
+                Require(index >= 0 && hand.All(card => card.code == Sparkman) &&
+                    drawn != null && drawn.SequenceEqual(hand.Select(card => card.Appearance)),
+                    "Shuffling or drawing lost the edition of identical card codes.");
+                session.SubmitResponseInt(index << 16);
+                if (session.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_PLACE)
+                    session.SubmitResponse(new byte[] { (byte)session.HumanPlayerIndex, (byte)YgoConstants.LOCATION_MZONE, 2 });
+                Require(summon?.Appearance?.overframe == special &&
+                    session.Players[session.HumanPlayerIndex].mzone.Any(card => card?.Appearance?.overframe == special) &&
+                    session.RetryCount == 0, "The move or resulting field card inherited the edition of another copy.");
+            }
+            Debug.Log("[VERIFY PHYSICAL CARDS] Regular and special copies retained separate identities through shuffle, draw and summon.");
         }
 
         private static void VerifyPackagedOverframe(byte[] image)
@@ -238,7 +285,8 @@ namespace YGOPortable.Editor
                 animator.transform.Find("ChainImpactWave") == null, "The overframe cut-in outlived the summon.");
 
             landed = false;
-            animator.QueueMove(new CardFlight(BlueEyes, start, end, false, false), CardMotion.SpecialSummon, () => landed = true);
+            animator.QueueMove(new CardFlight(BlueEyes, start, end, false, false,
+                new DeckCardAppearance { overframe = true }), CardMotion.SpecialSummon, () => landed = true);
             move = queue.Dequeue();
             Require(move.MoveNext() && move.Current.GetType().Name.StartsWith("<RevealSummon>", StringComparison.Ordinal),
                 "An ace that left the field lost its overframe on the next summon of the same duel.");
@@ -250,6 +298,14 @@ namespace YGOPortable.Editor
             while (reveal.MoveNext()) SampleAnimation((IEnumerator)reveal.Current)(1f);
             Require(!move.MoveNext() && landed && animator.transform.Find("ChainImpactWave") == null,
                 "The resummoned ace did not complete its field arrival.");
+
+            animator.QueueMove(new CardFlight(BlueEyes, start, end, false, false, default(DeckCardAppearance)),
+                CardMotion.SpecialSummon, null);
+            move = queue.Dequeue();
+            Require(move.MoveNext() && !move.Current.GetType().Name.StartsWith("<RevealSummon>", StringComparison.Ordinal) &&
+                !animator.transform.Find("MovingCard").GetComponent<CompositeCardView>().HasOverframe,
+                "The standard edition borrowed another copy's summon presentation.");
+            while (move.MoveNext()) { }
 
             animator.QueueMove(new CardFlight(BlueEyes, start, end, true, true), CardMotion.SpecialSummon, null);
             move = queue.Dequeue();

@@ -401,7 +401,7 @@ namespace YGOPortable.UI
             if (!_session.StartNewDuel(
                 myDeck.main, myDeck.extra,
                 oppDeck.main, oppDeck.extra,
-                p0GoesFirst: playerGoesFirst))
+                p0GoesFirst: playerGoesFirst, playerDeckAppearance: myDeck))
             {
                 ShowDuelStartFailure(isStoryDuel, "듀얼을 시작하지 못했습니다.");
                 return;

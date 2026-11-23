@@ -23,6 +23,7 @@ namespace YGOPortable.UI
         private Button _deckCardActionDetails;
         private Button _deckCardActionCrafting;
         private Button _deckCardActionArtwork;
+        private Button _deckCardActionEdition;
         private Button _deckCardActionCancel;
         private Button _deckCardActionDefault;
         private Button[] _deckCardActionRows;
@@ -72,9 +73,11 @@ namespace YGOPortable.UI
             _deckCardActionDetails = AddRow("Details");
             _deckCardActionCrafting = AddRow("Crafting");
             _deckCardActionArtwork = AddRow("Artwork");
+            _deckCardActionEdition = AddRow("Edition");
             _deckCardActionCancel = AddRow("Cancel", "취소", CloseDeckCardActions);
             _deckCardActionRows = new[] { _deckCardActionDetails, _deckCardActionMain, _deckCardActionAlternate,
-                _deckCardActionRelated, _deckCardActionCrafting, _deckCardActionArtwork, _deckCardActionCancel };
+                _deckCardActionRelated, _deckCardActionCrafting, _deckCardActionArtwork, _deckCardActionEdition,
+                _deckCardActionCancel };
             overlay.gameObject.SetActive(false);
         }
 
@@ -139,7 +142,8 @@ namespace YGOPortable.UI
             SetDeckCardAction(_deckCardActionDetails, "카드 상세 보기", true, () => OpenExpandedDeckCard(code));
             SetDeckCardAction(_deckCardActionCrafting, "제작·분해",
                 CollectionProgress.HasStarter && CollectionProgress.IsCraftableCard(card), () => OpenCardCrafting(code));
-            ConfigureTrunkArtworkAction(anchor, source, index, code);
+            _inspectedSource = anchor != null && anchor.GetComponent<CardDragTrigger>() != null ? anchor : null;
+            ConfigureAppearanceActions(anchor, source, index, code);
             _deckCardActionTitle.text = card.name;
             if (_mobileLayout) SelectMobileCard(code, source);
             InspectCard(code);
@@ -183,46 +187,55 @@ namespace YGOPortable.UI
             return index >= 0 ? (home, index) : (DragSourceType.DeckSide, side.FindLastIndex(SameName));
         }
 
-        private void ConfigureTrunkArtworkAction(RectTransform anchor, DragSourceType source, int index, uint code)
+        private void ConfigureAppearanceActions(RectTransform anchor, DragSourceType source, int index, uint code)
         {
-            CardInfo[] choices = Array.Empty<CardInfo>();
-            if (source == DragSourceType.Trunk && CardDatabase.TryGetDeckPrintings(code, out var printings))
-                choices = CollectionProgress.RequiresOwnedCardsForDecks
-                    ? printings.Where(printing => printing.code == code || CollectionProgress.GetOwnedCount(printing.code) > 0).ToArray()
-                    : printings;
-
-            bool show = choices.Length > 1;
-            _deckCardActionArtwork.gameObject.SetActive(show);
-            if (show)
+            var cards = GetDeckList(source);
+            var appearance = ReadAppearance(code, cards, index);
+            var choices = ArtworkChoices(code, appearance, cards != null);
+            bool artwork = choices.Count > 1;
+            bool edition = appearance.overframe || CardArtLoader.SupportsOverframe(code);
+            _deckCardActionArtwork.gameObject.SetActive(artwork);
+            _deckCardActionEdition.gameObject.SetActive(edition);
+            if (artwork)
             {
-                int current = Array.FindIndex(choices, printing => printing.code == code);
-                SetDeckCardAction(_deckCardActionArtwork, $"일러스트 변경 · {current + 1}/{choices.Length}", true, () =>
+                int choice = choices.IndexOf((code, appearance.artwork));
+                SetDeckCardAction(_deckCardActionArtwork, $"일러스트 변경 · {Math.Max(1, choice + 1)}/{choices.Count}", true, () =>
                 {
-                    uint key = DeckGroupKey(code);
-                    if (index >= _trunkResults.Count || DeckGroupKey(_trunkResults[index].code) != key) return;
-                    var next = choices[(current + 1) % choices.Length];
-                    _trunkPrintChoices[key] = next.code;
-                    _trunkResults[index] = next;
-                    UpdateVirtualTrunkSlots(_lastFirstRow, force: true);
-                    ShowDeckCardActions(anchor, source, index, next.code);
-                    EventSystem.current?.SetSelectedGameObject(_deckCardActionArtwork.gameObject);
+                    ChangeArtwork(code, cards, index);
+                    RefreshAppearanceMenu(_deckCardActionArtwork);
                 }, closeMenu: false);
+            }
+            if (edition)
+                SetDeckCardAction(_deckCardActionEdition, appearance.overframe ? "일반판으로 변경" : "오버프레임으로 변경",
+                    CanChangeEdition(code, cards, appearance), () =>
+                    {
+                        ChangeEdition(code, cards, index);
+                        RefreshAppearanceMenu(_deckCardActionEdition);
+                    }, closeMenu: false);
+
+            void RefreshAppearanceMenu(Button focus)
+            {
+                uint selected = source == DragSourceType.Trunk ? _trunkResults[index].code : _inspectedCode;
+                ShowDeckCardActions(anchor, source, index, selected);
+                if (focus.isActiveAndEnabled && focus.IsInteractable())
+                    EventSystem.current?.SetSelectedGameObject(focus.gameObject);
             }
 
             if (_mobileLayout)
             {
-                LayoutMobileCardActions(show);
+                LayoutMobileCardActions(artwork, edition);
                 return;
             }
-            _deckCardActionPanel.sizeDelta = new Vector2(CardActionWidth, show ? CardActionHeight + 40f : CardActionHeight);
-            float step = show ? .089f : .107f;
+            int rows = _deckCardActionRows.Count(button => button.gameObject.activeSelf);
+            _deckCardActionPanel.sizeDelta = new Vector2(CardActionWidth, CardActionHeight + Math.Max(0, rows - 6) * 36f);
+            float step = .603f / rows;
             int rowIndex = 0;
             foreach (var button in _deckCardActionRows)
             {
                 if (!button.gameObject.activeSelf) continue;
                 var row = (RectTransform)button.transform.parent;
                 float top = .666f - rowIndex++ * step;
-                row.anchorMin = new Vector2(.10f, top - .084f);
+                row.anchorMin = new Vector2(.10f, top - step + .012f);
                 row.anchorMax = new Vector2(.90f, top);
             }
         }

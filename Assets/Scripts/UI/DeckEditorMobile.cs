@@ -297,7 +297,7 @@ namespace YGOPortable.UI
             else if (current > quantity)
             {
                 for (int i = current; i > quantity; i--)
-                    list.RemoveAt(list.FindLastIndex(SameCard));
+                    _workingDeck.RemoveCard(list, list.FindLastIndex(SameCard));
                 FinishDeckEdit();
             }
             RefreshMobileCardSelection();
@@ -366,14 +366,15 @@ namespace YGOPortable.UI
             rt.anchorMax = new Vector2((col + 1f) / cols, 1f - row / (float)rows);
         }
 
-        private void LayoutMobileCardActions(bool showArtwork)
+        private void LayoutMobileCardActions(bool showArtwork, bool showEdition)
         {
             var overlay = (RectTransform)_deckCardActions.transform;
             float touch = MobileSafeArea.MinimumTouchSize(overlay);
             float width = Mathf.Min(overlay.rect.width - 20f, Mathf.Max(550f, 5.2f * touch));
-            float height = Mathf.Min(overlay.rect.height - 18f, touch * 5f + 49f);
+            int lines = showEdition ? 6 : 5;
+            float height = Mathf.Min(overlay.rect.height - 18f, touch * lines + 49f);
             _deckCardActionPanel.sizeDelta = new Vector2(width, height);
-            float step = (height - 32f) / 5f;
+            float step = (height - 32f) / lines;
             void Place(RectTransform row, int line, float left = .07f, float right = .93f)
             {
                 float y = 1f - (16f + line * step) / height;
@@ -391,6 +392,7 @@ namespace YGOPortable.UI
             PlaceButton(_deckCardActionAlternate, 3, .505f, .93f);
             PlaceButton(_deckCardActionCrafting, 4, .07f, showArtwork ? .495f : .93f);
             PlaceButton(_deckCardActionArtwork, 4, .505f, .93f);
+            if (showEdition) PlaceButton(_deckCardActionEdition, 5, .07f, .93f);
             PlaceButton(_deckCardActionCancel, 0, .724f, .93f);
         }
     }

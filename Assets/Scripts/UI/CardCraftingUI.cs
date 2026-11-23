@@ -8,6 +8,8 @@ using YGOPortable.Core;
 
 namespace YGOPortable.UI
 {
+    internal enum CardTradeAction { Browse, Craft, CraftOverframe, Disassemble, DisassembleOverframe }
+
     internal sealed class CardCraftingUI
     {
         private const int PageSize = 7;
@@ -20,14 +22,12 @@ namespace YGOPortable.UI
         {
             internal readonly CardInfo Card;
             internal readonly string Name;
-            internal readonly string SearchName;
             internal readonly CardRarity Rarity;
 
             internal Entry(CardInfo card)
             {
                 Card = card;
                 Name = CardDatabase.GetName(card.code);
-                SearchName = Normalize(Name);
                 Rarity = CardRarityCatalog.GetRarity(card.code);
             }
         }
@@ -37,6 +37,7 @@ namespace YGOPortable.UI
         private readonly CanvasGroup _mainControls;
         private readonly InputField _finder;
         private readonly Button _bulkButton;
+        private readonly CollectionCardFilters _collectionFilters;
         private readonly CardBulkDisassemblyUI _bulk;
         private readonly Button[] _rows = new Button[PageSize];
         private readonly Text[] _rowNames = new Text[PageSize];
@@ -56,6 +57,8 @@ namespace YGOPortable.UI
         private readonly Text _description;
         private readonly Button _craft;
         private readonly Button _disassemble;
+        private readonly Button _craftOverframe;
+        private readonly Button _disassembleOverframe;
         private readonly Text _status;
         private readonly GameObject _confirmation;
         private readonly GameObject _confirmationWindow;
@@ -76,6 +79,7 @@ namespace YGOPortable.UI
         private int _quantity;
         private int _maxQuantity;
         private bool _crafting;
+        private bool _overframe;
 
         internal GameObject Root { get; }
         internal bool IsOpen => Root.activeSelf;
@@ -84,7 +88,7 @@ namespace YGOPortable.UI
         internal InputField Search => _bulk.IsOpen ? _bulk.Search :
             _confirmation.activeSelf ? null : _finder;
 
-        internal CardCraftingUI(Transform parent, Action close)
+        internal CardCraftingUI(Transform parent, Action close, string backLabel = "덱 편집으로")
         {
             _onClose = close;
             var root = LotdUiKit.FillRect("Screen_CardCrafting", parent);
@@ -95,7 +99,7 @@ namespace YGOPortable.UI
             PackShopStyle.Backdrop(main);
             PackShopStyle.Header(main, "카드 제작·분해");
             _bulkButton = AddButton(main, "Bulk", "일괄 분해", .655f, .917f, .812f, .975f, OpenBulk);
-            AddButton(main, "Back", "덱 편집으로", .825f, .917f, .968f, .975f, Back);
+            AddButton(main, "Back", backLabel, .825f, .917f, .968f, .975f, Back);
 
             var catalog = PackShopStyle.Panel(main, "Catalog", new Vector2(.025f, .083f), new Vector2(.425f, .882f));
             _finder = PackShopStyle.Search(Slot(catalog, "Search", .08f, .849f, .92f, .925f),
@@ -109,13 +113,15 @@ namespace YGOPortable.UI
                     () => ChangeFilter(filter));
                 _filterLabels[i] = button.GetComponentInChildren<Text>();
             }
-            _count = Label(catalog, "Count", "", .087f, .710f, .915f, .761f, 16, TextAnchor.MiddleLeft, PackShopStyle.TextMuted);
+            _collectionFilters = new CollectionCardFilters(Slot(catalog, "CollectionFilters", .08f, .700f, .92f, .759f),
+                () => Filter(), includeRarity: false);
+            _count = Label(catalog, "Count", "", .087f, .655f, .915f, .695f, 16, TextAnchor.MiddleLeft, PackShopStyle.TextMuted);
 
             for (int i = 0; i < PageSize; i++)
             {
                 int row = i;
-                float top = .703f - i * .078f;
-                var button = AddButton(catalog, $"Card_{i}", "", .08f, top - .067f, .92f, top, () => SelectRow(row));
+                float top = .650f - i * .071f;
+                var button = AddButton(catalog, $"Card_{i}", "", .08f, top - .063f, .92f, top, () => SelectRow(row));
                 button.gameObject.AddComponent<StarterRowFocus>().ShowPreview = () => SelectRow(row);
                 _rows[i] = button;
                 _rowNames[i] = button.GetComponentInChildren<Text>();
@@ -139,19 +145,23 @@ namespace YGOPortable.UI
             var heading = Slot(details, "Name", .075f, .768f, .926f, .851f);
             _title = LotdUiKit.AddFittedText(heading, "Text", "", 26, 16,
                 TextAnchor.MiddleCenter, PackShopStyle.TextPrimary, FontStyle.Bold);
-            _art = CompositeCardView.Create(Slot(details, "Art", .061f, .085f, .463f, .749f), "SelectedCard", true);
+            _art = CompositeCardView.Create(Slot(details, "Art", .061f, .085f, .463f, .749f), "SelectedCard", true, duelArtwork: true);
             _rarity = ShopRarityBadge.Create(details, new Vector2(.491f, .679f), new Vector2(.572f, .738f), 17);
             _cardInfo = Label(details, "Ownership", "", .583f, .669f, .925f, .749f, 17,
                 TextAnchor.MiddleLeft, PackShopStyle.Accent);
             _cardStats = Label(details, "Stats", "", .491f, .591f, .925f, .668f, 16, TextAnchor.MiddleLeft, PackShopStyle.TextPrimary);
             (_descriptionScroll, _description) = CreateDescription(details);
-            _craft = AddButton(details, "Craft", "제작", .491f, .204f, .701f, .281f, () => OpenConfirmation(true), true);
-            _disassemble = AddButton(details, "Disassemble", "분해", .715f, .204f, .926f, .281f, () => OpenConfirmation(false));
-            _status = Label(details, "Status", "", .491f, .126f, .928f, .195f, 17, TextAnchor.MiddleCenter, PackShopStyle.TextPrimary);
+            _craft = AddButton(details, "Craft", "제작", .491f, .220f, .701f, .288f, () => OpenConfirmation(true), true);
+            _disassemble = AddButton(details, "Disassemble", "분해", .715f, .220f, .926f, .288f, () => OpenConfirmation(false));
+            _craftOverframe = AddButton(details, "CraftOverframe", "오버프레임 제작", .491f, .147f, .701f, .213f,
+                () => OpenConfirmation(true, overframe: true), true);
+            _disassembleOverframe = AddButton(details, "DisassembleOverframe", "오버프레임 분해", .715f, .147f, .926f, .213f,
+                () => OpenConfirmation(false, overframe: true));
+            _status = Label(details, "Status", "", .491f, .082f, .928f, .142f, 17, TextAnchor.MiddleCenter, PackShopStyle.TextPrimary);
             string prices = string.Join(" · ", Rarities.Select(rarity =>
                 $"{CardRarityCatalog.GetLabel(rarity)} {CollectionProgress.GetCraftDustCost(rarity)}"));
             Label(details, "Rules", $"제작에 드는 가루   {prices}",
-                .491f, .069f, .928f, .121f, 16, TextAnchor.MiddleCenter, PackShopStyle.TextMuted);
+                .491f, .035f, .928f, .078f, 15, TextAnchor.MiddleCenter, PackShopStyle.TextMuted);
 
             var footer = PackShopStyle.Panel(main, "Footer", new Vector2(.035f, .017f), new Vector2(.965f, .059f));
             LotdUiKit.AddFittedText(footer, "Controls", "방향키 이동   A 선택   Y 검색   LB/RB 페이지   오른쪽 스틱 설명   B 뒤로",
@@ -177,18 +187,33 @@ namespace YGOPortable.UI
             Root.SetActive(false);
         }
 
-        internal void Show(uint selectedCard)
+        internal void Show(uint selectedCard, CardTradeAction action = CardTradeAction.Browse)
         {
             _entries ??= CardDatabase.AllCards.Where(CollectionProgress.IsCraftableCard).Select(card => new Entry(card))
                 .OrderBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase).ThenBy(entry => entry.Card.code).ToArray();
             Root.SetActive(true);
             _main.SetActive(true);
             _filter = 0;
+            _collectionFilters.Selection = default;
             _finder.SetTextWithoutNotify("");
             RefreshDust();
             int selectedIndex = Filter(selectedCard);
             if (selectedIndex >= 0) Focus(_rows[selectedIndex % PageSize]);
             else Focus(_finder);
+            switch (action)
+            {
+                case CardTradeAction.Craft: OpenConfirmation(true); break;
+                case CardTradeAction.CraftOverframe: OpenConfirmation(true, overframe: true); break;
+                case CardTradeAction.Disassemble: OpenConfirmation(false); break;
+                case CardTradeAction.DisassembleOverframe: OpenConfirmation(false, overframe: true); break;
+            }
+        }
+
+        internal void ShowExcessDisassembly()
+        {
+            Show(0);
+            OpenBulk();
+            _bulk.SelectExcess();
         }
 
         internal void Hide()
@@ -243,28 +268,21 @@ namespace YGOPortable.UI
             Filter();
         }
 
-        private int Filter(uint selectedCard = 0)
+        private int Filter(uint selectedCard = 0, bool clearStatus = true)
         {
             if (_entries == null) return -1;
             for (int i = 0; i < _filterLabels.Length; i++)
                 SetButtonLabelColor(_filterLabels[i], i == _filter ? PackShopStyle.Accent :
                     i == 0 ? PackShopStyle.TextPrimary : CardRarityStyle.GetColor(Rarities[i - 1]));
 
-            string query = _finder.text.Trim();
-            string normalized = Normalize(query);
-            bool isCode = uint.TryParse(query, out uint code);
+            var query = new CardSearchQuery(_finder.text);
             _matches.Clear();
-            foreach (var entry in _entries)
-            {
-                if (_filter != 0 && entry.Rarity != Rarities[_filter - 1]) continue;
-                if (query.Length == 0 || (isCode ? entry.Card.code == code :
-                    entry.Name.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    normalized.Length > 0 && entry.SearchName.IndexOf(normalized, StringComparison.OrdinalIgnoreCase) >= 0))
-                    _matches.Add(entry);
-            }
+            _matches.AddRange(query.Order(_entries.Where(entry =>
+                (_filter == 0 || entry.Rarity == Rarities[_filter - 1]) && _collectionFilters.Matches(entry.Card.code)),
+                entry => entry.Card.code));
             int selectedIndex = _matches.FindIndex(entry => entry.Card.code == selectedCard);
             _page = selectedIndex < 0 ? 0 : selectedIndex / PageSize;
-            _status.text = "";
+            if (clearStatus) _status.text = "";
             RefreshPage();
             if (selectedIndex >= 0) SelectRow(selectedIndex % PageSize);
             return selectedIndex;
@@ -273,7 +291,7 @@ namespace YGOPortable.UI
         private void RefreshPointsAndOwnership()
         {
             RefreshDust();
-            RefreshPage();
+            Filter(_selected?.Card.code ?? 0, clearStatus: false);
         }
 
         private void RefreshDust() => _balance.text = $"보유 가루 {CollectionProgress.CraftDust:N0}";
@@ -289,7 +307,7 @@ namespace YGOPortable.UI
                 if (!visible) continue;
                 var entry = _matches[index];
                 uint code = entry.Card.code;
-                _rowNames[row].text = $"{entry.Name} · {CollectionProgress.GetOwnedCount(code)}장";
+                _rowNames[row].text = $"{entry.Name} · {CollectionProgress.GetTotalOwnedCount(code)}장";
                 ShopRarityBadge.Update(_rowRarities[row], code);
             }
             _count.text = _matches.Count == 0 ? "검색 결과 없음" : $"카드 {_matches.Count:N0}종";
@@ -325,12 +343,18 @@ namespace YGOPortable.UI
             PackShopStyle.ShowCardPreview(_art, code);
             ShopRarityBadge.Update(_rarity, code);
             _craft.interactable = _disassemble.interactable = code != 0;
-
-            if (entry == null) _cardInfo.text = "";
-            else
+            bool supports = CardArtLoader.SupportsOverframe(code);
+            int owned = CollectionProgress.GetOwnedCount(code);
+            int special = CollectionProgress.GetOwnedOverframeCount(code);
+            _cardInfo.text = code == 0 ? "" : supports || special > 0
+                ? $"일반판 {owned:N0}장 · 특별판 {special:N0}장" : $"보유 {owned:N0}장";
+            _craftOverframe.transform.parent.gameObject.SetActive(supports);
+            _disassembleOverframe.transform.parent.gameObject.SetActive(supports || special > 0);
+            _disassembleOverframe.interactable = special > 0;
+            if (entry != null)
             {
-                int owned = CollectionProgress.GetOwnedCount(code);
-                _cardInfo.text = $"보유 {owned:N0}장";
+                SetButtonText(_craftOverframe, $"오버프레임 제작 · {CollectionProgress.GetCraftDustCost(entry.Rarity, true):N0}");
+                SetButtonText(_disassembleOverframe, $"오버프레임 분해 · +{CollectionProgress.GetDisassemblyDustPerCard(code, true):N0}");
             }
             SetButtonText(_craft, entry == null ? "제작" : $"제작 · 가루 {CollectionProgress.GetCraftDustCost(entry.Rarity)}");
             SetButtonText(_disassemble, entry == null ? "분해" : $"분해 · 가루 +{CollectionProgress.GetDisassemblyDustPerCard(code)}");
@@ -356,15 +380,15 @@ namespace YGOPortable.UI
             Focus(_bulkButton);
         }
 
-        private void OpenConfirmation(bool crafting)
+        private void OpenConfirmation(bool crafting, bool overframe = false)
         {
             if (_selected == null || _confirmation.activeSelf) return;
             var card = _selected;
             uint code = card.Card.code;
             if (crafting)
             {
-                int room = CollectionProgress.GetCraftLimit(code);
-                int cost = CollectionProgress.GetCraftDustCost(card.Rarity);
+                int room = CollectionProgress.GetCraftLimit(code, overframe);
+                int cost = CollectionProgress.GetCraftDustCost(card.Rarity, overframe);
                 decimal usable = decimal.Floor(CollectionProgress.CraftDust / cost);
                 if (room == 0)
                 {
@@ -382,7 +406,7 @@ namespace YGOPortable.UI
             }
             else
             {
-                _maxQuantity = CollectionProgress.GetDisassembleLimit(code);
+                _maxQuantity = CollectionProgress.GetDisassembleLimit(code, overframe);
                 if (_maxQuantity == 0)
                 {
                     _status.color = PackShopStyle.Danger;
@@ -395,6 +419,7 @@ namespace YGOPortable.UI
             _confirmedCard = card;
             _quantity = 1;
             _crafting = crafting;
+            _overframe = overframe;
             _mainControls.interactable = false;
             _confirmation.SetActive(true);
             RefreshConfirmation();
@@ -423,12 +448,12 @@ namespace YGOPortable.UI
         {
             string action = _crafting ? "제작" : "분해";
             int perCard = _crafting
-                ? CollectionProgress.GetCraftDustCost(_confirmedCard.Rarity)
-                : CollectionProgress.GetDisassemblyDustPerCard(_confirmedCard.Card.code);
+                ? CollectionProgress.GetCraftDustCost(_confirmedCard.Rarity, _overframe)
+                : CollectionProgress.GetDisassemblyDustPerCard(_confirmedCard.Card.code, _overframe);
             long dust = (long)_quantity * perCard;
             decimal current = CollectionProgress.CraftDust;
             decimal result = _crafting ? current - dust : current + Math.Min(dust, decimal.MaxValue - current);
-            _confirmTitle.text = $"카드 {action}";
+            _confirmTitle.text = _overframe ? $"오버프레임 {action}" : $"카드 {action}";
             string change = _crafting ? "사용" : "획득";
             _confirmBody.text = $"{_confirmedCard.Name}\n가루 {dust:N0} {change}\n보유 가루 {current:N0} → {result:N0}";
             if (!_crafting) _confirmBody.text += "\n보유 카드가 부족해진 덱은 수정 후 사용할 수 있습니다.";
@@ -444,7 +469,7 @@ namespace YGOPortable.UI
         private void CloseConfirmation()
         {
             HideConfirmation();
-            Focus(_crafting ? _craft : _disassemble);
+            Focus(_overframe ? (_crafting ? _craftOverframe : _disassembleOverframe) : (_crafting ? _craft : _disassemble));
         }
 
         private void HideConfirmation()
@@ -460,8 +485,8 @@ namespace YGOPortable.UI
             uint code = _confirmedCard.Card.code;
             string name = _confirmedCard.Name;
             string error;
-            bool saved = _crafting ? CollectionProgress.TryCraftCard(code, _quantity, out error) :
-                CollectionProgress.TryDisassembleCards(new Dictionary<uint, int> { [code] = _quantity }, out error);
+            bool saved = _crafting ? CollectionProgress.TryCraftCard(code, _quantity, _overframe, out error) :
+                CollectionProgress.TryDisassembleCards(new Dictionary<uint, int> { [code] = _quantity }, _overframe, out error);
             CloseConfirmation();
             RefreshPointsAndOwnership();
             _status.color = saved ? PackShopStyle.TextPrimary : PackShopStyle.Danger;
@@ -494,7 +519,6 @@ namespace YGOPortable.UI
             return (scroll, text);
         }
 
-        private static string Normalize(string value) => new string(value.Where(char.IsLetterOrDigit).ToArray());
 
         private static void Focus(Selectable button)
         {

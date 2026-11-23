@@ -32,6 +32,7 @@ namespace YGOPortable.Core
         private const string SupplementalArtFileName = "supplementalart.pack";
         private static readonly Dictionary<(uint code, int variant), ArtEntry> _duelArt = new();
         private static readonly Dictionary<uint, List<int>> _duelVariants = new();
+        private static readonly Dictionary<uint, HashSet<int>> _overframeVariants = new();
         private static readonly Dictionary<(uint, int), (Sprite sprite, LinkedListNode<(uint, int)> node, (uint Code, int Variant) source)> _spriteCache =
             new(MaxCacheCount);
         private static readonly LinkedList<(uint, int)> _lru = new();
@@ -66,8 +67,44 @@ namespace YGOPortable.Core
                 if (variants[0] != 0 && (_index.ContainsKey(code) || RelatedPrintings(code).Any(_index.ContainsKey)))
                     variants.Insert(0, 0);
             }
+            ReadOverframeIndex(ActiveDuelVisualsPath);
+            ReadOverframeIndex(PackagedDuelVisualsPath);
             Debug.Log($"[CardArtLoader] Indexed {_index.Count} card artworks and {_duelArt.Count} duel artworks.");
         }
+
+        private static void ReadOverframeIndex(string directory)
+        {
+            string cutIns = Path.Combine(directory, "CutIns");
+            if (!Directory.Exists(cutIns)) return;
+
+            try
+            {
+                foreach (string path in Directory.EnumerateFiles(cutIns, "*.png"))
+                {
+                    string name = Path.GetFileNameWithoutExtension(path);
+                    int separator = name.IndexOf('-');
+                    if (separator <= 0 || !uint.TryParse(name.AsSpan(0, separator), out uint code) || code == 0 ||
+                        !int.TryParse(name.AsSpan(separator + 1), out int variant) || variant < 0) continue;
+                    if (!_overframeVariants.TryGetValue(code, out var variants))
+                        _overframeVariants[code] = variants = new HashSet<int>();
+                    variants.Add(variant);
+                }
+            }
+            catch (Exception error) when (error is IOException || error is UnauthorizedAccessException)
+            {
+                Debug.LogWarning($"[CardArtLoader] Cannot read overframe artwork index: {error.Message}");
+            }
+        }
+
+        internal static bool SupportsOverframe(uint code) => _overframeVariants.ContainsKey(code);
+
+        internal static bool SupportsOverframe(uint code, int variant) =>
+            _overframeVariants.TryGetValue(code, out var choices) && choices.Contains(Math.Max(0, variant));
+
+        internal static int FirstOverframeVariant(uint code) =>
+            _overframeVariants.TryGetValue(code, out var choices) ? choices.Min() : -1;
+
+        internal static bool HasDuelArtwork(uint code, int variant) => _duelArt.ContainsKey((code, variant));
 
         private static void ReadDuelArtIndex(string packPath, int packId)
         {
@@ -378,6 +415,7 @@ namespace YGOPortable.Core
             _visibleArtwork.Clear();
             _duelArt.Clear();
             _duelVariants.Clear();
+            _overframeVariants.Clear();
             _activeDuelVisualsPath = null;
             _streamingDir = null;
             _index = null;

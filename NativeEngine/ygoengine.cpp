@@ -367,6 +367,12 @@ YGO_API uint32_t YGO_QueryCount(void* duel, uint8_t team, uint32_t loc) {
     return OCG_DuelQueryCount(static_cast<OCG_Duel>(duel), team, loc);
 }
 
+YGO_API uint32_t YGO_QueryCardIdentity(void* handle, uint8_t controller, uint32_t location, uint32_t sequence) {
+    if (!handle || controller > 1) return 0;
+    auto* card = static_cast<duel*>(handle)->game_field->get_field_card(controller, location, sequence);
+    return card ? card->cardid + 1 : 0;
+}
+
 YGO_API const void* YGO_QueryCard(void* duel, uint32_t flags, uint8_t con, uint32_t loc,
                                   uint32_t seq, uint32_t overlaySeq, uint32_t* outLen)
 {

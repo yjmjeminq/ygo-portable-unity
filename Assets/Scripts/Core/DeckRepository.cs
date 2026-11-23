@@ -45,6 +45,16 @@ namespace YGOPortable.Core
     }
 
     [Serializable]
+    public struct DeckCardAppearance
+    {
+        public bool overframe;
+        // Zero uses bundled artwork. Other values store the local artwork variant plus one.
+        public int artwork;
+        internal int ArtworkVariant => artwork - 1;
+        internal bool IsDefault => !overframe && artwork == 0;
+    }
+
+    [Serializable]
     public class UserDeck
     {
         public string id;
@@ -53,7 +63,108 @@ namespace YGOPortable.Core
         public List<uint> extra = new List<uint>();
         public List<uint> side = new List<uint>();
 
+        public List<DeckCardAppearance> mainAppearances = new();
+        public List<DeckCardAppearance> extraAppearances = new();
+        public List<DeckCardAppearance> sideAppearances = new();
+
         public bool IsPlayable => main.Count >= 40 && main.Count <= 60 && extra.Count <= 15 && side.Count <= 15;
+
+        internal List<DeckCardAppearance> Appearances(List<uint> cards)
+        {
+            if (ReferenceEquals(cards, main)) return mainAppearances ??= new();
+            if (ReferenceEquals(cards, extra)) return extraAppearances ??= new();
+            if (ReferenceEquals(cards, side)) return sideAppearances ??= new();
+            throw new ArgumentException("The cards do not belong to this deck.", nameof(cards));
+        }
+
+        internal DeckCardAppearance GetAppearance(List<uint> cards, int index)
+        {
+            var appearances = Appearances(cards);
+            return index >= 0 && index < appearances.Count ? appearances[index] : default;
+        }
+
+        internal void SetAppearance(List<uint> cards, int index, DeckCardAppearance appearance)
+        {
+            var appearances = Appearances(cards);
+            if (appearance.IsDefault && index >= appearances.Count) return;
+            while (index >= appearances.Count) appearances.Add(default);
+            appearances[index] = appearance;
+            TrimAppearances(appearances);
+        }
+
+        internal void InsertCard(List<uint> cards, int index, uint code, DeckCardAppearance appearance)
+        {
+            var appearances = Appearances(cards);
+            cards.Insert(index, code);
+            if (index < appearances.Count) appearances.Insert(index, appearance);
+            else SetAppearance(cards, index, appearance);
+        }
+
+        internal DeckCardAppearance RemoveCard(List<uint> cards, int index)
+        {
+            var appearances = Appearances(cards);
+            cards.RemoveAt(index);
+            if (index >= appearances.Count) return default;
+            var removed = appearances[index];
+            appearances.RemoveAt(index);
+            TrimAppearances(appearances);
+            return removed;
+        }
+
+        internal void ClearCards(List<uint> cards)
+        {
+            cards.Clear();
+            Appearances(cards).Clear();
+        }
+
+        internal void ReorderCards(List<uint> cards, IEnumerable<uint> order)
+        {
+            var ordered = order.ToArray();
+            var appearances = Appearances(cards);
+            if (appearances.Count > 0)
+            {
+                // A sort keeps the relative order of physical copies of the same printing.
+                var copies = new Dictionary<uint, Queue<DeckCardAppearance>>();
+                for (int i = 0; i < cards.Count; i++)
+                {
+                    if (!copies.TryGetValue(cards[i], out var available))
+                        copies[cards[i]] = available = new Queue<DeckCardAppearance>();
+                    available.Enqueue(GetAppearance(cards, i));
+                }
+
+                appearances.Clear();
+                foreach (uint code in ordered)
+                    appearances.Add(copies[code].Dequeue());
+                TrimAppearances(appearances);
+            }
+            cards.Clear();
+            cards.AddRange(ordered);
+        }
+
+        internal IEnumerable<(uint Code, DeckCardAppearance Appearance)> Copies()
+        {
+            foreach (var cards in new[] { main, extra, side })
+                for (int i = 0; i < cards.Count; i++)
+                    yield return (cards[i], GetAppearance(cards, i));
+        }
+
+        internal void NormalizeAppearances()
+        {
+            foreach (var cards in new[] { main, extra, side })
+            {
+                var appearances = Appearances(cards);
+                if (appearances.Count > cards.Count)
+                    appearances.RemoveRange(cards.Count, appearances.Count - cards.Count);
+                for (int i = 0; i < appearances.Count; i++)
+                    if (appearances[i].artwork < 0) appearances[i] = default;
+                TrimAppearances(appearances);
+            }
+        }
+
+        private static void TrimAppearances(List<DeckCardAppearance> appearances)
+        {
+            while (appearances.Count > 0 && appearances[^1].IsDefault) appearances.RemoveAt(appearances.Count - 1);
+        }
     }
 
     public static class DeckRepository
@@ -141,6 +252,7 @@ namespace YGOPortable.Core
                         d.main ??= new List<uint>();
                         d.extra ??= new List<uint>();
                         d.side ??= new List<uint>();
+                        d.NormalizeAppearances();
                         UserDecks.Add(d);
                     }
                 }

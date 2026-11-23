@@ -94,9 +94,13 @@ namespace YGOPortable.UI
             if (!from.IsValid || !to.IsValid) return false;
             flight = new CardFlight(move.code, from, to,
                 move.code == 0 || IsFaceDown(move.fromCon, move.fromLoc, move.fromPos),
-                move.code == 0 || IsFaceDown(move.toCon, move.toLoc, move.toPos));
+                move.code == 0 || IsFaceDown(move.toCon, move.toLoc, move.toPos), MoveAppearance(move));
             return true;
         }
+
+        private DeckCardAppearance? MoveAppearance(CardMoveEvent move) =>
+            move.Appearance ?? move.DestinationReadout?.Appearance ?? move.SourceReadout?.Appearance ??
+            (_session.UsesDeckAppearances ? default(DeckCardAppearance) : null);
 
         private MovingFieldInspection TrackMovingInspection(CardMoveEvent move, CardMoveReadoutSnapshot readout,
             PresentedFieldReadout waiting)

@@ -43,7 +43,7 @@ namespace YGOPortable.Editor
             var selection = starters.First(option => option.Name.Contains("상검"));
             Require(CollectionProgress.TryChooseStarter(selection.Id, out var starter, out string error), error);
             Require(!CollectionProgress.TryChooseStarter(selection.Id, out _, out _) &&
-                CollectionProgress.CanUseDeck(starter, out _) && CollectionProgress.Balance == 20_000,
+                CollectionProgress.CanUseDeck(starter, out _) && CollectionProgress.Balance == 5_000,
                 "Starter selection did not grant the deck and starting DP exactly once.");
 
             VerifySaveSync(save, starter);
@@ -194,18 +194,18 @@ namespace YGOPortable.Editor
                 [super] = 2,
                 [ultra] = 15,
             }, out string error), error);
-            Require(CollectionProgress.CraftDust == 790 &&
-                materials.Select(CollectionProgress.GetDisassemblyDustPerCard).SequenceEqual(new[] { 10, 20, 30, 40 }) &&
-                Rarities.Select(CollectionProgress.GetCraftDustCost).SequenceEqual(new[] { 30, 60, 90, 120 }),
+            Require(CollectionProgress.CraftDust == 4025 &&
+                materials.Select(CollectionProgress.GetDisassemblyDustPerCard).SequenceEqual(new[] { 5, 20, 80, 250 }) &&
+                Rarities.Select(CollectionProgress.GetCraftDustCost).SequenceEqual(new[] { 30, 100, 300, 900 }),
                 "Bulk disassembly did not award shared dust or crafting costs did not increase by rarity.");
             Require(!CollectionProgress.TryCraftCard(AshBlossom, 0, out _), "A zero craft quantity was accepted.");
             Require(CollectionProgress.TryCraftCard(AshBlossom, 1, out error) &&
                 CollectionProgress.GetOwnedCount(AshBlossom) == 1 &&
-                CollectionProgress.CraftDust == 670, error);
-            Require(!CollectionProgress.TryCraftCard(rare, 12, out _) && CollectionProgress.CraftDust == 670 &&
+                CollectionProgress.CraftDust == 3125, error);
+            Require(!CollectionProgress.TryCraftCard(rare, 32, out _) && CollectionProgress.CraftDust == 3125 &&
                 CollectionProgress.GetOwnedCount(rare) == 0, "Crafting used more dust than the shared balance.");
-            Require(CollectionProgress.TryCraftCard(normal, 22, out error) &&
-                CollectionProgress.GetOwnedCount(normal) == 22 && CollectionProgress.CraftDust == 10, error);
+            Require(CollectionProgress.TryCraftCard(normal, 104, out error) &&
+                CollectionProgress.GetOwnedCount(normal) == 104 && CollectionProgress.CraftDust == 5, error);
             Require(!CollectionProgress.TryCraftCard(AshBlossom, 1, out _) &&
                 CollectionProgress.Balance == balanceBeforeCrafting &&
                 !File.ReadAllText(profile).Contains("\"craftPoints\""),
@@ -222,7 +222,7 @@ namespace YGOPortable.Editor
                 stockedProfile = WithOwnership(stockedProfile, code, Math.Max(3, CollectionProgress.GetOwnedCount(code)));
             File.WriteAllText(profile, stockedProfile);
             CollectionProgress.Load(save);
-            var beforePurchase = pack.CardPool.ToDictionary(code => code, CollectionProgress.GetOwnedCount);
+            var beforePurchase = pack.CardPool.ToDictionary(code => code, CollectionProgress.GetTotalOwnedCount);
             Require(CollectionProgress.TryBuyPack(SupportPack, out var single, out string error), error);
             expectedDp -= CollectionProgress.PackCost;
             Require(ValidPack(single, pack) && CollectionProgress.Balance == expectedDp,
@@ -230,9 +230,10 @@ namespace YGOPortable.Editor
             Require(CollectionProgress.TryBuyPacks(SupportPack, CollectionProgress.PackBundleSize, out var bundle, out error), error);
             expectedDp -= CollectionProgress.PackBundleSize * CollectionProgress.PackCost;
             Require(bundle.Count == CollectionProgress.PackBundleSize && bundle.All(pulls => ValidPack(pulls, pack)) &&
+                bundle.SelectMany(pulls => pulls).Any(code => CardRarityCatalog.GetRarity(code) >= CardRarity.SuperRare) &&
                 CollectionProgress.Balance == expectedDp &&
                 single.Concat(bundle.SelectMany(pulls => pulls)).GroupBy(code => code).All(group =>
-                    CollectionProgress.GetOwnedCount(group.Key) == beforePurchase[group.Key] + group.Count()),
+                    CollectionProgress.GetTotalOwnedCount(group.Key) == beforePurchase[group.Key] + group.Count()),
                 "A bundle did not retain every pull above the former three-copy inventory cap.");
 
             var opponent = DeckRepository.Characters.Last(character => OpponentDeckLevels.GetDecks(character.id).Count > 1);

@@ -51,6 +51,21 @@ namespace YGOPortable.Core
         }
     }
 
+    internal readonly struct PackPull
+    {
+        internal readonly uint Code;
+        internal readonly bool Overframe;
+        internal readonly int OwnedCopies;
+        internal bool IsNew => OwnedCopies == 1;
+
+        internal PackPull(uint code, bool overframe, int ownedCopies)
+        {
+            Code = code;
+            Overframe = overframe;
+            OwnedCopies = ownedCopies;
+        }
+    }
+
     public static class CollectionProgress
     {
         public const int PackCost = 100;
@@ -58,11 +73,12 @@ namespace YGOPortable.Core
         public const int CardsPerPack = 8;
         public const int WinReward = 300;
         public const int LossReward = 150;
-        public const int StartingBalance = 20_000;
+        public const int StartingBalance = 5_000;
         public const int DeckCopyLimit = 3;
 
         private const int SharedDustVersion = 6;
-        private const int ProfileVersion = SharedDustVersion;
+        private const int ProfileVersion = 7;
+        private const int OverframePullChance = 15;
         private const int GenericPackSize = 160;
         internal const string ProfileFileName = "collection-profile.json";
         private const int FirstOpponentId = 99;
@@ -95,6 +111,7 @@ namespace YGOPortable.Core
             public UserDeck starterDeck;
             public string lastDuelDeckId;
             public List<CardCopies> cards;
+            public List<CardCopies> overframeCards;
             public List<int> unlockedOpponentIds;
             public List<int> clearedOpponentIds;
             public List<OpponentDeckProgress> opponentDeckProgress;
@@ -130,12 +147,14 @@ namespace YGOPortable.Core
         private static string _savedJson;
         private static SavedProfile _profile;
         private static Dictionary<uint, int> _owned = new Dictionary<uint, int>();
+        private static Dictionary<uint, int> _ownedOverframes = new Dictionary<uint, int>();
+        private static List<uint> _bundleBonusPool;
         private static IReadOnlyList<CollectionStarter> _starters;
         private static IReadOnlyList<CollectionPack> _packs;
         private static IReadOnlyList<OpponentCharacter> _opponents;
 
         public static bool Initialized => _profilePath != null;
-        internal static bool AllDeckCardsAvailable { get; set; } = true;
+        internal static bool AllDeckCardsAvailable { get; set; } = false;
         internal static bool RequiresOwnedCardsForDecks => Initialized && !AllDeckCardsAvailable;
         internal static event Action SaveChanged;
         public static bool HasStarter => _profile?.starterDeck != null;
@@ -159,32 +178,37 @@ namespace YGOPortable.Core
             _profile = null;
             _savedJson = null;
             _owned = new Dictionary<uint, int>();
+            _ownedOverframes = new Dictionary<uint, int>();
+            _bundleBonusPool = null;
             LoadError = "";
             try
             {
                 // Reading directly distinguishes an absent profile from an inaccessible one.
                 string json = ReadProfileJson();
                 if (json == null) return;
-                var saved = ParseProfile(json, out var owned);
+                var saved = ParseProfile(json, out var owned, out var overframes);
                 InitializeOpponentProgress(saved);
                 _profile = saved;
                 _owned = owned;
+                _ownedOverframes = overframes;
                 _savedJson = json;
             }
             catch (DirectoryNotFoundException)
             {
                 // The first write creates the profile directory.
             }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException)
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException ||
+                ex is ArgumentException || ex is InvalidDataException)
             {
                 LoadError = "카드 보유 정보를 불러올 수 없습니다. 기존 수집 데이터는 보존했습니다.";
                 Debug.LogWarning($"[CollectionProgress] Could not load profile: {ex.Message}");
             }
         }
 
-        internal static void ValidateSaveProfile(string json) => ParseProfile(json, out _);
+        internal static void ValidateSaveProfile(string json) => ParseProfile(json, out _, out _);
 
-        private static SavedProfile ParseProfile(string json, out Dictionary<uint, int> owned)
+        private static SavedProfile ParseProfile(string json, out Dictionary<uint, int> owned,
+            out Dictionary<uint, int> overframes)
         {
             var saved = JsonUtility.FromJson<SavedProfile>(json);
             if (saved == null || saved.version < 1 || saved.version > ProfileVersion || saved.balance < 0 ||
@@ -208,81 +232,139 @@ namespace YGOPortable.Core
                 throw new InvalidDataException("Invalid craft dust balance.");
             }
 
-            owned = new Dictionary<uint, int>(saved.cards.Count);
-            foreach (var entry in saved.cards)
-            {
-                if (entry.code == 0 || entry.count < 1 || !owned.TryAdd(entry.code, entry.count))
-                    throw new InvalidDataException("Invalid card ownership entry.");
-            }
+            owned = ReadOwnership(saved.cards);
+            overframes = ReadOwnership(saved.overframeCards);
             return saved;
         }
 
-        public static int GetOwnedCount(uint code) => _owned.TryGetValue(code, out int copies) ? copies : 0;
+        private static Dictionary<uint, int> ReadOwnership(List<CardCopies> entries)
+        {
+            var result = new Dictionary<uint, int>(entries?.Count ?? 0);
+            if (entries == null) return result;
+            foreach (var entry in entries)
+            {
+                if (entry.code == 0 || entry.count < 1 || !result.TryAdd(entry.code, entry.count))
+                    throw new InvalidDataException("Invalid card ownership entry.");
+            }
+            return result;
+        }
+
+        public static int GetOwnedCount(uint code) => _owned.GetValueOrDefault(code);
+        internal static int GetOwnedOverframeCount(uint code) => _ownedOverframes.GetValueOrDefault(code);
+        internal static int GetTotalOwnedCount(uint code) => CombinedCount(GetOwnedCount(code), GetOwnedOverframeCount(code));
+        private static int CombinedCount(int regular, int overframes) => (int)Math.Min(int.MaxValue, (long)regular + overframes);
 
         public static decimal CraftDust => _profile?.dust ?? 0;
 
-        public static int GetCraftDustCost(CardRarity rarity) => rarity switch
-        {
-            CardRarity.Rare => 60,
-            CardRarity.SuperRare => 90,
-            CardRarity.UltraRare => 120,
-            _ => 30,
-        };
+        public static int GetCraftDustCost(CardRarity rarity) => GetCraftDustCost(rarity, overframe: false);
 
-        public static int GetDisassemblyDustPerCard(uint code) => GetCraftDustCost(CardRarityCatalog.GetRarity(code)) / 3;
+        internal static int GetCraftDustCost(CardRarity rarity, bool overframe)
+        {
+            int regular = rarity switch
+            {
+                CardRarity.Rare => 100,
+                CardRarity.SuperRare => 300,
+                CardRarity.UltraRare => 900,
+                _ => 30,
+            };
+            return overframe ? regular * 2 : regular;
+        }
+
+        public static int GetDisassemblyDustPerCard(uint code) => GetDisassemblyDustPerCard(code, overframe: false);
+
+        internal static int GetDisassemblyDustPerCard(uint code, bool overframe) =>
+            (CardRarityCatalog.GetRarity(code), overframe) switch
+            {
+                (CardRarity.Rare, false) => 20,
+                (CardRarity.SuperRare, false) => 80,
+                (CardRarity.UltraRare, false) => 250,
+                (CardRarity.Rare, true) => 50,
+                (CardRarity.SuperRare, true) => 200,
+                (CardRarity.UltraRare, true) => 600,
+                (_, true) => 15,
+                _ => 5,
+            };
 
         public static bool IsCraftableCard(CardInfo card) => IsDeckCard(card);
 
-        public static int GetCraftLimit(uint code) => HasStarter && IsCraftableCard(CardDatabase.Get(code))
-            ? int.MaxValue - GetOwnedCount(code) : 0;
+        public static int GetCraftLimit(uint code) => GetCraftLimit(code, overframe: false);
 
-        public static int GetDisassembleLimit(uint code) => HasStarter && IsCraftableCard(CardDatabase.Get(code))
-            ? GetOwnedCount(code) : 0;
+        internal static int GetCraftLimit(uint code, bool overframe) => HasStarter &&
+            IsCraftableCard(CardDatabase.Get(code)) && (!overframe || CardArtLoader.SupportsOverframe(code))
+            ? int.MaxValue - (overframe ? GetOwnedOverframeCount(code) : GetOwnedCount(code)) : 0;
+
+        public static int GetDisassembleLimit(uint code) => GetDisassembleLimit(code, overframe: false);
+
+        internal static int GetDisassembleLimit(uint code, bool overframe) => HasStarter && IsCraftableCard(CardDatabase.Get(code))
+            ? (overframe ? GetOwnedOverframeCount(code) : GetOwnedCount(code)) : 0;
 
         public static IReadOnlyDictionary<uint, int> GetDisassembleLimits() => HasStarter
             ? _owned.Where(entry => IsCraftableCard(CardDatabase.Get(entry.Key)))
                 .ToDictionary(entry => entry.Key, entry => entry.Value)
             : new Dictionary<uint, int>();
 
-        public static bool TryCraftCard(uint code, int quantity, out string error)
+        public static bool TryCraftCard(uint code, int quantity, out string error) =>
+            TryCraftCard(code, quantity, overframe: false, out error);
+
+        internal static bool TryCraftCard(uint code, int quantity, bool overframe, out string error)
         {
             if (!CanTradeCards(out error)) return false;
-            if (quantity <= 0 || !IsCraftableCard(CardDatabase.Get(code)))
+            if (quantity <= 0 || !IsCraftableCard(CardDatabase.Get(code)) ||
+                (overframe && !CardArtLoader.SupportsOverframe(code)))
             {
                 error = "제작할 카드와 수량을 확인하세요.";
                 return false;
             }
-            if (quantity > GetCraftLimit(code))
+            if (quantity > GetCraftLimit(code, overframe))
             {
                 error = "카드 보유 수량을 저장할 수 있는 범위를 초과합니다.";
                 return false;
             }
 
             var rarity = CardRarityCatalog.GetRarity(code);
-            long cost = (long)quantity * GetCraftDustCost(rarity);
+            long cost = (long)quantity * GetCraftDustCost(rarity, overframe);
             if (CraftDust < cost)
             {
                 error = $"제작에 가루 {cost:N0}개가 필요합니다.";
                 return false;
             }
 
-            var owned = new Dictionary<uint, int>(_owned) { [code] = GetOwnedCount(code) + quantity };
+            var copies = overframe ? _ownedOverframes : _owned;
+            var updated = new Dictionary<uint, int>(copies) { [code] = copies.GetValueOrDefault(code) + quantity };
             var next = WithBalance(Balance);
             next.dust -= cost;
-            return Write(next, owned, out error);
+            return Write(next, overframe ? _owned : updated, out error, overframe ? updated : null);
         }
 
-        public static bool TryDisassembleCards(IReadOnlyDictionary<uint, int> quantities, out string error)
+        public static bool TryDisassembleCards(IReadOnlyDictionary<uint, int> quantities, out string error) =>
+            TryDisassembleCards(quantities, overframe: false, out error);
+
+        internal static bool TryDisassembleCards(IReadOnlyDictionary<uint, int> quantities, bool overframe, out string error) =>
+            TryDisassembleCards(overframe ? null : quantities, overframe ? quantities : null, out error);
+
+        internal static bool TryDisassembleCards(IReadOnlyDictionary<uint, int> regular,
+            IReadOnlyDictionary<uint, int> special, out string error)
         {
             if (!CanTradeCards(out error)) return false;
-            if (quantities == null || quantities.Count == 0)
+            if ((regular == null || regular.Count == 0) && (special == null || special.Count == 0))
             {
                 error = "분해할 카드를 선택하세요.";
                 return false;
             }
 
             var owned = new Dictionary<uint, int>(_owned);
+            var overframes = new Dictionary<uint, int>(_ownedOverframes);
             var next = WithBalance(Balance);
+            if (!ApplyDisassembly(regular, owned, next, overframe: false, out error) ||
+                !ApplyDisassembly(special, overframes, next, overframe: true, out error)) return false;
+            return Write(next, owned, out error, overframes);
+        }
+
+        private static bool ApplyDisassembly(IReadOnlyDictionary<uint, int> quantities, Dictionary<uint, int> owned,
+            SavedProfile next, bool overframe, out string error)
+        {
+            error = "";
+            if (quantities == null) return true;
             foreach (var entry in quantities)
             {
                 uint code = entry.Key;
@@ -292,6 +374,7 @@ namespace YGOPortable.Core
                     error = "분해할 카드와 수량을 확인하세요.";
                     return false;
                 }
+
                 int copies = owned.GetValueOrDefault(code);
                 if (quantity > copies)
                 {
@@ -299,7 +382,7 @@ namespace YGOPortable.Core
                     return false;
                 }
 
-                long gain = (long)quantity * GetDisassemblyDustPerCard(code);
+                long gain = (long)quantity * GetDisassemblyDustPerCard(code, overframe);
                 if (next.dust > decimal.MaxValue - gain)
                 {
                     error = "가루 보유 한도를 초과합니다.";
@@ -310,7 +393,7 @@ namespace YGOPortable.Core
                 if (remaining == 0) owned.Remove(code);
                 else owned[code] = remaining;
             }
-            return Write(next, owned, out error);
+            return true;
         }
 
         private static bool CanTradeCards(out string error)
@@ -354,12 +437,14 @@ namespace YGOPortable.Core
             }
             if (AllDeckCardsAvailable) return true;
 
-            foreach (var copies in GetDeckCards(deck).GroupBy(code => code))
+            foreach (var copies in deck.Copies().GroupBy(copy => (copy.Code, copy.Appearance.overframe)))
             {
                 int needed = copies.Count();
-                int owned = GetOwnedCount(copies.Key);
+                var (code, overframe) = copies.Key;
+                int owned = overframe ? GetOwnedOverframeCount(code) : GetOwnedCount(code);
                 if (owned >= needed) continue;
-                reason = $"{CardDatabase.GetName(copies.Key)} 보유 {owned}장 / 필요 {needed}장";
+                string edition = overframe ? " 오버프레임" : "";
+                reason = $"{CardDatabase.GetName(code)}{edition} 보유 {owned}장 / 필요 {needed}장";
                 return false;
             }
             return true;
@@ -408,6 +493,14 @@ namespace YGOPortable.Core
         public static bool TryBuyPacks(string id, int packCount, out IReadOnlyList<IReadOnlyList<uint>> pulls, out string error)
         {
             pulls = Array.Empty<IReadOnlyList<uint>>();
+            if (!TryBuyPackContents(id, packCount, out var packs, out error)) return false;
+            pulls = packs.Select(pack => (IReadOnlyList<uint>)pack.Select(card => card.Code).ToArray()).ToArray();
+            return true;
+        }
+
+        internal static bool TryBuyPackContents(string id, int packCount, out IReadOnlyList<IReadOnlyList<PackPull>> pulls, out string error)
+        {
+            pulls = Array.Empty<IReadOnlyList<PackPull>>();
             if (!CanTransact(out error)) return false;
             if (!HasStarter)
             {
@@ -439,41 +532,60 @@ namespace YGOPortable.Core
                 packGroups[(int)CardRarityCatalog.GetRarity(code)].Add(code);
 
             var owned = new Dictionary<uint, int>(_owned);
-            var openedPacks = new IReadOnlyList<uint>[packCount];
+            var overframes = new Dictionary<uint, int>(_ownedOverframes);
+            var openedPacks = new IReadOnlyList<PackPull>[packCount];
+            bool guaranteedRarityFound = false;
             for (int packIndex = 0; packIndex < openedPacks.Length; packIndex++)
             {
-                var opened = new uint[CardsPerPack];
+                var opened = new PackPull[CardsPerPack];
                 for (int cardIndex = 0; cardIndex < opened.Length; cardIndex++)
                 {
-                    var group = RollPackRarity(packGroups, PackRandom);
+                    bool bonus = packCount == PackBundleSize && !guaranteedRarityFound &&
+                        packIndex == packCount - 1 && cardIndex == opened.Length - 1;
+                    var group = RollPackRarity(packGroups, PackRandom, bonus ? CardRarity.SuperRare : CardRarity.Normal);
+                    if (group == null && bonus)
+                    {
+                        group = _bundleBonusPool ??= CardDatabase.AllCards.Where(card => IsDeckCard(card) &&
+                            CardRarityCatalog.GetRarity(card.code) >= CardRarity.SuperRare).Select(card => card.code).ToList();
+                    }
+                    if (group == null || group.Count == 0)
+                    {
+                        error = "팩을 개봉할 수 없습니다. 수록 카드 정보를 확인하세요.";
+                        return false;
+                    }
+
                     uint code = group[PackRandom.Next(group.Count)];
-                    int count = owned.GetValueOrDefault(code);
+                    guaranteedRarityFound |= CardRarityCatalog.GetRarity(code) >= CardRarity.SuperRare;
+                    bool overframe = CardArtLoader.SupportsOverframe(code) && PackRandom.Next(100) < OverframePullChance;
+                    var inventory = overframe ? overframes : owned;
+                    int count = inventory.GetValueOrDefault(code);
                     if (count == int.MaxValue)
                     {
                         error = "카드 보유 수량을 저장할 수 있는 범위를 초과합니다.";
                         return false;
                     }
 
-                    opened[cardIndex] = code;
-                    owned[code] = count + 1;
+                    inventory[code] = count + 1;
+                    opened[cardIndex] = new PackPull(code, overframe, CombinedCount(owned.GetValueOrDefault(code),
+                        overframes.GetValueOrDefault(code)));
                 }
                 openedPacks[packIndex] = Array.AsReadOnly(opened);
             }
 
-            if (!Write(WithBalance(Balance - cost), owned, out error)) return false;
+            if (!Write(WithBalance(Balance - cost), owned, out error, overframes)) return false;
             pulls = Array.AsReadOnly(openedPacks);
             return true;
         }
 
-        private static List<uint> RollPackRarity(List<uint>[] groups, System.Random random)
+        private static List<uint> RollPackRarity(List<uint>[] groups, System.Random random, CardRarity minimum)
         {
             int weight = 0;
-            for (int tier = 0; tier < groups.Length; tier++)
+            for (int tier = (int)minimum; tier < groups.Length; tier++)
                 if (groups[tier].Count > 0) weight += CardRarityCatalog.GetBaseWeight((CardRarity)tier);
             if (weight == 0) return null;
 
             int roll = random.Next(weight);
-            for (int tier = 0; tier < groups.Length; tier++)
+            for (int tier = (int)minimum; tier < groups.Length; tier++)
             {
                 if (groups[tier].Count == 0) continue;
                 roll -= CardRarityCatalog.GetBaseWeight((CardRarity)tier);
@@ -538,6 +650,9 @@ namespace YGOPortable.Core
             main = new List<uint>(deck.main),
             extra = new List<uint>(deck.extra),
             side = new List<uint>(deck.side),
+            mainAppearances = new List<DeckCardAppearance>(deck.Appearances(deck.main)),
+            extraAppearances = new List<DeckCardAppearance>(deck.Appearances(deck.extra)),
+            sideAppearances = new List<DeckCardAppearance>(deck.Appearances(deck.side)),
         };
 
         private static bool IsStarterId(string id) => !string.IsNullOrEmpty(id) && id.Length <= 64 &&
@@ -603,8 +718,10 @@ namespace YGOPortable.Core
             }
         }
 
-        private static bool Write(SavedProfile next, Dictionary<uint, int> owned, out string error)
+        private static bool Write(SavedProfile next, Dictionary<uint, int> owned, out string error,
+            Dictionary<uint, int> overframes = null)
         {
+            overframes ??= _ownedOverframes;
             string pending = null;
             error = "";
             try
@@ -619,8 +736,8 @@ namespace YGOPortable.Core
                 }
 
                 pending = Path.Combine(directory, Path.GetRandomFileName() + ".tmp");
-                next.cards = owned.OrderBy(pair => pair.Key)
-                    .Select(pair => new CardCopies { code = pair.Key, count = pair.Value }).ToList();
+                next.cards = SerializeOwnership(owned);
+                next.overframeCards = SerializeOwnership(overframes);
                 next.craftDust = next.dust.ToString(CultureInfo.InvariantCulture);
                 string json = JsonUtility.ToJson(next, true);
                 File.WriteAllText(pending, json);
@@ -645,6 +762,7 @@ namespace YGOPortable.Core
             }
             _profile = next;
             _owned = owned;
+            _ownedOverframes = overframes;
             SaveChanged?.Invoke();
             return true;
         }
@@ -802,6 +920,9 @@ namespace YGOPortable.Core
             return YgoConstants.AttributeNamesKR.TryGetValue(card.attr, out string attribute)
                 ? $"{attribute} 속성 몬스터" : "공용 몬스터";
         }
+
+        private static List<CardCopies> SerializeOwnership(Dictionary<uint, int> inventory) =>
+            inventory.OrderBy(pair => pair.Key).Select(pair => new CardCopies { code = pair.Key, count = pair.Value }).ToList();
 
         private static bool IsDeckCard(CardInfo card) => card != null && card.code != 0 &&
             (card.IsMonster || card.IsSpell || card.IsTrap) && (card.type & YgoConstants.TYPE_TOKEN) == 0;

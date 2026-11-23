@@ -14,10 +14,12 @@ namespace YGOPortable.UI
         private readonly Button[] _rows = new Button[PageSize];
         private readonly Text[] _labels = new Text[PageSize];
         private readonly Text[] _rarities = new Text[PageSize];
-        private readonly List<(uint Code, string Name, ShopSearchKey SearchName)> _cards = new();
+        private readonly List<(uint Code, string Name)> _cards = new();
         private readonly List<(uint Code, string Name)> _matches = new();
         private readonly Text _packName;
         private readonly Text _count;
+        private readonly CollectionCardFilters _filters;
+        private readonly CardTradeControls _trade;
         private readonly Text _pageLabel;
         private readonly Text _cardName;
         private readonly Text _owner;
@@ -35,7 +37,8 @@ namespace YGOPortable.UI
         internal GameObject Root { get; }
         internal InputField SearchInput { get; }
 
-        internal PackContentsUI(Transform parent, Action onBack, Action<uint> onFindPacks = null)
+        internal PackContentsUI(Transform parent, Action onBack, Action<uint> onFindPacks = null,
+            Action<uint, CardTradeAction> trade = null)
         {
             var root = LotdUiKit.FillRect("Screen_PackContents", parent);
             Root = root.gameObject;
@@ -47,13 +50,14 @@ namespace YGOPortable.UI
             _packName = Heading(catalog, "PackName", .08f, .862f, .92f, .93f);
             var search = Slot(catalog, "Search", .08f, .769f, .92f, .848f);
             SearchInput = PackShopStyle.Search(search, "Input", "이 팩에서 카드명·카드 번호 검색", 17);
-            _count = Label(catalog, "Count", .087f, .721f, .914f, .76f, 16, TextAnchor.MiddleLeft, PackShopStyle.TextMuted);
+            _filters = new CollectionCardFilters(Slot(catalog, "Filters", .08f, .706f, .92f, .761f), Filter);
+            _count = Label(catalog, "Count", .087f, .666f, .914f, .701f, 16, TextAnchor.MiddleLeft, PackShopStyle.TextMuted);
 
             for (int i = 0; i < PageSize; i++)
             {
                 int row = i;
-                float top = .71f - i * .073f;
-                var button = AddButton(catalog, $"Card_{i}", "", .08f, top - .065f, .92f, top,
+                float top = .66f - i * .066f;
+                var button = AddButton(catalog, $"Card_{i}", "", .08f, top - .058f, .92f, top,
                     () => SelectRow(row));
                 button.gameObject.AddComponent<StarterRowFocus>().ShowPreview = () => SelectRow(row);
                 _rows[i] = button;
@@ -79,10 +83,12 @@ namespace YGOPortable.UI
             _owner = Label(details, "Owner", .52f, .748f, .822f, .828f, 19, TextAnchor.MiddleLeft, PackShopStyle.Accent);
             _rarity = ShopRarityBadge.Create(details, new Vector2(.835f, .759f), new Vector2(.919f, .816f), 17);
             _stats = Label(details, "Stats", .52f, .625f, .919f, .739f, 18, TextAnchor.MiddleLeft, PackShopStyle.TextPrimary);
-            (_descriptionScroll, _description) = CreateDescription(details);
+            (_descriptionScroll, _description) = CreateDescription(details, trade != null);
+            if (trade != null) _trade = new CardTradeControls(Slot(details, "Trade", .52f, .062f, .92f, .187f), trade);
             if (onFindPacks != null)
             {
-                _findPacks = AddButton(details, "FindPacks", "이 카드가 든 팩", .52f, .139f, .92f, .213f,
+                _findPacks = AddButton(details, "FindPacks", "이 카드가 든 팩", .52f, trade == null ? .139f : .199f, .92f,
+                    trade == null ? .213f : .273f,
                     () => { if (_selectedCode != 0) onFindPacks(_selectedCode); }, true);
             }
 
@@ -101,7 +107,7 @@ namespace YGOPortable.UI
             foreach (var code in pack.CardPool.OrderBy(CardDatabase.GetName, StringComparer.OrdinalIgnoreCase).ThenBy(code => code))
             {
                 string name = CardDatabase.GetName(code);
-                _cards.Add((code, name, ShopSearchKey.FromName(name)));
+                _cards.Add((code, name));
             }
             SearchInput.SetTextWithoutNotify("");
             Root.SetActive(true);
@@ -146,29 +152,23 @@ namespace YGOPortable.UI
                 direction * 300f * Time.unscaledDeltaTime / range);
         }
 
-        private void Filter()
+        internal void RefreshOwnership() => Filter(keepSelection: true);
+
+        private void Filter() => Filter(keepSelection: false);
+
+        private void Filter(bool keepSelection)
         {
-            string query = ShopSearchKey.NormalizeInput(SearchInput.text);
-            var nameQuery = ShopSearchKey.FromName(query);
-            bool isPasscode = uint.TryParse(query, out uint passcode);
+            var query = new CardSearchQuery(SearchInput.text);
             _matches.Clear();
-            foreach (var card in _cards)
-            {
-                if (query.Length == 0 || (isPasscode ? card.Code == passcode :
-                    card.Name.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    card.SearchName.Contains(nameQuery)))
-                    _matches.Add((card.Code, card.Name));
-            }
-            if (_matches.Count == 0 && !isPasscode && nameQuery.CanTrySimilar)
-                _matches.AddRange(_cards.Where(card => card.SearchName.Contains(nameQuery, similar: true))
-                    .Select(card => (card.Code, card.Name)));
-            _page = 0;
-            RefreshPage();
+            _matches.AddRange(query.Order(_cards.Where(card => _filters.Matches(card.Code)), card => card.Code));
+            int selectedIndex = keepSelection ? _matches.FindIndex(card => card.Code == _selectedCode) : -1;
+            _page = selectedIndex < 0 ? 0 : selectedIndex / PageSize;
+            RefreshPage(selectedIndex);
         }
 
         private int PageCount => Mathf.Max(1, (_matches.Count + PageSize - 1) / PageSize);
 
-        private void RefreshPage()
+        private void RefreshPage(int selectedIndex = -1)
         {
             int first = _page * PageSize;
             for (int i = 0; i < _rows.Length; i++)
@@ -182,13 +182,14 @@ namespace YGOPortable.UI
                 }
             }
 
-            _count.text = SearchInput.text.Trim().Length == 0
+            _count.text = _matches.Count == _cards.Count
                 ? $"수록 카드 {_cards.Count:N0}종"
                 : $"검색 결과 {_matches.Count:N0} / {_cards.Count:N0}종";
             _pageLabel.text = $"{_page + 1} / {PageCount}";
             _previous.interactable = _page > 0;
             _next.interactable = _page + 1 < PageCount;
-            SelectCard(first < _matches.Count ? _matches[first].Code : 0);
+            int selection = selectedIndex < 0 ? first : selectedIndex;
+            SelectCard(selection < _matches.Count ? _matches[selection].Code : 0);
         }
 
         private void FocusFirstRow() => EventSystem.current?.SetSelectedGameObject(_matches.Count > 0
@@ -204,7 +205,8 @@ namespace YGOPortable.UI
         {
             var info = CardDatabase.Get(code);
             _cardName.text = code == 0 ? "검색 결과 없음" : CardDatabase.GetName(code);
-            _owner.text = code == 0 ? "" : $"보유 {CollectionProgress.GetOwnedCount(code):N0}장  ·  카드 번호 {code:D8}";
+            _trade?.Bind(code);
+            _owner.text = code == 0 ? "" : $"보유 {CollectionProgress.GetTotalOwnedCount(code):N0}장  ·  카드 번호 {code:D8}";
             ShopRarityBadge.Update(_rarity, code);
             _stats.text = info?.FormatStatsLineKR() ?? "";
             if (_selectedCode != code)
@@ -226,9 +228,9 @@ namespace YGOPortable.UI
             }
         }
 
-        private static (ScrollRect, Text) CreateDescription(Transform parent)
+        private static (ScrollRect, Text) CreateDescription(Transform parent, bool trade)
         {
-            var holder = Slot(parent, "Description", .52f, .232f, .921f, .614f);
+            var holder = Slot(parent, "Description", .52f, trade ? .283f : .232f, .921f, .614f);
             LotdUiKit.AddImage(holder.gameObject, LotdUiKit.WhiteSprite, PackShopStyle.SurfaceInset);
             var viewport = LotdUiKit.CreateRect("Viewport", holder, Vector2.zero, Vector2.one,
                 new Vector2(8f, 5f), new Vector2(-20f, -5f));

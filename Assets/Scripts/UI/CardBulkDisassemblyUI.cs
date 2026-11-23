@@ -16,8 +16,7 @@ namespace YGOPortable.UI
         {
             internal uint Code;
             internal string Name;
-            internal string SearchName;
-            internal CardRarity Rarity;
+            internal bool Overframe;
             internal int Owned;
         }
 
@@ -47,7 +46,7 @@ namespace YGOPortable.UI
         private readonly Text _cardName;
         private readonly Text _cardInfo;
         private readonly Text _cardRarity;
-        private readonly Text _filterLabel;
+        private readonly CollectionCardFilters _filters;
         private readonly Text _count;
         private readonly Text _pageLabel;
         private readonly Text _reviewPageLabel;
@@ -67,7 +66,7 @@ namespace YGOPortable.UI
         private readonly Button _clear;
         private readonly Button _review;
         private readonly Button _reviewCancel;
-        private CardRarity? _filter;
+        private readonly Dictionary<uint, int> _selectedOverframes = new();
         private CardEntry _inspected;
         private int _page;
         private int _reviewPage;
@@ -84,12 +83,11 @@ namespace YGOPortable.UI
             _catalogRoot = root.gameObject;
             var catalog = Panel(root, "Catalog", .025f, .083f, .555f, .882f);
             Heading(catalog, "Heading", "분해할 카드 선택", .08f, .858f, .92f, .93f);
-            _search = PackShopStyle.Search(Slot(catalog, "Search", .08f, .768f, .663f, .845f),
-                "Input", "카드명·카드 번호 검색", 17);
+            _search = PackShopStyle.Search(Slot(catalog, "Search", .08f, .768f, .92f, .845f),
+                "Input", "카드명·효과·카드 번호 검색", 17);
             _search.onValueChanged.AddListener(_ => Filter());
-            var filter = AddButton(catalog, "RarityFilter", "", .675f, .768f, .92f, .845f, CycleRarity);
-            _filterLabel = filter.GetComponentInChildren<Text>();
-            _count = Label(catalog, "Count", "", .085f, .713f, .915f, .758f, 16, TextAnchor.MiddleLeft);
+            _filters = new CollectionCardFilters(Slot(catalog, "CollectionFilters", .08f, .700f, .92f, .762f), Filter);
+            _count = Label(catalog, "Count", "", .085f, .658f, .915f, .695f, 16, TextAnchor.MiddleLeft);
             for (int i = 0; i < _rows.Length; i++)
             {
                 int row = i;
@@ -142,8 +140,9 @@ namespace YGOPortable.UI
         internal void Show()
         {
             _reviewRoot.SetActive(false);
-            _filter = null;
+            _filters.Selection = (0, 1, 0);
             _selected.Clear();
+            _selectedOverframes.Clear();
             _reviewCards.Clear();
             _search.SetTextWithoutNotify("");
             _status.text = "";
@@ -158,6 +157,7 @@ namespace YGOPortable.UI
             _catalogRoot.SetActive(false);
             _reviewRoot.SetActive(false);
             _selected.Clear();
+            _selectedOverframes.Clear();
             _reviewCards.Clear();
             _art.SetCard(0);
         }
@@ -191,58 +191,37 @@ namespace YGOPortable.UI
         private void ReloadCards()
         {
             _cards.Clear();
-            var limits = CollectionProgress.GetDisassembleLimits();
-            foreach (var entry in limits)
+            foreach (var card in CardDatabase.AllCards.Where(CollectionProgress.IsCraftableCard)
+                .OrderBy(card => card.name, StringComparer.OrdinalIgnoreCase).ThenBy(card => card.code))
             {
-                string name = CardDatabase.GetName(entry.Key);
-                _cards.Add(new CardEntry
+                uint code = card.code;
+                _cards.Add(new CardEntry { Code = code, Name = card.name, Owned = CollectionProgress.GetOwnedCount(code) });
+                int special = CollectionProgress.GetOwnedOverframeCount(code);
+                if (special > 0)
+                    _cards.Add(new CardEntry { Code = code, Name = card.name, Owned = special, Overframe = true });
+            }
+            foreach (var selection in new[] { _selected, _selectedOverframes })
+            {
+                bool overframe = selection == _selectedOverframes;
+                foreach (uint code in selection.Keys.ToArray())
                 {
-                    Code = entry.Key,
-                    Name = name,
-                    SearchName = Normalize(name),
-                    Rarity = CardRarityCatalog.GetRarity(entry.Key),
-                    Owned = entry.Value,
-                });
+                    int limit = CollectionProgress.GetDisassembleLimit(code, overframe);
+                    if (limit > 0) selection[code] = Math.Min(selection[code], limit);
+                    else selection.Remove(code);
+                }
             }
-            _cards.Sort((left, right) =>
-            {
-                int comparison = string.Compare(left.Name, right.Name, StringComparison.OrdinalIgnoreCase);
-                return comparison != 0 ? comparison : left.Code.CompareTo(right.Code);
-            });
-            foreach (var code in _selected.Keys.ToArray())
-            {
-                if (limits.TryGetValue(code, out int limit))
-                    _selected[code] = Math.Min(_selected[code], limit);
-                else
-                    _selected.Remove(code);
-            }
-            _selectExcess.interactable = _cards.Any(card => card.Owned > CollectionProgress.DeckCopyLimit);
-            _autoSelect.interactable = _cards.Any(card => card.Owned > 1);
-            _selectAll.interactable = _cards.Count > 0;
-        }
-
-        private void CycleRarity()
-        {
-            int index = _filter.HasValue ? (int)_filter.Value + 1 : 0;
-            _filter = index < CardRarityCatalog.TierCount ? (CardRarity)index : null;
-            Filter();
+            var counts = _cards.Where(card => card.Owned > 0).GroupBy(card => CollectionProgress.GetDeckCopyKey(card.Code))
+                .Select(group => group.Sum(card => (long)card.Owned)).ToArray();
+            _selectExcess.interactable = counts.Any(count => count > CollectionProgress.DeckCopyLimit);
+            _autoSelect.interactable = counts.Any(count => count > 1);
+            _selectAll.interactable = counts.Length > 0;
         }
 
         private void Filter()
         {
-            string query = _search.text.Trim();
-            string normalized = Normalize(query);
-            bool byCode = uint.TryParse(query, out uint code);
+            var query = new CardSearchQuery(_search.text);
             _matches.Clear();
-            foreach (var entry in _cards)
-            {
-                if (_filter.HasValue && entry.Rarity != _filter.Value) continue;
-                if (query.Length == 0 || (byCode ? entry.Code == code :
-                    entry.Name.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    normalized.Length > 0 && entry.SearchName.IndexOf(normalized, StringComparison.OrdinalIgnoreCase) >= 0))
-                    _matches.Add(entry);
-            }
-            _filterLabel.text = _filter.HasValue ? $"등급: {CardRarityCatalog.GetLabel(_filter.Value)}" : "등급: 전체";
+            _matches.AddRange(query.Order(_cards.Where(entry => _filters.Matches(entry.Code, entry.Owned)), entry => entry.Code));
             _page = 0;
             RefreshPage();
         }
@@ -255,7 +234,7 @@ namespace YGOPortable.UI
                 var card = first + i < _matches.Count ? _matches[first + i] : null;
                 WriteRow(_rows[i], card, false);
             }
-            _count.text = $"분해 가능 {_matches.Count:N0}종";
+            _count.text = $"검색 결과 {_matches.Count:N0}종";
             _pageLabel.text = $"{_page + 1} / {PageCount(_matches.Count)}";
             _previous.interactable = _page > 0;
             _next.interactable = _page + 1 < PageCount(_matches.Count);
@@ -280,7 +259,7 @@ namespace YGOPortable.UI
 
         private void RefreshSelection()
         {
-            int quantity = _inspected == null ? 0 : Quantity(_inspected.Code);
+            int quantity = _inspected == null ? 0 : Quantity(_inspected);
             int limit = _inspected?.Owned ?? 0;
             _cardInfo.text = _inspected == null
                 ? ""
@@ -288,15 +267,14 @@ namespace YGOPortable.UI
             _decrement.interactable = quantity > 0;
             _increment.interactable = quantity < limit;
             _maximum.interactable = quantity < limit;
-            _clear.interactable = _selected.Count > 0;
-            _review.interactable = _selected.Count > 0;
+            _clear.interactable = _review.interactable = SelectionCount > 0;
             int first = _page * PageSize;
             for (int i = 0; i < _rows.Length && first + i < _matches.Count; i++)
             {
                 var card = _matches[first + i];
                 var row = _rows[i];
                 row.Name.color = card == _inspected ? PackShopStyle.Accent : PackShopStyle.TextPrimary;
-                int selected = Quantity(card.Code);
+                int selected = Quantity(card);
                 row.Quantity.text = $"선택 {selected:N0} / {card.Owned:N0}";
                 row.Quantity.color = selected > 0 ? PackShopStyle.Accent : PackShopStyle.TextMuted;
             }
@@ -305,33 +283,37 @@ namespace YGOPortable.UI
 
         private void RefreshTotals(Text summary, Text dust)
         {
-            long count = _selected.Values.Sum(quantity => (long)quantity);
-            decimal earned = _selected.Sum(entry => (decimal)entry.Value * CollectionProgress.GetDisassemblyDustPerCard(entry.Key));
-            summary.text = $"선택 {_selected.Count:N0}종 · {count:N0}장";
+            long count = _selected.Values.Concat(_selectedOverframes.Values).Sum(quantity => (long)quantity);
+            decimal earned = _selected.Sum(entry => (decimal)entry.Value * CollectionProgress.GetDisassemblyDustPerCard(entry.Key)) +
+                _selectedOverframes.Sum(entry => (decimal)entry.Value * CollectionProgress.GetDisassemblyDustPerCard(entry.Key, true));
+            summary.text = $"선택 {SelectionCount:N0}종 · {count:N0}장";
             dust.text = $"가루 +{earned:N0}";
         }
 
-        private int Quantity(uint code) => _selected.TryGetValue(code, out int count) ? count : 0;
+        private int SelectionCount => _selected.Count + _selectedOverframes.Count;
+        private Dictionary<uint, int> Selection(CardEntry card) => card.Overframe ? _selectedOverframes : _selected;
+        private int Quantity(CardEntry card) => Selection(card).GetValueOrDefault(card.Code);
 
         private void AdjustQuantity(int delta)
         {
             if (_inspected == null) return;
-            int quantity = (int)Math.Clamp((long)Quantity(_inspected.Code) + delta, 0, _inspected.Owned);
-            if (quantity == 0) _selected.Remove(_inspected.Code);
-            else _selected[_inspected.Code] = quantity;
+            int quantity = (int)Math.Clamp((long)Quantity(_inspected) + delta, 0, _inspected.Owned);
+            var selection = Selection(_inspected);
+            if (quantity == 0) selection.Remove(_inspected.Code);
+            else selection[_inspected.Code] = quantity;
             _status.text = "";
             RefreshSelection();
         }
 
         private void SelectMaximum()
         {
-            if (_inspected == null) return;
-            _selected[_inspected.Code] = _inspected.Owned;
+            if (_inspected == null || _inspected.Owned == 0) return;
+            Selection(_inspected)[_inspected.Code] = _inspected.Owned;
             _status.text = "";
             RefreshSelection();
         }
 
-        private void SelectExcess()
+        internal void SelectExcess()
         {
             if (!_selectExcess.IsInteractable()) return;
             SelectFromCollection(CollectionProgress.DeckCopyLimit, "카드별로 3장을 초과한 수량만 선택했습니다.");
@@ -345,10 +327,17 @@ namespace YGOPortable.UI
         private void SelectFromCollection(int keepCopies, string status)
         {
             _selected.Clear();
-            foreach (var card in _cards)
+            _selectedOverframes.Clear();
+            foreach (var group in _cards.Where(card => card.Owned > 0).GroupBy(card => CollectionProgress.GetDeckCopyKey(card.Code)))
             {
-                int quantity = card.Owned - keepCopies;
-                if (quantity > 0) _selected.Add(card.Code, quantity);
+                int remaining = keepCopies;
+                foreach (var card in group.OrderByDescending(card => card.Overframe))
+                {
+                    int keep = Math.Min(remaining, card.Owned);
+                    remaining -= keep;
+                    int quantity = card.Owned - keep;
+                    if (quantity > 0) Selection(card).Add(card.Code, quantity);
+                }
             }
             _status.color = PackShopStyle.TextPrimary;
             _status.text = status;
@@ -358,16 +347,17 @@ namespace YGOPortable.UI
         private void ClearSelection()
         {
             _selected.Clear();
+            _selectedOverframes.Clear();
             _status.text = "";
             RefreshSelection();
         }
 
         private void OpenReview()
         {
-            if (_selected.Count == 0) return;
+            if (SelectionCount == 0) return;
             _reviewPage = 0;
             _reviewCards.Clear();
-            _reviewCards.AddRange(_cards.Where(card => _selected.ContainsKey(card.Code)));
+            _reviewCards.AddRange(_cards.Where(card => Quantity(card) > 0));
             _catalogRoot.SetActive(false);
             _reviewRoot.SetActive(true);
             RefreshReview();
@@ -398,8 +388,12 @@ namespace YGOPortable.UI
         private void ConfirmDisassembly()
         {
             if (!_reviewRoot.activeInHierarchy) return;
-            bool success = CollectionProgress.TryDisassembleCards(_selected, out string error);
-            if (success) _selected.Clear();
+            bool success = CollectionProgress.TryDisassembleCards(_selected, _selectedOverframes, out string error);
+            if (success)
+            {
+                _selected.Clear();
+                _selectedOverframes.Clear();
+            }
             ReloadCards();
             _reviewRoot.SetActive(false);
             _catalogRoot.SetActive(true);
@@ -417,16 +411,16 @@ namespace YGOPortable.UI
         {
             row.Holder.gameObject.SetActive(card != null);
             if (card == null) return;
-            row.Name.text = card.Name;
-            if (review) row.Quantity.text = $"{Quantity(card.Code):N0}장";
+            row.Name.text = card.Overframe ? $"[OF] {card.Name}" : card.Name;
+            if (review) row.Quantity.text = $"{Quantity(card):N0}장";
             ShopRarityBadge.Update(row.Rarity, card.Code);
         }
 
         private static CardRow BuildRow(Transform parent, int index, Action select)
         {
             bool selectable = select != null;
-            float top = (selectable ? .704f : .815f) - index * (selectable ? .079f : .093f);
-            var holder = Slot(parent, $"Card_{index}", .08f, top - .071f, .92f, top);
+            float top = (selectable ? .65f : .815f) - index * (selectable ? .071f : .093f);
+            var holder = Slot(parent, $"Card_{index}", .08f, top - (selectable ? .064f : .071f), .92f, top);
             var row = new CardRow { Holder = holder };
             Transform content = holder;
             if (selectable)
@@ -469,7 +463,6 @@ namespace YGOPortable.UI
             LotdUiKit.AddFittedText(panel, "Controls", controls, 16, 11, TextAnchor.MiddleCenter, PackShopStyle.TextMuted);
         }
 
-        private static string Normalize(string text) => new string(text.Where(char.IsLetterOrDigit).ToArray());
 
         private static int PageCount(int count) => Mathf.Max(1, (count + PageSize - 1) / PageSize);
 

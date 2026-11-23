@@ -43,7 +43,17 @@ namespace YGOPortable.Editor
                 Canvas.ForceUpdateCanvases();
                 VerifyPack(shop, events);
                 VerifyCardSearch(shop);
-                Require(shop.Root.transform.Find("Crafting") == null, "The pack shop still exposes card crafting.");
+                ButtonAt(shop.Root, "Craft/Button").onClick.Invoke();
+                var crafting = Field(shop, "_crafting");
+                Require(Scope(shop) == CraftingScope(crafting), "The shop tab did not open the crafting catalog.");
+                Call(shop, "HandleShopBack");
+                ButtonAt(shop.Root, "Excess/Button").onClick.Invoke();
+                var bulk = (CardBulkDisassemblyUI)Field(crafting, "_bulk");
+                Require(bulk.IsOpen && Scope(shop) == bulk.ActiveRoot,
+                    "The shop tab did not go directly to bulk disassembly.");
+                for (int step = 0; step < 3 && Scope(shop) != shop.Root; step++)
+                    Call(shop, "HandleShopBack");
+                Require(Scope(shop) == shop.Root, "Leaving bulk disassembly did not restore the pack shop.");
                 Call(shop, "CloseShop");
 
                 var editor = new DeckEditorUI(canvasObject.AddComponent<GameAppController>(), canvasObject.transform);

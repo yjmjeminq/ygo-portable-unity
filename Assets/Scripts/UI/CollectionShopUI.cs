@@ -19,7 +19,6 @@ namespace YGOPortable.UI
             internal string Name;
             internal uint FeaturedCode;
             internal string Details;
-            internal ShopSearchKey SearchText;
             internal IReadOnlyList<uint> CardPool;
             internal CollectionStarter Starter;
         }
@@ -54,6 +53,9 @@ namespace YGOPortable.UI
         private readonly PackContentsUI _packContents;
         private readonly PackCardLookupUI _cardLookup;
         private PackOpeningView _openingView;
+        private CardCraftingUI _crafting;
+        private GameObject _craftingOrigin;
+        private GameObject _craftingReturnFocus;
         private Text _balance;
         private Text _filterCount;
         private Button[] _filterButtons;
@@ -79,7 +81,9 @@ namespace YGOPortable.UI
         public GameObject StarterRoot => _starter.Root;
         private bool OpeningIsOpen => _openingView?.IsOpen == true;
         private bool ShopDialogIsOpen => _shopDialog.activeSelf;
-        internal GameObject ActiveShopRoot => OpeningIsOpen ? _openingView.ActiveRoot :
+        private bool CraftingIsOpen => _crafting?.IsOpen == true;
+        internal GameObject ActiveShopRoot => CraftingIsOpen ? _crafting.ActiveRoot :
+            OpeningIsOpen ? _openingView.ActiveRoot :
             ShopDialogIsOpen ? _shopDialog :
             _cardLookup.Root.activeSelf ? _cardLookup.Root :
             _packContents.Root.activeSelf ? _packContents.Root : Root;
@@ -90,8 +94,8 @@ namespace YGOPortable.UI
             _onStarterClaimed = onStarterClaimed;
             _shop = BuildShop(parent);
             _starter = BuildStarter(parent);
-            _packContents = new PackContentsUI(parent, ReturnFromContents, OpenLookupForCard);
-            _cardLookup = new PackCardLookupUI(parent, ReturnFromLookup, ShowPackFromLookup);
+            _packContents = new PackContentsUI(parent, ReturnFromContents, OpenLookupForCard, OpenCrafting);
+            _cardLookup = new PackCardLookupUI(parent, ReturnFromLookup, ShowPackFromLookup, OpenCrafting);
         }
 
         public void OpenShop()
@@ -106,7 +110,6 @@ namespace YGOPortable.UI
                     Name = pack.Name,
                     FeaturedCode = pack.FeaturedCode,
                     Details = $"수록 {pack.CardPool.Count:N0}종   ·   팩당 {CollectionProgress.CardsPerPack}장",
-                    SearchText = ShopSearchKey.FromNames(pack.CardPool.Select(CardDatabase.GetName).Prepend(pack.Name)),
                     CardPool = pack.CardPool,
                 }).ToArray();
             }
@@ -118,6 +121,8 @@ namespace YGOPortable.UI
         internal void CloseShop()
         {
             _openingView?.Hide();
+            _crafting?.Hide();
+            _craftingOrigin = _craftingReturnFocus = null;
             HideShopDialog();
             _cardLookup.Root.SetActive(false);
             _packContents.Close();
@@ -135,9 +140,6 @@ namespace YGOPortable.UI
                     Id = starter.Id,
                     Name = starter.Name,
                     FeaturedCode = starter.FeaturedCode,
-                    SearchText = ShopSearchKey.FromNames(starter.ThemeCards.Select(CardDatabase.GetName)
-                        .Prepend(CardDatabase.GetName(starter.FeaturedCode))
-                        .Prepend(starter.Name)),
                     CardPool = starter.ThemeCards,
                     Starter = starter,
                 }).ToArray();
@@ -146,12 +148,18 @@ namespace YGOPortable.UI
         }
 
         internal InputField CatalogSearch(bool starter) => starter ? _starter.Search :
+            CraftingIsOpen ? _crafting.Search :
             OpeningIsOpen || ShopDialogIsOpen ? null :
             _cardLookup.Root.activeSelf ? _cardLookup.Search :
             _packContents.Root.activeSelf ? _packContents.SearchInput : _shop.Search;
 
         internal void ChangeCatalogPage(bool starter, int delta)
         {
+            if (!starter && CraftingIsOpen)
+            {
+                _crafting.ChangePage(delta);
+                return;
+            }
             if (!starter && OpeningIsOpen)
             {
                 _openingView.ChangePage(delta);
@@ -175,11 +183,17 @@ namespace YGOPortable.UI
 
         internal void ScrollShopDescription(float direction)
         {
-            if (_packContents.Root.activeSelf) _packContents.ScrollDescription(direction);
+            if (CraftingIsOpen) _crafting.ScrollDescription(direction);
+            else if (_packContents.Root.activeSelf) _packContents.ScrollDescription(direction);
         }
 
         internal bool HandleShopBack()
         {
+            if (CraftingIsOpen)
+            {
+                _crafting.Back();
+                return true;
+            }
             if (OpeningIsOpen)
             {
                 _openingView.Back();
@@ -204,6 +218,32 @@ namespace YGOPortable.UI
             return false;
         }
 
+
+        private void OpenCrafting(uint code, CardTradeAction action) => ShowCrafting(code, action, excess: false);
+
+        private void ShowCrafting(uint code, CardTradeAction action, bool excess)
+        {
+            if (CraftingIsOpen || OpeningIsOpen || ShopDialogIsOpen || !CollectionProgress.HasStarter) return;
+            _craftingOrigin = ActiveShopRoot;
+            _craftingReturnFocus = EventSystem.current?.currentSelectedGameObject;
+            _crafting ??= new CardCraftingUI(Root.transform.parent, ReturnFromCrafting, "상점으로");
+            _crafting.Root.transform.SetAsLastSibling();
+            _craftingOrigin.SetActive(false);
+            if (excess) _crafting.ShowExcessDisassembly();
+            else _crafting.Show(code, action);
+        }
+
+        private void ReturnFromCrafting()
+        {
+            _crafting.Hide();
+            _craftingOrigin.SetActive(true);
+            if (_craftingOrigin == _cardLookup.Root) _cardLookup.RefreshOwnership();
+            else if (_craftingOrigin == _packContents.Root) _packContents.RefreshOwnership();
+            else RefreshBalance();
+            if (_craftingReturnFocus != null && _craftingReturnFocus.activeInHierarchy)
+                EventSystem.current?.SetSelectedGameObject(_craftingReturnFocus);
+            _craftingOrigin = _craftingReturnFocus = null;
+        }
 
         private void ViewSelectedPack()
         {
@@ -291,10 +331,14 @@ namespace YGOPortable.UI
                 PackShopStyle.TextPrimary, FontStyle.Bold);
             ShopButton(root, "Back", "메인 메뉴", .853f, .918f, .965f, .971f, _onBack);
 
-            PackShopStyle.SetSelected(ShopButton(root, "Packs", "팩", .035f, .819f, .151f, .885f,
+            PackShopStyle.SetSelected(ShopButton(root, "Packs", "팩 상점", .035f, .819f, .192f, .885f,
                 () => SetPackFilter(PackFilter.All), kind: PackShopStyle.ButtonKind.Category), true);
-            _cardLookupButton = ShopButton(root, "CardLookup", "카드로 팩 찾기", .160f, .819f, .296f, .885f,
+            _cardLookupButton = ShopButton(root, "CardLookup", "카드로 팩 찾기", .204f, .819f, .374f, .885f,
                 OpenLookup, kind: PackShopStyle.ButtonKind.Category);
+            ShopButton(root, "Craft", "카드 제작·분해", .386f, .819f, .556f, .885f,
+                () => OpenCrafting(0, CardTradeAction.Browse), kind: PackShopStyle.ButtonKind.Category);
+            ShopButton(root, "Excess", "3장 초과 일괄 분해", .568f, .819f, .758f, .885f,
+                () => ShowCrafting(0, CardTradeAction.Browse, excess: true), kind: PackShopStyle.ButtonKind.Category);
 
 
             var rail = PackShopStyle.Panel(root, "Categories", new Vector2(.035f, .109f), new Vector2(.151f, .800f), .36f);
@@ -471,7 +515,7 @@ namespace YGOPortable.UI
             var item = _purchaseItem;
             int count = _purchaseCount;
             _openingView ??= new PackOpeningView(Root.transform.parent, ReturnFromOpening);
-            if (!CollectionProgress.TryBuyPacks(item.Id, count, out var cards, out string error))
+            if (!CollectionProgress.TryBuyPackContents(item.Id, count, out var cards, out string error))
             {
                 CloseShopDialog();
                 SetStatus(_shop, error, true);
@@ -492,7 +536,8 @@ namespace YGOPortable.UI
             _dialogReturn = count == 1 ? _shop.Action : _buyBundleButton;
             int cost = count * CollectionProgress.PackCost;
             _dialogHeading.text = "팩 구매 확인";
-            _dialogText.text = $"{_purchaseItem.Name}   ×{count}\n카드 {count * CollectionProgress.CardsPerPack}장\n\n보유 DP   {CollectionProgress.Balance:N0} → {CollectionProgress.Balance - cost:N0}";
+            string guarantee = count == CollectionProgress.PackBundleSize ? "  ·  SR 이상 1장 확정" : "";
+            _dialogText.text = $"{_purchaseItem.Name}   ×{count}\n카드 {count * CollectionProgress.CardsPerPack}장{guarantee}\n\n보유 DP   {CollectionProgress.Balance:N0} → {CollectionProgress.Balance - cost:N0}";
             _dialogConfirmLabel.text = $"구매   {cost:N0} DP";
             _dialogCancel.GetComponentInChildren<Text>().text = "취소";
             _dialogConfirm.gameObject.SetActive(true);
@@ -563,9 +608,7 @@ namespace YGOPortable.UI
 
         private void FilterCatalog(Catalog catalog)
         {
-            string query = ShopSearchKey.NormalizeInput(catalog.Search.text);
-            var searchText = ShopSearchKey.FromName(query);
-            bool codeQuery = uint.TryParse(query, out uint code);
+            var query = new CardSearchQuery(catalog.Search.text);
             IEnumerable<CatalogItem> candidates = catalog.Items;
             if (catalog == _shop && _packFilter != PackFilter.All)
             {
@@ -574,15 +617,32 @@ namespace YGOPortable.UI
             }
 
             catalog.Matches.Clear();
-            foreach (var item in candidates)
+            if (query.IsEmpty)
             {
-                if (query.Length == 0 || item.Name.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    (codeQuery ? item.FeaturedCode == code || item.CardPool?.Contains(code) == true :
-                        item.SearchText.Contains(searchText)))
-                    catalog.Matches.Add(item);
+                catalog.Matches.AddRange(candidates);
             }
-            if (catalog == _shop && catalog.Matches.Count == 0 && !codeQuery && searchText.CanTrySimilar)
-                catalog.Matches.AddRange(candidates.Where(item => item.SearchText.Contains(searchText, similar: true)));
+            else
+            {
+                var ranks = new Dictionary<uint, int>();
+                int RankCard(uint code)
+                {
+                    if (!ranks.TryGetValue(code, out int rank)) ranks[code] = rank = query.Rank(code);
+                    return rank;
+                }
+                int RankPack(CatalogItem item)
+                {
+                    int rank = Math.Min(query.RankName(item.Name), RankCard(item.FeaturedCode));
+                    foreach (uint code in item.CardPool)
+                    {
+                        if (rank == 0) break;
+                        rank = Math.Min(rank, RankCard(code));
+                    }
+                    return rank;
+                }
+                catalog.Matches.AddRange(candidates.Select(item => (Item: item, Rank: RankPack(item)))
+                    .Where(match => match.Rank != CardSearchQuery.NoMatch)
+                    .OrderBy(match => match.Rank).Select(match => match.Item));
+            }
             catalog.Page = 0;
             RefreshPage(catalog);
         }

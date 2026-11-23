@@ -17,14 +17,12 @@ namespace YGOPortable.UI
         {
             public uint Code { get; }
             public string Name { get; }
-            public ShopSearchKey SearchName { get; }
             public List<CollectionPack> Packs { get; } = new();
 
             public Entry(uint code)
             {
                 Code = code;
                 Name = CardDatabase.GetName(code);
-                SearchName = ShopSearchKey.FromName(Name);
             }
         }
 
@@ -37,6 +35,8 @@ namespace YGOPortable.UI
         private readonly Image[] _packCovers = new Image[PacksPerPage];
         private readonly List<Entry> _matches = new();
         private readonly Text _cardCount;
+        private readonly CollectionCardFilters _filters;
+        private readonly CardTradeControls _trade;
         private readonly Text _cardPageLabel;
         private readonly Text _packPageLabel;
         private readonly Text _packHeading;
@@ -58,7 +58,8 @@ namespace YGOPortable.UI
         internal GameObject Root { get; }
         internal InputField Search { get; }
 
-        internal PackCardLookupUI(Transform parent, Action onBack, Action<string> onPackChosen)
+        internal PackCardLookupUI(Transform parent, Action onBack, Action<string> onPackChosen,
+            Action<uint, CardTradeAction> trade = null)
         {
             _onPackChosen = onPackChosen;
             var root = LotdUiKit.FillRect("Screen_PackCardLookup", parent);
@@ -74,14 +75,15 @@ namespace YGOPortable.UI
             var searchSlot = Slot("Search", catalog, .08f, .851f, .92f, .924f);
             Search = PackShopStyle.Search(searchSlot, "Input", "카드 이름·카드 번호 검색", 18);
             Search.onValueChanged.AddListener(_ => FilterCards());
-            _cardCount = Label(catalog, "Count", .087f, .796f, .914f, .841f, 16,
+            _filters = new CollectionCardFilters(Slot("Filters", catalog, .08f, .782f, .92f, .842f), FilterCards);
+            _cardCount = Label(catalog, "Count", .087f, .727f, .914f, .778f, 16,
                 TextAnchor.MiddleLeft, PackShopStyle.TextMuted);
 
             for (int i = 0; i < CardsPerPage; i++)
             {
                 int row = i;
-                float top = .787f - i * .078f;
-                var button = AddButton(catalog, $"Card_{i}", "", .08f, top - .067f, .92f, top,
+                float top = .72f - i * .070f;
+                var button = AddButton(catalog, $"Card_{i}", "", .08f, top - .062f, .92f, top,
                     () => ChooseCard(row));
                 button.gameObject.AddComponent<StarterRowFocus>().ShowPreview = () => PreviewCard(row);
                 _cardRows[i] = button;
@@ -98,11 +100,14 @@ namespace YGOPortable.UI
             var heading = Slot("Heading", detail, .073f, .853f, .927f, .929f);
             _cardHeading = LotdUiKit.AddFittedText(heading, "Title", "", 27, 16,
                 TextAnchor.MiddleCenter, PackShopStyle.TextPrimary, FontStyle.Bold);
-            var art = Slot("Art", detail, .06f, .25f, .45f, .834f);
+            var art = Slot("Art", detail, .06f, trade == null ? .25f : .33f, .45f, .834f);
             _preview = CompositeCardView.Create(art, "SelectedCard", true);
-            _cardRarity = ShopRarityBadge.Create(detail, new Vector2(.198f, .188f), new Vector2(.312f, .24f), 17);
-            _cardInfo = Label(detail, "CardInfo", .067f, .075f, .443f, .176f, 17,
+            float tradeSpace = trade == null ? 0f : .08f;
+            _cardRarity = ShopRarityBadge.Create(detail, new Vector2(.198f, .188f + tradeSpace),
+                new Vector2(.312f, .24f + tradeSpace), 17);
+            _cardInfo = Label(detail, "CardInfo", .067f, .075f + tradeSpace, .443f, .176f + tradeSpace, 17,
                 TextAnchor.UpperCenter, PackShopStyle.TextPrimary);
+            if (trade != null) _trade = new CardTradeControls(Slot("Trade", detail, .059f, .054f, .451f, .155f), trade);
 
             _packPane = Slot("Packs", detail, .475f, .091f, .927f, .827f);
             _packHeading = Label(_packPane, "Count", 0f, .906f, 1f, .997f, 20,
@@ -187,20 +192,17 @@ namespace YGOPortable.UI
             _indexedPacks = packs;
         }
 
-        private void FilterCards()
+        internal void RefreshOwnership() => FilterCards(keepSelection: true);
+
+        private void FilterCards() => FilterCards(keepSelection: false);
+
+        private void FilterCards(bool keepSelection)
         {
-            string query = ShopSearchKey.NormalizeInput(Search.text);
-            bool codeQuery = uint.TryParse(query, out uint code);
-            var nameQuery = ShopSearchKey.FromName(query);
+            var query = new CardSearchQuery(Search.text);
             _matches.Clear();
-            foreach (var entry in _entries)
-            {
-                if (query.Length == 0 || (codeQuery ? entry.Code == code : entry.SearchName.Contains(nameQuery)))
-                    _matches.Add(entry);
-            }
-            if (_matches.Count == 0 && !codeQuery && nameQuery.CanTrySimilar)
-                _matches.AddRange(_entries.Where(entry => entry.SearchName.Contains(nameQuery, similar: true)));
-            _cardPage = 0;
+            _matches.AddRange(query.Order(_entries.Where(entry => _filters.Matches(entry.Code)), entry => entry.Code));
+            int selectedIndex = keepSelection ? _matches.IndexOf(_selected) : -1;
+            _cardPage = selectedIndex < 0 ? 0 : selectedIndex / CardsPerPage;
             ShowCardPage();
         }
 
@@ -259,7 +261,8 @@ namespace YGOPortable.UI
             _selected = entry;
             _cardHeading.text = entry?.Name ?? "선택 카드 없음";
             PackShopStyle.ShowCardPreview(_preview, entry?.Code ?? 0);
-            _cardInfo.text = entry == null ? "" : $"카드 번호 {entry.Code}\n보유 {CollectionProgress.GetOwnedCount(entry.Code)}장";
+            _trade?.Bind(entry?.Code ?? 0);
+            _cardInfo.text = entry == null ? "" : $"카드 번호 {entry.Code}\n보유 {CollectionProgress.GetTotalOwnedCount(entry.Code)}장";
             ShopRarityBadge.Update(_cardRarity, entry?.Code ?? 0);
             int first = _cardPage * CardsPerPage;
             for (int row = 0; row < CardsPerPage && first + row < _matches.Count; row++)

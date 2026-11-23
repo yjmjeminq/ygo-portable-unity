@@ -102,12 +102,14 @@ namespace YGOPortable.UI
         private Button _zoneDetailsButton;
         private Text _zoneSelectedName;
         private uint _zoneSelectedCode;
+        private LiveCardState _zoneSelectedCard;
         private Outline _zoneSelectedBorder;
         private Color _zonePreviousBorder;
         private bool _zoneOpponent;
         private int _zonePileIndex;
         private Action<bool, uint> _onBrowsePile;
-        private Action<uint> _onOpenZoneDetails;
+        private Action<uint, LiveCardState> _onOpenZoneDetails;
+        private Action<LiveCardState> _onInspectZoneCard;
         private GameObject _focusBeforePrompt;
         private GameObject _focusBeforeZone;
         private GameObject _focusBeforeKeyboard;
@@ -302,10 +304,12 @@ namespace YGOPortable.UI
 
         internal void SetCardDetailsOpen(bool open) => _promptInput.interactable = !open && !IsZoneViewerOpen;
 
-        internal void SetZoneBrowserActions(Action<bool, uint> browsePile, Action<uint> openDetails)
+        internal void SetZoneBrowserActions(Action<bool, uint> browsePile, Action<uint, LiveCardState> openDetails,
+            Action<LiveCardState> inspect)
         {
             _onBrowsePile = browsePile;
             _onOpenZoneDetails = openDetails;
+            _onInspectZoneCard = inspect;
         }
 
         internal bool IsPointOverBrowsablePile(Vector2 point)
@@ -2173,7 +2177,7 @@ namespace YGOPortable.UI
                 Vector2.zero, Vector2.zero);
             _zoneDetailsButton = DuelStyle.Button(details, "Button", "카드 상세 (X)", () =>
             {
-                if (IsZoneViewerOpen && _zoneSelectedCode != 0) _onOpenZoneDetails?.Invoke(_zoneSelectedCode);
+                if (IsZoneViewerOpen && _zoneSelectedCode != 0) _onOpenZoneDetails?.Invoke(_zoneSelectedCode, _zoneSelectedCard);
             }, 13);
             _zoneDetailsButton.interactable = false;
             ZoneViewRoot.SetActive(false);
@@ -2232,6 +2236,7 @@ namespace YGOPortable.UI
         {
             _zoneSelectedBorder = null;
             _zoneSelectedCode = 0;
+            _zoneSelectedCard = null;
             _zoneSelectedName.text = "카드를 선택하세요";
             _zoneDetailsButton.interactable = false;
             ClearChildren(_zoneGrid);
@@ -2441,7 +2446,7 @@ namespace YGOPortable.UI
             void OpenAction()
             {
                 if (!IsZoneViewerOpen || canUseCardActions?.Invoke() == false) return;
-                _onInspectCard?.Invoke(code);
+                InspectZoneCard(code, live);
                 CloseZoneViewer();
                 onOpenCardActions?.Invoke(live);
             }
@@ -2454,11 +2459,11 @@ namespace YGOPortable.UI
                 btn.onClick.AddListener(() =>
                 {
                     if (fullTileAction) OpenAction();
-                    else SelectZoneCard(tile, code);
+                    else SelectZoneCard(tile, code, live);
                 });
-                SelectionHandler(btn).OnSelected = () => SelectZoneCard(tile, code);
+                SelectionHandler(btn).OnSelected = () => SelectZoneCard(tile, code, live);
                 var trig = tile.gameObject.AddComponent<CardDragTrigger>();
-                trig.OnPointerEnterAction = () => _onInspectCard?.Invoke(code);
+                trig.OnPointerEnterAction = () => InspectZoneCard(code, live);
                 if (actionSelection && hasActions && live?.location == YgoConstants.LOCATION_EXTRA)
                 {
                     trig.SourceType = DragSourceType.ExtraDeck;
@@ -2480,11 +2485,11 @@ namespace YGOPortable.UI
                     return;
                 }
                 var action = DuelStyle.Button(actRt, "B", actionText, OpenAction, 11, true);
-                SelectionHandler(action).OnSelected = () => SelectZoneCard(tile, code);
+                SelectionHandler(action).OnSelected = () => SelectZoneCard(tile, code, live);
             }
         }
 
-        private void SelectZoneCard(RectTransform tile, uint code)
+        private void SelectZoneCard(RectTransform tile, uint code, LiveCardState live)
         {
             var border = tile.GetComponent<Outline>();
             if (_zoneSelectedBorder != border)
@@ -2495,9 +2500,16 @@ namespace YGOPortable.UI
                 border.effectColor = DuelStyle.Player;
             }
             _zoneSelectedCode = code;
+            _zoneSelectedCard = live;
             _zoneSelectedName.text = CardDatabase.GetName(code);
             _zoneDetailsButton.interactable = true;
-            _onInspectCard?.Invoke(code);
+            InspectZoneCard(code, live);
+        }
+
+        private void InspectZoneCard(uint code, LiveCardState live)
+        {
+            if (live?.Appearance?.IsDefault == false && _onInspectZoneCard != null) _onInspectZoneCard(live);
+            else _onInspectCard?.Invoke(code);
         }
 
         // ==================== MATCH RESULT ====================
@@ -2730,7 +2742,9 @@ namespace YGOPortable.UI
         {
             var live = session.GetVisibleFieldCard(code, item.controller, item.location, item.sequence);
             var view = CompositeCardView.Create(art, "V", duelArtwork: true);
-            view.SetCard(code, faceDown: code == 0, live: live);
+            var appearance = code == 0 ? null : live?.Appearance ??
+                session.GetDeckAppearance(item.controller, item.location, item.sequence);
+            view.SetDeckCard(code, appearance, faceDown: code == 0, live: live);
             if (live == null) return;
 
             var readout = new DuelCardReadout(CardDatabase.Get(code), live);

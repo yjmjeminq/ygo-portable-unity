@@ -157,8 +157,7 @@ namespace YGOPortable.UI
             var positions = CaptureDeckPositions(DragSourceType.DeckMain, before.Length);
             CancelDeckDrag();
             EndDeckTransfer();
-            main.Clear();
-            main.AddRange(sorted);
+            _workingDeck.ReorderCards(main, sorted);
             RefreshDeckGrids();
             AnimateOrderedDeck(DragSourceType.DeckMain, main, before, positions);
         }

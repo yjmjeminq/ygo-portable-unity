@@ -1,7 +1,4 @@
-using System;
 using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
 
 namespace YGOPortable.Core
 {
@@ -43,10 +40,8 @@ namespace YGOPortable.Core
             (1UL << 21, "연속 공격"),
         };
 
-        private readonly string _query;
-        private readonly string _compactNameQuery;
-        private readonly uint _passcode;
-        private readonly string _effectText;
+        private readonly CardSearchQuery _query;
+        private readonly CardSearchQuery _effectText;
         private readonly DeckCardKind _kind;
         private readonly uint _requiredTypes;
         private readonly uint _excludedTypes;
@@ -69,10 +64,8 @@ namespace YGOPortable.Core
             int? minAttack = null, int? maxAttack = null, int? minDefense = null, int? maxDefense = null,
             int? pendulumScale = null, uint linkMarker = 0)
         {
-            _query = query?.Trim() ?? "";
-            uint.TryParse(_query, out _passcode);
-            _compactNameQuery = new string(_query.Where(c => !IsNameSeparator(c)).Select(char.ToUpperInvariant).ToArray());
-            _effectText = effectText?.Trim() ?? "";
+            _query = new CardSearchQuery(query);
+            _effectText = new CardSearchQuery(effectText);
             _kind = kind;
             _requiredTypes = requiredTypes;
             _excludedTypes = excludedTypes;
@@ -111,14 +104,15 @@ namespace YGOPortable.Core
                 !MatchesStat(card.IsMonster && !card.IsLink, card.def, _minDefense, _maxDefense))
                 return false;
             if ((card.DeckEffectCategories & _effectCategories) != _effectCategories ||
-                _effectText.Length != 0 && !Contains(card.desc, _effectText))
+                !_effectText.MatchesEffect(card))
                 return false;
 
-            return _query.Length == 0 || Contains(card.desc, _query) || MatchesNameOrPasscode(card.code, card.name);
+            return SearchRank(card) != CardSearchQuery.NoMatch;
         }
 
-        internal bool MatchesNameOrPasscode(uint code, string name) => _query.Length == 0 ||
-            _passcode != 0 && code == _passcode || Contains(name, _query) || ContainsCompactName(name);
+        internal bool HasSearchQuery => !_query.IsEmpty;
+        internal int SearchRank(CardInfo card) => _query.Rank(card);
+        internal bool MatchesNameOrPasscode(uint code, string name) => _query.MatchesNameOrPasscode(code, name);
 
         private bool MatchesKind(CardInfo card) => _kind switch
         {
@@ -132,30 +126,5 @@ namespace YGOPortable.Core
         private static bool MatchesStat(bool hasStat, int stat, int? min, int? max) =>
             (!min.HasValue && !max.HasValue) ||
             (hasStat && stat >= 0 && (!min.HasValue || stat >= min.Value) && (!max.HasValue || stat <= max.Value));
-
-        private static bool Contains(string text, string query) =>
-            text?.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0;
-
-        private static bool IsNameSeparator(char c) =>
-            char.IsWhiteSpace(c) || c == '−' || char.GetUnicodeCategory(c) == UnicodeCategory.DashPunctuation;
-
-        private bool ContainsCompactName(string name)
-        {
-            if (string.IsNullOrEmpty(name) || _compactNameQuery.Length == 0) return false;
-            for (int start = 0; start < name.Length; start++)
-            {
-                if (char.ToUpperInvariant(name[start]) != _compactNameQuery[0]) continue;
-                int matched = 1;
-                for (int index = start + 1; index < name.Length && matched < _compactNameQuery.Length; index++)
-                {
-                    char letter = name[index];
-                    if (IsNameSeparator(letter)) continue;
-                    if (char.ToUpperInvariant(letter) != _compactNameQuery[matched]) break;
-                    matched++;
-                }
-                if (matched == _compactNameQuery.Length) return true;
-            }
-            return false;
-        }
     }
 }
