@@ -125,7 +125,7 @@ namespace YGOPortable.UI
         private void ChangeArtwork(uint code, List<uint> cards, int index)
         {
             var appearance = ReadAppearance(code, cards, index);
-            var choices = CardArtLoader.GetSelectableArtwork(code);
+            var choices = CardArtLoader.GetSelectableArtwork(code, appearance.overframe);
             if (choices.Length < 2) return;
             int current = CardArtLoader.ArtworkChoiceIndex(code, choices, appearance.ArtworkVariant);
             if (!CardArtLoader.SetDuelArtworkVariant(code, choices[(current + 1) % choices.Length])) return;
@@ -167,7 +167,7 @@ namespace YGOPortable.UI
             label.text = appearance.overframe ? "오버프레임" : "일반판";
             label.color = appearance.overframe ? LotdUiKit.GoldAccent : LotdUiKit.TextPrimary;
             _inspectEdition.interactable = CanChangeEdition(code, cards, appearance);
-            _inspectArtwork.gameObject.SetActive(CardArtLoader.GetSelectableArtwork(code).Length > 1);
+            _inspectArtwork.gameObject.SetActive(CardArtLoader.GetSelectableArtwork(code, appearance.overframe).Length > 1);
             bool eligible = cards != null && ReferenceEquals(cards, _workingDeck.main);
             _inspectDestiny.interactable = eligible;
             var destiny = _inspectDestiny.GetComponentInChildren<Text>();

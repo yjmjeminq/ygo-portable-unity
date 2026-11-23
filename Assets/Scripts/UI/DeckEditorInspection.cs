@@ -143,7 +143,7 @@ namespace YGOPortable.UI
             var (cards, index) = InspectedDeckSlot(code);
             var appearance = ReadAppearance(code, cards, index);
             _expandedDeckArt.SetDeckCard(code, appearance);
-            var choices = CardArtLoader.GetSelectableArtwork(code);
+            var choices = CardArtLoader.GetSelectableArtwork(code, appearance.overframe);
             _expandedDeckArtwork.gameObject.SetActive(choices.Length > 1);
             if (choices.Length > 1)
                 _expandedDeckArtworkLabel.text = $"일러스트 변경 · {CardArtLoader.ArtworkChoiceIndex(code, choices, appearance.ArtworkVariant) + 1}/{choices.Length}";

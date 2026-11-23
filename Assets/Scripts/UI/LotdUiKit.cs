@@ -388,6 +388,7 @@ namespace YGOPortable.UI
     public class CompositeCardView : MonoBehaviour
     {
         private Image _artImg;
+        private Image _sourceFace;
         private GameObject _missingArtwork;
         private CardFinishGraphic _finish;
         private Image _frameImg;
@@ -429,7 +430,7 @@ namespace YGOPortable.UI
         internal bool HasOverframePortrait => HasOverframe && _retainedCutIn != null;
 
         public uint CurrentCode { get; private set; }
-        internal Sprite ArtworkSprite => _artImg.sprite;
+        internal Sprite ArtworkSprite => _retainedVariant == CardArtLoader.SourceOverframeFace ? _sourceFace.sprite : _artImg.sprite;
         internal DeckCardAppearance? Appearance => _deckAppearance;
 
         internal void UsePrintedFaceOnly(bool enabled = true, bool showEditionBadge = true)
@@ -675,10 +676,26 @@ namespace YGOPortable.UI
         private void BindArtwork(uint code)
         {
             if (code == 0 || !isActiveAndEnabled) return;
-            var (artCode, variant) = CardArtLoader.GetPreferredArtwork(code, _deckAppearance?.ArtworkVariant);
-            if (artCode == _retainedArtwork && variant == _retainedVariant && _artImg.sprite != null) return;
+            bool fullFace = _deckAppearance?.overframe == true && CardArtLoader.HasSourceOverframe(code);
+            var (artCode, variant) = fullFace
+                ? (code, CardArtLoader.SourceOverframeFace)
+                : CardArtLoader.GetPreferredArtwork(code, _deckAppearance?.ArtworkVariant);
+            if (artCode == _retainedArtwork && variant == _retainedVariant && ArtworkSprite != null) return;
             ReleaseArtwork();
-            _artImg.sprite = CardArtLoader.RetainArtwork(artCode, variant, out _artworkSource);
+            var artwork = CardArtLoader.RetainArtwork(artCode, variant, out _artworkSource);
+            if (fullFace && _artworkSource.Code != 0)
+            {
+                SetSourceFace(artwork);
+                _retainedArtwork = artCode;
+                _retainedVariant = variant;
+                return;
+            }
+            if (fullFace)
+            {
+                (artCode, variant) = CardArtLoader.GetPreferredArtwork(code, _deckAppearance?.ArtworkVariant);
+                artwork = CardArtLoader.RetainArtwork(artCode, variant, out _artworkSource);
+            }
+            _artImg.sprite = artwork;
             bool missing = _artImg.sprite == CardArtLoader.GetFallbackArt();
             if (missing && _missingArtwork == null)
             {
@@ -689,6 +706,20 @@ namespace YGOPortable.UI
             if (_missingArtwork != null) _missingArtwork.SetActive(missing);
             _retainedArtwork = artCode;
             _retainedVariant = variant;
+        }
+
+        private void SetSourceFace(Sprite sprite)
+        {
+            if (sprite != null && _sourceFace == null)
+            {
+                var face = LotdUiKit.FillRect("OverframeCardFace", _artImg.transform.parent);
+                face.SetSiblingIndex(_artImg.transform.GetSiblingIndex());
+                _sourceFace = LotdUiKit.AddImage(face.gameObject, null, Color.white, false, false);
+            }
+            if (_sourceFace == null) return;
+            _sourceFace.sprite = sprite;
+            _sourceFace.enabled = sprite != null;
+            _artImg.enabled = _frameImg.enabled = sprite == null;
         }
 
         private void SetDeckEditionBadge(bool shown)
@@ -730,7 +761,8 @@ namespace YGOPortable.UI
 
         private void RefreshOverframe()
         {
-            if (_printedFaceOnly || !(_deckAppearance?.overframe ?? _overframeEnabled) || _overframeBound || _retainedArtwork == 0) return;
+            if (_printedFaceOnly || _retainedVariant == CardArtLoader.SourceOverframeFace ||
+                !(_deckAppearance?.overframe ?? _overframeEnabled) || _overframeBound || _retainedArtwork == 0) return;
             _overframeBound = true;
             var (code, variant) = _artworkSource.Code == 0 ? (_retainedArtwork, _retainedVariant) : _artworkSource;
             _retainedCutIn = DuelVisualAssets.RetainCutIn(code, variant);
@@ -878,10 +910,12 @@ namespace YGOPortable.UI
         {
             HideOverframe();
             if (_retainedArtwork == 0) return;
+            SetSourceFace(null);
             _artImg.sprite = null;
             if (_missingArtwork != null) _missingArtwork.SetActive(false);
             CardArtLoader.ReleaseArtwork(_retainedArtwork, _retainedVariant);
             _retainedArtwork = 0;
+            _retainedVariant = 0;
             _artworkSource = default;
         }
     }

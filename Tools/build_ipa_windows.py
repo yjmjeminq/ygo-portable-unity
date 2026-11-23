@@ -247,7 +247,11 @@ def verify_ipa(ipa, snapshot):
 def build(editor, github, branch, revision, scratch, local_cutins=None):
     visuals = prepare_local_visuals(local_cutins) if local_cutins else None
     if visuals is not None:
-        print(f"    최종 IPA에 로컬 컷인 {len(visuals) - 1}개와 전체 일러스트 팩을 포함합니다.")
+        portraits = sum(name.startswith("CutIns/") for name in visuals)
+        message = f"    최종 IPA에 로컬 컷인 {portraits}개와 전체 일러스트 팩을 포함합니다."
+        if "overframeart.pack" in visuals:
+            message += " 원본 오버프레임 앞면 팩도 포함합니다."
+        print(message)
     snapshot = scratch / "Project"
     for name in ("Assets", "Packages", "ProjectSettings"):
         shutil.copytree(PROJECT / name, snapshot / name)

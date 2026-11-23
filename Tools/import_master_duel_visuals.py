@@ -129,7 +129,8 @@ def scan_bundle(path):
 def get_catalog(install, catalogs):
     if catalogs:
         return [row for catalog in catalogs for row in json.loads(catalog.read_text(encoding="utf-8"))]
-    bundles = (path for path in (install / "LocalData").rglob("*") if path.is_file())
+    folders = (install / "LocalData", install / "masterduel_Data/StreamingAssets/AssetBundle")
+    bundles = (path for folder in folders for path in folder.rglob("*") if path.is_file())
     with ThreadPoolExecutor(max_workers=6) as pool:
         return [row for entries in pool.map(scan_bundle, bundles) for row in entries]
 
@@ -179,6 +180,65 @@ def card_images(rows):
         if art_id not in images or "/common/" in name:
             images[art_id] = row
     return images
+
+
+def source_overframe_ids(resources):
+    table = next((obj.read().m_Script for obj in resources.objects
+                  if obj.type.name == "TextAsset" and obj.peek_name() == "of_card_asset"), None)
+    if table is None:
+        return {}
+    if isinstance(table, str):
+        table = table.encode("utf-8", "surrogateescape")
+    if len(table) % 4:
+        raise ValueError("The installed Overframe table has an invalid record size.")
+    return {edition: ordinary for edition, ordinary in struct.iter_unpack("<HH", table) if edition and ordinary}
+
+
+def export_source_overframes(output, args, ids, images):
+    cards = json.loads((PROJECT / "Assets/StreamingAssets/cards_kr.json").read_text(encoding="utf-8-sig"))["cards"]
+    card_codes = {card["code"] for card in cards if not card["type"] & 0x4000}
+    codes_by_id = defaultdict(set)
+    for line in read_reference(args.id_map, YDK_IDS).splitlines():
+        fields = line.split()
+        if len(fields) != 2 or not all(field.isdecimal() for field in fields):
+            continue
+        code, card_id = map(int, fields)
+        if code in card_codes:
+            codes_by_id[card_id].add(code)
+    for card in cards:
+        if card["code"] in card_codes and card["konamiId"]:
+            codes_by_id[card["konamiId"]].add(card["code"])
+
+    entries = {}
+    for edition, ordinary in sorted(ids.items()):
+        row = images.get(edition)
+        codes = codes_by_id.get(ordinary)
+        if row is None or not row[-1].endswith(".png") or not codes:
+            continue
+        texture = read_asset(row).image.convert("RGBA")
+        if texture.height <= texture.width or texture.getchannel("A").getextrema() != (0, 255):
+            print(f"Skipped unexpected Overframe texture {edition}: {texture.size}", flush=True)
+            continue
+        with io.BytesIO() as image:
+            texture.save(image, format="PNG", compress_level=2)
+            payload = image.getvalue()
+        for code in sorted(codes):
+            entries.setdefault(code, (edition, payload))
+    if not entries:
+        raise ValueError("No complete Overframe textures matched the installed card database.")
+
+    with (output / "overframeart.pack").open("wb") as pack:
+        pack.seek(12 + 16 * len(entries))
+        blobs, index = {}, []
+        for code, (edition, payload) in sorted(entries.items()):
+            if edition not in blobs:
+                blobs[edition] = pack.tell(), len(payload)
+                pack.write(payload)
+            index.append(struct.pack("<IiII", code, edition, *blobs[edition]))
+        pack.seek(0)
+        pack.write(struct.pack("<4sII", b"MDOF", 1, len(entries)))
+        pack.writelines(index)
+    print(f"Imported {len(blobs)} Overframe textures for {len(entries)} card keys from {len(ids)} matched editions.", flush=True)
 
 
 def card_variants(args, images):
@@ -449,7 +509,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("install", type=Path, help="Master Duel Steam installation directory")
     parser.add_argument("--output", type=Path, default=PROFILE)
-    parser.add_argument("--hud-only", action="store_true", help="Refresh HUD textures and the default card back only")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--hud-only", action="store_true", help="Refresh HUD textures and the default card back only")
+    mode.add_argument("--overframes-only", action="store_true", help="Refresh the installed Overframe face pack only")
     parser.add_argument("--bundle-catalog", type=Path, action="append", default=[])
     parser.add_argument("--id-map", type=Path)
     parser.add_argument("--variant-map", type=Path)
@@ -462,14 +524,21 @@ def main():
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="ygo-duel-import-", dir=args.output.parent) as directory:
         output = Path(directory)
-        hud_count = export_hud(output, sprites, textures)
-        if args.hud_only:
+        hud_count = 0 if args.overframes_only else export_hud(output, sprites, textures)
+        if args.overframes_only:
+            rows = get_catalog(args.install, args.bundle_catalog)
+            export_source_overframes(output, args, source_overframe_ids(base), card_images(rows))
+        elif args.hud_only:
             if hud_count == 0:
                 raise ValueError("No installed duel HUD textures were found")
         else:
             clips = {obj.peek_name(): obj for obj in base.objects if obj.type.name == "AudioClip"}
             rows = get_catalog(args.install, args.bundle_catalog)
             images = card_images(rows)
+            overframes = source_overframe_ids(base)
+            if overframes.keys() & images.keys():
+                export_source_overframes(output, args, overframes, images)
+            images = {card_id: row for card_id, row in images.items() if card_id not in overframes}
             if not images:
                 raise ValueError("No installed card artwork bundles were found")
             export_field(output, textures)
@@ -484,9 +553,10 @@ def main():
                 destination = args.output / relative
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 os.replace(file, destination)
-        if not args.hud_only:
+        if not args.hud_only and not args.overframes_only:
             publish_cut_ins(output / "CutIns", args.output)
-    print(f"Imported {hud_count} HUD textures to {args.output}", flush=True)
+    if not args.overframes_only:
+        print(f"Imported {hud_count} HUD textures to {args.output}", flush=True)
 
 
 if __name__ == "__main__":

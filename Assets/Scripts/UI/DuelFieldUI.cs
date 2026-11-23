@@ -4577,7 +4577,7 @@ namespace YGOPortable.UI
 
         private void UpdateArtworkOptions(uint code, int direction)
         {
-            var choices = CardArtLoader.GetSelectableArtwork(code);
+            var choices = CardArtLoader.GetSelectableArtwork(code, _zoomCardView.Appearance?.overframe == true);
             _zoomArtworkControls.SetActive(choices.Length > 1);
             if (choices.Length < 2) return;
             int index = CardArtLoader.ArtworkChoiceIndex(code, choices, _zoomCardView.Appearance?.ArtworkVariant);

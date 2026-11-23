@@ -26,15 +26,20 @@ namespace YGOPortable.Core
         private const int DuelArtPackId = -2;
         private const int SupplementalArtPackId = -3;
         private const int PackagedDuelArtPackId = -4;
+        private const int SourceOverframePackId = -5;
+        private const int PackagedSourceOverframePackId = -6;
         private const int BundledArtwork = -1;
+        internal const int SourceOverframeFace = -2;
         private static readonly Dictionary<uint, (uint Code, int Variant)[]> ArtworkChoicesByFamily = new();
         private static readonly Dictionary<uint, (uint Code, int Variant)> SelectedArtworkByFamily = new();
         private const string TokenArtFileName = "tokenart.pack";
         private const string DuelArtFileName = "cardart.pack";
+        private const string SourceOverframeFileName = "overframeart.pack";
         private const string SupplementalArtFileName = "supplementalart.pack";
         private static readonly Dictionary<(uint code, int variant), ArtEntry> _duelArt = new();
         private static readonly Dictionary<uint, List<int>> _duelVariants = new();
         private static readonly Dictionary<uint, HashSet<int>> _overframeVariants = new();
+        private static readonly Dictionary<uint, (int Illustration, ArtEntry Face)> _sourceOverframes = new();
         private static readonly Dictionary<(uint, int), (Sprite sprite, LinkedListNode<(uint, int)> node, (uint Code, int Variant) source)> _spriteCache =
             new(MaxCacheCount);
         private static readonly LinkedList<(uint, int)> _lru = new();
@@ -64,18 +69,23 @@ namespace YGOPortable.Core
             ReadArtIndex(Path.Combine(streamingAssetsPath, SupplementalArtFileName));
             ReadDuelArtIndex(Path.Combine(localArtworkPath, DuelArtFileName), DuelArtPackId);
             ReadDuelArtIndex(Path.Combine(PackagedDuelVisualsPath, DuelArtFileName), PackagedDuelArtPackId);
+            ReadDuelArtIndex(Path.Combine(localArtworkPath, SourceOverframeFileName), SourceOverframePackId);
+            ReadDuelArtIndex(Path.Combine(PackagedDuelVisualsPath, SourceOverframeFileName), PackagedSourceOverframePackId);
             foreach (var (code, variants) in _duelVariants)
             {
                 variants.Sort();
                 if (variants[0] != 0 && (_index.ContainsKey(code) || RelatedPrintings(code).Any(_index.ContainsKey)))
                     variants.Insert(0, 0);
             }
-            ReadOverframeIndex(ActiveDuelVisualsPath);
-            ReadOverframeIndex(PackagedDuelVisualsPath);
-            Debug.Log($"[CardArtLoader] Indexed {_index.Count} card artworks and {_duelArt.Count} duel artworks.");
+            if (_sourceOverframes.Count == 0)
+            {
+                ReadLegacyOverframeIndex(ActiveDuelVisualsPath);
+                ReadLegacyOverframeIndex(PackagedDuelVisualsPath);
+            }
+            Debug.Log($"[CardArtLoader] Indexed {_index.Count} card artworks, {_duelArt.Count} duel artworks and {_sourceOverframes.Count} source Overframes.");
         }
 
-        private static void ReadOverframeIndex(string directory)
+        private static void ReadLegacyOverframeIndex(string directory)
         {
             string cutIns = Path.Combine(directory, "CutIns");
             if (!Directory.Exists(cutIns)) return;
@@ -99,13 +109,18 @@ namespace YGOPortable.Core
             }
         }
 
-        internal static bool SupportsOverframe(uint code) => _overframeVariants.ContainsKey(code);
+        internal static bool HasSourceOverframe(uint code) => _sourceOverframes.ContainsKey(code);
+
+        internal static bool SupportsOverframe(uint code) =>
+            HasSourceOverframe(code) || _overframeVariants.ContainsKey(code);
 
         internal static bool SupportsOverframe(uint code, int variant) =>
-            _overframeVariants.TryGetValue(code, out var choices) && choices.Contains(Math.Max(0, variant));
+            _sourceOverframes.TryGetValue(code, out var source) ? source.Illustration == variant :
+                _overframeVariants.TryGetValue(code, out var choices) && choices.Contains(Math.Max(0, variant));
 
         internal static int FirstOverframeVariant(uint code) =>
-            _overframeVariants.TryGetValue(code, out var choices) ? choices.Min() : -1;
+            _sourceOverframes.TryGetValue(code, out var source) ? source.Illustration :
+                _overframeVariants.TryGetValue(code, out var choices) ? choices.Min() : -1;
 
         internal static bool HasDuelArtwork(uint code, int variant) => _duelArt.ContainsKey((code, variant));
 
@@ -117,7 +132,9 @@ namespace YGOPortable.Core
             {
                 stream = File.OpenRead(packPath);
                 using var reader = new BinaryReader(stream, Encoding.UTF8, leaveOpen: true);
-                if (stream.Length < 12 || reader.ReadUInt32() != 0x5241444D || reader.ReadUInt32() != 1) return;
+                bool fullFace = packId is SourceOverframePackId or PackagedSourceOverframePackId;
+                uint tag = fullFace ? 0x464F444Du : 0x5241444Du;
+                if (stream.Length < 12 || reader.ReadUInt32() != tag || reader.ReadUInt32() != 1) return;
                 uint count = reader.ReadUInt32();
                 long indexEnd = 12L + count * 16L;
                 if (indexEnd > stream.Length) return;
@@ -134,6 +151,11 @@ namespace YGOPortable.Core
                 }
                 foreach (var (key, entry) in entries)
                 {
+                    if (fullFace)
+                    {
+                        _sourceOverframes.TryAdd(key.Code, (key.Variant, entry));
+                        continue;
+                    }
                     if (!_duelArt.TryAdd(key, entry)) continue;
                     if (!_duelVariants.TryGetValue(key.Code, out var variants))
                         _duelVariants[key.Code] = variants = new List<int>();
@@ -175,9 +197,10 @@ namespace YGOPortable.Core
                 PlayerPrefs.SetInt($"DuelArtwork.{code}", variant);
         }
 
-        internal static (uint Code, int Variant)[] GetSelectableArtwork(uint code)
+        internal static (uint Code, int Variant)[] GetSelectableArtwork(uint code, bool overframe = false)
         {
-            if (code == 0 || HasDedicatedTokenArt(code)) return Array.Empty<(uint, int)>();
+            if (code == 0 || HasDedicatedTokenArt(code) || overframe && HasSourceOverframe(code))
+                return Array.Empty<(uint, int)>();
             if (CollectionProgress.RequiresOwnedCardsForDecks && CollectionProgress.GetTotalOwnedCount(code) == 0 &&
                 (!CardDatabase.TryGetDeckPrintings(code, out var printings) ||
                     !printings.Any(printing => CollectionProgress.GetTotalOwnedCount(printing.code) > 0)))
@@ -312,8 +335,12 @@ namespace YGOPortable.Core
 
             if (_index == null) return GetFallbackArt();
             uint artCode = code;
-            Sprite sprite = LoadExactArtwork(code, variant, out int artVariant);
-            if (sprite == null)
+            int artVariant = variant;
+            bool fullFace = variant == SourceOverframeFace;
+            Sprite sprite = fullFace
+                ? _sourceOverframes.TryGetValue(code, out var official) ? DecodeArtwork(official.Face, opaque: true) : null
+                : LoadExactArtwork(code, variant, out artVariant);
+            if (sprite == null && !fullFace)
             {
                 // A rules alias may identify a different card. Use the same card's other printings.
                 foreach (uint relatedCode in RelatedPrintings(code))
@@ -356,7 +383,7 @@ namespace YGOPortable.Core
             return null;
         }
 
-        private static Sprite DecodeArtwork(ArtEntry entry)
+        private static Sprite DecodeArtwork(ArtEntry entry, bool opaque = false)
         {
             try
             {
@@ -393,7 +420,16 @@ namespace YGOPortable.Core
                 }
                 tex.wrapMode = TextureWrapMode.Clamp;
                 tex.filterMode = FilterMode.Bilinear;
-                return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
+                if (opaque)
+                {
+                    // The original alpha separates the foreground for effects. RGB contains the complete printed face.
+                    var colors = tex.GetPixels32();
+                    for (int i = 0; i < colors.Length; i++) colors[i].a = byte.MaxValue;
+                    tex.SetPixels32(colors);
+                    tex.Apply(false);
+                }
+                return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f,
+                    0, opaque ? SpriteMeshType.FullRect : SpriteMeshType.Tight);
             }
             catch
             {
@@ -484,6 +520,7 @@ namespace YGOPortable.Core
             _duelArt.Clear();
             _duelVariants.Clear();
             _overframeVariants.Clear();
+            _sourceOverframes.Clear();
             ArtworkChoicesByFamily.Clear();
             SelectedArtworkByFamily.Clear();
             _activeDuelVisualsPath = null;

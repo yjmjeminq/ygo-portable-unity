@@ -568,6 +568,7 @@ namespace YGOPortable.Editor
             string portrait = Path.Combine(cutIns, $"{BlueEyes}-0.png");
             string alternatePortrait = Path.Combine(cutIns, $"{BlueEyes}-1.png");
             string pack = Path.Combine(visuals, "cardart.pack");
+            string sourcePack = Path.Combine(visuals, "overframeart.pack");
             File.WriteAllBytes(portrait, image);
             File.WriteAllBytes(alternatePortrait, image);
             using (var writer = new BinaryWriter(File.Create(pack)))
@@ -623,6 +624,7 @@ namespace YGOPortable.Editor
                     "The shared card face overrode the artwork selected for a specific copy.");
                 Debug.Log("[VERIFY COMMON CARD FACE] Compact and detailed views share artwork and frames and honor explicit printings.");
                 VerifyDuelArtworkChoice(canvas.GetComponent<Canvas>(), view.ArtworkSprite, detail.ArtworkSprite);
+                VerifySourceOverframeFace(canvas.GetComponent<Canvas>(), freshApp, sourcePack);
             }
             finally
             {
@@ -637,10 +639,70 @@ namespace YGOPortable.Editor
                 File.Delete(portrait);
                 File.Delete(alternatePortrait);
                 File.Delete(pack);
+                File.Delete(sourcePack);
                 Directory.Delete(cutIns);
                 Directory.Delete(visuals);
                 Directory.Delete(freshApp);
             }
+        }
+
+        private static void VerifySourceOverframeFace(Canvas canvas, string streaming, string sourcePack)
+        {
+            const uint dominusImpulse = 40366667;
+            const int illustration = 22823;
+            var mask = new Texture2D(4, 8, TextureFormat.RGBA32, false);
+            var rgbUnderMask = new Color32(213, 68, 147, 0);
+            mask.SetPixels32(Enumerable.Repeat(rgbUnderMask, 32).ToArray());
+            mask.Apply();
+            byte[] image = mask.EncodeToPNG();
+            UnityEngine.Object.DestroyImmediate(mask);
+            using (var writer = new BinaryWriter(File.Create(sourcePack)))
+            {
+                writer.Write(0x464F444Du);
+                writer.Write(1u);
+                writer.Write(1u);
+                writer.Write(dominusImpulse);
+                writer.Write(illustration);
+                writer.Write(28u);
+                writer.Write((uint)image.Length);
+                writer.Write(image);
+            }
+
+            CardArtLoader.Shutdown();
+            CardArtLoader.Initialize(streaming, Path.Combine(streaming, "EmptyProfile"));
+            Require(CardArtLoader.SupportsOverframe(dominusImpulse, illustration) &&
+                CardArtLoader.FirstOverframeVariant(dominusImpulse) == illustration &&
+                !CardArtLoader.SupportsOverframe(BlueEyes) && DuelVisualAssets.CanDisplayCutIn(BlueEyes, 0),
+                "The source registry did not keep the Overframe face and the summon portrait independent.");
+
+            var deck = new UserDeck();
+            var edition = new DeckCardAppearance { overframe = true, artwork = illustration + 1 };
+            for (int i = 0; i < 40; i++) deck.InsertCard(deck.main, i, dominusImpulse, edition);
+            using var session = new DuelSession();
+            Require(session.StartNewDuel(deck.main, deck.extra, Enumerable.Repeat(SkullRedBird, 40).ToArray(),
+                Array.Empty<uint>(), playerDeckAppearance: deck), "Could not start the source Overframe fixture.");
+            var ui = new DuelFieldUI(null, canvas.transform, new DuelPromptModals(canvas.transform, null, null));
+            ui.BindSession(session, null, null);
+            ui.Refresh();
+            var hand = ui.Root.transform.Find("PlayerHand").GetComponentInChildren<CompositeCardView>();
+            var details = CompositeCardView.Create(canvas.transform, "SourceEdition", detailedOverlay: true);
+            details.UsePrintedFaceOnly();
+            details.SetDeckCard(dominusImpulse, edition);
+            var front = hand.transform.Find("AspectBox/OverframeCardFace").GetComponent<Image>();
+            Require(front.enabled && !front.preserveAspect && hand.ArtworkSprite == details.ArtworkSprite &&
+                !hand.HasOverframe && hand.transform.Find("AspectBox/DeckEdition") == null &&
+                ((Color32)front.sprite.texture.GetPixel(0, 0)).Equals(new Color32(213, 68, 147, 255)),
+                "The hand or editor did not display the original colors under the transparent render mask.");
+
+            details.SetDeckCard(dominusImpulse, default(DeckCardAppearance));
+            Require(details.ArtworkSprite != front.sprite &&
+                details.transform.Find("AspectBox/Frame").GetComponent<Image>().enabled,
+                "Switching to the regular edition kept the Overframe front.");
+            details.SetDeckCard(dominusImpulse, edition, faceDown: true);
+            Require(!details.transform.Find("AspectBox/OverframeCardFace").GetComponent<Image>().enabled,
+                "Turning over the card did not conceal its front.");
+            ui.UnbindSession();
+            Debug.Log("[VERIFY SOURCE OVERFRAME] Packaged registry, printed hand and detail faces, original RGB and hidden cards passed.");
         }
 
         private static void VerifyDuelArtworkChoice(Canvas canvas, Sprite original, Sprite alternate)

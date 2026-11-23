@@ -193,7 +193,7 @@ namespace YGOPortable.UI
         {
             var cards = GetDeckList(source);
             var appearance = ReadAppearance(code, cards, index);
-            var choices = CardArtLoader.GetSelectableArtwork(code);
+            var choices = CardArtLoader.GetSelectableArtwork(code, appearance.overframe);
             bool artwork = choices.Length > 1;
             bool edition = appearance.overframe || CardArtLoader.SupportsOverframe(code);
             bool destiny = source == DragSourceType.DeckMain;

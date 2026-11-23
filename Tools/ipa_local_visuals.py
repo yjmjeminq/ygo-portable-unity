@@ -12,6 +12,25 @@ ENTRY = struct.Struct("<IiII")
 PNG_HEADER = bytes.fromhex("89504e470d0a1a0a")
 
 
+def artwork_index(path, magic):
+    size = path.stat().st_size
+    if size < HEADER.size:
+        raise ValueError(f"Incomplete local {path.name} header.")
+    with path.open("rb") as source:
+        tag, version, count = HEADER.unpack(source.read(HEADER.size))
+        end_of_index = HEADER.size + count * ENTRY.size
+        if (tag, version) != (magic, 1) or end_of_index > size:
+            raise ValueError(f"Invalid local {path.name} index.")
+        entries = {}
+        for _ in range(count):
+            code, variant, offset, length = ENTRY.unpack(source.read(ENTRY.size))
+            key = (code, variant)
+            if key in entries or not code or variant < 0 or not length or offset < end_of_index or offset + length > size:
+                raise ValueError(f"Invalid artwork index for {code}-{variant}.")
+            entries[key] = (offset, length)
+    return entries
+
+
 def prepare_local_visuals(directory):
     """Validate the installed art pack, including alternates with no summon portrait."""
     directory = directory.resolve(strict=True)
@@ -32,26 +51,23 @@ def prepare_local_visuals(directory):
         raise ValueError("No local cut-in PNG files were found.")
 
     source_pack = directory / "cardart.pack"
-    size = source_pack.stat().st_size
-    if size < HEADER.size:
-        raise ValueError("Incomplete local cardart.pack header.")
-    with source_pack.open("rb") as source:
-        magic, version, count = HEADER.unpack(source.read(HEADER.size))
-        end_of_index = HEADER.size + count * ENTRY.size
-        if (magic, version) != (b"MDAR", 1) or end_of_index > size:
-            raise ValueError("Invalid local cardart.pack index.")
-        indexed = set()
-        for _ in range(count):
-            code, variant, offset, length = ENTRY.unpack(source.read(ENTRY.size))
-            key = (code, variant)
-            if key in indexed or not code or variant < 0 or not length or offset < end_of_index or offset + length > size:
-                raise ValueError(f"Invalid artwork index for {code}-{variant}.")
-            indexed.add(key)
-        missing = portraits.keys() - indexed
-        if missing:
-            raise ValueError(f"Missing matching artwork for {len(missing)} installed cut-ins.")
+    missing = portraits.keys() - artwork_index(source_pack, b"MDAR").keys()
+    if missing:
+        raise ValueError(f"Missing matching artwork for {len(missing)} installed cut-ins.")
 
-    return {"cardart.pack": source_pack, **{f"CutIns/{file.name}": file for file in portraits.values()}}
+    visuals = {"cardart.pack": source_pack, **{f"CutIns/{file.name}": file for file in portraits.values()}}
+    overframes = directory / "overframeart.pack"
+    if overframes.exists():
+        index = artwork_index(overframes, b"MDOF")
+        if not index or len({code for code, _ in index}) != len(index):
+            raise ValueError("Expected one Overframe face per listed card.")
+        with overframes.open("rb") as source:
+            for (code, variant), (offset, length) in index.items():
+                source.seek(offset)
+                if variant <= 0 or length <= len(PNG_HEADER) or source.read(len(PNG_HEADER)) != PNG_HEADER:
+                    raise ValueError(f"Invalid Overframe face for {code}-{variant}.")
+        visuals[overframes.name] = overframes
+    return visuals
 
 
 def _app_visual_path(package):
