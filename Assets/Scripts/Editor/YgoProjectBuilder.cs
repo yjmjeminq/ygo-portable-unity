@@ -585,26 +585,30 @@ namespace YGOPortable.Editor
 
                 var start = ButtonAt(ui.Root, "DuelSetup/StartDuelBtn/B");
                 Submit(start);
-                var rock = ButtonAt(ui.JankenRoot, "JnkWin/Hands/H1/B");
-                var first = ButtonAt(ui.JankenRoot, "JnkWin/Order/First/B");
-                var second = ButtonAt(ui.JankenRoot, "JnkWin/Order/Second/B");
-                AssertTrue(ui.JankenRoot.activeSelf && !start.IsInteractable() &&
-                    events.currentSelectedGameObject == ui.JankenRoot.transform.Find("JnkWin/Hands/H0/B").gameObject,
-                    "Opening rock-paper-scissors did not move focus out of the opponent screen.");
-                var resolve = typeof(OpponentSelectUI).GetMethod("ResolveJanken", BindingFlags.Instance | BindingFlags.NonPublic);
-                events.SetSelectedGameObject(rock.gameObject);
-                resolve.Invoke(ui, new object[] { 1, 1 });
-                AssertTrue(rock.gameObject.activeInHierarchy && events.currentSelectedGameObject == rock.gameObject,
-                    "A drawn rock-paper-scissors round should keep the hand controls available.");
-                Submit(ButtonAt(ui.JankenRoot, "JnkWin/Cancel/B"));
-                AssertTrue(!ui.JankenRoot.activeSelf && start.IsInteractable() && events.currentSelectedGameObject == start.gameObject,
-                    "Canceling rock-paper-scissors should return focus to Duel Start.");
+                var cancelToss = ButtonAt(ui.TurnOrderRoot, "TurnOrder/Cancel/B");
+                var first = ButtonAt(ui.TurnOrderRoot, "TurnOrder/Order/First/B");
+                var second = ButtonAt(ui.TurnOrderRoot, "TurnOrder/Order/Second/B");
+                AssertTrue(ui.TurnOrderRoot.activeSelf && !start.IsInteractable() &&
+                    events.currentSelectedGameObject == cancelToss.gameObject &&
+                    !first.gameObject.activeInHierarchy && !second.gameObject.activeInHierarchy,
+                    "Opening the toss should focus Cancel and hide the turn controls while the coin spins.");
+                Submit(cancelToss);
+                ui.UpdateTurnOrder(TurnOrderCoin.LaunchAt + .1f);
+                AssertTrue(!ui.TurnOrderRoot.activeSelf && start.IsInteractable() &&
+                    events.currentSelectedGameObject == start.gameObject && startedOrders.Count == 0,
+                    "Canceling the toss should return focus to Duel Start and prevent a late match launch.");
+
+                var beginToss = typeof(OpponentSelectUI).GetMethod("BeginCoinToss", BindingFlags.Instance | BindingFlags.NonPublic);
                 Submit(start);
-                resolve.Invoke(ui, new object[] { 1, 0 });
+                beginToss.Invoke(ui, new object[] { true });
+                ui.UpdateTurnOrder(TurnOrderCoin.RevealAt);
                 AssertTrue(first.gameObject.activeInHierarchy && second.gameObject.activeInHierarchy &&
                     events.currentSelectedGameObject == first.gameObject && startedOrders.Count == 0,
-                    "Winning rock-paper-scissors should let the player choose the turn order.");
-                Submit(ButtonAt(ui.JankenRoot, "JnkWin/Cancel/B"));
+                    "Winning the toss should let the player choose the turn order.");
+                Submit(second);
+                AssertTrue(!ui.TurnOrderRoot.activeSelf && startedOrders.SequenceEqual(new[] { false }),
+                    "Choosing second after winning the toss should launch exactly one duel.");
+                startedOrders.Clear();
 
                 var opponentDeck = OpponentDeckLevels.GetDecks(pageOpponent.id)[0];
                 uint[] originalMain = opponentDeck.main;
@@ -612,18 +616,23 @@ namespace YGOPortable.Editor
                 {
                     opponentDeck.main = new[] { 89631139u };
                     Submit(start);
-                    resolve.Invoke(ui, new object[] { 1, 2 });
-                    resolve.Invoke(ui, new object[] { 1, 2 });
-                    AssertTrue(!ui.JankenRoot.activeSelf && startedOrders.SequenceEqual(new[] { false }),
+                    beginToss.Invoke(ui, new object[] { false });
+                    ui.UpdateTurnOrder(TurnOrderCoin.RevealAt);
+                    AssertTrue(!first.gameObject.activeInHierarchy && startedOrders.Count == 0,
+                        "Losing the toss should show the opponent's choice without opening player controls.");
+                    ui.UpdateTurnOrder(TurnOrderCoin.LaunchAt);
+                    ui.UpdateTurnOrder(TurnOrderCoin.LaunchAt);
+                    AssertTrue(!ui.TurnOrderRoot.activeSelf && startedOrders.SequenceEqual(new[] { false }),
                         "An AI selecting first should start exactly one duel with the player going second.");
 
                     ui.Open();
                     Submit(ButtonAt(ui.Root, firstCell));
                     opponentDeck.main = new[] { 41418852u };
                     Submit(start);
-                    resolve.Invoke(ui, new object[] { 1, 2 });
-                    AssertTrue(!ui.JankenRoot.activeSelf && startedOrders.SequenceEqual(new[] { false, true }),
-                        "A Numeron AI selecting second should start immediately with the player going first.");
+                    beginToss.Invoke(ui, new object[] { false });
+                    ui.UpdateTurnOrder(TurnOrderCoin.LaunchAt);
+                    AssertTrue(!ui.TurnOrderRoot.activeSelf && startedOrders.SequenceEqual(new[] { false, true }),
+                        "A Numeron AI selecting second should start with the player going first.");
                 }
                 finally
                 {
@@ -643,7 +652,7 @@ namespace YGOPortable.Editor
                 AssertTrue(!menu.SettingsRoot.activeSelf && settings.IsInteractable() && events.currentSelectedGameObject == settings.gameObject,
                     "Closing settings should restore main menu focus.");
                 VerifyMenuPadInput(app, menu, ui, events, settings, canvas.transform);
-                Debug.Log("[VERIFY OPPONENT NAVIGATION] Opponent paging, turn selection after wins and draws, automatic turn order after losses, and settings focus passed.");
+                Debug.Log("[VERIFY OPPONENT NAVIGATION] Opponent paging, coin toss, manual order after wins, automatic order after losses, and settings focus passed.");
             }
             finally
             {

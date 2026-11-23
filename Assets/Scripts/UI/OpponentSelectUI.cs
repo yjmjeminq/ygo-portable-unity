@@ -11,7 +11,7 @@ namespace YGOPortable.UI
     public class OpponentSelectUI
     {
         public GameObject Root { get; private set; }
-        public GameObject JankenRoot { get; private set; }
+        public GameObject TurnOrderRoot { get; private set; }
 
         private readonly Action _returnToMenu;
         private readonly Action<OpponentCharacter, PresetDeckInfo, UserDeck, bool> _startMatch;
@@ -75,15 +75,16 @@ namespace YGOPortable.UI
         private Text _browserStatus;
         private Text _statusToast;
 
-        // Janken refs
-        private Text _jnkStatusText;
-        private Image _jnkPlayerImg;
-        private Image _jnkOppImg;
-        private GameObject _jnkPanel;
-        private GameObject _jnkHandsRow;
-        private GameObject _jnkOrderRow;
-        private Button _jnkFirstHand;
-        private Button _jnkChooseFirst;
+        private Text _tossStatus;
+        private Text _tossMatchup;
+        private RectTransform _tossPanel;
+        private RectTransform _orderChoices;
+        private Button _chooseFirst;
+        private Button _tossCancel;
+        private TurnOrderCoin _coin;
+        private bool _tossing;
+        private bool _playerWonToss;
+        private float _tossAge;
 
         public OpponentSelectUI(GameAppController app, Transform canvasParent)
             : this(canvasParent, () => app?.ShowScreen(AppScreen.MainMenu),
@@ -97,13 +98,13 @@ namespace YGOPortable.UI
             _returnToMenu = returnToMenu;
             _startMatch = startMatch;
             BuildOpponentScreen(canvasParent);
-            BuildJankenOverlay(canvasParent);
+            BuildTurnOrderOverlay(canvasParent);
         }
 
         public void Open()
         {
             Root.SetActive(true);
-            JankenRoot.SetActive(false);
+            TurnOrderRoot.SetActive(false);
             _deckSetupRoot.SetActive(false);
             _browserRoot.SetActive(true);
             _opponentControls.interactable = true;
@@ -236,7 +237,7 @@ namespace YGOPortable.UI
             var start = DuelUiKit.CreateRect("StartDuelBtn", setup, new Vector2(.327f, .061f), new Vector2(.673f, .158f),
                 Vector2.zero, Vector2.zero);
             _startDuelButton = MenuButtonMotion.Attach(
-                DuelUiKit.CreateButton(start, "B", "듀얼 시작", OpenJanken, 24, gold: true));
+                DuelUiKit.CreateButton(start, "B", "듀얼 시작", OpenTurnOrder, 24, gold: true));
             _deckSetupRoot.SetActive(false);
         }
 
@@ -617,109 +618,98 @@ namespace YGOPortable.UI
             ShowStatus(playable ? "덱 목록을 복제했습니다." : $"덱 목록 복제 완료 · {reason}");
         }
 
-        private void OpenJanken()
+        private void OpenTurnOrder()
         {
-            if (!TryGetSelectedOpponentDeck(out _) || _selectedMyDeck == null) return;
+            if (TurnOrderRoot.activeSelf || !TryGetSelectedOpponentDeck(out var opponentDeck) || _selectedMyDeck == null) return;
             if (!GameAppController.CanStartWithDeck(_selectedMyDeck, out string reason))
             {
                 RefreshMyDecks();
                 ShowStatus(reason, true);
                 return;
             }
+
             _opponentControls.interactable = false;
-            JankenRoot.SetActive(true);
-            _jnkHandsRow.SetActive(true);
-            _jnkOrderRow.SetActive(false);
-            _jnkStatusText.text = "선/후공 결정을 위해 가위·바위·보를 선택하세요!";
-            _jnkPlayerImg.sprite = DuelUiKit.LoadSprite("LOTD/Janken/jnkn_player_stone_inactive");
-            _jnkOppImg.sprite = DuelUiKit.LoadSprite("LOTD/Janken/jnkn_opp_stone_inactive");
-            UiEntranceMotion.Play(_jnkPanel, .56f);
-            EventSystem.current?.SetSelectedGameObject(_jnkFirstHand.gameObject);
+            _tossMatchup.text = $"플레이어   VS   {_selectedChar.name}  ·  {opponentDeck.title}";
+            TurnOrderRoot.SetActive(true);
+            BeginCoinToss(UnityEngine.Random.value < .5f);
+            UiEntranceMotion.Play(_tossPanel.gameObject, .62f);
         }
 
-        internal void CloseJanken()
+        private void BeginCoinToss(bool playerWon)
         {
-            JankenRoot.SetActive(false);
+            _playerWonToss = playerWon;
+            _tossing = true;
+            _tossAge = 0f;
+            _tossStatus.text = "코인을 던지는 중";
+            _orderChoices.gameObject.SetActive(false);
+            _coin.Show(0f, playerWon);
+            EventSystem.current?.SetSelectedGameObject(_tossCancel.gameObject);
+            DuelAudio.PlayCoin();
+        }
+
+        internal void CloseTurnOrder()
+        {
+            _tossing = false;
+            TurnOrderRoot.SetActive(false);
             _opponentControls.interactable = true;
             EventSystem.current?.SetSelectedGameObject(_startDuelButton.gameObject);
         }
 
-        private void BuildJankenOverlay(Transform parent)
+        internal void UpdateTurnOrder(float delta)
         {
-            var bg = DuelUiKit.FillRect("Overlay_Janken", parent);
-            JankenRoot = bg.gameObject;
-            DuelUiKit.AddImage(bg.gameObject, DuelUiKit.WhiteSprite, new Color(0f, 0f, 0f, 0.78f));
+            if (!_tossing || !TurnOrderRoot.activeInHierarchy) return;
+            _tossAge += delta;
+            _coin.Show(_tossAge, _playerWonToss);
+            if (_tossAge < TurnOrderCoin.RevealAt) return;
 
-            var win = DuelUiKit.CreateBorderedPanel(bg, "JnkWin",
-                new Vector2(0.18f, 0.16f), new Vector2(0.82f, 0.84f), Vector2.zero, Vector2.zero,
-                DuelUiKit.PanelNavy, DuelUiKit.GoldAccent);
-            _jnkPanel = win.gameObject;
-
-            var vsBg = DuelUiKit.CreateRect("VsBg", win, new Vector2(0.05f, 0.35f), new Vector2(0.95f, 0.85f), Vector2.zero, Vector2.zero);
-            DuelUiKit.AddImage(vsBg.gameObject, DuelUiKit.LoadSprite("LOTD/Janken/vs_background"), new Color(0.8f, 0.9f, 1f, 0.9f), true);
-
-            _jnkStatusText = DuelUiKit.AddText(DuelUiKit.CreateRect("Hdr", win, new Vector2(0.05f, 0.84f), new Vector2(0.95f, 0.96f), Vector2.zero, Vector2.zero),
-                "T", "가위·바위·보!", 24, TextAnchor.MiddleCenter, DuelUiKit.GoldAccent, FontStyle.Bold);
-
-            _jnkPlayerImg = DuelUiKit.AddImage(DuelUiKit.CreateRect("PHand", win, new Vector2(0.12f, 0.42f), new Vector2(0.38f, 0.78f), Vector2.zero, Vector2.zero).gameObject,
-                null, Color.white, true);
-            DuelUiKit.AddImage(DuelUiKit.CreateRect("VS", win, new Vector2(0.42f, 0.48f), new Vector2(0.58f, 0.72f), Vector2.zero, Vector2.zero).gameObject,
-                DuelUiKit.LoadSprite("LOTD/Janken/vs_text"), Color.white, true);
-            _jnkOppImg = DuelUiKit.AddImage(DuelUiKit.CreateRect("OHand", win, new Vector2(0.62f, 0.42f), new Vector2(0.88f, 0.78f), Vector2.zero, Vector2.zero).gameObject,
-                null, Color.white, true);
-
-            _jnkHandsRow = DuelUiKit.CreateRect("Hands", win, new Vector2(0.08f, 0.10f), new Vector2(0.92f, 0.30f), Vector2.zero, Vector2.zero).gameObject;
-            string[] names = { "가위 (SCISSORS)", "바위 (ROCK)", "보 (PAPER)" };
-            for (int i = 0; i < 3; i++)
+            if (_playerWonToss)
             {
-                int pick = i;
-                var slot = DuelUiKit.CreateRect($"H{i}", _jnkHandsRow.transform,
-                    new Vector2(i * 0.34f, 0f), new Vector2(i * 0.34f + 0.31f, 1f), Vector2.zero, Vector2.zero);
-                var button = DuelUiKit.CreateButton(slot, "B", names[i], () => ResolveJanken(pick, UnityEngine.Random.Range(0, 3)), 18);
-                if (i == 0) _jnkFirstHand = button;
+                _tossing = false;
+                _tossStatus.text = "토스 승리 · 선공 또는 후공을 선택하세요";
+                _orderChoices.gameObject.SetActive(true);
+                UiEntranceMotion.Play(_orderChoices.gameObject, .67f);
+                EventSystem.current?.SetSelectedGameObject(_chooseFirst.gameObject);
+                return;
             }
 
-            _jnkOrderRow = DuelUiKit.CreateRect("Order", win, new Vector2(0.12f, 0.10f), new Vector2(0.88f, 0.30f), Vector2.zero, Vector2.zero).gameObject;
-            var b1 = DuelUiKit.CreateRect("First", _jnkOrderRow.transform, new Vector2(0f, 0f), new Vector2(0.47f, 1f), Vector2.zero, Vector2.zero);
-            _jnkChooseFirst = DuelUiKit.CreateButton(b1, "B", "선공 선택", () => LaunchMatch(true), 20, gold: true);
-            var b2 = DuelUiKit.CreateRect("Second", _jnkOrderRow.transform, new Vector2(0.53f, 0f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
-            DuelUiKit.CreateButton(b2, "B", "후공 선택", () => LaunchMatch(false), 20);
-
-            var cancelRt = DuelUiKit.CreateRect("Cancel", win, new Vector2(0.82f, 0.02f), new Vector2(0.97f, 0.09f), Vector2.zero, Vector2.zero);
-            DuelUiKit.CreateButton(cancelRt, "B", "취소", CloseJanken, 14);
-            JankenRoot.SetActive(false);
+            if (!TryGetSelectedOpponentDeck(out var deck))
+            {
+                CloseTurnOrder();
+                return;
+            }
+            bool playerFirst = OpponentPrefersSecond(deck);
+            _tossStatus.text = playerFirst ? "상대가 후공을 선택했습니다" : "상대가 선공을 선택했습니다";
+            if (_tossAge >= TurnOrderCoin.LaunchAt) LaunchMatch(playerFirst);
         }
 
-        private void ResolveJanken(int playerHand, int oppHand) // 0=scissors, 1=rock, 2=paper
+        private void BuildTurnOrderOverlay(Transform parent)
         {
-            if (!JankenRoot.activeSelf || !_jnkHandsRow.activeSelf) return;
-            string[] pSprites = { "jnkn_player_scissor_active", "jnkn_player_stone_active", "jnkn_player_paper_active" };
-            string[] oSprites = { "jnkn_opp_scissor_active", "jnkn_opp_stone_active", "jnkn_opp_paper_active" };
-            _jnkPlayerImg.sprite = DuelUiKit.LoadSprite($"LOTD/Janken/{pSprites[playerHand]}");
-            _jnkOppImg.sprite = DuelUiKit.LoadSprite($"LOTD/Janken/{oSprites[oppHand]}");
-            UiEntranceMotion.Play(_jnkPlayerImg.gameObject, .44f);
-            UiEntranceMotion.Play(_jnkOppImg.gameObject, .44f);
+            var overlay = DuelUiKit.FillRect("Overlay_TurnOrder", parent);
+            TurnOrderRoot = overlay.gameObject;
+            DuelUiKit.AddImage(overlay.gameObject, DuelUiKit.WhiteSprite, new Color(.01f, .019f, .035f, .81f));
+            var content = Application.isMobilePlatform ? MobileSafeArea.Create(overlay) : overlay;
+            var panel = _tossPanel = DuelUiKit.CreateMenuPanel(content, "TurnOrder",
+                new Vector2(.20f, .175f), new Vector2(.80f, .825f));
 
-            if (playerHand == oppHand)
-            {
-                _jnkStatusText.text = "비겼습니다! 다시 선택하세요!";
-                return;
-            }
-            bool playerWon = (playerHand == 0 && oppHand == 2) || (playerHand == 1 && oppHand == 0) || (playerHand == 2 && oppHand == 1);
-            _jnkHandsRow.SetActive(false);
-            if (!playerWon)
-            {
-                if (TryGetSelectedOpponentDeck(out var deck))
-                    LaunchMatch(playerGoesFirst: OpponentPrefersSecond(deck));
-                else
-                    CloseJanken();
-                return;
-            }
+            RectTransform Place(Transform container, string name, float left, float bottom, float right, float top) =>
+                DuelUiKit.CreateRect(name, container, new Vector2(left, bottom), new Vector2(right, top), Vector2.zero, Vector2.zero);
 
-            _jnkStatusText.text = "승리했습니다. 선공 또는 후공을 선택하세요.";
-            _jnkOrderRow.SetActive(true);
-            UiEntranceMotion.Play(_jnkOrderRow, .58f);
-            EventSystem.current?.SetSelectedGameObject(_jnkChooseFirst.gameObject);
+            var matchup = Place(panel, "Matchup", .08f, .824f, .92f, .955f);
+            _tossMatchup = DuelUiKit.AddFittedText(matchup, "Label", "", 27, 13,
+                TextAnchor.MiddleCenter, DuelUiKit.TextPrimary, FontStyle.Bold);
+            _coin = new TurnOrderCoin(Place(panel, "Coin", .32f, .373f, .68f, .79f));
+            var result = Place(panel, "Status", .08f, .264f, .92f, .377f);
+            _tossStatus = DuelUiKit.AddFittedText(result, "Label", "", 24, 13,
+                TextAnchor.MiddleCenter, DuelUiKit.GoldAccent, FontStyle.Bold);
+            _orderChoices = Place(panel, "Order", .14f, .079f, .86f, .245f);
+            var first = Place(_orderChoices, "First", 0f, 0f, .48f, 1f);
+            _chooseFirst = DuelUiKit.CreateButton(first, "B", "선공 선택", () => LaunchMatch(true), 20, gold: true);
+            var second = Place(_orderChoices, "Second", .52f, 0f, 1f, 1f);
+            DuelUiKit.CreateButton(second, "B", "후공 선택", () => LaunchMatch(false), 20);
+
+            var cancel = Place(panel, "Cancel", .83f, .017f, .976f, .073f);
+            _tossCancel = DuelUiKit.CreateButton(cancel, "B", "취소", CloseTurnOrder, 14);
+            TurnOrderRoot.SetActive(false);
         }
 
         private static bool OpponentPrefersSecond(PresetDeckInfo deck)
@@ -735,13 +725,15 @@ namespace YGOPortable.UI
 
         private void LaunchMatch(bool playerGoesFirst)
         {
-            if (!JankenRoot.activeSelf) return;
+            if (!TurnOrderRoot.activeSelf || _tossAge < TurnOrderCoin.RevealAt) return;
             if (!TryGetSelectedOpponentDeck(out var oppDeck) || _selectedMyDeck == null)
             {
-                CloseJanken();
+                CloseTurnOrder();
                 return;
             }
-            JankenRoot.SetActive(false);
+            _tossing = false;
+            TurnOrderRoot.SetActive(false);
+            _opponentControls.interactable = true;
             _startMatch(_selectedChar, oppDeck, _selectedMyDeck, playerGoesFirst);
         }
 

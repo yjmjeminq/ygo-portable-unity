@@ -22,14 +22,14 @@ namespace YGOPortable.UI
         private readonly System.Random _random = new();
         private readonly RectTransform _lobby, _versus, _result, _reset;
         private readonly Text _season, _rank, _emblem, _progress, _notice, _streak, _record, _status, _emptyHistory;
-        private readonly Text _deckName, _deckAce, _vsMine, _vsOpponent, _vsDeck, _vsNotice, _coinText, _toss;
+        private readonly Text _deckName, _deckAce, _vsMine, _vsOpponent, _vsDeck, _vsNotice, _toss;
         private readonly Text _resetText, _resultHeading, _resultRank, _resultDetails, _resultBadge;
         private readonly Text[][] _history = new Text[10][];
         private readonly Image[] _wins = new Image[5];
         private readonly Image _opponentPortrait;
         private readonly Image _rankRing;
         private readonly Image _lobbyStakes, _versusStakes;
-        private readonly RectTransform _coin;
+        private readonly TurnOrderCoin _coin;
         private readonly CompositeCardView _deckPreview;
         private readonly Button _queue, _previous, _next, _resetSeason, _first, _second, _retry, _return;
         private UserDeck[] _decks = Array.Empty<UserDeck>();
@@ -124,11 +124,7 @@ namespace YGOPortable.UI
             Label(_versus, "VS", .375f, .708f, .625f, .835f, 67, "VS", tone: Gold);
             _vsNotice = Label(_versus, "Stakes", .18f, .848f, .82f, .905f, 24, tone: Gold);
             _versusStakes = DeckEditorStyle.Fill((RectTransform)_vsNotice.rectTransform.parent, Color.clear, false);
-            _coin = Square(Slot(_versus, "Coin", .429f, .376f, .571f, .636f));
-            DuelUiKit.AddImage(_coin.gameObject, DuelStyle.Disc, Gold, true, false);
-            var face = DuelUiKit.FillRect("MintedFace", _coin, 6f);
-            DuelUiKit.AddImage(face.gameObject, DuelStyle.Disc, new Color(.25f, .16f, .082f), true, false);
-            _coinText = Label(face, "Face", .08f, .13f, .92f, .86f, 64, "★", tone: Gold);
+            _coin = new TurnOrderCoin(Slot(_versus, "Coin", .429f, .376f, .571f, .636f));
             _toss = Label(_versus, "TossResult", .28f, .236f, .72f, .351f, 27);
             _first = Button(_versus, "First", "선공", .303f, .095f, .491f, .187f, () => Start(true), true);
             _second = Button(_versus, "Second", "후공", .509f, .095f, .697f, .187f, () => Start(false));
@@ -274,8 +270,7 @@ namespace YGOPortable.UI
             ShowStakes(_vsNotice, _versusStakes, state);
             _opponentPortrait.sprite = DuelUiKit.LoadOpponentPortrait(opponent.Character);
             _toss.text = "코인 토스";
-            _coinText.text = "★";
-            _coin.localScale = Vector3.one;
+            _coin.Show(0f, _match.PlayerWonToss);
             _first.gameObject.SetActive(false);
             _second.gameObject.SetActive(false);
             _versus.gameObject.SetActive(true);
@@ -295,13 +290,8 @@ namespace YGOPortable.UI
             Pulse(_versusStakes, glow);
             if (!_tossing || _match == null) return;
             _tossAge += delta;
-            float phase = Mathf.Clamp01(_tossAge / 1.1f);
-            float spin = phase * Mathf.PI * 7f;
-            _coin.localScale = new Vector3(Mathf.Max(.06f, Mathf.Abs(Mathf.Cos(spin))), 1f + .17f * Mathf.Sin(phase * Mathf.PI), 1f);
-            _coinText.text = Mathf.Cos(spin) > 0f ? "★" : "Ⅱ";
-            if (phase < 1f) return;
-            _coin.localScale = Vector3.one;
-            _coinText.text = _match.PlayerWonToss ? "★" : "Ⅱ";
+            _coin.Show(_tossAge, _match.PlayerWonToss);
+            if (_tossAge < TurnOrderCoin.RevealAt) return;
             if (_match.PlayerWonToss)
             {
                 _tossing = false;
@@ -313,7 +303,7 @@ namespace YGOPortable.UI
             }
             bool opponentFirst = OfflineRanked.OpponentTakesFirst(_match.Opponent.Deck);
             _toss.text = opponentFirst ? "상대가 선공을 선택했습니다" : "상대가 후공을 선택했습니다";
-            if (_tossAge >= 1.94f) Start(!opponentFirst);
+            if (_tossAge >= TurnOrderCoin.LaunchAt) Start(!opponentFirst);
         }
 
         private void Start(bool playerFirst)

@@ -255,7 +255,7 @@ namespace YGOPortable.UI
             if (screen == AppScreen.DeckEditor && _storyDeckEditorOpen) _storyMode.SuspendForDeckEditor();
             else if (screen != AppScreen.StoryMode) _storyMode.Close();
             _oppSelect.Root.SetActive(screen == AppScreen.OpponentSelect);
-            _oppSelect.JankenRoot.SetActive(false);
+            _oppSelect.TurnOrderRoot.SetActive(false);
             if (screen != AppScreen.DeckEditor) _deckEditor.Close();
             _duelField.Root.SetActive(screen == AppScreen.Duel);
 
@@ -582,6 +582,7 @@ namespace YGOPortable.UI
             else _saveConflictShown = false;
             _saveSyncMenu?.Refresh();
             if (_screen == AppScreen.Ranked) _ranked?.Update(Time.unscaledDeltaTime);
+            if (_screen == AppScreen.OpponentSelect) _oppSelect?.UpdateTurnOrder(Time.unscaledDeltaTime);
 
             if (_session == null)
             {
@@ -776,7 +777,7 @@ namespace YGOPortable.UI
                 AppScreen.Title => _titleAndMenu.TitleRoot,
                 AppScreen.MainMenu => _titleAndMenu.SettingsRoot.activeInHierarchy
                     ? _titleAndMenu.SettingsRoot : _titleAndMenu.MenuRoot,
-                AppScreen.OpponentSelect => _oppSelect.JankenRoot.activeInHierarchy ? _oppSelect.JankenRoot : _oppSelect.Root,
+                AppScreen.OpponentSelect => _oppSelect.TurnOrderRoot.activeInHierarchy ? _oppSelect.TurnOrderRoot : _oppSelect.Root,
                 AppScreen.StarterSelection => _collectionShop?.StarterRoot,
                 AppScreen.CardShop => _collectionShop?.ActiveShopRoot,
                 AppScreen.ArchetypeCodex => _archetypeCodex.Root,
@@ -793,7 +794,7 @@ namespace YGOPortable.UI
         {
             bool cloudSave = _saveSyncMenu?.Root.activeSelf == true;
             bool settings = _titleAndMenu.SettingsRoot.activeInHierarchy;
-            bool janken = _oppSelect.JankenRoot.activeInHierarchy;
+            bool choosingTurnOrder = _oppSelect.TurnOrderRoot.activeInHierarchy;
             bool selectingOpponent = _screen == AppScreen.OpponentSelect;
             bool selectingDecks = selectingOpponent && _oppSelect.IsDeckSetupOpen;
             bool selectingStarter = _screen == AppScreen.StarterSelection;
@@ -809,7 +810,7 @@ namespace YGOPortable.UI
             {
                 AppScreen.Title => _titleAndMenu.TitleRoot,
                 AppScreen.MainMenu => settings ? _titleAndMenu.SettingsRoot : _titleAndMenu.MenuRoot,
-                AppScreen.OpponentSelect => janken ? _oppSelect.JankenRoot : _oppSelect.Root,
+                AppScreen.OpponentSelect => choosingTurnOrder ? _oppSelect.TurnOrderRoot : _oppSelect.Root,
                 AppScreen.StarterSelection => _collectionShop?.StarterRoot,
                 AppScreen.CardShop => _collectionShop?.ActiveShopRoot,
                 AppScreen.ArchetypeCodex => _archetypeCodex.Root,
@@ -839,7 +840,7 @@ namespace YGOPortable.UI
                         return;
                     }
                 }
-                if (selectingOpponent && !janken && !selectingDecks && !cancel)
+                if (selectingOpponent && !choosingTurnOrder && !selectingDecks && !cancel)
                 {
                     if (frame.Search)
                     {
@@ -859,7 +860,7 @@ namespace YGOPortable.UI
             {
                 if (cloudSave) CloseSaveSync();
                 else if (settings) _titleAndMenu.CloseSettings();
-                else if (janken) _oppSelect.CloseJanken();
+                else if (choosingTurnOrder) _oppSelect.CloseTurnOrder();
                 else if (selectingDecks) _oppSelect.CloseDeckSetup();
                 else if (selectingStarter) ShowScreen(AppScreen.Title);
                 else if (_screen == AppScreen.CardShop)
