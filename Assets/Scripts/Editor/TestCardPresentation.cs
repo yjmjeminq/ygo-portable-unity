@@ -169,7 +169,9 @@ namespace YGOPortable.Editor
                     .GetField("_trunkAppearances", instance).GetValue(deck);
                 selected[BlueEyes] = new DeckCardAppearance { overframe = true };
                 typeof(DeckEditorUI).GetMethod("InspectCard", instance).Invoke(deck, new object[] { BlueEyes });
-                Require(preview.HasOverframe, "The selected special edition preview did not show the decoded portrait.");
+                Require(!preview.HasOverframe && preview.Appearance?.overframe == true &&
+                    preview.transform.Find("AspectBox/DeckEdition").gameObject.activeSelf,
+                    "The deck preview should show the printed face with its edition badge.");
                 typeof(DeckEditorUI).GetMethod("OpenExpandedDeckCard", instance).Invoke(deck, new object[] { BlueEyes });
                 var expanded = (CompositeCardView)typeof(DeckEditorUI).GetField("_expandedDeckArt", instance).GetValue(deck);
                 Require(!expanded.HasOverframe && expanded.ArtworkSprite == preview.ArtworkSprite,
@@ -178,10 +180,10 @@ namespace YGOPortable.Editor
                 var special = new DeckCardAppearance { overframe = true };
                 thumbnail.SetCard(BlueEyes, live: new LiveCardState { code = BlueEyes, Appearance = special });
                 Require(thumbnail.HasOverframe && thumbnail.transform.Find("AspectBox/DeckEdition").gameObject.activeSelf,
-                    "The live hand or field card did not show its extended face and edition marker.");
+                    "The compact extended preview did not show its portrait and edition marker.");
                 thumbnail.SetReadoutFocus(1f);
                 Require(thumbnail.transform.Find("AspectBox/Overframe/PortraitBounds/Depth").localScale.x > 1f,
-                    "Focusing a live copy did not lift the artwork.");
+                    "Focusing the extended preview did not lift the artwork.");
                 thumbnail.SetDeckCard(unrelated, special);
                 var fallback = thumbnail.transform.Find("AspectBox/Overframe");
                 Require(thumbnail.HasOverframe && !fallback.Find("PortraitBounds/Depth/LocalCutIn").GetComponent<Image>().enabled &&

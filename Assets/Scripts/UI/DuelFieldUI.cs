@@ -2150,7 +2150,7 @@ namespace YGOPortable.UI
         {
             var rect = LotdUiKit.FillRect("HandCard", row);
             var card = CompositeCardView.Create(rect, "CardView");
-            card.UsePrintedFaceOnly();
+            card.UsePrintedFaceOnly(showEditionBadge: false);
             var art = (RectTransform)card.transform.Find("AspectBox");
             CardDragTrigger trigger = null;
             Image glow = null;

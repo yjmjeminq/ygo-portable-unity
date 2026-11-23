@@ -3180,12 +3180,15 @@ namespace YGOPortable.Editor
             var mine = duel.Players[duel.HumanPlayerIndex];
             Require(mine.hand.Any(card => card.Appearance?.overframe == false) &&
                 mine.hand.Any(card => card.Appearance?.overframe == true), "The opening hand lacked both editions.");
+            var frame = CardFaceFrame.Get(CardDatabase.Get(excel).type);
             for (int i = 0; i < mine.hand.Count; i++)
             {
                 var face = row.GetChild(i).GetComponentInChildren<CompositeCardView>();
                 Require(!face.HasOverframe && Nullable.Equals(face.Appearance, mine.hand[i].Appearance) &&
-                    face.transform.Find("AspectBox/Artwork").GetComponent<Image>().preserveAspect,
-                    "The hand showed a cut-in, distorted its art or mixed up the physical copies.");
+                    face.transform.Find("AspectBox/Artwork").GetComponent<Image>().preserveAspect &&
+                    face.transform.Find("AspectBox/Frame").GetComponent<Image>().sprite == frame &&
+                    face.transform.Find("AspectBox/DeckEdition") == null,
+                    "The opening hand should use the same printed frame without a cut-in or edition badge for both editions.");
             }
             int choice = duel.ActivePrompt.summonable.FindIndex(card => mine.hand[(int)card.sequence].Appearance?.overframe == true);
             Require(choice >= 0, "The special copy could not be summoned in the field fixture.");

@@ -411,6 +411,7 @@ namespace YGOPortable.UI
         private GameObject _destinyBadge;
         private bool _overframeEnabled;
         private bool _printedFaceOnly;
+        private bool _showDeckEditionBadge = true;
         private bool _cinematicOverframe;
         private bool _overframeBound;
         private Sprite _retainedCutIn;
@@ -431,8 +432,10 @@ namespace YGOPortable.UI
         internal Sprite ArtworkSprite => _artImg.sprite;
         internal DeckCardAppearance? Appearance => _deckAppearance;
 
-        internal void UsePrintedFaceOnly(bool enabled = true)
+        internal void UsePrintedFaceOnly(bool enabled = true, bool showEditionBadge = true)
         {
+            _showDeckEditionBadge = showEditionBadge;
+            if (!showEditionBadge) SetDeckEditionBadge(false);
             if (_printedFaceOnly == enabled) return;
             _printedFaceOnly = enabled;
             _artImg.preserveAspect = enabled;
@@ -690,6 +693,7 @@ namespace YGOPortable.UI
 
         private void SetDeckEditionBadge(bool shown)
         {
+            shown &= _showDeckEditionBadge;
             if (shown && _deckEditionBadge == null)
             {
                 var aspect = _artImg.transform.parent;
