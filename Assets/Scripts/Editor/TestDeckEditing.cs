@@ -576,27 +576,62 @@ namespace YGOPortable.Editor
 
             search.text = CardDatabase.GetName(blueEyes);
             var row = slots.Single(slot => slot.rt.gameObject.activeInHierarchy && slot.card.CurrentCode == blueEyes);
-            row.trigger.OnTouchClick();
-            var artwork = Field<Button>(editor, "_deckCardActionArtwork");
-            Require(artwork.gameObject.activeInHierarchy && artwork.IsInteractable(), "The grouped entry hid its owned alternate artwork.");
-            events.SetSelectedGameObject(artwork.gameObject);
-            var editorType = editor.GetType();
-            editorType.GetField("_padMode", Instance).SetValue(editor, true);
-            var frame = editorType.Assembly.GetType("YGOPortable.UI.DeckPadFrame", true);
-            var buttons = editorType.Assembly.GetType("YGOPortable.UI.DeckPadButtons", true);
-            Call(editor, "HandleDeckPad", Activator.CreateInstance(frame, Instance, null,
-                new object[] { Vector2Int.zero, Enum.Parse(buttons, "Submit"), 0f }, null));
-            uint shownPrinting = BlueEyesEntry().code;
-            string shownCount = TrunkCount(editor, shownPrinting);
-            uint inspectedPrinting = Field<CompositeCardView>(editor, "_previewCard").CurrentCode;
-            Require(shownPrinting == blueEyesArt && shownCount == "×2" &&
-                events.currentSelectedGameObject == artwork.gameObject &&
-                inspectedPrinting == blueEyesArt,
-                $"Gamepad artwork selection showed {shownPrinting} ({shownCount}), inspected {inspectedPrinting}, " +
-                $"and retained artwork focus: {events.currentSelectedGameObject == artwork.gameObject}.");
-            Call(editor, "CloseDeckCardActions");
-            Require(CollectionProgress.GetOwnedCount(blueEyes) == 1 && CollectionProgress.GetOwnedCount(blueEyesArt) == 3,
-                "Grouping cards changed saved ownership per artwork.");
+            File.WriteAllText(path, profile);
+            CollectionProgress.Load(save);
+            Require(CollectionProgress.GetOwnedCount(blueEyes) == 1 && CollectionProgress.GetOwnedCount(blueEyesArt) == 0,
+                "The alternate artwork fixture must own only one physical copy.");
+            var deckCodes = deck.main.ToArray();
+            string key = $"DuelArtwork.Family.{blueEyes}";
+            string previous = PlayerPrefs.HasKey(key) ? PlayerPrefs.GetString(key) : null;
+            string previousArtwork = CardArtLoader.ActiveDuelVisualsPath;
+            WriteLocalArtworkFixture(save, blueEyesArt);
+            CardArtLoader.Shutdown();
+            CardArtLoader.Initialize(streamingPath, save);
+            var preferenceCache = (Dictionary<uint, (uint, int)>)typeof(CardArtLoader)
+                .GetField("SelectedArtworkByFamily", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+            try
+            {
+                var choices = CardArtLoader.GetSelectableArtwork(blueEyes);
+                Require(choices.Any(choice => choice.Code == blueEyesArt), "One owned copy did not unlock its other printing.");
+                row.trigger.OnTouchClick();
+                var artwork = Field<Button>(editor, "_deckCardActionArtwork");
+                Require(artwork.gameObject.activeInHierarchy && artwork.IsInteractable(), "The alternate artwork button was hidden.");
+                events.SetSelectedGameObject(artwork.gameObject);
+                var editorType = editor.GetType();
+                editorType.GetField("_padMode", Instance).SetValue(editor, true);
+                var frame = editorType.Assembly.GetType("YGOPortable.UI.DeckPadFrame", true);
+                var buttons = editorType.Assembly.GetType("YGOPortable.UI.DeckPadButtons", true);
+                var expected = choices[(CardArtLoader.ArtworkChoiceIndex(blueEyes, choices, -1) + 1) % choices.Length];
+                Call(editor, "HandleDeckPad", Activator.CreateInstance(frame, Instance, null,
+                    new object[] { Vector2Int.zero, Enum.Parse(buttons, "Submit"), 0f }, null));
+                Require(BlueEyesEntry().code == blueEyes && deck.main.SequenceEqual(deckCodes) &&
+                    events.currentSelectedGameObject == artwork.gameObject &&
+                    CardArtLoader.GetPreferredArtwork(blueEyesArt) == expected,
+                    "Changing artwork changed the physical printing, lost focus or did not share the preference.");
+                preferenceCache.Remove(blueEyes);
+                Require(CardArtLoader.GetPreferredArtwork(blueEyes) == expected,
+                    "The artwork preference did not reload from persistent storage.");
+                Call(editor, "CloseDeckCardActions");
+                Call(editor, "OpenExpandedDeckCard", blueEyes);
+                var expanded = Field<CompositeCardView>(editor, "_expandedDeckArt");
+                var button = Field<Button>(editor, "_expandedDeckArtwork");
+                Sprite before = expanded.ArtworkSprite;
+                button.onClick.Invoke();
+                Require(button.gameObject.activeInHierarchy && expanded.ArtworkSprite != before &&
+                    expanded.CurrentCode == blueEyes && deck.main.SequenceEqual(deckCodes) &&
+                    CollectionProgress.GetOwnedCount(blueEyes) == 1 && CollectionProgress.GetOwnedCount(blueEyesArt) == 0,
+                    "The detail button did not immediately change artwork or affected ownership.");
+                Call(editor, "CloseExpandedDeckCard");
+            }
+            finally
+            {
+                if (previous == null) PlayerPrefs.DeleteKey(key);
+                else PlayerPrefs.SetString(key, previous);
+                PlayerPrefs.Save();
+                preferenceCache.Remove(blueEyes);
+                CardArtLoader.Shutdown();
+                CardArtLoader.Initialize(streamingPath, previousArtwork);
+            }
 
             var variants = CardDatabase.AllCards.Where(card => CardDatabase.GetDeckPrintingKey(card.code) != card.code).ToArray();
             Debug.Log($"[VERIFY DECK PRINTINGS] {variants.Select(card => CardDatabase.GetDeckPrintingKey(card.code)).Distinct().Count()} " +

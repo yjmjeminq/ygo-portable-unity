@@ -59,6 +59,7 @@ namespace YGOPortable.Core
         internal const uint REASON_LINK = 0x10000000;
         internal const uint MATERIAL_METHOD_MASK = REASON_FUSION | REASON_SYNCHRO | REASON_RITUAL | REASON_XYZ | REASON_LINK;
         internal const uint SUMMON_METHOD_MASK = 0xff000000;
+        internal const uint SUMMON_TYPE_ADVANCE = 0x11000000;
         internal const uint SUMMON_TYPE_FUSION = 0x43000000;
         internal const uint SUMMON_TYPE_RITUAL = 0x45000000;
         internal const uint SUMMON_TYPE_SYNCHRO = 0x46000000;

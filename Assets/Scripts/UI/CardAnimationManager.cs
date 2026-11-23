@@ -73,6 +73,7 @@ namespace YGOPortable.UI
     {
         Transfer,
         Summon,
+        TributeSummon,
         SpecialSummon,
         ExtraDeckSummon,
         PendulumSummon,
@@ -190,6 +191,7 @@ namespace YGOPortable.UI
             internal Action Release;
             internal Action<float> LandingImpact;
             internal int SignatureUnits;
+            internal bool WideCutIn;
         }
 
         private sealed class FieldDepartureGroup
@@ -322,9 +324,10 @@ namespace YGOPortable.UI
         }
 
         internal void QueueMove(CardFlight flight, CardMotion motion, Action onArrive, CardMoveReadoutSnapshot readout = null,
-            Action onDepart = null, Action<float> landingImpact = null)
+            Action onDepart = null, Action<float> landingImpact = null, bool wideCutIn = false)
         {
-            QueueStep(MoveCard(flight, motion, onArrive, readout, onDepart, landingImpact: landingImpact));
+            QueueStep(MoveCard(flight, motion, onArrive, readout, onDepart, landingImpact: landingImpact,
+                wideCutIn: wideCutIn));
         }
 
         internal void QueueFieldDeparture(object group, CardFlight flight, CardMotion motion,
@@ -376,7 +379,7 @@ namespace YGOPortable.UI
 
         internal void StageFieldArrival(CardFlight flight, CardMotion motion, byte controller, uint location, uint sequence,
             CardMoveReadoutSnapshot readout, Action depart, Action release, Action refresh, uint? returnEffect = null,
-            Action handoff = null, int xyzMaterials = 0, Action<float> landingImpact = null)
+            Action handoff = null, int xyzMaterials = 0, Action<float> landingImpact = null, bool wideCutIn = false)
         {
             if (_pendingFieldArrivals != null && (_pendingReturnEffect != returnEffect || returnEffect == 0))
                 CompleteFieldArrivals();
@@ -400,6 +403,7 @@ namespace YGOPortable.UI
             {
                 Slot = (controller, location, sequence), Flight = flight, Motion = motion, Readout = readout,
                 Depart = depart, Handoff = handoff, Release = release, SignatureUnits = signatureUnits, LandingImpact = landingImpact,
+                WideCutIn = wideCutIn,
             });
             _pendingReturnEffect = returnEffect;
             _refreshAfterFieldArrivals = refresh;
@@ -427,7 +431,7 @@ namespace YGOPortable.UI
             _openEquip = null;
             _steps.Enqueue(moves.Count == 1 && first.Motion != CardMotion.FieldReturn
                 ? MoveCard(first.Flight, first.Motion, Land, first.Readout, first.Depart, signatureUnits: first.SignatureUnits,
-                    landingImpact: first.LandingImpact)
+                    landingImpact: first.LandingImpact, wideCutIn: first.WideCutIn)
                 : PlayFieldArrivalGroup(moves, Land, refresh));
         }
 
@@ -604,7 +608,7 @@ namespace YGOPortable.UI
         }
 
         private CompositeCardView TakeCard(uint code, bool faceDown, bool detailed = false, LiveCardState live = null,
-            DeckCardAppearance? appearance = null)
+            DeckCardAppearance? appearance = null, bool printedFaceOnly = false)
         {
             CompositeCardView view;
             if (detailed || !_cards.TryPop(out view))
@@ -613,6 +617,7 @@ namespace YGOPortable.UI
                 var rect = (RectTransform)view.transform;
                 rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
             }
+            view.UsePrintedFaceOnly(printedFaceOnly);
             view.SetDeckCard(code, appearance, faceDown, live);
             if (view.TryGetComponent<CanvasGroup>(out var opacity)) opacity.alpha = 1f;
             view.gameObject.SetActive(true);
@@ -623,7 +628,7 @@ namespace YGOPortable.UI
         private CompositeCardView PrepareFlightCard(CardFlight flight, bool detailed = false)
         {
             var view = TakeCard(flight.StartsFaceDown ? 0u : flight.Code, flight.StartsFaceDown, detailed,
-                appearance: flight.Appearance);
+                appearance: flight.Appearance, printedFaceOnly: !detailed);
             ApplyFlight(view, flight, 0f, 0f);
             return view;
         }
@@ -713,9 +718,19 @@ namespace YGOPortable.UI
         private IEnumerator PlayFieldArrivalGroup(IReadOnlyList<FieldArrival> moves, Action land, Action refresh)
         {
             bool returning = moves[0].Motion == CardMotion.FieldReturn;
-            var showcase = returning ? null : GroupSummonPoses(moves);
             foreach (var move in moves) move.Depart?.Invoke();
             if (returning) refresh();
+            bool printedFaces = returning;
+            foreach (var move in moves)
+            {
+                printedFaces |= move.WideCutIn;
+                if (!move.WideCutIn || !SupportsWideCutIn(move.Motion) || !HasSummonPortrait(move.Flight)) continue;
+                var cinematic = CreateWideCutIn(move.Flight, move.Motion, move.Readout?.DestinationCard);
+                if (cinematic == null) continue;
+                yield return cinematic.Play(() => Paused);
+                RemoveTransient(cinematic.gameObject);
+            }
+            var showcase = printedFaces ? null : GroupSummonPoses(moves);
             var effects = new DuelEffectGraphic[moves.Count];
             var views = new CompositeCardView[moves.Count];
             var opacity = new CanvasGroup[moves.Count];
@@ -1208,7 +1223,8 @@ namespace YGOPortable.UI
         }
 
         private IEnumerator MoveCard(CardFlight flight, CardMotion motion, Action onArrive, CardMoveReadoutSnapshot readout,
-            Action onDepart, Action onHandoff = null, int signatureUnits = 0, Action<float> landingImpact = null)
+            Action onDepart, Action onHandoff = null, int signatureUnits = 0, Action<float> landingImpact = null,
+            bool wideCutIn = false)
         {
             if (!flight.From.IsValid || !flight.To.IsValid)
             {
@@ -1225,15 +1241,19 @@ namespace YGOPortable.UI
 
             bool extraSummon = motion is CardMotion.ExtraDeckSummon or CardMotion.PendulumSummon;
             bool summons = IsSummonMotion(motion);
-            bool hasPortrait = summons && HasSummonPortrait(flight);
-            bool overframe = summons && (IsSpecialEditionLanding(flight) || (hasPortrait && flight.Appearance?.overframe != false));
-            bool featured = summons && (hasPortrait || TakeFeaturedSummon(flight));
+            bool hasPortrait = summons && (!wideCutIn || SupportsWideCutIn(motion)) && HasSummonPortrait(flight);
+            bool overframe = !wideCutIn && summons && (IsSpecialEditionLanding(flight) || (hasPortrait && flight.Appearance?.overframe != false));
+            bool featured = hasPortrait || !wideCutIn && summons && TakeFeaturedSummon(flight);
             bool reveal = !flight.EndsFaceDown && (extraSummon || featured || overframe);
+            var cinematic = wideCutIn && hasPortrait ? CreateWideCutIn(flight, motion, readout?.DestinationCard) : null;
             var proxy = PrepareFlightCard(flight, reveal);
+            if (wideCutIn) proxy.UsePrintedFaceOnly();
             var moving = reveal ? null : CreateMovingReadout(flight, motion, readout);
             moving?.Follow(proxy, 0f);
             onDepart?.Invoke();
-            if (reveal)
+            if (cinematic != null)
+                yield return PlayWideCutIn(cinematic, proxy, flight, readout?.DestinationCard);
+            else if (reveal)
                 yield return RevealSummon(proxy, flight, motion, featured, overframe, readout?.DestinationCard, signatureUnits);
             else if (motion is CardMotion.AttachMaterial or CardMotion.DetachMaterial)
             {
@@ -1313,7 +1333,37 @@ namespace YGOPortable.UI
         }
 
         internal static bool IsSummonMotion(CardMotion motion) =>
-            motion is CardMotion.Summon or CardMotion.SpecialSummon or CardMotion.ExtraDeckSummon or CardMotion.PendulumSummon;
+            motion == CardMotion.Summon || SupportsWideCutIn(motion);
+
+        internal static bool SupportsWideCutIn(CardMotion motion) =>
+            motion is CardMotion.TributeSummon or CardMotion.SpecialSummon or CardMotion.ExtraDeckSummon or CardMotion.PendulumSummon;
+
+        private DuelCutInCinematic CreateWideCutIn(CardFlight flight, CardMotion motion, LiveCardState live)
+        {
+            var (code, variant) = ResolveSummonPortrait(flight);
+            var portrait = DuelVisualAssets.RetainCutIn(code, variant);
+            if (portrait == null) return null;
+            var card = new DuelCardReadout(CardDatabase.Get(flight.Code), live);
+            var (_, accent, method) = SummonEffect(flight.Code, motion);
+            return DuelCutInCinematic.Create(_layer, flight.Code, portrait, card, method, accent, flight.To.Angle > 45f);
+        }
+
+        private IEnumerator PlayWideCutIn(DuelCutInCinematic cinematic, CompositeCardView proxy, CardFlight flight, LiveCardState live)
+        {
+            cinematic.transform.SetAsLastSibling();
+            proxy.UsePrintedFaceOnly();
+            proxy.gameObject.SetActive(false);
+            Vector2 area = _layer.rect.size;
+            float height = Mathf.Min(area.y * .36f, 330f);
+            var start = new CardPose(SummonShowcaseCenter(area), new Vector2(height * LotdUiKit.CardAspectRatio, height));
+            var landing = new CardFlight(flight.Code, start, flight.To, false, false, flight.Appearance);
+            yield return cinematic.Play(() => Paused, progress =>
+            {
+                if (!proxy.gameObject.activeSelf) proxy.gameObject.SetActive(true);
+                ApplyFlight(proxy, landing, progress, 20f, live);
+            });
+            RemoveTransient(cinematic.gameObject);
+        }
 
         private static bool IsSpecialEditionLanding(CardFlight flight) =>
             !flight.EndsFaceDown && flight.Appearance?.overframe == true;
@@ -1364,9 +1414,9 @@ namespace YGOPortable.UI
 
         private static (uint, int) ResolveSummonPortrait(CardFlight flight)
         {
-            int selected = flight.Appearance?.ArtworkVariant ?? CardArtLoader.GetDuelArtworkVariant(flight.Code);
-            var (artCode, artVariant) = CardArtLoader.GetArtworkSource(flight.Code, selected);
-            return artCode == 0 ? (flight.Code, selected) : (artCode, artVariant);
+            var selected = CardArtLoader.GetPreferredArtwork(flight.Code, flight.Appearance?.ArtworkVariant);
+            var (artCode, artVariant) = CardArtLoader.GetArtworkSource(selected.Code, selected.Variant);
+            return artCode == 0 ? selected : (artCode, artVariant);
         }
 
         internal bool TakeFeaturedSummon(CardFlight flight)
@@ -1387,16 +1437,16 @@ namespace YGOPortable.UI
             var sprite = DuelVisualAssets.RetainCutIn(artCode, artVariant);
             bool usesArtwork = sprite == null;
             if (usesArtwork && !artworkFallback) return null;
-            int selected = flight.Appearance?.ArtworkVariant ?? CardArtLoader.GetDuelArtworkVariant(flight.Code);
+            var selected = CardArtLoader.GetPreferredArtwork(flight.Code, flight.Appearance?.ArtworkVariant);
             if (usesArtwork)
             {
-                sprite = CardArtLoader.RetainArtwork(flight.Code, selected);
+                sprite = CardArtLoader.RetainArtwork(selected.Code, selected.Variant);
                 if (sprite == CardArtLoader.GetFallbackArt()) return null;
             }
             var holder = CenteredVisual(name, _layer, center, size);
             var portrait = holder.gameObject.AddComponent<SummonPortraitView>();
             portrait.Bind(sprite, accent, usesArtwork,
-                usesArtwork ? () => CardArtLoader.ReleaseArtwork(flight.Code, selected) : () => DuelVisualAssets.ReleaseCutIn(sprite));
+                usesArtwork ? () => CardArtLoader.ReleaseArtwork(selected.Code, selected.Variant) : () => DuelVisualAssets.ReleaseCutIn(sprite));
             return portrait;
         }
 
@@ -1631,6 +1681,8 @@ namespace YGOPortable.UI
                 return (DuelEffectKind.Summon, new Color(.54f, .73f, .90f), "세트");
             if (motion == CardMotion.Summon)
                 return (DuelEffectKind.Summon, DuelStyle.Player, "일반 소환");
+            if (motion == CardMotion.TributeSummon)
+                return (DuelEffectKind.Summon, DuelStyle.Gold, "어드밴스 소환");
             if (motion == CardMotion.SpecialSummon)
                 return (DuelEffectKind.Summon, DuelStyle.Gold, "특수 소환");
             if (motion == CardMotion.PendulumSummon)

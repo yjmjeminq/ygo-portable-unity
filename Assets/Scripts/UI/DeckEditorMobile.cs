@@ -157,7 +157,7 @@ namespace YGOPortable.UI
             _deckPanel.anchorMin = new Vector2(.458f, 0f);
             _deckPanel.anchorMax = new Vector2(.986f, 1f);
             _deckPanel.offsetMin = new Vector2(0f, 36f + selection);
-            _deckPanel.offsetMax = new Vector2(0f, -(16f + bar));
+            _deckPanel.offsetMax = new Vector2(0f, -(12f + bar));
             _deckPanel.ForceUpdateRectTransforms();
             PositionMobileTrunk();
 
@@ -225,9 +225,9 @@ namespace YGOPortable.UI
             float height = _deckPanel.rect.height;
             if (height <= 0f) return;
             _mobileDeckSize = _deckPanel.rect.size;
-            float commands = 40f * MobileHeightScale;
-            float header = 25f * MobileHeightScale;
-            const float gap = 4f;
+            float commands = 35f * MobileHeightScale;
+            float header = 23f * MobileHeightScale;
+            const float gap = 3f;
             PositionFromTop((RectTransform)_deckPanel.Find("DeckControls"), 8f, 8f + commands);
             PositionFromTop((RectTransform)_deckPanel.Find("EditControls"), 8f, 8f + commands);
             float y = 13f + commands;
@@ -235,7 +235,7 @@ namespace YGOPortable.UI
             for (int i = 0; i < MobileSectionRows.Length; i++)
                 if (_mobileSectionsOpen[i]) openRows += MobileSectionRows[i];
 
-            float body = Mathf.Max(1f, height - y - (header + gap) * MobileDeckSections.Length - 9f);
+            float body = Mathf.Max(1f, height - y - (header + gap) * MobileDeckSections.Length - 6f);
             float rowHeight = body / Mathf.Max(1, openRows);
             var grids = new[] { _mainGridRect, _extraGridRect, _sideGridRect };
             for (int i = 0; i < grids.Length; i++)

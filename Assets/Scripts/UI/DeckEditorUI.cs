@@ -25,6 +25,8 @@ namespace YGOPortable.UI
 
         // Virtualized Trunk Scroll Grid
         private const int TrunkCols = 4;
+        private const float GridCardInset = .75f;
+        private const float MobileTrunkColumnWidth = 98f;
         private float _rowHeight = 138f;
         private float _colWidth = 92f;
         private int _totalRows = 0;
@@ -626,7 +628,7 @@ namespace YGOPortable.UI
                     Vector2.zero, Vector2.zero);
                 slot.pivot = new Vector2(0f, 1f);
                 var hit = LotdUiKit.AddImage(slot.gameObject, LotdUiKit.WhiteSprite, Color.clear);
-                var card = CompositeCardView.Create(LotdUiKit.FillRect("CardInset", slot, 1.8f), "Card");
+                var card = CompositeCardView.Create(LotdUiKit.FillRect("CardInset", slot, GridCardInset), "Card");
                 DeckCardVisualMotion.Bind(card, hit);
                 var countBox = LotdUiKit.CreateRect("Copies", slot, new Vector2(0.24f, 0.032f), new Vector2(0.76f, 0.215f),
                     Vector2.zero, Vector2.zero);
@@ -818,7 +820,7 @@ namespace YGOPortable.UI
                 var slot = LotdUiKit.FillRect($"Card_{i}", parent, 1.2f);
                 SetDeckSlotPosition(slot, i, cols, rows);
                 var hit = LotdUiKit.AddImage(slot.gameObject, LotdUiKit.WhiteSprite, Color.clear);
-                var card = CompositeCardView.Create(LotdUiKit.FillRect("CardInset", slot, 1.8f), "Card");
+                var card = CompositeCardView.Create(LotdUiKit.FillRect("CardInset", slot, GridCardInset), "Card");
                 DeckCardVisualMotion.Bind(card, hit);
                 var trigger = slot.gameObject.AddComponent<CardDragTrigger>();
                 trigger.SourceType = source;
@@ -976,8 +978,7 @@ namespace YGOPortable.UI
             _trunkSize = _trunkViewport.rect.size;
             float scroll = startAtTop ? 1f : _trunkScroll.verticalNormalizedPosition;
             float vpWidth = _trunkViewport.rect.width > 10 ? _trunkViewport.rect.width : 405f;
-            // Use compact columns in the shared workspace and keep the search grid readable while typing.
-            _trunkColumns = _mobileLayout ? Mathf.Clamp(Mathf.FloorToInt(vpWidth / 86f), 1, 8) : TrunkCols;
+            _trunkColumns = _mobileLayout ? Mathf.Clamp(Mathf.FloorToInt(vpWidth / MobileTrunkColumnWidth), 1, 8) : TrunkCols;
             _colWidth = vpWidth / _trunkColumns;
             _rowHeight = Mathf.Max(20f, Mathf.Round((_colWidth - 4f) / LotdUiKit.CardAspectRatio + 4f));
 

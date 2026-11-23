@@ -97,40 +97,17 @@ namespace YGOPortable.UI
             ApplyAppearance(code, code, cards, index, appearance.WithAvailableArtwork(code));
         }
 
-        private List<(uint Code, int Artwork)> ArtworkChoices(uint code, DeckCardAppearance appearance, bool deckSlot)
-        {
-            var result = new List<(uint, int)>();
-            if (code == 0) return result;
-            var candidates = CardDatabase.TryGetDeckPrintings(code, out var printings)
-                ? printings.Select(printing => printing.code) : new[] { code };
-            foreach (uint printing in candidates)
-            {
-                if (printing != code && (CollectionProgress.RequiresOwnedCardsForDecks || appearance.overframe))
-                {
-                    int owned = appearance.overframe ? CollectionProgress.GetOwnedOverframeCount(printing) :
-                        CollectionProgress.GetOwnedCount(printing);
-                    if (owned == 0 || deckSlot && !HasUnusedEdition(printing, appearance.overframe)) continue;
-                }
-                bool CanUse(int variant) => !appearance.overframe || CardArtLoader.SupportsOverframe(printing, variant);
-                if (CanUse(-1)) result.Add((printing, 0));
-                foreach (int variant in CardArtLoader.GetDuelArtworkChoices(printing))
-                {
-                    if (!CardArtLoader.HasDuelArtwork(printing, variant) || !CanUse(variant)) continue;
-                    result.Add((printing, variant + 1));
-                }
-            }
-            return result.OrderBy(choice => choice.Item2 != 0).ToList();
-        }
-
         private void ChangeArtwork(uint code, List<uint> cards, int index)
         {
             var appearance = ReadAppearance(code, cards, index);
-            var choices = ArtworkChoices(code, appearance, cards != null);
-            if (choices.Count < 2) return;
-            int current = choices.IndexOf((code, appearance.artwork));
-            var next = choices[(current + 1) % choices.Count];
-            appearance.artwork = next.Artwork;
-            ApplyAppearance(code, next.Code, cards, index, appearance);
+            var choices = CardArtLoader.GetSelectableArtwork(code);
+            if (choices.Length < 2) return;
+            int current = CardArtLoader.ArtworkChoiceIndex(code, choices, appearance.ArtworkVariant);
+            if (!CardArtLoader.SetDuelArtworkVariant(code, choices[(current + 1) % choices.Length])) return;
+            if (_workingDeck != null) RefreshDeckGrids();
+            UpdateVirtualTrunkSlots(_lastFirstRow, force: true);
+            InspectCard(code);
+            if (_expandedDeckOverlay.gameObject.activeSelf && _expandedDeckCode == code) RefreshExpandedDeckArtwork();
         }
 
         private void ApplyAppearance(uint code, uint target, List<uint> cards, int index, DeckCardAppearance appearance)
@@ -165,7 +142,7 @@ namespace YGOPortable.UI
             label.text = appearance.overframe ? "오버프레임" : "일반판";
             label.color = appearance.overframe ? LotdUiKit.GoldAccent : LotdUiKit.TextPrimary;
             _inspectEdition.interactable = CanChangeEdition(code, cards, appearance);
-            _inspectArtwork.interactable = ArtworkChoices(code, appearance, cards != null).Count > 1;
+            _inspectArtwork.gameObject.SetActive(CardArtLoader.GetSelectableArtwork(code).Length > 1);
             bool eligible = cards != null && ReferenceEquals(cards, _workingDeck.main);
             _inspectDestiny.interactable = eligible;
             var destiny = _inspectDestiny.GetComponentInChildren<Text>();

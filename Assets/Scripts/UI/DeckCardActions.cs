@@ -193,8 +193,8 @@ namespace YGOPortable.UI
         {
             var cards = GetDeckList(source);
             var appearance = ReadAppearance(code, cards, index);
-            var choices = ArtworkChoices(code, appearance, cards != null);
-            bool artwork = choices.Count > 1;
+            var choices = CardArtLoader.GetSelectableArtwork(code);
+            bool artwork = choices.Length > 1;
             bool edition = appearance.overframe || CardArtLoader.SupportsOverframe(code);
             bool destiny = source == DragSourceType.DeckMain;
             _deckCardActionArtwork.gameObject.SetActive(artwork);
@@ -209,8 +209,8 @@ namespace YGOPortable.UI
                     }, closeMenu: false);
             if (artwork)
             {
-                int choice = choices.IndexOf((code, appearance.artwork));
-                SetDeckCardAction(_deckCardActionArtwork, $"일러스트 변경 · {Math.Max(1, choice + 1)}/{choices.Count}", true, () =>
+                int choice = CardArtLoader.ArtworkChoiceIndex(code, choices, appearance.ArtworkVariant);
+                SetDeckCardAction(_deckCardActionArtwork, $"일러스트 변경 · {choice + 1}/{choices.Length}", true, () =>
                 {
                     ChangeArtwork(code, cards, index);
                     RefreshAppearanceMenu(_deckCardActionArtwork);

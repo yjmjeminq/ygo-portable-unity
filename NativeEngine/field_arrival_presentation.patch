@@ -1,10 +1,12 @@
 --- a/operations.cpp
 +++ b/operations.cpp
-@@ -5084,6 +5084,13 @@
+@@ -5084,6 +5084,15 @@
  		target->set_status(STATUS_LEAVE_CONFIRMED, FALSE);
  		message->write(target->get_info_location());
  		message->write<uint32_t>(target->current.reason);
-+		if(reason == LOCATION_REASON::SPSUMMON && location == LOCATION_MZONE)
++		if(location == LOCATION_MZONE && (reason == LOCATION_REASON::SPSUMMON ||
++			(reason == LOCATION_REASON::SUMMON &&
++				(target->summon.type & 0xff000000) == SUMMON_TYPE_ADVANCE)))
 +			message->write<uint32_t>(target->summon.type); // Presentation metadata after the standard move payload.
 +		else if(reason == LOCATION_REASON::RETURN_TOFIELD) {
 +			message->write<uint32_t>(0x31524759); // YGR1

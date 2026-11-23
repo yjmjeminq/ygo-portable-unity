@@ -2,7 +2,6 @@
 
 import hashlib
 import re
-import shutil
 import struct
 import zipfile
 from pathlib import Path
@@ -13,8 +12,8 @@ ENTRY = struct.Struct("<IiII")
 PNG_HEADER = bytes.fromhex("89504e470d0a1a0a")
 
 
-def prepare_local_visuals(directory, destination):
-    """Build the artwork index for exactly the variants that have an installed cut-in."""
+def prepare_local_visuals(directory):
+    """Validate the installed art pack, including alternates with no summon portrait."""
     directory = directory.resolve(strict=True)
     cutins = (directory / "CutIns").resolve(strict=True)
     if cutins.parent != directory:
@@ -41,35 +40,18 @@ def prepare_local_visuals(directory, destination):
         end_of_index = HEADER.size + count * ENTRY.size
         if (magic, version) != (b"MDAR", 1) or end_of_index > size:
             raise ValueError("Invalid local cardart.pack index.")
-        selected = {}
+        indexed = set()
         for _ in range(count):
             code, variant, offset, length = ENTRY.unpack(source.read(ENTRY.size))
             key = (code, variant)
-            if key not in portraits:
-                continue
-            if key in selected or not length or offset < end_of_index or offset + length > size:
+            if key in indexed or not code or variant < 0 or not length or offset < end_of_index or offset + length > size:
                 raise ValueError(f"Invalid artwork index for {code}-{variant}.")
-            selected[key] = (offset, length)
-        missing = portraits.keys() - selected.keys()
+            indexed.add(key)
+        missing = portraits.keys() - indexed
         if missing:
             raise ValueError(f"Missing matching artwork for {len(missing)} installed cut-ins.")
 
-        with destination.open("wb") as package:
-            package.write(HEADER.pack(b"MDAR", 1, len(selected)))
-            next_offset = HEADER.size + len(selected) * ENTRY.size
-            for code, variant in sorted(selected):
-                length = selected[(code, variant)][1]
-                package.write(ENTRY.pack(code, variant, next_offset, length))
-                next_offset += length
-            for key in sorted(selected):
-                offset, length = selected[key]
-                source.seek(offset)
-                image = source.read(length)
-                if len(image) != length:
-                    raise ValueError(f"Incomplete artwork for {key[0]}-{key[1]}.")
-                package.write(image)
-
-    return {"cardart.pack": destination, **{f"CutIns/{file.name}": file for file in portraits.values()}}
+    return {"cardart.pack": source_pack, **{f"CutIns/{file.name}": file for file in portraits.values()}}
 
 
 def _app_visual_path(package):

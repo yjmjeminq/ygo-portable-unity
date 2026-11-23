@@ -36,14 +36,14 @@ namespace YGOPortable.UI
         private Image _fieldViewIcon;
         private Text _fieldViewLabel;
         private bool _chainPrompt;
-        private const float ChainCardWidth = 140f;
+        private const float ChainCardWidth = 154f;
         private const float ChainCardGap = 10f;
         private const float ChainLocationTabHeight = 30f;
         private const float ChainGroupPadding = 6f;
-        private const float ChoiceCardWidth = 142f;
+        private const float ChoiceCardWidth = 158f;
         private const float CounterCardWidth = 172f;
-        private const int ZoneCardWidth = 147;
-        private const int ZoneCardHeight = 218;
+        private const int ZoneCardWidth = 162;
+        private const int ZoneCardHeight = 240;
         private const float ChoiceCardGap = 8f;
         private RectTransform _chainBox;
         private RectTransform _chainCards;

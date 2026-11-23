@@ -99,7 +99,7 @@ namespace YGOPortable.UI
             _skipResult = ButtonAt(results, "Skip", "건너뛰기", .84f, .04f, .967f, .099f, Back);
             _exitLabel = _exit.GetComponentInChildren<Text>();
 
-            var spread = Slot(results, "Cards", .135f, .222f, .865f, .845f);
+            var spread = Slot(results, "Cards", .135f, .222f, .865f, .867f);
             for (int i = 0; i < _pulls.Length; i++)
                 _pulls[i] = BuildPull(spread, i);
             PackOpeningStage.FloorFade(results, 0f, .261f);
@@ -215,7 +215,7 @@ namespace YGOPortable.UI
             var slot = Slot(parent, $"Card_{index}", column / (float)CardsPerRow + .01f, bottom + .008f,
                 (column + 1) / (float)CardsPerRow - .01f, top - .008f);
             var group = slot.gameObject.AddComponent<CanvasGroup>();
-            var buttonBounds = Slot(slot, "Select", 0f, .179f, 1f, .95f);
+            var buttonBounds = Slot(slot, "Select", 0f, .172f, 1f, .975f);
             var clickArea = LotdUiKit.AddImage(buttonBounds.gameObject, LotdUiKit.WhiteSprite, Color.clear);
             var button = buttonBounds.gameObject.AddComponent<Button>();
             button.targetGraphic = clickArea;
@@ -261,7 +261,7 @@ namespace YGOPortable.UI
                 Reflection = reflection,
                 Tilt = tilt,
                 Button = button,
-                Name = Label(slot, "Name", "", 0f, .081f, 1f, .173f, 15, PackShopStyle.TextPrimary),
+                Name = Label(slot, "Name", "", 0f, .081f, 1f, .167f, 15, PackShopStyle.TextPrimary),
                 Ownership = Label(slot, "Ownership", "", .373f, 0f, .56f, .079f, 13, PackShopStyle.TextMuted),
                 SpecialEdition = specialLabel,
                 RarityLabel = rarity,

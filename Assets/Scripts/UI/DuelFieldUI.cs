@@ -828,7 +828,7 @@ namespace YGOPortable.UI
             var card = LotdUiKit.CreateRect("CardPreview", left,
                 new Vector2(.055f, .483f), new Vector2(.945f, .901f), Vector2.zero, Vector2.zero);
             _inspCard = CompositeCardView.Create(card, "Card");
-            _inspCard.EnableOverframe();
+            _inspCard.UsePrintedFaceOnly();
             var aspect = _inspCard.transform.Find("AspectBox");
             AddInspectorArtworkFrame(aspect);
             _inspectorDisabledBadge = BuildDisabledBadge(_inspCard.transform, 17);
@@ -1062,7 +1062,7 @@ namespace YGOPortable.UI
         private void BuildCenterBoard(Transform root)
         {
             var board = LotdUiKit.CreateRect("DuelBoard", root,
-                new Vector2(.145f, .221f), new Vector2(.894f, .88f), Vector2.zero, Vector2.zero);
+                new Vector2(.142f, .221f), new Vector2(.903f, .886f), Vector2.zero, Vector2.zero);
             _boardRect = board;
             _mat = LotdUiKit.FillRect("StoneMat", board).gameObject.AddComponent<DuelMat>();
             _mat.texture = Texture2D.whiteTexture;
@@ -1143,8 +1143,9 @@ namespace YGOPortable.UI
         }
 
         private static readonly Color ZoneTint = new Color(.032f, .07f, .092f, .42f);
-        private static readonly Vector2 SlotCardMin = new Vector2(.045f, .012f);
-        private static readonly Vector2 SlotCardMax = new Vector2(.955f, .988f);
+        // Use the spacing between field rows without letting face-up cards touch the next row.
+        private static readonly Vector2 SlotCardMin = new Vector2(.025f, -.008f);
+        private static readonly Vector2 SlotCardMax = new Vector2(.975f, 1.008f);
 
         private FieldSlotView CreateZoneSlot(RectTransform cell)
         {
@@ -1156,6 +1157,7 @@ namespace YGOPortable.UI
 
             var card = LotdUiKit.CreateRect("Card", cell, SlotCardMin, SlotCardMax, Vector2.zero, Vector2.zero);
             var view = CompositeCardView.Create(card, "CardView");
+            view.UsePrintedFaceOnly();
             view.gameObject.SetActive(false);
 
             var slot = new FieldSlotView
@@ -1201,6 +1203,7 @@ namespace YGOPortable.UI
             var card = LotdUiKit.CreateRect("TopCard", cell, usesWell ? new Vector2(.19f, .322f) : new Vector2(.15f, .312f),
                 usesWell ? new Vector2(.81f, .889f) : new Vector2(.85f, .949f), Vector2.zero, Vector2.zero);
             var view = CompositeCardView.Create(card, "CardView");
+            view.UsePrintedFaceOnly();
             view.transform.localRotation = Quaternion.Euler(0f, 0f, opponent ? 180f : 0f);
             DuelPileDepth depth = null;
             if (!usesWell)
@@ -1344,8 +1347,8 @@ namespace YGOPortable.UI
             var safe = (RectTransform)_boardRect.parent;
             if (safe.rect.width <= 0f || safe.rect.height <= 0f) return;
             // Account for the narrowest perspective cell and the spacing between rows.
-            float width = Mathf.Clamp(touch * 9f / (.968f * .81f * safe.rect.width), .749f, .901f);
-            float height = Mathf.Clamp(touch / (.196f * safe.rect.height), .659f, .745f);
+            float width = Mathf.Clamp(touch * 9f / (.968f * .81f * safe.rect.width), .761f, .901f);
+            float height = Mathf.Clamp(touch / (.196f * safe.rect.height), .671f, .745f);
             float bottom = .55f - height * .5f;
             float left = Mathf.Min(.145f, .995f - width);
             _boardRect.anchorMin = new Vector2(left, bottom);
@@ -2147,6 +2150,7 @@ namespace YGOPortable.UI
         {
             var rect = LotdUiKit.FillRect("HandCard", row);
             var card = CompositeCardView.Create(rect, "CardView");
+            card.UsePrintedFaceOnly();
             var art = (RectTransform)card.transform.Find("AspectBox");
             CardDragTrigger trigger = null;
             Image glow = null;
@@ -2166,8 +2170,10 @@ namespace YGOPortable.UI
             };
         }
 
+        private const float HandFaceHeight = .96f;
+
         private static float MobileHandCardWidth(RectTransform row) =>
-            Mathf.Max(MobileSafeArea.MinimumTouchSize(row), .86f * row.rect.height * LotdUiKit.CardAspectRatio);
+            Mathf.Max(MobileSafeArea.MinimumTouchSize(row), HandFaceHeight * row.rect.height * LotdUiKit.CardAspectRatio);
 
         private (Vector2 min, Vector2 max, float angle) HandCardBounds(RectTransform row, int count, int index, bool opponent)
         {
@@ -2177,18 +2183,18 @@ namespace YGOPortable.UI
                 float rowWidth = Mathf.Max(1f, row.rect.width);
                 float left = Mathf.Max(4f, (rowWidth - widthUnits * count - 4f * (count - 1)) * .5f);
                 float xStart = (left + (widthUnits + 4f) * index) / rowWidth;
-                float cardHeight = Mathf.Clamp01(Mathf.Max(.86f,
+                float cardHeight = Mathf.Clamp01(Mathf.Max(HandFaceHeight,
                     MobileSafeArea.MinimumTouchSize(row) / Mathf.Max(1f, row.rect.height)));
                 return (new Vector2(xStart, .5f * (1f - cardHeight)),
                     new Vector2(xStart + widthUnits / rowWidth, .5f * (1f + cardHeight)), 0f);
             }
-            const float height = .91f;
+            const float height = HandFaceHeight;
             float width = Mathf.Clamp(row.rect.height * height * LotdUiKit.CardAspectRatio / Mathf.Max(1f, row.rect.width),
                 0.045f, 0.25f);
             float spacing = Mathf.Min(width * .90f, (0.93f - width) / Mathf.Max(1, count - 1));
             float x = (1f - width - spacing * (count - 1)) * 0.5f + spacing * index;
             float fan = count <= 1 ? 0f : (2f * index / (count - 1) - 1f) * Mathf.Min(1f, (count - 1) / 4f);
-            float y = .04f + (opponent ? 1f : -1f) * fan * fan * .042f;
+            float y = (1f - height) * .5f + (opponent ? 1f : -1f) * fan * fan * .018f;
             return (new Vector2(x, y), new Vector2(x + width, y + height), -fan * 7f + (opponent ? 180f : 0f));
         }
 
@@ -3087,7 +3093,7 @@ namespace YGOPortable.UI
                     ReleaseArrival(key);
                     ReleaseMovingInspection(e, inspection);
                 }, Refresh, e.ReturnEffectId, inspection == null ? null : () => inspection.AtDestination = true, xyzMaterials,
-                    landingImpact);
+                    landingImpact, wideCutIn: true);
                 if (e.summonType.HasValue && CardDatabase.Get(e.code) is { IsLink: true, link: not 0 } summon)
                     _arrivalLinks.Add((e.toCon, e.toSeq, summon.link));
                 return held;
@@ -3104,7 +3110,8 @@ namespace YGOPortable.UI
                 e.toLoc is YgoConstants.LOCATION_GRAVE or YgoConstants.LOCATION_REMOVED)
                 animator.QueuePileTransfer(flight, OnArrival);
             else
-                animator.QueueMove(flight, motion, OnArrival, readout, departAndRefresh, landingImpact);
+                animator.QueueMove(flight, motion, OnArrival, readout, departAndRefresh, landingImpact,
+                    wideCutIn: true);
             return held;
         }
 
@@ -3190,6 +3197,7 @@ namespace YGOPortable.UI
             {
                 return (summonType & YgoConstants.SUMMON_METHOD_MASK) switch
                 {
+                    YgoConstants.SUMMON_TYPE_ADVANCE => CardMotion.TributeSummon,
                     YgoConstants.SUMMON_TYPE_PENDULUM => CardMotion.PendulumSummon,
                     YgoConstants.SUMMON_TYPE_FUSION or YgoConstants.SUMMON_TYPE_RITUAL or YgoConstants.SUMMON_TYPE_SYNCHRO or
                         YgoConstants.SUMMON_TYPE_XYZ or YgoConstants.SUMMON_TYPE_LINK => CardMotion.ExtraDeckSummon,
@@ -4378,15 +4386,15 @@ namespace YGOPortable.UI
 
             // Left Side: Large Card View
             float cardRight = onIPhone ? .375f : .448f;
-            var cardHolder = LotdUiKit.CreateRect("CardHolder", win, new Vector2(.033f, onIPhone ? .195f : .111f),
+            var cardHolder = LotdUiKit.CreateRect("CardHolder", win, new Vector2(.033f, onIPhone ? .172f : .111f),
                 new Vector2(cardRight, onIPhone ? .812f : .891f), Vector2.zero, Vector2.zero);
             _zoomCardView = CompositeCardView.Create(cardHolder, "ZoomCard", true);
-            _zoomCardView.EnableOverframe();
+            _zoomCardView.UsePrintedFaceOnly();
             CardOverframeInput.Attach(cardHolder, _zoomCardView, onIPhone);
             AddInspectorArtworkFrame(_zoomCardView.transform.Find("AspectBox"));
             _zoomDisabledBadge = BuildDisabledBadge(_zoomCardView.transform, 24);
-            var artwork = LotdUiKit.CreateRect("ArtworkOptions", win, new Vector2(.04f, onIPhone ? .025f : .035f),
-                new Vector2(cardRight, onIPhone ? .178f : .098f),
+            var artwork = LotdUiKit.CreateRect("ArtworkOptions", win, new Vector2(.04f, onIPhone ? .018f : .035f),
+                new Vector2(cardRight, onIPhone ? .157f : .098f),
                 Vector2.zero, Vector2.zero);
             _zoomArtworkControls = artwork.gameObject;
             float artworkButtonWidth = onIPhone ? .30f : .19f;
@@ -4564,30 +4572,21 @@ namespace YGOPortable.UI
             uint code = _zoomCardView.CurrentCode;
             UpdateArtworkOptions(code, direction);
             RefreshZoomReadout(code);
-            if (_inspectedCode == code) _inspCard.SetCard(code);
             Refresh();
         }
 
         private void UpdateArtworkOptions(uint code, int direction)
         {
-            if (_session?.UsesDeckAppearances == true)
-            {
-                _zoomArtworkControls.SetActive(false);
-                return;
-            }
-            var choices = CardArtLoader.GetDuelArtworkChoices(code);
-            _zoomArtworkControls.SetActive(choices.Count > 1);
-            if (choices.Count < 2) return;
-            int current = CardArtLoader.GetDuelArtworkVariant(code);
-            int index = 0;
-            while (index < choices.Count - 1 && choices[index] != current) index++;
-            index = (index + direction + choices.Count) % choices.Count;
+            var choices = CardArtLoader.GetSelectableArtwork(code);
+            _zoomArtworkControls.SetActive(choices.Length > 1);
+            if (choices.Length < 2) return;
+            int index = CardArtLoader.ArtworkChoiceIndex(code, choices, _zoomCardView.Appearance?.ArtworkVariant);
             if (direction != 0)
             {
-                CardArtLoader.SetDuelArtworkVariant(code, choices[index]);
-                PlayerPrefs.Save();
+                int next = (index + direction + choices.Length) % choices.Length;
+                if (CardArtLoader.SetDuelArtworkVariant(code, choices[next])) index = next;
             }
-            _zoomArtworkLabel.text = $"일러스트 {index + 1} / {choices.Count}";
+            _zoomArtworkLabel.text = $"일러스트 {index + 1} / {choices.Length}";
         }
     }
 }

@@ -512,9 +512,11 @@ namespace YGOPortable.Editor
             float leftOfDeck = safe.InverseTransformPoint(deckPane.TransformPoint(new Vector3(deckPane.rect.xMin, 0f))).x;
             Require(rightOfTrunk < leftOfDeck && trunkPane.gameObject.activeInHierarchy && deckPane.gameObject.activeInHierarchy,
                 $"{display} did not fit both mobile panes side by side.");
-            Require(trunkColumns >= 5 && rows >= 2 && mainColumns >= 7 &&
+            Require(trunkColumns >= 4 && rows >= 2 && mainColumns >= 7 &&
                 Field<int>(editor, "_mainVisibleRows") == 3 && Field<int>(editor, "_extraVisibleRows") == 2,
                 $"{display} showed only {trunkColumns}×{rows} trunk cards or {mainColumns} main-deck columns.");
+            var trunkArt = (RectTransform)Field<RectTransform>(editor, "_trunkContent").Find("TrunkCard/CardInset/Card/AspectBox");
+            Require(trunkArt.rect.width >= 88f, $"{display} trunk artwork became too small ({trunkArt.rect.width:F1}).");
             var mainArt = (RectTransform)Field<RectTransform>(editor, "_mainDeckSlotGrid").Find("Card_0/CardInset/Card/AspectBox");
             Require(mainArt.rect.width >= 44f, $"{display} deck artwork became too small ({mainArt.rect.width:F1}).");
         }

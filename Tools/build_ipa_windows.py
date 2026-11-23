@@ -245,9 +245,9 @@ def verify_ipa(ipa, snapshot):
 
 
 def build(editor, github, branch, revision, scratch, local_cutins=None):
-    visuals = prepare_local_visuals(local_cutins, scratch / "cutin-artwork.pack") if local_cutins else None
+    visuals = prepare_local_visuals(local_cutins) if local_cutins else None
     if visuals is not None:
-        print(f"    최종 IPA에 로컬 컷인 {len(visuals) - 1}개와 일러스트를 포함합니다.")
+        print(f"    최종 IPA에 로컬 컷인 {len(visuals) - 1}개와 전체 일러스트 팩을 포함합니다.")
     snapshot = scratch / "Project"
     for name in ("Assets", "Packages", "ProjectSettings"):
         shutil.copytree(PROJECT / name, snapshot / name)

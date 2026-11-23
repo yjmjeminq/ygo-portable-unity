@@ -1453,6 +1453,7 @@ namespace YGOPortable.Core
 
                 case YgoConstants.MSG_SUMMONED:
                     _summonedMonsters[_resolvingChainLink?.triggerPlayer ?? (byte)TurnPlayer]++;
+                    CompleteFieldArrivalPresentation();
                     break;
 
                 case YgoConstants.MSG_SPSUMMONING:

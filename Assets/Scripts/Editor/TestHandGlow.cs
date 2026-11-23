@@ -3122,11 +3122,10 @@ namespace YGOPortable.Editor
             var window = root.Find("Overlay_CardZoom/MobileSafeArea/ZoomWin");
             var view = window.Find("CardHolder/ZoomCard").GetComponent<CompositeCardView>();
             var trigger = safe.Find("PlayerHand/Cards").GetChild(0).GetComponent<CardDragTrigger>();
-            var source = CardArtLoader.GetArtworkSource(excel, CardArtLoader.GetDuelArtworkVariant(excel));
-            bool supported = DuelVisualAssets.CanDisplayCutIn(source.Code, source.Variant);
             Hold(trigger);
-            Require(window.gameObject.activeInHierarchy && view.CurrentCode == excel && view.HasOverframe == supported,
-                "Long-pressing the hand did not reveal the card's overframe details.");
+            Require(window.gameObject.activeInHierarchy && view.CurrentCode == excel && !view.HasOverframe &&
+                view.ArtworkSprite != CardArtLoader.GetFallbackArt(),
+                "Long-pressing the hand did not reveal the card's printed artwork.");
             window.Find("Hdr/Close/B").GetComponent<Button>().onClick.Invoke();
 
             int index = duel.ActivePrompt.summonable.FindIndex(card => card.code == excel);
@@ -3141,10 +3140,10 @@ namespace YGOPortable.Editor
             fieldCard.OnRightClick();
             Hold(fieldCard);
             var inspected = (CompositeCardView)typeof(DuelFieldUI).GetField("_inspCard", PrivateInstance).GetValue(ui.Field);
-            Require(window.gameObject.activeInHierarchy && view.CurrentCode == excel && view.HasOverframe == supported &&
-                inspected.CurrentCode == excel && inspected.HasOverframe == supported && duel.RetryCount == 0,
-                "The duel inspector and zoom did not show the same supported portrait.");
-            Debug.Log("[VERIFY OVERFRAME TOUCH] Hand and field long presses opened the same mobile detail view.");
+            Require(window.gameObject.activeInHierarchy && view.CurrentCode == excel && !view.HasOverframe &&
+                inspected.CurrentCode == excel && !inspected.HasOverframe && inspected.ArtworkSprite == view.ArtworkSprite &&
+                duel.RetryCount == 0, "The duel inspector and zoom did not show the same printed artwork.");
+            Debug.Log("[VERIFY PRINTED DUEL FACES] Hand and field long presses opened the same mobile detail view.");
             VerifyStyledDuelSurfaces();
             VerifyNativeStyledActivations();
 
@@ -3184,8 +3183,9 @@ namespace YGOPortable.Editor
             for (int i = 0; i < mine.hand.Count; i++)
             {
                 var face = row.GetChild(i).GetComponentInChildren<CompositeCardView>();
-                Require(face.HasOverframe == (mine.hand[i].Appearance?.overframe == true),
-                    "The rendered hand mixed up copies of the same card.");
+                Require(!face.HasOverframe && Nullable.Equals(face.Appearance, mine.hand[i].Appearance) &&
+                    face.transform.Find("AspectBox/Artwork").GetComponent<Image>().preserveAspect,
+                    "The hand showed a cut-in, distorted its art or mixed up the physical copies.");
             }
             int choice = duel.ActivePrompt.summonable.FindIndex(card => mine.hand[(int)card.sequence].Appearance?.overframe == true);
             Require(choice >= 0, "The special copy could not be summoned in the field fixture.");
@@ -3193,18 +3193,11 @@ namespace YGOPortable.Editor
             chosen.GetComponent<CardDragTrigger>().OnPointerEnterAction.Invoke();
             typeof(DuelFieldUI).GetMethod("AdvanceDuelPadCardMotions", PrivateInstance).Invoke(ui.Field, new object[] { .25f });
             var focused = (RectTransform)chosen.GetComponentInChildren<CompositeCardView>().transform;
-            var depth = focused.Find("AspectBox/Overframe/PortraitBounds/Depth");
-            Require(focused.anchoredPosition.y > 1f &&
-                depth.localScale.x > 1f,
-                "A special card in the touch layout did not lift both its card and artwork.");
-            Canvas.ForceUpdateCanvases();
+            Require(focused.anchoredPosition.y > 1f && focused.Find("AspectBox/Overframe") == null,
+                "Focusing a special copy did not lift the printed card, or exposed a cut-in.");
             var mask = row.parent.GetComponent<RectMask2D>();
-            var cutIn = (RectTransform)depth.Find("LocalCutIn");
-            var cardTop = cutIn.TransformPoint(new Vector3(cutIn.rect.center.x, cutIn.rect.yMax));
-            float topInCanvas = ui.Canvas.transform.InverseTransformPoint(cardTop).y;
-            Require(topInCanvas > mask.canvasRect.yMax && topInCanvas < mask.canvasRect.yMax - mask.padding.w &&
-                mask.padding.x == 0f && mask.padding.z == 0f,
-                "The mobile hand clipped the raised portrait or lost its horizontal clipping.");
+            Require(mask.padding.x == 0f && mask.padding.z == 0f,
+                "The mobile hand lost its horizontal clipping.");
 
             var animator = CardAnimationManager.Ensure(ui.Canvas);
             duel.SubmitResponseInt(choice << 16);
@@ -3222,20 +3215,20 @@ namespace YGOPortable.Editor
             var placed = mine.mzone.Single(card => card?.code == excel);
             var slot = safe.Find($"DuelBoard/Zone_{placed.sequence + 2}_3");
             var fieldFace = slot.GetComponentInChildren<CompositeCardView>();
-            Require(fieldFace.CurrentCode == excel && fieldFace.HasOverframe && duel.RetryCount == 0,
+            Require(fieldFace.CurrentCode == excel && !fieldFace.HasOverframe &&
+                fieldFace.Appearance?.overframe == true && duel.RetryCount == 0,
                 "The selected physical copy did not keep its edition on the actual duel field.");
             var landing = (IEnumerator)move.Current;
             Require(landing.MoveNext(), "The field landing did not animate.");
             var board = (RectTransform)safe.Find("DuelBoard");
             Vector2 rest = board.anchoredPosition;
-            var portrait = fieldFace.transform.Find("AspectBox/Overframe/PortraitBounds/Depth");
             TestCardPresentation.SampleAnimation((IEnumerator)landing.Current)(.18f);
-            Require(Vector2.Distance(board.anchoredPosition, rest) > .1f && portrait.localScale.x > 1f,
-                "The destination field and its actual card did not react to the landing.");
+            Require(Vector2.Distance(board.anchoredPosition, rest) > .1f && !fieldFace.HasOverframe,
+                "The destination field did not react to the landing, or introduced an extra portrait.");
             animator.Clear();
-            Require(Vector2.Distance(board.anchoredPosition, rest) < .01f && Mathf.Approximately(portrait.localScale.x, 1f),
-                "Interrupting the animation left the board or card offset.");
-            Debug.Log("[VERIFY OVERFRAME SURFACES] Mixed editions, unclipped mobile lift, horizontal clipping and native field identity passed.");
+            Require(Vector2.Distance(board.anchoredPosition, rest) < .01f,
+                "Interrupting the animation left the board offset.");
+            Debug.Log("[VERIFY OVERFRAME SURFACES] Printed hand and field faces preserved edition, focus and landing.");
         }
 
         private static void VerifyNativeStyledActivations()
@@ -4850,7 +4843,20 @@ namespace YGOPortable.Editor
                 "The materials lingered or the new monster arrived during their departure.");
             if (inspected != null) CheckInspectedAttack(CardDatabase.Get(inspected.code).atk);
             Require(arrival.MoveNext(), "The summon did not start its reveal.");
-            if (hasSignature)
+            if (animator.GetComponentInChildren<DuelCutInCinematic>() is { } cinematic)
+            {
+                var wide = (IEnumerator)arrival.Current;
+                Require(wide.MoveNext() && wide.Current is IEnumerator, "The native cinematic did not open its timeline.");
+                var frames = (IEnumerator)wide.Current;
+                Require(frames.MoveNext(), "The native cinematic did not show its first frame.");
+                cinematic.Pose(.90f);
+                Require(cinematic.transform.Find("Impact").GetComponent<Image>().color.a > .15f,
+                    "The native cinematic did not play its impact flash.");
+                ExecuteEvents.Execute(cinematic.gameObject, new PointerEventData(EventSystem.current)
+                    { button = PointerEventData.InputButton.Left }, ExecuteEvents.pointerDownHandler);
+                Require(!frames.MoveNext() && !wide.MoveNext(), "The native cut-in did not finish after a tap.");
+            }
+            else if (hasSignature)
             {
                 var reveal = (IEnumerator)arrival.Current;
                 Require(reveal.MoveNext(), "The signature finale did not start.");

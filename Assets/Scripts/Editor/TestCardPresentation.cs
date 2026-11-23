@@ -172,7 +172,8 @@ namespace YGOPortable.Editor
                 Require(preview.HasOverframe, "The selected special edition preview did not show the decoded portrait.");
                 typeof(DeckEditorUI).GetMethod("OpenExpandedDeckCard", instance).Invoke(deck, new object[] { BlueEyes });
                 var expanded = (CompositeCardView)typeof(DeckEditorUI).GetField("_expandedDeckArt", instance).GetValue(deck);
-                Require(expanded.HasOverframe, "The expanded deck viewer did not show the decoded portrait.");
+                Require(!expanded.HasOverframe && expanded.ArtworkSprite == preview.ArtworkSprite,
+                    "The expanded deck viewer did not show the printed alternate artwork.");
                 var thumbnail = CompositeCardView.Create(holder, "Compact");
                 var special = new DeckCardAppearance { overframe = true };
                 thumbnail.SetCard(BlueEyes, live: new LiveCardState { code = BlueEyes, Appearance = special });
@@ -209,7 +210,9 @@ namespace YGOPortable.Editor
 
                 VerifyOverframeOffsets(canvas.transform, folder, magician);
                 VerifyPackFaces(canvas.transform);
-                VerifyOverframeAnimation(CardAnimationManager.Ensure(canvas));
+                var animator = CardAnimationManager.Ensure(canvas);
+                VerifyWideCutIn(animator, unrelated);
+                VerifyOverframeAnimation(animator);
                 VerifyPhysicalDeckAppearances();
                 Debug.Log("[VERIFY OVERFRAME] Subject-free backdrops, artwork fallback, hidden cards, summon finish and chain animation passed.");
             }
@@ -312,6 +315,54 @@ namespace YGOPortable.Editor
             }
         }
 
+        private static void VerifyWideCutIn(CardAnimationManager animator, uint withoutPortrait)
+        {
+            var from = new CardPose(new Vector2(-280f, -280f), new Vector2(85f, 123f));
+            var to = new CardPose(new Vector2(132f, -74f), new Vector2(96f, 139f));
+            var queue = (Queue<IEnumerator>)typeof(CardAnimationManager).GetField("_steps",
+                BindingFlags.Instance | BindingFlags.NonPublic).GetValue(animator);
+            int landings = 0;
+            animator.StageFieldArrival(new CardFlight(Masquerena, from, to, true, false, new DeckCardAppearance()),
+                CardMotion.ExtraDeckSummon, 0, YgoConstants.LOCATION_MZONE, 2, null, null, () => landings++,
+                () => { }, wideCutIn: true);
+            animator.CompleteFieldArrivals();
+            var step = queue.Dequeue();
+            Require(step.MoveNext() && step.Current is IEnumerator, "The queued summon did not start its cinematic.");
+            var cinematic = animator.GetComponentInChildren<DuelCutInCinematic>();
+            Require(cinematic != null, "The Masquerena summon did not use the widescreen stage.");
+            var playback = (IEnumerator)step.Current;
+            Require(playback.MoveNext() && playback.Current is IEnumerator, "The cinematic did not prepare its landing.");
+            var timeline = (IEnumerator)playback.Current;
+            Require(timeline.MoveNext(), "The cinematic ended before showing a frame.");
+            Canvas.ForceUpdateCanvases();
+            cinematic.Pose(.68f);
+            var stage = (RectTransform)cinematic.transform.Find("WideStage");
+            var portrait = stage.Find("Portrait/SourceCanvas").GetComponent<RawImage>();
+            var title = stage.Find("MonsterReadout/MonsterName/Text").GetComponent<Text>();
+            Require(Mathf.Abs(stage.rect.width / stage.rect.height - 16f / 9f) < .001f &&
+                cinematic.GetComponent<Image>().color.a > .68f && portrait.texture != null &&
+                portrait.rectTransform.localScale == Vector3.one &&
+                stage.Find("Portrait").localScale.x > 1f &&
+                title.text == CardDatabase.GetName(Masquerena) &&
+                stage.Find("MonsterReadout/Arrows/LinkDirections").gameObject.activeInHierarchy,
+                "The cinematic lost its widescreen fit, slide, or Link monster readout.");
+            ExecuteEvents.Execute(cinematic.gameObject, new PointerEventData(EventSystem.current)
+                { button = PointerEventData.InputButton.Left }, ExecuteEvents.pointerDownHandler);
+            Require(!timeline.MoveNext() && !playback.MoveNext() && !step.MoveNext() && landings == 1 &&
+                animator.GetComponentInChildren<DuelCutInCinematic>() == null,
+                "Clicking the widescreen reveal did not immediately release the stage and land once.");
+
+            animator.QueueMove(new CardFlight(withoutPortrait, from, to, false, false),
+                CardMotion.SpecialSummon, () => landings++, wideCutIn: true);
+            var fallback = queue.Dequeue();
+            Require(fallback.MoveNext() && animator.GetComponentInChildren<DuelCutInCinematic>() == null,
+                "A monster without artwork started an empty widescreen stage.");
+            while (fallback.MoveNext()) { }
+            Require(landings == 2, "The summon without artwork did not complete.");
+            animator.Clear();
+            Debug.Log("[VERIFY WIDE CUT-IN] Queued Masquerena, 16:9 portrait, Link stats, click skip, landing and no-art fallback passed.");
+        }
+
         private static void VerifyPackFaces(Transform parent)
         {
             var opening = new PackOpeningView(parent, null);
@@ -411,8 +462,10 @@ namespace YGOPortable.Editor
             string cutIns = Path.Combine(visuals, "CutIns");
             Directory.CreateDirectory(cutIns);
             string portrait = Path.Combine(cutIns, $"{BlueEyes}-0.png");
+            string alternatePortrait = Path.Combine(cutIns, $"{BlueEyes}-1.png");
             string pack = Path.Combine(visuals, "cardart.pack");
             File.WriteAllBytes(portrait, image);
+            File.WriteAllBytes(alternatePortrait, image);
             using (var writer = new BinaryWriter(File.Create(pack)))
             {
                 writer.Write(0x5241444Du);
@@ -433,6 +486,9 @@ namespace YGOPortable.Editor
             const string artworkKey = "DuelArtwork.89631139";
             bool hadPreference = PlayerPrefs.HasKey(artworkKey);
             int previousPreference = PlayerPrefs.GetInt(artworkKey);
+            string familyKey = $"DuelArtwork.Family.{BlueEyes}";
+            string previousFamily = PlayerPrefs.HasKey(familyKey) ? PlayerPrefs.GetString(familyKey) : null;
+            PlayerPrefs.DeleteKey(familyKey);
             var canvas = new GameObject("Fresh install CutIn", typeof(Canvas));
             CardArtLoader.Shutdown();
             CardArtLoader.Initialize(freshApp, Path.Combine(freshApp, "EmptyProfile"));
@@ -462,20 +518,74 @@ namespace YGOPortable.Editor
                 Require(hand.ArtworkSprite == view.ArtworkSprite,
                     "The shared card face overrode the artwork selected for a specific copy.");
                 Debug.Log("[VERIFY COMMON CARD FACE] Compact and detailed views share artwork and frames and honor explicit printings.");
+                VerifyDuelArtworkChoice(canvas.GetComponent<Canvas>(), view.ArtworkSprite, detail.ArtworkSprite);
             }
             finally
             {
                 if (hadPreference) PlayerPrefs.SetInt(artworkKey, previousPreference);
                 else PlayerPrefs.DeleteKey(artworkKey);
+                if (previousFamily == null) PlayerPrefs.DeleteKey(familyKey);
+                else PlayerPrefs.SetString(familyKey, previousFamily);
+                PlayerPrefs.Save();
                 UnityEngine.Object.DestroyImmediate(canvas);
                 CardArtLoader.Shutdown();
                 CardArtLoader.Initialize(Application.streamingAssetsPath, previous);
                 File.Delete(portrait);
+                File.Delete(alternatePortrait);
                 File.Delete(pack);
                 Directory.Delete(cutIns);
                 Directory.Delete(visuals);
                 Directory.Delete(freshApp);
             }
+        }
+
+        private static void VerifyDuelArtworkChoice(Canvas canvas, Sprite original, Sprite alternate)
+        {
+            ((RectTransform)canvas.transform).sizeDelta = new Vector2(1600f, 900f);
+            var fixture = new UserDeck();
+            var appearance = new DeckCardAppearance { artwork = 1, overframe = true };
+            for (int i = 0; i < 40; i++) fixture.InsertCard(fixture.main, i, BlueEyes, appearance);
+            using var session = new DuelSession();
+            Require(session.StartNewDuel(fixture.main, fixture.extra, Enumerable.Repeat(SkullRedBird, 40).ToArray(),
+                Array.Empty<uint>(), playerDeckAppearance: fixture), "Could not start the artwork preference fixture.");
+            session.Players[session.HumanPlayerIndex].mzone[2] = new LiveCardState
+            {
+                code = BlueEyes, controller = (byte)session.HumanPlayerIndex, location = YgoConstants.LOCATION_MZONE,
+                sequence = 2, position = YgoConstants.POS_FACEUP_ATTACK, Appearance = appearance,
+            };
+            var ui = new DuelFieldUI(null, canvas.transform, new DuelPromptModals(canvas.transform, null, null));
+            ui.BindSession(session, null, null);
+            ui.Refresh();
+            typeof(DuelFieldUI).GetMethod("ShowCardZoomModal", BindingFlags.Instance | BindingFlags.NonPublic,
+                null, new[] { typeof(LiveCardState) }, null).Invoke(ui,
+                new object[] { session.Players[session.HumanPlayerIndex].hand[0] });
+            var zoom = ui.Root.transform.Find("Overlay_CardZoom/ZoomWin");
+            var option = zoom.Find("ArtworkOptions/Next/Button").GetComponent<Button>();
+            var enlarged = zoom.Find("CardHolder/ZoomCard").GetComponent<CompositeCardView>();
+            Require(option.gameObject.activeInHierarchy, "A deck with an existing artwork assignment could not open the artwork picker.");
+            Require(enlarged.ArtworkSprite == original, "The opened duel card did not show its existing assignment.");
+            option.onClick.Invoke();
+            var hand = ui.Root.transform.Find("PlayerHand").GetComponentInChildren<CompositeCardView>();
+            var field = ui.Root.transform.Find("DuelBoard/Zone_4_3/Card/CardView").GetComponent<CompositeCardView>();
+            Require(enlarged.ArtworkSprite == alternate && hand.ArtworkSprite == alternate && field.ArtworkSprite == alternate &&
+                !hand.HasOverframe && !field.HasOverframe && hand.CurrentCode == BlueEyes && field.CurrentCode == BlueEyes,
+                "The selected artwork was not immediately shared by the duel detail, hand and field.");
+            ui.UnbindSession();
+
+            var animator = CardAnimationManager.Ensure(canvas);
+            var pose = new CardPose(Vector2.zero, new Vector2(96f, 139f));
+            animator.QueueMove(new CardFlight(BlueEyes, pose, pose, true, false, appearance),
+                CardMotion.SpecialSummon, null, wideCutIn: true);
+            var queue = (Queue<IEnumerator>)typeof(CardAnimationManager).GetField("_steps",
+                BindingFlags.Instance | BindingFlags.NonPublic).GetValue(animator);
+            Require(queue.Dequeue().MoveNext(), "The selected artwork had no queued summon.");
+            var stage = animator.GetComponentInChildren<DuelCutInCinematic>();
+            var exact = DuelVisualAssets.RetainCutIn(BlueEyes, 1);
+            Require(stage != null && stage.GetComponentInChildren<RawImage>().texture == exact?.texture,
+                "The summon did not use the selected illustration's own cut-in.");
+            DuelVisualAssets.ReleaseCutIn(exact);
+            animator.Clear();
+            Debug.Log("[VERIFY ARTWORK PREFERENCE] Duel detail cycled an existing deck assignment and updated hand, field and the exact summon portrait.");
         }
 
         private static void VerifyOverframeAnimation(CardAnimationManager animator)

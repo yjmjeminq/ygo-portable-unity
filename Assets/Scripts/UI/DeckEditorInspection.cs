@@ -12,6 +12,8 @@ namespace YGOPortable.UI
         private RectTransform _expandedDeckPanel;
         private ScrollRect _expandedDeckScroll;
         private CompositeCardView _expandedDeckArt;
+        private Button _expandedDeckArtwork;
+        private Text _expandedDeckArtworkLabel;
         private Button _expandedDeckClose;
         private Text _expandedDeckName;
         private Text _expandedDeckStats;
@@ -41,10 +43,16 @@ namespace YGOPortable.UI
             if (_mobileLayout) _expandedDeckPanel.GetComponent<Image>().raycastTarget = true;
             float artRight = _mobileLayout ? .361f : .422f;
             float rulesLeft = artRight + .025f;
-            var art = DeckArea(_expandedDeckPanel, "Artwork", .048f, .084f, artRight, .913f);
+            var art = DeckArea(_expandedDeckPanel, "Artwork", .048f, .166f, artRight, .913f);
             _expandedDeckArt = CompositeCardView.Create(art, "Card", detailedOverlay: true);
-            _expandedDeckArt.EnableOverframe();
-            CardOverframeInput.Attach(art, _expandedDeckArt, _mobileLayout);
+            _expandedDeckArt.UsePrintedFaceOnly();
+            _expandedDeckArtwork = DeckButton(_expandedDeckPanel, "ChangeArtwork", "일러스트 변경",
+                .048f, .044f, artRight, .149f, () =>
+                {
+                    var (cards, index) = InspectedDeckSlot(_expandedDeckCode);
+                    ChangeArtwork(_expandedDeckCode, cards, index);
+                }, fontSize: _mobileLayout ? 22 : 17);
+            _expandedDeckArtworkLabel = _expandedDeckArtwork.GetComponentInChildren<Text>();
             var name = DeckArea(_expandedDeckPanel, "Name", rulesLeft, .804f, .759f, .928f);
             _expandedDeckName = LotdUiKit.AddFittedText(name, "Text", "", _mobileLayout ? 36 : 30, _mobileLayout ? 20 : 16, TextAnchor.MiddleLeft,
                 LotdUiKit.GoldAccent, FontStyle.Bold);
@@ -119,8 +127,7 @@ namespace YGOPortable.UI
             _expandedDeckDescription.text = card.desc;
             _expandedDeckOverlay.SetAsLastSibling();
             _expandedDeckOverlay.gameObject.SetActive(true);
-            var (cards, index) = InspectedDeckSlot(code);
-            _expandedDeckArt.SetDeckCard(code, ReadAppearance(code, cards, index));
+            RefreshExpandedDeckArtwork();
             Canvas.ForceUpdateCanvases();
             _expandedDeckScroll.StopMovement();
             _expandedDeckScroll.content.anchoredPosition = Vector2.zero;
@@ -129,6 +136,18 @@ namespace YGOPortable.UI
             UpdateExpandedDeckCard(0f);
             DeckPadUi.LimitKeyboardNavigation(_expandedDeckOverlay);
             EventSystem.current?.SetSelectedGameObject(_expandedDeckClose.gameObject);
+        }
+
+        private void RefreshExpandedDeckArtwork()
+        {
+            uint code = _expandedDeckCode;
+            var (cards, index) = InspectedDeckSlot(code);
+            var appearance = ReadAppearance(code, cards, index);
+            _expandedDeckArt.SetDeckCard(code, appearance);
+            var choices = CardArtLoader.GetSelectableArtwork(code);
+            _expandedDeckArtwork.gameObject.SetActive(choices.Length > 1);
+            if (choices.Length > 1)
+                _expandedDeckArtworkLabel.text = $"일러스트 변경 · {CardArtLoader.ArtworkChoiceIndex(code, choices, appearance.ArtworkVariant) + 1}/{choices.Length}";
         }
 
         private void UpdateExpandedDeckCard(float delta)

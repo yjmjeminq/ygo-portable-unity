@@ -410,6 +410,7 @@ namespace YGOPortable.UI
         private GameObject _deckEditionBadge;
         private GameObject _destinyBadge;
         private bool _overframeEnabled;
+        private bool _printedFaceOnly;
         private bool _cinematicOverframe;
         private bool _overframeBound;
         private Sprite _retainedCutIn;
@@ -429,6 +430,14 @@ namespace YGOPortable.UI
         public uint CurrentCode { get; private set; }
         internal Sprite ArtworkSprite => _artImg.sprite;
         internal DeckCardAppearance? Appearance => _deckAppearance;
+
+        internal void UsePrintedFaceOnly(bool enabled = true)
+        {
+            if (_printedFaceOnly == enabled) return;
+            _printedFaceOnly = enabled;
+            _artImg.preserveAspect = enabled;
+            if (enabled) HideOverframe();
+        }
 
         public static CompositeCardView Create(Transform parent, string name, bool detailedOverlay = false)
             => Create(parent, name, detailedOverlay, cinematicOverframe: false);
@@ -569,7 +578,7 @@ namespace YGOPortable.UI
             BindArtwork(code);
             BindRarityFinish(info);
             RefreshOverframe();
-            SetDeckEditionBadge(!_detailed && !_cinematicOverframe && appearance?.overframe == true);
+            SetDeckEditionBadge((!_detailed || _printedFaceOnly) && !_cinematicOverframe && appearance?.overframe == true);
             _frameImg.sprite = CardFaceFrame.Get(faceType);
 
             if (_detailed)
@@ -663,10 +672,10 @@ namespace YGOPortable.UI
         private void BindArtwork(uint code)
         {
             if (code == 0 || !isActiveAndEnabled) return;
-            int variant = _deckAppearance?.ArtworkVariant ?? CardArtLoader.GetDuelArtworkVariant(code);
-            if (code == _retainedArtwork && variant == _retainedVariant && _artImg.sprite != null) return;
+            var (artCode, variant) = CardArtLoader.GetPreferredArtwork(code, _deckAppearance?.ArtworkVariant);
+            if (artCode == _retainedArtwork && variant == _retainedVariant && _artImg.sprite != null) return;
             ReleaseArtwork();
-            _artImg.sprite = CardArtLoader.RetainArtwork(code, variant, out _artworkSource);
+            _artImg.sprite = CardArtLoader.RetainArtwork(artCode, variant, out _artworkSource);
             bool missing = _artImg.sprite == CardArtLoader.GetFallbackArt();
             if (missing && _missingArtwork == null)
             {
@@ -675,7 +684,7 @@ namespace YGOPortable.UI
                 _missingArtwork = label.gameObject;
             }
             if (_missingArtwork != null) _missingArtwork.SetActive(missing);
-            _retainedArtwork = code;
+            _retainedArtwork = artCode;
             _retainedVariant = variant;
         }
 
@@ -717,7 +726,7 @@ namespace YGOPortable.UI
 
         private void RefreshOverframe()
         {
-            if (!(_deckAppearance?.overframe ?? _overframeEnabled) || _overframeBound || _retainedArtwork == 0) return;
+            if (_printedFaceOnly || !(_deckAppearance?.overframe ?? _overframeEnabled) || _overframeBound || _retainedArtwork == 0) return;
             _overframeBound = true;
             var (code, variant) = _artworkSource.Code == 0 ? (_retainedArtwork, _retainedVariant) : _artworkSource;
             _retainedCutIn = DuelVisualAssets.RetainCutIn(code, variant);
@@ -787,7 +796,7 @@ namespace YGOPortable.UI
             _overframeFinish.gameObject.SetActive(showFinish);
             if (showFinish)
             {
-                _overframeFinish.Bind(_retainedArtwork, CardRarity.UltraRare);
+                _overframeFinish.Bind(CurrentCode, CardRarity.UltraRare);
                 _overframeFinish.SetHighlight(_cinematicOverframe ? .54f : .18f);
             }
             _overframePortrait.Bind(_retainedCutIn, code);

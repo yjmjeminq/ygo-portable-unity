@@ -27,6 +27,8 @@ namespace YGOPortable.Core
         private const int SupplementalArtPackId = -3;
         private const int PackagedDuelArtPackId = -4;
         private const int BundledArtwork = -1;
+        private static readonly Dictionary<uint, (uint Code, int Variant)[]> ArtworkChoicesByFamily = new();
+        private static readonly Dictionary<uint, (uint Code, int Variant)> SelectedArtworkByFamily = new();
         private const string TokenArtFileName = "tokenart.pack";
         private const string DuelArtFileName = "cardart.pack";
         private const string SupplementalArtFileName = "supplementalart.pack";
@@ -171,6 +173,68 @@ namespace YGOPortable.Core
         {
             if (_duelVariants.TryGetValue(code, out var variants) && variants.Contains(variant))
                 PlayerPrefs.SetInt($"DuelArtwork.{code}", variant);
+        }
+
+        internal static (uint Code, int Variant)[] GetSelectableArtwork(uint code)
+        {
+            if (code == 0 || HasDedicatedTokenArt(code)) return Array.Empty<(uint, int)>();
+            if (CollectionProgress.RequiresOwnedCardsForDecks && CollectionProgress.GetTotalOwnedCount(code) == 0 &&
+                (!CardDatabase.TryGetDeckPrintings(code, out var printings) ||
+                    !printings.Any(printing => CollectionProgress.GetTotalOwnedCount(printing.code) > 0)))
+                return Array.Empty<(uint, int)>();
+            return ArtworkChoicesForFamily(CardDatabase.GetDeckPrintingKey(code));
+        }
+
+        internal static (uint Code, int Variant) GetPreferredArtwork(uint code, int? savedVariant = null)
+        {
+            uint family = CardDatabase.GetDeckPrintingKey(code);
+            if (!SelectedArtworkByFamily.TryGetValue(family, out var choice))
+            {
+                string saved = PlayerPrefs.GetString($"DuelArtwork.Family.{family}");
+                var parts = saved.Split(':');
+                if (parts.Length == 2 && uint.TryParse(parts[0], out uint artCode) &&
+                    int.TryParse(parts[1], out int variant) && ArtworkChoicesForFamily(family).Contains((artCode, variant)))
+                    choice = (artCode, variant);
+                SelectedArtworkByFamily[family] = choice;
+            }
+            return choice.Code != 0 ? choice : (code, savedVariant ?? GetDuelArtworkVariant(code));
+        }
+
+        internal static bool SetDuelArtworkVariant(uint code, (uint Code, int Variant) choice)
+        {
+            if (!GetSelectableArtwork(code).Contains(choice)) return false;
+            uint family = CardDatabase.GetDeckPrintingKey(code);
+            SelectedArtworkByFamily[family] = choice;
+            PlayerPrefs.SetString($"DuelArtwork.Family.{family}", $"{choice.Code}:{choice.Variant}");
+            PlayerPrefs.Save();
+            return true;
+        }
+
+        internal static int ArtworkChoiceIndex(uint code, (uint Code, int Variant)[] choices, int? savedVariant = null)
+        {
+            var current = GetPreferredArtwork(code, savedVariant);
+            int index = Array.IndexOf(choices, current);
+            if (index < 0 && current.Variant == BundledArtwork) index = Array.IndexOf(choices, (current.Code, 0));
+            return Mathf.Max(0, index);
+        }
+
+        private static (uint Code, int Variant)[] ArtworkChoicesForFamily(uint family)
+        {
+            if (ArtworkChoicesByFamily.TryGetValue(family, out var cached)) return cached;
+            if (_index == null) return Array.Empty<(uint, int)>();
+            var printings = CardDatabase.TryGetDeckPrintings(family, out var cards)
+                ? cards.Select(card => card.code) : new[] { family };
+            var choices = new List<(uint, int)>();
+            foreach (uint printing in printings)
+            {
+                if (!HasDuelArtwork(printing, 0) && _index.ContainsKey(printing))
+                    choices.Add((printing, BundledArtwork));
+                foreach (int variant in GetDuelArtworkChoices(printing))
+                    if (HasDuelArtwork(printing, variant)) choices.Add((printing, variant));
+            }
+            cached = choices.ToArray();
+            ArtworkChoicesByFamily[family] = cached;
+            return cached;
         }
 
         private static bool ReadArtIndex(string path)
@@ -420,6 +484,8 @@ namespace YGOPortable.Core
             _duelArt.Clear();
             _duelVariants.Clear();
             _overframeVariants.Clear();
+            ArtworkChoicesByFamily.Clear();
+            SelectedArtworkByFamily.Clear();
             _activeDuelVisualsPath = null;
             _streamingDir = null;
             _index = null;
