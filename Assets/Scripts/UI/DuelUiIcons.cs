@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 using YGOPortable.Core;
 
 namespace YGOPortable.UI
@@ -49,6 +50,12 @@ namespace YGOPortable.UI
         }
 
         internal static Sprite Action(string key) => key == null ? null : Find("action/" + key.ToLowerInvariant());
+
+        internal static Image AddActionImage(Transform parent, string key, Vector2 min, Vector2 max)
+        {
+            var rect = DuelUiKit.CreateRect("Icon", parent, min, max, Vector2.zero, Vector2.zero);
+            return DuelUiKit.AddImage(rect.gameObject, Action(key), Color.white, true, false);
+        }
 
         internal static Sprite Filter(string key) => Find("filter/" + key.ToLowerInvariant());
 

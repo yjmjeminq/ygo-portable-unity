@@ -228,7 +228,7 @@ namespace YGOPortable.UI
                 _cardActionsPrompt = prompt;
                 ClearCardActionButtons(1);
                 bool activations = actions.Any(action => CommandIcon(action.responseVal) == "ACTION");
-                AddCardAction(0, "ACTION", activations ? "효과 발동" : "행동 선택", () =>
+                AddCardAction(0, activations ? "ACTION" : "LOOK", activations ? "효과 발동" : "행동 선택", () =>
                 {
                     if (!CanShowCardActions || _session != session || !ReferenceEquals(session.ActivePrompt, prompt) ||
                         _cardActionAnchor != pile.root) return;
@@ -365,18 +365,22 @@ namespace YGOPortable.UI
             var slot = DuelUiKit.CreateRect(name ?? iconName, _cardActionsBar, Vector2.zero, Vector2.zero,
                 new Vector2(left, 0f), new Vector2(left + CardActionWidth, CardActionHeight));
             bool highlighted = iconName is "ACTION" or "ATTACK" or "SUMMON" or "SUMMONSP";
+            bool iconOnly = iconName == "ACTION";
             var face = _mobileLayout ? DuelUiKit.FillRect("Circle", slot) : DuelUiKit.CreateRect("Circle", slot,
-                new Vector2(.09f, .25f), new Vector2(.91f, 1f), Vector2.zero, Vector2.zero);
+                new Vector2(.09f, iconOnly ? .06f : .25f), new Vector2(.91f, 1f), Vector2.zero, Vector2.zero);
             var button = _mobileLayout
                 ? DuelStyle.Button(face, "Button", "", action, 14, highlighted)
                 : DuelStyle.RoundButton(face, "Button", highlighted ? DuelStyle.Gold : DuelStyle.Player, action);
-            var caption = DuelUiKit.CreateRect("Caption", slot, Vector2.zero, new Vector2(1f, .27f),
-                Vector2.zero, Vector2.zero);
-            DuelStyle.Shadow(DuelUiKit.AddFittedText(caption, "Label", label, 14, 9, TextAnchor.MiddleCenter,
-                Color.white, FontStyle.Bold), 1.5f);
-            var icon = DuelUiKit.CreateRect("Icon", button.transform, new Vector2(.24f, _mobileLayout ? .36f : .24f),
-                new Vector2(.76f, _mobileLayout ? .91f : .76f), Vector2.zero, Vector2.zero);
-            DuelUiKit.AddImage(icon.gameObject, DuelUiIcons.Action(iconName), Color.white, true, false);
+            if (!iconOnly)
+            {
+                var caption = DuelUiKit.CreateRect("Caption", slot, Vector2.zero, new Vector2(1f, .27f),
+                    Vector2.zero, Vector2.zero);
+                DuelStyle.Shadow(DuelUiKit.AddFittedText(caption, "Label", label, 14, 9, TextAnchor.MiddleCenter,
+                    Color.white, FontStyle.Bold), 1.5f);
+            }
+            DuelUiIcons.AddActionImage(button.transform, iconName,
+                iconOnly ? new Vector2(.14f, .14f) : new Vector2(.24f, _mobileLayout ? .36f : .24f),
+                iconOnly ? new Vector2(.86f, .86f) : new Vector2(.76f, _mobileLayout ? .91f : .76f));
         }
 
         private void AddRadialCardAction(int index, string iconName, string label, Action action, string name)
@@ -394,9 +398,12 @@ namespace YGOPortable.UI
             bool primary = iconName is "ACTION" or "ATTACK" or "SUMMON" or "SUMMONSP";
             var circle = DuelUiKit.FillRect("Circle", slot);
             var button = DuelStyle.RoundButton(circle, "Button", primary ? DuelStyle.Gold : DuelStyle.ChainCyan, action);
-            var icon = DuelUiKit.CreateRect("Icon", button.transform, new Vector2(.24f, .39f), new Vector2(.76f, .86f),
-                Vector2.zero, Vector2.zero);
-            DuelUiKit.AddImage(icon.gameObject, DuelUiIcons.Action(iconName), Color.white, true, false);
+            if (iconName == "ACTION")
+            {
+                DuelUiIcons.AddActionImage(button.transform, iconName, new Vector2(.14f, .14f), new Vector2(.86f, .86f));
+                return;
+            }
+            DuelUiIcons.AddActionImage(button.transform, iconName, new Vector2(.21f, .39f), new Vector2(.79f, .89f));
             var caption = DuelUiKit.CreateRect("Caption", button.transform, new Vector2(.08f, .12f), new Vector2(.92f, .39f),
                 Vector2.zero, Vector2.zero);
             DuelUiKit.AddFittedText(caption, "Label", label, 15, 9, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);

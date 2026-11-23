@@ -45,6 +45,10 @@ namespace YGOPortable.Editor
             Require(DuelUiIcons.Find("phase/main2") != null && DuelUiIcons.Action("SUMMONSP") != null &&
                 DuelUiKit.GetSpellTrapSprite(YgoConstants.TYPE_TRAP | YgoConstants.TYPE_COUNTER) != null,
                 "A phase, command, or spell and trap icon did not resolve.");
+            var commands = new[] { "ACTION", "ATTACK", "SUMMON", "SUMMONSP", "TURN_DEF", "SETMONST",
+                "SET", "LOOK", "SURRENDER", "CANCEL" }.Select(DuelUiIcons.Action).ToArray();
+            Require(commands.All(sprite => sprite != null) && commands.Distinct().Count() == commands.Length,
+                "The duel commands did not each resolve to a distinct pictogram.");
             var suppliedSleeve = Resources.Load<Texture2D>(CardArtLoader.CardSleeveResource);
             var fileSleeve = CardArtLoader.GetDuelVisualsSprite(CardArtLoader.CardSleeveFile);
             var sleeve = CardArtLoader.GetCardBackSprite();

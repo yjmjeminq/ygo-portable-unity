@@ -1108,16 +1108,16 @@ namespace YGOPortable.UI
             _oppGyTile = CreateStackTile(Cell(1, 1), true, YgoConstants.LOCATION_GRAVE, "묘지");
             _oppBanTile = CreateStackTile(Cell(1, 2), true, YgoConstants.LOCATION_REMOVED, "제외");
 
-            _extraSummonButton = BuildPileActionButton(_myExtraTile, "ExtraSummon", "특수 소환", OpenExtraSummonPicker);
-            _extraEffectButton = BuildPileActionButton(_myExtraTile, "ExtraEffect", "발동",
+            _extraSummonButton = BuildPileActionButton(_myExtraTile, "ExtraSummon", "SUMMONSP", OpenExtraSummonPicker);
+            _extraEffectButton = BuildPileActionButton(_myExtraTile, "ExtraEffect", "ACTION",
                 () => OpenPileEffectPicker(YgoConstants.LOCATION_EXTRA), activation: true);
-            _graveEffectButton = BuildPileActionButton(_myGyTile, "GraveEffect", "효과 발동",
+            _graveEffectButton = BuildPileActionButton(_myGyTile, "GraveEffect", "ACTION",
                 () => OpenPileEffectPicker(YgoConstants.LOCATION_GRAVE), activation: true);
-            _banishedEffectButton = BuildPileActionButton(_myBanTile, "BanishedEffect", "효과 발동",
+            _banishedEffectButton = BuildPileActionButton(_myBanTile, "BanishedEffect", "ACTION",
                 () => OpenPileEffectPicker(YgoConstants.LOCATION_REMOVED), activation: true);
         }
 
-        private static Button BuildPileActionButton(StackTileView tile, string name, string label, Action action, bool activation = false)
+        private static Button BuildPileActionButton(StackTileView tile, string name, string icon, Action action, bool activation = false)
         {
             var indicator = DuelUiKit.CreateRect(name, tile.root, new Vector2(.07f, .645f),
                 new Vector2(.93f, .965f), Vector2.zero, Vector2.zero);
@@ -1126,16 +1126,7 @@ namespace YGOPortable.UI
             var rim = AddHudSurface(rect, tone, activation
                 ? new Color(.24f, .16f, .066f, .99f) : new Color(.063f, .18f, .22f, .99f));
             var button = AddHudButton(rim, action);
-            var caption = rect;
-            if (activation)
-            {
-                var symbol = DuelUiKit.CreateRect("Effect", rect, new Vector2(.055f, .13f),
-                    new Vector2(.29f, .87f), Vector2.zero, Vector2.zero);
-                DuelUiKit.AddImage(symbol.gameObject, DuelStatSymbols.BattleEffect, tone, true, false);
-                caption = DuelUiKit.CreateRect("Caption", rect, new Vector2(.29f, 0f), new Vector2(.96f, 1f),
-                    Vector2.zero, Vector2.zero);
-            }
-            DuelUiKit.AddFittedText(caption, "Label", label, 17, 9, TextAnchor.MiddleCenter, tone, FontStyle.Bold);
+            DuelUiIcons.AddActionImage(rect, icon, new Vector2(.12f, .045f), new Vector2(.88f, .955f));
             button.gameObject.SetActive(false);
             return button;
         }

@@ -924,6 +924,7 @@ namespace YGOPortable.Editor
                 var hoverArea = (RectTransform)bar.Find("HoverArea");
                 var activate = (RectTransform)bar.Find("ACTION/Circle/Button");
                 Require(bar.gameObject.activeInHierarchy && activate != null, "The hovered hand card had no activation icon.");
+                RequireActionIcon(activate, "ACTION");
                 var behind = DuelUiKit.FillRect("CardBehindActions", bar.parent);
                 behind.SetSiblingIndex(bar.GetSiblingIndex());
                 DuelUiKit.AddImage(behind.gameObject, DuelUiKit.WhiteSprite, Color.white);
@@ -961,8 +962,10 @@ namespace YGOPortable.Editor
             internal void VerifyGraveEffectButton(bool visible)
             {
                 Field.Refresh();
-                Require(Private<Button>(Field, "_graveEffectButton").gameObject.activeInHierarchy == visible,
+                var button = Private<Button>(Field, "_graveEffectButton");
+                Require(button.gameObject.activeInHierarchy == visible,
                     "The grave effect shortcut did not match the current activation availability.");
+                if (visible) RequireActionIcon(button.transform, "ACTION");
                 Require(StackRoot("_myGyTile").Find("PlayableGlow").gameObject.activeInHierarchy == visible,
                     "The grave effect glow did not match the current activation availability.");
             }
@@ -1018,10 +1021,19 @@ namespace YGOPortable.Editor
                 Field.HandleDuelPad(new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Submit));
                 picker = VerifyActivationPicker(prompt, "묘지 효과 발동", code);
                 var action = picker.Find("Footer/Activate/B").GetComponent<Button>();
-                Require(action.GetComponentInChildren<Text>().text == "발동한다", "The grave effect was not actionable in the chooser.");
+                Require(action.IsInteractable(), "The grave effect was not actionable in the chooser.");
+                RequireActionIcon(action.transform, "ACTION");
                 Click(action);
                 Require(!Modals.IsPromptOpen && !ReferenceEquals(prompt, _duel.ActivePrompt),
                     "Activating a grave effect did not close the picker and continue the duel.");
+            }
+
+            private static void RequireActionIcon(Transform button, string key)
+            {
+                var icon = button.Find("Icon")?.GetComponent<Image>();
+                Require(icon != null && icon.sprite != null && icon.sprite == DuelUiIcons.Action(key) &&
+                    !icon.raycastTarget && button.GetComponentsInChildren<Text>(true).All(label => label.text.Length == 0),
+                    $"The {button.name} command did not use a text-free {key} image.");
             }
 
             private Transform VerifyActivationPicker(DuelPrompt prompt, string title, params uint[] expected)
@@ -1096,6 +1108,8 @@ namespace YGOPortable.Editor
                     var indicator = (RectTransform)summonButton.transform;
                     var effectButton = Private<Button>(Field, "_extraEffectButton");
                     var effectPlate = (RectTransform)effectButton.transform.parent;
+                    RequireActionIcon(summonButton.transform, "SUMMONSP");
+                    RequireActionIcon(effectButton.transform, "ACTION");
                     Require(indicator.IsChildOf(pile) && ((RectTransform)indicator.parent).anchorMin.y > .5f,
                         "Summon availability must be shown at the top of the player's Extra Deck.");
                     Require(effectButton.gameObject.activeInHierarchy && effectPlate.IsChildOf(pile) &&

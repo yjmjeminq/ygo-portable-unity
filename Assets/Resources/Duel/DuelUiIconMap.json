@@ -73,6 +73,7 @@
     "race/creator",
     "race/mystdragon",
     "race/cyverse",
-    "race/illusion"
+    "race/illusion",
+    "action/cancel"
   ]
 }

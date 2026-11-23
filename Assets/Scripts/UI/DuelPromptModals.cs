@@ -651,8 +651,13 @@ namespace YGOPortable.UI
                 Vector2.zero, Vector2.zero);
             var pass = DuelUiKit.CreateRect("Pass", footer, new Vector2(.655f, 0f), new Vector2(.817f, 1f), Vector2.zero, Vector2.zero);
             _chainPass = DuelStyle.Button(pass, "B", "취소", OnModalCloseClicked, 16);
+            DuelUiIcons.AddActionImage(_chainPass.transform, "CANCEL", new Vector2(.045f, .13f), new Vector2(.25f, .87f));
+            var passText = _chainPass.GetComponentInChildren<Text>().rectTransform;
+            passText.anchorMin = new Vector2(.26f, 0f);
+            passText.anchorMax = new Vector2(.96f, 1f);
             var activate = DuelUiKit.CreateRect("Activate", footer, new Vector2(.836f, 0f), Vector2.one, Vector2.zero, Vector2.zero);
-            _chainActivate = DuelStyle.Button(activate, "B", "효과 발동", ConfirmChainChoice, 16, gold: true);
+            _chainActivate = DuelStyle.Button(activate, "B", "", ConfirmChainChoice, 16, gold: true);
+            DuelUiIcons.AddActionImage(_chainActivate.transform, "ACTION", new Vector2(.12f, .06f), new Vector2(.88f, .94f));
             _chainBox.gameObject.SetActive(false);
         }
 
@@ -1233,7 +1238,6 @@ namespace YGOPortable.UI
             _chainSummary.text = summary;
             _chainPass.transform.parent.gameObject.SetActive(passLabel != null);
             _chainPass.GetComponentInChildren<Text>(true).text = compact && passLabel != null ? "발동하지 않는다" : passLabel ?? "";
-            _chainActivate.GetComponentInChildren<Text>(true).text = compact ? "발동한다" : "효과 발동";
             _chainActivate.interactable = choices.Length > 0;
             _chainName.text = _chainSource.text = _chainEffect.text = "";
 

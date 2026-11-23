@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,9 +24,36 @@ FILTERS = {
     "pend": "P", "genre": "효과", "atk": "ATK", "def": "DEF",
 }
 ACTIONS = {
-    "action": "발동", "attack": "↗", "summon": "소환", "summonsp": "특수",
-    "turn_def": "표시", "setmonst": "세트", "set": "세트", "look": "◉", "surrender": "종료",
+    "action": ("#ffcd67", ("49,11 59,39 85,49 59,59 49,87 39,59 13,49 39,39",
+                            "77,10 81,20 91,24 81,28 77,38 73,28 63,24 73,20",
+                            "23,65 27,73 35,77 27,81 23,89 19,81 11,77 19,73"),
+               ("49,38 60,49 49,60 38,49",)),
+    "attack": ("#ffa08d", ("82,13 87,34 59,62 65,70 57,78 49,70 32,87 23,80 40,62 32,54 40,46 48,53 75,18",),
+               ("76,25 76,32 55,53 52,50",)),
+    "summon": ("#7ae9d3", ("50,11 75,36 60,36 60,55 40,55 40,36 25,36",
+                            "24,56 76,56 82,62 82,84 76,90 24,90 18,84 18,62"),
+               ("29,66 71,66 71,80 29,80",)),
+    "summonsp": ("#83dcff", ("50,12 67,34 57,34 57,49 43,49 43,34 33,34",
+                              "23,37 33,50 27,50 27,63 19,63 19,50 13,50",
+                              "77,37 87,50 81,50 81,63 73,63 73,50 67,50",
+                              "50,53 84,66 91,74 84,82 50,93 16,82 9,74 16,66"),
+                 ("50,63 78,74 50,83 22,74",)),
+    "turn_def": ("#b9d4ff", ("31,30 62,13 82,50 51,67",
+                              "21,38 21,60 35,74 60,74 60,65 83,80 60,93 60,85 33,85 10,64 10,38"),
+                 ("43,34 58,25 70,46 55,54",)),
+    "setmonst": ("#a6dae5", ("26,15 74,15 81,22 81,50 69,50 69,27 31,27 31,50 19,50 19,22",
+                              "50,35 80,51 73,77 50,91 27,77 20,51"),
+                 ("50,49 65,57 62,69 50,77 38,69 35,57",)),
+    "set": ("#a6dae5", ("40,12 60,12 60,33 74,33 50,58 26,33 40,33",
+                         "16,59 84,59 90,65 90,84 84,90 16,90 10,84 10,65"),
+            ("23,70 77,70 77,80 23,80",)),
+    "look": ("#dbedf0", ("9,50 26,31 50,22 74,31 91,50 74,69 50,78 26,69",
+                          "50,39 61,50 50,61 39,50"),
+             ("23,50 29,44 38,38 31,50 38,62 29,56", "77,50 71,44 62,38 69,50 62,62 71,56")),
+    "surrender": ("#ffc4a4", ("25,14 36,14 36,20 57,20 78,24 78,58 57,52 36,52 36,87 25,87",
+                               "19,82 46,82 46,90 19,90"), ()),
 }
+CANCEL_ACTION = ("#d5e5eb", ("28,17 50,39 72,17 83,28 61,50 83,72 72,83 50,61 28,83 17,72 39,50 17,28",), ())
 PHASES = {"draw": "D", "standby": "S", "main1": "1", "battle": "B", "main2": "2", "end": "E"}
 
 # Polygon points use a 100×100 canvas. A separate cutout keeps the marks readable at HUD size.
@@ -95,7 +122,7 @@ def entries():
         ("spell", SPELLS, "#8ce0c4", "orb"),
         ("trap", TRAPS, "#e7a7d7", "orb"),
         ("filter", FILTERS, "#bad6e1", "plate"),
-        ("action", ACTIONS, "#ffdf99", "plate"),
+        ("action", ACTIONS, None, "pictogram"),
         ("phase", PHASES, "#e2f5ff", "hex"),
     ):
         for key, label in labels.items():
@@ -104,6 +131,8 @@ def entries():
 
 
 def render(label, color, shape):
+    if shape == "pictogram":
+        return render_action(*label)
     size = CELL * SCALE
     image = Image.new("RGBA", (size, size))
     draw = ImageDraw.Draw(image)
@@ -142,23 +171,41 @@ def render(label, color, shape):
     return image.resize((CELL, CELL), Image.Resampling.LANCZOS)
 
 
+def contour_points(outline, size):
+    return [tuple(round(int(coord) * size / 100) for coord in pair.split(",")) for pair in outline.split()]
+
+
+def render_action(accent, symbol, cutouts):
+    size = CELL * SCALE
+    mask = Image.new("L", (size, size))
+    draw = ImageDraw.Draw(mask)
+    for contour in symbol:
+        draw.polygon(contour_points(contour, size), fill=255)
+    for contour in cutouts:
+        draw.polygon(contour_points(contour, size), fill=0)
+    image = Image.new("RGBA", mask.size, accent)
+    image.putalpha(mask.filter(ImageFilter.GaussianBlur(7)).point(lambda value: value * .52))
+    glyph = Image.new("RGBA", mask.size, accent)
+    glyph.paste("#fff9ea", (0, 0, size, size // 2), mask.crop((0, 0, size, size // 2)))
+    glyph.putalpha(mask)
+    image.alpha_composite(glyph)
+    return image.resize((CELL, CELL), Image.Resampling.LANCZOS)
+
+
 def render_identity(symbol, cutouts, accent, race=False):
     size = CELL * SCALE
     image = Image.new("RGBA", (size, size))
     draw = ImageDraw.Draw(image)
     ground = "#162836" if race else "#12202e"
 
-    def points(outline):
-        return [tuple(round(int(coord) * size / 100) for coord in pair.split(",")) for pair in outline.split()]
-
-    plate = points("25,8 75,8 92,25 92,75 75,92 25,92 8,75 8,25" if race else
-                   "34,7 66,7 93,34 93,66 66,93 34,93 7,66 7,34")
+    plate = contour_points("25,8 75,8 92,25 92,75 75,92 25,92 8,75 8,25" if race else
+                           "34,7 66,7 93,34 93,66 66,93 34,93 7,66 7,34", size)
     draw.polygon(plate, fill=ground)
     draw.line(plate + plate[:1], fill=accent, width=4 * SCALE, joint="curve")
     for contour in symbol:
-        draw.polygon(points(contour), fill=accent)
+        draw.polygon(contour_points(contour, size), fill=accent)
     for contour in cutouts:
-        draw.polygon(points(contour), fill=ground)
+        draw.polygon(contour_points(contour, size), fill=ground)
     return image.resize((CELL, CELL), Image.Resampling.LANCZOS)
 
 
@@ -168,6 +215,7 @@ def main():
                  for key, (accent, symbol, cutouts) in ATTRIBUTES.items())
     icons.extend((f"race/{key}", render_identity(symbol, cutouts, "#aee5e6", race=True))
                  for key, (symbol, cutouts) in RACES.items())
+    icons.append(("action/cancel", render_action(*CANCEL_ACTION)))
     rows = (len(icons) + COLUMNS - 1) // COLUMNS
     atlas = Image.new("RGBA", (COLUMNS * CELL, rows * CELL))
     for index, (_, icon) in enumerate(icons):
