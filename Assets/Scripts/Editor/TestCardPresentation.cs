@@ -49,10 +49,11 @@ namespace YGOPortable.Editor
 
         internal static void VerifyOverframePaths()
         {
+            const uint magician = 46986414, baronne = 84815190, excel = 9674034, unrelated = 20721928;
             var installed = Path.Combine(CardArtLoader.ActiveDuelVisualsPath, "CutIns");
             if (Directory.Exists(installed))
             {
-                int verified = 0;
+                int verified = 0, fellBack = 0;
                 foreach (string file in Directory.EnumerateFiles(installed, "*.png"))
                 {
                     var parts = Path.GetFileNameWithoutExtension(file).Split('-');
@@ -61,16 +62,24 @@ namespace YGOPortable.Editor
                     var source = CardArtLoader.GetArtworkSource(code, variant);
                     Require(source == (code, variant), $"The installed portrait {code}-{variant} had no matching card art.");
                     var portrait = DuelVisualAssets.RetainCutIn(source.Code, source.Variant);
+                    if (portrait == null && code == baronne && variant == 0)
+                    {
+                        var artwork = CardArtLoader.RetainArtwork(code, variant);
+                        Require(artwork != null && artwork != CardArtLoader.GetFallbackArt(),
+                            "The incomplete Baronne cut-in did not have its illustration available for fallback.");
+                        CardArtLoader.ReleaseArtwork(code, variant);
+                        fellBack++;
+                        continue;
+                    }
                     Require(portrait != null && portrait.rect.width > 0, $"The installed cut-in {code}-{variant} did not decode.");
                     if (variant == 0)
                         Require(DuelVisualAssets.CanDisplayCutIn(code, -1), $"Bundled art skipped the installed {code}-0 cut-in.");
                     DuelVisualAssets.ReleaseCutIn(portrait);
                     verified++;
                 }
-                Debug.Log($"[VERIFY OVERFRAME LIBRARY] Decoded {verified} installed cut-ins and checked the bundled default lookup.");
+                Debug.Log($"[VERIFY OVERFRAME LIBRARY] Verified {verified} installed cut-ins and {fellBack} illustration fallbacks.");
             }
 
-            const uint magician = 46986414, baronne = 84815190, excel = 9674034, unrelated = 20721928;
             string folder = Path.Combine(Path.GetTempPath(), "ygo-overframe-art-" + Guid.NewGuid().ToString("N"));
             string directory = Path.Combine(folder, "CutIns");
             Directory.CreateDirectory(directory);

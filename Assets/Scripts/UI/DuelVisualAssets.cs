@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Security.Cryptography;
 using UnityEngine;
 using YGOPortable.Core;
 
@@ -159,7 +160,7 @@ namespace YGOPortable.UI
             }
 
             if (UnreadableCutIns.Contains(path) || !File.Exists(path)) return null;
-            var texture = LoadTextureFile(path, TextureWrapMode.Clamp, markNonReadable: false);
+            var texture = LoadTextureFile(path, TextureWrapMode.Clamp, forCutIn: true);
             var sprite = texture == null ? null : CreateCutInSprite(texture);
             if (sprite == null)
             {
@@ -236,19 +237,28 @@ namespace YGOPortable.UI
         private static Texture2D LoadTexture(string name, TextureWrapMode wrapMode) =>
             LoadTextureFile(Path.Combine(CardArtLoader.LocalDuelVisualsPath, name), wrapMode);
 
-        private static Texture2D LoadTextureFile(string path, TextureWrapMode wrapMode, bool markNonReadable = true)
+        private static Texture2D LoadTextureFile(string path, TextureWrapMode wrapMode, bool forCutIn = false)
         {
             if (!File.Exists(path)) return null;
             try
             {
                 var bytes = File.ReadAllBytes(path);
+                string name = Path.GetFileNameWithoutExtension(path);
+                if (forCutIn && name == "84815190-0")
+                {
+                    // One released import contains separated pieces of Baronne. A replacement can use the same filename.
+                    using var hash = SHA256.Create();
+                    if (BitConverter.ToString(hash.ComputeHash(bytes)) ==
+                        "43-71-AC-BE-98-D4-0D-0A-61-A3-8E-76-0C-BD-68-0D-D3-1C-ED-AD-15-75-41-6A-56-F2-F7-39-B4-CF-0B-9A")
+                        return null;
+                }
                 var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false)
                 {
-                    name = Path.GetFileNameWithoutExtension(path),
+                    name = name,
                     wrapMode = wrapMode,
                     filterMode = FilterMode.Bilinear,
                 };
-                if (texture.LoadImage(bytes, markNonReadable)) return texture;
+                if (texture.LoadImage(bytes, markNonReadable: !forCutIn)) return texture;
                 if (Application.isPlaying) UnityEngine.Object.Destroy(texture);
                 else UnityEngine.Object.DestroyImmediate(texture);
             }
