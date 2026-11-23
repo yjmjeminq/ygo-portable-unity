@@ -555,22 +555,36 @@ namespace YGOPortable.Editor
 
         private static void VerifyOverframeActivationProjection(CardAnimationManager animator, Queue<IEnumerator> queue, CardPose start)
         {
-            const uint pot = 55144522, mirrorForce = 44095762;
-            foreach (uint code in new[] { pot, mirrorForce })
+            const uint pot = 55144522, mirrorForce = 44095762, fissure = 66788016;
+            foreach (uint code in new[] { pot, mirrorForce, fissure })
             {
                 animator.QueueChain(start, code, 1, code == mirrorForce, appearance: new DeckCardAppearance { overframe = true });
                 var link = queue.Dequeue();
                 Require(link.MoveNext(), "The spell or trap activation did not animate.");
-                SampleAnimation((IEnumerator)link.Current)(.94f);
+                var lift = SampleAnimation((IEnumerator)link.Current);
+                lift(.64f);
                 var card = animator.transform.Find("MovingCard").GetComponent<CompositeCardView>();
+                var artwork = card.transform.Find("AspectBox/Artwork");
+                var foil = artwork.Find("CinematicFinish").GetComponent<CardFinishGraphic>();
+                Canvas.ForceUpdateCanvases();
+                int changedVertices = 0;
+                foil.RegisterDirtyVerticesCallback(() => changedVertices++);
+                lift(.83f);
+                lift(.94f);
                 var projection = animator.transform.Find("OverframeArtProjection");
+                var flare = animator.transform.Find("OverframeActivation").GetComponent<DuelEffectGraphic>();
                 Require(card.HasOverframe && !card.HasOverframePortrait &&
                     projection.GetComponent<CanvasGroup>().alpha > .7f &&
                     projection.Find("Artwork").GetComponent<Image>().sprite == card.ArtworkSprite &&
-                    animator.transform.Find("OverframeActivation") != null,
+                    flare.Tint == DuelStyle.ChainCyan,
                     "The special spell or trap did not project the matching artwork with its own flare.");
+                Require(foil.Rarity == CardRarity.UltraRare && foil.canvasRenderer.GetAlpha() > .7f && changedVertices == 0 &&
+                    artwork.Find("OverframeShade").GetComponent<Image>().canvasRenderer.GetAlpha() < .35f &&
+                    (code != fissure || artwork.Find("RarityFinish") == null),
+                    "The edition reflection hid the source art, depended on rarity, or rebuilt its mesh during activation.");
                 Require(link.MoveNext(), "The projected artwork did not return to the field.");
                 SampleAnimation((IEnumerator)link.Current)(1f);
+                Require(foil.canvasRenderer.GetAlpha() < .01f, "The edition reflection stayed visible on return.");
                 Require(!link.MoveNext() && animator.transform.Find("OverframeArtProjection") == null &&
                     animator.transform.Find("OverframeActivation") == null, "The edition flare was not cleaned up.");
             }
@@ -579,7 +593,7 @@ namespace YGOPortable.Editor
             Require(concealed.MoveNext() && animator.transform.Find("OverframeArtProjection") == null &&
                 animator.transform.Find("OverframeActivation") == null, "The projection exposed an unidentified card.");
             animator.Clear();
-            Debug.Log("[VERIFY OVERFRAME ACTIVATION] Spell and trap artwork, edition flare and concealment passed.");
+            Debug.Log("[VERIFY OVERFRAME ACTIVATION] Spell and trap artwork, rarity-independent foil, cyan flare and concealment passed.");
         }
 
         private static void TrackStableOverframe(Transform overframe, Action<float> frame, float from, float to)

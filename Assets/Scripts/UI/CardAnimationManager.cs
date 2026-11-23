@@ -1966,10 +1966,7 @@ namespace YGOPortable.UI
             float projectionSide = previous == 0 ? -side : side;
             if (special)
             {
-                uint type = live?.type ?? CardDatabase.Get(code)?.type ?? 0;
-                var tint = (type & YgoConstants.TYPE_TRAP) != 0 ? new Color(.91f, .53f, 1f) :
-                    (type & YgoConstants.TYPE_SPELL) != 0 ? new Color(.28f, .92f, .77f) :
-                    new Color(.71f, .88f, 1f);
+                var tint = DuelStyle.ChainCyan;
                 editionFlare = CreateEffect(DuelEffectKind.ChainApplied, center, reveal.Size * 1.6f, tint);
                 editionFlare.name = "OverframeActivation";
                 if (!card.HasOverframePortrait && card.ArtworkSprite != null &&

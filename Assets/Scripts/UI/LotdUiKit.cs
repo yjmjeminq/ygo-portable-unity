@@ -610,7 +610,7 @@ namespace YGOPortable.UI
         internal void SetRarityHighlight(float amount)
         {
             if (_finish != null && _finish.gameObject.activeSelf) _finish.SetHighlight(amount);
-            if (_overframeFinish != null && HasOverframe) _overframeFinish.SetHighlight(Mathf.Lerp(.18f, .72f, amount));
+            if (!_cinematicOverframe && HasOverframe) _overframeFinish.SetHighlight(Mathf.Lerp(.18f, .72f, amount));
         }
 
         internal void SetReadoutFocus(float amount)
@@ -739,34 +739,30 @@ namespace YGOPortable.UI
                 _overframe = layer.gameObject.AddComponent<CanvasGroup>();
                 _overframe.blocksRaycasts = _overframe.interactable = false;
                 RectTransform portraitBounds = layer;
+                RectTransform finishBounds = _artImg.rectTransform;
                 if (!_cinematicOverframe)
                 {
                     var face = LotdUiKit.CreateRect("FaceArtwork", layer, new Vector2(.032f, .026f),
                         new Vector2(.968f, .974f), Vector2.zero, Vector2.zero);
                     face.gameObject.AddComponent<RectMask2D>();
+                    finishBounds = face;
                     var background = LotdUiKit.FillRect("ExpandedArtwork", face);
                     _overframeBackground = LotdUiKit.AddImage(background.gameObject, null, new Color(.86f, .91f, .98f), false, false);
                     _overframeBackgroundFit = background.gameObject.AddComponent<AspectRatioFitter>();
                     _overframeBackgroundFit.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
-                    _overframeFinish = LotdUiKit.FillRect("ExpandedFinish", face).gameObject.AddComponent<CardFinishGraphic>();
-                    _overframeFinish.raycastTarget = false;
                     // Leave clipping to the enclosing viewport so tilt can carry the subject past the card.
                     portraitBounds = LotdUiKit.CreateRect("PortraitBounds", layer, new Vector2(-.105f, .28f),
                         new Vector2(1.105f, 1.115f), Vector2.zero, Vector2.zero);
                 }
-                var shade = LotdUiKit.FillRect("OverframeShade", _cinematicOverframe ? _artImg.rectTransform : layer);
-                _overframeShade = LotdUiKit.AddImage(shade.gameObject,
-                    _cinematicOverframe ? LotdUiKit.WhiteSprite : DuelStyle.OverframeBackdrop,
-                    _cinematicOverframe ? new Color(.021f, .033f, .048f) : new Color(1f, 1f, 1f, .23f), false, false);
-                if (_cinematicOverframe) CreateOverframeTrim(layer);
-                else
-                {
-                    // Keep the tint between the expanded art and the prismatic finish.
-                    shade.SetParent(_overframeFinish.transform.parent, false);
-                    shade.SetSiblingIndex(_overframeFinish.transform.GetSiblingIndex());
-                    CreateOverframeTrim(layer);
+                var shade = LotdUiKit.FillRect("OverframeShade", finishBounds);
+                _overframeShade = LotdUiKit.AddImage(shade.gameObject, DuelStyle.OverframeBackdrop,
+                    _cinematicOverframe ? Color.white : new Color(1f, 1f, 1f, .23f), false, false);
+                var finish = LotdUiKit.FillRect(_cinematicOverframe ? "CinematicFinish" : "ExpandedFinish", finishBounds);
+                _overframeFinish = finish.gameObject.AddComponent<CardFinishGraphic>();
+                _overframeFinish.raycastTarget = false;
+                CreateOverframeTrim(layer);
+                if (!_cinematicOverframe)
                     _overframeTrim.transform.SetSiblingIndex(portraitBounds.GetSiblingIndex());
-                }
                 _overframeTilt = LotdUiKit.FillRect("Depth", portraitBounds);
                 _overframeTilt.pivot = new Vector2(.5f, .78f);
                 var portrait = LotdUiKit.CreateRect("LocalCutIn", _overframeTilt,
@@ -784,8 +780,13 @@ namespace YGOPortable.UI
                 _overframeBackground.color = hasPortrait ? Color.white : new Color(.86f, .91f, .98f);
                 Rect art = _overframeBackground.sprite.rect;
                 _overframeBackgroundFit.aspectRatio = art.width / Mathf.Max(1f, art.height);
+            }
+            bool showFinish = !_cinematicOverframe || _deckAppearance?.overframe == true;
+            _overframeFinish.gameObject.SetActive(showFinish);
+            if (showFinish)
+            {
                 _overframeFinish.Bind(_retainedArtwork, CardRarity.UltraRare);
-                _overframeFinish.SetHighlight(.18f);
+                _overframeFinish.SetHighlight(_cinematicOverframe ? .54f : .18f);
             }
             _overframePortrait.sprite = _retainedCutIn;
             _overframePortrait.enabled = hasPortrait;
@@ -798,7 +799,7 @@ namespace YGOPortable.UI
         private void CreateOverframeTrim(Transform layer)
         {
             _overframeTrim = LotdUiKit.FillRect("OverframeTrim", layer).gameObject.AddComponent<CardOverframeGraphic>();
-            _overframeTrim.Configure(_cinematicOverframe, _overframeFinish?.canvasRenderer);
+            _overframeTrim.Configure(_cinematicOverframe, _cinematicOverframe ? null : _overframeFinish.canvasRenderer);
         }
 
         private void ApplyOverframeInk()
@@ -818,6 +819,8 @@ namespace YGOPortable.UI
                 float spread = Mathf.Sin(Mathf.Clamp01(shimmer) * Mathf.PI);
                 _overframeTrim.transform.localScale = Vector3.one * (1.03f + spread * .26f);
                 _overframeTrim.canvasRenderer.SetAlpha(_deckAppearance?.overframe == true ? .42f + spread * .52f : 0f);
+                if (_overframeFinish.gameObject.activeSelf)
+                    _overframeFinish.canvasRenderer.SetAlpha(_overframe.alpha * Mathf.Lerp(.28f, .96f, spread));
             }
             else
             {
@@ -840,6 +843,7 @@ namespace YGOPortable.UI
             DuelVisualAssets.ReleaseCutIn(_retainedCutIn);
             _retainedCutIn = null;
             _overframeShade.gameObject.SetActive(false);
+            if (_cinematicOverframe) _overframeFinish.gameObject.SetActive(false);
             _overframe.gameObject.SetActive(false);
         }
 
