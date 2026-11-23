@@ -42,7 +42,7 @@ namespace YGOPortable.UI
             float artRight = _mobileLayout ? .361f : .422f;
             float rulesLeft = artRight + .025f;
             var art = DeckArea(_expandedDeckPanel, "Artwork", .048f, .084f, artRight, .913f);
-            _expandedDeckArt = CompositeCardView.Create(art, "Card", detailedOverlay: true, duelArtwork: true);
+            _expandedDeckArt = CompositeCardView.Create(art, "Card", detailedOverlay: true);
             _expandedDeckArt.EnableOverframe();
             CardOverframeInput.Attach(art, _expandedDeckArt, _mobileLayout);
             var name = DeckArea(_expandedDeckPanel, "Name", rulesLeft, .804f, .759f, .928f);

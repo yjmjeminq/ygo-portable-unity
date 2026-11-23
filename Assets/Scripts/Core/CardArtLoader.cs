@@ -151,13 +151,16 @@ namespace YGOPortable.Core
 
         internal static IReadOnlyList<int> GetDuelArtworkChoices(uint code)
         {
-            if (_duelVariants.TryGetValue(code, out var variants)) return variants;
+            if (_duelVariants.TryGetValue(code, out var variants) && !HasDedicatedTokenArt(code)) return variants;
             return Array.Empty<int>();
         }
 
+        private static bool HasDedicatedTokenArt(uint code) =>
+            _index?.ContainsKey(code) == true && ((CardDatabase.Get(code)?.type ?? 0) & YgoConstants.TYPE_TOKEN) != 0;
+
         internal static int GetDuelArtworkVariant(uint code)
         {
-            if (!_duelVariants.TryGetValue(code, out var variants)) return BundledArtwork;
+            if (!_duelVariants.TryGetValue(code, out var variants) || HasDedicatedTokenArt(code)) return BundledArtwork;
             if (variants.Count == 1) return variants[0];
             int variant = PlayerPrefs.GetInt($"DuelArtwork.{code}", variants[0]);
             return variants.Contains(variant) ? variant : variants[0];

@@ -158,12 +158,12 @@ namespace YGOPortable.UI
         private StatCell _effect;
         private DuelLinkCompass _compass;
 
-        internal DuelStatStrip(RectTransform root, bool compact)
+        internal DuelStatStrip(RectTransform root, bool compact, bool useHudSkin = true)
         {
             _root = root;
             _compact = compact;
-            _attack = new StatCell(root, "Attack", "공격력", AttackColor, compact);
-            _defense = new StatCell(root, "Defense", "수비력", DefenseColor, compact);
+            _attack = new StatCell(root, "Attack", "공격력", AttackColor, compact, useHudSkin: useHudSkin);
+            _defense = new StatCell(root, "Defense", "수비력", DefenseColor, compact, useHudSkin: useHudSkin);
             Hide();
         }
 
@@ -247,11 +247,13 @@ namespace YGOPortable.UI
             private long _lastValue = -1;
             private long _lastAdjustment;
 
-            internal StatCell(Transform parent, string key, string label, Color accent, bool compact, Sprite icon = null)
+            internal StatCell(Transform parent, string key, string label, Color accent, bool compact, Sprite icon = null,
+                bool useHudSkin = true)
             {
                 _accent = accent;
                 Rect = LotdUiKit.FillRect(key, parent);
-                var skin = key == "Defense" ? DuelVisualAssets.CardStatsBaseAlt : DuelVisualAssets.CardStatsBase;
+                Sprite skin = null;
+                if (useHudSkin) skin = key == "Defense" ? DuelVisualAssets.CardStatsBaseAlt : DuelVisualAssets.CardStatsBase;
                 _plate = DuelReadoutPlate.Add(Rect, Backing, skin);
                 var rail = LotdUiKit.CreateRect("Rail", Rect, new Vector2(.07f, 0f), new Vector2(.93f, 0f),
                     Vector2.zero, new Vector2(0f, 1.8f));

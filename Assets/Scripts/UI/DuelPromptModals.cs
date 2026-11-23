@@ -1071,7 +1071,7 @@ namespace YGOPortable.UI
                 art = LotdUiKit.CreateRect("Rotated", holder, center - halfSize, center + halfSize, Vector2.zero, Vector2.zero);
                 art.localRotation = Quaternion.Euler(0f, 0f, -90f);
             }
-            CompositeCardView.Create(art, "V", duelArtwork: true).SetCard(code, faceDown: faceDown || code == 0);
+            CompositeCardView.Create(art, "V").SetCard(code, faceDown: faceDown || code == 0);
         }
 
         private void RenderOptionList(DuelSession session, DuelPrompt p)
@@ -2099,7 +2099,7 @@ namespace YGOPortable.UI
 
                     var tile = DuelStyle.Panel(grid, $"Dec_{code}", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
                     var cRt = LotdUiKit.CreateRect("C", tile, new Vector2(0.10f, 0.22f), new Vector2(0.90f, 0.95f), Vector2.zero, Vector2.zero);
-                    CompositeCardView.Create(cRt, "V", false, duelArtwork: true).SetCard(code);
+                    CompositeCardView.Create(cRt, "V", false).SetCard(code);
                     LotdUiKit.AddFittedText(LotdUiKit.CreateRect("L", tile, new Vector2(0.04f, 0.02f),
                         new Vector2(0.96f, 0.20f), Vector2.zero, Vector2.zero), "T", name, 12, 8,
                         TextAnchor.MiddleCenter, LotdUiKit.TextPrimary);
@@ -2448,7 +2448,7 @@ namespace YGOPortable.UI
                 DuelStyle.PanelColor, hasActions ? DuelStyle.Gold : DuelStyle.BorderColor);
             var cRt = LotdUiKit.CreateRect("C", tile,
                 new Vector2(0.08f, hasActions ? 0.30f : 0.18f), new Vector2(0.92f, 0.96f), Vector2.zero, Vector2.zero);
-            var card = CompositeCardView.Create(cRt, "V", false, duelArtwork: true);
+            var card = CompositeCardView.Create(cRt, "V", false);
             card.SetCard(code, faceDown, faceDown ? null : live);
             if (hasActions && live?.location is YgoConstants.LOCATION_GRAVE or YgoConstants.LOCATION_REMOVED)
             {
@@ -2759,7 +2759,7 @@ namespace YGOPortable.UI
             bool showCounters = true)
         {
             var live = session.GetVisibleFieldCard(code, item.controller, item.location, item.sequence);
-            var view = CompositeCardView.Create(art, "V", duelArtwork: true);
+            var view = CompositeCardView.Create(art, "V");
             var appearance = code == 0 ? null : live?.Appearance ??
                 session.GetDeckAppearance(item.controller, item.location, item.sequence);
             view.SetDeckCard(code, appearance, faceDown: code == 0, live: live);

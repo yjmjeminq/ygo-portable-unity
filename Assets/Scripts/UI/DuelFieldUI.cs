@@ -820,7 +820,7 @@ namespace YGOPortable.UI
             var inside = LotdUiKit.FillRect("CardDetails", left, 9f);
             var card = LotdUiKit.CreateRect("CardPreview", left,
                 new Vector2(.055f, .483f), new Vector2(.945f, .901f), Vector2.zero, Vector2.zero);
-            _inspCard = CompositeCardView.Create(card, "Card", duelArtwork: true);
+            _inspCard = CompositeCardView.Create(card, "Card");
             _inspCard.EnableOverframe();
             var aspect = _inspCard.transform.Find("AspectBox");
             AddInspectorArtworkFrame(aspect);
@@ -1148,7 +1148,7 @@ namespace YGOPortable.UI
             border.effectDistance = new Vector2(2f, -2f);
 
             var card = LotdUiKit.CreateRect("Card", cell, SlotCardMin, SlotCardMax, Vector2.zero, Vector2.zero);
-            var view = CompositeCardView.Create(card, "CardView", duelArtwork: true);
+            var view = CompositeCardView.Create(card, "CardView");
             view.gameObject.SetActive(false);
 
             var slot = new FieldSlotView
@@ -1193,7 +1193,7 @@ namespace YGOPortable.UI
             }
             var card = LotdUiKit.CreateRect("TopCard", cell, usesWell ? new Vector2(.19f, .322f) : new Vector2(.15f, .312f),
                 usesWell ? new Vector2(.81f, .889f) : new Vector2(.85f, .949f), Vector2.zero, Vector2.zero);
-            var view = CompositeCardView.Create(card, "CardView", duelArtwork: true);
+            var view = CompositeCardView.Create(card, "CardView");
             view.transform.localRotation = Quaternion.Euler(0f, 0f, opponent ? 180f : 0f);
             DuelPileDepth depth = null;
             if (!usesWell)
@@ -2132,7 +2132,7 @@ namespace YGOPortable.UI
         private static HandCardView CreateHandCard(RectTransform row, bool opponent)
         {
             var rect = LotdUiKit.FillRect("HandCard", row);
-            var card = CompositeCardView.Create(rect, "CardView", duelArtwork: true);
+            var card = CompositeCardView.Create(rect, "CardView");
             var art = (RectTransform)card.transform.Find("AspectBox");
             CardDragTrigger trigger = null;
             Image glow = null;
@@ -4366,7 +4366,7 @@ namespace YGOPortable.UI
             float cardRight = onIPhone ? .375f : .448f;
             var cardHolder = LotdUiKit.CreateRect("CardHolder", win, new Vector2(.033f, onIPhone ? .195f : .111f),
                 new Vector2(cardRight, onIPhone ? .812f : .891f), Vector2.zero, Vector2.zero);
-            _zoomCardView = CompositeCardView.Create(cardHolder, "ZoomCard", true, duelArtwork: true);
+            _zoomCardView = CompositeCardView.Create(cardHolder, "ZoomCard", true);
             _zoomCardView.EnableOverframe();
             CardOverframeInput.Attach(cardHolder, _zoomCardView, onIPhone);
             AddInspectorArtworkFrame(_zoomCardView.transform.Find("AspectBox"));

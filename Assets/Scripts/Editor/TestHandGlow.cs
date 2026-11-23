@@ -2749,7 +2749,7 @@ namespace YGOPortable.Editor
                     plate.transform.Find("SummonStats/Attack/Digits/Value").GetComponent<Text>().text == "2400" &&
                     plate.transform.Find("SummonStats/Defense/Digits/Value").GetComponent<Text>().text == "2000",
                 "The Fusion Summon banner and the queued live readout disagreed.");
-            var proxy = CompositeCardView.Create(ui.Canvas.transform, "Summoned Card", detailedOverlay: true, duelArtwork: true);
+            var proxy = CompositeCardView.Create(ui.Canvas.transform, "Summoned Card", detailedOverlay: true);
             proxy.SetCard(0, faceDown: true);
             CardAnimationManager.ApplySummonEntrance(proxy, flight, DuelEffectKind.Fusion, .25f, stats);
             Require(proxy.CurrentCode == 0 && proxy.transform.Find("AspectBox/CardBack").gameObject.activeSelf,

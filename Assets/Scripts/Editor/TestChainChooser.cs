@@ -383,7 +383,7 @@ namespace YGOPortable.Editor
                     detail.transform.Find("ZoomWin/Info/Scales/Right/Kind/Label")?.GetComponent<Text>().text == "오른쪽",
                     "The detail window did not identify the two scale sides.");
 
-                var card = CompositeCardView.Create(root, "RulesPreview", detailedOverlay: true, duelArtwork: true);
+                var card = CompositeCardView.Create(root, "RulesPreview", detailedOverlay: true);
                 card.SetCard(kepler);
                 Require(card.transform.Find("AspectBox/Rules/Text").GetComponent<Text>().text == rules,
                     "The card face kept the unlocalized text.");

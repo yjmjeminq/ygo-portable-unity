@@ -152,7 +152,7 @@ namespace YGOPortable.UI
             _title = LotdUiKit.AddFittedText(heading, "Text", "", 26, 16,
                 TextAnchor.MiddleCenter, PackShopStyle.TextPrimary, FontStyle.Bold);
             var art = Slot(details, "Art", .061f, .090f, .463f, .718f);
-            _art = CompositeCardView.Create(art, "SelectedCard", true, duelArtwork: true);
+            _art = CompositeCardView.Create(art, "SelectedCard", true);
             CardOverframeInput.Attach(art, _art, motionSensor: true);
             _editionPreview = AddButton(details, "EditionPreview", "오버프레임 보기", .087f, .029f, .435f, .082f,
                 () => SetEditionPreview(!_previewOverframe));

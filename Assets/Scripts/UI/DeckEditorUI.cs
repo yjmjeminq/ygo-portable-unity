@@ -373,7 +373,7 @@ namespace YGOPortable.UI
             var card = LotdUiKit.CreateRect("LargeCard", panel,
                 new Vector2(.066f, _mobileLayout ? .677f : .501f), new Vector2(.934f, .917f), Vector2.zero, Vector2.zero);
             BuildAppearanceControls(panel, inset);
-            _previewCard = CompositeCardView.Create(card, "Preview", detailedOverlay: true, duelArtwork: true);
+            _previewCard = CompositeCardView.Create(card, "Preview", detailedOverlay: true);
             DeckCardVisualMotion.Bind(_previewCard);
             var previewHit = LotdUiKit.FillRect("PreviewHit", card);
             var previewGraphic = LotdUiKit.AddImage(previewHit.gameObject, LotdUiKit.WhiteSprite, Color.clear);

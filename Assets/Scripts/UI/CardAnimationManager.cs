@@ -609,7 +609,7 @@ namespace YGOPortable.UI
             CompositeCardView view;
             if (detailed || !_cards.TryPop(out view))
             {
-                view = CompositeCardView.Create(_layer, "MovingCard", detailed, duelArtwork: true, cinematicOverframe: true);
+                view = CompositeCardView.Create(_layer, "MovingCard", detailed, cinematicOverframe: true);
                 var rect = (RectTransform)view.transform;
                 rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
             }

@@ -397,9 +397,8 @@ namespace YGOPortable.UI
         private Text _levelText;
         private Text _leftScaleText;
         private Text _rightScaleText;
-        private Text _atkDefText;
-        private DuelRatingBadge _duelFaceRating;
-        private DuelStatStrip _duelFaceCombat;
+        private DuelRatingBadge _faceRating;
+        private DuelStatStrip _faceStats;
         private Text _rulesText;
         private RectTransform _rulesArea;
         private GameObject _backObj;
@@ -427,14 +426,13 @@ namespace YGOPortable.UI
         internal bool HasOverframePortrait => HasOverframe && _retainedCutIn != null;
 
         public uint CurrentCode { get; private set; }
-        internal bool UseDuelArtwork { get; set; }
         internal Sprite ArtworkSprite => _artImg.sprite;
+        internal DeckCardAppearance? Appearance => _deckAppearance;
 
-        public static CompositeCardView Create(Transform parent, string name, bool detailedOverlay = false, bool duelArtwork = false)
-            => Create(parent, name, detailedOverlay, duelArtwork, cinematicOverframe: false);
+        public static CompositeCardView Create(Transform parent, string name, bool detailedOverlay = false)
+            => Create(parent, name, detailedOverlay, cinematicOverframe: false);
 
-        internal static CompositeCardView Create(Transform parent, string name, bool detailedOverlay, bool duelArtwork,
-            bool cinematicOverframe)
+        internal static CompositeCardView Create(Transform parent, string name, bool detailedOverlay, bool cinematicOverframe)
         {
             var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent, false);
@@ -444,7 +442,6 @@ namespace YGOPortable.UI
             rt.offsetMin = Vector2.zero;
             rt.offsetMax = Vector2.zero;
             var view = go.AddComponent<CompositeCardView>();
-            view.UseDuelArtwork = duelArtwork;
             view._cinematicOverframe = cinematicOverframe;
             view.BuildHierarchy(detailedOverlay);
             return view;
@@ -467,7 +464,7 @@ namespace YGOPortable.UI
             _frameImg = LotdUiKit.AddImage(frameRt.gameObject, null, Color.white, false, false);
 
             var titleRt = LotdUiKit.CreateRect("CardTitle", innerRt,
-                new Vector2(.09f, .89f), new Vector2(detailed ? .795f : .91f, .953f), Vector2.zero, Vector2.zero);
+                new Vector2(.080f, .899f), new Vector2(detailed ? .81f : .921f, .958f), Vector2.zero, Vector2.zero);
             _titleText = LotdUiKit.AddFittedText(titleRt, "T", "", detailed ? 22 : 13, detailed ? 8 : 4,
                 TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
             var ts = _titleText.gameObject.AddComponent<Shadow>();
@@ -477,45 +474,40 @@ namespace YGOPortable.UI
             if (detailed)
             {
                 var attrRt = LotdUiKit.CreateRect("AttrIcon", innerRt,
-                    new Vector2(0.822f, 0.89f), new Vector2(0.914f, 0.946f), Vector2.zero, Vector2.zero);
+                    new Vector2(.828f, .901f), new Vector2(.923f, .953f), Vector2.zero, Vector2.zero);
                 _attrImg = LotdUiKit.AddImage(attrRt.gameObject, null, Color.white, true, false);
 
                 var lvRt = LotdUiKit.CreateRect("LevelInfo", innerRt,
-                    new Vector2(0.095f, 0.825f), new Vector2(0.90f, 0.883f), Vector2.zero, Vector2.zero);
-                var levelLabel = UseDuelArtwork ? LotdUiKit.FillRect("Type", lvRt) : lvRt;
-                _levelText = LotdUiKit.AddFittedText(levelLabel, "Lv", "", 12, 7, TextAnchor.MiddleRight, LotdUiKit.GoldAccent, FontStyle.Bold);
-                var ls = _levelText.gameObject.AddComponent<Shadow>();
-                ls.effectColor = Color.black;
-                if (UseDuelArtwork)
-                {
-                    var rating = LotdUiKit.CreateRect("Rating", lvRt, new Vector2(.55f, .02f), new Vector2(.985f, .98f),
-                        Vector2.zero, Vector2.zero);
-                    _duelFaceRating = new DuelRatingBadge(rating, compact: true);
-                }
+                    new Vector2(.079f, .844f), new Vector2(.921f, .886f), Vector2.zero, Vector2.zero);
+                var levelLabel = LotdUiKit.CreateRect("Type", lvRt, Vector2.zero, new Vector2(.70f, 1f), Vector2.zero, Vector2.zero);
+                _levelText = LotdUiKit.AddFittedText(levelLabel, "Lv", "", 15, 7,
+                    TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
+                var rating = LotdUiKit.CreateRect("Rating", lvRt, new Vector2(.74f, .045f), new Vector2(1f, .955f),
+                    Vector2.zero, Vector2.zero);
+                _faceRating = new DuelRatingBadge(rating, compact: true);
 
                 var leftScale = LotdUiKit.CreateRect("LeftScale", innerRt,
-                    new Vector2(0.077f, 0.263f), new Vector2(0.130f, 0.319f), Vector2.zero, Vector2.zero);
+                    new Vector2(.073f, .240f), new Vector2(.143f, .298f), Vector2.zero, Vector2.zero);
                 var rightScale = LotdUiKit.CreateRect("RightScale", innerRt,
-                    new Vector2(0.87f, 0.263f), new Vector2(0.923f, 0.319f), Vector2.zero, Vector2.zero);
-                _leftScaleText = AddScaleValue(leftScale, new Color(.07f, .21f, .43f));
-                _rightScaleText = AddScaleValue(rightScale, new Color(.44f, .08f, .07f));
+                    new Vector2(.857f, .240f), new Vector2(.927f, .298f), Vector2.zero, Vector2.zero);
+                _leftScaleText = AddScaleValue(leftScale, new Color(.56f, .82f, 1f));
+                _rightScaleText = AddScaleValue(rightScale, new Color(1f, .68f, .64f));
 
-                Text AddScaleValue(RectTransform parent, Color color) => UseDuelArtwork
-                    ? DuelTypography.AddNumber(parent, "Value", "", 14, TextAnchor.MiddleCenter, color)
-                    : LotdUiKit.AddFittedText(parent, "Value", "", 11, 7, TextAnchor.MiddleCenter, color, FontStyle.Bold);
+                Text AddScaleValue(RectTransform parent, Color color)
+                {
+                    DuelReadoutPlate.Add(parent, new Color(.041f, .063f, .097f, .97f));
+                    return DuelTypography.AddNumber(parent, "Value", "", 16, TextAnchor.MiddleCenter, color);
+                }
 
                 _rulesArea = LotdUiKit.CreateRect("Rules", innerRt,
-                    new Vector2(0.09f, 0.120f), new Vector2(0.91f, 0.244f), Vector2.zero, Vector2.zero);
+                    new Vector2(.080f, .124f), new Vector2(.920f, .218f), Vector2.zero, Vector2.zero);
                 _rulesArea.gameObject.AddComponent<RectMask2D>();
-                _rulesText = LotdUiKit.AddText(_rulesArea, "Text", "", 9, TextAnchor.UpperLeft, new Color(0.09f, 0.07f, 0.05f));
+                _rulesText = LotdUiKit.AddText(_rulesArea, "Text", "", 11, TextAnchor.UpperLeft, new Color(.075f, .09f, .12f));
                 _rulesText.supportRichText = false;
 
                 var statRt = LotdUiKit.CreateRect("AtkDef", innerRt,
-                    new Vector2(0.090f, UseDuelArtwork ? .057f : .064f),
-                    new Vector2(0.91f, UseDuelArtwork ? .128f : .115f), Vector2.zero, Vector2.zero);
-                if (UseDuelArtwork) _duelFaceCombat = new DuelStatStrip(statRt, compact: true);
-                else _atkDefText = LotdUiKit.AddFittedText(statRt, "Stat", "", 11, 7, TextAnchor.MiddleRight,
-                        new Color(0.12f, 0.1f, 0.1f, 1f), FontStyle.Bold);
+                    new Vector2(.080f, .054f), new Vector2(.920f, .118f), Vector2.zero, Vector2.zero);
+                _faceStats = new DuelStatStrip(statRt, compact: true, useHudSkin: false);
             }
 
             var limRt = LotdUiKit.CreateRect("LimitBadge", innerRt,
@@ -550,13 +542,12 @@ namespace YGOPortable.UI
                 ReleaseArtwork();
                 SetDeckEditionBadge(false);
                 HideRarityFinish();
-                if (_duelFaceCombat != null)
+                if (_detailed)
                 {
-                    _duelFaceCombat.Hide();
-                    _duelFaceRating.Bind(default);
+                    _faceStats.Hide();
+                    _faceRating.Bind(default);
                     _levelText.text = "";
-                    _leftScaleText.gameObject.SetActive(false);
-                    _rightScaleText.gameObject.SetActive(false);
+                    SetScalesVisible(false);
                 }
                 _backObj.SetActive(true);
                 return;
@@ -566,10 +557,11 @@ namespace YGOPortable.UI
             var info = CardDatabase.Get(code);
             _titleText.text = info != null ? info.name : $"카드 #{code}";
             uint type = live != null && live.type != 0 ? live.type : (info?.type ?? YgoConstants.TYPE_EFFECT);
+            uint faceType = info?.type ?? type;
             bool isPend = (type & YgoConstants.TYPE_PENDULUM) != 0;
 
             var artRt = _artImg.rectTransform;
-            Rect artwork = isPend ? CardFaceFrame.PendulumArtwork : CardFaceFrame.Artwork;
+            Rect artwork = (faceType & YgoConstants.TYPE_PENDULUM) != 0 ? CardFaceFrame.PendulumArtwork : CardFaceFrame.Artwork;
             artRt.anchorMin = artwork.min;
             artRt.anchorMax = artwork.max;
 
@@ -577,14 +569,13 @@ namespace YGOPortable.UI
             BindRarityFinish(info);
             RefreshOverframe();
             SetDeckEditionBadge(!_detailed && !_cinematicOverframe && appearance?.overframe == true);
-            _frameImg.sprite = CardFaceFrame.Get(type);
+            _frameImg.sprite = CardFaceFrame.Get(faceType);
 
             if (_detailed)
             {
                 var readout = presentation ?? new DuelCardReadout(info, live);
-                bool monster = _duelFaceCombat != null ? readout.IsMonster : (type & YgoConstants.TYPE_MONSTER) != 0;
-                float rulesBottom = _duelFaceCombat != null ? .134f : .120f;
-                _rulesArea.anchorMin = new Vector2(0.09f, monster ? rulesBottom : .074f);
+                bool monster = readout.IsMonster;
+                _rulesArea.anchorMin = new Vector2(.080f, monster ? .124f : .057f);
                 _rulesText.text = info?.desc ?? "";
                 ApplyOverframeInk();
 
@@ -597,55 +588,23 @@ namespace YGOPortable.UI
                 _attrImg.gameObject.SetActive(attrSp != null);
                 _attrImg.sprite = attrSp;
 
-                _leftScaleText.gameObject.SetActive(isPend && monster);
-                _rightScaleText.gameObject.SetActive(isPend && monster);
+                SetScalesVisible(isPend && monster);
                 if (isPend && monster)
                 {
                     _leftScaleText.text = readout.LeftScale.ToString();
                     _rightScaleText.text = readout.RightScale.ToString();
                 }
 
-                if (_duelFaceCombat != null)
-                {
-                    var rating = readout.InspectionRating;
-                    _duelFaceRating.Bind(rating);
-                    _duelFaceCombat.Bind(readout, position: 0, showModifiers: false);
-                    _levelText.text = !monster && rating.Kind == DuelRatingKind.None ? YgoConstants.GetTypeTagKR(type) : "";
-                    _levelText.color = Color.white;
-                }
-                else if (monster)
-                {
-                    uint lv = live != null ? ((type & YgoConstants.TYPE_XYZ) != 0 ? live.rank : ((type & YgoConstants.TYPE_LINK) != 0 ? live.link : live.level)) : (info?.level ?? 0);
-                    if ((type & YgoConstants.TYPE_LINK) != 0)
-                    {
-                        _levelText.text = $"LINK-{lv}";
-                        _levelText.color = LotdUiKit.CyanAccent;
-                    }
-                    else if ((type & YgoConstants.TYPE_XYZ) != 0)
-                    {
-                        _levelText.text = new string('★', (int)Mathf.Min(13, lv)) + $" (R{lv})";
-                        _levelText.color = new Color(0.95f, 0.55f, 0.2f, 1f);
-                    }
-                    else
-                    {
-                        _levelText.text = new string('★', (int)Mathf.Min(13, lv));
-                        _levelText.color = LotdUiKit.GoldAccent;
-                    }
-
-                    int atk = live?.attack ?? info?.atk ?? 0;
-                    int def = live?.defense ?? info?.def ?? 0;
-                    string aStr = atk < 0 ? "?" : atk.ToString();
-                    string defense = (type & YgoConstants.TYPE_LINK) != 0
-                        ? $"LINK-{lv}" : $"DEF/{(def < 0 ? "?" : def.ToString())}";
-                    _atkDefText.text = $"ATK/{aStr}  {defense}";
-                }
-                else
-                {
-                    _levelText.text = YgoConstants.GetTypeTagKR(type);
-                    _levelText.color = Color.white;
-                    _atkDefText.text = "";
-                }
+                _faceRating.Bind(readout.InspectionRating);
+                _faceStats.Bind(readout, position: 0, showModifiers: false);
+                _levelText.text = YgoConstants.GetTypeTagKR(type);
             }
+        }
+
+        private void SetScalesVisible(bool visible)
+        {
+            _leftScaleText.transform.parent.gameObject.SetActive(visible);
+            _rightScaleText.transform.parent.gameObject.SetActive(visible);
         }
 
         internal void SetRarityHighlight(float amount)
@@ -704,7 +663,7 @@ namespace YGOPortable.UI
         private void BindArtwork(uint code)
         {
             if (code == 0 || !isActiveAndEnabled) return;
-            int variant = _deckAppearance?.ArtworkVariant ?? (UseDuelArtwork ? CardArtLoader.GetDuelArtworkVariant(code) : -1);
+            int variant = _deckAppearance?.ArtworkVariant ?? CardArtLoader.GetDuelArtworkVariant(code);
             if (code == _retainedArtwork && variant == _retainedVariant && _artImg.sprite != null) return;
             ReleaseArtwork();
             _artImg.sprite = CardArtLoader.RetainArtwork(code, variant, out _artworkSource);
@@ -841,12 +800,7 @@ namespace YGOPortable.UI
         private void ApplyOverframeInk()
         {
             if (!_detailed || _cinematicOverframe) return;
-            bool fullArt = HasOverframe;
-            _rulesText.color = fullArt ? new Color(.92f, .94f, 1f) : new Color(.09f, .07f, .05f);
-            if (_atkDefText != null)
-                _atkDefText.color = fullArt ? Color.white : new Color(.12f, .10f, .10f);
-            _leftScaleText.color = fullArt ? new Color(.54f, .80f, 1f) : new Color(.07f, .21f, .43f);
-            _rightScaleText.color = fullArt ? new Color(1f, .66f, .62f) : new Color(.44f, .08f, .07f);
+            _rulesText.color = HasOverframe ? new Color(.92f, .94f, 1f) : new Color(.075f, .09f, .12f);
         }
 
         internal void PoseOverframe(float opacity, float scale, Vector2 parallax, float shimmer)

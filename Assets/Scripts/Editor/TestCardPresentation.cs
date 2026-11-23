@@ -258,21 +258,29 @@ namespace YGOPortable.Editor
             {
                 writer.Write(0x5241444Du);
                 writer.Write(1u);
-                writer.Write(1u);
-                writer.Write(BlueEyes);
-                writer.Write(0);
-                writer.Write(28u);
-                writer.Write((uint)image.Length);
+                writer.Write(2u);
+                for (int variant = 0; variant < 2; variant++)
+                {
+                    writer.Write(BlueEyes);
+                    writer.Write(variant);
+                    writer.Write((uint)(44 + variant * image.Length));
+                    writer.Write((uint)image.Length);
+                }
+                writer.Write(image);
                 writer.Write(image);
             }
 
             string previous = CardArtLoader.ActiveDuelVisualsPath;
+            const string artworkKey = "DuelArtwork.89631139";
+            bool hadPreference = PlayerPrefs.HasKey(artworkKey);
+            int previousPreference = PlayerPrefs.GetInt(artworkKey);
             var canvas = new GameObject("Fresh install CutIn", typeof(Canvas));
             CardArtLoader.Shutdown();
             CardArtLoader.Initialize(freshApp, Path.Combine(freshApp, "EmptyProfile"));
             try
             {
-                var view = CompositeCardView.Create(canvas.transform, "Portrait", duelArtwork: true);
+                CardArtLoader.SetDuelArtworkVariant(BlueEyes, 0);
+                var view = CompositeCardView.Create(canvas.transform, "Portrait");
                 view.EnableOverframe();
                 view.SetCard(BlueEyes);
                 Require(CardArtLoader.GetArtworkSource(BlueEyes, 0) == (BlueEyes, 0) &&
@@ -280,9 +288,26 @@ namespace YGOPortable.Editor
                     view.transform.Find("AspectBox/Overframe/PortraitBounds/Depth/LocalCutIn").GetComponent<Image>().sprite.texture.width == 8,
                     "An empty app profile could not use the artwork and cut-in from packaged StreamingAssets.");
                 Debug.Log("[VERIFY PACKAGED OVERFRAME] Fresh install loaded its matching artwork and portrait from the IPA resource layout.");
+
+                var detail = CompositeCardView.Create(canvas.transform, "Details", detailedOverlay: true);
+                var hand = CompositeCardView.Create(canvas.transform, "Hand");
+                CardArtLoader.SetDuelArtworkVariant(BlueEyes, 1);
+                detail.SetCard(BlueEyes);
+                hand.SetCard(BlueEyes);
+                Require(detail.ArtworkSprite == hand.ArtworkSprite &&
+                    detail.transform.Find("AspectBox/Frame").GetComponent<Image>().sprite ==
+                    hand.transform.Find("AspectBox/Frame").GetComponent<Image>().sprite &&
+                    detail.ArtworkSprite != view.ArtworkSprite,
+                    "The card gallery and the duel used different default artwork or frames.");
+                hand.SetDeckCard(BlueEyes, new DeckCardAppearance { artwork = 1 });
+                Require(hand.ArtworkSprite == view.ArtworkSprite,
+                    "The shared card face overrode the artwork selected for a specific copy.");
+                Debug.Log("[VERIFY COMMON CARD FACE] Compact and detailed views share artwork and frames and honor explicit printings.");
             }
             finally
             {
+                if (hadPreference) PlayerPrefs.SetInt(artworkKey, previousPreference);
+                else PlayerPrefs.DeleteKey(artworkKey);
                 UnityEngine.Object.DestroyImmediate(canvas);
                 CardArtLoader.Shutdown();
                 CardArtLoader.Initialize(Application.streamingAssetsPath, previous);
@@ -592,14 +617,15 @@ namespace YGOPortable.Editor
                 "An SR card did not replace the UR finish with its own foil.");
             card.SetCard(sparkman);
             Require(!finish.gameObject.activeSelf, "Reusing a card view left the foil on a normal card.");
-            Require(card.transform.Find("AspectBox/AtkDef/Stat").GetComponent<Text>().text == "ATK/1600  DEF/1400",
-                "The duel face styling changed the printed card used outside a duel.");
+            Require(card.transform.Find("AspectBox/AtkDef/Attack/Digits/Value").GetComponent<Text>().text == "1600" &&
+                card.transform.Find("AspectBox/AtkDef/Defense/Digits/Value").GetComponent<Text>().text == "1400",
+                "The common card face did not display printed stats outside a duel.");
         }
 
         private static void VerifyExpandedDuelCard(Transform parent)
         {
             const uint accesscode = 86066372, utopia = 84013237, oddEyes = 16178681;
-            var card = CompositeCardView.Create(parent, "Expanded Duel Card", detailedOverlay: true, duelArtwork: true);
+            var card = CompositeCardView.Create(parent, "Expanded Duel Card", detailedOverlay: true);
             try
             {
                 var face = card.transform.Find("AspectBox");
@@ -623,6 +649,8 @@ namespace YGOPortable.Editor
                     "A reused enlarged card lost Rank 0 or kept its Link layout.");
 
                 card.SetCard(oddEyes);
+                var pendulumFrame = face.Find("Frame").GetComponent<Image>();
+                var printedFrame = pendulumFrame.sprite;
                 var left = face.Find("LeftScale/Value").GetComponent<Text>();
                 var right = face.Find("RightScale/Value").GetComponent<Text>();
                 Require(left.text == "4" && right.text == "4" && left.font == DuelTypography.NumberFont &&
@@ -636,7 +664,8 @@ namespace YGOPortable.Editor
                     lscale = 4, rscale = 7,
                 });
                 Require(number.text == "7" && symbol.sprite == DuelStatSymbols.Rating(DuelRatingKind.Scale) &&
-                    !left.gameObject.activeSelf && !right.gameObject.activeSelf && !face.Find("AtkDef").gameObject.activeSelf,
+                    !left.gameObject.activeInHierarchy && !right.gameObject.activeInHierarchy &&
+                    !face.Find("AtkDef").gameObject.activeSelf && pendulumFrame.sprite == printedFrame,
                     "The enlarged card did not show the active scale in the right Pendulum Zone.");
                 card.SetCard(0, faceDown: true);
                 Require(!badge.gameObject.activeSelf && !face.Find("AtkDef").gameObject.activeSelf &&

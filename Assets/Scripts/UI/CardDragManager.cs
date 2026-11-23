@@ -98,7 +98,7 @@ namespace YGOPortable.UI
         }
 
         public void StartDrag(DragSourceType source, uint cardCode, int index = -1, object customData = null,
-            int pointerId = -1, Vector2? screenPosition = null)
+            int pointerId = -1, Vector2? screenPosition = null, DeckCardAppearance? appearance = null)
         {
             if (cardCode == 0) return;
             _dragPointerId = pointerId;
@@ -111,9 +111,7 @@ namespace YGOPortable.UI
             transform.SetAsLastSibling();
             _ghostRoot.gameObject.SetActive(true);
             _ghostRoot.SetAsLastSibling();
-            _ghostCardView.UseDuelArtwork = source == DragSourceType.Hand || source == DragSourceType.FieldMonster ||
-                source == DragSourceType.ExtraDeck;
-            _ghostCardView.SetCard(cardCode);
+            _ghostCardView.SetDeckCard(cardCode, appearance);
             UpdateGhostPosition(screenPosition ?? (Vector2)Input.mousePosition);
 
             _ghostOutline.effectColor = source == DragSourceType.FieldMonster ? LotdUiKit.RedAccent
@@ -365,7 +363,9 @@ namespace YGOPortable.UI
             _cg = GetComponent<CanvasGroup>() ?? gameObject.AddComponent<CanvasGroup>();
             _cg.alpha = 0.35f;
 
-            CardDragManager.Instance?.StartDrag(SourceType, code, idx, data, eventData.pointerId, eventData.position);
+            var card = GetComponentInChildren<CompositeCardView>();
+            CardDragManager.Instance?.StartDrag(SourceType, code, idx, data, eventData.pointerId, eventData.position,
+                card?.CurrentCode == code ? card.Appearance : null);
         }
 
         public void OnDrag(PointerEventData eventData)
