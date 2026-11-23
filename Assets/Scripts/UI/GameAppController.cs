@@ -345,7 +345,8 @@ namespace YGOPortable.UI
 
         public void StartDuelMatch(OpponentCharacter oppChar, PresetDeckInfo oppDeck, UserDeck myDeck,
             bool playerGoesFirst, bool isStoryDuel = false) =>
-            StartDuelMatch(oppChar, oppDeck, myDeck, playerGoesFirst, isStoryDuel, planningScale: 1f);
+            StartDuelMatch(oppChar, oppDeck, myDeck, playerGoesFirst, isStoryDuel,
+                planningScale: isStoryDuel ? 1f : ComboSearch.MaxPlanningScale);
 
         private void StartDuelMatch(OpponentCharacter oppChar, PresetDeckInfo oppDeck, UserDeck myDeck,
             bool playerGoesFirst, bool isStoryDuel, float planningScale)
