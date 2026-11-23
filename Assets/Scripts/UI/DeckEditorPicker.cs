@@ -121,6 +121,6 @@ namespace YGOPortable.UI
 
         private void ReturnToDeckPicker() => BeforeReplacingEdits(ShowDeckPicker);
 
-        private void CloseDeckPickerToMenu() => _app?.ShowScreen(AppScreen.MainMenu);
+        private void CloseDeckPickerToMenu() => _app?.CloseDeckEditor();
     }
 }

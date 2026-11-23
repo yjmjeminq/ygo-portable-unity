@@ -40,6 +40,7 @@ namespace YGOPortable.UI
         private CollectionShopUI _collectionShop;
         private ArchetypeCodexUI _archetypeCodex;
         private StoryModeUI _storyMode;
+        private bool _storyDeckEditorOpen;
         private GitHubSaveSync _saveSync;
         private SaveSyncMenu _saveSyncMenu;
         private GameObject _focusBeforeSaveSync;
@@ -236,7 +237,8 @@ namespace YGOPortable.UI
             _collectionShop?.StarterRoot.SetActive(false);
             _collectionShop?.CloseShop();
             _archetypeCodex.Close();
-            if (screen != AppScreen.StoryMode) _storyMode.Close();
+            if (screen == AppScreen.DeckEditor && _storyDeckEditorOpen) _storyMode.SuspendForDeckEditor();
+            else if (screen != AppScreen.StoryMode) _storyMode.Close();
             _oppSelect.Root.SetActive(screen == AppScreen.OpponentSelect);
             _oppSelect.JankenRoot.SetActive(false);
             if (screen != AppScreen.DeckEditor) _deckEditor.Close();
@@ -269,7 +271,10 @@ namespace YGOPortable.UI
             else if (screen == AppScreen.ArchetypeCodex)
                 _archetypeCodex.Open();
             else if (screen == AppScreen.StoryMode)
-                _storyMode.Open();
+            {
+                if (_storyDeckEditorOpen && previousScreen == AppScreen.DeckEditor) _storyMode.ResumeFromDeckEditor();
+                else _storyMode.Open();
+            }
             else if (screen == AppScreen.MainMenu)
                 _titleAndMenu.FocusMainMenu(previousScreen);
             else if (screen == AppScreen.Title)
@@ -295,8 +300,18 @@ namespace YGOPortable.UI
                 };
                 if (root != null) UiEntranceMotion.Play(root, .67f, .19f);
             }
+            if (screen != AppScreen.DeckEditor) _storyDeckEditorOpen = false;
             SyncFrontMenuFocus();
         }
+
+        internal void OpenStoryDeckEditor()
+        {
+            if (_screen != AppScreen.StoryMode) return;
+            _storyDeckEditorOpen = true;
+            ShowScreen(AppScreen.DeckEditor);
+        }
+
+        internal void CloseDeckEditor() => ShowScreen(_storyDeckEditorOpen ? AppScreen.StoryMode : AppScreen.MainMenu);
 
         private void CompleteStarterSelection(UserDeck deck)
         {
@@ -338,8 +353,9 @@ namespace YGOPortable.UI
             _activeStoryEpisode = episode;
             var opponent = DeckRepository.GetCharacter(episode.charId);
             var (deck, level, levelCount) = _storyMode.GetOpponentMatch(episode);
-            float planningScale = levelCount > 1
-                ? Mathf.Lerp(1f, ComboSearch.MaxPlanningScale, (level - 1f) / (levelCount - 1f)) : 1f;
+            float deckStrength = levelCount > 1 ? (level - 1f) / (levelCount - 1f) : (episode.chapter - 1f) / 4f;
+            float planningScale = _storyMode.GetRaid(episode) != null ? ComboSearch.MaxPlanningScale :
+                Mathf.Lerp(1f, ComboSearch.MaxPlanningScale, deckStrength);
             StartDuelMatch(opponent, deck, myDeck, playerGoesFirst: true, isStoryDuel: true, planningScale: planningScale);
         }
 
@@ -386,9 +402,11 @@ namespace YGOPortable.UI
                     Debug.LogWarning($"[Personal replay] Could not enable local recording ({exception.GetType().Name}).");
                 }
             }
-            _session = new DuelSession(recordPlanningReplay: AiDifficulty == AIDifficulty.Smart, playerReplay: _personalReplay);
+            var difficulty = isStoryDuel ? AIDifficulty.Smart : AiDifficulty;
+            var raid = isStoryDuel ? _storyMode.GetRaid(_activeStoryEpisode) : null;
+            _session = new DuelSession(recordPlanningReplay: difficulty == AIDifficulty.Smart, playerReplay: _personalReplay);
             _ai = new TacticalAI(DuelAiPolicy.LoadIncluded(), LinkComboPolicy.LoadIncluded(),
-                searchCombos: true, planningScale: planningScale) { Difficulty = AiDifficulty };
+                searchCombos: true, planningScale: planningScale) { Difficulty = difficulty };
             _shownHumanPrompt = null;
             _aiTimer = 0f;
             _resultShown = false;
@@ -401,7 +419,7 @@ namespace YGOPortable.UI
             if (!_session.StartNewDuel(
                 myDeck.main, myDeck.extra,
                 oppDeck.main, oppDeck.extra,
-                p0GoesFirst: playerGoesFirst, playerDeckAppearance: myDeck))
+                p0GoesFirst: playerGoesFirst, playerDeckAppearance: myDeck, opponentOpening: raid?.Opening))
             {
                 ShowDuelStartFailure(isStoryDuel, "듀얼을 시작하지 못했습니다.");
                 return;
@@ -464,6 +482,7 @@ namespace YGOPortable.UI
 
             if (_session == null)
             {
+                if (_screen == AppScreen.StoryMode) _storyMode?.Update(Time.unscaledDeltaTime);
                 if (_screen == AppScreen.DeckEditor) _deckEditor?.Update();
                 else if (_menuPad != null)
                 {
@@ -500,14 +519,12 @@ namespace YGOPortable.UI
                     bool draw = _session.Winner == 2;
                     if (_activeStoryEpisode is { } episode)
                     {
-                        string storyReward = "";
-                        if (won)
-                        {
-                            storyReward = CollectionProgress.TryAwardDuel(true, out int amount, out string error)
-                                ? $"듀얼 보상 +{amount:N0} DP"
-                                : error;
-                            _storyMode.RecordWin(episode);
-                        }
+                        var raid = _storyMode.GetRaid(episode);
+                        string storyReward = CollectionProgress.TryAwardStoryDuel(episode.id, won, raid, _activeOppDeck,
+                            out int amount, out var bonus, out string error) ? $"듀얼 보상 +{amount:N0} DP" : error;
+                        if (bonus is { } card)
+                            storyReward += $"\n{CardRarityCatalog.GetLabel(CardRarityCatalog.GetRarity(card.Code))} · " +
+                                $"{CardDatabase.GetName(card.Code)}{(card.Overframe ? " · OVERFRAME" : "")}";
                         ShowScreen(AppScreen.StoryMode);
                         _storyMode.ShowDuelResult(episode, won, draw, storyReward);
                         SyncFrontMenuFocus();

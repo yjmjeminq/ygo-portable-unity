@@ -77,7 +77,7 @@ namespace YGOPortable.Core
         public const int DeckCopyLimit = 3;
 
         private const int SharedDustVersion = 6;
-        private const int ProfileVersion = 7;
+        private const int ProfileVersion = 8;
         private const int OverframePullChance = 15;
         private const int GenericPackSize = 160;
         internal const string ProfileFileName = "collection-profile.json";
@@ -115,6 +115,8 @@ namespace YGOPortable.Core
             public List<int> unlockedOpponentIds;
             public List<int> clearedOpponentIds;
             public List<OpponentDeckProgress> opponentDeckProgress;
+            public List<string> clearedStoryEpisodes = new();
+            public bool storyProgressMigrated;
         }
 
         [Serializable]
@@ -545,8 +547,7 @@ namespace YGOPortable.Core
                     var group = RollPackRarity(packGroups, PackRandom, bonus ? CardRarity.SuperRare : CardRarity.Normal);
                     if (group == null && bonus)
                     {
-                        group = _bundleBonusPool ??= CardDatabase.AllCards.Where(card => IsDeckCard(card) &&
-                            CardRarityCatalog.GetRarity(card.code) >= CardRarity.SuperRare).Select(card => card.code).ToList();
+                        group = HighRarityPool;
                     }
                     if (group == null || group.Count == 0)
                     {
@@ -599,6 +600,75 @@ namespace YGOPortable.Core
 
         public static bool TryAwardDuel(bool won, int opponentId, int deckId, out int amount, out string error) =>
             TryAwardDuel(won, opponentId, (int?)deckId, out amount, out error);
+
+        internal static bool IsStoryEpisodeCleared(string episodeId) =>
+            _profile?.clearedStoryEpisodes?.Contains(episodeId) == true;
+
+        internal static void MigrateStoryClears(IEnumerable<string> legacyClears)
+        {
+            if (!HasStarter || _profile.storyProgressMigrated || !CanTransact(out _)) return;
+            var cleared = _profile.clearedStoryEpisodes.Concat(legacyClears).Distinct(StringComparer.Ordinal).ToList();
+            if (cleared.Count == 0) return;
+            var next = WithBalance(Balance);
+            next.clearedStoryEpisodes = cleared;
+            next.storyProgressMigrated = true;
+            if (!Write(next, _owned, out string error))
+                Debug.LogWarning($"[Collection] 스토리 진행도 이전: {error}");
+        }
+
+        private static List<uint> HighRarityPool => _bundleBonusPool ??= CardDatabase.AllCards
+            .Where(card => IsDeckCard(card) && CardRarityCatalog.GetRarity(card.code) >= CardRarity.SuperRare)
+            .Select(card => card.code).ToList();
+
+        internal static bool TryAwardStoryDuel(string episodeId, bool won, StoryRaid? raid, PresetDeckInfo opponentDeck,
+            out int amount, out PackPull? awardedCard, out string error)
+        {
+            amount = 0;
+            awardedCard = null;
+            if (!CanTransact(out error)) return false;
+            if (!HasStarter || string.IsNullOrWhiteSpace(episodeId))
+            {
+                error = "스토리 듀얼 정보를 확인할 수 없습니다.";
+                return false;
+            }
+
+            int reward = Math.Min(int.MaxValue - Balance, won ? raid?.WinDp ?? WinReward : LossReward);
+            bool firstClear = won && !IsStoryEpisodeCleared(episodeId);
+            var owned = _owned;
+            var overframes = _ownedOverframes;
+            PackPull? bonus = null;
+            if (firstClear && raid is { } challenge)
+            {
+                var candidates = new[] { challenge.Opening.FieldCard, opponentDeck.sigCard }
+                    .Concat(opponentDeck.main ?? Array.Empty<uint>()).Concat(opponentDeck.extra ?? Array.Empty<uint>())
+                    .Where(code => IsDeckCard(CardDatabase.Get(code)) &&
+                        CardRarityCatalog.GetRarity(code) >= CardRarity.SuperRare && GetOwnedCount(code) < int.MaxValue)
+                    .Distinct().OrderBy(code => GetTotalOwnedCount(code))
+                    .ThenByDescending(code => CardRarityCatalog.GetRarity(code)).ToArray();
+                uint code = candidates.FirstOrDefault();
+                if (code == 0) code = HighRarityPool.FirstOrDefault(candidate => GetOwnedCount(candidate) < int.MaxValue);
+                if (code == 0)
+                {
+                    error = "보스 보상을 보관할 공간이 부족합니다.";
+                    return false;
+                }
+                bool overframe = CardArtLoader.SupportsOverframe(code) && GetOwnedOverframeCount(code) < int.MaxValue &&
+                    PackRandom.Next(100) < OverframePullChance;
+                if (overframe) overframes = new Dictionary<uint, int>(_ownedOverframes);
+                else owned = new Dictionary<uint, int>(_owned);
+                var inventory = overframe ? overframes : owned;
+                inventory[code] = inventory.GetValueOrDefault(code) + 1;
+                bonus = new PackPull(code, overframe, CombinedCount(owned.GetValueOrDefault(code), overframes.GetValueOrDefault(code)));
+            }
+            var next = WithBalance(Balance + reward);
+            if (firstClear)
+                next.clearedStoryEpisodes = new List<string>(_profile.clearedStoryEpisodes) { episodeId };
+            next.storyProgressMigrated = true;
+            if (!Write(next, owned, out error, overframes)) return false;
+            amount = reward;
+            awardedCard = bonus;
+            return true;
+        }
 
         private static bool TryAwardDuel(bool won, int opponentId, int? deckId, out int amount, out string error)
         {
@@ -675,6 +745,8 @@ namespace YGOPortable.Core
             unlockedOpponentIds = _profile.unlockedOpponentIds,
             clearedOpponentIds = _profile.clearedOpponentIds,
             opponentDeckProgress = _profile.opponentDeckProgress,
+            clearedStoryEpisodes = _profile.clearedStoryEpisodes,
+            storyProgressMigrated = _profile.storyProgressMigrated,
         };
 
         private static OpponentDeckProgress FindDeckProgress(SavedProfile profile, int opponentId) =>
@@ -710,6 +782,7 @@ namespace YGOPortable.Core
             profile.clearedOpponentIds ??= new List<int>();
             profile.unlockedOpponentIds ??= new List<int>();
             profile.opponentDeckProgress ??= new List<OpponentDeckProgress>();
+            profile.clearedStoryEpisodes ??= new List<string>();
             foreach (var progress in profile.opponentDeckProgress)
             {
                 if (progress == null) continue;

@@ -6,6 +6,20 @@ using UnityEngine;
 
 namespace YGOPortable.Core
 {
+    public readonly struct DuelOpening
+    {
+        internal readonly int Life;
+        internal readonly int Hand;
+        internal readonly uint FieldCard;
+
+        internal DuelOpening(int life, int hand, uint fieldCard)
+        {
+            Life = life;
+            Hand = hand;
+            FieldCard = fieldCard;
+        }
+    }
+
     public class LiveCardState
     {
         public uint code;
@@ -302,6 +316,7 @@ namespace YGOPortable.Core
             internal ulong[] seed;
             internal bool first;
             internal int startingLp;
+            internal DuelOpening? opponentOpening;
             internal readonly List<(byte message, byte player, byte[] bytes)> responses = new();
         }
 
@@ -430,7 +445,8 @@ namespace YGOPortable.Core
         public bool StartNewDuel(
             IReadOnlyList<uint> p0Main, IReadOnlyList<uint> p0Extra,
             IReadOnlyList<uint> p1Main, IReadOnlyList<uint> p1Extra,
-            bool p0GoesFirst = true, int startingLp = 8000, ulong[] seed = null, UserDeck playerDeckAppearance = null)
+            bool p0GoesFirst = true, int startingLp = 8000, ulong[] seed = null, UserDeck playerDeckAppearance = null,
+            DuelOpening? opponentOpening = null)
         {
             Dispose();
             UsesDeckAppearances = playerDeckAppearance != null;
@@ -474,10 +490,13 @@ namespace YGOPortable.Core
                 }
             }
 
-            NativePtr = YgoNativeBridge.CreateDuel(
-                seed, YgoConstants.DUEL_MODE_MR5,
-                startingLp, 5, 1,
-                startingLp, 5, 1);
+            int bossLife = opponentOpening?.Life ?? startingLp;
+            int bossHand = opponentOpening?.Hand ?? 5;
+            int firstLife = p0GoesFirst ? startingLp : bossLife;
+            int secondLife = p0GoesFirst ? bossLife : startingLp;
+            NativePtr = YgoNativeBridge.CreateDuel(seed, YgoConstants.DUEL_MODE_MR5,
+                firstLife, p0GoesFirst ? 5 : bossHand, 1,
+                secondLife, p0GoesFirst ? bossHand : 5, 1);
 
             if (NativePtr == IntPtr.Zero) return false;
             if (YgoNativeBridge.YGO_LoadBaseScripts(NativePtr) == 0)
@@ -487,11 +506,9 @@ namespace YGOPortable.Core
                 return false;
             }
 
-            foreach (var player in Players)
-            {
-                player.lp = startingLp;
-                player.FieldZoneVersion = 0;
-            }
+            Players[0].lp = firstLife;
+            Players[1].lp = secondLife;
+            foreach (var player in Players) player.FieldZoneVersion = 0;
 
             var turn0Main = p0GoesFirst ? p0Main : p1Main;
             var turn0Extra = p0GoesFirst ? p0Extra : p1Extra;
@@ -513,6 +530,7 @@ namespace YGOPortable.Core
             var shuffle = new System.Random(unchecked((int)shuffleSeed));
             LoadDeckForPlayer(0, firstMain, turn0Extra, shuffle, p0GoesFirst ? playerDeckAppearance : null);
             LoadDeckForPlayer(1, secondMain, turn1Extra, shuffle, p0GoesFirst ? null : playerDeckAppearance);
+            if (opponentOpening is { FieldCard: > 0 } opening) PlaceOpeningCard((byte)AiPlayerIndex, opening.FieldCard);
 
             YgoNativeBridge.YGO_StartDuel(NativePtr);
             if (_recordPlanningReplay)
@@ -521,6 +539,7 @@ namespace YGOPortable.Core
                 {
                     first = p0GoesFirst,
                     startingLp = startingLp,
+                    opponentOpening = opponentOpening,
                     seed = (ulong[])seed.Clone(),
                     firstDeck = p0GoesFirst ? firstMain : secondMain, firstExtra = CopyDeck(p0Extra),
                     secondDeck = p0GoesFirst ? secondMain : firstMain, secondExtra = CopyDeck(p1Extra),
@@ -549,7 +568,7 @@ namespace YGOPortable.Core
             try
             {
                 if (!copy.StartNewDuel(replay.firstDeck, replay.firstExtra, replay.secondDeck, replay.secondExtra,
-                    replay.first, replay.startingLp, replay.seed)) return null;
+                    replay.first, replay.startingLp, replay.seed, opponentOpening: replay.opponentOpening)) return null;
                 foreach (var response in replay.responses)
                 {
                     if (expired() || copy.IsFinished) return null;
@@ -611,6 +630,16 @@ namespace YGOPortable.Core
                 uint identity = YgoNativeBridge.YGO_QueryCardIdentity(NativePtr, playerId, location, before);
                 if (identity != 0) _deckAppearances[identity] = appearance;
             }
+        }
+
+        private void PlaceOpeningCard(byte player, uint code)
+        {
+            var info = CardDatabase.Get(code);
+            if (info == null) return;
+            bool fieldSpell = (info.type & YgoConstants.TYPE_FIELD) != 0;
+            uint location = info.IsMonster ? YgoConstants.LOCATION_MZONE : YgoConstants.LOCATION_SZONE;
+            uint sequence = info.IsMonster ? 2u : fieldSpell ? 5u : 2u;
+            YgoNativeBridge.YGO_AddCard(NativePtr, player, 0, code, player, location, sequence, YgoConstants.POS_FACEUP_ATTACK);
         }
 
         internal DeckCardAppearance? GetDeckAppearance(byte player, uint location, uint sequence)
