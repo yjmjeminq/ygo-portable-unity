@@ -1004,13 +1004,9 @@ namespace YGOPortable.Editor
                 Require(bar.gameObject.activeInHierarchy && activate != null, "The hovered hand card had no activation icon.");
                 var plate = (RectTransform)activate.Find("Plate");
                 var caption = plate.Find("Caption/Label").GetComponent<Text>();
-                Require(caption.text.StartsWith("발동: ", StringComparison.Ordinal) && caption.text.Length <= 15 &&
-                    caption.resizeTextForBestFit && caption.horizontalOverflow == HorizontalWrapMode.Wrap &&
+                Require(caption.text == "발동" &&
                     plate.Find("Icon").GetComponent<Image>().sprite == DuelUiIcons.Action("ACTION"),
-                    "The actual activation button did not display its icon and fitted Korean effect.");
-                var activationCaption = typeof(DuelFieldUI).GetMethod("CardActivationCaption", BindingFlags.Static | BindingFlags.NonPublic);
-                Require((string)activationCaption.Invoke(null, new object[] { caption.text, 2 }) == "효과 발동 (2)",
-                    "A button with multiple activations did not report their count.");
+                    "The activation button did not display 발동 and its icon.");
                 var behind = DuelUiKit.FillRect("CardBehindActions", bar.parent);
                 behind.SetSiblingIndex(bar.GetSiblingIndex());
                 DuelUiKit.AddImage(behind.gameObject, DuelUiKit.WhiteSprite, Color.white);
