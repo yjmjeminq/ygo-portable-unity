@@ -1,16 +1,16 @@
 {
-  "complete": false,
+  "complete": true,
   "total": 240,
-  "reviewed": 236,
-  "pending": 4,
+  "reviewed": 240,
+  "pending": 0,
   "scopeDecision": "User approved preserving the existing 240 IDs and distinguishing original media.",
   "coverage": "Visible features of the selected official references; unseen anatomy and clothing are not invented.",
   "artworkGeneration": "This build produces reviewed prompts and data, not replacement character PNGs.",
   "reviewedByMedium": {
-    "anime": 227,
+    "anime": 229,
     "film": 5,
     "manga": 2,
-    "game": 0,
+    "game": 2,
     "card": 2
   },
   "series": {
@@ -24,7 +24,7 @@
     },
     "5DS": {
       "total": 46,
-      "reviewed": 45
+      "reviewed": 46
     },
     "ZEXAL": {
       "total": 37,
@@ -32,81 +32,12 @@
     },
     "ARCV": {
       "total": 41,
-      "reviewed": 39
+      "reviewed": 41
     },
     "VRAINS": {
       "total": 27,
-      "reviewed": 26
+      "reviewed": 27
     }
   },
-  "pendingCharacters": [
-    {
-      "id": 138,
-      "series": "5DS",
-      "name": "배가본드",
-      "canonicalName": "The Vagabond",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 64,
-      "series": "ARCV",
-      "name": "스트롱 이시지마",
-      "canonicalName": "The Sledgehammer",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 58,
-      "series": "ARCV",
-      "name": "아카바 레이",
-      "canonicalName": "Ray Akaba",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 232,
-      "series": "VRAINS",
-      "name": "베이그런트",
-      "canonicalName": "The Vagrant",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    }
-  ]
+  "pendingCharacters": []
 }

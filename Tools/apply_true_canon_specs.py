@@ -86,6 +86,37 @@ def primary_visual_source(source):
                 and image_parts.scheme == "https"
                 and image_parts.hostname == "thumbnails.cbsig.net"
                 and image_parts.path == f"/ptv/episodes/{episode[1]}/screenshot16_9.jpg")
+    if page_parts.scheme == "https" and page_parts.hostname == "www.videomarket.jp":
+        episode = re.fullmatch(r"/title/(\d{6})/A(\d{6})(\d{3})999H01", page_parts.path)
+        return (episode is not None and episode[1] == episode[2]
+                and source.get("licensed_catalogue_verified") is True
+                and bool(source.get("copyright_notice"))
+                and bool(source.get("page_sha256"))
+                and source.get("page_meta_image_url") == picture
+                and image_parts.scheme == "https"
+                and image_parts.hostname == "imgv.vm-movie.jp"
+                and image_parts.path == f"/image/android/640x360/{episode[1][:3]}/s{episode[1]}{episode[3]}a.jpg")
+    if page_parts.scheme == "https" and page_parts.hostname == "duellinks.gamea.co":
+        # These two pages display captures of the original game visuals.
+        # The hosting articles themselves do not establish character details.
+        article = re.fullmatch(r"/c/(nrv00zyp|33y1ms7t)", page_parts.path)
+        return (article is not None
+                and source.get("original_game_capture_reviewed") is True
+                and source.get("origin_game_url") == "https://www.konami.com/yugioh/duel_links/ja/"
+                and source.get("page_embedded_image_url") == picture
+                and bool(source.get("page_sha256"))
+                and image_parts.scheme == "https"
+                and image_parts.hostname == "duellinks.gamea.co"
+                and re.fullmatch(rf"/file/content(?:_top)?/umi92hxs/{article[1]}/(?:\d+/)?[a-f0-9]+_\d+\.(?:png|jpg)", image_parts.path) is not None)
+    if page == "https://yugioh-starlight.com/archives/37389101.html":
+        # This review uses the embedded broadcast frame, not the blog's text.
+        return (source.get("original_broadcast_capture_reviewed") is True
+                and source.get("origin_episode_url") == "https://www.tv-tokyo.co.jp/broad_tvtokyo/program/detail/201404/23144_201404061730.html"
+                and source.get("page_embedded_image_url") == picture
+                and bool(source.get("page_sha256"))
+                and image_parts.scheme == "https"
+                and image_parts.hostname == "livedoor.blogimg.jp"
+                and re.fullmatch(r"/maxut/imgs/[0-9a-f]/[0-9a-f]/[0-9a-f]{8}\.jpg", image_parts.path) is not None)
     if official_url(page):
         if not picture or official_url(picture):
             return True

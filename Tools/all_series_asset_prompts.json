@@ -3451,44 +3451,44 @@
     "canonicalName": "Blair Flannigan",
     "canonicalMedium": "anime",
     "renderMode": "color",
-    "selectedForm": "Blair enrolled female student appearance shown by Konami; long navy hair, red sleeveless jacket and yellow top",
+    "selectedForm": "Blair as the cap-wearing student in disguise in GX episode 20, The Maiden in Love",
     "verificationStatus": "reviewed",
     "generationAllowed": true,
     "pendingFields": [],
     "facts": {
       "hair_color": {
         "state": "observed",
-        "description": "Dark navy blue",
+        "description": "Dark navy-blue hair at the visible fringe under the cap",
         "source_ids": [
-          "konami_d9a18634cf93ac2c"
+          "review_7038d7b30e7412a059c2"
         ]
       },
       "hair_style": {
         "state": "observed",
-        "description": "Long loose straight hair with pointed layered bangs and a small crown tuft",
+        "description": "Short pointed bangs peeking out under the lowered cap; the crown and rear hairstyle are covered in this disguise",
         "source_ids": [
-          "konami_d9a18634cf93ac2c"
+          "review_7038d7b30e7412a059c2"
         ]
       },
       "facial_hair": {
         "state": "observed",
         "description": "No moustache or beard visible",
         "source_ids": [
-          "konami_d9a18634cf93ac2c"
+          "review_7038d7b30e7412a059c2"
         ]
       },
       "outfit": {
         "state": "observed",
-        "description": "Red cropped sleeveless jacket with pale collar over yellow high-neck shirt, dark lower garment and two brown studded waist belts",
+        "description": "First-season boy disguise: an oversized muted blue-green peaked cap and the red Duel Academy jacket visible at the shoulders and sleeve; preserve the on-screen upper-body crop and covered hairstyle",
         "source_ids": [
-          "konami_d9a18634cf93ac2c"
+          "review_7038d7b30e7412a059c2"
         ]
       },
       "duel_disk": {
         "state": "not_visible_in_selected_pose",
         "description": "No duel disk visible in this selected pose; do not add one",
         "source_ids": [
-          "konami_d9a18634cf93ac2c"
+          "review_7038d7b30e7412a059c2"
         ]
       }
     },
@@ -3500,14 +3500,14 @@
       "duel_disk"
     ],
     "referenceUrls": [
-      "https://www.konami.com/yugioh/duel_links/en/series/gx/#gx40"
+      "https://www.tv-tokyo.co.jp/contents/yugioh2004/episodes/episodes02/"
     ],
     "referenceImages": [
-      "https://www.konami.com/yugioh/duel_links/en/series/images/character/gx40.png"
+      "https://www.tv-tokyo.co.jp/contents/yugioh2004/images/story/20_1.jpg"
     ],
-    "referenceSubjectSelection": null,
-    "comfyPromptStanding": "Blair Flannigan, GX, selected official appearance: Blair enrolled female student appearance shown by Konami; long navy hair, red sleeveless jacket and yellow top. hair color: Dark navy blue; hair style: Long loose straight hair with pointed layered bangs and a small crown tuft; facial hair: No moustache or beard visible; outfit: Red cropped sleeveless jacket with pale collar over yellow high-neck shirt, dark lower garment and two brown studded waist belts; duel disk: No duel disk visible in this selected pose; do not add one. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. Standing illustration at the subject's actual canonical proportions, including any nonhuman body or life-support apparatus; no universal eight-head human redesign. Clear margins inside a vertical canvas for 1024x1536 output.",
-    "comfyPromptSd": "Blair Flannigan, GX, selected official appearance: Blair enrolled female student appearance shown by Konami; long navy hair, red sleeveless jacket and yellow top. hair color: Dark navy blue; hair style: Long loose straight hair with pointed layered bangs and a small crown tuft; facial hair: No moustache or beard visible; outfit: Red cropped sleeveless jacket with pale collar over yellow high-neck shirt, dark lower garment and two brown studded waist belts; duel disk: No duel disk visible in this selected pose; do not add one. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. 2.5-head chibi SD adaptation; simplify proportions while retaining every reviewed identity feature, costume color, facial-hair state and device shape. Complete silhouette with clear margins, square composition for 512x512 output."
+    "referenceSubjectSelection": "Select Blair in the cap on the left. Exclude the brown-haired character on the right, his clothing and the background.",
+    "comfyPromptStanding": "Blair Flannigan, GX, selected official appearance: Blair as the cap-wearing student in disguise in GX episode 20, The Maiden in Love. hair color: Dark navy-blue hair at the visible fringe under the cap; hair style: Short pointed bangs peeking out under the lowered cap; the crown and rear hairstyle are covered in this disguise; facial hair: No moustache or beard visible; outfit: First-season boy disguise: an oversized muted blue-green peaked cap and the red Duel Academy jacket visible at the shoulders and sleeve; preserve the on-screen upper-body crop and covered hairstyle; duel disk: No duel disk visible in this selected pose; do not add one. Reference subject selection: Select Blair in the cap on the left. Exclude the brown-haired character on the right, his clothing and the background.. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. Standing illustration at the subject's actual canonical proportions, including any nonhuman body or life-support apparatus; no universal eight-head human redesign. Clear margins inside a vertical canvas for 1024x1536 output.",
+    "comfyPromptSd": "Blair Flannigan, GX, selected official appearance: Blair as the cap-wearing student in disguise in GX episode 20, The Maiden in Love. hair color: Dark navy-blue hair at the visible fringe under the cap; hair style: Short pointed bangs peeking out under the lowered cap; the crown and rear hairstyle are covered in this disguise; facial hair: No moustache or beard visible; outfit: First-season boy disguise: an oversized muted blue-green peaked cap and the red Duel Academy jacket visible at the shoulders and sleeve; preserve the on-screen upper-body crop and covered hairstyle; duel disk: No duel disk visible in this selected pose; do not add one. Reference subject selection: Select Blair in the cap on the left. Exclude the brown-haired character on the right, his clothing and the background.. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. 2.5-head chibi SD adaptation; simplify proportions while retaining every reviewed identity feature, costume color, facial-hair state and device shape. Complete silhouette with clear margins, square composition for 512x512 output."
   },
   {
     "id": 125,
@@ -4491,44 +4491,46 @@
     "canonicalName": "Jean-Louis Bonaparte",
     "canonicalMedium": "anime",
     "renderMode": "color",
-    "selectedForm": "Hatless official GX Bonaparte portrait; no hat or cannon disk is visible",
+    "selectedForm": "Vice Chancellor Bonaparte in his bareheaded GX episode 69 duel against Crowler",
     "verificationStatus": "reviewed",
     "generationAllowed": true,
     "pendingFields": [],
     "facts": {
       "hair_color": {
         "state": "observed",
-        "description": "Dark brown side hair; bald crown",
+        "description": "Deep brown side hair and bald crown",
         "source_ids": [
-          "profile_07ed860867853698"
+          "review_4cd9adb6efe6ee208e0c",
+          "review_b550e5bffdff3c001e62"
         ]
       },
       "hair_style": {
         "state": "observed",
-        "description": "Bald domed scalp with small upward-curled pointed side tufts",
+        "description": "Smooth domed bald scalp with small pointed outward-curving tufts at both sides; bare head in the selected duel",
         "source_ids": [
-          "profile_07ed860867853698"
+          "review_4cd9adb6efe6ee208e0c",
+          "review_b550e5bffdff3c001e62"
         ]
       },
       "facial_hair": {
         "state": "observed",
-        "description": "No beard on the exposed chin. The upper-lip and nose area has very thin curled brown contour lines; retain the exact thin contours in the reference and do not invent a large dark filled moustache",
+        "description": "Exposed chin has no beard. The eyebrows and upper-lip area have thin curled dark lines as seen in the close-up; retain their narrow contour and size.",
         "source_ids": [
-          "profile_07ed860867853698"
+          "review_b550e5bffdff3c001e62"
         ]
       },
       "outfit": {
         "state": "observed",
-        "description": "Dark blue-green military coat with gold fringed epaulettes, white cravat and broad white cuffs",
+        "description": "Dark blue-green military coat with fringed gold shoulder epaulettes, bright white shirt cuffs and cravat, and a broad dark brown diagonal strap across his chest",
         "source_ids": [
-          "profile_07ed860867853698"
+          "review_4cd9adb6efe6ee208e0c"
         ]
       },
       "duel_disk": {
-        "state": "not_visible_in_selected_pose",
-        "description": "No duel disk visible in this selected pose; do not add one",
+        "state": "observed",
+        "description": "Pale lavender-gray duel disk on the arm with pale blue-green rectangular card zones and a rounded white-silver base with a red triangle and blue detail",
         "source_ids": [
-          "profile_07ed860867853698"
+          "review_4cd9adb6efe6ee208e0c"
         ]
       }
     },
@@ -4540,14 +4542,16 @@
       "duel_disk"
     ],
     "referenceUrls": [
-      "https://www.yugioh.com/characters/jean-louis-bonaparte"
+      "https://www.tv-tokyo.co.jp/contents/yugioh2004/episodes/episodes06/",
+      "https://www.tv-tokyo.co.jp/contents/yugioh2004/episodes/episodes08/"
     ],
     "referenceImages": [
-      "https://uploads4.yugioh.com/character/112/detail/detail/bonaparte-lrg.png"
+      "https://www.tv-tokyo.co.jp/contents/yugioh2004/images/story/69_2.jpg",
+      "https://www.tv-tokyo.co.jp/contents/yugioh2004/images/story/92_2.jpg"
     ],
-    "referenceSubjectSelection": null,
-    "comfyPromptStanding": "Jean-Louis Bonaparte, GX, selected official appearance: Hatless official GX Bonaparte portrait; no hat or cannon disk is visible. hair color: Dark brown side hair; bald crown; hair style: Bald domed scalp with small upward-curled pointed side tufts; facial hair: No beard on the exposed chin. The upper-lip and nose area has very thin curled brown contour lines; retain the exact thin contours in the reference and do not invent a large dark filled moustache; outfit: Dark blue-green military coat with gold fringed epaulettes, white cravat and broad white cuffs; duel disk: No duel disk visible in this selected pose; do not add one. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. Standing illustration at the subject's actual canonical proportions, including any nonhuman body or life-support apparatus; no universal eight-head human redesign. Clear margins inside a vertical canvas for 1024x1536 output.",
-    "comfyPromptSd": "Jean-Louis Bonaparte, GX, selected official appearance: Hatless official GX Bonaparte portrait; no hat or cannon disk is visible. hair color: Dark brown side hair; bald crown; hair style: Bald domed scalp with small upward-curled pointed side tufts; facial hair: No beard on the exposed chin. The upper-lip and nose area has very thin curled brown contour lines; retain the exact thin contours in the reference and do not invent a large dark filled moustache; outfit: Dark blue-green military coat with gold fringed epaulettes, white cravat and broad white cuffs; duel disk: No duel disk visible in this selected pose; do not add one. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. 2.5-head chibi SD adaptation; simplify proportions while retaining every reviewed identity feature, costume color, facial-hair state and device shape. Complete silhouette with clear margins, square composition for 512x512 output."
+    "referenceSubjectSelection": "Use only Bonaparte and his disk. Use the episode 92 close-up for the thin facial contours. Exclude opponent, scenery and lettering.",
+    "comfyPromptStanding": "Jean-Louis Bonaparte, GX, selected official appearance: Vice Chancellor Bonaparte in his bareheaded GX episode 69 duel against Crowler. hair color: Deep brown side hair and bald crown; hair style: Smooth domed bald scalp with small pointed outward-curving tufts at both sides; bare head in the selected duel; facial hair: Exposed chin has no beard. The eyebrows and upper-lip area have thin curled dark lines as seen in the close-up; retain their narrow contour and size.; outfit: Dark blue-green military coat with fringed gold shoulder epaulettes, bright white shirt cuffs and cravat, and a broad dark brown diagonal strap across his chest; duel disk: Pale lavender-gray duel disk on the arm with pale blue-green rectangular card zones and a rounded white-silver base with a red triangle and blue detail. Reference subject selection: Use only Bonaparte and his disk. Use the episode 92 close-up for the thin facial contours. Exclude opponent, scenery and lettering.. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. Standing illustration at the subject's actual canonical proportions, including any nonhuman body or life-support apparatus; no universal eight-head human redesign. Clear margins inside a vertical canvas for 1024x1536 output.",
+    "comfyPromptSd": "Jean-Louis Bonaparte, GX, selected official appearance: Vice Chancellor Bonaparte in his bareheaded GX episode 69 duel against Crowler. hair color: Deep brown side hair and bald crown; hair style: Smooth domed bald scalp with small pointed outward-curving tufts at both sides; bare head in the selected duel; facial hair: Exposed chin has no beard. The eyebrows and upper-lip area have thin curled dark lines as seen in the close-up; retain their narrow contour and size.; outfit: Dark blue-green military coat with fringed gold shoulder epaulettes, bright white shirt cuffs and cravat, and a broad dark brown diagonal strap across his chest; duel disk: Pale lavender-gray duel disk on the arm with pale blue-green rectangular card zones and a rounded white-silver base with a red triangle and blue detail. Reference subject selection: Use only Bonaparte and his disk. Use the episode 92 close-up for the thin facial contours. Exclude opponent, scenery and lettering.. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. 2.5-head chibi SD adaptation; simplify proportions while retaining every reviewed identity feature, costume color, facial-hair state and device shape. Complete silhouette with clear margins, square composition for 512x512 output."
   },
   {
     "id": 3100,
@@ -5854,54 +5858,65 @@
     "series": "5DS",
     "name": "배가본드",
     "canonicalName": "The Vagabond",
-    "canonicalMedium": null,
+    "canonicalMedium": "game",
     "renderMode": "color",
-    "selectedForm": null,
-    "verificationStatus": "pending",
-    "generationAllowed": false,
-    "pendingFields": [
+    "selectedForm": "The Vagabond in the original Duel Links dialogue screen",
+    "verificationStatus": "reviewed",
+    "generationAllowed": true,
+    "pendingFields": [],
+    "facts": {
+      "hair_color": {
+        "state": "observed",
+        "description": "Dark brown to nearly black visible side locks",
+        "source_ids": [
+          "review_d386ac245f144801df26"
+        ]
+      },
+      "hair_style": {
+        "state": "observed",
+        "description": "Eyes and crown concealed by the low baseball cap, with short angular side strands and tapered locks visible just behind the ears",
+        "source_ids": [
+          "review_d386ac245f144801df26"
+        ]
+      },
+      "facial_hair": {
+        "state": "observed",
+        "description": "No moustache or beard visible",
+        "source_ids": [
+          "review_d386ac245f144801df26"
+        ]
+      },
+      "outfit": {
+        "state": "observed",
+        "description": "Red baseball cap with slim white piping on the brim and two silver-rimmed teal goggle lenses on a dark strap; open red fitted jacket with raised collar, white chest stripes and turned-up white cuffs; dark charcoal crew-neck top with gray collar edge, blue denim waistband, brown belt with silver rectangular buckle; retain the visible hips-up framing",
+        "source_ids": [
+          "review_d386ac245f144801df26"
+        ]
+      },
+      "duel_disk": {
+        "state": "not_visible_in_selected_pose",
+        "description": "No duel disk visible in this selected pose; do not add one",
+        "source_ids": [
+          "review_d386ac245f144801df26"
+        ]
+      }
+    },
+    "reviewedFields": [
       "hair_color",
       "hair_style",
       "facial_hair",
       "outfit",
-      "duel_disk",
-      "selected_form",
-      "character_identity",
-      "canonical_medium"
+      "duel_disk"
     ],
-    "facts": {
-      "hair_color": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "hair_style": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "facial_hair": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "outfit": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "duel_disk": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      }
-    },
-    "reviewedFields": [],
-    "referenceUrls": [],
-    "referenceImages": [],
-    "referenceSubjectSelection": null,
-    "comfyPromptStanding": null,
-    "comfyPromptSd": null
+    "referenceUrls": [
+      "https://duellinks.gamea.co/c/33y1ms7t"
+    ],
+    "referenceImages": [
+      "https://duellinks.gamea.co/file/content_top/umi92hxs/33y1ms7t/a0ef4ac7a687a6f8f414509f10253ba64ba6ddea_600.png"
+    ],
+    "referenceSubjectSelection": "Use only the red-capped duelist in the center; exclude the game map, interface and the background.",
+    "comfyPromptStanding": "The Vagabond, 5DS, selected official appearance: The Vagabond in the original Duel Links dialogue screen. hair color: Dark brown to nearly black visible side locks; hair style: Eyes and crown concealed by the low baseball cap, with short angular side strands and tapered locks visible just behind the ears; facial hair: No moustache or beard visible; outfit: Red baseball cap with slim white piping on the brim and two silver-rimmed teal goggle lenses on a dark strap; open red fitted jacket with raised collar, white chest stripes and turned-up white cuffs; dark charcoal crew-neck top with gray collar edge, blue denim waistband, brown belt with silver rectangular buckle; retain the visible hips-up framing; duel disk: No duel disk visible in this selected pose; do not add one. Reference subject selection: Use only the red-capped duelist in the center; exclude the game map, interface and the background.. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. Standing illustration at the subject's actual canonical proportions, including any nonhuman body or life-support apparatus; no universal eight-head human redesign. Clear margins inside a vertical canvas for 1024x1536 output.",
+    "comfyPromptSd": "The Vagabond, 5DS, selected official appearance: The Vagabond in the original Duel Links dialogue screen. hair color: Dark brown to nearly black visible side locks; hair style: Eyes and crown concealed by the low baseball cap, with short angular side strands and tapered locks visible just behind the ears; facial hair: No moustache or beard visible; outfit: Red baseball cap with slim white piping on the brim and two silver-rimmed teal goggle lenses on a dark strap; open red fitted jacket with raised collar, white chest stripes and turned-up white cuffs; dark charcoal crew-neck top with gray collar edge, blue denim waistband, brown belt with silver rectangular buckle; retain the visible hips-up framing; duel disk: No duel disk visible in this selected pose; do not add one. Reference subject selection: Use only the red-capped duelist in the center; exclude the game map, interface and the background.. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. 2.5-head chibi SD adaptation; simplify proportions while retaining every reviewed identity feature, costume color, facial-hair state and device shape. Complete silhouette with clear margins, square composition for 512x512 output."
   },
   {
     "id": 10,
@@ -11173,54 +11188,67 @@
     "series": "ARCV",
     "name": "스트롱 이시지마",
     "canonicalName": "The Sledgehammer",
-    "canonicalMedium": null,
+    "canonicalMedium": "anime",
     "renderMode": "color",
-    "selectedForm": null,
-    "verificationStatus": "pending",
-    "generationAllowed": false,
-    "pendingFields": [
+    "selectedForm": "The Sledgehammer, named Strong Ishijima in the TV Tokyo broadcast of ARC-V episode 1, in the exhibition duel against Yuya",
+    "verificationStatus": "reviewed",
+    "generationAllowed": true,
+    "pendingFields": [],
+    "facts": {
+      "hair_color": {
+        "state": "observed",
+        "description": "Deep violet purple with brighter magenta-purple highlights",
+        "source_ids": [
+          "review_6b0dc3f9af9beb3a186f"
+        ]
+      },
+      "hair_style": {
+        "state": "observed",
+        "description": "Three extremely tall twisted spikes rise from the front, with the central spike upright and the two outer spikes tilted outward; a short knotted braid extends behind the neck",
+        "source_ids": [
+          "review_6b0dc3f9af9beb3a186f"
+        ]
+      },
+      "facial_hair": {
+        "state": "observed",
+        "description": "Clean upper lip and chin with no visible moustache or beard",
+        "source_ids": [
+          "review_6b0dc3f9af9beb3a186f"
+        ]
+      },
+      "outfit": {
+        "state": "observed",
+        "description": "Tall muscular tan duelist with sharply curved burgundy eye paint. Fitted sleeveless slate-green vest and split front tabard, rounded layered steel-gray shoulder plates, studded dark burgundy crossed straps and a large circular gold chest clasp. Dark fingerless gloves, pale wraps on the right forearm, burgundy utility belt with gold buckle, charcoal trousers, and tall burgundy boots with broad cuffs and light gray instep straps.",
+        "source_ids": [
+          "review_6b0dc3f9af9beb3a186f",
+          "review_2eeadd6e35a776ec9baa"
+        ]
+      },
+      "duel_disk": {
+        "state": "observed",
+        "description": "Left forearm has a broad dark blue-gray cuff and a dark angular module with a thin straight purple energy blade",
+        "source_ids": [
+          "review_2eeadd6e35a776ec9baa"
+        ]
+      }
+    },
+    "reviewedFields": [
       "hair_color",
       "hair_style",
       "facial_hair",
       "outfit",
-      "duel_disk",
-      "selected_form",
-      "character_identity",
-      "canonical_medium"
+      "duel_disk"
     ],
-    "facts": {
-      "hair_color": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "hair_style": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "facial_hair": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "outfit": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "duel_disk": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      }
-    },
-    "reviewedFields": [],
-    "referenceUrls": [],
-    "referenceImages": [],
-    "referenceSubjectSelection": null,
-    "comfyPromptStanding": null,
-    "comfyPromptSd": null
+    "referenceUrls": [
+      "https://yugioh-starlight.com/archives/37389101.html"
+    ],
+    "referenceImages": [
+      "https://livedoor.blogimg.jp/maxut/imgs/1/2/12980fde.jpg",
+      "https://livedoor.blogimg.jp/maxut/imgs/c/9/c9b9b598.jpg"
+    ],
+    "referenceSubjectSelection": "Use the purple-haired armored duelist named Strong Ishijima in the close-up and standing at the right of the wide shot. Exclude Yuya in the foreground, subtitles, watermarks and scenery.",
+    "comfyPromptStanding": "The Sledgehammer, ARCV, selected official appearance: The Sledgehammer, named Strong Ishijima in the TV Tokyo broadcast of ARC-V episode 1, in the exhibition duel against Yuya. hair color: Deep violet purple with brighter magenta-purple highlights; hair style: Three extremely tall twisted spikes rise from the front, with the central spike upright and the two outer spikes tilted outward; a short knotted braid extends behind the neck; facial hair: Clean upper lip and chin with no visible moustache or beard; outfit: Tall muscular tan duelist with sharply curved burgundy eye paint. Fitted sleeveless slate-green vest and split front tabard, rounded layered steel-gray shoulder plates, studded dark burgundy crossed straps and a large circular gold chest clasp. Dark fingerless gloves, pale wraps on the right forearm, burgundy utility belt with gold buckle, charcoal trousers, and tall burgundy boots with broad cuffs and light gray instep straps.; duel disk: Left forearm has a broad dark blue-gray cuff and a dark angular module with a thin straight purple energy blade. Reference subject selection: Use the purple-haired armored duelist named Strong Ishijima in the close-up and standing at the right of the wide shot. Exclude Yuya in the foreground, subtitles, watermarks and scenery.. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Use the full-body framing of the reviewed reference. Standing illustration at the subject's actual canonical proportions, including any nonhuman body or life-support apparatus; no universal eight-head human redesign. Clear margins inside a vertical canvas for 1024x1536 output.",
+    "comfyPromptSd": "The Sledgehammer, ARCV, selected official appearance: The Sledgehammer, named Strong Ishijima in the TV Tokyo broadcast of ARC-V episode 1, in the exhibition duel against Yuya. hair color: Deep violet purple with brighter magenta-purple highlights; hair style: Three extremely tall twisted spikes rise from the front, with the central spike upright and the two outer spikes tilted outward; a short knotted braid extends behind the neck; facial hair: Clean upper lip and chin with no visible moustache or beard; outfit: Tall muscular tan duelist with sharply curved burgundy eye paint. Fitted sleeveless slate-green vest and split front tabard, rounded layered steel-gray shoulder plates, studded dark burgundy crossed straps and a large circular gold chest clasp. Dark fingerless gloves, pale wraps on the right forearm, burgundy utility belt with gold buckle, charcoal trousers, and tall burgundy boots with broad cuffs and light gray instep straps.; duel disk: Left forearm has a broad dark blue-gray cuff and a dark angular module with a thin straight purple energy blade. Reference subject selection: Use the purple-haired armored duelist named Strong Ishijima in the close-up and standing at the right of the wide shot. Exclude Yuya in the foreground, subtitles, watermarks and scenery.. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Use the full-body framing of the reviewed reference. 2.5-head chibi SD adaptation; simplify proportions while retaining every reviewed identity feature, costume color, facial-hair state and device shape. Complete silhouette with clear margins, square composition for 512x512 output."
   },
   {
     "id": 73,
@@ -13697,54 +13725,65 @@
     "series": "ARCV",
     "name": "아카바 레이",
     "canonicalName": "Ray Akaba",
-    "canonicalMedium": null,
+    "canonicalMedium": "anime",
     "renderMode": "color",
-    "selectedForm": null,
-    "verificationStatus": "pending",
-    "generationAllowed": false,
-    "pendingFields": [
+    "selectedForm": "Ray Akaba’s luminous spirit behind Riley during the duel in ARC-V episode 131. The frame records her spirit form only",
+    "verificationStatus": "reviewed",
+    "generationAllowed": true,
+    "pendingFields": [],
+    "facts": {
+      "hair_color": {
+        "state": "not_visible_in_selected_pose",
+        "description": "The entire spirit, including the hair, shines pale yellow and white in this appearance; ordinary hair pigment is not visible",
+        "source_ids": [
+          "review_e870aec977fb40e6b659"
+        ]
+      },
+      "hair_style": {
+        "state": "observed",
+        "description": "Swept pointed fringe with long high side ponytails and a long curved lock trailing to the right in the reference",
+        "source_ids": [
+          "review_e870aec977fb40e6b659"
+        ]
+      },
+      "facial_hair": {
+        "state": "observed",
+        "description": "No moustache or beard visible",
+        "source_ids": [
+          "review_e870aec977fb40e6b659"
+        ]
+      },
+      "outfit": {
+        "state": "observed",
+        "description": "Glowing pale gold-white apparition with luminous blank eyes and a sleeveless fitted upper silhouette; the spirit glow obscures fabric colors and small details; the hooded duelist Riley in the foreground is separate from Ray",
+        "source_ids": [
+          "review_e870aec977fb40e6b659"
+        ]
+      },
+      "duel_disk": {
+        "state": "not_visible_in_selected_pose",
+        "description": "No duel disk visible in this selected pose; do not add one",
+        "source_ids": [
+          "review_e870aec977fb40e6b659"
+        ]
+      }
+    },
+    "reviewedFields": [
       "hair_color",
       "hair_style",
       "facial_hair",
       "outfit",
-      "duel_disk",
-      "selected_form",
-      "character_identity",
-      "canonical_medium"
+      "duel_disk"
     ],
-    "facts": {
-      "hair_color": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "hair_style": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "facial_hair": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "outfit": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "duel_disk": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      }
-    },
-    "reviewedFields": [],
-    "referenceUrls": [],
-    "referenceImages": [],
-    "referenceSubjectSelection": null,
-    "comfyPromptStanding": null,
-    "comfyPromptSd": null
+    "referenceUrls": [
+      "https://www.videomarket.jp/title/167101/A167101032999H01"
+    ],
+    "referenceImages": [
+      "https://imgv.vm-movie.jp/image/android/640x360/167/s167101032a.jpg"
+    ],
+    "referenceSubjectSelection": "Select the glowing female spirit at the right behind Riley. Retain her light and silhouette without Riley, the cyan hood, or Riley’s green duel-disk blade.",
+    "comfyPromptStanding": "Ray Akaba, ARCV, selected official appearance: Ray Akaba’s luminous spirit behind Riley during the duel in ARC-V episode 131. The frame records her spirit form only. hair color: The entire spirit, including the hair, shines pale yellow and white in this appearance; ordinary hair pigment is not visible; hair style: Swept pointed fringe with long high side ponytails and a long curved lock trailing to the right in the reference; facial hair: No moustache or beard visible; outfit: Glowing pale gold-white apparition with luminous blank eyes and a sleeveless fitted upper silhouette; the spirit glow obscures fabric colors and small details; the hooded duelist Riley in the foreground is separate from Ray; duel disk: No duel disk visible in this selected pose; do not add one. Reference subject selection: Select the glowing female spirit at the right behind Riley. Retain her light and silhouette without Riley, the cyan hood, or Riley’s green duel-disk blade.. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. Standing illustration at the subject's actual canonical proportions, including any nonhuman body or life-support apparatus; no universal eight-head human redesign. Clear margins inside a vertical canvas for 1024x1536 output.",
+    "comfyPromptSd": "Ray Akaba, ARCV, selected official appearance: Ray Akaba’s luminous spirit behind Riley during the duel in ARC-V episode 131. The frame records her spirit form only. hair color: The entire spirit, including the hair, shines pale yellow and white in this appearance; ordinary hair pigment is not visible; hair style: Swept pointed fringe with long high side ponytails and a long curved lock trailing to the right in the reference; facial hair: No moustache or beard visible; outfit: Glowing pale gold-white apparition with luminous blank eyes and a sleeveless fitted upper silhouette; the spirit glow obscures fabric colors and small details; the hooded duelist Riley in the foreground is separate from Ray; duel disk: No duel disk visible in this selected pose; do not add one. Reference subject selection: Select the glowing female spirit at the right behind Riley. Retain her light and silhouette without Riley, the cyan hood, or Riley’s green duel-disk blade.. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. 2.5-head chibi SD adaptation; simplify proportions while retaining every reviewed identity feature, costume color, facial-hair state and device shape. Complete silhouette with clear margins, square composition for 512x512 output."
   },
   {
     "id": 74,
@@ -13881,54 +13920,65 @@
     "series": "VRAINS",
     "name": "베이그런트",
     "canonicalName": "The Vagrant",
-    "canonicalMedium": null,
+    "canonicalMedium": "game",
     "renderMode": "color",
-    "selectedForm": null,
-    "verificationStatus": "pending",
-    "generationAllowed": false,
-    "pendingFields": [
+    "selectedForm": "The Vagrant in the Duel Links in-game promotion",
+    "verificationStatus": "reviewed",
+    "generationAllowed": true,
+    "pendingFields": [],
+    "facts": {
+      "hair_color": {
+        "state": "observed",
+        "description": "Dark brown to nearly black visible side locks",
+        "source_ids": [
+          "review_826b3290024932a0291e"
+        ]
+      },
+      "hair_style": {
+        "state": "observed",
+        "description": "Eyes and crown concealed by the low baseball cap, with short angular side strands and tapered locks visible just behind the ears",
+        "source_ids": [
+          "review_826b3290024932a0291e"
+        ]
+      },
+      "facial_hair": {
+        "state": "observed",
+        "description": "No moustache or beard visible",
+        "source_ids": [
+          "review_826b3290024932a0291e"
+        ]
+      },
+      "outfit": {
+        "state": "observed",
+        "description": "Deep navy baseball cap with two silver-rimmed teal goggle lenses on a dark strap; fitted dark navy jacket with raised lapels and subtle blue seam panels over a black crew-neck shirt; retain the chest and waist shown in the promotion",
+        "source_ids": [
+          "review_826b3290024932a0291e"
+        ]
+      },
+      "duel_disk": {
+        "state": "not_visible_in_selected_pose",
+        "description": "No duel disk visible in this selected pose; do not add one",
+        "source_ids": [
+          "review_826b3290024932a0291e"
+        ]
+      }
+    },
+    "reviewedFields": [
       "hair_color",
       "hair_style",
       "facial_hair",
       "outfit",
-      "duel_disk",
-      "selected_form",
-      "character_identity",
-      "canonical_medium"
+      "duel_disk"
     ],
-    "facts": {
-      "hair_color": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "hair_style": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "facial_hair": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "outfit": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "duel_disk": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      }
-    },
-    "reviewedFields": [],
-    "referenceUrls": [],
-    "referenceImages": [],
-    "referenceSubjectSelection": null,
-    "comfyPromptStanding": null,
-    "comfyPromptSd": null
+    "referenceUrls": [
+      "https://duellinks.gamea.co/c/nrv00zyp"
+    ],
+    "referenceImages": [
+      "https://duellinks.gamea.co/file/content/umi92hxs/nrv00zyp/576572/1321d6cde2e8a318ffd71cdaf3cb869e623b115c_500.jpg"
+    ],
+    "referenceSubjectSelection": "Use only the large dark-blue duelist at the right. Exclude the map, icons, and EXP multiplier labels.",
+    "comfyPromptStanding": "The Vagrant, VRAINS, selected official appearance: The Vagrant in the Duel Links in-game promotion. hair color: Dark brown to nearly black visible side locks; hair style: Eyes and crown concealed by the low baseball cap, with short angular side strands and tapered locks visible just behind the ears; facial hair: No moustache or beard visible; outfit: Deep navy baseball cap with two silver-rimmed teal goggle lenses on a dark strap; fitted dark navy jacket with raised lapels and subtle blue seam panels over a black crew-neck shirt; retain the chest and waist shown in the promotion; duel disk: No duel disk visible in this selected pose; do not add one. Reference subject selection: Use only the large dark-blue duelist at the right. Exclude the map, icons, and EXP multiplier labels.. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. Standing illustration at the subject's actual canonical proportions, including any nonhuman body or life-support apparatus; no universal eight-head human redesign. Clear margins inside a vertical canvas for 1024x1536 output.",
+    "comfyPromptSd": "The Vagrant, VRAINS, selected official appearance: The Vagrant in the Duel Links in-game promotion. hair color: Dark brown to nearly black visible side locks; hair style: Eyes and crown concealed by the low baseball cap, with short angular side strands and tapered locks visible just behind the ears; facial hair: No moustache or beard visible; outfit: Deep navy baseball cap with two silver-rimmed teal goggle lenses on a dark strap; fitted dark navy jacket with raised lapels and subtle blue seam panels over a black crew-neck shirt; retain the chest and waist shown in the promotion; duel disk: No duel disk visible in this selected pose; do not add one. Reference subject selection: Use only the large dark-blue duelist at the right. Exclude the map, icons, and EXP multiplier labels.. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. 2.5-head chibi SD adaptation; simplify proportions while retaining every reviewed identity feature, costume color, facial-hair state and device shape. Complete silhouette with clear margins, square composition for 512x512 output."
   },
   {
     "id": 142,

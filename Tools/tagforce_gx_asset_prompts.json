@@ -313,13 +313,13 @@
     "verificationStatus": "reviewed",
     "pendingFields": [],
     "referenceUrls": [
-      "https://www.konami.com/yugioh/duel_links/en/series/gx/#gx40"
+      "https://www.tv-tokyo.co.jp/contents/yugioh2004/episodes/episodes02/"
     ],
     "referenceImages": [
-      "https://www.konami.com/yugioh/duel_links/en/series/images/character/gx40.png"
+      "https://www.tv-tokyo.co.jp/contents/yugioh2004/images/story/20_1.jpg"
     ],
-    "referenceSubjectSelection": null,
-    "prompt": "Blair Flannigan, GX, selected official appearance: Blair enrolled female student appearance shown by Konami; long navy hair, red sleeveless jacket and yellow top. hair color: Dark navy blue; hair style: Long loose straight hair with pointed layered bangs and a small crown tuft; facial hair: No moustache or beard visible; outfit: Red cropped sleeveless jacket with pale collar over yellow high-neck shirt, dark lower garment and two brown studded waist belts; duel disk: No duel disk visible in this selected pose; do not add one. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. 2.5-head chibi SD adaptation; simplify proportions while retaining every reviewed identity feature, costume color, facial-hair state and device shape. Complete silhouette with clear margins, square composition for 512x512 output.",
+    "referenceSubjectSelection": "Select Blair in the cap on the left. Exclude the brown-haired character on the right, his clothing and the background.",
+    "prompt": "Blair Flannigan, GX, selected official appearance: Blair as the cap-wearing student in disguise in GX episode 20, The Maiden in Love. hair color: Dark navy-blue hair at the visible fringe under the cap; hair style: Short pointed bangs peeking out under the lowered cap; the crown and rear hairstyle are covered in this disguise; facial hair: No moustache or beard visible; outfit: First-season boy disguise: an oversized muted blue-green peaked cap and the red Duel Academy jacket visible at the shoulders and sleeve; preserve the on-screen upper-body crop and covered hairstyle; duel disk: No duel disk visible in this selected pose; do not add one. Reference subject selection: Select Blair in the cap on the left. Exclude the brown-haired character on the right, his clothing and the background.. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. 2.5-head chibi SD adaptation; simplify proportions while retaining every reviewed identity feature, costume color, facial-hair state and device shape. Complete silhouette with clear margins, square composition for 512x512 output.",
     "target": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_114.png"
   },
   {
@@ -332,13 +332,13 @@
     "verificationStatus": "reviewed",
     "pendingFields": [],
     "referenceUrls": [
-      "https://www.konami.com/yugioh/duel_links/en/series/gx/#gx40"
+      "https://www.tv-tokyo.co.jp/contents/yugioh2004/episodes/episodes02/"
     ],
     "referenceImages": [
-      "https://www.konami.com/yugioh/duel_links/en/series/images/character/gx40.png"
+      "https://www.tv-tokyo.co.jp/contents/yugioh2004/images/story/20_1.jpg"
     ],
-    "referenceSubjectSelection": null,
-    "prompt": "Blair Flannigan, GX, selected official appearance: Blair enrolled female student appearance shown by Konami; long navy hair, red sleeveless jacket and yellow top. hair color: Dark navy blue; hair style: Long loose straight hair with pointed layered bangs and a small crown tuft; facial hair: No moustache or beard visible; outfit: Red cropped sleeveless jacket with pale collar over yellow high-neck shirt, dark lower garment and two brown studded waist belts; duel disk: No duel disk visible in this selected pose; do not add one. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. Standing illustration at the subject's actual canonical proportions, including any nonhuman body or life-support apparatus; no universal eight-head human redesign. Clear margins inside a vertical canvas for 1024x1536 output.",
+    "referenceSubjectSelection": "Select Blair in the cap on the left. Exclude the brown-haired character on the right, his clothing and the background.",
+    "prompt": "Blair Flannigan, GX, selected official appearance: Blair as the cap-wearing student in disguise in GX episode 20, The Maiden in Love. hair color: Dark navy-blue hair at the visible fringe under the cap; hair style: Short pointed bangs peeking out under the lowered cap; the crown and rear hairstyle are covered in this disguise; facial hair: No moustache or beard visible; outfit: First-season boy disguise: an oversized muted blue-green peaked cap and the red Duel Academy jacket visible at the shoulders and sleeve; preserve the on-screen upper-body crop and covered hairstyle; duel disk: No duel disk visible in this selected pose; do not add one. Reference subject selection: Select Blair in the cap on the left. Exclude the brown-haired character on the right, his clothing and the background.. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. Standing illustration at the subject's actual canonical proportions, including any nonhuman body or life-support apparatus; no universal eight-head human redesign. Clear margins inside a vertical canvas for 1024x1536 output.",
     "target": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_114.png"
   },
   {
@@ -351,13 +351,15 @@
     "verificationStatus": "reviewed",
     "pendingFields": [],
     "referenceUrls": [
-      "https://www.yugioh.com/characters/jean-louis-bonaparte"
+      "https://www.tv-tokyo.co.jp/contents/yugioh2004/episodes/episodes06/",
+      "https://www.tv-tokyo.co.jp/contents/yugioh2004/episodes/episodes08/"
     ],
     "referenceImages": [
-      "https://uploads4.yugioh.com/character/112/detail/detail/bonaparte-lrg.png"
+      "https://www.tv-tokyo.co.jp/contents/yugioh2004/images/story/69_2.jpg",
+      "https://www.tv-tokyo.co.jp/contents/yugioh2004/images/story/92_2.jpg"
     ],
-    "referenceSubjectSelection": null,
-    "prompt": "Jean-Louis Bonaparte, GX, selected official appearance: Hatless official GX Bonaparte portrait; no hat or cannon disk is visible. hair color: Dark brown side hair; bald crown; hair style: Bald domed scalp with small upward-curled pointed side tufts; facial hair: No beard on the exposed chin. The upper-lip and nose area has very thin curled brown contour lines; retain the exact thin contours in the reference and do not invent a large dark filled moustache; outfit: Dark blue-green military coat with gold fringed epaulettes, white cravat and broad white cuffs; duel disk: No duel disk visible in this selected pose; do not add one. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. 2.5-head chibi SD adaptation; simplify proportions while retaining every reviewed identity feature, costume color, facial-hair state and device shape. Complete silhouette with clear margins, square composition for 512x512 output.",
+    "referenceSubjectSelection": "Use only Bonaparte and his disk. Use the episode 92 close-up for the thin facial contours. Exclude opponent, scenery and lettering.",
+    "prompt": "Jean-Louis Bonaparte, GX, selected official appearance: Vice Chancellor Bonaparte in his bareheaded GX episode 69 duel against Crowler. hair color: Deep brown side hair and bald crown; hair style: Smooth domed bald scalp with small pointed outward-curving tufts at both sides; bare head in the selected duel; facial hair: Exposed chin has no beard. The eyebrows and upper-lip area have thin curled dark lines as seen in the close-up; retain their narrow contour and size.; outfit: Dark blue-green military coat with fringed gold shoulder epaulettes, bright white shirt cuffs and cravat, and a broad dark brown diagonal strap across his chest; duel disk: Pale lavender-gray duel disk on the arm with pale blue-green rectangular card zones and a rounded white-silver base with a red triangle and blue detail. Reference subject selection: Use only Bonaparte and his disk. Use the episode 92 close-up for the thin facial contours. Exclude opponent, scenery and lettering.. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. 2.5-head chibi SD adaptation; simplify proportions while retaining every reviewed identity feature, costume color, facial-hair state and device shape. Complete silhouette with clear margins, square composition for 512x512 output.",
     "target": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_115.png"
   },
   {
@@ -370,13 +372,15 @@
     "verificationStatus": "reviewed",
     "pendingFields": [],
     "referenceUrls": [
-      "https://www.yugioh.com/characters/jean-louis-bonaparte"
+      "https://www.tv-tokyo.co.jp/contents/yugioh2004/episodes/episodes06/",
+      "https://www.tv-tokyo.co.jp/contents/yugioh2004/episodes/episodes08/"
     ],
     "referenceImages": [
-      "https://uploads4.yugioh.com/character/112/detail/detail/bonaparte-lrg.png"
+      "https://www.tv-tokyo.co.jp/contents/yugioh2004/images/story/69_2.jpg",
+      "https://www.tv-tokyo.co.jp/contents/yugioh2004/images/story/92_2.jpg"
     ],
-    "referenceSubjectSelection": null,
-    "prompt": "Jean-Louis Bonaparte, GX, selected official appearance: Hatless official GX Bonaparte portrait; no hat or cannon disk is visible. hair color: Dark brown side hair; bald crown; hair style: Bald domed scalp with small upward-curled pointed side tufts; facial hair: No beard on the exposed chin. The upper-lip and nose area has very thin curled brown contour lines; retain the exact thin contours in the reference and do not invent a large dark filled moustache; outfit: Dark blue-green military coat with gold fringed epaulettes, white cravat and broad white cuffs; duel disk: No duel disk visible in this selected pose; do not add one. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. Standing illustration at the subject's actual canonical proportions, including any nonhuman body or life-support apparatus; no universal eight-head human redesign. Clear margins inside a vertical canvas for 1024x1536 output.",
+    "referenceSubjectSelection": "Use only Bonaparte and his disk. Use the episode 92 close-up for the thin facial contours. Exclude opponent, scenery and lettering.",
+    "prompt": "Jean-Louis Bonaparte, GX, selected official appearance: Vice Chancellor Bonaparte in his bareheaded GX episode 69 duel against Crowler. hair color: Deep brown side hair and bald crown; hair style: Smooth domed bald scalp with small pointed outward-curving tufts at both sides; bare head in the selected duel; facial hair: Exposed chin has no beard. The eyebrows and upper-lip area have thin curled dark lines as seen in the close-up; retain their narrow contour and size.; outfit: Dark blue-green military coat with fringed gold shoulder epaulettes, bright white shirt cuffs and cravat, and a broad dark brown diagonal strap across his chest; duel disk: Pale lavender-gray duel disk on the arm with pale blue-green rectangular card zones and a rounded white-silver base with a red triangle and blue detail. Reference subject selection: Use only Bonaparte and his disk. Use the episode 92 close-up for the thin facial contours. Exclude opponent, scenery and lettering.. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. Standing illustration at the subject's actual canonical proportions, including any nonhuman body or life-support apparatus; no universal eight-head human redesign. Clear margins inside a vertical canvas for 1024x1536 output.",
     "target": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_115.png"
   },
   {
@@ -1601,21 +1605,17 @@
     "kind": "sd",
     "canonicalMedium": "anime",
     "renderMode": "color",
-    "generationAllowed": false,
-    "verificationStatus": "pending",
-    "pendingFields": [
-      "hair_color",
-      "hair_style",
-      "facial_hair",
-      "outfit",
-      "duel_disk",
-      "selected_form",
-      "character_identity"
+    "generationAllowed": true,
+    "verificationStatus": "reviewed",
+    "pendingFields": [],
+    "referenceUrls": [
+      "https://www.youtube.com/watch?v=5KRij8tBJEA"
     ],
-    "referenceUrls": [],
-    "referenceImages": [],
-    "referenceSubjectSelection": null,
-    "prompt": null,
+    "referenceImages": [
+      "https://i.ytimg.com/vi/5KRij8tBJEA/hqdefault.jpg"
+    ],
+    "referenceSubjectSelection": "Select only the broad-hatted duelist in the center, preserving his pale asymmetric chest trim. Exclude all shapes crowding the frame around him.",
+    "prompt": "Titan, Shadow Rider appearance, GX, selected official appearance: Titan in the GX episode 41 Shadow Rider rematch against Alexis, as seen in the center of the dark still. hair color: The broad hat and dark lighting obscure the scalp hair; hair style: The broad hat and dark lighting obscure the hairstyle; facial hair: Mouth and jaw partly obscured by face covering and dim shadow; no beard or moustache established; outfit: Broad-brimmed dark hat and long dark coat with heavy angular shoulders; wide pale metal chest and shoulder trim with three dark round fittings, dark gloves and an angular gray covering around the face. In this moment the entire outfit has a strong blue-violet cast; retain the visible upper-body framing.; duel disk: No duel disk visible in this selected pose; do not add one. Reference subject selection: Select only the broad-hatted duelist in the center, preserving his pale asymmetric chest trim. Exclude all shapes crowding the frame around him.. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. 2.5-head chibi SD adaptation; simplify proportions while retaining every reviewed identity feature, costume color, facial-hair state and device shape. Complete silhouette with clear margins, square composition for 512x512 output.",
     "target": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_3101.png"
   },
   {
@@ -1624,21 +1624,17 @@
     "kind": "standing",
     "canonicalMedium": "anime",
     "renderMode": "color",
-    "generationAllowed": false,
-    "verificationStatus": "pending",
-    "pendingFields": [
-      "hair_color",
-      "hair_style",
-      "facial_hair",
-      "outfit",
-      "duel_disk",
-      "selected_form",
-      "character_identity"
+    "generationAllowed": true,
+    "verificationStatus": "reviewed",
+    "pendingFields": [],
+    "referenceUrls": [
+      "https://www.youtube.com/watch?v=5KRij8tBJEA"
     ],
-    "referenceUrls": [],
-    "referenceImages": [],
-    "referenceSubjectSelection": null,
-    "prompt": null,
+    "referenceImages": [
+      "https://i.ytimg.com/vi/5KRij8tBJEA/hqdefault.jpg"
+    ],
+    "referenceSubjectSelection": "Select only the broad-hatted duelist in the center, preserving his pale asymmetric chest trim. Exclude all shapes crowding the frame around him.",
+    "prompt": "Titan, Shadow Rider appearance, GX, selected official appearance: Titan in the GX episode 41 Shadow Rider rematch against Alexis, as seen in the center of the dark still. hair color: The broad hat and dark lighting obscure the scalp hair; hair style: The broad hat and dark lighting obscure the hairstyle; facial hair: Mouth and jaw partly obscured by face covering and dim shadow; no beard or moustache established; outfit: Broad-brimmed dark hat and long dark coat with heavy angular shoulders; wide pale metal chest and shoulder trim with three dark round fittings, dark gloves and an angular gray covering around the face. In this moment the entire outfit has a strong blue-violet cast; retain the visible upper-body framing.; duel disk: No duel disk visible in this selected pose; do not add one. Reference subject selection: Select only the broad-hatted duelist in the center, preserving his pale asymmetric chest trim. Exclude all shapes crowding the frame around him.. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. Standing illustration at the subject's actual canonical proportions, including any nonhuman body or life-support apparatus; no universal eight-head human redesign. Clear margins inside a vertical canvas for 1024x1536 output.",
     "target": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_3101.png"
   },
   {

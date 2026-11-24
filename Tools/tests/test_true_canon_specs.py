@@ -16,14 +16,17 @@ class CanonSourceContractTests(unittest.TestCase):
         self.manifest = canon.read_json(canon.ROOT / "Tools/all_series_character_manifest.json")
 
     def test_incomplete_review_cannot_be_published_as_verified(self):
+        data = copy.deepcopy(self.catalogue)
+        camula = next(row for row in data["characters"] if row["id"] == 116)
+        camula["facts"]["hair_color"] = {"state": "pending", "description": None, "source_ids": []}
         with self.assertRaisesRegex(ValueError, "lack complete primary-source review"):
-            canon.build(self.catalogue, self.manifest)
-        records = canon.build(self.catalogue, self.manifest, allow_pending=True)
+            canon.build(data, self.manifest)
+        records = canon.build(data, self.manifest, allow_pending=True)
         self.assertEqual(len(records), 240)
-        for record in records:
-            if not record["generationAllowed"]:
-                self.assertIsNone(record["comfyPromptStanding"])
-                self.assertIsNone(record["comfyPromptSd"])
+        record = next(row for row in records if row["id"] == 116)
+        self.assertFalse(record["generationAllowed"])
+        self.assertIsNone(record["comfyPromptStanding"])
+        self.assertIsNone(record["comfyPromptSd"])
 
     def test_another_characters_reference_cannot_verify_an_identity(self):
         camula = next(row for row in self.catalogue["characters"] if row["id"] == 116)

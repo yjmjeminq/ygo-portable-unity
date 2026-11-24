@@ -3239,6 +3239,147 @@
       "applicable_character_ids": [
         217
       ]
+    },
+    "review_e870aec977fb40e6b659": {
+      "page_url": "https://www.videomarket.jp/title/167101/A167101032999H01",
+      "image_url": "https://imgv.vm-movie.jp/image/android/640x360/167/s167101032a.jpg",
+      "title": "ARC-V episode 131: Light in the Darkness",
+      "publisher": "VideoMarket licensed anime episode catalogue",
+      "medium": "anime_episode_promotional_still",
+      "coverage": "only_the_visible_selected_subject",
+      "visually_reviewed": true,
+      "image_sha256": "e870aec977fb40e6b65928895de716f443ff66bc4b6b16e42db89c9c4d33a9da",
+      "applicable_character_ids": [
+        58
+      ],
+      "licensed_catalogue_verified": true,
+      "page_sha256": "529308f11b96f926a53c6977901121e2c6c9ad72e44cbc18727b72bfdd2020de",
+      "page_meta_image_url": "https://imgv.vm-movie.jp/image/android/640x360/167/s167101032a.jpg",
+      "copyright_notice": "© 高橋和希 スタジオ・ダイス / 集英社・テレビ東京・NAS",
+      "identity_context_url": "https://www.tv-tokyo.co.jp/anime/yugioh-arcv/episodes/index_2.html"
+    },
+    "review_d386ac245f144801df26": {
+      "page_url": "https://duellinks.gamea.co/c/33y1ms7t",
+      "image_url": "https://duellinks.gamea.co/file/content_top/umi92hxs/33y1ms7t/a0ef4ac7a687a6f8f414509f10253ba64ba6ddea_600.png",
+      "title": "The Vagabond in the original Duel Links dialogue screen",
+      "publisher": "Konami Digital Entertainment game visuals; screenshot hosted by GameA",
+      "medium": "original_game_capture",
+      "coverage": "only_the_visible_selected_subject",
+      "visually_reviewed": true,
+      "image_sha256": "d386ac245f144801df26cafc796d97f3cdc3105b877235849298139bff77f615",
+      "applicable_character_ids": [
+        138
+      ],
+      "original_game_capture_reviewed": true,
+      "origin_game_url": "https://www.konami.com/yugioh/duel_links/ja/",
+      "page_embedded_image_url": "https://duellinks.gamea.co/file/content_top/umi92hxs/33y1ms7t/a0ef4ac7a687a6f8f414509f10253ba64ba6ddea_600.png",
+      "page_sha256": "fd1804a34b7ce93083846e0b027a2bc39e9f1baaa189913a56d09667396c4e77"
+    },
+    "review_826b3290024932a0291e": {
+      "page_url": "https://duellinks.gamea.co/c/nrv00zyp",
+      "image_url": "https://duellinks.gamea.co/file/content/umi92hxs/nrv00zyp/576572/1321d6cde2e8a318ffd71cdaf3cb869e623b115c_500.jpg",
+      "title": "The Vagrant in the Duel Links in-game promotion",
+      "publisher": "Konami Digital Entertainment game visuals; screenshot hosted by GameA",
+      "medium": "original_game_capture",
+      "coverage": "only_the_visible_selected_subject",
+      "visually_reviewed": true,
+      "image_sha256": "826b3290024932a0291eaff59a17e441e5c7ba48eb2c3766a23b86538d506029",
+      "applicable_character_ids": [
+        232
+      ],
+      "original_game_capture_reviewed": true,
+      "origin_game_url": "https://www.konami.com/yugioh/duel_links/ja/",
+      "page_embedded_image_url": "https://duellinks.gamea.co/file/content/umi92hxs/nrv00zyp/576572/1321d6cde2e8a318ffd71cdaf3cb869e623b115c_500.jpg",
+      "page_sha256": "1efed9e07f7ed7fbbfc80cfda6902c632d31e0a376a050a6887fce76f2a19b06"
+    },
+    "review_fc4f47206971d7eef002": {
+      "page_url": "https://www.youtube.com/watch?v=5KRij8tBJEA",
+      "image_url": "https://i.ytimg.com/vi/5KRij8tBJEA/hqdefault.jpg",
+      "title": "Yu-Gi-Oh! GX- Season 1 Episode 41- A Reason To Win",
+      "publisher": "KONAMI Cross Media NY",
+      "medium": "anime_episode_promotional_still",
+      "coverage": "only_the_visible_selected_subject",
+      "visually_reviewed": true,
+      "image_sha256": "fc4f47206971d7eef0028d2e27645f26e1e5a91a344463d9e1e0755288a2049e",
+      "applicable_character_ids": [
+        3101
+      ],
+      "channel_id": "UCZuVXrpKTUn_KEzRQgFgMWg",
+      "official_channel_verified": true,
+      "upload_metadata_sha256": "a71113798e5a3e0b55534c0f65503238cc0de10ca6c8207781206672135bf04f"
+    },
+    "review_6b0dc3f9af9beb3a186f": {
+      "page_url": "https://yugioh-starlight.com/archives/37389101.html",
+      "image_url": "https://livedoor.blogimg.jp/maxut/imgs/1/2/12980fde.jpg",
+      "title": "ARC-V episode 1, TV Tokyo broadcast screencap",
+      "publisher": "TV Tokyo / NAS broadcast footage; screencap hosted by Starlight",
+      "medium": "original_anime_broadcast_capture",
+      "coverage": "only_the_visible_selected_subject",
+      "visually_reviewed": true,
+      "image_sha256": "6b0dc3f9af9beb3a186f19e9d694802b6e24c556fa59200bd639b6d4e29a0550",
+      "applicable_character_ids": [
+        64
+      ],
+      "page_sha256": "8bc1a1edd26844371318e0f673b017c571b8556935162f2f6d818cb3595b1c89",
+      "original_broadcast_capture_reviewed": true,
+      "page_embedded_image_url": "https://livedoor.blogimg.jp/maxut/imgs/1/2/12980fde.jpg",
+      "origin_episode_url": "https://www.tv-tokyo.co.jp/broad_tvtokyo/program/detail/201404/23144_201404061730.html"
+    },
+    "review_2eeadd6e35a776ec9baa": {
+      "page_url": "https://yugioh-starlight.com/archives/37389101.html",
+      "image_url": "https://livedoor.blogimg.jp/maxut/imgs/c/9/c9b9b598.jpg",
+      "title": "ARC-V episode 1, TV Tokyo broadcast screencap",
+      "image_sha256": "2eeadd6e35a776ec9baa179b22a5360d159015930036a788823ebb191975e87c",
+      "page_sha256": "8bc1a1edd26844371318e0f673b017c571b8556935162f2f6d818cb3595b1c89",
+      "publisher": "TV Tokyo / NAS broadcast footage; screencap hosted by Starlight",
+      "medium": "original_anime_broadcast_capture",
+      "coverage": "full_body",
+      "applicable_character_ids": [
+        64
+      ],
+      "visually_reviewed": true,
+      "original_broadcast_capture_reviewed": true,
+      "page_embedded_image_url": "https://livedoor.blogimg.jp/maxut/imgs/c/9/c9b9b598.jpg",
+      "origin_episode_url": "https://www.tv-tokyo.co.jp/broad_tvtokyo/program/detail/201404/23144_201404061730.html"
+    },
+    "review_7038d7b30e7412a059c2": {
+      "page_url": "https://www.tv-tokyo.co.jp/contents/yugioh2004/episodes/episodes02/",
+      "image_url": "https://www.tv-tokyo.co.jp/contents/yugioh2004/images/story/20_1.jpg",
+      "title": "Yu-Gi-Oh! GX broadcast still 20_1.jpg",
+      "publisher": "TV Tokyo",
+      "medium": "anime_episode_still",
+      "coverage": "only_the_visible_selected_subject",
+      "visually_reviewed": true,
+      "image_sha256": "7038d7b30e7412a059c28b250be47f8a8630e1096ad8f0ab14dd11eb218a0cc4",
+      "applicable_character_ids": [
+        114
+      ]
+    },
+    "review_4cd9adb6efe6ee208e0c": {
+      "page_url": "https://www.tv-tokyo.co.jp/contents/yugioh2004/episodes/episodes06/",
+      "image_url": "https://www.tv-tokyo.co.jp/contents/yugioh2004/images/story/69_2.jpg",
+      "title": "Yu-Gi-Oh! GX broadcast still 69_2.jpg",
+      "publisher": "TV Tokyo",
+      "medium": "anime_episode_still",
+      "coverage": "only_the_visible_selected_subject",
+      "visually_reviewed": true,
+      "image_sha256": "4cd9adb6efe6ee208e0c83b9fa405d455a3ad59dade7f884f648dfd8300360e7",
+      "applicable_character_ids": [
+        115
+      ]
+    },
+    "review_b550e5bffdff3c001e62": {
+      "page_url": "https://www.tv-tokyo.co.jp/contents/yugioh2004/episodes/episodes08/",
+      "image_url": "https://www.tv-tokyo.co.jp/contents/yugioh2004/images/story/92_2.jpg",
+      "image_sha256": "b550e5bffdff3c001e623796247fb9cfe49d4f1d29327744c3b688f8e3d8552a",
+      "publisher": "TV Tokyo",
+      "medium": "anime_episode_still",
+      "coverage": "only_the_visible_selected_subject",
+      "visually_reviewed": true,
+      "applicable_character_ids": [
+        115
+      ],
+      "title": "Yu-Gi-Oh! GX broadcast still 92_2.jpg"
     }
   },
   "characters": [
@@ -5931,48 +6072,49 @@
       "series": "GX",
       "canonical_name": "Blair Flannigan",
       "canonical_medium": "anime",
-      "selected_form": "Blair enrolled female student appearance shown by Konami; long navy hair, red sleeveless jacket and yellow top",
+      "selected_form": "Blair as the cap-wearing student in disguise in GX episode 20, The Maiden in Love",
       "identity_verified": true,
       "subject_count": 1,
       "full_body_source_ids": [],
       "facts": {
         "hair_color": {
           "state": "observed",
-          "description": "Dark navy blue",
+          "description": "Dark navy-blue hair at the visible fringe under the cap",
           "source_ids": [
-            "konami_d9a18634cf93ac2c"
+            "review_7038d7b30e7412a059c2"
           ]
         },
         "hair_style": {
           "state": "observed",
-          "description": "Long loose straight hair with pointed layered bangs and a small crown tuft",
+          "description": "Short pointed bangs peeking out under the lowered cap; the crown and rear hairstyle are covered in this disguise",
           "source_ids": [
-            "konami_d9a18634cf93ac2c"
+            "review_7038d7b30e7412a059c2"
           ]
         },
         "facial_hair": {
           "state": "observed",
           "description": "No moustache or beard visible",
           "source_ids": [
-            "konami_d9a18634cf93ac2c"
+            "review_7038d7b30e7412a059c2"
           ]
         },
         "outfit": {
           "state": "observed",
-          "description": "Red cropped sleeveless jacket with pale collar over yellow high-neck shirt, dark lower garment and two brown studded waist belts",
+          "description": "First-season boy disguise: an oversized muted blue-green peaked cap and the red Duel Academy jacket visible at the shoulders and sleeve; preserve the on-screen upper-body crop and covered hairstyle",
           "source_ids": [
-            "konami_d9a18634cf93ac2c"
+            "review_7038d7b30e7412a059c2"
           ]
         },
         "duel_disk": {
           "state": "not_visible_in_selected_pose",
           "description": "No duel disk visible in this selected pose; do not add one",
           "source_ids": [
-            "konami_d9a18634cf93ac2c"
+            "review_7038d7b30e7412a059c2"
           ]
         }
       },
-      "candidate_reference_urls": []
+      "candidate_reference_urls": [],
+      "reference_subject_selection": "Select Blair in the cap on the left. Exclude the brown-haired character on the right, his clothing and the background."
     },
     {
       "id": 125,
@@ -6738,44 +6880,46 @@
       "series": "GX",
       "canonical_name": "Jean-Louis Bonaparte",
       "canonical_medium": "anime",
-      "selected_form": "Hatless official GX Bonaparte portrait; no hat or cannon disk is visible",
+      "selected_form": "Vice Chancellor Bonaparte in his bareheaded GX episode 69 duel against Crowler",
       "identity_verified": true,
       "subject_count": 1,
       "full_body_source_ids": [],
       "facts": {
         "hair_color": {
           "state": "observed",
-          "description": "Dark brown side hair; bald crown",
+          "description": "Deep brown side hair and bald crown",
           "source_ids": [
-            "profile_07ed860867853698"
+            "review_4cd9adb6efe6ee208e0c",
+            "review_b550e5bffdff3c001e62"
           ]
         },
         "hair_style": {
           "state": "observed",
-          "description": "Bald domed scalp with small upward-curled pointed side tufts",
+          "description": "Smooth domed bald scalp with small pointed outward-curving tufts at both sides; bare head in the selected duel",
           "source_ids": [
-            "profile_07ed860867853698"
+            "review_4cd9adb6efe6ee208e0c",
+            "review_b550e5bffdff3c001e62"
           ]
         },
         "facial_hair": {
           "state": "observed",
-          "description": "No beard on the exposed chin. The upper-lip and nose area has very thin curled brown contour lines; retain the exact thin contours in the reference and do not invent a large dark filled moustache",
+          "description": "Exposed chin has no beard. The eyebrows and upper-lip area have thin curled dark lines as seen in the close-up; retain their narrow contour and size.",
           "source_ids": [
-            "profile_07ed860867853698"
+            "review_b550e5bffdff3c001e62"
           ]
         },
         "outfit": {
           "state": "observed",
-          "description": "Dark blue-green military coat with gold fringed epaulettes, white cravat and broad white cuffs",
+          "description": "Dark blue-green military coat with fringed gold shoulder epaulettes, bright white shirt cuffs and cravat, and a broad dark brown diagonal strap across his chest",
           "source_ids": [
-            "profile_07ed860867853698"
+            "review_4cd9adb6efe6ee208e0c"
           ]
         },
         "duel_disk": {
-          "state": "not_visible_in_selected_pose",
-          "description": "No duel disk visible in this selected pose; do not add one",
+          "state": "observed",
+          "description": "Pale lavender-gray duel disk on the arm with pale blue-green rectangular card zones and a rounded white-silver base with a red triangle and blue detail",
           "source_ids": [
-            "profile_07ed860867853698"
+            "review_4cd9adb6efe6ee208e0c"
           ]
         }
       },
@@ -6784,7 +6928,8 @@
       ],
       "review_notes": [
         "Upper-lip linework must be checked against a clear official animation frame before categorizing facial hair. No giant invented moustache may be added."
-      ]
+      ],
+      "reference_subject_selection": "Use only Bonaparte and his disk. Use the episode 92 close-up for the thin facial contours. Exclude opponent, scenery and lettering."
     },
     {
       "id": 3100,
@@ -7803,39 +7948,50 @@
       "name": "배가본드",
       "series": "5DS",
       "canonical_name": "The Vagabond",
-      "canonical_medium": null,
-      "selected_form": null,
-      "identity_verified": false,
+      "canonical_medium": "game",
+      "selected_form": "The Vagabond in the original Duel Links dialogue screen",
+      "identity_verified": true,
       "subject_count": 1,
       "full_body_source_ids": [],
       "facts": {
         "hair_color": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Dark brown to nearly black visible side locks",
+          "source_ids": [
+            "review_d386ac245f144801df26"
+          ]
         },
         "hair_style": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Eyes and crown concealed by the low baseball cap, with short angular side strands and tapered locks visible just behind the ears",
+          "source_ids": [
+            "review_d386ac245f144801df26"
+          ]
         },
         "facial_hair": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "No moustache or beard visible",
+          "source_ids": [
+            "review_d386ac245f144801df26"
+          ]
         },
         "outfit": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Red baseball cap with slim white piping on the brim and two silver-rimmed teal goggle lenses on a dark strap; open red fitted jacket with raised collar, white chest stripes and turned-up white cuffs; dark charcoal crew-neck top with gray collar edge, blue denim waistband, brown belt with silver rectangular buckle; retain the visible hips-up framing",
+          "source_ids": [
+            "review_d386ac245f144801df26"
+          ]
         },
         "duel_disk": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "not_visible_in_selected_pose",
+          "description": "No duel disk visible in this selected pose; do not add one",
+          "source_ids": [
+            "review_d386ac245f144801df26"
+          ]
         }
       },
-      "candidate_reference_urls": []
+      "candidate_reference_urls": [],
+      "reference_subject_selection": "Use only the red-capped duelist in the center; exclude the game map, interface and the background."
     },
     {
       "id": 10,
@@ -11927,39 +12083,53 @@
       "name": "스트롱 이시지마",
       "series": "ARCV",
       "canonical_name": "The Sledgehammer",
-      "canonical_medium": null,
-      "selected_form": null,
-      "identity_verified": false,
+      "canonical_medium": "anime",
+      "selected_form": "The Sledgehammer, named Strong Ishijima in the TV Tokyo broadcast of ARC-V episode 1, in the exhibition duel against Yuya",
+      "identity_verified": true,
       "subject_count": 1,
-      "full_body_source_ids": [],
+      "full_body_source_ids": [
+        "review_2eeadd6e35a776ec9baa"
+      ],
       "facts": {
         "hair_color": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Deep violet purple with brighter magenta-purple highlights",
+          "source_ids": [
+            "review_6b0dc3f9af9beb3a186f"
+          ]
         },
         "hair_style": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Three extremely tall twisted spikes rise from the front, with the central spike upright and the two outer spikes tilted outward; a short knotted braid extends behind the neck",
+          "source_ids": [
+            "review_6b0dc3f9af9beb3a186f"
+          ]
         },
         "facial_hair": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Clean upper lip and chin with no visible moustache or beard",
+          "source_ids": [
+            "review_6b0dc3f9af9beb3a186f"
+          ]
         },
         "outfit": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Tall muscular tan duelist with sharply curved burgundy eye paint. Fitted sleeveless slate-green vest and split front tabard, rounded layered steel-gray shoulder plates, studded dark burgundy crossed straps and a large circular gold chest clasp. Dark fingerless gloves, pale wraps on the right forearm, burgundy utility belt with gold buckle, charcoal trousers, and tall burgundy boots with broad cuffs and light gray instep straps.",
+          "source_ids": [
+            "review_6b0dc3f9af9beb3a186f",
+            "review_2eeadd6e35a776ec9baa"
+          ]
         },
         "duel_disk": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Left forearm has a broad dark blue-gray cuff and a dark angular module with a thin straight purple energy blade",
+          "source_ids": [
+            "review_2eeadd6e35a776ec9baa"
+          ]
         }
       },
-      "candidate_reference_urls": []
+      "candidate_reference_urls": [],
+      "reference_subject_selection": "Use the purple-haired armored duelist named Strong Ishijima in the close-up and standing at the right of the wide shot. Exclude Yuya in the foreground, subtitles, watermarks and scenery."
     },
     {
       "id": 73,
@@ -13906,39 +14076,50 @@
       "name": "아카바 레이",
       "series": "ARCV",
       "canonical_name": "Ray Akaba",
-      "canonical_medium": null,
-      "selected_form": null,
-      "identity_verified": false,
+      "canonical_medium": "anime",
+      "selected_form": "Ray Akaba’s luminous spirit behind Riley during the duel in ARC-V episode 131. The frame records her spirit form only",
+      "identity_verified": true,
       "subject_count": 1,
       "full_body_source_ids": [],
       "facts": {
         "hair_color": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "not_visible_in_selected_pose",
+          "description": "The entire spirit, including the hair, shines pale yellow and white in this appearance; ordinary hair pigment is not visible",
+          "source_ids": [
+            "review_e870aec977fb40e6b659"
+          ]
         },
         "hair_style": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Swept pointed fringe with long high side ponytails and a long curved lock trailing to the right in the reference",
+          "source_ids": [
+            "review_e870aec977fb40e6b659"
+          ]
         },
         "facial_hair": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "No moustache or beard visible",
+          "source_ids": [
+            "review_e870aec977fb40e6b659"
+          ]
         },
         "outfit": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Glowing pale gold-white apparition with luminous blank eyes and a sleeveless fitted upper silhouette; the spirit glow obscures fabric colors and small details; the hooded duelist Riley in the foreground is separate from Ray",
+          "source_ids": [
+            "review_e870aec977fb40e6b659"
+          ]
         },
         "duel_disk": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "not_visible_in_selected_pose",
+          "description": "No duel disk visible in this selected pose; do not add one",
+          "source_ids": [
+            "review_e870aec977fb40e6b659"
+          ]
         }
       },
-      "candidate_reference_urls": []
+      "candidate_reference_urls": [],
+      "reference_subject_selection": "Select the glowing female spirit at the right behind Riley. Retain her light and silhouette without Riley, the cyan hood, or Riley’s green duel-disk blade."
     },
     {
       "id": 74,
@@ -14044,39 +14225,50 @@
       "name": "베이그런트",
       "series": "VRAINS",
       "canonical_name": "The Vagrant",
-      "canonical_medium": null,
-      "selected_form": null,
-      "identity_verified": false,
+      "canonical_medium": "game",
+      "selected_form": "The Vagrant in the Duel Links in-game promotion",
+      "identity_verified": true,
       "subject_count": 1,
       "full_body_source_ids": [],
       "facts": {
         "hair_color": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Dark brown to nearly black visible side locks",
+          "source_ids": [
+            "review_826b3290024932a0291e"
+          ]
         },
         "hair_style": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Eyes and crown concealed by the low baseball cap, with short angular side strands and tapered locks visible just behind the ears",
+          "source_ids": [
+            "review_826b3290024932a0291e"
+          ]
         },
         "facial_hair": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "No moustache or beard visible",
+          "source_ids": [
+            "review_826b3290024932a0291e"
+          ]
         },
         "outfit": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Deep navy baseball cap with two silver-rimmed teal goggle lenses on a dark strap; fitted dark navy jacket with raised lapels and subtle blue seam panels over a black crew-neck shirt; retain the chest and waist shown in the promotion",
+          "source_ids": [
+            "review_826b3290024932a0291e"
+          ]
         },
         "duel_disk": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "not_visible_in_selected_pose",
+          "description": "No duel disk visible in this selected pose; do not add one",
+          "source_ids": [
+            "review_826b3290024932a0291e"
+          ]
         }
       },
-      "candidate_reference_urls": []
+      "candidate_reference_urls": [],
+      "reference_subject_selection": "Use only the large dark-blue duelist at the right. Exclude the map, icons, and EXP multiplier labels."
     },
     {
       "id": 142,
@@ -15388,39 +15580,50 @@
       "name": "어둠의 타이탄",
       "canonical_name": "Titan, Shadow Rider appearance",
       "canonical_medium": "anime",
-      "selected_form": null,
-      "identity_verified": false,
+      "selected_form": "Titan in the GX episode 41 Shadow Rider rematch against Alexis, as seen in the center of the dark still",
+      "identity_verified": true,
       "full_body_source_ids": [],
       "facts": {
         "hair_color": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "not_visible_in_selected_pose",
+          "description": "The broad hat and dark lighting obscure the scalp hair",
+          "source_ids": [
+            "review_fc4f47206971d7eef002"
+          ]
         },
         "hair_style": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "not_visible_in_selected_pose",
+          "description": "The broad hat and dark lighting obscure the hairstyle",
+          "source_ids": [
+            "review_fc4f47206971d7eef002"
+          ]
         },
         "facial_hair": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "not_visible_in_selected_pose",
+          "description": "Mouth and jaw partly obscured by face covering and dim shadow; no beard or moustache established",
+          "source_ids": [
+            "review_fc4f47206971d7eef002"
+          ]
         },
         "outfit": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Broad-brimmed dark hat and long dark coat with heavy angular shoulders; wide pale metal chest and shoulder trim with three dark round fittings, dark gloves and an angular gray covering around the face. In this moment the entire outfit has a strong blue-violet cast; retain the visible upper-body framing.",
+          "source_ids": [
+            "review_fc4f47206971d7eef002"
+          ]
         },
         "duel_disk": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "not_visible_in_selected_pose",
+          "description": "No duel disk visible in this selected pose; do not add one",
+          "source_ids": [
+            "review_fc4f47206971d7eef002"
+          ]
         }
       },
       "review_notes": [
         "Episode 35 close-up rejected: this episode concerns the Princeton brothers and is not a verified Titan reference."
-      ]
+      ],
+      "reference_subject_selection": "Select only the broad-hatted duelist in the center, preserving his pale asymmetric chest trim. Exclude all shapes crowding the frame around him."
     }
   ]
 }
