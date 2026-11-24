@@ -1,13 +1,13 @@
 {
   "complete": false,
   "total": 240,
-  "reviewed": 208,
-  "pending": 32,
+  "reviewed": 223,
+  "pending": 17,
   "scopeDecision": "User approved preserving the existing 240 IDs and distinguishing original media.",
   "coverage": "Visible features of the selected official references; unseen anatomy and clothing are not invented.",
   "artworkGeneration": "This build produces reviewed prompts and data, not replacement character PNGs.",
   "reviewedByMedium": {
-    "anime": 200,
+    "anime": 215,
     "film": 4,
     "manga": 2,
     "game": 0,
@@ -16,7 +16,7 @@
   "series": {
     "DM": {
       "total": 46,
-      "reviewed": 42
+      "reviewed": 43
     },
     "GX": {
       "total": 43,
@@ -24,39 +24,22 @@
     },
     "5DS": {
       "total": 46,
-      "reviewed": 40
+      "reviewed": 43
     },
     "ZEXAL": {
       "total": 37,
-      "reviewed": 36
+      "reviewed": 37
     },
     "ARCV": {
       "total": 41,
-      "reviewed": 27
+      "reviewed": 35
     },
     "VRAINS": {
       "total": 27,
-      "reviewed": 20
+      "reviewed": 22
     }
   },
   "pendingCharacters": [
-    {
-      "id": 93,
-      "series": "DM",
-      "name": "레어 헌터",
-      "canonicalName": "Seeker",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
     {
       "id": 194,
       "series": "DM",
@@ -126,23 +109,6 @@
       ]
     },
     {
-      "id": 15,
-      "series": "5DS",
-      "name": "엔죠 무쿠로",
-      "canonicalName": "Hunter Pace",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
       "id": 25,
       "series": "5DS",
       "name": "미스티 로라",
@@ -177,146 +143,10 @@
       ]
     },
     {
-      "id": 2,
-      "series": "5DS",
-      "name": "안드레",
-      "canonicalName": "Andre",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 6,
-      "series": "5DS",
-      "name": "브레오",
-      "canonicalName": "Breo",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 176,
-      "series": "ZEXAL",
-      "name": "제알 Ⅲ",
-      "canonicalName": "ZEXAL 3",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
       "id": 64,
       "series": "ARCV",
       "name": "스트롱 이시지마",
       "canonicalName": "The Sledgehammer",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 67,
-      "series": "ARCV",
-      "name": "토도 야이바",
-      "canonicalName": "Kit Blade",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 39,
-      "series": "ARCV",
-      "name": "호우츄인 미에루",
-      "canonicalName": "Aura Sentia",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 57,
-      "series": "ARCV",
-      "name": "오벨리스크 포스",
-      "canonicalName": "Obelisk Force",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 3403,
-      "series": "ARCV",
-      "name": "바렛",
-      "canonicalName": "Barrett",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 45,
-      "series": "ARCV",
-      "name": "시큐리티 227",
-      "canonicalName": "Officer 227",
       "canonicalMedium": null,
       "pendingFields": [
         "hair_color",
@@ -364,61 +194,10 @@
       ]
     },
     {
-      "id": 197,
-      "series": "ARCV",
-      "name": "그레이스 타일러",
-      "canonicalName": "Grace Tyler",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 198,
-      "series": "ARCV",
-      "name": "글로리아 타일러",
-      "canonicalName": "Gloria Tyler",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
       "id": 3401,
       "series": "ARCV",
       "name": "배틀 비스트",
       "canonicalName": "Battle Beast",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 3402,
-      "series": "ARCV",
-      "name": "카치도키 이사오",
-      "canonicalName": "Isao Kachidoki",
       "canonicalMedium": null,
       "pendingFields": [
         "hair_color",
@@ -538,40 +317,6 @@
       "series": "VRAINS",
       "name": "블루 걸",
       "canonicalName": "Blue Gal",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 3503,
-      "series": "VRAINS",
-      "name": "판도르",
-      "canonicalName": "Pandor",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 3502,
-      "series": "VRAINS",
-      "name": "퀸",
-      "canonicalName": "Queen",
       "canonicalMedium": null,
       "pendingFields": [
         "hair_color",

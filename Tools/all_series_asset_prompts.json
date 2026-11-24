@@ -719,54 +719,65 @@
     "series": "DM",
     "name": "레어 헌터",
     "canonicalName": "Seeker",
-    "canonicalMedium": null,
+    "canonicalMedium": "anime",
     "renderMode": "color",
-    "selectedForm": null,
-    "verificationStatus": "pending",
-    "generationAllowed": false,
-    "pendingFields": [
+    "selectedForm": "Seeker / the Exodia Rare Hunter facing Yami Yugi in Duel Monsters episode 57",
+    "verificationStatus": "reviewed",
+    "generationAllowed": true,
+    "pendingFields": [],
+    "facts": {
+      "hair_color": {
+        "state": "observed",
+        "description": "Pale lavender-gray",
+        "source_ids": [
+          "review_4965707a3521c8915afa"
+        ]
+      },
+      "hair_style": {
+        "state": "observed",
+        "description": "Short tightly swept-back pointed strands, closely cropped at the temple, with a receding angular hairline; retain the side-profile head crop",
+        "source_ids": [
+          "review_4965707a3521c8915afa"
+        ]
+      },
+      "facial_hair": {
+        "state": "observed",
+        "description": "A tiny dark triangular soul patch directly below the lower lip; no full beard or moustache visible",
+        "source_ids": [
+          "review_4965707a3521c8915afa"
+        ]
+      },
+      "outfit": {
+        "state": "observed",
+        "description": "Only a very small dark purple collar edge is visible below the neck; preserve the head-only profile and do not invent the remainder of the robe",
+        "source_ids": [
+          "review_4965707a3521c8915afa"
+        ]
+      },
+      "duel_disk": {
+        "state": "not_visible_in_selected_pose",
+        "description": "No duel disk visible in this selected pose; do not add one",
+        "source_ids": [
+          "review_4965707a3521c8915afa"
+        ]
+      }
+    },
+    "reviewedFields": [
       "hair_color",
       "hair_style",
       "facial_hair",
       "outfit",
-      "duel_disk",
-      "selected_form",
-      "character_identity",
-      "canonical_medium"
+      "duel_disk"
     ],
-    "facts": {
-      "hair_color": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "hair_style": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "facial_hair": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "outfit": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "duel_disk": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      }
-    },
-    "reviewedFields": [],
-    "referenceUrls": [],
-    "referenceImages": [],
-    "referenceSubjectSelection": null,
-    "comfyPromptStanding": null,
-    "comfyPromptSd": null
+    "referenceUrls": [
+      "https://tv.apple.com/us/episode/episode-57/umc.cmc.2f35xxp7ftypi7r5hjeua9zm?showId=umc.cmc.1qutbuzq92u1z1v5jsyz2a20j"
+    ],
+    "referenceImages": [
+      "https://is1-ssl.mzstatic.com/image/thumb/kyuE_egCgNJIRd8eyWgnYw/1200x675.jpg"
+    ],
+    "referenceSubjectSelection": "Select only the lavender-haired Rare Hunter on the LEFT of the vertical split screen; exclude Yugi and the glowing divider",
+    "comfyPromptStanding": "Seeker, DM, selected official appearance: Seeker / the Exodia Rare Hunter facing Yami Yugi in Duel Monsters episode 57. hair color: Pale lavender-gray; hair style: Short tightly swept-back pointed strands, closely cropped at the temple, with a receding angular hairline; retain the side-profile head crop; facial hair: A tiny dark triangular soul patch directly below the lower lip; no full beard or moustache visible; outfit: Only a very small dark purple collar edge is visible below the neck; preserve the head-only profile and do not invent the remainder of the robe; duel disk: No duel disk visible in this selected pose; do not add one. Reference subject selection: Select only the lavender-haired Rare Hunter on the LEFT of the vertical split screen; exclude Yugi and the glowing divider. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. Standing illustration at the subject's actual canonical proportions, including any nonhuman body or life-support apparatus; no universal eight-head human redesign. Clear margins inside a vertical canvas for 1024x1536 output.",
+    "comfyPromptSd": "Seeker, DM, selected official appearance: Seeker / the Exodia Rare Hunter facing Yami Yugi in Duel Monsters episode 57. hair color: Pale lavender-gray; hair style: Short tightly swept-back pointed strands, closely cropped at the temple, with a receding angular hairline; retain the side-profile head crop; facial hair: A tiny dark triangular soul patch directly below the lower lip; no full beard or moustache visible; outfit: Only a very small dark purple collar edge is visible below the neck; preserve the head-only profile and do not invent the remainder of the robe; duel disk: No duel disk visible in this selected pose; do not add one. Reference subject selection: Select only the lavender-haired Rare Hunter on the LEFT of the vertical split screen; exclude Yugi and the glowing divider. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. 2.5-head chibi SD adaptation; simplify proportions while retaining every reviewed identity feature, costume color, facial-hair state and device shape. Complete silhouette with clear margins, square composition for 512x512 output."
   },
   {
     "id": 222,
@@ -6189,54 +6200,65 @@
     "series": "5DS",
     "name": "엔죠 무쿠로",
     "canonicalName": "Hunter Pace",
-    "canonicalMedium": null,
+    "canonicalMedium": "anime",
     "renderMode": "color",
-    "selectedForm": null,
-    "verificationStatus": "pending",
-    "generationAllowed": false,
-    "pendingFields": [
+    "selectedForm": "Hunter Pace / Mukuro Enjo in his skull riding helmet in the Fortune Cup, 5D's episode 17",
+    "verificationStatus": "reviewed",
+    "generationAllowed": true,
+    "pendingFields": [],
+    "facts": {
+      "hair_color": {
+        "state": "observed",
+        "description": "Orange pointed tufts exposed at the sides of the black helmet",
+        "source_ids": [
+          "review_fa98954717438f43f7fc"
+        ]
+      },
+      "hair_style": {
+        "state": "observed",
+        "description": "Most of the hair is covered by a large black riding helmet with a pale animal-skull face plate and a yellow-orange flame motif on top; preserve only the exposed orange tufts",
+        "source_ids": [
+          "review_fa98954717438f43f7fc"
+        ]
+      },
+      "facial_hair": {
+        "state": "observed",
+        "description": "No moustache or beard visible",
+        "source_ids": [
+          "review_fa98954717438f43f7fc"
+        ]
+      },
+      "outfit": {
+        "state": "observed",
+        "description": "Black riding jacket with red-orange flame markings on the sleeves, silver-gray riveted lapels and conical shoulder spikes; low golden-yellow shirt area with a partly visible pale horned/skull graphic and a fine hanging chain; dark glasses beneath the skull plate",
+        "source_ids": [
+          "review_fa98954717438f43f7fc"
+        ]
+      },
+      "duel_disk": {
+        "state": "not_visible_in_selected_pose",
+        "description": "No duel disk visible in this selected pose; do not add one",
+        "source_ids": [
+          "review_fa98954717438f43f7fc"
+        ]
+      }
+    },
+    "reviewedFields": [
       "hair_color",
       "hair_style",
       "facial_hair",
       "outfit",
-      "duel_disk",
-      "selected_form",
-      "character_identity",
-      "canonical_medium"
+      "duel_disk"
     ],
-    "facts": {
-      "hair_color": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "hair_style": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "facial_hair": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "outfit": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "duel_disk": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      }
-    },
-    "reviewedFields": [],
-    "referenceUrls": [],
-    "referenceImages": [],
+    "referenceUrls": [
+      "https://tv.apple.com/us/episode/surprise-surprise/umc.cmc.6304zd6w1rysrssz9mddtdott?showId=umc.cmc.35pa1xi9ipnhm5cz5dpid94n9"
+    ],
+    "referenceImages": [
+      "https://is1-ssl.mzstatic.com/image/thumb/avmLpn_-v5_6qURVgC9L4w/1200x675.jpg"
+    ],
     "referenceSubjectSelection": null,
-    "comfyPromptStanding": null,
-    "comfyPromptSd": null
+    "comfyPromptStanding": "Hunter Pace, 5DS, selected official appearance: Hunter Pace / Mukuro Enjo in his skull riding helmet in the Fortune Cup, 5D's episode 17. hair color: Orange pointed tufts exposed at the sides of the black helmet; hair style: Most of the hair is covered by a large black riding helmet with a pale animal-skull face plate and a yellow-orange flame motif on top; preserve only the exposed orange tufts; facial hair: No moustache or beard visible; outfit: Black riding jacket with red-orange flame markings on the sleeves, silver-gray riveted lapels and conical shoulder spikes; low golden-yellow shirt area with a partly visible pale horned/skull graphic and a fine hanging chain; dark glasses beneath the skull plate; duel disk: No duel disk visible in this selected pose; do not add one. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. Standing illustration at the subject's actual canonical proportions, including any nonhuman body or life-support apparatus; no universal eight-head human redesign. Clear margins inside a vertical canvas for 1024x1536 output.",
+    "comfyPromptSd": "Hunter Pace, 5DS, selected official appearance: Hunter Pace / Mukuro Enjo in his skull riding helmet in the Fortune Cup, 5D's episode 17. hair color: Orange pointed tufts exposed at the sides of the black helmet; hair style: Most of the hair is covered by a large black riding helmet with a pale animal-skull face plate and a yellow-orange flame motif on top; preserve only the exposed orange tufts; facial hair: No moustache or beard visible; outfit: Black riding jacket with red-orange flame markings on the sleeves, silver-gray riveted lapels and conical shoulder spikes; low golden-yellow shirt area with a partly visible pale horned/skull graphic and a fine hanging chain; dark glasses beneath the skull plate; duel disk: No duel disk visible in this selected pose; do not add one. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. 2.5-head chibi SD adaptation; simplify proportions while retaining every reviewed identity feature, costume color, facial-hair state and device shape. Complete silhouette with clear margins, square composition for 512x512 output."
   },
   {
     "id": 35,
@@ -7911,108 +7933,130 @@
     "series": "5DS",
     "name": "안드레",
     "canonicalName": "Andre",
-    "canonicalMedium": null,
+    "canonicalMedium": "anime",
     "renderMode": "color",
-    "selectedForm": null,
-    "verificationStatus": "pending",
-    "generationAllowed": false,
-    "pendingFields": [
+    "selectedForm": "Andre in the blue Team Unicorn riding helmet at the beginning of The Edge of Elimination, Part 1",
+    "verificationStatus": "reviewed",
+    "generationAllowed": true,
+    "pendingFields": [],
+    "facts": {
+      "hair_color": {
+        "state": "not_visible_in_selected_pose",
+        "description": "No clearly exposed hair color beneath the blue riding helmet",
+        "source_ids": [
+          "review_3a629a55ec9b0ff5502e"
+        ]
+      },
+      "hair_style": {
+        "state": "not_visible_in_selected_pose",
+        "description": "Dark blue enclosed riding helmet with raised pointed crown ridges, a small gold teardrop center ornament, orange eye visor and blue cheek guards; do not infer covered hair",
+        "source_ids": [
+          "review_3a629a55ec9b0ff5502e"
+        ]
+      },
+      "facial_hair": {
+        "state": "observed",
+        "description": "No moustache or beard visible",
+        "source_ids": [
+          "review_3a629a55ec9b0ff5502e"
+        ]
+      },
+      "outfit": {
+        "state": "observed",
+        "description": "Blue racing suit with light gray shoulder sections, orange chest stripe and pale blue round neck; the curved blue riding fairing with a large gold petal-like crest occupies the foreground and must not be mistaken for clothing or a duel disk",
+        "source_ids": [
+          "review_3a629a55ec9b0ff5502e"
+        ]
+      },
+      "duel_disk": {
+        "state": "not_visible_in_selected_pose",
+        "description": "No duel disk visible in this selected pose; do not add one",
+        "source_ids": [
+          "review_3a629a55ec9b0ff5502e"
+        ]
+      }
+    },
+    "reviewedFields": [
       "hair_color",
       "hair_style",
       "facial_hair",
       "outfit",
-      "duel_disk",
-      "selected_form",
-      "character_identity",
-      "canonical_medium"
+      "duel_disk"
     ],
-    "facts": {
-      "hair_color": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "hair_style": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "facial_hair": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "outfit": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "duel_disk": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      }
-    },
-    "reviewedFields": [],
-    "referenceUrls": [],
-    "referenceImages": [],
+    "referenceUrls": [
+      "https://tv.apple.com/us/episode/the-edge-of-elimination-pt-1/umc.cmc.44ja555pug9wy2qp5s3l3z2di?showId=umc.cmc.35pa1xi9ipnhm5cz5dpid94n9"
+    ],
+    "referenceImages": [
+      "https://is1-ssl.mzstatic.com/image/thumb/xg4A0ZODqXAkhzcZfdRhBA/1200x675.jpg"
+    ],
     "referenceSubjectSelection": null,
-    "comfyPromptStanding": null,
-    "comfyPromptSd": null
+    "comfyPromptStanding": "Andre, 5DS, selected official appearance: Andre in the blue Team Unicorn riding helmet at the beginning of The Edge of Elimination, Part 1. hair color: No clearly exposed hair color beneath the blue riding helmet; hair style: Dark blue enclosed riding helmet with raised pointed crown ridges, a small gold teardrop center ornament, orange eye visor and blue cheek guards; do not infer covered hair; facial hair: No moustache or beard visible; outfit: Blue racing suit with light gray shoulder sections, orange chest stripe and pale blue round neck; the curved blue riding fairing with a large gold petal-like crest occupies the foreground and must not be mistaken for clothing or a duel disk; duel disk: No duel disk visible in this selected pose; do not add one. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. Standing illustration at the subject's actual canonical proportions, including any nonhuman body or life-support apparatus; no universal eight-head human redesign. Clear margins inside a vertical canvas for 1024x1536 output.",
+    "comfyPromptSd": "Andre, 5DS, selected official appearance: Andre in the blue Team Unicorn riding helmet at the beginning of The Edge of Elimination, Part 1. hair color: No clearly exposed hair color beneath the blue riding helmet; hair style: Dark blue enclosed riding helmet with raised pointed crown ridges, a small gold teardrop center ornament, orange eye visor and blue cheek guards; do not infer covered hair; facial hair: No moustache or beard visible; outfit: Blue racing suit with light gray shoulder sections, orange chest stripe and pale blue round neck; the curved blue riding fairing with a large gold petal-like crest occupies the foreground and must not be mistaken for clothing or a duel disk; duel disk: No duel disk visible in this selected pose; do not add one. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. 2.5-head chibi SD adaptation; simplify proportions while retaining every reviewed identity feature, costume color, facial-hair state and device shape. Complete silhouette with clear margins, square composition for 512x512 output."
   },
   {
     "id": 6,
     "series": "5DS",
     "name": "브레오",
     "canonicalName": "Breo",
-    "canonicalMedium": null,
+    "canonicalMedium": "anime",
     "renderMode": "color",
-    "selectedForm": null,
-    "verificationStatus": "pending",
-    "generationAllowed": false,
-    "pendingFields": [
+    "selectedForm": "Breo, unhelmeted civilian close-up during the Team Unicorn arc, 5D's Power Plays",
+    "verificationStatus": "reviewed",
+    "generationAllowed": true,
+    "pendingFields": [],
+    "facts": {
+      "hair_color": {
+        "state": "observed",
+        "description": "Golden blond",
+        "source_ids": [
+          "review_6ffc754937573a931ad1"
+        ]
+      },
+      "hair_style": {
+        "state": "observed",
+        "description": "Straight chin-length bob with two long blunt side panels and a sharply V-shaped center hairline sweeping back from the forehead",
+        "source_ids": [
+          "review_6ffc754937573a931ad1"
+        ]
+      },
+      "facial_hair": {
+        "state": "observed",
+        "description": "Sparse thin vertical chin stubble, with a dark triangular shadow immediately below the chin; no moustache visible",
+        "source_ids": [
+          "review_6ffc754937573a931ad1"
+        ]
+      },
+      "outfit": {
+        "state": "observed",
+        "description": "Only the upper neck and small blue-gray garment area with a pale white raised collar edge are visible; retain this close face crop; pale teal eyes",
+        "source_ids": [
+          "review_6ffc754937573a931ad1"
+        ]
+      },
+      "duel_disk": {
+        "state": "not_visible_in_selected_pose",
+        "description": "No duel disk visible in this selected pose; do not add one",
+        "source_ids": [
+          "review_6ffc754937573a931ad1"
+        ]
+      }
+    },
+    "reviewedFields": [
       "hair_color",
       "hair_style",
       "facial_hair",
       "outfit",
-      "duel_disk",
-      "selected_form",
-      "character_identity",
-      "canonical_medium"
+      "duel_disk"
     ],
-    "facts": {
-      "hair_color": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "hair_style": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "facial_hair": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "outfit": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "duel_disk": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      }
-    },
-    "reviewedFields": [],
-    "referenceUrls": [],
-    "referenceImages": [],
-    "referenceSubjectSelection": null,
-    "comfyPromptStanding": null,
-    "comfyPromptSd": null
+    "referenceUrls": [
+      "https://tv.apple.com/us/episode/power-plays/umc.cmc.n81fdtd7igm7ugeapjj004lc?showId=umc.cmc.35pa1xi9ipnhm5cz5dpid94n9"
+    ],
+    "referenceImages": [
+      "https://is1-ssl.mzstatic.com/image/thumb/fvQ5RWUemas3X0cKFnddFA/1200x675.jpg"
+    ],
+    "referenceSubjectSelection": "Select only the blond man facing the camera on the LEFT; exclude the back of the dark-haired foreground person on the right",
+    "comfyPromptStanding": "Breo, 5DS, selected official appearance: Breo, unhelmeted civilian close-up during the Team Unicorn arc, 5D's Power Plays. hair color: Golden blond; hair style: Straight chin-length bob with two long blunt side panels and a sharply V-shaped center hairline sweeping back from the forehead; facial hair: Sparse thin vertical chin stubble, with a dark triangular shadow immediately below the chin; no moustache visible; outfit: Only the upper neck and small blue-gray garment area with a pale white raised collar edge are visible; retain this close face crop; pale teal eyes; duel disk: No duel disk visible in this selected pose; do not add one. Reference subject selection: Select only the blond man facing the camera on the LEFT; exclude the back of the dark-haired foreground person on the right. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. Standing illustration at the subject's actual canonical proportions, including any nonhuman body or life-support apparatus; no universal eight-head human redesign. Clear margins inside a vertical canvas for 1024x1536 output.",
+    "comfyPromptSd": "Breo, 5DS, selected official appearance: Breo, unhelmeted civilian close-up during the Team Unicorn arc, 5D's Power Plays. hair color: Golden blond; hair style: Straight chin-length bob with two long blunt side panels and a sharply V-shaped center hairline sweeping back from the forehead; facial hair: Sparse thin vertical chin stubble, with a dark triangular shadow immediately below the chin; no moustache visible; outfit: Only the upper neck and small blue-gray garment area with a pale white raised collar edge are visible; retain this close face crop; pale teal eyes; duel disk: No duel disk visible in this selected pose; do not add one. Reference subject selection: Select only the blond man facing the camera on the LEFT; exclude the back of the dark-haired foreground person on the right. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. 2.5-head chibi SD adaptation; simplify proportions while retaining every reviewed identity feature, costume color, facial-hair state and device shape. Complete silhouette with clear margins, square composition for 512x512 output."
   },
   {
     "id": 18,
@@ -11009,54 +11053,65 @@
     "series": "ZEXAL",
     "name": "제알 Ⅲ",
     "canonicalName": "ZEXAL 3",
-    "canonicalMedium": null,
+    "canonicalMedium": "anime",
     "renderMode": "color",
-    "selectedForm": null,
-    "verificationStatus": "pending",
-    "generationAllowed": false,
-    "pendingFields": [
+    "selectedForm": "The third gold-armored ZEXAL fusion form in ZEXAL episode 143, distinct from ordinary Yuma, Astral, ZEXAL I and ZEXAL II",
+    "verificationStatus": "reviewed",
+    "generationAllowed": true,
+    "pendingFields": [],
+    "facts": {
+      "hair_color": {
+        "state": "observed",
+        "description": "Luminous golden yellow with vivid magenta-red rear and side sections",
+        "source_ids": [
+          "review_6ce4cd675ee44219cd70"
+        ]
+      },
+      "hair_style": {
+        "state": "observed",
+        "description": "Large radiating sharp golden front spikes and a high central golden crest with a round red jewel; broad magenta-red pointed side and back spikes; preserve the exact arrangement of this powered form",
+        "source_ids": [
+          "review_6ce4cd675ee44219cd70"
+        ]
+      },
+      "facial_hair": {
+        "state": "observed",
+        "description": "No moustache or beard visible",
+        "source_ids": [
+          "review_6ce4cd675ee44219cd70"
+        ]
+      },
+      "outfit": {
+        "state": "observed",
+        "description": "Golden armor collar and angular gold shoulder area with magenta-red inset panels, heterochromatic gold and red-orange eyes, bold black pointed markings descending from the eyes over the cheeks; only the upper shoulder and face are shown",
+        "source_ids": [
+          "review_6ce4cd675ee44219cd70"
+        ]
+      },
+      "duel_disk": {
+        "state": "not_visible_in_selected_pose",
+        "description": "No duel disk visible in this selected pose; do not add one",
+        "source_ids": [
+          "review_6ce4cd675ee44219cd70"
+        ]
+      }
+    },
+    "reviewedFields": [
       "hair_color",
       "hair_style",
       "facial_hair",
       "outfit",
-      "duel_disk",
-      "selected_form",
-      "character_identity",
-      "canonical_medium"
+      "duel_disk"
     ],
-    "facts": {
-      "hair_color": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "hair_style": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "facial_hair": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "outfit": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "duel_disk": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      }
-    },
-    "reviewedFields": [],
-    "referenceUrls": [],
-    "referenceImages": [],
+    "referenceUrls": [
+      "https://tv.apple.com/us/episode/the-future-of-three-worlds/umc.cmc.2jc6b1qlea7ovj8r1lstdb6q2?showId=umc.cmc.587pz04mu5jwpcr5fhq1fkjkw"
+    ],
+    "referenceImages": [
+      "https://is1-ssl.mzstatic.com/image/thumb/W79HdM1yBoxHvI6wQo5zrA/1200x675.jpg"
+    ],
     "referenceSubjectSelection": null,
-    "comfyPromptStanding": null,
-    "comfyPromptSd": null
+    "comfyPromptStanding": "ZEXAL 3, ZEXAL, selected official appearance: The third gold-armored ZEXAL fusion form in ZEXAL episode 143, distinct from ordinary Yuma, Astral, ZEXAL I and ZEXAL II. hair color: Luminous golden yellow with vivid magenta-red rear and side sections; hair style: Large radiating sharp golden front spikes and a high central golden crest with a round red jewel; broad magenta-red pointed side and back spikes; preserve the exact arrangement of this powered form; facial hair: No moustache or beard visible; outfit: Golden armor collar and angular gold shoulder area with magenta-red inset panels, heterochromatic gold and red-orange eyes, bold black pointed markings descending from the eyes over the cheeks; only the upper shoulder and face are shown; duel disk: No duel disk visible in this selected pose; do not add one. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. Standing illustration at the subject's actual canonical proportions, including any nonhuman body or life-support apparatus; no universal eight-head human redesign. Clear margins inside a vertical canvas for 1024x1536 output.",
+    "comfyPromptSd": "ZEXAL 3, ZEXAL, selected official appearance: The third gold-armored ZEXAL fusion form in ZEXAL episode 143, distinct from ordinary Yuma, Astral, ZEXAL I and ZEXAL II. hair color: Luminous golden yellow with vivid magenta-red rear and side sections; hair style: Large radiating sharp golden front spikes and a high central golden crest with a round red jewel; broad magenta-red pointed side and back spikes; preserve the exact arrangement of this powered form; facial hair: No moustache or beard visible; outfit: Golden armor collar and angular gold shoulder area with magenta-red inset panels, heterochromatic gold and red-orange eyes, bold black pointed markings descending from the eyes over the cheeks; only the upper shoulder and face are shown; duel disk: No duel disk visible in this selected pose; do not add one. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. 2.5-head chibi SD adaptation; simplify proportions while retaining every reviewed identity feature, costume color, facial-hair state and device shape. Complete silhouette with clear margins, square composition for 512x512 output."
   },
   {
     "id": 64,
@@ -11377,54 +11432,65 @@
     "series": "ARCV",
     "name": "토도 야이바",
     "canonicalName": "Kit Blade",
-    "canonicalMedium": null,
+    "canonicalMedium": "anime",
     "renderMode": "color",
-    "selectedForm": null,
-    "verificationStatus": "pending",
-    "generationAllowed": false,
-    "pendingFields": [
+    "selectedForm": "Kit Blade / Yaiba Todo in his LID school duel outfit, ARC-V episode 11",
+    "verificationStatus": "reviewed",
+    "generationAllowed": true,
+    "pendingFields": [],
+    "facts": {
+      "hair_color": {
+        "state": "observed",
+        "description": "Medium chestnut / orange-brown",
+        "source_ids": [
+          "review_a5982aa83622e49ee1f3"
+        ]
+      },
+      "hair_style": {
+        "state": "observed",
+        "description": "Large swept-up and sideways pointed spikes, with long pointed bangs across the forehead and dark shaded hair behind the face",
+        "source_ids": [
+          "review_a5982aa83622e49ee1f3"
+        ]
+      },
+      "facial_hair": {
+        "state": "observed",
+        "description": "No moustache or beard visible",
+        "source_ids": [
+          "review_a5982aa83622e49ee1f3"
+        ]
+      },
+      "outfit": {
+        "state": "observed",
+        "description": "Dark purple sleeves and trousers, pale white long vest-like jacket front, high collar with red inner lining, dark inner neck, broad gray-green sash belt; retain the visible upper-thigh crop",
+        "source_ids": [
+          "review_a5982aa83622e49ee1f3"
+        ]
+      },
+      "duel_disk": {
+        "state": "observed",
+        "description": "Orange curved duel-disk housing on the left forearm with a cyan rectangular screen and a bright green angular energy blade; preserve the visible angled silhouette",
+        "source_ids": [
+          "review_a5982aa83622e49ee1f3"
+        ]
+      }
+    },
+    "reviewedFields": [
       "hair_color",
       "hair_style",
       "facial_hair",
       "outfit",
-      "duel_disk",
-      "selected_form",
-      "character_identity",
-      "canonical_medium"
+      "duel_disk"
     ],
-    "facts": {
-      "hair_color": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "hair_style": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "facial_hair": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "outfit": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "duel_disk": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      }
-    },
-    "reviewedFields": [],
-    "referenceUrls": [],
-    "referenceImages": [],
+    "referenceUrls": [
+      "https://tv.apple.com/us/episode/going/umc.cmc.3xfcp83sjteesl9g12k7cqav1?showId=umc.cmc.3xdfifw2fbee5ev5gqe9xmkx5"
+    ],
+    "referenceImages": [
+      "https://is1-ssl.mzstatic.com/image/thumb/RvSiAfBVh4ChuO20_FL6sQ/1200x675.jpg"
+    ],
     "referenceSubjectSelection": null,
-    "comfyPromptStanding": null,
-    "comfyPromptSd": null
+    "comfyPromptStanding": "Kit Blade, ARCV, selected official appearance: Kit Blade / Yaiba Todo in his LID school duel outfit, ARC-V episode 11. hair color: Medium chestnut / orange-brown; hair style: Large swept-up and sideways pointed spikes, with long pointed bangs across the forehead and dark shaded hair behind the face; facial hair: No moustache or beard visible; outfit: Dark purple sleeves and trousers, pale white long vest-like jacket front, high collar with red inner lining, dark inner neck, broad gray-green sash belt; retain the visible upper-thigh crop; duel disk: Orange curved duel-disk housing on the left forearm with a cyan rectangular screen and a bright green angular energy blade; preserve the visible angled silhouette. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. Standing illustration at the subject's actual canonical proportions, including any nonhuman body or life-support apparatus; no universal eight-head human redesign. Clear margins inside a vertical canvas for 1024x1536 output.",
+    "comfyPromptSd": "Kit Blade, ARCV, selected official appearance: Kit Blade / Yaiba Todo in his LID school duel outfit, ARC-V episode 11. hair color: Medium chestnut / orange-brown; hair style: Large swept-up and sideways pointed spikes, with long pointed bangs across the forehead and dark shaded hair behind the face; facial hair: No moustache or beard visible; outfit: Dark purple sleeves and trousers, pale white long vest-like jacket front, high collar with red inner lining, dark inner neck, broad gray-green sash belt; retain the visible upper-thigh crop; duel disk: Orange curved duel-disk housing on the left forearm with a cyan rectangular screen and a bright green angular energy blade; preserve the visible angled silhouette. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. 2.5-head chibi SD adaptation; simplify proportions while retaining every reviewed identity feature, costume color, facial-hair state and device shape. Complete silhouette with clear margins, square composition for 512x512 output."
   },
   {
     "id": 55,
@@ -11496,54 +11562,65 @@
     "series": "ARCV",
     "name": "호우츄인 미에루",
     "canonicalName": "Aura Sentia",
-    "canonicalMedium": null,
+    "canonicalMedium": "anime",
     "renderMode": "color",
-    "selectedForm": null,
-    "verificationStatus": "pending",
-    "generationAllowed": false,
-    "pendingFields": [
+    "selectedForm": "Aura Sentia / Mieru Houchun in the winking card-holding bust pose, ARC-V episode 23",
+    "verificationStatus": "reviewed",
+    "generationAllowed": true,
+    "pendingFields": [],
+    "facts": {
+      "hair_color": {
+        "state": "observed",
+        "description": "Warm coral-orange / reddish brown with dark red-brown shaded curls",
+        "source_ids": [
+          "review_faecfaf07662d0eb5058"
+        ]
+      },
+      "hair_style": {
+        "state": "observed",
+        "description": "Very voluminous long curled twin bunches with broad spiral sections, short curled forelocks, a large rounded front sweep, and a black bow on top",
+        "source_ids": [
+          "review_faecfaf07662d0eb5058"
+        ]
+      },
+      "facial_hair": {
+        "state": "observed",
+        "description": "No moustache or beard visible",
+        "source_ids": [
+          "review_faecfaf07662d0eb5058"
+        ]
+      },
+      "outfit": {
+        "state": "observed",
+        "description": "Light mint-cyan long-sleeved blouse with puffy shoulders, dark collar/shoulder panels and cuffs, narrow dark-red neck ribbon; pale front panel with thin red vertical stripes and a partly cropped round gold hanging ornament; bright green visible eye",
+        "source_ids": [
+          "review_faecfaf07662d0eb5058"
+        ]
+      },
+      "duel_disk": {
+        "state": "observed",
+        "description": "Only a short purple-lit device edge is visible at the very bottom of the source crop; keep it cropped and do not invent the rest of a duel disk",
+        "source_ids": [
+          "review_faecfaf07662d0eb5058"
+        ]
+      }
+    },
+    "reviewedFields": [
       "hair_color",
       "hair_style",
       "facial_hair",
       "outfit",
-      "duel_disk",
-      "selected_form",
-      "character_identity",
-      "canonical_medium"
+      "duel_disk"
     ],
-    "facts": {
-      "hair_color": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "hair_style": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "facial_hair": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "outfit": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "duel_disk": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      }
-    },
-    "reviewedFields": [],
-    "referenceUrls": [],
-    "referenceImages": [],
+    "referenceUrls": [
+      "https://tv.apple.com/us/episode/a-date-with-fate-pt-2/umc.cmc.1foskz7adp5vuzsj38v9iprj4?showId=umc.cmc.3xdfifw2fbee5ev5gqe9xmkx5"
+    ],
+    "referenceImages": [
+      "https://is1-ssl.mzstatic.com/image/thumb/LVTxGd1oQDgRlSovWwf_Lg/1200x675.jpg"
+    ],
     "referenceSubjectSelection": null,
-    "comfyPromptStanding": null,
-    "comfyPromptSd": null
+    "comfyPromptStanding": "Aura Sentia, ARCV, selected official appearance: Aura Sentia / Mieru Houchun in the winking card-holding bust pose, ARC-V episode 23. hair color: Warm coral-orange / reddish brown with dark red-brown shaded curls; hair style: Very voluminous long curled twin bunches with broad spiral sections, short curled forelocks, a large rounded front sweep, and a black bow on top; facial hair: No moustache or beard visible; outfit: Light mint-cyan long-sleeved blouse with puffy shoulders, dark collar/shoulder panels and cuffs, narrow dark-red neck ribbon; pale front panel with thin red vertical stripes and a partly cropped round gold hanging ornament; bright green visible eye; duel disk: Only a short purple-lit device edge is visible at the very bottom of the source crop; keep it cropped and do not invent the rest of a duel disk. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. Standing illustration at the subject's actual canonical proportions, including any nonhuman body or life-support apparatus; no universal eight-head human redesign. Clear margins inside a vertical canvas for 1024x1536 output.",
+    "comfyPromptSd": "Aura Sentia, ARCV, selected official appearance: Aura Sentia / Mieru Houchun in the winking card-holding bust pose, ARC-V episode 23. hair color: Warm coral-orange / reddish brown with dark red-brown shaded curls; hair style: Very voluminous long curled twin bunches with broad spiral sections, short curled forelocks, a large rounded front sweep, and a black bow on top; facial hair: No moustache or beard visible; outfit: Light mint-cyan long-sleeved blouse with puffy shoulders, dark collar/shoulder panels and cuffs, narrow dark-red neck ribbon; pale front panel with thin red vertical stripes and a partly cropped round gold hanging ornament; bright green visible eye; duel disk: Only a short purple-lit device edge is visible at the very bottom of the source crop; keep it cropped and do not invent the rest of a duel disk. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. 2.5-head chibi SD adaptation; simplify proportions while retaining every reviewed identity feature, costume color, facial-hair state and device shape. Complete silhouette with clear margins, square composition for 512x512 output."
   },
   {
     "id": 65,
@@ -11810,54 +11887,65 @@
     "series": "ARCV",
     "name": "오벨리스크 포스",
     "canonicalName": "Obelisk Force",
-    "canonicalMedium": null,
+    "canonicalMedium": "anime",
     "renderMode": "color",
-    "selectedForm": null,
-    "verificationStatus": "pending",
-    "generationAllowed": false,
-    "pendingFields": [
+    "selectedForm": "A helmeted Obelisk Force soldier in ARC-V episode 89, selected face-and-shoulders promotional still",
+    "verificationStatus": "reviewed",
+    "generationAllowed": true,
+    "pendingFields": [],
+    "facts": {
+      "hair_color": {
+        "state": "not_visible_in_selected_pose",
+        "description": "No hair exposed beneath the full head helmet",
+        "source_ids": [
+          "review_f7235af5491c6b84694c"
+        ]
+      },
+      "hair_style": {
+        "state": "not_visible_in_selected_pose",
+        "description": "Dark blue helmet with silver-white angular brow, long pointed cheek guards and a large purple oval forehead jewel; do not invent hair beneath it",
+        "source_ids": [
+          "review_f7235af5491c6b84694c"
+        ]
+      },
+      "facial_hair": {
+        "state": "observed",
+        "description": "No moustache or beard visible",
+        "source_ids": [
+          "review_f7235af5491c6b84694c"
+        ]
+      },
+      "outfit": {
+        "state": "observed",
+        "description": "Obelisk Force soldier with narrow pink eye openings in a silver-white mask, dark blue neck covering, light blue high collar bordered in gold, dark shoulder armor with pointed upper edges; only head and shoulders are shown",
+        "source_ids": [
+          "review_f7235af5491c6b84694c"
+        ]
+      },
+      "duel_disk": {
+        "state": "not_visible_in_selected_pose",
+        "description": "No duel disk visible in this selected pose; do not add one",
+        "source_ids": [
+          "review_f7235af5491c6b84694c"
+        ]
+      }
+    },
+    "reviewedFields": [
       "hair_color",
       "hair_style",
       "facial_hair",
       "outfit",
-      "duel_disk",
-      "selected_form",
-      "character_identity",
-      "canonical_medium"
+      "duel_disk"
     ],
-    "facts": {
-      "hair_color": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "hair_style": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "facial_hair": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "outfit": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "duel_disk": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      }
-    },
-    "reviewedFields": [],
-    "referenceUrls": [],
-    "referenceImages": [],
+    "referenceUrls": [
+      "https://tv.apple.com/gb/episode/hunted-and-hounded/umc.cmc.4jmxdv2pxefzji4d8zly7pw2s?showId=umc.cmc.3xdfifw2fbee5ev5gqe9xmkx5"
+    ],
+    "referenceImages": [
+      "https://is1-ssl.mzstatic.com/image/thumb/b96bAa8-3pqGMBxqwV0llw/1200x675.jpg"
+    ],
     "referenceSubjectSelection": null,
-    "comfyPromptStanding": null,
-    "comfyPromptSd": null
+    "comfyPromptStanding": "Obelisk Force, ARCV, selected official appearance: A helmeted Obelisk Force soldier in ARC-V episode 89, selected face-and-shoulders promotional still. hair color: No hair exposed beneath the full head helmet; hair style: Dark blue helmet with silver-white angular brow, long pointed cheek guards and a large purple oval forehead jewel; do not invent hair beneath it; facial hair: No moustache or beard visible; outfit: Obelisk Force soldier with narrow pink eye openings in a silver-white mask, dark blue neck covering, light blue high collar bordered in gold, dark shoulder armor with pointed upper edges; only head and shoulders are shown; duel disk: No duel disk visible in this selected pose; do not add one. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. Standing illustration at the subject's actual canonical proportions, including any nonhuman body or life-support apparatus; no universal eight-head human redesign. Clear margins inside a vertical canvas for 1024x1536 output.",
+    "comfyPromptSd": "Obelisk Force, ARCV, selected official appearance: A helmeted Obelisk Force soldier in ARC-V episode 89, selected face-and-shoulders promotional still. hair color: No hair exposed beneath the full head helmet; hair style: Dark blue helmet with silver-white angular brow, long pointed cheek guards and a large purple oval forehead jewel; do not invent hair beneath it; facial hair: No moustache or beard visible; outfit: Obelisk Force soldier with narrow pink eye openings in a silver-white mask, dark blue neck covering, light blue high collar bordered in gold, dark shoulder armor with pointed upper edges; only head and shoulders are shown; duel disk: No duel disk visible in this selected pose; do not add one. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. 2.5-head chibi SD adaptation; simplify proportions while retaining every reviewed identity feature, costume color, facial-hair state and device shape. Complete silhouette with clear margins, square composition for 512x512 output."
   },
   {
     "id": 44,
@@ -12059,54 +12147,65 @@
     "series": "ARCV",
     "name": "바렛",
     "canonicalName": "Barrett",
-    "canonicalMedium": null,
+    "canonicalMedium": "anime",
     "renderMode": "color",
-    "selectedForm": null,
-    "verificationStatus": "pending",
-    "generationAllowed": false,
-    "pendingFields": [
+    "selectedForm": "Barrett, left half of the split-screen licensed ARC-V episode 92 still",
+    "verificationStatus": "reviewed",
+    "generationAllowed": true,
+    "pendingFields": [],
+    "facts": {
+      "hair_color": {
+        "state": "observed",
+        "description": "Very dark blue with bright cyan-blue front streaks as lit in the selected night scene",
+        "source_ids": [
+          "review_fa4c8bebfee6d7f76444"
+        ]
+      },
+      "hair_style": {
+        "state": "observed",
+        "description": "Short shaved-close sides and a tall swept-back pointed crest, with jagged dark hair extending behind the crown",
+        "source_ids": [
+          "review_fa4c8bebfee6d7f76444"
+        ]
+      },
+      "facial_hair": {
+        "state": "observed",
+        "description": "No moustache or beard visible",
+        "source_ids": [
+          "review_fa4c8bebfee6d7f76444"
+        ]
+      },
+      "outfit": {
+        "state": "observed",
+        "description": "Dark open military-style jacket with a wide raised collar over a dark scoop-neck shirt, silver-gray dog-tag necklace, diagonal facial scars and a round black eyepatch over his left eye",
+        "source_ids": [
+          "review_fa4c8bebfee6d7f76444"
+        ]
+      },
+      "duel_disk": {
+        "state": "not_visible_in_selected_pose",
+        "description": "No duel disk visible in this selected pose; do not add one",
+        "source_ids": [
+          "review_fa4c8bebfee6d7f76444"
+        ]
+      }
+    },
+    "reviewedFields": [
       "hair_color",
       "hair_style",
       "facial_hair",
       "outfit",
-      "duel_disk",
-      "selected_form",
-      "character_identity",
-      "canonical_medium"
+      "duel_disk"
     ],
-    "facts": {
-      "hair_color": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "hair_style": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "facial_hair": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "outfit": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "duel_disk": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      }
-    },
-    "reviewedFields": [],
-    "referenceUrls": [],
-    "referenceImages": [],
-    "referenceSubjectSelection": null,
-    "comfyPromptStanding": null,
-    "comfyPromptSd": null
+    "referenceUrls": [
+      "https://tv.apple.com/de/episode/tragische-vereinigung/umc.cmc.782qbpkm5bgeviys1c7xhzp7h?showId=umc.cmc.3xdfifw2fbee5ev5gqe9xmkx5"
+    ],
+    "referenceImages": [
+      "https://is1-ssl.mzstatic.com/image/thumb/K_tsjZ8STBC_7LgP1eiRGQ/1200x675.jpg"
+    ],
+    "referenceSubjectSelection": "Select only Barrett on the LEFT of the vertical split screen; exclude Yuya, chains, divider and all objects belonging to the right-hand subject",
+    "comfyPromptStanding": "Barrett, ARCV, selected official appearance: Barrett, left half of the split-screen licensed ARC-V episode 92 still. hair color: Very dark blue with bright cyan-blue front streaks as lit in the selected night scene; hair style: Short shaved-close sides and a tall swept-back pointed crest, with jagged dark hair extending behind the crown; facial hair: No moustache or beard visible; outfit: Dark open military-style jacket with a wide raised collar over a dark scoop-neck shirt, silver-gray dog-tag necklace, diagonal facial scars and a round black eyepatch over his left eye; duel disk: No duel disk visible in this selected pose; do not add one. Reference subject selection: Select only Barrett on the LEFT of the vertical split screen; exclude Yuya, chains, divider and all objects belonging to the right-hand subject. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. Standing illustration at the subject's actual canonical proportions, including any nonhuman body or life-support apparatus; no universal eight-head human redesign. Clear margins inside a vertical canvas for 1024x1536 output.",
+    "comfyPromptSd": "Barrett, ARCV, selected official appearance: Barrett, left half of the split-screen licensed ARC-V episode 92 still. hair color: Very dark blue with bright cyan-blue front streaks as lit in the selected night scene; hair style: Short shaved-close sides and a tall swept-back pointed crest, with jagged dark hair extending behind the crown; facial hair: No moustache or beard visible; outfit: Dark open military-style jacket with a wide raised collar over a dark scoop-neck shirt, silver-gray dog-tag necklace, diagonal facial scars and a round black eyepatch over his left eye; duel disk: No duel disk visible in this selected pose; do not add one. Reference subject selection: Select only Barrett on the LEFT of the vertical split screen; exclude Yuya, chains, divider and all objects belonging to the right-hand subject. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. 2.5-head chibi SD adaptation; simplify proportions while retaining every reviewed identity feature, costume color, facial-hair state and device shape. Complete silhouette with clear margins, square composition for 512x512 output."
   },
   {
     "id": 61,
@@ -12308,54 +12407,65 @@
     "series": "ARCV",
     "name": "시큐리티 227",
     "canonicalName": "Officer 227",
-    "canonicalMedium": null,
+    "canonicalMedium": "anime",
     "renderMode": "color",
-    "selectedForm": null,
-    "verificationStatus": "pending",
-    "generationAllowed": false,
-    "pendingFields": [
+    "selectedForm": "Officer 227 in his white Security riding helmet, ARC-V episode 55",
+    "verificationStatus": "reviewed",
+    "generationAllowed": true,
+    "pendingFields": [],
+    "facts": {
+      "hair_color": {
+        "state": "not_visible_in_selected_pose",
+        "description": "No hair exposed beneath the white police riding helmet",
+        "source_ids": [
+          "review_8b65ef5fd7ab2051d7ed"
+        ]
+      },
+      "hair_style": {
+        "state": "not_visible_in_selected_pose",
+        "description": "White enclosed angular helmet with navy-gray center grooves, dark side panels outlined in gold, a dark blue eye visor and white cheek/chin guards; do not add hair outside it",
+        "source_ids": [
+          "review_8b65ef5fd7ab2051d7ed"
+        ]
+      },
+      "facial_hair": {
+        "state": "observed",
+        "description": "No moustache or beard visible",
+        "source_ids": [
+          "review_8b65ef5fd7ab2051d7ed"
+        ]
+      },
+      "outfit": {
+        "state": "observed",
+        "description": "Security riding outfit visible only at the neck and shoulders: dark inner neck, broad gray outer collar edged in red, pale gray-white shoulder sections; preserve the close face crop",
+        "source_ids": [
+          "review_8b65ef5fd7ab2051d7ed"
+        ]
+      },
+      "duel_disk": {
+        "state": "not_visible_in_selected_pose",
+        "description": "No duel disk visible in this selected pose; do not add one",
+        "source_ids": [
+          "review_8b65ef5fd7ab2051d7ed"
+        ]
+      }
+    },
+    "reviewedFields": [
       "hair_color",
       "hair_style",
       "facial_hair",
       "outfit",
-      "duel_disk",
-      "selected_form",
-      "character_identity",
-      "canonical_medium"
+      "duel_disk"
     ],
-    "facts": {
-      "hair_color": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "hair_style": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "facial_hair": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "outfit": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "duel_disk": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      }
-    },
-    "reviewedFields": [],
-    "referenceUrls": [],
-    "referenceImages": [],
+    "referenceUrls": [
+      "https://tv.apple.com/us/episode/tops-speed/umc.cmc.58tokh4oa18w4bgt169pvx9r3?showId=umc.cmc.3xdfifw2fbee5ev5gqe9xmkx5"
+    ],
+    "referenceImages": [
+      "https://is1-ssl.mzstatic.com/image/thumb/evDNC_sjRT8a2JGbjb1S5A/1200x675.jpg"
+    ],
     "referenceSubjectSelection": null,
-    "comfyPromptStanding": null,
-    "comfyPromptSd": null
+    "comfyPromptStanding": "Officer 227, ARCV, selected official appearance: Officer 227 in his white Security riding helmet, ARC-V episode 55. hair color: No hair exposed beneath the white police riding helmet; hair style: White enclosed angular helmet with navy-gray center grooves, dark side panels outlined in gold, a dark blue eye visor and white cheek/chin guards; do not add hair outside it; facial hair: No moustache or beard visible; outfit: Security riding outfit visible only at the neck and shoulders: dark inner neck, broad gray outer collar edged in red, pale gray-white shoulder sections; preserve the close face crop; duel disk: No duel disk visible in this selected pose; do not add one. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. Standing illustration at the subject's actual canonical proportions, including any nonhuman body or life-support apparatus; no universal eight-head human redesign. Clear margins inside a vertical canvas for 1024x1536 output.",
+    "comfyPromptSd": "Officer 227, ARCV, selected official appearance: Officer 227 in his white Security riding helmet, ARC-V episode 55. hair color: No hair exposed beneath the white police riding helmet; hair style: White enclosed angular helmet with navy-gray center grooves, dark side panels outlined in gold, a dark blue eye visor and white cheek/chin guards; do not add hair outside it; facial hair: No moustache or beard visible; outfit: Security riding outfit visible only at the neck and shoulders: dark inner neck, broad gray outer collar edged in red, pale gray-white shoulder sections; preserve the close face crop; duel disk: No duel disk visible in this selected pose; do not add one. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. 2.5-head chibi SD adaptation; simplify proportions while retaining every reviewed identity feature, costume color, facial-hair state and device shape. Complete silhouette with clear margins, square composition for 512x512 output."
   },
   {
     "id": 41,
@@ -12795,108 +12905,130 @@
     "series": "ARCV",
     "name": "그레이스 타일러",
     "canonicalName": "Grace Tyler",
-    "canonicalMedium": null,
+    "canonicalMedium": "anime",
     "renderMode": "color",
-    "selectedForm": null,
-    "verificationStatus": "pending",
-    "generationAllowed": false,
-    "pendingFields": [
+    "selectedForm": "Grace Tyler, loose-haired twin with a playful smile, ARC-V episode 107",
+    "verificationStatus": "reviewed",
+    "generationAllowed": true,
+    "pendingFields": [],
+    "facts": {
+      "hair_color": {
+        "state": "observed",
+        "description": "Silvery white / very pale blue-white with gray and ice-blue shaded panels",
+        "source_ids": [
+          "review_0b42120c46759709ff2b"
+        ]
+      },
+      "hair_style": {
+        "state": "observed",
+        "description": "Long straight loose hair behind the shoulders, a pointed asymmetrical fringe across the forehead and a narrow raised loop of hair at the crown; no braid or tied-back hairstyle in this selected view",
+        "source_ids": [
+          "review_0b42120c46759709ff2b"
+        ]
+      },
+      "facial_hair": {
+        "state": "observed",
+        "description": "No moustache or beard visible",
+        "source_ids": [
+          "review_0b42120c46759709ff2b"
+        ]
+      },
+      "outfit": {
+        "state": "observed",
+        "description": "Dark navy sleeveless open-front high-collar vest with broad silver-gray edging over a purple inner top; green eyes and heavy black upper lash lines; preserve this upper-chest portrait",
+        "source_ids": [
+          "review_0b42120c46759709ff2b"
+        ]
+      },
+      "duel_disk": {
+        "state": "not_visible_in_selected_pose",
+        "description": "No duel disk visible in this selected pose; do not add one",
+        "source_ids": [
+          "review_0b42120c46759709ff2b"
+        ]
+      }
+    },
+    "reviewedFields": [
       "hair_color",
       "hair_style",
       "facial_hair",
       "outfit",
-      "duel_disk",
-      "selected_form",
-      "character_identity",
-      "canonical_medium"
+      "duel_disk"
     ],
-    "facts": {
-      "hair_color": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "hair_style": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "facial_hair": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "outfit": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "duel_disk": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      }
-    },
-    "reviewedFields": [],
-    "referenceUrls": [],
-    "referenceImages": [],
+    "referenceUrls": [
+      "https://tv.apple.com/us/episode/belles--whistles/umc.cmc.1ftlo9uno0fl5dcaa1s73gg2m?showId=umc.cmc.3xdfifw2fbee5ev5gqe9xmkx5"
+    ],
+    "referenceImages": [
+      "https://is1-ssl.mzstatic.com/image/thumb/xNTgznE4RuorubkedG61Cg/1200x675.jpg"
+    ],
     "referenceSubjectSelection": null,
-    "comfyPromptStanding": null,
-    "comfyPromptSd": null
+    "comfyPromptStanding": "Grace Tyler, ARCV, selected official appearance: Grace Tyler, loose-haired twin with a playful smile, ARC-V episode 107. hair color: Silvery white / very pale blue-white with gray and ice-blue shaded panels; hair style: Long straight loose hair behind the shoulders, a pointed asymmetrical fringe across the forehead and a narrow raised loop of hair at the crown; no braid or tied-back hairstyle in this selected view; facial hair: No moustache or beard visible; outfit: Dark navy sleeveless open-front high-collar vest with broad silver-gray edging over a purple inner top; green eyes and heavy black upper lash lines; preserve this upper-chest portrait; duel disk: No duel disk visible in this selected pose; do not add one. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. Standing illustration at the subject's actual canonical proportions, including any nonhuman body or life-support apparatus; no universal eight-head human redesign. Clear margins inside a vertical canvas for 1024x1536 output.",
+    "comfyPromptSd": "Grace Tyler, ARCV, selected official appearance: Grace Tyler, loose-haired twin with a playful smile, ARC-V episode 107. hair color: Silvery white / very pale blue-white with gray and ice-blue shaded panels; hair style: Long straight loose hair behind the shoulders, a pointed asymmetrical fringe across the forehead and a narrow raised loop of hair at the crown; no braid or tied-back hairstyle in this selected view; facial hair: No moustache or beard visible; outfit: Dark navy sleeveless open-front high-collar vest with broad silver-gray edging over a purple inner top; green eyes and heavy black upper lash lines; preserve this upper-chest portrait; duel disk: No duel disk visible in this selected pose; do not add one. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. 2.5-head chibi SD adaptation; simplify proportions while retaining every reviewed identity feature, costume color, facial-hair state and device shape. Complete silhouette with clear margins, square composition for 512x512 output."
   },
   {
     "id": 198,
     "series": "ARCV",
     "name": "글로리아 타일러",
     "canonicalName": "Gloria Tyler",
-    "canonicalMedium": null,
+    "canonicalMedium": "anime",
     "renderMode": "color",
-    "selectedForm": null,
-    "verificationStatus": "pending",
-    "generationAllowed": false,
-    "pendingFields": [
+    "selectedForm": "Gloria Tyler, braided and tied-back-haired twin with a stern expression, ARC-V episode 108",
+    "verificationStatus": "reviewed",
+    "generationAllowed": true,
+    "pendingFields": [],
+    "facts": {
+      "hair_color": {
+        "state": "observed",
+        "description": "Silvery white / very pale blue-white with gray and ice-blue shaded panels",
+        "source_ids": [
+          "review_969bedc90e0f13cf9ef5"
+        ]
+      },
+      "hair_style": {
+        "state": "observed",
+        "description": "Asymmetrical long white fringe, broad braided / wrapped-back hair band around the crown and hair tied back behind the head; retain the exact hair arrangement visible in this side-facing portrait",
+        "source_ids": [
+          "review_969bedc90e0f13cf9ef5"
+        ]
+      },
+      "facial_hair": {
+        "state": "observed",
+        "description": "No moustache or beard visible",
+        "source_ids": [
+          "review_969bedc90e0f13cf9ef5"
+        ]
+      },
+      "outfit": {
+        "state": "observed",
+        "description": "Dark navy sleeveless open-front high-collar vest with broad silver-gray edging over a purple inner top; green eyes, heavy black upper lashes and a stern expression; preserve this upper-chest portrait",
+        "source_ids": [
+          "review_969bedc90e0f13cf9ef5"
+        ]
+      },
+      "duel_disk": {
+        "state": "not_visible_in_selected_pose",
+        "description": "No duel disk visible in this selected pose; do not add one",
+        "source_ids": [
+          "review_969bedc90e0f13cf9ef5"
+        ]
+      }
+    },
+    "reviewedFields": [
       "hair_color",
       "hair_style",
       "facial_hair",
       "outfit",
-      "duel_disk",
-      "selected_form",
-      "character_identity",
-      "canonical_medium"
+      "duel_disk"
     ],
-    "facts": {
-      "hair_color": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "hair_style": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "facial_hair": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "outfit": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "duel_disk": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      }
-    },
-    "reviewedFields": [],
-    "referenceUrls": [],
-    "referenceImages": [],
+    "referenceUrls": [
+      "https://tv.apple.com/us/episode/twins-with-tude/umc.cmc.5y7782npzwgmd068tlamyphf5?showId=umc.cmc.3xdfifw2fbee5ev5gqe9xmkx5"
+    ],
+    "referenceImages": [
+      "https://is1-ssl.mzstatic.com/image/thumb/04cjGVtxcv_KnLIz9FZPVQ/1200x675.jpg"
+    ],
     "referenceSubjectSelection": null,
-    "comfyPromptStanding": null,
-    "comfyPromptSd": null
+    "comfyPromptStanding": "Gloria Tyler, ARCV, selected official appearance: Gloria Tyler, braided and tied-back-haired twin with a stern expression, ARC-V episode 108. hair color: Silvery white / very pale blue-white with gray and ice-blue shaded panels; hair style: Asymmetrical long white fringe, broad braided / wrapped-back hair band around the crown and hair tied back behind the head; retain the exact hair arrangement visible in this side-facing portrait; facial hair: No moustache or beard visible; outfit: Dark navy sleeveless open-front high-collar vest with broad silver-gray edging over a purple inner top; green eyes, heavy black upper lashes and a stern expression; preserve this upper-chest portrait; duel disk: No duel disk visible in this selected pose; do not add one. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. Standing illustration at the subject's actual canonical proportions, including any nonhuman body or life-support apparatus; no universal eight-head human redesign. Clear margins inside a vertical canvas for 1024x1536 output.",
+    "comfyPromptSd": "Gloria Tyler, ARCV, selected official appearance: Gloria Tyler, braided and tied-back-haired twin with a stern expression, ARC-V episode 108. hair color: Silvery white / very pale blue-white with gray and ice-blue shaded panels; hair style: Asymmetrical long white fringe, broad braided / wrapped-back hair band around the crown and hair tied back behind the head; retain the exact hair arrangement visible in this side-facing portrait; facial hair: No moustache or beard visible; outfit: Dark navy sleeveless open-front high-collar vest with broad silver-gray edging over a purple inner top; green eyes, heavy black upper lashes and a stern expression; preserve this upper-chest portrait; duel disk: No duel disk visible in this selected pose; do not add one. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. 2.5-head chibi SD adaptation; simplify proportions while retaining every reviewed identity feature, costume color, facial-hair state and device shape. Complete silhouette with clear margins, square composition for 512x512 output."
   },
   {
     "id": 52,
@@ -13152,54 +13284,65 @@
     "series": "ARCV",
     "name": "카치도키 이사오",
     "canonicalName": "Isao Kachidoki",
-    "canonicalMedium": null,
+    "canonicalMedium": "anime",
     "renderMode": "color",
-    "selectedForm": null,
-    "verificationStatus": "pending",
-    "generationAllowed": false,
-    "pendingFields": [
+    "selectedForm": "Isao Kachidoki / Iggy Arlo in his later Academia appearance with green bow and cheek markings, ARC-V episode 113; do not merge with his earlier martial-arts outfit",
+    "verificationStatus": "reviewed",
+    "generationAllowed": true,
+    "pendingFields": [],
+    "facts": {
+      "hair_color": {
+        "state": "observed",
+        "description": "Deep purple with lighter violet-lit ridges",
+        "source_ids": [
+          "review_253c80ec277bd653c30f"
+        ]
+      },
+      "hair_style": {
+        "state": "observed",
+        "description": "Long jagged hair falling behind the shoulders, many sharp horizontal outward spikes around the crown, long pointed bangs meeting above and between the eyes",
+        "source_ids": [
+          "review_253c80ec277bd653c30f"
+        ]
+      },
+      "facial_hair": {
+        "state": "observed",
+        "description": "No moustache or beard visible",
+        "source_ids": [
+          "review_253c80ec277bd653c30f"
+        ]
+      },
+      "outfit": {
+        "state": "observed",
+        "description": "Red high-collar coat with gold edging, dark shoulder pieces with torn lilac inner edges, very large light-green bow at the throat; turquoise-blue eyes and vivid pink, purple and green decorative cheek markings are visible",
+        "source_ids": [
+          "review_253c80ec277bd653c30f"
+        ]
+      },
+      "duel_disk": {
+        "state": "not_visible_in_selected_pose",
+        "description": "No duel disk visible in this selected pose; do not add one",
+        "source_ids": [
+          "review_253c80ec277bd653c30f"
+        ]
+      }
+    },
+    "reviewedFields": [
       "hair_color",
       "hair_style",
       "facial_hair",
       "outfit",
-      "duel_disk",
-      "selected_form",
-      "character_identity",
-      "canonical_medium"
+      "duel_disk"
     ],
-    "facts": {
-      "hair_color": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "hair_style": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "facial_hair": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "outfit": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "duel_disk": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      }
-    },
-    "reviewedFields": [],
-    "referenceUrls": [],
-    "referenceImages": [],
+    "referenceUrls": [
+      "https://tv.apple.com/nz/episode/joy-of-revenge/umc.cmc.26pv6e3wqgts27paxthz8kchm?showId=umc.cmc.3xdfifw2fbee5ev5gqe9xmkx5"
+    ],
+    "referenceImages": [
+      "https://is1-ssl.mzstatic.com/image/thumb/u8K-6LSY-5PE7YFt3W_gBQ/1200x675.jpg"
+    ],
     "referenceSubjectSelection": null,
-    "comfyPromptStanding": null,
-    "comfyPromptSd": null
+    "comfyPromptStanding": "Isao Kachidoki, ARCV, selected official appearance: Isao Kachidoki / Iggy Arlo in his later Academia appearance with green bow and cheek markings, ARC-V episode 113; do not merge with his earlier martial-arts outfit. hair color: Deep purple with lighter violet-lit ridges; hair style: Long jagged hair falling behind the shoulders, many sharp horizontal outward spikes around the crown, long pointed bangs meeting above and between the eyes; facial hair: No moustache or beard visible; outfit: Red high-collar coat with gold edging, dark shoulder pieces with torn lilac inner edges, very large light-green bow at the throat; turquoise-blue eyes and vivid pink, purple and green decorative cheek markings are visible; duel disk: No duel disk visible in this selected pose; do not add one. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. Standing illustration at the subject's actual canonical proportions, including any nonhuman body or life-support apparatus; no universal eight-head human redesign. Clear margins inside a vertical canvas for 1024x1536 output.",
+    "comfyPromptSd": "Isao Kachidoki, ARCV, selected official appearance: Isao Kachidoki / Iggy Arlo in his later Academia appearance with green bow and cheek markings, ARC-V episode 113; do not merge with his earlier martial-arts outfit. hair color: Deep purple with lighter violet-lit ridges; hair style: Long jagged hair falling behind the shoulders, many sharp horizontal outward spikes around the crown, long pointed bangs meeting above and between the eyes; facial hair: No moustache or beard visible; outfit: Red high-collar coat with gold edging, dark shoulder pieces with torn lilac inner edges, very large light-green bow at the throat; turquoise-blue eyes and vivid pink, purple and green decorative cheek markings are visible; duel disk: No duel disk visible in this selected pose; do not add one. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. 2.5-head chibi SD adaptation; simplify proportions while retaining every reviewed identity feature, costume color, facial-hair state and device shape. Complete silhouette with clear margins, square composition for 512x512 output."
   },
   {
     "id": 54,
@@ -15014,54 +15157,65 @@
     "series": "VRAINS",
     "name": "판도르",
     "canonicalName": "Pandor",
-    "canonicalMedium": null,
+    "canonicalMedium": "anime",
     "renderMode": "color",
-    "selectedForm": null,
-    "verificationStatus": "pending",
-    "generationAllowed": false,
-    "pendingFields": [
+    "selectedForm": "Pandor avatar in VRAINS episode 109, helmeted bust shown in the licensed episode still",
+    "verificationStatus": "reviewed",
+    "generationAllowed": true,
+    "pendingFields": [],
+    "facts": {
+      "hair_color": {
+        "state": "not_visible_in_selected_pose",
+        "description": "No natural hair exposed under the smooth white and black helmet",
+        "source_ids": [
+          "review_e471131630d03d3e2d54"
+        ]
+      },
+      "hair_style": {
+        "state": "not_visible_in_selected_pose",
+        "description": "Helmet encloses the head, with pale cyan framing pieces along the forehead and cheeks and a gold oval on the black forehead panel; do not invent human hair",
+        "source_ids": [
+          "review_e471131630d03d3e2d54"
+        ]
+      },
+      "facial_hair": {
+        "state": "observed",
+        "description": "No moustache or beard visible",
+        "source_ids": [
+          "review_e471131630d03d3e2d54"
+        ]
+      },
+      "outfit": {
+        "state": "observed",
+        "description": "Pale face with vivid magenta eyes, black close-fitting cybernetic neck and torso with metallic gold center stripe and V-shaped collar, central purple gem, pale gray oval shoulder panels; preserve this bust crop",
+        "source_ids": [
+          "review_e471131630d03d3e2d54"
+        ]
+      },
+      "duel_disk": {
+        "state": "not_visible_in_selected_pose",
+        "description": "No duel disk visible in this selected pose; do not add one",
+        "source_ids": [
+          "review_e471131630d03d3e2d54"
+        ]
+      }
+    },
+    "reviewedFields": [
       "hair_color",
       "hair_style",
       "facial_hair",
       "outfit",
-      "duel_disk",
-      "selected_form",
-      "character_identity",
-      "canonical_medium"
+      "duel_disk"
     ],
-    "facts": {
-      "hair_color": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "hair_style": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "facial_hair": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "outfit": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "duel_disk": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      }
-    },
-    "reviewedFields": [],
-    "referenceUrls": [],
-    "referenceImages": [],
+    "referenceUrls": [
+      "https://tv.apple.com/cr/episode/cazadora-de-ignis/umc.cmc.26kmw5cvftk35exmqszvppxxe?showId=umc.cmc.6vt82bxaa0rtbl9qvr6qzj33e"
+    ],
+    "referenceImages": [
+      "https://is1-ssl.mzstatic.com/image/thumb/Fw5ZOYqLlRjrXYOWynHlBA/1200x675.jpg"
+    ],
     "referenceSubjectSelection": null,
-    "comfyPromptStanding": null,
-    "comfyPromptSd": null
+    "comfyPromptStanding": "Pandor, VRAINS, selected official appearance: Pandor avatar in VRAINS episode 109, helmeted bust shown in the licensed episode still. hair color: No natural hair exposed under the smooth white and black helmet; hair style: Helmet encloses the head, with pale cyan framing pieces along the forehead and cheeks and a gold oval on the black forehead panel; do not invent human hair; facial hair: No moustache or beard visible; outfit: Pale face with vivid magenta eyes, black close-fitting cybernetic neck and torso with metallic gold center stripe and V-shaped collar, central purple gem, pale gray oval shoulder panels; preserve this bust crop; duel disk: No duel disk visible in this selected pose; do not add one. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. Standing illustration at the subject's actual canonical proportions, including any nonhuman body or life-support apparatus; no universal eight-head human redesign. Clear margins inside a vertical canvas for 1024x1536 output.",
+    "comfyPromptSd": "Pandor, VRAINS, selected official appearance: Pandor avatar in VRAINS episode 109, helmeted bust shown in the licensed episode still. hair color: No natural hair exposed under the smooth white and black helmet; hair style: Helmet encloses the head, with pale cyan framing pieces along the forehead and cheeks and a gold oval on the black forehead panel; do not invent human hair; facial hair: No moustache or beard visible; outfit: Pale face with vivid magenta eyes, black close-fitting cybernetic neck and torso with metallic gold center stripe and V-shaped collar, central purple gem, pale gray oval shoulder panels; preserve this bust crop; duel disk: No duel disk visible in this selected pose; do not add one. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. 2.5-head chibi SD adaptation; simplify proportions while retaining every reviewed identity feature, costume color, facial-hair state and device shape. Complete silhouette with clear margins, square composition for 512x512 output."
   },
   {
     "id": 181,
@@ -15133,54 +15287,65 @@
     "series": "VRAINS",
     "name": "퀸",
     "canonicalName": "Queen",
-    "canonicalMedium": null,
+    "canonicalMedium": "anime",
     "renderMode": "color",
-    "selectedForm": null,
-    "verificationStatus": "pending",
-    "generationAllowed": false,
-    "pendingFields": [
+    "selectedForm": "Queen in the dark room in VRAINS episode 104; preserve the actual scene colors and upper-body crop",
+    "verificationStatus": "reviewed",
+    "generationAllowed": true,
+    "pendingFields": [],
+    "facts": {
+      "hair_color": {
+        "state": "observed",
+        "description": "Blue-green / muted teal main hair panels with olive-green edging as actually lit in the selected dark room scene",
+        "source_ids": [
+          "review_0460054a3f040b89bc61"
+        ]
+      },
+      "hair_style": {
+        "state": "observed",
+        "description": "Large smooth pointed front panels divide around the forehead and frame both cheeks; short rear hair flips outward at the nape; retain the visible head crop",
+        "source_ids": [
+          "review_0460054a3f040b89bc61"
+        ]
+      },
+      "facial_hair": {
+        "state": "observed",
+        "description": "No moustache or beard visible",
+        "source_ids": [
+          "review_0460054a3f040b89bc61"
+        ]
+      },
+      "outfit": {
+        "state": "observed",
+        "description": "Pale gray-white open high shoulder collar and jacket, dark curved neckline of the inner top, pale skin and narrow gray-blue eyes; only the upper chest and shoulders are visible",
+        "source_ids": [
+          "review_0460054a3f040b89bc61"
+        ]
+      },
+      "duel_disk": {
+        "state": "not_visible_in_selected_pose",
+        "description": "No duel disk visible in this selected pose; do not add one",
+        "source_ids": [
+          "review_0460054a3f040b89bc61"
+        ]
+      }
+    },
+    "reviewedFields": [
       "hair_color",
       "hair_style",
       "facial_hair",
       "outfit",
-      "duel_disk",
-      "selected_form",
-      "character_identity",
-      "canonical_medium"
+      "duel_disk"
     ],
-    "facts": {
-      "hair_color": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "hair_style": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "facial_hair": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "outfit": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "duel_disk": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      }
-    },
-    "reviewedFields": [],
-    "referenceUrls": [],
-    "referenceImages": [],
+    "referenceUrls": [
+      "https://tv.apple.com/us/episode/your-reign-is-over/umc.cmc.50ir82mlfs619tl7e2n4qn8pj?showId=umc.cmc.6vt82bxaa0rtbl9qvr6qzj33e"
+    ],
+    "referenceImages": [
+      "https://is1-ssl.mzstatic.com/image/thumb/OwYBmkyLuUnUxWZqwW5Xlw/1200x675.jpg"
+    ],
     "referenceSubjectSelection": null,
-    "comfyPromptStanding": null,
-    "comfyPromptSd": null
+    "comfyPromptStanding": "Queen, VRAINS, selected official appearance: Queen in the dark room in VRAINS episode 104; preserve the actual scene colors and upper-body crop. hair color: Blue-green / muted teal main hair panels with olive-green edging as actually lit in the selected dark room scene; hair style: Large smooth pointed front panels divide around the forehead and frame both cheeks; short rear hair flips outward at the nape; retain the visible head crop; facial hair: No moustache or beard visible; outfit: Pale gray-white open high shoulder collar and jacket, dark curved neckline of the inner top, pale skin and narrow gray-blue eyes; only the upper chest and shoulders are visible; duel disk: No duel disk visible in this selected pose; do not add one. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. Standing illustration at the subject's actual canonical proportions, including any nonhuman body or life-support apparatus; no universal eight-head human redesign. Clear margins inside a vertical canvas for 1024x1536 output.",
+    "comfyPromptSd": "Queen, VRAINS, selected official appearance: Queen in the dark room in VRAINS episode 104; preserve the actual scene colors and upper-body crop. hair color: Blue-green / muted teal main hair panels with olive-green edging as actually lit in the selected dark room scene; hair style: Large smooth pointed front panels divide around the forehead and frame both cheeks; short rear hair flips outward at the nape; retain the visible head crop; facial hair: No moustache or beard visible; outfit: Pale gray-white open high shoulder collar and jacket, dark curved neckline of the inner top, pale skin and narrow gray-blue eyes; only the upper chest and shoulders are visible; duel disk: No duel disk visible in this selected pose; do not add one. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. 2.5-head chibi SD adaptation; simplify proportions while retaining every reviewed identity feature, costume color, facial-hair state and device shape. Complete silhouette with clear margins, square composition for 512x512 output."
   },
   {
     "id": 186,

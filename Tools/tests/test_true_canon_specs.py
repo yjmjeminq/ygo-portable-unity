@@ -110,6 +110,20 @@ class CanonSourceContractTests(unittest.TestCase):
         row.pop("render_mode")
         self.assertIn("monochrome_reference_color_policy", canon.pending_reasons(row, self.catalogue["sources"], True))
 
+    def test_licensed_episode_still_requires_catalogue_metadata_and_publisher_binding(self):
+        source = {"page_url": "https://tv.apple.com/us/episode/your-reign-is-over/umc.cmc.50ir82mlfs619tl7e2n4qn8pj",
+                  "image_url": "https://is1-ssl.mzstatic.com/image/thumb/OwYBmkyLuUnUxWZqwW5Xlw/1200x675.jpg",
+                  "licensed_catalogue_verified": True, "copyright_notice": "© 2017 NAS • TV TOKYO",
+                  "page_sha256": "a" * 64}
+        self.assertFalse(canon.primary_visual_source(source))
+        source["page_meta_image_url"] = source["image_url"]
+        self.assertTrue(canon.primary_visual_source(source))
+        source["image_url"] = "https://is1-ssl.mzstatic.com/image/thumb/unrelated/1200x675.jpg"
+        self.assertFalse(canon.primary_visual_source(source))
+        source["image_url"] = source["page_meta_image_url"]
+        source["page_url"] = "https://tv.apple.com.example.com/us/episode/queen/id"
+        self.assertFalse(canon.primary_visual_source(source))
+
     def test_updating_visuals_removes_retired_fields_and_preserves_dialogue_and_player(self):
         records = canon.build(self.catalogue, self.manifest, allow_pending=True)
         original = canon.read_json(canon.ROOT / "Assets/StreamingAssets/tagforce_gx_script.json")

@@ -42,6 +42,19 @@ def official_url(url):
 
 def primary_visual_source(source):
     page, picture = source.get("page_url", ""), source.get("image_url", "")
+    # Licensed episode catalogs expose NAS / TV Tokyo stills on Apple's image
+    # CDN. Accept only a reviewed catalog page with recorded copyright and the
+    # exact image URL found in that page's metadata, never arbitrary CDN files.
+    page_parts, image_parts = urlparse(page), urlparse(picture)
+    if page_parts.scheme == "https" and page_parts.hostname == "tv.apple.com":
+        return (page_parts.path.split("/")[2:3] in (["episode"], ["movie"])
+                and source.get("licensed_catalogue_verified") is True
+                and bool(source.get("copyright_notice"))
+                and bool(source.get("page_sha256"))
+                and source.get("page_meta_image_url") == picture
+                and image_parts.scheme == "https"
+                and image_parts.hostname == "is1-ssl.mzstatic.com"
+                and image_parts.path.startswith("/image/thumb/"))
     if official_url(page):
         if not picture or official_url(picture):
             return True
