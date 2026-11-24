@@ -1,8 +1,8 @@
 {
   "complete": false,
   "total": 240,
-  "reviewed": 198,
-  "pending": 42,
+  "reviewed": 200,
+  "pending": 40,
   "scopeDecision": "awaiting user reply",
   "coverage": "Visible features of the selected official references; unseen anatomy and clothing are not invented.",
   "artworkGeneration": "This build produces reviewed prompts and data, not replacement character PNGs.",
@@ -25,7 +25,7 @@
     },
     "ARCV": {
       "total": 41,
-      "reviewed": 25
+      "reviewed": 27
     },
     "VRAINS": {
       "total": 27,
@@ -329,44 +329,10 @@
       ]
     },
     {
-      "id": 49,
-      "series": "ARCV",
-      "name": "시지마 호쿠토",
-      "canonicalName": "Dipper O'rion",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
       "id": 67,
       "series": "ARCV",
       "name": "토도 야이바",
       "canonicalName": "Kit Blade",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 55,
-      "series": "ARCV",
-      "name": "코우츠 마스미",
-      "canonicalName": "Julia Krystal",
       "canonicalMedium": null,
       "pendingFields": [
         "hair_color",

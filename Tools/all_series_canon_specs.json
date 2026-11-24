@@ -2700,6 +2700,38 @@
       "applicable_character_ids": [
         14
       ]
+    },
+    "review_409cb2a0e7e2e5e18f26": {
+      "page_url": "https://www.youtube.com/watch?v=OH0x8O777AE",
+      "image_url": "https://i.ytimg.com/vi/OH0x8O777AE/maxresdefault.jpg",
+      "title": "Yu-Gi-Oh! ARC-V 1x09 - Dueling with the Stars",
+      "publisher": "Official Yu-Gi-Oh! / KONAMI Cross Media NY",
+      "medium": "official_anime_upload_thumbnail",
+      "coverage": "only_the_visible_selected_subject",
+      "visually_reviewed": true,
+      "image_sha256": "409cb2a0e7e2e5e18f261ba9dbe48c092fe0a8ae6f388f164bbb00aec3efa477",
+      "applicable_character_ids": [
+        49
+      ],
+      "channel_id": "UCZuVXrpKTUn_KEzRQgFgMWg",
+      "official_channel_verified": true,
+      "upload_metadata_sha256": "d806aaf7af3e7f0a99ff9f2fc3b0048b991db7d8b5886ced0eed245cafb544c8"
+    },
+    "review_d524117d784dab0af111": {
+      "page_url": "https://www.youtube.com/watch?v=okmBv6wne4E",
+      "image_url": "https://i.ytimg.com/vi/okmBv6wne4E/maxresdefault.jpg",
+      "title": "Yu-Gi-Oh! ARC-V 1x29 - Fusion Foes",
+      "publisher": "Official Yu-Gi-Oh! / KONAMI Cross Media NY",
+      "medium": "official_anime_upload_thumbnail",
+      "coverage": "only_the_visible_selected_subject",
+      "visually_reviewed": true,
+      "image_sha256": "d524117d784dab0af11188b457f131af0460289a5b0022425ad8a45e92b46d2f",
+      "applicable_character_ids": [
+        55
+      ],
+      "channel_id": "UCZuVXrpKTUn_KEzRQgFgMWg",
+      "official_channel_verified": true,
+      "upload_metadata_sha256": "d0c127b7c522d460ba0241da0123b8873ba83f849d1b5b9c0aed8974c9db7b52"
     }
   },
   "characters": [
@@ -11434,39 +11466,52 @@
       "name": "시지마 호쿠토",
       "series": "ARCV",
       "canonical_name": "Dipper O'rion",
-      "canonical_medium": null,
-      "selected_form": null,
-      "identity_verified": false,
+      "canonical_medium": "anime",
+      "selected_form": "Dipper Orion / Hokuto Shijima in official ARC-V Dueling with the Stars episode 9, full standing figure",
+      "identity_verified": true,
       "subject_count": 1,
-      "full_body_source_ids": [],
+      "full_body_source_ids": [
+        "review_409cb2a0e7e2e5e18f26"
+      ],
       "facts": {
         "hair_color": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Dark violet purple with pale violet highlights",
+          "source_ids": [
+            "review_409cb2a0e7e2e5e18f26"
+          ]
         },
         "hair_style": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Tall multi-pronged purple spikes fanning upward and sideways like a star, with two narrow high central points",
+          "source_ids": [
+            "review_409cb2a0e7e2e5e18f26"
+          ]
         },
         "facial_hair": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "No moustache or beard visible",
+          "source_ids": [
+            "review_409cb2a0e7e2e5e18f26"
+          ]
         },
         "outfit": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Thin rectangular glasses, dark navy long coat with a wide pointed magenta collar and magenta inner front panel, dark inner high neck, fitted white trousers and pale yellow pointed shoes",
+          "source_ids": [
+            "review_409cb2a0e7e2e5e18f26"
+          ]
         },
         "duel_disk": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Pale blue-gray forearm unit projecting a bright cyan angular rectangular card-zone rim across the waist; preserve the open polygonal geometry shown in the still",
+          "source_ids": [
+            "review_409cb2a0e7e2e5e18f26"
+          ]
         }
       },
-      "candidate_reference_urls": []
+      "candidate_reference_urls": [],
+      "reference_subject_selection": "Select only the purple-haired glasses-wearing duelist at center-right; exclude Yuya in the foreground and the enormous Constellar monster behind Dipper"
     },
     {
       "id": 67,
@@ -11512,39 +11557,50 @@
       "name": "코우츠 마스미",
       "series": "ARCV",
       "canonical_name": "Julia Krystal",
-      "canonical_medium": null,
-      "selected_form": null,
-      "identity_verified": false,
+      "canonical_medium": "anime",
+      "selected_form": "Julia Krystal / Masumi Kotsu close-up in official ARC-V Fusion Foes episode 29",
+      "identity_verified": true,
       "subject_count": 1,
       "full_body_source_ids": [],
       "facts": {
         "hair_color": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Dark charcoal gray",
+          "source_ids": [
+            "review_d524117d784dab0af111"
+          ]
         },
         "hair_style": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Straight hair with a broad blunt fringe across the forehead and a long straight side section beside the cheek; retain this close crop",
+          "source_ids": [
+            "review_d524117d784dab0af111"
+          ]
         },
         "facial_hair": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "No moustache or beard visible",
+          "source_ids": [
+            "review_d524117d784dab0af111"
+          ]
         },
         "outfit": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Only the pale yellow high neck of the upper garment is visible below the face; the rest of the outfit is outside this selected close-up",
+          "source_ids": [
+            "review_d524117d784dab0af111"
+          ]
         },
         "duel_disk": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "not_visible_in_selected_pose",
+          "description": "No duel disk visible in this selected pose; do not add one",
+          "source_ids": [
+            "review_d524117d784dab0af111"
+          ]
         }
       },
-      "candidate_reference_urls": []
+      "candidate_reference_urls": [],
+      "reference_subject_selection": "Select only Julia, the dark-gray-haired girl on the left; exclude Zuzu on the right and the Gem-Knight monster in the center"
     },
     {
       "id": 39,

@@ -11111,53 +11111,64 @@
     "series": "ARCV",
     "name": "시지마 호쿠토",
     "canonicalName": "Dipper O'rion",
-    "canonicalMedium": null,
-    "selectedForm": null,
-    "verificationStatus": "pending",
-    "generationAllowed": false,
-    "pendingFields": [
+    "canonicalMedium": "anime",
+    "selectedForm": "Dipper Orion / Hokuto Shijima in official ARC-V Dueling with the Stars episode 9, full standing figure",
+    "verificationStatus": "reviewed",
+    "generationAllowed": true,
+    "pendingFields": [],
+    "facts": {
+      "hair_color": {
+        "state": "observed",
+        "description": "Dark violet purple with pale violet highlights",
+        "source_ids": [
+          "review_409cb2a0e7e2e5e18f26"
+        ]
+      },
+      "hair_style": {
+        "state": "observed",
+        "description": "Tall multi-pronged purple spikes fanning upward and sideways like a star, with two narrow high central points",
+        "source_ids": [
+          "review_409cb2a0e7e2e5e18f26"
+        ]
+      },
+      "facial_hair": {
+        "state": "observed",
+        "description": "No moustache or beard visible",
+        "source_ids": [
+          "review_409cb2a0e7e2e5e18f26"
+        ]
+      },
+      "outfit": {
+        "state": "observed",
+        "description": "Thin rectangular glasses, dark navy long coat with a wide pointed magenta collar and magenta inner front panel, dark inner high neck, fitted white trousers and pale yellow pointed shoes",
+        "source_ids": [
+          "review_409cb2a0e7e2e5e18f26"
+        ]
+      },
+      "duel_disk": {
+        "state": "observed",
+        "description": "Pale blue-gray forearm unit projecting a bright cyan angular rectangular card-zone rim across the waist; preserve the open polygonal geometry shown in the still",
+        "source_ids": [
+          "review_409cb2a0e7e2e5e18f26"
+        ]
+      }
+    },
+    "reviewedFields": [
       "hair_color",
       "hair_style",
       "facial_hair",
       "outfit",
-      "duel_disk",
-      "selected_form",
-      "character_identity",
-      "canonical_medium"
+      "duel_disk"
     ],
-    "facts": {
-      "hair_color": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "hair_style": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "facial_hair": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "outfit": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "duel_disk": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      }
-    },
-    "reviewedFields": [],
-    "referenceUrls": [],
-    "referenceImages": [],
-    "referenceSubjectSelection": null,
-    "comfyPromptStanding": null,
-    "comfyPromptSd": null
+    "referenceUrls": [
+      "https://www.youtube.com/watch?v=OH0x8O777AE"
+    ],
+    "referenceImages": [
+      "https://i.ytimg.com/vi/OH0x8O777AE/maxresdefault.jpg"
+    ],
+    "referenceSubjectSelection": "Select only the purple-haired glasses-wearing duelist at center-right; exclude Yuya in the foreground and the enormous Constellar monster behind Dipper",
+    "comfyPromptStanding": "Dipper O'rion, ARCV, selected official appearance: Dipper Orion / Hokuto Shijima in official ARC-V Dueling with the Stars episode 9, full standing figure. hair color: Dark violet purple with pale violet highlights; hair style: Tall multi-pronged purple spikes fanning upward and sideways like a star, with two narrow high central points; facial hair: No moustache or beard visible; outfit: Thin rectangular glasses, dark navy long coat with a wide pointed magenta collar and magenta inner front panel, dark inner high neck, fitted white trousers and pale yellow pointed shoes; duel disk: Pale blue-gray forearm unit projecting a bright cyan angular rectangular card-zone rim across the waist; preserve the open polygonal geometry shown in the still. Reference subject selection: Select only the purple-haired glasses-wearing duelist at center-right; exclude Yuya in the foreground and the enormous Constellar monster behind Dipper. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Use the full-body framing of the reviewed reference. Standing illustration at the subject's actual canonical proportions, including any nonhuman body or life-support apparatus; no universal eight-head human redesign. Clear margins inside a vertical canvas for 1024x1536 output.",
+    "comfyPromptSd": "Dipper O'rion, ARCV, selected official appearance: Dipper Orion / Hokuto Shijima in official ARC-V Dueling with the Stars episode 9, full standing figure. hair color: Dark violet purple with pale violet highlights; hair style: Tall multi-pronged purple spikes fanning upward and sideways like a star, with two narrow high central points; facial hair: No moustache or beard visible; outfit: Thin rectangular glasses, dark navy long coat with a wide pointed magenta collar and magenta inner front panel, dark inner high neck, fitted white trousers and pale yellow pointed shoes; duel disk: Pale blue-gray forearm unit projecting a bright cyan angular rectangular card-zone rim across the waist; preserve the open polygonal geometry shown in the still. Reference subject selection: Select only the purple-haired glasses-wearing duelist at center-right; exclude Yuya in the foreground and the enormous Constellar monster behind Dipper. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Use the full-body framing of the reviewed reference. 2.5-head chibi SD adaptation; simplify proportions while retaining every reviewed identity feature, costume color, facial-hair state and device shape. Complete silhouette with clear margins, square composition for 512x512 output."
   },
   {
     "id": 67,
@@ -11217,53 +11228,64 @@
     "series": "ARCV",
     "name": "코우츠 마스미",
     "canonicalName": "Julia Krystal",
-    "canonicalMedium": null,
-    "selectedForm": null,
-    "verificationStatus": "pending",
-    "generationAllowed": false,
-    "pendingFields": [
+    "canonicalMedium": "anime",
+    "selectedForm": "Julia Krystal / Masumi Kotsu close-up in official ARC-V Fusion Foes episode 29",
+    "verificationStatus": "reviewed",
+    "generationAllowed": true,
+    "pendingFields": [],
+    "facts": {
+      "hair_color": {
+        "state": "observed",
+        "description": "Dark charcoal gray",
+        "source_ids": [
+          "review_d524117d784dab0af111"
+        ]
+      },
+      "hair_style": {
+        "state": "observed",
+        "description": "Straight hair with a broad blunt fringe across the forehead and a long straight side section beside the cheek; retain this close crop",
+        "source_ids": [
+          "review_d524117d784dab0af111"
+        ]
+      },
+      "facial_hair": {
+        "state": "observed",
+        "description": "No moustache or beard visible",
+        "source_ids": [
+          "review_d524117d784dab0af111"
+        ]
+      },
+      "outfit": {
+        "state": "observed",
+        "description": "Only the pale yellow high neck of the upper garment is visible below the face; the rest of the outfit is outside this selected close-up",
+        "source_ids": [
+          "review_d524117d784dab0af111"
+        ]
+      },
+      "duel_disk": {
+        "state": "not_visible_in_selected_pose",
+        "description": "No duel disk visible in this selected pose; do not add one",
+        "source_ids": [
+          "review_d524117d784dab0af111"
+        ]
+      }
+    },
+    "reviewedFields": [
       "hair_color",
       "hair_style",
       "facial_hair",
       "outfit",
-      "duel_disk",
-      "selected_form",
-      "character_identity",
-      "canonical_medium"
+      "duel_disk"
     ],
-    "facts": {
-      "hair_color": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "hair_style": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "facial_hair": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "outfit": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      },
-      "duel_disk": {
-        "state": "pending",
-        "description": null,
-        "source_ids": []
-      }
-    },
-    "reviewedFields": [],
-    "referenceUrls": [],
-    "referenceImages": [],
-    "referenceSubjectSelection": null,
-    "comfyPromptStanding": null,
-    "comfyPromptSd": null
+    "referenceUrls": [
+      "https://www.youtube.com/watch?v=okmBv6wne4E"
+    ],
+    "referenceImages": [
+      "https://i.ytimg.com/vi/okmBv6wne4E/maxresdefault.jpg"
+    ],
+    "referenceSubjectSelection": "Select only Julia, the dark-gray-haired girl on the left; exclude Zuzu on the right and the Gem-Knight monster in the center",
+    "comfyPromptStanding": "Julia Krystal, ARCV, selected official appearance: Julia Krystal / Masumi Kotsu close-up in official ARC-V Fusion Foes episode 29. hair color: Dark charcoal gray; hair style: Straight hair with a broad blunt fringe across the forehead and a long straight side section beside the cheek; retain this close crop; facial hair: No moustache or beard visible; outfit: Only the pale yellow high neck of the upper garment is visible below the face; the rest of the outfit is outside this selected close-up; duel disk: No duel disk visible in this selected pose; do not add one. Reference subject selection: Select only Julia, the dark-gray-haired girl on the left; exclude Zuzu on the right and the Gem-Knight monster in the center. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. Standing illustration at the subject's actual canonical proportions, including any nonhuman body or life-support apparatus; no universal eight-head human redesign. Clear margins inside a vertical canvas for 1024x1536 output.",
+    "comfyPromptSd": "Julia Krystal, ARCV, selected official appearance: Julia Krystal / Masumi Kotsu close-up in official ARC-V Fusion Foes episode 29. hair color: Dark charcoal gray; hair style: Straight hair with a broad blunt fringe across the forehead and a long straight side section beside the cheek; retain this close crop; facial hair: No moustache or beard visible; outfit: Only the pale yellow high neck of the upper garment is visible below the face; the rest of the outfit is outside this selected close-up; duel disk: No duel disk visible in this selected pose; do not add one. Reference subject selection: Select only Julia, the dark-gray-haired girl on the left; exclude Zuzu on the right and the Gem-Knight monster in the center. Use exactly one subject. Match the cited official reference, retaining facial structure, costume, accessories and device geometry. Never merge different seasons, incarnations, anime and manga designs. Do not invent facial hair, headgear, armor, weapons, a duel disk, or themed costume decorations. Clean anime linework and cel shading; genuine transparent alpha background; no text, labels, emblems as substitutes, frames, interface, watermark, scenery, or ground plane. Match the framing of the reviewed reference; do not extrapolate unseen lower-body clothing, footwear or accessories. 2.5-head chibi SD adaptation; simplify proportions while retaining every reviewed identity feature, costume color, facial-hair state and device shape. Complete silhouette with clear margins, square composition for 512x512 output."
   },
   {
     "id": 39,
