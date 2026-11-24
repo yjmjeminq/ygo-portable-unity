@@ -613,6 +613,8 @@ namespace YGOPortable.UI
         private readonly Text _value;
         private readonly bool _compact;
         private (ushort Type, ushort Count)[] _previousCounters;
+        private readonly Image _compactIcon;
+        private readonly Text _speedCaption;
         internal RectTransform Root { get; }
 
         internal DuelCounterBadge(RectTransform root, bool compact)
@@ -624,7 +626,8 @@ namespace YGOPortable.UI
             {
                 var icon = DuelUiKit.CreateRect("Symbol", root, new Vector2(.04f, .08f), new Vector2(.41f, .92f),
                     Vector2.zero, Vector2.zero);
-                DuelUiKit.AddImage(icon.gameObject, DuelStatSymbols.Counter, Ink, true, false);
+                _compactIcon = DuelUiKit.AddImage(icon.gameObject, DuelStatSymbols.Counter, Ink, true, false);
+                _speedCaption = DuelUiKit.AddFittedText(icon, "Speed", "SPC", 12, 7, TextAnchor.MiddleCenter, Ink, FontStyle.Bold);
             }
             var digits = DuelUiKit.CreateRect("Number", root, new Vector2(compact ? .42f : .06f, 0f), new Vector2(.95f, 1f),
                 Vector2.zero, Vector2.zero);
@@ -639,6 +642,7 @@ namespace YGOPortable.UI
             // Counter IDs from the duel core's card scripts, named as in the Korean card text.
             string name = type switch
             {
+                StoryGimmickRuntime.SpeedCounter => "스피드(SPC)",
                 0x0001 => "마력",
                 0x0003 => "무사도",
                 0x0004 => "사이코",
@@ -709,6 +713,12 @@ namespace YGOPortable.UI
         {
             var counters = card.Counters;
             bool visible = counters.Length != 0;
+            if (_compactIcon != null)
+            {
+                bool speed = counters.Length == 1 && counters[0].Type == StoryGimmickRuntime.SpeedCounter;
+                _compactIcon.enabled = !speed;
+                _speedCaption.gameObject.SetActive(speed);
+            }
             string next = !visible ? "" : _compact ? card.CounterCount.ToString() :
                 counters.Length == 1 ? $"{TypeName(counters[0].Type)} {counters[0].Count}개" : $"카운터 {counters.Length}종";
             Root.gameObject.SetActive(visible);

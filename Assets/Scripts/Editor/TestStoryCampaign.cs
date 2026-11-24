@@ -229,7 +229,8 @@ namespace YGOPortable.Editor
                         OpponentDeckLevels.GetDecks(episode.charId).Any(deck => deck.main?.Length >= 40),
                         $"Missing cast or decks for {episode.id}.");
                     var scripted = StoryGimmickRuntime.StartingCards(episode.gimmick);
-                    if (episode.raidCard == 0 && episode.raidLife == 0 && scripted.Count == 0) continue;
+                    if (episode.raidCard == 0 && episode.raidLife == 0 && scripted.Count == 0 &&
+                        !StoryGimmickRuntime.IsRidingDuel(episode.gimmick)) continue;
                     StoryRaid? boss = episode.raidCard != 0 || episode.raidLife != 0 ?
                         StoryRaid.ForEncounter(i + 1, episode.raidCard, episode.raidLife) : null;
                     if (episode.raidCard != 0)
@@ -282,13 +283,18 @@ namespace YGOPortable.Editor
                 seed: new ulong[] { 222, 17, 821, 909 }, opponentOpening: raid?.Opening, storyGimmick: gimmick),
                 $"Could not start the raid {name}.");
             var boss = duel.Players[duel.AiPlayerIndex];
-            Require(boss.lp == (raid?.Opening.Life ?? 8000) && boss.hand.Count == (raid?.Opening.Hand ?? 5) &&
+            bool riding = StoryGimmickRuntime.IsRidingDuel(gimmick);
+            Require(boss.lp == (raid?.Opening.Life ?? 8000) &&
+                boss.hand.Count == (raid?.Opening.Hand ?? 5) + (riding ? 1 : 0) &&
                 duel.Players[duel.HumanPlayerIndex].lp == 8000,
                 $"The configured LP, hand or opening field was missing in {name}.");
             if (raid?.Opening.FieldCard is > 0)
                 VerifyCard(raid.Value.Opening.FieldCard, false);
             foreach (var (code, defense) in StoryGimmickRuntime.StartingCards(gimmick))
                 VerifyCard(code, defense);
+            if (riding)
+                Require(duel.Players.All(player => player.szone[5]?.code == StoryGimmickRuntime.SpeedWorld &&
+                    player.hand.Any(card => card.code == StoryGimmickRuntime.AngelBaton)), "The riding duel lacked a field spell or its Speed Spell.");
 
             void VerifyCard(uint code, bool defense)
             {

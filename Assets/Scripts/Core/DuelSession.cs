@@ -563,6 +563,11 @@ namespace YGOPortable.Core
                 Dispose();
                 return false;
             }
+            if (StoryGimmickRuntime.IsRidingDuel(storyGimmick) && !SetupRidingDuel())
+            {
+                Dispose();
+                return false;
+            }
 
             YgoNativeBridge.YGO_StartDuel(NativePtr);
             if (_recordPlanningReplay)
@@ -717,6 +722,23 @@ namespace YGOPortable.Core
 
         private static readonly uint[] StoryOpeningSequences = { 2, 1, 3, 0, 4 };
         private static readonly uint[] StoryFieldSpellSequence = { 5 };
+
+        private bool SetupRidingDuel()
+        {
+            uint world = StoryGimmickRuntime.SpeedWorld, spell = StoryGimmickRuntime.AngelBaton;
+            if (YgoNativeBridge.YGO_HasCard(world) == 0 || YgoNativeBridge.YGO_HasCard(spell) == 0 ||
+                YgoNativeBridge.YGO_HasScript($"c{world}.lua") == 0 || YgoNativeBridge.YGO_HasScript($"c{spell}.lua") == 0)
+                return false;
+            for (byte player = 0; player < Players.Length; player++)
+            {
+                if (YgoNativeBridge.YGO_QueryCardIdentity(NativePtr, player, YgoConstants.LOCATION_SZONE, 5) != 0)
+                    return false;
+                PlaceOpeningCard(player, world);
+                YgoNativeBridge.YGO_AddCard(NativePtr, player, 0, spell, player, YgoConstants.LOCATION_HAND, 0,
+                    YgoConstants.POS_FACEDOWN_DEFENSE);
+            }
+            return true;
+        }
 
         internal DeckCardAppearance? GetDeckAppearance(byte player, uint location, uint sequence)
         {

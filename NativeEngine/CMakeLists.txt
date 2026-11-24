@@ -34,9 +34,12 @@ foreach(CORE_SOURCE IN LISTS CORE_PATCH_SOURCES)
     file(WRITE "${CORE_PATCH_STAGE}/${CORE_SOURCE}" "${CORE_SOURCE_TEXT}")
 endforeach()
 foreach(CORE_PATCH IN LISTS CORE_PATCHES)
+    get_filename_component(CORE_PATCH_NAME "${CORE_PATCH}" NAME)
+    set(STAGED_PATCH "${CORE_PATCH_STAGE}/${CORE_PATCH_NAME}")
+    configure_file("${CORE_PATCH}" "${STAGED_PATCH}" @ONLY NEWLINE_STYLE LF)
     execute_process(
         COMMAND "${CMAKE_COMMAND}" -E env "GIT_CEILING_DIRECTORIES=${CMAKE_CURRENT_BINARY_DIR}"
-            "${GIT_EXECUTABLE}" apply --no-index --ignore-space-change "${CORE_PATCH}"
+            "${GIT_EXECUTABLE}" apply --no-index --ignore-space-change "${STAGED_PATCH}"
         WORKING_DIRECTORY "${CORE_PATCH_STAGE}"
         RESULT_VARIABLE CORE_PATCH_RESULT
         ERROR_VARIABLE CORE_PATCH_ERROR

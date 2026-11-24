@@ -1401,7 +1401,7 @@ namespace YGOPortable.Core
         public static CardInfo Get(uint code)
         {
             if (_byCode != null && _byCode.TryGetValue(code, out var c)) return c;
-            return null;
+            return StoryGimmickRuntime.StoryCard(code);
         }
 
         private static void IndexDeckPrintings()

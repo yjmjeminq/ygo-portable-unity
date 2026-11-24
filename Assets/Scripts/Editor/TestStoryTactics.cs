@@ -29,6 +29,7 @@ namespace YGOPortable.Editor
                 VerifyBranchesAndSupports(save);
                 VerifyOpponentOpenings();
                 VerifyStoryCrisis();
+                VerifyRidingDuel();
                 VerifyDestinyAwakening();
                 VerifyTournament(save);
                 VerifyNewScreens();
@@ -253,6 +254,88 @@ namespace YGOPortable.Editor
                     UnityEngine.Object.DestroyImmediate(canvas);
                 }
             }
+        }
+
+        private static void VerifyRidingDuel()
+        {
+            const uint hellfire = 46918794;
+            var player = Enumerable.Repeat(hellfire, 40).ToArray();
+            var rival = Enumerable.Repeat(20721928u, 40).ToArray();
+            var ai = new TacticalAI { Difficulty = AIDifficulty.Easy };
+            using var duel = new DuelSession();
+            Require(duel.StartNewDuel(player, Array.Empty<uint>(), rival, Array.Empty<uint>(),
+                seed: new ulong[] { 222, 17, 821, 909 }, storyGimmick: "riding_speed_world"), "Could not start the riding duel.");
+            int Counter(int seat) => duel.Players[seat].szone[5].Counters
+                .SingleOrDefault(counter => counter.Type == StoryGimmickRuntime.SpeedCounter).Count;
+            bool InMainPhase(int turn) => duel.TurnNumber == turn &&
+                duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD;
+            void Step(bool ending)
+            {
+                var prompt = duel.ActivePrompt;
+                if (prompt?.messageType == YgoConstants.MSG_SELECT_CARD && prompt.min == 1)
+                {
+                    int discard = prompt.candidates.FindIndex(item => item.location == YgoConstants.LOCATION_HAND &&
+                        item.code is not (0 or StoryGimmickRuntime.AngelBaton));
+                    if (discard >= 0)
+                    {
+                        duel.SubmitResponse(DuelSession.PackCardSelection(discard));
+                        return;
+                    }
+                }
+                if (prompt == null) duel.StepUntilPrompt();
+                else if (ending && prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD && prompt.canEp)
+                    duel.SubmitResponseInt(7);
+                else if (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN && !prompt.forced)
+                    duel.SubmitResponseInt(-1);
+                else duel.SubmitResponse(ai.ComputeResponse(duel, prompt));
+            }
+            void AdvanceTo(int turn)
+            {
+                for (int step = 0; step < 150 && !InMainPhase(turn) && duel.RetryCount == 0 && !duel.IsFinished; step++)
+                    Step(ending: true);
+                Require(InMainPhase(turn) && duel.RetryCount == 0, $"The riding duel did not reach turn {turn}.");
+            }
+            void Activate(uint code)
+            {
+                int index = duel.ActivePrompt.activatable.FindIndex(item => item.code == code);
+                Require(index >= 0, $"{CardDatabase.GetName(code)} was not activatable.");
+                int turn = duel.TurnNumber;
+                duel.SubmitResponseInt((index << 16) | 5);
+                for (int step = 0; step < 40 && !InMainPhase(turn) && duel.RetryCount == 0; step++) Step(ending: false);
+                Require(InMainPhase(turn) && duel.RetryCount == 0, "The Speed Spell or damage effect did not resolve.");
+            }
+
+            AdvanceTo(1);
+            Require(duel.Players.All(seat => seat.szone[5]?.code == StoryGimmickRuntime.SpeedWorld) &&
+                Counter(0) == 1 && Counter(1) == 1 &&
+                duel.ActivePrompt.activatable.All(item => item.code != StoryGimmickRuntime.AngelBaton),
+                "Speed World did not gain its first native counter, or an unaffordable Speed Spell was offered.");
+            AdvanceTo(3);
+            Require(Counter(0) == 3 && Counter(1) == 3, "Speed counters did not advance once per Standby Phase.");
+            Activate(hellfire);
+            Require(duel.Players[1].lp == 7000 && Counter(0) == 3 && Counter(1) == 3,
+                "Losing LP reduced the Speed Counters.");
+            AdvanceTo(15);
+            Require(Counter(0) == 12 && Counter(1) == 12, "Speed Counters exceeded their cap.");
+            Require(duel.Players[0].hand.Any(card => card.code == StoryGimmickRuntime.AngelBaton),
+                "The fixture discarded its Speed Spell before testing its effect.");
+            Activate(StoryGimmickRuntime.AngelBaton);
+            Require(Counter(0) == 10 && Counter(1) == 12 && duel.Players[0].grave.Any(card =>
+                card.code == StoryGimmickRuntime.AngelBaton), "The native Speed Spell did not spend exactly two counters.");
+            var canvas = new GameObject("Speed counter fixture", typeof(Canvas));
+            try
+            {
+                ((RectTransform)canvas.transform).sizeDelta = new Vector2(1600f, 900f);
+                canvas.GetComponent<Canvas>().renderMode = RenderMode.WorldSpace;
+                var field = new DuelFieldUI(null, canvas.transform, new DuelPromptModals(canvas.transform, null, null));
+                field.BindSession(duel, null, null);
+                field.Refresh();
+                Require(field.Root.GetComponentsInChildren<Text>().Count(label => label.text == "SPC") == 2,
+                    "The native Speed Counters were not rendered on both field spells.");
+                field.UnbindSession();
+            }
+            finally { UnityEngine.Object.DestroyImmediate(canvas); }
+            Debug.Log("[VERIFY RIDING DUEL] Native field zones, Standby counters, cap, damage retention, Speed Spell cost and SPC badges passed.");
         }
 
         private static void VerifyDestinyAwakening()

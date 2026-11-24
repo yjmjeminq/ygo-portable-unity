@@ -66,6 +66,16 @@ struct EngineState {
 
 EngineState g_state;
 
+// These cards are supplied by riding-duel scenarios, outside the regular deck catalogue.
+constexpr PackedCard story_cards[] = {
+    { 511090001, 0, 0x80002, 0, 0, 0, 0, 0, 0, 0, 0, {} },
+    { 511090002, 0, 0x2,     0, 0, 0, 0, 0, 0, 0, 0, {} },
+};
+
+bool is_story_script(const std::string& key) {
+    return key == "c511090001.lua" || key == "c511090002.lua";
+}
+
 std::string to_lower_ascii(const char* s) {
     std::string out;
     if (!s) return out;
@@ -111,6 +121,9 @@ const PackedCard* find_card(uint32_t code) {
     if (it != cards.end() && it->code == code) {
         return &(*it);
     }
+    for (const auto& story : story_cards) {
+        if (story.code == code) return &story;
+    }
     return nullptr;
 }
 
@@ -146,6 +159,13 @@ int read_script_cb(void* /*payload*/, OCG_Duel duel, const char* name) {
             const char* ptr = reinterpret_cast<const char*>(g_state.script_blob.data() + off);
             return OCG_LoadScript(duel, ptr, len, name) ? 1 : 0;
         }
+    }
+    if (is_story_script(key) && !g_state.fallback_script_dir.empty()) {
+        std::vector<uint8_t> script;
+        auto path = g_state.fallback_script_dir / key;
+        if (read_all_bytes(path.u8string().c_str(), script))
+            return OCG_LoadScript(duel, reinterpret_cast<const char*>(script.data()),
+                                  static_cast<uint32_t>(script.size()), name) ? 1 : 0;
     }
     return 0;
 }
@@ -207,6 +227,7 @@ YGO_API int32_t YGO_Init(const char* cardPropPath, const char* scriptPackPath) {
         }
         g_state.scripts[key] = { e.data_off, e.data_len };
     }
+    g_state.fallback_script_dir = std::filesystem::u8path(scriptPackPath).parent_path() / "StoryRules";
     return 0;
 }
 
@@ -215,6 +236,7 @@ YGO_API void YGO_Shutdown() {
     g_state.cards.clear();
     g_state.scripts.clear();
     g_state.script_blob.clear();
+    g_state.fallback_script_dir.clear();
     g_state.log_cb = nullptr;
 }
 
@@ -236,7 +258,11 @@ YGO_API int32_t YGO_HasCard(uint32_t code) {
 
 YGO_API int32_t YGO_HasScript(const char* name) {
     if (!name) return 0;
-    return g_state.scripts.find(to_lower_ascii(name)) != g_state.scripts.end() ? 1 : 0;
+    auto key = to_lower_ascii(name);
+    if (g_state.scripts.find(key) != g_state.scripts.end()) return 1;
+    if (!is_story_script(key) || g_state.fallback_script_dir.empty()) return 0;
+    std::error_code error;
+    return std::filesystem::is_regular_file(g_state.fallback_script_dir / key, error) ? 1 : 0;
 }
 
 YGO_API void* YGO_CreateDuel(
