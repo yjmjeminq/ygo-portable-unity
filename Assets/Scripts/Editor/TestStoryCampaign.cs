@@ -111,6 +111,17 @@ namespace YGOPortable.Editor
                     "Changing decks lost the conversation or kept the old deck.");
                 var summary = scene.Find("Choices/Summary/Label").GetComponent<Text>();
                 Button Choice(int index) => Control(scene, $"Choices/Choice_{index}");
+                Require(Choice(5).IsInteractable() && Choice(5).GetComponentInChildren<Text>().text.Contains("상대 시작 조건"),
+                    "The story preparation did not expose opening settings.");
+                Choice(5).onClick.Invoke();
+                Require(Choice(3).IsInteractable() && Choice(3).GetComponentInChildren<Text>().text.Contains("몬스터 선배치"),
+                    "The player could not choose both opponent bonuses.");
+                story.Back();
+                Require(summary.text.Contains("상대 시작 패 5장"), "Backing out changed the existing opening setting.");
+                Choice(5).onClick.Invoke();
+                Choice(3).onClick.Invoke();
+                Require(summary.text.Contains("상대 시작 패 7장") && summary.text.Contains("선배치 카드"),
+                    "The preparation summary did not reflect the stronger opening.");
                 Choice(0).onClick.Invoke();
                 Require(summary.text.Contains("가위바위보") && Choice(1).GetComponentInChildren<Text>().text == "바위",
                     "A story duel bypassed the turn order chooser.");
@@ -120,8 +131,8 @@ namespace YGOPortable.Editor
                 Require(summary.text.Contains("승리") && Choice(0).GetComponentInChildren<Text>().text == "선공" &&
                     Choice(1).GetComponentInChildren<Text>().text == "후공", "A won hand did not let the player choose either order.");
                 story.Back();
-                Require(summary.text.Contains(second.name) && summary.text.Contains("패 7장"),
-                    "Backing out of turn order discarded the selected deck or raid support.");
+                Require(summary.text.Contains(second.name) && summary.text.Contains("상대 시작 패 7장") &&
+                    summary.text.Contains("선배치 카드"), "Backing out of turn order discarded the selected opponent opening.");
                 Choice(0).onClick.Invoke();
                 Choice(1).onClick.Invoke();
                 Require(summary.text.Contains("상대가 선공을 선택했습니다") || summary.text.Contains("상대가 후공을 선택했습니다"),
@@ -136,11 +147,16 @@ namespace YGOPortable.Editor
                 var dm = (StoryScriptRoot)typeof(StoryModeUI).GetProperty("Script", BindingFlags.Instance | BindingFlags.NonPublic)
                     .GetValue(story);
                 var first = dm.episodes[0];
-                story.ShowDuelResult(first, false, false, "+150 DP");
+                story.ShowDuelResult(first, false, false, "+150 DP",
+                    new StoryBattlePlan(StoryStance.Calm, RaidSupport.None, StoryOpponentOpening.ExtraHandAndMonster));
                 Control(scene, "DialogueBox/Skip").onClick.Invoke();
                 Require(Control(scene, "Choices/Choice_0").GetComponentInChildren<Text>().text.Contains("재도전") &&
                     Control(scene, "Choices/Choice_1").GetComponentInChildren<Text>().text.Contains("덱 변경"),
                     "The loss result did not expose retry and deck change.");
+                Choice(4).onClick.Invoke();
+                Require(summary.text.Contains("상대 시작 패 7장") && summary.text.Contains("선배치 카드"),
+                    "The rematch discarded the last opponent opening.");
+                story.Back();
                 Choice(0).onClick.Invoke();
                 Require(summary.text.Contains("가위바위보"), "A story rematch bypassed the turn order chooser.");
                 story.Back();
@@ -234,7 +250,7 @@ namespace YGOPortable.Editor
             Require(duel.StartNewDuel(player, Array.Empty<uint>(), rival, extra ?? Array.Empty<uint>(), humanFirst,
                 seed: new ulong[] { 222, 17, 821, 909 }, opponentOpening: raid.Opening), $"Could not start the raid {name}.");
             var boss = duel.Players[duel.AiPlayerIndex];
-            Require(boss.lp == raid.Opening.Life && boss.hand.Count == raid.Opening.Hand &&
+            Require(boss.lp == 8000 && boss.hand.Count == raid.Opening.Hand &&
                 duel.Players[duel.HumanPlayerIndex].lp == 8000 && boss.mzone.Concat(boss.szone)
                     .Any(card => card?.code == raid.Opening.FieldCard && card.IsFaceUp),
                 $"The configured LP, hand or opening field was missing in {name}.");

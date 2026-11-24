@@ -27,6 +27,7 @@ namespace YGOPortable.Editor
                 Require(CollectionProgress.TryChooseStarter(CollectionProgress.Starters[0].Id, out _, out string error), error);
                 Require(YgoNativeBridge.Initialize(streaming, null) == 0, "The native engine did not start.");
                 VerifyBranchesAndSupports(save);
+                VerifyOpponentOpenings();
                 VerifyDestinyAwakening();
                 VerifyTournament(save);
                 VerifyNewScreens();
@@ -69,10 +70,12 @@ namespace YGOPortable.Editor
             using var duel = new DuelSession();
             var deck = Enumerable.Repeat(20721928u, 40).ToArray();
             Require(duel.StartNewDuel(deck, Array.Empty<uint>(), rival.main, rival.extra, seed: new ulong[] { 11, 73, 19, 92 },
-                opponentOpening: boss, playerOpening: player), "Could not start the triple-scaled raid fixture.");
+                opponentOpening: boss, playerOpening: player), "Could not start the enhanced raid fixture.");
             Require(duel.Players[duel.HumanPlayerIndex].hand.Count == 7 &&
-                duel.Players[duel.AiPlayerIndex].lp == 26000 && duel.Players[duel.AiPlayerIndex].hand.Count == 10,
-                "The opening LP and hand values did not reach the native engine.");
+                duel.Players[duel.AiPlayerIndex].lp == 8000 && duel.Players[duel.AiPlayerIndex].hand.Count == 12 &&
+                duel.Players[duel.AiPlayerIndex].mzone.All(card => card == null) &&
+                duel.Players[duel.AiPlayerIndex].szone.All(card => card == null),
+                "The challenge starting hand or the field breaker did not reach the native engine.");
             Require(CollectionProgress.TryConsumeRaidSupports(plan.Supports, true, out string consumeError) &&
                 CollectionProgress.GetSupportCount(RaidSupport.QuickDraw) == 0 && CollectionProgress.GetSupportCount(RaidSupport.Breaker) == 0,
                 consumeError);
@@ -92,6 +95,52 @@ namespace YGOPortable.Editor
                 new FixedRandom(0)) && drop.Support != RaidSupport.None, rewardError);
             CollectionProgress.Load(save);
             Require(CollectionProgress.GetStoryBond(rival.charId) == 1, "The opponent's bond was not persisted.");
+        }
+
+        private static void VerifyOpponentOpenings()
+        {
+            const uint blueEyes = 89631139, baronne = 84815190, utopia = 84013237;
+            var player = Enumerable.Repeat(20721928u, 40).ToArray();
+            var rival = new PresetDeckInfo { sigCard = blueEyes, main = player.Append(blueEyes).ToArray(), extra = new[] { baronne, utopia } };
+            var raid = StoryRaid.For("dm", 20).Value;
+            Require(raid.Opening.FieldCard == blueEyes &&
+                StoryBattlePlan.SelectOpeningMonster(rival, raid) == baronne,
+                "The enhanced opening duplicated the raid boss or selected an Xyz without materials.");
+            VerifyNativeOpening(StoryOpponentOpening.Standard, null, humanFirst: true, 5, 0);
+            VerifyNativeOpening(StoryOpponentOpening.ExtraHand, null, humanFirst: false, 7, 0);
+            VerifyNativeOpening(StoryOpponentOpening.PreplacedMonster, null, humanFirst: false, 5, blueEyes);
+            VerifyNativeOpening(StoryOpponentOpening.ExtraHandAndMonster, raid, humanFirst: true, 9, baronne);
+            Debug.Log("[VERIFY STORY OPENINGS] Four settings, both turn orders, main/extra transfers and planning replay passed.");
+
+            void VerifyNativeOpening(StoryOpponentOpening option, StoryRaid? battle, bool humanFirst, int hand, uint monster)
+            {
+                var plan = new StoryBattlePlan(StoryStance.Neutral, RaidSupport.None, option);
+                var opening = plan.Apply(battle, rival);
+                using var duel = new DuelSession(recordPlanningReplay: true);
+                Require(duel.StartNewDuel(player, Array.Empty<uint>(), rival.main, rival.extra, humanFirst,
+                    seed: new ulong[] { 222, 17, 821, 909 }, opponentOpening: opening.Opponent, playerOpening: opening.Player),
+                    $"Could not start the {option} fixture.");
+                VerifyBoard(duel);
+                using var replay = duel.ReplayForPlanning(() => false);
+                Require(replay != null, "The planning replay did not restore the enhanced opening.");
+                VerifyBoard(replay);
+
+                void VerifyBoard(DuelSession session)
+                {
+                    byte seat = (byte)session.AiPlayerIndex;
+                    var ai = session.Players[seat];
+                    var onField = ai.mzone.Where(card => card?.IsFaceUp == true).Select(card => card.code);
+                    uint baseCard = battle?.Opening.FieldCard ?? 0;
+                    var expected = new[] { baseCard, monster }.Where(code => code != 0);
+                    Require(ai.lp == 8000 && ai.hand.Count == hand && session.Players[session.HumanPlayerIndex].hand.Count == 5 &&
+                        onField.OrderBy(code => code).SequenceEqual(expected.OrderBy(code => code)) &&
+                        YgoNativeBridge.YGO_QueryCount(session.NativePtr, seat, YgoConstants.LOCATION_DECK) ==
+                            rival.main.Length - hand - (monster == blueEyes ? 1 : 0) &&
+                        YgoNativeBridge.YGO_QueryCount(session.NativePtr, seat, YgoConstants.LOCATION_EXTRA) ==
+                            rival.extra.Length - (monster == baronne ? 1 : 0),
+                        $"Unexpected field or deck counts for {option}, humanFirst={humanFirst}.");
+                }
+            }
         }
 
         private static void VerifyDestinyAwakening()

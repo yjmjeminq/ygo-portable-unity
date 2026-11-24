@@ -34,7 +34,7 @@ namespace YGOPortable.UI
 
         internal static string Effect(StoryStance stance) => stance switch
         {
-            StoryStance.Challenge => "도발 · 상대 LP +2,000 · 승리 DP·가루 ×1.5",
+            StoryStance.Challenge => $"도발 · 기본 상대 시작 패 +{StoryBattlePlan.ExtraOpeningCards}장 · 승리 DP·가루 ×1.5",
             StoryStance.Calm => "침착 · 내 시작 LP +1,000",
             StoryStance.Bond => "유대 · 승리 시 유대도 +1 · 테마 카드 드롭 ×2",
             _ => "",

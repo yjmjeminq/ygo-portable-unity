@@ -50,7 +50,7 @@ namespace YGOPortable.UI
             private readonly Button _logButton;
             private readonly GameObject _choiceRoot;
             private readonly Text _choiceSummary;
-            private readonly Button[] _choiceButtons = new Button[5];
+            private readonly Button[] _choiceButtons = new Button[6];
             private readonly RaidSupportPanel _supports;
             private readonly GameObject _logRoot;
             private readonly Text _logText;
@@ -128,7 +128,7 @@ namespace YGOPortable.UI
                 _skip = AddButton(dialogue, "Skip", "건너뛰기", .797f, .727f, .952f, .927f, Finish);
                 _next = AddButton(dialogue, "Next", "다음 ▶", .778f, .042f, .952f, .214f, Advance, gold: true);
 
-                var choices = DuelUiKit.CreateMenuPanel(content, "Choices", new Vector2(.261f, .408f), new Vector2(.739f, .833f));
+                var choices = DuelUiKit.CreateMenuPanel(content, "Choices", new Vector2(.261f, .405f), new Vector2(.739f, .869f));
                 _choiceRoot = choices.gameObject;
                 _choiceSummary = AddLabel(choices, "Summary", .065f, .762f, .935f, .966f, 21, color: DuelUiKit.GoldAccent);
                 for (int i = 0; i < _choiceButtons.Length; i++)

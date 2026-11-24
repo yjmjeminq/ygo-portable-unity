@@ -79,6 +79,8 @@ namespace YGOPortable.UI
         private string _deckId;
         private StoryStance _stance;
         private RaidSupport _supports;
+        private StoryOpponentOpening _opponentOpening;
+        private Action _returnFromOpeningPicker;
         private Action _returnFromTurnOrder;
         private Action _startAfterLoss;
         private float _lossRevealTime;
@@ -206,6 +208,7 @@ namespace YGOPortable.UI
             }
             if (_dialogue.ClosePopup()) return;
             if (_returnFromTurnOrder != null) CancelTurnOrder();
+            else if (_returnFromOpeningPicker != null) CloseOpeningPicker();
             else ReturnToEpisodes();
         }
 
@@ -215,13 +218,14 @@ namespace YGOPortable.UI
             return index >= 0 && index <= _unlockedIndex;
         }
 
-        internal void ShowDuelResult(StoryEpisodeData episode, bool won, bool draw, string reward, StoryStance stance = StoryStance.Neutral)
+        internal void ShowDuelResult(StoryEpisodeData episode, bool won, bool draw, string reward, StoryBattlePlan plan = default)
         {
             int index = IndexOf(episode);
             if (index < 0) return;
             SelectEpisode(index);
-            _stance = stance;
+            _stance = plan.Stance;
             _supports = RaidSupport.None;
+            _opponentOpening = plan.OpponentOpening;
             string result = won ? "승리" : draw ? "무승부" : "패배";
             PlayDialogue(episode, won ? episode.postWinDialogues : episode.postLoseDialogues, $"{TitleOf(episode)} · {result}", () =>
             {
@@ -240,7 +244,8 @@ namespace YGOPortable.UI
                 new("즉시 재도전", () => ChooseTurnOrder(episode, ShowRetry), () => _playableDecks.Count > 0),
                 new("내 덱 변경 후 재도전", PickDeck),
                 new("에피소드 목록으로", ReturnToEpisodes),
-                new("전술 서포트 장착", () => PickSupports(episode)));
+                new("전술 서포트 장착", () => PickSupports(episode)),
+                new("상대 시작 조건 변경", () => PickOpponentOpening(episode, ShowRetry)));
         }
 
         internal void ShowStatus(string status) => _status.text = status;
@@ -376,7 +381,7 @@ namespace YGOPortable.UI
                 string state = cleared ? "클리어" : locked ? "잠김" : "도전 가능";
                 var label = _episodeButtons[row].GetComponentInChildren<Text>();
                 var raid = GetRaid(episode);
-                string badge = raid is { } challenge ? $"◆ BOSS RAID {challenge.Opening.Life:N0} LP  " : "";
+                string badge = raid.HasValue ? "◆ BOSS RAID  " : "";
                 label.text = $"  {episodeIndex + 1:00}화  {badge}{TitleOf(episode)}  ·  {state}";
                 label.color = episodeIndex == index ? DuelUiKit.GoldAccent : locked ? DuelUiKit.TextMuted :
                     raid.HasValue ? DuelUiKit.RedAccent : DuelUiKit.TextPrimary;
@@ -433,6 +438,7 @@ namespace YGOPortable.UI
             var raid = GetRaid(episode);
             _stance = StoryStance.Neutral;
             _supports = RaidSupport.None;
+            _opponentOpening = StoryOpponentOpening.Standard;
             var deck = GetOpponentMatch(episode).Deck;
             var choices = StoryDialogueBranch.Create(episode, raid.HasValue,
                 deck?.sigCard is > 0 ? CardDatabase.GetName(deck.sigCard) : "");
@@ -445,22 +451,59 @@ namespace YGOPortable.UI
                         _dialogue.AnswerBranch(choice.Reply, episode.opponentName, choice.Response);
                     })).ToArray()));
 
-            void ShowPreparation() => _dialogue.ShowChoices(() => PreparationSummary(raid),
+            void ShowPreparation() => _dialogue.ShowChoices(() => PreparationSummary(raid, deck),
                 new("듀얼 개시!", () => ChooseTurnOrder(episode, ShowPreparation), () => _playableDecks.Count > 0),
                 new("내 덱 변경", PickDeck),
                 new("대화 다시 보기", () => OpenEpisode(index)),
                 new("에피소드 목록으로", ReturnToEpisodes),
-                new("전술 서포트 장착 · 최대 2개", () => PickSupports(episode)));
+                new("전술 서포트 장착 · 최대 2개", () => PickSupports(episode)),
+                new("상대 시작 조건 변경", () => PickOpponentOpening(episode, ShowPreparation)));
         }
 
-        private string PreparationSummary(StoryRaid? raid)
+        private StoryBattlePlan CurrentBattlePlan => new(_stance, _supports, _opponentOpening);
+
+        private string PreparationSummary(StoryRaid? raid, PresetDeckInfo deck)
         {
-            var (player, opponent) = new StoryBattlePlan(_stance, _supports).Apply(raid);
-            string field = raid.HasValue ? $"\n초기 필드 · {CardDatabase.GetName(opponent.FieldCard)}" : "";
+            var (player, opponent) = CurrentBattlePlan.Apply(raid, deck);
+            string field = string.Join(" · ", new[] { opponent.FieldCard, opponent.DeckMonster }
+                .Where(code => code != 0).Select(CardDatabase.GetName));
+            if (field.Length > 0) field = $"\n선배치 카드 · {field}";
             string equipped = string.Join(" · ", RaidSupportCatalog.Items.Where(item => (_supports & item.Id) != 0)
                 .Select(item => item.Name));
             string supports = equipped.Length > 0 ? $"\n장착 · {equipped}" : "";
-            return $"{SelectedStoryDeckLabel()}\n내 LP {player.Life:N0} · 패 {player.Hand}장 / 상대 LP {opponent.Life:N0} · 패 {opponent.Hand}장{field}{supports}";
+            return $"{SelectedStoryDeckLabel()}\n내 LP {player.Life:N0} · 패 {player.Hand}장 / 상대 시작 패 {opponent.Hand}장{field}{supports}";
+        }
+
+        private void PickOpponentOpening(StoryEpisodeData episode, Action restore)
+        {
+            var raid = GetRaid(episode);
+            var deck = GetOpponentMatch(episode).Deck;
+            uint monster = StoryBattlePlan.SelectOpeningMonster(deck, raid);
+            _returnFromOpeningPicker = restore;
+            string hand = $"상대 시작 패 +{StoryBattlePlan.ExtraOpeningCards}장";
+            string preplaced = monster == 0 ? "선배치할 몬스터 없음" : $"몬스터 선배치 · {CardDatabase.GetName(monster)}";
+            var choices = new List<StoryChoice>();
+            if (_stance != StoryStance.Challenge)
+                choices.Add(Option(StoryOpponentOpening.Standard, "기본 시작 조건"));
+            choices.Add(Option(StoryOpponentOpening.ExtraHand, hand));
+            choices.Add(Option(StoryOpponentOpening.PreplacedMonster, preplaced, monster != 0));
+            choices.Add(Option(StoryOpponentOpening.ExtraHandAndMonster, $"{hand}\n{preplaced}", monster != 0));
+            choices.Add(new StoryChoice("돌아가기", CloseOpeningPicker));
+            _dialogue.ShowChoices(() => PreparationSummary(raid, deck), choices.ToArray());
+
+            StoryChoice Option(StoryOpponentOpening opening, string label, bool available = true) =>
+                new(label, () =>
+                {
+                    _opponentOpening = opening;
+                    CloseOpeningPicker();
+                }, () => available);
+        }
+
+        private void CloseOpeningPicker()
+        {
+            var restore = _returnFromOpeningPicker;
+            _returnFromOpeningPicker = null;
+            restore?.Invoke();
         }
 
         private void PickSupports(StoryEpisodeData episode) => _dialogue.OpenSupportPicker(GetRaid(episode).HasValue, _supports,
@@ -486,7 +529,7 @@ namespace YGOPortable.UI
             var myDeck = _playableDecks[_deckPicker.value];
             var rivalDeck = GetOpponentMatch(episode).Deck;
             if (rivalDeck == null) return;
-            var plan = new StoryBattlePlan(_stance, _supports);
+            var plan = CurrentBattlePlan;
             _returnFromTurnOrder = restore;
             ShowHands("가위바위보 · 이기면 선공 또는 후공을 선택합니다.");
 
@@ -552,6 +595,7 @@ namespace YGOPortable.UI
         private void ResetDialogue()
         {
             ClearTurnOrder();
+            _returnFromOpeningPicker = null;
             _dialogue.Close();
             _browser.interactable = true;
             _browser.blocksRaycasts = true;

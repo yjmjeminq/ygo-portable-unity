@@ -453,7 +453,7 @@ namespace YGOPortable.UI
             }
             var difficulty = isCampaignMatch ? AIDifficulty.Smart : AiDifficulty;
             var raid = isStoryDuel ? _storyMode.GetRaid(_activeStoryEpisode) : null;
-            var opening = isStoryDuel ? _activeStoryPlan.Apply(raid) : ((DuelOpening Player, DuelOpening Opponent)?)null;
+            var opening = isStoryDuel ? _activeStoryPlan.Apply(raid, oppDeck) : ((DuelOpening Player, DuelOpening Opponent)?)null;
             if (isTournamentDuel)
                 opening = (new DuelOpening(8000, 5, 0), DimensionTournament.Opening(_activeTournament.Value.Slots, oppDeck));
             _session = new DuelSession(recordPlanningReplay: difficulty == AIDifficulty.Smart, playerReplay: _personalReplay);
@@ -622,7 +622,7 @@ namespace YGOPortable.UI
                         string storyReward = CollectionProgress.TryAwardStoryDuel(episode.id, won, raid, _activeOppDeck, plan,
                             out var prize, out string error) ? FormatStoryPrize(prize) : error;
                         ShowScreen(AppScreen.StoryMode);
-                        _storyMode.ShowDuelResult(episode, won, draw, storyReward, plan.Stance);
+                        _storyMode.ShowDuelResult(episode, won, draw, storyReward, plan);
                         SyncFrontMenuFocus();
                         return;
                     }

@@ -13,14 +13,16 @@ namespace YGOPortable.Core
         internal readonly uint FieldCard;
         internal readonly int DestinyLimit;
         internal readonly int DestinyUses;
+        internal readonly uint DeckMonster;
 
-        internal DuelOpening(int life, int hand, uint fieldCard, int destinyLimit = 2000, int destinyUses = 1)
+        internal DuelOpening(int life, int hand, uint fieldCard, int destinyLimit = 2000, int destinyUses = 1, uint deckMonster = 0)
         {
             Life = life;
             Hand = hand;
             FieldCard = fieldCard;
             DestinyLimit = destinyLimit;
             DestinyUses = destinyUses;
+            DeckMonster = deckMonster;
         }
     }
 
@@ -541,9 +543,18 @@ namespace YGOPortable.Core
             }
             var shuffle = new System.Random(unchecked((int)shuffleSeed));
             _destinyRandom = new System.Random(unchecked((int)(shuffleSeed ^ 0xD571D2A7)));
-            LoadDeckForPlayer(0, firstMain, turn0Extra, shuffle, p0GoesFirst ? playerDeckAppearance : null, p0GoesFirst ? null : opponentDestiny);
-            LoadDeckForPlayer(1, secondMain, turn1Extra, shuffle, p0GoesFirst ? null : playerDeckAppearance, p0GoesFirst ? opponentDestiny : null);
+            uint deckMonster = opponentOpening?.DeckMonster ?? 0;
+            var mainWithoutMonster = RemoveOpeningCard(p0GoesFirst ? secondMain : firstMain, deckMonster);
+            var extraWithoutMonster = mainWithoutMonster == null ? RemoveOpeningCard(p1Extra, deckMonster) : null;
+            LoadDeckForPlayer(0, p0GoesFirst ? firstMain : mainWithoutMonster ?? firstMain,
+                p0GoesFirst ? turn0Extra : extraWithoutMonster ?? turn0Extra, shuffle,
+                p0GoesFirst ? playerDeckAppearance : null, p0GoesFirst ? null : opponentDestiny);
+            LoadDeckForPlayer(1, p0GoesFirst ? mainWithoutMonster ?? secondMain : secondMain,
+                p0GoesFirst ? extraWithoutMonster ?? turn1Extra : turn1Extra, shuffle,
+                p0GoesFirst ? null : playerDeckAppearance, p0GoesFirst ? opponentDestiny : null);
             if (opponentOpening is { FieldCard: > 0 } opening) PlaceOpeningCard((byte)AiPlayerIndex, opening.FieldCard);
+            if (mainWithoutMonster != null || extraWithoutMonster != null)
+                PlaceOpeningCard((byte)AiPlayerIndex, deckMonster, opponentOpening.Value.FieldCard == 0 ? 2u : 1u);
 
             YgoNativeBridge.YGO_StartDuel(NativePtr);
             if (_recordPlanningReplay)
@@ -654,13 +665,21 @@ namespace YGOPortable.Core
             }
         }
 
-        private void PlaceOpeningCard(byte player, uint code)
+        private static uint[] RemoveOpeningCard(IReadOnlyList<uint> deck, uint code)
+        {
+            if (code == 0 || deck == null) return null;
+            for (int i = 0; i < deck.Count; i++)
+                if (deck[i] == code) return deck.Where((_, index) => index != i).ToArray();
+            return null;
+        }
+
+        private void PlaceOpeningCard(byte player, uint code, uint monsterSequence = 2)
         {
             var info = CardDatabase.Get(code);
             if (info == null) return;
             bool fieldSpell = (info.type & YgoConstants.TYPE_FIELD) != 0;
             uint location = info.IsMonster ? YgoConstants.LOCATION_MZONE : YgoConstants.LOCATION_SZONE;
-            uint sequence = info.IsMonster ? 2u : fieldSpell ? 5u : 2u;
+            uint sequence = info.IsMonster ? monsterSequence : fieldSpell ? 5u : 2u;
             YgoNativeBridge.YGO_AddCard(NativePtr, player, 0, code, player, location, sequence, YgoConstants.POS_FACEUP_ATTACK);
         }
 

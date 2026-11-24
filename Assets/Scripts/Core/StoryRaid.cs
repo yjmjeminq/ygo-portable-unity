@@ -23,17 +23,16 @@ namespace YGOPortable.Core
             [("arcv", 44)] = 13331639,
         };
 
-        private static readonly int[] Life = { 12000, 15000, 20000, 25000, 30000 };
         private static readonly int[] Hand = { 6, 7, 8, 9, 10 };
         private static readonly int[] Rewards = { 1800, 2500, 3500, 4500, 6000 };
 
         internal readonly DuelOpening Opening;
         internal readonly int WinDp;
-        internal string Summary => $"BOSS RAID  ·  LP {Opening.Life:N0}  ·  초기 패 {Opening.Hand}장\n초기 필드 · {CardDatabase.GetName(Opening.FieldCard)}";
+        internal string Summary => $"BOSS RAID  ·  시작 패 {Opening.Hand}장\n선배치 카드 · {CardDatabase.GetName(Opening.FieldCard)}";
 
         private StoryRaid(int chapter, uint fieldCard)
         {
-            Opening = new DuelOpening(Life[chapter - 1], Hand[chapter - 1], fieldCard);
+            Opening = new DuelOpening(8000, Hand[chapter - 1], fieldCard);
             WinDp = Rewards[chapter - 1];
         }
 
