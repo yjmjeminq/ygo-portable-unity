@@ -111,7 +111,8 @@ namespace YGOPortable.UI
             transform.SetAsLastSibling();
             _ghostRoot.gameObject.SetActive(true);
             _ghostRoot.SetAsLastSibling();
-            _ghostCardView.UsePrintedFaceOnly(source == DragSourceType.ExtraDeck);
+            bool fromExtraDeck = source == DragSourceType.ExtraDeck;
+            _ghostCardView.UsePrintedFaceOnly(enabled: fromExtraDeck, regularEditionOnly: fromExtraDeck);
             _ghostCardView.SetDeckCard(cardCode, appearance);
             UpdateGhostPosition(screenPosition ?? (Vector2)Input.mousePosition);
 

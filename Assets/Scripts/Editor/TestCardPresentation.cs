@@ -18,6 +18,8 @@ namespace YGOPortable.Editor
         private const uint AlternateBlueEyes = 89631134;
         private const uint SkullRedBird = 10202894;
         private const uint Masquerena = 65741786;
+        private const uint DominusImpulse = 40366667;
+        private const int DominusIllustration = 22823;
 
         internal static void VerifyInterfaceIcons()
         {
@@ -682,16 +684,18 @@ namespace YGOPortable.Editor
             {
                 writer.Write(0x5241444Du);
                 writer.Write(1u);
-                writer.Write(2u);
-                for (int variant = 0; variant < 2; variant++)
+                var artworks = new[] { (BlueEyes, 0), (BlueEyes, 1), (DominusImpulse, DominusIllustration) };
+                writer.Write((uint)artworks.Length);
+                int offset = 12 + 16 * artworks.Length;
+                foreach (var (code, variant) in artworks)
                 {
-                    writer.Write(BlueEyes);
+                    writer.Write(code);
                     writer.Write(variant);
-                    writer.Write((uint)(44 + variant * image.Length));
+                    writer.Write((uint)offset);
                     writer.Write((uint)image.Length);
+                    offset += image.Length;
                 }
-                writer.Write(image);
-                writer.Write(image);
+                foreach (var artwork in artworks) writer.Write(image);
             }
 
             string previous = CardArtLoader.ActiveDuelVisualsPath;
@@ -755,8 +759,6 @@ namespace YGOPortable.Editor
 
         private static void VerifySourceOverframeFace(Canvas canvas, string streaming, string sourcePack)
         {
-            const uint dominusImpulse = 40366667;
-            const int illustration = 22823;
             var mask = new Texture2D(4, 8, TextureFormat.RGBA32, false);
             var rgbUnderMask = new Color32(213, 68, 147, 0);
             mask.SetPixels32(Enumerable.Repeat(rgbUnderMask, 32).ToArray());
@@ -768,8 +770,8 @@ namespace YGOPortable.Editor
                 writer.Write(0x464F444Du);
                 writer.Write(1u);
                 writer.Write(1u);
-                writer.Write(dominusImpulse);
-                writer.Write(illustration);
+                writer.Write(DominusImpulse);
+                writer.Write(DominusIllustration);
                 writer.Write(28u);
                 writer.Write((uint)image.Length);
                 writer.Write(image);
@@ -777,14 +779,14 @@ namespace YGOPortable.Editor
 
             CardArtLoader.Shutdown();
             CardArtLoader.Initialize(streaming, Path.Combine(streaming, "EmptyProfile"));
-            Require(CardArtLoader.SupportsOverframe(dominusImpulse, illustration) &&
-                CardArtLoader.FirstOverframeVariant(dominusImpulse) == illustration &&
+            Require(CardArtLoader.SupportsOverframe(DominusImpulse, DominusIllustration) &&
+                CardArtLoader.FirstOverframeVariant(DominusImpulse) == DominusIllustration &&
                 !CardArtLoader.SupportsOverframe(BlueEyes) && DuelVisualAssets.CanDisplayCutIn(BlueEyes, 0),
                 "The source registry did not keep the Overframe face and the summon portrait independent.");
 
             var deck = new UserDeck();
-            var edition = new DeckCardAppearance { overframe = true, artwork = illustration + 1 };
-            for (int i = 0; i < 40; i++) deck.InsertCard(deck.main, i, dominusImpulse, edition);
+            var edition = new DeckCardAppearance { overframe = true, artwork = DominusIllustration + 1 };
+            for (int i = 0; i < 40; i++) deck.InsertCard(deck.main, i, DominusImpulse, edition);
             using var session = new DuelSession();
             Require(session.StartNewDuel(deck.main, deck.extra, Enumerable.Repeat(SkullRedBird, 40).ToArray(),
                 Array.Empty<uint>(), playerDeckAppearance: deck), "Could not start the source Overframe fixture.");
@@ -794,7 +796,7 @@ namespace YGOPortable.Editor
             var hand = ui.Root.transform.Find("PlayerHand").GetComponentInChildren<CompositeCardView>();
             var details = CompositeCardView.Create(canvas.transform, "SourceEdition", detailedOverlay: true);
             details.UsePrintedFaceOnly();
-            details.SetDeckCard(dominusImpulse, edition);
+            details.SetDeckCard(DominusImpulse, edition);
             var front = hand.transform.Find("AspectBox/OverframeCardFace").GetComponent<Image>();
             Require(front.enabled && !front.preserveAspect && hand.ArtworkSprite == details.ArtworkSprite &&
                 !hand.HasOverframe && hand.transform.Find("AspectBox/DeckEdition") == null &&
@@ -807,11 +809,23 @@ namespace YGOPortable.Editor
                 detailFace.GetSiblingIndex() < layers.Find("CardBack").GetSiblingIndex(),
                 "The complete source face drew behind the composed card labels or above the sleeve.");
 
-            details.SetDeckCard(dominusImpulse, default(DeckCardAppearance));
+            details.UsePrintedFaceOnly(regularEditionOnly: true);
+            details.SetDeckCard(DominusImpulse, edition);
+            Require(details.Appearance?.overframe == true && details.ArtworkSprite != front.sprite &&
+                details.ArtworkSprite != CardArtLoader.GetFallbackArt() &&
+                !detailFace.GetComponent<Image>().enabled && !layers.Find("DeckEdition").gameObject.activeSelf &&
+                layers.Find("Frame").GetComponent<Image>().enabled,
+                "The regular preview still exposed a packaged full Overframe face or its edition badge.");
+            details.UsePrintedFaceOnly();
+            details.SetDeckCard(DominusImpulse, edition);
+            Require(details.ArtworkSprite == front.sprite && detailFace.GetComponent<Image>().enabled,
+                "Reusing the preview left the next source Overframe hidden.");
+
+            details.SetDeckCard(DominusImpulse, default(DeckCardAppearance));
             Require(details.ArtworkSprite != front.sprite &&
                 details.transform.Find("AspectBox/Frame").GetComponent<Image>().enabled,
                 "Switching to the regular edition kept the Overframe front.");
-            details.SetDeckCard(dominusImpulse, edition, faceDown: true);
+            details.SetDeckCard(DominusImpulse, edition, faceDown: true);
             Require(!details.transform.Find("AspectBox/OverframeCardFace").GetComponent<Image>().enabled,
                 "Turning over the card did not conceal its front.");
             ui.UnbindSession();

@@ -389,11 +389,14 @@ namespace YGOPortable.UI
         public uint CurrentCode { get; private set; }
         internal Sprite ArtworkSprite => _retainedVariant == CardArtLoader.SourceOverframeFace ? _sourceFace.sprite : _artImg.sprite;
         internal DeckCardAppearance? Appearance => _deckAppearance;
+        internal bool RegularEditionOnly { get; private set; }
 
-        internal void UsePrintedFaceOnly(bool enabled = true, bool showEditionBadge = true)
+        internal void UsePrintedFaceOnly(bool enabled = true, bool showEditionBadge = true, bool regularEditionOnly = false)
         {
-            _showDeckEditionBadge = showEditionBadge;
-            if (!showEditionBadge) SetDeckEditionBadge(false);
+            RegularEditionOnly = regularEditionOnly;
+            _showDeckEditionBadge = showEditionBadge && !regularEditionOnly;
+            if (!_showDeckEditionBadge) SetDeckEditionBadge(false);
+            enabled |= regularEditionOnly;
             if (_printedFaceOnly == enabled) return;
             _printedFaceOnly = enabled;
             _artImg.preserveAspect = enabled;
@@ -633,7 +636,7 @@ namespace YGOPortable.UI
         private void BindArtwork(uint code)
         {
             if (code == 0 || !isActiveAndEnabled) return;
-            bool fullFace = _deckAppearance?.overframe == true && CardArtLoader.HasSourceOverframe(code);
+            bool fullFace = !RegularEditionOnly && _deckAppearance?.overframe == true && CardArtLoader.HasSourceOverframe(code);
             var (artCode, variant) = fullFace
                 ? (code, CardArtLoader.SourceOverframeFace)
                 : CardArtLoader.GetPreferredArtwork(code, _deckAppearance?.ArtworkVariant);

@@ -1251,24 +1251,38 @@ namespace YGOPortable.Editor
             private void VerifyPrintedSummonCard(DuelPrompt prompt)
             {
                 var card = VisibleCards.Single(view => view.CurrentCode == Chixiao);
-                Require(card.Appearance?.overframe == true && !card.HasOverframe &&
-                    card.transform.Find("AspectBox/DeckEdition").gameObject.activeSelf &&
+                Require(ShowsRegularFace(card) &&
                     VisibleCards.All(view => view == card || view.Appearance?.overframe != true),
-                    "The summon picker expanded the Overframe or lost the assigned edition.");
+                    "The summon picker exposed Overframe visuals or lost the assigned edition.");
 
                 Click(card.transform.parent.parent.GetComponent<Button>());
                 var inspector = Private<CompositeCardView>(Field, "_inspCard");
-                Require(inspector.CurrentCode == Chixiao && inspector.Appearance?.overframe == true &&
-                    !inspector.HasOverframe && inspector.ArtworkSprite == card.ArtworkSprite,
-                    "The summon list and inspector did not show the same printed face.");
+                Require(inspector.CurrentCode == Chixiao && ShowsRegularFace(inspector) &&
+                    inspector.ArtworkSprite == card.ArtworkSprite,
+                    "The summon list and inspector did not show the same regular face.");
                 Click(Private<Button>(Modals, "_zoneDetailsButton"));
-                var zoom = Private<CompositeCardView>(Field, "_zoomCardView");
-                Require(zoom.gameObject.activeInHierarchy && zoom.Appearance?.overframe == true &&
-                    !zoom.HasOverframe && zoom.ArtworkSprite == card.ArtworkSprite,
-                    "The card details changed the selected summon candidate's printed face.");
-                Click(Private<Button>(Field, "_zoomCloseButton"));
-                Require(Modals.IsZoneViewerOpen && ReferenceEquals(_duel.ActivePrompt, prompt),
-                    "Reading the Overframe card disrupted the pending summon.");
+                VerifyDetails();
+                Click(Private<Button>(Field, "_duelPadInspectButton"));
+                VerifyDetails();
+
+                void VerifyDetails()
+                {
+                    var zoom = Private<CompositeCardView>(Field, "_zoomCardView");
+                    Require(zoom.gameObject.activeInHierarchy && ShowsRegularFace(zoom) &&
+                        zoom.ArtworkSprite == card.ArtworkSprite,
+                        "The card details changed the selected summon candidate's regular face.");
+                    Click(Private<Button>(Field, "_zoomCloseButton"));
+                    Require(Modals.IsZoneViewerOpen && ReferenceEquals(_duel.ActivePrompt, prompt),
+                        "Reading the card disrupted the pending summon.");
+                }
+
+                static bool ShowsRegularFace(CompositeCardView view)
+                {
+                    var aspect = view.transform.Find("AspectBox");
+                    return view.Appearance?.overframe == true && !view.HasOverframe &&
+                        aspect.Find("Frame").GetComponent<Image>().isActiveAndEnabled &&
+                        aspect.Find("DeckEdition")?.gameObject.activeSelf != true;
+                }
             }
 
             internal void SelectSynchroMaterials(DuelPrompt prompt)

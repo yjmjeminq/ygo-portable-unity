@@ -302,7 +302,8 @@ namespace YGOPortable.UI
                 _oppExtraTile.root.GetComponent<DuelZoneImage>(), _oppBanTile.root.GetComponent<DuelZoneImage>());
             _modals.SetZoneBrowserActions(SwitchBrowsablePile,
                 (code, live) => { if (live == null) ShowCardZoomModal(code); else ShowCardZoomModal(live); },
-                live => InspectCardAt(live.code, null, appearance: live.Appearance));
+                live => InspectCardAt(live.code, null, appearance: live.Appearance,
+                    regularEditionOnly: live.location == YgoConstants.LOCATION_EXTRA));
 
             if (CardDragManager.Instance != null)
             {
@@ -424,13 +425,14 @@ namespace YGOPortable.UI
 
         private void InspectCandidate(SelectableCardItem item, uint code) =>
             InspectCardAt(code, (item.controller, item.location, item.sequence),
-                appearance: _session?.GetDeckAppearance(item.controller, item.location, item.sequence));
+                appearance: _session?.GetDeckAppearance(item.controller, item.location, item.sequence),
+                regularEditionOnly: item.location == YgoConstants.LOCATION_EXTRA);
 
         private DeckCardAppearance? DefaultDuelAppearance =>
             _session?.UsesDeckAppearances == true ? default(DeckCardAppearance) : null;
 
         private void InspectCardAt(uint code, (byte controller, uint location, uint sequence)? fieldCard,
-            ChainLinkInfo activation = null, DeckCardAppearance? appearance = null)
+            ChainLinkInfo activation = null, DeckCardAppearance? appearance = null, bool regularEditionOnly = false)
         {
             if (code == 0) return;
             _inspectedBanishedCard = null;
@@ -440,6 +442,7 @@ namespace YGOPortable.UI
             _inspectedActivation = activation;
             _inspectedFieldCard = fieldCard;
             _inspectedAppearance = appearance ?? activation?.Appearance;
+            _inspCard.UsePrintedFaceOnly(regularEditionOnly: regularEditionOnly);
             if (changed) _inspCard.gameObject.SetActive(true);
             RefreshInspectorReadout(showChanges: sameSource);
             RefreshFieldRelationships();
@@ -939,7 +942,8 @@ namespace YGOPortable.UI
 
         private void OpenInspectedCardDetails()
         {
-            ShowCardZoomModal(_inspectedCode, _inspectedFieldCard, _inspectedAppearance);
+            ShowCardZoomModal(_inspectedCode, _inspectedFieldCard, _inspectedAppearance,
+                regularEditionOnly: _inspCard.RegularEditionOnly);
             if (_cardZoomModal.activeSelf) _zoomBanishedCard = _inspectedBanishedCard;
         }
 
@@ -4455,10 +4459,11 @@ namespace YGOPortable.UI
         public void ShowCardZoomModal(uint code) => ShowCardZoomModal(code, null);
 
         private void ShowCardZoomModal(LiveCardState card) =>
-            ShowCardZoomModal(card.code, InspectionLocation(GetSlot(card.controller, card.location, card.sequence)), card.Appearance);
+            ShowCardZoomModal(card.code, InspectionLocation(GetSlot(card.controller, card.location, card.sequence)), card.Appearance,
+                regularEditionOnly: card.location == YgoConstants.LOCATION_EXTRA);
 
         private void ShowCardZoomModal(uint code, (byte controller, uint location, uint sequence)? fieldCard,
-            DeckCardAppearance? appearance = null)
+            DeckCardAppearance? appearance = null, bool regularEditionOnly = false)
         {
             if (code == 0 || !Root.activeInHierarchy) return;
             bool opening = !_cardZoomModal.activeSelf;
@@ -4474,6 +4479,7 @@ namespace YGOPortable.UI
             _zoomFieldCard = fieldCard;
             _zoomAppearance = appearance;
             _zoomBanishedCard = null;
+            _zoomCardView.UsePrintedFaceOnly(regularEditionOnly: regularEditionOnly);
             RefreshZoomReadout(code, showChanges: false);
             if (info != null)
             {
