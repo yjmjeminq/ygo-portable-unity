@@ -38,7 +38,7 @@ namespace YGOPortable.Core
                 opponentHand += ExtraOpeningCards;
             bool awakening = Has(RaidSupport.Awakening);
             return (new DuelOpening(playerLp, Has(RaidSupport.QuickDraw) ? 7 : 5, 0, awakening ? 4000 : 2000, awakening ? 2 : 1),
-                new DuelOpening(8000, opponentHand, baseFieldCard, deckMonster: preplaced));
+                new DuelOpening(boss.Life, opponentHand, baseFieldCard, deckMonster: preplaced));
         }
 
         internal static uint SelectOpeningMonster(PresetDeckInfo deck, StoryRaid? raid)

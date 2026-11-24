@@ -30,6 +30,9 @@ namespace YGOPortable.UI
         public StoryDialogueLine[] postLoseDialogues;
         public StoryDialogueOption[] choices;
         public int choiceAfterLine;
+        public string gimmick;
+        public uint raidCard;
+        public int raidLife;
     }
 
     [Serializable]
@@ -45,8 +48,9 @@ namespace YGOPortable.UI
 
     internal sealed partial class StoryModeUI
     {
-        private const int ChapterCount = 5;
-        private const int EpisodesPerChapter = 10;
+        internal const int TotalStoryEpisodes = StoryCampaign.EpisodeCount;
+        private const int ActCount = 5;
+        private const float EpisodeRowHeight = 52f;
         private static readonly (string Id, string Label)[] Series =
         {
             ("dm", "DM"), ("gx", "GX"), ("5ds", "5D's"), ("zexal", "ZEXAL"), ("arcv", "ARC-V"), ("vrains", "VRAINS")
@@ -57,8 +61,8 @@ namespace YGOPortable.UI
         private readonly System.Random _turnOrderRandom;
         private readonly (string Id, Button Button, StoryScriptRoot Script)[] _seriesTabs;
         private readonly List<UserDeck> _playableDecks = new();
-        private readonly Button[] _chapterButtons = new Button[ChapterCount];
-        private readonly Button[] _episodeButtons = new Button[EpisodesPerChapter];
+        private readonly Button[] _episodeButtons = new Button[TotalStoryEpisodes];
+        private readonly ScrollRect _episodeScroll;
         private readonly CanvasGroup _browser;
         private readonly StoryDialogueView _dialogue;
         private readonly Button _mainMenu;
@@ -89,8 +93,6 @@ namespace YGOPortable.UI
         internal GameObject ActiveRoot => _dialogue.IsOpen ? _dialogue.ActiveRoot : Root;
 
         private StoryScriptRoot Script => _seriesTabs[_selectedSeries].Script;
-        private string SeriesId => _seriesTabs[_selectedSeries].Id;
-
         internal StoryModeUI(GameAppController app, Transform parent, System.Random turnOrderRandom = null)
         {
             _app = app;
@@ -112,7 +114,7 @@ namespace YGOPortable.UI
                 int index = i;
                 var (id, label) = Series[i];
                 float left = .032f + .156f * i;
-                var tab = AddButton(content, $"Series_{id}", label, left, .817f, left + .147f, .886f, () => SelectSeries(index));
+                var tab = AddButton(content, $"Series_{id}", label, left, .827f, left + .147f, .886f, () => SelectSeries(index));
                 _seriesTabs[i] = (id, tab, LoadScript(Application.streamingAssetsPath, id));
             }
             _selectedSeries = Mathf.Max(0, Array.FindIndex(_seriesTabs, tab => tab.Script != null));
@@ -121,27 +123,31 @@ namespace YGOPortable.UI
             _tournament = AddButton(content, "DimensionTournament", "차원 대항전", .667f, .897f, .82f, .973f,
                 () => _app.ShowScreen(AppScreen.Tournament), gold: true);
 
-            const float tabWidth = .1872f;
-            for (int chapter = 0; chapter < _chapterButtons.Length; chapter++)
+            var listing = DuelUiKit.CreateMenuPanel(content, "Episodes", new Vector2(.032f, .08f), new Vector2(.57f, .82f));
+            var viewport = Region(listing, "Viewport", .04f, .043f, .946f, .957f);
+            DuelUiKit.AddImage(viewport.gameObject, DuelUiKit.WhiteSprite, Color.clear);
+            viewport.gameObject.AddComponent<RectMask2D>();
+            var rows = DuelUiKit.CreateRect("Rows", viewport, new Vector2(0f, 1f), Vector2.one, Vector2.zero, Vector2.zero);
+            rows.pivot = new Vector2(.5f, 1f);
+            rows.sizeDelta = new Vector2(0f, EpisodeRowHeight * TotalStoryEpisodes);
+            _episodeScroll = listing.gameObject.AddComponent<ScrollRect>();
+            _episodeScroll.viewport = viewport;
+            _episodeScroll.content = rows;
+            _episodeScroll.horizontal = false;
+            _episodeScroll.movementType = ScrollRect.MovementType.Clamped;
+            _episodeScroll.scrollSensitivity = EpisodeRowHeight;
+            _episodeScroll.verticalScrollbar = DuelUiKit.AddVerticalScrollbar(Region(listing, "EpisodeScrollbar", .95f, .043f, .973f, .957f));
+            for (int i = 0; i < _episodeButtons.Length; i++)
             {
-                int index = chapter;
-                float left = .032f + index * tabWidth;
-                _chapterButtons[index] = AddButton(content, $"Chapter_{index + 1}", "",
-                    left, .742f, left + tabWidth - .007f, .809f, () => SelectChapter(index));
-            }
-
-            var listing = DuelUiKit.CreateMenuPanel(content, "Episodes", new Vector2(.032f, .08f), new Vector2(.57f, .73f));
-            for (int row = 0; row < _episodeButtons.Length; row++)
-            {
-                int index = row;
-                float top = .956f - row * .0915f;
-                _episodeButtons[row] = AddButton(listing, $"Episode_{row + 1}", "", .049f, top - .08f, .951f, top,
-                    () => SelectEpisode(_selectedIndex / EpisodesPerChapter * EpisodesPerChapter + index));
-                _episodeButtons[row].GetComponentInChildren<Text>().alignment = TextAnchor.MiddleLeft;
+                int index = i;
+                float top = 1f - (float)i / TotalStoryEpisodes;
+                _episodeButtons[i] = AddButton(rows, $"Episode_{i + 1}", "", 0f, top - .89f / TotalStoryEpisodes, 1f, top,
+                    () => SelectEpisode(index));
+                _episodeButtons[i].GetComponentInChildren<Text>().alignment = TextAnchor.MiddleLeft;
             }
 
             var details = DuelUiKit.CreateMenuPanel(content, "EpisodeDetails",
-                new Vector2(.587f, .08f), new Vector2(.968f, .73f));
+                new Vector2(.587f, .08f), new Vector2(.968f, .82f));
             _episodeHeading = AddLabel(details, "Chapter", .07f, .88f, .93f, .955f, 21, color: DuelUiKit.GoldAccent);
             _episodeTitle = AddLabel(details, "EpisodeTitle", .07f, .758f, .93f, .885f, 26);
             var portrait = Region(details, "OpponentPortrait", .13f, .445f, .87f, .753f);
@@ -167,12 +173,13 @@ namespace YGOPortable.UI
             Root.SetActive(true);
             ResetDialogue();
             CollectionProgress.MigrateStoryClears(_seriesTabs.Where(tab => tab.Script != null)
-                .SelectMany(tab => tab.Script.episodes.Where(episode =>
-                    PlayerPrefs.GetInt(ClearedKey(tab.Id, episode.id), 0) != 0).Select(episode => episode.id)));
+                .SelectMany(tab => Enumerable.Range(1, StoryCampaign.LegacyEpisodeCount)
+                    .Select(number => StoryCampaign.LegacyEpisodeId(tab.Id, number))
+                    .Where(id => PlayerPrefs.GetInt(ClearedKey(tab.Id, id), 0) != 0)));
             LoadDeckChoices();
             SelectSeries(_selectedSeries);
             _tournament.GetComponentInChildren<Text>().text = DimensionTournament.Unlocked ? "차원 대항전" : "차원 대항전 · 잠김";
-            Focus(Script != null ? _episodeButtons[_selectedIndex % EpisodesPerChapter] : _mainMenu);
+            Focus(Script != null ? _episodeButtons[_selectedIndex] : _mainMenu);
         }
 
         internal void Close()
@@ -260,7 +267,8 @@ namespace YGOPortable.UI
             if (decks.Count == 0) return default;
             if (GetRaid(episode) != null)
             {
-                int floor = (episode.chapter * (decks.Count - 1) + ChapterCount - 1) / ChapterCount;
+                int final = TotalStoryEpisodes - 1;
+                int floor = (episodeIndex * (decks.Count - 1) + final - 1) / final;
                 return (decks[floor], floor + 1, decks.Count);
             }
 
@@ -283,12 +291,39 @@ namespace YGOPortable.UI
             return (decks[level - 1], level, decks.Count);
         }
 
-        internal StoryRaid? GetRaid(StoryEpisodeData episode) => StoryRaid.For(SeriesId, IndexOf(episode) + 1);
+        internal StoryRaid? GetRaid(StoryEpisodeData episode)
+        {
+            int number = IndexOf(episode) + 1;
+            return number > 0 && episode.raidCard > 0 ? StoryRaid.ForEncounter(number, episode.raidCard, episode.raidLife) : null;
+        }
 
         private static string ClearedKey(string seriesId, string episodeId) => $"ygo.story.{seriesId}.cleared.{episodeId}";
 
         private int IndexOf(StoryEpisodeData episode) =>
             Script == null || episode == null ? -1 : Array.IndexOf(Script.episodes, episode);
+
+        [Serializable]
+        private sealed class StoryLineup
+        {
+            public SeriesLineup[] series;
+        }
+
+        [Serializable]
+        private sealed class SeriesLineup
+        {
+            public string id;
+            public LineupEpisode[] episodes;
+        }
+
+        [Serializable]
+        private sealed class LineupEpisode
+        {
+            public int source;
+            public string title;
+            public string gimmick;
+            public uint raidCard;
+            public int raidLife;
+        }
 
         internal static StoryScriptRoot LoadScript(string streamingAssets, string seriesId)
         {
@@ -296,22 +331,44 @@ namespace YGOPortable.UI
             try
             {
                 var script = JsonUtility.FromJson<StoryScriptRoot>(File.ReadAllText(path));
-                int count = ChapterCount * EpisodesPerChapter;
-                if (script == null || script.seriesId != seriesId || script.totalChapters != ChapterCount ||
-                    script.totalEpisodes != count || script.episodes?.Length != count)
-                    throw new InvalidDataException("Expected five chapters of ten episodes.");
+                var lineup = JsonUtility.FromJson<StoryLineup>(File.ReadAllText(Path.Combine(streamingAssets, "story_lineup.json")));
+                var entries = lineup?.series?.SingleOrDefault(series => series?.id == seriesId)?.episodes;
+                if (script?.seriesId != seriesId || script.episodes?.Length != StoryCampaign.LegacyEpisodeCount ||
+                    entries?.Length != TotalStoryEpisodes)
+                    throw new InvalidDataException("Expected a complete thirty-episode lineup and its dialogue source.");
 
-                var ids = new HashSet<string>(StringComparer.Ordinal);
-                for (int i = 0; i < count; i++)
+                var episodes = new StoryEpisodeData[TotalStoryEpisodes];
+                for (int i = 0; i < episodes.Length; i++)
                 {
-                    var episode = script.episodes[i];
-                    if (episode == null || episode.chapter != i / EpisodesPerChapter + 1 ||
-                        string.IsNullOrWhiteSpace(episode.id) || !ids.Add(episode.id) ||
-                        string.IsNullOrWhiteSpace(episode.chapterTitle) || string.IsNullOrWhiteSpace(episode.title) ||
-                        !HasDialogue(episode.preDialogues) || !HasDialogue(episode.postWinDialogues) ||
-                        !HasDialogue(episode.postLoseDialogues))
+                    var entry = entries[i];
+                    if (entry == null || entry.source is < 1 or > StoryCampaign.LegacyEpisodeCount)
+                        throw new InvalidDataException($"Invalid dialogue source for episode {i + 1}.");
+                    var source = script.episodes[entry.source - 1];
+                    if (source == null || string.IsNullOrWhiteSpace(source.title) ||
+                        !HasDialogue(source.preDialogues) || !HasDialogue(source.postWinDialogues) ||
+                        !HasDialogue(source.postLoseDialogues))
                         throw new InvalidDataException($"Incomplete episode at index {i}.");
+                    episodes[i] = new StoryEpisodeData
+                    {
+                        id = StoryCampaign.EpisodeId(seriesId, i + 1),
+                        chapter = i * ActCount / TotalStoryEpisodes + 1,
+                        chapterTitle = $"{i + 1:00}화",
+                        title = string.IsNullOrWhiteSpace(entry.title) ? TitleOf(source) : entry.title,
+                        charId = source.charId,
+                        opponentName = source.opponentName,
+                        preDialogues = source.preDialogues,
+                        postWinDialogues = source.postWinDialogues,
+                        postLoseDialogues = source.postLoseDialogues,
+                        choices = source.choices,
+                        choiceAfterLine = source.choiceAfterLine,
+                        gimmick = entry.gimmick,
+                        raidCard = entry.raidCard,
+                        raidLife = entry.raidLife,
+                    };
                 }
+                script.totalEpisodes = episodes.Length;
+                script.totalChapters = 0;
+                script.episodes = episodes;
                 return script;
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is InvalidDataException)
@@ -335,11 +392,6 @@ namespace YGOPortable.UI
                 tab.Button.interactable = tab.Script != null;
                 tab.Button.GetComponentInChildren<Text>().color = i == index ? DuelUiKit.GoldAccent : DuelUiKit.TextPrimary;
             }
-            for (int i = 0; i < _chapterButtons.Length; i++)
-            {
-                _chapterButtons[i].interactable = Script != null;
-                _chapterButtons[i].GetComponentInChildren<Text>().text = $"제{i + 1}장";
-            }
             if (Script == null) _unlockedIndex = 0;
             else
             {
@@ -347,19 +399,15 @@ namespace YGOPortable.UI
                 _unlockedIndex = nextEpisode >= 0 ? nextEpisode : Script.episodes.Length - 1;
             }
             SelectEpisode(_unlockedIndex);
-        }
-
-        private void SelectChapter(int chapter)
-        {
-            if (Script == null) return;
-            SelectEpisode(Mathf.Clamp(_unlockedIndex, chapter * EpisodesPerChapter, (chapter + 1) * EpisodesPerChapter - 1));
+            Canvas.ForceUpdateCanvases();
+            _episodeScroll.verticalNormalizedPosition = 1f;
+            if (Script != null) DeckPadUi.ScrollTo(_episodeButtons[_selectedIndex]);
         }
 
         private void SelectEpisode(int index)
         {
             if (Script == null)
             {
-                foreach (var button in _chapterButtons) button.interactable = false;
                 foreach (var button in _episodeButtons) button.interactable = false;
                 _start.interactable = false;
                 _deckPicker.interactable = false;
@@ -368,14 +416,11 @@ namespace YGOPortable.UI
             }
 
             _selectedIndex = index;
-            int chapter = index / EpisodesPerChapter;
-            for (int i = 0; i < _chapterButtons.Length; i++)
-                _chapterButtons[i].GetComponentInChildren<Text>().color = i == chapter ? DuelUiKit.GoldAccent : DuelUiKit.TextPrimary;
-
             for (int row = 0; row < _episodeButtons.Length; row++)
             {
-                int episodeIndex = chapter * EpisodesPerChapter + row;
+                int episodeIndex = row;
                 var episode = Script.episodes[episodeIndex];
+                _episodeButtons[row].interactable = true;
                 bool cleared = CollectionProgress.IsStoryEpisodeCleared(episode.id);
                 bool locked = episodeIndex > _unlockedIndex;
                 string state = cleared ? "클리어" : locked ? "잠김" : "도전 가능";
@@ -589,7 +634,8 @@ namespace YGOPortable.UI
         private void ReturnToEpisodes()
         {
             ResetDialogue();
-            Focus(_episodeButtons[_selectedIndex % EpisodesPerChapter]);
+            Focus(_episodeButtons[_selectedIndex]);
+            DeckPadUi.ScrollTo(_episodeButtons[_selectedIndex]);
         }
 
         private void ResetDialogue()

@@ -51,7 +51,7 @@ namespace YGOPortable.Editor
             Require(original.Length == 3 && original[0].Reply == dm.episodes[0].choices[0].text &&
                 generated.Select(choice => choice.Stance).Distinct().Count() == 3,
                 "The authored or automatic dialogue branches were lost.");
-            var raid = StoryRaid.For("arcv", 44).Value;
+            var raid = StoryRaid.ForEncounter(30, 13331639);
             var rival = DimensionTournament.HighestDeck(74);
             foreach (var entry in RaidSupportCatalog.Items)
             {
@@ -102,7 +102,7 @@ namespace YGOPortable.Editor
             const uint blueEyes = 89631139, baronne = 84815190, utopia = 84013237;
             var player = Enumerable.Repeat(20721928u, 40).ToArray();
             var rival = new PresetDeckInfo { sigCard = blueEyes, main = player.Append(blueEyes).ToArray(), extra = new[] { baronne, utopia } };
-            var raid = StoryRaid.For("dm", 20).Value;
+            var raid = StoryRaid.ForEncounter(7, blueEyes);
             Require(raid.Opening.FieldCard == blueEyes &&
                 StoryBattlePlan.SelectOpeningMonster(rival, raid) == baronne,
                 "The enhanced opening duplicated the raid boss or selected an Xyz without materials.");

@@ -30,7 +30,7 @@ namespace YGOPortable.Editor
                 VerifyCampaigns();
                 VerifyDialogueChoices(starter);
                 VerifyOpeningAndSave(save);
-                Debug.Log("[VERIFY STORY] 300 episodes, cast portraits, boss openings, DP, high rarity rewards and separate saved campaign progress passed.");
+                Debug.Log("[VERIFY STORY] 180 episodes, scrolling, cast portraits, boss openings, rewards and saved campaign progress passed.");
                 exit = 0;
             }
             catch (Exception error) { Debug.LogException(error); }
@@ -66,7 +66,23 @@ namespace YGOPortable.Editor
                     Require(tab.IsInteractable(), $"The {id} tab was disabled.");
                     tab.onClick.Invoke();
                 }
-                Control(root.Find("StoryBrowser"), "EpisodeDetails/StartEpisode").onClick.Invoke();
+                var browser = root.Find("StoryBrowser");
+                var scroll = browser.Find("Episodes").GetComponent<ScrollRect>();
+                Require(scroll.vertical && !scroll.horizontal && scroll.content.childCount == StoryCampaign.EpisodeCount &&
+                    browser.Find("Chapter_1") == null, "The campaign did not expose a single 30-episode list.");
+                Canvas.ForceUpdateCanvases();
+                scroll.verticalNormalizedPosition = 0f;
+                var finale = Control(scroll.content, "Episode_30");
+                Require(finale.GetComponentInChildren<Text>().text.TrimStart().StartsWith("30화"),
+                    "Scrolling to the end did not expose episode thirty.");
+                finale.onClick.Invoke();
+                var detail = browser.Find("EpisodeDetails");
+                Require(detail.Find("OpponentName/Label").GetComponent<Text>().text.Contains("어둠의 유우기") &&
+                    detail.Find("OpponentDeck/Label").GetComponent<Text>().text.Contains("Lv.") &&
+                    !Control(detail, "StartEpisode").IsInteractable(), "Selecting a distant locked episode did not refresh its profile and deck.");
+                scroll.verticalNormalizedPosition = 1f;
+                Control(scroll.content, "Episode_1").onClick.Invoke();
+                Control(detail, "StartEpisode").onClick.Invoke();
                 var scene = dialogue.Find("Scene");
                 var line = scene.Find("DialogueBox/Text/Label").GetComponent<Text>();
                 Require(line.text.Length == 0, "The dialogue did not start in the typewriter state.");
@@ -195,23 +211,23 @@ namespace YGOPortable.Editor
         private static void VerifyCampaigns()
         {
             var ids = new HashSet<string>(StringComparer.Ordinal);
-            int raids = 0;
             foreach (string series in new[] { "dm", "gx", "5ds", "zexal", "arcv", "vrains" })
             {
                 var script = StoryModeUI.LoadScript(Application.streamingAssetsPath, series);
-                Require(script?.episodes.Length == 50, $"Missing episodes for {series}.");
+                Require(script?.episodes.Length == StoryCampaign.EpisodeCount &&
+                    script.episodes.Count(episode => !string.IsNullOrEmpty(episode.gimmick)) >= 18 &&
+                    script.episodes[^1].raidCard > 0, $"Incomplete lineup for {series}.");
                 for (int i = 0; i < script.episodes.Length; i++)
                 {
                     var episode = script.episodes[i];
                     var opponent = DeckRepository.GetCharacter(episode.charId);
-                    Require(ids.Add(episode.id) && opponent != null && !string.IsNullOrWhiteSpace(episode.title) &&
+                    Require(episode.id == StoryCampaign.EpisodeId(series, i + 1) && ids.Add(episode.id) &&
+                        opponent != null && !string.IsNullOrWhiteSpace(episode.title) &&
                         DuelUiKit.LoadOpponentPortrait(opponent) != null &&
                         OpponentDeckLevels.GetDecks(episode.charId).Any(deck => deck.main?.Length >= 40),
                         $"Missing cast or decks for {episode.id}.");
-                    var raid = StoryRaid.For(series, i + 1);
-                    if (i % 10 == 9 || i == 48) Require(raid.HasValue, $"Missing chapter boss at {episode.id}.");
-                    if (raid is not { } boss) continue;
-                    raids++;
+                    if (episode.raidCard == 0) continue;
+                    var boss = StoryRaid.ForEncounter(i + 1, episode.raidCard, episode.raidLife);
                     var card = CardDatabase.Get(boss.Opening.FieldCard);
                     Require(card != null && (card.IsMonster ||
                         (card.type & (YgoConstants.TYPE_FIELD | YgoConstants.TYPE_CONTINUOUS)) != 0) &&
@@ -221,26 +237,34 @@ namespace YGOPortable.Editor
                     VerifyNativeOpening(episode.id, boss, rival.main, rival.extra, humanFirst: true);
                 }
             }
-            Require(ids.Count == 300 && raids == 40, "Some episodes were not included.");
+            Require(ids.Count == 6 * StoryCampaign.EpisodeCount, "Some episodes were not included.");
             Require(DuelUiKit.LoadSprite("Story/Protagonist") != null, "Missing standing player artwork.");
         }
 
         private static void VerifyOpeningAndSave(string save)
         {
-            var raid = StoryRaid.For("arcv", 44).Value;
+            const int encounter = 24;
+            string episodeId = StoryCampaign.EpisodeId("arcv", encounter);
+            var raid = StoryRaid.ForEncounter(encounter, 13331639, 10000);
             var opponent = OpponentDeckLevels.GetDecks(74)[^1];
-            VerifyNativeOpening("arcv_ep_44", raid, opponent.main, opponent.extra, humanFirst: false);
+            VerifyNativeOpening(episodeId, raid, opponent.main, opponent.extra, humanFirst: false);
             int before = CollectionProgress.Balance;
-            Require(CollectionProgress.TryAwardStoryDuel("arcv_ep_44", true, raid, opponent, out int gained,
+            Require(CollectionProgress.TryAwardStoryDuel(episodeId, true, raid, opponent, out int gained,
                 out var cardReward, out string error), error);
             Require(gained == raid.WinDp && CollectionProgress.Balance == before + gained &&
                 cardReward is { } pull && CardRarityCatalog.GetRarity(pull.Code) >= CardRarity.SuperRare,
                 "The boss clear did not grant its DP and high rarity card.");
-            Require(CollectionProgress.TryAwardStoryDuel("arcv_ep_44", true, raid, opponent, out _, out var repeat, out error) &&
+            Require(CollectionProgress.TryAwardStoryDuel(episodeId, true, raid, opponent, out _, out var repeat, out error) &&
                 !repeat.HasValue, "A repeat win gave a second first-clear bonus.");
             CollectionProgress.Load(save);
-            Require(CollectionProgress.IsStoryEpisodeCleared("arcv_ep_44") &&
-                !CollectionProgress.IsStoryEpisodeCleared("vrains_ep_44"), "Campaign progress did not survive an independent reload.");
+            Require(CollectionProgress.IsStoryEpisodeCleared(episodeId) &&
+                !CollectionProgress.IsStoryEpisodeCleared(StoryCampaign.EpisodeId("vrains", encounter)),
+                "Campaign progress did not survive an independent reload.");
+            Require(!DimensionTournament.Unlocked, "The new finale was cleared prematurely.");
+            Require(CollectionProgress.TryAwardStoryDuel(StoryCampaign.LegacyEpisodeId("dm", 50), true,
+                null, null, out _, out _, out error) &&
+                CollectionProgress.IsStoryEpisodeCleared(StoryCampaign.EpisodeId("dm", 30)) && DimensionTournament.Unlocked,
+                "The legacy finale did not preserve the campaign and tournament unlock.");
         }
 
         private static void VerifyNativeOpening(string name, StoryRaid raid, uint[] rival, uint[] extra, bool humanFirst)
@@ -250,7 +274,7 @@ namespace YGOPortable.Editor
             Require(duel.StartNewDuel(player, Array.Empty<uint>(), rival, extra ?? Array.Empty<uint>(), humanFirst,
                 seed: new ulong[] { 222, 17, 821, 909 }, opponentOpening: raid.Opening), $"Could not start the raid {name}.");
             var boss = duel.Players[duel.AiPlayerIndex];
-            Require(boss.lp == 8000 && boss.hand.Count == raid.Opening.Hand &&
+            Require(boss.lp == raid.Opening.Life && boss.hand.Count == raid.Opening.Hand &&
                 duel.Players[duel.HumanPlayerIndex].lp == 8000 && boss.mzone.Concat(boss.szone)
                     .Any(card => card?.code == raid.Opening.FieldCard && card.IsFaceUp),
                 $"The configured LP, hand or opening field was missing in {name}.");

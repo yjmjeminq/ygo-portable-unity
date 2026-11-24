@@ -700,8 +700,12 @@ namespace YGOPortable.Core
         public static bool TryAwardDuel(bool won, int opponentId, int deckId, out int amount, out string error) =>
             TryAwardDuel(won, opponentId, (int?)deckId, out amount, out error);
 
-        internal static bool IsStoryEpisodeCleared(string episodeId) =>
-            _profile?.clearedStoryEpisodes?.Contains(episodeId) == true;
+        internal static bool IsStoryEpisodeCleared(string episodeId)
+        {
+            var cleared = _profile?.clearedStoryEpisodes;
+            return cleared != null && (cleared.Contains(episodeId) ||
+                (StoryCampaign.LegacyClearFor(episodeId) is { } legacy && cleared.Contains(legacy)));
+        }
 
         internal static void MigrateStoryClears(IEnumerable<string> legacyClears)
         {

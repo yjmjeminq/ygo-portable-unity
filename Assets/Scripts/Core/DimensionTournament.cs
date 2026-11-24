@@ -34,7 +34,8 @@ namespace YGOPortable.Core
         internal bool IsValid => size is 8 or 16 && bracket?.Length == size * 2 && bracket[size] == Player &&
             round >= 0 && round <= (size == 16 ? 4 : 3) && (round != RoundCount || Champion);
 
-        internal static bool Unlocked => Dimensions.Any(entry => CollectionProgress.IsStoryEpisodeCleared($"{entry.Series}_ep_50"));
+        internal static bool Unlocked => Dimensions.Any(entry =>
+            CollectionProgress.IsStoryEpisodeCleared(StoryCampaign.EpisodeId(entry.Series, StoryCampaign.EpisodeCount)));
 
         internal static DimensionTournament Create(int size, int seed)
         {
