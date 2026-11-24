@@ -391,6 +391,9 @@ namespace YGOPortable.UI
         internal DeckCardAppearance? Appearance => _deckAppearance;
         internal bool RegularEditionOnly { get; private set; }
 
+        internal static bool UsesRegularEditionInDuelZone(uint? location) =>
+            location is YgoConstants.LOCATION_GRAVE or YgoConstants.LOCATION_EXTRA;
+
         internal void UsePrintedFaceOnly(bool enabled = true, bool showEditionBadge = true, bool regularEditionOnly = false)
         {
             RegularEditionOnly = regularEditionOnly;

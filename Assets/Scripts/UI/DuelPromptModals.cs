@@ -2481,7 +2481,7 @@ namespace YGOPortable.UI
             var cRt = DuelUiKit.CreateRect("C", tile,
                 new Vector2(0.08f, inlineAction ? 0.30f : 0.18f), new Vector2(0.92f, 0.96f), Vector2.zero, Vector2.zero);
             var card = CompositeCardView.Create(cRt, "V", false);
-            card.UsePrintedFaceOnly(regularEditionOnly: live?.location == YgoConstants.LOCATION_EXTRA);
+            card.UsePrintedFaceOnly(regularEditionOnly: CompositeCardView.UsesRegularEditionInDuelZone(live?.location));
             card.SetCard(code, faceDown, faceDown ? null : live);
             if (hasActions && live?.location is YgoConstants.LOCATION_GRAVE or YgoConstants.LOCATION_REMOVED)
             {
@@ -2798,7 +2798,7 @@ namespace YGOPortable.UI
         {
             var live = session.GetVisibleFieldCard(code, item.controller, item.location, item.sequence);
             var view = CompositeCardView.Create(art, "V");
-            view.UsePrintedFaceOnly(regularEditionOnly: item.location == YgoConstants.LOCATION_EXTRA);
+            view.UsePrintedFaceOnly(regularEditionOnly: CompositeCardView.UsesRegularEditionInDuelZone(item.location));
             var appearance = code == 0 ? null : live?.Appearance ??
                 session.GetDeckAppearance(item.controller, item.location, item.sequence);
             view.SetDeckCard(code, appearance, faceDown: code == 0, live: live);

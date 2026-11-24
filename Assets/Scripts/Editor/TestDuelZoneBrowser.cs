@@ -361,8 +361,13 @@ namespace YGOPortable.Editor
             var main = Enumerable.Repeat(foolishBurial, 12).Concat(Enumerable.Repeat(jetSynchron, 12))
                 .Concat(Enumerable.Repeat(20721928u, 16)).ToArray();
             var opponent = Enumerable.Repeat(89631139u, 40).ToArray();
+            var styledDeck = new UserDeck { main = main.ToList() };
+            for (int i = 0; i < main.Length; i++)
+                if (main[i] is jetSynchron or foolishBurial)
+                    styledDeck.SetAppearance(styledDeck.main, i, new DeckCardAppearance { overframe = true });
             using var duel = YgoProjectBuilder.StartSeedMatching("Grave effect shortcut", main, empty, opponent, empty,
-                humanFirst, session => session.Players[session.HumanPlayerIndex].hand.Any(card => card.code == foolishBurial));
+                humanFirst, session => session.Players[session.HumanPlayerIndex].hand.Any(card => card.code == foolishBurial),
+                playerDeckAppearance: styledDeck);
             byte human = (byte)duel.HumanPlayerIndex;
             var prompt = ReachMainPhase(duel, human);
             using var ui = new Browser(duel);
@@ -987,6 +992,19 @@ namespace YGOPortable.Editor
                     "Hovering over the graveyard duplicated the activation indicator.");
                 ClickAt(pile, pointerId: 0);
                 VerifyOpened(prompt, grave.AsEnumerable().Reverse().Select(card => card.code));
+                var top = pile.Find("TopCard/CardView").GetComponent<CompositeCardView>();
+                var preview = VisibleCards.Single(card => card.CurrentCode == code);
+                Require(ShowsRegularFace(top) && ShowsRegularFace(preview),
+                    "The graveyard pile or viewer exposed Overframe visuals.");
+                Click(preview.transform.parent.parent.GetComponent<Button>());
+                var inspector = Private<CompositeCardView>(Field, "_inspCard");
+                Require(inspector.CurrentCode == code && ShowsRegularFace(inspector) && inspector.ArtworkSprite == preview.ArtworkSprite,
+                    "The graveyard inspector did not use the same regular face.");
+                Click(Private<Button>(Modals, "_zoneDetailsButton"));
+                var zoom = Private<CompositeCardView>(Field, "_zoomCardView");
+                Require(zoom.gameObject.activeInHierarchy && ShowsRegularFace(zoom) && zoom.ArtworkSprite == preview.ArtworkSprite,
+                    "The graveyard details exposed Overframe visuals.");
+                Click(Private<Button>(Field, "_zoomCloseButton"));
                 Close();
 
                 int index = prompt.activatable.FindIndex(item => item.code == code && item.location == YgoConstants.LOCATION_GRAVE);
@@ -1007,6 +1025,11 @@ namespace YGOPortable.Editor
 
                 ClickAt((RectTransform)button.transform, pointerId: 0);
                 var picker = VerifyActivationPicker(prompt, "묘지 효과 발동", code);
+                var candidate = picker.Find("Cards").GetComponentInChildren<CompositeCardView>();
+                Require(ShowsRegularFace(candidate), "The grave effect picker exposed Overframe visuals.");
+                Click(candidate.transform.parent.parent.GetComponent<Button>());
+                Require(inspector.CurrentCode == code && ShowsRegularFace(inspector) &&
+                    inspector.ArtworkSprite == candidate.ArtworkSprite, "The grave effect inspector did not show the regular face.");
                 Require(picker.Find("Details/Description").GetComponentsInChildren<Text>()
                     .Any(label => label.text.StartsWith("패 1장을 묘지로 보내고") && label.text.Contains("특수 소환한다")),
                     "The graveyard picker did not describe the available revival effect.");
@@ -1275,14 +1298,14 @@ namespace YGOPortable.Editor
                     Require(Modals.IsZoneViewerOpen && ReferenceEquals(_duel.ActivePrompt, prompt),
                         "Reading the card disrupted the pending summon.");
                 }
+            }
 
-                static bool ShowsRegularFace(CompositeCardView view)
-                {
-                    var aspect = view.transform.Find("AspectBox");
-                    return view.Appearance?.overframe == true && !view.HasOverframe &&
-                        aspect.Find("Frame").GetComponent<Image>().isActiveAndEnabled &&
-                        aspect.Find("DeckEdition")?.gameObject.activeSelf != true;
-                }
+            private static bool ShowsRegularFace(CompositeCardView view)
+            {
+                var aspect = view.transform.Find("AspectBox");
+                return view.Appearance?.overframe == true && !view.HasOverframe &&
+                    aspect.Find("Frame").GetComponent<Image>().isActiveAndEnabled &&
+                    aspect.Find("DeckEdition")?.gameObject.activeSelf != true;
             }
 
             internal void SelectSynchroMaterials(DuelPrompt prompt)

@@ -303,7 +303,7 @@ namespace YGOPortable.UI
             _modals.SetZoneBrowserActions(SwitchBrowsablePile,
                 (code, live) => { if (live == null) ShowCardZoomModal(code); else ShowCardZoomModal(live); },
                 live => InspectCardAt(live.code, null, appearance: live.Appearance,
-                    regularEditionOnly: live.location == YgoConstants.LOCATION_EXTRA));
+                    regularEditionOnly: CompositeCardView.UsesRegularEditionInDuelZone(live.location)));
 
             if (CardDragManager.Instance != null)
             {
@@ -426,7 +426,7 @@ namespace YGOPortable.UI
         private void InspectCandidate(SelectableCardItem item, uint code) =>
             InspectCardAt(code, (item.controller, item.location, item.sequence),
                 appearance: _session?.GetDeckAppearance(item.controller, item.location, item.sequence),
-                regularEditionOnly: item.location == YgoConstants.LOCATION_EXTRA);
+                regularEditionOnly: CompositeCardView.UsesRegularEditionInDuelZone(item.location));
 
         private DeckCardAppearance? DefaultDuelAppearance =>
             _session?.UsesDeckAppearances == true ? default(DeckCardAppearance) : null;
@@ -1196,7 +1196,7 @@ namespace YGOPortable.UI
             var card = DuelUiKit.CreateRect("TopCard", cell, usesWell ? new Vector2(.19f, .322f) : new Vector2(.15f, .312f),
                 usesWell ? new Vector2(.81f, .889f) : new Vector2(.85f, .949f), Vector2.zero, Vector2.zero);
             var view = CompositeCardView.Create(card, "CardView");
-            view.UsePrintedFaceOnly();
+            view.UsePrintedFaceOnly(regularEditionOnly: CompositeCardView.UsesRegularEditionInDuelZone(location));
             view.transform.localRotation = Quaternion.Euler(0f, 0f, opponent ? 180f : 0f);
             DuelPileDepth depth = null;
             if (!usesWell)
@@ -4460,7 +4460,7 @@ namespace YGOPortable.UI
 
         private void ShowCardZoomModal(LiveCardState card) =>
             ShowCardZoomModal(card.code, InspectionLocation(GetSlot(card.controller, card.location, card.sequence)), card.Appearance,
-                regularEditionOnly: card.location == YgoConstants.LOCATION_EXTRA);
+                regularEditionOnly: CompositeCardView.UsesRegularEditionInDuelZone(card.location));
 
         private void ShowCardZoomModal(uint code, (byte controller, uint location, uint sequence)? fieldCard,
             DeckCardAppearance? appearance = null, bool regularEditionOnly = false)
