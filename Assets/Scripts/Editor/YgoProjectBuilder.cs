@@ -128,14 +128,25 @@ namespace YGOPortable.Editor
                 AssertTrue(DeckRepository.PresetDecks.All(deck => deck.sigCard != 0 &&
                     (deck.main.Contains(deck.sigCard) || deck.extra.Contains(deck.sigCard))),
                     "A preset deck displayed an ace that is not in its main or Extra Deck.");
-                int featuredPortraits = 0, placeholders = 0;
+                var sharedPortraits = new Dictionary<int, int>
+                {
+                    { 9, 230 }, { 42, 10 }, { 50, 16 }, { 52, 156 }, { 110, 111 }, { 214, 119 },
+                };
+                int featuredPortraits = 0, linkedPortraits = 0, placeholders = 0;
                 foreach (var character in DeckRepository.Characters)
                 {
                     var portrait = DuelUiKit.LoadOpponentPortrait(character);
                     var dedicated = DuelUiKit.LoadSprite($"Duel/Characters/{character.id}");
-                    AssertTrue(portrait != null && portrait == (dedicated ?? DuelProfileArt.MissingOpponent),
+                    Sprite shared = null;
+                    if (sharedPortraits.TryGetValue(character.id, out int sharedId))
+                    {
+                        shared = DuelUiKit.LoadSprite($"Duel/Characters/{sharedId}");
+                        AssertTrue(shared != null && !character.isMeta2026, $"Invalid shared portrait for {character.name}.");
+                    }
+                    AssertTrue(portrait != null && portrait == (dedicated ?? shared ?? DuelProfileArt.MissingOpponent),
                         $"The opponent portrait came from an unexpected source for {character.name}.");
                     if (dedicated != null) featuredPortraits++;
+                    else if (shared != null) linkedPortraits++;
                     else placeholders++;
                 }
                 AssertTrue(featuredPortraits >= 143, $"The portrait catalog loaded only {featuredPortraits} character portraits.");
@@ -143,7 +154,8 @@ namespace YGOPortable.Editor
                 AssertTrue(DuelUiKit.LoadOpponentPortrait(missingPortrait) == DuelProfileArt.MissingOpponent,
                     "An opponent without a character portrait used its ace card.");
                 VerifyOpponentNavigation(canvas);
-                Debug.Log($"[VERIFY OPPONENT SELECTION] {featuredPortraits} character portraits, {placeholders} placeholders, navigation and turn-order selection passed.");
+                Debug.Log($"[VERIFY OPPONENT SELECTION] {featuredPortraits} dedicated portraits, {linkedPortraits} linked portraits, " +
+                    $"{placeholders} placeholders, navigation and turn-order selection passed.");
                 exit = 0;
             }
             catch (Exception error) { Debug.LogException(error); }

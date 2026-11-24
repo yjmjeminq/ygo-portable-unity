@@ -14,7 +14,22 @@ namespace YGOPortable.UI
         internal static Sprite Opponent(OpponentCharacter opponent)
         {
             if (opponent == null) return null;
-            return DuelUiKit.LoadSprite($"Duel/Characters/{opponent.id}") ?? MissingOpponent;
+            var portrait = DuelUiKit.LoadSprite($"Duel/Characters/{opponent.id}");
+            if (portrait != null) return portrait;
+
+            // Some versions of the same character share a portrait.
+            int sharedId = opponent.id switch
+            {
+                9 => 230,   // Carly Nagisa
+                42 => 10,   // Crow Hogan (ARC-V)
+                50 => 16,   // Jack Atlas (ARC-V)
+                52 => 156,  // Kaito Tenjo (ARC-V)
+                110 => 111, // Masked Atticus
+                214 => 119, // Supreme King Jaden
+                _ => 0,
+            };
+            return sharedId == 0 ? MissingOpponent :
+                DuelUiKit.LoadSprite($"Duel/Characters/{sharedId}") ?? MissingOpponent;
         }
 
         private static Sprite DrawOpponentPlaceholder()
