@@ -24,13 +24,10 @@ namespace YGOPortable.UI
         StoryMode,
         Tournament,
         Ranked,
-        TagForceWorld,
     }
 
     public class GameAppController : MonoBehaviour
     {
-        internal static bool TagForceEnabled => true;
-
         public float AiStepDelay { get; set; } = 0.25f;
         public AIDifficulty AiDifficulty { get; set; } = AIDifficulty.Master;
         internal ChainConfirmationMode ChainConfirmation { get; private set; } = ChainConfirmationMode.Auto;
@@ -50,10 +47,8 @@ namespace YGOPortable.UI
         private StoryModeUI _storyMode;
         private DimensionTournamentUI _tournament;
         private OfflineRankedUI _ranked;
-        private TagForceWorldUI _tagForceWorld;
         private bool _storyDeckEditorOpen;
         private bool _rankedDeckEditorOpen;
-        private bool _tagForceDeckEditorOpen;
         private GitHubSaveSync _saveSync;
         private SaveSyncMenu _saveSyncMenu;
         private GameObject _focusBeforeSaveSync;
@@ -79,7 +74,6 @@ namespace YGOPortable.UI
         private StoryBattlePlan _activeStoryPlan;
         private (int Seed, int Round, int Slots, int Opponent)? _activeTournament;
         private RankedMatch _activeRanked;
-        private TagForceDuel _activeTagForce;
 
         private bool _initialized;
 
@@ -154,7 +148,6 @@ namespace YGOPortable.UI
                 _storyMode = new StoryModeUI(this, canvas.transform);
                 _tournament = new DimensionTournamentUI(this, canvas.transform);
                 _ranked = new OfflineRankedUI(this, canvas.transform);
-                if (TagForceEnabled) _tagForceWorld = new TagForceWorldUI(this, canvas.transform);
 
                 Debug.Log("[GameApp] 6. Constructing OpponentSelectUI...");
                 _oppSelect = new OpponentSelectUI(this, canvas.transform);
@@ -242,7 +235,6 @@ namespace YGOPortable.UI
         public void ShowScreen(AppScreen screen)
         {
             if (!_initialized) return;
-            if (screen == AppScreen.TagForceWorld && !TagForceEnabled) screen = AppScreen.MainMenu;
             if (CollectionProgress.Initialized && !CollectionProgress.HasStarter && screen != AppScreen.Title)
                 screen = AppScreen.StarterSelection;
 
@@ -263,7 +255,6 @@ namespace YGOPortable.UI
             _archetypeCodex.Close();
             if (screen != AppScreen.Tournament) _tournament.Close();
             if (screen != AppScreen.Ranked) _ranked.Close();
-            if (screen != AppScreen.TagForceWorld) _tagForceWorld?.Close();
             if (screen == AppScreen.DeckEditor && _storyDeckEditorOpen) _storyMode.SuspendForDeckEditor();
             else if (screen != AppScreen.StoryMode) _storyMode.Close();
             _oppSelect.Root.SetActive(screen == AppScreen.OpponentSelect);
@@ -277,11 +268,10 @@ namespace YGOPortable.UI
             }
             else
             {
-                if (screen != AppScreen.TagForceWorld) DuelAudio.PlayMenuBgm();
+                DuelAudio.PlayMenuBgm();
                 _activeStoryEpisode = null;
                 _activeTournament = null;
                 _activeRanked = null;
-                _activeTagForce = null;
                 if (_session != null)
                 {
                     _duelField.UnbindSession();
@@ -304,8 +294,6 @@ namespace YGOPortable.UI
                 _tournament.Open();
             else if (screen == AppScreen.Ranked)
                 _ranked.Open();
-            else if (screen == AppScreen.TagForceWorld)
-                _tagForceWorld.Open(previousScreen is AppScreen.DeckEditor or AppScreen.Duel or AppScreen.TagForceWorld);
             else if (screen == AppScreen.StoryMode)
             {
                 if (_storyDeckEditorOpen && previousScreen == AppScreen.DeckEditor) _storyMode.ResumeFromDeckEditor();
@@ -334,14 +322,12 @@ namespace YGOPortable.UI
                     AppScreen.StoryMode => _storyMode.Root,
                     AppScreen.Tournament => _tournament.Root,
                     AppScreen.Ranked => _ranked.Root,
-                    AppScreen.TagForceWorld => _tagForceWorld.Root,
                     _ => null,
                 };
                 if (root != null) UiEntranceMotion.Play(root, .67f, .19f);
             }
             if (screen != AppScreen.DeckEditor) _storyDeckEditorOpen = false;
             if (screen != AppScreen.DeckEditor) _rankedDeckEditorOpen = false;
-            if (screen != AppScreen.DeckEditor) _tagForceDeckEditorOpen = false;
             SyncFrontMenuFocus();
         }
 
@@ -359,15 +345,7 @@ namespace YGOPortable.UI
             ShowScreen(AppScreen.DeckEditor);
         }
 
-        internal void OpenTagForceDeckEditor()
-        {
-            if (_screen != AppScreen.TagForceWorld) return;
-            _tagForceDeckEditorOpen = true;
-            ShowScreen(AppScreen.DeckEditor);
-        }
-
-        internal void CloseDeckEditor() => ShowScreen(_tagForceDeckEditorOpen ? AppScreen.TagForceWorld :
-            _rankedDeckEditorOpen ? AppScreen.Ranked :
+        internal void CloseDeckEditor() => ShowScreen(_rankedDeckEditorOpen ? AppScreen.Ranked :
             _storyDeckEditorOpen ? AppScreen.StoryMode : AppScreen.MainMenu);
 
         internal void OpenSecretPackShop(string id)
@@ -426,16 +404,6 @@ namespace YGOPortable.UI
                 isStoryDuel: false, planningScale: match.Opponent.PlanningScale, isRankedDuel: true);
         }
 
-        internal void StartTagForceDuel(TagForceDuel duel, UserDeck player)
-        {
-            if (_screen != AppScreen.TagForceWorld || duel == null) return;
-            var opponent = DeckRepository.GetCharacter(duel.Form.formCharId);
-            _activeTagForce = duel;
-            StartDuelMatch(opponent, duel.Deck, player, playerGoesFirst: true, isStoryDuel: false,
-                planningScale: Mathf.Lerp(1f, ComboSearch.MaxPlanningScale,
-                    (duel.Level - 1f) / Mathf.Max(1, duel.Form.Decks.Count - 1)), isTagForceDuel: true);
-        }
-
         public void StartDuelMatch(OpponentCharacter oppChar, PresetDeckInfo oppDeck, UserDeck myDeck,
             bool playerGoesFirst, bool isStoryDuel = false) =>
             StartDuelMatch(oppChar, oppDeck, myDeck, playerGoesFirst, isStoryDuel,
@@ -443,25 +411,23 @@ namespace YGOPortable.UI
 
         private void StartDuelMatch(OpponentCharacter oppChar, PresetDeckInfo oppDeck, UserDeck myDeck,
             bool playerGoesFirst, bool isStoryDuel, float planningScale, bool isTournamentDuel = false, bool isRankedDuel = false,
-            bool isTagForceDuel = false, AIDifficulty? opponentDifficulty = null)
+            AIDifficulty? opponentDifficulty = null)
         {
             AIDifficulty duelDifficulty = opponentDifficulty ?? AiDifficulty;
-            bool isCampaignMatch = isStoryDuel || isTournamentDuel || isRankedDuel || isTagForceDuel;
+            bool isCampaignMatch = isStoryDuel || isTournamentDuel || isRankedDuel;
             if (oppChar == null || oppDeck == null || oppDeck.charId != oppChar.id ||
                 (isStoryDuel && _activeStoryEpisode?.charId != oppChar.id) ||
                 (isTournamentDuel && _activeTournament?.Opponent != oppChar.id) ||
                 (isRankedDuel && (_activeRanked?.Opponent.Deck != oppDeck)) ||
-                (isTagForceDuel && _activeTagForce?.Deck != oppDeck) ||
                 (!isCampaignMatch && !CollectionProgress.IsOpponentDeckUnlocked(oppChar.id, oppDeck.id)))
             {
-                ShowDuelStartFailure(isStoryDuel, "목록에 있는 상대와 덱을 선택하세요.", isTournamentDuel, isRankedDuel, isTagForceDuel);
+                ShowDuelStartFailure(isStoryDuel, "목록에 있는 상대와 덱을 선택하세요.", isTournamentDuel, isRankedDuel);
                 return;
             }
             if (!isCampaignMatch)
             {
                 _activeStoryEpisode = null;
                 _activeTournament = null;
-                _activeTagForce = null;
                 oppDeck = OpponentDeckLevels.GetDecks(oppChar.id).First(deck => deck.id == oppDeck.id);
             }
             var duelDeck = myDeck;
@@ -471,7 +437,7 @@ namespace YGOPortable.UI
                 : CanStartWithDeck(myDeck, out reason);
             if (!deckReady)
             {
-                ShowDuelStartFailure(isStoryDuel, reason, isTournamentDuel, isRankedDuel, isTagForceDuel);
+                ShowDuelStartFailure(isStoryDuel, reason, isTournamentDuel, isRankedDuel);
                 return;
             }
             _activeOppChar = oppChar;
@@ -515,10 +481,9 @@ namespace YGOPortable.UI
                 myDeck.main, myDeck.extra,
                 oppDeck.main, oppDeck.extra,
                 p0GoesFirst: playerGoesFirst, playerDeckAppearance: duelDeck, opponentOpening: opening?.Opponent,
-                opponentDestiny: GetOpponentDestinyCards(oppDeck),
-                playerOpening: isTagForceDuel ? _activeTagForce.Opening : opening?.Player, storyGimmick: storyGimmick))
+                opponentDestiny: GetOpponentDestinyCards(oppDeck), playerOpening: opening?.Player, storyGimmick: storyGimmick))
             {
-                ShowDuelStartFailure(isStoryDuel, "듀얼을 시작하지 못했습니다.", isTournamentDuel, isRankedDuel, isTagForceDuel);
+                ShowDuelStartFailure(isStoryDuel, "듀얼을 시작하지 못했습니다.", isTournamentDuel, isRankedDuel);
                 return;
             }
             if (isStoryDuel && !CollectionProgress.TryConsumeRaidSupports(_activeStoryPlan.Supports, raid.HasValue, out string error))
@@ -540,15 +505,8 @@ namespace YGOPortable.UI
                 .ThenByDescending(card => card.atk).Take(2).Select(card => card.code).ToArray();
         }
 
-        private void ShowDuelStartFailure(bool isStoryDuel, string message, bool isTournamentDuel = false, bool isRankedDuel = false,
-            bool isTagForceDuel = false)
+        private void ShowDuelStartFailure(bool isStoryDuel, string message, bool isTournamentDuel = false, bool isRankedDuel = false)
         {
-            if (isTagForceDuel)
-            {
-                ShowScreen(AppScreen.TagForceWorld);
-                _tagForceWorld.ShowStatus(message);
-                return;
-            }
             if (isRankedDuel)
             {
                 _ranked.Close();
@@ -620,8 +578,6 @@ namespace YGOPortable.UI
                         DeckPadInput.DirectTouchBegan()))
                         _menuPad.Clear(preserveSelection: true);
                     HandleMenuInput(_menuPadInput.Read(Time.unscaledTime), Input.GetKeyDown(KeyCode.Escape));
-                    if (_screen == AppScreen.TagForceWorld)
-                        _tagForceWorld.Update(Time.unscaledDeltaTime, _menuPadInput.HeldDirection);
                     SyncFrontMenuFocus();
                 }
                 return;
@@ -649,16 +605,6 @@ namespace YGOPortable.UI
                     _duelField.Refresh();
                     bool won = _session.Winner == _session.HumanPlayerIndex;
                     bool draw = _session.Winner == 2;
-                    if (_activeTagForce is { } worldDuel)
-                    {
-                        string result = "듀얼 결과가 기록되지 않았습니다.";
-                        bool rewarded = _session.Winner >= 0 &&
-                            CollectionProgress.TryFinishTagForce(worldDuel, won, draw, out result);
-                        ShowScreen(AppScreen.TagForceWorld);
-                        _tagForceWorld.ShowResult(worldDuel, won, result, rewarded);
-                        SyncFrontMenuFocus();
-                        return;
-                    }
                     if (_activeRanked is { } ranked)
                     {
                         bool hasResult = _session.Winner >= 0;
@@ -820,7 +766,6 @@ namespace YGOPortable.UI
                 AppScreen.StoryMode => _storyMode.ActiveRoot,
                 AppScreen.Tournament => _tournament.ActiveRoot,
                 AppScreen.Ranked => _ranked.ActiveRoot,
-                AppScreen.TagForceWorld => _tagForceWorld.Root,
                 _ => null,
             };
             if (page != null && page.activeInHierarchy)
@@ -840,8 +785,7 @@ namespace YGOPortable.UI
             bool story = _screen == AppScreen.StoryMode;
             bool tournament = _screen == AppScreen.Tournament;
             bool ranked = _screen == AppScreen.Ranked;
-            bool tagForce = _screen == AppScreen.TagForceWorld;
-            bool cancel = frame.Cancel || (escape && (cloudSave || settings || selectingOpponent || _menuPad.HasPopup || collectionPage || story || tournament || ranked || tagForce));
+            bool cancel = frame.Cancel || (escape && (cloudSave || settings || selectingOpponent || _menuPad.HasPopup || collectionPage || story || tournament || ranked));
             if (!frame.HasInput && !cancel) return;
 
             GameObject scope = cloudSave ? _saveSyncMenu.Root : _screen switch
@@ -855,11 +799,9 @@ namespace YGOPortable.UI
                 AppScreen.StoryMode => _storyMode.ActiveRoot,
                 AppScreen.Tournament => _tournament.ActiveRoot,
                 AppScreen.Ranked => _ranked.ActiveRoot,
-                AppScreen.TagForceWorld => _tagForceWorld.Root,
                 _ => null,
             };
             if (scope == null || !scope.activeInHierarchy) return;
-            if (tagForce && !cloudSave && !_menuPad.HasPopup && !cancel && _tagForceWorld.HandleFieldInput(frame)) return;
             if (!_menuPad.HasPopup)
             {
                 if (_menuPad.HandleOpenedDropdown(scope.transform, frame.Direction, frame.Submit, cancel)) return;
@@ -910,7 +852,6 @@ namespace YGOPortable.UI
                 else if (story) _storyMode.Back();
                 else if (tournament) _tournament.Back();
                 else if (ranked) _ranked.Back();
-                else if (tagForce) _tagForceWorld.Back();
                 else if (_screen is AppScreen.OpponentSelect or AppScreen.ArchetypeCodex) ShowScreen(AppScreen.MainMenu);
                 else if (_screen == AppScreen.MainMenu) ShowScreen(AppScreen.Title);
             }

@@ -125,8 +125,6 @@ namespace YGOPortable.Core
             public DimensionTournament tournament;
             public int tournamentWins;
             public RankedSave ranked = new();
-            public TagForceSave tagForce = new();
-            public List<TagForceWorldSave> tagForceWorlds = new();
         }
 
         [Serializable]
@@ -245,13 +243,6 @@ namespace YGOPortable.Core
                 saved.shop?.freeSecretBundles < 0)
                 throw new InvalidDataException("Invalid tournament progress.");
             saved.ranked ??= new RankedSave();
-            saved.tagForce ??= new TagForceSave();
-            saved.tagForce.Normalize();
-            saved.tagForceWorlds ??= new();
-            saved.tagForceWorlds.RemoveAll(world => world?.progress == null ||
-                world.seriesId == TagForceWorldData.GxId ||
-                !TagForceWorldData.Series.Any(series => series.Id == world.seriesId));
-            foreach (var world in saved.tagForceWorlds) world.progress.Normalize();
             if (!saved.ranked.IsValid)
                 throw new InvalidDataException("Invalid offline ranked progress.");
 
@@ -894,8 +885,6 @@ namespace YGOPortable.Core
             tournament = _profile.tournament,
             tournamentWins = _profile.tournamentWins,
             ranked = _profile.ranked,
-            tagForce = _profile.tagForce,
-            tagForceWorlds = _profile.tagForceWorlds,
         };
 
         private static OpponentDeckProgress FindDeckProgress(SavedProfile profile, int opponentId) =>
