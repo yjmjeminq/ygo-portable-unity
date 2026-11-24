@@ -2,6 +2,7 @@ using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using YGOPortable.AI;
 using YGOPortable.Core;
 
 namespace YGOPortable.UI
@@ -26,6 +27,7 @@ namespace YGOPortable.UI
         private Text _shopBalance;
         private Button _settingsOpenButton;
         private Button _settingsCloseButton;
+        private Text _aiDifficultyLabel;
         private GameObject _settingsPanel;
 
         public TitleAndMenuUI(GameAppController app, Transform canvasParent)
@@ -39,6 +41,7 @@ namespace YGOPortable.UI
         private void OpenSettings()
         {
             _menuControls.interactable = false;
+            RefreshAiDifficulty();
             SettingsRoot.SetActive(true);
             UiEntranceMotion.Play(_settingsPanel, .57f);
             EventSystem.current?.SetSelectedGameObject(_settingsCloseButton.gameObject);
@@ -188,6 +191,12 @@ namespace YGOPortable.UI
             return MenuButtonMotion.Attach(DuelUiKit.CreateButton(row, "Button", label, action, 23));
         }
 
+        private void RefreshAiDifficulty()
+        {
+            _aiDifficultyLabel.text = _app.AiDifficulty == AIDifficulty.Master
+                ? "AI 난이도: 마스터 (0.6초 수읽기)" : "AI 난이도: 보통";
+        }
+
         private void BuildSettingsOverlay(Transform parent)
         {
             var bg = DuelUiKit.FillRect("Overlay_Settings", parent);
@@ -205,7 +214,7 @@ namespace YGOPortable.UI
             DuelUiKit.AddText(hdr, "T", "환경 설정", 22, TextAnchor.MiddleCenter, DuelUiKit.GoldAccent, FontStyle.Bold);
 
             // SFX Volume Row
-            var row1 = DuelUiKit.CreateRect("SfxRow", win, new Vector2(0.08f, 0.72f), new Vector2(0.92f, 0.83f), Vector2.zero, Vector2.zero);
+            var row1 = DuelUiKit.CreateRect("SfxRow", win, new Vector2(0.08f, 0.735f), new Vector2(0.92f, 0.835f), Vector2.zero, Vector2.zero);
             var sfxLabel = DuelUiKit.AddText(row1, "L", "효과음 음량: 65%", 17, TextAnchor.MiddleLeft, DuelUiKit.TextPrimary);
             var toggleSfx = DuelUiKit.CreateRect("BtnMute", row1, new Vector2(0.60f, 0.1f), new Vector2(1f, 0.9f), Vector2.zero, Vector2.zero);
             DuelUiKit.CreateButton(toggleSfx, "B", "음소거 전환", () =>
@@ -215,7 +224,7 @@ namespace YGOPortable.UI
             }, 15);
 
             // BGM Volume Row
-            var rowBgm = DuelUiKit.CreateRect("BgmRow", win, new Vector2(0.08f, 0.57f), new Vector2(0.92f, 0.68f), Vector2.zero, Vector2.zero);
+            var rowBgm = DuelUiKit.CreateRect("BgmRow", win, new Vector2(0.08f, 0.605f), new Vector2(0.92f, 0.705f), Vector2.zero, Vector2.zero);
             var bgmLabel = DuelUiKit.AddText(rowBgm, "L", "배경음악 음량: 35%", 17, TextAnchor.MiddleLeft, DuelUiKit.TextPrimary);
             var toggleBgm = DuelUiKit.CreateRect("BtnBgm", rowBgm, new Vector2(0.60f, 0.1f), new Vector2(1f, 0.9f), Vector2.zero, Vector2.zero);
             DuelUiKit.CreateButton(toggleBgm, "B", "음악 전환", () =>
@@ -226,16 +235,31 @@ namespace YGOPortable.UI
             }, 15);
 
             // AI Speed / Level Row
-            var row2 = DuelUiKit.CreateRect("AiRow", win, new Vector2(0.08f, 0.42f), new Vector2(0.92f, 0.53f), Vector2.zero, Vector2.zero);
-            var aiLbl = DuelUiKit.AddText(row2, "L", $"AI 사고 속도: {_app.AiStepDelay:0.00}초", 17, TextAnchor.MiddleLeft, DuelUiKit.TextPrimary);
+            var row2 = DuelUiKit.CreateRect("AiRow", win, new Vector2(0.08f, 0.475f), new Vector2(0.92f, 0.575f), Vector2.zero, Vector2.zero);
+            var aiLbl = DuelUiKit.AddText(row2, "L", $"AI 행동 간격: {_app.AiStepDelay:0.00}초", 17, TextAnchor.MiddleLeft, DuelUiKit.TextPrimary);
             var spdBtn = DuelUiKit.CreateRect("BtnSpd", row2, new Vector2(0.60f, 0.1f), new Vector2(1f, 0.9f), Vector2.zero, Vector2.zero);
             DuelUiKit.CreateButton(spdBtn, "B", "속도 전환 (빠름/보통)", () =>
             {
                 _app.AiStepDelay = _app.AiStepDelay > 0.30f ? 0.15f : 0.45f;
-                aiLbl.text = $"AI 사고 속도: {_app.AiStepDelay:0.00}초";
+                aiLbl.text = $"AI 행동 간격: {_app.AiStepDelay:0.00}초";
             }, 15);
 
-            var replay = DuelUiKit.CreateRect("PersonalReplay", win, new Vector2(.08f, .27f), new Vector2(.92f, .38f),
+            var difficulty = DuelUiKit.CreateRect("AiDiffRow", win, new Vector2(.08f, .345f), new Vector2(.92f, .445f),
+                Vector2.zero, Vector2.zero);
+            var difficultyLabel = DuelUiKit.CreateRect("Label", difficulty, Vector2.zero, new Vector2(.59f, 1f),
+                Vector2.zero, Vector2.zero);
+            _aiDifficultyLabel = DuelUiKit.AddFittedText(difficultyLabel, "Text", "", 17, 12,
+                TextAnchor.MiddleLeft, DuelUiKit.TextPrimary);
+            RefreshAiDifficulty();
+            var toggleDifficulty = DuelUiKit.CreateRect("BtnDiff", difficulty, new Vector2(.60f, .1f),
+                new Vector2(1f, .9f), Vector2.zero, Vector2.zero);
+            DuelUiKit.CreateButton(toggleDifficulty, "B", "난이도 전환", () =>
+            {
+                _app.ToggleAiDifficulty();
+                RefreshAiDifficulty();
+            }, 15);
+
+            var replay = DuelUiKit.CreateRect("PersonalReplay", win, new Vector2(.08f, .215f), new Vector2(.92f, .315f),
                 Vector2.zero, Vector2.zero);
             var replayLabel = DuelUiKit.AddFittedText(DuelUiKit.CreateRect("Label", replay,
                 new Vector2(0f, .40f), new Vector2(.59f, 1f), Vector2.zero, Vector2.zero), "Text",
@@ -251,10 +275,10 @@ namespace YGOPortable.UI
                     replayLabel.text = $"개인 대국 기록: {(_app.PersonalReplayEnabled ? "켜짐" : "꺼짐")}";
                 }, 15);
 
-            var info = DuelUiKit.CreateRect("Rule", win, new Vector2(.08f, .15f), new Vector2(.51f, .24f),
+            var info = DuelUiKit.CreateRect("Rule", win, new Vector2(.08f, .125f), new Vector2(.51f, .20f),
                 Vector2.zero, Vector2.zero);
             DuelUiKit.AddFittedText(info, "Text", "신 마스터 룰 2020", 17, 12, TextAnchor.MiddleLeft, DuelUiKit.TextMuted);
-            var cloud = DuelUiKit.CreateRect("CloudSave", win, new Vector2(.56f, .15f), new Vector2(.92f, .24f),
+            var cloud = DuelUiKit.CreateRect("CloudSave", win, new Vector2(.56f, .125f), new Vector2(.92f, .20f),
                 Vector2.zero, Vector2.zero);
             DuelUiKit.CreateButton(cloud, "Button", "클라우드 저장", _app.OpenSaveSync, 16);
 

@@ -9,6 +9,8 @@ namespace YGOPortable.AI
     internal sealed class ComboSearch
     {
         internal const float MaxPlanningScale = 1.65f;
+        internal const int MasterPlanningMilliseconds = 600;
+        private const int MasterPlanningSliceMilliseconds = 8;
         internal const int KeepSetup = -1; // Planner decision, never sent to the duel engine.
         private const int MaxMainActions = 24;
         private const int MaxResponses = 144;
@@ -72,9 +74,7 @@ namespace YGOPortable.AI
         };
 
         private readonly float _planningScale;
-        private readonly int _branchLimit;
         private readonly int _searchLimit;
-        private readonly int _timeBudget;
         private readonly Queue<(ulong state, int action)> _next = new();
         private (ulong State, int Index, int AfterMainActions)? _selectedTarget;
         private int _turn = -1;
@@ -90,9 +90,7 @@ namespace YGOPortable.AI
         internal ComboSearch(float planningScale = 1f)
         {
             _planningScale = Math.Clamp(planningScale, 1f, MaxPlanningScale);
-            _branchLimit = Scale(36);
             _searchLimit = Scale(7);
-            _timeBudget = Scale(195);
         }
 
         private int Scale(int budget) => (int)Math.Round(budget * _planningScale);
@@ -304,6 +302,8 @@ namespace YGOPortable.AI
                 _selectedTarget = null;
             }
             if (!lateLinkTrade && _searches >= _searchLimit) yield break;
+            bool master = advisor.Difficulty == AIDifficulty.Master;
+            int alternativesPerFork = master ? 5 : 3;
             var options = advisor.ComboMainOptions(live, prompt);
             var lateOptions = Array.Empty<int>();
             if (lateLinkTrade)
@@ -314,14 +314,16 @@ namespace YGOPortable.AI
                 if (!advisor.UsesLinkPlannerPreference(live, prompt))
                     trades = trades.OrderByDescending(option => LinkComboPolicy.IsBridge(option.summon.code))
                         .ThenBy(option => LinkComboPolicy.Rank(option.summon.code));
-                lateOptions = trades.Take(3).Select(option => option.action).ToArray();
+                lateOptions = trades.Take(alternativesPerFork).Select(option => option.action).ToArray();
             }
             if (lateLinkTrade ? lateOptions.Length == 0 : options.Length == 0) yield break;
             if (lateLinkTrade) _lateLinkSearches++;
             else _searches++;
 
+            int branchLimit = Scale(master ? 72 : 36);
+            int timeBudget = master ? MasterPlanningMilliseconds : Scale(195);
             var watch = new Stopwatch();
-            bool Expired() => watch.ElapsedMilliseconds >= _timeBudget;
+            bool Expired() => watch.ElapsedMilliseconds >= timeBudget;
             var queue = new Queue<Branch>();
             queue.Enqueue(new Branch(cached ? _next.TakeWhile(move => move.action != KeepSetup).Select(move => move.action).ToArray() : Array.Empty<int>(),
                 _selectedTarget is { } selected ? (selected.State, selected.Index) : null));
@@ -353,7 +355,8 @@ namespace YGOPortable.AI
             Branch? defensiveSet = null;
             bool comparedDefensiveSet = false;
             bool reservedOpeningBranch = false;
-            for (int attempt = 0; (defensiveSet.HasValue || queue.Count != 0) && attempt < _branchLimit && !Expired(); attempt++)
+            long sliceStart = 0;
+            for (int attempt = 0; (defensiveSet.HasValue || queue.Count != 0) && attempt < branchLimit && !Expired(); attempt++)
             {
                 bool comparingDefense = defensiveSet.HasValue;
                 Branch choices = defensiveSet ?? queue.Dequeue();
@@ -430,11 +433,11 @@ namespace YGOPortable.AI
                     // Examine both the opening choice and the transition into a possible finish.
                     var forks = line.unpaidLinkTrade == int.MaxValue
                         ? line.forks : line.forks.Where(fork => fork.prefix.Length > line.unpaidLinkTrade).ToList();
-                    for (int offset = 0; offset < Math.Min(9, forks.Count) && queue.Count < _branchLimit; offset++)
+                    for (int offset = 0; offset < Math.Min(master ? 13 : 9, forks.Count) && queue.Count < branchLimit; offset++)
                     {
                         int depth = offset % 2 == 0 ? offset / 2 : forks.Count - 1 - offset / 2;
                         var fork = forks[depth];
-                        foreach (int option in fork.options.Take(3))
+                        foreach (int option in fork.options.Take(alternativesPerFork))
                         {
                             var branch = new int[fork.prefix.Length + 1];
                             Array.Copy(fork.prefix, branch, fork.prefix.Length);
@@ -443,8 +446,14 @@ namespace YGOPortable.AI
                         }
                     }
                 }
-                watch.Stop();
-                if ((defensiveSet.HasValue || queue.Count != 0) && !Expired()) yield return true;
+                if (!master) watch.Stop();
+                // Group short Master replays so waiting for frames does not consume the whole decision.
+                if ((defensiveSet.HasValue || queue.Count != 0) && !Expired() &&
+                    (!master || watch.ElapsedMilliseconds - sliceStart >= MasterPlanningSliceMilliseconds))
+                {
+                    yield return true;
+                    sliceStart = watch.ElapsedMilliseconds;
+                }
             }
 
             if (best == null || best.moves.Count == 0) yield break;

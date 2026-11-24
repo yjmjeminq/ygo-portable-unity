@@ -11,17 +11,19 @@ namespace YGOPortable.AI
         Easy = 0,
         Normal = 1,
         Smart = 2,
+        Master = 3,
     }
 
     public class TacticalAI
     {
         public AIDifficulty Difficulty { get; set; } = AIDifficulty.Smart;
-        internal bool UsesTrainedPolicy => Difficulty == AIDifficulty.Smart && _policy != null;
-        internal bool HasLinkPolicy => Difficulty == AIDifficulty.Smart && _linkPolicy != null;
+        private bool UsesAdvancedDifficulty => Difficulty is AIDifficulty.Smart or AIDifficulty.Master;
+        internal bool UsesTrainedPolicy => UsesAdvancedDifficulty && _policy != null;
+        internal bool HasLinkPolicy => UsesAdvancedDifficulty && _linkPolicy != null;
         internal int SimulatedComboBranches => _comboSearch?.SimulatedBranches ?? 0;
         internal int ChangedComboLines => _comboSearch?.ChangedLines ?? 0;
         internal int ChosenComboAlternatives => _comboSearch?.ChosenAlternatives ?? 0;
-        private bool UsesTacticalRules => Difficulty == AIDifficulty.Smart && _tacticalRules;
+        private bool UsesTacticalRules => UsesAdvancedDifficulty && _tacticalRules;
         private bool UsesComboPlanning => _comboSearch != null || _comboProjection;
 
         private const int IdleRecoveryBudgetMilliseconds = 45;
@@ -362,7 +364,7 @@ namespace YGOPortable.AI
         }
 
         private bool CanSearchCombo(DuelSession session, DuelPrompt prompt, bool planLinks) =>
-            _comboSearch != null && Difficulty == AIDifficulty.Smart && session.RetryCount == 0 && _actionsThisTurn < 48 &&
+            _comboSearch != null && UsesAdvancedDifficulty && session.RetryCount == 0 && _actionsThisTurn < 48 &&
             !(prompt.canBp && DuelCombat.OpenLethal(session, prompt.playerId)) &&
             ChoosePriorityMainAction(session, prompt, planLinks) == null &&
             ReferenceEquals(session.ActivePrompt, prompt) && (IsRecovering(session, prompt) || planLinks ||

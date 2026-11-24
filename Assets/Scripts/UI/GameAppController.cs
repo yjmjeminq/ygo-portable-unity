@@ -29,8 +29,9 @@ namespace YGOPortable.UI
     public class GameAppController : MonoBehaviour
     {
         public float AiStepDelay { get; set; } = 0.25f;
-        public AIDifficulty AiDifficulty { get; set; } = AIDifficulty.Smart;
+        public AIDifficulty AiDifficulty { get; set; } = AIDifficulty.Master;
         internal ChainConfirmationMode ChainConfirmation { get; private set; } = ChainConfirmationMode.Auto;
+        private const string AiDifficultyPreference = "ygo.ai-difficulty.v1";
         private const string PersonalReplayPreference = "ygo.personal-duel-recording.v1";
         internal bool PersonalReplayEnabled { get; private set; }
         private LocalDuelReplayRecorder _personalReplay;
@@ -60,6 +61,8 @@ namespace YGOPortable.UI
         private TacticalAI _ai;
         private DuelPrompt _shownHumanPrompt;
         private float _aiTimer;
+        private DuelPrompt _timedAiPrompt;
+        private double _aiPromptStartedAt;
         private bool _resultShown;
         private bool _refreshAfterPresentation;
 
@@ -103,6 +106,7 @@ namespace YGOPortable.UI
                 if (Application.isMobilePlatform) Application.targetFrameRate = 60;
                 DuelAudio.EnsureInit(gameObject);
                 PersonalReplayEnabled = PlayerPrefs.GetInt(PersonalReplayPreference, 0) != 0;
+                AiDifficulty = ReadAiDifficulty();
 
                 if (!YgoNativeBridge.IsInitialized)
                 {
@@ -451,17 +455,17 @@ namespace YGOPortable.UI
                     Debug.LogWarning($"[Personal replay] Could not enable local recording ({exception.GetType().Name}).");
                 }
             }
-            var difficulty = isCampaignMatch ? AIDifficulty.Smart : AiDifficulty;
+            bool planCombos = AiDifficulty is AIDifficulty.Smart or AIDifficulty.Master;
             var raid = isStoryDuel ? _storyMode.GetRaid(_activeStoryEpisode) : null;
             string storyGimmick = isStoryDuel ? _activeStoryEpisode.gimmick : null;
             var opening = isStoryDuel ? _activeStoryPlan.Apply(raid, oppDeck, storyGimmick) : ((DuelOpening Player, DuelOpening Opponent)?)null;
             if (isTournamentDuel)
                 opening = (new DuelOpening(8000, 5, 0), DimensionTournament.Opening(_activeTournament.Value.Slots, oppDeck));
-            _session = new DuelSession(recordPlanningReplay: difficulty == AIDifficulty.Smart, playerReplay: _personalReplay);
+            _session = new DuelSession(recordPlanningReplay: planCombos, playerReplay: _personalReplay);
             _ai = new TacticalAI(DuelAiPolicy.LoadIncluded(), LinkComboPolicy.LoadIncluded(),
-                searchCombos: true, planningScale: planningScale) { Difficulty = difficulty };
+                searchCombos: planCombos, planningScale: planningScale) { Difficulty = AiDifficulty };
             _shownHumanPrompt = null;
-            _aiTimer = 0f;
+            _timedAiPrompt = null;
             _resultShown = false;
             _refreshAfterPresentation = false;
 
@@ -669,10 +673,9 @@ namespace YGOPortable.UI
                     _duelField.Refresh();
                     return;
                 }
-                _aiTimer += Time.deltaTime * DuelFieldUI.PlaybackRate;
-                if (_ai.AdvanceComboPlanning(_session, prompt) && _aiTimer >= AiStepDelay)
+                if (AdvanceAiDecision(prompt, Time.deltaTime * DuelFieldUI.PlaybackRate, Time.realtimeSinceStartupAsDouble))
                 {
-                    _aiTimer = 0f;
+                    _timedAiPrompt = null;
                     byte[] aiResp = _ai.ComputeResponse(_session, prompt);
                     _session.SubmitResponse(aiResp);
                     _duelField.Refresh();
@@ -863,6 +866,33 @@ namespace YGOPortable.UI
             session.SubmitResponse(response);
             _duelField.Refresh();
             return true;
+        }
+
+        internal static AIDifficulty ReadAiDifficulty() =>
+            PlayerPrefs.GetInt(AiDifficultyPreference, (int)AIDifficulty.Master) == (int)AIDifficulty.Normal
+                ? AIDifficulty.Normal : AIDifficulty.Master;
+
+        internal void ToggleAiDifficulty()
+        {
+            AiDifficulty = AiDifficulty == AIDifficulty.Master ? AIDifficulty.Normal : AIDifficulty.Master;
+            PlayerPrefs.SetInt(AiDifficultyPreference, (int)AiDifficulty);
+            PlayerPrefs.Save();
+        }
+
+        private bool AdvanceAiDecision(DuelPrompt prompt, float playbackDelta, double now)
+        {
+            if (!ReferenceEquals(_timedAiPrompt, prompt))
+            {
+                _timedAiPrompt = prompt;
+                _aiPromptStartedAt = now;
+                _aiTimer = 0f;
+            }
+
+            _aiTimer += playbackDelta;
+            bool masterMainPhase = _ai.Difficulty == AIDifficulty.Master &&
+                prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD;
+            return _ai.AdvanceComboPlanning(_session, prompt) && _aiTimer >= AiStepDelay &&
+                (!masterMainPhase || now - _aiPromptStartedAt >= ComboSearch.MasterPlanningMilliseconds / 1000d);
         }
 
         internal void SetPersonalReplayEnabled(bool enabled)

@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Reflection;
 using UnityEngine;
+using UnityEngine.UI;
 using YGOPortable.AI;
 using YGOPortable.Core;
 using YGOPortable.UI;
@@ -29,12 +30,31 @@ namespace YGOPortable.Editor
                 FindField(controller, "_duelField").SetValue(controller, field);
                 FindField(controller, "_modals").SetValue(controller, modals);
 
+                VerifyDifficultySettings(controller, canvas.transform);
+                var character = DeckRepository.GetCharacter(opponent.charId);
+                controller.StartDuelMatch(character, opponent, deck, playerGoesFirst: false);
+                var masterDuel = (DuelSession)FindField(controller, "_session").GetValue(controller);
+                var masterAi = (TacticalAI)FindField(controller, "_ai").GetValue(controller);
+                Require(masterAi.Difficulty == AIDifficulty.Master && masterAi.UsesTrainedPolicy && masterAi.HasLinkPolicy,
+                    "The default gameplay opponent did not use Master and its included policies.");
+                VerifyMainPhaseTiming(controller, masterDuel, master: true);
+
                 controller.AiDifficulty = AIDifficulty.Normal;
-                controller.StartDuelMatch(DeckRepository.GetCharacter(opponent.charId), opponent, deck, playerGoesFirst: false);
+                var ranked = new RankedMatch(new RankedSave(), new RankedOpponent(character, opponent, 1, 1f), deck, true);
+                FindField(controller, "_activeRanked").SetValue(controller, ranked);
+                typeof(GameAppController).GetMethods(PrivateInstance).Single(method => method.Name == "StartDuelMatch").Invoke(
+                    controller, new object[] { character, opponent, deck, false, false, 1f, false, true });
+                var rankedAi = (TacticalAI)FindField(controller, "_ai").GetValue(controller);
+                Require(rankedAi != masterAi && rankedAi.Difficulty == AIDifficulty.Normal && !rankedAi.UsesTrainedPolicy,
+                    "The ranked opponent overrode the selected Normal difficulty.");
+                FindField(controller, "_activeRanked").SetValue(controller, null);
+
+                controller.StartDuelMatch(character, opponent, deck, playerGoesFirst: false);
                 var firstDuel = (DuelSession)FindField(controller, "_session").GetValue(controller);
                 var firstAi = (TacticalAI)FindField(controller, "_ai").GetValue(controller);
                 Require(firstDuel.NativePtr != IntPtr.Zero && !firstDuel.IsFinished && firstDuel.HumanPlayerIndex == 1,
                     "The first duel did not start with the AI going first.");
+                VerifyMainPhaseTiming(controller, firstDuel, master: false);
                 firstAi.Difficulty = AIDifficulty.Smart;
                 Require(firstAi.UsesTrainedPolicy && firstAi.HasLinkPolicy, "The gameplay opponent could not load the included duel policies.");
                 firstAi.Difficulty = AIDifficulty.Normal;
@@ -73,6 +93,58 @@ namespace YGOPortable.Editor
                 field?.UnbindSession();
                 UnityEngine.Object.DestroyImmediate(canvas);
             }
+        }
+
+        private static void VerifyDifficultySettings(GameAppController controller, Transform root)
+        {
+            const string key = "ygo.ai-difficulty.v1";
+            int previous = PlayerPrefs.GetInt(key, int.MinValue);
+            try
+            {
+                PlayerPrefs.DeleteKey(key);
+                Require(controller.AiDifficulty == AIDifficulty.Master && GameAppController.ReadAiDifficulty() == AIDifficulty.Master,
+                    "The default AI difficulty was not Master.");
+                var menu = new TitleAndMenuUI(controller, root);
+                menu.MenuRoot.transform.Find("Menu/Settings/Button").GetComponent<Button>().onClick.Invoke();
+                var panel = menu.SettingsRoot.transform.Find("SettingsWin");
+                var speed = (RectTransform)panel.Find("AiRow");
+                var difficulty = (RectTransform)panel.Find("AiDiffRow");
+                var replay = (RectTransform)panel.Find("PersonalReplay");
+                var label = difficulty.Find("Label/Text").GetComponent<Text>();
+                var toggle = difficulty.Find("BtnDiff/B").GetComponent<Button>();
+                Require(toggle.IsActive() && toggle.IsInteractable() && label.text.Contains("마스터 (0.6초 수읽기)") &&
+                    speed.anchorMin.y > difficulty.anchorMax.y && difficulty.anchorMin.y > replay.anchorMax.y,
+                    "The difficulty control was missing, overlapped other rows, or showed the wrong default.");
+                toggle.onClick.Invoke();
+                Require(controller.AiDifficulty == AIDifficulty.Normal && GameAppController.ReadAiDifficulty() == AIDifficulty.Normal &&
+                    label.text.Contains("보통"), "One click did not apply, save and display Normal difficulty.");
+                menu.CloseSettings();
+                menu.MenuRoot.transform.Find("Menu/Settings/Button").GetComponent<Button>().onClick.Invoke();
+                Require(label.text.Contains("보통"), "Reopening Settings lost the selected difficulty.");
+                toggle.onClick.Invoke();
+                Require(controller.AiDifficulty == AIDifficulty.Master && GameAppController.ReadAiDifficulty() == AIDifficulty.Master &&
+                    label.text.Contains("마스터"), "One click did not restore, save and display Master difficulty.");
+                menu.CloseSettings();
+            }
+            finally
+            {
+                if (previous == int.MinValue) PlayerPrefs.DeleteKey(key);
+                else PlayerPrefs.SetInt(key, previous);
+                PlayerPrefs.Save();
+            }
+        }
+
+        private static void VerifyMainPhaseTiming(GameAppController controller, DuelSession duel, bool master)
+        {
+            var tick = typeof(GameAppController).GetMethod("AdvanceAiDecision", PrivateInstance);
+            var idle = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_IDLECMD, playerId = (byte)duel.AiPlayerIndex };
+            bool Tick(DuelPrompt prompt, float delta, double now) => (bool)tick.Invoke(controller, new object[] { prompt, delta, now });
+            Require(Tick(idle, 1f, 0) == !master, "The selected difficulty did not control the initial AI response.");
+            if (!master) return;
+            Require(!Tick(idle, 1f, .599) && Tick(idle, 0f, .6), "The Master main-phase decision did not wait at least 0.6 real seconds.");
+            var option = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_OPTION, playerId = idle.playerId };
+            Require(Tick(option, 1f, .6), "The Master minimum also delayed a card's resolution prompt.");
+            Debug.Log("[VERIFY AI DIFFICULTY] Settings toggle, saved preference, default Master and 600 ms Main Phase floor passed.");
         }
 
         private static FieldInfo FindField(object owner, string name) => owner.GetType().GetField(name, PrivateInstance);

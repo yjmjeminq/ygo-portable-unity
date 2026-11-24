@@ -28,6 +28,7 @@ namespace YGOPortable.Editor
 
         internal static void Run()
         {
+            VerifyMasterDifficulty();
             var failures = new List<string>();
             var general = DuelAiPolicy.LoadIncluded();
             var links = LinkComboPolicy.LoadIncluded();
@@ -57,6 +58,26 @@ namespace YGOPortable.Editor
             VerifyUncertainDraw();
             Require(failures.Count == 0, string.Join("\n", failures));
             Debug.Log("[VERIFY COMBO SEARCH] Firewall reached Link-5 and Link-6. D/D/D changed the route with the same hand and an alternate public board. Draw outcomes were excluded.");
+        }
+
+        internal static void VerifyMasterDifficulty()
+        {
+            var general = DuelAiPolicy.LoadIncluded();
+            var links = LinkComboPolicy.LoadIncluded();
+            var firewall = ComboRegressionDecks.Get(495);
+            var ddd = ComboRegressionDecks.Get(34043);
+            var smartLink = PlayOpening(general, links, firewall, 8, 2, search: true);
+            var smartDdd = PlayOpening(general, links, ddd, 17, 2, search: true);
+            var masterLink = PlayOpening(general, links, firewall, 8, 2, search: true, difficulty: AIDifficulty.Master);
+            var masterDdd = PlayOpening(general, links, ddd, 17, 2, search: true, difficulty: AIDifficulty.Master);
+            Require(masterLink.opening.SequenceEqual(smartLink.opening) && masterLink.rank >= 5 &&
+                masterDdd.opening.SequenceEqual(smartDdd.opening) && masterDdd.monsters.Contains(Machinex) &&
+                new[] { masterLink, masterDdd }.All(result => result.branches > 0 && result.retries == 0),
+                $"Master did not finish the native combo routes. Firewall: {Describe(masterLink)}. D/D/D: {Describe(masterDdd)}.");
+            Require(masterLink.branches + masterDdd.branches > smartLink.branches + smartDdd.branches,
+                $"Master did not use the larger search on the tested boards. Firewall: {Describe(masterLink)}. D/D/D: {Describe(masterDdd)}.");
+            Debug.Log($"[VERIFY MASTER COMBO] Firewall Link-{masterLink.rank}, D/D/D ended on Machinex. " +
+                $"Master replayed {masterLink.branches} and {masterDdd.branches} lines (Smart: {smartLink.branches} and {smartDdd.branches}).");
         }
 
         private static void VerifyUncertainDraw()
@@ -159,7 +180,8 @@ namespace YGOPortable.Editor
             if (Application.isBatchMode) EditorApplication.Exit(exit);
         }
 
-        private static Output PlayOpening(DuelAiPolicy general, LinkComboPolicy links, PresetDeckInfo deck, int seed, int board, bool search)
+        private static Output PlayOpening(DuelAiPolicy general, LinkComboPolicy links, PresetDeckInfo deck, int seed, int board,
+            bool search, AIDifficulty difficulty = AIDifficulty.Smart)
         {
             var enemy = Enumerable.Repeat(board == 2 ? NormalTrap : NormalMonster, 40).ToArray();
             var seeds = new ulong[] { (ulong)seed * 29 + 101, (ulong)seed * 47 + 7, (ulong)seed * 71 + 13, (ulong)seed * 97 + 3 };
@@ -167,12 +189,13 @@ namespace YGOPortable.Editor
             if (!duel.StartNewDuel(deck.main, deck.extra, enemy, Array.Empty<uint>(), board == 0, seed: seeds))
                 throw new InvalidOperationException("Could not start the sampled duel.");
             byte seat = (byte)duel.HumanPlayerIndex;
-            var adaptive = new TacticalAI(general, links, searchCombos: search);
+            var adaptive = new TacticalAI(general, links, searchCombos: search) { Difficulty = difficulty };
             var enemyAi = new TacticalAI(general);
             int placed = 0;
             var opening = Array.Empty<uint>();
             var steps = new List<uint>();
             double slowest = 0;
+            int planningStepLimit = difficulty == AIDifficulty.Master ? 128 : 24;
             bool canBattle = false;
             for (int i = 0; !duel.IsFinished && duel.RetryCount == 0 && i < 180; i++)
             {
@@ -197,7 +220,7 @@ namespace YGOPortable.Editor
                 while (!adaptive.AdvanceComboPlanning(duel, prompt))
                 {
                     slowest = Math.Max(slowest, watch.Elapsed.TotalMilliseconds);
-                    if (++planningSteps > 24) throw new InvalidOperationException("Combo planning did not finish.");
+                    if (++planningSteps > planningStepLimit) throw new InvalidOperationException("Combo planning did not finish.");
                     watch.Restart();
                 }
                 var response = adaptive.ComputeResponse(duel, prompt);
