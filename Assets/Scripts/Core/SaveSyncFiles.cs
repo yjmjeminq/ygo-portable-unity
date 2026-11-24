@@ -131,6 +131,26 @@ namespace YGOPortable.Core
             var before = ReadSnapshot();
             if (before.Hash != expectedLocalHash) return false;
             WriteAtomic(_backup, before.Serialize());
+            ApplyWithJournal(before, desired);
+            return true;
+        }
+
+        // The caller holds the profile lock while checking and creating the first collection.
+        internal void SaveInitialStarter(string profile, UserDeck starter)
+        {
+            var before = ReadSnapshot();
+            var desired = new SaveSyncSnapshot
+            {
+                profile = profile,
+                decks = new List<SaveSyncSnapshot.Deck>(before.decks),
+            };
+            if (!desired.decks.Any(deck => string.Equals(deck.id, starter.id, StringComparison.OrdinalIgnoreCase)))
+                desired.decks.Add(new SaveSyncSnapshot.Deck { id = starter.id, json = JsonUtility.ToJson(starter, true) });
+            ApplyWithJournal(before, desired);
+        }
+
+        private void ApplyWithJournal(SaveSyncSnapshot before, SaveSyncSnapshot desired)
+        {
             WriteAtomic(_journal, desired.Serialize());
             try
             {
@@ -144,7 +164,6 @@ namespace YGOPortable.Core
                 File.Delete(_journal);
                 throw;
             }
-            return true;
         }
 
         internal static FileStream LockProfile(string profile)

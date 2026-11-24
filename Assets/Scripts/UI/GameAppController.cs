@@ -124,7 +124,6 @@ namespace YGOPortable.UI
                 if (DeckRepository.PresetDecks.Count == 0)
                     DeckRepository.Load(Application.streamingAssetsPath, Application.persistentDataPath, seedDefaultDecks: false);
                 CollectionProgress.Load(Application.persistentDataPath);
-                RegisterStarterDeck(CollectionProgress.CreateStarterDeck());
 
                 Debug.Log("[GameApp] 4. Ensuring EventSystem & Canvas...");
                 EnsureEventSystem();
@@ -139,7 +138,7 @@ namespace YGOPortable.UI
                 _saveSyncMenu = new SaveSyncMenu(canvas.transform, _saveSync, () => CloseSaveSync());
                 _collectionShop = new CollectionShopUI(canvas.transform,
                     () => ShowScreen(_screen == AppScreen.StarterSelection ? AppScreen.Title : AppScreen.MainMenu),
-                    CompleteStarterSelection);
+                    _ => ShowScreen(AppScreen.MainMenu));
                 _secretPackToast = new SecretPackToast(canvas.transform);
                 _archetypeCodex = new ArchetypeCodexUI(canvas.transform, () => ShowScreen(AppScreen.MainMenu));
                 _storyMode = new StoryModeUI(this, canvas.transform);
@@ -351,30 +350,6 @@ namespace YGOPortable.UI
             if (_screen == AppScreen.CardShop) _collectionShop.ShowPackFromLookup(id);
         }
 
-        private void CompleteStarterSelection(UserDeck deck)
-        {
-            RegisterStarterDeck(deck);
-            ShowScreen(AppScreen.MainMenu);
-        }
-
-        private static void RegisterStarterDeck(UserDeck starter)
-        {
-            if (starter == null) return;
-            var existing = DeckRepository.UserDecks.Find(deck => deck.id == starter.id);
-            if (existing == null)
-            {
-                try { DeckRepository.SaveUserDeck(starter); }
-                catch (Exception error) when (error is IOException || error is UnauthorizedAccessException)
-                {
-                    Debug.LogWarning($"[GameApp] 스타터 덱 저장 실패. 다음 실행 시 수집 프로필에서 다시 불러옵니다. {error.Message}");
-                }
-                existing = starter;
-            }
-
-            DeckRepository.UserDecks.Remove(existing);
-            DeckRepository.UserDecks.Insert(0, existing);
-        }
-
         internal static bool CanStartWithDeck(UserDeck deck, out string reason)
         {
             if (CollectionProgress.Initialized) return CollectionProgress.CanUseDeck(deck, out reason);
@@ -542,7 +517,6 @@ namespace YGOPortable.UI
         {
             DeckRepository.ReloadUserDecks();
             CollectionProgress.Load(Application.persistentDataPath);
-            RegisterStarterDeck(CollectionProgress.CreateStarterDeck());
             _titleAndMenu.RefreshWallet();
         }
 

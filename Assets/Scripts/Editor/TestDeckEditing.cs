@@ -535,7 +535,7 @@ namespace YGOPortable.Editor
             var saved = new UserDeck { name = "Overframe shortage fixture", extra = { masquerena, masquerena }, side = { masquerena } };
             saved.SetAppearance(saved.side, 0, overframe);
             DeckRepository.SaveUserDeck(saved);
-            OpenSavedDeck(editor);
+            OpenSavedDeck(editor, DeckRepository.UserDecks.IndexOf(saved));
 
             var deck = Field<UserDeck>(editor, "_workingDeck");
             var extra = Field<RectTransform>(editor, "_extraGridRect");
@@ -727,13 +727,14 @@ namespace YGOPortable.Editor
                 profile = TestCollectionProgress.WithOwnership(profile, code, 1);
             File.WriteAllText(path, profile);
             CollectionProgress.Load(save);
-            DeckRepository.SaveUserDeck(new UserDeck
+            var saved = new UserDeck
             {
                 name = "Artwork source fixture",
                 main = new List<uint> { recoveredMain },
                 extra = new List<uint> { recoveredExtra, arcrayAlt },
                 side = new List<uint> { localOnly },
-            });
+            };
+            DeckRepository.SaveUserDeck(saved);
 
             WriteLocalArtworkFixture(save, localOnly);
             CardArtLoader.Shutdown();
@@ -744,7 +745,7 @@ namespace YGOPortable.Editor
                 foreach (uint code in recovered)
                     Require(CardArtLoader.GetArtSprite(code) != fallback, $"Shared artwork {code} did not load from the build.");
 
-                OpenSavedDeck(editor);
+                OpenSavedDeck(editor, DeckRepository.UserDecks.IndexOf(saved));
                 CompositeCardView FirstSlot(string field) => Field<RectTransform>(editor, field)
                     .Find("Card_0/CardInset/Card").GetComponent<CompositeCardView>();
                 Require(FirstSlot("_mainDeckSlotGrid").ArtworkSprite == CardArtLoader.GetArtSprite(recoveredMain) &&

@@ -41,12 +41,20 @@ namespace YGOPortable.Editor
                 starters.All(option => option.MainCount >= 40 && option.MainCount <= 60 && option.ExtraCount <= 15),
                 "A starter pack was missing, duplicated, or had an illegal deck size.");
             var selection = starters.First(option => option.Name.Contains("상검"));
+            string blockedDeckPath = Path.Combine(save, "Decks", "collection_" + selection.Id + ".json");
+            Directory.CreateDirectory(blockedDeckPath);
+            Require(!CollectionProgress.TryChooseStarter(selection.Id, out _, out _) &&
+                !CollectionProgress.HasStarter && !File.Exists(profile) && DeckRepository.UserDecks.Count == 0,
+                "A failed starter save committed the collection without the deck.");
+            Directory.Delete(blockedDeckPath);
+
             Require(CollectionProgress.TryChooseStarter(selection.Id, out var starter, out string error), error);
             Require(!CollectionProgress.TryChooseStarter(selection.Id, out _, out _) &&
-                CollectionProgress.CanUseDeck(starter, out _) && CollectionProgress.Balance == 5_000,
+                CollectionProgress.CanUseDeck(starter, out _) && CollectionProgress.Balance == 5_000 &&
+                DeckRepository.UserDecks.Single().id == starter.id && File.Exists(blockedDeckPath),
                 "Starter selection did not grant the deck and starting DP exactly once.");
 
-            VerifySaveSync(save, starter);
+            VerifySaveSync(streamingPath, save, starter);
             var materials = LoadLegacyProfile(save, profile);
             VerifyCrafting(materials, starter, profile);
             VerifyPurchasesAndRewards(save, profile);
@@ -72,14 +80,16 @@ namespace YGOPortable.Editor
                 $"{opponents.Sum(opponent => OpponentDeckLevels.GetDecks(opponent.id).Count)} decks available.");
         }
 
-        private static void VerifySaveSync(string save, UserDeck starter)
+        private static void VerifySaveSync(string streamingPath, string save, UserDeck starter)
         {
             string secondDevice = Path.Combine(save, "second-device");
             Directory.CreateDirectory(secondDevice);
             var source = new SaveSyncFiles(save);
             var destination = new SaveSyncFiles(secondDevice);
+            var otherDeck = CollectionProgress.CopyDeck(starter);
+            otherDeck.id = "another-deck";
+            DeckRepository.SaveUserDeck(otherDeck);
             var start = source.Capture();
-            start.decks.Add(new SaveSyncSnapshot.Deck { id = starter.id, json = JsonUtility.ToJson(starter) });
             var empty = destination.Capture();
             Require(SaveSyncSnapshot.Decide(start, start.Hash, null, null) == SaveSyncAction.Upload &&
                 SaveSyncSnapshot.Decide(empty, empty.Hash, start.Hash, null) == SaveSyncAction.Download,
@@ -89,8 +99,17 @@ namespace YGOPortable.Editor
             destination.SetBaseline(start.Hash);
             Require(destination.Baseline == start.Hash, "The last synced version did not persist.");
 
-            var changed = SaveSyncSnapshot.Parse(start.Serialize());
-            changed.decks.Clear();
+            int balance = CollectionProgress.Balance;
+            uint starterCard = starter.main[0];
+            int quantity = CollectionProgress.GetOwnedCount(starterCard);
+            DeckRepository.DeleteUserDeck(starter.id);
+            var changed = source.Capture();
+            DeckRepository.Load(streamingPath, save, seedDefaultDecks: false);
+            CollectionProgress.Load(save);
+            Require(DeckRepository.UserDecks.Single().id == otherDeck.id &&
+                CollectionProgress.HasStarter && CollectionProgress.Balance == balance &&
+                CollectionProgress.GetOwnedCount(starterCard) == quantity && source.Capture().Hash == changed.Hash,
+                "Reloading a local save restored a deleted starter or changed its collection.");
             Require(SaveSyncSnapshot.Decide(changed, changed.Hash, start.Hash, start.Hash) == SaveSyncAction.Upload &&
                 SaveSyncSnapshot.Decide(start, start.Hash, changed.Hash, start.Hash) == SaveSyncAction.Download &&
                 SaveSyncSnapshot.Decide(changed, changed.Hash, start.Hash, null) == SaveSyncAction.Conflict &&
@@ -98,9 +117,20 @@ namespace YGOPortable.Editor
                 "The sync rules did not distinguish one-sided changes from conflicts.");
             Require(!destination.Restore(changed, empty.Hash) && destination.Capture().Hash == start.Hash,
                 "A stale download replaced a locally changed save.");
+            DeckRepository.Load(streamingPath, secondDevice, seedDefaultDecks: false);
+            Require(DeckRepository.UserDecks.Any(deck => deck.id == starter.id), "The initial cloud save lacked the starter deck.");
             Require(destination.Restore(changed, start.Hash) && destination.Capture().Hash == changed.Hash &&
                 SaveSyncSnapshot.Parse(File.ReadAllText(Path.Combine(secondDevice, "cloud-save-previous-local.json"))).Hash == start.Hash,
                 "Cloud deck deletion or local backup did not work.");
+            DeckRepository.ReloadUserDecks();
+            CollectionProgress.Load(secondDevice);
+            Require(DeckRepository.UserDecks.Single().id == otherDeck.id &&
+                CollectionProgress.HasStarter && CollectionProgress.Balance == balance &&
+                CollectionProgress.GetOwnedCount(starterCard) == quantity && destination.Capture().Hash == changed.Hash,
+                "Reloading a cloud save restored a deleted starter or changed its collection.");
+            DeckRepository.Load(streamingPath, save, seedDefaultDecks: false);
+            CollectionProgress.Load(save);
+            DeckRepository.DeleteUserDeck(otherDeck.id);
 
             SaveSyncFiles.WriteAtomic(Path.Combine(secondDevice, "cloud-save-restore.pending"), start.Serialize());
             destination.Recover();
@@ -119,7 +149,7 @@ namespace YGOPortable.Editor
                 SaveSyncCredential.Write(secondDevice, null);
                 Require(SaveSyncCredential.Read(secondDevice) == null, "Disconnect did not remove the local credential.");
             }
-            Debug.Log("[VERIFY SAVE SYNC] First launch, handoff, conflict, stale writes, restore recovery and credential storage passed.");
+            Debug.Log("[VERIFY SAVE SYNC] First launch, starter deletion across reloads, handoff, conflict, stale writes, restore recovery and credential storage passed.");
         }
 
 

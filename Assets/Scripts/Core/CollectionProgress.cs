@@ -556,7 +556,8 @@ namespace YGOPortable.Core
                 shop = new SecretShopSave(),
             };
             InitializeOpponentProgress(next);
-            if (!Write(next, owned, out error)) return false;
+            if (!Write(next, owned, out error, starter: selected)) return false;
+            DeckRepository.ReloadUserDecks();
             deck = CopyDeck(selected);
             return true;
         }
@@ -925,7 +926,7 @@ namespace YGOPortable.Core
         }
 
         private static bool Write(SavedProfile next, Dictionary<uint, int> owned, out string error,
-            Dictionary<uint, int> overframes = null)
+            Dictionary<uint, int> overframes = null, UserDeck starter = null)
         {
             overframes ??= _ownedOverframes;
             string pending = null;
@@ -941,14 +942,21 @@ namespace YGOPortable.Core
                     return false;
                 }
 
-                pending = Path.Combine(directory, Path.GetRandomFileName() + ".tmp");
                 next.cards = SerializeOwnership(owned);
                 next.overframeCards = SerializeOwnership(overframes);
                 next.craftDust = next.dust.ToString(CultureInfo.InvariantCulture);
                 string json = JsonUtility.ToJson(next, true);
-                File.WriteAllText(pending, json);
-                if (File.Exists(_profilePath)) File.Replace(pending, _profilePath, null);
-                else File.Move(pending, _profilePath);
+                if (starter == null)
+                {
+                    pending = Path.Combine(directory, Path.GetRandomFileName() + ".tmp");
+                    File.WriteAllText(pending, json);
+                    if (File.Exists(_profilePath)) File.Replace(pending, _profilePath, null);
+                    else File.Move(pending, _profilePath);
+                }
+                else
+                {
+                    new SaveSyncFiles(directory).SaveInitialStarter(json, starter);
+                }
                 _savedJson = json;
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
