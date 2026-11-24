@@ -41,13 +41,19 @@ namespace YGOPortable.Editor
 
                 controller.AiDifficulty = AIDifficulty.Normal;
                 var ranked = new RankedMatch(new RankedSave(), new RankedOpponent(character, opponent, 1, 1f), deck, true);
-                FindField(controller, "_activeRanked").SetValue(controller, ranked);
-                typeof(GameAppController).GetMethods(PrivateInstance).Single(method => method.Name == "StartDuelMatch").Invoke(
-                    controller, new object[] { character, opponent, deck, false, false, 1f, false, true });
+                var rankedUi = new OfflineRankedUI(controller, canvas.transform);
+                FindField(controller, "_ranked").SetValue(controller, rankedUi);
+                FindField(controller, "_screen").SetValue(controller, AppScreen.Ranked);
+                FindField(rankedUi, "_match").SetValue(rankedUi, ranked);
+                rankedUi.Root.SetActive(true);
+                ((RectTransform)FindField(rankedUi, "_versus").GetValue(rankedUi)).gameObject.SetActive(true);
+                controller.StartRankedDuel(ranked);
                 var rankedAi = (TacticalAI)FindField(controller, "_ai").GetValue(controller);
                 Require(rankedAi != masterAi && rankedAi.Difficulty == AIDifficulty.Normal && !rankedAi.UsesTrainedPolicy,
                     "The ranked opponent overrode the selected Normal difficulty.");
+                rankedUi.Close();
                 FindField(controller, "_activeRanked").SetValue(controller, null);
+                FindField(controller, "_screen").SetValue(controller, AppScreen.Duel);
 
                 controller.StartDuelMatch(character, opponent, deck, playerGoesFirst: false);
                 var firstDuel = (DuelSession)FindField(controller, "_session").GetValue(controller);
