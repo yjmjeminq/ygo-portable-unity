@@ -124,6 +124,18 @@ class CanonSourceContractTests(unittest.TestCase):
         source["page_url"] = "https://tv.apple.com.example.com/us/episode/queen/id"
         self.assertFalse(canon.primary_visual_source(source))
 
+    def test_myvideo_episode_image_is_bound_to_licensed_metadata(self):
+        source = {"page_url": "https://www.myvideo.net.tw/details/0/395627",
+                  "image_url": "https://img.myvideo.net.tw/images/MED010/0000/6968/202405071725295381_2016.jpg",
+                  "licensed_catalogue_verified": True, "schema_type": "TVEpisode", "page_sha256": "a" * 64}
+        source["page_meta_image_url"] = source["image_url"]
+        self.assertTrue(canon.primary_visual_source(source))
+        source["image_url"] = "https://www.example.com/frame.jpg"
+        self.assertFalse(canon.primary_visual_source(source))
+        source["image_url"] = source["page_meta_image_url"]
+        source["schema_type"] = "UserUpload"
+        self.assertFalse(canon.primary_visual_source(source))
+
     def test_updating_visuals_removes_retired_fields_and_preserves_dialogue_and_player(self):
         records = canon.build(self.catalogue, self.manifest, allow_pending=True)
         original = canon.read_json(canon.ROOT / "Assets/StreamingAssets/tagforce_gx_script.json")

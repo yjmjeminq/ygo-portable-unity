@@ -1,14 +1,14 @@
 {
   "complete": false,
   "total": 240,
-  "reviewed": 223,
-  "pending": 17,
+  "reviewed": 236,
+  "pending": 4,
   "scopeDecision": "User approved preserving the existing 240 IDs and distinguishing original media.",
   "coverage": "Visible features of the selected official references; unseen anatomy and clothing are not invented.",
   "artworkGeneration": "This build produces reviewed prompts and data, not replacement character PNGs.",
   "reviewedByMedium": {
-    "anime": 215,
-    "film": 4,
+    "anime": 227,
+    "film": 5,
     "manga": 2,
     "game": 0,
     "card": 2
@@ -16,7 +16,7 @@
   "series": {
     "DM": {
       "total": 46,
-      "reviewed": 43
+      "reviewed": 46
     },
     "GX": {
       "total": 43,
@@ -24,7 +24,7 @@
     },
     "5DS": {
       "total": 46,
-      "reviewed": 43
+      "reviewed": 45
     },
     "ZEXAL": {
       "total": 37,
@@ -32,104 +32,19 @@
     },
     "ARCV": {
       "total": 41,
-      "reviewed": 35
+      "reviewed": 39
     },
     "VRAINS": {
       "total": 27,
-      "reviewed": 22
+      "reviewed": 26
     }
   },
   "pendingCharacters": [
-    {
-      "id": 194,
-      "series": "DM",
-      "name": "죠노우치 카츠야 (세뇌)",
-      "canonicalName": "Joey",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 217,
-      "series": "DM",
-      "name": "아누비스",
-      "canonicalName": "Anubis",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 3001,
-      "series": "DM",
-      "name": "마나",
-      "canonicalName": "Mana",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
     {
       "id": 138,
       "series": "5DS",
       "name": "배가본드",
       "canonicalName": "The Vagabond",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 25,
-      "series": "5DS",
-      "name": "미스티 로라",
-      "canonicalName": "Misty Tredwell",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 218,
-      "series": "5DS",
-      "name": "미스티 로라 (Ver.2)",
-      "canonicalName": "Misty Tredwell",
       "canonicalMedium": null,
       "pendingFields": [
         "hair_color",
@@ -160,57 +75,6 @@
       ]
     },
     {
-      "id": 41,
-      "series": "ARCV",
-      "name": "토쿠마츠 쵸지로",
-      "canonicalName": "Chojiro Tokumatsu",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 3400,
-      "series": "ARCV",
-      "name": "세르게이 볼코프",
-      "canonicalName": "Sergey Volkov",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 3401,
-      "series": "ARCV",
-      "name": "배틀 비스트",
-      "canonicalName": "Battle Beast",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
       "id": 58,
       "series": "ARCV",
       "name": "아카바 레이",
@@ -228,95 +92,10 @@
       ]
     },
     {
-      "id": 74,
-      "series": "ARCV",
-      "name": "패왕룡 즈아크",
-      "canonicalName": "Z-ARC",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
       "id": 232,
       "series": "VRAINS",
       "name": "베이그런트",
       "canonicalName": "The Vagrant",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 142,
-      "series": "VRAINS",
-      "name": "하노이의 기사",
-      "canonicalName": "Knight of Hanoi",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 3505,
-      "series": "VRAINS",
-      "name": "파우스트",
-      "canonicalName": "Faust",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 3504,
-      "series": "VRAINS",
-      "name": "바이라",
-      "canonicalName": "Vyra",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 180,
-      "series": "VRAINS",
-      "name": "블루 걸",
-      "canonicalName": "Blue Gal",
       "canonicalMedium": null,
       "pendingFields": [
         "hair_color",

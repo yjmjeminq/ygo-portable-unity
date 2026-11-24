@@ -9,6 +9,7 @@ this module does not modify the story, protagonist, prompts, or asset files.
 
 import argparse
 import json
+import re
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -55,6 +56,36 @@ def primary_visual_source(source):
                 and image_parts.scheme == "https"
                 and image_parts.hostname == "is1-ssl.mzstatic.com"
                 and image_parts.path.startswith("/image/thumb/"))
+    if page_parts.scheme == "https" and page_parts.hostname in {"myvideo.net.tw", "www.myvideo.net.tw"}:
+        return (re.fullmatch(r"/details/0/\d+", page_parts.path) is not None
+                and source.get("licensed_catalogue_verified") is True
+                and source.get("schema_type") in {"TVEpisode", "Movie"}
+                and bool(source.get("page_sha256"))
+                and source.get("page_meta_image_url") == picture
+                and image_parts.scheme == "https"
+                and image_parts.hostname == "img.myvideo.net.tw"
+                and image_parts.path.startswith("/images/MED010/"))
+    if page_parts.scheme == "https" and page_parts.hostname == "x.com":
+        # Konami links this account from the Duel Links home page. Match the
+        # promotional image to the metadata of the specific reviewed post.
+        return (re.fullmatch(r"/YuGiOh_DL_INFO/status/\d+", page_parts.path) is not None
+                and source.get("official_account_verified") is True
+                and source.get("official_account_page_url") == "https://www.konami.com/yugioh/duel_links/ja/"
+                and source.get("twitter_creator") == "@YuGiOh_DL_INFO"
+                and bool(source.get("page_sha256"))
+                and source.get("page_meta_image_url") == picture
+                and image_parts.scheme == "https"
+                and image_parts.hostname == "pbs.twimg.com"
+                and image_parts.path.startswith("/media/"))
+    if page_parts.scheme == "https" and page_parts.hostname == "pluto.tv":
+        episode = re.fullmatch(r"/(?:us/)?shows/\d+/episode/([0-9a-f]{24})/", page_parts.path)
+        return (episode is not None
+                and source.get("licensed_catalogue_verified") is True
+                and bool(source.get("page_sha256"))
+                and source.get("page_meta_image_url") == picture
+                and image_parts.scheme == "https"
+                and image_parts.hostname == "thumbnails.cbsig.net"
+                and image_parts.path == f"/ptv/episodes/{episode[1]}/screenshot16_9.jpg")
     if official_url(page):
         if not picture or official_url(picture):
             return True
