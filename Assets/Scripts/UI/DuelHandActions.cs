@@ -9,9 +9,10 @@ namespace YGOPortable.UI
 {
     public partial class DuelFieldUI
     {
-        private const float CardActionGap = 5f;
-        private float CardActionWidth => _mobileLayout ? Mathf.Max(104f, MobileSafeArea.MinimumTouchSize(_cardActionsBar)) : 77f;
-        private float CardActionHeight => _mobileLayout ? Mathf.Max(88f, MobileSafeArea.MinimumTouchSize(_cardActionsBar)) : 73f;
+        private const float CardActionGap = 8f;
+        private const float CardActionMargin = 14f;
+        internal const float CardActionOpenDuration = .12f;
+        internal const float CardActionOvershootAt = .075f;
 
         private readonly Dictionary<RectTransform, FieldSlotView> _fieldSlotsByRect = new();
         private readonly Dictionary<RectTransform, StackTileView> _stackTilesByRect = new();
@@ -27,12 +28,8 @@ namespace YGOPortable.UI
         private DuelPrompt _cardActionsPrompt;
         private (byte controller, uint location, uint sequence, uint code, int materials) _cardActionKey;
         private bool _infoActionShown;
-        private float _actionArcRadius;
-        private float _actionArcWidth;
-        private float _actionArcDiameter;
-        private float _actionArcOpenedAt;
-        private int _actionArcCount;
-        private readonly List<(RectTransform Rect, Vector2 Position)> _actionArcSlots = new();
+        private readonly List<(RectTransform Slot, RectTransform Plate)> _cardActionButtons = new();
+        private float _cardActionsOpenedAt;
         private bool _navigatingCardActions;
 
         private void BuildCardActions(Transform root)
@@ -226,9 +223,9 @@ namespace YGOPortable.UI
                 _cardActionAnchor = pile.root;
                 _cardActionArt = null;
                 _cardActionsPrompt = prompt;
-                ClearCardActionButtons(1);
+                ClearCardActionButtons();
                 bool activations = actions.Any(action => CommandIcon(action.responseVal) == "ACTION");
-                AddCardAction(0, activations ? "ACTION" : "LOOK", activations ? "효과 발동" : "행동 선택", () =>
+                AddCardAction(activations ? "ACTION" : "LOOK", activations ? "효과 발동" : "행동 선택", () =>
                 {
                     if (!CanShowCardActions || _session != session || !ReferenceEquals(session.ActivePrompt, prompt) ||
                         _cardActionAnchor != pile.root) return;
@@ -241,44 +238,18 @@ namespace YGOPortable.UI
             _cardActionsBar.gameObject.SetActive(true);
         }
 
-        private void ClearCardActionButtons(int count, bool radial = false)
+        private void ClearCardActionButtons()
         {
-            for (int i = _cardActionsBar.childCount - 1; i > 0; i--)
+            foreach (var (slot, _) in _cardActionButtons)
             {
-                var old = _cardActionsBar.GetChild(i);
-                old.gameObject.SetActive(false);
-                old.SetParent(null, false);
-                if (Application.isPlaying) UnityEngine.Object.Destroy(old.gameObject);
-                else UnityEngine.Object.DestroyImmediate(old.gameObject);
+                slot.gameObject.SetActive(false);
+                slot.SetParent(null, false);
+                if (Application.isPlaying) UnityEngine.Object.Destroy(slot.gameObject);
+                else UnityEngine.Object.DestroyImmediate(slot.gameObject);
             }
 
-            _actionArcSlots.Clear();
-            _actionArcCount = radial ? count : 0;
-            _actionArcOpenedAt = Time.unscaledTime;
-            if (!radial)
-            {
-                _cardActionsBar.sizeDelta = new Vector2(count * (CardActionWidth + CardActionGap) - CardActionGap,
-                    CardActionHeight);
-                return;
-            }
-
-            _actionArcDiameter = Mathf.Max(CardActionWidth, CardActionHeight);
-            _actionArcWidth = Mathf.Min(152f, 40f * (count - 1));
-            float step = _actionArcWidth * Mathf.Deg2Rad / Mathf.Max(1, count - 1);
-            _actionArcRadius = count == 1 ? 0f : (_actionArcDiameter + 8f) / (2f * Mathf.Sin(step * .5f));
-            float halfArc = _actionArcWidth * .5f * Mathf.Deg2Rad;
-            _cardActionsBar.sizeDelta = new Vector2(_actionArcDiameter + 2f * Mathf.Sin(halfArc) * _actionArcRadius,
-                _actionArcDiameter + (1f - Mathf.Cos(halfArc)) * _actionArcRadius);
-            if (count > 1)
-            {
-                var arc = DuelUiKit.FillRect("CommandArc", _cardActionsBar);
-                var graphic = arc.gameObject.AddComponent<DuelEffectGraphic>();
-                graphic.texture = Texture2D.whiteTexture;
-                graphic.Kind = DuelEffectKind.ActionArc;
-                graphic.Tint = DuelStyle.ChainCyan;
-                graphic.raycastTarget = false;
-                graphic.Seek(.54f);
-            }
+            _cardActionButtons.Clear();
+            _cardActionsOpenedAt = Time.unscaledTime;
         }
 
         private void RebuildCardActions(RectTransform anchor, LiveCardState card, DuelPrompt prompt,
@@ -286,8 +257,7 @@ namespace YGOPortable.UI
         {
             var groups = actions.GroupBy(action => action.responseVal & 0xffff).ToArray();
             bool hasMaterials = card.overlayCodes.Count > 0;
-            int infoIndex = groups.Length + (hasMaterials ? 1 : 0);
-            ClearCardActionButtons(infoIndex + (showInfo ? 1 : 0), radial: true);
+            ClearCardActionButtons();
             var session = _session;
             var key = CardActionKey(card);
             LiveCardState GetLiveSource()
@@ -310,7 +280,7 @@ namespace YGOPortable.UI
                     "SETMONST" or "SET" => "세트",
                     _ => first.label,
                 };
-                AddCardAction(i, icon, label, () =>
+                AddCardAction(icon, label, () =>
                 {
                     var source = GetLiveSource();
                     if (source == null) return;
@@ -333,7 +303,7 @@ namespace YGOPortable.UI
 
             if (hasMaterials)
             {
-                AddCardAction(groups.Length, "LOOK", $"소재 {card.overlayCodes.Count}", () =>
+                AddCardAction("LOOK", $"소재 {card.overlayCodes.Count}", () =>
                 {
                     var source = GetLiveSource();
                     if (source == null) return;
@@ -343,7 +313,7 @@ namespace YGOPortable.UI
             }
             if (showInfo)
             {
-                AddCardAction(infoIndex, "LOOK", "상세 정보", () =>
+                AddCardAction("LOOK", "상세 정보", () =>
                 {
                     var source = GetLiveSource();
                     if (!CanInspectCardActionSource(source)) return;
@@ -353,93 +323,93 @@ namespace YGOPortable.UI
             }
         }
 
-        private void AddCardAction(int index, string iconName, string label, Action action, string name = null)
+        private void AddCardAction(string iconName, string label, Action action, string name = null)
         {
-            if (_actionArcCount > 0)
-            {
-                AddRadialCardAction(index, iconName, label, action, name);
-                return;
-            }
-
-            float left = index * (CardActionWidth + CardActionGap);
             var slot = DuelUiKit.CreateRect(name ?? iconName, _cardActionsBar, Vector2.zero, Vector2.zero,
-                new Vector2(left, 0f), new Vector2(left + CardActionWidth, CardActionHeight));
-            bool highlighted = iconName is "ACTION" or "ATTACK" or "SUMMON" or "SUMMONSP";
-            bool iconOnly = iconName == "ACTION";
-            var face = _mobileLayout ? DuelUiKit.FillRect("Circle", slot) : DuelUiKit.CreateRect("Circle", slot,
-                new Vector2(.09f, iconOnly ? .06f : .25f), new Vector2(.91f, 1f), Vector2.zero, Vector2.zero);
-            var button = _mobileLayout
-                ? DuelStyle.Button(face, "Button", "", action, 14, highlighted)
-                : DuelStyle.RoundButton(face, "Button", highlighted ? DuelStyle.Gold : DuelStyle.Player, action);
-            if (!iconOnly)
-            {
-                var caption = DuelUiKit.CreateRect("Caption", slot, Vector2.zero, new Vector2(1f, .27f),
-                    Vector2.zero, Vector2.zero);
-                DuelStyle.Shadow(DuelUiKit.AddFittedText(caption, "Label", label, 14, 9, TextAnchor.MiddleCenter,
-                    Color.white, FontStyle.Bold), 1.5f);
-            }
-            DuelUiIcons.AddActionImage(button.transform, iconName,
-                iconOnly ? new Vector2(.14f, .14f) : new Vector2(.24f, _mobileLayout ? .36f : .24f),
-                iconOnly ? new Vector2(.86f, .86f) : new Vector2(.76f, _mobileLayout ? .91f : .76f));
+                Vector2.zero, Vector2.zero);
+            var plate = DuelStyle.AddCardActionCapsule(slot, iconName, label, action);
+            _cardActionButtons.Add((slot, plate));
         }
 
-        private void AddRadialCardAction(int index, string iconName, string label, Action action, string name)
+        private void LayoutCardActions(float availableWidth)
         {
-            float fraction = _actionArcCount == 1 ? .5f : (float)index / (_actionArcCount - 1);
-            float angle = Mathf.Lerp(-.5f, .5f, fraction) * _actionArcWidth * Mathf.Deg2Rad;
-            float arcFloor = Mathf.Cos(_actionArcWidth * .5f * Mathf.Deg2Rad);
-            float x = _cardActionsBar.sizeDelta.x * .5f + Mathf.Sin(angle) * _actionArcRadius;
-            float y = _actionArcDiameter * .5f + (Mathf.Cos(angle) - arcFloor) * _actionArcRadius;
-            var center = new Vector2(x, y);
-            float half = _actionArcDiameter * .5f;
-            var slot = DuelUiKit.CreateRect(name ?? iconName, _cardActionsBar, Vector2.zero, Vector2.zero,
-                center - Vector2.one * half, center + Vector2.one * half);
-            _actionArcSlots.Add((slot, center));
-            bool primary = iconName is "ACTION" or "ATTACK" or "SUMMON" or "SUMMONSP";
-            var circle = DuelUiKit.FillRect("Circle", slot);
-            var button = DuelStyle.RoundButton(circle, "Button", primary ? DuelStyle.Gold : DuelStyle.ChainCyan, action);
-            if (iconName == "ACTION")
+            int count = _cardActionButtons.Count;
+            if (count == 0) return;
+            float touchSize = _mobileLayout ? MobileSafeArea.MinimumTouchSize(_cardActionsBar) : 0f;
+            float width = Mathf.Max(DuelStyle.ActionCapsuleWidth, touchSize);
+            float height = Mathf.Max(DuelStyle.ActionCapsuleHeight, touchSize);
+            int columns = Mathf.Clamp(Mathf.FloorToInt((availableWidth - 2f * CardActionMargin + CardActionGap) /
+                (width + CardActionGap)), 1, count);
+            int rows = (count + columns - 1) / columns;
+            var size = new Vector2(columns * (width + CardActionGap) - CardActionGap,
+                rows * (height + CardActionGap) - CardActionGap);
+            var hitSize = new Vector2(width, height);
+            if (_cardActionsBar.sizeDelta == size && _cardActionButtons[0].Slot.sizeDelta == hitSize) return;
+            _cardActionsBar.sizeDelta = size;
+            for (int i = 0; i < count; i++)
             {
-                DuelUiIcons.AddActionImage(button.transform, iconName, new Vector2(.14f, .14f), new Vector2(.86f, .86f));
-                return;
+                int row = i / columns;
+                int inRow = Mathf.Min(columns, count - row * columns);
+                float x = size.x * .5f + (i % columns - (inRow - 1) * .5f) * (width + CardActionGap);
+                float y = height * .5f + (rows - 1 - row) * (height + CardActionGap);
+                var rect = _cardActionButtons[i].Slot;
+                rect.sizeDelta = hitSize;
+                rect.anchoredPosition = new Vector2(x, y);
             }
-            DuelUiIcons.AddActionImage(button.transform, iconName, new Vector2(.21f, .39f), new Vector2(.79f, .89f));
-            var caption = DuelUiKit.CreateRect("Caption", button.transform, new Vector2(.08f, .12f), new Vector2(.92f, .39f),
-                Vector2.zero, Vector2.zero);
-            DuelUiKit.AddFittedText(caption, "Label", label, 15, 9, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+        }
+
+        internal void AdvanceCardActionEntrance(float elapsed)
+        {
+            float scale = elapsed <= CardActionOvershootAt
+                ? Mathf.SmoothStep(.85f, 1.05f, elapsed / CardActionOvershootAt)
+                : Mathf.SmoothStep(1.05f, 1f, (elapsed - CardActionOvershootAt) /
+                    (CardActionOpenDuration - CardActionOvershootAt));
+            var visualScale = new Vector3(scale, scale, 1f);
+            foreach (var (_, plate) in _cardActionButtons)
+                plate.localScale = visualScale;
         }
 
         private void PositionCardActions(RectTransform anchor, bool inHand)
         {
             var root = (RectTransform)_cardActionsBar.parent;
+            LayoutCardActions(root.rect.width);
             float top = float.NegativeInfinity;
-            void IncludeTop(RectTransform area)
+            float bottom = float.PositiveInfinity;
+            void IncludeBounds(RectTransform area)
             {
                 area.GetWorldCorners(_cardActionCorners);
                 foreach (var corner in _cardActionCorners)
-                    top = Mathf.Max(top, root.InverseTransformPoint(corner).y);
+                {
+                    float edge = root.InverseTransformPoint(corner).y;
+                    top = Mathf.Max(top, edge);
+                    bottom = Mathf.Min(bottom, edge);
+                }
             }
-            IncludeTop(anchor);
+            IncludeBounds(anchor);
+            float anchorTop = top;
+            float anchorBottom = bottom;
             if (_fieldSlotsByRect.TryGetValue(anchor, out var slot) && slot.cardView.gameObject.activeInHierarchy)
             {
-                IncludeTop(slot.focusArt);
+                IncludeBounds(slot.focusArt);
                 if (slot.readout?.Rect is { } readout && readout.gameObject.activeInHierarchy)
-                    IncludeTop(readout);
+                    IncludeBounds(readout);
             }
-            float x = root.InverseTransformPoint(anchor.TransformPoint(anchor.rect.center)).x;
-            float inset = _cardActionsBar.sizeDelta.x * .5f + 8f;
-            float y = Mathf.Min(root.rect.yMax - _cardActionsBar.sizeDelta.y - 8f, top + (inHand ? 20f : 6f));
-            _cardActionsBar.anchoredPosition = new Vector2(Mathf.Clamp(x, root.rect.xMin + inset, root.rect.xMax - inset), y);
 
-            // Keep pointer travel from the card to the controls above cards behind the toolbar.
-            float topEdge = root.InverseTransformPoint(anchor.TransformPoint(new Vector2(anchor.rect.center.x, anchor.rect.yMax))).y;
-            _cardActionsHoverArea.offsetMin = new Vector2(0f, Mathf.Min(0f, topEdge - y));
-            if (_actionArcSlots.Count == 0) return;
-            float progress = Application.isPlaying ? Mathf.Clamp01((Time.unscaledTime - _actionArcOpenedAt) / .16f) : 1f;
-            float approach = Mathf.SmoothStep(.6f, 1f, progress);
-            var origin = new Vector2(_cardActionsBar.sizeDelta.x * .5f, _actionArcDiameter * .5f);
-            foreach (var (rect, position) in _actionArcSlots)
-                rect.anchoredPosition = Vector2.LerpUnclamped(origin, position, approach);
+            float x = root.InverseTransformPoint(anchor.TransformPoint(anchor.rect.center)).x;
+            float inset = Mathf.Min(root.rect.width * .5f, _cardActionsBar.sizeDelta.x * .5f + CardActionMargin);
+            float minY = root.rect.yMin + CardActionMargin;
+            float height = _cardActionsBar.sizeDelta.y;
+            float maxY = Mathf.Max(minY, root.rect.yMax - height - CardActionMargin);
+            float above = top + (inHand ? 20f : 8f);
+            float below = bottom - height - 8f;
+            float y = above <= maxY ? Mathf.Max(minY, above) : below >= minY ? below : maxY;
+            _cardActionsBar.anchoredPosition =
+                new Vector2(Mathf.Clamp(x, root.rect.xMin + inset, root.rect.xMax - inset), y) - root.rect.center;
+
+            // Keep the gap traversable while the pointer moves from the card to the menu.
+            _cardActionsHoverArea.offsetMin = new Vector2(0f, Mathf.Min(0f, anchorTop - y));
+            _cardActionsHoverArea.offsetMax = new Vector2(0f, Mathf.Max(0f, anchorBottom - (y + height)));
+            AdvanceCardActionEntrance(Application.isPlaying ? Time.unscaledTime - _cardActionsOpenedAt : CardActionOpenDuration);
         }
 
         private void HideCardActions()

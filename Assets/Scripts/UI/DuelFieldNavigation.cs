@@ -166,7 +166,7 @@ namespace YGOPortable.UI
             }
             else if (frame.Direction != Vector2Int.zero && _duelPadFocus != null)
             {
-                // Left/right follows the command order even when the arc lifts its middle buttons.
+                // Left/right follows the command order when the menu wraps.
                 index = scope == PadScope.CardActions && frame.Direction.x != 0
                     ? Mathf.Clamp(index + (frame.Direction.x > 0 ? 1 : -1), 0, _duelPadTargets.Count - 1)
                     : FindDuelPadNeighbor(index, frame.Direction);

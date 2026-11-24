@@ -121,6 +121,7 @@ namespace YGOPortable.Editor
                 }
 
                 var placeActions = typeof(DuelFieldUI).GetMethod("PositionCardActions", BindingFlags.Instance | BindingFlags.NonPublic);
+                VerifyActionCapsules(field, actions, slot, placeActions);
                 var cardPose = typeof(DuelFieldUI).GetMethod("GetCardPose", BindingFlags.Instance | BindingFlags.NonPublic);
                 foreach (var safe in new[] { new Rect(144, 36, 2256, 1044), new Rect(0, 36, 2256, 1044) })
                 {
@@ -282,6 +283,76 @@ namespace YGOPortable.Editor
                 BitConverter.ToInt32(response, 4) == 1 && BitConverter.ToInt32(response, 8) == 1,
                 "The field picker did not submit the original native index of the second target.");
             return response;
+        }
+
+        private static void VerifyActionCapsules(DuelFieldUI field, RectTransform bar, RectTransform anchor,
+            MethodInfo position)
+        {
+            const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
+            var type = typeof(DuelFieldUI);
+            var add = type.GetMethod("AddCardAction", Private);
+            var clear = type.GetMethod("ClearCardActionButtons", Private);
+            var layout = type.GetMethod("LayoutCardActions", Private);
+            var specs = new (string Icon, string Label, uint Fill, uint Rim)[]
+            {
+                ("ACTION", "효과 발동", 0xE67E22, 0xF39C12),
+                ("SUMMON", "일반 소환", 0x0984E3, 0x74B9FF),
+                ("SUMMONSP", "특수 소환", 0x8C7AE6, 0xDCDDE1),
+                ("SET", "세트", 0x2F3640, 0x718093),
+                ("SETMONST", "세트", 0x2F3640, 0x718093),
+                ("TURN_DEF", "표시 변경", 0x20BF6B, 0x55EFC4),
+                ("ATTACK", "공격", 0xEB3B5A, 0xFC5C65),
+                ("LOOK", "상세 정보", 0x192A56, 0x81ECEC),
+            };
+            Color32 ColorCode(uint rgb) => new Color32((byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb, 255);
+            int calls = 0;
+            clear.Invoke(field, null);
+            foreach (var (icon, label, _, _) in specs)
+                add.Invoke(field, new object[] { icon, label, (Action)(() => calls++), null });
+            position.Invoke(field, new object[] { anchor, false });
+            foreach (var (key, expected, fill, rim) in specs)
+            {
+                var button = bar.Find(key + "/Button").GetComponent<Button>();
+                var plate = (RectTransform)button.transform.Find("Plate");
+                var label = plate.Find("Caption/Label").GetComponent<Text>();
+                var stroke = label.GetComponent<Outline>();
+                var icon = plate.Find("Icon").GetComponent<Image>();
+                Require(plate.rect.size == new Vector2(144f, 46f) &&
+                    icon.rectTransform.rect.size == new Vector2(28f, 28f) &&
+                    icon.sprite == DuelUiIcons.Action(key) && icon.sprite.rect.size == new Vector2(128f, 128f) &&
+                    !icon.raycastTarget && label.text == expected && label.fontSize == 17 &&
+                    label.fontStyle == FontStyle.Bold && label.color == Color.white &&
+                    label.preferredWidth <= label.rectTransform.rect.width && stroke != null &&
+                    stroke.effectColor.r == 0f && stroke.effectColor.a > .9f &&
+                    ((Color32)plate.GetComponent<Image>().color).Equals(ColorCode(rim)) &&
+                    ((Color32)plate.Find("Surface").GetComponent<Image>().color).Equals(ColorCode(fill)) &&
+                    plate.Find("Halo").GetComponent<Image>().color.a > 0f,
+                    $"The {key} capsule failed its atlas, readable label, size or palette checks.");
+                button.onClick.Invoke();
+            }
+            Require(calls == specs.Length, "A capsule did not dispatch its action.");
+
+            const float narrowWidth = 400f;
+            layout.Invoke(field, new object[] { narrowWidth });
+            var first = (RectTransform)bar.Find("ACTION");
+            var second = (RectTransform)bar.Find("SUMMON");
+            var third = (RectTransform)bar.Find("SUMMONSP");
+            var hit = (RectTransform)first.Find("Button");
+            var plateToAnimate = (RectTransform)hit.Find("Plate");
+            var minimum = MobileSafeArea.MinimumTouchSize(hit);
+            Require(bar.rect.width < narrowWidth && first.anchoredPosition.y == second.anchoredPosition.y &&
+                third.anchoredPosition.y < first.anchoredPosition.y && hit.rect.width >= minimum &&
+                hit.rect.height >= minimum && first.anchoredPosition.x < second.anchoredPosition.x,
+                "The narrow mobile menu did not wrap or preserve its touch targets.");
+            foreach (var (time, scale) in new[] { (0f, .85f), (.075f, 1.05f), (.12f, 1f), (.3f, 1f) })
+            {
+                field.AdvanceCardActionEntrance(time);
+                Require(Mathf.Abs(plateToAnimate.localScale.x - scale) < .001f && hit.localScale == Vector3.one,
+                    "The capsule entrance changed its hitbox or missed a scale checkpoint.");
+            }
+            clear.Invoke(field, null);
+            bar.sizeDelta = new Vector2(100f, 40f);
+            Debug.Log("[VERIFY CARD ACTION CAPSULES] Atlas cells, labels, colors, hit areas, wrapping and 120 ms entrance passed.");
         }
 
         internal static void VerifyAttackTargetClicks(DuelSession duel, DuelPrompt prompt)
@@ -922,16 +993,19 @@ namespace YGOPortable.Editor
                     Require(!bar.gameObject.activeSelf, "Tapping elsewhere did not dismiss the hand actions.");
                     ExecuteEvents.Execute(source.gameObject, pointer, ExecuteEvents.pointerClickHandler);
                     var prompt = _duel.ActivePrompt;
-                    Click(bar.Find("Details/Circle/Button")?.GetComponent<Button>());
+                    Click(bar.Find("Details/Button")?.GetComponent<Button>());
                     VerifyCardDetails(card.code, prompt);
                     ExecuteEvents.Execute(source.gameObject, pointer, ExecuteEvents.pointerClickHandler);
                 }
                 else ExecuteEvents.Execute(source.gameObject, pointer, ExecuteEvents.pointerClickHandler);
                 VerifyInspectorArtwork(card.code, _duel.ActivePrompt, pointer.pointerId);
                 var hoverArea = (RectTransform)bar.Find("HoverArea");
-                var activate = (RectTransform)bar.Find("ACTION/Circle/Button");
+                var activate = (RectTransform)bar.Find("ACTION/Button");
                 Require(bar.gameObject.activeInHierarchy && activate != null, "The hovered hand card had no activation icon.");
-                RequireActionIcon(activate, "ACTION");
+                var plate = (RectTransform)activate.Find("Plate");
+                Require(plate.Find("Caption/Label").GetComponent<Text>().text == "효과 발동" &&
+                    plate.Find("Icon").GetComponent<Image>().sprite == DuelUiIcons.Action("ACTION"),
+                    "The actual activation button did not display its icon and Korean label.");
                 var behind = DuelUiKit.FillRect("CardBehindActions", bar.parent);
                 behind.SetSiblingIndex(bar.GetSiblingIndex());
                 DuelUiKit.AddImage(behind.gameObject, DuelUiKit.WhiteSprite, Color.white);
@@ -941,12 +1015,11 @@ namespace YGOPortable.Editor
                     float inGap = hoverArea.offsetMin.y * .5f;
                     Require(inGap < -1f, "The activation icon is too close to the hand card for this fixture.");
                     Vector2 gapPoint = RectTransformUtility.WorldToScreenPoint(_camera, bar.TransformPoint(new Vector2(0f, inGap)));
-                    var info = (RectTransform)bar.Find("Details/Circle/Button");
-                    var mid = (activate.position + info.position) * .5f;
-                    Vector2 betweenActions = RectTransformUtility.WorldToScreenPoint(_camera,
-                        mid);
-                    Require(bar.Find("CommandArc").GetComponent<DuelEffectGraphic>().Kind == DuelEffectKind.ActionArc &&
-                        Vector3.Distance(activate.position, info.position) > 5f, "The card commands did not unfold into separate ring targets.");
+                    var buttons = bar.GetComponentsInChildren<Button>();
+                    Require(buttons.Length >= 2 && Mathf.Abs(buttons[0].transform.position.y - buttons[1].transform.position.y) < .1f,
+                        "The card commands were not in a horizontal row.");
+                    var mid = (buttons[0].transform.position + buttons[1].transform.position) * .5f;
+                    Vector2 betweenActions = RectTransformUtility.WorldToScreenPoint(_camera, mid);
                     Require(Raycast(gapPoint, out _) == hoverArea.gameObject &&
                         Raycast(betweenActions, out _) == hoverArea.gameObject,
                         "A card behind the action toolbar intercepted the pointer.");

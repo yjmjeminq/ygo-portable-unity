@@ -142,6 +142,107 @@ namespace YGOPortable.UI
             stroke.effectDistance = new Vector2(1f, -1f);
         }
 
+        internal const int ActionCapsuleWidth = 144;
+        internal const int ActionCapsuleHeight = 46;
+        private const int CapsuleGlowSpread = 6;
+        private static Sprite _actionCapsule;
+        private static Sprite _actionCapsuleHalo;
+
+        internal static (Color32 Fill, Color32 Rim) CardActionPalette(string icon) => icon switch
+        {
+            "ACTION" => (new Color32(230, 126, 34, 255), new Color32(243, 156, 18, 255)),
+            "SUMMON" => (new Color32(9, 132, 227, 255), new Color32(116, 185, 255, 255)),
+            "SUMMONSP" => (new Color32(140, 122, 230, 255), new Color32(220, 221, 225, 255)),
+            "SET" or "SETMONST" => (new Color32(47, 54, 64, 255), new Color32(113, 128, 147, 255)),
+            "TURN_DEF" => (new Color32(32, 191, 107, 255), new Color32(85, 239, 196, 255)),
+            "ATTACK" => (new Color32(235, 59, 90, 255), new Color32(252, 92, 101, 255)),
+            _ => (new Color32(25, 42, 86, 255), new Color32(129, 236, 236, 255)),
+        };
+
+        internal static RectTransform AddCardActionCapsule(RectTransform slot, string icon, string text, Action action)
+        {
+            var (fill, rim) = CardActionPalette(icon);
+            _actionCapsule ??= BuildActionCapsule(0);
+            _actionCapsuleHalo ??= BuildActionCapsule(CapsuleGlowSpread);
+
+            var hitRect = DuelUiKit.FillRect("Button", slot);
+            DuelUiKit.AddImage(hitRect.gameObject, DuelUiKit.WhiteSprite, Color.clear);
+            var plate = DuelUiKit.CreateRect("Plate", hitRect, Vector2.one * .5f, Vector2.one * .5f,
+                new Vector2(-ActionCapsuleWidth, -ActionCapsuleHeight) * .5f,
+                new Vector2(ActionCapsuleWidth, ActionCapsuleHeight) * .5f);
+
+            Color haloColor = rim;
+            haloColor.a = .72f;
+            var halo = DuelUiKit.FillRect("Halo", plate, -CapsuleGlowSpread);
+            DuelUiKit.AddImage(halo.gameObject, _actionCapsuleHalo, haloColor, raycast: false);
+            DuelUiKit.AddImage(plate.gameObject, _actionCapsule, rim, raycast: false);
+            var surface = DuelUiKit.FillRect("Surface", plate, 1.5f);
+            var face = DuelUiKit.AddImage(surface.gameObject, _actionCapsule, fill, raycast: false);
+
+            var iconRect = DuelUiKit.CreateRect("Icon", plate, new Vector2(0f, .5f), new Vector2(0f, .5f),
+                new Vector2(13f, -14f), new Vector2(41f, 14f));
+            DuelUiKit.AddImage(iconRect.gameObject, DuelUiIcons.Action(icon), Color.white, true, false);
+            var divider = DuelUiKit.CreateRect("Divider", plate, new Vector2(0f, .5f), new Vector2(0f, .5f),
+                new Vector2(47f, -10f), new Vector2(48f, 10f));
+            DuelUiKit.AddImage(divider.gameObject, DuelUiKit.WhiteSprite, new Color(0f, 0f, 0f, .28f), raycast: false);
+            var caption = DuelUiKit.CreateRect("Caption", plate, Vector2.zero, Vector2.one,
+                new Vector2(53f, 0f), new Vector2(-12f, 0f));
+            var label = DuelUiKit.AddText(caption, "Label", text, 17, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
+            label.horizontalOverflow = HorizontalWrapMode.Overflow;
+            label.supportRichText = false;
+            var outline = label.gameObject.AddComponent<Outline>();
+            outline.effectColor = new Color(0f, 0f, 0f, .95f);
+            outline.effectDistance = new Vector2(1.2f, -1.2f);
+
+            var button = hitRect.gameObject.AddComponent<Button>();
+            button.targetGraphic = face;
+            button.navigation = new Navigation { mode = Navigation.Mode.None };
+            button.colors = new ColorBlock
+            {
+                normalColor = Color.white,
+                highlightedColor = new Color(1f, .94f, .85f),
+                selectedColor = new Color(1f, .94f, .85f),
+                pressedColor = new Color(.67f, .67f, .67f),
+                disabledColor = new Color(.63f, .63f, .63f, .72f),
+                colorMultiplier = 1f,
+                fadeDuration = .08f,
+            };
+            button.onClick.AddListener(() =>
+            {
+                DuelAudio.PlayClick();
+                action?.Invoke();
+            });
+            return plate;
+        }
+
+        private static Sprite BuildActionCapsule(int halo)
+        {
+            int width = ActionCapsuleWidth + halo * 2;
+            int height = ActionCapsuleHeight + halo * 2;
+            const float radius = ActionCapsuleHeight * .5f - 1f;
+            var pixels = new Color32[width * height];
+            for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+            {
+                var p = new Vector2(Mathf.Abs(x + .5f - width * .5f), Mathf.Abs(y + .5f - height * .5f));
+                var q = p - new Vector2(ActionCapsuleWidth * .5f - radius - 1f, 0f);
+                float distance = Vector2.Max(q, Vector2.zero).magnitude - radius;
+                float alpha = halo == 0 ? Mathf.Clamp01(.5f - distance) :
+                    Mathf.Pow(Mathf.Clamp01(1f - Mathf.Max(0f, distance) / halo), 2f);
+                pixels[y * width + x] = new Color32(255, 255, 255, (byte)(alpha * 255f));
+            }
+
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+            {
+                name = halo == 0 ? "Card action capsule" : "Card action halo",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+            };
+            texture.SetPixels32(pixels);
+            texture.Apply(false, true);
+            return Sprite.Create(texture, new Rect(0f, 0f, width, height), Vector2.one * .5f, 100f, 0, SpriteMeshType.FullRect);
+        }
+
         internal static Button RoundButton(RectTransform parent, string name, Color accent, Action action)
         {
             var rect = DuelUiKit.FillRect(name, parent);

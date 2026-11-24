@@ -104,8 +104,8 @@ namespace YGOPortable.Editor
                 Vector2 hitPosition = mouseCard.anchoredPosition;
                 ExecuteEvents.Execute(mouseCard.gameObject, pointer, ExecuteEvents.pointerEnterHandler);
                 var handActions = (RectTransform)field.Root.transform.Find("CardActions");
-                Require(handActions.gameObject.activeSelf && handActions.Find("SUMMON/Circle/Button/Icon").GetComponent<Image>().sprite != null &&
-                    handActions.Find("SETMONST/Circle/Button/Icon").GetComponent<Image>().sprite != null &&
+                Require(handActions.gameObject.activeSelf && handActions.Find("SUMMON/Button/Plate/Icon").GetComponent<Image>().sprite != null &&
+                    handActions.Find("SETMONST/Button/Plate/Icon").GetComponent<Image>().sprite != null &&
                     handActions.TransformPoint(Vector3.zero).y > mouseCard.TransformPoint(Vector3.up * mouseCard.rect.yMax).y &&
                     ReferenceEquals(idle, session.ActivePrompt), "Hovering a monster did not show its legal hand actions above the card.");
                 Invoke(field, "AdvanceDuelPadCardMotions", .06f);
@@ -199,8 +199,8 @@ namespace YGOPortable.Editor
                 var commandCardArt = (RectTransform)commandCard.GetComponentInChildren<CompositeCardView>().transform;
                 Require(handActions.gameObject.activeSelf && !Get<GameObject>(field, "_actionPopup").activeSelf,
                     "Focusing a hand card with the controller did not show the action icons.");
-                var summonIcon = handActions.Find("SUMMON/Circle/Button").gameObject;
-                var setIcon = handActions.Find("SETMONST/Circle/Button").gameObject;
+                var summonIcon = handActions.Find("SUMMON/Button").gameObject;
+                var setIcon = handActions.Find("SETMONST/Button").gameObject;
                 Pad(field, A);
                 Require(events.currentSelectedGameObject == summonIcon && ReferenceEquals(idle, session.ActivePrompt),
                     "Opening hand action choices submitted a command or selected the wrong icon.");
@@ -235,7 +235,7 @@ namespace YGOPortable.Editor
                     "Canceling placement consumed the summon or left its controls visible.");
 
                 Pad(field, A);
-                summonIcon = handActions.Find("SUMMON/Circle/Button").gameObject;
+                summonIcon = handActions.Find("SUMMON/Button").gameObject;
                 ChooseSummon();
                 Pad(field, direction: Vector2Int.right);
                 var placement = Get<RectTransform>(field, "_duelPadFocus");
@@ -269,7 +269,7 @@ namespace YGOPortable.Editor
                 Require(fieldCard.anchoredPosition.y > 0f && fieldStats.anchoredPosition == fieldCard.anchoredPosition &&
                     fieldStats.localScale == fieldArt.localScale,
                     "Controller focus did not lift the field card and its stats together.");
-                var attackIcon = handActions.Find("ATTACK/Circle/Button");
+                var attackIcon = handActions.Find("ATTACK/Button");
                 Require(handActions.gameObject.activeSelf && attackIcon != null &&
                     !Get<GameObject>(field, "_actionPopup").activeSelf,
                     "Focusing a field monster in the Battle Phase did not show the attack icon.");
