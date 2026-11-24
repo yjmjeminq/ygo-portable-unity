@@ -924,7 +924,8 @@ namespace YGOPortable.UI
         private static AudioSource _sfxSource;
         private static AudioSource _bgmSource;
         private static AudioClip _clipClick, _clipDraw, _clipSummon, _clipAttack, _clipDamage, _clipChain, _clipWin, _clipPhase, _clipDirectAttack, _clipTick, _clipCoin, _clipDice;
-        private static AudioClip _clipDuelBgm, _clipMenuBgm;
+        private static AudioClip _clipDuelBgm, _clipMenuBgm, _clipWorldDayBgm, _clipWorldNightBgm;
+        private static AudioClip _clipWorldReward;
 
         public static float SfxVolume { get; set; } = 0.65f;
         public static float BgmVolume { get; set; } = 0.35f;
@@ -958,7 +959,7 @@ namespace YGOPortable.UI
             _clipCoin = MakeTone(0.22f, 980f, 1320f, 0.35f);
             _clipDice = MakeTone(0.24f, 420f, 780f, 0.35f);
 
-            _clipMenuBgm = MakeMenuBgm(sr);
+            _clipMenuBgm = MakeAmbientBgm(sr, "menu_bgm", 2f, new[] { 130.81f, 116.54f, 146.83f, 110.00f });
         }
 
         public static void PlayClick() => Play(_clipClick);
@@ -974,25 +975,43 @@ namespace YGOPortable.UI
         public static void PlayCoin() => Play(_clipCoin);
         public static void PlayDice() => Play(_clipDice);
 
-        public static void PlayDuelBgm()
+        internal static void PlayTagForceReward()
         {
-            if (_bgmSource == null || BgmVolume < 0.01f) return;
-            _clipDuelBgm ??= DuelVisualAssets.LoadSound("DuelMusic") ?? MakeDuelBgm(22050);
-            if (_bgmSource.clip == _clipDuelBgm && _bgmSource.isPlaying) return;
-            _bgmSource.clip = _clipDuelBgm;
-            _bgmSource.loop = true;
-            _bgmSource.volume = BgmVolume;
-            _bgmSource.Play();
+            if (_sfxSource != null && SfxVolume > 0.01f)
+                Play(_clipWorldReward ??= MakeRewardJingle());
         }
 
-        public static void PlayMenuBgm()
+        public static void PlayDuelBgm()
         {
-            if (_bgmSource == null || _clipMenuBgm == null || BgmVolume < 0.01f) return;
-            if (_bgmSource.clip == _clipMenuBgm && _bgmSource.isPlaying) return;
-            _bgmSource.clip = _clipMenuBgm;
+            if (_bgmSource == null) return;
+            _clipDuelBgm ??= DuelVisualAssets.LoadSound("DuelMusic") ?? MakeDuelBgm(22050);
+            PlayBgm(_clipDuelBgm);
+        }
+
+        public static void PlayMenuBgm() => PlayBgm(_clipMenuBgm);
+
+        internal static void PlayTagForceBgm(bool night)
+        {
+            if (_bgmSource == null) return;
+            if (night)
+                PlayBgm(_clipWorldNightBgm ??= MakeAmbientBgm(22050, "tag_force_night", 3f,
+                    new[] { 98f, 82.41f, 87.31f, 110f }));
+            else
+                PlayBgm(_clipWorldDayBgm ??= MakeAmbientBgm(22050, "tag_force_day", 1.6f,
+                    new[] { 146.83f, 130.81f, 164.81f, 196f }));
+        }
+
+        private static void PlayBgm(AudioClip clip)
+        {
+            if (_bgmSource == null || clip == null) return;
+            if (_bgmSource.clip != clip)
+            {
+                _bgmSource.Stop();
+                _bgmSource.clip = clip;
+            }
             _bgmSource.loop = true;
             _bgmSource.volume = BgmVolume;
-            _bgmSource.Play();
+            if (BgmVolume >= 0.01f && !_bgmSource.isPlaying) _bgmSource.Play();
         }
 
         public static void StopBgm()
@@ -1031,6 +1050,27 @@ namespace YGOPortable.UI
                 samples[i] = (float)Math.Sin(phase) * env * amp;
             }
             var clip = AudioClip.Create("sfx", n, 1, sr, false);
+            clip.SetData(samples, 0);
+            return clip;
+        }
+
+        private static AudioClip MakeRewardJingle()
+        {
+            const int sampleRate = 22050;
+            const int note = 3000;
+            const int spacing = 1800;
+            float[] pitches = { 523.25f, 659.25f, 783.99f, 1046.50f };
+            float[] samples = new float[note + spacing * (pitches.Length - 1)];
+            for (int n = 0; n < pitches.Length; n++)
+            {
+                for (int i = 0; i < note; i++)
+                {
+                    float phase = i * pitches[n] * 2f * Mathf.PI / sampleRate;
+                    float envelope = Mathf.Min(1f, i / 80f) * (1f - (float)i / note);
+                    samples[n * spacing + i] += (Mathf.Sin(phase) + .22f * Mathf.Sin(phase * 2f)) * envelope * .21f;
+                }
+            }
+            var clip = AudioClip.Create("tag_force_reward", samples.Length, 1, sampleRate, false);
             clip.SetData(samples, 0);
             return clip;
         }
@@ -1092,27 +1132,26 @@ namespace YGOPortable.UI
             return clip;
         }
 
-        private static AudioClip MakeMenuBgm(int sr)
+        private static AudioClip MakeAmbientBgm(int sr, string name, float secondsPerBar, float[] chords)
         {
-            float duration = 8.0f;
-            int n = (int)(sr * duration);
+            int n = Mathf.RoundToInt(sr * secondsPerBar * chords.Length);
             float[] samples = new float[n];
-            float[] chords = { 130.81f, 116.54f, 146.83f, 110.00f };
 
             double pChord = 0.0, pPluck = 0.0;
             for (int i = 0; i < n; i++)
             {
                 float t = (float)i / sr;
-                int bar = Mathf.Clamp((int)(t / 2.0f), 0, 3);
+                int bar = Mathf.Min((int)(t / secondsPerBar), chords.Length - 1);
                 float f = chords[bar];
 
                 pChord += 2.0 * Math.PI * f / sr;
                 float pad = (float)(Math.Sin(pChord) * 0.20 + Math.Sin(pChord * 1.5) * 0.12 + Math.Sin(pChord * 2.0) * 0.08);
 
-                int pStep = (int)(t * 2f) % 2;
+                float beat = t * 4f / secondsPerBar;
+                int pStep = (int)beat % 2;
                 float pf = f * (pStep == 0 ? 2f : 3f);
                 pPluck += 2.0 * Math.PI * pf / sr;
-                float pluckEnv = Mathf.Repeat(t * 2f, 1f);
+                float pluckEnv = Mathf.Repeat(beat, 1f);
                 float pluck = (float)Math.Sin(pPluck) * Mathf.Exp(-pluckEnv * 3.5f) * 0.12f;
 
                 float loopFade = 1f;
@@ -1121,7 +1160,7 @@ namespace YGOPortable.UI
 
                 samples[i] = Mathf.Clamp((pad + pluck) * loopFade, -1f, 1f);
             }
-            var clip = AudioClip.Create("menu_bgm", n, 1, sr, false);
+            var clip = AudioClip.Create(name, n, 1, sr, false);
             clip.SetData(samples, 0);
             return clip;
         }

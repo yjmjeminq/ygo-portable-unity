@@ -1,0 +1,178 @@
+{
+  "seriesId": "vrains",
+  "assetConfig": {
+    "worldMapPath": "TagForce/VRAINS/Maps/world_map.png"
+  },
+  "spots": [
+    {
+      "spotId": "spot_link_plaza",
+      "name": "LINK VRAINS 광장",
+      "subtitle": "접속한 듀얼리스트들이 모이는 허브",
+      "mapPath": "TagForce/VRAINS/Maps/spot_link_plaza.png",
+      "defaultPickups": [
+        "dp_small",
+        "golden_egg_bread"
+      ]
+    },
+    {
+      "spotId": "spot_data_storm",
+      "name": "데이터 스톰 항로",
+      "subtitle": "스피드 듀얼이 열리는 가상 항로",
+      "mapPath": "TagForce/VRAINS/Maps/spot_data_storm.png",
+      "defaultPickups": [
+        "dp_small",
+        "cyber_custom_parts"
+      ]
+    },
+    {
+      "spotId": "spot_cyberse_gate",
+      "name": "사이버스 게이트",
+      "subtitle": "사이버스 세계와 연결되는 경계",
+      "mapPath": "TagForce/VRAINS/Maps/spot_cyberse_gate.png",
+      "defaultPickups": [
+        "dp_small",
+        "blue_queen_tea"
+      ]
+    },
+    {
+      "spotId": "spot_hanoi_node",
+      "name": "하노이 노드",
+      "subtitle": "하노이 기사단의 흔적이 남은 노드",
+      "mapPath": "TagForce/VRAINS/Maps/spot_hanoi_node.png",
+      "defaultPickups": [
+        "dp_small",
+        "spirit_amber_charm"
+      ]
+    },
+    {
+      "spotId": "spot_sol_district",
+      "name": "SOL 테크놀로지 구역",
+      "subtitle": "보안이 강화된 가상 업무 지구",
+      "mapPath": "TagForce/VRAINS/Maps/spot_sol_district.png",
+      "defaultPickups": [
+        "dp_small",
+        "dark_duel_emblem"
+      ]
+    },
+    {
+      "spotId": "spot_ignis_network",
+      "name": "이그니스 네트워크",
+      "subtitle": "이그니스가 남긴 가상 신호의 집결지",
+      "mapPath": "TagForce/VRAINS/Maps/spot_ignis_network.png",
+      "defaultPickups": [
+        "dp_small",
+        "golden_egg_bread"
+      ]
+    }
+  ],
+  "roster": [
+    {
+      "charId": 143,
+      "spotId": "spot_link_plaza"
+    },
+    {
+      "charId": 187,
+      "spotId": "spot_data_storm"
+    },
+    {
+      "charId": 189,
+      "spotId": "spot_cyberse_gate"
+    },
+    {
+      "charId": 3500,
+      "spotId": "spot_hanoi_node"
+    },
+    {
+      "charId": 3501,
+      "spotId": "spot_sol_district"
+    },
+    {
+      "charId": 3502,
+      "spotId": "spot_ignis_network"
+    },
+    {
+      "charId": 3503,
+      "spotId": "spot_link_plaza"
+    },
+    {
+      "charId": 3504,
+      "spotId": "spot_data_storm"
+    },
+    {
+      "charId": 3505,
+      "spotId": "spot_cyberse_gate"
+    },
+    {
+      "charId": 139,
+      "spotId": "spot_hanoi_node"
+    },
+    {
+      "charId": 140,
+      "spotId": "spot_sol_district"
+    },
+    {
+      "charId": 141,
+      "spotId": "spot_ignis_network"
+    },
+    {
+      "charId": 142,
+      "spotId": "spot_link_plaza"
+    },
+    {
+      "charId": 177,
+      "spotId": "spot_data_storm"
+    },
+    {
+      "charId": 178,
+      "spotId": "spot_cyberse_gate"
+    },
+    {
+      "charId": 179,
+      "spotId": "spot_hanoi_node"
+    },
+    {
+      "charId": 180,
+      "spotId": "spot_sol_district"
+    },
+    {
+      "charId": 181,
+      "spotId": "spot_ignis_network"
+    },
+    {
+      "charId": 182,
+      "spotId": "spot_link_plaza"
+    },
+    {
+      "charId": 183,
+      "spotId": "spot_data_storm"
+    },
+    {
+      "charId": 184,
+      "spotId": "spot_cyberse_gate"
+    },
+    {
+      "charId": 185,
+      "spotId": "spot_hanoi_node"
+    },
+    {
+      "charId": 186,
+      "spotId": "spot_sol_district"
+    },
+    {
+      "charId": 188,
+      "spotId": "spot_ignis_network"
+    },
+    {
+      "charId": 190,
+      "spotId": "spot_link_plaza"
+    },
+    {
+      "charId": 191,
+      "spotId": "spot_data_storm"
+    },
+    {
+      "charId": 232,
+      "spotId": "spot_cyberse_gate"
+    }
+  ]
+}
