@@ -244,6 +244,13 @@ namespace YGOPortable.Editor
                         DuelUiKit.LoadOpponentPortrait(opponent) != null &&
                         OpponentDeckLevels.GetDecks(episode.charId).Any(deck => deck.main?.Length >= 40),
                         $"Missing cast or decks for {episode.id}.");
+                    var levels = OpponentDeckLevels.GetDecks(episode.charId);
+                    bool raid = episode.raidCard != 0 || episode.raidLife != 0;
+                    int assignedLevel = StoryModeUI.SelectDeckLevel(script.episodes, i, levels.Count, raid);
+                    Require(assignedLevel >= 1 && assignedLevel <= levels.Count &&
+                        levels[assignedLevel - 1].charId == episode.charId &&
+                        (i != script.episodes.Length - 1 || assignedLevel == levels.Count),
+                        $"The runtime level assignment is invalid for {episode.id}.");
                     var scripted = StoryGimmickRuntime.StartingCards(episode.gimmick);
                     if (!((series is "gx" or "5ds" or "zexal" or "arcv" or "vrains") && !string.IsNullOrEmpty(episode.gimmick)) &&
                         episode.raidCard == 0 && episode.raidLife == 0 && scripted.Count == 0 &&
@@ -258,11 +265,17 @@ namespace YGOPortable.Editor
                             boss.Value.Opening.Hand == 5 + episode.chapter && boss.Value.WinDp > CollectionProgress.WinReward,
                             $"Invalid raid conditions for {episode.id}.");
                     }
-                    var rival = OpponentDeckLevels.GetDecks(episode.charId)[^1];
+                    var rival = levels[assignedLevel - 1];
                     VerifyNativeOpening(episode.id, boss, rival.main, rival.extra, humanFirst: true, gimmick: episode.gimmick);
                 }
             }
             Require(ids.Count == 6 * StoryCampaign.EpisodeCount, "Some episodes were not included.");
+            var legacy = Enumerable.Range(0, StoryCampaign.LegacyEpisodeCount)
+                .Select(i => new StoryEpisodeData { charId = i is 0 or 25 or 49 ? 104 : 94 }).ToArray();
+            Require(StoryModeUI.SelectDeckLevel(legacy, 0, 10, false) == 1 &&
+                StoryModeUI.SelectDeckLevel(legacy, 25, 10, false) is > 1 and < 10 &&
+                StoryModeUI.SelectDeckLevel(legacy, legacy.Length - 1, 10, true) == 10,
+                "A legacy 50-episode progression did not retain its opening, rematch, and finale levels.");
             Require(DuelUiKit.LoadSprite("Story/Protagonist") != null, "Missing standing player artwork.");
         }
 

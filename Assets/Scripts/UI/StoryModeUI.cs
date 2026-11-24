@@ -265,30 +265,30 @@ namespace YGOPortable.UI
             var decks = OpponentDeckLevels.GetDecks(episode.charId);
             if (decks.Count == 0) decks = DeckRepository.GetDecksForCharacter(episode.charId);
             if (decks.Count == 0) return default;
-            if (GetRaid(episode) != null)
-            {
-                int final = TotalStoryEpisodes - 1;
-                int floor = (episodeIndex * (decks.Count - 1) + final - 1) / final;
-                return (decks[floor], floor + 1, decks.Count);
-            }
+            int level = SelectDeckLevel(Script.episodes, episodeIndex, decks.Count, GetRaid(episode) != null);
+            return (decks[level - 1], level, decks.Count);
+        }
 
-            var episodes = Script.episodes;
-            int appearances = episodes.Count(entry => entry.charId == episode.charId);
+        internal static int SelectDeckLevel(StoryEpisodeData[] episodes, int episodeIndex, int deckCount, bool raid)
+        {
+            int finalIndex = Math.Max(1, episodes.Length - 1);
+            if (raid)
+                return 1 + (episodeIndex * (deckCount - 1) + finalIndex - 1) / finalIndex;
+
+            int characterId = episodes[episodeIndex].charId;
+            int appearances = episodes.Count(entry => entry.charId == characterId);
             int remaining = appearances;
             int level = 0;
-            int finalIndex = episodes.Length - 1;
             for (int i = 0; i <= episodeIndex; i++)
             {
-                if (episodes[i].charId != episode.charId) continue;
+                if (episodes[i].charId != characterId) continue;
                 remaining--;
-                int progressLevel = 1 + (i * (decks.Count - 1) + finalIndex / 2) / finalIndex;
-                // Reserve a higher deck for each rematch when the opponent has enough levels.
-                level = appearances <= decks.Count
-                    ? Math.Clamp(progressLevel, level + 1, decks.Count - remaining)
+                int progressLevel = 1 + (i * (deckCount - 1) + finalIndex / 2) / finalIndex;
+                level = appearances <= deckCount
+                    ? Math.Clamp(progressLevel, level + 1, deckCount - remaining)
                     : progressLevel;
             }
-
-            return (decks[level - 1], level, decks.Count);
+            return level;
         }
 
         internal StoryRaid? GetRaid(StoryEpisodeData episode)

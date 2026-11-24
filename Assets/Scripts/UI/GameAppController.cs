@@ -377,9 +377,11 @@ namespace YGOPortable.UI
             var opponent = DeckRepository.GetCharacter(episode.charId);
             var (deck, level, levelCount) = _storyMode.GetOpponentMatch(episode);
             float deckStrength = levelCount > 1 ? (level - 1f) / (levelCount - 1f) : (episode.chapter - 1f) / 4f;
-            float planningScale = _storyMode.GetRaid(episode) != null ? ComboSearch.MaxPlanningScale :
+            bool elite = levelCount > 0 && level >= Math.Min(9, levelCount);
+            float planningScale = elite || _storyMode.GetRaid(episode) != null ? ComboSearch.MaxPlanningScale :
                 Mathf.Lerp(1f, ComboSearch.MaxPlanningScale, deckStrength);
-            StartDuelMatch(opponent, deck, myDeck, playerGoesFirst, isStoryDuel: true, planningScale: planningScale);
+            StartDuelMatch(opponent, deck, myDeck, playerGoesFirst, isStoryDuel: true, planningScale: planningScale,
+                opponentDifficulty: elite ? AIDifficulty.Master : AiDifficulty);
         }
 
         internal void StartTournamentDuel(DimensionTournament run, UserDeck myDeck)
@@ -408,8 +410,10 @@ namespace YGOPortable.UI
                 planningScale: isStoryDuel ? 1f : ComboSearch.MaxPlanningScale);
 
         private void StartDuelMatch(OpponentCharacter oppChar, PresetDeckInfo oppDeck, UserDeck myDeck,
-            bool playerGoesFirst, bool isStoryDuel, float planningScale, bool isTournamentDuel = false, bool isRankedDuel = false)
+            bool playerGoesFirst, bool isStoryDuel, float planningScale, bool isTournamentDuel = false, bool isRankedDuel = false,
+            AIDifficulty? opponentDifficulty = null)
         {
+            AIDifficulty duelDifficulty = opponentDifficulty ?? AiDifficulty;
             bool isCampaignMatch = isStoryDuel || isTournamentDuel || isRankedDuel;
             if (oppChar == null || oppDeck == null || oppDeck.charId != oppChar.id ||
                 (isStoryDuel && _activeStoryEpisode?.charId != oppChar.id) ||
@@ -448,14 +452,14 @@ namespace YGOPortable.UI
                 try
                 {
                     _personalReplay = new LocalDuelReplayRecorder(Application.persistentDataPath, myDeck.id,
-                        oppChar.id, oppDeck.id, AiDifficulty.ToString(), ChainConfirmation.ToString());
+                        oppChar.id, oppDeck.id, duelDifficulty.ToString(), ChainConfirmation.ToString());
                 }
                 catch (Exception exception)
                 {
                     Debug.LogWarning($"[Personal replay] Could not enable local recording ({exception.GetType().Name}).");
                 }
             }
-            bool planCombos = AiDifficulty is AIDifficulty.Smart or AIDifficulty.Master;
+            bool planCombos = duelDifficulty is AIDifficulty.Smart or AIDifficulty.Master;
             var raid = isStoryDuel ? _storyMode.GetRaid(_activeStoryEpisode) : null;
             string storyGimmick = isStoryDuel ? _activeStoryEpisode.gimmick : null;
             var opening = isStoryDuel ? _activeStoryPlan.Apply(raid, oppDeck, storyGimmick) : ((DuelOpening Player, DuelOpening Opponent)?)null;
@@ -463,7 +467,7 @@ namespace YGOPortable.UI
                 opening = (new DuelOpening(8000, 5, 0), DimensionTournament.Opening(_activeTournament.Value.Slots, oppDeck));
             _session = new DuelSession(recordPlanningReplay: planCombos, playerReplay: _personalReplay);
             _ai = new TacticalAI(DuelAiPolicy.LoadIncluded(), LinkComboPolicy.LoadIncluded(),
-                searchCombos: planCombos, planningScale: planningScale) { Difficulty = AiDifficulty };
+                searchCombos: planCombos, planningScale: planningScale) { Difficulty = duelDifficulty };
             _shownHumanPrompt = null;
             _timedAiPrompt = null;
             _resultShown = false;
