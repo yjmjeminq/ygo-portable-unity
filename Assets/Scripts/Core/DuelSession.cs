@@ -460,6 +460,7 @@ namespace YGOPortable.Core
             string storyGimmick = null)
         {
             Dispose();
+            _storyRuntime = storyGimmick == null ? null : new StoryGimmickRuntime(storyGimmick);
             UsesDeckAppearances = playerDeckAppearance != null && !_loadingPlanningReplay;
             _deckAppearances.Clear();
             ResetDestinyDraw();
@@ -760,7 +761,9 @@ namespace YGOPortable.Core
                         ? prevPrompt.attackable[index] : null;
                 }
                 ActivePrompt = null;
-                if (prevPrompt?.messageType == YgoConstants.MSG_DESTINY_DRAW)
+                if (prevPrompt?.messageType == YgoConstants.MSG_STORY_CRISIS)
+                    ResolveStoryCrisis(prevPrompt.playerId, buffer?.Length >= sizeof(int) ? BitConverter.ToInt32(buffer, 0) : 0);
+                else if (prevPrompt?.messageType == YgoConstants.MSG_DESTINY_DRAW)
                     ResolveDestinyDraw(prevPrompt.playerId, buffer?.Length >= sizeof(int) && BitConverter.ToInt32(buffer, 0) == 1);
                 else YgoNativeBridge.SetResponse(NativePtr, buffer);
                 StepUntilPrompt();
@@ -916,7 +919,7 @@ namespace YGOPortable.Core
 
         public void StepUntilPrompt()
         {
-            if (NativePtr == IntPtr.Zero || IsFinished || ActivePrompt?.messageType == YgoConstants.MSG_DESTINY_DRAW) return;
+            if (NativePtr == IntPtr.Zero || IsFinished || IsManagedDrawPrompt(ActivePrompt)) return;
             if (!TracksFieldReadouts) _fieldReadoutBaseline = null;
             else _fieldReadoutBaseline ??= CaptureFieldReadouts(fromNative: true);
 
@@ -943,7 +946,7 @@ namespace YGOPortable.Core
                     break;
                 }
                 if (SpeculationPassedTurnLimit) break;
-                if (ActivePrompt?.messageType == YgoConstants.MSG_DESTINY_DRAW) break;
+                if (IsManagedDrawPrompt(ActivePrompt)) break;
                 if (status == YgoConstants.OCG_DUEL_STATUS_AWAITING)
                 {
                     var prompt = ActivePrompt;
@@ -1918,7 +1921,7 @@ namespace YGOPortable.Core
                         uint tag = br.ReadUInt32();
                         if (tag == DestinyDrawTag)
                         {
-                            OfferDestinyDraw(br.ReadByte());
+                            OfferDrawSkills(br.ReadByte());
                             break;
                         }
                         if (tag is DestructionGroupTag or MaterialGroupTag or PositionGroupTag or TemporaryBanishGroupTag)

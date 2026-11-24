@@ -1283,6 +1283,7 @@ namespace YGOPortable.UI
             _normalAvatarRim = _rankedAvatarRim.color;
 
             BuildTurnHud(root);
+            BuildStoryCrisisControls(root);
             _battleShortcut = BuildPhaseShortcut(root, "BattleShortcut", "배틀", "BATTLE PHASE", .399f, YgoConstants.PHASE_BATTLE);
             _endShortcut = BuildPhaseShortcut(root, "EndShortcut", "턴 종료", "END PHASE", .257f, YgoConstants.PHASE_END);
             BuildPhasePicker(root);
@@ -1712,6 +1713,7 @@ namespace YGOPortable.UI
 
             RefreshPlacementControls(prompt);
             RefreshPhaseChoices(prompt);
+            RefreshStoryCrisisControls();
 
             UpdateStackTile(_myDeckTile, mine.deckCount, me);
             UpdateStackTile(_myExtraTile, mine.extra.Count, me, mine.extra.LastOrDefault());

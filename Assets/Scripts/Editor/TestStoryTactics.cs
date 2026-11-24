@@ -28,6 +28,7 @@ namespace YGOPortable.Editor
                 Require(YgoNativeBridge.Initialize(streaming, null) == 0, "The native engine did not start.");
                 VerifyBranchesAndSupports(save);
                 VerifyOpponentOpenings();
+                VerifyStoryCrisis();
                 VerifyDestinyAwakening();
                 VerifyTournament(save);
                 VerifyNewScreens();
@@ -139,6 +140,117 @@ namespace YGOPortable.Editor
                         YgoNativeBridge.YGO_QueryCount(session.NativePtr, seat, YgoConstants.LOCATION_EXTRA) ==
                             rival.extra.Length - (monster == baronne ? 1 : 0),
                         $"Unexpected field or deck counts for {option}, humanFirst={humanFirst}.");
+                }
+            }
+        }
+
+        private static void VerifyStoryCrisis()
+        {
+            var threshold = new StoryGimmickRuntime("barian_chaos");
+            Require(!threshold.CanActivateCrisisSkill(2001) && threshold.CanActivateCrisisSkill(2000) &&
+                !threshold.CanActivateCrisisSkill(0), "The story crisis LP boundary is incorrect.");
+            threshold.RecordCrisisUse();
+            Require(!threshold.CanActivateCrisisSkill(1000), "A story crisis skill was offered twice.");
+            VerifyShining();
+            VerifyStormAndDestiny();
+            Debug.Log("[VERIFY STORY CRISIS] LP boundary, selectable Shining draw, native Storm Extra Deck and independent Destiny Draw passed.");
+
+            static UserDeck CreatePlayerDeck(bool markDestiny)
+            {
+                var deck = new UserDeck();
+                for (int i = 0; i < 40; i++)
+                    deck.InsertCard(deck.main, i, i % 2 == 0 ? 20721928u : 89631139u,
+                        new DeckCardAppearance { destinyDraw = markDestiny });
+                return deck;
+            }
+
+            static DuelSession Start(string gimmick, UserDeck deck, int lp)
+            {
+                var duel = new DuelSession(recordPlanningReplay: true);
+                Require(duel.StartNewDuel(deck.main, deck.extra, Enumerable.Repeat(20721928u, 40).ToArray(),
+                    Array.Empty<uint>(), p0GoesFirst: false, seed: new ulong[] { 11, 73, 19, 92 },
+                    playerDeckAppearance: deck, playerOpening: new DuelOpening(lp, 5, 0), storyGimmick: gimmick),
+                    $"Could not start {gimmick}.");
+                return duel;
+            }
+
+            static void Drive(DuelSession duel, Func<bool> stop)
+            {
+                var ai = new TacticalAI { Difficulty = AIDifficulty.Easy };
+                for (int step = 0; step < 95 && !stop() && !duel.IsFinished && duel.RetryCount == 0; step++)
+                {
+                    var prompt = duel.ActivePrompt;
+                    if (prompt == null) { duel.StepUntilPrompt(); continue; }
+                    if (prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD && prompt.canEp) duel.SubmitResponseInt(7);
+                    else if (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN && !prompt.forced) duel.SubmitResponseInt(-1);
+                    else duel.SubmitResponse(ai.ComputeResponse(duel, prompt));
+                }
+                Require(stop() && duel.RetryCount == 0 && !duel.IsFinished, "The expected story crisis window was not reached.");
+            }
+
+            static void VerifyShining()
+            {
+                using (var above = Start("barian_chaos", CreatePlayerDeck(false), 2001))
+                {
+                    Drive(above, () => above.TurnNumber >= 2 && above.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD);
+                    Require(above.PendingStoryCrisis == StoryCrisisSkill.None, "Shining Draw lit above 2,000 LP.");
+                }
+                using var duel = Start("barian_chaos", CreatePlayerDeck(false), 2000);
+                Drive(duel, () => duel.PendingStoryCrisis == StoryCrisisSkill.ShiningDraw);
+                int human = duel.HumanPlayerIndex;
+                var choice = duel.ShiningDrawChoices().Single(card => card.code == 89631139);
+                int before = duel.Players[human].hand.Count(card => card.code == choice.code);
+                UseCrisisButton(duel, "샤이닝 드로우", choice.code);
+                Require(duel.Players[human].hand.Count(card => card.code == choice.code) == before + 1 &&
+                    duel.DestinyUsesLeft((byte)human) == 1, "Shining Draw did not replace the next native draw or consumed Destiny Draw.");
+                Drive(duel, () => duel.TurnNumber >= 4 && duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD);
+                Require(duel.PendingStoryCrisis == StoryCrisisSkill.None, "Shining Draw was offered on a second draw.");
+            }
+
+            static void VerifyStormAndDestiny()
+            {
+                using var duel = Start("mirror_link", CreatePlayerDeck(true), 1700);
+                Drive(duel, () => duel.PendingStoryCrisis == StoryCrisisSkill.StormAccess);
+                byte human = (byte)duel.HumanPlayerIndex;
+                UseCrisisButton(duel, "스톰 액세스");
+                Require(duel.Players[human].extra.Single().code == 1861629 &&
+                    duel.ActivePrompt?.messageType == YgoConstants.MSG_DESTINY_DRAW && duel.DestinyUsesLeft(human) == 1,
+                    "Storm Access was not added natively or interfered with the independent Destiny choice.");
+                duel.SubmitResponseInt(1);
+                Require(duel.DestinyUsesLeft(human) == 0, "Taking Destiny Draw after Storm Access failed.");
+                Drive(duel, () => duel.TurnNumber >= 4 && duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD);
+                Require(duel.Players[human].extra.Count == 1 && duel.PendingStoryCrisis == StoryCrisisSkill.None,
+                    "Storm Access could be used twice.");
+                using var replay = duel.ReplayForPlanning(() => false);
+                Require(replay?.Players[human].extra.Single().code == 1861629, "Planning replay lost Storm Access.");
+            }
+
+            static void UseCrisisButton(DuelSession duel, string label, uint select = 0)
+            {
+                var canvas = new GameObject("Story skill", typeof(Canvas));
+                ((RectTransform)canvas.transform).sizeDelta = new Vector2(1600f, 900f);
+                canvas.GetComponent<Canvas>().renderMode = RenderMode.WorldSpace;
+                var modals = new DuelPromptModals(canvas.transform, null, duel.SubmitResponse);
+                var field = new DuelFieldUI(null, canvas.transform, modals, mobileLayout: false);
+                try
+                {
+                    field.BindSession(duel, null, null);
+                    field.Refresh();
+                    var button = field.Root.GetComponentsInChildren<Button>().Single(control =>
+                        control.transform.parent.name == "Activate" && control.transform.parent.parent.name == "StoryCrisis");
+                    Require(button.IsInteractable() && button.GetComponentInChildren<Text>().text.Contains(label) &&
+                        !modals.IsPromptOpen, "The story skill was not shown as a separate HUD button.");
+                    button.onClick.Invoke();
+                    if (select == 0) return;
+                    Require(modals.IsZoneViewerOpen, "Shining Draw did not open a playable card choice.");
+                    var choice = modals.ZoneViewRoot.GetComponentsInChildren<CompositeCardView>()
+                        .Single(card => card.CurrentCode == select);
+                    choice.transform.parent.parent.Find("Act/B").GetComponent<Button>().onClick.Invoke();
+                }
+                finally
+                {
+                    field.UnbindSession();
+                    UnityEngine.Object.DestroyImmediate(canvas);
                 }
             }
         }

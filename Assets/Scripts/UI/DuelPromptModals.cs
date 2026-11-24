@@ -2300,10 +2300,11 @@ namespace YGOPortable.UI
             Func<bool> canUseCardActions = null,
             Sprite icon = null,
             bool actionsOnly = false,
-            bool sidePanel = false)
+            bool sidePanel = false,
+            string actionLabel = null)
         {
             StartZoneViewer(sidePanel);
-            PopulateZoneCards(cards, hideFaceDown, newestFirst, hasCardActions, onOpenCardActions, canUseCardActions, actionsOnly);
+            PopulateZoneCards(cards, hideFaceDown, newestFirst, hasCardActions, onOpenCardActions, canUseCardActions, actionsOnly, actionLabel);
             FinishZoneViewer(title, icon);
         }
 
@@ -2351,7 +2352,7 @@ namespace YGOPortable.UI
 
         private void PopulateZoneCards(IReadOnlyList<LiveCardState> cards, bool hideFaceDown, bool newestFirst,
             Func<LiveCardState, bool> hasCardActions, Action<LiveCardState> onOpenCardActions,
-            Func<bool> canUseCardActions, bool actionsOnly)
+            Func<bool> canUseCardActions, bool actionsOnly, string actionLabel = null)
         {
             int count = cards?.Count ?? 0;
             for (int i = 0; i < count; i++)
@@ -2362,7 +2363,7 @@ namespace YGOPortable.UI
                 bool actionable = !hidden && onOpenCardActions != null && hasCardActions?.Invoke(card) == true;
                 if (actionsOnly && !actionable) continue;
                 AddZoneCardTile(hidden ? 0u : card.code, hidden, card, actionable, onOpenCardActions, canUseCardActions,
-                    actionsOnly, hasCardActions);
+                    actionsOnly, hasCardActions, actionLabel);
             }
         }
 
@@ -2472,7 +2473,8 @@ namespace YGOPortable.UI
             Action<LiveCardState> onOpenCardActions = null,
             Func<bool> canUseCardActions = null,
             bool actionSelection = false,
-            Func<LiveCardState, bool> hasCardActions = null)
+            Func<LiveCardState, bool> hasCardActions = null,
+            string actionLabel = null)
         {
             bool inlineAction = hasActions && !_mobileLayout;
             _zoneHasActions |= hasActions;
@@ -2494,8 +2496,8 @@ namespace YGOPortable.UI
                 new Vector2(0.05f, inlineAction ? 0.17f : 0.02f), new Vector2(0.95f, inlineAction ? 0.29f : 0.17f), Vector2.zero, Vector2.zero),
                 "T", caption, 12, 8, TextAnchor.MiddleCenter, DuelUiKit.TextPrimary);
 
-            string actionText = !actionSelection ? "행동 확인" :
-                live?.location == YgoConstants.LOCATION_EXTRA ? "특수 소환" : "효과 발동";
+            string actionText = actionLabel ?? (!actionSelection ? "행동 확인" :
+                live?.location == YgoConstants.LOCATION_EXTRA ? "특수 소환" : "효과 발동");
             bool CanOpenAction() => IsZoneViewerOpen && canUseCardActions?.Invoke() != false &&
                 hasCardActions?.Invoke(live) != false;
             void OpenAction()

@@ -691,7 +691,7 @@ namespace YGOPortable.UI
 
             // The core waits on this exact prompt until a response is accepted. Reopen it if an overlay hid it.
             bool needsModal = prompt.messageType is not (YgoConstants.MSG_SELECT_IDLECMD or YgoConstants.MSG_SELECT_BATTLECMD or
-                YgoConstants.MSG_SELECT_PLACE or YgoConstants.MSG_SELECT_DISFIELD);
+                YgoConstants.MSG_SELECT_PLACE or YgoConstants.MSG_SELECT_DISFIELD or YgoConstants.MSG_STORY_CRISIS);
             if (_shownHumanPrompt != prompt || needsModal && !_modals.IsShowingNativePrompt(_session, prompt))
             {
                 _shownHumanPrompt = prompt;

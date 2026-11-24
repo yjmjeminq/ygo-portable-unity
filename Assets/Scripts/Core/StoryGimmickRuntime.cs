@@ -3,7 +3,9 @@ using System.Collections.Generic;
 
 namespace YGOPortable.Core
 {
-    internal static class StoryGimmickRuntime
+    internal enum StoryCrisisSkill { None, ShiningDraw, StormAccess }
+
+    internal sealed class StoryGimmickRuntime
     {
         private static readonly Dictionary<string, (uint Code, bool Defense)[]> OpeningCards = new(StringComparer.Ordinal)
         {
@@ -28,5 +30,23 @@ namespace YGOPortable.Core
 
         internal static IReadOnlyList<(uint Code, bool Defense)> StartingCards(string gimmick) =>
             gimmick != null && OpeningCards.TryGetValue(gimmick, out var cards) ? cards : Array.Empty<(uint, bool)>();
+
+        internal StoryGimmickRuntime(string gimmick)
+        {
+            CrisisSkill = gimmick switch
+            {
+                "barian_chaos" or "numeronius" or "barian_emperors" => StoryCrisisSkill.ShiningDraw,
+                "borreload_storm" or "mirror_link" or "borreload_final" => StoryCrisisSkill.StormAccess,
+                _ => StoryCrisisSkill.None,
+            };
+        }
+
+        internal StoryCrisisSkill CrisisSkill { get; }
+        private bool _crisisUsed;
+
+        internal bool CanActivateCrisisSkill(int currentLp) =>
+            CrisisSkill != StoryCrisisSkill.None && !_crisisUsed && currentLp is > 0 and <= 2000;
+
+        internal void RecordCrisisUse() => _crisisUsed = true;
     }
 }

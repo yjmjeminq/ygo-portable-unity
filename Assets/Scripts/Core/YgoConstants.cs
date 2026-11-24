@@ -277,6 +277,7 @@ namespace YGOPortable.Core
         public const byte MSG_MATCH_KILL = 170;
         internal const byte MSG_CUSTOM_MSG = 180;
         internal const byte MSG_DESTINY_DRAW = 254;
+        internal const byte MSG_STORY_CRISIS = 253;
 
         public static readonly Dictionary<uint, string> AttributeNamesKR = new Dictionary<uint, string>
         {

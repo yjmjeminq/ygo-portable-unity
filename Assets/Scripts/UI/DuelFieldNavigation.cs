@@ -10,7 +10,7 @@ namespace YGOPortable.UI
 {
     public partial class DuelFieldUI
     {
-        private enum PadScope { None, Board, Place, FieldCards, Piles, CardActions, Commands, Phase, Log, Zoom }
+        private enum PadScope { None, Board, Place, FieldCards, Piles, CardActions, Commands, Phase, Log, Zoom, StoryCrisis }
 
         private readonly struct PadTarget
         {
@@ -129,6 +129,7 @@ namespace YGOPortable.UI
                     case PadScope.FieldCards:
                     case PadScope.Piles: _modals.TryCancelOrPass(); break;
                     case PadScope.Place: TryCancelPlacement(); break;
+                    case PadScope.StoryCrisis: SkipStoryCrisis(); break;
                     default: OnPauseClicked(); break;
                 }
                 RefreshDuelPadCursor();
@@ -193,6 +194,8 @@ namespace YGOPortable.UI
             if (_session == null || _session.IsFinished) return PadScope.None;
             if (prompt != null && prompt.playerId == _session.HumanPlayerIndex)
             {
+                if (prompt.messageType == YgoConstants.MSG_STORY_CRISIS)
+                    return CanAcceptPlayerAction ? PadScope.StoryCrisis : PadScope.None;
                 if (IsStagingPlacement || IsNativePlacement(prompt))
                     return IsPresenting ? PadScope.None : PadScope.Place;
                 if (prompt.messageType is not (YgoConstants.MSG_SELECT_IDLECMD or YgoConstants.MSG_SELECT_BATTLECMD))
@@ -226,6 +229,10 @@ namespace YGOPortable.UI
                     return;
                 case PadScope.Zoom:
                     AddDuelPadButtons(_cardZoomModal.transform);
+                    return;
+                case PadScope.StoryCrisis:
+                    AddDuelPadButton(_storyCrisisButton);
+                    AddDuelPadButton(_storyDrawButton);
                     return;
                 case PadScope.Piles:
                     AddDuelPadButton(_modals.FieldViewControl as Button);
