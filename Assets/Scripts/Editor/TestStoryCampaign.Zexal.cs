@@ -187,12 +187,12 @@ namespace YGOPortable.Editor
             duel.Drive(() => InBattle(duel));
         }
 
-        private static void Attack(ScenarioDuel duel, uint code, uint acceptEffect = 0)
+        private static void Attack(ScenarioDuel duel, uint code, uint acceptEffect = 0, uint declineEffect = 0)
         {
             int index = duel.Duel.ActivePrompt.attackable.FindIndex(card => card.code == code);
             Require(index >= 0, $"Native attack {code} was unavailable.");
             duel.Duel.SubmitResponseInt((index << 16) | 1);
-            duel.Drive(() => InBattle(duel), acceptEffect: acceptEffect);
+            duel.Drive(() => InBattle(duel), acceptEffect: acceptEffect, declineEffect: declineEffect);
         }
     }
 }

@@ -235,14 +235,14 @@ namespace YGOPortable.Editor
             internal ScenarioDuel(string name, uint playerCard = 20721928, uint rivalCard = 20721928,
                 bool humanFirst = true, DuelOpening? rivalOpening = null, ulong seed = 41,
                 IReadOnlyList<uint> playerDeck = null, IReadOnlyList<uint> rivalExtra = null,
-                IReadOnlyList<uint> playerExtra = null, bool recordReplay = false)
+                IReadOnlyList<uint> playerExtra = null, bool recordReplay = false, DuelOpening? playerOpening = null)
             {
                 _name = name;
                 Duel = new DuelSession(recordPlanningReplay: recordReplay);
                 Require(Duel.StartNewDuel(playerDeck ?? Enumerable.Repeat(playerCard, 40).ToArray(), playerExtra ?? Array.Empty<uint>(),
                     Enumerable.Repeat(rivalCard, 40).ToArray(), rivalExtra ?? Array.Empty<uint>(), humanFirst,
                     seed: new ulong[] { seed, unchecked(32 + (seed ^ 41UL) * 0x9E3779B97F4A7C15UL), 7, 11 },
-                    opponentOpening: rivalOpening, storyGimmick: name), $"Could not start {name}.");
+                    opponentOpening: rivalOpening, playerOpening: playerOpening, storyGimmick: name), $"Could not start {name}.");
                 Drive(() => InMain(Duel, 1));
             }
 
@@ -266,7 +266,8 @@ namespace YGOPortable.Editor
                 Drive(() => InMain(Duel, turn), target: target, acceptEffect: acceptEffect);
             }
 
-            internal void Drive(Func<bool> stop, bool endTurn = false, uint target = 0, uint acceptEffect = 0, bool attackPosition = false)
+            internal void Drive(Func<bool> stop, bool endTurn = false, uint target = 0, uint acceptEffect = 0,
+                bool attackPosition = false, uint declineEffect = 0)
             {
                 for (int step = 0; step < 170 && !stop() && !Duel.IsFinished && Duel.RetryCount == 0; step++)
                 {
@@ -282,6 +283,8 @@ namespace YGOPortable.Editor
                         Duel.SubmitResponseInt((int)YgoConstants.POS_FACEUP_ATTACK);
                     else if (acceptEffect != 0 && prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && prompt.promptCardCode == acceptEffect)
                         Duel.SubmitResponseInt(1);
+                    else if (declineEffect != 0 && prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && prompt.promptCardCode == declineEffect)
+                        Duel.SubmitResponseInt(0);
                     else if (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN && !prompt.forced)
                         Duel.SubmitResponseInt(acceptEffect == 0 ? -1 : prompt.candidates.FindIndex(card => card.code == acceptEffect));
                     else if (endTurn && prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD && prompt.canEp)

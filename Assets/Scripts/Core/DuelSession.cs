@@ -555,7 +555,9 @@ namespace YGOPortable.Core
             LoadDeckForPlayer(1, p0GoesFirst ? mainWithoutMonster ?? secondMain : secondMain,
                 p0GoesFirst ? extraWithoutMonster ?? turn1Extra : turn1Extra, shuffle,
                 p0GoesFirst ? null : playerDeckAppearance, p0GoesFirst ? opponentDestiny : null);
-            if (opponentOpening is { FieldCard: > 0 } opening) PlaceOpeningCard((byte)AiPlayerIndex, opening.FieldCard);
+            if (opponentOpening is { FieldCard: > 0 } opening)
+                PlaceOpeningCard((byte)AiPlayerIndex, opening.FieldCard,
+                    StoryGimmickRuntime.OpeningMonsterSequence(storyGimmick, opening.FieldCard) ?? 2u);
             if (mainWithoutMonster != null || extraWithoutMonster != null)
                 PlaceOpeningCard((byte)AiPlayerIndex, deckMonster, opponentOpening.Value.FieldCard == 0 ? 2u : 1u);
             if (!PlaceStoryOpeningCards((byte)AiPlayerIndex, storyGimmick))
@@ -712,7 +714,9 @@ namespace YGOPortable.Core
                 if (info == null || YgoNativeBridge.YGO_HasCard(code) == 0) return false;
                 uint location = info.IsMonster ? YgoConstants.LOCATION_MZONE : YgoConstants.LOCATION_SZONE;
                 bool fieldSpell = (info.type & YgoConstants.TYPE_FIELD) != 0;
-                uint[] sequences = fieldSpell ? StoryFieldSpellSequence : StoryOpeningSequences;
+                uint[] sequences = fieldSpell ? StoryFieldSpellSequence :
+                    StoryGimmickRuntime.OpeningMonsterSequence(storyGimmick, code) is { } requestedSequence
+                        ? new[] { requestedSequence } : StoryOpeningSequences;
                 bool placed = false;
                 foreach (uint sequence in sequences)
                 {

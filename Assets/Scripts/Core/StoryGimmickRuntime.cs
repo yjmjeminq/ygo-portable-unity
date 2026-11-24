@@ -17,6 +17,7 @@ namespace YGOPortable.Core
         internal const uint ActionField = 511090301;
         internal const uint ActionEvasion = 511090302;
         internal const uint ActionMiracle = 511090303;
+        internal const uint DroneRadar = 511090401;
         private static readonly CardInfo SpeedWorldCard = new()
         {
             code = SpeedWorld,
@@ -56,6 +57,13 @@ namespace YGOPortable.Core
             "액션 마법－회피", "상대가 공격을 선언했을 때 패에서도 발동할 수 있다. 그 공격을 무효로 한다.");
         private static readonly CardInfo ActionMiracleCard = ActionSpell(ActionMiracle, YgoConstants.TYPE_QUICKPLAY,
             "액션 마법－미라클", "상대가 자신의 몬스터에 공격을 선언했을 때 패에서도 발동할 수 있다. 해당 몬스터는 이번 전투로 파괴되지 않으며 자신이 받는 전투 데미지는 절반이 된다.");
+        private static readonly CardInfo DroneRadarCard = new()
+        {
+            code = DroneRadar,
+            type = YgoConstants.TYPE_TRAP | YgoConstants.TYPE_CONTINUOUS,
+            name = "드론 레이다",
+            desc = "상대가 발동한 마법 및 함정 카드의 효과를 처리할 때 그 효과를 무효로 하고, 필드에 있는 그 카드를 파괴한다.",
+        };
 
         private static CardInfo ActionSpell(uint code, uint subtype, string name, string description) => new()
         {
@@ -82,6 +90,7 @@ namespace YGOPortable.Core
             ActionField => ActionFieldCard,
             ActionEvasion => ActionEvasionCard,
             ActionMiracle => ActionMiracleCard,
+            DroneRadar => DroneRadarCard,
             >= DarknessZero and <= 511090105 => DarknessTraps[code - DarknessZero],
             _ => null,
         };
@@ -157,13 +166,33 @@ namespace YGOPortable.Core
             ["starving_venom"] = new[] { (41209827u, Attack) },
             ["ddd_final_trial"] = new[] { (72181263u, Attack), (12822541u, Attack) },
             ["four_dragons"] = new[] { (96733134u, Attack) },
+            ["hanoi_backdoor"] = new[] { (33897356u, Attack) },
+            ["gouki_showdown"] = new[] { (78437364u, Attack) },
+            ["altergeist_traps"] = new[] { (27541563u, Attack), (42790071u, Attack), (89538537u, Attack) },
             ["trickstar_poison"] = new[] { (35371948u, Attack) },
-            ["marincess_ocean"] = new[] { (91027843u, Attack) },
+            ["borreload_storm"] = new[] { (31833038u, Attack), (68464358u, Attack) },
+            ["sunavalon_fortress"] = new[] { (92770064u, Attack) },
+            ["lightning_link"] = new[] { (21887175u, Attack), (63528891u, Attack) },
+            ["drone_intercept"] = new[] { (DroneRadar, Attack), (24610207u, Attack) },
+            ["salamangreat_reincarnation"] = new[] { (1295111u, Attack), (87871125u, Attack) },
+            ["marincess_ocean"] = new[] { (91027843u, Attack), (20934852u, Attack) },
+            ["hydradrive"] = new[] { (13203964u, Attack) },
+            ["storm_core"] = new[] { (40669071u, Attack) },
+            ["appliancer_links"] = new[] { (3875465u, Attack), (78225596u, Attack), (77102944u, Attack) },
+            ["mirror_link"] = new[] { (13203964u, Attack) },
             ["ignister_arrival"] = new[] { (59054773u, Attack) },
+            ["borreload_final"] = new[] { (31833038u, Attack) },
         };
 
         internal static IReadOnlyList<(uint Code, uint Position)> StartingCards(string gimmick) =>
             gimmick != null && OpeningCards.TryGetValue(gimmick, out var cards) ? cards : Array.Empty<(uint, uint)>();
+
+        internal static uint? OpeningMonsterSequence(string gimmick, uint code) => (gimmick, code) switch
+        {
+            ("topologic_tower", 66403530) or ("appliancer_links", 78225596) => 5u,
+            ("appliancer_links", 77102944) => 1u,
+            _ => null,
+        };
 
         internal StoryGimmickRuntime(string gimmick)
         {
