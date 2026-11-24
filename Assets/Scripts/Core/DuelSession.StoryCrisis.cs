@@ -16,6 +16,11 @@ namespace YGOPortable.Core
             _storyRuntime?.CanActivateCrisisSkill(Players[HumanPlayerIndex].lp) == true
                 ? _storyRuntime.CrisisSkill : StoryCrisisSkill.None;
 
+        internal int StoryActionSearchIndex => ActivePrompt is { messageType: YgoConstants.MSG_SELECT_IDLECMD } prompt &&
+            prompt.playerId == HumanPlayerIndex
+                ? prompt.activatable.FindIndex(card => card.code == StoryGimmickRuntime.ActionField)
+                : -1;
+
         private static bool IsManagedDrawPrompt(DuelPrompt prompt) =>
             prompt?.messageType is YgoConstants.MSG_DESTINY_DRAW or YgoConstants.MSG_STORY_CRISIS;
 

@@ -10,6 +10,7 @@ namespace YGOPortable.UI
         private GameObject _storyCrisisControls;
         private Button _storyCrisisButton;
         private Button _storyDrawButton;
+        private Button _storyActionButton;
         private Text _storyCrisisLabel;
 
         private void BuildStoryCrisisControls(Transform root)
@@ -21,6 +22,7 @@ namespace YGOPortable.UI
             _storyCrisisButton = AddControl("Activate", "", .52f, 1f, ActivateStoryCrisis, gold: true);
             _storyCrisisLabel = _storyCrisisButton.GetComponentInChildren<Text>();
             _storyDrawButton = AddControl("DrawNormally", "일반 드로우", 0f, .43f, SkipStoryCrisis);
+            _storyActionButton = AddControl("ActionSearch", "액션 카드 탐색", .52f, 1f, SearchActionCard, gold: true);
             _storyCrisisControls.SetActive(false);
 
             Button AddControl(string name, string label, float bottom, float top, Action action, bool gold = false)
@@ -36,7 +38,10 @@ namespace YGOPortable.UI
             var skill = _session?.ReadyStoryCrisis ?? StoryCrisisSkill.None;
             bool visible = skill != StoryCrisisSkill.None;
             bool available = visible && CanAcceptPlayerAction && _session.PendingStoryCrisis == skill;
-            _storyCrisisControls.SetActive(visible);
+            bool search = CanAcceptPlayerAction && _session.StoryActionSearchIndex >= 0;
+            _storyCrisisControls.SetActive(visible || search);
+            _storyCrisisButton.transform.parent.gameObject.SetActive(visible);
+            _storyActionButton.transform.parent.gameObject.SetActive(search);
             _storyCrisisButton.interactable = available;
             _storyDrawButton.transform.parent.gameObject.SetActive(available);
             if (visible)
@@ -44,6 +49,13 @@ namespace YGOPortable.UI
                 string title = skill == StoryCrisisSkill.ShiningDraw ? "✧ 샤이닝 드로우" : "⚡ 스톰 액세스";
                 _storyCrisisLabel.text = available ? title : $"{title}\n드로우 대기";
             }
+        }
+
+        private void SearchActionCard()
+        {
+            if (!CanAcceptPlayerAction || IsBrowsingZone || IsReadingCardDetails) return;
+            int index = _session.StoryActionSearchIndex;
+            if (index >= 0) ExecuteActionInt((index << 16) | 5);
         }
 
         private void SkipStoryCrisis()

@@ -268,6 +268,7 @@ namespace YGOPortable.UI
             AddDuelPadButton(_graveEffectButton);
             AddDuelPadButton(_extraEffectButton);
             AddDuelPadButton(_banishedEffectButton);
+            AddDuelPadButton(_storyActionButton);
             AddDuelPadButton(_phaseButton);
             AddDuelPadButton(_battleShortcut);
             AddDuelPadButton(_endShortcut);

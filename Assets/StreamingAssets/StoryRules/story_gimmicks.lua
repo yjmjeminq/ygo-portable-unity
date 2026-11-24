@@ -204,7 +204,7 @@ YgoStory={
     addAttack=addAttack,
 }
 
-local modules={"story_gx.lua","story_5ds.lua","story_zexal.lua"}
+local modules={"story_gx.lua","story_5ds.lua","story_zexal.lua","story_arcv.lua"}
 function YgoStoryConfigure(rule,human)
     for _,module in ipairs(modules) do
         if rules[rule] then break end

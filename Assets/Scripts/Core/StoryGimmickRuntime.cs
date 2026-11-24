@@ -14,6 +14,9 @@ namespace YGOPortable.Core
         internal const uint DarknessZero = 511090101;
         internal const uint DarknessInfinity = 511090102;
         internal const uint HandcuffToken = 511090201;
+        internal const uint ActionField = 511090301;
+        internal const uint ActionEvasion = 511090302;
+        internal const uint ActionMiracle = 511090303;
         private static readonly CardInfo SpeedWorldCard = new()
         {
             code = SpeedWorld,
@@ -47,6 +50,22 @@ namespace YGOPortable.Core
             DarknessTrap(511090105, "다크니스 3", "첫 번째로 공개되면, 공개한 다크니스 1장당 상대에게 1000 데미지를 준다."),
         };
 
+        private static readonly CardInfo ActionFieldCard = ActionSpell(ActionField, YgoConstants.TYPE_FIELD,
+            "액션 필드", "자신 메인 페이즈에 1턴에 1번, 패에 액션 카드가 없으면 액션 카드를 탐색해 1장 얻는다.");
+        private static readonly CardInfo ActionEvasionCard = ActionSpell(ActionEvasion, YgoConstants.TYPE_QUICKPLAY,
+            "액션 마법－회피", "상대가 공격을 선언했을 때 패에서도 발동할 수 있다. 그 공격을 무효로 한다.");
+        private static readonly CardInfo ActionMiracleCard = ActionSpell(ActionMiracle, YgoConstants.TYPE_QUICKPLAY,
+            "액션 마법－미라클", "상대가 자신의 몬스터에 공격을 선언했을 때 패에서도 발동할 수 있다. 해당 몬스터는 이번 전투로 파괴되지 않으며 자신이 받는 전투 데미지는 절반이 된다.");
+
+        private static CardInfo ActionSpell(uint code, uint subtype, string name, string description) => new()
+        {
+            code = code,
+            type = YgoConstants.TYPE_SPELL | subtype,
+            name = name,
+            desc = description,
+            strs = new[] { description },
+        };
+
         private static CardInfo DarknessTrap(uint code, string name, string description) => new()
         {
             code = code,
@@ -60,6 +79,9 @@ namespace YGOPortable.Core
             SpeedWorld => SpeedWorldCard,
             AngelBaton => AngelBatonCard,
             HandcuffToken => HandcuffTokenCard,
+            ActionField => ActionFieldCard,
+            ActionEvasion => ActionEvasionCard,
+            ActionMiracle => ActionMiracleCard,
             >= DarknessZero and <= 511090105 => DarknessTraps[code - DarknessZero],
             _ => null,
         };
@@ -119,6 +141,22 @@ namespace YGOPortable.Core
             ["numeron_network"] = new[] { (41418852u, Attack) },
             ["hundred_numbers"] = new[] { (84013237u, Attack) },
             ["hope_roots"] = new[] { (84124261u, Attack) },
+            ["action_opening"] = new[] { (16178681u, Attack) },
+            ["showmanship"] = new[] { (25629622u, Attack) },
+            ["frightfur_circus"] = new[] { (78778375u, Attack) },
+            ["action_ddd"] = new[] { (48210156u, Attack), (12822541u, Attack), (19808608u, Attack), (46796664u, Attack) },
+            ["raidraptor_resistance"] = new[] { (73887236u, Attack) },
+            ["action_speedroid"] = new[] { (16725505u, Attack), (81275020u, Attack), (53932291u, Attack) },
+            ["superheavy_defense"] = new[] { (3117804u, Defense) },
+            ["action_dark_rebellion"] = new[] { (16195942u, Attack) },
+            ["lunalight_dance"] = new[] { (51777272u, Attack) },
+            ["windwitch_barrier"] = new[] { (14577226u, Attack) },
+            ["action_king"] = new[] { (16172067u, Attack) },
+            ["predator_counters"] = new[] { (69946549u, Attack) },
+            ["destiny_hero_return"] = new[] { (60461804u, Attack) },
+            ["starving_venom"] = new[] { (41209827u, Attack) },
+            ["ddd_final_trial"] = new[] { (72181263u, Attack), (12822541u, Attack) },
+            ["four_dragons"] = new[] { (96733134u, Attack) },
             ["trickstar_poison"] = new[] { (35371948u, Attack) },
             ["marincess_ocean"] = new[] { (91027843u, Attack) },
             ["ignister_arrival"] = new[] { (59054773u, Attack) },

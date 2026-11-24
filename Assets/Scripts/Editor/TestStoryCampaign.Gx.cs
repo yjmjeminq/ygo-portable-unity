@@ -226,7 +226,7 @@ namespace YGOPortable.Editor
 
         private sealed class ScenarioDuel : IDisposable
         {
-            internal DuelSession Duel { get; } = new();
+            internal DuelSession Duel { get; }
             internal PlayerFieldSnapshot Player => Duel.Players[Duel.HumanPlayerIndex];
             internal PlayerFieldSnapshot Rival => Duel.Players[Duel.AiPlayerIndex];
             private readonly TacticalAI _ai = new() { Difficulty = AIDifficulty.Easy };
@@ -235,9 +235,10 @@ namespace YGOPortable.Editor
             internal ScenarioDuel(string name, uint playerCard = 20721928, uint rivalCard = 20721928,
                 bool humanFirst = true, DuelOpening? rivalOpening = null, ulong seed = 41,
                 IReadOnlyList<uint> playerDeck = null, IReadOnlyList<uint> rivalExtra = null,
-                IReadOnlyList<uint> playerExtra = null)
+                IReadOnlyList<uint> playerExtra = null, bool recordReplay = false)
             {
                 _name = name;
+                Duel = new DuelSession(recordPlanningReplay: recordReplay);
                 Require(Duel.StartNewDuel(playerDeck ?? Enumerable.Repeat(playerCard, 40).ToArray(), playerExtra ?? Array.Empty<uint>(),
                     Enumerable.Repeat(rivalCard, 40).ToArray(), rivalExtra ?? Array.Empty<uint>(), humanFirst,
                     seed: new ulong[] { seed, unchecked(32 + (seed ^ 41UL) * 0x9E3779B97F4A7C15UL), 7, 11 },
@@ -256,13 +257,13 @@ namespace YGOPortable.Editor
 
             internal void NextMain(int turn) => Drive(() => InMain(Duel, turn), endTurn: true);
 
-            internal void Activate(uint code, uint target = 0)
+            internal void Activate(uint code, uint target = 0, uint acceptEffect = 0)
             {
                 int index = Duel.ActivePrompt.activatable.FindIndex(card => card.code == code);
                 Require(index >= 0, $"Could not activate {code} in {_name}.");
                 int turn = Duel.TurnNumber;
                 Duel.SubmitResponseInt((index << 16) | 5);
-                Drive(() => InMain(Duel, turn), target: target);
+                Drive(() => InMain(Duel, turn), target: target, acceptEffect: acceptEffect);
             }
 
             internal void Drive(Func<bool> stop, bool endTurn = false, uint target = 0, uint acceptEffect = 0, bool attackPosition = false)

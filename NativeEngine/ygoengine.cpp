@@ -78,14 +78,20 @@ constexpr PackedCard story_cards[] = {
     { 511090104, 0, 0x20004, 0, 0, 0, 0, 0, 0, 0, 0, {} },
     { 511090105, 0, 0x20004, 0, 0, 0, 0, 0, 0, 0, 0, {} },
     { 511090201, 0, 0x4011,  1, 1, 0, 0x2000, 0, 0, 0, 0, {} },
+    { 511090301, 0, 0x80002, 0, 0, 0, 0, 0, 0, 0, 0, {} },
+    { 511090302, 0, 0x10002, 0, 0, 0, 0, 0, 0, 0, 0, {} },
+    { 511090303, 0, 0x10002, 0, 0, 0, 0, 0, 0, 0, 0, {} },
 };
 
 std::string story_script_file(const std::string& key) {
     if (key == "c511090101.lua" || key == "c511090102.lua" || key == "c511090103.lua" ||
         key == "c511090104.lua" || key == "c511090105.lua")
         return "story_darkness_trap.lua";
+    if (key == "c511090302.lua" || key == "c511090303.lua")
+        return "story_action_magic.lua";
     if (key == "c511090001.lua" || key == "c511090002.lua" || key == "story_gimmicks.lua" ||
-        key == "story_gx.lua" || key == "story_5ds.lua" || key == "story_zexal.lua")
+        key == "story_gx.lua" || key == "story_5ds.lua" || key == "story_zexal.lua" ||
+        key == "story_arcv.lua" || key == "c511090301.lua")
         return key;
     return {};
 }
