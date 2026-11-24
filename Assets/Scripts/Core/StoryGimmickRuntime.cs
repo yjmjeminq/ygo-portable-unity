@@ -10,6 +10,7 @@ namespace YGOPortable.Core
         internal const uint SpeedWorld = 511090001;
         internal const uint AngelBaton = 511090002;
         internal const ushort SpeedCounter = 0x0091;
+        internal const byte CountdownWinReason = 0x80;
         private static readonly CardInfo SpeedWorldCard = new()
         {
             code = SpeedWorld,
@@ -34,29 +35,35 @@ namespace YGOPortable.Core
 
         internal static bool IsRidingDuel(string gimmick) => gimmick?.StartsWith("riding_", StringComparison.Ordinal) == true;
 
-        private static readonly Dictionary<string, (uint Code, bool Defense)[]> OpeningCards = new(StringComparer.Ordinal)
+        private const uint Attack = YgoConstants.POS_FACEUP_ATTACK;
+        private const uint Defense = YgoConstants.POS_FACEUP_DEFENSE;
+        private static readonly Dictionary<string, (uint Code, uint Position)[]> OpeningCards = new(StringComparer.Ordinal)
         {
-            ["insect_forest"] = new[] { (87430998u, false) },
-            ["ocean_ambush"] = new[] { (22702055u, false), (19089195u, false) },
-            ["labyrinth"] = new[] { (67284908u, true) },
-            ["jinzo"] = new[] { (77585513u, false) },
-            ["slifer_draw"] = new[] { (10000020u, false) },
-            ["tribute_mask"] = new[] { (29549364u, false) },
-            ["egyptian_gods"] = new[] { (10000020u, false), (10000010u, false) },
-            ["ancient_gear"] = new[] { (37694547u, false) },
-            ["helios_alchemy"] = new[] { (54493213u, false) },
-            ["amazoness_colosseum"] = new[] { (712559u, false) },
-            ["sacred_beasts"] = new[] { (6007213u, false), (32491822u, false) },
-            ["plasma"] = new[] { (83965310u, false) },
-            ["possessed_beasts"] = new[] { (6007213u, false), (32491822u, false), (69890967u, false) },
-            ["numeron_network"] = new[] { (41418852u, false) },
-            ["trickstar_poison"] = new[] { (35371948u, false) },
-            ["marincess_ocean"] = new[] { (91027843u, false) },
-            ["ignister_arrival"] = new[] { (59054773u, false) },
+            ["insect_forest"] = new[] { (87430998u, Attack), (89091579u, Attack) },
+            ["ocean_ambush"] = new[] { (22702055u, Attack), (19089195u, Attack), (23771716u, Attack) },
+            ["undead_renewal"] = new[] { (20277860u, Attack) },
+            ["labyrinth"] = new[] { (67284908u, Defense) },
+            ["darkness_curtain"] = new[] { (62121u, YgoConstants.POS_FACEDOWN_DEFENSE) },
+            ["machine_immunity"] = new[] { (3797883u, Attack) },
+            ["jinzo"] = new[] { (77585513u, Attack) },
+            ["slifer_draw"] = new[] { (10000020u, Attack) },
+            ["tribute_mask"] = new[] { (29549364u, Attack) },
+            ["dark_sanctuary"] = new[] { (16625614u, Attack) },
+            ["egyptian_gods"] = new[] { (10000020u, Attack), (10000010u, Attack) },
+            ["ancient_gear"] = new[] { (37694547u, Attack) },
+            ["helios_alchemy"] = new[] { (54493213u, Attack) },
+            ["amazoness_colosseum"] = new[] { (712559u, Attack) },
+            ["sacred_beasts"] = new[] { (6007213u, Attack), (32491822u, Attack) },
+            ["plasma"] = new[] { (83965310u, Attack) },
+            ["possessed_beasts"] = new[] { (6007213u, Attack), (32491822u, Attack), (69890967u, Attack) },
+            ["numeron_network"] = new[] { (41418852u, Attack) },
+            ["trickstar_poison"] = new[] { (35371948u, Attack) },
+            ["marincess_ocean"] = new[] { (91027843u, Attack) },
+            ["ignister_arrival"] = new[] { (59054773u, Attack) },
         };
 
-        internal static IReadOnlyList<(uint Code, bool Defense)> StartingCards(string gimmick) =>
-            gimmick != null && OpeningCards.TryGetValue(gimmick, out var cards) ? cards : Array.Empty<(uint, bool)>();
+        internal static IReadOnlyList<(uint Code, uint Position)> StartingCards(string gimmick) =>
+            gimmick != null && OpeningCards.TryGetValue(gimmick, out var cards) ? cards : Array.Empty<(uint, uint)>();
 
         internal StoryGimmickRuntime(string gimmick)
         {

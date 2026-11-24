@@ -27,9 +27,16 @@ namespace YGOPortable.Editor
                 CardArtLoader.Initialize(streaming, Path.Combine(save, "Art"));
                 CollectionProgress.Load(save);
                 Require(CollectionProgress.TryChooseStarter(CollectionProgress.Starters[0].Id, out var starter, out string error), error);
-                Require(YgoNativeBridge.Initialize(streaming, null) == 0, "The native engine did not start.");
+                var nativeErrors = new List<string>();
+                Require(YgoNativeBridge.Initialize(streaming, (type, message) =>
+                {
+                    if (type == 0) nativeErrors.Add(message);
+                }) == 0, "The native engine did not start.");
                 VerifyCampaigns();
                 VerifyOpeningCardRemoval();
+                nativeErrors.Clear();
+                VerifyDmScenarioEffects();
+                Require(nativeErrors.Count == 0, string.Join("\n", nativeErrors));
                 VerifyDialogueChoices(starter);
                 VerifyOpeningAndSave(save);
                 Debug.Log("[VERIFY STORY] 180 episodes, scrolling, cast portraits, boss openings, rewards and saved campaign progress passed.");
@@ -289,19 +296,19 @@ namespace YGOPortable.Editor
                 duel.Players[duel.HumanPlayerIndex].lp == 8000,
                 $"The configured LP, hand or opening field was missing in {name}.");
             if (raid?.Opening.FieldCard is > 0)
-                VerifyCard(raid.Value.Opening.FieldCard, false);
-            foreach (var (code, defense) in StoryGimmickRuntime.StartingCards(gimmick))
-                VerifyCard(code, defense);
+                VerifyCard(raid.Value.Opening.FieldCard, YgoConstants.POS_FACEUP_ATTACK);
+            foreach (var (code, position) in StoryGimmickRuntime.StartingCards(gimmick))
+                VerifyCard(code, position);
             if (riding)
                 Require(duel.Players.All(player => player.szone[5]?.code == StoryGimmickRuntime.SpeedWorld &&
                     player.hand.Any(card => card.code == StoryGimmickRuntime.AngelBaton)), "The riding duel lacked a field spell or its Speed Spell.");
 
-            void VerifyCard(uint code, bool defense)
+            void VerifyCard(uint code, uint position)
             {
                 var info = CardDatabase.Get(code);
                 var zone = info.IsMonster ? boss.mzone : boss.szone;
                 var placed = zone.SingleOrDefault(card => card?.code == code);
-                Require(placed?.IsFaceUp == true && (!defense || (placed.position & YgoConstants.POS_FACEUP_DEFENSE) != 0) &&
+                Require(placed?.position == position &&
                     ((info.type & YgoConstants.TYPE_FIELD) == 0 || placed.sequence == 5), $"Wrong zone or position for {code} in {name}.");
             }
         }
@@ -344,6 +351,144 @@ namespace YGOPortable.Editor
                 }
                 Require(opponent.grave.Any(card => card.code == target) && duel.RetryCount == 0,
                     $"{target} could not be destroyed by the native effect in {gimmick}.");
+            }
+        }
+
+        private static void VerifyDmScenarioEffects()
+        {
+            using (var forest = Start("insect_forest"))
+            {
+                var beetle = forest.Players[forest.AiPlayerIndex].mzone.Single(card => card?.code == 89091579);
+                Require(beetle.attack == 650 && forest.Players[forest.HumanPlayerIndex].deckCount == 36,
+                    "Forest did not give the insect exactly 30 percent ATK or infiltrate the deck.");
+            }
+            using (var parasite = Start("insect_forest", playerDeckSize: 6))
+            {
+                Advance(parasite, () => parasite.TurnNumber == 5 &&
+                    parasite.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD);
+                var player = parasite.Players[parasite.HumanPlayerIndex];
+                Require(player.lp == 7000 && player.mzone.Any(card => card is { code: 27911549 } && card.IsDefense),
+                    "Drawing the infiltrating Parasite did not summon it in defense or deal 1000 damage.");
+            }
+            const uint submarineroid = 99861526;
+            using (var openSea = Start(null, submarineroid, humanFirst: false))
+            {
+                EnterBattle(openSea);
+                Require(openSea.ActivePrompt.attackable.Any(card => card.code == submarineroid && card.directAttackable),
+                    "The battle control did not offer a direct attack.");
+            }
+            using (var ambush = Start("ocean_ambush", submarineroid, humanFirst: false))
+            {
+                EnterBattle(ambush);
+                Require(ambush.ActivePrompt.attackable.Any(card => card.code == submarineroid && !card.directAttackable),
+                    "The underwater ambush did not prevent the direct attack.");
+            }
+            using (var curtain = Start("darkness_curtain", humanFirst: false))
+            {
+                EnterBattle(curtain);
+                Require(curtain.ActivePrompt.attackable.Count == 0,
+                    "The curtain allowed the player to attack the opponent's set monster.");
+            }
+            using (var zombies = Start("undead_renewal", 12580477))
+            {
+                PlaySpell(zombies, 12580477);
+                var rival = zombies.Players[zombies.AiPlayerIndex];
+                Require(rival.mzone.Any(card => card is { code: 20277860, attack: 1650 }) &&
+                    rival.grave.All(card => card.code != 20277860), "The destroyed Zombie was not revived with its 10 percent bonus.");
+            }
+            using (var machines = Start("machine_immunity", 12580477))
+            {
+                PlaySpell(machines, 12580477);
+                Require(machines.Players[machines.AiPlayerIndex].mzone.Any(card => card?.code == 3797883),
+                    "Raigeki destroyed the spell-immune Machine.");
+            }
+            using (var eyes = Start("toon_mind_read"))
+                Require(eyes.IsKnownInOpposingHand((byte)eyes.AiPlayerIndex, 20721928),
+                    "The Millennium Eye did not reveal the player's cards to the opponent.");
+            foreach (string rule in new[] { "exodia_draw", "slifer_draw" })
+            {
+                using var duel = Start(rule);
+                Advance(duel, () => duel.TurnNumber == 2 && duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD);
+                Require(duel.Players[duel.AiPlayerIndex].hand.Count == 7, $"{rule} did not draw two cards on the opponent's turn.");
+                if (rule == "slifer_draw")
+                {
+                    Advance(duel, () => duel.TurnNumber >= 3);
+                    Require(duel.Players[duel.AiPlayerIndex].hand.Count == 7, "Slifer's hand limit discarded a seventh card.");
+                }
+            }
+            using (var circus = Start("circus_saw"))
+            {
+                Require(circus.Players[circus.HumanPlayerIndex].lp == 7700, "The first saw hit missed the player.");
+                Advance(circus, () => circus.TurnNumber == 2 && circus.CurrentPhase == YgoConstants.PHASE_MAIN1);
+                Require(circus.Players[circus.HumanPlayerIndex].lp == 7400 &&
+                    circus.Players[circus.AiPlayerIndex].lp == 8000, "The saw did not hit once per turn on the correct side.");
+            }
+            using (var prophecy = Start("ishtar_foresight"))
+                Require(prophecy.Logs.Any(log => log.Contains("덱 위 확인") && log.Split('[').Length >= 4),
+                    "Ishizu did not reveal the three cards before the draw.");
+            using (var shadow = Start("shadow_game", rivalCard: 46918794, humanFirst: false))
+            {
+                PlaySpell(shadow, 46918794);
+                var player = shadow.Players[shadow.HumanPlayerIndex];
+                Require(player.lp == 7000 && player.banished.Count == 1 && !player.banished[0].IsFaceUp &&
+                    player.deckCount == 34 && shadow.Players[shadow.AiPlayerIndex].banished.Count == 0,
+                    $"The Shadow Game did not banish one card from the damaged player's deck (LP {player.lp}, " +
+                    $"deck {player.deckCount}, banished {player.banished.Count}): " + string.Join(" / ", shadow.Logs.TakeLast(14)));
+            }
+            using (var timer = Start("voodoo_countdown", humanFirst: false))
+            {
+                Advance(timer, () => timer.IsFinished);
+                Require(timer.TurnNumber == 15 && timer.Winner == timer.AiPlayerIndex &&
+                    timer.WinReason == StoryGimmickRuntime.CountdownWinReason, "The voodoo countdown was not enforced on turn 15.");
+            }
+            Debug.Log("[VERIFY DM SCENARIOS] Field strength, Parasite, revival, immunity, opponent knowledge, draw and hand limits, damage, reveal, banish and countdown passed.");
+
+            static DuelSession Start(string rule, uint playerCard = 20721928, uint rivalCard = 20721928,
+                bool humanFirst = true, int playerDeckSize = 40)
+            {
+                var duel = new DuelSession();
+                Require(duel.StartNewDuel(Enumerable.Repeat(playerCard, playerDeckSize).ToArray(), Array.Empty<uint>(),
+                    Enumerable.Repeat(rivalCard, 40).ToArray(), Array.Empty<uint>(), humanFirst,
+                    seed: new ulong[] { 41, 32, 7, 11 }, storyGimmick: rule), $"Could not start {rule}.");
+                return duel;
+            }
+
+            static void EnterBattle(DuelSession duel)
+            {
+                bool MainPhase() => duel.TurnNumber == 2 && duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD;
+                Advance(duel, MainPhase);
+                Require(duel.ActivePrompt.summonable.Count > 0, "Missing test attacker.");
+                duel.SubmitResponseInt(0);
+                Advance(duel, MainPhase);
+                Require(duel.ActivePrompt.canBp, "The player could not enter the battle phase.");
+                duel.SubmitResponseInt(6);
+                Advance(duel, () => duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_BATTLECMD);
+            }
+
+            static void PlaySpell(DuelSession duel, uint code)
+            {
+                var prompt = duel.ActivePrompt;
+                Require(prompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD, "The duel did not reach the first main phase.");
+                int index = prompt.activatable.FindIndex(choice => choice.code == code);
+                Require(index >= 0, $"Could not activate test card {code}.");
+                duel.SubmitResponseInt((index << 16) | 5);
+                Advance(duel, () => duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD);
+            }
+
+            static void Advance(DuelSession duel, Func<bool> stop)
+            {
+                var ai = new TacticalAI { Difficulty = AIDifficulty.Easy };
+                for (int step = 0; step < 150 && !stop() && !duel.IsFinished && duel.RetryCount == 0; step++)
+                {
+                    var prompt = duel.ActivePrompt;
+                    if (prompt == null) { duel.StepUntilPrompt(); continue; }
+                    if (prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD && prompt.canEp) duel.SubmitResponseInt(7);
+                    else if (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN && !prompt.forced) duel.SubmitResponseInt(-1);
+                    else duel.SubmitResponse(ai.ComputeResponse(duel, prompt));
+                }
+                Require(stop() && duel.RetryCount == 0, $"The scenario checkpoint was missed on turn {duel.TurnNumber} " +
+                    $"(phase {duel.CurrentPhase}, prompt {duel.ActivePrompt?.messageType}, retries {duel.RetryCount}): " +
+                    string.Join(" / ", duel.Logs.TakeLast(16)));
             }
         }
 

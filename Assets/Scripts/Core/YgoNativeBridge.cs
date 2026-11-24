@@ -60,6 +60,10 @@ namespace YGOPortable.Core
             byte con, uint loc, uint seq, uint pos);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int YGO_ConfigureStoryGimmick(IntPtr duel,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string gimmick, byte human);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern void YGO_StartDuel(IntPtr duel);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]

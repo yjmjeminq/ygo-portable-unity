@@ -23,6 +23,8 @@
 #include "duel.h"
 #include "effect.h"
 #include "field.h"
+#include "interpreter.h"
+#include <lua.h>
 
 namespace {
 
@@ -73,7 +75,7 @@ constexpr PackedCard story_cards[] = {
 };
 
 bool is_story_script(const std::string& key) {
-    return key == "c511090001.lua" || key == "c511090002.lua";
+    return key == "c511090001.lua" || key == "c511090002.lua" || key == "story_gimmicks.lua";
 }
 
 std::string to_lower_ascii(const char* s) {
@@ -325,6 +327,25 @@ YGO_API void YGO_AddCard(void* duel, uint8_t team, uint8_t duelist, uint32_t cod
     info.seq = seq;
     info.pos = pos;
     OCG_DuelNewCard(static_cast<OCG_Duel>(duel), &info);
+}
+
+YGO_API int32_t YGO_ConfigureStoryGimmick(void* handle, const char* rule, uint8_t human) {
+    if (!handle || !rule || !*rule || human > 1) return -1;
+    auto* instance = static_cast<duel*>(handle);
+    if (!read_script_cb(nullptr, instance, "story_gimmicks.lua")) {
+        instance->handle_message("Could not load story_gimmicks.lua", OCG_LOG_TYPE_ERROR);
+        return -1;
+    }
+    auto* state = instance->lua->current_state;
+    lua_getglobal(state, "YgoStoryConfigure");
+    lua_pushstring(state, rule);
+    lua_pushinteger(state, human);
+    const int status = lua_pcall(state, 2, 1, 0);
+    if (status != LUA_OK)
+        instance->handle_message(lua_tostring(state, -1), OCG_LOG_TYPE_ERROR);
+    const int result = status == LUA_OK ? lua_toboolean(state, -1) : -1;
+    lua_pop(state, 1);
+    return result;
 }
 
 YGO_API void YGO_StartDuel(void* duel) {

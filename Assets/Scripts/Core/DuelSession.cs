@@ -568,6 +568,13 @@ namespace YGOPortable.Core
                 Dispose();
                 return false;
             }
+            if (!string.IsNullOrEmpty(storyGimmick) &&
+                YgoNativeBridge.YGO_ConfigureStoryGimmick(NativePtr, storyGimmick, (byte)HumanPlayerIndex) < 0)
+            {
+                Debug.LogError($"Could not configure story rule: {storyGimmick}");
+                Dispose();
+                return false;
+            }
 
             YgoNativeBridge.YGO_StartDuel(NativePtr);
             if (_recordPlanningReplay)
@@ -699,7 +706,7 @@ namespace YGOPortable.Core
 
         private bool PlaceStoryOpeningCards(byte player, string storyGimmick)
         {
-            foreach (var (code, defense) in StoryGimmickRuntime.StartingCards(storyGimmick))
+            foreach (var (code, position) in StoryGimmickRuntime.StartingCards(storyGimmick))
             {
                 var info = CardDatabase.Get(code);
                 if (info == null || YgoNativeBridge.YGO_HasCard(code) == 0) return false;
@@ -710,7 +717,6 @@ namespace YGOPortable.Core
                 foreach (uint sequence in sequences)
                 {
                     if (YgoNativeBridge.YGO_QueryCardIdentity(NativePtr, player, location, sequence) != 0) continue;
-                    uint position = defense ? YgoConstants.POS_FACEUP_DEFENSE : YgoConstants.POS_FACEUP_ATTACK;
                     YgoNativeBridge.YGO_AddCard(NativePtr, player, 0, code, player, location, sequence, position);
                     placed = YgoNativeBridge.YGO_QueryCardIdentity(NativePtr, player, location, sequence) != 0;
                     break;
@@ -1407,6 +1413,7 @@ namespace YGOPortable.Core
                     WinReason = reason;
                     ActivePrompt = null;
                     string who = Winner == 2 ? "무승부" : (Winner == HumanPlayerIndex ? "플레이어 승리!" : "AI 승리!");
+                    if (reason == StoryGimmickRuntime.CountdownWinReason) AddLog("스토리 듀얼의 턴 제한에 도달했습니다.");
                     AddLog($"듀얼 종료: {who}");
                     break;
                 }
