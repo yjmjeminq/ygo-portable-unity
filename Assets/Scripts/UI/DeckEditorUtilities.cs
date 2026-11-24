@@ -55,6 +55,13 @@ namespace YGOPortable.UI
         private GameObject _utilityReturnFocus;
         private InputField _deckRecipeInput;
         private Text _deckRecipeStatus;
+        private const int ShortagePageSize = 7;
+        private Button _deckShortageButton, _shortageClose, _shortagePrevious, _shortageNext;
+        private RectTransform _deckShortagesOverlay;
+        private Text _shortagePageLabel;
+        private int _shortagePage;
+        private readonly (RectTransform Row, Text Name, Text Count)[] _shortageRows = new (RectTransform, Text, Text)[ShortagePageSize];
+        private (uint Code, int Needed, long Owned)[] _deckShortages = Array.Empty<(uint, int, long)>();
 
         private static RectTransform DeckArea(Transform parent, string name, float x1, float y1, float x2, float y2) =>
             DuelUiKit.CreateRect(name, parent, new Vector2(x1, y1), new Vector2(x2, y2), Vector2.zero, Vector2.zero);
@@ -125,6 +132,7 @@ namespace YGOPortable.UI
 
         private void BuildDeckUtilities(Transform root)
         {
+            BuildDeckShortages(root);
             _deckToolsOverlay = BuildDeckOverlay(root, "DeckTools", out var tools);
             DuelUiKit.AddFittedText(DeckArea(tools, "Title", .06f, .847f, .73f, .955f),
                 "Text", "덱 관리 · 레시피", 27, 16, TextAnchor.MiddleLeft, DuelUiKit.TextPrimary, FontStyle.Bold);
@@ -196,6 +204,68 @@ namespace YGOPortable.UI
                 _mobileLayout ? new Vector2(.952f, .952f) : new Vector2(.895f, .877f));
             dim.gameObject.SetActive(false);
             return dim;
+        }
+
+        private void BuildDeckShortages(Transform root)
+        {
+            _deckShortagesOverlay = BuildDeckOverlay(root, "DeckShortageList", out var panel);
+            DuelUiKit.AddFittedText(DeckArea(panel, "Title", .06f, .847f, .73f, .955f),
+                "Text", "부족한 카드", 27, 16, TextAnchor.MiddleLeft, DuelUiKit.TextPrimary, FontStyle.Bold);
+            _shortageClose = DeckButton(panel, "Close", "닫기", .79f, .847f, .945f, .948f, CloseDeckUtility);
+            for (int i = 0; i < _shortageRows.Length; i++)
+            {
+                float top = .809f - i * .094f;
+                var row = DeckArea(panel, $"Card_{i}", .055f, top - .086f, .945f, top);
+                DeckEditorStyle.Fill(row, DeckEditorStyle.Inset, false);
+                var name = DuelUiKit.AddFittedText(DeckArea(row, "Name", .023f, .045f, .60f, .955f),
+                    "Label", "", 23, 13, TextAnchor.MiddleLeft, DuelUiKit.TextPrimary, FontStyle.Bold);
+                var count = DuelUiKit.AddFittedText(DeckArea(row, "Count", .62f, .045f, .975f, .955f),
+                    "Label", "", 21, 12, TextAnchor.MiddleRight, DuelUiKit.RedAccent, FontStyle.Bold);
+                _shortageRows[i] = (row, name, count);
+            }
+            _shortagePrevious = DeckButton(panel, "Previous", "이전", .345f, .048f, .44f, .137f, () => ShowShortagePage(_shortagePage - 1));
+            _shortageNext = DeckButton(panel, "Next", "다음", .56f, .048f, .655f, .137f, () => ShowShortagePage(_shortagePage + 1));
+            _shortagePageLabel = DuelUiKit.AddFittedText(DeckArea(panel, "Page", .446f, .048f, .554f, .137f),
+                "Label", "", 18, 12, TextAnchor.MiddleCenter, DuelUiKit.TextPrimary);
+        }
+
+        private void RefreshDeckShortages(int missingCount)
+        {
+            _deckShortages = missingCount == 0 ? Array.Empty<(uint, int, long)>() : _workingDeck.Copies()
+                .GroupBy(copy => CardDatabase.GetDeckPrintingKey(copy.Code))
+                .Select(group => (Code: group.Key, Needed: group.Count(), Owned: CollectionProgress.GetOwnedDeckCopies(group.Key)))
+                .Where(card => card.Needed > card.Owned).ToArray();
+            _deckShortageButton.transform.parent.gameObject.SetActive(missingCount > 0);
+            var label = _deckShortageButton.GetComponentInChildren<Text>(true);
+            label.text = $"부족 {missingCount}장 보기";
+            label.color = DuelUiKit.RedAccent;
+            if (_utilityOverlay == _deckShortagesOverlay) ShowShortagePage(_shortagePage);
+        }
+
+        private void OpenDeckShortages()
+        {
+            if (_deckShortages.Length == 0) return;
+            ShowShortagePage(0);
+            OpenDeckUtility(_deckShortagesOverlay, _shortageClose);
+        }
+
+        private void ShowShortagePage(int page)
+        {
+            int pages = Mathf.Max(1, (_deckShortages.Length + ShortagePageSize - 1) / ShortagePageSize);
+            _shortagePage = Mathf.Clamp(page, 0, pages - 1);
+            for (int i = 0; i < _shortageRows.Length; i++)
+            {
+                var (row, name, count) = _shortageRows[i];
+                int index = _shortagePage * ShortagePageSize + i;
+                row.gameObject.SetActive(index < _deckShortages.Length);
+                if (index >= _deckShortages.Length) continue;
+                var card = _deckShortages[index];
+                name.text = CardDatabase.GetName(card.Code);
+                count.text = $"부족 {card.Needed - card.Owned}장  ·  보유 {card.Owned} / 필요 {card.Needed}장";
+            }
+            _shortagePrevious.interactable = _shortagePage > 0;
+            _shortageNext.interactable = _shortagePage + 1 < pages;
+            _shortagePageLabel.text = $"{_shortagePage + 1} / {pages}";
         }
 
         private void OpenDeckTools()

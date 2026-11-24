@@ -497,8 +497,18 @@ namespace YGOPortable.Editor
             Require(CollectionProgress.TryDisassembleCards(new Dictionary<uint, int> { [code] = 3 }, out string error), error);
             Call(editor, "ReturnFromCardCrafting");
             Require(mainBadge.gameObject.activeInHierarchy && sideBadge.gameObject.activeInHierarchy &&
-                TrunkCount(editor, code) == "미보유" && preview.text.Contains("미보유"),
+                TrunkCount(editor, code) == "미보유" && preview.text.Contains("부족 3장"),
                 "Disassembling the last copy did not refresh the deck, card list and preview.");
+            var shortages = Field<Button>(editor, "_deckShortageButton");
+            Require(shortages.gameObject.activeInHierarchy && shortages.GetComponentInChildren<Text>().text == "부족 3장 보기",
+                "A deck with missing cards did not show a visible shortage count.");
+            shortages.onClick.Invoke();
+            var list = Field<RectTransform>(editor, "_deckShortagesOverlay");
+            var row = list.Find("Window/Card_0");
+            Require(row.gameObject.activeInHierarchy && row.Find("Name/Label").GetComponent<Text>().text == CardDatabase.GetName(code) &&
+                row.Find("Count/Label").GetComponent<Text>().text.Contains("보유 0 / 필요 3장"),
+                "The shortage list did not identify the missing card and its quantities.");
+            Field<Button>(editor, "_shortageClose").onClick.Invoke();
 
             Call(editor, "OpenCardCrafting", code, CardTradeAction.Browse);
             Require(CollectionProgress.TryCraftCard(code, 1, out error), error);
@@ -513,7 +523,7 @@ namespace YGOPortable.Editor
             Call(editor, "OpenCardCrafting", code, CardTradeAction.Browse);
             Require(CollectionProgress.TryCraftCard(code, 2, out error), error);
             Call(editor, "ReturnFromCardCrafting");
-            Require(!secondBadge.gameObject.activeInHierarchy && !sideBadge.gameObject.activeInHierarchy &&
+            Require(!secondBadge.gameObject.activeInHierarchy && !sideBadge.gameObject.activeInHierarchy && !shortages.gameObject.activeInHierarchy &&
                 !Field<Text>(editor, "_mainCountText").text.Contains("부족") &&
                 !Field<Text>(editor, "_sideCountText").text.Contains("부족"),
                 "Obtaining the remaining copies did not clear the badges and section counters.");
@@ -580,6 +590,10 @@ namespace YGOPortable.Editor
                     "A deck view should show an in-frame illustration and the Overframe edition badge.");
             }
             Call(editor, "CloseExpandedDeckCard");
+            deck.RemoveCard(deck.extra, 0);
+            Call(editor, "RefreshDeckGrids");
+            Require(!sideBadge.activeInHierarchy && !Field<Button>(editor, "_deckShortageButton").gameObject.activeInHierarchy,
+                "A regular owned copy did not clear a shortage for the second requested Overframe.");
             Debug.Log("[VERIFY DECK SHORTAGES] Partial ownership across sections, reserved Overframes, and printed edition views passed.");
         }
 

@@ -352,9 +352,31 @@ namespace YGOPortable.Editor
                     $"Mixed editions did not preserve the saved deck and assign both owned Overframes. {reason}");
                 deck.SetAppearance(deck.main, start + 1, new DeckCardAppearance { overframe = true });
                 deck.SetAppearance(deck.main, start + 2, new DeckCardAppearance { overframe = true });
-                Require(!CollectionProgress.CanUseDeck(deck, out reason) && reason.Contains("오버프레임 보유 2장 / 필요 3장"),
-                    "The deck accepted more explicit Overframes than the player owns.");
-                Debug.Log("[VERIFY MIXED DECK EDITIONS] Owned Overframes filled regular slots without changing the saved deck.");
+                Require(CollectionProgress.TryPrepareDeckForDuel(deck, out prepared, out reason) &&
+                    prepared.GetAppearance(prepared.main, start).overframe &&
+                    prepared.GetAppearance(prepared.main, start + 1).overframe &&
+                    !prepared.GetAppearance(prepared.main, start + 2).overframe &&
+                    deck.GetAppearance(deck.main, start + 2).overframe,
+                    $"A regular copy did not substitute for a requested Overframe. {reason}");
+
+                const uint blueEyes = 89631139, alternateArt = 89631140;
+                File.WriteAllText(profile, WithOwnership(mixed, alternateArt, 1));
+                CollectionProgress.Load(save);
+                int ownedBlueEyes = CollectionProgress.GetOwnedCount(blueEyes);
+                if (ownedBlueEyes > 0)
+                    Require(CollectionProgress.TryDisassembleCards(new Dictionary<uint, int> { [blueEyes] = ownedBlueEyes },
+                        out string disassemblyError), disassemblyError);
+                var alternateDeck = CollectionProgress.CopyDeck(deck);
+                alternateDeck.main[start] = blueEyes;
+                alternateDeck.SetAppearance(alternateDeck.main, start, new DeckCardAppearance { overframe = true, destinyDraw = true });
+                Require(CollectionProgress.TryPrepareDeckForDuel(alternateDeck, out prepared, out reason) &&
+                    prepared.main[start] == alternateArt && !prepared.GetAppearance(prepared.main, start).overframe &&
+                    prepared.GetAppearance(prepared.main, start).destinyDraw && alternateDeck.main[start] == blueEyes,
+                    $"An owned alternate illustration did not replace the unavailable printing in the duel. {reason}");
+                alternateDeck.side.Add(blueEyes);
+                Require(!CollectionProgress.CanUseDeck(alternateDeck, out reason) && reason.Contains("보유 1장 / 필요 2장"),
+                    "One physical copy cannot satisfy two deck slots across sections.");
+                Debug.Log("[VERIFY MIXED DECK EDITIONS] Alternate artwork and both editions substitute without changing the saved deck.");
             }
             finally
             {

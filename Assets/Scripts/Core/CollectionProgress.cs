@@ -457,12 +457,8 @@ namespace YGOPortable.Core
 
         public static UserDeck CreateStarterDeck() => HasStarter ? CopyDeck(_profile.starterDeck) : null;
 
-        public static bool CanUseDeck(UserDeck deck, out string reason) =>
-            ValidateDeckOwnership(deck, out _, out reason);
-
-        private static bool ValidateDeckOwnership(UserDeck deck, out bool useSpareOverframes, out string reason)
+        public static bool CanUseDeck(UserDeck deck, out string reason)
         {
-            useSpareOverframes = false;
             if (!ValidateDeck(deck, out reason)) return false;
             if (!Initialized) return true;
             if (!CanTransact(out reason)) return false;
@@ -473,56 +469,84 @@ namespace YGOPortable.Core
             }
             if (AllDeckCardsAvailable) return true;
 
-            foreach (var copies in deck.Copies().GroupBy(copy => copy.Code))
+            foreach (var copies in GetDeckCards(deck).GroupBy(CardDatabase.GetDeckPrintingKey))
             {
                 uint code = copies.Key;
                 int needed = copies.Count();
-                int neededOverframes = copies.Count(copy => copy.Appearance.overframe);
-                int overframes = GetOwnedOverframeCount(code);
-                if (overframes < neededOverframes)
-                {
-                    reason = $"{CardDatabase.GetName(code)} 오버프레임 보유 {overframes}장 / 필요 {neededOverframes}장";
-                    return false;
-                }
-
-                int regular = GetOwnedCount(code);
-                int owned = CombinedCount(regular, overframes);
+                long owned = GetOwnedDeckCopies(code);
                 if (owned < needed)
                 {
                     reason = $"{CardDatabase.GetName(code)} 보유 {owned}장 / 필요 {needed}장";
                     return false;
                 }
-
-                useSpareOverframes |= regular < needed - neededOverframes;
             }
             return true;
+        }
+
+        internal static long GetOwnedDeckCopies(uint code) => CardDatabase.TryGetDeckPrintings(code, out var printings)
+            ? printings.Sum(card => (long)GetOwnedCount(card.code) + GetOwnedOverframeCount(card.code))
+            : (long)GetOwnedCount(code) + GetOwnedOverframeCount(code);
+
+        internal static (uint Code, bool Overframe)[] AssignOwnedDeckCopies(UserDeck deck)
+        {
+            var requested = deck.Copies().Select(copy => (copy.Code, Overframe: copy.Appearance.overframe)).ToArray();
+            var assigned = new (uint Code, bool Overframe)[requested.Length];
+            var remaining = new Dictionary<(uint Code, bool Overframe), int>();
+
+            bool Assign(int index, uint code, bool overframe)
+            {
+                var edition = (code, overframe);
+                if (!remaining.TryGetValue(edition, out int count))
+                    count = overframe ? GetOwnedOverframeCount(code) : GetOwnedCount(code);
+                if (code == 0 || count == 0) return false;
+                remaining[edition] = count - 1;
+                assigned[index] = edition;
+                return true;
+            }
+
+            // Reserve exact editions across all three sections before substituting any of them.
+            for (int i = 0; i < requested.Length; i++)
+                Assign(i, requested[i].Code, requested[i].Overframe);
+
+            for (int i = 0; i < requested.Length; i++)
+            {
+                var (code, overframe) = requested[i];
+                if (assigned[i].Code != 0 || Assign(i, code, !overframe) ||
+                    !CardDatabase.TryGetDeckPrintings(code, out var printings)) continue;
+                foreach (var printing in printings)
+                    if (Assign(i, printing.code, overframe) || Assign(i, printing.code, !overframe)) break;
+            }
+            return assigned;
         }
 
         internal static bool TryPrepareDeckForDuel(UserDeck deck, out UserDeck prepared, out string reason)
         {
             prepared = deck;
-            if (!ValidateDeckOwnership(deck, out bool useSpareOverframes, out reason)) return false;
-            if (!useSpareOverframes) return true;
+            if (!CanUseDeck(deck, out reason)) return false;
+            if (!RequiresOwnedCardsForDecks) return true;
 
             // Keep the saved appearance preferences and use the actual editions for this duel.
-            prepared = CopyDeck(deck);
-            var regularUsed = new Dictionary<uint, int>();
-            foreach (var section in new[] { prepared.main, prepared.extra, prepared.side })
+            var assigned = AssignOwnedDeckCopies(deck);
+            int slot = 0;
+            var sections = new[] { deck.main, deck.extra, deck.side };
+            List<uint>[] preparedSections = null;
+            for (int section = 0; section < sections.Length; section++)
             {
-                for (int index = 0; index < section.Count; index++)
+                var cards = sections[section];
+                for (int index = 0; index < cards.Count; index++)
                 {
-                    var appearance = prepared.GetAppearance(section, index);
-                    if (appearance.overframe) continue;
-                    uint code = section[index];
-                    int used = regularUsed.GetValueOrDefault(code);
-                    if (used < GetOwnedCount(code))
+                    var (code, overframe) = assigned[slot++];
+                    var appearance = deck.GetAppearance(cards, index);
+                    if (cards[index] == code && appearance.overframe == overframe) continue;
+                    if (preparedSections == null)
                     {
-                        regularUsed[code] = used + 1;
-                        continue;
+                        prepared = CopyDeck(deck);
+                        preparedSections = new[] { prepared.main, prepared.extra, prepared.side };
                     }
-
-                    appearance.overframe = true;
-                    prepared.SetAppearance(section, index, appearance.WithAvailableArtwork(code));
+                    if (cards[index] != code) appearance.artwork = 0;
+                    appearance.overframe = overframe;
+                    preparedSections[section][index] = code;
+                    prepared.SetAppearance(preparedSections[section], index, appearance.WithAvailableArtwork(code));
                 }
             }
             return true;

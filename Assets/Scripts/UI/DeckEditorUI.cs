@@ -335,6 +335,8 @@ namespace YGOPortable.UI
                 DeckEditorStyle.Fill(wallet, DeckEditorStyle.Inset, false);
                 _dustBalance = DuelUiKit.AddFittedText(wallet, "Balance", "", 17, 12,
                     TextAnchor.MiddleCenter, DeckEditorStyle.Accent, FontStyle.Bold);
+                _deckShortageButton = DeckButton(root, "DeckShortages", "", .633f, .918f, .755f, .976f,
+                    OpenDeckShortages, fontSize: 16);
                 var examples = DuelUiKit.CreateRect("Examples", root, new Vector2(0.765f, 0.918f), new Vector2(0.871f, 0.976f),
                     Vector2.zero, Vector2.zero);
                 DeckEditorStyle.Button(examples, "Button", "카드군 예시 덱", OpenArchetypeModal, 15);
@@ -837,9 +839,9 @@ namespace YGOPortable.UI
                 var trigger = slot.gameObject.AddComponent<CardDragTrigger>();
                 trigger.SourceType = source;
                 var badge = DuelUiKit.CreateRect("Unowned", card.transform.Find("AspectBox"),
-                    new Vector2(.03f, .18f), new Vector2(.97f, .36f), Vector2.zero, Vector2.zero);
+                    new Vector2(.03f, .12f), new Vector2(.97f, .39f), Vector2.zero, Vector2.zero);
                 DuelUiKit.AddImage(badge.gameObject, DuelUiKit.WhiteSprite, UnownedBadgeColor, false, false);
-                DuelUiKit.AddFittedText(badge, "Label", "부족", 14, 7, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
+                DuelUiKit.AddFittedText(badge, "Label", "부족", 17, 9, TextAnchor.MiddleCenter, Color.white, FontStyle.Bold);
                 badge.gameObject.SetActive(false);
                 target.Add((slot, card, trigger));
             }
@@ -1083,14 +1085,17 @@ namespace YGOPortable.UI
                 ResizeVerticalDeckScroll(_extraDeckScroll, _extraDeckSlotGrid, _workingDeck.extra.Count,
                     OtherDeckCapacity, _extraColumns, _extraVisibleRows);
             ResizeSideDeckScroll();
-            var available = AvailableDeckCopies();
+            var assigned = CollectionProgress.RequiresOwnedCardsForDecks
+                ? CollectionProgress.AssignOwnedDeckCopies(_workingDeck) : null;
+            int mainCount = _workingDeck.main.Count;
             var missing = new[]
             {
-                SyncSlotList(_mainSlots, _workingDeck.main, PadArea.Main, available),
-                SyncSlotList(_extraSlots, _workingDeck.extra, PadArea.Extra, available),
-                SyncSlotList(_sideSlots, _workingDeck.side, PadArea.Side, available),
+                SyncSlotList(_mainSlots, _workingDeck.main, PadArea.Main, assigned, 0),
+                SyncSlotList(_extraSlots, _workingDeck.extra, PadArea.Extra, assigned, mainCount),
+                SyncSlotList(_sideSlots, _workingDeck.side, PadArea.Side, assigned, mainCount + _workingDeck.extra.Count),
             };
             RefreshComposition(missing);
+            RefreshDeckShortages(missing.Sum());
             RefreshPreviewOwnership();
             RefreshSaveLabel();
             RefreshMobileSectionLabels(missing);
@@ -1098,7 +1103,7 @@ namespace YGOPortable.UI
         }
 
         private int SyncSlotList(List<(RectTransform rt, CompositeCardView card, CardDragTrigger trigger)> slots,
-            List<uint> cards, PadArea area, Dictionary<(uint Code, bool Overframe), long> available)
+            List<uint> cards, PadArea area, (uint Code, bool Overframe)[] assigned, int offset)
         {
             int missing = 0;
             int count = Mathf.Max(slots.Count, cards.Count);
@@ -1107,15 +1112,8 @@ namespace YGOPortable.UI
                 bool filled = i < cards.Count;
                 uint code = filled ? cards[i] : 0;
                 var appearance = filled ? _workingDeck.GetAppearance(cards, i) : default;
-                bool shortage = false;
-                if (filled && available != null)
-                {
-                    var edition = (code, appearance.overframe);
-                    long copiesLeft = available[edition];
-                    shortage = copiesLeft == 0;
-                    if (shortage) missing++;
-                    else available[edition] = copiesLeft - 1;
-                }
+                bool shortage = filled && assigned != null && assigned[offset + i].Code == 0;
+                if (shortage) missing++;
 
                 if (i >= slots.Count) continue;
                 var (rect, view, trigger) = slots[i];
@@ -1373,40 +1371,25 @@ namespace YGOPortable.UI
             return -1;
         }
 
-        private int CountInWorkingDeck(uint code, bool combineAlternateArts = true)
+        private int CountInWorkingDeck(uint code)
         {
-            uint targetKey = combineAlternateArts ? CollectionProgress.GetDeckCopyKey(code) : code;
-            int cnt = 0;
-            void CountList(List<uint> l)
-            {
-                foreach (var c in l)
-                {
-                    uint k = combineAlternateArts ? CollectionProgress.GetDeckCopyKey(c) : c;
-                    if (k == targetKey) cnt++;
-                }
-            }
-            CountList(_workingDeck.main);
-            CountList(_workingDeck.extra);
-            CountList(_workingDeck.side);
-            return cnt;
+            uint targetKey = CollectionProgress.GetDeckCopyKey(code);
+            bool SameName(uint card) => CollectionProgress.GetDeckCopyKey(card) == targetKey;
+            return _workingDeck.main.Count(SameName) + _workingDeck.extra.Count(SameName) + _workingDeck.side.Count(SameName);
         }
 
         private uint FindAddableCardCopy(uint code, bool showReason = true)
         {
-            if (CollectionProgress.RequiresOwnedCardsForDecks && !HasUnusedCopy(code))
+            if (CollectionProgress.RequiresOwnedCardsForDecks)
             {
-                var spare = CardDatabase.TryGetDeckPrintings(code, out var printings)
-                    ? Array.Find(printings, printing => HasUnusedCopy(printing.code)) : null;
-                if (spare == null)
+                if (GetRemainingTrunkCopies(code, out long owned, out _) == 0)
                 {
                     if (showReason)
-                    {
-                        GetRemainingTrunkCopies(code, out long owned, out _);
                         ShowToast(owned == 0 ? "보유하지 않은 카드입니다." : $"보유 카드 {owned}장을 모두 사용 중입니다.");
-                    }
                     return 0;
                 }
-                code = spare.code;
+                if (!HasUnusedCopy(code) && CardDatabase.TryGetDeckPrintings(code, out var printings))
+                    code = Array.Find(printings, printing => HasUnusedCopy(printing.code))?.code ?? code;
             }
 
             int limit = CollectionProgress.DeckCopyLimit;
@@ -1493,24 +1476,11 @@ namespace YGOPortable.UI
                 inDeck = CountInWorkingDeck(code);
                 return Math.Max(0, owned - inDeck);
             }
-            if (!CardDatabase.TryGetDeckPrintings(code, out var printings))
-            {
-                owned = CollectionProgress.GetTotalOwnedCount(code);
-                inDeck = CountInWorkingDeck(code, combineAlternateArts: false);
-                return UnusedEditionCount(code, false) + (long)UnusedEditionCount(code, true);
-            }
-
-            owned = 0;
-            inDeck = 0;
-            long remaining = 0;
-            foreach (var printing in printings)
-            {
-                uint variant = printing.code;
-                owned += CollectionProgress.GetTotalOwnedCount(variant);
-                inDeck += CountInWorkingDeck(variant, combineAlternateArts: false);
-                remaining += UnusedEditionCount(variant, false) + (long)UnusedEditionCount(variant, true);
-            }
-            return remaining;
+            uint key = DeckGroupKey(code);
+            bool SameCard(uint candidate) => DeckGroupKey(candidate) == key;
+            owned = CollectionProgress.GetOwnedDeckCopies(code);
+            inDeck = _workingDeck.main.Count(SameCard) + _workingDeck.extra.Count(SameCard) + _workingDeck.side.Count(SameCard);
+            return Math.Max(0, owned - inDeck);
         }
 
         private void RefreshPreviewOwnership()
@@ -1528,6 +1498,8 @@ namespace YGOPortable.UI
             _previewOwnership.text = CollectionProgress.AllDeckCardsAvailable ? $"추가 가능 {remaining}장 · 덱에 {inDeck}장" :
                 owned == 0 ? $"{UnownedLabel} · 덱에 {inDeck}장" :
                     $"보관함 {remaining}장 · 덱에 {inDeck}장 · 보유 {owned}장";
+            if (!CollectionProgress.AllDeckCardsAvailable && inDeck > owned)
+                _previewOwnership.text += $" · 부족 {inDeck - owned}장";
             _previewOwnership.color = inDeck > owned || owned == 0 ? DuelUiKit.RedAccent : DuelUiKit.TextPrimary;
             var rarity = CardRarityCatalog.GetRarity(_inspectedCode);
             _previewRarity.text = CardRarityCatalog.GetLabel(rarity);

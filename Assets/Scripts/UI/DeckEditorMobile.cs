@@ -46,9 +46,11 @@ namespace YGOPortable.UI
         private void BuildMobileEditor(RectTransform root)
         {
             _mobileEditor = root;
-            _mobileTitle = DeckArea(root, "MobileTitle", .027f, 0f, .265f, 1f);
+            _mobileTitle = DeckArea(root, "MobileTitle", .027f, 0f, .145f, 1f);
             DuelUiKit.AddFittedText(_mobileTitle, "Title", "덱 편집", 35, 21, TextAnchor.MiddleLeft, DuelUiKit.TextPrimary,
                 FontStyle.Bold);
+            _deckShortageButton = DeckButton(root, "DeckShortages", "", .153f, 0f, .277f, 1f,
+                OpenDeckShortages, fontSize: 21);
             _mobileToolbar = DeckArea(root, "MobileToolbar", .28f, 0f, .985f, 1f);
             DeckButton(_mobileToolbar, "AutoSort", "자동 정렬", .02f, 0f, .215f, 1f, () => SortWorkingDeck(byFrame: true), fontSize: 24);
             _openDrawButton = DeckButton(_mobileToolbar, "TestDraw", "5장 테스트 드로우", .227f, 0f, .504f, 1f,
@@ -150,6 +152,7 @@ namespace YGOPortable.UI
             float selection = Mathf.Clamp(touch * .40f, 43f, 57f) * MobileHeightScale;
             PositionFromTop(_mobileToolbar, 8f, 8f + bar);
             PositionFromTop(_mobileTitle, 8f, 8f + bar);
+            PositionFromTop((RectTransform)_deckShortageButton.transform.parent, 8f, 8f + bar);
             _mobileSelection.anchorMin = new Vector2(.02f, 0f);
             _mobileSelection.anchorMax = new Vector2(.98f, 0f);
             _mobileSelection.offsetMin = new Vector2(0f, 34f);
