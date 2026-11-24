@@ -18,6 +18,7 @@ namespace YGOPortable.Editor
             int exitCode = 0;
             try
             {
+                var (shard, shardCount) = SmokeShard();
                 string streaming = Application.streamingAssetsPath;
                 int scriptErrors = 0;
                 var errorMsgs = new HashSet<string>();
@@ -106,7 +107,7 @@ namespace YGOPortable.Editor
                     (3202, 5, 3305, 5, 603), // 세크트 이쥬인 Lv.5 vs 야구모 쿄지 Lv.5 (코믹스 대결)
                 };
 
-                foreach (var (cA, lvA, cB, lvB, seed) in matchups)
+                foreach (var (cA, lvA, cB, lvB, seed) in shard == 0 ? matchups : Array.Empty<(int, int, int, int, int)>())
                 {
                     var chA = DeckRepository.Characters.First(c => c.id == cA);
                     var chB = DeckRepository.Characters.First(c => c.id == cB);
@@ -118,27 +119,42 @@ namespace YGOPortable.Editor
 
                 // Rotate the second seat so every runtime deck plays once in each seat.
                 int totalDecisions = 0, earlyFinishes = 0;
+                const int MaxIndependentSeeds = 6;
                 int offset = (roster.Length + 1) / 2;
+                int firstMatch = roster.Length * shard / shardCount;
+                int matchLimit = roster.Length * (shard + 1) / shardCount;
+                int matchCount = matchLimit - firstMatch;
                 var clock = Stopwatch.StartNew();
-                for (int i = 0; i < roster.Length; i++)
+                for (int i = firstMatch; i < matchLimit; i++)
                 {
                     var first = roster[i];
                     var second = roster[(i + offset) % roster.Length];
-                    var result = RunOpeningDuel(first, second, i, general, links, CheckNativeErrors);
-                    totalDecisions += result.Decisions;
-                    if (result.Finished) earlyFinishes++;
-                    if ((i + 1) % 25 == 0 || i + 1 == roster.Length)
-                        Debug.Log($"[SMOKE-ROSTER-PROGRESS] {i + 1}/{roster.Length} opening duels; " +
+                    bool completed = false;
+                    for (int seedIndex = 0; seedIndex < MaxIndependentSeeds && !completed; seedIndex++)
+                    {
+                        int matchSeed = i + seedIndex * roster.Length;
+                        var result = RunOpeningDuel(first, second, matchSeed, general, links, CheckNativeErrors);
+                        totalDecisions += result.Decisions;
+                        completed = result.CompletedThreeTurns;
+                        if (!completed) earlyFinishes++;
+                    }
+                    if (!completed)
+                        throw new InvalidOperationException($"No three-turn match for decks {first.Deck.id}/{second.Deck.id} " +
+                            $"after {MaxIndependentSeeds} independent matches.");
+                    int tested = i - firstMatch + 1;
+                    if (tested % 25 == 0 || tested == matchCount)
+                        Debug.Log($"[SMOKE-ROSTER-PROGRESS] Shard={shard + 1}/{shardCount}; {tested}/{matchCount} opening duels; " +
                             $"{totalDecisions} responses; elapsed={clock.Elapsed.TotalSeconds:F1}s; " +
                             $"last={first.Character.name}/Lv.{first.Level} vs {second.Character.name}/Lv.{second.Level}");
                 }
 
-                Debug.Log($"[SMOKE-ROSTER-266] All {DeckRepository.Characters.Count} characters and {roster.Length} runtime deck levels " +
-                    $"played in both seats across {roster.Length} opening duels, each reaching turn 3 or a valid duel result. " +
-                    $"Responses={totalDecisions}, earlyResults={earlyFinishes}, Retries=0, ScriptErrors={scriptErrors}");
                 CheckNativeErrors();
-                Debug.Log($"[SMOKE-SUMMARY] ALL MATCHUPS PASSED! Levels={roster.Length}, " +
-                    $"OpeningDuels={roster.Length}, Retries=0, ScriptErrors={scriptErrors}");
+                Debug.Log($"[SMOKE-ROSTER-266] Shard={shard + 1}/{shardCount}; MatchIndices=[{firstMatch},{matchLimit}); " +
+                    $"Characters={DeckRepository.Characters.Count}, Levels={roster.Length}, CompleteThreeTurnDuels={matchCount}, " +
+                    $"Responses={totalDecisions}, shortMatchesWithValidResults={earlyFinishes}, Retries=0, ScriptErrors={scriptErrors}");
+                string coverage = shardCount == 1 ? "ALL MATCHUPS PASSED!" : "ALL ASSIGNED MATCHUPS PASSED!";
+                Debug.Log($"[SMOKE-SUMMARY] {coverage} Levels={roster.Length}, " +
+                    $"OpeningDuels={matchCount}, Retries=0, ScriptErrors={scriptErrors}");
             }
             catch (Exception ex)
             {
@@ -149,6 +165,19 @@ namespace YGOPortable.Editor
             {
                 EditorApplication.Exit(exitCode);
             }
+        }
+
+        private static (int Index, int Count) SmokeShard()
+        {
+            const string Option = "-duelSmokeShard";
+            var args = Environment.GetCommandLineArgs();
+            int index = Array.IndexOf(args, Option);
+            if (index < 0) return (0, 1);
+            var value = index + 1 < args.Length ? args[index + 1].Split('/') : Array.Empty<string>();
+            if (value.Length != 2 || !int.TryParse(value[0], out int number) ||
+                !int.TryParse(value[1], out int count) || count is < 1 or > 32 || number < 1 || number > count)
+                throw new ArgumentException($"Pass {Option} as a one-based shard number and count, for example 1/4.");
+            return (number - 1, count);
         }
 
         private static (OpponentCharacter Character, int Level, PresetDeckInfo Deck)[] VerifyAllLevels()
@@ -166,7 +195,7 @@ namespace YGOPortable.Editor
                     if (deck == null || deck.charId != character.id || !ids.Add(deck.id) ||
                         OpponentDeckLevels.GetLevel(character.id, deck.id) != i + 1 ||
                         deck.main == null || deck.main.Length is < 40 or > 60 ||
-                        deck.extra == null || deck.extra.Length > 15 || deck.side == null || deck.side.Length > 15)
+                        deck.extra == null || deck.extra.Length != 15 || deck.side == null || deck.side.Length > 15)
                         throw new InvalidOperationException($"Invalid level definition for opponent {character.id}, level {i + 1}.");
                     var cards = deck.main.Concat(deck.extra).Concat(deck.side).ToArray();
                     if (cards.Any(code => CardDatabase.Get(code) is not CardInfo card ||
@@ -177,12 +206,16 @@ namespace YGOPortable.Editor
                         throw new InvalidOperationException($"Invalid card or deck placement in {character.name} Lv.{i + 1} ({deck.id}).");
                     if (cards.GroupBy(CollectionProgress.GetDeckCopyKey).Any(group => group.Count() > CollectionProgress.DeckCopyLimit))
                         throw new InvalidOperationException($"Too many copies of the same card in {character.name} Lv.{i + 1} ({deck.id}).");
-                    if (deck.sigCard != 0 && !deck.main.Concat(deck.extra).Contains(deck.sigCard))
-                        Debug.LogWarning($"[SMOKE-SIGNATURE] {character.name} Lv.{i + 1} ({deck.id}) lists an ace absent from its deck: {deck.sigCard}.");
+                    if (deck.main.Count(code => code == 55144522) != 1 ||
+                        deck.main.Count(code => code == 79571449) != 1)
+                        throw new InvalidOperationException($"Missing mandatory draws in {character.name} Lv.{i + 1} ({deck.id}).");
+                    if (!deck.main.Concat(deck.extra).Contains(deck.sigCard))
+                        throw new InvalidOperationException($"Missing ace in {character.name} Lv.{i + 1} ({deck.id}): {deck.sigCard}.");
                     roster.Add((character, i + 1, deck));
                 }
             }
-            if (roster.Count < 2 || DeckRepository.PresetDecks.Any(deck => !ids.Contains(deck.id)))
+            if (DeckRepository.Characters.Count != 266 || roster.Count != 1401 ||
+                DeckRepository.PresetDecks.Any(deck => !ids.Contains(deck.id)))
                 throw new InvalidOperationException("The runtime levels omit an existing opponent preset.");
             Debug.Log($"[SMOKE-ALL-LEVELS] {DeckRepository.Characters.Count} opponents, {roster.Count} unique levels, " +
                 $"all {DeckRepository.PresetDecks.Count} roster presets retained; card placement, copy limits and level indices passed.");
@@ -216,7 +249,7 @@ namespace YGOPortable.Editor
             Debug.Log("[SMOKE-ALL-STYLES] " + string.Join(", ", styles.OrderBy(pair => pair.Key).Select(pair => $"{pair.Key}={pair.Value}")));
         }
 
-        private static (int Decisions, bool Finished) RunOpeningDuel(
+        private static (int Decisions, bool CompletedThreeTurns) RunOpeningDuel(
             (OpponentCharacter Character, int Level, PresetDeckInfo Deck) first,
             (OpponentCharacter Character, int Level, PresetDeckInfo Deck) second,
             int index, DuelAiPolicy general, LinkComboPolicy links, Action checkNativeErrors)
@@ -224,8 +257,8 @@ namespace YGOPortable.Editor
             using var session = new DuelSession(recordPlanningReplay: true);
             var pilots = new[]
             {
-                new TacticalAI(general, links, searchCombos: true) { Difficulty = AIDifficulty.Smart },
-                new TacticalAI(general, links, searchCombos: true) { Difficulty = AIDifficulty.Smart },
+                CreatePilot(first.Level, first.Character.id, general, links),
+                CreatePilot(second.Level, second.Character.id, general, links),
             };
             string label = $"{first.Character.name}/Lv.{first.Level}/{first.Deck.id} vs " +
                 $"{second.Character.name}/Lv.{second.Level}/{second.Deck.id}";
@@ -235,12 +268,13 @@ namespace YGOPortable.Editor
                 throw new InvalidOperationException($"Opening duel start failed: {label}.");
             checkNativeErrors();
             const int MaxResponses = 512;
+            const int RequiredTurns = 3;
             var reachedMain = new bool[2];
             int steps = 0;
-            while (!session.IsFinished && session.TurnNumber <= 2)
+            while (!session.IsFinished && session.TurnNumber <= RequiredTurns)
             {
                 if (steps >= MaxResponses)
-                    throw new InvalidOperationException($"Opening reached {MaxResponses} responses before completing both turns: {label}. " +
+                    throw new InvalidOperationException($"Opening reached {MaxResponses} responses before completing three turns: {label}. " +
                         $"Turn={session.TurnNumber}, prompt={session.ActivePrompt?.messageType}; {string.Join(" | ", session.Logs.TakeLast(6))}");
                 var prompt = RequirePrompt(session, label);
                 if (prompt == null) break;
@@ -251,11 +285,22 @@ namespace YGOPortable.Editor
                 RequireAccepted(session, prompt, response, label, checkNativeErrors);
                 steps++;
             }
-            if (!session.IsFinished && (!reachedMain[0] || !reachedMain[1] || session.TurnNumber < 3))
+            if (!session.IsFinished && (!reachedMain[0] || !reachedMain[1] || session.TurnNumber <= RequiredTurns))
                 throw new InvalidOperationException($"Opening did not complete both Main Phases: {label}.");
             if (session.IsFinished && session.Winner is < 0 or > 2)
                 throw new InvalidOperationException($"Opening ended without a valid winner or draw: {label}.");
-            return (steps, session.IsFinished);
+            return (steps, session.TurnNumber > RequiredTurns && reachedMain[0] && reachedMain[1]);
+        }
+
+        private static TacticalAI CreatePilot(int level, int characterId, DuelAiPolicy general, LinkComboPolicy links)
+        {
+            int last = OpponentDeckLevels.GetDecks(characterId).Count;
+            bool elite = level >= Math.Min(9, last);
+            return new TacticalAI(general, links, searchCombos: true,
+                planningScale: elite ? ComboSearch.MaxPlanningScale : 1f)
+            {
+                Difficulty = elite ? AIDifficulty.Master : AIDifficulty.Smart,
+            };
         }
 
         private static DuelPrompt RequirePrompt(DuelSession session, string label)
