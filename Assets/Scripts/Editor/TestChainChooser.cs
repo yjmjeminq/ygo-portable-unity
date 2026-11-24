@@ -204,6 +204,26 @@ namespace YGOPortable.Editor
             Require(effect.text == "상대 필드의 카드 1장을 주인의 덱으로 되돌린다.",
                 "Kaleido-Heart's chain preview did not show its Korean effect text.");
 
+            const uint mirrorjade = 44146295, ashBlossom = 14558127;
+            ulong mirrorjadeEffect = (ulong)mirrorjade << 20;
+            view.Modals.ShowPrompt(duel, new DuelPrompt { messageType = YgoConstants.MSG_SELECT_EFFECTYN, playerId = 0,
+                promptCardCode = mirrorjade, promptEffectDesc = mirrorjadeEffect });
+            string mirrorjadePreview = view.Modals.ModalRoot.GetComponentsInChildren<Text>()
+                .Single(label => label.name == "Effect").text;
+            Require(mirrorjadePreview.Contains("알버스의 낙윤") && mirrorjadePreview.Contains("엑스트라 덱에서 묘지로") &&
+                mirrorjadePreview.Contains("필드의 몬스터 1장을 골라 제외") && mirrorjadePreview.Contains("다음 턴") &&
+                !mirrorjadePreview.Contains("엔드 페이즈") &&
+                CardDatabase.ResolveEffectDescription(mirrorjadeEffect | 1, mirrorjade).Contains("엔드 페이즈"),
+                "Mirrorjade's banish and End Phase effects must display their own conditions and results.");
+
+            view.Modals.ShowPrompt(duel, new DuelPrompt { messageType = YgoConstants.MSG_SELECT_EFFECTYN, playerId = 0,
+                promptCardCode = ashBlossom, promptEffectDesc = (ulong)ashBlossom << 20 });
+            string ashPreview = view.Modals.ModalRoot.GetComponentsInChildren<Text>()
+                .Single(label => label.name == "Effect").text;
+            Require(ashPreview.Contains("패에서 버리고") && ashPreview.Contains("무효로 한다") &&
+                ashPreview.Contains("덱에서 몬스터를 특수 소환하는 효과"),
+                "A short chain label should be expanded with its matching printed effect and cost.");
+
             view.Modals.ShowPrompt(duel, new DuelPrompt { messageType = YgoConstants.MSG_SELECT_EFFECTYN, playerId = 0,
                 promptCardCode = legendaryBlackLusterSoldier, promptEffectDesc = drawReplacement });
             effect = view.Modals.ModalRoot.GetComponentsInChildren<Text>()
@@ -1375,6 +1395,13 @@ namespace YGOPortable.Editor
             using var view = new ChainView();
             view.Show(duel, prompt);
             view.VerifyPassAvailability(true);
+            Canvas.ForceUpdateCanvases();
+            var activate = (RectTransform)view.Modals.ModalRoot.transform.Find("ChainWin/Footer/Activate/B");
+            var icon = activate.Find("Icon").GetComponent<Image>();
+            Require(activate.Find("Label").GetComponent<Text>().text == "발동" && activate.rect.height <= 56f &&
+                icon.sprite == DuelUiIcons.Action("ACTION") && icon.rectTransform.rect.width <= 26f &&
+                icon.rectTransform.rect.height <= 26f,
+                "The compact activation button must show 발동 with a small icon.");
             view.VerifyEffect(new SelectableCardItem
             {
                 code = LadyLabrynth,

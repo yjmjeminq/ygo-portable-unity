@@ -1121,18 +1121,19 @@ namespace YGOPortable.Editor
                 picker = VerifyActivationPicker(prompt, "묘지 효과 발동", code);
                 var action = picker.Find("Footer/Activate/B").GetComponent<Button>();
                 Require(action.IsInteractable(), "The grave effect was not actionable in the chooser.");
-                RequireActionIcon(action.transform, "ACTION");
+                RequireActionIcon(action.transform, "ACTION", "발동");
                 Click(action);
                 Require(!Modals.IsPromptOpen && !ReferenceEquals(prompt, _duel.ActivePrompt),
                     "Activating a grave effect did not close the picker and continue the duel.");
             }
 
-            private static void RequireActionIcon(Transform button, string key)
+            private static void RequireActionIcon(Transform button, string key, string caption = "")
             {
                 var icon = button.Find("Icon")?.GetComponent<Image>();
+                string label = button.GetComponentInChildren<Text>(true)?.text ?? "";
                 Require(icon != null && icon.sprite != null && icon.sprite == DuelUiIcons.Action(key) &&
-                    !icon.raycastTarget && button.GetComponentsInChildren<Text>(true).All(label => label.text.Length == 0),
-                    $"The {button.name} command did not use a text-free {key} image.");
+                    !icon.raycastTarget && label == caption,
+                    $"The {button.name} command did not use the {key} image and expected label.");
             }
 
             private Transform VerifyActivationPicker(DuelPrompt prompt, string title, params uint[] expected)
@@ -1172,7 +1173,7 @@ namespace YGOPortable.Editor
                 Require(picker.Find("Details/Source/Text").GetComponent<Text>().text == "내 엑스트라 덱" &&
                     picker.Find("Details/Name/Text").GetComponent<Text>().text == CardDatabase.GetName(expected) &&
                     picker.Find("Details/Description").GetComponentsInChildren<Text>()
-                        .Any(label => label.text == "이 카드를 자신의 펜듈럼 존에 놓는다"),
+                        .Any(label => label.text.Contains("이 카드를 자신의 펜듈럼 존에 놓는다", StringComparison.Ordinal)),
                     "The Extra Deck shortcut lost the card's effect or original zone.");
                 Click(view);
                 SetPrivate(Field, "_usingDuelPad", true);

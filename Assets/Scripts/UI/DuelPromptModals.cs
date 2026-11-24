@@ -636,13 +636,13 @@ namespace YGOPortable.UI
             _chainCardScroll = CreateCardStrip(cards, out _chainCards, ChainCardGap);
 
             var details = _chainDetails = DuelStyle.Panel(_chainBox, "Details", new Vector2(.711f, .176f), new Vector2(.977f, .852f));
-            var name = DuelUiKit.CreateRect("Name", details, new Vector2(.04f, .77f), new Vector2(.96f, .98f),
+            var name = DuelUiKit.CreateRect("Name", details, new Vector2(.04f, .82f), new Vector2(.96f, .98f),
                 Vector2.zero, Vector2.zero);
             _chainName = DuelUiKit.AddFittedText(name, "Text", "", 21, 12, TextAnchor.MiddleLeft, Color.white);
-            var source = DuelUiKit.CreateRect("Source", details, new Vector2(.04f, .59f), new Vector2(.96f, .76f),
+            var source = DuelUiKit.CreateRect("Source", details, new Vector2(.04f, .68f), new Vector2(.96f, .82f),
                 Vector2.zero, Vector2.zero);
             _chainSource = DuelUiKit.AddFittedText(source, "Text", "", 16, 10, TextAnchor.MiddleLeft, DuelStyle.Gold);
-            var description = DuelUiKit.CreateRect("Description", details, new Vector2(.0f, .025f), new Vector2(1f, .57f),
+            var description = DuelUiKit.CreateRect("Description", details, new Vector2(.0f, .025f), new Vector2(1f, .66f),
                 Vector2.zero, Vector2.zero);
             _chainEffectScroll = CreateVerticalScroll(description, out Transform content);
             _chainEffect = AddDescriptionText(content, "Effect", "", 18);
@@ -651,14 +651,25 @@ namespace YGOPortable.UI
                 Vector2.zero, Vector2.zero);
             var pass = DuelUiKit.CreateRect("Pass", footer, new Vector2(.655f, 0f), new Vector2(.817f, 1f), Vector2.zero, Vector2.zero);
             _chainPass = DuelStyle.Button(pass, "B", "취소", OnModalCloseClicked, 16);
-            DuelUiIcons.AddActionImage(_chainPass.transform, "CANCEL", new Vector2(.045f, .13f), new Vector2(.25f, .87f));
-            var passText = _chainPass.GetComponentInChildren<Text>().rectTransform;
-            passText.anchorMin = new Vector2(.26f, 0f);
-            passText.anchorMax = new Vector2(.96f, 1f);
+            StyleChainButtonLabel(_chainPass, "CANCEL");
             var activate = DuelUiKit.CreateRect("Activate", footer, new Vector2(.836f, 0f), Vector2.one, Vector2.zero, Vector2.zero);
-            _chainActivate = DuelStyle.Button(activate, "B", "", ConfirmChainChoice, 16, gold: true);
-            DuelUiIcons.AddActionImage(_chainActivate.transform, "ACTION", new Vector2(.12f, .06f), new Vector2(.88f, .94f));
+            _chainActivate = DuelStyle.Button(activate, "B", "발동", ConfirmChainChoice, 16, gold: true);
+            StyleChainButtonLabel(_chainActivate, "ACTION");
             _chainBox.gameObject.SetActive(false);
+        }
+
+        private static void StyleChainButtonLabel(Button button, string action)
+        {
+            var icon = DuelUiKit.CreateRect("Icon", button.transform, new Vector2(0f, .5f), new Vector2(0f, .5f),
+                new Vector2(14f, -12f), new Vector2(38f, 12f));
+            DuelUiKit.AddImage(icon.gameObject, DuelUiIcons.Action(action), Color.white, true, false);
+            var label = button.GetComponentInChildren<Text>();
+            label.alignment = TextAnchor.MiddleLeft;
+            label.resizeTextForBestFit = true;
+            label.resizeTextMinSize = 12;
+            label.resizeTextMaxSize = 16;
+            label.rectTransform.offsetMin = new Vector2(48f, 0f);
+            label.rectTransform.offsetMax = new Vector2(-10f, 0f);
         }
 
         public bool TryCancelOrPass()
@@ -1189,7 +1200,7 @@ namespace YGOPortable.UI
             bool compact = choices.Length == 1;
             _chainBox.anchorMin = compact ? new Vector2(.255f, .200f) : new Vector2(.222f, .185f);
             _chainBox.anchorMax = compact ? new Vector2(.749f, .655f) : new Vector2(.922f, .628f);
-            float stripEnd = cards.Length switch { 1 => .33f, 2 => .455f, 3 => .615f, _ => .695f };
+            float stripEnd = cards.Length switch { 1 => .265f, 2 => .455f, 3 => .615f, _ => .695f };
             if (hasEffectLists) stripEnd = Mathf.Min(.49f, stripEnd);
             var cardStrip = (RectTransform)_chainCardScroll.transform;
             var pass = (RectTransform)_chainPass.transform.parent;
@@ -1200,6 +1211,7 @@ namespace YGOPortable.UI
             pass.anchorMax = new Vector2(.817f, 1f);
             activate.anchorMin = new Vector2(.836f, 0f);
             activate.anchorMax = Vector2.one;
+            pass.offsetMin = pass.offsetMax = activate.offsetMin = activate.offsetMax = Vector2.zero;
             cardStrip.anchorMin = new Vector2(.019f, .149f);
             cardStrip.anchorMax = new Vector2(stripEnd, .852f);
             _chainDetails.anchorMin = new Vector2(stripEnd + .016f, .176f);
@@ -1223,10 +1235,15 @@ namespace YGOPortable.UI
                 _chainDetails.anchorMax = new Vector2(.726f, .851f);
                 _chainFooter.anchorMin = new Vector2(.745f, .083f);
                 _chainFooter.anchorMax = new Vector2(.977f, .851f);
-                pass.anchorMin = new Vector2(0f, .045f);
-                pass.anchorMax = new Vector2(1f, .453f);
-                activate.anchorMin = new Vector2(0f, .531f);
-                activate.anchorMax = new Vector2(1f, .954f);
+                float height = _mobileLayout ? Mathf.Max(52f, MobileSafeArea.MinimumTouchSize(_chainFooter)) : 52f;
+                const float halfGap = 5f;
+                float activateBottom = passLabel == null ? -height * .5f : halfGap;
+                pass.anchorMin = activate.anchorMin = new Vector2(0f, .5f);
+                pass.anchorMax = activate.anchorMax = new Vector2(1f, .5f);
+                pass.offsetMin = new Vector2(0f, -height - halfGap);
+                pass.offsetMax = new Vector2(0f, -halfGap);
+                activate.offsetMin = new Vector2(0f, activateBottom);
+                activate.offsetMax = new Vector2(0f, activateBottom + height);
             }
             SetFieldView(false);
             _chainTitle.text = title;
@@ -1275,7 +1292,7 @@ namespace YGOPortable.UI
                 var item = choices[index].Card;
                 _chainName.text = CardDatabase.GetName(item.code);
                 _chainSource.text = CardSourceLabel(session, item);
-                _chainEffect.text = effects[index];
+                _chainEffect.text = group.Length == 1 ? CardDatabase.ExpandShortChainEffect(item.code, effects[index]) : effects[index];
                 if (inspect) InspectChoice(item.code, item);
             }
 

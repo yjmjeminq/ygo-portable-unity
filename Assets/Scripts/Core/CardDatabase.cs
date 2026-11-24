@@ -615,10 +615,12 @@ namespace YGOPortable.Core
             { "Select number of cards to excavate", "덱에서 넘길 카드의 수를 선택하세요." },
         };
 
-        // These scripts reuse the same description ID for an alternate summon and for an activated effect.
+        // Some scripts expose only a command name or reuse the same ID for an alternate summon.
         private static readonly Dictionary<ulong, string> CardActivationTextKR = new()
         {
             { 26096328UL << DescriptionIndexBits, "엑시즈 소재를 1개 제거해 공격력과 수비력을 2000 올린다" },
+            { 44146295UL << DescriptionIndexBits, "자신 또는 상대 턴에 1번, ‘알버스의 낙윤’을 소재로 하는 융합 몬스터 1장을 엑스트라 덱에서 묘지로 보내 발동한다.\n필드의 몬스터 1장을 골라 제외한다. 다음 턴에는 이 효과를 쓸 수 없다." },
+            { (44146295UL << DescriptionIndexBits) | 1, "융합 소환한 이 카드가 상대에 의해 필드를 벗어나면 발동할 수 있다. 그 턴의 엔드 페이즈에 상대 필드의 몬스터를 모두 파괴한다." },
             { 90448279UL << DescriptionIndexBits, "엑시즈 소재를 2개 제거해 필드의 다른 카드를 전부 묘지로 보낸다" },
         };
 
@@ -1504,6 +1506,22 @@ namespace YGOPortable.Core
             if (item.code == 9742784 && item.location == YgoConstants.LOCATION_GRAVE)
                 return "패 1장을 묘지로 보내고 제트 싱크론을 묘지에서 특수 소환한다. 이렇게 소환된 카드는 필드를 벗어나면 제외된다.";
             return ResolveEffectDescription(item.description, item.code);
+        }
+
+        internal static string ExpandShortChainEffect(uint cardCode, string label)
+        {
+            if (string.IsNullOrWhiteSpace(label) || label.Length > 20) return label;
+            string rules = ReadPrintedEffectText(cardCode);
+            string phrase = label.TrimEnd('.', ' ');
+            if (rules == null || !phrase.EndsWith("다", StringComparison.Ordinal)) return label;
+
+            // Script description indices can skip passive printed effects. Match the text before expanding it.
+            var blocks = ReadPrintedEffectBlocks(rules).Select(block => block.Text.Trim()).ToArray();
+            var matches = (blocks.Length == 0 ? new[] { rules } : blocks)
+                .Where(block => block.Contains(phrase + ".", StringComparison.Ordinal) ||
+                    block.EndsWith(phrase, StringComparison.Ordinal))
+                .Take(2).ToArray();
+            return matches.Length == 1 ? matches[0] : $"{label}\n\n카드 설명\n{rules}";
         }
 
         internal static string ResolveOptionDescription(ulong desc) =>
