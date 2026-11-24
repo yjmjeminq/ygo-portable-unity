@@ -68,14 +68,24 @@ struct EngineState {
 
 EngineState g_state;
 
-// These cards are supplied by riding-duel scenarios, outside the regular deck catalogue.
+// Scenario-only cards are outside the regular deck catalogue.
 constexpr PackedCard story_cards[] = {
     { 511090001, 0, 0x80002, 0, 0, 0, 0, 0, 0, 0, 0, {} },
     { 511090002, 0, 0x2,     0, 0, 0, 0, 0, 0, 0, 0, {} },
+    { 511090101, 0, 0x20004, 0, 0, 0, 0, 0, 0, 0, 0, {} },
+    { 511090102, 0, 0x20004, 0, 0, 0, 0, 0, 0, 0, 0, {} },
+    { 511090103, 0, 0x20004, 0, 0, 0, 0, 0, 0, 0, 0, {} },
+    { 511090104, 0, 0x20004, 0, 0, 0, 0, 0, 0, 0, 0, {} },
+    { 511090105, 0, 0x20004, 0, 0, 0, 0, 0, 0, 0, 0, {} },
 };
 
-bool is_story_script(const std::string& key) {
-    return key == "c511090001.lua" || key == "c511090002.lua" || key == "story_gimmicks.lua";
+std::string story_script_file(const std::string& key) {
+    if (key == "c511090101.lua" || key == "c511090102.lua" || key == "c511090103.lua" ||
+        key == "c511090104.lua" || key == "c511090105.lua")
+        return "story_darkness_trap.lua";
+    if (key == "c511090001.lua" || key == "c511090002.lua" || key == "story_gimmicks.lua" || key == "story_gx.lua")
+        return key;
+    return {};
 }
 
 std::string to_lower_ascii(const char* s) {
@@ -162,9 +172,10 @@ int read_script_cb(void* /*payload*/, OCG_Duel duel, const char* name) {
             return OCG_LoadScript(duel, ptr, len, name) ? 1 : 0;
         }
     }
-    if (is_story_script(key) && !g_state.fallback_script_dir.empty()) {
+    auto storyFile = story_script_file(key);
+    if (!storyFile.empty() && !g_state.fallback_script_dir.empty()) {
         std::vector<uint8_t> script;
-        auto path = g_state.fallback_script_dir / key;
+        auto path = g_state.fallback_script_dir / storyFile;
         if (read_all_bytes(path.u8string().c_str(), script))
             return OCG_LoadScript(duel, reinterpret_cast<const char*>(script.data()),
                                   static_cast<uint32_t>(script.size()), name) ? 1 : 0;
@@ -262,9 +273,10 @@ YGO_API int32_t YGO_HasScript(const char* name) {
     if (!name) return 0;
     auto key = to_lower_ascii(name);
     if (g_state.scripts.find(key) != g_state.scripts.end()) return 1;
-    if (!is_story_script(key) || g_state.fallback_script_dir.empty()) return 0;
+    auto storyFile = story_script_file(key);
+    if (storyFile.empty() || g_state.fallback_script_dir.empty()) return 0;
     std::error_code error;
-    return std::filesystem::is_regular_file(g_state.fallback_script_dir / key, error) ? 1 : 0;
+    return std::filesystem::is_regular_file(g_state.fallback_script_dir / storyFile, error) ? 1 : 0;
 }
 
 YGO_API void* YGO_CreateDuel(

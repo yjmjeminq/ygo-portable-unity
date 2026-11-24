@@ -9,12 +9,13 @@ local function aura(code)
     return effect
 end
 
-local function playerRule(player,code,value,condition)
+local function playerRule(player,code,value,condition,target)
     local effect=aura(code)
     effect:SetProperty(EFFECT_FLAG_PLAYER_TARGET)
     effect:SetTargetRange(1,0)
     effect:SetValue(value)
     if condition then effect:SetCondition(condition) end
+    if target then effect:SetTarget(target) end
     Duel.RegisterEffect(effect,player)
 end
 
@@ -59,12 +60,12 @@ local function damageEachTurn(ai,human,amount)
     end)
 end
 
-local function addAttack(card,amount)
+local function addAttack(card,amount,reset)
     local effect=Effect.CreateEffect(card)
     effect:SetType(EFFECT_TYPE_SINGLE)
     effect:SetCode(EFFECT_UPDATE_ATTACK)
     effect:SetValue(amount)
-    effect:SetReset(RESET_EVENT|RESETS_STANDARD)
+    effect:SetReset(RESET_EVENT|RESETS_STANDARD|(reset or 0))
     card:RegisterEffect(effect)
 end
 
@@ -191,7 +192,21 @@ function rules.orichalcos(human,ai)
     playerRule(ai,EFFECT_CANNOT_ACTIVATE,forbidden,sealed)
 end
 
+YgoStory={
+    rules=rules,
+    playerRule=playerRule,
+    monsterRule=monsterRule,
+    onEvent=onEvent,
+    onPhase=onPhase,
+    activeField=activeField,
+    countdown=countdown,
+    addAttack=addAttack,
+}
+
 function YgoStoryConfigure(rule,human)
+    if not rules[rule] and not Duel.LoadScript("story_gx.lua") then
+        error("Could not load GX story rules.")
+    end
     local install=rules[rule]
     if not install then return false end
     install(human,1-human)

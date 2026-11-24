@@ -13,13 +13,14 @@ using YGOPortable.UI;
 
 namespace YGOPortable.Editor
 {
-    internal static class TestStoryCampaign
+    internal static partial class TestStoryCampaign
     {
         public static void Run()
         {
             string streaming = Application.streamingAssetsPath;
             string save = Path.Combine(Path.GetTempPath(), "ygo-story-" + Guid.NewGuid().ToString("N"));
             int exit = 1;
+            var nativeErrors = new List<string>();
             try
             {
                 CardDatabase.Load(streaming);
@@ -27,7 +28,6 @@ namespace YGOPortable.Editor
                 CardArtLoader.Initialize(streaming, Path.Combine(save, "Art"));
                 CollectionProgress.Load(save);
                 Require(CollectionProgress.TryChooseStarter(CollectionProgress.Starters[0].Id, out var starter, out string error), error);
-                var nativeErrors = new List<string>();
                 Require(YgoNativeBridge.Initialize(streaming, (type, message) =>
                 {
                     if (type == 0) nativeErrors.Add(message);
@@ -36,13 +36,18 @@ namespace YGOPortable.Editor
                 VerifyOpeningCardRemoval();
                 nativeErrors.Clear();
                 VerifyDmScenarioEffects();
+                VerifyGxScenarioEffects();
                 Require(nativeErrors.Count == 0, string.Join("\n", nativeErrors));
                 VerifyDialogueChoices(starter);
                 VerifyOpeningAndSave(save);
                 Debug.Log("[VERIFY STORY] 180 episodes, scrolling, cast portraits, boss openings, rewards and saved campaign progress passed.");
                 exit = 0;
             }
-            catch (Exception error) { Debug.LogException(error); }
+            catch (Exception error)
+            {
+                if (nativeErrors.Count != 0) Debug.LogError(string.Join("\n", nativeErrors.TakeLast(12)));
+                Debug.LogException(error);
+            }
             finally
             {
                 CardArtLoader.Shutdown();
@@ -236,7 +241,8 @@ namespace YGOPortable.Editor
                         OpponentDeckLevels.GetDecks(episode.charId).Any(deck => deck.main?.Length >= 40),
                         $"Missing cast or decks for {episode.id}.");
                     var scripted = StoryGimmickRuntime.StartingCards(episode.gimmick);
-                    if (episode.raidCard == 0 && episode.raidLife == 0 && scripted.Count == 0 &&
+                    if (!(series == "gx" && !string.IsNullOrEmpty(episode.gimmick)) &&
+                        episode.raidCard == 0 && episode.raidLife == 0 && scripted.Count == 0 &&
                         !StoryGimmickRuntime.IsRidingDuel(episode.gimmick)) continue;
                     StoryRaid? boss = episode.raidCard != 0 || episode.raidLife != 0 ?
                         StoryRaid.ForEncounter(i + 1, episode.raidCard, episode.raidLife) : null;
@@ -289,12 +295,24 @@ namespace YGOPortable.Editor
             Require(duel.StartNewDuel(player, Array.Empty<uint>(), rival, extra ?? Array.Empty<uint>(), humanFirst,
                 seed: new ulong[] { 222, 17, 821, 909 }, opponentOpening: raid?.Opening, storyGimmick: gimmick),
                 $"Could not start the raid {name}.");
+            if (name.StartsWith("gx_", StringComparison.Ordinal))
+            {
+                var ai = new TacticalAI { Difficulty = AIDifficulty.Easy };
+                for (int step = 0; step < 30 && !InMain(duel, 1) && !duel.IsFinished && duel.RetryCount == 0; step++)
+                {
+                    var prompt = duel.ActivePrompt;
+                    if (prompt == null) duel.StepUntilPrompt();
+                    else if (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN && !prompt.forced) duel.SubmitResponseInt(-1);
+                    else duel.SubmitResponse(ai.ComputeResponse(duel, prompt));
+                }
+                Require(InMain(duel, 1) && duel.RetryCount == 0, $"Opening effects in {name} did not reach the first Main Phase.");
+            }
             var boss = duel.Players[duel.AiPlayerIndex];
             bool riding = StoryGimmickRuntime.IsRidingDuel(gimmick);
             Require(boss.lp == (raid?.Opening.Life ?? 8000) &&
                 boss.hand.Count == (raid?.Opening.Hand ?? 5) + (riding ? 1 : 0) &&
                 duel.Players[duel.HumanPlayerIndex].lp == 8000,
-                $"The configured LP, hand or opening field was missing in {name}.");
+                $"The configured LP, hand or opening field was missing in {name} (boss LP {boss.lp}, hand {boss.hand.Count}).");
             if (raid?.Opening.FieldCard is > 0)
                 VerifyCard(raid.Value.Opening.FieldCard, YgoConstants.POS_FACEUP_ATTACK);
             foreach (var (code, position) in StoryGimmickRuntime.StartingCards(gimmick))
