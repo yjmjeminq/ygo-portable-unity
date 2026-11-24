@@ -25,14 +25,15 @@ namespace YGOPortable.Core
                 ? StoryOpponentOpening.ExtraHand : opponentOpening;
         }
 
-        internal (DuelOpening Player, DuelOpening Opponent) Apply(StoryRaid? raid, PresetDeckInfo deck = null)
+        internal (DuelOpening Player, DuelOpening Opponent) Apply(StoryRaid? raid, PresetDeckInfo deck = null,
+            string storyGimmick = null)
         {
             var boss = raid?.Opening ?? new DuelOpening(8000, 5, 0);
             int playerLp = Has(RaidSupport.Aegis) ? 12000 : Stance == StoryStance.Calm ? 9000 : 8000;
             int opponentHand = boss.Hand;
             uint baseFieldCard = Has(RaidSupport.Breaker) ? 0 : boss.FieldCard;
             uint preplaced = OpponentOpening is StoryOpponentOpening.PreplacedMonster or StoryOpponentOpening.ExtraHandAndMonster
-                ? SelectOpeningMonster(deck, raid) : 0;
+                ? SelectOpeningMonster(deck, raid, storyGimmick) : 0;
             if (OpponentOpening is StoryOpponentOpening.ExtraHand or StoryOpponentOpening.ExtraHandAndMonster ||
                 (Stance == StoryStance.Challenge && preplaced == 0))
                 opponentHand += ExtraOpeningCards;
@@ -41,14 +42,16 @@ namespace YGOPortable.Core
                 new DuelOpening(boss.Life, opponentHand, baseFieldCard, deckMonster: preplaced));
         }
 
-        internal static uint SelectOpeningMonster(PresetDeckInfo deck, StoryRaid? raid)
+        internal static uint SelectOpeningMonster(PresetDeckInfo deck, StoryRaid? raid, string storyGimmick = null)
         {
             if (deck?.main == null) return 0;
             uint bossCard = raid?.Opening.FieldCard ?? 0;
+            var scriptedCards = StoryGimmickRuntime.StartingCards(storyGimmick);
             // A preplaced Xyz monster would lack materials for its effects.
             return deck.main.Concat(deck.extra ?? Array.Empty<uint>()).Select(CardDatabase.Get)
                 .Where(card => card?.IsMonster == true && !card.IsXyz && card.atk > 0 &&
-                    (card.type & YgoConstants.TYPE_TOKEN) == 0 && card.code != bossCard)
+                    (card.type & YgoConstants.TYPE_TOKEN) == 0 && card.code != bossCard &&
+                    !scriptedCards.Any(entry => entry.Code == card.code))
                 .OrderByDescending(card => card.code == deck.sigCard)
                 .ThenByDescending(card => card.atk)
                 .FirstOrDefault()?.code ?? 0;

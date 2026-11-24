@@ -7,6 +7,7 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using YGOPortable.AI;
 using YGOPortable.Core;
 using YGOPortable.UI;
 
@@ -28,6 +29,7 @@ namespace YGOPortable.Editor
                 Require(CollectionProgress.TryChooseStarter(CollectionProgress.Starters[0].Id, out var starter, out string error), error);
                 Require(YgoNativeBridge.Initialize(streaming, null) == 0, "The native engine did not start.");
                 VerifyCampaigns();
+                VerifyOpeningCardRemoval();
                 VerifyDialogueChoices(starter);
                 VerifyOpeningAndSave(save);
                 Debug.Log("[VERIFY STORY] 180 episodes, scrolling, cast portraits, boss openings, rewards and saved campaign progress passed.");
@@ -226,15 +228,20 @@ namespace YGOPortable.Editor
                         DuelUiKit.LoadOpponentPortrait(opponent) != null &&
                         OpponentDeckLevels.GetDecks(episode.charId).Any(deck => deck.main?.Length >= 40),
                         $"Missing cast or decks for {episode.id}.");
-                    if (episode.raidCard == 0) continue;
-                    var boss = StoryRaid.ForEncounter(i + 1, episode.raidCard, episode.raidLife);
-                    var card = CardDatabase.Get(boss.Opening.FieldCard);
-                    Require(card != null && (card.IsMonster ||
-                        (card.type & (YgoConstants.TYPE_FIELD | YgoConstants.TYPE_CONTINUOUS)) != 0) &&
-                        boss.Opening.Hand == 5 + episode.chapter && boss.WinDp > CollectionProgress.WinReward,
-                        $"Invalid raid conditions for {episode.id}.");
+                    var scripted = StoryGimmickRuntime.StartingCards(episode.gimmick);
+                    if (episode.raidCard == 0 && episode.raidLife == 0 && scripted.Count == 0) continue;
+                    StoryRaid? boss = episode.raidCard != 0 || episode.raidLife != 0 ?
+                        StoryRaid.ForEncounter(i + 1, episode.raidCard, episode.raidLife) : null;
+                    if (episode.raidCard != 0)
+                    {
+                        var card = CardDatabase.Get(episode.raidCard);
+                        Require(card != null && (card.IsMonster ||
+                            (card.type & (YgoConstants.TYPE_FIELD | YgoConstants.TYPE_CONTINUOUS)) != 0) &&
+                            boss.Value.Opening.Hand == 5 + episode.chapter && boss.Value.WinDp > CollectionProgress.WinReward,
+                            $"Invalid raid conditions for {episode.id}.");
+                    }
                     var rival = OpponentDeckLevels.GetDecks(episode.charId)[^1];
-                    VerifyNativeOpening(episode.id, boss, rival.main, rival.extra, humanFirst: true);
+                    VerifyNativeOpening(episode.id, boss, rival.main, rival.extra, humanFirst: true, gimmick: episode.gimmick);
                 }
             }
             Require(ids.Count == 6 * StoryCampaign.EpisodeCount, "Some episodes were not included.");
@@ -267,17 +274,71 @@ namespace YGOPortable.Editor
                 "The legacy finale did not preserve the campaign and tournament unlock.");
         }
 
-        private static void VerifyNativeOpening(string name, StoryRaid raid, uint[] rival, uint[] extra, bool humanFirst)
+        private static void VerifyNativeOpening(string name, StoryRaid? raid, uint[] rival, uint[] extra, bool humanFirst, string gimmick = null)
         {
             var player = Enumerable.Repeat(20721928u, 40).ToArray();
             using var duel = new DuelSession();
             Require(duel.StartNewDuel(player, Array.Empty<uint>(), rival, extra ?? Array.Empty<uint>(), humanFirst,
-                seed: new ulong[] { 222, 17, 821, 909 }, opponentOpening: raid.Opening), $"Could not start the raid {name}.");
+                seed: new ulong[] { 222, 17, 821, 909 }, opponentOpening: raid?.Opening, storyGimmick: gimmick),
+                $"Could not start the raid {name}.");
             var boss = duel.Players[duel.AiPlayerIndex];
-            Require(boss.lp == raid.Opening.Life && boss.hand.Count == raid.Opening.Hand &&
-                duel.Players[duel.HumanPlayerIndex].lp == 8000 && boss.mzone.Concat(boss.szone)
-                    .Any(card => card?.code == raid.Opening.FieldCard && card.IsFaceUp),
+            Require(boss.lp == (raid?.Opening.Life ?? 8000) && boss.hand.Count == (raid?.Opening.Hand ?? 5) &&
+                duel.Players[duel.HumanPlayerIndex].lp == 8000,
                 $"The configured LP, hand or opening field was missing in {name}.");
+            if (raid?.Opening.FieldCard is > 0)
+                VerifyCard(raid.Value.Opening.FieldCard, false);
+            foreach (var (code, defense) in StoryGimmickRuntime.StartingCards(gimmick))
+                VerifyCard(code, defense);
+
+            void VerifyCard(uint code, bool defense)
+            {
+                var info = CardDatabase.Get(code);
+                var zone = info.IsMonster ? boss.mzone : boss.szone;
+                var placed = zone.SingleOrDefault(card => card?.code == code);
+                Require(placed?.IsFaceUp == true && (!defense || (placed.position & YgoConstants.POS_FACEUP_DEFENSE) != 0) &&
+                    ((info.type & YgoConstants.TYPE_FIELD) == 0 || placed.sequence == 5), $"Wrong zone or position for {code} in {name}.");
+            }
+        }
+
+        private static void VerifyOpeningCardRemoval()
+        {
+            AssertRemoval("jinzo", 77585513, 12580477, YgoConstants.LOCATION_MZONE, null);
+            AssertRemoval("plasma", 83965310, 53129443, YgoConstants.LOCATION_MZONE, null);
+            AssertRemoval("numeron_network", 41418852, 5318639, YgoConstants.LOCATION_SZONE, null);
+            AssertRemoval("orichalcos", 48179391, 5318639, YgoConstants.LOCATION_SZONE, StoryRaid.ForEncounter(28, 48179391));
+            Debug.Log("[VERIFY STORY OPENING CARDS] Real monster and field spell destruction, including Orichalcos's first protection, passed.");
+
+            static void AssertRemoval(string gimmick, uint target, uint removal, uint location, StoryRaid? raid)
+            {
+                var player = Enumerable.Repeat(removal, 40).ToArray();
+                var rival = Enumerable.Repeat(20721928u, 40).ToArray();
+                var ai = new TacticalAI { Difficulty = AIDifficulty.Easy };
+                using var duel = new DuelSession(recordPlanningReplay: true);
+                Require(duel.StartNewDuel(player, Array.Empty<uint>(), rival, Array.Empty<uint>(),
+                    seed: new ulong[] { 21, 906, 711, 399 }, opponentOpening: raid?.Opening, storyGimmick: gimmick),
+                    $"Could not open {gimmick}.");
+                var opponent = duel.Players[duel.AiPlayerIndex];
+                var zone = location == YgoConstants.LOCATION_MZONE ? opponent.mzone : opponent.szone;
+                Require(zone.Any(card => card?.code == target && card.IsFaceUp), $"{target} did not start in its native zone.");
+                for (int step = 0; step < 35 && opponent.grave.All(card => card.code != target) && duel.RetryCount == 0; step++)
+                {
+                    var prompt = duel.ActivePrompt;
+                    if (prompt == null) { duel.StepUntilPrompt(); continue; }
+                    if (prompt.playerId == duel.HumanPlayerIndex && prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD)
+                    {
+                        int index = prompt.activatable.FindIndex(item => item.code == removal);
+                        if (index >= 0) { duel.SubmitResponseInt((index << 16) | 5); continue; }
+                    }
+                    if (prompt.messageType == YgoConstants.MSG_SELECT_CARD)
+                    {
+                        int index = prompt.candidates.FindIndex(item => item.code == target);
+                        if (index >= 0) { duel.SubmitResponse(DuelSession.PackCardSelection(index)); continue; }
+                    }
+                    duel.SubmitResponse(ai.ComputeResponse(duel, prompt));
+                }
+                Require(opponent.grave.Any(card => card.code == target) && duel.RetryCount == 0,
+                    $"{target} could not be destroyed by the native effect in {gimmick}.");
+            }
         }
 
         private static void Require(bool condition, string reason)

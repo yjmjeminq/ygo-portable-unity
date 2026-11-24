@@ -294,7 +294,8 @@ namespace YGOPortable.UI
         internal StoryRaid? GetRaid(StoryEpisodeData episode)
         {
             int number = IndexOf(episode) + 1;
-            return number > 0 && episode.raidCard > 0 ? StoryRaid.ForEncounter(number, episode.raidCard, episode.raidLife) : null;
+            return number > 0 && (episode.raidCard > 0 || episode.raidLife > 0)
+                ? StoryRaid.ForEncounter(number, episode.raidCard, episode.raidLife) : null;
         }
 
         private static string ClearedKey(string seriesId, string episodeId) => $"ygo.story.{seriesId}.cleared.{episodeId}";
@@ -496,7 +497,7 @@ namespace YGOPortable.UI
                         _dialogue.AnswerBranch(choice.Reply, episode.opponentName, choice.Response);
                     })).ToArray()));
 
-            void ShowPreparation() => _dialogue.ShowChoices(() => PreparationSummary(raid, deck),
+            void ShowPreparation() => _dialogue.ShowChoices(() => PreparationSummary(episode, raid, deck),
                 new("듀얼 개시!", () => ChooseTurnOrder(episode, ShowPreparation), () => _playableDecks.Count > 0),
                 new("내 덱 변경", PickDeck),
                 new("대화 다시 보기", () => OpenEpisode(index)),
@@ -507,10 +508,11 @@ namespace YGOPortable.UI
 
         private StoryBattlePlan CurrentBattlePlan => new(_stance, _supports, _opponentOpening);
 
-        private string PreparationSummary(StoryRaid? raid, PresetDeckInfo deck)
+        private string PreparationSummary(StoryEpisodeData episode, StoryRaid? raid, PresetDeckInfo deck)
         {
-            var (player, opponent) = CurrentBattlePlan.Apply(raid, deck);
+            var (player, opponent) = CurrentBattlePlan.Apply(raid, deck, episode.gimmick);
             string field = string.Join(" · ", new[] { opponent.FieldCard, opponent.DeckMonster }
+                .Concat(StoryGimmickRuntime.StartingCards(episode.gimmick).Select(card => card.Code))
                 .Where(code => code != 0).Select(CardDatabase.GetName));
             if (field.Length > 0) field = $"\n선배치 카드 · {field}";
             string equipped = string.Join(" · ", RaidSupportCatalog.Items.Where(item => (_supports & item.Id) != 0)
@@ -523,7 +525,7 @@ namespace YGOPortable.UI
         {
             var raid = GetRaid(episode);
             var deck = GetOpponentMatch(episode).Deck;
-            uint monster = StoryBattlePlan.SelectOpeningMonster(deck, raid);
+            uint monster = StoryBattlePlan.SelectOpeningMonster(deck, raid, episode.gimmick);
             _returnFromOpeningPicker = restore;
             string hand = $"상대 시작 패 +{StoryBattlePlan.ExtraOpeningCards}장";
             string preplaced = monster == 0 ? "선배치할 몬스터 없음" : $"몬스터 선배치 · {CardDatabase.GetName(monster)}";
@@ -534,7 +536,7 @@ namespace YGOPortable.UI
             choices.Add(Option(StoryOpponentOpening.PreplacedMonster, preplaced, monster != 0));
             choices.Add(Option(StoryOpponentOpening.ExtraHandAndMonster, $"{hand}\n{preplaced}", monster != 0));
             choices.Add(new StoryChoice("돌아가기", CloseOpeningPicker));
-            _dialogue.ShowChoices(() => PreparationSummary(raid, deck), choices.ToArray());
+            _dialogue.ShowChoices(() => PreparationSummary(episode, raid, deck), choices.ToArray());
 
             StoryChoice Option(StoryOpponentOpening opening, string label, bool available = true) =>
                 new(label, () =>

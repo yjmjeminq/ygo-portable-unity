@@ -453,7 +453,8 @@ namespace YGOPortable.UI
             }
             var difficulty = isCampaignMatch ? AIDifficulty.Smart : AiDifficulty;
             var raid = isStoryDuel ? _storyMode.GetRaid(_activeStoryEpisode) : null;
-            var opening = isStoryDuel ? _activeStoryPlan.Apply(raid, oppDeck) : ((DuelOpening Player, DuelOpening Opponent)?)null;
+            string storyGimmick = isStoryDuel ? _activeStoryEpisode.gimmick : null;
+            var opening = isStoryDuel ? _activeStoryPlan.Apply(raid, oppDeck, storyGimmick) : ((DuelOpening Player, DuelOpening Opponent)?)null;
             if (isTournamentDuel)
                 opening = (new DuelOpening(8000, 5, 0), DimensionTournament.Opening(_activeTournament.Value.Slots, oppDeck));
             _session = new DuelSession(recordPlanningReplay: difficulty == AIDifficulty.Smart, playerReplay: _personalReplay);
@@ -472,7 +473,7 @@ namespace YGOPortable.UI
                 myDeck.main, myDeck.extra,
                 oppDeck.main, oppDeck.extra,
                 p0GoesFirst: playerGoesFirst, playerDeckAppearance: duelDeck, opponentOpening: opening?.Opponent,
-                opponentDestiny: GetOpponentDestinyCards(oppDeck), playerOpening: opening?.Player))
+                opponentDestiny: GetOpponentDestinyCards(oppDeck), playerOpening: opening?.Player, storyGimmick: storyGimmick))
             {
                 ShowDuelStartFailure(isStoryDuel, "듀얼을 시작하지 못했습니다.", isTournamentDuel, isRankedDuel);
                 return;

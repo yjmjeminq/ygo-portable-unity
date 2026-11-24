@@ -7,7 +7,8 @@ namespace YGOPortable.Core
 
         internal readonly DuelOpening Opening;
         internal readonly int WinDp;
-        internal string Summary => $"BOSS RAID  ·  시작 LP {Opening.Life:N0}  ·  시작 패 {Opening.Hand}장\n선배치 카드 · {CardDatabase.GetName(Opening.FieldCard)}";
+        internal string Summary => $"BOSS RAID  ·  시작 LP {Opening.Life:N0}  ·  시작 패 {Opening.Hand}장" +
+            (Opening.FieldCard == 0 ? "" : $"\n선배치 카드 · {CardDatabase.GetName(Opening.FieldCard)}");
 
         private StoryRaid(int chapter, uint fieldCard, int life)
         {

@@ -324,6 +324,7 @@ namespace YGOPortable.Core
             internal int startingLp;
             internal DuelOpening? opponentOpening;
             internal DuelOpening? playerOpening;
+            internal string storyGimmick;
             internal UserDeck destinyDeck;
             internal uint[] opponentDestiny;
             internal readonly List<(byte message, byte player, byte[] bytes)> responses = new();
@@ -455,7 +456,8 @@ namespace YGOPortable.Core
             IReadOnlyList<uint> p0Main, IReadOnlyList<uint> p0Extra,
             IReadOnlyList<uint> p1Main, IReadOnlyList<uint> p1Extra,
             bool p0GoesFirst = true, int startingLp = 8000, ulong[] seed = null, UserDeck playerDeckAppearance = null,
-            DuelOpening? opponentOpening = null, IReadOnlyList<uint> opponentDestiny = null, DuelOpening? playerOpening = null)
+            DuelOpening? opponentOpening = null, IReadOnlyList<uint> opponentDestiny = null, DuelOpening? playerOpening = null,
+            string storyGimmick = null)
         {
             Dispose();
             UsesDeckAppearances = playerDeckAppearance != null && !_loadingPlanningReplay;
@@ -555,6 +557,11 @@ namespace YGOPortable.Core
             if (opponentOpening is { FieldCard: > 0 } opening) PlaceOpeningCard((byte)AiPlayerIndex, opening.FieldCard);
             if (mainWithoutMonster != null || extraWithoutMonster != null)
                 PlaceOpeningCard((byte)AiPlayerIndex, deckMonster, opponentOpening.Value.FieldCard == 0 ? 2u : 1u);
+            if (!PlaceStoryOpeningCards((byte)AiPlayerIndex, storyGimmick))
+            {
+                Dispose();
+                return false;
+            }
 
             YgoNativeBridge.YGO_StartDuel(NativePtr);
             if (_recordPlanningReplay)
@@ -565,6 +572,7 @@ namespace YGOPortable.Core
                     startingLp = startingLp,
                     opponentOpening = opponentOpening,
                     playerOpening = playerOpening,
+                    storyGimmick = storyGimmick,
                     destinyDeck = _destinyCards[HumanPlayerIndex].Count == 0 ? null : CollectionProgress.CopyDeck(playerDeckAppearance),
                     opponentDestiny = CopyDeck(opponentDestiny),
                     seed = (ulong[])seed.Clone(),
@@ -596,7 +604,7 @@ namespace YGOPortable.Core
             {
                 if (!copy.StartNewDuel(replay.firstDeck, replay.firstExtra, replay.secondDeck, replay.secondExtra,
                     replay.first, replay.startingLp, replay.seed, replay.destinyDeck,
-                    replay.opponentOpening, replay.opponentDestiny, replay.playerOpening)) return null;
+                    replay.opponentOpening, replay.opponentDestiny, replay.playerOpening, replay.storyGimmick)) return null;
                 foreach (var response in replay.responses)
                 {
                     if (expired() || copy.IsFinished) return null;
@@ -682,6 +690,32 @@ namespace YGOPortable.Core
             uint sequence = info.IsMonster ? monsterSequence : fieldSpell ? 5u : 2u;
             YgoNativeBridge.YGO_AddCard(NativePtr, player, 0, code, player, location, sequence, YgoConstants.POS_FACEUP_ATTACK);
         }
+
+        private bool PlaceStoryOpeningCards(byte player, string storyGimmick)
+        {
+            foreach (var (code, defense) in StoryGimmickRuntime.StartingCards(storyGimmick))
+            {
+                var info = CardDatabase.Get(code);
+                if (info == null || YgoNativeBridge.YGO_HasCard(code) == 0) return false;
+                uint location = info.IsMonster ? YgoConstants.LOCATION_MZONE : YgoConstants.LOCATION_SZONE;
+                bool fieldSpell = (info.type & YgoConstants.TYPE_FIELD) != 0;
+                uint[] sequences = fieldSpell ? StoryFieldSpellSequence : StoryOpeningSequences;
+                bool placed = false;
+                foreach (uint sequence in sequences)
+                {
+                    if (YgoNativeBridge.YGO_QueryCardIdentity(NativePtr, player, location, sequence) != 0) continue;
+                    uint position = defense ? YgoConstants.POS_FACEUP_DEFENSE : YgoConstants.POS_FACEUP_ATTACK;
+                    YgoNativeBridge.YGO_AddCard(NativePtr, player, 0, code, player, location, sequence, position);
+                    placed = YgoNativeBridge.YGO_QueryCardIdentity(NativePtr, player, location, sequence) != 0;
+                    break;
+                }
+                if (!placed) return false;
+            }
+            return true;
+        }
+
+        private static readonly uint[] StoryOpeningSequences = { 2, 1, 3, 0, 4 };
+        private static readonly uint[] StoryFieldSpellSequence = { 5 };
 
         internal DeckCardAppearance? GetDeckAppearance(byte player, uint location, uint sequence)
         {
