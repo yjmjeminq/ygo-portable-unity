@@ -1,0 +1,649 @@
+{
+  "generator": "built-in image_gen",
+  "assets": [
+    {
+      "id": "106",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_106.png",
+      "sha256": "c29132a971106ea3149c66c145f61e56675a26a6d1e7181a997b17b25b1e5186",
+      "source_sha256": "b81ad61dbf4c3540877467ce9dd849a7b3450d1c6bd5e5e3fd2f568f84e4dd5f"
+    },
+    {
+      "id": "106",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_106.png",
+      "sha256": "e3c3eadd4680d5bdcdc47f90c86d2920301e9260f202b7946d606a1709db1603",
+      "source_sha256": "11d129c220f3857b7ce91972d83dc63b9169864f1631be4e9cd71145b38cdd85"
+    },
+    {
+      "id": "107",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_107.png",
+      "sha256": "6c76db136f667521abcba270a5d9ddf13bdb79c353272d3d06012576960ab145",
+      "source_sha256": "8c192dd21aa9b866746a73182b3a9458b2522a969119913c7794eff4a86fa8ae"
+    },
+    {
+      "id": "107",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_107.png",
+      "sha256": "9d0590957559e73d85a4a884048a14f84bcdb9b77235eaefc7e6ea7305ae5ec2",
+      "source_sha256": "1bb409406e4583645f1016360400f8398709093a61bb6e1589a643b5eac09c86"
+    },
+    {
+      "id": "108",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_108.png",
+      "sha256": "20c4c182fb357e619f794cd131ea53494c9db18c929778e2514cfe7b9f1f8ea1",
+      "source_sha256": "93e220fb6d34c5ecf323942c90ea450236ac94cd2da9e720774f9b62c0311a4e"
+    },
+    {
+      "id": "108",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_108.png",
+      "sha256": "3c7b470557944fbe091704d29998b52839dcce685775fe4e59fa3db046924182",
+      "source_sha256": "e8da9c92bb441a2a8b3665f4cf57159ed80ef3fc86d105fb2e55486ed8e38195"
+    },
+    {
+      "id": "109",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_109.png",
+      "sha256": "54a29df29d4efc96a6293b84382a68828002ba2a5a5d421c7e6d88ed9946a7e0",
+      "source_sha256": "6a385c2e41cceb6ed8cbcc4ea84b38db1cb2e6c24684f5ca41e69ef1aff17ac5"
+    },
+    {
+      "id": "109",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_109.png",
+      "sha256": "32dc2bfa63c4268cf50111dc68c0306c253ff433db84c8ab674f8ae5e505e3cc",
+      "source_sha256": "5cda42c8bfa267229205dcf8209bf8197984587dcc2096d2717e64b19bd29283"
+    },
+    {
+      "id": "110",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_110.png",
+      "sha256": "bcc94475f8aa68391635d2f6dc281b3488a3fad195159560db68fa377e913601",
+      "source_sha256": "9fabb1eda31e026921feb674704d1ee07ef52fdd53c6786034e338c658ede586"
+    },
+    {
+      "id": "110",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_110.png",
+      "sha256": "1890f7f5b8fd51f8ca030b1824a76023bbd4e0768810fb130976a40d58114416",
+      "source_sha256": "cad6c4f66821d73f84a471f81407578b0b01936154896c5ca42bdfd99ba709ac"
+    },
+    {
+      "id": "111",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_111.png",
+      "sha256": "8236168e75c8c8281e05d4bab8af956b5e1b619bcdec99501a05b9eea88f62ad",
+      "source_sha256": "fc0f360cef279ec337c5af6ec2d370cb6e7c4106d7fbccabadc3ce4e00256671"
+    },
+    {
+      "id": "111",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_111.png",
+      "sha256": "878a18ba63d5a6ab7d54790a6a491ec08ad5f69f24ac2312a40666e383629415",
+      "source_sha256": "c10b40d4c76deb2e72bd938e2a44913ea78d08b05aa6ed3f68c6f392beb94059"
+    },
+    {
+      "id": "112",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_112.png",
+      "sha256": "f65019c8fd4ec2c6b92705dd68d8be3263b3b224717a32adf2fbb9706d71e1c6",
+      "source_sha256": "f4dd37238ce45c05f9e9a5ad1845de8618832379630617ac3218c85897b4b439"
+    },
+    {
+      "id": "112",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_112.png",
+      "sha256": "d4c478717dd044c5aa4d06db2d680eae68598fc5be6188aad522ac4f53a28794",
+      "source_sha256": "67933500b89ed018b770757ac0e92d715ababb6e3c8630bdc48fbfb37170c05d"
+    },
+    {
+      "id": "113",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_113.png",
+      "sha256": "dbcf2817e14309e335173062c3f9098d9dafca8c608f6049d335df8e903a9c98",
+      "source_sha256": "4639bbbbe6d29d2ce1fcbd2562b9584746762f85265c2dc0916074914c638cfc"
+    },
+    {
+      "id": "113",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_113.png",
+      "sha256": "ed7958cf29f60768f966cda7adfba9c97d79bd2de9147a83d6d222030b06fdea",
+      "source_sha256": "cf10c52d610002ee99c525f94191d5ee0cdfc1a398f15932e504cbc3715a4b1d"
+    },
+    {
+      "id": "114",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_114.png",
+      "sha256": "2197d9612c04feaee8fc5d2a3b7abc058f4e2a93292890ffdecb65406ab9a4b8",
+      "source_sha256": "631b96ea162cff6d9ac4505fe02faba4086de2f8cc7e4ce137d81742d457da07"
+    },
+    {
+      "id": "114",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_114.png",
+      "sha256": "a49d22b0f435849b704fe382c36776ccfb750ce1e58700995b2868c884fce4b5",
+      "source_sha256": "34eb7ed9eaf9277863200206a59cedc1133406e114d7c3f56f753be2092e84c8"
+    },
+    {
+      "id": "115",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_115.png",
+      "sha256": "80ea5c62d5ff164c196c5a7c4b9d744483095158c608909db78e33cf86c8c139",
+      "source_sha256": "14baaa080b23b3eb093258f37de8e80ae3851a4853bb24bb3ffe6612d6743b96"
+    },
+    {
+      "id": "115",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_115.png",
+      "sha256": "9af33e68ab3bcbaea96fb7772a13050b0815d6d8eed32c0aede91912b2a90868",
+      "source_sha256": "e4b097e5b8357c1cacbcf1a0ad5061920edf759ec2d326cb555a4e1b7e9c7bac"
+    },
+    {
+      "id": "116",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_116.png",
+      "sha256": "f26823b5249bc27c7f45adb306f3d9ed32d935b4c8196177b358a03f4fd7fade",
+      "source_sha256": "785c4ab8a7059704868a4d57f5d4538827c3a74f2758d5b4c21ade2df04c4226"
+    },
+    {
+      "id": "116",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_116.png",
+      "sha256": "cf8eec36775ad3375cbf676e3a5bc76bac9ed8c10040c14a5f1222621557b317",
+      "source_sha256": "353e6a470866031f36b5fe45293d852c03208d8ff16279651f6a4278173dceb5"
+    },
+    {
+      "id": "117",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_117.png",
+      "sha256": "ddcb0956da67bb5409371d4f0dd7eae31d85572898bcb094413dd60d82011fe5",
+      "source_sha256": "79293a9c17cb215a0aa1a5c5e7e85ea909159f72d7ae6041b7dfe6c6d8b22e85"
+    },
+    {
+      "id": "117",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_117.png",
+      "sha256": "d41eea681df813ce400657cdcaac3f913393198de3c5d04c2f5a2bd0b0701a76",
+      "source_sha256": "2a1c038878a376164b5b23d21ef9342fd300db104a3dad18759fb45fca6c09e1"
+    },
+    {
+      "id": "118",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_118.png",
+      "sha256": "39cbeadbfbd599d8444390ffceec9bd91e7d329d53fa2255ff835115e3eee7f9",
+      "source_sha256": "a6acbf8ade9f44c86b0798a53319b51a910f1fcde30cd29d1ea479f43f34e85e"
+    },
+    {
+      "id": "118",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_118.png",
+      "sha256": "b650570c765dd58d1e9e9e1966af41212b64578590578c33f1d7025e6749cc33",
+      "source_sha256": "ae9e64d5fb91c2917c46ba082b9473323688ef59a61b6dbe8adea7e735848949"
+    },
+    {
+      "id": "119",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_119.png",
+      "sha256": "cfd0cbdd7b4f1943cd2758d06b57633d7cf54fad3939a2dc7d9169d2ca08983b",
+      "source_sha256": "c0276ad7cbfe55d664c9fb9734701f164e322f7b73c855d68c385905a17c9234"
+    },
+    {
+      "id": "119",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_119.png",
+      "sha256": "42c7eea82b235af501b89f3eb2d1bbb7f371772cc6f2c9c59a9f8f9cc6dc3ccd",
+      "source_sha256": "4ec14d5d5958e2f8fd3b0654e61a9f92dfb94b0a5b0641923cdd6b045006f317"
+    },
+    {
+      "id": "120",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_120.png",
+      "sha256": "648dfda0ecc611d265a22a442bf3203bd0d6002d3520749e8ed32e6f61bd1d4e",
+      "source_sha256": "6467aa2332bed3e0a1dbb7335a15415c304367827fd598eefb11d85559423650"
+    },
+    {
+      "id": "120",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_120.png",
+      "sha256": "cfbb2e222c8663503546eaf2bb6796748046273fa41b318a02497ea0df856d4f",
+      "source_sha256": "b6d0beb754d65eed7118d95578540d72cd274683d28c3ea1e9fc5dcc261e5972"
+    },
+    {
+      "id": "121",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_121.png",
+      "sha256": "654b42a8402cae8f9013509bd2e9016799f0ff3436da323368eaca4587ddfc13",
+      "source_sha256": "195d1003aa36ac1286922aa4ee5143cc37693e5809acd153413c2664827c3918"
+    },
+    {
+      "id": "121",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_121.png",
+      "sha256": "6036803806f179b19b97eb9de434319d6b7ed72dbcba3d5c22a0ab7cd26ff9d9",
+      "source_sha256": "c785616b950ed0569160706deaa53f1412a928d25398cc45017562a0f1c06ce3"
+    },
+    {
+      "id": "122",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_122.png",
+      "sha256": "00cd9dca36f2e3b59de23744eed314b76a9355997b007492b9ab55da828d0fee",
+      "source_sha256": "a16075079174f7fabd2eb5bfc065383131666e3b2fd1d794c6a630644ba456ef"
+    },
+    {
+      "id": "122",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_122.png",
+      "sha256": "ca8b056cb950fd74bb1e2899e91dd73b074f78f3d14f109cec276b30ed21bc9e",
+      "source_sha256": "95e50e21d2cd76ee4147d6558bb51c7d7375b8333bd17eb04948fc462fc38e4c"
+    },
+    {
+      "id": "123",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_123.png",
+      "sha256": "8e1284a91174fb85a5e38ca35e616d0e5e24edf923f8ea7c1b7d35ce52df434e",
+      "source_sha256": "8d71bcd1f63d68fd3b16051fc440c1df9df4d6e11202c4b753c0f6a32e5f6984"
+    },
+    {
+      "id": "123",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_123.png",
+      "sha256": "2c15c0c3d833423305621d2b4790144b4063f27b3e94a16f1411c7ef767509dd",
+      "source_sha256": "ff0f5787c925d25019f7546264d1b9ce9fcda7a526541a5d4a1cee29acf0b388"
+    },
+    {
+      "id": "124",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_124.png",
+      "sha256": "a33582e22bfa77f471f3ca4df0200809a0f8c35845bc5c49a77e8986307874d5",
+      "source_sha256": "4283d76edd4c3c2fe486af1a03ac2323285a25c187e5beb6f750dcb09055c627"
+    },
+    {
+      "id": "124",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_124.png",
+      "sha256": "9e660588e9c8157dfa730d6fd41d0ffe2ae676872d4bf0b9e53f2a57126d9fea",
+      "source_sha256": "fd5bafa1c893f23033796e09a688aaab855971ad7efd899769c8ef1c777d9934"
+    },
+    {
+      "id": "125",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_125.png",
+      "sha256": "8aee45569492c0be7868922fcb0ad844566ec65df2e57039fb4ba6d48cb6790d",
+      "source_sha256": "3ab910c329192f4a3c15f3c8f25f5c111b144bfb63f2a0a35ccfe2adeade85e3"
+    },
+    {
+      "id": "125",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_125.png",
+      "sha256": "c37084ee98ab5b48e3c6eebf45d782d3dc2fa1690e5152012d0f556f7a632a4f",
+      "source_sha256": "d60461cb2b51937843fdcad964457b7b06ce43c6db26b1b7678c5f2c22dd3a1a"
+    },
+    {
+      "id": "126",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_126.png",
+      "sha256": "36e15f3ded2efe52a524a281bcb8a6fee676aca1b623348fc56646a1ad9aede5",
+      "source_sha256": "bd53d7f56c04dfddb805737c526570208f0a1431b8c898316e930e12076959dc"
+    },
+    {
+      "id": "126",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_126.png",
+      "sha256": "3725a3e23f213df3b14e79ed99bb8231c4c7a6efc797cadef7a3e9bdf18c5471",
+      "source_sha256": "361809a97a45698a194d4d9cfb4a27ce8585569a0e8308bd29dc707befaa311a"
+    },
+    {
+      "id": "127",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_127.png",
+      "sha256": "4859378eba50da355811dd8e6f90be3b854f8bcf5a1cbe299df1796ede3d3448",
+      "source_sha256": "363ae7f56b5afc7497a4657492e9d257f81968c62e5e97722616d2aacff07181"
+    },
+    {
+      "id": "127",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_127.png",
+      "sha256": "427f591858526ed9f84834ee76e94cbb843b9f13e19bf410a996e4972c0c2c18",
+      "source_sha256": "088b8c9dad2171a2ebb542ce71d2baa2a184b5dee4d42867a7531f0eec5890aa"
+    },
+    {
+      "id": "128",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_128.png",
+      "sha256": "1f07aebd573e6305e19793b7d9ffff497f3a6b451a25c0a7ec0c7562ba1d3654",
+      "source_sha256": "9d575ec5913044fb9538513fa4489351f34060e835fa42e41732ee9bdea54119"
+    },
+    {
+      "id": "128",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_128.png",
+      "sha256": "a2aea19c71bbebad2cca9b6cdc80f92f138b6061e549b111668fb42da4571cff",
+      "source_sha256": "d7969afb90e3b52ade8a9f52821635244334cc61a787ce5f2edec2304e0d1b2e"
+    },
+    {
+      "id": "129",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_129.png",
+      "sha256": "99af1e7682b874c50facc29dc7bcd60d960a21c149952883905d50f882a98015",
+      "source_sha256": "084756b38ad809c911064df0c712399bbe895928c5dd3af9eb24f4ffb6c63713"
+    },
+    {
+      "id": "129",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_129.png",
+      "sha256": "918dea000051b35b9bb44eca4d7de9323a9537ab8a4438f9e870778cda435510",
+      "source_sha256": "c1e072447555d57a3f22b0d31c3606b9e8e22a974a3f75419bb26edd02e7ce5d"
+    },
+    {
+      "id": "130",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_130.png",
+      "sha256": "d1119e0062aa155909c55fe297486e5abbce5abd4761dc26302e1a660dd05b6c",
+      "source_sha256": "14153c57527cfc3ef7fe5bf985bd8a93613e02ad655f890db95a48b3db803d22"
+    },
+    {
+      "id": "130",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_130.png",
+      "sha256": "748cf661ba81bc46fdc63302d43b3d4ebee384e307d292ded44b2b4e0cc0bf72",
+      "source_sha256": "94e74c0e775b070e1cccf6b7c23ff4e6bc78bb0543a52abcb87c411b8163c989"
+    },
+    {
+      "id": "131",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_131.png",
+      "sha256": "bb3d4c05a88f20d3dbb12810eb6c0a69eae4a394d69ec37ce9956f5644fa0428",
+      "source_sha256": "ba5c9bb8a11d062fcc49d6279b182d848f7f614a09aea69fc9c9d76c8fdde861"
+    },
+    {
+      "id": "131",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_131.png",
+      "sha256": "de5a358ba3c3166f14d7811f624c2a94ab74486d32dd672b72dcc82028816ac2",
+      "source_sha256": "47313f3a3700ab38b44639d3b7362aeaa105e51171eadb4e1bea29fccb0a2c15"
+    },
+    {
+      "id": "132",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_132.png",
+      "sha256": "aeeeef52f79d686eb44e5fb6aabbe5f23b6efebb8fca63e6d1922777aefe3a59",
+      "source_sha256": "0f351b6695fd1efb88f63219fdba57f8959b3948befc6f2da76bdd32fb2e5c05"
+    },
+    {
+      "id": "132",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_132.png",
+      "sha256": "6b62eb0063e6e0abf462c605352502def2211b776fcf3bf39d20d79ae6a9cde0",
+      "source_sha256": "d406bd264790b7e3bbcafe325c731706172a5dc658ac63b16ad1866440a97224"
+    },
+    {
+      "id": "133",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_133.png",
+      "sha256": "61fb2e08ec219efa78f3e89bf96f887c555cf4917ed0086ac9674fa6e6eb5041",
+      "source_sha256": "f6101e6c373e12d22023b83332bf0fcc23b8c9034c7146f145080a73ad5d4ab0"
+    },
+    {
+      "id": "133",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_133.png",
+      "sha256": "70725eae050a4a44a311c760ac870f68bb9f19f021829c0421f9a7abcc6193b7",
+      "source_sha256": "27e6b0c5635ca438ea26b85b517a37bfb336fd1eeb8938f90e5afba2ce2657b3"
+    },
+    {
+      "id": "136",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_136.png",
+      "sha256": "c55fed2d1d9a3469f9b9597ba87a1141183f8f643373e2d35fe7820c34dd648c",
+      "source_sha256": "b07af446b2ffda3904ef7466d982faadb9474fd736f9897fd8379be9bdcb96cd"
+    },
+    {
+      "id": "136",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_136.png",
+      "sha256": "ab4b2154e31d5bc66df3222024caea21752672bdb527b7cdd7a99d74954d145c",
+      "source_sha256": "d499fb48eae3a1e3ba09c97aafde29596db55a68d1664b9f2dde9af2eeab69e9"
+    },
+    {
+      "id": "137",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_137.png",
+      "sha256": "691ff81e4fd0a411ae37bdbb27b5e1555370fc9b8e9f84976f4b4c46cd92dd5b",
+      "source_sha256": "fa8007fe95163b194814c6adf08693947d8b4cdfc8efec73dde9e2302486536a"
+    },
+    {
+      "id": "137",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_137.png",
+      "sha256": "770dd70976b7285c35dfeec72529d4a38bff7da9dd33f7c6055ae5f8f9e92f72",
+      "source_sha256": "fdd4d0dfddfa6510fb5946340131df8db3d8df900557d8eec6b32519b03ce9b0"
+    },
+    {
+      "id": "199",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_199.png",
+      "sha256": "fad3b5066fcf7291a92a866f13dbc76351a3355b1e3476f9589dbe2521e7783f",
+      "source_sha256": "0f4879e2404b2bd106fcca9ffaebdc5a3ebb77fc78ce4353f5a7ef5fb9fb8670"
+    },
+    {
+      "id": "199",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_199.png",
+      "sha256": "2d7ff239d9c3b7d4ae5819de6e85afa4623ca0720901cae1141f301d8d7eeba1",
+      "source_sha256": "939cd4bef51b863c14250d8ba5b7af2e9579ca49881c4e22a3ed44404abf2dc0"
+    },
+    {
+      "id": "201",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_201.png",
+      "sha256": "7f74539fd14f0aa9d06cb1a740edaac2e72ad85ac50cb2cdb791316fb2349ae4",
+      "source_sha256": "8d576dfc5ef155b5d13f799aaaacf4fb1145822ee2eed96a56064f5879da312e"
+    },
+    {
+      "id": "201",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_201.png",
+      "sha256": "690eca72d932b1abdf4b38bb75523d36d802c4aaea29b5d5fa8a9cd043b6a669",
+      "source_sha256": "cb49fd04c9e683b2a971dad8f2da8911c284b8684d990d5f4fa85325c1c74878"
+    },
+    {
+      "id": "202",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_202.png",
+      "sha256": "5b3b573d33548f2d131c84bef9a38336370b3eda28f391c3cf7377a6805e9e5c",
+      "source_sha256": "4956fb38f67e601df986ada4ab382a8ae43eca2a103400ee5b93827af5a4dbed"
+    },
+    {
+      "id": "202",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_202.png",
+      "sha256": "ad1db2b68ad7a2a73aca01eb3b3c706e0ce1459370c5475d7773f3e4a7f70e37",
+      "source_sha256": "f95a028849eb624930b681ad5fda49eba6593c94b6de69b6446bfd2ffd908925"
+    },
+    {
+      "id": "205",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_205.png",
+      "sha256": "7b0c5f96a4845bd7c468746a75b9128f430f255cd95caa1dd6d6fca2f6942ca2",
+      "source_sha256": "35a10468ab56f92a663c1109bf4ad8e53a0f0a9dfb4501c5bd509b00642f1a58"
+    },
+    {
+      "id": "205",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_205.png",
+      "sha256": "ba571498ed1d855a9b307d16bc0ff5cd7e909c1b3864552879b934ef3b62c108",
+      "source_sha256": "d5e27a9a49d374b6d17914e7614926d4f461aa72fe7ff891609cd97a7ec1e37b"
+    },
+    {
+      "id": "206",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_206.png",
+      "sha256": "b33b06e834a5cb28acde52ed4ad13fd4e9081707ff575884c65be3b4861af6d2",
+      "source_sha256": "ca6c543796f33b6170758996647c9c2d0c9c359d5d64ca8dfa4e4f962b5d95b8"
+    },
+    {
+      "id": "206",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_206.png",
+      "sha256": "7e418351c129dfcc5552fe0ddecdcb22d9ca9be0433899412b9d9944d4c5314d",
+      "source_sha256": "7238054d72af8917d31f523d2c415eb112a353dae7df6ae6720ac830a157d7c5"
+    },
+    {
+      "id": "207",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_207.png",
+      "sha256": "5a8c2c62e75a429c6bbb3b6b12f52d8c3011dfc1ed5684b0ec8ae6ad1b14ee66",
+      "source_sha256": "14a583e7e7542e5ef02ccd3e056ea998b0d65305338b955e1bb859a3f71ab038"
+    },
+    {
+      "id": "207",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_207.png",
+      "sha256": "191e7f585233bc4e1d3b1b83cd844a2f20bd235c64aeb09370b065948df869cd",
+      "source_sha256": "b69193672d0ddf09c009c90d646a6e05d462e13c0e914470fd90d318e19939e5"
+    },
+    {
+      "id": "209",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_209.png",
+      "sha256": "c95b9912549a27da04680e8e05c1b156fe769601072136141b5b3d9d91b0daee",
+      "source_sha256": "831ff79fcddfbcd29f33cbba457894c5f96d1d7d6ea487dd9491a22669fdba20"
+    },
+    {
+      "id": "209",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_209.png",
+      "sha256": "8c19df62b8ea505efe6fd45aebdd1763a82e5551be97775df1a86e1cba10738b",
+      "source_sha256": "326f39ed370e0a21748d405862f92f189a73a492c770a7a9a3f568d3ad4b6aa1"
+    },
+    {
+      "id": "213",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_213.png",
+      "sha256": "1f3875f672ba8dd9c636dfccf2dce4557beba6592611aca75cc8104106b1bb36",
+      "source_sha256": "7a0977eb3cdd6f7807d3fa64fd6d4263c16d7845a06706b7a78125077e02776e"
+    },
+    {
+      "id": "213",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_213.png",
+      "sha256": "207b9be44ba7f757f0f8909fd112b5b1928098da3f6979a0482aac1eda2c4304",
+      "source_sha256": "b9e38bb8b7d2728e94b5b3e3089b21172e2245a153e733e55579555ed2369720"
+    },
+    {
+      "id": "214",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_214.png",
+      "sha256": "9d1112b7b1273bc035670fba98bd074489b94d31a09e623190ea3aea26c68f08",
+      "source_sha256": "5f5331c6e9f9b60e6c56e7374585c668ce42a4b47136d3b6d0242a9d30687dcb"
+    },
+    {
+      "id": "214",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_214.png",
+      "sha256": "95688785d51dafe045b9b76b0e2a90337a7d609112951c0832a9ebcc4016b563",
+      "source_sha256": "25f5c7dcf0f7590167a9adb1d82194cfeb4142dd01f15bf8f909c77eeff1766c"
+    },
+    {
+      "id": "215",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_215.png",
+      "sha256": "a410c052910fdc1eef132f509d72ad1ea149ab45506c7e1d4ad74aa129f93865",
+      "source_sha256": "a118104baff402c8fe471f3007d7229b39c2f50ad865154bc3256ca8aabf32fc"
+    },
+    {
+      "id": "215",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_215.png",
+      "sha256": "489cacb428745e5be745664f545bdebfdce945c28ace49ae1bf728c9658b35da",
+      "source_sha256": "89594d115e45b22beb7e4ebf3adcff1a77fda0172b997638fbafdb08a871e305"
+    },
+    {
+      "id": "225",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_225.png",
+      "sha256": "981f7db412720cdfacdc7b49d888596170fd94ba2d38dd0d6283cc6b6b799901",
+      "source_sha256": "107c29b909393f5f6a890980fb75970771e155da63668cf7d36d89980a319b8c"
+    },
+    {
+      "id": "225",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_225.png",
+      "sha256": "085b7a27dcc0bde58c824676931d22b6566650ca55e969ca569e747a8be2023b",
+      "source_sha256": "22bcf7cc6a30e53a72894df89ce1dd460260e32bb59aaaf3cc87221648c7f22b"
+    },
+    {
+      "id": "3100",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_3100.png",
+      "sha256": "9e5d19753e3d2bfc59cdc587762e78890f602699b8295f4450cf66e7a0dd4708",
+      "source_sha256": "347d224a06c0fbbbf31d118e13677b885968c7c776e1803e106bc87ecb8526f4"
+    },
+    {
+      "id": "3100",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_3100.png",
+      "sha256": "86190bacc6edf24cf8e27b07383b4d0077e83206492d7c1c366c4ee5d03aaebe",
+      "source_sha256": "2c178bea1c41a7c0e4c1def6f5ce9651b44936132a061746118a8999c16de550"
+    },
+    {
+      "id": "3101",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_3101.png",
+      "sha256": "e9a9ea4c02941d0b19d672990c13e59e039006a4cd1fa6118a89b2e3e1ef5d02",
+      "source_sha256": "9c3fad9078708d574944b7847d36dbe4bf4906bffaf12564c4367386b4bfc385"
+    },
+    {
+      "id": "3101",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_3101.png",
+      "sha256": "155f7e20f3aafb30b30e25b0a0de731d8f9ed6f2f6179809f65c71adb4ccbd1c",
+      "source_sha256": "57a02515250937e82bcf200840d246ce87f0ddae4ecfaac10818fd04089453fe"
+    },
+    {
+      "id": "3102",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_3102.png",
+      "sha256": "505937f8141bceca729f78e1277ddee684529d033459a1718a5a6ad94455aea8",
+      "source_sha256": "41e8c6069320beb1d04d03a13b04836f6c81d70a027ebda8c5cb9e91e13268e5"
+    },
+    {
+      "id": "3102",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_3102.png",
+      "sha256": "be678ab0744374d86dfb23ea81850a717829a47c570b3c5a121fbc951d9928ff",
+      "source_sha256": "6808df8ee0ae4813db39bffa2438747d73248726cf7f4d10726d966c73393b08"
+    },
+    {
+      "id": "3103",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_3103.png",
+      "sha256": "49745a86996bb027e49d664bf873248c984899827afebc07bf2feff1deae998b",
+      "source_sha256": "6d979406eeb3a1349cd9430589fd78a09b7177b717edcc097e488c6255538ad0"
+    },
+    {
+      "id": "3103",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_3103.png",
+      "sha256": "cf2364ab160473f8a801d0642484d3c29fdbc85c2c77a5a98590fa6eabe6195f",
+      "source_sha256": "86ed42f1bdc707c7101f48e944a51577c85559acef1bd0a7226a18242d308ff3"
+    },
+    {
+      "id": "player_heroine",
+      "kind": "sd",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_player_heroine.png",
+      "sha256": "3c5d913a8fba027ede7d653a53a1cb90b99e05f0ff6d746e4eb3023975b76912",
+      "source_sha256": "02822d2eb9b348427a8abef80d5229676fd29e9eee548e1f209bb9e865c842ca"
+    },
+    {
+      "id": "player_heroine",
+      "kind": "standing",
+      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_player_heroine.png",
+      "sha256": "5f648899cef7941abd5b9a9ad92c2203a2aa57d16e6de8ef0699899bf4880fc9",
+      "source_sha256": "b961b98bd996ec179ddf8421873311ad43de45fb745add7bc9c4f50993d866c2"
+    }
+  ]
+}
