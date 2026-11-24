@@ -1327,13 +1327,16 @@ namespace YGOPortable.Editor
             }
         }
 
-        internal static DuelSession StartSeedMatching(string label, uint[] main0, uint[] extra0, uint[] main1, uint[] extra1, bool humanFirst, Func<DuelSession, bool> setupAndCheck, int maxSeeds = 600)
+        internal static DuelSession StartSeedMatching(string label, uint[] main0, uint[] extra0, uint[] main1,
+            uint[] extra1, bool humanFirst, Func<DuelSession, bool> setupAndCheck, int maxSeeds = 600,
+            UserDeck playerDeckAppearance = null)
         {
             for (uint seedBase = 1; seedBase <= maxSeeds; seedBase++)
             {
                 var session = new DuelSession();
                 ulong[] seed = { seedBase * 29 + 101, seedBase * 47 + 7, seedBase * 71 + 13, seedBase * 97 + 3 };
-                AssertTrue(session.StartNewDuel(main0, extra0, main1, extra1, humanFirst, 8000, seed), $"{label}: StartNewDuel failed");
+                AssertTrue(session.StartNewDuel(main0, extra0, main1, extra1, humanFirst, 8000, seed,
+                    playerDeckAppearance), $"{label}: StartNewDuel failed");
                 if (setupAndCheck(session)) return session;
                 session.Dispose();
             }

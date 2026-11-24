@@ -437,9 +437,11 @@ namespace YGOPortable.Editor
             var main = Enumerable.Repeat(MoYe, 20).Concat(Enumerable.Repeat(Longyuan, 20)).ToArray();
             var otherMain = Enumerable.Repeat(20721928u, 40).ToArray();
             var synchroExtra = new[] { 44508094u, 96633955u, Chixiao };
+            var styledDeck = new UserDeck { main = main.ToList(), extra = synchroExtra.ToList() };
+            styledDeck.SetAppearance(styledDeck.extra, 2, new DeckCardAppearance { overframe = true });
             using var duel = YgoProjectBuilder.StartSeedMatching("Zone browser Synchro", main, synchroExtra, otherMain, ExtraDeck, true,
                 session => session.Players[0].hand.Any(card => card.code == MoYe) &&
-                           session.Players[0].hand.Any(card => card.code == Longyuan));
+                           session.Players[0].hand.Any(card => card.code == Longyuan), playerDeckAppearance: styledDeck);
             Action<byte[]> submit = duel.SubmitResponse;
             using var ui = new Browser(duel, bytes => submit(bytes), mobileLayout);
             var mine = duel.Players[0];
@@ -1137,7 +1139,8 @@ namespace YGOPortable.Editor
                     VerifyOpened(prompt, all.Select(card => card.code));
                     var preview = VisibleCards.Single(card => card.CurrentCode == Chixiao).transform.parent.parent;
                     Click(preview.GetComponent<Button>());
-                    Require(Modals.IsZoneViewerOpen && InspectedCode == Chixiao && ReferenceEquals(_duel.ActivePrompt, prompt) &&
+                    Require(Modals.IsZoneViewerOpen && Private<uint>(Field, "_inspectedCode") == Chixiao &&
+                        ReferenceEquals(_duel.ActivePrompt, prompt) &&
                         !preview.Find("Act/B") && VisibleCards.Single(card => card.CurrentCode == blocked.code)
                             .transform.parent.parent.Find("Act/B"),
                         "The full list exposed a summon or failed to retain a separate Extra Deck effect.");
@@ -1145,6 +1148,7 @@ namespace YGOPortable.Editor
 
                     ClickAt((RectTransform)summonButton.transform, pointerId: 0);
                     VerifyOpened(prompt, legal);
+                    VerifyPrintedSummonCard(prompt);
                     Require(VisibleCards.All(card => card.transform.parent.parent.Find("Act/B")
                             .GetComponentInChildren<Text>().text == "특수 소환"),
                         "The summon list did not show only Special Summon buttons.");
@@ -1218,6 +1222,7 @@ namespace YGOPortable.Editor
                 Field.Refresh();
                 ClickAt((RectTransform)Private<Button>(Field, "_extraSummonButton").transform, pointerId: 0);
                 VerifyOpened(prompt, legal);
+                VerifyPrintedSummonCard(prompt);
                 var target = (RectTransform)VisibleCards.Single(card => card.CurrentCode == Chixiao).transform.parent.parent;
                 DeckPadUi.ScrollTo(target.GetComponent<Button>());
                 ClickAt(target, pointerId: 0);
@@ -1241,6 +1246,29 @@ namespace YGOPortable.Editor
                 ClickAt((RectTransform)action.transform, pointerId: 0);
                 Require(!Modals.IsZoneViewerOpen && !ReferenceEquals(_duel.ActivePrompt, prompt),
                     "Confirming the selected mobile summon did not advance the native duel.");
+            }
+
+            private void VerifyPrintedSummonCard(DuelPrompt prompt)
+            {
+                var card = VisibleCards.Single(view => view.CurrentCode == Chixiao);
+                Require(card.Appearance?.overframe == true && !card.HasOverframe &&
+                    card.transform.Find("AspectBox/DeckEdition").gameObject.activeSelf &&
+                    VisibleCards.All(view => view == card || view.Appearance?.overframe != true),
+                    "The summon picker expanded the Overframe or lost the assigned edition.");
+
+                Click(card.transform.parent.parent.GetComponent<Button>());
+                var inspector = Private<CompositeCardView>(Field, "_inspCard");
+                Require(inspector.CurrentCode == Chixiao && inspector.Appearance?.overframe == true &&
+                    !inspector.HasOverframe && inspector.ArtworkSprite == card.ArtworkSprite,
+                    "The summon list and inspector did not show the same printed face.");
+                Click(Private<Button>(Modals, "_zoneDetailsButton"));
+                var zoom = Private<CompositeCardView>(Field, "_zoomCardView");
+                Require(zoom.gameObject.activeInHierarchy && zoom.Appearance?.overframe == true &&
+                    !zoom.HasOverframe && zoom.ArtworkSprite == card.ArtworkSprite,
+                    "The card details changed the selected summon candidate's printed face.");
+                Click(Private<Button>(Field, "_zoomCloseButton"));
+                Require(Modals.IsZoneViewerOpen && ReferenceEquals(_duel.ActivePrompt, prompt),
+                    "Reading the Overframe card disrupted the pending summon.");
             }
 
             internal void SelectSynchroMaterials(DuelPrompt prompt)

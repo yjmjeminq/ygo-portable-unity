@@ -800,6 +800,12 @@ namespace YGOPortable.Editor
                 !hand.HasOverframe && hand.transform.Find("AspectBox/DeckEdition") == null &&
                 ((Color32)front.sprite.texture.GetPixel(0, 0)).Equals(new Color32(213, 68, 147, 255)),
                 "The hand or editor did not display the original colors under the transparent render mask.");
+            var detailFace = details.transform.Find("AspectBox/OverframeCardFace");
+            var layers = detailFace.parent;
+            Require(detailFace.GetSiblingIndex() > layers.Find("CardTitle").GetSiblingIndex() &&
+                detailFace.GetSiblingIndex() > layers.Find("Rules").GetSiblingIndex() &&
+                detailFace.GetSiblingIndex() < layers.Find("CardBack").GetSiblingIndex(),
+                "The complete source face drew behind the composed card labels or above the sleeve.");
 
             details.SetDeckCard(dominusImpulse, default(DeckCardAppearance));
             Require(details.ArtworkSprite != front.sprite &&

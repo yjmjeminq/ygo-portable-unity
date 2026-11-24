@@ -670,7 +670,8 @@ namespace YGOPortable.UI
             if (sprite != null && _sourceFace == null)
             {
                 var face = DuelUiKit.FillRect("OverframeCardFace", _artImg.transform.parent);
-                face.SetSiblingIndex(_artImg.transform.GetSiblingIndex());
+                // The supplied face includes its own rules and title. Only badges and the sleeve go above it.
+                face.SetSiblingIndex(_limitImg.transform.GetSiblingIndex());
                 _sourceFace = DuelUiKit.AddImage(face.gameObject, null, Color.white, false, false);
             }
             if (_sourceFace == null) return;
