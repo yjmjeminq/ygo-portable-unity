@@ -128,12 +128,22 @@ namespace YGOPortable.Editor
                 AssertTrue(DeckRepository.PresetDecks.All(deck => deck.sigCard != 0 &&
                     (deck.main.Contains(deck.sigCard) || deck.extra.Contains(deck.sigCard))),
                     "A preset deck displayed an ace that is not in its main or Extra Deck.");
-                var portraits = DeckRepository.Characters.Select(DuelUiKit.LoadOpponentPortrait).ToArray();
-                AssertTrue(portraits.All(sprite => sprite != null) &&
-                    portraits.Count(sprite => sprite != DuelProfileArt.Player) >= 250,
-                    "The opponent roster did not resolve its ace portraits.");
+                int featuredPortraits = 0, placeholders = 0;
+                foreach (var character in DeckRepository.Characters)
+                {
+                    var portrait = DuelUiKit.LoadOpponentPortrait(character);
+                    var dedicated = DuelUiKit.LoadSprite($"Duel/Characters/{character.id}");
+                    AssertTrue(portrait != null && portrait == (dedicated ?? DuelProfileArt.MissingOpponent),
+                        $"The opponent portrait came from an unexpected source for {character.name}.");
+                    if (dedicated != null) featuredPortraits++;
+                    else placeholders++;
+                }
+                AssertTrue(featuredPortraits >= 143, $"The portrait catalog loaded only {featuredPortraits} character portraits.");
+                var missingPortrait = new OpponentCharacter { id = int.MaxValue, portraitCard = DeckRepository.PresetDecks[0].sigCard };
+                AssertTrue(DuelUiKit.LoadOpponentPortrait(missingPortrait) == DuelProfileArt.MissingOpponent,
+                    "An opponent without a character portrait used its ace card.");
                 VerifyOpponentNavigation(canvas);
-                Debug.Log($"[VERIFY OPPONENT SELECTION] {portraits.Length} avatars, mouse and controller flow, and turn-order selection passed.");
+                Debug.Log($"[VERIFY OPPONENT SELECTION] {featuredPortraits} character portraits, {placeholders} placeholders, navigation and turn-order selection passed.");
                 exit = 0;
             }
             catch (Exception error) { Debug.LogException(error); }
@@ -523,9 +533,9 @@ namespace YGOPortable.Editor
 
             var yugiPortrait = DuelUiKit.LoadOpponentPortrait(DeckRepository.GetCharacter(104));
             var kaibaPortrait = DuelUiKit.LoadOpponentPortrait(DeckRepository.GetCharacter(94));
-            AssertTrue(yugiPortrait != null && kaibaPortrait != null && yugiPortrait != DuelProfileArt.Player &&
-                kaibaPortrait != DuelProfileArt.Player && yugiPortrait != kaibaPortrait,
-                "The first two opponents did not show distinct ace portraits.");
+            AssertTrue(yugiPortrait == DuelUiKit.LoadSprite("Duel/Characters/104") &&
+                kaibaPortrait == DuelUiKit.LoadSprite("Duel/Characters/94") && yugiPortrait != kaibaPortrait,
+                "Yugi and Kaiba did not show their character portraits.");
 
             var canvas = new GameObject("Opponent Roster Test", typeof(Canvas));
             try
@@ -594,11 +604,15 @@ namespace YGOPortable.Editor
                     "The opponent controller focus should start on the selected character.");
                 var secondCell = ui.Root.transform.Find(grid + "/GridArea/CharSlot_0_1");
                 var nextOpponent = CollectionProgress.AvailableOpponents[1];
+                AssertTrue(secondCell.Find("Portrait").GetComponent<Image>().sprite == DuelUiKit.LoadOpponentPortrait(nextOpponent),
+                    "The opponent list did not bind the character portrait.");
                 events.SetSelectedGameObject(secondCell.gameObject);
                 AssertTrue(!ui.IsDeckSetupOpen, "Moving focus opened the matchup before confirming the opponent.");
                 Submit(secondCell.GetComponent<Button>());
                 var preview = ui.Root.GetComponentInChildren<CompositeCardView>();
                 var levels = OpponentDeckLevels.GetDecks(nextOpponent.id);
+                AssertTrue(ui.Root.transform.Find("DuelSetup/OpponentDeck/Portrait").GetComponent<Image>().sprite ==
+                    DuelUiKit.LoadOpponentPortrait(nextOpponent), "The matchup did not bind the character portrait.");
                 AssertTrue(ui.IsDeckSetupOpen && preview.CurrentCode == levels[0].sigCard,
                     "Confirming the opponent should show its first deck.");
                 Submit(ButtonAt(ui.Root, "DuelSetup/OpponentDeck/PreviousDeck/B"));

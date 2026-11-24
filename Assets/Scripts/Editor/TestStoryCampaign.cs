@@ -98,10 +98,16 @@ namespace YGOPortable.Editor
                 Require(detail.Find("OpponentName/Label").GetComponent<Text>().text.Contains("어둠의 유우기") &&
                     detail.Find("OpponentDeck/Label").GetComponent<Text>().text.Contains("Lv.") &&
                     !Control(detail, "StartEpisode").IsInteractable(), "Selecting a distant locked episode did not refresh its profile and deck.");
+                var finalePortrait = DuelUiKit.LoadSprite("Duel/Characters/104");
+                Require(finalePortrait != null && detail.Find("OpponentPortrait").GetComponent<Image>().sprite == finalePortrait,
+                    "The episode detail did not show Yugi's character portrait.");
                 scroll.verticalNormalizedPosition = 1f;
                 Control(scroll.content, "Episode_1").onClick.Invoke();
                 Control(detail, "StartEpisode").onClick.Invoke();
                 var scene = dialogue.Find("Scene");
+                Require(scene.Find("Opponent").GetComponent<Image>().sprite ==
+                    detail.Find("OpponentPortrait").GetComponent<Image>().sprite,
+                    "The dialogue did not use the selected episode's character portrait.");
                 var line = scene.Find("DialogueBox/Text/Label").GetComponent<Text>();
                 Require(line.text.Length == 0, "The dialogue did not start in the typewriter state.");
                 story.Update(.15f);
