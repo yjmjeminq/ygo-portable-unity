@@ -25,6 +25,7 @@ else:
 PROJECT = Path(__file__).resolve().parents[1]
 WORKFLOW = "ios-ipa-windows-export.yml"
 BUNDLE_ID = "com.ygoportable.lotd"
+KOREA_TIME = datetime.timezone(datetime.timedelta(hours=9))
 ROSTER_FILES = ("opponents_db.json", "opponent_deck_levels.json")
 
 
@@ -44,6 +45,15 @@ def git(*args, check=True, stdin=None):
         input=stdin, encoding="utf-8", errors="replace", capture_output=True,
         env={**os.environ, "GIT_TERMINAL_PROMPT": "0"}, timeout=90, check=check,
     )
+
+
+def local_build_folder(key):
+    result = git("config", "--local", "--get", key, check=False)
+    if result.returncode == 1:
+        return None
+    result.check_returncode()
+    value = result.stdout.strip()
+    return Path(value).expanduser() if value else None
 
 
 class GitHub:
@@ -244,7 +254,29 @@ def verify_ipa(ipa, snapshot):
                 raise BuildError(f"IPA에 포함된 {name} 파일이 작업 폴더와 다릅니다.")
 
 
-def build(editor, github, branch, revision, scratch, local_cutins=None, local_interface=None):
+def ipa_filename(run_number, stamp, full=False):
+    edition = "-full" if full else ""
+    return f"YGO-Portable-unsigned{edition}-run{run_number}-{stamp}-KST.ipa"
+
+
+def save_verified_ipa(source, destination):
+    if destination.exists():
+        raise BuildError(f"같은 이름의 IPA가 이미 있습니다. {destination}")
+    temporary = tempfile.NamedTemporaryFile(prefix=f".{destination.stem}-", suffix=".part",
+                                            dir=destination.parent, delete=False)
+    partial = Path(temporary.name)
+    try:
+        with temporary, source.open("rb") as data:
+            shutil.copyfileobj(data, temporary, length=4 * 1024 * 1024)
+            temporary.flush()
+            if temporary.tell() != source.stat().st_size:
+                raise BuildError(f"IPA 복사본의 크기가 원본과 일치하지 않습니다. {destination}")
+        partial.rename(destination)
+    finally:
+        partial.unlink(missing_ok=True)
+
+
+def build(editor, github, branch, revision, scratch, local_cutins=None, local_interface=None, drive_folder=None):
     visuals = {}
     if local_cutins:
         visuals.update(prepare_local_visuals(local_cutins))
@@ -267,7 +299,7 @@ def build(editor, github, branch, revision, scratch, local_cutins=None, local_in
     github.download_artifact(run, "YGO-iOS-native-library", library)
 
     print("[3/5] Unity에서 현재 작업 파일을 iOS 프로젝트로 내보냅니다.")
-    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    stamp = datetime.datetime.now(KOREA_TIME).strftime("%Y%m%d-%H%M%S")
     log = PROJECT / "Logs" / f"ipa-{stamp}-{scratch.name}.log"
     log.parent.mkdir(exist_ok=True)
     xcode = scratch / "Xcode"
@@ -304,17 +336,18 @@ def build(editor, github, branch, revision, scratch, local_cutins=None, local_in
     verify_ipa(ipa, snapshot)
     out_dir = PROJECT / "Builds/iOS/IPA"
     out_dir.mkdir(parents=True, exist_ok=True)
-    destination = out_dir / f"YGO-Portable-unsigned-{stamp}-run{run['run_number']}.ipa"
-    partial = destination.with_suffix(".ipa.part")
-    try:
-        shutil.copyfile(ipa, partial)
-        partial.replace(destination)
-    finally:
-        partial.unlink(missing_ok=True)
+    destination = out_dir / ipa_filename(run["run_number"], stamp, full=bool(local_cutins))
+    save_verified_ipa(ipa, destination)
     print(f"\n완료 {destination}")
     artifact_label = "GitHub 기본 빌드" if visuals else "GitHub 다운로드"
     print(f"{artifact_label} https://github.com/{github.repository}/actions/runs/{run['id']}/artifacts/{artifact_id}")
     print("아이폰에서 기존 방식으로 서명해 설치하는 미서명 IPA입니다.")
+    if drive_folder is not None:
+        if not drive_folder.is_dir():
+            raise BuildError(f"로컬 IPA 저장 완료. Google Drive 폴더를 연결한 뒤 복사하세요. {drive_folder}")
+        drive_copy = drive_folder / destination.name
+        save_verified_ipa(destination, drive_copy)
+        print(f"Google Drive 동기화 폴더에 저장 {drive_copy}")
 
 
 def main():
@@ -330,13 +363,20 @@ def main():
     print("[1/5] Unity iOS 모듈과 GitHub 연결을 확인합니다.")
     editor, github, branch, revision = prepare()
     print(f"    {github.repository} / {branch} / {revision[:7]}")
+    drive_folder = local_build_folder("ygo.ipaDriveFolder")
+    local_cutins = options.local_cutins or local_build_folder("ygo.ipaDuelVisuals")
+    if local_cutins is not None:
+        print(f"    풀버전 에셋 폴더 {local_cutins}")
+    if drive_folder is not None:
+        drive_status = "연결됨" if drive_folder.is_dir() else "연결 필요"
+        print(f"    Google Drive 폴더 {drive_folder} ({drive_status})")
     if options.check:
         print("준비 확인 완료")
         return
     temp_root = Path(tempfile.gettempdir()).resolve()
     scratch = Path(tempfile.mkdtemp(prefix="ygo-ipa-", dir=temp_root)).resolve()
     try:
-        build(editor, github, branch, revision, scratch, options.local_cutins, options.local_interface)
+        build(editor, github, branch, revision, scratch, local_cutins, options.local_interface, drive_folder)
     finally:
         # Remove only the temporary directory allocated for this build.
         if scratch.resolve().parent == temp_root and scratch.name.startswith("ygo-ipa-"):
