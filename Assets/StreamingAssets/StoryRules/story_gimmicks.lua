@@ -203,9 +203,11 @@ YgoStory={
     addAttack=addAttack,
 }
 
+local modules={"story_gx.lua","story_5ds.lua"}
 function YgoStoryConfigure(rule,human)
-    if not rules[rule] and not Duel.LoadScript("story_gx.lua") then
-        error("Could not load GX story rules.")
+    for _,module in ipairs(modules) do
+        if rules[rule] then break end
+        if not Duel.LoadScript(module) then error("Could not load story rules: "..module) end
     end
     local install=rules[rule]
     if not install then return false end

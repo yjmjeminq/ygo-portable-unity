@@ -12,7 +12,7 @@ namespace YGOPortable.Editor
         private static void VerifyGxScenarioEffects()
         {
             const uint sparkman = 20721928, raigeki = 12580477, darkHole = 53129443;
-            using (var ancientGear = new GxDuel("ancient_gear", playerCard: sparkman))
+            using (var ancientGear = new ScenarioDuel("ancient_gear", playerCard: sparkman))
             {
                 ancientGear.Duel.SubmitResponseInt(3);
                 ancientGear.Drive(() => InMain(ancientGear.Duel, 1));
@@ -25,7 +25,7 @@ namespace YGOPortable.Editor
                 Require(ancientGear.Player.lp == 6400 && ancientGear.Player.mzone.All(card => card == null),
                     "Ancient Gear Golem did not inflict piercing damage against 1400 defense.");
             }
-            using (var ojama = new GxDuel("ojama_trio", playerCard: darkHole))
+            using (var ojama = new ScenarioDuel("ojama_trio", playerCard: darkHole))
             {
                 Require(new[] { 0, 2, 4 }.All(i => ojama.Player.mzone[i] is { code: >= 29843092 and <= 29843094 } card &&
                     card.IsDefense), "Three Ojama Tokens did not occupy the player's zones.");
@@ -33,7 +33,7 @@ namespace YGOPortable.Editor
                 Require(ojama.Player.mzone.All(card => card == null) && ojama.Player.lp == 7100,
                     "Destroying the Ojamas did not free the three zones and inflict the normal penalty.");
             }
-            using (var elements = new GxDuel("six_attributes", playerCard: 13039848))
+            using (var elements = new ScenarioDuel("six_attributes", playerCard: 13039848))
             {
                 Require(elements.Duel.ActivePrompt.summonable.Count == 0 && elements.Duel.ActivePrompt.mSetable.Count == 0,
                     "Earth summons and sets were legal on the first turn.");
@@ -41,7 +41,7 @@ namespace YGOPortable.Editor
                 Require(elements.Duel.ActivePrompt.summonable.Count == 6,
                     "The second player's turn still blocked Earth after the element changed to Water.");
             }
-            using (var helios = new GxDuel("helios_alchemy"))
+            using (var helios = new ScenarioDuel("helios_alchemy"))
             {
                 Require(helios.Rival.mzone.Any(card => card is { code: 54493213, attack: 300 }) &&
                     helios.Player.banished.Count == 1, "Helios did not gain 300 ATK from the first banished monster.");
@@ -49,7 +49,7 @@ namespace YGOPortable.Editor
                 Require(helios.Rival.mzone.Any(card => card is { code: 54493213, attack: 600 }) &&
                     helios.Rival.banished.Count == 1, "Helios did not grow with the next banished monster.");
             }
-            using (var vampires = new GxDuel("vampire_pact", rivalCard: darkHole, humanFirst: false))
+            using (var vampires = new ScenarioDuel("vampire_pact", rivalCard: darkHole, humanFirst: false))
             {
                 vampires.Activate(darkHole);
                 Require(vampires.Rival.grave.Any(card => card.code == 53839837), "Dark Hole did not destroy its controller's Vampire Lord.");
@@ -57,7 +57,7 @@ namespace YGOPortable.Editor
                 Require(vampires.Rival.mzone.Any(card => card?.code == 53839837),
                     "The scenario did not revive its own destroyed Vampire Lord.");
             }
-            using (var amazoness = new GxDuel("amazoness_colosseum", humanFirst: false))
+            using (var amazoness = new ScenarioDuel("amazoness_colosseum", humanFirst: false))
             {
                 amazoness.NextMain(2);
                 Require(amazoness.Duel.ActivePrompt.mSetable.Count == 0, "The arena allowed a face-down Defense Position set.");
@@ -66,7 +66,7 @@ namespace YGOPortable.Editor
                     "The arena allowed the player to skip an available attack.");
             }
             var ravielOpening = new DuelOpening(8000, 5, 69890967);
-            using (var beasts = new GxDuel("sacred_beasts", playerCard: raigeki, rivalOpening: ravielOpening))
+            using (var beasts = new ScenarioDuel("sacred_beasts", playerCard: raigeki, rivalOpening: ravielOpening))
             {
                 beasts.Activate(raigeki);
                 Require(beasts.Rival.mzone.Count(card => card != null) == 3, "Each Sacred Beast must survive its first destruction.");
@@ -78,7 +78,7 @@ namespace YGOPortable.Editor
             var arcanaFaces = (Upright: false, Reversed: false);
             for (ulong seed = 11; seed < 30 && (!arcanaFaces.Upright || !arcanaFaces.Reversed); seed++)
             {
-                using var arcana = new GxDuel("arcana_fate", seed: seed);
+                using var arcana = new ScenarioDuel("arcana_fate", seed: seed);
                 string toss = arcana.Duel.Logs.FirstOrDefault(log => log.Contains("코인 토스"));
                 Require(toss != null, "The native Arcana coin toss did not occur.");
                 bool upright = toss.EndsWith("앞면", StringComparison.Ordinal);
@@ -87,14 +87,14 @@ namespace YGOPortable.Editor
                 arcanaFaces = (arcanaFaces.Upright || upright, arcanaFaces.Reversed || !upright);
             }
             Require(arcanaFaces.Upright && arcanaFaces.Reversed, "The seeds did not exercise both results of the Arcana coin toss.");
-            using (var plasma = new GxDuel("plasma", playerCard: 28985331))
+            using (var plasma = new ScenarioDuel("plasma", playerCard: 28985331))
             {
                 plasma.NormalSummon();
                 Require(plasma.Player.mzone.Single(card => card != null).effectsDisabled,
                     "The player's on-field monster effect remained enabled under Plasma.");
             }
             const uint crow = 24508238, upstart = 70368879;
-            using (var plasma = new GxDuel("plasma", playerCard: crow, rivalCard: upstart, humanFirst: false))
+            using (var plasma = new ScenarioDuel("plasma", playerCard: crow, rivalCard: upstart, humanFirst: false))
             {
                 plasma.Activate(upstart);
                 plasma.NextMain(2);
@@ -103,14 +103,14 @@ namespace YGOPortable.Editor
                     plasma.Rival.grave.Any(card => card.code == upstart) && plasma.Rival.banished.Count == 0,
                     "Plasma did not negate the effect activated in hand after the player paid its discard cost.");
             }
-            using (var shock = new GxDuel("shock_collar", playerCard: raigeki,
+            using (var shock = new ScenarioDuel("shock_collar", playerCard: raigeki,
                 rivalOpening: new DuelOpening(8000, 5, sparkman)))
             {
                 shock.Activate(raigeki);
                 Require(shock.Rival.lp == 7700 && shock.Player.lp == 8000,
                     "The collar did not shock the controller of the destroyed monster.");
             }
-            using (var venom = new GxDuel("venom_counters"))
+            using (var venom = new ScenarioDuel("venom_counters"))
             {
                 venom.NormalSummon();
                 var poisoned = venom.Player.mzone.Single(card => card != null);
@@ -118,7 +118,7 @@ namespace YGOPortable.Editor
                     "The summoned monster did not get a native Venom counter and lose 500 ATK.");
             }
             VerifyFossilFusion();
-            using (var crystals = new GxDuel("crystal_beasts", playerCard: 5318639))
+            using (var crystals = new ScenarioDuel("crystal_beasts", playerCard: 5318639))
             {
                 const uint continuousSpell = YgoConstants.TYPE_SPELL | YgoConstants.TYPE_CONTINUOUS;
                 var opening = crystals.Rival.szone.Where(card => card != null).ToArray();
@@ -129,32 +129,32 @@ namespace YGOPortable.Editor
                 Require(crystals.Rival.grave.Any(card => card.code == opening[0].code),
                     "Mystical Space Typhoon could not destroy the crystallized monster card.");
             }
-            using (var martel = new GxDuel("possessed_beasts"))
+            using (var martel = new ScenarioDuel("possessed_beasts"))
             {
                 martel.NextMain(2);
                 Require(martel.Rival.mzone.Count(card => card != null) == 1 &&
                     martel.Rival.mzone.Any(card => card?.code == 43378048) && martel.Rival.banished.Count == 3,
                     "Martel did not use the three actual Sacred Beasts to summon Armityle.");
             }
-            using (var disrupted = new GxDuel("possessed_beasts", playerCard: raigeki))
+            using (var disrupted = new ScenarioDuel("possessed_beasts", playerCard: raigeki))
             {
                 disrupted.Activate(raigeki);
                 disrupted.NextMain(2);
                 Require(disrupted.Rival.mzone.All(card => card?.code != 43378048),
                     "Martel still fused after the player destroyed the materials.");
             }
-            using (var king = new GxDuel("supreme_king_fusion", playerCard: 87910978,
+            using (var king = new ScenarioDuel("supreme_king_fusion", playerCard: 87910978,
                 rivalOpening: new DuelOpening(8000, 5, 86165817)))
                 Require(king.Duel.ActivePrompt.activatable.All(card => card.code != 87910978),
                     "Brain Control could target the Supreme King's face-up Fiend.");
-            using (var yubel = new GxDuel("super_polymerization_countdown"))
+            using (var yubel = new ScenarioDuel("super_polymerization_countdown"))
             {
-                yubel.Drive(() => yubel.Duel.IsFinished);
+                yubel.Drive(() => yubel.Duel.IsFinished, endTurn: true);
                 Require(yubel.Duel.TurnNumber == 10 && yubel.Duel.Winner == yubel.Duel.AiPlayerIndex &&
                     yubel.Duel.WinReason == StoryGimmickRuntime.CountdownWinReason, "Yubel's ten-turn limit did not end the duel.");
             }
             VerifyDarknessCombo();
-            using (var graduation = new GxDuel("graduation_duel",
+            using (var graduation = new ScenarioDuel("graduation_duel",
                 rivalOpening: new DuelOpening(8000, 5, 31111109)))
             {
                 graduation.NextMain(2);
@@ -176,7 +176,7 @@ namespace YGOPortable.Editor
             }).ToArray();
             for (ulong seed = 11; seed < 35; seed++)
             {
-                using var fossils = new GxDuel("fossil_fusion", playerDeck: opening, rivalExtra: new[] { skullKing }, seed: seed);
+                using var fossils = new ScenarioDuel("fossil_fusion", playerDeck: opening, rivalExtra: new[] { skullKing }, seed: seed);
                 Require(fossils.Rival.hand.Any(card => card.code == fossilFusion) &&
                     fossils.Rival.mzone.Any(card => card?.code == skullKing), "The Fossil duel did not guarantee its opening.");
                 if (!fossils.Duel.ActivePrompt.activatable.Any(card => card.code == burial) ||
@@ -198,7 +198,7 @@ namespace YGOPortable.Editor
         {
             for (ulong seed = 11; seed < 35; seed++)
             {
-                using var darkness = new GxDuel("darkness_zero_infinity", seed: seed,
+                using var darkness = new ScenarioDuel("darkness_zero_infinity", seed: seed,
                     rivalOpening: new DuelOpening(8000, 5, 60417395));
                 var pieces = darkness.Rival.szone.Take(5).ToArray();
                 Require(pieces.All(card => card is { code: >= 511090101 and <= 511090105 } && !card.IsFaceUp),
@@ -224,7 +224,7 @@ namespace YGOPortable.Editor
         private static bool InMain(DuelSession duel, int turn) =>
             duel.TurnNumber == turn && duel.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD;
 
-        private sealed class GxDuel : IDisposable
+        private sealed class ScenarioDuel : IDisposable
         {
             internal DuelSession Duel { get; } = new();
             internal PlayerFieldSnapshot Player => Duel.Players[Duel.HumanPlayerIndex];
@@ -232,23 +232,25 @@ namespace YGOPortable.Editor
             private readonly TacticalAI _ai = new() { Difficulty = AIDifficulty.Easy };
             private readonly string _name;
 
-            internal GxDuel(string name, uint playerCard = 20721928, uint rivalCard = 20721928,
+            internal ScenarioDuel(string name, uint playerCard = 20721928, uint rivalCard = 20721928,
                 bool humanFirst = true, DuelOpening? rivalOpening = null, ulong seed = 41,
-                IReadOnlyList<uint> playerDeck = null, IReadOnlyList<uint> rivalExtra = null)
+                IReadOnlyList<uint> playerDeck = null, IReadOnlyList<uint> rivalExtra = null,
+                IReadOnlyList<uint> playerExtra = null)
             {
                 _name = name;
-                Require(Duel.StartNewDuel(playerDeck ?? Enumerable.Repeat(playerCard, 40).ToArray(), Array.Empty<uint>(),
+                Require(Duel.StartNewDuel(playerDeck ?? Enumerable.Repeat(playerCard, 40).ToArray(), playerExtra ?? Array.Empty<uint>(),
                     Enumerable.Repeat(rivalCard, 40).ToArray(), rivalExtra ?? Array.Empty<uint>(), humanFirst,
                     seed: new ulong[] { seed, unchecked(32 + (seed ^ 41UL) * 0x9E3779B97F4A7C15UL), 7, 11 },
                     opponentOpening: rivalOpening, storyGimmick: name), $"Could not start {name}.");
                 Drive(() => InMain(Duel, 1));
             }
 
-            internal void NormalSummon()
+            internal void NormalSummon(uint code = 0)
             {
-                Require(Duel.ActivePrompt.summonable.Count > 0, $"The test had no legal normal summon in {_name}.");
+                int index = Duel.ActivePrompt.summonable.FindIndex(card => code == 0 || card.code == code);
+                Require(index >= 0, $"The test had no legal normal summon in {_name}.");
                 int turn = Duel.TurnNumber;
-                Duel.SubmitResponseInt(0);
+                Duel.SubmitResponseInt(index << 16);
                 Drive(() => InMain(Duel, turn));
             }
 
@@ -263,7 +265,7 @@ namespace YGOPortable.Editor
                 Drive(() => InMain(Duel, turn), target: target);
             }
 
-            internal void Drive(Func<bool> stop, bool endTurn = false, uint target = 0)
+            internal void Drive(Func<bool> stop, bool endTurn = false, uint target = 0, uint acceptEffect = 0)
             {
                 for (int step = 0; step < 170 && !stop() && !Duel.IsFinished && Duel.RetryCount == 0; step++)
                 {
@@ -274,9 +276,12 @@ namespace YGOPortable.Editor
                         int index = prompt.candidates.FindIndex(card => card.code == target);
                         if (index >= 0) { Duel.SubmitResponse(DuelSession.PackCardSelection(index)); continue; }
                     }
-                    if (prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD && prompt.canEp &&
-                        (endTurn || _name == "super_polymerization_countdown")) Duel.SubmitResponseInt(7);
-                    else if (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN && !prompt.forced) Duel.SubmitResponseInt(-1);
+                    if (acceptEffect != 0 && prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && prompt.promptCardCode == acceptEffect)
+                        Duel.SubmitResponseInt(1);
+                    else if (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN && !prompt.forced)
+                        Duel.SubmitResponseInt(acceptEffect == 0 ? -1 : prompt.candidates.FindIndex(card => card.code == acceptEffect));
+                    else if (endTurn && prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD && prompt.canEp)
+                        Duel.SubmitResponseInt(7);
                     else Duel.SubmitResponse(_ai.ComputeResponse(Duel, prompt));
                 }
                 Require(stop() && Duel.RetryCount == 0, $"The {_name} test missed its checkpoint in turn {Duel.TurnNumber} " +

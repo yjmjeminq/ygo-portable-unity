@@ -37,6 +37,7 @@ namespace YGOPortable.Editor
                 nativeErrors.Clear();
                 VerifyDmScenarioEffects();
                 VerifyGxScenarioEffects();
+                Verify5DsScenarioEffects();
                 Require(nativeErrors.Count == 0, string.Join("\n", nativeErrors));
                 VerifyDialogueChoices(starter);
                 VerifyOpeningAndSave(save);
@@ -241,7 +242,7 @@ namespace YGOPortable.Editor
                         OpponentDeckLevels.GetDecks(episode.charId).Any(deck => deck.main?.Length >= 40),
                         $"Missing cast or decks for {episode.id}.");
                     var scripted = StoryGimmickRuntime.StartingCards(episode.gimmick);
-                    if (!(series == "gx" && !string.IsNullOrEmpty(episode.gimmick)) &&
+                    if (!((series is "gx" or "5ds") && !string.IsNullOrEmpty(episode.gimmick)) &&
                         episode.raidCard == 0 && episode.raidLife == 0 && scripted.Count == 0 &&
                         !StoryGimmickRuntime.IsRidingDuel(episode.gimmick)) continue;
                     StoryRaid? boss = episode.raidCard != 0 || episode.raidLife != 0 ?
@@ -295,7 +296,7 @@ namespace YGOPortable.Editor
             Require(duel.StartNewDuel(player, Array.Empty<uint>(), rival, extra ?? Array.Empty<uint>(), humanFirst,
                 seed: new ulong[] { 222, 17, 821, 909 }, opponentOpening: raid?.Opening, storyGimmick: gimmick),
                 $"Could not start the raid {name}.");
-            if (name.StartsWith("gx_", StringComparison.Ordinal))
+            if (name.StartsWith("gx_", StringComparison.Ordinal) || name.StartsWith("5ds_", StringComparison.Ordinal))
             {
                 var ai = new TacticalAI { Difficulty = AIDifficulty.Easy };
                 for (int step = 0; step < 30 && !InMain(duel, 1) && !duel.IsFinished && duel.RetryCount == 0; step++)
