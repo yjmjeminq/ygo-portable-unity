@@ -1,27 +1,34 @@
 {
   "complete": false,
   "total": 240,
-  "reviewed": 200,
-  "pending": 40,
-  "scopeDecision": "awaiting user reply",
+  "reviewed": 208,
+  "pending": 32,
+  "scopeDecision": "User approved preserving the existing 240 IDs and distinguishing original media.",
   "coverage": "Visible features of the selected official references; unseen anatomy and clothing are not invented.",
   "artworkGeneration": "This build produces reviewed prompts and data, not replacement character PNGs.",
+  "reviewedByMedium": {
+    "anime": 200,
+    "film": 4,
+    "manga": 2,
+    "game": 0,
+    "card": 2
+  },
   "series": {
     "DM": {
       "total": 46,
-      "reviewed": 39
+      "reviewed": 42
     },
     "GX": {
       "total": 43,
-      "reviewed": 42
+      "reviewed": 43
     },
     "5DS": {
       "total": 46,
-      "reviewed": 38
+      "reviewed": 40
     },
     "ZEXAL": {
       "total": 37,
-      "reviewed": 35
+      "reviewed": 36
     },
     "ARCV": {
       "total": 41,
@@ -29,7 +36,7 @@
     },
     "VRAINS": {
       "total": 27,
-      "reviewed": 19
+      "reviewed": 20
     }
   },
   "pendingCharacters": [
@@ -85,57 +92,10 @@
       ]
     },
     {
-      "id": 203,
-      "series": "DM",
-      "name": "세라",
-      "canonicalName": "Sera",
-      "canonicalMedium": "film",
-      "pendingFields": [
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 234,
-      "series": "DM",
-      "name": "아이가미",
-      "canonicalName": "Aigami",
-      "canonicalMedium": "film",
-      "pendingFields": [
-        "canonical_medium"
-      ]
-    },
-    {
       "id": 3001,
       "series": "DM",
       "name": "마나",
       "canonicalName": "Mana",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 195,
-      "series": "DM",
-      "name": "카이바 세토 (극장판)",
-      "canonicalName": "Seto Kaiba",
-      "canonicalMedium": "film",
-      "pendingFields": [
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 202,
-      "series": "GX",
-      "name": "돈 잘우그",
-      "canonicalName": "Don Zaloog",
       "canonicalMedium": null,
       "pendingFields": [
         "hair_color",
@@ -170,23 +130,6 @@
       "series": "5DS",
       "name": "엔죠 무쿠로",
       "canonicalName": "Hunter Pace",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 3202,
-      "series": "5DS",
-      "name": "세크트 이쥬인",
-      "canonicalName": "Sect Ijuin",
       "canonicalMedium": null,
       "pendingFields": [
         "hair_color",
@@ -255,33 +198,6 @@
       "series": "5DS",
       "name": "브레오",
       "canonicalName": "Breo",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 216,
-      "series": "5DS",
-      "name": "패러독스",
-      "canonicalName": "Paradox",
-      "canonicalMedium": "film",
-      "pendingFields": [
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 3305,
-      "series": "ZEXAL",
-      "name": "야구모 쿄지",
-      "canonicalName": "Kyoji Yagumo",
       "canonicalMedium": null,
       "pendingFields": [
         "hair_color",
@@ -537,23 +453,6 @@
       "series": "ARCV",
       "name": "패왕룡 즈아크",
       "canonicalName": "Z-ARC",
-      "canonicalMedium": null,
-      "pendingFields": [
-        "hair_color",
-        "hair_style",
-        "facial_hair",
-        "outfit",
-        "duel_disk",
-        "selected_form",
-        "character_identity",
-        "canonical_medium"
-      ]
-    },
-    {
-      "id": 139,
-      "series": "VRAINS",
-      "name": "마계발 현세행 데스가이드",
-      "canonicalName": "Tour Guide",
       "canonicalMedium": null,
       "pendingFields": [
         "hair_color",

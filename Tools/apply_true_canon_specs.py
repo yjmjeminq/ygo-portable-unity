@@ -16,9 +16,10 @@ ROOT = Path(__file__).resolve().parents[1]
 SERIES = {"dm": "DM", "gx": "GX", "5ds": "5DS", "zexal": "ZEXAL", "arcv": "ARCV", "vrains": "VRAINS"}
 FACTS = ("hair_color", "hair_style", "facial_hair", "outfit", "duel_disk")
 VERIFIED_STATES = {"observed", "not_visible_in_selected_pose", "not_applicable"}
-PRIMARY_DOMAINS = ("yugioh.com", "konami.com", "tv-tokyo.co.jp", "nasinc.co.jp", "yugioh.jp", "yu-gi-oh.jp",
+PRIMARY_DOMAINS = ("yugioh.com", "yugioh-card.com", "konami.com", "tv-tokyo.co.jp", "nasinc.co.jp", "yugioh.jp", "yu-gi-oh.jp",
                    "viz.com", "shueisha.co.jp", "shonenjump.com")
 PRIMARY_VIDEO_CHANNELS = {"UCZuVXrpKTUn_KEzRQgFgMWg": "Official Yu-Gi-Oh! / KONAMI Cross Media NY"}
+PUBLISHER_IMAGE_CDNS = {"viz.com": {"de7i3bh7bgh0d.cloudfront.net", "dw9to29mmj727.cloudfront.net"}}
 
 
 def read_json(path):
@@ -42,7 +43,12 @@ def official_url(url):
 def primary_visual_source(source):
     page, picture = source.get("page_url", ""), source.get("image_url", "")
     if official_url(page):
-        return not picture or official_url(picture)
+        if not picture or official_url(picture):
+            return True
+        page_host, image = urlparse(page).hostname, urlparse(picture)
+        return image.scheme == "https" and any(
+            (page_host == publisher or (page_host or "").endswith("."+publisher)) and image.hostname in cdns
+            for publisher, cdns in PUBLISHER_IMAGE_CDNS.items())
     # A publisher's verified upload may live on YouTube rather than its own
     # domain. Bind the public thumbnail to that exact upload and known channel;
     # a random YouTube upload or image is never sufficient primary evidence.
@@ -112,6 +118,10 @@ def pending_reasons(row, sources, allow_non_anime):
         reasons.append("canonical_medium")
     if row.get("variant_unverified", False):
         reasons.append("unverified_variant")
+    used_sources = {sid for fact in row.get("facts", {}).values() if isinstance(fact, dict)
+                    for sid in fact.get("source_ids", []) if sid in sources}
+    if any(sources[sid].get("color_mode") == "monochrome" for sid in used_sources) and row.get("render_mode") != "monochrome":
+        reasons.append("monochrome_reference_color_policy")
     full_body = row.get("full_body_source_ids", [])
     if full_body and (not sources_reviewed(full_body, sources) or any(
             row["id"] not in sources[source_id].get("applicable_character_ids", []) for source_id in full_body)):
@@ -126,6 +136,8 @@ def make_prompts(row):
     count = "the two named members together in one grouped sprite" if row.get("subject_count", 1) == 2 else "exactly one subject"
     selection = row.get("reference_subject_selection")
     shared = (f"{subject}, {row['series']}, selected official appearance: {row['selected_form']}. {details}. "
+              + ("Strict black, white and grayscale rendering matching the original manga panel. Do not colorize or invent natural hair, skin or costume hues. "
+                 if row.get("render_mode") == "monochrome" else "")
               + (f"Reference subject selection: {selection}. " if selection else "") +
               f"Use {count}. Match the cited official reference, retaining facial structure, costume, accessories "
               "and device geometry. Never merge different seasons, incarnations, anime and manga designs. "
@@ -151,6 +163,7 @@ def master_record(roster_row, canon, sources, allow_non_anime):
                         | {source_id for source_id in canon.get("full_body_source_ids", []) if source_id in sources})
     return {"id": roster_row["id"], "series": roster_row["series"], "name": roster_row["name"],
             "canonicalName": canon.get("canonical_name"), "canonicalMedium": canon.get("canonical_medium"),
+            "renderMode": canon.get("render_mode", "color"),
             "selectedForm": canon.get("selected_form"), "verificationStatus": "pending" if reasons else "reviewed",
             "generationAllowed": not reasons, "pendingFields": reasons, "facts": canon.get("facts", {}),
             "reviewedFields": [key for key in FACTS if fact_is_reviewed(canon.get("facts", {}).get(key), sources, canon["id"])],
@@ -167,11 +180,14 @@ def visual_spec(record):
     return {"hair": "; ".join(item for item in (color, style) if item) or None,
             "facialHair": value("facial_hair"), "outfit": value("outfit"), "duelDisk": value("duel_disk"),
             "canonReviewStatus": record["verificationStatus"], "generationAllowed": record["generationAllowed"],
+            "canonicalMedium": record["canonicalMedium"], "renderMode": record["renderMode"],
             "pendingFields": record["pendingFields"], "referenceUrls": record["referenceUrls"],
             "comfyPromptStanding": record["comfyPromptStanding"], "comfyPromptSd": record["comfyPromptSd"]}
 
 
-def build(catalogue, manifest, allow_pending=False, allow_non_anime=False):
+def build(catalogue, manifest, allow_pending=False, allow_non_anime=None):
+    if allow_non_anime is None:
+        allow_non_anime = catalogue.get("policy", {}).get("non_anime_media_allowed", False)
     roster = roster_rows(manifest)
     by_id, sources = validate_catalogue(catalogue, roster)
     records = [master_record(row, by_id[row["id"]], sources, allow_non_anime) for row in roster]
@@ -201,6 +217,7 @@ def gx_prompt_jobs(records, catalogue, allow_non_anime=False):
         for kind, folder, prefix, field in (("sd", "Characters_SD", "sd_", "comfyPromptSd"),
                                              ("standing", "Characters_Standing", "full_", "comfyPromptStanding")):
             jobs.append({"id": str(record["id"]), "name": record["name"], "kind": kind,
+                         "canonicalMedium": record["canonicalMedium"], "renderMode": record["renderMode"],
                          "generationAllowed": record["generationAllowed"],
                          "verificationStatus": record["verificationStatus"], "pendingFields": record["pendingFields"],
                          "referenceUrls": record["referenceUrls"], "referenceImages": record["referenceImages"],
@@ -215,6 +232,8 @@ def review_report(records, catalogue):
             "pending": len(pending), "scopeDecision": catalogue.get("policy", {}).get("roster_scope_decision"),
             "coverage": "Visible features of the selected official references; unseen anatomy and clothing are not invented.",
             "artworkGeneration": "This build produces reviewed prompts and data, not replacement character PNGs.",
+            "reviewedByMedium": {medium: sum(row["canonicalMedium"] == medium and row["generationAllowed"] for row in records)
+                                 for medium in ("anime", "film", "manga", "game", "card")},
             "series": {series: {"total": sum(row["series"] == series for row in records),
                                 "reviewed": sum(row["series"] == series and row["generationAllowed"] for row in records)}
                        for series in SERIES.values()},
@@ -248,20 +267,25 @@ def main():
     parser.add_argument("--gx-prompts", type=Path, default=ROOT / "Tools/tagforce_gx_asset_prompts.json")
     parser.add_argument("--report", type=Path, default=ROOT / "Tools/canon_review_status.json")
     parser.add_argument("--allow-pending", action="store_true", help="Publish disabled records with null prompts for incomplete reviews")
-    parser.add_argument("--allow-non-anime", action="store_true", help="Retain labeled official manga/game/card/film designs")
+    parser.add_argument("--allow-non-anime", action="store_true", default=None,
+                        help="Allow labeled original media (otherwise use the saved roster-scope decision)")
+    parser.add_argument("--anime-only", action="store_false", dest="allow_non_anime",
+                        help="Audit TV-anime designs only, overriding the saved media decision")
     parser.add_argument("--update-gx", action="store_true")
     parser.add_argument("--audit-only", action="store_true")
     args = parser.parse_args()
     try:
         catalogue = read_json(args.catalogue)
-        records = build(catalogue, read_json(args.manifest), args.allow_pending, args.allow_non_anime)
-        gx_jobs = gx_prompt_jobs(records, catalogue, args.allow_non_anime)
+        allow_non_anime = (catalogue.get("policy", {}).get("non_anime_media_allowed", False)
+                           if args.allow_non_anime is None else args.allow_non_anime)
+        records = build(catalogue, read_json(args.manifest), args.allow_pending, allow_non_anime)
+        gx_jobs = gx_prompt_jobs(records, catalogue, allow_non_anime)
         if not args.audit_only:
             write_json(args.output, records)
             write_json(args.gx_prompts, gx_jobs)
             write_json(args.report, review_report(records, catalogue))
             if args.update_gx:
-                count = update_gx(args.gx_script, records, catalogue, args.allow_non_anime)
+                count = update_gx(args.gx_script, records, catalogue, allow_non_anime)
                 print(f"Replaced GX visual specs: {count}; protagonist preserved")
         ready = sum(record["generationAllowed"] for record in records)
         print(f"Master records: {len(records)}; reviewed and generation-enabled: {ready}; pending: {len(records)-ready}")

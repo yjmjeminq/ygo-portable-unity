@@ -72,20 +72,6 @@
       "source_sha256": "d7969afb90e3b52ade8a9f52821635244334cc61a787ce5f2edec2304e0d1b2e"
     },
     {
-      "id": "202",
-      "kind": "sd",
-      "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_202.png",
-      "sha256": "5b3b573d33548f2d131c84bef9a38336370b3eda28f391c3cf7377a6805e9e5c",
-      "source_sha256": "4956fb38f67e601df986ada4ab382a8ae43eca2a103400ee5b93827af5a4dbed"
-    },
-    {
-      "id": "202",
-      "kind": "standing",
-      "file": "Assets/StreamingAssets/TagForce/GX/Characters_Standing/full_202.png",
-      "sha256": "ad1db2b68ad7a2a73aca01eb3b3c706e0ce1459370c5475d7773f3e4a7f70e37",
-      "source_sha256": "f95a028849eb624930b681ad5fda49eba6593c94b6de69b6446bfd2ffd908925"
-    },
-    {
       "id": "209",
       "kind": "sd",
       "file": "Assets/StreamingAssets/TagForce/GX/Characters_SD/sd_209.png",

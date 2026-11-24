@@ -4,7 +4,9 @@
     "primary_sources_only": true,
     "inference_from_names_or_deck_themes": false,
     "unreviewed_generation_allowed": false,
-    "roster_scope_decision": "awaiting user reply"
+    "roster_scope_decision": "User approved preserving the existing 240 IDs and distinguishing original media.",
+    "non_anime_media_allowed": true,
+    "user_scope_instruction": "기존 240개 ID 유지, 원본 매체를 구분해 고증"
   },
   "sources": {
     "camula_profile": {
@@ -2732,6 +2734,59 @@
       "channel_id": "UCZuVXrpKTUn_KEzRQgFgMWg",
       "official_channel_verified": true,
       "upload_metadata_sha256": "d0c127b7c522d460ba0241da0123b8873ba83f849d1b5b9c0aed8974c9db7b52"
+    },
+    "review_a18dd5564dc48fdb365c": {
+      "page_url": "https://www.db.yugioh-card.com/yugiohdb/card_search.action?ope=2&cid=9702&request_locale=en",
+      "image_url": "https://www.db.yugioh-card.com/yugiohdb/get_image.action?type=1&osplang=1&cid=9702&ciid=1&enc=7N3fqFn-pD1ZJD7Y5Wq2WA&app=tournament&request_locale=en",
+      "title": "Tour Guide From the Underworld, original official card illustration",
+      "publisher": "KONAMI Digital Entertainment",
+      "medium": "official_trading_card_illustration",
+      "coverage": "only_the_visible_selected_subject",
+      "visually_reviewed": true,
+      "image_sha256": "a18dd5564dc48fdb365cfa63395ea92bef41772a0ea14a1ca4ca3db1d0ea483f",
+      "applicable_character_ids": [
+        139
+      ]
+    },
+    "review_7bbcb080d4b852a53cd8": {
+      "page_url": "https://www.yugioh.com/cards/don-zaloog",
+      "image_url": "https://uploads4.yugioh.com/card_images/1637/detail/2551.jpg?1385102068",
+      "title": "Don Zaloog official English card illustration",
+      "publisher": "KONAMI Cross Media NY",
+      "medium": "official_trading_card_illustration",
+      "coverage": "only_the_visible_selected_subject",
+      "visually_reviewed": true,
+      "image_sha256": "7bbcb080d4b852a53cd850d41eedf6809ee7b77a54afe8a416914b4e5ccc1f2a",
+      "applicable_character_ids": [
+        202
+      ]
+    },
+    "review_b74cf8cc383ec04dfb63": {
+      "page_url": "https://www.viz.com/blog/posts/yu-gi-oh-5d-s-series-review",
+      "image_url": "https://de7i3bh7bgh0d.cloudfront.net/2016/05/25/21/14/30/711/Yug5DsSplash.jpg",
+      "title": "Yug5DsSplash.jpg",
+      "publisher": "VIZ Media",
+      "medium": "official_manga_color_illustration",
+      "coverage": "only_the_visible_selected_subject",
+      "visually_reviewed": true,
+      "image_sha256": "b74cf8cc383ec04dfb634200d6e36a283bcca6a6c87244824bffa3c92418e23c",
+      "applicable_character_ids": [
+        3202
+      ]
+    },
+    "review_e6eaa2e3eca5e6e86713": {
+      "page_url": "https://www.viz.com/blog/posts/yu-gi-oh-zexal-vol-5-2256",
+      "image_url": "https://de7i3bh7bgh0d.cloudfront.net/drupal/art/YGZv5_02.jpg",
+      "title": "YGZv5_02.jpg",
+      "publisher": "VIZ Media",
+      "medium": "manga_monochrome_panel",
+      "coverage": "only_the_visible_selected_subject",
+      "visually_reviewed": true,
+      "image_sha256": "e6eaa2e3eca5e6e86713d96a35e378af2050efe769fb0cdb0ee502e607ca3df6",
+      "applicable_character_ids": [
+        3305
+      ],
+      "color_mode": "monochrome"
     }
   },
   "characters": [
@@ -5733,36 +5788,46 @@
       "name": "돈 잘우그",
       "series": "GX",
       "canonical_name": "Don Zaloog",
-      "canonical_medium": null,
-      "selected_form": null,
-      "identity_verified": false,
+      "canonical_medium": "card",
+      "selected_form": "Don Zaloog original official English TCG card design with crossed metal blades; explicitly a card-origin design, not an invented GX purple pirate costume",
+      "identity_verified": true,
       "subject_count": 1,
       "full_body_source_ids": [],
       "facts": {
         "hair_color": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Pale silver lavender with dark purple shaded sections",
+          "source_ids": [
+            "review_7bbcb080d4b852a53cd8"
+          ]
         },
         "hair_style": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Straight thick shoulder-length bob with a long divided fringe; a brown diagonal strap crosses the crown to a dark metal eyepatch",
+          "source_ids": [
+            "review_7bbcb080d4b852a53cd8"
+          ]
         },
         "facial_hair": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Very narrow dark upper-lip contour and small dark chin linework, exactly as drawn in the reference; no broad filled beard",
+          "source_ids": [
+            "review_7bbcb080d4b852a53cd8"
+          ]
         },
         "outfit": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Gray ribbed sleeveless armored vest with brown diagonal weapon straps, two round blue front fasteners, brown belt and buckle, red and gray riveted forearm bracers; two straight metal blades held in a crossed-arm pose",
+          "source_ids": [
+            "review_7bbcb080d4b852a53cd8"
+          ]
         },
         "duel_disk": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "not_visible_in_selected_pose",
+          "description": "No duel disk visible in this selected pose; do not add one",
+          "source_ids": [
+            "review_7bbcb080d4b852a53cd8"
+          ]
         }
       },
       "candidate_reference_urls": []
@@ -7826,39 +7891,50 @@
       "name": "세크트 이쥬인",
       "series": "5DS",
       "canonical_name": "Sect Ijuin",
-      "canonical_medium": null,
-      "selected_form": null,
-      "identity_verified": false,
+      "canonical_medium": "manga",
+      "selected_form": "Sect Ijuin ordinary manga riding appearance in the official VIZ 5D's color illustration; not an invented TV-anime incarnation or later armored form",
+      "identity_verified": true,
       "subject_count": 1,
       "full_body_source_ids": [],
       "facts": {
         "hair_color": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Copper orange with dark brown shaded sections",
+          "source_ids": [
+            "review_b74cf8cc383ec04dfb63"
+          ]
         },
         "hair_style": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Short layered orange side and back locks with pointed outward ends; the crown is under a pale rounded riding cap with a brown goggle strap",
+          "source_ids": [
+            "review_b74cf8cc383ec04dfb63"
+          ]
         },
         "facial_hair": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "No moustache or beard visible",
+          "source_ids": [
+            "review_b74cf8cc383ec04dfb63"
+          ]
         },
         "outfit": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Pale gray rounded riding cap, round blue-gray goggles on a brown strap, burnt-orange scarf tied behind the neck, dark riding jacket with broad pale front and shoulder edging; retain the bust crop",
+          "source_ids": [
+            "review_b74cf8cc383ec04dfb63"
+          ]
         },
         "duel_disk": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "not_visible_in_selected_pose",
+          "description": "No duel disk visible in this selected pose; do not add one",
+          "source_ids": [
+            "review_b74cf8cc383ec04dfb63"
+          ]
         }
       },
-      "candidate_reference_urls": []
+      "candidate_reference_urls": [],
+      "reference_subject_selection": "Select only the small orange-haired, cap-and-goggles-wearing boy at the lower left; exclude Jack, Yusei and Akiza"
     },
     {
       "id": 25,
@@ -10744,39 +10820,57 @@
       "name": "야구모 쿄지",
       "series": "ZEXAL",
       "canonical_name": "Kyoji Yagumo",
-      "canonical_medium": null,
-      "selected_form": null,
-      "identity_verified": false,
+      "canonical_medium": "manga",
+      "selected_form": "Kyoji Yagumo in the original black-and-white manga panel published by VIZ for ZEXAL volume 5; no anime design or invented color palette",
+      "identity_verified": true,
       "subject_count": 1,
       "full_body_source_ids": [],
       "facts": {
         "hair_color": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Hair depicted in solid black ink with narrow white highlight lines in the original monochrome manga; no natural color hue is asserted",
+          "source_ids": [
+            "review_e6eaa2e3eca5e6e86713"
+          ]
         },
         "hair_style": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Very high angular central points and broad long jagged side sections curving outward toward the shoulders",
+          "source_ids": [
+            "review_e6eaa2e3eca5e6e86713"
+          ]
         },
         "facial_hair": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "No moustache or beard visible",
+          "source_ids": [
+            "review_e6eaa2e3eca5e6e86713"
+          ]
         },
         "outfit": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Light-tone open long coat with a wide raised collar over a solid dark V-neck top, long neck chain and a large angular open pendant; preserve the black-and-white ink and screentone values of the panel",
+          "source_ids": [
+            "review_e6eaa2e3eca5e6e86713"
+          ]
         },
         "duel_disk": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "not_visible_in_selected_pose",
+          "description": "No duel disk visible in this selected pose; do not add one",
+          "source_ids": [
+            "review_e6eaa2e3eca5e6e86713"
+          ]
         }
       },
-      "candidate_reference_urls": []
+      "candidate_reference_urls": [
+        "https://www.viz.com/manga-books/manga/yu-gi-oh-zexal-volume-7/product/3558",
+        "https://www.viz.com/blog/posts/yu-gi-oh-zexal-vol-5-2256"
+      ],
+      "review_notes": [
+        "Original manga appearance is reproduced in monochrome. No natural hair, skin or clothing hues are inferred from uncolored ink artwork."
+      ],
+      "reference_subject_selection": "Select only Kyoji Yagumo, the tall black-haired man in the right foreground; exclude the pale-haired woman and the other faces",
+      "render_mode": "monochrome"
     },
     {
       "id": 175,
@@ -13218,36 +13312,46 @@
       "name": "마계발 현세행 데스가이드",
       "series": "VRAINS",
       "canonical_name": "Tour Guide",
-      "canonical_medium": null,
-      "selected_form": null,
-      "identity_verified": false,
+      "canonical_medium": "card",
+      "selected_form": "Tour Guide From the Underworld original card illustration, official KONAMI card database CID 9702 image 1; not a VRAINS anime avatar",
+      "identity_verified": true,
       "subject_count": 1,
       "full_body_source_ids": [],
       "facts": {
         "hair_color": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Magenta red with vivid cyan-blue edge highlights as painted in this specific official card illustration",
+          "source_ids": [
+            "review_a18dd5564dc48fdb365c"
+          ]
         },
         "hair_style": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Short curved side sections and thick pointed side-swept bangs, with the crown beneath a small dark uniform cap",
+          "source_ids": [
+            "review_a18dd5564dc48fdb365c"
+          ]
         },
         "facial_hair": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "No moustache or beard visible",
+          "source_ids": [
+            "review_a18dd5564dc48fdb365c"
+          ]
         },
         "outfit": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "observed",
+          "description": "Dark navy tour-guide uniform and matching cap, red edging and buttons, pale gray collar and cuffs, dark necktie and a dark satchel bearing a pale skull emblem; preserve only the visible framing",
+          "source_ids": [
+            "review_a18dd5564dc48fdb365c"
+          ]
         },
         "duel_disk": {
-          "state": "pending",
-          "description": null,
-          "source_ids": []
+          "state": "not_visible_in_selected_pose",
+          "description": "No duel disk visible in this selected pose; do not add one",
+          "source_ids": [
+            "review_a18dd5564dc48fdb365c"
+          ]
         }
       },
       "candidate_reference_urls": []

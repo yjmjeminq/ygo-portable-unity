@@ -88,6 +88,28 @@ class CanonSourceContractTests(unittest.TestCase):
         self.assertIn("canonical_medium", canon.pending_reasons(row, self.catalogue["sources"], False))
         self.assertNotIn("canonical_medium", canon.pending_reasons(row, self.catalogue["sources"], True))
 
+    def test_saved_original_media_decision_keeps_media_labels_and_can_be_overridden(self):
+        data = copy.deepcopy(self.catalogue)
+        data["policy"]["non_anime_media_allowed"] = True
+        approved = canon.build(data, self.manifest, allow_pending=True)
+        anime_only = canon.build(data, self.manifest, allow_pending=True, allow_non_anime=False)
+        sera = next(row for row in approved if row["id"] == 203)
+        self.assertTrue(sera["generationAllowed"])
+        self.assertEqual(sera["canonicalMedium"], "film")
+        self.assertFalse(next(row for row in anime_only if row["id"] == 203)["generationAllowed"])
+
+    def test_publisher_cdns_are_bound_to_the_publisher_and_manga_cannot_be_silently_colorized(self):
+        source = {"page_url": "https://www.viz.com/blog/posts/yu-gi-oh-zexal-vol-5-2256",
+                  "image_url": "https://de7i3bh7bgh0d.cloudfront.net/drupal/art/YGZv5_02.jpg"}
+        self.assertTrue(canon.primary_visual_source(source))
+        source["page_url"] = "https://www.yugioh.com/characters/camula"
+        self.assertFalse(canon.primary_visual_source(source))
+        row = copy.deepcopy(next(row for row in self.catalogue["characters"] if row["id"] == 3305))
+        self.assertEqual(row["render_mode"], "monochrome")
+        self.assertIn("Do not colorize", canon.make_prompts(row)[0])
+        row.pop("render_mode")
+        self.assertIn("monochrome_reference_color_policy", canon.pending_reasons(row, self.catalogue["sources"], True))
+
     def test_updating_visuals_removes_retired_fields_and_preserves_dialogue_and_player(self):
         records = canon.build(self.catalogue, self.manifest, allow_pending=True)
         original = canon.read_json(canon.ROOT / "Assets/StreamingAssets/tagforce_gx_script.json")
