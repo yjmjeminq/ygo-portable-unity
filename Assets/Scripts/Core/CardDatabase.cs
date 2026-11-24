@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using UnityEngine;
 
 namespace YGOPortable.Core
@@ -90,6 +91,9 @@ namespace YGOPortable.Core
     {
         private const int DescriptionIndexBits = 20;
         private const ulong DescriptionIndexMask = (1UL << DescriptionIndexBits) - 1;
+        private const int EffectSummaryLength = 60;
+        private static readonly Regex PrintedEffectBoundary =
+            new(@"[①-⑳]\s*[:：]|\[(?:펜듈럼|몬스터) 효과\]", RegexOptions.CultureInvariant);
         private static Dictionary<uint, CardInfo> _byCode;
         private static readonly Dictionary<uint, CardInfo[]> DeckPrintingsByCode = new();
         private static List<CardInfo> _allCards;
@@ -1468,7 +1472,7 @@ namespace YGOPortable.Core
 
         public static string ResolveDescription(ulong desc) => ResolveDescription(desc, activation: false);
 
-        private static string ResolveDescription(ulong desc, bool activation)
+        private static string ResolveDescription(ulong desc, bool activation, bool usePrintedEffect = true)
         {
             if (desc <= DescriptionIndexMask)
                 return SystemHintsKR.TryGetValue((uint)desc, out var hint) ? hint : null;
@@ -1479,7 +1483,8 @@ namespace YGOPortable.Core
             var original = GetSameNameOriginal(card);
             if (original != null && TryGetCardEffectText(((ulong)original.code << DescriptionIndexBits) | (uint)index, activation, out specificText))
                 return specificText;
-            return ReadLocalizedDescription(card, index) ?? ReadLocalizedDescription(original, index);
+            return ReadLocalizedDescription(card, index) ?? ReadLocalizedDescription(original, index) ??
+                (usePrintedEffect ? ExtractIndexedEffectDescription(card?.code ?? 0, index) : null);
         }
 
         private static bool TryGetCardEffectText(ulong desc, bool activation, out string text) =>
@@ -1487,9 +1492,10 @@ namespace YGOPortable.Core
 
         public static string ResolveEffectDescription(ulong desc, uint cardCode)
         {
-            string text = ResolveDescription(desc, activation: true);
-            if (text != null) return text;
-            return GetKoreanCardDescription(GetDescriptionCardCode(desc)) ?? GetKoreanCardDescription(cardCode);
+            uint descriptionCode = GetDescriptionCardCode(desc);
+            return ResolveDescription(desc, activation: true) ??
+                ExtractPrintedEffectDescription(descriptionCode, index: null) ??
+                (descriptionCode == cardCode ? null : ExtractPrintedEffectDescription(cardCode, index: null));
         }
 
         internal static string ResolveCommandEffectDescription(SelectableCardItem item)
@@ -1500,7 +1506,104 @@ namespace YGOPortable.Core
             return ResolveEffectDescription(item.description, item.code);
         }
 
-        internal static string ResolveOptionDescription(ulong desc) => ResolveDescription(desc);
+        internal static string ResolveOptionDescription(ulong desc) =>
+            ResolveDescription(desc, activation: false, usePrintedEffect: false);
+
+        /// <summary>Returns a concise printed effect for a zero-based description index.</summary>
+        public static string ExtractIndexedEffectDescription(uint cardCode, int index) =>
+            index < 0 ? null : ExtractPrintedEffectDescription(cardCode, index);
+
+        private static string ExtractPrintedEffectDescription(uint cardCode, int? index)
+        {
+            string rules = ReadPrintedEffectText(cardCode);
+            if (rules == null) return null;
+            var blocks = ReadPrintedEffectBlocks(rules).ToArray();
+            if (blocks.Length > 0)
+            {
+                var block = blocks.FirstOrDefault(block => index.HasValue ? block.Index == index : HasKoreanText(block.Text));
+                if (block.Text != null) return SummarizePrintedEffect(block.Text);
+
+                // One numbered effect with a menu typically has the activation at index zero,
+                // followed by the printed choices in order.
+                if (blocks.Length == 1 && blocks[0].Index == 0 && index is > 0)
+                    return SummarizePrintedEffect(ReadPrintedBullets(blocks[0].Text).ElementAtOrDefault(index.Value - 1));
+                return null;
+            }
+
+            var bullets = ReadPrintedBullets(rules);
+            if (bullets.Length > 0)
+                return SummarizePrintedEffect(bullets.ElementAtOrDefault(index.GetValueOrDefault()));
+            return index.GetValueOrDefault() == 0 ? SummarizePrintedEffect(rules) : null;
+        }
+
+        internal static string ExtractPrintedOptionDescription(uint cardCode, int index, int count)
+        {
+            if (index < 0 || index >= count) return null;
+            string rules = ReadPrintedEffectText(cardCode);
+            if (rules == null) return null;
+            var blocks = ReadPrintedEffectBlocks(rules).ToArray();
+            var bulletGroups = (blocks.Length == 0 ? new[] { rules } : blocks.Select(block => block.Text))
+                .Select(ReadPrintedBullets).Where(bullets => bullets.Length > 0).ToArray();
+            if (bulletGroups.Length > 0)
+            {
+                var matches = bulletGroups.Where(bullets => bullets.Length == count).ToArray();
+                return matches.Length == 1 ? SummarizePrintedEffect(matches[0][index]) : null;
+            }
+            if (blocks.Length == count && blocks.Select(block => block.Index).Distinct().Count() == count)
+                return SummarizePrintedEffect(blocks[index].Text);
+            return count == 1 ? ExtractPrintedEffectDescription(cardCode, index: null) : null;
+        }
+
+        private static string ReadPrintedEffectText(uint code)
+        {
+            var card = Get(code);
+            if (card == null || (!card.IsPendulum && (card.type & (YgoConstants.TYPE_NORMAL | YgoConstants.TYPE_TOKEN)) != 0))
+                return null;
+            return GetKoreanCardDescription(code) ?? GetKoreanCardDescription(GetSameNameOriginal(card)?.code ?? 0);
+        }
+
+        private static IEnumerable<(int Index, string Text)> ReadPrintedEffectBlocks(string rules)
+        {
+            var markers = PrintedEffectBoundary.Matches(rules);
+            for (int i = 0; i < markers.Count; i++)
+            {
+                var marker = markers[i];
+                char number = rules[marker.Index];
+                if (number == '[') continue;
+                int start = marker.Index + marker.Length;
+                int end = i + 1 < markers.Count ? markers[i + 1].Index : rules.Length;
+                yield return (number - '①', rules[start..end]);
+            }
+        }
+
+        private static string[] ReadPrintedBullets(string rules) =>
+            rules.Split('●').Skip(1).Where(HasKoreanText).ToArray();
+
+        private static string SummarizePrintedEffect(string text)
+        {
+            if (!HasKoreanText(text)) return null;
+            string summary = Regex.Replace(text.Trim(), @"\s+", " ");
+            int sentence = summary.IndexOf(". ", StringComparison.Ordinal);
+            if (sentence >= 0)
+            {
+                string opening = summary[..sentence];
+                string rest = summary[(sentence + 2)..];
+                if ((opening.EndsWith("발동할 수 있다", StringComparison.Ordinal) ||
+                    opening.EndsWith("발동한다", StringComparison.Ordinal)) &&
+                    !opening.Contains("대상") && !opening.Contains("지불") && !opening.Contains("하고 발동") &&
+                    !rest.StartsWith("그 ", StringComparison.Ordinal) && !rest.StartsWith("●", StringComparison.Ordinal))
+                    summary = rest;
+            }
+            return ShortenEffectText(summary, EffectSummaryLength);
+        }
+
+        internal static string ShortenEffectText(string text, int maxLength)
+        {
+            if (text.Length <= maxLength) return text;
+            int length = maxLength - 1;
+            if (char.IsHighSurrogate(text[length - 1])) length--;
+            return text[..length].TrimEnd() + "…";
+        }
 
         internal static string GetKoreanCardDescription(uint code)
         {

@@ -264,12 +264,13 @@ namespace YGOPortable.Editor
             uint[] traps = trapFlags.Select(flag => flag == 0 ? MirrorForce : AnyCard(YgoConstants.TYPE_TRAP | flag)).ToArray();
             uint[] extra = { DragonKnight, AnyCard(YgoConstants.TYPE_SYNCHRO), AnyCard(YgoConstants.TYPE_XYZ),
                 AnyCard(YgoConstants.TYPE_LINK) };
-            uint[] expected = new[] { BlueEyes, Magician, 74677422u, Ash }.Concat(spells).Concat(traps).ToArray();
-            deck.main = expected.Reverse().ToList();
+            uint[] cards = new[] { BlueEyes, Magician, 74677422u, Ash }.Concat(spells).Concat(traps).ToArray();
+            deck.main = cards.Reverse().ToList();
             deck.extra = extra.Reverse().ToList();
             editor.Root.transform.Find("Editor/Deck/EditControls/AutoSort/Button").GetComponent<Button>().onClick.Invoke();
-            Require(deck.main.SequenceEqual(expected) && deck.extra.SequenceEqual(extra),
-                "The automatic sort did not apply the requested monster, spell, trap and extra-deck order.");
+            Require(deck.main.SequenceEqual(DeckMainSorter.Order(cards, DeckMainSortMode.Frame)) &&
+                deck.extra.SequenceEqual(DeckMainSorter.Order(extra, DeckMainSortMode.Frame)),
+                "The automatic sort did not apply frame order.");
         }
 
         private static void VerifyRecipeActions(DeckEditorUI editor)
@@ -570,14 +571,15 @@ namespace YGOPortable.Editor
                 "Releasing a long press edited the deck or opened the details a second time.");
             panel.Find("Related/Button").GetComponent<Button>().onClick.Invoke();
             Require(Field<uint>(editor, "_relatedFilterCode") == Magician && trunkPane.gameObject.activeInHierarchy &&
-                deckPane.gameObject.activeInHierarchy && results.Any(card => card.code == DragonKnight),
+                deckPane.gameObject.activeInHierarchy && results.Any(card => card.code == DragonKnight) &&
+                Field<Text>(editor, "_mobileTrunkSort").text == "카드 프레임별",
                 "Related-card search did not filter the trunk while leaving the deck visible.");
 
             deck.main.Clear();
             deck.main.AddRange(new[] { Pot, Magician, Ash, MirrorForce, Excel, Diabellstar });
+            var expected = DeckMainSorter.Order(deck.main, DeckMainSortMode.Frame);
             root.Find("MobileToolbar/AutoSort/Button").GetComponent<Button>().onClick.Invoke();
-            Require(CardDatabase.Get(deck.main[0]).IsMonster && CardDatabase.Get(deck.main[^1]).IsTrap,
-                "The top autosort did not order cards by frame.");
+            Require(deck.main.SequenceEqual(expected), "The top autosort did not order cards by frame.");
             root.Find("MobileToolbar/Save/Button").GetComponent<Button>().onClick.Invoke();
             Require(!(bool)Call(editor, "HasUnsavedChanges"), "The top save button did not persist the edited deck.");
             Field<Button>(editor, "_openDrawButton").onClick.Invoke();

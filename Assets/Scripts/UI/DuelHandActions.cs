@@ -275,7 +275,7 @@ namespace YGOPortable.UI
                 string icon = CommandIcon(first.responseVal);
                 string label = icon switch
                 {
-                    "ACTION" => "효과 발동",
+                    "ACTION" => CardActivationCaption(first.label, choices.Count),
                     "TURN_DEF" => "표시 변경",
                     "SETMONST" or "SET" => "세트",
                     _ => first.label,
@@ -321,6 +321,15 @@ namespace YGOPortable.UI
                     ShowCardZoomModal(source);
                 }, "Details");
             }
+        }
+
+        private static string CardActivationCaption(string action, int count)
+        {
+            if (count > 1) return $"효과 발동 ({count})";
+            const string prefix = "발동 · ";
+            if (!action.StartsWith(prefix, StringComparison.Ordinal)) return "효과 발동";
+            string effect = action[prefix.Length..].Trim();
+            return effect.Length == 0 ? "효과 발동" : $"발동: {CardDatabase.ShortenEffectText(effect, 11)}";
         }
 
         private void AddCardAction(string iconName, string label, Action action, string name = null)

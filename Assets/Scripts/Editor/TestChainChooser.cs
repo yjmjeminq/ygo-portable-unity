@@ -162,9 +162,22 @@ namespace YGOPortable.Editor
             ulong destruction = (ulong)spyralVortex << 20;
             ulong unknown = destruction | 14;
             string rulesText = CardDatabase.GetKoreanCardDescription(spyralVortex);
+            string extracted = CardDatabase.ExtractIndexedEffectDescription(spyralVortex, 0);
             Require(CardDatabase.ResolveOptionDescription(unknown) == null &&
-                    CardDatabase.ResolveEffectDescription(unknown, spyralVortex) == rulesText,
-                "An unknown effect label did not fall back to the Korean card text.");
+                    extracted != null && extracted.Length <= 60 && extracted != rulesText &&
+                    CardDatabase.ResolveEffectDescription(unknown, spyralVortex) == extracted,
+                "An unknown effect label did not fall back to its first concise Korean effect.");
+            const uint chamber = 32600024;
+            var second = CardDatabase.ExtractIndexedEffectDescription(chamber, 1);
+            Require(CardDatabase.ResolveDescription((ulong)chamber << 20).StartsWith("덱에서", StringComparison.Ordinal) &&
+                    second.StartsWith("이 카드를 패로 되돌리고", StringComparison.Ordinal) && second.Length <= 60 &&
+                    CardDatabase.ResolveDescription(((ulong)chamber << 20) | 1) == second &&
+                    CardDatabase.ExtractIndexedEffectDescription(chamber, 14) == null,
+                "The printed card numbering did not resolve the corresponding zero-based effect.");
+            Require(CardDatabase.ExtractIndexedEffectDescription(967928, 1) == "이 턴, 상대는 마법/함정 카드를 발동할 수 없다.",
+                "The printed bullet-only card did not resolve its second effect.");
+            Require(CardDatabase.ExtractIndexedEffectDescription(25311006, 2).Contains("컨트롤"),
+                "A printed choice indexed after its parent effect did not resolve to the corresponding bullet.");
             ulong drawReplacement = (ulong)legendaryBlackLusterSoldier << 20;
             const string drawLabel = "이번 턴의 일반 드로우 대신 덱에서 의식 마법 카드 1장을 패에 넣는다";
             Require(CardDatabase.ResolveDescription(drawReplacement | 1) == "덱으로 되돌린다" &&
@@ -207,17 +220,27 @@ namespace YGOPortable.Editor
                 promptCardCode = spyralVortex, promptEffectDesc = unknown });
             effect = view.Modals.ModalRoot.GetComponentsInChildren<Text>()
                 .Single(label => label.gameObject.name == "Effect");
-            Require(effect.text == rulesText, "An untranslated English label escaped into the chain preview.");
+            Require(effect.text == extracted, "An unlocalized chain confirmation did not show a concise Korean effect.");
             view.Modals.ShowPrompt(duel, new DuelPrompt { messageType = YgoConstants.MSG_SELECT_YESNO, playerId = 0,
                 promptDesc = unknown });
-            Require(view.Modals.ModalRoot.GetComponentsInChildren<Text>().Single(label => label.name == "Question").text == rulesText,
+            Require(view.Modals.ModalRoot.GetComponentsInChildren<Text>().Single(label => label.name == "Question").text == extracted,
                 "An untranslated English label escaped into the yes/no confirmation.");
             var options = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_OPTION, playerId = 0 };
-            options.options.Add(unknown);
-            options.options.Add(unknown | 1);
+            const ulong tripleTacticsTalent = 25311006UL << 20;
+            options.options.Add(tripleTacticsTalent | 102);
+            options.options.Add(tripleTacticsTalent | 100);
+            options.options.Add(tripleTacticsTalent | 101);
             view.Modals.ShowPrompt(duel, options);
-            Require(view.Modals.ModalRoot.GetComponentsInChildren<Text>().Single(label => label.name == "CardText").text == rulesText,
-                "An unlabelled choice omitted the Korean source effect.");
+            var buttons = view.Modals.ModalRoot.GetComponentsInChildren<Button>();
+            Button PrintedOption(int index) => buttons.Single(button => button.name == $"Opt_{index}");
+            Require(PrintedOption(0).GetComponentInChildren<Text>().text.StartsWith("상대의 패를 확인", StringComparison.Ordinal) &&
+                    PrintedOption(1).GetComponentInChildren<Text>().text == "자신은 2장 드로우한다." &&
+                    PrintedOption(2).GetComponentInChildren<Text>().text.Contains("컨트롤") &&
+                    !view.Modals.ModalRoot.GetComponentsInChildren<Text>().Any(label => label.name == "CardText"),
+                "Unlabelled options did not show their printed bullets individually.");
+            PrintedOption(1).onClick.Invoke();
+            Require(view.Responses.SequenceEqual(new[] { 1 }),
+                "Printed option labels altered the response index.");
         }
 
         private static void VerifyEffectOptions(DuelSession duel)
@@ -1155,7 +1178,8 @@ namespace YGOPortable.Editor
                     Require(label == null || label.Any(letter => letter is >= '가' and <= '힣'),
                         $"An English option label was exposed for {card.code}/{i}.");
                     string text = CardDatabase.ResolveEffectDescription(id, card.code);
-                    Require(text != null && text.Any(letter => letter is >= '가' and <= '힣') &&
+                    bool flavorOnly = (card.type & (YgoConstants.TYPE_NORMAL | YgoConstants.TYPE_TOKEN)) != 0 && !card.IsPendulum;
+                    Require(text == null && flavorOnly || text != null && text.Any(letter => letter is >= '가' and <= '힣') &&
                         !text.Contains("[Pendulum Effect]"), $"The Korean fallback was missing for {card.code}/{i}.");
                     labels++;
                     if (label != null) withDescriptions++;
@@ -2101,7 +2125,7 @@ namespace YGOPortable.Editor
             internal void VerifyEffect(SelectableCardItem source)
             {
                 string text = CardDatabase.ResolveEffectDescription(source.description, source.code)
-                    ?? "이 카드의 효과를 발동할 수 있습니다.";
+                    ?? "한글 효과 설명 없음";
                 string location = YgoConstants.GetLocationNameKR(source.location);
                 var visibleText = Modals.ModalRoot.GetComponentsInChildren<Text>();
                 var labels = visibleText.Select(label => label.text).ToArray();

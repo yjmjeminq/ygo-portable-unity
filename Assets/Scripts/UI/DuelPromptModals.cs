@@ -946,7 +946,7 @@ namespace YGOPortable.UI
             if (cardCode == 0) cardCode = CardDatabase.GetDescriptionCardCode(p.promptDesc);
             if (cardCode == 0) cardCode = session.SelectionChainLink?.code ?? 0;
             var card = CardDatabase.Get(cardCode);
-            string msg = CardDatabase.ResolveDescription(p.promptDesc) ?? CardDatabase.GetKoreanCardDescription(cardCode)
+            string msg = CardDatabase.ResolveDescription(p.promptDesc) ?? CardDatabase.ResolveEffectDescription(p.promptDesc, cardCode)
                 ?? "선택한 처리를 실행하시겠습니까?";
 
             _modalTitle.text = "선택 확인";
@@ -1112,7 +1112,9 @@ namespace YGOPortable.UI
                 .Select(opt => CardDatabase.Get(CardDatabase.GetDescriptionCardCode(opt))).ToArray();
             var sources = cards.Where(card => card != null).Distinct().ToArray();
             var link = session.SelectionChainLink;
-            var rulesNeeded = new HashSet<uint>();
+            uint promptSource = p.promptCardCode != 0 ? p.promptCardCode : link?.code ?? 0;
+            var descriptionOrder = sources.Length == 1 && cards.All(card => card == sources[0]) &&
+                p.options.Distinct().Count() == p.options.Count ? p.options.OrderBy(option => option).ToArray() : null;
             for (int i = 0; i < p.options.Count; i++)
             {
                 int pick = i;
@@ -1121,13 +1123,12 @@ namespace YGOPortable.UI
                 string text = isNum ? opt.ToString() : CardDatabase.ResolveOptionDescription(opt);
                 if (text == null)
                 {
-                    uint source = card?.code ?? session.SelectionChainLink?.code ?? 0;
-                    if (p.options.Count == 1) text = CardDatabase.GetKoreanCardDescription(source);
-                    if (text == null)
-                    {
-                        text = $"선택지 {i + 1}";
-                        if (source != 0) rulesNeeded.Add(source);
-                    }
+                    uint source = card?.code ?? promptSource;
+                    int effectIndex = descriptionOrder == null ? i : Array.IndexOf(descriptionOrder, opt);
+                    if (sources.Length <= 1)
+                        text = CardDatabase.ExtractPrintedOptionDescription(source, effectIndex, p.options.Count);
+                    if (text == null && card != null) text = CardDatabase.ResolveDescription(opt);
+                    text ??= $"선택지 {i + 1}";
                 }
                 if (sources.Length > 1 && card != null)
                     text = $"{card.name}\n{text}";
@@ -1139,7 +1140,7 @@ namespace YGOPortable.UI
                     var value = option.GetComponentInChildren<Text>();
                     value.font = DuelTypography.NumberFont;
                 }
-                uint inspectCode = card?.code ?? link?.code ?? 0;
+                uint inspectCode = card?.code ?? promptSource;
                 PreviewOnFocus(option, inspectCode, ReadFieldEffectSource(session, p, inspectCode));
             }
             if (sources.Length == 1)
@@ -1148,16 +1149,10 @@ namespace YGOPortable.UI
                 uint code = sources[0].code;
                 InspectChoice(code, ReadFieldEffectSource(session, p, code));
             }
-            else if (sources.Length == 0 && link != null)
+            else if (sources.Length == 0 && promptSource != 0)
             {
-                _modalSubtitle.text = CardDatabase.GetName(link.code);
-                InspectChoice(link.code, ReadFieldEffectSource(session, p, link.code));
-            }
-            foreach (uint code in rulesNeeded)
-            {
-                string rules = CardDatabase.GetKoreanCardDescription(code);
-                if (rules != null)
-                    AddDescriptionText(content, "CardText", sources.Length == 1 ? rules : $"{CardDatabase.GetName(code)}\n{rules}");
+                _modalSubtitle.text = CardDatabase.GetName(promptSource);
+                InspectChoice(promptSource, ReadFieldEffectSource(session, p, promptSource));
             }
         }
 
@@ -1248,7 +1243,7 @@ namespace YGOPortable.UI
             var effects = choices.Select(choice =>
                 (_confirmPileActivation != null ? CardDatabase.ResolveCommandEffectDescription(choice.Card) :
                     CardDatabase.ResolveEffectDescription(choice.Card.description, choice.Card.code)) ??
-                    "이 카드의 효과를 발동할 수 있습니다.").ToArray();
+                    "한글 효과 설명 없음").ToArray();
             bool respondingToOpponent = _confirmPileActivation == null && prompt.messageType == YgoConstants.MSG_SELECT_CHAIN &&
                 session.CurrentChain.LastOrDefault() is { code: not 0 } link && link.triggerPlayer != session.HumanPlayerIndex;
 

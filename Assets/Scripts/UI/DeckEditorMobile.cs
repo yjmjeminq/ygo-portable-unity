@@ -50,7 +50,7 @@ namespace YGOPortable.UI
             DuelUiKit.AddFittedText(_mobileTitle, "Title", "덱 편집", 35, 21, TextAnchor.MiddleLeft, DuelUiKit.TextPrimary,
                 FontStyle.Bold);
             _mobileToolbar = DeckArea(root, "MobileToolbar", .28f, 0f, .985f, 1f);
-            DeckButton(_mobileToolbar, "AutoSort", "자동 정렬", .02f, 0f, .215f, 1f, () => SortWorkingDeck(), fontSize: 24);
+            DeckButton(_mobileToolbar, "AutoSort", "자동 정렬", .02f, 0f, .215f, 1f, () => SortWorkingDeck(byFrame: true), fontSize: 24);
             _openDrawButton = DeckButton(_mobileToolbar, "TestDraw", "5장 테스트 드로우", .227f, 0f, .504f, 1f,
                 OpenTestDraw, fontSize: 24);
             _saveButtonText = DeckButton(_mobileToolbar, "Save", "저장", .516f, 0f, .716f, 1f,
@@ -101,7 +101,7 @@ namespace YGOPortable.UI
             ((RectTransform)searchTools.Find("DetailedSearch")).anchorMax = new Vector2(.26f, 1f);
             ((RectTransform)searchTools.Find("ArchetypeSearch")).anchorMin = new Vector2(.28f, 0f);
             ((RectTransform)searchTools.Find("ArchetypeSearch")).anchorMax = new Vector2(.61f, 1f);
-            _mobileTrunkSort = DeckButton(searchTools, "Sort", SortOptions[_sortFilter.value], .63f, 0f, 1f, 1f,
+            _mobileTrunkSort = DeckButton(searchTools, "Sort", SortOptions[DefaultTrunkSort], .63f, 0f, 1f, 1f,
                 () => _sortFilter.value = (_sortFilter.value + 1) % SortOptions.Length, fontSize: 18).GetComponentInChildren<Text>();
             _searchInp.textComponent.fontSize = 25;
             _searchInp.placeholder.GetComponent<Text>().fontSize = 24;

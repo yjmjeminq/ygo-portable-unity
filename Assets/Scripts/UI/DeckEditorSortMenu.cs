@@ -27,7 +27,7 @@ namespace YGOPortable.UI
         private readonly Button[] _mainSortOptions = new Button[MainSortOptions.Length];
         private readonly Button[] _wholeSortOptions = new Button[2];
         private int _lastMainSort;
-        private int _lastWholeSort;
+        private int _lastWholeSort = 1;
         private bool _sortingWholeDeck;
 
         private Button ActiveDeckSortOption =>

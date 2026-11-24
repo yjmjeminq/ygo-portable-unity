@@ -441,25 +441,31 @@ namespace YGOPortable.Editor
             OpenSavedDeck(editor, DeckRepository.UserDecks.IndexOf(saved));
 
             var deck = Field<UserDeck>(editor, "_workingDeck");
-            Require(deck.main.SequenceEqual(new[] { repeated, repeated, other }) &&
+            bool repeatedFirst = DeckMainSorter.Order(new[] { repeated, other }, DeckMainSortMode.Frame)[0] == repeated;
+            var defaultOrder = repeatedFirst ? new[] { repeated, repeated, other } : new[] { other, repeated, repeated };
+            IEnumerable<uint> Reordered(int count) => repeatedFirst
+                ? new[] { other }.Concat(Enumerable.Repeat(repeated, count))
+                : Enumerable.Repeat(repeated, count).Append(other);
+            Require(deck.main.SequenceEqual(defaultOrder) &&
                 saved.main.SequenceEqual(new[] { repeated, other, repeated }),
-                "Loading separated copies did not group them without rewriting the saved deck.");
-            Require(!(bool)CallResult(editor, "HasUnsavedChanges"), "Loading a deck marked it dirty just for grouping copies.");
+                "Loading separated copies did not group and frame-sort them without rewriting the saved deck.");
+            Require(!(bool)CallResult(editor, "HasUnsavedChanges"), "Default frame sorting marked the deck dirty.");
 
             Field<InputField>(editor, "_searchInp").text = repeated.ToString();
             Call(editor, "InspectCard", repeated);
             Require(TrunkCount(editor, repeated) == "×1", "Two copies assigned to Main did not leave one in the trunk.");
-            Call(editor, "MoveDeckCard", DragSourceType.DeckMain, 1, DragSourceType.DeckMain, 2, null);
-            Require(deck.main.SequenceEqual(new[] { other, repeated, repeated }),
+            Call(editor, "MoveDeckCard", DragSourceType.DeckMain, deck.main.LastIndexOf(repeated),
+                DragSourceType.DeckMain, deck.main.IndexOf(other), null);
+            Require(deck.main.SequenceEqual(Reordered(2)),
                 "Reordering within Main split the group instead of moving it together.");
             Call(editor, "TryAddCardToDeck", repeated, DragSourceType.DeckMain, null, null);
-            Require(deck.main.SequenceEqual(new[] { other, repeated, repeated, repeated }) &&
+            Require(deck.main.SequenceEqual(Reordered(3)) &&
                 TrunkCount(editor, repeated) == "×0", "An added copy did not join its group and consume the last trunk copy.");
             Call(editor, "TryAddCardToDeck", repeated, DragSourceType.DeckMain, null, null);
             Require(deck.main.Count == 4, "The zero trunk balance allowed another copy into the deck.");
 
-            Call(editor, "MoveDeckCard", DragSourceType.DeckMain, 2, DragSourceType.DeckSide, -1, null);
-            Require(deck.main.SequenceEqual(new[] { other, repeated, repeated }) && deck.side.SequenceEqual(new[] { repeated }) &&
+            Call(editor, "MoveDeckCard", DragSourceType.DeckMain, deck.main.LastIndexOf(repeated), DragSourceType.DeckSide, -1, null);
+            Require(deck.main.SequenceEqual(Reordered(2)) && deck.side.SequenceEqual(new[] { repeated }) &&
                 TrunkCount(editor, repeated) == "×0", "Moving one copy to Side changed the total available in the trunk.");
             Call(editor, "RemoveDeckCard", DragSourceType.DeckSide, 0, null);
             Require(TrunkCount(editor, repeated) == "×1" &&
@@ -611,8 +617,14 @@ namespace YGOPortable.Editor
             OpenSavedDeck(editor, DeckRepository.UserDecks.IndexOf(saved));
 
             var deck = Field<UserDeck>(editor, "_workingDeck");
-            Require(deck.main.SequenceEqual(new[] { blueEyes, blueEyesArt, other }) &&
-                deck.extra.SequenceEqual(new[] { arcray, arcrayArt, zarc }) &&
+            IEnumerable<uint> ExpectedGroup(uint primary, uint alternate, uint remaining, bool extraCopy = false)
+            {
+                var copies = extraCopy ? new[] { primary, alternate, alternate } : new[] { primary, alternate };
+                return DeckMainSorter.Order(new[] { primary, remaining }, DeckMainSortMode.Frame)[0] == primary
+                    ? copies.Append(remaining) : copies.Prepend(remaining);
+            }
+            Require(deck.main.SequenceEqual(ExpectedGroup(blueEyes, blueEyesArt, other)) &&
+                deck.extra.SequenceEqual(ExpectedGroup(arcray, arcrayArt, zarc)) &&
                 saved.extra.SequenceEqual(new[] { arcray, zarc, arcrayArt }) &&
                 !(bool)CallResult(editor, "HasUnsavedChanges"), "Loading variants changed the saved deck or split their display order.");
             var search = Field<InputField>(editor, "_searchInp");
@@ -637,11 +649,11 @@ namespace YGOPortable.Editor
             Require(related.gameObject.activeInHierarchy && related.IsInteractable() && deck.main.Count == 3,
                 "Right-click did not expose related-card search without changing the deck.");
             Field<Button>(editor, "_deckCardActionMain").onClick.Invoke();
-            Require(deck.main.SequenceEqual(new[] { blueEyes, blueEyesArt, blueEyesArt, other }) && TrunkCount(editor, blueEyes) == "×1",
+            Require(deck.main.SequenceEqual(ExpectedGroup(blueEyes, blueEyesArt, other, extraCopy: true)) && TrunkCount(editor, blueEyes) == "×1",
                 "Adding the grouped card did not consume an available owned artwork or keep its copies adjacent.");
             Call(editor, "TryAddCardToDeck", blueEyesArt, DragSourceType.DeckMain, null, null);
             Require(deck.main.Count == 4, "A different illustration bypassed the shared copy limit.");
-            Call(editor, "MoveDeckCard", DragSourceType.DeckMain, 2, DragSourceType.DeckSide, -1, null);
+            Call(editor, "MoveDeckCard", DragSourceType.DeckMain, deck.main.LastIndexOf(blueEyesArt), DragSourceType.DeckSide, -1, null);
             Require(deck.side.SequenceEqual(new[] { blueEyesArt }) && TrunkCount(editor, blueEyes) == "×1",
                 "Moving an artwork to the side deck changed the available ownership.");
             Call(editor, "RemoveDeckCard", DragSourceType.DeckSide, 0, null);
@@ -885,6 +897,9 @@ namespace YGOPortable.Editor
                 "Controller sorting did not preserve the selected card or apply the highlighted mode.");
             padArea.SetValue(editor, Enum.Parse(padArea.FieldType, "Trunk"));
             var trunkSort = Field<Dropdown>(editor, "_sortFilter");
+            Call(editor, "ResetTrunkFilters");
+            Require(trunkSort.value == 4 && trunkSort.captionText.text == "카드 프레임별",
+                "Resetting the trunk filters did not restore frame sorting.");
             int before = trunkSort.value;
             Pad("Alternate");
             Require(!overlay.activeSelf && trunkSort.value == (before + 1) % trunkSort.options.Count &&
@@ -912,7 +927,8 @@ namespace YGOPortable.Editor
             events.SetSelectedGameObject(allSort.gameObject);
             allSort.onClick.Invoke();
             Require(overlay.activeSelf && allOptions.All(button => button.gameObject.activeInHierarchy) &&
-                options.All(button => !button.gameObject.activeInHierarchy),
+                options.All(button => !button.gameObject.activeInHierarchy) &&
+                events.currentSelectedGameObject == allOptions[1].gameObject,
                 "Whole-deck sort showed incorrect choices.");
             events.SetSelectedGameObject(allOptions[1].gameObject);
             Pad("Submit");

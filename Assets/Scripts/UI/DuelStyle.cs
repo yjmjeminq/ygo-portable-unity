@@ -188,7 +188,15 @@ namespace YGOPortable.UI
             var caption = DuelUiKit.CreateRect("Caption", plate, Vector2.zero, Vector2.one,
                 new Vector2(53f, 0f), new Vector2(-12f, 0f));
             var label = DuelUiKit.AddText(caption, "Label", text, 17, TextAnchor.MiddleLeft, Color.white, FontStyle.Bold);
-            label.horizontalOverflow = HorizontalWrapMode.Overflow;
+            if (icon == "ACTION")
+            {
+                label.resizeTextForBestFit = true;
+                label.resizeTextMinSize = 10;
+                label.resizeTextMaxSize = 17;
+                label.horizontalOverflow = HorizontalWrapMode.Wrap;
+                label.verticalOverflow = VerticalWrapMode.Truncate;
+            }
+            else label.horizontalOverflow = HorizontalWrapMode.Overflow;
             label.supportRichText = false;
             var outline = label.gameObject.AddComponent<Outline>();
             outline.effectColor = new Color(0f, 0f, 0f, .95f);

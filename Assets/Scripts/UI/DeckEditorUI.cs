@@ -18,10 +18,12 @@ namespace YGOPortable.UI
         // Current edited deck
         private int _userDeckIdx = 0;
         private UserDeck _workingDeck;
+        private UserDeck _workingDeckBaseline;
         private uint _inspectedCode = 89631139;
 
         private static readonly string[] CardKinds = { "종류: 전체", "메인 몬스터", "마법", "함정", "엑스트라" };
         private static readonly string[] SortOptions = { "기본순", "공격력 높은 순", "레벨 높은 순", "이름순", "카드 프레임별" };
+        private const int DefaultTrunkSort = 4;
 
         // Virtualized Trunk Scroll Grid
         private const int TrunkCols = 4;
@@ -293,9 +295,8 @@ namespace YGOPortable.UI
             }
             _workingDeck = CopyDeck(DeckRepository.UserDecks[_userDeckIdx]);
             _mobileSelectedCode = 0;
-            GroupDeckCopies(_workingDeck.main);
-            GroupDeckCopies(_workingDeck.extra);
-            GroupDeckCopies(_workingDeck.side);
+            OrderWorkingDeckCards(DeckMainSortMode.Frame);
+            _workingDeckBaseline = CopyDeck(_workingDeck);
             _deckNameInput.SetTextWithoutNotify(_workingDeck.name);
             RefreshDeckGrids();
             _mainDeckScroll.StopMovement();
@@ -549,6 +550,7 @@ namespace YGOPortable.UI
             }
             _kindFilter = AddFilter("Kind", 0f, .322f, CardKinds, ChangeTrunkKind);
             _sortFilter = AddFilter("Sort", .336f, .632f, SortOptions, _ => RefreshTrunkFilter());
+            _sortFilter.SetValueWithoutNotify(DefaultTrunkSort);
             var ownership = DuelUiKit.CreateRect("Ownership", filters, new Vector2(.647f, 0f), Vector2.one,
                 Vector2.zero, Vector2.zero);
             _trunkOwnershipToggle = DeckEditorStyle.Button(ownership, "Button", "보유 카드만", () =>
@@ -686,7 +688,7 @@ namespace YGOPortable.UI
                 new Vector2(0.430f, 1f), Vector2.zero, Vector2.zero), "Input", "덱 이름", 15);
             _deckNameInput.onValueChanged.AddListener(_ => RefreshSaveLabel());
             _wholeSortButton = Control(edit, "Sort", "정렬 옵션", .442f, .17f, OpenWholeDeckSort);
-            Control(edit, "AutoSort", "자동 정렬", .625f, .18f, () => SortWorkingDeck());
+            Control(edit, "AutoSort", "자동 정렬", .625f, .18f, () => SortWorkingDeck(byFrame: true));
             Control(edit, "DeckTools", "덱 관리", .819f, .181f, OpenDeckTools);
 
             (_mainGridRect, _mainCountText) = BuildDeckSection(panel, "Main", "메인", .789f, .429f);
@@ -854,7 +856,6 @@ namespace YGOPortable.UI
             CloseDetailedSearch();
             _relatedFilterCode = relatedCode;
             _activeArchetypeFilter = archetype;
-            _sortFilter.SetValueWithoutNotify(0);
             ClearTrunkFilterValues();
         }
 
@@ -868,6 +869,8 @@ namespace YGOPortable.UI
 
         private void ClearTrunkFilterValues()
         {
+            _sortFilter.SetValueWithoutNotify(DefaultTrunkSort);
+            if (_mobileTrunkSort != null) _mobileTrunkSort.text = SortOptions[DefaultTrunkSort];
             _queryBeforeFilters = "";
             ClearDetailedSearch();
             SetQuickFilter(0, refresh: false);
@@ -938,7 +941,7 @@ namespace YGOPortable.UI
             if (sort == 1) _trunkResults.Sort((a, b) => b.atk.CompareTo(a.atk));
             else if (sort == 2) _trunkResults.Sort((a, b) => b.level.CompareTo(a.level));
             else if (sort == 3) _trunkResults.Sort((a, b) => string.Compare(a.name, b.name, StringComparison.Ordinal));
-            else if (sort == 4) _trunkResults.Sort((a, b) =>
+            else if (sort == DefaultTrunkSort) _trunkResults.Sort((a, b) =>
             {
                 int frame = DeckMainSorter.FrameOrder(a).CompareTo(DeckMainSorter.FrameOrder(b));
                 return frame != 0 ? frame : string.Compare(a.name, b.name, StringComparison.Ordinal);
@@ -1273,11 +1276,6 @@ namespace YGOPortable.UI
 
         private static uint DeckGroupKey(uint code) => CardDatabase.GetDeckPrintingKey(code);
 
-        private static IEnumerable<uint> GroupedDeckOrder(List<uint> cards) =>
-            cards.GroupBy(DeckGroupKey).SelectMany(group => group);
-
-        private void GroupDeckCopies(List<uint> cards) => _workingDeck.ReorderCards(cards, GroupedDeckOrder(cards));
-
         private static int DeckGroupStart(List<uint> cards, int index)
         {
             uint key = DeckGroupKey(cards[index]);
@@ -1609,15 +1607,15 @@ namespace YGOPortable.UI
             if (_workingDeck == null) return false;
             var saved = DeckRepository.UserDecks.FirstOrDefault(deck => deck.id == _workingDeck.id);
             if (saved == null || DeckNameForSave != saved.name) return true;
+            var baseline = _workingDeckBaseline?.id == saved.id ? _workingDeckBaseline : saved;
             bool Changed(List<uint> current, List<uint> previous)
             {
-                var ordered = previous.Select((code, index) => (Code: code, Appearance: saved.GetAppearance(previous, index)))
-                    .GroupBy(card => DeckGroupKey(card.Code)).SelectMany(group => group);
+                var ordered = previous.Select((code, index) => (Code: code, Appearance: baseline.GetAppearance(previous, index)));
                 var working = current.Select((code, index) => (Code: code, Appearance: _workingDeck.GetAppearance(current, index)));
                 return !working.SequenceEqual(ordered);
             }
-            return Changed(_workingDeck.main, saved.main) || Changed(_workingDeck.extra, saved.extra) ||
-                Changed(_workingDeck.side, saved.side);
+            return Changed(_workingDeck.main, baseline.main) || Changed(_workingDeck.extra, baseline.extra) ||
+                Changed(_workingDeck.side, baseline.side);
         }
 
         private void RefreshSaveLabel()
@@ -1645,6 +1643,7 @@ namespace YGOPortable.UI
                 return false;
             }
             _workingDeck.name = snapshot.name;
+            _workingDeckBaseline = snapshot;
             _deckNameInput.SetTextWithoutNotify(snapshot.name);
             RefreshSaveLabel();
             ShowToast(GameAppController.CanStartWithDeck(snapshot, out string reason)
@@ -1674,7 +1673,7 @@ namespace YGOPortable.UI
                 });
         }
 
-        private void SortWorkingDeck(bool byFrame = false, bool byName = false)
+        private void SortWorkingDeck(bool byFrame = true, bool byName = false)
         {
             var main = _workingDeck.main.ToArray();
             var extra = _workingDeck.extra.ToArray();
@@ -1684,13 +1683,20 @@ namespace YGOPortable.UI
             var sidePositions = CaptureDeckPositions(DragSourceType.DeckSide, side.Length);
             CancelDeckDrag();
             EndDeckTransfer();
-            var mode = byFrame ? DeckMainSortMode.Frame : DeckMainSortMode.Auto;
+            OrderWorkingDeckCards(byName ? DeckMainSortMode.Name : byFrame ? DeckMainSortMode.Frame : DeckMainSortMode.Auto);
+            RefreshDeckGrids();
+            AnimateOrderedDeck(DragSourceType.DeckMain, _workingDeck.main, main, mainPositions);
+            AnimateOrderedDeck(DragSourceType.DeckExtra, _workingDeck.extra, extra, extraPositions);
+            AnimateOrderedDeck(DragSourceType.DeckSide, _workingDeck.side, side, sidePositions);
+            ShowToast(byFrame && !byName ? "전체 덱 정렬 · 카드 프레임별" : "덱 정렬 완료");
+        }
+
+        private void OrderWorkingDeckCards(DeckMainSortMode mode)
+        {
             foreach (var section in new[] { _workingDeck.main, _workingDeck.extra, _workingDeck.side })
             {
-                var ordered = byName
-                    ? OrderDeckGroups(section, DeckMainSortMode.Name)
-                    : OrderDeckGroups(section, mode);
-                if (byName && section == _workingDeck.main)
+                var ordered = OrderDeckGroups(section, mode);
+                if (mode == DeckMainSortMode.Name && section == _workingDeck.main)
                     ordered = ordered.OrderBy(code =>
                     {
                         var card = CardDatabase.Get(code);
@@ -1698,11 +1704,6 @@ namespace YGOPortable.UI
                     }).ToArray();
                 _workingDeck.ReorderCards(section, ordered);
             }
-            RefreshDeckGrids();
-            AnimateOrderedDeck(DragSourceType.DeckMain, _workingDeck.main, main, mainPositions);
-            AnimateOrderedDeck(DragSourceType.DeckExtra, _workingDeck.extra, extra, extraPositions);
-            AnimateOrderedDeck(DragSourceType.DeckSide, _workingDeck.side, side, sidePositions);
-            ShowToast(byFrame ? "전체 덱 정렬 · 카드 프레임별" : "덱 정렬 완료");
         }
 
         private void ShuffleWorkingDeck()
