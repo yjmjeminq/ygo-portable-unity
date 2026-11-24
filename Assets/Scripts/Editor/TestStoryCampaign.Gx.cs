@@ -265,7 +265,7 @@ namespace YGOPortable.Editor
                 Drive(() => InMain(Duel, turn), target: target);
             }
 
-            internal void Drive(Func<bool> stop, bool endTurn = false, uint target = 0, uint acceptEffect = 0)
+            internal void Drive(Func<bool> stop, bool endTurn = false, uint target = 0, uint acceptEffect = 0, bool attackPosition = false)
             {
                 for (int step = 0; step < 170 && !stop() && !Duel.IsFinished && Duel.RetryCount == 0; step++)
                 {
@@ -276,7 +276,10 @@ namespace YGOPortable.Editor
                         int index = prompt.candidates.FindIndex(card => card.code == target);
                         if (index >= 0) { Duel.SubmitResponse(DuelSession.PackCardSelection(index)); continue; }
                     }
-                    if (acceptEffect != 0 && prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && prompt.promptCardCode == acceptEffect)
+                    if (attackPosition && prompt.messageType == YgoConstants.MSG_SELECT_POSITION &&
+                        (prompt.allowedPositions & YgoConstants.POS_FACEUP_ATTACK) != 0)
+                        Duel.SubmitResponseInt((int)YgoConstants.POS_FACEUP_ATTACK);
+                    else if (acceptEffect != 0 && prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && prompt.promptCardCode == acceptEffect)
                         Duel.SubmitResponseInt(1);
                     else if (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN && !prompt.forced)
                         Duel.SubmitResponseInt(acceptEffect == 0 ? -1 : prompt.candidates.FindIndex(card => card.code == acceptEffect));

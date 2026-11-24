@@ -85,7 +85,7 @@ std::string story_script_file(const std::string& key) {
         key == "c511090104.lua" || key == "c511090105.lua")
         return "story_darkness_trap.lua";
     if (key == "c511090001.lua" || key == "c511090002.lua" || key == "story_gimmicks.lua" ||
-        key == "story_gx.lua" || key == "story_5ds.lua")
+        key == "story_gx.lua" || key == "story_5ds.lua" || key == "story_zexal.lua")
         return key;
     return {};
 }
@@ -444,6 +444,13 @@ YGO_API int32_t YGO_MoveDeckCardToTop(void* handle, uint8_t controller, uint32_t
     deck.push_back(selected);
     field.reset_sequence(controller, LOCATION_DECK);
     return 1;
+}
+
+YGO_API void YGO_RecordStoryShiningDraw(void* handle) {
+    if (!handle) return;
+    auto* state = static_cast<duel*>(handle)->lua->current_state;
+    lua_pushboolean(state, 1);
+    lua_setglobal(state, "YgoStoryShiningUsed");
 }
 
 YGO_API const void* YGO_QueryCard(void* duel, uint32_t flags, uint8_t con, uint32_t loc,

@@ -200,10 +200,11 @@ YgoStory={
     onPhase=onPhase,
     activeField=activeField,
     countdown=countdown,
+    damageEachTurn=damageEachTurn,
     addAttack=addAttack,
 }
 
-local modules={"story_gx.lua","story_5ds.lua"}
+local modules={"story_gx.lua","story_5ds.lua","story_zexal.lua"}
 function YgoStoryConfigure(rule,human)
     for _,module in ipairs(modules) do
         if rules[rule] then break end

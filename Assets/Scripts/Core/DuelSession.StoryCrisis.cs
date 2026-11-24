@@ -12,12 +12,16 @@ namespace YGOPortable.Core
         internal StoryCrisisSkill PendingStoryCrisis => ActivePrompt?.messageType == YgoConstants.MSG_STORY_CRISIS
             ? _storyRuntime?.CrisisSkill ?? StoryCrisisSkill.None : StoryCrisisSkill.None;
 
+        internal StoryCrisisSkill ReadyStoryCrisis => !IsFinished &&
+            _storyRuntime?.CanActivateCrisisSkill(Players[HumanPlayerIndex].lp) == true
+                ? _storyRuntime.CrisisSkill : StoryCrisisSkill.None;
+
         private static bool IsManagedDrawPrompt(DuelPrompt prompt) =>
             prompt?.messageType is YgoConstants.MSG_DESTINY_DRAW or YgoConstants.MSG_STORY_CRISIS;
 
         private void OfferDrawSkills(byte player)
         {
-            if (player == HumanPlayerIndex && _storyRuntime?.CanActivateCrisisSkill(Players[player].lp) == true)
+            if (player == HumanPlayerIndex && ReadyStoryCrisis != StoryCrisisSkill.None)
                 ActivePrompt = new DuelPrompt { messageType = YgoConstants.MSG_STORY_CRISIS, playerId = player };
             else
                 OfferDestinyDraw(player);
@@ -45,6 +49,7 @@ namespace YGOPortable.Core
                 uint sequence = (uint)(answer - 1);
                 if (YgoNativeBridge.YGO_MoveDeckCardToTop(NativePtr, player, sequence) != 0)
                 {
+                    YgoNativeBridge.YGO_RecordStoryShiningDraw(NativePtr);
                     _storyRuntime.RecordCrisisUse();
                     ForgetObservedDeckTop(player);
                     AddLog("플레이어 샤이닝 드로우 발동!");

@@ -121,12 +121,12 @@
       {"source":41},
       {"source":43,"title":"고르고닉 앤 고스트","gimmick":"gorgonic_ghost"},
       {"source":44,"title":"누메론 네트워크","gimmick":"numeron_network"},
-      {"source":44,"title":"누메로니어스 결전","gimmick":"numeronius","raidCard":89477759},
+      {"source":44,"title":"누메로니어스 결전","gimmick":"numeronius","raidCard":15862758},
       {"source":45,"title":"바리안 칠황의 영혼","gimmick":"barian_emperors","raidCard":12744567,"raidLife":10000},
       {"source":48},
       {"source":49,"title":"100장의 넘버즈 의식","gimmick":"hundred_numbers"},
       {"source":28,"title":"호프 루츠 결전","gimmick":"hope_roots"},
-      {"source":50,"title":"미래황 호프 피날레","gimmick":"uturpic_finale","raidCard":26973555}
+      {"source":50,"title":"미래황 호프 피날레","gimmick":"uturpic_finale","raidCard":65305468}
     ]},
     {"id":"arcv","episodes":[
       {"source":1,"title":"액션 듀얼 개막","gimmick":"action_opening"},

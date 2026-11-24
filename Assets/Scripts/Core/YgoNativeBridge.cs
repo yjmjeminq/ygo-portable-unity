@@ -91,6 +91,9 @@ namespace YGOPortable.Core
         internal static extern int YGO_MoveDeckCardToTop(IntPtr duel, byte controller, uint sequence);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void YGO_RecordStoryShiningDraw(IntPtr duel);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         private static extern IntPtr YGO_QueryCard(
             IntPtr duel, uint flags, byte con, uint loc, uint seq, uint overlaySeq, out uint outLen);
 

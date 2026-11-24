@@ -33,11 +33,17 @@ namespace YGOPortable.UI
 
         private void RefreshStoryCrisisControls()
         {
-            var skill = _session?.PendingStoryCrisis ?? StoryCrisisSkill.None;
-            bool visible = CanAcceptPlayerAction && skill != StoryCrisisSkill.None;
+            var skill = _session?.ReadyStoryCrisis ?? StoryCrisisSkill.None;
+            bool visible = skill != StoryCrisisSkill.None;
+            bool available = visible && CanAcceptPlayerAction && _session.PendingStoryCrisis == skill;
             _storyCrisisControls.SetActive(visible);
+            _storyCrisisButton.interactable = available;
+            _storyDrawButton.transform.parent.gameObject.SetActive(available);
             if (visible)
-                _storyCrisisLabel.text = skill == StoryCrisisSkill.ShiningDraw ? "✧ 샤이닝 드로우" : "⚡ 스톰 액세스";
+            {
+                string title = skill == StoryCrisisSkill.ShiningDraw ? "✧ 샤이닝 드로우" : "⚡ 스톰 액세스";
+                _storyCrisisLabel.text = available ? title : $"{title}\n드로우 대기";
+            }
         }
 
         private void SkipStoryCrisis()

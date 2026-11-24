@@ -38,6 +38,7 @@ namespace YGOPortable.Editor
                 VerifyDmScenarioEffects();
                 VerifyGxScenarioEffects();
                 Verify5DsScenarioEffects();
+                VerifyZexalScenarioEffects();
                 Require(nativeErrors.Count == 0, string.Join("\n", nativeErrors));
                 VerifyDialogueChoices(starter);
                 VerifyOpeningAndSave(save);
@@ -242,7 +243,7 @@ namespace YGOPortable.Editor
                         OpponentDeckLevels.GetDecks(episode.charId).Any(deck => deck.main?.Length >= 40),
                         $"Missing cast or decks for {episode.id}.");
                     var scripted = StoryGimmickRuntime.StartingCards(episode.gimmick);
-                    if (!((series is "gx" or "5ds") && !string.IsNullOrEmpty(episode.gimmick)) &&
+                    if (!((series is "gx" or "5ds" or "zexal") && !string.IsNullOrEmpty(episode.gimmick)) &&
                         episode.raidCard == 0 && episode.raidLife == 0 && scripted.Count == 0 &&
                         !StoryGimmickRuntime.IsRidingDuel(episode.gimmick)) continue;
                     StoryRaid? boss = episode.raidCard != 0 || episode.raidLife != 0 ?
@@ -296,7 +297,8 @@ namespace YGOPortable.Editor
             Require(duel.StartNewDuel(player, Array.Empty<uint>(), rival, extra ?? Array.Empty<uint>(), humanFirst,
                 seed: new ulong[] { 222, 17, 821, 909 }, opponentOpening: raid?.Opening, storyGimmick: gimmick),
                 $"Could not start the raid {name}.");
-            if (name.StartsWith("gx_", StringComparison.Ordinal) || name.StartsWith("5ds_", StringComparison.Ordinal))
+            if (name.StartsWith("gx_", StringComparison.Ordinal) || name.StartsWith("5ds_", StringComparison.Ordinal) ||
+                name.StartsWith("zexal_", StringComparison.Ordinal))
             {
                 var ai = new TacticalAI { Difficulty = AIDifficulty.Easy };
                 for (int step = 0; step < 30 && !InMain(duel, 1) && !duel.IsFinished && duel.RetryCount == 0; step++)
@@ -309,10 +311,11 @@ namespace YGOPortable.Editor
                 Require(InMain(duel, 1) && duel.RetryCount == 0, $"Opening effects in {name} did not reach the first Main Phase.");
             }
             var boss = duel.Players[duel.AiPlayerIndex];
+            int playerLife = gimmick switch { "heartland_cannon" => 7500, "numeronius" => 2000, _ => 8000 };
             bool riding = StoryGimmickRuntime.IsRidingDuel(gimmick);
             Require(boss.lp == (raid?.Opening.Life ?? 8000) &&
                 boss.hand.Count == (raid?.Opening.Hand ?? 5) + (riding ? 1 : 0) &&
-                duel.Players[duel.HumanPlayerIndex].lp == 8000,
+                duel.Players[duel.HumanPlayerIndex].lp == playerLife,
                 $"The configured LP, hand or opening field was missing in {name} (boss LP {boss.lp}, hand {boss.hand.Count}).");
             if (raid?.Opening.FieldCard is > 0)
                 VerifyCard(raid.Value.Opening.FieldCard, YgoConstants.POS_FACEUP_ATTACK);

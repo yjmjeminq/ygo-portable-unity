@@ -194,9 +194,12 @@ namespace YGOPortable.Editor
                 using (var above = Start("barian_chaos", CreatePlayerDeck(false), 2001))
                 {
                     Drive(above, () => above.TurnNumber >= 2 && above.ActivePrompt?.messageType == YgoConstants.MSG_SELECT_IDLECMD);
-                    Require(above.PendingStoryCrisis == StoryCrisisSkill.None, "Shining Draw lit above 2,000 LP.");
+                    Require(above.ReadyStoryCrisis == StoryCrisisSkill.None, "Shining Draw lit above 2,000 LP.");
                 }
                 using var duel = Start("barian_chaos", CreatePlayerDeck(false), 2000);
+                Require(duel.ReadyStoryCrisis == StoryCrisisSkill.ShiningDraw &&
+                    duel.PendingStoryCrisis == StoryCrisisSkill.None, "Shining Draw did not light before the next available draw.");
+                UseCrisisButton(duel, "샤이닝 드로우", waitingForDraw: true);
                 Drive(duel, () => duel.PendingStoryCrisis == StoryCrisisSkill.ShiningDraw);
                 int human = duel.HumanPlayerIndex;
                 var choice = duel.ShiningDrawChoices().Single(card => card.code == 89631139);
@@ -211,6 +214,7 @@ namespace YGOPortable.Editor
             static void VerifyStormAndDestiny()
             {
                 using var duel = Start("mirror_link", CreatePlayerDeck(true), 1700);
+                UseCrisisButton(duel, "스톰 액세스", waitingForDraw: true);
                 Drive(duel, () => duel.PendingStoryCrisis == StoryCrisisSkill.StormAccess);
                 byte human = (byte)duel.HumanPlayerIndex;
                 UseCrisisButton(duel, "스톰 액세스");
@@ -226,7 +230,7 @@ namespace YGOPortable.Editor
                 Require(replay?.Players[human].extra.Single().code == 1861629, "Planning replay lost Storm Access.");
             }
 
-            static void UseCrisisButton(DuelSession duel, string label, uint select = 0)
+            static void UseCrisisButton(DuelSession duel, string label, uint select = 0, bool waitingForDraw = false)
             {
                 var canvas = new GameObject("Story skill", typeof(Canvas));
                 ((RectTransform)canvas.transform).sizeDelta = new Vector2(1600f, 900f);
@@ -239,8 +243,11 @@ namespace YGOPortable.Editor
                     field.Refresh();
                     var button = field.Root.GetComponentsInChildren<Button>().Single(control =>
                         control.transform.parent.name == "Activate" && control.transform.parent.parent.name == "StoryCrisis");
-                    Require(button.IsInteractable() && button.GetComponentInChildren<Text>().text.Contains(label) &&
+                    string caption = button.GetComponentInChildren<Text>().text;
+                    Require(button.IsInteractable() == !waitingForDraw && caption.Contains(label) &&
+                        (!waitingForDraw || caption.Contains("드로우 대기")) &&
                         !modals.IsPromptOpen, "The story skill was not shown as a separate HUD button.");
+                    if (waitingForDraw) return;
                     button.onClick.Invoke();
                     if (select == 0) return;
                     Require(modals.IsZoneViewerOpen, "Shining Draw did not open a playable card choice.");
