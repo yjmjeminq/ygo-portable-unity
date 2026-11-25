@@ -42,6 +42,7 @@ namespace YGOPortable.UI
             private static Sprite _cheekGlow, _glassPanel;
 
             private readonly GameObject _root;
+            private readonly Image _shade;
             private readonly CanvasGroup _scene;
             private readonly Button _advanceSurface;
             private readonly Text _heading;
@@ -106,6 +107,7 @@ namespace YGOPortable.UI
             private bool _rpg;
             private bool _showCutscene;
             private bool _akiBlush;
+            private TagForceWorldUI _field;
             private OpponentCharacter _sceneOpponent;
             private string _protagonist;
             private string _emotion;
@@ -123,7 +125,7 @@ namespace YGOPortable.UI
             {
                 var overlay = DuelUiKit.FillRect("StoryDialogue", parent);
                 _root = overlay.gameObject;
-                var back = DuelUiKit.AddImage(_root, DuelUiKit.WhiteSprite, new Color(.014f, .026f, .058f, .95f));
+                _shade = DuelUiKit.AddImage(_root, DuelUiKit.WhiteSprite, new Color(.014f, .026f, .058f, .95f));
                 var surface = DuelUiKit.FillRect("AdvanceSurface", overlay);
                 var pointer = DuelUiKit.AddImage(surface.gameObject, DuelUiKit.WhiteSprite, Color.clear);
                 _advanceSurface = surface.gameObject.AddComponent<Button>();
@@ -131,7 +133,7 @@ namespace YGOPortable.UI
                 _advanceSurface.transition = Selectable.Transition.None;
                 _advanceSurface.navigation = new Navigation { mode = Navigation.Mode.None };
                 _advanceSurface.onClick.AddListener(Advance);
-                back.raycastTarget = true;
+                _shade.raycastTarget = true;
 
                 var scene = DuelUiKit.FillRect("Scene", overlay);
                 _stage = DuelUiKit.AddImage(DuelUiKit.FillRect("RpgStage", scene).gameObject, null,
@@ -257,11 +259,17 @@ namespace YGOPortable.UI
             }
 
             internal void Open(string heading, string protagonist, OpponentCharacter opponent, StoryDialogueLine[] lines,
-                Action onEnd, bool rpg = false, string rpgScenery = null)
+                Action onEnd, bool rpg = false, TagForceWorldUI field = null)
             {
                 Close();
+                _field = field;
+                bool onField = field != null;
                 _heading.text = heading;
                 _heroIdentity.text = protagonist;
+                _heroIdentity.gameObject.SetActive(!onField);
+                _portraitGroup.gameObject.SetActive(!onField);
+                _shade.color = new Color(.014f, .026f, .058f, onField ? .14f : .95f);
+                _dialoguePanel.rectTransform.anchorMax = new Vector2(.946f, onField ? .32f : .406f);
                 _protagonist = protagonist;
                 _sceneOpponent = opponent;
                 _rpg = rpg;
@@ -270,10 +278,13 @@ namespace YGOPortable.UI
                 _hero.rectTransform.anchorMax = rpg ? new Vector2(.41f, .855f) : new Vector2(.493f, .855f);
                 _opponent.rectTransform.anchorMin = rpg ? new Vector2(.59f, .30f) : new Vector2(.508f, .26f);
                 _opponent.rectTransform.anchorMax = rpg ? new Vector2(.957f, .855f) : new Vector2(.93f, .855f);
-                SetSprite(_stage, rpg ? LoadRpgSprite(rpgScenery ?? "Maps/spot_daedalus_bridge.png") : null);
-                SetSprite(_heroSd, rpg ? LoadRpgSprite("Characters_SD/sd_protagonist.png") : null);
-                SetSprite(_hero, rpg ? LoadHeroBust(null) : DuelProfileArt.Player);
-                SetOpponent(opponent, null);
+                if (!onField)
+                {
+                    SetSprite(_stage, rpg ? LoadRpgSprite("Maps/spot_daedalus_bridge.png") : null);
+                    SetSprite(_heroSd, rpg ? LoadRpgSprite("Characters_SD/sd_protagonist.png") : null);
+                    SetSprite(_hero, rpg ? LoadHeroBust(null) : DuelProfileArt.Player);
+                    SetOpponent(opponent, null);
+                }
                 _dialogue = lines;
                 _onEnd = onEnd;
                 _root.SetActive(true);
@@ -292,6 +303,7 @@ namespace YGOPortable.UI
             {
                 _fx.ResetEffect();
                 _showCutscene = false;
+                _field = null;
                 _fx.ShowCaret(_caret, false);
                 _cutsceneOverlay.alpha = 0f;
                 _portraitGroup.alpha = 1f;
@@ -334,6 +346,7 @@ namespace YGOPortable.UI
             internal void Update(float delta)
             {
                 if (_dialogue == null || !_root.activeInHierarchy) return;
+                _field?.UpdateRpgDialogue(delta);
                 _poseTime += delta;
                 _cutsceneOverlay.alpha = Mathf.MoveTowards(_cutsceneOverlay.alpha, _showCutscene ? 1f : 0f, delta / .4f);
                 _portraitGroup.alpha = 1f - _cutsceneOverlay.alpha;
@@ -446,8 +459,9 @@ namespace YGOPortable.UI
                 _text.color = _rpg && narration ? NarrationColor : DuelUiKit.TextPrimary;
                 _emotion = _rpg ? line.emotion : null;
                 _poseTime = 0f;
-                _akiBlush = _rpg && speaker?.id == 1 && _emotion == "blush";
-                if (_rpg)
+                _akiBlush = _rpg && _field == null && speaker?.id == 1 && _emotion == "blush";
+                if (_field != null) _field.SetRpgDialogueLine(_dialogue, index);
+                else if (_rpg)
                 {
                     if (_heroSpeaking) SetSprite(_hero, LoadHeroBust(_emotion));
                     if (speaker != null) SetOpponent(speaker, _emotion);

@@ -17,6 +17,8 @@ namespace YGOPortable.UI
         private readonly GameAppController _app;
         private readonly TagForceWorldImages _images = new();
         private readonly RectTransform _screen, _body, _navigation;
+        private readonly CanvasGroup _worldInput;
+        private readonly Button _back;
         private readonly Text _header, _status;
         private const float WalkFrequency = 8f * 2f * Mathf.PI;
         private static readonly Vector2[] VisitorSlots =
@@ -66,16 +68,17 @@ namespace YGOPortable.UI
         private TagForceSpot CurrentSpot => _manager.CurrentSpot;
         private TagForcePersona Selected => _data.Persona(_selectedId);
         internal GameObject Root => _screen.gameObject;
-        internal bool CanWalk => _page == Page.Field && _player != null;
+        internal bool CanWalk => _page == Page.Field && _player != null && _rpgDialogueCast == null;
 
         internal TagForceWorldUI(GameAppController app, Transform parent)
         {
             _app = app;
             _screen = DuelUiKit.FillRect("Screen_TagForceWorld", parent);
+            _worldInput = _screen.gameObject.AddComponent<CanvasGroup>();
             Tint(_screen, new Color(.027f, .064f, .102f));
             var layout = Application.isMobilePlatform ? MobileSafeArea.Create(_screen) : _screen;
             _header = Label(Area(layout, "Header", .05f, .899f, .78f, .975f), "", 24, TextAnchor.MiddleLeft);
-            Btn(Area(layout, "Back", .82f, .908f, .95f, .967f), "뒤로", Back, sound: null);
+            _back = Btn(Area(layout, "Back", .82f, .908f, .95f, .967f), "뒤로", Back, sound: null);
             _body = Area(layout, "World", .05f, .174f, .95f, .895f);
             _status = Label(Area(layout, "Status", .05f, .112f, .95f, .168f), "", 17, TextAnchor.MiddleLeft);
 
@@ -110,7 +113,7 @@ namespace YGOPortable.UI
 
         internal void Back()
         {
-            if (_closingConversation) return;
+            if (_closingConversation || _rpgDialogueCast != null) return;
             DuelAudio.PlayTagForceSfx(TagForceSfx.Cancel);
             if (_rpgField)
             {
@@ -229,6 +232,8 @@ namespace YGOPortable.UI
 
         private void ClearBody()
         {
+            ClearRpgDialogue();
+            _rpgResidents.Clear();
             _interactions.Clear();
             _visitors.Clear();
             _questMarkers.Clear();
@@ -424,6 +429,7 @@ namespace YGOPortable.UI
 
         private void MoveTo(Vector2 point, Action arrive = null)
         {
+            if (!CanWalk) return;
             _manualWalk = false;
             _destination = new Vector2(Mathf.Clamp(point.x, .06f, .94f), Mathf.Clamp(point.y, .095f, _rpgField ? .455f : .77f));
             _moving = true;

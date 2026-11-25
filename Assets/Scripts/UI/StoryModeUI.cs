@@ -73,6 +73,7 @@ namespace YGOPortable.UI
         private readonly Dictionary<int, PresetDeckInfo> _rpgDecks;
         private readonly ScrollRect _episodeScroll;
         private readonly CanvasGroup _browser;
+        private readonly Image _backdrop;
         private readonly StoryDialogueView _dialogue;
         private readonly Button _mainMenu;
         private readonly Button _tournament;
@@ -111,7 +112,7 @@ namespace YGOPortable.UI
             _rpgDecks = LoadRpgDecks(Application.streamingAssetsPath);
             var root = DuelUiKit.FillRect("Screen_StoryMode", parent);
             Root = root.gameObject;
-            DuelUiKit.AddImage(root.gameObject, DuelUiChrome.Backdrop, Color.white, false, false);
+            _backdrop = DuelUiKit.AddImage(root.gameObject, DuelUiChrome.Backdrop, Color.white, false, false);
 
             var browser = DuelUiKit.FillRect("StoryBrowser", root);
             _browser = browser.gameObject.AddComponent<CanvasGroup>();
@@ -760,9 +761,16 @@ namespace YGOPortable.UI
         {
             _browser.interactable = false;
             _browser.blocksRaycasts = false;
-            string scenery = FromRpgField ? TagForceWorldUI.RpgRegions[
-                TagForceWorldUI.RegionForEpisode(IndexOf(episode) + 1)].Background : null;
-            _dialogue.Open(heading, Script.protagonist, DeckRepository.GetCharacter(episode.charId), lines, onFinish, _rpgWorld, scenery);
+            var field = FromRpgField ? _app.RpgField : null;
+            if (field != null)
+            {
+                if (field.Root.transform.GetSiblingIndex() > Root.transform.GetSiblingIndex())
+                    field.Root.transform.SetSiblingIndex(Root.transform.GetSiblingIndex());
+                field.BeginRpgDialogue(episode, Script.protagonist, lines);
+                _backdrop.enabled = false;
+                _browser.gameObject.SetActive(false);
+            }
+            _dialogue.Open(heading, Script.protagonist, DeckRepository.GetCharacter(episode.charId), lines, onFinish, _rpgWorld, field);
         }
 
         private void ReturnToEpisodes()
@@ -783,6 +791,8 @@ namespace YGOPortable.UI
             _returnFromOpeningPicker = null;
             _finishFieldResult = null;
             _dialogue.Close();
+            _backdrop.enabled = true;
+            _browser.gameObject.SetActive(true);
             _browser.interactable = true;
             _browser.blocksRaycasts = true;
         }

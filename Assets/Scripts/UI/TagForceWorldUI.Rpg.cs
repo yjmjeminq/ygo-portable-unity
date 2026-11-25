@@ -47,7 +47,9 @@ namespace YGOPortable.UI
 
         private static readonly Vector2[] RpgNpcSlots = { new(.48f, .40f), new(.23f, .33f), new(.74f, .36f) };
         private readonly List<RectTransform> _questMarkers = new();
+        private readonly Dictionary<int, RectTransform> _rpgResidents = new();
         private RectTransform _rpgNavigation;
+        private RectTransform _rpgFieldHud;
         private StoryScriptRoot _rpgCampaign;
         private Dictionary<int, PresetDeckInfo> _rpgWorldDecks;
         private StoryEpisodeData _resident;
@@ -162,7 +164,8 @@ namespace YGOPortable.UI
 
         internal bool EnterRpgRegion(int index)
         {
-            if (!_rpgField || index < 0 || index >= RpgRegions.Length || !RpgRegions[index].IsOpen(RpgClears))
+            if (!_rpgField || _rpgDialogueCast != null || index < 0 || index >= RpgRegions.Length ||
+                !RpgRegions[index].IsOpen(RpgClears))
                 return false;
             if (index != _rpgLocation) _position = RpgArrival;
             _rpgLocation = index;
@@ -177,7 +180,8 @@ namespace YGOPortable.UI
             var floor = Backdrop(RpgRegions[_rpgLocation].Background, new Color(.10f, .21f, .27f));
             floor.raycastTarget = true;
             floor.gameObject.AddComponent<TagForceFloorTap>().Click = target => MoveTo(target);
-            var status = Area(_body, "QuestTrack", .02f, .885f, .77f, .977f);
+            _rpgFieldHud = DuelUiKit.FillRect("FieldHud", _body);
+            var status = Area(_rpgFieldHud, "QuestTrack", .02f, .885f, .77f, .977f);
             Tint(status, new Color(.014f, .03f, .065f, .90f));
             var episodes = _rpgCampaign?.episodes ?? Array.Empty<StoryEpisodeData>();
             int cleared = RpgClears;
@@ -187,8 +191,8 @@ namespace YGOPortable.UI
                 complete ? "50화 스토리 완료 · 자유 탐험" :
                 $"{cleared + 1:00}화 · {episodes[cleared].title}  ·  {RpgRegions[targetRegion].Name}";
             Label(status, quest, 20, TextAnchor.MiddleLeft).color = DuelUiKit.GoldAccent;
-            Btn(Area(_body, "FieldMap", .80f, .885f, .98f, .977f), "월드맵", () => Show(Page.Map));
-            _fieldControls = Label(Area(_body, "FieldControls", .02f, .012f, .98f, .078f), RpgFieldHelp, 15,
+            Btn(Area(_rpgFieldHud, "FieldMap", .80f, .885f, .98f, .977f), "월드맵", () => Show(Page.Map));
+            _fieldControls = Label(Area(_rpgFieldHud, "FieldControls", .02f, .012f, .98f, .078f), RpgFieldHelp, 15,
                 TextAnchor.MiddleRight);
 
             StoryEpisodeData questNpc = !complete && _rpgLocation == targetRegion ? episodes[cleared] : null;
@@ -214,6 +218,7 @@ namespace YGOPortable.UI
         private void AddRpgResident(StoryEpisodeData resident, Vector2 spot, bool story, Action interact)
         {
             var actor = Anchor(_body, story ? "MainQuestNpc" : $"Resident_{resident.charId}", spot, new Vector2(133f, 117f));
+            _rpgResidents[resident.charId] = actor;
             var art = Area(actor, "SD", .08f, .22f, .92f, 1f);
             Portrait(art, RpgArt + $"Characters_SD/sd_{resident.charId}.png", resident.opponentName);
             void Approach() => MoveTo(actor.anchorMin - new Vector2(0f, .06f), interact);

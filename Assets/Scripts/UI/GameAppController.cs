@@ -263,6 +263,8 @@ namespace YGOPortable.UI
             _tagForceWorld.ShowStatus(message);
         }
 
+        internal TagForceWorldUI RpgField => _tagForceWorld;
+
         public void ShowScreen(AppScreen screen)
         {
             if (!_initialized) return;
@@ -270,6 +272,8 @@ namespace YGOPortable.UI
                 screen = AppScreen.StarterSelection;
 
             var previousScreen = _screen;
+            bool fieldStory = screen == AppScreen.StoryMode && _storyMode.FromRpgField;
+            bool fieldStoryDeckEditor = screen == AppScreen.DeckEditor && _storyDeckEditorOpen && _storyMode.FromRpgField;
             _screen = screen;
             _menuPad?.Clear();
             _menuPadInput.Reset();
@@ -286,7 +290,8 @@ namespace YGOPortable.UI
             _archetypeCodex.Close();
             if (screen != AppScreen.Tournament) _tournament.Close();
             if (screen != AppScreen.Ranked) _ranked.Close();
-            if (screen != AppScreen.TagForceWorld) _tagForceWorld?.Close();
+            if (fieldStoryDeckEditor) _tagForceWorld.Root.SetActive(false);
+            else if (screen != AppScreen.TagForceWorld && !fieldStory) _tagForceWorld?.Close();
             if (screen == AppScreen.DeckEditor && _storyDeckEditorOpen) _storyMode.SuspendForDeckEditor();
             else if (screen != AppScreen.StoryMode) _storyMode.Close();
             _oppSelect.Root.SetActive(screen == AppScreen.OpponentSelect);
@@ -300,7 +305,7 @@ namespace YGOPortable.UI
             }
             else
             {
-                if (screen != AppScreen.TagForceWorld) DuelAudio.PlayMenuBgm();
+                if (screen != AppScreen.TagForceWorld && !fieldStory && !fieldStoryDeckEditor) DuelAudio.PlayMenuBgm();
                 _activeStoryEpisode = null;
                 _activeTournament = null;
                 _activeRanked = null;
@@ -332,7 +337,11 @@ namespace YGOPortable.UI
                     restoreRpgPage: previousScreen == AppScreen.DeckEditor && _tagForceDeckEditorOpen);
             else if (screen == AppScreen.StoryMode)
             {
-                if (_storyDeckEditorOpen && previousScreen == AppScreen.DeckEditor) _storyMode.ResumeFromDeckEditor();
+                if (_storyDeckEditorOpen && previousScreen == AppScreen.DeckEditor)
+                {
+                    if (fieldStory) _tagForceWorld.Root.SetActive(true);
+                    _storyMode.ResumeFromDeckEditor();
+                }
                 else _storyMode.Open();
             }
             else if (screen == AppScreen.MainMenu)
