@@ -88,8 +88,7 @@ namespace YGOPortable.UI
         {
             if (!CanWalk) return;
             var arrival = RpgExitPoints[entry] - RpgExitDirection(entry) * .105f;
-            if (TravelRpgRegion(destination, arrival))
-                ShowStatus($"{RpgRegions[_rpgLocation].Name} 도착");
+            BeginRpgTravel(destination, arrival);
         }
 
         private bool CheckRpgExit(Vector2 previous)
@@ -179,6 +178,7 @@ namespace YGOPortable.UI
             else if (bridge && state >= RpgQuestState.Ready)
                 line = "커플러가 걸려 있던 난간에는 정비용 끈 자국만 남아 있다.";
 
+            if (garage) actions.Add(("WorkbenchMenu", "작업대 메뉴", () => { _rpgWorkbenchServices = true; Show(Page.Talk); }));
             actions.Add(("Leave", "돌아가기", () => Show(Page.Field)));
             var panel = BuildRpgConversation(landmark.Name, line, out _);
             var first = AddRpgConversationActions(panel, actions);

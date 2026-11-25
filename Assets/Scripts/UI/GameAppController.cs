@@ -52,6 +52,7 @@ namespace YGOPortable.UI
         private bool _storyDeckEditorOpen;
         private bool _rankedDeckEditorOpen;
         private bool _tagForceDeckEditorOpen;
+        private bool _rpgCardShopOpen;
         private GitHubSaveSync _saveSync;
         private SaveSyncMenu _saveSyncMenu;
         private GameObject _focusBeforeSaveSync;
@@ -145,7 +146,7 @@ namespace YGOPortable.UI
                     CanApplyCloudSave, ReloadCloudSave);
                 _saveSyncMenu = new SaveSyncMenu(canvas.transform, _saveSync, () => CloseSaveSync());
                 _collectionShop = new CollectionShopUI(canvas.transform,
-                    () => ShowScreen(_screen == AppScreen.StarterSelection ? AppScreen.Title : AppScreen.MainMenu),
+                    CloseCollectionShop,
                     _ => ShowScreen(AppScreen.MainMenu));
                 _secretPackToast = new SecretPackToast(canvas.transform);
                 _archetypeCodex = new ArchetypeCodexUI(canvas.transform, () => ShowScreen(AppScreen.MainMenu));
@@ -245,7 +246,7 @@ namespace YGOPortable.UI
 
         internal void OpenRpgField()
         {
-            _tagForceWorld.PrepareRpgField();
+            _tagForceWorld.PrepareRpgField(openIntro: true);
             ShowScreen(AppScreen.TagForceWorld);
         }
 
@@ -264,6 +265,25 @@ namespace YGOPortable.UI
         }
 
         internal TagForceWorldUI RpgField => _tagForceWorld;
+
+        internal void OpenRpgCardShop()
+        {
+            if (_screen != AppScreen.TagForceWorld) return;
+            _rpgCardShopOpen = true;
+            ShowScreen(AppScreen.CardShop);
+        }
+
+        private void CloseCollectionShop() => ShowScreen(_screen == AppScreen.StarterSelection ? AppScreen.Title :
+            _rpgCardShopOpen ? AppScreen.TagForceWorld : AppScreen.MainMenu);
+
+        internal void OpenRpgRecap()
+        {
+            if (_screen != AppScreen.TagForceWorld || _tagForceWorld.RpgClears == 0) return;
+            int episode = _tagForceWorld.RpgClears - 1;
+            _storyMode.UseRpgCampaign(true, fromField: true);
+            ShowScreen(AppScreen.StoryMode);
+            _storyMode.OpenFieldRecap(episode);
+        }
 
         public void ShowScreen(AppScreen screen)
         {
@@ -375,6 +395,7 @@ namespace YGOPortable.UI
             if (screen != AppScreen.DeckEditor) _storyDeckEditorOpen = false;
             if (screen != AppScreen.DeckEditor) _rankedDeckEditorOpen = false;
             if (screen != AppScreen.DeckEditor) _tagForceDeckEditorOpen = false;
+            if (screen != AppScreen.CardShop) _rpgCardShopOpen = false;
             SyncFrontMenuFocus();
         }
 
@@ -693,10 +714,13 @@ namespace YGOPortable.UI
                     if (_activeTagForce is { } worldDuel)
                     {
                         string result = "듀얼 결과가 기록되지 않았습니다.";
+                        int previousRank = CollectionProgress.RpgRank;
                         bool rewarded = _session.Winner >= 0 &&
                             (worldDuel.SeriesId == TagForceWorldUI.RpgPracticeId
                                 ? CollectionProgress.TryAwardRpgPractice(worldDuel.Deck, won, draw, out result)
                                 : TagForceManager.TryFinishDuel(worldDuel, won, draw, out result));
+                        if (rewarded && worldDuel.SeriesId == TagForceWorldUI.RpgPracticeId)
+                            _tagForceWorld.QueueRpgRankNotice(previousRank);
                         ShowScreen(AppScreen.TagForceWorld);
                         _tagForceWorld.ShowResult(worldDuel, won, result, rewarded);
                         SyncFrontMenuFocus();
@@ -726,9 +750,17 @@ namespace YGOPortable.UI
                         var raid = _storyMode.GetRaid(episode);
                         var plan = _activeStoryPlan;
                         var opponentDeck = _activeOppDeck;
-                        string Settle() => CollectionProgress.TryAwardStoryDuel(episode.id, won, raid, opponentDeck, plan,
-                            out var prize, out string error) ? FormatStoryPrize(prize) : error;
                         bool fromField = _storyMode.FromRpgField;
+                        string Settle()
+                        {
+                            int previousRank = CollectionProgress.RpgRank;
+                            int previousXp = CollectionProgress.RpgExperience;
+                            if (!CollectionProgress.TryAwardStoryDuel(episode.id, won, raid, opponentDeck, plan,
+                                out var prize, out string error, rpgField: fromField)) return error;
+                            if (fromField) _tagForceWorld.QueueRpgRankNotice(previousRank);
+                            int gained = CollectionProgress.RpgExperience - previousXp;
+                            return FormatStoryPrize(prize) + (gained > 0 ? $" · +{gained} EXP" : "");
+                        }
                         string storyReward = fromField ? null : Settle();
                         ShowScreen(AppScreen.StoryMode);
                         if (fromField) _storyMode.ShowFieldDuelResult(episode, won, draw, Settle);
@@ -952,7 +984,7 @@ namespace YGOPortable.UI
                 else if (selectingStarter) ShowScreen(AppScreen.Title);
                 else if (_screen == AppScreen.CardShop)
                 {
-                    if (!_collectionShop.HandleShopBack()) ShowScreen(AppScreen.MainMenu);
+                    if (!_collectionShop.HandleShopBack()) CloseCollectionShop();
                 }
                 else if (story) _storyMode.Back();
                 else if (tournament) _tournament.Back();

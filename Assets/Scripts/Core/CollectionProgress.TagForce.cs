@@ -80,6 +80,8 @@ namespace YGOPortable.Core
             if (!CanTransact(out result)) return false;
             int dp = Math.Min(int.MaxValue - Balance, won ? 300 : draw ? 160 : 130);
             var next = WithBalance(Balance + dp);
+            int previousXp = RpgExperience;
+            if (won) dp += ApplyRpgDuelGrowth(next, story: false);
             var owned = _owned;
             uint reward = 0;
             if (won)
@@ -96,6 +98,7 @@ namespace YGOPortable.Core
             if (!Write(next, owned, out result)) return false;
             string outcome = won ? "연습 듀얼 승리" : draw ? "연습 듀얼 무승부" : "연습 듀얼 패배";
             result = $"{outcome} · +{dp:N0} DP";
+            if (RpgExperience > previousXp) result += $" · +{RpgExperience - previousXp} EXP";
             if (reward != 0) result += $" · {CardDatabase.GetName(reward)} 획득";
             return true;
         }

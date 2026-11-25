@@ -92,6 +92,11 @@ namespace YGOPortable.UI
             }
             _rpgSceneSpace.Find("SideQuestItem")?.gameObject.SetActive(false);
             _rpgFieldObjects?.gameObject.SetActive(false);
+            _rpgCompanion?.gameObject.SetActive(false);
+            _rpgGreeting?.gameObject.SetActive(false);
+            _rpgTravelBanner?.gameObject.SetActive(false);
+            _rpgTravelFade?.gameObject.SetActive(false);
+            _rpgRankBanner?.gameObject.SetActive(false);
 
             foreach (var line in lines)
             {

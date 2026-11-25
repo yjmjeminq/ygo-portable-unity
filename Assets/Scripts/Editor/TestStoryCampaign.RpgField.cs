@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -61,6 +62,8 @@ namespace YGOPortable.Editor
                 Set("_oppSelect", new OpponentSelectUI(app, canvas.transform));
                 Set("_deckEditor", new DeckEditorUI(app, canvas.transform));
                 Set("_modals", modals);
+                Set("_collectionShop", new CollectionShopUI(canvas.transform,
+                    () => typeof(GameAppController).GetMethod("CloseCollectionShop", flags).Invoke(app, null), _ => { }));
                 Set("_duelField", new DuelFieldUI(app, canvas.transform, modals));
                 Set("_initialized", true);
 
@@ -68,6 +71,10 @@ namespace YGOPortable.Editor
                 var entry = menu.MenuRoot.GetComponentsInChildren<Button>()
                     .Single(button => button.transform.parent.name == "RpgWorld");
                 entry.onClick.Invoke();
+                Require(!world.CanWalk && panel.Find("StoryDialogue/Scene/DialogueBox") != null,
+                    "A new RPG save did not enter the skippable prologue.");
+                Press(panel, "StoryDialogue/Scene/DialogueBox/Skip/Button");
+                Require(CollectionProgress.RpgIntroSeen, "Skipping the prologue did not persist completion.");
                 Require(world.Root.activeSelf && FieldScene().Find("Player/Sprite").GetComponent<Image>().sprite != null &&
                     FieldScene().Find("MainQuestNpc/MainQuestMarker").GetComponent<Image>().sprite != null &&
                     world.CanStartRpgEpisode(0) && !world.CanStartRpgEpisode(1),
@@ -146,6 +153,7 @@ namespace YGOPortable.Editor
                     "The quest journal could not page through all regions.");
                 world.Back();
                 VerifyRpgExploration();
+                VerifyRpgAdventure();
                 Debug.Log("[VERIFY 5DS FIELD] Map gates, guest entrances, movement lock, practice rewards, story result order and saved progression passed.");
             }
             finally
@@ -593,6 +601,107 @@ namespace YGOPortable.Editor
                     FieldScene().Find("Scenery").GetComponent<TagForceFloorTap>().Click(point);
                     world.Update(4f);
                 }
+            }
+
+            void VerifyRpgAdventure()
+            {
+                string audit = Path.Combine(save, "rpg-adventure");
+                DeckRepository.Load(streaming, audit, seedDefaultDecks: false);
+                CollectionProgress.Load(audit);
+                Require(CollectionProgress.TryChooseStarter(CollectionProgress.Starters[0].Id, out _, out var error), error);
+                app.OpenRpgField();
+                for (int i = 0; i < 4; i++) Press(panel, "StoryDialogue/Scene/DialogueBox/Next/Button");
+                Require(!world.CanWalk && FieldScene().Find("RpgCompanion") != null,
+                    "The prologue did not lead into Yusei's workshop guide.");
+                Press(panel, "StoryDialogue/Scene/DialogueBox/Skip/Button");
+                CollectionProgress.Load(audit);
+                app.OpenRpgField();
+                Require(world.CanWalk && CollectionProgress.RpgIntroSeen && panel.Find("FieldHud/DuelistHud") != null,
+                    "The guide repeated or the RPG HUD was absent after reloading.");
+                var follower = (RectTransform)FieldScene().Find("RpgCompanion");
+                var old = follower.anchorMin;
+                for (int i = 0; i < 4; i++) world.Update(.10f, Vector2.right);
+                Require(follower.anchorMin.x > old.x && panel.Find("PartnerGreeting").gameObject.activeSelf,
+                    "The partner failed to follow the player or greet the location.");
+                world.Update(0f);
+                var talk = new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Alternate);
+                world.HandleFieldInput(talk);
+                Require(!world.CanWalk && CollectionProgress.RpgAffinity == 4, "Talking to the partner did not grant affinity.");
+                world.Back();
+                world.HandleFieldInput(talk);
+                Require(CollectionProgress.RpgAffinity == 4, "Repeatedly opening the same dialogue allowed affinity farming.");
+                world.Back();
+
+                int balance = CollectionProgress.Balance;
+                Press(FieldScene(), "Exploration/HiddenCache");
+                world.Update(4f);
+                CollectionProgress.Load(audit);
+                Require(CollectionProgress.Balance == balance + 180 && CollectionProgress.RpgCacheFound(0) &&
+                    FieldScene().Find("Exploration/HiddenCache") == null &&
+                    !CollectionProgress.TryFindRpgCache(0, out _), "The cache did not persist a one-time payout.");
+                int tickets = CollectionProgress.PackUrTickets;
+                Require(world.EnterRpgRegion(1) && CollectionProgress.TryFindRpgCache(1, out _) &&
+                    CollectionProgress.PackUrTickets == tickets + 1, "The cache did not store the existing shop's ticket.");
+                Require(world.EnterRpgRegion(0), "Cannot return to the workshop.");
+
+                Press(FieldScene(), "Exploration/Landmark");
+                world.Update(4f);
+                Press(panel, "ResidentChoices/WorkbenchMenu");
+                Press(panel, "ResidentChoices/SaveRpg");
+                Require(panel.Find("ResidentChoices/DailyLine/Label").GetComponent<Text>().text.Contains("진행을 저장"),
+                    "Saving from the workbench did not provide confirmation.");
+                world.Back();
+
+                var rival = decks[script.episodes[0].deckId];
+                balance = CollectionProgress.Balance;
+                for (int i = 0; i < 3; i++) Require(CollectionProgress.TryAwardRpgPractice(rival, true, false, out _), "Practice reward failed.");
+                Require(CollectionProgress.RpgRank == 2 && CollectionProgress.RpgExperience == 120 &&
+                    CollectionProgress.RpgAffinity == 13 && CollectionProgress.Balance == balance + 1150,
+                    "Practice XP, affinity or one-time level-up DP was incorrect.");
+                world.QueueRpgRankNotice(1);
+                world.EnterRpgRegion(0);
+                Require(panel.Find("RankUp") != null, "The rank-up banner was absent.");
+                Press(FieldScene(), "RpgCardMerchant/Interact");
+                world.Update(4f);
+                Press(panel, "ResidentChoices/OpenCardShop");
+                Require(!world.Root.activeSelf && (Get("_collectionShop") as CollectionShopUI).Root.activeSelf,
+                    "The workshop merchant did not open the collection shop.");
+                typeof(GameAppController).GetMethod("CloseCollectionShop", flags).Invoke(app, null);
+                Require(world.CanWalk, "Leaving the merchant did not return to the RPG.");
+                Require(CollectionProgress.TryAwardStoryDuel(script.episodes[0].id, true, null, rival, default,
+                    out _, out _, rpgField: true) && CollectionProgress.RpgExperience == 200,
+                    "A story field result did not award its own RPG XP.");
+                Press(FieldScene(), "Exploration/Landmark");
+                world.Update(4f);
+                Press(panel, "ResidentChoices/WorkbenchMenu");
+                Press(panel, "ResidentChoices/Recall");
+                Require(storyRoot.gameObject.activeSelf && !world.Root.activeSelf, "Workbench recall did not launch the last story.");
+                story.Back();
+                Require(world.CanWalk && world.RpgClears == 1, "Leaving a recap altered the story progress.");
+                int launches = 0;
+                typeof(StoryModeUI).GetMethod("PlayRpgFaceoff", flags).Invoke(story,
+                    new object[] { script.episodes[0], (Action)(() => launches++) });
+                story.Update(.19f);
+                Require(story.Root.transform.Find("RpgBossFaceoff") != null && launches == 0, "The boss faceoff skipped its presentation.");
+                story.Update(1.5f);
+                Require(launches == 1 && story.Root.transform.Find("RpgBossFaceoff") == null, "The boss faceoff did not dispatch once.");
+
+                var images = (TagForceWorldImages)typeof(TagForceWorldUI).GetField("_images", flags).GetValue(world);
+                var loadedArt = (Dictionary<string, Sprite>)typeof(TagForceWorldImages).GetField("_loaded", flags).GetValue(images);
+                images.Clear();
+                loadedArt[regions[0].Background] = null;
+                loadedArt["TagForce/UI/icon_quest_main.png"] = null;
+                loadedArt["TagForce/UI/icon_quest_sub.png"] = null;
+                Require(world.EnterRpgRegion(0) && FieldScene().Find("Scenery").GetComponent<Image>().sprite == DuelUiKit.WhiteSprite &&
+                    FieldScene().Find("Scenery").GetComponent<Image>().color != Color.white &&
+                    FieldScene().Find("MainQuestNpc/MainQuestMarker/Label").GetComponent<Text>().text == "!",
+                    "Missing optional map or quest-icon art did not fall back to colors and text.");
+                loadedArt["TagForce/UI/icon_map_lock.png"] = null;
+                Press(panel, "FieldHud/FieldMap");
+                Require(panel.Find("spot_facility_prison/MapLock/Label") != null,
+                    "The locked map needed external icon art.");
+                world.Back();
+                Debug.Log("[VERIFY 5DS ADVENTURE] Prologue and guide, map arrival, follower, affinity, saved cache, rank, workbench, shop, recap, faceoff and missing art passed.");
             }
 
             void VerifyStageExit()

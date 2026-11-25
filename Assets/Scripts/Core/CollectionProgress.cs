@@ -128,6 +128,7 @@ namespace YGOPortable.Core
             public TagForceSave tagForce = new() { affinityVersion = TagForceSave.AffinityVersion };
             public List<TagForceWorldSave> tagForceWorlds = new();
             public List<RpgQuestRecord> rpgQuests = new();
+            public RpgAdventureSave rpgAdventure = new();
         }
 
         [Serializable]
@@ -254,6 +255,7 @@ namespace YGOPortable.Core
                 !TagForceData.Series.Any(series => series.Id == world.seriesId));
             foreach (var world in saved.tagForceWorlds) world.progress.Normalize();
             saved.rpgQuests ??= new();
+            NormalizeRpgAdventure(saved);
             saved.rpgQuests = saved.rpgQuests.Where(quest => quest != null && !string.IsNullOrWhiteSpace(quest.id) &&
                 quest.state is >= RpgQuestState.Active and <= RpgQuestState.Complete)
                 .GroupBy(quest => quest.id, StringComparer.Ordinal)
@@ -772,7 +774,7 @@ namespace YGOPortable.Core
         }
 
         internal static bool TryAwardStoryDuel(string episodeId, bool won, StoryRaid? raid, PresetDeckInfo opponentDeck,
-            StoryBattlePlan plan, out StoryPrize prize, out string error, System.Random random = null)
+            StoryBattlePlan plan, out StoryPrize prize, out string error, System.Random random = null, bool rpgField = false)
         {
             prize = default;
             random ??= PackRandom;
@@ -817,6 +819,7 @@ namespace YGOPortable.Core
                 if (candidates.Length > 0) theme = AwardCard(candidates[random.Next(candidates.Length)]);
             }
             var next = WithBalance(Balance + reward);
+            if (rpgField && won) reward += ApplyRpgDuelGrowth(next, story: true);
             next.dust += dust;
             next.tactics = next.tactics.Copy();
             int bond = won && plan.Stance == StoryStance.Bond && opponentDeck != null
@@ -927,6 +930,7 @@ namespace YGOPortable.Core
             tagForce = _profile.tagForce,
             tagForceWorlds = _profile.tagForceWorlds,
             rpgQuests = _profile.rpgQuests,
+            rpgAdventure = _profile.rpgAdventure,
         };
 
         private static OpponentDeckProgress FindDeckProgress(SavedProfile profile, int opponentId) =>

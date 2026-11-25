@@ -75,7 +75,7 @@ namespace YGOPortable.UI
                 RpgCouplerState is RpgQuestState.Active or RpgQuestState.Ready)
                 hint = RpgCouplerState == RpgQuestState.Active ? RpgCouplerQuest.Objective : RpgQuestReturn(RpgCouplerQuest);
             if (hint == null) return;
-            var tracker = Area(_rpgFieldHud, "SideQuestTrack", .02f, .865f, .77f, .915f);
+            var tracker = Area(_rpgFieldHud, "SideQuestTrack", .02f, .01f, .72f, .075f);
             Tint(tracker, new Color(.018f, .07f, .10f, .92f));
             Label(tracker, $"의뢰  ·  {hint}", 17, TextAnchor.MiddleLeft).color = new Color(.63f, .86f, .95f);
         }

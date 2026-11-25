@@ -114,7 +114,7 @@ namespace YGOPortable.UI
         private float _lossRevealTime;
 
         internal GameObject Root { get; }
-        internal GameObject ActiveRoot => _dialogue.IsOpen ? _dialogue.ActiveRoot : Root;
+        internal GameObject ActiveRoot => _rpgFaceoff != null ? _rpgFaceoff.gameObject : _dialogue.IsOpen ? _dialogue.ActiveRoot : Root;
 
         private StoryScriptRoot Script => _rpgWorld ? _rpgScript : _seriesTabs[_selectedSeries].Script;
         internal StoryModeUI(GameAppController app, Transform parent, System.Random turnOrderRandom = null)
@@ -275,12 +275,14 @@ namespace YGOPortable.UI
         internal void Update(float delta)
         {
             _dialogue.Update(delta);
+            UpdateRpgFaceoff(delta);
             if (_startAfterLoss != null && (_lossRevealTime -= delta) <= 0f)
                 _startAfterLoss();
         }
 
         internal void Back()
         {
+            if (_rpgFaceoff != null) { FinishRpgFaceoff(); return; }
             if (!_dialogue.IsOpen)
             {
                 _app.ShowScreen(AppScreen.MainMenu);
@@ -752,8 +754,14 @@ namespace YGOPortable.UI
             {
                 if (_returnFromTurnOrder == null) return;
                 ClearTurnOrder();
-                _app.StartStoryDuel(episode, myDeck, playerFirst, plan);
-                if (Root.activeInHierarchy) restore();
+                if (FromRpgField && GetRaid(episode).HasValue) PlayRpgFaceoff(episode, Launch);
+                else Launch();
+
+                void Launch()
+                {
+                    _app.StartStoryDuel(episode, myDeck, playerFirst, plan);
+                    if (Root.activeInHierarchy) restore();
+                }
             }
         }
 
@@ -800,6 +808,7 @@ namespace YGOPortable.UI
 
         private void ResetDialogue()
         {
+            CancelRpgFaceoff();
             ClearTurnOrder();
             _returnFromOpeningPicker = null;
             _finishFieldResult = null;

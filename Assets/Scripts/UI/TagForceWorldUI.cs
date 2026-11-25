@@ -12,7 +12,7 @@ namespace YGOPortable.UI
 {
     internal sealed partial class TagForceWorldUI
     {
-        private enum Page { SeriesSelect, Map, Field, Room, Mail, Ledger, Talk, Topics, DialogueLog, Shop, Gift, Duel, Bond }
+        private enum Page { SeriesSelect, Map, Field, Room, Mail, Ledger, Talk, Topics, DialogueLog, Shop, Gift, Duel, Bond, Prologue, Guide }
 
         private readonly GameAppController _app;
         private readonly TagForceWorldImages _images = new();
@@ -68,7 +68,7 @@ namespace YGOPortable.UI
         private TagForceSpot CurrentSpot => _manager.CurrentSpot;
         private TagForcePersona Selected => _data.Persona(_selectedId);
         internal GameObject Root => _screen.gameObject;
-        internal bool CanWalk => _page == Page.Field && _player != null && _rpgDialogueCast == null;
+        internal bool CanWalk => _page == Page.Field && _player != null && _rpgDialogueCast == null && _rpgPendingRegion < 0;
 
         internal TagForceWorldUI(GameAppController app, Transform parent)
         {
@@ -99,7 +99,7 @@ namespace YGOPortable.UI
         {
             Root.SetActive(true);
             _status.text = "";
-            if (_rpgField) Show(restoreRpgPage ? _page : Page.Field);
+            if (_rpgField) Show(restoreRpgPage ? _page : _rpgIntroOnOpen ? Page.Prologue : Page.Field);
             else if (resume && _data != null) Show(Page.Field);
             else ShowSeriesSelect();
         }
@@ -113,11 +113,15 @@ namespace YGOPortable.UI
 
         internal void Back()
         {
-            if (_closingConversation || _rpgDialogueCast != null) return;
+            if (_closingConversation || _rpgDialogueCast != null || _rpgPendingRegion >= 0) return;
             DuelAudio.PlayTagForceSfx(TagForceSfx.Cancel);
             if (_rpgField)
             {
-                if (_page is Page.Map or Page.Talk or Page.Ledger) Show(Page.Field);
+                if (_page is Page.Prologue or Page.Guide)
+                {
+                    if (_rpgIntroDialogue?.ClosePopup() != true) FinishRpgIntro();
+                }
+                else if (_page is Page.Map or Page.Talk or Page.Ledger) Show(Page.Field);
                 else if (_page == Page.Duel) Show(Page.Talk);
                 else Show(Page.Map);
                 return;
@@ -235,6 +239,7 @@ namespace YGOPortable.UI
             ClearRpgDialogue();
             ClearRpgAtmosphere();
             ClearRpgExploration();
+            ClearRpgPresentation();
             _rpgResidents.Clear();
             _rpgNearbyScene = null;
             _rpgSceneSpace = _rpgViewport = null;
@@ -445,8 +450,9 @@ namespace YGOPortable.UI
         {
             UpdateBreadSpin(delta);
             UpdateConversation(delta);
+            bool traveling = _rpgPendingRegion >= 0;
             if (_rpgField) UpdateRpgField(delta);
-            if (!CanWalk) return;
+            if (traveling || !CanWalk) return;
             Vector2 movement = _fieldMenu ? Vector2.zero : padDirection;
             if (!_fieldMenu && movement == Vector2.zero)
             {
@@ -487,6 +493,7 @@ namespace YGOPortable.UI
             {
                 PoseRpgWalker(_player, _playerSprite, _position, _position - previous, _moving);
                 TrackRpgCamera(delta, horizontalTravel: _position.x - previous.x);
+                FollowRpgPlayer(delta);
                 CheckRpgSceneEncounter(previous);
                 if (!CanWalk || CheckRpgExit(previous)) return;
             }
@@ -538,6 +545,7 @@ namespace YGOPortable.UI
 
         internal bool HandleFieldInput(DeckPadFrame frame)
         {
+            if (_rpgPendingRegion >= 0) return true;
             if (!CanWalk) return false;
             if (frame.Search)
             {
@@ -550,6 +558,11 @@ namespace YGOPortable.UI
                 return true;
             }
             if (_fieldMenu) return false;
+            if (_rpgField && frame.Alternate && (_rpgCompanion != null || _rpgResidents.ContainsKey(RpgPartnerId)))
+            {
+                OpenRpgService(RpgPartnerId);
+                return true;
+            }
             if (frame.Submit)
             {
                 var closest = _interactions.OrderBy(entry => Vector2.SqrMagnitude(entry.Actor.anchorMin - _position)).FirstOrDefault();
@@ -732,7 +745,12 @@ namespace YGOPortable.UI
 
         private void TypeDialogue(RectTransform area, string line)
         {
-            _dialogue = Label(area, "", 18, TextAnchor.UpperLeft);
+            StartTypingDialogue(Label(area, "", 18, TextAnchor.UpperLeft), line);
+        }
+
+        private void StartTypingDialogue(Text label, string line)
+        {
+            _dialogue = label;
             _dialogue.supportRichText = true;
             _dialogueLine = line ?? "";
             _dialogueLetters = StringInfo.ParseCombiningCharacters(_dialogueLine);

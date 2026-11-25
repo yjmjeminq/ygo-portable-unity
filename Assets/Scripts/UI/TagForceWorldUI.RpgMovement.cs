@@ -22,7 +22,8 @@ namespace YGOPortable.UI
             _rpgSceneSpace = DuelUiKit.FillRect("Camera", _rpgViewport);
             _rpgSceneSpace.localScale = Vector3.one * RpgActorScale;
             var floor = Backdrop(mapPath, new Color(.10f, .21f, .27f), _rpgSceneSpace);
-            _rpgBackdropAspect = floor.sprite != null ? floor.sprite.rect.width / floor.sprite.rect.height : 16f / 9f;
+            _rpgBackdropAspect = floor.sprite != null && floor.sprite != DuelUiKit.WhiteSprite
+                ? floor.sprite.rect.width / floor.sprite.rect.height : 16f / 9f;
             _rpgCameraLead = 0f;
             var span = RpgCameraSpan();
             _rpgCameraPan = ClampRpgCameraPan(TargetRpgCameraPan(_position, span), span);

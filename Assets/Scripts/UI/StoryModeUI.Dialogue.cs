@@ -40,6 +40,12 @@ namespace YGOPortable.UI
             private static readonly Color Listening = new(.48f, .53f, .63f);
             private const float CharactersPerSecond = 34f;
             private static Sprite _cheekGlow, _glassPanel;
+            internal static Sprite RpgGlassPanel => _glassPanel ??= DuelUiChrome.DrawPlate("RPG dialogue glass",
+                new Color(.055f, .105f, .19f, .92f), new Color(.02f, .04f, .09f, .92f),
+                new Color(.31f, .35f, .42f, .72f));
+            private static Font _rpgBodyFont, _rpgHeadingFont;
+            internal static Font RpgBodyFont => _rpgBodyFont ??= Resources.Load<Font>("StoryFonts/Pretendard-Medium");
+            internal static Font RpgHeadingFont => _rpgHeadingFont ??= Resources.Load<Font>("StoryFonts/Paperlogy-7Bold");
 
             private readonly GameObject _root;
             private readonly Image _shade;
@@ -89,6 +95,7 @@ namespace YGOPortable.UI
             private readonly Button _pickerEdit;
             private StoryDialogueLine[] _dialogue;
             private Action _onEnd;
+            private Action _onSkip;
             private Func<string> _summary;
             private StoryChoice[] _choices;
             private Action<int> _confirmDeck;
@@ -178,7 +185,7 @@ namespace YGOPortable.UI
                     new Vector2(.054f, .064f), new Vector2(.946f, .406f));
                 _dialoguePanel = dialogue.GetComponent<Image>();
                 _dialogueFrame = DuelUiKit.AddImage(DuelUiKit.FillRect("RpgDialogueFrame", dialogue).gameObject,
-                    null, new Color(.72f, .84f, .96f, .72f), false, false);
+                    null, new Color(.34f, .49f, .65f, .40f), false, false);
                 _dialogueFrame.type = Image.Type.Sliced;
                 var rim = DuelUiKit.CreateRect("GoldRim", dialogue, new Vector2(.025f, 1f), new Vector2(.975f, 1f),
                     new Vector2(0f, -4f), new Vector2(0f, -2f));
@@ -203,7 +210,8 @@ namespace YGOPortable.UI
                 _previous = AddButton(dialogue, "Previous", "◀ 이전 대사", .36f, .727f, .50f, .927f, Previous);
                 _logButton = AddButton(dialogue, "Log", "대화 로그", .51f, .727f, .647f, .927f, OpenLog);
                 _auto = AddButton(dialogue, "Auto", "오토 꺼짐", .657f, .727f, .787f, .927f, ToggleAuto);
-                _skip = AddButton(dialogue, "Skip", "건너뛰기", .797f, .727f, .952f, .927f, Finish);
+                _skip = AddButton(dialogue, "Skip", "건너뛰기", .797f, .727f, .952f, .927f, () =>
+                    (_onSkip ?? Finish).Invoke());
                 _next = AddButton(dialogue, "Next", "다음 ▶", .778f, .042f, .952f, .214f, Advance, gold: true);
                 var flash = DuelUiKit.AddImage(DuelUiKit.FillRect("DialogueFlash", scene).gameObject, DuelUiKit.WhiteSprite,
                     Color.clear, false, false);
@@ -260,11 +268,12 @@ namespace YGOPortable.UI
             }
 
             internal void Open(string heading, string protagonist, OpponentCharacter opponent, StoryDialogueLine[] lines,
-                Action onEnd, bool rpg = false, TagForceWorldUI field = null)
+                Action onEnd, bool rpg = false, TagForceWorldUI field = null, bool backdropBelow = false,
+                string rpgBackdrop = "Maps/spot_daedalus_bridge.png", Action onSkip = null)
             {
                 Close();
                 _field = field;
-                bool onField = field != null;
+                bool onField = field != null || backdropBelow;
                 _heading.text = heading;
                 _heroIdentity.text = protagonist;
                 _heroIdentity.gameObject.SetActive(!onField);
@@ -281,13 +290,14 @@ namespace YGOPortable.UI
                 _opponent.rectTransform.anchorMax = rpg ? new Vector2(.957f, .855f) : new Vector2(.93f, .855f);
                 if (!onField)
                 {
-                    SetSprite(_stage, rpg ? LoadRpgSprite("Maps/spot_daedalus_bridge.png") : null);
+                    SetSprite(_stage, rpg ? LoadRpgSprite(rpgBackdrop) : null);
                     SetSprite(_heroSd, rpg ? LoadRpgSprite("Characters_SD/sd_protagonist.png") : null);
                     SetSprite(_hero, rpg ? LoadHeroBust(null) : DuelProfileArt.Player);
                     SetOpponent(opponent, null);
                 }
                 _dialogue = lines;
                 _onEnd = onEnd;
+                _onSkip = onSkip;
                 _root.SetActive(true);
                 _readThrough = 0;
                 BindLine(0);
@@ -333,6 +343,7 @@ namespace YGOPortable.UI
                 _scene.interactable = _scene.blocksRaycasts = true;
                 _dialogue = null;
                 _onEnd = null;
+                _onSkip = null;
                 _choices = null;
                 _summary = null;
                 _branch = null;
@@ -532,13 +543,11 @@ namespace YGOPortable.UI
 
             private void ApplyDialogueStyle(bool rpg)
             {
-                _dialoguePanel.sprite = rpg ? _glassPanel ??= DuelUiChrome.DrawPlate("RPG dialogue glass",
-                    new Color(.055f, .105f, .19f, .92f), new Color(.02f, .04f, .09f, .92f),
-                    new Color(.31f, .35f, .42f, .72f)) : DuelUiChrome.Panel;
+                _dialoguePanel.sprite = rpg ? RpgGlassPanel : DuelUiChrome.Panel;
                 _goldRim.enabled = rpg;
                 SetSprite(_dialogueFrame, rpg ? LoadRpgSprite("TagForce/UI/panel_dialogue_frame.png", slice: true) : null);
-                Font body = rpg ? Resources.Load<Font>("StoryFonts/Pretendard-Medium") : null;
-                Font heading = rpg ? Resources.Load<Font>("StoryFonts/Paperlogy-7Bold") : null;
+                Font body = rpg ? RpgBodyFont : null;
+                Font heading = rpg ? RpgHeadingFont : null;
                 _text.font = _logText.font = body ?? DuelUiKit.FontKR;
                 _speaker.font = _heading.font = _heroIdentity.font = heading ?? DuelUiKit.FontKR;
                 _speaker.fontStyle = _heading.fontStyle = _heroIdentity.fontStyle = heading == null ? FontStyle.Bold : FontStyle.Normal;
