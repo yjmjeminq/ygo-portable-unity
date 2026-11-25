@@ -34,7 +34,8 @@ namespace YGOPortable.Editor
             canvas.GetComponent<Canvas>().renderMode = RenderMode.WorldSpace;
             ((RectTransform)canvas.transform).sizeDelta = new Vector2(1600, 900);
             var events = new GameObject("Deck convenience input", typeof(EventSystem)).GetComponent<EventSystem>();
-            if (EventSystem.current == null) Call(events, "OnEnable");
+            bool registeredForBatchMode = EventSystem.current == null;
+            if (registeredForBatchMode) Call(events, "OnEnable");
             DeckEditorUI editor = null;
             DeckEditorUI mobile = null;
             try
@@ -59,6 +60,7 @@ namespace YGOPortable.Editor
             {
                 mobile?.Close();
                 editor?.Close();
+                if (registeredForBatchMode) Call(events, "OnDisable");
                 UnityEngine.Object.DestroyImmediate(events.gameObject);
                 UnityEngine.Object.DestroyImmediate(canvas);
                 CollectionProgress.AllDeckCardsAvailable = previousAccess;

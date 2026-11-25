@@ -77,6 +77,10 @@ namespace YGOPortable.Editor
                     panel.Find("spot_satellite_hideout/Travel").GetComponent<Button>().interactable &&
                     panel.Find("spot_facility_prison/MapLock").GetComponent<Image>().sprite != null &&
                     !world.EnterRpgRegion(2), "The world map allowed early entry to the prison.");
+                Press(world.Root.transform, "RpgNavigation/Decks");
+                app.CloseDeckEditor();
+                Require(panel.Find("spot_facility_prison/MapLock") != null,
+                    "Returning from deck editing did not restore the RPG world map.");
                 world.Back();
 
                 var local = panel.Cast<Transform>().First(child => child.name.StartsWith("Resident_", StringComparison.Ordinal));

@@ -328,7 +328,8 @@ namespace YGOPortable.UI
             else if (screen == AppScreen.Ranked)
                 _ranked.Open();
             else if (screen == AppScreen.TagForceWorld)
-                _tagForceWorld.Open(previousScreen is AppScreen.DeckEditor or AppScreen.Duel or AppScreen.TagForceWorld);
+                _tagForceWorld.Open(previousScreen is AppScreen.DeckEditor or AppScreen.Duel or AppScreen.TagForceWorld,
+                    restoreRpgPage: previousScreen == AppScreen.DeckEditor && _tagForceDeckEditorOpen);
             else if (screen == AppScreen.StoryMode)
             {
                 if (_storyDeckEditorOpen && previousScreen == AppScreen.DeckEditor) _storyMode.ResumeFromDeckEditor();

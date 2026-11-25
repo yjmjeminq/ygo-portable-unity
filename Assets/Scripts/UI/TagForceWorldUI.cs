@@ -92,11 +92,12 @@ namespace YGOPortable.UI
             Root.SetActive(false);
         }
 
-        internal void Open(bool resume = false)
+        internal void Open(bool resume = false, bool restoreRpgPage = false)
         {
             Root.SetActive(true);
             _status.text = "";
-            if (_rpgField || (resume && _data != null)) Show(Page.Field);
+            if (_rpgField) Show(restoreRpgPage ? _page : Page.Field);
+            else if (resume && _data != null) Show(Page.Field);
             else ShowSeriesSelect();
         }
 
