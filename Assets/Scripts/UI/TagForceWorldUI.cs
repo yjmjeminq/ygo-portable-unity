@@ -233,6 +233,7 @@ namespace YGOPortable.UI
         private void ClearBody()
         {
             ClearRpgDialogue();
+            ClearRpgAtmosphere();
             _rpgResidents.Clear();
             _rpgNearbyScene = null;
             _rpgSceneSpace = _rpgViewport = null;

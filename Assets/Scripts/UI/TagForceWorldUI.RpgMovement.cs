@@ -94,6 +94,7 @@ namespace YGOPortable.UI
                 art.anchorMax -= Vector2.up * padding;
             }
             var depth = sides == null ? null : _images.GetSlices(cycle + "_vertical.png", 3, 2);
+            AddRpgGroundShadow(art);
             var image = DuelUiKit.AddImage(art.gameObject, idle, Color.white, true, false);
             art.gameObject.AddComponent<TagForceRpgWalkAnimator>().Initialize(image, idle, sides, depth, directions);
             return art;

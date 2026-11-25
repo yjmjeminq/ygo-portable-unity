@@ -14,6 +14,10 @@ namespace YGOPortable.UI
         private readonly Dictionary<string, RpgStageActor> _rpgStageSpeakers = new(StringComparer.Ordinal);
         private readonly Dictionary<int, RpgStageActor> _rpgStageIds = new();
         private RectTransform _rpgDialogueCast, _rpgDialogueOpponent, _rpgSpeakerCue;
+        private RpgStageActor _rpgSpeakingActor, _rpgPreviousSpeaker;
+        private Text _rpgSpeakerLabel;
+        private string _rpgReaction;
+        private float _rpgCueTime;
         private StoryDialogueLine[] _rpgBeatLines;
         private RectTransform _rpgCameraFocus;
         private int[] _rpgBeats = Array.Empty<int>();
@@ -110,9 +114,17 @@ namespace YGOPortable.UI
                 _position - _rpgDialogueOpponent.anchorMin);
             PoseRpgWalker(_player, _playerSprite, _position, Vector2.zero, false, RpgNpcSlots[0] - _position);
             _player.SetAsLastSibling();
-            _rpgSpeakerCue = Anchor(_rpgDialogueCast, "SpeakingCue", Vector2.zero, new Vector2(29f, 24f));
-            Label(_rpgSpeakerCue, "▼", 17).color = DuelUiKit.GoldAccent;
+            _rpgSpeakerCue = BuildRpgSpeakerCue(_rpgDialogueCast, out _rpgSpeakerLabel);
             _rpgSpeakerCue.gameObject.SetActive(false);
+        }
+
+        private static RectTransform BuildRpgSpeakerCue(Transform parent, out Text label)
+        {
+            var cue = Anchor(parent, "SpeakingCue", new Vector2(.50f, 1.10f), new Vector2(30f, 24f));
+            DuelUiKit.AddImage(cue.gameObject, RpgSoftLight, new Color(.018f, .033f, .065f, .92f), false, false);
+            label = Label(cue, "▼", 17);
+            label.color = DuelUiKit.GoldAccent;
+            return cue;
         }
 
         private void EnsureRpgStageGuest(int id)
@@ -171,6 +183,23 @@ namespace YGOPortable.UI
         internal void SetRpgDialogueLine(StoryDialogueLine[] lines, int index, bool playMotion)
         {
             bool playingNext = playMotion && index == _rpgLastLine + 1;
+            _rpgSpeakingActor = RpgSpeaker(lines[index].speaker);
+            _rpgPreviousSpeaker = null;
+            for (int i = index - 1; i >= 0 && _rpgSpeakingActor != null; i--)
+            {
+                var previous = RpgSpeaker(lines[i].speaker);
+                if (previous == null || previous == _rpgSpeakingActor) continue;
+                _rpgPreviousSpeaker = previous;
+                break;
+            }
+            _rpgReaction = lines[index].emotion switch
+            {
+                "shock" => "!",
+                "sad" or "hurt" => "…",
+                "blush" => "♥",
+                _ => null,
+            };
+            _rpgCueTime = 0f;
             _rpgLastLine = index;
             _rpgCameraFocus = null;
             _rpgBeatRemaining = 0f;
@@ -257,20 +286,21 @@ namespace YGOPortable.UI
                 BeginRpgStageMove(actor, target, slide);
             }
             RefreshRpgStageFacing();
-            var speaker = RpgSpeaker(lines[index].speaker);
-            RectTransform speaking = speaker?.Target.Visible == true ? speaker.Root : null;
+            RectTransform speaking = _rpgSpeakingActor?.Target.Visible == true ? _rpgSpeakingActor.Root : null;
             _rpgSpeakerCue.gameObject.SetActive(speaking != null);
             if (speaking != null)
             {
                 _rpgSpeakerCue.SetParent(speaking, false);
-                _rpgSpeakerCue.anchorMin = _rpgSpeakerCue.anchorMax = new Vector2(.50f, 1.05f);
-                _rpgSpeakerCue.anchoredPosition = Vector2.zero;
+                _rpgSpeakerCue.anchorMin = _rpgSpeakerCue.anchorMax = new Vector2(.50f, 1.10f);
                 _rpgSpeakerCue.SetAsLastSibling();
+                PaintRpgSpeakerCue();
             }
         }
 
         internal void UpdateRpgDialogue(float delta)
         {
+            UpdateRpgAtmosphere(delta);
+            _rpgCueTime += delta;
             while (RpgStageRunning && delta > 0f)
             {
                 float slice = Mathf.Min(delta, _rpgBeatRemaining);
@@ -282,14 +312,33 @@ namespace YGOPortable.UI
                     actor.Progress = RpgStageRunning ? Mathf.Min(1f, actor.Progress + slice / RpgStageMoveTime) : 1f;
                     PoseRpgStageActor(actor);
                 }
-                TrackRpgCamera(slice, (_rpgCameraFocus ?? _player).anchorMin);
+                TrackRpgCamera(slice, RpgDialogueCameraFocus());
                 if (!RpgStageRunning)
                 {
                     RefreshRpgStageFacing();
                     PlayNextRpgBeat();
                 }
             }
-            TrackRpgCamera(delta, (_rpgCameraFocus ?? _player).anchorMin);
+            TrackRpgCamera(delta, RpgDialogueCameraFocus());
+            if (_rpgSpeakerCue.gameObject.activeSelf) PaintRpgSpeakerCue();
+        }
+
+        private Vector2 RpgDialogueCameraFocus()
+        {
+            if (_rpgCameraFocus != null) return _rpgCameraFocus.anchorMin;
+            if (!RpgStageRunning && _rpgSpeakingActor?.Target.Visible == true)
+                return Vector2.Lerp(_player.anchorMin, _rpgSpeakingActor.Root.anchorMin, .38f);
+            return _player.anchorMin;
+        }
+
+        private void PaintRpgSpeakerCue()
+        {
+            string reaction = _rpgCueTime < 1.3f ? _rpgReaction : null;
+            _rpgSpeakerLabel.text = reaction ?? "▼";
+            _rpgSpeakerLabel.color = reaction == "♥" ? new Color(1f, .62f, .71f) :
+                reaction == "…" ? new Color(.73f, .86f, 1f) : DuelUiKit.GoldAccent;
+            float rise = 4f * Mathf.SmoothStep(0f, 1f, _rpgCueTime / .23f);
+            _rpgSpeakerCue.anchoredPosition = Vector2.up * rise;
         }
 
         private void BeginRpgStageMove(RpgStageActor actor, RpgStagePose target, bool animate)
@@ -320,6 +369,9 @@ namespace YGOPortable.UI
         {
             if (actor.Target.LookAt is int id && _rpgStageIds[id].Root.gameObject.activeSelf)
                 return _rpgStageIds[id].Root.anchorMin - position;
+            var partner = actor == _rpgSpeakingActor ? _rpgPreviousSpeaker : _rpgSpeakingActor;
+            if (partner?.Target.Visible == true && partner.Root.gameObject.activeSelf)
+                return partner.Root.anchorMin - position;
             return (actor.Root == _player ? _rpgDialogueOpponent.anchorMin : _player.anchorMin) - position;
         }
 
@@ -327,7 +379,8 @@ namespace YGOPortable.UI
         {
             foreach (var actor in _rpgStageActors)
             {
-                if (actor.Progress < 1f || !actor.Target.Visible || !actor.Target.LookAt.HasValue) continue;
+                if (actor.Progress < 1f || !actor.Target.Visible ||
+                    (_rpgSpeakingActor == null && !actor.Target.LookAt.HasValue)) continue;
                 Vector2 position = actor.Root.anchorMin;
                 PoseRpgWalker(actor.Root, actor.Art, position, Vector2.zero, false, RpgStageHeading(actor, position));
             }
@@ -347,6 +400,8 @@ namespace YGOPortable.UI
             }
             _rpgFieldHud = null;
             _rpgDialogueCast = _rpgDialogueOpponent = _rpgSpeakerCue = null;
+            _rpgSpeakingActor = _rpgPreviousSpeaker = null;
+            _rpgSpeakerLabel = null;
             _rpgBeatLines = null;
             _rpgCameraFocus = null;
             _rpgBeatRemaining = 0f;

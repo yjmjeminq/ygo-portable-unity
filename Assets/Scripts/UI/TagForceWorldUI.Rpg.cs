@@ -188,6 +188,7 @@ namespace YGOPortable.UI
             var floor = BuildRpgCamera(RpgRegions[_rpgLocation].Background);
             floor.raycastTarget = true;
             floor.gameObject.AddComponent<TagForceFloorTap>().Click = target => MoveTo(target);
+            BuildRpgAtmosphere();
             _rpgFieldHud = DuelUiKit.FillRect("FieldHud", _body);
             var status = Area(_rpgFieldHud, "QuestTrack", .02f, .885f, .77f, .977f);
             Tint(status, new Color(.014f, .03f, .065f, .90f));
@@ -284,6 +285,9 @@ namespace YGOPortable.UI
                 var direction = speaker.anchorMin - _position;
                 PoseRpgWalker(_player, _playerSprite, _position, Vector2.zero, false, direction);
                 PoseRpgWalker(speaker, speaker.Find("SD") as RectTransform, speaker.anchorMin, Vector2.zero, false, -direction);
+                speaker.Find("ResidentMarker")?.gameObject.SetActive(false);
+                speaker.Find("QuestBadge")?.gameObject.SetActive(false);
+                BuildRpgSpeakerCue(speaker, out _);
             }
             var panel = DuelUiKit.CreateMenuPanel(_body, "ResidentChoices",
                 new Vector2(.065f, .025f), new Vector2(.935f, .35f));
@@ -341,6 +345,7 @@ namespace YGOPortable.UI
 
         private void UpdateRpgField(float delta)
         {
+            UpdateRpgAtmosphere(delta);
             if (_rpgToast != null && (_rpgToastTime -= delta) <= 0f)
             {
                 _rpgToast.transform.parent.gameObject.SetActive(false);

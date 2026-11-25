@@ -138,6 +138,7 @@ namespace YGOPortable.Editor
                     var request = RpgSideQuest.All.Single(quest => quest.Region == regions[region].Id);
                     Require(world.EnterRpgRegion(region) && FieldScene().Find($"QuestNpc_{request.Giver}/SD").GetComponent<Image>().sprite != null,
                         $"The region {request.Region} was missing its quest giver or SD art.");
+                    VerifyAtmosphere(region);
                 }
                 Press(world.Root.transform, "RpgNavigation/Quests");
                 Press(panel, "QuestPageNext");
@@ -156,6 +157,26 @@ namespace YGOPortable.Editor
                 if (hadPreference) PlayerPrefs.SetString(preference, oldPreference);
                 else PlayerPrefs.DeleteKey(preference);
                 PlayerPrefs.Save();
+            }
+
+            void VerifyAtmosphere(int region)
+            {
+                var field = FieldScene();
+                var layer = field.Find("FieldAtmosphere");
+                var shadow = field.Find("Player/GroundShadow").GetComponent<Image>();
+                Require(layer != null && layer.GetSiblingIndex() > field.Find("Scenery").GetSiblingIndex() &&
+                    layer.GetSiblingIndex() < field.Find("Player").GetSiblingIndex() &&
+                    layer.GetComponentsInChildren<Image>().All(image => !image.raycastTarget) &&
+                    shadow.sprite != null && !shadow.raycastTarget &&
+                    (layer.Find("Haze") != null) == (region is 5 or 6 or 8),
+                    $"The atmosphere of {regions[region].Id} obscured the actors or blocked input.");
+                var mote = (RectTransform)layer.Find("Mote_0");
+                var light = layer.Find("Light").GetComponent<Image>();
+                Vector2 origin = mote.anchorMin;
+                float opacity = light.color.a;
+                world.Update(.31f);
+                Require(mote.anchorMin != origin && light.color.a != opacity,
+                    $"The atmosphere of {regions[region].Id} did not animate in the field.");
             }
 
             Transform FieldScene() => panel.Find("FieldViewport/Camera");
@@ -241,7 +262,8 @@ namespace YGOPortable.Editor
                 var buildArt = typeof(TagForceWorldUI).GetMethod("BuildRpgActorArt", flags);
                 foreach (int id in new[] { 1, 16, 35, 138 })
                 {
-                    var art = DuelUiKit.FillRect($"Walk_{id}", canvas.transform);
+                    var actor = DuelUiKit.FillRect($"Walk_{id}", canvas.transform);
+                    var art = DuelUiKit.FillRect("Art", actor);
                     try
                     {
                         buildArt.Invoke(world, new object[] { art, $"TagForce/5DS/Characters_SD/sd_{id}.png", id.ToString() });
@@ -265,7 +287,7 @@ namespace YGOPortable.Editor
                             image.sprite == front && art.GetComponent<TagForceRpgStride>() == null,
                             $"Character {id} did not use its front, back and side walking sheet.");
                     }
-                    finally { UnityEngine.Object.DestroyImmediate(art.gameObject); }
+                    finally { UnityEngine.Object.DestroyImmediate(actor.gameObject); }
                 }
                 Debug.Log("[VERIFY 5DS WALK ART] Aki, Jack, Yusei and Vagabond directional poses passed.");
             }
@@ -323,6 +345,18 @@ namespace YGOPortable.Editor
                     "The guest did not reach her mark and face the rival after replaying the entrance.");
                 AdvanceToLine(firstAkiLine);
                 Require(guest.Find("SpeakingCue") != null, "The speaking marker did not follow the guest.");
+                int shocked = Array.FindIndex(lines, firstAkiLine + 1,
+                    line => line.speaker == "이자요이 아키" && line.emotion == "shock");
+                Require(shocked > firstAkiLine, "The narration fixture did not have an Aki reaction.");
+                AdvanceToLine(shocked);
+                var cue = guest.Find("SpeakingCue/Label").GetComponent<Text>();
+                Require(cue.text == "!" && player.Find("Sprite").localScale.x < 0f,
+                    "Aki did not show a reaction or Kai did not turn toward the current speaker.");
+                var mote = (RectTransform)field.Find("FieldAtmosphere/Mote_0");
+                Vector2 beforeMote = mote.anchorMin;
+                story.Update(1.4f);
+                Require(cue.text == "▼" && mote.anchorMin != beforeMote,
+                    "The dialogue reaction did not clear or the background stopped during the conversation.");
                 int approach = Array.FindIndex(lines, line => line.stage?.Any(a => a.actor == 0 && a.action == "move") == true);
                 AdvanceToLine(approach);
                 story.Update(.65f);
