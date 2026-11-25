@@ -6,24 +6,24 @@ namespace YGOPortable.UI
 {
     internal sealed partial class TagForceWorldUI
     {
-        private const float RpgCameraWidth = 1.78f;
         private const float RpgActorScale = 1.22f;
-        private const float RpgWalkSpeed = .40f * RpgActorScale / RpgCameraWidth;
-        private static readonly Vector2 RpgCameraCenter = new(.50f, .44f);
+        private const float RpgWalkSpeed = .27416f;
+        private const float RpgStrideDistanceScale = 1.46f;
+        private const float RpgSceneryFocusY = .55f;
         private RectTransform _rpgSceneSpace, _rpgViewport;
         private Vector2 _rpgCameraPan;
         private float _rpgBackdropAspect, _rpgCameraLead;
 
-        private Image BuildRpgCamera(string mapPath, bool reserveHud)
+        private Image BuildRpgCamera(Sprite scenery, bool reserveHud)
         {
             _rpgViewport = DuelUiKit.FillRect("FieldViewport", _body);
             if (reserveHud) _rpgViewport.anchorMax = new Vector2(1f, .86f);
             _rpgViewport.gameObject.AddComponent<RectMask2D>();
             _rpgSceneSpace = DuelUiKit.FillRect("Camera", _rpgViewport);
             _rpgSceneSpace.localScale = Vector3.one * RpgActorScale;
-            var floor = Backdrop(mapPath, new Color(.10f, .21f, .27f), _rpgSceneSpace);
-            _rpgBackdropAspect = floor.sprite != null && floor.sprite != DuelUiKit.WhiteSprite
-                ? floor.sprite.rect.width / floor.sprite.rect.height : 16f / 9f;
+            var floor = DuelUiKit.AddImage(DuelUiKit.FillRect("Scenery", _rpgSceneSpace).gameObject,
+                scenery, scenery == null ? new Color(.10f, .21f, .27f) : Color.white, false, false);
+            _rpgBackdropAspect = scenery != null ? scenery.rect.width / scenery.rect.height : 16f / 9f;
             _rpgCameraLead = 0f;
             var span = RpgCameraSpan();
             _rpgCameraPan = ClampRpgCameraPan(TargetRpgCameraPan(_position, span), span);
@@ -35,18 +35,20 @@ namespace YGOPortable.UI
         {
             var viewport = _rpgViewport.rect;
             float aspect = viewport.width > 0f && viewport.height > 0f ? viewport.width / viewport.height : 16f / 9f;
-            float width = Mathf.Max(RpgCameraWidth, _rpgBackdropAspect / aspect);
-            return new Vector2(width, width * aspect / _rpgBackdropAspect);
+            float coverWidth = _rpgBackdropAspect / aspect;
+            // Keep some horizontal travel on wide displays while limiting how much scenery is cropped vertically.
+            float width = Mathf.Max(coverWidth, Mathf.Clamp(1.77f * coverWidth, 1.12f, 1.32f));
+            return new Vector2(width, width / coverWidth);
         }
 
         private Vector2 TargetRpgCameraPan(Vector2 position, Vector2 span)
         {
-            var center = RpgCameraCenter;
+            var center = new Vector2(.50f, .44f);
             if (_page == Page.Field && _rpgDialogueCast == null)
             {
-                // Leave headroom for the opening NPC and its marker on tall and wide viewports.
-                float headroom = Mathf.Max(0f, RpgNpcSlots[0].y - position.y) * span.y;
-                center.y = Mathf.Clamp(.80f - headroom, .18f, center.y);
+                // Let the player walk beneath the landmarks without pushing the back wall offscreen at the entrance.
+                float sceneryHeight = (RpgSceneryFocusY - position.y) * span.y;
+                center.y = Mathf.Clamp(.81f - sceneryHeight, .19f, center.y);
             }
             return center - Vector2.one * .5f - Vector2.Scale(position - Vector2.one * .5f, span) -
                 Vector2.right * _rpgCameraLead;
@@ -118,7 +120,7 @@ namespace YGOPortable.UI
             actor.anchorMin = actor.anchorMax = position;
             actor.anchoredPosition = Vector2.zero;
             if (art != null && art.TryGetComponent<TagForceRpgWalkAnimator>(out var animation))
-                animation.Pose(RpgArtDirection(step).magnitude * (RpgCameraWidth / RpgActorScale), walking,
+                animation.Pose(RpgArtDirection(step).magnitude * RpgStrideDistanceScale, walking,
                     RpgArtDirection(facing == Vector2.zero ? step : facing));
         }
     }

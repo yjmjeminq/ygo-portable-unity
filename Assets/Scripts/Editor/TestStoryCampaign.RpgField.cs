@@ -33,7 +33,10 @@ namespace YGOPortable.Editor
                     Require(region.IsOpen(i) == (i >= region.RequiredEpisode), $"Bad unlock gate: {region.Id}.");
             }
             foreach (var region in regions)
+            {
                 Require(File.Exists(Path.Combine(streaming, region.Background)), $"Missing 5D's map {region.Id}.");
+                Require(File.Exists(Path.Combine(streaming, region.FieldBackground)), $"Missing 5D's field art {region.Id}.");
+            }
 
             const string preference = "ygo.5ds-rpg.last-region";
             string oldPreference = PlayerPrefs.GetString(preference);
@@ -239,6 +242,17 @@ namespace YGOPortable.Editor
                 var viewport = (RectTransform)camera.parent;
                 var player = (RectTransform)camera.Find("Player");
                 var map = (RectTransform)camera.Find("Scenery");
+                var canvasRect = (RectTransform)canvas.transform;
+                var desktopSize = canvasRect.sizeDelta;
+                VerifySceneryAtArrival();
+                canvasRect.sizeDelta = new Vector2(2340f, 1080f);
+                Canvas.ForceUpdateCanvases();
+                world.Update(.8f);
+                VerifySceneryAtArrival();
+                canvasRect.sizeDelta = desktopSize;
+                Canvas.ForceUpdateCanvases();
+                world.Update(.8f);
+
                 var hud = (RectTransform)panel.Find("FieldHud");
                 var hudPosition = hud.position;
                 var art = player.Find("Sprite").GetComponent<Image>();
@@ -280,11 +294,10 @@ namespace YGOPortable.Editor
                 world.Update(.6f);
                 float right = CameraCenter();
                 VerifyCameraBounds();
-                Require(left - right > viewport.rect.width * .70f && hud.position == hudPosition,
-                    "Walking across the field did not reveal a wide portion of the map or moved the fixed HUD.");
+                float travel = map.rect.width * camera.localScale.x - viewport.rect.width;
+                Require(travel > viewport.rect.width * .18f && left - right > travel * .96f && hud.position == hudPosition,
+                    "Walking across the field did not reach both sides of the scenery or moved the fixed HUD.");
 
-                var canvasRect = (RectTransform)canvas.transform;
-                var desktopSize = canvasRect.sizeDelta;
                 canvasRect.sizeDelta = new Vector2(2340f, 1080f);
                 Canvas.ForceUpdateCanvases();
                 world.Update(0f);
@@ -295,6 +308,14 @@ namespace YGOPortable.Editor
                 Debug.Log("[VERIFY 5DS SCROLL] Wide horizontal travel, aspect ratio, edge coverage, fixed HUD and panned clicks passed.");
 
                 float CameraCenter() => viewport.InverseTransformPoint(camera.TransformPoint(camera.rect.center)).x;
+
+                void VerifySceneryAtArrival()
+                {
+                    VerifyCameraBounds();
+                    var landmark = new Vector2(map.rect.center.x, Mathf.Lerp(map.rect.yMin, map.rect.yMax, .56f));
+                    var projected = viewport.InverseTransformPoint(map.TransformPoint(landmark));
+                    Require(viewport.rect.Contains((Vector2)projected), "The opening camera cropped the garage landmarks.");
+                }
 
                 void VerifyCameraBounds()
                 {
@@ -767,6 +788,11 @@ namespace YGOPortable.Editor
                 var images = (TagForceWorldImages)typeof(TagForceWorldUI).GetField("_images", flags).GetValue(world);
                 var loadedArt = (Dictionary<string, Sprite>)typeof(TagForceWorldImages).GetField("_loaded", flags).GetValue(images);
                 images.Clear();
+                loadedArt[regions[0].FieldBackground] = null;
+                var originalGarage = images.Get(regions[0].Background);
+                Require(originalGarage != null && world.EnterRpgRegion(0) &&
+                    FieldScene().Find("Scenery").GetComponent<Image>().sprite == originalGarage,
+                    "Missing field-specific art did not use the original map.");
                 loadedArt[regions[0].Background] = null;
                 loadedArt["TagForce/UI/icon_quest_main.png"] = null;
                 loadedArt["TagForce/UI/icon_quest_sub.png"] = null;

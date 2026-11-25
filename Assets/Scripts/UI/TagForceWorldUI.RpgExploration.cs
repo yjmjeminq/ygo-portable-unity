@@ -24,7 +24,7 @@ namespace YGOPortable.UI
 
         private static readonly (string Name, Vector2 Position, string Description)[] RpgLandmarks =
         {
-            ("정비 작업대", new(.71f, .24f), "듀얼 러너의 분해 도면과 부품함이 작업대에 놓여 있다."),
+            ("정비 작업대", new(.67f, .275f), "듀얼 러너의 분해 도면과 부품함이 작업대에 놓여 있다."),
             ("벽의 표식", new(.66f, .27f), "벽에 그려진 작은 화살표는 밤에도 은신처 입구를 찾을 수 있게 표시한 것이다."),
             ("수용소 게시판", new(.58f, .34f), "교대 시간표 아래에 통신기가 끊겼다는 메모가 붙어 있다."),
             ("라디오", new(.67f, .29f), "낡은 라디오에서 포춘 컵 경기 결과가 흘러나온다."),

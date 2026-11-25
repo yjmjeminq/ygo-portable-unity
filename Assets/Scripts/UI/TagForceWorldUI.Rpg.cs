@@ -15,7 +15,7 @@ namespace YGOPortable.UI
         private const string RpgIcons = "TagForce/UI/";
         private const string RpgRegionPreference = "ygo.5ds-rpg.last-region";
         private const float RpgSceneRadius = .096f;
-        private static readonly Vector2 RpgArrival = new(.50f, .17f);
+        private static readonly Vector2 RpgArrival = new(.50f, .20f);
 
         internal readonly struct RpgRegion
         {
@@ -30,6 +30,7 @@ namespace YGOPortable.UI
             }
 
             internal string Background => RpgArt + "Maps/" + Id + ".png";
+            internal string FieldBackground => RpgArt + "Maps/" + Id + "_field.png";
             internal bool IsOpen(int clears) => clears >= RequiredEpisode;
         }
 
@@ -199,7 +200,7 @@ namespace YGOPortable.UI
                 var tile = Area(_body, region.Id, x, y, x + .30f, y + .292f);
                 RpgUiStyle.Panel(tile, accent: i == target && cleared < 50);
                 bool open = region.IsOpen(cleared);
-                var poster = _images.Get(region.Background);
+                var poster = GetRpgFieldArt(region);
                 DuelUiKit.AddImage(Area(tile, "MapPreview", .036f, .292f, .964f, .947f).gameObject, poster,
                     poster == null ? new Color(.09f, .18f, .24f) : open ? Color.white : new Color(.24f, .26f, .30f),
                     false, false);
@@ -241,9 +242,11 @@ namespace YGOPortable.UI
             return true;
         }
 
+        private Sprite GetRpgFieldArt(RpgRegion region) => _images.Get(region.FieldBackground) ?? _images.Get(region.Background);
+
         private void BuildRpgField()
         {
-            var floor = BuildRpgCamera(RpgRegions[_rpgLocation].Background, _page == Page.Field);
+            var floor = BuildRpgCamera(GetRpgFieldArt(RpgRegions[_rpgLocation]), _page == Page.Field);
             floor.raycastTarget = true;
             floor.gameObject.AddComponent<TagForceFloorTap>().Click = target => MoveTo(target);
             BuildRpgAtmosphere();
