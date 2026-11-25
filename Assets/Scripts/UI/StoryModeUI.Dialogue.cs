@@ -112,6 +112,7 @@ namespace YGOPortable.UI
             private bool _heroSpeaking;
             private bool _opponentSpeaking;
             private bool _rpg;
+            private bool _sceneUsesFieldActors;
             private bool _showCutscene;
             private bool _akiBlush;
             private TagForceWorldUI _field;
@@ -274,6 +275,7 @@ namespace YGOPortable.UI
                 Close();
                 _field = field;
                 bool onField = field != null || backdropBelow;
+                _sceneUsesFieldActors = onField;
                 _heading.text = heading;
                 _heroIdentity.text = protagonist;
                 _heroIdentity.gameObject.SetActive(!onField);
@@ -315,6 +317,7 @@ namespace YGOPortable.UI
                 _fx.ResetEffect();
                 _showCutscene = false;
                 _field = null;
+                _sceneUsesFieldActors = false;
                 RefreshStageCaption();
                 _fx.ShowCaret(_caret, false);
                 _cutsceneOverlay.alpha = 0f;
@@ -476,7 +479,7 @@ namespace YGOPortable.UI
                 _poseTime = 0f;
                 _akiBlush = _rpg && _field == null && speaker?.id == 1 && _emotion == "blush";
                 if (_field != null) _field.SetRpgDialogueLine(_dialogue, index, playStageMotion);
-                else if (_rpg)
+                else if (_rpg && !_sceneUsesFieldActors)
                 {
                     if (_heroSpeaking) SetSprite(_hero, LoadHeroBust(_emotion));
                     if (speaker != null) SetOpponent(speaker, _emotion);

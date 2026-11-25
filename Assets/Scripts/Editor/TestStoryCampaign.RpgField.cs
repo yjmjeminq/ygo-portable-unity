@@ -611,8 +611,9 @@ namespace YGOPortable.Editor
                 Require(CollectionProgress.TryChooseStarter(CollectionProgress.Starters[0].Id, out _, out var error), error);
                 app.OpenRpgField();
                 for (int i = 0; i < 4; i++) Press(panel, "StoryDialogue/Scene/DialogueBox/Next/Button");
-                Require(!world.CanWalk && FieldScene().Find("RpgCompanion") != null,
-                    "The prologue did not lead into Yusei's workshop guide.");
+                Require(!world.CanWalk && FieldScene().Find("RpgCompanion") != null &&
+                    !panel.Find("StoryDialogue/Scene/OpponentSD").GetComponent<Image>().enabled,
+                    "The prologue did not lead into the workshop guide with a single field actor.");
                 Press(panel, "StoryDialogue/Scene/DialogueBox/Skip/Button");
                 CollectionProgress.Load(audit);
                 app.OpenRpgField();

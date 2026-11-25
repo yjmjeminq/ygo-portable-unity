@@ -45,7 +45,17 @@ namespace YGOPortable.UI
 
         private void BuildRpgIntro(bool guide)
         {
-            if (guide) BeginRpgTalkBackdrop();
+            if (guide)
+            {
+                BeginRpgTalkBackdrop();
+                if (_rpgCompanion != null)
+                {
+                    _rpgCompanionPoint = _position + new Vector2(.105f, .083f);
+                    PoseRpgWalker(_rpgCompanion, _rpgCompanionArt, _rpgCompanionPoint, Vector2.zero,
+                        false, _position - _rpgCompanionPoint);
+                    FaceRpgConversation(_rpgCompanion, _rpgCompanionArt);
+                }
+            }
             else
             {
                 Backdrop(RpgRegions[RpgGarage].Background, new Color(.055f, .091f, .135f));
