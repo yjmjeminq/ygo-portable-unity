@@ -32,7 +32,7 @@ namespace YGOPortable.UI
             Show(Page.Talk);
         }
 
-        private void AddRpgSideQuest(RpgSideQuest quest)
+        private string AddRpgSideQuest(RpgSideQuest quest)
         {
             var state = CollectionProgress.GetRpgQuestState(quest.Id);
             var delivery = RpgPendingDeliveries(quest).FirstOrDefault();
@@ -61,8 +61,9 @@ namespace YGOPortable.UI
                 var item = Anchor(_rpgSceneSpace, "SideQuestItem", quest.Point, new Vector2(160f, 56f));
                 void Investigate() => AdvanceRpgQuest(quest, RpgQuestState.Active, Page.Field,
                     $"{quest.Item} 확보 · {RpgQuestName(quest)}에게 돌아가세요.");
-                Btn(item, "조사 · " + quest.Item, () => MoveTo(quest.Point, Investigate), 15);
-                _interactions.Add((item, Investigate));
+                void Approach() => MoveTo(quest.Point, Investigate);
+                Btn(item, "조사 · " + quest.Item, Approach, 15);
+                RegisterRpgInteraction(item, $"{quest.Item} · 조사", Approach);
             }
 
             string hint = delivery?.Objective ?? (state switch
@@ -74,10 +75,7 @@ namespace YGOPortable.UI
             if ((_rpgLocation == RpgGarage || _rpgLocation == RpgBridge) &&
                 RpgCouplerState is RpgQuestState.Active or RpgQuestState.Ready)
                 hint = RpgCouplerState == RpgQuestState.Active ? RpgCouplerQuest.Objective : RpgQuestReturn(RpgCouplerQuest);
-            if (hint == null) return;
-            var tracker = Area(_rpgFieldHud, "SideQuestTrack", .02f, .01f, .72f, .075f);
-            Tint(tracker, new Color(.018f, .07f, .10f, .92f));
-            Label(tracker, $"의뢰  ·  {hint}", 17, TextAnchor.MiddleLeft).color = new Color(.63f, .86f, .95f);
+            return hint;
         }
 
         private static string RpgQuestDialogue(RpgSideQuest quest)

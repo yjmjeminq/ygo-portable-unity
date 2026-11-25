@@ -8,6 +8,7 @@
 | `icon_quest_sub.png` | [Kenney Emotes Pack](https://kenney.nl/assets/emotes-pack) · `PNG/Vector/Style 1/emote_dots3.png` | CC0. 하늘색으로 조정하고 128×128 투명 캔버스에 배치 |
 | `icon_duel_ready.png` | [Crossed swords](https://game-icons.net/1x1/lorc/crossed-swords.html) · 투명 PNG | Lorc, CC BY 3.0. 색과 크기 조정 |
 | `icon_map_lock.png` | [Padlock](https://game-icons.net/1x1/lorc/padlock.html) · 투명 PNG | Lorc, CC BY 3.0. 색과 크기 조정 |
+| `hud_target.png` | [Lucide Target 0.468.0](https://github.com/lucide-icons/lucide/blob/0.468.0/icons/target.svg) | 96×96 투명 PNG로 변환. Lucide ISC 및 Feather MIT 고지는 같은 폴더의 `Lucide-LICENSE.txt` |
 | `panel_dialogue_frame.png` | [Kenney UI Pack – Sci-Fi](https://kenney.nl/assets/ui-pack-sci-fi) · `PNG/Extra/Double/panel_glass_notches_top.png` | CC0. 1024×256으로 9-Slice 확장, 네 변에 24픽셀 여백 |
 
 직접 다운로드는 [Kenney Emotes ZIP](https://kenney.nl/media/pages/assets/emotes-pack/d00a3dcb06-1677578798/kenney_emotes-pack.zip), [Kenney Sci-Fi ZIP](https://kenney.nl/media/pages/assets/ui-pack-sci-fi/b67c2acd31-1724181109/kenney_ui-pack-space-expansion.zip), [Crossed swords PNG](https://game-icons.net/icons/ffffff/transparent/1x1/lorc/crossed-swords.png), [Padlock PNG](https://game-icons.net/icons/ffffff/transparent/1x1/lorc/padlock.png)에서 제공됩니다. 프로젝트에 넣은 Kenney 원본은 제작자가 OpenGameArt에 올린 [Emotes ZIP](https://opengameart.org/sites/default/files/kenney_emotesPack.zip)과 [Sci-Fi ZIP](https://opengameart.org/sites/default/files/kenney_ui-pack-scifi.zip)에서 추출했습니다. Game-icons.net의 [CC BY 3.0 사용 조건](https://creativecommons.org/licenses/by/3.0/)을 함께 보존합니다.

@@ -62,9 +62,11 @@ namespace YGOPortable.UI
 
             var landmark = RpgLandmarks[_rpgLocation];
             var marker = Anchor(_rpgFieldObjects, "Landmark", landmark.Position, new Vector2(146f, 31f));
-            var inspect = Btn(marker, landmark.Name, () => MoveTo(landmark.Position, OpenRpgLandmark), 15);
+            void Inspect() => MoveTo(landmark.Position, OpenRpgLandmark);
+            var inspect = Btn(marker, landmark.Name, Inspect, 15);
             inspect.targetGraphic.color = new Color(.047f, .18f, .225f, .93f);
             _rpgLandmarkLabel = marker.GetComponentInChildren<Text>();
+            RegisterRpgInteraction(marker, $"{landmark.Name} · 조사", Inspect);
 
             void AddExit(int slot, int destination, int entry)
             {
@@ -113,16 +115,6 @@ namespace YGOPortable.UI
 
         private bool RpgLandmarkIsNear =>
             RpgArtDirection(RpgLandmarks[_rpgLocation].Position - _position).sqrMagnitude <= .085f * .085f;
-
-        private bool TryInspectNearbyLandmark(RectTransform closestActor)
-        {
-            if (!RpgLandmarkIsNear || (closestActor != null &&
-                RpgArtDirection(closestActor.anchorMin - _position).sqrMagnitude <
-                RpgArtDirection(RpgLandmarks[_rpgLocation].Position - _position).sqrMagnitude)) return false;
-            DuelAudio.PlayTagForceSfx(TagForceSfx.Confirm);
-            OpenRpgLandmark();
-            return true;
-        }
 
         private void OpenRpgLandmark()
         {

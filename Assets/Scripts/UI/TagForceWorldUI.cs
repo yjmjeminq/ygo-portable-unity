@@ -191,6 +191,7 @@ namespace YGOPortable.UI
         {
             bool openConversation = page == Page.Talk && _page == Page.Field;
             _page = page;
+            _status.rectTransform.anchorMax = new Vector2(_rpgField && page == Page.Field ? .59f : .95f, .168f);
             ClearBody();
             _images.BeginPage();
             if (_rpgField)
@@ -239,6 +240,7 @@ namespace YGOPortable.UI
             ClearRpgDialogue();
             ClearRpgAtmosphere();
             ClearRpgExploration();
+            ClearRpgFieldHud();
             ClearRpgPresentation();
             _rpgResidents.Clear();
             _rpgNearbyScene = null;
@@ -476,6 +478,7 @@ namespace YGOPortable.UI
             float time = Time.unscaledTime;
             AdvanceWalk(delta, time);
             if (CanWalk) AdvanceVisitors(time);
+            if (_rpgField) RefreshRpgFieldPrompt();
         }
 
         private void AdvanceWalk(float delta, float time)
@@ -553,8 +556,9 @@ namespace YGOPortable.UI
                 DuelAudio.PlayTagForceSfx(TagForceSfx.Cursor, .65f);
                 _manualWalk = _moving = false;
                 _onArrival = null;
-                _fieldControls.text = _fieldMenu ? "위쪽 버튼으로 보행 복귀" :
-                    _rpgField ? RpgFieldHelp : "방향키 · 스틱 이동   선택 조사/대화   위쪽 버튼 메뉴";
+                if (_rpgField) RefreshRpgFieldPrompt();
+                else _fieldControls.text = _fieldMenu ? "위쪽 버튼으로 보행 복귀" :
+                    "방향키 · 스틱 이동   선택 조사/대화   위쪽 버튼 메뉴";
                 return true;
             }
             if (_fieldMenu) return false;
@@ -563,13 +567,16 @@ namespace YGOPortable.UI
                 OpenRpgService(RpgPartnerId);
                 return true;
             }
-            if (frame.Submit)
+            if (!frame.Submit) return true;
+            if (_rpgField)
             {
-                var closest = _interactions.OrderBy(entry => Vector2.SqrMagnitude(entry.Actor.anchorMin - _position)).FirstOrDefault();
-                if ((_rpgField && TryInspectNearbyLandmark(closest.Actor)) || closest.Actor == null) return true;
-                DuelAudio.PlayTagForceSfx(TagForceSfx.Confirm);
-                MoveTo(closest.Actor.anchorMin - (_rpgField ? new Vector2(0f, .06f) : Vector2.zero), closest.Action);
+                ActivateRpgInteraction();
+                return true;
             }
+            var closest = _interactions.OrderBy(entry => Vector2.SqrMagnitude(entry.Actor.anchorMin - _position)).FirstOrDefault();
+            if (closest.Actor == null) return true;
+            DuelAudio.PlayTagForceSfx(TagForceSfx.Confirm);
+            MoveTo(closest.Actor.anchorMin, closest.Action);
             return true;
         }
 

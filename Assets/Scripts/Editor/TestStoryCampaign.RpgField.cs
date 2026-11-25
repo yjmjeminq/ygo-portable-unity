@@ -79,7 +79,7 @@ namespace YGOPortable.Editor
                     FieldScene().Find("MainQuestNpc/MainQuestMarker").GetComponent<Image>().sprite != null &&
                     world.CanStartRpgEpisode(0) && !world.CanStartRpgEpisode(1),
                     "RPG did not start as a walkable field with the first main quest.");
-                Press(panel, "FieldHud/FieldMap");
+                Press(world.Root.transform, "RpgNavigation/Map");
                 Require(panel.Find("spot_kai_garage/Travel").GetComponent<Button>().interactable &&
                     panel.Find("spot_satellite_hideout/Travel").GetComponent<Button>().interactable &&
                     panel.Find("spot_facility_prison/MapLock").GetComponent<Image>().sprite != null &&
@@ -90,6 +90,7 @@ namespace YGOPortable.Editor
                     "Returning from deck editing did not restore the RPG world map.");
                 world.Back();
 
+                VerifyRpgHud();
                 VerifyFieldMovement();
                 VerifyDirectionalArt();
                 VerifySceneGuests();
@@ -189,6 +190,41 @@ namespace YGOPortable.Editor
             }
 
             Transform FieldScene() => panel.Find("FieldViewport/Camera");
+
+            void VerifyRpgHud()
+            {
+                var hud = panel.Find("FieldHud");
+                var action = hud.Find("ContextAction");
+                var padSubmit = new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Submit);
+                var player = (RectTransform)FieldScene().Find("Player");
+                var start = player.anchorMin;
+                Require(!action.gameObject.activeSelf && hud.Find("FieldMap") == null &&
+                    ((RectTransform)action).anchorMax.y < ((RectTransform)panel.Find("FieldViewport")).anchorMin.y &&
+                    hud.Find("QuestTrack/Objective/Label").GetComponent<Text>().text.Contains(script.episodes[0].opponentName) &&
+                    hud.Find("QuestTrack/GoalIcon").GetComponent<Image>().sprite != null,
+                    "The field HUD exposed a far interaction, a duplicate map, or omitted the objective.");
+                world.HandleFieldInput(padSubmit);
+                world.Update(.25f);
+                Require(player.anchorMin == start && world.CanWalk, "Selecting away from every target started an unintended walk.");
+
+                var landmark = (RectTransform)FieldScene().Find("Exploration/Landmark");
+                FieldScene().Find("Scenery").GetComponent<TagForceFloorTap>().Click(landmark.anchorMin);
+                world.Update(4f);
+                Require(action.gameObject.activeSelf && action.Find("Label").GetComponent<Text>().text == "정비 작업대 · 조사",
+                    "The prompt did not identify the nearby landmark.");
+                var menuToggle = new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Search);
+                world.HandleFieldInput(menuToggle);
+                Require(!action.gameObject.activeSelf && hud.Find("FieldControls").gameObject.activeSelf,
+                    "The action prompt conflicted with the field menu.");
+                world.HandleFieldInput(menuToggle);
+                Press(hud, "ContextAction");
+                world.Update(.1f);
+                Require(!world.CanWalk && panel.Find("ResidentChoices/WorkbenchMenu") != null,
+                    "Tapping the action prompt opened the wrong target.");
+                world.Back();
+                Require(world.EnterRpgRegion(1) && world.EnterRpgRegion(0), "Could not reset the field after HUD verification.");
+                Debug.Log("[VERIFY 5DS HUD] Single map shortcut, goal icon, proximity, menu focus and touch action passed.");
+            }
 
             void VerifyFieldMovement()
             {
@@ -693,12 +729,14 @@ namespace YGOPortable.Editor
                 loadedArt[regions[0].Background] = null;
                 loadedArt["TagForce/UI/icon_quest_main.png"] = null;
                 loadedArt["TagForce/UI/icon_quest_sub.png"] = null;
+                loadedArt["TagForce/UI/hud_target.png"] = null;
                 Require(world.EnterRpgRegion(0) && FieldScene().Find("Scenery").GetComponent<Image>().sprite == DuelUiKit.WhiteSprite &&
                     FieldScene().Find("Scenery").GetComponent<Image>().color != Color.white &&
-                    FieldScene().Find("MainQuestNpc/MainQuestMarker/Label").GetComponent<Text>().text == "!",
+                    FieldScene().Find("MainQuestNpc/MainQuestMarker/Label").GetComponent<Text>().text == "!" &&
+                    panel.Find("FieldHud/QuestTrack/GoalIcon/Label").GetComponent<Text>().text == "!",
                     "Missing optional map or quest-icon art did not fall back to colors and text.");
                 loadedArt["TagForce/UI/icon_map_lock.png"] = null;
-                Press(panel, "FieldHud/FieldMap");
+                Press(world.Root.transform, "RpgNavigation/Map");
                 Require(panel.Find("spot_facility_prison/MapLock/Label") != null,
                     "The locked map needed external icon art.");
                 world.Back();

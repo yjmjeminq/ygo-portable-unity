@@ -13,7 +13,6 @@ namespace YGOPortable.UI
         internal const string RpgPracticeId = "5ds-rpg";
         private const string RpgArt = "TagForce/5DS/";
         private const string RpgIcons = "TagForce/UI/";
-        private const string RpgFieldHelp = "스틱 이동   선택 조사·대화   왼쪽 버튼 유세이";
         private const string RpgRegionPreference = "ygo.5ds-rpg.last-region";
         private const float RpgSceneRadius = .096f;
         private static readonly Vector2 RpgArrival = new(.50f, .17f);
@@ -122,7 +121,7 @@ namespace YGOPortable.UI
         {
             _navigation.gameObject.SetActive(false);
             _rpgNavigation.gameObject.SetActive(true);
-            _header.text = $"5D's RPG 월드 · {RpgRegions[_rpgLocation].Name} · {CollectionProgress.Balance:N0} DP";
+            _header.text = $"5D's RPG 월드 · {RpgRegions[_rpgLocation].Name}";
             DuelAudio.PlayTagForceBgm(_rpgLocation is 3 or 4 or 5);
             switch (page)
             {
@@ -211,23 +210,10 @@ namespace YGOPortable.UI
             floor.raycastTarget = true;
             floor.gameObject.AddComponent<TagForceFloorTap>().Click = target => MoveTo(target);
             BuildRpgAtmosphere();
-            _rpgFieldHud = DuelUiKit.FillRect("FieldHud", _body);
-            var status = Area(_rpgFieldHud, "QuestTrack", .02f, .921f, .77f, .986f);
-            Tint(status, new Color(.014f, .03f, .065f, .90f));
             var episodes = _rpgCampaign?.episodes ?? Array.Empty<StoryEpisodeData>();
             int cleared = RpgClears;
             bool complete = cleared == episodes.Length;
             int targetRegion = RegionForEpisode(cleared + 1);
-            string objective = !complete && _rpgLocation == targetRegion
-                ? $"[!] {episodes[cleared].opponentName}에게 다가가기" : "지도나 출구를 따라 이동하기";
-            string quest = episodes.Length == 0 ? "RPG 대본을 불러오지 못했습니다." :
-                complete ? "50화 스토리 완료 · 자유 탐험" :
-                $"[Ep {cleared + 1:00}]  {RpgRegions[targetRegion].Name}  ·  {objective}";
-            Label(status, quest, 20, TextAnchor.MiddleLeft).color = DuelUiKit.GoldAccent;
-            BuildRpgProgressHud();
-            Btn(Area(_rpgFieldHud, "FieldMap", .80f, .872f, .98f, .986f), "월드맵", () => Show(Page.Map));
-            _fieldControls = Label(Area(_rpgFieldHud, "FieldControls", .02f, .012f, .98f, .078f), RpgFieldHelp, 15,
-                TextAnchor.MiddleRight);
 
             StoryEpisodeData questNpc = !complete && _rpgLocation == targetRegion ? episodes[cleared] : null;
             var sideQuest = RpgSideQuest.All.FirstOrDefault(item => item.Region == RpgRegions[_rpgLocation].Id);
@@ -256,11 +242,12 @@ namespace YGOPortable.UI
                     Show(Page.Talk);
                 });
             }
-            if (sideQuest != null) AddRpgSideQuest(sideQuest);
+            string sideObjective = sideQuest != null ? AddRpgSideQuest(sideQuest) : null;
             AddRpgShopkeeper();
             BuildRpgCompanion();
             _player = Anchor(_rpgSceneSpace, "Player", _position, new Vector2(91f, 116f));
             _playerSprite = WalkerSprite(_player, RpgArt + "Characters_SD/sd_protagonist.png", "카이");
+            BuildRpgFieldHud(cleared, targetRegion, episodes, sideObjective);
         }
 
         private void CheckRpgSceneEncounter(Vector2 previous)
@@ -294,7 +281,8 @@ namespace YGOPortable.UI
             if (!story && _rpgLocation > 1 && node.StartsWith("Resident_", StringComparison.Ordinal) && _rpgRoamers.Count == 0)
                 _rpgRoamers.Add((actor, spot));
             Btn(Area(actor, "Interact", 0f, 0f, 1f, .265f), name, Approach, 15);
-            _interactions.Add((actor, interact));
+            string verb = story ? "이야기 진행" : node == "RpgCardMerchant" ? "팩 구매" : "대화";
+            RegisterRpgInteraction(actor, $"{name} · {verb}", Approach);
         }
 
         private void DrawRpgIcon(RectTransform anchor, string name, string fallback, Color color)

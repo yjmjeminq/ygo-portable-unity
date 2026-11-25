@@ -65,8 +65,8 @@ namespace YGOPortable.UI
             var lines = guide ? new[]
             {
                 new StoryDialogueLine { speaker = RpgPartnerName, text = "카이, 일어났군. 스틱이나 방향키로 걸어 봐. 화면을 눌러도 그쪽으로 갈 수 있어." },
-                new StoryDialogueLine { speaker = RpgPartnerName, text = "사람 곁에 가서 선택 버튼을 누르면 말할 수 있어. 머리 위에 느낌표가 보이면 그곳에서 다음 사건이 시작돼." },
-                new StoryDialogueLine { speaker = RpgPartnerName, text = "작업대에서 덱을 정리하고, 정비소 출구를 따라가면 새틀라이트로 나갈 수 있어. 먼저 정비소 사람들한테 말을 걸어 보자." },
+                new StoryDialogueLine { speaker = RpgPartnerName, text = "가까이 가면 조사나 대화 버튼이 보여. 패드는 선택 버튼으로 실행하고, 위쪽 버튼으로 메뉴를 열어." },
+                new StoryDialogueLine { speaker = RpgPartnerName, text = "정비소 출구로 나가면 새틀라이트야. 머리 위에 느낌표가 보이는 사람에게 다가가면 다음 이야기가 시작돼." },
             } : new[]
             {
                 new StoryDialogueLine { speaker = "내레이션", text = "새틀라이트의 밤. 철길 너머의 불빛은 새벽이 와도 좀처럼 가까워지지 않았다." },
@@ -87,23 +87,6 @@ namespace YGOPortable.UI
             if (!saved) ShowStatus(error);
         }
 
-        private void BuildRpgProgressHud()
-        {
-            var card = Area(_rpgFieldHud, "DuelistHud", .02f, .865f, .77f, .915f);
-            Tint(card, new Color(.026f, .08f, .13f, .96f));
-            var rank = Label(Area(card, "Rank", .02f, .05f, .22f, .98f),
-                $"듀얼리스트 Lv.{CollectionProgress.RpgRank}", 16, TextAnchor.MiddleLeft);
-            rank.color = DuelUiKit.GoldAccent;
-            Label(Area(card, "ExperienceLabel", .235f, .05f, .288f, .98f), "EXP", 13);
-            var track = Area(card, "Experience", .295f, .27f, .526f, .72f);
-            Tint(track, new Color(.006f, .026f, .047f, .95f));
-            var fill = Area(track, "Fill", 0f, 0f, CollectionProgress.RpgRankProgress, 1f);
-            Tint(fill, new Color(.18f, .70f, .81f));
-            Label(Area(card, "Dp", .562f, .05f, .738f, .98f), $"{CollectionProgress.Balance:N0} DP", 16);
-            Label(Area(card, "Affinity", .761f, .05f, .992f, .98f),
-                $"♥ 유세이 {CollectionProgress.RpgAffinity}/100", 16).color = new Color(1f, .70f, .77f);
-        }
-
         private void BuildRpgCache()
         {
             int region = _rpgLocation;
@@ -117,11 +100,12 @@ namespace YGOPortable.UI
                 Show(Page.Field);
                 ShowStatus(result);
             }
-            var open = Btn(cache, "✦", () => MoveTo(point, Take), 32);
+            void Search() => MoveTo(point, Take);
+            var open = Btn(cache, "✦", Search, 32);
             open.targetGraphic.color = new Color(.05f, .15f, .215f, .48f);
             cache.GetComponentInChildren<Text>().color = new Color(1f, .87f, .47f);
             _questMarkers.Add(cache);
-            _interactions.Add((cache, Take));
+            RegisterRpgInteraction(cache, "반짝이는 물건 · 조사", Search);
         }
 
         private void BuildRpgCompanion()
