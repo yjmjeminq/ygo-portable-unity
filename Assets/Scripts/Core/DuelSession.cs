@@ -2654,6 +2654,8 @@ namespace YGOPortable.Core
             OnLifePointsChanged?.Invoke(player, delta, lp);
         }
 
+        internal void RecordRidingLaunch(string machine) => AddLog($"카이 · D-휠 《{machine}》 출격");
+
         private void AddLog(string line)
         {
             if (Logs.Count > 250) Logs.RemoveAt(0);

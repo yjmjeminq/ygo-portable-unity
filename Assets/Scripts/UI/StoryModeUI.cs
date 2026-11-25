@@ -14,6 +14,9 @@ namespace YGOPortable.UI
     {
         public string speaker;
         public string text;
+        public string cutscene;
+        public string emotion;
+        public string fx;
     }
 
     [Serializable]
@@ -25,6 +28,7 @@ namespace YGOPortable.UI
         public string title;
         public int charId;
         public string opponentName;
+        public int deckId;
         public StoryDialogueLine[] preDialogues;
         public StoryDialogueLine[] postWinDialogues;
         public StoryDialogueLine[] postLoseDialogues;
@@ -50,6 +54,8 @@ namespace YGOPortable.UI
     {
         internal const int TotalStoryEpisodes = StoryCampaign.EpisodeCount;
         private const int ActCount = 5;
+        private const string RpgSeriesId = "5ds";
+        private const string RpgMachine = "스트라이크 팽";
         private const float EpisodeRowHeight = 52f;
         private static readonly (string Id, string Label)[] Series =
         {
@@ -61,7 +67,10 @@ namespace YGOPortable.UI
         private readonly System.Random _turnOrderRandom;
         private readonly (string Id, Button Button, StoryScriptRoot Script)[] _seriesTabs;
         private readonly List<UserDeck> _playableDecks = new();
-        private readonly Button[] _episodeButtons = new Button[TotalStoryEpisodes];
+        private readonly Button[] _episodeButtons = new Button[StoryCampaign.LegacyEpisodeCount];
+        private readonly RectTransform _episodeRows;
+        private readonly StoryScriptRoot _rpgScript;
+        private readonly Dictionary<int, PresetDeckInfo> _rpgDecks;
         private readonly ScrollRect _episodeScroll;
         private readonly CanvasGroup _browser;
         private readonly StoryDialogueView _dialogue;
@@ -78,6 +87,7 @@ namespace YGOPortable.UI
         private readonly Text _status;
 
         private int _selectedSeries;
+        private bool _rpgWorld;
         private int _unlockedIndex;
         private int _selectedIndex;
         private string _deckId;
@@ -92,11 +102,13 @@ namespace YGOPortable.UI
         internal GameObject Root { get; }
         internal GameObject ActiveRoot => _dialogue.IsOpen ? _dialogue.ActiveRoot : Root;
 
-        private StoryScriptRoot Script => _seriesTabs[_selectedSeries].Script;
+        private StoryScriptRoot Script => _rpgWorld ? _rpgScript : _seriesTabs[_selectedSeries].Script;
         internal StoryModeUI(GameAppController app, Transform parent, System.Random turnOrderRandom = null)
         {
             _app = app;
             _turnOrderRandom = turnOrderRandom ?? new System.Random();
+            _rpgScript = LoadRpgScript(Application.streamingAssetsPath);
+            _rpgDecks = LoadRpgDecks(Application.streamingAssetsPath);
             var root = DuelUiKit.FillRect("Screen_StoryMode", parent);
             Root = root.gameObject;
             DuelUiKit.AddImage(root.gameObject, DuelUiChrome.Backdrop, Color.white, false, false);
@@ -127,7 +139,7 @@ namespace YGOPortable.UI
             var viewport = Region(listing, "Viewport", .04f, .043f, .946f, .957f);
             DuelUiKit.AddImage(viewport.gameObject, DuelUiKit.WhiteSprite, Color.clear);
             viewport.gameObject.AddComponent<RectMask2D>();
-            var rows = DuelUiKit.CreateRect("Rows", viewport, new Vector2(0f, 1f), Vector2.one, Vector2.zero, Vector2.zero);
+            var rows = _episodeRows = DuelUiKit.CreateRect("Rows", viewport, new Vector2(0f, 1f), Vector2.one, Vector2.zero, Vector2.zero);
             rows.pivot = new Vector2(.5f, 1f);
             rows.sizeDelta = new Vector2(0f, EpisodeRowHeight * TotalStoryEpisodes);
             _episodeScroll = listing.gameObject.AddComponent<ScrollRect>();
@@ -137,14 +149,7 @@ namespace YGOPortable.UI
             _episodeScroll.movementType = ScrollRect.MovementType.Clamped;
             _episodeScroll.scrollSensitivity = EpisodeRowHeight;
             _episodeScroll.verticalScrollbar = DuelUiKit.AddVerticalScrollbar(Region(listing, "EpisodeScrollbar", .95f, .043f, .973f, .957f));
-            for (int i = 0; i < _episodeButtons.Length; i++)
-            {
-                int index = i;
-                float top = 1f - (float)i / TotalStoryEpisodes;
-                _episodeButtons[i] = AddButton(rows, $"Episode_{i + 1}", "", 0f, top - .89f / TotalStoryEpisodes, 1f, top,
-                    () => SelectEpisode(index));
-                _episodeButtons[i].GetComponentInChildren<Text>().alignment = TextAnchor.MiddleLeft;
-            }
+            LayoutEpisodeRows(TotalStoryEpisodes);
 
             var details = DuelUiKit.CreateMenuPanel(content, "EpisodeDetails",
                 new Vector2(.587f, .08f), new Vector2(.968f, .82f));
@@ -166,6 +171,34 @@ namespace YGOPortable.UI
             _dialogue = new StoryDialogueView(root);
 
             Close();
+        }
+
+        internal void UseRpgCampaign(bool enabled) => _rpgWorld = enabled;
+
+        private void LayoutEpisodeRows(int count)
+        {
+            _episodeRows.sizeDelta = new Vector2(0f, EpisodeRowHeight * count);
+            for (int i = 0; i < _episodeButtons.Length; i++)
+            {
+                if (i >= count)
+                {
+                    if (_episodeButtons[i] != null) _episodeButtons[i].transform.parent.gameObject.SetActive(false);
+                    continue;
+                }
+                int index = i;
+                float top = 1f - (float)i / count;
+                float bottom = top - .89f / count;
+                if (_episodeButtons[i] == null)
+                {
+                    _episodeButtons[i] = AddButton(_episodeRows, $"Episode_{i + 1}", "", 0f, bottom, 1f, top,
+                        () => SelectEpisode(index));
+                    _episodeButtons[i].GetComponentInChildren<Text>().alignment = TextAnchor.MiddleLeft;
+                }
+                var row = (RectTransform)_episodeButtons[i].transform.parent;
+                row.anchorMin = new Vector2(0f, bottom);
+                row.anchorMax = new Vector2(1f, top);
+                row.gameObject.SetActive(true);
+            }
         }
 
         internal void Open()
@@ -225,6 +258,9 @@ namespace YGOPortable.UI
             return index >= 0 && index <= _unlockedIndex;
         }
 
+        internal string RidingMachineFor(StoryEpisodeData episode) =>
+            _rpgWorld && IndexOf(episode) >= 0 && StoryGimmickRuntime.IsRidingDuel(episode.gimmick) ? RpgMachine : null;
+
         internal void ShowDuelResult(StoryEpisodeData episode, bool won, bool draw, string reward, StoryBattlePlan plan = default)
         {
             int index = IndexOf(episode);
@@ -261,6 +297,8 @@ namespace YGOPortable.UI
         {
             int episodeIndex = IndexOf(episode);
             if (episodeIndex < 0) return default;
+            if (_rpgWorld && _rpgDecks.TryGetValue(episode.deckId, out var dedicated))
+                return (dedicated, 0, 0);
 
             var decks = OpponentDeckLevels.GetDecks(episode.charId);
             if (decks.Count == 0) decks = DeckRepository.GetDecksForCharacter(episode.charId);
@@ -328,7 +366,8 @@ namespace YGOPortable.UI
 
         internal static StoryScriptRoot LoadScript(string streamingAssets, string seriesId)
         {
-            string path = Path.Combine(streamingAssets, $"story_{seriesId}_script.json");
+            string path = Path.Combine(streamingAssets, seriesId == RpgSeriesId
+                ? "story_5ds_classic_script.json" : $"story_{seriesId}_script.json");
             try
             {
                 var script = JsonUtility.FromJson<StoryScriptRoot>(File.ReadAllText(path));
@@ -379,20 +418,71 @@ namespace YGOPortable.UI
             }
         }
 
+        internal static StoryScriptRoot LoadRpgScript(string streamingAssets)
+        {
+            try
+            {
+                var script = JsonUtility.FromJson<StoryScriptRoot>(
+                    File.ReadAllText(Path.Combine(streamingAssets, "story_5ds_script.json")));
+                if (script?.seriesId?.Equals(RpgSeriesId, StringComparison.OrdinalIgnoreCase) != true ||
+                    script.episodes?.Length != StoryCampaign.LegacyEpisodeCount)
+                    throw new InvalidDataException("Expected the 50-episode RPG script.");
+                for (int i = 0; i < script.episodes.Length; i++)
+                {
+                    var episode = script.episodes[i];
+                    if (episode == null || episode.deckId != 59001 + i || string.IsNullOrWhiteSpace(episode.title) ||
+                        !HasDialogue(episode.preDialogues) || !HasDialogue(episode.postWinDialogues) || !HasDialogue(episode.postLoseDialogues))
+                        throw new InvalidDataException($"Invalid RPG episode {i + 1}.");
+                    episode.id = $"5ds_rpg_ep_{i + 1:00}";
+                    if (episode.gimmick == "none") episode.gimmick = null;
+                }
+                return script;
+            }
+            catch (Exception error) when (error is IOException || error is UnauthorizedAccessException || error is ArgumentException ||
+                error is InvalidDataException)
+            {
+                Debug.LogWarning($"[StoryMode] Could not load the RPG campaign: {error.Message}");
+                return null;
+            }
+        }
+
+        internal static Dictionary<int, PresetDeckInfo> LoadRpgDecks(string streamingAssets)
+        {
+            var decks = new Dictionary<int, PresetDeckInfo>();
+            try
+            {
+                var data = JsonUtility.FromJson<OpponentsDbWrapper>(
+                    File.ReadAllText(Path.Combine(streamingAssets, "story_5ds_rpg_decks.json")));
+                foreach (var deck in data?.decks ?? Array.Empty<PresetDeckInfo>())
+                {
+                    if (deck?.id is >= 59001 and <= 59050 && deck.main?.Length is >= 40 and <= 60 &&
+                        deck.extra?.Length <= 15 && deck.side?.Length <= 15)
+                        decks.TryAdd(deck.id, deck);
+                }
+            }
+            catch (Exception error) when (error is IOException || error is UnauthorizedAccessException || error is ArgumentException)
+            {
+                Debug.LogWarning($"[StoryMode] Could not load RPG opponent decks: {error.Message}");
+            }
+            return decks;
+        }
+
         private static bool HasDialogue(StoryDialogueLine[] lines) => lines?.Length > 0 &&
-            lines.All(line => line != null && !string.IsNullOrWhiteSpace(line.speaker) && !string.IsNullOrWhiteSpace(line.text));
+            lines.All(line => line != null && !string.IsNullOrWhiteSpace(line.text));
 
         private void SelectSeries(int index)
         {
             if (!Root.activeSelf || _dialogue.IsOpen) return;
-            _selectedSeries = index;
+            if (!_rpgWorld) _selectedSeries = index;
             _seriesTitle.text = Script?.seriesTitle ?? "스토리 모드";
             for (int i = 0; i < _seriesTabs.Length; i++)
             {
                 var tab = _seriesTabs[i];
-                tab.Button.interactable = tab.Script != null;
+                tab.Button.transform.parent.gameObject.SetActive(!_rpgWorld);
+                tab.Button.interactable = !_rpgWorld && tab.Script != null;
                 tab.Button.GetComponentInChildren<Text>().color = i == index ? DuelUiKit.GoldAccent : DuelUiKit.TextPrimary;
             }
+            LayoutEpisodeRows(Script?.episodes.Length ?? 0);
             if (Script == null) _unlockedIndex = 0;
             else
             {
@@ -409,7 +499,6 @@ namespace YGOPortable.UI
         {
             if (Script == null)
             {
-                foreach (var button in _episodeButtons) button.interactable = false;
                 _start.interactable = false;
                 _deckPicker.interactable = false;
                 ShowStatus("스토리 대본을 불러오지 못했습니다.");
@@ -417,7 +506,7 @@ namespace YGOPortable.UI
             }
 
             _selectedIndex = index;
-            for (int row = 0; row < _episodeButtons.Length; row++)
+            for (int row = 0; row < Script.episodes.Length; row++)
             {
                 int episodeIndex = row;
                 var episode = Script.episodes[episodeIndex];
@@ -442,7 +531,7 @@ namespace YGOPortable.UI
             _portrait.sprite = DuelUiKit.LoadOpponentPortrait(opponent);
             _portrait.enabled = _portrait.sprite != null;
             var (deck, level, levelCount) = GetOpponentMatch(current);
-            _opponentDeck.text = deck == null ? "" : $"Lv. {level}/{levelCount}  ·  {deck.title}";
+            _opponentDeck.text = deck == null ? "" : levelCount == 0 ? deck.title : $"Lv. {level}/{levelCount}  ·  {deck.title}";
             bool ready = opponent != null && deck != null;
             _start.interactable = CanPlay(current) && ready;
             string status = !CanPlay(current) ? "이전 에피소드를 클리어하면 열립니다." :
@@ -488,6 +577,7 @@ namespace YGOPortable.UI
             var deck = GetOpponentMatch(episode).Deck;
             var choices = StoryDialogueBranch.Create(episode, raid.HasValue,
                 deck?.sigCard is > 0 ? CardDatabase.GetName(deck.sigCard) : "");
+            bool pickedInitialDeck = false;
             PlayDialogue(episode, episode.preDialogues, TitleOf(episode), ShowPreparation);
             _dialogue.SetBranch(StoryDialogueBranch.AfterLine(episode), () =>
                 _dialogue.ShowChoices(() => "어떻게 답할까?", choices.Select(choice => new StoryChoice(
@@ -497,13 +587,21 @@ namespace YGOPortable.UI
                         _dialogue.AnswerBranch(choice.Reply, episode.opponentName, choice.Response);
                     })).ToArray()));
 
-            void ShowPreparation() => _dialogue.ShowChoices(() => PreparationSummary(episode, raid, deck),
-                new("듀얼 개시!", () => ChooseTurnOrder(episode, ShowPreparation), () => _playableDecks.Count > 0),
-                new("내 덱 변경", PickDeck),
-                new("대화 다시 보기", () => OpenEpisode(index)),
-                new("에피소드 목록으로", ReturnToEpisodes),
-                new("전술 서포트 장착 · 최대 2개", () => PickSupports(episode)),
-                new("상대 시작 조건 변경", () => PickOpponentOpening(episode, ShowPreparation)));
+            void ShowPreparation()
+            {
+                _dialogue.ShowChoices(() => PreparationSummary(episode, raid, deck),
+                    new("듀얼 개시!", () => ChooseTurnOrder(episode, ShowPreparation), () => _playableDecks.Count > 0),
+                    new("내 덱 변경", PickDeck),
+                    new("대화 다시 보기", () => OpenEpisode(index)),
+                    new("에피소드 목록으로", ReturnToEpisodes),
+                    new("전술 서포트 장착 · 최대 2개", () => PickSupports(episode)),
+                    new("상대 시작 조건 변경", () => PickOpponentOpening(episode, ShowPreparation)));
+                if (_rpgWorld && !pickedInitialDeck)
+                {
+                    pickedInitialDeck = true;
+                    PickDeck();
+                }
+            }
         }
 
         private StoryBattlePlan CurrentBattlePlan => new(_stance, _supports, _opponentOpening);
@@ -518,7 +616,8 @@ namespace YGOPortable.UI
             string equipped = string.Join(" · ", RaidSupportCatalog.Items.Where(item => (_supports & item.Id) != 0)
                 .Select(item => item.Name));
             string supports = equipped.Length > 0 ? $"\n장착 · {equipped}" : "";
-            return $"{SelectedStoryDeckLabel()}\n내 LP {player.Life:N0} · 패 {player.Hand}장 / 상대 시작 패 {opponent.Hand}장{field}{supports}";
+            string machine = _rpgWorld ? $"\n카이 · D-휠 《{RpgMachine}》" : "";
+            return $"{SelectedStoryDeckLabel()}{machine}\n내 LP {player.Life:N0} · 패 {player.Hand}장 / 상대 시작 패 {opponent.Hand}장{field}{supports}";
         }
 
         private void PickOpponentOpening(StoryEpisodeData episode, Action restore)
@@ -578,7 +677,7 @@ namespace YGOPortable.UI
             if (rivalDeck == null) return;
             var plan = CurrentBattlePlan;
             _returnFromTurnOrder = restore;
-            ShowHands("가위바위보 · 이기면 선공 또는 후공을 선택합니다.");
+            ShowHands((_rpgWorld ? $"《{RpgMachine}》 출격\n" : "") + "가위바위보 · 이기면 선공 또는 후공을 선택합니다.");
 
             void ShowHands(string summary) => _dialogue.ShowChoices(() => summary,
                 new(TurnOrderHands[0], () => PlayHand(0)), new(TurnOrderHands[1], () => PlayHand(1)),
@@ -629,8 +728,7 @@ namespace YGOPortable.UI
         {
             _browser.interactable = false;
             _browser.blocksRaycasts = false;
-            var portrait = DuelUiKit.LoadOpponentPortrait(DeckRepository.GetCharacter(episode.charId));
-            _dialogue.Open(heading, Script.protagonist, portrait, lines, onFinish);
+            _dialogue.Open(heading, Script.protagonist, DeckRepository.GetCharacter(episode.charId), lines, onFinish, _rpgWorld);
         }
 
         private void ReturnToEpisodes()

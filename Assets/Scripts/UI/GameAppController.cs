@@ -237,6 +237,12 @@ namespace YGOPortable.UI
             return canvas;
         }
 
+        internal void OpenStoryCampaign(bool rpgWorld)
+        {
+            _storyMode.UseRpgCampaign(rpgWorld);
+            ShowScreen(AppScreen.StoryMode);
+        }
+
         public void ShowScreen(AppScreen screen)
         {
             if (!_initialized) return;
@@ -493,6 +499,7 @@ namespace YGOPortable.UI
             bool planCombos = duelDifficulty is AIDifficulty.Smart or AIDifficulty.Master;
             var raid = isStoryDuel ? _storyMode.GetRaid(_activeStoryEpisode) : null;
             string storyGimmick = isStoryDuel ? _activeStoryEpisode.gimmick : null;
+            string ridingMachine = isStoryDuel ? _storyMode.RidingMachineFor(_activeStoryEpisode) : null;
             var opening = isStoryDuel ? _activeStoryPlan.Apply(raid, oppDeck, storyGimmick) : ((DuelOpening Player, DuelOpening Opponent)?)null;
             if (isTournamentDuel)
                 opening = (new DuelOpening(8000, 5, 0), DimensionTournament.Opening(_activeTournament.Value.Slots, oppDeck));
@@ -519,6 +526,7 @@ namespace YGOPortable.UI
                 ShowDuelStartFailure(isStoryDuel, "듀얼을 시작하지 못했습니다.", isTournamentDuel, isRankedDuel, isTagForceDuel);
                 return;
             }
+            if (ridingMachine != null) _session.RecordRidingLaunch(ridingMachine);
             if (isStoryDuel && !CollectionProgress.TryConsumeRaidSupports(_activeStoryPlan.Supports, raid.HasValue, out string error))
             {
                 ShowDuelStartFailure(isStoryDuel, error);

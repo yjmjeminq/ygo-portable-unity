@@ -1,6 +1,8 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Text;
 using UnityEngine;
@@ -29,9 +31,9 @@ namespace YGOPortable.UI
         {
             private static readonly Color HeroColor = new(.47f, .85f, 1f);
             private static readonly Color OpponentColor = new(1f, .76f, .43f);
-            private static readonly Color NarratorColor = new(.75f, .72f, .91f);
             private static readonly Color Listening = new(.48f, .53f, .63f);
             private const float CharactersPerSecond = 34f;
+            private static Sprite _cheekGlow;
 
             private readonly GameObject _root;
             private readonly CanvasGroup _scene;
@@ -40,6 +42,18 @@ namespace YGOPortable.UI
             private readonly Text _heroIdentity;
             private readonly Image _hero;
             private readonly Image _opponent;
+            private readonly Image _heroSd;
+            private readonly Image _opponentSd;
+            private readonly Image _stage;
+            private readonly CanvasGroup _portraitGroup;
+            private readonly CanvasGroup _cutsceneOverlay;
+            private readonly Image _cutsceneImage;
+            private readonly AspectRatioFitter _cutsceneAspect;
+            private readonly Image _blush;
+            private readonly Text[] _hearts = new Text[3];
+            private readonly StoryDialogueFx _fx;
+            private readonly GameObject _speakerBadge;
+            private readonly Dictionary<string, Sprite> _rpgSprites = new(StringComparer.Ordinal);
             private readonly Text _speaker;
             private readonly Text _text;
             private readonly Text _counter;
@@ -77,6 +91,13 @@ namespace YGOPortable.UI
             private bool _finished;
             private bool _heroSpeaking;
             private bool _opponentSpeaking;
+            private bool _rpg;
+            private bool _showCutscene;
+            private bool _akiBlush;
+            private OpponentCharacter _sceneOpponent;
+            private string _protagonist;
+            private string _emotion;
+            private float _poseTime;
             private Selectable _popupReturn;
             private int _branchLine;
             private Action _branch;
@@ -101,14 +122,41 @@ namespace YGOPortable.UI
                 back.raycastTarget = true;
 
                 var scene = DuelUiKit.FillRect("Scene", overlay);
+                _stage = DuelUiKit.AddImage(DuelUiKit.FillRect("RpgStage", scene).gameObject, null,
+                    new Color(.60f, .67f, .77f), false, false);
+                _heroSd = DuelUiKit.AddImage(Region(scene, "ProtagonistSD", .31f, .33f, .485f, .61f).gameObject,
+                    null, Color.white, true, false);
+                _opponentSd = DuelUiKit.AddImage(Region(scene, "OpponentSD", .515f, .33f, .69f, .61f).gameObject,
+                    null, Color.white, true, false);
+                _opponentSd.rectTransform.localScale = new Vector3(-1f, 1f, 1f);
+                var cutscene = DuelUiKit.FillRect("CutsceneOverlay", scene);
+                cutscene.gameObject.AddComponent<RectMask2D>();
+                _cutsceneOverlay = cutscene.gameObject.AddComponent<CanvasGroup>();
+                _cutsceneOverlay.blocksRaycasts = _cutsceneOverlay.interactable = false;
+                _cutsceneImage = DuelUiKit.AddImage(DuelUiKit.FillRect("CG", cutscene).gameObject, null, Color.white, false, false);
+                _cutsceneAspect = _cutsceneImage.gameObject.AddComponent<AspectRatioFitter>();
+                _cutsceneAspect.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
+
                 var content = Application.isMobilePlatform ? MobileSafeArea.Create(scene) : scene;
                 _scene = content.gameObject.AddComponent<CanvasGroup>();
                 _heading = AddLabel(content, "Episode", .06f, .88f, .94f, .965f, 29, color: DuelUiKit.GoldAccent);
                 _heroIdentity = AddLabel(content, "ProtagonistIdentity", .065f, .837f, .495f, .884f, 17, color: HeroColor);
-                var hero = Region(content, "Protagonist", .07f, .26f, .493f, .855f);
-                var opponent = Region(content, "Opponent", .508f, .26f, .93f, .855f);
-                _hero = DuelUiKit.AddImage(hero.gameObject, DuelUiKit.LoadSprite("Story/Protagonist"), Color.white, true, false);
+                var portraits = DuelUiKit.FillRect("Portraits", content);
+                _portraitGroup = portraits.gameObject.AddComponent<CanvasGroup>();
+                _portraitGroup.blocksRaycasts = _portraitGroup.interactable = false;
+                var hero = Region(portraits, "Protagonist", .043f, .30f, .41f, .855f);
+                var opponent = Region(portraits, "Opponent", .59f, .30f, .957f, .855f);
+                _hero = DuelUiKit.AddImage(hero.gameObject, DuelProfileArt.Player, Color.white, true, false);
                 _opponent = DuelUiKit.AddImage(opponent.gameObject, null, Listening, true, false);
+                _blush = DuelUiKit.AddImage(Region(opponent, "Blush", .40f, .72f, .60f, .80f).gameObject,
+                    null, new Color(1f, .36f, .60f, .28f), false, false);
+                for (int i = 0; i < _hearts.Length; i++)
+                {
+                    _hearts[i] = AddLabel(opponent, $"Heart_{i}", .59f + i * .063f, .70f, .73f + i * .063f, .83f,
+                        25 - i * 3, color: new Color(1f, .46f, .69f));
+                    _hearts[i].text = "♥";
+                    _hearts[i].raycastTarget = false;
+                }
 
                 var dialogue = DuelUiKit.CreateMenuPanel(content, "DialogueBox",
                     new Vector2(.054f, .064f), new Vector2(.946f, .406f));
@@ -117,6 +165,7 @@ namespace YGOPortable.UI
                 dialogueHit.navigation = new Navigation { mode = Navigation.Mode.None };
                 dialogueHit.onClick.AddListener(Advance);
                 var speakerPlate = Region(dialogue, "SpeakerBadge", .038f, .703f, .35f, .95f);
+                _speakerBadge = speakerPlate.gameObject;
                 DuelUiKit.AddImage(speakerPlate.gameObject, DuelUiKit.WhiteSprite, new Color(.028f, .063f, .13f, .94f), false, false);
                 _speaker = AddLabel(speakerPlate, "Speaker", .08f, .05f, .94f, .95f, 23, TextAnchor.MiddleLeft);
                 _text = AddLabel(dialogue, "Text", .047f, .234f, .947f, .69f, 29, TextAnchor.UpperLeft);
@@ -127,6 +176,10 @@ namespace YGOPortable.UI
                 _auto = AddButton(dialogue, "Auto", "오토 꺼짐", .657f, .727f, .787f, .927f, ToggleAuto);
                 _skip = AddButton(dialogue, "Skip", "건너뛰기", .797f, .727f, .952f, .927f, Finish);
                 _next = AddButton(dialogue, "Next", "다음 ▶", .778f, .042f, .952f, .214f, Advance, gold: true);
+                var flash = DuelUiKit.AddImage(DuelUiKit.FillRect("DialogueFlash", scene).gameObject, DuelUiKit.WhiteSprite,
+                    Color.clear, false, false);
+                _fx = scene.gameObject.AddComponent<StoryDialogueFx>();
+                _fx.Initialize(dialogue, flash);
 
                 var choices = DuelUiKit.CreateMenuPanel(content, "Choices", new Vector2(.261f, .405f), new Vector2(.739f, .869f));
                 _choiceRoot = choices.gameObject;
@@ -177,13 +230,23 @@ namespace YGOPortable.UI
                 Close();
             }
 
-            internal void Open(string heading, string protagonist, Sprite opponent, StoryDialogueLine[] lines, Action onEnd)
+            internal void Open(string heading, string protagonist, OpponentCharacter opponent, StoryDialogueLine[] lines,
+                Action onEnd, bool rpg = false)
             {
                 Close();
                 _heading.text = heading;
                 _heroIdentity.text = protagonist;
-                _opponent.sprite = opponent;
-                _opponent.enabled = opponent != null;
+                _protagonist = protagonist;
+                _sceneOpponent = opponent;
+                _rpg = rpg;
+                _hero.rectTransform.anchorMin = rpg ? new Vector2(.043f, .30f) : new Vector2(.07f, .26f);
+                _hero.rectTransform.anchorMax = rpg ? new Vector2(.41f, .855f) : new Vector2(.493f, .855f);
+                _opponent.rectTransform.anchorMin = rpg ? new Vector2(.59f, .30f) : new Vector2(.508f, .26f);
+                _opponent.rectTransform.anchorMax = rpg ? new Vector2(.957f, .855f) : new Vector2(.93f, .855f);
+                SetSprite(_stage, rpg ? LoadRpgSprite("Maps/spot_daedalus_bridge.png") : null);
+                SetSprite(_heroSd, rpg ? LoadRpgSprite("Characters_SD/sd_protagonist.png") : null);
+                SetSprite(_hero, rpg ? LoadHeroBust(null) : DuelProfileArt.Player);
+                SetOpponent(opponent, null);
                 _dialogue = lines;
                 _onEnd = onEnd;
                 _root.SetActive(true);
@@ -192,8 +255,32 @@ namespace YGOPortable.UI
                 Focus(_next);
             }
 
+            internal void Open(string heading, string protagonist, Sprite opponent, StoryDialogueLine[] lines, Action onEnd)
+            {
+                Open(heading, protagonist, (OpponentCharacter)null, lines, onEnd);
+                SetSprite(_opponent, opponent);
+            }
+
             internal void Close()
             {
+                _fx.ResetEffect();
+                _showCutscene = false;
+                _cutsceneOverlay.alpha = 0f;
+                _portraitGroup.alpha = 1f;
+                SetSprite(_cutsceneImage, null);
+                SetSprite(_stage, null);
+                SetSprite(_heroSd, null);
+                SetSprite(_opponentSd, null);
+                SetSprite(_hero, null);
+                SetSprite(_opponent, null);
+                foreach (var sprite in _rpgSprites.Values)
+                {
+                    if (sprite == null) continue;
+                    var texture = sprite.texture;
+                    DestroyArtwork(sprite);
+                    DestroyArtwork(texture);
+                }
+                _rpgSprites.Clear();
                 _root.SetActive(false);
                 _logRoot.SetActive(false);
                 _picker.Hide();
@@ -218,8 +305,14 @@ namespace YGOPortable.UI
             internal void Update(float delta)
             {
                 if (_dialogue == null || !_root.activeInHierarchy) return;
-                AnimatePortrait(_hero, _heroSpeaking, delta);
-                AnimatePortrait(_opponent, _opponentSpeaking, delta);
+                _poseTime += delta;
+                _cutsceneOverlay.alpha = Mathf.MoveTowards(_cutsceneOverlay.alpha, _showCutscene ? 1f : 0f, delta / .4f);
+                _portraitGroup.alpha = 1f - _cutsceneOverlay.alpha;
+                _heading.canvasRenderer.SetAlpha(_portraitGroup.alpha);
+                _heroIdentity.canvasRenderer.SetAlpha(_portraitGroup.alpha);
+                AnimatePortrait(_hero, _heroSpeaking, delta, _heroSpeaking ? _emotion : null, _poseTime);
+                AnimatePortrait(_opponent, _opponentSpeaking, delta, _opponentSpeaking ? _emotion : null, _poseTime);
+                AnimateHearts();
                 if (_finished || _waitingBranch || _logRoot.activeSelf || _pickerRoot.activeSelf || _supports.Root.activeSelf) return;
                 if (_visible < _characters.Length)
                 {
@@ -307,11 +400,27 @@ namespace YGOPortable.UI
                 _index = index;
                 _readThrough = Math.Max(_readThrough, index);
                 var line = _dialogue[index];
-                _speaker.text = line.speaker;
-                _heroSpeaking = line.speaker.StartsWith("주인공", StringComparison.Ordinal) ||
-                    line.speaker.StartsWith("여주인공", StringComparison.Ordinal);
-                _opponentSpeaking = !_heroSpeaking && line.speaker != "내레이션" && line.speaker != "나레이션";
-                _speaker.color = _heroSpeaking ? HeroColor : _opponentSpeaking ? OpponentColor : NarratorColor;
+                bool narration = IsNarration(line.speaker);
+                _speakerBadge.SetActive(!narration);
+                _speaker.text = narration ? "" : line.speaker;
+                _heroSpeaking = !narration && (line.speaker == _protagonist ||
+                    line.speaker.StartsWith("주인공", StringComparison.Ordinal) ||
+                    line.speaker.StartsWith("여주인공", StringComparison.Ordinal));
+                var speaker = !narration && !_heroSpeaking && _rpg
+                    ? FindSpeaker(line.speaker) : null;
+                _opponentSpeaking = !narration && !_heroSpeaking && (!_rpg || speaker != null);
+                _speaker.color = _heroSpeaking ? HeroColor : OpponentColor;
+                _emotion = _rpg ? line.emotion : null;
+                _poseTime = 0f;
+                _akiBlush = _rpg && speaker?.id == 1 && _emotion == "blush";
+                if (_rpg)
+                {
+                    if (_heroSpeaking) SetSprite(_hero, LoadHeroBust(_emotion));
+                    if (speaker != null) SetOpponent(speaker, _emotion);
+                }
+                AnimateHearts();
+                BindCutscene(_rpg ? line.cutscene : null);
+                _fx.Play(_rpg ? line.fx : null);
                 _characters = StringInfo.ParseCombiningCharacters(line.text);
                 _text.text = "";
                 _counter.text = $"{index + 1} / {_dialogue.Length}";
@@ -388,7 +497,7 @@ namespace YGOPortable.UI
                 if (!_waitingBranch) return;
                 _dialogue = _dialogue.Take(_branchLine + 1).Concat(new[]
                 {
-                    new StoryDialogueLine { speaker = "주인공", text = reply },
+                    new StoryDialogueLine { speaker = _rpg ? _protagonist : "주인공", text = reply },
                     new StoryDialogueLine { speaker = opponent, text = response },
                 }).Concat(_dialogue.Skip(_branchLine + 1)).ToArray();
                 _branch = null;
@@ -419,7 +528,7 @@ namespace YGOPortable.UI
                 for (int i = 0; i <= _readThrough; i++)
                 {
                     var line = _dialogue[i];
-                    history.AppendLine(line.speaker);
+                    if (!IsNarration(line.speaker)) history.AppendLine(line.speaker);
                     history.AppendLine(i == _index && !_finished ? _text.text : line.text);
                     history.AppendLine();
                 }
@@ -457,11 +566,150 @@ namespace YGOPortable.UI
                 _popupReturn = null;
             }
 
-            private static void AnimatePortrait(Image image, bool speaking, float delta)
+            private static bool IsNarration(string speaker) =>
+                string.IsNullOrWhiteSpace(speaker) || speaker is "설명" or "내레이션" or "나레이션";
+
+            private OpponentCharacter FindSpeaker(string name)
+            {
+                if (_sceneOpponent?.name == name) return _sceneOpponent;
+                return DeckRepository.Characters.FirstOrDefault(character => character.name == name) ??
+                    DeckRepository.Characters.FirstOrDefault(character => character.aliases?.Contains(name) == true);
+            }
+
+            private void SetOpponent(OpponentCharacter character, string emotion)
+            {
+                string bust = character == null ? null : $"Characters_Standing/full_{character.id}";
+                SetSprite(_opponent, _rpg && bust != null
+                    ? LoadBust(bust, emotion) ?? DuelProfileArt.Opponent(character)
+                    : DuelProfileArt.Opponent(character));
+                SetSprite(_opponentSd, _rpg && character != null ? LoadRpgSprite($"Characters_SD/sd_{character.id}.png") : null);
+            }
+
+            private Sprite LoadHeroBust(string emotion) =>
+                LoadBust("Characters_Standing/full_protagonist", emotion) ?? DuelProfileArt.Player;
+
+            private Sprite LoadBust(string stem, string emotion)
+            {
+                if (emotion is "smile" or "blush" or "sad" or "determined" or "shock" or "hurt")
+                {
+                    var pose = LoadRpgSprite($"{stem}_{emotion}.png", waistUp: true);
+                    if (pose != null) return pose;
+                }
+                return LoadRpgSprite(stem + ".png", waistUp: true);
+            }
+
+            private void BindCutscene(string id)
+            {
+                _showCutscene = false;
+                if (string.IsNullOrEmpty(id) || id.Any(c => !char.IsLetterOrDigit(c) && c != '_' && c != '-')) return;
+                var picture = LoadRpgSprite($"Cutscenes/{id}.jpg");
+                if (picture == null) return;
+                if (_cutsceneImage.sprite != picture)
+                {
+                    _cutsceneOverlay.alpha = 0f;
+                    SetSprite(_cutsceneImage, picture);
+                    _cutsceneAspect.aspectRatio = picture.rect.width / picture.rect.height;
+                }
+                _showCutscene = true;
+            }
+
+            private Sprite LoadRpgSprite(string name, bool waistUp = false)
+            {
+                string relative = "TagForce/5DS/" + name;
+                string path = Path.Combine(Application.streamingAssetsPath, relative);
+                if (_rpgSprites.TryGetValue(path, out var loaded)) return loaded;
+
+                Sprite sprite = null;
+                Texture2D texture = null;
+                try
+                {
+                    if (File.Exists(path))
+                    {
+                        texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                        if (texture.LoadImage(File.ReadAllBytes(path), markNonReadable: true))
+                        {
+                            float bottom = waistUp ? Mathf.Floor(texture.height * .43f) : 0f;
+                            sprite = Sprite.Create(texture, new Rect(0f, bottom, texture.width, texture.height - bottom),
+                                new Vector2(.5f, .5f));
+                        }
+                    }
+                }
+                catch (Exception error) when (error is IOException || error is UnauthorizedAccessException || error is ArgumentException)
+                {
+                    Debug.LogWarning($"[StoryMode] Could not load story illustration {name}: {error.Message}");
+                }
+                finally { if (sprite == null && texture != null) DestroyArtwork(texture); }
+                _rpgSprites.Add(path, sprite);
+                return sprite;
+            }
+
+            private static void SetSprite(Image image, Sprite sprite)
+            {
+                image.sprite = sprite;
+                image.enabled = sprite != null;
+            }
+
+            private static void DestroyArtwork(UnityEngine.Object asset)
+            {
+                if (Application.isPlaying) UnityEngine.Object.Destroy(asset);
+                else UnityEngine.Object.DestroyImmediate(asset);
+            }
+
+            private void AnimateHearts()
+            {
+                _blush.enabled = _akiBlush;
+                if (_akiBlush && _blush.sprite == null)
+                {
+                    if (_cheekGlow == null)
+                    {
+                        const int size = 32;
+                        var pixels = new Color32[size * size];
+                        for (int y = 0; y < size; y++)
+                        for (int x = 0; x < size; x++)
+                        {
+                            float a = 1f - new Vector2((x + .5f) / size * 2f - 1f, (y + .5f) / size * 2f - 1f).magnitude;
+                            pixels[y * size + x] = new Color(1f, 1f, 1f, Mathf.Max(0f, a));
+                        }
+                        _cheekGlow = DuelUiChrome.CreateSprite("Story blush", size, size, pixels);
+                    }
+                    _blush.sprite = _cheekGlow;
+                }
+                for (int i = 0; i < _hearts.Length; i++)
+                {
+                    float life = Mathf.Clamp01((_poseTime - i * .13f) / .9f);
+                    var heart = _hearts[i];
+                    heart.enabled = _akiBlush && life is > 0f and < 1f;
+                    heart.rectTransform.anchoredPosition = new Vector2(i * 4f * life, life * 44f);
+                    heart.color = new Color(1f, .46f, .69f, Mathf.Sin(Mathf.PI * life) * .85f);
+                }
+            }
+
+            private static void AnimatePortrait(Image image, bool speaking, float delta, string emotion, float elapsed)
             {
                 float mix = 1f - Mathf.Exp(-delta * 12f);
-                image.color = Color.Lerp(image.color, speaking ? Color.white : Listening, mix);
+                Color mood = emotion switch
+                {
+                    "smile" => new Color(1f, .97f, .91f),
+                    "blush" => new Color(1f, .91f, .94f),
+                    "determined" => new Color(1f, .94f, .85f),
+                    "sad" => new Color(.76f, .85f, 1f),
+                    "hurt" => new Color(.88f, .74f, .77f),
+                    _ => Color.white,
+                };
+                float settle = Mathf.Exp(-elapsed * 7f);
+                var motion = emotion switch
+                {
+                    "smile" => new Vector2(0f, 10f * Mathf.Sin(elapsed * 6f) * settle),
+                    "blush" => new Vector2(0f, -4f * Mathf.Sin(elapsed * 7f) * settle),
+                    "shock" => new Vector2(0f, 14f * Mathf.Sin(elapsed * 18f) * settle),
+                    "hurt" => new Vector2(11f * Mathf.Sin(elapsed * 31f) * settle, -4f * settle),
+                    "sad" => new Vector2(0f, -5f),
+                    "determined" => new Vector2(3f * settle, 0f),
+                    _ => Vector2.zero,
+                };
+                image.color = Color.Lerp(image.color, speaking ? mood : Listening, mix);
                 image.rectTransform.localScale = Vector3.Lerp(image.rectTransform.localScale, Vector3.one * (speaking ? 1.05f : 1f), mix);
+                image.rectTransform.anchoredPosition = Vector2.Lerp(image.rectTransform.anchoredPosition, motion, mix);
             }
 
             private static (GameObject Root, RectTransform Panel) BuildPopup(Transform parent, string name,
@@ -472,6 +720,56 @@ namespace YGOPortable.UI
                 var panel = DuelUiKit.CreateMenuPanel(overlay, "Window", new Vector2(left, bottom), new Vector2(right, top));
                 return (overlay.gameObject, panel);
             }
+        }
+    }
+
+    internal sealed class StoryDialogueFx : MonoBehaviour
+    {
+        private RectTransform _dialogue;
+        private Image _overlay;
+        private Vector2 _restingPosition;
+
+        internal void Initialize(RectTransform dialogue, Image overlay)
+        {
+            _dialogue = dialogue;
+            _restingPosition = dialogue.anchoredPosition;
+            _overlay = overlay;
+        }
+
+        internal void ResetEffect()
+        {
+            StopAllCoroutines();
+            _dialogue.anchoredPosition = _restingPosition;
+            _overlay.color = Color.clear;
+        }
+
+        internal void Play(string name)
+        {
+            ResetEffect();
+            if (Application.isPlaying && name is ("shake" or "flash" or "heartbeat")) StartCoroutine(Animate(name));
+        }
+
+        private IEnumerator Animate(string name)
+        {
+            float duration = name == "heartbeat" ? .72f : .36f;
+            for (float time = 0f; time < duration; time += Time.unscaledDeltaTime)
+            {
+                DrawFrame(name, time / duration);
+                yield return null;
+            }
+            _dialogue.anchoredPosition = _restingPosition;
+            _overlay.color = Color.clear;
+        }
+
+        internal void DrawFrame(string name, float progress)
+        {
+            if (name == "shake")
+                _dialogue.anchoredPosition = _restingPosition + Vector2.right * (Mathf.Sin(progress * 31.32f) * (1f - progress) * 13f);
+            else if (name == "flash")
+                _overlay.color = new Color(1f, 1f, 1f, .6f * (1f - progress));
+            else if (name == "heartbeat")
+                _overlay.color = new Color(1f, .36f, .63f, .33f *
+                    Mathf.Pow(Mathf.Max(0f, Mathf.Sin(progress * Mathf.PI * 4f)), 2f) * (1f - progress));
         }
     }
 }
