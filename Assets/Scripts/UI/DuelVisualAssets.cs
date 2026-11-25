@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Security.Cryptography;
 using UnityEngine;
 using YGOPortable.Core;
@@ -253,6 +254,40 @@ namespace YGOPortable.UI
             string file = name + ".wav";
             return ReadSound(Path.Combine(Application.streamingAssetsPath, "TagForce", "Audio", file), name) ??
                 ReadSound(Path.Combine(CardArtLoader.LocalDuelVisualsPath, "Audio", file), name);
+        }
+
+        internal static string FindSummonVideo(DuelEffectKind kind) =>
+            FindSummonVideo(kind, CardArtLoader.ActiveDuelVisualsPath, Application.streamingAssetsPath);
+
+        internal static string FindSummonVideo(DuelEffectKind kind, string visualPack, string streamingAssets)
+        {
+            if (!DuelEffectGraphic.HasSummonSignature(kind)) return null;
+            string name = kind + ".mp4";
+            string local = Path.Combine(visualPack, "Effects", name);
+            if (File.Exists(local)) return local;
+
+            // Packaged Android files are addressed inside the APK. Check the archive before handing Unity a URL.
+            if (streamingAssets.StartsWith("jar:file:", StringComparison.OrdinalIgnoreCase))
+            {
+                int separator = streamingAssets.IndexOf("!/", StringComparison.Ordinal);
+                if (separator < 0 || !Uri.TryCreate(streamingAssets.Substring(4, separator - 4),
+                    UriKind.Absolute, out var archive) || !archive.IsFile) return null;
+                string entry = streamingAssets.Substring(separator + 2).TrimEnd('/') + "/Effects/" + name;
+                try
+                {
+                    using var stream = File.OpenRead(archive.LocalPath);
+                    using var zip = new ZipArchive(stream, ZipArchiveMode.Read);
+                    return zip.GetEntry(entry) != null ? streamingAssets.TrimEnd('/') + "/Effects/" + name : null;
+                }
+                catch (Exception error) when (error is IOException || error is InvalidDataException ||
+                    error is UnauthorizedAccessException)
+                {
+                    return null;
+                }
+            }
+
+            string packaged = Path.Combine(streamingAssets, "Effects", name);
+            return File.Exists(packaged) ? packaged : null;
         }
 
         private static AudioClip ReadSound(string path, string name)

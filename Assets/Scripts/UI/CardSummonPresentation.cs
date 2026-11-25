@@ -212,5 +212,59 @@ namespace YGOPortable.UI
             return visibility;
         }
 
+        private SummonVideoOverlay _summonVideo;
+
+        private static string FindSummonVideo(CardFlight flight, CardMotion motion)
+        {
+            if (flight.EndsFaceDown || motion != CardMotion.ExtraDeckSummon || !SummonVideoOverlay.CanRender) return null;
+            return DuelVisualAssets.FindSummonVideo(SummonEffect(flight.Code, motion).kind);
+        }
+
+        private static bool HasSummonVideo(IReadOnlyList<FieldArrival> moves)
+        {
+            foreach (var move in moves)
+                if (FindSummonVideo(move.Flight, move.Motion) != null) return true;
+            return false;
+        }
+
+        private System.Collections.IEnumerator PlayVideoArrivalGroup(IReadOnlyList<FieldArrival> moves, System.Action refresh)
+        {
+            foreach (var move in moves)
+            {
+                yield return MoveCard(move.Flight, move.Motion, () => { move.Release(); refresh(); },
+                    move.Readout, move.Depart, move.Handoff, move.SignatureUnits, move.LandingImpact, move.WideCutIn);
+            }
+        }
+
+        private SummonVideoOverlay StartSummonVideo() =>
+            _summonVideo = DuelUiKit.FillRect("SummonVideoOverlay", _layer).gameObject.AddComponent<SummonVideoOverlay>();
+
+        private void StopSummonVideo()
+        {
+            var overlay = _summonVideo;
+            _summonVideo = null;
+            if (overlay == null) return;
+            overlay.ReleasePlayback();
+            RemoveTransient(overlay.gameObject);
+        }
+
+        private System.Collections.IEnumerator LandVideoSummon(CardFlight flight, CardMotion motion, LiveCardState live,
+            bool showCutIn)
+        {
+            Vector2 area = _layer.rect.size;
+            float height = Mathf.Min(area.y * .30f, 290f);
+            var start = new CardPose(SummonShowcaseCenter(area), new Vector2(height * DuelUiKit.CardAspectRatio, height));
+            var landing = new CardFlight(flight.Code, start, flight.To, false, flight.EndsFaceDown, flight.Appearance);
+            var proxy = PrepareFlightCard(landing);
+            var cinematic = showCutIn ? CreateWideCutIn(flight, motion, live) : null;
+            if (cinematic != null) yield return PlayWideCutIn(cinematic, proxy, flight, motion, live);
+            else
+            {
+                if (!IsSpecialEditionLanding(flight)) DuelAudio.PlaySummon(motion);
+                yield return Animate(.20f, progress => ApplyFlight(proxy, landing, progress, 8f, live));
+            }
+            RecycleCard(proxy);
+        }
+
     }
 }

@@ -245,6 +245,7 @@ namespace YGOPortable.UI
         public void Clear()
         {
             StopAllCoroutines();
+            StopSummonVideo();
             ResetLandingImpact();
             _steps.Clear();
             _openTargetLocks = null;
@@ -273,6 +274,7 @@ namespace YGOPortable.UI
 
         private void OnDestroy()
         {
+            StopSummonVideo();
             ResetLandingImpact();
             if (ReferenceEquals(_instance, this)) _instance = null;
         }
@@ -429,7 +431,9 @@ namespace YGOPortable.UI
 
             var first = moves[0];
             _openEquip = null;
-            _steps.Enqueue(moves.Count == 1 && first.Motion != CardMotion.FieldReturn
+            _steps.Enqueue(moves.Count > 1 && first.Motion != CardMotion.FieldReturn && HasSummonVideo(moves)
+                ? PlayVideoArrivalGroup(moves, refresh)
+                : moves.Count == 1 && first.Motion != CardMotion.FieldReturn
                 ? MoveCard(first.Flight, first.Motion, Land, first.Readout, first.Depart, signatureUnits: first.SignatureUnits,
                     landingImpact: first.LandingImpact, wideCutIn: first.WideCutIn)
                 : PlayFieldArrivalGroup(moves, Land, refresh));
@@ -1245,6 +1249,24 @@ namespace YGOPortable.UI
             bool overframe = !wideCutIn && summons && (IsSpecialEditionLanding(flight) || (hasPortrait && flight.Appearance?.overframe != false));
             bool featured = hasPortrait || !wideCutIn && summons && TakeFeaturedSummon(flight);
             bool reveal = !flight.EndsFaceDown && (extraSummon || featured || overframe);
+            if (reveal && FindSummonVideo(flight, motion) is string videoPath)
+            {
+                var overlay = StartSummonVideo();
+                onDepart?.Invoke();
+                onDepart = null;
+                yield return overlay.Play(videoPath, () => Paused);
+                bool finished = overlay.FinishedOrSkipped;
+                bool skipped = overlay.Skipped;
+                StopSummonVideo();
+                if (finished)
+                {
+                    if (!skipped) yield return LandVideoSummon(flight, motion, readout?.DestinationCard, wideCutIn && hasPortrait);
+                    onArrive?.Invoke();
+                    if (!skipped && IsSpecialEditionLanding(flight))
+                        yield return PlayOverframeLanding(new[] { (flight.To, landingImpact) }, motion);
+                    yield break;
+                }
+            }
             var cinematic = wideCutIn && hasPortrait ? CreateWideCutIn(flight, motion, readout?.DestinationCard) : null;
             var proxy = PrepareFlightCard(flight, reveal);
             if (wideCutIn) proxy.UsePrintedFaceOnly();
