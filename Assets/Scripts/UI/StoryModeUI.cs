@@ -647,7 +647,7 @@ namespace YGOPortable.UI
             string equipped = string.Join(" · ", RaidSupportCatalog.Items.Where(item => (_supports & item.Id) != 0)
                 .Select(item => item.Name));
             string supports = equipped.Length > 0 ? $"\n장착 · {equipped}" : "";
-            string machine = _rpgWorld ? $"\n카이 · D-휠 《{RpgMachine}》" : "";
+            string machine = RidingMachineFor(episode) is { } ridingMachine ? $"\n카이 · D-휠 《{ridingMachine}》" : "";
             return $"{SelectedStoryDeckLabel()}{machine}\n내 LP {player.Life:N0} · 패 {player.Hand}장 / 상대 시작 패 {opponent.Hand}장{field}{supports}";
         }
 
@@ -708,7 +708,8 @@ namespace YGOPortable.UI
             if (rivalDeck == null) return;
             var plan = CurrentBattlePlan;
             _returnFromTurnOrder = restore;
-            ShowHands((_rpgWorld ? $"《{RpgMachine}》 출격\n" : "") + "가위바위보 · 이기면 선공 또는 후공을 선택합니다.");
+            string departure = RidingMachineFor(episode) is { } machine ? $"《{machine}》 출격\n" : "";
+            ShowHands(departure + "가위바위보 · 이기면 선공 또는 후공을 선택합니다.");
 
             void ShowHands(string summary) => _dialogue.ShowChoices(() => summary,
                 new(TurnOrderHands[0], () => PlayHand(0)), new(TurnOrderHands[1], () => PlayHand(1)),
