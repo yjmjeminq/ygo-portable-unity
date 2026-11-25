@@ -763,7 +763,7 @@ namespace YGOPortable.UI
 
             float stagger = returning ? 0f : .026f;
             float travel = returning ? .34f : .37f + (moves.Count - 1) * stagger;
-            if (!returning && showcase == null) DuelAudio.PlaySummon();
+            if (!returning && showcase == null) DuelAudio.PlaySummon(moves[0].Motion);
             bool revealedReturn = false;
             yield return Animate(travel, progress =>
             {
@@ -803,7 +803,7 @@ namespace YGOPortable.UI
                 foreach (var move in moves)
                     if (IsSummonMotion(move.Motion) && IsSpecialEditionLanding(move.Flight))
                         (slots ??= new List<(CardPose, Action<float>)>(moves.Count)).Add((move.Flight.To, move.LandingImpact));
-                if (slots != null) yield return PlayOverframeLanding(slots);
+                if (slots != null) yield return PlayOverframeLanding(slots, moves[0].Motion);
             }
         }
 
@@ -866,7 +866,7 @@ namespace YGOPortable.UI
                 views[i].transform.SetAsLastSibling();
             }
 
-            DuelAudio.PlaySummon();
+            DuelAudio.PlaySummon(moves[0].Motion);
             yield return Animate(.27f, t =>
             {
                 shade.color = new Color(.009f, .013f, .02f, Mathf.SmoothStep(0f, .64f, t));
@@ -1252,7 +1252,7 @@ namespace YGOPortable.UI
             moving?.Follow(proxy, 0f);
             onDepart?.Invoke();
             if (cinematic != null)
-                yield return PlayWideCutIn(cinematic, proxy, flight, readout?.DestinationCard);
+                yield return PlayWideCutIn(cinematic, proxy, flight, motion, readout?.DestinationCard);
             else if (reveal)
                 yield return RevealSummon(proxy, flight, motion, featured, overframe, readout?.DestinationCard, signatureUnits);
             else if (motion is CardMotion.AttachMaterial or CardMotion.DetachMaterial)
@@ -1286,7 +1286,7 @@ namespace YGOPortable.UI
                 proxy.transform.SetAsLastSibling();
                 moving?.Root.SetAsLastSibling();
                 fade.alpha = appearing ? 0f : 1f;
-                if (appearing) DuelAudio.PlaySummon();
+                if (appearing) DuelAudio.PlaySummon(motion);
                 yield return Animate(appearing ? .35f : .22f, t =>
                 {
                     ApplyFlight(proxy, flight, t, appearing ? 10f : 6f);
@@ -1317,16 +1317,16 @@ namespace YGOPortable.UI
             else RecycleCard(proxy);
             onArrive?.Invoke();
             if (summons && IsSpecialEditionLanding(flight))
-                yield return PlayOverframeLanding(new[] { (flight.To, landingImpact) });
+                yield return PlayOverframeLanding(new[] { (flight.To, landingImpact) }, motion);
             else if (summons && !reveal)
             {
-                DuelAudio.PlaySummon();
+                DuelAudio.PlaySummon(motion);
                 Color accent = motion == CardMotion.SpecialSummon ? DuelStyle.Gold : new Color(.58f, .87f, 1f);
                 yield return Burst(DuelEffectKind.Summon, flight.To, 1.9f, accent, .21f);
             }
             else if (motion == CardMotion.Set)
             {
-                DuelAudio.PlayClick();
+                DuelAudio.PlaySet();
                 yield return Burst(DuelEffectKind.Summon, flight.To, 1.45f,
                     new Color(.54f, .73f, .90f, .64f), .14f);
             }
@@ -1348,7 +1348,7 @@ namespace YGOPortable.UI
             return DuelCutInCinematic.Create(_layer, flight.Code, portrait, card, method, accent, flight.To.Angle > 45f);
         }
 
-        private IEnumerator PlayWideCutIn(DuelCutInCinematic cinematic, CompositeCardView proxy, CardFlight flight, LiveCardState live)
+        private IEnumerator PlayWideCutIn(DuelCutInCinematic cinematic, CompositeCardView proxy, CardFlight flight, CardMotion motion, LiveCardState live)
         {
             cinematic.transform.SetAsLastSibling();
             proxy.UsePrintedFaceOnly();
@@ -1361,14 +1361,14 @@ namespace YGOPortable.UI
             {
                 if (!proxy.gameObject.activeSelf) proxy.gameObject.SetActive(true);
                 ApplyFlight(proxy, landing, progress, 20f, live);
-            });
+            }, () => DuelAudio.PlaySummon(motion));
             RemoveTransient(cinematic.gameObject);
         }
 
         private static bool IsSpecialEditionLanding(CardFlight flight) =>
             !flight.EndsFaceDown && flight.Appearance?.overframe == true;
 
-        private IEnumerator PlayOverframeLanding(IReadOnlyList<(CardPose Slot, Action<float> Impact)> slots)
+        private IEnumerator PlayOverframeLanding(IReadOnlyList<(CardPose Slot, Action<float> Impact)> slots, CardMotion motion)
         {
             const float scale = 2.04f;
             var waves = new DuelEffectGraphic[slots.Count];
@@ -1385,7 +1385,7 @@ namespace YGOPortable.UI
             {
                 foreach (var slot in slots) slot.Impact?.Invoke(progress);
             };
-            DuelAudio.PlaySummon();
+            DuelAudio.PlaySummon(motion);
             yield return Animate(.18f, t =>
             {
                 _activeLandingImpact?.Invoke(t);
@@ -1519,13 +1519,13 @@ namespace YGOPortable.UI
             statsRect.anchoredPosition = statsCenter + statsEntrance;
 
             bool playedImpact = !signature;
-            if (playedImpact) DuelAudio.PlaySummon();
+            if (playedImpact) DuelAudio.PlaySummon(motion);
             yield return Animate(signature ? .36f : .28f, t =>
             {
                 if (!playedImpact && t >= .88f)
                 {
                     playedImpact = true;
-                    DuelAudio.PlaySummon();
+                    DuelAudio.PlaySummon(motion);
                 }
                 float arrival = signature ? Mathf.InverseLerp(.20f, .97f, t) : t;
                 ApplySummonEntrance(proxy, first, kind, arrival, live, layoutHeight);
@@ -2049,7 +2049,8 @@ namespace YGOPortable.UI
             var badgeOpacity = badge.gameObject.AddComponent<CanvasGroup>();
             badgeOpacity.alpha = 0f;
             badge.localScale = Vector3.one * 1.6f;
-            DuelAudio.PlayChain();
+            if (chainNumber <= 1) DuelAudio.PlayActivation();
+            else DuelAudio.PlayChain();
 
             var lift = new CardFlight(code, source, reveal, code == 0, code == 0);
             yield return Animate(.23f, t =>

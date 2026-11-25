@@ -84,7 +84,7 @@ namespace YGOPortable.UI
             Pose(0f);
         }
 
-        internal IEnumerator Play(Func<bool> paused, Action<float> land = null)
+        internal IEnumerator Play(Func<bool> paused, Action<float> land = null, Action playSound = null)
         {
             float elapsed = 0f;
             bool played = false;
@@ -94,7 +94,8 @@ namespace YGOPortable.UI
                 if (!played && elapsed >= SlideStart)
                 {
                     played = true;
-                    DuelAudio.PlaySummon();
+                    if (playSound != null) playSound();
+                    else DuelAudio.PlaySummon();
                 }
                 if (elapsed >= LandingStart)
                     land?.Invoke(Mathf.InverseLerp(LandingStart, Duration, elapsed));

@@ -45,13 +45,15 @@ namespace YGOPortable.Editor
                 var panel = world.Root.transform.Find("World");
 
                 VerifyAssets(streaming);
+                VerifyAudio(streaming);
                 VerifyFallback(streaming, scratch);
                 VerifyTravel(world, panel, streaming);
+                VerifyBreadRoulette(world, panel);
                 VerifyMotionAndDialogue(world, panel, bgm);
                 VerifySavedWorlds(world, panel, scratch, bgm);
                 VerifyRelationships(world, panel, streaming, scratch);
                 VerifyDuelReturn(app, world, menu, canvas.transform, streaming);
-                Debug.Log("[VERIFY TAG FORCE] Four worlds with three staffed hubs and three daily shifts, SD walking at 8 Hz, portrait transitions, four hearts, partners, gifts, saved progress, BGM and two native duel round trips passed.");
+                Debug.Log("[VERIFY TAG FORCE] Four worlds, shifts, 8 Hz walking, portraits, hearts, gifts, partners, bundled audio, sandwich roulette, saves and two native duel round trips passed.");
                 exit = 0;
             }
             catch (Exception error)
@@ -106,6 +108,79 @@ namespace YGOPortable.Editor
                     UnityEngine.Object.DestroyImmediate(texture);
                 }
             }
+        }
+
+        private static void VerifyAudio(string streaming)
+        {
+            const BindingFlags fields = BindingFlags.NonPublic | BindingFlags.Static;
+            var duel = new Dictionary<string, string>
+            {
+                ["_clipClick"] = "Click", ["_clipDraw"] = "Draw", ["_clipSummon"] = "Summon",
+                ["_clipSpecialSummon"] = "SpecialSummon", ["_clipAttack"] = "Attack", ["_clipDirectAttack"] = "DirectAttack",
+                ["_clipDamage"] = "Damage", ["_clipChain"] = "Chain", ["_clipActivate"] = "Activate",
+                ["_clipPhase"] = "Phase", ["_clipWin"] = "Win", ["_clipCoin"] = "Coin", ["_clipDice"] = "Dice",
+                ["_clipSet"] = "Set", ["_clipTick"] = "DialogueBlip", ["_clipShuffle"] = "Shuffle",
+            };
+            foreach (var (field, name) in duel)
+                CheckClip((AudioClip)typeof(DuelAudio).GetField(field, fields).GetValue(null), name);
+            var world = new[] { "button_confirm", "button_cancel", "cursor_move", "dialogue_blip", "heart_up", "heart_down",
+                "card_draw", "duel_encounter", "sandwich_roulette", "sandwich_win", "partner_accept" };
+            var cues = (TagForceSfx[])Enum.GetValues(typeof(TagForceSfx));
+            Require(cues.Length == world.Length, "Not all Tag Force SFX mappings are tested.");
+            for (int i = 0; i < world.Length; i++)
+            {
+                var clip = DuelAudio.GetTagForceClip(cues[i]);
+                CheckClip(clip, "sfx_" + world[i]);
+                Require(ReferenceEquals(clip, DuelAudio.GetTagForceClip(cues[i])), $"No cached clip for {cues[i]}.");
+            }
+            Require(Directory.GetFiles(Path.Combine(streaming, "TagForce", "Audio"), "*.wav").Length == 33,
+                "The supplied WAV set is incomplete.");
+            Require(DuelVisualAssets.LoadSound("missing-tag-force-fixture") == null, "Missing sound did not fall back safely.");
+
+            void CheckClip(AudioClip clip, string name)
+            {
+                byte[] bytes = File.ReadAllBytes(Path.Combine(streaming, "TagForce", "Audio", name + ".wav"));
+                int channels = BitConverter.ToUInt16(bytes, 22);
+                int frames = BitConverter.ToInt32(bytes, 40) / (channels * 2);
+                Require(clip != null && clip.name == name && clip.channels == channels &&
+                    clip.frequency == BitConverter.ToInt32(bytes, 24) && clip.samples == frames,
+                    $"Sound {name} did not prefer the packaged WAV.");
+                // Compare a section of the decoded waveform, independently of the audio device.
+                int frameOffset = frames / 4;
+                var sample = new float[Math.Min(128, (frames - frameOffset) * channels)];
+                Require(clip.GetData(sample, frameOffset), $"Could not read decoded samples for {name}.");
+                for (int index = 0; index < sample.Length; index++)
+                    Require(Mathf.Abs(sample[index] - BitConverter.ToInt16(bytes, 44 + (frameOffset * channels + index) * 2) /
+                        32768f) < .0001f, $"Decoded sample differs for {name}.");
+            }
+        }
+
+        private static void VerifyBreadRoulette(TagForceWorldUI world, Transform panel)
+        {
+            var data = TagForceData.Load(Application.streamingAssetsPath, TagForceData.Series[1]);
+            int balance = CollectionProgress.Balance;
+            world.Open();
+            Press(panel, "GX");
+            Press(world.Root.transform, "WorldNavigation/매점");
+            Press(panel, "Bag0");
+            var caption = panel.Find("BreadRoulette/Prize/Caption/Label")?.GetComponent<Text>();
+            var saved = CollectionProgress.GetTagForceProgress(data.seriesId);
+            Require(caption != null && saved.bags.SequenceEqual(new[] { 0 }) && saved.items.Count == 1 &&
+                CollectionProgress.Balance == balance - data.drawBreadCatalog.drawPriceDp,
+                "The selected sandwich prize and cost were not saved atomically before the roulette.");
+            string initial = caption.text;
+            var blocked = panel.Find("Bag1").GetComponent<Button>();
+            Require(!blocked.IsInteractable(), "A second bag could be selected during the roulette.");
+            blocked.onClick.Invoke();
+            world.Update(.22f);
+            Require(caption.text != initial, "The roulette did not cycle through sandwiches.");
+            world.Update(.63f);
+            Require(caption.text.Contains(data.Item(saved.items[0].id).name, StringComparison.Ordinal) &&
+                caption.text.Contains("획득!", StringComparison.Ordinal), "The roulette did not reveal the saved prize.");
+            world.Update(1f);
+            Require(panel.Find("BreadRoulette") == null && !panel.Find("Bag0").GetComponent<Button>().IsInteractable() &&
+                panel.Find("Bag1").GetComponent<Button>().IsInteractable() && saved.bags.Count == 1,
+                "The purchased bag reopened or another bag was charged.");
         }
 
         private static void VerifyFallback(string streaming, string scratch)
@@ -391,7 +466,7 @@ namespace YGOPortable.Editor
 
             var bread = data.drawBreadCatalog.breads[0];
             state = manager.Progress.Copy();
-            state.ChangeItem(bread.Id, 1);
+            state.ChangeItem(bread.Id, 1 - state.Count(bread.Id));
             state.AddAffinity(heroine.personaId, 3999);
             Require(manager.TrySave(state, 0, out error), error);
             Require(manager.TryGive(heroine, bread, 0, out var reaction, out _, out error) &&
@@ -412,11 +487,15 @@ namespace YGOPortable.Editor
             Press(panel, "GX");
             Call(world, "Talk", heroine);
             Require(panel.Find("Conversation/Dialogue/Hearts/Label").GetComponent<Text>().text.StartsWith("♥♥♥♥"), "The fourth heart did not render.");
+            Require(panel.Find("Conversation/Dialogue/DialogueActions/Items").GetComponentsInChildren<Image>()
+                .Count(icon => icon.name == "ActionIcon" && icon.sprite != null && !icon.raycastTarget) == 4,
+                "Not all four dialogue action icons were shown.");
             foreach (string label in new[] { "이야기하기", "샌드위치·선물 주기", "듀얼 신청", "파트너 해제", "대화 기록" })
                 Require(panel.GetComponentsInChildren<Button>().Any(button => button.GetComponentInChildren<Text>()?.text == label),
                     $"Missing conversation action: {label}");
 
             var stagedGift = manager.Progress.Copy();
+            int priorBreadCount = stagedGift.Count(bread.Id);
             stagedGift.ChangeItem(bread.Id, 1);
             Require(manager.TrySave(stagedGift, 0, out error), error);
             world.Update(.35f);
@@ -429,7 +508,7 @@ namespace YGOPortable.Editor
             PressLabel(bread.name + " · ", prefix: true);
             world.Update(10f);
             reply = panel.Find("Conversation/Dialogue/DialogueText/Label").GetComponent<Text>();
-            Require(manager.Progress.Count(bread.Id) == 0 && reply.text == heroine.giftReactions.Reply(bread.IsFavorite(heroine), bread),
+            Require(manager.Progress.Count(bread.Id) == priorBreadCount && reply.text == heroine.giftReactions.Reply(bread.IsFavorite(heroine), bread),
                 "The gift action did not consume the inventory item and show its response.");
             PressLabel("파트너 해제");
             Require(manager.Progress.partnerId == null, "The partner action did not end the partnership.");

@@ -431,6 +431,7 @@ namespace YGOPortable.Core
         internal event Action<CardMoveEvent, CardMoveEvent> OnCardLocationsChanged;
         internal event Action OnFieldArrivalBoundary;
         public event Action<byte, IReadOnlyList<uint>> OnCardsDrawn;
+        internal event Action OnCardsShuffled;
         internal event Action<byte, IReadOnlyList<uint>, IReadOnlyList<DeckCardAppearance?>> OnStyledCardsDrawn;
         public event Action<byte, int, int> OnLifePointsChanged;
         internal event Action<byte, int, int, LifePointChangeKind> OnLifePointChange;
@@ -1774,6 +1775,7 @@ namespace YGOPortable.Core
                         : msgType == YgoConstants.MSG_SHUFFLE_DECK ? YgoConstants.LOCATION_DECK : YgoConstants.LOCATION_EXTRA;
                     if (_confirmedCards.Count != 0)
                         _confirmedCards.RemoveWhere(c => c.Player == player && c.Location == location);
+                    OnCardsShuffled?.Invoke();
                     break;
                 }
 
@@ -1782,6 +1784,7 @@ namespace YGOPortable.Core
                     uint location = br.ReadByte();
                     if (_confirmedCards.Count != 0)
                         _confirmedCards.RemoveWhere(c => c.Location == location);
+                    OnCardsShuffled?.Invoke();
                     break;
                 }
 

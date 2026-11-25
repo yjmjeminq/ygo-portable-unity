@@ -506,6 +506,7 @@ namespace YGOPortable.UI
 
             ShowScreen(AppScreen.Duel);
             _session.PreparePlayerIndices(playerGoesFirst);
+            _session.OnCardsShuffled += DuelAudio.PlayShuffle;
             _duelField.BindSession(_session, oppChar, oppDeck);
             _duelField.RefreshChainConfirmation(ChainConfirmation);
             if (!_session.StartNewDuel(

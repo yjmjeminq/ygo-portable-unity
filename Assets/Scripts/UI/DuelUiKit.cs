@@ -924,6 +924,7 @@ namespace YGOPortable.UI
         private static AudioSource _sfxSource;
         private static AudioSource _bgmSource;
         private static AudioClip _clipClick, _clipDraw, _clipSummon, _clipAttack, _clipDamage, _clipChain, _clipWin, _clipPhase, _clipDirectAttack, _clipTick, _clipCoin, _clipDice;
+        private static AudioClip _clipSpecialSummon, _clipActivate, _clipSet, _clipShuffle;
         private static AudioClip _clipDuelBgm, _clipMenuBgm;
 
         public static float SfxVolume { get; set; } = 0.65f;
@@ -945,18 +946,22 @@ namespace YGOPortable.UI
             }
 
             int sr = 22050;
-            _clipClick = MakeTone(0.06f, 880f, 1180f, 0.25f);
+            _clipClick = DuelVisualAssets.LoadSound("Click") ?? MakeTone(0.06f, 880f, 1180f, 0.25f);
             _clipDraw = DuelVisualAssets.LoadSound("Draw") ?? MakeTone(0.09f, 520f, 760f, 0.25f);
             _clipSummon = DuelVisualAssets.LoadSound("Summon") ?? MakeTone(0.24f, 240f, 540f, 0.35f);
             _clipAttack = DuelVisualAssets.LoadSound("Attack") ?? MakeTone(0.18f, 440f, 110f, 0.45f);
             _clipDamage = DuelVisualAssets.LoadSound("Damage") ?? MakeTone(0.25f, 180f, 65f, 0.48f);
             _clipChain = DuelVisualAssets.LoadSound("Chain") ?? MakeTone(0.16f, 660f, 990f, 0.30f);
-            _clipWin = MakeTone(0.45f, 523f, 1046f, 0.35f);
-            _clipPhase = MakeTone(0.24f, 440f, 880f, 0.32f);
+            _clipWin = DuelVisualAssets.LoadSound("Win") ?? MakeTone(0.45f, 523f, 1046f, 0.35f);
+            _clipPhase = DuelVisualAssets.LoadSound("Phase") ?? MakeTone(0.24f, 440f, 880f, 0.32f);
             _clipDirectAttack = DuelVisualAssets.LoadSound("DirectAttack") ?? MakeTone(0.32f, 280f, 60f, 0.50f);
-            _clipTick = MakeTone(0.04f, 1320f, 1600f, 0.15f);
-            _clipCoin = MakeTone(0.22f, 980f, 1320f, 0.35f);
-            _clipDice = MakeTone(0.24f, 420f, 780f, 0.35f);
+            _clipTick = DuelVisualAssets.LoadSound("DialogueBlip") ?? MakeTone(0.04f, 1320f, 1600f, 0.15f);
+            _clipCoin = DuelVisualAssets.LoadSound("Coin") ?? MakeTone(0.22f, 980f, 1320f, 0.35f);
+            _clipDice = DuelVisualAssets.LoadSound("Dice") ?? MakeTone(0.24f, 420f, 780f, 0.35f);
+            _clipSpecialSummon = DuelVisualAssets.LoadSound("SpecialSummon") ?? _clipSummon;
+            _clipActivate = DuelVisualAssets.LoadSound("Activate") ?? _clipChain;
+            _clipSet = DuelVisualAssets.LoadSound("Set") ?? _clipClick;
+            _clipShuffle = DuelVisualAssets.LoadSound("Shuffle") ?? _clipDraw;
 
             _clipMenuBgm = MakeMenuBgm(sr);
         }
@@ -964,6 +969,11 @@ namespace YGOPortable.UI
         public static void PlayClick() => Play(_clipClick);
         public static void PlayDraw() => Play(_clipDraw);
         public static void PlaySummon() => Play(_clipSummon);
+        internal static void PlaySummon(CardMotion motion) =>
+            Play(motion is CardMotion.Summon or CardMotion.TributeSummon ? _clipSummon : _clipSpecialSummon);
+        internal static void PlaySet() => Play(_clipSet);
+        internal static void PlayShuffle() => Play(_clipShuffle);
+        internal static void PlayActivation() => Play(_clipActivate);
         public static void PlayAttack() => Play(_clipAttack);
         public static void PlayDamage() => Play(_clipDamage);
         public static void PlayChain() => Play(_clipChain);
@@ -1010,10 +1020,11 @@ namespace YGOPortable.UI
             }
         }
 
-        private static void Play(AudioClip clip)
+        private static void Play(AudioClip clip, float volumeMultiplier = 1f)
         {
-            if (_sfxSource != null && clip != null && SfxVolume > 0.01f)
-                _sfxSource.PlayOneShot(clip, SfxVolume);
+            float volume = Mathf.Clamp01(SfxVolume * volumeMultiplier);
+            if (_sfxSource != null && clip != null && SfxVolume > 0.01f && volume > 0f)
+                _sfxSource.PlayOneShot(clip, volume);
         }
 
         private static AudioClip MakeTone(float sec, float fStart, float fEnd, float amp)

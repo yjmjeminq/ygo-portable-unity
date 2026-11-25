@@ -1,16 +1,61 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace YGOPortable.UI
 {
+    internal enum TagForceSfx
+    {
+        Confirm, Cancel, Cursor, DialogueBlip, HeartUp, HeartDown, CardDraw, DuelEncounter,
+        SandwichRoulette, SandwichWin, PartnerAccept,
+    }
+
     public static partial class DuelAudio
     {
+        private static readonly Dictionary<TagForceSfx, AudioClip> TagForceSfxClips = new();
         private static AudioClip _clipWorldReward, _clipWorldDayBgm, _clipWorldNightBgm;
+
+        internal static AudioClip GetTagForceClip(TagForceSfx sfx)
+        {
+            if (TagForceSfxClips.TryGetValue(sfx, out var cached)) return cached;
+            var (file, alternate) = sfx switch
+            {
+                TagForceSfx.Confirm => ("sfx_button_confirm", "Click"),
+                TagForceSfx.Cancel => ("sfx_button_cancel", "Cancel"),
+                TagForceSfx.Cursor => ("sfx_cursor_move", "Click"),
+                TagForceSfx.DialogueBlip => ("sfx_dialogue_blip", "DialogueBlip"),
+                TagForceSfx.HeartUp => ("sfx_heart_up", "HeartUp"),
+                TagForceSfx.HeartDown => ("sfx_heart_down", "HeartDown"),
+                TagForceSfx.CardDraw => ("sfx_card_draw", "Draw"),
+                TagForceSfx.DuelEncounter => ("sfx_duel_encounter", "DuelEncounter"),
+                TagForceSfx.SandwichRoulette => ("sfx_sandwich_roulette", "SandwichRoulette"),
+                TagForceSfx.SandwichWin => ("sfx_sandwich_win", "SandwichWin"),
+                TagForceSfx.PartnerAccept => ("sfx_partner_accept", "SandwichWin"),
+                _ => throw new ArgumentOutOfRangeException(nameof(sfx)),
+            };
+            var clip = DuelVisualAssets.LoadSound(file) ?? DuelVisualAssets.LoadSound(alternate);
+            TagForceSfxClips[sfx] = clip;
+            return clip;
+        }
+
+        internal static void PlayTagForceSfx(TagForceSfx sfx, float volumeMultiplier = 1f)
+        {
+            if (_sfxSource == null || SfxVolume <= .01f || volumeMultiplier <= 0f) return;
+            var fallback = sfx switch
+            {
+                TagForceSfx.DialogueBlip => _clipTick,
+                TagForceSfx.CardDraw => _clipDraw,
+                TagForceSfx.HeartUp or TagForceSfx.SandwichWin or TagForceSfx.PartnerAccept => _clipWin,
+                TagForceSfx.DuelEncounter => _clipActivate,
+                _ => _clipClick,
+            };
+            Play(GetTagForceClip(sfx) ?? fallback, volumeMultiplier);
+        }
 
         internal static void PlayTagForceReward()
         {
             if (_sfxSource != null && SfxVolume > 0.01f)
-                Play(_clipWorldReward ??= MakeRewardJingle());
+                Play(_clipWorldReward ??= DuelVisualAssets.LoadSound("Win") ?? MakeRewardJingle());
         }
 
         internal static void PlayTagForceBgm(bool night)

@@ -44,7 +44,19 @@ namespace YGOPortable.UI
         private CanvasGroup _dialoguePanel;
         private float _conversationProgress;
         private bool _closingConversation;
-        private Text _dialogue;
+        private Text _dialogue, _heartGauge;
+        private BreadSpin _breadSpin;
+
+        private sealed class BreadSpin
+        {
+            internal TagForceItem Prize;
+            internal uint Card;
+            internal Text Caption;
+            internal Image Icon;
+            internal float Elapsed;
+            internal int LastPreview = -1;
+            internal bool Revealed;
+        }
         private string _dialogueLine;
         private int[] _dialogueLetters;
         private float _dialogueProgress;
@@ -63,7 +75,7 @@ namespace YGOPortable.UI
             Tint(_screen, new Color(.027f, .064f, .102f));
             var layout = Application.isMobilePlatform ? MobileSafeArea.Create(_screen) : _screen;
             _header = Label(Area(layout, "Header", .05f, .899f, .78f, .975f), "", 24, TextAnchor.MiddleLeft);
-            Btn(Area(layout, "Back", .82f, .908f, .95f, .967f), "뒤로", Back);
+            Btn(Area(layout, "Back", .82f, .908f, .95f, .967f), "뒤로", Back, sound: null);
             _body = Area(layout, "World", .05f, .174f, .95f, .895f);
             _status = Label(Area(layout, "Status", .05f, .112f, .95f, .168f), "", 17, TextAnchor.MiddleLeft);
 
@@ -96,6 +108,8 @@ namespace YGOPortable.UI
 
         internal void Back()
         {
+            if (_closingConversation) return;
+            DuelAudio.PlayTagForceSfx(TagForceSfx.Cancel);
             if (_page == Page.SeriesSelect)
             {
                 _app.ShowScreen(AppScreen.MainMenu);
@@ -201,7 +215,8 @@ namespace YGOPortable.UI
             _leftStanding = _rightStanding = null;
             _dialoguePanel = null;
             _closingConversation = false;
-            _dialogue = null;
+            _dialogue = _heartGauge = null;
+            FinishBread();
             _dialogueLine = null;
             _dialogueLetters = null;
             _moving = _manualWalk = _fieldMenu = false;
@@ -215,11 +230,12 @@ namespace YGOPortable.UI
             }
         }
 
-        private bool Commit(TagForceSave next, int dp = 0, uint reward = 0, bool foil = false, uint gift = 0)
+        private bool Commit(TagForceSave next, int dp = 0, uint reward = 0, bool foil = false, uint gift = 0,
+            bool playReward = true)
         {
             if (_manager.TrySave(next, dp, out string error, reward, foil, gift))
             {
-                if (dp > 0 || reward != 0) DuelAudio.PlayTagForceReward();
+                if (playReward && (dp > 0 || reward != 0)) DuelAudio.PlayTagForceReward();
                 return true;
             }
             _status.text = error;
@@ -348,7 +364,12 @@ namespace YGOPortable.UI
             var button = rect.gameObject.AddComponent<Button>();
             button.targetGraphic = target;
             button.transition = Selectable.Transition.None;
-            button.onClick.AddListener(() => action());
+            button.onClick.AddListener(() =>
+            {
+                DuelAudio.PlayTagForceSfx(TagForceSfx.Confirm);
+                action();
+            });
+            rect.gameObject.AddComponent<TagForceCursorSound>();
         }
 
         private RectTransform WalkerSprite(RectTransform actor, string path, string name)
@@ -367,9 +388,10 @@ namespace YGOPortable.UI
             int dp = item switch { "dp_small" => 150, "dp_medium" => 350, "dp_large" => 600, _ => 0 };
             uint card = index == 2 && State.day % 3 == 0 ? CollectionProgress.TagForceBonusCard() : 0;
             if (dp == 0 && card == 0) next.ChangeItem(item, 1);
-            if (Commit(next, dp, card))
+            if (Commit(next, dp, card, playReward: card == 0))
             {
-                if (dp == 0 && card == 0) DuelAudio.PlayTagForceReward();
+                if (card != 0) DuelAudio.PlayTagForceSfx(TagForceSfx.CardDraw);
+                else if (dp == 0) DuelAudio.PlayTagForceReward();
                 ShowStatus(card != 0 ? $"{CardDatabase.GetName(card)} 획득" :
                     dp > 0 ? $"+{dp} DP" : $"{_data.Item(item)?.name ?? "아이템"} 획득");
                 Show(Page.Field);
@@ -386,6 +408,7 @@ namespace YGOPortable.UI
 
         internal void Update(float delta, Vector2 padDirection = default)
         {
+            UpdateBreadSpin(delta);
             UpdateConversation(delta);
             if (!CanWalk) return;
             Vector2 movement = _fieldMenu ? Vector2.zero : padDirection;
@@ -474,6 +497,7 @@ namespace YGOPortable.UI
             if (frame.Search)
             {
                 _fieldMenu = !_fieldMenu;
+                DuelAudio.PlayTagForceSfx(TagForceSfx.Cursor, .65f);
                 _manualWalk = _moving = false;
                 _onArrival = null;
                 _fieldControls.text = _fieldMenu ? "위쪽 버튼으로 보행 복귀" : "방향키 · 스틱 이동   선택 조사/대화   위쪽 버튼 메뉴";
@@ -482,6 +506,7 @@ namespace YGOPortable.UI
             if (_fieldMenu) return false;
             if (frame.Submit && _interactions.Count > 0)
             {
+                DuelAudio.PlayTagForceSfx(TagForceSfx.Confirm);
                 var closest = _interactions.OrderBy(entry => Vector2.SqrMagnitude(entry.Actor.anchorMin - _position)).First();
                 MoveTo(closest.Actor.anchorMin, closest.Action);
             }
@@ -581,10 +606,10 @@ namespace YGOPortable.UI
             Tint(panel, new Color(.029f, .084f, .118f, .98f));
             Tint(Area(panel, "TopRule", 0f, .982f, 1f, 1f), new Color(.30f, .75f, .77f));
             Label(Area(panel, "Name", .035f, .72f, .36f, .96f), form.formName, 25, TextAnchor.MiddleLeft);
-            var hearts = Label(Area(panel, "Hearts", .37f, .73f, .61f, .95f),
+            _heartGauge = Label(Area(panel, "Hearts", .37f, .73f, .61f, .95f),
                 $"{Hearts(persona)}   {relationship.affinity:N0} / {TagForceRelation.MaxAffinity:N0} pt", 19,
                 TextAnchor.MiddleRight);
-            hearts.color = new Color(1f, .70f, .80f);
+            _heartGauge.color = new Color(1f, .70f, .80f);
             Label(Area(panel, "Title", .035f, .575f, .61f, .73f), form.formTitle, 15, TextAnchor.MiddleLeft);
             string line = string.IsNullOrEmpty(_reply) ? form.Greet(relationship.Hearts) : _reply;
             if (!string.IsNullOrWhiteSpace(line) && (_dialogueLog.Count == 0 || _dialogueLog[^1] != line))
@@ -595,10 +620,12 @@ namespace YGOPortable.UI
             TypeDialogue(Area(panel, "DialogueText", .035f, .11f, .61f, .545f), line);
 
             var actions = List("DialogueActions", .65f, .06f, .978f, .91f, panel);
-            Row(actions, "이야기하기", () => Show(Page.Topics));
-            Row(actions, "샌드위치·선물 주기", () => Show(Page.Gift));
-            Row(actions, "듀얼 신청", () => { _deckLevel = 1; Show(Page.Duel); });
-            Row(actions, state.partnerId == persona.personaId ? "파트너 해제" : "파트너 신청", () => SetPartner(persona));
+            Row(actions, "이야기하기", () => Show(Page.Topics), icon: "action/look");
+            Row(actions, "샌드위치·선물 주기", () => Show(Page.Gift), icon: "action/set");
+            Row(actions, "듀얼 신청", () => { _deckLevel = 1; Show(Page.Duel); },
+                sound: TagForceSfx.DuelEncounter, icon: "action/attack");
+            Row(actions, state.partnerId == persona.personaId ? "파트너 해제" : "파트너 신청",
+                () => SetPartner(persona), sound: null, icon: "check");
             Row(actions, "대화 기록", () => Show(Page.DialogueLog));
             if (persona.NextBond(relationship) is { } pending)
                 Row(actions, "인연 승급전", () => { _bond = pending; Show(Page.Bond); });
@@ -674,7 +701,8 @@ namespace YGOPortable.UI
             int before = _visibleDialogueLetters;
             _visibleDialogueLetters = Math.Min((int)_dialogueProgress, _dialogueLetters.Length);
             if (_visibleDialogueLetters == before) return;
-            if (before == 0 || before / 3 != _visibleDialogueLetters / 3) DuelAudio.PlayTick();
+            if (before == 0 || before / 3 != _visibleDialogueLetters / 3)
+                DuelAudio.PlayTagForceSfx(TagForceSfx.DialogueBlip, .5f);
             PaintDialogue();
         }
 
@@ -687,15 +715,15 @@ namespace YGOPortable.UI
 
         private void Discuss(TagForcePersona persona, TagForceTopic topic)
         {
+            int before = State.Relationship(persona.personaId).affinity;
             if (!_manager.TryTalk(persona, topic, out var line, out uint reward, out var error))
             {
                 ShowStatus(error);
                 return;
             }
-            DuelAudio.PlayClick();
-            ShowAffinityReward(reward);
             _reply = line;
             Show(Page.Talk);
+            ShowAffinityFeedback(persona, before, reward);
         }
 
         private void BuildGifts()
@@ -720,33 +748,39 @@ namespace YGOPortable.UI
 
         private void Gift(TagForcePersona persona, TagForceItem item, uint card)
         {
+            int before = State.Relationship(persona.personaId).affinity;
             if (!_manager.TryGive(persona, item, card, out var line, out uint reward, out var error))
             {
                 ShowStatus(error);
                 return;
             }
-            DuelAudio.PlayClick();
-            ShowAffinityReward(reward);
             _reply = line;
             Show(Page.Talk);
+            ShowAffinityFeedback(persona, before, reward);
         }
 
-        private void ShowAffinityReward(uint reward)
+        private void ShowAffinityFeedback(TagForcePersona persona, int before, uint reward)
         {
-            if (reward != 0)
+            int affinity = State.Relationship(persona.personaId).affinity;
+            if (affinity != before)
             {
-                DuelAudio.PlayTagForceReward();
-                ShowStatus($"마스터 달성 · 오버프레임 {CardDatabase.GetName(reward)}");
+                DuelAudio.PlayTagForceSfx(affinity > before ? TagForceSfx.HeartUp : TagForceSfx.HeartDown);
+                if (_heartGauge != null) UiEntranceMotion.Play(_heartGauge.gameObject, .48f, .55f);
             }
+            if (reward != 0)
+                ShowStatus($"마스터 달성 · 오버프레임 {CardDatabase.GetName(reward)}");
         }
 
         private void SetPartner(TagForcePersona persona)
         {
+            bool wasPartner = State.partnerId == persona.personaId;
             if (!_manager.TrySetPartner(persona, out var line, out var error))
             {
                 ShowStatus(error);
                 return;
             }
+            DuelAudio.PlayTagForceSfx(wasPartner ? TagForceSfx.Cancel :
+                State.partnerId == persona.personaId ? TagForceSfx.PartnerAccept : TagForceSfx.HeartDown);
             _reply = line;
             Show(Page.Talk);
         }
@@ -762,9 +796,8 @@ namespace YGOPortable.UI
                     _effect = option.effectType;
                     _reply = option.reply;
                     _deckLevel = 1;
-                    DuelAudio.PlayClick();
                     Show(Page.Duel);
-                }, 54);
+                }, 54, sound: TagForceSfx.DuelEncounter);
         }
 
         private void BuildDuelChoice()
@@ -864,7 +897,7 @@ namespace YGOPortable.UI
                 float y = i < 6 ? .473f : .252f;
                 bool opened = State.bags.Contains(i);
                 var button = Btn(Area(_body, "Bag" + i, x, y, x + .137f, y + .191f),
-                    opened ? "개봉 완료" : $"빵 봉지 {i + 1}", () => DrawBread(bag));
+                    opened ? "개봉 완료" : $"빵 봉지 {i + 1}", () => DrawBread(bag), sound: null);
                 button.interactable = !opened && CollectionProgress.Balance >= shop.drawPriceDp;
             }
             var gifts = List("ShopGifts", .055f, .025f, .945f, .231f);
@@ -885,18 +918,73 @@ namespace YGOPortable.UI
         private void DrawBread(int bag)
         {
             var next = State.Copy();
-            if (next.bags.Contains(bag)) return;
+            if (_breadSpin != null || next.bags.Contains(bag)) return;
             var shop = _data.drawBreadCatalog;
             int weight = shop.breads.Sum(item => Math.Max(0, item.weight));
             var bread = _data.DrawBread(UnityEngine.Random.Range(0, weight));
             next.bags.Add(bag);
             next.ChangeItem(bread.Id, 1);
             uint card = bread.bonusRandomCard ? CollectionProgress.TagForceBonusCard() : 0;
-            if (!Commit(next, -shop.drawPriceDp, card)) return;
-            if (card == 0) DuelAudio.PlayTagForceReward();
-            ShowStatus(card == 0 ? $"{bread.name} 획득!" : $"{bread.name} · {CardDatabase.GetName(card)} 획득!");
-            Show(Page.Shop);
+            if (!Commit(next, -shop.drawPriceDp, card, playReward: false)) return;
+
+            foreach (var button in _body.GetComponentsInChildren<Button>()) button.interactable = false;
+            var shade = DuelUiKit.FillRect("BreadRoulette", _body);
+            DuelUiKit.AddImage(shade.gameObject, DuelUiKit.WhiteSprite, new Color(.022f, .039f, .053f, .75f));
+            var reveal = Area(shade, "Prize", .24f, .28f, .76f, .73f);
+            Tint(reveal, new Color(.075f, .18f, .24f));
+            _breadSpin = new BreadSpin
+            {
+                Prize = bread,
+                Card = card,
+                Caption = Label(Area(reveal, "Caption", .31f, .12f, .94f, .89f), "", 24),
+                Icon = DuelUiKit.AddImage(Area(reveal, "Icon", .04f, .13f, .29f, .86f).gameObject,
+                    null, Color.clear, true, false),
+            };
+            DuelAudio.PlayTagForceSfx(TagForceSfx.SandwichRoulette);
+            UpdateBreadSpin(0f);
         }
+
+        private void UpdateBreadSpin(float delta)
+        {
+            var spin = _breadSpin;
+            if (spin == null) return;
+            spin.Elapsed += delta;
+            if (spin.Elapsed >= .80f)
+            {
+                if (!spin.Revealed)
+                {
+                    spin.Revealed = true;
+                    PresentBread(spin.Prize, BreadResult(spin));
+                    DuelAudio.PlayTagForceSfx(TagForceSfx.SandwichWin);
+                }
+                if (spin.Elapsed >= 1.72f) Show(Page.Shop);
+                return;
+            }
+
+            var breads = _data.drawBreadCatalog.breads;
+            int preview = (int)(spin.Elapsed / .085f) % breads.Length;
+            if (preview == spin.LastPreview) return;
+            spin.LastPreview = preview;
+            PresentBread(breads[preview], breads[preview].name);
+        }
+
+        private void PresentBread(TagForceItem item, string caption)
+        {
+            _breadSpin.Caption.text = caption;
+            var sprite = _images.Get(item.iconPath);
+            _breadSpin.Icon.sprite = sprite;
+            _breadSpin.Icon.color = sprite != null ? Color.white : Color.clear;
+        }
+
+        private void FinishBread()
+        {
+            if (_breadSpin == null) return;
+            ShowStatus(BreadResult(_breadSpin));
+            _breadSpin = null;
+        }
+
+        private static string BreadResult(BreadSpin spin) => spin.Card == 0 ? $"{spin.Prize.name} 획득!" :
+            $"{spin.Prize.name} · {CardDatabase.GetName(spin.Card)} 획득!";
 
         private string Hearts(TagForcePersona persona)
         {
@@ -954,12 +1042,24 @@ namespace YGOPortable.UI
             return items;
         }
 
-        private static RectTransform Row(Transform parent, string text, Action click, float height = 37)
+        private static RectTransform Row(Transform parent, string text, Action click, float height = 37,
+            TagForceSfx? sound = TagForceSfx.Confirm, string icon = null)
         {
             var row = DuelUiKit.FillRect("Row", parent);
             row.gameObject.AddComponent<LayoutElement>().preferredHeight = height;
             if (click == null) Label(row, text, 17, TextAnchor.MiddleLeft);
-            else Btn(row, text, click);
+            else
+            {
+                Btn(row, text, click, sound: sound);
+                var sprite = icon == null ? null : DuelUiIcons.Find(icon);
+                if (sprite != null)
+                {
+                    var art = Area(row, "ActionIcon", .025f, .12f, .13f, .88f);
+                    DuelUiKit.AddImage(art.gameObject, sprite, Color.white, true, false);
+                    var label = (RectTransform)row.Find("Label");
+                    label.anchorMin = new Vector2(.14f, label.anchorMin.y);
+                }
+            }
             return row;
         }
 
@@ -973,12 +1073,18 @@ namespace YGOPortable.UI
         private static RectTransform Area(Transform parent, string name, float l, float b, float r, float t) =>
             DuelUiKit.CreateRect(name, parent, new(l, b), new(r, t), Vector2.zero, Vector2.zero);
 
-        private static Button Btn(RectTransform rect, string text, Action action, int size = 17)
+        private static Button Btn(RectTransform rect, string text, Action action, int size = 17,
+            TagForceSfx? sound = TagForceSfx.Confirm)
         {
             var background = DuelUiKit.AddImage(rect.gameObject, DuelUiKit.WhiteSprite, new Color(.12f, .31f, .39f));
             var button = rect.gameObject.AddComponent<Button>();
             button.targetGraphic = background;
-            button.onClick.AddListener(() => action());
+            button.onClick.AddListener(() =>
+            {
+                if (sound is { } cue) DuelAudio.PlayTagForceSfx(cue);
+                action();
+            });
+            rect.gameObject.AddComponent<TagForceCursorSound>();
             Label(rect, text, size);
             return button;
         }
@@ -988,6 +1094,17 @@ namespace YGOPortable.UI
                 new Color(.95f, .97f, .93f), FontStyle.Bold);
         private static void Tint(RectTransform rect, Color color) =>
             DuelUiKit.AddImage(rect.gameObject, DuelUiKit.WhiteSprite, color, false, false);
+    }
+
+    internal sealed class TagForceCursorSound : MonoBehaviour, ISelectHandler, IPointerEnterHandler
+    {
+        public void OnSelect(BaseEventData eventData) => Play();
+        public void OnPointerEnter(PointerEventData eventData) => Play();
+
+        private void Play()
+        {
+            if (GetComponent<Button>().IsInteractable()) DuelAudio.PlayTagForceSfx(TagForceSfx.Cursor, .65f);
+        }
     }
 
     internal sealed class TagForceFloorTap : MonoBehaviour, IPointerClickHandler

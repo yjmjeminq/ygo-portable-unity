@@ -250,7 +250,13 @@ namespace YGOPortable.UI
 
         internal static AudioClip LoadSound(string name)
         {
-            string path = Path.Combine(CardArtLoader.LocalDuelVisualsPath, "Audio", name + ".wav");
+            string file = name + ".wav";
+            return ReadSound(Path.Combine(Application.streamingAssetsPath, "TagForce", "Audio", file), name) ??
+                ReadSound(Path.Combine(CardArtLoader.LocalDuelVisualsPath, "Audio", file), name);
+        }
+
+        private static AudioClip ReadSound(string path, string name)
+        {
             if (!File.Exists(path)) return null;
             try
             {
