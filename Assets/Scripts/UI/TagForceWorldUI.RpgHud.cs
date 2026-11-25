@@ -72,12 +72,11 @@ namespace YGOPortable.UI
 
         private void BuildRpgFieldHud(int cleared, int targetRegion, StoryEpisodeData[] episodes, string sideObjective)
         {
-            var panelColor = new Color(.027f, .066f, .105f, .98f);
             var soft = new Color(.66f, .78f, .86f);
             var accent = new Color(.39f, .81f, .90f);
             _rpgFieldHud = DuelUiKit.FillRect("FieldHud", _body);
             var quest = Area(_rpgFieldHud, "QuestTrack", .02f, .865f, .635f, .989f);
-            Tint(quest, panelColor);
+            RpgUiStyle.Panel(quest);
             var iconSlot = Area(quest, "GoalIcon", .018f, .58f, .065f, .90f);
             DrawRpgIcon(iconSlot, "hud_target.png", "!", DuelUiKit.GoldAccent);
             bool hasEpisode = cleared < episodes.Length;
@@ -94,7 +93,7 @@ namespace YGOPortable.UI
                     $"의뢰 · {sideObjective}", 17, soft);
 
             var stats = Area(_rpgFieldHud, "DuelistHud", .651f, .865f, .98f, .989f);
-            Tint(stats, panelColor);
+            RpgUiStyle.Panel(stats);
             HudLabel(Area(stats, "Rank", .042f, .53f, .42f, .94f), $"Lv. {CollectionProgress.RpgRank}", 23, accent, heading: true);
             HudLabel(Area(stats, "Dp", .426f, .53f, .957f, .94f), $"{CollectionProgress.Balance:N0} DP",
                 23, Color.white, align: TextAnchor.MiddleRight, heading: true);
@@ -106,12 +105,10 @@ namespace YGOPortable.UI
                 $"유세이 ♥ {CollectionProgress.RpgAffinity}/100", 17, new Color(1f, .72f, .80f), align: TextAnchor.MiddleRight);
 
             // Keep the tap target between the viewport and navigation so it cannot cover map objects.
-            _rpgActionButton = Btn(Area(_rpgFieldHud, "ContextAction", .62f, -.079f, .98f, -.007f),
-                "", ActivateRpgInteraction, 21, sound: null);
+            _rpgActionButton = RpgButton(Area(_rpgFieldHud, "ContextAction", .62f, -.079f, .98f, -.007f),
+                "", ActivateRpgInteraction, 21, primary: true, sound: null);
             _rpgActionButton.navigation = new Navigation { mode = Navigation.Mode.None };
-            _rpgActionButton.targetGraphic.color = new Color(.042f, .19f, .25f, .98f);
             _rpgActionText = _rpgActionButton.GetComponentInChildren<Text>();
-            _rpgActionText.font = StoryModeUI.StoryDialogueView.RpgHeadingFont ?? DuelUiKit.FontKR;
             _fieldControls = HudLabel(Area(_rpgFieldHud, "FieldControls", .62f, -.079f, .98f, -.007f),
                 "위쪽 버튼 · 필드로", 17, soft, align: TextAnchor.MiddleCenter);
             RefreshRpgFieldPrompt();
@@ -121,9 +118,7 @@ namespace YGOPortable.UI
             TextAnchor align = TextAnchor.MiddleLeft, bool heading = false)
         {
             var label = Label(slot, text, size, align);
-            label.font = (heading ? StoryModeUI.StoryDialogueView.RpgHeadingFont :
-                StoryModeUI.StoryDialogueView.RpgBodyFont) ?? DuelUiKit.FontKR;
-            label.fontStyle = FontStyle.Normal;
+            RpgUiStyle.Type(label, strong: heading);
             label.color = color;
             return label;
         }

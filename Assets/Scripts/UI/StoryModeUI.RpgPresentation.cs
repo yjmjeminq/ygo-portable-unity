@@ -40,13 +40,17 @@ namespace YGOPortable.UI
             _rpgFaceoffGroup.alpha = 0f;
             DuelUiKit.AddImage(_rpgFaceoff.gameObject, DuelUiKit.WhiteSprite, new Color(.009f, .019f, .037f, .98f));
             var hero = DuelUiKit.CreateMenuPanel(_rpgFaceoff, "Kai", new Vector2(.12f, .28f), new Vector2(.40f, .76f));
-            var boss = DuelUiKit.CreateMenuPanel(_rpgFaceoff, "Boss", new Vector2(.60f, .28f), new Vector2(.88f, .76f), true);
+            var boss = DuelUiKit.CreateMenuPanel(_rpgFaceoff, "Boss", new Vector2(.60f, .28f), new Vector2(.88f, .76f));
+            RpgUiStyle.Panel(hero);
+            RpgUiStyle.Panel(boss, accent: true);
             Portrait(hero, _app.RpgField?.RpgStandingPortrait(0) ?? DuelProfileArt.Player, "카이");
             Portrait(boss, _app.RpgField?.RpgStandingPortrait(episode.charId) ??
                 DuelProfileArt.Opponent(DeckRepository.GetCharacter(episode.charId)), episode.opponentName);
             AddLabel(_rpgFaceoff, "Versus", .42f, .41f, .58f, .64f, 46, color: DuelUiKit.GoldAccent).text = "VS";
             AddLabel(_rpgFaceoff, "Match", .12f, .77f, .88f, .90f, 27, color: DuelUiKit.GoldAccent).text = TitleOf(episode);
-            Focus(AddButton(_rpgFaceoff, "Continue", "듀얼 시작", .39f, .13f, .61f, .24f, FinishRpgFaceoff, gold: true));
+            var start = AddButton(_rpgFaceoff, "Continue", "듀얼 시작", .39f, .13f, .61f, .24f, FinishRpgFaceoff, gold: true);
+            RpgUiStyle.Control(start, primary: true);
+            Focus(start);
 
             void Portrait(RectTransform card, Sprite art, string name)
             {
@@ -56,7 +60,9 @@ namespace YGOPortable.UI
                         new Vector2(.87f, .91f), Vector2.zero, Vector2.zero);
                     DuelUiKit.AddImage(image.gameObject, art, Color.white, true, false);
                 }
-                AddLabel(card, "Name", .04f, .028f, .96f, .18f, 25).text = name;
+                var label = AddLabel(card, "Name", .04f, .028f, .96f, .18f, 25);
+                RpgUiStyle.Type(label, strong: true);
+                label.text = name;
             }
         }
 

@@ -196,6 +196,11 @@ namespace YGOPortable.Editor
                 var hud = panel.Find("FieldHud");
                 var action = hud.Find("ContextAction");
                 var padSubmit = new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Submit);
+                var mapButton = world.Root.transform.Find("RpgNavigation/Map").GetComponent<Button>();
+                Require(((Image)mapButton.targetGraphic).type == Image.Type.Sliced &&
+                    mapButton.colors.fadeDuration > 0f && mapButton.colors.selectedColor != mapButton.colors.normalColor &&
+                    mapButton.GetComponentInChildren<Text>().font == Resources.Load<Font>("StoryFonts/Pretendard-Medium"),
+                    "RPG navigation lost its rounded treatment or visible controller focus.");
                 var player = (RectTransform)FieldScene().Find("Player");
                 var start = player.anchorMin;
                 Require(!action.gameObject.activeSelf && hud.Find("FieldMap") == null &&

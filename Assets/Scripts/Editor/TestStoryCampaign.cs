@@ -181,7 +181,9 @@ namespace YGOPortable.Editor
                             heroSd.localScale.x > 0f && opponentSd.localScale.x < 0f, "Narration or the RPG portraits were misconfigured.");
                         Require(body.supportRichText && Mathf.Approximately(body.lineSpacing, 1.25f) &&
                             body.font == Resources.Load<Font>("StoryFonts/Pretendard-Medium") &&
-                            scene.Find("DialogueBox/RpgDialogueFrame").GetComponent<Image>().sprite.border == Vector4.one * 24f &&
+                            scene.Find("DialogueBox").GetComponent<Image>() is { type: Image.Type.Sliced } panel &&
+                            panel.sprite.name == "RPG panel" &&
+                            badge.GetComponentInChildren<Text>(true).font == Resources.Load<Font>("StoryFonts/Pretendard-SemiBold") &&
                             body.GetComponent<Shadow>().effectDistance == new Vector2(1.5f, -1.5f) &&
                             body.color == new Color(.92f, .93f, .96f) && !caret.enabled &&
                             cg.GetComponent<AspectRatioFitter>().aspectMode == AspectRatioFitter.AspectMode.FitInParent,

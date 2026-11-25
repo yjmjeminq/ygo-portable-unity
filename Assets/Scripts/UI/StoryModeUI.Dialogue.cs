@@ -32,20 +32,13 @@ namespace YGOPortable.UI
         {
             private static readonly Color HeroColor = new Color32(0x78, 0xDC, 0xFF, 255);
             private static readonly Color NarrationColor = new(.92f, .93f, .96f);
-            private static readonly Color RimColor = new(.85f, .70f, .35f, .8f);
             private static readonly Regex DialogueTag = new(
                 @"<(?<end>/)?(?<name>b|i|color|size)(?:=[^<>\r\n]+)?>",
                 RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
             private static readonly Color OpponentColor = new(1f, .76f, .43f);
             private static readonly Color Listening = new(.48f, .53f, .63f);
             private const float CharactersPerSecond = 34f;
-            private static Sprite _cheekGlow, _glassPanel;
-            internal static Sprite RpgGlassPanel => _glassPanel ??= DuelUiChrome.DrawPlate("RPG dialogue glass",
-                new Color(.055f, .105f, .19f, .92f), new Color(.02f, .04f, .09f, .92f),
-                new Color(.31f, .35f, .42f, .72f));
-            private static Font _rpgBodyFont, _rpgHeadingFont;
-            internal static Font RpgBodyFont => _rpgBodyFont ??= Resources.Load<Font>("StoryFonts/Pretendard-Medium");
-            internal static Font RpgHeadingFont => _rpgHeadingFont ??= Resources.Load<Font>("StoryFonts/Paperlogy-7Bold");
+            private static Sprite _cheekGlow;
 
             private readonly GameObject _root;
             private readonly Image _shade;
@@ -66,8 +59,6 @@ namespace YGOPortable.UI
             private readonly Text[] _hearts = new Text[3];
             private readonly StoryDialogueFx _fx;
             private readonly Image _dialoguePanel;
-            private readonly Image _dialogueFrame;
-            private readonly Image _goldRim;
             private readonly Image _speakerPlate;
             private readonly GameObject _speakerBadge;
             private readonly Dictionary<string, Sprite> _rpgSprites = new(StringComparer.Ordinal);
@@ -185,12 +176,6 @@ namespace YGOPortable.UI
                 var dialogue = DuelUiKit.CreateMenuPanel(content, "DialogueBox",
                     new Vector2(.054f, .064f), new Vector2(.946f, .406f));
                 _dialoguePanel = dialogue.GetComponent<Image>();
-                _dialogueFrame = DuelUiKit.AddImage(DuelUiKit.FillRect("RpgDialogueFrame", dialogue).gameObject,
-                    null, new Color(.34f, .49f, .65f, .40f), false, false);
-                _dialogueFrame.type = Image.Type.Sliced;
-                var rim = DuelUiKit.CreateRect("GoldRim", dialogue, new Vector2(.025f, 1f), new Vector2(.975f, 1f),
-                    new Vector2(0f, -4f), new Vector2(0f, -2f));
-                _goldRim = DuelUiKit.AddImage(rim.gameObject, DuelUiKit.WhiteSprite, RimColor, false, false);
                 var dialogueHit = dialogue.gameObject.AddComponent<Button>();
                 dialogueHit.transition = Selectable.Transition.None;
                 dialogueHit.navigation = new Navigation { mode = Navigation.Mode.None };
@@ -303,6 +288,7 @@ namespace YGOPortable.UI
                 _root.SetActive(true);
                 _readThrough = 0;
                 BindLine(0);
+                if (rpg) UiEntranceMotion.Play(_dialoguePanel.gameObject, .86f, .18f);
                 Focus(_next);
             }
 
@@ -323,7 +309,6 @@ namespace YGOPortable.UI
                 _cutsceneOverlay.alpha = 0f;
                 _portraitGroup.alpha = 1f;
                 SetSprite(_cutsceneImage, null);
-                SetSprite(_dialogueFrame, null);
                 SetSprite(_stage, null);
                 SetSprite(_heroSd, null);
                 SetSprite(_opponentSd, null);
@@ -546,40 +531,56 @@ namespace YGOPortable.UI
 
             private void ApplyDialogueStyle(bool rpg)
             {
-                _dialoguePanel.sprite = rpg ? RpgGlassPanel : DuelUiChrome.Panel;
-                _goldRim.enabled = rpg;
-                SetSprite(_dialogueFrame, rpg ? LoadRpgSprite("TagForce/UI/panel_dialogue_frame.png", slice: true) : null);
-                Font body = rpg ? RpgBodyFont : null;
-                Font heading = rpg ? RpgHeadingFont : null;
-                _text.font = _logText.font = body ?? DuelUiKit.FontKR;
-                _speaker.font = _heading.font = _heroIdentity.font = heading ?? DuelUiKit.FontKR;
-                _speaker.fontStyle = _heading.fontStyle = _heroIdentity.fontStyle = heading == null ? FontStyle.Bold : FontStyle.Normal;
-                _text.fontStyle = rpg ? FontStyle.Normal : FontStyle.Bold;
+                foreach (var panel in new[] { _dialoguePanel.rectTransform, (RectTransform)_choiceRoot.transform,
+                    (RectTransform)_logRoot.transform.Find("Window"), (RectTransform)_pickerRoot.transform.Find("Window") })
+                {
+                    if (rpg) RpgUiStyle.Panel(panel);
+                    else panel.GetComponent<Image>().sprite = DuelUiChrome.Panel;
+                }
+                foreach (var label in new[] { _text, _logText, _speaker, _heading, _heroIdentity, _counter, _choiceSummary })
+                {
+                    if (rpg) RpgUiStyle.Type(label, strong: label == _speaker || label == _heading);
+                    else
+                    {
+                        label.font = DuelUiKit.FontKR;
+                        label.fontStyle = label == _logText ? FontStyle.Normal : FontStyle.Bold;
+                    }
+                }
                 _text.lineSpacing = rpg ? 1.25f : 1f;
                 _text.supportRichText = rpg;
                 foreach (var button in new[] { _previous, _logButton, _auto, _skip })
+                    StyleButton(button);
+                StyleButton(_next, primary: true);
+                for (int i = 0; i < _choiceButtons.Length; i++)
+                    StyleButton(_choiceButtons[i], primary: i == 0);
+                foreach (var popup in new[] { _logRoot, _pickerRoot })
                 {
+                    var title = popup.transform.Find("Window/Title/Label").GetComponent<Text>();
+                    if (rpg) RpgUiStyle.Type(title, strong: true);
+                    else
+                    {
+                        title.font = DuelUiKit.FontKR;
+                        title.fontStyle = FontStyle.Bold;
+                    }
+                    foreach (var button in popup.GetComponentsInChildren<Button>(true))
+                        StyleButton(button, primary: button == _logClose || button == _pickerApply);
+                }
+
+                void StyleButton(Button button, bool primary = false)
+                {
+                    if (rpg)
+                    {
+                        RpgUiStyle.Control(button, primary);
+                        return;
+                    }
                     var image = (Image)button.targetGraphic;
                     image.overrideSprite = null;
                     image.canvasRenderer.SetColor(Color.white);
-                    if (!rpg)
-                    {
-                        DuelUiChrome.ApplyControl(button, image);
-                        continue;
-                    }
-                    image.sprite = DuelUiKit.WhiteSprite;
-                    image.type = Image.Type.Simple;
-                    button.transition = Selectable.Transition.ColorTint;
-                    button.colors = new ColorBlock
-                    {
-                        normalColor = new Color(.09f, .15f, .23f, .82f),
-                        highlightedColor = new Color(.18f, .29f, .41f, .92f),
-                        selectedColor = new Color(.20f, .36f, .48f, .96f),
-                        pressedColor = new Color(.12f, .24f, .36f, 1f),
-                        disabledColor = new Color(.08f, .10f, .15f, .48f),
-                        colorMultiplier = 1f,
-                        fadeDuration = .12f,
-                    };
+                    DuelUiChrome.ApplyControl(button, image, primary);
+                    var label = button.GetComponentInChildren<Text>(true);
+                    label.font = DuelUiKit.FontKR;
+                    label.fontStyle = FontStyle.Bold;
+                    label.color = DuelUiKit.TextPrimary;
                 }
             }
 
@@ -773,10 +774,9 @@ namespace YGOPortable.UI
                 _showCutscene = true;
             }
 
-            private Sprite LoadRpgSprite(string name, bool waistUp = false, bool slice = false)
+            private Sprite LoadRpgSprite(string name, bool waistUp = false)
             {
-                string relative = name.StartsWith("TagForce/", StringComparison.Ordinal) ? name : "TagForce/5DS/" + name;
-                string path = Path.Combine(Application.streamingAssetsPath, relative);
+                string path = Path.Combine(Application.streamingAssetsPath, "TagForce/5DS", name);
                 if (_rpgSprites.TryGetValue(path, out var loaded)) return loaded;
 
                 Sprite sprite = null;
@@ -789,9 +789,8 @@ namespace YGOPortable.UI
                         if (texture.LoadImage(File.ReadAllBytes(path), markNonReadable: true))
                         {
                             float bottom = waistUp ? Mathf.Floor(texture.height * .43f) : 0f;
-                            Vector4 border = slice && texture.width >= 48 && texture.height >= 48 ? Vector4.one * 24f : Vector4.zero;
                             sprite = Sprite.Create(texture, new Rect(0f, bottom, texture.width, texture.height - bottom),
-                                new Vector2(.5f, .5f), 100f, 0, SpriteMeshType.FullRect, border);
+                                new Vector2(.5f, .5f), 100f, 0, SpriteMeshType.FullRect);
                         }
                     }
                 }

@@ -117,8 +117,7 @@ namespace YGOPortable.UI
             _rpgCompanionArt = WalkerSprite(_rpgCompanion, RpgArt + "Characters_SD/sd_35.png", RpgPartnerName);
             if (_page != Page.Field) return;
             void Speak() => OpenRpgService(RpgPartnerId);
-            var choice = Btn(Area(_rpgCompanion, "Interact", .01f, 0f, .99f, .235f), "유세이", Speak, 15);
-            choice.targetGraphic.color = new Color(.06f, .23f, .33f, .85f);
+            RpgButton(Area(_rpgCompanion, "Interact", .01f, 0f, .99f, .235f), "유세이", Speak, 16);
         }
 
         private void FollowRpgPlayer(float delta)
@@ -140,7 +139,7 @@ namespace YGOPortable.UI
             if (marker.TryGetComponent<Image>(out var icon)) icon.enabled = false;
             var fallback = marker.GetComponentInChildren<Text>();
             if (fallback != null) fallback.gameObject.SetActive(false);
-            Label(marker, "상점", 15).color = new Color(.63f, 1f, .82f);
+            HudLabel(marker, "상점", 15, new Color(.63f, 1f, .82f), align: TextAnchor.MiddleCenter, heading: true);
         }
 
         private void OpenRpgService(int speaker)
@@ -215,15 +214,16 @@ namespace YGOPortable.UI
             _rpgTravelFade = DuelUiKit.AddImage(DuelUiKit.FillRect("TravelFade", _body).gameObject,
                 DuelUiKit.WhiteSprite, new Color(.012f, .023f, .040f, 1f), false, false);
             _rpgTravelBanner = Area(_body, "RegionBanner", .27f, .108f, .73f, .201f);
-            Tint(_rpgTravelBanner, new Color(.024f, .088f, .135f, .82f));
-            Label(_rpgTravelBanner, RpgRegions[_rpgLocation].Name, 27).color = DuelUiKit.GoldAccent;
+            RpgUiStyle.Panel(_rpgTravelBanner, accent: true);
+            HudLabel(_rpgTravelBanner, RpgRegions[_rpgLocation].Name, 27, DuelUiKit.GoldAccent,
+                align: TextAnchor.MiddleCenter, heading: true);
             if (_rpgCompanion != null || _rpgResidents.ContainsKey(RpgPartnerId))
             {
                 _rpgGreetingTime = 0f;
                 _rpgGreeting = Area(_body, "PartnerGreeting", .19f, .10f, .81f, .181f);
-                Tint(_rpgGreeting, new Color(.031f, .098f, .15f, .94f));
-                Label(Area(_rpgGreeting, "Speech", .04f, .03f, .96f, .97f),
-                    $"유세이  ·  {RpgPartnerLines[_rpgLocation]}", 17);
+                RpgUiStyle.Panel(_rpgGreeting);
+                HudLabel(Area(_rpgGreeting, "Speech", .04f, .03f, .96f, .97f),
+                    $"유세이  ·  {RpgPartnerLines[_rpgLocation]}", 18, Color.white, align: TextAnchor.MiddleCenter);
                 Label(Area(_rpgGreeting, "Tail", .45f, -.21f, .55f, .10f), "▼", 13).color =
                     new Color(.031f, .098f, .15f, .94f);
                 PositionRpgGreeting();
@@ -234,8 +234,9 @@ namespace YGOPortable.UI
         {
             _rpgRankTime = 0f;
             _rpgRankBanner = Area(_body, "RankUp", .29f, .59f, .71f, .69f);
-            Tint(_rpgRankBanner, new Color(.22f, .13f, .04f, .96f));
-            Label(_rpgRankBanner, $"DUELIST RANK UP!  ·  Lv.{_rpgRankNotice}", 25).color = DuelUiKit.GoldAccent;
+            RpgUiStyle.Panel(_rpgRankBanner, accent: true);
+            HudLabel(_rpgRankBanner, $"DUELIST RANK UP!  ·  Lv.{_rpgRankNotice}", 25, DuelUiKit.GoldAccent,
+                align: TextAnchor.MiddleCenter, heading: true);
             _rpgRankNotice = 0;
         }
 

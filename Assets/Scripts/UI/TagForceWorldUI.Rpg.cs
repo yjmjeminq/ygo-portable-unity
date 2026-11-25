@@ -60,6 +60,7 @@ namespace YGOPortable.UI
         private float _rpgToastTime;
         private int _rpgLocation, _observedRpgClears;
         private bool _rpgField;
+        private bool _rpgHeaderStyled;
 
         internal int RpgClears => CountClearedRpgEpisodes(_rpgCampaign, CollectionProgress.IsStoryEpisodeCleared);
 
@@ -110,11 +111,41 @@ namespace YGOPortable.UI
         private RectTransform BuildRpgNavigation(Transform parent)
         {
             var bar = Area(parent, "RpgNavigation", .05f, .027f, .95f, .101f);
-            Btn(Area(bar, "Map", 0f, 0f, .235f, 1f), "월드맵", () => Show(Page.Map));
-            Btn(Area(bar, "Quests", .255f, 0f, .490f, 1f), "의뢰 수첩", () => Show(Page.Ledger));
-            Btn(Area(bar, "Decks", .510f, 0f, .745f, 1f), "덱 편집", _app.OpenTagForceDeckEditor);
-            Btn(Area(bar, "Menu", .765f, 0f, 1f, 1f), "메인 메뉴", () => _app.ShowScreen(AppScreen.MainMenu));
+            RpgButton(Area(bar, "Map", 0f, 0f, .235f, 1f), "월드맵", () => Show(Page.Map), 20);
+            RpgButton(Area(bar, "Quests", .255f, 0f, .490f, 1f), "의뢰 수첩", () => Show(Page.Ledger), 20);
+            RpgButton(Area(bar, "Decks", .510f, 0f, .745f, 1f), "덱 편집", _app.OpenTagForceDeckEditor, 20);
+            RpgButton(Area(bar, "Menu", .765f, 0f, 1f, 1f), "메인 메뉴", () => _app.ShowScreen(AppScreen.MainMenu), 20);
             return bar;
+        }
+
+        private static Button RpgButton(RectTransform area, string text, Action action, int size = 19,
+            bool primary = false, TagForceSfx? sound = TagForceSfx.Confirm)
+        {
+            var button = Btn(area, text, action, size, sound);
+            RpgUiStyle.Control(button, primary);
+            return button;
+        }
+
+        private void UpdateRpgWorldChrome()
+        {
+            if (_rpgHeaderStyled == _rpgField) return;
+            _rpgHeaderStyled = _rpgField;
+            if (_rpgField)
+            {
+                RpgUiStyle.Type(_header, strong: true);
+                RpgUiStyle.Type(_status);
+                RpgUiStyle.Control(_back);
+                return;
+            }
+            var image = (Image)_back.targetGraphic;
+            image.sprite = DuelUiKit.WhiteSprite;
+            image.type = Image.Type.Simple;
+            image.color = new Color(.12f, .31f, .39f);
+            _back.colors = ColorBlock.defaultColorBlock;
+            var backLabel = _back.GetComponentInChildren<Text>();
+            _header.font = _status.font = backLabel.font = DuelUiKit.FontKR;
+            _header.fontStyle = _status.fontStyle = backLabel.fontStyle = FontStyle.Bold;
+            backLabel.color = new Color(.95f, .97f, .93f);
         }
 
         private void ShowRpgPage(Page page)
@@ -147,16 +178,16 @@ namespace YGOPortable.UI
             if (opened.Length > 0)
             {
                 var toast = Area(_body, "RegionUnlockToast", .19f, .79f, .81f, .93f);
-                Tint(toast, new Color(.118f, .10f, .046f, .94f));
-                _rpgToast = Label(toast, $"신규 지역 개방!  ·  {opened}", 21);
-                _rpgToast.color = DuelUiKit.GoldAccent;
+                RpgUiStyle.Panel(toast, accent: true);
+                _rpgToast = HudLabel(toast, $"신규 지역 개방!  ·  {opened}", 21, DuelUiKit.GoldAccent,
+                    align: TextAnchor.MiddleCenter, heading: true);
                 _rpgToastTime = 4.5f;
             }
         }
 
         private void BuildRpgMap()
         {
-            Backdrop(null, new Color(.035f, .083f, .135f));
+            BuildRpgMenuBackdrop();
             int cleared = RpgClears;
             int target = RegionForEpisode(cleared + 1);
             for (int i = 0; i < RpgRegions.Length; i++)
@@ -165,8 +196,8 @@ namespace YGOPortable.UI
                 var region = RpgRegions[i];
                 float x = .025f + i % 3 * .324f;
                 float y = .678f - i / 3 * .323f;
-                var tile = DuelUiKit.CreateMenuPanel(_body, region.Id,
-                    new Vector2(x, y), new Vector2(x + .30f, y + .292f), i == target && cleared < 50);
+                var tile = Area(_body, region.Id, x, y, x + .30f, y + .292f);
+                RpgUiStyle.Panel(tile, accent: i == target && cleared < 50);
                 bool open = region.IsOpen(cleared);
                 var poster = _images.Get(region.Background);
                 DuelUiKit.AddImage(Area(tile, "MapPreview", .036f, .292f, .964f, .947f).gameObject, poster,
@@ -174,15 +205,21 @@ namespace YGOPortable.UI
                     false, false);
                 if (!open)
                     DrawRpgIcon(Area(tile, "MapLock", .413f, .47f, .587f, .83f), "icon_map_lock.png", "잠김", DuelUiKit.GoldAccent);
-                var travel = Btn(Area(tile, "Travel", .037f, .047f, .965f, .273f),
+                var travel = RpgButton(Area(tile, "Travel", .037f, .047f, .965f, .273f),
                     open ? i == _rpgLocation ? $"{region.Name} · 현재" : region.Name :
                         $"{region.Name} · {region.RequiredEpisode}화 클리어", () =>
                     {
                         if (index == _rpgLocation) Show(Page.Field);
                         else BeginRpgTravel(index, RpgArrival);
-                    });
+                    }, primary: i == target && cleared < 50);
                 travel.interactable = open;
             }
+        }
+
+        private void BuildRpgMenuBackdrop()
+        {
+            var backdrop = DuelUiKit.FillRect("Scenery", _body);
+            DuelUiKit.AddImage(backdrop.gameObject, DuelUiChrome.Backdrop, Color.white, false, false);
         }
 
         internal bool EnterRpgRegion(int index) => TravelRpgRegion(index, RpgArrival);
@@ -280,7 +317,7 @@ namespace YGOPortable.UI
             _questMarkers.Add(marker);
             if (!story && _rpgLocation > 1 && node.StartsWith("Resident_", StringComparison.Ordinal) && _rpgRoamers.Count == 0)
                 _rpgRoamers.Add((actor, spot));
-            Btn(Area(actor, "Interact", 0f, 0f, 1f, .265f), name, Approach, 15);
+            RpgButton(Area(actor, "Interact", 0f, 0f, 1f, .265f), name, Approach, 16, primary: story);
             string verb = story ? "이야기 진행" : node == "RpgCardMerchant" ? "팩 구매" : "대화";
             RegisterRpgInteraction(actor, $"{name} · {verb}", Approach);
         }
@@ -289,7 +326,7 @@ namespace YGOPortable.UI
         {
             var icon = _images.Get(RpgIcons + name);
             if (icon != null) DuelUiKit.AddImage(anchor.gameObject, icon, Color.white, true, false);
-            else Label(anchor, fallback, 21).color = color;
+            else HudLabel(anchor, fallback, 21, color, align: TextAnchor.MiddleCenter, heading: true);
         }
 
         private void BuildRpgTalk()
@@ -331,16 +368,15 @@ namespace YGOPortable.UI
 
         private RectTransform BuildRpgConversation(string name, string line, out Text conversation)
         {
-            var panel = DuelUiKit.CreateMenuPanel(_body, "ResidentChoices",
-                new Vector2(.065f, .025f), new Vector2(.935f, .35f));
-            panel.GetComponent<Image>().sprite = StoryModeUI.StoryDialogueView.RpgGlassPanel;
-            var speaker = Label(Area(panel, "Name", .035f, .72f, .96f, .94f), name, 22, TextAnchor.MiddleLeft);
-            speaker.color = DuelUiKit.GoldAccent;
-            speaker.font = StoryModeUI.StoryDialogueView.RpgHeadingFont ?? DuelUiKit.FontKR;
-            conversation = Label(Area(panel, "DailyLine", .035f, .335f, .962f, .735f), line, 21, TextAnchor.MiddleLeft);
-            conversation.font = StoryModeUI.StoryDialogueView.RpgBodyFont ?? DuelUiKit.FontKR;
-            conversation.fontStyle = FontStyle.Normal;
+            var panel = Area(_body, "ResidentChoices", .065f, .025f, .935f, .35f);
+            RpgUiStyle.Panel(panel);
+            HudLabel(Area(panel, "Name", .04f, .74f, .96f, .94f), name, 24,
+                new Color(.57f, .86f, .89f), heading: true);
+            conversation = HudLabel(Area(panel, "DailyLine", .04f, .335f, .96f, .725f), line, 23,
+                new Color(.90f, .94f, .97f));
+            conversation.lineSpacing = 1.16f;
             StartTypingDialogue(conversation, line);
+            UiEntranceMotion.Play(panel.gameObject, .84f, .18f);
             return panel;
         }
 
@@ -352,7 +388,7 @@ namespace YGOPortable.UI
             {
                 float left = .035f + i * width;
                 var (id, label, select) = actions[i];
-                var button = Btn(Area(panel, id, left, .065f, left + width - .012f, .278f), label, select);
+                var button = RpgButton(Area(panel, id, left, .065f, left + width - .014f, .278f), label, select);
                 first ??= button;
             }
             DeckPadUi.LimitKeyboardNavigation(panel);
@@ -370,23 +406,29 @@ namespace YGOPortable.UI
             var candidates = DeckRepository.UserDecks.Where(deck => GameAppController.CanStartWithDeck(deck, out _)).ToArray();
             var preferred = _deckId ?? CollectionProgress.LastDuelDeckId;
             var selected = candidates.FirstOrDefault(deck => deck.id == preferred) ?? candidates.FirstOrDefault();
-            Label(Area(_body, "Opponent", .05f, .82f, .95f, .97f), $"{_resident.opponentName} · {rival.title}", 23);
+            BuildRpgMenuBackdrop();
+            HudLabel(Area(_body, "Opponent", .05f, .82f, .95f, .97f), $"{_resident.opponentName} · {rival.title}",
+                25, Color.white, align: TextAnchor.MiddleCenter, heading: true);
             var list = List("YourDeck", .14f, .19f, .86f, .79f);
             foreach (var deck in candidates)
-                Row(list, (deck == selected ? "✓ " : "") + deck.name, () =>
+            {
+                var row = Row(list, (deck == selected ? "✓ " : "") + deck.name, () =>
                 {
                     _deckId = deck.id;
                     Show(Page.Duel);
-                });
-            if (selected == null) Row(list, DuelDeckAvailability.ExplainEmptyList(preferred), null);
-            var start = Btn(Area(_body, "StartPractice", .36f, .028f, .64f, .152f), "연습 듀얼 시작", () =>
+                }, 50);
+                RpgUiStyle.Control(row.GetComponent<Button>(), deck == selected);
+            }
+            if (selected == null) RpgUiStyle.Type(Row(list, DuelDeckAvailability.ExplainEmptyList(preferred), null)
+                .GetComponentInChildren<Text>());
+            var start = RpgButton(Area(_body, "StartPractice", .36f, .028f, .64f, .152f), "연습 듀얼 시작", () =>
             {
                 var persona = new TagForcePersona { personaId = $"rpg_{_resident.charId}", baseCharId = _resident.charId,
                     displayName = _resident.opponentName };
                 var form = new TagForceForm { formCharId = _resident.charId, formName = _resident.opponentName };
                 _app.StartTagForceDuel(new TagForceDuel(RpgPracticeId, persona, form, null, rival, 1,
                     null, null, false, 0), selected);
-            });
+            }, primary: true);
             start.interactable = selected != null;
         }
 

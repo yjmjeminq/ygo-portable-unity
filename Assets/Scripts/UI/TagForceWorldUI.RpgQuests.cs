@@ -51,8 +51,8 @@ namespace YGOPortable.UI
                 if (badge != null)
                 {
                     var marker = Area(_rpgResidents[quest.Giver], "QuestBadge", .19f, 1.238f, .81f, 1.49f);
-                    Tint(marker, new Color(.025f, .085f, .12f, .96f));
-                    Label(marker, badge, 15).color = DuelUiKit.GoldAccent;
+                    RpgUiStyle.Panel(marker, accent: true);
+                    HudLabel(marker, badge, 15, DuelUiKit.GoldAccent, align: TextAnchor.MiddleCenter, heading: true);
                 }
             }
 
@@ -62,7 +62,7 @@ namespace YGOPortable.UI
                 void Investigate() => AdvanceRpgQuest(quest, RpgQuestState.Active, Page.Field,
                     $"{quest.Item} 확보 · {RpgQuestName(quest)}에게 돌아가세요.");
                 void Approach() => MoveTo(quest.Point, Investigate);
-                Btn(item, "조사 · " + quest.Item, Approach, 15);
+                RpgButton(item, "조사 · " + quest.Item, Approach, 16, primary: true);
                 RegisterRpgInteraction(item, $"{quest.Item} · 조사", Approach);
             }
 
@@ -134,7 +134,7 @@ namespace YGOPortable.UI
         private void BuildRpgQuestJournal()
         {
             const int perPage = 4;
-            Backdrop(null, new Color(.035f, .083f, .135f));
+            BuildRpgMenuBackdrop();
             int clears = RpgClears;
             var quests = RpgSideQuest.All.Where(quest => IsRpgQuestOpen(quest, clears) &&
                 (quest.Id != RpgSideQuest.GarageCouplerId || RpgCouplerState != RpgQuestState.Available))
@@ -142,11 +142,13 @@ namespace YGOPortable.UI
                 .OrderBy(item => item.State is RpgQuestState.Active or RpgQuestState.Ready ? 0 :
                     item.State == RpgQuestState.Available ? 1 : 2).ToArray();
             int complete = RpgSideQuest.All.Count(quest => CollectionProgress.GetRpgQuestState(quest.Id) == RpgQuestState.Complete);
-            Label(Area(_body, "QuestJournalHeading", .08f, .882f, .92f, .98f),
-                $"의뢰 수첩  ·  {complete}/{RpgSideQuest.All.Length} 완료", 25, TextAnchor.MiddleLeft).color = DuelUiKit.GoldAccent;
+            HudLabel(Area(_body, "QuestJournalHeading", .08f, .882f, .92f, .98f),
+                $"의뢰 수첩  ·  {complete}/{RpgSideQuest.All.Length} 완료", 26, Color.white, heading: true);
             int pages = Mathf.Max(1, (quests.Length + perPage - 1) / perPage);
             _rpgQuestPage = Mathf.Clamp(_rpgQuestPage, 0, pages - 1);
-            var entries = List("QuestJournal", .08f, .16f, .92f, .86f);
+            var journal = Area(_body, "QuestJournal", .08f, .16f, .92f, .86f);
+            var entries = DuelUiKit.FillRect("Items", journal);
+            int rowIndex = 0;
             foreach (var (quest, state) in quests.Skip(_rpgQuestPage * perPage).Take(perPage))
             {
                 string progress = state switch
@@ -163,15 +165,20 @@ namespace YGOPortable.UI
                     RpgQuestState.Complete => $"{quest.Reward:N0} DP 보상 수령",
                     _ => $"{RpgQuestRegionName(quest)} · {RpgQuestName(quest)} · 보상 {quest.Reward:N0} DP",
                 };
-                var row = Row(entries, $"[{progress}]  {quest.Title}\n{detail}", null, 77);
-                Tint(row, new Color(.04f, .13f, .18f, .93f));
+                float top = 1f - rowIndex++ / (float)perPage;
+                var row = Area(entries, quest.Id, 0f, top - .223f, 1f, top - .01f);
+                RpgUiStyle.Panel(row, accent: state is RpgQuestState.Active or RpgQuestState.Ready);
+                HudLabel(Area(row, "Title", .026f, .48f, .974f, .93f), $"[{progress}]  {quest.Title}",
+                    22, Color.white, heading: true);
+                HudLabel(Area(row, "Detail", .026f, .07f, .974f, .48f), detail, 18, new Color(.72f, .83f, .90f));
             }
             if (pages == 1) return;
-            Btn(Area(_body, "QuestPagePrev", .08f, .027f, .29f, .126f), "이전", () => ChangePage(-1))
+            RpgButton(Area(_body, "QuestPagePrev", .08f, .027f, .29f, .126f), "이전", () => ChangePage(-1))
                 .interactable = _rpgQuestPage > 0;
-            Btn(Area(_body, "QuestPageNext", .71f, .027f, .92f, .126f), "다음", () => ChangePage(1))
+            RpgButton(Area(_body, "QuestPageNext", .71f, .027f, .92f, .126f), "다음", () => ChangePage(1))
                 .interactable = _rpgQuestPage + 1 < pages;
-            Label(Area(_body, "QuestPage", .32f, .029f, .68f, .126f), $"{_rpgQuestPage + 1} / {pages}", 18);
+            HudLabel(Area(_body, "QuestPage", .32f, .029f, .68f, .126f), $"{_rpgQuestPage + 1} / {pages}", 18, Color.white,
+                align: TextAnchor.MiddleCenter);
 
             void ChangePage(int offset)
             {

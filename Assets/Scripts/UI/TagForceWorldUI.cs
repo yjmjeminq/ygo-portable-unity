@@ -191,6 +191,7 @@ namespace YGOPortable.UI
         {
             bool openConversation = page == Page.Talk && _page == Page.Field;
             _page = page;
+            UpdateRpgWorldChrome();
             _status.rectTransform.anchorMax = new Vector2(_rpgField && page == Page.Field ? .59f : .95f, .168f);
             ClearBody();
             _images.BeginPage();

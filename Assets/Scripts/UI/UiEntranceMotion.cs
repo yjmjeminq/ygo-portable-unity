@@ -16,13 +16,15 @@ namespace YGOPortable.UI
         internal static void Play(GameObject target, float startAlpha = .78f, float duration = .16f)
         {
             if (!Application.isPlaying || !target.activeInHierarchy) return;
-            var motion = target.GetComponent<UiEntranceMotion>() ?? target.AddComponent<UiEntranceMotion>();
+            if (!target.TryGetComponent<UiEntranceMotion>(out var motion))
+                motion = target.AddComponent<UiEntranceMotion>();
             motion.Begin(startAlpha, duration);
         }
 
         private void Begin(float startAlpha, float duration)
         {
-            _group ??= GetComponent<CanvasGroup>() ?? gameObject.AddComponent<CanvasGroup>();
+            if (_group == null && !TryGetComponent(out _group))
+                _group = gameObject.AddComponent<CanvasGroup>();
             if (!_active) _restAlpha = _group.alpha;
             float requested = _restAlpha * startAlpha;
             _startAlpha = _active ? Mathf.Max(requested, _group.alpha) : requested;

@@ -63,8 +63,7 @@ namespace YGOPortable.UI
             var landmark = RpgLandmarks[_rpgLocation];
             var marker = Anchor(_rpgFieldObjects, "Landmark", landmark.Position, new Vector2(146f, 31f));
             void Inspect() => MoveTo(landmark.Position, OpenRpgLandmark);
-            var inspect = Btn(marker, landmark.Name, Inspect, 15);
-            inspect.targetGraphic.color = new Color(.047f, .18f, .225f, .93f);
+            RpgButton(marker, landmark.Name, Inspect, 16);
             _rpgLandmarkLabel = marker.GetComponentInChildren<Text>();
             RegisterRpgInteraction(marker, $"{landmark.Name} · 조사", Inspect);
 
@@ -74,10 +73,9 @@ namespace YGOPortable.UI
                 var gate = Anchor(_rpgFieldObjects, $"Exit_{destination}",
                     RpgExitPoints[slot] + new Vector2(0f, .047f), new Vector2(196f, 32f));
                 string arrow = slot switch { 0 => "‹", 1 => "›", _ => "↑" };
-                var button = Btn(gate, open ? $"{arrow}  {RpgRegions[destination].Name}" :
+                var button = RpgButton(gate, open ? $"{arrow}  {RpgRegions[destination].Name}" :
                     $"{RpgRegions[destination].Name} · {RpgRegions[destination].RequiredEpisode}화", () =>
                         MoveTo(RpgExitPoints[slot], () => FollowRpgExit(destination, entry)), 15);
-                button.targetGraphic.color = new Color(.039f, .15f, .19f, .90f);
                 button.interactable = open;
                 if (open) _rpgExits.Add((slot, destination, entry));
             }
@@ -180,7 +178,8 @@ namespace YGOPortable.UI
                 _rpgWalkInElapsed = 0f;
                 _rpgWalkInActor.Find("ResidentMarker")?.gameObject.SetActive(false);
                 _rpgWalkInActor.Find("QuestBadge")?.gameObject.SetActive(false);
-                _rpgWalkInChoices = panel.gameObject.AddComponent<CanvasGroup>();
+                if (!panel.TryGetComponent(out _rpgWalkInChoices))
+                    _rpgWalkInChoices = panel.gameObject.AddComponent<CanvasGroup>();
                 _rpgWalkInChoices.interactable = _rpgWalkInChoices.blocksRaycasts = false;
                 _rpgWalkInSelection = first;
             }
