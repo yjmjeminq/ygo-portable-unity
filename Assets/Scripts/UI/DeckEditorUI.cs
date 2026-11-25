@@ -295,7 +295,7 @@ namespace YGOPortable.UI
             }
             _workingDeck = CopyDeck(DeckRepository.UserDecks[_userDeckIdx]);
             _mobileSelectedCode = 0;
-            OrderWorkingDeckCards(DeckMainSortMode.Frame);
+            OrderWorkingDeckCards(DeckMainSortMode.Frame, preserveTournament: true);
             _workingDeckBaseline = CopyDeck(_workingDeck);
             _deckNameInput.SetTextWithoutNotify(_workingDeck.name);
             RefreshDeckGrids();
@@ -580,7 +580,7 @@ namespace YGOPortable.UI
             BuildQuickFilters(col, insideLeft, insideRight);
 
             var scrollHolder = DuelUiKit.CreateRect("TrunkScrollHolder", col,
-                new Vector2(0f, .101f), new Vector2(1f, .694f), insideLeft, insideRight);
+                new Vector2(0f, .101f), new Vector2(1f, .634f), insideLeft, insideRight);
             DuelUiKit.AddImage(scrollHolder.gameObject, DuelUiKit.WhiteSprite, Color.clear);
             _trunkScroll = scrollHolder.gameObject.AddComponent<ScrollRect>();
             _trunkScroll.horizontal = false;
@@ -690,7 +690,7 @@ namespace YGOPortable.UI
                 new Vector2(0.430f, 1f), Vector2.zero, Vector2.zero), "Input", "덱 이름", 15);
             _deckNameInput.onValueChanged.AddListener(_ => RefreshSaveLabel());
             _wholeSortButton = Control(edit, "Sort", "정렬 옵션", .442f, .17f, OpenWholeDeckSort);
-            Control(edit, "AutoSort", "자동 정렬", .625f, .18f, () => SortWorkingDeck(byFrame: true));
+            Control(edit, "AutoSort", "자동 정렬", .625f, .18f, () => SortWorkingDeck());
             Control(edit, "DeckTools", "덱 관리", .819f, .181f, OpenDeckTools);
 
             (_mainGridRect, _mainCountText) = BuildDeckSection(panel, "Main", "메인", .789f, .429f);
@@ -871,8 +871,9 @@ namespace YGOPortable.UI
 
         private void ClearTrunkFilterValues()
         {
-            _sortFilter.SetValueWithoutNotify(DefaultTrunkSort);
-            if (_mobileTrunkSort != null) _mobileTrunkSort.text = SortOptions[DefaultTrunkSort];
+            int sort = _relatedFilterCode != 0 ? 0 : DefaultTrunkSort;
+            _sortFilter.SetValueWithoutNotify(sort);
+            if (_mobileTrunkSort != null) _mobileTrunkSort.text = SortOptions[sort];
             _queryBeforeFilters = "";
             ClearDetailedSearch();
             SetQuickFilter(0, refresh: false);
@@ -891,6 +892,8 @@ namespace YGOPortable.UI
 
         private void ExitTrunkScope()
         {
+            if (_relatedFilterCode != 0 && _sortFilter.value == 0)
+                _sortFilter.SetValueWithoutNotify(DefaultTrunkSort);
             _relatedFilterCode = 0;
             _activeArchetypeFilter = null;
             RefreshTrunkFilter();
@@ -1216,12 +1219,20 @@ namespace YGOPortable.UI
                 sourceIndex < sourcePositions.Length ? sourcePositions[sourceIndex] : null;
             var appearance = _workingDeck.RemoveCard(source, sourceIndex);
             _workingDeck.InsertCard(target, landing, code, appearance);
+            int insertedIndex = landing;
+            var order = ApplyTournamentInsertion(targetZone, target);
+            if (order != null) landing = Array.IndexOf(order, insertedIndex);
             FinishDeckEdit();
             RevealDeckSlot(targetZone, landing);
             if (dropPosition.HasValue && !_padMode) RememberMouseCard(DeckPadArea(targetZone), landing);
 
             AnimateDeckSlots(sourceZone, sourceIndex, source.Count, sourcePositions, i => i + 1);
-            AnimateDeckSlots(targetZone, landing + 1, target.Count, targetPositions, i => i - 1);
+            AnimateDeckSlots(targetZone, 0, target.Count, targetPositions, index =>
+            {
+                int beforeSort = order?[index] ?? index;
+                if (beforeSort == insertedIndex) return -1;
+                return beforeSort > insertedIndex ? beforeSort - 1 : beforeSort;
+            });
             if (_padMode && CurrentPadDeck == sourceZone)
             {
                 var destination = DeckPadArea(targetZone);
@@ -1296,6 +1307,14 @@ namespace YGOPortable.UI
             if (match >= 0) return match + 1;
             return requestedIndex >= 0 && requestedIndex < cards.Count
                 ? DeckGroupStart(cards, requestedIndex) : cards.Count;
+        }
+
+        private int[] ApplyTournamentInsertion(DragSourceType zone, List<uint> cards)
+        {
+            if (zone is not (DragSourceType.DeckMain or DragSourceType.DeckExtra)) return null;
+            var indices = OrderDeckGroupIndices(cards, DeckMainSortMode.Tournament);
+            _workingDeck.ReorderCards(cards, indices.Select(index => cards[index]));
+            return indices;
         }
 
         private void RemoveDeckCard(DragSourceType zone, int index, Vector2? dropPosition = null)
@@ -1410,7 +1429,7 @@ namespace YGOPortable.UI
         private void AddDeckCopies(uint code, DragSourceType destination, int quantity,
             RectTransform origin = null, Vector2? dropPosition = null)
         {
-            if (_workingDeck == null || CardDatabase.Get(code) == null) return;
+            if (_workingDeck == null || quantity <= 0 || CardDatabase.Get(code) == null) return;
             code = FindAddableCardCopy(code);
             if (code == 0) return;
             var card = CardDatabase.Get(code);
@@ -1443,10 +1462,27 @@ namespace YGOPortable.UI
                     if (inserted[i] >= landing) inserted[i]++;
                 inserted.Add(landing);
             }
+            var order = ApplyTournamentInsertion(destination, target);
+            if (order != null) landing = Array.IndexOf(order, landing);
             FinishDeckEdit();
             RevealDeckSlot(destination, landing);
-            int PreviousIndex(int index) => inserted.Contains(index) ? -1 : index - inserted.Count(added => added < index);
-            AnimateDeckSlots(destination, inserted.Min(), target.Count, targetPositions, PreviousIndex);
+            int PreviousIndex(int index)
+            {
+                int beforeSort = order?[index] ?? index;
+                return inserted.Contains(beforeSort) ? -1 : beforeSort - inserted.Count(added => added < beforeSort);
+            }
+            if (_padMode && CurrentPadDeck == destination)
+            {
+                int area = (int)DeckPadArea(destination);
+                int focused = _padIndices[area];
+                for (int index = 0; index < target.Count; index++)
+                {
+                    if (PreviousIndex(index) != focused) continue;
+                    _padIndices[area] = index;
+                    break;
+                }
+            }
+            AnimateDeckSlots(destination, 0, target.Count, targetPositions, PreviousIndex);
             var landingCard = GetDeckSlots(destination)[landing].card;
             if (!_mobileLayout || landingCard.isActiveAndEnabled)
                 AnimateTransfer(target[landing], from, (RectTransform)landingCard.transform);
@@ -1645,7 +1681,7 @@ namespace YGOPortable.UI
                 });
         }
 
-        private void SortWorkingDeck(bool byFrame = true, bool byName = false)
+        private void SortWorkingDeck(DeckMainSortMode mode = DeckMainSortMode.Frame)
         {
             var main = _workingDeck.main.ToArray();
             var extra = _workingDeck.extra.ToArray();
@@ -1655,18 +1691,30 @@ namespace YGOPortable.UI
             var sidePositions = CaptureDeckPositions(DragSourceType.DeckSide, side.Length);
             CancelDeckDrag();
             EndDeckTransfer();
-            OrderWorkingDeckCards(byName ? DeckMainSortMode.Name : byFrame ? DeckMainSortMode.Frame : DeckMainSortMode.Auto);
+            OrderWorkingDeckCards(mode);
             RefreshDeckGrids();
             AnimateOrderedDeck(DragSourceType.DeckMain, _workingDeck.main, main, mainPositions);
             AnimateOrderedDeck(DragSourceType.DeckExtra, _workingDeck.extra, extra, extraPositions);
-            AnimateOrderedDeck(DragSourceType.DeckSide, _workingDeck.side, side, sidePositions);
-            ShowToast(byFrame && !byName ? "전체 덱 정렬 · 카드 프레임별" : "덱 정렬 완료");
+            if (mode != DeckMainSortMode.Tournament)
+                AnimateOrderedDeck(DragSourceType.DeckSide, _workingDeck.side, side, sidePositions);
+            ShowToast(mode switch
+            {
+                DeckMainSortMode.Frame => "전체 덱 정렬 · 카드 프레임별",
+                DeckMainSortMode.Tournament => $"메인·엑스트라 덱 · {TournamentSortLabel}",
+                _ => "덱 정렬 완료",
+            });
         }
 
-        private void OrderWorkingDeckCards(DeckMainSortMode mode)
+        private void OrderWorkingDeckCards(DeckMainSortMode mode, bool preserveTournament = false)
         {
             foreach (var section in new[] { _workingDeck.main, _workingDeck.extra, _workingDeck.side })
             {
+                if (section == _workingDeck.side)
+                {
+                    if (mode == DeckMainSortMode.Tournament) continue;
+                }
+                else if (preserveTournament && section.SequenceEqual(OrderDeckGroups(section, DeckMainSortMode.Tournament)))
+                    continue;
                 var ordered = OrderDeckGroups(section, mode);
                 if (mode == DeckMainSortMode.Name && section == _workingDeck.main)
                     ordered = ordered.OrderBy(code =>

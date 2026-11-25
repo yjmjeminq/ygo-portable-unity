@@ -32,6 +32,8 @@ namespace YGOPortable.Core
         public bool IsSpell => (type & YgoConstants.TYPE_SPELL) != 0;
         public bool IsTrap => (type & YgoConstants.TYPE_TRAP) != 0;
         public bool IsExtra => (type & YgoConstants.TYPE_EXTRA) != 0;
+        public bool IsFusion => (type & YgoConstants.TYPE_FUSION) != 0;
+        public bool IsSynchro => (type & YgoConstants.TYPE_SYNCHRO) != 0;
         public bool IsLink => (type & YgoConstants.TYPE_LINK) != 0;
         public bool IsXyz => (type & YgoConstants.TYPE_XYZ) != 0;
         public bool IsPendulum => (type & YgoConstants.TYPE_PENDULUM) != 0;
@@ -810,6 +812,7 @@ namespace YGOPortable.Core
             LoadDuelEffectLabels(streamingAssetsPath);
             IndexDeckPrintings();
             _relatedCache.Clear();
+            _quotedCardNames = null;
             _archetypes = null;
             Debug.Log($"[CardDatabase] Loaded {_allCards.Count} KR cards.");
         }
@@ -843,6 +846,22 @@ namespace YGOPortable.Core
         }
 
         private static readonly Dictionary<uint, List<CardInfo>> _relatedCache = new Dictionary<uint, List<CardInfo>>();
+        private static Dictionary<uint, HashSet<string>> _quotedCardNames;
+        private static readonly Regex RelatedNameQuotes = new(
+            @"""(?<name>[^""\r\n]+)""|“(?<name>[^”\r\n]+)”|「(?<name>[^」\r\n]+)」|『(?<name>[^』\r\n]+)』",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        private static readonly HashSet<string> GenericKeywordsBlacklist = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "융합", "퓨전", "싱크로", "엑시즈", "링크", "의식", "펜듈럼", "토큰", "카운터",
+            "마법", "함정", "몬스터", "효과", "턴", "페이즈", "배틀", "메인", "스탠바이", "엔드",
+            "드로우", "필드", "묘지", "패", "덱", "공격력", "수비력", "레벨", "랭크", "스케일",
+            "속성", "종족", "컨트롤러", "오너", "플레이어", "세트", "표시", "소환", "특수 소환", "일반 소환",
+            "반전 소환", "융합 소환", "싱크로 소환", "엑시즈 소환", "링크 소환", "의식 소환", "펜듈럼 소환",
+            "마법 카드", "함정 카드", "몬스터 카드", "배틀 페이즈", "메인 페이즈", "스탠바이 페이즈",
+            "엔드 페이즈", "드로우 페이즈", "엑스트라 덱", "링크 마커", "어둠", "화염",
+            "fusion", "synchro", "xyz", "link", "ritual", "pendulum",
+            "token", "counter", "spell", "trap", "monster", "effect", "turn", "phase", "summon", "special summon",
+        };
 
         public static HashSet<ushort> ExtractSetcodes(ulong setcode)
         {
@@ -866,87 +885,62 @@ namespace YGOPortable.Core
             if (code == 0) return new List<CardInfo>();
             if (_relatedCache.TryGetValue(code, out var cached)) return cached;
 
-            var results = new List<CardInfo>();
             var target = Get(code);
-            if (target == null || _allCards == null) return results;
+            if (target == null || _allCards == null) return new List<CardInfo>();
 
-            string tname = StripRuby(target.name);
-            string tdesc = StripRuby(target.desc);
-            bool snakeEyeFamily = IsSnakeEyeFamily(tname);
+            _quotedCardNames ??= IndexQuotedCardNames();
+            string targetName = StripRuby(target.name);
+            bool snakeEyeFamily = IsSnakeEyeFamily(targetName);
             var targetSetcodes = ExtractSetcodes(target.setcode);
-
-            // Localized card text uses several different quote pairs.
-            var descKeywords = new List<string>();
-            var matches = System.Text.RegularExpressions.Regex.Matches(tdesc, "[\"“「『]([^\"”」』]+)[\"”」』]");
-            foreach (System.Text.RegularExpressions.Match m in matches)
-            {
-                if (m.Groups.Count > 1)
-                {
-                    string term = m.Groups[1].Value.Trim();
-                    if (term.Length >= 2 && !term.EndsWith("효과") && !term.EndsWith("턴") && !term.EndsWith("페이즈"))
-                    {
-                        descKeywords.Add(term);
-                    }
-                }
-            }
+            _quotedCardNames.TryGetValue(code, out var descKeywords);
+            var results = new List<CardInfo>();
+            var family = new List<CardInfo>();
+            var named = new List<CardInfo>();
 
             foreach (var c in _allCards)
             {
                 if (c.code == code || (c.type & YgoConstants.TYPE_TOKEN) != 0) continue;
 
-                // 1. Same archetype / setcode match
-                if (targetSetcodes.Count > 0 && c.setcode != 0)
+                if (targetSetcodes.Count > 0 && c.setcode != 0 && targetSetcodes.Overlaps(ExtractSetcodes(c.setcode)))
                 {
-                    var otherSc = ExtractSetcodes(c.setcode);
-                    if (targetSetcodes.Overlaps(otherSc))
-                    {
-                        results.Add(c);
-                        continue;
-                    }
+                    results.Add(c);
+                    continue;
                 }
 
                 string otherName = StripRuby(c.name);
                 if (snakeEyeFamily && IsSnakeEyeFamily(otherName))
                 {
-                    results.Add(c);
+                    family.Add(c);
                     continue;
                 }
 
-                string otherDesc = c.desc ?? "";
-
-                // 2. Other card mentions target card's exact name
-                if (tname.Length >= 2 && otherDesc.Contains(tname))
-                {
-                    results.Add(c);
-                    continue;
-                }
-
-                // 3. Target card mentions other card's exact name (if meaningful length)
-                if (otherName.Length >= 3 && tdesc.Contains(otherName))
-                {
-                    results.Add(c);
-                    continue;
-                }
-
-                // 4. Target's quoted archetype keyword appears in other card's name
-                bool kwMatch = false;
-                for (int k = 0; k < descKeywords.Count; k++)
-                {
-                    if (otherName.Contains(descKeywords[k]))
-                    {
-                        kwMatch = true;
-                        break;
-                    }
-                }
-                if (kwMatch)
-                {
-                    results.Add(c);
-                    continue;
-                }
+                if (descKeywords?.Contains(otherName) == true ||
+                    (_quotedCardNames.TryGetValue(c.code, out var references) && references.Contains(targetName)))
+                    named.Add(c);
             }
 
+            results.AddRange(family);
+            results.AddRange(named);
             _relatedCache[code] = results;
             return results;
+        }
+
+        private static Dictionary<uint, HashSet<string>> IndexQuotedCardNames()
+        {
+            var index = new Dictionary<uint, HashSet<string>>();
+            foreach (var card in _allCards)
+            {
+                if (string.IsNullOrEmpty(card.desc) || (card.type & YgoConstants.TYPE_TOKEN) != 0) continue;
+                foreach (Match match in RelatedNameQuotes.Matches(card.desc))
+                {
+                    string term = StripRuby(match.Groups["name"].Value);
+                    if (term.Length < 2 || GenericKeywordsBlacklist.Contains(term)) continue;
+                    if (!index.TryGetValue(card.code, out var terms))
+                        index.Add(card.code, terms = new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+                    terms.Add(term);
+                }
+            }
+            return index;
         }
 
         private static bool IsSnakeEyeFamily(string name) =>

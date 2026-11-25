@@ -10,11 +10,9 @@ namespace YGOPortable.UI
     {
         private const int HandTrapFilter = 1;
         private const int BoardBreakerFilter = 2;
+        private const int TunerFilter = 3;
         private static readonly string[] QuickFilterLabels =
             { "전체", "패트랩", "범용 돌파", "튜너", "융합", "싱크로", "엑시즈", "링크" };
-        private static readonly uint[] QuickFilterTypes =
-            { 0, 0, 0, YgoConstants.TYPE_TUNER, YgoConstants.TYPE_FUSION, YgoConstants.TYPE_SYNCHRO,
-                YgoConstants.TYPE_XYZ, YgoConstants.TYPE_LINK };
         private static readonly HashSet<uint> HandTraps = new()
         {
             14558127, 23434538, 10045474, 97268402, 27204311, 94145021, 59438930, 38814750,
@@ -44,6 +42,7 @@ namespace YGOPortable.UI
 
         private void BuildQuickFilters(RectTransform panel, Vector2 left, Vector2 right)
         {
+            BuildExtraSummonFilters(panel, left, right);
             var row = DuelUiKit.CreateRect("QuickFilters", panel, new Vector2(0f, .702f),
                 new Vector2(1f, .757f), left, right);
             DuelUiKit.AddImage(row.gameObject, DuelUiKit.WhiteSprite, DeckEditorStyle.Surface);
@@ -67,20 +66,30 @@ namespace YGOPortable.UI
             _quickFilterButtons = new Button[_quickChips.Length];
             _quickFilterCaptions = new Text[_quickChips.Length];
             float x = 0f;
+            Button previousChip = null, previousSummon = null;
             for (int i = 0; i < _quickChips.Length; i++)
             {
                 var filter = _quickChips[i];
-                float width = filter.label.Length * (_mobileLayout ? 22f : 15f) + 34f;
-                if (_mobileLayout) width = Mathf.Max(width, MobileSafeArea.MinimumTouchSize(row) + 6f);
-                var chip = DuelUiKit.CreateRect($"Chip_{i}", content, Vector2.zero, Vector2.up,
-                    new Vector2(x + 2f, 1f), new Vector2(x + width - 2f, -1f));
+                bool summon = filter.kind == QuickChipKind.Preset && filter.index >= FirstExtraSummonFilter;
+                RectTransform chip;
+                if (summon)
+                    chip = ExtraSummonFilterSlot(filter.index);
+                else
+                {
+                    float width = filter.label.Length * (_mobileLayout ? 22f : 15f) + 34f;
+                    if (_mobileLayout) width = Mathf.Max(width, MobileSafeArea.MinimumTouchSize(row) + 6f);
+                    chip = DuelUiKit.CreateRect($"Chip_{i}", content, Vector2.zero, Vector2.up,
+                        new Vector2(x + 2f, 1f), new Vector2(x + width - 2f, -1f));
+                    x += width;
+                }
+                int fontSize = _mobileLayout ? (summon ? 19 : 22) : 15;
                 var button = DeckEditorStyle.Button(chip, "Button", filter.label, () =>
-                    ToggleQuickFilter(filter.kind, filter.index), _mobileLayout ? 22 : 15);
+                    ToggleQuickFilter(filter.kind, filter.index), fontSize);
                 _quickFilterButtons[i] = button;
                 _quickFilterCaptions[i] = button.GetComponentInChildren<Text>();
-                if (i > 0)
+                var previous = summon ? previousSummon : previousChip;
+                if (previous != null)
                 {
-                    var previous = _quickFilterButtons[i - 1];
                     var navigation = previous.navigation;
                     navigation.mode = Navigation.Mode.Explicit;
                     navigation.selectOnRight = button;
@@ -90,7 +99,8 @@ namespace YGOPortable.UI
                     navigation.selectOnLeft = previous;
                     button.navigation = navigation;
                 }
-                x += width;
+                if (summon) previousSummon = button;
+                else previousChip = button;
             }
             content.sizeDelta = new Vector2(x, 0f);
             content.anchoredPosition = Vector2.zero;
@@ -106,6 +116,7 @@ namespace YGOPortable.UI
             heading.gameObject.SetActive(!typing);
             searchOptions.gameObject.SetActive(!typing);
             _quickFilterScroll.gameObject.SetActive(!typing);
+            _extraSummonFilters.gameObject.SetActive(!typing);
             var searchRow = (RectTransform)_trunkPanel.Find("SearchRow");
             searchRow.anchorMax = Vector2.one;
             searchOptions.anchorMin = new Vector2(.49f, 1f);
@@ -120,11 +131,14 @@ namespace YGOPortable.UI
             PositionFromTop(searchRow, searchTop, searchTop + searchHeight);
             float chipsTop = searchTop + searchHeight + 5f;
             PositionFromTop(chips, chipsTop, chipsTop + chipsHeight);
+            float summonTop = chipsTop + chipsHeight + 4f;
+            float summonBottom = summonTop + chipsHeight;
+            PositionFromTop(_extraSummonFilters, summonTop, summonBottom);
             var list = (RectTransform)_trunkScroll.transform;
             list.anchorMin = new Vector2(0f, 0f);
             list.anchorMax = new Vector2(1f, 1f);
             list.offsetMin = new Vector2(list.offsetMin.x, 10f);
-            list.offsetMax = new Vector2(list.offsetMax.x, -(typing ? chipsTop : chipsTop + chipsHeight + 5f));
+            list.offsetMax = new Vector2(list.offsetMax.x, -(typing ? chipsTop : summonBottom + 5f));
             list.ForceUpdateRectTransforms();
         }
 
@@ -189,7 +203,8 @@ namespace YGOPortable.UI
                 0 => true,
                 HandTrapFilter => HandTraps.Contains(DeckGroupKey(card.code)),
                 BoardBreakerFilter => BoardBreakers.Contains(DeckGroupKey(card.code)),
-                _ => (card.type & QuickFilterTypes[_quickFilter]) != 0,
+                TunerFilter => (card.type & YgoConstants.TYPE_TUNER) != 0,
+                _ => MatchesExtraSummonFilter(card),
             };
         }
     }

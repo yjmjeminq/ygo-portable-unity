@@ -136,6 +136,7 @@ namespace YGOPortable.Editor
                 VerifyCardPrintings(editor, events, streamingPath, Path.Combine(save, "printings"));
                 VerifyOverframeSlots(editor, streamingPath, Path.Combine(save, "overframe"));
                 VerifyArtworkSources(editor, streamingPath, Path.Combine(save, "artwork"));
+                VerifyTournamentSorting(editor, streamingPath, Path.Combine(save, "tournament"));
             }
             finally
             {
@@ -459,13 +460,15 @@ namespace YGOPortable.Editor
             Require(deck.main.SequenceEqual(Reordered(2)),
                 "Reordering within Main split the group instead of moving it together.");
             Call(editor, "TryAddCardToDeck", repeated, DragSourceType.DeckMain, null, null);
-            Require(deck.main.SequenceEqual(Reordered(3)) &&
+            var addedOrder = DeckMainSorter.Order(new[] { other, repeated, repeated, repeated }, DeckMainSortMode.Tournament);
+            Require(deck.main.SequenceEqual(addedOrder) &&
                 TrunkCount(editor, repeated) == "×0", "An added copy did not join its group and consume the last trunk copy.");
             Call(editor, "TryAddCardToDeck", repeated, DragSourceType.DeckMain, null, null);
             Require(deck.main.Count == 4, "The zero trunk balance allowed another copy into the deck.");
 
             Call(editor, "MoveDeckCard", DragSourceType.DeckMain, deck.main.LastIndexOf(repeated), DragSourceType.DeckSide, -1, null);
-            Require(deck.main.SequenceEqual(Reordered(2)) && deck.side.SequenceEqual(new[] { repeated }) &&
+            Require(deck.main.SequenceEqual(DeckMainSorter.Order(new[] { other, repeated, repeated }, DeckMainSortMode.Tournament)) &&
+                deck.side.SequenceEqual(new[] { repeated }) &&
                 TrunkCount(editor, repeated) == "×0", "Moving one copy to Side changed the total available in the trunk.");
             Call(editor, "RemoveDeckCard", DragSourceType.DeckSide, 0, null);
             Require(TrunkCount(editor, repeated) == "×1" &&
@@ -634,7 +637,8 @@ namespace YGOPortable.Editor
             IEnumerable<uint> ExpectedGroup(uint primary, uint alternate, uint remaining, bool extraCopy = false)
             {
                 var copies = extraCopy ? new[] { primary, alternate, alternate } : new[] { primary, alternate };
-                return DeckMainSorter.Order(new[] { primary, remaining }, DeckMainSortMode.Frame)[0] == primary
+                var mode = extraCopy ? DeckMainSortMode.Tournament : DeckMainSortMode.Frame;
+                return DeckMainSorter.Order(new[] { primary, remaining }, mode)[0] == primary
                     ? copies.Append(remaining) : copies.Prepend(remaining);
             }
             Require(deck.main.SequenceEqual(ExpectedGroup(blueEyes, blueEyesArt, other)) &&
@@ -956,6 +960,81 @@ namespace YGOPortable.Editor
             Require(!overlay.activeSelf && deck.side.Select(CardDatabase.GetName).SequenceEqual(
                 deck.side.Select(CardDatabase.GetName).OrderBy(name => name, StringComparer.Ordinal)),
                 "The original whole-deck sort did not remain available.");
+        }
+
+        private static void VerifyTournamentSorting(DeckEditorUI editor, string streaming, string save)
+        {
+            const uint normal = 49003308, fusion = 11321089, synchro = 53325667;
+            // Each pair is in Korean name order, with a higher level, rank or Link rating second.
+            uint[] main = { normal, normal, 49888191, 12423762, 67120578, 90844184, 49064413, 77511331, 32872239,
+                21831848, 17494901, 82052602, 48653261, 75956913, 8025950, 90673413, 1118137, 56594520, 3875465,
+                78577570, 94377247, 64283880, 33622465, 60621361, 50277973, 9591819, 92080692 };
+            uint[] extra = { fusion, fusion, 42166000, synchro, 49816630, 12014404, 77799846, 78437364, 30286474 };
+            uint[] side = { 44095762, 83764718, synchro };
+            Require(DeckMainSorter.Order(main.Reverse(), DeckMainSortMode.Tournament).SequenceEqual(main) &&
+                DeckMainSorter.Order(extra.Reverse(), DeckMainSortMode.Tournament).SequenceEqual(extra),
+                "Tournament sorting did not follow the specified buckets and name order.");
+
+            bool openDecks = CollectionProgress.AllDeckCardsAvailable;
+            editor.Close();
+            DeckRepository.Load(streaming, save, seedDefaultDecks: false);
+            CollectionProgress.AllDeckCardsAvailable = true;
+            try
+            {
+                var initial = new UserDeck
+                {
+                    name = "Tournament test",
+                    main = main.Skip(1).Reverse().ToList(),
+                    extra = extra.Where(code => code != fusion && code != synchro).Reverse().ToList(),
+                    side = side.ToList(),
+                };
+                var marked = new DeckCardAppearance { destinyDraw = true };
+                var artwork = new DeckCardAppearance { artwork = 1 };
+                initial.SetAppearance(initial.main, initial.main.IndexOf(normal), marked);
+                initial.SetAppearance(initial.side, initial.side.IndexOf(synchro), artwork);
+                DeckRepository.SaveUserDeck(initial);
+                OpenSavedDeck(editor);
+                var deck = Field<UserDeck>(editor, "_workingDeck");
+                Call(editor, "TryAddCardToDeck", normal, DragSourceType.DeckMain, null, null);
+                Require(deck.main.SequenceEqual(main) && deck.GetAppearance(deck.main, 0).Equals(marked) &&
+                    deck.GetAppearance(deck.main, 1).IsDefault,
+                    "Inserting one copy did not sort Main or preserve the marked copy.");
+                Call(editor, "AddDeckCopies", fusion, DragSourceType.DeckExtra, 2, null, null);
+                Require(deck.extra.SequenceEqual(extra.Where(code => code != synchro)),
+                    "Adding several copies did not place them together in the Extra Deck.");
+                var extraGrid = Field<RectTransform>(editor, "_extraGridRect");
+                Canvas.ForceUpdateCanvases();
+                Call(editor, "HandleCardDrop", new DragContext
+                {
+                    SourceType = DragSourceType.DeckSide,
+                    SourceIndex = deck.side.IndexOf(synchro),
+                    CardCode = synchro,
+                    DropPosition = RectTransformUtility.WorldToScreenPoint(null, extraGrid.TransformPoint(extraGrid.rect.center)),
+                });
+                Require(deck.extra.SequenceEqual(extra) && deck.GetAppearance(deck.extra, Array.IndexOf(extra, synchro)).Equals(artwork),
+                    "Moving from Side landed at the wrong position or lost its artwork.");
+
+                deck.ReorderCards(deck.main, deck.main.AsEnumerable().Reverse());
+                deck.ReorderCards(deck.extra, deck.extra.AsEnumerable().Reverse());
+                var sideBefore = deck.side.ToArray();
+                Call(editor, "RefreshDeckGrids");
+                Field<Button>(editor, "_wholeSortButton").onClick.Invoke();
+                Field<Button[]>(editor, "_wholeSortOptions").Single(button =>
+                    button.GetComponentInChildren<Text>().text == "공식 대회식 정렬").onClick.Invoke();
+                Require(deck.main.SequenceEqual(main) && deck.extra.SequenceEqual(extra) && deck.side.SequenceEqual(sideBefore),
+                    "The tournament menu did not sort Main and Extra together.");
+                Require((bool)CallResult(editor, "TrySaveCurrentDeck"), "The tournament deck could not be saved.");
+                editor.Close();
+                DeckRepository.Load(streaming, save, seedDefaultDecks: false);
+                OpenSavedDeck(editor);
+                var reloaded = Field<UserDeck>(editor, "_workingDeck");
+                Require(reloaded.main.SequenceEqual(main) && reloaded.extra.SequenceEqual(extra) &&
+                    reloaded.GetAppearance(reloaded.main, 0).Equals(marked) &&
+                    reloaded.GetAppearance(reloaded.extra, Array.IndexOf(extra, synchro)).Equals(artwork),
+                    "Tournament order or card appearances changed after saving and reopening.");
+            }
+            finally { CollectionProgress.AllDeckCardsAvailable = openDecks; }
+            Debug.Log("[VERIFY TOURNAMENT SORT] Category and name order, batch copies, zone transfer, menu, and save/load passed.");
         }
 
         private static void VerifyTouchDeckMenu(DeckEditorUI editor, EventSystem events)

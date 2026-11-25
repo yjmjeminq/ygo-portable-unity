@@ -52,7 +52,7 @@ namespace YGOPortable.UI
             _deckShortageButton = DeckButton(root, "DeckShortages", "", .153f, 0f, .277f, 1f,
                 OpenDeckShortages, fontSize: 21);
             _mobileToolbar = DeckArea(root, "MobileToolbar", .28f, 0f, .985f, 1f);
-            DeckButton(_mobileToolbar, "AutoSort", "자동 정렬", .02f, 0f, .215f, 1f, () => SortWorkingDeck(byFrame: true), fontSize: 24);
+            DeckButton(_mobileToolbar, "AutoSort", "자동 정렬", .02f, 0f, .215f, 1f, () => SortWorkingDeck(), fontSize: 24);
             _openDrawButton = DeckButton(_mobileToolbar, "TestDraw", "5장 테스트 드로우", .227f, 0f, .504f, 1f,
                 OpenTestDraw, fontSize: 24);
             _saveButtonText = DeckButton(_mobileToolbar, "Save", "저장", .516f, 0f, .716f, 1f,

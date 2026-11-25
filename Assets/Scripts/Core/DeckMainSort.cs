@@ -12,6 +12,7 @@ namespace YGOPortable.Core
         Defense,
         Level,
         Auto,
+        Tournament,
     }
 
     public static class DeckMainSorter
@@ -24,6 +25,7 @@ namespace YGOPortable.Core
                 DeckMainSortMode.Auto => entries.OrderBy(entry => AutoOrder(entry.Card))
                     .ThenByDescending(entry => Level(entry.Card))
                     .ThenByDescending(entry => Attack(entry.Card)),
+                DeckMainSortMode.Tournament => entries.OrderBy(entry => TournamentOrder(entry.Card)),
                 DeckMainSortMode.Frame => entries.OrderBy(entry => FrameOrder(entry.Card)),
                 DeckMainSortMode.Attack => entries.OrderByDescending(entry => Attack(entry.Card)),
                 DeckMainSortMode.Defense => entries.OrderByDescending(entry => Defense(entry.Card)),
@@ -41,27 +43,50 @@ namespace YGOPortable.Core
         private static int AutoOrder(CardInfo card)
         {
             if (card == null) return int.MaxValue;
-            uint type = card.type;
-            if (card.IsExtra)
-            {
-                if ((type & YgoConstants.TYPE_FUSION) != 0) return 20;
-                if ((type & YgoConstants.TYPE_SYNCHRO) != 0) return 21;
-                if (card.IsXyz) return 22;
-                return 23;
-            }
+            if (card.IsExtra) return ExtraOrder(card);
             if (card.IsMonster) return 0;
-            if (card.IsSpell)
+            return card.IsSpell ? 1 + SpellOrder(card) : 7 + TrapOrder(card);
+        }
+
+        private static int TournamentOrder(CardInfo card)
+        {
+            if (card == null) return int.MaxValue;
+            if (card.IsExtra) return ExtraOrder(card);
+            if (card.IsMonster)
             {
-                if ((type & YgoConstants.TYPE_QUICKPLAY) != 0) return 2;
-                if ((type & YgoConstants.TYPE_CONTINUOUS) != 0) return 3;
-                if ((type & YgoConstants.TYPE_EQUIP) != 0) return 4;
-                if ((type & YgoConstants.TYPE_FIELD) != 0) return 5;
-                if ((type & YgoConstants.TYPE_RITUAL) != 0) return 6;
-                return 1;
+                if (card.IsPendulum) return 18;
+                if ((card.type & YgoConstants.TYPE_RITUAL) != 0) return 15;
+                return (card.type & YgoConstants.TYPE_NORMAL) != 0 ? 0 : 10;
             }
-            if ((type & YgoConstants.TYPE_CONTINUOUS) != 0) return 8;
-            if ((type & YgoConstants.TYPE_COUNTER) != 0) return 9;
-            return 7;
+            if (card.IsSpell) return 30 + SpellOrder(card);
+            if (card.IsTrap) return 40 + TrapOrder(card);
+            return int.MaxValue;
+        }
+
+        private static int ExtraOrder(CardInfo card)
+        {
+            if (card.IsFusion) return 20;
+            if (card.IsSynchro) return 21;
+            if (card.IsXyz) return 22;
+            return 23;
+        }
+
+        private static int SpellOrder(CardInfo card)
+        {
+            uint type = card.type;
+            if ((type & YgoConstants.TYPE_QUICKPLAY) != 0) return 1;
+            if ((type & YgoConstants.TYPE_CONTINUOUS) != 0) return 2;
+            if ((type & YgoConstants.TYPE_EQUIP) != 0) return 3;
+            if ((type & YgoConstants.TYPE_FIELD) != 0) return 4;
+            if ((type & YgoConstants.TYPE_RITUAL) != 0) return 5;
+            return 0;
+        }
+
+        private static int TrapOrder(CardInfo card)
+        {
+            if ((card.type & YgoConstants.TYPE_CONTINUOUS) != 0) return 1;
+            if ((card.type & YgoConstants.TYPE_COUNTER) != 0) return 2;
+            return 0;
         }
 
         private static int? Attack(CardInfo card) => card?.IsMonster == true && card.atk >= 0 ? card.atk : null;

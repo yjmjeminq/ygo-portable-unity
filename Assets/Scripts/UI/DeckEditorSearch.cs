@@ -108,6 +108,35 @@ namespace YGOPortable.UI
         private RectTransform _effectTextEditor;
         private Facet _activeFacet;
 
+        private const int FirstExtraSummonFilter = 4;
+        private const int ExtraSummonFilterCount = 4;
+        private RectTransform _extraSummonFilters;
+
+        private void BuildExtraSummonFilters(RectTransform panel, Vector2 left, Vector2 right)
+        {
+            _extraSummonFilters = DuelUiKit.CreateRect("ExtraSummonFilters", panel, new Vector2(0f, .641f),
+                new Vector2(1f, .696f), left, right);
+            DuelUiKit.AddImage(_extraSummonFilters.gameObject, DuelUiKit.WhiteSprite, DeckEditorStyle.Surface);
+        }
+
+        private RectTransform ExtraSummonFilterSlot(int index)
+        {
+            int column = index - FirstExtraSummonFilter;
+            return DuelUiKit.CreateRect($"SummonMethod_{column}", _extraSummonFilters,
+                new Vector2((float)column / ExtraSummonFilterCount, 0f),
+                new Vector2((float)(column + 1) / ExtraSummonFilterCount, 1f),
+                new Vector2(2f, 1f), new Vector2(-2f, -1f));
+        }
+
+        private bool MatchesExtraSummonFilter(CardInfo card) => (_quickFilter - FirstExtraSummonFilter) switch
+        {
+            0 => card.IsFusion,
+            1 => card.IsSynchro,
+            2 => card.IsXyz,
+            3 => card.IsLink,
+            _ => false,
+        };
+
         private void BuildDetailedSearch(Transform parent)
         {
             var panel = DuelUiKit.CreateRect("TrunkFilterPanel", parent, _deckPanel.anchorMin, _deckPanel.anchorMax,

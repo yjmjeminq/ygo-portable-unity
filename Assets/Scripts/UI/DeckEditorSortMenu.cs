@@ -10,6 +10,7 @@ namespace YGOPortable.UI
 {
     public partial class DeckEditorUI
     {
+        private const string TournamentSortLabel = "공식 대회식 정렬";
         private static readonly (DeckMainSortMode Mode, string Label)[] MainSortOptions =
         {
             (DeckMainSortMode.Frame, "카드 프레임별"),
@@ -17,6 +18,7 @@ namespace YGOPortable.UI
             (DeckMainSortMode.Attack, "공격력 높은 순"),
             (DeckMainSortMode.Defense, "수비력 높은 순"),
             (DeckMainSortMode.Level, "레벨·랭크·링크 높은 순"),
+            (DeckMainSortMode.Tournament, TournamentSortLabel),
         };
 
         private GameObject _mainSortMenu;
@@ -25,7 +27,7 @@ namespace YGOPortable.UI
         private Button _wholeSortButton;
         private Text _deckSortTitle;
         private readonly Button[] _mainSortOptions = new Button[MainSortOptions.Length];
-        private readonly Button[] _wholeSortOptions = new Button[2];
+        private readonly Button[] _wholeSortOptions = new Button[3];
         private int _lastMainSort;
         private int _lastWholeSort = 1;
         private bool _sortingWholeDeck;
@@ -62,15 +64,17 @@ namespace YGOPortable.UI
             for (int index = 0; index < MainSortOptions.Length; index++)
             {
                 int choice = index;
-                float top = .813f - index * .123f;
-                var row = SortMenuRow(menu, $"Order_{index}", top - .103f, top);
+                float top = .813f - index * .102f;
+                var row = SortMenuRow(menu, $"Order_{index}", top - .087f, top);
                 _mainSortOptions[index] = DeckEditorStyle.Button(row, "Button", MainSortOptions[index].Label,
                     () => ChooseMainSort(choice), 17);
             }
             _wholeSortOptions[0] = DeckEditorStyle.Button(SortMenuRow(menu, "WholeDefault", .640f, .767f),
-                "Button", "종류·이름순", () => ChooseWholeSort(byFrame: false), 17);
+                "Button", "종류·이름순", () => ChooseWholeSort(0, DeckMainSortMode.Name), 17);
             _wholeSortOptions[1] = DeckEditorStyle.Button(SortMenuRow(menu, "WholeFrame", .465f, .592f),
-                "Button", "카드 프레임별", () => ChooseWholeSort(byFrame: true), 17);
+                "Button", "카드 프레임별", () => ChooseWholeSort(1, DeckMainSortMode.Frame), 17);
+            _wholeSortOptions[2] = DeckEditorStyle.Button(SortMenuRow(menu, "Tournament", .290f, .417f),
+                "Button", TournamentSortLabel, () => ChooseWholeSort(2, DeckMainSortMode.Tournament), 17);
             var cancel = SortMenuRow(menu, "Cancel", .075f, .182f);
             DeckEditorStyle.Button(cancel, "Button", "취소", () => CloseMainDeckSort(), 16);
             _mainSortMenu.SetActive(false);
@@ -128,23 +132,32 @@ namespace YGOPortable.UI
             if (!_mainSortMenu.activeSelf) return;
             _lastMainSort = index;
             var (mode, label) = MainSortOptions[index];
+            if (mode == DeckMainSortMode.Tournament)
+            {
+                SortWorkingDeck(mode);
+                CloseMainDeckSort();
+                return;
+            }
             SortMainDeck(mode);
             CloseMainDeckSort();
             ShowToast($"메인 덱 정렬 · {label}");
         }
 
-        private void ChooseWholeSort(bool byFrame)
+        private void ChooseWholeSort(int index, DeckMainSortMode mode)
         {
             if (!_mainSortMenu.activeSelf) return;
-            _lastWholeSort = byFrame ? 1 : 0;
-            SortWorkingDeck(byFrame, byName: !byFrame);
+            _lastWholeSort = index;
+            SortWorkingDeck(mode);
             CloseMainDeckSort();
         }
 
-        private static uint[] OrderDeckGroups(IEnumerable<uint> cards, DeckMainSortMode mode)
+        private static uint[] OrderDeckGroups(IReadOnlyList<uint> cards, DeckMainSortMode mode) =>
+            OrderDeckGroupIndices(cards, mode).Select(index => cards[index]).ToArray();
+
+        private static int[] OrderDeckGroupIndices(IReadOnlyList<uint> cards, DeckMainSortMode mode)
         {
-            var groups = cards.GroupBy(DeckGroupKey).ToDictionary(group => group.Key);
-            return DeckMainSorter.Order(groups.Keys, mode).SelectMany(key => groups[key]).ToArray();
+            var groups = Enumerable.Range(0, cards.Count).ToLookup(index => DeckGroupKey(cards[index]));
+            return DeckMainSorter.Order(groups.Select(group => group.Key), mode).SelectMany(key => groups[key]).ToArray();
         }
 
         private void SortMainDeck(DeckMainSortMode mode)

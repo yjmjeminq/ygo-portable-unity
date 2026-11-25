@@ -164,12 +164,28 @@ namespace YGOPortable.Editor
         private static void VerifyQuickSearch(DeckEditorUI editor)
         {
             var trunk = Field<List<CardInfo>>(editor, "_trunkResults");
+            var quotes = (System.Text.RegularExpressions.Regex)typeof(CardDatabase)
+                .GetField("RelatedNameQuotes", BindingFlags.NonPublic | BindingFlags.Static).GetValue(null);
+            Require(quotes.Matches("\"가디언 키메라\" 「블랙 매지션」 『영원의 혼』 “흑의 마도진”")
+                .Cast<System.Text.RegularExpressions.Match>().Select(match => match.Groups["name"].Value)
+                .SequenceEqual(new[] { "가디언 키메라", "블랙 매지션", "영원의 혼", "흑의 마도진" }),
+                "Straight, Korean and curly quote pairs did not capture full card names.");
             var inspector = editor.Root.transform.Find("Editor/CardDetails");
             Call(editor, "InspectCard", Magician);
             inspector.Find("RelatedCards/Button").GetComponent<Button>().onClick.Invoke();
             Require(new[] { Magician, 47222536u, 48680970u, DragonKnight }.All(
                 code => trunk.Any(card => CardDatabase.GetDeckPrintingKey(card.code) == code)),
                 "Dark Magician scope missed its spell, trap or fusion support.");
+            Require(trunk.All(card => card.code != 42006475 && card.code != 49702428) &&
+                trunk.FindIndex(card => card.code == DragonKnight) < trunk.FindIndex(card => card.code == 48680970),
+                "A quoted longer name matched Dark Magician or a quoted match ranked before the same setcode.");
+            Call(editor, "FilterRelatedCards", 11321089u);
+            Require(trunk.Any(card => card.code == 11321089) &&
+                trunk.All(card => card.code is not (24094653 or 44362883 or 1845204)),
+                "A generic quoted Fusion term contaminated Guardian Chimera's related cards.");
+            Require(CardDatabase.GetRelatedCards(48680970).Any(card => card.code == Magician) &&
+                CardDatabase.GetRelatedCards(19652159).All(card => card.code != 59197169),
+                "A forward exact quote was missed, or a quoted attribute matched an unrelated field spell.");
             Call(editor, "FilterRelatedCards", Excel);
             Require(new[] { Excel, Diabellstar, 89023486u, 80845034u, 45663742u }.All(
                 code => trunk.Any(card => CardDatabase.GetDeckPrintingKey(card.code) == code)),
@@ -192,12 +208,15 @@ namespace YGOPortable.Editor
                     $"Quick type filter {i} returned incorrect card types.");
             }
 
-            var strip = chips[0].GetComponentInParent<ScrollRect>();
+            VerifyExtraSummonBar(editor, chips);
             var pad = Field<DeckPadUi>(editor, "_padUi");
-            strip.horizontalNormalizedPosition = 0f;
-            pad.FocusInScope(editor.Root.transform, chips[^1]);
-            Canvas.ForceUpdateCanvases();
-            Require(strip.horizontalNormalizedPosition > 0f, "Controller focus did not reveal a clipped filter chip.");
+            pad.FocusInScope(editor.Root.transform, chips[4]);
+            pad.Handle(editor.Root.transform, Vector2Int.right, false, false, null);
+            Require(EventSystem.current.currentSelectedGameObject == chips[5].gameObject,
+                "The controller could not move across the summon filters.");
+            pad.Handle(editor.Root.transform, Vector2Int.zero, true, false, null);
+            Require(trunk.Count > 0 && trunk.All(card => card.IsSynchro),
+                "Controller submit did not apply the visible summon filter.");
             Call(editor, "ResetTrunkFilters");
 
             var trunkPanel = Field<RectTransform>(editor, "_trunkPanel");
@@ -209,6 +228,38 @@ namespace YGOPortable.Editor
                 view.transform.Find("AspectBox/Regulation") == null,
                 "The trunk still showed an OCG reference block.");
             Call(editor, "ResetTrunkFilters");
+        }
+
+        private static void VerifyExtraSummonBar(DeckEditorUI editor, Button[] chips)
+        {
+            var bar = Field<RectTransform>(editor, "_extraSummonFilters");
+            var results = Field<List<CardInfo>>(editor, "_trunkResults");
+            Canvas.ForceUpdateCanvases();
+            var methods = chips.Skip(4).Take(4).ToArray();
+            Require(methods.Select(button => button.GetComponentInChildren<Text>().text.TrimStart('•', ' '))
+                .SequenceEqual(new[] { "융합", "싱크로", "엑시즈", "링크" }), "Summon filter order changed.");
+            var selectors = new Func<CardInfo, bool>[] { card => card.IsFusion, card => card.IsSynchro,
+                card => card.IsXyz, card => card.IsLink };
+            double slowest = 0;
+            Call(editor, "ResetTrunkFilters");
+            for (int index = 0; index < methods.Length; index++)
+            {
+                var button = methods[index];
+                var bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(bar, button.transform);
+                Require(button.gameObject.activeInHierarchy && button.transform.IsChildOf(bar) &&
+                    bounds.min.x >= bar.rect.xMin - .1f && bounds.max.x <= bar.rect.xMax + .1f &&
+                    bounds.min.y >= bar.rect.yMin - .1f && bounds.max.y <= bar.rect.yMax + .1f,
+                    "A summon filter was clipped or required horizontal scrolling.");
+                var watch = System.Diagnostics.Stopwatch.StartNew();
+                button.onClick.Invoke();
+                watch.Stop();
+                slowest = Math.Max(slowest, watch.Elapsed.TotalMilliseconds);
+                Require(results.Count > 0 && results.All(selectors[index]),
+                    "An Extra Deck summon button left mixed summon methods in the results.");
+            }
+            Require(slowest < 1000, $"A summon filter took {slowest:F0} ms.");
+            Call(editor, "ResetTrunkFilters");
+            Debug.Log($"[VERIFY SUMMON FILTER BAR] Four visible methods refreshed the trunk within {slowest:F0} ms.");
         }
 
         private static void VerifyQuantitiesAndSort(DeckEditorUI editor)
@@ -486,6 +537,7 @@ namespace YGOPortable.Editor
             Require(deckPane.gameObject.activeInHierarchy && trunkPane.gameObject.activeInHierarchy,
                 "Removing a card hid one of the two panes.");
             var chips = Field<Button[]>(editor, "_quickFilterButtons");
+            VerifyExtraSummonBar(editor, chips);
             Button Chip(string label) => chips.Single(button => button.GetComponentInChildren<Text>().text.TrimStart('•', ' ') == label);
             var results = Field<List<CardInfo>>(editor, "_trunkResults");
             Chip("마법").onClick.Invoke();
@@ -572,7 +624,7 @@ namespace YGOPortable.Editor
             panel.Find("Related/Button").GetComponent<Button>().onClick.Invoke();
             Require(Field<uint>(editor, "_relatedFilterCode") == Magician && trunkPane.gameObject.activeInHierarchy &&
                 deckPane.gameObject.activeInHierarchy && results.Any(card => card.code == DragonKnight) &&
-                Field<Text>(editor, "_mobileTrunkSort").text == "카드 프레임별",
+                Field<Text>(editor, "_mobileTrunkSort").text == "기본순",
                 "Related-card search did not filter the trunk while leaving the deck visible.");
 
             deck.main.Clear();
@@ -580,6 +632,12 @@ namespace YGOPortable.Editor
             var expected = DeckMainSorter.Order(deck.main, DeckMainSortMode.Frame);
             root.Find("MobileToolbar/AutoSort/Button").GetComponent<Button>().onClick.Invoke();
             Require(deck.main.SequenceEqual(expected), "The top autosort did not order cards by frame.");
+            var wholeSort = Field<Button>(editor, "_wholeSortButton");
+            Require(wholeSort.gameObject.activeInHierarchy, "Mobile did not expose the sort menu.");
+            wholeSort.onClick.Invoke();
+            Field<Button[]>(editor, "_wholeSortOptions")[2].onClick.Invoke();
+            Require(deck.main.SequenceEqual(DeckMainSorter.Order(expected, DeckMainSortMode.Tournament)),
+                "Mobile did not apply the tournament sort.");
             root.Find("MobileToolbar/Save/Button").GetComponent<Button>().onClick.Invoke();
             Require(!(bool)Call(editor, "HasUnsavedChanges"), "The top save button did not persist the edited deck.");
             Field<Button>(editor, "_openDrawButton").onClick.Invoke();
