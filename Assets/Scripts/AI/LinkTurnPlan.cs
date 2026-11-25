@@ -27,6 +27,7 @@ namespace YGOPortable.AI
         private const uint ProxyDragon = 22862454;
         private const uint DecodeTalker = 1861629;
         private const uint EncodeTalker = 6622715;
+        internal const uint CynetCodec = 60018643, MathmechSigma = 27182739, TranscodeTalker = 46947713;
         private const int LinkMaterial = 533;
 
         internal static int? ChooseIdle(DuelSession session, DuelPrompt prompt, Func<int, SelectableCardItem, bool> canUse)

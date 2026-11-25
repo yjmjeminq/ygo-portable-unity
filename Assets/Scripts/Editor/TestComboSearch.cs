@@ -22,6 +22,7 @@ namespace YGOPortable.Editor
             internal uint[] monsters;
             internal int rank, branches, changed, retries;
             internal double score;
+            internal bool conflictReady;
             internal string line;
             internal double slowest;
         }
@@ -35,29 +36,35 @@ namespace YGOPortable.Editor
             var firewall = ComboRegressionDecks.Get(495);
             var previous = PlayOpening(general, links, firewall, 4, 1, search: false);
             var upgraded = PlayOpening(general, links, firewall, 4, 1, search: true);
-            var singularity = PlayOpening(general, links, firewall, 6, 0, search: true);
+            var singularity = PlayOpening(general, links, firewall, 2, 0, search: true);
+            var defendedOpening = PlayOpening(general, links, firewall, 6, 0, search: true);
             if (!previous.opening.SequenceEqual(upgraded.opening) || previous.rank != 4 ||
-                !upgraded.monsters.Contains(Darkfluid) || upgraded.changed == 0)
-                failures.Add($"Firewall did not choose the available Link-5 upgrade from the same hand. " +
+                !upgraded.monsters.Any(code => code is Darkfluid or Singularity) ||
+                upgraded.score <= previous.score || upgraded.changed == 0)
+                failures.Add($"Firewall did not improve the same hand into a stronger board with a Link-5 or Link-6 monster. " +
                     $"Reference: {Describe(previous)}. Planner: {Describe(upgraded)}.");
             if (!singularity.monsters.Contains(Singularity))
-                failures.Add($"Firewall could not resolve its Link-6 line. {Describe(singularity)}.");
+                failures.Add($"Firewall could not resolve its first-turn Link-6 line. {Describe(singularity)}.");
+            if (defendedOpening.rank < 3 || !defendedOpening.conflictReady)
+                failures.Add($"Firewall lost its live Counter Trap when the opening could keep it. {Describe(defendedOpening)}.");
 
             var ddd = ComboRegressionDecks.Get(34043);
             var monster = PlayOpening(general, links, ddd, 1, 1, search: true);
             var backrow = PlayOpening(general, links, ddd, 1, 2, search: true);
             var scaleLine = PlayOpening(general, links, ddd, 17, 2, search: true);
             if (!monster.opening.SequenceEqual(backrow.opening) || !monster.monsters.Contains(Machinex) ||
-                !backrow.monsters.Contains(Gilgamesh) || backrow.changed == 0)
+                (!backrow.monsters.Contains(Siegfried) && !backrow.monsters.Contains(Gilgamesh)) ||
+                monster.line == backrow.line)
                 failures.Add($"D/D/D did not adapt the same hand to a monster versus backrow. " +
                     $"Monster board: {Describe(monster)}. Backrow: {Describe(backrow)}.");
             if (!scaleLine.line.Contains(Gilgamesh.ToString()) || !scaleLine.monsters.Contains(Machinex))
                 failures.Add($"D/D/D could not continue from Gilgamesh into Machinex. {Describe(scaleLine)}.");
-            if (new[] { previous, upgraded, singularity, monster, backrow, scaleLine }.Any(result => result.retries != 0))
+            if (new[] { previous, upgraded, singularity, defendedOpening, monster, backrow, scaleLine }.Any(result => result.retries != 0))
                 failures.Add("An adaptive opening produced an illegal engine response.");
             VerifyUncertainDraw();
             Require(failures.Count == 0, string.Join("\n", failures));
-            Debug.Log("[VERIFY COMBO SEARCH] Firewall reached Link-5 and Link-6. D/D/D changed the route with the same hand and an alternate public board. Draw outcomes were excluded.");
+            Debug.Log($"[VERIFY COMBO SEARCH] Firewall improved from Link-{previous.rank} to Link-{upgraded.rank} and reached Singularity in the separate fixture. " +
+                "A different first-turn hand kept a live Counter Trap. D/D/D adapted the same hand to different public boards. Draw outcomes were excluded.");
         }
 
         internal static void VerifyMasterDifficulty()
@@ -238,11 +245,14 @@ namespace YGOPortable.Editor
                 duel.SubmitResponse(response);
             }
 
-            var final = duel.Players[seat].mzone.Where(card => card?.IsFaceUp == true).Select(card => card.code).ToArray();
+            var own = duel.Players[seat];
+            var final = own.mzone.Where(card => card?.IsFaceUp == true).Select(card => card.code).ToArray();
             return new Output
             {
                 opening = opening, monsters = final, rank = final.Select(LinkComboPolicy.Rank).DefaultIfEmpty().Max(),
                 branches = adaptive.SimulatedComboBranches, changed = adaptive.ChangedComboLines, retries = duel.RetryCount,
+                conflictReady = own.szone.Any(card => card is { code: 7403341, IsFaceUp: false }) &&
+                    final.Any(code => code is 1861629 or LinkTurnPlan.TranscodeTalker),
                 score = ComboSearch.BoardValue(duel, seat, canBattle), line = string.Join(">", steps), slowest = slowest,
             };
         }

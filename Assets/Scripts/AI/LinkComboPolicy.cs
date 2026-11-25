@@ -228,7 +228,8 @@ namespace YGOPortable.AI
             return choices != null && (uint)index < (uint)choices.Count ? choices[index] : null;
         }
 
-        internal int? Choose(DuelSession session, DuelPrompt prompt, Func<int, SelectableCardItem, bool> canUse)
+        internal int? Choose(DuelSession session, DuelPrompt prompt, Func<int, SelectableCardItem, bool> canUse,
+            bool projecting = false)
         {
             // DuelSession maps the player who started the duel to engine seat 0.
             var weights = WeightsFor(goingSecond: prompt.playerId == 1);
@@ -238,6 +239,9 @@ namespace YGOPortable.AI
             var field = own.mzone.Where(card => card?.IsFaceUp == true).ToArray();
             int highest = field.Length == 0 ? 0 : field.Max(card => Rank(card.code));
             bool hasOpposition = rival.mzone.Any(card => card != null);
+            bool canClimbAfterRevival = projecting && own.extra.Any(card => Rank(card.code) >= 5) &&
+                own.grave.Any(card => Rank(card.code) is >= 1 and <= 3 &&
+                    CardDatabase.Get(card.code)?.race == YgoConstants.RACE_CYBERSE);
             if (prompt.canBp && !hasOpposition && field.Where(card => card.IsAttack).Sum(card => Math.Max(0, card.attack)) >= rival.lp)
                 return 6;
 
@@ -275,6 +279,8 @@ namespace YGOPortable.AI
                         int rank = (int)card.level;
                         score = Weight(rank >= 3 ? Feature.Boss : Feature.SmallLink) + rank * Weight(Feature.Rating);
                         if (IsBridge(item.code)) score += Weight(Feature.Bridge);
+                        if (canClimbAfterRevival && item.code == LinkTurnPlan.TranscodeTalker)
+                            score += Weight(Feature.Extend) + Weight(Feature.Bridge);
                         if (rank >= 3 && IsInteractive(card)) score += Weight(Feature.Interaction);
                         if (highest >= 3 && rank <= highest) score += Weight(Feature.SpendStrongLink);
                         score += Math.Max(0, card.atk) / 15000f;
@@ -370,6 +376,9 @@ namespace YGOPortable.AI
 
             return (link.code, prompt.SelectionHint) switch
             {
+                // Codec can find a hand material instead of a body that needs another Normal Summon.
+                (LinkTurnPlan.CynetCodec, DuelTactics.AddToHand) =>
+                    First(2347477, 30114823, 75130221, 77189532),
                 // Blue Tang sends a body that Blue Slug can return, then Sea Horse can summon itself.
                 (91953000, DuelTactics.SendToGrave) => InHand(36492575) ? First(21057444, 28174796) : First(36492575, 21057444),
                 (43735670, 506) => InHand(36492575) ? First(21057444, 91953000, 36492575) : First(36492575, 21057444, 91953000),

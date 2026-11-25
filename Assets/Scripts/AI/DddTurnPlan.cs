@@ -140,6 +140,39 @@ namespace YGOPortable.AI
             _ => 0,
         };
 
+        internal static int? ChooseScalesAgainstBackrow(DuelSession session, DuelPrompt prompt,
+            Func<int, SelectableCardItem, bool> canUse)
+        {
+            if (session.CurrentPhase != YgoConstants.PHASE_MAIN1 || session.TurnPlayer != prompt.playerId) return null;
+            var own = session.Players[prompt.playerId];
+            var rival = session.Players[1 - prompt.playerId];
+            if (!NeedsScalesAgainstBackrow(own, rival) ||
+                own.mzone.Any(card => card?.code == Gilgamesh) ||
+                !(own.hand.Any(card => IsLevelMonster(card.code) && CardDatabase.Get(card.code)?.IsPendulum == true) ||
+                    own.mzone.Any(card => card?.IsFaceUp == true && CardDatabase.Get(card.code)?.IsPendulum == true)))
+                return null;
+            // Scales leave a way to rebuild if the opponent answers the first attackers with set cards.
+            int index = prompt.spSummonable.FindIndex(item => item.code == Gilgamesh && item.controller == prompt.playerId &&
+                canUse(SpecialSummon, item));
+            return index < 0 ? null : (index << 16) | SpecialSummon;
+        }
+
+        internal static bool ReserveScalesForGilgamesh(DuelSession session, DuelPrompt prompt, SelectableCardItem effect)
+        {
+            if (effect.description != PlacePendulumScale || !IsSet(effect.code, DdSet)) return false;
+            var own = session.Players[prompt.playerId];
+            if (!NeedsScalesAgainstBackrow(own, session.Players[1 - prompt.playerId]) ||
+                !own.extra.Any(card => card.code == Gilgamesh)) return false;
+            bool ready = prompt.spSummonable.Any(card => card.code == Gilgamesh);
+            // Griffin can follow a normal D/D summon without placing a scale first.
+            return ready || own.hand.Any(card => card.code == Griffin) &&
+                prompt.summonable.Any(card => card.code != Griffin && IsSet(card.code, DdSet));
+        }
+
+        private static bool NeedsScalesAgainstBackrow(PlayerFieldSnapshot own, PlayerFieldSnapshot rival) =>
+            own.lp > 1000 && own.szone[0] == null && own.szone[4] == null && own.szone[6] == null && own.szone[7] == null &&
+            !rival.mzone.Any(card => card?.IsFaceUp == true) && rival.szone.Count(card => card?.IsFaceUp == false) >= 2;
+
         internal static int? ChooseEarlyPendulumRecovery(DuelSession session, DuelPrompt prompt,
             Func<int, SelectableCardItem, bool> canUse)
         {

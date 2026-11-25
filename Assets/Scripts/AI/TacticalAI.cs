@@ -304,7 +304,8 @@ namespace YGOPortable.AI
             (command != 1 || (CanUseSpecialSummon(session.Players[prompt.playerId], item, planLinks, projected) &&
                 (!UsesTacticalRules || DuelTactics.CanSummonRedDragonSafely(session, prompt, item.code)))) &&
             (command != 5 || (CanActivate(session, prompt, item) && CanPlayFieldSpell(session, prompt, item) &&
-                CanEndMainPhaseWithEffect(session, prompt, item)));
+                CanEndMainPhaseWithEffect(session, prompt, item) &&
+                (!UsesTacticalRules || !DddTurnPlan.ReserveScalesForGilgamesh(session, prompt, item))));
 
         private DuelTactics.ExtensionRisk ExtensionRisk(DuelSession session, DuelPrompt prompt)
         {
@@ -414,7 +415,7 @@ namespace YGOPortable.AI
                 }
                 return FinishMainPhase(s, p, p.canBp && HasWorthwhileAttack(s, p.playerId), preserveHand: true);
             }
-            else if (((planLinks ? _linkPolicy.Choose(s, p, CanUse) : null) ?? ChoosePlannedIdle(s, p, CanUse)) is int planned)
+            else if (((planLinks ? _linkPolicy.Choose(s, p, CanUse, _comboProjection) : null) ?? ChoosePlannedIdle(s, p, CanUse)) is int planned)
             {
                 int index = planned >> 16;
                 if (!_comboProjection && UsesComboPlanning && (planned & 0xffff) == 0 &&
@@ -502,6 +503,8 @@ namespace YGOPortable.AI
                 own.hand.Any(card => (card.type & YgoConstants.TYPE_RITUAL) != 0 && (card.type & YgoConstants.TYPE_MONSTER) != 0) &&
                 own.mzone.All(card => card == null || card.code == SignatureTurnPlan.MagiciansSouls) &&
                 own.szone.All(card => card == null || card is { code: 47222536, IsFaceUp: true });
+            bool readyRitualBeforeNegation = prompt.summonable.Count != 0 &&
+                DuelTactics.CanLeadWithRitualBeforeNegation(session, prompt);
             int best = -1, priority = 0;
             for (int i = 0; i < prompt.activatable.Count; i++)
             {
@@ -509,7 +512,9 @@ namespace YGOPortable.AI
                 bool drawRitual = usableRitualDraw && item.location == YgoConstants.LOCATION_MZONE &&
                     item.code == SignatureTurnPlan.MagiciansSouls &&
                     item.description == (((ulong)SignatureTurnPlan.MagiciansSouls << 20) | 1);
-                if (item.controller != prompt.playerId || (!drawRitual && item.location is not (YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_SZONE)))
+                bool sigmaBeforeLink = planLinks && item.code == LinkTurnPlan.MathmechSigma && item.location == YgoConstants.LOCATION_GRAVE;
+                if (item.controller != prompt.playerId || (!drawRitual && !sigmaBeforeLink &&
+                    item.location is not (YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_SZONE)))
                     continue;
                 int value = item.code switch
                 {
@@ -517,7 +522,12 @@ namespace YGOPortable.AI
                     PotOfGreed when own.deckCount >= 2 => 4,
                     GracefulCharity when own.deckCount >= 3 => 3,
                     SignatureTurnPlan.MagiciansSouls when drawRitual => 2,
-                    _ when canSpendHandtrap && CardDatabase.Get(item.code) is { IsSpell: true } ritual &&
+                    LinkTurnPlan.CynetCodec when session.TurnNumber <= 2 && planLinks => 2,
+                    LinkTurnPlan.MathmechSigma when item.location == YgoConstants.LOCATION_GRAVE &&
+                        prompt.spSummonable.Any(summon => summon.location == YgoConstants.LOCATION_EXTRA &&
+                            LinkComboPolicy.Rank(summon.code) > 0) => 2,
+                    _ when (canSpendHandtrap || readyRitualBeforeNegation) &&
+                        CardDatabase.Get(item.code) is { IsSpell: true } ritual &&
                         (ritual.type & YgoConstants.TYPE_RITUAL) != 0 => 2,
                     // See the result of the search before committing a vulnerable D/D to a Normal Summon or Set.
                     _ when exposedOpening && DddTurnPlan.IsContractSearch(item) => 2,
@@ -534,6 +544,8 @@ namespace YGOPortable.AI
                 priority = value;
             }
             if (best >= 0) return (best << 16) | 5;
+            if (DddTurnPlan.ChooseScalesAgainstBackrow(session, prompt, CanUse) is int scales)
+                return scales;
             if (DddTurnPlan.ChooseEarlyPendulumRecovery(session, prompt,
                 (command, item) => CanUseMainAction(session, prompt, planLinks, command, item)) is int pendulum)
                 return pendulum;

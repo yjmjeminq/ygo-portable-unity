@@ -39,6 +39,7 @@ namespace YGOPortable.AI
             Dragoon = 37818794, CyberInfinity = 10443957, Dragonlord = 19652159, Quasar = 35952884,
             ShootingMajestic = 40939228, Savage = 27548199, CrystalWing = 50954680, Rulkallos = 84330567;
         private const uint ShiEn = 29981921, NaturiaBeast = 33198837;
+        private const uint BlueEyesSpirit = 59822133, BlueEyesUltimateSpirit = 89604813;
         private const uint Raigeki = 12580477, EvenlyMatched = 15693423, InterruptedKaijuSlumber = 99330325;
         private const uint Reinforcement = 32807846, FossilDig = 47325505, Tuning = 96363153,
             Tenki = 57103969, Terraforming = 73628505;
@@ -873,6 +874,7 @@ namespace YGOPortable.AI
                     Dragonlord => card.attack >= 1000 && card.defense >= 1000,
                     Quasar => Unused(Quasar),
                     ShootingMajestic => Unused(ShootingMajestic, 1),
+                    BlueEyesUltimateSpirit => Unused(BlueEyesUltimateSpirit),
                     Savage => Unused(Savage, 1) && Array.Exists(card.Counters, counter => counter.Type == 0x147 && counter.Count > 0),
                     Apollousa => monsters && card.attack >= 800,
                     CrystalWing => monsters && Unused(CrystalWing),
@@ -882,6 +884,14 @@ namespace YGOPortable.AI
                 if (ready) return true;
             }
             return false;
+        }
+
+        internal static bool CanLeadWithRitualBeforeNegation(DuelSession duel, DuelPrompt prompt)
+        {
+            byte rival = (byte)(1 - prompt.playerId);
+            // A Synchro tag-out can bring in a negate before the next spell, but cannot negate a link already resolving.
+            return duel.Players[rival].mzone.Any(card => IsActive(card, BlueEyesSpirit)) &&
+                !HasReadyNegation(duel, rival, monsters: false);
         }
 
         internal static int? ChooseGoingSecondBait(DuelSession duel, DuelPrompt prompt, Func<int, SelectableCardItem, bool> canUse)

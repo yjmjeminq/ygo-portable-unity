@@ -109,6 +109,7 @@ namespace YGOPortable.AI
             internal Position ending;
             internal int unpaidLinkTrade = int.MaxValue;
             internal Branch? defensiveSetFork;
+            internal Branch? starterBeforeLink;
             internal int opposingCardsBeforeBattle = -1;
             internal HashSet<uint> battleAttackers;
             internal readonly List<(ulong state, int action)> moves = new();
@@ -292,9 +293,10 @@ namespace YGOPortable.AI
             bool CouldTrade(SelectableCardItem item) => LinkComboPolicy.NeedsMaterialProjection(own, item);
             bool cached = _next.Count > 0 && _next.Peek().state == state;
             // An opening search may run out before the first strong Link monster reaches the board.
-            bool lateLinkTrade = _searches >= _searchLimit && _lateLinkSearches < MaxLateLinkSearches &&
-                prompt.spSummonable.Any(CouldTrade);
-            if (cached && (!lateLinkTrade || _next.Peek().action == KeepSetup)) yield break;
+            bool reviewingStop = cached && _next.Peek().action is KeepSetup or 7;
+            bool lateLinkTrade = (_searches >= _searchLimit || reviewingStop) &&
+                _lateLinkSearches < MaxLateLinkSearches && prompt.spSummonable.Any(CouldTrade);
+            if (cached && !lateLinkTrade) yield break;
             if (!cached)
             {
                 ClearsBattleLethal = false;
@@ -305,6 +307,7 @@ namespace YGOPortable.AI
             bool master = advisor.Difficulty == AIDifficulty.Master;
             int alternativesPerFork = master ? 5 : 3;
             var options = advisor.ComboMainOptions(live, prompt);
+            bool prioritizeLinkActions = LinkComboPolicy.FitsDeck(own);
             var lateOptions = Array.Empty<int>();
             if (lateLinkTrade)
             {
@@ -352,19 +355,22 @@ namespace YGOPortable.AI
             }
             Line best = null;
             Line baseline = null;
-            Branch? defensiveSet = null;
-            bool comparedDefensiveSet = false;
+            Branch? defensiveSet = null, starterBeforeLink = null;
+            bool comparedDefensiveSet = false, comparedStarterBeforeLink = false;
             bool reservedOpeningBranch = false;
             long sliceStart = 0;
-            for (int attempt = 0; (defensiveSet.HasValue || queue.Count != 0) && attempt < branchLimit && !Expired(); attempt++)
+            bool HasPendingBranches() => defensiveSet.HasValue || starterBeforeLink.HasValue || queue.Count != 0;
+            for (int attempt = 0; HasPendingBranches() && attempt < branchLimit && !Expired(); attempt++)
             {
                 bool comparingDefense = defensiveSet.HasValue;
-                Branch choices = defensiveSet ?? queue.Dequeue();
-                defensiveSet = null;
+                bool comparingStarter = !comparingDefense && starterBeforeLink.HasValue;
+                Branch choices = defensiveSet ?? starterBeforeLink ?? queue.Dequeue();
+                if (comparingDefense) defensiveSet = null;
+                if (comparingStarter) starterBeforeLink = null;
                 Line line;
                 bool blocksResourceZone;
                 long branchStart = watch.ElapsedMilliseconds;
-                int currentBranchBudget = branchBudget;
+                int currentBranchBudget = comparingStarter ? OpeningDevelopmentBranchMilliseconds : branchBudget;
                 if (openingSuppression != 0 && choices.MainActions.Length == 1 && choices.MainActions[0] == openingSuppression)
                 {
                     currentBranchBudget = OpeningDevelopmentBranchMilliseconds;
@@ -423,16 +429,25 @@ namespace YGOPortable.AI
                 }
                 if (better || attempt == 0 || (line.complete && line.unpaidLinkTrade != int.MaxValue))
                 {
-                    if (choices.Target == null)
+                    if (!comparedStarterBeforeLink && line.starterBeforeLink is { } starter &&
+                        seen.Add(string.Join(",", starter.MainActions)))
                     {
+                        comparedStarterBeforeLink = true;
+                        starterBeforeLink = starter;
+                    }
+                    void QueueTargetBranches()
+                    {
+                        if (choices.Target != null) return;
                         foreach (var target in line.targets.Take(3))
                             foreach (int option in target.Options)
                                 if (seen.Add($"{string.Join(",", target.Prefix)};{target.State};{option}"))
                                     queue.Enqueue(new Branch(target.Prefix, (target.State, option)));
                     }
+                    if (!prioritizeLinkActions) QueueTargetBranches();
                     // Examine both the opening choice and the transition into a possible finish.
                     var forks = line.unpaidLinkTrade == int.MaxValue
                         ? line.forks : line.forks.Where(fork => fork.prefix.Length > line.unpaidLinkTrade).ToList();
+                    bool queuedLinkTargets = false;
                     for (int offset = 0; offset < Math.Min(master ? 13 : 9, forks.Count) && queue.Count < branchLimit; offset++)
                     {
                         int depth = offset % 2 == 0 ? offset / 2 : forks.Count - 1 - offset / 2;
@@ -444,11 +459,17 @@ namespace YGOPortable.AI
                             branch[^1] = option;
                             if (seen.Add(string.Join(",", branch))) queue.Enqueue(new Branch(branch));
                         }
+                        if (prioritizeLinkActions && !queuedLinkTargets)
+                        {
+                            QueueTargetBranches();
+                            queuedLinkTargets = true;
+                        }
                     }
+                    if (prioritizeLinkActions && !queuedLinkTargets) QueueTargetBranches();
                 }
                 if (!master) watch.Stop();
                 // Group short Master replays so waiting for frames does not consume the whole decision.
-                if ((defensiveSet.HasValue || queue.Count != 0) && !Expired() &&
+                if (HasPendingBranches() && !Expired() &&
                     (!master || watch.ElapsedMilliseconds - sliceStart >= MasterPlanningSliceMilliseconds))
                 {
                     yield return true;
@@ -473,6 +494,7 @@ namespace YGOPortable.AI
             uint linkTarget = 0;
             int targetRank = 0;
             bool canBattle = false;
+            bool checkEarlyStarter = startTurn <= 2 && trial.Players[player].extra.Any(card => LinkComboPolicy.Rank(card.code) >= 5);
             var beforeLink = default(Position);
             double beforeLinkScore = 0;
             var trades = new List<(int index, int rank, double score, Position before)>();
@@ -515,8 +537,7 @@ namespace YGOPortable.AI
                 if (prompt == null) { trial.StepUntilPrompt(); continue; }
                 if (prompt.playerId != player)
                 {
-                    if (prompt.messageType != YgoConstants.MSG_SELECT_CHAIN || prompt.forced) break;
-                    trial.SubmitResponseInt(-1);
+                    if (!PassOptionalOpponentPrompt(trial, prompt)) break;
                     continue;
                 }
                 if (prompt.messageType != YgoConstants.MSG_SELECT_IDLECMD)
@@ -582,6 +603,18 @@ namespace YGOPortable.AI
                 if ((move & 0xffff) == 1 && prompt.spSummonable[move >> 16] is { location: YgoConstants.LOCATION_EXTRA } summon)
                 {
                     int next = LinkComboPolicy.Rank(summon.code);
+                    var field = trial.Players[player].mzone;
+                    if (checkEarlyStarter && next is >= 1 and <= 3 && line.starterBeforeLink == null &&
+                        field.Count(card => card?.IsFaceUp == true) >= 2 &&
+                        (startTurn == 1 || field.Any(card => card is { IsFaceUp: true } && LinkComboPolicy.Rank(card.code) > 0)))
+                    {
+                        // Compare developing the board before converting its bodies into a small Link.
+                        int starter = Array.FindIndex(options, action => (action & 0xffff) == 0 &&
+                            prompt.summonable[action >> 16] is { location: YgoConstants.LOCATION_HAND } normalStarter &&
+                            !NeedsProvenNormalSummon(normalStarter.code) && CanDevelopFromCard(CardDatabase.Get(normalStarter.code)));
+                        if (starter >= 0)
+                            line.starterBeforeLink = new Branch(line.moves.Select(entry => entry.action).Append(options[starter]).ToArray());
+                    }
                     if (LinkComboPolicy.HasStrongerLink(trial.Players[player], next))
                     {
                         linkTarget = summon.code;
@@ -729,6 +762,19 @@ namespace YGOPortable.AI
             return line;
         }
 
+        private static bool PassOptionalOpponentPrompt(DuelSession trial, DuelPrompt prompt)
+        {
+            if (prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN)
+            {
+                // Decline a trigger without evaluating the opponent's undisclosed cards.
+                trial.SubmitResponseInt(0);
+                return true;
+            }
+            if (prompt.messageType != YgoConstants.MSG_SELECT_CHAIN || prompt.forced) return false;
+            trial.SubmitResponseInt(-1);
+            return true;
+        }
+
         private static bool HasPrivateOpponentChoices(DuelPrompt prompt) => prompt.candidates.Any(card => card.controller != prompt.playerId &&
             card.location is YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_DECK or YgoConstants.LOCATION_EXTRA);
 
@@ -789,8 +835,7 @@ namespace YGOPortable.AI
                 if (prompt == null) break;
                 if (prompt.playerId != player)
                 {
-                    if (prompt.messageType != YgoConstants.MSG_SELECT_CHAIN || prompt.forced) break;
-                    trial.SubmitResponseInt(-1);
+                    if (!PassOptionalOpponentPrompt(trial, prompt)) break;
                     continue;
                 }
                 if (prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD || HasPrivateOpponentChoices(prompt)) break;
@@ -842,9 +887,8 @@ namespace YGOPortable.AI
                 if (prompt == null || HasPrivateOpponentChoices(prompt)) break;
                 if (prompt.playerId == player)
                     trial.SubmitPlanningResponse(ai.ComputeResponse(trial, prompt));
-                else if (prompt.messageType == YgoConstants.MSG_SELECT_CHAIN && !prompt.forced)
-                    trial.SubmitResponseInt(-1);
-                else break;
+                else if (!PassOptionalOpponentPrompt(trial, prompt))
+                    break;
             }
             if (trial.SpeculationUncertain || trial.RetryCount != 0) return;
             if (trial.IsFinished)
