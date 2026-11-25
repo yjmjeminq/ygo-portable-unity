@@ -18,8 +18,10 @@ import zipfile
 
 if __package__:
     from .ipa_local_visuals import append_local_visuals, prepare_local_interface, prepare_local_visuals
+    from .package_duel_visuals import DEFAULT_SOURCE, collect_visual_files
 else:
     from ipa_local_visuals import append_local_visuals, prepare_local_interface, prepare_local_visuals
+    from package_duel_visuals import DEFAULT_SOURCE, collect_visual_files
 
 
 PROJECT = Path(__file__).resolve().parents[1]
@@ -27,6 +29,7 @@ WORKFLOW = "ios-ipa-windows-export.yml"
 BUNDLE_ID = "com.ygoportable.lotd"
 KOREA_TIME = datetime.timezone(datetime.timedelta(hours=9))
 ROSTER_FILES = ("opponents_db.json", "opponent_deck_levels.json")
+LIGHT_IPA_LIMIT = 1_000_000_000
 
 
 class BuildError(Exception):
@@ -212,7 +215,7 @@ def prepare():
     return editor.resolve(), github, branch, revision
 
 
-def export_project(editor, snapshot, library, output, log):
+def export_project(editor, snapshot, library, output, log, *, full=False):
     plugin = snapshot / "Assets/Plugins/iOS/libygo_native.a"
     plugin.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(library) as artifact:
@@ -221,18 +224,20 @@ def export_project(editor, snapshot, library, output, log):
         raise BuildError("iOS 듀얼 엔진 파일이 올바른 정적 라이브러리가 아닙니다.")
     plugin.write_bytes(data)
     print(f"    Unity 빌드 로그 {log}")
-    result = subprocess.run(
-        [str(editor), "-batchmode", "-nographics", "-quit", "-job-worker-count", "4",
-         "-projectPath", str(snapshot), "-logFile", str(log), "-buildTarget", "iOS",
-         "-executeMethod", "YGOPortable.Editor.YgoIosBuilder.Export",
-         "-ygoIosOutput", str(output), "-ygoIosBundleId", BUNDLE_ID],
-        creationflags=subprocess.CREATE_NO_WINDOW, timeout=1800,
-    )
+    arguments = [str(editor), "-batchmode", "-nographics", "-quit", "-job-worker-count", "4",
+                 "-projectPath", str(snapshot), "-logFile", str(log), "-buildTarget", "iOS",
+                 "-executeMethod", "YGOPortable.Editor.YgoIosBuilder.Export",
+                 "-ygoIosOutput", str(output), "-ygoIosBundleId", BUNDLE_ID]
+    if full:
+        arguments.append("-ygoIosFullVisuals")
+    result = subprocess.run(arguments, creationflags=subprocess.CREATE_NO_WINDOW, timeout=1800)
     if result.returncode or not (output / "Unity-iPhone.xcodeproj/project.pbxproj").is_file():
         raise BuildError(f"Unity에서 iOS 프로젝트를 내보내지 못했습니다. 로그 파일 {log}")
 
 
-def verify_ipa(ipa, snapshot):
+def verify_ipa(ipa, snapshot, full=False):
+    if not full and ipa.stat().st_size >= LIGHT_IPA_LIMIT:
+        raise BuildError("경량 IPA가 1 GB를 넘습니다. 기본 번들에서 대용량 에셋을 확인하세요.")
     with zipfile.ZipFile(ipa) as package:
         if package.testzip() is not None:
             raise BuildError("IPA 압축 파일이 손상되었습니다.")
@@ -244,6 +249,15 @@ def verify_ipa(ipa, snapshot):
         settings = plistlib.loads(package.read(apps[0]))
         if settings.get("CFBundleIdentifier") != BUNDLE_ID:
             raise BuildError("IPA의 번들 ID가 기존 앱과 일치하지 않습니다.")
+        if settings.get("CFBundleDisplayName") != "YGO Portable" or not all(
+            settings.get(key) is True for key in ("UIFileSharingEnabled", "LSSupportsOpeningDocumentsInPlace")
+        ):
+            raise BuildError("IPA의 파일 앱 연동 설정을 확인할 수 없습니다.")
+        visual_prefix = f"{app}/Data/Raw/DuelVisuals/"
+        if not full and any(name.startswith(visual_prefix) for name in package.namelist()):
+            raise BuildError("경량 IPA에 외부 DuelVisuals 팩이 포함되었습니다.")
+        if full and visual_prefix + "cardart.pack" not in package.namelist():
+            raise BuildError("풀버전 IPA에서 DuelVisuals 카드 일러스트 팩을 찾을 수 없습니다.")
         binaries = (settings["CFBundleExecutable"], "Frameworks/UnityFramework.framework/UnityFramework")
         for name in binaries:
             with package.open(f"{app}/{name}") as executable:
@@ -276,22 +290,35 @@ def save_verified_ipa(source, destination):
         partial.unlink(missing_ok=True)
 
 
-def build(editor, github, branch, revision, scratch, local_cutins=None, local_interface=None, drive_folder=None):
+def snapshot_project(snapshot):
+    streaming = PROJECT / "Assets/StreamingAssets"
+
+    def exclude_visual_pack(directory, names):
+        if Path(directory) == streaming:
+            return [name for name in names if name.casefold() in ("duelvisuals", "duelvisuals.meta")]
+        return []
+
+    for name in ("Assets", "Packages", "ProjectSettings"):
+        shutil.copytree(PROJECT / name, snapshot / name, ignore=exclude_visual_pack)
+
+
+def build(editor, github, branch, revision, scratch, *, full=False, local_cutins=None,
+          local_interface=None, drive_folder=None):
     visuals = {}
-    if local_cutins:
-        visuals.update(prepare_local_visuals(local_cutins))
+    if full:
+        prepare_local_visuals(local_cutins)
+        visuals = collect_visual_files(local_cutins)
         portraits = sum(name.startswith("CutIns/") for name in visuals)
         message = f"    최종 IPA에 로컬 컷인 {portraits}개와 전체 일러스트 팩을 포함합니다."
         if "overframeart.pack" in visuals:
             message += " 원본 오버프레임 앞면 팩도 포함합니다."
         print(message)
-    if local_interface:
-        interface = prepare_local_interface(local_interface)
-        visuals.update(interface)
-        print(f"    최종 IPA에 로컬 슬리브·페이즈·카드 아이콘 {len(interface)}개를 포함합니다.")
+        if local_interface:
+            interface = prepare_local_interface(local_interface)
+            visuals.update(interface)
+            print(f"    별도 슬리브·페이즈·카드 아이콘 {len(interface)}개를 추가합니다.")
     snapshot = scratch / "Project"
-    for name in ("Assets", "Packages", "ProjectSettings"):
-        shutil.copytree(PROJECT / name, snapshot / name)
+    snapshot_project(snapshot)
 
     print("[2/5] GitHub에서 iOS 듀얼 엔진을 컴파일합니다.")
     run = github.run_workflow(branch, revision)
@@ -303,7 +330,7 @@ def build(editor, github, branch, revision, scratch, local_cutins=None, local_in
     log = PROJECT / "Logs" / f"ipa-{stamp}-{scratch.name}.log"
     log.parent.mkdir(exist_ok=True)
     xcode = scratch / "Xcode"
-    export_project(editor, snapshot, library, xcode, log)
+    export_project(editor, snapshot, library, xcode, log, full=full)
     archive = scratch / "xcode-project.tar.gz"
     subprocess.run(["tar.exe", "-czf", str(archive), "-C", str(xcode), "."], check=True)
 
@@ -333,12 +360,12 @@ def build(editor, github, branch, revision, scratch, local_cutins=None, local_in
         shutil.copyfileobj(source, output)
     if visuals:
         append_local_visuals(ipa, visuals)
-    verify_ipa(ipa, snapshot)
+    verify_ipa(ipa, snapshot, full=full)
     out_dir = PROJECT / "Builds/iOS/IPA"
     out_dir.mkdir(parents=True, exist_ok=True)
-    destination = out_dir / ipa_filename(run["run_number"], stamp, full=bool(local_cutins))
+    destination = out_dir / ipa_filename(run["run_number"], stamp, full=full)
     save_verified_ipa(ipa, destination)
-    print(f"\n완료 {destination}")
+    print(f"\n완료 {destination} ({destination.stat().st_size / 1_000_000:,.1f} MB)")
     artifact_label = "GitHub 기본 빌드" if visuals else "GitHub 다운로드"
     print(f"{artifact_label} https://github.com/{github.repository}/actions/runs/{run['id']}/artifacts/{artifact_id}")
     print("아이폰에서 기존 방식으로 서명해 설치하는 미서명 IPA입니다.")
@@ -353,20 +380,25 @@ def build(editor, github, branch, revision, scratch, local_cutins=None, local_in
 def main():
     parser = argparse.ArgumentParser(description="Windows Unity와 GitHub Actions로 테스트용 IPA를 만듭니다.")
     parser.add_argument("--check", action="store_true", help="빌드 없이 설치 상태와 GitHub 연결을 확인합니다.")
+    parser.add_argument("--full", action="store_true", help="로컬 DuelVisuals를 포함합니다. 기본값은 경량 IPA입니다.")
     parser.add_argument("--local-cutins", type=Path, metavar="DUEL_VISUALS",
                         help="PC의 DuelVisuals에서 컷인과 대응 일러스트를 최종 미서명 IPA에 추가합니다.")
     parser.add_argument("--local-interface", type=Path, metavar="DUEL_VISUALS",
                         help="PC의 DuelVisuals에서 슬리브·페이즈·카드 아이콘을 최종 미서명 IPA에 추가합니다.")
     options = parser.parse_args()
+    if not options.full and (options.local_cutins or options.local_interface):
+        parser.error("--local-cutins와 --local-interface는 --full과 함께 사용하세요.")
     if sys.version_info < (3, 9):
         raise BuildError("Python 3.9 이상이 필요합니다.")
     print("[1/5] Unity iOS 모듈과 GitHub 연결을 확인합니다.")
     editor, github, branch, revision = prepare()
     print(f"    {github.repository} / {branch} / {revision[:7]}")
     drive_folder = local_build_folder("ygo.ipaDriveFolder")
-    local_cutins = options.local_cutins or local_build_folder("ygo.ipaDuelVisuals")
-    if local_cutins is not None:
+    local_cutins = (options.local_cutins or local_build_folder("ygo.ipaDuelVisuals") or DEFAULT_SOURCE) if options.full else None
+    if options.full:
         print(f"    풀버전 에셋 폴더 {local_cutins}")
+    else:
+        print("    경량 빌드 · 외부 DuelVisuals는 아이폰 파일 앱에서 연동합니다.")
     if drive_folder is not None:
         drive_status = "연결됨" if drive_folder.is_dir() else "연결 필요"
         print(f"    Google Drive 폴더 {drive_folder} ({drive_status})")
@@ -376,7 +408,8 @@ def main():
     temp_root = Path(tempfile.gettempdir()).resolve()
     scratch = Path(tempfile.mkdtemp(prefix="ygo-ipa-", dir=temp_root)).resolve()
     try:
-        build(editor, github, branch, revision, scratch, local_cutins, options.local_interface, drive_folder)
+        build(editor, github, branch, revision, scratch, full=options.full, local_cutins=local_cutins,
+              local_interface=options.local_interface, drive_folder=drive_folder)
     finally:
         # Remove only the temporary directory allocated for this build.
         if scratch.resolve().parent == temp_root and scratch.name.startswith("ygo-ipa-"):

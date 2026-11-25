@@ -52,7 +52,6 @@ namespace YGOPortable.UI
         private DuelEffectGraphic CreateSignatureEffect(DuelEffectKind kind, Vector2 center, Vector2 view, Color tint,
             bool finale)
         {
-            // These meshes supply their own color and motion at both stages.
             var holder = CenteredVisual(kind.ToString(), _layer, center, view);
             var graphic = holder.gameObject.AddComponent<DuelEffectGraphic>();
             graphic.texture = Texture2D.whiteTexture;
@@ -61,6 +60,7 @@ namespace YGOPortable.UI
             graphic.Tint = tint;
             graphic.SummonSignature = true;
             graphic.SummonFinale = finale;
+            graphic.ApplyTexture(DuelVisualAssets.SummonTexture(kind));
             return graphic;
         }
 

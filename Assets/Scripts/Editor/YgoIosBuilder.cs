@@ -54,6 +54,17 @@ namespace YGOPortable.Editor
             if (report.summary.result != BuildResult.Succeeded)
                 throw new BuildFailedException($"iOS Xcode export {report.summary.result} ({report.summary.totalErrors} errors).");
 
+            if (Array.IndexOf(arguments, "-ygoIosFullVisuals") < 0)
+                OptimizeTagForceSprites(output);
+
+            string plistPath = Path.Combine(output, "Info.plist");
+            var plist = new PlistDocument();
+            plist.ReadFromFile(plistPath);
+            plist.root.SetString("CFBundleDisplayName", "YGO Portable");
+            plist.root.SetBoolean("UIFileSharingEnabled", true);
+            plist.root.SetBoolean("LSSupportsOpeningDocumentsInPlace", true);
+            plist.WriteToFile(plistPath);
+
             string projectPath = PBXProject.GetPBXProjectPath(output);
             var project = new PBXProject();
             project.ReadFromFile(projectPath);
@@ -61,6 +72,58 @@ namespace YGOPortable.Editor
             if (teamId != null) ConfigureSigning(project, teamId, profileId, identity);
             project.WriteToFile(projectPath);
             Debug.Log($"[iOS] Exported Xcode project to {output}");
+        }
+
+        private static void OptimizeTagForceSprites(string output)
+        {
+            string root = Path.Combine(output, "Data", "Raw", "TagForce");
+            if (!Directory.Exists(root)) return;
+
+            long saved = 0;
+            foreach (string file in Directory.EnumerateFiles(root, "*.png", SearchOption.AllDirectories))
+            {
+                int maxEdge = Path.GetFileName(Path.GetDirectoryName(file)) switch
+                {
+                    "Standing" or "Characters_Standing" => 640,
+                    "SD" or "Characters_SD" => 256,
+                    _ => 0,
+                };
+                if (maxEdge > 0) saved += ShrinkSprite(file, maxEdge);
+            }
+            Debug.Log($"[iOS] Optimized Tag Force character sprites in the lightweight export ({saved / 1_000_000d:F1} MB saved).");
+        }
+
+        private static int ShrinkSprite(string file, int maxEdge)
+        {
+            var source = new Texture2D(2, 2, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+            Texture2D resized = null;
+            try
+            {
+                byte[] original = File.ReadAllBytes(file);
+                if (!source.LoadImage(original)) return 0;
+                int edge = Mathf.Max(source.width, source.height);
+                if (edge <= maxEdge) return 0;
+
+                float scale = maxEdge / (float)edge;
+                int width = Mathf.Max(1, Mathf.RoundToInt(source.width * scale));
+                int height = Mathf.Max(1, Mathf.RoundToInt(source.height * scale));
+                var pixels = new Color32[width * height];
+                for (int y = 0; y < height; y++)
+                    for (int x = 0; x < width; x++)
+                        pixels[y * width + x] = source.GetPixelBilinear((x + .5f) / width, (y + .5f) / height);
+
+                resized = new Texture2D(width, height, TextureFormat.RGBA32, false);
+                resized.SetPixels32(pixels);
+                byte[] encoded = resized.EncodeToPNG();
+                if (encoded.Length >= original.Length) return 0;
+                File.WriteAllBytes(file, encoded);
+                return original.Length - encoded.Length;
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(source);
+                if (resized != null) UnityEngine.Object.DestroyImmediate(resized);
+            }
         }
 
         private static void ConfigureNativePlugin(string projectRoot, string asset)

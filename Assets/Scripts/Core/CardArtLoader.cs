@@ -54,6 +54,18 @@ namespace YGOPortable.Core
         internal static string PackagedDuelVisualsPath =>
             Path.Combine(_streamingDir ?? Application.streamingAssetsPath, "DuelVisuals");
 
+        public static bool IsDuelArtActive => ActiveDuelArtCount > 0;
+        public static int ActiveDuelArtCount => _duelArt.Count;
+        internal static bool HasExternalDuelArt => _duelArt.Values.Any(entry => entry.packId == DuelArtPackId);
+
+        public static void Reload()
+        {
+            string streamingAssetsPath = _streamingDir ?? Application.streamingAssetsPath;
+            string localArtworkPath = ActiveDuelVisualsPath;
+            Shutdown();
+            Initialize(streamingAssetsPath, localArtworkPath);
+        }
+
         public static void Initialize(string streamingAssetsPath) => Initialize(streamingAssetsPath, LocalDuelVisualsPath);
 
         internal static void Initialize(string streamingAssetsPath, string localArtworkPath)
@@ -133,7 +145,7 @@ namespace YGOPortable.Core
             FileStream stream = null;
             try
             {
-                stream = File.OpenRead(packPath);
+                stream = new FileStream(packPath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
                 using var reader = new BinaryReader(stream, Encoding.UTF8, leaveOpen: true);
                 bool fullFace = packId is SourceOverframePackId or PackagedSourceOverframePackId;
                 uint tag = fullFace ? 0x464F444Du : 0x5241444Du;

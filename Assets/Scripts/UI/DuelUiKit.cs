@@ -359,7 +359,7 @@ namespace YGOPortable.UI
         private DuelStatStrip _faceStats;
         private Text _rulesText;
         private RectTransform _rulesArea;
-        private GameObject _backObj;
+        private Image _backImg;
         private bool _detailed;
         private uint _retainedArtwork;
         private int _retainedVariant;
@@ -493,9 +493,8 @@ namespace YGOPortable.UI
             _limitImg.gameObject.SetActive(false);
 
             var backRt = DuelUiKit.FillRect("CardBack", innerRt);
-            DuelUiKit.AddImage(backRt.gameObject, CardArtLoader.GetCardBackSprite(), Color.white, false, false);
-            _backObj = backRt.gameObject;
-            _backObj.SetActive(false);
+            _backImg = DuelUiKit.AddImage(backRt.gameObject, null, Color.white, false, false);
+            _backImg.gameObject.SetActive(false);
         }
 
         public void SetCard(uint code, bool faceDown = false, LiveCardState live = null)
@@ -526,10 +525,11 @@ namespace YGOPortable.UI
                     _levelText.text = "";
                     SetScalesVisible(false);
                 }
-                _backObj.SetActive(true);
+                _backImg.sprite = CardArtLoader.GetCardBackSprite();
+                _backImg.gameObject.SetActive(true);
                 return;
             }
-            _backObj.SetActive(false);
+            _backImg.gameObject.SetActive(false);
 
             var info = CardDatabase.Get(code);
             _titleText.text = info != null ? info.name : $"카드 #{code}";
@@ -624,7 +624,10 @@ namespace YGOPortable.UI
 
         private void OnEnable()
         {
-            if (_backObj != null && !_backObj.activeSelf)
+            if (_backImg == null) return;
+            if (_backImg.gameObject.activeSelf)
+                _backImg.sprite = CardArtLoader.GetCardBackSprite();
+            else
             {
                 BindArtwork(CurrentCode);
                 RefreshOverframe();

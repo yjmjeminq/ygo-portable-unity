@@ -10,7 +10,6 @@ namespace YGOPortable.UI
 {
     internal static class DuelVisualAssets
     {
-        private static readonly Dictionary<DuelEffectKind, Sprite> Effects = new();
         private const int CutInCacheLimit = 8;
 
         private sealed class CutInEntry
@@ -90,17 +89,30 @@ namespace YGOPortable.UI
         private static Sprite LoadHudSprite(string name, Vector4 border = default) =>
             AsSprite(LoadTexture(Path.Combine("Hud", name + ".png"), TextureWrapMode.Clamp), border);
 
-        internal static Sprite Effect(DuelEffectKind kind)
+        internal static Sprite Effect(DuelEffectKind kind) =>
+            CardArtLoader.GetDuelVisualsSprite(Path.Combine("Effects", kind + ".png"));
+
+        internal static Sprite SummonTexture(DuelEffectKind kind)
         {
-            if (!Effects.TryGetValue(kind, out var sprite))
+            string name = kind switch
             {
-                sprite = AsSprite(LoadTexture(Path.Combine("Effects", kind + ".png"), TextureWrapMode.Clamp));
-                Effects.Add(kind, sprite);
-            }
-            return sprite;
+                DuelEffectKind.Fusion => "Fusion_Vortex",
+                DuelEffectKind.Synchro => "Synchro_Rings",
+                DuelEffectKind.Xyz => "Xyz_Galaxy",
+                DuelEffectKind.Link => "Link_Circuit",
+                _ => null,
+            };
+            return name == null ? null : Effect(kind) ??
+                CardArtLoader.GetDuelVisualsSprite(Path.Combine("Effects", name + ".png"));
         }
 
         internal static bool CanDisplayCutIn(uint artCode, int artVariant) => GetCutIn(artCode, artVariant) != null;
+
+        internal static void ReloadCutIns()
+        {
+            TrimCutInCache(0);
+            UnreadableCutIns.Clear();
+        }
 
         internal static Sprite RetainCutIn(uint artCode, int artVariant)
         {
@@ -215,7 +227,8 @@ namespace YGOPortable.UI
                 100f, 0, SpriteMeshType.FullRect, border);
 
         private static Texture2D LoadTexture(string name, TextureWrapMode wrapMode) =>
-            LoadTextureFile(Path.Combine(CardArtLoader.LocalDuelVisualsPath, name), wrapMode);
+            LoadTextureFile(Path.Combine(CardArtLoader.ActiveDuelVisualsPath, name), wrapMode) ??
+            LoadTextureFile(Path.Combine(CardArtLoader.PackagedDuelVisualsPath, name), wrapMode);
 
         private static Texture2D LoadTextureFile(string path, TextureWrapMode wrapMode, bool forCutIn = false)
         {
@@ -253,7 +266,8 @@ namespace YGOPortable.UI
         {
             string file = name + ".wav";
             return ReadSound(Path.Combine(Application.streamingAssetsPath, "TagForce", "Audio", file), name) ??
-                ReadSound(Path.Combine(CardArtLoader.LocalDuelVisualsPath, "Audio", file), name);
+                ReadSound(Path.Combine(CardArtLoader.ActiveDuelVisualsPath, "Audio", file), name) ??
+                ReadSound(Path.Combine(CardArtLoader.PackagedDuelVisualsPath, "Audio", file), name);
         }
 
         internal static string FindSummonVideo(DuelEffectKind kind) =>
@@ -272,12 +286,15 @@ namespace YGOPortable.UI
                 int separator = streamingAssets.IndexOf("!/", StringComparison.Ordinal);
                 if (separator < 0 || !Uri.TryCreate(streamingAssets.Substring(4, separator - 4),
                     UriKind.Absolute, out var archive) || !archive.IsFile) return null;
-                string entry = streamingAssets.Substring(separator + 2).TrimEnd('/') + "/Effects/" + name;
+                string root = streamingAssets.Substring(separator + 2).TrimEnd('/');
                 try
                 {
                     using var stream = File.OpenRead(archive.LocalPath);
                     using var zip = new ZipArchive(stream, ZipArchiveMode.Read);
-                    return zip.GetEntry(entry) != null ? streamingAssets.TrimEnd('/') + "/Effects/" + name : null;
+                    foreach (string directory in new[] { "DuelVisuals/Effects", "Effects" })
+                        if (zip.GetEntry($"{root}/{directory}/{name}") != null)
+                            return $"{streamingAssets.TrimEnd('/')}/{directory}/{name}";
+                    return null;
                 }
                 catch (Exception error) when (error is IOException || error is InvalidDataException ||
                     error is UnauthorizedAccessException)
@@ -286,8 +303,10 @@ namespace YGOPortable.UI
                 }
             }
 
-            string packaged = Path.Combine(streamingAssets, "Effects", name);
-            return File.Exists(packaged) ? packaged : null;
+            string packaged = Path.Combine(streamingAssets, "DuelVisuals", "Effects", name);
+            if (File.Exists(packaged)) return packaged;
+            string standalone = Path.Combine(streamingAssets, "Effects", name);
+            return File.Exists(standalone) ? standalone : null;
         }
 
         private static AudioClip ReadSound(string path, string name)

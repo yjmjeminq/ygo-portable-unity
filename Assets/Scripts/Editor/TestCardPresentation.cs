@@ -91,6 +91,7 @@ namespace YGOPortable.Editor
                 WriteImage(packaged, "CardIcons/attribute/light.png", 24, 24);
                 WriteImage(packaged, "CardIcons/race/dragon.png", 24, 24);
                 WriteImage(local, "CardIcons/race/soldier.png", 19, 19);
+                WriteImage(packaged, "Effects/Summon.png", 14, 14);
                 File.Copy(Path.Combine(Application.streamingAssetsPath, "cardart.idx"), Path.Combine(streaming, "cardart.idx"));
 
                 CardArtLoader.Shutdown();
@@ -103,12 +104,45 @@ namespace YGOPortable.Editor
                     "The race icon did not fall back to the packaged visuals.");
                 Require(DuelUiKit.GetRaceSprite(YgoConstants.RACE_WARRIOR)?.texture.width == 19,
                     "The renamed warrior icon did not preserve a user's existing override.");
+                Require(!CardArtLoader.IsDuelArtActive && DuelVisualAssets.Effect(DuelEffectKind.Summon)?.texture.width == 14,
+                    "The base visuals should work before the external art pack is installed.");
 
-                CardArtLoader.Shutdown();
+                string pack = Path.Combine(local, "cardart.pack");
+                byte[] illustration = File.ReadAllBytes(Path.Combine(local, CardArtLoader.CardSleeveFile));
+                using (var writer = new BinaryWriter(File.Create(pack)))
+                {
+                    writer.Write(0x5241444Du);
+                    writer.Write(1u);
+                    writer.Write(1u);
+                    writer.Write(BlueEyes);
+                    writer.Write(0);
+                    writer.Write(28u);
+                    writer.Write((uint)illustration.Length);
+                    writer.Write(illustration);
+                }
+                WriteImage(local, "Effects/Summon.png", 18, 18);
+                WriteImage(local, "Effects/Fusion_Vortex.png", 20, 20);
+                string video = Path.Combine(packaged, "Effects", "Fusion.mp4");
+                File.WriteAllBytes(video, new byte[] { 1 });
                 File.Delete(Path.Combine(local, CardArtLoader.CardSleeveFile));
-                CardArtLoader.Initialize(streaming, local);
+                CardArtLoader.Reload();
                 Require(CardArtLoader.GetCardBackSprite().texture.width == 24,
-                    "Reinitializing with a removed local sleeve did not restore the packaged one.");
+                    "Reloading with a removed local sleeve did not restore the packaged one.");
+                var installed = CardArtLoader.RetainArtwork(BlueEyes, 0);
+                CardArtLoader.ReleaseArtwork(BlueEyes, 0);
+                Require(CardArtLoader.IsDuelArtActive && CardArtLoader.HasExternalDuelArt &&
+                    CardArtLoader.ActiveDuelArtCount == 1 && installed.texture.width == 16,
+                    "Reloading did not index and decode the installed artwork.");
+                Require(DuelVisualAssets.Effect(DuelEffectKind.Summon)?.texture.width == 18 &&
+                    DuelVisualAssets.SummonTexture(DuelEffectKind.Fusion)?.texture.width == 20 &&
+                    DuelVisualAssets.FindSummonVideo(DuelEffectKind.Fusion, local, streaming) == video,
+                    "The runtime did not pick up the local effect or bundled summon video.");
+                File.Delete(pack);
+                File.Delete(Path.Combine(local, "Effects/Summon.png"));
+                CardArtLoader.Reload();
+                Require(!CardArtLoader.IsDuelArtActive && CardArtLoader.ActiveDuelArtCount == 0 &&
+                    DuelVisualAssets.Effect(DuelEffectKind.Summon)?.texture.width == 14,
+                    "Removing the external pack did not clear the cached artwork and effects.");
             }
             finally
             {
@@ -116,7 +150,7 @@ namespace YGOPortable.Editor
                 CardArtLoader.Initialize(Application.streamingAssetsPath, previous);
                 if (Directory.Exists(testRoot)) Directory.Delete(testRoot, recursive: true);
             }
-            Debug.Log("[VERIFY DUEL VISUALS] Local sleeve and attribute overrides, packaged fallbacks, and reinitialization passed.");
+            Debug.Log("[VERIFY DUEL VISUALS] Local artwork and effects, packaged fallbacks, and live reload passed.");
 
             static void WriteImage(string directory, string relative, int width, int height)
             {

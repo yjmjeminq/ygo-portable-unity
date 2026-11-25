@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -26,9 +27,13 @@ namespace YGOPortable.UI
         private Button _shopButton;
         private Button _codexButton;
         private Text _shopBalance;
+        private RectTransform _shopCardBacks;
         private Button _settingsOpenButton;
         private Button _settingsCloseButton;
         private Text _aiDifficultyLabel;
+        private Text _duelArtStatus;
+        private Text _duelArtToast;
+        private Coroutine _duelArtToastTimer;
         private GameObject _settingsPanel;
 
         public TitleAndMenuUI(GameAppController app, Transform canvasParent)
@@ -43,6 +48,8 @@ namespace YGOPortable.UI
         {
             _menuControls.interactable = false;
             RefreshAiDifficulty();
+            RefreshDuelArtStatus();
+            _duelArtToast.gameObject.SetActive(false);
             SettingsRoot.SetActive(true);
             UiEntranceMotion.Play(_settingsPanel, .57f);
             EventSystem.current?.SetSelectedGameObject(_settingsCloseButton.gameObject);
@@ -147,11 +154,11 @@ namespace YGOPortable.UI
             MenuButtonMotion.Attach(_shopButton);
 
             var cardBack = CardArtLoader.GetCardBackSprite();
-            var cards = DuelUiKit.CreateRect("Cards", tile, new Vector2(.12f, .385f), new Vector2(.88f, .885f),
+            _shopCardBacks = DuelUiKit.CreateRect("Cards", tile, new Vector2(.12f, .385f), new Vector2(.88f, .885f),
                 Vector2.zero, Vector2.zero);
             void AddCard(float left, float right, float angle, Color tint)
             {
-                var card = DuelUiKit.CreateRect("Card", cards, new Vector2(left, .02f), new Vector2(right, .98f),
+                var card = DuelUiKit.CreateRect("Card", _shopCardBacks, new Vector2(left, .02f), new Vector2(right, .98f),
                     Vector2.zero, Vector2.zero);
                 card.localRotation = Quaternion.Euler(0f, 0f, angle);
                 DuelUiKit.AddImage(card.gameObject, cardBack, tint, true, false);
@@ -211,7 +218,7 @@ namespace YGOPortable.UI
             DuelUiKit.AddImage(bg.gameObject, DuelUiKit.WhiteSprite, new Color(0f, 0f, 0f, 0.72f));
 
             var win = DuelUiKit.CreateMenuPanel(bg, "SettingsWin",
-                new Vector2(0.26f, 0.14f), new Vector2(0.74f, 0.86f));
+                new Vector2(.22f, .08f), new Vector2(.78f, .92f));
             _settingsPanel = win.gameObject;
 
             var hdr = DuelUiKit.CreateRect("Hdr", win,
@@ -220,7 +227,7 @@ namespace YGOPortable.UI
             DuelUiKit.AddText(hdr, "T", "환경 설정", 22, TextAnchor.MiddleCenter, DuelUiKit.GoldAccent, FontStyle.Bold);
 
             // SFX Volume Row
-            var row1 = DuelUiKit.CreateRect("SfxRow", win, new Vector2(0.08f, 0.735f), new Vector2(0.92f, 0.835f), Vector2.zero, Vector2.zero);
+            var row1 = DuelUiKit.CreateRect("SfxRow", win, new Vector2(.08f, .784f), new Vector2(.92f, .862f), Vector2.zero, Vector2.zero);
             var sfxLabel = DuelUiKit.AddText(row1, "L", "효과음 음량: 65%", 17, TextAnchor.MiddleLeft, DuelUiKit.TextPrimary);
             var toggleSfx = DuelUiKit.CreateRect("BtnMute", row1, new Vector2(0.60f, 0.1f), new Vector2(1f, 0.9f), Vector2.zero, Vector2.zero);
             DuelUiKit.CreateButton(toggleSfx, "B", "음소거 전환", () =>
@@ -230,7 +237,7 @@ namespace YGOPortable.UI
             }, 15);
 
             // BGM Volume Row
-            var rowBgm = DuelUiKit.CreateRect("BgmRow", win, new Vector2(0.08f, 0.605f), new Vector2(0.92f, 0.705f), Vector2.zero, Vector2.zero);
+            var rowBgm = DuelUiKit.CreateRect("BgmRow", win, new Vector2(.08f, .696f), new Vector2(.92f, .774f), Vector2.zero, Vector2.zero);
             var bgmLabel = DuelUiKit.AddText(rowBgm, "L", "배경음악 음량: 35%", 17, TextAnchor.MiddleLeft, DuelUiKit.TextPrimary);
             var toggleBgm = DuelUiKit.CreateRect("BtnBgm", rowBgm, new Vector2(0.60f, 0.1f), new Vector2(1f, 0.9f), Vector2.zero, Vector2.zero);
             DuelUiKit.CreateButton(toggleBgm, "B", "음악 전환", () =>
@@ -241,7 +248,7 @@ namespace YGOPortable.UI
             }, 15);
 
             // AI Speed / Level Row
-            var row2 = DuelUiKit.CreateRect("AiRow", win, new Vector2(0.08f, 0.475f), new Vector2(0.92f, 0.575f), Vector2.zero, Vector2.zero);
+            var row2 = DuelUiKit.CreateRect("AiRow", win, new Vector2(.08f, .608f), new Vector2(.92f, .686f), Vector2.zero, Vector2.zero);
             var aiLbl = DuelUiKit.AddText(row2, "L", $"AI 행동 간격: {_app.AiStepDelay:0.00}초", 17, TextAnchor.MiddleLeft, DuelUiKit.TextPrimary);
             var spdBtn = DuelUiKit.CreateRect("BtnSpd", row2, new Vector2(0.60f, 0.1f), new Vector2(1f, 0.9f), Vector2.zero, Vector2.zero);
             DuelUiKit.CreateButton(spdBtn, "B", "속도 전환 (빠름/보통)", () =>
@@ -250,7 +257,7 @@ namespace YGOPortable.UI
                 aiLbl.text = $"AI 행동 간격: {_app.AiStepDelay:0.00}초";
             }, 15);
 
-            var difficulty = DuelUiKit.CreateRect("AiDiffRow", win, new Vector2(.08f, .345f), new Vector2(.92f, .445f),
+            var difficulty = DuelUiKit.CreateRect("AiDiffRow", win, new Vector2(.08f, .520f), new Vector2(.92f, .598f),
                 Vector2.zero, Vector2.zero);
             var difficultyLabel = DuelUiKit.CreateRect("Label", difficulty, Vector2.zero, new Vector2(.59f, 1f),
                 Vector2.zero, Vector2.zero);
@@ -265,7 +272,7 @@ namespace YGOPortable.UI
                 RefreshAiDifficulty();
             }, 15);
 
-            var replay = DuelUiKit.CreateRect("PersonalReplay", win, new Vector2(.08f, .215f), new Vector2(.92f, .315f),
+            var replay = DuelUiKit.CreateRect("PersonalReplay", win, new Vector2(.08f, .432f), new Vector2(.92f, .510f),
                 Vector2.zero, Vector2.zero);
             var replayLabel = DuelUiKit.AddFittedText(DuelUiKit.CreateRect("Label", replay,
                 new Vector2(0f, .40f), new Vector2(.59f, 1f), Vector2.zero, Vector2.zero), "Text",
@@ -280,6 +287,28 @@ namespace YGOPortable.UI
                     _app.SetPersonalReplayEnabled(!_app.PersonalReplayEnabled);
                     replayLabel.text = $"개인 대국 기록: {(_app.PersonalReplayEnabled ? "켜짐" : "꺼짐")}";
                 }, 15);
+
+            var artwork = DuelUiKit.CreateRect("DuelArtwork", win, new Vector2(.08f, .217f), new Vector2(.92f, .417f),
+                Vector2.zero, Vector2.zero);
+            var status = DuelUiKit.CreateRect("DuelArtworkStatus", artwork, new Vector2(0f, .53f), new Vector2(.59f, 1f),
+                Vector2.zero, Vector2.zero);
+            _duelArtStatus = DuelUiKit.AddFittedText(status, "Label", "", 17, 12, TextAnchor.MiddleLeft,
+                DuelUiKit.TextPrimary, FontStyle.Bold);
+            _duelArtStatus.supportRichText = true;
+            var hint = DuelUiKit.CreateRect("DuelArtworkHelp", artwork, Vector2.zero, new Vector2(.59f, .53f),
+                Vector2.zero, Vector2.zero);
+            DuelUiKit.AddFittedText(hint, "Label", Application.platform == RuntimePlatform.IPhonePlayer
+                ? "파일 앱 → 나의 iPhone → YGO Portable\nDuelVisuals 폴더를 넣으세요."
+                : "저장 폴더에 DuelVisuals를 넣은 뒤\n다시 불러오기를 누르세요.", 14, 11,
+                TextAnchor.MiddleLeft, DuelUiKit.TextMuted);
+            var reload = DuelUiKit.CreateRect("ReloadDuelArtwork", artwork, new Vector2(.60f, .53f), new Vector2(1f, .96f),
+                Vector2.zero, Vector2.zero);
+            DuelUiKit.CreateButton(reload, "Button", "다시 불러오기", ReloadDuelArtwork, 15);
+            var toast = DuelUiKit.CreateRect("ArtworkToast", artwork, new Vector2(.60f, 0f), new Vector2(1f, .49f),
+                Vector2.zero, Vector2.zero);
+            _duelArtToast = DuelUiKit.AddFittedText(toast, "Label", "", 14, 10, TextAnchor.MiddleCenter, DuelUiKit.GoldAccent);
+            _duelArtToast.gameObject.SetActive(false);
+            RefreshDuelArtStatus();
 
             var info = DuelUiKit.CreateRect("Rule", win, new Vector2(.08f, .125f), new Vector2(.51f, .20f),
                 Vector2.zero, Vector2.zero);
@@ -296,6 +325,36 @@ namespace YGOPortable.UI
             DuelUiKit.CreateButton(quitRt, "BtnQuit", "게임 종료", () => Application.Quit(), 18);
 
             SettingsRoot.SetActive(false);
+        }
+
+        private void RefreshDuelArtStatus()
+        {
+            if (!CardArtLoader.IsDuelArtActive)
+                _duelArtStatus.text = "<color=#FFAA00>카드 일러스트: 미연동</color>";
+            else
+                _duelArtStatus.text = $"<color=#55FF55>카드 일러스트: " +
+                    $"{(CardArtLoader.HasExternalDuelArt ? "정상 연동됨" : "내장 팩")} ({CardArtLoader.ActiveDuelArtCount:N0}장 감지)</color>";
+        }
+
+        private void ReloadDuelArtwork()
+        {
+            CardArtLoader.Reload();
+            DuelVisualAssets.ReloadCutIns();
+            var sleeve = CardArtLoader.GetCardBackSprite();
+            foreach (Transform card in _shopCardBacks) card.GetComponent<Image>().sprite = sleeve;
+            RefreshDuelArtStatus();
+            _duelArtToast.text = CardArtLoader.HasExternalDuelArt ? "일러스트를 다시 불러왔습니다."
+                : "외부 카드 일러스트를 찾지 못했습니다.";
+            _duelArtToast.gameObject.SetActive(true);
+            if (_duelArtToastTimer != null) _app.StopCoroutine(_duelArtToastTimer);
+            _duelArtToastTimer = _app.StartCoroutine(HideDuelArtToast());
+        }
+
+        private IEnumerator HideDuelArtToast()
+        {
+            yield return new WaitForSecondsRealtime(2.5f);
+            _duelArtToast.gameObject.SetActive(false);
+            _duelArtToastTimer = null;
         }
     }
 }
