@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
 using UnityEngine;
@@ -112,16 +113,7 @@ namespace YGOPortable.Editor
                 string pack = Path.Combine(local, "cardart.pack");
                 byte[] illustration = File.ReadAllBytes(Path.Combine(local, CardArtLoader.CardSleeveFile));
                 using (var writer = new BinaryWriter(File.Create(pack)))
-                {
-                    writer.Write(0x5241444Du);
-                    writer.Write(1u);
-                    writer.Write(1u);
-                    writer.Write(BlueEyes);
-                    writer.Write(0);
-                    writer.Write(28u);
-                    writer.Write((uint)illustration.Length);
-                    writer.Write(illustration);
-                }
+                    WriteArtPack(writer, illustration);
                 WriteImage(local, "Effects/Summon.png", 18, 18);
                 WriteImage(local, "Effects/Fusion_Vortex.png", 20, 20);
                 string video = Path.Combine(packaged, "Effects", "Fusion.mp4");
@@ -169,6 +161,32 @@ namespace YGOPortable.Editor
                 CardArtLoader.Reload();
                 Require(!CardArtLoader.HasExternalDuelArt && CardArtLoader.HasExternalDuelArtFile,
                     "A damaged local pack could not be distinguished from a missing file.");
+
+                string zipPath = Path.Combine(testRoot, "DuelVisuals.zip");
+                using (var zip = ZipFile.Open(zipPath, ZipArchiveMode.Create))
+                {
+                    using (var writer = new BinaryWriter(zip.CreateEntry("DuelVisuals/cardart.pack").Open()))
+                        WriteArtPack(writer, illustration);
+                    using var effectEntry = zip.CreateEntry("DuelVisuals/Effects/Summon.png").Open();
+                    effectEntry.Write(illustration, 0, illustration.Length);
+                }
+                DuelVisualsZipImport.Install(zipPath, local);
+                CardArtLoader.Reload();
+                Require(File.ReadAllText(pack) == "invalid fixture" && CardArtLoader.HasExternalDuelArt &&
+                    CardArtLoader.ActiveDuelArtCount == 1 &&
+                    DuelVisualAssets.Effect(DuelEffectKind.Summon)?.texture.width == 16,
+                    "The selected ZIP was not used, or the manually installed file was overwritten.");
+
+                string badZip = Path.Combine(testRoot, "MissingCardArt.zip");
+                using (var zip = ZipFile.Open(badZip, ZipArchiveMode.Create))
+                using (var entry = zip.CreateEntry("DuelVisuals/Field.png").Open())
+                    entry.WriteByte(1);
+                bool rejected = false;
+                try { DuelVisualsZipImport.Install(badZip, local); }
+                catch (InvalidDataException) { rejected = true; }
+                CardArtLoader.Reload();
+                Require(rejected && CardArtLoader.HasExternalDuelArt && CardArtLoader.ActiveDuelArtCount == 1,
+                    "A failed ZIP import replaced the previously installed artwork.");
             }
             finally
             {
@@ -176,7 +194,19 @@ namespace YGOPortable.Editor
                 CardArtLoader.Initialize(Application.streamingAssetsPath, previous);
                 if (Directory.Exists(testRoot)) Directory.Delete(testRoot, recursive: true);
             }
-            Debug.Log("[VERIFY DUEL VISUALS] Folder creation, nested packs, invalid pack detection, and live reload passed.");
+            Debug.Log("[VERIFY DUEL VISUALS] Folder creation, nested packs, ZIP import and recovery, and live reload passed.");
+
+            static void WriteArtPack(BinaryWriter writer, byte[] artwork)
+            {
+                writer.Write(0x5241444Du);
+                writer.Write(1u);
+                writer.Write(1u);
+                writer.Write(BlueEyes);
+                writer.Write(0);
+                writer.Write(28u);
+                writer.Write((uint)artwork.Length);
+                writer.Write(artwork);
+            }
 
             static void WriteImage(string directory, string relative, int width, int height)
             {

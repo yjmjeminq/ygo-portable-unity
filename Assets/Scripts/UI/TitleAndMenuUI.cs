@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.IO;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -34,6 +35,7 @@ namespace YGOPortable.UI
         private Text _duelArtStatus;
         private Text _duelArtToast;
         private Coroutine _duelArtToastTimer;
+        private bool _importingDuelVisuals;
         private GameObject _settingsPanel;
 
         public TitleAndMenuUI(GameAppController app, Transform canvasParent)
@@ -57,6 +59,7 @@ namespace YGOPortable.UI
 
         internal void CloseSettings(bool restoreFocus = true)
         {
+            if (_importingDuelVisuals) return;
             SettingsRoot.SetActive(false);
             _menuControls.interactable = true;
             if (restoreFocus) EventSystem.current?.SetSelectedGameObject(_settingsOpenButton.gameObject);
@@ -65,7 +68,7 @@ namespace YGOPortable.UI
         internal void SetSaveSyncOpen(bool open)
         {
             _titleControls.interactable = !open;
-            _settingsControls.interactable = !open;
+            _settingsControls.interactable = !open && !_importingDuelVisuals;
             _menuControls.interactable = !open && !SettingsRoot.activeSelf;
         }
 
@@ -301,9 +304,16 @@ namespace YGOPortable.UI
                 ? "파일 앱 → 나의 iPhone → YGO Portable\nDuelVisuals 안에 cardart.pack 넣기"
                 : "저장 폴더에 DuelVisuals를 넣은 뒤\n다시 불러오기를 누르세요.", 14, 11,
                 TextAnchor.MiddleLeft, DuelUiKit.TextMuted);
-            var reload = DuelUiKit.CreateRect("ReloadDuelArtwork", artwork, new Vector2(.60f, .53f), new Vector2(1f, .96f),
-                Vector2.zero, Vector2.zero);
-            DuelUiKit.CreateButton(reload, "Button", "다시 불러오기", ReloadDuelArtwork, 15);
+            bool supportsZip = DuelVisualsZipPicker.Supported;
+            var reload = DuelUiKit.CreateRect("ReloadDuelArtwork", artwork, new Vector2(.60f, .53f),
+                new Vector2(supportsZip ? .80f : 1f, .96f), Vector2.zero, Vector2.zero);
+            DuelUiKit.CreateButton(reload, "Button", "다시 불러오기", ReloadDuelArtwork, supportsZip ? 13 : 15);
+            if (supportsZip)
+            {
+                var import = DuelUiKit.CreateRect("ImportDuelArtwork", artwork, new Vector2(.81f, .53f),
+                    new Vector2(1f, .96f), Vector2.zero, Vector2.zero);
+                DuelUiKit.CreateButton(import, "Button", "ZIP 가져오기", () => _app.StartCoroutine(ImportDuelArtwork()), 13);
+            }
             var toast = DuelUiKit.CreateRect("ArtworkToast", artwork, new Vector2(.60f, 0f), new Vector2(1f, .49f),
                 Vector2.zero, Vector2.zero);
             _duelArtToast = DuelUiKit.AddFittedText(toast, "Label", "", 14, 10, TextAnchor.MiddleCenter, DuelUiKit.GoldAccent);
@@ -343,15 +353,42 @@ namespace YGOPortable.UI
             var sleeve = CardArtLoader.GetCardBackSprite();
             foreach (Transform card in _shopCardBacks) card.GetComponent<Image>().sprite = sleeve;
             RefreshDuelArtStatus();
-            if (CardArtLoader.HasExternalDuelArt)
-                _duelArtToast.text = "일러스트를 다시 불러왔습니다.";
-            else
-                _duelArtToast.text = CardArtLoader.HasExternalDuelArtFile
+            ShowDuelArtNotice(CardArtLoader.HasExternalDuelArt ? "일러스트를 다시 불러왔습니다."
+                : CardArtLoader.HasExternalDuelArtFile
                     ? "cardart.pack을 읽지 못했습니다."
-                    : "DuelVisuals 안에 cardart.pack이 없습니다.";
+                    : "DuelVisuals 안에 cardart.pack이 없습니다.");
+        }
+
+        private IEnumerator ImportDuelArtwork()
+        {
+            if (_importingDuelVisuals) yield break;
+            _importingDuelVisuals = true;
+            _settingsControls.interactable = false;
+            ShowDuelArtNotice("ZIP을 가져오는 중입니다…", persistent: true);
+            var import = DuelVisualsZipPicker.Import(CardArtLoader.LocalDuelVisualsPath);
+            while (!import.IsCompleted) yield return null;
+            _importingDuelVisuals = false;
+            _settingsControls.interactable = true;
+
+            if (import.IsFaulted)
+            {
+                Exception error = import.Exception.GetBaseException();
+                Debug.LogWarning($"[DuelVisuals] ZIP import failed: {error.Message}");
+                ShowDuelArtNotice(error is InvalidDataException ? error.Message
+                    : "ZIP을 가져오지 못했습니다. 파일과 저장 공간을 확인하세요.", persistent: true);
+            }
+            else if (!import.IsCanceled && import.Result)
+                ReloadDuelArtwork();
+            else
+                ShowDuelArtNotice("ZIP 선택을 취소했습니다.");
+        }
+
+        private void ShowDuelArtNotice(string message, bool persistent = false)
+        {
+            _duelArtToast.text = message;
             _duelArtToast.gameObject.SetActive(true);
             if (_duelArtToastTimer != null) _app.StopCoroutine(_duelArtToastTimer);
-            _duelArtToastTimer = _app.StartCoroutine(HideDuelArtToast());
+            _duelArtToastTimer = persistent ? null : _app.StartCoroutine(HideDuelArtToast());
         }
 
         private IEnumerator HideDuelArtToast()

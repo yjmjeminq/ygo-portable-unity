@@ -14,6 +14,7 @@ namespace YGOPortable.Editor
         private const string MainScene = "Assets/Scenes/Main.unity";
         private const string NativePlugin = "Assets/Plugins/iOS/libygo_native.a";
         private const string KeychainPlugin = "Assets/Plugins/SaveSyncKeychain.mm";
+        private const string VisualsPickerPlugin = "Assets/Plugins/DuelVisualsDocumentPicker.mm";
 
         [MenuItem("YGO Portable/Export iOS Xcode Project")]
         public static void Export()
@@ -41,6 +42,7 @@ namespace YGOPortable.Editor
 
             ConfigureNativePlugin(projectRoot, NativePlugin);
             ConfigureNativePlugin(projectRoot, KeychainPlugin);
+            ConfigureNativePlugin(projectRoot, VisualsPickerPlugin);
             PlayerSettings.iOS.sdkVersion = iOSSdkVersion.DeviceSDK;
             if (bundleId != null)
                 PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.iOS, bundleId);
@@ -69,6 +71,7 @@ namespace YGOPortable.Editor
             var project = new PBXProject();
             project.ReadFromFile(projectPath);
             project.AddFrameworkToProject(project.GetUnityFrameworkTargetGuid(), "Security.framework", false);
+            project.AddFrameworkToProject(project.GetUnityFrameworkTargetGuid(), "UniformTypeIdentifiers.framework", false);
             if (teamId != null) ConfigureSigning(project, teamId, profileId, identity);
             project.WriteToFile(projectPath);
             Debug.Log($"[iOS] Exported Xcode project to {output}");

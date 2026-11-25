@@ -34,8 +34,8 @@ namespace YGOPortable.Core
         private static readonly Dictionary<uint, (uint Code, int Variant)[]> ArtworkChoicesByFamily = new();
         private static readonly Dictionary<uint, (uint Code, int Variant)> SelectedArtworkByFamily = new();
         private const string TokenArtFileName = "tokenart.pack";
-        private const string DuelArtFileName = "cardart.pack";
-        private const string SourceOverframeFileName = "overframeart.pack";
+        internal const string DuelArtFileName = "cardart.pack";
+        internal const string SourceOverframeFileName = "overframeart.pack";
         private const string SupplementalArtFileName = "supplementalart.pack";
         private static readonly Dictionary<(uint code, int variant), ArtEntry> _duelArt = new();
         private static readonly Dictionary<uint, List<int>> _duelVariants = new();
@@ -116,6 +116,9 @@ namespace YGOPortable.Core
 
         private static string ResolveLocalDuelVisuals(string root)
         {
+            string imported = DuelVisualsZipImport.FindInstalledFolder(root);
+            if (imported != null) return imported;
+
             // Files can wrap the ZIP's own DuelVisuals folder in another folder of the same name.
             string nested = Path.Combine(root, "DuelVisuals");
             return !File.Exists(Path.Combine(root, DuelArtFileName)) &&
@@ -168,24 +171,9 @@ namespace YGOPortable.Core
             try
             {
                 stream = new FileStream(packPath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
-                using var reader = new BinaryReader(stream, Encoding.UTF8, leaveOpen: true);
                 bool fullFace = packId is SourceOverframePackId or PackagedSourceOverframePackId;
-                uint tag = fullFace ? 0x464F444Du : 0x5241444Du;
-                if (stream.Length < 12 || reader.ReadUInt32() != tag || reader.ReadUInt32() != 1) return;
-                uint count = reader.ReadUInt32();
-                long indexEnd = 12L + count * 16L;
-                if (indexEnd > stream.Length) return;
-                var entries = new List<((uint Code, int Variant) Key, ArtEntry Entry)>();
-                for (uint i = 0; i < count; i++)
-                {
-                    uint code = reader.ReadUInt32();
-                    int variant = reader.ReadInt32();
-                    uint offset = reader.ReadUInt32();
-                    uint length = reader.ReadUInt32();
-                    if (code == 0 || variant < 0 || offset < indexEnd || length == 0 ||
-                        (long)offset + length > stream.Length) continue;
-                    entries.Add(((code, variant), new ArtEntry { packId = packId, offset = offset, length = length }));
-                }
+                var entries = ReadDuelArtEntries(stream, packId, fullFace);
+                if (entries == null) return;
                 foreach (var (key, entry) in entries)
                 {
                     if (fullFace)
@@ -209,6 +197,35 @@ namespace YGOPortable.Core
             {
                 stream?.Dispose();
             }
+        }
+
+        internal static bool HasValidImportedArtwork(string path, bool overframe)
+        {
+            using var stream = File.OpenRead(path);
+            return ReadDuelArtEntries(stream, overframe ? SourceOverframePackId : DuelArtPackId, overframe)?.Count > 0;
+        }
+
+        private static List<((uint Code, int Variant) Key, ArtEntry Entry)> ReadDuelArtEntries(
+            Stream stream, int packId, bool fullFace)
+        {
+            using var reader = new BinaryReader(stream, Encoding.UTF8, leaveOpen: true);
+            uint marker = fullFace ? 0x464F444Du : 0x5241444Du;
+            if (stream.Length < 12 || reader.ReadUInt32() != marker || reader.ReadUInt32() != 1) return null;
+            uint count = reader.ReadUInt32();
+            long indexEnd = 12L + count * 16L;
+            if (indexEnd > stream.Length) return null;
+            var entries = new List<((uint Code, int Variant) Key, ArtEntry Entry)>();
+            for (uint i = 0; i < count; i++)
+            {
+                uint code = reader.ReadUInt32();
+                int variant = reader.ReadInt32();
+                uint offset = reader.ReadUInt32();
+                uint length = reader.ReadUInt32();
+                if (code == 0 || variant < 0 || offset < indexEnd || length == 0 ||
+                    (long)offset + length > stream.Length) continue;
+                entries.Add(((code, variant), new ArtEntry { packId = packId, offset = offset, length = length }));
+            }
+            return entries;
         }
 
         internal static IReadOnlyList<int> GetDuelArtworkChoices(uint code)
