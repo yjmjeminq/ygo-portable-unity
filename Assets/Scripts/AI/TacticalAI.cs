@@ -241,7 +241,8 @@ namespace YGOPortable.AI
                         !distinct.Add((command, item.code, item.location, item.description))) continue;
                     var card = CardDatabase.Get(item.code);
                     uint tags = card?.DeckEffectCategories ?? 0;
-                    bool develops = (tags & ((1u << 5) | (1u << 6) | (1u << 7))) != 0;
+                    bool develops = (tags & ((1u << 5) | (1u << 6) | (1u << 7))) != 0 ||
+                        (card != null && (card.type & YgoConstants.TYPE_RITUAL) != 0);
                     int priority = command switch
                     {
                         1 => 550 + (card?.IsExtra == true ? 140 * (card.IsLink ? (int)card.level : 2) : 50),
@@ -503,8 +504,6 @@ namespace YGOPortable.AI
                 own.hand.Any(card => (card.type & YgoConstants.TYPE_RITUAL) != 0 && (card.type & YgoConstants.TYPE_MONSTER) != 0) &&
                 own.mzone.All(card => card == null || card.code == SignatureTurnPlan.MagiciansSouls) &&
                 own.szone.All(card => card == null || card is { code: 47222536, IsFaceUp: true });
-            bool readyRitualBeforeNegation = prompt.summonable.Count != 0 &&
-                DuelTactics.CanLeadWithRitualBeforeNegation(session, prompt);
             int best = -1, priority = 0;
             for (int i = 0; i < prompt.activatable.Count; i++)
             {
@@ -526,8 +525,7 @@ namespace YGOPortable.AI
                     LinkTurnPlan.MathmechSigma when item.location == YgoConstants.LOCATION_GRAVE &&
                         prompt.spSummonable.Any(summon => summon.location == YgoConstants.LOCATION_EXTRA &&
                             LinkComboPolicy.Rank(summon.code) > 0) => 2,
-                    _ when (canSpendHandtrap || readyRitualBeforeNegation) &&
-                        CardDatabase.Get(item.code) is { IsSpell: true } ritual &&
+                    _ when CardDatabase.Get(item.code) is { IsSpell: true } ritual &&
                         (ritual.type & YgoConstants.TYPE_RITUAL) != 0 => 2,
                     // See the result of the search before committing a vulnerable D/D to a Normal Summon or Set.
                     _ when exposedOpening && DddTurnPlan.IsContractSearch(item) => 2,

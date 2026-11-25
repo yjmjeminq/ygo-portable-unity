@@ -17,6 +17,8 @@ namespace YGOPortable.AI
         private const int MaxLateLinkSearches = 2;
         private const int BranchMilliseconds = 46;
         private const int OpeningDevelopmentBranchMilliseconds = 105;
+        private const int LinkOpeningPlanningMilliseconds = 360;
+        private const int LinkOpeningBranchMilliseconds = 80;
         private const int LateLinkBranchMilliseconds = 48;
         private const int RecoveryBranchMilliseconds = 110;
         private const uint Machinex = 46593546, Siegfried = 44852429, Gilgamesh = 9024198;
@@ -292,10 +294,10 @@ namespace YGOPortable.AI
                     ? .38 * Math.Clamp(ending.defenders - held.defenders, 0, 2) : 0;
             bool CouldTrade(SelectableCardItem item) => LinkComboPolicy.NeedsMaterialProjection(own, item);
             bool cached = _next.Count > 0 && _next.Peek().state == state;
+            if (cached && _next.Peek().action == KeepSetup) yield break;
             // An opening search may run out before the first strong Link monster reaches the board.
-            bool reviewingStop = cached && _next.Peek().action is KeepSetup or 7;
-            bool lateLinkTrade = (_searches >= _searchLimit || reviewingStop) &&
-                _lateLinkSearches < MaxLateLinkSearches && prompt.spSummonable.Any(CouldTrade);
+            bool lateLinkTrade = _searches >= _searchLimit && _lateLinkSearches < MaxLateLinkSearches &&
+                prompt.spSummonable.Any(CouldTrade);
             if (cached && !lateLinkTrade) yield break;
             if (!cached)
             {
@@ -307,7 +309,6 @@ namespace YGOPortable.AI
             bool master = advisor.Difficulty == AIDifficulty.Master;
             int alternativesPerFork = master ? 5 : 3;
             var options = advisor.ComboMainOptions(live, prompt);
-            bool prioritizeLinkActions = LinkComboPolicy.FitsDeck(own);
             var lateOptions = Array.Empty<int>();
             if (lateLinkTrade)
             {
@@ -324,7 +325,9 @@ namespace YGOPortable.AI
             else _searches++;
 
             int branchLimit = Scale(master ? 72 : 36);
-            int timeBudget = master ? MasterPlanningMilliseconds : Scale(195);
+            // Leave time to compare the action forks after the material selections in a Link opening.
+            bool linkOpening = live.TurnNumber <= 2 && LinkComboPolicy.FitsDeck(own);
+            int timeBudget = master ? MasterPlanningMilliseconds : Scale(linkOpening ? LinkOpeningPlanningMilliseconds : 195);
             var watch = new Stopwatch();
             bool Expired() => watch.ElapsedMilliseconds >= timeBudget;
             var queue = new Queue<Branch>();
@@ -333,6 +336,7 @@ namespace YGOPortable.AI
             var seen = new HashSet<string>();
             int branchBudget = lateLinkTrade ? LateLinkBranchMilliseconds : BranchMilliseconds;
             if (needsDefense) branchBudget = RecoveryBranchMilliseconds;
+            else if (linkOpening && !lateLinkTrade) branchBudget = LinkOpeningBranchMilliseconds;
             int openingSuppression = 0;
             if (!cached && !recovering && !lateLinkTrade && live.TurnNumber == 2 && prompt.canBp &&
                 prompt.summonable.Any(item => !NeedsProvenNormalSummon(item.code) && CanDevelopFromCard(CardDatabase.Get(item.code))) &&
@@ -369,7 +373,6 @@ namespace YGOPortable.AI
                 if (comparingStarter) starterBeforeLink = null;
                 Line line;
                 bool blocksResourceZone;
-                long branchStart = watch.ElapsedMilliseconds;
                 int currentBranchBudget = comparingStarter ? OpeningDevelopmentBranchMilliseconds : branchBudget;
                 if (openingSuppression != 0 && choices.MainActions.Length == 1 && choices.MainActions[0] == openingSuppression)
                 {
@@ -388,10 +391,13 @@ namespace YGOPortable.AI
                 }
                 int scaledBranchBudget = Scale(currentBranchBudget);
                 watch.Start();
-                bool BranchExpired() => Expired() || watch.ElapsedMilliseconds - branchStart >= scaledBranchBudget;
-                using (var trial = live.ReplayForPlanning(BranchExpired))
+                // Restoring the live position uses the total budget. Start the branch timer
+                // once that position is ready so a slow replay cannot discard the whole search early.
+                using (var trial = live.ReplayForPlanning(Expired))
                 {
                     if (trial == null || Fingerprint(trial, trial.ActivePrompt) != state) break;
+                    long branchStart = watch.ElapsedMilliseconds;
+                    bool BranchExpired() => Expired() || watch.ElapsedMilliseconds - branchStart >= scaledBranchBudget;
                     SimulatedBranches++;
                     trial.BeginSpeculation(prompt.playerId, stopAfterTurn: true);
                     line = Explore(trial, advisor.ForkForComboSearch(), prompt.playerId, choices, BranchExpired, recovering);
@@ -435,19 +441,17 @@ namespace YGOPortable.AI
                         comparedStarterBeforeLink = true;
                         starterBeforeLink = starter;
                     }
-                    void QueueTargetBranches()
+                    // Preserve the native material and effect choices before queuing different main actions.
+                    if (choices.Target == null)
                     {
-                        if (choices.Target != null) return;
                         foreach (var target in line.targets.Take(3))
                             foreach (int option in target.Options)
                                 if (seen.Add($"{string.Join(",", target.Prefix)};{target.State};{option}"))
                                     queue.Enqueue(new Branch(target.Prefix, (target.State, option)));
                     }
-                    if (!prioritizeLinkActions) QueueTargetBranches();
                     // Examine both the opening choice and the transition into a possible finish.
                     var forks = line.unpaidLinkTrade == int.MaxValue
                         ? line.forks : line.forks.Where(fork => fork.prefix.Length > line.unpaidLinkTrade).ToList();
-                    bool queuedLinkTargets = false;
                     for (int offset = 0; offset < Math.Min(master ? 13 : 9, forks.Count) && queue.Count < branchLimit; offset++)
                     {
                         int depth = offset % 2 == 0 ? offset / 2 : forks.Count - 1 - offset / 2;
@@ -459,13 +463,7 @@ namespace YGOPortable.AI
                             branch[^1] = option;
                             if (seen.Add(string.Join(",", branch))) queue.Enqueue(new Branch(branch));
                         }
-                        if (prioritizeLinkActions && !queuedLinkTargets)
-                        {
-                            QueueTargetBranches();
-                            queuedLinkTargets = true;
-                        }
                     }
-                    if (prioritizeLinkActions && !queuedLinkTargets) QueueTargetBranches();
                 }
                 if (!master) watch.Stop();
                 // Group short Master replays so waiting for frames does not consume the whole decision.

@@ -36,6 +36,7 @@ namespace YGOPortable.Editor
             internal string diagnostic;
             internal string downlinkTrace;
             internal readonly List<uint> finishers = new List<uint>();
+            internal readonly List<uint> ritualSummons = new List<uint>();
         }
 
         internal static void VerifyLinkMaterialProtection()
@@ -57,7 +58,11 @@ namespace YGOPortable.Editor
             bool grewWithSpare = sunavalon.lowerWithSpareMaterials > 0 && sunavalon.finalLink >= 4;
             bool rebuilt = gGolem.downlinkMaterials > 0 && gGolem.finalLink >= gGolem.strongestSpentLink;
             if (!grewWithSpare && !rebuilt)
-                throw new InvalidOperationException("The Link material protection prevented both useful development lines.");
+                throw new InvalidOperationException(
+                    $"Neither Link fixture extended the board as expected. Sunavalon: Link-{sunavalon.finalLink}, " +
+                    $"{sunavalon.lowerWithSpareMaterials} extensions, {sunavalon.branches} branches. " +
+                    $"G Golem: Link-{gGolem.finalLink}, {gGolem.downlinkMaterials} stronger materials spent, " +
+                    $"{gGolem.branches} branches, final board [{string.Join(",", gGolem.finishers.Select(CardDatabase.GetName))}].");
             Debug.Log($"[VERIFY LINK MATERIALS] Accesscode retained. Sunavalon extended with spare materials: {grewWithSpare}. G Golem rebuilt after a lower Link: {rebuilt}.");
         }
 
@@ -82,7 +87,8 @@ namespace YGOPortable.Editor
                 if (!result.stopped || result.retries != 0 || result.branches == 0 ||
                     (result.summonedTypes & route.type) == 0 || (route.pendulum && result.pendulumSummons == 0))
                     throw new InvalidOperationException($"The adaptive combo did not resolve for deck {route.deck} ({deck.title}).");
-                Debug.Log($"[VERIFY COMBO METHODS] {deck.title} used the planner and summoned {string.Join(", ", result.finishers.Select(CardDatabase.GetName))}.");
+                var summoned = route.type == YgoConstants.TYPE_RITUAL ? result.ritualSummons : result.finishers;
+                Debug.Log($"[VERIFY COMBO METHODS] {deck.title} used the planner and summoned {string.Join(", ", summoned.Select(CardDatabase.GetName))}.");
             }
         }
 
@@ -231,7 +237,11 @@ namespace YGOPortable.Editor
                 result.specialSummons++;
                 if (CardDatabase.Get(move.code) is not CardInfo card) return;
                 if (move.fromLoc == YgoConstants.LOCATION_EXTRA) result.summonedTypes |= card.type & ExtraTypes;
-                if (move.fromLoc == YgoConstants.LOCATION_HAND) result.summonedTypes |= card.type & YgoConstants.TYPE_RITUAL;
+                if ((move.summonType & YgoConstants.SUMMON_METHOD_MASK) == YgoConstants.SUMMON_TYPE_RITUAL)
+                {
+                    result.summonedTypes |= YgoConstants.TYPE_RITUAL;
+                    result.ritualSummons.Add(move.code);
+                }
                 if (move.code == linkTarget && move.fromLoc == YgoConstants.LOCATION_EXTRA)
                 {
                     if (lowerLinkOffered && !spentStrongMaterial) result.lowerWithSpareMaterials++;

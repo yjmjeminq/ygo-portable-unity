@@ -36,6 +36,7 @@ namespace YGOPortable.Editor
             var firewall = ComboRegressionDecks.Get(495);
             var previous = PlayOpening(general, links, firewall, 4, 1, search: false);
             var upgraded = PlayOpening(general, links, firewall, 4, 1, search: true);
+            var darkfluid = PlayOpening(general, links, firewall, 11, 1, search: true);
             var singularity = PlayOpening(general, links, firewall, 2, 0, search: true);
             var defendedOpening = PlayOpening(general, links, firewall, 6, 0, search: true);
             if (!previous.opening.SequenceEqual(upgraded.opening) || previous.rank != 4 ||
@@ -43,6 +44,8 @@ namespace YGOPortable.Editor
                 upgraded.score <= previous.score || upgraded.changed == 0)
                 failures.Add($"Firewall did not improve the same hand into a stronger board with a Link-5 or Link-6 monster. " +
                     $"Reference: {Describe(previous)}. Planner: {Describe(upgraded)}.");
+            if (darkfluid.rank != 5 || !darkfluid.monsters.Contains(Darkfluid) || darkfluid.branches == 0)
+                failures.Add($"Firewall did not end with Darkfluid in the fixed Link-5 fixture. {Describe(darkfluid)}.");
             if (!singularity.monsters.Contains(Singularity))
                 failures.Add($"Firewall could not resolve its first-turn Link-6 line. {Describe(singularity)}.");
             if (defendedOpening.rank < 3 || !defendedOpening.conflictReady)
@@ -59,11 +62,11 @@ namespace YGOPortable.Editor
                     $"Monster board: {Describe(monster)}. Backrow: {Describe(backrow)}.");
             if (!scaleLine.line.Contains(Gilgamesh.ToString()) || !scaleLine.monsters.Contains(Machinex))
                 failures.Add($"D/D/D could not continue from Gilgamesh into Machinex. {Describe(scaleLine)}.");
-            if (new[] { previous, upgraded, singularity, defendedOpening, monster, backrow, scaleLine }.Any(result => result.retries != 0))
+            if (new[] { previous, upgraded, darkfluid, singularity, defendedOpening, monster, backrow, scaleLine }.Any(result => result.retries != 0))
                 failures.Add("An adaptive opening produced an illegal engine response.");
             VerifyUncertainDraw();
             Require(failures.Count == 0, string.Join("\n", failures));
-            Debug.Log($"[VERIFY COMBO SEARCH] Firewall improved from Link-{previous.rank} to Link-{upgraded.rank} and reached Singularity in the separate fixture. " +
+            Debug.Log($"[VERIFY COMBO SEARCH] Firewall ended with Darkfluid at Link-5, improved the same comparison hand from Link-{previous.rank} to Link-{upgraded.rank}, and reached first-turn Singularity. " +
                 "A different first-turn hand kept a live Counter Trap. D/D/D adapted the same hand to different public boards. Draw outcomes were excluded.");
         }
 
