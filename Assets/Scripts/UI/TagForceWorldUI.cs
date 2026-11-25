@@ -234,6 +234,7 @@ namespace YGOPortable.UI
         {
             ClearRpgDialogue();
             ClearRpgAtmosphere();
+            ClearRpgExploration();
             _rpgResidents.Clear();
             _rpgNearbyScene = null;
             _rpgSceneSpace = _rpgViewport = null;
@@ -487,7 +488,7 @@ namespace YGOPortable.UI
                 PoseRpgWalker(_player, _playerSprite, _position, _position - previous, _moving);
                 TrackRpgCamera(delta, horizontalTravel: _position.x - previous.x);
                 CheckRpgSceneEncounter(previous);
-                if (!CanWalk) return;
+                if (!CanWalk || CheckRpgExit(previous)) return;
             }
             else PoseWalker(_player, _playerSprite, _position, _position - previous, _moving, phase);
             if (_partner != null)
@@ -549,10 +550,11 @@ namespace YGOPortable.UI
                 return true;
             }
             if (_fieldMenu) return false;
-            if (frame.Submit && _interactions.Count > 0)
+            if (frame.Submit)
             {
+                var closest = _interactions.OrderBy(entry => Vector2.SqrMagnitude(entry.Actor.anchorMin - _position)).FirstOrDefault();
+                if ((_rpgField && TryInspectNearbyLandmark(closest.Actor)) || closest.Actor == null) return true;
                 DuelAudio.PlayTagForceSfx(TagForceSfx.Confirm);
-                var closest = _interactions.OrderBy(entry => Vector2.SqrMagnitude(entry.Actor.anchorMin - _position)).First();
                 MoveTo(closest.Actor.anchorMin - (_rpgField ? new Vector2(0f, .06f) : Vector2.zero), closest.Action);
             }
             return true;

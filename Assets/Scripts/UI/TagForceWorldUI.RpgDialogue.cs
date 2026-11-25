@@ -57,6 +57,7 @@ namespace YGOPortable.UI
             Root.SetActive(true);
             if (_player == null || _rpgDialogueCast != null) Show(Page.Field);
 
+            _rpgViewport.anchorMax = Vector2.one;
             _rpgDialogueCast = DuelUiKit.FillRect("DialogueCast", _rpgSceneSpace);
             _rpgLastPlayedSceneId = episode.id;
             _rpgHeroName = hero;
@@ -90,6 +91,7 @@ namespace YGOPortable.UI
                 actor.Find("QuestBadge")?.gameObject.SetActive(false);
             }
             _rpgSceneSpace.Find("SideQuestItem")?.gameObject.SetActive(false);
+            _rpgFieldObjects?.gameObject.SetActive(false);
 
             foreach (var line in lines)
             {

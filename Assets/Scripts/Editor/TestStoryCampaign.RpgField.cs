@@ -135,7 +135,7 @@ namespace YGOPortable.Editor
                 VerifyAutomaticScenes();
                 foreach (int region in Enumerable.Range(0, regions.Length))
                 {
-                    var request = RpgSideQuest.All.Single(quest => quest.Region == regions[region].Id);
+                    var request = RpgSideQuest.All.First(quest => quest.Region == regions[region].Id);
                     Require(world.EnterRpgRegion(region) && FieldScene().Find($"QuestNpc_{request.Giver}/SD").GetComponent<Image>().sprite != null,
                         $"The region {request.Region} was missing its quest giver or SD art.");
                     VerifyAtmosphere(region);
@@ -145,6 +145,7 @@ namespace YGOPortable.Editor
                 Require(panel.Find("QuestPage/Label").GetComponent<Text>().text == "2 / 3",
                     "The quest journal could not page through all regions.");
                 world.Back();
+                VerifyRpgExploration();
                 Debug.Log("[VERIFY 5DS FIELD] Map gates, guest entrances, movement lock, practice rewards, story result order and saved progression passed.");
             }
             finally
@@ -471,6 +472,126 @@ namespace YGOPortable.Editor
                     world.Update(4f);
                     Require(!world.CanWalk && panel.Find("ResidentChoices") != null && FieldScene().Find($"QuestNpc_{id}") != null,
                         $"Quest giver {id} did not open a conversation on the field.");
+                }
+            }
+
+            void VerifyRpgExploration()
+            {
+                const string coupler = RpgSideQuest.GarageCouplerId;
+                foreach (bool askCrow in new[] { false, true })
+                {
+                    string audit = Path.Combine(save, askCrow ? "explore-npc" : "explore-log");
+                    DeckRepository.Load(streaming, audit, seedDefaultDecks: false);
+                    CollectionProgress.Load(audit);
+                    Require(CollectionProgress.TryChooseStarter(CollectionProgress.Starters[0].Id, out _, out var error), error);
+                    world.PrepareRpgField();
+                    Require(world.EnterRpgRegion(0), "The garage was unavailable in the exploration test.");
+                    var viewport = (RectTransform)panel.Find("FieldViewport");
+                    var track = (RectTransform)panel.Find("FieldHud/QuestTrack");
+                    Require(viewport.anchorMax.y < track.anchorMin.y, "The quest HUD overlapped the walkable scenery.");
+                    ExamineLandmark();
+                    Require(panel.Find("ResidentChoices/AskCrow") == null && !world.CanWalk,
+                        "The workbench exposed the late bridge quest early, or allowed motion while inspecting.");
+                    world.Back();
+                    WalkOut(1, Vector2.right, .18f);
+                    var locked = FieldScene().Find("Exploration/Exit_6").GetComponent<Button>();
+                    Require(!locked.IsInteractable(), "The bridge exit opened before the story gate.");
+                    PointAt(new Vector2(.805f, .20f));
+                    for (int i = 0; i < 3; i++) world.Update(.5f, Vector2.right);
+                    Require(FieldScene().Find("Exploration/Exit_6") != null && !world.EnterRpgRegion(6),
+                        "Walking near a locked exit bypassed the story gate.");
+
+                    foreach (var episode in script.episodes.Take(regions[6].RequiredEpisode))
+                        Require(CollectionProgress.TryAwardStoryDuel(episode.id, true, null, decks[episode.deckId],
+                            out _, out _, out _), $"Could not stage {episode.id}.");
+                    Require(world.EnterRpgRegion(0), "Could not return to the garage.");
+                    if (askCrow) ExamineLandmark(withController: true);
+                    else ExamineLandmark();
+                    if (askCrow)
+                    {
+                        Press(panel, "ResidentChoices/AskCrow");
+                        world.Update(4f);
+                        Require(FieldScene().Find("QuestNpc_10/SpeakingCue") != null,
+                            "Choosing to ask Crow did not lead to an actual conversation.");
+                        Press(panel, "ResidentChoices/AskCoupler");
+                    }
+                    else Press(panel, "ResidentChoices/ReadRunnerLog");
+                    CollectionProgress.Load(audit);
+                    Require(CollectionProgress.GetRpgQuestState(coupler) == RpgQuestState.Active,
+                        "The chosen clue route did not save the quest.");
+                    world.Back();
+                    WalkOut(1, Vector2.right, .18f);
+                    WalkOut(6, Vector2.right, .18f);
+                    ExamineLandmark(withController: askCrow);
+                    Press(panel, "ResidentChoices/RecoverCoupler");
+                    CollectionProgress.Load(audit);
+                    Require(CollectionProgress.GetRpgQuestState(coupler) == RpgQuestState.Ready,
+                        "The bridge investigation did not persist the recovered component.");
+                    world.Back();
+                    WalkOut(1, Vector2.left, .82f);
+                    WalkOut(0, Vector2.left, .82f);
+                    ExamineLandmark();
+                    var crow = (RectTransform)FieldScene().Find("QuestNpc_10");
+                    var start = crow.anchorMin;
+                    var fit = panel.Find("ResidentChoices/FitCoupler").GetComponent<Button>();
+                    Require(!fit.IsInteractable() && !world.CanWalk, "The workbench cutscene allowed input while Crow was moving.");
+                    world.Update(.31f, Vector2.right);
+                    Require(crow.anchorMin != start && !fit.IsInteractable(), "Crow did not walk to the workbench.");
+                    world.Update(.9f);
+                    int balance = CollectionProgress.Balance;
+                    Press(panel, "ResidentChoices/FitCoupler");
+                    CollectionProgress.Load(audit);
+                    Require(CollectionProgress.GetRpgQuestState(coupler) == RpgQuestState.Complete &&
+                        CollectionProgress.Balance == balance + RpgSideQuest.Find(coupler).Reward &&
+                        !CollectionProgress.TryAdvanceRpgQuest(coupler, RpgQuestState.Ready, out _, out _),
+                        "The repair reward did not persist exactly once.");
+                    Require(panel.Find("ResidentChoices/DailyLine/Label").GetComponent<Text>().text.Contains("엔진"),
+                        "The landmark text did not react to the completed repair.");
+                    world.Back();
+                    var repairedCrow = (RectTransform)FieldScene().Find("QuestNpc_10");
+                    Require(repairedCrow.anchorMin != start, "The resident did not relocate after repairing the runner.");
+                    Press(repairedCrow, "Interact");
+                    world.Update(4f);
+                    Require(panel.Find("ResidentChoices/DailyLine/Label").GetComponent<Text>().text.Contains("시동"),
+                        "The resident did not remember the completed repair.");
+                    world.Back();
+                }
+                Debug.Log("[VERIFY 5DS EXPLORATION] Landmarks, both dialogue routes, locked exits, connected travel, animated walk-in, rewards and reload passed.");
+
+                void WalkOut(int destination, Vector2 direction, float entranceX)
+                {
+                    var field = FieldScene();
+                    var exit = field.Find($"Exploration/Exit_{destination}");
+                    Require(exit != null && exit.GetComponent<Button>().IsInteractable(), "The expected path was unavailable.");
+                    var point = ((RectTransform)exit).anchorMin;
+                    PointAt(new Vector2(point.x - direction.x * .12f, .20f));
+                    for (int i = 0; i < 4 && FieldScene() == field; i++) world.Update(.35f, direction);
+                    Require(FieldScene() != field &&
+                        Mathf.Abs(((RectTransform)FieldScene().Find("Player")).anchorMin.x - entranceX) < .001f,
+                        "Crossing an exit did not spawn the player at its paired entrance.");
+                    var arrived = FieldScene();
+                    world.Update(.01f);
+                    Require(FieldScene() == arrived, "The entrance immediately sent the player back.");
+                }
+
+                void ExamineLandmark(bool withController = false)
+                {
+                    var field = FieldScene();
+                    if (!withController) Press(field, "Exploration/Landmark");
+                    else
+                    {
+                        PointAt(((RectTransform)field.Find("Exploration/Landmark")).anchorMin);
+                        world.HandleFieldInput(new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Submit));
+                    }
+                    world.Update(4f);
+                    Require(!world.CanWalk && panel.Find("ResidentChoices/DailyLine/Label") != null,
+                        "The landmark did not open its inspection panel.");
+                }
+
+                void PointAt(Vector2 point)
+                {
+                    FieldScene().Find("Scenery").GetComponent<TagForceFloorTap>().Click(point);
+                    world.Update(4f);
                 }
             }
 

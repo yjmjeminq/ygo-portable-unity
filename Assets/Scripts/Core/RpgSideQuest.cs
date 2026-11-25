@@ -15,6 +15,7 @@ namespace YGOPortable.Core
 
     internal sealed class RpgSideQuest
     {
+        internal const string GarageCouplerId = "garage-runner-coupler";
         internal readonly string Id, Region, Title, Greeting, Item, Objective, Receiver;
         internal readonly int Giver, Reward;
         internal readonly Vector2 Point;
@@ -55,6 +56,9 @@ namespace YGOPortable.Core
             new("cradle-memory", "spot_ark_cradle", 3204, "아크 크레이들의 기억",
                 "오른쪽 끝에 보조 단말기가 하나 남아 있어. 전원이 끊기기 전에 기록을 가져와 줘.",
                 "단말기 기록", "아크 크레이들 오른편의 보조 단말기를 조사하기", 500, new(.84f, .19f)),
+            new(GarageCouplerId, "spot_kai_garage", 10, "멈춰 선 듀얼 러너",
+                "작업대 위 부품함에 점화 커플러가 없다. 크로우에게 묻거나 주행 일지를 확인해 보자.",
+                "점화 커플러", "다이달로스 브리지의 다리 난간에서 점화 커플러 찾기", 650),
         };
 
         internal static RpgSideQuest Find(string id) => All.FirstOrDefault(quest => quest.Id == id);

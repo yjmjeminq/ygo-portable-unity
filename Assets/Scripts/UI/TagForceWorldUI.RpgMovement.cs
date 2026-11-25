@@ -14,9 +14,10 @@ namespace YGOPortable.UI
         private Vector2 _rpgCameraPan;
         private float _rpgBackdropAspect, _rpgCameraLead;
 
-        private Image BuildRpgCamera(string mapPath)
+        private Image BuildRpgCamera(string mapPath, bool reserveHud)
         {
             _rpgViewport = DuelUiKit.FillRect("FieldViewport", _body);
+            if (reserveHud) _rpgViewport.anchorMax = new Vector2(1f, .86f);
             _rpgViewport.gameObject.AddComponent<RectMask2D>();
             _rpgSceneSpace = DuelUiKit.FillRect("Camera", _rpgViewport);
             _rpgSceneSpace.localScale = Vector3.one * RpgActorScale;

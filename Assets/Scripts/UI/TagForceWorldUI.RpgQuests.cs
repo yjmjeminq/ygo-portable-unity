@@ -17,11 +17,20 @@ namespace YGOPortable.UI
         private static string RpgQuestRegionName(RpgSideQuest quest) =>
             RpgRegions.First(region => region.Id == quest.Region).Name;
 
-        private static string RpgQuestReturn(RpgSideQuest quest) => $"{RpgQuestRegionName(quest)}의 {RpgQuestName(quest)}에게 돌아가기";
+        private static string RpgQuestReturn(RpgSideQuest quest) => quest.Id == RpgSideQuest.GarageCouplerId
+            ? "카이의 정비소 작업대로 돌아가 커플러 건네기"
+            : $"{RpgQuestRegionName(quest)}의 {RpgQuestName(quest)}에게 돌아가기";
 
         private static IEnumerable<RpgSideQuest> RpgPendingDeliveries(RpgSideQuest receiver) =>
             RpgSideQuest.All.Where(quest => quest.Receiver == receiver.Id &&
                 CollectionProgress.GetRpgQuestState(quest.Id) == RpgQuestState.Active);
+
+        private void OpenRpgQuestTalk(RpgSideQuest quest)
+        {
+            _resident = null;
+            _rpgQuestResident = quest;
+            Show(Page.Talk);
+        }
 
         private void AddRpgSideQuest(RpgSideQuest quest)
         {
@@ -29,13 +38,10 @@ namespace YGOPortable.UI
             var delivery = RpgPendingDeliveries(quest).FirstOrDefault();
             if (!_rpgResidents.ContainsKey(quest.Giver))
             {
-                AddRpgResident(quest.Giver, RpgQuestName(quest), $"QuestNpc_{quest.Giver}", RpgQuestGiverPosition,
-                    false, () =>
-                    {
-                        _resident = null;
-                        _rpgQuestResident = quest;
-                        Show(Page.Talk);
-                    });
+                var spot = quest.Giver == RpgCrow && RpgCouplerState == RpgQuestState.Complete
+                    ? RpgQuestCrowBench : RpgQuestGiverPosition;
+                AddRpgResident(quest.Giver, RpgQuestName(quest), $"QuestNpc_{quest.Giver}", spot,
+                    false, () => OpenRpgQuestTalk(quest));
                 string badge = delivery != null ? "전달" : state switch
                 {
                     RpgQuestState.Available => "의뢰",
@@ -65,8 +71,11 @@ namespace YGOPortable.UI
                 RpgQuestState.Ready => RpgQuestReturn(quest),
                 _ => null,
             });
+            if ((_rpgLocation == RpgGarage || _rpgLocation == RpgBridge) &&
+                RpgCouplerState is RpgQuestState.Active or RpgQuestState.Ready)
+                hint = RpgCouplerState == RpgQuestState.Active ? RpgCouplerQuest.Objective : RpgQuestReturn(RpgCouplerQuest);
             if (hint == null) return;
-            var tracker = Area(_rpgFieldHud, "SideQuestTrack", .02f, .805f, .77f, .875f);
+            var tracker = Area(_rpgFieldHud, "SideQuestTrack", .02f, .865f, .77f, .915f);
             Tint(tracker, new Color(.018f, .07f, .10f, .92f));
             Label(tracker, $"의뢰  ·  {hint}", 17, TextAnchor.MiddleLeft).color = new Color(.63f, .86f, .95f);
         }
@@ -75,11 +84,21 @@ namespace YGOPortable.UI
         {
             var delivery = RpgPendingDeliveries(quest).FirstOrDefault();
             if (delivery != null) return $"혹시 {delivery.Item} 가져왔어?";
-            return CollectionProgress.GetRpgQuestState(quest.Id) switch
+            var state = CollectionProgress.GetRpgQuestState(quest.Id);
+            if (quest.Giver == RpgCrow && state is RpgQuestState.Available or RpgQuestState.Complete)
+            {
+                if (RpgCouplerState == RpgQuestState.Complete)
+                    return "커플러 덕에 시동이 잘 걸려. 오늘은 작업대 옆에서 러너를 마저 손볼게.";
+                if (RpgCouplerState == RpgQuestState.Active)
+                    return "다리 난간 가까이 세워 뒀었어. 거기부터 찾아보면 될 거야.";
+                if (RpgCouplerState == RpgQuestState.Ready)
+                    return "찾았구나! 작업대로 가져오면 바로 끼워 볼게.";
+            }
+            return state switch
             {
                 RpgQuestState.Active => quest.Objective,
                 RpgQuestState.Ready => "수고했어. 약속한 보상을 받아 가.",
-                RpgQuestState.Complete => "지난번엔 정말 고마웠어.",
+                RpgQuestState.Complete => $"{quest.Item} 건은 지난번에 도와줘서 고마웠어.",
                 _ => quest.Greeting,
             };
         }
@@ -96,6 +115,10 @@ namespace YGOPortable.UI
             foreach (var delivery in RpgPendingDeliveries(quest))
                 actions.Add(("DeliverQuest", "물품 전달", () => AdvanceRpgQuest(delivery, RpgQuestState.Active,
                     Page.Talk, $"{delivery.Item} 전달 완료 · {RpgQuestName(delivery)}에게 알려 주세요.")));
+
+            if (quest.Giver == RpgCrow && RpgCouplerState == RpgQuestState.Available && IsRpgQuestOpen(RpgCouplerQuest, RpgClears))
+                actions.Add(("AskCoupler", "커플러 행방 묻기", () => AdvanceRpgQuest(RpgCouplerQuest, RpgQuestState.Available,
+                    Page.Talk, "크로우가 러너를 세웠던 다리 난간을 알려 줬습니다.")));
         }
 
         private void AdvanceRpgQuest(RpgSideQuest quest, RpgQuestState from, Page page, string message)
@@ -115,8 +138,9 @@ namespace YGOPortable.UI
             const int perPage = 4;
             Backdrop(null, new Color(.035f, .083f, .135f));
             int clears = RpgClears;
-            var quests = RpgSideQuest.All.Where(quest => RpgRegions.Any(region => region.Id == quest.Region &&
-                region.IsOpen(clears))).Select(quest => (Quest: quest, State: CollectionProgress.GetRpgQuestState(quest.Id)))
+            var quests = RpgSideQuest.All.Where(quest => IsRpgQuestOpen(quest, clears) &&
+                (quest.Id != RpgSideQuest.GarageCouplerId || RpgCouplerState != RpgQuestState.Available))
+                .Select(quest => (Quest: quest, State: CollectionProgress.GetRpgQuestState(quest.Id)))
                 .OrderBy(item => item.State is RpgQuestState.Active or RpgQuestState.Ready ? 0 :
                     item.State == RpgQuestState.Available ? 1 : 2).ToArray();
             int complete = RpgSideQuest.All.Count(quest => CollectionProgress.GetRpgQuestState(quest.Id) == RpgQuestState.Complete);

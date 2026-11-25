@@ -13,7 +13,7 @@ namespace YGOPortable.UI
         internal const string RpgPracticeId = "5ds-rpg";
         private const string RpgArt = "TagForce/5DS/";
         private const string RpgIcons = "TagForce/UI/";
-        private const string RpgFieldHelp = "방향키 · 스틱 이동   선택 대화   위쪽 버튼 메뉴";
+        private const string RpgFieldHelp = "방향키 · 스틱 이동   선택 조사/대화   위쪽 버튼 메뉴";
         private const string RpgRegionPreference = "ygo.5ds-rpg.last-region";
         private const float RpgSceneRadius = .096f;
         private static readonly Vector2 RpgArrival = new(.50f, .17f);
@@ -124,7 +124,10 @@ namespace YGOPortable.UI
             switch (page)
             {
                 case Page.Map: BuildRpgMap(); break;
-                case Page.Field: BuildRpgField(); break;
+                case Page.Field:
+                    _rpgInspecting = false;
+                    BuildRpgField();
+                    break;
                 case Page.Talk: BuildRpgTalk(); break;
                 case Page.Duel: BuildRpgPractice(); break;
                 case Page.Ledger: BuildRpgQuestJournal(); break;
@@ -170,12 +173,14 @@ namespace YGOPortable.UI
             }
         }
 
-        internal bool EnterRpgRegion(int index)
+        internal bool EnterRpgRegion(int index) => TravelRpgRegion(index, RpgArrival);
+
+        private bool TravelRpgRegion(int index, Vector2 arrival)
         {
             if (!_rpgField || _rpgDialogueCast != null || index < 0 || index >= RpgRegions.Length ||
                 !RpgRegions[index].IsOpen(RpgClears))
                 return false;
-            if (index != _rpgLocation) _position = RpgArrival;
+            if (index != _rpgLocation) _position = arrival;
             _rpgLocation = index;
             PlayerPrefs.SetString(RpgRegionPreference, RpgRegions[index].Id);
             PlayerPrefs.Save();
@@ -185,12 +190,12 @@ namespace YGOPortable.UI
 
         private void BuildRpgField()
         {
-            var floor = BuildRpgCamera(RpgRegions[_rpgLocation].Background);
+            var floor = BuildRpgCamera(RpgRegions[_rpgLocation].Background, _page == Page.Field);
             floor.raycastTarget = true;
             floor.gameObject.AddComponent<TagForceFloorTap>().Click = target => MoveTo(target);
             BuildRpgAtmosphere();
             _rpgFieldHud = DuelUiKit.FillRect("FieldHud", _body);
-            var status = Area(_rpgFieldHud, "QuestTrack", .02f, .885f, .77f, .977f);
+            var status = Area(_rpgFieldHud, "QuestTrack", .02f, .921f, .77f, .986f);
             Tint(status, new Color(.014f, .03f, .065f, .90f));
             var episodes = _rpgCampaign?.episodes ?? Array.Empty<StoryEpisodeData>();
             int cleared = RpgClears;
@@ -200,12 +205,13 @@ namespace YGOPortable.UI
                 complete ? "50화 스토리 완료 · 자유 탐험" :
                 $"{cleared + 1:00}화 · {episodes[cleared].title}  ·  {RpgRegions[targetRegion].Name}";
             Label(status, quest, 20, TextAnchor.MiddleLeft).color = DuelUiKit.GoldAccent;
-            Btn(Area(_rpgFieldHud, "FieldMap", .80f, .885f, .98f, .977f), "월드맵", () => Show(Page.Map));
+            Btn(Area(_rpgFieldHud, "FieldMap", .80f, .872f, .98f, .986f), "월드맵", () => Show(Page.Map));
             _fieldControls = Label(Area(_rpgFieldHud, "FieldControls", .02f, .012f, .98f, .078f), RpgFieldHelp, 15,
                 TextAnchor.MiddleRight);
 
             StoryEpisodeData questNpc = !complete && _rpgLocation == targetRegion ? episodes[cleared] : null;
             var sideQuest = RpgSideQuest.All.FirstOrDefault(item => item.Region == RpgRegions[_rpgLocation].Id);
+            if (_page == Page.Field) BuildRpgExploration(cleared);
             _rpgNearbyScene = questNpc?.sceneOnApproach == true ? questNpc : null;
             if (questNpc != null)
                 AddRpgResident(questNpc, RpgNpcSlots[0], true, () => _app.OpenRpgFieldEpisode(cleared));
@@ -270,14 +276,9 @@ namespace YGOPortable.UI
 
         private void BuildRpgTalk()
         {
+            if (_rpgInspecting) { BuildRpgLandmarkTalk(); return; }
             if (_resident == null && _rpgQuestResident == null) { Show(Page.Field); return; }
-            BuildRpgField();
-            _rpgFieldHud.gameObject.SetActive(false);
-            _rpgNavigation.gameObject.SetActive(false);
-            var fieldInput = _rpgViewport.gameObject.AddComponent<CanvasGroup>();
-            fieldInput.interactable = fieldInput.blocksRaycasts = false;
-            var shade = DuelUiKit.FillRect("ResidentTalkShade", _body);
-            DuelUiKit.AddImage(shade.gameObject, DuelUiKit.WhiteSprite, new Color(.01f, .03f, .06f, .14f));
+            BeginRpgTalkBackdrop();
             var quest = _rpgQuestResident;
             string name = quest == null ? _resident.opponentName : RpgQuestName(quest);
             if (_rpgResidents.TryGetValue(quest?.Giver ?? _resident.charId, out var speaker))
@@ -289,28 +290,53 @@ namespace YGOPortable.UI
                 speaker.Find("QuestBadge")?.gameObject.SetActive(false);
                 BuildRpgSpeakerCue(speaker, out _);
             }
-            var panel = DuelUiKit.CreateMenuPanel(_body, "ResidentChoices",
-                new Vector2(.065f, .025f), new Vector2(.935f, .35f));
-            Label(Area(panel, "Name", .035f, .72f, .96f, .94f), name, 22, TextAnchor.MiddleLeft).color = DuelUiKit.GoldAccent;
-            var conversation = Label(Area(panel, "DailyLine", .035f, .335f, .962f, .735f),
-                quest != null ? RpgQuestDialogue(quest) : "무슨 일로 왔어?", 21, TextAnchor.MiddleLeft);
+            var panel = BuildRpgConversation(name, quest != null ? RpgQuestDialogue(quest) : "무슨 일로 왔어?",
+                out var conversation);
             var actions = new List<(string Id, string Label, Action Select)>
             {
                 ("TalkDaily", "일상 대화", () => conversation.text = quest != null
-                    ? quest.Greeting : $"이곳은 {RpgRegions[_rpgLocation].Name}이야. 덱을 시험해 보고 싶으면 한 판 하자."),
+                    ? RpgQuestDialogue(quest) : $"이곳은 {RpgRegions[_rpgLocation].Name}이야. 덱을 시험해 보고 싶으면 한 판 하자."),
             };
             if (quest == null) actions.Add(("Practice", "연습 듀얼", () => Show(Page.Duel)));
             else AppendRpgQuestActions(quest, actions);
             actions.Add(("Leave", "돌아가기", () => Show(Page.Field)));
+            AddRpgConversationActions(panel, actions);
+        }
+
+        private void BeginRpgTalkBackdrop()
+        {
+            BuildRpgField();
+            _rpgFieldHud.gameObject.SetActive(false);
+            _rpgNavigation.gameObject.SetActive(false);
+            var fieldInput = _rpgViewport.gameObject.AddComponent<CanvasGroup>();
+            fieldInput.interactable = fieldInput.blocksRaycasts = false;
+            var shade = DuelUiKit.FillRect("ResidentTalkShade", _body);
+            DuelUiKit.AddImage(shade.gameObject, DuelUiKit.WhiteSprite, new Color(.01f, .03f, .06f, .14f));
+        }
+
+        private RectTransform BuildRpgConversation(string name, string line, out Text conversation)
+        {
+            var panel = DuelUiKit.CreateMenuPanel(_body, "ResidentChoices",
+                new Vector2(.065f, .025f), new Vector2(.935f, .35f));
+            Label(Area(panel, "Name", .035f, .72f, .96f, .94f), name, 22, TextAnchor.MiddleLeft).color = DuelUiKit.GoldAccent;
+            conversation = Label(Area(panel, "DailyLine", .035f, .335f, .962f, .735f), line, 21, TextAnchor.MiddleLeft);
+            return panel;
+        }
+
+        private static Button AddRpgConversationActions(RectTransform panel, List<(string Id, string Label, Action Select)> actions)
+        {
+            Button first = null;
             float width = .93f / actions.Count;
             for (int i = 0; i < actions.Count; i++)
             {
                 float left = .035f + i * width;
                 var (id, label, select) = actions[i];
-                Btn(Area(panel, id, left, .065f, left + width - .012f, .278f), label, select);
+                var button = Btn(Area(panel, id, left, .065f, left + width - .012f, .278f), label, select);
+                first ??= button;
             }
             DeckPadUi.LimitKeyboardNavigation(panel);
-            EventSystem.current?.SetSelectedGameObject(panel.Find("TalkDaily/Button").gameObject);
+            EventSystem.current?.SetSelectedGameObject(first?.gameObject);
+            return first;
         }
 
         private void BuildRpgPractice()
@@ -346,6 +372,7 @@ namespace YGOPortable.UI
         private void UpdateRpgField(float delta)
         {
             UpdateRpgAtmosphere(delta);
+            UpdateRpgExploration(delta);
             if (_rpgToast != null && (_rpgToastTime -= delta) <= 0f)
             {
                 _rpgToast.transform.parent.gameObject.SetActive(false);
