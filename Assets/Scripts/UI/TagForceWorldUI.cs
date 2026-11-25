@@ -1195,6 +1195,7 @@ namespace YGOPortable.UI
     {
         private readonly Dictionary<string, Sprite> _loaded = new();
         private readonly Dictionary<string, Sprite[]> _slices = new();
+        private readonly Dictionary<string, Sprite> _busts = new();
         private readonly HashSet<string> _visible = new();
 
         internal void BeginPage() => _visible.Clear();
@@ -1257,6 +1258,15 @@ namespace YGOPortable.UI
             }
         }
 
+        internal Sprite GetBust(string path)
+        {
+            var source = Get(path);
+            if (source == null) return null;
+            if (!_busts.TryGetValue(path, out var bust))
+                _busts[path] = bust = RpgDialoguePortrait.Crop(source.texture, source.rect);
+            return bust;
+        }
+
         private static Sprite Read(string file, bool readable)
         {
             Texture2D texture = null;
@@ -1298,6 +1308,7 @@ namespace YGOPortable.UI
                 _loaded.Remove(path);
                 if (_slices.Remove(path, out var clips) && clips != null)
                     foreach (var clip in clips) DestroyAsset(clip);
+                if (_busts.Remove(path, out var bust)) DestroyAsset(bust);
                 if (sprite == null) continue;
                 var texture = sprite.texture;
                 DestroyAsset(sprite);

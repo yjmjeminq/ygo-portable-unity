@@ -159,6 +159,7 @@ namespace YGOPortable.Editor
                 var caret = scene.Find("DialogueBox/AdvanceCaret/Label").GetComponent<Text>();
                 var next = scene.Find("DialogueBox/Next/Button").GetComponent<Button>();
                 var playerPortrait = portraits.transform.Find("Protagonist").GetComponent<Image>();
+                var speakerPortrait = portraits.transform.Find("Opponent").GetComponent<Image>();
                 try
                 {
                     var cgLines = loaded.episodes.SelectMany(episode =>
@@ -172,13 +173,12 @@ namespace YGOPortable.Editor
                             {
                                 new StoryDialogueLine { speaker = line.speaker, text = new string('가', 40), cutscene = line.cutscene },
                                 new StoryDialogueLine { speaker = "이자요이 아키", text = "<b>고마워.</b>", emotion = "blush" },
+                                new StoryDialogueLine { speaker = "카이", text = "그래." },
                                 new StoryDialogueLine { speaker = "설명", text = "바람이 스쳤다." },
                             }, () => { }, rpg: true);
-                        var heroSd = scene.Find("ProtagonistSD");
-                        var opponentSd = scene.Find("OpponentSD");
-                        Require(!badge.activeSelf && playerPortrait.sprite.rect.height < playerPortrait.sprite.texture.height &&
-                            heroSd.GetComponent<Image>().sprite != null && opponentSd.GetComponent<Image>().sprite != null &&
-                            heroSd.localScale.x > 0f && opponentSd.localScale.x < 0f, "Narration or the RPG portraits were misconfigured.");
+                        Require(!badge.activeSelf && !playerPortrait.enabled && !speakerPortrait.enabled &&
+                            scene.Find("ProtagonistSD") == null && scene.Find("OpponentSD") == null,
+                            "Narration displayed a portrait or an SD character.");
                         Require(body.supportRichText && Mathf.Approximately(body.lineSpacing, 1.25f) &&
                             body.font == Resources.Load<Font>("StoryFonts/Pretendard-Medium") &&
                             scene.Find("DialogueBox").GetComponent<Image>() is { type: Image.Type.Sliced } panel &&
@@ -201,6 +201,8 @@ namespace YGOPortable.Editor
                             "Typing leaked rich-text markup or showed the advance caret too soon.");
                         dialogue.Update(.35f);
                         Require(cutscene.alpha == 0f && portraits.alpha == 1f && badge.activeSelf &&
+                            !playerPortrait.enabled && speakerPortrait.enabled &&
+                            speakerPortrait.sprite.rect.height < speakerPortrait.sprite.texture.height &&
                             caret.enabled && body.text == "<b>고마워.</b>" &&
                             badge.GetComponentInChildren<Text>().color == (Color)new Color32(0xFF, 0x40, 0x81, 255) &&
                             portraits.transform.Find("Opponent/Blush").GetComponent<Image>().enabled &&
@@ -208,7 +210,12 @@ namespace YGOPortable.Editor
                             "The portrait and blush did not return after fading out the CG.");
                         next.onClick.Invoke();
                         dialogue.Update(.4f);
-                        Require(!badge.activeSelf && Mathf.Abs(portraits.transform.Find("Opponent").localScale.x - 1f) < .005f,
+                        Require(playerPortrait.enabled && !speakerPortrait.enabled &&
+                            playerPortrait.sprite.rect.height < playerPortrait.sprite.texture.height,
+                            "Switching speakers did not display only Kai's upper-body portrait.");
+                        next.onClick.Invoke();
+                        dialogue.Update(.4f);
+                        Require(!badge.activeSelf && !playerPortrait.enabled && !speakerPortrait.enabled,
                             "A narration line left the speaker badge or portrait emphasis active.");
                     }
                     var fx = scene.GetComponent<StoryDialogueFx>();

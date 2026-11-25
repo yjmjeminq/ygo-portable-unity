@@ -150,7 +150,7 @@ namespace YGOPortable.UI
                         line = "주행 일지에 마지막 정차 지점이 적혀 있다. 다이달로스 브리지의 난간 쪽부터 살펴보자.";
                         break;
                     case RpgQuestState.Ready:
-                        line = "크로우가 작업대로 다가온다. “그 부품 맞아. 이리 줘, 바로 끼워 볼게.”";
+                        line = "그 부품 맞아. 이리 줘, 바로 끼워 볼게.";
                         actions.Add(("FitCoupler", "커플러 건네기", () => AdvanceRpgQuest(
                             quest, RpgQuestState.Ready, Page.Talk, null)));
                         break;
@@ -170,7 +170,9 @@ namespace YGOPortable.UI
 
             if (garage) actions.Add(("WorkbenchMenu", "작업대 메뉴", () => { _rpgWorkbenchServices = true; Show(Page.Talk); }));
             actions.Add(("Leave", "돌아가기", () => Show(Page.Field)));
-            var panel = BuildRpgConversation(landmark.Name, line, out _);
+            bool talkingToCrow = garage && state == RpgQuestState.Ready;
+            var panel = BuildRpgConversation(talkingToCrow ? "크로우 호건" : landmark.Name, line, out _,
+                talkingToCrow ? RpgCrow : (int?)null);
             var first = AddRpgConversationActions(panel, actions);
             if (garage && state == RpgQuestState.Ready && _rpgResidents.TryGetValue(RpgCrow, out _rpgWalkInActor))
             {

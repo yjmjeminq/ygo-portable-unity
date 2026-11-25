@@ -48,8 +48,6 @@ namespace YGOPortable.UI
             private readonly Text _heroIdentity;
             private readonly Image _hero;
             private readonly Image _opponent;
-            private readonly Image _heroSd;
-            private readonly Image _opponentSd;
             private readonly Image _stage;
             private readonly CanvasGroup _portraitGroup;
             private readonly CanvasGroup _cutsceneOverlay;
@@ -103,7 +101,6 @@ namespace YGOPortable.UI
             private bool _heroSpeaking;
             private bool _opponentSpeaking;
             private bool _rpg;
-            private bool _sceneUsesFieldActors;
             private bool _showCutscene;
             private bool _akiBlush;
             private TagForceWorldUI _field;
@@ -138,11 +135,6 @@ namespace YGOPortable.UI
                 var scene = DuelUiKit.FillRect("Scene", overlay);
                 _stage = DuelUiKit.AddImage(DuelUiKit.FillRect("RpgStage", scene).gameObject, null,
                     new Color(.60f, .67f, .77f), false, false);
-                _heroSd = DuelUiKit.AddImage(Region(scene, "ProtagonistSD", .31f, .33f, .485f, .61f).gameObject,
-                    null, Color.white, true, false);
-                _opponentSd = DuelUiKit.AddImage(Region(scene, "OpponentSD", .515f, .33f, .69f, .61f).gameObject,
-                    null, Color.white, true, false);
-                _opponentSd.rectTransform.localScale = new Vector3(-1f, 1f, 1f);
                 var cutscene = DuelUiKit.FillRect("CutsceneOverlay", scene);
                 DuelUiKit.AddImage(cutscene.gameObject, DuelUiKit.WhiteSprite, new Color(.014f, .026f, .058f), false, false);
                 cutscene.gameObject.AddComponent<RectMask2D>();
@@ -260,27 +252,28 @@ namespace YGOPortable.UI
                 Close();
                 _field = field;
                 bool onField = field != null || backdropBelow;
-                _sceneUsesFieldActors = onField;
                 _heading.text = heading;
                 _heroIdentity.text = protagonist;
-                _heroIdentity.gameObject.SetActive(!onField);
-                _portraitGroup.gameObject.SetActive(!onField);
+                _heroIdentity.gameObject.SetActive(!rpg && !onField);
+                _portraitGroup.gameObject.SetActive(rpg || !onField);
                 _shade.color = new Color(.014f, .026f, .058f, onField ? .14f : .95f);
                 _dialoguePanel.rectTransform.anchorMax = new Vector2(.946f, onField ? .32f : .406f);
                 _protagonist = protagonist;
                 _sceneOpponent = opponent;
                 _rpg = rpg;
                 ApplyDialogueStyle(rpg);
-                _hero.rectTransform.anchorMin = rpg ? new Vector2(.043f, .30f) : new Vector2(.07f, .26f);
-                _hero.rectTransform.anchorMax = rpg ? new Vector2(.41f, .855f) : new Vector2(.493f, .855f);
-                _opponent.rectTransform.anchorMin = rpg ? new Vector2(.59f, .30f) : new Vector2(.508f, .26f);
-                _opponent.rectTransform.anchorMax = rpg ? new Vector2(.957f, .855f) : new Vector2(.93f, .855f);
-                if (!onField)
+                var bustMin = new Vector2(.24f, onField ? .295f : .378f);
+                var bustMax = new Vector2(.76f, onField ? .883f : .868f);
+                _hero.rectTransform.anchorMin = rpg ? bustMin : new Vector2(.07f, .26f);
+                _hero.rectTransform.anchorMax = rpg ? bustMax : new Vector2(.493f, .855f);
+                _opponent.rectTransform.anchorMin = rpg ? bustMin : new Vector2(.508f, .26f);
+                _opponent.rectTransform.anchorMax = rpg ? bustMax : new Vector2(.93f, .855f);
+                if (rpg && !onField)
+                    SetSprite(_stage, LoadRpgSprite(rpgBackdrop));
+                if (!rpg && !onField)
                 {
-                    SetSprite(_stage, rpg ? LoadRpgSprite(rpgBackdrop) : null);
-                    SetSprite(_heroSd, rpg ? LoadRpgSprite("Characters_SD/sd_protagonist.png") : null);
-                    SetSprite(_hero, rpg ? LoadHeroBust(null) : DuelProfileArt.Player);
-                    SetOpponent(opponent, null);
+                    SetSprite(_hero, DuelProfileArt.Player);
+                    SetSprite(_opponent, DuelProfileArt.Opponent(opponent));
                 }
                 _dialogue = lines;
                 _onEnd = onEnd;
@@ -303,15 +296,12 @@ namespace YGOPortable.UI
                 _fx.ResetEffect();
                 _showCutscene = false;
                 _field = null;
-                _sceneUsesFieldActors = false;
                 RefreshStageCaption();
                 _fx.ShowCaret(_caret, false);
                 _cutsceneOverlay.alpha = 0f;
                 _portraitGroup.alpha = 1f;
                 SetSprite(_cutsceneImage, null);
                 SetSprite(_stage, null);
-                SetSprite(_heroSd, null);
-                SetSprite(_opponentSd, null);
                 SetSprite(_hero, null);
                 SetSprite(_opponent, null);
                 foreach (var sprite in _rpgSprites.Values)
@@ -462,12 +452,13 @@ namespace YGOPortable.UI
                 _text.color = _rpg && narration ? NarrationColor : DuelUiKit.TextPrimary;
                 _emotion = _rpg ? line.emotion : null;
                 _poseTime = 0f;
-                _akiBlush = _rpg && _field == null && speaker?.id == 1 && _emotion == "blush";
-                if (_field != null) _field.SetRpgDialogueLine(_dialogue, index, playStageMotion);
-                else if (_rpg && !_sceneUsesFieldActors)
+                _akiBlush = _rpg && speaker?.id == 1 && _emotion == "blush";
+                _field?.SetRpgDialogueLine(_dialogue, index, playStageMotion);
+                if (_rpg)
                 {
-                    if (_heroSpeaking) SetSprite(_hero, LoadHeroBust(_emotion));
-                    if (speaker != null) SetOpponent(speaker, _emotion);
+                    ShowBust(_hero, _heroSpeaking ? LoadHeroBust(_emotion) : null);
+                    ShowBust(_opponent, speaker != null ? LoadBust($"Characters_Standing/full_{speaker.id}", _emotion)
+                        ?? DuelProfileArt.Opponent(speaker) : null);
                 }
                 AnimateHearts();
                 BindCutscene(_rpg ? line.cutscene : null);
@@ -737,13 +728,14 @@ namespace YGOPortable.UI
                     DeckRepository.Characters.FirstOrDefault(character => character.aliases?.Contains(name) == true);
             }
 
-            private void SetOpponent(OpponentCharacter character, string emotion)
+            private static void ShowBust(Image image, Sprite bust)
             {
-                string bust = character == null ? null : $"Characters_Standing/full_{character.id}";
-                SetSprite(_opponent, _rpg && bust != null
-                    ? LoadBust(bust, emotion) ?? DuelProfileArt.Opponent(character)
-                    : DuelProfileArt.Opponent(character));
-                SetSprite(_opponentSd, _rpg && character != null ? LoadRpgSprite($"Characters_SD/sd_{character.id}.png") : null);
+                if (image.sprite == bust) return;
+                SetSprite(image, bust);
+                if (bust == null) return;
+                image.color = new Color(1f, 1f, 1f, .62f);
+                image.rectTransform.localScale = Vector3.one;
+                image.rectTransform.anchoredPosition = Vector2.zero;
             }
 
             private Sprite LoadHeroBust(string emotion) =>
@@ -788,9 +780,9 @@ namespace YGOPortable.UI
                         texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
                         if (texture.LoadImage(File.ReadAllBytes(path), markNonReadable: true))
                         {
-                            float bottom = waistUp ? Mathf.Floor(texture.height * .43f) : 0f;
-                            sprite = Sprite.Create(texture, new Rect(0f, bottom, texture.width, texture.height - bottom),
-                                new Vector2(.5f, .5f), 100f, 0, SpriteMeshType.FullRect);
+                            var rect = new Rect(0f, 0f, texture.width, texture.height);
+                            sprite = waistUp ? RpgDialoguePortrait.Crop(texture, rect) :
+                                Sprite.Create(texture, rect, Vector2.one * .5f, 100f, 0, SpriteMeshType.FullRect);
                         }
                     }
                 }

@@ -338,12 +338,8 @@ namespace YGOPortable.UI
             BeginRpgTalkBackdrop();
             var quest = _rpgQuestResident;
             string name = quest == null ? _resident.opponentName : RpgQuestName(quest);
-            if (_rpgResidents.TryGetValue(quest?.Giver ?? _resident.charId, out var speaker))
-            {
-                FaceRpgConversation(speaker, speaker.Find("SD") as RectTransform);
-            }
             var panel = BuildRpgConversation(name, quest != null ? RpgQuestDialogue(quest) : "무슨 일로 왔어?",
-                out var conversation);
+                out var conversation, quest?.Giver ?? _resident.charId);
             var actions = new List<(string Id, string Label, Action Select)>
             {
                 ("TalkDaily", "일상 대화", () => StartTypingDialogue(conversation, quest != null
@@ -358,6 +354,8 @@ namespace YGOPortable.UI
         private void BeginRpgTalkBackdrop()
         {
             BuildRpgField();
+            HideRpgActorGraphics();
+            _rpgSceneSpace.Find("SideQuestItem")?.gameObject.SetActive(false);
             _rpgFieldHud.gameObject.SetActive(false);
             _rpgNavigation.gameObject.SetActive(false);
             var fieldInput = _rpgViewport.gameObject.AddComponent<CanvasGroup>();
@@ -366,8 +364,19 @@ namespace YGOPortable.UI
             DuelUiKit.AddImage(shade.gameObject, DuelUiKit.WhiteSprite, new Color(.01f, .03f, .06f, .14f));
         }
 
-        private RectTransform BuildRpgConversation(string name, string line, out Text conversation)
+        private RectTransform BuildRpgConversation(string name, string line, out Text conversation, int? speakerId = null)
         {
+            if (speakerId is int id)
+            {
+                var bust = _images.GetBust(RpgArt + $"Characters_Standing/full_{id}.png") ??
+                    DuelProfileArt.Opponent(DeckRepository.GetCharacter(id));
+                if (bust != null && bust != DuelProfileArt.MissingOpponent)
+                {
+                    var portrait = Area(_body, "ConversationPortrait", .25f, .31f, .75f, .96f);
+                    DuelUiKit.AddImage(portrait.gameObject, bust, Color.white, true, false);
+                    UiEntranceMotion.Play(portrait.gameObject, .65f, .20f);
+                }
+            }
             var panel = Area(_body, "ResidentChoices", .065f, .025f, .935f, .35f);
             RpgUiStyle.Panel(panel);
             HudLabel(Area(panel, "Name", .04f, .74f, .96f, .94f), name, 24,

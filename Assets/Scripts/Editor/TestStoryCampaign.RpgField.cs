@@ -355,7 +355,9 @@ namespace YGOPortable.Editor
                 Require(storyRoot.gameObject.activeSelf && world.Root.activeSelf && !world.CanWalk &&
                     world.Root.transform.GetSiblingIndex() < story.Root.transform.GetSiblingIndex() &&
                     field.Find("Player") == player && field.Find("MainQuestNpc") == opponent &&
-                    !storyRoot.Find("Scene/Portraits").gameObject.activeSelf &&
+                    !storyRoot.Find("Scene/Portraits/Protagonist").GetComponent<Image>().enabled &&
+                    !storyRoot.Find("Scene/Portraits/Opponent").GetComponent<Image>().enabled &&
+                    !player.Find("Sprite").GetComponent<Image>().enabled &&
                     !guest.gameObject.activeSelf && guest.Find("Sprite").GetComponent<Image>().sprite != null &&
                     !world.Root.GetComponent<CanvasGroup>().blocksRaycasts,
                     "The conversation did not preserve the real field or hold Aki until her first line.");
@@ -394,19 +396,20 @@ namespace YGOPortable.Editor
                     guest.anchorMin != entry && !world.RpgStageRunning && guest.Find("Sprite").localScale.x > 0f,
                     "The guest did not reach her mark and face the rival after replaying the entrance.");
                 AdvanceToLine(firstAkiLine);
-                Require(guest.Find("SpeakingCue") != null, "The speaking marker did not follow the guest.");
+                var portrait = storyRoot.Find("Scene/Portraits/Opponent").GetComponent<Image>();
+                Require(portrait.enabled && portrait.sprite.rect.height < portrait.sprite.texture.height &&
+                    !guest.Find("Sprite").GetComponent<Image>().enabled,
+                    "Aki's dialogue did not replace the SD character with a portrait.");
                 int shocked = Array.FindIndex(lines, firstAkiLine + 1,
                     line => line.speaker == "이자요이 아키" && line.emotion == "shock");
                 Require(shocked > firstAkiLine, "The narration fixture did not have an Aki reaction.");
                 AdvanceToLine(shocked);
-                var cue = guest.Find("SpeakingCue/Label").GetComponent<Text>();
-                Require(cue.text == "!" && player.Find("Sprite").localScale.x < 0f,
-                    "Aki did not show a reaction or Kai did not turn toward the current speaker.");
+                Require(portrait.enabled && player.Find("Sprite").localScale.x < 0f,
+                    "Aki's reaction or the scripted speaker facing was lost.");
                 var mote = (RectTransform)field.Find("FieldAtmosphere/Mote_0");
                 Vector2 beforeMote = mote.anchorMin;
                 story.Update(1.4f);
-                Require(cue.text == "▼" && mote.anchorMin != beforeMote,
-                    "The dialogue reaction did not clear or the background stopped during the conversation.");
+                Require(mote.anchorMin != beforeMote, "The background stopped during the conversation.");
                 int approach = Array.FindIndex(lines, line => line.stage?.Any(a => a.actor == 0 && a.action == "move") == true);
                 AdvanceToLine(approach);
                 story.Update(.65f);
@@ -417,6 +420,7 @@ namespace YGOPortable.Editor
                 Require(guest.gameObject.activeInHierarchy && !world.CanWalk, "Deck editing lost the active field scene.");
                 story.Back();
                 Require(world.CanWalk && FieldScene().Find("DialogueCast") == null &&
+                    FieldScene().Find("Player/Sprite").GetComponent<Image>().enabled &&
                     ((RectTransform)FieldScene().Find("Player")).anchorMin == position &&
                     world.Root.GetComponent<CanvasGroup>().blocksRaycasts,
                     "Leaving the conversation did not remove its cast and restore movement at the original location.");
@@ -560,8 +564,9 @@ namespace YGOPortable.Editor
                     {
                         Press(panel, "ResidentChoices/AskCrow");
                         world.Update(4f);
-                        Require(FieldScene().Find("QuestNpc_10/SpeakingCue") != null,
-                            "Choosing to ask Crow did not lead to an actual conversation.");
+                        Require(panel.Find("ConversationPortrait").GetComponent<Image>().sprite != null &&
+                            !FieldScene().Find("QuestNpc_10/SD").GetComponent<Image>().enabled,
+                            "Choosing to ask Crow did not replace his SD art with the upper-body portrait.");
                         Press(panel, "ResidentChoices/AskCoupler");
                     }
                     else Press(panel, "ResidentChoices/ReadRunnerLog");
@@ -653,8 +658,9 @@ namespace YGOPortable.Editor
                 app.OpenRpgField();
                 for (int i = 0; i < 4; i++) Press(panel, "StoryDialogue/Scene/DialogueBox/Next/Button");
                 Require(!world.CanWalk && FieldScene().Find("RpgCompanion") != null &&
-                    !panel.Find("StoryDialogue/Scene/OpponentSD").GetComponent<Image>().enabled,
-                    "The prologue did not lead into the workshop guide with a single field actor.");
+                    !FieldScene().Find("RpgCompanion/Sprite").GetComponent<Image>().enabled &&
+                    panel.Find("StoryDialogue/Scene/Portraits/Opponent").GetComponent<Image>().enabled,
+                    "The prologue did not lead into the workshop guide with only Yusei's portrait.");
                 Press(panel, "StoryDialogue/Scene/DialogueBox/Skip/Button");
                 CollectionProgress.Load(audit);
                 app.OpenRpgField();

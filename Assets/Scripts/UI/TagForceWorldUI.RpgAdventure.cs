@@ -45,17 +45,7 @@ namespace YGOPortable.UI
 
         private void BuildRpgIntro(bool guide)
         {
-            if (guide)
-            {
-                BeginRpgTalkBackdrop();
-                if (_rpgCompanion != null)
-                {
-                    _rpgCompanionPoint = _position + new Vector2(.105f, .083f);
-                    PoseRpgWalker(_rpgCompanion, _rpgCompanionArt, _rpgCompanionPoint, Vector2.zero,
-                        false, _position - _rpgCompanionPoint);
-                    FaceRpgConversation(_rpgCompanion, _rpgCompanionArt);
-                }
-            }
+            if (guide) BeginRpgTalkBackdrop();
             else
             {
                 Backdrop(RpgRegions[RpgGarage].Background, new Color(.055f, .091f, .135f));
@@ -157,25 +147,12 @@ namespace YGOPortable.UI
         {
             BeginRpgTalkBackdrop();
             bool partner = speaker == RpgPartnerId;
-            var target = (partner ? _rpgCompanion : null) ?? _rpgResidents.GetValueOrDefault(speaker);
-            if (target != null)
-                FaceRpgConversation(target, (target.Find("SD") ?? target.Find("Sprite")) as RectTransform);
             var panel = BuildRpgConversation(partner ? RpgPartnerName : "보머 · 카드 매점",
-                partner ? RpgPartnerLines[_rpgLocation] : "시내까지 갈 필요 없어. 여기서도 DP로 팩을 살 수 있어.", out _);
+                partner ? RpgPartnerLines[_rpgLocation] : "시내까지 갈 필요 없어. 여기서도 DP로 팩을 살 수 있어.", out _, speaker);
             var actions = new List<(string Id, string Label, Action Select)>();
             if (!partner) actions.Add(("OpenCardShop", "카드 팩 보기", _app.OpenRpgCardShop));
             actions.Add(("Leave", "돌아가기", () => Show(Page.Field)));
             AddRpgConversationActions(panel, actions);
-        }
-
-        private void FaceRpgConversation(RectTransform speaker, RectTransform art)
-        {
-            var direction = speaker.anchorMin - _position;
-            PoseRpgWalker(_player, _playerSprite, _position, Vector2.zero, false, direction);
-            PoseRpgWalker(speaker, art, speaker.anchorMin, Vector2.zero, false, -direction);
-            speaker.Find("ResidentMarker")?.gameObject.SetActive(false);
-            speaker.Find("QuestBadge")?.gameObject.SetActive(false);
-            BuildRpgSpeakerCue(speaker, out _);
         }
 
         private void BuildRpgWorkbenchServices()
