@@ -124,7 +124,7 @@ namespace YGOPortable.UI
         private void AddRpgShopkeeper()
         {
             if (_rpgLocation != RpgGarage) return;
-            AddRpgResident(RpgShopkeeperId, "보머 · 카드 매점", "RpgCardMerchant", new Vector2(.74f, .38f),
+            AddRpgResident(RpgShopkeeperId, "보머 · 카드 매점", "RpgCardMerchant", new Vector2(.82f, .38f),
                 false, () => OpenRpgService(RpgShopkeeperId));
             var marker = _rpgResidents[RpgShopkeeperId].Find("ResidentMarker") as RectTransform;
             if (marker.TryGetComponent<Image>(out var icon)) icon.enabled = false;

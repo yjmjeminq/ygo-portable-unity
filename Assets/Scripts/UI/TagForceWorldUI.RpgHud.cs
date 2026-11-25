@@ -100,7 +100,7 @@ namespace YGOPortable.UI
             string objective = episodes.Length == 0 ? "대본을 불러오지 못했습니다." :
                 !hasEpisode ? "자유 탐험" :
                 _rpgLocation == targetRegion ? $"{episodes[cleared].opponentName}에게 다가가기" :
-                $"{RpgRegions[targetRegion].Name}(으)로 이동";
+                $"이동 · {RpgRegions[targetRegion].Name}";
             var quest = Area(_rpgFieldHud, "QuestTrack", .019f, sideObjective == null ? .837f : .811f, .284f, .915f);
             PaintRpgHudPlate(quest);
             DrawRpgIcon(Area(quest, "GoalIcon", .039f, .56f, .105f, .94f), "hud_target.png", "!", DuelUiKit.GoldAccent);
