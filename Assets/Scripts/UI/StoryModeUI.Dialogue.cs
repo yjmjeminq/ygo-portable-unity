@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using UnityEngine;
 using UnityEngine.UI;
 using YGOPortable.Core;
@@ -29,11 +30,16 @@ namespace YGOPortable.UI
 
         internal sealed class StoryDialogueView
         {
-            private static readonly Color HeroColor = new(.47f, .85f, 1f);
+            private static readonly Color HeroColor = new Color32(0x78, 0xDC, 0xFF, 255);
+            private static readonly Color NarrationColor = new(.92f, .93f, .96f);
+            private static readonly Color RimColor = new(.85f, .70f, .35f, .8f);
+            private static readonly Regex DialogueTag = new(
+                @"<(?<end>/)?(?<name>b|i|color|size)(?:=[^<>\r\n]+)?>",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
             private static readonly Color OpponentColor = new(1f, .76f, .43f);
             private static readonly Color Listening = new(.48f, .53f, .63f);
             private const float CharactersPerSecond = 34f;
-            private static Sprite _cheekGlow;
+            private static Sprite _cheekGlow, _glassPanel;
 
             private readonly GameObject _root;
             private readonly CanvasGroup _scene;
@@ -52,10 +58,14 @@ namespace YGOPortable.UI
             private readonly Image _blush;
             private readonly Text[] _hearts = new Text[3];
             private readonly StoryDialogueFx _fx;
+            private readonly Image _dialoguePanel;
+            private readonly Image _goldRim;
+            private readonly Image _speakerPlate;
             private readonly GameObject _speakerBadge;
             private readonly Dictionary<string, Sprite> _rpgSprites = new(StringComparer.Ordinal);
             private readonly Text _speaker;
             private readonly Text _text;
+            private readonly Text _caret;
             private readonly Text _counter;
             private readonly Button _next;
             private readonly Button _previous;
@@ -82,6 +92,7 @@ namespace YGOPortable.UI
             private Action<int> _confirmDeck;
             private Action _editDeck;
             private int[] _characters;
+            private Match[] _formatting = Array.Empty<Match>();
             private int _index;
             private int _readThrough;
             private int _visible;
@@ -130,12 +141,13 @@ namespace YGOPortable.UI
                     null, Color.white, true, false);
                 _opponentSd.rectTransform.localScale = new Vector3(-1f, 1f, 1f);
                 var cutscene = DuelUiKit.FillRect("CutsceneOverlay", scene);
+                DuelUiKit.AddImage(cutscene.gameObject, DuelUiKit.WhiteSprite, new Color(.014f, .026f, .058f), false, false);
                 cutscene.gameObject.AddComponent<RectMask2D>();
                 _cutsceneOverlay = cutscene.gameObject.AddComponent<CanvasGroup>();
                 _cutsceneOverlay.blocksRaycasts = _cutsceneOverlay.interactable = false;
                 _cutsceneImage = DuelUiKit.AddImage(DuelUiKit.FillRect("CG", cutscene).gameObject, null, Color.white, false, false);
                 _cutsceneAspect = _cutsceneImage.gameObject.AddComponent<AspectRatioFitter>();
-                _cutsceneAspect.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
+                _cutsceneAspect.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
 
                 var content = Application.isMobilePlatform ? MobileSafeArea.Create(scene) : scene;
                 _scene = content.gameObject.AddComponent<CanvasGroup>();
@@ -160,16 +172,26 @@ namespace YGOPortable.UI
 
                 var dialogue = DuelUiKit.CreateMenuPanel(content, "DialogueBox",
                     new Vector2(.054f, .064f), new Vector2(.946f, .406f));
+                _dialoguePanel = dialogue.GetComponent<Image>();
+                var rim = DuelUiKit.CreateRect("GoldRim", dialogue, new Vector2(.025f, 1f), new Vector2(.975f, 1f),
+                    new Vector2(0f, -4f), new Vector2(0f, -2f));
+                _goldRim = DuelUiKit.AddImage(rim.gameObject, DuelUiKit.WhiteSprite, RimColor, false, false);
                 var dialogueHit = dialogue.gameObject.AddComponent<Button>();
                 dialogueHit.transition = Selectable.Transition.None;
                 dialogueHit.navigation = new Navigation { mode = Navigation.Mode.None };
                 dialogueHit.onClick.AddListener(Advance);
                 var speakerPlate = Region(dialogue, "SpeakerBadge", .038f, .703f, .35f, .95f);
                 _speakerBadge = speakerPlate.gameObject;
-                DuelUiKit.AddImage(speakerPlate.gameObject, DuelUiKit.WhiteSprite, new Color(.028f, .063f, .13f, .94f), false, false);
+                _speakerPlate = DuelUiKit.AddImage(speakerPlate.gameObject, DuelUiKit.WhiteSprite,
+                    new Color(.028f, .063f, .13f, .94f), false, false);
                 _speaker = AddLabel(speakerPlate, "Speaker", .08f, .05f, .94f, .95f, 23, TextAnchor.MiddleLeft);
-                _text = AddLabel(dialogue, "Text", .047f, .234f, .947f, .69f, 29, TextAnchor.UpperLeft);
-                _text.supportRichText = false;
+                var body = Region(dialogue, "Text", .047f, .234f, .947f, .69f);
+                _text = DuelUiKit.AddFittedText(body, "Label", "", 29, 13, TextAnchor.UpperLeft, DuelUiKit.TextPrimary);
+                var shadow = _text.gameObject.AddComponent<Shadow>();
+                shadow.effectDistance = new Vector2(1.5f, -1.5f);
+                shadow.effectColor = new Color(0f, 0f, 0f, .85f);
+                _caret = AddLabel(dialogue, "AdvanceCaret", .724f, .046f, .772f, .211f, 22, color: HeroColor);
+                _caret.text = "▼";
                 _counter = AddLabel(dialogue, "LineCount", .048f, .048f, .26f, .208f, 16, TextAnchor.MiddleLeft);
                 _previous = AddButton(dialogue, "Previous", "◀ 이전 대사", .36f, .727f, .50f, .927f, Previous);
                 _logButton = AddButton(dialogue, "Log", "대화 로그", .51f, .727f, .647f, .927f, OpenLog);
@@ -239,6 +261,7 @@ namespace YGOPortable.UI
                 _protagonist = protagonist;
                 _sceneOpponent = opponent;
                 _rpg = rpg;
+                ApplyDialogueStyle(rpg);
                 _hero.rectTransform.anchorMin = rpg ? new Vector2(.043f, .30f) : new Vector2(.07f, .26f);
                 _hero.rectTransform.anchorMax = rpg ? new Vector2(.41f, .855f) : new Vector2(.493f, .855f);
                 _opponent.rectTransform.anchorMin = rpg ? new Vector2(.59f, .30f) : new Vector2(.508f, .26f);
@@ -265,6 +288,7 @@ namespace YGOPortable.UI
             {
                 _fx.ResetEffect();
                 _showCutscene = false;
+                _fx.ShowCaret(_caret, false);
                 _cutsceneOverlay.alpha = 0f;
                 _portraitGroup.alpha = 1f;
                 SetSprite(_cutsceneImage, null);
@@ -313,6 +337,7 @@ namespace YGOPortable.UI
                 AnimatePortrait(_hero, _heroSpeaking, delta, _heroSpeaking ? _emotion : null, _poseTime);
                 AnimatePortrait(_opponent, _opponentSpeaking, delta, _opponentSpeaking ? _emotion : null, _poseTime);
                 AnimateHearts();
+                RefreshCaret();
                 if (_finished || _waitingBranch || _logRoot.activeSelf || _pickerRoot.activeSelf || _supports.Root.activeSelf) return;
                 if (_visible < _characters.Length)
                 {
@@ -409,7 +434,11 @@ namespace YGOPortable.UI
                 var speaker = !narration && !_heroSpeaking && _rpg
                     ? FindSpeaker(line.speaker) : null;
                 _opponentSpeaking = !narration && !_heroSpeaking && (!_rpg || speaker != null);
-                _speaker.color = _heroSpeaking ? HeroColor : OpponentColor;
+                _speaker.color = _heroSpeaking ? HeroColor : _rpg ? SpeakerColor(speaker?.name ?? line.speaker) : OpponentColor;
+                _speakerPlate.color = _rpg
+                    ? Color.Lerp(new Color(.028f, .063f, .13f, 1f), _speaker.color, .12f)
+                    : new Color(.028f, .063f, .13f, .94f);
+                _text.color = _rpg && narration ? NarrationColor : DuelUiKit.TextPrimary;
                 _emotion = _rpg ? line.emotion : null;
                 _poseTime = 0f;
                 _akiBlush = _rpg && speaker?.id == 1 && _emotion == "blush";
@@ -421,8 +450,13 @@ namespace YGOPortable.UI
                 AnimateHearts();
                 BindCutscene(_rpg ? line.cutscene : null);
                 _fx.Play(_rpg ? line.fx : null);
+                _formatting = _rpg ? DialogueTag.Matches(line.text).Cast<Match>().ToArray() : Array.Empty<Match>();
                 _characters = StringInfo.ParseCombiningCharacters(line.text);
+                if (_formatting.Length > 0)
+                    _characters = _characters.Where(offset =>
+                        !_formatting.Any(tag => offset >= tag.Index && offset < tag.Index + tag.Length)).ToArray();
                 _text.text = "";
+                _fx.ShowCaret(_caret, false);
                 _counter.text = $"{index + 1} / {_dialogue.Length}";
                 _typed = _readTime = 0f;
                 _visible = 0;
@@ -434,8 +468,79 @@ namespace YGOPortable.UI
                 if (_visible == count) return;
                 _visible = count;
                 string text = _dialogue[_index].text;
-                _text.text = count == _characters.Length ? text : text.Substring(0, _characters[count]);
+                if (count == _characters.Length)
+                {
+                    _text.text = text;
+                }
+                else
+                {
+                    int end = _characters[count];
+                    string prefix = text.Substring(0, end);
+                    if (_formatting.Length > 0)
+                    {
+                        var open = new Stack<string>();
+                        foreach (var tag in _formatting)
+                        {
+                            if (tag.Index >= end) break;
+                            bool closing = tag.Groups["end"].Success;
+                            string name = tag.Groups["name"].Value.ToLowerInvariant();
+                            if (!closing) open.Push(name);
+                            else if (open.Count > 0 && open.Peek() == name) open.Pop();
+                        }
+                        prefix += string.Concat(open.Select(tag => $"</{tag}>"));
+                    }
+                    _text.text = prefix;
+                }
+                RefreshCaret();
             }
+
+            private void RefreshCaret() => _fx.ShowCaret(_caret, _rpg && _dialogue != null &&
+                !_finished && !_waitingBranch && _visible == _characters.Length &&
+                !_logRoot.activeSelf && !_pickerRoot.activeSelf && !_supports.Root.activeSelf);
+
+            private void ApplyDialogueStyle(bool rpg)
+            {
+                _dialoguePanel.sprite = rpg ? _glassPanel ??= DuelUiChrome.DrawPlate("RPG dialogue glass",
+                    new Color(.055f, .105f, .19f, .92f), new Color(.02f, .04f, .09f, .92f),
+                    new Color(.31f, .35f, .42f, .72f)) : DuelUiChrome.Panel;
+                _goldRim.enabled = rpg;
+                _text.fontStyle = rpg ? FontStyle.Normal : FontStyle.Bold;
+                _text.lineSpacing = rpg ? 1.25f : 1f;
+                _text.supportRichText = rpg;
+                foreach (var button in new[] { _previous, _logButton, _auto, _skip })
+                {
+                    var image = (Image)button.targetGraphic;
+                    image.overrideSprite = null;
+                    image.canvasRenderer.SetColor(Color.white);
+                    if (!rpg)
+                    {
+                        DuelUiChrome.ApplyControl(button, image);
+                        continue;
+                    }
+                    image.sprite = DuelUiKit.WhiteSprite;
+                    image.type = Image.Type.Simple;
+                    button.transition = Selectable.Transition.ColorTint;
+                    button.colors = new ColorBlock
+                    {
+                        normalColor = new Color(.09f, .15f, .23f, .82f),
+                        highlightedColor = new Color(.18f, .29f, .41f, .92f),
+                        selectedColor = new Color(.20f, .36f, .48f, .96f),
+                        pressedColor = new Color(.12f, .24f, .36f, 1f),
+                        disabledColor = new Color(.08f, .10f, .15f, .48f),
+                        colorMultiplier = 1f,
+                        fadeDuration = .12f,
+                    };
+                }
+            }
+
+            private static Color SpeakerColor(string name) => name switch
+            {
+                "이자요이 아키" => new Color32(0xFF, 0x40, 0x81, 255),
+                "후도 유세이" => new Color32(0x00, 0xE5, 0xFF, 255),
+                "잭 아틀라스" => new Color32(0xFF, 0x52, 0x52, 255),
+                "예거" => new Color32(0xE0, 0x40, 0xFB, 255),
+                _ => new Color32(0xFF, 0xC1, 0x07, 255),
+            };
 
             private void Advance()
             {
@@ -470,6 +575,7 @@ namespace YGOPortable.UI
                 BindLine(_dialogue.Length - 1);
                 Reveal(_characters.Length);
                 _finished = true;
+                _fx.ShowCaret(_caret, false);
                 _advanceSurface.interactable = false;
                 _previous.interactable = _auto.interactable = _next.interactable = _skip.interactable = false;
                 _onEnd?.Invoke();
@@ -487,6 +593,7 @@ namespace YGOPortable.UI
                 BindLine(_branchLine);
                 Reveal(_characters.Length);
                 _waitingBranch = true;
+                _fx.ShowCaret(_caret, false);
                 _advanceSurface.interactable = false;
                 _previous.interactable = _auto.interactable = _next.interactable = _skip.interactable = false;
                 _branch.Invoke();
@@ -529,7 +636,8 @@ namespace YGOPortable.UI
                 {
                     var line = _dialogue[i];
                     if (!IsNarration(line.speaker)) history.AppendLine(line.speaker);
-                    history.AppendLine(i == _index && !_finished ? _text.text : line.text);
+                    string text = i == _index && !_finished ? _text.text : line.text;
+                    history.AppendLine(_rpg ? DialogueTag.Replace(text, "") : text);
                     history.AppendLine();
                 }
                 _logText.text = history.ToString();
@@ -553,6 +661,7 @@ namespace YGOPortable.UI
                 _scene.interactable = _scene.blocksRaycasts = false;
                 _advanceSurface.interactable = false;
                 popup.SetActive(true);
+                _fx.ShowCaret(_caret, false);
                 DeckPadUi.LimitKeyboardNavigation(popup.transform);
                 Focus(focus);
             }
@@ -564,6 +673,7 @@ namespace YGOPortable.UI
                 _advanceSurface.interactable = !_finished && !_waitingBranch;
                 if (_popupReturn != null && _popupReturn.IsInteractable()) Focus(_popupReturn);
                 _popupReturn = null;
+                RefreshCaret();
             }
 
             private static bool IsNarration(string speaker) =>
@@ -728,6 +838,8 @@ namespace YGOPortable.UI
         private RectTransform _dialogue;
         private Image _overlay;
         private Vector2 _restingPosition;
+        private Coroutine _effectAnimation;
+        private Coroutine _caretAnimation;
 
         internal void Initialize(RectTransform dialogue, Image overlay)
         {
@@ -738,7 +850,8 @@ namespace YGOPortable.UI
 
         internal void ResetEffect()
         {
-            StopAllCoroutines();
+            if (_effectAnimation != null) StopCoroutine(_effectAnimation);
+            _effectAnimation = null;
             _dialogue.anchoredPosition = _restingPosition;
             _overlay.color = Color.clear;
         }
@@ -746,7 +859,27 @@ namespace YGOPortable.UI
         internal void Play(string name)
         {
             ResetEffect();
-            if (Application.isPlaying && name is ("shake" or "flash" or "heartbeat")) StartCoroutine(Animate(name));
+            if (Application.isPlaying && name is ("shake" or "flash" or "heartbeat"))
+                _effectAnimation = StartCoroutine(Animate(name));
+        }
+
+        internal void ShowCaret(Text caret, bool visible)
+        {
+            if (caret.enabled == visible) return;
+            caret.enabled = visible;
+            if (_caretAnimation != null) StopCoroutine(_caretAnimation);
+            _caretAnimation = visible && Application.isPlaying ? StartCoroutine(PulseCaret(caret)) : null;
+        }
+
+        private static IEnumerator PulseCaret(Text caret)
+        {
+            Color glow = caret.color;
+            for (float time = 0f; caret.enabled; time += Time.unscaledDeltaTime)
+            {
+                glow.a = .72f + .23f * Mathf.Sin(time * 5f);
+                caret.color = glow;
+                yield return null;
+            }
         }
 
         private IEnumerator Animate(string name)
@@ -759,6 +892,7 @@ namespace YGOPortable.UI
             }
             _dialogue.anchoredPosition = _restingPosition;
             _overlay.color = Color.clear;
+            _effectAnimation = null;
         }
 
         internal void DrawFrame(string name, float progress)

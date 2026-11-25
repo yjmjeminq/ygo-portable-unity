@@ -125,6 +125,9 @@ namespace YGOPortable.Editor
                 var cutscene = scene.Find("CutsceneOverlay").GetComponent<CanvasGroup>();
                 var portraits = scene.Find("Portraits").GetComponent<CanvasGroup>();
                 var badge = scene.Find("DialogueBox/SpeakerBadge").gameObject;
+                var cg = cutscene.transform.Find("CG").GetComponent<Image>();
+                var body = scene.Find("DialogueBox/Text/Label").GetComponent<Text>();
+                var caret = scene.Find("DialogueBox/AdvanceCaret/Label").GetComponent<Text>();
                 var next = scene.Find("DialogueBox/Next/Button").GetComponent<Button>();
                 var playerPortrait = portraits.transform.Find("Protagonist").GetComponent<Image>();
                 try
@@ -139,7 +142,7 @@ namespace YGOPortable.Editor
                             new[]
                             {
                                 new StoryDialogueLine { speaker = line.speaker, text = new string('가', 40), cutscene = line.cutscene },
-                                new StoryDialogueLine { speaker = "이자요이 아키", text = "고마워.", emotion = "blush" },
+                                new StoryDialogueLine { speaker = "이자요이 아키", text = "<b>고마워.</b>", emotion = "blush" },
                                 new StoryDialogueLine { speaker = "설명", text = "바람이 스쳤다." },
                             }, () => { }, rpg: true);
                         var heroSd = scene.Find("ProtagonistSD");
@@ -147,16 +150,26 @@ namespace YGOPortable.Editor
                         Require(!badge.activeSelf && playerPortrait.sprite.rect.height < playerPortrait.sprite.texture.height &&
                             heroSd.GetComponent<Image>().sprite != null && opponentSd.GetComponent<Image>().sprite != null &&
                             heroSd.localScale.x > 0f && opponentSd.localScale.x < 0f, "Narration or the RPG portraits were misconfigured.");
+                        Require(body.supportRichText && Mathf.Approximately(body.lineSpacing, 1.25f) &&
+                            body.font == DuelUiKit.FontKR && body.GetComponent<Shadow>().effectDistance == new Vector2(1.5f, -1.5f) &&
+                            body.color == new Color(.92f, .93f, .96f) && !caret.enabled &&
+                            cg.GetComponent<AspectRatioFitter>().aspectMode == AspectRatioFitter.AspectMode.FitInParent,
+                            "RPG dialogue typography or the cutscene fit did not match the visual novel layout.");
                         dialogue.Update(.2f);
                         Require(Mathf.Approximately(cutscene.alpha, .5f) && Mathf.Approximately(portraits.alpha, .5f),
                             "The midpoint of the CG fade was incorrect.");
                         dialogue.Update(.2f);
-                        Require(cutscene.alpha == 1f && portraits.alpha == 0f && cutscene.GetComponentInChildren<Image>().sprite != null,
+                        Require(cutscene.alpha == 1f && portraits.alpha == 0f && cg.sprite != null,
                             "The CG did not cover the scene.");
                         next.onClick.Invoke();
                         next.onClick.Invoke();
-                        dialogue.Update(.4f);
+                        dialogue.Update(.05f);
+                        Require(body.text == "<b>고</b>" && !caret.enabled,
+                            "Typing leaked rich-text markup or showed the advance caret too soon.");
+                        dialogue.Update(.35f);
                         Require(cutscene.alpha == 0f && portraits.alpha == 1f && badge.activeSelf &&
+                            caret.enabled && body.text == "<b>고마워.</b>" &&
+                            badge.GetComponentInChildren<Text>().color == (Color)new Color32(0xFF, 0x40, 0x81, 255) &&
                             portraits.transform.Find("Opponent/Blush").GetComponent<Image>().enabled &&
                             portraits.transform.Find("Opponent/Heart_0/Label").GetComponent<Text>().enabled,
                             "The portrait and blush did not return after fading out the CG.");
