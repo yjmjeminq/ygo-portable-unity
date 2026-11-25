@@ -1004,7 +1004,7 @@ namespace YGOPortable.Editor
             enter(.96f);
             var synchro = animator.transform.Find("Synchro").GetComponent<DuelEffectGraphic>();
             var subject = animator.transform.Find("MovingCard/Overframe").GetComponent<CanvasGroup>();
-            Require(synchro.SummonFinale && subject.alpha > .9f && animator.transform.Find("SummonPeakFlash") != null,
+            Require(synchro.SummonFinale && subject.alpha > .9f && animator.transform.Find("SummonPeakFlash") == null,
                 "The signature finale did not flow into the ace's overframe.");
             while (reveal.MoveNext()) SampleAnimation((IEnumerator)reveal.Current)(1f);
             Require(!move.MoveNext() && animator.transform.Find("Synchro") == null,
@@ -1330,11 +1330,13 @@ namespace YGOPortable.Editor
             var to = new CardPose(Vector2.zero, new Vector2(220f, 319f));
             var flight = new CardFlight(BlueEyes, from, to, false, false);
             var rect = (RectTransform)card.transform;
-            CardAnimationManager.ApplySummonEntrance(card, flight, DuelEffectKind.Synchro, .5f);
-            Vector2 synchro = rect.anchoredPosition;
-            CardAnimationManager.ApplySummonEntrance(card, flight, DuelEffectKind.Xyz, .5f);
-            Vector2 xyz = rect.anchoredPosition;
-            Require(synchro.y > xyz.y + 50f && xyz.x > synchro.x + 30f, "The special summons used the same entrance path.");
+            foreach (var kind in new[] { DuelEffectKind.Fusion, DuelEffectKind.Synchro, DuelEffectKind.Xyz, DuelEffectKind.Link })
+            {
+                CardAnimationManager.ApplySummonEntrance(card, flight, kind, .5f);
+                Require(Vector2.Distance(rect.anchoredPosition, Vector2.Lerp(from.Position, to.Position, .5f)) < .1f &&
+                    Quaternion.Angle(rect.localRotation, Quaternion.identity) < .1f,
+                    "A signature summon veered away from the reveal or twisted the card.");
+            }
             CardAnimationManager.ApplySummonEntrance(card, flight, DuelEffectKind.Link, 1f);
             Require(Vector2.Distance(rect.anchoredPosition, to.Position) < .1f, "The reveal did not settle at its target pose.");
         }

@@ -9,6 +9,9 @@ namespace YGOPortable.UI
     {
         private static Vector2 SummonShowcaseCenter(Vector2 view) => new Vector2(view.x * .035f, view.y * .045f);
 
+        private static Vector2 MaterialStageSize(Vector2 view) =>
+            new Vector2(Mathf.Min(view.x * .76f, view.y * 1.36f), view.y * .76f);
+
         private static DuelEffectKind? MaterialSignature(uint method) => method switch
         {
             YgoConstants.REASON_SYNCHRO => DuelEffectKind.Synchro,
@@ -65,7 +68,7 @@ namespace YGOPortable.UI
             Color accent, uint linkMarkers)
         {
             var view = _layer.rect.size;
-            var portal = CreateSignatureEffect(kind, SummonShowcaseCenter(view), view, accent, finale: false);
+            var portal = CreateSignatureEffect(kind, SummonShowcaseCenter(view), MaterialStageSize(view), accent, finale: false);
             if (kind == DuelEffectKind.Synchro) portal.SummonUnits = SummonTunerLevels(moves);
             if (kind == DuelEffectKind.Link) portal.DirectionMask = linkMarkers;
             return portal;
@@ -99,8 +102,9 @@ namespace YGOPortable.UI
             switch (portal.Kind)
             {
                 case DuelEffectKind.Xyz:
-                    point = center + RotateSummonVector(origin - center, travel * (5.7f + index * .31f)) *
-                        Mathf.Pow(1f - travel, 1.3f);
+                    var entry = origin - center;
+                    var orbit = RotateSummonVector(new Vector2(entry.x, entry.y / .65f), travel * (5.1f + index * .23f));
+                    point = center + new Vector2(orbit.x, orbit.y * .65f) * Mathf.Pow(1f - travel, 1.2f);
                     break;
                 case DuelEffectKind.Synchro:
                     var lower = center - Vector2.up * radius * .89f;
@@ -170,10 +174,10 @@ namespace YGOPortable.UI
             if (pull == 0f) return;
             var rect = (RectTransform)view.transform;
             var offset = flight.From.AtLayout().Position - center;
-            Vector2 spiral = RotateSummonVector(offset, pull * (index % 2 == 0 ? 4.9f : -4.9f)) *
+            Vector2 spiral = RotateSummonVector(offset, pull * (3.9f + Mathf.Min(index, 5) * .22f)) *
                 Mathf.Pow(1f - pull, 1.12f);
             rect.anchoredPosition = Vector2.Lerp(rect.anchoredPosition, center + spiral, Mathf.SmoothStep(0f, 1f, pull * 4f));
-            rect.localRotation *= Quaternion.Euler(0f, 0f, pull * (index % 2 == 0 ? -104f : 104f));
+            rect.localRotation *= Quaternion.Euler(0f, 0f, -72f * pull);
             rect.localScale *= Mathf.Lerp(1f, .22f, pull);
         }
 
@@ -208,19 +212,5 @@ namespace YGOPortable.UI
             return visibility;
         }
 
-        private void PoseSummonPeak(Image flash, Text circuitClosed, float progress, float canvasHeight)
-        {
-            float shock = Mathf.InverseLerp(.48f, .67f, progress);
-            float pulse = Mathf.Sin(shock * Mathf.PI) * (1f - shock);
-            _layer.anchoredPosition = new Vector2(Mathf.Sin(shock * 29f), Mathf.Sin(shock * 41f)) * (canvasHeight * .020f * pulse);
-            float white = Mathf.Sin(Mathf.InverseLerp(.49f, .64f, progress) * Mathf.PI);
-            flash.color = new Color(.92f, .97f, 1f, Mathf.Max(0f, white) * .33f);
-            if (circuitClosed != null)
-            {
-                Color ink = DuelStyle.Gold;
-                ink.a = Mathf.Sin(Mathf.InverseLerp(.43f, .82f, progress) * Mathf.PI);
-                circuitClosed.color = ink;
-            }
-        }
     }
 }

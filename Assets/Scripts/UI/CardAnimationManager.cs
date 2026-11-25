@@ -1151,7 +1151,7 @@ namespace YGOPortable.UI
                 if (portal != null)
                 {
                     portal.Seek(time);
-                    shade.color = new Color(.008f, .012f, .021f, Mathf.Sin(time * Mathf.PI) * .58f);
+                    shade.color = new Color(.010f, .016f, .028f, Mathf.Sin(time * Mathf.PI) * .38f);
                 }
                 for (int i = 0; i < moves.Count; i++)
                 {
@@ -1458,7 +1458,8 @@ namespace YGOPortable.UI
             Vector2 view = _layer.rect.size;
             var center = SummonShowcaseCenter(view);
             bool signature = DuelEffectGraphic.HasSummonSignature(kind);
-            float height = Mathf.Min(352f, view.y * .395f);
+            bool compact = signature && !overframe && (!featured || !HasSummonPortrait(flight));
+            float height = Mathf.Min(352f, view.y * (compact ? .32f : .395f));
             float layoutHeight = overframe ? height : 0f;
             if (overframe)
             {
@@ -1466,23 +1467,16 @@ namespace YGOPortable.UI
                 proxy.PoseOverframe(0f, 1f, Vector2.zero, 0f);
             }
             var reveal = new CardPose(center, new Vector2(height * DuelUiKit.CardAspectRatio, height), 0f);
-            var first = new CardFlight(flight.Code, flight.From, reveal, flight.StartsFaceDown, false, flight.Appearance);
+            var emergence = signature ? new CardPose(center, reveal.Size * .44f) : flight.From;
+            var first = new CardFlight(flight.Code, emergence, reveal, flight.StartsFaceDown, false, flight.Appearance);
+            float shadeOpacity = compact ? .28f : .64f;
             var background = SummonScreenTint("SummonShade");
             var effect = signature
-                ? CreateSignatureEffect(kind, center, view, accent, finale: true)
+                ? CreateSignatureEffect(kind, center, new Vector2(height * 2.18f, height * 1.55f), accent, finale: true)
                 : CreateEffect(kind, center, new Vector2(view.x * .76f, view.y * .83f), accent);
             effect.SummonUnits = LimitSummonUnits(kind == DuelEffectKind.Xyz
                 ? Mathf.Max(signatureUnits, live?.overlayCodes.Count ?? 0) : signatureUnits);
             if (kind == DuelEffectKind.Link) effect.DirectionMask = SummonedLinkMarkers(flight.Code, live);
-            var flash = signature ? SummonScreenTint("SummonPeakFlash") : null;
-            Text circuitClosed = null;
-            if (kind == DuelEffectKind.Link)
-            {
-                var banner = CenteredVisual("LinkCircuitClosed", _layer, center + Vector2.up * view.y * .35f,
-                    new Vector2(view.x * .35f, view.y * .066f));
-                circuitClosed = DuelUiKit.AddFittedText(banner, "Message", "LINK CLOSED!", 30, 16,
-                    TextAnchor.MiddleCenter, Color.clear, FontStyle.Bold);
-            }
             Vector2 portraitCenter = center + new Vector2(view.x * .065f, view.y * .032f);
             DuelEffectGraphic aura = null;
             DuelEffectGraphic wave = null;
@@ -1520,18 +1514,18 @@ namespace YGOPortable.UI
 
             bool playedImpact = !signature;
             if (playedImpact) DuelAudio.PlaySummon(motion);
-            yield return Animate(signature ? .36f : .28f, t =>
+            if (signature) ApplyFlight(proxy, first, 0f, 0f, live, layoutHeight: layoutHeight);
+            yield return Animate(compact ? .26f : signature ? .36f : .28f, t =>
             {
                 if (!playedImpact && t >= .88f)
                 {
                     playedImpact = true;
                     DuelAudio.PlaySummon(motion);
                 }
-                float arrival = signature ? Mathf.InverseLerp(.20f, .97f, t) : t;
+                float arrival = signature ? Mathf.InverseLerp(.08f, .96f, t) : t;
                 ApplySummonEntrance(proxy, first, kind, arrival, live, layoutHeight);
                 effect.Seek(t * .54f);
-                if (signature) PoseSummonPeak(flash, circuitClosed, t * .54f, view.y);
-                background.color = new Color(.009f, .013f, .02f, Mathf.SmoothStep(0f, .64f, t));
+                background.color = new Color(.009f, .013f, .02f, Mathf.SmoothStep(0f, shadeOpacity, t));
                 name.alpha = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(portrait != null ? .74f : .47f, 1f, t));
                 nameRect.anchoredPosition = nameCenter + Vector2.left * (42f * (1f - name.alpha));
                 if (overframe)
@@ -1548,10 +1542,9 @@ namespace YGOPortable.UI
                     movingFace.alpha = 1f - emerge;
                 }
             });
-            yield return Animate(featured || overframe ? .29f : .18f, t =>
+            yield return Animate(!compact && (featured || overframe) ? .29f : .18f, t =>
             {
                 effect.Seek(.54f + t * .22f);
-                if (signature) PoseSummonPeak(flash, circuitClosed, .54f + t * .22f, view.y);
                 stats.alpha = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.04f, .67f, t));
                 statsRect.anchoredPosition = statsCenter + statsEntrance * (1f - stats.alpha);
                 proxy.SetRarityHighlight(Mathf.Lerp(.85f, .25f, t));
@@ -1572,12 +1565,11 @@ namespace YGOPortable.UI
             var last = new CardFlight(flight.Code, reveal, flight.To, false, flight.EndsFaceDown, flight.Appearance);
             yield return Animate(.22f, t =>
             {
-                ApplyFlight(proxy, last, t, 23f, live, layoutHeight: layoutHeight);
+                ApplyFlight(proxy, last, t, compact ? 10f : 23f, live, layoutHeight: layoutHeight);
                 proxy.SetRarityHighlight(.25f * (1f - t));
                 effect.Seek(.76f + t * .24f);
-                if (signature) PoseSummonPeak(flash, circuitClosed, .76f + t * .24f, view.y);
                 name.alpha = 1f - t;
-                background.color = new Color(.009f, .013f, .02f, .64f * (1f - t));
+                background.color = new Color(.009f, .013f, .02f, shadeOpacity * (1f - t));
                 if (portrait != null)
                 {
                     float dissolve = Mathf.SmoothStep(0f, 1f, t * 2.5f);
@@ -1595,8 +1587,6 @@ namespace YGOPortable.UI
             RemoveTransient(background.gameObject);
             RemoveTransient(effect.gameObject);
             RemoveTransient(name.gameObject);
-            if (flash != null) RemoveTransient(flash.gameObject);
-            if (circuitClosed != null) RemoveTransient(circuitClosed.transform.parent.gameObject);
             if (portrait != null) RemoveTransient(portrait.gameObject);
             if (aura != null) RemoveTransient(aura.gameObject);
             if (wave != null) RemoveTransient(wave.gameObject);
@@ -1626,10 +1616,7 @@ namespace YGOPortable.UI
         {
             var (lift, shift, roll) = kind switch
             {
-                DuelEffectKind.Fusion => (37f, -25f, -12f),
-                DuelEffectKind.Synchro => (73f, 0f, 0f),
-                DuelEffectKind.Xyz => (11f, 39f, 15f),
-                DuelEffectKind.Link => (19f, -52f, 6f),
+                _ when DuelEffectGraphic.HasSummonSignature(kind) => (0f, 0f, 0f),
                 DuelEffectKind.Ritual => (48f, 0f, -4f),
                 DuelEffectKind.Pendulum => (51f, 32f, -10f),
                 _ => (38f, 0f, 0f),

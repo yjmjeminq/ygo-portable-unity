@@ -18,6 +18,11 @@ namespace YGOPortable.UI
 
         private void DrawSummonSignature(VertexHelper mesh, Rect rect, float radius, float time, float glow)
         {
+            if (SummonFinale)
+            {
+                DrawSummonLanding(mesh, rect.center, radius, time, glow);
+                return;
+            }
             switch (Kind)
             {
                 case DuelEffectKind.Synchro:
@@ -38,69 +43,61 @@ namespace YGOPortable.UI
         private void DrawSynchroCorridor(VertexHelper mesh, Rect rect, float radius, float time, float glow)
         {
             var center = rect.center;
-            Glow(mesh, center, radius * .71f, 1.12f, Shade(Tint, glow * .50f));
+            float beam = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.60f, .94f, time));
+            var floor = center - Vector2.up * radius * .82f;
+            var ceiling = center + Vector2.up * radius * .92f;
+            Glow(mesh, center, radius * .70f, 1.12f, Shade(Tint, glow * .38f));
+            Line(mesh, floor, ceiling, radius * .48f, Shade(Tint, glow * beam * .26f));
+            Line(mesh, floor, ceiling, radius * .105f, Shade(Color.white, glow * beam * .66f));
             for (int i = 0; i < SummonUnits; i++)
             {
                 float depth = (i + .5f) / SummonUnits;
-                float forming = SummonFinale ? time : Mathf.InverseLerp(.34f, .86f, time);
-                float form = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(i * .038f, .38f + i * .014f, forming));
-                var point = center + Vector2.up * (radius * Mathf.Lerp(-.69f, .53f, depth) * form);
-                float size = radius * Mathf.Lerp(.54f, .33f, depth) * form;
+                float delay = .18f + depth * .30f;
+                float form = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(delay, delay + .24f, time));
+                var point = center + Vector2.up * (radius * Mathf.Lerp(-.69f, .57f, depth));
+                float size = radius * Mathf.Lerp(.64f, .43f, depth) * Mathf.Lerp(.55f, 1f, form);
                 var ink = Color.Lerp(Tint, Color.white, depth * .55f);
-                Ring(mesh, point, size, .27f, 2.2f + 2f * form, 0f, 1f, Shade(ink, glow * form), 32);
-                Ring(mesh, point, size * 1.15f, .27f, 1.8f, time + depth, .28f,
-                    Shade(Color.white, glow * .53f * form), 14);
+                Ring(mesh, point, size, .26f, radius * .025f, 0f, 1f, Shade(ink, glow * .33f * form), 32);
+                Ring(mesh, point, size, .26f, 2.2f, 0f, 1f, Shade(ink, glow * form), 32);
+                Ring(mesh, point, size * 1.11f, .26f, 1.4f, time + depth, .28f,
+                    Shade(Color.white, glow * .64f * form), 14);
             }
-            if (!SummonFinale) return;
-            float beam = Mathf.SmoothStep(0f, 1f, 1f - Mathf.Abs(time - .54f) / .25f);
-            var bottom = center - Vector2.up * rect.height * .54f;
-            var top = center + Vector2.up * rect.height * .61f;
-            Line(mesh, bottom, top, radius * .68f * beam, Shade(Tint, glow * beam * .28f));
-            Line(mesh, bottom, top, radius * .23f * beam, Shade(Color.white, glow * beam * .95f));
-            Ring(mesh, center, radius * Mathf.Lerp(.30f, 1.20f, Mathf.InverseLerp(.45f, .84f, time)), .39f,
-                3.8f, 0f, 1f, Shade(Color.white, glow * beam * .81f), 40);
         }
 
         private void DrawXyzGate(VertexHelper mesh, Vector2 center, float radius, float time, float glow)
         {
             var core = new Color(.023f, .011f, .063f);
             var indigo = new Color(.35f, .29f, .95f);
-            Glow(mesh, center, radius * 1.24f, .74f, Shade(indigo, glow * .66f));
-            Glow(mesh, center, radius * .71f, .68f, Shade(core, glow));
+            Glow(mesh, center, radius * 1.18f, .69f, Shade(indigo, glow * .61f));
             for (int i = 0; i < 3; i++)
-                DrawSpiral(mesh, center, new Vector2(radius, radius * .70f), time * -.91f + i / 3f,
-                    .95f, 3.5f, Shade(i == 2 ? DuelStyle.Gold : Tint, glow), 30);
-
-            if (!SummonFinale) return;
-            float emerged = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.44f, .61f, time));
-            for (int i = 0; i < SummonUnits; i++)
+                DrawSpiral(mesh, center, new Vector2(radius * 1.21f, radius * .65f), time * .74f + i / 3f,
+                    .81f, i == 2 ? 1.8f : 3f, Shade(i == 2 ? DuelStyle.Gold : Tint, glow * .82f), 36);
+            Glow(mesh, center, radius * .39f, .61f, Shade(core, glow * .98f));
+            for (int i = 0; i < 18; i++)
             {
-                float turn = i / (float)SummonUnits + time * .84f;
-                var orbit = center - Vector2.up * radius * .19f;
-                float range = radius * Mathf.Lerp(.32f, .82f, emerged);
-                var point = OnEllipse(orbit, range, .47f, turn);
-                var tail = OnEllipse(orbit, range, .47f, turn - .061f);
-                float opacity = glow * emerged;
-                Line(mesh, tail, point, radius * .019f, Shade(DuelStyle.Gold, opacity * .75f));
-                DrawStar(mesh, point, radius * .057f, Shade(DuelStyle.Gold, opacity));
+                float range = radius * (.48f + (i % 7) * .108f);
+                var point = OnEllipse(center, range, .65f, i * .618f + time * .43f);
+                float opacity = glow * (.29f + .21f * Mathf.Sin(i + time * 8f));
+                Glow(mesh, point, radius * .026f, 1f, Shade(Color.white, opacity));
             }
         }
 
         private void DrawFusionVortex(VertexHelper mesh, Rect rect, float time, float glow)
         {
-            var reach = rect.size * .66f;
+            var reach = new Vector2(rect.width * .55f, rect.height * .47f);
             var center = rect.center;
-            Glow(mesh, center, reach.y * .77f, 1f, Shade(Tint, glow * .63f));
+            var inlet = new Color(.35f, .46f, 1f);
+            Glow(mesh, center, reach.y * 1.14f, .81f, Shade(Tint, glow * .42f));
             for (int i = 0; i < 4; i++)
             {
-                float turn = time * (i % 2 == 0 ? .85f : -.72f) + i * .25f;
-                Color ink = i % 2 == 0 ? Tint : VortexAmber;
-                DrawSpiral(mesh, center, reach, turn, i % 2 == 0 ? 1.14f : -1.08f,
-                    6.2f - i * .70f, Shade(ink, glow), 44);
+                float turn = time * .79f + i * .25f;
+                Color ink = i switch { 0 => inlet, 2 => VortexAmber, _ => Tint };
+                DrawSpiral(mesh, center, reach, turn, .92f + i * .042f,
+                    4.6f - i * .57f, Shade(ink, glow * .84f), 44);
             }
-            if (SummonFinale)
-                Glow(mesh, center, reach.y * (.17f + time * .62f), .81f,
-                    Shade(Color.white, glow * Mathf.Clamp01(1f - 4.6f * Mathf.Abs(time - .54f))));
+            float convergence = Mathf.InverseLerp(.66f, 1f, time);
+            Glow(mesh, center, reach.y * (.13f + convergence * .25f), .82f,
+                Shade(Color.Lerp(inlet, Color.white, convergence), glow * (.53f + convergence * .38f)));
         }
 
         internal static uint LitLinkMarkers(uint directionMask, float time)
@@ -123,7 +120,7 @@ namespace YGOPortable.UI
             Glow(mesh, center, radius * form, .72f, Shade(Tint, glow * .49f));
             Ring(mesh, center, radius * .89f * form, .76f, 3.8f, .0625f, 1f, baseInk, 8);
             Ring(mesh, center, radius * .61f * form, .76f, 2.2f, .0625f, 1f, baseInk, 8);
-            uint lit = LitLinkMarkers(DirectionMask, SummonFinale ? time : Mathf.InverseLerp(.48f, .96f, time));
+            uint lit = LitLinkMarkers(DirectionMask, Mathf.InverseLerp(.48f, .96f, time));
 
             foreach (var mark in DuelLinkCompass.Marks)
             {
@@ -146,11 +143,37 @@ namespace YGOPortable.UI
                     Glow(mesh, contact, radius * .13f, 1f, Shade(DuelStyle.Gold, glow * .76f));
                 }
             }
-            if (SummonFinale)
+        }
+
+        private void DrawSummonLanding(VertexHelper mesh, Vector2 center, float radius, float time, float glow)
+        {
+            float travel = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.28f, .94f, time));
+            float core = Mathf.SmoothStep(0f, 1f, 1f - Mathf.Abs(time - .48f) / .24f);
+            Glow(mesh, center, radius * .87f, 1f, Shade(Tint, glow * .32f));
+            Glow(mesh, center, radius * (.45f + core * .34f), .88f, Shade(Color.white, glow * core * .63f));
+            var floor = center - Vector2.up * radius * .37f;
+            float opening = radius * Mathf.Lerp(.38f, 1.07f, travel);
+            int edges = Kind == DuelEffectKind.Link ? 8 : 40;
+            Ring(mesh, floor, opening, .38f, 2f, Kind == DuelEffectKind.Link ? .0625f : 0f, 1f,
+                Shade(Tint, glow * (1f - travel) * .74f), edges);
+            if (Kind == DuelEffectKind.Link)
             {
-                float pulse = Mathf.InverseLerp(.49f, .84f, time);
-                Ring(mesh, center, radius * Mathf.Lerp(.39f, 1.35f, pulse), .76f, 5.2f * (1f - pulse) + 1f,
-                    .0625f, 1f, Shade(DuelStyle.Gold, glow * Mathf.Sin(pulse * Mathf.PI)), 8);
+                foreach (var mark in DuelLinkCompass.Marks)
+                {
+                    if ((DirectionMask & mark.mask) == 0) continue;
+                    var direction = ((Vector2)mark.direction).normalized;
+                    var point = floor + new Vector2(direction.x, direction.y * .38f) * opening;
+                    Glow(mesh, point, radius * .048f, 1f, Shade(LinkRed, glow * (1f - travel) * .84f));
+                }
+            }
+            if (Kind != DuelEffectKind.Xyz) return;
+            for (int i = 0; i < SummonUnits; i++)
+            {
+                float turn = i / (float)SummonUnits + time * .81f;
+                var point = OnEllipse(floor, opening, .43f, turn);
+                var tail = OnEllipse(floor, opening, .43f, turn - .053f);
+                Line(mesh, tail, point, radius * .014f, Shade(DuelStyle.Gold, glow * .70f));
+                DrawStar(mesh, point, radius * .049f, Shade(DuelStyle.Gold, glow));
             }
         }
 

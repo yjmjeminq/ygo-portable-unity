@@ -4865,25 +4865,34 @@ namespace YGOPortable.Editor
             {
                 var reveal = (IEnumerator)arrival.Current;
                 Require(reveal.MoveNext(), "The signature finale did not start.");
-                TestCardPresentation.SampleAnimation((IEnumerator)reveal.Current)(.96f);
+                var emerge = TestCardPresentation.SampleAnimation((IEnumerator)reveal.Current);
+                emerge(.06f);
                 var finale = animator.GetComponentsInChildren<DuelEffectGraphic>().Single(graphic => graphic.SummonFinale);
-                var flash = animator.transform.Find("SummonPeakFlash").GetComponent<Image>();
-                Require(finale.Kind == kind && flash.color.a > .1f &&
-                        ((RectTransform)animator.transform).anchoredPosition.sqrMagnitude > .01f,
-                    "The signature finale missed its flash or shake.");
+                var movingCard = (RectTransform)animator.GetComponentsInChildren<CompositeCardView>()
+                    .Single(card => card.name == "MovingCard").transform;
+                Vector2 center = finale.rectTransform.anchoredPosition;
+                Require(finale.Kind == kind && (movingCard.anchoredPosition - center).sqrMagnitude < .01f &&
+                        !animator.GetComponentsInChildren<DuelEffectGraphic>().Any(graphic => graphic.SummonSignature && !graphic.SummonFinale),
+                    "The card did not start at the completed material portal.");
+                emerge(.96f);
+                Require((movingCard.anchoredPosition - center).sqrMagnitude < .01f &&
+                        finale.rectTransform.rect.height < ((RectTransform)animator.transform).rect.height * .78f &&
+                        animator.transform.Find("SummonPeakFlash") == null &&
+                        ((RectTransform)animator.transform).anchoredPosition.sqrMagnitude < .001f,
+                    "The signature reveal replayed the full-stage effect or displaced the stage.");
                 if (kind == DuelEffectKind.Xyz)
                     Require(finale.SummonUnits == host.overlayCodes.Count, "The finale did not orbit the actual Xyz materials.");
                 if (kind == DuelEffectKind.Link)
-                    Require(finale.DirectionMask == host.linkMarker && animator.transform.Find("LinkCircuitClosed") != null,
-                        "The Link finale omitted its circuit confirmation.");
+                    Require(finale.DirectionMask == host.linkMarker && animator.transform.Find("LinkCircuitClosed") == null,
+                        "The Link finale lost its markers or covered the reveal with a second banner.");
                 using var mesh = new VertexHelper();
                 var populate = typeof(DuelEffectGraphic).GetMethod("OnPopulateMesh", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
                 populate.Invoke(finale, new object[] { mesh });
                 Require(mesh.currentVertCount is > 100 and < 12000, "The signature finale produced an empty or excessive mesh.");
                 while (reveal.MoveNext()) TestCardPresentation.SampleAnimation((IEnumerator)reveal.Current)(1f);
-                Require(animator.transform.Find("SummonPeakFlash") == null &&
+                Require(finale == null &&
                         ((RectTransform)animator.transform).anchoredPosition.sqrMagnitude < .001f,
-                    "The finale left a flash or moved the stage after the animation.");
+                    "The finale remained visible or moved the stage after the animation.");
                 Debug.Log($"[VERIFY SIGNATURE SUMMON] {kind} material transition and finale passed.");
             }
             Require(!arrival.MoveNext() &&
