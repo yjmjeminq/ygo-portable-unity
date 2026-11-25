@@ -14,9 +14,15 @@ namespace YGOPortable.UI
         private readonly Dictionary<string, RpgStageActor> _rpgStageSpeakers = new(StringComparer.Ordinal);
         private readonly Dictionary<int, RpgStageActor> _rpgStageIds = new();
         private RectTransform _rpgDialogueCast, _rpgDialogueOpponent, _rpgSpeakerCue;
+        private StoryDialogueLine[] _rpgBeatLines;
+        private RectTransform _rpgCameraFocus;
+        private int[] _rpgBeats = Array.Empty<int>();
+        private int _rpgNextBeat;
+        private float _rpgBeatRemaining;
         private string _rpgHeroName;
         private int _rpgLastLine;
         private int _rpgGuestSlots;
+        internal bool RpgStageRunning => _rpgBeatRemaining > 0f;
 
         private readonly struct RpgStagePose
         {
@@ -46,6 +52,7 @@ namespace YGOPortable.UI
             if (_player == null || _rpgDialogueCast != null) Show(Page.Field);
 
             _rpgDialogueCast = DuelUiKit.FillRect("DialogueCast", _rpgSceneSpace);
+            _rpgLastPlayedSceneId = episode.id;
             _rpgHeroName = hero;
             _rpgLastLine = -1;
             _moving = _manualWalk = _fieldMenu = false;
@@ -150,9 +157,54 @@ namespace YGOPortable.UI
             return name != null && _rpgStageSpeakers.TryGetValue(name, out var actor) ? actor : null;
         }
 
-        internal void SetRpgDialogueLine(StoryDialogueLine[] lines, int index)
+        internal void SetRpgDialogueLine(StoryDialogueLine[] lines, int index, bool playMotion)
         {
-            bool playingNext = index == _rpgLastLine + 1;
+            bool playingNext = playMotion && index == _rpgLastLine + 1;
+            _rpgLastLine = index;
+            _rpgCameraFocus = null;
+            _rpgBeatRemaining = 0f;
+            if (playingNext)
+            {
+                _rpgBeatLines = lines;
+                _rpgBeats = (lines[index].stage ?? Array.Empty<StoryStageAction>())
+                    .Where(action => action != null).Select(action => action.step)
+                    .Append(0).Distinct().OrderBy(step => step).ToArray();
+                _rpgNextBeat = 0;
+                PlayNextRpgBeat();
+            }
+            else
+            {
+                _rpgBeatLines = null;
+                ApplyRpgBeat(lines, index, int.MaxValue, animate: false);
+            }
+        }
+
+        private void PlayNextRpgBeat()
+        {
+            while (_rpgNextBeat < _rpgBeats.Length)
+            {
+                int step = _rpgBeats[_rpgNextBeat++];
+                ApplyRpgBeat(_rpgBeatLines, _rpgLastLine, step, animate: true);
+                var focus = (_rpgBeatLines[_rpgLastLine].stage ?? Array.Empty<StoryStageAction>())
+                    .LastOrDefault(action => action?.step == step && action.action == "focus");
+                bool cameraMove = focus != null && _rpgStageIds.TryGetValue(focus.actor, out var subject) &&
+                    SetRpgCameraFocus(subject);
+                if (!cameraMove && !_rpgStageActors.Any(actor => actor.Progress < 1f)) continue;
+                _rpgBeatRemaining = RpgStageMoveTime;
+                return;
+            }
+            _rpgBeatLines = null;
+        }
+
+        private bool SetRpgCameraFocus(RpgStageActor actor)
+        {
+            if (!actor.Root.gameObject.activeSelf || _rpgCameraFocus == actor.Root) return false;
+            _rpgCameraFocus = actor.Root;
+            return true;
+        }
+
+        private void ApplyRpgBeat(StoryDialogueLine[] lines, int index, int step, bool animate)
+        {
             foreach (var actor in _rpgStageActors)
             {
                 var target = actor.Initial;
@@ -167,9 +219,11 @@ namespace YGOPortable.UI
                         staged = true;
                         changedLine = i;
                     }
+                    int latestStep = int.MinValue;
                     foreach (var action in line.stage ?? Array.Empty<StoryStageAction>())
                     {
-                        if (action == null || !_rpgStageIds.TryGetValue(action.actor, out var subject) || subject != actor)
+                        if (action == null || action.step < latestStep || (i == index && action.step > step) ||
+                            !_rpgStageIds.TryGetValue(action.actor, out var subject) || subject != actor)
                             continue;
                         if (action.action == "enter") target = new RpgStagePose(actor.Mark, true);
                         else if (action.action == "move")
@@ -178,16 +232,16 @@ namespace YGOPortable.UI
                         else if (action.action == "exit")
                             target = new RpgStagePose(new Vector2(target.Position.x < .5f ? .04f : .96f, target.Position.y), false);
                         else continue;
+                        latestStep = action.step;
                         staged = true;
                         changedLine = i;
                     }
                 }
                 if (actor.Target.Visible == target.Visible && actor.Target.Position == target.Position &&
-                    (index >= _rpgLastLine || actor.Progress >= 1f)) continue;
-                bool animate = playingNext && changedLine == index && (actor.Root.gameObject.activeSelf || target.Visible);
-                BeginRpgStageMove(actor, target, animate);
+                    (animate || actor.Progress >= 1f)) continue;
+                bool slide = animate && changedLine == index && (actor.Root.gameObject.activeSelf || target.Visible);
+                BeginRpgStageMove(actor, target, slide);
             }
-            _rpgLastLine = index;
             var speaker = RpgSpeaker(lines[index].speaker);
             RectTransform speaking = speaker?.Target.Visible == true ? speaker.Root : null;
             _rpgSpeakerCue.gameObject.SetActive(speaking != null);
@@ -202,13 +256,21 @@ namespace YGOPortable.UI
 
         internal void UpdateRpgDialogue(float delta)
         {
-            foreach (var actor in _rpgStageActors)
+            while (RpgStageRunning && delta > 0f)
             {
-                if (actor.Progress >= 1f) continue;
-                actor.Progress = Mathf.Min(1f, actor.Progress + delta / RpgStageMoveTime);
-                PoseRpgStageActor(actor);
+                float slice = Mathf.Min(delta, _rpgBeatRemaining);
+                _rpgBeatRemaining -= slice;
+                delta -= slice;
+                foreach (var actor in _rpgStageActors)
+                {
+                    if (actor.Progress >= 1f) continue;
+                    actor.Progress = RpgStageRunning ? Mathf.Min(1f, actor.Progress + slice / RpgStageMoveTime) : 1f;
+                    PoseRpgStageActor(actor);
+                }
+                TrackRpgCamera(slice, (_rpgCameraFocus ?? _player).anchorMin);
+                if (!RpgStageRunning) PlayNextRpgBeat();
             }
-            TrackRpgCamera(delta, _player.anchorMin);
+            TrackRpgCamera(delta, (_rpgCameraFocus ?? _player).anchorMin);
         }
 
         private void BeginRpgStageMove(RpgStageActor actor, RpgStagePose target, bool animate)
@@ -250,6 +312,10 @@ namespace YGOPortable.UI
             }
             _rpgFieldHud = null;
             _rpgDialogueCast = _rpgDialogueOpponent = _rpgSpeakerCue = null;
+            _rpgBeatLines = null;
+            _rpgCameraFocus = null;
+            _rpgBeatRemaining = 0f;
+            _rpgBeats = Array.Empty<int>();
             _rpgStageActors.Clear();
             _rpgStageSpeakers.Clear();
             _rpgStageIds.Clear();

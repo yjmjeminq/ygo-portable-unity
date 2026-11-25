@@ -14,6 +14,7 @@ namespace YGOPortable.UI
         private const string RpgIcons = "TagForce/UI/";
         private const string RpgFieldHelp = "방향키 · 스틱 이동   선택 대화   위쪽 버튼 메뉴";
         private const string RpgRegionPreference = "ygo.5ds-rpg.last-region";
+        private const float RpgSceneRadius = .096f;
         private static readonly Vector2 RpgArrival = new(.50f, .17f);
 
         internal readonly struct RpgRegion
@@ -53,6 +54,8 @@ namespace YGOPortable.UI
         private StoryScriptRoot _rpgCampaign;
         private Dictionary<int, PresetDeckInfo> _rpgWorldDecks;
         private StoryEpisodeData _resident;
+        private StoryEpisodeData _rpgNearbyScene;
+        private string _rpgLastPlayedSceneId;
         private Text _rpgToast;
         private float _rpgToastTime;
         private int _rpgLocation, _observedRpgClears;
@@ -93,6 +96,7 @@ namespace YGOPortable.UI
                 _rpgLocation = RegionForEpisode(_observedRpgClears + 1);
             _position = RpgArrival;
             _resident = null;
+            _rpgLastPlayedSceneId = null;
         }
 
         internal bool CanStartRpgEpisode(int index) =>
@@ -197,6 +201,7 @@ namespace YGOPortable.UI
                 TextAnchor.MiddleRight);
 
             StoryEpisodeData questNpc = !complete && _rpgLocation == targetRegion ? episodes[cleared] : null;
+            _rpgNearbyScene = questNpc?.sceneOnApproach == true ? questNpc : null;
             if (questNpc != null)
                 AddRpgResident(questNpc, RpgNpcSlots[0], true, () => _app.OpenRpgFieldEpisode(cleared));
             var locals = episodes.Where((episode, i) => RegionForEpisode(i + 1) == _rpgLocation)
@@ -214,6 +219,17 @@ namespace YGOPortable.UI
             }
             _player = Anchor(_rpgSceneSpace, "Player", _position, new Vector2(91f, 116f));
             _playerSprite = WalkerSprite(_player, RpgArt + "Characters_SD/sd_protagonist.png", "카이");
+        }
+
+        private void CheckRpgSceneEncounter(Vector2 previous)
+        {
+            if (_rpgNearbyScene == null || _rpgNearbyScene.id == _rpgLastPlayedSceneId || !CanWalk) return;
+            var distance = RpgNpcSlots[0] - previous;
+            var step = _position - previous;
+            if (step.sqrMagnitude < 1e-8f || distance.sqrMagnitude <= RpgSceneRadius * RpgSceneRadius) return;
+            float closest = Mathf.Clamp01(Vector2.Dot(distance, step) / step.sqrMagnitude);
+            if ((distance - step * closest).sqrMagnitude <= RpgSceneRadius * RpgSceneRadius)
+                _app.OpenRpgFieldEpisode(RpgClears);
         }
 
         private void AddRpgResident(StoryEpisodeData resident, Vector2 spot, bool story, Action interact)

@@ -234,6 +234,7 @@ namespace YGOPortable.UI
         {
             ClearRpgDialogue();
             _rpgResidents.Clear();
+            _rpgNearbyScene = null;
             _rpgSceneSpace = null;
             _interactions.Clear();
             _visitors.Clear();
@@ -482,6 +483,8 @@ namespace YGOPortable.UI
             {
                 PoseRpgWalker(_player, _playerSprite, _position, _position - previous, _moving);
                 TrackRpgCamera(delta);
+                CheckRpgSceneEncounter(previous);
+                if (!CanWalk) return;
             }
             else PoseWalker(_player, _playerSprite, _position, _position - previous, _moving, phase);
             if (_partner != null)

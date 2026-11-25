@@ -25,6 +25,7 @@ namespace YGOPortable.UI
     {
         public int actor;
         public string action;
+        public int step;
         public float x;
         public float y;
     }
@@ -44,6 +45,7 @@ namespace YGOPortable.UI
         public StoryDialogueLine[] postLoseDialogues;
         public StoryDialogueOption[] choices;
         public int choiceAfterLine;
+        public bool sceneOnApproach;
         public string gimmick;
         public uint raidCard;
         public int raidLife;

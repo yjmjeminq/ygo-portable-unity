@@ -108,6 +108,7 @@ namespace YGOPortable.UI
             private bool _showCutscene;
             private bool _akiBlush;
             private TagForceWorldUI _field;
+            private bool _stageCaption;
             private OpponentCharacter _sceneOpponent;
             private string _protagonist;
             private string _emotion;
@@ -304,6 +305,7 @@ namespace YGOPortable.UI
                 _fx.ResetEffect();
                 _showCutscene = false;
                 _field = null;
+                RefreshStageCaption();
                 _fx.ShowCaret(_caret, false);
                 _cutsceneOverlay.alpha = 0f;
                 _portraitGroup.alpha = 1f;
@@ -347,6 +349,7 @@ namespace YGOPortable.UI
             {
                 if (_dialogue == null || !_root.activeInHierarchy) return;
                 _field?.UpdateRpgDialogue(delta);
+                RefreshStageCaption();
                 _poseTime += delta;
                 _cutsceneOverlay.alpha = Mathf.MoveTowards(_cutsceneOverlay.alpha, _showCutscene ? 1f : 0f, delta / .4f);
                 _portraitGroup.alpha = 1f - _cutsceneOverlay.alpha;
@@ -356,7 +359,8 @@ namespace YGOPortable.UI
                 AnimatePortrait(_opponent, _opponentSpeaking, delta, _opponentSpeaking ? _emotion : null, _poseTime);
                 AnimateHearts();
                 RefreshCaret();
-                if (_finished || _waitingBranch || _logRoot.activeSelf || _pickerRoot.activeSelf || _supports.Root.activeSelf) return;
+                if (_stageCaption || _finished || _waitingBranch || _logRoot.activeSelf ||
+                    _pickerRoot.activeSelf || _supports.Root.activeSelf) return;
                 if (_visible < _characters.Length)
                 {
                     _typed += delta * CharactersPerSecond;
@@ -438,7 +442,7 @@ namespace YGOPortable.UI
                 return true;
             }
 
-            private void BindLine(int index)
+            private void BindLine(int index, bool playStageMotion = true)
             {
                 _index = index;
                 _readThrough = Math.Max(_readThrough, index);
@@ -460,7 +464,7 @@ namespace YGOPortable.UI
                 _emotion = _rpg ? line.emotion : null;
                 _poseTime = 0f;
                 _akiBlush = _rpg && _field == null && speaker?.id == 1 && _emotion == "blush";
-                if (_field != null) _field.SetRpgDialogueLine(_dialogue, index);
+                if (_field != null) _field.SetRpgDialogueLine(_dialogue, index, playStageMotion);
                 else if (_rpg)
                 {
                     if (_heroSpeaking) SetSprite(_hero, LoadHeroBust(_emotion));
@@ -480,6 +484,7 @@ namespace YGOPortable.UI
                 _typed = _readTime = 0f;
                 _visible = 0;
                 _previous.interactable = index > 0;
+                RefreshStageCaption();
             }
 
             private void Reveal(int count)
@@ -514,8 +519,16 @@ namespace YGOPortable.UI
             }
 
             private void RefreshCaret() => _fx.ShowCaret(_caret, _rpg && _dialogue != null &&
-                !_finished && !_waitingBranch && _visible == _characters.Length &&
+                !_stageCaption && !_finished && !_waitingBranch && _visible == _characters.Length &&
                 !_logRoot.activeSelf && !_pickerRoot.activeSelf && !_supports.Root.activeSelf);
+
+            private void RefreshStageCaption()
+            {
+                bool playing = _field?.RpgStageRunning == true;
+                if (_stageCaption == playing) return;
+                _stageCaption = playing;
+                _next.GetComponentInChildren<Text>().text = playing ? "연출 중" : "다음 ▶";
+            }
 
             private void ApplyDialogueStyle(bool rpg)
             {
@@ -569,7 +582,7 @@ namespace YGOPortable.UI
 
             private void Advance()
             {
-                if (_finished || _waitingBranch || _dialogue == null) return;
+                if (_stageCaption || _finished || _waitingBranch || _dialogue == null) return;
                 if (_visible < _characters.Length) Reveal(_characters.Length);
                 else if (_branch != null && _index == _branchLine) OfferBranch();
                 else if (_index + 1 == _dialogue.Length) Finish();
@@ -579,7 +592,7 @@ namespace YGOPortable.UI
             private void Previous()
             {
                 if (_index <= 0 || _finished) return;
-                BindLine(_index - 1);
+                BindLine(_index - 1, playStageMotion: false);
                 Reveal(_characters.Length);
             }
 
@@ -597,7 +610,7 @@ namespace YGOPortable.UI
                     OfferBranch();
                     return;
                 }
-                BindLine(_dialogue.Length - 1);
+                BindLine(_dialogue.Length - 1, playStageMotion: false);
                 Reveal(_characters.Length);
                 _finished = true;
                 _fx.ShowCaret(_caret, false);
@@ -615,7 +628,7 @@ namespace YGOPortable.UI
 
             private void OfferBranch()
             {
-                BindLine(_branchLine);
+                BindLine(_branchLine, playStageMotion: false);
                 Reveal(_characters.Length);
                 _waitingBranch = true;
                 _fx.ShowCaret(_caret, false);

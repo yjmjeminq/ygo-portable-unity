@@ -191,11 +191,13 @@ namespace YGOPortable.Editor
             {
                 var field = FieldScene();
                 var player = (RectTransform)field.Find("Player");
-                var opponent = field.Find("MainQuestNpc");
-                Press(field, "MainQuestNpc/Interact");
-                world.Update(4f);
+                var opponent = (RectTransform)field.Find("MainQuestNpc");
+                var entrance = new Vector2(.48f, .35f);
+                for (int frame = 0; frame < 45 && world.CanWalk; frame++)
+                    world.Update(.04f, (entrance - player.anchorMin).normalized);
                 Vector2 position = player.anchorMin;
                 var cast = field.Find("DialogueCast");
+                Require(cast != null && world.RpgStageRunning, "Walking near the main quest did not start its opening shot.");
                 var guest = (RectTransform)cast.Find("Guest_1");
                 Require(storyRoot.gameObject.activeSelf && world.Root.activeSelf && !world.CanWalk &&
                     world.Root.transform.GetSiblingIndex() < story.Root.transform.GetSiblingIndex() &&
@@ -208,6 +210,10 @@ namespace YGOPortable.Editor
                 Require(player.anchorMin == position && !world.EnterRpgRegion(1) &&
                     !world.HandleFieldInput(new DeckPadFrame(Vector2Int.right, DeckPadButtons.Submit | DeckPadButtons.Search)),
                     "The player could move, interact or travel during the conversation.");
+                Press(storyRoot, "Scene/DialogueBox/Next/Button");
+                Press(storyRoot, "Scene/DialogueBox/Next/Button");
+                Require(CurrentLine() == 0 && world.RpgStageRunning,
+                    "Repeated advance input bypassed the opening camera move.");
 
                 var lines = loaded.episodes[0].preDialogues;
                 int arrival = Array.FindIndex(lines, line => line.stage?.Any(a => a.actor == 1 && a.action == "enter") == true);
@@ -215,17 +221,24 @@ namespace YGOPortable.Editor
                 Require(arrival > 0 && arrival < firstAkiLine, "Aki should enter during narration before speaking.");
                 AdvanceToLine(arrival);
                 Vector2 entry = guest.anchorMin;
+                Vector2 otherStart = opponent.anchorMin;
+                Vector2 cameraStart = ((RectTransform)field).anchorMin;
                 story.Update(.30f);
                 Require(guest.gameObject.activeSelf && guest.anchorMin != entry && lines[arrival].speaker == "" &&
-                    opponent.gameObject.activeSelf && player.gameObject.activeSelf,
-                    "Aki did not walk in as a separate actor during narration.");
+                    opponent.gameObject.activeSelf && opponent.anchorMin == otherStart && player.gameObject.activeSelf &&
+                    ((RectTransform)field).anchorMin != cameraStart,
+                    "The first shot did not follow Aki as she entered before the other actor moved.");
                 VerifyStride(guest.Find("Sprite").GetComponent<TagForceRpgStride>());
+                story.Update(.57f);
+                Require(world.RpgStageRunning && opponent.anchorMin != otherStart,
+                    "The second actor did not move automatically after the first beat.");
                 Press(storyRoot, "Scene/DialogueBox/Previous/Button");
-                Require(!guest.gameObject.activeSelf, "Rewinding retained a guest who had yet to arrive.");
+                Require(!guest.gameObject.activeSelf && opponent.anchorMin == otherStart && !world.RpgStageRunning,
+                    "Rewinding did not restore the actors before the two-beat scene.");
                 Press(storyRoot, "Scene/DialogueBox/Next/Button");
-                story.Update(.65f);
+                story.Update(1.35f);
                 Require(guest.gameObject.activeSelf && guest.GetComponent<CanvasGroup>().alpha == 1f &&
-                    guest.anchorMin != entry, "The guest did not reach her mark after replaying the entrance.");
+                    guest.anchorMin != entry && !world.RpgStageRunning, "The guest did not reach her mark after replaying the entrance.");
                 AdvanceToLine(firstAkiLine);
                 Require(guest.Find("SpeakingCue") != null, "The speaking marker did not follow the guest.");
                 int approach = Array.FindIndex(lines, line => line.stage?.Any(a => a.actor == 0 && a.action == "move") == true);
@@ -241,6 +254,10 @@ namespace YGOPortable.Editor
                     ((RectTransform)FieldScene().Find("Player")).anchorMin == position &&
                     world.Root.GetComponent<CanvasGroup>().blocksRaycasts,
                     "Leaving the conversation did not remove its cast and restore movement at the original location.");
+                world.Update(.25f, Vector2.down);
+                for (int frame = 0; frame < 3; frame++) world.Update(.15f, Vector2.up);
+                Require(world.CanWalk && !storyRoot.gameObject.activeSelf,
+                    "The automatic scene immediately reopened after leaving it.");
             }
 
             void VerifyStageExit()
@@ -259,7 +276,8 @@ namespace YGOPortable.Editor
                 Require(opponent.gameObject.activeSelf && opponent.anchorMin != before,
                     "The opponent did not begin walking out.");
                 story.Update(.40f);
-                Require(!opponent.gameObject.activeSelf, "The opponent stayed in the field after leaving.");
+                Require(!opponent.gameObject.activeSelf && world.RpgStageRunning,
+                    "The opponent did not finish leaving before the player's next beat.");
                 Press(storyRoot, "Scene/DialogueBox/Previous/Button");
                 Require(opponent.gameObject.activeSelf && opponent.anchorMin == before,
                     "Rewinding did not restore the actor before the exit.");
@@ -270,11 +288,18 @@ namespace YGOPortable.Editor
 
             void AdvanceToLine(int target)
             {
-                var dialogue = typeof(StoryModeUI).GetField("_dialogue", flags).GetValue(story);
-                var line = typeof(StoryModeUI.StoryDialogueView).GetField("_index", flags);
-                for (int presses = 0; (int)line.GetValue(dialogue) < target && presses < 2 * (target + 1); presses++)
+                for (int presses = 0; CurrentLine() < target && presses < 2 * (target + 1); presses++)
+                {
+                    if (world.RpgStageRunning) story.Update(3f);
                     Press(storyRoot, "Scene/DialogueBox/Next/Button");
-                Require((int)line.GetValue(dialogue) == target, $"The dialogue did not advance to line {target}.");
+                }
+                Require(CurrentLine() == target, $"The dialogue did not advance to line {target}.");
+            }
+
+            int CurrentLine()
+            {
+                var dialogue = typeof(StoryModeUI).GetField("_dialogue", flags).GetValue(story);
+                return (int)typeof(StoryModeUI.StoryDialogueView).GetField("_index", flags).GetValue(dialogue);
             }
 
             void VerifyStride(TagForceRpgStride stride)
