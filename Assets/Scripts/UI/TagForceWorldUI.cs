@@ -235,7 +235,7 @@ namespace YGOPortable.UI
             ClearRpgDialogue();
             _rpgResidents.Clear();
             _rpgNearbyScene = null;
-            _rpgSceneSpace = null;
+            _rpgSceneSpace = _rpgViewport = null;
             _interactions.Clear();
             _visitors.Clear();
             _questMarkers.Clear();
@@ -456,7 +456,9 @@ namespace YGOPortable.UI
             }
             if (movement != Vector2.zero)
             {
-                MoveTo(_position + movement.normalized * .12f);
+                var direction = movement.normalized;
+                if (_rpgField) direction.y *= _rpgBackdropAspect;
+                MoveTo(_position + direction * .12f);
                 _manualWalk = true;
             }
             else if (_manualWalk)
@@ -474,7 +476,7 @@ namespace YGOPortable.UI
             bool arrived = false;
             if (_moving)
             {
-                _position = Vector2.MoveTowards(_position, _destination, delta * .40f);
+                _position = _rpgField ? AdvanceRpgWalk(delta) : Vector2.MoveTowards(_position, _destination, delta * .40f);
                 arrived = _position == _destination;
                 _moving = !arrived;
             }
@@ -482,7 +484,7 @@ namespace YGOPortable.UI
             if (_rpgField)
             {
                 PoseRpgWalker(_player, _playerSprite, _position, _position - previous, _moving);
-                TrackRpgCamera(delta);
+                TrackRpgCamera(delta, horizontalTravel: _position.x - previous.x);
                 CheckRpgSceneEncounter(previous);
                 if (!CanWalk) return;
             }

@@ -6,39 +6,74 @@ namespace YGOPortable.UI
 {
     internal sealed partial class TagForceWorldUI
     {
-        private const float RpgCameraZoom = 1.22f;
-        private static readonly Vector2 RpgCameraCenter = new(.50f, .41f);
-        private RectTransform _rpgSceneSpace;
+        private const float RpgCameraWidth = 1.78f;
+        private const float RpgActorScale = 1.22f;
+        private const float RpgWalkSpeed = .40f * RpgActorScale / RpgCameraWidth;
+        private static readonly Vector2 RpgCameraCenter = new(.50f, .44f);
+        private RectTransform _rpgSceneSpace, _rpgViewport;
         private Vector2 _rpgCameraPan;
+        private float _rpgBackdropAspect, _rpgCameraLead;
 
-        private void BuildRpgCamera()
+        private Image BuildRpgCamera(string mapPath)
         {
-            var viewport = DuelUiKit.FillRect("FieldViewport", _body);
-            viewport.gameObject.AddComponent<RectMask2D>();
-            _rpgSceneSpace = DuelUiKit.FillRect("Camera", viewport);
-            _rpgSceneSpace.localScale = Vector3.one * RpgCameraZoom;
-            _rpgCameraPan = TargetRpgCameraPan(_position);
-            ApplyRpgCameraPan();
+            _rpgViewport = DuelUiKit.FillRect("FieldViewport", _body);
+            _rpgViewport.gameObject.AddComponent<RectMask2D>();
+            _rpgSceneSpace = DuelUiKit.FillRect("Camera", _rpgViewport);
+            _rpgSceneSpace.localScale = Vector3.one * RpgActorScale;
+            var floor = Backdrop(mapPath, new Color(.10f, .21f, .27f), _rpgSceneSpace);
+            _rpgBackdropAspect = floor.sprite != null ? floor.sprite.rect.width / floor.sprite.rect.height : 16f / 9f;
+            _rpgCameraLead = 0f;
+            var span = RpgCameraSpan();
+            _rpgCameraPan = ClampRpgCameraPan(TargetRpgCameraPan(_position, span), span);
+            ApplyRpgCameraPan(span);
+            return floor;
         }
 
-        private static Vector2 TargetRpgCameraPan(Vector2 position)
+        private Vector2 RpgCameraSpan()
         {
-            const float limit = (RpgCameraZoom - 1f) * .5f;
-            var target = (RpgCameraCenter - position) * RpgCameraZoom;
-            return new Vector2(Mathf.Clamp(target.x, -limit, limit), Mathf.Clamp(target.y, -limit, limit));
+            var viewport = _rpgViewport.rect;
+            float aspect = viewport.width > 0f && viewport.height > 0f ? viewport.width / viewport.height : 16f / 9f;
+            float width = Mathf.Max(RpgCameraWidth, _rpgBackdropAspect / aspect);
+            return new Vector2(width, width * aspect / _rpgBackdropAspect);
         }
 
-        private void TrackRpgCamera(float delta, Vector2? focus = null)
+        private Vector2 TargetRpgCameraPan(Vector2 position, Vector2 span) =>
+            RpgCameraCenter - Vector2.one * .5f - Vector2.Scale(position - Vector2.one * .5f, span) -
+            Vector2.right * _rpgCameraLead;
+
+        private static Vector2 ClampRpgCameraPan(Vector2 pan, Vector2 span)
         {
-            _rpgCameraPan = Vector2.Lerp(_rpgCameraPan, TargetRpgCameraPan(focus ?? _position), 1f - Mathf.Exp(-9f * delta));
-            ApplyRpgCameraPan();
+            var limit = Vector2.Max(Vector2.zero, (span - Vector2.one) * .5f);
+            return Vector2.Min(Vector2.Max(pan, -limit), limit);
         }
 
-        private void ApplyRpgCameraPan()
+        private void TrackRpgCamera(float delta, Vector2? focus = null, float horizontalTravel = 0f)
         {
-            _rpgSceneSpace.anchorMin = _rpgCameraPan;
-            _rpgSceneSpace.anchorMax = Vector2.one + _rpgCameraPan;
+            float lookAhead = Mathf.Abs(horizontalTravel) > 1e-5f ? Mathf.Sign(horizontalTravel) * .065f : 0f;
+            _rpgCameraLead = Mathf.Lerp(_rpgCameraLead, lookAhead, 1f - Mathf.Exp(-4f * delta));
+            var span = RpgCameraSpan();
+            var target = ClampRpgCameraPan(TargetRpgCameraPan(focus ?? _position, span), span);
+            _rpgCameraPan = ClampRpgCameraPan(Vector2.Lerp(_rpgCameraPan, target, 1f - Mathf.Exp(-8f * delta)), span);
+            ApplyRpgCameraPan(span);
         }
+
+        private void ApplyRpgCameraPan(Vector2 span)
+        {
+            var center = Vector2.one * .5f + _rpgCameraPan;
+            var halfSize = span * (.5f / RpgActorScale);
+            _rpgSceneSpace.anchorMin = center - halfSize;
+            _rpgSceneSpace.anchorMax = center + halfSize;
+        }
+
+        private Vector2 AdvanceRpgWalk(float delta)
+        {
+            var remaining = _destination - _position;
+            float distance = RpgArtDirection(remaining).magnitude;
+            float travel = RpgWalkSpeed * delta;
+            return distance <= travel ? _destination : _position + remaining * (travel / distance);
+        }
+
+        private Vector2 RpgArtDirection(Vector2 direction) => new(direction.x, direction.y / _rpgBackdropAspect);
 
         private RectTransform BuildRpgActorArt(RectTransform art, string path, string name)
         {
@@ -64,13 +99,14 @@ namespace YGOPortable.UI
             return art;
         }
 
-        private static void PoseRpgWalker(RectTransform actor, RectTransform art, Vector2 position, Vector2 step,
+        private void PoseRpgWalker(RectTransform actor, RectTransform art, Vector2 position, Vector2 step,
             bool walking, Vector2 facing = default)
         {
             actor.anchorMin = actor.anchorMax = position;
             actor.anchoredPosition = Vector2.zero;
             if (art != null && art.TryGetComponent<TagForceRpgWalkAnimator>(out var animation))
-                animation.Pose(step.magnitude, walking, facing == Vector2.zero ? step : facing);
+                animation.Pose(RpgArtDirection(step).magnitude * (RpgCameraWidth / RpgActorScale), walking,
+                    RpgArtDirection(facing == Vector2.zero ? step : facing));
         }
     }
 

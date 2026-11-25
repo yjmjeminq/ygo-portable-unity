@@ -152,8 +152,11 @@ namespace YGOPortable.Editor
             {
                 Canvas.ForceUpdateCanvases();
                 var camera = (RectTransform)FieldScene();
+                var viewport = (RectTransform)camera.parent;
                 var player = (RectTransform)camera.Find("Player");
                 var map = (RectTransform)camera.Find("Scenery");
+                var hud = (RectTransform)panel.Find("FieldHud");
+                var hudPosition = hud.position;
                 var art = player.Find("Sprite").GetComponent<Image>();
                 var idle = art.sprite;
                 Vector2 pan = camera.anchorMin;
@@ -175,7 +178,7 @@ namespace YGOPortable.Editor
                 Require(back != art.sprite && back.texture == art.sprite.texture && back.texture != firstStep.texture,
                     "Up and down did not use the separate back and front poses.");
 
-                var point = new Vector2(.83f, .29f);
+                var point = new Vector2(.73f, .27f);
                 var local = map.rect.min + Vector2.Scale(map.rect.size, point);
                 var ev = new PointerEventData(events.GetComponent<EventSystem>())
                 {
@@ -183,10 +186,42 @@ namespace YGOPortable.Editor
                 };
                 map.GetComponent<TagForceFloorTap>().OnPointerClick(ev);
                 world.Update(4f);
-                float limit = (camera.localScale.x - 1f) * .5f;
-                Require(Vector2.Distance(player.anchorMin, point) < .001f &&
-                    Mathf.Abs(camera.anchorMin.x) <= limit + .0001f && Mathf.Abs(camera.anchorMin.y) <= limit + .0001f,
-                    "A click used screen space instead of map space, or the camera passed the map edge.");
+                Require(Vector2.Distance(player.anchorMin, point) < .001f, "A click used screen space instead of map space.");
+
+                for (int frame = 0; frame < 27; frame++) world.Update(.16f, Vector2.left);
+                world.Update(.6f);
+                float left = CameraCenter();
+                VerifyCameraBounds();
+                for (int frame = 0; frame < 27; frame++) world.Update(.16f, Vector2.right);
+                world.Update(.6f);
+                float right = CameraCenter();
+                VerifyCameraBounds();
+                Require(left - right > viewport.rect.width * .70f && hud.position == hudPosition,
+                    "Walking across the field did not reveal a wide portion of the map or moved the fixed HUD.");
+
+                var canvasRect = (RectTransform)canvas.transform;
+                var desktopSize = canvasRect.sizeDelta;
+                canvasRect.sizeDelta = new Vector2(2340f, 1080f);
+                Canvas.ForceUpdateCanvases();
+                world.Update(0f);
+                VerifyCameraBounds();
+                canvasRect.sizeDelta = desktopSize;
+                Canvas.ForceUpdateCanvases();
+                world.Update(0f);
+                Debug.Log("[VERIFY 5DS SCROLL] Wide horizontal travel, aspect ratio, edge coverage, fixed HUD and panned clicks passed.");
+
+                float CameraCenter() => viewport.InverseTransformPoint(camera.TransformPoint(camera.rect.center)).x;
+
+                void VerifyCameraBounds()
+                {
+                    var low = viewport.InverseTransformPoint(map.TransformPoint(map.rect.min));
+                    var high = viewport.InverseTransformPoint(map.TransformPoint(map.rect.max));
+                    float artAspect = map.GetComponent<Image>().sprite.rect.width / map.GetComponent<Image>().sprite.rect.height;
+                    Require(low.x <= viewport.rect.xMin + .1f && low.y <= viewport.rect.yMin + .1f &&
+                        high.x >= viewport.rect.xMax - .1f && high.y >= viewport.rect.yMax - .1f &&
+                        Mathf.Abs((high.x - low.x) / (high.y - low.y) - artAspect) < .005f,
+                        "Camera edges uncovered the map or stretched its image after a pan or resize.");
+                }
             }
 
             void VerifyDirectionalArt()

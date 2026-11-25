@@ -181,8 +181,7 @@ namespace YGOPortable.UI
 
         private void BuildRpgField()
         {
-            BuildRpgCamera();
-            var floor = Backdrop(RpgRegions[_rpgLocation].Background, new Color(.10f, .21f, .27f), _rpgSceneSpace);
+            var floor = BuildRpgCamera(RpgRegions[_rpgLocation].Background);
             floor.raycastTarget = true;
             floor.gameObject.AddComponent<TagForceFloorTap>().Click = target => MoveTo(target);
             _rpgFieldHud = DuelUiKit.FillRect("FieldHud", _body);
