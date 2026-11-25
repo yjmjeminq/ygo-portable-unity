@@ -104,11 +104,11 @@ namespace YGOPortable.UI
             if (_rpgResidents.ContainsKey(RpgPartnerId)) return;
             _rpgCompanionPoint = new Vector2(Mathf.Clamp(_position.x - .074f, .06f, .94f),
                 Mathf.Max(.105f, _position.y - .026f));
-            _rpgCompanion = Anchor(_rpgSceneSpace, "RpgCompanion", _rpgCompanionPoint, new Vector2(90f, 108f));
+            _rpgCompanion = Anchor(_rpgSceneSpace, "RpgCompanion", _rpgCompanionPoint, RpgFieldActorSize);
             _rpgCompanionArt = WalkerSprite(_rpgCompanion, RpgArt + "Characters_SD/sd_35.png", RpgPartnerName);
             if (_page != Page.Field) return;
             void Speak() => OpenRpgService(RpgPartnerId);
-            RpgButton(Area(_rpgCompanion, "Interact", .01f, 0f, .99f, .235f), "유세이", Speak, 16);
+            if (_rpgCompanionArt != null) BindPortrait(_rpgCompanionArt, Speak);
         }
 
         private void FollowRpgPlayer(float delta)

@@ -934,7 +934,7 @@ namespace YGOPortable.UI
                 AppScreen.StoryMode => _storyMode.ActiveRoot,
                 AppScreen.Tournament => _tournament.ActiveRoot,
                 AppScreen.Ranked => _ranked.ActiveRoot,
-                AppScreen.TagForceWorld => _tagForceWorld.Root,
+                AppScreen.TagForceWorld => _tagForceWorld.RpgFieldMenuScope,
                 _ => null,
             };
             if (scope == null || !scope.activeInHierarchy) return;

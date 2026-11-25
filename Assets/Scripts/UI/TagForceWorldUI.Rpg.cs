@@ -51,6 +51,7 @@ namespace YGOPortable.UI
         private readonly List<RectTransform> _questMarkers = new();
         private readonly Dictionary<int, RectTransform> _rpgResidents = new();
         private RectTransform _rpgNavigation;
+        private readonly RectTransform[] _rpgNavItems = new RectTransform[4];
         private RectTransform _rpgFieldHud;
         private StoryScriptRoot _rpgCampaign;
         private Dictionary<int, PresetDeckInfo> _rpgWorldDecks;
@@ -112,11 +113,34 @@ namespace YGOPortable.UI
         private RectTransform BuildRpgNavigation(Transform parent)
         {
             var bar = Area(parent, "RpgNavigation", .05f, .027f, .95f, .101f);
-            RpgButton(Area(bar, "Map", 0f, 0f, .235f, 1f), "월드맵", () => Show(Page.Map), 20);
-            RpgButton(Area(bar, "Quests", .255f, 0f, .490f, 1f), "의뢰 수첩", () => Show(Page.Ledger), 20);
-            RpgButton(Area(bar, "Decks", .510f, 0f, .745f, 1f), "덱 편집", _app.OpenTagForceDeckEditor, 20);
-            RpgButton(Area(bar, "Menu", .765f, 0f, 1f, 1f), "메인 메뉴", () => _app.ShowScreen(AppScreen.MainMenu), 20);
+            Add(0, "Map", "월드맵", () => Show(Page.Map));
+            Add(1, "Quests", "의뢰 수첩", () => Show(Page.Ledger));
+            Add(2, "Decks", "덱 편집", _app.OpenTagForceDeckEditor);
+            Add(3, "Menu", "메인 메뉴", () => _app.ShowScreen(AppScreen.MainMenu));
             return bar;
+
+            void Add(int index, string id, string caption, Action action)
+            {
+                _rpgNavItems[index] = DuelUiKit.FillRect(id, bar);
+                RpgButton(_rpgNavItems[index], caption, action, 20);
+            }
+        }
+
+        private void LayoutRpgField(bool field)
+        {
+            _body.anchorMin = field ? new Vector2(.012f, .012f) : new Vector2(.05f, .174f);
+            _body.anchorMax = field ? new Vector2(.988f, .988f) : new Vector2(.95f, .895f);
+            _status.rectTransform.anchorMin = field ? new Vector2(.025f, .105f) : new Vector2(.05f, .112f);
+            _status.rectTransform.anchorMax = field ? new Vector2(.46f, .151f) : new Vector2(.95f, .168f);
+            _header.gameObject.SetActive(!field);
+            _back.gameObject.SetActive(!field);
+            _rpgNavigation.anchorMin = field ? new Vector2(.777f, .113f) : new Vector2(.05f, .027f);
+            _rpgNavigation.anchorMax = field ? new Vector2(.973f, .409f) : new Vector2(.95f, .101f);
+            for (int i = 0; i < _rpgNavItems.Length; i++)
+            {
+                _rpgNavItems[i].anchorMin = field ? new Vector2(0f, .773f - .254f * i) : new Vector2(.255f * i, 0f);
+                _rpgNavItems[i].anchorMax = field ? new Vector2(1f, 1f - .254f * i) : new Vector2(.235f + .255f * i, 1f);
+            }
         }
 
         private static Button RpgButton(RectTransform area, string text, Action action, int size = 19,
@@ -152,7 +176,7 @@ namespace YGOPortable.UI
         private void ShowRpgPage(Page page)
         {
             _navigation.gameObject.SetActive(false);
-            _rpgNavigation.gameObject.SetActive(true);
+            _rpgNavigation.gameObject.SetActive(page != Page.Field);
             _header.text = $"5D's RPG 월드 · {RpgRegions[_rpgLocation].Name}";
             DuelAudio.PlayTagForceBgm(_rpgLocation is 3 or 4 or 5);
             switch (page)
@@ -246,7 +270,7 @@ namespace YGOPortable.UI
 
         private void BuildRpgField()
         {
-            var floor = BuildRpgCamera(GetRpgFieldArt(RpgRegions[_rpgLocation]), _page == Page.Field);
+            var floor = BuildRpgCamera(GetRpgFieldArt(RpgRegions[_rpgLocation]));
             floor.raycastTarget = true;
             floor.gameObject.AddComponent<TagForceFloorTap>().Click = target => MoveTo(target);
             BuildRpgAtmosphere();
@@ -285,8 +309,10 @@ namespace YGOPortable.UI
             string sideObjective = sideQuest != null ? AddRpgSideQuest(sideQuest) : null;
             AddRpgShopkeeper();
             BuildRpgCompanion();
-            _player = Anchor(_rpgSceneSpace, "Player", _position, new Vector2(91f, 116f));
+            _player = Anchor(_rpgSceneSpace, "Player", _position, RpgFieldActorSize);
             _playerSprite = WalkerSprite(_player, RpgArt + "Characters_SD/sd_protagonist.png", "카이");
+            PoseRpgWalker(_player, _playerSprite, _position, Vector2.zero, false);
+            OrderRpgFieldActors();
             BuildRpgFieldHud(cleared, targetRegion, episodes, sideObjective);
         }
 
@@ -307,21 +333,20 @@ namespace YGOPortable.UI
 
         private void AddRpgResident(int id, string name, string node, Vector2 spot, bool story, Action interact)
         {
-            var actor = Anchor(_rpgSceneSpace, node, spot, new Vector2(133f, 117f));
+            var actor = Anchor(_rpgSceneSpace, node, spot, RpgFieldActorSize);
             _rpgResidents[id] = actor;
-            var art = Area(actor, "SD", .08f, .22f, .92f, 1f);
+            var art = DuelUiKit.FillRect("SD", actor);
             var profile = BuildRpgActorArt(art, RpgArt + $"Characters_SD/sd_{id}.png", name);
             PoseRpgWalker(actor, profile, spot, Vector2.zero, false, Vector2.right * (_position.x - spot.x));
             void Approach() => MoveTo(actor.anchorMin - new Vector2(0f, .06f), interact);
             BindPortrait(art, Approach);
             var marker = Anchor(actor, story ? "MainQuestMarker" : "ResidentMarker", new Vector2(.50f, 1.07f),
-                new Vector2(45f, 45f));
+                new Vector2(28f, 28f));
             DrawRpgIcon(marker, story ? "icon_quest_main.png" : "icon_quest_sub.png", story ? "!" : "…",
                 story ? DuelUiKit.GoldAccent : new Color(.40f, .78f, 1f));
             _questMarkers.Add(marker);
             if (!story && _rpgLocation > 1 && node.StartsWith("Resident_", StringComparison.Ordinal) && _rpgRoamers.Count == 0)
                 _rpgRoamers.Add((actor, spot));
-            RpgButton(Area(actor, "Interact", 0f, 0f, 1f, .265f), name, Approach, 16, primary: story);
             string verb = story ? "이야기 진행" : node == "RpgCardMerchant" ? "팩 구매" : "대화";
             RegisterRpgInteraction(actor, $"{name} · {verb}", Approach);
         }

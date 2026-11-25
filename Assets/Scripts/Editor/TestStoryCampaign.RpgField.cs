@@ -44,6 +44,10 @@ namespace YGOPortable.Editor
             PlayerPrefs.DeleteKey(preference);
             var canvas = new GameObject("5D's field verification", typeof(Canvas));
             var events = new GameObject("5D's field controls", typeof(EventSystem));
+            var priorEvents = EventSystem.current;
+            var input = events.GetComponent<EventSystem>();
+            if (EventSystem.current != input) typeof(EventSystem).GetMethod("OnEnable", flags).Invoke(input, null);
+            EventSystem.current = input;
             ((RectTransform)canvas.transform).sizeDelta = new Vector2(1600f, 900f);
             var app = canvas.AddComponent<GameAppController>();
             var story = new StoryModeUI(app, canvas.transform);
@@ -68,6 +72,7 @@ namespace YGOPortable.Editor
                 Set("_collectionShop", new CollectionShopUI(canvas.transform,
                     () => typeof(GameAppController).GetMethod("CloseCollectionShop", flags).Invoke(app, null), _ => { }));
                 Set("_duelField", new DuelFieldUI(app, canvas.transform, modals));
+                Set("_menuPad", new DeckPadUi(DuelUiKit.FillRect("RpgTestMenuPad", canvas.transform), null));
                 Set("_initialized", true);
 
                 app.ShowScreen(AppScreen.MainMenu);
@@ -82,12 +87,12 @@ namespace YGOPortable.Editor
                     FieldScene().Find("MainQuestNpc/MainQuestMarker").GetComponent<Image>().sprite != null &&
                     world.CanStartRpgEpisode(0) && !world.CanStartRpgEpisode(1),
                     "RPG did not start as a walkable field with the first main quest.");
-                Press(world.Root.transform, "RpgNavigation/Map");
+                PressRpgNavigation("Map");
                 Require(panel.Find("spot_kai_garage/Travel").GetComponent<Button>().interactable &&
                     panel.Find("spot_satellite_hideout/Travel").GetComponent<Button>().interactable &&
                     panel.Find("spot_facility_prison/MapLock").GetComponent<Image>().sprite != null &&
                     !world.EnterRpgRegion(2), "The world map allowed early entry to the prison.");
-                Press(world.Root.transform, "RpgNavigation/Decks");
+                PressRpgNavigation("Decks");
                 app.CloseDeckEditor();
                 Require(panel.Find("spot_facility_prison/MapLock") != null,
                     "Returning from deck editing did not restore the RPG world map.");
@@ -100,9 +105,9 @@ namespace YGOPortable.Editor
                 VerifySceneGuests();
                 VerifyStageExit();
 
-                var local = FieldScene().Cast<Transform>().First(child => child.name.StartsWith("Resident_", StringComparison.Ordinal));
+                var local = FieldScene().Find($"Resident_{script.episodes[1].charId}");
                 Require(local.Find("ResidentMarker").GetComponent<Image>().sprite != null, "The resident marker was missing.");
-                Press(local, "Interact");
+                Press(local, "SD");
                 world.Update(4f);
                 Press(panel, "ResidentChoices/TalkDaily");
                 Require(panel.Find("ResidentChoices/DailyLine/Label").GetComponent<Text>().text.Contains("정비소"),
@@ -152,7 +157,7 @@ namespace YGOPortable.Editor
                         $"The region {request.Region} was missing its quest giver or SD art.");
                     VerifyAtmosphere(region);
                 }
-                Press(world.Root.transform, "RpgNavigation/Quests");
+                PressRpgNavigation("Quests");
                 Press(panel, "QuestPageNext");
                 Require(panel.Find("QuestPage/Label").GetComponent<Text>().text == "2 / 3",
                     "The quest journal could not page through all regions.");
@@ -167,6 +172,8 @@ namespace YGOPortable.Editor
                 world.Close();
                 story.Close();
                 UnityEngine.Object.DestroyImmediate(canvas);
+                if (EventSystem.current == input) typeof(EventSystem).GetMethod("OnDisable", flags).Invoke(input, null);
+                if (priorEvents != null) EventSystem.current = priorEvents;
                 UnityEngine.Object.DestroyImmediate(events);
                 if (hadPreference) PlayerPrefs.SetString(preference, oldPreference);
                 else PlayerPrefs.DeleteKey(preference);
@@ -195,6 +202,14 @@ namespace YGOPortable.Editor
 
             Transform FieldScene() => panel.Find("FieldViewport/Camera");
 
+            void PressRpgNavigation(string option)
+            {
+                var nav = world.Root.transform.Find("RpgNavigation");
+                if (!nav.gameObject.activeInHierarchy) Press(panel, "FieldHud/MenuToggle");
+                Require(nav.gameObject.activeInHierarchy, "Opening the field menu did not show its commands.");
+                Press(nav, option);
+            }
+
             void VerifyRpgHud()
             {
                 var hud = panel.Find("FieldHud");
@@ -207,8 +222,10 @@ namespace YGOPortable.Editor
                     "RPG navigation lost its rounded treatment or visible controller focus.");
                 var player = (RectTransform)FieldScene().Find("Player");
                 var start = player.anchorMin;
-                Require(!action.gameObject.activeSelf && hud.Find("FieldMap") == null &&
-                    ((RectTransform)action).anchorMax.y < ((RectTransform)panel.Find("FieldViewport")).anchorMin.y &&
+                Require(!action.gameObject.activeSelf && !mapButton.gameObject.activeInHierarchy &&
+                    panel.Find("FieldViewport").GetComponent<CanvasGroup>().blocksRaycasts &&
+                    hud.Find("Deck/DeckName/Label").GetComponent<Text>().text == playerDeck.name &&
+                    hud.Find("DuelistHud/Partner/PortraitFrame/Portrait").GetComponent<Image>().sprite != null &&
                     hud.Find("QuestTrack/Objective/Label").GetComponent<Text>().text.Contains(script.episodes[0].opponentName) &&
                     hud.Find("QuestTrack/GoalIcon").GetComponent<Image>().sprite != null,
                     "The field HUD exposed a far interaction, a duplicate map, or omitted the objective.");
@@ -223,16 +240,27 @@ namespace YGOPortable.Editor
                     "The prompt did not identify the nearby landmark.");
                 var menuToggle = new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Search);
                 world.HandleFieldInput(menuToggle);
-                Require(!action.gameObject.activeSelf && hud.Find("FieldControls").gameObject.activeSelf,
-                    "The action prompt conflicted with the field menu.");
-                world.HandleFieldInput(menuToggle);
+                var atLandmark = player.anchorMin;
+                world.Update(.4f, Vector2.left);
+                Require(!action.gameObject.activeSelf && mapButton.gameObject.activeInHierarchy &&
+                    world.RpgFieldMenuScope == mapButton.transform.parent.gameObject &&
+                    EventSystem.current.currentSelectedGameObject == mapButton.gameObject &&
+                    player.anchorMin == atLandmark && !panel.Find("FieldViewport").GetComponent<CanvasGroup>().blocksRaycasts,
+                    "The field menu did not capture controller focus and suspend field interaction.");
+                var handlePad = typeof(GameAppController).GetMethod("HandleMenuInput", flags);
+                handlePad.Invoke(app, new object[] { new DeckPadFrame(Vector2Int.down, DeckPadButtons.None), false });
+                Require(EventSystem.current.currentSelectedGameObject == mapButton.transform.parent.Find("Quests").gameObject,
+                    "The controller moved its focus outside the field commands.");
+                handlePad.Invoke(app, new object[] { new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Cancel), false });
+                Require(!mapButton.gameObject.activeInHierarchy && action.gameObject.activeSelf,
+                    "Cancel did not return to the active field.");
                 Press(hud, "ContextAction");
                 world.Update(.1f);
                 Require(!world.CanWalk && panel.Find("ResidentChoices/WorkbenchMenu") != null,
                     "Tapping the action prompt opened the wrong target.");
                 world.Back();
                 Require(world.EnterRpgRegion(1) && world.EnterRpgRegion(0), "Could not reset the field after HUD verification.");
-                Debug.Log("[VERIFY 5DS HUD] Single map shortcut, goal icon, proximity, menu focus and touch action passed.");
+                Debug.Log("[VERIFY 5DS HUD] Deck, partner, quest, proximity, touch action and controller menu passed.");
             }
 
             void VerifyFieldMovement()
@@ -273,7 +301,8 @@ namespace YGOPortable.Editor
                 world.Update(.15f, Vector2.up);
                 var back = art.sprite;
                 world.Update(.15f, Vector2.down);
-                Require(back != art.sprite && back.texture == art.sprite.texture && back.texture != firstStep.texture,
+                Require(back.texture == art.sprite.texture && back.texture == firstStep.texture &&
+                    back.rect.y < art.sprite.rect.y && art.sprite.rect.y < firstStep.rect.y,
                     "Up and down did not use the separate back and front poses.");
 
                 var point = new Vector2(.73f, .27f);
@@ -332,13 +361,13 @@ namespace YGOPortable.Editor
             void VerifyDirectionalArt()
             {
                 var buildArt = typeof(TagForceWorldUI).GetMethod("BuildRpgActorArt", flags);
-                foreach (int id in new[] { 1, 16, 35, 138 })
+                foreach (string id in new[] { "protagonist", "1", "10", "13", "16", "32", "34", "35", "138", "210", "3200", "3202" })
                 {
                     var actor = DuelUiKit.FillRect($"Walk_{id}", canvas.transform);
                     var art = DuelUiKit.FillRect("Art", actor);
                     try
                     {
-                        buildArt.Invoke(world, new object[] { art, $"TagForce/5DS/Characters_SD/sd_{id}.png", id.ToString() });
+                        buildArt.Invoke(world, new object[] { art, $"TagForce/5DS/Characters_SD/sd_{id}.png", id });
                         var animator = art.GetComponent<TagForceRpgWalkAnimator>();
                         var image = art.GetComponent<Image>();
                         var sideIdle = image.sprite;
@@ -358,13 +387,22 @@ namespace YGOPortable.Editor
                         animator.Pose(0f, false, Vector2.down);
                         Require(right != nextStep && right != leftIdle && rear != rearStep && flips &&
                             leftIdle == sideIdle && image.sprite == sideIdle &&
-                            right.texture == front.texture && right.rect.y > front.rect.y && front.rect.y > rear.rect.y &&
+                            right.texture == front.texture && right.rect.size == new Vector2(256f, 256f) &&
+                            right.rect.y > front.rect.y && front.rect.y > rear.rect.y &&
                             art.GetComponent<TagForceRpgStride>() == null,
                             $"Character {id} did not use its front, back and side walking sheet.");
                     }
                     finally { UnityEngine.Object.DestroyImmediate(actor.gameObject); }
                 }
-                Debug.Log("[VERIFY 5DS WALK ART] Aki, Jack, Yusei and Vagabond directional poses passed.");
+                var fallback = DuelUiKit.FillRect("WalkFallback", canvas.transform);
+                try
+                {
+                    var art = DuelUiKit.FillRect("Art", fallback);
+                    buildArt.Invoke(world, new object[] { art, "TagForce/5DS/Characters_SD/sd_33.png", "야나기 텐젠" });
+                    VerifyStride(art.GetComponent<TagForceRpgStride>());
+                }
+                finally { UnityEngine.Object.DestroyImmediate(fallback.gameObject); }
+                Debug.Log("[VERIFY 5DS WALK ART] Compact atlas directions and single-sprite walk fallback passed.");
             }
 
             void VerifyResidentProfiles()
@@ -434,7 +472,6 @@ namespace YGOPortable.Editor
                     opponent.gameObject.activeSelf && opponent.anchorMin == otherStart && player.gameObject.activeSelf &&
                     ((RectTransform)field).anchorMin != cameraStart,
                     "The first shot did not follow Aki as she entered before the other actor moved.");
-                VerifyStride(field.Find("Resident_210/SD").GetComponent<TagForceRpgStride>());
                 story.Update(.57f);
                 Require(world.RpgStageRunning && opponent.anchorMin != otherStart,
                     "The second actor did not move automatically after the first beat.");
@@ -549,7 +586,7 @@ namespace YGOPortable.Editor
                 TalkTo(33);
                 Press(panel, "ResidentChoices/AcceptQuest");
                 world.Back();
-                Press(world.Root.transform, "RpgNavigation/Quests");
+                PressRpgNavigation("Quests");
                 var journal = panel.Find("QuestJournal/Items").GetComponentsInChildren<Text>();
                 Require(journal.Any(text => text.text.Contains("크로우 호건에게 부품 상자 전하기")),
                     "The quest journal was missing the active delivery destination.");
@@ -572,7 +609,7 @@ namespace YGOPortable.Editor
 
                 void TalkTo(int id)
                 {
-                    Press(FieldScene(), $"QuestNpc_{id}/Interact");
+                    Press(FieldScene(), $"QuestNpc_{id}/SD");
                     world.Update(4f);
                     Require(!world.CanWalk && panel.Find("ResidentChoices") != null && FieldScene().Find($"QuestNpc_{id}") != null,
                         $"Quest giver {id} did not open a conversation on the field.");
@@ -592,7 +629,8 @@ namespace YGOPortable.Editor
                     Require(world.EnterRpgRegion(0), "The garage was unavailable in the exploration test.");
                     var viewport = (RectTransform)panel.Find("FieldViewport");
                     var track = (RectTransform)panel.Find("FieldHud/QuestTrack");
-                    Require(viewport.anchorMax.y < track.anchorMin.y, "The quest HUD overlapped the walkable scenery.");
+                    Require(viewport.anchorMax == Vector2.one && track.anchorMin.y > .80f && track.anchorMax.x < .32f,
+                        "The quest tracker no longer left the middle of the full-screen field clear.");
                     ExamineLandmark();
                     Require(panel.Find("ResidentChoices/AskCrow") == null && !world.CanWalk,
                         "The workbench exposed the late bridge quest early, or allowed motion while inspecting.");
@@ -655,7 +693,7 @@ namespace YGOPortable.Editor
                     world.Back();
                     var repairedCrow = (RectTransform)FieldScene().Find("QuestNpc_10");
                     Require(repairedCrow.anchorMin != start, "The resident did not relocate after repairing the runner.");
-                    Press(repairedCrow, "Interact");
+                    Press(repairedCrow, "SD");
                     world.Update(4f);
                     Require(panel.Find("ResidentChoices/DailyLine/Label").GetComponent<Text>().text.Contains("시동"),
                         "The resident did not remember the completed repair.");
@@ -760,7 +798,7 @@ namespace YGOPortable.Editor
                 world.QueueRpgRankNotice(1);
                 world.EnterRpgRegion(0);
                 Require(panel.Find("RankUp") != null, "The rank-up banner was absent.");
-                Press(FieldScene(), "RpgCardMerchant/Interact");
+                Press(FieldScene(), "RpgCardMerchant/SD");
                 world.Update(4f);
                 Press(panel, "ResidentChoices/OpenCardShop");
                 Require(!world.Root.activeSelf && (Get("_collectionShop") as CollectionShopUI).Root.activeSelf,
@@ -803,7 +841,7 @@ namespace YGOPortable.Editor
                     panel.Find("FieldHud/QuestTrack/GoalIcon/Label").GetComponent<Text>().text == "!",
                     "Missing optional map or quest-icon art did not fall back to colors and text.");
                 loadedArt["TagForce/UI/icon_map_lock.png"] = null;
-                Press(world.Root.transform, "RpgNavigation/Map");
+                PressRpgNavigation("Map");
                 Require(panel.Find("spot_facility_prison/MapLock/Label") != null,
                     "The locked map needed external icon art.");
                 world.Back();
@@ -813,7 +851,7 @@ namespace YGOPortable.Editor
             void VerifyStageExit()
             {
                 var firstEpisode = loaded.episodes[0];
-                Press(FieldScene(), "MainQuestNpc/Interact");
+                Press(FieldScene(), "MainQuestNpc/SD");
                 world.Update(4f);
                 story.ShowFieldDuelResult(firstEpisode, true, false, () => "");
                 var opponent = (RectTransform)FieldScene().Find("MainQuestNpc");
@@ -884,7 +922,7 @@ namespace YGOPortable.Editor
                 var resident = (RectTransform)field.Find("Resident_1");
                 Require(resident != null, "Aki was missing from the hideout before the conversation.");
                 Vector2 residentPosition = resident.anchorMin;
-                Press(field, "MainQuestNpc/Interact");
+                Press(field, "MainQuestNpc/SD");
                 world.Update(4f);
                 Require(storyRoot.gameObject.activeSelf && story.FromRpgField && world.Root.activeSelf && !world.CanWalk &&
                     story.GetOpponentMatch(episode6).Deck.id == 59006,

@@ -36,6 +36,7 @@ namespace YGOPortable.UI
         };
 
         private readonly List<(int Slot, int Region, int Entry)> _rpgExits = new();
+        private readonly List<RectTransform> _rpgExitSigns = new();
         private RectTransform _rpgFieldObjects, _rpgWalkInActor;
         private Text _rpgLandmarkLabel;
         private CanvasGroup _rpgWalkInChoices;
@@ -59,6 +60,7 @@ namespace YGOPortable.UI
                 if (_rpgLocation == from) AddExit(exit, to, entrance);
                 if (_rpgLocation == to) AddExit(entrance, from, exit);
             }
+            UpdateRpgExitSigns();
 
             var landmark = RpgLandmarks[_rpgLocation];
             var marker = Anchor(_rpgFieldObjects, "Landmark", landmark.Position, new Vector2(146f, 31f));
@@ -72,12 +74,25 @@ namespace YGOPortable.UI
                 bool open = RpgRegions[destination].IsOpen(cleared);
                 var gate = Anchor(_rpgFieldObjects, $"Exit_{destination}",
                     RpgExitPoints[slot] + new Vector2(0f, .047f), new Vector2(196f, 32f));
+                _rpgExitSigns.Add(gate);
                 string arrow = slot switch { 0 => "‹", 1 => "›", _ => "↑" };
                 var button = RpgButton(gate, open ? $"{arrow}  {RpgRegions[destination].Name}" :
                     $"{RpgRegions[destination].Name} · {RpgRegions[destination].RequiredEpisode}화", () =>
                         MoveTo(RpgExitPoints[slot], () => FollowRpgExit(destination, entry)), 15);
                 button.interactable = open;
                 if (open) _rpgExits.Add((slot, destination, entry));
+            }
+        }
+
+        private void UpdateRpgExitSigns()
+        {
+            var bounds = _rpgViewport.rect;
+            foreach (var sign in _rpgExitSigns)
+            {
+                float x = _rpgViewport.InverseTransformPoint(sign.TransformPoint(sign.rect.center)).x;
+                float halfWidth = sign.rect.width * _rpgSceneSpace.localScale.x * .5f;
+                bool visible = x - halfWidth >= bounds.xMin && x + halfWidth <= bounds.xMax;
+                if (sign.gameObject.activeSelf != visible) sign.gameObject.SetActive(visible);
             }
         }
 
@@ -211,6 +226,7 @@ namespace YGOPortable.UI
         private void ClearRpgExploration()
         {
             _rpgExits.Clear();
+            _rpgExitSigns.Clear();
             _rpgFieldObjects = _rpgWalkInActor = null;
             _rpgLandmarkLabel = null;
             _rpgWalkInChoices = null;

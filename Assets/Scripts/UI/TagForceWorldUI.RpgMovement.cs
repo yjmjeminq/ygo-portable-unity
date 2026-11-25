@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
@@ -10,14 +11,15 @@ namespace YGOPortable.UI
         private const float RpgWalkSpeed = .27416f;
         private const float RpgStrideDistanceScale = 1.46f;
         private const float RpgSceneryFocusY = .55f;
+        private static readonly Vector2 RpgFieldActorSize = new(82f, 83f);
+        private readonly List<RectTransform> _rpgDepthOrder = new();
         private RectTransform _rpgSceneSpace, _rpgViewport;
         private Vector2 _rpgCameraPan;
         private float _rpgBackdropAspect, _rpgCameraLead;
 
-        private Image BuildRpgCamera(Sprite scenery, bool reserveHud)
+        private Image BuildRpgCamera(Sprite scenery)
         {
             _rpgViewport = DuelUiKit.FillRect("FieldViewport", _body);
-            if (reserveHud) _rpgViewport.anchorMax = new Vector2(1f, .86f);
             _rpgViewport.gameObject.AddComponent<RectMask2D>();
             _rpgSceneSpace = DuelUiKit.FillRect("Camera", _rpgViewport);
             _rpgSceneSpace.localScale = Vector3.one * RpgActorScale;
@@ -76,6 +78,7 @@ namespace YGOPortable.UI
             var halfSize = span * (.5f / RpgActorScale);
             _rpgSceneSpace.anchorMin = center - halfSize;
             _rpgSceneSpace.anchorMax = center + halfSize;
+            UpdateRpgExitSigns();
         }
 
         private Vector2 AdvanceRpgWalk(float delta)
@@ -88,10 +91,26 @@ namespace YGOPortable.UI
 
         private Vector2 RpgArtDirection(Vector2 direction) => new(direction.x, direction.y / _rpgBackdropAspect);
 
+        private void OrderRpgFieldActors()
+        {
+            _rpgDepthOrder.Clear();
+            _rpgDepthOrder.AddRange(_rpgResidents.Values);
+            if (_rpgCompanion != null) _rpgDepthOrder.Add(_rpgCompanion);
+            _rpgDepthOrder.Add(_player);
+            _rpgDepthOrder.Sort((left, right) => right.anchorMin.y.CompareTo(left.anchorMin.y));
+            int first = _rpgSceneSpace.childCount - _rpgDepthOrder.Count;
+            for (int i = _rpgDepthOrder.Count - 1; i >= 0; i--)
+            {
+                var actor = _rpgDepthOrder[i];
+                if (actor.GetSiblingIndex() != first + i) actor.SetSiblingIndex(first + i);
+            }
+        }
+
         private RectTransform BuildRpgActorArt(RectTransform art, string path, string name)
         {
             string cycle = RpgArt + "WalkCycles/" + Path.GetFileNameWithoutExtension(path);
-            var directions = path == null ? null : _images.GetSlices(cycle + "_directions.png", 3, 3);
+            var field = path == null ? null : _images.GetSlices(cycle + "_field.png", 3, 3, fixedCells: true);
+            var directions = field ?? (path == null ? null : _images.GetSlices(cycle + "_directions.png", 3, 3));
             var sides = path == null || directions != null ? null : _images.GetSlices(cycle + ".png", 2, 2);
             var profile = path == null || directions != null ? null : _images.GetSlices(cycle + "_side_idle.png", 1, 1)?[0];
             var idle = directions?[0] ?? profile ?? _images.GetSlices(path, 1, 1)?[0] ?? _images.Get(path);
@@ -108,9 +127,9 @@ namespace YGOPortable.UI
                 art.anchorMax -= Vector2.up * padding;
             }
             var depth = sides == null ? null : _images.GetSlices(cycle + "_vertical.png", 3, 2);
-            AddRpgGroundShadow(art);
+            AddRpgGroundShadow(art, field != null ? .06f : 0f);
             var image = DuelUiKit.AddImage(art.gameObject, idle, Color.white, true, false);
-            art.gameObject.AddComponent<TagForceRpgWalkAnimator>().Initialize(image, idle, sides, depth, directions);
+            art.gameObject.AddComponent<TagForceRpgWalkAnimator>().Initialize(image, idle, sides, depth, directions, field != null);
             return art;
         }
 
@@ -134,9 +153,9 @@ namespace YGOPortable.UI
         private TagForceRpgStride _stride;
         private Facing _facing;
         private bool _left;
-        private float _phase;
+        private float _phase, _widthScale;
 
-        internal void Initialize(Image image, Sprite idle, Sprite[] side, Sprite[] depth, Sprite[] directions)
+        internal void Initialize(Image image, Sprite idle, Sprite[] side, Sprite[] depth, Sprite[] directions, bool compactArt)
         {
             _image = image;
             _idle = idle;
@@ -144,6 +163,7 @@ namespace YGOPortable.UI
             _depth = depth;
             _directions = directions;
             _facing = Facing.Side;
+            _widthScale = compactArt ? 1f : 1.14f;
             if (directions == null && side == null) _stride = gameObject.AddComponent<TagForceRpgStride>();
         }
 
@@ -186,7 +206,7 @@ namespace YGOPortable.UI
             }
             else if (walking && _side != null) next = _side[frame];
             if (_image.sprite != next) _image.sprite = next;
-            transform.localScale = new Vector3(flip ? -1f : 1f, 1f, 1f);
+            transform.localScale = new Vector3(flip ? -_widthScale : _widthScale, 1f, 1f);
             _stride?.SetFrame(walking ? frame : -1);
         }
     }

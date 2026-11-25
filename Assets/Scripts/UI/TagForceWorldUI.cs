@@ -117,6 +117,11 @@ namespace YGOPortable.UI
             DuelAudio.PlayTagForceSfx(TagForceSfx.Cancel);
             if (_rpgField)
             {
+                if (_page == Page.Field && _fieldMenu)
+                {
+                    ToggleFieldMenu(playSound: false);
+                    return;
+                }
                 if (_page is Page.Prologue or Page.Guide)
                 {
                     if (_rpgIntroDialogue?.ClosePopup() != true) FinishRpgIntro();
@@ -192,8 +197,8 @@ namespace YGOPortable.UI
             bool openConversation = page == Page.Talk && _page == Page.Field;
             _page = page;
             UpdateRpgWorldChrome();
-            _status.rectTransform.anchorMax = new Vector2(_rpgField && page == Page.Field ? .59f : .95f, .168f);
             ClearBody();
+            LayoutRpgField(_rpgField && page == Page.Field);
             _images.BeginPage();
             if (_rpgField)
             {
@@ -442,7 +447,7 @@ namespace YGOPortable.UI
 
         private void MoveTo(Vector2 point, Action arrive = null)
         {
-            if (!CanWalk) return;
+            if (!CanWalk || (_rpgField && _fieldMenu)) return;
             _manualWalk = false;
             _destination = new Vector2(Mathf.Clamp(point.x, .06f, .94f), Mathf.Clamp(point.y, .095f, _rpgField ? .455f : .77f));
             _moving = true;
@@ -498,6 +503,7 @@ namespace YGOPortable.UI
                 PoseRpgWalker(_player, _playerSprite, _position, _position - previous, _moving);
                 TrackRpgCamera(delta, horizontalTravel: _position.x - previous.x);
                 FollowRpgPlayer(delta);
+                OrderRpgFieldActors();
                 CheckRpgSceneEncounter(previous);
                 if (!CanWalk || CheckRpgExit(previous)) return;
             }
@@ -553,13 +559,7 @@ namespace YGOPortable.UI
             if (!CanWalk) return false;
             if (frame.Search)
             {
-                _fieldMenu = !_fieldMenu;
-                DuelAudio.PlayTagForceSfx(TagForceSfx.Cursor, .65f);
-                _manualWalk = _moving = false;
-                _onArrival = null;
-                if (_rpgField) RefreshRpgFieldPrompt();
-                else _fieldControls.text = _fieldMenu ? "위쪽 버튼으로 보행 복귀" :
-                    "방향키 · 스틱 이동   선택 조사/대화   위쪽 버튼 메뉴";
+                ToggleFieldMenu();
                 return true;
             }
             if (_fieldMenu) return false;
@@ -579,6 +579,22 @@ namespace YGOPortable.UI
             DuelAudio.PlayTagForceSfx(TagForceSfx.Confirm);
             MoveTo(closest.Actor.anchorMin, closest.Action);
             return true;
+        }
+
+        private void ToggleFieldMenu(bool playSound = true)
+        {
+            if (!CanWalk) return;
+            _fieldMenu = !_fieldMenu;
+            if (playSound) DuelAudio.PlayTagForceSfx(TagForceSfx.Cursor, .65f);
+            _manualWalk = _moving = false;
+            _onArrival = null;
+            if (_rpgField)
+            {
+                RefreshRpgFieldPrompt();
+                EventSystem.current?.SetSelectedGameObject(_fieldMenu ? _rpgNavigation.Find("Map").gameObject : null);
+            }
+            else _fieldControls.text = _fieldMenu ? "위쪽 버튼으로 보행 복귀" :
+                "방향키 · 스틱 이동   선택 조사/대화   위쪽 버튼 메뉴";
         }
 
         private void BuildRoom()
@@ -1213,17 +1229,17 @@ namespace YGOPortable.UI
             return result;
         }
 
-        internal Sprite[] GetSlices(string path, int columns, int rows)
+        internal Sprite[] GetSlices(string path, int columns, int rows, bool fixedCells = false)
         {
-            var source = Get(path, readable: true);
+            var source = Get(path, readable: !fixedCells);
             if (source == null) return null;
             if (_slices.TryGetValue(path, out var clips)) return clips;
             var texture = source.texture;
-            if (!texture.isReadable) return null;
+            if (!fixedCells && !texture.isReadable) return null;
 
             try
             {
-                Color32[] pixels = texture.GetPixels32();
+                Color32[] pixels = fixedCells ? null : texture.GetPixels32();
                 var rectangles = new Rect[columns * rows];
                 for (int row = 0; row < rows; row++)
                 {
@@ -1233,6 +1249,11 @@ namespace YGOPortable.UI
                     {
                         int left = texture.width * column / columns;
                         int right = texture.width * (column + 1) / columns;
+                        if (fixedCells)
+                        {
+                            rectangles[row * columns + column] = new Rect(left, bottom, right - left, top - bottom);
+                            continue;
+                        }
                         int xMin = right, yMin = top, xMax = left - 1, yMax = bottom - 1;
                         for (int y = bottom; y < top; y++)
                         for (int x = left; x < right; x++)
@@ -1254,7 +1275,7 @@ namespace YGOPortable.UI
             finally
             {
                 _slices.Add(path, clips);
-                texture.Apply(false, true);
+                if (!fixedCells) texture.Apply(false, true);
             }
         }
 

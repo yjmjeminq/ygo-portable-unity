@@ -11,6 +11,11 @@ namespace YGOPortable.UI
         private readonly List<RpgInteraction> _rpgInteractions = new();
         private Button _rpgActionButton;
         private Text _rpgActionText;
+        private Text _rpgMenuCaption;
+        private CanvasGroup _rpgFieldInput;
+
+        internal GameObject RpgFieldMenuScope => _rpgField && _fieldMenu && _rpgNavigation.gameObject.activeInHierarchy
+            ? _rpgNavigation.gameObject : Root;
 
         private readonly struct RpgInteraction
         {
@@ -60,7 +65,11 @@ namespace YGOPortable.UI
             var candidate = CanWalk && !_fieldMenu ? NearbyRpgInteraction() : default;
             _rpgActionButton.gameObject.SetActive(candidate.Select != null);
             if (_rpgActionText.text != candidate.Caption) _rpgActionText.text = candidate.Caption ?? "";
-            _fieldControls.gameObject.SetActive(_fieldMenu);
+            if (_rpgFieldInput == null) return;
+            _rpgNavigation.gameObject.SetActive(_fieldMenu);
+            _rpgFieldInput.interactable = _rpgFieldInput.blocksRaycasts = !_fieldMenu;
+            string menuText = _fieldMenu ? "메뉴 닫기" : "메뉴";
+            if (_rpgMenuCaption.text != menuText) _rpgMenuCaption.text = menuText;
         }
 
         private void ClearRpgFieldHud()
@@ -68,50 +77,93 @@ namespace YGOPortable.UI
             _rpgInteractions.Clear();
             _rpgActionButton = null;
             _rpgActionText = null;
+            _rpgMenuCaption = null;
+            _rpgFieldInput = null;
         }
 
         private void BuildRpgFieldHud(int cleared, int targetRegion, StoryEpisodeData[] episodes, string sideObjective)
         {
-            var soft = new Color(.66f, .78f, .86f);
-            var accent = new Color(.39f, .81f, .90f);
+            var soft = new Color(.75f, .84f, .89f);
+            var accent = new Color(.44f, .89f, .93f);
             _rpgFieldHud = DuelUiKit.FillRect("FieldHud", _body);
-            var quest = Area(_rpgFieldHud, "QuestTrack", .02f, .865f, .635f, .989f);
-            RpgUiStyle.Panel(quest);
-            var iconSlot = Area(quest, "GoalIcon", .018f, .58f, .065f, .90f);
-            DrawRpgIcon(iconSlot, "hud_target.png", "!", DuelUiKit.GoldAccent);
+
+            var deckName = DeckRepository.UserDecks.Find(deck => deck.id == (_deckId ?? CollectionProgress.LastDuelDeckId))?.name ??
+                DeckRepository.UserDecks.Find(deck => GameAppController.CanStartWithDeck(deck, out _))?.name ?? "덱 없음";
+            var deckPlate = Area(_rpgFieldHud, "Deck", .019f, .928f, .242f, .980f);
+            PaintRpgHudPlate(deckPlate);
+            HudLabel(Area(deckPlate, "Icon", .045f, .07f, .145f, .93f), "▣", 19, accent, align: TextAnchor.MiddleCenter);
+            HudLabel(Area(deckPlate, "DeckName", .168f, .07f, .967f, .93f), deckName, 22, Color.white, heading: true);
+
             bool hasEpisode = cleared < episodes.Length;
-            string caption = hasEpisode ? $"EP {cleared + 1:00}   ·   {RpgRegions[targetRegion].Name}" : "스토리";
+            string location = RpgRegions[_rpgLocation].Name;
+            string caption = hasEpisode ? $"EP {cleared + 1:00} · {location}" : location;
             string objective = episodes.Length == 0 ? "대본을 불러오지 못했습니다." :
-                !hasEpisode ? $"전체 {episodes.Length}화 완료 · 자유 탐험" :
+                !hasEpisode ? "자유 탐험" :
                 _rpgLocation == targetRegion ? $"{episodes[cleared].opponentName}에게 다가가기" :
-                "월드맵 또는 출구로 이동";
-            HudLabel(Area(quest, "Chapter", .077f, .61f, .97f, .97f), caption, 18, DuelUiKit.GoldAccent);
-            HudLabel(Area(quest, "Objective", .027f, sideObjective == null ? .10f : .29f, .973f, .62f),
-                objective, 23, Color.white, heading: true);
+                $"{RpgRegions[targetRegion].Name}(으)로 이동";
+            var quest = Area(_rpgFieldHud, "QuestTrack", .019f, sideObjective == null ? .837f : .811f, .284f, .915f);
+            PaintRpgHudPlate(quest);
+            DrawRpgIcon(Area(quest, "GoalIcon", .039f, .56f, .105f, .94f), "hud_target.png", "!", DuelUiKit.GoldAccent);
+            HudLabel(Area(quest, "Chapter", .126f, .52f, .955f, .95f), caption, 16, DuelUiKit.GoldAccent);
+            HudLabel(Area(quest, "Objective", .047f, sideObjective == null ? .055f : .25f, .955f, .53f),
+                objective, 19, Color.white, heading: true);
             if (sideObjective != null)
-                HudLabel(Area(quest, "SideQuestTrack", .027f, .003f, .973f, .31f),
-                    $"의뢰 · {sideObjective}", 17, soft);
+                HudLabel(Area(quest, "SideQuestTrack", .047f, .03f, .955f, .27f),
+                    $"의뢰 · {sideObjective}", 15, soft);
 
-            var stats = Area(_rpgFieldHud, "DuelistHud", .651f, .865f, .98f, .989f);
-            RpgUiStyle.Panel(stats);
-            HudLabel(Area(stats, "Rank", .042f, .53f, .42f, .94f), $"Lv. {CollectionProgress.RpgRank}", 23, accent, heading: true);
-            HudLabel(Area(stats, "Dp", .426f, .53f, .957f, .94f), $"{CollectionProgress.Balance:N0} DP",
-                23, Color.white, align: TextAnchor.MiddleRight, heading: true);
-            HudLabel(Area(stats, "ExperienceLabel", .042f, .09f, .17f, .46f), "EXP", 16, soft);
-            var bar = Area(stats, "Experience", .18f, .19f, .52f, .35f);
-            Tint(bar, new Color(.11f, .21f, .28f));
-            Tint(Area(bar, "Fill", 0f, 0f, CollectionProgress.RpgRankProgress, 1f), accent);
-            HudLabel(Area(stats, "Affinity", .56f, .09f, .957f, .46f),
-                $"유세이 ♥ {CollectionProgress.RpgAffinity}/100", 17, new Color(1f, .72f, .80f), align: TextAnchor.MiddleRight);
+            var stats = Area(_rpgFieldHud, "DuelistHud", .794f, .877f, .981f, .980f);
+            var statsText = Area(stats, "Stats", 0f, .16f, .731f, 1f);
+            PaintRpgHudPlate(statsText);
+            HudLabel(Area(statsText, "Dp", .06f, .47f, .92f, .95f), $"DP   {CollectionProgress.Balance:N0}",
+                24, Color.white, align: TextAnchor.MiddleRight, heading: true);
+            HudLabel(Area(statsText, "Rank", .06f, .065f, .37f, .42f), $"Lv.{CollectionProgress.RpgRank}", 16, accent);
+            var bar = Area(statsText, "Experience", .405f, .173f, .92f, .277f);
+            Tint(bar, new Color(.18f, .29f, .36f));
+            float rankProgress = Mathf.Clamp01(CollectionProgress.RpgRankProgress);
+            if (rankProgress > 0f) Tint(Area(bar, "Fill", 0f, 0f, rankProgress, 1f), accent);
 
-            // Keep the tap target between the viewport and navigation so it cannot cover map objects.
-            _rpgActionButton = RpgButton(Area(_rpgFieldHud, "ContextAction", .62f, -.079f, .98f, -.007f),
+            var partner = Area(stats, "Partner", .768f, .246f, 1f, 1f);
+            PaintRpgHudPlate(partner);
+            var bust = _images.GetBust(RpgArt + $"Characters_Standing/full_{RpgPartnerId}.png");
+            if (bust != null)
+            {
+                var frame = Area(partner, "PortraitFrame", .049f, .06f, .954f, .938f);
+                frame.gameObject.AddComponent<RectMask2D>();
+                Tint(frame, new Color(.14f, .21f, .29f));
+                DuelUiKit.AddImage(Area(frame, "Portrait", -.52f, -.86f, 1.52f, 1.09f).gameObject,
+                    bust, Color.white, false, false);
+            }
+            else HudLabel(partner, "유세이", 16, soft, align: TextAnchor.MiddleCenter);
+            var affinity = Area(stats, "Affinity", .756f, -.022f, 1f, .228f);
+            Tint(affinity, new Color(.055f, .073f, .117f, .91f));
+            int hearts = Mathf.Clamp(CollectionProgress.RpgAffinity, 0, 100);
+            for (int i = 0; i < 5; i++)
+            {
+                int level = hearts - i * 20;
+                HudLabel(Area(affinity, $"Heart{i}", i * .2f, 0f, (i + 1) * .2f, 1f),
+                    level > 0 ? "♥" : "♡", 15,
+                    level >= 20 ? new Color(1f, .52f, .62f) : level > 0 ? new Color(1f, .74f, .81f) : soft,
+                    align: TextAnchor.MiddleCenter);
+            }
+
+            _rpgActionButton = RpgButton(Area(_rpgFieldHud, "ContextAction", .019f, .028f, .288f, .088f),
                 "", ActivateRpgInteraction, 21, primary: true, sound: null);
             _rpgActionButton.navigation = new Navigation { mode = Navigation.Mode.None };
             _rpgActionText = _rpgActionButton.GetComponentInChildren<Text>();
-            _fieldControls = HudLabel(Area(_rpgFieldHud, "FieldControls", .62f, -.079f, .98f, -.007f),
-                "위쪽 버튼 · 필드로", 17, soft, align: TextAnchor.MiddleCenter);
+            var menu = RpgButton(Area(_rpgFieldHud, "MenuToggle", .873f, .028f, .981f, .088f),
+                "메뉴", () => ToggleFieldMenu(), 20, sound: null);
+            menu.navigation = new Navigation { mode = Navigation.Mode.None };
+            _rpgMenuCaption = menu.GetComponentInChildren<Text>();
+
+            if (_page == Page.Field) _rpgFieldInput = _rpgViewport.gameObject.AddComponent<CanvasGroup>();
             RefreshRpgFieldPrompt();
+        }
+
+        private static void PaintRpgHudPlate(RectTransform plate)
+        {
+            Tint(plate, new Color(.047f, .075f, .12f, .92f));
+            Tint(Area(plate, "Edge", 0f, .08f, .013f, .92f), new Color(.39f, .74f, .79f, .95f));
+            Tint(Area(plate, "Rule", .025f, .028f, .986f, .064f), new Color(.26f, .37f, .46f, .85f));
         }
 
         private static Text HudLabel(RectTransform slot, string text, int size, Color color,

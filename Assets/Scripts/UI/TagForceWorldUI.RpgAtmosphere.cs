@@ -139,9 +139,9 @@ namespace YGOPortable.UI
             }
         }
 
-        private static void AddRpgGroundShadow(RectTransform art)
+        private static void AddRpgGroundShadow(RectTransform art, float raisedFeet)
         {
-            float bottom = art.anchorMin.y;
+            float bottom = art.anchorMin.y + raisedFeet;
             var shadow = Area(art.parent, "GroundShadow", .19f, bottom - .063f, .81f, bottom + .084f);
             shadow.SetSiblingIndex(art.GetSiblingIndex());
             DuelUiKit.AddImage(shadow.gameObject, RpgSoftLight, new Color(.01f, .02f, .035f, .55f), false, false);

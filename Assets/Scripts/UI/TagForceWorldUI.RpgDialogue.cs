@@ -54,7 +54,6 @@ namespace YGOPortable.UI
             Root.SetActive(true);
             if (_player == null || _rpgDialogueCast != null) Show(Page.Field);
 
-            _rpgViewport.anchorMax = Vector2.one;
             _rpgDialogueCast = DuelUiKit.FillRect("DialogueCast", _rpgSceneSpace);
             _rpgLastPlayedSceneId = episode.id;
             _rpgHeroName = hero;
@@ -82,7 +81,6 @@ namespace YGOPortable.UI
 
             foreach (var actor in _rpgResidents.Values)
             {
-                actor.Find("Interact").gameObject.SetActive(false);
                 var marker = actor.Find(actor == _rpgDialogueOpponent ? "MainQuestMarker" : "ResidentMarker");
                 if (marker != null) marker.gameObject.SetActive(false);
                 actor.Find("QuestBadge")?.gameObject.SetActive(false);
