@@ -68,8 +68,8 @@ namespace YGOPortable.Editor
                 var entry = menu.MenuRoot.GetComponentsInChildren<Button>()
                     .Single(button => button.transform.parent.name == "RpgWorld");
                 entry.onClick.Invoke();
-                Require(world.Root.activeSelf && panel.Find("Player/Sprite").GetComponent<Image>().sprite != null &&
-                    panel.Find("MainQuestNpc/MainQuestMarker").GetComponent<Image>().sprite != null &&
+                Require(world.Root.activeSelf && FieldScene().Find("Player/Sprite").GetComponent<Image>().sprite != null &&
+                    FieldScene().Find("MainQuestNpc/MainQuestMarker").GetComponent<Image>().sprite != null &&
                     world.CanStartRpgEpisode(0) && !world.CanStartRpgEpisode(1),
                     "RPG did not start as a walkable field with the first main quest.");
                 Press(panel, "FieldHud/FieldMap");
@@ -83,9 +83,10 @@ namespace YGOPortable.Editor
                     "Returning from deck editing did not restore the RPG world map.");
                 world.Back();
 
+                VerifyFieldMovement();
                 VerifySceneGuests();
 
-                var local = panel.Cast<Transform>().First(child => child.name.StartsWith("Resident_", StringComparison.Ordinal));
+                var local = FieldScene().Cast<Transform>().First(child => child.name.StartsWith("Resident_", StringComparison.Ordinal));
                 Require(local.Find("ResidentMarker").GetComponent<Image>().sprite != null, "The resident marker was missing.");
                 Press(local, "Interact");
                 world.Update(4f);
@@ -142,18 +143,62 @@ namespace YGOPortable.Editor
                 PlayerPrefs.Save();
             }
 
+            Transform FieldScene() => panel.Find("FieldViewport/Camera");
+
+            void VerifyFieldMovement()
+            {
+                Canvas.ForceUpdateCanvases();
+                var camera = (RectTransform)FieldScene();
+                var player = (RectTransform)camera.Find("Player");
+                var map = (RectTransform)camera.Find("Scenery");
+                var art = player.Find("Sprite").GetComponent<Image>();
+                var idle = art.sprite;
+                Vector2 pan = camera.anchorMin;
+                world.Update(.09f, Vector2.right);
+                var firstStep = art.sprite;
+                world.Update(.12f, Vector2.right);
+                Require(firstStep != idle && art.sprite != firstStep && art.rectTransform.localScale.x > 0f &&
+                    player.anchoredPosition == Vector2.zero && camera.anchorMin.x < pan.x &&
+                    camera.Find("MainQuestNpc").parent == map.parent &&
+                    panel.Find("FieldHud").parent != camera,
+                    "The horizontal walk did not change frames or move the shared map camera.");
+                world.Update(.12f, Vector2.left);
+                Require(art.rectTransform.localScale.x < 0f, "Walking left did not face left.");
+                world.Update(0f);
+                Require(art.sprite == idle, "Stopping did not restore the idle pose.");
+                world.Update(.15f, Vector2.up);
+                var back = art.sprite;
+                world.Update(.15f, Vector2.down);
+                Require(back != art.sprite && back.texture == art.sprite.texture && back.texture != firstStep.texture,
+                    "Up and down did not use the separate back and front poses.");
+
+                var point = new Vector2(.83f, .29f);
+                var local = map.rect.min + Vector2.Scale(map.rect.size, point);
+                var ev = new PointerEventData(events.GetComponent<EventSystem>())
+                {
+                    position = RectTransformUtility.WorldToScreenPoint(null, map.TransformPoint(local)),
+                };
+                map.GetComponent<TagForceFloorTap>().OnPointerClick(ev);
+                world.Update(4f);
+                float limit = (camera.localScale.x - 1f) * .5f;
+                Require(Vector2.Distance(player.anchorMin, point) < .001f &&
+                    Mathf.Abs(camera.anchorMin.x) <= limit + .0001f && Mathf.Abs(camera.anchorMin.y) <= limit + .0001f,
+                    "A click used screen space instead of map space, or the camera passed the map edge.");
+            }
+
             void VerifySceneGuests()
             {
-                var player = (RectTransform)panel.Find("Player");
-                var opponent = panel.Find("MainQuestNpc");
-                Press(panel, "MainQuestNpc/Interact");
+                var field = FieldScene();
+                var player = (RectTransform)field.Find("Player");
+                var opponent = field.Find("MainQuestNpc");
+                Press(field, "MainQuestNpc/Interact");
                 world.Update(4f);
                 Vector2 position = player.anchorMin;
-                var cast = panel.Find("DialogueCast");
+                var cast = field.Find("DialogueCast");
                 var guest = (RectTransform)cast.Find("Guest_1");
                 Require(storyRoot.gameObject.activeSelf && world.Root.activeSelf && !world.CanWalk &&
                     world.Root.transform.GetSiblingIndex() < story.Root.transform.GetSiblingIndex() &&
-                    panel.Find("Player") == player && panel.Find("MainQuestNpc") == opponent &&
+                    field.Find("Player") == player && field.Find("MainQuestNpc") == opponent &&
                     !storyRoot.Find("Scene/Portraits").gameObject.activeSelf &&
                     !guest.gameObject.activeSelf && guest.Find("Sprite").GetComponent<Image>().sprite != null &&
                     !world.Root.GetComponent<CanvasGroup>().blocksRaycasts,
@@ -186,23 +231,24 @@ namespace YGOPortable.Editor
                 app.CloseDeckEditor();
                 Require(guest.gameObject.activeInHierarchy && !world.CanWalk, "Deck editing lost the active field scene.");
                 story.Back();
-                Require(world.CanWalk && panel.Find("DialogueCast") == null &&
-                    ((RectTransform)panel.Find("Player")).anchorMin == position &&
+                Require(world.CanWalk && FieldScene().Find("DialogueCast") == null &&
+                    ((RectTransform)FieldScene().Find("Player")).anchorMin == position &&
                     world.Root.GetComponent<CanvasGroup>().blocksRaycasts,
                     "Leaving the conversation did not remove its cast and restore movement at the original location.");
             }
 
             void OpenEpisode6()
             {
-                var resident = (RectTransform)panel.Find("Resident_1");
+                var field = FieldScene();
+                var resident = (RectTransform)field.Find("Resident_1");
                 Require(resident != null, "Aki was missing from the hideout before the conversation.");
                 Vector2 residentPosition = resident.anchorMin;
-                Press(panel, "MainQuestNpc/Interact");
+                Press(field, "MainQuestNpc/Interact");
                 world.Update(4f);
                 Require(storyRoot.gameObject.activeSelf && story.FromRpgField && world.Root.activeSelf && !world.CanWalk &&
                     story.GetOpponentMatch(episode6).Deck.id == 59006,
                     "The current field NPC did not open the corresponding cinematic and RPG deck.");
-                Require(resident.gameObject.activeInHierarchy && panel.Find("DialogueCast/Guest_1") == null,
+                Require(resident.gameObject.activeInHierarchy && field.Find("DialogueCast/Guest_1") == null,
                     "The dialogue replaced an existing field resident with a duplicate.");
                 Press(storyRoot, "Scene/DialogueBox/Skip/Button");
                 Press(storyRoot, "Scene/Choices/Choice_0/Button");

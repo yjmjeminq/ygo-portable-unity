@@ -30,7 +30,7 @@ namespace YGOPortable.UI
             Root.SetActive(true);
             if (_player == null || _rpgDialogueCast != null) Show(Page.Field);
 
-            _rpgDialogueCast = DuelUiKit.FillRect("DialogueCast", _body);
+            _rpgDialogueCast = DuelUiKit.FillRect("DialogueCast", _rpgSceneSpace);
             _rpgHeroName = hero;
             _rpgOpponentName = episode.opponentName;
             _moving = _manualWalk = _fieldMenu = false;
@@ -70,7 +70,7 @@ namespace YGOPortable.UI
 
             FaceDirection((_rpgDialogueOpponent.Find("SD") ?? _rpgDialogueOpponent.Find("Sprite")) as RectTransform,
                 _position.x - RpgNpcSlots[0].x);
-            PoseWalker(_player, _playerSprite, _position, RpgNpcSlots[0] - _position, false, 0f);
+            PoseRpgWalker(_player, _playerSprite, _position, Vector2.zero, false, RpgNpcSlots[0] - _position);
             _player.SetAsLastSibling();
             _rpgSpeakerCue = Anchor(_rpgDialogueCast, "SpeakingCue", Vector2.zero, new Vector2(29f, 24f));
             Label(_rpgSpeakerCue, "▼", 17).color = DuelUiKit.GoldAccent;
@@ -119,7 +119,7 @@ namespace YGOPortable.UI
                     {
                         guest.Joined = false;
                         if (guest.Visibility != null) guest.Actor.gameObject.SetActive(false);
-                        else PoseWalker(guest.Actor, guest.Sprite, guest.Entry, Vector2.zero, false, 0f);
+                        else PoseRpgWalker(guest.Actor, guest.Sprite, guest.Entry, Vector2.zero, false);
                     }
                     continue;
                 }
@@ -144,6 +144,7 @@ namespace YGOPortable.UI
 
         internal void UpdateRpgDialogue(float delta)
         {
+            TrackRpgCamera(delta);
             foreach (var guest in _rpgDialogueGuests)
             {
                 if (!guest.Joined || guest.Entrance >= 1f) continue;
@@ -158,8 +159,8 @@ namespace YGOPortable.UI
             bool walking = guest.Entrance < 1f;
             var heading = walking ? guest.Mark - guest.Entry : RpgNpcSlots[0] - guest.Mark;
             if (guest.Visibility != null) guest.Visibility.alpha = Mathf.Clamp01(guest.Entrance * 5f);
-            PoseWalker(guest.Actor, guest.Sprite, Vector2.LerpUnclamped(guest.Entry, guest.Mark, progress),
-                heading, walking, guest.Entrance * 22f);
+            var position = Vector2.LerpUnclamped(guest.Entry, guest.Mark, progress);
+            PoseRpgWalker(guest.Actor, guest.Sprite, position, position - guest.Actor.anchorMin, walking, heading);
         }
 
         private bool IsRpgHero(string name) => name == _rpgHeroName || name?.StartsWith("주인공", StringComparison.Ordinal) == true ||

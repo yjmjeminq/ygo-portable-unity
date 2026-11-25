@@ -177,7 +177,8 @@ namespace YGOPortable.UI
 
         private void BuildRpgField()
         {
-            var floor = Backdrop(RpgRegions[_rpgLocation].Background, new Color(.10f, .21f, .27f));
+            BuildRpgCamera();
+            var floor = Backdrop(RpgRegions[_rpgLocation].Background, new Color(.10f, .21f, .27f), _rpgSceneSpace);
             floor.raycastTarget = true;
             floor.gameObject.AddComponent<TagForceFloorTap>().Click = target => MoveTo(target);
             _rpgFieldHud = DuelUiKit.FillRect("FieldHud", _body);
@@ -211,16 +212,16 @@ namespace YGOPortable.UI
                     Show(Page.Talk);
                 });
             }
-            _player = Anchor(_body, "Player", _position, new Vector2(91f, 116f));
+            _player = Anchor(_rpgSceneSpace, "Player", _position, new Vector2(91f, 116f));
             _playerSprite = WalkerSprite(_player, RpgArt + "Characters_SD/sd_protagonist.png", "카이");
         }
 
         private void AddRpgResident(StoryEpisodeData resident, Vector2 spot, bool story, Action interact)
         {
-            var actor = Anchor(_body, story ? "MainQuestNpc" : $"Resident_{resident.charId}", spot, new Vector2(133f, 117f));
+            var actor = Anchor(_rpgSceneSpace, story ? "MainQuestNpc" : $"Resident_{resident.charId}", spot, new Vector2(133f, 117f));
             _rpgResidents[resident.charId] = actor;
             var art = Area(actor, "SD", .08f, .22f, .92f, 1f);
-            Portrait(art, RpgArt + $"Characters_SD/sd_{resident.charId}.png", resident.opponentName);
+            BuildRpgActorArt(art, RpgArt + $"Characters_SD/sd_{resident.charId}.png", resident.opponentName);
             void Approach() => MoveTo(actor.anchorMin - new Vector2(0f, .06f), interact);
             BindPortrait(art, Approach);
             var marker = Anchor(actor, story ? "MainQuestMarker" : "ResidentMarker", new Vector2(.50f, 1.07f),

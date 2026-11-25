@@ -234,6 +234,7 @@ namespace YGOPortable.UI
         {
             ClearRpgDialogue();
             _rpgResidents.Clear();
+            _rpgSceneSpace = null;
             _interactions.Clear();
             _visitors.Clear();
             _questMarkers.Clear();
@@ -404,6 +405,7 @@ namespace YGOPortable.UI
         private RectTransform WalkerSprite(RectTransform actor, string path, string name)
         {
             var visual = DuelUiKit.FillRect("Sprite", actor);
+            if (_rpgField) return BuildRpgActorArt(visual, path, name);
             return Portrait(visual, path, name) ? visual : null;
         }
 
@@ -476,7 +478,12 @@ namespace YGOPortable.UI
                 _moving = !arrived;
             }
             float phase = time * WalkFrequency;
-            PoseWalker(_player, _playerSprite, _position, _position - previous, _moving, phase);
+            if (_rpgField)
+            {
+                PoseRpgWalker(_player, _playerSprite, _position, _position - previous, _moving);
+                TrackRpgCamera(delta);
+            }
+            else PoseWalker(_player, _playerSprite, _position, _position - previous, _moving, phase);
             if (_partner != null)
             {
                 Vector2 before = _partnerPosition;
@@ -1027,10 +1034,10 @@ namespace YGOPortable.UI
         private static string PrintDialogue(TagForceBondEvent story) =>
             story.title + "\n" + string.Join("\n", story.dialogues.Select(line => $"{line.speaker}  {line.text}"));
 
-        private Image Backdrop(string path, Color fallback)
+        private Image Backdrop(string path, Color fallback, Transform parent = null)
         {
             var sprite = _images.Get(path);
-            return DuelUiKit.AddImage(DuelUiKit.FillRect("Scenery", _body).gameObject, sprite,
+            return DuelUiKit.AddImage(DuelUiKit.FillRect("Scenery", parent ?? _body).gameObject, sprite,
                 sprite == null ? fallback : Color.white, false, false);
         }
 
@@ -1153,24 +1160,70 @@ namespace YGOPortable.UI
     internal sealed class TagForceWorldImages
     {
         private readonly Dictionary<string, Sprite> _loaded = new();
+        private readonly Dictionary<string, Sprite[]> _slices = new();
         private readonly HashSet<string> _visible = new();
 
         internal void BeginPage() => _visible.Clear();
 
-        internal Sprite Get(string relative)
+        internal Sprite Get(string relative, bool readable = false)
         {
             if (string.IsNullOrWhiteSpace(relative) || !relative.StartsWith("TagForce/", StringComparison.Ordinal) ||
                 !relative.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
                 relative.IndexOfAny(new[] { '\\', ':' }) >= 0 || relative.Split('/').Contains("..")) return null;
             _visible.Add(relative);
             if (_loaded.TryGetValue(relative, out var result)) return result;
-            result = Read(Path.Combine(Application.persistentDataPath, relative)) ??
-                Read(Path.Combine(Application.streamingAssetsPath, relative));
+            result = Read(Path.Combine(Application.persistentDataPath, relative), readable) ??
+                Read(Path.Combine(Application.streamingAssetsPath, relative), readable);
             _loaded.Add(relative, result);
             return result;
         }
 
-        private static Sprite Read(string file)
+        internal Sprite[] GetSlices(string path, int columns, int rows)
+        {
+            var source = Get(path, readable: true);
+            if (source == null) return null;
+            if (_slices.TryGetValue(path, out var clips)) return clips;
+            var texture = source.texture;
+            if (!texture.isReadable) return null;
+
+            try
+            {
+                Color32[] pixels = texture.GetPixels32();
+                var rectangles = new Rect[columns * rows];
+                for (int row = 0; row < rows; row++)
+                {
+                    int bottom = texture.height * (rows - row - 1) / rows;
+                    int top = texture.height * (rows - row) / rows;
+                    for (int column = 0; column < columns; column++)
+                    {
+                        int left = texture.width * column / columns;
+                        int right = texture.width * (column + 1) / columns;
+                        int xMin = right, yMin = top, xMax = left - 1, yMax = bottom - 1;
+                        for (int y = bottom; y < top; y++)
+                        for (int x = left; x < right; x++)
+                        {
+                            if (pixels[y * texture.width + x].a < 28) continue;
+                            xMin = Math.Min(xMin, x);
+                            xMax = Math.Max(xMax, x);
+                            yMin = Math.Min(yMin, y);
+                            yMax = Math.Max(yMax, y);
+                        }
+                        if (xMin >= xMax || yMin >= yMax) return null;
+                        rectangles[row * columns + column] = new Rect(xMin, yMin, xMax - xMin + 1, yMax - yMin + 1);
+                    }
+                }
+                clips = rectangles.Select(rect => Sprite.Create(texture, rect, new Vector2(.5f, .5f),
+                    100f, 0, SpriteMeshType.FullRect)).ToArray();
+                return clips;
+            }
+            finally
+            {
+                _slices.Add(path, clips);
+                texture.Apply(false, true);
+            }
+        }
+
+        private static Sprite Read(string file, bool readable)
         {
             Texture2D texture = null;
             bool keep = false;
@@ -1181,7 +1234,7 @@ namespace YGOPortable.UI
                 if (bytes.Length < 24 || bytes[0] != 137 || bytes[1] != 80 || bytes[2] != 78 || bytes[3] != 71)
                     return null;
                 texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
-                if (!texture.LoadImage(bytes, true)) return null;
+                if (!texture.LoadImage(bytes, !readable)) return null;
                 var sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(.50f, .50f));
                 keep = sprite != null;
                 return sprite;
@@ -1209,6 +1262,8 @@ namespace YGOPortable.UI
             {
                 var sprite = _loaded[path];
                 _loaded.Remove(path);
+                if (_slices.Remove(path, out var clips) && clips != null)
+                    foreach (var clip in clips) DestroyAsset(clip);
                 if (sprite == null) continue;
                 var texture = sprite.texture;
                 DestroyAsset(sprite);
