@@ -298,7 +298,7 @@ namespace YGOPortable.UI
             var hint = DuelUiKit.CreateRect("DuelArtworkHelp", artwork, Vector2.zero, new Vector2(.59f, .53f),
                 Vector2.zero, Vector2.zero);
             DuelUiKit.AddFittedText(hint, "Label", Application.platform == RuntimePlatform.IPhonePlayer
-                ? "파일 앱 → 나의 iPhone → YGO Portable\nDuelVisuals 폴더를 넣으세요."
+                ? "파일 앱 → 나의 iPhone → YGO Portable\nDuelVisuals 안에 cardart.pack 넣기"
                 : "저장 폴더에 DuelVisuals를 넣은 뒤\n다시 불러오기를 누르세요.", 14, 11,
                 TextAnchor.MiddleLeft, DuelUiKit.TextMuted);
             var reload = DuelUiKit.CreateRect("ReloadDuelArtwork", artwork, new Vector2(.60f, .53f), new Vector2(1f, .96f),
@@ -343,8 +343,12 @@ namespace YGOPortable.UI
             var sleeve = CardArtLoader.GetCardBackSprite();
             foreach (Transform card in _shopCardBacks) card.GetComponent<Image>().sprite = sleeve;
             RefreshDuelArtStatus();
-            _duelArtToast.text = CardArtLoader.HasExternalDuelArt ? "일러스트를 다시 불러왔습니다."
-                : "외부 카드 일러스트를 찾지 못했습니다.";
+            if (CardArtLoader.HasExternalDuelArt)
+                _duelArtToast.text = "일러스트를 다시 불러왔습니다.";
+            else
+                _duelArtToast.text = CardArtLoader.HasExternalDuelArtFile
+                    ? "cardart.pack을 읽지 못했습니다."
+                    : "DuelVisuals 안에 cardart.pack이 없습니다.";
             _duelArtToast.gameObject.SetActive(true);
             if (_duelArtToastTimer != null) _app.StopCoroutine(_duelArtToastTimer);
             _duelArtToastTimer = _app.StartCoroutine(HideDuelArtToast());

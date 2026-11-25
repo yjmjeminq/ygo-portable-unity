@@ -79,12 +79,14 @@ namespace YGOPortable.Editor
         private static void VerifyDuelVisualsOverrides()
         {
             string testRoot = Path.Combine(Path.GetTempPath(), "ygo-duel-visuals-" + Guid.NewGuid().ToString("N"));
-            string local = Path.Combine(testRoot, "Local");
+            string local = Path.Combine(testRoot, "Documents", "DuelVisuals");
             string streaming = Path.Combine(testRoot, "StreamingAssets");
             string packaged = Path.Combine(streaming, "DuelVisuals");
             string previous = CardArtLoader.ActiveDuelVisualsPath;
             try
             {
+                CardArtLoader.EnsureLocalDuelVisualsFolder(local);
+                Require(Directory.Exists(local), "The app could not create a Files-visible DuelVisuals folder.");
                 WriteImage(local, CardArtLoader.CardSleeveFile, 16, 24);
                 WriteImage(packaged, CardArtLoader.CardSleeveFile, 24, 36);
                 WriteImage(local, "CardIcons/attribute/light.png", 18, 18);
@@ -137,12 +139,36 @@ namespace YGOPortable.Editor
                     DuelVisualAssets.SummonTexture(DuelEffectKind.Fusion)?.texture.width == 20 &&
                     DuelVisualAssets.FindSummonVideo(DuelEffectKind.Fusion, local, streaming) == video,
                     "The runtime did not pick up the local effect or bundled summon video.");
-                File.Delete(pack);
-                File.Delete(Path.Combine(local, "Effects/Summon.png"));
+
+                string nested = Path.Combine(local, "DuelVisuals");
+                Directory.CreateDirectory(nested);
+                string nestedPack = Path.Combine(nested, "cardart.pack");
+                string localEffect = Path.Combine(local, "Effects", "Summon.png");
+                string nestedEffect = Path.Combine(nested, "Effects", "Summon.png");
+                Directory.CreateDirectory(Path.GetDirectoryName(nestedEffect));
+                File.Move(pack, nestedPack);
+                File.Move(localEffect, nestedEffect);
                 CardArtLoader.Reload();
-                Require(!CardArtLoader.IsDuelArtActive && CardArtLoader.ActiveDuelArtCount == 0 &&
+                Require(CardArtLoader.HasExternalDuelArt && CardArtLoader.HasExternalDuelArtFile &&
+                    CardArtLoader.ActiveDuelVisualsPath == nested &&
+                    DuelVisualAssets.Effect(DuelEffectKind.Summon)?.texture.width == 18,
+                    "Reloading did not find the pack and matching effects inside the iOS extraction folder.");
+
+                File.Move(nestedPack, pack);
+                File.Move(nestedEffect, localEffect);
+                CardArtLoader.Reload();
+                Require(CardArtLoader.HasExternalDuelArt && CardArtLoader.ActiveDuelVisualsPath == local,
+                    "Reloading continued using the nested path after the pack moved to the standard location.");
+                File.Delete(pack);
+                File.Delete(localEffect);
+                CardArtLoader.Reload();
+                Require(!CardArtLoader.IsDuelArtActive && !CardArtLoader.HasExternalDuelArtFile &&
                     DuelVisualAssets.Effect(DuelEffectKind.Summon)?.texture.width == 14,
                     "Removing the external pack did not clear the cached artwork and effects.");
+                File.WriteAllText(pack, "invalid fixture");
+                CardArtLoader.Reload();
+                Require(!CardArtLoader.HasExternalDuelArt && CardArtLoader.HasExternalDuelArtFile,
+                    "A damaged local pack could not be distinguished from a missing file.");
             }
             finally
             {
@@ -150,7 +176,7 @@ namespace YGOPortable.Editor
                 CardArtLoader.Initialize(Application.streamingAssetsPath, previous);
                 if (Directory.Exists(testRoot)) Directory.Delete(testRoot, recursive: true);
             }
-            Debug.Log("[VERIFY DUEL VISUALS] Local artwork and effects, packaged fallbacks, and live reload passed.");
+            Debug.Log("[VERIFY DUEL VISUALS] Folder creation, nested packs, invalid pack detection, and live reload passed.");
 
             static void WriteImage(string directory, string relative, int width, int height)
             {

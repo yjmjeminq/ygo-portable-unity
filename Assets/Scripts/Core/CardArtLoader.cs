@@ -19,6 +19,7 @@ namespace YGOPortable.Core
         private static Dictionary<uint, ArtEntry> _index;
         private static Dictionary<int, FileStream> _packStreams;
         private static string _streamingDir;
+        private static string _localDuelVisualsRoot;
         private static string _activeDuelVisualsPath;
 
         private const int MaxCacheCount = 500;
@@ -57,11 +58,12 @@ namespace YGOPortable.Core
         public static bool IsDuelArtActive => ActiveDuelArtCount > 0;
         public static int ActiveDuelArtCount => _duelArt.Count;
         internal static bool HasExternalDuelArt => _duelArt.Values.Any(entry => entry.packId == DuelArtPackId);
+        internal static bool HasExternalDuelArtFile => File.Exists(Path.Combine(ActiveDuelVisualsPath, DuelArtFileName));
 
         public static void Reload()
         {
             string streamingAssetsPath = _streamingDir ?? Application.streamingAssetsPath;
-            string localArtworkPath = ActiveDuelVisualsPath;
+            string localArtworkPath = _localDuelVisualsRoot ?? LocalDuelVisualsPath;
             Shutdown();
             Initialize(streamingAssetsPath, localArtworkPath);
         }
@@ -71,9 +73,12 @@ namespace YGOPortable.Core
         internal static void Initialize(string streamingAssetsPath, string localArtworkPath)
         {
             if (_index != null) return;
+            if (Application.platform == RuntimePlatform.IPhonePlayer)
+                EnsureLocalDuelVisualsFolder(localArtworkPath);
             OverframeOffsetCatalog.Load(streamingAssetsPath);
             _streamingDir = streamingAssetsPath;
-            _activeDuelVisualsPath = localArtworkPath;
+            _localDuelVisualsRoot = localArtworkPath;
+            _activeDuelVisualsPath = ResolveLocalDuelVisuals(localArtworkPath);
             _index = new Dictionary<uint, ArtEntry>(16000);
             _packStreams = new Dictionary<int, FileStream>();
 
@@ -82,9 +87,9 @@ namespace YGOPortable.Core
                 Debug.LogWarning($"[CardArtLoader] Missing or invalid {idxPath}");
             ReadArtIndex(Path.Combine(streamingAssetsPath, TokenArtFileName));
             ReadArtIndex(Path.Combine(streamingAssetsPath, SupplementalArtFileName));
-            ReadDuelArtIndex(Path.Combine(localArtworkPath, DuelArtFileName), DuelArtPackId);
+            ReadDuelArtIndex(Path.Combine(ActiveDuelVisualsPath, DuelArtFileName), DuelArtPackId);
             ReadDuelArtIndex(Path.Combine(PackagedDuelVisualsPath, DuelArtFileName), PackagedDuelArtPackId);
-            ReadDuelArtIndex(Path.Combine(localArtworkPath, SourceOverframeFileName), SourceOverframePackId);
+            ReadDuelArtIndex(Path.Combine(ActiveDuelVisualsPath, SourceOverframeFileName), SourceOverframePackId);
             ReadDuelArtIndex(Path.Combine(PackagedDuelVisualsPath, SourceOverframeFileName), PackagedSourceOverframePackId);
             foreach (var (code, variants) in _duelVariants)
             {
@@ -98,6 +103,23 @@ namespace YGOPortable.Core
                 ReadLegacyOverframeIndex(PackagedDuelVisualsPath);
             }
             Debug.Log($"[CardArtLoader] Indexed {_index.Count} card artworks, {_duelArt.Count} duel artworks and {_sourceOverframes.Count} source Overframes.");
+        }
+
+        internal static void EnsureLocalDuelVisualsFolder(string root)
+        {
+            try { Directory.CreateDirectory(root); }
+            catch (Exception error) when (error is IOException || error is UnauthorizedAccessException)
+            {
+                Debug.LogWarning($"[CardArtLoader] Cannot create the local DuelVisuals folder: {error.Message}");
+            }
+        }
+
+        private static string ResolveLocalDuelVisuals(string root)
+        {
+            // Files can wrap the ZIP's own DuelVisuals folder in another folder of the same name.
+            string nested = Path.Combine(root, "DuelVisuals");
+            return !File.Exists(Path.Combine(root, DuelArtFileName)) &&
+                File.Exists(Path.Combine(nested, DuelArtFileName)) ? nested : root;
         }
 
         private static void ReadLegacyOverframeIndex(string directory)
@@ -580,6 +602,7 @@ namespace YGOPortable.Core
             _sourceOverframes.Clear();
             ArtworkChoicesByFamily.Clear();
             SelectedArtworkByFamily.Clear();
+            _localDuelVisualsRoot = null;
             _activeDuelVisualsPath = null;
             _streamingDir = null;
             _index = null;
