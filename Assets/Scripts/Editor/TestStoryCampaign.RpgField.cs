@@ -104,6 +104,7 @@ namespace YGOPortable.Editor
                     CollectionProgress.Balance == balance + 300 &&
                     decks[script.episodes[1].deckId].main.Distinct().Sum(CollectionProgress.GetTotalOwnedCount) == owned + 1,
                     "A practice win did not award DP and a card without advancing the story.");
+                VerifySideQuests();
 
                 foreach (var episode in script.episodes.Take(5))
                     Require(CollectionProgress.TryAwardStoryDuel(episode.id, true, null, decks[episode.deckId],
@@ -132,6 +133,17 @@ namespace YGOPortable.Editor
                 Require(world.EnterRpgRegion(2) && world.CanStartRpgEpisode(6) && world.RpgClears == 6,
                     "The next quest or unlocked region was lost after reloading the save.");
                 VerifyAutomaticScenes();
+                foreach (int region in Enumerable.Range(0, regions.Length))
+                {
+                    var request = RpgSideQuest.All.Single(quest => quest.Region == regions[region].Id);
+                    Require(world.EnterRpgRegion(region) && FieldScene().Find($"QuestNpc_{request.Giver}/SD").GetComponent<Image>().sprite != null,
+                        $"The region {request.Region} was missing its quest giver or SD art.");
+                }
+                Press(world.Root.transform, "RpgNavigation/Quests");
+                Press(panel, "QuestPageNext");
+                Require(panel.Find("QuestPage/Label").GetComponent<Text>().text == "2 / 3",
+                    "The quest journal could not page through all regions.");
+                world.Back();
                 Debug.Log("[VERIFY 5DS FIELD] Map gates, guest entrances, movement lock, practice rewards, story result order and saved progression passed.");
             }
             finally
@@ -367,6 +379,65 @@ namespace YGOPortable.Editor
                     Require(world.CanWalk && world.RpgClears == index, $"Leaving {episode.id} lost the field or awarded a clear.");
                 }
                 Debug.Log($"[VERIFY 5DS AUTO SCENES] All {automatic.Length} scripted approaches, opening sequences and returns passed.");
+            }
+
+            void VerifySideQuests()
+            {
+                const string tools = "garage-tools";
+                const string parts = "hideout-parts";
+                int before = CollectionProgress.Balance;
+                Require(world.EnterRpgRegion(0) && FieldScene().Find("SideQuestItem") == null,
+                    "A quest item appeared before accepting its request.");
+                TalkTo(10);
+                Press(panel, "ResidentChoices/AcceptQuest");
+                Require(CollectionProgress.GetRpgQuestState(tools) == RpgQuestState.Active && !world.CanWalk &&
+                    FieldScene().Find("Player") != null, "Accepting a request left the field or lost its actors.");
+                world.Back();
+                Press(FieldScene(), "SideQuestItem");
+                world.Update(4f);
+                CollectionProgress.Load(save);
+                Require(CollectionProgress.GetRpgQuestState(tools) == RpgQuestState.Ready &&
+                    FieldScene().Find("SideQuestItem") == null && CollectionProgress.Balance == before,
+                    "Investigating did not persist the objective or granted an early reward.");
+                TalkTo(10);
+                Press(panel, "ResidentChoices/ClaimQuest");
+                Require(CollectionProgress.Balance == before + RpgSideQuest.Find(tools).Reward &&
+                    !CollectionProgress.TryAdvanceRpgQuest(tools, RpgQuestState.Ready, out _, out _),
+                    "The reward was missing or could be claimed twice.");
+                world.Back();
+
+                Require(world.EnterRpgRegion(1), "The hideout was unavailable for the delivery request.");
+                TalkTo(33);
+                Press(panel, "ResidentChoices/AcceptQuest");
+                world.Back();
+                Press(world.Root.transform, "RpgNavigation/Quests");
+                var journal = panel.Find("QuestJournal/Items").GetComponentsInChildren<Text>();
+                Require(journal.Any(text => text.text.Contains("크로우 호건에게 부품 상자 전하기")),
+                    "The quest journal was missing the active delivery destination.");
+                world.Back();
+                Require(world.EnterRpgRegion(0), "The garage was unreachable during delivery.");
+                TalkTo(10);
+                Press(panel, "ResidentChoices/DeliverQuest");
+                world.Back();
+                CollectionProgress.Load(save);
+                Require(CollectionProgress.GetRpgQuestState(tools) == RpgQuestState.Complete &&
+                    CollectionProgress.GetRpgQuestState(parts) == RpgQuestState.Ready && world.RpgClears == 0,
+                    "The delivery did not persist independently of the main story and the earlier reward.");
+                Require(world.EnterRpgRegion(1), "The sender's region was unavailable after delivery.");
+                TalkTo(33);
+                Press(panel, "ResidentChoices/ClaimQuest");
+                Require(CollectionProgress.Balance == before + RpgSideQuest.Find(tools).Reward + RpgSideQuest.Find(parts).Reward,
+                    "The delivery reward was incorrect.");
+                world.Back();
+                Debug.Log("[VERIFY 5DS QUESTS] Field conversation, item search, inter-region delivery, journal, reload and one-time rewards passed.");
+
+                void TalkTo(int id)
+                {
+                    Press(FieldScene(), $"QuestNpc_{id}/Interact");
+                    world.Update(4f);
+                    Require(!world.CanWalk && panel.Find("ResidentChoices") != null && FieldScene().Find($"QuestNpc_{id}") != null,
+                        $"Quest giver {id} did not open a conversation on the field.");
+                }
             }
 
             void VerifyStageExit()

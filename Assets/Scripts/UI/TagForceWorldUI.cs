@@ -117,7 +117,7 @@ namespace YGOPortable.UI
             DuelAudio.PlayTagForceSfx(TagForceSfx.Cancel);
             if (_rpgField)
             {
-                if (_page == Page.Map || _page == Page.Talk) Show(Page.Field);
+                if (_page is Page.Map or Page.Talk or Page.Ledger) Show(Page.Field);
                 else if (_page == Page.Duel) Show(Page.Talk);
                 else Show(Page.Map);
                 return;

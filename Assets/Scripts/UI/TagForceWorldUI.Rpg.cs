@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using YGOPortable.Core;
 
@@ -96,6 +97,7 @@ namespace YGOPortable.UI
                 _rpgLocation = RegionForEpisode(_observedRpgClears + 1);
             _position = RpgArrival;
             _resident = null;
+            _rpgQuestResident = null;
             _rpgLastPlayedSceneId = null;
         }
 
@@ -106,9 +108,10 @@ namespace YGOPortable.UI
         private RectTransform BuildRpgNavigation(Transform parent)
         {
             var bar = Area(parent, "RpgNavigation", .05f, .027f, .95f, .101f);
-            Btn(Area(bar, "Map", 0f, 0f, .32f, 1f), "월드맵", () => Show(Page.Map));
-            Btn(Area(bar, "Decks", .34f, 0f, .66f, 1f), "덱 편집", _app.OpenTagForceDeckEditor);
-            Btn(Area(bar, "Menu", .68f, 0f, 1f, 1f), "메인 메뉴", () => _app.ShowScreen(AppScreen.MainMenu));
+            Btn(Area(bar, "Map", 0f, 0f, .235f, 1f), "월드맵", () => Show(Page.Map));
+            Btn(Area(bar, "Quests", .255f, 0f, .490f, 1f), "의뢰 수첩", () => Show(Page.Ledger));
+            Btn(Area(bar, "Decks", .510f, 0f, .745f, 1f), "덱 편집", _app.OpenTagForceDeckEditor);
+            Btn(Area(bar, "Menu", .765f, 0f, 1f, 1f), "메인 메뉴", () => _app.ShowScreen(AppScreen.MainMenu));
             return bar;
         }
 
@@ -124,6 +127,7 @@ namespace YGOPortable.UI
                 case Page.Field: BuildRpgField(); break;
                 case Page.Talk: BuildRpgTalk(); break;
                 case Page.Duel: BuildRpgPractice(); break;
+                case Page.Ledger: BuildRpgQuestJournal(); break;
             }
 
             int clears = RpgClears;
@@ -200,12 +204,14 @@ namespace YGOPortable.UI
                 TextAnchor.MiddleRight);
 
             StoryEpisodeData questNpc = !complete && _rpgLocation == targetRegion ? episodes[cleared] : null;
+            var sideQuest = RpgSideQuest.All.FirstOrDefault(item => item.Region == RpgRegions[_rpgLocation].Id);
             _rpgNearbyScene = questNpc?.sceneOnApproach == true ? questNpc : null;
             if (questNpc != null)
                 AddRpgResident(questNpc, RpgNpcSlots[0], true, () => _app.OpenRpgFieldEpisode(cleared));
             var locals = episodes.Where((episode, i) => RegionForEpisode(i + 1) == _rpgLocation)
                 .Concat(episodes.Take(cleared)).Concat(episodes.Take(2))
-                .Where(episode => episode.charId != questNpc?.charId && _rpgWorldDecks.ContainsKey(episode.deckId))
+                .Where(episode => episode.charId != questNpc?.charId && episode.charId != sideQuest?.Giver &&
+                    _rpgWorldDecks.ContainsKey(episode.deckId))
                 .GroupBy(episode => episode.charId).Select(group => group.First()).Take(2).ToArray();
             for (int i = 0; i < locals.Length; i++)
             {
@@ -213,9 +219,11 @@ namespace YGOPortable.UI
                 AddRpgResident(resident, RpgNpcSlots[i + 1], false, () =>
                 {
                     _resident = resident;
+                    _rpgQuestResident = null;
                     Show(Page.Talk);
                 });
             }
+            if (sideQuest != null) AddRpgSideQuest(sideQuest);
             _player = Anchor(_rpgSceneSpace, "Player", _position, new Vector2(91f, 116f));
             _playerSprite = WalkerSprite(_player, RpgArt + "Characters_SD/sd_protagonist.png", "카이");
         }
@@ -231,12 +239,16 @@ namespace YGOPortable.UI
                 _app.OpenRpgFieldEpisode(RpgClears);
         }
 
-        private void AddRpgResident(StoryEpisodeData resident, Vector2 spot, bool story, Action interact)
+        private void AddRpgResident(StoryEpisodeData resident, Vector2 spot, bool story, Action interact) =>
+            AddRpgResident(resident.charId, resident.opponentName,
+                story ? "MainQuestNpc" : $"Resident_{resident.charId}", spot, story, interact);
+
+        private void AddRpgResident(int id, string name, string node, Vector2 spot, bool story, Action interact)
         {
-            var actor = Anchor(_rpgSceneSpace, story ? "MainQuestNpc" : $"Resident_{resident.charId}", spot, new Vector2(133f, 117f));
-            _rpgResidents[resident.charId] = actor;
+            var actor = Anchor(_rpgSceneSpace, node, spot, new Vector2(133f, 117f));
+            _rpgResidents[id] = actor;
             var art = Area(actor, "SD", .08f, .22f, .92f, 1f);
-            BuildRpgActorArt(art, RpgArt + $"Characters_SD/sd_{resident.charId}.png", resident.opponentName);
+            BuildRpgActorArt(art, RpgArt + $"Characters_SD/sd_{id}.png", name);
             void Approach() => MoveTo(actor.anchorMin - new Vector2(0f, .06f), interact);
             BindPortrait(art, Approach);
             var marker = Anchor(actor, story ? "MainQuestMarker" : "ResidentMarker", new Vector2(.50f, 1.07f),
@@ -244,7 +256,7 @@ namespace YGOPortable.UI
             DrawRpgIcon(marker, story ? "icon_quest_main.png" : "icon_quest_sub.png", story ? "!" : "…",
                 story ? DuelUiKit.GoldAccent : new Color(.40f, .78f, 1f));
             if (story) _questMarkers.Add(marker);
-            Btn(Area(actor, "Interact", 0f, 0f, 1f, .265f), resident.opponentName, Approach, 15);
+            Btn(Area(actor, "Interact", 0f, 0f, 1f, .265f), name, Approach, 15);
             _interactions.Add((actor, interact));
         }
 
@@ -257,23 +269,44 @@ namespace YGOPortable.UI
 
         private void BuildRpgTalk()
         {
-            if (_resident == null) { Show(Page.Field); return; }
-            Backdrop(RpgRegions[_rpgLocation].Background, new Color(.10f, .21f, .27f));
-            Portrait(Area(_body, "ResidentStanding", .075f, .10f, .47f, .96f),
-                RpgArt + $"Characters_Standing/full_{_resident.charId}.png", _resident.opponentName);
-            var panel = DuelUiKit.CreateMenuPanel(_body, "ResidentChoices",
-                new Vector2(.48f, .18f), new Vector2(.958f, .86f));
-            Label(Area(panel, "Name", .08f, .74f, .92f, .94f), _resident.opponentName, 26);
-            var conversation = Label(Area(panel, "DailyLine", .08f, .49f, .92f, .74f),
-                "무슨 일로 왔어?", 20);
-            Btn(Area(panel, "TalkDaily", .08f, .335f, .92f, .475f), "일상 대화", () =>
+            if (_resident == null && _rpgQuestResident == null) { Show(Page.Field); return; }
+            BuildRpgField();
+            _rpgFieldHud.gameObject.SetActive(false);
+            _rpgNavigation.gameObject.SetActive(false);
+            var fieldInput = _rpgViewport.gameObject.AddComponent<CanvasGroup>();
+            fieldInput.interactable = fieldInput.blocksRaycasts = false;
+            var shade = DuelUiKit.FillRect("ResidentTalkShade", _body);
+            DuelUiKit.AddImage(shade.gameObject, DuelUiKit.WhiteSprite, new Color(.01f, .03f, .06f, .14f));
+            var quest = _rpgQuestResident;
+            string name = quest == null ? _resident.opponentName : RpgQuestName(quest);
+            if (_rpgResidents.TryGetValue(quest?.Giver ?? _resident.charId, out var speaker))
             {
-                conversation.text = $"이곳은 {RpgRegions[_rpgLocation].Name}이야.\n덱을 시험해 보고 싶으면 한 판 하자.";
-            });
-            var practice = Area(panel, "Practice", .08f, .18f, .92f, .32f);
-            Btn(practice, "프리 연습 듀얼 · DP와 카드", () => Show(Page.Duel));
-            DrawRpgIcon(Area(practice, "DuelIcon", .03f, .12f, .14f, .88f), "icon_duel_ready.png", "⚔", DuelUiKit.GoldAccent);
-            Btn(Area(panel, "Leave", .08f, .025f, .92f, .165f), "돌아가기", () => Show(Page.Field));
+                var direction = speaker.anchorMin - _position;
+                PoseRpgWalker(_player, _playerSprite, _position, Vector2.zero, false, direction);
+                PoseRpgWalker(speaker, speaker.Find("SD") as RectTransform, speaker.anchorMin, Vector2.zero, false, -direction);
+            }
+            var panel = DuelUiKit.CreateMenuPanel(_body, "ResidentChoices",
+                new Vector2(.065f, .025f), new Vector2(.935f, .35f));
+            Label(Area(panel, "Name", .035f, .72f, .96f, .94f), name, 22, TextAnchor.MiddleLeft).color = DuelUiKit.GoldAccent;
+            var conversation = Label(Area(panel, "DailyLine", .035f, .335f, .962f, .735f),
+                quest != null ? RpgQuestDialogue(quest) : "무슨 일로 왔어?", 21, TextAnchor.MiddleLeft);
+            var actions = new List<(string Id, string Label, Action Select)>
+            {
+                ("TalkDaily", "일상 대화", () => conversation.text = quest != null
+                    ? quest.Greeting : $"이곳은 {RpgRegions[_rpgLocation].Name}이야. 덱을 시험해 보고 싶으면 한 판 하자."),
+            };
+            if (quest == null) actions.Add(("Practice", "연습 듀얼", () => Show(Page.Duel)));
+            else AppendRpgQuestActions(quest, actions);
+            actions.Add(("Leave", "돌아가기", () => Show(Page.Field)));
+            float width = .93f / actions.Count;
+            for (int i = 0; i < actions.Count; i++)
+            {
+                float left = .035f + i * width;
+                var (id, label, select) = actions[i];
+                Btn(Area(panel, id, left, .065f, left + width - .012f, .278f), label, select);
+            }
+            DeckPadUi.LimitKeyboardNavigation(panel);
+            EventSystem.current?.SetSelectedGameObject(panel.Find("TalkDaily/Button").gameObject);
         }
 
         private void BuildRpgPractice()

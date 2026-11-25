@@ -83,7 +83,9 @@ namespace YGOPortable.UI
                 actor.Find("Interact").gameObject.SetActive(false);
                 var marker = actor.Find(actor == _rpgDialogueOpponent ? "MainQuestMarker" : "ResidentMarker");
                 if (marker != null) marker.gameObject.SetActive(false);
+                actor.Find("QuestBadge")?.gameObject.SetActive(false);
             }
+            _rpgSceneSpace.Find("SideQuestItem")?.gameObject.SetActive(false);
 
             foreach (var line in lines)
             {

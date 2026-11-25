@@ -127,6 +127,7 @@ namespace YGOPortable.Core
             public RankedSave ranked = new();
             public TagForceSave tagForce = new() { affinityVersion = TagForceSave.AffinityVersion };
             public List<TagForceWorldSave> tagForceWorlds = new();
+            public List<RpgQuestRecord> rpgQuests = new();
         }
 
         [Serializable]
@@ -252,6 +253,11 @@ namespace YGOPortable.Core
                 world.seriesId == TagForceData.GxId ||
                 !TagForceData.Series.Any(series => series.Id == world.seriesId));
             foreach (var world in saved.tagForceWorlds) world.progress.Normalize();
+            saved.rpgQuests ??= new();
+            saved.rpgQuests = saved.rpgQuests.Where(quest => quest != null && !string.IsNullOrWhiteSpace(quest.id) &&
+                quest.state is >= RpgQuestState.Active and <= RpgQuestState.Complete)
+                .GroupBy(quest => quest.id, StringComparer.Ordinal)
+                .Select(group => group.OrderByDescending(quest => quest.state).First()).ToList();
             if (!saved.ranked.IsValid)
                 throw new InvalidDataException("Invalid offline ranked progress.");
 
@@ -920,6 +926,7 @@ namespace YGOPortable.Core
             ranked = _profile.ranked,
             tagForce = _profile.tagForce,
             tagForceWorlds = _profile.tagForceWorlds,
+            rpgQuests = _profile.rpgQuests,
         };
 
         private static OpponentDeckProgress FindDeckProgress(SavedProfile profile, int opponentId) =>

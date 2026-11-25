@@ -10,6 +10,31 @@ namespace YGOPortable.Core
             (seriesId == TagForceData.GxId ? _profile?.tagForce :
                 _profile?.tagForceWorlds.Find(world => world.seriesId == seriesId)?.progress) ?? new TagForceSave { affinityVersion = TagForceSave.AffinityVersion };
 
+        internal static RpgQuestState GetRpgQuestState(string id) =>
+            _profile?.rpgQuests.Find(quest => quest.id == id)?.state ?? RpgQuestState.Available;
+
+        internal static bool TryAdvanceRpgQuest(string id, RpgQuestState from, out int reward, out string error)
+        {
+            reward = 0;
+            if (!CanTransact(out error)) return false;
+            var quest = RpgSideQuest.Find(id);
+            if (!HasStarter || quest == null || from is < RpgQuestState.Available or >= RpgQuestState.Complete ||
+                GetRpgQuestState(id) != from)
+            {
+                error = "의뢰 진행 상태를 확인할 수 없습니다.";
+                return false;
+            }
+
+            var state = (RpgQuestState)((int)from + 1);
+            int dp = state == RpgQuestState.Complete ? Math.Min(int.MaxValue - Balance, quest.Reward) : 0;
+            var next = WithBalance(Balance + dp);
+            next.rpgQuests = _profile.rpgQuests.Where(entry => entry.id != id).ToList();
+            next.rpgQuests.Add(new RpgQuestRecord { id = id, state = state });
+            if (!Write(next, _owned, out error)) return false;
+            reward = dp;
+            return true;
+        }
+
         internal static bool TrySaveTagForce(string seriesId, TagForceSave state, int dp, out string error,
             uint reward = 0, bool overframe = false, uint gift = 0)
         {
