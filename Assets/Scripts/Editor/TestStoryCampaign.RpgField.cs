@@ -85,6 +85,7 @@ namespace YGOPortable.Editor
 
                 VerifyFieldMovement();
                 VerifySceneGuests();
+                VerifyStageExit();
 
                 var local = FieldScene().Cast<Transform>().First(child => child.name.StartsWith("Resident_", StringComparison.Ordinal));
                 Require(local.Find("ResidentMarker").GetComponent<Image>().sprite != null, "The resident marker was missing.");
@@ -208,24 +209,29 @@ namespace YGOPortable.Editor
                     !world.HandleFieldInput(new DeckPadFrame(Vector2Int.right, DeckPadButtons.Submit | DeckPadButtons.Search)),
                     "The player could move, interact or travel during the conversation.");
 
-                int firstAkiLine = Array.FindIndex(loaded.episodes[0].preDialogues, line => line.speaker == "이자요이 아키");
-                Require(firstAkiLine > 0, "The first field conversation lost Aki's entrance.");
-                for (int i = 0; i < firstAkiLine; i++)
-                {
-                    Press(storyRoot, "Scene/DialogueBox/Next/Button");
-                    Press(storyRoot, "Scene/DialogueBox/Next/Button");
-                }
+                var lines = loaded.episodes[0].preDialogues;
+                int arrival = Array.FindIndex(lines, line => line.stage?.Any(a => a.actor == 1 && a.action == "enter") == true);
+                int firstAkiLine = Array.FindIndex(lines, line => line.speaker == "이자요이 아키");
+                Require(arrival > 0 && arrival < firstAkiLine, "Aki should enter during narration before speaking.");
+                AdvanceToLine(arrival);
                 Vector2 entry = guest.anchorMin;
                 story.Update(.30f);
-                Require(guest.gameObject.activeSelf && guest.anchorMin != entry &&
-                    guest.Find("SpeakingCue") != null && opponent.gameObject.activeSelf && player.gameObject.activeSelf,
-                    "Aki did not walk in as a separate speaker beside the player and the opponent.");
+                Require(guest.gameObject.activeSelf && guest.anchorMin != entry && lines[arrival].speaker == "" &&
+                    opponent.gameObject.activeSelf && player.gameObject.activeSelf,
+                    "Aki did not walk in as a separate actor during narration.");
+                VerifyStride(guest.Find("Sprite").GetComponent<TagForceRpgStride>());
                 Press(storyRoot, "Scene/DialogueBox/Previous/Button");
                 Require(!guest.gameObject.activeSelf, "Rewinding retained a guest who had yet to arrive.");
                 Press(storyRoot, "Scene/DialogueBox/Next/Button");
                 story.Update(.65f);
                 Require(guest.gameObject.activeSelf && guest.GetComponent<CanvasGroup>().alpha == 1f &&
                     guest.anchorMin != entry, "The guest did not reach her mark after replaying the entrance.");
+                AdvanceToLine(firstAkiLine);
+                Require(guest.Find("SpeakingCue") != null, "The speaking marker did not follow the guest.");
+                int approach = Array.FindIndex(lines, line => line.stage?.Any(a => a.actor == 0 && a.action == "move") == true);
+                AdvanceToLine(approach);
+                story.Update(.65f);
+                Require(player.anchorMin != position && !world.CanWalk, "The hero did not respond to the scripted movement.");
                 app.OpenStoryDeckEditor();
                 Require(!world.Root.activeSelf, "The field remained over the deck editor.");
                 app.CloseDeckEditor();
@@ -235,6 +241,66 @@ namespace YGOPortable.Editor
                     ((RectTransform)FieldScene().Find("Player")).anchorMin == position &&
                     world.Root.GetComponent<CanvasGroup>().blocksRaycasts,
                     "Leaving the conversation did not remove its cast and restore movement at the original location.");
+            }
+
+            void VerifyStageExit()
+            {
+                var firstEpisode = loaded.episodes[0];
+                Press(FieldScene(), "MainQuestNpc/Interact");
+                world.Update(4f);
+                story.ShowFieldDuelResult(firstEpisode, true, false, () => "");
+                var opponent = (RectTransform)FieldScene().Find("MainQuestNpc");
+                Vector2 before = opponent.anchorMin;
+                int exit = Array.FindIndex(firstEpisode.postWinDialogues,
+                    line => line.stage?.Any(a => a.actor == firstEpisode.charId && a.action == "exit") == true);
+                Require(exit > 0, "The first win scene did not have its scripted exit.");
+                AdvanceToLine(exit);
+                story.Update(.30f);
+                Require(opponent.gameObject.activeSelf && opponent.anchorMin != before,
+                    "The opponent did not begin walking out.");
+                story.Update(.40f);
+                Require(!opponent.gameObject.activeSelf, "The opponent stayed in the field after leaving.");
+                Press(storyRoot, "Scene/DialogueBox/Previous/Button");
+                Require(opponent.gameObject.activeSelf && opponent.anchorMin == before,
+                    "Rewinding did not restore the actor before the exit.");
+                Press(storyRoot, "Scene/DialogueBox/Skip/Button");
+                Require(world.CanWalk && FieldScene().Find("DialogueCast") == null,
+                    "Skipping a staged exit did not restore control of the field.");
+            }
+
+            void AdvanceToLine(int target)
+            {
+                var dialogue = typeof(StoryModeUI).GetField("_dialogue", flags).GetValue(story);
+                var line = typeof(StoryModeUI.StoryDialogueView).GetField("_index", flags);
+                for (int presses = 0; (int)line.GetValue(dialogue) < target && presses < 2 * (target + 1); presses++)
+                    Press(storyRoot, "Scene/DialogueBox/Next/Button");
+                Require((int)line.GetValue(dialogue) == target, $"The dialogue did not advance to line {target}.");
+            }
+
+            void VerifyStride(TagForceRpgStride stride)
+            {
+                Vector3[] corners = { Vector3.zero, new(0, 100), new(50, 100), new(50, 0) };
+                using var mesh = new VertexHelper();
+                Vector3 Foot(int frame, bool right)
+                {
+                    mesh.Clear();
+                    foreach (var corner in corners)
+                    {
+                        var vertex = UIVertex.simpleVert;
+                        vertex.position = corner;
+                        mesh.AddVert(vertex);
+                    }
+                    stride.SetFrame(frame);
+                    stride.ModifyMesh(mesh);
+                    var foot = UIVertex.simpleVert;
+                    mesh.PopulateUIVertex(ref foot, right ? (frame < 0 ? 3 : 8) : 0);
+                    return foot.position;
+                }
+
+                Require(stride != null && Foot(0, false).x < Foot(2, false).x &&
+                    Foot(1, true).y > Foot(1, false).y && Foot(3, false).y > Foot(3, true).y &&
+                    Foot(-1, true) == corners[3] && mesh.currentVertCount == 4,
+                    "A single-image NPC did not alternate its steps and restore its idle silhouette.");
             }
 
             void OpenEpisode6()

@@ -17,6 +17,16 @@ namespace YGOPortable.UI
         public string cutscene;
         public string emotion;
         public string fx;
+        public StoryStageAction[] stage;
+    }
+
+    [Serializable]
+    public class StoryStageAction
+    {
+        public int actor;
+        public string action;
+        public float x;
+        public float y;
     }
 
     [Serializable]
