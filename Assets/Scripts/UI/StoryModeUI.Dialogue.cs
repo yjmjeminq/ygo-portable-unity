@@ -59,6 +59,7 @@ namespace YGOPortable.UI
             private readonly Text[] _hearts = new Text[3];
             private readonly StoryDialogueFx _fx;
             private readonly Image _dialoguePanel;
+            private readonly Image _dialogueFrame;
             private readonly Image _goldRim;
             private readonly Image _speakerPlate;
             private readonly GameObject _speakerBadge;
@@ -173,6 +174,9 @@ namespace YGOPortable.UI
                 var dialogue = DuelUiKit.CreateMenuPanel(content, "DialogueBox",
                     new Vector2(.054f, .064f), new Vector2(.946f, .406f));
                 _dialoguePanel = dialogue.GetComponent<Image>();
+                _dialogueFrame = DuelUiKit.AddImage(DuelUiKit.FillRect("RpgDialogueFrame", dialogue).gameObject,
+                    null, new Color(.72f, .84f, .96f, .72f), false, false);
+                _dialogueFrame.type = Image.Type.Sliced;
                 var rim = DuelUiKit.CreateRect("GoldRim", dialogue, new Vector2(.025f, 1f), new Vector2(.975f, 1f),
                     new Vector2(0f, -4f), new Vector2(0f, -2f));
                 _goldRim = DuelUiKit.AddImage(rim.gameObject, DuelUiKit.WhiteSprite, RimColor, false, false);
@@ -253,7 +257,7 @@ namespace YGOPortable.UI
             }
 
             internal void Open(string heading, string protagonist, OpponentCharacter opponent, StoryDialogueLine[] lines,
-                Action onEnd, bool rpg = false)
+                Action onEnd, bool rpg = false, string rpgScenery = null)
             {
                 Close();
                 _heading.text = heading;
@@ -266,7 +270,7 @@ namespace YGOPortable.UI
                 _hero.rectTransform.anchorMax = rpg ? new Vector2(.41f, .855f) : new Vector2(.493f, .855f);
                 _opponent.rectTransform.anchorMin = rpg ? new Vector2(.59f, .30f) : new Vector2(.508f, .26f);
                 _opponent.rectTransform.anchorMax = rpg ? new Vector2(.957f, .855f) : new Vector2(.93f, .855f);
-                SetSprite(_stage, rpg ? LoadRpgSprite("Maps/spot_daedalus_bridge.png") : null);
+                SetSprite(_stage, rpg ? LoadRpgSprite(rpgScenery ?? "Maps/spot_daedalus_bridge.png") : null);
                 SetSprite(_heroSd, rpg ? LoadRpgSprite("Characters_SD/sd_protagonist.png") : null);
                 SetSprite(_hero, rpg ? LoadHeroBust(null) : DuelProfileArt.Player);
                 SetOpponent(opponent, null);
@@ -292,6 +296,7 @@ namespace YGOPortable.UI
                 _cutsceneOverlay.alpha = 0f;
                 _portraitGroup.alpha = 1f;
                 SetSprite(_cutsceneImage, null);
+                SetSprite(_dialogueFrame, null);
                 SetSprite(_stage, null);
                 SetSprite(_heroSd, null);
                 SetSprite(_opponentSd, null);
@@ -504,6 +509,12 @@ namespace YGOPortable.UI
                     new Color(.055f, .105f, .19f, .92f), new Color(.02f, .04f, .09f, .92f),
                     new Color(.31f, .35f, .42f, .72f)) : DuelUiChrome.Panel;
                 _goldRim.enabled = rpg;
+                SetSprite(_dialogueFrame, rpg ? LoadRpgSprite("TagForce/UI/panel_dialogue_frame.png", slice: true) : null);
+                Font body = rpg ? Resources.Load<Font>("StoryFonts/Pretendard-Medium") : null;
+                Font heading = rpg ? Resources.Load<Font>("StoryFonts/Paperlogy-7Bold") : null;
+                _text.font = _logText.font = body ?? DuelUiKit.FontKR;
+                _speaker.font = _heading.font = _heroIdentity.font = heading ?? DuelUiKit.FontKR;
+                _speaker.fontStyle = _heading.fontStyle = _heroIdentity.fontStyle = heading == null ? FontStyle.Bold : FontStyle.Normal;
                 _text.fontStyle = rpg ? FontStyle.Normal : FontStyle.Bold;
                 _text.lineSpacing = rpg ? 1.25f : 1f;
                 _text.supportRichText = rpg;
@@ -723,9 +734,9 @@ namespace YGOPortable.UI
                 _showCutscene = true;
             }
 
-            private Sprite LoadRpgSprite(string name, bool waistUp = false)
+            private Sprite LoadRpgSprite(string name, bool waistUp = false, bool slice = false)
             {
-                string relative = "TagForce/5DS/" + name;
+                string relative = name.StartsWith("TagForce/", StringComparison.Ordinal) ? name : "TagForce/5DS/" + name;
                 string path = Path.Combine(Application.streamingAssetsPath, relative);
                 if (_rpgSprites.TryGetValue(path, out var loaded)) return loaded;
 
@@ -739,8 +750,9 @@ namespace YGOPortable.UI
                         if (texture.LoadImage(File.ReadAllBytes(path), markNonReadable: true))
                         {
                             float bottom = waistUp ? Mathf.Floor(texture.height * .43f) : 0f;
+                            Vector4 border = slice && texture.width >= 48 && texture.height >= 48 ? Vector4.one * 24f : Vector4.zero;
                             sprite = Sprite.Create(texture, new Rect(0f, bottom, texture.width, texture.height - bottom),
-                                new Vector2(.5f, .5f));
+                                new Vector2(.5f, .5f), 100f, 0, SpriteMeshType.FullRect, border);
                         }
                     }
                 }

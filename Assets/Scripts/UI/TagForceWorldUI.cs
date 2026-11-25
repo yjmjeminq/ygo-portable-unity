@@ -10,7 +10,7 @@ using YGOPortable.Core;
 
 namespace YGOPortable.UI
 {
-    internal sealed class TagForceWorldUI
+    internal sealed partial class TagForceWorldUI
     {
         private enum Page { SeriesSelect, Map, Field, Room, Mail, Ledger, Talk, Topics, DialogueLog, Shop, Gift, Duel, Bond }
 
@@ -88,6 +88,7 @@ namespace YGOPortable.UI
                 float x = (float)i / labels.Length;
                 Btn(Area(_navigation, labels[i], x, 0, (float)(i + 1) / labels.Length - .005f, 1), labels[i], actions[i]);
             }
+            _rpgNavigation = BuildRpgNavigation(layout);
             Root.SetActive(false);
         }
 
@@ -95,7 +96,7 @@ namespace YGOPortable.UI
         {
             Root.SetActive(true);
             _status.text = "";
-            if (resume && _data != null) Show(Page.Field);
+            if (_rpgField || (resume && _data != null)) Show(Page.Field);
             else ShowSeriesSelect();
         }
 
@@ -110,6 +111,13 @@ namespace YGOPortable.UI
         {
             if (_closingConversation) return;
             DuelAudio.PlayTagForceSfx(TagForceSfx.Cancel);
+            if (_rpgField)
+            {
+                if (_page == Page.Map || _page == Page.Talk) Show(Page.Field);
+                else if (_page == Page.Duel) Show(Page.Talk);
+                else Show(Page.Map);
+                return;
+            }
             if (_page == Page.SeriesSelect)
             {
                 _app.ShowScreen(AppScreen.MainMenu);
@@ -154,6 +162,12 @@ namespace YGOPortable.UI
 
         internal void ShowResult(TagForceDuel duel, bool won, string result, bool rewarded)
         {
+            if (_rpgField)
+            {
+                ShowStatus(result);
+                if (rewarded) DuelAudio.PlayTagForceReward();
+                return;
+            }
             _selectedId = duel.Persona.personaId;
             _status.text = result;
             _reply = won ? duel.Form.loseLine : duel.Form.winLine;
@@ -171,6 +185,13 @@ namespace YGOPortable.UI
             _page = page;
             ClearBody();
             _images.BeginPage();
+            if (_rpgField)
+            {
+                ShowRpgPage(page);
+                _images.Trim();
+                return;
+            }
+            _rpgNavigation.gameObject.SetActive(false);
             _navigation.gameObject.SetActive(page is not (Page.SeriesSelect or Page.Talk));
             if (page == Page.SeriesSelect)
             {
@@ -209,6 +230,8 @@ namespace YGOPortable.UI
         {
             _interactions.Clear();
             _visitors.Clear();
+            _questMarkers.Clear();
+            _rpgToast = null;
             _player = _partner = _playerSprite = _partnerSprite = null;
             _fieldControls = null;
             _conversationShade = null;
@@ -401,7 +424,7 @@ namespace YGOPortable.UI
         private void MoveTo(Vector2 point, Action arrive = null)
         {
             _manualWalk = false;
-            _destination = new Vector2(Mathf.Clamp(point.x, .06f, .94f), Mathf.Clamp(point.y, .095f, .77f));
+            _destination = new Vector2(Mathf.Clamp(point.x, .06f, .94f), Mathf.Clamp(point.y, .095f, _rpgField ? .455f : .77f));
             _moving = true;
             _onArrival = arrive;
         }
@@ -410,6 +433,7 @@ namespace YGOPortable.UI
         {
             UpdateBreadSpin(delta);
             UpdateConversation(delta);
+            if (_rpgField) UpdateRpgField(delta);
             if (!CanWalk) return;
             Vector2 movement = _fieldMenu ? Vector2.zero : padDirection;
             if (!_fieldMenu && movement == Vector2.zero)
@@ -500,7 +524,8 @@ namespace YGOPortable.UI
                 DuelAudio.PlayTagForceSfx(TagForceSfx.Cursor, .65f);
                 _manualWalk = _moving = false;
                 _onArrival = null;
-                _fieldControls.text = _fieldMenu ? "위쪽 버튼으로 보행 복귀" : "방향키 · 스틱 이동   선택 조사/대화   위쪽 버튼 메뉴";
+                _fieldControls.text = _fieldMenu ? "위쪽 버튼으로 보행 복귀" :
+                    _rpgField ? RpgFieldHelp : "방향키 · 스틱 이동   선택 조사/대화   위쪽 버튼 메뉴";
                 return true;
             }
             if (_fieldMenu) return false;
@@ -508,7 +533,7 @@ namespace YGOPortable.UI
             {
                 DuelAudio.PlayTagForceSfx(TagForceSfx.Confirm);
                 var closest = _interactions.OrderBy(entry => Vector2.SqrMagnitude(entry.Actor.anchorMin - _position)).First();
-                MoveTo(closest.Actor.anchorMin, closest.Action);
+                MoveTo(closest.Actor.anchorMin - (_rpgField ? new Vector2(0f, .06f) : Vector2.zero), closest.Action);
             }
             return true;
         }

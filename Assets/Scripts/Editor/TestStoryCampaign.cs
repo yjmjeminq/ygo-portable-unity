@@ -45,6 +45,7 @@ namespace YGOPortable.Editor
                 Require(nativeErrors.Count == 0, string.Join("\n", nativeErrors));
                 VerifyDialogueChoices(starter);
                 VerifyOpeningAndSave(save);
+                VerifyRpgField(starter, save);
                 Debug.Log("[VERIFY STORY] 180 episodes, scrolling, cast portraits, boss openings, rewards and saved campaign progress passed.");
                 exit = 0;
             }
@@ -111,14 +112,42 @@ namespace YGOPortable.Editor
                             main.Any(card => card.IsMonster && (card.type & YgoConstants.TYPE_TUNER) == 0),
                             $"Missing Synchro materials in 5D's RPG deck {match.id}.");
                     }
+                    var raid = story.GetRaid(episode);
+                    var opening = default(StoryBattlePlan).Apply(raid, match, episode.gimmick);
                     using var duel = new DuelSession();
                     Require(duel.StartNewDuel(playerDeck.main, playerDeck.extra, match.main, match.extra,
-                        seed: new ulong[] { 21, 906, 711, 399 }, storyGimmick: episode.gimmick),
+                        seed: new ulong[] { 21, 906, 711, 399 }, storyGimmick: episode.gimmick,
+                        playerOpening: opening.Player, opponentOpening: opening.Opponent),
                         $"RPG episode {i + 1} could not start.");
+                    if (i is 6 or 26)
+                    {
+                        var pilot = new TacticalAI { Difficulty = AIDifficulty.Easy };
+                        for (int step = 0; step < 30 && !InMain(duel, 1) && !duel.IsFinished && duel.RetryCount == 0; step++)
+                        {
+                            if (duel.ActivePrompt is { } prompt) duel.SubmitResponse(pilot.ComputeResponse(duel, prompt));
+                            else duel.StepUntilPrompt();
+                        }
+                        Require(InMain(duel, 1) && duel.RetryCount == 0,
+                            $"RPG episode {i + 1} did not resolve its startup prompts.");
+                    }
+                    var rival = duel.Players[1];
                     if (StoryGimmickRuntime.IsRidingDuel(episode.gimmick))
                         Require(story.RidingMachineFor(episode) == "스트라이크 팽" &&
-                            duel.Players.All(seat => seat.szone[5]?.code == StoryGimmickRuntime.SpeedWorld &&
-                                seat.hand.Count == 5), $"Riding duel {i + 1} had the wrong machine, field or hand.");
+                            duel.Players.All(seat => seat.szone[5]?.code == StoryGimmickRuntime.SpeedWorld) &&
+                            duel.Players[0].hand.Count == 5 && rival.hand.Count == opening.Opponent.Hand,
+                            $"Riding duel {i + 1} had the wrong machine, field or hand.");
+                    if (i == 6)
+                        Require(duel.Players[0].mzone.Count(card => card?.code == StoryGimmickRuntime.HandcuffToken) == 2,
+                            "The prison episode did not begin with both handcuffs.");
+                    if (i == 26)
+                        Require(rival.mzone.Any(card => card?.code == 39823987) &&
+                            rival.grave.Any(card => card.code == 66818682), "The Godwin raid did not prepare Inti and Quilla.");
+                    if (raid.HasValue && episode.raidCard != 0)
+                        Require(rival.mzone.Concat(rival.szone).Any(card => card?.code == episode.raidCard),
+                            $"The RPG raid had no opening ace in episode {i + 1}.");
+                    foreach (var (code, _) in StoryGimmickRuntime.StartingCards(episode.gimmick))
+                        Require(rival.mzone.Concat(rival.szone).Any(card => card?.code == code),
+                            $"Missing starting card {code} for episode {i + 1}.");
                 }
                 var dialogue = new StoryModeUI.StoryDialogueView(canvas.transform);
                 var scene = canvas.transform.Find("StoryDialogue/Scene");
@@ -151,7 +180,9 @@ namespace YGOPortable.Editor
                             heroSd.GetComponent<Image>().sprite != null && opponentSd.GetComponent<Image>().sprite != null &&
                             heroSd.localScale.x > 0f && opponentSd.localScale.x < 0f, "Narration or the RPG portraits were misconfigured.");
                         Require(body.supportRichText && Mathf.Approximately(body.lineSpacing, 1.25f) &&
-                            body.font == DuelUiKit.FontKR && body.GetComponent<Shadow>().effectDistance == new Vector2(1.5f, -1.5f) &&
+                            body.font == Resources.Load<Font>("StoryFonts/Pretendard-Medium") &&
+                            scene.Find("DialogueBox/RpgDialogueFrame").GetComponent<Image>().sprite.border == Vector4.one * 24f &&
+                            body.GetComponent<Shadow>().effectDistance == new Vector2(1.5f, -1.5f) &&
                             body.color == new Color(.92f, .93f, .96f) && !caret.enabled &&
                             cg.GetComponent<AspectRatioFitter>().aspectMode == AspectRatioFitter.AspectMode.FitInParent,
                             "RPG dialogue typography or the cutscene fit did not match the visual novel layout.");

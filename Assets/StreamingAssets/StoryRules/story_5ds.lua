@@ -59,6 +59,8 @@ function rules.monkey_prison(human,ai)
         function(_,_,_,summonType) return summonType&SUMMON_TYPE_SYNCHRO==SUMMON_TYPE_SYNCHRO end)
 end
 
+rules.riding_monkey_prison=rules.monkey_prison
+
 function rules.riding_petrification(human,ai)
     story.monsterRule(human,EFFECT_SET_ATTACK_FINAL,nil,0,
         function() return faceupMonster(ai,89810518)~=nil end)

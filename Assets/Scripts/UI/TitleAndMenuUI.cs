@@ -24,7 +24,6 @@ namespace YGOPortable.UI
         private GameObject _championBadge;
         private Button _storyButton;
         private Button _rpgWorldButton;
-        private bool _enteredRpgWorld;
         private Button _deckEditorButton;
         private Button _shopButton;
         private Button _codexButton;
@@ -86,7 +85,8 @@ namespace YGOPortable.UI
             {
                 AppScreen.CardShop => _shopButton,
                 AppScreen.DeckEditor => _deckEditorButton,
-                AppScreen.StoryMode => _enteredRpgWorld ? _rpgWorldButton : _storyButton,
+                AppScreen.StoryMode => _storyButton,
+                AppScreen.TagForceWorld => _rpgWorldButton,
                 AppScreen.ArchetypeCodex => _codexButton,
                 AppScreen.Ranked => _rankedButton,
                 _ => _freeDuelButton,
@@ -128,8 +128,8 @@ namespace YGOPortable.UI
             int row = 0;
             Button AddRow(string name, string label, Action action) =>
                 AddMenuEntry(menu, name, .840f - row++ * .112f, label, action);
-            _storyButton = AddRow("StoryMode", "스토리 모드", () => OpenStoryCampaign(false));
-            _rpgWorldButton = AddRow("RpgWorld", "RPG 월드", () => OpenStoryCampaign(true));
+            _storyButton = AddRow("StoryMode", "스토리 모드", () => _app.OpenStoryCampaign(false));
+            _rpgWorldButton = AddRow("RpgWorld", "RPG 월드", _app.OpenRpgField);
             _rankedButton = AddRow("Ranked", "랭크 매치", () => _app.ShowScreen(AppScreen.Ranked));
             _freeDuelButton = AddRow("FreeDuel", "프리 듀얼", () => _app.ShowScreen(AppScreen.OpponentSelect));
             _deckEditorButton = AddRow("DeckEditor", "덱 편집", () => _app.ShowScreen(AppScreen.DeckEditor));
@@ -139,12 +139,6 @@ namespace YGOPortable.UI
             BuildShopTile(root);
             _championBadge = OfflineRankedUI.AddChampionBadge(root, new Vector2(.726f, .908f), new Vector2(.971f, .966f));
             _championBadge.SetActive(false);
-        }
-
-        private void OpenStoryCampaign(bool rpgWorld)
-        {
-            _enteredRpgWorld = rpgWorld;
-            _app.OpenStoryCampaign(rpgWorld);
         }
 
         private void BuildShopTile(Transform root)

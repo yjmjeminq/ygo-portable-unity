@@ -39,8 +39,10 @@ namespace YGOPortable.Editor
                 DuelAudio.EnsureInit(canvas);
                 var bgm = canvas.GetComponents<AudioSource>()[1];
                 var menu = new TitleAndMenuUI(app, canvas.transform);
-                Require(menu.MenuRoot.GetComponentsInChildren<Button>(true).Any(button => button.transform.parent.name == "TagForceWorld"),
-                    "The main menu has no Tag Force button.");
+                var entries = menu.MenuRoot.GetComponentsInChildren<Button>(true);
+                Require(entries.Any(button => button.transform.parent.name == "RpgWorld") &&
+                    entries.All(button => button.transform.parent.name != "TagForceWorld"),
+                    "The main menu did not offer RPG World in place of the old Tag Force entry.");
                 world = new TagForceWorldUI(app, canvas.transform);
                 var panel = world.Root.transform.Find("World");
 
@@ -548,8 +550,7 @@ namespace YGOPortable.Editor
             Set("_initialized", true);
             try
             {
-                app.ShowScreen(AppScreen.MainMenu);
-                menu.MenuRoot.GetComponentsInChildren<Button>().Single(button => button.transform.parent.name == "TagForceWorld").onClick.Invoke();
+                app.ShowScreen(AppScreen.TagForceWorld);
                 var panel = world.Root.transform.Find("World");
                 Press(panel, "GX");
                 var data = TagForceData.Load(streaming, TagForceData.Series[1]);

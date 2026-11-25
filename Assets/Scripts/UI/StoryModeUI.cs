@@ -173,7 +173,33 @@ namespace YGOPortable.UI
             Close();
         }
 
-        internal void UseRpgCampaign(bool enabled) => _rpgWorld = enabled;
+        private Action _finishFieldResult;
+        internal bool FromRpgField { get; private set; }
+
+        internal void UseRpgCampaign(bool enabled, bool fromField = false)
+        {
+            _rpgWorld = enabled;
+            FromRpgField = fromField;
+        }
+
+        internal void OpenFieldEpisode(int index)
+        {
+            if (FromRpgField && Script?.episodes != null && index >= 0 && index < Script.episodes.Length)
+                OpenEpisode(index);
+        }
+
+        internal void ShowFieldDuelResult(StoryEpisodeData episode, bool won, bool draw, Func<string> settle)
+        {
+            string result = won ? "승리" : draw ? "무승부" : "패배";
+            _finishFieldResult = () =>
+            {
+                _finishFieldResult = null;
+                if (won && Application.isPlaying) DuelAudio.PlayWin();
+                _app.ReturnToRpgField(settle());
+            };
+            PlayDialogue(episode, won ? episode.postWinDialogues : episode.postLoseDialogues,
+                $"{TitleOf(episode)} · {result}", () => _finishFieldResult?.Invoke());
+        }
 
         private void LayoutEpisodeRows(int count)
         {
@@ -247,6 +273,11 @@ namespace YGOPortable.UI
                 return;
             }
             if (_dialogue.ClosePopup()) return;
+            if (_finishFieldResult != null)
+            {
+                _finishFieldResult();
+                return;
+            }
             if (_returnFromTurnOrder != null) CancelTurnOrder();
             else if (_returnFromOpeningPicker != null) CloseOpeningPicker();
             else ReturnToEpisodes();
@@ -333,7 +364,7 @@ namespace YGOPortable.UI
         {
             int number = IndexOf(episode) + 1;
             return number > 0 && (episode.raidCard > 0 || episode.raidLife > 0)
-                ? StoryRaid.ForEncounter(number, episode.raidCard, episode.raidLife) : null;
+                ? StoryRaid.ForEncounter(number, episode.raidCard, episode.raidLife, Script.episodes.Length) : null;
         }
 
         private static string ClearedKey(string seriesId, string episodeId) => $"ygo.story.{seriesId}.cleared.{episodeId}";
@@ -593,7 +624,7 @@ namespace YGOPortable.UI
                     new("듀얼 개시!", () => ChooseTurnOrder(episode, ShowPreparation), () => _playableDecks.Count > 0),
                     new("내 덱 변경", PickDeck),
                     new("대화 다시 보기", () => OpenEpisode(index)),
-                    new("에피소드 목록으로", ReturnToEpisodes),
+                    new(FromRpgField ? "필드로 돌아가기" : "에피소드 목록으로", ReturnToEpisodes),
                     new("전술 서포트 장착 · 최대 2개", () => PickSupports(episode)),
                     new("상대 시작 조건 변경", () => PickOpponentOpening(episode, ShowPreparation)));
                 if (_rpgWorld && !pickedInitialDeck)
@@ -728,11 +759,18 @@ namespace YGOPortable.UI
         {
             _browser.interactable = false;
             _browser.blocksRaycasts = false;
-            _dialogue.Open(heading, Script.protagonist, DeckRepository.GetCharacter(episode.charId), lines, onFinish, _rpgWorld);
+            string scenery = FromRpgField ? TagForceWorldUI.RpgRegions[
+                TagForceWorldUI.RegionForEpisode(IndexOf(episode) + 1)].Background : null;
+            _dialogue.Open(heading, Script.protagonist, DeckRepository.GetCharacter(episode.charId), lines, onFinish, _rpgWorld, scenery);
         }
 
         private void ReturnToEpisodes()
         {
+            if (FromRpgField)
+            {
+                _app.ReturnToRpgField();
+                return;
+            }
             ResetDialogue();
             Focus(_episodeButtons[_selectedIndex]);
             DeckPadUi.ScrollTo(_episodeButtons[_selectedIndex]);
@@ -742,6 +780,7 @@ namespace YGOPortable.UI
         {
             ClearTurnOrder();
             _returnFromOpeningPicker = null;
+            _finishFieldResult = null;
             _dialogue.Close();
             _browser.interactable = true;
             _browser.blocksRaycasts = true;

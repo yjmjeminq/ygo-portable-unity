@@ -1398,7 +1398,7 @@
       "charId": 26,
       "opponentName": "타카스",
       "deckId": 59007,
-      "gimmick": "riding_duel",
+      "gimmick": "handcuff_tokens",
       "preDialogues": [
         {
           "speaker": "",
@@ -2208,7 +2208,8 @@
       "charId": 13,
       "opponentName": "보머",
       "deckId": 59011,
-      "gimmick": "riding_duel",
+      "gimmick": "riding_reactor_barrage",
+      "raidLife": 8000,
       "preDialogues": [
         {
           "speaker": "",
@@ -2412,7 +2413,8 @@
       "charId": 1,
       "opponentName": "이자요이 아키",
       "deckId": 59012,
-      "gimmick": "none",
+      "gimmick": "black_rose_thorns",
+      "raidLife": 8000,
       "preDialogues": [
         {
           "speaker": "",
@@ -4248,7 +4250,8 @@
       "charId": 11,
       "opponentName": "디맥",
       "deckId": 59021,
-      "gimmick": "riding_duel",
+      "gimmick": "riding_monkey_prison",
+      "raidLife": 8000,
       "preDialogues": [
         {
           "speaker": "",
@@ -5492,7 +5495,9 @@
       "charId": 3203,
       "opponentName": "다크 시그너 렉스 고드윈",
       "deckId": 59027,
-      "gimmick": "riding_duel",
+      "gimmick": "riding_underworld_altar",
+      "raidLife": 8000,
+      "raidCard": 39823987,
       "preDialogues": [
         {
           "speaker": "",
@@ -8692,6 +8697,8 @@
       "opponentName": "드래건",
       "deckId": 59043,
       "gimmick": "none",
+      "raidLife": 8000,
+      "raidCard": 30604579,
       "preDialogues": [
         {
           "speaker": "",
@@ -8891,6 +8898,8 @@
       "opponentName": "브레이브",
       "deckId": 59044,
       "gimmick": "none",
+      "raidLife": 8000,
+      "raidCard": 67098114,
       "preDialogues": [
         {
           "speaker": "",
@@ -9084,7 +9093,8 @@
       "charId": 27,
       "opponentName": "플라시도",
       "deckId": 59045,
-      "gimmick": "none",
+      "gimmick": "riding_wisel",
+      "raidLife": 8000,
       "preDialogues": [
         {
           "speaker": "",
@@ -9472,7 +9482,8 @@
       "charId": 17,
       "opponentName": "호세",
       "deckId": 59047,
-      "gimmick": "none",
+      "gimmick": "riding_granel",
+      "raidLife": 8000,
       "preDialogues": [
         {
           "speaker": "",
@@ -9665,7 +9676,8 @@
       "charId": 4,
       "opponentName": "아포리아",
       "deckId": 59048,
-      "gimmick": "none",
+      "gimmick": "riding_mashinicle",
+      "raidLife": 8000,
       "preDialogues": [
         {
           "speaker": "",
@@ -9865,6 +9877,8 @@
       "opponentName": "셰리 르블랑",
       "deckId": 59049,
       "gimmick": "none",
+      "raidLife": 8000,
+      "raidCard": 45037489,
       "preDialogues": [
         {
           "speaker": "",

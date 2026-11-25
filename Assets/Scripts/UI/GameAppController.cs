@@ -243,6 +243,26 @@ namespace YGOPortable.UI
             ShowScreen(AppScreen.StoryMode);
         }
 
+        internal void OpenRpgField()
+        {
+            _tagForceWorld.PrepareRpgField();
+            ShowScreen(AppScreen.TagForceWorld);
+        }
+
+        internal void OpenRpgFieldEpisode(int index)
+        {
+            if (_screen != AppScreen.TagForceWorld || !_tagForceWorld.CanStartRpgEpisode(index)) return;
+            _storyMode.UseRpgCampaign(true, fromField: true);
+            ShowScreen(AppScreen.StoryMode);
+            _storyMode.OpenFieldEpisode(index);
+        }
+
+        internal void ReturnToRpgField(string message = "")
+        {
+            ShowScreen(AppScreen.TagForceWorld);
+            _tagForceWorld.ShowStatus(message);
+        }
+
         public void ShowScreen(AppScreen screen)
         {
             if (!_initialized) return;
@@ -562,6 +582,11 @@ namespace YGOPortable.UI
                 _ranked.ShowStatus(message);
                 return;
             }
+            if (isStoryDuel && _storyMode.FromRpgField)
+            {
+                ReturnToRpgField(message);
+                return;
+            }
             ShowScreen(isTournamentDuel ? AppScreen.Tournament : isStoryDuel ? AppScreen.StoryMode : AppScreen.OpponentSelect);
             if (isTournamentDuel) { _tournament.ShowStatus(message); return; }
             if (isStoryDuel) _storyMode.ShowStatus(message);
@@ -659,7 +684,9 @@ namespace YGOPortable.UI
                     {
                         string result = "듀얼 결과가 기록되지 않았습니다.";
                         bool rewarded = _session.Winner >= 0 &&
-                            TagForceManager.TryFinishDuel(worldDuel, won, draw, out result);
+                            (worldDuel.SeriesId == TagForceWorldUI.RpgPracticeId
+                                ? CollectionProgress.TryAwardRpgPractice(worldDuel.Deck, won, draw, out result)
+                                : TagForceManager.TryFinishDuel(worldDuel, won, draw, out result));
                         ShowScreen(AppScreen.TagForceWorld);
                         _tagForceWorld.ShowResult(worldDuel, won, result, rewarded);
                         SyncFrontMenuFocus();
@@ -688,10 +715,14 @@ namespace YGOPortable.UI
                     {
                         var raid = _storyMode.GetRaid(episode);
                         var plan = _activeStoryPlan;
-                        string storyReward = CollectionProgress.TryAwardStoryDuel(episode.id, won, raid, _activeOppDeck, plan,
+                        var opponentDeck = _activeOppDeck;
+                        string Settle() => CollectionProgress.TryAwardStoryDuel(episode.id, won, raid, opponentDeck, plan,
                             out var prize, out string error) ? FormatStoryPrize(prize) : error;
+                        bool fromField = _storyMode.FromRpgField;
+                        string storyReward = fromField ? null : Settle();
                         ShowScreen(AppScreen.StoryMode);
-                        _storyMode.ShowDuelResult(episode, won, draw, storyReward, plan);
+                        if (fromField) _storyMode.ShowFieldDuelResult(episode, won, draw, Settle);
+                        else _storyMode.ShowDuelResult(episode, won, draw, storyReward, plan);
                         SyncFrontMenuFocus();
                         return;
                     }

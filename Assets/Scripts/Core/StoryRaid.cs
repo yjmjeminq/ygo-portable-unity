@@ -16,7 +16,8 @@ namespace YGOPortable.Core
             WinDp = Rewards[chapter - 1];
         }
 
-        internal static StoryRaid ForEncounter(int episode, uint fieldCard, int life = 8000) =>
-            new StoryRaid(1 + (episode - 1) * Rewards.Length / StoryCampaign.EpisodeCount, fieldCard, life > 0 ? life : 8000);
+        internal static StoryRaid ForEncounter(int episode, uint fieldCard, int life = 8000,
+            int episodeCount = StoryCampaign.EpisodeCount) =>
+            new StoryRaid(1 + (episode - 1) * Rewards.Length / episodeCount, fieldCard, life > 0 ? life : 8000);
     }
 }

@@ -50,6 +50,31 @@ namespace YGOPortable.Core
             return Write(next, owned, out error, special);
         }
 
+        internal static bool TryAwardRpgPractice(PresetDeckInfo deck, bool won, bool draw, out string result)
+        {
+            if (!CanTransact(out result)) return false;
+            int dp = Math.Min(int.MaxValue - Balance, won ? 300 : draw ? 160 : 130);
+            var next = WithBalance(Balance + dp);
+            var owned = _owned;
+            uint reward = 0;
+            if (won)
+            {
+                var choices = deck.main.Distinct().Where(code => IsDeckCard(CardDatabase.Get(code)) &&
+                    _owned.GetValueOrDefault(code) < int.MaxValue).ToArray();
+                if (choices.Length > 0)
+                {
+                    reward = choices[PackRandom.Next(choices.Length)];
+                    owned = new Dictionary<uint, int>(_owned) { [reward] = _owned.GetValueOrDefault(reward) + 1 };
+                    UnlockSecretPacks(next, new[] { reward });
+                }
+            }
+            if (!Write(next, owned, out result)) return false;
+            string outcome = won ? "연습 듀얼 승리" : draw ? "연습 듀얼 무승부" : "연습 듀얼 패배";
+            result = $"{outcome} · +{dp:N0} DP";
+            if (reward != 0) result += $" · {CardDatabase.GetName(reward)} 획득";
+            return true;
+        }
+
         internal static uint TagForceAce(TagForceForm form)
         {
             var deck = form.Decks.LastOrDefault();
