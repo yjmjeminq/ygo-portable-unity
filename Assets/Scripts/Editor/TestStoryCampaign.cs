@@ -336,7 +336,7 @@ namespace YGOPortable.Editor
             int playerLife = gimmick switch { "heartland_cannon" => 7500, "numeronius" => 2000, _ => 8000 };
             bool riding = StoryGimmickRuntime.IsRidingDuel(gimmick);
             Require(boss.lp == (raid?.Opening.Life ?? 8000) &&
-                boss.hand.Count == (raid?.Opening.Hand ?? 5) + (riding ? 1 : 0) &&
+                boss.hand.Count == (raid?.Opening.Hand ?? 5) &&
                 duel.Players[duel.HumanPlayerIndex].lp == playerLife,
                 $"The configured LP, hand or opening field was missing in {name} (boss LP {boss.lp}, hand {boss.hand.Count}).");
             if (raid?.Opening.FieldCard is > 0)
@@ -344,8 +344,8 @@ namespace YGOPortable.Editor
             foreach (var (code, position) in StoryGimmickRuntime.StartingCards(gimmick))
                 VerifyCard(code, position);
             if (riding)
-                Require(duel.Players.All(player => player.szone[5]?.code == StoryGimmickRuntime.SpeedWorld &&
-                    player.hand.Any(card => card.code == StoryGimmickRuntime.AngelBaton)), "The riding duel lacked a field spell or its Speed Spell.");
+                Require(duel.Players.All(player => player.szone[5]?.code == StoryGimmickRuntime.SpeedWorld),
+                    "The riding duel lacked Speed World 2 in a field zone.");
 
             void VerifyCard(uint code, uint position)
             {

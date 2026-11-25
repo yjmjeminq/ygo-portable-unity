@@ -266,6 +266,10 @@ namespace YGOPortable.Editor
         private static void VerifyRidingDuel()
         {
             const uint hellfire = 46918794;
+            const uint removedSpeedSpell = 511090002;
+            Require(CardDatabase.Get(removedSpeedSpell) == null && YgoNativeBridge.YGO_HasCard(removedSpeedSpell) == 0 &&
+                YgoNativeBridge.YGO_HasScript($"c{removedSpeedSpell}.lua") == 0,
+                "The removed story Speed Spell is still registered.");
             var player = Enumerable.Repeat(hellfire, 40).ToArray();
             var rival = Enumerable.Repeat(20721928u, 40).ToArray();
             var ai = new TacticalAI { Difficulty = AIDifficulty.Easy };
@@ -279,16 +283,6 @@ namespace YGOPortable.Editor
             void Step(bool ending)
             {
                 var prompt = duel.ActivePrompt;
-                if (prompt?.messageType == YgoConstants.MSG_SELECT_CARD && prompt.min == 1)
-                {
-                    int discard = prompt.candidates.FindIndex(item => item.location == YgoConstants.LOCATION_HAND &&
-                        item.code is not (0 or StoryGimmickRuntime.AngelBaton));
-                    if (discard >= 0)
-                    {
-                        duel.SubmitResponse(DuelSession.PackCardSelection(discard));
-                        return;
-                    }
-                }
                 if (prompt == null) duel.StepUntilPrompt();
                 else if (ending && prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD && prompt.canEp)
                     duel.SubmitResponseInt(7);
@@ -309,14 +303,15 @@ namespace YGOPortable.Editor
                 int turn = duel.TurnNumber;
                 duel.SubmitResponseInt((index << 16) | 5);
                 for (int step = 0; step < 40 && !InMainPhase(turn) && duel.RetryCount == 0; step++) Step(ending: false);
-                Require(InMainPhase(turn) && duel.RetryCount == 0, "The Speed Spell or damage effect did not resolve.");
+                Require(InMainPhase(turn) && duel.RetryCount == 0, "The regular spell did not resolve.");
             }
 
             AdvanceTo(1);
             Require(duel.Players.All(seat => seat.szone[5]?.code == StoryGimmickRuntime.SpeedWorld) &&
                 Counter(0) == 1 && Counter(1) == 1 &&
-                duel.ActivePrompt.activatable.All(item => item.code != StoryGimmickRuntime.AngelBaton),
-                "Speed World did not gain its first native counter, or an unaffordable Speed Spell was offered.");
+                duel.Players[0].hand.Count == 5 && duel.Players[0].hand.All(card => card.code == hellfire) &&
+                duel.Players[1].hand.Count == 5 && duel.Players[1].hand.All(card => card.code == rival[0]),
+                "The riding duel did not start with Speed World 2 and the original decks' opening hands.");
             AdvanceTo(3);
             Require(Counter(0) == 3 && Counter(1) == 3, "Speed counters did not advance once per Standby Phase.");
             Activate(hellfire);
@@ -324,11 +319,6 @@ namespace YGOPortable.Editor
                 "Losing LP reduced the Speed Counters.");
             AdvanceTo(15);
             Require(Counter(0) == 12 && Counter(1) == 12, "Speed Counters exceeded their cap.");
-            Require(duel.Players[0].hand.Any(card => card.code == StoryGimmickRuntime.AngelBaton),
-                "The fixture discarded its Speed Spell before testing its effect.");
-            Activate(StoryGimmickRuntime.AngelBaton);
-            Require(Counter(0) == 10 && Counter(1) == 12 && duel.Players[0].grave.Any(card =>
-                card.code == StoryGimmickRuntime.AngelBaton), "The native Speed Spell did not spend exactly two counters.");
             var canvas = new GameObject("Speed counter fixture", typeof(Canvas));
             try
             {
@@ -342,7 +332,7 @@ namespace YGOPortable.Editor
                 field.UnbindSession();
             }
             finally { UnityEngine.Object.DestroyImmediate(canvas); }
-            Debug.Log("[VERIFY RIDING DUEL] Native field zones, Standby counters, cap, damage retention, Speed Spell cost and SPC badges passed.");
+            Debug.Log("[VERIFY RIDING DUEL] Original hands, normal spells, Speed World 2, counter cap and SPC badges passed.");
         }
 
         private static void VerifyDestinyAwakening()

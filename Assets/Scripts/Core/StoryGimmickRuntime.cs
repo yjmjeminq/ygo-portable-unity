@@ -8,7 +8,6 @@ namespace YGOPortable.Core
     internal sealed class StoryGimmickRuntime
     {
         internal const uint SpeedWorld = 511090001;
-        internal const uint AngelBaton = 511090002;
         internal const ushort SpeedCounter = 0x0091;
         internal const byte CountdownWinReason = 0x80;
         internal const uint DarknessZero = 511090101;
@@ -24,13 +23,6 @@ namespace YGOPortable.Core
             type = YgoConstants.TYPE_SPELL | YgoConstants.TYPE_FIELD,
             name = "스피드 월드 2",
             desc = "서로의 스탠바이 페이즈마다 이 카드에 스피드 카운터(SPC)를 1개 놓는다(최대 12개). 피해를 받아도 카운터는 줄어들지 않는다.",
-        };
-        private static readonly CardInfo AngelBatonCard = new()
-        {
-            code = AngelBaton,
-            type = YgoConstants.TYPE_SPELL,
-            name = "Sp－엔젤 배턴",
-            desc = "자신의 「스피드 월드 2」에서 스피드 카운터(SPC)를 2개 제거하고 발동할 수 있다. 2장 드로우한 뒤 패 1장을 버린다.",
         };
         private static readonly CardInfo HandcuffTokenCard = new()
         {
@@ -85,7 +77,6 @@ namespace YGOPortable.Core
         internal static CardInfo StoryCard(uint code) => code switch
         {
             SpeedWorld => SpeedWorldCard,
-            AngelBaton => AngelBatonCard,
             HandcuffToken => HandcuffTokenCard,
             ActionField => ActionFieldCard,
             ActionEvasion => ActionEvasionCard,

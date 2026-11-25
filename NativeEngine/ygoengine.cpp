@@ -71,7 +71,6 @@ EngineState g_state;
 // Scenario-only cards are outside the regular deck catalogue.
 constexpr PackedCard story_cards[] = {
     { 511090001, 0, 0x80002, 0, 0, 0, 0, 0, 0, 0, 0, {} },
-    { 511090002, 0, 0x2,     0, 0, 0, 0, 0, 0, 0, 0, {} },
     { 511090101, 0, 0x20004, 0, 0, 0, 0, 0, 0, 0, 0, {} },
     { 511090102, 0, 0x20004, 0, 0, 0, 0, 0, 0, 0, 0, {} },
     { 511090103, 0, 0x20004, 0, 0, 0, 0, 0, 0, 0, 0, {} },
@@ -90,7 +89,7 @@ std::string story_script_file(const std::string& key) {
         return "story_darkness_trap.lua";
     if (key == "c511090302.lua" || key == "c511090303.lua")
         return "story_action_magic.lua";
-    if (key == "c511090001.lua" || key == "c511090002.lua" || key == "story_gimmicks.lua" ||
+    if (key == "c511090001.lua" || key == "story_gimmicks.lua" ||
         key == "story_gx.lua" || key == "story_5ds.lua" || key == "story_zexal.lua" ||
         key == "story_arcv.lua" || key == "c511090301.lua" ||
         key == "story_vrains.lua" || key == "c511090401.lua")
