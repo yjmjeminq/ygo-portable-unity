@@ -84,6 +84,7 @@ namespace YGOPortable.Editor
                 world.Back();
 
                 VerifyFieldMovement();
+                VerifyDirectionalArt();
                 VerifySceneGuests();
                 VerifyStageExit();
 
@@ -130,6 +131,7 @@ namespace YGOPortable.Editor
                 CollectionProgress.Load(save);
                 Require(world.EnterRpgRegion(2) && world.CanStartRpgEpisode(6) && world.RpgClears == 6,
                     "The next quest or unlocked region was lost after reloading the save.");
+                VerifyAutomaticScenes();
                 Debug.Log("[VERIFY 5DS FIELD] Map gates, guest entrances, movement lock, practice rewards, story result order and saved progression passed.");
             }
             finally
@@ -187,14 +189,46 @@ namespace YGOPortable.Editor
                     "A click used screen space instead of map space, or the camera passed the map edge.");
             }
 
+            void VerifyDirectionalArt()
+            {
+                var buildArt = typeof(TagForceWorldUI).GetMethod("BuildRpgActorArt", flags);
+                foreach (int id in new[] { 1, 16, 35, 138 })
+                {
+                    var art = DuelUiKit.FillRect($"Walk_{id}", canvas.transform);
+                    try
+                    {
+                        buildArt.Invoke(world, new object[] { art, $"TagForce/5DS/Characters_SD/sd_{id}.png", id.ToString() });
+                        var animator = art.GetComponent<TagForceRpgWalkAnimator>();
+                        var image = art.GetComponent<Image>();
+                        var front = image.sprite;
+                        animator.Pose(.02f, true, Vector2.right);
+                        var right = image.sprite;
+                        animator.Pose(.08f, true, Vector2.right);
+                        var nextStep = image.sprite;
+                        animator.Pose(0f, false, Vector2.left);
+                        var leftIdle = image.sprite;
+                        bool flips = art.localScale.x < 0f;
+                        animator.Pose(0f, false, Vector2.up);
+                        var rear = image.sprite;
+                        animator.Pose(.02f, true, Vector2.up);
+                        var rearStep = image.sprite;
+                        animator.Pose(0f, false, Vector2.down);
+                        Require(right != nextStep && right != leftIdle && rear != rearStep && flips &&
+                            right.texture == front.texture && right.rect.y > front.rect.y && front.rect.y > rear.rect.y &&
+                            image.sprite == front && art.GetComponent<TagForceRpgStride>() == null,
+                            $"Character {id} did not use its front, back and side walking sheet.");
+                    }
+                    finally { UnityEngine.Object.DestroyImmediate(art.gameObject); }
+                }
+                Debug.Log("[VERIFY 5DS WALK ART] Aki, Jack, Yusei and Vagabond directional poses passed.");
+            }
+
             void VerifySceneGuests()
             {
                 var field = FieldScene();
                 var player = (RectTransform)field.Find("Player");
                 var opponent = (RectTransform)field.Find("MainQuestNpc");
-                var entrance = new Vector2(.48f, .35f);
-                for (int frame = 0; frame < 45 && world.CanWalk; frame++)
-                    world.Update(.04f, (entrance - player.anchorMin).normalized);
+                WalkToQuestScene(player);
                 Vector2 position = player.anchorMin;
                 var cast = field.Find("DialogueCast");
                 Require(cast != null && world.RpgStageRunning, "Walking near the main quest did not start its opening shot.");
@@ -228,7 +262,7 @@ namespace YGOPortable.Editor
                     opponent.gameObject.activeSelf && opponent.anchorMin == otherStart && player.gameObject.activeSelf &&
                     ((RectTransform)field).anchorMin != cameraStart,
                     "The first shot did not follow Aki as she entered before the other actor moved.");
-                VerifyStride(guest.Find("Sprite").GetComponent<TagForceRpgStride>());
+                VerifyStride(field.Find("Resident_210/SD").GetComponent<TagForceRpgStride>());
                 story.Update(.57f);
                 Require(world.RpgStageRunning && opponent.anchorMin != otherStart,
                     "The second actor did not move automatically after the first beat.");
@@ -238,7 +272,8 @@ namespace YGOPortable.Editor
                 Press(storyRoot, "Scene/DialogueBox/Next/Button");
                 story.Update(1.35f);
                 Require(guest.gameObject.activeSelf && guest.GetComponent<CanvasGroup>().alpha == 1f &&
-                    guest.anchorMin != entry && !world.RpgStageRunning, "The guest did not reach her mark after replaying the entrance.");
+                    guest.anchorMin != entry && !world.RpgStageRunning && guest.Find("Sprite").localScale.x > 0f,
+                    "The guest did not reach her mark and face the rival after replaying the entrance.");
                 AdvanceToLine(firstAkiLine);
                 Require(guest.Find("SpeakingCue") != null, "The speaking marker did not follow the guest.");
                 int approach = Array.FindIndex(lines, line => line.stage?.Any(a => a.actor == 0 && a.action == "move") == true);
@@ -258,6 +293,45 @@ namespace YGOPortable.Editor
                 for (int frame = 0; frame < 3; frame++) world.Update(.15f, Vector2.up);
                 Require(world.CanWalk && !storyRoot.gameObject.activeSelf,
                     "The automatic scene immediately reopened after leaving it.");
+            }
+
+            void WalkToQuestScene(RectTransform player)
+            {
+                var approach = new Vector2(.48f, .35f);
+                for (int frame = 0; frame < 45 && world.CanWalk; frame++)
+                    world.Update(.04f, (approach - player.anchorMin).normalized);
+            }
+
+            void VerifyAutomaticScenes()
+            {
+                string auditSave = Path.Combine(save, "automatic-scene-audit");
+                DeckRepository.Load(streaming, auditSave, seedDefaultDecks: false);
+                CollectionProgress.Load(auditSave);
+                Require(CollectionProgress.TryChooseStarter(CollectionProgress.Starters[0].Id, out _, out var error), error);
+                world.PrepareRpgField();
+                var automatic = loaded.episodes.Select((episode, index) => (episode, index))
+                    .Where(item => item.episode.sceneOnApproach).ToArray();
+                foreach (var (episode, index) in automatic)
+                {
+                    for (int i = world.RpgClears; i < index; i++)
+                    {
+                        var prior = script.episodes[i];
+                        Require(CollectionProgress.TryAwardStoryDuel(prior.id, true, null, decks[prior.deckId],
+                            out _, out _, out _), $"Could not stage {prior.id}.");
+                    }
+                    int region = TagForceWorldUI.RegionForEpisode(index + 1);
+                    Require(world.EnterRpgRegion(region == 0 ? 1 : 0) && world.EnterRpgRegion(region),
+                        $"Region for {episode.id} did not open.");
+                    WalkToQuestScene((RectTransform)FieldScene().Find("Player"));
+                    Require(storyRoot.gameObject.activeSelf && world.RpgStageRunning && !world.CanWalk && CurrentLine() == 0,
+                        $"Approaching the NPC did not start {episode.id}.");
+                    story.Update(3f);
+                    Require(!world.RpgStageRunning && world.RpgClears == index && CurrentLine() == 0,
+                        $"The opening stage of {episode.id} did not finish before its first dialogue.");
+                    story.Back();
+                    Require(world.CanWalk && world.RpgClears == index, $"Leaving {episode.id} lost the field or awarded a clear.");
+                }
+                Debug.Log($"[VERIFY 5DS AUTO SCENES] All {automatic.Length} scripted approaches, opening sequences and returns passed.");
             }
 
             void VerifyStageExit()

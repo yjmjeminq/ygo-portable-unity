@@ -43,15 +43,16 @@ namespace YGOPortable.UI
         private RectTransform BuildRpgActorArt(RectTransform art, string path, string name)
         {
             string cycle = RpgArt + "WalkCycles/" + Path.GetFileNameWithoutExtension(path);
-            var sides = path == null ? null : _images.GetSlices(cycle + ".png", 2, 2);
-            var idle = _images.GetSlices(path, 1, 1)?[0] ?? _images.Get(path);
+            var directions = path == null ? null : _images.GetSlices(cycle + "_directions.png", 3, 3);
+            var sides = path == null || directions != null ? null : _images.GetSlices(cycle + ".png", 2, 2);
+            var idle = directions?[3] ?? _images.GetSlices(path, 1, 1)?[0] ?? _images.Get(path);
             if (idle == null)
             {
                 Portrait(art, path, name);
                 return null;
             }
 
-            if (sides != null)
+            if (directions != null || sides != null)
             {
                 float padding = (art.anchorMax.y - art.anchorMin.y) * .095f;
                 art.anchorMin += Vector2.up * padding;
@@ -59,7 +60,7 @@ namespace YGOPortable.UI
             }
             var depth = sides == null ? null : _images.GetSlices(cycle + "_vertical.png", 3, 2);
             var image = DuelUiKit.AddImage(art.gameObject, idle, Color.white, true, false);
-            art.gameObject.AddComponent<TagForceRpgWalkAnimator>().Initialize(image, idle, sides, depth);
+            art.gameObject.AddComponent<TagForceRpgWalkAnimator>().Initialize(image, idle, sides, depth, directions);
             return art;
         }
 
@@ -78,26 +79,29 @@ namespace YGOPortable.UI
         private enum Facing { Side, Front, Back }
         private Image _image;
         private Sprite _idle;
-        private Sprite[] _side, _depth;
+        private Sprite[] _side, _depth, _directions;
         private TagForceRpgStride _stride;
         private Facing _facing;
         private bool _left;
         private float _phase;
 
-        internal void Initialize(Image image, Sprite idle, Sprite[] side, Sprite[] depth)
+        internal void Initialize(Image image, Sprite idle, Sprite[] side, Sprite[] depth, Sprite[] directions)
         {
             _image = image;
             _idle = idle;
             _side = side;
             _depth = depth;
-            if (side == null) _stride = gameObject.AddComponent<TagForceRpgStride>();
+            _directions = directions;
+            if (directions != null) _facing = Facing.Front;
+            else if (side == null) _stride = gameObject.AddComponent<TagForceRpgStride>();
         }
 
         internal void Pose(float distance, bool walking, Vector2 direction)
         {
             if (direction.sqrMagnitude > 1e-7f)
             {
-                if (_depth != null && Mathf.Abs(direction.y) > Mathf.Abs(direction.x) * 1.1f)
+                float threshold = _facing == Facing.Side ? 1.12f : .90f;
+                if ((_depth != null || _directions != null) && Mathf.Abs(direction.y) > Mathf.Abs(direction.x) * threshold)
                     _facing = direction.y > 0f ? Facing.Back : Facing.Front;
                 else if (Mathf.Abs(direction.x) > 1e-5f)
                 {
@@ -110,7 +114,14 @@ namespace YGOPortable.UI
             int frame = (int)_phase;
             Sprite next = _idle;
             bool flip = _left;
-            if (_facing != Facing.Side)
+            if (_directions != null)
+            {
+                int row = _facing switch { Facing.Side => 0, Facing.Front => 3, _ => 6 };
+                int offset = walking && (frame & 1) == 0 ? 1 + frame / 2 : 0;
+                next = _directions[row + offset];
+                flip = _facing == Facing.Side && _left;
+            }
+            else if (_facing != Facing.Side)
             {
                 int row = _facing == Facing.Back ? 3 : 0;
                 int offset = walking && (frame & 1) == 0 ? 1 + frame / 2 : 0;

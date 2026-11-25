@@ -26,6 +26,7 @@ namespace YGOPortable.UI
         public int actor;
         public string action;
         public int step;
+        public int target;
         public float x;
         public float y;
     }

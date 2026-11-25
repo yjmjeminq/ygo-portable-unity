@@ -27,7 +27,7 @@
         {
           "speaker": "",
           "text": "수십 명의 상류층 학생들이 잔인한 미소를 지으며 한 소녀를 둘러싸고 있었다. 그 중심에는 통제할 수 없는 사이킥 파괴 현상 때문에 '흑장미의 마녀', '재앙의 괴물'이라 불리며 배척당하는 내 동급생, '이자요이 아키'가 있었다.",
-          "stage": [{"actor": 1, "action": "enter"}, {"actor": 1, "action": "focus"}, {"actor": 138, "action": "move", "step": 1, "x": 0.59, "y": 0.41}, {"actor": 138, "action": "focus", "step": 1}]
+          "stage": [{"actor": 1, "action": "enter"}, {"actor": 1, "action": "focus"}, {"actor": 138, "action": "move", "step": 1, "x": 0.59, "y": 0.41}, {"actor": 138, "action": "focus", "step": 1}, {"actor": 1, "action": "face", "target": 138, "step": 1}]
         },
         {
           "speaker": "카이",
@@ -78,7 +78,7 @@
         {
           "speaker": "",
           "text": "아키의 눈가에서 눈물이 왈칵 쏟아지는 순간, 내 가슴속에서 차가운 분노와 함께 지켜주고 싶다는 본능이 치밀어 올랐다. 나는 인파를 거칠게 밀치며 성큼 걸어 들어갔다.",
-          "stage": [{"actor": 0, "action": "move", "x": 0.41, "y": 0.37}, {"actor": 0, "action": "focus"}]
+          "stage": [{"actor": 0, "action": "move", "x": 0.41, "y": 0.37}, {"actor": 0, "action": "focus"}, {"actor": 0, "action": "face", "target": 138, "step": 1}, {"actor": 138, "action": "face", "target": 0, "step": 1}]
         },
         {
           "speaker": "카이",
@@ -2594,7 +2594,7 @@
         {
           "speaker": "",
           "text": "포츈 컵의 모든 격전이 끝나고 정적만이 감도는 경기장 지하 격납고. 붉은 D-휠의 정비를 마치고 일어서던 내 앞에 후도 유세이가 다가왔다.",
-          "stage": [{"actor": 35, "action": "move", "x": 0.55, "y": 0.39}, {"actor": 35, "action": "focus"}]
+          "stage": [{"actor": 35, "action": "move", "x": 0.55, "y": 0.39}, {"actor": 35, "action": "focus"}, {"actor": 35, "action": "face", "target": 0, "step": 1}]
         },
         {
           "speaker": "",
@@ -7156,7 +7156,8 @@
       "preDialogues": [
         {
           "speaker": "",
-          "text": "WRGP 개막을 앞둔 메인 경기장 특설 트랙. 하얀 D-휠 '휠 오브 포츈' 위에 팔짱을 끼고 군림하듯 선 전 킹, 잭 아틀라스가 고고하게 내려다보고 있었다."
+          "text": "WRGP 개막을 앞둔 메인 경기장 특설 트랙. 하얀 D-휠 '휠 오브 포츈' 위에 팔짱을 끼고 군림하듯 선 전 킹, 잭 아틀라스가 고고하게 내려다보고 있었다.",
+          "stage": [{"actor": 16, "action": "focus"}, {"actor": 16, "action": "face", "target": 0}]
         },
         {
           "speaker": "",
@@ -7342,7 +7343,8 @@
           "emotion": "determined",
           "text": "더 강해지겠다. 아키를 지키기 위해서라도 난 여기서 멈출 수 없어."
         }
-      ]
+      ],
+      "sceneOnApproach": true
     },
     {
       "id": "5ds_ep_36",
@@ -10144,7 +10146,7 @@
         {
           "speaker": "",
           "text": "시티와 새틀라이트를 하나로 잇는 거대한 무지개 빛깔의 현수교, 다이달로스 브릿지. 파멸의 미래에서 온 Z-ONE을 물리치고 네오 도미노 시티에 완전한 평화가 찾아온 늦은 가을의 어느 날.",
-          "stage": [{"actor": 0, "action": "move", "x": 0.39, "y": 0.39}, {"actor": 1, "action": "move", "x": 0.58, "y": 0.42}, {"actor": 1, "action": "focus", "step": 1}]
+          "stage": [{"actor": 0, "action": "move", "x": 0.39, "y": 0.39}, {"actor": 1, "action": "move", "x": 0.58, "y": 0.42}, {"actor": 1, "action": "focus", "step": 1}, {"actor": 0, "action": "face", "target": 1, "step": 1}, {"actor": 1, "action": "face", "target": 0, "step": 1}]
         },
         {
           "speaker": "",

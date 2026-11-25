@@ -28,11 +28,13 @@ namespace YGOPortable.UI
         {
             internal readonly Vector2 Position;
             internal readonly bool Visible;
+            internal readonly int? LookAt;
 
-            internal RpgStagePose(Vector2 position, bool visible)
+            internal RpgStagePose(Vector2 position, bool visible, int? lookAt = null)
             {
                 Position = position;
                 Visible = visible;
+                LookAt = lookAt;
             }
         }
 
@@ -96,9 +98,9 @@ namespace YGOPortable.UI
                 }
                 foreach (var action in line.stage ?? Array.Empty<StoryStageAction>())
                 {
-                    if (action == null || _rpgStageIds.ContainsKey(action.actor)) continue;
-                    var character = DeckRepository.GetCharacter(action.actor);
-                    if (character != null) GetRpgStageGuest(character.name, character.id);
+                    if (action == null) continue;
+                    EnsureRpgStageGuest(action.actor);
+                    if (action.action == "face") EnsureRpgStageGuest(action.target);
                 }
             }
 
@@ -109,6 +111,13 @@ namespace YGOPortable.UI
             _rpgSpeakerCue = Anchor(_rpgDialogueCast, "SpeakingCue", Vector2.zero, new Vector2(29f, 24f));
             Label(_rpgSpeakerCue, "▼", 17).color = DuelUiKit.GoldAccent;
             _rpgSpeakerCue.gameObject.SetActive(false);
+        }
+
+        private void EnsureRpgStageGuest(int id)
+        {
+            if (_rpgStageIds.ContainsKey(id)) return;
+            var character = DeckRepository.GetCharacter(id);
+            if (character != null) GetRpgStageGuest(character.name, character.id);
         }
 
         private RpgStageActor GetRpgStageGuest(string name, int? id)
@@ -225,12 +234,14 @@ namespace YGOPortable.UI
                         if (action == null || action.step < latestStep || (i == index && action.step > step) ||
                             !_rpgStageIds.TryGetValue(action.actor, out var subject) || subject != actor)
                             continue;
-                        if (action.action == "enter") target = new RpgStagePose(actor.Mark, true);
+                        if (action.action == "enter") target = new RpgStagePose(actor.Mark, true, target.LookAt);
                         else if (action.action == "move")
                             target = new RpgStagePose(new Vector2(Mathf.Clamp(action.x, .05f, .95f),
-                                Mathf.Clamp(action.y, .12f, .64f)), true);
+                                Mathf.Clamp(action.y, .12f, .64f)), true, target.LookAt);
                         else if (action.action == "exit")
                             target = new RpgStagePose(new Vector2(target.Position.x < .5f ? .04f : .96f, target.Position.y), false);
+                        else if (action.action == "face" && _rpgStageIds.TryGetValue(action.target, out var facing) && facing != actor)
+                            target = new RpgStagePose(target.Position, target.Visible, action.target);
                         else continue;
                         latestStep = action.step;
                         staged = true;
@@ -238,10 +249,12 @@ namespace YGOPortable.UI
                     }
                 }
                 if (actor.Target.Visible == target.Visible && actor.Target.Position == target.Position &&
+                    actor.Target.LookAt == target.LookAt &&
                     (animate || actor.Progress >= 1f)) continue;
                 bool slide = animate && changedLine == index && (actor.Root.gameObject.activeSelf || target.Visible);
                 BeginRpgStageMove(actor, target, slide);
             }
+            RefreshRpgStageFacing();
             var speaker = RpgSpeaker(lines[index].speaker);
             RectTransform speaking = speaker?.Target.Visible == true ? speaker.Root : null;
             _rpgSpeakerCue.gameObject.SetActive(speaking != null);
@@ -268,7 +281,11 @@ namespace YGOPortable.UI
                     PoseRpgStageActor(actor);
                 }
                 TrackRpgCamera(slice, (_rpgCameraFocus ?? _player).anchorMin);
-                if (!RpgStageRunning) PlayNextRpgBeat();
+                if (!RpgStageRunning)
+                {
+                    RefreshRpgStageFacing();
+                    PlayNextRpgBeat();
+                }
             }
             TrackRpgCamera(delta, (_rpgCameraFocus ?? _player).anchorMin);
         }
@@ -289,13 +306,29 @@ namespace YGOPortable.UI
             float progress = Mathf.SmoothStep(0f, 1f, actor.Progress);
             bool walking = actor.Progress < 1f && actor.From != actor.Target.Position;
             var position = Vector2.LerpUnclamped(actor.From, actor.Target.Position, progress);
-            var heading = walking ? actor.Target.Position - actor.From :
-                (actor.Root == _player ? _rpgDialogueOpponent.anchorMin : _player.anchorMin) - position;
+            var heading = walking ? actor.Target.Position - actor.From : RpgStageHeading(actor, position);
             actor.Visibility.alpha = actor.Target.Visible
                 ? Mathf.Lerp(actor.StartAlpha, 1f, Mathf.Clamp01(actor.Progress * 4f))
                 : Mathf.Lerp(actor.StartAlpha, 0f, Mathf.Clamp01(actor.Progress * 2f - 1f));
             PoseRpgWalker(actor.Root, actor.Art, position, position - actor.Root.anchorMin, walking, heading);
             if (actor.Progress >= 1f && !actor.Target.Visible) actor.Root.gameObject.SetActive(false);
+        }
+
+        private Vector2 RpgStageHeading(RpgStageActor actor, Vector2 position)
+        {
+            if (actor.Target.LookAt is int id && _rpgStageIds[id].Root.gameObject.activeSelf)
+                return _rpgStageIds[id].Root.anchorMin - position;
+            return (actor.Root == _player ? _rpgDialogueOpponent.anchorMin : _player.anchorMin) - position;
+        }
+
+        private void RefreshRpgStageFacing()
+        {
+            foreach (var actor in _rpgStageActors)
+            {
+                if (actor.Progress < 1f || !actor.Target.Visible || !actor.Target.LookAt.HasValue) continue;
+                Vector2 position = actor.Root.anchorMin;
+                PoseRpgWalker(actor.Root, actor.Art, position, Vector2.zero, false, RpgStageHeading(actor, position));
+            }
         }
 
         private bool IsRpgHero(string name) => name == _rpgHeroName || name?.StartsWith("주인공", StringComparison.Ordinal) == true ||
