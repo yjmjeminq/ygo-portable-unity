@@ -89,11 +89,27 @@ namespace YGOPortable.Editor
                     var match = story.GetOpponentMatch(episode).Deck;
                     Require(match?.id == 59001 + i && match.charId == episode.charId,
                         $"Wrong deck for RPG episode {i + 1}.");
-                    foreach (uint code in match.main.Concat(match.extra).Concat(match.side))
+                    Require(match.main.Length is >= 40 and <= 60 && match.extra.Length <= 15 && match.side.Length <= 15,
+                        $"Invalid deck size in 5D's RPG deck {match.id}.");
+                    var cards = match.main.Concat(match.extra).Concat(match.side).ToArray();
+                    Require(cards.Contains(match.sigCard), $"The signature card is absent from 5D's RPG deck {match.id}.");
+                    foreach (uint code in cards)
                     {
                         var card = CardDatabase.Get(code);
-                        Require(card != null && (card.type & (YgoConstants.TYPE_XYZ | YgoConstants.TYPE_PENDULUM |
-                            YgoConstants.TYPE_LINK)) == 0, $"Illegal 5D's RPG card {code} in deck {match.id}.");
+                        Require(card != null && YgoNativeBridge.YGO_HasCard(code) != 0 &&
+                            (card.type & (YgoConstants.TYPE_XYZ | YgoConstants.TYPE_PENDULUM |
+                            YgoConstants.TYPE_LINK | YgoConstants.TYPE_TOKEN)) == 0,
+                            $"Illegal or unavailable 5D's RPG card {code} in deck {match.id}.");
+                    }
+                    var main = match.main.Select(CardDatabase.Get).ToArray();
+                    var extra = match.extra.Select(CardDatabase.Get).ToArray();
+                    Require(main.All(card => !card.IsExtra) && extra.All(card => card.IsExtra),
+                        $"A card is in the wrong zone in 5D's RPG deck {match.id}.");
+                    if (extra.Any(card => card.IsSynchro))
+                    {
+                        Require(main.Any(card => card.IsMonster && (card.type & YgoConstants.TYPE_TUNER) != 0) &&
+                            main.Any(card => card.IsMonster && (card.type & YgoConstants.TYPE_TUNER) == 0),
+                            $"Missing Synchro materials in 5D's RPG deck {match.id}.");
                     }
                     using var duel = new DuelSession();
                     Require(duel.StartNewDuel(playerDeck.main, playerDeck.extra, match.main, match.extra,

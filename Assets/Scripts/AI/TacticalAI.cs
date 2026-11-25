@@ -37,6 +37,7 @@ namespace YGOPortable.AI
         private const uint Faris = 18094166, ShadowMist = 50720316, Malicious = 9411399, Scheiren = 572850;
         private const uint VisasStarfrost = 56099748;
         private const uint MelffyFootsteps = 25687946;
+        private const uint Terraforming = 73628505, MaleficWorld = 27564031, MaleficTerritory = 75223115;
         private const ushort MelffySet = 0x147;
         private const ushort TrickstarSet = 0xfb;
         private const ushort TearlamentsSet = 0x182;
@@ -494,6 +495,13 @@ namespace YGOPortable.AI
                 return (upgrade << 16) | 1;
 
             var own = session.Players[prompt.playerId];
+            // These Malefic monsters can appear in the summon menu with no Field Spell,
+            // but they destroy themselves on arrival. Prepare the field before simulating the summon.
+            bool needsMaleficField = session.Players.All(player =>
+                    player.szone[YgoConstants.FIELD_ZONE_SEQUENCE]?.IsFaceUp != true) &&
+                prompt.spSummonable.Any(item => item.controller == prompt.playerId &&
+                    item.location == YgoConstants.LOCATION_HAND &&
+                    item.code is 598988 or 1710476 or 9433350 or 36521459 or 55343236);
             bool exposedOpening = session.TurnNumber <= 2 && own.lp > 1000 && own.mzone.All(card => card == null) &&
                 prompt.summonable.Any(card => (CardDatabase.Get(card.code)?.atk ?? 0) <
                     DuelTactics.StrongestAttacker(session.Players[1 - prompt.playerId]));
@@ -520,6 +528,10 @@ namespace YGOPortable.AI
                     DuelTactics.LightningStorm when DuelTactics.ShouldLeadWithLightningStorm(session, prompt) => 5,
                     PotOfGreed when own.deckCount >= 2 => 4,
                     GracefulCharity when own.deckCount >= 3 => 3,
+                    MaleficTerritory when needsMaleficField &&
+                        session.HasCardInDeck(prompt.playerId, card => card.code == MaleficWorld) => 3,
+                    MaleficWorld when needsMaleficField => 2,
+                    Terraforming when needsMaleficField => 1,
                     SignatureTurnPlan.MagiciansSouls when drawRitual => 2,
                     LinkTurnPlan.CynetCodec when session.TurnNumber <= 2 && planLinks => 2,
                     LinkTurnPlan.MathmechSigma when item.location == YgoConstants.LOCATION_GRAVE &&
