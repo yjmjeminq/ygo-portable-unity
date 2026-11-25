@@ -21,6 +21,7 @@ namespace YGOPortable.UI
         private Button _rankedButton;
         private GameObject _championBadge;
         private Button _storyButton;
+        private Button _tagForceButton;
         private Button _deckEditorButton;
         private Button _shopButton;
         private Button _codexButton;
@@ -75,6 +76,7 @@ namespace YGOPortable.UI
                 AppScreen.CardShop => _shopButton,
                 AppScreen.DeckEditor => _deckEditorButton,
                 AppScreen.StoryMode => _storyButton,
+                AppScreen.TagForceWorld => _tagForceButton,
                 AppScreen.ArchetypeCodex => _codexButton,
                 AppScreen.Ranked => _rankedButton,
                 _ => _freeDuelButton,
@@ -113,13 +115,17 @@ namespace YGOPortable.UI
             AddLogo(logo);
             var menu = DuelUiKit.CreateMenuPanel(root, "Menu", new Vector2(.205f, .132f),
                 new Vector2(.538f, .643f));
-            _storyButton = AddMenuEntry(menu, "StoryMode", .834f, "스토리 모드", () => _app.ShowScreen(AppScreen.StoryMode));
-            _rankedButton = AddMenuEntry(menu, "Ranked", .708f, "랭크 매치", () => _app.ShowScreen(AppScreen.Ranked));
-            _freeDuelButton = AddMenuEntry(menu, "FreeDuel", .582f, "프리 듀얼", () => _app.ShowScreen(AppScreen.OpponentSelect));
-            _deckEditorButton = AddMenuEntry(menu, "DeckEditor", .456f, "덱 편집", () => _app.ShowScreen(AppScreen.DeckEditor));
-            _codexButton = AddMenuEntry(menu, "ArchetypeCodex", .330f, "카드군 도감", () => _app.ShowScreen(AppScreen.ArchetypeCodex));
-            _settingsOpenButton = AddMenuEntry(menu, "Settings", .204f, "환경 설정", OpenSettings);
-            AddMenuEntry(menu, "ReturnToTitle", .078f, "타이틀로 돌아가기", () => _app.ShowScreen(AppScreen.Title));
+            int row = 0;
+            Button AddRow(string name, string label, Action action) =>
+                AddMenuEntry(menu, name, .840f - row++ * .112f, label, action);
+            _storyButton = AddRow("StoryMode", "스토리 모드", () => _app.ShowScreen(AppScreen.StoryMode));
+            _tagForceButton = AddRow("TagForceWorld", "태그포스 월드", () => _app.ShowScreen(AppScreen.TagForceWorld));
+            _rankedButton = AddRow("Ranked", "랭크 매치", () => _app.ShowScreen(AppScreen.Ranked));
+            _freeDuelButton = AddRow("FreeDuel", "프리 듀얼", () => _app.ShowScreen(AppScreen.OpponentSelect));
+            _deckEditorButton = AddRow("DeckEditor", "덱 편집", () => _app.ShowScreen(AppScreen.DeckEditor));
+            _codexButton = AddRow("ArchetypeCodex", "카드군 도감", () => _app.ShowScreen(AppScreen.ArchetypeCodex));
+            _settingsOpenButton = AddRow("Settings", "환경 설정", OpenSettings);
+            AddRow("ReturnToTitle", "타이틀로 돌아가기", () => _app.ShowScreen(AppScreen.Title));
             BuildShopTile(root);
             _championBadge = OfflineRankedUI.AddChampionBadge(root, new Vector2(.726f, .908f), new Vector2(.971f, .966f));
             _championBadge.SetActive(false);

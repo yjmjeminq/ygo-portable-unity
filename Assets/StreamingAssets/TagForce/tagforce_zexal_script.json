@@ -1,0 +1,3356 @@
+{
+  "seriesId": "zexal",
+  "seriesIdx": 3,
+  "seriesTitle": "유희왕 ZEXAL (하트랜드 시티)",
+  "protagonist": {
+    "name": "주인공",
+    "title": "홍련의 듀얼 퀸",
+    "portraitPath": "Story/Protagonist",
+    "sdSpritePath": "TagForce/ZEXAL/SD/sd_protagonist.png",
+    "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_protagonist.png"
+  },
+  "spots": [
+    {
+      "spotId": "spot_heartland_city",
+      "name": "하트랜드 시티 테마파크 중앙 광장",
+      "subtitle": "거대 롤러코스터와 홀로그램 듀얼 게이저가 빛나는 미래형 도시",
+      "ambientTheme": "heartland_city",
+      "defaultPickups": [
+        "duelist_riceball",
+        "dp_small",
+        "emperor_key_replica"
+      ],
+      "mapPath": "TagForce/ZEXAL/Maps/spot_heartland_city.png"
+    },
+    {
+      "spotId": "spot_yuma_house",
+      "name": "유우마의 집 & 다락방 차고",
+      "subtitle": "캇토빙의 발상지이자 아스트랄과 넘버즈를 분석하는 비밀 기지",
+      "ambientTheme": "yuma_house",
+      "defaultPickups": [
+        "duelist_riceball",
+        "dp_medium",
+        "astral_crystal_fragment"
+      ],
+      "mapPath": "TagForce/ZEXAL/Maps/spot_yuma_house.png"
+    },
+    {
+      "spotId": "spot_heartland_tower",
+      "name": "하트랜드 타워 최상층 & Dr. 페이커 연구실",
+      "subtitle": "바리안 세계와 아스트랄 세계를 관측하는 도시의 최정상 랜드마크",
+      "ambientTheme": "heartland_tower",
+      "defaultPickups": [
+        "galaxy_photon_core",
+        "dp_large",
+        "emperor_key_replica"
+      ],
+      "mapPath": "TagForce/ZEXAL/Maps/spot_heartland_tower.png"
+    },
+    {
+      "spotId": "spot_waterfront_pier",
+      "name": "하트랜드 수변 공원 & 샤크의 아지트",
+      "subtitle": "샤크와 리오가 머무는 시원한 분수대와 강변 산책로",
+      "ambientTheme": "waterfront_pier",
+      "defaultPickups": [
+        "duelist_riceball",
+        "dp_medium",
+        "galaxy_photon_core"
+      ],
+      "mapPath": "TagForce/ZEXAL/Maps/spot_waterfront_pier.png"
+    },
+    {
+      "spotId": "spot_astral_world",
+      "name": "아스트랄 세계 & 신전 유적",
+      "subtitle": "순백의 빛과 랭크업 엑시즈의 기원이 잠들어 있는 신비의 이세계",
+      "ambientTheme": "astral_world",
+      "defaultPickups": [
+        "astral_crystal_fragment",
+        "dp_large",
+        "emperor_key_replica"
+      ],
+      "mapPath": "TagForce/ZEXAL/Maps/spot_astral_world.png"
+    },
+    {
+      "spotId": "spot_barian_world",
+      "name": "붉은 바리안 세계의 계곡",
+      "subtitle": "칠황의 맹세와 카오스 엑시즈 체인지의 불꽃이 소용돌이치는 이계",
+      "ambientTheme": "barian_world",
+      "defaultPickups": [
+        "barian_chaos_stone",
+        "dp_large",
+        "astral_crystal_fragment"
+      ],
+      "mapPath": "TagForce/ZEXAL/Maps/spot_barian_world.png"
+    }
+  ],
+  "gifts": [
+    {
+      "giftId": "duelist_riceball",
+      "name": "🍙 아카리의 영양 만점 수제 듀얼 주먹밥",
+      "priceDp": 150,
+      "baseAffinity": 25,
+      "favoriteAffinity": 60,
+      "desc": "유우마의 누나 아카리가 만들어준 거대 주먹밥. 캇토빙 에너지의 원천."
+    },
+    {
+      "giftId": "emperor_key_replica",
+      "name": "🗝️ 황제의 열쇠 정밀 레플리카",
+      "priceDp": 350,
+      "baseAffinity": 40,
+      "favoriteAffinity": 80,
+      "desc": "아스트랄 세계의 비행선 형태를 본뜬 황금 열쇠 펜던트. 아스트랄과 유우마가 소중히 여긴다."
+    },
+    {
+      "giftId": "galaxy_photon_core",
+      "name": "🌌 갤럭시아이즈 포톤 에너지 코어",
+      "priceDp": 450,
+      "baseAffinity": 45,
+      "favoriteAffinity": 95,
+      "desc": "카이토의 포톤 체인지에 필요한 순수 광자 크리스탈. 카이토와 궤도 7이 아주 아낀다."
+    },
+    {
+      "giftId": "astral_crystal_fragment",
+      "name": "💎 아스트랄 순백의 수정 조각",
+      "priceDp": 400,
+      "baseAffinity": 40,
+      "favoriteAffinity": 85,
+      "desc": "기억의 파편(넘버즈)을 감지하는 영롱한 크리스탈. 아스트랄 세계의 듀얼리스트들이 선호한다."
+    },
+    {
+      "giftId": "barian_chaos_stone",
+      "name": "🔥 바리안 칠황의 카오스 젬",
+      "priceDp": 500,
+      "baseAffinity": 50,
+      "favoriteAffinity": 100,
+      "desc": "바리안 칠황의 카오스 엑시즈 에너지가 응축된 붉은 원석. 샤크(낫슈), 아리트 등이 경외한다."
+    }
+  ],
+  "personas": [
+    {
+      "personaId": "zexal_char_174",
+      "baseCharId": 174,
+      "displayName": "츠쿠모 유마",
+      "isTagEligible": false,
+      "partnerRefusal": "캇토빙이다, 나! 난 아스트랄이랑 함께 넘버즈를 모아야 해! 그래도 듀얼이라면 언제든 좋아, 한 판 붙자!",
+      "dormOrFaction": "하트랜드 시티 듀얼리스트",
+      "partnerRole": "XyzRival",
+      "partnerSkillName": "라이벌의 오버레이",
+      "partnerSkillDesc": "어떤 절망적인 상황에서도 포기하지 않고 캇토빙으로 역전의 희망을 여는 유우마의 영혼.",
+      "favoriteGiftId": "duelist_riceball",
+      "forms": [
+        {
+          "formCharId": 174,
+          "formName": "츠쿠모 유마",
+          "formTitle": "츠쿠모 유마 · 하트랜드 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_waterfront_pier"
+          ],
+          "greetingLines": {
+            "low": "안녕! 난 츠쿠모 유마! 언제나 캇토빙으로 부딪치는 중이야! 한 판 붙자!",
+            "mid": "오, 너구나! 네 덱 플레이를 보면 가슴이 쿵쾅쿵쾅 뛰어서 가만히 있을 수가 없어!",
+            "high": "너랑 듀얼할 땐 진짜 캇토빙 파워가 100배는 솟아나는 것 같아! 가자!!"
+          },
+          "duelStartLine": "캇토빙이다, 나! 전력으로 부딪치겠어! 듀얼!",
+          "aceCutInLine": "나와라, 넘버즈 39! 희망황 호프!! 빛의 검으로 어둠을 갈라라!",
+          "winLine": "해냈다-! 캇토빙 승리다! 진짜 끝내주게 두근거리는 승부였어!",
+          "loseLine": "으아악~ 졌다! 하지만 캇토빙은 멈추지 않아! 다시 한 판 더 도전할게!",
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_174.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_174.png"
+        },
+        {
+          "formCharId": 175,
+          "formName": "제알",
+          "formTitle": "제알 · 하트랜드 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_waterfront_pier"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 제알! 하트랜드의 승부사다! 덤벼라!",
+            "mid": "오, 네 엑시즈 감각 제법이군! 하지만 내 오버레이 유닛을 깰 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 쿵쾅거리게 하는군! 진검승부다!"
+          },
+          "duelStartLine": [
+            "오버레이 네트워크를 구축! 내 덱의 진정한 힘을 보여주마! 듀얼!"
+          ],
+          "aceCutInLine": [
+            "차원을 열어라! 나의 비장의 엑시즈 몬스터 소환!"
+          ],
+          "winLine": [
+            "좋았어! 완벽한 승리다!"
+          ],
+          "loseLine": [
+            "크윽... 완패다! 하지만 다음엔 내가 이긴다!"
+          ],
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_175.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_175.png"
+        },
+        {
+          "formCharId": 176,
+          "formName": "제알 Ⅲ",
+          "formTitle": "제알 Ⅲ · 하트랜드 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_waterfront_pier"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 제알 Ⅲ! 하트랜드의 승부사다! 덤벼라!",
+            "mid": "오, 네 엑시즈 감각 제법이군! 하지만 내 오버레이 유닛을 깰 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 쿵쾅거리게 하는군! 진검승부다!"
+          },
+          "duelStartLine": [
+            "오버레이 네트워크를 구축! 내 덱의 진정한 힘을 보여주마! 듀얼!"
+          ],
+          "aceCutInLine": [
+            "차원을 열어라! 나의 비장의 엑시즈 몬스터 소환!"
+          ],
+          "winLine": [
+            "좋았어! 완벽한 승리다!"
+          ],
+          "loseLine": [
+            "크윽... 완패다! 하지만 다음엔 내가 이긴다!"
+          ],
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_176.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_176.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "츠쿠모 유마: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "츠쿠모 유마: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "츠쿠모 유마: 음? 선물이군. 받아두지.",
+        "hated": "츠쿠모 유마: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "우와앗! 지각이다 지각! 캇토빙으로 학교까지 전력 질주다-!! 좋은 아침!",
+        "evening": "에헤헤~ 노을빛 보면서 결투 밥 먹으니까 진짜 꿀맛이다! 오늘 듀얼 진짜 재밌었어!",
+        "deckComment": "네 덱, 진짜 두근두근거리고 끝내줘! 아스트랄도 네 카드들이 믿음직스럽다고 칭찬했어!",
+        "duelReady": "캇토빙이다, 나! 어떤 위기라도 정면 돌파로 뒤집어주마! 듀얼!",
+        "cheer": "포기하면 거기서 캇토빙이 끝장나는 거야! 백 번 넘어져도 백한 번 일어서는 거다-!!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "xyz_duel",
+      "topicReplies": {
+        "xyz_duel": "엑시즈 소환은 서로 다른 둘이 만나서 새로운 희망을 만들어내는 마법 같은 거야!",
+        "heartland": "하트랜드 시티의 롤러코스터랑 듀얼 코스터! 몇 번을 타도 심장이 쿵쾅거린다니까!",
+        "food": "누나가 정성껏 빚어준 초대형 결투 밥! 속에는 고기랑 소시지가 꽉 차서 최고야!",
+        "numbers": "넘버즈 카드는 위험하지만, 아스트랄의 기억을 되찾고 세상을 구하기 위해 다 모을 거야!"
+      },
+      "pdaMails": [
+        {
+          "mailId": "zexal_char_174_mail_invite",
+          "sender": "츠쿠모 유마",
+          "timeSlot": "morning",
+          "spotId": "spot_heartland_city",
+          "subject": "[유우마] 캇토빙하게 듀얼 한판 하자!",
+          "body": "어이! 결투 밥 잔뜩 챙겨서 광장으로 나왔어! 아스트랄도 너랑 붙고 싶대! 백 번 넘어져도 백한 번 캇토빙이다!!"
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "zexal_char_168",
+      "baseCharId": 168,
+      "displayName": "카미시로 료가 (샤크)",
+      "isTagEligible": false,
+      "partnerRefusal": "방해하지 마라. 난 혼자서 심연을 헤엄친다. 다치고 싶지 않으면 물러서.",
+      "dormOrFaction": "하트랜드 시티 듀얼리스트",
+      "partnerRole": "XyzRival",
+      "partnerSkillName": "라이벌의 오버레이",
+      "partnerSkillDesc": "물 속성 및 엑시즈 몬스터의 공격력을 높이고 상대 수비벽을 일격에 관통하는 심해의 송곳니.",
+      "favoriteGiftId": "emperor_key_replica",
+      "forms": [
+        {
+          "formCharId": 168,
+          "formName": "카미시로 료가 (샤크)",
+          "formTitle": "카미시로 료가 (샤크) · 하트랜드 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_heartland_city"
+          ],
+          "greetingLines": {
+            "low": "흥, 방해하지 마라. 날 시험해보고 싶다면 덱으로 말해라.",
+            "mid": "제법이군... 네 덱에는 물러터진 감상이 아니라 확실한 각오가 담겨 있어.",
+            "high": "어이! 네 덱과 내 샤크들의 이빨이 격돌할 시간이다! 전력으로 와라!"
+          },
+          "duelStartLine": "심연의 턱에 물어뜯길 준비는 됐겠지? 듀얼이다!",
+          "aceCutInLine": "심연에서 솟구쳐올라라! No.32 사해귀신 바이스 스트림!!",
+          "winLine": "흥, 당연한 결과다. 내 송곳니를 벗어날 수 있을 줄 알았나?",
+          "loseLine": "칫... 제법이잖아. 하지만 다음엔 내 완전한 이빨에 갈기갈기 찢길 거다.",
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_168.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_168.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "카미시로 료가 (샤크): 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "카미시로 료가 (샤크): 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "카미시로 료가 (샤크): 음? 선물이군. 받아두지.",
+        "hated": "카미시로 료가 (샤크): 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "쳇, 아침부터 귀찮게 굴지 마라. 어슬렁거리는 꼴이 거슬리는군.",
+        "evening": "어두워졌군. 내 영역에 발을 들이지 마라. 어중간한 녀석과 어울려줄 생각 없다.",
+        "deckComment": "흥, 제법 날카로운 송곳니를 숨겨둔 덱이군. 방심하면 내 손가락이 잘려 나가겠어.",
+        "duelReady": "내 깊은 해저의 포식자들에게 먹잇감을 던져주지. 산산조각 날 각오나 해라! 듀얼!",
+        "cheer": "네놈, 꼴사납게 바닥에 뒹굴지 마라! 내 파트너라면 지느러미를 세우고 끝까지 물어뜯어라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "xyz_duel",
+      "topicReplies": {
+        "xyz_duel": "엑시즈 소환은 적의 숨통을 일격에 끊어버리는 가장 날카로운 수중 암살이다.",
+        "heartland": "화려한 테마파크 따위 역겨울 뿐이다. 부둣가 바닷바람이나 맞는 게 훨씬 속 편해.",
+        "food": "리오가 만들어주는 매콤한 해물 스튜... 뭐, 먹을만하더군. 리오한테는 비밀이다.",
+        "numbers": "넘버즈의 저주 따위에 굴복할 생각 없다. 내 영혼은 오직 내 손으로 지배한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "zexal_char_168_mail_invite",
+          "sender": "카미시로 료가 (샤크)",
+          "timeSlot": "morning",
+          "spotId": "spot_heartland_city",
+          "subject": "[카미시로 료가 (샤크)] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "zexal_char_156",
+      "baseCharId": 156,
+      "displayName": "텐조 카이토",
+      "isTagEligible": false,
+      "partnerRefusal": "넘버즈 헌터에게 파트너는 사치다. 참회할 준비가 되었다면 내 앞에 서라.",
+      "dormOrFaction": "하트랜드 시티 듀얼리스트",
+      "partnerRole": "XyzRival",
+      "partnerSkillName": "라이벌의 오버레이",
+      "partnerSkillDesc": "갤럭시아이즈의 압도적인 화력으로 상대 엑시즈 소재를 강탈하고 광자 스트림을 뿜는 사냥꾼의 긍지.",
+      "favoriteGiftId": "galaxy_photon_core",
+      "forms": [
+        {
+          "formCharId": 156,
+          "formName": "텐조 카이토",
+          "formTitle": "텐조 카이토 · 하트랜드 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_yuma_house"
+          ],
+          "greetingLines": {
+            "low": "어설픈 듀얼리스트에게 낭비할 시간은 없다. 각오가 되어 있다면 덤벼라.",
+            "mid": "네 듀얼 감각은 인정하지. 내 동생 하루토를 지키기 위해, 난 절대 질 수 없다.",
+            "high": "네 덱의 빛과 나의 은하가 격돌하는 순간... 우주가 흔들리는군. 와라!"
+          },
+          "duelStartLine": "포톤 체인지! 내 은하의 빛으로 네 영혼을 참회시켜주마!",
+          "aceCutInLine": "우주를 꿰뚫는 은하의 포효! 갤럭시아이즈 포톤 드래곤, 파멸의 포톤 스트림!!",
+          "winLine": "참회의 시간은 끝났다. 내 갤럭시아이즈의 빛 앞에 무릎 꿇어라.",
+          "loseLine": "크윽... 은하를 뛰어넘는 빛을 보았군. 인정한다, 네 승리다.",
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_156.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_156.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "텐조 카이토: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "텐조 카이토: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "텐조 카이토: 음? 선물이군. 받아두지.",
+        "hated": "텐조 카이토: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "흥, 방해된다. 하루토의 안정을 방해하지 말고 물러서라. 오비탈, 잡상인을 치워라.",
+        "evening": "별빛이 차갑게 내리는군. 참회의 기도를 올리기에 적합한 시간이다.",
+        "deckComment": "군더더기 없는 광자 계산식이다. 네 전술 데이터는 제법 신뢰할 만하군.",
+        "duelReady": "너에게 묻겠다. 참회의 준비는 되었는가! 듀얼!",
+        "cheer": "그 정도로 무너질 텐가? 네 영혼의 빛은 겨우 그 정도에 꺼질 나약한 불씨였나! 일어서라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "xyz_duel",
+      "topicReplies": {
+        "xyz_duel": "오버레이 네트워크는 은하의 눈동자를 깨우는 절대적인 광자 수식이다.",
+        "heartland": "하트랜드 타워의 꼭대기... 더러운 음모가 도사리고 있지만, 난 하루토만을 위해 싸운다.",
+        "food": "하루토의 건강을 위해 오비탈이 조제하는 특제 비타민 젤리와 무카페인 허브 티면 족하다.",
+        "numbers": "넘버즈는 하루토를 살리기 위한 대가일 뿐. 악마의 힘이라 해도 난 기꺼이 손에 넣겠다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "zexal_char_156_mail_invite",
+          "sender": "텐조 카이토",
+          "timeSlot": "morning",
+          "spotId": "spot_heartland_city",
+          "subject": "[카이트] 통신을 수신해라.",
+          "body": "오비탈을 통해 좌표를 보냈다. 은하의 빛을 증폭시킬 듀얼 상대가 필요하다. 하트랜드 타워 옥상으로 와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "zexal_char_3304",
+      "baseCharId": 3304,
+      "displayName": "Mr. 하트랜드",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 넘버즈를 사냥하는 고독한 듀얼리스트다! 내 곁에 파트너는 필요 없다. 듀얼이라면 언제든 덤벼라!",
+      "dormOrFaction": "하트랜드 시티 듀얼리스트",
+      "partnerRole": "XyzRival",
+      "partnerSkillName": "라이벌의 오버레이",
+      "partnerSkillDesc": "하트랜드 시티에서 연마한 엑시즈 전술과 오버레이 파워로 파트너를 지원하는 Mr. 하트랜드 전용 스탯.",
+      "favoriteGiftId": "emperor_key_replica",
+      "forms": [
+        {
+          "formCharId": 3304,
+          "formName": "Mr. 하트랜드",
+          "formTitle": "Mr. 하트랜드 · 하트랜드 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_waterfront_pier"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 Mr. 하트랜드! 하트랜드의 승부사다! 덤벼라!",
+            "mid": "오, 네 엑시즈 감각 제법이군! 하지만 내 오버레이 유닛을 깰 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 쿵쾅거리게 하는군! 진검승부다!"
+          },
+          "duelStartLine": [
+            "오버레이 네트워크를 구축! 내 덱의 진정한 힘을 보여주마! 듀얼!"
+          ],
+          "aceCutInLine": [
+            "차원을 열어라! 나의 비장의 엑시즈 몬스터 소환!"
+          ],
+          "winLine": [
+            "좋았어! 완벽한 승리다!"
+          ],
+          "loseLine": [
+            "크윽... 완패다! 하지만 다음엔 내가 이긴다!"
+          ],
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_3304.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_3304.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "Mr. 하트랜드: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "Mr. 하트랜드: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "Mr. 하트랜드: 음? 선물이군. 받아두지.",
+        "hated": "Mr. 하트랜드: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "Mr. 하트랜드: 흥, 아침부터 연습인가? 내 엑시즈 파워를 따라올 수 있다면 덤벼라.",
+        "evening": "Mr. 하트랜드: 어둠이 깔렸군. 나약한 결투자는 이 도시에서 살아남지 못한다.",
+        "deckComment": "Mr. 하트랜드: 제법 날카로운 카드군을 모았군. 하지만 내 랭크 업이 한 수 위다.",
+        "duelReady": "Mr. 하트랜드: 전력으로 덤벼라! 자비 따윈 없다!",
+        "cheer": "Mr. 하트랜드: 거기서 무너지지 마라! 내 라이벌이라면 끝까지 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "xyz_duel",
+      "topicReplies": {
+        "xyz_duel": "Mr. 하트랜드: 엑시즈 소환은 서로 다른 영혼이 하나가 되는 기적이지.",
+        "heartland": "Mr. 하트랜드: 하트랜드 시티의 테마파크엔 언제나 새로운 모험이 기다리고 있어.",
+        "food": "Mr. 하트랜드: 아카리 누나의 주먹밥이나 특제 버거가 최고지!",
+        "numbers": "Mr. 하트랜드: 넘버즈의 전설... 그 거대한 운명 속에서도 우린 우리의 길을 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "zexal_char_3304_mail_invite",
+          "sender": "Mr. 하트랜드",
+          "timeSlot": "morning",
+          "spotId": "spot_heartland_city",
+          "subject": "[Mr. 하트랜드] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "zexal_char_3305",
+      "baseCharId": 3305,
+      "displayName": "야구모 쿄지",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 넘버즈를 사냥하는 고독한 듀얼리스트다! 내 곁에 파트너는 필요 없다. 듀얼이라면 언제든 덤벼라!",
+      "dormOrFaction": "하트랜드 시티 듀얼리스트",
+      "partnerRole": "XyzRival",
+      "partnerSkillName": "라이벌의 오버레이",
+      "partnerSkillDesc": "하트랜드 시티에서 연마한 엑시즈 전술과 오버레이 파워로 파트너를 지원하는 야구모 쿄지 전용 스탯.",
+      "favoriteGiftId": "emperor_key_replica",
+      "forms": [
+        {
+          "formCharId": 3305,
+          "formName": "야구모 쿄지",
+          "formTitle": "야구모 쿄지 · 하트랜드 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_heartland_city"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 야구모 쿄지! 하트랜드의 승부사다! 덤벼라!",
+            "mid": "오, 네 엑시즈 감각 제법이군! 하지만 내 오버레이 유닛을 깰 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 쿵쾅거리게 하는군! 진검승부다!"
+          },
+          "duelStartLine": [
+            "오버레이 네트워크를 구축! 내 덱의 진정한 힘을 보여주마! 듀얼!"
+          ],
+          "aceCutInLine": [
+            "차원을 열어라! 나의 비장의 엑시즈 몬스터 소환!"
+          ],
+          "winLine": [
+            "좋았어! 완벽한 승리다!"
+          ],
+          "loseLine": [
+            "크윽... 완패다! 하지만 다음엔 내가 이긴다!"
+          ],
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_3305.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_3305.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "야구모 쿄지: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "야구모 쿄지: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "야구모 쿄지: 음? 선물이군. 받아두지.",
+        "hated": "야구모 쿄지: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "야구모 쿄지: 흥, 아침부터 연습인가? 내 엑시즈 파워를 따라올 수 있다면 덤벼라.",
+        "evening": "야구모 쿄지: 어둠이 깔렸군. 나약한 결투자는 이 도시에서 살아남지 못한다.",
+        "deckComment": "야구모 쿄지: 제법 날카로운 카드군을 모았군. 하지만 내 랭크 업이 한 수 위다.",
+        "duelReady": "야구모 쿄지: 전력으로 덤벼라! 자비 따윈 없다!",
+        "cheer": "야구모 쿄지: 거기서 무너지지 마라! 내 라이벌이라면 끝까지 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "xyz_duel",
+      "topicReplies": {
+        "xyz_duel": "야구모 쿄지: 엑시즈 소환은 서로 다른 영혼이 하나가 되는 기적이지.",
+        "heartland": "야구모 쿄지: 하트랜드 시티의 테마파크엔 언제나 새로운 모험이 기다리고 있어.",
+        "food": "야구모 쿄지: 아카리 누나의 주먹밥이나 특제 버거가 최고지!",
+        "numbers": "야구모 쿄지: 넘버즈의 전설... 그 거대한 운명 속에서도 우린 우리의 길을 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "zexal_char_3305_mail_invite",
+          "sender": "야구모 쿄지",
+          "timeSlot": "morning",
+          "spotId": "spot_waterfront_pier",
+          "subject": "[야구모 쿄지] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "zexal_char_144",
+      "baseCharId": 144,
+      "displayName": "아리트",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 넘버즈를 사냥하는 고독한 듀얼리스트다! 내 곁에 파트너는 필요 없다. 듀얼이라면 언제든 덤벼라!",
+      "dormOrFaction": "하트랜드 시티 듀얼리스트",
+      "partnerRole": "XyzRival",
+      "partnerSkillName": "라이벌의 오버레이",
+      "partnerSkillDesc": "하트랜드 시티에서 연마한 엑시즈 전술과 오버레이 파워로 파트너를 지원하는 아리트 전용 스탯.",
+      "favoriteGiftId": "emperor_key_replica",
+      "forms": [
+        {
+          "formCharId": 144,
+          "formName": "아리트",
+          "formTitle": "아리트 · 하트랜드 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_yuma_house"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 아리트! 하트랜드의 승부사다! 덤벼라!",
+            "mid": "오, 네 엑시즈 감각 제법이군! 하지만 내 오버레이 유닛을 깰 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 쿵쾅거리게 하는군! 진검승부다!"
+          },
+          "duelStartLine": [
+            "오버레이 네트워크를 구축! 내 덱의 진정한 힘을 보여주마! 듀얼!"
+          ],
+          "aceCutInLine": [
+            "차원을 열어라! 나의 비장의 엑시즈 몬스터 소환!"
+          ],
+          "winLine": [
+            "좋았어! 완벽한 승리다!"
+          ],
+          "loseLine": [
+            "크윽... 완패다! 하지만 다음엔 내가 이긴다!"
+          ],
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_144.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_144.png"
+        },
+        {
+          "formCharId": 3300,
+          "formName": "아리트 (바리안체)",
+          "formTitle": "아리트 (바리안체) · 하트랜드 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_yuma_house"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 아리트 (바리안체)! 하트랜드의 승부사다! 덤벼라!",
+            "mid": "오, 네 엑시즈 감각 제법이군! 하지만 내 오버레이 유닛을 깰 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 쿵쾅거리게 하는군! 진검승부다!"
+          },
+          "duelStartLine": [
+            "오버레이 네트워크를 구축! 내 덱의 진정한 힘을 보여주마! 듀얼!"
+          ],
+          "aceCutInLine": [
+            "차원을 열어라! 나의 비장의 엑시즈 몬스터 소환!"
+          ],
+          "winLine": [
+            "좋았어! 완벽한 승리다!"
+          ],
+          "loseLine": [
+            "크윽... 완패다! 하지만 다음엔 내가 이긴다!"
+          ],
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_3300.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_3300.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "아리트: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "아리트: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "아리트: 음? 선물이군. 받아두지.",
+        "hated": "아리트: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "아리트: 흥, 아침부터 연습인가? 내 엑시즈 파워를 따라올 수 있다면 덤벼라.",
+        "evening": "아리트: 어둠이 깔렸군. 나약한 결투자는 이 도시에서 살아남지 못한다.",
+        "deckComment": "아리트: 제법 날카로운 카드군을 모았군. 하지만 내 랭크 업이 한 수 위다.",
+        "duelReady": "아리트: 전력으로 덤벼라! 자비 따윈 없다!",
+        "cheer": "아리트: 거기서 무너지지 마라! 내 라이벌이라면 끝까지 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "xyz_duel",
+      "topicReplies": {
+        "xyz_duel": "아리트: 엑시즈 소환은 서로 다른 영혼이 하나가 되는 기적이지.",
+        "heartland": "아리트: 하트랜드 시티의 테마파크엔 언제나 새로운 모험이 기다리고 있어.",
+        "food": "아리트: 아카리 누나의 주먹밥이나 특제 버거가 최고지!",
+        "numbers": "아리트: 넘버즈의 전설... 그 거대한 운명 속에서도 우린 우리의 길을 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "zexal_char_144_mail_invite",
+          "sender": "아리트",
+          "timeSlot": "morning",
+          "spotId": "spot_heartland_city",
+          "subject": "[아리트] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "zexal_char_145",
+      "baseCharId": 145,
+      "displayName": "코즈키 안나",
+      "isTagEligible": true,
+      "partnerRefusal": null,
+      "dormOrFaction": "하트랜드 시티 히로인",
+      "partnerRole": "TagHeroine",
+      "partnerSkillName": "코즈키 안나의 결속: 빙설의 엑시즈!",
+      "partnerSkillDesc": "랭크 10 초노급 포탑열차의 막강한 관통 파괴력으로 상대 라이프에 직접 번 데미지를 꽂는 화력 지원.",
+      "favoriteGiftId": "emperor_key_replica",
+      "forms": [
+        {
+          "formCharId": 145,
+          "formName": "코즈키 안나",
+          "formTitle": "코즈키 안나 · 하트랜드 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_heartland_city"
+          ],
+          "greetingLines": {
+            "low": "야! 길 비켜! 폭주 특급 코즈키 안나 님이 나가신다! 한 판 붙자고!",
+            "mid": "우하하! 네 덱 박력 장난 아닌데?! 내 초대형 열차포랑 완전 찰떡궁합이잖아!",
+            "high": "멍하니 있지 말고 빨리 내 뒤에 타! 우리 둘의 초대형 철도포로 적들을 전부 가루로 만들어버리자고-!!"
+          },
+          "duelStartLine": "비켜라 비켜! 내 슈퍼 로켓 바주카의 화력을 똑똑히 맛보여 주마!",
+          "aceCutInLine": "초노급의 파괴력으로 날려버려라! 엑시즈 소환, 초노급포탑열차 구스타프 맥스! 발포-!!",
+          "winLine": "하하하! 봤냐! 내 열차포 앞에서는 어떤 덱도 가루가 된다고!",
+          "loseLine": "끼야악- 바주카가 역류했잖아! 하지만 다음엔 열차 3연장 포격으로 갈겨줄 테다!",
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_145.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_145.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "코즈키 안나: 우하하하-! 대형 바비큐 폭탄 샌드위치랑 로켓 바주카 전용 크롬 탄피잖아?! 넌 진짜 화끈한 녀석이다, 짱이야!!",
+        "liked": "코즈키 안나: 오- 고기 샌드위치! 한입에 털어 넣어야지!",
+        "neutral": "코즈키 안나: 오냐, 선물 잘 받으마!",
+        "hated": "코즈키 안나: 켁! 뭐야 이 풀때기 샐러드는?! 토끼 사료냐?! 고기를 가져오라고, 고기를!"
+      },
+      "partnerQuotes": {
+        "morning": "우하하하! 좋은 아침이다! 내 특제 비행 로켓 바주카 배기음으로 하루를 활기차게 깨워주마!",
+        "evening": "해가 졌네! 바주카 탄피 주우러 가야 되는데, 오늘 너랑 듀얼 하느라 시간 가는 줄 몰랐잖아!",
+        "deckComment": "우오오! 네 덱, 제법 포격전의 맛을 아는 화끈한 구성인데?! 아주 내 마음에 쏙 들어!",
+        "duelReady": "비켜라 비켜! 슈퍼 드레드노트 포탑열차의 화력을 똑똑히 맛보여 주마! 전포 발사-!!",
+        "cheer": "기죽지 마! 내 레일건의 포격 지원은 아직 끝나지 않았어! 단숨에 뚫어버려!!"
+      },
+      "bondEvents": [
+        {
+          "heartLevel": 1,
+          "title": "[코즈키 안나] 첫 번째 인연: 하트랜드의 만남",
+          "dialogues": [
+            {
+              "speaker": "코즈키 안나",
+              "text": "안녕! 테마파크 광장에서 네 듀얼을 지켜봤는데 정말 두근거렸어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워! 네 엑시즈 소환 타이밍도 정말 날카롭던걸? 앞으로 잘 부탁해."
+            },
+            {
+              "speaker": "코즈키 안나",
+              "text": "응! 우리 서로를 북돋아 주는 최고의 파트너가 되어보자!"
+            }
+          ],
+          "choice": {
+            "prompt": "코즈키 안나와 함께 어떤 결의를 다질까?",
+            "options": [
+              {
+                "text": "🔥 당당하고 화려하게 상대를 압도하자! (보상 DP 1.2배)",
+                "reply": "하핫, 좋아! 그 기백 아주 마음에 드는데?",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 차분하게 오버레이 유닛을 지키며 전술을 엮자! (내 시작 LP +500)",
+                "reply": "기본이 가장 중요한 법이지. 함께 연습하자!",
+                "effectType": "SafeBuff"
+              },
+              {
+                "text": "🤝 최고의 태그 파트너가 되어줄게! (호감도 대폭 상승)",
+                "reply": "든든한걸? 앞으로 잘 부탁해, 내 파트너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 3,
+          "title": "[코즈키 안나] 세 번째 인연: 시련을 넘는 오버레이",
+          "dialogues": [
+            {
+              "speaker": "코즈키 안나",
+              "text": "수많은 강적과 싸우면서... 네가 내 등을 맡아준다는 확신이 들었어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "나도 그래. 네가 옆에 있어 주는 것만으로도 어떤 넘버즈의 어둠도 두렵지 않아."
+            },
+            {
+              "speaker": "코즈키 안나",
+              "text": "좋아! 이번 듀얼 카니발 결승전에서도 끝까지 함께 가보는 거야!"
+            }
+          ],
+          "choice": {
+            "prompt": "카니발 결승을 앞두고 어떤 전략으로 단결할까?",
+            "options": [
+              {
+                "text": "🔥 랭크업 매직! 에이스의 공격력을 한계까지 끌어올리자! (공격력 +400 버프)",
+                "reply": "정면 승부로 적을 박살내자고!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 빈틈없는 카운터와 수비로 적의 맹공을 막아내자! (내 시작 LP +1,000)",
+                "reply": "치밀한 전술이야. 완벽하게 준비하자!",
+                "effectType": "SafeBuff"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 5,
+          "title": "[코즈키 안나] 최종 인연(MASTER): 영혼으로 맺어진 결속",
+          "dialogues": [
+            {
+              "speaker": "코즈키 안나",
+              "text": "세계의 운명을 건 사투를 함께 헤쳐 나오며... 넌 내게 세상 그 누구보다 소중한 파트너가 되었어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워. 네 곁에서 싸울 수 있어서 난 진정한 넘버즈의 여왕으로 성장할 수 있었어."
+            },
+            {
+              "speaker": "코즈키 안나",
+              "text": "우리의 결속은 영원해. 하트랜드 시티의 정상에서 영광을 함께 누리자!"
+            }
+          ],
+          "choice": {
+            "prompt": "최종 마스터 승급전! 마지막 맹세를 선택하자!",
+            "options": [
+              {
+                "text": "🔥 우리의 영혼과 모든 넘버즈를 걸고 승리하자! (마스터 보상 & DP 1.5배)",
+                "reply": "우리의 기적을 온 세계에 보여주자!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🤝 영원히 함께할 소울메이트로서 승리를 증명할게! (마스터 영구 버프)",
+                "reply": "고마워, 내 최고의 영원한 파트너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        }
+      ],
+      "favoriteTopic": "xyz_duel",
+      "topicReplies": {
+        "xyz_duel": "랭크 10 엑시즈! 두 대의 열차가 하나로 합체해서 거대한 대포를 쏠 때의 쾌감이 짱이지!",
+        "heartland": "하트랜드 시티의 철도 선로는 내 전용 활주로다! 가로막는 녀석은 다 날려버릴 테다!",
+        "food": "패티 3장에 치즈 4장 얹은 메가 바비큐 폭탄 버거! 이 정도는 씹어줘야 바주카를 들 힘이 나지!",
+        "numbers": "넘버즈인지 뭔지 내 알 바냐! 방해되는 녀석은 내 열차포로 한 방에 날려버리면 그만이야!"
+      },
+      "pdaMails": [
+        {
+          "mailId": "zexal_char_145_mail_invite",
+          "sender": "코즈키 안나",
+          "timeSlot": "morning",
+          "spotId": "spot_waterfront_pier",
+          "subject": "[안나] 야! 포격 훈련 파트너 해라!",
+          "body": "우하하하! 로켓 바주카 2연장 개조 성공했다! 철도 건널목 앞으로 나와! 내 열차포의 위력을 온몸으로 맞아보라고!"
+        }
+      ],
+      "grandPrixEnding": {
+        "title": "🏆 듀얼 카니발 그랑프리 챔피언 엔딩: [코즈키 안나]와의 영원한 유대",
+        "dialogues": [
+          {
+            "speaker": "코즈키 안나",
+            "text": "우리가 해냈어... 하트랜드 듀얼 카니발의 정점에 너와 함께 서다니 꿈만 같아!"
+          },
+          {
+            "speaker": "여주인공",
+            "text": "네가 내 곁에서 등을 지켜주었기 때문에 승리할 수 있었어. 고마워, 최고의 파트너!"
+          },
+          {
+            "speaker": "코즈키 안나",
+            "text": "이 우승 트로피와 우리의 카드는 영원한 유대의 증표야. 앞으로도 언제나 함께하자!"
+          }
+        ]
+      }
+    },
+    {
+      "personaId": "zexal_char_146",
+      "baseCharId": 146,
+      "displayName": "아스트랄",
+      "isTagEligible": false,
+      "partnerRefusal": "관측 결과, 나의 파트너는 오직 유우마 한 명뿐이다. 하지만 너의 듀얼 알고리즘은 흥미롭군. 승부를 청한다.",
+      "dormOrFaction": "하트랜드 시티 듀얼리스트",
+      "partnerRole": "XyzRival",
+      "partnerSkillName": "라이벌의 오버레이",
+      "partnerSkillDesc": "하트랜드 시티에서 연마한 엑시즈 전술과 오버레이 파워로 파트너를 지원하는 아스트랄 전용 스탯.",
+      "favoriteGiftId": "emperor_key_replica",
+      "forms": [
+        {
+          "formCharId": 146,
+          "formName": "아스트랄",
+          "formTitle": "아스트랄 · 하트랜드 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_waterfront_pier"
+          ],
+          "greetingLines": {
+            "low": "관측 개시. 너의 듀얼 알고리즘과 카드의 결속을 정밀하게 분석하겠다.",
+            "mid": "너와의 듀얼을 거듭할수록... 내 잃어버린 기억의 조각들이 따뜻한 빛을 되찾고 있다.",
+            "high": "너의 순수한 영혼은 아스트랄 세계의 기적과도 닮아있군. 진검승부를 청한다."
+          },
+          "duelStartLine": "승리를 위한 3가지 전술을 실행한다. 듀얼 개시.",
+          "aceCutInLine": "희망의 빛이여, 새로운 미래를 개척하라! CNo.39 유토피아 레이!",
+          "winLine": "관측 완료. 계산을 뛰어넘는 결속이 승리를 이끌어냈다.",
+          "loseLine": "예상 밖의 결과다... 하지만 너의 창조적인 플레이에서 소중한 데이터를 얻었다.",
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_146.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_146.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "아스트랄: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "아스트랄: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "아스트랄: 음? 선물이군. 받아두지.",
+        "hated": "아스트랄: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "아스트랄: 흥, 아침부터 연습인가? 내 엑시즈 파워를 따라올 수 있다면 덤벼라.",
+        "evening": "아스트랄: 어둠이 깔렸군. 나약한 결투자는 이 도시에서 살아남지 못한다.",
+        "deckComment": "아스트랄: 제법 날카로운 카드군을 모았군. 하지만 내 랭크 업이 한 수 위다.",
+        "duelReady": "아스트랄: 전력으로 덤벼라! 자비 따윈 없다!",
+        "cheer": "아스트랄: 거기서 무너지지 마라! 내 라이벌이라면 끝까지 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "xyz_duel",
+      "topicReplies": {
+        "xyz_duel": "아스트랄: 엑시즈 소환은 서로 다른 영혼이 하나가 되는 기적이지.",
+        "heartland": "아스트랄: 하트랜드 시티의 테마파크엔 언제나 새로운 모험이 기다리고 있어.",
+        "food": "아스트랄: 아카리 누나의 주먹밥이나 특제 버거가 최고지!",
+        "numbers": "아스트랄: 넘버즈의 전설... 그 거대한 운명 속에서도 우린 우리의 길을 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "zexal_char_146_mail_invite",
+          "sender": "아스트랄",
+          "timeSlot": "morning",
+          "spotId": "spot_heartland_city",
+          "subject": "[아스트랄] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "zexal_char_147",
+      "baseCharId": 147,
+      "displayName": "타케다 테츠오",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 넘버즈를 사냥하는 고독한 듀얼리스트다! 내 곁에 파트너는 필요 없다. 듀얼이라면 언제든 덤벼라!",
+      "dormOrFaction": "하트랜드 시티 듀얼리스트",
+      "partnerRole": "XyzRival",
+      "partnerSkillName": "라이벌의 오버레이",
+      "partnerSkillDesc": "하트랜드 시티에서 연마한 엑시즈 전술과 오버레이 파워로 파트너를 지원하는 타케다 테츠오 전용 스탯.",
+      "favoriteGiftId": "emperor_key_replica",
+      "forms": [
+        {
+          "formCharId": 147,
+          "formName": "타케다 테츠오",
+          "formTitle": "타케다 테츠오 · 하트랜드 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_heartland_city"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 타케다 테츠오! 하트랜드의 승부사다! 덤벼라!",
+            "mid": "오, 네 엑시즈 감각 제법이군! 하지만 내 오버레이 유닛을 깰 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 쿵쾅거리게 하는군! 진검승부다!"
+          },
+          "duelStartLine": [
+            "오버레이 네트워크를 구축! 내 덱의 진정한 힘을 보여주마! 듀얼!"
+          ],
+          "aceCutInLine": [
+            "차원을 열어라! 나의 비장의 엑시즈 몬스터 소환!"
+          ],
+          "winLine": [
+            "좋았어! 완벽한 승리다!"
+          ],
+          "loseLine": [
+            "크윽... 완패다! 하지만 다음엔 내가 이긴다!"
+          ],
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_147.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_147.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "타케다 테츠오: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "타케다 테츠오: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "타케다 테츠오: 음? 선물이군. 받아두지.",
+        "hated": "타케다 테츠오: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "타케다 테츠오: 흥, 아침부터 연습인가? 내 엑시즈 파워를 따라올 수 있다면 덤벼라.",
+        "evening": "타케다 테츠오: 어둠이 깔렸군. 나약한 결투자는 이 도시에서 살아남지 못한다.",
+        "deckComment": "타케다 테츠오: 제법 날카로운 카드군을 모았군. 하지만 내 랭크 업이 한 수 위다.",
+        "duelReady": "타케다 테츠오: 전력으로 덤벼라! 자비 따윈 없다!",
+        "cheer": "타케다 테츠오: 거기서 무너지지 마라! 내 라이벌이라면 끝까지 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "xyz_duel",
+      "topicReplies": {
+        "xyz_duel": "타케다 테츠오: 엑시즈 소환은 서로 다른 영혼이 하나가 되는 기적이지.",
+        "heartland": "타케다 테츠오: 하트랜드 시티의 테마파크엔 언제나 새로운 모험이 기다리고 있어.",
+        "food": "타케다 테츠오: 아카리 누나의 주먹밥이나 특제 버거가 최고지!",
+        "numbers": "타케다 테츠오: 넘버즈의 전설... 그 거대한 운명 속에서도 우린 우리의 길을 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "zexal_char_147_mail_invite",
+          "sender": "타케다 테츠오",
+          "timeSlot": "morning",
+          "spotId": "spot_waterfront_pier",
+          "subject": "[타케다 테츠오] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "zexal_char_148",
+      "baseCharId": 148,
+      "displayName": "캐시",
+      "isTagEligible": true,
+      "partnerRefusal": null,
+      "dormOrFaction": "하트랜드 시티 히로인",
+      "partnerRole": "TagHeroine",
+      "partnerSkillName": "캐시의 결속: 빙설의 엑시즈!",
+      "partnerSkillDesc": "하트랜드 시티에서 연마한 엑시즈 전술과 오버레이 파워로 파트너를 지원하는 캐시 전용 스탯.",
+      "favoriteGiftId": "emperor_key_replica",
+      "forms": [
+        {
+          "formCharId": 148,
+          "formName": "캐시",
+          "formTitle": "캐시 · 하트랜드 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_yuma_house"
+          ],
+          "greetingLines": {
+            "low": "냐앙~? 난 캐시라냥! 유마 말고 내 고양이 덱에 관심 가진 사람은 네가 처음이다냥!",
+            "mid": "골골골... 네 옆에 있으면 기분이 포근포근해진다냥! 생선 샌드위치 먹으러 가자냥!",
+            "high": "냐아앗! 넌 내 최고의 소울메이트 집사... 아니 파트너다냥! 평생 내 곁에 있어줘냥!"
+          },
+          "duelStartLine": "발톱을 세우고 돌격이다냥! 캣 듀얼 개시다냥!",
+          "aceCutInLine": "야옹~ 나와라냥! 캣 걸 & 캣 킹, 날카로운 할퀴기 공격이다냥!",
+          "winLine": "냐하하! 완벽한 고양이의 승리다냥! 간식 내놓으라냥!",
+          "loseLine": "냐앙... 꼬리가 밟혔다냥... 하지만 냥이는 9개의 목숨이 있다냥!",
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_148.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_148.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "캐시: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "캐시: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "캐시: 음? 선물이군. 받아두지.",
+        "hated": "캐시: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "캐시: 좋은 아침이야! 오늘도 하트랜드 시티에서 즐겁게 듀얼 해보자!",
+        "evening": "캐시: 벌써 별이 떴네. 오늘 너랑 나눈 듀얼, 정말 잊지 못할 거야.",
+        "deckComment": "캐시: 네 덱은 볼 때마다 엑시즈 연계가 끈끈해서 든든해!",
+        "duelReady": "캐시: 준비 완료야! 우리 둘의 오버레이 유대를 보여주자고!",
+        "cheer": "캐시: 포기하지 마! 아직 네 오버레이 유닛이 남아있어!"
+      },
+      "bondEvents": [
+        {
+          "heartLevel": 1,
+          "title": "[캐시] 첫 번째 인연: 하트랜드의 만남",
+          "dialogues": [
+            {
+              "speaker": "캐시",
+              "text": "안녕! 테마파크 광장에서 네 듀얼을 지켜봤는데 정말 두근거렸어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워! 네 엑시즈 소환 타이밍도 정말 날카롭던걸? 앞으로 잘 부탁해."
+            },
+            {
+              "speaker": "캐시",
+              "text": "응! 우리 서로를 북돋아 주는 최고의 파트너가 되어보자!"
+            }
+          ],
+          "choice": {
+            "prompt": "캐시와 함께 어떤 결의를 다질까?",
+            "options": [
+              {
+                "text": "🔥 당당하고 화려하게 상대를 압도하자! (보상 DP 1.2배)",
+                "reply": "하핫, 좋아! 그 기백 아주 마음에 드는데?",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 차분하게 오버레이 유닛을 지키며 전술을 엮자! (내 시작 LP +500)",
+                "reply": "기본이 가장 중요한 법이지. 함께 연습하자!",
+                "effectType": "SafeBuff"
+              },
+              {
+                "text": "🤝 최고의 태그 파트너가 되어줄게! (호감도 대폭 상승)",
+                "reply": "든든한걸? 앞으로 잘 부탁해, 내 파트너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 3,
+          "title": "[캐시] 세 번째 인연: 시련을 넘는 오버레이",
+          "dialogues": [
+            {
+              "speaker": "캐시",
+              "text": "수많은 강적과 싸우면서... 네가 내 등을 맡아준다는 확신이 들었어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "나도 그래. 네가 옆에 있어 주는 것만으로도 어떤 넘버즈의 어둠도 두렵지 않아."
+            },
+            {
+              "speaker": "캐시",
+              "text": "좋아! 이번 듀얼 카니발 결승전에서도 끝까지 함께 가보는 거야!"
+            }
+          ],
+          "choice": {
+            "prompt": "카니발 결승을 앞두고 어떤 전략으로 단결할까?",
+            "options": [
+              {
+                "text": "🔥 랭크업 매직! 에이스의 공격력을 한계까지 끌어올리자! (공격력 +400 버프)",
+                "reply": "정면 승부로 적을 박살내자고!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 빈틈없는 카운터와 수비로 적의 맹공을 막아내자! (내 시작 LP +1,000)",
+                "reply": "치밀한 전술이야. 완벽하게 준비하자!",
+                "effectType": "SafeBuff"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 5,
+          "title": "[캐시] 최종 인연(MASTER): 영혼으로 맺어진 결속",
+          "dialogues": [
+            {
+              "speaker": "캐시",
+              "text": "세계의 운명을 건 사투를 함께 헤쳐 나오며... 넌 내게 세상 그 누구보다 소중한 파트너가 되었어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워. 네 곁에서 싸울 수 있어서 난 진정한 넘버즈의 여왕으로 성장할 수 있었어."
+            },
+            {
+              "speaker": "캐시",
+              "text": "우리의 결속은 영원해. 하트랜드 시티의 정상에서 영광을 함께 누리자!"
+            }
+          ],
+          "choice": {
+            "prompt": "최종 마스터 승급전! 마지막 맹세를 선택하자!",
+            "options": [
+              {
+                "text": "🔥 우리의 영혼과 모든 넘버즈를 걸고 승리하자! (마스터 보상 & DP 1.5배)",
+                "reply": "우리의 기적을 온 세계에 보여주자!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🤝 영원히 함께할 소울메이트로서 승리를 증명할게! (마스터 영구 버프)",
+                "reply": "고마워, 내 최고의 영원한 파트너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        }
+      ],
+      "favoriteTopic": "xyz_duel",
+      "topicReplies": {
+        "xyz_duel": "캐시: 엑시즈 소환은 서로 다른 영혼이 하나가 되는 기적이지.",
+        "heartland": "캐시: 하트랜드 시티의 테마파크엔 언제나 새로운 모험이 기다리고 있어.",
+        "food": "캐시: 아카리 누나의 주먹밥이나 특제 버거가 최고지!",
+        "numbers": "캐시: 넘버즈의 전설... 그 거대한 운명 속에서도 우린 우리의 길을 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "zexal_char_148_mail_invite",
+          "sender": "캐시",
+          "timeSlot": "morning",
+          "spotId": "spot_heartland_city",
+          "subject": "[캐시] 오늘 잠깐 만날 수 있을까?",
+          "body": "안녕! 오늘 날씨가 참 좋아서 너랑 같이 듀얼 연습도 하고 바람도 쐬고 싶어. 시간 되면 편할 때 들러줘!"
+        }
+      ],
+      "grandPrixEnding": {
+        "title": "🏆 듀얼 카니발 그랑프리 챔피언 엔딩: [캐시]와의 영원한 유대",
+        "dialogues": [
+          {
+            "speaker": "캐시",
+            "text": "우리가 해냈어... 하트랜드 듀얼 카니발의 정점에 너와 함께 서다니 꿈만 같아!"
+          },
+          {
+            "speaker": "여주인공",
+            "text": "네가 내 곁에서 등을 지켜주었기 때문에 승리할 수 있었어. 고마워, 최고의 파트너!"
+          },
+          {
+            "speaker": "캐시",
+            "text": "이 우승 트로피와 우리의 카드는 영원한 유대의 증표야. 앞으로도 언제나 함께하자!"
+          }
+        ]
+      }
+    },
+    {
+      "personaId": "zexal_char_149",
+      "baseCharId": 149,
+      "displayName": "드로와",
+      "isTagEligible": true,
+      "partnerRefusal": null,
+      "dormOrFaction": "하트랜드 시티 히로인",
+      "partnerRole": "TagHeroine",
+      "partnerSkillName": "드로와의 결속: 빙설의 엑시즈!",
+      "partnerSkillDesc": "하트랜드 시티에서 연마한 엑시즈 전술과 오버레이 파워로 파트너를 지원하는 드로와 전용 스탯.",
+      "favoriteGiftId": "emperor_key_replica",
+      "forms": [
+        {
+          "formCharId": 149,
+          "formName": "드로와",
+          "formTitle": "드로와 · 하트랜드 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_waterfront_pier"
+          ],
+          "greetingLines": {
+            "low": "안녕! 난 드로와! 하트랜드 시티에서 엑시즈를 연마하고 있어. 한 판 겨뤄볼까?",
+            "mid": "와, 당신의 엑시즈 소환은 볼 때마다 정말 멋져요! 저도 온 힘을 다해 서포트할게요!",
+            "high": "당신 옆에서 함께 엑시즈를 부를 수 있어서 정말 행복해요! 우리 둘의 오버레이는 영원해요!"
+          },
+          "duelStartLine": "제 덱의 진심을 보여드릴게요! 듀얼 시작이에요!",
+          "aceCutInLine": "오버레이 네트워크 구축! 제 소중한 에이스 엑시즈 소환!",
+          "winLine": "해냈어요! 끝까지 카드를 믿은 덕분이에요!",
+          "loseLine": "아쉽지만 정말 즐거운 듀얼이었어요! 다음엔 더 성장해서 도전할게요!",
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_149.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_149.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "드로와: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "드로와: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "드로와: 음? 선물이군. 받아두지.",
+        "hated": "드로와: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "드로와: 좋은 아침이야! 오늘도 하트랜드 시티에서 즐겁게 듀얼 해보자!",
+        "evening": "드로와: 벌써 별이 떴네. 오늘 너랑 나눈 듀얼, 정말 잊지 못할 거야.",
+        "deckComment": "드로와: 네 덱은 볼 때마다 엑시즈 연계가 끈끈해서 든든해!",
+        "duelReady": "드로와: 준비 완료야! 우리 둘의 오버레이 유대를 보여주자고!",
+        "cheer": "드로와: 포기하지 마! 아직 네 오버레이 유닛이 남아있어!"
+      },
+      "bondEvents": [
+        {
+          "heartLevel": 1,
+          "title": "[드로와] 첫 번째 인연: 하트랜드의 만남",
+          "dialogues": [
+            {
+              "speaker": "드로와",
+              "text": "안녕! 테마파크 광장에서 네 듀얼을 지켜봤는데 정말 두근거렸어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워! 네 엑시즈 소환 타이밍도 정말 날카롭던걸? 앞으로 잘 부탁해."
+            },
+            {
+              "speaker": "드로와",
+              "text": "응! 우리 서로를 북돋아 주는 최고의 파트너가 되어보자!"
+            }
+          ],
+          "choice": {
+            "prompt": "드로와와 함께 어떤 결의를 다질까?",
+            "options": [
+              {
+                "text": "🔥 당당하고 화려하게 상대를 압도하자! (보상 DP 1.2배)",
+                "reply": "하핫, 좋아! 그 기백 아주 마음에 드는데?",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 차분하게 오버레이 유닛을 지키며 전술을 엮자! (내 시작 LP +500)",
+                "reply": "기본이 가장 중요한 법이지. 함께 연습하자!",
+                "effectType": "SafeBuff"
+              },
+              {
+                "text": "🤝 최고의 태그 파트너가 되어줄게! (호감도 대폭 상승)",
+                "reply": "든든한걸? 앞으로 잘 부탁해, 내 파트너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 3,
+          "title": "[드로와] 세 번째 인연: 시련을 넘는 오버레이",
+          "dialogues": [
+            {
+              "speaker": "드로와",
+              "text": "수많은 강적과 싸우면서... 네가 내 등을 맡아준다는 확신이 들었어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "나도 그래. 네가 옆에 있어 주는 것만으로도 어떤 넘버즈의 어둠도 두렵지 않아."
+            },
+            {
+              "speaker": "드로와",
+              "text": "좋아! 이번 듀얼 카니발 결승전에서도 끝까지 함께 가보는 거야!"
+            }
+          ],
+          "choice": {
+            "prompt": "카니발 결승을 앞두고 어떤 전략으로 단결할까?",
+            "options": [
+              {
+                "text": "🔥 랭크업 매직! 에이스의 공격력을 한계까지 끌어올리자! (공격력 +400 버프)",
+                "reply": "정면 승부로 적을 박살내자고!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 빈틈없는 카운터와 수비로 적의 맹공을 막아내자! (내 시작 LP +1,000)",
+                "reply": "치밀한 전술이야. 완벽하게 준비하자!",
+                "effectType": "SafeBuff"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 5,
+          "title": "[드로와] 최종 인연(MASTER): 영혼으로 맺어진 결속",
+          "dialogues": [
+            {
+              "speaker": "드로와",
+              "text": "세계의 운명을 건 사투를 함께 헤쳐 나오며... 넌 내게 세상 그 누구보다 소중한 파트너가 되었어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워. 네 곁에서 싸울 수 있어서 난 진정한 넘버즈의 여왕으로 성장할 수 있었어."
+            },
+            {
+              "speaker": "드로와",
+              "text": "우리의 결속은 영원해. 하트랜드 시티의 정상에서 영광을 함께 누리자!"
+            }
+          ],
+          "choice": {
+            "prompt": "최종 마스터 승급전! 마지막 맹세를 선택하자!",
+            "options": [
+              {
+                "text": "🔥 우리의 영혼과 모든 넘버즈를 걸고 승리하자! (마스터 보상 & DP 1.5배)",
+                "reply": "우리의 기적을 온 세계에 보여주자!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🤝 영원히 함께할 소울메이트로서 승리를 증명할게! (마스터 영구 버프)",
+                "reply": "고마워, 내 최고의 영원한 파트너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        }
+      ],
+      "favoriteTopic": "xyz_duel",
+      "topicReplies": {
+        "xyz_duel": "드로와: 엑시즈 소환은 서로 다른 영혼이 하나가 되는 기적이지.",
+        "heartland": "드로와: 하트랜드 시티의 테마파크엔 언제나 새로운 모험이 기다리고 있어.",
+        "food": "드로와: 아카리 누나의 주먹밥이나 특제 버거가 최고지!",
+        "numbers": "드로와: 넘버즈의 전설... 그 거대한 운명 속에서도 우린 우리의 길을 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "zexal_char_149_mail_invite",
+          "sender": "드로와",
+          "timeSlot": "morning",
+          "spotId": "spot_waterfront_pier",
+          "subject": "[드로와] 오늘 잠깐 만날 수 있을까?",
+          "body": "안녕! 오늘 날씨가 참 좋아서 너랑 같이 듀얼 연습도 하고 바람도 쐬고 싶어. 시간 되면 편할 때 들러줘!"
+        }
+      ],
+      "grandPrixEnding": {
+        "title": "🏆 듀얼 카니발 그랑프리 챔피언 엔딩: [드로와]와의 영원한 유대",
+        "dialogues": [
+          {
+            "speaker": "드로와",
+            "text": "우리가 해냈어... 하트랜드 듀얼 카니발의 정점에 너와 함께 서다니 꿈만 같아!"
+          },
+          {
+            "speaker": "여주인공",
+            "text": "네가 내 곁에서 등을 지켜주었기 때문에 승리할 수 있었어. 고마워, 최고의 파트너!"
+          },
+          {
+            "speaker": "드로와",
+            "text": "이 우승 트로피와 우리의 카드는 영원한 유대의 증표야. 앞으로도 언제나 함께하자!"
+          }
+        ]
+      }
+    },
+    {
+      "personaId": "zexal_char_150",
+      "baseCharId": 150,
+      "displayName": "돈 사우전드",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 넘버즈를 사냥하는 고독한 듀얼리스트다! 내 곁에 파트너는 필요 없다. 듀얼이라면 언제든 덤벼라!",
+      "dormOrFaction": "하트랜드 시티 듀얼리스트",
+      "partnerRole": "XyzRival",
+      "partnerSkillName": "라이벌의 오버레이",
+      "partnerSkillDesc": "하트랜드 시티에서 연마한 엑시즈 전술과 오버레이 파워로 파트너를 지원하는 돈 사우전드 전용 스탯.",
+      "favoriteGiftId": "emperor_key_replica",
+      "forms": [
+        {
+          "formCharId": 150,
+          "formName": "돈 사우전드",
+          "formTitle": "돈 사우전드 · 하트랜드 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_yuma_house"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 돈 사우전드! 하트랜드의 승부사다! 덤벼라!",
+            "mid": "오, 네 엑시즈 감각 제법이군! 하지만 내 오버레이 유닛을 깰 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 쿵쾅거리게 하는군! 진검승부다!"
+          },
+          "duelStartLine": [
+            "오버레이 네트워크를 구축! 내 덱의 진정한 힘을 보여주마! 듀얼!"
+          ],
+          "aceCutInLine": [
+            "차원을 열어라! 나의 비장의 엑시즈 몬스터 소환!"
+          ],
+          "winLine": [
+            "좋았어! 완벽한 승리다!"
+          ],
+          "loseLine": [
+            "크윽... 완패다! 하지만 다음엔 내가 이긴다!"
+          ],
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_150.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_150.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "돈 사우전드: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "돈 사우전드: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "돈 사우전드: 음? 선물이군. 받아두지.",
+        "hated": "돈 사우전드: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "돈 사우전드: 흥, 아침부터 연습인가? 내 엑시즈 파워를 따라올 수 있다면 덤벼라.",
+        "evening": "돈 사우전드: 어둠이 깔렸군. 나약한 결투자는 이 도시에서 살아남지 못한다.",
+        "deckComment": "돈 사우전드: 제법 날카로운 카드군을 모았군. 하지만 내 랭크 업이 한 수 위다.",
+        "duelReady": "돈 사우전드: 전력으로 덤벼라! 자비 따윈 없다!",
+        "cheer": "돈 사우전드: 거기서 무너지지 마라! 내 라이벌이라면 끝까지 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "xyz_duel",
+      "topicReplies": {
+        "xyz_duel": "돈 사우전드: 엑시즈 소환은 서로 다른 영혼이 하나가 되는 기적이지.",
+        "heartland": "돈 사우전드: 하트랜드 시티의 테마파크엔 언제나 새로운 모험이 기다리고 있어.",
+        "food": "돈 사우전드: 아카리 누나의 주먹밥이나 특제 버거가 최고지!",
+        "numbers": "돈 사우전드: 넘버즈의 전설... 그 거대한 운명 속에서도 우린 우리의 길을 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "zexal_char_150_mail_invite",
+          "sender": "돈 사우전드",
+          "timeSlot": "morning",
+          "spotId": "spot_heartland_city",
+          "subject": "[돈 사우전드] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "zexal_char_151",
+      "baseCharId": 151,
+      "displayName": "Dr. 페이커",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 넘버즈를 사냥하는 고독한 듀얼리스트다! 내 곁에 파트너는 필요 없다. 듀얼이라면 언제든 덤벼라!",
+      "dormOrFaction": "하트랜드 시티 듀얼리스트",
+      "partnerRole": "XyzRival",
+      "partnerSkillName": "라이벌의 오버레이",
+      "partnerSkillDesc": "하트랜드 시티에서 연마한 엑시즈 전술과 오버레이 파워로 파트너를 지원하는 Dr. 페이커 전용 스탯.",
+      "favoriteGiftId": "emperor_key_replica",
+      "forms": [
+        {
+          "formCharId": 151,
+          "formName": "Dr. 페이커",
+          "formTitle": "Dr. 페이커 · 하트랜드 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_waterfront_pier"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 Dr. 페이커! 하트랜드의 승부사다! 덤벼라!",
+            "mid": "오, 네 엑시즈 감각 제법이군! 하지만 내 오버레이 유닛을 깰 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 쿵쾅거리게 하는군! 진검승부다!"
+          },
+          "duelStartLine": [
+            "오버레이 네트워크를 구축! 내 덱의 진정한 힘을 보여주마! 듀얼!"
+          ],
+          "aceCutInLine": [
+            "차원을 열어라! 나의 비장의 엑시즈 몬스터 소환!"
+          ],
+          "winLine": [
+            "좋았어! 완벽한 승리다!"
+          ],
+          "loseLine": [
+            "크윽... 완패다! 하지만 다음엔 내가 이긴다!"
+          ],
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_151.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_151.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "Dr. 페이커: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "Dr. 페이커: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "Dr. 페이커: 음? 선물이군. 받아두지.",
+        "hated": "Dr. 페이커: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "Dr. 페이커: 흥, 아침부터 연습인가? 내 엑시즈 파워를 따라올 수 있다면 덤벼라.",
+        "evening": "Dr. 페이커: 어둠이 깔렸군. 나약한 결투자는 이 도시에서 살아남지 못한다.",
+        "deckComment": "Dr. 페이커: 제법 날카로운 카드군을 모았군. 하지만 내 랭크 업이 한 수 위다.",
+        "duelReady": "Dr. 페이커: 전력으로 덤벼라! 자비 따윈 없다!",
+        "cheer": "Dr. 페이커: 거기서 무너지지 마라! 내 라이벌이라면 끝까지 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "xyz_duel",
+      "topicReplies": {
+        "xyz_duel": "Dr. 페이커: 엑시즈 소환은 서로 다른 영혼이 하나가 되는 기적이지.",
+        "heartland": "Dr. 페이커: 하트랜드 시티의 테마파크엔 언제나 새로운 모험이 기다리고 있어.",
+        "food": "Dr. 페이커: 아카리 누나의 주먹밥이나 특제 버거가 최고지!",
+        "numbers": "Dr. 페이커: 넘버즈의 전설... 그 거대한 운명 속에서도 우린 우리의 길을 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "zexal_char_151_mail_invite",
+          "sender": "Dr. 페이커",
+          "timeSlot": "morning",
+          "spotId": "spot_waterfront_pier",
+          "subject": "[Dr. 페이커] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "zexal_char_152",
+      "baseCharId": 152,
+      "displayName": "도르베",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 넘버즈를 사냥하는 고독한 듀얼리스트다! 내 곁에 파트너는 필요 없다. 듀얼이라면 언제든 덤벼라!",
+      "dormOrFaction": "하트랜드 시티 듀얼리스트",
+      "partnerRole": "XyzRival",
+      "partnerSkillName": "라이벌의 오버레이",
+      "partnerSkillDesc": "하트랜드 시티에서 연마한 엑시즈 전술과 오버레이 파워로 파트너를 지원하는 도르베 전용 스탯.",
+      "favoriteGiftId": "emperor_key_replica",
+      "forms": [
+        {
+          "formCharId": 152,
+          "formName": "도르베",
+          "formTitle": "도르베 · 하트랜드 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_heartland_city"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 도르베! 하트랜드의 승부사다! 덤벼라!",
+            "mid": "오, 네 엑시즈 감각 제법이군! 하지만 내 오버레이 유닛을 깰 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 쿵쾅거리게 하는군! 진검승부다!"
+          },
+          "duelStartLine": [
+            "오버레이 네트워크를 구축! 내 덱의 진정한 힘을 보여주마! 듀얼!"
+          ],
+          "aceCutInLine": [
+            "차원을 열어라! 나의 비장의 엑시즈 몬스터 소환!"
+          ],
+          "winLine": [
+            "좋았어! 완벽한 승리다!"
+          ],
+          "loseLine": [
+            "크윽... 완패다! 하지만 다음엔 내가 이긴다!"
+          ],
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_152.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_152.png"
+        },
+        {
+          "formCharId": 3301,
+          "formName": "도르베 (바리안체)",
+          "formTitle": "도르베 (바리안체) · 하트랜드 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_heartland_city"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 도르베 (바리안체)! 하트랜드의 승부사다! 덤벼라!",
+            "mid": "오, 네 엑시즈 감각 제법이군! 하지만 내 오버레이 유닛을 깰 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 쿵쾅거리게 하는군! 진검승부다!"
+          },
+          "duelStartLine": [
+            "오버레이 네트워크를 구축! 내 덱의 진정한 힘을 보여주마! 듀얼!"
+          ],
+          "aceCutInLine": [
+            "차원을 열어라! 나의 비장의 엑시즈 몬스터 소환!"
+          ],
+          "winLine": [
+            "좋았어! 완벽한 승리다!"
+          ],
+          "loseLine": [
+            "크윽... 완패다! 하지만 다음엔 내가 이긴다!"
+          ],
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_3301.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_3301.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "도르베: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "도르베: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "도르베: 음? 선물이군. 받아두지.",
+        "hated": "도르베: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "도르베: 흥, 아침부터 연습인가? 내 엑시즈 파워를 따라올 수 있다면 덤벼라.",
+        "evening": "도르베: 어둠이 깔렸군. 나약한 결투자는 이 도시에서 살아남지 못한다.",
+        "deckComment": "도르베: 제법 날카로운 카드군을 모았군. 하지만 내 랭크 업이 한 수 위다.",
+        "duelReady": "도르베: 전력으로 덤벼라! 자비 따윈 없다!",
+        "cheer": "도르베: 거기서 무너지지 마라! 내 라이벌이라면 끝까지 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "xyz_duel",
+      "topicReplies": {
+        "xyz_duel": "도르베: 엑시즈 소환은 서로 다른 영혼이 하나가 되는 기적이지.",
+        "heartland": "도르베: 하트랜드 시티의 테마파크엔 언제나 새로운 모험이 기다리고 있어.",
+        "food": "도르베: 아카리 누나의 주먹밥이나 특제 버거가 최고지!",
+        "numbers": "도르베: 넘버즈의 전설... 그 거대한 운명 속에서도 우린 우리의 길을 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "zexal_char_152_mail_invite",
+          "sender": "도르베",
+          "timeSlot": "morning",
+          "spotId": "spot_heartland_city",
+          "subject": "[도르베] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "zexal_char_153",
+      "baseCharId": 153,
+      "displayName": "토쿠노스케",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 넘버즈를 사냥하는 고독한 듀얼리스트다! 내 곁에 파트너는 필요 없다. 듀얼이라면 언제든 덤벼라!",
+      "dormOrFaction": "하트랜드 시티 듀얼리스트",
+      "partnerRole": "XyzRival",
+      "partnerSkillName": "라이벌의 오버레이",
+      "partnerSkillDesc": "하트랜드 시티에서 연마한 엑시즈 전술과 오버레이 파워로 파트너를 지원하는 토쿠노스케 전용 스탯.",
+      "favoriteGiftId": "emperor_key_replica",
+      "forms": [
+        {
+          "formCharId": 153,
+          "formName": "토쿠노스케",
+          "formTitle": "토쿠노스케 · 하트랜드 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_yuma_house"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 토쿠노스케! 하트랜드의 승부사다! 덤벼라!",
+            "mid": "오, 네 엑시즈 감각 제법이군! 하지만 내 오버레이 유닛을 깰 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 쿵쾅거리게 하는군! 진검승부다!"
+          },
+          "duelStartLine": [
+            "오버레이 네트워크를 구축! 내 덱의 진정한 힘을 보여주마! 듀얼!"
+          ],
+          "aceCutInLine": [
+            "차원을 열어라! 나의 비장의 엑시즈 몬스터 소환!"
+          ],
+          "winLine": [
+            "좋았어! 완벽한 승리다!"
+          ],
+          "loseLine": [
+            "크윽... 완패다! 하지만 다음엔 내가 이긴다!"
+          ],
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_153.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_153.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "토쿠노스케: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "토쿠노스케: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "토쿠노스케: 음? 선물이군. 받아두지.",
+        "hated": "토쿠노스케: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "토쿠노스케: 흥, 아침부터 연습인가? 내 엑시즈 파워를 따라올 수 있다면 덤벼라.",
+        "evening": "토쿠노스케: 어둠이 깔렸군. 나약한 결투자는 이 도시에서 살아남지 못한다.",
+        "deckComment": "토쿠노스케: 제법 날카로운 카드군을 모았군. 하지만 내 랭크 업이 한 수 위다.",
+        "duelReady": "토쿠노스케: 전력으로 덤벼라! 자비 따윈 없다!",
+        "cheer": "토쿠노스케: 거기서 무너지지 마라! 내 라이벌이라면 끝까지 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "xyz_duel",
+      "topicReplies": {
+        "xyz_duel": "토쿠노스케: 엑시즈 소환은 서로 다른 영혼이 하나가 되는 기적이지.",
+        "heartland": "토쿠노스케: 하트랜드 시티의 테마파크엔 언제나 새로운 모험이 기다리고 있어.",
+        "food": "토쿠노스케: 아카리 누나의 주먹밥이나 특제 버거가 최고지!",
+        "numbers": "토쿠노스케: 넘버즈의 전설... 그 거대한 운명 속에서도 우린 우리의 길을 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "zexal_char_153_mail_invite",
+          "sender": "토쿠노스케",
+          "timeSlot": "morning",
+          "spotId": "spot_waterfront_pier",
+          "subject": "[토쿠노스케] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "zexal_char_154",
+      "baseCharId": 154,
+      "displayName": "기라그",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 넘버즈를 사냥하는 고독한 듀얼리스트다! 내 곁에 파트너는 필요 없다. 듀얼이라면 언제든 덤벼라!",
+      "dormOrFaction": "하트랜드 시티 듀얼리스트",
+      "partnerRole": "XyzRival",
+      "partnerSkillName": "라이벌의 오버레이",
+      "partnerSkillDesc": "하트랜드 시티에서 연마한 엑시즈 전술과 오버레이 파워로 파트너를 지원하는 기라그 전용 스탯.",
+      "favoriteGiftId": "emperor_key_replica",
+      "forms": [
+        {
+          "formCharId": 154,
+          "formName": "기라그",
+          "formTitle": "기라그 · 하트랜드 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_waterfront_pier"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 기라그! 하트랜드의 승부사다! 덤벼라!",
+            "mid": "오, 네 엑시즈 감각 제법이군! 하지만 내 오버레이 유닛을 깰 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 쿵쾅거리게 하는군! 진검승부다!"
+          },
+          "duelStartLine": [
+            "오버레이 네트워크를 구축! 내 덱의 진정한 힘을 보여주마! 듀얼!"
+          ],
+          "aceCutInLine": [
+            "차원을 열어라! 나의 비장의 엑시즈 몬스터 소환!"
+          ],
+          "winLine": [
+            "좋았어! 완벽한 승리다!"
+          ],
+          "loseLine": [
+            "크윽... 완패다! 하지만 다음엔 내가 이긴다!"
+          ],
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_154.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_154.png"
+        },
+        {
+          "formCharId": 3302,
+          "formName": "기라그 (바리안체)",
+          "formTitle": "기라그 (바리안체) · 하트랜드 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_waterfront_pier"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 기라그 (바리안체)! 하트랜드의 승부사다! 덤벼라!",
+            "mid": "오, 네 엑시즈 감각 제법이군! 하지만 내 오버레이 유닛을 깰 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 쿵쾅거리게 하는군! 진검승부다!"
+          },
+          "duelStartLine": [
+            "오버레이 네트워크를 구축! 내 덱의 진정한 힘을 보여주마! 듀얼!"
+          ],
+          "aceCutInLine": [
+            "차원을 열어라! 나의 비장의 엑시즈 몬스터 소환!"
+          ],
+          "winLine": [
+            "좋았어! 완벽한 승리다!"
+          ],
+          "loseLine": [
+            "크윽... 완패다! 하지만 다음엔 내가 이긴다!"
+          ],
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_3302.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_3302.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "기라그: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "기라그: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "기라그: 음? 선물이군. 받아두지.",
+        "hated": "기라그: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "기라그: 흥, 아침부터 연습인가? 내 엑시즈 파워를 따라올 수 있다면 덤벼라.",
+        "evening": "기라그: 어둠이 깔렸군. 나약한 결투자는 이 도시에서 살아남지 못한다.",
+        "deckComment": "기라그: 제법 날카로운 카드군을 모았군. 하지만 내 랭크 업이 한 수 위다.",
+        "duelReady": "기라그: 전력으로 덤벼라! 자비 따윈 없다!",
+        "cheer": "기라그: 거기서 무너지지 마라! 내 라이벌이라면 끝까지 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "xyz_duel",
+      "topicReplies": {
+        "xyz_duel": "기라그: 엑시즈 소환은 서로 다른 영혼이 하나가 되는 기적이지.",
+        "heartland": "기라그: 하트랜드 시티의 테마파크엔 언제나 새로운 모험이 기다리고 있어.",
+        "food": "기라그: 아카리 누나의 주먹밥이나 특제 버거가 최고지!",
+        "numbers": "기라그: 넘버즈의 전설... 그 거대한 운명 속에서도 우린 우리의 길을 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "zexal_char_154_mail_invite",
+          "sender": "기라그",
+          "timeSlot": "morning",
+          "spotId": "spot_heartland_city",
+          "subject": "[기라그] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "zexal_char_158",
+      "baseCharId": 158,
+      "displayName": "미자엘",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 넘버즈를 사냥하는 고독한 듀얼리스트다! 내 곁에 파트너는 필요 없다. 듀얼이라면 언제든 덤벼라!",
+      "dormOrFaction": "하트랜드 시티 듀얼리스트",
+      "partnerRole": "XyzRival",
+      "partnerSkillName": "라이벌의 오버레이",
+      "partnerSkillDesc": "하트랜드 시티에서 연마한 엑시즈 전술과 오버레이 파워로 파트너를 지원하는 미자엘 전용 스탯.",
+      "favoriteGiftId": "emperor_key_replica",
+      "forms": [
+        {
+          "formCharId": 158,
+          "formName": "미자엘",
+          "formTitle": "미자엘 · 하트랜드 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_heartland_city"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 미자엘! 하트랜드의 승부사다! 덤벼라!",
+            "mid": "오, 네 엑시즈 감각 제법이군! 하지만 내 오버레이 유닛을 깰 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 쿵쾅거리게 하는군! 진검승부다!"
+          },
+          "duelStartLine": [
+            "오버레이 네트워크를 구축! 내 덱의 진정한 힘을 보여주마! 듀얼!"
+          ],
+          "aceCutInLine": [
+            "차원을 열어라! 나의 비장의 엑시즈 몬스터 소환!"
+          ],
+          "winLine": [
+            "좋았어! 완벽한 승리다!"
+          ],
+          "loseLine": [
+            "크윽... 완패다! 하지만 다음엔 내가 이긴다!"
+          ],
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_158.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_158.png"
+        },
+        {
+          "formCharId": 3303,
+          "formName": "미자엘 (바리안체)",
+          "formTitle": "미자엘 (바리안체) · 하트랜드 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_heartland_city"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 미자엘 (바리안체)! 하트랜드의 승부사다! 덤벼라!",
+            "mid": "오, 네 엑시즈 감각 제법이군! 하지만 내 오버레이 유닛을 깰 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 쿵쾅거리게 하는군! 진검승부다!"
+          },
+          "duelStartLine": [
+            "오버레이 네트워크를 구축! 내 덱의 진정한 힘을 보여주마! 듀얼!"
+          ],
+          "aceCutInLine": [
+            "차원을 열어라! 나의 비장의 엑시즈 몬스터 소환!"
+          ],
+          "winLine": [
+            "좋았어! 완벽한 승리다!"
+          ],
+          "loseLine": [
+            "크윽... 완패다! 하지만 다음엔 내가 이긴다!"
+          ],
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_3303.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_3303.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "미자엘: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "미자엘: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "미자엘: 음? 선물이군. 받아두지.",
+        "hated": "미자엘: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "미자엘: 흥, 아침부터 연습인가? 내 엑시즈 파워를 따라올 수 있다면 덤벼라.",
+        "evening": "미자엘: 어둠이 깔렸군. 나약한 결투자는 이 도시에서 살아남지 못한다.",
+        "deckComment": "미자엘: 제법 날카로운 카드군을 모았군. 하지만 내 랭크 업이 한 수 위다.",
+        "duelReady": "미자엘: 전력으로 덤벼라! 자비 따윈 없다!",
+        "cheer": "미자엘: 거기서 무너지지 마라! 내 라이벌이라면 끝까지 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "xyz_duel",
+      "topicReplies": {
+        "xyz_duel": "미자엘: 엑시즈 소환은 서로 다른 영혼이 하나가 되는 기적이지.",
+        "heartland": "미자엘: 하트랜드 시티의 테마파크엔 언제나 새로운 모험이 기다리고 있어.",
+        "food": "미자엘: 아카리 누나의 주먹밥이나 특제 버거가 최고지!",
+        "numbers": "미자엘: 넘버즈의 전설... 그 거대한 운명 속에서도 우린 우리의 길을 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "zexal_char_158_mail_invite",
+          "sender": "미자엘",
+          "timeSlot": "morning",
+          "spotId": "spot_heartland_city",
+          "subject": "[미자엘] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "zexal_char_160",
+      "baseCharId": 160,
+      "displayName": "낫슈",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 넘버즈를 사냥하는 고독한 듀얼리스트다! 내 곁에 파트너는 필요 없다. 듀얼이라면 언제든 덤벼라!",
+      "dormOrFaction": "하트랜드 시티 듀얼리스트",
+      "partnerRole": "XyzRival",
+      "partnerSkillName": "라이벌의 오버레이",
+      "partnerSkillDesc": "하트랜드 시티에서 연마한 엑시즈 전술과 오버레이 파워로 파트너를 지원하는 낫슈 전용 스탯.",
+      "favoriteGiftId": "emperor_key_replica",
+      "forms": [
+        {
+          "formCharId": 160,
+          "formName": "낫슈",
+          "formTitle": "낫슈 · 하트랜드 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_yuma_house"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 낫슈! 하트랜드의 승부사다! 덤벼라!",
+            "mid": "오, 네 엑시즈 감각 제법이군! 하지만 내 오버레이 유닛을 깰 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 쿵쾅거리게 하는군! 진검승부다!"
+          },
+          "duelStartLine": [
+            "오버레이 네트워크를 구축! 내 덱의 진정한 힘을 보여주마! 듀얼!"
+          ],
+          "aceCutInLine": [
+            "차원을 열어라! 나의 비장의 엑시즈 몬스터 소환!"
+          ],
+          "winLine": [
+            "좋았어! 완벽한 승리다!"
+          ],
+          "loseLine": [
+            "크윽... 완패다! 하지만 다음엔 내가 이긴다!"
+          ],
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_160.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_160.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "낫슈: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "낫슈: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "낫슈: 음? 선물이군. 받아두지.",
+        "hated": "낫슈: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "낫슈: 흥, 아침부터 연습인가? 내 엑시즈 파워를 따라올 수 있다면 덤벼라.",
+        "evening": "낫슈: 어둠이 깔렸군. 나약한 결투자는 이 도시에서 살아남지 못한다.",
+        "deckComment": "낫슈: 제법 날카로운 카드군을 모았군. 하지만 내 랭크 업이 한 수 위다.",
+        "duelReady": "낫슈: 전력으로 덤벼라! 자비 따윈 없다!",
+        "cheer": "낫슈: 거기서 무너지지 마라! 내 라이벌이라면 끝까지 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "xyz_duel",
+      "topicReplies": {
+        "xyz_duel": "낫슈: 엑시즈 소환은 서로 다른 영혼이 하나가 되는 기적이지.",
+        "heartland": "낫슈: 하트랜드 시티의 테마파크엔 언제나 새로운 모험이 기다리고 있어.",
+        "food": "낫슈: 아카리 누나의 주먹밥이나 특제 버거가 최고지!",
+        "numbers": "낫슈: 넘버즈의 전설... 그 거대한 운명 속에서도 우린 우리의 길을 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "zexal_char_160_mail_invite",
+          "sender": "낫슈",
+          "timeSlot": "morning",
+          "spotId": "spot_heartland_city",
+          "subject": "[낫슈] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "zexal_char_161",
+      "baseCharId": 161,
+      "displayName": "오쿠다이라 후야",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 넘버즈를 사냥하는 고독한 듀얼리스트다! 내 곁에 파트너는 필요 없다. 듀얼이라면 언제든 덤벼라!",
+      "dormOrFaction": "하트랜드 시티 듀얼리스트",
+      "partnerRole": "XyzRival",
+      "partnerSkillName": "라이벌의 오버레이",
+      "partnerSkillDesc": "하트랜드 시티에서 연마한 엑시즈 전술과 오버레이 파워로 파트너를 지원하는 오쿠다이라 후야 전용 스탯.",
+      "favoriteGiftId": "emperor_key_replica",
+      "forms": [
+        {
+          "formCharId": 161,
+          "formName": "오쿠다이라 후야",
+          "formTitle": "오쿠다이라 후야 · 하트랜드 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_waterfront_pier"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 오쿠다이라 후야! 하트랜드의 승부사다! 덤벼라!",
+            "mid": "오, 네 엑시즈 감각 제법이군! 하지만 내 오버레이 유닛을 깰 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 쿵쾅거리게 하는군! 진검승부다!"
+          },
+          "duelStartLine": [
+            "오버레이 네트워크를 구축! 내 덱의 진정한 힘을 보여주마! 듀얼!"
+          ],
+          "aceCutInLine": [
+            "차원을 열어라! 나의 비장의 엑시즈 몬스터 소환!"
+          ],
+          "winLine": [
+            "좋았어! 완벽한 승리다!"
+          ],
+          "loseLine": [
+            "크윽... 완패다! 하지만 다음엔 내가 이긴다!"
+          ],
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_161.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_161.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "오쿠다이라 후야: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "오쿠다이라 후야: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "오쿠다이라 후야: 음? 선물이군. 받아두지.",
+        "hated": "오쿠다이라 후야: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "오쿠다이라 후야: 흥, 아침부터 연습인가? 내 엑시즈 파워를 따라올 수 있다면 덤벼라.",
+        "evening": "오쿠다이라 후야: 어둠이 깔렸군. 나약한 결투자는 이 도시에서 살아남지 못한다.",
+        "deckComment": "오쿠다이라 후야: 제법 날카로운 카드군을 모았군. 하지만 내 랭크 업이 한 수 위다.",
+        "duelReady": "오쿠다이라 후야: 전력으로 덤벼라! 자비 따윈 없다!",
+        "cheer": "오쿠다이라 후야: 거기서 무너지지 마라! 내 라이벌이라면 끝까지 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "xyz_duel",
+      "topicReplies": {
+        "xyz_duel": "오쿠다이라 후야: 엑시즈 소환은 서로 다른 영혼이 하나가 되는 기적이지.",
+        "heartland": "오쿠다이라 후야: 하트랜드 시티의 테마파크엔 언제나 새로운 모험이 기다리고 있어.",
+        "food": "오쿠다이라 후야: 아카리 누나의 주먹밥이나 특제 버거가 최고지!",
+        "numbers": "오쿠다이라 후야: 넘버즈의 전설... 그 거대한 운명 속에서도 우린 우리의 길을 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "zexal_char_161_mail_invite",
+          "sender": "오쿠다이라 후야",
+          "timeSlot": "morning",
+          "spotId": "spot_waterfront_pier",
+          "subject": "[오쿠다이라 후야] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "zexal_char_162",
+      "baseCharId": 162,
+      "displayName": "고슈",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 넘버즈를 사냥하는 고독한 듀얼리스트다! 내 곁에 파트너는 필요 없다. 듀얼이라면 언제든 덤벼라!",
+      "dormOrFaction": "하트랜드 시티 듀얼리스트",
+      "partnerRole": "XyzRival",
+      "partnerSkillName": "라이벌의 오버레이",
+      "partnerSkillDesc": "하트랜드 시티에서 연마한 엑시즈 전술과 오버레이 파워로 파트너를 지원하는 고슈 전용 스탯.",
+      "favoriteGiftId": "emperor_key_replica",
+      "forms": [
+        {
+          "formCharId": 162,
+          "formName": "고슈",
+          "formTitle": "고슈 · 하트랜드 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_heartland_city"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 고슈! 하트랜드의 승부사다! 덤벼라!",
+            "mid": "오, 네 엑시즈 감각 제법이군! 하지만 내 오버레이 유닛을 깰 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 쿵쾅거리게 하는군! 진검승부다!"
+          },
+          "duelStartLine": [
+            "오버레이 네트워크를 구축! 내 덱의 진정한 힘을 보여주마! 듀얼!"
+          ],
+          "aceCutInLine": [
+            "차원을 열어라! 나의 비장의 엑시즈 몬스터 소환!"
+          ],
+          "winLine": [
+            "좋았어! 완벽한 승리다!"
+          ],
+          "loseLine": [
+            "크윽... 완패다! 하지만 다음엔 내가 이긴다!"
+          ],
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_162.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_162.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "고슈: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "고슈: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "고슈: 음? 선물이군. 받아두지.",
+        "hated": "고슈: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "고슈: 흥, 아침부터 연습인가? 내 엑시즈 파워를 따라올 수 있다면 덤벼라.",
+        "evening": "고슈: 어둠이 깔렸군. 나약한 결투자는 이 도시에서 살아남지 못한다.",
+        "deckComment": "고슈: 제법 날카로운 카드군을 모았군. 하지만 내 랭크 업이 한 수 위다.",
+        "duelReady": "고슈: 전력으로 덤벼라! 자비 따윈 없다!",
+        "cheer": "고슈: 거기서 무너지지 마라! 내 라이벌이라면 끝까지 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "xyz_duel",
+      "topicReplies": {
+        "xyz_duel": "고슈: 엑시즈 소환은 서로 다른 영혼이 하나가 되는 기적이지.",
+        "heartland": "고슈: 하트랜드 시티의 테마파크엔 언제나 새로운 모험이 기다리고 있어.",
+        "food": "고슈: 아카리 누나의 주먹밥이나 특제 버거가 최고지!",
+        "numbers": "고슈: 넘버즈의 전설... 그 거대한 운명 속에서도 우린 우리의 길을 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "zexal_char_162_mail_invite",
+          "sender": "고슈",
+          "timeSlot": "morning",
+          "spotId": "spot_heartland_city",
+          "subject": "[고슈] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "zexal_char_163",
+      "baseCharId": 163,
+      "displayName": "No.96 블랙 미스트",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 넘버즈를 사냥하는 고독한 듀얼리스트다! 내 곁에 파트너는 필요 없다. 듀얼이라면 언제든 덤벼라!",
+      "dormOrFaction": "하트랜드 시티 듀얼리스트",
+      "partnerRole": "XyzRival",
+      "partnerSkillName": "라이벌의 오버레이",
+      "partnerSkillDesc": "하트랜드 시티에서 연마한 엑시즈 전술과 오버레이 파워로 파트너를 지원하는 No.96 블랙 미스트 전용 스탯.",
+      "favoriteGiftId": "emperor_key_replica",
+      "forms": [
+        {
+          "formCharId": 163,
+          "formName": "No.96 블랙 미스트",
+          "formTitle": "No.96 블랙 미스트 · 하트랜드 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_yuma_house"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 No.96 블랙 미스트! 하트랜드의 승부사다! 덤벼라!",
+            "mid": "오, 네 엑시즈 감각 제법이군! 하지만 내 오버레이 유닛을 깰 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 쿵쾅거리게 하는군! 진검승부다!"
+          },
+          "duelStartLine": [
+            "오버레이 네트워크를 구축! 내 덱의 진정한 힘을 보여주마! 듀얼!"
+          ],
+          "aceCutInLine": [
+            "차원을 열어라! 나의 비장의 엑시즈 몬스터 소환!"
+          ],
+          "winLine": [
+            "좋았어! 완벽한 승리다!"
+          ],
+          "loseLine": [
+            "크윽... 완패다! 하지만 다음엔 내가 이긴다!"
+          ],
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_163.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_163.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "No.96 블랙 미스트: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "No.96 블랙 미스트: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "No.96 블랙 미스트: 음? 선물이군. 받아두지.",
+        "hated": "No.96 블랙 미스트: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "No.96 블랙 미스트: 흥, 아침부터 연습인가? 내 엑시즈 파워를 따라올 수 있다면 덤벼라.",
+        "evening": "No.96 블랙 미스트: 어둠이 깔렸군. 나약한 결투자는 이 도시에서 살아남지 못한다.",
+        "deckComment": "No.96 블랙 미스트: 제법 날카로운 카드군을 모았군. 하지만 내 랭크 업이 한 수 위다.",
+        "duelReady": "No.96 블랙 미스트: 전력으로 덤벼라! 자비 따윈 없다!",
+        "cheer": "No.96 블랙 미스트: 거기서 무너지지 마라! 내 라이벌이라면 끝까지 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "xyz_duel",
+      "topicReplies": {
+        "xyz_duel": "No.96 블랙 미스트: 엑시즈 소환은 서로 다른 영혼이 하나가 되는 기적이지.",
+        "heartland": "No.96 블랙 미스트: 하트랜드 시티의 테마파크엔 언제나 새로운 모험이 기다리고 있어.",
+        "food": "No.96 블랙 미스트: 아카리 누나의 주먹밥이나 특제 버거가 최고지!",
+        "numbers": "No.96 블랙 미스트: 넘버즈의 전설... 그 거대한 운명 속에서도 우린 우리의 길을 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "zexal_char_163_mail_invite",
+          "sender": "No.96 블랙 미스트",
+          "timeSlot": "morning",
+          "spotId": "spot_waterfront_pier",
+          "subject": "[No.96 블랙 미스트] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "zexal_char_165",
+      "baseCharId": 165,
+      "displayName": "포 (Ⅳ)",
+      "isTagEligible": false,
+      "partnerRefusal": "하하하하! 이 Ⅳ님의 파트너가 되고 싶다고? 내 극상의 팬서비스에 찢겨 나가고 싶지 않다면 조용히 관객석에나 앉아있어!",
+      "dormOrFaction": "하트랜드 시티 듀얼리스트",
+      "partnerRole": "XyzRival",
+      "partnerSkillName": "라이벌의 오버레이",
+      "partnerSkillDesc": "하트랜드 시티에서 연마한 엑시즈 전술과 오버레이 파워로 파트너를 지원하는 포 (Ⅳ) 전용 스탯.",
+      "favoriteGiftId": "emperor_key_replica",
+      "forms": [
+        {
+          "formCharId": 165,
+          "formName": "포 (Ⅳ)",
+          "formTitle": "포 (Ⅳ) · 하트랜드 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_waterfront_pier"
+          ],
+          "greetingLines": {
+            "low": "하하하! 이 Ⅳ님의 극상의 팬서비스를 받고 싶어서 안달이 났구나!",
+            "mid": "크큭, 네 리액션은 아주 마음에 들어! 오늘은 특별히 더 지독한 팬서비스를 해주지!",
+            "high": "어이, 관객! 세상 모든 관객이 지켜보는 무대에서 피날레 쇼를 펼쳐보자고!"
+          },
+          "duelStartLine": "극상의 팬서비스를 시작하지! 비명을 질러라!",
+          "aceCutInLine": "나와라! No.15 기믹 퍼핏 자이언트 킬러!! 갈기갈기 찢어버려라!",
+          "winLine": "하하하하! 만족스러웠나, 내 팬서비스가?!",
+          "loseLine": "크윽... 이 Ⅳ님이 관객 앞에서 무릎 꿇다니... 인정 못 해!",
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_165.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_165.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "포 (Ⅳ): 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "포 (Ⅳ): 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "포 (Ⅳ): 음? 선물이군. 받아두지.",
+        "hated": "포 (Ⅳ): 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "포 (Ⅳ): 흥, 아침부터 연습인가? 내 엑시즈 파워를 따라올 수 있다면 덤벼라.",
+        "evening": "포 (Ⅳ): 어둠이 깔렸군. 나약한 결투자는 이 도시에서 살아남지 못한다.",
+        "deckComment": "포 (Ⅳ): 제법 날카로운 카드군을 모았군. 하지만 내 랭크 업이 한 수 위다.",
+        "duelReady": "포 (Ⅳ): 전력으로 덤벼라! 자비 따윈 없다!",
+        "cheer": "포 (Ⅳ): 거기서 무너지지 마라! 내 라이벌이라면 끝까지 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "xyz_duel",
+      "topicReplies": {
+        "xyz_duel": "포 (Ⅳ): 엑시즈 소환은 서로 다른 영혼이 하나가 되는 기적이지.",
+        "heartland": "포 (Ⅳ): 하트랜드 시티의 테마파크엔 언제나 새로운 모험이 기다리고 있어.",
+        "food": "포 (Ⅳ): 아카리 누나의 주먹밥이나 특제 버거가 최고지!",
+        "numbers": "포 (Ⅳ): 넘버즈의 전설... 그 거대한 운명 속에서도 우린 우리의 길을 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "zexal_char_165_mail_invite",
+          "sender": "포 (Ⅳ)",
+          "timeSlot": "morning",
+          "spotId": "spot_waterfront_pier",
+          "subject": "[포 (Ⅳ)] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "zexal_char_166",
+      "baseCharId": 166,
+      "displayName": "브이 (Ⅴ)",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 넘버즈를 사냥하는 고독한 듀얼리스트다! 내 곁에 파트너는 필요 없다. 듀얼이라면 언제든 덤벼라!",
+      "dormOrFaction": "하트랜드 시티 듀얼리스트",
+      "partnerRole": "XyzRival",
+      "partnerSkillName": "라이벌의 오버레이",
+      "partnerSkillDesc": "하트랜드 시티에서 연마한 엑시즈 전술과 오버레이 파워로 파트너를 지원하는 브이 (Ⅴ) 전용 스탯.",
+      "favoriteGiftId": "emperor_key_replica",
+      "forms": [
+        {
+          "formCharId": 166,
+          "formName": "브이 (Ⅴ)",
+          "formTitle": "브이 (Ⅴ) · 하트랜드 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_heartland_city"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 브이 (Ⅴ)! 하트랜드의 승부사다! 덤벼라!",
+            "mid": "오, 네 엑시즈 감각 제법이군! 하지만 내 오버레이 유닛을 깰 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 쿵쾅거리게 하는군! 진검승부다!"
+          },
+          "duelStartLine": [
+            "오버레이 네트워크를 구축! 내 덱의 진정한 힘을 보여주마! 듀얼!"
+          ],
+          "aceCutInLine": [
+            "차원을 열어라! 나의 비장의 엑시즈 몬스터 소환!"
+          ],
+          "winLine": [
+            "좋았어! 완벽한 승리다!"
+          ],
+          "loseLine": [
+            "크윽... 완패다! 하지만 다음엔 내가 이긴다!"
+          ],
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_166.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_166.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "브이 (Ⅴ): 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "브이 (Ⅴ): 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "브이 (Ⅴ): 음? 선물이군. 받아두지.",
+        "hated": "브이 (Ⅴ): 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "브이 (Ⅴ): 흥, 아침부터 연습인가? 내 엑시즈 파워를 따라올 수 있다면 덤벼라.",
+        "evening": "브이 (Ⅴ): 어둠이 깔렸군. 나약한 결투자는 이 도시에서 살아남지 못한다.",
+        "deckComment": "브이 (Ⅴ): 제법 날카로운 카드군을 모았군. 하지만 내 랭크 업이 한 수 위다.",
+        "duelReady": "브이 (Ⅴ): 전력으로 덤벼라! 자비 따윈 없다!",
+        "cheer": "브이 (Ⅴ): 거기서 무너지지 마라! 내 라이벌이라면 끝까지 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "xyz_duel",
+      "topicReplies": {
+        "xyz_duel": "브이 (Ⅴ): 엑시즈 소환은 서로 다른 영혼이 하나가 되는 기적이지.",
+        "heartland": "브이 (Ⅴ): 하트랜드 시티의 테마파크엔 언제나 새로운 모험이 기다리고 있어.",
+        "food": "브이 (Ⅴ): 아카리 누나의 주먹밥이나 특제 버거가 최고지!",
+        "numbers": "브이 (Ⅴ): 넘버즈의 전설... 그 거대한 운명 속에서도 우린 우리의 길을 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "zexal_char_166_mail_invite",
+          "sender": "브이 (Ⅴ)",
+          "timeSlot": "morning",
+          "spotId": "spot_heartland_city",
+          "subject": "[브이 (Ⅴ)] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "zexal_char_167",
+      "baseCharId": 167,
+      "displayName": "신게츠 레이",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 넘버즈를 사냥하는 고독한 듀얼리스트다! 내 곁에 파트너는 필요 없다. 듀얼이라면 언제든 덤벼라!",
+      "dormOrFaction": "하트랜드 시티 듀얼리스트",
+      "partnerRole": "XyzRival",
+      "partnerSkillName": "라이벌의 오버레이",
+      "partnerSkillDesc": "하트랜드 시티에서 연마한 엑시즈 전술과 오버레이 파워로 파트너를 지원하는 신게츠 레이 전용 스탯.",
+      "favoriteGiftId": "emperor_key_replica",
+      "forms": [
+        {
+          "formCharId": 167,
+          "formName": "신게츠 레이",
+          "formTitle": "신게츠 레이 · 하트랜드 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_yuma_house"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 신게츠 레이! 하트랜드의 승부사다! 덤벼라!",
+            "mid": "오, 네 엑시즈 감각 제법이군! 하지만 내 오버레이 유닛을 깰 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 쿵쾅거리게 하는군! 진검승부다!"
+          },
+          "duelStartLine": [
+            "오버레이 네트워크를 구축! 내 덱의 진정한 힘을 보여주마! 듀얼!"
+          ],
+          "aceCutInLine": [
+            "차원을 열어라! 나의 비장의 엑시즈 몬스터 소환!"
+          ],
+          "winLine": [
+            "좋았어! 완벽한 승리다!"
+          ],
+          "loseLine": [
+            "크윽... 완패다! 하지만 다음엔 내가 이긴다!"
+          ],
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_167.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_167.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "신게츠 레이: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "신게츠 레이: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "신게츠 레이: 음? 선물이군. 받아두지.",
+        "hated": "신게츠 레이: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "신게츠 레이: 흥, 아침부터 연습인가? 내 엑시즈 파워를 따라올 수 있다면 덤벼라.",
+        "evening": "신게츠 레이: 어둠이 깔렸군. 나약한 결투자는 이 도시에서 살아남지 못한다.",
+        "deckComment": "신게츠 레이: 제법 날카로운 카드군을 모았군. 하지만 내 랭크 업이 한 수 위다.",
+        "duelReady": "신게츠 레이: 전력으로 덤벼라! 자비 따윈 없다!",
+        "cheer": "신게츠 레이: 거기서 무너지지 마라! 내 라이벌이라면 끝까지 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "xyz_duel",
+      "topicReplies": {
+        "xyz_duel": "신게츠 레이: 엑시즈 소환은 서로 다른 영혼이 하나가 되는 기적이지.",
+        "heartland": "신게츠 레이: 하트랜드 시티의 테마파크엔 언제나 새로운 모험이 기다리고 있어.",
+        "food": "신게츠 레이: 아카리 누나의 주먹밥이나 특제 버거가 최고지!",
+        "numbers": "신게츠 레이: 넘버즈의 전설... 그 거대한 운명 속에서도 우린 우리의 길을 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "zexal_char_167_mail_invite",
+          "sender": "신게츠 레이",
+          "timeSlot": "morning",
+          "spotId": "spot_waterfront_pier",
+          "subject": "[신게츠 레이] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "zexal_char_169",
+      "baseCharId": 169,
+      "displayName": "카미시로 리오 / 메라그",
+      "isTagEligible": true,
+      "partnerRefusal": null,
+      "dormOrFaction": "하트랜드 시티 히로인",
+      "partnerRole": "TagHeroine",
+      "partnerSkillName": "카미시로 리오의 결속: 빙설의 엑시즈!",
+      "partnerSkillDesc": "하트랜드 시티에서 연마한 엑시즈 전술과 오버레이 파워로 파트너를 지원하는 카미시로 리오 / 메라그 전용 스탯.",
+      "favoriteGiftId": "emperor_key_replica",
+      "forms": [
+        {
+          "formCharId": 169,
+          "formName": "카미시로 리오",
+          "formTitle": "카미시로 리오 · 하트랜드 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_heartland_city"
+          ],
+          "greetingLines": {
+            "low": "어머? 내 얼음 칼날을 보고도 도망치지 않는 사람은 네가 처음이네.",
+            "mid": "후훗, 오빠(료가)보다 훨씬 센스 있고 품격 있는 듀얼리스트잖아? 마음에 드네.",
+            "high": "내 곁에 설 자격이 있는 파트너는 오직 너 하나뿐이야. 얼어붙은 전장을 아름답게 지배하자!"
+          },
+          "duelStartLine": "얼어붙은 얼음의 여왕 앞에 무릎 꿇으세요! 듀얼!",
+          "aceCutInLine": "빙설의 숨결이여, 적을 영원히 동결시켜라! 영조수 실피네, 블리자드 윙!!",
+          "winLine": "후훗, 차갑게 얼어붙은 패배의 맛이 어떠신가요?",
+          "loseLine": "어머나... 내 얼음벽을 녹여버릴 정도의 열정이라니, 제법 인정해 주겠어.",
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_169.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_169.png"
+        },
+        {
+          "formCharId": 157,
+          "formName": "메라그",
+          "formTitle": "메라그 · 하트랜드 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_heartland_city"
+          ],
+          "greetingLines": {
+            "low": "안녕! 난 메라그! 하트랜드 시티에서 엑시즈를 연마하고 있어. 한 판 겨뤄볼까?",
+            "mid": "와, 당신의 엑시즈 소환은 볼 때마다 정말 멋져요! 저도 온 힘을 다해 서포트할게요!",
+            "high": "당신 옆에서 함께 엑시즈를 부를 수 있어서 정말 행복해요! 우리 둘의 오버레이는 영원해요!"
+          },
+          "duelStartLine": "제 덱의 진심을 보여드릴게요! 듀얼 시작이에요!",
+          "aceCutInLine": "오버레이 네트워크 구축! 제 소중한 에이스 엑시즈 소환!",
+          "winLine": "해냈어요! 끝까지 카드를 믿은 덕분이에요!",
+          "loseLine": "아쉽지만 정말 즐거운 듀얼이었어요! 다음엔 더 성장해서 도전할게요!",
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_157.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_157.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "카미시로 리오: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "카미시로 리오: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "카미시로 리오: 음? 선물이군. 받아두지.",
+        "hated": "카미시로 리오: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "카미시로 리오 / 메라그: 좋은 아침이야! 오늘도 하트랜드 시티에서 즐겁게 듀얼 해보자!",
+        "evening": "카미시로 리오 / 메라그: 벌써 별이 떴네. 오늘 너랑 나눈 듀얼, 정말 잊지 못할 거야.",
+        "deckComment": "카미시로 리오 / 메라그: 네 덱은 볼 때마다 엑시즈 연계가 끈끈해서 든든해!",
+        "duelReady": "카미시로 리오 / 메라그: 준비 완료야! 우리 둘의 오버레이 유대를 보여주자고!",
+        "cheer": "카미시로 리오 / 메라그: 포기하지 마! 아직 네 오버레이 유닛이 남아있어!"
+      },
+      "bondEvents": [
+        {
+          "heartLevel": 1,
+          "title": "[카미시로 리오] 첫 번째 인연: 하트랜드의 만남",
+          "dialogues": [
+            {
+              "speaker": "카미시로 리오",
+              "text": "안녕! 테마파크 광장에서 네 듀얼을 지켜봤는데 정말 두근거렸어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워! 네 엑시즈 소환 타이밍도 정말 날카롭던걸? 앞으로 잘 부탁해."
+            },
+            {
+              "speaker": "카미시로 리오",
+              "text": "응! 우리 서로를 북돋아 주는 최고의 파트너가 되어보자!"
+            }
+          ],
+          "choice": {
+            "prompt": "카미시로 리오와 함께 어떤 결의를 다질까?",
+            "options": [
+              {
+                "text": "🔥 당당하고 화려하게 상대를 압도하자! (보상 DP 1.2배)",
+                "reply": "하핫, 좋아! 그 기백 아주 마음에 드는데?",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 차분하게 오버레이 유닛을 지키며 전술을 엮자! (내 시작 LP +500)",
+                "reply": "기본이 가장 중요한 법이지. 함께 연습하자!",
+                "effectType": "SafeBuff"
+              },
+              {
+                "text": "🤝 최고의 태그 파트너가 되어줄게! (호감도 대폭 상승)",
+                "reply": "든든한걸? 앞으로 잘 부탁해, 내 파트너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 3,
+          "title": "[카미시로 리오] 세 번째 인연: 시련을 넘는 오버레이",
+          "dialogues": [
+            {
+              "speaker": "카미시로 리오",
+              "text": "수많은 강적과 싸우면서... 네가 내 등을 맡아준다는 확신이 들었어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "나도 그래. 네가 옆에 있어 주는 것만으로도 어떤 넘버즈의 어둠도 두렵지 않아."
+            },
+            {
+              "speaker": "카미시로 리오",
+              "text": "좋아! 이번 듀얼 카니발 결승전에서도 끝까지 함께 가보는 거야!"
+            }
+          ],
+          "choice": {
+            "prompt": "카니발 결승을 앞두고 어떤 전략으로 단결할까?",
+            "options": [
+              {
+                "text": "🔥 랭크업 매직! 에이스의 공격력을 한계까지 끌어올리자! (공격력 +400 버프)",
+                "reply": "정면 승부로 적을 박살내자고!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 빈틈없는 카운터와 수비로 적의 맹공을 막아내자! (내 시작 LP +1,000)",
+                "reply": "치밀한 전술이야. 완벽하게 준비하자!",
+                "effectType": "SafeBuff"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 5,
+          "title": "[카미시로 리오] 최종 인연(MASTER): 영혼으로 맺어진 결속",
+          "dialogues": [
+            {
+              "speaker": "카미시로 리오",
+              "text": "세계의 운명을 건 사투를 함께 헤쳐 나오며... 넌 내게 세상 그 누구보다 소중한 파트너가 되었어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워. 네 곁에서 싸울 수 있어서 난 진정한 넘버즈의 여왕으로 성장할 수 있었어."
+            },
+            {
+              "speaker": "카미시로 리오",
+              "text": "우리의 결속은 영원해. 하트랜드 시티의 정상에서 영광을 함께 누리자!"
+            }
+          ],
+          "choice": {
+            "prompt": "최종 마스터 승급전! 마지막 맹세를 선택하자!",
+            "options": [
+              {
+                "text": "🔥 우리의 영혼과 모든 넘버즈를 걸고 승리하자! (마스터 보상 & DP 1.5배)",
+                "reply": "우리의 기적을 온 세계에 보여주자!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🤝 영원히 함께할 소울메이트로서 승리를 증명할게! (마스터 영구 버프)",
+                "reply": "고마워, 내 최고의 영원한 파트너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        }
+      ],
+      "favoriteTopic": "xyz_duel",
+      "topicReplies": {
+        "xyz_duel": "카미시로 리오: 엑시즈 소환은 서로 다른 영혼이 하나가 되는 기적이지.",
+        "heartland": "카미시로 리오: 하트랜드 시티의 테마파크엔 언제나 새로운 모험이 기다리고 있어.",
+        "food": "카미시로 리오: 아카리 누나의 주먹밥이나 특제 버거가 최고지!",
+        "numbers": "카미시로 리오: 넘버즈의 전설... 그 거대한 운명 속에서도 우린 우리의 길을 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "zexal_char_169_mail_invite",
+          "sender": "카미시로 리오 / 메라그",
+          "timeSlot": "morning",
+          "spotId": "spot_waterfront_pier",
+          "subject": "[카미시로 리오 / 메라그] 오늘 잠깐 만날 수 있을까?",
+          "body": "안녕! 오늘 날씨가 참 좋아서 너랑 같이 듀얼 연습도 하고 바람도 쐬고 싶어. 시간 되면 편할 때 들러줘!"
+        }
+      ],
+      "grandPrixEnding": {
+        "title": "🏆 듀얼 카니발 그랑프리 챔피언 엔딩: [카미시로 리오]와의 영원한 유대",
+        "dialogues": [
+          {
+            "speaker": "카미시로 리오",
+            "text": "우리가 해냈어... 하트랜드 듀얼 카니발의 정점에 너와 함께 서다니 꿈만 같아!"
+          },
+          {
+            "speaker": "여주인공",
+            "text": "네가 내 곁에서 등을 지켜주었기 때문에 승리할 수 있었어. 고마워, 최고의 파트너!"
+          },
+          {
+            "speaker": "카미시로 리오",
+            "text": "이 우승 트로피와 우리의 카드는 영원한 유대의 증표야. 앞으로도 언제나 함께하자!"
+          }
+        ]
+      }
+    },
+    {
+      "personaId": "zexal_char_170",
+      "baseCharId": 170,
+      "displayName": "미즈키 코토리",
+      "isTagEligible": true,
+      "partnerRefusal": null,
+      "dormOrFaction": "하트랜드 시티 히로인",
+      "partnerRole": "TagHeroine",
+      "partnerSkillName": "미즈키 코토리의 결속: 빙설의 엑시즈!",
+      "partnerSkillDesc": "캇토빙 치어로 파트너 턴의 공격력을 북돋우고 배틀 페이즈를 상냥하게 지켜내는 치어리더의 활력.",
+      "favoriteGiftId": "duelist_riceball",
+      "forms": [
+        {
+          "formCharId": 170,
+          "formName": "미즈키 코토리",
+          "formTitle": "미즈키 코토리 · 하트랜드 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_yuma_house"
+          ],
+          "greetingLines": {
+            "low": "안녕! 난 미즈키 코토리야! 유마 녀석 뒤치다꺼리하느라 바쁘지만, 듀얼은 언제든 환영이야!",
+            "mid": "와, 네 듀얼은 유마랑 다르게 정말 든든하고 똑 부러져서 좋아! 나까지 힘이 나!",
+            "high": "너랑 함께라면 어떤 무서운 사건이 터져도 든든해! 내가 제일 열심히 응원해 줄게!"
+          },
+          "duelStartLine": "유우마 녀석만 캇토빙하게 둘 순 없지! 나도 전력으로 응원 듀얼 할 거야!",
+          "aceCutInLine": "모두에게 승리의 용기를! 리틀 페어리 소환! 하트풀 치어풀 샤인!!",
+          "winLine": "와아-! 이겼다! 우리의 완벽한 호흡과 응원 승리야!",
+          "loseLine": "아쉽다~ 하지만 포기하지 않고 다음엔 더 힘차게 응원해서 이길 거야!",
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_170.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_170.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "미즈키 코토리: 꺄아-! 신선한 사과 파이와 예쁜 치어리더 리본 방울이잖아! 너무 귀여워, 매일 달고 다닐게!",
+        "liked": "미즈키 코토리: 후훗, 고마워! 기분 좋게 간식으로 먹을게!",
+        "neutral": "미즈키 코토리: 선물 고마워!",
+        "hated": "미즈키 코토리: 으앗... 냄새가 너무 지독해... 마늘 냄새가 펄펄 나는 건 사양할게!"
+      },
+      "partnerQuotes": {
+        "morning": "안녕! 좋은 아침이야! 유우마 녀석 또 늦잠 자서 헐레벌떡 뛰어가겠지? 우리라도 힘내자!",
+        "evening": "노을빛 하트랜드 거리가 참 예쁘다... 오늘 너랑 함께해서 정말 든든하고 즐거웠어!",
+        "deckComment": "와아, 네 덱은 언제 봐도 믿음직스럽고 따뜻해! 지켜보는 내 가슴도 두근두근거려!",
+        "duelReady": "유우마 녀석 뒤만 봐주던 내가 아니라고! 나도 전력으로 응원 듀얼 할 거야! 듀얼!",
+        "cheer": "힘내! 넌 절대 지지 않아! 내가 세상에서 제일 큰 소리로 응원하고 있잖아! 파이팅!!"
+      },
+      "bondEvents": [
+        {
+          "heartLevel": 1,
+          "title": "[미즈키 코토리] 첫 번째 인연: 하트랜드의 만남",
+          "dialogues": [
+            {
+              "speaker": "미즈키 코토리",
+              "text": "안녕! 테마파크 광장에서 네 듀얼을 지켜봤는데 정말 두근거렸어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워! 네 엑시즈 소환 타이밍도 정말 날카롭던걸? 앞으로 잘 부탁해."
+            },
+            {
+              "speaker": "미즈키 코토리",
+              "text": "응! 우리 서로를 북돋아 주는 최고의 파트너가 되어보자!"
+            }
+          ],
+          "choice": {
+            "prompt": "미즈키 코토리와 함께 어떤 결의를 다질까?",
+            "options": [
+              {
+                "text": "🔥 당당하고 화려하게 상대를 압도하자! (보상 DP 1.2배)",
+                "reply": "하핫, 좋아! 그 기백 아주 마음에 드는데?",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 차분하게 오버레이 유닛을 지키며 전술을 엮자! (내 시작 LP +500)",
+                "reply": "기본이 가장 중요한 법이지. 함께 연습하자!",
+                "effectType": "SafeBuff"
+              },
+              {
+                "text": "🤝 최고의 태그 파트너가 되어줄게! (호감도 대폭 상승)",
+                "reply": "든든한걸? 앞으로 잘 부탁해, 내 파트너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 3,
+          "title": "[미즈키 코토리] 세 번째 인연: 시련을 넘는 오버레이",
+          "dialogues": [
+            {
+              "speaker": "미즈키 코토리",
+              "text": "수많은 강적과 싸우면서... 네가 내 등을 맡아준다는 확신이 들었어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "나도 그래. 네가 옆에 있어 주는 것만으로도 어떤 넘버즈의 어둠도 두렵지 않아."
+            },
+            {
+              "speaker": "미즈키 코토리",
+              "text": "좋아! 이번 듀얼 카니발 결승전에서도 끝까지 함께 가보는 거야!"
+            }
+          ],
+          "choice": {
+            "prompt": "카니발 결승을 앞두고 어떤 전략으로 단결할까?",
+            "options": [
+              {
+                "text": "🔥 랭크업 매직! 에이스의 공격력을 한계까지 끌어올리자! (공격력 +400 버프)",
+                "reply": "정면 승부로 적을 박살내자고!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 빈틈없는 카운터와 수비로 적의 맹공을 막아내자! (내 시작 LP +1,000)",
+                "reply": "치밀한 전술이야. 완벽하게 준비하자!",
+                "effectType": "SafeBuff"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 5,
+          "title": "[미즈키 코토리] 최종 인연(MASTER): 영혼으로 맺어진 결속",
+          "dialogues": [
+            {
+              "speaker": "미즈키 코토리",
+              "text": "세계의 운명을 건 사투를 함께 헤쳐 나오며... 넌 내게 세상 그 누구보다 소중한 파트너가 되었어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워. 네 곁에서 싸울 수 있어서 난 진정한 넘버즈의 여왕으로 성장할 수 있었어."
+            },
+            {
+              "speaker": "미즈키 코토리",
+              "text": "우리의 결속은 영원해. 하트랜드 시티의 정상에서 영광을 함께 누리자!"
+            }
+          ],
+          "choice": {
+            "prompt": "최종 마스터 승급전! 마지막 맹세를 선택하자!",
+            "options": [
+              {
+                "text": "🔥 우리의 영혼과 모든 넘버즈를 걸고 승리하자! (마스터 보상 & DP 1.5배)",
+                "reply": "우리의 기적을 온 세계에 보여주자!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🤝 영원히 함께할 소울메이트로서 승리를 증명할게! (마스터 영구 버프)",
+                "reply": "고마워, 내 최고의 영원한 파트너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        }
+      ],
+      "favoriteTopic": "xyz_duel",
+      "topicReplies": {
+        "xyz_duel": "엑시즈 소환할 때 몬스터들이 손을 맞잡는 모습... 마치 우리들의 유대 같아서 정말 멋져!",
+        "heartland": "하트랜드 파크의 회전목마랑 츄러스! 주말에 친구들이랑 가면 시간 가는 줄 모른다니까!",
+        "food": "아삭아삭 신선한 사과 파이랑 달콤한 홍차! 응원하느라 목 쉴 때 마시면 최고야!",
+        "numbers": "유우마랑 아스트랄이 넘버즈 때문에 다치는 건 싫지만... 친구를 지키기 위해 나도 도울 거야!"
+      },
+      "pdaMails": [
+        {
+          "mailId": "zexal_char_170_mail_invite",
+          "sender": "미즈키 코토리",
+          "timeSlot": "morning",
+          "spotId": "spot_heartland_city",
+          "subject": "[코토리] 유우마 몰래 맛있는 거 먹자!",
+          "body": "안녕! 유우마 녀석 또 사고 쳐서 벌서고 있어, 헤헤! 우리끼리 시내 카페에서 달콤한 사과 파이 먹으면서 놀자!"
+        }
+      ],
+      "grandPrixEnding": {
+        "title": "🏆 듀얼 카니발 그랑프리 챔피언 엔딩: [미즈키 코토리]와의 영원한 유대",
+        "dialogues": [
+          {
+            "speaker": "미즈키 코토리",
+            "text": "우리가 해냈어... 하트랜드 듀얼 카니발의 정점에 너와 함께 서다니 꿈만 같아!"
+          },
+          {
+            "speaker": "여주인공",
+            "text": "네가 내 곁에서 등을 지켜주었기 때문에 승리할 수 있었어. 고마워, 최고의 파트너!"
+          },
+          {
+            "speaker": "미즈키 코토리",
+            "text": "이 우승 트로피와 우리의 카드는 영원한 유대의 증표야. 앞으로도 언제나 함께하자!"
+          }
+        ]
+      }
+    },
+    {
+      "personaId": "zexal_char_171",
+      "baseCharId": 171,
+      "displayName": "쓰리 (Ⅲ)",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 넘버즈를 사냥하는 고독한 듀얼리스트다! 내 곁에 파트너는 필요 없다. 듀얼이라면 언제든 덤벼라!",
+      "dormOrFaction": "하트랜드 시티 듀얼리스트",
+      "partnerRole": "XyzRival",
+      "partnerSkillName": "라이벌의 오버레이",
+      "partnerSkillDesc": "하트랜드 시티에서 연마한 엑시즈 전술과 오버레이 파워로 파트너를 지원하는 쓰리 (Ⅲ) 전용 스탯.",
+      "favoriteGiftId": "emperor_key_replica",
+      "forms": [
+        {
+          "formCharId": 171,
+          "formName": "쓰리 (Ⅲ)",
+          "formTitle": "쓰리 (Ⅲ) · 하트랜드 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_waterfront_pier"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 쓰리 (Ⅲ)! 하트랜드의 승부사다! 덤벼라!",
+            "mid": "오, 네 엑시즈 감각 제법이군! 하지만 내 오버레이 유닛을 깰 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 쿵쾅거리게 하는군! 진검승부다!"
+          },
+          "duelStartLine": [
+            "오버레이 네트워크를 구축! 내 덱의 진정한 힘을 보여주마! 듀얼!"
+          ],
+          "aceCutInLine": [
+            "차원을 열어라! 나의 비장의 엑시즈 몬스터 소환!"
+          ],
+          "winLine": [
+            "좋았어! 완벽한 승리다!"
+          ],
+          "loseLine": [
+            "크윽... 완패다! 하지만 다음엔 내가 이긴다!"
+          ],
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_171.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_171.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "쓰리 (Ⅲ): 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "쓰리 (Ⅲ): 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "쓰리 (Ⅲ): 음? 선물이군. 받아두지.",
+        "hated": "쓰리 (Ⅲ): 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "쓰리 (Ⅲ): 흥, 아침부터 연습인가? 내 엑시즈 파워를 따라올 수 있다면 덤벼라.",
+        "evening": "쓰리 (Ⅲ): 어둠이 깔렸군. 나약한 결투자는 이 도시에서 살아남지 못한다.",
+        "deckComment": "쓰리 (Ⅲ): 제법 날카로운 카드군을 모았군. 하지만 내 랭크 업이 한 수 위다.",
+        "duelReady": "쓰리 (Ⅲ): 전력으로 덤벼라! 자비 따윈 없다!",
+        "cheer": "쓰리 (Ⅲ): 거기서 무너지지 마라! 내 라이벌이라면 끝까지 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "xyz_duel",
+      "topicReplies": {
+        "xyz_duel": "쓰리 (Ⅲ): 엑시즈 소환은 서로 다른 영혼이 하나가 되는 기적이지.",
+        "heartland": "쓰리 (Ⅲ): 하트랜드 시티의 테마파크엔 언제나 새로운 모험이 기다리고 있어.",
+        "food": "쓰리 (Ⅲ): 아카리 누나의 주먹밥이나 특제 버거가 최고지!",
+        "numbers": "쓰리 (Ⅲ): 넘버즈의 전설... 그 거대한 운명 속에서도 우린 우리의 길을 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "zexal_char_171_mail_invite",
+          "sender": "쓰리 (Ⅲ)",
+          "timeSlot": "morning",
+          "spotId": "spot_waterfront_pier",
+          "subject": "[쓰리 (Ⅲ)] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "zexal_char_172",
+      "baseCharId": 172,
+      "displayName": "벡터",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 넘버즈를 사냥하는 고독한 듀얼리스트다! 내 곁에 파트너는 필요 없다. 듀얼이라면 언제든 덤벼라!",
+      "dormOrFaction": "하트랜드 시티 듀얼리스트",
+      "partnerRole": "XyzRival",
+      "partnerSkillName": "라이벌의 오버레이",
+      "partnerSkillDesc": "하트랜드 시티에서 연마한 엑시즈 전술과 오버레이 파워로 파트너를 지원하는 벡터 전용 스탯.",
+      "favoriteGiftId": "emperor_key_replica",
+      "forms": [
+        {
+          "formCharId": 172,
+          "formName": "벡터",
+          "formTitle": "벡터 · 하트랜드 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_heartland_city"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 벡터! 하트랜드의 승부사다! 덤벼라!",
+            "mid": "오, 네 엑시즈 감각 제법이군! 하지만 내 오버레이 유닛을 깰 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 쿵쾅거리게 하는군! 진검승부다!"
+          },
+          "duelStartLine": [
+            "오버레이 네트워크를 구축! 내 덱의 진정한 힘을 보여주마! 듀얼!"
+          ],
+          "aceCutInLine": [
+            "차원을 열어라! 나의 비장의 엑시즈 몬스터 소환!"
+          ],
+          "winLine": [
+            "좋았어! 완벽한 승리다!"
+          ],
+          "loseLine": [
+            "크윽... 완패다! 하지만 다음엔 내가 이긴다!"
+          ],
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_172.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_172.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "벡터: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "벡터: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "벡터: 음? 선물이군. 받아두지.",
+        "hated": "벡터: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "벡터: 흥, 아침부터 연습인가? 내 엑시즈 파워를 따라올 수 있다면 덤벼라.",
+        "evening": "벡터: 어둠이 깔렸군. 나약한 결투자는 이 도시에서 살아남지 못한다.",
+        "deckComment": "벡터: 제법 날카로운 카드군을 모았군. 하지만 내 랭크 업이 한 수 위다.",
+        "duelReady": "벡터: 전력으로 덤벼라! 자비 따윈 없다!",
+        "cheer": "벡터: 거기서 무너지지 마라! 내 라이벌이라면 끝까지 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "xyz_duel",
+      "topicReplies": {
+        "xyz_duel": "벡터: 엑시즈 소환은 서로 다른 영혼이 하나가 되는 기적이지.",
+        "heartland": "벡터: 하트랜드 시티의 테마파크엔 언제나 새로운 모험이 기다리고 있어.",
+        "food": "벡터: 아카리 누나의 주먹밥이나 특제 버거가 최고지!",
+        "numbers": "벡터: 넘버즈의 전설... 그 거대한 운명 속에서도 우린 우리의 길을 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "zexal_char_172_mail_invite",
+          "sender": "벡터",
+          "timeSlot": "morning",
+          "spotId": "spot_heartland_city",
+          "subject": "[벡터] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "zexal_char_173",
+      "baseCharId": 173,
+      "displayName": "트론",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 넘버즈를 사냥하는 고독한 듀얼리스트다! 내 곁에 파트너는 필요 없다. 듀얼이라면 언제든 덤벼라!",
+      "dormOrFaction": "하트랜드 시티 듀얼리스트",
+      "partnerRole": "XyzRival",
+      "partnerSkillName": "라이벌의 오버레이",
+      "partnerSkillDesc": "하트랜드 시티에서 연마한 엑시즈 전술과 오버레이 파워로 파트너를 지원하는 트론 전용 스탯.",
+      "favoriteGiftId": "emperor_key_replica",
+      "forms": [
+        {
+          "formCharId": 173,
+          "formName": "트론",
+          "formTitle": "트론 · 하트랜드 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_yuma_house"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 트론! 하트랜드의 승부사다! 덤벼라!",
+            "mid": "오, 네 엑시즈 감각 제법이군! 하지만 내 오버레이 유닛을 깰 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 쿵쾅거리게 하는군! 진검승부다!"
+          },
+          "duelStartLine": [
+            "오버레이 네트워크를 구축! 내 덱의 진정한 힘을 보여주마! 듀얼!"
+          ],
+          "aceCutInLine": [
+            "차원을 열어라! 나의 비장의 엑시즈 몬스터 소환!"
+          ],
+          "winLine": [
+            "좋았어! 완벽한 승리다!"
+          ],
+          "loseLine": [
+            "크윽... 완패다! 하지만 다음엔 내가 이긴다!"
+          ],
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_173.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_173.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "트론: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "트론: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "트론: 음? 선물이군. 받아두지.",
+        "hated": "트론: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "트론: 흥, 아침부터 연습인가? 내 엑시즈 파워를 따라올 수 있다면 덤벼라.",
+        "evening": "트론: 어둠이 깔렸군. 나약한 결투자는 이 도시에서 살아남지 못한다.",
+        "deckComment": "트론: 제법 날카로운 카드군을 모았군. 하지만 내 랭크 업이 한 수 위다.",
+        "duelReady": "트론: 전력으로 덤벼라! 자비 따윈 없다!",
+        "cheer": "트론: 거기서 무너지지 마라! 내 라이벌이라면 끝까지 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "xyz_duel",
+      "topicReplies": {
+        "xyz_duel": "트론: 엑시즈 소환은 서로 다른 영혼이 하나가 되는 기적이지.",
+        "heartland": "트론: 하트랜드 시티의 테마파크엔 언제나 새로운 모험이 기다리고 있어.",
+        "food": "트론: 아카리 누나의 주먹밥이나 특제 버거가 최고지!",
+        "numbers": "트론: 넘버즈의 전설... 그 거대한 운명 속에서도 우린 우리의 길을 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "zexal_char_173_mail_invite",
+          "sender": "트론",
+          "timeSlot": "morning",
+          "spotId": "spot_waterfront_pier",
+          "subject": "[트론] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "zexal_char_228",
+      "baseCharId": 228,
+      "displayName": "하나조에 아이카",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 꽃꽂이 동아리 활동으로 바빠서 태그 파트너는 무리야. 듀얼이라면 상대해 줄게!",
+      "dormOrFaction": "하트랜드 시티 히로인",
+      "partnerRole": "TagHeroine",
+      "partnerSkillName": "하나조에 아이카의 결속: 빙설의 엑시즈!",
+      "partnerSkillDesc": "하트랜드 시티에서 연마한 엑시즈 전술과 오버레이 파워로 파트너를 지원하는 하나조에 아이카 전용 스탯.",
+      "favoriteGiftId": "emperor_key_replica",
+      "forms": [
+        {
+          "formCharId": 228,
+          "formName": "하나조에 아이카",
+          "formTitle": "하나조에 아이카 · 하트랜드 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_waterfront_pier"
+          ],
+          "greetingLines": {
+            "low": "안녕! 난 하나조에 아이카! 하트랜드 시티에서 엑시즈를 연마하고 있어. 한 판 겨뤄볼까?",
+            "mid": "와, 당신의 엑시즈 소환은 볼 때마다 정말 멋져요! 저도 온 힘을 다해 서포트할게요!",
+            "high": "당신 옆에서 함께 엑시즈를 부를 수 있어서 정말 행복해요! 우리 둘의 오버레이는 영원해요!"
+          },
+          "duelStartLine": "제 덱의 진심을 보여드릴게요! 듀얼 시작이에요!",
+          "aceCutInLine": "오버레이 네트워크 구축! 제 소중한 에이스 엑시즈 소환!",
+          "winLine": "해냈어요! 끝까지 카드를 믿은 덕분이에요!",
+          "loseLine": "아쉽지만 정말 즐거운 듀얼이었어요! 다음엔 더 성장해서 도전할게요!",
+          "sdSpritePath": "TagForce/ZEXAL/Characters_SD/sd_228.png",
+          "standingSpritePath": "TagForce/ZEXAL/Characters_Standing/full_228.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "하나조에 아이카: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "하나조에 아이카: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "하나조에 아이카: 음? 선물이군. 받아두지.",
+        "hated": "하나조에 아이카: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "하나조에 아이카: 여어! 좋은 아침! 오늘도 하트랜드에서 신나게 듀얼 해볼까?",
+        "evening": "하나조에 아이카: 오늘 듀얼도 진짜 박진감 넘쳤어! 내일 또 만나자고!",
+        "deckComment": "하나조에 아이카: 오호, 네 덱 엑시즈 전술 진짜 기발한데? 한 수 배웠어!",
+        "duelReady": "하나조에 아이카: 좋아, 듀얼 개시다! 캇토빙하게 붙어보자고!",
+        "cheer": "하나조에 아이카: 아직 끝난 게 아니야! 덱을 믿고 오버레이 드로우해!"
+      },
+      "bondEvents": [
+        {
+          "heartLevel": 1,
+          "title": "[하나조에 아이카] 첫 번째 인연: 하트랜드의 만남",
+          "dialogues": [
+            {
+              "speaker": "하나조에 아이카",
+              "text": "안녕! 테마파크 광장에서 네 듀얼을 지켜봤는데 정말 두근거렸어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워! 네 엑시즈 소환 타이밍도 정말 날카롭던걸? 앞으로 잘 부탁해."
+            },
+            {
+              "speaker": "하나조에 아이카",
+              "text": "응! 우리 서로를 북돋아 주는 최고의 파트너가 되어보자!"
+            }
+          ],
+          "choice": {
+            "prompt": "하나조에 아이카와 함께 어떤 결의를 다질까?",
+            "options": [
+              {
+                "text": "🔥 당당하고 화려하게 상대를 압도하자! (보상 DP 1.2배)",
+                "reply": "하핫, 좋아! 그 기백 아주 마음에 드는데?",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 차분하게 오버레이 유닛을 지키며 전술을 엮자! (내 시작 LP +500)",
+                "reply": "기본이 가장 중요한 법이지. 함께 연습하자!",
+                "effectType": "SafeBuff"
+              },
+              {
+                "text": "🤝 최고의 태그 파트너가 되어줄게! (호감도 대폭 상승)",
+                "reply": "든든한걸? 앞으로 잘 부탁해, 내 파트너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 3,
+          "title": "[하나조에 아이카] 세 번째 인연: 시련을 넘는 오버레이",
+          "dialogues": [
+            {
+              "speaker": "하나조에 아이카",
+              "text": "수많은 강적과 싸우면서... 네가 내 등을 맡아준다는 확신이 들었어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "나도 그래. 네가 옆에 있어 주는 것만으로도 어떤 넘버즈의 어둠도 두렵지 않아."
+            },
+            {
+              "speaker": "하나조에 아이카",
+              "text": "좋아! 이번 듀얼 카니발 결승전에서도 끝까지 함께 가보는 거야!"
+            }
+          ],
+          "choice": {
+            "prompt": "카니발 결승을 앞두고 어떤 전략으로 단결할까?",
+            "options": [
+              {
+                "text": "🔥 랭크업 매직! 에이스의 공격력을 한계까지 끌어올리자! (공격력 +400 버프)",
+                "reply": "정면 승부로 적을 박살내자고!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 빈틈없는 카운터와 수비로 적의 맹공을 막아내자! (내 시작 LP +1,000)",
+                "reply": "치밀한 전술이야. 완벽하게 준비하자!",
+                "effectType": "SafeBuff"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 5,
+          "title": "[하나조에 아이카] 최종 인연(MASTER): 영혼으로 맺어진 결속",
+          "dialogues": [
+            {
+              "speaker": "하나조에 아이카",
+              "text": "세계의 운명을 건 사투를 함께 헤쳐 나오며... 넌 내게 세상 그 누구보다 소중한 파트너가 되었어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워. 네 곁에서 싸울 수 있어서 난 진정한 넘버즈의 여왕으로 성장할 수 있었어."
+            },
+            {
+              "speaker": "하나조에 아이카",
+              "text": "우리의 결속은 영원해. 하트랜드 시티의 정상에서 영광을 함께 누리자!"
+            }
+          ],
+          "choice": {
+            "prompt": "최종 마스터 승급전! 마지막 맹세를 선택하자!",
+            "options": [
+              {
+                "text": "🔥 우리의 영혼과 모든 넘버즈를 걸고 승리하자! (마스터 보상 & DP 1.5배)",
+                "reply": "우리의 기적을 온 세계에 보여주자!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🤝 영원히 함께할 소울메이트로서 승리를 증명할게! (마스터 영구 버프)",
+                "reply": "고마워, 내 최고의 영원한 파트너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        }
+      ],
+      "favoriteTopic": "xyz_duel",
+      "topicReplies": {
+        "xyz_duel": "하나조에 아이카: 엑시즈 소환은 서로 다른 영혼이 하나가 되는 기적이지.",
+        "heartland": "하나조에 아이카: 하트랜드 시티의 테마파크엔 언제나 새로운 모험이 기다리고 있어.",
+        "food": "하나조에 아이카: 아카리 누나의 주먹밥이나 특제 버거가 최고지!",
+        "numbers": "하나조에 아이카: 넘버즈의 전설... 그 거대한 운명 속에서도 우린 우리의 길을 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "zexal_char_228_mail_invite",
+          "sender": "하나조에 아이카",
+          "timeSlot": "morning",
+          "spotId": "spot_heartland_city",
+          "subject": "[하나조에 아이카] 야! 듀얼 한판 붙자!",
+          "body": "여어! 지금 광장에 나와 있는데 몸이 근질거리네! 시간 괜찮으면 와서 화끈하게 한판 붙자고!"
+        }
+      ],
+      "grandPrixEnding": {
+        "title": "🏆 듀얼 카니발 그랑프리 챔피언 엔딩: [하나조에 아이카]와의 영원한 유대",
+        "dialogues": [
+          {
+            "speaker": "하나조에 아이카",
+            "text": "우리가 해냈어... 하트랜드 듀얼 카니발의 정점에 너와 함께 서다니 꿈만 같아!"
+          },
+          {
+            "speaker": "여주인공",
+            "text": "네가 내 곁에서 등을 지켜주었기 때문에 승리할 수 있었어. 고마워, 최고의 파트너!"
+          },
+          {
+            "speaker": "하나조에 아이카",
+            "text": "이 우승 트로피와 우리의 카드는 영원한 유대의 증표야. 앞으로도 언제나 함께하자!"
+          }
+        ]
+      }
+    }
+  ],
+  "drawBreadCatalog": [
+    {
+      "breadId": "bread_heartland_burger",
+      "name": "🍔 하트랜드 캇토빙 특제 치즈버거",
+      "priceDp": 120,
+      "flavor": "delicious",
+      "desc": "유우마가 가장 좋아하는 두툼한 비프 패티와 치즈가 듬뿍 들어간 활력 버거."
+    },
+    {
+      "breadId": "bread_photon_parfait",
+      "name": "🍨 포톤 갤럭시 블루베리 샌드",
+      "priceDp": 180,
+      "flavor": "luxury",
+      "desc": "하트랜드 시티 고급 라운지에서 판매하는 우아하고 차가운 블루베리 크림 샌드."
+    },
+    {
+      "breadId": "bread_chaos_spicy",
+      "name": "🌶️ 바리안 카오스 불닭 핫도그",
+      "priceDp": 140,
+      "flavor": "spicy",
+      "desc": "한 입 베어 물면 불꽃이 치솟는 초특급 매운맛 핫도그. 아리트의 열혈 간식."
+    },
+    {
+      "breadId": "bread_legendary_golden_egg",
+      "name": "🥚 전설의 황금 계란빵 (특등)",
+      "priceDp": 300,
+      "flavor": "legendary",
+      "desc": "넘버즈의 기적처럼 호감도를 단숨에 폭발적으로 올려주는 환상의 황금 샌드위치."
+    }
+  ],
+  "conversationTopics": [
+    {
+      "topicId": "xyz_duel",
+      "name": "✨ 엑시즈 소환 & 오버레이 유닛",
+      "desc": "오버레이 네트워크, 랭크업 매직, 카오스 엑시즈에 대해 이야기를 나눕니다."
+    },
+    {
+      "topicId": "heartland",
+      "name": "🎡 하트랜드 시티 & 테마파크",
+      "desc": "롤러코스터, 듀얼 카니발, 하트랜드 타워의 비밀에 대해 대화를 나눕니다."
+    },
+    {
+      "topicId": "food",
+      "name": "🍙 아카리의 듀얼 도시락 & 버거",
+      "desc": "주먹밥과 하트랜드 특제 디저트, 듀얼 후 먹는 별미에 대해 이야기합니다."
+    },
+    {
+      "topicId": "numbers",
+      "name": "🌌 넘버즈 & 아스트랄·바리안 세계",
+      "desc": "100장의 넘버즈 카드와 아스트랄 세계의 기억, 칠황의 사명에 대해 깊은 이야기를 나눕니다."
+    }
+  ],
+  "myRoomConfig": {
+    "roomName": "하트랜드 호텔 스위트 (My Room)",
+    "roomDesc": "하루를 시작하고 마무리하는 하트랜드 시티의 호화 숙소. 휴식을 취하거나 PDA 단말기를 통해 인연 명부와 메일을 확인할 수 있다.",
+    "features": [
+      "🛏️ 침대에서 휴식 (다음 시간대 진행 및 바닥 아이템 리셋)",
+      "📱 하트랜드 PDA 단말기 (동료들의 결투 초대 메일 확인)",
+      "📖 듀얼리스트 명부 (37명 전원의 출몰 정보 & 여성 파트너 호감도)",
+      "🃏 내 덱 & 넘버즈 오버레이 파트너 스킬 확인"
+    ]
+  },
+  "assetConfig": {
+    "baseResourceDir": "TagForce/ZEXAL",
+    "baseStreamingDir": "TagForce/ZEXAL",
+    "worldMapPath": "TagForce/ZEXAL/Maps/worldmap_zexal.png",
+    "myRoomPath": "TagForce/ZEXAL/Maps/myroom_zexal.png",
+    "breadShopPath": "TagForce/ZEXAL/Maps/shop_zexal_bakery.png"
+  }
+}

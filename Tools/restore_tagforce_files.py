@@ -9,6 +9,7 @@ import shutil
 
 PROJECT = Path(__file__).resolve().parents[1]
 SCENARIO = re.compile(r"tagforce_[a-z0-9_]+\.json(?:\.meta)?")
+WORLD_SCRIPT = re.compile(r"tagforce_[a-z0-9_]+_script\.json(?:\.meta)?")
 
 
 def staged_files(source):
@@ -34,7 +35,10 @@ def restore(source, destination, check):
     files = staged_files(source)
     pending = []
     for path in files:
-        target = destination / path.relative_to(source)
+        relative = path.relative_to(source)
+        if len(relative.parts) == 1 and WORLD_SCRIPT.fullmatch(path.name):
+            relative = Path("TagForce") / relative
+        target = destination / relative
         if not target.resolve().is_relative_to(destination):
             raise ValueError(f"Destination resolves outside StreamingAssets: {target}")
         if target.exists():

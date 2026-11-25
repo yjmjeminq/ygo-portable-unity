@@ -63,6 +63,7 @@ namespace YGOPortable.UI
         private const float NextRepeatDelay = .10f;
 
         private Vector2Int _heldDirection;
+        internal Vector2Int HeldDirection => _heldDirection;
         private DeckPadButtons _heldButtons;
         private bool _sampledButtons;
         private float _nextDirection;

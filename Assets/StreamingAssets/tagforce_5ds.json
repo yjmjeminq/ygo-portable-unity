@@ -1,0 +1,254 @@
+{
+  "seriesId": "5ds",
+  "assetConfig": {
+    "worldMapPath": "TagForce/5DS/Maps/world_map.png"
+  },
+  "spots": [
+    {
+      "spotId": "spot_satellite_hideout",
+      "name": "새틀라이트 아지트",
+      "subtitle": "레이서들이 D 휠을 정비하는 거점",
+      "mapPath": "TagForce/5DS/Maps/spot_satellite_hideout.png",
+      "defaultPickups": [
+        "dp_small",
+        "golden_egg_bread"
+      ]
+    },
+    {
+      "spotId": "spot_neo_domino",
+      "name": "네오 도미노 광장",
+      "subtitle": "고가도로가 교차하는 도심 광장",
+      "mapPath": "TagForce/5DS/Maps/spot_neo_domino.png",
+      "defaultPickups": [
+        "dp_small",
+        "cyber_custom_parts"
+      ]
+    },
+    {
+      "spotId": "spot_speedway",
+      "name": "라이딩 듀얼 경기장",
+      "subtitle": "WRGP 주행 코스와 선수 대기실",
+      "mapPath": "TagForce/5DS/Maps/spot_speedway.png",
+      "defaultPickups": [
+        "dp_small",
+        "blue_queen_tea"
+      ]
+    },
+    {
+      "spotId": "spot_garage",
+      "name": "D 휠 정비소",
+      "subtitle": "공구와 예비 부품을 갖춘 정비 구역",
+      "mapPath": "TagForce/5DS/Maps/spot_garage.png",
+      "defaultPickups": [
+        "dp_small",
+        "spirit_amber_charm"
+      ]
+    },
+    {
+      "spotId": "spot_security",
+      "name": "시큐리티 지구",
+      "subtitle": "시큐리티 순찰이 지나는 거리",
+      "mapPath": "TagForce/5DS/Maps/spot_security.png",
+      "defaultPickups": [
+        "dp_small",
+        "dark_duel_emblem"
+      ]
+    },
+    {
+      "spotId": "spot_satellite_docks",
+      "name": "새틀라이트 부두",
+      "subtitle": "물자 창고가 남아 있는 해안 지대",
+      "mapPath": "TagForce/5DS/Maps/spot_satellite_docks.png",
+      "defaultPickups": [
+        "dp_small",
+        "golden_egg_bread"
+      ]
+    }
+  ],
+  "roster": [
+    {
+      "charId": 35,
+      "spotId": "spot_satellite_hideout"
+    },
+    {
+      "charId": 16,
+      "spotId": "spot_neo_domino"
+    },
+    {
+      "charId": 1,
+      "spotId": "spot_speedway"
+    },
+    {
+      "charId": 3200,
+      "spotId": "spot_garage"
+    },
+    {
+      "charId": 3201,
+      "spotId": "spot_security"
+    },
+    {
+      "charId": 3202,
+      "spotId": "spot_satellite_docks"
+    },
+    {
+      "charId": 3203,
+      "spotId": "spot_satellite_hideout"
+    },
+    {
+      "charId": 3204,
+      "spotId": "spot_neo_domino"
+    },
+    {
+      "charId": 2,
+      "spotId": "spot_speedway"
+    },
+    {
+      "charId": 3,
+      "spotId": "spot_garage"
+    },
+    {
+      "charId": 4,
+      "spotId": "spot_security"
+    },
+    {
+      "charId": 5,
+      "spotId": "spot_satellite_docks"
+    },
+    {
+      "charId": 6,
+      "spotId": "spot_satellite_hideout"
+    },
+    {
+      "charId": 7,
+      "spotId": "spot_neo_domino"
+    },
+    {
+      "charId": 10,
+      "spotId": "spot_speedway"
+    },
+    {
+      "charId": 11,
+      "spotId": "spot_garage"
+    },
+    {
+      "charId": 12,
+      "spotId": "spot_security"
+    },
+    {
+      "charId": 13,
+      "spotId": "spot_satellite_docks"
+    },
+    {
+      "charId": 14,
+      "spotId": "spot_satellite_hideout"
+    },
+    {
+      "charId": 15,
+      "spotId": "spot_neo_domino"
+    },
+    {
+      "charId": 17,
+      "spotId": "spot_speedway"
+    },
+    {
+      "charId": 18,
+      "spotId": "spot_garage"
+    },
+    {
+      "charId": 19,
+      "spotId": "spot_security"
+    },
+    {
+      "charId": 20,
+      "spotId": "spot_satellite_docks"
+    },
+    {
+      "charId": 21,
+      "spotId": "spot_satellite_hideout"
+    },
+    {
+      "charId": 23,
+      "spotId": "spot_neo_domino"
+    },
+    {
+      "charId": 24,
+      "spotId": "spot_speedway"
+    },
+    {
+      "charId": 25,
+      "spotId": "spot_garage"
+    },
+    {
+      "charId": 26,
+      "spotId": "spot_security"
+    },
+    {
+      "charId": 27,
+      "spotId": "spot_satellite_docks"
+    },
+    {
+      "charId": 28,
+      "spotId": "spot_satellite_hideout"
+    },
+    {
+      "charId": 29,
+      "spotId": "spot_neo_domino"
+    },
+    {
+      "charId": 30,
+      "spotId": "spot_speedway"
+    },
+    {
+      "charId": 31,
+      "spotId": "spot_garage"
+    },
+    {
+      "charId": 32,
+      "spotId": "spot_security"
+    },
+    {
+      "charId": 33,
+      "spotId": "spot_satellite_docks"
+    },
+    {
+      "charId": 34,
+      "spotId": "spot_satellite_hideout"
+    },
+    {
+      "charId": 36,
+      "spotId": "spot_neo_domino"
+    },
+    {
+      "charId": 138,
+      "spotId": "spot_speedway"
+    },
+    {
+      "charId": 210,
+      "spotId": "spot_garage"
+    },
+    {
+      "charId": 216,
+      "spotId": "spot_security"
+    },
+    {
+      "charId": 218,
+      "spotId": "spot_satellite_docks"
+    },
+    {
+      "charId": 219,
+      "spotId": "spot_satellite_hideout"
+    },
+    {
+      "charId": 220,
+      "spotId": "spot_neo_domino"
+    },
+    {
+      "charId": 221,
+      "spotId": "spot_speedway"
+    },
+    {
+      "charId": 230,
+      "spotId": "spot_garage"
+    }
+  ]
+}

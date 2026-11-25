@@ -1,0 +1,4036 @@
+{
+  "seriesId": "dm",
+  "seriesIdx": 0,
+  "seriesTitle": "유희왕 DM (도미노 시티)",
+  "protagonist": {
+    "name": "주인공",
+    "title": "홍련의 듀얼 퀸",
+    "portraitPath": "Story/Protagonist",
+    "sdSpritePath": "TagForce/DM/SD/sd_protagonist.png",
+    "standingSpritePath": "TagForce/DM/Characters_Standing/full_protagonist.png"
+  },
+  "spots": [
+    {
+      "spotId": "spot_domino_plaza",
+      "name": "도미노 플라자 중앙 광장",
+      "subtitle": "대형 시계탑과 분수대가 있는 배틀 시티의 중심지",
+      "ambientTheme": "domino_plaza",
+      "defaultPickups": [
+        "beef_croquette",
+        "dp_small",
+        "millennium_puzzle_strap"
+      ],
+      "mapPath": "TagForce/DM/Maps/spot_domino_plaza.png"
+    },
+    {
+      "spotId": "spot_kame_game",
+      "name": "거북 게임점 & 골목 상점가",
+      "subtitle": "유희네 할아버지의 카드샵과 정겨운 도미노 상가 골목",
+      "ambientTheme": "kame_game",
+      "defaultPickups": [
+        "beef_croquette",
+        "dp_medium",
+        "exodia_puzzle_piece"
+      ],
+      "mapPath": "TagForce/DM/Maps/spot_kame_game.png"
+    },
+    {
+      "spotId": "spot_kaiba_corp",
+      "name": "카이바 코퍼레이션(KC) 본사 돔 광장",
+      "subtitle": "최첨단 홀로그램 듀얼 링과 푸른 눈의 백룡 엠블럼 테라스",
+      "ambientTheme": "kaiba_corp",
+      "defaultPickups": [
+        "kc_energy_drink",
+        "dp_large",
+        "kc_energy_drink"
+      ],
+      "mapPath": "TagForce/DM/Maps/spot_kaiba_corp.png"
+    },
+    {
+      "spotId": "spot_domino_pier",
+      "name": "도미노 시티 항구 & 배틀십 부두",
+      "subtitle": "거대 비행선 배틀십이 정박하는 바닷바람 부는 부두",
+      "ambientTheme": "domino_pier",
+      "defaultPickups": [
+        "beef_croquette",
+        "dp_medium",
+        "millennium_puzzle_strap"
+      ],
+      "mapPath": "TagForce/DM/Maps/spot_domino_pier.png"
+    },
+    {
+      "spotId": "spot_museum",
+      "name": "도미노 시립 박물관 & 고대 석판 홀",
+      "subtitle": "파라오의 기억과 천년 아이템이 깃든 신비의 전시실",
+      "ambientTheme": "ancient_museum",
+      "defaultPickups": [
+        "ancient_egypt_papyrus",
+        "dp_large",
+        "millennium_puzzle_strap"
+      ],
+      "mapPath": "TagForce/DM/Maps/spot_museum.png"
+    },
+    {
+      "spotId": "spot_underground_arena",
+      "name": "도미노 지하 듀얼 콜로세움",
+      "subtitle": "도시의 어두운 이면, 거친 배틀 시티 승부사들의 투기장",
+      "ambientTheme": "dark_underground",
+      "defaultPickups": [
+        "exodia_puzzle_piece",
+        "dp_large",
+        "kc_energy_drink"
+      ],
+      "mapPath": "TagForce/DM/Maps/spot_underground_arena.png"
+    }
+  ],
+  "gifts": [
+    {
+      "giftId": "exodia_puzzle_piece",
+      "name": "🧩 전설의 봉인된 파츠 모형",
+      "priceDp": 250,
+      "baseAffinity": 35,
+      "favoriteAffinity": 70,
+      "desc": "봉인된 엑조디아의 비밀이 새겨진 황금 조각 모형. 지략파와 수집가 듀얼리스트가 아주 좋아한다."
+    },
+    {
+      "giftId": "kc_energy_drink",
+      "name": "⚡ KC 울트라 블루 드링크",
+      "priceDp": 350,
+      "baseAffinity": 40,
+      "favoriteAffinity": 80,
+      "desc": "카이바 코퍼레이션에서 연구·개발한 최고급 집중력 강화 음료. 엘리트 듀얼리스트들의 필수품."
+    },
+    {
+      "giftId": "millennium_puzzle_strap",
+      "name": "👁️ 천년 퍼즐 황금 스트랩",
+      "priceDp": 350,
+      "baseAffinity": 40,
+      "favoriteAffinity": 80,
+      "desc": "천년 퍼즐의 우로보로스 문양이 정교하게 각인된 황금빛 스트랩. 파라오와 고대의 유대를 맺는다."
+    },
+    {
+      "giftId": "beef_croquette",
+      "name": "🥩 도미노 정육점 갓 튀긴 비프 고로케",
+      "priceDp": 200,
+      "baseAffinity": 30,
+      "favoriteAffinity": 65,
+      "desc": "도미노 상가 정육점에서 갓 튀겨내어 육즙이 가득한 바삭한 고로케. 조이와 열혈 듀얼리스트의 최애 간식."
+    },
+    {
+      "giftId": "ancient_egypt_papyrus",
+      "name": "📜 고대 이집트 상형문자 파피루스",
+      "priceDp": 500,
+      "baseAffinity": 50,
+      "favoriteAffinity": 100,
+      "desc": "파라오의 신관들과 삼환신의 문양이 적혀있는 신비한 파피루스 사본. 이시즈, 마리크 등이 경외한다."
+    }
+  ],
+  "personas": [
+    {
+      "personaId": "dm_char_104",
+      "baseCharId": 104,
+      "displayName": "어둠의 유우기",
+      "isTagEligible": false,
+      "partnerRefusal": "네 실력과 카드를 향한 신뢰는 인정한다. 하지만 파라오로서, 내 등은 홀로 카드의 운명을 짊어져야 해. 필드 위에서 전력으로 겨루자!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "파트너와 듀얼 시 드로우 단계에서 위기를 타개할 역전의 카드를 이끌어내는 파라오의 긍지.",
+      "favoriteGiftId": "millennium_puzzle_strap",
+      "forms": [
+        {
+          "formCharId": 104,
+          "formName": "어둠의 유우기",
+          "formTitle": "어둠의 유우기 · 도미노 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_kaiba_corp"
+          ],
+          "greetingLines": {
+            "low": "왔는가! 내 이름은 어둠의 유우기. 카드의 신뢰를 믿는 자라면 언제든 환영이다.",
+            "mid": "너의 눈빛에는 확고한 결투자의 영혼이 깃들어 있군. 필드에서 마주하자!",
+            "high": "진정한 결투자여! 너와 나누는 듀얼은 3천 년 전의 기억 속에서도 가장 뜨겁게 빛난다!"
+          },
+          "duelStartLine": "나의 턴, 드로우! 카드의 운명을 믿고 승부하겠다!",
+          "aceCutInLine": "나와라, 궁극의 마도사! 블랙 매지션! 검은 마도 연탄-!!",
+          "winLine": "카드를 믿는 마음에 승리의 여신이 미소 지어주었다. 훌륭한 승부였다!",
+          "loseLine": "완패다... 네 카드의 결속과 결단력이 나를 뛰어넘었다!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_104.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_104.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "어둠의 유우기: 오오! 내 마음에 꼭 드는 선물이군. 카드의 유대만큼이나 소중히 간직하마!",
+        "liked": "어둠의 유우기: 호오, 센스 있는 선물이군. 감사히 받겠다.",
+        "neutral": "어둠의 유우기: 음? 날 위한 선물인가? 고맙군.",
+        "hated": "어둠의 유우기: 으음... 마음은 고맙지만, 솔직히 내 취향과는 거리가 멀군."
+      },
+      "partnerQuotes": {
+        "morning": "좋은 아침이다! 새로운 하루의 시작, 카드의 인도에 몸을 맡겨보자.",
+        "evening": "어느덧 해가 졌군. 오늘 나눈 듀얼의 영혼은 가슴속 깊이 남아있다.",
+        "deckComment": "네 덱에서는 카드 한 장 한 장을 아끼는 강한 유대와 신뢰가 느껴진다.",
+        "duelReady": "나의 턴, 드로우! 필드 위에서 결투자의 긍지를 보여주마!",
+        "cheer": "포기하지 마라! 네 덱의 카드는 아직 살아 숨 쉬고 있다! 자신을 믿어라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "듀얼이란 카드를 신뢰하고, 자신을 뛰어넘는 영혼의 대화다.",
+        "domino_city": "배틀 시티의 열기가 아직도 골목 구석구석에 살아 숨 쉬고 있는 것 같군.",
+        "food": "할아버지 가게에서 아이보가 끓여주는 따뜻한 카레는 언제 먹어도 기운이 나지.",
+        "millennium": "천년 퍼즐... 잃어버린 3천 년의 기억과 사명이 이 퍼즐 속에 담겨있다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_104_mail_invite",
+          "sender": "어둠의 유우기",
+          "timeSlot": "morning",
+          "spotId": "spot_domino_plaza",
+          "subject": "[어둠의 유우기] 광장에서 듀얼을 청한다.",
+          "body": "왔는가, 결투자여. 카드의 운명이 너와의 듀얼을 가리키고 있다. 광장 필드에서 전력으로 승부하자!"
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_94",
+      "baseCharId": 94,
+      "displayName": "카이바 세토",
+      "isTagEligible": false,
+      "partnerRefusal": "흥! 와하하하하! 범골 녀석과 어울려 다니는 네놈 따위와 손을 잡을 이유는 없다! 분쇄! 옥쇄! 대갈채! 내 푸른 눈 앞에 무릎 꿇을 각오나 해라!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "상대 필드의 에이스를 무자비하게 분쇄하고 절대적인 타점으로 압도하는 사장님의 패기.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 94,
+          "formName": "카이바 세토",
+          "formTitle": "카이바 세토 · 도미노 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_domino_plaza"
+          ],
+          "greetingLines": {
+            "low": "흥! 시간 낭비는 딱 질색이다. 범골 녀석처럼 한심한 덱을 쥐고 온 건 아니겠지?",
+            "mid": "흐음... 네 듀얼 데이터는 제법 흥미롭군. 카이바 코퍼레이션의 테스트 상대로 삼아주마.",
+            "high": "와하하하하! 지루한 일상에 그나마 볼 만한 듀얼리스트가 나타났군! 내 앞에 서라!"
+          },
+          "duelStartLine": "승자만이 정의다! 카이바 세토의 압도적인 전술 앞에 엎드려라!",
+          "aceCutInLine": "강인! 무적! 최강! 분쇄하라! 푸른 눈의 백룡, 멸망의 버스트 스트림-!!",
+          "winLine": "하하하하! 분쇄! 옥쇄! 대갈채! 이것이 바로 카이바 세토의 절대 승리 공식이다!",
+          "loseLine": "크윽... 인정할 수 없다! 내가 패배하다니... 다음엔 전력으로 네놈의 덱을 짓밟아주마!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_94.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_94.png"
+        },
+        {
+          "formCharId": 195,
+          "formName": "카이바 세토 (극장판)",
+          "formTitle": "카이바 세토 (극장판) · 도미노 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_domino_plaza"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 카이바 세토 (극장판)! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "승자만이 정의다! 카이바 세토의 압도적인 전술 앞에 엎드려라!",
+          "aceCutInLine": "강인! 무적! 최강! 분쇄하라! 푸른 눈의 백룡, 멸망의 버스트 스트림-!!",
+          "winLine": "하하하하! 분쇄! 옥쇄! 대갈채! 이것이 바로 카이바 세토의 절대 승리 공식이다!",
+          "loseLine": "크윽... 인정할 수 없다! 내가 패배하다니... 다음엔 전력으로 네놈의 덱을 짓밟아주마!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_195.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_195.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "카이바 세토: 흥... 제법 가치 있는 물건을 골라왔군. 내 듀얼 디스크 덱 케이스에 보관해주마.",
+        "liked": "카이바 세토: 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "카이바 세토: 쓸데없는 선물 따위로 내 환심을 살 수 있을 거라 생각 마라.",
+        "hated": "카이바 세토: 네놈! 이 카이바 세토에게 이런 삼류 쓰레기를 던져주다니, 제정신이냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "흥! 게으름뱅이 녀석! 지금이 몇 시인 줄 알고 어슬렁거리나? 푸른 눈의 시뮬레이션을 방해하지 마라!",
+        "evening": "어두워졌군. 범골 녀석들처럼 빈둥거릴 시간 따윈 없다. 덱을 재구축해라!",
+        "deckComment": "흥, 제법 날카로운 카드군을 모았군. 하지만 이 카이바 세토의 푸른 눈을 뚫기엔 어림없다!",
+        "duelReady": "와하하하하! 전속전진이다! 패배의 공포를 뼈저리게 새겨주마!",
+        "cheer": "네놈! 꼴사납게 무릎 꿇지 마라! 내 라이벌이라 자부한다면 그 자리에서 일어서라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "듀얼에 기적 따윈 없다! 철저히 계산된 전술과 절대적인 힘만이 승리를 쟁취할 뿐!",
+        "domino_city": "이 도미노 시티 전체가 카이바 코퍼레이션의 최첨단 솔리드 비전 실험장이다.",
+        "food": "음식 따윈 영양 공급용 연료에 불과하다. 비효율적인 잡담에 시간 낭비하지 마라.",
+        "millennium": "천년 아이템 따위 미신에 불과해! 나의 미래는 오직 과학과 나의 의지로만 쟁취한다!"
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_94_mail_invite",
+          "sender": "카이바 세토",
+          "timeSlot": "morning",
+          "spotId": "spot_domino_plaza",
+          "subject": "[KC 카이바] 즉시 광장으로 출두해라.",
+          "body": "네놈의 듀얼 데이터를 검증할 필요가 생겼다. 내 푸른 눈의 가상 시뮬레이션 상대가 되어라. 1초의 지각도 용납하지 않는다!"
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_81",
+      "baseCharId": 81,
+      "displayName": "죠노우치 카츠야",
+      "isTagEligible": false,
+      "partnerRefusal": "오! 너 꽤 하잖아?! 하지만 사나이 죠노우치 카츠야의 영혼의 파트너는 유우기 하나뿐이라고! 듀얼이라면 언제든 덤비라고, 이 자식아!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "절체절명의 위기에서 기적의 역전을 터뜨리는 불꽃의 주사위와 근성 스탯.",
+      "favoriteGiftId": "beef_croquette",
+      "forms": [
+        {
+          "formCharId": 81,
+          "formName": "죠노우치 카츠야",
+          "formTitle": "죠노우치 카츠야 · 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_kame_game"
+          ],
+          "greetingLines": {
+            "low": "오! 기다리고 있었다고! 사나이 죠노우치 카츠야 님이 상대해주마!",
+            "mid": "크으~ 너 꽤 하잖아? 하지만 유우기한테 배운 내 불꽃의 근성은 못 꺾는다제!",
+            "high": "헤헷! 너 진짜 마음에 든다! 이따가 상가 고로케 먹으러 가자, 내가 쏠게!"
+          },
+          "duelStartLine": "사나이의 배짱과 근성을 보여주마! 듀얼 개시다제!",
+          "aceCutInLine": "검붉은 마룡이여, 분노의 업화를 뿜어라! 붉은 눈의 흑룡, 흑염탄-!!",
+          "winLine": "만세-! 봤냐, 내 불꽃의 역전 콤보! 진짜 짜릿한 승부였다제!",
+          "loseLine": "아이고~ 졌네 졌어! 하지만 포기란 없다! 한 판 더 하자제!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_81.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_81.png"
+        },
+        {
+          "formCharId": 194,
+          "formName": "죠노우치 카츠야 (세뇌)",
+          "formTitle": "죠노우치 카츠야 (세뇌) · 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_kame_game"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 죠노우치 카츠야 (세뇌)! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "사나이의 배짱과 근성을 보여주마! 듀얼 개시다제!",
+          "aceCutInLine": "검붉은 마룡이여, 분노의 업화를 뿜어라! 붉은 눈의 흑룡, 흑염탄-!!",
+          "winLine": "만세-! 봤냐, 내 불꽃의 역전 콤보! 진짜 짜릿한 승부였다제!",
+          "loseLine": "아이고~ 졌네 졌어! 하지만 포기란 없다! 한 판 더 하자제!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_194.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_194.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "죠노우치 카츠야: 우오오옷-! 이 고로케 샌드위치 냄새는?! 진짜 먹고 싶었는데! 넌 최고의 친구다제!!",
+        "liked": "죠노우치 카츠야: 오! 꽤 센스 있는데? 고맙게 잘 먹을게!",
+        "neutral": "죠노우치 카츠야: 오, 선물이냐? 사양 않고 받으마!",
+        "hated": "죠노우치 카츠야: 으아악! 뭐야 이거, 두리안이냐?! 코가 썩어 문드러질 것 같다제-!!"
+      },
+      "partnerQuotes": {
+        "morning": "오우~! 좋은 아침이다제! 오늘 아침밥으로 토스트 물고 전력 질주해왔다고!",
+        "evening": "으아~ 벌써 노을 졌네! 이따가 동네 분식집 가서 고로케에 라면 한 그릇 때리러 가자!",
+        "deckComment": "오호! 네 덱, 제법 사나이의 피가 끓어오르는 화끈한 맛이 있는데?! 아주 좋아!",
+        "duelReady": "사나이 죠노우치 님의 불꽃의 듀얼이다! 절대 안 봐주니까 덤비라고!",
+        "cheer": "포기하면 거기서 끝장이다제! 사나이의 근성을 보여줘! 기합으로 드로우다-!!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "승부는 확률이나 머리가 아니라 배짱이다! 마지막 1장에 모든 걸 거는 게 듀얼이지!",
+        "domino_city": "상가 아주머니들이 듀얼 대회 이겼다고 어묵 하나씩 더 얹어주시더라, 헤헷!",
+        "food": "바삭바삭 갓 튀긴 감자 고로케랑 불고기 덮밥! 이것만 있으면 사흘 밤도 샐 수 있어!",
+        "millennium": "천년 아이템인지 뭔지는 잘 몰라도, 유우기를 괴롭히는 녀석은 내가 다 때려눕혀줄 거야!"
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_81_mail_invite",
+          "sender": "죠노우치 카츠야",
+          "timeSlot": "morning",
+          "spotId": "spot_kaiba_corp",
+          "subject": "[죠노우치] 야! 고로케 먹고 한 판 붙자제!",
+          "body": "어이! 상가에서 갓 튀긴 고로케 샀는데 너한테도 하나 줄게! 먹고 나서 바로 사나이의 불꽃 듀얼 한판 때리자고!"
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_105",
+      "baseCharId": 105,
+      "displayName": "무토 유우기",
+      "isTagEligible": false,
+      "partnerRefusal": "미안해... 난 또 다른 나와의 마지막 결투를 준비하며, 혼자서 온전히 일어서는 법을 배우고 있어. 필드 위에서 서로의 성장을 확인하자!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 무토 유우기 전용 전술 스탯.",
+      "favoriteGiftId": "millennium_puzzle_strap",
+      "forms": [
+        {
+          "formCharId": 105,
+          "formName": "무토 유우기",
+          "formTitle": "무토 유우기 · 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_kaiba_corp"
+          ],
+          "greetingLines": {
+            "low": "안녕! 거북 게임샵에 온 걸 환영해! 새로운 카드 구경하러 온 거야?",
+            "mid": "네 덱을 보면 마음이 따뜻해져. 또 다른 나 없이도, 나 최선을 다할게!",
+            "high": "너와 듀얼을 하고 있으면... 내 안에서도 큰 용기가 솟아나는 것 같아!"
+          },
+          "duelStartLine": "카드를 소중히 여기는 마음으로, 전력을 다할게! 듀얼!",
+          "aceCutInLine": "나와라, 침묵의 마도사! 사일런트 매지션, 마법을 밝혀줘!",
+          "winLine": "고마워! 끝까지 서로를 믿었기에 거둘 수 있었던 소중한 승리야.",
+          "loseLine": "대단해! 네 침착함과 콤보 전술에서 정말 많은 걸 배웠어.",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_105.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_105.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "무토 유우기: 흥! 제법 값어치 있는 물건을 골라왔군. 덱 케이스에 챙겨두마!",
+        "liked": "무토 유우기: 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "무토 유우기: 쓸데없는 정성에 신경 쓸 시간 있으면 덱이나 튜닝해라.",
+        "hated": "무토 유우기: 네놈! 감히 나한테 이런 쓰레기를 던져주는 배짱은 어디서 나온 거냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "무토 유우기: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "무토 유우기: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "무토 유우기: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "무토 유우기: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "무토 유우기: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "카드는 싸움의 도구가 아니라, 친구이자 서로를 이어주는 마음의 다리야.",
+        "domino_city": "우리 가게 지하에 희귀한 보드게임도 진짜 많아. 나중에 구경시켜 줄게!",
+        "food": "할아버지가 끓여주시는 구수한 된장국이 제일 좋아.",
+        "millennium": "천년 퍼즐을 완성했을 때 빌었던 소원... 평생 함께할 친구를 달라는 소원이었어."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_105_mail_invite",
+          "sender": "무토 유우기",
+          "timeSlot": "morning",
+          "spotId": "spot_kaiba_corp",
+          "subject": "[무토 유우기] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_102",
+      "baseCharId": 102,
+      "displayName": "어둠의 바쿠라",
+      "isTagEligible": false,
+      "partnerRefusal": "크하하하! 도적왕인 내가 계집아이와 손을 잡고 사이좋게 태그 듀얼을 하라고? 웃기지 마라! 네 영혼은 묘지로 직행하는 제물일 뿐이다!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 어둠의 바쿠라 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 102,
+          "formName": "어둠의 바쿠라",
+          "formTitle": "어둠의 바쿠라 · 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_domino_plaza"
+          ],
+          "greetingLines": {
+            "low": "크크큭... 내 천년 링의 바늘이 네 영혼을 가리키고 있더군. 어디 한번 놀아볼까?",
+            "mid": "크하하! 네 덱에 숨겨진 그 날카로운 어둠, 제법 마음에 드는군. 훌륭한 제물이 되겠어.",
+            "high": "어둠의 게임의 진정한 지배자는 오직 나뿐이다! 네 영혼도 묘지로 처박아주마!"
+          },
+          "duelStartLine": "크크크... 어둠의 게임의 개막이다! 네 녀석의 영혼을 묘지로 매장해주마!",
+          "aceCutInLine": "원한의 심연에서 기어나와라! 다크 네크로피어! 네놈의 몸을 강탈한다!",
+          "winLine": "크하하하하! 네놈의 영혼은 영원한 어둠의 세계로 추락했다!",
+          "loseLine": "크윽... 천년 링의 주술이 빗나가다니... 두고 봐라, 언젠가 네놈의 영혼을 찢어발겨 주마!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_102.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_102.png"
+        },
+        {
+          "formCharId": 3002,
+          "formName": "도적왕 바쿠라",
+          "formTitle": "도적왕 바쿠라 · 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_domino_plaza"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 도적왕 바쿠라! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "크크크... 어둠의 게임의 개막이다! 네 녀석의 영혼을 묘지로 매장해주마!",
+          "aceCutInLine": "원한의 심연에서 기어나와라! 다크 네크로피어! 네놈의 몸을 강탈한다!",
+          "winLine": "크하하하하! 네놈의 영혼은 영원한 어둠의 세계로 추락했다!",
+          "loseLine": "크윽... 천년 링의 주술이 빗나가다니... 두고 봐라, 언젠가 네놈의 영혼을 찢어발겨 주마!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_3002.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_3002.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "어둠의 바쿠라: 크크크... 피비린내 나는 어둠의 제물로 바치기 딱 좋은 물건이군. 마음에 든다!",
+        "liked": "어둠의 바쿠라: 호오... 제법 어둠의 기운이 서려 있는 물건이군.",
+        "neutral": "어둠의 바쿠라: 흥, 인간 놈들의 조잡한 장난감이군.",
+        "hated": "어둠의 바쿠라: 칫! 역겨운 성수의 냄새가 난다! 썩 치워라, 당장 불태워버리기 전에!"
+      },
+      "partnerQuotes": {
+        "morning": "어둠의 바쿠라: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "어둠의 바쿠라: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "어둠의 바쿠라: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "어둠의 바쿠라: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "어둠의 바쿠라: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "오컬트 콤보의 진정한 맛은 상대가 서서히 질식해가는 걸 지켜보는 거지.",
+        "domino_city": "밤의 도미노 시티 골목길... 어둠의 게임을 펼치기에 아주 안성맞춤인 사냥터야.",
+        "food": "피비린내 나는 승리의 쾌감만이 내 유일한 만찬이다.",
+        "millennium": "천년 링에 깃든 도적왕 바쿠라의 원념... 파라오를 지옥으로 끌고 갈 것이다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_102_mail_invite",
+          "sender": "어둠의 바쿠라",
+          "timeSlot": "morning",
+          "spotId": "spot_domino_plaza",
+          "subject": "[어둠의 바쿠라] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_84",
+      "baseCharId": 84,
+      "displayName": "페가수스 J. 크로포드",
+      "isTagEligible": false,
+      "partnerRefusal": "오우, 노우~! 걸(Girl), 미(Me)는 듀얼리스트 킹덤의 호스트이자 인더스트리얼 일루전의 회장이에요! 미는 관전석에서 와인을 마시며 유우의 활약을 지켜보는 게 어울린답니다~ 굿 럭!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 페가수스 J. 크로포드 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 84,
+          "formName": "페가수스 J. 크로포드",
+          "formTitle": "페가수스 J. 크로포드 · 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_kame_game"
+          ],
+          "greetingLines": {
+            "low": "오우~ 걸(Girl)! 듀얼 몬스터즈의 창시자인 미(Me)에게 도전할 용기가 있다니 판타스틱해요!",
+            "mid": "유우(You)의 덱 플레이는 마치 한 편의 만화 영화를 보는 것처럼 두근거려요~!",
+            "high": "오우! 유우와 미의 듀얼이라면 세상에서 가장 익사이팅한 명승부가 될 거예요!"
+          },
+          "duelStartLine": "잇츠 듀얼 타임~! 미의 환상적인 툰 월드로 웰컴 투 킹덤!",
+          "aceCutInLine": "페이지를 열어라! 툰 월드에서 튀어나와라, 툰 블루 아이즈 화이트 드래곤!",
+          "winLine": "오우 예~ 역시 미의 툰 몬스터들은 너무나도 큐트하고 무적이라니까요~!",
+          "loseLine": "노우~! 미의 마인드 스캔을 꿰뚫다니... 유우는 정말 서프라이징한 듀얼리스트예요!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_84.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_84.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "페가수스 J. 크로포드: 흥! 제법 값어치 있는 물건을 골라왔군. 덱 케이스에 챙겨두마!",
+        "liked": "페가수스 J. 크로포드: 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "페가수스 J. 크로포드: 쓸데없는 정성에 신경 쓸 시간 있으면 덱이나 튜닝해라.",
+        "hated": "페가수스 J. 크로포드: 네놈! 감히 나한테 이런 쓰레기를 던져주는 배짱은 어디서 나온 거냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "페가수스 J. 크로포드: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "페가수스 J. 크로포드: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "페가수스 J. 크로포드: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "페가수스 J. 크로포드: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "페가수스 J. 크로포드: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "카드는 상상력의 산물이에요! 룰에 얽매이지 않는 판타스틱한 전술을 즐기세요!",
+        "domino_city": "카이바 보이가 주최한 배틀 시티... 제법 스릴 넘치는 쇼였어요.",
+        "food": "프랑스 보르도산 최고급 레드 와인과 치즈... 미의 영원한 사랑 신디아를 추억하며 마신답니다.",
+        "millennium": "천년 눈(아이)... 사랑하는 신디아를 다시 만나기 위해 고대 이집트의 어둠과 손을 잡았었죠..."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_84_mail_invite",
+          "sender": "페가수스 J. 크로포드",
+          "timeSlot": "morning",
+          "spotId": "spot_domino_plaza",
+          "subject": "[페가수스 J. 크로포드] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_103",
+      "baseCharId": 103,
+      "displayName": "어둠의 마리크",
+      "isTagEligible": false,
+      "partnerRefusal": "크하하하하! 미쳤느냐? 어둠의 인격인 내가 네놈과 손을 잡을 것 같으냐! 내 유일한 목적은 파괴와 고통뿐이다!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 어둠의 마리크 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 103,
+          "formName": "어둠의 마리크",
+          "formTitle": "어둠의 마리크 · 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_kaiba_corp"
+          ],
+          "greetingLines": {
+            "low": "크하하하하! 산산조각 날 준비는 되었느냐? 어둠의 제물이 될 시간이다!",
+            "mid": "크큭... 네 영혼이 고통 속에서 울부짖는 소리가 벌써부터 들려오는 것 같군!",
+            "high": "크하하! 태양의 신 라의 불꽃으로 세상 모든 것을 불태워주마!"
+          },
+          "duelStartLine": "크하하하하! 피와 살점이 튀는 어둠의 제전을 시작하자꾸나! 듀얼!",
+          "aceCutInLine": "신의 화신이여, 불사조가 되어 적의 숨통을 끊어라! 라의 익신룡, 갓 피닉스-!!",
+          "winLine": "아하하하하! 들린다, 네 영혼이 어둠 속에서 찢어지는 비명소리가!",
+          "loseLine": "네놈 따위에게... 신의 분노가 꺾이다니... 크아아악-!!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_103.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_103.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "어둠의 마리크: 크하하하! 칠흑의 광기가 서린 극상의 독극물이군! 네 영혼을 고문할 때 써주마!",
+        "liked": "어둠의 마리크: 호오... 꽤나 잔혹한 취향의 선물이로군, 마음에 든다.",
+        "neutral": "어둠의 마리크: 시시하군. 네놈의 내장을 꺼내는 게 훨씬 재미있겠어.",
+        "hated": "어둠의 마리크: 역겹고 구역질 나는 빛의 물건이군! 이 자리에서 가루로 으깨버리겠다!"
+      },
+      "partnerQuotes": {
+        "morning": "어둠의 마리크: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "어둠의 마리크: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "어둠의 마리크: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "어둠의 마리크: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "어둠의 마리크: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "진정한 듀얼이란 상대의 신체를 갉아먹는 고통의 예술이다!",
+        "domino_city": "배틀십 꼭대기의 어둠의 듀얼 경기장... 녀석들의 단말마가 들려오는군.",
+        "food": "공포에 질린 패자의 눈물이야말로 최고의 양념이지!",
+        "millennium": "묘지기 일족의 저주와 천년 로드의 빛... 파라오를 갈기갈기 찢어주마!"
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_103_mail_invite",
+          "sender": "어둠의 마리크",
+          "timeSlot": "morning",
+          "spotId": "spot_kaiba_corp",
+          "subject": "[어둠의 마리크] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_3000",
+      "baseCharId": 3000,
+      "displayName": "마하드",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 싸우는 고독한 듀얼리스트다! 내 등에 남을 태울 생각은 없다. 결투라면 언제든 받아주마!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 마하드 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 3000,
+          "formName": "마하드",
+          "formTitle": "마하드 · 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_domino_plaza"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 마하드! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "내 덱의 쓴맛을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "필드를 지배하라! 나의 비장의 카드 소환!",
+          "winLine": "하하핫! 완벽한 승리다! 분수를 알았겠지!",
+          "loseLine": "크윽... 분하다! 하지만 다음엔 절대 안 진다!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_3000.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_3000.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "마하드: 흥! 제법 값어치 있는 물건을 골라왔군. 덱 케이스에 챙겨두마!",
+        "liked": "마하드: 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "마하드: 쓸데없는 정성에 신경 쓸 시간 있으면 덱이나 튜닝해라.",
+        "hated": "마하드: 네놈! 감히 나한테 이런 쓰레기를 던져주는 배짱은 어디서 나온 거냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "마하드: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "마하드: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "마하드: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "마하드: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "마하드: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "마하드: 듀얼리스트라면 말보다 카드로 증명해야지!",
+        "domino_city": "마하드: 도미노 시티 골목길마다 강자들이 숨어있어.",
+        "food": "마하드: 고로케 하나 사 먹고 또 듀얼 한 판 뛰러 가야지!",
+        "millennium": "마하드: 천년 아이템의 신비보다 눈앞의 승부에 집중하겠어."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_3000_mail_invite",
+          "sender": "마하드",
+          "timeSlot": "morning",
+          "spotId": "spot_domino_plaza",
+          "subject": "[마하드] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_3001",
+      "baseCharId": 3001,
+      "displayName": "마나",
+      "isTagEligible": true,
+      "partnerRefusal": null,
+      "dormOrFaction": "도미노 시티 히로인",
+      "partnerRole": "TagHeroine",
+      "partnerSkillName": "마나의 결속: 화려한 연격!",
+      "partnerSkillDesc": "마법 카드를 발동할 때마다 상대에게 따끔한 마도 데미지를 입히고 팀의 활력을 채우는 마법 견습.",
+      "favoriteGiftId": "millennium_puzzle_strap",
+      "forms": [
+        {
+          "formCharId": 3001,
+          "formName": "마나",
+          "formTitle": "마나 · 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_kame_game"
+          ],
+          "greetingLines": {
+            "low": "에헤헷! 파라오의 제1제자, 천재 마술사 마나 등장이야! 마법 연습 한 판 할래?",
+            "mid": "마하드 스승님한테는 비밀이지만, 너랑 듀얼할 때 마법이 제일 펑펑 잘 터져!",
+            "high": "와아~! 넌 3천 년 전 고대 이집트에서도 최고의 짝꿍이었을 거야! 평생 함께하자!"
+          },
+          "duelStartLine": "주문 영창! 덜렁거리지 않고 이번엔 제대로 보여줄게! 듀얼이야!",
+          "aceCutInLine": "스승님의 가르침을 이어받아! 블랙 매지션 걸, 흑마도폭열파(버스트 번)!!",
+          "winLine": "에헤헤, 대성공~! 봤지? 내 마법의 위력을 얕보면 큰코다친다고!",
+          "loseLine": "아야야... 또 마법 항아리가 깨졌어~! 스승님한테 혼나겠다아~",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_3001.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_3001.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "마나: 어머, 이걸 날 위해 준비해 준 거야?! 너무 감동이야, 소중히 간직할게!",
+        "liked": "마나: 후후, 기분 좋은 선물이야. 정말 고마워!",
+        "neutral": "마나: 날 생각해서 챙겨준 거지? 고마워!",
+        "hated": "마나: 으음... 이건 내 취향이랑은 조금 안 맞는 것 같아..."
+      },
+      "partnerQuotes": {
+        "morning": "스승님-! 아니, 파트너! 좋은 아침이에요~! 마나, 오늘도 마법 연습 만반의 준비 완료예요!",
+        "evening": "우와~ 별들이 반짝반짝 떠올랐어요! 오늘 하루도 스승님 몰래 신나게 놀아서 대만족!",
+        "deckComment": "에헤헤~ 반짝반짝 마법의 기운이 가득한 덱이네요! 저랑 진짜 찰떡궁합이에요!",
+        "duelReady": "마법 견습생 마나의 매지컬 듀얼 시작이에요! 에잇- 듀얼!",
+        "cheer": "포기하면 안 돼요! 마나가 마법봉 붕붕 흔들면서 힘차게 마법 걸어드릴게요! 얍-!"
+      },
+      "bondEvents": [
+        {
+          "heartLevel": 1,
+          "title": "[마나] 첫 번째 인연: 도미노 시티의 만남",
+          "dialogues": [
+            {
+              "speaker": "마나",
+              "text": "안녕! 거리에서 네 듀얼을 지켜봤는데... 정말 가슴이 두근거렸어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워! 네 덱 플레이도 정말 매력적이던걸? 앞으로 잘 부탁해."
+            },
+            {
+              "speaker": "마나",
+              "text": "응! 우리 서로를 지켜주는 최고의 파트너가 되어보자!"
+            }
+          ],
+          "choice": {
+            "prompt": "마나와 함께 어떤 다짐을 나눌까?",
+            "options": [
+              {
+                "text": "🔥 당당하고 화려하게 승리하자! (보상 DP 1.2배)",
+                "reply": "후훗, 좋아! 그 당찬 기백 아주 마음에 들어!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 차분하게 서로의 등을 지켜주자! (내 시작 LP +500)",
+                "reply": "기본이 가장 중요한 법이지. 함께 연습하자!",
+                "effectType": "SafeBuff"
+              },
+              {
+                "text": "🤝 영원한 듀얼 소울메이트가 되어줄게! (호감도 대폭 상승)",
+                "reply": "든든한걸? 앞으로 잘 부탁해, 내 파트너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 3,
+          "title": "[마나] 세 번째 인연: 깊어지는 신뢰와 맹세",
+          "dialogues": [
+            {
+              "speaker": "마나",
+              "text": "수많은 결투를 거치면서... 네가 내 옆에 있다는 게 얼마나 큰 힘이 되는지 몰라."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "나도 그래. 네가 있어 주기에 난 어떤 어둠의 게임도 두렵지 않아."
+            },
+            {
+              "speaker": "마나",
+              "text": "고마워... 우리 둘의 유대라면 세상 어떤 상대라도 이겨낼 수 있어!"
+            }
+          ],
+          "choice": {
+            "prompt": "토너먼트를 앞두고 어떤 전술로 결속할까?",
+            "options": [
+              {
+                "text": "🔥 공격력을 한계까지 끌어올려 정면 돌파하자! (공격력 +400 버프)",
+                "reply": "우리의 화려한 콤보를 보여주자고!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 빈틈없는 카운터로 상대를 압박하자! (내 시작 LP +1,000)",
+                "reply": "완벽한 전술이야. 철저하게 준비하자!",
+                "effectType": "SafeBuff"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 5,
+          "title": "[마나] 최종 인연(MASTER): 영혼으로 맺어진 결속",
+          "dialogues": [
+            {
+              "speaker": "마나",
+              "text": "수많은 시련을 함께 헤쳐 나오며... 넌 내게 세상 그 누구보다 소중한 사람이 되었어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워. 네 곁에서 싸웠기에 난 진정한 듀얼 퀸으로 설 수 있었어."
+            },
+            {
+              "speaker": "마나",
+              "text": "우리의 유대는 영원해. 도미노 시티의 정상에서 영광을 함께 누리자!"
+            }
+          ],
+          "choice": {
+            "prompt": "최종 마스터 승급전! 마지막 맹세를 선택하자!",
+            "options": [
+              {
+                "text": "🔥 우리의 모든 카드를 걸고 정상에 오르자! (마스터 보상 & DP 1.5배)",
+                "reply": "우리의 기적을 세상에 보여주자!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🤝 영원히 함께할 소울메이트로서 승리를 맹세할게! (마스터 영구 버프)",
+                "reply": "고마워, 내 생애 최고의 영원한 파트너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        }
+      ],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "마법을 뿅뿅 쓰면서 친구들과 웃을 수 있는 듀얼이 세상에서 제일 재미있어요!",
+        "domino_city": "고대 왕궁이랑은 비교도 안 되게 높은 빌딩들이 가득해서 눈이 핑핑 돌 지경이에요!",
+        "food": "달콤한 꿀을 듬뿍 바른 구운 빵이랑 석류 주스! 백 개라도 먹을 수 있어요!",
+        "millennium": "스승님의 천년 지팡이... 가끔 마나 머리를 콩 쥐어박을 때 쓰셔서 쪼끔 무서워요, 헤헤."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_3001_mail_invite",
+          "sender": "마나",
+          "timeSlot": "morning",
+          "spotId": "spot_kaiba_corp",
+          "subject": "[마나] 스승님 몰래 마법 연습해요~!",
+          "body": "파트너! 스승님이 명상하러 가신 틈에 몰래 탈출했어요! 골목 뒤쪽에서 신나는 마법 듀얼 해요, 빨리빨리!"
+        }
+      ],
+      "grandPrixEnding": {
+        "title": "🏆 배틀 시티 그랑프리 우승 엔딩: [마나]와의 영원한 유대",
+        "dialogues": [
+          {
+            "speaker": "마나",
+            "text": "우리가 해냈어... 배틀 시티의 정상에서 너와 함께 트로피를 안다니 꿈만 같아!"
+          },
+          {
+            "speaker": "여주인공",
+            "text": "네가 내 곁에서 손을 잡아주었기 때문에 승리할 수 있었어. 고마워, 최고의 파트너!"
+          },
+          {
+            "speaker": "마나",
+            "text": "이 우승 트로피와 우리의 카드는 영원한 유대의 증표야. 앞으로도 언제나 내 곁에 있어줘!"
+          }
+        ]
+      }
+    },
+    {
+      "personaId": "dm_char_3003",
+      "baseCharId": 3003,
+      "displayName": "카와이 시즈카",
+      "isTagEligible": true,
+      "partnerRefusal": null,
+      "dormOrFaction": "도미노 시티 히로인",
+      "partnerRole": "TagHeroine",
+      "partnerSkillName": "카와이 시즈카의 결속: 화려한 연격!",
+      "partnerSkillDesc": "순수한 격려로 파트너의 몬스터 공격력을 북돋우고 라이프를 치유하는 천사의 미소.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 3003,
+          "formName": "카와이 시즈카",
+          "formTitle": "카와이 시즈카 · 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_kaiba_corp"
+          ],
+          "greetingLines": {
+            "low": "저, 저기... 안녕하세요! 오빠(죠노우치)한테 듀얼의 소중함을 배우고 있어요.",
+            "mid": "와, 당신의 듀얼은 오빠처럼 정말 따뜻하고 든든해요! 저도 용기가 생겨요!",
+            "high": "당신 옆에 서 있으면 어떤 무서운 상대 앞에서도 도망치지 않을 수 있어요. 함께 힘내요!"
+          },
+          "duelStartLine": "오빠가 지켜준 이 눈으로... 끝까지 지켜볼게요! 듀얼!",
+          "aceCutInLine": "모두에게 용기를 전해줘! 성스러운 마법사, 부탁이야!",
+          "winLine": "해냈어요! 카드를 믿는 마음이 닿았나 봐요... 정말 기뻐요!",
+          "loseLine": "죄송해요... 하지만 포기하지 않고 더 열심히 연습할게요!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_3003.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_3003.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "카와이 시즈카: 어머, 이걸 날 위해 준비해 준 거야?! 너무 감동이야, 소중히 간직할게!",
+        "liked": "카와이 시즈카: 후후, 기분 좋은 선물이야. 정말 고마워!",
+        "neutral": "카와이 시즈카: 날 생각해서 챙겨준 거지? 고마워!",
+        "hated": "카와이 시즈카: 으음... 이건 내 취향이랑은 조금 안 맞는 것 같아..."
+      },
+      "partnerQuotes": {
+        "morning": "좋은 아침이에요! 오늘도 오빠랑 당신을 위해 열심히 응원할게요!",
+        "evening": "오늘 하루도 무사히 지나갔네요... 당신의 상냥한 듀얼을 볼 수 있어서 정말 기뻤어요.",
+        "deckComment": "당신의 덱은 마치 따뜻한 온기 같아요. 보고만 있어도 용기가 샘솟아요!",
+        "duelReady": "저도 오빠처럼 용기 내어 한 걸음 내디뎌 볼게요! 잘 부탁드려요!",
+        "cheer": "포기하지 마세요! 당신의 덱은 분명 당신에게 힘을 빌려줄 거예요! 힘내세요!"
+      },
+      "bondEvents": [
+        {
+          "heartLevel": 1,
+          "title": "[카와이 시즈카] 첫 번째 인연: 도미노 시티의 만남",
+          "dialogues": [
+            {
+              "speaker": "카와이 시즈카",
+              "text": "안녕! 거리에서 네 듀얼을 지켜봤는데... 정말 가슴이 두근거렸어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워! 네 덱 플레이도 정말 매력적이던걸? 앞으로 잘 부탁해."
+            },
+            {
+              "speaker": "카와이 시즈카",
+              "text": "응! 우리 서로를 지켜주는 최고의 파트너가 되어보자!"
+            }
+          ],
+          "choice": {
+            "prompt": "카와이 시즈카와 함께 어떤 다짐을 나눌까?",
+            "options": [
+              {
+                "text": "🔥 당당하고 화려하게 승리하자! (보상 DP 1.2배)",
+                "reply": "후훗, 좋아! 그 당찬 기백 아주 마음에 들어!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 차분하게 서로의 등을 지켜주자! (내 시작 LP +500)",
+                "reply": "기본이 가장 중요한 법이지. 함께 연습하자!",
+                "effectType": "SafeBuff"
+              },
+              {
+                "text": "🤝 영원한 듀얼 소울메이트가 되어줄게! (호감도 대폭 상승)",
+                "reply": "든든한걸? 앞으로 잘 부탁해, 내 파트너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 3,
+          "title": "[카와이 시즈카] 세 번째 인연: 깊어지는 신뢰와 맹세",
+          "dialogues": [
+            {
+              "speaker": "카와이 시즈카",
+              "text": "수많은 결투를 거치면서... 네가 내 옆에 있다는 게 얼마나 큰 힘이 되는지 몰라."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "나도 그래. 네가 있어 주기에 난 어떤 어둠의 게임도 두렵지 않아."
+            },
+            {
+              "speaker": "카와이 시즈카",
+              "text": "고마워... 우리 둘의 유대라면 세상 어떤 상대라도 이겨낼 수 있어!"
+            }
+          ],
+          "choice": {
+            "prompt": "토너먼트를 앞두고 어떤 전술로 결속할까?",
+            "options": [
+              {
+                "text": "🔥 공격력을 한계까지 끌어올려 정면 돌파하자! (공격력 +400 버프)",
+                "reply": "우리의 화려한 콤보를 보여주자고!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 빈틈없는 카운터로 상대를 압박하자! (내 시작 LP +1,000)",
+                "reply": "완벽한 전술이야. 철저하게 준비하자!",
+                "effectType": "SafeBuff"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 5,
+          "title": "[카와이 시즈카] 최종 인연(MASTER): 영혼으로 맺어진 결속",
+          "dialogues": [
+            {
+              "speaker": "카와이 시즈카",
+              "text": "수많은 시련을 함께 헤쳐 나오며... 넌 내게 세상 그 누구보다 소중한 사람이 되었어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워. 네 곁에서 싸웠기에 난 진정한 듀얼 퀸으로 설 수 있었어."
+            },
+            {
+              "speaker": "카와이 시즈카",
+              "text": "우리의 유대는 영원해. 도미노 시티의 정상에서 영광을 함께 누리자!"
+            }
+          ],
+          "choice": {
+            "prompt": "최종 마스터 승급전! 마지막 맹세를 선택하자!",
+            "options": [
+              {
+                "text": "🔥 우리의 모든 카드를 걸고 정상에 오르자! (마스터 보상 & DP 1.5배)",
+                "reply": "우리의 기적을 세상에 보여주자!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🤝 영원히 함께할 소울메이트로서 승리를 맹세할게! (마스터 영구 버프)",
+                "reply": "고마워, 내 생애 최고의 영원한 파트너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        }
+      ],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "오빠가 절 위해 목숨 걸고 듀얼했던 것처럼, 듀얼은 소중한 사람을 지키는 용기예요.",
+        "domino_city": "눈 수술을 받고 나서 처음 본 도미노 시티의 바다는 평생 잊을 수 없을 만큼 눈부셨어요.",
+        "food": "오빠를 위해 정성껏 싼 계란말이 도시락! 소박하지만 맛있게 먹어주면 참 행복해요.",
+        "millennium": "어려운 건 잘 모르지만... 유우기 씨와 친구들이 서로를 위하는 마음은 진짜예요."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_3003_mail_invite",
+          "sender": "카와이 시즈카",
+          "timeSlot": "morning",
+          "spotId": "spot_kaiba_corp",
+          "subject": "[시즈카] 오빠 몰래 연락드려요...",
+          "body": "안녕하세요! 오빠가 듀얼 하러 나간 사이에 저도 덱 연습을 하고 싶어서요... 혹시 시간 되시면 공원으로 와주실 수 있나요?"
+        }
+      ],
+      "grandPrixEnding": {
+        "title": "🏆 배틀 시티 그랑프리 우승 엔딩: [카와이 시즈카]와의 영원한 유대",
+        "dialogues": [
+          {
+            "speaker": "카와이 시즈카",
+            "text": "우리가 해냈어... 배틀 시티의 정상에서 너와 함께 트로피를 안다니 꿈만 같아!"
+          },
+          {
+            "speaker": "여주인공",
+            "text": "네가 내 곁에서 손을 잡아주었기 때문에 승리할 수 있었어. 고마워, 최고의 파트너!"
+          },
+          {
+            "speaker": "카와이 시즈카",
+            "text": "이 우승 트로피와 우리의 카드는 영원한 유대의 증표야. 앞으로도 언제나 내 곁에 있어줘!"
+          }
+        ]
+      }
+    },
+    {
+      "personaId": "dm_char_75",
+      "baseCharId": 75,
+      "displayName": "아멜다",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 싸우는 고독한 듀얼리스트다! 내 등에 남을 태울 생각은 없다. 결투라면 언제든 받아주마!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 아멜다 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 75,
+          "formName": "아멜다",
+          "formTitle": "아멜다 · 도미노 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_kame_game"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 아멜다! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "내 덱의 쓴맛을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "필드를 지배하라! 나의 비장의 카드 소환!",
+          "winLine": "하하핫! 완벽한 승리다! 분수를 알았겠지!",
+          "loseLine": "크윽... 분하다! 하지만 다음엔 절대 안 진다!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_75.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_75.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "아멜다: 흥! 제법 값어치 있는 물건을 골라왔군. 덱 케이스에 챙겨두마!",
+        "liked": "아멜다: 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "아멜다: 쓸데없는 정성에 신경 쓸 시간 있으면 덱이나 튜닝해라.",
+        "hated": "아멜다: 네놈! 감히 나한테 이런 쓰레기를 던져주는 배짱은 어디서 나온 거냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "아멜다: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "아멜다: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "아멜다: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "아멜다: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "아멜다: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "아멜다: 듀얼리스트라면 말보다 카드로 증명해야지!",
+        "domino_city": "아멜다: 도미노 시티 골목길마다 강자들이 숨어있어.",
+        "food": "아멜다: 고로케 하나 사 먹고 또 듀얼 한 판 뛰러 가야지!",
+        "millennium": "아멜다: 천년 아이템의 신비보다 눈앞의 승부에 집중하겠어."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_75_mail_invite",
+          "sender": "아멜다",
+          "timeSlot": "morning",
+          "spotId": "spot_kaiba_corp",
+          "subject": "[아멜다] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_76",
+      "baseCharId": 76,
+      "displayName": "판도라",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 싸우는 고독한 듀얼리스트다! 내 등에 남을 태울 생각은 없다. 결투라면 언제든 받아주마!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 판도라 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 76,
+          "formName": "판도라",
+          "formTitle": "판도라 · 도미노 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_kaiba_corp"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 판도라! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "내 덱의 쓴맛을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "필드를 지배하라! 나의 비장의 카드 소환!",
+          "winLine": "하하핫! 완벽한 승리다! 분수를 알았겠지!",
+          "loseLine": "크윽... 분하다! 하지만 다음엔 절대 안 진다!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_76.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_76.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "판도라: 흥! 제법 값어치 있는 물건을 골라왔군. 덱 케이스에 챙겨두마!",
+        "liked": "판도라: 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "판도라: 쓸데없는 정성에 신경 쓸 시간 있으면 덱이나 튜닝해라.",
+        "hated": "판도라: 네놈! 감히 나한테 이런 쓰레기를 던져주는 배짱은 어디서 나온 거냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "판도라: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "판도라: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "판도라: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "판도라: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "판도라: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "판도라: 듀얼리스트라면 말보다 카드로 증명해야지!",
+        "domino_city": "판도라: 도미노 시티 골목길마다 강자들이 숨어있어.",
+        "food": "판도라: 고로케 하나 사 먹고 또 듀얼 한 판 뛰러 가야지!",
+        "millennium": "판도라: 천년 아이템의 신비보다 눈앞의 승부에 집중하겠어."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_76_mail_invite",
+          "sender": "판도라",
+          "timeSlot": "morning",
+          "spotId": "spot_domino_plaza",
+          "subject": "[판도라] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_77",
+      "baseCharId": 77,
+      "displayName": "밴디트 키스",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 싸우는 고독한 듀얼리스트다! 내 등에 남을 태울 생각은 없다. 결투라면 언제든 받아주마!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 밴디트 키스 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 77,
+          "formName": "밴디트 키스",
+          "formTitle": "밴디트 키스 · 도미노 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_domino_plaza"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 밴디트 키스! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "내 덱의 쓴맛을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "필드를 지배하라! 나의 비장의 카드 소환!",
+          "winLine": "하하핫! 완벽한 승리다! 분수를 알았겠지!",
+          "loseLine": "크윽... 분하다! 하지만 다음엔 절대 안 진다!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_77.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_77.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "밴디트 키스: 흥! 제법 값어치 있는 물건을 골라왔군. 덱 케이스에 챙겨두마!",
+        "liked": "밴디트 키스: 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "밴디트 키스: 쓸데없는 정성에 신경 쓸 시간 있으면 덱이나 튜닝해라.",
+        "hated": "밴디트 키스: 네놈! 감히 나한테 이런 쓰레기를 던져주는 배짱은 어디서 나온 거냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "밴디트 키스: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "밴디트 키스: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "밴디트 키스: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "밴디트 키스: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "밴디트 키스: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "밴디트 키스: 듀얼리스트라면 말보다 카드로 증명해야지!",
+        "domino_city": "밴디트 키스: 도미노 시티 골목길마다 강자들이 숨어있어.",
+        "food": "밴디트 키스: 고로케 하나 사 먹고 또 듀얼 한 판 뛰러 가야지!",
+        "millennium": "밴디트 키스: 천년 아이템의 신비보다 눈앞의 승부에 집중하겠어."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_77_mail_invite",
+          "sender": "밴디트 키스",
+          "timeSlot": "morning",
+          "spotId": "spot_kaiba_corp",
+          "subject": "[밴디트 키스] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_78",
+      "baseCharId": 78,
+      "displayName": "고스트 코츠즈카",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 싸우는 고독한 듀얼리스트다! 내 등에 남을 태울 생각은 없다. 결투라면 언제든 받아주마!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 고스트 코츠즈카 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 78,
+          "formName": "고스트 코츠즈카",
+          "formTitle": "고스트 코츠즈카 · 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_kame_game"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 고스트 코츠즈카! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "내 덱의 쓴맛을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "필드를 지배하라! 나의 비장의 카드 소환!",
+          "winLine": "하하핫! 완벽한 승리다! 분수를 알았겠지!",
+          "loseLine": "크윽... 분하다! 하지만 다음엔 절대 안 진다!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_78.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_78.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "고스트 코츠즈카: 흥! 제법 값어치 있는 물건을 골라왔군. 덱 케이스에 챙겨두마!",
+        "liked": "고스트 코츠즈카: 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "고스트 코츠즈카: 쓸데없는 정성에 신경 쓸 시간 있으면 덱이나 튜닝해라.",
+        "hated": "고스트 코츠즈카: 네놈! 감히 나한테 이런 쓰레기를 던져주는 배짱은 어디서 나온 거냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "고스트 코츠즈카: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "고스트 코츠즈카: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "고스트 코츠즈카: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "고스트 코츠즈카: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "고스트 코츠즈카: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "고스트 코츠즈카: 듀얼리스트라면 말보다 카드로 증명해야지!",
+        "domino_city": "고스트 코츠즈카: 도미노 시티 골목길마다 강자들이 숨어있어.",
+        "food": "고스트 코츠즈카: 고로케 하나 사 먹고 또 듀얼 한 판 뛰러 가야지!",
+        "millennium": "고스트 코츠즈카: 천년 아이템의 신비보다 눈앞의 승부에 집중하겠어."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_78_mail_invite",
+          "sender": "고스트 코츠즈카",
+          "timeSlot": "morning",
+          "spotId": "spot_domino_plaza",
+          "subject": "[고스트 코츠즈카] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_79",
+      "baseCharId": 79,
+      "displayName": "다츠",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 싸우는 고독한 듀얼리스트다! 내 등에 남을 태울 생각은 없다. 결투라면 언제든 받아주마!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 다츠 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 79,
+          "formName": "다츠",
+          "formTitle": "다츠 · 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_kaiba_corp"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 다츠! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "내 덱의 쓴맛을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "필드를 지배하라! 나의 비장의 카드 소환!",
+          "winLine": "하하핫! 완벽한 승리다! 분수를 알았겠지!",
+          "loseLine": "크윽... 분하다! 하지만 다음엔 절대 안 진다!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_79.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_79.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "다츠: 흥! 제법 값어치 있는 물건을 골라왔군. 덱 케이스에 챙겨두마!",
+        "liked": "다츠: 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "다츠: 쓸데없는 정성에 신경 쓸 시간 있으면 덱이나 튜닝해라.",
+        "hated": "다츠: 네놈! 감히 나한테 이런 쓰레기를 던져주는 배짱은 어디서 나온 거냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "다츠: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "다츠: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "다츠: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "다츠: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "다츠: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "다츠: 듀얼리스트라면 말보다 카드로 증명해야지!",
+        "domino_city": "다츠: 도미노 시티 골목길마다 강자들이 숨어있어.",
+        "food": "다츠: 고로케 하나 사 먹고 또 듀얼 한 판 뛰러 가야지!",
+        "millennium": "다츠: 천년 아이템의 신비보다 눈앞의 승부에 집중하겠어."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_79_mail_invite",
+          "sender": "다츠",
+          "timeSlot": "morning",
+          "spotId": "spot_kaiba_corp",
+          "subject": "[다츠] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_80",
+      "baseCharId": 80,
+      "displayName": "이시즈 이슈타르",
+      "isTagEligible": true,
+      "partnerRefusal": null,
+      "dormOrFaction": "도미노 시티 히로인",
+      "partnerRole": "TagHeroine",
+      "partnerSkillName": "이시즈 이슈타르의 결속: 화려한 연격!",
+      "partnerSkillDesc": "묘지를 봉인하고 상대 덱의 흐름을 꿰뚫어 미래를 자신에게 유리하게 이끄는 신관의 예지.",
+      "favoriteGiftId": "millennium_puzzle_strap",
+      "forms": [
+        {
+          "formCharId": 80,
+          "formName": "이시즈 이슈타르",
+          "formTitle": "이시즈 이슈타르 · 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_domino_plaza"
+          ],
+          "greetingLines": {
+            "low": "천년 목걸이가 당신과의 만남을 비추고 있었습니다. 당신의 결의를 시험해 보지요.",
+            "mid": "운명은 정해진 것이 아닙니다. 당신의 맑고 강인한 의지가 새로운 미래를 자아내고 있어요.",
+            "high": "당신과 함께라면 3천 년 동안 이어진 비극의 사슬을 끊고 새로운 빛을 열 수 있습니다."
+          },
+          "duelStartLine": "천년 목걸이의 계시에 따라, 카드의 진실을 마주하겠습니다.",
+          "aceCutInLine": "묘지에서 다시 태어나라! 현세와 명계의 역전!!",
+          "winLine": "이것이 운명이 가리킨 길입니다. 당신의 마음에 영원한 평화가 깃들기를...",
+          "loseLine": "놀랍군요... 천년 목걸이가 미처 보지 못한 새로운 기적이 당신의 손에서 태어났습니다.",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_80.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_80.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "이시즈 이슈타르: 어머, 이걸 날 위해 준비해 준 거야?! 너무 감동이야, 소중히 간직할게!",
+        "liked": "이시즈 이슈타르: 후후, 기분 좋은 선물이야. 정말 고마워!",
+        "neutral": "이시즈 이슈타르: 날 생각해서 챙겨준 거지? 고마워!",
+        "hated": "이시즈 이슈타르: 으음... 이건 내 취향이랑은 조금 안 맞는 것 같아..."
+      },
+      "partnerQuotes": {
+        "morning": "평안한 아침입니다. 천년 목걸이가 오늘 당신과 만날 운명을 비추고 있었습니다.",
+        "evening": "어둠이 내리는군요. 운명의 흐름은 당신의 올곧은 신념에 따라 조금씩 변화하고 있습니다.",
+        "deckComment": "과거와 미래의 순리가 깃든 덱이군요. 영혼의 깊이가 카드에 여실히 드러납니다.",
+        "duelReady": "운명의 진실을 마주할 시간입니다. 신성한 결투의 장을 펼치겠습니다.",
+        "cheer": "망설이지 마십시오. 미래는 정해진 것이 아니라, 당신의 손으로 개척하는 것입니다!"
+      },
+      "bondEvents": [
+        {
+          "heartLevel": 1,
+          "title": "[이시즈 이슈타르] 첫 번째 인연: 도미노 시티의 만남",
+          "dialogues": [
+            {
+              "speaker": "이시즈 이슈타르",
+              "text": "안녕! 거리에서 네 듀얼을 지켜봤는데... 정말 가슴이 두근거렸어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워! 네 덱 플레이도 정말 매력적이던걸? 앞으로 잘 부탁해."
+            },
+            {
+              "speaker": "이시즈 이슈타르",
+              "text": "응! 우리 서로를 지켜주는 최고의 파트너가 되어보자!"
+            }
+          ],
+          "choice": {
+            "prompt": "이시즈 이슈타르와 함께 어떤 다짐을 나눌까?",
+            "options": [
+              {
+                "text": "🔥 당당하고 화려하게 승리하자! (보상 DP 1.2배)",
+                "reply": "후훗, 좋아! 그 당찬 기백 아주 마음에 들어!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 차분하게 서로의 등을 지켜주자! (내 시작 LP +500)",
+                "reply": "기본이 가장 중요한 법이지. 함께 연습하자!",
+                "effectType": "SafeBuff"
+              },
+              {
+                "text": "🤝 영원한 듀얼 소울메이트가 되어줄게! (호감도 대폭 상승)",
+                "reply": "든든한걸? 앞으로 잘 부탁해, 내 파트너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 3,
+          "title": "[이시즈 이슈타르] 세 번째 인연: 깊어지는 신뢰와 맹세",
+          "dialogues": [
+            {
+              "speaker": "이시즈 이슈타르",
+              "text": "수많은 결투를 거치면서... 네가 내 옆에 있다는 게 얼마나 큰 힘이 되는지 몰라."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "나도 그래. 네가 있어 주기에 난 어떤 어둠의 게임도 두렵지 않아."
+            },
+            {
+              "speaker": "이시즈 이슈타르",
+              "text": "고마워... 우리 둘의 유대라면 세상 어떤 상대라도 이겨낼 수 있어!"
+            }
+          ],
+          "choice": {
+            "prompt": "토너먼트를 앞두고 어떤 전술로 결속할까?",
+            "options": [
+              {
+                "text": "🔥 공격력을 한계까지 끌어올려 정면 돌파하자! (공격력 +400 버프)",
+                "reply": "우리의 화려한 콤보를 보여주자고!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 빈틈없는 카운터로 상대를 압박하자! (내 시작 LP +1,000)",
+                "reply": "완벽한 전술이야. 철저하게 준비하자!",
+                "effectType": "SafeBuff"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 5,
+          "title": "[이시즈 이슈타르] 최종 인연(MASTER): 영혼으로 맺어진 결속",
+          "dialogues": [
+            {
+              "speaker": "이시즈 이슈타르",
+              "text": "수많은 시련을 함께 헤쳐 나오며... 넌 내게 세상 그 누구보다 소중한 사람이 되었어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워. 네 곁에서 싸웠기에 난 진정한 듀얼 퀸으로 설 수 있었어."
+            },
+            {
+              "speaker": "이시즈 이슈타르",
+              "text": "우리의 유대는 영원해. 도미노 시티의 정상에서 영광을 함께 누리자!"
+            }
+          ],
+          "choice": {
+            "prompt": "최종 마스터 승급전! 마지막 맹세를 선택하자!",
+            "options": [
+              {
+                "text": "🔥 우리의 모든 카드를 걸고 정상에 오르자! (마스터 보상 & DP 1.5배)",
+                "reply": "우리의 기적을 세상에 보여주자!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🤝 영원히 함께할 소울메이트로서 승리를 맹세할게! (마스터 영구 버프)",
+                "reply": "고마워, 내 생애 최고의 영원한 파트너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        }
+      ],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "듀얼이란 파라오와 신관들이 치르던 영혼의 의식... 거짓 없는 자만이 승리할 수 있습니다.",
+        "domino_city": "문명의 소음 너머로 고대 이집트의 기억이 메아리치는 신비로운 도시로군요.",
+        "food": "사막의 오아시스를 연상시키는 맑은 물과 신선한 올리브 잎으로 우려낸 차를 즐깁니다.",
+        "millennium": "천년 목걸이가 보여주는 미래의 편린... 하지만 당신의 유대가 그 운명을 바꾸고 있습니다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_80_mail_invite",
+          "sender": "이시즈 이슈타르",
+          "timeSlot": "morning",
+          "spotId": "spot_domino_plaza",
+          "subject": "[이시즈] 고대 유적의 바람이 당신을 부릅니다.",
+          "body": "평안하신지요. 천년 목걸이가 당신과 나눌 운명의 결투를 비추고 있습니다. 박물관 앞 광장에서 기다리겠습니다."
+        }
+      ],
+      "grandPrixEnding": {
+        "title": "🏆 배틀 시티 그랑프리 우승 엔딩: [이시즈 이슈타르]와의 영원한 유대",
+        "dialogues": [
+          {
+            "speaker": "이시즈 이슈타르",
+            "text": "우리가 해냈어... 배틀 시티의 정상에서 너와 함께 트로피를 안다니 꿈만 같아!"
+          },
+          {
+            "speaker": "여주인공",
+            "text": "네가 내 곁에서 손을 잡아주었기 때문에 승리할 수 있었어. 고마워, 최고의 파트너!"
+          },
+          {
+            "speaker": "이시즈 이슈타르",
+            "text": "이 우승 트로피와 우리의 카드는 영원한 유대의 증표야. 앞으로도 언제나 내 곁에 있어줘!"
+          }
+        ]
+      }
+    },
+    {
+      "personaId": "dm_char_82",
+      "baseCharId": 82,
+      "displayName": "쿠자크 마이",
+      "isTagEligible": true,
+      "partnerRefusal": null,
+      "dormOrFaction": "도미노 시티 히로인",
+      "partnerRole": "TagHeroine",
+      "partnerSkillName": "쿠자크 마이의 결속: 화려한 연격!",
+      "partnerSkillDesc": "상대의 숨겨진 세트 카드를 간파하고 비행야수족의 날카로운 연계로 필드를 제압하는 향기 전술.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 82,
+          "formName": "쿠자크 마이",
+          "formTitle": "쿠자크 마이 · 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_kame_game"
+          ],
+          "greetingLines": {
+            "low": "어머, 나한테 도전하러 온 거야? 내 아로마 택틱스(향기 전술)를 꿰뚫을 수 있을까?",
+            "mid": "후훗, 제법이잖아? 고독한 듀얼만을 고집하던 내가... 너한테는 왠지 마음이 열리네.",
+            "high": "내 곁에 설 수 있는 파트너는 오직 너 하나뿐이야. 우아하고 완벽하게 승리하자!"
+          },
+          "duelStartLine": "화려하고 아름답게 날아올라라! 해피 레이디, 듀얼 개시다!",
+          "aceCutInLine": "바람을 가르는 사냥매의 날개! 해피의 애완 드래곤, 적을 갈기갈기 찢어버려!",
+          "winLine": "어머, 벌써 끝난 거야? 내 해피들의 화려한 춤사위에 넋을 잃었나 보네.",
+          "loseLine": "후훗... 제법이잖아? 날 이렇게 진심으로 당황하게 만들다니, 인정해 줄게.",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_82.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_82.png"
+        },
+        {
+          "formCharId": 229,
+          "formName": "쿠자크 마이 (해피 컨덕터)",
+          "formTitle": "쿠자크 마이 (해피 컨덕터) · 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_kame_game"
+          ],
+          "greetingLines": {
+            "low": "안녕하세요! 난 쿠자크 마이 (해피 컨덕터)! 도미노 시티에서 듀얼을 배우고 있어요. 한 판 겨뤄볼까요?",
+            "mid": "와, 당신의 듀얼은 볼 때마다 정말 멋져요! 저도 온 힘을 다해 서포트할게요!",
+            "high": "당신 옆에서 함께 싸울 수 있어서 정말 행복해요! 우리 둘의 우정은 절대 지지 않아요!"
+          },
+          "duelStartLine": "화려하고 아름답게 날아올라라! 해피 레이디, 듀얼 개시다!",
+          "aceCutInLine": "바람을 가르는 사냥매의 날개! 해피의 애완 드래곤, 적을 갈기갈기 찢어버려!",
+          "winLine": "어머, 벌써 끝난 거야? 내 해피들의 화려한 춤사위에 넋을 잃었나 보네.",
+          "loseLine": "후훗... 제법이잖아? 날 이렇게 진심으로 당황하게 만들다니, 인정해 줄게.",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_229.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_229.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "쿠자크 마이: 어머, 이 최고급 와인 향수는 어떻게 구한 거야? 역시 넌 사람 볼 줄 아는 듀얼리스트네.",
+        "liked": "쿠자크 마이: 후후, 기분 좋은 선물이야. 고맙게 받아줄게.",
+        "neutral": "쿠자크 마이: 선물? 글쎄, 내 마음에 찰지는 모르겠지만 일단 받아두지.",
+        "hated": "쿠자크 마이: 질색이야! 이런 촌스럽고 냄새나는 걸 나한테 주다니, 나를 무시하는 거야?!"
+      },
+      "partnerQuotes": {
+        "morning": "어머, 좋은 아침. 오늘도 날 설레게 할 만한 멋진 듀얼을 보여줄 준비는 됐겠지?",
+        "evening": "해가 지고 밤바람이 시원하네. 오늘 밤은 칵테일 한잔하면서 오늘 승부를 돌아볼까?",
+        "deckComment": "어머, 제법 우아하면서도 치명적인 독을 품은 덱이네? 아주 내 마음에 쏙 들어.",
+        "duelReady": "내 해피들의 화려한 춤사위로 필드를 수놓아 줄게. 듀얼!",
+        "cheer": "거기서 풀 죽어 있을 거야? 당당하게 가슴 펴! 넌 내가 인정한 파트너잖아!"
+      },
+      "bondEvents": [
+        {
+          "heartLevel": 1,
+          "title": "[쿠자크 마이] 첫 번째 인연: 도미노 시티의 만남",
+          "dialogues": [
+            {
+              "speaker": "쿠자크 마이",
+              "text": "안녕! 거리에서 네 듀얼을 지켜봤는데... 정말 가슴이 두근거렸어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워! 네 덱 플레이도 정말 매력적이던걸? 앞으로 잘 부탁해."
+            },
+            {
+              "speaker": "쿠자크 마이",
+              "text": "응! 우리 서로를 지켜주는 최고의 파트너가 되어보자!"
+            }
+          ],
+          "choice": {
+            "prompt": "쿠자크 마이와 함께 어떤 다짐을 나눌까?",
+            "options": [
+              {
+                "text": "🔥 당당하고 화려하게 승리하자! (보상 DP 1.2배)",
+                "reply": "후훗, 좋아! 그 당찬 기백 아주 마음에 들어!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 차분하게 서로의 등을 지켜주자! (내 시작 LP +500)",
+                "reply": "기본이 가장 중요한 법이지. 함께 연습하자!",
+                "effectType": "SafeBuff"
+              },
+              {
+                "text": "🤝 영원한 듀얼 소울메이트가 되어줄게! (호감도 대폭 상승)",
+                "reply": "든든한걸? 앞으로 잘 부탁해, 내 파트너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 3,
+          "title": "[쿠자크 마이] 세 번째 인연: 깊어지는 신뢰와 맹세",
+          "dialogues": [
+            {
+              "speaker": "쿠자크 마이",
+              "text": "수많은 결투를 거치면서... 네가 내 옆에 있다는 게 얼마나 큰 힘이 되는지 몰라."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "나도 그래. 네가 있어 주기에 난 어떤 어둠의 게임도 두렵지 않아."
+            },
+            {
+              "speaker": "쿠자크 마이",
+              "text": "고마워... 우리 둘의 유대라면 세상 어떤 상대라도 이겨낼 수 있어!"
+            }
+          ],
+          "choice": {
+            "prompt": "토너먼트를 앞두고 어떤 전술로 결속할까?",
+            "options": [
+              {
+                "text": "🔥 공격력을 한계까지 끌어올려 정면 돌파하자! (공격력 +400 버프)",
+                "reply": "우리의 화려한 콤보를 보여주자고!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 빈틈없는 카운터로 상대를 압박하자! (내 시작 LP +1,000)",
+                "reply": "완벽한 전술이야. 철저하게 준비하자!",
+                "effectType": "SafeBuff"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 5,
+          "title": "[쿠자크 마이] 최종 인연(MASTER): 영혼으로 맺어진 결속",
+          "dialogues": [
+            {
+              "speaker": "쿠자크 마이",
+              "text": "수많은 시련을 함께 헤쳐 나오며... 넌 내게 세상 그 누구보다 소중한 사람이 되었어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워. 네 곁에서 싸웠기에 난 진정한 듀얼 퀸으로 설 수 있었어."
+            },
+            {
+              "speaker": "쿠자크 마이",
+              "text": "우리의 유대는 영원해. 도미노 시티의 정상에서 영광을 함께 누리자!"
+            }
+          ],
+          "choice": {
+            "prompt": "최종 마스터 승급전! 마지막 맹세를 선택하자!",
+            "options": [
+              {
+                "text": "🔥 우리의 모든 카드를 걸고 정상에 오르자! (마스터 보상 & DP 1.5배)",
+                "reply": "우리의 기적을 세상에 보여주자!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🤝 영원히 함께할 소울메이트로서 승리를 맹세할게! (마스터 영구 버프)",
+                "reply": "고마워, 내 생애 최고의 영원한 파트너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        }
+      ],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "듀얼리스트는 고독한 승부사지만... 진심으로 등을 맡길 파트너를 만나는 건 근사한 일이지.",
+        "domino_city": "고급 호텔 라운지에서 내려다보는 야경이 제법 볼만해. 혼자만의 시간을 즐기기에 딱이야.",
+        "food": "빈티지 레드 와인에 곁들이는 신선한 치즈와 크래커. 품격 있는 맛이어야 만족스럽지.",
+        "millennium": "천년 아이템 따위 없어도, 난 내 실력과 내 카드들만으로 최고의 자리에 오를 거야."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_82_mail_invite",
+          "sender": "쿠자크 마이",
+          "timeSlot": "morning",
+          "spotId": "spot_domino_plaza",
+          "subject": "[마이] 호텔 라운지 쪽으로 와 볼래?",
+          "body": "후훗, 오늘은 네 얼굴이 왠지 보고 싶네. 내 해피들의 아로마 향기 속에서 우아하게 한 수 겨뤄볼까? 기다릴게."
+        }
+      ],
+      "grandPrixEnding": {
+        "title": "🏆 배틀 시티 그랑프리 우승 엔딩: [쿠자크 마이]와의 영원한 유대",
+        "dialogues": [
+          {
+            "speaker": "쿠자크 마이",
+            "text": "우리가 해냈어... 배틀 시티의 정상에서 너와 함께 트로피를 안다니 꿈만 같아!"
+          },
+          {
+            "speaker": "여주인공",
+            "text": "네가 내 곁에서 손을 잡아주었기 때문에 승리할 수 있었어. 고마워, 최고의 파트너!"
+          },
+          {
+            "speaker": "쿠자크 마이",
+            "text": "이 우승 트로피와 우리의 카드는 영원한 유대의 증표야. 앞으로도 언제나 내 곁에 있어줘!"
+          }
+        ]
+      }
+    },
+    {
+      "personaId": "dm_char_83",
+      "baseCharId": 83,
+      "displayName": "카지키 료타",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 싸우는 고독한 듀얼리스트다! 내 등에 남을 태울 생각은 없다. 결투라면 언제든 받아주마!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 카지키 료타 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 83,
+          "formName": "카지키 료타",
+          "formTitle": "카지키 료타 · 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_domino_plaza"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 카지키 료타! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "내 덱의 쓴맛을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "필드를 지배하라! 나의 비장의 카드 소환!",
+          "winLine": "하하핫! 완벽한 승리다! 분수를 알았겠지!",
+          "loseLine": "크윽... 분하다! 하지만 다음엔 절대 안 진다!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_83.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_83.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "카지키 료타: 흥! 제법 값어치 있는 물건을 골라왔군. 덱 케이스에 챙겨두마!",
+        "liked": "카지키 료타: 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "카지키 료타: 쓸데없는 정성에 신경 쓸 시간 있으면 덱이나 튜닝해라.",
+        "hated": "카지키 료타: 네놈! 감히 나한테 이런 쓰레기를 던져주는 배짱은 어디서 나온 거냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "카지키 료타: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "카지키 료타: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "카지키 료타: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "카지키 료타: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "카지키 료타: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "카지키 료타: 듀얼리스트라면 말보다 카드로 증명해야지!",
+        "domino_city": "카지키 료타: 도미노 시티 골목길마다 강자들이 숨어있어.",
+        "food": "카지키 료타: 고로케 하나 사 먹고 또 듀얼 한 판 뛰러 가야지!",
+        "millennium": "카지키 료타: 천년 아이템의 신비보다 눈앞의 승부에 집중하겠어."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_83_mail_invite",
+          "sender": "카지키 료타",
+          "timeSlot": "morning",
+          "spotId": "spot_kaiba_corp",
+          "subject": "[카지키 료타] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_85",
+      "baseCharId": 85,
+      "displayName": "카이바 모쿠바",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 싸우는 고독한 듀얼리스트다! 내 등에 남을 태울 생각은 없다. 결투라면 언제든 받아주마!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 카이바 모쿠바 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 85,
+          "formName": "카이바 모쿠바",
+          "formTitle": "카이바 모쿠바 · 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_kame_game"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 카이바 모쿠바! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "내 덱의 쓴맛을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "필드를 지배하라! 나의 비장의 카드 소환!",
+          "winLine": "하하핫! 완벽한 승리다! 분수를 알았겠지!",
+          "loseLine": "크윽... 분하다! 하지만 다음엔 절대 안 진다!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_85.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_85.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "카이바 모쿠바: 흥! 제법 값어치 있는 물건을 골라왔군. 덱 케이스에 챙겨두마!",
+        "liked": "카이바 모쿠바: 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "카이바 모쿠바: 쓸데없는 정성에 신경 쓸 시간 있으면 덱이나 튜닝해라.",
+        "hated": "카이바 모쿠바: 네놈! 감히 나한테 이런 쓰레기를 던져주는 배짱은 어디서 나온 거냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "카이바 모쿠바: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "카이바 모쿠바: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "카이바 모쿠바: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "카이바 모쿠바: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "카이바 모쿠바: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "카이바 모쿠바: 듀얼리스트라면 말보다 카드로 증명해야지!",
+        "domino_city": "카이바 모쿠바: 도미노 시티 골목길마다 강자들이 숨어있어.",
+        "food": "카이바 모쿠바: 고로케 하나 사 먹고 또 듀얼 한 판 뛰러 가야지!",
+        "millennium": "카이바 모쿠바: 천년 아이템의 신비보다 눈앞의 승부에 집중하겠어."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_85_mail_invite",
+          "sender": "카이바 모쿠바",
+          "timeSlot": "morning",
+          "spotId": "spot_kaiba_corp",
+          "subject": "[카이바 모쿠바] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_89",
+      "baseCharId": 89,
+      "displayName": "리시드",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 싸우는 고독한 듀얼리스트다! 내 등에 남을 태울 생각은 없다. 결투라면 언제든 받아주마!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 리시드 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 89,
+          "formName": "리시드",
+          "formTitle": "리시드 · 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_kaiba_corp"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 리시드! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "내 덱의 쓴맛을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "필드를 지배하라! 나의 비장의 카드 소환!",
+          "winLine": "하하핫! 완벽한 승리다! 분수를 알았겠지!",
+          "loseLine": "크윽... 분하다! 하지만 다음엔 절대 안 진다!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_89.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_89.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "리시드: 흥! 제법 값어치 있는 물건을 골라왔군. 덱 케이스에 챙겨두마!",
+        "liked": "리시드: 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "리시드: 쓸데없는 정성에 신경 쓸 시간 있으면 덱이나 튜닝해라.",
+        "hated": "리시드: 네놈! 감히 나한테 이런 쓰레기를 던져주는 배짱은 어디서 나온 거냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "리시드: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "리시드: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "리시드: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "리시드: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "리시드: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "리시드: 듀얼리스트라면 말보다 카드로 증명해야지!",
+        "domino_city": "리시드: 도미노 시티 골목길마다 강자들이 숨어있어.",
+        "food": "리시드: 고로케 하나 사 먹고 또 듀얼 한 판 뛰러 가야지!",
+        "millennium": "리시드: 천년 아이템의 신비보다 눈앞의 승부에 집중하겠어."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_89_mail_invite",
+          "sender": "리시드",
+          "timeSlot": "morning",
+          "spotId": "spot_kaiba_corp",
+          "subject": "[리시드] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_90",
+      "baseCharId": 90,
+      "displayName": "어둠의 플레이어 킬러",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 싸우는 고독한 듀얼리스트다! 내 등에 남을 태울 생각은 없다. 결투라면 언제든 받아주마!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 어둠의 플레이어 킬러 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 90,
+          "formName": "어둠의 플레이어 킬러",
+          "formTitle": "어둠의 플레이어 킬러 · 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_domino_plaza"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 어둠의 플레이어 킬러! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "내 덱의 쓴맛을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "필드를 지배하라! 나의 비장의 카드 소환!",
+          "winLine": "하하핫! 완벽한 승리다! 분수를 알았겠지!",
+          "loseLine": "크윽... 분하다! 하지만 다음엔 절대 안 진다!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_90.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_90.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "어둠의 플레이어 킬러: 흥! 제법 값어치 있는 물건을 골라왔군. 덱 케이스에 챙겨두마!",
+        "liked": "어둠의 플레이어 킬러: 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "어둠의 플레이어 킬러: 쓸데없는 정성에 신경 쓸 시간 있으면 덱이나 튜닝해라.",
+        "hated": "어둠의 플레이어 킬러: 네놈! 감히 나한테 이런 쓰레기를 던져주는 배짱은 어디서 나온 거냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "어둠의 플레이어 킬러: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "어둠의 플레이어 킬러: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "어둠의 플레이어 킬러: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "어둠의 플레이어 킬러: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "어둠의 플레이어 킬러: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "어둠의 플레이어 킬러: 듀얼리스트라면 말보다 카드로 증명해야지!",
+        "domino_city": "어둠의 플레이어 킬러: 도미노 시티 골목길마다 강자들이 숨어있어.",
+        "food": "어둠의 플레이어 킬러: 고로케 하나 사 먹고 또 듀얼 한 판 뛰러 가야지!",
+        "millennium": "어둠의 플레이어 킬러: 천년 아이템의 신비보다 눈앞의 승부에 집중하겠어."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_90_mail_invite",
+          "sender": "어둠의 플레이어 킬러",
+          "timeSlot": "morning",
+          "spotId": "spot_domino_plaza",
+          "subject": "[어둠의 플레이어 킬러] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_91",
+      "baseCharId": 91,
+      "displayName": "라펠",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 싸우는 고독한 듀얼리스트다! 내 등에 남을 태울 생각은 없다. 결투라면 언제든 받아주마!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 라펠 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 91,
+          "formName": "라펠",
+          "formTitle": "라펠 · 도미노 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_kame_game"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 라펠! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "내 덱의 쓴맛을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "필드를 지배하라! 나의 비장의 카드 소환!",
+          "winLine": "하하핫! 완벽한 승리다! 분수를 알았겠지!",
+          "loseLine": "크윽... 분하다! 하지만 다음엔 절대 안 진다!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_91.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_91.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "라펠: 흥! 제법 값어치 있는 물건을 골라왔군. 덱 케이스에 챙겨두마!",
+        "liked": "라펠: 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "라펠: 쓸데없는 정성에 신경 쓸 시간 있으면 덱이나 튜닝해라.",
+        "hated": "라펠: 네놈! 감히 나한테 이런 쓰레기를 던져주는 배짱은 어디서 나온 거냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "라펠: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "라펠: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "라펠: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "라펠: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "라펠: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "라펠: 듀얼리스트라면 말보다 카드로 증명해야지!",
+        "domino_city": "라펠: 도미노 시티 골목길마다 강자들이 숨어있어.",
+        "food": "라펠: 고로케 하나 사 먹고 또 듀얼 한 판 뛰러 가야지!",
+        "millennium": "라펠: 천년 아이템의 신비보다 눈앞의 승부에 집중하겠어."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_91_mail_invite",
+          "sender": "라펠",
+          "timeSlot": "morning",
+          "spotId": "spot_kaiba_corp",
+          "subject": "[라펠] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_92",
+      "baseCharId": 92,
+      "displayName": "다이너소어 류자키",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 싸우는 고독한 듀얼리스트다! 내 등에 남을 태울 생각은 없다. 결투라면 언제든 받아주마!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 다이너소어 류자키 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 92,
+          "formName": "다이너소어 류자키",
+          "formTitle": "다이너소어 류자키 · 도미노 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_kaiba_corp"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 다이너소어 류자키! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "내 덱의 쓴맛을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "필드를 지배하라! 나의 비장의 카드 소환!",
+          "winLine": "하하핫! 완벽한 승리다! 분수를 알았겠지!",
+          "loseLine": "크윽... 분하다! 하지만 다음엔 절대 안 진다!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_92.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_92.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "다이너소어 류자키: 흥! 제법 값어치 있는 물건을 골라왔군. 덱 케이스에 챙겨두마!",
+        "liked": "다이너소어 류자키: 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "다이너소어 류자키: 쓸데없는 정성에 신경 쓸 시간 있으면 덱이나 튜닝해라.",
+        "hated": "다이너소어 류자키: 네놈! 감히 나한테 이런 쓰레기를 던져주는 배짱은 어디서 나온 거냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "다이너소어 류자키: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "다이너소어 류자키: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "다이너소어 류자키: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "다이너소어 류자키: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "다이너소어 류자키: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "다이너소어 류자키: 듀얼리스트라면 말보다 카드로 증명해야지!",
+        "domino_city": "다이너소어 류자키: 도미노 시티 골목길마다 강자들이 숨어있어.",
+        "food": "다이너소어 류자키: 고로케 하나 사 먹고 또 듀얼 한 판 뛰러 가야지!",
+        "millennium": "다이너소어 류자키: 천년 아이템의 신비보다 눈앞의 승부에 집중하겠어."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_92_mail_invite",
+          "sender": "다이너소어 류자키",
+          "timeSlot": "morning",
+          "spotId": "spot_domino_plaza",
+          "subject": "[다이너소어 류자키] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_93",
+      "baseCharId": 93,
+      "displayName": "레어 헌터",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 싸우는 고독한 듀얼리스트다! 내 등에 남을 태울 생각은 없다. 결투라면 언제든 받아주마!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 레어 헌터 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 93,
+          "formName": "레어 헌터",
+          "formTitle": "레어 헌터 · 도미노 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_domino_plaza"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 레어 헌터! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "내 덱의 쓴맛을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "필드를 지배하라! 나의 비장의 카드 소환!",
+          "winLine": "하하핫! 완벽한 승리다! 분수를 알았겠지!",
+          "loseLine": "크윽... 분하다! 하지만 다음엔 절대 안 진다!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_93.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_93.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "레어 헌터: 흥! 제법 값어치 있는 물건을 골라왔군. 덱 케이스에 챙겨두마!",
+        "liked": "레어 헌터: 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "레어 헌터: 쓸데없는 정성에 신경 쓸 시간 있으면 덱이나 튜닝해라.",
+        "hated": "레어 헌터: 네놈! 감히 나한테 이런 쓰레기를 던져주는 배짱은 어디서 나온 거냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "레어 헌터: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "레어 헌터: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "레어 헌터: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "레어 헌터: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "레어 헌터: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "레어 헌터: 듀얼리스트라면 말보다 카드로 증명해야지!",
+        "domino_city": "레어 헌터: 도미노 시티 골목길마다 강자들이 숨어있어.",
+        "food": "레어 헌터: 고로케 하나 사 먹고 또 듀얼 한 판 뛰러 가야지!",
+        "millennium": "레어 헌터: 천년 아이템의 신비보다 눈앞의 승부에 집중하겠어."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_93_mail_invite",
+          "sender": "레어 헌터",
+          "timeSlot": "morning",
+          "spotId": "spot_kaiba_corp",
+          "subject": "[레어 헌터] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_95",
+      "baseCharId": 95,
+      "displayName": "샤디",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 싸우는 고독한 듀얼리스트다! 내 등에 남을 태울 생각은 없다. 결투라면 언제든 받아주마!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 샤디 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 95,
+          "formName": "샤디",
+          "formTitle": "샤디 · 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_kame_game"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 샤디! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "내 덱의 쓴맛을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "필드를 지배하라! 나의 비장의 카드 소환!",
+          "winLine": "하하핫! 완벽한 승리다! 분수를 알았겠지!",
+          "loseLine": "크윽... 분하다! 하지만 다음엔 절대 안 진다!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_95.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_95.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "샤디: 흥! 제법 값어치 있는 물건을 골라왔군. 덱 케이스에 챙겨두마!",
+        "liked": "샤디: 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "샤디: 쓸데없는 정성에 신경 쓸 시간 있으면 덱이나 튜닝해라.",
+        "hated": "샤디: 네놈! 감히 나한테 이런 쓰레기를 던져주는 배짱은 어디서 나온 거냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "샤디: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "샤디: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "샤디: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "샤디: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "샤디: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "샤디: 듀얼리스트라면 말보다 카드로 증명해야지!",
+        "domino_city": "샤디: 도미노 시티 골목길마다 강자들이 숨어있어.",
+        "food": "샤디: 고로케 하나 사 먹고 또 듀얼 한 판 뛰러 가야지!",
+        "millennium": "샤디: 천년 아이템의 신비보다 눈앞의 승부에 집중하겠어."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_95_mail_invite",
+          "sender": "샤디",
+          "timeSlot": "morning",
+          "spotId": "spot_kaiba_corp",
+          "subject": "[샤디] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_96",
+      "baseCharId": 96,
+      "displayName": "무토 스고로쿠",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 싸우는 고독한 듀얼리스트다! 내 등에 남을 태울 생각은 없다. 결투라면 언제든 받아주마!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 무토 스고로쿠 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 96,
+          "formName": "무토 스고로쿠",
+          "formTitle": "무토 스고로쿠 · 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_kaiba_corp"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 무토 스고로쿠! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "내 덱의 쓴맛을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "필드를 지배하라! 나의 비장의 카드 소환!",
+          "winLine": "하하핫! 완벽한 승리다! 분수를 알았겠지!",
+          "loseLine": "크윽... 분하다! 하지만 다음엔 절대 안 진다!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_96.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_96.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "무토 스고로쿠: 흥! 제법 값어치 있는 물건을 골라왔군. 덱 케이스에 챙겨두마!",
+        "liked": "무토 스고로쿠: 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "무토 스고로쿠: 쓸데없는 정성에 신경 쓸 시간 있으면 덱이나 튜닝해라.",
+        "hated": "무토 스고로쿠: 네놈! 감히 나한테 이런 쓰레기를 던져주는 배짱은 어디서 나온 거냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "무토 스고로쿠: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "무토 스고로쿠: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "무토 스고로쿠: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "무토 스고로쿠: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "무토 스고로쿠: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "무토 스고로쿠: 듀얼리스트라면 말보다 카드로 증명해야지!",
+        "domino_city": "무토 스고로쿠: 도미노 시티 골목길마다 강자들이 숨어있어.",
+        "food": "무토 스고로쿠: 고로케 하나 사 먹고 또 듀얼 한 판 뛰러 가야지!",
+        "millennium": "무토 스고로쿠: 천년 아이템의 신비보다 눈앞의 승부에 집중하겠어."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_96_mail_invite",
+          "sender": "무토 스고로쿠",
+          "timeSlot": "morning",
+          "spotId": "spot_domino_plaza",
+          "subject": "[무토 스고로쿠] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_97",
+      "baseCharId": 97,
+      "displayName": "인형 (스트링스)",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 싸우는 고독한 듀얼리스트다! 내 등에 남을 태울 생각은 없다. 결투라면 언제든 받아주마!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 인형 (스트링스) 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 97,
+          "formName": "인형 (스트링스)",
+          "formTitle": "인형 (스트링스) · 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_domino_plaza"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 인형 (스트링스)! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "내 덱의 쓴맛을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "필드를 지배하라! 나의 비장의 카드 소환!",
+          "winLine": "하하핫! 완벽한 승리다! 분수를 알았겠지!",
+          "loseLine": "크윽... 분하다! 하지만 다음엔 절대 안 진다!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_97.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_97.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "인형 (스트링스): 흥! 제법 값어치 있는 물건을 골라왔군. 덱 케이스에 챙겨두마!",
+        "liked": "인형 (스트링스): 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "인형 (스트링스): 쓸데없는 정성에 신경 쓸 시간 있으면 덱이나 튜닝해라.",
+        "hated": "인형 (스트링스): 네놈! 감히 나한테 이런 쓰레기를 던져주는 배짱은 어디서 나온 거냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "인형 (스트링스): 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "인형 (스트링스): 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "인형 (스트링스): 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "인형 (스트링스): 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "인형 (스트링스): 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "인형 (스트링스): 듀얼리스트라면 말보다 카드로 증명해야지!",
+        "domino_city": "인형 (스트링스): 도미노 시티 골목길마다 강자들이 숨어있어.",
+        "food": "인형 (스트링스): 고로케 하나 사 먹고 또 듀얼 한 판 뛰러 가야지!",
+        "millennium": "인형 (스트링스): 천년 아이템의 신비보다 눈앞의 승부에 집중하겠어."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_97_mail_invite",
+          "sender": "인형 (스트링스)",
+          "timeSlot": "morning",
+          "spotId": "spot_kaiba_corp",
+          "subject": "[인형 (스트링스)] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_98",
+      "baseCharId": 98,
+      "displayName": "마자키 안즈",
+      "isTagEligible": true,
+      "partnerRefusal": null,
+      "dormOrFaction": "도미노 시티 히로인",
+      "partnerRole": "TagHeroine",
+      "partnerSkillName": "마자키 안즈의 결속: 화려한 연격!",
+      "partnerSkillDesc": "따뜻한 응원으로 매 턴 라이프를 회복시키고 팀의 유대를 든든하게 지켜주는 치어링.",
+      "favoriteGiftId": "beef_croquette",
+      "forms": [
+        {
+          "formCharId": 98,
+          "formName": "마자키 안즈",
+          "formTitle": "마자키 안즈 · 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_kaiba_corp"
+          ],
+          "greetingLines": {
+            "low": "안녕! 난 마자키 안즈! 듀얼도 좋지만 댄스 레슨도 게을리하지 않는다고!",
+            "mid": "와, 네 덱 플레이는 리듬감이 정말 살아있어! 보고 있으면 나까지 춤추고 싶어져!",
+            "high": "너랑 함께라면 어떤 무대라도 자신 있어! 우리 둘의 우정 파워를 보여주자!"
+          },
+          "duelStartLine": "신나고 경쾌하게 가자! 듀얼 개시야!",
+          "aceCutInLine": "우정의 빛을 비춰줘! 성스러운 마술사, 필드를 환하게 밝혀라!",
+          "winLine": "해냈다! 리듬과 우정이 완벽하게 맞아떨어진 멋진 승리였어!",
+          "loseLine": "아깝다~ 하지만 정말 즐거웠어! 다음엔 더 멋진 스텝으로 도전할게!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_98.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_98.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "마자키 안즈: 어머나, 딸기 쇼트케이크 샌드위치잖아! 댄스 레슨 끝나고 먹으면 최고야, 고마워!",
+        "liked": "마자키 안즈: 후훗, 기분 좋은 선물인걸? 고마워!",
+        "neutral": "마자키 안즈: 선물 고마워! 기쁘게 받을게.",
+        "hated": "마자키 안즈: 우왓... 너무 기름져서 칼로리가 걱정돼... 이건 사양할게."
+      },
+      "partnerQuotes": {
+        "morning": "안녕! 좋은 아침이야! 오늘 날씨 정말 화창하다, 상쾌하게 스트레칭부터 할까?",
+        "evening": "노을빛이 참 예쁘다... 오늘 너랑 보낸 시간, 잊지 못할 멋진 추억이 될 것 같아.",
+        "deckComment": "네 덱을 보면 경쾌한 댄스 스텝처럼 리듬감이 살아있어서 정말 멋져!",
+        "duelReady": "우리 둘의 리듬을 맞춰서 신나게 가보자! 듀얼 개시야!",
+        "cheer": "힘내! 혼자가 아니잖아! 내가 옆에서 온 마음을 다해 응원하고 있어!"
+      },
+      "bondEvents": [
+        {
+          "heartLevel": 1,
+          "title": "[마자키 안즈] 첫 번째 인연: 도미노 시티의 만남",
+          "dialogues": [
+            {
+              "speaker": "마자키 안즈",
+              "text": "안녕! 거리에서 네 듀얼을 지켜봤는데... 정말 가슴이 두근거렸어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워! 네 덱 플레이도 정말 매력적이던걸? 앞으로 잘 부탁해."
+            },
+            {
+              "speaker": "마자키 안즈",
+              "text": "응! 우리 서로를 지켜주는 최고의 파트너가 되어보자!"
+            }
+          ],
+          "choice": {
+            "prompt": "마자키 안즈와 함께 어떤 다짐을 나눌까?",
+            "options": [
+              {
+                "text": "🔥 당당하고 화려하게 승리하자! (보상 DP 1.2배)",
+                "reply": "후훗, 좋아! 그 당찬 기백 아주 마음에 들어!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 차분하게 서로의 등을 지켜주자! (내 시작 LP +500)",
+                "reply": "기본이 가장 중요한 법이지. 함께 연습하자!",
+                "effectType": "SafeBuff"
+              },
+              {
+                "text": "🤝 영원한 듀얼 소울메이트가 되어줄게! (호감도 대폭 상승)",
+                "reply": "든든한걸? 앞으로 잘 부탁해, 내 파트너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 3,
+          "title": "[마자키 안즈] 세 번째 인연: 깊어지는 신뢰와 맹세",
+          "dialogues": [
+            {
+              "speaker": "마자키 안즈",
+              "text": "수많은 결투를 거치면서... 네가 내 옆에 있다는 게 얼마나 큰 힘이 되는지 몰라."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "나도 그래. 네가 있어 주기에 난 어떤 어둠의 게임도 두렵지 않아."
+            },
+            {
+              "speaker": "마자키 안즈",
+              "text": "고마워... 우리 둘의 유대라면 세상 어떤 상대라도 이겨낼 수 있어!"
+            }
+          ],
+          "choice": {
+            "prompt": "토너먼트를 앞두고 어떤 전술로 결속할까?",
+            "options": [
+              {
+                "text": "🔥 공격력을 한계까지 끌어올려 정면 돌파하자! (공격력 +400 버프)",
+                "reply": "우리의 화려한 콤보를 보여주자고!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 빈틈없는 카운터로 상대를 압박하자! (내 시작 LP +1,000)",
+                "reply": "완벽한 전술이야. 철저하게 준비하자!",
+                "effectType": "SafeBuff"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 5,
+          "title": "[마자키 안즈] 최종 인연(MASTER): 영혼으로 맺어진 결속",
+          "dialogues": [
+            {
+              "speaker": "마자키 안즈",
+              "text": "수많은 시련을 함께 헤쳐 나오며... 넌 내게 세상 그 누구보다 소중한 사람이 되었어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워. 네 곁에서 싸웠기에 난 진정한 듀얼 퀸으로 설 수 있었어."
+            },
+            {
+              "speaker": "마자키 안즈",
+              "text": "우리의 유대는 영원해. 도미노 시티의 정상에서 영광을 함께 누리자!"
+            }
+          ],
+          "choice": {
+            "prompt": "최종 마스터 승급전! 마지막 맹세를 선택하자!",
+            "options": [
+              {
+                "text": "🔥 우리의 모든 카드를 걸고 정상에 오르자! (마스터 보상 & DP 1.5배)",
+                "reply": "우리의 기적을 세상에 보여주자!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🤝 영원히 함께할 소울메이트로서 승리를 맹세할게! (마스터 영구 버프)",
+                "reply": "고마워, 내 생애 최고의 영원한 파트너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        }
+      ],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "듀얼도 댄스처럼 상대와 호흡을 맞추며 서로를 이해해 가는 무대라고 생각해.",
+        "domino_city": "브로드웨이로 유학 가는 게 내 꿈이지만, 이 도미노 시티의 친구들도 너무 소중해.",
+        "food": "달콤한 딸기 타르트랑 생과일주스! 레슨 끝나고 친구들이랑 먹으면 피로가 싹 풀려.",
+        "millennium": "유우기 손등에 새겨진 우정의 스마일 마크... 우리들의 영원한 결속의 상징이야."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_98_mail_invite",
+          "sender": "마자키 안즈",
+          "timeSlot": "morning",
+          "spotId": "spot_domino_plaza",
+          "subject": "[안즈] 댄스 레슨 끝나고 만날래?",
+          "body": "안녕! 오늘 레슨이 일찍 끝났거든. 광장 분수대 앞에서 시원한 주스 마시면서 듀얼도 하고 수다도 떨자!"
+        }
+      ],
+      "grandPrixEnding": {
+        "title": "🏆 배틀 시티 그랑프리 우승 엔딩: [마자키 안즈]와의 영원한 유대",
+        "dialogues": [
+          {
+            "speaker": "마자키 안즈",
+            "text": "우리가 해냈어... 배틀 시티의 정상에서 너와 함께 트로피를 안다니 꿈만 같아!"
+          },
+          {
+            "speaker": "여주인공",
+            "text": "네가 내 곁에서 손을 잡아주었기 때문에 승리할 수 있었어. 고마워, 최고의 파트너!"
+          },
+          {
+            "speaker": "마자키 안즈",
+            "text": "이 우승 트로피와 우리의 카드는 영원한 유대의 증표야. 앞으로도 언제나 내 곁에 있어줘!"
+          }
+        ]
+      }
+    },
+    {
+      "personaId": "dm_char_99",
+      "baseCharId": 99,
+      "displayName": "혼다 히로토",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 싸우는 고독한 듀얼리스트다! 내 등에 남을 태울 생각은 없다. 결투라면 언제든 받아주마!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 혼다 히로토 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 99,
+          "formName": "혼다 히로토",
+          "formTitle": "혼다 히로토 · 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_kame_game"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 혼다 히로토! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "내 덱의 쓴맛을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "필드를 지배하라! 나의 비장의 카드 소환!",
+          "winLine": "하하핫! 완벽한 승리다! 분수를 알았겠지!",
+          "loseLine": "크윽... 분하다! 하지만 다음엔 절대 안 진다!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_99.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_99.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "혼다 히로토: 흥! 제법 값어치 있는 물건을 골라왔군. 덱 케이스에 챙겨두마!",
+        "liked": "혼다 히로토: 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "혼다 히로토: 쓸데없는 정성에 신경 쓸 시간 있으면 덱이나 튜닝해라.",
+        "hated": "혼다 히로토: 네놈! 감히 나한테 이런 쓰레기를 던져주는 배짱은 어디서 나온 거냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "혼다 히로토: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "혼다 히로토: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "혼다 히로토: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "혼다 히로토: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "혼다 히로토: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "혼다 히로토: 듀얼리스트라면 말보다 카드로 증명해야지!",
+        "domino_city": "혼다 히로토: 도미노 시티 골목길마다 강자들이 숨어있어.",
+        "food": "혼다 히로토: 고로케 하나 사 먹고 또 듀얼 한 판 뛰러 가야지!",
+        "millennium": "혼다 히로토: 천년 아이템의 신비보다 눈앞의 승부에 집중하겠어."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_99_mail_invite",
+          "sender": "혼다 히로토",
+          "timeSlot": "morning",
+          "spotId": "spot_kaiba_corp",
+          "subject": "[혼다 히로토] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_100",
+      "baseCharId": 100,
+      "displayName": "바론",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 싸우는 고독한 듀얼리스트다! 내 등에 남을 태울 생각은 없다. 결투라면 언제든 받아주마!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 바론 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 100,
+          "formName": "바론",
+          "formTitle": "바론 · 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_kaiba_corp"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 바론! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "내 덱의 쓴맛을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "필드를 지배하라! 나의 비장의 카드 소환!",
+          "winLine": "하하핫! 완벽한 승리다! 분수를 알았겠지!",
+          "loseLine": "크윽... 분하다! 하지만 다음엔 절대 안 진다!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_100.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_100.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "바론: 흥! 제법 값어치 있는 물건을 골라왔군. 덱 케이스에 챙겨두마!",
+        "liked": "바론: 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "바론: 쓸데없는 정성에 신경 쓸 시간 있으면 덱이나 튜닝해라.",
+        "hated": "바론: 네놈! 감히 나한테 이런 쓰레기를 던져주는 배짱은 어디서 나온 거냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "바론: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "바론: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "바론: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "바론: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "바론: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "바론: 듀얼리스트라면 말보다 카드로 증명해야지!",
+        "domino_city": "바론: 도미노 시티 골목길마다 강자들이 숨어있어.",
+        "food": "바론: 고로케 하나 사 먹고 또 듀얼 한 판 뛰러 가야지!",
+        "millennium": "바론: 천년 아이템의 신비보다 눈앞의 승부에 집중하겠어."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_100_mail_invite",
+          "sender": "바론",
+          "timeSlot": "morning",
+          "spotId": "spot_domino_plaza",
+          "subject": "[바론] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_101",
+      "baseCharId": 101,
+      "displayName": "인섹터 하가",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 싸우는 고독한 듀얼리스트다! 내 등에 남을 태울 생각은 없다. 결투라면 언제든 받아주마!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 인섹터 하가 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 101,
+          "formName": "인섹터 하가",
+          "formTitle": "인섹터 하가 · 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_domino_plaza"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 인섹터 하가! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "내 덱의 쓴맛을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "필드를 지배하라! 나의 비장의 카드 소환!",
+          "winLine": "하하핫! 완벽한 승리다! 분수를 알았겠지!",
+          "loseLine": "크윽... 분하다! 하지만 다음엔 절대 안 진다!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_101.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_101.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "인섹터 하가: 흥! 제법 값어치 있는 물건을 골라왔군. 덱 케이스에 챙겨두마!",
+        "liked": "인섹터 하가: 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "인섹터 하가: 쓸데없는 정성에 신경 쓸 시간 있으면 덱이나 튜닝해라.",
+        "hated": "인섹터 하가: 네놈! 감히 나한테 이런 쓰레기를 던져주는 배짱은 어디서 나온 거냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "인섹터 하가: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "인섹터 하가: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "인섹터 하가: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "인섹터 하가: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "인섹터 하가: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "인섹터 하가: 듀얼리스트라면 말보다 카드로 증명해야지!",
+        "domino_city": "인섹터 하가: 도미노 시티 골목길마다 강자들이 숨어있어.",
+        "food": "인섹터 하가: 고로케 하나 사 먹고 또 듀얼 한 판 뛰러 가야지!",
+        "millennium": "인섹터 하가: 천년 아이템의 신비보다 눈앞의 승부에 집중하겠어."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_101_mail_invite",
+          "sender": "인섹터 하가",
+          "timeSlot": "morning",
+          "spotId": "spot_kaiba_corp",
+          "subject": "[인섹터 하가] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_192",
+      "baseCharId": 192,
+      "displayName": "카이바 노아",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 싸우는 고독한 듀얼리스트다! 내 등에 남을 태울 생각은 없다. 결투라면 언제든 받아주마!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 카이바 노아 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 192,
+          "formName": "카이바 노아",
+          "formTitle": "카이바 노아 · 도미노 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_kame_game"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 카이바 노아! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "내 덱의 쓴맛을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "필드를 지배하라! 나의 비장의 카드 소환!",
+          "winLine": "하하핫! 완벽한 승리다! 분수를 알았겠지!",
+          "loseLine": "크윽... 분하다! 하지만 다음엔 절대 안 진다!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_192.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_192.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "카이바 노아: 흥! 제법 값어치 있는 물건을 골라왔군. 덱 케이스에 챙겨두마!",
+        "liked": "카이바 노아: 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "카이바 노아: 쓸데없는 정성에 신경 쓸 시간 있으면 덱이나 튜닝해라.",
+        "hated": "카이바 노아: 네놈! 감히 나한테 이런 쓰레기를 던져주는 배짱은 어디서 나온 거냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "카이바 노아: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "카이바 노아: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "카이바 노아: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "카이바 노아: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "카이바 노아: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "카이바 노아: 듀얼리스트라면 말보다 카드로 증명해야지!",
+        "domino_city": "카이바 노아: 도미노 시티 골목길마다 강자들이 숨어있어.",
+        "food": "카이바 노아: 고로케 하나 사 먹고 또 듀얼 한 판 뛰러 가야지!",
+        "millennium": "카이바 노아: 천년 아이템의 신비보다 눈앞의 승부에 집중하겠어."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_192_mail_invite",
+          "sender": "카이바 노아",
+          "timeSlot": "morning",
+          "spotId": "spot_domino_plaza",
+          "subject": "[카이바 노아] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_193",
+      "baseCharId": 193,
+      "displayName": "빛의 가면 & 어둠의 가면",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 싸우는 고독한 듀얼리스트다! 내 등에 남을 태울 생각은 없다. 결투라면 언제든 받아주마!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 빛의 가면 & 어둠의 가면 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 193,
+          "formName": "빛의 가면 & 어둠의 가면",
+          "formTitle": "빛의 가면 & 어둠의 가면 · 도미노 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_kaiba_corp"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 빛의 가면 & 어둠의 가면! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "내 덱의 쓴맛을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "필드를 지배하라! 나의 비장의 카드 소환!",
+          "winLine": "하하핫! 완벽한 승리다! 분수를 알았겠지!",
+          "loseLine": "크윽... 분하다! 하지만 다음엔 절대 안 진다!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_193.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_193.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "빛의 가면 & 어둠의 가면: 흥! 제법 값어치 있는 물건을 골라왔군. 덱 케이스에 챙겨두마!",
+        "liked": "빛의 가면 & 어둠의 가면: 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "빛의 가면 & 어둠의 가면: 쓸데없는 정성에 신경 쓸 시간 있으면 덱이나 튜닝해라.",
+        "hated": "빛의 가면 & 어둠의 가면: 네놈! 감히 나한테 이런 쓰레기를 던져주는 배짱은 어디서 나온 거냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "빛의 가면 & 어둠의 가면: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "빛의 가면 & 어둠의 가면: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "빛의 가면 & 어둠의 가면: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "빛의 가면 & 어둠의 가면: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "빛의 가면 & 어둠의 가면: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "빛의 가면 & 어둠의 가면: 듀얼리스트라면 말보다 카드로 증명해야지!",
+        "domino_city": "빛의 가면 & 어둠의 가면: 도미노 시티 골목길마다 강자들이 숨어있어.",
+        "food": "빛의 가면 & 어둠의 가면: 고로케 하나 사 먹고 또 듀얼 한 판 뛰러 가야지!",
+        "millennium": "빛의 가면 & 어둠의 가면: 천년 아이템의 신비보다 눈앞의 승부에 집중하겠어."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_193_mail_invite",
+          "sender": "빛의 가면 & 어둠의 가면",
+          "timeSlot": "morning",
+          "spotId": "spot_kaiba_corp",
+          "subject": "[빛의 가면 & 어둠의 가면] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_196",
+      "baseCharId": 196,
+      "displayName": "미궁 형제",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 싸우는 고독한 듀얼리스트다! 내 등에 남을 태울 생각은 없다. 결투라면 언제든 받아주마!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 미궁 형제 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 196,
+          "formName": "미궁 형제",
+          "formTitle": "미궁 형제 · 도미노 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_domino_plaza"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 미궁 형제! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "내 덱의 쓴맛을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "필드를 지배하라! 나의 비장의 카드 소환!",
+          "winLine": "하하핫! 완벽한 승리다! 분수를 알았겠지!",
+          "loseLine": "크윽... 분하다! 하지만 다음엔 절대 안 진다!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_196.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_196.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "미궁 형제: 흥! 제법 값어치 있는 물건을 골라왔군. 덱 케이스에 챙겨두마!",
+        "liked": "미궁 형제: 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "미궁 형제: 쓸데없는 정성에 신경 쓸 시간 있으면 덱이나 튜닝해라.",
+        "hated": "미궁 형제: 네놈! 감히 나한테 이런 쓰레기를 던져주는 배짱은 어디서 나온 거냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "미궁 형제: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "미궁 형제: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "미궁 형제: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "미궁 형제: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "미궁 형제: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "미궁 형제: 듀얼리스트라면 말보다 카드로 증명해야지!",
+        "domino_city": "미궁 형제: 도미노 시티 골목길마다 강자들이 숨어있어.",
+        "food": "미궁 형제: 고로케 하나 사 먹고 또 듀얼 한 판 뛰러 가야지!",
+        "millennium": "미궁 형제: 천년 아이템의 신비보다 눈앞의 승부에 집중하겠어."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_196_mail_invite",
+          "sender": "미궁 형제",
+          "timeSlot": "morning",
+          "spotId": "spot_domino_plaza",
+          "subject": "[미궁 형제] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_200",
+      "baseCharId": 200,
+      "displayName": "오토기 류지",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 싸우는 고독한 듀얼리스트다! 내 등에 남을 태울 생각은 없다. 결투라면 언제든 받아주마!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 오토기 류지 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 200,
+          "formName": "오토기 류지",
+          "formTitle": "오토기 류지 · 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_kame_game"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 오토기 류지! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "내 덱의 쓴맛을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "필드를 지배하라! 나의 비장의 카드 소환!",
+          "winLine": "하하핫! 완벽한 승리다! 분수를 알았겠지!",
+          "loseLine": "크윽... 분하다! 하지만 다음엔 절대 안 진다!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_200.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_200.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "오토기 류지: 흥! 제법 값어치 있는 물건을 골라왔군. 덱 케이스에 챙겨두마!",
+        "liked": "오토기 류지: 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "오토기 류지: 쓸데없는 정성에 신경 쓸 시간 있으면 덱이나 튜닝해라.",
+        "hated": "오토기 류지: 네놈! 감히 나한테 이런 쓰레기를 던져주는 배짱은 어디서 나온 거냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "오토기 류지: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "오토기 류지: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "오토기 류지: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "오토기 류지: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "오토기 류지: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "오토기 류지: 듀얼리스트라면 말보다 카드로 증명해야지!",
+        "domino_city": "오토기 류지: 도미노 시티 골목길마다 강자들이 숨어있어.",
+        "food": "오토기 류지: 고로케 하나 사 먹고 또 듀얼 한 판 뛰러 가야지!",
+        "millennium": "오토기 류지: 천년 아이템의 신비보다 눈앞의 승부에 집중하겠어."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_200_mail_invite",
+          "sender": "오토기 류지",
+          "timeSlot": "morning",
+          "spotId": "spot_domino_plaza",
+          "subject": "[오토기 류지] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_203",
+      "baseCharId": 203,
+      "displayName": "세라",
+      "isTagEligible": true,
+      "partnerRefusal": null,
+      "dormOrFaction": "도미노 시티 히로인",
+      "partnerRole": "TagHeroine",
+      "partnerSkillName": "세라의 결속: 화려한 연격!",
+      "partnerSkillDesc": "자신/파트너 몬스터 공격 시 공격력 500 상승 및 효과 파괴 1회 무효화!",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 203,
+          "formName": "세라",
+          "formTitle": "세라 · 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_domino_plaza"
+          ],
+          "greetingLines": {
+            "low": "차원의 틈새에서 당신을 지켜보고 있었습니다. 정화의 듀얼을 청합니다.",
+            "mid": "당신의 영혼은 분노와 증오가 아닌, 맑은 온기로 차 있군요. 마음이 편안해집니다.",
+            "high": "오빠(아이가미)의 증오를 멈출 수 있는 것은 오직 당신과 저의 순수한 유대뿐입니다."
+          },
+          "duelStartLine": "차원을 넘어선 진실을 위해, 듀얼을 시작하겠습니다.",
+          "aceCutInLine": "차원의 정화자여, 빛의 만다라를 펼쳐라! 듀체 자피라!!",
+          "winLine": "어둠이 걷히고 새로운 차원의 평화가 깃들기를...",
+          "loseLine": "훌륭하군요... 당신의 빛이 프라나의 기억을 일깨웠습니다.",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_203.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_203.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "세라: 어머, 이걸 날 위해 준비해 준 거야?! 너무 감동이야, 소중히 간직할게!",
+        "liked": "세라: 후후, 기분 좋은 선물이야. 정말 고마워!",
+        "neutral": "세라: 날 생각해서 챙겨준 거지? 고마워!",
+        "hated": "세라: 으음... 이건 내 취향이랑은 조금 안 맞는 것 같아..."
+      },
+      "partnerQuotes": {
+        "morning": "세라: 좋은 아침이야! 오늘도 활기차게 힘내보자!",
+        "evening": "세라: 벌써 저녁이네. 오늘 하루 함께해 줘서 즐거웠어.",
+        "deckComment": "세라: 네 덱은 볼 때마다 세심한 손길이 느껴져서 참 좋아.",
+        "duelReady": "세라: 준비 완료야! 우리 둘의 팀워크를 보여주자!",
+        "cheer": "세라: 힘내! 넌 할 수 있어, 끝까지 널 믿을게!"
+      },
+      "bondEvents": [
+        {
+          "heartLevel": 1,
+          "title": "[세라] 첫 번째 인연: 도미노 시티의 만남",
+          "dialogues": [
+            {
+              "speaker": "세라",
+              "text": "안녕! 거리에서 네 듀얼을 지켜봤는데... 정말 가슴이 두근거렸어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워! 네 덱 플레이도 정말 매력적이던걸? 앞으로 잘 부탁해."
+            },
+            {
+              "speaker": "세라",
+              "text": "응! 우리 서로를 지켜주는 최고의 파트너가 되어보자!"
+            }
+          ],
+          "choice": {
+            "prompt": "세라와 함께 어떤 다짐을 나눌까?",
+            "options": [
+              {
+                "text": "🔥 당당하고 화려하게 승리하자! (보상 DP 1.2배)",
+                "reply": "후훗, 좋아! 그 당찬 기백 아주 마음에 들어!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 차분하게 서로의 등을 지켜주자! (내 시작 LP +500)",
+                "reply": "기본이 가장 중요한 법이지. 함께 연습하자!",
+                "effectType": "SafeBuff"
+              },
+              {
+                "text": "🤝 영원한 듀얼 소울메이트가 되어줄게! (호감도 대폭 상승)",
+                "reply": "든든한걸? 앞으로 잘 부탁해, 내 파트너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 3,
+          "title": "[세라] 세 번째 인연: 깊어지는 신뢰와 맹세",
+          "dialogues": [
+            {
+              "speaker": "세라",
+              "text": "수많은 결투를 거치면서... 네가 내 옆에 있다는 게 얼마나 큰 힘이 되는지 몰라."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "나도 그래. 네가 있어 주기에 난 어떤 어둠의 게임도 두렵지 않아."
+            },
+            {
+              "speaker": "세라",
+              "text": "고마워... 우리 둘의 유대라면 세상 어떤 상대라도 이겨낼 수 있어!"
+            }
+          ],
+          "choice": {
+            "prompt": "토너먼트를 앞두고 어떤 전술로 결속할까?",
+            "options": [
+              {
+                "text": "🔥 공격력을 한계까지 끌어올려 정면 돌파하자! (공격력 +400 버프)",
+                "reply": "우리의 화려한 콤보를 보여주자고!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 빈틈없는 카운터로 상대를 압박하자! (내 시작 LP +1,000)",
+                "reply": "완벽한 전술이야. 철저하게 준비하자!",
+                "effectType": "SafeBuff"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 5,
+          "title": "[세라] 최종 인연(MASTER): 영혼으로 맺어진 결속",
+          "dialogues": [
+            {
+              "speaker": "세라",
+              "text": "수많은 시련을 함께 헤쳐 나오며... 넌 내게 세상 그 누구보다 소중한 사람이 되었어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워. 네 곁에서 싸웠기에 난 진정한 듀얼 퀸으로 설 수 있었어."
+            },
+            {
+              "speaker": "세라",
+              "text": "우리의 유대는 영원해. 도미노 시티의 정상에서 영광을 함께 누리자!"
+            }
+          ],
+          "choice": {
+            "prompt": "최종 마스터 승급전! 마지막 맹세를 선택하자!",
+            "options": [
+              {
+                "text": "🔥 우리의 모든 카드를 걸고 정상에 오르자! (마스터 보상 & DP 1.5배)",
+                "reply": "우리의 기적을 세상에 보여주자!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🤝 영원히 함께할 소울메이트로서 승리를 맹세할게! (마스터 영구 버프)",
+                "reply": "고마워, 내 생애 최고의 영원한 파트너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        }
+      ],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "카드는 마음의 거울입니다. 사악한 집착을 버릴 때 비로소 진정한 섭리가 드러납니다.",
+        "domino_city": "도미노 시티의 하늘 너머로 고차원의 세계가 이어져 있습니다.",
+        "food": "맑은 샘물과 과일 한 조각이면 영혼을 맑게 하기에 충분합니다.",
+        "millennium": "천년 퍼즐이 다시 맞춰질 때, 파라오와의 마지막 약속이 완성될 것입니다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_203_mail_invite",
+          "sender": "세라",
+          "timeSlot": "morning",
+          "spotId": "spot_kaiba_corp",
+          "subject": "[세라] 오늘 잠깐 만날 수 있을까?",
+          "body": "안녕! 오늘 날씨가 참 좋아서 너랑 같이 듀얼 연습도 하고 바람도 쐬고 싶어. 시간 되면 편할 때 들러줘!"
+        }
+      ],
+      "grandPrixEnding": {
+        "title": "🏆 배틀 시티 그랑프리 우승 엔딩: [세라]와의 영원한 유대",
+        "dialogues": [
+          {
+            "speaker": "세라",
+            "text": "우리가 해냈어... 배틀 시티의 정상에서 너와 함께 트로피를 안다니 꿈만 같아!"
+          },
+          {
+            "speaker": "여주인공",
+            "text": "네가 내 곁에서 손을 잡아주었기 때문에 승리할 수 있었어. 고마워, 최고의 파트너!"
+          },
+          {
+            "speaker": "세라",
+            "text": "이 우승 트로피와 우리의 카드는 영원한 유대의 증표야. 앞으로도 언제나 내 곁에 있어줘!"
+          }
+        ]
+      }
+    },
+    {
+      "personaId": "dm_char_217",
+      "baseCharId": 217,
+      "displayName": "아누비스",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 싸우는 고독한 듀얼리스트다! 내 등에 남을 태울 생각은 없다. 결투라면 언제든 받아주마!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 아누비스 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 217,
+          "formName": "아누비스",
+          "formTitle": "아누비스 · 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_kaiba_corp"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 아누비스! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "내 덱의 쓴맛을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "필드를 지배하라! 나의 비장의 카드 소환!",
+          "winLine": "하하핫! 완벽한 승리다! 분수를 알았겠지!",
+          "loseLine": "크윽... 분하다! 하지만 다음엔 절대 안 진다!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_217.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_217.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "아누비스: 흥! 제법 값어치 있는 물건을 골라왔군. 덱 케이스에 챙겨두마!",
+        "liked": "아누비스: 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "아누비스: 쓸데없는 정성에 신경 쓸 시간 있으면 덱이나 튜닝해라.",
+        "hated": "아누비스: 네놈! 감히 나한테 이런 쓰레기를 던져주는 배짱은 어디서 나온 거냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "아누비스: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "아누비스: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "아누비스: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "아누비스: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "아누비스: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "아누비스: 듀얼리스트라면 말보다 카드로 증명해야지!",
+        "domino_city": "아누비스: 도미노 시티 골목길마다 강자들이 숨어있어.",
+        "food": "아누비스: 고로케 하나 사 먹고 또 듀얼 한 판 뛰러 가야지!",
+        "millennium": "아누비스: 천년 아이템의 신비보다 눈앞의 승부에 집중하겠어."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_217_mail_invite",
+          "sender": "아누비스",
+          "timeSlot": "morning",
+          "spotId": "spot_kaiba_corp",
+          "subject": "[아누비스] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_222",
+      "baseCharId": 222,
+      "displayName": "에스퍼 로바",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 싸우는 고독한 듀얼리스트다! 내 등에 남을 태울 생각은 없다. 결투라면 언제든 받아주마!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 에스퍼 로바 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 222,
+          "formName": "에스퍼 로바",
+          "formTitle": "에스퍼 로바 · 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_domino_plaza"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 에스퍼 로바! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "내 덱의 쓴맛을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "필드를 지배하라! 나의 비장의 카드 소환!",
+          "winLine": "하하핫! 완벽한 승리다! 분수를 알았겠지!",
+          "loseLine": "크윽... 분하다! 하지만 다음엔 절대 안 진다!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_222.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_222.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "에스퍼 로바: 흥! 제법 값어치 있는 물건을 골라왔군. 덱 케이스에 챙겨두마!",
+        "liked": "에스퍼 로바: 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "에스퍼 로바: 쓸데없는 정성에 신경 쓸 시간 있으면 덱이나 튜닝해라.",
+        "hated": "에스퍼 로바: 네놈! 감히 나한테 이런 쓰레기를 던져주는 배짱은 어디서 나온 거냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "에스퍼 로바: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "에스퍼 로바: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "에스퍼 로바: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "에스퍼 로바: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "에스퍼 로바: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "에스퍼 로바: 듀얼리스트라면 말보다 카드로 증명해야지!",
+        "domino_city": "에스퍼 로바: 도미노 시티 골목길마다 강자들이 숨어있어.",
+        "food": "에스퍼 로바: 고로케 하나 사 먹고 또 듀얼 한 판 뛰러 가야지!",
+        "millennium": "에스퍼 로바: 천년 아이템의 신비보다 눈앞의 승부에 집중하겠어."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_222_mail_invite",
+          "sender": "에스퍼 로바",
+          "timeSlot": "morning",
+          "spotId": "spot_domino_plaza",
+          "subject": "[에스퍼 로바] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_223",
+      "baseCharId": 223,
+      "displayName": "지크 로이드",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 싸우는 고독한 듀얼리스트다! 내 등에 남을 태울 생각은 없다. 결투라면 언제든 받아주마!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 지크 로이드 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 223,
+          "formName": "지크 로이드",
+          "formTitle": "지크 로이드 · 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_kame_game"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 지크 로이드! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "내 덱의 쓴맛을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "필드를 지배하라! 나의 비장의 카드 소환!",
+          "winLine": "하하핫! 완벽한 승리다! 분수를 알았겠지!",
+          "loseLine": "크윽... 분하다! 하지만 다음엔 절대 안 진다!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_223.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_223.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "지크 로이드: 흥! 제법 값어치 있는 물건을 골라왔군. 덱 케이스에 챙겨두마!",
+        "liked": "지크 로이드: 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "지크 로이드: 쓸데없는 정성에 신경 쓸 시간 있으면 덱이나 튜닝해라.",
+        "hated": "지크 로이드: 네놈! 감히 나한테 이런 쓰레기를 던져주는 배짱은 어디서 나온 거냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "지크 로이드: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "지크 로이드: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "지크 로이드: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "지크 로이드: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "지크 로이드: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "지크 로이드: 듀얼리스트라면 말보다 카드로 증명해야지!",
+        "domino_city": "지크 로이드: 도미노 시티 골목길마다 강자들이 숨어있어.",
+        "food": "지크 로이드: 고로케 하나 사 먹고 또 듀얼 한 판 뛰러 가야지!",
+        "millennium": "지크 로이드: 천년 아이템의 신비보다 눈앞의 승부에 집중하겠어."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_223_mail_invite",
+          "sender": "지크 로이드",
+          "timeSlot": "morning",
+          "spotId": "spot_kaiba_corp",
+          "subject": "[지크 로이드] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_224",
+      "baseCharId": 224,
+      "displayName": "레온 윌슨",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 싸우는 고독한 듀얼리스트다! 내 등에 남을 태울 생각은 없다. 결투라면 언제든 받아주마!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 레온 윌슨 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 224,
+          "formName": "레온 윌슨",
+          "formTitle": "레온 윌슨 · 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_kaiba_corp"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 레온 윌슨! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "내 덱의 쓴맛을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "필드를 지배하라! 나의 비장의 카드 소환!",
+          "winLine": "하하핫! 완벽한 승리다! 분수를 알았겠지!",
+          "loseLine": "크윽... 분하다! 하지만 다음엔 절대 안 진다!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_224.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_224.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "레온 윌슨: 흥! 제법 값어치 있는 물건을 골라왔군. 덱 케이스에 챙겨두마!",
+        "liked": "레온 윌슨: 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "레온 윌슨: 쓸데없는 정성에 신경 쓸 시간 있으면 덱이나 튜닝해라.",
+        "hated": "레온 윌슨: 네놈! 감히 나한테 이런 쓰레기를 던져주는 배짱은 어디서 나온 거냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "레온 윌슨: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "레온 윌슨: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "레온 윌슨: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "레온 윌슨: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "레온 윌슨: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "레온 윌슨: 듀얼리스트라면 말보다 카드로 증명해야지!",
+        "domino_city": "레온 윌슨: 도미노 시티 골목길마다 강자들이 숨어있어.",
+        "food": "레온 윌슨: 고로케 하나 사 먹고 또 듀얼 한 판 뛰러 가야지!",
+        "millennium": "레온 윌슨: 천년 아이템의 신비보다 눈앞의 승부에 집중하겠어."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_224_mail_invite",
+          "sender": "레온 윌슨",
+          "timeSlot": "morning",
+          "spotId": "spot_domino_plaza",
+          "subject": "[레온 윌슨] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "dm_char_231",
+      "baseCharId": 231,
+      "displayName": "레베카 홉킨스",
+      "isTagEligible": true,
+      "partnerRefusal": null,
+      "dormOrFaction": "도미노 시티 히로인",
+      "partnerRole": "TagHeroine",
+      "partnerSkillName": "레베카 홉킨스의 결속: 화려한 연격!",
+      "partnerSkillDesc": "천재적인 계산 능력으로 위기 시 패를 보충하고 상대에게 빈틈없는 번 데미지를 꽂아 넣는 전술.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 231,
+          "formName": "레베카 홉킨스",
+          "formTitle": "레베카 홉킨스 · 도미노 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_kame_game"
+          ],
+          "greetingLines": {
+            "low": "흥! 전미 챔피언인 천재 소녀 레베카 홉킨스 님이 친히 상대해 줄게!",
+            "mid": "제법이잖아? 달링(유우기) 다음으로 실력 있는 듀얼리스트로 특별히 인정해 줄게!",
+            "high": "어머, 너랑 함께 듀얼하는 거... 꽤 신나잖아? 우리 둘이서 세계 대회를 접수하자!"
+          },
+          "duelStartLine": "내 천재적인 전술에 깜짝 놀라지나 마! 듀얼!",
+          "aceCutInLine": "내 귀여운 친구들, 혼내줘! 루비 드래곤 & 토이 덱, 전격 공격이야!",
+          "winLine": "봤지? 이게 바로 전미 챔피언 레베카 님의 완벽한 승리라고!",
+          "loseLine": "말도 안 돼! 내가 지다니... 으앙, 달링한테 이를 거야!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_231.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_231.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "레베카 홉킨스: 어머, 이걸 날 위해 준비해 준 거야?! 너무 감동이야, 소중히 간직할게!",
+        "liked": "레베카 홉킨스: 후후, 기분 좋은 선물이야. 정말 고마워!",
+        "neutral": "레베카 홉킨스: 날 생각해서 챙겨준 거지? 고마워!",
+        "hated": "레베카 홉킨스: 으음... 이건 내 취향이랑은 조금 안 맞는 것 같아..."
+      },
+      "partnerQuotes": {
+        "morning": "달링-! 좋은 아침이야! 오늘도 내 완벽한 두뇌와 덱 전술로 달링을 서포트해 줄게!",
+        "evening": "벌써 밤이네? 달링이랑 같이 있으면 1초가 1밀리초처럼 휙 지나가 버린다니까!",
+        "deckComment": "흠, 데이터상으로도 승률 99.8%의 초일류 덱이야! 역시 내 달링다운 완벽한 구성이야!",
+        "duelReady": "전미 챔피언 천재 소녀 레베카 님의 화려한 테크닉을 보여줄게! 듀얼 개시!",
+        "cheer": "달링, 기죽지 마! 내 계산에 따르면 역전 확률은 아직 100%야! 팍팍 밀어붙여!"
+      },
+      "bondEvents": [
+        {
+          "heartLevel": 1,
+          "title": "[레베카 홉킨스] 첫 번째 인연: 도미노 시티의 만남",
+          "dialogues": [
+            {
+              "speaker": "레베카 홉킨스",
+              "text": "안녕! 거리에서 네 듀얼을 지켜봤는데... 정말 가슴이 두근거렸어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워! 네 덱 플레이도 정말 매력적이던걸? 앞으로 잘 부탁해."
+            },
+            {
+              "speaker": "레베카 홉킨스",
+              "text": "응! 우리 서로를 지켜주는 최고의 파트너가 되어보자!"
+            }
+          ],
+          "choice": {
+            "prompt": "레베카 홉킨스와 함께 어떤 다짐을 나눌까?",
+            "options": [
+              {
+                "text": "🔥 당당하고 화려하게 승리하자! (보상 DP 1.2배)",
+                "reply": "후훗, 좋아! 그 당찬 기백 아주 마음에 들어!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 차분하게 서로의 등을 지켜주자! (내 시작 LP +500)",
+                "reply": "기본이 가장 중요한 법이지. 함께 연습하자!",
+                "effectType": "SafeBuff"
+              },
+              {
+                "text": "🤝 영원한 듀얼 소울메이트가 되어줄게! (호감도 대폭 상승)",
+                "reply": "든든한걸? 앞으로 잘 부탁해, 내 파트너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 3,
+          "title": "[레베카 홉킨스] 세 번째 인연: 깊어지는 신뢰와 맹세",
+          "dialogues": [
+            {
+              "speaker": "레베카 홉킨스",
+              "text": "수많은 결투를 거치면서... 네가 내 옆에 있다는 게 얼마나 큰 힘이 되는지 몰라."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "나도 그래. 네가 있어 주기에 난 어떤 어둠의 게임도 두렵지 않아."
+            },
+            {
+              "speaker": "레베카 홉킨스",
+              "text": "고마워... 우리 둘의 유대라면 세상 어떤 상대라도 이겨낼 수 있어!"
+            }
+          ],
+          "choice": {
+            "prompt": "토너먼트를 앞두고 어떤 전술로 결속할까?",
+            "options": [
+              {
+                "text": "🔥 공격력을 한계까지 끌어올려 정면 돌파하자! (공격력 +400 버프)",
+                "reply": "우리의 화려한 콤보를 보여주자고!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 빈틈없는 카운터로 상대를 압박하자! (내 시작 LP +1,000)",
+                "reply": "완벽한 전술이야. 철저하게 준비하자!",
+                "effectType": "SafeBuff"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 5,
+          "title": "[레베카 홉킨스] 최종 인연(MASTER): 영혼으로 맺어진 결속",
+          "dialogues": [
+            {
+              "speaker": "레베카 홉킨스",
+              "text": "수많은 시련을 함께 헤쳐 나오며... 넌 내게 세상 그 누구보다 소중한 사람이 되었어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워. 네 곁에서 싸웠기에 난 진정한 듀얼 퀸으로 설 수 있었어."
+            },
+            {
+              "speaker": "레베카 홉킨스",
+              "text": "우리의 유대는 영원해. 도미노 시티의 정상에서 영광을 함께 누리자!"
+            }
+          ],
+          "choice": {
+            "prompt": "최종 마스터 승급전! 마지막 맹세를 선택하자!",
+            "options": [
+              {
+                "text": "🔥 우리의 모든 카드를 걸고 정상에 오르자! (마스터 보상 & DP 1.5배)",
+                "reply": "우리의 기적을 세상에 보여주자!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🤝 영원히 함께할 소울메이트로서 승리를 맹세할게! (마스터 영구 버프)",
+                "reply": "고마워, 내 생애 최고의 영원한 파트너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        }
+      ],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "듀얼은 감정이 아니라 정밀한 수학과 확률이야! 물론 달링을 향한 내 사랑은 무한대지만!",
+        "domino_city": "할아버지와 유우기 일행을 만나러 미국에서 날아왔는데, 여긴 정말 활기찬 도시야!",
+        "food": "초콜릿 시럽을 듬뿍 뿌린 팬케이크랑 바나나 밀크셰이크! 당분 보충엔 최고라구!",
+        "millennium": "천년 카드의 수수께끼 따위, 내 슈퍼컴퓨터로 분석하면 금방 해답이 나올 거야!"
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_231_mail_invite",
+          "sender": "레베카 홉킨스",
+          "timeSlot": "morning",
+          "spotId": "spot_kaiba_corp",
+          "subject": "[레베카] 달링-! 당장 나한테로 와!",
+          "body": "달링! 내가 만든 슈퍼 컴퓨터 덱 계산이 드디어 완성됐어! 달링한테 제일 먼저 보여주고 싶단 말이야, 빨리 와~!"
+        }
+      ],
+      "grandPrixEnding": {
+        "title": "🏆 배틀 시티 그랑프리 우승 엔딩: [레베카 홉킨스]와의 영원한 유대",
+        "dialogues": [
+          {
+            "speaker": "레베카 홉킨스",
+            "text": "우리가 해냈어... 배틀 시티의 정상에서 너와 함께 트로피를 안다니 꿈만 같아!"
+          },
+          {
+            "speaker": "여주인공",
+            "text": "네가 내 곁에서 손을 잡아주었기 때문에 승리할 수 있었어. 고마워, 최고의 파트너!"
+          },
+          {
+            "speaker": "레베카 홉킨스",
+            "text": "이 우승 트로피와 우리의 카드는 영원한 유대의 증표야. 앞으로도 언제나 내 곁에 있어줘!"
+          }
+        ]
+      }
+    },
+    {
+      "personaId": "dm_char_234",
+      "baseCharId": 234,
+      "displayName": "아이가미",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 싸우는 고독한 듀얼리스트다! 내 등에 남을 태울 생각은 없다. 결투라면 언제든 받아주마!",
+      "dormOrFaction": "도미노 시티 듀얼리스트",
+      "partnerRole": "RivalDuelist",
+      "partnerSkillName": "라이벌의 투지",
+      "partnerSkillDesc": "듀얼리스트의 긍지와 덱의 개성을 살려 배틀 페이즈를 유리하게 이끄는 아이가미 전용 전술 스탯.",
+      "favoriteGiftId": "kc_energy_drink",
+      "forms": [
+        {
+          "formCharId": 234,
+          "formName": "아이가미",
+          "formTitle": "아이가미 · 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_domino_plaza"
+          ],
+          "greetingLines": {
+            "low": "흥! 난 아이가미! 배틀 시티에서 살아남은 듀얼리스트다! 덤벼라!",
+            "mid": "오, 네 실력 제법이군! 하지만 내 콤보를 뚫을 수 있을까?",
+            "high": "너와의 승부는 언제나 가슴을 뜨겁게 태우는군! 진검승부다!"
+          },
+          "duelStartLine": "내 덱의 쓴맛을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "필드를 지배하라! 나의 비장의 카드 소환!",
+          "winLine": "하하핫! 완벽한 승리다! 분수를 알았겠지!",
+          "loseLine": "크윽... 분하다! 하지만 다음엔 절대 안 진다!",
+          "sdSpritePath": "TagForce/DM/Characters_SD/sd_234.png",
+          "standingSpritePath": "TagForce/DM/Characters_Standing/full_234.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "아이가미: 흥! 제법 값어치 있는 물건을 골라왔군. 덱 케이스에 챙겨두마!",
+        "liked": "아이가미: 나쁘지 않은 안목이다. 받아두지.",
+        "neutral": "아이가미: 쓸데없는 정성에 신경 쓸 시간 있으면 덱이나 튜닝해라.",
+        "hated": "아이가미: 네놈! 감히 나한테 이런 쓰레기를 던져주는 배짱은 어디서 나온 거냐?!"
+      },
+      "partnerQuotes": {
+        "morning": "아이가미: 흥, 아침부터 어슬렁거리는군. 한가한 녀석이다.",
+        "evening": "아이가미: 날이 저물었다. 시시한 잡담에 어울려줄 시간은 없다.",
+        "deckComment": "아이가미: 제법 날카로운 덱이군. 하지만 내 앞에서는 무용지물이다.",
+        "duelReady": "아이가미: 전력으로 덤벼라! 자비 따윈 베풀지 않는다!",
+        "cheer": "아이가미: 한심하게 무너지지 마라! 내 라이벌이라면 그 자리에서 버텨라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "duel",
+      "topicReplies": {
+        "duel": "아이가미: 듀얼리스트라면 말보다 카드로 증명해야지!",
+        "domino_city": "아이가미: 도미노 시티 골목길마다 강자들이 숨어있어.",
+        "food": "아이가미: 고로케 하나 사 먹고 또 듀얼 한 판 뛰러 가야지!",
+        "millennium": "아이가미: 천년 아이템의 신비보다 눈앞의 승부에 집중하겠어."
+      },
+      "pdaMails": [
+        {
+          "mailId": "dm_char_234_mail_invite",
+          "sender": "아이가미",
+          "timeSlot": "morning",
+          "spotId": "spot_domino_plaza",
+          "subject": "[아이가미] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    }
+  ],
+  "drawBreadCatalog": [
+    {
+      "breadId": "bread_domino_croquette",
+      "name": "🥖 바삭바삭 비프 고로케 빵",
+      "priceDp": 100,
+      "flavor": "delicious",
+      "desc": "도미노 상점가 빵집의 인기 넘버원! 겉은 바삭하고 속은 촉촉한 쇠고기 고로케 샌드."
+    },
+    {
+      "breadId": "bread_kc_blue_sandwich",
+      "name": "🥪 KC 프리미엄 로스트비프 샌드",
+      "priceDp": 150,
+      "flavor": "luxury",
+      "desc": "카이바 사원 전용 카페테리아에서 납품받은 최고급 로스트비프 샌드위치."
+    },
+    {
+      "breadId": "bread_curry_bun",
+      "name": "🍛 매콤한 매운맛 카레빵",
+      "priceDp": 100,
+      "flavor": "spicy",
+      "desc": "한 입 먹으면 정신이 번쩍 들 정도로 매콤한 도미노 특제 카레빵."
+    },
+    {
+      "breadId": "bread_legendary_golden_egg",
+      "name": "🥚 전설의 황금 계란빵 (특등)",
+      "priceDp": 300,
+      "flavor": "legendary",
+      "desc": "하루에 딱 1개만 나오는 초희귀 황금 샌드위치! 어떤 듀얼리스트라도 호감도가 단숨에 대폭 상승한다."
+    }
+  ],
+  "conversationTopics": [
+    {
+      "topicId": "duel",
+      "name": "🃏 듀얼 전술 & 카드 이야기",
+      "desc": "서로의 덱 구성과 콤보, 에이스 카드에 대해 열띤 대화를 나눕니다."
+    },
+    {
+      "topicId": "domino_city",
+      "name": "🏙️ 도미노 시티 & 배틀 시티",
+      "desc": "거리의 명소, 카이바 코퍼레이션, 배틀십과 듀얼리스트 킹덤에 대해 이야기합니다."
+    },
+    {
+      "topicId": "food",
+      "name": "🍔 맛있는 음식 & 카페",
+      "desc": "도미노 상점가 고로케와 버거, 맛집에 대해 가볍게 이야기를 나눕니다."
+    },
+    {
+      "topicId": "millennium",
+      "name": "👁️ 천년 아이템 & 고대의 기억",
+      "desc": "파라오의 전설, 어둠의 문과 3천 년 전의 신비로운 기억에 대해 깊은 이야기를 나눕니다."
+    }
+  ],
+  "myRoomConfig": {
+    "roomName": "도미노 시티 게스트 스위트 (My Room)",
+    "roomDesc": "하루를 시작하고 마무리하는 도미노 시티의 아늑한 숙소. 휴식을 취하거나 PDA 단말기를 통해 인연 명부와 메일을 확인할 수 있다.",
+    "features": [
+      "🛏️ 침대에서 휴식 (다음 시간대 진행 및 바닥 아이템 리셋)",
+      "📱 도미노 PDA 단말기 (동료들의 결투 초대 메일 확인)",
+      "📖 듀얼리스트 명부 (46명 전원의 출몰 정보 & 태그 파트너 호감도)",
+      "🃏 내 덱 정비 & 동행 여성 파트너 스킬 확인"
+    ]
+  },
+  "assetConfig": {
+    "baseResourceDir": "TagForce/DM",
+    "baseStreamingDir": "TagForce/DM",
+    "worldMapPath": "TagForce/DM/Maps/worldmap_domino.png",
+    "myRoomPath": "TagForce/DM/Maps/myroom_domino.png",
+    "breadShopPath": "TagForce/DM/Maps/shop_domino_bakery.png"
+  }
+}

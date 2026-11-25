@@ -919,7 +919,7 @@ namespace YGOPortable.UI
         }
     }
 
-    public static class DuelAudio
+    public static partial class DuelAudio
     {
         private static AudioSource _sfxSource;
         private static AudioSource _bgmSource;

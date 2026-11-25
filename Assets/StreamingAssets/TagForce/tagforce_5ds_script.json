@@ -1,0 +1,3778 @@
+{
+  "seriesId": "5ds",
+  "seriesIdx": 2,
+  "seriesTitle": "유희왕 5D's (네오 도미노 시티)",
+  "protagonist": {
+    "name": "주인공",
+    "title": "홍련의 듀얼 퀸",
+    "portraitPath": "Story/Protagonist",
+    "sdSpritePath": "TagForce/5DS/SD/sd_protagonist.png",
+    "standingSpritePath": "TagForce/5DS/Characters_Standing/full_protagonist.png"
+  },
+  "spots": [
+    {
+      "spotId": "spot_satellite_hideout",
+      "name": "새틀라이트 폐차장 아지트",
+      "subtitle": "유세이와 동료들의 정비소이자 팀 5D's의 태동지",
+      "ambientTheme": "satellite_hideout",
+      "defaultPickups": [
+        "dwheel_spark_plug",
+        "dp_small",
+        "milk_carton"
+      ],
+      "mapPath": "TagForce/5DS/Maps/spot_satellite_hideout.png"
+    },
+    {
+      "spotId": "spot_daedalus_bridge",
+      "name": "다이달로스 브릿지 & 하이웨이",
+      "subtitle": "시티와 새틀라이트를 잇는 전설의 미완성 희망의 다리",
+      "ambientTheme": "daedalus_bridge",
+      "defaultPickups": [
+        "dwheel_spark_plug",
+        "dp_medium",
+        "synchro_tuner_core"
+      ],
+      "mapPath": "TagForce/5DS/Maps/spot_daedalus_bridge.png"
+    },
+    {
+      "spotId": "spot_poppo_time",
+      "name": "포포 타임 차고 & 정비소",
+      "subtitle": "유세이, 잭, 크로우가 모여 D-휠을 튜닝하는 시티의 보금자리",
+      "ambientTheme": "poppo_time",
+      "defaultPickups": [
+        "milk_carton",
+        "dp_medium",
+        "dwheel_spark_plug"
+      ],
+      "mapPath": "TagForce/5DS/Maps/spot_poppo_time.png"
+    },
+    {
+      "spotId": "spot_new_domino_stadium",
+      "name": "WRGP 라이딩 스타디움 & 메인 서킷",
+      "subtitle": "수만 관중의 환호와 스피드가 폭발하는 세계 대회의 성지",
+      "ambientTheme": "riding_stadium",
+      "defaultPickups": [
+        "blue_eyes_mountain_coffee",
+        "dp_large",
+        "synchro_tuner_core"
+      ],
+      "mapPath": "TagForce/5DS/Maps/spot_new_domino_stadium.png"
+    },
+    {
+      "spotId": "spot_security_hq",
+      "name": "시큐리티 중앙 본부 & 타워 광장",
+      "subtitle": "네오 도미노 시티의 치안을 수호하는 중앙 사령부",
+      "ambientTheme": "security_hq",
+      "defaultPickups": [
+        "blue_eyes_mountain_coffee",
+        "dp_large",
+        "synchro_tuner_core"
+      ],
+      "mapPath": "TagForce/5DS/Maps/spot_security_hq.png"
+    },
+    {
+      "spotId": "spot_nazca_lines",
+      "name": "나스카 지상화 & 지하 명계 유적",
+      "subtitle": "지박신과 다크 시그너의 어둠이 도사리는 고대 유적",
+      "ambientTheme": "dark_nazca",
+      "defaultPickups": [
+        "crimson_dragon_emblem",
+        "dp_large",
+        "synchro_tuner_core"
+      ],
+      "mapPath": "TagForce/5DS/Maps/spot_nazca_lines.png"
+    }
+  ],
+  "gifts": [
+    {
+      "giftId": "dwheel_spark_plug",
+      "name": "🔧 초정밀 D-휠 스파크 플러그",
+      "priceDp": 250,
+      "baseAffinity": 35,
+      "favoriteAffinity": 70,
+      "desc": "유세이호나 블러디 키스의 가속을 극한까지 끌어올리는 튜닝 부품. 라이더들이 아주 좋아한다."
+    },
+    {
+      "giftId": "blue_eyes_mountain_coffee",
+      "name": "☕ 3천 엔짜리 블루 아이즈 마운틴 커피",
+      "priceDp": 400,
+      "baseAffinity": 45,
+      "favoriteAffinity": 90,
+      "desc": "전설의 킹 잭 아틀라스가 하루에도 몇 잔씩 마신다는 최고급 명품 커피. 잭이 환장한다."
+    },
+    {
+      "giftId": "milk_carton",
+      "name": "🥛 새틀라이트 산 신선한 팩 우유",
+      "priceDp": 150,
+      "baseAffinity": 25,
+      "favoriteAffinity": 60,
+      "desc": "바에서 '우유를 달라'고 주문하던 유세이의 소박하고 영양 만점인 최애 음료."
+    },
+    {
+      "giftId": "synchro_tuner_core",
+      "name": "💫 클리어 마인드 튜너 코어",
+      "priceDp": 350,
+      "baseAffinity": 40,
+      "favoriteAffinity": 80,
+      "desc": "액셀 싱크로의 경지에 도달할 수 있도록 정신을 맑게 가다듬어주는 신비로운 발광 크리스탈."
+    },
+    {
+      "giftId": "crimson_dragon_emblem",
+      "name": "🐉 붉은 용의 성흔 브로치",
+      "priceDp": 500,
+      "baseAffinity": 50,
+      "favoriteAffinity": 100,
+      "desc": "시그너들의 붉은 유대와 결속을 상징하는 황금 브로치. 아키, 크로우, 루카 등이 소중히 여긴다."
+    }
+  ],
+  "personas": [
+    {
+      "personaId": "5ds_akiza",
+      "baseCharId": 1,
+      "displayName": "이자요이 아키",
+      "isTagEligible": true,
+      "partnerRefusal": null,
+      "dormOrFaction": "흑장미의 마녀 & 시그너",
+      "partnerRole": "TagHeroine",
+      "partnerSkillName": "이자요이 아키의 결속: 붉은 성흔의 비상!",
+      "partnerSkillDesc": "식물족의 유대로 상대 몬스터의 효과 파괴를 봉쇄하고 흑장미의 장막으로 파트너를 수호하는 마녀의 결속.",
+      "favoriteGiftId": "crimson_dragon_emblem",
+      "forms": [
+        {
+          "formCharId": 1,
+          "formName": "이자요이 아키",
+          "formTitle": "이자요이 아키 · 네오 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_poppo_time"
+          ],
+          "greetingLines": {
+            "low": "안녕... 내 초능력과 가시가 두렵지 않은 거야? 카드를 쥐면 마음이 차분해져.",
+            "mid": "네 따뜻한 눈빛을 보고 있으면... 가슴 속의 차가운 불안이 녹아내리는 기분이야.",
+            "high": "너와 함께라면 내 장미는 더 이상 파괴의 마녀가 아니야. 널 지키기 위해 피어날게."
+          },
+          "duelStartLine": "차가운 불꽃이 세계의 모든 것을 삼킨다... 피어나라, 흑장미여!",
+          "aceCutInLine": "칠흑의 꽃잎이여, 전장을 뒤덮어라! 싱크로 소환, 블랙 로즈 드래곤! 블랙 로즈 플레어!!",
+          "winLine": "이겼어... 카드의 따뜻한 마음에 보답할 수 있어서 다행이야.",
+          "loseLine": "대단해... 내 가시를 부드럽게 감싸 안는 네 상냥한 전술에 마음 깊이 감동했어.",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_1.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_1.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "이자요이 아키: 어머... 은은한 향기의 잉글리시 로즈 홍차와 흑장미 머리핀이네. 널 만나면 마음의 가시가 녹아내려, 고마워.",
+        "liked": "이자요이 아키: 후후, 기분 좋은 선물이야. 고맙게 간직할게.",
+        "neutral": "이자요이 아키: 날 위한 선물이야? 고마워.",
+        "hated": "이자요이 아키: 차갑고 파괴적인 물건은... 과거의 괴로운 기억을 떠올리게 해서 조금 무서워."
+      },
+      "partnerQuotes": {
+        "morning": "좋은 아침... 네 따뜻한 인사를 들으면, 내 가슴속 차가운 가시가 녹아내리는 기분이야.",
+        "evening": "밤하늘의 장미꽃들이 조용히 잠드는 시간... 오늘 너와 함께 달릴 수 있어서 참 다행이야.",
+        "deckComment": "네 덱에서는 상처받은 마음을 어루만져 주는 부드럽고 강인한 힘이 느껴져.",
+        "duelReady": "차가운 불꽃이 세계의 모든 것을 삼킨다... 피어나라, 흑장미여! 듀얼!",
+        "cheer": "두려워하지 마... 넌 혼자가 아니야. 내 흑장미가 네 곁에서 가시를 거두고 바람을 막아줄게!"
+      },
+      "bondEvents": [
+        {
+          "heartLevel": 1,
+          "title": "[이자요이 아키] 첫 번째 인연: 서킷에서의 조우",
+          "dialogues": [
+            {
+              "speaker": "이자요이 아키",
+              "text": "안녕! 하이웨이에서 네 D-휠 주행과 덱 플레이를 지켜봤어. 정말 날카롭더군."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워! 네 싱크로 소환 타이밍도 정말 감탄스러웠어. 앞으로 잘 부탁해."
+            },
+            {
+              "speaker": "이자요이 아키",
+              "text": "응! 우리 서로의 스피드를 끌어올려 주는 최고의 파트너가 되어보자!"
+            }
+          ],
+          "choice": {
+            "prompt": "이자요이 아키와 함께 어떤 레이스 다짐을 나눌까?",
+            "options": [
+              {
+                "text": "🔥 액셀러레이션! 극한의 스피드로 상대를 압도하자! (보상 DP 1.2배)",
+                "reply": "좋아, 그 패기 넘치는 가속감 아주 마음에 들어!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 안정적인 코너링과 든든한 서포트로 호흡을 맞추자! (내 시작 LP +500)",
+                "reply": "기본 정비가 탄탄해야 완주하는 법이지. 함께 달리자!",
+                "effectType": "SafeBuff"
+              },
+              {
+                "text": "🤝 팀 5D's의 영원한 유대를 함께 잇자! (호감도 대폭 상승)",
+                "reply": "든든한걸? 앞으로 네 등 뒤는 내가 지킨다!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 3,
+          "title": "[이자요이 아키] 세 번째 인연: 거센 바람 속의 결속",
+          "dialogues": [
+            {
+              "speaker": "이자요이 아키",
+              "text": "수많은 코너를 함께 돌파하며... 네가 내 옆에 있다는 것만으로도 두려움이 사라져."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "나도 그래. 어떤 폭풍이 몰아쳐도 네 붉은 성흔의 빛이 길을 밝혀주니까."
+            },
+            {
+              "speaker": "이자요이 아키",
+              "text": "좋아! 이번 WRGP 결승 무대에서도 끝까지 하나가 되어 질주하자!"
+            }
+          ],
+          "choice": {
+            "prompt": "WRGP 결승을 앞두고 어떤 전략으로 단결할까?",
+            "options": [
+              {
+                "text": "🔥 오버 톱 클리어 마인드! 전속력으로 적을 꿰뚫자! (공격력 +400 버프)",
+                "reply": "한계를 뛰어넘은 스피드를 보여주자고!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 빈틈없는 함정과 카운터로 완벽한 방어를 구축하자! (내 시작 LP +1,000)",
+                "reply": "치밀한 레이스 운영이야. 완벽하게 준비하자!",
+                "effectType": "SafeBuff"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 5,
+          "title": "[이자요이 아키] 최종 인연(MASTER): 붉은 용이 맺어준 기적",
+          "dialogues": [
+            {
+              "speaker": "이자요이 아키",
+              "text": "시공의 어둠과 절망을 함께 건너오며... 넌 내게 대체할 수 없는 영혼의 파트너가 되었어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워. 네 곁에서 달렸기에 나 역시 홍련의 듀얼 퀸으로서 새로운 미래를 열 수 있었어."
+            },
+            {
+              "speaker": "이자요이 아키",
+              "text": "우리의 유대는 시공을 넘어 영원해. 네오 도미노 시티의 하늘을 향해 함께 비상하자!"
+            }
+          ],
+          "choice": {
+            "prompt": "최종 마스터 승급전! 마지막 맹세를 선택하자!",
+            "options": [
+              {
+                "text": "🔥 우리의 영혼과 모든 싱크로를 걸고 승리하자! (마스터 보상 & DP 1.5배)",
+                "reply": "우리의 기적의 궤적을 전 세계에 새겨넣자!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🤝 영원히 함께 달릴 소울메이트로서 승리를 증명할게! (마스터 영구 버프)",
+                "reply": "고마워, 내 생애 최고의 영원한 러너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        }
+      ],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "유세이가 라이딩 듀얼의 면허를 따도록 도와주었을 때... 비로소 내 바람을 만난 기분이었어.",
+        "city_satellite": "흑장미의 마녀라 불리며 미움받던 거리였지만... 지금은 널 위해 꽃을 피우고 싶어.",
+        "food": "은은한 잉글리시 로즈 홍차와 갓 구운 스콘... 마음이 어지러울 때 차분하게 달래주거든.",
+        "signers": "손목의 성흔이 욱신거릴 때마다 슬펐지만, 지금은 너와 시그너 동료들을 지키는 긍지야."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_akiza_mail_invite",
+          "sender": "이자요이 아키",
+          "timeSlot": "morning",
+          "spotId": "spot_poppo_time",
+          "subject": "[아키] 당신과 함께 바람을 맞고 싶어.",
+          "body": "안녕... 오늘 온실의 흑장미들이 유난히 예쁘게 피었어. 너와 함께 따뜻한 차 한잔하며 듀얼 이야기를 나누고 싶어."
+        }
+      ],
+      "grandPrixEnding": {
+        "title": "🏆 WRGP 월드 그랑프리 챔피언 엔딩: [이자요이 아키]와의 영원한 유대",
+        "dialogues": [
+          {
+            "speaker": "이자요이 아키",
+            "text": "우리가 해냈어... WRGP의 최정상에서 너와 함께 체커기를 받다니 믿기지 않아!"
+          },
+          {
+            "speaker": "여주인공",
+            "text": "네가 내 옆에서 바람을 갈라주었기 때문에 승리할 수 있었어. 고마워, 최고의 러너!"
+          },
+          {
+            "speaker": "이자요이 아키",
+            "text": "이 우승 트로피와 우리의 D-휠은 영원한 결속의 증표야. 앞으로도 새로운 지평선을 향해 계속 달리자!"
+          }
+        ]
+      }
+    },
+    {
+      "personaId": "5ds_ruka",
+      "baseCharId": 24,
+      "displayName": "루카",
+      "isTagEligible": true,
+      "partnerRefusal": null,
+      "dormOrFaction": "정령계의 소녀 & 시그너",
+      "partnerRole": "TagHeroine",
+      "partnerSkillName": "루카의 결속: 붉은 성흔의 비상!",
+      "partnerSkillDesc": "전투 데미지를 0으로 만들고 라이프를 회복시키며 요정의 숲으로 필드를 정화하는 정령의 가호.",
+      "favoriteGiftId": "milk_carton",
+      "forms": [
+        {
+          "formCharId": 24,
+          "formName": "루카",
+          "formTitle": "루카 · 네오 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_satellite_hideout"
+          ],
+          "greetingLines": {
+            "low": "안녕하세요! 전 루카예요. 카드 정령들의 목소리를 들을 수 있어요.",
+            "mid": "당신의 덱에서 정령들이 정말 기뻐하며 춤추고 있어요! 당신은 참 다정한 분이군요.",
+            "high": "당신과 함께라면 정령계의 숲도 평화를 되찾을 수 있어요. 우리 함께 힘내요!"
+          },
+          "duelStartLine": "정령 세계의 몬스터들과 함께 싸울게요. 듀얼 시작해요!",
+          "aceCutInLine": "성스러운 정령의 빛이여, 세상을 정화해 줘! 고대 요정 드래곤! 이터널 선샤인!!",
+          "winLine": "이겼어요! 정령 친구들도 기뻐서 날아다니고 있어요!",
+          "loseLine": "졌지만 정말 즐거운 듀얼이었어요. 당신의 덱은 정말 따뜻해요.",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_24.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_24.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "루카: 와아-! 정령의 숲을 닮은 예쁜 꽃다발과 신선한 딸기 샌드위치예요! 크리본도 너무 좋아해요, 고마워요!",
+        "liked": "루카: 고마워요! 루아랑 같이 나눠 먹을게요!",
+        "neutral": "루카: 선물 고마워요!",
+        "hated": "루카: 으응... 시끄럽고 냄새가 독한 물건은 정령 친구들이 무서워해서 슬퍼요..."
+      },
+      "partnerQuotes": {
+        "morning": "좋은 아침이에요! 오늘도 정령 친구들이 당신 머리 위에서 예쁘게 춤추고 있어요!",
+        "evening": "노을빛 다이달로스 다리가 반짝거려요... 오늘 하루도 당신과 함께여서 정말 따뜻했어요.",
+        "deckComment": "와아, 당신의 덱은 숲속의 맑은 샘물 같아요. 카드들이 안심하고 숨 쉬고 있어요!",
+        "duelReady": "정령 세계의 몬스터들과 함께 싸울게요. 정정당당하게 듀얼 시작해요!",
+        "cheer": "울지 마세요, 힘내세요! 정령 친구들과 제가 온 마음을 다해 지켜드릴게요! 얍-!"
+      },
+      "bondEvents": [
+        {
+          "heartLevel": 1,
+          "title": "[루카] 첫 번째 인연: 서킷에서의 조우",
+          "dialogues": [
+            {
+              "speaker": "루카",
+              "text": "안녕! 하이웨이에서 네 D-휠 주행과 덱 플레이를 지켜봤어. 정말 날카롭더군."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워! 네 싱크로 소환 타이밍도 정말 감탄스러웠어. 앞으로 잘 부탁해."
+            },
+            {
+              "speaker": "루카",
+              "text": "응! 우리 서로의 스피드를 끌어올려 주는 최고의 파트너가 되어보자!"
+            }
+          ],
+          "choice": {
+            "prompt": "루카와 함께 어떤 레이스 다짐을 나눌까?",
+            "options": [
+              {
+                "text": "🔥 액셀러레이션! 극한의 스피드로 상대를 압도하자! (보상 DP 1.2배)",
+                "reply": "좋아, 그 패기 넘치는 가속감 아주 마음에 들어!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 안정적인 코너링과 든든한 서포트로 호흡을 맞추자! (내 시작 LP +500)",
+                "reply": "기본 정비가 탄탄해야 완주하는 법이지. 함께 달리자!",
+                "effectType": "SafeBuff"
+              },
+              {
+                "text": "🤝 팀 5D's의 영원한 유대를 함께 잇자! (호감도 대폭 상승)",
+                "reply": "든든한걸? 앞으로 네 등 뒤는 내가 지킨다!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 3,
+          "title": "[루카] 세 번째 인연: 거센 바람 속의 결속",
+          "dialogues": [
+            {
+              "speaker": "루카",
+              "text": "수많은 코너를 함께 돌파하며... 네가 내 옆에 있다는 것만으로도 두려움이 사라져."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "나도 그래. 어떤 폭풍이 몰아쳐도 네 붉은 성흔의 빛이 길을 밝혀주니까."
+            },
+            {
+              "speaker": "루카",
+              "text": "좋아! 이번 WRGP 결승 무대에서도 끝까지 하나가 되어 질주하자!"
+            }
+          ],
+          "choice": {
+            "prompt": "WRGP 결승을 앞두고 어떤 전략으로 단결할까?",
+            "options": [
+              {
+                "text": "🔥 오버 톱 클리어 마인드! 전속력으로 적을 꿰뚫자! (공격력 +400 버프)",
+                "reply": "한계를 뛰어넘은 스피드를 보여주자고!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 빈틈없는 함정과 카운터로 완벽한 방어를 구축하자! (내 시작 LP +1,000)",
+                "reply": "치밀한 레이스 운영이야. 완벽하게 준비하자!",
+                "effectType": "SafeBuff"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 5,
+          "title": "[루카] 최종 인연(MASTER): 붉은 용이 맺어준 기적",
+          "dialogues": [
+            {
+              "speaker": "루카",
+              "text": "시공의 어둠과 절망을 함께 건너오며... 넌 내게 대체할 수 없는 영혼의 파트너가 되었어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워. 네 곁에서 달렸기에 나 역시 홍련의 듀얼 퀸으로서 새로운 미래를 열 수 있었어."
+            },
+            {
+              "speaker": "루카",
+              "text": "우리의 유대는 시공을 넘어 영원해. 네오 도미노 시티의 하늘을 향해 함께 비상하자!"
+            }
+          ],
+          "choice": {
+            "prompt": "최종 마스터 승급전! 마지막 맹세를 선택하자!",
+            "options": [
+              {
+                "text": "🔥 우리의 영혼과 모든 싱크로를 걸고 승리하자! (마스터 보상 & DP 1.5배)",
+                "reply": "우리의 기적의 궤적을 전 세계에 새겨넣자!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🤝 영원히 함께 달릴 소울메이트로서 승리를 증명할게! (마스터 영구 버프)",
+                "reply": "고마워, 내 생애 최고의 영원한 러너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        }
+      ],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "루아는 D-휠 타고 싶어서 안달이지만, 전 스피드보단 몬스터들과 눈을 맞추는 게 더 좋아요.",
+        "city_satellite": "루아랑 같이 도시와 새틀라이트의 친구들을 도우러 다닐 때가 제일 보람차요.",
+        "food": "신선한 딸기랑 유기농 야채가 듬뿍 들어간 샌드위치! 먹으면 몸이 정화되는 기분이에요.",
+        "signers": "고대 요정 드래곤이 말해줬어요. 우리들의 유대가 세상을 지키는 빛이 될 거라고요."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_ruka_mail_invite",
+          "sender": "루카",
+          "timeSlot": "morning",
+          "spotId": "spot_satellite_hideout",
+          "subject": "[루카] 정령 친구들이 보고 싶대요!",
+          "body": "안녕하세요! 오늘 숲속 바람이 참 상쾌해요. 크리본과 정령들이 당신을 만나고 싶어 해요. 분수대로 와주실래요?"
+        }
+      ],
+      "grandPrixEnding": {
+        "title": "🏆 WRGP 월드 그랑프리 챔피언 엔딩: [루카]와의 영원한 유대",
+        "dialogues": [
+          {
+            "speaker": "루카",
+            "text": "우리가 해냈어... WRGP의 최정상에서 너와 함께 체커기를 받다니 믿기지 않아!"
+          },
+          {
+            "speaker": "여주인공",
+            "text": "네가 내 옆에서 바람을 갈라주었기 때문에 승리할 수 있었어. 고마워, 최고의 러너!"
+          },
+          {
+            "speaker": "루카",
+            "text": "이 우승 트로피와 우리의 D-휠은 영원한 결속의 증표야. 앞으로도 새로운 지평선을 향해 계속 달리자!"
+          }
+        ]
+      }
+    },
+    {
+      "personaId": "5ds_carly",
+      "baseCharId": 9,
+      "displayName": "칼리 나기사",
+      "isTagEligible": true,
+      "partnerRefusal": null,
+      "dormOrFaction": "특종 점술 기자 & 포츈 레이디",
+      "partnerRole": "TagHeroine",
+      "partnerSkillName": "칼리 나기사의 결속: 붉은 성흔의 비상!",
+      "partnerSkillDesc": "운명의 점괘로 매 턴 드로우의 질을 높이고 공격력을 배가시키는 르포 라이터의 포츈 파워.",
+      "favoriteGiftId": "crimson_dragon_emblem",
+      "forms": [
+        {
+          "formCharId": 9,
+          "formName": "칼리 나기사",
+          "formTitle": "칼리 나기사 · 네오 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_daedalus_bridge"
+          ],
+          "greetingLines": {
+            "low": "특종이에요, 특종! 운명의 듀얼리스트가 나타났다는 점괘가 딱 맞았어요!",
+            "mid": "와아! 네 듀얼을 기사로 쓰면 네오 도미노 시티 신문 1면 톱기사 확정이에요!",
+            "high": "당신 옆에 있으면 어떤 위험한 취재도 두렵지 않아요! 저, 평생 파트너 할래요!"
+          },
+          "duelStartLine": "특종이에요, 특종! 운명의 점괘가 가리키는 대로, 듀얼 개시예요!",
+          "aceCutInLine": "과거, 현재, 미래를 관통하라! 포츈 레이디 에브리! 포츈 슬래시!!",
+          "winLine": "특종 대성공~! 봤죠? 제 점괘는 절대 빗나가지 않는다고요!",
+          "loseLine": "으아앙~ 안경이 날아갔어요~! 하지만 포기 않고 특종 듀얼 취재는 계속할 거예요!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_9.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_9.png"
+        },
+        {
+          "formCharId": 230,
+          "formName": "칼리 나기사 (안경)",
+          "formTitle": "칼리 나기사 (안경) · 네오 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_daedalus_bridge"
+          ],
+          "greetingLines": {
+            "low": "특종이에요, 특종! 운명의 듀얼리스트가 나타났다는 점괘가 딱 맞았어요!",
+            "mid": "와아! 네 듀얼을 기사로 쓰면 네오 도미노 시티 신문 1면 톱기사 확정이에요!",
+            "high": "당신 옆에 있으면 어떤 위험한 취재도 두렵지 않아요! 저, 평생 파트너 할래요!"
+          },
+          "duelStartLine": "특종이에요, 특종! 운명의 점괘가 가리키는 대로, 듀얼 개시예요!",
+          "aceCutInLine": "과거, 현재, 미래를 관통하라! 포츈 레이디 에브리! 포츈 슬래시!!",
+          "winLine": "특종 대성공~! 봤죠? 제 점괘는 절대 빗나가지 않는다고요!",
+          "loseLine": "으아앙~ 안경이 날아갔어요~! 하지만 포기 않고 특종 듀얼 취재는 계속할 거예요!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_230.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_230.png"
+        },
+        {
+          "formCharId": 220,
+          "formName": "칼리 나기사 (Ver.2)",
+          "formTitle": "칼리 나기사 (Ver.2) · 네오 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_daedalus_bridge"
+          ],
+          "greetingLines": {
+            "low": "특종이에요, 특종! 운명의 듀얼리스트가 나타났다는 점괘가 딱 맞았어요!",
+            "mid": "와아! 네 듀얼을 기사로 쓰면 네오 도미노 시티 신문 1면 톱기사 확정이에요!",
+            "high": "당신 옆에 있으면 어떤 위험한 취재도 두렵지 않아요! 저, 평생 파트너 할래요!"
+          },
+          "duelStartLine": "특종이에요, 특종! 운명의 점괘가 가리키는 대로, 듀얼 개시예요!",
+          "aceCutInLine": "과거, 현재, 미래를 관통하라! 포츈 레이디 에브리! 포츈 슬래시!!",
+          "winLine": "특종 대성공~! 봤죠? 제 점괘는 절대 빗나가지 않는다고요!",
+          "loseLine": "으아앙~ 안경이 날아갔어요~! 하지만 포기 않고 특종 듀얼 취재는 계속할 거예요!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_220.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_220.png"
+        },
+        {
+          "formCharId": 221,
+          "formName": "다크 시그너 칼리",
+          "formTitle": "다크 시그너 칼리 · 네오 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_daedalus_bridge"
+          ],
+          "greetingLines": {
+            "low": "특종이에요, 특종! 운명의 듀얼리스트가 나타났다는 점괘가 딱 맞았어요!",
+            "mid": "와아! 네 듀얼을 기사로 쓰면 네오 도미노 시티 신문 1면 톱기사 확정이에요!",
+            "high": "당신 옆에 있으면 어떤 위험한 취재도 두렵지 않아요! 저, 평생 파트너 할래요!"
+          },
+          "duelStartLine": "특종이에요, 특종! 운명의 점괘가 가리키는 대로, 듀얼 개시예요!",
+          "aceCutInLine": "과거, 현재, 미래를 관통하라! 포츈 레이디 에브리! 포츈 슬래시!!",
+          "winLine": "특종 대성공~! 봤죠? 제 점괘는 절대 빗나가지 않는다고요!",
+          "loseLine": "으아앙~ 안경이 날아갔어요~! 하지만 포기 않고 특종 듀얼 취재는 계속할 거예요!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_221.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_221.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "칼리 나기사: 꺄아-! 최신형 망원 렌즈 카메라와 점술용 타로 카드 세트잖아요! 잭 특종 취재 때 꼭 쓸게요, 당신은 천사예요!",
+        "liked": "칼리 나기사: 헤헤, 취재비가 굳었네요! 맛있게 먹을게요!",
+        "neutral": "칼리 나기사: 선물 고마워요! 나중에 특종 기사 1면에 실어드릴게요!",
+        "hated": "칼리 나기사: 으아앙! 매운 고추냉이가 잔뜩 든 삼각김밥이잖아요! 혀에 불나요 불!!"
+      },
+      "partnerQuotes": {
+        "morning": "특종이에요, 특종! 좋은 아침이에요! 오늘 운명의 타로 점괘가 '최고의 만남'을 가리켰다고요!",
+        "evening": "우와~ 네온사인 아래서 셔터를 찰칵! 오늘 당신과의 특종 듀얼, 1면 톱기사감이에요!",
+        "deckComment": "제 돋보기로 분석해 본 결과, 당신의 덱은 대박 특종 기사만큼이나 반짝반짝 빛나고 있어요!",
+        "duelReady": "운명의 수레바퀴여, 미래를 비춰라! 포츈 레이디, 듀얼 개시예요!",
+        "cheer": "안경 똑바로 고쳐 쓰고 집중하세요! 운명의 여신은 끝까지 포기하지 않는 자의 편이라고요!"
+      },
+      "bondEvents": [
+        {
+          "heartLevel": 1,
+          "title": "[칼리 나기사] 첫 번째 인연: 서킷에서의 조우",
+          "dialogues": [
+            {
+              "speaker": "칼리 나기사",
+              "text": "안녕! 하이웨이에서 네 D-휠 주행과 덱 플레이를 지켜봤어. 정말 날카롭더군."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워! 네 싱크로 소환 타이밍도 정말 감탄스러웠어. 앞으로 잘 부탁해."
+            },
+            {
+              "speaker": "칼리 나기사",
+              "text": "응! 우리 서로의 스피드를 끌어올려 주는 최고의 파트너가 되어보자!"
+            }
+          ],
+          "choice": {
+            "prompt": "칼리 나기사와 함께 어떤 레이스 다짐을 나눌까?",
+            "options": [
+              {
+                "text": "🔥 액셀러레이션! 극한의 스피드로 상대를 압도하자! (보상 DP 1.2배)",
+                "reply": "좋아, 그 패기 넘치는 가속감 아주 마음에 들어!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 안정적인 코너링과 든든한 서포트로 호흡을 맞추자! (내 시작 LP +500)",
+                "reply": "기본 정비가 탄탄해야 완주하는 법이지. 함께 달리자!",
+                "effectType": "SafeBuff"
+              },
+              {
+                "text": "🤝 팀 5D's의 영원한 유대를 함께 잇자! (호감도 대폭 상승)",
+                "reply": "든든한걸? 앞으로 네 등 뒤는 내가 지킨다!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 3,
+          "title": "[칼리 나기사] 세 번째 인연: 거센 바람 속의 결속",
+          "dialogues": [
+            {
+              "speaker": "칼리 나기사",
+              "text": "수많은 코너를 함께 돌파하며... 네가 내 옆에 있다는 것만으로도 두려움이 사라져."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "나도 그래. 어떤 폭풍이 몰아쳐도 네 붉은 성흔의 빛이 길을 밝혀주니까."
+            },
+            {
+              "speaker": "칼리 나기사",
+              "text": "좋아! 이번 WRGP 결승 무대에서도 끝까지 하나가 되어 질주하자!"
+            }
+          ],
+          "choice": {
+            "prompt": "WRGP 결승을 앞두고 어떤 전략으로 단결할까?",
+            "options": [
+              {
+                "text": "🔥 오버 톱 클리어 마인드! 전속력으로 적을 꿰뚫자! (공격력 +400 버프)",
+                "reply": "한계를 뛰어넘은 스피드를 보여주자고!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 빈틈없는 함정과 카운터로 완벽한 방어를 구축하자! (내 시작 LP +1,000)",
+                "reply": "치밀한 레이스 운영이야. 완벽하게 준비하자!",
+                "effectType": "SafeBuff"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 5,
+          "title": "[칼리 나기사] 최종 인연(MASTER): 붉은 용이 맺어준 기적",
+          "dialogues": [
+            {
+              "speaker": "칼리 나기사",
+              "text": "시공의 어둠과 절망을 함께 건너오며... 넌 내게 대체할 수 없는 영혼의 파트너가 되었어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워. 네 곁에서 달렸기에 나 역시 홍련의 듀얼 퀸으로서 새로운 미래를 열 수 있었어."
+            },
+            {
+              "speaker": "칼리 나기사",
+              "text": "우리의 유대는 시공을 넘어 영원해. 네오 도미노 시티의 하늘을 향해 함께 비상하자!"
+            }
+          ],
+          "choice": {
+            "prompt": "최종 마스터 승급전! 마지막 맹세를 선택하자!",
+            "options": [
+              {
+                "text": "🔥 우리의 영혼과 모든 싱크로를 걸고 승리하자! (마스터 보상 & DP 1.5배)",
+                "reply": "우리의 기적의 궤적을 전 세계에 새겨넣자!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🤝 영원히 함께 달릴 소울메이트로서 승리를 증명할게! (마스터 영구 버프)",
+                "reply": "고마워, 내 생애 최고의 영원한 러너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        }
+      ],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "잭의 휠 오브 포츈을 카메라로 쫓아갈 때가 제일 심장이 쿵쾅거려요! 물론 당신도요!",
+        "city_satellite": "신문사 데스크에선 매번 핀잔을 주지만, 전 네오 도미노 시티의 진실을 끝까지 취재할 거예요!",
+        "food": "마감 직전에 허겁지겁 먹는 참치 삼각김밥과 캔커피! 기자에겐 이게 최고의 만찬이에요!",
+        "signers": "다크 시그너였을 때의 기억은 가슴 아프지만... 잭과 당신이 구해준 이 삶을 소중히 여길 거예요."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_carly_mail_invite",
+          "sender": "칼리 나기사",
+          "timeSlot": "morning",
+          "spotId": "spot_poppo_time",
+          "subject": "[칼리] 대박 특종이에요! 빨리 와요!",
+          "body": "꺅! 오늘 점괘가 '운명적인 만남과 대박 듀얼'이라고 나왔어요! 카메라 들고 광장 카페에서 기다릴 테니 빨리요!"
+        }
+      ],
+      "grandPrixEnding": {
+        "title": "🏆 WRGP 월드 그랑프리 챔피언 엔딩: [칼리 나기사]와의 영원한 유대",
+        "dialogues": [
+          {
+            "speaker": "칼리 나기사",
+            "text": "우리가 해냈어... WRGP의 최정상에서 너와 함께 체커기를 받다니 믿기지 않아!"
+          },
+          {
+            "speaker": "여주인공",
+            "text": "네가 내 옆에서 바람을 갈라주었기 때문에 승리할 수 있었어. 고마워, 최고의 러너!"
+          },
+          {
+            "speaker": "칼리 나기사",
+            "text": "이 우승 트로피와 우리의 D-휠은 영원한 결속의 증표야. 앞으로도 새로운 지평선을 향해 계속 달리자!"
+          }
+        ]
+      }
+    },
+    {
+      "personaId": "5ds_sherry",
+      "baseCharId": 32,
+      "displayName": "셰리 르블랑",
+      "isTagEligible": true,
+      "partnerRefusal": null,
+      "dormOrFaction": "고결한 성기사",
+      "partnerRole": "TagHeroine",
+      "partnerSkillName": "셰리 르블랑의 결속: 붉은 성흔의 비상!",
+      "partnerSkillDesc": "상대의 마법/함정을 무효화하고 기사의 관통 공격으로 필드를 돌파하는 귀족의 일격.",
+      "favoriteGiftId": "crimson_dragon_emblem",
+      "forms": [
+        {
+          "formCharId": 32,
+          "formName": "셰리 르블랑",
+          "formTitle": "셰리 르블랑 · 네오 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_poppo_time"
+          ],
+          "greetingLines": {
+            "low": "본주르. 날 시험해보고 싶다면 전력으로 부딪쳐 오세요.",
+            "mid": "당신의 듀얼에는 거짓이 없군요. 복수에 불타던 내 마음에 빛이 스며듭니다.",
+            "high": "당신과 함께라면 가문의 비극을 넘어, 진정한 기사도를 완성할 수 있습니다."
+          },
+          "duelStartLine": "고결한 기사의 긍지를 걸고, 듀얼을 시작하겠습니다!",
+          "aceCutInLine": "질주하라! 플뢰르 드 슈발리에, 적의 어둠을 일격에 꿰뚫어라!",
+          "winLine": "완벽한 승리입니다. 카드의 선율이 아름답게 울려 퍼졌군요.",
+          "loseLine": "놀랍군요... 당신의 순수한 검 끝에서 많은 것을 깨달았습니다.",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_32.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_32.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "셰리 르블랑: 와, 이걸 날 위해 준비해 준 거야?! 정말 고마워, 소중히 간직할게!",
+        "liked": "셰리 르블랑: 고마워! 기분 좋게 받을게. 주행 후 마시는 한 잔처럼 든든하네!",
+        "neutral": "셰리 르블랑: 응? 선물이구나. 고마워, 잘 쓸게.",
+        "hated": "셰리 르블랑: 으음... 이건 내 취향이랑은 조금 안 맞는 것 같은데..."
+      },
+      "partnerQuotes": {
+        "morning": "봉주르. 상쾌한 아침이로군. 펜싱의 검끝처럼 날카롭게 덱을 정비해 두었나?",
+        "evening": "보나수아. 황혼의 서킷을 달리는 기분은 각별하군. 오늘 듀얼, 네 기백이 훌륭했다.",
+        "deckComment": "기품이 넘치면서도 단칼에 적을 베어 넘기는 결단력이 돋보이는 훌륭한 덱이다.",
+        "duelReady": "기사의 명예를 걸고 승부하겠다. 플뢰르 드 슈발리에, 출진이다! 듀얼!",
+        "cheer": "검을 놓지 마라! 고결한 기사는 어떤 궁지에 몰려도 절대 고개를 숙이지 않는다!"
+      },
+      "bondEvents": [
+        {
+          "heartLevel": 1,
+          "title": "[셰리 르블랑] 첫 번째 인연: 서킷에서의 조우",
+          "dialogues": [
+            {
+              "speaker": "셰리 르블랑",
+              "text": "안녕! 하이웨이에서 네 D-휠 주행과 덱 플레이를 지켜봤어. 정말 날카롭더군."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워! 네 싱크로 소환 타이밍도 정말 감탄스러웠어. 앞으로 잘 부탁해."
+            },
+            {
+              "speaker": "셰리 르블랑",
+              "text": "응! 우리 서로의 스피드를 끌어올려 주는 최고의 파트너가 되어보자!"
+            }
+          ],
+          "choice": {
+            "prompt": "셰리 르블랑와 함께 어떤 레이스 다짐을 나눌까?",
+            "options": [
+              {
+                "text": "🔥 액셀러레이션! 극한의 스피드로 상대를 압도하자! (보상 DP 1.2배)",
+                "reply": "좋아, 그 패기 넘치는 가속감 아주 마음에 들어!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 안정적인 코너링과 든든한 서포트로 호흡을 맞추자! (내 시작 LP +500)",
+                "reply": "기본 정비가 탄탄해야 완주하는 법이지. 함께 달리자!",
+                "effectType": "SafeBuff"
+              },
+              {
+                "text": "🤝 팀 5D's의 영원한 유대를 함께 잇자! (호감도 대폭 상승)",
+                "reply": "든든한걸? 앞으로 네 등 뒤는 내가 지킨다!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 3,
+          "title": "[셰리 르블랑] 세 번째 인연: 거센 바람 속의 결속",
+          "dialogues": [
+            {
+              "speaker": "셰리 르블랑",
+              "text": "수많은 코너를 함께 돌파하며... 네가 내 옆에 있다는 것만으로도 두려움이 사라져."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "나도 그래. 어떤 폭풍이 몰아쳐도 네 붉은 성흔의 빛이 길을 밝혀주니까."
+            },
+            {
+              "speaker": "셰리 르블랑",
+              "text": "좋아! 이번 WRGP 결승 무대에서도 끝까지 하나가 되어 질주하자!"
+            }
+          ],
+          "choice": {
+            "prompt": "WRGP 결승을 앞두고 어떤 전략으로 단결할까?",
+            "options": [
+              {
+                "text": "🔥 오버 톱 클리어 마인드! 전속력으로 적을 꿰뚫자! (공격력 +400 버프)",
+                "reply": "한계를 뛰어넘은 스피드를 보여주자고!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 빈틈없는 함정과 카운터로 완벽한 방어를 구축하자! (내 시작 LP +1,000)",
+                "reply": "치밀한 레이스 운영이야. 완벽하게 준비하자!",
+                "effectType": "SafeBuff"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 5,
+          "title": "[셰리 르블랑] 최종 인연(MASTER): 붉은 용이 맺어준 기적",
+          "dialogues": [
+            {
+              "speaker": "셰리 르블랑",
+              "text": "시공의 어둠과 절망을 함께 건너오며... 넌 내게 대체할 수 없는 영혼의 파트너가 되었어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워. 네 곁에서 달렸기에 나 역시 홍련의 듀얼 퀸으로서 새로운 미래를 열 수 있었어."
+            },
+            {
+              "speaker": "셰리 르블랑",
+              "text": "우리의 유대는 시공을 넘어 영원해. 네오 도미노 시티의 하늘을 향해 함께 비상하자!"
+            }
+          ],
+          "choice": {
+            "prompt": "최종 마스터 승급전! 마지막 맹세를 선택하자!",
+            "options": [
+              {
+                "text": "🔥 우리의 영혼과 모든 싱크로를 걸고 승리하자! (마스터 보상 & DP 1.5배)",
+                "reply": "우리의 기적의 궤적을 전 세계에 새겨넣자!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🤝 영원히 함께 달릴 소울메이트로서 승리를 증명할게! (마스터 영구 버프)",
+                "reply": "고마워, 내 생애 최고의 영원한 러너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        }
+      ],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "부모님의 원수를 갚고 진실을 찾기 위해 D-휠에 올랐다. 내 검은 결코 멈추지 않아.",
+        "city_satellite": "파리의 고향 거리가 그립기도 하지만, 네오 도미노 시티의 거친 바람도 나쁘지 않군.",
+        "food": "바삭한 버터 크루아상과 진한 카페오레. 프랑스 귀족의 아침에 어울리는 소박한 품격이지.",
+        "signers": "운명에 농락당하지 않겠다. 내 미래는 내 펜싱 검과 카드로 직접 개척할 뿐."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_sherry_mail_invite",
+          "sender": "셰리 르블랑",
+          "timeSlot": "morning",
+          "spotId": "spot_satellite_hideout",
+          "subject": "[셰리] 서킷에서 검을 섞어보지 않겠나.",
+          "body": "봉주르. 네오 도미노의 직선 코스에서 내 풀 플뢰르의 가속을 시험해보고 싶군. 명예로운 결투를 기다리마."
+        }
+      ],
+      "grandPrixEnding": {
+        "title": "🏆 WRGP 월드 그랑프리 챔피언 엔딩: [셰리 르블랑]와의 영원한 유대",
+        "dialogues": [
+          {
+            "speaker": "셰리 르블랑",
+            "text": "우리가 해냈어... WRGP의 최정상에서 너와 함께 체커기를 받다니 믿기지 않아!"
+          },
+          {
+            "speaker": "여주인공",
+            "text": "네가 내 옆에서 바람을 갈라주었기 때문에 승리할 수 있었어. 고마워, 최고의 러너!"
+          },
+          {
+            "speaker": "셰리 르블랑",
+            "text": "이 우승 트로피와 우리의 D-휠은 영원한 결속의 증표야. 앞으로도 새로운 지평선을 향해 계속 달리자!"
+          }
+        ]
+      }
+    },
+    {
+      "personaId": "5ds_misty",
+      "baseCharId": 25,
+      "displayName": "미스티 로라",
+      "isTagEligible": true,
+      "partnerRefusal": null,
+      "dormOrFaction": "톱 모델 & 레프티리스",
+      "partnerRole": "TagHeroine",
+      "partnerSkillName": "미스티 로라의 결속: 붉은 성흔의 비상!",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 미스티 로라 전용 스탯.",
+      "favoriteGiftId": "crimson_dragon_emblem",
+      "forms": [
+        {
+          "formCharId": 25,
+          "formName": "미스티 로라",
+          "formTitle": "미스티 로라 · 네오 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_satellite_hideout"
+          ],
+          "greetingLines": {
+            "low": "어머, 반가워요. 런웨이만큼이나 이 듀얼 필드도 자극적인 곳이죠.",
+            "mid": "당신의 눈빛... 거짓과 위선이 없어서 참 편안하네요. 좋은 친구가 될 수 있을 것 같아요.",
+            "high": "제 마음의 어둠과 상처를 보듬어준 사람은 당신뿐이에요. 제 곁을 지켜주세요."
+          },
+          "duelStartLine": "차가운 파충류의 눈빛을 감당할 수 있겠나요? 듀얼이에요.",
+          "aceCutInLine": "돌처럼 굳어버려라! 레프티리스 바스키, 석화의 시선을 보내라!",
+          "winLine": "우아한 승리군요. 패자의 표정 또한 훌륭한 셔터 찬스예요.",
+          "loseLine": "대단하군요... 제 독기를 이렇게 상냥하게 녹여버릴 줄은 몰랐어요.",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_25.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_25.png"
+        },
+        {
+          "formCharId": 218,
+          "formName": "미스티 로라 (Ver.2)",
+          "formTitle": "미스티 로라 (Ver.2) · 네오 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_satellite_hideout"
+          ],
+          "greetingLines": {
+            "low": "어머, 반가워요. 런웨이만큼이나 이 듀얼 필드도 자극적인 곳이죠.",
+            "mid": "당신의 눈빛... 거짓과 위선이 없어서 참 편안하네요. 좋은 친구가 될 수 있을 것 같아요.",
+            "high": "제 마음의 어둠과 상처를 보듬어준 사람은 당신뿐이에요. 제 곁을 지켜주세요."
+          },
+          "duelStartLine": "차가운 파충류의 눈빛을 감당할 수 있겠나요? 듀얼이에요.",
+          "aceCutInLine": "돌처럼 굳어버려라! 레프티리스 바스키, 석화의 시선을 보내라!",
+          "winLine": "우아한 승리군요. 패자의 표정 또한 훌륭한 셔터 찬스예요.",
+          "loseLine": "대단하군요... 제 독기를 이렇게 상냥하게 녹여버릴 줄은 몰랐어요.",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_218.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_218.png"
+        },
+        {
+          "formCharId": 219,
+          "formName": "다크 시그너 미스티",
+          "formTitle": "다크 시그너 미스티 · 네오 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_satellite_hideout"
+          ],
+          "greetingLines": {
+            "low": "어머, 반가워요. 런웨이만큼이나 이 듀얼 필드도 자극적인 곳이죠.",
+            "mid": "당신의 눈빛... 거짓과 위선이 없어서 참 편안하네요. 좋은 친구가 될 수 있을 것 같아요.",
+            "high": "제 마음의 어둠과 상처를 보듬어준 사람은 당신뿐이에요. 제 곁을 지켜주세요."
+          },
+          "duelStartLine": "차가운 파충류의 눈빛을 감당할 수 있겠나요? 듀얼이에요.",
+          "aceCutInLine": "돌처럼 굳어버려라! 레프티리스 바스키, 석화의 시선을 보내라!",
+          "winLine": "우아한 승리군요. 패자의 표정 또한 훌륭한 셔터 찬스예요.",
+          "loseLine": "대단하군요... 제 독기를 이렇게 상냥하게 녹여버릴 줄은 몰랐어요.",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_219.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_219.png"
+        }
+      ],
+      "giftReactions": {
+        "loved": "미스티 로라: 와, 이걸 날 위해 준비해 준 거야?! 정말 고마워, 소중히 간직할게!",
+        "liked": "미스티 로라: 고마워! 기분 좋게 받을게. 주행 후 마시는 한 잔처럼 든든하네!",
+        "neutral": "미스티 로라: 응? 선물이구나. 고마워, 잘 쓸게.",
+        "hated": "미스티 로라: 으음... 이건 내 취향이랑은 조금 안 맞는 것 같은데..."
+      },
+      "partnerQuotes": {
+        "morning": "미스티 로라: 좋은 아침이야! 오늘도 서킷을 향해 힘차게 출발해보자!",
+        "evening": "미스티 로라: 해가 졌네. 오늘 나눈 듀얼의 스피드가 아직도 가슴에 남아있어.",
+        "deckComment": "미스티 로라: 네 덱은 볼 때마다 세심한 조율이 돋보여서 정말 든든해!",
+        "duelReady": "미스티 로라: D-휠 악셀 온! 우리의 유대를 보여주자고!",
+        "cheer": "미스티 로라: 포기하지 마! 바람을 가르고 다음 코너에서 역전하는 거야!"
+      },
+      "bondEvents": [
+        {
+          "heartLevel": 1,
+          "title": "[미스티 로라] 첫 번째 인연: 서킷에서의 조우",
+          "dialogues": [
+            {
+              "speaker": "미스티 로라",
+              "text": "안녕! 하이웨이에서 네 D-휠 주행과 덱 플레이를 지켜봤어. 정말 날카롭더군."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워! 네 싱크로 소환 타이밍도 정말 감탄스러웠어. 앞으로 잘 부탁해."
+            },
+            {
+              "speaker": "미스티 로라",
+              "text": "응! 우리 서로의 스피드를 끌어올려 주는 최고의 파트너가 되어보자!"
+            }
+          ],
+          "choice": {
+            "prompt": "미스티 로라와 함께 어떤 레이스 다짐을 나눌까?",
+            "options": [
+              {
+                "text": "🔥 액셀러레이션! 극한의 스피드로 상대를 압도하자! (보상 DP 1.2배)",
+                "reply": "좋아, 그 패기 넘치는 가속감 아주 마음에 들어!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 안정적인 코너링과 든든한 서포트로 호흡을 맞추자! (내 시작 LP +500)",
+                "reply": "기본 정비가 탄탄해야 완주하는 법이지. 함께 달리자!",
+                "effectType": "SafeBuff"
+              },
+              {
+                "text": "🤝 팀 5D's의 영원한 유대를 함께 잇자! (호감도 대폭 상승)",
+                "reply": "든든한걸? 앞으로 네 등 뒤는 내가 지킨다!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 3,
+          "title": "[미스티 로라] 세 번째 인연: 거센 바람 속의 결속",
+          "dialogues": [
+            {
+              "speaker": "미스티 로라",
+              "text": "수많은 코너를 함께 돌파하며... 네가 내 옆에 있다는 것만으로도 두려움이 사라져."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "나도 그래. 어떤 폭풍이 몰아쳐도 네 붉은 성흔의 빛이 길을 밝혀주니까."
+            },
+            {
+              "speaker": "미스티 로라",
+              "text": "좋아! 이번 WRGP 결승 무대에서도 끝까지 하나가 되어 질주하자!"
+            }
+          ],
+          "choice": {
+            "prompt": "WRGP 결승을 앞두고 어떤 전략으로 단결할까?",
+            "options": [
+              {
+                "text": "🔥 오버 톱 클리어 마인드! 전속력으로 적을 꿰뚫자! (공격력 +400 버프)",
+                "reply": "한계를 뛰어넘은 스피드를 보여주자고!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🛡️ 빈틈없는 함정과 카운터로 완벽한 방어를 구축하자! (내 시작 LP +1,000)",
+                "reply": "치밀한 레이스 운영이야. 완벽하게 준비하자!",
+                "effectType": "SafeBuff"
+              }
+            ]
+          }
+        },
+        {
+          "heartLevel": 5,
+          "title": "[미스티 로라] 최종 인연(MASTER): 붉은 용이 맺어준 기적",
+          "dialogues": [
+            {
+              "speaker": "미스티 로라",
+              "text": "시공의 어둠과 절망을 함께 건너오며... 넌 내게 대체할 수 없는 영혼의 파트너가 되었어."
+            },
+            {
+              "speaker": "여주인공",
+              "text": "고마워. 네 곁에서 달렸기에 나 역시 홍련의 듀얼 퀸으로서 새로운 미래를 열 수 있었어."
+            },
+            {
+              "speaker": "미스티 로라",
+              "text": "우리의 유대는 시공을 넘어 영원해. 네오 도미노 시티의 하늘을 향해 함께 비상하자!"
+            }
+          ],
+          "choice": {
+            "prompt": "최종 마스터 승급전! 마지막 맹세를 선택하자!",
+            "options": [
+              {
+                "text": "🔥 우리의 영혼과 모든 싱크로를 걸고 승리하자! (마스터 보상 & DP 1.5배)",
+                "reply": "우리의 기적의 궤적을 전 세계에 새겨넣자!",
+                "effectType": "HighRiskHighReturn"
+              },
+              {
+                "text": "🤝 영원히 함께 달릴 소울메이트로서 승리를 증명할게! (마스터 영구 버프)",
+                "reply": "고마워, 내 생애 최고의 영원한 러너!",
+                "effectType": "BondBoost"
+              }
+            ]
+          }
+        }
+      ],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "미스티 로라: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지. 네 주행을 보고 있으면 가슴이 뜨거워져.",
+        "city_satellite": "미스티 로라: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이야.",
+        "food": "미스티 로라: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "미스티 로라: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척해 나가자."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_misty_mail_invite",
+          "sender": "미스티 로라",
+          "timeSlot": "morning",
+          "spotId": "spot_poppo_time",
+          "subject": "[미스티 로라] 오늘 잠깐 만날 수 있을까?",
+          "body": "안녕! 오늘 날씨가 참 좋아서 너랑 같이 듀얼 연습도 하고 바람도 쐬고 싶어. 시간 되면 편할 때 들러줘!"
+        }
+      ],
+      "grandPrixEnding": {
+        "title": "🏆 WRGP 월드 그랑프리 챔피언 엔딩: [미스티 로라]와의 영원한 유대",
+        "dialogues": [
+          {
+            "speaker": "미스티 로라",
+            "text": "우리가 해냈어... WRGP의 최정상에서 너와 함께 체커기를 받다니 믿기지 않아!"
+          },
+          {
+            "speaker": "여주인공",
+            "text": "네가 내 옆에서 바람을 갈라주었기 때문에 승리할 수 있었어. 고마워, 최고의 러너!"
+          },
+          {
+            "speaker": "미스티 로라",
+            "text": "이 우승 트로피와 우리의 D-휠은 영원한 결속의 증표야. 앞으로도 새로운 지평선을 향해 계속 달리자!"
+          }
+        ]
+      }
+    },
+    {
+      "personaId": "5ds_char_2",
+      "baseCharId": 2,
+      "displayName": "안드레",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 하이웨이를 질주하는 고독한 러너다! 내 뒤에 탠덤석은 없다. 서킷에서 진검승부로 겨루자!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 안드레 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 2,
+          "formName": "안드레",
+          "formTitle": "안드레 · 네오 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_daedalus_bridge"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 안드레! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_2.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_2.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "안드레: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "안드레: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "안드레: 음? 선물이군. 받아두지.",
+        "hated": "안드레: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "안드레: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "안드레: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "안드레: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "안드레: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "안드레: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "안드레: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "안드레: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "안드레: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "안드레: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_2_mail_invite",
+          "sender": "안드레",
+          "timeSlot": "morning",
+          "spotId": "spot_satellite_hideout",
+          "subject": "[안드레] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_3",
+      "baseCharId": 3,
+      "displayName": "안티노미",
+      "isTagEligible": false,
+      "partnerRefusal": "미안해, 유세이와 나눈 액셀 싱크로의 약속을 완수하기 전까진 다른 길을 돌아볼 수 없어.",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 안티노미 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 3,
+          "formName": "안티노미",
+          "formTitle": "안티노미 · 네오 도미노 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_poppo_time"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 안티노미! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_3.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_3.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        },
+        {
+          "formCharId": 3204,
+          "formName": "브루노 (안티노미)",
+          "formTitle": "브루노 (안티노미) · 네오 도미노 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_poppo_time"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 브루노 (안티노미)! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_3204.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_3204.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "안티노미: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "안티노미: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "안티노미: 음? 선물이군. 받아두지.",
+        "hated": "안티노미: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "안티노미: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "안티노미: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "안티노미: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "안티노미: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "안티노미: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "안티노미: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "안티노미: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "안티노미: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "안티노미: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_3_mail_invite",
+          "sender": "안티노미",
+          "timeSlot": "morning",
+          "spotId": "spot_poppo_time",
+          "subject": "[안티노미] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_4",
+      "baseCharId": 4,
+      "displayName": "아포리아",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 하이웨이를 질주하는 고독한 러너다! 내 뒤에 탠덤석은 없다. 서킷에서 진검승부로 겨루자!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 아포리아 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 4,
+          "formName": "아포리아",
+          "formTitle": "아포리아 · 네오 도미노 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_satellite_hideout"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 아포리아! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_4.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_4.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "아포리아: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "아포리아: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "아포리아: 음? 선물이군. 받아두지.",
+        "hated": "아포리아: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "아포리아: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "아포리아: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "아포리아: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "아포리아: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "아포리아: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "아포리아: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "아포리아: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "아포리아: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "아포리아: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_4_mail_invite",
+          "sender": "아포리아",
+          "timeSlot": "morning",
+          "spotId": "spot_satellite_hideout",
+          "subject": "[아포리아] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_5",
+      "baseCharId": 5,
+      "displayName": "야마시타 타로",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 하이웨이를 질주하는 고독한 러너다! 내 뒤에 탠덤석은 없다. 서킷에서 진검승부로 겨루자!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 야마시타 타로 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 5,
+          "formName": "야마시타 타로",
+          "formTitle": "야마시타 타로 · 네오 도미노 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_daedalus_bridge"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 야마시타 타로! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_5.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_5.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "야마시타 타로: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "야마시타 타로: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "야마시타 타로: 음? 선물이군. 받아두지.",
+        "hated": "야마시타 타로: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "야마시타 타로: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "야마시타 타로: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "야마시타 타로: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "야마시타 타로: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "야마시타 타로: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "야마시타 타로: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "야마시타 타로: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "야마시타 타로: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "야마시타 타로: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_5_mail_invite",
+          "sender": "야마시타 타로",
+          "timeSlot": "morning",
+          "spotId": "spot_poppo_time",
+          "subject": "[야마시타 타로] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_6",
+      "baseCharId": 6,
+      "displayName": "브레오",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 하이웨이를 질주하는 고독한 러너다! 내 뒤에 탠덤석은 없다. 서킷에서 진검승부로 겨루자!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 브레오 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 6,
+          "formName": "브레오",
+          "formTitle": "브레오 · 네오 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_poppo_time"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 브레오! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_6.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_6.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "브레오: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "브레오: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "브레오: 음? 선물이군. 받아두지.",
+        "hated": "브레오: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "브레오: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "브레오: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "브레오: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "브레오: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "브레오: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "브레오: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "브레오: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "브레오: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "브레오: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_6_mail_invite",
+          "sender": "브레오",
+          "timeSlot": "morning",
+          "spotId": "spot_satellite_hideout",
+          "subject": "[브레오] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_7",
+      "baseCharId": 7,
+      "displayName": "브레이브",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 하이웨이를 질주하는 고독한 러너다! 내 뒤에 탠덤석은 없다. 서킷에서 진검승부로 겨루자!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 브레이브 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 7,
+          "formName": "브레이브",
+          "formTitle": "브레이브 · 네오 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_satellite_hideout"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 브레이브! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_7.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_7.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "브레이브: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "브레이브: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "브레이브: 음? 선물이군. 받아두지.",
+        "hated": "브레이브: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "브레이브: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "브레이브: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "브레이브: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "브레이브: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "브레이브: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "브레이브: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "브레이브: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "브레이브: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "브레이브: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_7_mail_invite",
+          "sender": "브레이브",
+          "timeSlot": "morning",
+          "spotId": "spot_poppo_time",
+          "subject": "[브레이브] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_10",
+      "baseCharId": 10,
+      "displayName": "크로우 호건",
+      "isTagEligible": false,
+      "partnerRefusal": "미안해! 내 D-휠 보조석은 새틀라이트 꼬마 녀석들이 탈 자리거든! 듀얼이라면 한 판 멋지게 달려보자고!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 크로우 호건 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 10,
+          "formName": "크로우 호건",
+          "formTitle": "크로우 호건 · 네오 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_daedalus_bridge"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 크로우 호건! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_10.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_10.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "크로우 호건: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "크로우 호건: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "크로우 호건: 음? 선물이군. 받아두지.",
+        "hated": "크로우 호건: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "크로우 호건: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "크로우 호건: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "크로우 호건: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "크로우 호건: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "크로우 호건: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "크로우 호건: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "크로우 호건: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "크로우 호건: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "크로우 호건: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_10_mail_invite",
+          "sender": "크로우 호건",
+          "timeSlot": "morning",
+          "spotId": "spot_satellite_hideout",
+          "subject": "[크로우 호건] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_11",
+      "baseCharId": 11,
+      "displayName": "디맥",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 하이웨이를 질주하는 고독한 러너다! 내 뒤에 탠덤석은 없다. 서킷에서 진검승부로 겨루자!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 디맥 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 11,
+          "formName": "디맥",
+          "formTitle": "디맥 · 네오 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_poppo_time"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 디맥! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_11.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_11.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "디맥: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "디맥: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "디맥: 음? 선물이군. 받아두지.",
+        "hated": "디맥: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "디맥: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "디맥: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "디맥: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "디맥: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "디맥: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "디맥: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "디맥: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "디맥: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "디맥: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_11_mail_invite",
+          "sender": "디맥",
+          "timeSlot": "morning",
+          "spotId": "spot_poppo_time",
+          "subject": "[디맥] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_12",
+      "baseCharId": 12,
+      "displayName": "드래건",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 하이웨이를 질주하는 고독한 러너다! 내 뒤에 탠덤석은 없다. 서킷에서 진검승부로 겨루자!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 드래건 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 12,
+          "formName": "드래건",
+          "formTitle": "드래건 · 네오 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_satellite_hideout"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 드래건! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_12.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_12.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "드래건: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "드래건: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "드래건: 음? 선물이군. 받아두지.",
+        "hated": "드래건: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "드래건: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "드래건: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "드래건: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "드래건: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "드래건: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "드래건: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "드래건: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "드래건: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "드래건: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_12_mail_invite",
+          "sender": "드래건",
+          "timeSlot": "morning",
+          "spotId": "spot_satellite_hideout",
+          "subject": "[드래건] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_13",
+      "baseCharId": 13,
+      "displayName": "보머",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 하이웨이를 질주하는 고독한 러너다! 내 뒤에 탠덤석은 없다. 서킷에서 진검승부로 겨루자!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 보머 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 13,
+          "formName": "보머",
+          "formTitle": "보머 · 네오 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_daedalus_bridge"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 보머! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_13.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_13.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        },
+        {
+          "formCharId": 3201,
+          "formName": "다크 시그너 보머",
+          "formTitle": "다크 시그너 보머 · 네오 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_daedalus_bridge"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 다크 시그너 보머! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_3201.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_3201.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "보머: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "보머: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "보머: 음? 선물이군. 받아두지.",
+        "hated": "보머: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "보머: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "보머: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "보머: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "보머: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "보머: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "보머: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "보머: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "보머: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "보머: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_13_mail_invite",
+          "sender": "보머",
+          "timeSlot": "morning",
+          "spotId": "spot_poppo_time",
+          "subject": "[보머] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_14",
+      "baseCharId": 14,
+      "displayName": "해럴드",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 하이웨이를 질주하는 고독한 러너다! 내 뒤에 탠덤석은 없다. 서킷에서 진검승부로 겨루자!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 해럴드 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 14,
+          "formName": "해럴드",
+          "formTitle": "해럴드 · 네오 도미노 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_poppo_time"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 해럴드! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_14.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_14.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "해럴드: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "해럴드: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "해럴드: 음? 선물이군. 받아두지.",
+        "hated": "해럴드: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "해럴드: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "해럴드: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "해럴드: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "해럴드: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "해럴드: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "해럴드: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "해럴드: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "해럴드: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "해럴드: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_14_mail_invite",
+          "sender": "해럴드",
+          "timeSlot": "morning",
+          "spotId": "spot_satellite_hideout",
+          "subject": "[해럴드] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_15",
+      "baseCharId": 15,
+      "displayName": "엔죠 무쿠로",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 하이웨이를 질주하는 고독한 러너다! 내 뒤에 탠덤석은 없다. 서킷에서 진검승부로 겨루자!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 엔죠 무쿠로 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 15,
+          "formName": "엔죠 무쿠로",
+          "formTitle": "엔죠 무쿠로 · 네오 도미노 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_satellite_hideout"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 엔죠 무쿠로! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_15.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_15.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "엔죠 무쿠로: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "엔죠 무쿠로: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "엔죠 무쿠로: 음? 선물이군. 받아두지.",
+        "hated": "엔죠 무쿠로: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "엔죠 무쿠로: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "엔죠 무쿠로: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "엔죠 무쿠로: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "엔죠 무쿠로: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "엔죠 무쿠로: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "엔죠 무쿠로: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "엔죠 무쿠로: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "엔죠 무쿠로: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "엔죠 무쿠로: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_15_mail_invite",
+          "sender": "엔죠 무쿠로",
+          "timeSlot": "morning",
+          "spotId": "spot_poppo_time",
+          "subject": "[엔죠 무쿠로] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_16",
+      "baseCharId": 16,
+      "displayName": "잭 아틀라스",
+      "isTagEligible": false,
+      "partnerRefusal": "킹에게 파트너 따윈 필요 없다! 왕자의 고동을 따라올 수 없다면 내 뒤에 서 있을 자격조차 없다!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "배틀 페이즈 개시 시 공격력을 폭발시키고 수비 몬스터를 일거에 섬멸하는 킹의 절대적인 패기.",
+      "favoriteGiftId": "blue_eyes_mountain_coffee",
+      "forms": [
+        {
+          "formCharId": 16,
+          "formName": "잭 아틀라스",
+          "formTitle": "잭 아틀라스 · 네오 도미노 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_daedalus_bridge"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 잭 아틀라스! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "하하하하! 킹의 듀얼은 언제나 엔터테인먼트여야 하는 법! 완전무결한 승리다!",
+          "loseLine": "바보 같은... 킹인 내가 무릎 꿇다니! 하지만 이 패배조차 나를 더 높은 정점으로 이끌 채찍이다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_16.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_16.png",
+          "duelStartLine": "왕자의 고동, 지금 여기에 대열을 이루노니! 천지개벽의 힘을 보아라! 듀얼!",
+          "aceCutInLine": "천지를 뒤흔드는 절대의 힘이여! 싱크로 소환, 나의 영혼! 레드 데몬즈 드래곤-!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "잭 아틀라스: 음! 1잔에 3천 엔 하는 전설의 최고급 블루아이즈 마운틴 커피로군! 킹의 기품에 걸맞은 최상의 공물이다!",
+        "liked": "잭 아틀라스: 흠, 제법 킹을 기쁘게 할 줄 아는 녀석이로군.",
+        "neutral": "잭 아틀라스: 킹에게 바치는 선물인가? 받아두마.",
+        "hated": "잭 아틀라스: 네놈! 킹에게 서민들이나 먹는 싸구려 컵라면 따위를 들이밀다니, 불경죄로 다스리겠다!"
+      },
+      "partnerQuotes": {
+        "morning": "음! 킹의 아침은 언제나 고고하고 완벽해야 하는 법! 게으름 피우지 말고 따라와라!",
+        "evening": "네오 도미노 시티의 야경... 이 모든 빛이 킹인 나를 우러러보고 있다! 감상에 젖어볼 텐가?",
+        "deckComment": "흥, 제법 날카로운 칼날을 벼려왔군. 하지만 내 레드 데몬즈의 파괴력을 넘어서기엔 역부족이다!",
+        "duelReady": "왕자의 고동, 지금 여기에 대열을 이루노니! 천지개벽의 힘을 보아라! 듀얼!",
+        "cheer": "네놈! 킹의 파트너라는 자가 꼴사납게 무릎을 꿇을 셈이냐! 분노의 업화를 태워 일어서라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "라이딩 듀얼은 고고한 서킷의 패권을 증명하는 왕자의 무대다!",
+        "city_satellite": "새틀라이트의 밑바닥에서 정점까지 기어 올라왔다. 킹의 자리는 오직 내 실력으로 쟁취한 것!",
+        "food": "1잔에 3천 엔 하는 최고급 블루아이즈 마운틴 커피! 이것만이 내 품격을 채울 수 있지.",
+        "signers": "붉은 용의 날개... 내 영혼의 고동 레드 데몬즈와 함께 세상의 악을 불태울 뿐이다!"
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_16_mail_invite",
+          "sender": "잭 아틀라스",
+          "timeSlot": "morning",
+          "spotId": "spot_satellite_hideout",
+          "subject": "[잭 아틀라스] 킹의 알현을 허락하겠다.",
+          "body": "하이웨이 서킷에 나와라. 킹의 고고하고 완벽한 영혼의 비트를 네놈의 눈에 똑똑히 새겨주마. 지각은 불경죄다!"
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_17",
+      "baseCharId": 17,
+      "displayName": "호세",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 하이웨이를 질주하는 고독한 러너다! 내 뒤에 탠덤석은 없다. 서킷에서 진검승부로 겨루자!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 호세 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 17,
+          "formName": "호세",
+          "formTitle": "호세 · 네오 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_poppo_time"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 호세! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_17.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_17.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "호세: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "호세: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "호세: 음? 선물이군. 받아두지.",
+        "hated": "호세: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "호세: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "호세: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "호세: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "호세: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "호세: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "호세: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "호세: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "호세: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "호세: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_17_mail_invite",
+          "sender": "호세",
+          "timeSlot": "morning",
+          "spotId": "spot_poppo_time",
+          "subject": "[호세] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_18",
+      "baseCharId": 18,
+      "displayName": "장",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 하이웨이를 질주하는 고독한 러너다! 내 뒤에 탠덤석은 없다. 서킷에서 진검승부로 겨루자!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 장 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 18,
+          "formName": "장",
+          "formTitle": "장 · 네오 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_satellite_hideout"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 장! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_18.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_18.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "장: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "장: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "장: 음? 선물이군. 받아두지.",
+        "hated": "장: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "장: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "장: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "장: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "장: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "장: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "장: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "장: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "장: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "장: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_18_mail_invite",
+          "sender": "장",
+          "timeSlot": "morning",
+          "spotId": "spot_satellite_hideout",
+          "subject": "[장] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_19",
+      "baseCharId": 19,
+      "displayName": "키류 쿄스케",
+      "isTagEligible": false,
+      "partnerRefusal": "사신과 손을 잡겠다고...? 크큭, 만족할 수 없을 텐데. 하모니카 소리가 들리기 전에 물러나라.",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 키류 쿄스케 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 19,
+          "formName": "키류 쿄스케",
+          "formTitle": "키류 쿄스케 · 네오 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_daedalus_bridge"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 키류 쿄스케! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "크하하하! 이걸로... 나를 만족시켜 준 건가!",
+          "loseLine": "하하하... 완벽한 패배다! 하지만 최고의 만족을 느꼈다고!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_19.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_19.png",
+          "duelStartLine": "패 0장의 경지... 만족의 듀얼을 시작해보자고!",
+          "aceCutInLine": "죽은 자의 세계에서 부활하라! 인페르니티 데스 드래곤! 인페르노 블래스트!!"
+        },
+        {
+          "formCharId": 3200,
+          "formName": "다크 시그너 키류",
+          "formTitle": "다크 시그너 키류 · 네오 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_daedalus_bridge"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 다크 시그너 키류! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "크하하하! 이걸로... 나를 만족시켜 준 건가!",
+          "loseLine": "하하하... 완벽한 패배다! 하지만 최고의 만족을 느꼈다고!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_3200.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_3200.png",
+          "duelStartLine": "패 0장의 경지... 만족의 듀얼을 시작해보자고!",
+          "aceCutInLine": "죽은 자의 세계에서 부활하라! 인페르니티 데스 드래곤! 인페르노 블래스트!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "키류 쿄스케: 크크크... 하모니카와 크래시 타운의 녹슨 리볼버 탄피인가. 심장을 만족으로 울리는 최고의 선물이군!",
+        "liked": "키류 쿄스케: 호오, 제법 만족스러운 물건이군.",
+        "neutral": "키류 쿄스케: 흠, 받아두지.",
+        "hated": "키류 쿄스케: 시시해... 전혀 만족스럽지 못한 시시한 쓰레기다."
+      },
+      "partnerQuotes": {
+        "morning": "키류 쿄스케: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "키류 쿄스케: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "키류 쿄스케: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "키류 쿄스케: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "키류 쿄스케: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "키류 쿄스케: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "키류 쿄스케: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "키류 쿄스케: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "키류 쿄스케: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_19_mail_invite",
+          "sender": "키류 쿄스케",
+          "timeSlot": "morning",
+          "spotId": "spot_poppo_time",
+          "subject": "[키류 쿄스케] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_20",
+      "baseCharId": 20,
+      "displayName": "예거",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 하이웨이를 질주하는 고독한 러너다! 내 뒤에 탠덤석은 없다. 서킷에서 진검승부로 겨루자!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 예거 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 20,
+          "formName": "예거",
+          "formTitle": "예거 · 네오 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_poppo_time"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 예거! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_20.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_20.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "예거: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "예거: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "예거: 음? 선물이군. 받아두지.",
+        "hated": "예거: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "예거: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "예거: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "예거: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "예거: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "예거: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "예거: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "예거: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "예거: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "예거: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_20_mail_invite",
+          "sender": "예거",
+          "timeSlot": "morning",
+          "spotId": "spot_satellite_hideout",
+          "subject": "[예거] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_21",
+      "baseCharId": 21,
+      "displayName": "루아",
+      "isTagEligible": false,
+      "partnerRefusal": "으에? 난 루카를 지키는 슈퍼 용자 루아라고! 루카를 두고 파트너를 바꿀 순 없어!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 루아 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 21,
+          "formName": "루아",
+          "formTitle": "루아 · 네오 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_satellite_hideout"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 루아! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_21.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_21.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "루아: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "루아: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "루아: 음? 선물이군. 받아두지.",
+        "hated": "루아: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "루아: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "루아: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "루아: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "루아: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "루아: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "루아: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "루아: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "루아: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "루아: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_21_mail_invite",
+          "sender": "루아",
+          "timeSlot": "morning",
+          "spotId": "spot_poppo_time",
+          "subject": "[루아] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_23",
+      "baseCharId": 23,
+      "displayName": "루치아노",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 하이웨이를 질주하는 고독한 러너다! 내 뒤에 탠덤석은 없다. 서킷에서 진검승부로 겨루자!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 루치아노 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 23,
+          "formName": "루치아노",
+          "formTitle": "루치아노 · 네오 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_daedalus_bridge"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 루치아노! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_23.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_23.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "루치아노: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "루치아노: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "루치아노: 음? 선물이군. 받아두지.",
+        "hated": "루치아노: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "루치아노: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "루치아노: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "루치아노: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "루치아노: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "루치아노: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "루치아노: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "루치아노: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "루치아노: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "루치아노: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_23_mail_invite",
+          "sender": "루치아노",
+          "timeSlot": "morning",
+          "spotId": "spot_poppo_time",
+          "subject": "[루치아노] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_26",
+      "baseCharId": 26,
+      "displayName": "타카스",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 하이웨이를 질주하는 고독한 러너다! 내 뒤에 탠덤석은 없다. 서킷에서 진검승부로 겨루자!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 타카스 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 26,
+          "formName": "타카스",
+          "formTitle": "타카스 · 네오 도미노 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_poppo_time"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 타카스! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_26.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_26.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "타카스: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "타카스: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "타카스: 음? 선물이군. 받아두지.",
+        "hated": "타카스: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "타카스: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "타카스: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "타카스: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "타카스: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "타카스: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "타카스: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "타카스: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "타카스: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "타카스: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_26_mail_invite",
+          "sender": "타카스",
+          "timeSlot": "morning",
+          "spotId": "spot_satellite_hideout",
+          "subject": "[타카스] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_27",
+      "baseCharId": 27,
+      "displayName": "플라시도",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 하이웨이를 질주하는 고독한 러너다! 내 뒤에 탠덤석은 없다. 서킷에서 진검승부로 겨루자!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 플라시도 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 27,
+          "formName": "플라시도",
+          "formTitle": "플라시도 · 네오 도미노 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_satellite_hideout"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 플라시도! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_27.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_27.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "플라시도: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "플라시도: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "플라시도: 음? 선물이군. 받아두지.",
+        "hated": "플라시도: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "플라시도: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "플라시도: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "플라시도: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "플라시도: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "플라시도: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "플라시도: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "플라시도: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "플라시도: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "플라시도: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_27_mail_invite",
+          "sender": "플라시도",
+          "timeSlot": "morning",
+          "spotId": "spot_poppo_time",
+          "subject": "[플라시도] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_28",
+      "baseCharId": 28,
+      "displayName": "랠리 도슨",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 하이웨이를 질주하는 고독한 러너다! 내 뒤에 탠덤석은 없다. 서킷에서 진검승부로 겨루자!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 랠리 도슨 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 28,
+          "formName": "랠리 도슨",
+          "formTitle": "랠리 도슨 · 네오 도미노 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_daedalus_bridge"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 랠리 도슨! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_28.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_28.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "랠리 도슨: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "랠리 도슨: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "랠리 도슨: 음? 선물이군. 받아두지.",
+        "hated": "랠리 도슨: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "랠리 도슨: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "랠리 도슨: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "랠리 도슨: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "랠리 도슨: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "랠리 도슨: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "랠리 도슨: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "랠리 도슨: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "랠리 도슨: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "랠리 도슨: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_28_mail_invite",
+          "sender": "랠리 도슨",
+          "timeSlot": "morning",
+          "spotId": "spot_satellite_hideout",
+          "subject": "[랠리 도슨] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_29",
+      "baseCharId": 29,
+      "displayName": "렉스 고드윈",
+      "isTagEligible": false,
+      "partnerRefusal": "명계의 왕과 붉은 용의 궁극의 힘은 오직 나 렉스 고드윈 한 명의 손에 의해 완성된다!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 렉스 고드윈 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 29,
+          "formName": "렉스 고드윈",
+          "formTitle": "렉스 고드윈 · 네오 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_poppo_time"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 렉스 고드윈! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_29.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_29.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        },
+        {
+          "formCharId": 3203,
+          "formName": "다크 시그너 렉스 고드윈",
+          "formTitle": "다크 시그너 렉스 고드윈 · 네오 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_poppo_time"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 다크 시그너 렉스 고드윈! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_3203.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_3203.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "렉스 고드윈: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "렉스 고드윈: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "렉스 고드윈: 음? 선물이군. 받아두지.",
+        "hated": "렉스 고드윈: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "렉스 고드윈: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "렉스 고드윈: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "렉스 고드윈: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "렉스 고드윈: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "렉스 고드윈: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "렉스 고드윈: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "렉스 고드윈: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "렉스 고드윈: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "렉스 고드윈: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_29_mail_invite",
+          "sender": "렉스 고드윈",
+          "timeSlot": "morning",
+          "spotId": "spot_poppo_time",
+          "subject": "[렉스 고드윈] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_30",
+      "baseCharId": 30,
+      "displayName": "루드거 고드윈",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 하이웨이를 질주하는 고독한 러너다! 내 뒤에 탠덤석은 없다. 서킷에서 진검승부로 겨루자!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 루드거 고드윈 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 30,
+          "formName": "루드거 고드윈",
+          "formTitle": "루드거 고드윈 · 네오 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_satellite_hideout"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 루드거 고드윈! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_30.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_30.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "루드거 고드윈: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "루드거 고드윈: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "루드거 고드윈: 음? 선물이군. 받아두지.",
+        "hated": "루드거 고드윈: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "루드거 고드윈: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "루드거 고드윈: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "루드거 고드윈: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "루드거 고드윈: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "루드거 고드윈: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "루드거 고드윈: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "루드거 고드윈: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "루드거 고드윈: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "루드거 고드윈: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_30_mail_invite",
+          "sender": "루드거 고드윈",
+          "timeSlot": "morning",
+          "spotId": "spot_satellite_hideout",
+          "subject": "[루드거 고드윈] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_31",
+      "baseCharId": 31,
+      "displayName": "디바인",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 하이웨이를 질주하는 고독한 러너다! 내 뒤에 탠덤석은 없다. 서킷에서 진검승부로 겨루자!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 디바인 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 31,
+          "formName": "디바인",
+          "formTitle": "디바인 · 네오 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_daedalus_bridge"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 디바인! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_31.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_31.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "디바인: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "디바인: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "디바인: 음? 선물이군. 받아두지.",
+        "hated": "디바인: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "디바인: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "디바인: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "디바인: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "디바인: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "디바인: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "디바인: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "디바인: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "디바인: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "디바인: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_31_mail_invite",
+          "sender": "디바인",
+          "timeSlot": "morning",
+          "spotId": "spot_poppo_time",
+          "subject": "[디바인] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_33",
+      "baseCharId": 33,
+      "displayName": "야나기 텐젠",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 하이웨이를 질주하는 고독한 러너다! 내 뒤에 탠덤석은 없다. 서킷에서 진검승부로 겨루자!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 야나기 텐젠 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 33,
+          "formName": "야나기 텐젠",
+          "formTitle": "야나기 텐젠 · 네오 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_poppo_time"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 야나기 텐젠! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_33.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_33.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "야나기 텐젠: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "야나기 텐젠: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "야나기 텐젠: 음? 선물이군. 받아두지.",
+        "hated": "야나기 텐젠: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "야나기 텐젠: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "야나기 텐젠: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "야나기 텐젠: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "야나기 텐젠: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "야나기 텐젠: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "야나기 텐젠: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "야나기 텐젠: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "야나기 텐젠: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "야나기 텐젠: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_33_mail_invite",
+          "sender": "야나기 텐젠",
+          "timeSlot": "morning",
+          "spotId": "spot_poppo_time",
+          "subject": "[야나기 텐젠] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_34",
+      "baseCharId": 34,
+      "displayName": "우시오 테츠",
+      "isTagEligible": false,
+      "partnerRefusal": "어이! 시큐리티의 경찰관이 일반인과 어울려 다닐 성싶으냐! 도로교통법 위반으로 체포당하기 전에 물러서라!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 우시오 테츠 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 34,
+          "formName": "우시오 테츠",
+          "formTitle": "우시오 테츠 · 네오 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_satellite_hideout"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 우시오 테츠! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_34.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_34.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "우시오 테츠: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "우시오 테츠: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "우시오 테츠: 음? 선물이군. 받아두지.",
+        "hated": "우시오 테츠: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "우시오 테츠: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "우시오 테츠: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "우시오 테츠: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "우시오 테츠: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "우시오 테츠: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "우시오 테츠: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "우시오 테츠: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "우시오 테츠: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "우시오 테츠: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_34_mail_invite",
+          "sender": "우시오 테츠",
+          "timeSlot": "morning",
+          "spotId": "spot_satellite_hideout",
+          "subject": "[우시오 테츠] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_35",
+      "baseCharId": 35,
+      "displayName": "후도 유세이",
+      "isTagEligible": false,
+      "partnerRefusal": "팀 5D's의 유대는 언제나 내 가슴속에 있어. 라이딩 듀얼의 코너에서 네 실력을 지켜보겠다.",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "싱크로 소환 시 상대 필드의 마법/함정을 견제하고 클러스터의 유대로 파트너를 수호하는 스타더스트의 가호.",
+      "favoriteGiftId": "milk_carton",
+      "forms": [
+        {
+          "formCharId": 35,
+          "formName": "후도 유세이",
+          "formTitle": "후도 유세이 · 네오 도미노 시티",
+          "activeTimes": [
+            "day"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_daedalus_bridge"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 후도 유세이! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "카드의 마음과 동료의 유대가 승리로 이끌어주었다. 좋은 듀얼이었어.",
+          "loseLine": "완패다... 네가 보여준 카드의 가능성에 진심으로 경의를 표하지.",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_35.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_35.png",
+          "duelStartLine": "밀집된 유대가 새로운 미래의 바람을 부른다. 가자, 라이딩 듀얼 악셀레이션!",
+          "aceCutInLine": "클러스터의 별들이 하나가 될 때, 새로운 유대가 미래를 비추리라! 싱크로 소환, 날아올라라 스타더스트 드래곤!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "후도 유세이: 이건... D-휠 메인 엔진의 특수 합금 부품이잖아! 정말 고마워, 유성호 정비에 큰 도움이 되겠어.",
+        "liked": "후도 유세이: 고마워. 동료들과 함께 나누도록 할게.",
+        "neutral": "후도 유세이: 선물이군. 감사히 받겠다.",
+        "hated": "후도 유세이: 미안하지만... 정밀 기계를 다루는 손이라 기름때가 묻으면 곤란한 물건은 다루기 어렵군."
+      },
+      "partnerQuotes": {
+        "morning": "좋은 아침이다. D-휠 정비는 끝났다. 오늘도 바람을 느끼며 서킷으로 나가보자.",
+        "evening": "시티의 네온사인이 하나둘 켜지는군. 오늘 나눈 듀얼, 네 유대의 온기를 똑똑히 느꼈다.",
+        "deckComment": "버려진 카드 한 장조차 의미가 깃들어 있는 법... 네 덱은 카드를 향한 깊은 신뢰가 느껴진다.",
+        "duelReady": "밀집된 유대가 새로운 미래의 바람을 부른다. 가자, 라이딩 듀얼 악셀레이션!",
+        "cheer": "포기하지 마라! 카드는 언제나 네 마음에 응답해 준다! 미래를 향해 질주해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "라이딩 듀얼은 D-휠과 카드가 하나가 되어 바람 속에서 미래를 개척하는 질주다.",
+        "city_satellite": "새틀라이트와 네오 도미노 시티... 다이달로스 브릿지가 두 세계의 유대를 이어주었지.",
+        "food": "차고에서 크로우, 잭과 함께 끓여 먹는 소박한 냄비 요리가 세상에서 가장 따뜻해.",
+        "signers": "붉은 용의 성흔... 우리 시그너들은 세상을 파멸로부터 구하기 위해 뭉친 동료들이다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_35_mail_invite",
+          "sender": "후도 유세이",
+          "timeSlot": "morning",
+          "spotId": "spot_poppo_time",
+          "subject": "[유세이] 차고에서 기다리고 있다.",
+          "body": "안녕. D-휠 엔진 점검과 새 싱크로 콤보 테스트가 끝났다. 바람을 가르며 함께 달려보고 싶군. 시간 되면 들러줘."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_36",
+      "baseCharId": 36,
+      "displayName": "Z-one",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 하이웨이를 질주하는 고독한 러너다! 내 뒤에 탠덤석은 없다. 서킷에서 진검승부로 겨루자!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 Z-one 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 36,
+          "formName": "Z-one",
+          "formTitle": "Z-one · 네오 도미노 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_poppo_time"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 Z-one! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_36.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_36.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "Z-one: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "Z-one: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "Z-one: 음? 선물이군. 받아두지.",
+        "hated": "Z-one: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "Z-one: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "Z-one: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "Z-one: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "Z-one: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "Z-one: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "Z-one: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "Z-one: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "Z-one: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "Z-one: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_36_mail_invite",
+          "sender": "Z-one",
+          "timeSlot": "morning",
+          "spotId": "spot_satellite_hideout",
+          "subject": "[Z-one] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_138",
+      "baseCharId": 138,
+      "displayName": "배가본드",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 하이웨이를 질주하는 고독한 러너다! 내 뒤에 탠덤석은 없다. 서킷에서 진검승부로 겨루자!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 배가본드 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 138,
+          "formName": "배가본드",
+          "formTitle": "배가본드 · 네오 도미노 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_satellite_hideout"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 배가본드! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_138.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_138.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "배가본드: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "배가본드: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "배가본드: 음? 선물이군. 받아두지.",
+        "hated": "배가본드: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "배가본드: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "배가본드: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "배가본드: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "배가본드: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "배가본드: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "배가본드: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "배가본드: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "배가본드: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "배가본드: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_138_mail_invite",
+          "sender": "배가본드",
+          "timeSlot": "morning",
+          "spotId": "spot_satellite_hideout",
+          "subject": "[배가본드] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_208",
+      "baseCharId": 208,
+      "displayName": "사기리 미카게",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 하이웨이를 질주하는 고독한 러너다! 내 뒤에 탠덤석은 없다. 서킷에서 진검승부로 겨루자!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 사기리 미카게 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 208,
+          "formName": "사기리 미카게",
+          "formTitle": "사기리 미카게 · 네오 도미노 시티",
+          "activeTimes": [
+            "evening"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_daedalus_bridge"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 사기리 미카게! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_208.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_208.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "사기리 미카게: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "사기리 미카게: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "사기리 미카게: 음? 선물이군. 받아두지.",
+        "hated": "사기리 미카게: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "사기리 미카게: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "사기리 미카게: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "사기리 미카게: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "사기리 미카게: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "사기리 미카게: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "사기리 미카게: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "사기리 미카게: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "사기리 미카게: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "사기리 미카게: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_208_mail_invite",
+          "sender": "사기리 미카게",
+          "timeSlot": "morning",
+          "spotId": "spot_satellite_hideout",
+          "subject": "[사기리 미카게] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_210",
+      "baseCharId": 210,
+      "displayName": "히무로 진",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 하이웨이를 질주하는 고독한 러너다! 내 뒤에 탠덤석은 없다. 서킷에서 진검승부로 겨루자!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 히무로 진 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 210,
+          "formName": "히무로 진",
+          "formTitle": "히무로 진 · 네오 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_poppo_time"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 히무로 진! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_210.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_210.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "히무로 진: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "히무로 진: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "히무로 진: 음? 선물이군. 받아두지.",
+        "hated": "히무로 진: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "히무로 진: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "히무로 진: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "히무로 진: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "히무로 진: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "히무로 진: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "히무로 진: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "히무로 진: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "히무로 진: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "히무로 진: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_210_mail_invite",
+          "sender": "히무로 진",
+          "timeSlot": "morning",
+          "spotId": "spot_satellite_hideout",
+          "subject": "[히무로 진] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_216",
+      "baseCharId": 216,
+      "displayName": "패러독스",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 하이웨이를 질주하는 고독한 러너다! 내 뒤에 탠덤석은 없다. 서킷에서 진검승부로 겨루자!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 패러독스 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 216,
+          "formName": "패러독스",
+          "formTitle": "패러독스 · 네오 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_satellite_hideout"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 패러독스! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_216.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_216.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "패러독스: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "패러독스: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "패러독스: 음? 선물이군. 받아두지.",
+        "hated": "패러독스: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "패러독스: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "패러독스: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "패러독스: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "패러독스: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "패러독스: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "패러독스: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "패러독스: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "패러독스: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "패러독스: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_216_mail_invite",
+          "sender": "패러독스",
+          "timeSlot": "morning",
+          "spotId": "spot_satellite_hideout",
+          "subject": "[패러독스] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    },
+    {
+      "personaId": "5ds_char_3202",
+      "baseCharId": 3202,
+      "displayName": "세크트 이쥬인",
+      "isTagEligible": false,
+      "partnerRefusal": "미안하지만 난 혼자서 하이웨이를 질주하는 고독한 러너다! 내 뒤에 탠덤석은 없다. 서킷에서 진검승부로 겨루자!",
+      "dormOrFaction": "네오 도미노 시티 라이더",
+      "partnerRole": "TurboRival",
+      "partnerSkillName": "라이벌의 가속",
+      "partnerSkillDesc": "네오 도미노 시티의 고속 서킷에서 연마한 스피드와 싱크로 전술로 파트너를 지원하는 세크트 이쥬인 전용 스탯.",
+      "favoriteGiftId": "dwheel_spark_plug",
+      "forms": [
+        {
+          "formCharId": 3202,
+          "formName": "세크트 이쥬인",
+          "formTitle": "세크트 이쥬인 · 네오 도미노 시티",
+          "activeTimes": [
+            "morning"
+          ],
+          "minHeart": 0,
+          "spots": [
+            "spot_daedalus_bridge"
+          ],
+          "greetingLines": {
+            "low": "여어! 난 세크트 이쥬인! 네오 도미노 시티의 하이웨이를 달리는 중이다! 덤벼라!",
+            "mid": "오, 네 D-휠 감각 제법이군! 하지만 내 엔진 출력을 따라올 수 있을까?",
+            "high": "너와의 승부는 언제나 심장을 폭발시킬 것 같군! 전속력으로 승부다!"
+          },
+          "duelStart": "엔진 출력 전개! 내 덱의 진정한 스피드를 보여주마! 듀얼!",
+          "aceCutIn": "회로를 열어라! 나의 비장의 싱크로 몬스터 소환!",
+          "winLine": "좋았어! 완벽한 서킷 주행과 승리다!",
+          "loseLine": "크윽... 완패다! 하지만 다음 코너에선 내가 앞서겠다!",
+          "sdSpritePath": "TagForce/5DS/Characters_SD/sd_3202.png",
+          "standingSpritePath": "TagForce/5DS/Characters_Standing/full_3202.png",
+          "duelStartLine": "내 덱의 진정한 힘을 보여주마! 듀얼 개시다!",
+          "aceCutInLine": "나의 에이스 몬스터여, 필드를 지배하라! 전력 공격이다!!"
+        }
+      ],
+      "giftReactions": {
+        "loved": "세크트 이쥬인: 와, 이걸 날 위해 준비해 준 거야?! 정말 고맙다, 소중히 간직하지!",
+        "liked": "세크트 이쥬인: 호오, 꽤 센스 있는 선물이군. 고맙게 받으마.",
+        "neutral": "세크트 이쥬인: 음? 선물이군. 받아두지.",
+        "hated": "세크트 이쥬인: 으음... 이건 내 취향이랑은 전혀 맞지 않는군."
+      },
+      "partnerQuotes": {
+        "morning": "세크트 이쥬인: 흥, 아침부터 연습인가? 내 스피드를 따라올 수 있다면 덤벼라.",
+        "evening": "세크트 이쥬인: 서킷에 어둠이 깔렸군. 나약한 자는 코너를 돌지 못하고 탈락할 뿐이다.",
+        "deckComment": "세크트 이쥬인: 꽤 정밀하게 세팅된 덱이군. 하지만 내 마력과 파워가 한 수 위다.",
+        "duelReady": "세크트 이쥬인: 라이딩 듀얼 악셀레이션! 전력으로 짓밟아주마!",
+        "cheer": "세크트 이쥬인: 거기서 멈추지 마라! 내 라이벌이라면 끝까지 가속해라!"
+      },
+      "bondEvents": [],
+      "favoriteTopic": "riding_duel",
+      "topicReplies": {
+        "riding_duel": "세크트 이쥬인: 라이딩 듀얼은 스피드와 영혼이 하나가 되는 순간이지.",
+        "city_satellite": "세크트 이쥬인: 시티와 새틀라이트의 벽을 허무는 것은 오직 진정한 유대뿐이다.",
+        "food": "세크트 이쥬인: 정비 후 마시는 우유나 커피 한 잔이 제일이지!",
+        "signers": "세크트 이쥬인: 붉은 용의 전설... 그 거대한 운명 속에서도 우린 우리의 미래를 개척한다."
+      },
+      "pdaMails": [
+        {
+          "mailId": "5ds_char_3202_mail_invite",
+          "sender": "세크트 이쥬인",
+          "timeSlot": "morning",
+          "spotId": "spot_satellite_hideout",
+          "subject": "[세크트 이쥬인] 호출이다. 나와라.",
+          "body": "어이, 네놈의 덱 상태를 점검할 필요가 있다. 꽁무니 빼지 말고 지정된 장소로 나와라."
+        }
+      ],
+      "grandPrixEnding": null
+    }
+  ],
+  "drawBreadCatalog": [
+    {
+      "breadId": "bread_poppo_sandwich",
+      "name": "🥪 포포 타임 특제 스크램블 에그 샌드",
+      "priceDp": 100,
+      "flavor": "delicious",
+      "desc": "크로우가 동생들을 위해 정성껏 만들어주던 영양 가득 달콤한 달걀 샌드위치."
+    },
+    {
+      "breadId": "bread_king_roast",
+      "name": "🥩 전설의 킹 로스트비프 버거",
+      "priceDp": 200,
+      "flavor": "luxury",
+      "desc": "잭 아틀라스의 취향을 완벽히 저격한 초호화 비프 패티 샌드위치."
+    },
+    {
+      "breadId": "bread_junk_curry",
+      "name": "🍛 정크 스파이시 핫도그",
+      "priceDp": 120,
+      "flavor": "spicy",
+      "desc": "새틀라이트 라이더들이 야간 주행 전에 먹고 힘을 내는 매콤한 소시지 빵."
+    },
+    {
+      "breadId": "bread_legendary_golden_egg",
+      "name": "🥚 전설의 황금 계란빵 (특등)",
+      "priceDp": 300,
+      "flavor": "legendary",
+      "desc": "어떤 라이더라도 단숨에 호감도를 최대치로 올려주는 기적의 황금 샌드위치."
+    }
+  ],
+  "conversationTopics": [
+    {
+      "topicId": "riding_duel",
+      "name": "🏍️ 라이딩 듀얼 & D-휠 커스텀",
+      "desc": "스피드 스펠, 코너링, 엔진 튜닝과 싱크로 소환에 대해 대화를 나눕니다."
+    },
+    {
+      "topicId": "city_satellite",
+      "name": "🌆 네오 도미노 시티 & 새틀라이트",
+      "desc": "시티와 새틀라이트의 역사, 다이달로스 브릿지와 미래에 대해 이야기합니다."
+    },
+    {
+      "topicId": "food",
+      "name": "☕ 커피 & 정비소 간식",
+      "desc": "블루 아이즈 마운틴 커피와 우유, 정비 후 먹는 야식에 대해 이야기를 나눕니다."
+    },
+    {
+      "topicId": "signers",
+      "name": "🐉 붉은 용의 전설 & 일리아스텔",
+      "desc": "시그너의 사명, 다크 시그너의 어둠과 시공을 넘는 결투에 대해 깊은 이야기를 나눕니다."
+    }
+  ],
+  "myRoomConfig": {
+    "roomName": "포포 타임 게스트 하우스 2층 (My Room)",
+    "roomDesc": "하루를 시작하고 마무리하는 네오 도미노 시티의 아늑한 정비소 숙소. 휴식을 취하거나 PDA 단말기를 통해 인연 명부와 메일을 확인할 수 있다.",
+    "features": [
+      "🛏️ 침대에서 휴식 (다음 시간대 진행 및 바닥 아이템 리셋)",
+      "📱 라이더 PDA 단말기 (동료들의 결투 초대 메일 확인)",
+      "📖 라이더 명부 (네오 도미노 시티 전원의 출몰 정보 & 여성 파트너 호감도)",
+      "🃏 내 덱 & D-휠 튜닝 파트너 스킬 확인"
+    ]
+  },
+  "assetConfig": {
+    "baseResourceDir": "TagForce/5DS",
+    "baseStreamingDir": "TagForce/5DS",
+    "worldMapPath": "TagForce/5DS/Maps/worldmap_5ds.png",
+    "myRoomPath": "TagForce/5DS/Maps/myroom_poppo.png",
+    "breadShopPath": "TagForce/5DS/Maps/shop_poppo_bakery.png"
+  }
+}
