@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using YGOPortable.Core;
 using YGOPortable.UI;
@@ -20,6 +21,8 @@ namespace YGOPortable.Editor
             int exit = 1;
             var scratch = Path.Combine(Path.GetTempPath(), "ygo-tag-force-" + Guid.NewGuid().ToString("N"));
             var canvas = new GameObject("Tag Force world verification", typeof(Canvas));
+            canvas.GetComponent<Canvas>().renderMode = RenderMode.WorldSpace;
+            ((RectTransform)canvas.transform).sizeDelta = new Vector2(1600f, 900f);
             var app = canvas.AddComponent<GameAppController>();
             TagForceWorldUI world = null;
             float music = DuelAudio.BgmVolume;
@@ -48,7 +51,7 @@ namespace YGOPortable.Editor
                 VerifySavedWorlds(world, panel, scratch, bgm);
                 VerifyRelationships(world, panel, streaming, scratch);
                 VerifyDuelReturn(app, world, menu, canvas.transform, streaming);
-                Debug.Log("[VERIFY TAG FORCE] Scripted worlds, form schedules, four hearts, partner responses, gifts, saved progress, walking, BGM and a native duel round trip passed.");
+                Debug.Log("[VERIFY TAG FORCE] Four worlds with three staffed hubs and three daily shifts, SD walking at 8 Hz, portrait transitions, four hearts, partners, gifts, saved progress, BGM and two native duel round trips passed.");
                 exit = 0;
             }
             catch (Exception error)
@@ -69,7 +72,25 @@ namespace YGOPortable.Editor
         {
             CheckImage(TagForceData.PlayerSd, 512, 512, true);
             CheckImage(TagForceData.PlayerStanding, 900, 1400, true);
-            CheckImage("TagForce/GX/Maps/spot_red_dorm.png", 1920, 1080, false);
+            foreach (var series in TagForceData.Series.Take(4))
+            {
+                var data = TagForceData.Load(streaming, series);
+                foreach (var hub in data.Hubs)
+                    Require(File.Exists(Path.Combine(streaming, hub.mapPath)), $"Missing hub artwork: {hub.mapPath}");
+                foreach (var form in data.personas.SelectMany(persona => persona.forms))
+                {
+                    Require(File.Exists(Path.Combine(streaming, form.sdSpritePath)) &&
+                        File.Exists(Path.Combine(streaming, form.standingSpritePath)), $"Missing SD or standing art for {form.formName}.");
+                }
+            }
+            foreach (string hub in new[] { "GX/Maps/spot_red_dorm.png", "5DS/Maps/spot_daedalus_bridge.png",
+                "ZEXAL/Maps/spot_yuma_house.png", "ZEXAL/Maps/spot_waterfront_pier.png" })
+                CheckImage("TagForce/" + hub, 1920, 1080, false);
+            foreach (int character in new[] { 9, 208 })
+            {
+                CheckImage($"TagForce/5DS/Characters_SD/sd_{character}.png", 512, 512, true);
+                CheckImage($"TagForce/5DS/Characters_Standing/full_{character}.png", 900, 1400, true);
+            }
             void CheckImage(string path, int width, int height, bool transparent)
             {
                 var texture = new Texture2D(2, 2);
@@ -105,14 +126,24 @@ namespace YGOPortable.Editor
         {
             int[] expected = { 42, 36, 39, 30, 41, 27 };
             string[] firstBread = { "bread_domino_croquette", "bread_golden_egg", "bread_poppo_sandwich", "bread_heartland_burger" };
+            string[][] hubIds =
+            {
+                new[] { "spot_domino_plaza", "spot_kame_game", "spot_kaiba_corp" },
+                new[] { "spot_red_dorm", "spot_main_academy", "spot_blue_arena" },
+                new[] { "spot_satellite_hideout", "spot_daedalus_bridge", "spot_poppo_time" },
+                new[] { "spot_heartland_city", "spot_yuma_house", "spot_waterfront_pier" },
+            };
+            Require(TagForceData.TimeKeys.SequenceEqual(new[] { "morning", "day", "evening" }), "Unexpected time slots.");
             for (int i = 0; i < expected.Length; i++)
             {
                 var series = TagForceData.Series[i];
                 var data = TagForceData.Load(streaming, series);
                 Require(data?.seriesId == series.Id && data.personas.Length == expected[i],
                     $"Bad roster for {series.Id}: expected {expected[i]}, loaded {data?.seriesId} with {data?.personas.Length}.");
-                if (i < firstBread.Length)
+                bool scripted = i < firstBread.Length;
+                if (scripted)
                 {
+                    Require(data.Hubs.Select(hub => hub.spotId).SequenceEqual(hubIds[i]), $"Wrong hubs for {series.Id}.");
                     var bread = data.drawBreadCatalog?.breads.FirstOrDefault();
                     Require(bread?.Id == firstBread[i] && bread.baseAffinity > 0 && data.drawBreadCatalog.drawPriceDp > 0 &&
                         data.personas.All(persona => data.conversationTopics.All(topic =>
@@ -124,32 +155,57 @@ namespace YGOPortable.Editor
                 world.Open();
                 Require(TagForceData.Series.All(entry => panel.Find(entry.AssetFolder) != null), "Incomplete series hub.");
                 Press(panel, series.AssetFolder);
-                CheckField(data.spots[0]);
+                CheckField(data.Hubs[0]);
                 var seen = new HashSet<string>();
                 for (int time = 0; time < TagForceData.TimeKeys.Length; time++)
                 {
                     var save = CollectionProgress.GetTagForceProgress(series.Id).Copy();
                     save.time = time;
                     Require(CollectionProgress.TrySaveTagForce(series.Id, save, 0, out var error), error);
-                    foreach (var spot in data.spots)
+                    foreach (var spot in data.Hubs)
                     {
                         Press(world.Root.transform, "WorldNavigation/월드맵");
+                        Require(panel.GetComponentsInChildren<Button>().Count(button => button.name == "Visit") == data.Hubs.Length,
+                            $"Unexpected selectable maps for {series.Id}.");
                         Press(panel, spot.spotId + "/Visit");
                         CheckField(spot);
-                        foreach (var (persona, form) in data.Visitors(save, spot.spotId))
+                        var visitors = data.Visitors(save, spot.spotId).ToArray();
+                        int screens = panel.GetComponentsInChildren<Button>().Count(button => button.name == "Face");
+                        Require(screens == visitors.Length && screens <= 5 && (!scripted || screens >= 3),
+                            $"{series.Id}/{spot.spotId} in shift {time} spawned {screens} visitors.");
+                        if (scripted)
+                        {
+                            var scheduled = data.personas.Where(persona => persona.ActiveForm(save)?.spots.Contains(spot.spotId) == true);
+                            Require(visitors.Select(visitor => visitor.Persona).SequenceEqual(scheduled),
+                                $"Rendered roster differs from the script for {series.Id}/{spot.spotId}, shift {time}.");
+                        }
+                        foreach (var (persona, form) in visitors)
                         {
                             var figure = panel.Find(persona.personaId);
-                            Require(figure?.Find("Talk") != null && form.Decks.Count > 0,
-                                $"Missing spawn or duel deck for {persona.personaId} in {spot.spotId}.");
-                            var face = figure.Find("Face");
-                            Require(face.GetComponent<Image>()?.sprite != null ||
-                                face.Find("Label")?.GetComponent<Text>().text == form.formName,
-                                $"Missing art and the name fallback for {form.formName}.");
+                            var face = figure?.Find("Face");
+                            Require(face?.GetComponent<Button>() != null && form.Decks.Count > 0,
+                                $"Missing selectable spawn or duel deck for {persona.personaId} in {spot.spotId}.");
+                            Require(scripted ? face.GetComponent<Image>().sprite != DuelUiKit.WhiteSprite :
+                                face.GetComponent<Image>().sprite != DuelUiKit.WhiteSprite || face.Find("Label")?.GetComponent<Text>().text == form.formName,
+                                $"Missing SD art for {form.formName}.");
                             seen.Add(persona.personaId);
+                        }
+                        if (scripted)
+                        {
+                            var accompanied = save.Copy();
+                            foreach (var partner in data.personas.Where(persona => persona.CanPartner))
+                            {
+                                accompanied.partnerId = partner.personaId;
+                                var withPartner = data.Visitors(accompanied, spot.spotId).ToArray();
+                                Require(withPartner.Length is >= 2 and <= 4 &&
+                                    withPartner.All(visitor => visitor.Persona != partner),
+                                    $"Partner caused duplicate or out-of-range map population in {spot.spotId}.");
+                            }
                         }
                     }
                 }
-                Require(seen.Count == expected[i], $"Expected {expected[i]} visitors in {series.Id}, spawned {seen.Count}.");
+                if (scripted)
+                    Require(seen.Count == expected[i], $"Expected {expected[i]} visitors in {series.Id}, spawned {seen.Count}.");
                 Press(world.Root.transform, "WorldNavigation/시리즈 선택");
                 Require(panel.Find(series.AssetFolder) != null, "The travel button did not return to the hub.");
 
@@ -179,12 +235,17 @@ namespace YGOPortable.Editor
             var partner = (RectTransform)panel.Find("Partner");
             var playerSprite = player.Find("Sprite");
             var partnerSprite = partner.Find("Sprite");
-            float peak = Mathf.PI / 32f;
+            float quarterStep = 1f / (4f * 8f);
+            float peak = quarterStep;
             Call(world, "MoveTo", new Vector2(.1f, .16f), null);
             Call(world, "AdvanceWalk", .5f, peak);
             Require(playerSprite.localScale.x == -1 && partnerSprite.localScale.x == -1 &&
                 Mathf.Abs(player.anchoredPosition.y - 6f) < .01f && partner.anchoredPosition.y != 0,
                 "Leftward movement did not face left and bob.");
+            Call(world, "AdvanceWalk", .1f, quarterStep * 3f);
+            Require(Mathf.Abs(player.anchoredPosition.y + 6f) < .01f, "Walking bob half-cycle did not match 8 Hz.");
+            Call(world, "AdvanceWalk", .1f, quarterStep * 5f);
+            Require(Mathf.Abs(player.anchoredPosition.y - 6f) < .01f, "Walking bob full cycle did not match 8 Hz.");
             Call(world, "AdvanceWalk", 2f, peak);
             Require(player.anchoredPosition == Vector2.zero && partner.anchoredPosition == Vector2.zero,
                 "Idle actors retained a bob offset.");
@@ -205,18 +266,51 @@ namespace YGOPortable.Editor
 
             var data = TagForceData.Load(Application.streamingAssetsPath, TagForceData.Series[1]);
             var npc = data.Visitors(state, state.spotId).First();
-            Press(panel, npc.Persona.personaId + "/Talk");
+            Require(panel.Find("gx_asuka") == null && panel.Find("Partner") != null, "The partner was spawned twice.");
+            var visitor = (RectTransform)panel.Find(npc.Persona.personaId);
+            var anchor = visitor.anchorMin;
+            Call(world, "AdvanceVisitors", quarterStep);
+            Require(visitor.anchorMin != anchor && visitor.anchoredPosition.y != 0, "SD visitor did not walk and bob.");
+            var sdSprite = visitor.Find("Face");
+            Require(sdSprite.GetComponent<Image>().raycastTarget, "The SD portrait could not receive a pointer click.");
+            var click = new PointerEventData(null) { button = PointerEventData.InputButton.Left };
+            Require(ExecuteEvents.Execute(sdSprite.gameObject, click, ExecuteEvents.pointerClickHandler),
+                "No pointer-click handler was attached to the SD portrait.");
             Call(world, "AdvanceWalk", 4f, peak);
-            var portrait = panel.Find("Protagonist").GetComponent<Image>().sprite;
-            Require(portrait.texture.width == 900 && portrait.texture.height == 1400,
-                "The dialogue did not use the shared heroine portrait.");
-            var line = panel.Find("Dialogue/DialogueText/Label").GetComponent<Text>();
+            var left = (RectTransform)panel.Find("Conversation/Protagonist");
+            var right = (RectTransform)panel.Find("Conversation/Guest");
+            var portrait = left.GetComponent<Image>().sprite;
+            var guest = right.GetComponent<Image>().sprite;
+            var bottom = (RectTransform)panel.Find("Conversation/Dialogue");
+            var card = bottom.GetComponent<CanvasGroup>();
+            Require(portrait.texture.width == 900 && portrait.texture.height == 1400 &&
+                guest != DuelUiKit.WhiteSprite && guest.texture.height > guest.texture.width,
+                "The conversation did not use both high-resolution standing portraits.");
+            Require(bottom.anchorMax.y < .5f && left.anchoredPosition.x < 0 && right.anchoredPosition.x > 0 && card.alpha == 0f &&
+                !world.CanWalk && !panel.Find(npc.Persona.personaId + "/Face").GetComponent<Button>().IsInteractable(),
+                "Conversation did not begin with both standing portraits offscreen and field input suppressed.");
+            var line = bottom.Find("DialogueText/Label").GetComponent<Text>();
             Require(line.supportRichText && line.text.StartsWith("<color="), "The first dialogue frame should hide unrevealed letters.");
-            world.Update(.2f);
-            Require(!line.text.StartsWith("<color="), "Dialogue text did not advance.");
+            var slideStart = right.anchoredPosition.x;
+            world.Update(.12f);
+            Require(right.anchoredPosition.x > 0 && right.anchoredPosition.x < slideStart && !card.interactable,
+                "Standing portraits did not visibly slide toward the scene during the transition.");
+            world.Update(.24f);
+            Require(left.anchoredPosition == Vector2.zero && right.anchoredPosition == Vector2.zero &&
+                card.alpha == 1f && card.interactable && !line.text.StartsWith("<color="),
+                "Standing portraits and the interactive dialogue card did not finish opening.");
             world.Update(15f);
             Require(line.text == npc.Form.Greet(state.Relationship(npc.Persona.personaId).Hearts),
                 "The full dialogue line did not become readable.");
+            var visitPosition = panel.Find("Player").GetComponent<RectTransform>().anchorMin;
+            world.Back();
+            world.Update(.11f);
+            Require(right.anchoredPosition.x > 0 && !card.interactable, "Closing did not slide the portrait out.");
+            world.Update(.12f);
+            Require(panel.Find("Conversation") == null && world.CanWalk &&
+                panel.Find("Player").GetComponent<RectTransform>().anchorMin == visitPosition &&
+                panel.Find(npc.Persona.personaId + "/Face").GetComponent<Button>().IsInteractable(),
+                "Closing dialogue did not restore the same SD exploration position and controls.");
         }
 
         private static void VerifySavedWorlds(TagForceWorldUI world, Transform panel, string scratch, AudioSource bgm)
@@ -242,9 +336,9 @@ namespace YGOPortable.Editor
                 "A DP pickup did not pay out exactly once.");
             Press(world.Root.transform, "WorldNavigation/내 방");
             var night = bgm.clip;
-            Require(night.name == "tag_force_night", "The saved night state did not switch music.");
+            Require(night.name == "tag_force_night", "The saved evening state did not switch music.");
             Press(panel, "Rest");
-            Require(bgm.clip.name == "tag_force_day" && bgm.clip != night, "Resting through midnight did not switch music.");
+            Require(bgm.clip.name == "tag_force_day" && bgm.clip != night, "Resting after evening did not start the next morning.");
             CollectionProgress.Load(scratch);
             var dm = CollectionProgress.GetTagForceProgress("dm");
             var gx = CollectionProgress.GetTagForceProgress("gx");
@@ -260,11 +354,13 @@ namespace YGOPortable.Editor
 
         private static void VerifyRelationships(TagForceWorldUI world, Transform panel, string streaming, string scratch)
         {
-            var legacy = JsonUtility.FromJson<TagForceSave>("{\"relations\":[{\"personaId\":\"old\",\"affinity\":500}]}");
+            var legacy = JsonUtility.FromJson<TagForceSave>("{\"time\":3,\"relations\":[{\"personaId\":\"old\",\"affinity\":500}]}");
             legacy.Normalize();
             legacy.Normalize();
-            Require(legacy.Relationship("old").affinity == 4000 && legacy.Relationship("old").Hearts == 4,
-                "Legacy affinity did not migrate exactly once to four hearts.");
+            Require(legacy.Relationship("old").affinity == 4000 && legacy.Relationship("old").Hearts == 4 && legacy.time == 2,
+                "Legacy affinity and night-shift progress did not migrate correctly.");
+            legacy.Advance();
+            Require(legacy.time == 0 && legacy.day == 2, "The three shifts did not roll over to morning.");
 
             var data = TagForceData.Load(streaming, TagForceData.Series[1]);
             var manager = new TagForceManager(data);
@@ -315,10 +411,41 @@ namespace YGOPortable.Editor
             world.Open();
             Press(panel, "GX");
             Call(world, "Talk", heroine);
-            Require(panel.Find("Dialogue/Hearts/Label").GetComponent<Text>().text.StartsWith("♥♥♥♥"), "The fourth heart did not render.");
+            Require(panel.Find("Conversation/Dialogue/Hearts/Label").GetComponent<Text>().text.StartsWith("♥♥♥♥"), "The fourth heart did not render.");
             foreach (string label in new[] { "이야기하기", "샌드위치·선물 주기", "듀얼 신청", "파트너 해제", "대화 기록" })
                 Require(panel.GetComponentsInChildren<Button>().Any(button => button.GetComponentInChildren<Text>()?.text == label),
                     $"Missing conversation action: {label}");
+
+            var stagedGift = manager.Progress.Copy();
+            stagedGift.ChangeItem(bread.Id, 1);
+            Require(manager.TrySave(stagedGift, 0, out error), error);
+            world.Update(.35f);
+            PressLabel("이야기하기");
+            PressLabel(topic.name);
+            world.Update(10f);
+            var reply = panel.Find("Conversation/Dialogue/DialogueText/Label").GetComponent<Text>();
+            Require(reply.text.EndsWith(heroine.topicReplies.Reply(topic.topicId)), "The talk action did not display the selected topic reply.");
+            PressLabel("샌드위치·선물 주기");
+            PressLabel(bread.name + " · ", prefix: true);
+            world.Update(10f);
+            reply = panel.Find("Conversation/Dialogue/DialogueText/Label").GetComponent<Text>();
+            Require(manager.Progress.Count(bread.Id) == 0 && reply.text == heroine.giftReactions.Reply(bread.IsFavorite(heroine), bread),
+                "The gift action did not consume the inventory item and show its response.");
+            PressLabel("파트너 해제");
+            Require(manager.Progress.partnerId == null, "The partner action did not end the partnership.");
+            PressLabel("파트너 신청");
+            Require(manager.Progress.partnerId == heroine.personaId, "The partner action did not restore the partnership.");
+
+            void PressLabel(string label, bool prefix = false)
+            {
+                var button = panel.GetComponentsInChildren<Button>().FirstOrDefault(entry =>
+                {
+                    string value = entry.GetComponentInChildren<Text>()?.text;
+                    return entry.IsInteractable() && (prefix ? value?.StartsWith(label, StringComparison.Ordinal) == true : value == label);
+                });
+                Require(button != null, $"Missing active action: {label}");
+                button.onClick.Invoke();
+            }
         }
 
         private static void VerifyDuelReturn(GameAppController app, TagForceWorldUI world, TitleAndMenuUI menu,
@@ -371,7 +498,10 @@ namespace YGOPortable.Editor
                 void StartFromDialogue()
                 {
                     Call(world, "Talk", rival);
-                    panel.GetComponentsInChildren<Button>().Single(button => button.GetComponentInChildren<Text>()?.text == "듀얼 신청").onClick.Invoke();
+                    world.Update(.35f);
+                    var request = panel.GetComponentsInChildren<Button>().Single(button => button.GetComponentInChildren<Text>()?.text == "듀얼 신청");
+                    Require(request.IsInteractable(), "The duel action was blocked after dialogue opened.");
+                    request.onClick.Invoke();
                     Press(panel, "Start");
                 }
             }

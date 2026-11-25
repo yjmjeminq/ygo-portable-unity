@@ -18,8 +18,14 @@ namespace YGOPortable.UI
         private readonly TagForceWorldImages _images = new();
         private readonly RectTransform _screen, _body, _navigation;
         private readonly Text _header, _status;
-        private readonly List<(Vector2 Point, Action Action)> _interactions = new();
-        private readonly List<RectTransform> _visitors = new();
+        private const float WalkFrequency = 8f * 2f * Mathf.PI;
+        private static readonly Vector2[] VisitorSlots =
+        {
+            new(.19f, .59f), new(.50f, .65f), new(.80f, .57f), new(.34f, .42f), new(.67f, .40f),
+        };
+
+        private readonly List<(RectTransform Actor, Action Action)> _interactions = new();
+        private readonly List<(RectTransform Actor, RectTransform Art, Vector2 Center)> _visitors = new();
         private readonly List<string> _dialogueLog = new();
         private TagForceData _data;
         private TagForceManager _manager;
@@ -33,6 +39,11 @@ namespace YGOPortable.UI
         private RectTransform _player, _partner, _playerSprite, _partnerSprite;
         private Text _fieldControls;
         private Action _onArrival;
+        private Image _conversationShade;
+        private RectTransform _leftStanding, _rightStanding;
+        private CanvasGroup _dialoguePanel;
+        private float _conversationProgress;
+        private bool _closingConversation;
         private Text _dialogue;
         private string _dialogueLine;
         private int[] _dialogueLetters;
@@ -91,8 +102,13 @@ namespace YGOPortable.UI
                 return;
             }
             if (_page == Page.Map) { ShowSeriesSelect(); return; }
-            Show(_page is Page.Topics or Page.DialogueLog or Page.Gift or Page.Bond or Page.Duel ? Page.Talk :
-                _page == Page.Talk ? Page.Field : Page.Map);
+            if (_page == Page.Talk && _dialoguePanel != null)
+            {
+                _closingConversation = true;
+                _dialoguePanel.interactable = false;
+                return;
+            }
+            Show(_page is Page.Topics or Page.DialogueLog or Page.Gift or Page.Bond or Page.Duel ? Page.Talk : Page.Map);
         }
 
         internal void ShowStatus(string message) => _status.text = message;
@@ -137,10 +153,11 @@ namespace YGOPortable.UI
 
         private void Show(Page page)
         {
+            bool openConversation = page == Page.Talk && _page == Page.Field;
             _page = page;
             ClearBody();
             _images.BeginPage();
-            _navigation.gameObject.SetActive(page != Page.SeriesSelect);
+            _navigation.gameObject.SetActive(page is not (Page.SeriesSelect or Page.Talk));
             if (page == Page.SeriesSelect)
             {
                 _header.text = "태그 포스 월드";
@@ -163,7 +180,7 @@ namespace YGOPortable.UI
                 case Page.Room: BuildRoom(); break;
                 case Page.Mail: BuildMail(); break;
                 case Page.Ledger: BuildLedger(); break;
-                case Page.Talk: BuildTalk(); break;
+                case Page.Talk: BuildTalk(openConversation); break;
                 case Page.Topics: BuildTopics(); break;
                 case Page.DialogueLog: BuildDialogueLog(); break;
                 case Page.Gift: BuildGifts(); break;
@@ -180,6 +197,10 @@ namespace YGOPortable.UI
             _visitors.Clear();
             _player = _partner = _playerSprite = _partnerSprite = null;
             _fieldControls = null;
+            _conversationShade = null;
+            _leftStanding = _rightStanding = null;
+            _dialoguePanel = null;
+            _closingConversation = false;
             _dialogue = null;
             _dialogueLine = null;
             _dialogueLetters = null;
@@ -207,6 +228,7 @@ namespace YGOPortable.UI
 
         private void GoTo(string spot, string invite = null, string mailId = null)
         {
+            if (_data.Hub(spot) == null) return;
             var next = State.Copy();
             next.spotId = spot;
             if (invite != null)
@@ -238,27 +260,29 @@ namespace YGOPortable.UI
         private void BuildMap()
         {
             Backdrop(_data.assetConfig.worldMapPath, new Color(.14f, .31f, .37f));
-            var spots = _data.spots;
+            var spots = _data.Hubs;
             for (int i = 0; i < spots.Length; i++)
             {
                 var spot = spots[i];
                 float x = .035f + i % 3 * .319f;
-                float y = i < 3 ? .535f : .065f;
+                float y = spots.Length <= 3 ? .26f : i < 3 ? .535f : .065f;
                 var tile = Area(_body, spot.spotId, x, y, x + .294f, y + .405f);
                 Tint(tile, new Color(.031f, .124f, .169f, .97f));
                 Label(Area(tile, "Spot", .04f, .78f, .96f, .97f), spot.name, 18, TextAnchor.MiddleLeft);
-                var present = _data.Visitors(State, spot.spotId).Take(4).ToArray();
-                float col = .042f;
+                var state = State;
+                var present = _data.Visitors(state, spot.spotId);
+                float col = .035f;
                 foreach (var (persona, form) in present)
                 {
-                    var chip = Area(tile, persona.personaId, col, .29f, col + .215f, .76f);
+                    var chip = Area(tile, persona.personaId, col, .29f, col + .176f, .76f);
                     Portrait(chip, form.sdSpritePath, form.formName);
-                    string notices = persona.NextBond(State.Relationship(persona.personaId)) != null ? " !" : "";
-                    if (_data.Mail(State).Any(entry => entry.Persona == persona && entry.Mail.spotId == spot.spotId))
+                    string notices = persona.NextBond(state.Relationship(persona.personaId)) != null ? " !" : "";
+                    if (_data.Mail(state).Any(entry => entry.Persona == persona &&
+                        _data.MeetingSpot(state, persona, entry.Mail) == spot.spotId))
                         notices += " 메일";
-                    Label(Area(tile, "Hearts", col, .215f, col + .215f, .34f),
+                    Label(Area(tile, "Hearts", col, .215f, col + .176f, .34f),
                         $"{Hearts(persona)}{notices}", 12);
-                    col += .229f;
+                    col += .188f;
                 }
                 Btn(Area(tile, "Visit", .04f, .039f, .96f, .205f), "이동", () => GoTo(spot.spotId));
             }
@@ -278,16 +302,19 @@ namespace YGOPortable.UI
             if (_data.seriesId == TagForceData.GxId && spot.spotId == "spot_main_academy")
                 Btn(Area(_body, "GrandPrix", .76f, .87f, .98f, .97f), "GX 그랑프리", BeginGrandPrix);
 
-            var present = _data.Visitors(State, spot.spotId).ToArray();
-            for (int i = 0; i < present.Length; i++)
+            int visitorIndex = 0;
+            var state = State;
+            foreach (var (persona, form) in _data.Visitors(state, spot.spotId))
             {
-                var (persona, form) = present[i];
-                var slot = new Vector2(.11f + i % 7 * .125f, .62f - i / 7 * .142f);
-                var figure = Anchor(_body, persona.personaId, slot, new Vector2(110, 108));
-                var face = Area(figure, "Face", .08f, .21f, .92f, 1);
-                if (Portrait(face, form.sdSpritePath, form.formName)) _visitors.Add(face);
-                Btn(Area(figure, "Talk", 0, 0, 1, .25f), form.formName, () => MoveTo(slot, () => Talk(persona)));
-                _interactions.Add((slot, () => Talk(persona)));
+                var slot = VisitorSlots[visitorIndex++];
+                var figure = Anchor(_body, persona.personaId, slot, new Vector2(123, 116));
+                var face = Area(figure, "Face", .05f, .22f, .95f, 1f);
+                bool hasArt = Portrait(face, form.sdSpritePath, form.formName);
+                void OpenTalk() => MoveTo(figure.anchorMin, () => Talk(persona));
+                BindPortrait(face, OpenTalk);
+                _visitors.Add((figure, hasArt ? face : null, slot));
+                Btn(Area(figure, "Talk", 0, 0, 1, .25f), form.formName, OpenTalk, 15);
+                _interactions.Add((figure, () => Talk(persona)));
             }
             for (int i = 0; i < (spot.defaultPickups?.Length ?? 0); i++)
             {
@@ -297,19 +324,31 @@ namespace YGOPortable.UI
                 var position = new Vector2(.24f + i * .255f, .245f + (i % 2) * .09f);
                 var button = Anchor(_body, "Pickup" + i, position, new Vector2(82, 30));
                 Btn(button, "조사", () => MoveTo(position, () => Pickup(spot, index)));
-                _interactions.Add((position, () => Pickup(spot, index)));
+                _interactions.Add((button, () => Pickup(spot, index)));
             }
 
-            var partner = _data.Persona(State.partnerId);
+            var partner = _data.Persona(state.partnerId);
             if (partner != null)
             {
-                var form = partner.DisplayForm(State);
+                var form = partner.DisplayForm(state);
                 _partnerPosition = _position - new Vector2(.06f, 0);
                 _partner = Anchor(_body, "Partner", _partnerPosition, new Vector2(72, 94));
                 _partnerSprite = WalkerSprite(_partner, form.sdSpritePath, form.formName);
+                if (_partnerSprite != null) BindPortrait(_partnerSprite, () => Talk(partner));
+                Btn(Area(_body, "PartnerTalk", .02f, .085f, .24f, .145f), "파트너와 대화", () => Talk(partner), 15);
             }
             _player = Anchor(_body, "Player", _position, new Vector2(83, 106));
             _playerSprite = WalkerSprite(_player, TagForceData.PlayerSd, TagForceData.ProtagonistName);
+        }
+
+        private static void BindPortrait(RectTransform rect, Action action)
+        {
+            var target = rect.GetComponent<Image>();
+            target.raycastTarget = true;
+            var button = rect.gameObject.AddComponent<Button>();
+            button.targetGraphic = target;
+            button.transition = Selectable.Transition.None;
+            button.onClick.AddListener(() => action());
         }
 
         private RectTransform WalkerSprite(RectTransform actor, string path, string name)
@@ -347,7 +386,7 @@ namespace YGOPortable.UI
 
         internal void Update(float delta, Vector2 padDirection = default)
         {
-            UpdateDialogue(delta);
+            UpdateConversation(delta);
             if (!CanWalk) return;
             Vector2 movement = _fieldMenu ? Vector2.zero : padDirection;
             if (!_fieldMenu && movement == Vector2.zero)
@@ -367,9 +406,9 @@ namespace YGOPortable.UI
             {
                 _manualWalk = _moving = false;
             }
-            AdvanceWalk(delta, Time.time);
-            for (int i = 0; i < _visitors.Count; i++)
-                _visitors[i].anchoredPosition = Vector2.up * (1.6f * Mathf.Sin(Time.time * 3f + i));
+            float time = Time.unscaledTime;
+            AdvanceWalk(delta, time);
+            if (CanWalk) AdvanceVisitors(time);
         }
 
         private void AdvanceWalk(float delta, float time)
@@ -382,7 +421,7 @@ namespace YGOPortable.UI
                 arrived = _position == _destination;
                 _moving = !arrived;
             }
-            float phase = time * 16f;
+            float phase = time * WalkFrequency;
             PoseWalker(_player, _playerSprite, _position, _position - previous, _moving, phase);
             if (_partner != null)
             {
@@ -401,13 +440,32 @@ namespace YGOPortable.UI
             action?.Invoke();
         }
 
+        private void AdvanceVisitors(float time)
+        {
+            float phase = time * WalkFrequency;
+            for (int i = 0; i < _visitors.Count; i++)
+            {
+                var (actor, art, center) = _visitors[i];
+                float pace = time * (1.25f + .09f * i) + i * 1.14f;
+                float heading = Mathf.Cos(pace);
+                actor.anchorMin = actor.anchorMax = center + new Vector2(.022f * Mathf.Sin(pace), 0f);
+                actor.anchoredPosition = Vector2.up * (Mathf.Sin(phase + i) * 2.4f * Mathf.Abs(heading));
+                FaceDirection(art, heading);
+            }
+        }
+
         private static void PoseWalker(RectTransform actor, RectTransform sprite, Vector2 position, Vector2 step,
             bool walking, float phase)
         {
             actor.anchorMin = actor.anchorMax = position;
             actor.anchoredPosition = Vector2.up * (walking ? Mathf.Sin(phase) * 6f : 0f);
-            if (sprite != null && Mathf.Abs(step.x) > 1e-5f)
-                sprite.localScale = new Vector3(step.x < 0f ? -1f : 1f, 1f, 1f);
+            FaceDirection(sprite, step.x);
+        }
+
+        private static void FaceDirection(RectTransform sprite, float horizontal)
+        {
+            if (sprite != null && Mathf.Abs(horizontal) > 1e-5f)
+                sprite.localScale = new Vector3(horizontal < 0f ? -1f : 1f, 1f, 1f);
         }
 
         internal bool HandleFieldInput(DeckPadFrame frame)
@@ -424,8 +482,8 @@ namespace YGOPortable.UI
             if (_fieldMenu) return false;
             if (frame.Submit && _interactions.Count > 0)
             {
-                var closest = _interactions.OrderBy(entry => Vector2.SqrMagnitude(entry.Point - _position)).First();
-                MoveTo(closest.Point, closest.Action);
+                var closest = _interactions.OrderBy(entry => Vector2.SqrMagnitude(entry.Actor.anchorMin - _position)).First();
+                MoveTo(closest.Actor.anchorMin, closest.Action);
             }
             return true;
         }
@@ -454,9 +512,13 @@ namespace YGOPortable.UI
         private void BuildMail()
         {
             var list = List("Mail", .01f, .07f, .99f, .95f);
-            foreach (var (persona, mail) in _data.Mail(State))
-                Row(list, $"{(State.seenMail.Contains(mail.mailId) ? "" : "새 메일 · ")}{mail.subject}\n{mail.body}",
-                    () => GoTo(mail.spotId, persona.personaId, mail.mailId), 76);
+            var state = State;
+            foreach (var (persona, mail) in _data.Mail(state))
+            {
+                string spot = _data.MeetingSpot(state, persona, mail);
+                Row(list, $"{(state.seenMail.Contains(mail.mailId) ? "" : "새 메일 · ")}{mail.subject} · {_data.Hub(spot).name}\n{mail.body}",
+                    () => GoTo(spot, persona.personaId, mail.mailId), 76);
+            }
             if (list.childCount == 0) Row(list, "이 시간대에 도착한 메일이 없습니다.", null);
         }
 
@@ -475,7 +537,8 @@ namespace YGOPortable.UI
                         var progress = State.Relationship(persona.personaId);
                         var events = persona.bondEvents.Where(bond => progress.clearedBonds.Contains(bond.heartLevel));
                         string memory = string.Join("\n", events.Select(PrintDialogue));
-                        if (progress.wonGrandPrix || progress.Hearts == TagForceRelation.HeartCount) memory += "\n" + PrintDialogue(persona.grandPrixEnding);
+                        if (persona.grandPrixEnding != null && (progress.wonGrandPrix || progress.Hearts == TagForceRelation.HeartCount))
+                            memory += "\n" + PrintDialogue(persona.grandPrixEnding);
                         ShowStatus(string.IsNullOrWhiteSpace(memory) ? "아직 회상할 인연 이벤트가 없습니다." : "");
                         if (string.IsNullOrWhiteSpace(memory)) return;
                         ClearBody();
@@ -495,40 +558,84 @@ namespace YGOPortable.UI
             Show(Page.Talk);
         }
 
-        private void BuildTalk()
+        private void BuildTalk(bool animate)
         {
             var persona = Selected;
             if (persona == null) { Show(Page.Field); return; }
-            var form = persona.DisplayForm(State);
-            var relationship = State.Relationship(persona.personaId);
-            Backdrop(CurrentSpot.mapPath, new Color(.11f, .235f, .27f));
-            Portrait(Area(_body, "Protagonist", .005f, .18f, .30f, .97f),
-                TagForceData.PlayerStanding, TagForceData.ProtagonistName);
-            Portrait(Area(_body, "Guest", .70f, .18f, .995f, .97f), form.standingSpritePath, form.formName);
-            var panel = Area(_body, "Dialogue", .29f, .04f, .71f, .97f);
-            Tint(panel, new Color(.027f, .089f, .128f, .96f));
-            Label(Area(panel, "Name", .05f, .89f, .95f, .99f), form.formName, 23);
-            Label(Area(panel, "Title", .05f, .825f, .95f, .89f), form.formTitle, 16);
-            Label(Area(panel, "Hearts", .05f, .75f, .95f, .825f),
-                $"{Hearts(persona)}   {relationship.affinity:N0} / {TagForceRelation.MaxAffinity:N0} pt", 19);
+            var state = State;
+            var form = persona.DisplayForm(state);
+            var relationship = state.Relationship(persona.personaId);
+
+            BuildField();
+            foreach (var button in _body.GetComponentsInChildren<Button>()) button.interactable = false;
+            var overlay = DuelUiKit.FillRect("Conversation", _body);
+            overlay.gameObject.AddComponent<RectMask2D>();
+            _conversationShade = DuelUiKit.AddImage(overlay.gameObject, DuelUiKit.WhiteSprite, Color.black);
+            _leftStanding = Area(overlay, "Protagonist", .035f, .195f, .47f, 1f);
+            _rightStanding = Area(overlay, "Guest", .53f, .195f, .965f, 1f);
+            Portrait(_leftStanding, TagForceData.PlayerStanding, TagForceData.ProtagonistName);
+            Portrait(_rightStanding, form.standingSpritePath, form.formName);
+
+            var panel = Area(overlay, "Dialogue", .018f, .012f, .982f, .405f);
+            _dialoguePanel = panel.gameObject.AddComponent<CanvasGroup>();
+            Tint(panel, new Color(.029f, .084f, .118f, .98f));
+            Tint(Area(panel, "TopRule", 0f, .982f, 1f, 1f), new Color(.30f, .75f, .77f));
+            Label(Area(panel, "Name", .035f, .72f, .36f, .96f), form.formName, 25, TextAnchor.MiddleLeft);
+            var hearts = Label(Area(panel, "Hearts", .37f, .73f, .61f, .95f),
+                $"{Hearts(persona)}   {relationship.affinity:N0} / {TagForceRelation.MaxAffinity:N0} pt", 19,
+                TextAnchor.MiddleRight);
+            hearts.color = new Color(1f, .70f, .80f);
+            Label(Area(panel, "Title", .035f, .575f, .61f, .73f), form.formTitle, 15, TextAnchor.MiddleLeft);
             string line = string.IsNullOrEmpty(_reply) ? form.Greet(relationship.Hearts) : _reply;
             if (!string.IsNullOrWhiteSpace(line) && (_dialogueLog.Count == 0 || _dialogueLog[^1] != line))
             {
                 if (_dialogueLog.Count == 16) _dialogueLog.RemoveAt(0);
                 _dialogueLog.Add(line);
             }
-            TypeDialogue(Area(panel, "DialogueText", .06f, .54f, .94f, .74f), line);
+            TypeDialogue(Area(panel, "DialogueText", .035f, .11f, .61f, .545f), line);
 
-            var actions = List("DialogueActions", .30f, .062f, .70f, .53f);
+            var actions = List("DialogueActions", .65f, .06f, .978f, .91f, panel);
             Row(actions, "이야기하기", () => Show(Page.Topics));
             Row(actions, "샌드위치·선물 주기", () => Show(Page.Gift));
             Row(actions, "듀얼 신청", () => { _deckLevel = 1; Show(Page.Duel); });
-            Row(actions, State.partnerId == persona.personaId ? "파트너 해제" : "파트너 신청", () => SetPartner(persona));
+            Row(actions, state.partnerId == persona.personaId ? "파트너 해제" : "파트너 신청", () => SetPartner(persona));
             Row(actions, "대화 기록", () => Show(Page.DialogueLog));
             if (persona.NextBond(relationship) is { } pending)
                 Row(actions, "인연 승급전", () => { _bond = pending; Show(Page.Bond); });
             if (relationship.masterReward || relationship.wonGrandPrix || relationship.Hearts == TagForceRelation.HeartCount)
                 Row(actions, "파트너 마스터 덱 레시피 받기", () => CopyMasterDeck(persona));
+
+            _conversationProgress = animate ? 0f : 1f;
+            ApplyConversationPose();
+        }
+
+        private void UpdateConversation(float delta)
+        {
+            if (_dialoguePanel == null) return;
+            if (_closingConversation || _conversationProgress < 1f)
+            {
+                _conversationProgress = Mathf.MoveTowards(_conversationProgress, _closingConversation ? 0f : 1f,
+                    delta / (_closingConversation ? .22f : .32f));
+                if (_closingConversation && _conversationProgress == 0f)
+                {
+                    Show(Page.Field);
+                    return;
+                }
+                ApplyConversationPose();
+            }
+            if (!_closingConversation && _conversationProgress >= .55f) UpdateDialogue(delta);
+        }
+
+        private void ApplyConversationPose()
+        {
+            float visible = Mathf.SmoothStep(0f, 1f, _conversationProgress);
+            float offset = (1f - visible) * _body.rect.width * .50f;
+            _leftStanding.anchoredPosition = Vector2.left * offset;
+            _rightStanding.anchoredPosition = Vector2.right * offset;
+            _conversationShade.color = new Color(.017f, .037f, .055f, .65f * visible);
+            _dialoguePanel.alpha = Mathf.InverseLerp(.23f, .90f, visible);
+            _dialoguePanel.interactable = !_closingConversation && _conversationProgress >= .90f;
+            ((RectTransform)_dialoguePanel.transform).anchoredPosition = Vector2.down * (1f - visible) * 64f;
         }
 
         private void BuildTopics()
@@ -830,9 +937,9 @@ namespace YGOPortable.UI
             label.anchorMin = new Vector2(.13f, label.anchorMin.y);
         }
 
-        private RectTransform List(string name, float l, float b, float r, float t)
+        private RectTransform List(string name, float l, float b, float r, float t, Transform parent = null)
         {
-            var viewport = Area(_body, name, l, b, r, t);
+            var viewport = Area(parent ?? _body, name, l, b, r, t);
             viewport.gameObject.AddComponent<RectMask2D>();
             var scroll = viewport.gameObject.AddComponent<ScrollRect>();
             var items = DuelUiKit.CreateRect("Items", viewport, Vector2.up, Vector2.one, Vector2.zero, Vector2.zero);

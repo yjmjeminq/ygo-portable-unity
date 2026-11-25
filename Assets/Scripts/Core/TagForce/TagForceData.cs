@@ -36,8 +36,9 @@ namespace YGOPortable.Core
             new("arcv", "ARC-V", "마이아미 시티", "ARCV"),
             new("vrains", "VRAINS", "LINK VRAINS", "VRAINS"),
         };
-        internal static readonly string[] TimeKeys = { "morning", "day", "sunset", "night" };
-        internal static readonly string[] TimeNames = { "아침", "낮", "석양", "심야" };
+        internal const int MaxFieldCharacters = 5;
+        internal static readonly string[] TimeKeys = { "morning", "day", "evening" };
+        internal static readonly string[] TimeNames = { "아침", "낮", "저녁" };
         public string seriesId;
         public bool useLegacyGx;
         public TagForceSpot[] spots;
@@ -47,6 +48,7 @@ namespace YGOPortable.Core
         public TagForceBreadShop drawBreadCatalog;
         public TagForceTopic[] conversationTopics;
         public TagForcePaths assetConfig;
+        internal TagForceSpot[] Hubs { get; private set; }
 
         internal static TagForceData Load(string directory, TagForceSeries series)
         {
@@ -64,7 +66,12 @@ namespace YGOPortable.Core
                     selected.drawBreadCatalog = gx?.drawBreadCatalog;
                 selected.assetConfig ??= new TagForcePaths();
                 if (selected.roster?.Length > 0) selected.BuildRoster(series);
-                if (selected.IsUsable()) return selected;
+                if (!selected.IsUsable()) continue;
+                var staffed = new HashSet<string>(selected.personas.SelectMany(persona => persona.forms)
+                    .SelectMany(form => form.spots));
+                selected.Hubs = selected.roster?.Length > 0 ? selected.spots :
+                    selected.spots.Where(spot => staffed.Contains(spot.spotId)).ToArray();
+                return selected;
             }
             return null;
         }
@@ -102,7 +109,7 @@ namespace YGOPortable.Core
             }
         }
 
-        private static string NormalizeTime(string time) => time == "evening" ? "sunset" : time;
+        private static string NormalizeTime(string time) => time is "sunset" or "night" ? "evening" : time;
 
         private bool HasSpots() => spots?.Length > 0 &&
             spots.All(spot => !string.IsNullOrEmpty(spot?.spotId) && !string.IsNullOrEmpty(spot.name)) &&
@@ -173,16 +180,30 @@ namespace YGOPortable.Core
 
         internal TagForcePersona Persona(string id) => Array.Find(personas, entry => entry.personaId == id);
         internal TagForceSpot Spot(string id) => Array.Find(spots, entry => entry.spotId == id);
+        internal TagForceSpot Hub(string id) => Array.Find(Hubs, entry => entry.spotId == id);
+
+        internal string MeetingSpot(TagForceSave state, TagForcePersona persona, TagForceMail mail)
+        {
+            var form = persona.DisplayForm(state);
+            if (form.spots.Contains(mail.spotId) && Hub(mail.spotId) != null) return mail.spotId;
+            return form.spots[0];
+        }
         internal TagForceItem Item(string id) => Array.Find(gifts, entry => entry.giftId == id) ??
             (drawBreadCatalog == null ? null : Array.Find(drawBreadCatalog.breads, entry => entry.breadId == id));
 
-        internal IEnumerable<(TagForcePersona Persona, TagForceForm Form)> Visitors(TagForceSave state, string spot = null)
+        internal IEnumerable<(TagForcePersona Persona, TagForceForm Form)> Visitors(TagForceSave state, string spot)
         {
+            int capacity = MaxFieldCharacters - (Persona(state.partnerId) != null ? 1 : 0);
+            var available = new List<(TagForcePersona Persona, TagForceForm Form)>();
             foreach (var persona in personas)
             {
+                if (persona.personaId == state.partnerId) continue;
                 var form = persona.ActiveForm(state);
-                if (form != null && (spot == null || form.spots.Contains(spot))) yield return (persona, form);
+                if (form != null && form.spots.Contains(spot)) available.Add((persona, form));
             }
+            int start = available.Count > capacity ? (state.day - 1) % available.Count : 0;
+            for (int i = 0; i < Math.Min(capacity, available.Count); i++)
+                yield return available[(start + i) % available.Count];
         }
 
         internal IEnumerable<(TagForcePersona Persona, TagForceMail Mail)> Mail(TagForceSave state)

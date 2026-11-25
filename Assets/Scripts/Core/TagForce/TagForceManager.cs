@@ -10,11 +10,11 @@ namespace YGOPortable.Core
         internal TagForceManager(TagForceData data) => _data = data;
 
         internal TagForceSave Progress => CollectionProgress.GetTagForceProgress(_data.seriesId);
-        internal TagForceSpot CurrentSpot => _data.Spot(Progress.spotId) ?? _data.spots[0];
+        internal TagForceSpot CurrentSpot => _data.Hub(Progress.spotId) ?? _data.Hubs[0];
 
         internal bool TrySave(TagForceSave next, int dp, out string error, uint reward = 0, bool foil = false, uint gift = 0)
         {
-            if (_data.Spot(next.spotId) == null) next.spotId = CurrentSpot.spotId;
+            if (_data.Hub(next.spotId) == null) next.spotId = CurrentSpot.spotId;
             return CollectionProgress.TrySaveTagForce(_data.seriesId, next, dp, out error, reward, foil, gift);
         }
 
