@@ -91,14 +91,15 @@ namespace YGOPortable.UI
             string cycle = RpgArt + "WalkCycles/" + Path.GetFileNameWithoutExtension(path);
             var directions = path == null ? null : _images.GetSlices(cycle + "_directions.png", 3, 3);
             var sides = path == null || directions != null ? null : _images.GetSlices(cycle + ".png", 2, 2);
-            var idle = directions?[3] ?? _images.GetSlices(path, 1, 1)?[0] ?? _images.Get(path);
+            var profile = path == null || directions != null ? null : _images.GetSlices(cycle + "_side_idle.png", 1, 1)?[0];
+            var idle = directions?[0] ?? profile ?? _images.GetSlices(path, 1, 1)?[0] ?? _images.Get(path);
             if (idle == null)
             {
                 Portrait(art, path, name);
                 return null;
             }
 
-            if (directions != null || sides != null)
+            if (directions != null || sides != null || profile != null)
             {
                 float padding = (art.anchorMax.y - art.anchorMin.y) * .095f;
                 art.anchorMin += Vector2.up * padding;
@@ -140,13 +141,18 @@ namespace YGOPortable.UI
             _side = side;
             _depth = depth;
             _directions = directions;
-            if (directions != null) _facing = Facing.Front;
-            else if (side == null) _stride = gameObject.AddComponent<TagForceRpgStride>();
+            _facing = Facing.Side;
+            if (directions == null && side == null) _stride = gameObject.AddComponent<TagForceRpgStride>();
         }
 
         internal void Pose(float distance, bool walking, Vector2 direction)
         {
-            if (direction.sqrMagnitude > 1e-7f)
+            if (!walking)
+            {
+                _facing = Facing.Side;
+                if (Mathf.Abs(direction.x) > 1e-5f) _left = direction.x < 0f;
+            }
+            else if (direction.sqrMagnitude > 1e-7f)
             {
                 float threshold = _facing == Facing.Side ? 1.12f : .90f;
                 if ((_depth != null || _directions != null) && Mathf.Abs(direction.y) > Mathf.Abs(direction.x) * threshold)

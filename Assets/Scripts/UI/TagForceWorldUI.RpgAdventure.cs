@@ -10,6 +10,7 @@ namespace YGOPortable.UI
     {
         private const int RpgPartnerId = 35;
         private const int RpgShopkeeperId = 13;
+        private const float RpgResidentLookRange = .12f;
         private const string RpgPartnerName = "후도 유세이";
         private static readonly string[] RpgPartnerLines =
         {
@@ -272,11 +273,19 @@ namespace YGOPortable.UI
                 _rpgRankBanner = null;
             }
 
-            if (!CanWalk || _rpgRoamers.Count == 0 || _onArrival != null) return;
+            if (!CanWalk) return;
+            foreach (var actor in _rpgResidents.Values)
+            {
+                var facing = RpgArtDirection(_position - actor.anchorMin);
+                if (Mathf.Abs(facing.x) < .015f || facing.sqrMagnitude > RpgResidentLookRange * RpgResidentLookRange) continue;
+                PoseRpgWalker(actor, actor.Find("SD") as RectTransform, actor.anchorMin, Vector2.zero, false,
+                    Vector2.right * facing.x);
+            }
+            if (_rpgRoamers.Count == 0 || _onArrival != null) return;
             _rpgPatrolTime += delta;
             foreach (var (actor, home) in _rpgRoamers)
             {
-                if (Vector2.SqrMagnitude(actor.anchorMin - _position) < .11f * .11f) continue;
+                if (RpgArtDirection(actor.anchorMin - _position).sqrMagnitude <= RpgResidentLookRange * RpgResidentLookRange) continue;
                 float sway = Mathf.Sin(_rpgPatrolTime * .72f);
                 var next = home + Vector2.right * (.037f * sway);
                 var step = Vector2.MoveTowards(actor.anchorMin, next, delta * .042f) - actor.anchorMin;

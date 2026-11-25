@@ -93,6 +93,7 @@ namespace YGOPortable.Editor
                 VerifyRpgHud();
                 VerifyFieldMovement();
                 VerifyDirectionalArt();
+                VerifyResidentProfiles();
                 VerifySceneGuests();
                 VerifyStageExit();
 
@@ -319,7 +320,7 @@ namespace YGOPortable.Editor
                         buildArt.Invoke(world, new object[] { art, $"TagForce/5DS/Characters_SD/sd_{id}.png", id.ToString() });
                         var animator = art.GetComponent<TagForceRpgWalkAnimator>();
                         var image = art.GetComponent<Image>();
-                        var front = image.sprite;
+                        var sideIdle = image.sprite;
                         animator.Pose(.02f, true, Vector2.right);
                         var right = image.sprite;
                         animator.Pose(.08f, true, Vector2.right);
@@ -327,19 +328,48 @@ namespace YGOPortable.Editor
                         animator.Pose(0f, false, Vector2.left);
                         var leftIdle = image.sprite;
                         bool flips = art.localScale.x < 0f;
-                        animator.Pose(0f, false, Vector2.up);
-                        var rear = image.sprite;
                         animator.Pose(.02f, true, Vector2.up);
+                        var rear = image.sprite;
+                        animator.Pose(.08f, true, Vector2.up);
                         var rearStep = image.sprite;
+                        animator.Pose(.02f, true, Vector2.down);
+                        var front = image.sprite;
                         animator.Pose(0f, false, Vector2.down);
                         Require(right != nextStep && right != leftIdle && rear != rearStep && flips &&
+                            leftIdle == sideIdle && image.sprite == sideIdle &&
                             right.texture == front.texture && right.rect.y > front.rect.y && front.rect.y > rear.rect.y &&
-                            image.sprite == front && art.GetComponent<TagForceRpgStride>() == null,
+                            art.GetComponent<TagForceRpgStride>() == null,
                             $"Character {id} did not use its front, back and side walking sheet.");
                     }
                     finally { UnityEngine.Object.DestroyImmediate(actor.gameObject); }
                 }
                 Debug.Log("[VERIFY 5DS WALK ART] Aki, Jack, Yusei and Vagabond directional poses passed.");
+            }
+
+            void VerifyResidentProfiles()
+            {
+                var ids = script.episodes.Select(episode => episode.charId).Concat(RpgSideQuest.All.Select(quest => quest.Giver))
+                    .Append(13).Distinct();
+                foreach (int id in ids)
+                {
+                    string cycle = Path.Combine(streaming, $"TagForce/5DS/WalkCycles/sd_{id}");
+                    Require(File.Exists(cycle + "_directions.png") || File.Exists(cycle + "_side_idle.png"),
+                        $"RPG field character {id} lacked a side-facing sprite.");
+                }
+                Require(world.EnterRpgRegion(1) && world.EnterRpgRegion(0), "Could not reset the garage.");
+                var scene = FieldScene();
+                var merchant = (RectTransform)scene.Find("RpgCardMerchant");
+                var art = (RectTransform)merchant.Find("SD");
+                var idle = art.GetComponent<Image>().sprite;
+                Require(idle != null && art.localScale.x < 0f, "The merchant did not start facing inward.");
+                var floor = scene.Find("Scenery").GetComponent<TagForceFloorTap>();
+                floor.Click(merchant.anchorMin + new Vector2(.072f, -.042f));
+                world.Update(4f);
+                world.Update(.02f);
+                Require(world.CanWalk && art.localScale.x > 0f && art.GetComponent<Image>().sprite == idle,
+                    "The merchant did not turn toward the player while keeping the side profile.");
+                Require(world.EnterRpgRegion(1) && world.EnterRpgRegion(0), "Could not reset the garage after turning.");
+                Debug.Log("[VERIFY 5DS PROFILES] Every field resident has side art, and facing responds to approach.");
             }
 
             void VerifySceneGuests()

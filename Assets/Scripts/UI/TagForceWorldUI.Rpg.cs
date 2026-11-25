@@ -307,7 +307,8 @@ namespace YGOPortable.UI
             var actor = Anchor(_rpgSceneSpace, node, spot, new Vector2(133f, 117f));
             _rpgResidents[id] = actor;
             var art = Area(actor, "SD", .08f, .22f, .92f, 1f);
-            BuildRpgActorArt(art, RpgArt + $"Characters_SD/sd_{id}.png", name);
+            var profile = BuildRpgActorArt(art, RpgArt + $"Characters_SD/sd_{id}.png", name);
+            PoseRpgWalker(actor, profile, spot, Vector2.zero, false, Vector2.right * (_position.x - spot.x));
             void Approach() => MoveTo(actor.anchorMin - new Vector2(0f, .06f), interact);
             BindPortrait(art, Approach);
             var marker = Anchor(actor, story ? "MainQuestMarker" : "ResidentMarker", new Vector2(.50f, 1.07f),
