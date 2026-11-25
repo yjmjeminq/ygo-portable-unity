@@ -39,9 +39,18 @@ namespace YGOPortable.UI
             return new Vector2(width, width * aspect / _rpgBackdropAspect);
         }
 
-        private Vector2 TargetRpgCameraPan(Vector2 position, Vector2 span) =>
-            RpgCameraCenter - Vector2.one * .5f - Vector2.Scale(position - Vector2.one * .5f, span) -
-            Vector2.right * _rpgCameraLead;
+        private Vector2 TargetRpgCameraPan(Vector2 position, Vector2 span)
+        {
+            var center = RpgCameraCenter;
+            if (_page == Page.Field && _rpgDialogueCast == null)
+            {
+                // Leave headroom for the opening NPC and its marker on tall and wide viewports.
+                float headroom = Mathf.Max(0f, RpgNpcSlots[0].y - position.y) * span.y;
+                center.y = Mathf.Clamp(.80f - headroom, .18f, center.y);
+            }
+            return center - Vector2.one * .5f - Vector2.Scale(position - Vector2.one * .5f, span) -
+                Vector2.right * _rpgCameraLead;
+        }
 
         private static Vector2 ClampRpgCameraPan(Vector2 pan, Vector2 span)
         {

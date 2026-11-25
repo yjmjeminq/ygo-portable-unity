@@ -84,11 +84,11 @@ namespace YGOPortable.UI
             var rank = Label(Area(card, "Rank", .02f, .05f, .22f, .98f),
                 $"듀얼리스트 Lv.{CollectionProgress.RpgRank}", 16, TextAnchor.MiddleLeft);
             rank.color = DuelUiKit.GoldAccent;
-            var track = Area(card, "Experience", .235f, .27f, .526f, .72f);
+            Label(Area(card, "ExperienceLabel", .235f, .05f, .288f, .98f), "EXP", 13);
+            var track = Area(card, "Experience", .295f, .27f, .526f, .72f);
             Tint(track, new Color(.006f, .026f, .047f, .95f));
             var fill = Area(track, "Fill", 0f, 0f, CollectionProgress.RpgRankProgress, 1f);
             Tint(fill, new Color(.18f, .70f, .81f));
-            Label(track, "EXP", 12).rectTransform.SetAsLastSibling();
             Label(Area(card, "Dp", .562f, .05f, .738f, .98f), $"{CollectionProgress.Balance:N0} DP", 16);
             Label(Area(card, "Affinity", .761f, .05f, .992f, .98f),
                 $"♥ 유세이 {CollectionProgress.RpgAffinity}/100", 16).color = new Color(1f, .70f, .77f);
@@ -140,7 +140,7 @@ namespace YGOPortable.UI
         private void AddRpgShopkeeper()
         {
             if (_rpgLocation != RpgGarage) return;
-            AddRpgResident(RpgShopkeeperId, "보머 · 카드 매점", "RpgCardMerchant", new Vector2(.315f, .37f),
+            AddRpgResident(RpgShopkeeperId, "보머 · 카드 매점", "RpgCardMerchant", new Vector2(.74f, .38f),
                 false, () => OpenRpgService(RpgShopkeeperId));
             var marker = _rpgResidents[RpgShopkeeperId].Find("ResidentMarker") as RectTransform;
             if (marker.TryGetComponent<Image>(out var icon)) icon.enabled = false;
@@ -220,8 +220,8 @@ namespace YGOPortable.UI
             _rpgTravelTime = 0f;
             _rpgTravelFade = DuelUiKit.AddImage(DuelUiKit.FillRect("TravelFade", _body).gameObject,
                 DuelUiKit.WhiteSprite, new Color(.012f, .023f, .040f, 1f), false, false);
-            _rpgTravelBanner = Area(_body, "RegionBanner", .25f, .723f, .75f, .83f);
-            Tint(_rpgTravelBanner, new Color(.024f, .088f, .135f, .96f));
+            _rpgTravelBanner = Area(_body, "RegionBanner", .27f, .108f, .73f, .201f);
+            Tint(_rpgTravelBanner, new Color(.024f, .088f, .135f, .82f));
             Label(_rpgTravelBanner, RpgRegions[_rpgLocation].Name, 27).color = DuelUiKit.GoldAccent;
             if (_rpgCompanion != null || _rpgResidents.ContainsKey(RpgPartnerId))
             {
@@ -317,10 +317,10 @@ namespace YGOPortable.UI
             var speaker = _rpgCompanion ?? _rpgResidents.GetValueOrDefault(RpgPartnerId);
             if (speaker == null) return;
             Vector2 point = Rect.PointToNormalized(_body.rect, _body.InverseTransformPoint(speaker.position));
-            float x = Mathf.Clamp(point.x, .25f, .75f);
-            float y = Mathf.Clamp(point.y + .10f, .20f, .69f);
-            _rpgGreeting.anchorMin = new Vector2(x - .23f, y);
-            _rpgGreeting.anchorMax = new Vector2(x + .23f, y + .075f);
+            float x = Mathf.Clamp(point.x - .06f, .215f, .785f);
+            float y = Mathf.Clamp(point.y + .145f, .20f, .69f);
+            _rpgGreeting.anchorMin = new Vector2(x - .205f, y);
+            _rpgGreeting.anchorMax = new Vector2(x + .205f, y + .075f);
         }
 
         private void ClearRpgPresentation()
