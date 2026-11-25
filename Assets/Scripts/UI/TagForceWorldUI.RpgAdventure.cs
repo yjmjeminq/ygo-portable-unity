@@ -10,7 +10,6 @@ namespace YGOPortable.UI
     {
         private const int RpgPartnerId = 35;
         private const int RpgShopkeeperId = 13;
-        private const float RpgResidentLookRange = .12f;
         private const string RpgPartnerName = "후도 유세이";
         private static readonly string[] RpgPartnerLines =
         {
@@ -30,12 +29,11 @@ namespace YGOPortable.UI
             new(.16f, .32f), new(.81f, .34f), new(.17f, .32f), new(.82f, .26f),
         };
 
-        private readonly List<(RectTransform Actor, Vector2 Home)> _rpgRoamers = new();
         private StoryModeUI.StoryDialogueView _rpgIntroDialogue;
         private RectTransform _rpgCompanion, _rpgCompanionArt, _rpgGreeting, _rpgTravelBanner, _rpgRankBanner;
         private Image _rpgTravelFade;
         private Vector2 _rpgCompanionPoint;
-        private float _rpgGreetingTime, _rpgTravelTime, _rpgRankTime, _rpgPatrolTime;
+        private float _rpgGreetingTime, _rpgTravelTime, _rpgRankTime;
         private int _rpgRankNotice, _rpgPendingRegion = -1;
         private Vector2 _rpgPendingArrival;
         private bool _rpgIntroOnOpen, _rpgAnnounceArrival, _rpgWorkbenchServices;
@@ -125,12 +123,7 @@ namespace YGOPortable.UI
         {
             if (_rpgLocation != RpgGarage) return;
             AddRpgResident(RpgShopkeeperId, "보머 · 카드 매점", "RpgCardMerchant", new Vector2(.82f, .38f),
-                false, () => OpenRpgService(RpgShopkeeperId));
-            var marker = _rpgResidents[RpgShopkeeperId].Find("ResidentMarker") as RectTransform;
-            if (marker.TryGetComponent<Image>(out var icon)) icon.enabled = false;
-            var fallback = marker.GetComponentInChildren<Text>();
-            if (fallback != null) fallback.gameObject.SetActive(false);
-            HudLabel(marker, "상점", 15, new Color(.63f, 1f, .82f), align: TextAnchor.MiddleCenter, heading: true);
+                RpgResidentRole.Shop, () => OpenRpgService(RpgShopkeeperId));
         }
 
         private void OpenRpgService(int speaker)
@@ -272,25 +265,6 @@ namespace YGOPortable.UI
                 _rpgRankBanner.gameObject.SetActive(false);
                 _rpgRankBanner = null;
             }
-
-            if (!CanWalk) return;
-            foreach (var actor in _rpgResidents.Values)
-            {
-                var facing = RpgArtDirection(_position - actor.anchorMin);
-                if (Mathf.Abs(facing.x) < .015f || facing.sqrMagnitude > RpgResidentLookRange * RpgResidentLookRange) continue;
-                PoseRpgWalker(actor, actor.Find("SD") as RectTransform, actor.anchorMin, Vector2.zero, false,
-                    Vector2.right * facing.x);
-            }
-            if (_rpgRoamers.Count == 0 || _onArrival != null) return;
-            _rpgPatrolTime += delta;
-            foreach (var (actor, home) in _rpgRoamers)
-            {
-                if (RpgArtDirection(actor.anchorMin - _position).sqrMagnitude <= RpgResidentLookRange * RpgResidentLookRange) continue;
-                float sway = Mathf.Sin(_rpgPatrolTime * .72f);
-                var next = home + Vector2.right * (.037f * sway);
-                var step = Vector2.MoveTowards(actor.anchorMin, next, delta * .042f) - actor.anchorMin;
-                PoseRpgWalker(actor, actor.Find("SD") as RectTransform, actor.anchorMin + step, step, step.sqrMagnitude > .000001f);
-            }
         }
 
         private void PositionRpgGreeting()
@@ -311,8 +285,6 @@ namespace YGOPortable.UI
             _rpgCompanion = _rpgCompanionArt = _rpgGreeting = _rpgTravelBanner = _rpgRankBanner = null;
             _rpgTravelFade = null;
             _rpgPendingRegion = -1;
-            _rpgRoamers.Clear();
-            _rpgPatrolTime = 0f;
         }
     }
 }

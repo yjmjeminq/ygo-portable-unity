@@ -194,7 +194,6 @@ namespace YGOPortable.UI
                 _rpgWalkInFrom = _rpgWalkInActor.anchorMin;
                 _rpgWalkInElapsed = 0f;
                 _rpgWalkInActor.Find("ResidentMarker")?.gameObject.SetActive(false);
-                _rpgWalkInActor.Find("QuestBadge")?.gameObject.SetActive(false);
                 if (!panel.TryGetComponent(out _rpgWalkInChoices))
                     _rpgWalkInChoices = panel.gameObject.AddComponent<CanvasGroup>();
                 _rpgWalkInChoices.interactable = _rpgWalkInChoices.blocksRaycasts = false;

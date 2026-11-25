@@ -246,6 +246,7 @@ namespace YGOPortable.UI
             ClearRpgDialogue();
             ClearRpgAtmosphere();
             ClearRpgExploration();
+            ClearRpgResidentMotion();
             ClearRpgFieldHud();
             ClearRpgPresentation();
             _rpgResidents.Clear();
@@ -445,13 +446,14 @@ namespace YGOPortable.UI
             }
         }
 
-        private void MoveTo(Vector2 point, Action arrive = null)
+        private void MoveTo(Vector2 point, Action arrive = null, RectTransform approachActor = null)
         {
             if (!CanWalk || (_rpgField && _fieldMenu)) return;
             _manualWalk = false;
             _destination = new Vector2(Mathf.Clamp(point.x, .06f, .94f), Mathf.Clamp(point.y, .095f, _rpgField ? .455f : .77f));
             _moving = true;
             _onArrival = arrive;
+            _rpgApproachActor = approachActor;
         }
 
         internal void Update(float delta, Vector2 padDirection = default)
@@ -484,7 +486,7 @@ namespace YGOPortable.UI
             float time = Time.unscaledTime;
             AdvanceWalk(delta, time);
             if (CanWalk) AdvanceVisitors(time);
-            if (_rpgField) RefreshRpgFieldPrompt();
+            if (_rpgField) RefreshRpgFieldPrompt(delta);
         }
 
         private void AdvanceWalk(float delta, float time)
@@ -503,6 +505,7 @@ namespace YGOPortable.UI
                 PoseRpgWalker(_player, _playerSprite, _position, _position - previous, _moving);
                 TrackRpgCamera(delta, horizontalTravel: _position.x - previous.x);
                 FollowRpgPlayer(delta);
+                UpdateRpgResidentMotion(delta);
                 OrderRpgFieldActors();
                 CheckRpgSceneEncounter(previous);
                 if (!CanWalk || CheckRpgExit(previous)) return;
@@ -522,6 +525,7 @@ namespace YGOPortable.UI
             if (!arrived) return;
             var action = _onArrival;
             _onArrival = null;
+            _rpgApproachActor = null;
             action?.Invoke();
         }
 
@@ -588,6 +592,7 @@ namespace YGOPortable.UI
             if (playSound) DuelAudio.PlayTagForceSfx(TagForceSfx.Cursor, .65f);
             _manualWalk = _moving = false;
             _onArrival = null;
+            _rpgApproachActor = null;
             if (_rpgField)
             {
                 RefreshRpgFieldPrompt();

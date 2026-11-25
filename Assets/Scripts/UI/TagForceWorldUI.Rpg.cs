@@ -329,25 +329,29 @@ namespace YGOPortable.UI
 
         private void AddRpgResident(StoryEpisodeData resident, Vector2 spot, bool story, Action interact) =>
             AddRpgResident(resident.charId, resident.opponentName,
-                story ? "MainQuestNpc" : $"Resident_{resident.charId}", spot, story, interact);
+                story ? "MainQuestNpc" : $"Resident_{resident.charId}", spot,
+                story ? RpgResidentRole.Story : RpgResidentRole.Conversation, interact, patrol: !story);
 
-        private void AddRpgResident(int id, string name, string node, Vector2 spot, bool story, Action interact)
+        private void AddRpgResident(int id, string name, string node, Vector2 spot, RpgResidentRole role,
+            Action interact, bool patrol = false)
         {
             var actor = Anchor(_rpgSceneSpace, node, spot, RpgFieldActorSize);
             _rpgResidents[id] = actor;
             var art = DuelUiKit.FillRect("SD", actor);
             var profile = BuildRpgActorArt(art, RpgArt + $"Characters_SD/sd_{id}.png", name);
             PoseRpgWalker(actor, profile, spot, Vector2.zero, false, Vector2.right * (_position.x - spot.x));
-            void Approach() => MoveTo(actor.anchorMin - new Vector2(0f, .06f), interact);
+            void Approach() => MoveTo(actor.anchorMin - new Vector2(0f, .06f), interact, actor);
             BindPortrait(art, Approach);
-            var marker = Anchor(actor, story ? "MainQuestMarker" : "ResidentMarker", new Vector2(.50f, 1.07f),
-                new Vector2(28f, 28f));
-            DrawRpgIcon(marker, story ? "icon_quest_main.png" : "icon_quest_sub.png", story ? "!" : "…",
-                story ? DuelUiKit.GoldAccent : new Color(.40f, .78f, 1f));
-            _questMarkers.Add(marker);
-            if (!story && _rpgLocation > 1 && node.StartsWith("Resident_", StringComparison.Ordinal) && _rpgRoamers.Count == 0)
-                _rpgRoamers.Add((actor, spot));
-            string verb = story ? "이야기 진행" : node == "RpgCardMerchant" ? "팩 구매" : "대화";
+            BuildRpgResidentMotion(actor, profile, spot, role, patrol);
+            string verb = role switch
+            {
+                RpgResidentRole.Story => "이야기 진행",
+                RpgResidentRole.Request => "의뢰",
+                RpgResidentRole.Delivery => "전달",
+                RpgResidentRole.Reward => "보상 받기",
+                RpgResidentRole.Shop => "팩 구매",
+                _ => "대화",
+            };
             RegisterRpgInteraction(actor, $"{name} · {verb}", Approach);
         }
 

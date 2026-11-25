@@ -59,13 +59,14 @@ namespace YGOPortable.UI
             action();
         }
 
-        private void RefreshRpgFieldPrompt()
+        private void RefreshRpgFieldPrompt(float delta = 0f)
         {
             if (_rpgActionButton == null) return;
             var candidate = CanWalk && !_fieldMenu ? NearbyRpgInteraction() : default;
             _rpgActionButton.gameObject.SetActive(candidate.Select != null);
             if (_rpgActionText.text != candidate.Caption) _rpgActionText.text = candidate.Caption ?? "";
             if (_rpgFieldInput == null) return;
+            UpdateRpgResidentMarkers(candidate.Anchor, delta);
             _rpgNavigation.gameObject.SetActive(_fieldMenu);
             _rpgFieldInput.interactable = _rpgFieldInput.blocksRaycasts = !_fieldMenu;
             string menuText = _fieldMenu ? "메뉴 닫기" : "메뉴";

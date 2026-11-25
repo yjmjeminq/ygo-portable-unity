@@ -102,6 +102,7 @@ namespace YGOPortable.Editor
                 VerifyFieldMovement();
                 VerifyDirectionalArt();
                 VerifyResidentProfiles();
+                VerifyResidentActivity();
                 VerifySceneGuests();
                 VerifyStageExit();
 
@@ -431,6 +432,65 @@ namespace YGOPortable.Editor
                 Debug.Log("[VERIFY 5DS PROFILES] Every field resident has side art, and facing responds to approach.");
             }
 
+            void VerifyResidentActivity()
+            {
+                var field = FieldScene();
+                var resident = (RectTransform)field.Find($"Resident_{script.episodes[1].charId}");
+                var marker = resident.Find("ResidentMarker").GetComponent<CanvasGroup>();
+                var art = resident.Find("SD").GetComponent<Image>();
+                var idle = art.sprite;
+                var home = resident.anchorMin;
+                var player = (RectTransform)field.Find("Player");
+                var playerHome = player.anchorMin;
+                var main = (RectTransform)field.Find("MainQuestNpc");
+                var storyHome = main.anchorMin;
+                var questGiver = (RectTransform)field.Find("QuestNpc_10");
+                var requestHome = questGiver.anchorMin;
+                Require(marker.alpha == 0f && main.Find("MainQuestMarker/Label").GetComponent<Text>().text == "!" &&
+                    field.Find("QuestNpc_10/ResidentMarker/Label").GetComponent<Text>().text == "?" &&
+                    field.Find("QuestNpc_10/QuestBadge") == null &&
+                    field.Find("RpgCardMerchant/ResidentMarker/Label").GetComponent<Text>().text == "▣",
+                    "The field did not distinguish story, request, shop and nearby conversation markers.");
+                bool stepped = false;
+                for (int i = 0; i < 9; i++)
+                {
+                    world.Update(.1f);
+                    stepped |= art.sprite != idle;
+                }
+                Require(stepped && resident.anchorMin.x < home.x - .03f && resident.anchorMin.y < home.y - .02f &&
+                    player.anchorMin == playerHome && main.anchorMin == storyHome && marker.alpha == 0f &&
+                    questGiver.anchorMin.x > requestHome.x + .003f &&
+                    questGiver.anchorMin.x < requestHome.x + .02f,
+                    "The resident did not use its walking poses and change position while the player stood still.");
+
+                var stopped = resident.anchorMin;
+                Press(panel, "FieldHud/MenuToggle");
+                world.Update(.9f);
+                Require(resident.anchorMin == stopped, "Background walkers did not pause for the field menu.");
+                world.Back();
+
+                Press(resident, "SD");
+                world.Update(.15f);
+                Require(resident.anchorMin == stopped && world.CanWalk,
+                    "A resident kept walking after the player tapped it from far away.");
+                var floor = field.Find("Scenery").GetComponent<TagForceFloorTap>();
+                floor.Click(stopped + new Vector2(.055f, -.048f));
+                for (int i = 0; i < 12; i++) world.Update(.1f);
+                Require(world.CanWalk && marker.alpha > .95f && art.rectTransform.localScale.x > 0f &&
+                    panel.Find("FieldHud/ContextAction/Label").GetComponent<Text>().text.Contains(script.episodes[1].opponentName),
+                    "The walker did not pause, face the player or display the nearby conversation bubble.");
+                var focused = resident.anchorMin;
+                world.Update(.4f);
+                Require(resident.anchorMin == focused, "A resident moved away during nearby interaction.");
+                Press(panel, "FieldHud/ContextAction");
+                world.Update(.5f);
+                Require(!world.CanWalk && panel.Find("ResidentChoices/TalkDaily") != null,
+                    "The approach did not open the moving resident's conversation.");
+                world.Back();
+                Require(world.EnterRpgRegion(1) && world.EnterRpgRegion(0), "Could not reset the field after resident activity.");
+                Debug.Log("[VERIFY 5DS RESIDENTS] Idle-player routes, separate footsteps, menu pause and contextual markers passed.");
+            }
+
             void VerifySceneGuests()
             {
                 var field = FieldScene();
@@ -573,7 +633,8 @@ namespace YGOPortable.Editor
                 world.Update(4f);
                 CollectionProgress.Load(save);
                 Require(CollectionProgress.GetRpgQuestState(tools) == RpgQuestState.Ready &&
-                    FieldScene().Find("SideQuestItem") == null && CollectionProgress.Balance == before,
+                    FieldScene().Find("SideQuestItem") == null && CollectionProgress.Balance == before &&
+                    FieldScene().Find("QuestNpc_10/ResidentMarker/Label").GetComponent<Text>().text == "✓",
                     "Investigating did not persist the objective or granted an early reward.");
                 TalkTo(10);
                 Press(panel, "ResidentChoices/ClaimQuest");
@@ -592,6 +653,8 @@ namespace YGOPortable.Editor
                     "The quest journal was missing the active delivery destination.");
                 world.Back();
                 Require(world.EnterRpgRegion(0), "The garage was unreachable during delivery.");
+                Require(FieldScene().Find("QuestNpc_10/ResidentMarker/Label").GetComponent<Text>().text == "›",
+                    "The delivery receiver did not show the handoff marker.");
                 TalkTo(10);
                 Press(panel, "ResidentChoices/DeliverQuest");
                 world.Back();

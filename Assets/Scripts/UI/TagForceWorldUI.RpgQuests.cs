@@ -38,22 +38,16 @@ namespace YGOPortable.UI
             var delivery = RpgPendingDeliveries(quest).FirstOrDefault();
             if (!_rpgResidents.ContainsKey(quest.Giver))
             {
-                var spot = quest.Giver == RpgCrow && RpgCouplerState == RpgQuestState.Complete
-                    ? RpgQuestCrowBench : RpgQuestGiverPosition;
-                AddRpgResident(quest.Giver, RpgQuestName(quest), $"QuestNpc_{quest.Giver}", spot,
-                    false, () => OpenRpgQuestTalk(quest));
-                string badge = delivery != null ? "전달" : state switch
+                bool atWorkbench = quest.Giver == RpgCrow && RpgCouplerState == RpgQuestState.Complete;
+                var spot = atWorkbench ? RpgQuestCrowBench : RpgQuestGiverPosition;
+                var role = delivery != null ? RpgResidentRole.Delivery : state switch
                 {
-                    RpgQuestState.Available => "의뢰",
-                    RpgQuestState.Ready => "보상",
-                    _ => null,
+                    RpgQuestState.Available => RpgResidentRole.Request,
+                    RpgQuestState.Ready => RpgResidentRole.Reward,
+                    _ => RpgResidentRole.Conversation,
                 };
-                if (badge != null)
-                {
-                    var marker = Area(_rpgResidents[quest.Giver], "QuestBadge", .19f, 1.238f, .81f, 1.49f);
-                    RpgUiStyle.Panel(marker, accent: true);
-                    HudLabel(marker, badge, 15, DuelUiKit.GoldAccent, align: TextAnchor.MiddleCenter, heading: true);
-                }
+                AddRpgResident(quest.Giver, RpgQuestName(quest), $"QuestNpc_{quest.Giver}", spot,
+                    role, () => OpenRpgQuestTalk(quest), patrol: role == RpgResidentRole.Request && !atWorkbench);
             }
 
             if (state == RpgQuestState.Active && quest.Receiver == null)

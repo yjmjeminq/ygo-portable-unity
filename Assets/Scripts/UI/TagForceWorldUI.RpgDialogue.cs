@@ -79,12 +79,8 @@ namespace YGOPortable.UI
                 _rpgDialogueOpponent.anchorMin, true, false);
             _rpgStageSpeakers[episode.opponentName] = opponent;
 
-            foreach (var actor in _rpgResidents.Values)
-            {
-                var marker = actor.Find(actor == _rpgDialogueOpponent ? "MainQuestMarker" : "ResidentMarker");
-                if (marker != null) marker.gameObject.SetActive(false);
-                actor.Find("QuestBadge")?.gameObject.SetActive(false);
-            }
+            foreach (var resident in _rpgResidentMotion)
+                resident.Marker.gameObject.SetActive(false);
             _rpgSceneSpace.Find("SideQuestItem")?.gameObject.SetActive(false);
             _rpgFieldObjects?.gameObject.SetActive(false);
             _rpgCompanion?.gameObject.SetActive(false);
