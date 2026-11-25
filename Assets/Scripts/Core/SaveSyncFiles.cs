@@ -7,6 +7,7 @@ using System.Runtime.CompilerServices;
 #endif
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using UnityEngine;
 
 #if UNITY_EDITOR
@@ -193,6 +194,26 @@ namespace YGOPortable.Core
             catch (DirectoryNotFoundException) { return null; }
         }
 
+        internal static void CommitAtomicFile(string pending, string destination)
+        {
+            for (int attempt = 0; ; attempt++)
+            {
+                try
+                {
+                    if (File.Exists(destination)) File.Replace(pending, destination, null);
+                    else File.Move(pending, destination);
+                    return;
+                }
+                catch (IOException error) when (attempt < 3 && File.Exists(pending) &&
+                    ((error.HResult & 0xffff) is 32 or 33 or 1175 ||
+                    ((error.HResult & 0xffff) == 183 && File.Exists(destination))))
+                {
+                    // A Windows reader or scanner can briefly hold the destination without delete sharing.
+                    Thread.Sleep(20 << attempt);
+                }
+            }
+        }
+
         internal static void WriteAtomic(string path, string value)
         {
             string directory = Path.GetDirectoryName(path);
@@ -201,8 +222,7 @@ namespace YGOPortable.Core
             try
             {
                 File.WriteAllText(pending, value, new UTF8Encoding(false));
-                if (File.Exists(path)) File.Replace(pending, path, null);
-                else File.Move(pending, path);
+                CommitAtomicFile(pending, path);
             }
             finally
             {

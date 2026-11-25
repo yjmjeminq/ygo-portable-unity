@@ -989,8 +989,7 @@ namespace YGOPortable.Core
                 {
                     pending = Path.Combine(directory, Path.GetRandomFileName() + ".tmp");
                     File.WriteAllText(pending, json);
-                    if (File.Exists(_profilePath)) File.Replace(pending, _profilePath, null);
-                    else File.Move(pending, _profilePath);
+                    SaveSyncFiles.CommitAtomicFile(pending, _profilePath);
                 }
                 else
                 {

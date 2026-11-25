@@ -325,8 +325,7 @@ namespace YGOPortable.Core
             try
             {
                 File.WriteAllText(pending, JsonUtility.ToJson(deck, true), Encoding.UTF8);
-                if (File.Exists(path)) File.Replace(pending, path, null);
-                else File.Move(pending, path);
+                SaveSyncFiles.CommitAtomicFile(pending, path);
             }
             finally
             {

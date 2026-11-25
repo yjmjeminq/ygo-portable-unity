@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading;
 using UnityEngine;
 using UnityEngine.UI;
 using YGOPortable.Core;
@@ -54,6 +55,7 @@ namespace YGOPortable.Editor
                 DeckRepository.UserDecks.Single().id == starter.id && File.Exists(blockedDeckPath),
                 "Starter selection did not grant the deck and starting DP exactly once.");
 
+            VerifyWindowsSaveRetry(save);
             VerifySaveSync(streamingPath, save, starter);
             var materials = LoadLegacyProfile(save, profile);
             VerifyCrafting(materials, starter, profile);
@@ -62,6 +64,24 @@ namespace YGOPortable.Editor
             VerifyDeckCopyLimitAndFullDisassembly(starter, profile);
             Debug.Log($"[VERIFY COLLECTION] {starters.Count} starter deck sizes, legacy saves, uncapped inventory, shared crafting dust, " +
                 "deck copy limits, full disassembly, pack ownership, rollback and opponent access passed.");
+        }
+
+        private static void VerifyWindowsSaveRetry(string save)
+        {
+            if (Application.platform != RuntimePlatform.WindowsEditor) return;
+            string path = Path.Combine(save, "save-sharing-probe.json");
+            SaveSyncFiles.WriteAtomic(path, "before");
+            using var reader = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+            var release = new Thread(() =>
+            {
+                Thread.Sleep(45);
+                reader.Dispose();
+            }) { IsBackground = true };
+            release.Start();
+            try { SaveSyncFiles.WriteAtomic(path, "after"); }
+            finally { release.Join(); }
+            Require(File.ReadAllText(path) == "after", "A transient Windows file lock lost the committed save.");
+            Debug.Log("[VERIFY ATOMIC SAVE] Windows reader temporarily blocking replacement passed.");
         }
 
         private static void VerifyOpponentAccess()
