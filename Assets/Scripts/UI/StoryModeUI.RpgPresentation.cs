@@ -29,7 +29,7 @@ namespace YGOPortable.UI
             _dialogue.Open("지난 이야기 · " + TitleOf(episode), Script.protagonist,
                 DeckRepository.GetCharacter(episode.charId), lines, ReturnToEpisodes, rpg: true,
                 rpgBackdrop: region.StoryBackdrop,
-                preferredRpgBackdrop: TagForceWorldUI.LightingForEpisode(region, index + 1));
+                preferredRpgBackdrop: TagForceWorldUI.LightingForEpisode(region, index + 1), rpgEpisode: index + 1);
         }
 
         private void PlayRpgFaceoff(StoryEpisodeData episode, Action finish)
@@ -46,7 +46,7 @@ namespace YGOPortable.UI
             RpgUiStyle.Panel(hero);
             RpgUiStyle.Panel(boss, accent: true);
             Portrait(hero, _app.RpgField?.RpgStandingPortrait(0) ?? DuelProfileArt.Player, "카이");
-            Portrait(boss, _app.RpgField?.RpgStandingPortrait(episode.charId) ??
+            Portrait(boss, _app.RpgField?.RpgStandingPortrait(episode.charId, RpgWardrobe.EpisodeNumber(episode)) ??
                 DuelProfileArt.Opponent(DeckRepository.GetCharacter(episode.charId)), episode.opponentName);
             AddLabel(_rpgFaceoff, "Versus", .42f, .41f, .58f, .64f, 46, color: DuelUiKit.GoldAccent).text = "VS";
             AddLabel(_rpgFaceoff, "Match", .12f, .77f, .88f, .90f, 27, color: DuelUiKit.GoldAccent).text = TitleOf(episode);

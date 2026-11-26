@@ -43,8 +43,13 @@ namespace YGOPortable.UI
         private bool _rpgIntroOnOpen, _rpgAnnounceArrival, _rpgWorkbenchServices;
         private int? _rpgServiceSpeaker;
 
-        internal Sprite RpgStandingPortrait(int id) => _images.Get(RpgArt + "Characters_Standing/" +
-            (id == 0 ? "full_protagonist.png" : $"full_{id}.png"));
+        internal Sprite RpgStandingPortrait(int id, int episode = 0)
+        {
+            if (id == 0) return _images.Get(RpgArt + "Characters_Standing/full_protagonist.png");
+            string outfit = RpgWardrobe.ForStory(id, episode);
+            return (outfit == null ? null : _images.Get(RpgArt + RpgWardrobe.Preview(id, outfit))) ??
+                _images.Get(RpgArt + RpgWardrobe.PortraitStem(id, null) + ".png");
+        }
 
         private void BuildRpgIntro(bool guide)
         {

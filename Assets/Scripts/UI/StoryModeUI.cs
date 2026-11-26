@@ -791,7 +791,8 @@ namespace YGOPortable.UI
                 _backdrop.enabled = false;
                 _browser.gameObject.SetActive(false);
             }
-            _dialogue.Open(heading, Script.protagonist, DeckRepository.GetCharacter(episode.charId), lines, onFinish, _rpgWorld, field);
+            _dialogue.Open(heading, Script.protagonist, DeckRepository.GetCharacter(episode.charId), lines, onFinish, _rpgWorld, field,
+                rpgEpisode: RpgWardrobe.EpisodeNumber(episode));
         }
 
         private void ReturnToEpisodes()

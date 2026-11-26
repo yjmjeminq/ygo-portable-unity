@@ -286,6 +286,8 @@ namespace YGOPortable.UI
             (LightingForEpisode(region, RpgClears + 1) is string lighting ? _images.Get(RpgArt + lighting) : null) ??
             _images.Get(region.FieldBackground) ?? _images.Get(region.Background);
 
+        private string FieldOutfit(int id) => RpgWardrobe.ForField(id, _rpgLocation, RpgClears + 1);
+
         private void BuildRpgField()
         {
             var floor = BuildRpgCamera(GetRpgFieldArt(RpgRegions[_rpgLocation]));
@@ -355,7 +357,9 @@ namespace YGOPortable.UI
             var actor = Anchor(_rpgSceneSpace, node, spot, RpgFieldActorSize);
             _rpgResidents[id] = actor;
             var art = DuelUiKit.FillRect("SD", actor);
-            var profile = BuildRpgActorArt(art, RpgArt + $"Characters_SD/sd_{RpgArtKey(id)}.png", name);
+            var outfit = FieldOutfit(id);
+            var profile = BuildRpgActorArt(art, RpgArt + $"Characters_SD/sd_{RpgArtKey(id)}.png", name,
+                outfit == null ? null : RpgWardrobe.WalkAtlas(id, outfit));
             PoseRpgWalker(actor, profile, spot, Vector2.zero, false, Vector2.right * (_position.x - spot.x));
             void Approach() => MoveTo(actor.anchorMin - new Vector2(0f, .06f), interact, actor);
             BindPortrait(art, Approach);
@@ -426,7 +430,9 @@ namespace YGOPortable.UI
             if (speakerId is int id)
             {
                 var speaker = FaceRpgConversationSpeaker(id);
-                var bust = _images.GetBust(RpgArt + $"Characters_Standing/full_{RpgArtKey(id)}.png");
+                var outfit = FieldOutfit(id);
+                var bust = (outfit == null ? null : _images.Get(RpgArt + RpgWardrobe.Preview(id, outfit))) ??
+                    _images.GetBust(RpgArt + $"Characters_Standing/full_{RpgArtKey(id)}.png");
                 if (bust == null && id != RpgShopkeeperId)
                     bust = DuelProfileArt.Opponent(DeckRepository.GetCharacter(id));
                 if (bust != null && bust != DuelProfileArt.MissingOpponent)

@@ -37,3 +37,18 @@ OpenAI 내장 이미지 생성 도구로 여섯 장을 각각 생성한 뒤 1920
 - `5DS/WalkCycles/sd_*_field.png`의 추가 시트는 기존 프로젝트 SD를 참고했습니다. 위부터 옆·앞·뒤, 각 행은 대기·왼발·오른발을 배치한 투명 3×3 시트입니다.
 - `5DS/Cutscenes/cg_dark_signer_altar.jpg`, `cg_aki_garage_training.jpg`, `cg_wrgp_riding_clash.jpg`, `cg_ark_cradle_final.jpg`는 각각 보라색 제단, 아침 정비소의 실습, 서킷의 라이딩 대결, 공중 요새의 마지막 장면을 새 구도로 제작했습니다.
 - `icon_shop.png`, `icon_treasure.png`, `icon_talk.png`는 프로젝트용 카드, 반짝임, 대화 아이콘을 128×128 투명 PNG로 직접 그린 파일입니다.
+
+## 장면별 의상
+
+프로젝트 스탠딩과 SD 원화를 참고해 OpenAI 내장 이미지 생성 도구로 제작했습니다. 투명 상반신은 미소, 홍조, 슬픔, 결의, 놀람, 아픔 6종으로 만들었습니다. 같은 옷의 SD는 옆·앞·뒤 대기와 왼발·오른발 보행을 담은 투명 3×3 시트입니다.
+
+| 인물과 장면 | 사용한 의상 프롬프트 | 파일명 |
+| --- | --- | --- |
+| 아키 · 아카데미아 | 짙은 남색 블레이저, 흰 셔츠, 와인색 리본, 회색 주름치마 | `full_1_school_*`, `sd_1_school_field.png` |
+| 아키 · 일상 | 크림색 블라우스, 버건디 조끼와 리본, 버건디 치마 | 기존 `full_1_*`, `sd_1_everyday_field.png` |
+| 아키 · 정비소 훈련 | 크림색 몸판과 와인색 소매가 있는 정비 재킷, 어두운 작업 바지 | `full_1_workshop_*`, `sd_1_workshop_field.png` |
+| 아키 · 결전 | 버건디와 검정의 결전복, 크림색 퍼프 소매, 녹색 펜던트 | `full_1_duel_*`, 기존 `sd_1_field.png` |
+| 아키 · WRGP | 아이보리 어깨 보호대, 적색 몸판, 차콜 보호대와 승차용 바지 | `full_1_riding_*`, `sd_1_riding_field.png` |
+| 칼리 · 시티 취재 | 짙은 청록 트렌치코트, 복숭아색 스카프, 작은 카메라 가방 | `full_220_press_*`, `sd_220_press_field.png` |
+| 셰리 · 시내 만남 | 남색 롱 블레이저, 엷은 세이지색 스카프, 아이보리 블라우스 | `full_32_city_*`, `sd_32_city_field.png` |
+| 칼리 · 다크 시그너 | 기존 검정과 보라색 의상의 앞·옆·뒤 걸음 | `sd_221_field.png` |

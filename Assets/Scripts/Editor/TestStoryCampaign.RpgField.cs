@@ -126,6 +126,7 @@ namespace YGOPortable.Editor
                 VerifyResidentProfiles();
                 VerifyResidentActivity();
                 VerifyDialoguePortraitAssets();
+                VerifyWardrobe();
                 VerifySceneGuests();
                 VerifyStageExit();
 
@@ -440,7 +441,7 @@ namespace YGOPortable.Editor
                     var art = DuelUiKit.FillRect("Art", actor);
                     try
                     {
-                        buildArt.Invoke(world, new object[] { art, $"TagForce/5DS/Characters_SD/sd_{id}.png", id });
+                        buildArt.Invoke(world, new object[] { art, $"TagForce/5DS/Characters_SD/sd_{id}.png", id, null });
                         var animator = art.GetComponent<TagForceRpgWalkAnimator>();
                         var image = art.GetComponent<Image>();
                         var sideIdle = image.sprite;
@@ -471,7 +472,7 @@ namespace YGOPortable.Editor
                 try
                 {
                     var art = DuelUiKit.FillRect("Art", fallback);
-                    buildArt.Invoke(world, new object[] { art, "TagForce/5DS/Characters_SD/sd_33.png", "야나기 텐젠" });
+                    buildArt.Invoke(world, new object[] { art, "TagForce/5DS/Characters_SD/sd_33.png", "야나기 텐젠", null });
                     VerifyStride(art.GetComponent<TagForceRpgStride>());
                 }
                 finally { UnityEngine.Object.DestroyImmediate(fallback.gameObject); }
@@ -644,6 +645,15 @@ namespace YGOPortable.Editor
                 Require(portrait.enabled && portrait.sprite != null &&
                     guest.Find("Sprite").GetComponent<Image>().enabled,
                     "Aki's dialogue did not keep both the field actor and upper-body portrait visible.");
+                var worldArt = (TagForceWorldImages)typeof(TagForceWorldUI).GetField("_images", flags).GetValue(world);
+                var schoolWalk = worldArt.GetSlices("TagForce/5DS/WalkCycles/sd_1_school_field.png", 3, 3, fixedCells: true);
+                Require(guest.Find("Sprite").GetComponent<Image>().sprite.texture == schoolWalk[0].texture,
+                    "Aki's cutscene actor did not wear her academy outfit.");
+                var dialogue = (StoryModeUI.StoryDialogueView)typeof(StoryModeUI).GetField("_dialogue", flags).GetValue(story);
+                var sprites = (Dictionary<string, Sprite>)typeof(StoryModeUI.StoryDialogueView).GetField("_rpgSprites", flags).GetValue(dialogue);
+                string schoolPose = Path.Combine(streaming, "TagForce/5DS", $"Characters_Standing/full_1_school_{lines[firstAkiLine].emotion}.png");
+                Require(sprites.TryGetValue(schoolPose, out var schoolPortrait) && portrait.sprite == schoolPortrait,
+                    "Aki's portrait did not use the same wardrobe as her stage actor.");
                 int shocked = Array.FindIndex(lines, firstAkiLine + 1,
                     line => line.speaker == "이자요이 아키" && line.emotion == "shock");
                 Require(shocked > firstAkiLine, "The narration fixture did not have an Aki reaction.");
@@ -682,6 +692,43 @@ namespace YGOPortable.Editor
                 for (int frame = 0; frame < 3; frame++) world.Update(.15f, Vector2.up);
                 Require(world.CanWalk && !storyRoot.gameObject.activeSelf,
                     "The automatic scene immediately reopened after leaving it.");
+            }
+
+            void VerifyWardrobe()
+            {
+                var expected = new[]
+                {
+                    (1, 1, "school"), (1, 3, "school"), (1, 8, "everyday"), (1, 12, "duel"),
+                    (1, 26, "duel"), (1, 32, "workshop"), (1, 34, "workshop"), (1, 39, "riding"),
+                    (1, 48, "duel"), (1, 50, "everyday"), (32, 33, "city"), (32, 49, (string)null),
+                    (220, 30, "press"), (230, 14, (string)null), (221, 22, (string)null),
+                };
+                var images = new TagForceWorldImages();
+                try
+                {
+                    foreach (var (id, episode, outfit) in expected)
+                    {
+                        Require(RpgWardrobe.EpisodeNumber(script.episodes[episode - 1]) == episode &&
+                            RpgWardrobe.ForStory(id, episode) == outfit &&
+                            RpgWardrobe.ForField(id, RegionForEpisode(episode), episode) == outfit,
+                            $"The field and dialogue chose different outfits for {id}, episode {episode}.");
+                        if (outfit == null) continue;
+                        var stem = "TagForce/5DS/" + RpgWardrobe.PortraitStem(id, outfit);
+                        foreach (var mood in new[] { "smile", "blush", "sad", "determined", "shock", "hurt" })
+                            Require(images.Get($"{stem}_{mood}.png") != null, $"Missing {outfit}/{mood} for {id}.");
+                        var walk = images.GetSlices("TagForce/5DS/" + RpgWardrobe.WalkAtlas(id, outfit), 3, 3, fixedCells: true);
+                        Require(walk is { Length: 9 } && walk.All(pose => pose.rect.size == new Vector2(256f, 256f)),
+                            $"The {outfit} wear set for {id} lacked directional field art.");
+                    }
+                    Require(RpgWardrobe.ForField(1, RpgGarage, 39) == "everyday" &&
+                        RpgWardrobe.ForField(1, RpgAcademia, 39) == "school" &&
+                        RpgWardrobe.ForField(1, RpgWrgp, 3) == "riding",
+                        "Free exploration did not dress residents for their actual map.");
+                    var darkCarly = images.GetSlices("TagForce/5DS/WalkCycles/sd_221_field.png", 3, 3, fixedCells: true);
+                    Require(darkCarly is { Length: 9 }, "Dark Signer Carly still lacked directional field art.");
+                }
+                finally { images.Clear(); }
+                Debug.Log("[VERIFY 5DS WARDROBE] Scene outfits, matching portrait and SD assignments, and free exploration passed.");
             }
 
             void VerifyDialoguePortraitAssets()

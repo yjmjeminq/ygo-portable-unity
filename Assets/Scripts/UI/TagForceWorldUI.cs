@@ -419,10 +419,10 @@ namespace YGOPortable.UI
             rect.gameObject.AddComponent<TagForceCursorSound>();
         }
 
-        private RectTransform WalkerSprite(RectTransform actor, string path, string name)
+        private RectTransform WalkerSprite(RectTransform actor, string path, string name, string outfitAtlas = null)
         {
             var visual = DuelUiKit.FillRect("Sprite", actor);
-            if (_rpgField) return BuildRpgActorArt(visual, path, name);
+            if (_rpgField) return BuildRpgActorArt(visual, path, name, outfitAtlas);
             return Portrait(visual, path, name) ? visual : null;
         }
 

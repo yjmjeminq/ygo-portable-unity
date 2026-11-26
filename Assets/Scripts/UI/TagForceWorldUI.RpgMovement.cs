@@ -148,10 +148,11 @@ namespace YGOPortable.UI
             }
         }
 
-        private RectTransform BuildRpgActorArt(RectTransform art, string path, string name)
+        private RectTransform BuildRpgActorArt(RectTransform art, string path, string name, string outfitAtlas = null)
         {
             string cycle = RpgArt + "WalkCycles/" + Path.GetFileNameWithoutExtension(path);
-            var field = path == null ? null : _images.GetSlices(cycle + "_field.png", 3, 3, fixedCells: true);
+            var field = outfitAtlas == null ? null : _images.GetSlices(RpgArt + outfitAtlas, 3, 3, fixedCells: true);
+            if (field == null && path != null) field = _images.GetSlices(cycle + "_field.png", 3, 3, fixedCells: true);
             var directions = field ?? (path == null ? null : _images.GetSlices(cycle + "_directions.png", 3, 3));
             var sides = path == null || directions != null ? null : _images.GetSlices(cycle + ".png", 2, 2);
             var profile = path == null || directions != null ? null : _images.GetSlices(cycle + "_side_idle.png", 1, 1)?[0];

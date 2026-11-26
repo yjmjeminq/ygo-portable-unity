@@ -23,6 +23,7 @@ namespace YGOPortable.UI
         private string _rpgHeroName;
         private int _rpgLastLine;
         private int _rpgGuestSlots;
+        private int _rpgSceneEpisode;
         internal bool RpgStageRunning => _rpgBeatRemaining > 0f;
 
         private readonly struct RpgStagePose
@@ -55,6 +56,7 @@ namespace YGOPortable.UI
             if (_player == null || _rpgDialogueCast != null || _page != Page.Field) Show(Page.Field);
 
             _rpgDialogueCast = DuelUiKit.FillRect("DialogueCast", _rpgSceneSpace);
+            _rpgSceneEpisode = RpgWardrobe.EpisodeNumber(episode);
             _rpgLastPlayedSceneId = episode.id;
             _rpgHeroName = hero;
             _rpgLastLine = -1;
@@ -69,10 +71,11 @@ namespace YGOPortable.UI
             _rpgNavigation.gameObject.SetActive(false);
 
             _rpgResidents.TryGetValue(episode.charId, out _rpgDialogueOpponent);
-            if (_rpgDialogueOpponent == null)
+            if (_rpgDialogueOpponent == null || FieldOutfit(episode.charId) != RpgWardrobe.ForStory(episode.charId, _rpgSceneEpisode))
             {
-                _rpgDialogueOpponent = Anchor(_rpgDialogueCast, "Opponent", RpgNpcSlots[0], new Vector2(91f, 100f));
-                WalkerSprite(_rpgDialogueOpponent, RpgArt + $"Characters_SD/sd_{episode.charId}.png", episode.opponentName);
+                var mark = _rpgDialogueOpponent != null ? _rpgDialogueOpponent.anchorMin : RpgNpcSlots[0];
+                _rpgDialogueOpponent = Anchor(_rpgDialogueCast, "Opponent", mark, new Vector2(91f, 100f));
+                CreateStageWalker(_rpgDialogueOpponent, episode.charId, episode.opponentName);
             }
             RegisterRpgActor(0, _player, _playerSprite, _position, true, false);
             var opponentArt = (_rpgDialogueOpponent.Find("SD") ?? _rpgDialogueOpponent.Find("Sprite")) as RectTransform;
@@ -144,7 +147,8 @@ namespace YGOPortable.UI
                 sprite = actor.Find("Sprite") as RectTransform;
                 resident = true;
             }
-            else if (!enters && id.HasValue && _rpgResidents.TryGetValue(id.Value, out actor))
+            else if (!enters && id is int residentId && FieldOutfit(residentId) == RpgWardrobe.ForStory(residentId, _rpgSceneEpisode) &&
+                _rpgResidents.TryGetValue(residentId, out actor))
             {
                 sprite = actor.Find("SD") as RectTransform;
                 resident = true;
@@ -153,9 +157,17 @@ namespace YGOPortable.UI
             {
                 string key = id.HasValue ? id.Value.ToString() : $"Unknown_{slot}";
                 actor = Anchor(_rpgDialogueCast, $"Guest_{key}", entry, new Vector2(91f, 103f));
-                sprite = WalkerSprite(actor, id.HasValue ? RpgArt + $"Characters_SD/sd_{id}.png" : null, name);
+                sprite = CreateStageWalker(actor, id, name);
             }
             return RegisterRpgActor(id, actor, sprite, mark, resident, true);
+        }
+
+        private RectTransform CreateStageWalker(RectTransform actor, int? id, string name)
+        {
+            if (id is not int character) return WalkerSprite(actor, null, name);
+            string outfit = RpgWardrobe.ForStory(character, _rpgSceneEpisode);
+            return WalkerSprite(actor, RpgArt + $"Characters_SD/sd_{id}.png", name,
+                outfit == null ? null : RpgWardrobe.WalkAtlas(character, outfit));
         }
 
         private RpgStageActor RegisterRpgActor(int? id, RectTransform root, RectTransform art, Vector2 mark,

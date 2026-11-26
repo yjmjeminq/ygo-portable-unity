@@ -101,6 +101,7 @@ namespace YGOPortable.UI
             private bool _heroSpeaking;
             private bool _opponentSpeaking;
             private bool _rpg;
+            private int _rpgEpisode;
             private bool _showCutscene;
             private bool _akiBlush;
             private readonly Image _heroPrevious, _opponentPrevious;
@@ -255,7 +256,7 @@ namespace YGOPortable.UI
             internal void Open(string heading, string protagonist, OpponentCharacter opponent, StoryDialogueLine[] lines,
                 Action onEnd, bool rpg = false, TagForceWorldUI field = null, bool backdropBelow = false,
                 string rpgBackdrop = "Maps/spot_daedalus_bridge.png", Action onSkip = null,
-                string preferredRpgBackdrop = null)
+                string preferredRpgBackdrop = null, int rpgEpisode = 0)
             {
                 Close();
                 _field = field;
@@ -269,6 +270,7 @@ namespace YGOPortable.UI
                 _protagonist = protagonist;
                 _sceneOpponent = opponent;
                 _rpg = rpg;
+                _rpgEpisode = rpgEpisode;
                 ApplyDialogueStyle(rpg);
                 _hero.rectTransform.anchorMin = rpg ? new Vector2(.025f, onField ? .32f : .385f) : new Vector2(.07f, .26f);
                 _hero.rectTransform.anchorMax = rpg ? new Vector2(onField ? .235f : .365f, .91f) : new Vector2(.493f, .855f);
@@ -480,7 +482,7 @@ namespace YGOPortable.UI
                     if (_heroSpeaking || _hero.sprite == null)
                         ShowBust(_hero, _heroPrevious, LoadHeroBust(_heroSpeaking ? _emotion : null), ref _heroFade, ref _heroSlide);
                     if ((speaker ?? (_opponent.sprite == null ? _sceneOpponent : null)) is { } actor)
-                        ShowBust(_opponent, _opponentPrevious, LoadBust($"Characters_Standing/full_{actor.id}", speaker != null ? _emotion : null)
+                        ShowBust(_opponent, _opponentPrevious, LoadActorBust(actor.id, speaker != null ? _emotion : null)
                             ?? DuelProfileArt.Opponent(actor), ref _opponentFade, ref _opponentSlide);
                     if (_heroSpeaking && !heroPreviouslySpeaking) _heroSlide = Mathf.Max(_heroSlide, .12f);
                     if (_opponentSpeaking && !opponentPreviouslySpeaking) _opponentSlide = Mathf.Max(_opponentSlide, .12f);
@@ -784,20 +786,26 @@ namespace YGOPortable.UI
             private Sprite LoadHeroBust(string emotion) =>
                 LoadBust("Characters_Standing/full_protagonist", emotion) ?? DuelProfileArt.Player;
 
-            private Sprite LoadBust(string stem, string emotion)
+            private Sprite LoadActorBust(int id, string emotion)
             {
-                if (emotion is "smile" or "blush" or "sad" or "determined" or "shock" or "hurt")
+                string outfit = RpgWardrobe.ForStory(id, _rpgEpisode);
+                if (outfit != null)
                 {
-                    var pose = LoadRpgSprite($"{stem}_{emotion}.png");
+                    var pose = LoadExpression(RpgWardrobe.PortraitStem(id, outfit), emotion) ??
+                        LoadRpgSprite(RpgWardrobe.Preview(id, outfit));
                     if (pose != null) return pose;
                 }
-                if (stem == "Characters_Standing/full_1")
-                {
-                    var neutral = LoadRpgSprite($"{stem}_determined.png");
-                    if (neutral != null) return neutral;
-                }
-                return LoadRpgSprite(stem + ".png", waistUp: true);
+                return LoadBust(RpgWardrobe.PortraitStem(id, null), emotion);
             }
+
+            private Sprite LoadBust(string stem, string emotion)
+            {
+                return LoadExpression(stem, emotion) ?? LoadRpgSprite(stem + ".png", waistUp: true);
+            }
+
+            private Sprite LoadExpression(string stem, string emotion) =>
+                emotion is "smile" or "blush" or "sad" or "determined" or "shock" or "hurt"
+                    ? LoadRpgSprite($"{stem}_{emotion}.png") : null;
 
             private void BindCutscene(string id)
             {
