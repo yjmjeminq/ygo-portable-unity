@@ -413,6 +413,7 @@ namespace YGOPortable.Editor
                             FieldScene().Find("Scenery").GetComponent<Image>().sprite != null &&
                             panel.Find("FieldHud/FieldDetails/GxOpponentTier/Value/Label") != null,
                             $"GX duel HUD or field was missing for {episode.id}.");
+                        VerifyGxResidentTimeline(episode, location);
                         bool isPov = episode.playAsCharacterId > 0;
                         string identity = FieldScene().Find("Player/GxIdentity/Label").GetComponent<Text>().text;
                         Require(identity.Contains(isPov ? "아스카" : "윤"), $"Wrong field point of view at {episode.id}.");
@@ -568,6 +569,9 @@ namespace YGOPortable.Editor
                         string map = gxMap.spots[location].spotId;
                         Require(world.EnterRpgRegion(location) && FieldScene().Find("Scenery").GetComponent<Image>().sprite != null,
                             $"Unable to enter GX map {map}.");
+                        Require(!FieldScene().Cast<Transform>().Any(child => gxMap.roster.Any(resident =>
+                            resident.storyOnly && child.name == $"Resident_{resident.charId}")),
+                            $"A story-only GX actor was patrolling {map} after the credits.");
                         VerifyGxGrounded(location);
                         VerifyGroundedPresentation();
                         var ground = CurrentTerrain();
@@ -607,6 +611,7 @@ namespace YGOPortable.Editor
                     VerifyEveryStageFootprint(gxScript);
                     Debug.Log("[VERIFY GX DIALOGUE] Event, victory and defeat scripts rendered, with distinct Yun, Asuka and possessed Yun speaker roles.");
                     Debug.Log("[VERIFY GX FIELD] 53 sequences, 34 Master wins, 34 surrender/retry routes, 19 lockouts, 12 grounded fields and three POV decks passed.");
+                    Debug.Log("[VERIFY GX RESIDENTS] Rescue, recovery, changed forms, missing characters and story-only patrol restrictions passed.");
                     Debug.Log("[VERIFY GX QOL] One-click travel, NPC prompts, running, deck swaps and editor return, save recovery and three aspect ratios passed.");
                 }
                 finally
@@ -618,6 +623,63 @@ namespace YGOPortable.Editor
                     if (hadLocation) PlayerPrefs.SetString(gxPreference, previousLocation);
                     else PlayerPrefs.DeleteKey(gxPreference);
                     PlayerPrefs.Save();
+                }
+
+                void VerifyGxResidentTimeline(StoryEpisodeData episode, int location)
+                {
+                    switch (episode.id)
+                    {
+                        case "gx_ep_04":
+                        case "gx_ep_08":
+                        case "gx_ep_09":
+                            ExpectResident(111, present: false);
+                            break;
+                        case "gx_ep_10":
+                            Visit("spot_harbor_beach");
+                            ExpectResident(111, present: true);
+                            break;
+                        case "gx_ep_13":
+                            ExpectResident(199, present: false);
+                            Visit("spot_forest_duel_ground");
+                            ExpectResident(107, present: false);
+                            ExpectResident(117, present: false);
+                            break;
+                        case "gx_ep_14":
+                            ExpectResident(117, present: true);
+                            ExpectResident(3100, present: false);
+                            break;
+                        case "gx_ep_15":
+                            ExpectResident(107, present: false);
+                            break;
+                        case "gx_ep_16":
+                            Visit("spot_main_academy");
+                            ExpectResident(137, present: false);
+                            break;
+                        case "gx_ep_22":
+                        case "gx_ep_25":
+                            ExpectResident(119, present: false);
+                            ExpectResident(120, present: false);
+                            break;
+                        case "gx_ep_26":
+                            ExpectResident(119, present: true);
+                            ExpectResident(214, present: false);
+                            break;
+                    }
+
+                    void Visit(string spotId)
+                    {
+                        int index = Array.FindIndex(gxMap.spots, spot => spot.spotId == spotId);
+                        Require(world.EnterRpgRegion(index), $"Cannot check GX residents at {spotId}.");
+                    }
+
+                    void ExpectResident(int actorId, bool present)
+                    {
+                        Require((FieldScene().Find($"Resident_{actorId}") != null) == present,
+                            $"Unexpected field presence for GX resident {actorId} at {episode.id}.");
+                    }
+
+                    if (!world.CanStartRpgEpisode(world.RpgClears))
+                        Require(world.EnterRpgRegion(location), $"Cannot restore the objective at {episode.id}.");
                 }
 
                 void CaptureGx(string name)

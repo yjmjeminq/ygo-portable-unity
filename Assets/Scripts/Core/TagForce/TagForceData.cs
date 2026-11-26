@@ -241,6 +241,7 @@ namespace YGOPortable.Core
         public int charId;
         public string spotId;
         public int unlockAfter;
+        public bool storyOnly;
         public TagForceVisitMove[] storyMoves;
     }
 
@@ -248,6 +249,7 @@ namespace YGOPortable.Core
     {
         public int after;
         public string spotId;
+        public bool hidden;
     }
 
     [Serializable] internal sealed class TagForceSpot

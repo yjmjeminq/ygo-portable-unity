@@ -157,9 +157,10 @@ namespace YGOPortable.UI
         {
             foreach (var entry in _rpgConfiguration.roster ?? Array.Empty<TagForceVisitor>())
             {
-                if (entry.unlockAfter > clears || entry.charId == active?.charId || entry.charId == RpgPlayerId) continue;
+                if (entry.storyOnly || entry.unlockAfter > clears || entry.charId == active?.charId ||
+                    entry.charId == RpgPlayerId) continue;
                 var move = entry.storyMoves?.LastOrDefault(change => change.after <= clears);
-                if ((move?.spotId ?? entry.spotId) != CampaignRegions[region].Id) continue;
+                if (move?.hidden == true || (move?.spotId ?? entry.spotId) != CampaignRegions[region].Id) continue;
                 var character = DeckRepository.GetCharacter(entry.charId);
                 if (character == null) continue;
                 var duel = _rpgCampaign.episodes.FirstOrDefault(episode => !episode.isCutsceneOnly && episode.charId == entry.charId);

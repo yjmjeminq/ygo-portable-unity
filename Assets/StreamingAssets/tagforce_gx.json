@@ -371,11 +371,8 @@
     {
       "charId": 107,
       "spotId": "spot_main_academy",
+      "unlockAfter": 1,
       "storyMoves": [
-        {
-          "after": 0,
-          "spotId": "spot_harbor_beach"
-        },
         {
           "after": 1,
           "spotId": "spot_main_academy"
@@ -415,6 +412,10 @@
         {
           "after": 18,
           "spotId": "spot_forest_duel_ground"
+        },
+        {
+          "after": 19,
+          "hidden": true
         },
         {
           "after": 23,
@@ -469,16 +470,14 @@
     {
       "charId": 199,
       "spotId": "spot_blue_arena",
-      "unlockAfter": 19
+      "unlockAfter": 19,
+      "storyOnly": true
     },
     {
       "charId": 119,
       "spotId": "spot_red_dorm",
+      "unlockAfter": 1,
       "storyMoves": [
-        {
-          "after": 0,
-          "spotId": "spot_harbor_beach"
-        },
         {
           "after": 1,
           "spotId": "spot_main_academy"
@@ -508,6 +507,14 @@
           "spotId": "spot_dark_dimension"
         },
         {
+          "after": 33,
+          "hidden": true
+        },
+        {
+          "after": 38,
+          "spotId": "spot_dark_dimension"
+        },
+        {
           "after": 41,
           "spotId": "spot_main_academy"
         },
@@ -518,21 +525,27 @@
         {
           "after": 48,
           "spotId": "spot_darkness_altar"
+        },
+        {
+          "after": 49,
+          "spotId": "spot_main_academy"
         }
       ]
     },
     {
       "charId": 214,
       "spotId": "spot_dark_dimension",
-      "unlockAfter": 37
+      "unlockAfter": 37,
+      "storyOnly": true
     },
     {
       "charId": 137,
-      "spotId": "spot_blue_arena",
+      "spotId": "spot_main_academy",
+      "unlockAfter": 2,
       "storyMoves": [
         {
-          "after": 1,
-          "spotId": "spot_main_academy"
+          "after": 24,
+          "hidden": true
         }
       ]
     },
@@ -540,6 +553,7 @@
       "charId": 207,
       "spotId": "spot_harbor_beach",
       "unlockAfter": 24,
+      "storyOnly": true,
       "storyMoves": [
         {
           "after": 24,
@@ -550,10 +564,31 @@
     {
       "charId": 117,
       "spotId": "spot_main_academy",
+      "unlockAfter": 2,
       "storyMoves": [
         {
           "after": 5,
           "spotId": "spot_forest_duel_ground"
+        },
+        {
+          "after": 19,
+          "hidden": true
+        },
+        {
+          "after": 21,
+          "spotId": "spot_blue_arena"
+        },
+        {
+          "after": 22,
+          "spotId": "spot_main_academy"
+        },
+        {
+          "after": 31,
+          "spotId": "spot_dark_dimension"
+        },
+        {
+          "after": 41,
+          "spotId": "spot_main_academy"
         },
         {
           "after": 43,
@@ -568,16 +603,14 @@
     {
       "charId": 3100,
       "spotId": "spot_blue_arena",
-      "unlockAfter": 19
+      "unlockAfter": 19,
+      "storyOnly": true
     },
     {
       "charId": 111,
-      "spotId": "spot_forest_duel_ground",
+      "spotId": "spot_harbor_beach",
+      "unlockAfter": 13,
       "storyMoves": [
-        {
-          "after": 11,
-          "spotId": "spot_abandoned_dorm"
-        },
         {
           "after": 17,
           "spotId": "spot_main_academy"
@@ -587,7 +620,7 @@
           "spotId": "spot_infirmary"
         },
         {
-          "after": 25,
+          "after": 23,
           "spotId": "spot_main_academy"
         },
         {
@@ -597,27 +630,35 @@
         {
           "after": 46,
           "spotId": "spot_darkness_altar"
+        },
+        {
+          "after": 49,
+          "spotId": "spot_main_academy"
         }
       ]
     },
     {
       "charId": 110,
       "spotId": "spot_abandoned_dorm",
-      "unlockAfter": 11
+      "unlockAfter": 11,
+      "storyOnly": true
     },
     {
       "charId": 113,
-      "spotId": "spot_library"
+      "spotId": "spot_library",
+      "unlockAfter": 9
     },
     {
       "charId": 131,
       "spotId": "spot_abandoned_dorm",
-      "unlockAfter": 9
+      "unlockAfter": 9,
+      "storyOnly": true
     },
     {
       "charId": 122,
       "spotId": "spot_volcano_arena",
       "unlockAfter": 12,
+      "storyOnly": true,
       "storyMoves": [
         {
           "after": 12,
@@ -627,16 +668,16 @@
     },
     {
       "charId": 109,
-      "spotId": "spot_blue_arena",
-      "unlockAfter": 15,
+      "spotId": "spot_harbor_beach",
+      "unlockAfter": 16,
       "storyMoves": [
-        {
-          "after": 15,
-          "spotId": "spot_harbor_beach"
-        },
         {
           "after": 28,
           "spotId": "spot_blue_arena"
+        },
+        {
+          "after": 29,
+          "hidden": true
         }
       ]
     },
@@ -644,6 +685,7 @@
       "charId": 126,
       "spotId": "spot_blue_arena",
       "unlockAfter": 15,
+      "storyOnly": true,
       "storyMoves": [
         {
           "after": 15,
@@ -657,94 +699,103 @@
     },
     {
       "charId": 213,
-      "spotId": "spot_blue_arena",
-      "unlockAfter": 15,
+      "spotId": "spot_harbor_beach",
+      "unlockAfter": 16,
       "storyMoves": [
         {
-          "after": 15,
-          "spotId": "spot_harbor_beach"
-        },
-        {
-          "after": 18,
-          "spotId": "spot_forest_duel_ground"
-        },
-        {
-          "after": 25,
+          "after": 17,
           "spotId": "spot_main_academy"
+        },
+        {
+          "after": 29,
+          "hidden": true
         }
       ]
     },
     {
       "charId": 120,
       "spotId": "spot_harbor_beach",
-      "unlockAfter": 29,
+      "unlockAfter": 30,
       "storyMoves": [
         {
-          "after": 38,
+          "after": 31,
           "spotId": "spot_dark_dimension"
+        },
+        {
+          "after": 33,
+          "hidden": true
+        },
+        {
+          "after": 39,
+          "spotId": "spot_dark_dimension"
+        },
+        {
+          "after": 41,
+          "spotId": "spot_harbor_beach"
         }
       ]
     },
     {
       "charId": 112,
       "spotId": "spot_harbor_beach",
-      "unlockAfter": 29,
+      "unlockAfter": 30,
       "storyMoves": [
         {
-          "after": 32,
+          "after": 31,
           "spotId": "spot_dark_dimension"
+        },
+        {
+          "after": 41,
+          "spotId": "spot_harbor_beach"
         }
       ]
     },
     {
       "charId": 121,
       "spotId": "spot_harbor_beach",
-      "unlockAfter": 29,
+      "unlockAfter": 30,
       "storyMoves": [
         {
-          "after": 33,
+          "after": 31,
           "spotId": "spot_dark_dimension"
+        },
+        {
+          "after": 41,
+          "spotId": "spot_harbor_beach"
         }
       ]
     },
     {
       "charId": 106,
       "spotId": "spot_harbor_beach",
-      "unlockAfter": 29,
+      "unlockAfter": 30,
       "storyMoves": [
         {
-          "after": 35,
+          "after": 31,
           "spotId": "spot_dark_dimension"
+        },
+        {
+          "after": 36,
+          "hidden": true
         }
       ]
     },
     {
       "charId": 136,
       "spotId": "spot_dark_dimension",
-      "unlockAfter": 31
+      "unlockAfter": 31,
+      "storyOnly": true
     },
     {
       "charId": 133,
       "spotId": "spot_main_academy",
-      "storyMoves": [
-        {
-          "after": 0,
-          "spotId": "spot_harbor_beach"
-        },
-        {
-          "after": 1,
-          "spotId": "spot_main_academy"
-        }
-      ]
+      "unlockAfter": 1
     },
     {
       "charId": 114,
       "spotId": "spot_red_dorm",
+      "unlockAfter": 8,
       "storyMoves": [
-        {
-          "after": 7,
-          "spotId": "spot_vending_bench"
-        },
         {
           "after": 17,
           "spotId": "spot_main_academy"
@@ -752,6 +803,10 @@
         {
           "after": 43,
           "spotId": "spot_blue_arena"
+        },
+        {
+          "after": 49,
+          "spotId": "spot_main_academy"
         }
       ]
     },
@@ -759,6 +814,7 @@
       "charId": 225,
       "spotId": "spot_main_academy",
       "unlockAfter": 46,
+      "storyOnly": true,
       "storyMoves": [
         {
           "after": 46,
@@ -769,12 +825,14 @@
     {
       "charId": 124,
       "spotId": "spot_darkness_altar",
-      "unlockAfter": 48
+      "unlockAfter": 48,
+      "storyOnly": true
     },
     {
       "charId": 104,
       "spotId": "spot_forest_duel_ground",
-      "unlockAfter": 51
+      "unlockAfter": 51,
+      "storyOnly": true
     }
   ]
 }

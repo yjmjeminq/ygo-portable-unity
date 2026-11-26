@@ -132,6 +132,7 @@ def main():
 
     cg = set()
     used_actors = set()
+    first_appearance = {}
     lines_read = 0
     for index, episode in enumerate(episodes):
         chapter = episode["id"]
@@ -159,6 +160,8 @@ def main():
                         f"{label}: unknown speaker {speaker}.")
                 if isinstance(speaker, str) and speaker not in narration and speaker in names:
                     used_actors.add(names[speaker])
+                    if branch != "postLoseDialogues":
+                        first_appearance.setdefault(names[speaker], index)
                 require(isinstance(line.get("text"), str) and line["text"].strip(), f"{label}: empty dialogue.")
                 require(not line.get("emotion") or line["emotion"] in EMOTIONS, f"{label}: unknown expression.")
                 require(not line.get("fx") or line["fx"] in {"shake", "flash", "heartbeat", "fade"},
@@ -175,6 +178,8 @@ def main():
                     require(actor == 0 or actor in characters, f"{label}: invalid stage actor {actor}.")
                     if actor:
                         used_actors.add(actor)
+                        if move == "enter" and branch != "postLoseDialogues":
+                            first_appearance.setdefault(actor, index)
                     require(move in STAGE_ACTIONS and isinstance(action.get("step", 0), int) and action.get("step", 0) >= 0,
                             f"{label}: invalid stage action.")
                     if move == "face":
@@ -190,10 +195,22 @@ def main():
         require(KEY.fullmatch(key) and png(ART / "Cutscenes" / (key + ".png")), f"Missing or invalid CG {key}.")
 
     roster = {actor["charId"] for actor in world["roster"]}
+    require(len(roster) == len(world["roster"]), "Duplicate GX roster NPC.")
     for actor in world["roster"]:
-        require(actor["charId"] in characters and actor["spotId"] in regions, f"Unknown roster NPC/location {actor['charId']}.")
-        require(all(move["spotId"] in regions and 0 <= move["after"] <= 53 for move in actor.get("storyMoves") or []),
-                f"Invalid roster move for {actor['charId']}.")
+        actor_id = actor["charId"]
+        unlock = actor.get("unlockAfter", 0)
+        moves = actor.get("storyMoves") or []
+        require(actor_id in characters and actor["spotId"] in regions, f"Unknown roster NPC/location {actor_id}.")
+        require(type(unlock) is int and 0 <= unlock <= len(episodes), f"Invalid unlock for roster NPC {actor_id}.")
+        if not actor.get("storyOnly"):
+            introduction = first_appearance.get(actor_id)
+            require(introduction is not None and type(unlock) is int and unlock > introduction,
+                    f"Roster NPC {actor_id} can roam before its story introduction.")
+        progress = [move["after"] for move in moves]
+        require(progress == sorted(set(progress)) and all(
+            type(when) is int and unlock <= when <= len(episodes) and
+            (not move.get("spotId") if move.get("hidden") else move.get("spotId") in regions)
+            for when, move in zip(progress, moves)), f"Invalid or out-of-order roster move for {actor_id}.")
     for key in sorted(roster | used_actors):
         require(png(ART / "Standing" / f"full_{key}.png"), f"Missing standing portrait {key}.")
         require(png(ART / "DialoguePortraits" / f"bust_{key}.png"), f"Missing dialogue portrait {key}.")
