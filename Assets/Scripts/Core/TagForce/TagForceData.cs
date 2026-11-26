@@ -41,7 +41,7 @@ namespace YGOPortable.Core
         internal static readonly string[] TimeNames = { "아침", "낮", "저녁" };
         public string seriesId;
         public bool useLegacyGx;
-        public TagForceSpot[] spots;
+        public TagForceSpot[] spots, fieldSpots, fieldScenes;
         public TagForceItem[] gifts;
         public TagForcePersona[] personas;
         public TagForceVisitor[] roster;
@@ -252,10 +252,17 @@ namespace YGOPortable.Core
 
     [Serializable] internal sealed class TagForceSpot
     {
-        public string spotId, name, subtitle, mapPath, fieldTheme;
-        public float worldX, worldY;
+        public string spotId, name, subtitle, mapPath, fieldTheme, surfaceType, fieldLight;
+        public float worldX, worldY, nearScale, farScale;
+        public Vector2[] walkPolygon;
+        public TagForceGroundObstacle[] obstacles;
         public int unlockAfter;
         public string[] defaultPickups, routes;
+    }
+
+    [Serializable] internal sealed class TagForceGroundObstacle
+    {
+        public Vector2[] vertices;
     }
 
     [Serializable] internal sealed class TagForcePaths

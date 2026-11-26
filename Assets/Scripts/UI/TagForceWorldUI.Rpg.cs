@@ -315,10 +315,12 @@ namespace YGOPortable.UI
         {
             var opening = AutomaticRpgScenePending && _rpgLocation == CampaignRegionForEpisode(RpgClears + 1)
                 ? CurrentRpgEpisode.preDialogues[0].SceneMapPath : null;
+            _rpgTerrain = TerrainForScene(opening);
             var floor = BuildRpgCamera(GetRpgDialogueScenery(opening));
             floor.raycastTarget = true;
             floor.gameObject.AddComponent<TagForceFloorTap>().Click = target => MoveTo(target);
             BuildRpgAtmosphere();
+            BuildRpgFieldEffects();
             var episodes = _rpgCampaign?.episodes ?? Array.Empty<StoryEpisodeData>();
             int cleared = RpgClears;
             bool complete = cleared == episodes.Length;
@@ -358,6 +360,7 @@ namespace YGOPortable.UI
                 _rpgAtmosphereLayer.gameObject.SetActive(false);
                 _rpgFieldHud.gameObject.SetActive(false);
                 _rpgFieldObjects.gameObject.SetActive(false);
+                foreach (var prop in _rpgFieldProps) prop.gameObject.SetActive(false);
                 foreach (var resident in _rpgResidents.Values) resident.gameObject.SetActive(false);
             }
         }
@@ -393,6 +396,7 @@ namespace YGOPortable.UI
         private void AddRpgResident(int id, string name, string node, Vector2 spot, RpgResidentRole role,
             Action interact, bool patrol = false)
         {
+            spot = RpgGroundPoint(_rpgLocation, spot);
             var actor = Anchor(_rpgSceneSpace, node, spot, RpgFieldActorSize);
             _rpgResidents[id] = actor;
             var art = DuelUiKit.FillRect("SD", actor);
@@ -581,8 +585,10 @@ namespace YGOPortable.UI
             if (_page == Page.Map) UpdateRpgMapPulse(delta);
             UpdateRpgQuestReward(delta);
             UpdateRpgAtmosphere(delta);
+            UpdateRpgFieldEffects(delta);
             UpdateRpgExploration(delta);
             UpdateRpgPresentation(delta);
+            RefreshRpgCameraBounds();
             if (_page == Page.Talk) UpdateDialogue(delta);
             if (_rpgToast != null && (_rpgToastTime -= delta) <= 0f)
             {
@@ -591,7 +597,7 @@ namespace YGOPortable.UI
             }
             float phase = Time.unscaledTime * 3.6f;
             foreach (var marker in _questMarkers)
-                marker.anchoredPosition = new Vector2(0f, 5.5f * Mathf.Sin(phase));
+                marker.localScale = Vector3.one * (_rpgTerrain.ScaleAt(marker.anchorMin.y) * (1f + .035f * Mathf.Sin(phase)));
         }
     }
 }

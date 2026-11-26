@@ -155,12 +155,15 @@ namespace YGOPortable.UI
             }
         }
 
-        private static void AddRpgGroundShadow(RectTransform art, float raisedFeet)
+        private static (RectTransform Penumbra, RectTransform Core) AddRpgGroundShadow(RectTransform art, float raisedFeet)
         {
             float bottom = art.anchorMin.y + raisedFeet;
-            var shadow = Area(art.parent, "GroundShadow", .19f, bottom - .063f, .81f, bottom + .084f);
+            var shadow = Area(art.parent, "GroundShadow", .13f, bottom - .055f, .87f, bottom + .075f);
             shadow.SetSiblingIndex(art.GetSiblingIndex());
-            DuelUiKit.AddImage(shadow.gameObject, RpgSoftLight, new Color(.01f, .02f, .035f, .55f), false, false);
+            DuelUiKit.AddImage(shadow.gameObject, RpgSoftLight, new Color(.025f, .025f, .047f, .44f), false, false);
+            var core = Area(shadow, "ContactCore", .26f, .23f, .74f, .83f);
+            DuelUiKit.AddImage(core.gameObject, RpgMote, new Color(.016f, .016f, .025f, .76f), false, false);
+            return (shadow, core);
         }
 
         private void ClearRpgAtmosphere()

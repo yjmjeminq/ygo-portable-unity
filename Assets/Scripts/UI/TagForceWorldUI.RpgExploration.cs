@@ -21,8 +21,11 @@ namespace YGOPortable.UI
             new(.075f, .23f), new(.925f, .22f), new(.37f, .90f), new(.63f, .90f),
         };
 
+        private Vector2 GxExitApproach(int region, int slot) =>
+            IsGxHarbor(region) && slot == 1 ? new Vector2(.61f, .16f) : GxExitApproaches[slot];
+
         private Vector2 RpgExitPoint(int region, int slot) =>
-            IsGxCampaign ? RpgGroundPoint(region, GxExitApproaches[slot]) : RpgExitPoints[slot];
+            RpgGroundPoint(region, IsGxCampaign ? GxExitApproach(region, slot) : RpgExitPoints[slot]);
 
         private static readonly (int Region, int Exit, int Other, int Entrance)[] RpgPaths =
         {
@@ -75,7 +78,7 @@ namespace YGOPortable.UI
             UpdateRpgExitSigns();
 
             var landmark = CampaignLandmark(_rpgLocation);
-            var marker = Anchor(_rpgFieldObjects, "Landmark", landmark.Position, IsGxCampaign ? new Vector2(87f, 34f) : new Vector2(146f, 31f));
+            var marker = RpgFieldProp("Landmark", landmark.Position, IsGxCampaign ? new Vector2(87f, 34f) : new Vector2(146f, 31f));
             void Inspect() => MoveTo(landmark.Position, OpenRpgLandmark);
             RpgButton(marker, IsGxCampaign ? "지역 안내" : landmark.Name, Inspect, 16);
             if (!IsGxCampaign) _rpgLandmarkLabel = marker.GetComponentInChildren<Text>();
@@ -120,7 +123,7 @@ namespace YGOPortable.UI
             if (!CanWalk) return;
             var exit = RpgExitPoint(destination, entry);
             var arrival = IsGxCampaign ? Vector2.MoveTowards(exit, RpgFieldArrival(destination), .105f) :
-                exit - RpgExitDirection(entry) * .105f;
+                RpgGroundPoint(destination, exit - RpgExitDirection(entry) * .105f);
             BeginRpgTravel(destination, arrival);
         }
 
@@ -132,7 +135,7 @@ namespace YGOPortable.UI
                 var exit = RpgExitPoint(_rpgLocation, slot);
                 if (IsGxCampaign)
                 {
-                    var outward = GxExitApproaches[slot] - exit;
+                    var outward = GxExitApproach(_rpgLocation, slot) - exit;
                     if (Vector2.Dot(step, outward) <= 0f || (_position - exit).sqrMagnitude > .018f * .018f) continue;
                     FollowRpgExit(destination, entry);
                     return true;
@@ -140,9 +143,9 @@ namespace YGOPortable.UI
                 if (Vector2.Dot(step, RpgExitDirection(slot)) <= 0f) continue;
                 bool reached = slot switch
                 {
-                    0 => _position.x <= exit.x && Mathf.Abs(_position.y - exit.y) <= .043f,
-                    1 => _position.x >= exit.x && Mathf.Abs(_position.y - exit.y) <= .043f,
-                    _ => _position.y >= exit.y && Mathf.Abs(_position.x - exit.x) <= .046f,
+                    0 => _position.x <= exit.x + .001f && Mathf.Abs(_position.y - exit.y) <= .043f,
+                    1 => _position.x >= exit.x - .001f && Mathf.Abs(_position.y - exit.y) <= .043f,
+                    _ => _position.y >= exit.y - .001f && Mathf.Abs(_position.x - exit.x) <= .046f,
                 };
                 if (!reached) continue;
                 FollowRpgExit(destination, entry);
@@ -237,10 +240,11 @@ namespace YGOPortable.UI
             if (_rpgWalkInActor == null) return;
             _rpgWalkInElapsed += delta;
             float progress = Mathf.Clamp01(_rpgWalkInElapsed / .82f);
-            var position = Vector2.Lerp(_rpgWalkInFrom, RpgQuestCrowBench, Mathf.SmoothStep(0f, 1f, progress));
+            var position = FieldTerrain.Ground(Vector2.Lerp(_rpgWalkInFrom, RpgQuestCrowBench, Mathf.SmoothStep(0f, 1f, progress)));
             PoseRpgWalker(_rpgWalkInActor, _rpgWalkInActor.Find("SD") as RectTransform, position,
                 position - _rpgWalkInActor.anchorMin, progress < 1f, progress >= 1f ? _position - position : Vector2.zero);
             TrackRpgCamera(delta, Vector2.Lerp(_position, position, .32f));
+            OrderRpgFieldActors();
             if (progress < 1f) return;
             _rpgWalkInChoices.interactable = _rpgWalkInChoices.blocksRaycasts = true;
             EventSystem.current?.SetSelectedGameObject(_rpgWalkInSelection.gameObject);

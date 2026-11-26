@@ -22,7 +22,19 @@
         "spot_infirmary",
         "spot_harbor_beach"
       ],
-      "fieldTheme": "campus"
+      "fieldTheme": "campus",
+      "walkPolygon": [
+        {"x": 0.125, "y": 0.24}, {"x": 0.3, "y": 0.115}, {"x": 0.56, "y": 0.115},
+        {"x": 0.78, "y": 0.37}, {"x": 0.735, "y": 0.5}, {"x": 0.56, "y": 0.535},
+        {"x": 0.365, "y": 0.47}
+      ],
+      "obstacles": [
+        {"vertices": [{"x": 0.81, "y": 0.43}, {"x": 0.95, "y": 0.48}, {"x": 0.95, "y": 0.65}, {"x": 0.82, "y": 0.55}]}
+      ],
+      "nearScale": 1.13,
+      "farScale": 0.78,
+      "surfaceType": "stone",
+      "fieldLight": "day"
     },
     {
       "spotId": "spot_blue_arena",
@@ -40,7 +52,18 @@
         "spot_vending_bench",
         "spot_volcano_arena"
       ],
-      "fieldTheme": "arena"
+      "fieldTheme": "arena",
+      "walkPolygon": [
+        {"x": 0.34, "y": 0.35}, {"x": 0.57, "y": 0.3}, {"x": 0.68, "y": 0.33},
+        {"x": 0.77, "y": 0.54}, {"x": 0.62, "y": 0.575}, {"x": 0.44, "y": 0.49}
+      ],
+      "obstacles": [
+        {"vertices": [{"x": 0.415, "y": 0.09}, {"x": 0.63, "y": 0.09}, {"x": 0.63, "y": 0.27}, {"x": 0.415, "y": 0.27}]}
+      ],
+      "nearScale": 1.13,
+      "farScale": 0.78,
+      "surfaceType": "stone",
+      "fieldLight": "day"
     },
     {
       "spotId": "spot_red_dorm",
@@ -58,7 +81,19 @@
         "spot_vending_bench",
         "spot_harbor_beach"
       ],
-      "fieldTheme": "campus"
+      "fieldTheme": "campus",
+      "walkPolygon": [
+        {"x": 0.095, "y": 0.23}, {"x": 0.235, "y": 0.125}, {"x": 0.81, "y": 0.125},
+        {"x": 0.855, "y": 0.25}, {"x": 0.82, "y": 0.43}, {"x": 0.67, "y": 0.505},
+        {"x": 0.445, "y": 0.45}
+      ],
+      "obstacles": [
+        {"vertices": [{"x": 0.555, "y": 0.4}, {"x": 0.64, "y": 0.397}, {"x": 0.685, "y": 0.426}, {"x": 0.648, "y": 0.46}, {"x": 0.58, "y": 0.451}]}
+      ],
+      "nearScale": 1.13,
+      "farScale": 0.78,
+      "surfaceType": "stone",
+      "fieldLight": "day"
     },
     {
       "spotId": "spot_forest_duel_ground",
@@ -76,7 +111,19 @@
         "spot_abandoned_dorm",
         "spot_darkness_altar"
       ],
-      "fieldTheme": "forest"
+      "fieldTheme": "forest",
+      "walkPolygon": [
+        {"x": 0.44, "y": 0.17}, {"x": 0.56, "y": 0.17}, {"x": 0.7, "y": 0.39},
+        {"x": 0.69, "y": 0.6}, {"x": 0.59, "y": 0.67}, {"x": 0.4, "y": 0.67},
+        {"x": 0.3, "y": 0.54}, {"x": 0.3, "y": 0.4}
+      ],
+      "obstacles": [
+        {"vertices": [{"x": 0.14, "y": 0.28}, {"x": 0.25, "y": 0.27}, {"x": 0.28, "y": 0.43}, {"x": 0.18, "y": 0.46}]}
+      ],
+      "nearScale": 1.17,
+      "farScale": 0.75,
+      "surfaceType": "soil",
+      "fieldLight": "moon"
     },
     {
       "spotId": "spot_vending_bench",
@@ -91,7 +138,19 @@
         "golden_egg_bread"
       ],
       "routes": [],
-      "fieldTheme": "campus"
+      "fieldTheme": "campus",
+      "walkPolygon": [
+        {"x": 0.175, "y": 0.27}, {"x": 0.41, "y": 0.16}, {"x": 0.84, "y": 0.19},
+        {"x": 0.89, "y": 0.255}, {"x": 0.76, "y": 0.385}, {"x": 0.585, "y": 0.465},
+        {"x": 0.4, "y": 0.43}
+      ],
+      "obstacles": [
+        {"vertices": [{"x": 0.81, "y": 0.347}, {"x": 0.92, "y": 0.28}, {"x": 0.94, "y": 0.35}, {"x": 0.84, "y": 0.408}]}
+      ],
+      "nearScale": 1.13,
+      "farScale": 0.78,
+      "surfaceType": "stone",
+      "fieldLight": "moon"
     },
     {
       "spotId": "spot_library",
@@ -106,7 +165,19 @@
         "blue_queen_tea"
       ],
       "routes": [],
-      "fieldTheme": "campus"
+      "fieldTheme": "campus",
+      "walkPolygon": [
+        {"x": 0.455, "y": 0.105}, {"x": 0.545, "y": 0.105}, {"x": 0.535, "y": 0.73},
+        {"x": 0.473, "y": 0.73}
+      ],
+      "obstacles": [
+        {"vertices": [{"x": 0.22, "y": 0.18}, {"x": 0.44, "y": 0.18}, {"x": 0.44, "y": 0.49}, {"x": 0.28, "y": 0.49}]},
+        {"vertices": [{"x": 0.56, "y": 0.18}, {"x": 0.77, "y": 0.18}, {"x": 0.73, "y": 0.49}, {"x": 0.56, "y": 0.49}]}
+      ],
+      "nearScale": 1.13,
+      "farScale": 0.78,
+      "surfaceType": "wood",
+      "fieldLight": "day"
     },
     {
       "spotId": "spot_abandoned_dorm",
@@ -122,7 +193,18 @@
       "routes": [
         "spot_dark_dimension"
       ],
-      "fieldTheme": "dark"
+      "fieldTheme": "dark",
+      "walkPolygon": [
+        {"x": 0.23, "y": 0.39}, {"x": 0.4, "y": 0.31}, {"x": 0.62, "y": 0.34},
+        {"x": 0.74, "y": 0.46}, {"x": 0.54, "y": 0.49}, {"x": 0.32, "y": 0.47}
+      ],
+      "obstacles": [
+        {"vertices": [{"x": 0.37, "y": 0.14}, {"x": 0.52, "y": 0.14}, {"x": 0.55, "y": 0.25}, {"x": 0.37, "y": 0.24}]}
+      ],
+      "nearScale": 1.17,
+      "farScale": 0.75,
+      "surfaceType": "soil",
+      "fieldLight": "violet"
     },
     {
       "spotId": "spot_volcano_arena",
@@ -136,7 +218,19 @@
         "dp_small"
       ],
       "routes": [],
-      "fieldTheme": "volcano"
+      "fieldTheme": "volcano",
+      "walkPolygon": [
+        {"x": 0.345, "y": 0.365}, {"x": 0.66, "y": 0.365}, {"x": 0.695, "y": 0.425},
+        {"x": 0.695, "y": 0.595}, {"x": 0.62, "y": 0.69}, {"x": 0.39, "y": 0.69},
+        {"x": 0.315, "y": 0.595}, {"x": 0.315, "y": 0.425}
+      ],
+      "obstacles": [
+        {"vertices": [{"x": 0.35, "y": 0.15}, {"x": 0.64, "y": 0.14}, {"x": 0.68, "y": 0.31}, {"x": 0.51, "y": 0.34}, {"x": 0.35, "y": 0.31}]}
+      ],
+      "nearScale": 1.17,
+      "farScale": 0.75,
+      "surfaceType": "rock",
+      "fieldLight": "embers"
     },
     {
       "spotId": "spot_harbor_beach",
@@ -151,7 +245,21 @@
         "golden_egg_bread"
       ],
       "routes": [],
-      "fieldTheme": "shore"
+      "fieldTheme": "shore",
+      "walkPolygon": [
+        {"x": 0.14, "y": 0.285}, {"x": 0.22, "y": 0.205}, {"x": 0.515, "y": 0.195},
+        {"x": 0.542, "y": 0.292}, {"x": 0.572, "y": 0.322}, {"x": 0.59, "y": 0.332},
+        {"x": 0.929, "y": 0.552}, {"x": 0.883, "y": 0.57}, {"x": 0.528, "y": 0.371},
+        {"x": 0.47, "y": 0.355}, {"x": 0.36, "y": 0.393}, {"x": 0.2, "y": 0.375}
+      ],
+      "obstacles": [
+        {"vertices": [{"x": 0.53, "y": 0.43}, {"x": 0.88, "y": 0.62}, {"x": 0.97, "y": 0.61}, {"x": 0.97, "y": 0.81}, {"x": 0.45, "y": 0.63}, {"x": 0.45, "y": 0.57}]},
+        {"vertices": [{"x": 0.692, "y": 0.373}, {"x": 0.965, "y": 0.524}, {"x": 0.97, "y": 0.48}, {"x": 0.96, "y": 0.37}, {"x": 0.75, "y": 0.29}]}
+      ],
+      "nearScale": 1.17,
+      "farScale": 0.75,
+      "surfaceType": "sand",
+      "fieldLight": "day"
     },
     {
       "spotId": "spot_infirmary",
@@ -166,7 +274,19 @@
         "blue_queen_tea"
       ],
       "routes": [],
-      "fieldTheme": "campus"
+      "fieldTheme": "campus",
+      "walkPolygon": [
+        {"x": 0.28, "y": 0.115}, {"x": 0.73, "y": 0.115}, {"x": 0.7, "y": 0.41},
+        {"x": 0.625, "y": 0.7}, {"x": 0.41, "y": 0.7}, {"x": 0.32, "y": 0.49}
+      ],
+      "obstacles": [
+        {"vertices": [{"x": 0.06, "y": 0.29}, {"x": 0.22, "y": 0.29}, {"x": 0.26, "y": 0.42}, {"x": 0.06, "y": 0.46}]},
+        {"vertices": [{"x": 0.75, "y": 0.22}, {"x": 0.88, "y": 0.22}, {"x": 0.88, "y": 0.42}, {"x": 0.75, "y": 0.44}]}
+      ],
+      "nearScale": 1.13,
+      "farScale": 0.78,
+      "surfaceType": "stone",
+      "fieldLight": "day"
     },
     {
       "spotId": "spot_dark_dimension",
@@ -180,7 +300,19 @@
         "dp_small"
       ],
       "routes": [],
-      "fieldTheme": "dark"
+      "fieldTheme": "dark",
+      "walkPolygon": [
+        {"x": 0.23, "y": 0.44}, {"x": 0.41, "y": 0.32}, {"x": 0.62, "y": 0.32},
+        {"x": 0.77, "y": 0.4}, {"x": 0.75, "y": 0.6}, {"x": 0.6, "y": 0.67},
+        {"x": 0.38, "y": 0.65}, {"x": 0.23, "y": 0.57}
+      ],
+      "obstacles": [
+        {"vertices": [{"x": 0.83, "y": 0.42}, {"x": 0.95, "y": 0.41}, {"x": 0.97, "y": 0.71}, {"x": 0.83, "y": 0.66}]}
+      ],
+      "nearScale": 1.17,
+      "farScale": 0.75,
+      "surfaceType": "soil",
+      "fieldLight": "violet"
     },
     {
       "spotId": "spot_darkness_altar",
@@ -194,7 +326,45 @@
         "dp_small"
       ],
       "routes": [],
-      "fieldTheme": "dark"
+      "fieldTheme": "dark",
+      "walkPolygon": [
+        {"x": 0.24, "y": 0.37}, {"x": 0.36, "y": 0.285}, {"x": 0.65, "y": 0.285},
+        {"x": 0.77, "y": 0.39}, {"x": 0.76, "y": 0.53}, {"x": 0.64, "y": 0.66},
+        {"x": 0.37, "y": 0.66}, {"x": 0.25, "y": 0.54}
+      ],
+      "obstacles": [
+        {"vertices": [{"x": 0.08, "y": 0.25}, {"x": 0.19, "y": 0.24}, {"x": 0.2, "y": 0.55}, {"x": 0.1, "y": 0.56}]}
+      ],
+      "nearScale": 1.17,
+      "farScale": 0.75,
+      "surfaceType": "rock",
+      "fieldLight": "violet"
+    }
+  ],
+  "fieldScenes": [
+    {
+      "spotId": "spot_pro_tournament",
+      "mapPath": "TagForce/GX/Maps/spot_pro_tournament.png",
+      "walkPolygon": [
+        {"x": 0.065, "y": 0.16}, {"x": 0.2, "y": 0.1}, {"x": 0.8, "y": 0.1},
+        {"x": 0.94, "y": 0.17}, {"x": 0.94, "y": 0.49}, {"x": 0.064, "y": 0.49}
+      ],
+      "nearScale": 1.13,
+      "farScale": 0.78,
+      "surfaceType": "stone",
+      "fieldLight": "warm"
+    },
+    {
+      "spotId": "spot_pro_backstage",
+      "mapPath": "TagForce/GX/Maps/spot_pro_backstage.png",
+      "walkPolygon": [
+        {"x": 0.06, "y": 0.105}, {"x": 0.92, "y": 0.105}, {"x": 0.94, "y": 0.52},
+        {"x": 0.56, "y": 0.6}, {"x": 0.345, "y": 0.49}, {"x": 0.07, "y": 0.43}
+      ],
+      "nearScale": 1.13,
+      "farScale": 0.78,
+      "surfaceType": "wood",
+      "fieldLight": "moon"
     }
   ],
   "roster": [

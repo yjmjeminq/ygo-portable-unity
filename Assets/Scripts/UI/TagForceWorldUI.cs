@@ -267,6 +267,8 @@ namespace YGOPortable.UI
             ClearRpgFieldHud();
             ClearRpgPresentation();
             _rpgResidents.Clear();
+            _rpgFieldProps.Clear();
+            ClearRpgFieldEffects();
             _rpgNearbyScene = null;
             _rpgSceneSpace = _rpgViewport = null;
             _rpgFieldScenery = null;
@@ -468,8 +470,13 @@ namespace YGOPortable.UI
         {
             if (!CanWalk || (_rpgField && _fieldMenu)) return;
             _manualWalk = false;
-            _destination = _rpgField && IsGxCampaign ? RpgGroundPoint(_rpgLocation, point) :
-                new Vector2(Mathf.Clamp(point.x, .06f, .94f), Mathf.Clamp(point.y, .095f, _rpgField ? .455f : .77f));
+            if (_rpgField)
+            {
+                FieldTerrain.BuildPath(_position, point, _rpgWalkPath);
+                _rpgWalkWaypoint = 0;
+                _destination = _rpgWalkPath[^1];
+            }
+            else _destination = new Vector2(Mathf.Clamp(point.x, .06f, .94f), Mathf.Clamp(point.y, .095f, .77f));
             _moving = true;
             _onArrival = arrive;
             _rpgApproachActor = approachActor;
@@ -510,8 +517,15 @@ namespace YGOPortable.UI
             if (movement != Vector2.zero)
             {
                 var direction = movement.normalized;
-                if (_rpgField) direction.y *= _rpgBackdropAspect;
-                MoveTo(_position + direction * .12f);
+                if (_rpgField)
+                {
+                    direction.y *= _rpgBackdropAspect;
+                    _destination = _position + direction * .12f;
+                    _moving = true;
+                    _onArrival = null;
+                    _rpgApproachActor = null;
+                }
+                else MoveTo(_position + direction * .12f);
                 _manualWalk = true;
             }
             else if (_manualWalk)
@@ -537,7 +551,8 @@ namespace YGOPortable.UI
             float phase = time * WalkFrequency;
             if (_rpgField)
             {
-                PoseRpgWalker(_player, _playerSprite, _position, _position - previous, _moving);
+                PoseRpgWalker(_player, _playerSprite, _position, _position - previous,
+                    (_position - previous).sqrMagnitude > 1e-10f);
                 TrackRpgCamera(delta, horizontalTravel: _position.x - previous.x);
                 FollowRpgPlayer(delta);
                 UpdateRpgResidentMotion(delta);

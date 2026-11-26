@@ -117,11 +117,13 @@ namespace YGOPortable.UI
 
                 var toStop = RpgGroundPoint(_rpgLocation, resident.Home + resident.Patrol[resident.Stop]) - position;
                 float distance = RpgArtDirection(toStop).magnitude;
-                float travel = resident.Speed * delta;
+                float travel = resident.Speed * delta * Mathf.Lerp(1f, FieldTerrain.ScaleAt(position.y), .28f);
                 bool arrived = travel >= distance;
-                var step = arrived ? toStop : toStop * (travel / distance);
+                var planned = arrived ? toStop : toStop * (travel / distance);
+                var next = FieldTerrain.Slide(position, position + planned);
+                var step = next - position;
                 if (step.sqrMagnitude > 1e-8f) resident.Facing = step;
-                PoseRpgWalker(resident.Actor, resident.Art, position + step, step, !arrived, resident.Facing);
+                PoseRpgWalker(resident.Actor, resident.Art, next, step, !arrived, resident.Facing);
                 if (arrived)
                 {
                     resident.Stop = (resident.Stop + 1) % resident.Patrol.Length;

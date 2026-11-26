@@ -54,6 +54,50 @@ namespace YGOPortable.UI
             Play(GetTagForceClip(sfx) ?? fallback, volumeMultiplier);
         }
 
+        private static readonly AudioClip[,] RpgSteps = new AudioClip[6, 2];
+
+        internal static AudioClip GetRpgFootstep(RpgSurface surface, int foot)
+        {
+            int take = foot < 0 ? 0 : 1;
+            return RpgSteps[(int)surface, take] ??= MakeRpgFootstep(surface, take);
+        }
+
+        internal static void PlayRpgFootstep(RpgSurface surface, int foot, float volume)
+        {
+            if (_sfxSource != null && SfxVolume > .01f) Play(GetRpgFootstep(surface, foot), volume);
+        }
+
+        private static AudioClip MakeRpgFootstep(RpgSurface surface, int take)
+        {
+            var (duration, tone, decay, noise) = surface switch
+            {
+                RpgSurface.Soil => (.105f, 118f, 30f, .66f),
+                RpgSurface.Sand => (.14f, 81f, 25f, .86f),
+                RpgSurface.Wood => (.098f, 234f, 47f, .32f),
+                RpgSurface.Rock => (.12f, 109f, 34f, .43f),
+                RpgSurface.Metal => (.095f, 414f, 51f, .26f),
+                _ => (.077f, 303f, 65f, .31f),
+            };
+            const int rate = 22050;
+            var samples = new float[Mathf.RoundToInt(duration * rate)];
+            var random = new System.Random(934 + (int)surface * 59 + take * 23);
+            float filtered = 0f;
+            for (int i = 0; i < samples.Length; i++)
+            {
+                float t = i / (float)rate;
+                float grain = (float)random.NextDouble() * 2f - 1f;
+                filtered = Mathf.Lerp(filtered, grain, surface == RpgSurface.Sand ? .20f : .42f);
+                float attack = Mathf.Clamp01(t * 550f);
+                float release = Mathf.Clamp01((duration - t) * 90f);
+                float impact = Mathf.Sin(t * tone * (take == 0 ? 6.28f : 6.04f)) * Mathf.Exp(-t * decay);
+                float scuff = filtered * Mathf.Exp(-t * (decay * .72f));
+                samples[i] = .49f * (impact * (1f - noise) + scuff * noise) * attack * release;
+            }
+            var clip = AudioClip.Create($"field_step_{surface}_{take}", samples.Length, 1, rate, false);
+            clip.SetData(samples, 0);
+            return clip;
+        }
+
         internal static void PlayTagForceReward()
         {
             if (_sfxSource != null && SfxVolume > 0.01f)

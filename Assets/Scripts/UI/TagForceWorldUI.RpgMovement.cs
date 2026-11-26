@@ -14,9 +14,17 @@ namespace YGOPortable.UI
         private static readonly Vector2 RpgFieldActorSize = new(82f, 83f);
         private static readonly Vector2 GxFieldActorSize = new(224f, 228f);
         private readonly List<RectTransform> _rpgDepthOrder = new();
+        private readonly List<RectTransform> _rpgFieldProps = new();
+        private static readonly System.Comparison<RectTransform> CompareDepth = (left, right) =>
+        {
+            int y = right.anchorMin.y.CompareTo(left.anchorMin.y);
+            return y != 0 ? y : left.GetSiblingIndex().CompareTo(right.GetSiblingIndex());
+        };
+        private readonly List<Vector2> _rpgWalkPath = new(16);
+        private int _rpgWalkWaypoint;
         private RectTransform _rpgSceneSpace, _rpgViewport;
         private Image _rpgFieldScenery;
-        private Vector2 _rpgCameraPan;
+        private Vector2 _rpgCameraPan, _rpgFramedViewport;
         private float _rpgBackdropAspect, _rpgCameraLead;
         private bool _preserveRpgCamera;
         private bool UsesRpgDialogueCamera => _rpgDialogueCast != null || _page == Page.Guide;
@@ -53,8 +61,8 @@ namespace YGOPortable.UI
             var viewport = _rpgViewport.rect;
             float aspect = viewport.width > 0f && viewport.height > 0f ? viewport.width / viewport.height : 16f / 9f;
             float coverWidth = _rpgBackdropAspect / aspect;
-            // Match the exploration zoom even when several actors enter or leave the dialogue.
-            float width = Mathf.Max(coverWidth, Mathf.Clamp(1.77f * coverWidth, 1.12f, 1.32f));
+            // Use one zoom for traversal and dialogue; always cover the viewport on both axes.
+            float width = Mathf.Max(coverWidth, Mathf.Clamp(1.60f * coverWidth, 1.14f, 1.26f));
             return new Vector2(width, width / coverWidth);
         }
 
@@ -102,9 +110,7 @@ namespace YGOPortable.UI
         private Vector2 ClampRpgCameraPan(Vector2 pan, Vector2 span)
         {
             var limit = Vector2.Max(Vector2.zero, (span - Vector2.one) * .5f);
-            // The dialogue panel occupies the lower part of the screen, so the shot can use that space for the matte.
-            var upper = limit + (UsesRpgDialogueCamera ? Vector2.up * .42f : Vector2.zero);
-            return Vector2.Min(Vector2.Max(pan, -limit), upper);
+            return Vector2.Min(Vector2.Max(pan, -limit), limit);
         }
 
         private void TrackRpgCamera(float delta, Vector2? focus = null, float horizontalTravel = 0f)
@@ -119,31 +125,77 @@ namespace YGOPortable.UI
 
         private void ApplyRpgCameraPan(Vector2 span)
         {
+            _rpgFramedViewport = _rpgViewport.rect.size;
             var center = Vector2.one * .5f + _rpgCameraPan;
             var halfSize = span * (.5f / RpgActorScale);
             _rpgSceneSpace.anchorMin = center - halfSize;
             _rpgSceneSpace.anchorMax = center + halfSize;
+            ApplyRpgForegroundParallax(span);
             UpdateRpgExitSigns();
+        }
+
+        private void RefreshRpgCameraBounds()
+        {
+            if (_rpgViewport == null || _rpgViewport.rect.size == _rpgFramedViewport) return;
+            var span = RpgCameraSpan();
+            _rpgCameraPan = ClampRpgCameraPan(_rpgCameraPan, span);
+            ApplyRpgCameraPan(span);
         }
 
         private Vector2 AdvanceRpgWalk(float delta)
         {
-            var remaining = _destination - _position;
-            float distance = RpgArtDirection(remaining).magnitude;
-            float travel = RpgWalkSpeed * delta;
-            return distance <= travel ? _destination : _position + remaining * (travel / distance);
+            var position = _position;
+            float travel = RpgWalkSpeed * delta * Mathf.Lerp(1f, FieldTerrain.ScaleAt(position.y), .28f);
+            if (_manualWalk)
+            {
+                var step = _destination - position;
+                float distance = RpgArtDirection(step).magnitude;
+                var next = distance <= travel ? _destination : position + step * (travel / distance);
+                return FieldTerrain.Slide(position, next);
+            }
+            while (_rpgWalkWaypoint < _rpgWalkPath.Count)
+            {
+                var waypoint = _rpgWalkPath[_rpgWalkWaypoint];
+                var step = waypoint - position;
+                float distance = RpgArtDirection(step).magnitude;
+                if (distance > travel) return position + step * (travel / distance);
+                position = waypoint;
+                travel -= distance;
+                ++_rpgWalkWaypoint;
+            }
+            return position;
         }
 
         private Vector2 RpgArtDirection(Vector2 direction) => new(direction.x, direction.y / _rpgBackdropAspect);
 
+        private RectTransform RpgFieldProp(string name, Vector2 point, Vector2 size)
+        {
+            var prop = Anchor(_rpgSceneSpace, name, point, size);
+            prop.localScale = Vector3.one * _rpgTerrain.ScaleAt(point.y);
+            _rpgFieldProps.Add(prop);
+            return prop;
+        }
+
         private void OrderRpgFieldActors()
         {
             _rpgDepthOrder.Clear();
-            _rpgDepthOrder.AddRange(_rpgResidents.Values);
-            if (_rpgCompanion != null && !_rpgDepthOrder.Contains(_rpgCompanion)) _rpgDepthOrder.Add(_rpgCompanion);
-            _rpgDepthOrder.Add(_player);
-            _rpgDepthOrder.Sort((left, right) => right.anchorMin.y.CompareTo(left.anchorMin.y));
-            int first = _rpgSceneSpace.childCount - _rpgDepthOrder.Count;
+            if (_rpgDialogueCast != null)
+            {
+                foreach (var actor in _rpgStageActors) _rpgDepthOrder.Add(actor.Root);
+            }
+            else
+            {
+                _rpgDepthOrder.AddRange(_rpgFieldProps);
+                foreach (var resident in _rpgResidents.Values) _rpgDepthOrder.Add(resident);
+                if (_rpgCompanion != null && !_rpgDepthOrder.Contains(_rpgCompanion)) _rpgDepthOrder.Add(_rpgCompanion);
+                _rpgDepthOrder.Add(_player);
+            }
+            _rpgDepthOrder.Sort(CompareDepth);
+            var parent = _rpgDialogueCast ?? _rpgSceneSpace;
+            if (_rpgForeground != null && _rpgForeground.GetSiblingIndex() + 1 != _rpgSceneSpace.childCount)
+                _rpgForeground.SetAsLastSibling();
+            int foreground = _rpgDialogueCast == null && _rpgForeground != null ? 1 : 0;
+            int first = parent.childCount - _rpgDepthOrder.Count - foreground;
             for (int i = _rpgDepthOrder.Count - 1; i >= 0; i--)
             {
                 var actor = _rpgDepthOrder[i];
@@ -181,11 +233,12 @@ namespace YGOPortable.UI
                 art.anchorMax -= Vector2.up * padding;
             }
             var depth = sides == null ? null : _images.GetSlices(cycle + "_vertical.png", 3, 2);
-            AddRpgGroundShadow(art, field != null ? .06f : 0f);
+            var (penumbra, core) = AddRpgGroundShadow(art, field != null ? .06f : 0f);
             var image = DuelUiKit.AddImage(art.gameObject, idle, Color.white, true, false);
             // Keep the transparent sides of the larger atlas cells from intercepting floor taps.
             if (IsGxCampaign) image.raycastPadding = new Vector4(44f, 0f, 44f, 0f);
-            art.gameObject.AddComponent<TagForceRpgWalkAnimator>().Initialize(image, idle, sides, depth, directions, field != null);
+            art.gameObject.AddComponent<TagForceRpgWalkAnimator>().Initialize(image, idle, sides, depth, directions, field != null,
+                penumbra, core);
             return art;
         }
 
@@ -194,9 +247,14 @@ namespace YGOPortable.UI
         {
             actor.anchorMin = actor.anchorMax = position;
             actor.anchoredPosition = Vector2.zero;
-            if (art != null && art.TryGetComponent<TagForceRpgWalkAnimator>(out var animation))
-                animation.Pose(RpgArtDirection(step).magnitude * RpgStrideDistanceScale, walking,
-                    RpgArtDirection(facing == Vector2.zero ? step : facing));
+            float scale = _rpgTerrain.ScaleAt(position.y);
+            actor.localScale = new Vector3(scale, scale, 1f);
+            if (art == null || !art.TryGetComponent<TagForceRpgWalkAnimator>(out var animation)) return;
+            float distance = RpgArtDirection(step).magnitude;
+            animation.Tint(RpgActorLight(position));
+            int foot = animation.Pose(distance * RpgStrideDistanceScale, walking && distance > .00001f,
+                RpgArtDirection(facing == Vector2.zero ? step : facing));
+            if (foot != 0) EmitRpgFootfall(actor, position, foot);
         }
     }
 
@@ -210,10 +268,19 @@ namespace YGOPortable.UI
         private Facing _facing;
         private bool _left;
         private float _phase, _widthScale;
+        private RectTransform _penumbra, _core;
 
-        internal void Initialize(Image image, Sprite idle, Sprite[] side, Sprite[] depth, Sprite[] directions, bool compactArt)
+        internal void Tint(Color color)
+        {
+            if (_image.color != color) _image.color = color;
+        }
+
+        internal void Initialize(Image image, Sprite idle, Sprite[] side, Sprite[] depth, Sprite[] directions, bool compactArt,
+            RectTransform penumbra, RectTransform core)
         {
             _image = image;
+            _penumbra = penumbra;
+            _core = core;
             _idle = idle;
             _side = side;
             _depth = depth;
@@ -223,7 +290,7 @@ namespace YGOPortable.UI
             if (directions == null && side == null) _stride = gameObject.AddComponent<TagForceRpgStride>();
         }
 
-        internal void Pose(float distance, bool walking, Vector2 direction)
+        internal int Pose(float distance, bool walking, Vector2 direction)
         {
             if (!walking)
             {
@@ -242,7 +309,10 @@ namespace YGOPortable.UI
                 }
             }
 
-            _phase = walking ? (_phase + distance * 25f) % 4f : 0f;
+            int previousPlant = Mathf.FloorToInt(_phase * .5f);
+            float advance = _phase + distance * 25f;
+            int plant = Mathf.FloorToInt(advance * .5f);
+            _phase = walking ? advance % 4f : 0f;
             int frame = (int)_phase;
             Sprite next = _idle;
             bool flip = _left;
@@ -264,6 +334,10 @@ namespace YGOPortable.UI
             if (_image.sprite != next) _image.sprite = next;
             transform.localScale = new Vector3(flip ? -_widthScale : _widthScale, 1f, 1f);
             _stride?.SetFrame(walking ? frame : -1);
+            float contact = walking ? .5f + .5f * Mathf.Cos(_phase * Mathf.PI) : 1f;
+            _penumbra.localScale = new Vector3(.94f + .06f * contact, 1.04f - .04f * contact, 1f);
+            _core.localScale = new Vector3(.86f + .14f * contact, .92f + .08f * contact, 1f);
+            return walking && plant != previousPlant ? (plant % 2 == 0 ? -1 : 1) : 0;
         }
     }
 

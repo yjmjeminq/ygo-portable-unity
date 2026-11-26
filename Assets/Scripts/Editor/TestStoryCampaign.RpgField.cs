@@ -239,8 +239,10 @@ namespace YGOPortable.Editor
                     Require(world.EnterRpgRegion(region) && FieldScene().Find($"QuestNpc_{request.Giver}/SD").GetComponent<Image>().sprite != null,
                         $"The region {request.Region} was missing its quest giver or SD art.");
                     VerifyAtmosphere(region);
+                    VerifyGroundedPresentation();
                 }
                 VerifyMapLighting();
+                VerifyEveryStageFootprint(loaded);
                 PressRpgNavigation("Quests");
                 Press(panel, "QuestPageNext");
                 Require(panel.Find("QuestPage/Label").GetComponent<Text>().text == "2 / 3",
@@ -460,6 +462,7 @@ namespace YGOPortable.Editor
                         Require(world.EnterRpgRegion(location) && FieldScene().Find("Scenery").GetComponent<Image>().sprite != null,
                             $"Unable to enter GX map {map}.");
                         VerifyGxGrounded(location);
+                        VerifyGroundedPresentation();
                         var exitPoints = FieldScene().Find("Exploration").Cast<RectTransform>()
                             .Where(anchor => anchor.name.StartsWith("ExitTarget_", StringComparison.Ordinal))
                             .Select(anchor => anchor.anchorMin).ToArray();
@@ -485,6 +488,7 @@ namespace YGOPortable.Editor
                     world.Back();
                     VerifyGxArtwork(gxMap, expectedCg);
                     VerifyGxMemories();
+                    VerifyEveryStageFootprint(gxScript);
                     Debug.Log("[VERIFY GX DIALOGUE] Event, victory and defeat scripts rendered, with distinct Yun, Asuka and possessed Yun speaker roles.");
                     Debug.Log("[VERIFY GX FIELD] 53 sequences, 34 Master duels, 19 lockouts, 12 grounded fields, solo travel and three POV decks passed.");
                 }
@@ -502,11 +506,14 @@ namespace YGOPortable.Editor
                     VerifyGxGrounded(harbor);
                     var field = FieldScene();
                     var player = (RectTransform)field.Find("Player");
-                    WalkOnGxMap(new Vector2(.82f, .70f));
-                    Require(player.anchorMin.x < .54f && player.anchorMin.y < .40f,
+                    var ground = CurrentTerrain();
+                    var water = new Vector2(.82f, .70f);
+                    WalkOnGxMap(water);
+                    Require(!ground.Contains(water) && ground.Contains(player.anchorMin) &&
+                        player.anchorMin != water && player.anchorMin.y < .58f,
                         "Touch movement crossed from the GX harbor onto the water.");
                     for (int i = 0; i < 5; i++) world.Update(.1f, new Vector2(1f, 1f));
-                    Require(FieldScene() == field && player.anchorMin.x < .54f && player.anchorMin.y < .40f,
+                    Require(FieldScene() == field && ground.Contains(player.anchorMin) && player.anchorMin.y < .58f,
                         "Stick movement crossed from the GX harbor onto the water.");
                     world.Update(0f);
                     int academy = world.CampaignRegionForEpisode(2);
@@ -773,6 +780,131 @@ namespace YGOPortable.Editor
 
             Transform FieldScene() => panel.Find("FieldViewport/Camera");
 
+            RpgFieldTerrain CurrentTerrain() => (RpgFieldTerrain)typeof(TagForceWorldUI).GetField("_rpgTerrain", flags).GetValue(world);
+
+            void VerifyGroundedPresentation()
+            {
+                var terrain = CurrentTerrain();
+                var field = (RectTransform)FieldScene();
+                var player = (RectTransform)field.Find("Player");
+                var art = (RectTransform)player.Find("Sprite");
+                var type = typeof(TagForceWorldUI);
+                var pose = type.GetMethod("PoseRpgWalker", flags);
+                var order = type.GetMethod("OrderRpgFieldActors", flags);
+                var track = type.GetMethod("TrackRpgCamera", flags);
+                var pan = type.GetField("_rpgCameraPan", flags);
+                var prop = (RectTransform)field.Find("Landmark");
+                var viewport = (RectTransform)field.parent;
+                var floor = (RectTransform)field.Find("Scenery");
+                var foreground = (RectTransform)field.Find("FieldForeground");
+                var fieldPoint = player.anchorMin;
+                var place = prop.anchorMin;
+                var oldPan = (Vector2)pan.GetValue(world);
+                var front = terrain.Spot.walkPolygon.OrderBy(point => point.y).First();
+                var back = terrain.Spot.walkPolygon.OrderByDescending(point => point.y).First();
+                var farWard = terrain.Ground(Vector2.Lerp(back, fieldPoint, .09f));
+                var nearWard = terrain.Ground(Vector2.Lerp(front, fieldPoint, .09f));
+                foreach (var foot in field.GetComponentsInChildren<TagForceRpgWalkAnimator>())
+                    Require(terrain.Contains(((RectTransform)foot.transform.parent).anchorMin),
+                        $"An actor spawned in an obstacle at {terrain.Spot.spotId}.");
+                foreach (var anchor in field.GetComponentsInChildren<RectTransform>())
+                {
+                    string id = anchor.name;
+                    if (id == "Player" || id == "Landmark" || id == "HiddenCache" || id == "SideQuestItem" ||
+                        id.StartsWith("Pickup_", StringComparison.Ordinal) || id.StartsWith("ExitTarget_", StringComparison.Ordinal))
+                        Require(terrain.Contains(anchor.anchorMin), $"Object {id} was off the floor of {terrain.Spot.spotId}.");
+                }
+                pose.Invoke(world, new object[] { player, art, nearWard, Vector2.zero, false, Vector2.left });
+                var nearScale = player.localScale.x;
+                Require(art.localScale.x < 0f && nearScale > 1f, "Near perspective inverted or shrank the actor.");
+                pose.Invoke(world, new object[] { player, art, farWard, Vector2.zero, false, Vector2.right });
+                Require(art.localScale.x > 0f && player.localScale.x < nearScale && player.localScale.x > 0f,
+                    "Far perspective did not preserve facing or reduce scale.");
+                Require(player.Find("GroundShadow/ContactCore").GetComponent<Image>().color.a >
+                    player.Find("GroundShadow").GetComponent<Image>().color.a && art.GetComponent<Image>().color != Color.white,
+                    "A field actor omitted its contact core or environmental tint.");
+                var particles = field.Find("Footfalls");
+                int poolSize = particles.childCount;
+                pose.Invoke(world, new object[] { player, art, farWard, new Vector2(.1f, 0f), true, Vector2.right });
+                Require(particles.Cast<Transform>().Any(particle => particle.gameObject.activeSelf),
+                    "A planted foot did not emit a visible particle.");
+                type.GetMethod("UpdateRpgFieldEffects", flags).Invoke(world, new object[] { 1f });
+                Require(particles.childCount == poolSize &&
+                    particles.Cast<Transform>().All(particle => !particle.gameObject.activeSelf),
+                    "Footfall particles did not return to the pool.");
+
+                prop.anchorMin = prop.anchorMax = (farWard + nearWard) * .5f;
+                order.Invoke(world, null);
+                Require(player.GetSiblingIndex() < prop.GetSiblingIndex(), "An actor behind a field object was drawn in front.");
+                pose.Invoke(world, new object[] { player, art, nearWard, Vector2.zero, false, Vector2.left });
+                order.Invoke(world, null);
+                Require(player.GetSiblingIndex() > prop.GetSiblingIndex() &&
+                    foreground.GetSiblingIndex() > player.GetSiblingIndex(), "Y ordering or the foreground broke at a depth crossing.");
+
+                var corners = new Vector3[4];
+                foreach (var edge in terrain.Spot.walkPolygon)
+                {
+                    track.Invoke(world, new object[] { 1f, edge, 0f });
+                    Canvas.ForceUpdateCanvases();
+                    floor.GetWorldCorners(corners);
+                    var min = viewport.InverseTransformPoint(corners[0]);
+                    var max = viewport.InverseTransformPoint(corners[2]);
+                    Require(min.x <= viewport.rect.xMin + .01f && min.y <= viewport.rect.yMin + .01f &&
+                        max.x >= viewport.rect.xMax - .01f && max.y >= viewport.rect.yMax - .01f,
+                        $"The camera exposed empty space at the edge of {terrain.Spot.spotId}.");
+                    var offset = (Vector2)pan.GetValue(world);
+                    var span = (field.anchorMax - field.anchorMin) * field.localScale.x;
+                    Require(Vector2.Distance(Vector2.Scale(foreground.anchorMin, span), .18f * offset) < .0001f,
+                        $"The foreground drifted from its 1.18x camera motion in {terrain.Spot.spotId}.");
+                }
+                prop.anchorMin = prop.anchorMax = place;
+                pose.Invoke(world, new object[] { player, art, fieldPoint, Vector2.zero, false, Vector2.zero });
+                pan.SetValue(world, oldPan);
+                track.Invoke(world, new object[] { 0f, fieldPoint, 0f });
+                order.Invoke(world, null);
+            }
+
+            void VerifyEveryStageFootprint(StoryScriptRoot campaign)
+            {
+                var type = typeof(TagForceWorldUI);
+                var show = type.GetMethod("Show", flags);
+                var fieldPage = Enum.Parse(show.GetParameters()[0].ParameterType, "Field");
+                var location = type.GetField("_rpgLocation", flags);
+                var lastScene = type.GetField("_rpgLastPlayedSceneId", flags);
+                int returnRegion = (int)location.GetValue(world);
+                var returnScene = lastScene.GetValue(world);
+                int branches = 0;
+                for (int i = 0; i < campaign.episodes.Length; i++)
+                {
+                    var episode = campaign.episodes[i];
+                    Require(world.EnterRpgRegion(world.CampaignRegionForEpisode(i + 1)), $"Unreachable stage {episode.id}.");
+                    foreach (var lines in new[] { episode.preDialogues, episode.postWinDialogues, episode.postLoseDialogues })
+                    {
+                        if (lines == null || lines.Length == 0) continue;
+                        world.BeginRpgDialogue(episode, campaign.protagonist, lines);
+                        string previousMap = null;
+                        for (int index = 0; index < lines.Length; index++)
+                        {
+                            var line = lines[index];
+                            if (index != 0 && index + 1 != lines.Length && line.stage?.Length is not > 0 &&
+                                previousMap == line.SceneMapPath) continue;
+                            world.SetRpgDialogueLine(lines, index, playMotion: false);
+                            previousMap = line.SceneMapPath;
+                            var terrain = CurrentTerrain();
+                            var cast = FieldScene().Find("DialogueCast");
+                            foreach (RectTransform actor in cast)
+                                Require(terrain.Contains(actor.anchorMin),
+                                    $"{actor.name} was outside the floor of {terrain.Spot.spotId} at {episode.id} line {index + 1}.");
+                        }
+                        branches++;
+                        show.Invoke(world, new[] { fieldPage });
+                    }
+                }
+                Require(world.EnterRpgRegion(returnRegion), "The terrain stage test did not restore the field.");
+                lastScene.SetValue(world, returnScene);
+                Debug.Log($"[VERIFY 2.5D STAGES] {world.RpgCampaignId}: {branches} opening, victory and defeat branches grounded.");
+            }
+
             (Vector2 Min, Vector2 Max) CameraFrame()
             {
                 var camera = (RectTransform)FieldScene();
@@ -903,11 +1035,11 @@ namespace YGOPortable.Editor
                 world.Update(.25f);
                 Require(player.anchorMin == start && world.CanWalk, "Selecting away from every target started an unintended walk.");
 
-                var landmark = (RectTransform)FieldScene().Find("Exploration/Landmark");
+                var landmark = (RectTransform)FieldScene().Find("Landmark");
                 FieldScene().Find("Scenery").GetComponent<TagForceFloorTap>().Click(landmark.anchorMin);
                 world.Update(4f);
-                Require(radarPlayer.anchorMin != radarStart && radarPlayer.anchorMin == new Vector2(
-                    Mathf.InverseLerp(.06f, .94f, player.anchorMin.x), Mathf.InverseLerp(.095f, .455f, player.anchorMin.y)),
+                Require(radarPlayer.anchorMin != radarStart &&
+                    radarPlayer.anchorMin == CurrentTerrain().Normalize(player.anchorMin),
                     "The radar did not track the player proportionally while walking.");
                 Require(action.gameObject.activeSelf && action.Find("Label").GetComponent<Text>().text == "교정 게시판 · 조사",
                     "The prompt did not identify the nearby landmark.");
@@ -1208,7 +1340,7 @@ namespace YGOPortable.Editor
                 var guest = (RectTransform)cast.Find("Guest_1");
                 Require(storyRoot.gameObject.activeSelf && world.Root.activeSelf && !world.CanWalk &&
                     world.Root.transform.GetSiblingIndex() < story.Root.transform.GetSiblingIndex() &&
-                    field.Find("Player") == player && field.Find("MainQuestNpc") == opponent &&
+                    cast.Find("Player") == player && cast.Find("MainQuestNpc") == opponent &&
                     storyRoot.Find("Scene/Portraits/Protagonist").GetComponent<Image>().enabled &&
                     storyRoot.Find("Scene/Portraits/Opponent").GetComponent<Image>().enabled &&
                     player.Find("Sprite").GetComponent<Image>().enabled && opponent.Find("SD").GetComponent<Image>().enabled &&
@@ -1698,10 +1830,10 @@ namespace YGOPortable.Editor
                 void ExamineLandmark(bool withController = false)
                 {
                     var field = FieldScene();
-                    if (!withController) Press(field, "Exploration/Landmark");
+                    if (!withController) Press(field, "Landmark");
                     else
                     {
-                        PointAt(((RectTransform)field.Find("Exploration/Landmark")).anchorMin);
+                        PointAt(((RectTransform)field.Find("Landmark")).anchorMin);
                         world.HandleFieldInput(new DeckPadFrame(Vector2Int.zero, DeckPadButtons.Submit));
                     }
                     world.Update(4f);
@@ -1753,7 +1885,7 @@ namespace YGOPortable.Editor
 
                 Require(world.EnterRpgRegion(RpgGarage), "Could not verify the garage cache.");
                 int balance = CollectionProgress.Balance;
-                var cache = (RectTransform)FieldScene().Find("Exploration/HiddenCache");
+                var cache = (RectTransform)FieldScene().Find("HiddenCache");
                 FieldScene().Find("Scenery").GetComponent<TagForceFloorTap>().Click(cache.anchorMin);
                 world.Update(3f);
                 Require(panel.Find("FieldHud/ContextAction/Label").GetComponent<Text>().text.EndsWith("줍기", StringComparison.Ordinal),
@@ -1762,14 +1894,14 @@ namespace YGOPortable.Editor
                 world.Update(4f);
                 CollectionProgress.Load(audit);
                 Require(CollectionProgress.Balance == balance + 180 && CollectionProgress.RpgCacheFound(0) &&
-                    FieldScene().Find("Exploration/HiddenCache") == null &&
+                    FieldScene().Find("HiddenCache") == null &&
                     !CollectionProgress.TryFindRpgCache(0, out _), "The cache did not persist a one-time payout.");
                 int tickets = CollectionProgress.PackUrTickets;
                 Require(!world.EnterRpgRegion(RpgHideout) && CollectionProgress.TryFindRpgCache(regions[RpgHideout].AdventureSlot, out _) &&
                     CollectionProgress.PackUrTickets == tickets + 1, "The cache did not store the existing shop's ticket.");
                 Require(world.EnterRpgRegion(RpgGarage), "Cannot return to the workshop.");
 
-                Press(FieldScene(), "Exploration/Landmark");
+                Press(FieldScene(), "Landmark");
                 world.Update(4f);
                 Press(panel, "ResidentChoices/WorkbenchMenu");
                 Press(panel, "ResidentChoices/SaveRpg");
@@ -1801,7 +1933,7 @@ namespace YGOPortable.Editor
                 Require(CollectionProgress.TryAwardStoryDuel(script.episodes[0].id, true, null, rival, default,
                     out _, out _, rpgField: true) && CollectionProgress.RpgExperience == 200,
                     "A story field result did not award its own RPG XP.");
-                Press(FieldScene(), "Exploration/Landmark");
+                Press(FieldScene(), "Landmark");
                 world.Update(4f);
                 Press(panel, "ResidentChoices/WorkbenchMenu");
                 Press(panel, "ResidentChoices/Recall");
@@ -1889,7 +2021,7 @@ namespace YGOPortable.Editor
                 foreach (int id in choices)
                 {
                     Sprite before = panel.Find("FieldHud/DuelistHud/Partner/PortraitFrame/Crop/Portrait").GetComponent<Image>().sprite;
-                    Press(FieldScene(), "Exploration/Landmark");
+                    Press(FieldScene(), "Landmark");
                     world.Update(4f);
                     Press(panel, "ResidentChoices/WorkbenchMenu");
                     Press(panel, "ResidentChoices/ChangePartner");
@@ -2143,7 +2275,7 @@ namespace YGOPortable.Editor
 
                 void OpenWorkbench()
                 {
-                    Press(FieldScene(), "Exploration/Landmark");
+                    Press(FieldScene(), "Landmark");
                     world.Update(4f);
                     Press(panel, "ResidentChoices/WorkbenchMenu");
                 }
@@ -2155,7 +2287,7 @@ namespace YGOPortable.Editor
                 Press(FieldScene(), "MainQuestNpc/SD");
                 world.Update(4f);
                 story.ShowFieldDuelResult(firstEpisode, true, false, () => "", default);
-                var opponent = (RectTransform)FieldScene().Find("MainQuestNpc");
+                var opponent = (RectTransform)FieldScene().Find("DialogueCast/MainQuestNpc");
                 Vector2 before = opponent.anchorMin;
                 int exit = Array.FindIndex(firstEpisode.postWinDialogues,
                     line => line.stage?.Any(a => a.actor == firstEpisode.charId && a.action == "exit") == true);

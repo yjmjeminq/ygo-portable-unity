@@ -47,7 +47,8 @@ namespace YGOPortable.UI
             internal Vector2 Entry, Mark, From;
             internal RpgStagePose Initial, Target;
             internal bool AutoJoin;
-            internal float Progress, StartAlpha;
+            internal float Progress, StartAlpha, PathLength;
+            internal readonly List<Vector2> Path = new(12);
         }
 
         internal void BeginRpgDialogue(StoryEpisodeData episode, string hero, StoryDialogueLine[] lines)
@@ -55,6 +56,7 @@ namespace YGOPortable.UI
             Root.SetActive(true);
             if (_player == null || _rpgDialogueCast != null || _page != Page.Field) Show(Page.Field);
 
+            _rpgTerrain = TerrainForScene(lines[0].SceneMapPath);
             _rpgDialogueCast = DuelUiKit.FillRect("DialogueCast", _rpgSceneSpace);
             _rpgSceneEpisode = RpgWardrobe.EpisodeNumber(episode);
             _rpgLastPlayedSceneId = episode.id;
@@ -108,6 +110,7 @@ namespace YGOPortable.UI
             _player.Find("GxIdentity")?.gameObject.SetActive(false);
             _rpgSceneSpace.Find("SideQuestItem")?.gameObject.SetActive(false);
             _rpgFieldObjects?.gameObject.SetActive(false);
+            foreach (var prop in _rpgFieldProps) prop.gameObject.SetActive(false);
             _rpgGreeting?.gameObject.SetActive(false);
             _rpgTravelBanner?.gameObject.SetActive(false);
             _rpgTravelFade?.gameObject.SetActive(false);
@@ -134,11 +137,11 @@ namespace YGOPortable.UI
             }
 
             PoseRpgWalker(_rpgDialogueOpponent, opponentArt, opponentMark, Vector2.zero, false, heroMark - opponentMark);
-            _player.SetAsLastSibling();
             foreach (var resident in _rpgResidents.Values)
                 if (!_rpgStageActors.Any(actor => actor.Root == resident)) resident.gameObject.SetActive(false);
             if (_rpgCompanion != null && !_rpgStageActors.Any(actor => actor.Root == _rpgCompanion))
                 _rpgCompanion.gameObject.SetActive(false);
+            OrderRpgFieldActors();
         }
 
         private void EnsureRpgStageGuest(int id, HashSet<int> entrances)
@@ -198,12 +201,14 @@ namespace YGOPortable.UI
         private RpgStageActor RegisterRpgActor(int? id, RectTransform root, RectTransform art, Vector2 mark,
             bool visible, bool autoJoin)
         {
-            var pose = new RpgStagePose(root.anchorMin, visible);
+            var pose = new RpgStagePose(FieldTerrain.Ground(root.anchorMin), visible);
+            root.SetParent(_rpgDialogueCast, false);
             var actor = new RpgStageActor
             {
                 Root = root, Art = art, Visibility = root.gameObject.AddComponent<CanvasGroup>(),
-                Entry = root.anchorMin, Mark = mark, Initial = pose, Target = pose, Progress = 1f, AutoJoin = autoJoin,
+                Entry = pose.Position, Mark = mark, Initial = pose, Target = pose, Progress = 1f, AutoJoin = autoJoin,
             };
+            PoseRpgWalker(root, art, _rpgTerrain.Ground(pose.Position), Vector2.zero, false);
             actor.Visibility.alpha = visible ? 1f : 0f;
             root.gameObject.SetActive(visible);
             _rpgStageActors.Add(actor);
@@ -221,6 +226,19 @@ namespace YGOPortable.UI
         {
             string sceneMap = lines[index].SceneMapPath;
             var scenery = GetRpgDialogueScenery(sceneMap);
+            var terrain = TerrainForScene(sceneMap);
+            if (_rpgTerrain != terrain)
+            {
+                _rpgTerrain = terrain;
+                foreach (var actor in _rpgStageActors)
+                {
+                    actor.Progress = 1f;
+                    PoseRpgStageActor(actor);
+                }
+                foreach (var footfall in _rpgFootfalls) footfall.Art.gameObject.SetActive(false);
+                RefreshRpgForeground();
+                OrderRpgFieldActors();
+            }
             _rpgAtmosphereLayer.gameObject.SetActive(sceneMap == null);
             if (scenery != null && scenery != _rpgFieldScenery.sprite)
             {
@@ -310,10 +328,10 @@ namespace YGOPortable.UI
                             continue;
                         if (action.action == "enter") target = new RpgStagePose(actor.Mark, true, target.LookAt);
                         else if (action.action == "move")
-                            target = new RpgStagePose(RpgGroundPoint(_rpgLocation, new Vector2(Mathf.Clamp(action.x, .05f, .95f),
-                                Mathf.Clamp(action.y, .12f, .64f))), true, target.LookAt);
+                            target = new RpgStagePose(TerrainForScene(line.SceneMapPath).Ground(new Vector2(action.x, action.y)),
+                                true, target.LookAt);
                         else if (action.action == "exit")
-                            target = new RpgStagePose(RpgGroundPoint(_rpgLocation,
+                            target = new RpgStagePose(TerrainForScene(line.SceneMapPath).Ground(
                                 new Vector2(target.Position.x < .5f ? .04f : .96f, target.Position.y)), false);
                         else if (action.action == "face" && _rpgStageIds.TryGetValue(action.target, out var facing) && facing != actor)
                             target = new RpgStagePose(target.Position, target.Visible, action.target);
@@ -330,11 +348,13 @@ namespace YGOPortable.UI
                 BeginRpgStageMove(actor, target, slide);
             }
             RefreshRpgStageFacing();
+            OrderRpgFieldActors();
         }
 
         internal void UpdateRpgDialogue(float delta)
         {
             UpdateRpgAtmosphere(delta);
+            UpdateRpgFieldEffects(delta);
             while (RpgStageRunning && delta > 0f)
             {
                 float slice = Mathf.Min(delta, _rpgBeatRemaining);
@@ -354,6 +374,7 @@ namespace YGOPortable.UI
                 }
             }
             TrackRpgCamera(delta, RpgDialogueCameraFocus());
+            OrderRpgFieldActors();
         }
 
         private Vector2 RpgDialogueCameraFocus()
@@ -367,7 +388,18 @@ namespace YGOPortable.UI
         private void BeginRpgStageMove(RpgStageActor actor, RpgStagePose target, bool animate)
         {
             bool visible = actor.Root.gameObject.activeSelf;
-            actor.From = visible ? actor.Root.anchorMin : actor.Entry;
+            actor.From = _rpgTerrain.Ground(visible ? actor.Root.anchorMin : actor.Entry);
+            actor.PathLength = 0f;
+            if (animate)
+            {
+                _rpgTerrain.BuildPath(actor.From, target.Position, actor.Path);
+                var previous = actor.From;
+                foreach (var point in actor.Path)
+                {
+                    actor.PathLength += RpgArtDirection(point - previous).magnitude;
+                    previous = point;
+                }
+            }
             actor.StartAlpha = visible ? actor.Visibility.alpha : 0f;
             actor.Target = target;
             actor.Progress = animate ? 0f : 1f;
@@ -378,9 +410,26 @@ namespace YGOPortable.UI
         private void PoseRpgStageActor(RpgStageActor actor)
         {
             float progress = Mathf.SmoothStep(0f, 1f, actor.Progress);
-            bool walking = actor.Progress < 1f && actor.From != actor.Target.Position;
-            var position = Vector2.LerpUnclamped(actor.From, actor.Target.Position, progress);
-            var heading = walking ? actor.Target.Position - actor.From : RpgStageHeading(actor, position);
+            bool walking = actor.Progress < 1f && actor.PathLength > .00001f;
+            var position = _rpgTerrain.Ground(actor.Target.Position);
+            if (walking)
+            {
+                float distance = progress * actor.PathLength;
+                position = actor.From;
+                foreach (var waypoint in actor.Path)
+                {
+                    var step = waypoint - position;
+                    float length = RpgArtDirection(step).magnitude;
+                    if (distance < length)
+                    {
+                        position += step * (distance / length);
+                        break;
+                    }
+                    position = waypoint;
+                    distance -= length;
+                }
+            }
+            var heading = walking ? position - actor.Root.anchorMin : RpgStageHeading(actor, position);
             actor.Visibility.alpha = actor.Target.Visible
                 ? Mathf.Lerp(actor.StartAlpha, 1f, Mathf.Clamp01(actor.Progress * 4f))
                 : Mathf.Lerp(actor.StartAlpha, 0f, Mathf.Clamp01(actor.Progress * 2f - 1f));

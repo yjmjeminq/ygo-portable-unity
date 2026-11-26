@@ -20,106 +20,25 @@ namespace YGOPortable.UI
         private RpgRegion[] CampaignRegions => _campaignRegions;
         private bool IsGxHarbor(int region) => IsGxCampaign && CampaignRegions[region].Id == "spot_harbor_beach";
 
-        // Convex footprints follow the floor plane in each GX background. Every straight path between
-        // two grounded points stays inside the same footprint, including patrols and stage movement.
-        private static readonly Dictionary<string, Vector2[]> GxGround = new()
-        {
-            ["spot_abandoned_dorm"] = new[]
-            {
-                new Vector2(.23f, .39f), new Vector2(.4f, .31f), new Vector2(.62f, .34f), new Vector2(.74f, .46f),
-                new Vector2(.54f, .49f), new Vector2(.32f, .47f),
-            },
-            ["spot_blue_arena"] = new[]
-            {
-                new Vector2(.34f, .35f), new Vector2(.57f, .3f), new Vector2(.68f, .33f), new Vector2(.77f, .54f),
-                new Vector2(.62f, .575f), new Vector2(.44f, .49f),
-            },
-            ["spot_dark_dimension"] = new[]
-            {
-                new Vector2(.23f, .44f), new Vector2(.41f, .32f), new Vector2(.62f, .32f), new Vector2(.77f, .4f),
-                new Vector2(.75f, .6f), new Vector2(.6f, .67f), new Vector2(.38f, .65f), new Vector2(.23f, .57f),
-            },
-            ["spot_darkness_altar"] = new[]
-            {
-                new Vector2(.24f, .37f), new Vector2(.36f, .285f), new Vector2(.65f, .285f), new Vector2(.77f, .39f),
-                new Vector2(.76f, .53f), new Vector2(.64f, .66f), new Vector2(.37f, .66f), new Vector2(.25f, .54f),
-            },
-            ["spot_forest_duel_ground"] = new[]
-            {
-                new Vector2(.44f, .17f), new Vector2(.56f, .17f), new Vector2(.7f, .39f), new Vector2(.69f, .6f),
-                new Vector2(.59f, .67f), new Vector2(.4f, .67f), new Vector2(.3f, .54f), new Vector2(.3f, .4f),
-            },
-            ["spot_harbor_beach"] = new[]
-            {
-                new Vector2(.14f, .285f), new Vector2(.22f, .205f), new Vector2(.515f, .195f), new Vector2(.525f, .29f),
-                new Vector2(.47f, .355f), new Vector2(.36f, .393f), new Vector2(.2f, .375f),
-            },
-            ["spot_infirmary"] = new[]
-            {
-                new Vector2(.28f, .115f), new Vector2(.73f, .115f), new Vector2(.7f, .41f), new Vector2(.625f, .7f),
-                new Vector2(.41f, .7f), new Vector2(.32f, .49f),
-            },
-            ["spot_library"] = new[]
-            {
-                new Vector2(.455f, .105f), new Vector2(.545f, .105f), new Vector2(.535f, .73f), new Vector2(.473f, .73f),
-            },
-            ["spot_main_academy"] = new[]
-            {
-                new Vector2(.125f, .24f), new Vector2(.3f, .115f), new Vector2(.56f, .115f), new Vector2(.78f, .37f),
-                new Vector2(.735f, .5f), new Vector2(.56f, .535f), new Vector2(.365f, .47f),
-            },
-            ["spot_red_dorm"] = new[]
-            {
-                new Vector2(.095f, .23f), new Vector2(.235f, .125f), new Vector2(.81f, .125f), new Vector2(.855f, .25f),
-                new Vector2(.82f, .43f), new Vector2(.67f, .505f), new Vector2(.445f, .45f),
-            },
-            ["spot_vending_bench"] = new[]
-            {
-                new Vector2(.175f, .27f), new Vector2(.41f, .16f), new Vector2(.84f, .19f), new Vector2(.89f, .255f),
-                new Vector2(.76f, .385f), new Vector2(.585f, .465f), new Vector2(.4f, .43f),
-            },
-            ["spot_volcano_arena"] = new[]
-            {
-                new Vector2(.345f, .365f), new Vector2(.66f, .365f), new Vector2(.695f, .425f), new Vector2(.695f, .595f),
-                new Vector2(.62f, .69f), new Vector2(.39f, .69f), new Vector2(.315f, .595f), new Vector2(.315f, .425f),
-            },
-        };
+        private RpgFieldTerrain[] _rpgTerrainByRegion;
+        private readonly Dictionary<string, RpgFieldTerrain> _rpgSceneTerrain = new(StringComparer.Ordinal);
+        private RpgFieldTerrain _rpgTerrain;
+        private RpgFieldTerrain FieldTerrain => _rpgTerrainByRegion[_rpgLocation];
 
-        private Vector2 RpgGroundPoint(int region, Vector2 position)
-        {
-            if (!IsGxCampaign) return position;
-            var polygon = GxGround[CampaignRegions[region].Id];
-            var nearest = position;
-            float distance = float.PositiveInfinity;
-            bool inside = true;
-            // X and Y are normalized to the artwork. Measure distances in its 16:9 proportions.
-            var scale = new Vector2(1f, 9f / 16f);
-            for (int i = 0; i < polygon.Length; ++i)
-            {
-                var start = polygon[i];
-                var edge = polygon[(i + 1) % polygon.Length] - start;
-                var offset = position - start;
-                if (edge.x * offset.y - edge.y * offset.x < 0f) inside = false;
-
-                var scaledEdge = Vector2.Scale(edge, scale);
-                float along = Mathf.Clamp01(Vector2.Dot(Vector2.Scale(offset, scale), scaledEdge) / scaledEdge.sqrMagnitude);
-                var candidate = start + edge * along;
-                float squared = Vector2.Scale(position - candidate, scale).sqrMagnitude;
-                if (squared >= distance) continue;
-                nearest = candidate;
-                distance = squared;
-            }
-            return inside ? position : nearest;
-        }
+        private Vector2 RpgGroundPoint(int region, Vector2 position) => _rpgTerrainByRegion[region].Ground(position);
 
         private Vector2 RpgGroundMark(int region, Vector2 position)
         {
-            if (!IsGxCampaign) return position;
-            var polygon = GxGround[CampaignRegions[region].Id];
+            var terrain = _rpgTerrainByRegion[region];
+            if (!IsGxCampaign) return terrain.Ground(position);
+            var polygon = terrain.Spot.walkPolygon;
             var center = Vector2.zero;
             foreach (var vertex in polygon) center += vertex;
-            return Vector2.Lerp(RpgGroundPoint(region, position), center / polygon.Length, .12f);
+            return terrain.Ground(Vector2.Lerp(terrain.Ground(position), center / polygon.Length, .12f));
         }
+
+        private RpgFieldTerrain TerrainForScene(string sceneMap) =>
+            sceneMap != null && _rpgSceneTerrain.TryGetValue(sceneMap, out var terrain) ? terrain : FieldTerrain;
 
         private Vector2 RpgFieldArrival(int region)
         {
@@ -132,7 +51,7 @@ namespace YGOPortable.UI
             return RpgGroundMark(region, point);
         }
 
-        private string CampaignFieldTheme => _rpgConfiguration?.spots[_rpgLocation].fieldTheme;
+        private string CampaignFieldTheme => FieldTerrain.Spot.fieldTheme;
         private (int From, int Exit, int To, int Entry)[] CampaignRoutes => _campaignRoutes ?? RpgPaths;
         private StoryEpisodeData CurrentRpgEpisode => _rpgCampaign?.episodes != null && RpgClears < _rpgCampaign.episodes.Length
             ? _rpgCampaign.episodes[RpgClears] : null;
@@ -154,10 +73,15 @@ namespace YGOPortable.UI
                     !decks.ContainsKey(episode.forcedPlayerDeckId))))
                 return false;
 
-            var configuration = seriesId == StoryModeUI.GxRpgSeriesId
-                ? TagForceData.LoadRpgConfiguration(Application.streamingAssetsPath, seriesId) : null;
-            if (seriesId == StoryModeUI.GxRpgSeriesId && (configuration == null ||
-                script.episodes.Any(episode => configuration.Spot(episode.regionId) == null))) return false;
+            bool gx = seriesId == StoryModeUI.GxRpgSeriesId;
+            var configuration = TagForceData.LoadRpgConfiguration(Application.streamingAssetsPath, seriesId);
+            if (configuration == null || gx && script.episodes.Any(episode => configuration.Spot(episode.regionId) == null))
+                return false;
+            var regions = gx ? configuration.spots.Select((spot, index) =>
+                new RpgRegion(spot.spotId, spot.name, spot.unlockAfter, index, mapPath: spot.mapPath)).ToArray() : RpgRegions;
+            var floorData = (gx ? configuration.spots : configuration.fieldSpots)?.ToDictionary(spot => spot.spotId);
+            if (floorData == null || regions.Any(region => !floorData.TryGetValue(region.Id, out var spot) ||
+                spot.walkPolygon?.Length is not > 2)) return false;
 
             RpgCampaignId = seriesId;
             _rpgCampaign = script;
@@ -165,11 +89,12 @@ namespace YGOPortable.UI
             _rpgConfiguration = configuration;
             _campaignRegionIndex.Clear();
             _campaignRoutes = null;
-            _campaignRegions = RpgRegions;
-            if (configuration == null) return true;
-
-            _campaignRegions = configuration.spots.Select((spot, index) =>
-                new RpgRegion(spot.spotId, spot.name, spot.unlockAfter, index, mapPath: spot.mapPath)).ToArray();
+            _campaignRegions = regions;
+            _rpgTerrainByRegion = regions.Select(region => new RpgFieldTerrain(floorData[region.Id])).ToArray();
+            _rpgSceneTerrain.Clear();
+            foreach (var scene in configuration.fieldScenes ?? Array.Empty<TagForceSpot>())
+                _rpgSceneTerrain.Add($"Maps/{scene.spotId}.png", new RpgFieldTerrain(scene));
+            if (!gx) return true;
             for (int index = 0; index < _campaignRegions.Length; ++index)
                 _campaignRegionIndex.Add(_campaignRegions[index].Id, index);
 
@@ -201,7 +126,11 @@ namespace YGOPortable.UI
 
         private (string Name, Vector2 Position, string Description) CampaignLandmark(int index)
         {
-            if (!IsGxCampaign) return RpgLandmarks[index];
+            if (!IsGxCampaign)
+            {
+                var (name, position, description) = RpgLandmarks[index];
+                return (name, RpgGroundPoint(index, position), description);
+            }
             var spot = _rpgConfiguration.spots[index];
             var marker = spot.spotId switch
             {
@@ -263,7 +192,7 @@ namespace YGOPortable.UI
                 var point = narrowAisle ? new Vector2(.50f, .18f + .07f * index) :
                     new Vector2(index % 2 == 0 ? .21f : .75f, .30f + .08f * (index / 2));
                 var position = RpgGroundMark(_rpgLocation, point);
-                var marker = Anchor(_rpgFieldObjects, $"Pickup_{item}", position, new Vector2(89f, 35f));
+                var marker = RpgFieldProp($"Pickup_{item}", position, new Vector2(89f, 35f));
                 RpgButton(marker, "✦ 줍기", Approach, 17, primary: true);
                 _questMarkers.Add(marker);
                 RegisterRpgInteraction(marker, "반짝이는 물건 · 줍기", Approach, RpgActionPriority.Service);

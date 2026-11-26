@@ -355,7 +355,7 @@ namespace YGOPortable.UI
                 var icon = Mark($"Exit_{destination}", RpgUiStyle.Symbol.Arrow, ExitGreen, 16f, RpgExitPoint(_rpgLocation, slot));
                 icon.localRotation = Quaternion.Euler(0f, 0f, slot == 0 ? 90f : slot == 1 ? -90f : 0f);
             }
-            if (!gx && _rpgFieldObjects != null && _rpgFieldObjects.Find("HiddenCache") is RectTransform treasure)
+            if (!gx && _rpgSceneSpace.Find("HiddenCache") is RectTransform treasure)
                 Mark("Cache", RpgUiStyle.Symbol.Star, RpgUiStyle.Gold, 18f, treasure.anchorMin);
             foreach (var resident in _rpgResidentMotion)
             {
@@ -376,8 +376,7 @@ namespace YGOPortable.UI
             }
         }
 
-        private static Vector2 RadarPosition(Vector2 point) =>
-            new(Mathf.InverseLerp(.06f, .94f, point.x), Mathf.InverseLerp(.095f, .455f, point.y));
+        private Vector2 RadarPosition(Vector2 point) => FieldTerrain.Normalize(point);
 
         private void UpdateRpgMinimap()
         {

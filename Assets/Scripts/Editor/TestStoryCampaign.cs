@@ -46,6 +46,7 @@ namespace YGOPortable.Editor
                 VerifyMutedMusicRouting();
                 VerifyDialogueChoices(starter);
                 VerifyOpeningAndSave(save);
+                VerifyRpgTerrainData(streaming);
                 VerifyRpgField(starter, save);
                 Debug.Log("[VERIFY STORY] 180 episodes, scrolling, cast portraits, boss openings, rewards and saved campaign progress passed.");
                 exit = 0;

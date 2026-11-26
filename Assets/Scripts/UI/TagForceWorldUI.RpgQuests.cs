@@ -68,10 +68,11 @@ namespace YGOPortable.UI
 
             if (state == RpgQuestState.Active && quest.Receiver == null)
             {
-                var item = Anchor(_rpgSceneSpace, "SideQuestItem", quest.Point, new Vector2(160f, 56f));
+                var point = RpgGroundPoint(_rpgLocation, quest.Point);
+                var item = RpgFieldProp("SideQuestItem", point, new Vector2(160f, 56f));
                 void Investigate() => AdvanceRpgQuest(quest, RpgQuestState.Active, Page.Field,
                     $"{quest.Item} 확보 · {RpgQuestName(quest)}에게 돌아가세요.");
-                void Approach() => MoveTo(quest.Point, Investigate);
+                void Approach() => MoveTo(point, Investigate);
                 RpgButton(item, "조사 · " + quest.Item, Approach, 16, primary: true);
                 RegisterRpgInteraction(item, $"{quest.Item} · 줍기", Approach, RpgActionPriority.Request);
             }

@@ -51,6 +51,7 @@ namespace YGOPortable.UI
         private RectTransform _rpgCompanion, _rpgCompanionArt, _rpgGreeting, _rpgTravelBanner, _rpgRankBanner;
         private Image _rpgTravelFade;
         private Vector2 _rpgCompanionPoint;
+        private readonly List<Vector2> _rpgFollowerPath = new(12);
         private float _rpgGreetingTime, _rpgTravelTime, _rpgRankTime, _rpgBondTime;
         private RectTransform _rpgBondBanner;
         private int _rpgRankNotice, _rpgPendingRegion = -1;
@@ -108,8 +109,8 @@ namespace YGOPortable.UI
             int region = _rpgLocation;
             int saveSlot = CampaignRegions[region].AdventureSlot;
             if (CollectionProgress.RpgCacheFound(saveSlot)) return;
-            var point = RpgCachePoints[region];
-            var cache = Anchor(_rpgFieldObjects, "HiddenCache", point, new Vector2(56f, 52f));
+            var point = RpgGroundPoint(region, RpgCachePoints[region]);
+            var cache = RpgFieldProp("HiddenCache", point, new Vector2(56f, 52f));
             void Take()
             {
                 if (!CollectionProgress.TryFindRpgCache(saveSlot, out string result)) { ShowStatus(result); return; }
@@ -160,8 +161,20 @@ namespace YGOPortable.UI
             if (_rpgCompanion == null) return;
             var gap = _position - _rpgCompanionPoint;
             float distance = RpgArtDirection(gap).magnitude;
-            var step = gap * (Mathf.Min(Mathf.Max(0f, distance - .068f), .41f * delta) / Mathf.Max(.0001f, distance));
-            _rpgCompanionPoint += step;
+            float speed = .41f * Mathf.Lerp(1f, FieldTerrain.ScaleAt(_rpgCompanionPoint.y), .28f);
+            float travel = Mathf.Min(Mathf.Max(0f, distance - .068f), speed * delta);
+            if (travel > 0f && !FieldTerrain.IsClear(_rpgCompanionPoint, _position))
+            {
+                FieldTerrain.BuildPath(_rpgCompanionPoint, _position, _rpgFollowerPath);
+                int next = 0;
+                while (next < _rpgFollowerPath.Count - 1 && _rpgFollowerPath[next] == _rpgCompanionPoint) ++next;
+                gap = _rpgFollowerPath[next] - _rpgCompanionPoint;
+                distance = RpgArtDirection(gap).magnitude;
+                travel = Mathf.Min(travel, distance);
+            }
+            var previous = _rpgCompanionPoint;
+            _rpgCompanionPoint = FieldTerrain.Slide(previous, previous + gap * (travel / Mathf.Max(.0001f, distance)));
+            var step = _rpgCompanionPoint - previous;
             PoseRpgWalker(_rpgCompanion, _rpgCompanionArt, _rpgCompanionPoint, step, step.sqrMagnitude > .000001f, gap);
         }
 
