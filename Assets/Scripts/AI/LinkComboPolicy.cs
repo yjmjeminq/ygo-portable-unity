@@ -331,7 +331,8 @@ namespace YGOPortable.AI
                 prompt.candidates.Count == 0 || prompt.finishable) return null;
 
             int targetRank = Rank(linkTarget);
-            if (!planLinks && !prompt.candidates.Any(card => card.controller == prompt.playerId && IsDowngrade(Rank(card.code), targetRank)))
+            if (!planLinks && !prompt.candidates.Any(card => card.controller == prompt.playerId &&
+                IsDowngrade(MaterialRiskRank(card.code, targetRank), targetRank)))
                 return null;
             int bodies = session.Players[prompt.playerId].mzone.Count(card => card?.IsFaceUp == true);
             int remaining = targetRank - prompt.unselectCandidates.Sum(card => Math.Max(1, Rank(card.code)));
@@ -345,6 +346,7 @@ namespace YGOPortable.AI
                 if (item.controller == prompt.playerId)
                 {
                     if (rank >= targetRank && rank >= 3) score -= 4000;
+                    if (MaterialRiskRank(item.code, targetRank) > rank) score -= 20000;
                     if (rank > 1 && rank <= remaining && bodies < targetRank) score += 1300 + 250 * rank;
                     if (item.code is 20455229 or 18789533 or 30342076 or 27520594) score += 700;
                 }
@@ -445,8 +447,15 @@ namespace YGOPortable.AI
         internal static bool IsDowngrade(int materialRank, int targetRank) => targetRank > 0 && materialRank >= 3 && materialRank > targetRank;
         internal static bool HasStrongerLink(PlayerFieldSnapshot own, int targetRank) => targetRank > 0 && own.mzone.Any(card =>
             card?.IsFaceUp == true && IsDowngrade(Rank(card.code), targetRank));
+        internal static int MaterialRiskRank(uint code, int targetRank) =>
+            targetRank > 0 && ProtectAsLinkMaterial(code) ? Math.Max(4, targetRank + 1) : Rank(code);
+        internal static bool HasAceAtRisk(PlayerFieldSnapshot own, int targetRank) =>
+            targetRank > 0 && own.mzone.Any(card => card?.IsFaceUp == true && ProtectAsLinkMaterial(card.code));
+        internal static bool ProtectAsLinkMaterial(uint code) =>
+            DuelAiPolicy.IsRitualAce(code) || code is DuelAiPolicy.Mirrorjade or 22908820 or 75286621 or 80453041;
         internal static bool NeedsMaterialProjection(PlayerFieldSnapshot own, SelectableCardItem summon) =>
-            summon.location == YgoConstants.LOCATION_EXTRA && HasStrongerLink(own, Rank(summon.code));
+            summon.location == YgoConstants.LOCATION_EXTRA &&
+            (HasStrongerLink(own, Rank(summon.code)) || HasAceAtRisk(own, Rank(summon.code)));
         internal static bool IsInteractive(CardInfo card) => (card.DeckEffectCategories & Interaction) != 0 ||
             card.code is 24151924 or 98630720 or 20934852 or 24361622;
 

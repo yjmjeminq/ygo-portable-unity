@@ -151,6 +151,16 @@ namespace YGOPortable.Editor
             public ExposureTrace[] exposureTraces;
             public UnusedDevelopmentTrace[] unusedDevelopmentTraces;
             public LinkMaterialDowngradeTrace[] linkMaterialDowngradeTraces;
+            public FieldCostTrace[] fieldCosts;
+        }
+
+        [Serializable]
+        private sealed class FieldCostTrace
+        {
+            public int turn, phase, actionStep, moveStep, actor, actionOwner;
+            public uint card, source, action, reason, from, to, method;
+            public uint[] ownBefore, ownAfter, rivalBefore, rivalAfter;
+            public int ownLifeBefore, ownLifeAfter, rivalLifeBefore, rivalLifeAfter;
         }
 
         [Serializable]
@@ -231,7 +241,8 @@ namespace YGOPortable.Editor
                 DeckRepository.Load(streaming, Path.Combine(Path.GetDirectoryName(output), "benchmark-save"), false);
                 var decks = DeckRepository.PresetDecks.ToDictionary(deck => deck.id);
                 bool gxSuite = Environment.GetEnvironmentVariable("YGO_BENCH_GX_SUITE") == "1";
-                if (gxSuite)
+                bool gxFieldAudit = Environment.GetEnvironmentVariable("YGO_BENCH_GX_FIELD_AUDIT") == "1";
+                if (gxSuite || gxFieldAudit)
                 {
                     var gxDecks = StoryModeUI.LoadRpgDecks(streaming, StoryModeUI.GxRpgSeriesId);
                     if (gxDecks.Count != 37) throw new InvalidOperationException("The GX benchmark requires all 37 story decks.");
@@ -265,7 +276,8 @@ namespace YGOPortable.Editor
                 bool captureReplays = Environment.GetEnvironmentVariable("YGO_BENCH_CAPTURE_REPLAYS") == "1";
                 bool randomOpponent = Environment.GetEnvironmentVariable("YGO_BENCH_RANDOM_OPPONENT") == "1";
                 string fixture = Environment.GetEnvironmentVariable("YGO_BENCH_FIXTURE");
-                var matchups = gxSuite ? GxMatchups : fullSuite ? Matchups.Concat(StyleMatchups).ToArray() : styleSuite ? StyleMatchups : Matchups;
+                var matchups = gxFieldAudit ? GxFieldMatchups(decks) : gxSuite ? GxMatchups :
+                    fullSuite ? Matchups.Concat(StyleMatchups).ToArray() : styleSuite ? StyleMatchups : Matchups;
                 if (randomOpponent) Debug.Log($"[AI BENCH] Facing {RandomLegalPilot.Version} with independent fixed seeds.");
                 if (fullSuite || styleSuite)
                 {
@@ -347,6 +359,14 @@ namespace YGOPortable.Editor
                 YgoNativeBridge.Shutdown();
                 if (Application.isBatchMode) EditorApplication.Exit(exit);
             }
+        }
+
+        private static (string Era, int FirstDeck, int SecondDeck, uint Method)[] GxFieldMatchups(Dictionary<int, PresetDeckInfo> decks)
+        {
+            int[] rivals = { 20689, 69033, 20680, 51991 };
+            return decks.Keys.Where(id => id is >= 69001 and <= 69034 or >= 69101 and <= 69103).OrderBy(id => id)
+                .Select((id, index) => ($"GX/Audit/{id}", id, rivals[index % rivals.Length] == id ? 20689 : rivals[index % rivals.Length], 0u))
+                .ToArray();
         }
 
         private static Func<int, Pilot> LoadPilotFactory(string name) =>
@@ -436,7 +456,7 @@ namespace YGOPortable.Editor
         private static void InspectReplayPrompt(DuelSession duel, DuelPrompt prompt, int step, string answer)
         {
             string Describe(IReadOnlyList<SelectableCardItem> items) => string.Join(", ",
-                items.Select((item, index) => $"{index}={item.code}@{item.controller}/{item.location}/{item.sequence}"));
+                items.Select((item, index) => $"{index}={item.code}@{item.controller}/{item.location}/{item.sequence} desc={item.description}"));
             Debug.Log($"[AI REPLAY PROMPT] Step {step}, turn {duel.TurnNumber}, phase {duel.CurrentPhase}, " +
                 $"player {prompt.playerId}, message {prompt.messageType}, hint {prompt.SelectionHint}, answer {answer}.\n" +
                 $"Normal Summon: {Describe(prompt.summonable)}\nSpecial Summon: {Describe(prompt.spSummonable)}\n" +
@@ -1146,7 +1166,14 @@ namespace YGOPortable.Editor
             var pendingLinkMaterials = new[] { new List<(uint Card, int Rank)>(), new List<(uint Card, int Rank)>() };
             var pendingLinkTurns = new int[2];
             var provenMissedBattleTurns = new[] { new HashSet<int>(), new HashSet<int>() };
-            bool auditGx = era.StartsWith("GX/", StringComparison.Ordinal);
+            bool auditFieldCosts = era.StartsWith("GX/Audit/", StringComparison.Ordinal);
+            bool auditGx = era.StartsWith("GX/", StringComparison.Ordinal) && !auditFieldCosts;
+            var fieldCosts = new[] { new List<FieldCostTrace>(), new List<FieldCostTrace>() };
+            var pendingFieldCosts = new List<(byte Owner, FieldCostTrace Trace)>();
+            uint[][] fieldBefore = null;
+            int[] lifeBefore = null;
+            int fieldActionStep = -1, fieldActionOwner = -1, lastChoiceOwner = -1;
+            uint fieldActionCode = 0, lastChoiceCode = 0;
             int responseIndex = 0, activeResponseStep = -1;
             using var duel = new DuelSession(recordPlanningReplay: true);
             StartFixture(duel, matchup, seed, first, second);
@@ -1160,6 +1187,7 @@ namespace YGOPortable.Editor
             {
                 TrackDestruction(duel.ResolvingChainLink, move);
                 TrackLinkMaterialDowngrade(move);
+                if (auditFieldCosts) TrackFieldCost(move);
                 if (move.toCon < 2 && move.toLoc == YgoConstants.LOCATION_MZONE &&
                     move.fromLoc != YgoConstants.LOCATION_MZONE && (move.toPos & YgoConstants.POS_FACEUP) != 0 &&
                     move.code == presets[move.toCon].sigCard)
@@ -1290,7 +1318,19 @@ namespace YGOPortable.Editor
                 var prompt = duel.ActivePrompt;
                 if (prompt == null) { duel.StepUntilPrompt(); continue; }
                 if (prompt.messageType is YgoConstants.MSG_SELECT_IDLECMD or YgoConstants.MSG_SELECT_BATTLECMD)
+                {
                     foreach (var pending in pendingLinkMaterials) pending.Clear();
+                    if (auditFieldCosts)
+                    {
+                        CompleteFieldCosts();
+                        fieldBefore = duel.Players.Select(FieldCodes).ToArray();
+                        lifeBefore = duel.Players.Select(player => player.lp).ToArray();
+                        fieldActionStep = responseIndex;
+                        fieldActionOwner = prompt.playerId;
+                        fieldActionCode = lastChoiceCode = 0;
+                        lastChoiceOwner = prompt.playerId;
+                    }
+                }
                 byte player = prompt.playerId;
                 int replayStep = responseIndex++;
                 activeResponseStep = replayStep;
@@ -1331,6 +1371,17 @@ namespace YGOPortable.Editor
                     hint = prompt.SelectionHint, answer = BitConverter.ToString(response)
                 });
                 var card = ChosenCard(prompt, command);
+                if (auditFieldCosts && card != null)
+                {
+                    lastChoiceCode = card.code;
+                    lastChoiceOwner = player;
+                    if (replayStep == fieldActionStep) fieldActionCode = card.code;
+                }
+                else if (auditFieldCosts && prompt.messageType == YgoConstants.MSG_SELECT_EFFECTYN && command == 1)
+                {
+                    lastChoiceCode = prompt.promptCardCode;
+                    lastChoiceOwner = player;
+                }
                 if (turn <= 2 && player == turnPlayer)
                 {
                     if (prompt.messageType == YgoConstants.MSG_SELECT_IDLECMD)
@@ -1489,6 +1540,7 @@ namespace YGOPortable.Editor
             result.turns = duel.TurnNumber;
             result.finalLife = duel.Players.Select(field => field.lp).ToArray();
             result.capped = !duel.IsFinished && duel.RetryCount == 0 && (!openingOnly || duel.TurnNumber <= 2);
+            if (auditFieldCosts) CompleteFieldCosts();
             for (int player = 0; player < 2; player++)
             {
                 var side = result.sides[player];
@@ -1507,6 +1559,7 @@ namespace YGOPortable.Editor
                 foreach (var trace in unusedDevelopment[player]) trace.eventualLoss = lost;
                 side.unusedDevelopmentTraces = unusedDevelopment[player].ToArray();
                 side.linkMaterialDowngradeTraces = linkDowngrades[player].ToArray();
+                side.fieldCosts = fieldCosts[player].ToArray();
                 if (side.reachedMain && !side.methodReached && !side.aceReached)
                     Failure(player, side.methodAvailable ? "missed_development" : "no_progression", string.Join(" > ", actions[player]));
                 if (result.winner == 1 - player && side.selfDefeatEffect != 0)
@@ -1521,6 +1574,48 @@ namespace YGOPortable.Editor
             }
             result.replay = responses?.ToArray();
             return result;
+
+            static uint[] FieldCodes(PlayerFieldSnapshot snapshot) => snapshot.mzone.Concat(snapshot.szone)
+                .Where(card => card != null).Select(card => card.code).ToArray();
+
+            void TrackFieldCost(CardMoveEvent move)
+            {
+                const uint release = 0x2, cost = 0x80;
+                if (fieldBefore == null || move.fromCon > 1 ||
+                    move.fromLoc is not (YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE) ||
+                    move.toCon == move.fromCon && move.toLoc is YgoConstants.LOCATION_MZONE or YgoConstants.LOCATION_SZONE ||
+                    move.TemporarilyBanished || (move.reason & YgoConstants.REASON_BATTLE) != 0 ||
+                    (move.reason & (YgoConstants.REASON_DESTROY | YgoConstants.REASON_MATERIAL | release | cost)) == 0 &&
+                        move.toLoc is not (YgoConstants.LOCATION_REMOVED or YgoConstants.LOCATION_HAND or
+                            YgoConstants.LOCATION_DECK or YgoConstants.LOCATION_EXTRA))
+                    return;
+                byte owner = move.fromCon;
+                var effect = duel.ResolvingChainLink;
+                pendingFieldCosts.Add((owner, new FieldCostTrace
+                {
+                    turn = duel.TurnNumber, phase = duel.CurrentPhase, actionStep = fieldActionStep, moveStep = activeResponseStep,
+                    actor = effect?.triggerPlayer ?? lastChoiceOwner, actionOwner = fieldActionOwner,
+                    card = move.code, source = effect?.code ?? lastChoiceCode, action = fieldActionCode,
+                    reason = move.reason, from = move.fromLoc, to = move.toLoc, method = move.MaterialMethod,
+                    ownBefore = fieldBefore[owner], rivalBefore = fieldBefore[1 - owner],
+                    ownLifeBefore = lifeBefore[owner], rivalLifeBefore = lifeBefore[1 - owner],
+                }));
+            }
+
+            void CompleteFieldCosts()
+            {
+                if (pendingFieldCosts.Count == 0) return;
+                var board = duel.Players.Select(FieldCodes).ToArray();
+                foreach (var (owner, trace) in pendingFieldCosts)
+                {
+                    trace.ownAfter = board[owner];
+                    trace.rivalAfter = board[1 - owner];
+                    trace.ownLifeAfter = duel.Players[owner].lp;
+                    trace.rivalLifeAfter = duel.Players[1 - owner].lp;
+                    fieldCosts[owner].Add(trace);
+                }
+                pendingFieldCosts.Clear();
+            }
 
             void TrackLinkMaterialDowngrade(CardMoveEvent move)
             {

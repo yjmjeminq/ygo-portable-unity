@@ -233,7 +233,7 @@ def worker_path(workspace, frozen, index, candidate_snapshot=None, previous_snap
 def run_worker(index, arguments, editor, frozen, output):
     worker = worker_path(arguments.workspace, frozen, index, arguments.candidate_snapshot, arguments.previous_snapshot)
     prepare(worker, frozen, arguments.candidate_policies, arguments.candidate_snapshot, arguments.previous_snapshot)
-    if arguments.gx_suite:
+    if arguments.gx_suite or arguments.gx_field_audit:
         for name, contents in arguments.gx_deck_inputs.items():
             write(worker / 'Assets/StreamingAssets' / name, contents)
     write(output / f'candidate-source-{index}.json', source_manifest(worker))
@@ -249,6 +249,7 @@ def run_worker(index, arguments, editor, frozen, output):
                YGO_BENCH_STYLE_SUITE='1' if arguments.style_suite else '0',
                YGO_BENCH_FULL_SUITE='1' if arguments.full_suite else '0',
                YGO_BENCH_GX_SUITE='1' if arguments.gx_suite else '0',
+               YGO_BENCH_GX_FIELD_AUDIT='1' if arguments.gx_field_audit else '0',
                YGO_BENCH_ROSTER_LEVELS='1' if arguments.roster_levels else '0',
                YGO_BENCH_OPENINGS_ONLY='1' if arguments.openings_only else '0',
                YGO_BENCH_REFERENCE_ONLY='1' if arguments.reference_only else '0',
@@ -416,6 +417,7 @@ def summarize(matches):
                  'battleFinishes', 'provenMissedBattleWins', 'lethalMisses', 'threatsSpent', 'wastedHandtraps',
                  'trackedResponses', 'selfDestruction', 'decisionMs', 'retries')
     gx_metrics = {role: Counter() for role in blunders}
+    field_audit = {role: Counter() for role in blunders}
     for match in matches:
         if not match['era'].startswith('GX/'):
             continue
@@ -424,6 +426,15 @@ def summarize(matches):
             gx_metrics[role]['games'] += 1
             for field in gx_fields:
                 gx_metrics[role][field] += side[field]
+            if match['era'].startswith('GX/Audit/'):
+                moves = [trace for trace in side['fieldCosts'] if trace['actor'] == seat]
+                field_audit[role]['games'] += 1
+                field_audit[role]['ownMoves'] += len(moves)
+                field_audit[role]['asMaterial'] += sum(trace['method'] != 0 for trace in moves)
+                field_audit[role]['releases'] += sum(bool(trace['reason'] & 0x2) for trace in moves)
+                field_audit[role]['destructions'] += sum(bool(trace['reason'] & 0x1) for trace in moves)
+                field_audit[role]['banishments'] += sum(trace['to'] == 0x20 for trace in moves)
+                field_audit[role]['returns'] += sum(trace['to'] in (1, 2, 64) for trace in moves)
     for counts in gx_metrics.values():
         if not counts:
             continue
@@ -440,6 +451,7 @@ def summarize(matches):
                            for role, counts in rate_counts.items()},
         'firstTurnDrawHandtrapActivationsOutsideChain': first_turn_draw_handtraps,
         **({'gxThemeMetrics': gx_metrics} if gx_metrics['candidate'] else {}),
+        **({'gxFieldCostAudit': field_audit} if field_audit['candidate'] else {}),
         'byStyleAndSeat': dict(style_report),
         'topFailures': {role: [dict(kind=kind, count=count, example=examples[role][kind])
                                for kind, count in counts.most_common(5)] for role, counts in problems.items()},
@@ -653,6 +665,7 @@ def main():
     suite.add_argument('--style-suite', action='store_true', help='Run added trap, lock, burn and alternate-win matchups.')
     suite.add_argument('--full-suite', action='store_true', help='Run all 22 fixed era, summon-method and playstyle matchups.')
     suite.add_argument('--gx-suite', action='store_true', help='Run the ten GX story and competitive theme matchups.')
+    suite.add_argument('--gx-field-audit', action='store_true', help='Audit field costs for all 37 GX story decks.')
     suite.add_argument('--fixed-regressions', action='store_true', help='Replay every fixed scenario with the current native AI.')
     suite.add_argument('--roster-levels', action='store_true', help='Check every available deck in both seats with the candidate AI through turn two.')
     parser.add_argument('--openings-only', action='store_true', help='Measure the first two duel turns without scoring match winners.')
@@ -672,7 +685,7 @@ def main():
     args = parser.parse_args()
     if not re.fullmatch(r'[\w-]+', args.label) or not 1 <= args.jobs <= 4 or args.seeds < 1:
         parser.error('Use a simple run label and positive job/seed counts.')
-    matchups = 10 if args.gx_suite else 22 if args.full_suite else 8 if args.style_suite else 14
+    matchups = 37 if args.gx_field_audit else 10 if args.gx_suite else 22 if args.full_suite else 8 if args.style_suite else 14
     if args.jobs < 2 and not (args.fixture or args.replay or args.fixed_regressions):
         parser.error('Full benchmarks require two to four workers.')
     if args.fixture:
@@ -763,7 +776,7 @@ def main():
             parser.error('Confirmation requires the same source and policies to pass the random opponent floor.')
     output = args.workspace / args.label
     output.mkdir(parents=True, exist_ok=False)
-    if args.gx_suite:
+    if args.gx_suite or args.gx_field_audit:
         args.gx_deck_inputs = {name: (PROJECT / 'Assets/StreamingAssets' / name).read_bytes() for name in GX_DECK_INPUTS}
         hashes = {name: hashlib.sha256(contents).hexdigest() for name, contents in args.gx_deck_inputs.items()}
         write(output / 'gx-decks-sha256.json', json.dumps(hashes, indent=2).encode())

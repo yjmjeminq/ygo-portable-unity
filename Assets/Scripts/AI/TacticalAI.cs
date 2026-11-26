@@ -54,6 +54,7 @@ namespace YGOPortable.AI
         private uint _linkSummon;
         private uint? _crossoutDeclaration;
         private uint _lastAnnouncedEffect, _calledByTarget;
+        private uint _accesscodeSpentAttributes;
         private bool? _linkDeck;
         private readonly Dictionary<string, int> _effectCounts = new Dictionary<string, int>();
         private readonly HashSet<uint> _repositionedSeqs = new HashSet<uint>();
@@ -102,6 +103,7 @@ namespace YGOPortable.AI
                 _plannedAttackTargetSequence = uint.MaxValue;
                 _linkSummon = 0;
                 _lastAnnouncedEffect = _calledByTarget = 0;
+                _accesscodeSpentAttributes = 0;
                 _effectCounts.Clear();
                 _repositionedSeqs.Clear();
             }
@@ -230,6 +232,7 @@ namespace YGOPortable.AI
                 _lastTurn = _lastTurn,
                 _actionsThisTurn = _actionsThisTurn,
                 _linkDeck = _linkDeck,
+                _accesscodeSpentAttributes = _accesscodeSpentAttributes,
                 _comboProjection = true,
             };
             foreach (var pair in _effectCounts) copy._effectCounts.Add(pair.Key, pair.Value);
@@ -342,7 +345,8 @@ namespace YGOPortable.AI
 
         private bool CanUseSpecialSummon(PlayerFieldSnapshot own, SelectableCardItem item, bool planLinks, bool projected)
         {
-            if (UsesTacticalRules && UsesComboPlanning && LinkComboPolicy.NeedsMaterialProjection(own, item)) return projected;
+            if (UsesTacticalRules && LinkComboPolicy.NeedsMaterialProjection(own, item) &&
+                (UsesComboPlanning || LinkComboPolicy.HasAceAtRisk(own, LinkComboPolicy.Rank(item.code)))) return projected;
             return !planLinks || LinkComboPolicy.CanUseSummon(own, item);
         }
 
@@ -758,10 +762,20 @@ namespace YGOPortable.AI
         }
 
         private bool CanActivate(DuelSession session, DuelPrompt prompt, SelectableCardItem item) =>
-            DuelAiPolicy.CanActivateMachineAngelRitual(session.Players[prompt.playerId], item) &&
+            DuelAiPolicy.CanActivateRitual(session.Players[prompt.playerId], item) &&
+            (!UsesTacticalRules ||
+                (!DuelAiPolicy.IsDrytronReleaseEffect(item.code) ||
+                    DuelAiPolicy.CanSpendForDrytron(session.Players[prompt.playerId], item)) &&
+                (item.code != DuelTactics.Accesscode || item.description != (((ulong)DuelTactics.Accesscode << 20) | 1) ||
+                    CanPayForAccesscode(session.Players[prompt.playerId]))) &&
             SynchroTurnPlan.CanActivate(session, prompt, item) && (UsesTacticalRules
                 ? DuelTactics.CanActivate(session, prompt, item)
                 : !DuelTactics.IsTemporaryFieldNegation(item) || DuelTactics.CanSpendFieldNegation(session, prompt, item));
+
+        private bool CanPayForAccesscode(PlayerFieldSnapshot own) => own.grave.Concat(own.mzone.Where(card =>
+                card is { IsFaceUp: true } && !DuelTactics.IsEstablishedFieldAce(card)))
+            .Any(card => CardDatabase.Get(card.code) is { IsLink: true } link &&
+                (_accesscodeSpentAttributes & link.attr) == 0);
 
         private bool CanPlayFieldSpell(DuelSession session, DuelPrompt prompt, SelectableCardItem item)
         {
@@ -1120,6 +1134,16 @@ namespace YGOPortable.AI
 
             ulong hint = UsesTacticalRules ? p.SelectionHint : s.LastHintMsg;
             uint effect = SelectionEffect(s, p);
+            if (UsesTacticalRules && effect == DuelTactics.Accesscode && hint == DuelTactics.Banish &&
+                p.min == 1 && p.max == 1 && p.candidates.Count != 0 && p.candidates.All(card => card.controller == p.playerId))
+            {
+                int cost = Enumerable.Range(0, p.candidates.Count)
+                    .OrderByDescending(i => p.candidates[i].location == YgoConstants.LOCATION_GRAVE)
+                    .ThenBy(i => p.candidates[i].code == DuelTactics.Accesscode)
+                    .ThenBy(i => CardDatabase.Get(p.candidates[i].code)?.atk ?? 0).First();
+                _accesscodeSpentAttributes |= CardDatabase.Get(p.candidates[cost].code)?.attr ?? 0;
+                return PackIndexList(new[] { cost });
+            }
             if (UsesTacticalRules && hint == DuelTactics.Banish && p.min == 1 && p.max == 1)
             {
                 int graveTarget = DuelTactics.ChooseCalledByTarget(s, p);
@@ -1346,9 +1370,10 @@ namespace YGOPortable.AI
 
         private bool ShouldRankThemedMaterials(uint effect, ulong hint) =>
             hint == DuelTactics.Release && (DuelAiPolicy.IsMachineAngelRitual(effect) ||
-                UsesTacticalRules && DuelAiPolicy.IsRitualSpell(effect)) || UsesTacticalRules && hint == 511 && effect is
+                UsesTacticalRules && DuelAiPolicy.IsRitualSpell(effect)) ||
+            UsesTacticalRules && (DuelTactics.IsGxFieldCost(effect, hint) || hint == 511 && effect is
                 DuelAiPolicy.BrandedFusion or DuelAiPolicy.Lubellion or DuelAiPolicy.Albion or DuelAiPolicy.FusionDestiny or
-                DuelAiPolicy.MiracleFusion or DuelAiPolicy.SuperPoly or DuelAiPolicy.PowerBond;
+                DuelAiPolicy.MiracleFusion or DuelAiPolicy.SuperPoly or DuelAiPolicy.PowerBond);
 
         private byte[] BuildSelectSum(DuelSession s, DuelPrompt p)
         {
@@ -1359,12 +1384,13 @@ namespace YGOPortable.AI
             var mustParams = p.mustSelect.Select(m => ((int)(m.sumParam & 0xFFFF), (int)((m.sumParam >> 16) & 0xFFFF))).ToList();
             uint effect = SelectionEffect(s, p);
             var order = Enumerable.Range(0, n);
-            bool machineAngel = DuelAiPolicy.IsMachineAngelRitual(effect);
-            if (machineAngel || UsesTacticalRules && DuelAiPolicy.IsRitualSpell(effect))
+            bool keepRitualAces = DuelAiPolicy.IsMachineAngelRitual(effect) ||
+                UsesTacticalRules && DuelAiPolicy.IsRitualSpell(effect);
+            if (keepRitualAces)
                 order = order.OrderByDescending(i => DuelTactics.SummonMaterialPriority(
                     s, p.playerId, p.candidates[i], effect, DuelTactics.Release));
             int[] indices = order.ToArray();
-            if (machineAngel)
+            if (keepRitualAces)
             {
                 var own = s.Players[p.playerId];
                 var reserveAce = indices.Where(i => !DuelAiPolicy.IsProtectedRitualMaterial(own, p.playerId, p.candidates[i])).ToArray();

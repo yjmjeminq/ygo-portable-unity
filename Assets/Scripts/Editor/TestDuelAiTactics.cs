@@ -61,6 +61,9 @@ namespace YGOPortable.Editor
             VerifyNativeBentenSearch();
             VerifyNativeRitualAcePreservation();
             VerifyNativeRitualWithSpareMaterials();
+            VerifyFieldAceEffects();
+            VerifyDrytronAceCosts();
+            VerifyAccesscodeCosts();
             VerifyGxBattlePriority();
             Debug.Log("[VERIFY AI TACTICS] Ash conservation, Baronne bait, summon budget, revealed sweeper and chain ordering passed. Retry=0");
         }
@@ -261,8 +264,7 @@ namespace YGOPortable.Editor
                 duel.SubmitResponse(DuelSession.PackCardSelection(tributeIndex));
                 var idle = Drive(duel, IsIdle);
                 var second = idle.activatable.Find(card => card.code == secondSpell && card.location == YgoConstants.LOCATION_HAND);
-                Require(second != null && DuelAiPolicy.CanActivateMachineAngelRitual(duel.Players[0], second),
-                    "The AI blocked a Ritual with enough affordable materials to keep Vishnu.");
+                Require(second != null, "The engine did not offer the second Ritual.");
                 SubmitIdle(duel, 5, secondSpell);
                 var ai = Smart();
                 for (int step = 0; step < 25 && !duel.IsFinished && duel.RetryCount == 0; step++)
@@ -277,6 +279,161 @@ namespace YGOPortable.Editor
                     $"The native Ritual {secondSpell} did not summon Idaten while keeping Vishnu. " + string.Join(" | ", duel.Logs.TakeLast(8)));
                 Debug.Log($"[VERIFY GX AI RITUAL] {secondSpell} summoned Idaten with spare materials while Vishnu stayed on the field. Retry=0");
             }
+        }
+
+        private static void VerifyFieldAceEffects()
+        {
+            const uint mirrorjade = 44146295, advance = 4064925, pain = 65261141, inferno = 44352516,
+                cartesia = 95515789, increase = 22865492, chaosGiant = 51788412, unicorn = 38342335,
+                spirit = 90829280, horn = 41230939, sunrise = 22908820, avian = 21844576;
+            using var duel = new DuelSession();
+            var own = duel.Players[0];
+            var rival = duel.Players[1];
+            var idle = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_IDLECMD, canEp = true };
+            var spare = FieldMonster(GeminiElf, 1);
+            rival.szone[0] = new LiveCardState { code = Foolish };
+            var mirrorEffect = Effect(mirrorjade, 0, YgoConstants.LOCATION_MZONE);
+            Require(!DuelTactics.CanActivate(duel, idle, mirrorEffect), "Mirrorjade spent its banish on its empty opposing monster field.");
+            Require(!DuelTactics.CanActivate(duel, idle, Effect(64043465, 0)), "Exodd Frame returned a friendly monster on an empty opposing field.");
+            rival.szone[0] = null;
+            Require(!DuelTactics.CanActivate(duel, idle, Effect(unicorn, 0, YgoConstants.LOCATION_MZONE)),
+                "Knightmare Unicorn returned itself with an empty opposing field.");
+            rival.mzone[0] = FieldMonster(Stratos);
+            Require(DuelTactics.CanActivate(duel, idle, mirrorEffect) && DuelTactics.CanActivate(duel, idle, Effect(64043465, 0)),
+                "Mirrorjade or Exodd Frame missed a valid opposing monster.");
+
+            own.mzone[0] = FieldMonster(chaosGiant);
+            var draw = Effect(advance, 1);
+            Require(!DuelTactics.CanActivate(duel, idle, draw), "Ancient Gear Advance traded Chaos Giant for a draw.");
+            own.mzone[1] = spare;
+            Require(DuelTactics.CanActivate(duel, idle, draw), "Ancient Gear Advance rejected a spare tribute.");
+            Require(ChooseCost(advance, DuelTactics.Release, chaosGiant, spare.code), "Ancient Gear Advance chose Chaos Giant over spare material.");
+
+            own.mzone[0] = FieldMonster(unicorn);
+            own.mzone[1] = null;
+            var search = Effect(pain, 0);
+            Require(!DuelTactics.CanActivate(duel, idle, search), "Nightmare Pain destroyed its only Unicorn.");
+            own.mzone[1] = FieldMonster(spirit, 1);
+            Require(DuelTactics.CanActivate(duel, idle, search), "Nightmare Pain rejected the Spirit of Yubel destruction trigger.");
+            Require(ChooseCost(pain, DuelTactics.Destroy, unicorn, spirit), "Nightmare Pain destroyed Unicorn instead of Spirit of Yubel.");
+
+            own.mzone[0] = FieldMonster(horn);
+            own.mzone[1] = null;
+            own.grave.Add(FieldMonster(82562802));
+            own.szone[0] = new LiveCardState { code = 45078193, EquipTarget = (0, 0) };
+            var recycle = Effect(inferno, 0);
+            Require(!DuelTactics.CanActivate(duel, idle, recycle), "Cyberdark Inferno discarded live equipment.");
+            own.szone[0] = null;
+            Require(DuelTactics.CanActivate(duel, idle, recycle), "Cyberdark Inferno could not equip a previously unequipped monster.");
+
+            own.mzone[0] = FieldMonster(mirrorjade);
+            own.mzone[0].position = YgoConstants.POS_FACEDOWN_DEFENSE;
+            own.mzone[1] = FieldMonster(cartesia, 1);
+            own.mzone[5] = FieldMonster(38811586, 5);
+            own.extra.Add(FieldMonster(11321089));
+            var fuse = Effect(cartesia, 1, YgoConstants.LOCATION_MZONE);
+            Require(!DuelTactics.CanActivate(duel, idle, fuse), "Cartesia gave up Mirrorjade for Chimera without the Spell payoff.");
+            own.extra.Add(FieldMonster(24915933));
+            Require(!DuelTactics.CanActivate(duel, idle, fuse), "Cartesia counted Albion the Sanctifire Dragon as legal material.");
+            own.hand.Add(FieldMonster(DuelTactics.EffectVeiler));
+            Require(DuelTactics.CanActivate(duel, idle, fuse), "Cartesia skipped a Fusion that could preserve Mirrorjade.");
+            own.mzone[5] = null;
+
+            own.mzone[0] = FieldMonster(46986414);
+            own.mzone[1] = null;
+            var rod = Effect(7084129, 1, YgoConstants.LOCATION_GRAVE);
+            Require(!DuelTactics.CanActivate(duel, idle, rod), "Magician's Rod tributed Dark Magician just to recover itself.");
+            own.mzone[1] = FieldMonster(DuelTactics.EffectVeiler, 1);
+            Require(DuelTactics.CanActivate(duel, idle, rod), "Magician's Rod could not use a spare Spellcaster.");
+
+            own.mzone[0] = FieldMonster(sunrise);
+            own.mzone[1] = null;
+            var extend = Effect(increase, 1);
+            Require(!DuelTactics.CanActivate(duel, idle, extend), "Increase tributed its only Sunrise.");
+            own.mzone[1] = FieldMonster(avian, 1);
+            Require(DuelTactics.CanActivate(duel, idle, extend) && ChooseCost(increase, DuelTactics.Release, sunrise, avian),
+                "Increase did not extend using a spare HERO.");
+            Require(LinkComboPolicy.NeedsMaterialProjection(own, new SelectableCardItem
+                { code = 1948619, location = YgoConstants.LOCATION_EXTRA }), "Wonder Driver could trade away Sunrise without projection.");
+            Debug.Log("[VERIFY GX AI FIELD COST] Mirrorjade, Advance, Nightmare Pain, Inferno, Cartesia and Increase passed.");
+
+            bool ChooseCost(uint source, ulong hint, uint primary, uint secondary)
+            {
+                duel.CurrentChain.Clear();
+                duel.CurrentChain.Add(new ChainLinkInfo { code = source });
+                var prompt = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_CARD, min = 1, max = 1, SelectionHint = hint };
+                prompt.candidates.Add(new SelectableCardItem { code = primary, location = YgoConstants.LOCATION_MZONE });
+                prompt.candidates.Add(new SelectableCardItem { code = secondary, location = YgoConstants.LOCATION_MZONE, sequence = 1 });
+                return Smart().ComputeResponse(duel, prompt).SequenceEqual(DuelSession.PackCardSelection(1));
+            }
+        }
+
+        private static void VerifyDrytronAceCosts()
+        {
+            const uint dad = 56863746, qua = 95209656, meteonis = 22398665, meteoroa = 24166324,
+                alpha = 97148796, beta = 33543890, gamma = 60037599, phoenix = 2857636;
+            using var duel = new DuelSession();
+            var own = duel.Players[0];
+            own.mzone[0] = FieldMonster(dad);
+            own.grave.Add(FieldMonster(qua));
+            var idle = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_IDLECMD, canEp = true };
+            var ritual = Effect(meteonis, 0, YgoConstants.LOCATION_HAND);
+            idle.activatable.Add(ritual);
+            Require(Read(Smart().ComputeResponse(duel, idle)) == 7, "Meteonis replaced the established DAD with QUA.");
+            own.mzone[0].position = YgoConstants.POS_FACEDOWN_DEFENSE;
+            Require(Read(Smart().ComputeResponse(duel, idle)) == 7, "Meteonis treated the face-down DAD as expendable.");
+            own.mzone[0].position = YgoConstants.POS_FACEUP_ATTACK;
+            own.mzone[1] = FieldMonster(beta, 1);
+            own.mzone[2] = FieldMonster(gamma, 2);
+            Require(Read(Smart().ComputeResponse(duel, idle)) == 5, "Meteonis rejected two spare Machines.");
+            own.mzone[1] = own.mzone[2] = null;
+            idle.activatable[0] = Effect(meteoroa, 1);
+            Require(Read(Smart().ComputeResponse(duel, idle)) == 7, "Meteoroa replaced the established DAD with QUA.");
+            idle.activatable[0] = Effect(meteoroa, 0);
+            Require(Read(Smart().ComputeResponse(duel, idle)) == 7, "Meteoroa tributed DAD for banished resources.");
+            idle.activatable[0] = Effect(alpha, 0, YgoConstants.LOCATION_GRAVE);
+            own.hand.Add(FieldMonster(meteonis));
+            Require(Read(Smart().ComputeResponse(duel, idle)) == 7, "Alpha tributed an established DAD.");
+            own.mzone[1] = FieldMonster(beta, 1);
+            Require(Read(Smart().ComputeResponse(duel, idle)) == 5, "Alpha rejected a spare Drytron monster.");
+            Require(LinkComboPolicy.NeedsMaterialProjection(own, new SelectableCardItem
+                { code = phoenix, location = YgoConstants.LOCATION_EXTRA }), "A small Link could trade away DAD without projection.");
+            Require(LinkComboPolicy.NeedsMaterialProjection(own, new SelectableCardItem
+                { code = 98127546, location = YgoConstants.LOCATION_EXTRA }), "A high-Link summon could trade away DAD without projection.");
+            Debug.Log("[VERIFY GX AI FIELD COST] Drytron rituals, starter tributes and Link commitments passed.");
+        }
+
+        private static void VerifyAccesscodeCosts()
+        {
+            const uint accesscode = 86066372, unicorn = 38342335;
+            using var duel = new DuelSession();
+            var own = duel.Players[0];
+            own.mzone[0] = FieldMonster(accesscode);
+            own.mzone[0].attack = 5300;
+            duel.Players[1].mzone[0] = FieldMonster(GeminiElf);
+            var idle = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_IDLECMD, canEp = true };
+            idle.activatable.Add(Effect(accesscode, 1, YgoConstants.LOCATION_MZONE));
+            var ai = Smart();
+            Require(Read(ai.ComputeResponse(duel, idle)) == 7, "Accesscode banished itself for an optional removal.");
+            own.grave.Add(FieldMonster(unicorn));
+            Require(Read(ai.ComputeResponse(duel, idle)) == 5, "Accesscode missed a Link in the GY.");
+            var cost = new DuelPrompt { messageType = YgoConstants.MSG_SELECT_CARD, min = 1, max = 1, SelectionHint = DuelTactics.Banish };
+            cost.candidates.Add(new SelectableCardItem { code = accesscode, location = YgoConstants.LOCATION_MZONE });
+            cost.candidates.Add(new SelectableCardItem { code = unicorn, location = YgoConstants.LOCATION_GRAVE });
+            Require(ai.ComputeResponse(duel, cost).SequenceEqual(DuelSession.PackCardSelection(1)), "Accesscode did not reserve its own body.");
+            Require(Read(ai.ComputeResponse(duel, idle)) == 7, "An already-spent Link Attribute was treated as another valid cost.");
+            Debug.Log("[VERIFY GX AI FIELD COST] Accesscode protected its body and used the available GY Link.");
+        }
+
+        private static SelectableCardItem Effect(uint code, uint index, uint location = YgoConstants.LOCATION_SZONE) =>
+            new() { code = code, location = location, description = ((ulong)code << 20) | index };
+
+        private static LiveCardState FieldMonster(uint code, uint slot = 0)
+        {
+            var info = CardDatabase.Get(code);
+            return new LiveCardState { code = code, sequence = slot, position = YgoConstants.POS_FACEUP_ATTACK,
+                location = YgoConstants.LOCATION_MZONE, attack = info.atk, defense = info.def, level = info.level,
+                type = info.type, race = info.race, attribute = info.attr };
         }
 
         private static void VerifyNegationTargets()

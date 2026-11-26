@@ -22,6 +22,9 @@ namespace YGOPortable.AI
         private const uint DarklordRebellion = 50501121, NoblemanOfCrossout = 71044499, HexeTrude = 46294982;
         private const uint GiftCard = 39526584, DarkCure = 3701074, NurseReficule = 67316075, BadReaction = 40633297;
         private const uint DestroyerPhoenix = 60461804, Deadnader = 34909328;
+        internal const uint AncientGearAdvance = 4064925, NightmarePain = 65261141, CyberdarkInferno = 44352516;
+        internal const uint Accesscode = 86066372, Cartesia = 95515789, VisionIncrease = 22865492;
+        private const uint KnightmareUnicorn = 38342335, ExoddFrame = 64043465, MagiciansRod = 7084129;
         private const uint CyberEternityDragon = 82315403, AttachmentCybern = 79875526;
         private const uint PhotonHowling = 28331069, GalaxyPhotonDragon = 85747929, GalaxyZero = 97617181;
         private const uint GalaxyEyesPhoton = 93717133, GalaxyWarDrake = 19316241, GalaxySummoner = 863795, GalaxyHundred = 897409;
@@ -246,6 +249,34 @@ namespace YGOPortable.AI
             ulong effectIndex = effect.description & 0xfffff;
             bool firstEffect = cardEffect && effectIndex == 0;
             bool summonTrigger = effect.isTriggeredEffect || prompt.IsTriggerActivationConfirmation;
+            if (effect.code == DuelAiPolicy.Mirrorjade && effect.location == YgoConstants.LOCATION_MZONE && firstEffect)
+                return rival.mzone.Any(card => card != null);
+            if (effect.code == ExoddFrame && effect.location == YgoConstants.LOCATION_SZONE && (firstEffect || !cardEffect))
+                return rival.mzone.Any(card => card != null);
+            if (effect.code == KnightmareUnicorn && (firstEffect || summonTrigger))
+                return HasFieldCard(rival);
+            if (effect.code == MagiciansRod && effect.location == YgoConstants.LOCATION_GRAVE)
+                return own.mzone.Any(card => card != null && card.race == YgoConstants.RACE_SPELLCASTER &&
+                    !IsEstablishedFieldAce(card));
+            if (effect.code == AncientGearAdvance && cardEffect && effectIndex == 1)
+                return own.mzone.Any(card => card != null && !IsEstablishedFieldAce(card));
+            if (effect.code == NightmarePain && firstEffect)
+                return own.hand.Any(card => card.attribute == YgoConstants.ATTRIBUTE_DARK) ||
+                    own.mzone.Any(CanDestroyForNightmarePain);
+            if (effect.code == CyberdarkInferno && effect.location == YgoConstants.LOCATION_SZONE && firstEffect)
+            {
+                duel.RefreshVisibleEquipTargets(prompt.playerId);
+                return own.grave.Any(card => card.race == YgoConstants.RACE_DRAGON && card.level is >= 1 and <= 3) &&
+                    own.mzone.Any(card => CanRecycleCyberdark(own, card));
+            }
+            if (effect.code == DuelAiPolicy.MeteoroaDrytron && firstEffect)
+                return !own.mzone.Any(DuelAiPolicy.IsEstablishedRitualAce) || own.mzone.Any(card =>
+                    card is { IsFaceUp: true } && DuelAiPolicy.IsDrytronMonster(card.code) && !DuelAiPolicy.IsEstablishedRitualAce(card));
+            if (effect.code == VisionIncrease && effect.location == YgoConstants.LOCATION_SZONE && (!cardEffect || effectIndex == 1))
+                return own.mzone.Any(card => card != null && !IsEstablishedFieldAce(card) &&
+                    CardDatabase.Get(card.code) is { } info && CardDatabase.ExtractSetcodes(info.setcode).Contains(HeroSet));
+            if (effect.code == Cartesia && effect.location == YgoConstants.LOCATION_MZONE && cardEffect && effectIndex == 1)
+                return DuelAiPolicy.CanFuseWithCartesia(own);
             // Let Doomcaliber wait for an opposing monster effect instead of forcing it to negate our S:P.
             if (cardEffect && effectIndex == 1 && effect.code is LittleKnight or LittleKnightAlternateArt &&
                 effect.location == YgoConstants.LOCATION_MZONE && prompt.messageType == YgoConstants.MSG_SELECT_CHAIN &&
@@ -1153,13 +1184,41 @@ namespace YGOPortable.AI
             return own ? 10000 + value : -5000 + value;
         }
 
+        internal static bool IsEstablishedFieldAce(LiveCardState card) => card != null &&
+            (DuelAiPolicy.IsEstablishedRitualAce(card) ||
+                card.code is 80453041 or 87182127 or 1948619 || card.attack >= 2500 ||
+                CardDatabase.Get(card.code) is { IsExtra: true } info &&
+                    (card.attack >= 2000 || !card.effectsDisabled && LinkComboPolicy.IsInteractive(info)));
+
+        private static bool IsYubelDestructionStarter(uint code) => code is 78371393 or 90829280 or 4779091;
+
+        private static bool CanDestroyForNightmarePain(LiveCardState card) =>
+            card is { IsFaceUp: true, attribute: YgoConstants.ATTRIBUTE_DARK } &&
+            (IsYubelDestructionStarter(card.code) || !IsEstablishedFieldAce(card));
+
+        private static bool CanRecycleCyberdark(PlayerFieldSnapshot own, LiveCardState card) =>
+            card is { IsFaceUp: true, code: 3019642 or 41230939 or 77625948 } &&
+            !own.szone.Any(equip => equip?.EquipTarget == (card.controller, card.sequence));
+
+        internal static bool IsGxFieldCost(uint effect, ulong hint) =>
+            hint == Release && (effect is AncientGearAdvance or VisionIncrease or MagiciansRod or DuelAiPolicy.MeteoroaDrytron ||
+                DuelAiPolicy.IsDrytronReleaseEffect(effect)) ||
+            hint == Destroy && effect == NightmarePain || hint == ReturnToHand && effect == CyberdarkInferno ||
+            hint == 511 && effect == Cartesia;
+
         internal static int SummonMaterialPriority(DuelSession duel, byte player, SelectableCardItem option,
             uint source, ulong hint)
         {
-            if (DuelAiPolicy.IsMachineAngelRitual(source) &&
-                DuelAiPolicy.IsProtectedRitualMaterial(duel.Players[player], player, option))
+            var own = duel.Players[player];
+            if ((DuelAiPolicy.IsRitualSpell(source) || DuelAiPolicy.IsDrytronReleaseEffect(source)) &&
+                DuelAiPolicy.IsProtectedRitualMaterial(own, player, option))
                 return -20000;
             if (option.controller != player) return 10000 + SelectionPriority(duel, player, option, Destroy);
+            if (source == NightmarePain && IsYubelDestructionStarter(option.code)) return 5000;
+            var onField = option.location == YgoConstants.LOCATION_MZONE && option.sequence < own.mzone.Length
+                ? own.mzone[option.sequence] : null;
+            if ((IsGxFieldCost(source, hint) || source == DuelAiPolicy.SuperPoly) && IsEstablishedFieldAce(onField)) return -20000;
+            if (source == CyberdarkInferno && !CanRecycleCyberdark(own, onField)) return -20000;
             var info = CardDatabase.Get(option.code);
             int score = -(Math.Max(0, info?.atk ?? 1000) + Math.Max(0, info?.def ?? 0) / 3);
             if (option.location == YgoConstants.LOCATION_MZONE)
@@ -1167,7 +1226,7 @@ namespace YGOPortable.AI
             if (option.location == YgoConstants.LOCATION_DECK) score += 1700;
             if (option.location == YgoConstants.LOCATION_GRAVE) score += 2200;
             if (option.location == YgoConstants.LOCATION_HAND && ProtectInHand.Contains(option.code) &&
-                duel.Players[player].hand.Count(card => card.code == option.code) < 2) score -= 3000;
+                own.hand.Count(card => card.code == option.code) < 2) score -= 3000;
             if (DuelAiPolicy.IsRitualSpell(source) && hint == Release && option.code == DuelAiPolicy.Benten)
                 score += 4200;
             if (source == DuelAiPolicy.FusionDestiny && option.code is 9411399 or 16605586)

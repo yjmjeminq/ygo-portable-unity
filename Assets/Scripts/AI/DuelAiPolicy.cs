@@ -20,6 +20,10 @@ namespace YGOPortable.AI
         internal const uint MachineAngelRitual = 39996157, MeteonisDrytron = 22398665, Benten = 77235086;
         private const uint MachineAngelAbsoluteRitual = 11398951;
         internal const uint Dakini = 39618799, Nasateiya = 99427357, Vishnu = 78316184;
+        internal const uint MeteoroaDrytron = 24166324;
+        private const uint DrytronDad = 56863746, DrytronDra = 69815951, DrytronQua = 95209656, DrytronMuBeta = 1174075;
+        private const uint FallenOfAlbaz = 68468459, Granguignol = 24915933, Sanctifire = 38811586;
+        private const uint Masquerade = 6855503, Quaeritis = 72272462;
         private const ushort CyberAngelSet = 0x2093;
         private const uint PhantomOfYubel = 80453041;
         private const uint Garura = 11765832, Mudragon = 54757758, StarvingVenom = 41209827, LovingDefender = 47172959;
@@ -273,25 +277,55 @@ namespace YGOPortable.AI
             return score;
         }
 
-        internal static bool IsRitualSpell(uint code) => IsMachineAngelRitual(code) || code == MeteonisDrytron;
+        internal static bool IsRitualSpell(uint code) => IsMachineAngelRitual(code) || code is MeteonisDrytron or MeteoroaDrytron;
 
         internal static bool IsMachineAngelRitual(uint code) => code is MachineAngelRitual or MachineAngelAbsoluteRitual;
 
-        internal static bool IsEstablishedRitualAce(LiveCardState card) => card is { IsFaceUp: true, code: Vishnu or Dakini };
+        internal static bool IsRitualAce(uint code) => code is Vishnu or Dakini or DrytronDad or DrytronDra or DrytronQua;
+
+        internal static bool IsEstablishedRitualAce(LiveCardState card) => card != null && IsRitualAce(card.code);
+
+        internal static bool IsDrytronReleaseEffect(uint code) => code is 97148796 or 96026108 or 60037599 or 33543890 or 22420202;
+
+        internal static bool IsDrytronMonster(uint code) => IsDrytronReleaseEffect(code) ||
+            code is 22435424 or DrytronMuBeta or DrytronDad or DrytronDra or DrytronQua;
+
+        internal static bool CanSpendForDrytron(PlayerFieldSnapshot own, SelectableCardItem source) =>
+            !own.mzone.Any(IsEstablishedRitualAce) ||
+            own.hand.Concat(own.mzone.Where(card => card != null && !IsEstablishedRitualAce(card))).Any(card =>
+                (source.code != card.code || source.location == YgoConstants.LOCATION_GRAVE) &&
+                (IsDrytronMonster(card.code) ||
+                    CardDatabase.Get(card.code) is { IsMonster: true } info && (info.type & YgoConstants.TYPE_RITUAL) != 0));
 
         internal static bool IsProtectedRitualMaterial(PlayerFieldSnapshot own, byte player, SelectableCardItem card) =>
             card.controller == player && card.location == YgoConstants.LOCATION_MZONE &&
             card.sequence < own.mzone.Length && IsEstablishedRitualAce(own.mzone[card.sequence]);
 
-        internal static bool CanActivateMachineAngelRitual(PlayerFieldSnapshot own, SelectableCardItem spell) =>
-            !IsMachineAngelRitual(spell.code) || spell.location is not (YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_SZONE) ||
-            !own.mzone.Any(IsEstablishedRitualAce) ||
-            own.hand.Any(target => CanPayWithoutRitualAce(own, spell.code, target));
+        internal static bool CanActivateRitual(PlayerFieldSnapshot own, SelectableCardItem spell)
+        {
+            if (!IsRitualSpell(spell.code) || spell.location is not (YgoConstants.LOCATION_HAND or YgoConstants.LOCATION_SZONE) ||
+                spell.code == MeteoroaDrytron && spell.description != (((ulong)MeteoroaDrytron << 20) | 1) ||
+                !own.mzone.Any(IsEstablishedRitualAce)) return true;
+            return own.hand.Any(target => CanPayWithoutRitualAce(own, spell.code, target)) ||
+                spell.code is MeteonisDrytron or MeteoroaDrytron && own.grave.Any(target => CanPayWithoutRitualAce(own, spell.code, target));
+        }
 
         private static bool CanPayWithoutRitualAce(PlayerFieldSnapshot own, uint spell, LiveCardState target)
         {
             var info = CardDatabase.Get(target.code);
             if (info == null || (info.type & YgoConstants.TYPE_RITUAL) == 0 || info.level is 0 or > 31) return false;
+            if (spell is MeteonisDrytron or MeteoroaDrytron)
+            {
+                if (spell == MeteoroaDrytron && info.race != YgoConstants.RACE_MACHINE) return false;
+                var machines = own.hand.Where(card => card != target)
+                    .Concat(own.mzone.Where(card => card != null && !IsEstablishedRitualAce(card)));
+                int attack = machines.Where(card => card.race == YgoConstants.RACE_MACHINE).Sum(card =>
+                    card is { code: DrytronMuBeta, IsFaceUp: true, effectsDisabled: false }
+                        ? Math.Max(card.attack, card.overlayCodes.Sum(code =>
+                            CardDatabase.Get(code) is { race: YgoConstants.RACE_MACHINE } material ? Math.Max(0, material.atk) : 0))
+                        : Math.Max(0, card.attack));
+                return info.atk > 0 && attack >= info.atk;
+            }
             bool exact = spell == MachineAngelAbsoluteRitual;
             if (exact && !CardDatabase.ExtractSetcodes(info.setcode).Contains(CyberAngelSet)) return false;
 
@@ -326,10 +360,36 @@ namespace YGOPortable.AI
 
         internal static bool HasOpposingFusionMaterial(PlayerFieldSnapshot own, PlayerFieldSnapshot rival)
         {
-            var facing = rival.mzone.Where(card => card?.IsFaceUp == true).ToArray();
+            var facing = rival.mzone.Where(card => card?.IsFaceUp == true && CanUseAsFusionMaterial(card)).ToArray();
             if (facing.Length == 0) return false;
-            var board = own.mzone.Where(card => card != null).Concat(facing).ToArray();
+            var board = own.mzone.Where(card => CanUseAsFusionMaterial(card) && !DuelTactics.IsEstablishedFieldAce(card))
+                .Concat(facing).ToArray();
             return own.extra.Any(card => OpposingMaterialCount(card.code, board, facing) > 0);
+        }
+
+        private static bool CanUseAsFusionMaterial(LiveCardState card) => card != null &&
+            CardDatabase.Get(card.code)?.desc?.Contains("이 카드는 융합 소재로 할 수 없다", StringComparison.Ordinal) != true;
+
+        internal static bool CanFuseWithCartesia(PlayerFieldSnapshot own)
+        {
+            if (!own.mzone.Any(card => card?.code == Mirrorjade)) return true;
+            var materials = own.hand.Concat(own.mzone.Where(card => card != null && card.code != Mirrorjade))
+                .Where(card => CanUseAsFusionMaterial(card) && CardDatabase.Get(card.code)?.IsMonster == true).ToArray();
+            const uint lightOrDark = YgoConstants.ATTRIBUTE_LIGHT | YgoConstants.ATTRIBUTE_DARK;
+            return own.extra.Any(fusion => fusion.code switch
+            {
+                Granguignol => Pair(card => card.code == DuelTactics.Cartesia, card => (card.attribute & lightOrDark) != 0),
+                Sanctifire => Pair(card => card.code == FallenOfAlbaz,
+                    card => card.attribute == YgoConstants.ATTRIBUTE_LIGHT && card.race == YgoConstants.RACE_SPELLCASTER),
+                Albion => Pair(card => card.code == FallenOfAlbaz, card => card.attribute == YgoConstants.ATTRIBUTE_LIGHT),
+                Lubellion => Pair(card => card.code == FallenOfAlbaz, card => card.attribute == YgoConstants.ATTRIBUTE_DARK),
+                Masquerade or Quaeritis => Pair(card => CardDatabase.Get(card.code) is { } info &&
+                    CardDatabase.ExtractSetcodes(info.setcode).Contains((ushort)0x166), card => (card.attribute & lightOrDark) != 0),
+                _ => false,
+            });
+
+            bool Pair(Func<LiveCardState, bool> first, Func<LiveCardState, bool> second) =>
+                materials.Any(a => first(a) && materials.Any(b => a != b && second(b)));
         }
 
         private static int OpposingMaterialCount(uint target, LiveCardState[] board, LiveCardState[] facing)
@@ -363,8 +423,9 @@ namespace YGOPortable.AI
             {
                 if (source == SuperPoly)
                 {
-                    var facing = rival.mzone.Where(card => card?.IsFaceUp == true).ToArray();
-                    var board = own.mzone.Where(card => card != null).Concat(facing).ToArray();
+                    var facing = rival.mzone.Where(card => card?.IsFaceUp == true && CanUseAsFusionMaterial(card)).ToArray();
+                    var board = own.mzone.Where(card => CanUseAsFusionMaterial(card) && !DuelTactics.IsEstablishedFieldAce(card))
+                        .Concat(facing).ToArray();
                     return Best(item => OpposingMaterialCount(item.code, board, facing));
                 }
                 return Best(item => source switch
@@ -379,6 +440,8 @@ namespace YGOPortable.AI
                     FusionDestiny => item.code == DestroyerPhoenix ? 5 : 0,
                     MaskChange or 21143941 or 93600443 => item.code == DarkLaw ? 5 : 0,
                     MiracleFusion => item.code == WakeUpHero ? 4 : item.code == 22908820 ? 3 : 0,
+                    DuelTactics.Cartesia => item.code is Granguignol or Sanctifire ? 5 :
+                        item.code is Masquerade or Quaeritis or Albion or Lubellion ? 3 : 0,
                     PowerBond => PowerBondTarget(item),
                     _ => 0,
                 });
@@ -386,16 +449,20 @@ namespace YGOPortable.AI
             if (IsRitualSpell(source) && prompt.SelectionHint == 509 &&
                 prompt.candidates.All(item => (CardDatabase.Get(item.code)?.type & YgoConstants.TYPE_RITUAL) != 0))
             {
-                bool preserveAce = IsMachineAngelRitual(source) && own.mzone.Any(IsEstablishedRitualAce);
+                bool preserveAce = own.mzone.Any(IsEstablishedRitualAce);
                 return Best(item => (item.code switch
                 {
                     Dakini or Vishnu when rival.mzone.Any(card => card != null) => 5,
+                    DrytronDad => 6,
+                    DrytronQua when rival.szone.Count(card => card != null) >= 2 => 5,
+                    DrytronDra => 4,
                     48546368 when own.hand.Any(card => CardDatabase.Get(card.code)?.race == YgoConstants.RACE_FAIRY) => 5,
                     48546368 => 1,
                     Nasateiya when rival.mzone.Any(card => card != null) => 2,
                     Benten => 1,
                     _ => 3,
-                }) + (preserveAce && own.hand.FirstOrDefault(card => card.code == item.code) is { } target &&
+                }) + (preserveAce &&
+                    (item.location == YgoConstants.LOCATION_GRAVE ? own.grave : own.hand).FirstOrDefault(card => card.code == item.code) is { } target &&
                     CanPayWithoutRitualAce(own, source, target) ? 10 : 0));
             }
             return null;

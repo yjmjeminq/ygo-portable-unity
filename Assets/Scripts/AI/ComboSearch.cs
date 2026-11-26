@@ -498,7 +498,7 @@ namespace YGOPortable.AI
             bool checkEarlyStarter = startTurn <= 2 && trial.Players[player].extra.Any(card => LinkComboPolicy.Rank(card.code) >= 5);
             var beforeLink = default(Position);
             double beforeLinkScore = 0;
-            var trades = new List<(int index, int rank, double score, Position before)>();
+            var trades = new List<(int index, int rank, double score, Position before, bool ace)>();
             bool canKeepSetup = false;
             var initial = default(Position);
             (int step, ulong state, double score, Position before)? start = null;
@@ -519,9 +519,9 @@ namespace YGOPortable.AI
                     targetRank = 0;
                 if (move.fromCon != player || move.fromLoc != YgoConstants.LOCATION_MZONE ||
                     (move.reason & YgoConstants.REASON_LINK) == 0) return;
-                int rank = LinkComboPolicy.Rank(move.code);
+                int rank = LinkComboPolicy.MaterialRiskRank(move.code, targetRank);
                 if (LinkComboPolicy.IsDowngrade(rank, targetRank))
-                    trades.Add((line.moves.Count - 1, rank, beforeLinkScore, beforeLink));
+                    trades.Add((line.moves.Count - 1, rank, beforeLinkScore, beforeLink, LinkComboPolicy.ProtectAsLinkMaterial(move.code)));
             };
             for (int i = 0; i < _responseLimit && !expired() && trial.TurnNumber == startTurn &&
                 trial.RetryCount == 0 && !trial.SpeculationUncertain; i++)
@@ -616,7 +616,8 @@ namespace YGOPortable.AI
                         if (starter >= 0)
                             line.starterBeforeLink = new Branch(line.moves.Select(entry => entry.action).Append(options[starter]).ToArray());
                     }
-                    if (LinkComboPolicy.HasStrongerLink(trial.Players[player], next))
+                    if (LinkComboPolicy.HasStrongerLink(trial.Players[player], next) ||
+                        LinkComboPolicy.HasAceAtRisk(trial.Players[player], next))
                     {
                         linkTarget = summon.code;
                         targetRank = next;
@@ -752,11 +753,16 @@ namespace YGOPortable.AI
             // Leaving more small bodies is insufficient. The projected line must recover the lost Link rating
             // or gain an actionable advantage against the actual board before committing the material.
             var end = line.ending;
+            var aceCounts = trades.Where(trade => trade.ace).GroupBy(trade => trade.index)
+                .ToDictionary(group => group.Key, group => group.Count());
             foreach (var trade in trades)
             {
                 if (trade.index >= settledMoves) continue;
                 bool payoff = end.rank >= trade.rank || end.opposingCards < trade.before.opposingCards ||
                     end.interaction > trade.before.interaction || (end.lethal && !trade.before.lethal);
+                if (aceCounts.TryGetValue(trade.index, out int spent) && spent > 1 && !end.lethal &&
+                    !trade.before.exposedToBattleLethal && trade.before.opposingCards - end.opposingCards < spent)
+                    payoff = false;
                 if (!line.complete || !payoff || line.score <= trade.score + .08)
                     line.unpaidLinkTrade = Math.Min(line.unpaidLinkTrade, trade.index);
             }
@@ -783,10 +789,13 @@ namespace YGOPortable.AI
         {
             state = 0;
             alternatives = Array.Empty<int>();
-            if (prompt.SelectionHint is DuelTactics.Release or 509 &&
-                duel.SelectionChainLink is { } ritual && ritual.triggerPlayer == prompt.playerId &&
-                DuelAiPolicy.IsMachineAngelRitual(ritual.code) &&
-                duel.Players[prompt.playerId].mzone.Any(DuelAiPolicy.IsEstablishedRitualAce)) return false;
+            if (duel.SelectionChainLink is { } source && source.triggerPlayer == prompt.playerId &&
+                (DuelTactics.IsGxFieldCost(source.code, prompt.SelectionHint) ||
+                 prompt.SelectionHint is DuelTactics.Release or 509 && DuelAiPolicy.IsRitualSpell(source.code) &&
+                    duel.Players[prompt.playerId].mzone.Any(DuelAiPolicy.IsEstablishedRitualAce))) return false;
+            if (prompt.SelectionHint == DuelTactics.Banish && prompt.candidates.Any(card =>
+                card.code == DuelTactics.Accesscode && card.controller == prompt.playerId &&
+                card.location == YgoConstants.LOCATION_MZONE)) return false;
             if (prompt.messageType == YgoConstants.MSG_SELECT_POSITION && response.Length == 4 &&
                 BitConverter.ToInt32(response, 0) == YgoConstants.POS_FACEUP_DEFENSE &&
                 (prompt.allowedPositions & YgoConstants.POS_FACEUP_ATTACK) != 0 &&
